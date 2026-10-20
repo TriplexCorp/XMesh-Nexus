@@ -374,7 +374,7 @@ h3{font-size:1rem;font-weight:700;letter-spacing:-.025em}
 .search,.ib{background:linear-gradient(180deg,color-mix(in srgb,var(--s1) 92%,var(--tx) 8%),var(--s1));border-color:var(--ln)}
 .search{height:2.65rem;border-radius:9px}.search:hover,.search:focus-within,.ib:hover{border-color:color-mix(in srgb,var(--a) 40%,var(--ln))}
 .ib{height:2.65rem;width:2.65rem;border-radius:9px}.pip{border-color:var(--s1)}
-.btn{background:linear-gradient(135deg,var(--btn-start) 0%,var(--btn-end) 72%,color-mix(in srgb,var(--btn-end) 84%,var(--btn-ink)) 100%);color:var(--btn-ink);border:1px solid color-mix(in srgb,var(--b) 48%,transparent);border-radius:9px;box-shadow:0 7px 20px -14px color-mix(in srgb,var(--a) 90%,transparent),inset 0 1px rgba(255,255,255,.42);font-weight:800;letter-spacing:-.015em}
+.btn{background:linear-gradient(135deg,var(--btn-start) 0%,var(--btn-end) 72%,color-mix(in srgb,var(--btn-end) 84%,var(--btn-start)) 100%);color:var(--btn-ink);border:1px solid color-mix(in srgb,var(--b) 48%,transparent);border-radius:9px;box-shadow:0 7px 20px -14px color-mix(in srgb,var(--a) 90%,transparent),inset 0 1px rgba(255,255,255,.42);font-weight:800;letter-spacing:-.015em}
 .btn:hover{box-shadow:0 10px 26px -14px color-mix(in srgb,var(--a) 85%,transparent),inset 0 1px rgba(255,255,255,.5)}
 .gh,.dg{border-radius:9px;border-color:var(--ln);background:linear-gradient(180deg,color-mix(in srgb,var(--s1) 92%,var(--tx) 8%),var(--s1))}
 .gh:hover{background:color-mix(in srgb,var(--a) 7.5%,var(--s2));border-color:color-mix(in srgb,var(--a) 24%,var(--ln))}
