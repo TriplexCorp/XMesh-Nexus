@@ -936,7 +936,7 @@ async function profilesP(){
    if(transportUnsupported&&transportPanel)$$('[data-xray-option-group]',transportPanel).forEach(section=>section.hidden=true);
    const hasTransportSettings=!transportUnsupported&&transportPanel&&$$('[data-xray-option-group]',transportPanel).some(section=>!section.hidden&&$$('.f',section).some(field=>!field.hidden));
    if(transportEmpty)transportEmpty.hidden=!!hasTransportSettings;
-   $('[data-xray-mode]').forEach(b=>{const active=b.dataset.xrayMode===(customMode?'custom':'visual');b.classList.toggle('on',active);b.setAttribute('aria-pressed',active?'true':'false')});
+   $$('[data-xray-mode]').forEach(b=>{const active=b.dataset.xrayMode===(customMode?'custom':'visual');b.classList.toggle('on',active);b.setAttribute('aria-pressed',active?'true':'false')});
    syncConfigTabs();
   };
   let customMode=false,customInitialized=false,customDirty=false,generatedVlessPairs=null;
@@ -1029,7 +1029,7 @@ async function profilesP(){
    const previewView=$('#xpb-preview')?.closest('.xray-code-view');
    if(previewView)previewView.hidden=customMode;
    $('#xpb-preview').hidden=customMode;
-   $('[data-xray-mode]').forEach(b=>{const active=b.dataset.xrayMode===(customMode?'custom':'visual');b.classList.toggle('on',active);b.setAttribute('aria-pressed',active?'true':'false')});
+   $$('[data-xray-mode]').forEach(b=>{const active=b.dataset.xrayMode===(customMode?'custom':'visual');b.classList.toggle('on',active);b.setAttribute('aria-pressed',active?'true':'false')});
    setOutput('server');
    const clientSourceNote=$('#xpb-client-source-note');
    if(clientSourceNote)clientSourceNote.textContent=customMode
