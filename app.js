@@ -741,8 +741,12 @@ async function profilesP(){
    if(network==='masque'&&protocol!=='masque')throw new Error('Транспорт MASQUE доступен только для inbound MASQUE.');
    if(network==='xdrive'&&protocol!=='vless')throw new Error('XDrive в текущем ядре требует VLESS. Выберите VLESS или используйте полный JSON-режим.');
    if(network==='xdrive'&&$('#xpb-flow').value)throw new Error('XDrive несовместим с VLESS flow. Оставьте flow пустым.');
-   if(security==='reality'){const sid=$('#xpb-short-id').value.trim();if(!sid||sid.length>16||sid.length%2||!/^[a-fA-F0-9]+$/.test(sid))throw new Error('Short ID: 2–16 hex-символов, чётная длина.');if(!$('#xpb-sni').value.trim())throw new Error('Для Reality укажите Server name / SNI.');}
    let warning='';
+   if(security==='reality'){
+    const sid=$('#xpb-short-id').value.trim();
+    if(!sid||sid.length>16||sid.length%2||!/^[a-fA-F0-9]+$/.test(sid))warning='Reality: задайте Short ID длиной 2–16 hex-символов чётной длины.';
+    else if(!$('#xpb-sni').value.trim())warning='Reality: укажите Server name / SNI.';
+   }
    if(protocol==='vless'&&security==='none'&&(($('#xpb-vlessenc-mode')?.value||'off')==='off')&&network!=='xdrive')warning='Внимание: у VLESS нет TLS/Reality и VLESS Encryption. Для публичного узла включите один из этих способов защиты.';
    if(protocol==='shadowsocks'&&$('#xpb-ss-method').value==='2022-blake3-chacha20-poly1305'&&$('#xpb-uuid').value.trim())throw new Error('Shadowsocks 2022 ChaCha поддерживает только одного пользователя: очистите UUID или выберите AES-128/AES-256 для нескольких пользователей.');
    if(protocol==='shadowsocks'){const method=$('#xpb-ss-method').value||'chacha20-ietf-poly1305',hasUuid=!!$('#xpb-uuid').value.trim(),hasServerPass=!!$('#xpb-ss-password').value.trim(),hasUserPass=!!$('#xpb-ss-user-password').value.trim();if(method.startsWith('2022-')&&(!hasServerPass||(hasUuid&&!hasUserPass)))warning=hasUuid?'Укажите server key и user key Shadowsocks 2022 (сгенерируйте оба или введите Base64-ключи).':'Укажите серверный Base64-ключ Shadowsocks 2022.';else if(!hasUuid&&!hasServerPass)warning='Для Shadowsocks без отдельного UUID укажите серверный пароль или нажмите «Сгенерировать пароли Shadowsocks».';}
@@ -751,8 +755,10 @@ async function profilesP(){
    if(network==='xdrive'&&pqMode==='off')warning='XDrive требует VLESS Encryption: выберите ML-KEM-768, X25519 или ручную настройку.';
    else if(protocol==='vless'&&(pqMode!=='off'||network==='xdrive')){
     const dec=$('#xpb-vless-decryption').value.trim(),enc=$('#xpb-vless-encryption').value.trim();
-    if(!dec||!enc||dec.startsWith('REPLACE_')||enc.startsWith('REPLACE_'))warning='VLESS Encryption включён, но пара не заполнена. Нажмите «Сгенерировать пару на сервере» или вставьте оба значения вручную.';
+    if(!dec||!enc||dec.startsWith('REPLACE_')||enc.startsWith('REPLACE_'))warning=warning||'VLESS Encryption включён, но пара не заполнена. Нажмите «Сгенерировать пару на сервере» или вставьте оба значения вручную.';
    }
+   if(!$('#xpb-server-address').value.trim())warning=warning||'Client JSON: укажите внешний IP-адрес или домен сервера в поле «Адрес узла».';
+   if(['vless','vmess','trojan'].includes(protocol)&&!$('#xpb-uuid').value.trim())warning=warning||'Не задан ID/credential клиента. Сгенерируйте UUID внизу конструктора.';
    $('#xpb-error').textContent=warning;
    const state=$('#xpb-output-state');if(state)state.textContent=warning?'Проверьте предупреждение':'Предпросмотр готов';
    $('#xpb-preview').value=JSON.stringify(xrayBuilderConfig(),null,2);
@@ -887,7 +893,7 @@ async function profilesP(){
    const tagField=$('#xpb-tag')?.closest('.f');if(tagField)tagField.hidden=customMode;
    $('#xpb-server-output').hidden=customMode;
    $('#xpb-preview').hidden=customMode;
-   $('[data-xray-mode]').forEach(b=>b.classList.toggle('on',b.dataset.xrayMode===(customMode?'custom':'visual')));
+   $$('[data-xray-mode]').forEach(b=>b.classList.toggle('on',b.dataset.xrayMode===(customMode?'custom':'visual')));
    setOutput('server');
    if(customMode)validateCustomJson();
   };
