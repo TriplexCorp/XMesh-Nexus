@@ -81,10 +81,6 @@ pub async fn login(
     .bind(&username_key)
     .fetch_one(&state.pool)
     .await?;
-    if locked {
-        return Err(ApiError::new(StatusCode::TOO_MANY_REQUESTS, "Слишком много попыток. Повторите вход через 15 минут."));
-    }
-
     let row = sqlx::query(
         "SELECT id, username, password_hash, is_active \
          FROM panel_auth_users WHERE LOWER(username) = LOWER($1) LIMIT 1",
@@ -94,6 +90,9 @@ pub async fn login(
     .await?;
 
     let Some(row) = row else {
+        if locked {
+            return Err(ApiError::new(StatusCode::TOO_MANY_REQUESTS, "Слишком много попыток. Повторите вход через 15 минут."));
+        }
         record_failed_login(&state.pool, &username_key).await?;
         return Err(ApiError::new(StatusCode::UNAUTHORIZED, "Неверный логин или пароль."));
     };
@@ -106,6 +105,9 @@ pub async fn login(
         .map_err(|_| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Не удалось проверить пароль."))?;
     let verified = Argon2::default().verify_password(body.password.as_bytes(), &parsed_hash).is_ok();
     if !is_active || !verified {
+        if locked {
+            return Err(ApiError::new(StatusCode::TOO_MANY_REQUESTS, "Слишком много попыток. Повторите вход через 15 минут."));
+        }
         record_failed_login(&state.pool, &username_key).await?;
         return Err(ApiError::new(StatusCode::UNAUTHORIZED, "Неверный логин или пароль."));
     }
