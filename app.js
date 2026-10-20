@@ -150,7 +150,11 @@ async function homeP(){
 /* ================= ПОЛЬЗОВАТЕЛИ ================= */
 const UQ={q:'',st:'all',sq:'',page:1,size:15,sort:'created',dir:'desc',sel:new Set()};let UIDS=[];
 async function usersP(){
-  return [`<div class="card"><div class="bar2" style="margin-bottom:1rem"><div class="fl" id="uf"></div></div><div class="bar2" style="margin-bottom:1rem"><label class="search" style="cursor:text">${ic('search')}<input id="uq" placeholder="Имя, тег, email, Telegram ID, ссылка" value="${esc(UQ.q)}" aria-label="Поиск"></label><select id="usq" style="width:auto" aria-label="Сквад"><option value="">Все сквады</option>${DB.squads.map(s=>`<option value="${s.id}"${UQ.sq==s.id?' selected':''}>${esc(s.name)}</option>`).join('')}</select><span style="margin-right:auto"></span><button class="gh" data-exp>${ic('dl')}Экспорт CSV</button><button class="btn" data-nu>${ic('plus')}Пользователь</button></div><div id="ut"></div></div>`,()=>{drawUsers();let h;$('#uq').oninput=e=>{clearTimeout(h);h=setTimeout(()=>{UQ.q=e.target.value.trim().toLowerCase();UQ.page=1;drawUsers()},200)};$('#usq').onchange=e=>{UQ.sq=e.target.value;UQ.page=1;drawUsers()}}];
+  return [`<div class="card users-panel"><div class="bar2 users-statusbar"><div class="fl" id="uf"></div></div><div class="users-toolbar">
+    <label class="search users-search-field" style="cursor:text">${ic('search')}<input id="uq" placeholder="Имя, тег, email, Telegram ID, ссылка" value="${esc(UQ.q)}" aria-label="Поиск"></label>
+    <select id="usq" aria-label="Сквад"><option value="">Все сквады</option>${DB.squads.map(s=>`<option value="${s.id}"${UQ.sq==s.id?' selected':''}>${esc(s.name)}</option>`).join('')}</select>
+    <div class="users-toolbar-actions"><button class="gh" data-exp>${ic('dl')}Экспорт CSV</button><button class="btn" data-nu>${ic('plus')}Пользователь</button></div>
+  </div><div id="ut"></div></div>`,()=>{drawUsers();let h;$('#uq').oninput=e=>{clearTimeout(h);h=setTimeout(()=>{UQ.q=e.target.value.trim().toLowerCase();UQ.page=1;drawUsers()},200)};$('#usq').onchange=e=>{UQ.sq=e.target.value;UQ.page=1;drawUsers()}}];
 }
 const uf=u=>(UQ.st=='all'||(UQ.st=='ONLINE'?isOn(u):st(u)==UQ.st))&&(!UQ.sq||u.squads.includes(+UQ.sq))&&(!UQ.q||[u.username,u.tag,u.email,u.desc,u.tg,u.short].join(' ').toLowerCase().includes(UQ.q));
 async function drawUsers(){
