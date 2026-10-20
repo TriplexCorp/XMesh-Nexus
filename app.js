@@ -244,7 +244,10 @@ function exportCsv(){const rows=[['username','status','used_gb','limit_gb','expi
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n')],{type:'text/csv'}));a.download='users.csv';a.click();toast(`Экспортировано: ${UIDS.length}`)}
 
 /* ================= XRAY STUDIO: PROTOCOLS, TRANSPORTS & FINGERPRINTS ================= */
-const XRAY_FP=["chrome","firefox","safari","ios","android","edge","360","qq","random","randomized","randomizednoalpn","unsafe","hellofirefox_120","hellofirefox_148","hellochrome_120","hellochrome_131","hellochrome_133","helloios_13","helloios_14","helloedge_106","hellosafari_26_3","hello360_11_0","helloqq_11_1","hellogolang","hellorandomized","hellorandomizedalpn","hellorandomizednoalpn","hellofirefox_auto","hellofirefox_55","hellofirefox_56","hellofirefox_63","hellofirefox_65","hellofirefox_99","hellofirefox_102","hellofirefox_105","hellochrome_auto","hellochrome_58","hellochrome_62","hellochrome_70","hellochrome_72","hellochrome_83","hellochrome_87","hellochrome_96","hellochrome_100","hellochrome_102","hellochrome_106_shuffle","helloios_auto","helloios_11_1","helloios_12_1","helloandroid_11_okhttp","helloedge_85","helloedge_auto","hellosafari_16_0","hellosafari_auto","hello360_auto","hello360_7_5","helloqq_auto","hellochrome_100_psk","hellochrome_112_psk_shuf","hellochrome_114_padding_psk_shuf","hellochrome_115_pq","hellochrome_115_pq_psk","hellochrome_120_pq"];
+const XRAY_FP_RECOMMENDED=["chrome","firefox","safari","ios","android","edge","360","qq","random","randomized","randomizednoalpn","unsafe"];
+const XRAY_FP_MODERN=["hellofirefox_120","hellofirefox_148","hellochrome_120","hellochrome_131","hellochrome_133","helloios_13","helloios_14","helloedge_106","hellosafari_26_3","hello360_11_0","helloqq_11_1"];
+const XRAY_FP_OTHER=["hellogolang","hellorandomized","hellorandomizedalpn","hellorandomizednoalpn","hellofirefox_auto","hellofirefox_55","hellofirefox_56","hellofirefox_63","hellofirefox_65","hellofirefox_99","hellofirefox_102","hellofirefox_105","hellochrome_auto","hellochrome_58","hellochrome_62","hellochrome_70","hellochrome_72","hellochrome_83","hellochrome_87","hellochrome_96","hellochrome_100","hellochrome_102","hellochrome_106_shuffle","helloios_auto","helloios_11_1","helloios_12_1","helloandroid_11_okhttp","helloedge_85","helloedge_auto","hellosafari_16_0","hellosafari_auto","hello360_auto","hello360_7_5","helloqq_auto","hellochrome_100_psk","hellochrome_112_psk_shuf","hellochrome_114_padding_psk_shuf","hellochrome_115_pq","hellochrome_115_pq_psk","hellochrome_120_pq"];
+const XRAY_FP=[...XRAY_FP_RECOMMENDED,...XRAY_FP_MODERN,...XRAY_FP_OTHER];
 const XRAY_PROTOCOLS=[['vless','VLESS'],['vmess','VMess'],['trojan','Trojan'],['shadowsocks','Shadowsocks'],['socks','SOCKS'],['mixed','Mixed (SOCKS + HTTP)'],['http','HTTP proxy'],['dokodemo-door','Dokodemo-door'],['tunnel','Tunnel (alias)'],['wireguard','WireGuard'],['hysteria','Hysteria 2'],['tun','TUN interface'],['masque','MASQUE']];
 const XRAY_NETWORKS=[['raw','RAW / TCP'],['xhttp','XHTTP'],['websocket','WebSocket'],['grpc','gRPC'],['httpupgrade','HTTPUpgrade'],['mkcp','mKCP'],['hysteria','Hysteria transport'],['masque','MASQUE transport']];
 function xrayBuilderConfig(){
@@ -491,7 +494,7 @@ async function profilesP(){
  group('Протокол и клиент','Flow, fingerprint, cipher и специальные параметры',
  '<div class="xray-main-grid">'+
  field('uuid','UUID клиента',inp('uuid','','Нажмите «Сгенерировать UUID»','autocomplete="off"'))+
- field('fingerprint','uTLS fingerprint · клиент',sel('fingerprint',XRAY_FP.map(x=>[x,x])))+
+ field('fingerprint','uTLS fingerprint · клиент','<select id="xpb-fingerprint"><optgroup label="Рекомендуемые">'+options(XRAY_FP_RECOMMENDED.map(x=>[x,x]))+'</optgroup><optgroup label="Современные профили">'+options(XRAY_FP_MODERN.map(x=>[x,x]))+'</optgroup><optgroup label="Дополнительные и legacy">'+options(XRAY_FP_OTHER.map(x=>[x,x]))+'</optgroup></select>')+
  field('flow','VLESS flow',sel('flow',[['','Без flow'],['xtls-rprx-vision','xtls-rprx-vision']]))+
  field('vmess-security','VMess cipher',sel('vmess-security',[['auto','auto'],['aes-128-gcm','aes-128-gcm'],['chacha20-poly1305','chacha20-poly1305'],['none','none']]))+
  field('ss-method','Shadowsocks method',sel('ss-method',[['chacha20-ietf-poly1305','chacha20-ietf-poly1305'],['2022-blake3-aes-128-gcm','2022-blake3-aes-128-gcm'],['2022-blake3-aes-256-gcm','2022-blake3-aes-256-gcm'],['2022-blake3-chacha20-poly1305','2022-blake3-chacha20-poly1305'],['aes-128-gcm','aes-128-gcm'],['aes-256-gcm','aes-256-gcm'],['none','none']]))+
@@ -682,7 +685,12 @@ async function profilesP(){
      if(inbound?.protocol==='shadowsocks'){
       const ss=inbound.settings||{};
       if(!ss.password||String(ss.password).startsWith('REPLACE_')||String(ss.password).startsWith('CHANGE_ME_'))throw new Error('Shadowsocks: задайте серверный пароль.');
-      if(String(ss.method||'').startsWith('2022-')&&Array.isArray(ss.users)&&ss.users.some(u=>!u.password||String(u.password).startsWith('REPLACE_')))throw new Error('Shadowsocks 2022: задайте корректные Base64-ключи server и user.');
+      if(String(ss.method||'').startsWith('2022-')){
+       const expected=ss.method==='2022-blake3-aes-128-gcm'?16:32;
+       const keyBytes=value=>{try{return atob(String(value).replace(/-/g,'+').replace(/_/g,'/').replace(/\s/g,'' )).length}catch{return -1}};
+       if(keyBytes(ss.password)!==expected)throw new Error('Shadowsocks 2022: серверный ключ должен быть Base64-кодированным ключом на '+expected+' байт.');
+       if(!Array.isArray(ss.users)||!ss.users.length||ss.users.some(u=>keyBytes(u.password)!==expected))throw new Error('Shadowsocks 2022: каждый пользователь должен иметь Base64-ключ на '+expected+' байт.'); 
+      }
      }
      if(inbound?.protocol==='wireguard'&&(!inbound.settings?.secretKey||String(inbound.settings.secretKey).startsWith('REPLACE_')))throw new Error('WireGuard: задайте server private key (xray wg).');
     }
