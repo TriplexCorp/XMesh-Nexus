@@ -1069,10 +1069,45 @@ async function profilesP(){
  field('host','HTTP Host / authority',inp('host','','Необязательно'))+
  field('path','Путь / имя gRPC-сервиса',inp('path','/','/path или имя gRPC service'))+
  field('xhttp-mode','Режим XHTTP',sel('xhttp-mode',[['auto','auto'],['packet-up','packet-up'],['stream-up','stream-up'],['stream-one','stream-one']]))+
- field('xhttp-padding','XHTTP padding',inp('xhttp-padding','100-1000','Например, 100-1000'))+
  field('grpc-mode','Режим gRPC',sel('grpc-mode',[['gun','gun'],['multi','multi']]))+
  field('kcp-seed','mKCP seed',inp('kcp-seed','','Необязательно'))+
  field('raw-header','RAW header',sel('raw-header',[['none','Без заголовка'],['http','HTTP camouflage']])))+
+ optionGroup('transport-xhttp','XHTTP · расширенные параметры','Общие настройки, клиентский uplink, сервер и соединения xmux',
+ '<div class="xray-xhttp-note">Пустые поля используют значения по умолчанию Xray-core. Серверные параметры попадут только в Server JSON, клиентские — только в Client JSON.</div>'+
+ field('xhttp-padding','Padding · bytes',inp('xhttp-padding','100-1000','100-1000'),'Диапазон случайного HTTP padding')+
+ field('xhttp-padding-obfs','Padding obfuscation',sel('xhttp-padding-obfs',[['','Автоматически'],['true','Включено'],['false','Выключено']]))+
+ field('xhttp-padding-placement','Расположение padding',inp('xhttp-padding-placement','','query / header'))+
+ field('xhttp-padding-key','Ключ padding',inp('xhttp-padding-key','','x_padding'))+
+ field('xhttp-padding-header','Заголовок padding',inp('xhttp-padding-header','','X-Padding'))+
+ field('xhttp-padding-method','Метод padding',inp('xhttp-padding-method','','По умолчанию'))+
+ '<div class="xray-xhttp-subtitle">Клиент · HTTP uplink</div>'+
+ field('xhttp-uplink-method','HTTP method',sel('xhttp-uplink-method',[['','Авто'],['POST','POST'],['GET','GET'],['PUT','PUT']]))+
+ field('xhttp-no-grpc','Без gRPC header',sel('xhttp-no-grpc',[['','Авто'],['true','Да'],['false','Нет']]))+
+ field('xhttp-post-bytes','Максимум bytes / POST',inp('xhttp-post-bytes','','131072-524288'),'Только packet-up · клиент')+
+ field('xhttp-post-interval','Интервал POST · мс',inp('xhttp-post-interval','','10-50'),'Только packet-up · клиент')+
+ field('xhttp-session-placement','Session ID placement',inp('xhttp-session-placement','','query / header'))+
+ field('xhttp-session-key','Session ID key',inp('xhttp-session-key','','По умолчанию'))+
+ field('xhttp-seq-placement','Sequence placement',inp('xhttp-seq-placement','','query / header'))+
+ field('xhttp-seq-key','Sequence key',inp('xhttp-seq-key','','По умолчанию'))+
+ field('xhttp-data-placement','Uplink data placement',inp('xhttp-data-placement','','По умолчанию'))+
+ field('xhttp-data-key','Uplink data key',inp('xhttp-data-key','','По умолчанию'))+
+ field('xhttp-chunk-size','Uplink chunk · bytes',inp('xhttp-chunk-size','','65536-262144'))+
+ field('xhttp-session-length','Session ID length',inp('xhttp-session-length','','16-32'))+
+ field('xhttp-session-table','Session ID table',inp('xhttp-session-table','','По умолчанию'))+
+ field('xhttp-headers','Дополнительные HTTP headers','<textarea id="xpb-xhttp-headers" rows="3" spellcheck="false" placeholder=\'{ "User-Agent": "Mozilla/5.0" }\'></textarea>','JSON-объект строковых HTTP-заголовков')+
+ '<div class="xray-xhttp-subtitle">Клиент · xmux</div>'+
+ field('xhttp-mux-concurrency','maxConcurrency',inp('xhttp-mux-concurrency','','4-8'),'Не задавайте вместе с maxConnections')+
+ field('xhttp-mux-connections','maxConnections',inp('xhttp-mux-connections','','3-6'),'Не задавайте вместе с maxConcurrency')+
+ field('xhttp-mux-reuse','cMaxReuseTimes',inp('xhttp-mux-reuse','','64-128'))+
+ field('xhttp-mux-requests','hMaxRequestTimes',inp('xhttp-mux-requests','','600-900'))+
+ field('xhttp-mux-seconds','hMaxReusableSecs',inp('xhttp-mux-seconds','','1800-3000'))+
+ field('xhttp-mux-keepalive','hKeepAlivePeriod',inp('xhttp-mux-keepalive','','0'))+
+ '<div class="xray-xhttp-subtitle">Сервер · ограничения приёма</div>'+
+ field('xhttp-no-sse','Без SSE header',sel('xhttp-no-sse',[['','Авто'],['true','Да'],['false','Нет']]))+
+ field('xhttp-buffered-posts','Буферизованных POST',inp('xhttp-buffered-posts','','30'),'Только сервер · packet-up')+
+ field('xhttp-stream-secs','Время stream-up · с',inp('xhttp-stream-secs','','20-80'),'Только сервер · stream-up')+
+ field('xhttp-server-headers','Максимум header bytes',inp('xhttp-server-headers','','16384'),'Только сервер')
+ )+
  optionGroup('transport-hysteria','Hysteria 2','Учётные данные, тайм-аут и masquerade',
  field('hy-auth','Аутентификация Hysteria',inp('hy-auth','','Обычно UUID пользователя','autocomplete="off"'))+
  field('hy-idle','UDP idle timeout',inp('hy-idle','60','Секунды','type="number" min="2" max="600"'))+
