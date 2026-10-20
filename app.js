@@ -39,7 +39,7 @@ function decorateButtons(root=document){
  nodes.forEach(button=>{
   if(button.querySelector('.ic')||button.classList.contains('palette-swatch')||button.classList.contains('sw'))return;
   const text=button.getAttribute('aria-label')||button.title||button.textContent||'';
-  const key=buttonIconFor(text);
+  const key=buttonIconFor(text)||(button.matches('.btn,.gh,.dg,.pi,.ia')?'activity':null);
   if(!key)return;
   button.insertAdjacentHTML('afterbegin',ic(key));
   button.classList.add('has-auto-icon');
