@@ -2107,7 +2107,8 @@ white-space:nowrap;
   .top #pal kbd{display:none}
 
   /* Touch forms: minimum 16px prevents involuntary iOS Safari zoom. */
-  :where(input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=range]),select,textarea){
+  input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=range]),
+  select,textarea{
     font-size:max(16px,1rem);
   }
   .f>span,.setting-copy>b{font-size:max(13px,.86rem);line-height:1.35}
@@ -2129,16 +2130,19 @@ white-space:nowrap;
   }
 
   /* Action grids and mobile overlays must contain long translated labels. */
-  .nc .acts{grid-template-columns:repeat(3,minmax(0,1fr));gap:.35rem}
+  .nc .acts{grid-template-columns:repeat(2,minmax(0,1fr));gap:.4rem}
   .nc .acts .gh{
     min-width:0;
     width:100%;
-    gap:.26rem;
-    padding:0 .3rem;
-    font-size:max(11px,.72rem);
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
+    height:auto;
+    min-height:2.72rem;
+    gap:.32rem;
+    padding:.4rem .42rem;
+    font-size:max(12px,.8rem);
+    line-height:1.25;
+    text-align:center;
+    white-space:normal;
+    overflow-wrap:anywhere;
   }
   .nc .acts .gh>.ic{
     display:block;
