@@ -760,7 +760,7 @@ async function profilesP(){
  '<div class="xray-code-view"><pre id="xpb-preview-syntax" class="xray-code-syntax" aria-hidden="true"></pre><textarea id="xpb-preview" class="xray-preview xray-code-input" spellcheck="false" readonly aria-label="Server JSON"></textarea></div>'+
  '<div id="xpb-custom-mode" class="xray-custom-mode" hidden>'+
  '<div class="xray-output-head"><div><b>Полный Server JSON · ручной режим</b><small>Расширенные поля Xray: DNS, policy, API, routing и любые параметры актуального ядра.</small></div><div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-custom-copy">Копировать</button><button type="button" class="gh sm" id="xpb-custom-download">Скачать</button><button type="button" class="gh sm" id="xpb-format-json">Форматировать</button><button type="button" class="gh sm" id="xpb-reset-json">Заново из конструктора</button></div></div>'+
- '<textarea id="xpb-custom-json" class="xray-preview" spellcheck="false" aria-label="Ручной Server JSON"></textarea>'+
+ '<div class="xray-code-view xray-custom-code-view"><pre id="xpb-custom-syntax" class="xray-code-syntax" aria-hidden="true"></pre><textarea id="xpb-custom-json" class="xray-preview xray-code-input" spellcheck="false" aria-label="Ручной Server JSON" autocapitalize="off" autocomplete="off" autocorrect="off"></textarea></div>'+
  '<p class="mu" id="xpb-custom-error" role="status">Синтаксис JSON и обязательные поля проверяются перед сохранением.</p></div>'+
  '</div>'+
  '<div class="xray-output-pane" id="xpb-output-client" role="tabpanel" aria-labelledby="xpb-tab-client" hidden>'+
@@ -1005,16 +1005,43 @@ async function profilesP(){
   };
   $$('[data-xray-config-tab]').forEach(button=>button.addEventListener('click',()=>setConfigTab(button.dataset.xrayConfigTab)));
   setConfigTab('basic');
+  const renderCustomSyntax=()=>{
+   const pre=$('#xpb-custom-syntax');if(!pre)return;
+   const source=customArea.value;
+   const token=/(\\s+)|("(?:\\\\.|[^"\\\\])*"(?=\\s*:))|("(?:\\\\.|[^"\\\\])*")|(-?\\b\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?\\b)|(\\btrue\\b|\\bfalse\\b)|(\\bnull\\b)|([{}\\[\\],:])/g;
+   let out='',last=0,m;
+   while((m=token.exec(source))!==null){
+    out+=esc(source.slice(last,m.index));
+    const value=m[0];let cls='';
+    if(m[2])cls='jx-key';else if(m[3])cls='jx-string';else if(m[4])cls='jx-number';else if(m[5])cls='jx-boolean';else if(m[6])cls='jx-null';else if(m[7])cls='jx-punct';
+    out+=cls?'<span class="'+cls+'">'+esc(value)+'</span>':esc(value);
+    last=token.lastIndex;
+   }
+   out+=esc(source.slice(last));
+   pre.innerHTML=out+'\\n';
+   pre.scrollTop=customArea.scrollTop;pre.scrollLeft=customArea.scrollLeft;
+  };
   const validateCustomJson=()=>{
+   renderCustomSyntax();
    const status=$('#xpb-custom-error');
    try{
     const obj=JSON.parse(customArea.value);
     if(!obj||typeof obj!=='object'||Array.isArray(obj))throw new Error('Корень JSON должен быть объектом Xray.');
     if(!Array.isArray(obj.inbounds)||!obj.inbounds.length)throw new Error('Добавьте хотя бы один inbound.');
     status.classList.remove('er');status.classList.add('mu');
-    status.textContent='JSON синтаксически корректен; перед сохранением будут проверены теги, Reality, Shadowsocks 2022 и специальные транспорты.';
+    status.textContent='✓ JSON корректен. Перед сохранением дополнительно проверяются теги, Reality, Shadowsocks 2022 и специальные транспорты.';
+    status.setAttribute('aria-live','polite');
+    customArea.removeAttribute('aria-invalid');
     return obj;
-   }catch(e){status.classList.add('er');status.classList.remove('mu');status.textContent='Ошибка JSON: '+e.message;return null}
+   }catch(e){
+    status.classList.add('er');status.classList.remove('mu');
+    const match=String(e.message).match(/(?:position|at position)\\s+(\\d+)/i);
+    let detail=e.message;
+    if(match){const pos=Number(match[1]),before=customArea.value.slice(0,pos),line=before.split('\\n').length,col=pos-(before.lastIndexOf('\\n')+1)+1;detail+=' · строка '+line+', столбец '+col}
+    status.textContent='✕ Ошибка JSON: '+detail;
+    customArea.setAttribute('aria-invalid','true');
+    return null
+   }
   };
   const setMode=mode=>{
    if(mode==='visual'&&customMode&&customDirty){
@@ -1040,6 +1067,8 @@ async function profilesP(){
   };
   $$('[data-xray-mode]').forEach(btn=>btn.addEventListener('click',()=>setMode(btn.dataset.xrayMode)));
   customArea.addEventListener('input',()=>{customDirty=true;validateCustomJson()});
+  customArea.addEventListener('scroll',()=>{const pre=$('#xpb-custom-syntax');if(pre){pre.scrollTop=customArea.scrollTop;pre.scrollLeft=customArea.scrollLeft}});
+  customArea.addEventListener('keydown',event=>{if(event.key==='Tab'){event.preventDefault();const start=customArea.selectionStart,end=customArea.selectionEnd;customArea.setRangeText('  ',start,end,'end');customDirty=true;validateCustomJson()}});
   $('#xpb-custom-copy').onclick=()=>copyText('xpb-custom-json');
   $('#xpb-custom-download').onclick=()=>download('xpb-custom-json','server');
   $('#xpb-format-json').onclick=()=>{const obj=validateCustomJson();if(obj){customArea.value=JSON.stringify(obj,null,2);customDirty=true;validateCustomJson();toast('JSON отформатирован')}};
