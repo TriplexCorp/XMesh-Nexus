@@ -225,7 +225,7 @@ function userDrawer(id,tab){
   const [sl,sc]=STM[st(u)],k=u.limit?u.used/u.limit:0,h=hs(u.username)%360;
   const tabs=[['ov','Обзор'],['acc','Доступ'],['sub','Подписка'],['dev','Устройства '+u.devices.length+'/'+u.hwid]];
   const body={
-    ov:`<div class="bar2"><span class="mu">Использовано</span><b style="margin-left:auto">${gb(u.used)} / ${u.limit?u.limit+' ГБ':'∞'}</b></div>${u.limit?`<div class="pb f${k>=1?' er':k>.85?' wr':''}" style="--w:${Math.min(100,k*100)}%"><i></i></div>`:''}<div class="history-placeholder">История расхода за период будет отображаться после подключения сбора статистики. Текущие значения не заменяются расчётной симуляцией.</div>
+    ov:`<div class="bar2"><span class="mu">Использовано</span><b style="margin-left:auto">${gb(u.used)} / ${u.limit?u.limit+' ГБ':'∞'}</b></div><div class="xray-user-credential"><div><span class="mu">Xray credential ID</span><code>${esc(u.xrayId||'Не назначен')}</code><small class="mu">Создаётся автоматически. Для фактического подключения требуется привязка профиля и применение конфигурации к ядру.</small></div>${u.xrayId?`<button type="button" class="gh sm" data-copy-xray-id="${u.id}">Копировать ID</button>`:''}</div>${u.limit?`<div class="pb f${k>=1?' er':k>.85?' wr':''}" style="--w:${Math.min(100,k*100)}%"><i></i></div>`:''}<div class="history-placeholder">История расхода за период будет отображаться после подключения сбора статистики. Текущие значения не заменяются расчётной симуляцией.</div>
     <form data-k="uedit" data-id="${u.id}" method="dialog" class="sg" style="gap:.9rem"><div class="r2" style="display:grid;border:0;padding:0">${FE.slice(0,4).map(f=>field(f,f.k=='expireAt'?u.expireAt:u[f.k])).join('')}</div><div class="r2" style="display:grid;border:0;padding:0">${FE.slice(4).map(f=>field(f,u[f.k])).join('')}</div><p class="er" id="fe" style="border:0;padding:0"></p><div style="border:0;padding:0"><button class="btn" style="width:100%">Сохранить</button></div></form>
     <div class="mu">Создан ${new Date(u.created).toLocaleDateString('ru-RU')} · Админ: ${esc(DB.admins.find(a=>a.id==u.adminId)?.username||'—')}</div>`,
     acc:`<p class="note">Отметьте сквады: доступ меняется сразу.</p><div class="ms">${DB.squads.map(s=>`<label class="ck"><input type="checkbox" data-usq="${u.id}:${s.id}" ${u.squads.includes(s.id)?'checked':''}><span>${esc(s.name)}</span></label>`).join('')}</div><div><span class="mu">Итоговые инбаунды</span><div style="margin-top:.5rem">${uin(u).map(t=>chip(esc(t),tcol(t))).join(' ')||'<span class="mu">Нет доступа</span>'}</div></div><div><span class="mu">Хосты в подписке</span><div style="margin-top:.5rem">${DB.hosts.filter(x=>!x.disabled&&uin(u).includes(x.tag)).map(x=>`<div class="rowi">${esc(x.remark)}<small class="mu" style="margin-left:auto">${esc(x.address)}:${x.port}</small></div>`).join('')||'<span class="mu">Нет подходящих хостов</span>'}</div></div><label class="f"><span>Лимит устройств</span><input type="number" min="0" value="${u.hwid}" data-hw="${u.id}"></label>`,
@@ -248,16 +248,21 @@ const XRAY_FP=['chrome','firefox','safari','ios','android','edge','360','qq','ra
 const XRAY_PROTOCOLS=[['vless','VLESS'],['vmess','VMess'],['trojan','Trojan'],['shadowsocks','Shadowsocks'],['socks','SOCKS'],['http','HTTP proxy'],['dokodemo-door','Dokodemo-door'],['wireguard','WireGuard']];
 const XRAY_NETWORKS=[['raw','RAW / TCP'],['xhttp','XHTTP'],['ws','WebSocket'],['grpc','gRPC'],['httpupgrade','HTTPUpgrade'],['kcp','mKCP']];
 function xrayBuilderConfig(){
- const v=id=>$('#xpb-'+id)?.value||'',protocol=v('protocol'),network=v('network'),security=v('security'),tag=v('tag').trim()||'inbound-1',port=cl(+v('port')||443,1,65535),sni=v('sni').trim(),dest=v('dest').trim()||(sni?sni+':443':'example.com:443'),path=v('path').trim()||'/';
+ const v=id=>$('#xpb-'+id)?.value||'',protocol=v('protocol'),network=v('network'),security=v('security'),tag=v('tag').trim()||'inbound-1',port=cl(+v('port')||443,1,65535),sni=v('sni').trim(),dest=v('dest').trim()||(sni?sni+':443':'example.com:443'),path=v('path').trim()||'/',uuid=v('uuid')||'';
+ const flow=protocol==='vless'&&security==='reality'&&network==='raw'?v('flow'):'';
+ const clientName=(v('name').trim()||'XMesh client').replace(/[<>"]/g,'').slice(0,64);
  const settings={
-  vless:{clients:[],decryption:'none'},vmess:{clients:[],default:{alterId:0}},
-  trojan:{clients:[]},shadowsocks:{clients:[],network:'tcp,udp',method:v('ss-method')||'chacha20-ietf-poly1305',password:'REPLACE_WITH_STRONG_PASSWORD'},
-  socks:{auth:v('socks-auth')||'noauth',accounts:[],udp:true,ip:'127.0.0.1'},http:{accounts:[],allowTransparent:false},
+  vless:{clients:uuid?[{id:uuid,level:0,email:clientName,...(flow?{flow}:{})}]:[],decryption:'none'},
+  vmess:{clients:uuid?[{id:uuid,level:0,email:clientName,alterId:0}]:[],default:{alterId:0}},
+  trojan:{clients:uuid?[{password:uuid,email:clientName}]:[]},
+  shadowsocks:{clients:uuid?[{password:uuid,email:clientName}]:[],network:'tcp,udp',method:v('ss-method')||'chacha20-ietf-poly1305'},
+  socks:{auth:v('socks-auth')||'noauth',accounts:uuid?[{user:clientName,password:uuid}]:[],udp:true,ip:'127.0.0.1'},
+  http:{accounts:uuid?[{user:clientName,pass:uuid}]:[],allowTransparent:false},
   'dokodemo-door':{address:v('doko-address')||'127.0.0.1',port:cl(+v('doko-port')||53,1,65535),network:v('doko-network')||'tcp,udp',followRedirect:false},
   wireguard:{secretKey:'REPLACE_WITH_WIREGUARD_PRIVATE_KEY',address:['10.0.0.1/32'],peers:[],mtu:1420}
  }[protocol];
  const inbound={tag,listen:v('listen')||'0.0.0.0',port,protocol,settings};
- if(['raw','xhttp','ws','grpc','httpupgrade','kcp'].includes(network)){
+ if(['raw','xhttp','ws','grpc','httpupgrade','kcp'].includes(network)&&!['dokodemo-door','wireguard'].includes(protocol)){
   inbound.streamSettings={network,security};
   const ss=inbound.streamSettings;
   if(network==='ws')ss.wsSettings={path,headers:v('host')?{Host:v('host')}:{},heartbeatPeriod:0};
@@ -267,18 +272,18 @@ function xrayBuilderConfig(){
   if(network==='kcp')ss.kcpSettings={mtu:1350,tti:20,uplinkCapacity:5,downlinkCapacity:20,congestion:false,readBufferSize:2,writeBufferSize:2,seed:v('kcp-seed')||''};
   if(network==='raw'&&v('raw-header')==='http')ss.rawSettings={header:{type:'http',request:{version:'1.1',method:'GET',path:[path],headers:{Host:[v('host')||sni||'example.com'],'User-Agent':['Mozilla/5.0'],'Accept-Encoding':['gzip, deflate'],'Connection':['keep-alive']}}}};
   if(security==='tls')ss.tlsSettings={serverName:sni||undefined,alpn:v('alpn').split(',').map(x=>x.trim()).filter(Boolean),minVersion:v('tls-min')||'1.2',maxVersion:v('tls-max')||'1.3',certificates:[{certificateFile:v('cert')||'/etc/ssl/xray/fullchain.pem',keyFile:v('key')||'/etc/ssl/xray/privkey.pem'}]};
-  if(security==='reality')ss.realitySettings={show:false,dest,xver:cl(+v('xver')||0,0,2),serverNames:sni?[sni]:[],privateKey:v('private-key')||'REPLACE_WITH_XRAY_PRIVATE_KEY',shortIds:[(v('short-id')||'').replace(/[^a-fA-F0-9]/g,'').slice(0,16)],spiderX:v('spider-x')||'/'};
+  if(security==='reality')ss.realitySettings={show:false,target:dest,xver:cl(+v('xver')||0,0,2),serverNames:sni?[sni]:[],privateKey:v('private-key')||'REPLACE_WITH_XRAY_PRIVATE_KEY',shortIds:[(v('short-id')||'').replace(/[^a-fA-F0-9]/g,'').slice(0,16)]};
  }
  return {log:{loglevel:v('loglevel')||'warning'},inbounds:[inbound],outbounds:[{protocol:'freedom',tag:'direct'},{protocol:'blackhole',tag:'blocked'}],routing:{rules:[{type:'field',outboundTag:'direct',inboundTag:[tag]}]}};
 }
 function xrayClientSample(){
- const v=id=>$('#xpb-'+id)?.value||'',protocol=v('protocol'),network=v('network'),security=v('security'),sni=v('sni').trim()||'example.com',port=cl(+v('port')||443,1,65535),path=v('path')||'/',host=v('host')||sni,uuid=v('uuid')||'REPLACE_WITH_USER_UUID';
+ const v=id=>$('#xpb-'+id)?.value||'',protocol=v('protocol'),network=v('network'),security=v('security'),sni=v('sni').trim()||'example.com',port=cl(+v('port')||443,1,65535),path=v('path')||'/',host=v('host')||sni,uuid=v('uuid'),flow=protocol==='vless'&&security==='reality'&&network==='raw'?v('flow'):'';
  let settings;
- if(protocol==='vless')settings={vnext:[{address:'SERVER_ADDRESS',port,users:[{id:uuid,encryption:'none',...(v('flow')?{flow:v('flow')}:{})}]}]};
+ if(protocol==='vless')settings={vnext:[{address:'SERVER_ADDRESS',port,users:[{id:uuid,encryption:'none',...(flow?{flow}:{})}]}]};
  else if(protocol==='vmess')settings={vnext:[{address:'SERVER_ADDRESS',port,users:[{id:uuid,alterId:0,security:v('vmess-security')||'auto'}]}]};
- else if(protocol==='trojan')settings={servers:[{address:'SERVER_ADDRESS',port,password:'REPLACE_WITH_USER_PASSWORD'}]};
- else if(protocol==='shadowsocks')settings={servers:[{address:'SERVER_ADDRESS',port,method:v('ss-method')||'chacha20-ietf-poly1305',password:'REPLACE_WITH_STRONG_PASSWORD'}]};
- else if(protocol==='socks'||protocol==='http')settings={servers:[{address:'SERVER_ADDRESS',port,users:[]}]};
+ else if(protocol==='trojan')settings={servers:[{address:'SERVER_ADDRESS',port,password:uuid}]};
+ else if(protocol==='shadowsocks')settings={servers:[{address:'SERVER_ADDRESS',port,method:v('ss-method')||'chacha20-ietf-poly1305',password:uuid}]};
+ else if(protocol==='socks'||protocol==='http')settings={servers:[{address:'SERVER_ADDRESS',port,users:[{user:($('#xpb-name')?.value||'client').trim(),pass:uuid}]}]};
  else settings={servers:[{address:'SERVER_ADDRESS',port}]};
  const streamSettings={network,security};
  if(network==='ws')streamSettings.wsSettings={path,headers:host?{Host:host}:{}};
@@ -369,12 +374,13 @@ async function profilesP(){
  '<textarea id="xpb-client-preview" class="xray-preview" spellcheck="false" readonly aria-label="Предпросмотр клиентского JSON"></textarea>'+
  '<div class="xray-footer"><p class="er" id="xpb-error" role="status"></p><button type="button" class="btn" id="xpb-save">Сохранить профиль</button></div></section>';
  return [builderHtml+saved,()=>{
-  const updatePreview=()=>{try{$('#xpb-preview').value=JSON.stringify(xrayBuilderConfig(),null,2);$('#xpb-client-preview').value=JSON.stringify(xrayClientSample(),null,2);$('#xpb-error').textContent=''}catch(e){$('#xpb-error').textContent=e.message}};
+  const updatePreview=()=>{try{const protocol=$('#xpb-protocol').value,network=$('#xpb-network').value,security=$('#xpb-security').value;const compatible=security!=='reality'||['raw','xhttp','grpc'].includes(network);if(!compatible)throw new Error('Reality совместим только с RAW, XHTTP и gRPC. Выберите другой транспорт или TLS.');if(['dokodemo-door','wireguard'].includes(protocol)&&security!=='none')throw new Error('Для этого протокола в этом конструкторе транспортная защита не настраивается.');if(protocol==='vless'&&security==='none')$('#xpb-error').textContent='Внимание: VLESS без TLS/Reality допустим только в доверенной сети либо с VLESS Encryption.';else $('#xpb-error').textContent='';$('#xpb-preview').value=JSON.stringify(xrayBuilderConfig(),null,2);$('#xpb-client-preview').value=JSON.stringify(xrayClientSample(),null,2)}catch(e){$('#xpb-preview').value='';$('#xpb-client-preview').value='';$('#xpb-error').textContent=e.message}};
   const updateVisibility=()=>{
    const sec=$('#xpb-security').value,net=$('#xpb-network').value,proto=$('#xpb-protocol').value;
    const setGroup=(selector,show)=>{const d=$(selector);if(d)d.hidden=!show};
-   setGroup('.xray-section:has(#xpb-private-key)',sec==='reality');
-   setGroup('.xray-section:has(#xpb-cert)',sec==='tls');
+   setGroup('.xray-section:has(#xpb-private-key)',sec==='reality'&&!['dokodemo-door','wireguard'].includes(proto));
+   setGroup('.xray-section:has(#xpb-cert)',sec==='tls'&&!['dokodemo-door','wireguard'].includes(proto));
+   const securitySelect=$('#xpb-security');if(securitySelect){const realityOption=securitySelect.querySelector('option[value="reality"]');if(realityOption)realityOption.disabled=!['raw','xhttp','grpc'].includes(net)||['dokodemo-door','wireguard'].includes(proto);const tlsOption=securitySelect.querySelector('option[value="tls"]');if(tlsOption)tlsOption.disabled=['dokodemo-door','wireguard'].includes(proto);if(realityOption?.disabled&&sec==='reality')securitySelect.value='tls';if(tlsOption?.disabled&&securitySelect.value==='tls')securitySelect.value='none';}
    $$('[data-xray-preset]').forEach(b=>b.classList.toggle('on',b.dataset.xrayPreset===(sec==='reality'&&proto==='vless'&&net==='raw'?'reality':sec==='tls'&&proto==='vless'?'tls':net==='xhttp'&&proto==='vless'?'xhttp':'custom')));
    const transport=$('.xray-section:has(#xpb-host)');
    if(transport){transport.querySelectorAll('[id^="xpb-"]').forEach(el=>{const f=el.id.replace('xpb-',''),wrap=el.closest('.f');if(!wrap)return;let show=true;if(f==='xhttp-mode'||f==='xhttp-padding')show=net==='xhttp';if(f==='grpc-mode')show=net==='grpc';if(f==='kcp-seed')show=net==='kcp';if(f==='raw-header')show=net==='raw';if(f==='host')show=['ws','xhttp','httpupgrade'].includes(net);if(f==='path')show=['raw','xhttp','ws','grpc','httpupgrade'].includes(net);wrap.hidden=!show})}
@@ -392,6 +398,7 @@ async function profilesP(){
   $('#xpb-copy').onclick=()=>copyText('xpb-preview');$('#xpb-client-copy').onclick=()=>copyText('xpb-client-preview');$('#xpb-download').onclick=()=>download('xpb-preview','server');$('#xpb-client-download').onclick=()=>download('xpb-client-preview','client');
   $('#xpb-save').onclick=async()=>{const name=$('#xpb-name').value.trim();if(!name){$('#xpb-error').textContent='Укажите название профиля.';return}try{const config=$('#xpb-preview').value,data=JSON.parse(config),tags=data.inbounds.map(i=>i.tag);if(!data.inbounds.length||tags.some(t=>!t))throw new Error('У inbound должен быть тег.');if(new Set(tags).size!==tags.length)throw new Error('Теги inbound должны быть уникальными.');if(DB.profiles.some(p=>p.name.toLowerCase()===name.toLowerCase()))throw new Error('Профиль с таким названием уже существует.');const used=DB.profiles.flatMap(inbs).map(i=>i.tag);if(tags.some(t=>used.includes(t)))throw new Error('Тег уже используется в другом профиле.');if(data.inbounds[0].streamSettings?.security==='reality'&&(!data.inbounds[0].streamSettings.realitySettings.privateKey||data.inbounds[0].streamSettings.realitySettings.privateKey==='REPLACE_WITH_XRAY_PRIVATE_KEY'))throw new Error('Сначала сгенерируйте или укажите настоящий Reality private key.');await api.create('profiles',{name,config});toast('Профиль сохранён в XRAY STUDIO');await render(1)}catch(e){$('#xpb-error').textContent=e.message||'Не удалось сохранить профиль.'}};
   if(!$('#xpb-short-id').value)$('#xpb-short-id').value=randomShortId();
+  if(!$('#xpb-uuid').value)$('#xpb-uuid').value=crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=crypto.getRandomValues(new Uint8Array(1))[0]&15;return(c==='x'?r:(r&3|8)).toString(16)});
   updateVisibility();updatePreview();
  }];
 }
@@ -539,6 +546,7 @@ document.addEventListener('click',async e=>{
   else if(b=g('[data-dt]')){userDrawer(+$('[data-a]').dataset.u,b.dataset.dt)}
   else if(b=g('tr[data-id]'))userDrawer(+b.dataset.id,'ov');
   else if(b=g('[data-uo]'))userDrawer(+b.dataset.uo,'dev');
+  else if(b=g('[data-copy-xray-id]')){const u=DB.users.find(x=>x.id==+b.dataset.copyXrayId);if(u?.xrayId)copyT(u.xrayId)}
   else if(g('[data-copy]'))copyT($('#lk').value);
   else if(b=g('[data-a]')){const id=+b.dataset.u,a=b.dataset.a;
     if(a=='del'){confirmBox('Удалить пользователя?','Удалить',()=>delUsers(new Set([id])));return}
@@ -587,7 +595,7 @@ document.addEventListener('keydown',e=>{
   if(e.key=='/'&&!/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)){e.preventDefault();cur=='users'?$('#uq').focus():palette()}});
 document.addEventListener('submit',async e=>{const f=e.target,k=f.dataset.k;if(!k)return;const er=m=>{e.preventDefault();$('#fe')&&($('#fe').textContent=m)};
   if(k=='user'){const d=read(FU,f);if(DB.users.some(u=>u.username.toLowerCase()==d.username.toLowerCase()))return er('Такое имя уже есть. Выберите другое.');if(!d.squads.length)return er('Выберите хотя бы один сквад.');
-    const u={username:d.username,disabled:false,hold:d.hold,holdDays:d.days||30,created:Date.now(),expireAt:d.hold||!d.days?null:Date.now()+d.days*DAY,limit:d.limit,used:0,strategy:d.strategy,tag:d.tag,tg:'',email:'',desc:d.desc,hwid:d.hwid,squads:d.squads,onlineAt:0,adminId:DB.admins.find(a=>a.role==='owner')?.id||null,short:Math.floor(Math.random()*2**40).toString(36).padStart(8,'a'),devices:[]};
+    const u={username:d.username,disabled:false,hold:d.hold,holdDays:d.days||30,created:Date.now(),expireAt:d.hold||!d.days?null:Date.now()+d.days*DAY,limit:d.limit,used:0,strategy:d.strategy,tag:d.tag,tg:'',email:'',desc:d.desc,hwid:d.hwid,squads:d.squads,onlineAt:0,adminId:DB.admins.find(a=>a.role==='owner')?.id||null,short:Math.floor(Math.random()*2**40).toString(36).padStart(8,'a'),xrayId:crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=crypto.getRandomValues(new Uint8Array(1))[0]&15;return(c==='x'?r:(r&3|8)).toString(16)}),devices:[]};
     const c=await api.create('users',u);UQ.q='';UQ.st='all';UQ.sort='created';UQ.dir='desc';toast(`Пользователь ${c.username} создан`);location.hash=='#users'?render(1):location.hash='users';setTimeout(()=>userDrawer(c.id,'sub'),350)}
   else if(k=='uedit'){e.preventDefault();const d=read(FE,f),id=+f.dataset.id;if(DB.users.some(u=>u.username.toLowerCase()==d.username.toLowerCase()&&u.id!=id))return er('Такое имя уже есть.');await api.update('users',id,d);toast('Сохранено');render(1);userDrawer(id,'ov')}
   else if(k=='ent'){const key=f.dataset.ent,e2=ENT[key],d=read(e2.fs,f),id=f.dataset.id,m=e2.chk?.(d,+id);if(m)return er(m);
