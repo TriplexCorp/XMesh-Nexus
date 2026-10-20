@@ -70,6 +70,20 @@ pub async fn login(
     if body.username.len() > 128 || body.password.len() > 1024 {
         return Err(ApiError::new(StatusCode::UNAUTHORIZED, "Неверный логин или пароль."));
     }
+    let username_key = body.username.trim().to_lowercase();
+    if username_key.is_empty() {
+        record_failed_login(&state.pool, &username_key).await?;
+        return Err(ApiError::new(StatusCode::UNAUTHORIZED, "Неверный логин или пароль."));
+    }
+    let locked: bool = sqlx::query_scalar(
+        "SELECT COALESCE((SELECT locked_until > NOW() FROM auth_login_limits WHERE username_key = $1), FALSE)",
+    )
+    .bind(&username_key)
+    .fetch_one(&state.pool)
+    .await?;
+    if locked {
+        return Err(ApiError::new(StatusCode::TOO_MANY_REQUESTS, "Слишком много попыток. Повторите вход через 15 минут."));
+    }
 
     let row = sqlx::query(
         "SELECT id, username, password_hash, is_active \
@@ -80,6 +94,7 @@ pub async fn login(
     .await?;
 
     let Some(row) = row else {
+        record_failed_login(&state.pool, &username_key).await?;
         return Err(ApiError::new(StatusCode::UNAUTHORIZED, "Неверный логин или пароль."));
     };
     let admin_id: i64 = row.try_get("id")?;
@@ -91,8 +106,13 @@ pub async fn login(
         .map_err(|_| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Не удалось проверить пароль."))?;
     let verified = Argon2::default().verify_password(body.password.as_bytes(), &parsed_hash).is_ok();
     if !is_active || !verified {
+        record_failed_login(&state.pool, &username_key).await?;
         return Err(ApiError::new(StatusCode::UNAUTHORIZED, "Неверный логин или пароль."));
     }
+    sqlx::query("DELETE FROM auth_login_limits WHERE username_key = $1")
+        .bind(&username_key)
+        .execute(&state.pool)
+        .await?;
 
     let token = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
     let token_hash = hash_token(&token);
@@ -123,6 +143,29 @@ pub async fn login(
         headers,
         Json(json!({"authenticated": true, "user": {"id": admin_id, "username": username}})),
     ))
+}
+
+async fn record_failed_login(pool: &PgPool, username_key: &str) -> Result<(), ApiError> {
+    sqlx::query(
+        "INSERT INTO auth_login_limits (username_key, attempts, window_started_at, locked_until) \
+         VALUES ($1, 1, NOW(), NULL) \
+         ON CONFLICT (username_key) DO UPDATE SET \
+           attempts = CASE WHEN auth_login_limits.window_started_at < NOW() - INTERVAL '15 minutes' \
+                           THEN 1 ELSE auth_login_limits.attempts + 1 END, \
+           window_started_at = CASE WHEN auth_login_limits.window_started_at < NOW() - INTERVAL '15 minutes' \
+                                     THEN NOW() ELSE auth_login_limits.window_started_at END, \
+           locked_until = CASE WHEN (CASE WHEN auth_login_limits.window_started_at < NOW() - INTERVAL '15 minutes' \
+                                          THEN 1 ELSE auth_login_limits.attempts + 1 END) >= 8 \
+                               THEN NOW() + INTERVAL '15 minutes' ELSE NULL END",
+    )
+    .bind(username_key)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+pub async fn is_authenticated(state: &AppState, headers: &HeaderMap) -> bool {
+    user_from_headers(state, headers).await.is_some()
 }
 
 pub async fn session(
