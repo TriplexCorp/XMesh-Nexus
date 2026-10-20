@@ -620,7 +620,7 @@ function userTrafficDonutsMarkup(payload){
   const servers=Array.isArray(payload?.servers)?payload.servers.filter(r=>
     r&&Number.isFinite(+r.nodeId)&&Number.isFinite(+r.uplinkBytes)&&Number.isFinite(+r.downlinkBytes)
     &&+r.uplinkBytes>=0&&+r.downlinkBytes>=0):[];
-  if(!servers.length)return '<div class="user-traffic-empty">'+ic('activity')+'<div><b>Пока нет разбивки по серверам</b><p>Для этой статистики узлы должны отправлять персональные счётчики Xray. Трафик сетевого интерфейса не используется вместо пользовательского.</p></div></div>';
+  if(!servers.length)return '<div class="user-chart-empty"><div class="user-chart-empty-ring" aria-hidden="true"><span>—</span></div><div class="user-chart-empty-copy"><b>Нет данных по серверам</b><p>График появится после получения персональных счётчиков Xray от нод.</p><small>Трафик VPS не подменяет статистику пользователя.</small></div></div>';
   const up=servers.reduce((sum,r)=>sum+Number(r.uplinkBytes),0);
   const down=servers.reduce((sum,r)=>sum+Number(r.downlinkBytes),0);
   const total=up+down;
@@ -631,13 +631,15 @@ function userTrafficDonutsMarkup(payload){
     const seen=Number.isFinite(+r.updatedAtMs)?new Date(+r.updatedAtMs).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
     return '<article class="user-server-item"><div class="user-server-donut" style="--traffic-share:'+share.toFixed(3)+'%" role="img" aria-label="'+esc(String(r.name||'Узел #'+r.nodeId))+': '+percent+'% пользовательского трафика"><span>'+percent+'%</span></div><div class="user-server-details"><b title="'+esc(r.name||'Узел #'+r.nodeId)+'">'+esc(r.name||'Узел #'+r.nodeId)+'</b><strong>'+userTrafficBytes(amount)+'</strong><small>↑ '+userTrafficBytes(r.uplinkBytes)+' · ↓ '+userTrafficBytes(r.downlinkBytes)+'</small><span class="user-server-updated">Срез '+esc(seen)+'</span></div></article>';
   }).join('');
-  return '<div class="user-server-totals"><span>Измерено: <b>'+userTrafficBytes(total)+'</b></span><span>↑ '+userTrafficBytes(up)+'</span><span>↓ '+userTrafficBytes(down)+'</span></div>'+(total===0?'<p class="user-server-pending">Счётчики подключены, но прирост трафика ещё не зарегистрирован.</p>':'')+'<div class="user-server-grid">'+cards+'</div><small class="user-server-source">Учитывается прирост персональных счётчиков Xray с момента подключения сбора метрик. Не общий трафик VPS.</small>';
+  const downloadShare=total?down/total*100:0;
+  const chart='<div class="user-traffic-visual"><div class="user-traffic-main-donut" style="--down-share:'+downloadShare.toFixed(3)+'%" role="img" aria-label="Скачано '+userTrafficBytes(down)+', загружено '+userTrafficBytes(up)+'"><div><small>Всего</small><strong>'+userTrafficBytes(total)+'</strong></div></div><div class="user-traffic-legend"><div><span class="user-legend-dot is-down"></span><span>Скачано</span><b>'+userTrafficBytes(down)+'</b></div><div><span class="user-legend-dot is-up"></span><span>Отправлено</span><b>'+userTrafficBytes(up)+'</b></div><small>Серверов с данными: '+servers.length+'</small></div></div>';
+  return chart+(total===0?'<p class="user-server-pending">Счётчики подключены, но трафик пока не зарегистрирован.</p>':'')+'<div class="user-server-grid">'+cards+'</div><small class="user-server-source">Данные только из персональных счётчиков Xray. Общий трафик VPS не используется.</small>';
 }
 async function loadUserTrafficStats(userId){
   const container=dlg.querySelector('[data-user-traffic-id="'+userId+'"]');
   if(!container)return;
   if(!backendReady){
-    container.innerHTML='<div class="user-traffic-empty">'+ic('activity')+'<div><b>Нет подключения к серверу метрик</b><p>Статистика появится после подключения backend и передачи персональных счётчиков Xray.</p></div></div>';
+    container.innerHTML=userTrafficDonutsMarkup(null);
     return;
   }
   try{
