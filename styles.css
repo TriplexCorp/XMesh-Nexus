@@ -2626,3 +2626,10 @@ white-space:nowrap;
     padding:.72rem;
   }
 }
+
+
+/* Sidebar labels are rendered in a viewport layer so the scrollable rail cannot crop them. */
+.rail-tooltip{position:fixed;z-index:1000;pointer-events:none;max-width:min(16rem,calc(100vw - 1rem));padding:.48rem .7rem;border:1px solid var(--ln);border-radius:.55rem;background:var(--s1);color:var(--tx);font-size:.79rem;font-weight:650;line-height:1.25;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.22)}
+.rail-tooltip[hidden]{display:none!important}
+#brand-panel{scroll-margin-top:1.5rem}
+@media(max-width:760px){.rail-tooltip{display:none!important}}
