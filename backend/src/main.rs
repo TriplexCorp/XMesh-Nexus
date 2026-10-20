@@ -12,6 +12,8 @@ use axum::{
 use core::CoreManager;
 use redis::aio::ConnectionManager;
 use serde::Deserialize;
+use sha2::{Digest, Sha256};
+use uuid::Uuid;
 use serde_json::{json, Map, Value};
 use sqlx::{postgres::PgPoolOptions, PgPool, Row};
 use std::{collections::BTreeMap, env, path::PathBuf, time::Duration};
@@ -76,6 +78,21 @@ struct TrafficMetricsQuery {
     squad_id: Option<i64>,
 }
 
+#[derive(Debug, Deserialize)]
+struct NodeMetricsIngestRequest {
+    node_id: i64,
+    cpu_percent: Option<f64>,
+    ram_used_bytes: Option<i64>,
+    ram_total_bytes: Option<i64>,
+    disk_used_bytes: Option<i64>,
+    disk_total_bytes: Option<i64>,
+    rx_bytes_per_sec: Option<f64>,
+    tx_bytes_per_sec: Option<f64>,
+    active_connections: Option<i32>,
+    online_clients: Option<i32>,
+    metrics: Option<Value>,
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
@@ -126,6 +143,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/stats", get(get_stats))
         .route("/system/stats", get(get_system_stats))
         .route("/metrics/traffic", get(get_traffic_metrics))
+        .route("/nodes/{id}/metrics-token", post(create_node_metrics_token))
         .route("/collections/{collection}", get(list_records).post(create_record))
         .route("/collections/{collection}/{id}", patch(update_record).delete(delete_record))
         .route("/core", get(get_core_status))
@@ -137,6 +155,7 @@ async fn main() -> anyhow::Result<()> {
     let public = Router::new()
         .route("/health/live", get(health_live))
         .route("/health/ready", get(health_ready))
+        .route("/metrics/ingest", post(ingest_node_metrics))
         .route("/auth/session", get(auth::session))
         .route("/auth/login", post(auth::login))
         .route("/auth/logout", post(auth::logout));
@@ -196,7 +215,12 @@ async fn login_page(State(state): State<AppState>, headers: HeaderMap) -> Respon
 
 async fn csrf_guard(request: Request, next: Next) -> Response {
     let is_mutation = matches!(*request.method(), Method::POST | Method::PUT | Method::PATCH | Method::DELETE);
-    if is_mutation && request.uri().path().starts_with("/api/v1/") {
+    let agent_bearer = request.uri().path() == "/api/v1/metrics/ingest"
+        && request.headers().get(header::ORIGIN).is_none()
+        && request.headers().get(header::AUTHORIZATION)
+            .and_then(|value| value.to_str().ok())
+            .is_some_and(|value| value.strip_prefix("Bearer ").is_some_and(|token| !token.trim().is_empty()));
+    if is_mutation && request.uri().path().starts_with("/api/v1/") && !agent_bearer {
         let origin = request.headers().get(header::ORIGIN).and_then(|value| value.to_str().ok());
         let host = request.headers().get(header::HOST).and_then(|value| value.to_str().ok());
         let valid = origin
@@ -377,6 +401,12 @@ async fn delete_record(
     .await?
     .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Запись не найдена."))?;
     let result = row_to_record(&row)?;
+    if collection == "nodes" {
+        sqlx::query("DELETE FROM node_metric_auth WHERE node_id = $1")
+            .bind(id)
+            .execute(&state.pool)
+            .await?;
+    }
     audit(&state.pool, &actor.username, "delete", Some(&collection), Some(id), json!({})).await;
     Ok(Json(result))
 }
@@ -556,6 +586,139 @@ async fn get_system_stats(State(state): State<AppState>) -> Json<Value> {
         "sampledAt": sampled_at,
         "scope": "Ресурсы, видимые контейнеру панели; диск — корневая файловая система контейнера"
     }))
+}
+
+async fn create_node_metrics_token(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+    Path(id): Path<i64>,
+) -> Result<(StatusCode, Json<Value>), ApiError> {
+    if id <= 0 {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "ID узла должен быть положительным числом."));
+    }
+    let node_exists: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM panel_records WHERE collection = 'nodes' AND id = $1)"
+    )
+    .bind(id)
+    .fetch_one(&state.pool)
+    .await?;
+    if !node_exists {
+        return Err(ApiError::new(StatusCode::NOT_FOUND, "Узел не найден."));
+    }
+
+    // 2 UUIDv4 values provide a high-entropy bearer token. Only its SHA-256 hash is persisted.
+    let token = format!("xm_{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
+    let token_hash = hex::encode(Sha256::digest(token.as_bytes()));
+    sqlx::query(
+        "INSERT INTO node_metric_auth (node_id, token_hash) VALUES ($1, $2)
+         ON CONFLICT (node_id) DO UPDATE
+           SET token_hash = EXCLUDED.token_hash, created_at = NOW(), last_seen_at = NULL"
+    )
+    .bind(id)
+    .bind(&token_hash)
+    .execute(&state.pool)
+    .await?;
+
+    audit(
+        &state.pool,
+        &actor.username,
+        "node_metrics.token_rotated",
+        Some("nodes"),
+        Some(id),
+        json!({"tokenStoredAs": "sha256"}),
+    ).await;
+
+    Ok((StatusCode::CREATED, Json(json!({
+        "nodeId": id,
+        "token": token,
+        "message": "Токен показывается только один раз. Сохраните его на узле."
+    }))))
+}
+
+async fn ingest_node_metrics(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(body): Json<NodeMetricsIngestRequest>,
+) -> Result<(StatusCode, Json<Value>), ApiError> {
+    if body.node_id <= 0 {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "node_id должен быть положительным числом."));
+    }
+    let token = headers.get(header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "))
+        .map(str::trim)
+        .filter(|value| !value.is_empty() && value.len() <= 256)
+        .ok_or_else(|| ApiError::new(StatusCode::UNAUTHORIZED, "Требуется Bearer-токен агента метрик."))?;
+
+    let metrics = body.metrics.unwrap_or_else(|| json!({}));
+    if !metrics.is_object() || serde_json::to_vec(&metrics).map(|v| v.len()).unwrap_or(usize::MAX) > 32 * 1024 {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "metrics должен быть JSON-объектом не больше 32 КиБ."));
+    }
+    if body.cpu_percent.is_some_and(|value| !value.is_finite() || !(0.0..=100.0).contains(&value))
+        || body.ram_used_bytes.is_some_and(|value| value < 0)
+        || body.ram_total_bytes.is_some_and(|value| value < 0)
+        || body.disk_used_bytes.is_some_and(|value| value < 0)
+        || body.disk_total_bytes.is_some_and(|value| value < 0)
+        || body.rx_bytes_per_sec.is_some_and(|value| !value.is_finite() || value < 0.0)
+        || body.tx_bytes_per_sec.is_some_and(|value| !value.is_finite() || value < 0.0)
+        || body.active_connections.is_some_and(|value| value < 0)
+        || body.online_clients.is_some_and(|value| value < 0)
+    {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Одно или несколько значений метрик выходят за допустимые пределы."));
+    }
+
+    let token_hash = hex::encode(Sha256::digest(token.as_bytes()));
+    let token_valid: bool = sqlx::query_scalar(
+        "SELECT EXISTS (
+            SELECT 1
+            FROM node_metric_auth a
+            JOIN panel_records n ON n.collection = 'nodes' AND n.id = a.node_id
+            WHERE a.node_id = $1 AND a.token_hash = $2
+        )"
+    )
+    .bind(body.node_id)
+    .bind(token_hash)
+    .fetch_one(&state.pool)
+    .await?;
+    if !token_valid {
+        return Err(ApiError::new(StatusCode::UNAUTHORIZED, "Токен агента недействителен или отозван."));
+    }
+
+    let node_id = body.node_id.to_string();
+    let sampled_at: i64 = sqlx::query_scalar(
+        "INSERT INTO server_metric_samples (
+            sampled_at, node_id, cpu_percent,
+            ram_used_bytes, ram_total_bytes, disk_used_bytes, disk_total_bytes,
+            rx_bytes_per_sec, tx_bytes_per_sec, active_connections, online_clients, metrics
+         ) VALUES (
+            NOW(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+         )
+         RETURNING (EXTRACT(EPOCH FROM sampled_at) * 1000)::BIGINT"
+    )
+    .bind(&node_id)
+    .bind(body.cpu_percent)
+    .bind(body.ram_used_bytes)
+    .bind(body.ram_total_bytes)
+    .bind(body.disk_used_bytes)
+    .bind(body.disk_total_bytes)
+    .bind(body.rx_bytes_per_sec)
+    .bind(body.tx_bytes_per_sec)
+    .bind(body.active_connections)
+    .bind(body.online_clients)
+    .bind(metrics)
+    .fetch_one(&state.pool)
+    .await?;
+
+    sqlx::query("UPDATE node_metric_auth SET last_seen_at = NOW() WHERE node_id = $1")
+        .bind(body.node_id)
+        .execute(&state.pool)
+        .await?;
+
+    Ok((StatusCode::CREATED, Json(json!({
+        "status": "accepted",
+        "nodeId": body.node_id,
+        "sampledAt": sampled_at
+    }))))
 }
 
 async fn get_traffic_metrics(
