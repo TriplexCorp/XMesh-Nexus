@@ -221,7 +221,7 @@ function drawBulk(){const b=$('#bulk'),n=UQ.sel.size;if(!b)return;b.classList.to
 const uid=s=>{let h=hs(s),x='';for(let i=0;i<32;i++){h=(h*1664525+1013904223)>>>0;x+=(h>>>24&15).toString(16)}return x.replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/,'$1-$2-$3-$4-$5')};
 let UT='ov';const subUrl=u=>'';
 function userDrawer(id,tab){
-  const u=DB.users.find(x=>x.id==id);if(!u)return dlg.close();UT=tab||(dlg.open&&dlg.classList.contains('user-modal')?UT:'ov');
+  const u=DB.users.find(x=>x.id==id);if(!u)return dlg.close();if(!u.xrayId){u.xrayId=crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=crypto.getRandomValues(new Uint8Array(1))[0]&15;return(c==='x'?r:(r&3|8)).toString(16)});api.update('users',u.id,{xrayId:u.xrayId}).catch(err=>console.warn('Could not persist generated Xray credential',err))}UT=tab||(dlg.open&&dlg.classList.contains('user-modal')?UT:'ov');
   const [sl,sc]=STM[st(u)],k=u.limit?u.used/u.limit:0,h=hs(u.username)%360;
   const tabs=[['ov','Обзор'],['acc','Доступ'],['sub','Подписка'],['dev','Устройства '+u.devices.length+'/'+u.hwid]];
   const body={
@@ -427,7 +427,7 @@ async function profilesP(){
    const setGroup=(selector,show)=>{const d=$(selector);if(d)d.hidden=!show};
    setGroup('.xray-section:has(#xpb-private-key)',sec==='reality'&&!['dokodemo-door','wireguard'].includes(proto));
    setGroup('.xray-section:has(#xpb-cert)',sec==='tls'&&!['dokodemo-door','wireguard'].includes(proto));
-   const securitySelect=$('#xpb-security');if(securitySelect){const realityOption=securitySelect.querySelector('option[value="reality"]');if(realityOption)realityOption.disabled=!['raw','xhttp','grpc'].includes(net)||['dokodemo-door','wireguard'].includes(proto);const tlsOption=securitySelect.querySelector('option[value="tls"]');if(tlsOption)tlsOption.disabled=['dokodemo-door','wireguard'].includes(proto);if(realityOption?.disabled&&sec==='reality')securitySelect.value='tls';if(tlsOption?.disabled&&securitySelect.value==='tls')securitySelect.value='none';}
+   const securitySelect=$('#xpb-security');if(securitySelect){const before=securitySelect.value;const realityOption=securitySelect.querySelector('option[value="reality"]');if(realityOption)realityOption.disabled=!['raw','xhttp','grpc'].includes(net)||['dokodemo-door','wireguard'].includes(proto);const tlsOption=securitySelect.querySelector('option[value="tls"]');if(tlsOption)tlsOption.disabled=['dokodemo-door','wireguard'].includes(proto);if(realityOption?.disabled&&securitySelect.value==='reality')securitySelect.value=tlsOption?.disabled?'none':'tls';if(tlsOption?.disabled&&securitySelect.value==='tls')securitySelect.value='none';if(before!==securitySelect.value)updatePreview()}
    $$('[data-xray-preset]').forEach(b=>b.classList.toggle('on',b.dataset.xrayPreset===(sec==='reality'&&proto==='vless'&&net==='raw'?'reality':sec==='tls'&&proto==='vless'?'tls':net==='xhttp'&&proto==='vless'?'xhttp':'custom')));
    const transport=$('.xray-section:has(#xpb-host)');
    if(transport){transport.querySelectorAll('[id^="xpb-"]').forEach(el=>{const f=el.id.replace('xpb-',''),wrap=el.closest('.f');if(!wrap)return;let show=true;if(f==='xhttp-mode'||f==='xhttp-padding')show=net==='xhttp';if(f==='grpc-mode')show=net==='grpc';if(f==='kcp-seed')show=net==='kcp';if(f==='raw-header')show=net==='raw';if(f==='host')show=['ws','xhttp','httpupgrade'].includes(net);if(f==='path')show=['raw','xhttp','ws','grpc','httpupgrade'].includes(net);wrap.hidden=!show})}
