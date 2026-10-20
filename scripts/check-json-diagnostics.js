@@ -25,7 +25,7 @@ function fixCase(text,label){
 }
 fixCase('{\n "inbounds":[{"protocol":"vless",}]\n}', 'лишнюю запятую');
 
-fixCase('{\\n  "log": {"loglevel": "warning"},\\n  "inbounds": [\\n    {\\n      "tag": "vless-reality",\\n      "protocol": "vless",,\\n      "settings": {"users": [], "decryption": "none"}\\n    }\\n  ]\\n}', 'лишнюю запятую');
+fixCase('{\n  "log": {"loglevel": "warning"},\n  "inbounds": [\n    {\n      "tag": "vless-reality",\n      "protocol": "vless",,\n      "settings": {"users": [], "decryption": "none"}\n    }\n  ]\n}', 'лишнюю запятую');
 fixCase('{"inbounds":[{"protocol":"vless",   , "tag":"x"}]}', 'лишнюю запятую');
 fixCase('{"inbounds":[{"protocol":"vless"}],, "log":{}}', 'лишнюю запятую');
 assert.equal(editor.inspect('{"inbounds":[{"protocol":"vless","tag":",,"}]}'),null,'Do not treat commas inside strings as syntax errors');
