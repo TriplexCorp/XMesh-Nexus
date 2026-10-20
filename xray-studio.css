@@ -2473,3 +2473,291 @@ body:has(.studio-reference-v5) .wrap{
     grid-template-columns:minmax(0,1fr)!important;
   }
 }
+
+
+/* XRAY STUDIO / Minimal launcher + full-screen settings workspace.
+   Controls, theme, size and radii share panel tokens. */
+.xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode){
+ gap:.8rem!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) .xray-workspace-layout{
+ align-items:start!important;
+ grid-template-columns:minmax(0,1.48fr) minmax(24rem,1fr)!important;
+ gap:1rem!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) .xray-output-dock{
+ align-self:start!important;
+ position:sticky!important;
+ top:1rem!important;
+ margin-top:0!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) .xray-config-content{
+ display:flex!important;
+ flex-direction:column!important;
+ gap:1rem!important;
+ padding:1.15rem 1.3rem!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) #xpb-config-basic{
+ width:100%!important;
+ margin:0!important;
+ padding:0!important;
+ border:0!important;
+ background:transparent!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) .sr-studio-launchers{
+ display:flex;flex-direction:column;gap:.85rem;
+ width:100%;padding-top:1rem;
+ border-top:1px solid var(--ln);
+}
+.xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) .sr-studio-launchers[hidden]{
+ display:none!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) .sr-launchers-heading{
+ display:flex;align-items:center;justify-content:space-between;
+ flex-wrap:wrap;gap:1rem;
+}
+.xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) .sr-launchers-heading h3{
+ color:var(--tx);font-size:1.02rem;font-weight:780;line-height:1.3;letter-spacing:-.025em;
+}
+.xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) .sr-launchers-heading p{
+ color:var(--mu);font-size:max(13px,.82rem);line-height:1.5;margin-top:.25rem;
+}
+.xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) .sr-launchers-count{
+ font-size:.8rem;font-weight:650;color:var(--mu);
+ background:var(--s2);border-radius:999px;border:1px solid var(--ln);
+ padding:.25rem .6rem;
+}
+.xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) .sr-launchers-grid{
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.7rem;
+}
+.xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) .sr-studio-launch{
+ display:flex!important;align-items:center!important;text-align:left!important;
+ width:100%;min-width:0;gap:.75rem;
+ min-height:5.2rem;padding:.9rem!important;
+ border:1px solid var(--ln)!important;
+ border-radius:var(--ui-control-radius)!important;
+ background:var(--s2)!important;
+ color:var(--tx)!important;
+ cursor:pointer;
+ transition:border-color .15s ease,background .15s ease,transform .15s ease,box-shadow .15s ease;
+}
+.xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) .sr-studio-launch[hidden]{
+ display:none!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) .sr-studio-launch:is(:hover,:focus-visible){
+ background:color-mix(in srgb,var(--a) 12%,var(--s2))!important;
+ border-color:color-mix(in srgb,var(--a) 70%,var(--ln))!important;
+ box-shadow:0 0 0 1px color-mix(in srgb,var(--a) 12%,transparent)!important;
+ transform:translateY(-1px);
+}
+.xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) .sr-launch-icon{
+ display:grid;place-items:center;flex:0 0 2.35rem;width:2.35rem;height:2.35rem;
+ border-radius:.65rem;background:color-mix(in srgb,var(--a) 9%,var(--s1));
+ border:1px solid color-mix(in srgb,var(--a) 20%,var(--ln));
+ color:var(--a);
+}
+.xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) .sr-launch-copy{
+ min-width:0;flex:1;display:flex;flex-direction:column;gap:.25rem;
+}
+.xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) .sr-launch-copy strong{
+ font-size:max(14px,.91rem);color:var(--tx);font-weight:760;
+ line-height:1.33;overflow-wrap:anywhere;
+}
+.xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) .sr-launch-copy small{
+ font-size:max(12px,.78rem);color:var(--mu);line-height:1.45;
+}
+.xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) .sr-launch-chevron{
+ font-size:1.3rem;color:var(--mu);flex:0 0 auto;transition:transform .15s,color .15s;
+}
+.xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) .sr-studio-launch:hover .sr-launch-chevron{
+ transform:translateX(3px);color:var(--a);
+}
+/* Native modal: fullscreen, focus trapped by browser, dismiss with Escape. */
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog{
+ position:fixed!important;
+ inset:0!important;
+ width:100vw!important;max-width:none!important;
+ height:100dvh!important;max-height:none!important;
+ margin:0!important;padding:clamp(1rem,2.5vw,2.5rem)!important;
+ border:0!important;border-radius:0!important;
+ overflow:hidden!important;
+ background:var(--bg)!important;
+ color:var(--tx)!important;
+ box-sizing:border-box!important;
+ z-index:9999;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog:not([open]){
+ display:none!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog[open]{
+ display:block!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog::backdrop{
+ background:rgba(0,0,0,.72);
+ backdrop-filter:blur(7px);
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-dialog-shell{
+ max-width:1620px;margin-inline:auto;width:100%;height:100%;
+ display:flex;flex-direction:column;min-height:0;gap:1rem;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-dialog-head{
+ display:flex;align-items:center;justify-content:space-between;flex:0 0 auto;
+ gap:1.5rem;
+ padding:0 0 1rem;border-bottom:1px solid var(--ln);
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-dialog-heading p{
+ font-size:max(11px,.7rem);font-weight:780;letter-spacing:.11em;color:var(--a);margin-bottom:.35rem;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-dialog-heading h2{
+ font-size:clamp(1.45rem,2vw,2rem);font-weight:790;line-height:1.24;letter-spacing:-.035em;color:var(--tx);
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-dialog-heading span{
+ display:block;color:var(--mu);font-size:.9rem;margin-top:.35rem;line-height:1.45;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) :is(.sr-dialog-close,.sr-dialog-done){
+ display:inline-flex;align-items:center;justify-content:center;gap:.65rem;
+ min-height:2.75rem;padding:.65rem 1.1rem;
+ border-radius:var(--ui-control-radius);
+ font-size:.9rem;font-weight:730;cursor:pointer;
+ white-space:nowrap;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-dialog-close{
+ background:var(--s2)!important;border:1px solid var(--ln)!important;color:var(--tx)!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-dialog-close:hover{
+ background:color-mix(in srgb,var(--a) 13%,var(--s2))!important;border-color:var(--a)!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-dialog-scroll{
+ min-height:0;flex:1 1 auto;overflow-y:auto;overscroll-behavior:contain;
+ padding:.2rem .3rem 1rem;
+ scrollbar-gutter:stable;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-dialog-inner{
+ width:100%;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .xray-config-panel{
+ display:none!important;
+ width:100%!important;
+ padding:1.35rem!important;
+ border:1px solid var(--ln)!important;border-radius:var(--ui-radius)!important;
+ background:var(--s1)!important;
+ gap:1.1rem!important;
+ box-shadow:none!important;
+ margin:0!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog[data-active-panel="security"] #xpb-config-security:not([hidden]),
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog[data-active-panel="transport"] #xpb-config-transport:not([hidden]),
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog[data-active-panel="encryption"] #xpb-config-encryption:not([hidden]),
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog[data-active-panel="client"] #xpb-config-client:not([hidden]){
+ display:grid!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .xray-config-panel-title{
+ display:flex!important;min-height:0!important;gap:1rem!important;
+ margin:0 0 .4rem!important;padding:0 0 1rem!important;border-bottom:1px solid var(--ln)!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .xray-config-panel-title h3{
+ font-size:1.22rem!important;line-height:1.35!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .xray-config-panel-title p{
+ font-size:max(13px,.86rem)!important;line-height:1.5!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .xray-section{
+ display:grid!important;gap:1rem!important;
+ padding:1rem!important;margin:0!important;
+ border:1px solid var(--ln)!important;border-radius:var(--ui-control-radius)!important;
+ background:color-mix(in srgb,var(--s1) 85%,var(--s2) 15%)!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .xray-section[hidden],
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .xray-option-group[hidden],
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .f[hidden]{
+ display:none!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .xray-option-group{
+ gap:.9rem!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .xray-section-heading b,
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .xray-option-group-head b{
+ font-size:1.03rem!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .xray-main-grid,
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .xray-key-grid,
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .xray-option-grid{
+ display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;
+ gap:1rem!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .xray-config-panel .f>span:first-child{
+ font-size:max(14px,.92rem)!important;color:var(--tx)!important;font-weight:690!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .xray-config-panel .f>small{
+ font-size:max(13px,.82rem)!important;color:var(--mu)!important;line-height:1.5!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .xray-config-panel :is(.sr-v5-input,.sr-v5-select-shell){
+ min-height:2.85rem!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .xray-config-panel :is(.sr-v5-input>input,.sr-v5-select-trigger){
+ min-height:2.8rem!important;height:2.8rem!important;font-size:max(15px,.94rem)!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .xray-config-panel .xray-xhttp-subtitle{
+ grid-column:1/-1!important;
+ font-size:1rem!important;line-height:1.45!important;
+ padding:1rem 0 .4rem!important;
+ border-bottom:1px solid var(--ln);
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .xray-xhttp-note{
+ grid-column:1/-1!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .xray-config-panel .f:has(textarea){
+ grid-column:1/-1!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-dialog-footer{
+ flex:0 0 auto;
+ display:flex;align-items:center;justify-content:space-between;
+ gap:1rem;flex-wrap:wrap;
+ padding:1rem 0 0;border-top:1px solid var(--ln);
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-dialog-footer span{
+ font-size:.85rem;color:var(--mu);
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-dialog-done{
+ background:var(--a)!important;border:1px solid var(--a)!important;color:var(--btn-text)!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-dialog-done:hover{
+ background:color-mix(in srgb,var(--a) 85%,var(--tx) 15%)!important;
+}
+@media(max-width:1250px){
+ .xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) .xray-workspace-layout{
+  grid-template-columns:minmax(0,1fr)!important;
+ }
+ .xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) .xray-output-dock{
+  position:static!important;
+ }
+ .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .xray-main-grid,
+ .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .xray-key-grid,
+ .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .xray-option-grid{
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+ }
+}
+@media(max-width:720px){
+ .xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) .sr-launchers-grid{
+  grid-template-columns:minmax(0,1fr)!important;
+ }
+ .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog{
+  padding:.8rem!important;
+ }
+ .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .xray-config-panel{
+  padding:1rem!important;
+ }
+ .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .xray-main-grid,
+ .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .xray-key-grid,
+ .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .xray-option-grid{
+  grid-template-columns:minmax(0,1fr)!important;
+ }
+ .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-dialog-footer span{
+  font-size:.75rem;
+ }
+}
+@media(prefers-reduced-motion:reduce){
+ .xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) .sr-studio-launch{
+  transition:none!important;transform:none!important;
+ }
+}
