@@ -1404,6 +1404,7 @@ async function profilesP(){
 
    // Selecting a protocol filters the network list first. Do not leave
    // invisible or disabled options selected after switching protocols.
+   const initialNetwork=net,initialSecurity=sec;
    const allowedNetworks=xrayAllowedNetworks(proto);
    const networkSelect=$('#xpb-network');
    if(!allowedNetworks.includes(net)){
@@ -1436,7 +1437,12 @@ async function profilesP(){
    }
    const hint=$('#xpb-context-hint');
    if(hint){
-    hint.textContent='Показаны настройки, совместимые с выбранным протоколом и транспортом';
+    const changed=[];
+    if(initialNetwork!==net)changed.push('транспорт');
+    if(initialSecurity!==sec)changed.push('защита');
+    hint.textContent=changed.length
+     ? 'Несовместимые параметры скорректированы: '+changed.join(' и ')
+     : 'Показаны только совместимые настройки';
    }
    const listenField=$('#xpb-listen')?.closest('.f'),portField=$('#xpb-port')?.closest('.f'),securityField=$('#xpb-security')?.closest('.f');
    if(listenField)listenField.hidden=proto==='tun';
