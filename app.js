@@ -62,7 +62,8 @@ const api={
   async remove(c,id){await lat();const i=DB[c].findIndex(x=>x.id==id);if(i<0)return null;const old=DB[c][i];if(backendReady)await backendRequest('/api/v1/collections/'+encodeURIComponent(c)+'/'+encodeURIComponent(id),{method:'DELETE'});DB[c].splice(i,1);save();return old},
   async bulk(c,ids,fn){await lat();for(const x of [...(DB[c]||[])].filter(item=>ids.has(item.id))){fn(x);await this.update(c,x.id,{...x})}save()},
   async saveSettings(patch){const saved=await backendRequest('/api/v1/settings',{method:'PATCH',body:JSON.stringify(patch)});DB.set={...DB.set,...saved,hooks:{...DB.set.hooks,...(saved.hooks||{})}};return DB.set},
-  async stats(){await lat();const U=DB.users,by={};U.forEach(u=>{const status=st(u);by[status]=(by[status]||0)+1});const on=U.filter(isOn),live=DB.nodes.filter(n=>n.state==='ONLINE'&&!n.disabled),nodeOn={};live.forEach(n=>nodeOn[n.id]=0);return{by,total:U.length,online:on.length,conn:null,nodeOn,nOn:live.length,nAll:DB.nodes.length};}
+  async stats(){await lat();const U=DB.users,by={};U.forEach(u=>{const status=st(u);by[status]=(by[status]||0)+1});const on=U.filter(isOn),live=DB.nodes.filter(n=>n.state==='ONLINE'&&!n.disabled),nodeOn={};live.forEach(n=>nodeOn[n.id]=0);return{by,total:U.length,online:on.length,conn:null,nodeOn,nOn:live.length,nAll:DB.nodes.length};},
+  async systemStats(){if(!backendReady)return null;return backendRequest('/api/v1/system/stats')}
 };
 
 /* ================= МЕТАДАННЫЕ ================= */
@@ -148,11 +149,34 @@ async function render(soft){
   const [h,i]=await f();if(rt!=RT)return;v.classList.toggle('still',!!soft);v.innerHTML=h;i&&i();$('#unb').textContent=DB.users.length;drawBulk();
 }
 
+/* ================= СИСТЕМНЫЕ МЕТРИКИ ================= */
+const sysBytes=n=>{if(!Number.isFinite(+n))return'—';const v=+n;if(v<1024)return fmt(v)+' Б';if(v<1024**2)return fmt(v/1024,1)+' КБ';if(v<1024**3)return fmt(v/1024**2,1)+' МБ';if(v<1024**4)return fmt(v/1024**3,2)+' ГБ';return fmt(v/1024**4,2)+' ТБ'};
+const sysPct=n=>Number.isFinite(+n)?Math.max(0,Math.min(100,+n)):null;
+const sysBar=n=>{const p=sysPct(n);return p===null?'<div class="sys-progress"><i style="width:0%"></i></div>':`<div class="sys-progress ${p>=90?'danger':p>=75?'warning':''}"><i style="width:${p}%"></i></div>`};
+const sysUptime=n=>{if(!Number.isFinite(+n))return'—';n=Math.max(0,Math.floor(+n));const d=Math.floor(n/86400),h=Math.floor(n%86400/3600),m=Math.floor(n%3600/60);return d?`${d} д ${h} ч`:h?`${h} ч ${m} мин`:`${m} мин`};
+function systemPanel(s,error=''){
+  if(!s)return `<section class="card system-card"><div class="hd"><div><p class="note">МОНИТОРИНГ</p><h3>Состояние системы</h3><p>${error?esc(error):'Получаем системные показатели…'}</p></div><span class="sys-live"><i></i> Ожидание</span></div><div class="sys-empty">${ic('server')}<span>Метрики станут доступны после подключения к backend.</span></div></section>`;
+  const cpu=s.cpu?.percent,ram=s.ram?.percent,disk=s.disk?.percent;
+  const metric=(key,title,value,detail,pct,unit='')=>`<article class="sys-metric"><div class="sys-metric-head"><span>${title}</span><span class="sys-glyph">${key}</span></div><div class="sys-value">${value}</div><div class="sys-detail">${detail}</div>${sysBar(pct)}<div class="sys-foot"><span>${pct===null?'Нет данных':fmt(pct,1)+'% использовано'}</span><span>${unit}</span></div></article>`;
+  const diskDetail=s.disk?`${sysBytes(s.disk.usedBytes)} из ${sysBytes(s.disk.totalBytes)}`:'Нет данных о файловой системе';
+  const ramDetail=s.ram?.totalBytes?`${sysBytes(s.ram.usedBytes)} из ${sysBytes(s.ram.totalBytes)}`:'Нет данных о памяти';
+  const cpuDetail=cpu==null?'Недостаточно данных для расчёта':`Средняя нагрузка: ${s.loadAverage?.one==null?'—':fmt(s.loadAverage.one,2)}`;
+  const dbOnline=s.database==='online';
+  const sampled=s.sampledAt?new Date(s.sampledAt).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'—';
+  return `<section class="card system-card"><div class="hd"><div><p class="note">МОНИТОРИНГ · LIVE</p><h3>Состояние системы</h3><p>Ресурсы и доступность сервисов панели в реальном времени.</p></div><span class="sys-live"><i></i> Обновляется</span></div><div class="sys-grid">
+  ${metric('CPU','Процессор',cpu==null?'—':fmt(cpu,1)+'%',cpuDetail,cpu,'')}
+  ${metric('RAM','Оперативная память',ram==null?'—':fmt(ram,1)+'%',ramDetail,ram,'')}
+  ${metric('SSD','Диск',disk==null?'—':fmt(disk,1)+'%',diskDetail,disk,'корень контейнера')}
+  ${metric('UP','Время работы',sysUptime(s.uptimeSeconds),`Процессов видно: ${s.processCount==null?'—':fmt(s.processCount)}`,null,'uptime')}
+  </div><div class="sys-details"><div class="sys-detail-item"><span class="sys-detail-label">Средняя нагрузка</span><b>${[s.loadAverage?.one,s.loadAverage?.five,s.loadAverage?.fifteen].map(v=>v==null?'—':fmt(v,2)).join(' / ')}</b><small>1 · 5 · 15 минут</small></div><div class="sys-detail-item"><span class="sys-detail-label">База данных</span><b class="${dbOnline?'sys-ok':'sys-bad'}"><i></i>${dbOnline?'Подключена':'Нет соединения'}</b><small>PostgreSQL · проверка SELECT 1</small></div><div class="sys-detail-item"><span class="sys-detail-label">Последнее обновление</span><b>${sampled}</b><small>Автообновление каждые 15 секунд</small></div></div><p class="sys-note">${esc(s.scope||'Показатели зависят от ресурсов, доступных контейнеру панели.')} Диск показывает файловую систему, смонтированную в контейнер как /.</p></section>`;
+}
+
 /* ================= ДАШБОРД ================= */
 const LV={};DB.nodes.forEach(n=>LV[n.id]={cpu:null,ram:null,mbps:null});
 let ST;
 async function homeP(){
   const stats=ST=await api.stats();
+  let system=null,systemError="";try{system=await api.systemStats()}catch(e){systemError=e.message||"Не удалось получить системные показатели."}
   const totalItems=DB.nodes.length+DB.users.length+DB.profiles.length+DB.hosts.length+DB.squads.length+DB.tpls.length+DB.subs.length+DB.admins.length;
   const firstRun=totalItems===0;
   const counts=[['Узлы',DB.nodes.length],['Пользователи',DB.users.length],['Профили Xray',DB.profiles.length],['Хосты',DB.hosts.length]];
@@ -166,7 +190,8 @@ async function homeP(){
   const nodeRows=DB.nodes.length?DB.nodes.slice(0,6).map(n=>`<div class="rowi"><span class="fg" style="font-size:1.25rem">${flagView(n.flag)}</span><div><b>${esc(n.name)}</b><br><small class="mu">${esc(n.addr)}${n.port?':'+esc(n.port):''}</small></div>${chip(NS[nstat(n)]?.[0]||'Не проверен',NS[nstat(n)]?.[1]||'--mu')}</div>`).join(''):'<div class="empty"><b>Узлов пока нет</b><span>Добавьте первый сервер, чтобы начать настройку.</span><button class="btn sm" data-ne="nodes">'+ic('plus')+'Добавить узел</button></div>';
   const userRows=DB.users.length?DB.users.slice(0,6).map(u=>`<div class="rowi"><button class="who" data-uo="${u.id}"><span class="av" style="background:linear-gradient(135deg,var(--b),var(--a))">${esc((u.username||'?')[0].toUpperCase())}</span><span>${esc(u.username)}</span></button>${chip(STM[st(u)]?.[0]||st(u),'--mu')}</div>`).join(''):'<div class="empty"><b>Пользователей пока нет</b><span>Создайте сквад перед добавлением первого пользователя.</span><button class="gh sm" data-ne="squads">'+ic('plus')+'Создать сквад</button></div>';
   return [`<section class="card"><div class="hd"><div><p class="note">ОБЗОР</p><h3 style="font-size:1.35rem;margin-top:.2rem">${firstRun?'Панель готова к настройке':'Обзор инфраструктуры'}</h3><p>${firstRun?'Добавьте свои серверы и конфигурации. Демонстрационных пользователей, узлов и фиктивной телеметрии здесь нет.':'Сводка по объектам, которые вы добавили в панель.'}</p></div><div class="setting-control"><a class="gh sm" href="#set" style="text-decoration:none;color:inherit">${ic('sliders')}Внешний вид</a></div></div><div class="home-counts">${counts.map(([label,value])=>`<div class="home-count"><b>${value}</b><span>${label}</span></div>`).join('')}</div></section>
-  ${firstRun?`<section class="card"><div class="hd"><div><h3>Первый запуск</h3><p>Создайте свои объекты — примеры не подставляются автоматически.</p></div></div><div class="setup-grid">${setupHtml}</div></section>`:`<div class="two"><section class="card"><div class="hd"><div><h3>Узлы</h3><p>${DB.nodes.length} настроено</p></div><button class="gh sm" data-ne="nodes">${ic('plus')}Добавить</button></div>${nodeRows}</section><section class="card"><div class="hd"><div><h3>Пользователи</h3><p>${DB.users.length} создано</p></div><a class="gh sm" href="#users" style="text-decoration:none;color:inherit">Все</a></div>${userRows}</section></div>`}`,()=>{}];
+  <div id="system-stats">${systemPanel(system,systemError)}</div>
+  ${firstRun?`<section class="card"><div class="hd"><div><h3>Первый запуск</h3><p>Создайте свои объекты — примеры не подставляются автоматически.</p></div></div><div class="setup-grid">${setupHtml}</div></section>`:`<div class="two"><section class="card"><div class="hd"><div><h3>Узлы</h3><p>${DB.nodes.length} настроено</p></div><button class="gh sm" data-ne="nodes">${ic('plus')}Добавить</button></div>${nodeRows}</section><section class="card"><div class="hd"><div><h3>Пользователи</h3><p>${DB.users.length} создано</p></div><a class="gh sm" href="#users" style="text-decoration:none;color:inherit">Все</a></div>${userRows}</section></div>`}`,()=>{const refreshSystem=async()=>{try{const latest=await api.systemStats();const target=$('#system-stats');if(target)target.innerHTML=systemPanel(latest)}catch(e){const target=$('#system-stats');if(target)target.innerHTML=systemPanel(null,e.message||'Не удалось обновить показатели.')}};const timer=setInterval(refreshSystem,15000);T.push(timer)}];
 }
 /* ================= ПОЛЬЗОВАТЕЛИ ================= */
 const UQ={q:'',st:'all',sq:'',page:1,size:15,sort:'created',dir:'desc',sel:new Set()};let UIDS=[];
