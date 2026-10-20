@@ -775,7 +775,8 @@ async function profilesP(){
      }
      if(inbound?.protocol==='shadowsocks'){
       const ss=inbound.settings||{};
-      if(!ss.password||String(ss.password).startsWith('REPLACE_')||String(ss.password).startsWith('CHANGE_ME_'))throw new Error('Shadowsocks: задайте серверный пароль.');
+      const ssUsersForValidation=Array.isArray(ss.users)?ss.users:[];
+      if((String(ss.method||'').startsWith('2022-')||!ssUsersForValidation.length)&&(!ss.password||String(ss.password).startsWith('REPLACE_')||String(ss.password).startsWith('CHANGE_ME_')))throw new Error('Shadowsocks: задайте серверный пароль.');
       if(String(ss.method||'').startsWith('2022-')){
        const method=String(ss.method),expected=method==='2022-blake3-aes-128-gcm'?16:32;
        const keyBytes=value=>{try{return atob(String(value).replace(/-/g,'+').replace(/_/g,'/').replace(/\s/g,'')).length}catch{return -1}};
