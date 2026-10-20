@@ -120,3 +120,14 @@ The selector lists recent GitHub releases; pinning is limited to the latest 30 e
 - app.js — panel UI, authenticated API client and Xray-core controls.
 
 The UI intentionally avoids presenting generated node telemetry as live operational data.
+
+### Updating frontend assets
+
+The dashboard CSS and JavaScript are baked into the `panel` Docker image via `backend/Dockerfile`. Running `git pull` alone does **not** update the UI served by an existing container. After pulling changes, rebuild and recreate the panel:
+
+```bash
+git pull --ff-only origin main
+docker compose up -d --build panel
+```
+
+Preserve database volumes. A hard browser refresh may still be needed after the container is recreated. CI verifies that every HTML-referenced local CSS/JS asset is included in the runtime image.
