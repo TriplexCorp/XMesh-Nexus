@@ -71,7 +71,7 @@ const STM={ACTIVE:['Активен','--ok'],DISABLED:['Отключён','--mu']
 const NS={ONLINE:['Онлайн','--ok'],OFFLINE:['Не отвечает','--er'],CONNECTING:['Подключение','--wr'],DISABLED:['Отключён','--mu']};
 const STRAT=[['NO_RESET','Не сбрасывать'],['DAY','Каждый день'],['WEEK','Каждую неделю'],['MONTH','Каждый месяц']];
 const nstat=n=>n.disabled?'DISABLED':n.state;
-const NAV=[['Обзор',[['home','home','Дашборд',1]]],['Управление',[['users','users','Пользователи',1],['squads','layers','Сквады'],['hosts','link','Хосты',1],['nodes','server','Узлы',1],['templates','file','Шаблоны'],['profiles','code','Профили Xray']]],['Инструменты',[['tools','tool','Диагностика']]],['Система',[['admins','shield','Админы'],['set','sliders','Настройки']]]];
+const NAV=[['Обзор',[['home','home','Дашборд',1]]],['Управление',[['users','users','Пользователи',1],['squads','layers','Сквады'],['hosts','link','Хосты',1],['nodes','server','Узлы',1],['templates','file','Шаблоны'],['profiles','code','XRAY STUDIO']]],['Инструменты',[['tools','tool','Диагностика']]],['Система',[['admins','shield','Админы'],['set','sliders','Настройки']]]];
 const FLAT=NAV.flatMap(g=>g[1]);
 const swc=k=>r=>`<label class="sw"><input type="checkbox" data-tg="${k}:${r.id}" ${r.disabled?'':'checked'} aria-label="Включено"><span></span></label>`;
 const ENT={
@@ -81,13 +81,13 @@ const ENT={
   hosts:{t:'Хосты',n:'Точки входа, которые попадают в подписку. Порядок определяет приоритет.',s:'order',nw:'Хост',mv:1,fs:[{k:'remark',l:'Название (remark)',req:1},{k:'address',l:'Адрес',req:1},{k:'port',l:'Порт',t:'num'},{k:'tag',l:'Инбаунд',t:'sel',o:tags},{k:'sni',l:'SNI'},{k:'path',l:'Path'},{k:'sec',l:'Безопасность',t:'sel',o:['reality','tls','none']},{k:'fp',l:'Fingerprint',t:'sel',o:['chrome','firefox','safari','random']},{k:'nodes',l:'Только на узлах',t:'multi',o:()=>DB.nodes.map(n=>[n.id,n.flag+' '+n.name]),h:'Ничего не выбрано — на всех узлах'}],
     def:()=>({port:443,sec:'reality',fp:'chrome',order:DB.hosts.length+1,nodes:[]}),
     cols:[['Название',r=>`<b>${esc(r.remark)}</b>`],['Адрес',r=>`${esc(r.address)}:${r.port}`],['Инбаунд',r=>chip(esc(r.tag),tcol(r.tag))],['SNI',r=>esc(r.sni||'—')],['Узлы',r=>r.nodes.length?r.nodes.map(i=>DB.nodes.find(n=>n.id==i)?.flag).join(' '):'все'],['Вкл.',swc('hosts')]]},
-  nodes:{t:'Узлы',nw:'Узел',s:'id',fs:[{k:'name',l:'Название',req:1},{k:'flag',l:'Страна и флаг',t:'country'},{k:'addr',l:'Адрес',req:1},{k:'port',l:'Порт ноды',t:'num',req:1},{k:'profileId',l:'Профиль Xray',t:'sel',o:()=>DB.profiles.map(p=>[p.id,p.name])},{k:'mult',l:'Коэффициент трафика',t:'num',h:'1 — без изменений, 2 — считать вдвое'},{k:'limit',l:'Лимит трафика, ГБ',t:'num',h:'0 — без лимита'},{k:'resetDay',l:'День сброса счётчика',t:'num'}],def:()=>({flag:'',mult:1,limit:0,resetDay:1}),
+  nodes:{t:'Узлы',nw:'Узел',s:'id',fs:[{k:'name',l:'Название',req:1},{k:'flag',l:'Страна и флаг',t:'country'},{k:'addr',l:'Адрес',req:1},{k:'port',l:'Порт ноды',t:'num',req:1},{k:'profileId',l:'XRAY STUDIO',t:'sel',o:()=>DB.profiles.map(p=>[p.id,p.name])},{k:'mult',l:'Коэффициент трафика',t:'num',h:'1 — без изменений, 2 — считать вдвое'},{k:'limit',l:'Лимит трафика, ГБ',t:'num',h:'0 — без лимита'},{k:'resetDay',l:'День сброса счётчика',t:'num'}],def:()=>({flag:'',mult:1,limit:0,resetDay:1}),
     guard:r=>DB.hosts.some(h=>h.nodes.includes(r.id))?'Узел указан в хостах. Уберите его оттуда.':''},
   tpls:{t:'Шаблоны пользователей',n:'Готовые тарифы: выбираются при создании и подставляют лимиты, срок и доступ.',s:'id',nw:'Шаблон',fs:[{k:'name',l:'Название',req:1},{k:'limit',l:'Лимит, ГБ',t:'num',h:'0 — без лимита'},{k:'days',l:'Срок, дней',t:'num',h:'0 — бессрочно'},{k:'strategy',l:'Сброс трафика',t:'sel',o:STRAT},{k:'hwid',l:'Лимит устройств',t:'num'},{k:'squads',l:'Сквады',t:'multi',o:()=>DB.squads.map(s=>[s.id,s.name])},{k:'hold',l:'Отсчёт срока с первого подключения',t:'bool'}],def:()=>({strategy:'NO_RESET',hwid:2,squads:[]}),
     cols:[['Название',r=>`<b>${esc(r.name)}</b>`],['Трафик',r=>r.limit?r.limit+' ГБ':'∞'],['Срок',r=>r.days?r.days+' дн':'∞'],['Устройств',r=>r.hwid],['Сквады',r=>r.squads.map(i=>chip(esc(DB.squads.find(s=>s.id==i)?.name||'?'),'--b')).join(' ')],['Режим',r=>r.hold?chip('on hold','--c3'):'—']]},
   subs:{t:'Шаблоны подписки',n:'Что получает клиентское приложение: формат и содержимое конфигурации.',s:'id',nw:'Шаблон',fs:[{k:'name',l:'Название',req:1},{k:'fmt',l:'Формат',t:'sel',o:FMT},{k:'content',l:'Содержимое',t:'area',rows:9}],def:()=>({fmt:'XRAY_JSON',content:'{}'}),
     cols:[['Название',r=>`<b>${esc(r.name)}</b>`],['Формат',r=>chip(r.fmt,'--c3')],['Размер',r=>r.content.length+' симв.']]},
-  profiles:{t:'Профили Xray',n:'Конфигурации ядра. Инбаунды из профиля становятся доступны в сквадах и хостах.',s:'id',nw:'Профиль',fs:[{k:'name',l:'Название',req:1},{k:'config',l:'Конфигурация (JSON)',t:'area',rows:16,h:'Вставьте полный конфиг Xray. В нём должен быть хотя бы один inbound.'}],def:()=>({config:''}),
+  profiles:{t:'XRAY STUDIO',n:'Конфигурации ядра. Инбаунды из профиля становятся доступны в сквадах и хостах.',s:'id',nw:'Профиль',fs:[{k:'name',l:'Название',req:1},{k:'config',l:'Конфигурация (JSON)',t:'area',rows:16,h:'Вставьте полный конфиг Xray. В нём должен быть хотя бы один inbound.'}],def:()=>({config:''}),
     chk:(d,id)=>{let j;try{j=JSON.parse(d.config)}catch(e){return'Некорректный JSON: '+e.message}if(!Array.isArray(j.inbounds)||!j.inbounds.length)return'В конфиге нет массива inbounds.';const t=j.inbounds.map(i=>i.tag);if(t.some(x=>!x))return'У каждого инбаунда должен быть tag.';if(new Set(t).size!=t.length)return'Теги инбаундов должны быть уникальными.';const ot=DB.profiles.filter(p=>p.id!=id).flatMap(p=>inbs(p).map(i=>i.tag));if(t.some(x=>ot.includes(x)))return'Тег уже используется в другом профиле.'},
     cols:[['Название',r=>`<b>${esc(r.name)}</b>`],['Инбаунды',r=>inbs(r).map(i=>chip(esc(i.tag)+' · '+i.port,tcol(i.tag))).join(' ')||'—'],['Узлов',r=>DB.nodes.filter(n=>n.profileId==r.id).length]],
     guard:r=>DB.nodes.some(n=>n.profileId==r.id)?'Профиль назначен узлам. Сначала смените профиль у этих узлов.':''},
@@ -139,7 +139,7 @@ const apply=()=>{const r=document.documentElement;r.dataset.theme=C.theme=='auto
 const brand=()=>{$('#bn').textContent=DB.set.brand;$('#lg').textContent=(DB.set.brand[0]||'L').toUpperCase()};
 
 let T=[],cur='',RT=0;
-const pages={home:['Дашборд',homeP],users:['Пользователи',usersP],squads:['Сквады',()=>simple(['squads'])],hosts:['Хосты',()=>simple(['hosts'])],nodes:['Узлы',nodesP],templates:['Шаблоны',()=>simple(['tpls','subs'])],profiles:['Профили Xray',profilesP],tools:['Диагностика',toolsP],admins:['Администраторы',()=>simple(['admins'])],set:['Настройки',setP]};
+const pages={home:['Дашборд',homeP],users:['Пользователи',usersP],squads:['Сквады',()=>simple(['squads'])],hosts:['Хосты',()=>simple(['hosts'])],nodes:['Узлы',nodesP],templates:['Шаблоны',()=>simple(['tpls','subs'])],profiles:['XRAY STUDIO',profilesP],tools:['Диагностика',toolsP],admins:['Администраторы',()=>simple(['admins'])],set:['Настройки',setP]};
 const skel=()=>`<div class="sk" style="height:7rem"></div><div class="sk" style="height:18rem"></div><div class="sk" style="height:12rem"></div>`;
 $('#nav').innerHTML=NAV.map(([g,a])=>`<div class="g">${g}</div>`+a.map(([k,i,l,p])=>`<a href="#${k}" class="${p?'':'sec'}">${ic(i)}<span class="lbl">${l}</span>${k=='users'?'<em id="unb"></em>':''}</a>`).join('')).join('')+`<button class="more" id="more">${ic('more')}<span class="lbl">Ещё</span></button>`;
 async function render(soft){
@@ -184,9 +184,9 @@ async function homeP(){
   let system=null,systemError="";try{system=await api.systemStats()}catch(e){systemError=e.message||"Не удалось получить системные показатели."}
   const totalItems=DB.nodes.length+DB.users.length+DB.profiles.length+DB.hosts.length+DB.squads.length+DB.tpls.length+DB.subs.length+DB.admins.length;
   const firstRun=totalItems===0;
-  const counts=[['Узлы',DB.nodes.length],['Пользователи',DB.users.length],['Профили Xray',DB.profiles.length],['Хосты',DB.hosts.length]];
+  const counts=[['Узлы',DB.nodes.length],['Пользователи',DB.users.length],['XRAY STUDIO',DB.profiles.length],['Хосты',DB.hosts.length]];
   const setup=[
-    ['01','Профиль Xray','Добавьте свой конфиг Xray с нужными inbound.','Профиль','profiles'],
+    ['01','XRAY STUDIO','Добавьте свой конфиг Xray с нужными inbound.','Профиль','profiles'],
     ['02','Узел','Укажите адрес сервера и назначьте профиль.','Добавить узел','nodes'],
     ['03','Хост','Опишите адреса и параметры подключения, которые будут доступны клиентам.','Добавить хост','hosts'],
     ['04','Сквад','Объедините inbound в группы доступа.','Создать сквад','squads']
@@ -243,51 +243,107 @@ function userNew(){
 function exportCsv(){const rows=[['username','status','used_gb','limit_gb','expire','tag','telegram','email','squads','sub_url']].concat(UIDS.map(id=>DB.users.find(u=>u.id==id)).map(u=>[u.username,st(u),u.used,u.limit,u.expireAt?new Date(u.expireAt).toISOString().slice(0,10):'',u.tag,u.tg,u.email,u.squads.map(i=>DB.squads.find(s=>s.id==i)?.name).join('|'),subUrl(u)]));
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n')],{type:'text/csv'}));a.download='users.csv';a.click();toast(`Экспортировано: ${UIDS.length}`)}
 
-/* ================= БЫСТРЫЙ КОНСТРУКТОР ПРОФИЛЯ XRAY ================= */
+/* ================= XRAY STUDIO: PROTOCOLS, TRANSPORTS & FINGERPRINTS ================= */
+const XRAY_FP=['chrome','firefox','safari','ios','android','edge','360','qq','random','randomized','randomized-no-sni'];
+const XRAY_PROTOCOLS=[['vless','VLESS'],['vmess','VMess'],['trojan','Trojan'],['shadowsocks','Shadowsocks'],['socks','SOCKS'],['http','HTTP proxy'],['dokodemo-door','Dokodemo-door'],['wireguard','WireGuard']];
+const XRAY_NETWORKS=[['raw','RAW / TCP'],['xhttp','XHTTP'],['ws','WebSocket'],['grpc','gRPC'],['httpupgrade','HTTPUpgrade'],['kcp','mKCP']];
 function xrayBuilderConfig(){
-  const protocol=$('#xpb-protocol').value,network=$('#xpb-network').value,security=$('#xpb-security').value;
-  const tag=$('#xpb-tag').value.trim()||'inbound-1',port=cl(+$('#xpb-port').value||443,1,65535);
-  const sni=$('#xpb-sni').value.trim()||'example.com',dest=$('#xpb-dest').value.trim()||sni+':443',path=$('#xpb-path').value.trim()||'/';
-  const settings=protocol==='vless'?{clients:[],decryption:''}:protocol==='trojan'?{clients:[]}:{clients:[],network:'tcp,udp',method:'chacha20-ietf-poly1305'};
-  const inbound={tag,listen:'0.0.0.0',port,protocol,settings,streamSettings:{network,security}};
-  if(network==='ws')inbound.streamSettings.wsSettings={path};
-  if(network==='xhttp')inbound.streamSettings.xhttpSettings={path};
-  if(network==='grpc')inbound.streamSettings.grpcSettings={serviceName:path.replace(/^\//,'')||'grpc'};
-  if(security==='tls')inbound.streamSettings.tlsSettings={serverName:sni,alpn:['h2','http/1.1'],certificates:[{certificateFile:'/etc/ssl/xray/fullchain.pem',keyFile:'/etc/ssl/xray/privkey.pem'}]};
-  if(security==='reality')inbound.streamSettings.realitySettings={show:false,dest,xver:0,serverNames:[sni],privateKey:'REPLACE_WITH_XRAY_PRIVATE_KEY',shortIds:['0123456789abcdef']};
-  return {log:{loglevel:'warning'},inbounds:[inbound],outbounds:[{protocol:'freedom',tag:'direct'},{protocol:'blackhole',tag:'blocked'}],routing:{rules:[{type:'field',outboundTag:'direct',inboundTag:[tag]}]}};
+ const v=id=>$('#xpb-'+id)?.value||'',protocol=v('protocol'),network=v('network'),security=v('security'),tag=v('tag').trim()||'inbound-1',port=cl(+v('port')||443,1,65535),sni=v('sni').trim()||'example.com',dest=v('dest').trim()||sni+':443',path=v('path').trim()||'/';
+ const settings={
+ vless:{clients:[],decryption:'none'},vmess:{clients:[],default:{alterId:0}},trojan:{clients:[]},
+ shadowsocks:{clients:[],network:'tcp,udp',method:v('ss-method')||'chacha20-ietf-poly1305',password:'REPLACE_WITH_STRONG_PASSWORD'},
+ socks:{auth:v('socks-auth')||'noauth',accounts:[],udp:true,ip:'127.0.0.1'},http:{accounts:[],allowTransparent:false},
+ 'dokodemo-door':{address:v('doko-address')||'127.0.0.1',port:cl(+v('doko-port')||53,1,65535),network:v('doko-network')||'tcp,udp',followRedirect:false},
+ wireguard:{secretKey:'REPLACE_WITH_WIREGUARD_PRIVATE_KEY',address:['10.0.0.1/32'],peers:[],mtu:1420}
+ }[protocol];
+ const inbound={tag,listen:v('listen')||'0.0.0.0',port,protocol,settings,streamSettings:{network,security}},ss=inbound.streamSettings;
+ if(network==='ws')ss.wsSettings={path,headers:v('host')?{Host:v('host')}:{},heartbeatPeriod:0};
+ if(network==='xhttp')ss.xhttpSettings={path,host:v('host'),mode:v('xhttp-mode')||'auto',extra:{xPaddingBytes:v('xhttp-padding')||'100-1000'}};
+ if(network==='grpc')ss.grpcSettings={serviceName:path.replace(/^\//,'')||'grpc',multiMode:v('grpc-mode')==='multi'};
+ if(network==='httpupgrade')ss.httpupgradeSettings={path,host:v('host')};
+ if(network==='kcp')ss.kcpSettings={mtu:1350,tti:20,uplinkCapacity:5,downlinkCapacity:20,congestion:false,readBufferSize:2,writeBufferSize:2,seed:v('kcp-seed')||''};
+ if(network==='raw'&&v('raw-header')==='http')ss.rawSettings={header:{type:'http',request:{version:'1.1',method:'GET',path:[path],headers:{Host:[v('host')||sni],'User-Agent':['Mozilla/5.0'],'Accept-Encoding':['gzip, deflate'],'Connection':['keep-alive']}}}};
+ if(security==='tls')ss.tlsSettings={serverName:sni,alpn:v('alpn').split(',').map(x=>x.trim()).filter(Boolean),minVersion:v('tls-min')||'1.2',maxVersion:v('tls-max')||'1.3',certificates:[{certificateFile:v('cert')||'/etc/ssl/xray/fullchain.pem',keyFile:v('key')||'/etc/ssl/xray/privkey.pem'}]};
+ if(security==='reality')ss.realitySettings={show:false,dest,xver:cl(+v('xver')||0,0,2),serverNames:[sni],privateKey:v('private-key')||'REPLACE_WITH_XRAY_PRIVATE_KEY',shortIds:[(v('short-id')||'0123456789abcdef').replace(/[^a-fA-F0-9]/g,'').slice(0,16)],spiderX:v('spider-x')||'/'};
+ return {log:{loglevel:v('loglevel')||'warning'},inbounds:[inbound],outbounds:[{protocol:'freedom',tag:'direct'},{protocol:'blackhole',tag:'blocked'}],routing:{rules:[{type:'field',outboundTag:'direct',inboundTag:[tag]}]}};
+}
+function xrayClientSample(){
+ const v=id=>$('#xpb-'+id)?.value||'',protocol=v('protocol'),network=v('network'),security=v('security'),sni=v('sni').trim()||'example.com',port=cl(+v('port')||443,1,65535),path=v('path')||'/',host=v('host')||sni;
+ let settings;
+ if(protocol==='vless')settings={vnext:[{address:'SERVER_ADDRESS',port,users:[{id:'REPLACE_WITH_USER_UUID',encryption:'none',...(v('flow')?{flow:v('flow')}:{})}]}]};
+ else if(protocol==='vmess')settings={vnext:[{address:'SERVER_ADDRESS',port,users:[{id:'REPLACE_WITH_USER_UUID',alterId:0,security:v('vmess-security')||'auto'}]}]};
+ else if(protocol==='trojan')settings={servers:[{address:'SERVER_ADDRESS',port,password:'REPLACE_WITH_USER_PASSWORD'}]};
+ else if(protocol==='shadowsocks')settings={servers:[{address:'SERVER_ADDRESS',port,method:v('ss-method')||'chacha20-ietf-poly1305',password:'REPLACE_WITH_STRONG_PASSWORD'}]};
+ else settings={servers:[{address:'SERVER_ADDRESS',port}]};
+ const streamSettings={network,security};
+ if(network==='ws')streamSettings.wsSettings={path,headers:host?{Host:host}:{}};
+ if(network==='xhttp')streamSettings.xhttpSettings={path,host,mode:v('xhttp-mode')||'auto'};
+ if(network==='grpc')streamSettings.grpcSettings={serviceName:path.replace(/^\//,'')||'grpc',multiMode:v('grpc-mode')==='multi'};
+ if(network==='httpupgrade')streamSettings.httpupgradeSettings={path,host};
+ if(network==='kcp')streamSettings.kcpSettings={seed:v('kcp-seed')||''};
+ if(security==='tls')streamSettings.tlsSettings={serverName:sni,alpn:v('alpn').split(',').map(x=>x.trim()).filter(Boolean),fingerprint:v('fingerprint')||'chrome'};
+ if(security==='reality')streamSettings.realitySettings={serverName:sni,fingerprint:v('fingerprint')||'chrome',publicKey:v('public-key')||'REPLACE_WITH_REALITY_PUBLIC_KEY',shortId:v('short-id')||'0123456789abcdef',spiderX:v('spider-x')||'/'};
+ return {remarks:$('#xpb-name')?.value.trim()||'XRAY STUDIO client',outbounds:[{tag:'proxy',protocol,settings,streamSettings},{tag:'direct',protocol:'freedom'},{tag:'block',protocol:'blackhole'}],routing:{domainStrategy:'AsIs',rules:[]}};
 }
 async function profilesP(){
-  const saved=await crudCard('profiles');
-  const builderHtml=`<section class="card xray-builder"><div class="hd"><div><h3>Быстрый конструктор Xray</h3><p>Соберите стартовый профиль без ручного набора JSON. Перед запуском замените шаблонные ключи и сертификаты.</p></div><span class="chip" style="--c:var(--a)">JSON builder</span></div>
-  <div class="xray-builder-grid">
-    <label class="f"><span>Название профиля</span><input id="xpb-name" value="Новый Xray профиль" maxlength="80"></label>
-    <label class="f"><span>Тег inbound</span><input id="xpb-tag" value="inbound-1" maxlength="64"></label>
-    <label class="f"><span>Порт</span><input id="xpb-port" type="number" min="1" max="65535" value="443"></label>
-    <label class="f"><span>Протокол</span><select id="xpb-protocol"><option value="vless">VLESS</option><option value="trojan">Trojan</option><option value="shadowsocks">Shadowsocks</option></select></label>
-    <label class="f"><span>Транспорт</span><select id="xpb-network"><option value="tcp">TCP</option><option value="xhttp">XHTTP</option><option value="ws">WebSocket</option><option value="grpc">gRPC</option></select></label>
-    <label class="f"><span>Защита транспорта</span><select id="xpb-security"><option value="reality">Reality</option><option value="tls">TLS</option><option value="none">Без TLS/Reality</option></select></label>
-    <label class="f"><span>SNI / Server name</span><input id="xpb-sni" value="example.com"></label>
-    <label class="f"><span>Reality destination</span><input id="xpb-dest" value="example.com:443"></label>
-    <label class="f"><span>Path / gRPC service</span><input id="xpb-path" value="/" placeholder="/path"></label>
-  </div>
-  <p class="note">Клиенты намеренно пустые. Reality private key и TLS-сертификаты — шаблонные значения: настройте их под свой сервер. Конструктор создаёт конфигурацию, но сам не меняет запущенный Xray.</p>
-  <label class="f"><span>Предпросмотр JSON</span><textarea id="xpb-preview" class="xray-preview" spellcheck="false" readonly></textarea></label>
-  <div class="act"><button type="button" class="gh" id="xpb-download">Скачать JSON</button><button type="button" class="gh" id="xpb-copy">Копировать JSON</button><button type="button" class="btn" id="xpb-save">Сохранить профиль</button></div><p class="er" id="xpb-error" role="status"></p></section>`;
-  return [builderHtml+saved,()=>{
-    const updatePreview=()=>{try{$('#xpb-preview').value=JSON.stringify(xrayBuilderConfig(),null,2);$('#xpb-error').textContent=''}catch(e){$('#xpb-error').textContent=e.message}};
-    ['xpb-tag','xpb-port','xpb-protocol','xpb-network','xpb-security','xpb-sni','xpb-dest','xpb-path'].forEach(id=>$('#'+id).addEventListener('input',updatePreview));
-    updatePreview();
-    $('#xpb-copy').onclick=async()=>{try{await navigator.clipboard.writeText($('#xpb-preview').value);toast('JSON скопирован')}catch(e){$('#xpb-preview').select();document.execCommand('copy');toast('JSON скопирован')}};
-    $('#xpb-download').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([$('#xpb-preview').value],{type:'application/json'}));a.download=(($('#xpb-name').value||'xray-profile').trim().replace(/[^a-z0-9_-]+/gi,'-')||'xray-profile')+'.json';a.click();URL.revokeObjectURL(a.href)};
-    $('#xpb-save').onclick=async()=>{const name=$('#xpb-name').value.trim();if(!name){$('#xpb-error').textContent='Укажите название профиля.';return}try{const config=$('#xpb-preview').value,data=JSON.parse(config),tags=data.inbounds.map(i=>i.tag);if(!data.inbounds.length||tags.some(t=>!t))throw new Error('У inbound должен быть тег.');if(new Set(tags).size!==tags.length)throw new Error('Теги inbound должны быть уникальными.');if(DB.profiles.some(p=>p.name.toLowerCase()===name.toLowerCase()))throw new Error('Профиль с таким названием уже существует.');const used=DB.profiles.flatMap(inbs).map(i=>i.tag);if(tags.some(t=>used.includes(t)))throw new Error('Такой тег уже используется в другом профиле.');await api.create('profiles',{name,config});toast('Профиль Xray сохранён');await render(1)}catch(e){$('#xpb-error').textContent=e.message||'Не удалось сохранить профиль.'}};
-  }];
+ const saved=await crudCard('profiles');
+ const builderHtml='<section class="card xray-builder"><div class="hd"><div><p class="note">XRAY CORE · ADVANCED CONFIGURATION</p><h3>XRAY STUDIO</h3><p>Конструктор серверных inbound и клиентских outbound: протоколы, транспорты, TLS/Reality и uTLS fingerprints.</p></div><span class="chip" style="--c:var(--a)">PRO MODE</span></div>'+
+ '<div class="xray-studio-tabs" role="tablist"><button type="button" class="on" data-xray-tab="server">Серверный inbound</button><button type="button" data-xray-tab="client">Клиентский outbound</button></div>'+
+ '<div class="xray-builder-grid">'+
+ '<label class="f"><span>Название профиля</span><input id="xpb-name" value="XRAY STUDIO profile" maxlength="80"></label>'+
+ '<label class="f"><span>Inbound tag</span><input id="xpb-tag" value="inbound-1" maxlength="64"></label>'+
+ '<label class="f"><span>Listen address</span><input id="xpb-listen" value="0.0.0.0"></label>'+
+ '<label class="f"><span>Порт</span><input id="xpb-port" type="number" min="1" max="65535" value="443"></label>'+
+ '<label class="f"><span>Протокол</span><select id="xpb-protocol">'+XRAY_PROTOCOLS.map(x=>'<option value="'+x[0]+'">'+x[1]+'</option>').join('')+'</select></label>'+
+ '<label class="f"><span>Транспорт</span><select id="xpb-network">'+XRAY_NETWORKS.map(x=>'<option value="'+x[0]+'"'+(x[0]==='raw'?' selected':'')+'>'+x[1]+'</option>').join('')+'</select></label>'+
+ '<label class="f"><span>Безопасность</span><select id="xpb-security"><option value="reality">Reality</option><option value="tls">TLS</option><option value="none">Без TLS/Reality</option></select></label>'+
+ '<label class="f"><span>SNI / Server name</span><input id="xpb-sni" value="example.com"></label>'+
+ '<label class="f"><span>Host header</span><input id="xpb-host" placeholder="Необязательно"></label>'+
+ '<label class="f"><span>Path / service name</span><input id="xpb-path" value="/" placeholder="/path или gRPC service"></label>'+
+ '<label class="f"><span>Reality destination</span><input id="xpb-dest" value="example.com:443"></label>'+
+ '<label class="f"><span>Reality private key (сервер)</span><input id="xpb-private-key" placeholder="REPLACE_WITH_XRAY_PRIVATE_KEY" autocomplete="off"></label>'+
+ '<label class="f"><span>Reality public key (клиент)</span><input id="xpb-public-key" placeholder="Публичный ключ Reality" autocomplete="off"></label>'+
+ '<label class="f"><span>Reality short ID</span><input id="xpb-short-id" value="0123456789abcdef" maxlength="16"></label>'+
+ '<label class="f"><span>Reality spiderX</span><input id="xpb-spider-x" value="/"></label>'+
+ '<label class="f"><span>Reality xver</span><select id="xpb-xver"><option>0</option><option>1</option><option>2</option></select></label>'+
+ '<label class="f"><span>TLS certificate file</span><input id="xpb-cert" value="/etc/ssl/xray/fullchain.pem"></label>'+
+ '<label class="f"><span>TLS private key file</span><input id="xpb-key" value="/etc/ssl/xray/privkey.pem"></label>'+
+ '<label class="f"><span>TLS ALPN</span><input id="xpb-alpn" value="h2,http/1.1" placeholder="h2,http/1.1"></label>'+
+ '<label class="f"><span>TLS minimum</span><select id="xpb-tls-min"><option>1.2</option><option>1.3</option></select></label>'+
+ '<label class="f"><span>TLS maximum</span><select id="xpb-tls-max"><option>1.3</option><option>1.2</option></select></label>'+
+ '<label class="f"><span>uTLS fingerprint (клиент)</span><select id="xpb-fingerprint">'+XRAY_FP.map(x=>'<option value="'+x+'"'+(x==='chrome'?' selected':'')+'>'+x+'</option>').join('')+'</select><small>Fingerprint работает на клиентском outbound, а не на inbound.</small></label>'+
+ '<label class="f"><span>VLESS flow (клиент)</span><select id="xpb-flow"><option value="">Без flow</option><option value="xtls-rprx-vision">xtls-rprx-vision</option></select></label>'+
+ '<label class="f"><span>VMess cipher (клиент)</span><select id="xpb-vmess-security"><option>auto</option><option>aes-128-gcm</option><option>chacha20-poly1305</option><option>none</option></select></label>'+
+ '<label class="f"><span>Shadowsocks method</span><select id="xpb-ss-method"><option>chacha20-ietf-poly1305</option><option>2022-blake3-aes-128-gcm</option><option>2022-blake3-aes-256-gcm</option><option>2022-blake3-chacha20-poly1305</option><option>aes-128-gcm</option><option>aes-256-gcm</option><option>none</option></select></label>'+
+ '<label class="f"><span>SOCKS authentication</span><select id="xpb-socks-auth"><option value="noauth">No authentication</option><option value="password">Username / password</option></select></label>'+
+ '<label class="f"><span>Dokodemo destination address</span><input id="xpb-doko-address" value="127.0.0.1"></label>'+
+ '<label class="f"><span>Dokodemo destination port</span><input id="xpb-doko-port" type="number" min="1" max="65535" value="53"></label>'+
+ '<label class="f"><span>Dokodemo network</span><select id="xpb-doko-network"><option>tcp,udp</option><option>tcp</option><option>udp</option></select></label>'+
+ '<label class="f"><span>XHTTP mode</span><select id="xpb-xhttp-mode"><option>auto</option><option>packet-up</option><option>stream-up</option><option>stream-one</option></select></label>'+
+ '<label class="f"><span>XHTTP padding range</span><input id="xpb-xhttp-padding" value="100-1000"></label>'+
+ '<label class="f"><span>gRPC mode</span><select id="xpb-grpc-mode"><option value="gun">gun</option><option value="multi">multi</option></select></label>'+
+ '<label class="f"><span>mKCP seed</span><input id="xpb-kcp-seed"></label>'+
+ '<label class="f"><span>RAW TCP header</span><select id="xpb-raw-header"><option value="none">None</option><option value="http">HTTP camouflage header</option></select></label>'+
+ '<label class="f"><span>Log level</span><select id="xpb-loglevel"><option>warning</option><option>error</option><option>none</option><option>info</option><option>debug</option></select></label></div>'+
+ '<div class="xray-studio-note"><b>Важно:</b> uTLS fingerprint — параметр исходящего подключения клиента. Он добавляется в client sample, а не в server inbound. UUID, ключи Reality и пароли — шаблоны. XRAY STUDIO генерирует JSON, но не применяет его автоматически к работающему Xray.</div>'+
+ '<section class="xray-output-pane" data-xray-pane="server"><label class="f"><span>Серверный Xray config · JSON</span><textarea id="xpb-preview" class="xray-preview" spellcheck="false" readonly></textarea></label><div class="act"><button type="button" class="gh" id="xpb-download">Скачать server JSON</button><button type="button" class="gh" id="xpb-copy">Копировать server JSON</button><button type="button" class="btn" id="xpb-save">Сохранить профиль</button></div></section>'+
+ '<section class="xray-output-pane" data-xray-pane="client" hidden><label class="f"><span>Клиентский outbound sample · JSON</span><textarea id="xpb-client-preview" class="xray-preview" spellcheck="false" readonly></textarea></label><p class="note">Это шаблон, а не готовая подписка. Замените SERVER_ADDRESS, UUID/пароль и публичный Reality key реальными значениями.</p><div class="act"><button type="button" class="gh" id="xpb-client-download">Скачать client JSON</button><button type="button" class="gh" id="xpb-client-copy">Копировать client JSON</button></div></section><p class="er" id="xpb-error" role="status"></p></section>';
+ return [builderHtml+saved,()=>{
+  const updatePreview=()=>{try{$('#xpb-preview').value=JSON.stringify(xrayBuilderConfig(),null,2);$('#xpb-client-preview').value=JSON.stringify(xrayClientSample(),null,2);$('#xpb-error').textContent=''}catch(e){$('#xpb-error').textContent=e.message}};
+  $$('[id^="xpb-"]').filter(el=>el.tagName==='INPUT'||el.tagName==='SELECT').forEach(el=>{el.addEventListener('input',updatePreview);el.addEventListener('change',updatePreview)});
+  $$('[data-xray-tab]').forEach(btn=>btn.addEventListener('click',()=>{const target=btn.dataset.xrayTab;$$('[data-xray-tab]').forEach(x=>x.classList.toggle('on',x===btn));$$('[data-xray-pane]').forEach(x=>x.hidden=x.dataset.xrayPane!==target)}));
+  updatePreview();
+  const copyText=async id=>{try{await navigator.clipboard.writeText($('#'+id).value);toast('JSON скопирован')}catch(e){$('#'+id).select();document.execCommand('copy');toast('JSON скопирован')}};
+  const download=(id,suffix)=>{const a=document.createElement('a'),blob=URL.createObjectURL(new Blob([$('#'+id).value],{type:'application/json'}));a.href=blob;a.download=((($('#xpb-name').value||'xray-studio').trim().replace(/[^a-z0-9_-]+/gi,'-')||'xray-studio')+'-'+suffix+'.json');a.click();setTimeout(()=>URL.revokeObjectURL(blob),1000)};
+  $('#xpb-copy').onclick=()=>copyText('xpb-preview');$('#xpb-client-copy').onclick=()=>copyText('xpb-client-preview');$('#xpb-download').onclick=()=>download('xpb-preview','server');$('#xpb-client-download').onclick=()=>download('xpb-client-preview','client');
+  $('#xpb-save').onclick=async()=>{const name=$('#xpb-name').value.trim();if(!name){$('#xpb-error').textContent='Укажите название профиля.';return}try{const config=$('#xpb-preview').value,data=JSON.parse(config),tags=data.inbounds.map(i=>i.tag);if(!data.inbounds.length||tags.some(t=>!t))throw new Error('У inbound должен быть тег.');if(new Set(tags).size!==tags.length)throw new Error('Теги inbound должны быть уникальными.');if(DB.profiles.some(p=>p.name.toLowerCase()===name.toLowerCase()))throw new Error('Профиль с таким названием уже существует.');const used=DB.profiles.flatMap(inbs).map(i=>i.tag);if(tags.some(t=>used.includes(t)))throw new Error('Тег уже используется в другом профиле.');await api.create('profiles',{name,config});toast('Профиль сохранён в XRAY STUDIO');await render(1)}catch(e){$('#xpb-error').textContent=e.message||'Не удалось сохранить профиль.'}};
+ }];
 }
 
 /* ================= CRUD-страницы ================= */
 async function crudCard(k){
   const e=ENT[k],{items}=await api.list(k,{sort:e.s});
-  const emptyLabel={nodes:'Узлов пока нет',profiles:'Профилей Xray пока нет',squads:'Сквадов пока нет',hosts:'Хостов пока нет',tpls:'Шаблонов пока нет',subs:'Шаблонов подписки пока нет',admins:'Администраторов пока нет',tokens:'API-токенов пока нет'}[k]||'Пока пусто';
+  const emptyLabel={nodes:'Узлов пока нет',profiles:'Профилей в XRAY STUDIO пока нет',squads:'Сквадов пока нет',hosts:'Хостов пока нет',tpls:'Шаблонов пока нет',subs:'Шаблонов подписки пока нет',admins:'Администраторов пока нет',tokens:'API-токенов пока нет'}[k]||'Пока пусто';
   const emptyHint={nodes:'Добавьте первый сервер и назначьте ему профиль.',profiles:'Добавьте собственную конфигурацию Xray с inbound.',squads:'Создайте группу доступа на основе inbound.',hosts:'Добавьте адреса подключения, которые должны видеть клиенты.',tpls:'Сохраните тарифные параметры для повторного использования.',subs:'Настройте формат выдачи подписки после подключения API.',admins:'Список заполнится после добавления администраторов.',tokens:'Создайте токен для внешней интеграции.'}[k]||'Добавьте первую запись.';
   return `<div class="card"><div class="hd"><div><h3>${e.t}</h3><p>${e.n||''}</p></div><button class="btn sm" data-ne="${k}">${ic('plus')}${e.nw}</button></div>${items.length?`<div class="tw"><table class="tb"><thead><tr>${e.cols.map(c=>`<th>${c[0]}</th>`).join('')}${e.mv?'<th></th>':''}</tr></thead><tbody>${items.map((r,i)=>`<tr data-e="${k}:${r.id}">${e.cols.map(c=>`<td data-l="${c[0]}">${c[1](r)}</td>`).join('')}${e.mv?`<td data-l="Порядок"><button class="ia" data-mv="${k}:${r.id}:-1" ${i?'':'disabled'} aria-label="Выше">${ic('up')}</button><button class="ia" data-mv="${k}:${r.id}:1" ${i<items.length-1?'':'disabled'} aria-label="Ниже">${ic('down')}</button></td>`:''}</tr>`).join('')}</tbody></table></div>`:`<div class="empty"><b>${emptyLabel}</b><span>${emptyHint}</span><button class="gh sm" data-ne="${k}">${ic('plus')}${e.nw}</button></div>`}</div>`
 }
@@ -310,7 +366,7 @@ async function nodesP(){
   const cards=r.items.map(n=>{
     const ss=nstat(n),p=DB.profiles.find(x=>x.id==n.profileId),l=LV[n.id]||{cpu:null,ram:null,mbps:null},k=n.limit?cl(n.used/n.limit,0,1):0,tc=k>.9?'--er':k>.75?'--wr':'--c3';
     return `<div class="card nc${n.disabled?' off':''}"><div class="h"><span class="fg">${flagView(n.flag)}</span><div><b>${esc(n.name)}</b><br><small class="mu">${esc(n.addr)}${n.port?':'+esc(n.port):''}</small></div>${chip(NS[ss]?.[0]||'Не проверен',NS[ss]?.[1]||'--mu')}</div>
-      <div class="kvg"><div><span>Активные пользователи</span><b>${s.nodeOn[n.id]??0}</b></div><div><span>Профиль Xray</span>${esc(p?.name||'—')}</div></div>
+      <div class="kvg"><div><span>Активные пользователи</span><b>${s.nodeOn[n.id]??0}</b></div><div><span>XRAY STUDIO</span>${esc(p?.name||'—')}</div></div>
       <div class="node-gauges">
         ${nodeGauge(n,'cpu-'+n.id,'CPU',Number.isFinite(l.cpu)?l.cpu:0,Number.isFinite(l.cpu)?Math.round(l.cpu)+'%':'—',Number.isFinite(l.cpu)?'загрузка':'нет данных','--a')}
         ${nodeGauge(n,'ram-'+n.id,'RAM',Number.isFinite(l.ram)?l.ram:0,Number.isFinite(l.ram)?Math.round(l.ram)+'%':'—',Number.isFinite(l.ram)?'занято':'нет данных','--b')}
