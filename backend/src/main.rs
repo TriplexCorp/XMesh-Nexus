@@ -3,9 +3,9 @@ mod core;
 
 use axum::{
     extract::{Extension, Path, Request, State},
-    http::{HeaderName, HeaderValue, StatusCode},
+    http::{header, HeaderMap, HeaderName, HeaderValue, Method, StatusCode, Uri},
     middleware::{self, Next},
-    response::{IntoResponse, Response},
+    response::{Html, IntoResponse, Redirect, Response},
     routing::{get, patch, post},
     Json, Router,
 };
@@ -122,12 +122,16 @@ async fn main() -> anyhow::Result<()> {
 
     let static_dir = env::var("STATIC_DIR").unwrap_or_else(|_| "/app/static".to_owned());
     let app = Router::new()
+        .route("/", get(panel_entry))
+        .route("/index.html", get(index_redirect))
+        .route("/login", get(login_page))
         .nest("/api/v1", public.merge(protected))
         .fallback_service(ServeDir::new(static_dir).append_index_html_on_directories(true))
         .layer(RequestBodyLimitLayer::new(2 * 1024 * 1024))
         .layer(CompressionLayer::new())
         .layer(TraceLayer::new_for_http())
         .layer(middleware::from_fn(security_headers))
+        .layer(middleware::from_fn(csrf_guard))
         .with_state(state);
 
     let address = env::var("APP_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".to_owned());
@@ -135,6 +139,55 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!(address = %address, "XMesh Nexus API ready");
     axum::serve(listener, app).with_graceful_shutdown(shutdown_signal()).await?;
     Ok(())
+}
+
+async fn panel_entry(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    if !auth::is_authenticated(&state, &headers).await {
+        return Redirect::to("/login").into_response();
+    }
+    let static_dir = env::var("STATIC_DIR").unwrap_or_else(|_| "/app/static".to_owned());
+    match tokio::fs::read_to_string(PathBuf::from(static_dir).join("index.html")).await {
+        Ok(page) => Html(page).into_response(),
+        Err(error) => {
+            tracing::error!(error = %error, "Could not read panel entry page");
+            (StatusCode::INTERNAL_SERVER_ERROR, "Panel assets unavailable").into_response()
+        }
+    }
+}
+
+async fn index_redirect() -> Redirect {
+    Redirect::to("/")
+}
+
+async fn login_page(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    if auth::is_authenticated(&state, &headers).await {
+        return Redirect::to("/").into_response();
+    }
+    let static_dir = env::var("STATIC_DIR").unwrap_or_else(|_| "/app/static".to_owned());
+    match tokio::fs::read_to_string(PathBuf::from(static_dir).join("login.html")).await {
+        Ok(page) => Html(page).into_response(),
+        Err(error) => {
+            tracing::error!(error = %error, "Could not read login page");
+            (StatusCode::INTERNAL_SERVER_ERROR, "Login page unavailable").into_response()
+        }
+    }
+}
+
+async fn csrf_guard(request: Request, next: Next) -> Response {
+    let is_mutation = matches!(*request.method(), Method::POST | Method::PUT | Method::PATCH | Method::DELETE);
+    if is_mutation && request.uri().path().starts_with("/api/v1/") {
+        let origin = request.headers().get(header::ORIGIN).and_then(|value| value.to_str().ok());
+        let host = request.headers().get(header::HOST).and_then(|value| value.to_str().ok());
+        let valid = origin
+            .and_then(|value| value.parse::<Uri>().ok())
+            .and_then(|uri| uri.authority().map(|authority| authority.as_str().to_ascii_lowercase()))
+            .zip(host.map(str::to_ascii_lowercase))
+            .is_some_and(|(origin_authority, request_host)| origin_authority == request_host);
+        if !valid {
+            return (StatusCode::FORBIDDEN, Json(json!({"error": "Запрос отклонён проверкой источника."}))).into_response();
+        }
+    }
+    next.run(request).await
 }
 
 async fn shutdown_signal() {
