@@ -6,7 +6,9 @@
 
 - Rust API service and PostgreSQL persistence for panel collections: users, nodes, Xray profiles, hosts, squads, templates, administrators, tokens and settings.
 - Persistent records and settings in PostgreSQL (not browser-only `localStorage`).
-- Administrator sign-in with Argon2 password hashing, a 12-hour HttpOnly/SameSite session cookie, and an audit log for mutations.
+- Administrator sign-in with Argon2 password hashing, a dedicated `/login` page, a 12-hour HttpOnly/SameSite session cookie, and an audit log for mutations.
+- Server-side guard for the panel entry point, same-origin validation for state-changing API requests, and persistent account-based login throttling (8 failed attempts within 15 minutes trigger a 15-minute cooldown).
+- TOTP-based two-factor authentication is not part of this patch and remains a recommended next step before exposing the panel to untrusted networks.
 - Xray-core version manager in **Settings → Xray-core**. The default target is `latest`; the service reads official release metadata from the XTLS/Xray-core GitHub project, downloads the expected Linux archive for the container architecture, verifies an advertised SHA-256 digest when GitHub supplies one, runs `xray version` to check the executable, and switches the active version atomically.
 - API/database readiness probes, Rust CI, and a non-root/read-only application container.
 
