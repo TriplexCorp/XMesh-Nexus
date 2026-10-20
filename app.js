@@ -11,58 +11,41 @@ const chip=(t,c)=>`<span class="chip" style="--c:var(${c})">${t}</span>`;
 const smooth=p=>{let d=`M${p[0]}`;for(let i=0;i<p.length-1;i++){const a=p[i-1]||p[i],b=p[i],c=p[i+1],e=p[i+2]||c;d+=`C${b[0]+(c[0]-a[0])/6},${b[1]+(c[1]-a[1])/6},${c[0]-(e[0]-b[0])/6},${c[1]-(e[1]-b[1])/6},${c}`}return d};
 const P={home:'<rect x="3" y="3" width="7" height="9" rx="1.500"/><rect x="14" y="3" width="7" height="5" rx="1.500"/><rect x="14" y="12" width="7" height="9" rx="1.500"/><rect x="3" y="16" width="7" height="5" rx="1.500"/>',users:'<circle cx="9" cy="8" r="3.500"/><path d="M2.500 20c.6-3.600 3.200-5.500 6.500-5.500s5.900 1.900 6.500 5.500M16 4.600a3.500 3.500 0 0 1 0 6.800M18.500 14.800c1.700.7 2.700 2.300 3 4.700"/>',layers:'<path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 13 9 5 9-5"/>',link:'<path d="M10 14a4 4 0 0 0 5.700 0l3-3a4 4 0 0 0-5.700-5.700l-1 1M14 10a4 4 0 0 0-5.700 0l-3 3a4 4 0 0 0 5.700 5.700l1-1"/>',server:'<rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.500h.01M7 16.500h.01"/>',activity:'<path d="M3 12h4l3-8 4 16 3-8h4"/>',file:'<path d="M7 3h7l5 5v13H7V3Z"/><path d="M14 3v5h5"/>',code:'<path d="m8 8-4 4 4 4M16 8l4 4-4 4M13.500 5l-3 14"/>',tool:'<path d="M14 7a4 4 0 0 1 5.500-3.500L16 7l1 3 3 1 3.500-3.500A4 4 0 0 1 14 13l-8 8a2 2 0 0 1-3-3l8-8"/>',shield:'<path d="M12 3 4 6v6c0 4.500 3.400 8 8 9 4.600-1 8-4.500 8-9V6l-8-3Z"/>',sliders:'<path d="M4 7h9M19 7h1M4 17h1M11 17h9"/><circle cx="16" cy="7" r="2.200"/><circle cx="8" cy="17" r="2.200"/>',bell:'<path d="M6 16v-5a6 6 0 1 1 12 0v5l1.500 2h-15L6 16ZM10 21h4"/>',search:'<circle cx="11" cy="11" r="6.500"/><path d="m16 16 4.500 4.500"/>',sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2.500v2M12 19.500v2M2.500 12h2M19.500 12h2M5.300 5.300l1.400 1.400M17.300 17.300l1.400 1.400M5.300 18.700l1.400-1.400M17.300 6.700l1.400-1.400"/>',moon:'<path d="M20 14.500A8 8 0 1 1 9.500 4a6.500 6.500 0 0 0 10.500 10.500Z"/>',redo:'<path d="M20 11a8 8 0 1 0-2.300 5.700M20 4v7h-7"/>',plus:'<path d="M12 5v14M5 12h14"/>',x:'<path d="M6 6l12 12M18 6 6 18"/>',copy:'<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/>',trash:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/>',pause:'<path d="M8 5v14M16 5v14"/>',play:'<path d="M7 4.500v15l12-7.500L7 4.500Z"/>',up:'<path d="m6 15 6-6 6 6"/>',down:'<path d="m6 9 6 6 6-6"/>',more:'<circle cx="5" cy="12" r="1.500"/><circle cx="12" cy="12" r="1.500"/><circle cx="19" cy="12" r="1.500"/>',dl:'<path d="M12 4v11M7 11l5 5 5-5M5 20h14"/>',pen:'<path d="M4 20h4L19 9a2.800 2.800 0 0 0-4-4L4 16v4Z"/>',logout:'<path d="M10 17l5-5-5-5M15 12H3M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6"/>',save:'<path d="M5 3h12l4 4v14H3V3h2Z"/><path d="M7 3v6h10V3M7 21v-7h10v7"/>',check:'<path d="m5 12 4 4L19 6"/>',upload:'<path d="M12 16V4m0 0L7 9m5-5 5 5M5 20h14"/>',filter:'<path d="M4 5h16l-6.5 7.5V19l-3 1v-7.5L4 5Z"/>',arrowRight:'<path d="M5 12h14m-6-6 6 6-6 6"/>'};
 const ic=n=>`<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${P[n]}</svg>`;
-const buttonIconFor=value=>{
- const text=String(value||'').replace(/\s+/g,' ').trim().toLocaleLowerCase('ru');
- const has=words=>words.some(word=>text.includes(word));
- if(has(['выйти','logout','sign out','log out']))return'logout';
- if(has(['удал','delete','remove','отозв']))return'trash';
- if(has(['сохран','save','примен','apply']))return'save';
- if(has(['отмен','закры','cancel','close']))return'x';
- if(has(['установ','запуск','включить','activate','enable','install','start','выдать токен']))return'play';
- if(has(['останов','отключить','stop','pause']))return'pause';
- if(has(['генерир','создать пару','новый short id','заново','regenerate']))return'tool';
- if(has(['добав','созда','новый','новая','new ','add','create','продл','выдать'])||text.startsWith('+'))return'plus';
- if(has(['копир','copy','буфер']))return'copy';
- if(has(['скачат','экспорт','резервн','download','export','backup']))return'dl';
- if(has(['импорт','загрузить','upload','import']))return'upload';
- if(has(['обнов','провер','перезагруз','refresh','reload','sync','сброс']))return'redo';
- if(has(['редакт','изменить','переимен','edit']))return'pen';
- if(has(['настрой','параметр','settings']))return'sliders';
- if(has(['фильтр','сортиров','filter']))return'filter';
- if(has(['поиск','найти','search']))return'search';
- if(has(['json','формат','конфиг','код']))return'code';
- if(has(['защит','security','encryption']))return'shield';
- if(has(['транспорт','transport','хост','hostname']))return'link';
- if(has(['клиент','пользователь','users','устройств','device']))return'users';
- if(has(['сквад','группа','доступ']))return'layers';
- if(has(['основное','обзор','dashboard','конструктор']))return'tool';
- if(has(['выбрать все','готово','подтверд','заверш','отправить','перейти','открыть','continue','ок']))return'check';
- if(has(['уведом','событи','notification']))return'bell';
- if(has(['диагност','метрик','состояние']))return'activity';
- return null;
-};
+// Only explicit action buttons receive icons. Navigation tabs, palettes and Xray
+// mode selectors have their own visual language and must never be decorated.
+const ACTION_ICON_RULES=[
+ [/^(?:выйти|logout|sign out|log out)$/i,'logout'],
+ [/^(?:сохранить|сохранить профиль|save|применить)$/i,'save'],
+ [/^(?:удалить|удалить профиль|delete|remove)$/i,'trash'],
+ [/^(?:отмена|закрыть|cancel|close)$/i,'x'],
+ [/^(?:добавить|добавить узел|создать|создать сквад|новый пользователь|new|add)$/i,'plus'],
+ [/^(?:копировать(?: id| server json| client json)?|скопировать(?: токен| команду)?|copy)$/i,'copy'],
+ [/^(?:скачать(?: резервную копию| server.json| client.json)?|экспорт|download|export)$/i,'dl'],
+ [/^(?:импорт json|импортировать|import json)$/i,'upload'],
+ [/^(?:проверить статус|обновить|обновить список|сбросить трафик|сбросить оформление|refresh)$/i,'redo'],
+ [/^(?:редактировать|изменить|edit)$/i,'pen'],
+ [/^(?:включить|запустить|установить \/ обновить)$/i,'play'],
+ [/^(?:отключить|остановить)$/i,'pause'],
+ [/^(?:сгенерировать (?:пару ключей|пару на сервере|uuid|пароли)|новый short id)$/i,'tool'],
+ [/^(?:форматировать|форматировать json)$/i,'code'],
+ [/^(?:готово|подтвердить)$/i,'check']
+];
 function decorateButtonIcons(root){
  if(!root||!root.querySelectorAll)return;
  const buttons=[];
  if(root.nodeType===1&&root.matches('button'))buttons.push(root);
  buttons.push(...root.querySelectorAll('button'));
  buttons.forEach(button=>{
-  if(button.querySelector('.ic')||button.classList.contains('palette-swatch'))return;
-  if(button.closest('.seg,.fl,.swt,.palette-swatch,.country-picker,.color-bubbles'))return;
-  const key=buttonIconFor(button.getAttribute('aria-label')||button.title||button.textContent);
-  if(!key)return;
-  button.insertAdjacentHTML('afterbegin',ic(key));
-  button.classList.add('has-icon');
+  if(button.querySelector('.ic,.xray-tab-icon')||button.dataset.actionIcon==='done')return;
+  if(button.closest('.xray-config-tabs,.xray-presets,.xray-output-tabs,.xray-preset-row,.seg,.fl,.swt,.choice,.palette-swatch,.country-picker,.color-bubbles,[role="tablist"]'))return;
+  if(button.matches('.palette-swatch,.xray-preset,.xray-import-btn,[data-xray-config-tab],[data-xray-output],[data-ui],[data-th],[data-ac],[data-uf],[data-s],[data-dt],[data-tt],[data-lv],[data-traffic-range],[data-node-grid-mode],[data-xray-mode]'))return;
+  const label=(button.getAttribute('aria-label')||button.textContent||'').replace(/\s+/g,' ').trim();
+  const icon=ACTION_ICON_RULES.find(([pattern])=>pattern.test(label))?.[1];
+  if(!icon)return;
+  button.insertAdjacentHTML('afterbegin',ic(icon));
+  button.dataset.actionIcon='done';
  });
 }
-const buttonIconObserver=new MutationObserver(records=>{
- records.forEach(record=>record.addedNodes.forEach(node=>{
-  if(node.nodeType===1)decorateButtonIcons(node);
- }));
-});
-buttonIconObserver.observe(document.body,{childList:true,subtree:true});
-decorateButtonIcons(document);
-
 /* ================= ДАННЫЕ: пустое хранилище + слой API ================= */
 const PL={iOS:['iPhone','iPad'],Android:['Android'],Windows:['Windows'],macOS:['macOS'],Linux:['Linux']};
 const FMT=['XRAY_JSON','MIHOMO','CLASH','SINGBOX','STASH'];
