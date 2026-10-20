@@ -38,7 +38,7 @@ assert(!('xmux' in server.extra),'Client xmux must not leak into server JSON');
 assert(!('scMaxBufferedPosts' in client.extra),'Server-only setting must not leak into client JSON');
 assert.throws(()=>create({'xhttp-mux-connections':'4','xhttp-mux-concurrency':'8'},'client'),/нельзя включать/);
 assert.throws(()=>create({'xhttp-post-bytes':'50-10'},'client'),/диапазон/);
-assert.throws(()=>create({'xhttp-headers':'{"X":3}'},'client'),/строковых|JSON-объект/);
+assert.throws(()=>create({'xhttp-headers':'{"X":3}'},'client'),/требуется объект/);
 assert.match(app,/data-xray-option-group="transport-xhttp"/,'XHTTP section must be conditional');
 assert.match(ui,/sr-v5-select-trigger/,'Themed select replacement missing');
 assert.match(css,/\.sr-v5-menu-item:disabled/,'Disabled menu items must be visually distinct');
