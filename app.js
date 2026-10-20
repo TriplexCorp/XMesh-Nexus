@@ -249,7 +249,7 @@ const XRAY_FP_MODERN=["hellofirefox_120","hellofirefox_148","hellochrome_120","h
 const XRAY_FP_OTHER=["hellogolang","hellorandomized","hellorandomizedalpn","hellorandomizednoalpn","hellofirefox_auto","hellofirefox_55","hellofirefox_56","hellofirefox_63","hellofirefox_65","hellofirefox_99","hellofirefox_102","hellofirefox_105","hellochrome_auto","hellochrome_58","hellochrome_62","hellochrome_70","hellochrome_72","hellochrome_83","hellochrome_87","hellochrome_96","hellochrome_100","hellochrome_102","hellochrome_106_shuffle","helloios_auto","helloios_11_1","helloios_12_1","helloandroid_11_okhttp","helloedge_85","helloedge_auto","hellosafari_16_0","hellosafari_auto","hello360_auto","hello360_7_5","helloqq_auto","hellochrome_100_psk","hellochrome_112_psk_shuf","hellochrome_114_padding_psk_shuf","hellochrome_115_pq","hellochrome_115_pq_psk","hellochrome_120_pq"];
 const XRAY_FP=[...XRAY_FP_RECOMMENDED,...XRAY_FP_MODERN,...XRAY_FP_OTHER];
 const XRAY_PROTOCOLS=[['vless','VLESS'],['vmess','VMess'],['trojan','Trojan'],['shadowsocks','Shadowsocks'],['socks','SOCKS'],['mixed','Mixed (SOCKS + HTTP)'],['http','HTTP proxy'],['dokodemo-door','Dokodemo-door'],['tunnel','Tunnel (alias)'],['wireguard','WireGuard'],['hysteria','Hysteria 2'],['tun','TUN interface'],['masque','MASQUE']];
-const XRAY_NETWORKS=[['raw','RAW / TCP'],['xhttp','XHTTP'],['websocket','WebSocket'],['grpc','gRPC'],['httpupgrade','HTTPUpgrade'],['mkcp','mKCP'],['hysteria','Hysteria transport'],['masque','MASQUE transport']];
+const XRAY_NETWORKS=[['raw','RAW / TCP'],['xhttp','XHTTP'],['websocket','WebSocket'],['grpc','gRPC'],['httpupgrade','HTTPUpgrade'],['mkcp','mKCP'],['hysteria','Hysteria transport'],['masque','MASQUE transport'],['xdrive','XDrive · VLESS Encryption + Mux']];
 function xrayBuilderConfig(){
  const v=id=>$('#xpb-'+id)?.value||'';
  const protocol=v('protocol')||'vless';
@@ -272,8 +272,14 @@ function xrayBuilderConfig(){
  const ss2022=ssMethod.startsWith('2022-');
  const ssServerPassword=v('ss-password').trim()||(ss2022?'REPLACE_WITH_VALID_SS2022_SERVER_KEY':'REPLACE_WITH_STRONG_SERVER_PASSWORD');
  const ssUserPassword=v('ss-user-password').trim()||(ss2022?'REPLACE_WITH_VALID_SS2022_USER_KEY':(uuid||'REPLACE_WITH_USER_PASSWORD'));
+ const lines=value=>String(value||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+ let xdriveTemplate;
+ if(network==='xdrive'&&v('xdrive-service')==='template'){
+  try{xdriveTemplate=JSON.parse(v('xdrive-template')||'{}')}
+  catch(e){throw new Error('XDrive template должен быть корректным JSON: '+e.message)}
+ }
  const settings={
-  vless:{users:uuid?[{id:uuid,level:0,email,...(network==='raw'&&['tls','reality'].includes(security)&&v('flow')?{flow:v('flow')}:{})}]:[],decryption:'none'},
+  vless:{users:uuid?[{id:uuid,level:0,email,...(network==='raw'&&['tls','reality'].includes(security)&&v('flow')?{flow:v('flow')}:{})}]:[],decryption:network==='xdrive'?(v('vless-decryption').trim()||'REPLACE_WITH_VLESS_ENCRYPTION_CONFIG'):'none'},
   vmess:{users:uuid?[{id:uuid,level:0,email,alterId:0}]:[],default:{alterId:0}},
   trojan:{clients:uuid?[{password:uuid,email,level:0}]:[]},
   shadowsocks:{network:'tcp,udp',method:ssMethod,password:ssServerPassword,users:uuid?[{password:ssUserPassword,...(ss2022?{}:{method:ssMethod}),level:0,email}]:[]},
@@ -300,6 +306,21 @@ function xrayBuilderConfig(){
   if(network==='raw')ss.rawSettings={header:v('raw-header')==='http'?{type:'http',request:{version:'1.1',method:'GET',path:[path],headers:{Host:[v('host')||sni||'example.com'],'User-Agent':['Mozilla/5.0'],'Accept-Encoding':['gzip, deflate'],'Connection':['keep-alive']}}}:{type:'none'}};
   if(network==='hysteria')ss.hysteriaSettings={version:2,auth:v('hy-auth').trim()||(protocol==='hysteria'?'':uuid),udpIdleTimeout:cl(+v('hy-idle')||60,2,600),masquerade:{type:v('hy-masq-type')||'',...(v('hy-masq-dir').trim()?{dir:v('hy-masq-dir').trim()}:{}),...(v('hy-masq-url').trim()?{url:v('hy-masq-url').trim()}:{}),...(v('hy-masq-content').trim()?{content:v('hy-masq-content').trim()}:{}),...(v('hy-masq-type')==='string'?{statusCode:cl(+v('hy-masq-status')||200,100,599)}:{})}};
   if(network==='masque')ss.masqueSettings={host:v('masque-host').trim()||sni||'example.com',path:v('masque-path').trim()||'/masque',...(v('masque-user').trim()?{user:v('masque-user').trim()}:{}),...(v('masque-pass').trim()?{pass:v('masque-pass').trim()}:{}),headers:{}};
+  if(network==='xdrive'){
+   const service=v('xdrive-service')||'local',secrets=lines(v('xdrive-secrets'));
+   if(service==='google-drive'&&secrets.length!==3)throw new Error('XDrive Google Drive требует ровно 3 секрета: Client ID, Client Secret и Refresh Token, каждый с новой строки.');
+   if(service==='template'&&!xdriveTemplate)throw new Error('XDrive template требует корректный JSON-объект.');
+   ss.xdriveSettings={remoteFolder:v('xdrive-folder').trim()||'/var/lib/xray/xdrive',service,secrets,
+    ...(v('xdrive-segment-bytes')?{segmentBytes:cl(+v('xdrive-segment-bytes')||0,0,67108864)}:{}),
+    ...(v('xdrive-flush-ms')?{flushIntervalMs:cl(+v('xdrive-flush-ms')||0,0,600000)}:{}),
+    ...(v('xdrive-poll-ms')?{pollIntervalMs:cl(+v('xdrive-poll-ms')||0,0,600000)}:{}),
+    ...(v('xdrive-max-poll-ms')?{maxPollIntervalMs:cl(+v('xdrive-max-poll-ms')||0,0,600000)}:{}),
+    ...(v('xdrive-session-ttl')?{sessionTtlSeconds:cl(+v('xdrive-session-ttl')||0,0,86400)}:{}),
+    ...(v('xdrive-concurrency')?{concurrency:cl(+v('xdrive-concurrency')||0,0,1024)}:{}),
+    ...(v('xdrive-eager-ms')?{eagerWindowMs:cl(+v('xdrive-eager-ms')||0,0,600000)}:{}),
+    ...(v('xdrive-hole-ms')?{holeTimeoutMs:cl(+v('xdrive-hole-ms')||0,0,600000)}:{}),
+    ...(service==='template'?{template:xdriveTemplate}:{})};
+  }
   if(security==='tls')ss.tlsSettings={serverName:sni||undefined,alpn:v('alpn').split(',').map(x=>x.trim()).filter(Boolean),minVersion:v('tls-min')||'1.2',maxVersion:v('tls-max')||'1.3',certificates:[{certificateFile:v('cert')||'/etc/ssl/xray/fullchain.pem',keyFile:v('key')||'/etc/ssl/xray/privkey.pem'}]};
   if(security==='reality')ss.realitySettings={show:false,target:dest,xver:cl(+v('xver')||0,0,2),serverNames:sni?[sni]:[],privateKey:v('private-key')||'REPLACE_WITH_XRAY_PRIVATE_KEY',shortIds:[(v('short-id')||'').replace(/[^a-fA-F0-9]/g,'').slice(0,16)]};
   inbound.streamSettings=ss;
@@ -399,7 +420,7 @@ function xrayClientSample(){
  const flow=protocol==='vless'&&['tls','reality'].includes(security)&&network==='raw'?v('flow'):'';
  let outProtocol=protocol,settings;
  if(['dokodemo-door','tunnel','tun'].includes(protocol))return {remarks:$('#xpb-name')?.value.trim()||'XRAY STUDIO client',note:'Для этого inbound нет прямого одноимённого клиентского outbound. Используйте совместимый клиентский протокол или полный JSON-режим.',outbounds:[]};
- if(protocol==='vless')settings={vnext:[{address:'SERVER_ADDRESS',port,users:[{id:uuid,encryption:'none',...(flow?{flow}:{})}]}]};
+ if(protocol==='vless')settings={vnext:[{address:'SERVER_ADDRESS',port,users:[{id:uuid,encryption:network==='xdrive'?(v('vless-encryption').trim()||'REPLACE_WITH_VLESS_ENCRYPTION_CONFIG'):'none',...(flow?{flow}:{})}]}]};
  else if(protocol==='vmess')settings={vnext:[{address:'SERVER_ADDRESS',port,users:[{id:uuid,alterId:0,security:v('vmess-security')||'auto'}]}]};
  else if(protocol==='trojan')settings={servers:[{address:'SERVER_ADDRESS',port,password:uuid}]};
  else if(protocol==='shadowsocks'){
@@ -422,10 +443,25 @@ function xrayClientSample(){
  if(network==='mkcp')streamSettings.kcpSettings={seed:v('kcp-seed')||''};
  if(network==='hysteria')streamSettings.hysteriaSettings={version:2,auth:v('hy-auth')||uuid,udpIdleTimeout:cl(+v('hy-idle')||60,2,600)};
  if(network==='masque')streamSettings.masqueSettings={host:v('masque-host')||sni,path:v('masque-path')||'/masque',...(v('masque-user')?{user:v('masque-user')}:{}),...(v('masque-pass')?{pass:v('masque-pass')}:{})};
+ if(network==='xdrive'){
+  const service=v('xdrive-service')||'local',secrets=String(v('xdrive-secrets')||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+  let template;if(service==='template'){try{template=JSON.parse(v('xdrive-template')||'{}')}catch(e){template={}}}
+  streamSettings.xdriveSettings={remoteFolder:v('xdrive-folder')||'/var/lib/xray/xdrive',service,secrets,
+   ...(v('xdrive-segment-bytes')?{segmentBytes:cl(+v('xdrive-segment-bytes')||0,0,67108864)}:{}),
+   ...(v('xdrive-flush-ms')?{flushIntervalMs:cl(+v('xdrive-flush-ms')||0,0,600000)}:{}),
+   ...(v('xdrive-poll-ms')?{pollIntervalMs:cl(+v('xdrive-poll-ms')||0,0,600000)}:{}),
+   ...(v('xdrive-max-poll-ms')?{maxPollIntervalMs:cl(+v('xdrive-max-poll-ms')||0,0,600000)}:{}),
+   ...(v('xdrive-session-ttl')?{sessionTtlSeconds:cl(+v('xdrive-session-ttl')||0,0,86400)}:{}),
+   ...(v('xdrive-concurrency')?{concurrency:cl(+v('xdrive-concurrency')||0,0,1024)}:{}),
+   ...(v('xdrive-eager-ms')?{eagerWindowMs:cl(+v('xdrive-eager-ms')||0,0,600000)}:{}),
+   ...(v('xdrive-hole-ms')?{holeTimeoutMs:cl(+v('xdrive-hole-ms')||0,0,600000)}:{}),
+   ...(service==='template'&&template?{template}:{})};
+ }
  if(security==='tls')streamSettings.tlsSettings={serverName:sni,alpn:v('alpn').split(',').map(x=>x.trim()).filter(Boolean),fingerprint:v('fingerprint')||'chrome'};
  if(security==='reality')streamSettings.realitySettings={serverName:sni,fingerprint:v('fingerprint')||'chrome',publicKey:v('public-key')||'REPLACE_WITH_REALITY_PUBLIC_KEY',shortId:v('short-id')||'REPLACE_SHORT_ID',spiderX:v('spider-x')||'/'};
  const outbound={tag:'proxy',protocol:outProtocol,settings};
  if(!['wireguard'].includes(protocol))outbound.streamSettings=streamSettings;
+ if(network==='xdrive')outbound.mux={enabled:true,concurrency:cl(+v('xdrive-mux-concurrency')||8,1,1024)};
  return {remarks:$('#xpb-name')?.value.trim()||'XRAY STUDIO client',outbounds:[outbound,{tag:'direct',protocol:'freedom'},{tag:'block',protocol:'blackhole'}],routing:{domainStrategy:'AsIs',rules:[]}};
 }
 async function generateRealityKeyPair(){
@@ -490,12 +526,27 @@ async function profilesP(){
  field('grpc-mode','Режим gRPC',sel('grpc-mode',[['gun','gun'],['multi','multi']]))+
  field('kcp-seed','mKCP seed',inp('kcp-seed','','Необязательно'))+
  field('raw-header','RAW header',sel('raw-header',[['none','Без заголовка'],['http','HTTP camouflage']]))+
+ field('xdrive-service','XDrive · service',sel('xdrive-service',[['local','Local filesystem'],['google-drive','Google Drive'],['template','Custom HTTP template']]))+
+ field('xdrive-folder','XDrive · remote folder',inp('xdrive-folder','/var/lib/xray/xdrive','Local path or remote folder ID'))+
+ field('xdrive-secrets','XDrive · secrets','<textarea id="xpb-xdrive-secrets" rows="3" placeholder="One secret per line"></textarea>')+
+ field('xdrive-segment-bytes','XDrive · segment bytes',inp('xdrive-segment-bytes','','0 = core default','type="number" min="0" max="67108864"'))+
+ field('xdrive-flush-ms','XDrive · flush interval (ms)',inp('xdrive-flush-ms','','0 = core default','type="number" min="0" max="600000"'))+
+ field('xdrive-poll-ms','XDrive · poll interval (ms)',inp('xdrive-poll-ms','','0 = core default','type="number" min="0" max="600000"'))+
+ field('xdrive-max-poll-ms','XDrive · max poll interval (ms)',inp('xdrive-max-poll-ms','','0 = core default','type="number" min="0" max="600000"'))+
+ field('xdrive-session-ttl','XDrive · session TTL (s)',inp('xdrive-session-ttl','','0 = core default','type="number" min="0" max="86400"'))+
+ field('xdrive-concurrency','XDrive · concurrency',inp('xdrive-concurrency','','0 = core default','type="number" min="0" max="1024"'))+
+ field('xdrive-eager-ms','XDrive · eager window (ms)',inp('xdrive-eager-ms','','0 = core default','type="number" min="0" max="600000"'))+
+ field('xdrive-hole-ms','XDrive · hole timeout (ms)',inp('xdrive-hole-ms','','0 = core default','type="number" min="0" max="600000"'))+
+ field('xdrive-mux-concurrency','XDrive · client mux concurrency',inp('xdrive-mux-concurrency','8','1–1024','type="number" min="1" max="1024"'))+
+ field('xdrive-template','XDrive · template JSON','<textarea id="xpb-xdrive-template" rows="5" spellcheck="false" placeholder="{ }"></textarea>')+
  '</div>',false)+
  group('Протокол и клиент','Flow, fingerprint, cipher и специальные параметры',
  '<div class="xray-main-grid">'+
  field('uuid','UUID клиента',inp('uuid','','Нажмите «Сгенерировать UUID»','autocomplete="off"'))+
  field('fingerprint','uTLS fingerprint · клиент','<select id="xpb-fingerprint"><optgroup label="Рекомендуемые">'+options(XRAY_FP_RECOMMENDED.map(x=>[x,x]))+'</optgroup><optgroup label="Современные профили">'+options(XRAY_FP_MODERN.map(x=>[x,x]))+'</optgroup><optgroup label="Дополнительные и legacy">'+options(XRAY_FP_OTHER.map(x=>[x,x]))+'</optgroup></select>')+
  field('flow','VLESS flow',sel('flow',[['','Без flow'],['xtls-rprx-vision','xtls-rprx-vision']]))+
+ field('vless-decryption','VLESS Encryption · server',inp('vless-decryption','','Вывод xray vlessenc для сервера','autocomplete="off"'))+
+ field('vless-encryption','VLESS Encryption · client',inp('vless-encryption','','Вывод xray vlessenc для клиента','autocomplete="off"'))+
  field('vmess-security','VMess cipher',sel('vmess-security',[['auto','auto'],['aes-128-gcm','aes-128-gcm'],['chacha20-poly1305','chacha20-poly1305'],['none','none']]))+
  field('ss-method','Shadowsocks method',sel('ss-method',[['chacha20-ietf-poly1305','chacha20-ietf-poly1305'],['2022-blake3-aes-128-gcm','2022-blake3-aes-128-gcm'],['2022-blake3-aes-256-gcm','2022-blake3-aes-256-gcm'],['2022-blake3-chacha20-poly1305','2022-blake3-chacha20-poly1305'],['aes-128-gcm','aes-128-gcm'],['aes-256-gcm','aes-256-gcm'],['none','none']]))+
  field('socks-auth','SOCKS authentication',sel('socks-auth',[['noauth','Без авторизации'],['password','Логин / пароль']]))+
@@ -550,11 +601,14 @@ async function profilesP(){
    if((protocol==='hysteria'||network==='hysteria')&&security!=='tls')throw new Error('Транспорт Hysteria требует TLS.');
    if((protocol==='hysteria'&&network!=='hysteria')||(protocol==='masque'&&network!=='masque'))throw new Error('Выберите соответствующий транспорт для выбранного протокола.');
    if(network==='masque'&&protocol!=='masque')throw new Error('Транспорт MASQUE доступен только для inbound MASQUE.');
+   if(network==='xdrive'&&protocol!=='vless')throw new Error('XDrive в текущем ядре требует VLESS. Выберите VLESS или используйте полный JSON-режим.');
+   if(network==='xdrive'&&$('#xpb-flow').value)throw new Error('XDrive несовместим с VLESS flow. Оставьте flow пустым.');
    if(security==='reality'){const sid=$('#xpb-short-id').value.trim();if(!sid||sid.length>16||sid.length%2||!/^[a-fA-F0-9]+$/.test(sid))throw new Error('Short ID: 2–16 hex-символов, чётная длина.');if(!$('#xpb-sni').value.trim())throw new Error('Для Reality укажите Server name / SNI.');}
    let warning='';
    if(protocol==='vless'&&security==='none')warning='Внимание: публичный VLESS без TLS/Reality не защищает транспорт.';
    if(protocol==='shadowsocks'&&(!$('#xpb-ss-password').value.trim()||!$('#xpb-ss-user-password').value.trim()))warning='Укажите или сгенерируйте оба пароля Shadowsocks перед использованием конфигурации.';
    if(protocol==='wireguard'&&!$('#xpb-wg-secret-key').value.trim())warning='Укажите серверный WireGuard private key (команда xray wg).';
+   if(network==='xdrive'&&!$('#xpb-vless-decryption').value.trim())warning='Для XDrive укажите VLESS Encryption decryption из xray vlessenc; на клиенте нужен парный encryption.';
    $('#xpb-error').textContent=warning;
    $('#xpb-preview').value=JSON.stringify(xrayBuilderConfig(),null,2);
    $('#xpb-client-preview').value=JSON.stringify(xrayClientSample(),null,2);
@@ -600,6 +654,7 @@ async function profilesP(){
     if(f==='raw-header')show=net==='raw';
     if(f==='host')show=['websocket','xhttp','httpupgrade'].includes(net);
     if(f==='path')show=['raw','xhttp','websocket','grpc','httpupgrade'].includes(net);
+    if(f.startsWith('xdrive-'))show=net==='xdrive';
     if(f.startsWith('hy-'))show=net==='hysteria';
     if(f.startsWith('masque-'))show=proto==='masque'||net==='masque';
     wrap.hidden=!show;
@@ -609,7 +664,8 @@ async function profilesP(){
     const f=el.id.replace('xpb-',''),wrap=el.closest('.f');if(!wrap)return;
     let show=true;
     if(f==='fingerprint')show=sec!=='none'&&['vless','vmess','trojan'].includes(proto)&&net!=='masque';
-    if(f==='flow')show=proto==='vless';
+    if(f==='flow')show=proto==='vless'&&net!=='xdrive';
+    if(f.startsWith('vless-'))show=proto==='vless'&&net==='xdrive';
     if(f==='vmess-security')show=proto==='vmess';
     if(['ss-method','ss-password','ss-user-password'].includes(f))show=proto==='shadowsocks';
     if(['socks-auth'].includes(f))show=['socks','mixed'].includes(proto);
@@ -693,6 +749,8 @@ async function profilesP(){
       }
      }
      if(inbound?.protocol==='wireguard'&&(!inbound.settings?.secretKey||String(inbound.settings.secretKey).startsWith('REPLACE_')))throw new Error('WireGuard: задайте server private key (xray wg).');
+     if((inbound?.streamSettings?.method||inbound?.streamSettings?.network)==='xdrive'&&inbound.protocol==='vless'&&(!inbound.settings?.decryption||inbound.settings.decryption==='none'||String(inbound.settings.decryption).startsWith('REPLACE_')))throw new Error('XDrive inbound: задайте настоящий VLESS Encryption decryption из xray vlessenc.');
+     if((inbound?.streamSettings?.method||inbound?.streamSettings?.network)==='xdrive'&&inbound.protocol!=='vless')throw new Error('XDrive transport в этой версии Xray требует VLESS.');
     }
     const config=JSON.stringify(data,null,2);
     await api.create('profiles',{name,config});
