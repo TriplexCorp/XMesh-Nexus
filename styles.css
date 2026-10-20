@@ -2046,3 +2046,25 @@ nav a.on{background:var(--s2)!important;box-shadow:none!important}
 .xray-builder .xray-output-pane .xray-custom-mode .xray-output-head .xray-key-actions{
  justify-content:flex-end;
 }
+
+
+/* Stepper connector line and completion/active affordances. */
+.xray-builder .xray-config-tabs button:not(:last-child)::after{
+ content:"";
+ position:absolute;
+ left:.815rem;
+ top:2.22rem;
+ bottom:-.72rem;
+ width:1px;
+ background:var(--ln);
+ pointer-events:none;
+}
+.xray-builder .xray-config-tabs button.on:not(:last-child)::after{
+ background:linear-gradient(to bottom,var(--a),var(--ln));
+}
+.xray-builder .xray-config-tabs button.on>span{
+ box-shadow:0 0 0 3px color-mix(in srgb,var(--a) 12%,transparent);
+}
+@media(max-width:940px){
+ .xray-builder .xray-config-tabs button:not(:last-child)::after{display:none}
+}
