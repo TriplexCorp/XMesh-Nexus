@@ -250,6 +250,28 @@ const XRAY_FP_OTHER=["hellogolang","hellorandomized","hellorandomizedalpn","hell
 const XRAY_FP=[...XRAY_FP_RECOMMENDED,...XRAY_FP_MODERN,...XRAY_FP_OTHER];
 const XRAY_PROTOCOLS=[['vless','VLESS'],['vmess','VMess'],['trojan','Trojan'],['shadowsocks','Shadowsocks'],['socks','SOCKS'],['mixed','Mixed (SOCKS + HTTP)'],['http','HTTP proxy'],['dokodemo-door','Dokodemo-door'],['tunnel','Tunnel (alias)'],['wireguard','WireGuard'],['hysteria','Hysteria 2'],['tun','TUN interface'],['masque','MASQUE']];
 const XRAY_NETWORKS=[['raw','RAW / TCP'],['xhttp','XHTTP'],['websocket','WebSocket'],['grpc','gRPC'],['httpupgrade','HTTPUpgrade'],['mkcp','mKCP'],['hysteria','Hysteria transport'],['masque','MASQUE transport'],['xdrive','XDrive · VLESS Encryption + Mux']];
+function validateXDriveTemplate(template){
+ if(!template||typeof template!=='object'||Array.isArray(template))throw new Error('XDrive template должен быть JSON-объектом.');
+ const missing=['put','get','list','delete'].filter(key=>!template[key]||typeof template[key]!=='object'||typeof template[key].url!=='string'||!template[key].url.trim());
+ if(missing.length)throw new Error('XDrive template: укажите URL для операций '+missing.join(', ')+'.');
+ const pattern=template.list.namesRegex;
+ if(typeof pattern!=='string'||!pattern.trim())throw new Error('XDrive template: list.namesRegex обязателен и должен содержать одну capture group.');
+ let re;try{re=new RegExp(pattern)}catch(e){throw new Error('XDrive list.namesRegex невалиден: '+e.message)}
+ let captures=0,inClass=false,escaped=false;
+ for(let i=0;i<pattern.length;i++){
+  const ch=pattern[i];
+  if(escaped){escaped=false;continue}
+  if(ch==='\\'){escaped=true;continue}
+  if(ch==='['){inClass=true;continue}
+  if(ch===']'){inClass=false;continue}
+  if(ch==='('&&!inClass){
+   if(pattern[i+1]!=='?')captures++;
+   else if(pattern[i+2]==='<'&&pattern[i+3]!=='='&&pattern[i+3]!=='!')captures++;
+  }
+ }
+ if(captures<1)throw new Error('XDrive list.namesRegex должен содержать хотя бы одну capture group.');
+ return template;
+}
 function xrayBuilderConfig(){
  const v=id=>$('#xpb-'+id)?.value||'';
  const protocol=v('protocol')||'vless';
@@ -275,8 +297,8 @@ function xrayBuilderConfig(){
  const lines=value=>String(value||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
  let xdriveTemplate;
  if(network==='xdrive'&&v('xdrive-service')==='template'){
-  try{xdriveTemplate=JSON.parse(v('xdrive-template')||'{}')}
-  catch(e){throw new Error('XDrive template должен быть корректным JSON: '+e.message)}
+  try{xdriveTemplate=validateXDriveTemplate(JSON.parse(v('xdrive-template')||'{}'))}
+  catch(e){throw new Error(e.message.startsWith('XDrive')?e.message:'XDrive template должен быть корректным JSON: '+e.message)}
  }
  const settings={
   vless:{users:uuid?[{id:uuid,level:0,email,...(network==='raw'&&['tls','reality'].includes(security)&&v('flow')?{flow:v('flow')}:{})}]:[],decryption:network==='xdrive'?(v('vless-decryption').trim()||'REPLACE_WITH_VLESS_ENCRYPTION_CONFIG'):'none'},
@@ -753,7 +775,13 @@ async function profilesP(){
      }
      if(inbound?.protocol==='wireguard'&&(!inbound.settings?.secretKey||String(inbound.settings.secretKey).startsWith('REPLACE_')))throw new Error('WireGuard: задайте server private key (xray wg).');
      if((inbound?.streamSettings?.method||inbound?.streamSettings?.network)==='xdrive'&&inbound.protocol==='vless'&&(!inbound.settings?.decryption||inbound.settings.decryption==='none'||String(inbound.settings.decryption).startsWith('REPLACE_')))throw new Error('XDrive inbound: задайте настоящий VLESS Encryption decryption из xray vlessenc.');
-     if((inbound?.streamSettings?.method||inbound?.streamSettings?.network)==='xdrive'&&inbound.protocol!=='vless')throw new Error('XDrive transport в этой версии Xray требует VLESS.');
+     if((inbound?.streamSettings?.method||inbound?.streamSettings?.network)==='xdrive'){
+      if(inbound.protocol!=='vless')throw new Error('XDrive transport в этой версии Xray требует VLESS.');
+      const xs=inbound.streamSettings?.xdriveSettings||{},service=xs.service||'local';
+      if(!['local','google-drive','template','Google Drive'].includes(service))throw new Error('XDrive: неизвестный service '+service+'.');
+      if(service==='google-drive'&&(!Array.isArray(xs.secrets)||xs.secrets.length!==3||xs.secrets.some(x=>!String(x).trim())))throw new Error('XDrive Google Drive требует ровно 3 непустых секрета: Client ID, Client Secret и Refresh Token.');
+      if(service==='template')validateXDriveTemplate(xs.template);
+     }
     }
     const config=JSON.stringify(data,null,2);
     await api.create('profiles',{name,config});
