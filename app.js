@@ -120,13 +120,14 @@ const modal=(h,c='')=>{dlg.className=c;dlg.innerHTML=h;if(!dlg.open)dlg.showModa
 dlg.addEventListener('click',e=>{if(e.target==dlg||e.target.closest('[data-x]'))dlg.close()});
 const confirmBox=(h,ok,fn)=>{CF=fn;modal(`<div class="box"><h2>${h}</h2><div class="act"><button class="gh" data-x>Отмена</button><button class="btn" data-cf>${ok}</button></div></div>`)};
 let tt;const toast=(m,al,fn)=>{const t=$('#toast');t.innerHTML=`<span>${esc(m)}</span>${al?`<button id="ta">${al}</button>`:''}`;if(al)$('#ta').onclick=()=>{fn();t.classList.remove('show')};t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),al?6000:2400)};
-const CDEFAULT={theme:'dark',accent:'mint',ts:1,motion:1,density:'comfortable',surface:'solid',glow:'normal',font:'onest',radius:16,borders:'soft',sidebar:'standard'};
-let C={...CDEFAULT};try{Object.assign(C,JSON.parse(localStorage.xmeshNexusSettings||'{}'))}catch(e){}
-const apply=()=>{const r=document.documentElement;r.dataset.theme=C.theme=='auto'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):C.theme;r.dataset.accent=C.accent;r.dataset.density=C.density||CDEFAULT.density;r.dataset.surface=C.surface||CDEFAULT.surface;r.dataset.glow=C.glow||CDEFAULT.glow;r.dataset.font=C.font||CDEFAULT.font;r.dataset.borders=C.borders||CDEFAULT.borders;r.dataset.sidebar=C.sidebar||CDEFAULT.sidebar;r.style.setProperty('--ts',cl(+C.ts||1,.9,1.3));const radius=cl(+C.radius||16,4,24);r.style.setProperty('--ui-radius',radius+'px');r.style.setProperty('--ui-control-radius',Math.max(5,radius*.72)+'px');r.dataset.motion=C.motion?'on':'off';try{localStorage.xmeshNexusSettings=JSON.stringify(C)}catch(e){}};
+const CDEFAULT={theme:'dark',accent:'emerald',customA:'#60d6a2',customB:'#c3e879',hue:151,sat:62,lum:61,ts:1,motion:1,density:'comfortable',surface:'solid',glow:'normal',font:'onest',radius:16,borders:'soft',sidebar:'standard'};
+let C={...CDEFAULT};try{Object.assign(C,JSON.parse(localStorage.xmeshNexusSettings||'{}'))}catch(e){}if(C.accent==='mint')C.accent='emerald';
+const hslHex=(h,s,l)=>{s/=100;l/=100;const k=n=>(n+h/30)%12,a=s*Math.min(l,1-l),f=n=>{const c=(k(n)+12)%12;return l-a*Math.max(-1,Math.min(c-3,9-c,1))};return '#'+[f(0),f(8),f(4)].map(v=>Math.round(v*255).toString(16).padStart(2,'0')).join('')};
+const apply=()=>{const r=document.documentElement;r.dataset.theme=C.theme=='auto'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):C.theme;r.dataset.accent=C.accent;r.style.setProperty('--custom-a',C.customA||hslHex(+C.hue||151,+C.sat||62,+C.lum||61));r.style.setProperty('--custom-b',C.customB||'#c3e879');r.dataset.density=C.density||CDEFAULT.density;r.dataset.surface=C.surface||CDEFAULT.surface;r.dataset.glow=C.glow||CDEFAULT.glow;r.dataset.font=C.font||CDEFAULT.font;r.dataset.borders=C.borders||CDEFAULT.borders;r.dataset.sidebar=C.sidebar||CDEFAULT.sidebar;r.style.setProperty('--ts',cl(+C.ts||1,.9,1.3));const radius=cl(+C.radius||16,4,24);r.style.setProperty('--ui-radius',radius+'px');r.style.setProperty('--ui-control-radius',Math.max(5,radius*.72)+'px');r.dataset.motion=C.motion?'on':'off';try{localStorage.xmeshNexusSettings=JSON.stringify(C)}catch(e){}};
 const brand=()=>{$('#bn').textContent=DB.set.brand;$('#lg').textContent=(DB.set.brand[0]||'L').toUpperCase()};
 
 let T=[],cur='',RT=0;
-const pages={home:['Дашборд',homeP],users:['Пользователи',usersP],squads:['Сквады',()=>simple(['squads'])],hosts:['Хосты',()=>simple(['hosts'])],nodes:['Узлы',nodesP],templates:['Шаблоны',()=>simple(['tpls','subs'])],profiles:['Профили Xray',()=>simple(['profiles'])],tools:['Диагностика',toolsP],admins:['Администраторы',()=>simple(['admins'])],set:['Настройки',setP]};
+const pages={home:['Дашборд',homeP],users:['Пользователи',usersP],squads:['Сквады',()=>simple(['squads'])],hosts:['Хосты',()=>simple(['hosts'])],nodes:['Узлы',nodesP],templates:['Шаблоны',()=>simple(['tpls','subs'])],profiles:['Профили Xray',profilesP],tools:['Диагностика',toolsP],admins:['Администраторы',()=>simple(['admins'])],set:['Настройки',setP]};
 const skel=()=>`<div class="sk" style="height:7rem"></div><div class="sk" style="height:18rem"></div><div class="sk" style="height:12rem"></div>`;
 $('#nav').innerHTML=NAV.map(([g,a])=>`<div class="g">${g}</div>`+a.map(([k,i,l,p])=>`<a href="#${k}" class="${p?'':'sec'}">${ic(i)}<span class="lbl">${l}</span>${k=='users'?'<em id="unb"></em>':''}</a>`).join('')).join('')+`<button class="more" id="more">${ic('more')}<span class="lbl">Ещё</span></button>`;
 async function render(soft){
@@ -201,6 +202,47 @@ function userNew(){
 function exportCsv(){const rows=[['username','status','used_gb','limit_gb','expire','tag','telegram','email','squads','sub_url']].concat(UIDS.map(id=>DB.users.find(u=>u.id==id)).map(u=>[u.username,st(u),u.used,u.limit,u.expireAt?new Date(u.expireAt).toISOString().slice(0,10):'',u.tag,u.tg,u.email,u.squads.map(i=>DB.squads.find(s=>s.id==i)?.name).join('|'),subUrl(u)]));
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n')],{type:'text/csv'}));a.download='users.csv';a.click();toast(`Экспортировано: ${UIDS.length}`)}
 
+/* ================= БЫСТРЫЙ КОНСТРУКТОР ПРОФИЛЯ XRAY ================= */
+function xrayBuilderConfig(){
+  const protocol=$('#xpb-protocol').value,network=$('#xpb-network').value,security=$('#xpb-security').value;
+  const tag=$('#xpb-tag').value.trim()||'inbound-1',port=cl(+$('#xpb-port').value||443,1,65535);
+  const sni=$('#xpb-sni').value.trim()||'example.com',dest=$('#xpb-dest').value.trim()||sni+':443',path=$('#xpb-path').value.trim()||'/';
+  const settings=protocol==='vless'?{clients:[],decryption:''}:protocol==='trojan'?{clients:[]}:{clients:[],network:'tcp,udp',method:'chacha20-ietf-poly1305'};
+  const inbound={tag,listen:'0.0.0.0',port,protocol,settings,streamSettings:{network,security}};
+  if(network==='ws')inbound.streamSettings.wsSettings={path};
+  if(network==='xhttp')inbound.streamSettings.xhttpSettings={path};
+  if(network==='grpc')inbound.streamSettings.grpcSettings={serviceName:path.replace(/^\\//,'')||'grpc'};
+  if(security==='tls')inbound.streamSettings.tlsSettings={serverName:sni,alpn:['h2','http/1.1'],certificates:[{certificateFile:'/etc/ssl/xray/fullchain.pem',keyFile:'/etc/ssl/xray/privkey.pem'}]};
+  if(security==='reality')inbound.streamSettings.realitySettings={show:false,dest,xver:0,serverNames:[sni],privateKey:'REPLACE_WITH_XRAY_PRIVATE_KEY',shortIds:['0123456789abcdef']};
+  return {log:{loglevel:'warning'},inbounds:[inbound],outbounds:[{protocol:'freedom',tag:'direct'},{protocol:'blackhole',tag:'blocked'}],routing:{rules:[{type:'field',outboundTag:'direct',inboundTag:[tag]}]}};
+}
+async function profilesP(){
+  const saved=await crudCard('profiles');
+  const builderHtml=`<section class="card xray-builder"><div class="hd"><div><h3>Быстрый конструктор Xray</h3><p>Соберите стартовый профиль без ручного набора JSON. Перед запуском замените шаблонные ключи и сертификаты.</p></div><span class="chip" style="--c:var(--a)">JSON builder</span></div>
+  <div class="xray-builder-grid">
+    <label class="f"><span>Название профиля</span><input id="xpb-name" value="Новый Xray профиль" maxlength="80"></label>
+    <label class="f"><span>Тег inbound</span><input id="xpb-tag" value="inbound-1" maxlength="64"></label>
+    <label class="f"><span>Порт</span><input id="xpb-port" type="number" min="1" max="65535" value="443"></label>
+    <label class="f"><span>Протокол</span><select id="xpb-protocol"><option value="vless">VLESS</option><option value="trojan">Trojan</option><option value="shadowsocks">Shadowsocks</option></select></label>
+    <label class="f"><span>Транспорт</span><select id="xpb-network"><option value="tcp">TCP</option><option value="xhttp">XHTTP</option><option value="ws">WebSocket</option><option value="grpc">gRPC</option></select></label>
+    <label class="f"><span>Защита транспорта</span><select id="xpb-security"><option value="reality">Reality</option><option value="tls">TLS</option><option value="none">Без TLS/Reality</option></select></label>
+    <label class="f"><span>SNI / Server name</span><input id="xpb-sni" value="example.com"></label>
+    <label class="f"><span>Reality destination</span><input id="xpb-dest" value="example.com:443"></label>
+    <label class="f"><span>Path / gRPC service</span><input id="xpb-path" value="/" placeholder="/path"></label>
+  </div>
+  <p class="note">Клиенты намеренно пустые. Reality private key и TLS-сертификаты — шаблонные значения: настройте их под свой сервер. Конструктор создаёт конфигурацию, но сам не меняет запущенный Xray.</p>
+  <label class="f"><span>Предпросмотр JSON</span><textarea id="xpb-preview" class="xray-preview" spellcheck="false" readonly></textarea></label>
+  <div class="act"><button type="button" class="gh" id="xpb-download">Скачать JSON</button><button type="button" class="gh" id="xpb-copy">Копировать JSON</button><button type="button" class="btn" id="xpb-save">Сохранить профиль</button></div><p class="er" id="xpb-error" role="status"></p></section>`;
+  return [builderHtml+saved,()=>{
+    const updatePreview=()=>{try{$('#xpb-preview').value=JSON.stringify(xrayBuilderConfig(),null,2);$('#xpb-error').textContent=''}catch(e){$('#xpb-error').textContent=e.message}};
+    ['xpb-tag','xpb-port','xpb-protocol','xpb-network','xpb-security','xpb-sni','xpb-dest','xpb-path'].forEach(id=>$('#'+id).addEventListener('input',updatePreview));
+    updatePreview();
+    $('#xpb-copy').onclick=async()=>{try{await navigator.clipboard.writeText($('#xpb-preview').value);toast('JSON скопирован')}catch(e){$('#xpb-preview').select();document.execCommand('copy');toast('JSON скопирован')}};
+    $('#xpb-download').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([$('#xpb-preview').value],{type:'application/json'}));a.download=(($('#xpb-name').value||'xray-profile').trim().replace(/[^a-z0-9_-]+/gi,'-')||'xray-profile')+'.json';a.click();URL.revokeObjectURL(a.href)};
+    $('#xpb-save').onclick=async()=>{const name=$('#xpb-name').value.trim();if(!name){$('#xpb-error').textContent='Укажите название профиля.';return}try{const config=$('#xpb-preview').value,data=JSON.parse(config),tags=data.inbounds.map(i=>i.tag);if(!data.inbounds.length||tags.some(t=>!t))throw new Error('У inbound должен быть тег.');if(new Set(tags).size!==tags.length)throw new Error('Теги inbound должны быть уникальными.');if(DB.profiles.some(p=>p.name.toLowerCase()===name.toLowerCase()))throw new Error('Профиль с таким названием уже существует.');const used=DB.profiles.flatMap(inbs).map(i=>i.tag);if(tags.some(t=>used.includes(t)))throw new Error('Такой тег уже используется в другом профиле.');await api.create('profiles',{name,config});toast('Профиль Xray сохранён');await render(1)}catch(e){$('#xpb-error').textContent=e.message||'Не удалось сохранить профиль.'}};
+  }];
+}
+
 /* ================= CRUD-страницы ================= */
 async function crudCard(k){
   const e=ENT[k],{items}=await api.list(k,{sort:e.s});
@@ -273,8 +315,8 @@ function drawTools(){const e=$('#tr');if(!e)return;const q=TP.q;
 /* ================= НАСТРОЙКИ ================= */
 async function setP(){
   const sw=[
-    ['mint','#c7a66b','#ead7a8','Шампань'],['ocean','#7fb3e8','#6fd8c3','Океан'],['amber','#ebbd7a','#f0899a','Янтарь'],['rose','#f0a0c4','#a0a2f6','Роза'],
-    ['violet','#b7a1ff','#83d9ed','Фиолетовый'],['emerald','#60d6a2','#c3e879','Изумруд'],['cyan','#63dff2','#7fa8ff','Циан'],['ruby','#ff8aa7','#d4a1ff','Рубин']
+    ['emerald','#60d6a2','#c3e879','Изумруд'],['ocean','#7fb3e8','#6fd8c3','Океан'],['amber','#ebbd7a','#f0899a','Янтарь'],['rose','#f0a0c4','#a0a2f6','Роза'],
+    ['violet','#b7a1ff','#83d9ed','Фиолетовый'],['cyan','#63dff2','#7fa8ff','Циан'],['ruby','#ff8aa7','#d4a1ff','Рубин'],['custom',C.customA||'#60d6a2',C.customB||'#c3e879','Своя тема']
   ];
   const choices=(key,items)=>`<div class="seg choice" role="group" aria-label="${key}">${items.map(([v,l])=>`<button type="button" data-ui="${key}" data-value="${v}" class="${(C[key]||CDEFAULT[key])==v?'on':''}">${l}</button>`).join('')}</div>`;
   const tk=await crudCard('tokens');
@@ -285,6 +327,8 @@ async function setP(){
     <section class="card sg"><div><h3>Цвет и тема</h3><small>Основная палитра интерфейса и брендовые акценты</small></div>
       <div class="setting-row"><div class="setting-copy"><b>Тема</b><small>Автоматически — по настройкам ОС</small></div><div class="setting-control"><div class="seg choice" id="th">${[['dark','Тёмная'],['light','Светлая'],['auto','Авто']].map(([k,l])=>`<button type="button" data-th="${k}" class="${C.theme==k?'on':''}">${l}</button>`).join('')}</div></div></div>
       <div class="setting-row"><div class="setting-copy"><b>Акцентный цвет</b><small>Влияет на кнопки, графики и активные элементы</small></div><div class="setting-control" style="gap:.85rem;max-width:18rem">${sw.map(([k,x,y,l])=>`<button class="palette-swatch ${C.accent==k?'on':''}" style="--x:${x};--y:${y}" data-ac="${k}" title="${l}" aria-label="${l}"></button>`).join('')}</div></div>
+      <div class="setting-row"><div class="setting-copy"><b>Своя палитра</b><small>Цветовые «бублики» открывают выбор цвета; ползунки позволяют точно настроить оттенок, насыщенность и яркость.</small></div><div class="setting-control"><div class="color-bubbles"><label class="color-bubble-wrap"><span class="color-bubble"><input type="color" id="custom-a" value="${C.customA||'#60d6a2'}" aria-label="Основной цвет"></span>Основной</label><label class="color-bubble-wrap"><span class="color-bubble"><input type="color" id="custom-b" value="${C.customB||'#c3e879'}" aria-label="Вторичный цвет"></span>Вторичный</label></div></div></div>
+      <div class="color-slider-grid"><label for="hue">Оттенок</label><input type="range" id="hue" min="0" max="360" value="${C.hue??151}"><output id="huev">${C.hue??151}°</output></div><div class="color-slider-grid"><label for="sat">Насыщенность</label><input type="range" id="sat" min="0" max="100" value="${C.sat??62}"><output id="satv">${C.sat??62}%</output></div><div class="color-slider-grid"><label for="lum">Яркость</label><input type="range" id="lum" min="15" max="85" value="${C.lum??61}"><output id="lumv">${C.lum??61}%</output></div>
       <div class="setting-row"><div class="setting-copy"><b>Размер текста</b><small>Можно увеличить интерфейс для большого монитора или уменьшить плотность текста</small></div><div class="setting-control slider-control"><input type="range" id="ts" min="0.9" max="1.3" step="0.05" value="${C.ts}" aria-label="Размер текста"><b id="tsv">${Math.round(C.ts*100)}%</b></div></div>
       <div class="setting-row"><div class="setting-copy"><b>Шрифт</b><small>Выберите нейтральный системный или моноширинный стиль</small></div><div class="setting-control">${choices('font',[['onest','Manrope'],['system','Системный'],['mono','Моно']])}</div></div>
     </section>
@@ -372,6 +416,7 @@ document.addEventListener('click',async e=>{
   else if(g('#pal'))palette();
 });
 document.addEventListener('change',async e=>{const t=e.target;
+  if(t.id==='custom-a'||t.id==='custom-b'){if(t.id==='custom-a')C.customA=t.value;else C.customB=t.value;C.accent='custom';if(t.id==='custom-a'){const rgb=t.value.match(/[0-9a-f]{2}/gi).map(v=>parseInt(v,16)/255);const max=Math.max(...rgb),min=Math.min(...rgb),d=max-min;let h=0,s=0,l=(max+min)/2;if(d){s=d/(1-Math.abs(2*l-1));if(max===rgb[0])h=60*(((rgb[1]-rgb[2])/d)%6);else if(max===rgb[1])h=60*((rgb[2]-rgb[0])/d+2);else h=60*((rgb[0]-rgb[1])/d+4);if(h<0)h+=360}C.hue=Math.round(h);C.sat=Math.round(s*100);C.lum=Math.round(l*100);if($('#hue'))$('#hue').value=C.hue;if($('#sat'))$('#sat').value=C.sat;if($('#lum'))$('#lum').value=C.lum;if($('#huev'))$('#huev').textContent=C.hue+'°';if($('#satv'))$('#satv').textContent=C.sat+'%';if($('#lumv'))$('#lumv').textContent=C.lum+'%'}apply();$('[data-ac]').forEach(x=>x.classList.toggle('on',x.dataset.ac==='custom'));return}
   if(t.dataset.tg){const [k,id]=t.dataset.tg.split(':');await api.update(k,id,{disabled:!t.checked});toast(t.checked?'Включено':'Отключено')}
   else if(t.dataset.usq){const [ui,si]=t.dataset.usq.split(':').map(Number),u=DB.users.find(x=>x.id==ui);await api.update('users',ui,{squads:t.checked?[...new Set([...u.squads,si])]:u.squads.filter(x=>x!=si)});toast('Доступ обновлён');render(1);userDrawer(ui,'acc')}
   else if(t.dataset.hw){await api.update('users',+t.dataset.hw,{hwid:+t.value||0});toast('Лимит устройств сохранён');render(1);userDrawer(+t.dataset.hw,'acc')}
@@ -379,7 +424,7 @@ document.addEventListener('change',async e=>{const t=e.target;
   else if(t.dataset.psz){UQ.size=+t.value;UQ.page=1;drawUsers()}
   else if(t.id=='mo'){C.motion=t.checked?1:0;apply()}
   else if(t.id=='tplsel'){const p=DB.tpls.find(x=>x.id==t.value);if(!p)return;const f=$('form[data-k=user]');const set=(k,v)=>{const el=$(`[name=${k}]`,f);if(el)el.value=v};set('limit',p.limit);set('days',p.days);set('strategy',p.strategy);set('hwid',p.hwid);$('[name=hold]',f).checked=p.hold;$$('[name=squads]',f).forEach(c=>c.checked=p.squads.includes(+c.value))}});
-document.addEventListener('input',e=>{if(e.target.id=='ts'){C.ts=+e.target.value;$('#tsv').textContent=Math.round(C.ts*100)+'%';apply()}else if(e.target.id=='radius'){C.radius=+e.target.value;$('#rv').textContent=C.radius+' px';apply()}if(e.target.id=='pq')pdraw(e.target.value)});
+document.addEventListener('input',e=>{if(['hue','sat','lum'].includes(e.target.id)){C.hue=+$('#hue').value;C.sat=+$('#sat').value;C.lum=+$('#lum').value;C.customA=hslHex(C.hue,C.sat,C.lum);C.accent='custom';$('#custom-a').value=C.customA;$('#huev').textContent=C.hue+'°';$('#satv').textContent=C.sat+'%';$('#lumv').textContent=C.lum+'%';apply();$('[data-ac]').forEach(x=>x.classList.toggle('on',x.dataset.ac==='custom'))}else if(e.target.id=='ts'){C.ts=+e.target.value;$('#tsv').textContent=Math.round(C.ts*100)+'%';apply()}else if(e.target.id=='radius'){C.radius=+e.target.value;$('#rv').textContent=C.radius+' px';apply()}if(e.target.id=='pq')pdraw(e.target.value)});
 document.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()=='k'){e.preventDefault();palette();return}
   if(e.target.id=='pq'){if(e.key=='ArrowDown'||e.key=='ArrowUp'){e.preventDefault();const n=Math.min(PI.length,12);PX=(PX+(e.key=='ArrowDown'?1:n-1))%Math.max(n,1);$$('.pi').forEach((x,i)=>x.classList.toggle('on',i==PX));$('.pi.on')?.scrollIntoView({block:'nearest'})}if(e.key=='Enter'){e.preventDefault();const x=PI[PX];if(x){dlg.close();x.r()}}return}
