@@ -9,8 +9,51 @@ const ago=t=>{if(!t)return'никогда';const s=(Date.now()-t)/1e3;return s<6
 const DAY=864e5,left=t=>{if(!t)return'бессрочно';const d=Math.ceil((t-Date.now())/DAY);return d>0?d+' дн':d==0?'истёк сегодня':'истёк '+(-d)+' дн назад'};
 const chip=(t,c)=>`<span class="chip" style="--c:var(${c})">${t}</span>`;
 const smooth=p=>{let d=`M${p[0]}`;for(let i=0;i<p.length-1;i++){const a=p[i-1]||p[i],b=p[i],c=p[i+1],e=p[i+2]||c;d+=`C${b[0]+(c[0]-a[0])/6},${b[1]+(c[1]-a[1])/6},${c[0]-(e[0]-b[0])/6},${c[1]-(e[1]-b[1])/6},${c}`}return d};
-const P={home:'<rect x="3" y="3" width="7" height="9" rx="1.500"/><rect x="14" y="3" width="7" height="5" rx="1.500"/><rect x="14" y="12" width="7" height="9" rx="1.500"/><rect x="3" y="16" width="7" height="5" rx="1.500"/>',users:'<circle cx="9" cy="8" r="3.500"/><path d="M2.500 20c.6-3.600 3.200-5.500 6.500-5.500s5.900 1.900 6.500 5.500M16 4.600a3.500 3.500 0 0 1 0 6.800M18.500 14.800c1.700.7 2.700 2.300 3 4.700"/>',layers:'<path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 13 9 5 9-5"/>',link:'<path d="M10 14a4 4 0 0 0 5.700 0l3-3a4 4 0 0 0-5.700-5.700l-1 1M14 10a4 4 0 0 0-5.700 0l-3 3a4 4 0 0 0 5.700 5.700l1-1"/>',server:'<rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.500h.01M7 16.500h.01"/>',activity:'<path d="M3 12h4l3-8 4 16 3-8h4"/>',file:'<path d="M7 3h7l5 5v13H7V3Z"/><path d="M14 3v5h5"/>',code:'<path d="m8 8-4 4 4 4M16 8l4 4-4 4M13.500 5l-3 14"/>',tool:'<path d="M14 7a4 4 0 0 1 5.500-3.500L16 7l1 3 3 1 3.500-3.500A4 4 0 0 1 14 13l-8 8a2 2 0 0 1-3-3l8-8"/>',shield:'<path d="M12 3 4 6v6c0 4.500 3.400 8 8 9 4.600-1 8-4.500 8-9V6l-8-3Z"/>',sliders:'<path d="M4 7h9M19 7h1M4 17h1M11 17h9"/><circle cx="16" cy="7" r="2.200"/><circle cx="8" cy="17" r="2.200"/>',bell:'<path d="M6 16v-5a6 6 0 1 1 12 0v5l1.500 2h-15L6 16ZM10 21h4"/>',search:'<circle cx="11" cy="11" r="6.500"/><path d="m16 16 4.500 4.500"/>',sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2.500v2M12 19.500v2M2.500 12h2M19.500 12h2M5.300 5.300l1.400 1.400M17.300 17.300l1.400 1.400M5.300 18.700l1.400-1.400M17.300 6.700l1.400-1.400"/>',moon:'<path d="M20 14.500A8 8 0 1 1 9.500 4a6.500 6.500 0 0 0 10.500 10.500Z"/>',redo:'<path d="M20 11a8 8 0 1 0-2.300 5.700M20 4v7h-7"/>',plus:'<path d="M12 5v14M5 12h14"/>',x:'<path d="M6 6l12 12M18 6 6 18"/>',copy:'<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/>',trash:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/>',pause:'<path d="M8 5v14M16 5v14"/>',play:'<path d="M7 4.500v15l12-7.500L7 4.500Z"/>',up:'<path d="m6 15 6-6 6 6"/>',down:'<path d="m6 9 6 6 6-6"/>',more:'<circle cx="5" cy="12" r="1.500"/><circle cx="12" cy="12" r="1.500"/><circle cx="19" cy="12" r="1.500"/>',dl:'<path d="M12 4v11M7 11l5 5 5-5M5 20h14"/>',pen:'<path d="M4 20h4L19 9a2.800 2.800 0 0 0-4-4L4 16v4Z"/>'};
+const P={home:'<rect x="3" y="3" width="7" height="9" rx="1.500"/><rect x="14" y="3" width="7" height="5" rx="1.500"/><rect x="14" y="12" width="7" height="9" rx="1.500"/><rect x="3" y="16" width="7" height="5" rx="1.500"/>',users:'<circle cx="9" cy="8" r="3.500"/><path d="M2.500 20c.6-3.600 3.200-5.500 6.500-5.500s5.900 1.900 6.500 5.500M16 4.600a3.500 3.500 0 0 1 0 6.800M18.500 14.800c1.700.7 2.700 2.300 3 4.700"/>',layers:'<path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 13 9 5 9-5"/>',link:'<path d="M10 14a4 4 0 0 0 5.700 0l3-3a4 4 0 0 0-5.700-5.700l-1 1M14 10a4 4 0 0 0-5.700 0l-3 3a4 4 0 0 0 5.700 5.700l1-1"/>',server:'<rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.500h.01M7 16.500h.01"/>',activity:'<path d="M3 12h4l3-8 4 16 3-8h4"/>',file:'<path d="M7 3h7l5 5v13H7V3Z"/><path d="M14 3v5h5"/>',code:'<path d="m8 8-4 4 4 4M16 8l4 4-4 4M13.500 5l-3 14"/>',tool:'<path d="M14 7a4 4 0 0 1 5.500-3.500L16 7l1 3 3 1 3.500-3.500A4 4 0 0 1 14 13l-8 8a2 2 0 0 1-3-3l8-8"/>',shield:'<path d="M12 3 4 6v6c0 4.500 3.400 8 8 9 4.600-1 8-4.500 8-9V6l-8-3Z"/>',sliders:'<path d="M4 7h9M19 7h1M4 17h1M11 17h9"/><circle cx="16" cy="7" r="2.200"/><circle cx="8" cy="17" r="2.200"/>',bell:'<path d="M6 16v-5a6 6 0 1 1 12 0v5l1.500 2h-15L6 16ZM10 21h4"/>',search:'<circle cx="11" cy="11" r="6.500"/><path d="m16 16 4.500 4.500"/>',sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2.500v2M12 19.500v2M2.500 12h2M19.500 12h2M5.300 5.300l1.400 1.400M17.300 17.300l1.400 1.400M5.300 18.700l1.400-1.400M17.300 6.700l1.400-1.400"/>',moon:'<path d="M20 14.500A8 8 0 1 1 9.500 4a6.500 6.500 0 0 0 10.500 10.500Z"/>',redo:'<path d="M20 11a8 8 0 1 0-2.300 5.700M20 4v7h-7"/>',plus:'<path d="M12 5v14M5 12h14"/>',x:'<path d="M6 6l12 12M18 6 6 18"/>',copy:'<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/>',trash:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/>',pause:'<path d="M8 5v14M16 5v14"/>',play:'<path d="M7 4.500v15l12-7.500L7 4.500Z"/>',up:'<path d="m6 15 6-6 6 6"/>',down:'<path d="m6 9 6 6 6-6"/>',more:'<circle cx="5" cy="12" r="1.500"/><circle cx="12" cy="12" r="1.500"/><circle cx="19" cy="12" r="1.500"/>',dl:'<path d="M12 4v11M7 11l5 5 5-5M5 20h14"/>',pen:'<path d="M4 20h4L19 9a2.800 2.800 0 0 0-4-4L4 16v4Z"/>',logout:'<path d="M10 17l5-5-5-5M15 12H3M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6"/>',save:'<path d="M5 3h12l4 4v14H3V3h2Z"/><path d="M7 3v6h10V3M7 21v-7h10v7"/>',check:'<path d="m5 12 4 4L19 6"/>',upload:'<path d="M12 16V4m0 0L7 9m5-5 5 5M5 20h14"/>',filter:'<path d="M4 5h16l-6.5 7.5V19l-3 1v-7.5L4 5Z"/>',arrowRight:'<path d="M5 12h14m-6-6 6 6-6 6"/>'};
 const ic=n=>`<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${P[n]}</svg>`;
+const buttonIconFor=value=>{
+ const text=String(value||'').replace(/\\s+/g,' ').trim().toLocaleLowerCase('ru');
+ const has=words=>words.some(word=>text.includes(word));
+ if(has(['выйти','logout','sign out','log out']))return'logout';
+ if(has(['удал','delete','remove','отозв']))return'trash';
+ if(has(['сохран','save','примен','apply']))return'save';
+ if(has(['отмен','закры','cancel','close']))return'x';
+ if(has(['установ','запуск','install','start','выдать токен']))return'play';
+ if(has(['останов','отключить','stop','pause']))return'pause';
+ if(has(['добав','созда','новый','новая','new ','add','create','продл','выдать']))return'plus';
+ if(has(['копир','copy','буфер']))return'copy';
+ if(has(['скачат','экспорт','резервн','download','export','backup']))return'dl';
+ if(has(['импорт','загрузить','upload','import']))return'upload';
+ if(has(['обнов','провер','перезагруз','refresh','reload','sync','сброс']))return'redo';
+ if(has(['редакт','изменить','переимен','edit']))return'pen';
+ if(has(['настрой','параметр','settings','фильтр','сортиров']))return'filter';
+ if(has(['поиск','найти','search']))return'search';
+ if(has(['json','формат','конфиг','код']))return'code';
+ if(has(['готово','подтверд','заверш','отправить','перейти','открыть','continue']))return'check';
+ if(has(['уведом','событи','notification']))return'bell';
+ return null;
+};
+function decorateButtonIcons(root){
+ if(!root||!root.querySelectorAll)return;
+ const buttons=[];
+ if(root.nodeType===1&&root.matches('button'))buttons.push(root);
+ buttons.push(...root.querySelectorAll('button'));
+ buttons.forEach(button=>{
+  if(button.querySelector('.ic')||button.classList.contains('palette-swatch'))return;
+  if(button.closest('.seg,.fl,.swt,.palette-swatch,.country-picker,.color-bubbles'))return;
+  const key=buttonIconFor(button.getAttribute('aria-label')||button.title||button.textContent);
+  if(!key)return;
+  button.insertAdjacentHTML('afterbegin',ic(key));
+  button.classList.add('has-icon');
+ });
+}
+const buttonIconObserver=new MutationObserver(records=>{
+ records.forEach(record=>record.addedNodes.forEach(node=>{
+  if(node.nodeType===1)decorateButtonIcons(node);
+ }));
+});
+buttonIconObserver.observe(document.body,{childList:true,subtree:true});
+decorateButtonIcons(document);
 
 /* ================= ДАННЫЕ: пустое хранилище + слой API ================= */
 const PL={iOS:['iPhone','iPad'],Android:['Android'],Windows:['Windows'],macOS:['macOS'],Linux:['Linux']};
@@ -133,11 +176,11 @@ function read(fs,form){const d={};fs.forEach(f=>{const e=$$(`[name="${f.k}"]`,fo
 
 /* ================= ОБОЛОЧКА ================= */
 const dlg=$('#dlg');let CF;
-const modal=(h,c='')=>{dlg.className=c;dlg.innerHTML=h;if(!dlg.open)dlg.showModal()};
+const modal=(h,c='')=>{dlg.className=c;dlg.innerHTML=h;decorateButtonIcons(dlg);if(!dlg.open)dlg.showModal()};
 dlg.addEventListener('click',e=>{if(e.target==dlg||e.target.closest('[data-x]'))dlg.close()});
 const confirmBox=(h,ok,fn)=>{CF=fn;modal(`<div class="box"><h2>${h}</h2><div class="act"><button class="gh" data-x>Отмена</button><button class="btn" data-cf>${ok}</button></div></div>`)};
 let tt;const toast=(m,al,fn)=>{const t=$('#toast');t.innerHTML=`<span>${esc(m)}</span>${al?`<button id="ta">${al}</button>`:''}`;if(al)$('#ta').onclick=()=>{fn();t.classList.remove('show')};t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),al?6000:2400)};
-const CDEFAULT={theme:'dark',accent:'emerald',customA:'#60d6a2',customB:'#c3e879',hue:151,sat:62,lum:61,ts:1,motion:1,density:'comfortable',surface:'solid',glow:'normal',font:'onest',radius:16,borders:'soft',sidebar:'standard'};
+const CDEFAULT={theme:'dark',accent:'emerald',customA:'#60d6a2',customB:'#c3e879',hue:151,sat:62,lum:61,ts:1,motion:1,density:'comfortable',surface:'solid',glow:'normal',font:'onest',radius:16,borders:'soft',sidebar:'standard',autoCoreRefresh:1,coreRefreshSeconds:30};
 let C={...CDEFAULT};try{Object.assign(C,JSON.parse(localStorage.xmeshNexusSettings||'{}'))}catch(e){}if(C.accent==='mint')C.accent='emerald';
 const hslHex=(h,s,l)=>{s/=100;l/=100;const k=n=>(n+h/30)%12,a=s*Math.min(l,1-l),f=n=>{const c=(k(n)+12)%12;return l-a*Math.max(-1,Math.min(c-3,9-c,1))};return '#'+[f(0),f(8),f(4)].map(v=>Math.round(v*255).toString(16).padStart(2,'0')).join('')};
 const apply=()=>{const r=document.documentElement;r.dataset.theme=C.theme=='auto'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):C.theme;r.dataset.accent=C.accent;r.style.setProperty('--custom-a',C.customA||hslHex(+C.hue||151,+C.sat||62,+C.lum||61));r.style.setProperty('--custom-b',C.customB||'#c3e879');if(C.accent==='custom'){const rgb=(C.customA||'#60d6a2').match(/[0-9a-f]{2}/gi).map(v=>parseInt(v,16)/255);const linear=rgb.map(v=>v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4));const lum=.2126*linear[0]+.7152*linear[1]+.0722*linear[2];r.style.setProperty('--btn-text',lum>.42?'#082b1d':'#ffffff')}else r.style.setProperty('--btn-text',r.dataset.theme==='light'?'#ffffff':'#082b1d');r.dataset.density=C.density||CDEFAULT.density;r.dataset.surface=C.surface||CDEFAULT.surface;r.dataset.glow=C.glow||CDEFAULT.glow;r.dataset.font=C.font||CDEFAULT.font;r.dataset.borders=C.borders||CDEFAULT.borders;r.dataset.sidebar=C.sidebar||CDEFAULT.sidebar;r.style.setProperty('--ts',cl(+C.ts||1,.9,1.3));const radius=cl(+C.radius||16,4,24);r.style.setProperty('--ui-radius',radius+'px');r.style.setProperty('--ui-control-radius',Math.max(5,radius*.72)+'px');r.dataset.motion=C.motion?'on':'off';try{localStorage.xmeshNexusSettings=JSON.stringify(C)}catch(e){}};
@@ -151,7 +194,7 @@ async function render(soft){
   T.forEach(clearInterval);T=[];cur=location.hash.slice(1);if(!pages[cur])cur='home';const rt=++RT,[t,f]=pages[cur],v=$('#view');
   $('#title').textContent=t;document.title=t+' — '+DB.set.brand;$$('#nav a').forEach(a=>a.classList.toggle('on',a.getAttribute('href')=='#'+cur));
   if(!soft){v.classList.remove('still');v.innerHTML=skel();scrollTo(0,0)}
-  const [h,i]=await f();if(rt!=RT)return;v.classList.toggle('still',!!soft);v.innerHTML=h;i&&i();$('#unb').textContent=DB.users.length;drawBulk();
+  const [h,i]=await f();if(rt!=RT)return;v.classList.toggle('still',!!soft);v.innerHTML=h;decorateButtonIcons(v);i&&i();$('#unb').textContent=DB.users.length;drawBulk();
 }
 
 /* ================= СИСТЕМНЫЕ МЕТРИКИ ================= */
@@ -1268,6 +1311,8 @@ async function setP(){
   <div class="card"><div class="hd"><div><h3>Вебхуки</h3><p>События, о которых панель сообщает во внешние сервисы</p></div></div>${Object.entries(DB.set.hooks).map(([k,v])=>`<div class="rowi"><div>${k}</div><label class="sw"><input type="checkbox" data-hk="${k}" ${v?'checked':''} aria-label="${k}"><span></span></label></div>`).join('')}</div>${tk}
   <div class="card" id="core-panel"><div class="hd"><div><h3>Xray-core</h3><p>Установка и обновление бинарника ядра на сервере панели</p></div><span class="chip" id="core-state">${esc(coreLabel)}</span></div>
     <div class="setting-row"><div class="setting-copy"><b>Установленная версия</b><small id="core-installed">${coreView.installed_version?esc(coreView.installed_version):'Ещё не установлена'}</small></div><div class="setting-copy"><b>Архитектура</b><small id="core-architecture">${esc(coreView.architecture||'—')}</small></div></div>
+    <div class="setting-row"><div class="setting-copy"><b>Автопроверка статуса</b><small>Проверять Xray-core в фоне, только когда панель открыта и вкладка активна.</small></div><label class="sw"><input type="checkbox" id="auto-core-refresh" ${C.autoCoreRefresh?'checked':''} aria-label="Автоматически проверять статус Xray-core"><span></span></label></div>
+    <div class="setting-row"><div class="setting-copy"><b>Интервал проверки</b><small>Как часто опрашивать backend, если автопроверка включена.</small></div><div class="setting-control"><select id="core-refresh-seconds" aria-label="Интервал проверки Xray-core"><option value="15" ${Number(C.coreRefreshSeconds)===15?'selected':''}>Каждые 15 секунд</option><option value="30" ${Number(C.coreRefreshSeconds)===30?'selected':''}>Каждые 30 секунд</option><option value="60" ${Number(C.coreRefreshSeconds)===60?'selected':''}>Каждую минуту</option><option value="120" ${Number(C.coreRefreshSeconds)===120?'selected':''}>Каждые 2 минуты</option></select></div></div>
     <div class="sg" style="gap:.6rem"><label class="f"><span>Версия для установки</span><input id="core-target" value="${esc(coreView.desired_version||'latest')}" placeholder="latest или v26.10.10" autocomplete="off"><small>Значение latest выбирает самый свежий опубликованный релиз GitHub. По умолчанию используется latest.</small></label></div>
     <div class="act"><button class="gh" type="button" data-core-refresh>Проверить статус</button><button class="btn" type="button" data-core-update>Установить / обновить</button></div>
     <div class="history-placeholder" id="core-message">${esc(coreView.last_error||coreView.progress||'Обновление ядра выполняется отдельно от запуска VPN-трафика.')}</div>
@@ -1426,6 +1471,14 @@ document.addEventListener('change',e=>{
  preview.innerHTML=flagView(select.value,'country-flag-preview')+`<span data-country-label>${country?esc(country.name):select.value?esc(select.value+' Сохранённый флаг'):'Выберите страну…'}</span>`;
 });
 document.addEventListener('change',async e=>{const t=e.target;
+  if(t.id==='auto-core-refresh'||t.id==='core-refresh-seconds'){
+    if(t.id==='auto-core-refresh')C.autoCoreRefresh=t.checked?1:0;
+    else C.coreRefreshSeconds=Number(t.value)||30;
+    apply();
+    syncCoreAutoRefresh();
+    toast(C.autoCoreRefresh?'Автопроверка статуса включена':'Автопроверка статуса выключена');
+    return;
+  }
   if(t.id==='custom-a'||t.id==='custom-b'){if(t.id==='custom-a')C.customA=t.value;else C.customB=t.value;C.accent='custom';if(t.id==='custom-a'){const rgb=t.value.match(/[0-9a-f]{2}/gi).map(v=>parseInt(v,16)/255);const max=Math.max(...rgb),min=Math.min(...rgb),d=max-min;let h=0,s=0,l=(max+min)/2;if(d){s=d/(1-Math.abs(2*l-1));if(max===rgb[0])h=60*(((rgb[1]-rgb[2])/d)%6);else if(max===rgb[1])h=60*((rgb[2]-rgb[0])/d+2);else h=60*((rgb[0]-rgb[1])/d+4);if(h<0)h+=360}C.hue=Math.round(h);C.sat=Math.round(s*100);C.lum=Math.round(l*100);if($('#hue'))$('#hue').value=C.hue;if($('#sat'))$('#sat').value=C.sat;if($('#lum'))$('#lum').value=C.lum;if($('#huev'))$('#huev').textContent=C.hue+'°';if($('#satv'))$('#satv').textContent=C.sat+'%';if($('#lumv'))$('#lumv').textContent=C.lum+'%'}apply();$$('[data-ac]').forEach(x=>x.classList.toggle('on',x.dataset.ac==='custom'));return}
   if(t.dataset.tg){const [k,id]=t.dataset.tg.split(':');await api.update(k,id,{disabled:!t.checked});toast(t.checked?'Включено':'Отключено')}
   else if(t.dataset.usq){const [ui,si]=t.dataset.usq.split(':').map(Number),u=DB.users.find(x=>x.id==ui);await api.update('users',ui,{squads:t.checked?[...new Set([...u.squads,si])]:u.squads.filter(x=>x!=si)});toast('Доступ обновлён');render(1);userDrawer(ui,'acc')}
@@ -1490,6 +1543,7 @@ async function initializePanel(){
   $('#xmesh-auth')?.remove();
   brand();render();
   refreshCoreStatus().catch(()=>{});
+  syncCoreAutoRefresh();
 }
 async function bootPanel(){
   try{
@@ -1518,5 +1572,17 @@ async function refreshCoreStatus(showToast=false){
   if(showToast)toast(state.status==='error'?(state.last_error||'Ошибка Xray-core'):state.status==='updating'?'Xray-core обновляется':'Статус Xray-core обновлён');
   if(state.status==='updating'&&$('#core-panel'))setTimeout(()=>refreshCoreStatus().catch(()=>{}),2200);
   return state;
+}
+let coreRefreshTimer=null,coreRefreshBusy=false;
+function syncCoreAutoRefresh(){
+  if(coreRefreshTimer!==null){clearInterval(coreRefreshTimer);coreRefreshTimer=null}
+  if(!C.autoCoreRefresh)return;
+  const seconds=[15,30,60,120].includes(Number(C.coreRefreshSeconds))?Number(C.coreRefreshSeconds):30;
+  coreRefreshTimer=setInterval(async()=>{
+    if(document.hidden||!backendReady||coreRefreshBusy)return;
+    coreRefreshBusy=true;
+    try{await refreshCoreStatus()}catch(_){}
+    finally{coreRefreshBusy=false}
+  },seconds*1000);
 }
 bootPanel().catch(err=>showAuthGate(err.message||'Ошибка запуска панели'));
