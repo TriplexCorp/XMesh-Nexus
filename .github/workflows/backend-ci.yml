@@ -28,10 +28,13 @@ jobs:
           node --check app.js
           node --check login.js
           node --check xray-studio-v5.js
+          node --check xray-studio-dialog.js
       - name: Verify packaged frontend assets
         run: node scripts/check-static-assets.js
       - name: Check shared Studio theme and CSS structure
         run: node scripts/check-studio-theme.js
+      - name: Check modal settings editor
+        run: node scripts/check-studio-dialog.js
       - name: Check XHTTP serialization and themed dropdowns
         run: node scripts/check-xhttp-extras.js
       - name: Check context-driven Studio editor
