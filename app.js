@@ -351,7 +351,8 @@ async function profilesP(){
  '</div>',false)+
  group('Протокол и клиент','Flow, fingerprint, cipher и специальные параметры',
  '<div class="xray-main-grid">'+
- field('uuid','UUID клиента',inp('uuid','','Нажмите «Сгенерировать UUID»','autocomplete="off"'))+\n field('fingerprint','uTLS fingerprint · клиент',sel('fingerprint',XRAY_FP.map(x=>[x,x])))+
+ field('uuid','UUID клиента',inp('uuid','','Нажмите «Сгенерировать UUID»','autocomplete="off"'))+
+ field('fingerprint','uTLS fingerprint · клиент',sel('fingerprint',XRAY_FP.map(x=>[x,x])))+
  field('flow','VLESS flow',sel('flow',[['','Без flow'],['xtls-rprx-vision','xtls-rprx-vision']]))+
  field('vmess-security','VMess cipher',sel('vmess-security',[['auto','auto'],['aes-128-gcm','aes-128-gcm'],['chacha20-poly1305','chacha20-poly1305'],['none','none']]))+
  field('ss-method','Shadowsocks method',sel('ss-method',[['chacha20-ietf-poly1305','chacha20-ietf-poly1305'],['2022-blake3-aes-128-gcm','2022-blake3-aes-128-gcm'],['2022-blake3-aes-256-gcm','2022-blake3-aes-256-gcm'],['2022-blake3-chacha20-poly1305','2022-blake3-chacha20-poly1305'],['aes-128-gcm','aes-128-gcm'],['aes-256-gcm','aes-256-gcm'],['none','none']]))+
@@ -388,7 +389,8 @@ async function profilesP(){
   const download=(id,suffix)=>{const a=document.createElement('a'),blob=URL.createObjectURL(new Blob([$('#'+id).value],{type:'application/json'}));a.href=blob;a.download=((($('#xpb-name').value||'xray-studio').trim().replace(/[^a-z0-9_-]+/gi,'-')||'xray-studio')+'-'+suffix+'.json');a.click();setTimeout(()=>URL.revokeObjectURL(blob),1000)};
   $('#xpb-copy').onclick=()=>copyText('xpb-preview');$('#xpb-client-copy').onclick=()=>copyText('xpb-client-preview');$('#xpb-download').onclick=()=>download('xpb-preview','server');$('#xpb-client-download').onclick=()=>download('xpb-client-preview','client');
   $('#xpb-save').onclick=async()=>{const name=$('#xpb-name').value.trim();if(!name){$('#xpb-error').textContent='Укажите название профиля.';return}try{const config=$('#xpb-preview').value,data=JSON.parse(config),tags=data.inbounds.map(i=>i.tag);if(!data.inbounds.length||tags.some(t=>!t))throw new Error('У inbound должен быть тег.');if(new Set(tags).size!==tags.length)throw new Error('Теги inbound должны быть уникальными.');if(DB.profiles.some(p=>p.name.toLowerCase()===name.toLowerCase()))throw new Error('Профиль с таким названием уже существует.');const used=DB.profiles.flatMap(inbs).map(i=>i.tag);if(tags.some(t=>used.includes(t)))throw new Error('Тег уже используется в другом профиле.');if(data.inbounds[0].streamSettings?.security==='reality'&&(!data.inbounds[0].streamSettings.realitySettings.privateKey||data.inbounds[0].streamSettings.realitySettings.privateKey==='REPLACE_WITH_XRAY_PRIVATE_KEY'))throw new Error('Сначала сгенерируйте или укажите настоящий Reality private key.');await api.create('profiles',{name,config});toast('Профиль сохранён в XRAY STUDIO');await render(1)}catch(e){$('#xpb-error').textContent=e.message||'Не удалось сохранить профиль.'}};
-  if(!$('#xpb-short-id').value)$('#xpb-short-id').value=randomShortId();\n  updateVisibility();updatePreview();
+  if(!$('#xpb-short-id').value)$('#xpb-short-id').value=randomShortId();
+  updateVisibility();updatePreview();
  }];
 }
 
