@@ -2284,3 +2284,6 @@ html[data-theme=light] .xray-builder select:not(.sr-native-select){color-scheme:
   padding:.65rem!important;
  }
 }
+
+/* Manual JSON retains its full-width editing canvas without contextual controls. */
+.xray-builder.manual-mode>.sr-inline-context{display:none!important}
