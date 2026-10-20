@@ -746,12 +746,16 @@ async function profilesP(){
  ,false)+ '</div></div></div></div></div><aside class="xray-output-dock">'+
  '<section class="xray-output-workspace" aria-label="JSON-конфигурации">'+
  '<div class="xray-output-workspace-head"><div><p class="note">OUTPUT WORKSPACE</p><b>Конфигурации для сервера и клиента</b><small>Отдельные JSON-документы из общей модели параметров. Экспорт не применяет конфиг к работающему ядру.</small></div><span class="xray-output-state" id="xpb-output-state">Предпросмотр готов</span></div>'+
+ '<div class="xray-output-toolbar">'+
  '<div class="xray-output-tabs" role="tablist" aria-label="Выберите тип JSON">'+
  '<button type="button" id="xpb-tab-server" class="on" role="tab" aria-selected="true" aria-controls="xpb-output-server" data-xray-output="server"><span class="xray-output-tab-kicker">01 · SERVER</span><b>Server JSON</b><small>Inbound · слушающий узел</small></button>'+
  '<button type="button" id="xpb-tab-client" role="tab" aria-selected="false" aria-controls="xpb-output-client" data-xray-output="client"><span class="xray-output-tab-kicker">02 · CLIENT</span><b>Client JSON</b><small>Outbound · подключение клиента</small></button>'+
  '</div>'+
+ '<div class="xray-key-actions xray-output-actions" id="xpb-actions-server"><button type="button" class="gh sm" id="xpb-copy" title="Копировать Server JSON" aria-label="Копировать Server JSON">Копировать</button><button type="button" class="gh sm" id="xpb-download" title="Скачать server.json" aria-label="Скачать server.json">Скачать</button></div>'+
+ '<div class="xray-key-actions xray-output-actions" id="xpb-actions-client" hidden><button type="button" class="gh sm" id="xpb-client-copy" title="Копировать Client JSON" aria-label="Копировать Client JSON">Копировать</button><button type="button" class="gh sm" id="xpb-client-download" title="Скачать client.json" aria-label="Скачать client.json">Скачать</button></div>'+
+ '</div>'+
  '<div class="xray-output-pane" id="xpb-output-server" role="tabpanel" aria-labelledby="xpb-tab-server">'+
- '<div class="xray-output-head" id="xpb-server-output"><div><b>Серверная конфигурация</b><small>Полный конфиг Xray: inbounds, outbounds и routing</small></div><div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-copy">Копировать JSON</button><button type="button" class="gh sm" id="xpb-download">Скачать server.json</button></div></div>'+
+ '<div class="xray-output-head" id="xpb-server-output" aria-hidden="true"></div>'+
  '<div class="xray-code-view"><pre id="xpb-preview-syntax" class="xray-code-syntax" aria-hidden="true"></pre><textarea id="xpb-preview" class="xray-preview xray-code-input" spellcheck="false" readonly aria-label="Server JSON"></textarea></div>'+
  '<div id="xpb-custom-mode" class="xray-custom-mode" hidden>'+
  '<div class="xray-output-head"><div><b>Полный Server JSON · ручной режим</b><small>Расширенные поля Xray: DNS, policy, API, routing и любые параметры актуального ядра.</small></div><div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-custom-copy">Копировать</button><button type="button" class="gh sm" id="xpb-custom-download">Скачать</button><button type="button" class="gh sm" id="xpb-format-json">Форматировать</button><button type="button" class="gh sm" id="xpb-reset-json">Заново из конструктора</button></div></div>'+
@@ -759,7 +763,7 @@ async function profilesP(){
  '<p class="mu" id="xpb-custom-error" role="status">Синтаксис JSON и обязательные поля проверяются перед сохранением.</p></div>'+
  '</div>'+
  '<div class="xray-output-pane" id="xpb-output-client" role="tabpanel" aria-labelledby="xpb-tab-client" hidden>'+
- '<div class="xray-output-head" id="xpb-client-output"><div><b>Клиентская конфигурация</b><small>Outbound с transport, security, SNI, fingerprint, UUID и encryption</small></div><div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-client-copy">Копировать JSON</button><button type="button" class="gh sm" id="xpb-client-download">Скачать client.json</button></div></div>'+
+ '<div class="xray-output-head" id="xpb-client-output" aria-hidden="true"></div>'+
  '<p class="xray-client-hint" id="xpb-client-source-note">Это клиентский outbound-конфиг, а не серверный inbound. Если адрес узла, UUID или ключи оставлены как placeholders, замените их перед импортом в приложение.</p>'+
  '<div class="xray-code-view"><pre id="xpb-client-preview-syntax" class="xray-code-syntax" aria-hidden="true"></pre><textarea id="xpb-client-preview" class="xray-preview xray-code-input" spellcheck="false" readonly aria-label="Client JSON"></textarea></div>'+
  '</div></section>'+
@@ -950,6 +954,9 @@ async function profilesP(){
    });
    $('#xpb-output-server').hidden=target!=='server';
    $('#xpb-output-client').hidden=target!=='client';
+   const serverActions=$('#xpb-actions-server'),clientActions=$('#xpb-actions-client');
+   if(serverActions)serverActions.hidden=target!=='server'||customMode;
+   if(clientActions)clientActions.hidden=target!=='client';
   };
   $$('[data-xray-output]').forEach(button=>button.addEventListener('click',()=>setOutput(button.dataset.xrayOutput)));
   setOutput('server');
