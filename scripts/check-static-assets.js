@@ -18,7 +18,7 @@ const errors=[];
 for(const page of pages){
  const html=fs.readFileSync(path.join(root,page),'utf8');
  for(const match of html.matchAll(/(?:href|src)=["']([^"']+\.(?:css|js))(?:\?[^"']*)?["']/g)){
-  const asset=match[1];
+  const asset=match[1].replace(/^\/+/, '');
   if(!fs.existsSync(path.join(root,asset)))errors.push(page+': missing source '+asset);
   else if(!files.has(asset))errors.push(page+': asset not packaged in Docker: '+asset);
  }
