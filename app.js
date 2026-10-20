@@ -211,7 +211,7 @@ function xrayBuilderConfig(){
   const inbound={tag,listen:'0.0.0.0',port,protocol,settings,streamSettings:{network,security}};
   if(network==='ws')inbound.streamSettings.wsSettings={path};
   if(network==='xhttp')inbound.streamSettings.xhttpSettings={path};
-  if(network==='grpc')inbound.streamSettings.grpcSettings={serviceName:path.replace(/^\\//,'')||'grpc'};
+  if(network==='grpc')inbound.streamSettings.grpcSettings={serviceName:path.replace(/^\//,'')||'grpc'};
   if(security==='tls')inbound.streamSettings.tlsSettings={serverName:sni,alpn:['h2','http/1.1'],certificates:[{certificateFile:'/etc/ssl/xray/fullchain.pem',keyFile:'/etc/ssl/xray/privkey.pem'}]};
   if(security==='reality')inbound.streamSettings.realitySettings={show:false,dest,xver:0,serverNames:[sni],privateKey:'REPLACE_WITH_XRAY_PRIVATE_KEY',shortIds:['0123456789abcdef']};
   return {log:{loglevel:'warning'},inbounds:[inbound],outbounds:[{protocol:'freedom',tag:'direct'},{protocol:'blackhole',tag:'blocked'}],routing:{rules:[{type:'field',outboundTag:'direct',inboundTag:[tag]}]}};
