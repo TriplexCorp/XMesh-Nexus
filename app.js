@@ -623,7 +623,7 @@ async function profilesP(){
  field('network','Транспорт',sel('network',XRAY_NETWORKS))+
  field('security','Защита',sel('security',[['reality','Reality'],['tls','TLS'],['none','Без TLS / Reality']]))+
  '</div>'+
- group('Reality','Ключи, Short ID и параметры маскировки',
+ group('Настройки Reality','Ключи и Short ID',
  '<div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-generate-keys">Сгенерировать пару ключей</button><button type="button" class="gh sm" id="xpb-generate-short">Новый Short ID</button></div>'+
  '<div class="xray-key-grid">'+
  field('private-key','Private key · сервер',inp('private-key','','Нажмите «Сгенерировать пару ключей»','autocomplete="off"'))+
@@ -634,7 +634,7 @@ async function profilesP(){
  field('spider-x','SpiderX',inp('spider-x','/','/'))+
  field('xver','Xver',sel('xver',[['0','0 — по умолчанию'],['1','1'],['2','2']]))+
  '</div><p class="note xray-inline-note">Ключи генерируются как X25519 в браузере. Для production проверьте совместимость с вашей версией Xray; приватный ключ остаётся в форме и не отправляется на сервер до сохранения JSON.</p>',true)+
- group('TLS','Сертификаты, ALPN и версии TLS',
+ group('Настройки TLS','Сертификат, ALPN и версия TLS',
  '<div class="xray-main-grid">'+
  field('cert','Путь к сертификату',inp('cert','/etc/ssl/xray/fullchain.pem','/path/fullchain.pem'))+
  field('key','Путь к приватному ключу',inp('key','/etc/ssl/xray/privkey.pem','/path/privkey.pem'))+
@@ -642,8 +642,8 @@ async function profilesP(){
  field('tls-min','Минимальная версия',sel('tls-min',[['1.2','TLS 1.2'],['1.3','TLS 1.3']]))+
  field('tls-max','Максимальная версия',sel('tls-max',[['1.3','TLS 1.3'],['1.2','TLS 1.2']]))+
  '</div>',false)+
- group('Параметры транспорта','Настройки сгруппированы по типу транспорта; нерелевантные блоки скрываются автоматически',
- optionGroup('transport-shared','Потоковые транспорты','Общие параметры RAW, WebSocket, XHTTP, gRPC и HTTPUpgrade',
+ group('Транспорт','Параметры зависят от выбранной сети',
+ optionGroup('transport-shared','Общие настройки','Поля зависят от выбранного транспорта',
  field('host','Host header',inp('host','','Необязательно'))+
  field('path','Path / service name',inp('path','/','/path или имя gRPC service'))+
  field('xhttp-mode','Режим XHTTP',sel('xhttp-mode',[['auto','auto'],['packet-up','packet-up'],['stream-up','stream-up'],['stream-one','stream-one']]))+
@@ -651,7 +651,7 @@ async function profilesP(){
  field('grpc-mode','Режим gRPC',sel('grpc-mode',[['gun','gun'],['multi','multi']]))+
  field('kcp-seed','mKCP seed',inp('kcp-seed','','Необязательно'))+
  field('raw-header','RAW header',sel('raw-header',[['none','Без заголовка'],['http','HTTP camouflage']])))+
- optionGroup('transport-hysteria','Hysteria 2','Аутентификация, UDP и параметры masquerade',
+ optionGroup('transport-hysteria','Hysteria 2','Учётные данные, тайм-аут и masquerade',
  field('hy-auth','Аутентификация Hysteria',inp('hy-auth','','Обычно UUID пользователя','autocomplete="off"'))+
  field('hy-idle','UDP idle timeout',inp('hy-idle','60','Секунды','type="number" min="2" max="600"'))+
  field('hy-masq-type','Тип masquerade',sel('hy-masq-type',[['','По умолчанию'],['string','Текст'],['file','Каталог файлов'],['proxy','Обратный proxy']]))+
@@ -659,12 +659,12 @@ async function profilesP(){
  field('hy-masq-url','URL masquerade',inp('hy-masq-url','','https://example.com'))+
  field('hy-masq-content','Содержимое masquerade',inp('hy-masq-content','','HTML / текст'))+
  field('hy-masq-status','HTTP status',inp('hy-masq-status','200','100–599','type="number" min="100" max="599"')))+
- optionGroup('transport-masque','MASQUE','Адрес назначения, маршрут и необязательная Basic Auth',
+ optionGroup('transport-masque','MASQUE','Назначение и необязательная Basic Auth',
  field('masque-host','MASQUE · host',inp('masque-host','','Host / domain'))+
  field('masque-path','MASQUE · path',inp('masque-path','/masque','Path'))+
  field('masque-user','Пользователь Basic Auth',inp('masque-user','','Необязательно'))+
  field('masque-pass','Пароль Basic Auth',inp('masque-pass','','Необязательно','autocomplete="off"')))+
- optionGroup('transport-xdrive','XDrive · storage и mux','Параметры удалённого хранилища и управления потоком; доступны только при выборе XDrive',
+ optionGroup('transport-xdrive','XDrive · storage и mux','Хранилище и параметры потока',
  field('xdrive-service','Backend хранилища',sel('xdrive-service',[['local','Local filesystem'],['google-drive','Google Drive'],['template','Custom HTTP template']]))+
  field('xdrive-folder','Папка / remote ID',inp('xdrive-folder','/var/lib/xray/xdrive','Local path or remote folder ID'))+
  field('xdrive-secrets','Секреты интеграции','<textarea id="xpb-xdrive-secrets" rows="3" placeholder="Один секрет на строку"></textarea>')+
@@ -679,7 +679,7 @@ async function profilesP(){
  field('xdrive-mux-concurrency','Client mux concurrency',inp('xdrive-mux-concurrency','8','1–1024','type="number" min="1" max="1024"'))+
  field('xdrive-template','HTTP template JSON','<textarea id="xpb-xdrive-template" rows="5" spellcheck="false" placeholder="{ }"></textarea>'))
  ,false)+
- group('Постквантовая защита · VLESS Encryption','ML-KEM-768 — постквантовый вариант аутентификации; X25519 — классический. Сервер и клиент должны использовать парные значения.',
+ group('VLESS Encryption','Серверные и клиентские параметры',
  '<div class="xray-pq-intro"><b>Сгенерировать согласованную пару через Xray-core</b><span>Используется штатная команда <code>xray vlessenc</code>; панель разбирает её текстовый вывод. Значения показываются только в авторизованной панели и попадут в профиль после сохранения.</span></div>'+
  '<div class="xray-main-grid">'+
  field('vlessenc-mode','Режим VLESS Encryption',sel('vlessenc-mode',[['off','Отключено'],['mlkem768','ML-KEM-768 · постквантовый'],['x25519','X25519 · классический'],['manual','Ручная настройка']]),'Для обычного VLESS без VLESS Encryption выберите «Отключено». XDrive требует включённую функцию.')+
@@ -689,8 +689,8 @@ async function profilesP(){
  field('vless-decryption','Сервер · settings.decryption',inp('vless-decryption','','Значение decryption из xray vlessenc','autocomplete="off"'))+
  field('vless-encryption','Клиент · users[0].encryption',inp('vless-encryption','','Парное значение encryption','autocomplete="off"'))+
  '</div><p class="note xray-inline-note">Важно: ML-KEM-768 — не отдельный транспорт и не uTLS fingerprint. Он выбирает постквантовый способ аутентификации в VLESS Encryption. Эфемерный обмен также использует гибрид ML-KEM-768/X25519.</p>',false)+
- group('Протокол и клиент','Учётные данные, параметры протоколов и системные опции',
- optionGroup('client-identity','Идентификация и совместимость','Учётная запись, fingerprint и protocol-specific режимы',
+ group('Параметры протокола','Учётные данные и совместимость клиента',
+ optionGroup('client-identity','Идентификация','UUID, fingerprint и режим протокола',
  field('uuid','UUID / credential клиента',inp('uuid','','Нажмите «Сгенерировать UUID»','autocomplete="off"'))+
  field('fingerprint','uTLS fingerprint · клиент','<select id="xpb-fingerprint"><optgroup label="Рекомендуемые">'+options(XRAY_FP_RECOMMENDED.map(x=>[x,x]))+'</optgroup><optgroup label="Современные профили">'+options(XRAY_FP_MODERN.map(x=>[x,x]))+'</optgroup><optgroup label="Дополнительные и legacy">'+options(XRAY_FP_OTHER.map(x=>[x,x]))+'</optgroup></select>')+
  field('flow','VLESS flow',sel('flow',[['','Без flow'],['xtls-rprx-vision','xtls-rprx-vision']]))+
