@@ -381,8 +381,7 @@ document.addEventListener('click',e=>{
   const mode=button.dataset.nodeGridMode;
   if(!['compact','standard','spacious'].includes(mode))return;
   const grid=document.querySelector('.nodes');
-  if(!grid)return;
-  grid.dataset.gridMode=mode;
+  if(grid)grid.dataset.gridMode=mode;
   document.querySelectorAll('[data-node-grid-mode]').forEach(item=>{
     const active=item.dataset.nodeGridMode===mode;
     item.classList.toggle('on',active);
