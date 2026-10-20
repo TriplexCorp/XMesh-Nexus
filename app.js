@@ -113,7 +113,6 @@ function field(f,v){
   if(t==='country'){
     const existing=COUNTRIES.find(c=>c.flag===v);
     const current=existing?existing.flag:(v||'');
-    const searchLabel=existing?existing.name:(v?'Сохранённый флаг':'Выберите страну');
     i=`<div class="country-picker"><input class="country-search" type="search" data-country-search placeholder="Поиск страны…" aria-label="Поиск страны" autocomplete="off"><select name="${f.k}" class="country-select" aria-label="Страна"><option value="">Выберите страну…</option>${current&&!existing?`<option value="${esc(current)}" selected>${esc(current)} Сохранённый флаг</option>`:''}${COUNTRIES.map(c=>`<option value="${c.flag}" data-country-name="${esc(c.name.toLocaleLowerCase('ru'))}" data-country-code="${c.code}"${c.flag===current?' selected':''}>${c.flag} ${esc(c.name)} (${c.code})</option>`).join('')}</select><small class="country-hint">В списке ${COUNTRIES.length} стран и территорий. Флаг автоматически сохранится в поле узла.</small></div>`;
   }
   else if(t=='sel')i=`<select name="${f.k}">${opt(f.o).map(([a,b])=>`<option value="${esc(a)}"${a==v?' selected':''}>${esc(b)}</option>`).join('')}</select>`;
