@@ -920,6 +920,7 @@ nav a.on{background:color-mix(in srgb,var(--a) 10%,var(--s2));box-shadow:none}
 }
 .xray-builder .xray-import-btn{
   display:inline-flex;
+  gap:.45rem;
   align-items:center;
   justify-content:center;
   min-height:2.72rem;
