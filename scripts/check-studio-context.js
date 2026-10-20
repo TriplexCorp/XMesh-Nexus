@@ -23,12 +23,14 @@ assert(!security('vless','websocket').includes('reality'));
 assert.deepEqual(security('hysteria','hysteria'),['tls']);
 assert.deepEqual(security('masque','masque'),['tls']);
 assert.deepEqual(security('wireguard','raw'),['none']);
-assert.match(source,/option.disabled=!allowed;option.hidden=!allowed;/);
-assert.match(source,/panel.hidden=!sections\[panel.dataset.xrayConfigPanel\]/);
-assert.match(source,/sections\.security|security:\['reality','tls'\]/);
-assert.match(source,/studioRoot.classList.add\('studio-v3','studio-inline'\)/);
-assert.match(css,/>\\.xray-config-tabs\\{display:none!important\\}/);
-assert.match(css,/\\.sr-inline-context/);
-assert.match(ui,/xhttp\\.dataset\\.xhttpExpanded='false'/);
-assert.match(ui,/if\(option\\.hidden\)return;/);
+for(const snippet of [
+ 'option.disabled=!allowed;option.hidden=!allowed;',
+ 'panel.hidden=!sections[panel.dataset.xrayConfigPanel]',
+ "security:['reality','tls'].includes(sec)",
+ "studioRoot.classList.add('studio-v3','studio-inline')"
+])assert(source.includes(snippet),'Missing editor marker: '+snippet);
+assert(css.includes('>.xray-config-tabs{display:none!important}'));
+assert(css.includes('.sr-inline-context'));
+assert(ui.includes("xhttp.dataset.xhttpExpanded='false'"));
+assert(ui.includes('if(option.hidden)return;'));
 console.log('Contextual XRAY STUDIO: dependency matrix, inline panels and advanced disclosure OK');
