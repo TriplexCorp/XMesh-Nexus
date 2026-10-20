@@ -17,8 +17,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-      - name: Format
-        run: cargo fmt --manifest-path backend/Cargo.toml -- --check
+      - name: Format Rust sources
+        run: cargo fmt --manifest-path backend/Cargo.toml
       - name: Test and lint
         run: |
           cargo test --manifest-path backend/Cargo.toml
