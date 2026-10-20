@@ -201,8 +201,7 @@ impl CoreManager {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            let detail = stderr.trim();
-            let detail = if detail.len() > 320 { &detail[..320] } else { detail };
+            let detail = stderr.trim().chars().take(320).collect::<String>();
             return Err(if detail.is_empty() {
                 format!("Xray-core завершился с кодом {}.", output.status)
             } else {
