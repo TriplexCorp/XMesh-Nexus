@@ -1071,28 +1071,28 @@ nav a.on{background:color-mix(in srgb,var(--a) 10%,var(--s2));box-shadow:none}
 }
 .xray-builder .xray-heading-copy{display:grid;gap:.2rem;min-width:0}
 .xray-builder .xray-hero .note{
-  display:block;
-  margin:0 0 .08rem;
-  color:var(--a);
-  font-size:.63rem;
-  font-weight:750;
-  letter-spacing:.1em;
-  line-height:1.25;
+display:block;
+margin:0 0 .12rem;
+color:color-mix(in srgb,var(--a) 84%,var(--tx));
+font-size:.64rem;
+font-weight:770;
+letter-spacing:.12em;
+line-height:1.3;
 }
 .xray-builder .xray-hero h2{
-  margin:0;
-  font-size:1.45rem;
-  font-weight:760;
-  line-height:1.12;
-  letter-spacing:-.045em;
+margin:0;
+font-size:clamp(1.45rem,1.9vw,1.78rem);
+font-weight:785;
+line-height:1.15;
+letter-spacing:-.055em;
 }
 .xray-builder .xray-hero .xray-hero-description{
-  display:block;
-  margin:.14rem 0 0;
-  max-width:62ch;
-  color:var(--mu);
-  font-size:.8rem;
-  line-height:1.45;
+display:block;
+margin:.22rem 0 0;
+max-width:62ch;
+color:var(--mu);
+font-size:.78rem;
+line-height:1.55;
 }
 .xray-builder>.xray-presets{
   grid-column:2;
@@ -1104,38 +1104,39 @@ nav a.on{background:color-mix(in srgb,var(--a) 10%,var(--s2));box-shadow:none}
   min-width:0;
 }
 .xray-builder .xray-preset-row{
-  display:flex;
-  align-items:center;
-  gap:.18rem;
-  min-width:0;
-  padding:.2rem;
-  border:1px solid var(--ln);
-  border-radius:.72rem;
-  background:var(--s2);
+display:flex;
+align-items:center;
+gap:.14rem;
+min-width:0;
+padding:.18rem;
+border:1px solid var(--ln);
+border-radius:.63rem;
+background:var(--elevated);
 }
 .xray-builder .xray-preset{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  min-width:0;
-  min-height:2.3rem;
-  padding:.48rem .78rem;
-  border:1px solid transparent;
-  border-radius:.52rem;
-  background:transparent;
-  color:var(--mu);
-  box-shadow:none;
-  white-space:nowrap;
-  cursor:pointer;
-  transition:background .16s,border-color .16s,color .16s;
+display:inline-flex;
+align-items:center;
+justify-content:center;
+gap:.42rem;
+min-width:0;
+min-height:2.38rem;
+padding:.43rem .76rem;
+border:1px solid transparent;
+border-radius:.45rem;
+background:transparent;
+color:var(--mu);
+box-shadow:none;
+white-space:nowrap;
+cursor:pointer;
+transition:background .16s,border-color .16s,color .16s;
 }
 .xray-builder .xray-preset b{font-size:.74rem;font-weight:680;line-height:1.2}
 .xray-builder .xray-preset:hover{color:var(--tx);background:color-mix(in srgb,var(--ln) 42%,transparent)}
 .xray-builder .xray-preset.on{
-  border-color:color-mix(in srgb,var(--a) 35%,var(--ln));
-  background:color-mix(in srgb,var(--a) 10%,var(--s1));
-  color:var(--tx);
-  box-shadow:none;
+border-color:color-mix(in srgb,var(--a) 23%,var(--ln));
+background:color-mix(in srgb,var(--a) 8%,var(--s1));
+color:var(--tx);
+box-shadow:inset 0 1px 0 var(--surface-highlight);
 }
 .xray-builder .xray-import-btn{
   display:inline-flex;
@@ -1160,17 +1161,17 @@ nav a.on{background:color-mix(in srgb,var(--a) 10%,var(--s2));box-shadow:none}
   background:color-mix(in srgb,var(--a) 7%,transparent);
 }
 .xray-builder .xray-meta-grid{
-  grid-column:1/-1;
-  display:grid;
-  grid-template-columns:repeat(3,minmax(0,1fr));
-  gap:.7rem;
-  align-items:start;
-  min-width:0;
-  margin:0;
-  padding:.82rem;
-  border:1px solid var(--ln);
-  border-radius:.82rem;
-  background:var(--s2);
+grid-column:1/-1;
+display:grid;
+grid-template-columns:repeat(3,minmax(0,1fr));
+gap:.75rem;
+align-items:start;
+min-width:0;
+margin:0;
+padding:.9rem;
+border:1px solid var(--ln);
+border-radius:.8rem;
+background:var(--elevated);
 }
 .xray-builder .xray-meta-grid>.f{min-width:0;margin:0}
 .xray-builder .xray-meta-grid>.f:last-child{grid-column:auto}
@@ -1238,20 +1239,20 @@ nav a.on{background:color-mix(in srgb,var(--a) 10%,var(--s2));box-shadow:none}
 display:flex;
 align-items:center;
 justify-content:flex-start;
-gap:.42rem;
+gap:.4rem;
 min-width:0;
-min-height:2.5rem;
-height:2.5rem;
+min-height:2.58rem;
+height:2.58rem;
 margin:0;
-padding:.45rem .65rem;
+padding:.42rem .58rem;
 border:1px solid var(--ln);
-border-radius:.6rem;
-background:var(--s2);
+border-radius:.58rem;
+background:var(--elevated);
 color:var(--mu);
 text-align:left;
 white-space:nowrap;
 cursor:pointer;
-transition:background .17s,border-color .17s,color .17s;
+transition:background .16s,border-color .16s,color .16s,box-shadow .16s;
 }
 .xray-builder .xray-config-tabs button>.ic{width:1rem;height:1rem;flex:0 0 1rem}
 .xray-builder .xray-preset-row .xray-preset{gap:.45rem}
@@ -1291,10 +1292,10 @@ text-overflow:ellipsis;
 .xray-builder .xray-config-tabs button>small{display:none}
 .xray-builder .xray-config-tabs button.on,
 .xray-builder .xray-config-tabs button[aria-selected="true"]{
-  border-color:color-mix(in srgb,var(--a) 60%,var(--ln));
-  background:linear-gradient(145deg,color-mix(in srgb,var(--a) 12%,var(--s1)),var(--s1));
+  border-color:color-mix(in srgb,var(--a) 42%,var(--ln));
+  background:color-mix(in srgb,var(--a) 9%,var(--s1));
   color:var(--tx);
-  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--a) 10%,transparent);
+  box-shadow:inset 0 1px 0 var(--surface-highlight),0 0 0 1px color-mix(in srgb,var(--a) 4%,transparent);
 }
 .xray-builder .xray-config-tabs button.on>span,
 .xray-builder .xray-config-tabs button[aria-selected="true"]>span{
@@ -1308,19 +1309,19 @@ text-overflow:ellipsis;
 }
 .xray-builder [hidden]{display:none!important}
 .xray-builder .xray-config-content{
-  display:block;
-  width:100%;
-  height:auto;
-  min-width:0;
-  min-height:0;
-  padding:.95rem;
-  border:1px solid var(--ln);
-  border-radius:.82rem;
-  background:var(--s1);
-  overflow-y:auto;
-  overflow-x:hidden;
-  overscroll-behavior:contain;
-  scrollbar-gutter:stable;
+display:block;
+width:100%;
+height:auto;
+min-width:0;
+min-height:0;
+padding:1.05rem;
+border:1px solid var(--ln);
+border-radius:.8rem;
+background:var(--s1);
+overflow-y:auto;
+overflow-x:hidden;
+overscroll-behavior:contain;
+scrollbar-gutter:stable;
 }
 .xray-builder .xray-config-panel{
   display:grid;
@@ -1331,13 +1332,13 @@ text-overflow:ellipsis;
   animation:xrayPanelIn .14s ease-out;
 }
 .xray-builder .xray-config-panel-title{
-  display:flex;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap:.55rem;
-  min-width:0;
-  padding:0 0 .7rem;
-  border-bottom:1px solid var(--ln);
+display:flex;
+align-items:flex-start;
+justify-content:space-between;
+gap:.62rem;
+min-width:0;
+padding:0 0 .85rem;
+border-bottom:1px solid var(--ln);
 }
 .xray-builder .xray-config-panel-title>div{display:grid;gap:.2rem;min-width:0}
 .xray-builder .xray-config-panel-title h3{
@@ -1374,17 +1375,17 @@ gap:.75rem;
 .xray-builder .xray-config-panel[data-xray-config-panel="basic"] .xray-row-3{grid-template-columns:repeat(3,minmax(0,1fr));gap:.75rem}
 .xray-builder .xray-config-panel[data-xray-config-panel="basic"] .xray-main-grid>.f{grid-column:auto}
 .xray-builder .xray-config-panel .xray-section{
-  display:grid;
-  align-content:start;
-  gap:.72rem;
-  min-width:0;
-  margin:0;
-  padding:.86rem;
-  border:1px solid var(--ln);
-  border-radius:.72rem;
-  background:var(--s2);
-  box-shadow:none;
-  overflow:visible;
+display:grid;
+align-content:start;
+gap:.7rem;
+min-width:0;
+margin:0;
+padding:.94rem;
+border:1px solid var(--ln);
+border-radius:.7rem;
+background:var(--elevated);
+box-shadow:inset 0 1px 0 var(--surface-highlight);
+overflow:visible;
 }
 .xray-builder .xray-config-panel .xray-section.xray-section-compact{
 border:0;
@@ -1537,20 +1538,20 @@ box-shadow:0 0 0 3px color-mix(in srgb,var(--a) 18%,transparent);
 
 /* JSON output: clear tabs, readable code, actions close to the result. */
 .xray-builder .xray-output-dock{
-  display:grid;
-  grid-template-rows:minmax(0,1fr) auto;
-  gap:.78rem;
-  min-width:0;
-  min-height:0;
-  width:auto;
-  height:100%;
-  margin:0;
-  padding:.9rem;
-  border:1px solid var(--ln);
-  border-radius:.9rem;
-  background:color-mix(in srgb,var(--s1) 88%,var(--bg));
-  box-shadow:0 10px 28px #00000012;
-  overflow:hidden;
+display:grid;
+grid-template-rows:minmax(0,1fr) auto;
+gap:.66rem;
+min-width:0;
+min-height:0;
+width:auto;
+height:100%;
+margin:0;
+padding:.94rem;
+border:1px solid color-mix(in srgb,var(--a) 10%,var(--ln));
+border-radius:.85rem;
+background:var(--s1);
+box-shadow:var(--shadow-card);
+overflow:hidden;
 }
 .xray-builder .xray-output-workspace{
   display:grid;
@@ -1727,15 +1728,15 @@ white-space:nowrap;
   line-height:1;
 }
 .xray-builder .xray-code-view{
-  position:relative;
-  width:100%;
-  height:100%;
-  min-width:0;
-  min-height:0;
-  border:1px solid color-mix(in srgb,var(--ln) 88%,transparent);
-  border-radius:.68rem;
-  background:#080d0b;
-  overflow:hidden;
+position:relative;
+width:100%;
+height:100%;
+min-width:0;
+min-height:0;
+border:1px solid color-mix(in srgb,var(--tx) 9%,var(--ln));
+border-radius:.64rem;
+background:#0b1119;
+overflow:hidden;
 }
 .xray-builder .xray-code-syntax,
 .xray-builder .xray-code-input{
@@ -1876,7 +1877,7 @@ white-space:nowrap;
   resize:none;
   border:1px solid var(--ln);
   border-radius:.65rem;
-  background:#080d0b!important;
+  background:#0b1119!important;
   color:#d8e6de!important;
   -webkit-text-fill-color:#d8e6de!important;
   caret-color:#6ee7b7;
@@ -2025,7 +2026,7 @@ white-space:nowrap;
   min-height:0;
   height:100%;
   border-color:color-mix(in srgb,var(--a) 24%,var(--ln));
-  background:#080d0b;
+  background:#0b1119;
 }
 .xray-builder .xray-custom-code-view:focus-within{
   border-color:color-mix(in srgb,var(--a) 70%,var(--ln));
