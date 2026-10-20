@@ -1177,6 +1177,24 @@ async function profilesP(){
  '</div></section>'+
  '<div class="xray-footer"><p class="er" id="xpb-error" role="status"></p><button type="button" class="btn" id="xpb-save">Сохранить профиль</button></div></aside></div></section>';
  return [builderHtml+saved,()=>{
+  // Studio layout v3: move navigation and actions into their own full-width
+  // rows; existing field ids, events, and JSON generation remain unchanged.
+  const studioRoot=document.querySelector('.xray-builder');
+  if(studioRoot){
+    const tabs=studioRoot.querySelector('.xray-config-tabs');
+    const layout=studioRoot.querySelector('.xray-workspace-layout');
+    const footer=studioRoot.querySelector('.xray-footer');
+    if(tabs&&layout)studioRoot.insertBefore(tabs,layout);
+    if(footer)studioRoot.appendChild(footer);
+    studioRoot.classList.add('studio-v3');
+    const basic=studioRoot.querySelector('#xpb-config-basic');
+    if(basic&&!basic.querySelector('.studio-v3-tip')){
+      const tip=document.createElement('div');
+      tip.className='studio-v3-tip';
+      tip.innerHTML='<span class="studio-v3-tip-icon" aria-hidden="true">i</span><div><strong>О протоколе VLESS</strong><p>VLESS поддерживает различные транспорты и режимы защиты. Для соединения с Reality настройте параметры во вкладке «Защита».</p></div>';
+      basic.appendChild(tip);
+    }
+  }
   const renderJsonHighlight=(sourceId,targetId)=>{
    const source=$('#'+sourceId),target=$('#'+targetId);
    if(!source||!target)return;
