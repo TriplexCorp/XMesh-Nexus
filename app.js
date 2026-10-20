@@ -990,7 +990,7 @@ async function nodesP(){
         ${nodeGauge(n,'traffic-'+n.id,'Трафик',n.limit?k*100:0,n.limit?Math.round(k*100)+'%':'∞',n.limit?`${gb(n.used)} / ${gb(n.limit)}`:`${gb(n.used)} · без лимита`,tc)}
       </div>
       <div class="mb node-speed"><div><span>Текущая скорость</span><b id="nm${n.id}">${Number.isFinite(l.mbps)?fmt(l.mbps)+' Мбит/с':'—'}</b></div><div class="pb f" style="--w:${Number.isFinite(l.mbps)?cl(l.mbps/240*100,0,100):0}%" id="npm${n.id}"><i></i></div></div>
-      <div class="acts"><button class="gh sm" data-nr="${n.id}">${ic('redo')}Перезапуск</button><button class="gh sm" data-nt="${n.id}">${n.disabled?'Включить':'Отключить'}</button><button class="gh sm" data-ne="nodes:${n.id}">${ic('pen')}Изменить</button></div></div>`;
+      <div class="acts"><button class="gh sm" data-metrics-token="${n.id}">${ic('activity')}Агент метрик</button><button class="gh sm" data-nr="${n.id}">${ic('redo')}Перезапуск</button><button class="gh sm" data-nt="${n.id}">${n.disabled?'Включить':'Отключить'}</button><button class="gh sm" data-ne="nodes:${n.id}">${ic('pen')}Изменить</button></div></div>`;
   }).join('');
   const empty=`<div class="card empty"><b>Узлов пока нет</b><span>Список начнёт заполняться после добавления ваших серверов.</span><button class="btn sm" data-ne="nodes">${ic('plus')}Добавить узел</button></div>`;
   const gridMode=getNodeGridMode();
@@ -1114,6 +1114,29 @@ document.addEventListener('click',async e=>{
   else if(b=g('tr[data-e]')){const [k,id]=b.dataset.e.split(':');entForm(k,id)}
   else if(b=g('[data-mv]')){const [k,id,d]=b.dataset.mv.split(':'),a=[...DB[k]].sort((x,y)=>x.order-y.order),i=a.findIndex(x=>x.id==id),j=i+ +d;if(a[j]){const o=a[i].order;await api.update(k,a[i].id,{order:a[j].order});await api.update(k,a[j].id,{order:o});render(1)}}
   else if(b=g('[data-del]')){const [k,id]=b.dataset.del.split(':'),e=ENT[k],r=DB[k].find(x=>String(x.id)===id),m=e?.guard?.(r);if(m){const error=$('#fe');if(error)error.textContent=m;else toast(m);return}if(!r){toast('Запись уже удалена или не найдена.');return}confirmBox(`Удалить «${e?.t||k}»?`,'Удалить',async()=>{try{await api.remove(k,id);toast('Запись удалена');await render(1)}catch(err){toast('Не удалось удалить: '+(err.message||'ошибка backend'))}})}
+  else if(b=g('[data-metrics-token]')){
+    const id=Number(b.dataset.metricsToken),node=DB.nodes.find(n=>Number(n.id)===id);
+    if(!node){toast('Узел не найден.');return}
+    if(location.protocol!=='https:'){toast('Открой панель через HTTPS перед созданием токена агента.');return}
+    b.disabled=true;
+    try{
+      const issued=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/metrics-token',{method:'POST',body:JSON.stringify({})});
+      const shellQuote=value=>"'"+String(value).replace(/'/g,"'\\''")+"'";
+      const installUrl='https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy/install-node-metrics-agent.sh';
+      const command='curl -fsSL '+shellQuote(installUrl)+' -o /tmp/xmesh-node-metrics-install.sh\nsudo bash /tmp/xmesh-node-metrics-install.sh '+shellQuote(location.origin)+' '+shellQuote(String(id))+' '+shellQuote(issued.token);
+      const html='<div class="box"><div class="bar2"><h2>Агент метрик · '+esc(node.name)+'</h2><button class="ia" data-x aria-label="Закрыть">'+ic('x')+'</button></div>'+
+        '<p class="note">Токен выдан. Скопируйте токен и команду сейчас: позже показать токен повторно нельзя. Новый токен немедленно отзывает старый.</p>'+
+        '<label class="f"><span>Bearer-токен · '+id+'</span><div class="lk"><input id="lk" readonly value="'+esc(issued.token)+'" aria-label="Токен агента"><button class="gh" data-copy aria-label="Скопировать токен">'+ic('copy')+'</button></div></label>'+
+        '<label class="f"><span>Команда для Linux-узла (root)</span><textarea id="metrics-install-command" rows="3" spellcheck="false" readonly>'+esc(command)+'</textarea><small>Узел должен иметь исходящий HTTPS-доступ к панели и GitHub. Агент использует systemd timer с интервалом в минуту.</small></label>'+
+        '<div class="act"><button type="button" class="gh" data-copy-metrics-install>'+ic('copy')+'Скопировать команду</button><button type="button" class="btn" data-x>Готово</button></div></div>';
+      modal(html,'wide');
+    }catch(error){toast('Не удалось создать токен агента: '+(error.message||'ошибка API'))}
+    finally{b.disabled=false}
+  }
+  else if(b=g('[data-copy-metrics-install]')){
+    const field=$('#metrics-install-command');
+    if(field){try{await navigator.clipboard.writeText(field.value);toast('Команда скопирована')}catch(error){field.focus();field.select();document.execCommand('copy');toast('Команда скопирована')}}
+  }
   else if(b=g('[data-nr]')){toast('Перезапуск требует подключённого backend/API Xray. В автономном HTML он не выполняется.')}
   else if(b=g('[data-nt]')){const n=DB.nodes.find(x=>x.id==b.dataset.nt);await api.update('nodes',n.id,{disabled:!n.disabled});toast(`${n.name}: ${n.disabled?'отключён':'включён'}`);render(1)}
   else if(b=g('[data-tt]')){TP.tab=b.dataset.tt;TP.q='';TP.f='';render(1)}
