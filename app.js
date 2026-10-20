@@ -979,7 +979,7 @@ async function profilesP(){
     item.setAttribute('aria-selected',active?'true':'false');
     item.tabIndex=active?0:-1;
    });
-   $$$('[data-xray-config-panel]').forEach(item=>{item.hidden=item.dataset.xrayConfigPanel!==key});
+   $$('[data-xray-config-panel]').forEach(item=>{item.hidden=item.dataset.xrayConfigPanel!==key});
   };
   const syncConfigTabs=()=>{
    $$('[data-xray-config-panel]').forEach(panel=>{
@@ -1037,7 +1037,7 @@ async function profilesP(){
     :'Этот Client JSON — отдельный outbound-конфиг. Адрес узла, UUID, Reality public key / Short ID и другие placeholders нужно заполнить реальными значениями.';
    if(customMode)validateCustomJson();
   };
-  $$$('[data-xray-mode]').forEach(btn=>btn.addEventListener('click',()=>setMode(btn.dataset.xrayMode)));
+  $$('[data-xray-mode]').forEach(btn=>btn.addEventListener('click',()=>setMode(btn.dataset.xrayMode)));
   customArea.addEventListener('input',()=>{customDirty=true;validateCustomJson()});
   $('#xpb-custom-copy').onclick=()=>copyText('xpb-custom-json');
   $('#xpb-custom-download').onclick=()=>download('xpb-custom-json','server');
