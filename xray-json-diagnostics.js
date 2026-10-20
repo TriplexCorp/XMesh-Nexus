@@ -56,6 +56,19 @@
  }
  function safeFix(source,position){
    if(position===null)return null;
+   // Two commas in a row, optionally separated by whitespace. The second
+   // comma is the syntax error (e.g. "protocol": "vless",, on line 8).
+   // Only change the offending comma near the parser position, outside
+   // string literals, and only when parsing advances after removal.
+   for(let i=Math.max(0,position-6);i<=Math.min(source.length-1,position+1);i++){
+     if(source[i]!==','||!notInsideString(source,i))continue;
+     const previous=previousNonSpace(source,i-1);
+     if(previous<0||source[previous]!==','||Math.abs(i-position)>3)continue;
+     const next=source.slice(0,i)+source.slice(i+1);
+     if(tryParseProgress(source,next,position)){
+       return {start:i,end:i+1,replacement:'',label:'Убрать лишнюю запятую'};
+     }
+   }
    // Remove one trailing comma before a closing object/array. Only outside strings.
    const commaCandidates=[];
    // The parser already pinpoints the invalid neighborhood. Never inspect
@@ -224,7 +237,7 @@
        jump.hidden=true;hotfix.hidden=true;
      }else{
        const where=issue.line===null?'':('Строка '+issue.line+', столбец '+issue.column+' · ');
-       text.textContent=where+issue.message;
+       text.textContent=where+issue.message+(issue.fix?'':' · Безопасное автоисправление не найдено.');
        jump.hidden=issue.start===null;
        hotfix.hidden=!issue.fix;
        if(issue.fix)hotfix.textContent='⚡ Hot Fix: '+issue.fix.label;
