@@ -49,7 +49,8 @@ assert.match(editor.decorateRun('<img src=x>',0,'jx-string',{
 assert.doesNotMatch(editor.decorateRun('<img src=x>',0,'jx-string',null),/<img/,'Editor tokens must escape markup');
 assert.match(app,/XrayJsonDiagnostics\?\.attach\(customArea\)/,'Builder must attach diagnostics');
 assert.match(app,/jsonDiagnostics\.decorateRun/,'Builder must paint inline squiggles in syntax layer');
-assert.match(app,/jsonDiagnostics\?\.update\(issue\)/,'Builder must update live validation status');
+assert.match(app,/jsonDiagnostics\?\.update\(issues\)/,'Builder must update all live diagnostics');
+assert.match(app,/jsonDiagnostics\.decorateRun\(value,start,cls,issues\)/,'Builder highlights multiple issues simultaneously');
 assert.match(src,/setRangeText\(proposal\.replacement,proposal\.start,proposal\.end,'end'\)/,'Hot Fix must edit only affected range');
 assert.match(src,/textarea\.dispatchEvent\(new Event\('input'/,'Hot Fix must notify existing validators and JSON state');
 assert.match(src,/Math\.floor\(\(scroll-topPad\)\/lineHeight\)/,'Line gutter must use virtualized visible lines');
