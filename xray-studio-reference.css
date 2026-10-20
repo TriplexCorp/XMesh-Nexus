@@ -1,0 +1,90 @@
+/* Reference 2026-10-20 — Studio composition v4. */
+.xray-builder.studio-v3:not(.manual-mode){
+  --studio-ref-gold:#f1bf76;--studio-ref-border:#28384d;
+  width:100%;background:#0b1421!important;border:0!important;
+  padding:1.15rem!important;gap:1rem!important;
+}
+.xray-builder.studio-v3:not(.manual-mode)>.xray-meta-grid{
+  gap:.75rem!important;
+}
+.xray-builder.studio-v3:not(.manual-mode)>.xray-meta-grid>.f{
+  border:1px solid #25374c!important;background:#122032!important;
+  border-radius:.75rem!important;padding:.82rem!important;
+}
+.xray-builder.studio-v3:not(.manual-mode)>.xray-meta-grid input{
+  height:2.9rem!important;min-height:2.9rem!important;
+  border-radius:.55rem!important;background:#1b2d42!important;
+  font-size:.83rem!important;
+}
+.xray-builder.studio-v3:not(.manual-mode)>.xray-config-tabs{gap:.65rem!important}
+.xray-builder.studio-v3:not(.manual-mode)>.xray-config-tabs button{
+  min-height:4.15rem!important;height:4.15rem!important;
+  padding:.85rem!important;font-size:.87rem!important;
+  border:1px solid #27394f!important;background:#101d2d!important;
+}
+.xray-builder.studio-v3:not(.manual-mode)>.xray-config-tabs button.on{
+  background:linear-gradient(115deg,#372e26,#152336)!important;
+  border-color:#efbd72!important;box-shadow:0 0 18px #f1bd7040!important;
+}
+.xray-builder.studio-v3:not(.manual-mode)>.xray-workspace-layout{
+  grid-template-columns:minmax(0,1.55fr) minmax(0,1fr)!important;
+  align-items:start!important;gap:.9rem!important;
+}
+.xray-builder.studio-v3:not(.manual-mode) .xray-config-content,
+.xray-builder.studio-v3:not(.manual-mode) .xray-output-dock{
+  background:linear-gradient(160deg,#142236,#101a2a)!important;
+  border:1px solid #283a50!important;border-radius:.9rem!important;
+  padding:1.2rem!important;
+}
+.xray-builder.studio-v3:not(.manual-mode) .xray-config-panel-title{
+  min-height:4.5rem!important;display:flex!important;align-items:center!important;
+  border-bottom:1px solid #2a3a50!important;margin-bottom:.5rem!important;
+}
+.xray-builder.studio-v3:not(.manual-mode) .xray-config-panel-title h3{font-size:1.23rem!important}
+.xray-builder.studio-v3:not(.manual-mode) .xray-config-panel-title p{
+  font-size:.81rem!important;color:#97abc1!important;
+}
+.xray-builder.studio-v3:not(.manual-mode) .xray-config-panel .f{gap:.45rem!important}
+.xray-builder.studio-v3:not(.manual-mode) .xray-config-panel .f>span{
+  font-size:.83rem!important;color:#b9c8dd!important;
+}
+.xray-builder.studio-v3:not(.manual-mode) .xray-config-panel .f :is(input,select){
+  height:3rem!important;min-height:3rem!important;
+  border-radius:.56rem!important;background:#1b2c40!important;
+  border:1px solid #30445b!important;font-size:.86rem!important;
+}
+.xray-builder.studio-v3:not(.manual-mode) .xray-config-panel[data-xray-config-panel="basic"]{
+  gap:1.45rem!important;
+}
+.xray-builder.studio-v3:not(.manual-mode) .xray-output-workspace-head>div>b{
+  font-size:1.06rem!important;
+}
+.xray-builder.studio-v3:not(.manual-mode) .xray-code-view{
+  height:clamp(22rem,44dvh,33rem)!important;min-height:22rem!important;
+  background:#081322!important;border:1px solid #293c51!important;
+}
+.xray-builder.studio-v3:not(.manual-mode) .xray-output-toolbar{padding:.1rem 0 .5rem!important}
+.xray-builder.studio-v3:not(.manual-mode)>.xray-footer{
+  background:#172538!important;border:1px solid #26374d!important;
+  min-height:4.5rem!important;padding:.85rem 1rem!important;
+}
+.xray-builder.studio-v3:not(.manual-mode) .studio-v3-tip{
+  background:#172a42!important;border:1px solid #284c73!important;
+  padding:1rem!important;border-radius:.7rem!important;
+}
+.xray-builder.studio-v3:not(.manual-mode) .studio-v3-tip-icon{
+  background:#70adff!important;color:#0a1728!important;
+}
+@media(max-width:1250px){
+ .xray-builder.studio-v3:not(.manual-mode)>.xray-workspace-layout{
+   grid-template-columns:minmax(0,1fr)!important;
+ }
+}
+@media(max-width:760px){
+ .xray-builder.studio-v3:not(.manual-mode)>.xray-meta-grid{
+   grid-template-columns:minmax(0,1fr)!important;
+ }
+ .xray-builder.studio-v3:not(.manual-mode) .xray-config-panel[data-xray-config-panel="basic"] :is(.xray-row-2,.xray-row-3){
+   grid-template-columns:minmax(0,1fr)!important;
+ }
+}
