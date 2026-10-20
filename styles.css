@@ -1075,10 +1075,7 @@ nav a.on{background:var(--s2)!important;box-shadow:none!important}
   outline:2px solid var(--a);
   outline-offset:2px;
 }
-.xray-builder .xray-config-tabs button[hidden],
-.xray-builder .xray-config-panel[hidden],
-.xray-builder .xray-output-pane[hidden],
-.xray-builder #xpb-custom-mode[hidden]{display:none!important}
+.xray-builder [hidden]{display:none!important}
 .xray-builder .xray-config-content{
   display:block;
   width:100%;
