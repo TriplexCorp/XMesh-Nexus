@@ -1746,3 +1746,35 @@ nav a.on{background:var(--s2)!important;box-shadow:none!important}
   .xray-builder .xray-output-tabs button{transition:none}
   .xray-builder .xray-config-panel{animation:none}
 }
+
+/* Manual JSON editor: token colors remain visible beneath the editable text layer. */
+.xray-builder .xray-custom-code-view{
+  min-height:0;
+  height:100%;
+  border-color:color-mix(in srgb,var(--a) 24%,var(--ln));
+  background:#080d0b;
+}
+.xray-builder .xray-custom-code-view:focus-within{
+  border-color:color-mix(in srgb,var(--a) 70%,var(--ln));
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--a) 12%,transparent);
+}
+.xray-builder #xpb-custom-json{
+  color:transparent!important;
+  -webkit-text-fill-color:transparent!important;
+  caret-color:#e5fff4;
+  background:transparent!important;
+  outline:none!important;
+  box-shadow:none!important;
+  resize:none;
+}
+.xray-builder #xpb-custom-syntax{color:#cbd5d1}
+.xray-builder #xpb-custom-json::selection{background:rgba(16,185,129,.30);color:transparent}
+.xray-builder #xpb-custom-error.er{
+  border-color:color-mix(in srgb,var(--er) 45%,var(--ln));
+  background:color-mix(in srgb,var(--er) 9%,var(--s2));
+  color:var(--er);
+}
+.xray-builder #xpb-custom-error.mu{
+  border-color:color-mix(in srgb,var(--ok) 25%,var(--ln));
+  color:var(--mu);
+}
