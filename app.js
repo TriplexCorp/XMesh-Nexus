@@ -625,11 +625,11 @@ async function profilesP(){
  '<div class="xray-config-panel" id="xpb-config-basic" data-xray-config-panel="basic">'+
  '<div class="xray-config-panel-title"><div><h3>Основные параметры</h3><p>Начните с типа inbound, порта и базовой защиты.</p></div><span class="xray-config-required">ОБЯЗАТЕЛЬНОЕ</span></div>'+
  '<div class="xray-main-grid">'+
- field('listen','Listen address',inp('listen','0.0.0.0','0.0.0.0'))+
- field('port','Порт',inp('port','443','443','type="number" min="1" max="65535" required'))+
+ field('listen','Адрес прослушивания',inp('listen','0.0.0.0','0.0.0.0'))+
+ field('port','Порт inbound',inp('port','443','443','type="number" min="1" max="65535" required'))+
  field('protocol','Протокол',sel('protocol',XRAY_PROTOCOLS))+
  field('network','Транспорт',sel('network',XRAY_NETWORKS))+
- field('security','Защита',sel('security',[['reality','Reality'],['tls','TLS'],['none','Без TLS / Reality']]))+
+ field('security','Защита транспорта',sel('security',[['reality','Reality'],['tls','TLS'],['none','Без TLS / Reality']]))+
  '</div></div>'+
  '<div class="xray-config-panel" id="xpb-config-security" data-xray-config-panel="security" hidden>'+
  '<div class="xray-config-panel-title"><div><h3>Защита соединения</h3><p>Показываются только настройки, совместимые с выбранным режимом.</p></div></div>'+
@@ -639,15 +639,15 @@ async function profilesP(){
  field('private-key','Private key · сервер',inp('private-key','','Нажмите «Сгенерировать пару ключей»','autocomplete="off"'))+
  field('public-key','Public key · клиент',inp('public-key','','Заполнится после генерации','autocomplete="off"'))+
  field('short-id','Short ID',inp('short-id','','До 16 hex-символов','maxlength="16" autocapitalize="off"'))+
- field('dest','Destination',inp('dest','example.com:443','domain:443'))+
- field('sni','Server name / SNI',inp('sni','example.com','Домен назначения'))+
- field('spider-x','SpiderX',inp('spider-x','/','/'))+
- field('xver','Xver',sel('xver',[['0','0 — по умолчанию'],['1','1'],['2','2']]))+
+ field('dest','Целевой адрес (dest)',inp('dest','example.com:443','domain:443'))+
+ field('sni','Имя сервера (SNI)',inp('sni','example.com','Домен назначения'))+
+ field('spider-x','SpiderX · путь запроса',inp('spider-x','/','/'))+
+ field('xver','PROXY protocol · xver',sel('xver',[['0','0 — по умолчанию'],['1','1'],['2','2']]))+
  '</div><p class="note xray-inline-note">Ключи генерируются как X25519 в браузере. Для production проверьте совместимость с вашей версией Xray; приватный ключ остаётся в форме и не отправляется на сервер до сохранения JSON.</p>',true)+
  group('Настройки TLS','Сертификат, ALPN и версия TLS',
  '<div class="xray-main-grid">'+
- field('cert','Путь к сертификату',inp('cert','/etc/ssl/xray/fullchain.pem','/path/fullchain.pem'))+
- field('key','Путь к приватному ключу',inp('key','/etc/ssl/xray/privkey.pem','/path/privkey.pem'))+
+ field('cert','Путь к TLS-сертификату',inp('cert','/etc/ssl/xray/fullchain.pem','/path/fullchain.pem'))+
+ field('key','Путь к приватному ключу TLS',inp('key','/etc/ssl/xray/privkey.pem','/path/privkey.pem'))+
  field('alpn','ALPN',inp('alpn','h2,http/1.1','h2,http/1.1'))+
  field('tls-min','Минимальная версия',sel('tls-min',[['1.2','TLS 1.2'],['1.3','TLS 1.3']]))+
  field('tls-max','Максимальная версия',sel('tls-max',[['1.3','TLS 1.3'],['1.2','TLS 1.2']]))+
@@ -657,8 +657,8 @@ async function profilesP(){
  '<div class="xray-config-panel-title"><div><h3>Настройки транспорта</h3><p>Меняйте транспорт в разделе «Основное». Нерелевантные поля скрываются автоматически.</p></div></div>'+
  group('Транспорт','Параметры зависят от выбранной сети',
  optionGroup('transport-shared','Общие настройки','Поля зависят от выбранного транспорта',
- field('host','Host header',inp('host','','Необязательно'))+
- field('path','Path / service name',inp('path','/','/path или имя gRPC service'))+
+ field('host','HTTP Host / authority',inp('host','','Необязательно'))+
+ field('path','Путь / имя gRPC-сервиса',inp('path','/','/path или имя gRPC service'))+
  field('xhttp-mode','Режим XHTTP',sel('xhttp-mode',[['auto','auto'],['packet-up','packet-up'],['stream-up','stream-up'],['stream-one','stream-one']]))+
  field('xhttp-padding','XHTTP padding',inp('xhttp-padding','100-1000','Например, 100-1000'))+
  field('grpc-mode','Режим gRPC',sel('grpc-mode',[['gun','gun'],['multi','multi']]))+
@@ -695,7 +695,7 @@ async function profilesP(){
  '</div>'+
  '<div class="xray-config-panel" id="xpb-config-encryption" data-xray-config-panel="encryption" hidden>'+
  '<div class="xray-config-panel-title"><div><h3>VLESS Encryption</h3><p>Дополнительный механизм защиты для VLESS. Не является заменой транспорта.</p></div></div>'+
- group('VLESS Encryption','Серверные и клиентские параметры',
+ group('Пара ключей','Серверный decryption и клиентский encryption',
  '<div class="xray-pq-intro"><b>Сгенерировать согласованную пару через Xray-core</b><span>Используется штатная команда <code>xray vlessenc</code>; панель разбирает её текстовый вывод. Значения показываются только в авторизованной панели и попадут в профиль после сохранения.</span></div>'+
  '<div class="xray-main-grid">'+
  field('vlessenc-mode','Режим VLESS Encryption',sel('vlessenc-mode',[['off','Отключено'],['mlkem768','ML-KEM-768 · постквантовый'],['x25519','X25519 · классический'],['manual','Ручная настройка']]),'Для обычного VLESS без VLESS Encryption выберите «Отключено». XDrive требует включённую функцию.')+
@@ -1064,7 +1064,7 @@ async function profilesP(){
     await api.create('profiles',{name,config});
     toast('Профиль сохранён в XRAY STUDIO');
     await render(1);
-   }catch(e){$('#xpb-error').textContent=e.message||'Не удалось сохранить профиль.';if(customMode)$('#xpb-custom-error').textContent=e.message||'Не удалось сохранить профиль.'}
+   }catch(e){const message=e.message||'Не удалось сохранить профиль.';$('#xpb-error').textContent=message;if(customMode)$('#xpb-custom-error').textContent=message;toast(message);}
   };
   if(!$('#xpb-short-id').value)$('#xpb-short-id').value=randomShortId();
   updateVisibility();updatePreview();
