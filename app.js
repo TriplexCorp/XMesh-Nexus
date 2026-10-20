@@ -880,11 +880,11 @@ async function profilesP(){
     if(f.startsWith('masque-'))show=proto==='masque'||net==='masque';
     wrap.hidden=!show;
    });
-   $('[data-xray-option-group]').forEach(section=>{
+   $$('[data-xray-option-group]').forEach(section=>{
     const visibleField=section.querySelector('.f:not([hidden])');
     section.hidden=!visibleField;
    });
-   $('[data-xray-mode]').forEach(b=>b.classList.toggle('on',b.dataset.xrayMode===(customMode?'custom':'visual')));
+   $$('[data-xray-mode]').forEach(b=>b.classList.toggle('on',b.dataset.xrayMode===(customMode?'custom':'visual')));
    syncConfigTabs();
   };
   let customMode=false,customInitialized=false,customDirty=false,generatedVlessPairs=null;
@@ -902,7 +902,7 @@ async function profilesP(){
   const setOutput=target=>{
    if(!['server','client'].includes(target))return;
    activeOutput=target;
-   $('[data-xray-output]').forEach(button=>{
+   $$('[data-xray-output]').forEach(button=>{
     const active=button.dataset.xrayOutput===target;
     button.classList.toggle('on',active);
     button.setAttribute('aria-selected',active?'true':'false');
@@ -910,7 +910,7 @@ async function profilesP(){
    $('#xpb-output-server').hidden=target!=='server';
    $('#xpb-output-client').hidden=target!=='client';
   };
-  $('[data-xray-output]').forEach(button=>button.addEventListener('click',()=>setOutput(button.dataset.xrayOutput)));
+  $$('[data-xray-output]').forEach(button=>button.addEventListener('click',()=>setOutput(button.dataset.xrayOutput)));
   setOutput('server');
   let activeConfigTab='basic';
   const setConfigTab=key=>{
@@ -964,7 +964,7 @@ async function profilesP(){
    const tagField=$('#xpb-tag')?.closest('.f');if(tagField)tagField.hidden=customMode;
    $('#xpb-server-output').hidden=customMode;
    $('#xpb-preview').hidden=customMode;
-   $$('[data-xray-mode]').forEach(b=>b.classList.toggle('on',b.dataset.xrayMode===(customMode?'custom':'visual')));
+   $$$('[data-xray-mode]').forEach(b=>b.classList.toggle('on',b.dataset.xrayMode===(customMode?'custom':'visual')));
    setOutput('server');
    const clientSourceNote=$('#xpb-client-source-note');
    if(clientSourceNote)clientSourceNote.textContent=customMode
@@ -972,13 +972,13 @@ async function profilesP(){
     :'Этот Client JSON — отдельный outbound-конфиг. Адрес узла, UUID, Reality public key / Short ID и другие placeholders нужно заполнить реальными значениями.';
    if(customMode)validateCustomJson();
   };
-  $$('[data-xray-mode]').forEach(btn=>btn.addEventListener('click',()=>setMode(btn.dataset.xrayMode)));
+  $$$('[data-xray-mode]').forEach(btn=>btn.addEventListener('click',()=>setMode(btn.dataset.xrayMode)));
   customArea.addEventListener('input',()=>{customDirty=true;validateCustomJson()});
   $('#xpb-custom-copy').onclick=()=>copyText('xpb-custom-json');
   $('#xpb-custom-download').onclick=()=>download('xpb-custom-json','server');
   $('#xpb-format-json').onclick=()=>{const obj=validateCustomJson();if(obj){customArea.value=JSON.stringify(obj,null,2);customDirty=true;validateCustomJson();toast('JSON отформатирован')}};
   $('#xpb-reset-json').onclick=()=>{if(confirm('Заменить ручной JSON текущим конфигом визуального конструктора?')){customArea.value=$('#xpb-preview').value;customDirty=false;validateCustomJson();toast('JSON обновлён из конструктора')}};
-  $('[id^="xpb-"]').filter(el=>(el.tagName==='INPUT'||el.tagName==='SELECT'||el.tagName==='TEXTAREA')&&!['xpb-custom-json','xpb-preview','xpb-client-preview'].includes(el.id)).forEach(el=>{el.addEventListener('input',()=>{updateVisibility();updatePreview()});el.addEventListener('change',()=>{updateVisibility();updatePreview()})});
+  $$('[id^="xpb-"]').filter(el=>(el.tagName==='INPUT'||el.tagName==='SELECT'||el.tagName==='TEXTAREA')&&!['xpb-custom-json','xpb-preview','xpb-client-preview'].includes(el.id)).forEach(el=>{el.addEventListener('input',()=>{updateVisibility();updatePreview()});el.addEventListener('change',()=>{updateVisibility();updatePreview()})});
   $('#xpb-security').addEventListener('change',()=>{if($('#xpb-security').value!=='none')setConfigTab('security')});
   $('#xpb-network').addEventListener('change',()=>setConfigTab('transport'));
   $('#xpb-generate-short').onclick=()=>{$('#xpb-short-id').value=randomShortId();updatePreview();toast('Short ID создан')};
@@ -1253,7 +1253,7 @@ document.addEventListener('click',async e=>{
   else if(b=g('[data-tt]')){TP.tab=b.dataset.tt;TP.q='';TP.f='';render(1)}
   else if(b=g('[data-lv]')){}
   else if(b=g('[data-th]')){C.theme=b.dataset.th;apply();$$('#th button').forEach(x=>x.classList.toggle('on',x==b))}
-  else if(b=g('[data-ac]')){C.accent=b.dataset.ac;apply();$$('[data-ac]').forEach(x=>x.classList.toggle('on',x==b))}
+  else if(b=g('[data-ac]')){C.accent=b.dataset.ac;apply();$$$('[data-ac]').forEach(x=>x.classList.toggle('on',x==b))}
   else if(b=g('[data-ui]')){const prop=b.dataset.ui,value=b.dataset.value;if(prop&&value){C[prop]=value;apply();$$(`[data-ui="${prop}"]`).forEach(x=>x.classList.toggle('on',x==b))}}
   else if(g('#rs')){C={...CDEFAULT};apply();render(1);toast('Оформление сброшено')}
   else if(g('#gx')){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(DB,null,2)],{type:'application/json'}));a.download='xmesh-nexus-backup.json';a.click()}
@@ -1331,7 +1331,7 @@ document.addEventListener('change',e=>{
  preview.innerHTML=flagView(select.value,'country-flag-preview')+`<span data-country-label>${country?esc(country.name):select.value?esc(select.value+' Сохранённый флаг'):'Выберите страну…'}</span>`;
 });
 document.addEventListener('change',async e=>{const t=e.target;
-  if(t.id==='custom-a'||t.id==='custom-b'){if(t.id==='custom-a')C.customA=t.value;else C.customB=t.value;C.accent='custom';if(t.id==='custom-a'){const rgb=t.value.match(/[0-9a-f]{2}/gi).map(v=>parseInt(v,16)/255);const max=Math.max(...rgb),min=Math.min(...rgb),d=max-min;let h=0,s=0,l=(max+min)/2;if(d){s=d/(1-Math.abs(2*l-1));if(max===rgb[0])h=60*(((rgb[1]-rgb[2])/d)%6);else if(max===rgb[1])h=60*((rgb[2]-rgb[0])/d+2);else h=60*((rgb[0]-rgb[1])/d+4);if(h<0)h+=360}C.hue=Math.round(h);C.sat=Math.round(s*100);C.lum=Math.round(l*100);if($('#hue'))$('#hue').value=C.hue;if($('#sat'))$('#sat').value=C.sat;if($('#lum'))$('#lum').value=C.lum;if($('#huev'))$('#huev').textContent=C.hue+'°';if($('#satv'))$('#satv').textContent=C.sat+'%';if($('#lumv'))$('#lumv').textContent=C.lum+'%'}apply();$('[data-ac]').forEach(x=>x.classList.toggle('on',x.dataset.ac==='custom'));return}
+  if(t.id==='custom-a'||t.id==='custom-b'){if(t.id==='custom-a')C.customA=t.value;else C.customB=t.value;C.accent='custom';if(t.id==='custom-a'){const rgb=t.value.match(/[0-9a-f]{2}/gi).map(v=>parseInt(v,16)/255);const max=Math.max(...rgb),min=Math.min(...rgb),d=max-min;let h=0,s=0,l=(max+min)/2;if(d){s=d/(1-Math.abs(2*l-1));if(max===rgb[0])h=60*(((rgb[1]-rgb[2])/d)%6);else if(max===rgb[1])h=60*((rgb[2]-rgb[0])/d+2);else h=60*((rgb[0]-rgb[1])/d+4);if(h<0)h+=360}C.hue=Math.round(h);C.sat=Math.round(s*100);C.lum=Math.round(l*100);if($('#hue'))$('#hue').value=C.hue;if($('#sat'))$('#sat').value=C.sat;if($('#lum'))$('#lum').value=C.lum;if($('#huev'))$('#huev').textContent=C.hue+'°';if($('#satv'))$('#satv').textContent=C.sat+'%';if($('#lumv'))$('#lumv').textContent=C.lum+'%'}apply();$$('[data-ac]').forEach(x=>x.classList.toggle('on',x.dataset.ac==='custom'));return}
   if(t.dataset.tg){const [k,id]=t.dataset.tg.split(':');await api.update(k,id,{disabled:!t.checked});toast(t.checked?'Включено':'Отключено')}
   else if(t.dataset.usq){const [ui,si]=t.dataset.usq.split(':').map(Number),u=DB.users.find(x=>x.id==ui);await api.update('users',ui,{squads:t.checked?[...new Set([...u.squads,si])]:u.squads.filter(x=>x!=si)});toast('Доступ обновлён');render(1);userDrawer(ui,'acc')}
   else if(t.dataset.hw){await api.update('users',+t.dataset.hw,{hwid:+t.value||0});toast('Лимит устройств сохранён');render(1);userDrawer(+t.dataset.hw,'acc')}
@@ -1339,7 +1339,7 @@ document.addEventListener('change',async e=>{const t=e.target;
   else if(t.dataset.psz){UQ.size=+t.value;UQ.page=1;drawUsers()}
   else if(t.id=='mo'){C.motion=t.checked?1:0;apply()}
   else if(t.id=='tplsel'){const p=DB.tpls.find(x=>x.id==t.value);if(!p)return;const f=$('form[data-k=user]');const set=(k,v)=>{const el=$(`[name=${k}]`,f);if(el)el.value=v};set('limit',p.limit);set('days',p.days);set('strategy',p.strategy);set('hwid',p.hwid);$('[name=hold]',f).checked=p.hold;$$('[name=squads]',f).forEach(c=>c.checked=p.squads.includes(+c.value))}});
-document.addEventListener('input',e=>{if(['hue','sat','lum'].includes(e.target.id)){C.hue=+$('#hue').value;C.sat=+$('#sat').value;C.lum=+$('#lum').value;C.customA=hslHex(C.hue,C.sat,C.lum);C.accent='custom';$('#custom-a').value=C.customA;$('#huev').textContent=C.hue+'°';$('#satv').textContent=C.sat+'%';$('#lumv').textContent=C.lum+'%';apply();$('[data-ac]').forEach(x=>x.classList.toggle('on',x.dataset.ac==='custom'))}else if(e.target.id=='ts'){C.ts=+e.target.value;$('#tsv').textContent=Math.round(C.ts*100)+'%';apply()}else if(e.target.id=='radius'){C.radius=+e.target.value;$('#rv').textContent=C.radius+' px';apply()}if(e.target.id=='pq')pdraw(e.target.value)});
+document.addEventListener('input',e=>{if(['hue','sat','lum'].includes(e.target.id)){C.hue=+$('#hue').value;C.sat=+$('#sat').value;C.lum=+$('#lum').value;C.customA=hslHex(C.hue,C.sat,C.lum);C.accent='custom';$('#custom-a').value=C.customA;$('#huev').textContent=C.hue+'°';$('#satv').textContent=C.sat+'%';$('#lumv').textContent=C.lum+'%';apply();$$('[data-ac]').forEach(x=>x.classList.toggle('on',x.dataset.ac==='custom'))}else if(e.target.id=='ts'){C.ts=+e.target.value;$('#tsv').textContent=Math.round(C.ts*100)+'%';apply()}else if(e.target.id=='radius'){C.radius=+e.target.value;$('#rv').textContent=C.radius+' px';apply()}if(e.target.id=='pq')pdraw(e.target.value)});
 document.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()=='k'){e.preventDefault();palette();return}
   if(e.target.id=='pq'){if(e.key=='ArrowDown'||e.key=='ArrowUp'){e.preventDefault();const n=Math.min(PI.length,12);PX=(PX+(e.key=='ArrowDown'?1:n-1))%Math.max(n,1);$$('.pi').forEach((x,i)=>x.classList.toggle('on',i==PX));$('.pi.on')?.scrollIntoView({block:'nearest'})}if(e.key=='Enter'){e.preventDefault();const x=PI[PX];if(x){dlg.close();x.r()}}return}
