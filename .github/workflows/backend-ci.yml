@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, security/auth-hardening]
+    branches: [main, security/auth-hardening, ui/emerald-theme-xray-builder]
 
 permissions:
   contents: read
