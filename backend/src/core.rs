@@ -519,7 +519,7 @@ fn chrono_free_timestamp() -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::normalize_version;
+    use super::{normalize_version, parse_vless_encryption_output};
 
     #[test]
     fn latest_is_the_default_alias() {
