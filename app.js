@@ -622,6 +622,7 @@ async function profilesP(){
    else if(proto==='hysteria'){force('network','hysteria');force('security','tls')}
    else if(['tun','wireguard'].includes(proto))force('security','none');
    else if(net==='masque')force('network','raw');
+   else if(net==='xdrive'&&proto!=='vless')force('network','raw');
    if(['hysteria','masque'].includes(net)&&sec!=='tls')force('security','tls');
    if(net==='xdrive'&&v('flow'))force('flow','');
    if(sec==='reality'&&(!['raw','xhttp','grpc'].includes(net)||!['vless','vmess','trojan'].includes(proto)))force('security',['tun','wireguard','masque','dokodemo-door','tunnel'].includes(proto)?'none':'tls');
@@ -712,7 +713,7 @@ async function profilesP(){
   customArea.addEventListener('input',()=>{customDirty=true;validateCustomJson()});
   $('#xpb-format-json').onclick=()=>{const obj=validateCustomJson();if(obj){customArea.value=JSON.stringify(obj,null,2);customDirty=true;validateCustomJson();toast('JSON отформатирован')}};
   $('#xpb-reset-json').onclick=()=>{if(confirm('Заменить ручной JSON текущим конфигом визуального конструктора?')){customArea.value=$('#xpb-preview').value;customDirty=false;validateCustomJson();toast('JSON обновлён из конструктора')}};
-  $$('[id^="xpb-"]').filter(el=>el.tagName==='INPUT'||el.tagName==='SELECT').forEach(el=>{el.addEventListener('input',()=>{updateVisibility();updatePreview()});el.addEventListener('change',()=>{updateVisibility();updatePreview()})});
+  $$('[id^="xpb-"]').filter(el=>(el.tagName==='INPUT'||el.tagName==='SELECT'||el.tagName==='TEXTAREA')&&!['xpb-custom-json','xpb-preview','xpb-client-preview'].includes(el.id)).forEach(el=>{el.addEventListener('input',()=>{updateVisibility();updatePreview()});el.addEventListener('change',()=>{updateVisibility();updatePreview()})});
   $('#xpb-generate-short').onclick=()=>{$('#xpb-short-id').value=randomShortId();updatePreview();toast('Short ID создан')};
   $('#xpb-generate-ss-password').onclick=()=>{const method=$('#xpb-ss-method').value||'chacha20-ietf-poly1305';const n=method==='2022-blake3-aes-128-gcm'?16:32;$('#xpb-ss-password').value=randomBase64(n);$('#xpb-ss-user-password').value=randomBase64(n);updatePreview();toast('Пароли Shadowsocks сгенерированы')};
   $('#xpb-generate-uuid').onclick=()=>{const u=crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=crypto.getRandomValues(new Uint8Array(1))[0]&15;return(c==='x'?r:(r&3|8)).toString(16)});$('#xpb-uuid').value=u;updatePreview();toast('UUID создан')};
