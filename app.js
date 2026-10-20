@@ -643,7 +643,7 @@ async function profilesP(){
    if(network==='xdrive'&&$('#xpb-flow').value)throw new Error('XDrive несовместим с VLESS flow. Оставьте flow пустым.');
    if(security==='reality'){const sid=$('#xpb-short-id').value.trim();if(!sid||sid.length>16||sid.length%2||!/^[a-fA-F0-9]+$/.test(sid))throw new Error('Short ID: 2–16 hex-символов, чётная длина.');if(!$('#xpb-sni').value.trim())throw new Error('Для Reality укажите Server name / SNI.');}
    let warning='';
-   if(protocol==='vless'&&security==='none')warning='Внимание: публичный VLESS без TLS/Reality не защищает транспорт.';
+   if(protocol==='vless'&&security==='none'&&(($('#xpb-vlessenc-mode')?.value||'off')==='off')&&network!=='xdrive')warning='Внимание: у VLESS нет TLS/Reality и VLESS Encryption. Для публичного узла включите один из этих способов защиты.';
    if(protocol==='shadowsocks'&&$('#xpb-ss-method').value==='2022-blake3-chacha20-poly1305'&&$('#xpb-uuid').value.trim())throw new Error('Shadowsocks 2022 ChaCha поддерживает только одного пользователя: очистите UUID или выберите AES-128/AES-256 для нескольких пользователей.');
    if(protocol==='shadowsocks'){const method=$('#xpb-ss-method').value||'chacha20-ietf-poly1305',hasUuid=!!$('#xpb-uuid').value.trim(),hasServerPass=!!$('#xpb-ss-password').value.trim(),hasUserPass=!!$('#xpb-ss-user-password').value.trim();if(method.startsWith('2022-')&&(!hasServerPass||(hasUuid&&!hasUserPass)))warning=hasUuid?'Укажите server key и user key Shadowsocks 2022 (сгенерируйте оба или введите Base64-ключи).':'Укажите серверный Base64-ключ Shadowsocks 2022.';else if(!hasUuid&&!hasServerPass)warning='Для Shadowsocks без отдельного UUID укажите серверный пароль или нажмите «Сгенерировать пароли Shadowsocks».';}
    if(protocol==='wireguard'&&!$('#xpb-wg-secret-key').value.trim())warning='Укажите серверный WireGuard private key (команда xray wg).';
@@ -825,6 +825,7 @@ async function profilesP(){
       const ids=rk.shortIds||[];
       if(!Array.isArray(ids)||ids.some(id=>String(id).length>16||String(id).length%2||!/^[a-fA-F0-9]*$/.test(String(id))))throw new Error('Inbound '+(inbound.tag||'(без tag)')+': Short ID должен быть массивом из hex-значений до 16 символов чётной длины.');
      }
+     if(inbound?.protocol==='vless'&&(!inbound.settings||typeof inbound.settings.decryption!=='string'||!inbound.settings.decryption.trim()))throw new Error('Inbound '+(inbound.tag||'(без tag)')+': явно задайте settings.decryption: "none" или корректное VLESS Encryption значение.');
      if(inbound?.protocol==='vless'&&inbound.settings?.decryption&&inbound.settings.decryption!=='none'){
       const decryption=String(inbound.settings.decryption);
       if(decryption.startsWith('REPLACE_')||!decryption.startsWith('mlkem768x25519plus.'))throw new Error('Inbound '+(inbound.tag||'(без tag)')+': задайте корректный VLESS Encryption decryption из xray vlessenc.');
