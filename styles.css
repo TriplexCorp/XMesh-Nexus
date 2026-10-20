@@ -40,7 +40,7 @@ nav em{margin-left:auto;font-style:normal;font-size:.78rem;font-weight:800}.more
 @keyframes ping{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--c,var(--ok)) 55%,transparent)}100%{box-shadow:0 0 0 .6rem transparent}}
 
 .wrap{padding:1.45rem clamp(1rem,2.5vw,2.5rem) 4rem;width:100%;max-width:120rem;margin-inline:auto}
-.top{position:sticky;top:0;z-index:15;display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;margin: -1.45rem calc(0px - clamp(1rem,2.5vw,2.5rem)) 1.1rem;padding:1rem clamp(1rem,2.5vw,2.5rem);border-bottom:1px solid var(--ln);background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(18px)}
+.top{position:relative;z-index:1;display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;margin:0 0 1.1rem;padding:0 0 1rem;border-bottom:1px solid var(--ln);background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none}
 h1{font-size:1.42rem;font-weight:800;letter-spacing:-.05em;margin-right:auto}
 .search{display:flex;align-items:center;gap:.6rem;padding:0 .85rem;height:2.65rem;width:min(22rem,100%);border-radius:var(--ui-control-radius);background:var(--s1);border:1px solid var(--ln);color:var(--mu);text-align:left;transition:border-color .16s,background .16s}
 .search:hover,.search:focus-within{border-color:color-mix(in srgb,var(--a) 48%,var(--ln));background:var(--s2)}.search span,.search input{flex:1;min-width:0;background:none;border:0;outline:0;color:var(--mu)}.search input{color:var(--tx)}
@@ -374,7 +374,7 @@ nav a.on .ic{color:var(--a)}
 .core button{border:1px solid var(--ln);background:color-mix(in srgb,var(--tx) 3%,var(--s2))}
 .core button:hover{background:color-mix(in srgb,var(--a) 10%,var(--s2));border-color:color-mix(in srgb,var(--a) 20%,var(--ln))}
 .wrap{max-width:132rem;padding:1.7rem clamp(1.15rem,2.45vw,2.8rem) 4rem}
-.top{gap:.75rem;margin-bottom:1.6rem;padding-bottom:1.15rem;border-bottom:1px solid var(--ln)}
+.top{gap:.75rem;margin-bottom:1.25rem;padding-bottom:1rem;border-bottom:1px solid var(--ln)}
 h1{font-size:1.42rem;font-weight:800;letter-spacing:-.05em}
 h3{font-size:1rem;font-weight:700;letter-spacing:-.025em}
 .hd{margin-bottom:1.15rem}.hd p,.note{font-size:.88rem;line-height:1.6}
