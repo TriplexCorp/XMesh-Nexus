@@ -755,3 +755,18 @@ nav a.on{background:var(--s2)!important;box-shadow:none!important}
   .users-panel>.bulk{position:static;bottom:auto;left:auto;transform:none;justify-content:flex-start}
   .users-panel>.bulk.on{transform:none}
 }
+
+
+/* XRAY STUDIO: advanced protocol and client fingerprint workspace */
+.xray-studio-tabs{display:flex;gap:.5rem;flex-wrap:wrap;padding:.35rem;border:1px solid var(--ln);border-radius:14px;background:var(--s1)}
+.xray-studio-tabs button{border:1px solid transparent;background:transparent;color:var(--mu);padding:.7rem 1rem;border-radius:10px;cursor:pointer;font:inherit;font-weight:650}
+.xray-studio-tabs button.on{background:var(--s2);border-color:var(--ln);color:var(--tx);box-shadow:0 4px 14px #00000012}
+.xray-studio-note{padding:1rem 1.1rem;border:1px solid var(--ln);border-left:3px solid var(--a);border-radius:12px;background:color-mix(in srgb,var(--a) 5%,var(--s1));color:var(--mu);line-height:1.55;font-size:.9rem}
+.xray-studio-note b{color:var(--tx)}
+.xray-output-pane{display:grid;gap:.85rem;min-width:0}
+.xray-output-pane[hidden]{display:none!important}
+.xray-output-pane .act{display:flex;gap:.6rem;flex-wrap:wrap}
+.xray-builder-grid .f{min-width:0}
+.xray-builder-grid input,.xray-builder-grid select{min-width:0;width:100%}
+.xray-builder-grid .f small{display:block;color:var(--mu);font-size:.76rem}
+@media(max-width:560px){.xray-studio-tabs button{flex:1;padding:.65rem .55rem;font-size:.86rem}.xray-output-pane .act>*{flex:1 1 100%}}
