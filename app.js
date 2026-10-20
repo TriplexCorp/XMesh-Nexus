@@ -1618,7 +1618,8 @@ function syncCoreBadge(state){
   const status=state.status==='updating'?'Установка Xray-core…':installed?('Версия '+installed):state.status==='error'?'Ошибка установки':'Ядро не установлено';
   if(el)el.textContent=status;
   if(rail){
-    rail.textContent=installed|| (state.status==='updating'?'Обновление':state.status==='error'?'Ошибка':'—');
+    const railLabel=installed||(state.status==='updating'?'Обновление':state.status==='error'?'Ошибка':'Нет ядра');
+    if(rail.textContent!==railLabel)rail.textContent=railLabel;
     rail.title='Xray-core · '+status;
   }
   if(settings)settings.title='Настройки Xray-core · '+status;
