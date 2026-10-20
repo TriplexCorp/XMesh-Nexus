@@ -2167,6 +2167,22 @@ white-space:nowrap;
   .app>aside nav a.on::before{display:none}
 
   /* Readable header without overflowing the four action buttons. */
+  .top .top-identity{
+    display:flex;
+    flex:1 1 7rem;
+    min-width:0;
+    gap:0;
+  }
+  .top .top-eyebrow{display:none}
+  .top .top-identity h1{
+    display:block;
+    flex:none;
+    width:100%;
+    max-width:100%;
+    margin:0;
+    line-height:1.2;
+    overflow-wrap:anywhere;
+  }
   .top{
     display:flex;
     align-items:center;
