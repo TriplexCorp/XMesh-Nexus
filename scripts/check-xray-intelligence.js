@@ -57,7 +57,7 @@ assert(findings.some(x=>x.code==='REALITY_TRANSPORT'));
 assert(findings.some(x=>x.code==='REALITY_MISSING'));
 const route={outbounds:[{tag:'direct',protocol:'freedom'}],routing:{rules:[{type:'field',domain:['example.com'],outboundTag:'missing'}]}};
 assert(verify(route).some(x=>x.code==='MISSING_OUTBOUND_TAG'));
-const invalid='{"inbounds":[{"protocol":"vless",,}]}';
+const invalid='{"inbounds":[{"protocol":"vless",, "tag":"node","port":443}]}';
 assert.equal(engine.inspectAll(invalid).length,1,'Syntax error comes before semantic analysis');
 assert(engine.inspectAll(invalid)[0].fix,'Keep legacy syntax Hot Fix');
 assert.match(engine.decorateRun('<script>',0,'jx-string',null),/&lt;script&gt;/);
