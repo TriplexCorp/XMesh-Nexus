@@ -29,7 +29,7 @@ assert.match(css,/\.sr-studio-dialog:not\(\[open\]\)/,'Closed dialog must remain
 assert.match(css,/\.sr-studio-dialog\[data-active-panel="transport"\]/,'Transport settings overlay missing');
 assert.match(css,/\.xray-workspace-layout\{\s*align-items:start!important/,'JSON and main editor must align at top');
 assert.match(css,/width:min\(1700px,calc\(100vw - 72px\)\)!important/,'Dialog must leave a visible margin around the panel');
-assert.match(css,/-webkit-backdrop-filter:blur\(13px\) saturate\(\.7\)!important/,'Modal must blur the underlying app');
+assert.match(css,/-webkit-backdrop-filter:blur\(12px\) saturate\(\.78\)!important/,'Modal must blur the underlying app');
 assert.match(css,/\.studio-inline\.manual-mode\s*>\s*\.xray-workspace-layout/,'Manual JSON must use the same Studio shell');
 assert.match(css,/\.studio-inline\.manual-mode\s+\.xray-custom-mode \.xray-output-head/,'Manual JSON must use shared editor header styling');
 assert.match(css,/\.studio-inline\.manual-mode\s+\.xray-custom-code-view/,'Manual JSON code editor must retain its full-width design');
