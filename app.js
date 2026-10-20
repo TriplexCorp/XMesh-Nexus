@@ -277,6 +277,32 @@ document.addEventListener('focusin',e=>{
 document.addEventListener('focusout',e=>{
   if(railTipTarget&&e.target===railTipTarget)hideRailTip();
 });
+/* Keep the inline calendar inside its dialog and close it predictably. */
+document.addEventListener('click',e=>{
+  const picker=dlg.querySelector('.user-date-field');
+  if(picker&&!picker.contains(e.target))closeUserCalendar(picker);
+});
+document.addEventListener('keydown',e=>{
+  const panel=e.target.closest?.('.user-date-calendar');
+  if(!panel||panel.hidden)return;
+  const picker=panel.closest('.user-date-field');
+  if(e.key==='Escape'){
+    e.preventDefault();
+    closeUserCalendar(picker);
+    picker.querySelector('[data-user-date-open]')?.focus();
+    return;
+  }
+  const current=e.target.closest('[data-user-date-day]');
+  if(!current)return;
+  const steps={ArrowLeft:-1,ArrowRight:1,ArrowUp:-7,ArrowDown:7};
+  if(!Object.prototype.hasOwnProperty.call(steps,e.key))return;
+  e.preventDefault();
+  const selected=userDateFromYmd(current.dataset.userDateDay);
+  if(!selected)return;
+  const target=new Date(selected.getFullYear(),selected.getMonth(),selected.getDate()+steps[e.key],12);
+  if(target.getMonth()!==selected.getMonth()||target.getFullYear()!==selected.getFullYear())drawUserCalendar(picker,target);
+  panel.querySelector('[data-user-date-day="'+userYmd(target)+'"]')?.focus();
+});
 document.addEventListener('pointerdown',hideRailTip);
 window.addEventListener('scroll',hideRailTip,true);
 window.addEventListener('resize',hideRailTip);
@@ -1603,6 +1629,7 @@ document.addEventListener('click',async e=>{
   else if(b=g('[data-dt]')){userDrawer(+$('[data-a]').dataset.u,b.dataset.dt)}
   else if(b=g('tr[data-id]'))userDrawer(+b.dataset.id,'ov');
   else if(b=g('[data-uo]'))userDrawer(+b.dataset.uo,'dev');
+  else if(b=g('[data-user-date-open],[data-user-date-nav],[data-user-date-day],[data-user-date-today],[data-user-date-clear]')){e.preventDefault();handleUserCalendarAction(b)}
   else if(b=g('[data-copy-xray-id]')){const u=DB.users.find(x=>x.id==+b.dataset.copyXrayId);if(u?.xrayId)copyT(u.xrayId)}
   else if(g('[data-copy]'))copyT($('#lk').value);
   else if(b=g('[data-a]')){const id=+b.dataset.u,a=b.dataset.a;
