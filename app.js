@@ -115,12 +115,12 @@ function field(f,v){
   if(t==='country'){
     const existing=COUNTRIES.find(c=>c.flag===v);
     const current=existing?existing.flag:(v||'');
-    i=\`<div class="country-picker">
-      <div class="country-search-wrap"><input class="country-search" type="search" data-country-search placeholder="Поиск по названию или коду…" aria-label="Поиск страны" autocomplete="off" aria-controls="country-options-\${f.k}" aria-expanded="false"><div class="country-options" id="country-options-\${f.k}" role="listbox" aria-label="Результаты поиска стран" hidden></div></div>
-      <div class="country-selected">\${flagView(current,'country-flag-preview')}<span data-country-label>\${existing?esc(existing.name):current?esc(current+' Сохранённый флаг'):'Выберите страну…'}</span></div>
-      <input type="hidden" name="\${f.k}" class="country-value" value="\${esc(current)}">
-      <small class="country-hint">Поиск по названию страны или ISO-коду. \${COUNTRIES.length} стран и территорий.</small>
-    </div>\`
+    i=`<div class="country-picker">
+      <div class="country-search-wrap"><input class="country-search" type="search" data-country-search placeholder="Поиск по названию или коду…" aria-label="Поиск страны" autocomplete="off" aria-controls="country-options-${f.k}" aria-expanded="false"><div class="country-options" id="country-options-${f.k}" role="listbox" aria-label="Результаты поиска стран" hidden></div></div>
+      <div class="country-selected">${flagView(current,'country-flag-preview')}<span data-country-label>${existing?esc(existing.name):current?esc(current+' Сохранённый флаг'):'Выберите страну…'}</span></div>
+      <input type="hidden" name="${f.k}" class="country-value" value="${esc(current)}">
+      <small class="country-hint">Поиск по названию страны или ISO-коду. ${COUNTRIES.length} стран и территорий.</small>
+    </div>`
   }
   else if(t=='sel')i=`<select name="${f.k}">${opt(f.o).map(([a,b])=>`<option value="${esc(a)}"${a==v?' selected':''}>${esc(b)}</option>`).join('')}</select>`;
   else if(t=='multi')i=`<div class="ms">${opt(f.o).map(([a,b])=>`<label class="ck"><input type="checkbox" name="${f.k}" value="${esc(a)}"${(v||[]).map(String).includes(String(a))?' checked':''}><span>${esc(b)}</span></label>`).join('')||'<span class="mu">Нет вариантов</span>'}</div>`;
@@ -1273,7 +1273,7 @@ document.addEventListener('change',e=>{
  const picker=select.closest('.country-picker');
  const country=COUNTRIES.find(c=>c.flag===select.value);
  const preview=picker.querySelector('.country-selected');
- preview.innerHTML=flagView(select.value,'country-flag-preview')+\`<span data-country-label>\${country?esc(country.name):select.value?esc(select.value+' Сохранённый флаг'):'Выберите страну…'}</span>\`;
+ preview.innerHTML=flagView(select.value,'country-flag-preview')+`<span data-country-label>${country?esc(country.name):select.value?esc(select.value+' Сохранённый флаг'):'Выберите страну…'}</span>`;
 });
 document.addEventListener('change',async e=>{const t=e.target;
   if(t.id==='custom-a'||t.id==='custom-b'){if(t.id==='custom-a')C.customA=t.value;else C.customB=t.value;C.accent='custom';if(t.id==='custom-a'){const rgb=t.value.match(/[0-9a-f]{2}/gi).map(v=>parseInt(v,16)/255);const max=Math.max(...rgb),min=Math.min(...rgb),d=max-min;let h=0,s=0,l=(max+min)/2;if(d){s=d/(1-Math.abs(2*l-1));if(max===rgb[0])h=60*(((rgb[1]-rgb[2])/d)%6);else if(max===rgb[1])h=60*((rgb[2]-rgb[0])/d+2);else h=60*((rgb[0]-rgb[1])/d+4);if(h<0)h+=360}C.hue=Math.round(h);C.sat=Math.round(s*100);C.lum=Math.round(l*100);if($('#hue'))$('#hue').value=C.hue;if($('#sat'))$('#sat').value=C.sat;if($('#lum'))$('#lum').value=C.lum;if($('#huev'))$('#huev').textContent=C.hue+'°';if($('#satv'))$('#satv').textContent=C.sat+'%';if($('#lumv'))$('#lumv').textContent=C.lum+'%'}apply();$('[data-ac]').forEach(x=>x.classList.toggle('on',x.dataset.ac==='custom'));return}
