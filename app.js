@@ -575,6 +575,10 @@ function handleUserCalendarAction(button){
   if(!picker)return;
   const cal=picker.querySelector('.user-date-calendar');
   if(button.hasAttribute('data-user-date-open')){
+    const renewPanel=picker.querySelector('.user-renew-panel');
+    const renewToggle=picker.querySelector('[data-user-renew-toggle]');
+    if(renewPanel)renewPanel.hidden=true;
+    if(renewToggle)renewToggle.setAttribute('aria-expanded','false');
     if(!cal.hidden){closeUserCalendar(picker);return}
     const selected=userDateFromYmd(picker.querySelector('[name="expireAt"]').value)||new Date();
     drawUserCalendar(picker,selected);
@@ -594,6 +598,39 @@ function handleUserCalendarAction(button){
     setUserCalendarDate(picker,userYmd(new Date()));
   }else if(button.hasAttribute('data-user-date-clear')){
     setUserCalendarDate(picker,'');
+  }
+}
+function handleUserRenewalAction(button){
+  const picker=button.closest('.user-date-field');
+  if(!picker)return;
+  const panel=picker.querySelector('.user-renew-panel');
+  const toggle=picker.querySelector('[data-user-renew-toggle]');
+  if(button.hasAttribute('data-user-renew-toggle')){
+    const opening=panel.hidden;
+    closeUserCalendar(picker);
+    panel.hidden=!opening;
+    toggle.setAttribute('aria-expanded',String(opening));
+    if(opening)panel.querySelector('#user-renew-days')?.focus();
+    return;
+  }
+  if(!button.hasAttribute('data-user-renew-apply'))return;
+  const field=panel.querySelector('#user-renew-days');
+  const error=panel.querySelector('.user-renew-error');
+  const entered=String(field.value||'').trim();
+  const days=/^[1-9]\d*$/.test(entered)?Number(entered):NaN;
+  try{
+    const next=userExtendExpiryYmd(picker.querySelector('[name="expireAt"]').value,days);
+    setUserCalendarDate(picker,next);
+    panel.hidden=true;
+    toggle.setAttribute('aria-expanded','false');
+    error.hidden=true;
+    error.textContent='';
+    field.value='';
+    toggle.focus();
+  }catch(err){
+    error.textContent=err.message||'Укажите корректное количество дней.';
+    error.hidden=false;
+    field.focus();
   }
 }
 function userDrawer(id,tab){
@@ -1641,6 +1678,7 @@ document.addEventListener('click',async e=>{
   else if(b=g('tr[data-id]'))userDrawer(+b.dataset.id,'ov');
   else if(b=g('[data-uo]'))userDrawer(+b.dataset.uo,'dev');
   else if(b=g('[data-user-date-open],[data-user-date-nav],[data-user-date-day],[data-user-date-today],[data-user-date-clear]')){e.preventDefault();handleUserCalendarAction(b)}
+  else if(b=g('[data-user-renew-toggle],[data-user-renew-apply]')){e.preventDefault();handleUserRenewalAction(b)}
   else if(b=g('[data-copy-xray-id]')){const u=DB.users.find(x=>x.id==+b.dataset.copyXrayId);if(u?.xrayId)copyT(u.xrayId)}
   else if(g('[data-copy]'))copyT($('#lk').value);
   else if(b=g('[data-a]')){const id=+b.dataset.u,a=b.dataset.a;
