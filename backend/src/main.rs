@@ -123,6 +123,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/core", get(get_core_status))
         .route("/core/releases", get(get_core_releases))
         .route("/core/update", post(update_core))
+        .route("/core/vlessenc", post(generate_vless_encryption))
         .route_layer(middleware::from_fn_with_state(state.clone(), auth::require_session));
 
     let public = Router::new()
@@ -567,6 +568,26 @@ async fn get_core_releases(State(state): State<AppState>) -> Result<Json<Value>,
     let releases = state.core.available_releases().await
         .map_err(|error| ApiError::new(StatusCode::BAD_GATEWAY, error))?;
     Ok(Json(json!({"items": releases})))
+}
+
+async fn generate_vless_encryption(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+) -> Result<Json<Value>, ApiError> {
+    let generated = state.core.generate_vless_encryption().await
+        .map_err(|error| ApiError::new(StatusCode::SERVICE_UNAVAILABLE, error))?;
+
+    // Audit the action but never persist or log the secret encryption/decryption values.
+    audit(
+        &state.pool,
+        &actor.username,
+        "xray_core.vlessenc_generated",
+        None,
+        None,
+        json!({"methods": ["x25519", "mlkem768"]}),
+    ).await;
+
+    Ok(Json(generated))
 }
 
 async fn update_core(
