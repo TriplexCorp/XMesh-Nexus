@@ -761,7 +761,8 @@ async function profilesP(){
     const data=JSON.parse(source);
     if(!data||typeof data!=='object'||Array.isArray(data))throw new Error('Корень конфига должен быть JSON-объектом.');
     if(!Array.isArray(data.inbounds)||!data.inbounds.length)throw new Error('В конфигурации нужен хотя бы один inbound.');
-    const tags=data.inbounds.map(i=>i&&i.tag).filter(Boolean);
+    const tags=data.inbounds.map(i=>String(i?.tag||'').trim());
+    if(tags.some(t=>!t))throw new Error('У каждого inbound должен быть непустой tag.');
     if(new Set(tags).size!==tags.length)throw new Error('Теги inbound должны быть уникальными.');
     if(DB.profiles.some(p=>p.name.toLowerCase()===name.toLowerCase()))throw new Error('Профиль с таким названием уже существует.');
     const used=DB.profiles.flatMap(inbs).map(i=>i.tag).filter(Boolean);
