@@ -609,12 +609,12 @@ async function profilesP(){
  const optionGroup=(key,title,desc,body)=>'<section class="xray-option-group" data-xray-option-group="'+key+'"><div class="xray-option-group-head"><div><b>'+title+'</b><small>'+desc+'</small></div></div><div class="xray-option-grid">'+body+'</div></section>';
  const builderHtml='<section class="card xray-builder"><div class="xray-hero"><div class="xray-heading-copy"><p class="note">XRAY CORE · CONFIGURATOR</p><h2>XRAY STUDIO</h2><p class="xray-hero-description">Настройте inbound — конфигурации сервера и клиента обновятся автоматически.</p></div></div>'+
  '<div class="xray-presets"><div class="xray-preset-row" role="group" aria-label="Режим настройки"><button type="button" class="xray-preset on" data-xray-mode="visual" aria-pressed="true"><b>Конструктор</b></button><button type="button" class="xray-preset" data-xray-mode="custom" aria-pressed="false"><b>Ручной JSON</b></button></div><button type="button" class="xray-import-btn" id="xpb-import-trigger">Импорт JSON</button><input type="file" id="xpb-import-file" accept=".json,application/json,text/json" aria-label="Выбрать файл JSON" hidden></div>'+
- '<div class="xray-workspace-layout"><div class="xray-editor-pane">'+
-  '<div class="xray-meta-grid">'+
+ '<div class="xray-meta-grid">'+
  field('name','Название профиля',inp('name','VLESS Reality','Например, DE · Reality','maxlength="80" required'))+
  field('tag','Тег inbound',inp('tag','vless-reality','Уникальный tag','maxlength="64"'))+
  field('server-address','Адрес сервера для Client JSON',inp('server-address','','vpn.example.com или IP','autocomplete="url"'))+
  '</div>'+
+ '<div class="xray-workspace-layout"><div class="xray-editor-pane">'+
  '<div id="xpb-visual-mode">'+
  '<div class="xray-config-steps"><nav class="xray-config-tabs" role="tablist" aria-label="Шаги настройки inbound">'+
  '<button type="button" class="on" data-xray-config-tab="basic" role="tab" aria-selected="true" aria-controls="xpb-config-basic"><span>01</span><b>Основное</b><small>Inbound, сеть, порт, защита</small></button>'+
@@ -1022,6 +1022,7 @@ async function profilesP(){
    }
    if(mode==='custom'&&!customInitialized){customArea.value=$('#xpb-preview').value||JSON.stringify(xrayBuilderConfig(),null,2);customInitialized=true;customDirty=false}
    customMode=mode==='custom';
+   const studio=$('.xray-builder');if(studio)studio.classList.toggle('manual-mode',customMode);
    $('#xpb-visual-mode').hidden=customMode;
    $('#xpb-custom-mode').hidden=!customMode;
    const tagField=$('#xpb-tag')?.closest('.f');if(tagField)tagField.hidden=customMode;
