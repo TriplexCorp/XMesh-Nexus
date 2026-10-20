@@ -151,7 +151,7 @@ async function homeP(){
 const UQ={q:'',st:'all',sq:'',page:1,size:15,sort:'created',dir:'desc',sel:new Set()};let UIDS=[];
 async function usersP(){
   return [`<div class="card users-panel"><div class="bar2 users-statusbar"><div class="fl" id="uf"></div></div><div class="users-toolbar">
-    <label class="search users-search-field" style="cursor:text">${ic('search')}<input id="uq" placeholder="Имя, тег, email, Telegram ID, ссылка" value="${esc(UQ.q)}" aria-label="Поиск"></label>
+    <div class="users-search-wrap"><label class="search users-search-field" style="cursor:text">${ic('search')}<input id="uq" placeholder="Поиск пользователей" value="${esc(UQ.q)}" aria-label="Поиск по имени, тегу, email, ссылке или Telegram ID"></label><span class="users-search-hint">Поиск по имени · тегу · email · ссылке · Telegram ID</span></div>
     <select id="usq" aria-label="Сквад"><option value="">Все сквады</option>${DB.squads.map(s=>`<option value="${s.id}"${UQ.sq==s.id?' selected':''}>${esc(s.name)}</option>`).join('')}</select>
     <div class="users-toolbar-actions"><button class="gh" data-exp>${ic('dl')}Экспорт CSV</button><button class="btn" data-nu>${ic('plus')}Пользователь</button></div>
   </div><div id="ut"></div></div>`,()=>{drawUsers();let h;$('#uq').oninput=e=>{clearTimeout(h);h=setTimeout(()=>{UQ.q=e.target.value.trim().toLowerCase();UQ.page=1;drawUsers()},200)};$('#usq').onchange=e=>{UQ.sq=e.target.value;UQ.page=1;drawUsers()}}];
