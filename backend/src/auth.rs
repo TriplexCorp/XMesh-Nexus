@@ -167,10 +167,17 @@ async fn record_failed_login(state: &AppState, username_key: &str) -> Result<(),
     // Redis provides cross-instance throttling; PostgreSQL remains the durable fallback.
     let mut redis_conn = state.redis.clone();
     let redis_key = format!("xmesh:auth:login:{username_key}");
-    if let Ok(attempts) = redis::cmd("INCR").arg(&redis_key).query_async::<i64>(&mut redis_conn).await {
-        if attempts == 1 {
-            let _ = redis::cmd("EXPIRE").arg(&redis_key).arg(900).query_async::<i64>(&mut redis_conn).await;
-        }
+    if let Ok(attempts) = redis::cmd("INCR")
+        .arg(&redis_key)
+        .query_async::<i64>(&mut redis_conn)
+        .await
+        && attempts == 1
+    {
+        let _ = redis::cmd("EXPIRE")
+            .arg(&redis_key)
+            .arg(900)
+            .query_async::<i64>(&mut redis_conn)
+            .await;
     }
 
     sqlx::query(
