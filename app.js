@@ -263,7 +263,7 @@ function xrayBuilderConfig(){
  }[protocol];
  if(protocol==='vless'&&flow)settings.flow=flow;
  const inbound={tag,listen:v('listen')||'0.0.0.0',port,protocol,settings};
- if(['raw','xhttp','ws','grpc','httpupgrade','kcp'].includes(network)&&!['dokodemo-door','wireguard'].includes(protocol)){
+ if(['raw','xhttp','websocket','grpc','httpupgrade','mkcp'].includes(network)&&!['dokodemo-door','wireguard'].includes(protocol)){
   inbound.streamSettings={method:network,security};
   const ss=inbound.streamSettings;
   if(network==='websocket')ss.wsSettings={path,headers:v('host')?{Host:v('host')}:{},heartbeatPeriod:0};
@@ -289,7 +289,7 @@ async function syncXrayUserToProfile(user){
   if(inbound.protocol==='vless'){
    const list=inbound.settings.users||(inbound.settings.users=[]);
    if(Array.isArray(inbound.settings.clients)){for(const legacy of inbound.settings.clients){if(legacy.id&&!list.some(x=>x.id===legacy.id))list.push({...legacy})}delete inbound.settings.clients}
-   if(!list.some(x=>x.id===user.xrayId))list.push({id:user.xrayId,level:0,email,...((inbound.settings.flow||((inbound.streamSettings?.method||inbound.streamSettings?.network)==='raw'&&['reality','tls'].includes(inbound.streamSettings?.security)?'xtls-rprx-vision':''))?{flow:inbound.settings.flow||(inbound.streamSettings?.network==='raw'&&['reality','tls'].includes(inbound.streamSettings?.security)?'xtls-rprx-vision':'')}:{})});
+   const flow=inbound.settings.flow||(((inbound.streamSettings?.method||inbound.streamSettings?.network)==='raw'&&['reality','tls'].includes(inbound.streamSettings?.security))?'xtls-rprx-vision':'');if(!list.some(x=>x.id===user.xrayId))list.push({id:user.xrayId,level:0,email,...(flow?{flow}:{})});
    changed++;
   }else if(inbound.protocol==='vmess'){
    const list=inbound.settings.users||(inbound.settings.users=[]);
@@ -433,7 +433,7 @@ async function profilesP(){
    const securitySelect=$('#xpb-security');if(securitySelect){const before=securitySelect.value;const realityOption=securitySelect.querySelector('option[value="reality"]');if(realityOption)realityOption.disabled=!['raw','xhttp','grpc'].includes(net)||['dokodemo-door','wireguard'].includes(proto);const tlsOption=securitySelect.querySelector('option[value="tls"]');if(tlsOption)tlsOption.disabled=['dokodemo-door','wireguard'].includes(proto);if(realityOption?.disabled&&securitySelect.value==='reality')securitySelect.value=tlsOption?.disabled?'none':'tls';if(tlsOption?.disabled&&securitySelect.value==='tls')securitySelect.value='none';if(before!==securitySelect.value)updatePreview()}
    $$('[data-xray-preset]').forEach(b=>b.classList.toggle('on',b.dataset.xrayPreset===(sec==='reality'&&proto==='vless'&&net==='raw'?'reality':sec==='tls'&&proto==='vless'?'tls':net==='xhttp'&&proto==='vless'?'xhttp':'custom')));
    const transport=$('.xray-section:has(#xpb-host)');
-   if(transport){transport.querySelectorAll('[id^="xpb-"]').forEach(el=>{const f=el.id.replace('xpb-',''),wrap=el.closest('.f');if(!wrap)return;let show=true;if(f==='xhttp-mode'||f==='xhttp-padding')show=net==='xhttp';if(f==='grpc-mode')show=net==='grpc';if(f==='kcp-seed')show=net==='kcp';if(f==='raw-header')show=net==='raw';if(f==='host')show=['ws','xhttp','httpupgrade'].includes(net);if(f==='path')show=['raw','xhttp','ws','grpc','httpupgrade'].includes(net);wrap.hidden=!show})}
+   if(transport){transport.querySelectorAll('[id^="xpb-"]').forEach(el=>{const f=el.id.replace('xpb-',''),wrap=el.closest('.f');if(!wrap)return;let show=true;if(f==='xhttp-mode'||f==='xhttp-padding')show=net==='xhttp';if(f==='grpc-mode')show=net==='grpc';if(f==='kcp-seed')show=net==='mkcp';if(f==='raw-header')show=net==='raw';if(f==='host')show=['websocket','xhttp','httpupgrade'].includes(net);if(f==='path')show=['raw','xhttp','websocket','grpc','httpupgrade'].includes(net);wrap.hidden=!show})}
    const protoGroup=$('.xray-section:has(#xpb-fingerprint)');
    if(protoGroup)protoGroup.querySelectorAll('[id^="xpb-"]').forEach(el=>{const f=el.id.replace('xpb-',''),wrap=el.closest('.f');if(!wrap)return;let show=true;if(f==='fingerprint')show=security!=='none'&&['vless','vmess','trojan'].includes(proto);if(f==='flow')show=proto==='vless';if(f==='vmess-security')show=proto==='vmess';if(f==='ss-method')show=proto==='shadowsocks';if(f==='socks-auth')show=proto==='socks';if(f.startsWith('doko-'))show=proto==='dokodemo-door';wrap.hidden=!show});
    const secSelect=$('#xpb-security');if(secSelect)secSelect.disabled=proto==='dokodemo-door'||proto==='wireguard';
