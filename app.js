@@ -926,17 +926,17 @@ async function profilesP(){
     if(f.startsWith('masque-'))show=proto==='masque'||net==='masque';
     wrap.hidden=!show;
    });
-   $('[data-xray-option-group]').forEach(section=>{
+   $$('[data-xray-option-group]').forEach(section=>{
     const visibleField=section.querySelector('.f:not([hidden])');
     section.hidden=!visibleField;
    });
    const transportPanel=$('#xpb-config-transport');
    const transportEmpty=$('#xpb-transport-empty');
    const transportUnsupported=['tun','wireguard','dokodemo-door','tunnel'].includes(proto);
-   if(transportUnsupported&&transportPanel)$('[data-xray-option-group]',transportPanel).forEach(section=>section.hidden=true);
-   const hasTransportSettings=!transportUnsupported&&transportPanel&&$('[data-xray-option-group]',transportPanel).some(section=>!section.hidden&&$('.f',section).some(field=>!field.hidden));
+   if(transportUnsupported&&transportPanel)$$('[data-xray-option-group]',transportPanel).forEach(section=>section.hidden=true);
+   const hasTransportSettings=!transportUnsupported&&transportPanel&&$$('[data-xray-option-group]',transportPanel).some(section=>!section.hidden&&$$('.f',section).some(field=>!field.hidden));
    if(transportEmpty)transportEmpty.hidden=!!hasTransportSettings;
-   $('[data-xray-mode]').forEach(b=>b.classList.toggle('on',b.dataset.xrayMode===(customMode?'custom':'visual')));
+   $$('[data-xray-mode]').forEach(b=>b.classList.toggle('on',b.dataset.xrayMode===(customMode?'custom':'visual')));
    syncConfigTabs();
   };
   let customMode=false,customInitialized=false,customDirty=false,generatedVlessPairs=null;
@@ -979,18 +979,18 @@ async function profilesP(){
     item.setAttribute('aria-selected',active?'true':'false');
     item.tabIndex=active?0:-1;
    });
-   $$('[data-xray-config-panel]').forEach(item=>{item.hidden=item.dataset.xrayConfigPanel!==key});
+   $$$('[data-xray-config-panel]').forEach(item=>{item.hidden=item.dataset.xrayConfigPanel!==key});
   };
   const syncConfigTabs=()=>{
-   $('[data-xray-config-panel]').forEach(panel=>{
+   $$('[data-xray-config-panel]').forEach(panel=>{
     const key=panel.dataset.xrayConfigPanel;
     const button=$('[data-xray-config-tab="'+key+'"]');
     if(key==='basic')return;
     /* Transport is a primary workflow step, not an optional tab. Keep it
        reachable even when the selected protocol has no extra transport fields. */
     if(key==='transport'){if(button)button.hidden=false;return}
-    const sections=$('.xray-section',panel);
-    const visible=sections.some(section=>!section.hidden&&$('.f',section).some(field=>{
+    const sections=$$('.xray-section',panel);
+    const visible=sections.some(section=>!section.hidden&&$$('.f',section).some(field=>{
     if(field.hidden)return false;
     const subgroup=field.closest('.xray-option-group');
     return !subgroup||!subgroup.hidden;
@@ -1029,7 +1029,7 @@ async function profilesP(){
    const previewView=$('#xpb-preview')?.closest('.xray-code-view');
    if(previewView)previewView.hidden=customMode;
    $('#xpb-preview').hidden=customMode;
-   $('[data-xray-mode]').forEach(b=>b.classList.toggle('on',b.dataset.xrayMode===(customMode?'custom':'visual')));
+   $$('[data-xray-mode]').forEach(b=>b.classList.toggle('on',b.dataset.xrayMode===(customMode?'custom':'visual')));
    setOutput('server');
    const clientSourceNote=$('#xpb-client-source-note');
    if(clientSourceNote)clientSourceNote.textContent=customMode
@@ -1037,7 +1037,7 @@ async function profilesP(){
     :'Этот Client JSON — отдельный outbound-конфиг. Адрес узла, UUID, Reality public key / Short ID и другие placeholders нужно заполнить реальными значениями.';
    if(customMode)validateCustomJson();
   };
-  $$('[data-xray-mode]').forEach(btn=>btn.addEventListener('click',()=>setMode(btn.dataset.xrayMode)));
+  $$$('[data-xray-mode]').forEach(btn=>btn.addEventListener('click',()=>setMode(btn.dataset.xrayMode)));
   customArea.addEventListener('input',()=>{customDirty=true;validateCustomJson()});
   $('#xpb-custom-copy').onclick=()=>copyText('xpb-custom-json');
   $('#xpb-custom-download').onclick=()=>download('xpb-custom-json','server');
