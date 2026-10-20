@@ -146,17 +146,34 @@
  function escapeText(text){
    return String(text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
  }
- function decorateRun(text,offset,kind,diagnostic){
-   let classes=kind?' class="'+escapeText(kind)+'"':'';
-   if(diagnostic?.start===null||diagnostic?.start===undefined||diagnostic.end===null||diagnostic.end<=offset||diagnostic.start>=offset+text.length){
-     return '<span'+classes+'>'+escapeText(text)+'</span>';
+ function inspectAll(source){
+   const first=inspect(source);
+   if(first?.kind==='syntax')return [first];
+   const expert=global.XrayJsonIntelligence;
+   if(expert){
+     try{return expert.analyze(source)}catch(error){
+       return [{kind:'info',severity:'info',message:'Расширенная проверка временно недоступна: '+error.message,start:0,end:1,line:1,column:1,code:'ENGINE_ERROR',fix:null}];
+     }
    }
-   const a=Math.max(0,diagnostic.start-offset);
-   const b=Math.min(text.length,Math.max(a+1,diagnostic.end-offset));
-   const wrap=segment=>'<span'+classes+'>'+escapeText(segment)+'</span>';
-   return wrap(text.slice(0,a))+
-     '<span class="sr-json-squiggle" title="'+escapeText(diagnostic.message)+'">'+wrap(text.slice(a,b))+'</span>'+
-     wrap(text.slice(b));
+   return first?[first]:[];
+ }
+ function decorateRun(text,offset,kind,diagnostics){
+   const issues=Array.isArray(diagnostics)?diagnostics:diagnostics?[diagnostics]:[];
+   const cls=kind?' class="'+escapeText(kind)+'"':'';
+   const wrap=segment=>segment?'<span'+cls+'>'+escapeText(segment)+'</span>':'';
+   let current=0,out='';
+   const candidates=issues.filter(d=>d.start!==null&&d.start!==undefined&&d.end>offset&&d.start<offset+text.length)
+     .sort((a,b)=>a.start-b.start);
+   for(const issue of candidates){
+     const begin=Math.min(text.length,Math.max(current,issue.start-offset));
+     const end=Math.min(text.length,Math.max(begin,issue.end-offset));
+     if(end<=begin)continue;
+     out+=wrap(text.slice(current,begin));
+     out+='<span class="sr-json-squiggle '+(issue.severity==='warning'?'is-warning':issue.severity==='info'?'is-info':'is-error')+
+       '" title="'+escapeText(issue.message)+'">'+wrap(text.slice(begin,end))+'</span>';
+     current=end;
+   }
+   return out+wrap(text.slice(current));
  }
  function attach(textarea){
    const frame=textarea.closest('.xray-custom-code-view');
@@ -182,8 +199,17 @@
    const text=bar.querySelector('.sr-json-status-text');
    const hotfix=bar.querySelector('.sr-json-hotfix');
    const jump=bar.querySelector('.sr-json-jump');
-   let diagnostic=null;
+   let diagnostic=null,diagnostics=[],selected=0,expanded=false;
    let lastTop=null,lastN=null,lastLine=null,lastHeight=0;
+   const issueList=document.createElement('div');
+   issueList.className='sr-json-issue-list';
+   issueList.setAttribute('aria-label','Найденные проблемы Xray');
+   const counters=document.createElement('span');counters.className='sr-json-counters';
+   const more=document.createElement('button');more.type='button';more.className='sr-json-more';more.hidden=true;
+   bar.prepend(counters);
+   bar.append(issueList,more);
+   more.addEventListener('click',()=>{expanded=!expanded;renderItems();});
+
    function drawGutter(){
      const total=textarea.value.split('\n').length;
      const styles=getComputedStyle(textarea);
@@ -192,19 +218,19 @@
      const scroll=textarea.scrollTop;
      const first=Math.max(1,Math.floor((scroll-topPad)/lineHeight)+1-2);
      const last=Math.min(total,Math.ceil((scroll+frame.clientHeight-topPad)/lineHeight)+3);
-     const flagged=diagnostic?.line;
-     if(lastTop===first && lastN===total&&lastLine===flagged&&lastHeight===frame.clientHeight)return;
-     lastTop=first;lastN=total;lastLine=flagged;lastHeight=frame.clientHeight;
+     const flagged=diagnostics.filter(x=>x.line!==null&&x.line!==undefined).map(x=>x.line);
+     if(lastTop===first && lastN===total&&lastLine===flagged.join(',')&&lastHeight===frame.clientHeight)return;
+     lastTop=first;lastN=total;lastLine=flagged.join(',');lastHeight=frame.clientHeight;
      gutter.replaceChildren();
      const frag=document.createDocumentFragment();
      for(let line=first;line<=last;line++){
        const node=document.createElement('span');
-       node.className='sr-json-gutter-number'+(flagged===line?' is-error':'');
+       node.className='sr-json-gutter-number'+(flagged.includes(line)?' is-error':'');
        node.textContent=line;
        node.style.top=(topPad+(line-1)*lineHeight-scroll)+'px';
        node.style.height=lineHeight+'px';
        node.style.lineHeight=lineHeight+'px';
-       if(flagged===line)node.title='Ошибка: строка '+line;
+       if(flagged.includes(line))node.title='Проблема Xray: строка '+line;
        frag.append(node);
      }
      gutter.append(frag);
@@ -228,27 +254,69 @@
      textarea.dispatchEvent(new Event('input',{bubbles:true}));
    });
    textarea.addEventListener('scroll',()=>{lastTop=null;drawGutter()},{passive:true});
-   const update=issue=>{
-     diagnostic=issue;
-     const status=issue?.kind==='syntax'?'error':issue?'warning':'ok';
+   const selectIssue=index=>{
+     if(index<0||index>=diagnostics.length)return;
+     selected=index;diagnostic=diagnostics[index];
+     renderStatus();
+     jumpToError();
+   };
+   const renderItems=()=>{
+     issueList.replaceChildren();
+     issueList.hidden=diagnostics.length<2;
+     const limit=expanded?diagnostics.length:Math.min(diagnostics.length,5);
+     const frag=document.createDocumentFragment();
+     diagnostics.slice(0,limit).forEach((item,index)=>{
+       const button=document.createElement('button');
+       button.type='button';
+       button.className='sr-json-issue'+(index===selected?' is-selected':'');
+       const tag=document.createElement('span');
+       tag.className='sr-json-issue-severity '+(item.severity||item.kind||'warning');
+       tag.textContent=(item.severity==='error'||item.kind==='syntax'?'Ошибка':item.severity==='info'?'Совет':'Предупреждение');
+       const title=document.createElement('span');
+       title.className='sr-json-issue-label';
+       title.textContent=(item.line?('Строка '+item.line+' · '):'')+item.message;
+       button.append(tag,title);
+       button.addEventListener('click',()=>selectIssue(index));
+       frag.append(button);
+     });
+     issueList.append(frag);
+     more.hidden=diagnostics.length<=5;
+     more.textContent=expanded?'Свернуть список':'Показать все ('+diagnostics.length+')';
+   };
+   const renderStatus=()=>{
+     const issue=diagnostic;
+     const status=issue?.kind==='syntax'||issue?.severity==='error'?'error':issue?.severity==='warning'||issue?.kind==='structure'?'warning':issue?'info':'ok';
      bar.dataset.state=status;
+     const errs=diagnostics.filter(x=>x.severity==='error'||x.kind==='syntax').length;
+     const warnings=diagnostics.filter(x=>x.severity==='warning').length;
+     counters.textContent=diagnostics.length?('Проблемы: '+errs+' ошибок, '+warnings+' предупреждений'):'✓ JSON проверен';
      if(!issue){
-       text.textContent='JSON корректен — синтаксических ошибок нет.';
+       text.textContent='Синтаксис и известные параметры Xray: замечаний не найдено. Окончательная проверка — xray run -test.';
        jump.hidden=true;hotfix.hidden=true;
      }else{
-       const where=issue.line===null?'':('Строка '+issue.line+', столбец '+issue.column+' · ');
-       text.textContent=where+issue.message+(issue.fix?'':' · Безопасное автоисправление не найдено.');
-       jump.hidden=issue.start===null;
+       const where=issue.line==null?'':('Строка '+issue.line+', столбец '+issue.column+' · ');
+       text.textContent=where+issue.message+(issue.fix?'':' · Автоматическая правка недоступна.');
+       jump.hidden=issue.start==null;
        hotfix.hidden=!issue.fix;
        if(issue.fix)hotfix.textContent='⚡ Hot Fix: '+issue.fix.label;
      }
+     renderItems();
      lastTop=null;drawGutter();
    };
-   const api={update,inspect,decorateRun,jumpToError};
+   const update=issues=>{
+     diagnostics=Array.isArray(issues)?issues:issues?[issues]:[];
+     const previous=diagnostic?.code;
+     const previousLine=diagnostic?.line;
+     const preserved=diagnostics.findIndex(x=>x.code===previous&&x.line===previousLine);
+     selected=preserved>=0?preserved:0;
+     diagnostic=diagnostics[selected]||null;
+     renderStatus();
+   };
+   const api={update,inspect,inspectAll,decorateRun,jumpToError};
    frame._jsonDiagnostics=api;
    if(global.ResizeObserver){const ro=new ResizeObserver(()=>{lastTop=null;drawGutter()});ro.observe(frame)}
    drawGutter();
    return api;
  }
- global.XrayJsonDiagnostics={inspect,locate,safeFix,point,decorateRun,attach};
+ global.XrayJsonDiagnostics={inspect,inspectAll,locate,safeFix,point,decorateRun,attach};
 })(window);
