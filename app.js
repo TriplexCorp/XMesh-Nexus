@@ -680,7 +680,12 @@ async function profilesP(){
     if(f==='host')show=['websocket','xhttp','httpupgrade'].includes(net);
     if(f==='path')show=['raw','xhttp','websocket','grpc','httpupgrade'].includes(net);
     if(f.startsWith('xdrive-'))show=net==='xdrive';
+    if(f==='xdrive-secrets')show=net==='xdrive'&&$('#xpb-xdrive-service').value!=='local';
+    if(f==='xdrive-template')show=net==='xdrive'&&$('#xpb-xdrive-service').value==='template';
     if(f.startsWith('hy-'))show=net==='hysteria';
+    if(f==='hy-masq-dir')show=net==='hysteria'&&$('#xpb-hy-masq-type').value==='file';
+    if(f==='hy-masq-url')show=net==='hysteria'&&$('#xpb-hy-masq-type').value==='proxy';
+    if(['hy-masq-content','hy-masq-status'].includes(f))show=net==='hysteria'&&$('#xpb-hy-masq-type').value==='string';
     if(f.startsWith('masque-'))show=proto==='masque'||net==='masque';
     wrap.hidden=!show;
    });
