@@ -446,10 +446,10 @@ async fn get_stats(State(state): State<AppState>) -> Result<Json<Value>, ApiErro
 
 
 async fn get_system_stats(State(state): State<AppState>) -> Json<Value> {
-    let cpu = match (read_cpu_ticks().await, async {
-        tokio::time::sleep(Duration::from_millis(220)).await;
-        read_cpu_ticks().await
-    }.await) {
+    let cpu_before = read_cpu_ticks().await;
+    tokio::time::sleep(Duration::from_millis(220)).await;
+    let cpu_after = read_cpu_ticks().await;
+    let cpu = match (cpu_before, cpu_after) {
         (Some(before), Some(after)) => {
             let total_delta = after.0.saturating_sub(before.0);
             let idle_delta = after.1.saturating_sub(before.1);
@@ -527,7 +527,7 @@ async fn get_system_stats(State(state): State<AppState>) -> Json<Value> {
 async fn read_cpu_ticks() -> Option<(u64, u64)> {
     let stat = tokio::fs::read_to_string("/proc/stat").await.ok()?;
     let line = stat.lines().find(|line| line.starts_with("cpu "))?;
-    let values = line.split_whitespace().skip(1).filter_map(|value| value.parse::<u64>().ok()).collect::<Vec<_>>();
+    let values = line.split_whitespace().skip(1).take(8).filter_map(|value| value.parse::<u64>().ok()).collect::<Vec<_>>();
     if values.len() < 4 { return None; }
     let total = values.iter().copied().fold(0u64, u64::saturating_add);
     let idle = values[3].saturating_add(*values.get(4).unwrap_or(&0));
