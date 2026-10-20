@@ -24,7 +24,10 @@ for (let index = 0; index < lines.length; index += 1) {
 const requiredFragments = [
   ['transport tab', 'data-xray-config-tab="transport"'],
   ['transport panel', 'data-xray-config-panel="transport"'],
-  ['transport visibility guard', "if(key==='transport'){if(button)button.hidden=false;return}"],
+  ['contextual transport availability', "transport:networkFieldActive&&$('[data-xray-option-group]'"],
+  ['inline editor state', "studioRoot.classList.add('studio-v3','studio-inline')"],
+  ['network capability check', 'xrayAllowedNetworks(proto)'],
+  ['security capability check', 'xrayAllowedSecurity(proto,net)'],
 ];
 for (const [label, fragment] of requiredFragments) {
   if (!source.includes(fragment)) issues.push('app.js: required ' + label + ' marker is missing');
