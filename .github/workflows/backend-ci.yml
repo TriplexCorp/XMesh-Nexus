@@ -27,6 +27,8 @@ jobs:
         run: |
           node --check app.js
           node --check login.js
+      - name: Check XRAY Studio selector safety
+        run: node scripts/check-xray-studio-selectors.js
       - name: Validate installer and Docker Compose
         env:
           POSTGRES_PASSWORD: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
