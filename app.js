@@ -419,23 +419,9 @@ $('#si').innerHTML=ic('search');$('#theme').innerHTML=ic('moon').replace('class=
 $('#bell').innerHTML=ic('bell');$('#addb').innerHTML=ic('plus')+'<span class="bt">Пользователь</span>';$('#restart').setAttribute('aria-label','Настройки Xray-core');$('#restart').innerHTML=ic('code')+'<span class="lbl">Версия</span>';
 apply();matchMedia('(prefers-color-scheme: light)').addEventListener('change',apply);
 addEventListener('hashchange',()=>{if(backendReady)render()});
-function showAuthGate(message=''){
-  if($('#xmesh-auth')){if(message)$('#xmesh-auth-error').textContent=message;return}
-  const layer=document.createElement('div');layer.id='xmesh-auth';layer.className='auth-layer';
-  layer.innerHTML=`<form class="auth-card" id="xmesh-auth-form"><div class="auth-mark">X</div><p class="auth-eyebrow">XMESH NEXUS · ADMIN ACCESS</p><h1>Вход в панель</h1><p class="auth-intro">Используйте учётную запись администратора, заданную при установке.</p><label class="f"><span>Логин</span><input name="username" autocomplete="username" required value="admin"></label><label class="f"><span>Пароль</span><input name="password" type="password" autocomplete="current-password" required></label><p id="xmesh-auth-error" class="auth-error">${esc(message)}</p><button type="submit" class="btn auth-submit">Войти</button><p class="auth-foot">Защищённая сессия · PostgreSQL</p></form>`;
-  document.body.appendChild(layer);
-  layer.querySelector('form').addEventListener('submit',async e=>{
-    e.preventDefault();const form=e.currentTarget,button=form.querySelector('button[type=submit]'),error=form.querySelector('#xmesh-auth-error');
-    const username=form.elements.username.value.trim(),password=form.elements.password.value;
-    button.disabled=true;button.textContent='Вход…';error.textContent='';
-    try{
-      const response=await fetch('/api/v1/auth/login',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password})});
-      const payload=await response.json().catch(()=>({}));
-      if(!response.ok)throw new Error(payload.error||'Не удалось войти.');
-      form.elements.password.value='';
-      await initializePanel();
-    }catch(err){error.textContent=err.message||'Ошибка входа';button.disabled=false;button.textContent='Войти';}
-  });
+function showAuthGate(){
+  backendReady=false;
+  location.replace('/login');
 }
 async function initializePanel(){
   const response=await fetch('/api/v1/bootstrap',{credentials:'same-origin',cache:'no-store'});
@@ -454,9 +440,9 @@ async function bootPanel(){
     const response=await fetch('/api/v1/auth/session',{credentials:'same-origin',cache:'no-store'});
     if(!response.ok)throw new Error('Backend API не отвечает.');
     const session=await response.json();
-    if(!session.authenticated){showAuthGate();return}
+    if(!session.authenticated){location.replace('/login');return}
     await initializePanel();
-  }catch(err){showAuthGate(err.message||'Не удалось подключиться к backend API.')}
+  }catch(err){location.replace('/login?unavailable=1')}
 }
 function coreStateLabel(status){
   return status==='updating'?'Обновляется':status==='ready'?'Установлено':status==='error'?'Ошибка':'Не установлено';
