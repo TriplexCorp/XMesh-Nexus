@@ -310,7 +310,7 @@ dialog.user-modal .sg{gap:.9rem}
  --bg:#090a0c;--s1:#111214;--s2:#191a1c;--ln:rgba(214,191,143,.14);
  --tx:#f1eee7;--mu:#a8a193;--a:#c7a66b;--b:#ead7a8;--c3:#a9b6b5;--c4:#d6b77b;
  --ok:#9fbea0;--wr:#d7b46f;--er:#d47e76;--ink:#090a0c;--btn-ink:#090a0c;--mark-ink:#090a0c;--btn-start:var(--b);--btn-end:var(--a);
- --ui-radius:14px;--ui-control-radius:9px;--card-pad:1.25rem;--view-gap:1rem;--glow-alpha:5%;
+ --ui-radius:16px;--ui-control-radius:11.5px;--card-pad:1.3rem;--view-gap:1.1rem;--glow-alpha:5%;
  color-scheme:dark;
 }
 html[data-theme=light]{
