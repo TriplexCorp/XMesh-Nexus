@@ -304,7 +304,7 @@ function xrayBuilderConfig(){
   vless:{users:uuid?[{id:uuid,level:0,email,...(network==='raw'&&['tls','reality'].includes(security)&&v('flow')?{flow:v('flow')}:{})}]:[],decryption:network==='xdrive'?(v('vless-decryption').trim()||'REPLACE_WITH_VLESS_ENCRYPTION_CONFIG'):'none'},
   vmess:{users:uuid?[{id:uuid,level:0,email,alterId:0}]:[],default:{alterId:0}},
   trojan:{clients:uuid?[{password:uuid,email,level:0}]:[]},
-  shadowsocks:{network:'tcp,udp',method:ssMethod,password:ssServerPassword,users:uuid?[{password:ssUserPassword,...(ss2022?{}:{method:ssMethod}),level:0,email}]:[]},
+  shadowsocks:{network:'tcp,udp',method:ssMethod,...(ss2022||!uuid?{password:ssServerPassword}:{}),...(uuid?{users:[{password:ssUserPassword,...(ss2022?{}:{method:ssMethod}),level:0,email}]}:{})},
   socks:{auth:v('socks-auth')||'noauth',users:(v('socks-auth')==='password'&&uuid)?[{user:login,pass:uuid}]:[],udp:true,ip:'127.0.0.1'},
   mixed:{auth:v('socks-auth')||'noauth',users:(v('socks-auth')==='password'&&uuid)?[{user:login,pass:uuid}]:[],udp:true,ip:'127.0.0.1'},
   http:{users:uuid?[{user:login,pass:uuid}]:[],allowTransparent:false,userLevel:0},
@@ -447,8 +447,10 @@ function xrayClientSample(){
  else if(protocol==='trojan')settings={servers:[{address:'SERVER_ADDRESS',port,password:uuid}]};
  else if(protocol==='shadowsocks'){
   const method=v('ss-method')||'chacha20-ietf-poly1305';
+  const serverPassword=v('ss-password')||(method.startsWith('2022-')?'REPLACE_WITH_VALID_SS2022_SERVER_KEY':'REPLACE_WITH_STRONG_SERVER_PASSWORD');
   const userPassword=v('ss-user-password')||(method.startsWith('2022-')?'REPLACE_WITH_VALID_SS2022_USER_KEY':uuid);
-  const password=method.startsWith('2022-')?(v('ss-password')||'REPLACE_WITH_VALID_SS2022_SERVER_KEY')+':'+userPassword:userPassword;
+  const multiUser=Boolean(uuid)&&!(method==='2022-blake3-chacha20-poly1305');
+  const password=method.startsWith('2022-')?(multiUser?serverPassword+':'+userPassword:serverPassword):(multiUser?userPassword:serverPassword);
   settings={servers:[{address:'SERVER_ADDRESS',port,method,password}]};
  }else if(protocol==='socks'||protocol==='mixed')settings={servers:[{address:'SERVER_ADDRESS',port,...(v('socks-auth')==='password'?{users:[{user:(v('name')||'xmesh').toLowerCase().replace(/[^a-z0-9_.-]/g,'-'),pass:uuid}]}:{})}]};
  else if(protocol==='http')settings={address:'SERVER_ADDRESS',port,...(uuid?{user:(v('name')||'xmesh').toLowerCase().replace(/[^a-z0-9_.-]/g,'-'),pass:uuid}:{})};
@@ -570,7 +572,7 @@ async function profilesP(){
  field('vless-decryption','VLESS Encryption · server',inp('vless-decryption','','Вывод xray vlessenc для сервера','autocomplete="off"'))+
  field('vless-encryption','VLESS Encryption · client',inp('vless-encryption','','Вывод xray vlessenc для клиента','autocomplete="off"'))+
  field('vmess-security','VMess cipher',sel('vmess-security',[['auto','auto'],['aes-128-gcm','aes-128-gcm'],['chacha20-poly1305','chacha20-poly1305'],['none','none']]))+
- field('ss-method','Shadowsocks method',sel('ss-method',[['chacha20-ietf-poly1305','chacha20-ietf-poly1305'],['2022-blake3-aes-128-gcm','2022-blake3-aes-128-gcm'],['2022-blake3-aes-256-gcm','2022-blake3-aes-256-gcm'],['2022-blake3-chacha20-poly1305','2022-blake3-chacha20-poly1305'],['aes-128-gcm','aes-128-gcm'],['aes-256-gcm','aes-256-gcm'],['none','none']]))+
+ field('ss-method','Shadowsocks method',sel('ss-method',[['chacha20-ietf-poly1305','chacha20-ietf-poly1305'],['chacha20-poly1305','chacha20-poly1305'],['xchacha20-poly1305','xchacha20-poly1305'],['aes-128-gcm','aes-128-gcm'],['aes-256-gcm','aes-256-gcm'],['2022-blake3-aes-128-gcm','2022-blake3-aes-128-gcm'],['2022-blake3-aes-256-gcm','2022-blake3-aes-256-gcm'],['2022-blake3-chacha20-poly1305','2022-blake3-chacha20-poly1305']]))+
  field('socks-auth','SOCKS authentication',sel('socks-auth',[['noauth','Без авторизации'],['password','Логин / пароль']]))+
  field('doko-address','Dokodemo destination',inp('doko-address','127.0.0.1','127.0.0.1'))+
  field('doko-port','Dokodemo port',inp('doko-port','53','53','type="number" min="1" max="65535"'))+
@@ -629,6 +631,7 @@ async function profilesP(){
    if(security==='reality'){const sid=$('#xpb-short-id').value.trim();if(!sid||sid.length>16||sid.length%2||!/^[a-fA-F0-9]+$/.test(sid))throw new Error('Short ID: 2–16 hex-символов, чётная длина.');if(!$('#xpb-sni').value.trim())throw new Error('Для Reality укажите Server name / SNI.');}
    let warning='';
    if(protocol==='vless'&&security==='none')warning='Внимание: публичный VLESS без TLS/Reality не защищает транспорт.';
+   if(protocol==='shadowsocks'&&$('#xpb-ss-method').value==='2022-blake3-chacha20-poly1305'&&$('#xpb-uuid').value.trim())throw new Error('Shadowsocks 2022 ChaCha поддерживает только одного пользователя: очистите UUID или выберите AES-128/AES-256 для нескольких пользователей.');
    if(protocol==='shadowsocks'&&(!$('#xpb-ss-password').value.trim()||!$('#xpb-ss-user-password').value.trim()))warning='Укажите или сгенерируйте оба пароля Shadowsocks перед использованием конфигурации.';
    if(protocol==='wireguard'&&!$('#xpb-wg-secret-key').value.trim())warning='Укажите серверный WireGuard private key (команда xray wg).';
    if(network==='xdrive'&&(!$('#xpb-vless-decryption').value.trim()||!$('#xpb-vless-encryption').value.trim()))warning='XDrive требует обе стороны VLESS Encryption: server decryption и client encryption из xray vlessenc.';
@@ -774,10 +777,18 @@ async function profilesP(){
       const ss=inbound.settings||{};
       if(!ss.password||String(ss.password).startsWith('REPLACE_')||String(ss.password).startsWith('CHANGE_ME_'))throw new Error('Shadowsocks: задайте серверный пароль.');
       if(String(ss.method||'').startsWith('2022-')){
-       const expected=ss.method==='2022-blake3-aes-128-gcm'?16:32;
-       const keyBytes=value=>{try{return atob(String(value).replace(/-/g,'+').replace(/_/g,'/').replace(/\s/g,'' )).length}catch{return -1}};
+       const method=String(ss.method),expected=method==='2022-blake3-aes-128-gcm'?16:32;
+       const keyBytes=value=>{try{return atob(String(value).replace(/-/g,'+').replace(/_/g,'/').replace(/\s/g,'')).length}catch{return -1}};
        if(keyBytes(ss.password)!==expected)throw new Error('Shadowsocks 2022: серверный ключ должен быть Base64-кодированным ключом на '+expected+' байт.');
-       if(!Array.isArray(ss.users)||!ss.users.length||ss.users.some(u=>keyBytes(u.password)!==expected))throw new Error('Shadowsocks 2022: каждый пользователь должен иметь Base64-ключ на '+expected+' байт.'); 
+       const users=Array.isArray(ss.users)?ss.users:[];
+       if(method==='2022-blake3-chacha20-poly1305'&&users.length)throw new Error('Shadowsocks 2022 ChaCha поддерживает одного пользователя: уберите settings.users и используйте серверный ключ.');
+       if(users.some(u=>keyBytes(u.password)!==expected))throw new Error('Shadowsocks 2022: каждый пользователь должен иметь Base64-ключ на '+expected+' байт.');
+       if(users.length&&!method.includes('aes'))throw new Error('Shadowsocks 2022 multi-user поддерживается только методами AES-128-GCM и AES-256-GCM.');
+      }else{
+       const users=Array.isArray(ss.users)?ss.users:[];
+       if(users.length){
+        if(users.some(u=>!u.password||String(u.password).startsWith('REPLACE_')||!['chacha20-ietf-poly1305','chacha20-poly1305','xchacha20-poly1305','aes-128-gcm','aes-256-gcm'].includes(u.method)))throw new Error('Shadowsocks: задайте пароль и поддерживаемый method для каждого пользователя.');
+       }else if(!ss.password||String(ss.password).startsWith('REPLACE_')||String(ss.password).startsWith('CHANGE_ME_'))throw new Error('Shadowsocks: задайте пароль сервера.');
       }
      }
      if(inbound?.protocol==='wireguard'&&(!inbound.settings?.secretKey||String(inbound.settings.secretKey).startsWith('REPLACE_')))throw new Error('WireGuard: задайте server private key (xray wg).');
