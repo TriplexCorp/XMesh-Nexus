@@ -493,7 +493,7 @@ function userDrawer(id,tab){
           <small>Отпечаток клиента для этого пользователя</small>
         </section>
       </div>
-      <p class="user-overview-notice">${ic('link')}<span>ID и fingerprint сохранены в панели. Подключение заработает после привязки Xray-профиля и настройки выдачи подписок. История расхода появится после подключения сбора статистики.</span></p>
+      <p class="user-overview-notice">${ic('link')}<span>Это параметры Xray-подключения, а не готовая подписка. Для выдачи рабочей ссылки потребуется привязать профиль и настроить генератор подписок.</span></p>
     </div>
     <details class="user-edit-details">
       <summary><span class="user-edit-trigger">${ic('pen')}<span><b>Изменить параметры</b><small>Лимиты, срок действия и настройки пользователя</small></span></span>${ic('chevronRight')}</summary>
