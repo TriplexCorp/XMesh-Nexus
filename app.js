@@ -255,7 +255,7 @@ function xrayBuilderConfig(){
  const protocol=v('protocol')||'vless';
  let network=v('network')||'raw';
  let security=v('security')||'none';
- if(protocol==='masque'){network='masque';security='none'}
+ if(protocol==='masque'){network='masque';security='tls'}
  if(protocol==='hysteria'){network='hysteria';security='tls'}
  if(['tun','wireguard'].includes(protocol))security='none';
  const tag=v('tag').trim()||'inbound-1';
@@ -411,7 +411,7 @@ function xrayClientSample(){
  const v=id=>$('#xpb-'+id)?.value||'';
  const protocol=v('protocol')||'vless';
  const network=protocol==='hysteria'?'hysteria':protocol==='masque'?'masque':v('network')||'raw';
- const security=protocol==='masque'||['tun','wireguard'].includes(protocol)?'none':protocol==='hysteria'?'tls':v('security')||'none';
+ const security=['tun','wireguard'].includes(protocol)?'none':['hysteria','masque'].includes(protocol)?'tls':v('security')||'none';
  const sni=v('sni').trim()||'example.com';
  const port=protocol==='tun'?0:cl(+v('port')||443,1,65535);
  const path=v('path')||'/';
@@ -599,6 +599,7 @@ async function profilesP(){
    const protocol=$('#xpb-protocol').value,network=$('#xpb-network').value,security=$('#xpb-security').value;
    if(security==='reality'&&(!['raw','xhttp','grpc'].includes(network)||!['vless','vmess','trojan'].includes(protocol)))throw new Error('Reality в визуальном конструкторе доступен для VLESS/VMess/Trojan с RAW, XHTTP или gRPC.');
    if((protocol==='hysteria'||network==='hysteria')&&security!=='tls')throw new Error('Транспорт Hysteria требует TLS.');
+   if((protocol==='masque'||network==='masque')&&security!=='tls')throw new Error('Транспорт MASQUE требует TLS.');
    if((protocol==='hysteria'&&network!=='hysteria')||(protocol==='masque'&&network!=='masque'))throw new Error('Выберите соответствующий транспорт для выбранного протокола.');
    if(network==='masque'&&protocol!=='masque')throw new Error('Транспорт MASQUE доступен только для inbound MASQUE.');
    if(network==='xdrive'&&protocol!=='vless')throw new Error('XDrive в текущем ядре требует VLESS. Выберите VLESS или используйте полный JSON-режим.');
@@ -617,11 +618,12 @@ async function profilesP(){
    let proto=$('#xpb-protocol').value,net=$('#xpb-network').value,sec=$('#xpb-security').value;
    const setGroup=(selector,show)=>{const d=$(selector);if(d)d.hidden=!show};
    const force=(id,value)=>{const e=$('#xpb-'+id);if(e&&e.value!==value)e.value=value};
-   if(proto==='masque'){force('network','masque');force('security','none')}
+   if(proto==='masque'){force('network','masque');force('security','tls')}
    else if(proto==='hysteria'){force('network','hysteria');force('security','tls')}
    else if(['tun','wireguard'].includes(proto))force('security','none');
    else if(net==='masque')force('network','raw');
-   if(['hysteria'].includes(net)&&sec!=='tls')force('security','tls');
+   if(['hysteria','masque'].includes(net)&&sec!=='tls')force('security','tls');
+   if(net==='xdrive'&&v('flow'))force('flow','');
    if(sec==='reality'&&(!['raw','xhttp','grpc'].includes(net)||!['vless','vmess','trojan'].includes(proto)))force('security',['tun','wireguard','masque','dokodemo-door','tunnel'].includes(proto)?'none':'tls');
    if(['tun','wireguard','masque','dokodemo-door','tunnel'].includes(proto)&&sec!=='none'&&proto!=='hysteria')force('security','none');
    proto=$('#xpb-protocol').value;net=$('#xpb-network').value;sec=$('#xpb-security').value;
@@ -629,21 +631,21 @@ async function profilesP(){
    if(networkSelect){const noTransport=['tun','wireguard','dokodemo-door','tunnel'].includes(proto);networkSelect.closest('.f').hidden=noTransport;networkSelect.disabled=noTransport;const masqueOption=networkSelect.querySelector('option[value="masque"]');if(masqueOption)masqueOption.disabled=proto!=='masque';}
    const securitySelect=$('#xpb-security');
    if(securitySelect){
-    const disabled=['tun','wireguard','masque','dokodemo-door','tunnel'].includes(proto);
+    const disabled=['tun','wireguard','dokodemo-door','tunnel'].includes(proto);
     securitySelect.disabled=disabled;
     const realityOption=securitySelect.querySelector('option[value="reality"]');
     if(realityOption)realityOption.disabled=!['raw','xhttp','grpc'].includes(net)||!['vless','vmess','trojan'].includes(proto);
     const tlsOption=securitySelect.querySelector('option[value="tls"]');
     if(tlsOption)tlsOption.disabled=disabled;
     const noneOption=securitySelect.querySelector('option[value="none"]');
-    if(noneOption)noneOption.disabled=proto==='hysteria'||net==='hysteria';
+    if(noneOption)noneOption.disabled=proto==='hysteria'||net==='hysteria'||proto==='masque'||net==='masque';
    }
    const listenField=$('#xpb-listen')?.closest('.f'),portField=$('#xpb-port')?.closest('.f'),securityField=$('#xpb-security')?.closest('.f');
    if(listenField)listenField.hidden=proto==='tun';
    if(portField)portField.hidden=proto==='tun';
-   if(securityField)securityField.hidden=['tun','wireguard','masque'].includes(proto);
+   if(securityField)securityField.hidden=['tun','wireguard','dokodemo-door','tunnel'].includes(proto);
    setGroup('.xray-section:has(#xpb-private-key)',sec==='reality');
-   setGroup('.xray-section:has(#xpb-cert)',sec==='tls'&&!['tun','wireguard','masque'].includes(proto));
+   setGroup('.xray-section:has(#xpb-cert)',sec==='tls'&&!['tun','wireguard','dokodemo-door','tunnel'].includes(proto));
    const transport=$('.xray-section:has(#xpb-host)');
    if(transport)transport.querySelectorAll('[id^="xpb-"]').forEach(el=>{
     const f=el.id.replace('xpb-',''),wrap=el.closest('.f');if(!wrap)return;
