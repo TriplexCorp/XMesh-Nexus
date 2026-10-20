@@ -3119,3 +3119,129 @@ body:has(.studio-reference-v5) .wrap{
     backdrop-filter:none!important;
   }
 }
+
+
+/* Live manual-JSON diagnostics: numbered gutter + VS Code-like inline hints.
+   Reuses the existing textarea and syntax overlay; no independent editor state. */
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .xray-custom-mode{
+ grid-template-rows:auto auto minmax(0,1fr) auto!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .xray-custom-code-view{
+ position:relative!important;isolation:isolate;
+ overflow:hidden!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .xray-custom-code-view :is(#xpb-custom-json,#xpb-custom-syntax){
+ padding-left:4.35rem!important;
+ line-height:1.6rem!important;
+ tab-size:2!important;
+ white-space:pre!important;
+ overflow-wrap:normal!important;
+ letter-spacing:0!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-json-gutter{
+ position:absolute!important;
+ inset:0 auto 0 0!important;
+ width:3.3rem!important;
+ background:var(--sr-code-gutter)!important;
+ border-right:1px solid color-mix(in srgb,var(--tx) 11%,var(--ln))!important;
+ z-index:3!important;
+ pointer-events:none!important;
+ overflow:hidden!important;
+ user-select:none!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-json-gutter-number{
+ position:absolute!important;left:0;right:0;
+ display:block!important;
+ box-sizing:border-box;
+ padding:0 .8rem 0 .25rem;
+ text-align:right;
+ font:500 .79rem/1.6rem "IBM Plex Mono",ui-monospace,monospace!important;
+ color:var(--mu)!important;
+ white-space:nowrap;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-json-gutter-number.is-error{
+ color:var(--er)!important;
+ background:color-mix(in srgb,var(--er) 12%,transparent)!important;
+ font-weight:800!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-json-gutter-number.is-error::before{
+ content:'●';position:absolute;left:.26rem;
+ font-size:.5rem;color:var(--er);
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode #xpb-custom-syntax .sr-json-squiggle{
+ display:inline!important;
+ text-decoration-line:underline!important;
+ text-decoration-style:wavy!important;
+ text-decoration-color:var(--er)!important;
+ text-decoration-thickness:1.7px!important;
+ text-underline-offset:.2em!important;
+ background:color-mix(in srgb,var(--er) 12%,transparent)!important;
+ border-radius:2px;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-json-diagnostic{
+ display:flex;align-items:center;flex-wrap:wrap;
+ gap:.6rem;
+ min-height:2.9rem;
+ padding:.62rem .82rem;
+ border:1px solid var(--ln);
+ border-radius:var(--ui-control-radius);
+ background:var(--s2);
+ color:var(--mu);
+ font-size:max(13px,.82rem);
+ line-height:1.45;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-json-diagnostic[data-state=error]{
+ border-color:color-mix(in srgb,var(--er) 38%,var(--ln));
+ background:color-mix(in srgb,var(--er) 6%,var(--s2));
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-json-diagnostic[data-state=warning]{
+ border-color:color-mix(in srgb,var(--wr) 37%,var(--ln));
+ background:color-mix(in srgb,var(--wr) 6%,var(--s2));
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-json-status-icon{
+ width:.56rem;height:.56rem;flex:0 0 .56rem;
+ border-radius:50%;background:var(--ok);
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-json-diagnostic[data-state=error] .sr-json-status-icon{
+ background:var(--er);
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-json-diagnostic[data-state=warning] .sr-json-status-icon{
+ background:var(--wr);
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-json-status-text{
+ flex:1 1 18rem;min-width:0;
+ white-space:normal;overflow-wrap:anywhere;
+ font-size:max(13px,.82rem)!important;
+ color:var(--tx)!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-json-diagnostic button{
+ min-height:2.25rem!important;
+ padding:.43rem .82rem!important;
+ border:1px solid var(--ln)!important;
+ border-radius:var(--ui-control-radius)!important;
+ background:var(--s1)!important;
+ color:var(--tx)!important;
+ font-size:max(12px,.8rem)!important;
+ font-weight:700!important;
+ cursor:pointer;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-json-diagnostic button[hidden]{
+ display:none!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-json-diagnostic .sr-json-hotfix{
+ background:color-mix(in srgb,var(--a) 12%,var(--s1))!important;
+ border-color:color-mix(in srgb,var(--a) 54%,var(--ln))!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-json-diagnostic button:is(:hover,:focus-visible){
+ background:color-mix(in srgb,var(--a) 20%,var(--s2))!important;
+ border-color:var(--a)!important;
+ outline:0!important;
+}
+@media(max-width:700px){
+ .xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-json-diagnostic{
+  align-items:stretch;
+ }
+ .xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-json-status-text{
+  flex-basis:100%;
+ }
+}
