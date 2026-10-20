@@ -1008,8 +1008,10 @@ async function profilesP(){
    $('#xpb-custom-mode').hidden=!customMode;
    const tagField=$('#xpb-tag')?.closest('.f');if(tagField)tagField.hidden=customMode;
    $('#xpb-server-output').hidden=customMode;
+   const previewView=$('#xpb-preview')?.closest('.xray-code-view');
+   if(previewView)previewView.hidden=customMode;
    $('#xpb-preview').hidden=customMode;
-   $$('[data-xray-mode]').forEach(b=>b.classList.toggle('on',b.dataset.xrayMode===(customMode?'custom':'visual')));
+   $('[data-xray-mode]').forEach(b=>b.classList.toggle('on',b.dataset.xrayMode===(customMode?'custom':'visual')));
    setOutput('server');
    const clientSourceNote=$('#xpb-client-source-note');
    if(clientSourceNote)clientSourceNote.textContent=customMode
