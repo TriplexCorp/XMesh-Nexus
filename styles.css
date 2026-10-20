@@ -2068,3 +2068,21 @@ nav a.on{background:var(--s2)!important;box-shadow:none!important}
 @media(max-width:940px){
  .xray-builder .xray-config-tabs button:not(:last-child)::after{display:none}
 }
+
+
+/* Keep generation actions aligned with the input they belong to. */
+.xray-builder .xray-config-panel .xray-option-grid>.xray-field-action,
+.xray-builder .xray-config-panel .xray-field-action{
+ display:flex;
+ align-items:flex-start;
+ min-width:0;
+ padding:2.18rem 0 0;
+}
+.xray-builder .xray-config-panel .xray-field-action button{
+ min-height:2.35rem;
+ align-self:flex-start;
+}
+@media(max-width:620px){
+ .xray-builder .xray-config-panel .xray-option-grid>.xray-field-action,
+ .xray-builder .xray-config-panel .xray-field-action{padding:0}
+}
