@@ -1838,3 +1838,41 @@ html[data-theme=light] .xray-builder .xray-code-syntax{color:#32455a}
 .xray-builder.studio-reference-v5:not(.manual-mode) .xray-config-tabs button{border-radius:var(--ui-control-radius)!important}
 html[data-borders=off] .xray-builder.studio-reference-v5:not(.manual-mode) :is(.xray-meta-grid>.f,.xray-config-content,.xray-output-dock,.xray-config-tabs>button){border-color:transparent!important}
 html[data-borders=strong] .xray-builder.studio-reference-v5:not(.manual-mode) :is(.xray-meta-grid>.f,.xray-config-content,.xray-output-dock,.xray-config-tabs>button){border-color:var(--border-strong)!important}
+
+/* Final integration: manual JSON is a full-width workspace that shares global themes. */
+.xray-builder .xray-preview{min-height:18rem;width:100%;font:.85rem/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}
+.xray-builder.manual-mode>.xray-hero{grid-column:1}
+.xray-builder.manual-mode>.xray-presets{grid-column:2}
+.xray-builder.manual-mode>.xray-meta-grid,
+.xray-builder.manual-mode>.xray-workspace-layout,
+.xray-builder.manual-mode>.xray-footer{grid-column:1/-1}
+.xray-builder.manual-mode>.xray-config-tabs{display:none!important}
+.xray-builder.manual-mode .xray-output-dock{
+ background:var(--sr-panel);border-color:var(--sr-border);
+ border-radius:var(--ui-radius);
+}
+.xray-builder.manual-mode .xray-custom-code-view{background:var(--sr-code)!important}
+.xray-builder.manual-mode .xray-custom-code-view .xray-code-syntax{color:var(--sr-text)}
+.xray-builder.manual-mode #xpb-custom-json{caret-color:var(--a)!important}
+.xray-builder.manual-mode>.xray-footer{
+ padding:.7rem .85rem;border-radius:var(--ui-radius);
+ background:var(--sr-panel);border:1px solid var(--sr-border);
+}
+.xray-builder.studio-reference-v5:not(.manual-mode)>.xray-config-tabs>button.on>span{
+ color:var(--mark-ink)!important;
+}
+.xray-builder.studio-reference-v5:not(.manual-mode)>.xray-footer #xpb-save{
+ color:var(--btn-text)!important;
+ background:var(--a)!important;
+ border-color:color-mix(in srgb,var(--a) 75%,var(--ln))!important;
+}
+.xray-builder.studio-reference-v5:not(.manual-mode)>.xray-footer #xpb-save:hover{
+ background:color-mix(in srgb,var(--a) 86%,var(--tx) 14%)!important;
+}
+.xray-builder.studio-reference-v5:not(.manual-mode) .xray-code-view .xray-code-syntax{
+ background:transparent!important;
+}
+/* Color preferences are owned by html[data-accent], not by Studio. */
+html[data-theme=light] .xray-builder.studio-reference-v5 :is(.xray-code-syntax,.xray-code-input){
+ color:var(--tx);
+}
