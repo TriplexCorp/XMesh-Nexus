@@ -43,11 +43,13 @@ docker compose restart panel
 docker compose down
 ```
 
-Database backup (writes a SQL dump in the current directory):
+Create and verify a PostgreSQL custom-format backup, with 14-day local retention:
 
 ```bash
-docker compose exec -T db pg_dump -U postgres -d xmesh > xmesh-backup.sql
+bash deploy/backup-postgres.sh
 ```
+
+The script writes a permission-restricted dump to `./backups`. Copy backups off the VPS as well; a local backup does not protect against loss of the server or its disk. To change retention or destination, set `BACKUP_RETENTION_DAYS` or `BACKUP_DIR` for the script process.
 
 Do not delete the `postgres_data` or `core_data` volumes during routine updates. Redis is intentionally ephemeral: its rate-limit counter can reset after a Redis restart, while the PostgreSQL-backed limit remains as a fallback.
 
