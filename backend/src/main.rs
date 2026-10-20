@@ -11,7 +11,7 @@ use axum::{
 };
 use core::CoreManager;
 use redis::aio::ConnectionManager;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 use serde_json::{json, Map, Value};
@@ -91,6 +91,20 @@ struct NodeMetricsIngestRequest {
     active_connections: Option<i32>,
     online_clients: Option<i32>,
     metrics: Option<Value>,
+    #[serde(default, alias = "userTraffic")]
+    user_traffic: Option<Vec<UserTrafficSample>>,
+}
+
+/// Cumulative Xray byte counters scoped to a real panel user and the reporting node.
+/// The node agent must provide these explicitly; host traffic must not be inferred.
+#[derive(Debug, Deserialize, Serialize)]
+struct UserTrafficSample {
+    #[serde(alias = "userId")]
+    user_id: i64,
+    #[serde(alias = "uplinkBytes")]
+    uplink_bytes: i64,
+    #[serde(alias = "downlinkBytes")]
+    downlink_bytes: i64,
 }
 
 #[tokio::main]
@@ -143,6 +157,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/stats", get(get_stats))
         .route("/system/stats", get(get_system_stats))
         .route("/metrics/traffic", get(get_traffic_metrics))
+        .route("/users/{id}/traffic", get(get_user_traffic))
         .route("/nodes/{id}/metrics-token", post(create_node_metrics_token))
         .route("/collections/{collection}", get(list_records).post(create_record))
         .route("/collections/{collection}/{id}", patch(update_record).delete(delete_record))
@@ -684,6 +699,19 @@ async fn ingest_node_metrics(
         return Err(ApiError::new(StatusCode::UNAUTHORIZED, "Токен агента недействителен или отозван."));
     }
 
+    let user_traffic = body.user_traffic.unwrap_or_default();
+    if user_traffic.len() > 2048 {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Не более 2048 пользователей за один пакет метрик."));
+    }
+    let mut seen_users = std::collections::HashSet::new();
+    for sample in &user_traffic {
+        if sample.user_id <= 0 || sample.uplink_bytes < 0 || sample.downlink_bytes < 0
+            || !seen_users.insert(sample.user_id)
+        {
+            return Err(ApiError::new(StatusCode::BAD_REQUEST, "Некорректная или дублирующаяся запись userTraffic."));
+        }
+    }
+
     let node_id = body.node_id.to_string();
     let sampled_at: i64 = sqlx::query_scalar(
         "INSERT INTO server_metric_samples (
@@ -709,6 +737,38 @@ async fn ingest_node_metrics(
     .fetch_one(&state.pool)
     .await?;
 
+    if !user_traffic.is_empty() {
+        // One atomic UPSERT for the full node batch. Initial samples establish a
+        // baseline instead of spuriously counting traffic from before collection.
+        // Counter resets start a new baseline, never subtract or fabricate usage.
+        let serialized = serde_json::to_value(&user_traffic)
+            .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Некорректный userTraffic."))?;
+        sqlx::query(
+            "INSERT INTO user_node_traffic_totals AS totals (
+                node_id, user_id, last_uplink_bytes, last_downlink_bytes,
+                uplink_bytes, downlink_bytes, observations, updated_at
+            )
+            SELECT $1, metrics.user_id, metrics.uplink_bytes, metrics.downlink_bytes,
+                   0, 0, 1, NOW()
+            FROM jsonb_to_recordset($2::jsonb)
+                 AS metrics(user_id BIGINT, uplink_bytes BIGINT, downlink_bytes BIGINT)
+            JOIN panel_records u ON u.collection = 'users' AND u.id = metrics.user_id
+            ON CONFLICT (node_id, user_id) DO UPDATE SET
+                uplink_bytes = totals.uplink_bytes +
+                    GREATEST(EXCLUDED.last_uplink_bytes - totals.last_uplink_bytes, 0),
+                downlink_bytes = totals.downlink_bytes +
+                    GREATEST(EXCLUDED.last_downlink_bytes - totals.last_downlink_bytes, 0),
+                last_uplink_bytes = EXCLUDED.last_uplink_bytes,
+                last_downlink_bytes = EXCLUDED.last_downlink_bytes,
+                observations = totals.observations + 1,
+                updated_at = NOW()"
+        )
+        .bind(body.node_id)
+        .bind(serialized)
+        .execute(&state.pool)
+        .await?;
+    }
+
     sqlx::query("UPDATE node_metric_auth SET last_seen_at = NOW() WHERE node_id = $1")
         .bind(body.node_id)
         .execute(&state.pool)
@@ -717,8 +777,76 @@ async fn ingest_node_metrics(
     Ok((StatusCode::CREATED, Json(json!({
         "status": "accepted",
         "nodeId": body.node_id,
-        "sampledAt": sampled_at
+        "sampledAt": sampled_at,
+        "userTrafficSamples": user_traffic.len()
     }))))
+}
+
+/// Real per-user, per-node traffic collected from authenticated Xray node counters.
+/// Without actual per-user counter reports this returns an empty server list.
+async fn get_user_traffic(
+    State(state): State<AppState>,
+    Path(user_id): Path<i64>,
+) -> Result<Json<Value>, ApiError> {
+    if user_id <= 0 {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Некорректный ID пользователя."));
+    }
+    let user_exists: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM panel_records WHERE collection = 'users' AND id = $1)"
+    )
+    .bind(user_id)
+    .fetch_one(&state.pool)
+    .await?;
+    if !user_exists {
+        return Err(ApiError::new(StatusCode::NOT_FOUND, "Пользователь не найден."));
+    }
+    let rows = sqlx::query(
+        "SELECT totals.node_id,
+                COALESCE(
+                  NULLIF(node.data->>'remark', ''),
+                  NULLIF(node.data->>'name', ''),
+                  NULLIF(node.data->>'tag', ''),
+                  'Узел #' || totals.node_id::text
+                ) AS node_name,
+                totals.uplink_bytes,
+                totals.downlink_bytes,
+                totals.observations,
+                (EXTRACT(EPOCH FROM totals.updated_at) * 1000)::BIGINT AS updated_at_ms
+         FROM user_node_traffic_totals totals
+         LEFT JOIN panel_records node
+           ON node.collection = 'nodes' AND node.id = totals.node_id
+         WHERE totals.user_id = $1
+         ORDER BY (totals.uplink_bytes + totals.downlink_bytes) DESC, totals.node_id"
+    )
+    .bind(user_id)
+    .fetch_all(&state.pool)
+    .await?;
+    let mut servers = Vec::with_capacity(rows.len());
+    let mut uplink = 0_i64;
+    let mut downlink = 0_i64;
+    for row in rows {
+        let up: i64 = row.try_get("uplink_bytes")?;
+        let down: i64 = row.try_get("downlink_bytes")?;
+        uplink = uplink.saturating_add(up);
+        downlink = downlink.saturating_add(down);
+        servers.push(json!({
+            "nodeId": row.try_get::<i64, _>("node_id")?,
+            "name": row.try_get::<String, _>("node_name")?,
+            "uplinkBytes": up,
+            "downlinkBytes": down,
+            "observations": row.try_get::<i64, _>("observations")?,
+            "updatedAtMs": row.try_get::<i64, _>("updated_at_ms")?
+        }));
+    }
+    Ok(Json(json!({
+        "userId": user_id,
+        "dataSource": "user_node_traffic_totals",
+        "accounting": "monotonic_counter_deltas",
+        "sampleCount": servers.len(),
+        "totalUplinkBytes": uplink,
+        "totalDownlinkBytes": downlink,
+        "servers": servers
+    })))
 }
 
 async fn get_traffic_metrics(
