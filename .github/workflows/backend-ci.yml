@@ -34,6 +34,8 @@ jobs:
         run: node scripts/check-studio-theme.js
       - name: Check XHTTP serialization and themed dropdowns
         run: node scripts/check-xhttp-extras.js
+      - name: Check context-driven Studio editor
+        run: node scripts/check-studio-context.js
       - name: Check XRAY Studio selector safety
         run: node scripts/check-xray-studio-selectors.js
       - name: Validate installer and Docker Compose
