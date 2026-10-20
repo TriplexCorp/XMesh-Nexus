@@ -1,0 +1,126 @@
+/* XRAY STUDIO compact workspace — isolated visual and scrolling overrides.
+   Keep manual JSON independent of the visual builder. */
+.xray-builder:not(.manual-mode){
+  align-items:start;
+  gap:.62rem;
+  padding:.85rem;
+  overflow:visible;
+}
+.xray-builder:not(.manual-mode)>.xray-hero{min-width:0}
+.xray-builder:not(.manual-mode) .xray-hero h2{font-size:1.16rem;line-height:1.2}
+.xray-builder:not(.manual-mode) .xray-hero .xray-hero-description{line-height:1.3;max-width:48ch}
+.xray-builder:not(.manual-mode) .xray-meta-grid{
+  gap:.52rem;
+  padding:.65rem;
+}
+.xray-builder:not(.manual-mode) .xray-meta-grid .f input{
+  height:2.2rem;min-height:2.2rem;padding:.42rem .6rem;
+}
+.xray-builder:not(.manual-mode) .xray-workspace-layout{
+  height:auto!important;
+  min-height:0!important;
+  align-items:start;
+  gap:.65rem;
+}
+.xray-builder:not(.manual-mode) .xray-editor-pane,
+.xray-builder:not(.manual-mode) #xpb-visual-mode,
+.xray-builder:not(.manual-mode) .xray-config-steps{
+  height:auto!important;
+  min-height:0!important;
+  overflow:visible!important;
+  grid-template-rows:auto!important;
+}
+.xray-builder:not(.manual-mode) .xray-config-content{
+  height:auto!important;
+  max-height:none!important;
+  min-height:0!important;
+  overflow:visible!important;
+  overscroll-behavior:auto!important;
+  padding:.7rem;
+}
+.xray-builder:not(.manual-mode) .xray-config-tabs{gap:.3rem}
+.xray-builder:not(.manual-mode) .xray-config-tabs button{
+  min-height:2.15rem;height:2.15rem;
+  padding:.35rem .5rem;
+}
+.xray-builder:not(.manual-mode) .xray-config-panel{gap:.5rem}
+.xray-builder:not(.manual-mode) .xray-config-panel-title{gap:.35rem}
+.xray-builder:not(.manual-mode) .xray-config-panel-title p{line-height:1.3}
+.xray-builder:not(.manual-mode) .xray-config-panel .xray-section{
+  padding:.6rem;gap:.5rem;
+}
+.xray-builder:not(.manual-mode) .xray-config-panel .xray-section.xray-section-compact{padding:0}
+.xray-builder:not(.manual-mode) .xray-config-panel .f{gap:.26rem}
+.xray-builder:not(.manual-mode) .xray-config-panel .f input,
+.xray-builder:not(.manual-mode) .xray-config-panel .f select{
+  height:2.2rem;min-height:2.2rem;
+  padding:.35rem .55rem;
+}
+.xray-builder:not(.manual-mode) .xray-config-panel .xray-main-grid,
+.xray-builder:not(.manual-mode) .xray-config-panel .xray-key-grid,
+.xray-builder:not(.manual-mode) .xray-config-panel .xray-option-grid{
+  gap:.5rem;
+}
+.xray-builder:not(.manual-mode) .xray-output-dock{
+  height:auto!important;
+  min-height:0!important;
+  max-height:none!important;
+  display:flex;
+  flex-direction:column;
+  padding:.7rem;
+  gap:.45rem;
+  overflow:visible;
+}
+.xray-builder:not(.manual-mode) .xray-output-workspace{
+  height:auto!important;
+  min-height:0!important;
+  display:flex;
+  flex-direction:column;
+  gap:.45rem;
+  overflow:visible;
+}
+.xray-builder:not(.manual-mode) .xray-output-toolbar{gap:.32rem}
+.xray-builder:not(.manual-mode) .xray-code-view{
+  height:clamp(16rem,40dvh,29rem)!important;
+  min-height:16rem!important;
+  max-height:29rem;
+  overflow:hidden;
+}
+.xray-builder:not(.manual-mode) .xray-footer{gap:.45rem;padding-top:.4rem}
+.xray-builder:not(.manual-mode) .xray-code-syntax,
+.xray-builder:not(.manual-mode) .xray-code-input{font-size:.73rem;line-height:1.48;padding:.65rem}
+@media(min-width:1151px){
+  .xray-builder:not(.manual-mode) .xray-workspace-layout{
+    grid-template-columns:minmax(0,1fr) minmax(0,.92fr);
+  }
+  .xray-builder:not(.manual-mode) .xray-config-tabs{
+    display:grid;grid-template-columns:repeat(5,minmax(0,1fr));
+    overflow:visible;
+  }
+  .xray-builder:not(.manual-mode) .xray-config-tabs button{
+    width:auto;min-width:0;
+  }
+  .xray-builder:not(.manual-mode) .xray-config-tabs button>b{
+    font-size:.7rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .xray-builder:not(.manual-mode) .xray-config-panel[data-xray-config-panel="basic"] .xray-row-2{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .xray-builder:not(.manual-mode) .xray-config-panel[data-xray-config-panel="basic"] .xray-row-3{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+  .xray-builder:not(.manual-mode) .xray-config-panel .xray-main-grid,
+  .xray-builder:not(.manual-mode) .xray-config-panel .xray-key-grid,
+  .xray-builder:not(.manual-mode) .xray-config-panel .xray-option-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+@media(max-width:1150px){
+  .xray-builder:not(.manual-mode) .xray-workspace-layout{grid-template-columns:minmax(0,1fr)}
+  .xray-builder:not(.manual-mode) .xray-code-view{height:20rem!important;max-height:none}
+}
+@media(max-width:760px){
+  .xray-builder:not(.manual-mode){padding:.65rem}
+  .xray-builder:not(.manual-mode) .xray-output-tabs,
+  .xray-builder:not(.manual-mode) .xray-output-actions{flex:1 1 100%}
+}
