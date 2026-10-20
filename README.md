@@ -1,17 +1,25 @@
 # XMesh Nexus
 
-**XMesh Nexus** is the infrastructure control-panel UI for the XMesh project.
+**XMesh Nexus** is the web-based **control panel** for managing XMesh / Xray VPN infrastructure.
 
-The repository contains the panel in both `index.html` (homepage entry point) and `lumen-panel-updated.html` (the original source filename).
+> This repository is for the **panel UI** — not an XMesh node, node agent, or server-side daemon.
+
+## Entry points
+
+- `index.html` — main panel page
+- `lumen-panel-updated.html` — same panel under its original filename
 
 ## Current implementation status
 
-This uploaded HTML is a **frontend prototype**. Its current data layer uses browser `localStorage` and generated demo data. The node CPU/RAM/speed values and user records are not live server telemetry, and the panel is not yet connected to Xray, Marzban, or a production backend API.
+The current HTML is a **frontend prototype**. It stores settings in browser `localStorage` and uses generated demo data. CPU, RAM, speed, node status, and user records shown in the interface are not live telemetry.
 
-Do not treat the current prototype as a production control plane until backend integration, authentication, authorization, and server-side validation are implemented.
+The panel is **not yet connected** to Xray, Marzban, or a production backend API. Node-side services and the control-plane backend are separate components and are not implemented by this frontend repository.
 
-## Positioning
+Do not use the current prototype as a production control plane until backend integration, authentication, authorization, and server-side validation are implemented.
 
-- Product: **XMesh Nexus**
-- Descriptor: **Infrastructure Control Platform**
-- Tagline: **One platform. Every node. Total control.**
+## Product identity
+
+- **Product:** XMesh Nexus
+- **Role:** Infrastructure Control Panel
+- **Descriptor:** Infrastructure Control Platform
+- **Tagline:** One platform. Every node. Total control.
