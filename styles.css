@@ -523,3 +523,24 @@ button:active,.btn:active,.gh:active{transform:translateY(0)}
   .users-toolbar .users-search-field{gap:.45rem;padding-inline:.65rem}
   .users-toolbar .users-search-field input#uq{font-size:.85rem}
 }
+
+/* ================= USERS SEARCH — READABLE FIELD HINT ================= */
+.users-toolbar{align-items:start}
+.users-search-wrap{display:grid;align-content:start;gap:.38rem;width:100%;min-width:0;max-width:100%}
+.users-toolbar .users-search-field{grid-column:auto;align-self:start}
+.users-search-hint{
+  display:block;
+  min-width:0;
+  margin:0;
+  padding-inline:.15rem;
+  color:var(--mu);
+  font-size:.72rem;
+  line-height:1.4;
+  letter-spacing:0;
+  overflow-wrap:anywhere;
+}
+.users-toolbar select#usq,.users-toolbar-actions{align-self:start}
+@media(max-width:760px){
+  .users-search-wrap{grid-column:1/-1}
+  .users-toolbar .users-search-field{grid-column:auto}
+}
