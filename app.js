@@ -118,7 +118,7 @@ function field(f,v){
     i=\`<div class="country-picker">
       <div class="country-search-wrap"><input class="country-search" type="search" data-country-search placeholder="Поиск по названию или коду…" aria-label="Поиск страны" autocomplete="off" aria-controls="country-options-\${f.k}" aria-expanded="false"><div class="country-options" id="country-options-\${f.k}" role="listbox" aria-label="Результаты поиска стран" hidden></div></div>
       <div class="country-selected">\${flagView(current,'country-flag-preview')}<span data-country-label>\${existing?esc(existing.name):current?esc(current+' Сохранённый флаг'):'Выберите страну…'}</span></div>
-      <select name="\${f.k}" class="country-select" aria-label="Страна" tabindex="-1" aria-hidden="true"><option value="">Не выбрана</option>\${current&&!existing?\`<option value="\${esc(current)}" selected>\${esc(current)} Сохранённый флаг</option>\`:''}\${COUNTRIES.map(c=>\`<option value="\${c.flag}" data-country-name="\${esc(c.name.toLocaleLowerCase('ru'))}" data-country-code="\${c.code}"\${c.flag===current?' selected':''}>\${esc(c.name)} (\${c.code})</option>\`).join('')}</select>
+      <input type="hidden" name="\${f.k}" class="country-value" value="\${esc(current)}">
       <small class="country-hint">Поиск по названию страны или ISO-коду. \${COUNTRIES.length} стран и территорий.</small>
     </div>\`
   }
@@ -1211,7 +1211,7 @@ document.addEventListener('click',async e=>{
   else if(g('#pal'))palette();
 });
 function renderCountryOptions(picker, query=''){
- const input=picker.querySelector('[data-country-search]'),select=picker.querySelector('select[name=flag]'),options=picker.querySelector('.country-options');
+ const input=picker.querySelector('[data-country-search]'),select=picker.querySelector('input.country-value[name=flag]'),options=picker.querySelector('.country-options');
  if(!input||!select||!options)return;
  const q=String(query||'').trim().toLocaleLowerCase('ru');
  const matches=COUNTRIES.filter(c=>(c.name+' '+c.code).toLocaleLowerCase('ru').includes(q));
@@ -1256,7 +1256,7 @@ document.addEventListener('click',e=>{
  const choice=e.target.closest('[data-country-choice]');
  if(choice){
   const picker=choice.closest('.country-picker');
-  const select=picker?.querySelector('select[name=flag]');
+  const select=picker?.querySelector('input.country-value[name=flag]');
   const input=picker?.querySelector('[data-country-search]');
   if(!picker||!select)return;
   select.value=choice.dataset.countryChoice||'';
@@ -1268,7 +1268,7 @@ document.addEventListener('click',e=>{
  if(!e.target.closest('.country-picker'))document.querySelectorAll('.country-picker').forEach(closeCountryOptions);
 });
 document.addEventListener('change',e=>{
- const select=e.target.closest('.country-picker select[name=flag]');
+ const select=e.target.closest('.country-picker input.country-value[name=flag]');
  if(!select)return;
  const picker=select.closest('.country-picker');
  const country=COUNTRIES.find(c=>c.flag===select.value);
