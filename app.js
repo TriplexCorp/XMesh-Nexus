@@ -613,6 +613,44 @@ function handleUserRenewalAction(button){
     field?.focus();
   }
 }
+/* Per-user accounting is only rendered from authenticated node counter telemetry.
+   Never derive a user's consumption from node-wide RX/TX interface speeds. */
+const userTrafficBytes=v=>sysBytes(Number.isFinite(+v)&&+v>=0?+v:0);
+function userTrafficDonutsMarkup(payload){
+  const servers=Array.isArray(payload?.servers)?payload.servers.filter(r=>
+    r&&Number.isFinite(+r.nodeId)&&Number.isFinite(+r.uplinkBytes)&&Number.isFinite(+r.downlinkBytes)
+    &&+r.uplinkBytes>=0&&+r.downlinkBytes>=0):[];
+  if(!servers.length)return '<div class="user-traffic-empty">'+ic('activity')+'<div><b>Пока нет разбивки по серверам</b><p>Для этой статистики узлы должны отправлять персональные счётчики Xray. Трафик сетевого интерфейса не используется вместо пользовательского.</p></div></div>';
+  const up=servers.reduce((sum,r)=>sum+Number(r.uplinkBytes),0);
+  const down=servers.reduce((sum,r)=>sum+Number(r.downlinkBytes),0);
+  const total=up+down;
+  const cards=servers.map(r=>{
+    const amount=Number(r.uplinkBytes)+Number(r.downlinkBytes);
+    const share=total?Math.min(100,Math.max(0,amount/total*100)):0;
+    const percent=total?fmt(share,share<1?1:0):'0';
+    const seen=Number.isFinite(+r.updatedAtMs)?new Date(+r.updatedAtMs).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
+    return '<article class="user-server-item"><div class="user-server-donut" style="--traffic-share:'+share.toFixed(3)+'%" role="img" aria-label="'+esc(String(r.name||'Узел #'+r.nodeId))+': '+percent+'% пользовательского трафика"><span>'+percent+'%</span></div><div class="user-server-details"><b title="'+esc(r.name||'Узел #'+r.nodeId)+'">'+esc(r.name||'Узел #'+r.nodeId)+'</b><strong>'+userTrafficBytes(amount)+'</strong><small>↑ '+userTrafficBytes(r.uplinkBytes)+' · ↓ '+userTrafficBytes(r.downlinkBytes)+'</small><span class="user-server-updated">Срез '+esc(seen)+'</span></div></article>';
+  }).join('');
+  return '<div class="user-server-totals"><span>Измерено: <b>'+userTrafficBytes(total)+'</b></span><span>↑ '+userTrafficBytes(up)+'</span><span>↓ '+userTrafficBytes(down)+'</span></div>'+(total===0?'<p class="user-server-pending">Счётчики подключены, но прирост трафика ещё не зарегистрирован.</p>':'')+'<div class="user-server-grid">'+cards+'</div><small class="user-server-source">Учитывается прирост персональных счётчиков Xray с момента подключения сбора метрик. Не общий трафик VPS.</small>';
+}
+async function loadUserTrafficStats(userId){
+  const container=dlg.querySelector('[data-user-traffic-id="'+userId+'"]');
+  if(!container)return;
+  if(!backendReady){
+    container.innerHTML='<div class="user-traffic-empty">'+ic('activity')+'<div><b>Нет подключения к серверу метрик</b><p>Статистика появится после подключения backend и передачи персональных счётчиков Xray.</p></div></div>';
+    return;
+  }
+  try{
+    const payload=await backendRequest('/api/v1/users/'+encodeURIComponent(userId)+'/traffic');
+    if(dlg.open&&container.isConnected&&dlg.contains(container)){
+      container.innerHTML=userTrafficDonutsMarkup(payload);
+    }
+  }catch(error){
+    if(dlg.open&&container.isConnected&&dlg.contains(container)){
+      container.innerHTML='<div class="user-traffic-empty">'+ic('activity')+'<div><b>Не удалось получить статистику</b><p>'+esc(error.message||'Ошибка загрузки метрик')+'</p><button type="button" class="gh sm" data-user-traffic-refresh="'+userId+'">Повторить</button></div></div>';
+    }
+  }
+}
 function userDrawer(id,tab){
   const u=DB.users.find(x=>x.id==id);if(!u)return dlg.close();if(!u.xrayId){u.xrayId=crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=crypto.getRandomValues(new Uint8Array(1))[0]&15;return(c==='x'?r:(r&3|8)).toString(16)});api.update('users',u.id,{xrayId:u.xrayId}).catch(err=>console.warn('Could not persist generated Xray credential',err))}UT=tab||(dlg.open&&dlg.classList.contains('user-modal')?UT:'ov');
   const [sl,sc]=STM[st(u)],k=u.limit?u.used/u.limit:0,h=hs(u.username)%360;
