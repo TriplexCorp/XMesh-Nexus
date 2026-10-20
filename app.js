@@ -964,7 +964,7 @@ async function profilesP(){
    const tagField=$('#xpb-tag')?.closest('.f');if(tagField)tagField.hidden=customMode;
    $('#xpb-server-output').hidden=customMode;
    $('#xpb-preview').hidden=customMode;
-   $$$('[data-xray-mode]').forEach(b=>b.classList.toggle('on',b.dataset.xrayMode===(customMode?'custom':'visual')));
+   $('[data-xray-mode]').forEach(b=>b.classList.toggle('on',b.dataset.xrayMode===(customMode?'custom':'visual')));
    setOutput('server');
    const clientSourceNote=$('#xpb-client-source-note');
    if(clientSourceNote)clientSourceNote.textContent=customMode
@@ -972,7 +972,7 @@ async function profilesP(){
     :'Этот Client JSON — отдельный outbound-конфиг. Адрес узла, UUID, Reality public key / Short ID и другие placeholders нужно заполнить реальными значениями.';
    if(customMode)validateCustomJson();
   };
-  $$$('[data-xray-mode]').forEach(btn=>btn.addEventListener('click',()=>setMode(btn.dataset.xrayMode)));
+  $('[data-xray-mode]').forEach(btn=>btn.addEventListener('click',()=>setMode(btn.dataset.xrayMode)));
   customArea.addEventListener('input',()=>{customDirty=true;validateCustomJson()});
   $('#xpb-custom-copy').onclick=()=>copyText('xpb-custom-json');
   $('#xpb-custom-download').onclick=()=>download('xpb-custom-json','server');
@@ -1253,7 +1253,7 @@ document.addEventListener('click',async e=>{
   else if(b=g('[data-tt]')){TP.tab=b.dataset.tt;TP.q='';TP.f='';render(1)}
   else if(b=g('[data-lv]')){}
   else if(b=g('[data-th]')){C.theme=b.dataset.th;apply();$$('#th button').forEach(x=>x.classList.toggle('on',x==b))}
-  else if(b=g('[data-ac]')){C.accent=b.dataset.ac;apply();$$$('[data-ac]').forEach(x=>x.classList.toggle('on',x==b))}
+  else if(b=g('[data-ac]')){C.accent=b.dataset.ac;apply();$('[data-ac]').forEach(x=>x.classList.toggle('on',x==b))}
   else if(b=g('[data-ui]')){const prop=b.dataset.ui,value=b.dataset.value;if(prop&&value){C[prop]=value;apply();$$(`[data-ui="${prop}"]`).forEach(x=>x.classList.toggle('on',x==b))}}
   else if(g('#rs')){C={...CDEFAULT};apply();render(1);toast('Оформление сброшено')}
   else if(g('#gx')){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(DB,null,2)],{type:'application/json'}));a.download='xmesh-nexus-backup.json';a.click()}
