@@ -2768,3 +2768,354 @@ body:has(.studio-reference-v5) .wrap{
 .sr-studio-dialog[data-active-panel="transport"] [data-xray-option-group="transport-xhttp"] .sr-xhttp-toggle{
  display:none!important;
 }
+
+
+/* ================================================================
+   XRAY STUDIO / Shared appearance & clearly separated settings modal
+   Backdrop is visible because the dialog no longer covers the viewport.
+   ================================================================ */
+
+/* Dialog floats above, instead of replacing the entire app background. */
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog{
+  position:fixed!important;
+  inset:0!important;
+  width:min(1700px,calc(100vw - 72px))!important;
+  max-width:calc(100vw - 72px)!important;
+  height:calc(100dvh - 64px)!important;
+  max-height:calc(100dvh - 64px)!important;
+  margin:auto!important;
+  padding:0!important;
+  border:1px solid color-mix(in srgb,var(--a) 32%,var(--ln))!important;
+  border-radius:clamp(13px,var(--ui-radius),22px)!important;
+  background:var(--s1)!important;
+  box-shadow:0 34px 110px rgba(0,0,0,.52),
+              0 0 0 1px color-mix(in srgb,var(--tx) 7%,transparent) inset,
+              0 0 56px color-mix(in srgb,var(--a) 9%,transparent)!important;
+  isolation:isolate;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog::backdrop{
+  background:rgba(4,8,15,.63)!important;
+  -webkit-backdrop-filter:blur(13px) saturate(.7)!important;
+  backdrop-filter:blur(13px) saturate(.7)!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .sr-dialog-shell{
+  max-width:none!important;
+  padding:clamp(1rem,2.2vw,2.2rem)!important;
+  gap:.9rem!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .sr-dialog-head{
+  border-bottom:1px solid var(--ln)!important;
+  background:color-mix(in srgb,var(--a) 3%,transparent)!important;
+  border-radius:var(--ui-control-radius)!important;
+  padding:1rem 1.15rem!important;
+  margin:-.5rem -.5rem 0!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .sr-dialog-scroll{
+  padding:.4rem .3rem 1rem!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .sr-dialog-inner .xray-config-panel{
+  border:1px solid color-mix(in srgb,var(--tx) 12%,var(--ln))!important;
+  background:var(--s2)!important;
+  box-shadow:0 3px 18px rgba(0,0,0,.09)!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .sr-dialog-footer{
+  background:color-mix(in srgb,var(--a) 3%,transparent);
+  border-radius:var(--ui-control-radius);
+  padding:1rem 1.15rem!important;
+  margin:0 -.5rem -.5rem!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .sr-dialog-close:hover,
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .sr-dialog-close:focus-visible{
+  outline:2px solid color-mix(in srgb,var(--a) 68%,transparent)!important;
+  outline-offset:2px!important;
+}
+
+/* Manual JSON mode: match the constructor's outer design and controls,
+   while retaining the requested full-width editable source. */
+.xray-builder.studio-reference-v5.studio-inline.manual-mode{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) auto!important;
+  grid-template-rows:auto auto minmax(0,1fr) auto!important;
+  align-items:start!important;
+  gap:1rem!important;
+  padding:0!important;
+  margin:0!important;
+  width:100%!important;max-width:none!important;
+  border:0!important;border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  color:var(--tx)!important;
+  font-family:inherit!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode > .xray-hero{
+  grid-column:1!important;
+  grid-row:1!important;
+  display:flex!important;
+  align-items:center!important;
+  gap:1rem!important;
+  margin:0!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode > .xray-hero::before{
+  content:'◇';display:grid;place-items:center;
+  width:33px;height:33px;flex:0 0 33px;
+  color:var(--a);font-size:2.2rem;
+  filter:drop-shadow(0 0 8px color-mix(in srgb,var(--a) 25%,transparent));
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .xray-hero .note{
+  color:var(--a)!important;
+  font-size:.73rem!important;
+  font-weight:750!important;
+  letter-spacing:.08em!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .xray-hero h2{
+  color:var(--tx)!important;
+  font-size:1.58rem!important;
+  line-height:1.2!important;
+  letter-spacing:-.035em!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .xray-hero .xray-hero-description{
+  color:var(--mu)!important;
+  font-size:.88rem!important;line-height:1.45!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode > .xray-presets{
+  grid-column:2!important;
+  grid-row:1!important;
+  display:flex!important;align-items:center!important;
+  gap:.55rem!important;
+  margin:0!important;
+  justify-content:flex-end!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode :is(.xray-preset,.xray-import-btn){
+  min-height:2.7rem!important;
+  height:2.7rem!important;
+  padding:.45rem .8rem!important;
+  border-radius:var(--ui-control-radius)!important;
+  border:1px solid var(--ln)!important;
+  background:var(--s2)!important;
+  color:var(--tx)!important;
+  font-size:.85rem!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode :is(.xray-preset,.xray-import-btn):hover{
+  background:color-mix(in srgb,var(--a) 12%,var(--s2))!important;
+  border-color:color-mix(in srgb,var(--a) 58%,var(--ln))!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .xray-preset.on{
+  border-color:color-mix(in srgb,var(--a) 75%,var(--ln))!important;
+  background:color-mix(in srgb,var(--a) 14%,var(--s2))!important;
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--a) 11%,transparent)!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode > .xray-meta-grid{
+  grid-column:1/-1!important;
+  grid-row:2!important;
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  gap:.75rem!important;
+  padding:0!important;margin:0!important;
+  border:0!important;background:transparent!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode > .xray-meta-grid > .f{
+  padding:.9rem 1rem!important;
+  display:flex!important;flex-direction:column!important;
+  gap:.5rem!important;min-width:0!important;
+  border:1px solid var(--ln)!important;
+  border-radius:var(--ui-radius)!important;
+  background:var(--s1)!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode > .xray-meta-grid > .f[hidden]{
+  display:none!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .xray-meta-grid .f>span:first-child{
+  color:var(--tx)!important;
+  font-size:max(14px,.86rem)!important;
+  font-weight:700!important;
+  line-height:1.35!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-v5-input{
+  display:flex!important;align-items:center!important;
+  min-height:2.85rem!important;
+  width:100%!important;
+  border:1px solid var(--ln)!important;
+  border-radius:var(--ui-control-radius)!important;
+  background:var(--s2)!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-v5-input input{
+  height:2.8rem!important;min-height:2.8rem!important;
+  flex:1!important;min-width:0!important;
+  font-size:max(15px,.96rem)!important;
+  color:var(--tx)!important;
+  background:transparent!important;border:0!important;
+  padding:.4rem .7rem!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-v5-icon{
+  display:grid!important;place-items:center!important;
+  width:2.75rem;height:2.75rem;flex:0 0 2.75rem!important;
+  border-right:1px solid var(--ln)!important;
+  color:var(--mu)!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-v5-meta-hint{
+  font-size:max(12px,.77rem)!important;
+  color:var(--mu)!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode > .sr-inline-context,
+.xray-builder.studio-reference-v5.studio-inline.manual-mode > .xray-config-tabs{
+  display:none!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode > .xray-workspace-layout{
+  grid-column:1/-1!important;
+  grid-row:3!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr)!important;
+  gap:0!important;
+  height:clamp(34rem,calc(100dvh - 15rem),84rem)!important;
+  min-height:34rem!important;
+  width:100%!important;
+  margin:0!important;padding:0!important;
+  overflow:visible!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .xray-output-dock{
+  display:flex!important;flex-direction:column!important;
+  padding:1rem!important;
+  width:100%!important;
+  height:100%!important;
+  min-height:0!important;
+  gap:.85rem!important;
+  border:1px solid var(--ln)!important;
+  border-radius:var(--ui-radius)!important;
+  background:var(--s1)!important;
+  box-shadow:var(--shadow-card)!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .xray-output-workspace,
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .xray-output-pane#xpb-output-server{
+  width:100%!important;
+  height:100%!important;min-height:0!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .xray-custom-mode{
+  display:grid!important;
+  grid-template-rows:auto minmax(0,1fr) auto!important;
+  height:100%!important;min-height:0!important;
+  gap:.85rem!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .xray-custom-mode .xray-output-head{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  gap:.7rem!important;
+  padding:0 0 .85rem!important;
+  border-bottom:1px solid var(--ln)!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .xray-custom-mode .xray-output-head>div:first-child>b{
+  font-size:1.12rem!important;
+  color:var(--tx)!important;
+  line-height:1.3!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .xray-custom-mode .xray-output-head>div:first-child>small{
+  font-size:.83rem!important;
+  color:var(--mu)!important;
+  line-height:1.45!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .xray-custom-mode .xray-key-actions{
+  display:flex!important;
+  gap:.5rem!important;
+  flex-wrap:wrap!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .xray-custom-mode .xray-key-actions button{
+  min-height:2.5rem!important;
+  padding:.5rem .85rem!important;
+  border:1px solid var(--ln)!important;
+  border-radius:var(--ui-control-radius)!important;
+  background:var(--s2)!important;
+  color:var(--tx)!important;
+  font-size:.83rem!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .xray-custom-mode .xray-key-actions button:hover{
+  background:color-mix(in srgb,var(--a) 12%,var(--s2))!important;
+  border-color:color-mix(in srgb,var(--a) 55%,var(--ln))!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .xray-custom-code-view{
+  height:100%!important;
+  min-height:0!important;
+  border-radius:var(--ui-control-radius)!important;
+  border-color:var(--ln)!important;
+  background:var(--sr-code)!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode :is(#xpb-custom-json,#xpb-custom-syntax){
+  padding:1rem!important;
+  font: max(14px,.88rem)/1.6 "IBM Plex Mono",ui-monospace,monospace!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode #xpb-custom-error{
+  margin:0!important;
+  font-size:max(13px,.82rem)!important;
+  line-height:1.5!important;
+  border-radius:var(--ui-control-radius)!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode > .xray-footer{
+  grid-column:1/-1!important;
+  grid-row:4!important;
+  display:flex!important;
+  align-items:center!important;
+  padding:.85rem 1rem!important;
+  border:1px solid var(--ln)!important;
+  border-radius:var(--ui-radius)!important;
+  background:var(--s1)!important;
+  gap:.8rem!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode > .xray-footer .sr-v5-save-label{
+  margin-right:auto!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode > .xray-footer :is(#xpb-save,.sr-v5-reset){
+  min-height:2.7rem!important;
+  height:2.7rem!important;
+  font-size:.86rem!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode > .xray-footer #xpb-save{
+  background:var(--a)!important;
+  color:var(--btn-text)!important;
+  border-color:var(--a)!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode [hidden]{
+  display:none!important;
+}
+@media(max-width:1100px){
+  .xray-builder.studio-reference-v5.studio-inline.manual-mode{
+    grid-template-columns:minmax(0,1fr)!important;
+  }
+  .xray-builder.studio-reference-v5.studio-inline.manual-mode > .xray-hero,
+  .xray-builder.studio-reference-v5.studio-inline.manual-mode > .xray-presets{
+    grid-column:1!important;
+    grid-row:auto!important;
+  }
+  .xray-builder.studio-reference-v5.studio-inline.manual-mode > .xray-meta-grid{
+    grid-template-columns:minmax(0,1fr)!important;
+  }
+  .xray-builder.studio-reference-v5.studio-inline.manual-mode > .xray-workspace-layout{
+    grid-row:auto!important;
+  }
+  .xray-builder.studio-reference-v5.studio-inline.manual-mode > .xray-footer{
+    grid-row:auto!important;flex-wrap:wrap;
+  }
+}
+@media(max-width:700px){
+  .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog{
+    width:calc(100vw - 16px)!important;
+    max-width:calc(100vw - 16px)!important;
+    height:calc(100dvh - 16px)!important;
+    max-height:calc(100dvh - 16px)!important;
+    border-radius:12px!important;
+  }
+  .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .sr-dialog-shell{
+    padding:1rem!important;
+  }
+  .xray-builder.studio-reference-v5.studio-inline.manual-mode .xray-custom-mode .xray-output-head{
+    align-items:flex-start!important;
+  }
+  .xray-builder.studio-reference-v5.studio-inline.manual-mode > .xray-footer{
+    flex-direction:column;
+    align-items:stretch!important;
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog::backdrop{
+    -webkit-backdrop-filter:none!important;
+    backdrop-filter:none!important;
+  }
+}
