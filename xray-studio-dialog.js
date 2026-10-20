@@ -66,6 +66,16 @@
         returnFocus=button;
         active=key;
         dialog.dataset.activePanel=key;
+        // Fullscreen XHTTP is the advanced editor itself; show all XHTTP fields
+        // immediately instead of forcing a second nested "More settings" click.
+        if(key==='transport'&&root.querySelector('#xpb-network')?.value==='xhttp'){
+          const xhttp=root.querySelector('[data-xray-option-group="transport-xhttp"]');
+          if(xhttp){
+            xhttp.dataset.xhttpExpanded='true';
+            const toggle=xhttp.querySelector('.sr-xhttp-toggle');
+            if(toggle)toggle.setAttribute('aria-expanded','true');
+          }
+        }
         dialog.querySelector('#sr-studio-dialog-title').textContent=button.querySelector('strong').textContent;
         dialog.querySelector('#sr-studio-dialog-description').textContent=button.querySelector('small').textContent;
         const scroller=dialog.querySelector('.sr-dialog-scroll');
