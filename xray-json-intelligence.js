@@ -140,10 +140,10 @@ function analyze(source,data){
   if(!n)return;
   if(n.type!=='object'){add('error','TYPE_STREAM','streamSettings должен быть объектом.',n,path);return}
   wrongKeys(n,sets.stream,path);
-  const networkNode=prop(n,'network'), secNode=prop(n,'security');
+  const networkNode=prop(n,'method')||prop(n,'network'), secNode=prop(n,'security');
   const network=primitive(networkNode)||'raw', security=primitive(secNode)||'none';
   const canonical=networkAliases[network]||network;
-  if(networkNode&&typeof network!=='string')add('error','TYPE_NETWORK','network должен быть строкой.',networkNode,path.concat('network'));
+  if(networkNode&&typeof network!=='string')add('error','TYPE_NETWORK','method/network должен быть строкой.',networkNode,path.concat(networkNode===prop(n,'method')?'method':'network'));
   else if(deprecatedNetworks.includes(network))add('error','REMOVED_NETWORK','Транспорт '+network+' удалён из актуальных версий Xray-core. Обычно вместо него используют XHTTP.',networkNode,path.concat('network'));
   else if(!networks.includes(network))add('warning','UNKNOWN_NETWORK','Транспорт «'+network+'» не удалось сопоставить с известными вариантами Xray-core.',networkNode,path.concat('network'));
   if(secNode&&!['none','tls','reality'].includes(security))add('error','UNKNOWN_SECURITY','Поддерживаются значения security: none, tls и reality.',secNode,path.concat('security'));
@@ -183,21 +183,27 @@ function analyze(source,data){
      const old=primitive(route),fix={start:route.start,end:route.end,replacement:JSON.stringify('/'+old),label:'Добавить / перед path',confidence:'high'};
      add('warning','XHTTP_PATH','Путь XHTTP обычно начинается с символа «/».',route,xp.concat('path'),fix);
     }
-    const xmux=prop(xhttp,'xmux');
+    const extra=prop(xhttp,'extra');
+    if(extra&&extra.type!=='object')add('error','XHTTP_EXTRA_TYPE','extra внутри xhttpSettings должен быть объектом.',extra,xp.concat('extra'));
+    // Xray accepts advanced values in XHTTP extra; the editor generates
+    // its extended options here, not at the top level.
+    const advanced=extra?.type==='object'?extra:xhttp;
+    const ap=extra?.type==='object'?xp.concat('extra'):xp;
+    const xmux=prop(advanced,'xmux');
     if(xmux){
-     if(xmux.type!=='object')add('error','XMUX_TYPE','xmux должен быть объектом.',xmux,xp.concat('xmux'));
+     if(xmux.type!=='object')add('error','XMUX_TYPE','xmux должен быть объектом.',xmux,ap.concat('xmux'));
      else{
-      wrongKeys(xmux,sets.xmux,xp.concat('xmux'));
+      wrongKeys(xmux,sets.xmux,ap.concat('xmux'));
       const mx=prop(xmux,'maxConcurrency'), mc=prop(xmux,'maxConnections');
       const greaterThanZero=n=>{const x=primitive(n);return typeof x==='number'?x>0:typeof x==='string'?Number(x.split('-').at(-1))>0:false};
-      if(greaterThanZero(mx)&&greaterThanZero(mc))add('warning','XMUX_CONFLICT','maxConcurrency и maxConnections одновременно заданы положительными. Проверьте выбор стратегии xmux.',mc,xp.concat('xmux','maxConnections'));
+      if(greaterThanZero(mx)&&greaterThanZero(mc))add('warning','XMUX_CONFLICT','maxConcurrency и maxConnections одновременно заданы положительными. Проверьте выбор стратегии xmux.',mc,ap.concat('xmux','maxConnections'));
      }
     }
     for(const field of ['xPaddingBytes','scMaxEachPostBytes','scMinPostsIntervalMs','uplinkChunkSize','sessionIDLength','scStreamUpServerSecs']){
-     const val=prop(xhttp,field);if(!val)continue;
+     const val=prop(advanced,field)||prop(xhttp,field);if(!val)continue;
      const raw=primitive(val);
      if(!(typeof raw==='number'&&Number.isInteger(raw)&&raw>=0)&&!(typeof raw==='string'&&/^\d+(?:-\d+)?$/.test(raw)))
-      add('warning','XHTTP_RANGE','Для '+field+' ожидается неотрицательное число или диапазон, например «10-50».',val,xp.concat(field));
+      add('warning','XHTTP_RANGE','Для '+field+' ожидается неотрицательное число или диапазон, например «10-50».',val,ap.concat(field));
     }
    }
   }
