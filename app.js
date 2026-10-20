@@ -296,7 +296,7 @@ async function setP(){
 
 /* ================= ПАЛИТРА КОМАНД ================= */
 let PI=[],PX=0;
-function palette(){modal(`<div class="box" style="gap:.6rem"><label class="search" style="width:100%;cursor:text">${ic('search')}<input id="pq" placeholder="Страница, действие или пользователь" autocomplete="off" aria-label="Команда"></label><div id="pr" role="listbox"></div></div>`,'pal');pdraw('');setTimeout(()=>$('#pq').focus(),40)}
+function palette(){modal(`<div class="box palette-box" style="gap:.6rem"><div class="palette-search-wrap"><label class="search palette-search-field" style="cursor:text">${ic('search')}<input id="pq" placeholder="Поиск команд и страниц" autocomplete="off" aria-label="Поиск страницы, действия или пользователя"></label><span class="palette-search-hint">Введите название страницы, действие или пользователя</span></div><div id="pr" role="listbox"></div></div>`,'pal');pdraw('');setTimeout(()=>$('#pq').focus(),40)}
 function pdraw(q){q=q.toLowerCase();const go=k=>()=>{dlg.close();location.hash=k};
   PI=[...FLAT.map(([k,i,l])=>({i,l:'Перейти: '+l,r:go(k)})),{i:'plus',l:'Новый пользователь',r:()=>userNew()},{i:'plus',l:'Новый хост',r:()=>entForm('hosts')},{i:'plus',l:'Новый узел',r:()=>entForm('nodes')},{i:'plus',l:'Новый сквад',r:()=>entForm('squads')},{i:'sun',l:'Сменить тему',r:()=>{dlg.close();$('#theme').click()}},{i:'sliders',l:'Настроить внешний вид',r:go('set')}].filter(x=>x.l.toLowerCase().includes(q));
   if(q)PI.push(...DB.users.filter(u=>(u.username+u.tag+u.email+u.tg).toLowerCase().includes(q)).slice(0,6).map(u=>({i:'users',l:u.username,m:STM[st(u)][0],r:()=>userDrawer(u.id,'ov')})));PX=0;
