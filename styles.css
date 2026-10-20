@@ -2455,3 +2455,12 @@ nav a.on{background:var(--s2)!important;box-shadow:none!important}
   .xray-builder .xray-output-tabs button>b{font-size:.68rem}
   .xray-builder .xray-output-actions button{font-size:.63rem;padding:.35rem .42rem}
 }
+
+
+/* Remove the redundant wrapper heading in the protocol/client step and keep
+   generated-action buttons aligned with the compact field label height. */
+.xray-builder .xray-config-panel[data-xray-config-panel="client"]>.xray-section>.xray-section-heading{
+  display:none;
+}
+.xray-builder .xray-config-panel .xray-option-group-head small{display:none}
+.xray-builder .xray-config-panel .xray-field-action{padding:1.83rem 0 0}
