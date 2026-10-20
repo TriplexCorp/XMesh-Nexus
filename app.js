@@ -176,6 +176,53 @@ function systemPanel(s,error=''){
   </div><div class="sys-details"><div class="sys-detail-item"><span class="sys-detail-label">Средняя нагрузка</span><b>${[s.loadAverage?.one,s.loadAverage?.five,s.loadAverage?.fifteen].map(v=>v==null?'—':fmt(v,2)).join(' / ')}</b><small>1 · 5 · 15 минут</small></div><div class="sys-detail-item"><span class="sys-detail-label">База данных</span><b class="${dbOnline?'sys-ok':'sys-bad'}"><i></i>${dbOnline?'Подключена':'Нет соединения'}</b><small>PostgreSQL · проверка SELECT 1</small></div><div class="sys-detail-item"><span class="sys-detail-label">Последнее обновление</span><b>${sampled}</b><small>Автообновление каждые 15 секунд</small></div></div><p class="sys-note">${esc(s.scope||'Показатели зависят от ресурсов, доступных контейнеру панели.')} Диск показывает файловую систему, смонтированную в контейнер как /.</p></section>`;
 }
 
+
+/* ================= RX/TX HISTORY ================= */
+const trafficMbit=value=>Math.max(0,Number(value)||0)*8/1_000_000;
+const trafficRateLabel=value=>{
+  const mbps=trafficMbit(value);
+  if(mbps>=1000)return fmt(mbps/1000,2)+' Гбит/с';
+  if(mbps>=1)return fmt(mbps,2)+' Мбит/с';
+  if(mbps>=0.01)return fmt(mbps*1000,1)+' Кбит/с';
+  if(mbps===0)return '0 Мбит/с';
+  return fmt(mbps*1000,3)+' Кбит/с';
+};
+function trafficSummaryMarkup(payload){
+  const points=Array.isArray(payload?.points)?payload.points:[];
+  const latest=points[points.length-1];
+  const when=latest?.bucketMs?new Date(latest.bucketMs).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}):'—';
+  const rx=latest?trafficRateLabel(latest.rxBytesPerSec):'—';
+  const tx=latest?trafficRateLabel(latest.txBytesPerSec):'—';
+  const detail=latest?('Последний бакет · '+when):'Ожидание телеметрии';
+  return `<div class="traffic-kpi"><span><i class="traffic-dot rx"></i> RX · принято узлами</span><b>${rx}</b><small>${detail}</small></div><div class="traffic-kpi"><span><i class="traffic-dot tx"></i> TX · отправлено узлами</span><b>${tx}</b><small>${detail}</small></div>`;
+}
+function trafficChartMarkup(payload,range){
+  const points=Array.isArray(payload?.points)?payload.points:[];
+  if(!payload||!payload.sampleCount||!points.length){
+    return `<div class="traffic-empty"><span class="traffic-empty-icon">${ic('activity')}</span><b>Пока нет данных RX/TX</b><span>TimescaleDB готова хранить телеметрию, но отправитель метрик от узлов ещё не подключён. График появится после поступления реальных измерений — фиктивные значения не отображаются.</span>${DB.nodes.length?'<small>Выбранный период: '+(range==='1h'?'последний час':'последние 24 часа')+'. Проверьте выбранный узел или сквад.</small>':'<small>Сначала добавьте узлы в раздел «Узлы».</small>'}</div>`;
+  }
+  const width=960,height=292,left=66,right=22,top=18,bottom=44,plotW=width-left-right,plotH=height-top-bottom;
+  const rx=points.map(p=>trafficMbit(p.rxBytesPerSec)),tx=points.map(p=>trafficMbit(p.txBytesPerSec));
+  const peak=Math.max(0,...rx,...tx);
+  const max=peak>0?peak*1.12:1;
+  const x=i=>left+(points.length>1?i/(points.length-1):0.5)*plotW;
+  const y=v=>top+plotH-(v/max)*plotH;
+  const path=values=>values.map((v,i)=>(i?'L':'M')+' '+x(i).toFixed(2)+' '+y(v).toFixed(2)).join(' ');
+  const grid=[0,0.25,0.5,0.75,1].map(frac=>{
+    const yy=y(max*frac);
+    return `<line class="traffic-gridline" x1="${left}" x2="${width-right}" y1="${yy}" y2="${yy}"></line><text class="traffic-axis-label" x="${left-10}" y="${yy+4}" text-anchor="end">${fmt(max*frac,frac===0?0:2)}</text>`;
+  }).join('');
+  const axisLabels=[0,Math.floor((points.length-1)/2),points.length-1].filter((idx,i,arr)=>arr.indexOf(idx)===i).map(idx=>{
+    const d=new Date(points[idx].bucketMs);
+    const label=range==='24h'?d.toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+    return `<text class="traffic-axis-label" x="${x(idx)}" y="${height-13}" text-anchor="${idx===0?'start':idx===points.length-1?'end':'middle'}">${label}</text>`;
+  }).join('');
+  const latest=points[points.length-1];
+  const samples=Number(payload.sampleCount)||0;
+  const nodes=Number(latest?.nodeCount)||0;
+  return `<div class="traffic-chart-wrap"><svg class="traffic-chart-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="RX и TX в Мбит/с за ${range==='1h'?'последний час':'последние 24 часа'}">${grid}<path class="traffic-area rx" d="${path(rx)} L ${x(points.length-1)} ${top+plotH} L ${x(0)} ${top+plotH} Z"></path><path class="traffic-area tx" d="${path(tx)} L ${x(points.length-1)} ${top+plotH} L ${x(0)} ${top+plotH} Z"></path><path class="traffic-line rx" d="${path(rx)}"></path><path class="traffic-line tx" d="${path(tx)}"></path>${axisLabels}<text class="traffic-axis-title" x="14" y="${top+plotH/2}" transform="rotate(-90 14 ${top+plotH/2})" text-anchor="middle">Мбит/с</text></svg></div><div class="traffic-chart-meta"><span>${fmt(points.length)} временных интервалов · ${fmt(samples)} исходных измерений</span><span>Данные получены от ${fmt(nodes)} узл. в последнем интервале</span></div>`;
+}
+
 /* ================= ДАШБОРД ================= */
 const LV={};DB.nodes.forEach(n=>LV[n.id]={cpu:null,ram:null,mbps:null});
 let ST;
@@ -195,8 +242,48 @@ async function homeP(){
   const nodeRows=DB.nodes.length?DB.nodes.slice(0,6).map(n=>`<div class="rowi"><span class="fg" style="font-size:1.25rem">${flagView(n.flag)}</span><div><b>${esc(n.name)}</b><br><small class="mu">${esc(n.addr)}${n.port?':'+esc(n.port):''}</small></div>${chip(NS[nstat(n)]?.[0]||'Не проверен',NS[nstat(n)]?.[1]||'--mu')}</div>`).join(''):'<div class="empty"><b>Узлов пока нет</b><span>Добавьте первый сервер, чтобы начать настройку.</span><button class="btn sm" data-ne="nodes">'+ic('plus')+'Добавить узел</button></div>';
   const userRows=DB.users.length?DB.users.slice(0,6).map(u=>`<div class="rowi"><button class="who" data-uo="${u.id}"><span class="av" style="background:linear-gradient(135deg,var(--b),var(--a))">${esc((u.username||'?')[0].toUpperCase())}</span><span>${esc(u.username)}</span></button>${chip(STM[st(u)]?.[0]||st(u),'--mu')}</div>`).join(''):'<div class="empty"><b>Пользователей пока нет</b><span>Создайте сквад перед добавлением первого пользователя.</span><button class="gh sm" data-ne="squads">'+ic('plus')+'Создать сквад</button></div>';
   return [`<section class="card"><div class="hd"><div><p class="note">ОБЗОР</p><h3 style="font-size:1.35rem;margin-top:.2rem">${firstRun?'Панель готова к настройке':'Обзор инфраструктуры'}</h3><p>${firstRun?'Добавьте свои серверы и конфигурации. Демонстрационных пользователей, узлов и фиктивной телеметрии здесь нет.':'Сводка по объектам, которые вы добавили в панель.'}</p></div><div class="setting-control"><a class="gh sm" href="#set" style="text-decoration:none;color:inherit">${ic('sliders')}Внешний вид</a></div></div><div class="home-counts">${counts.map(([label,value])=>`<div class="home-count"><b>${value}</b><span>${label}</span></div>`).join('')}</div></section>
+  <section class="card traffic-card" id="traffic-card">
+    <div class="hd traffic-heading"><div><p class="note">TIMESCALEDB · TRAFFIC</p><h3>Трафик RX / TX</h3><p>Скорость входящего и исходящего трафика узлов во времени.</p></div><div class="traffic-period" role="group" aria-label="Период графика"><button type="button" data-traffic-range="1h" class="on" aria-pressed="true">1 час</button><button type="button" data-traffic-range="24h" aria-pressed="false">24 часа</button></div></div>
+    <div class="traffic-filters">
+      <label class="f"><span>Узел</span><select id="traffic-node" aria-label="Фильтр по узлу"><option value="">Все узлы</option>${DB.nodes.map(n=>`<option value="${n.id}">${esc(n.name)} · ${esc(n.addr)}</option>`).join('')}</select></label>
+      <label class="f"><span>Сквад</span><select id="traffic-squad" aria-label="Фильтр по скваду"><option value="">Все сквады</option>${DB.squads.map(q=>`<option value="${q.id}">${esc(q.name)}</option>`).join('')}</select></label>
+      <span class="traffic-refresh"><i></i> Автообновление · 60 сек</span>
+    </div>
+    <div class="traffic-kpis" id="traffic-kpis"><div class="traffic-kpi"><span>RX</span><b>—</b><small>Загрузка показаний…</small></div><div class="traffic-kpi"><span>TX</span><b>—</b><small>Загрузка показаний…</small></div></div>
+    <div id="traffic-chart" class="traffic-chart" aria-live="polite"><div class="traffic-empty"><b>Загрузка графика…</b></div></div>
+  </section>
   <div id="system-stats">${systemPanel(system,systemError)}</div>
-  ${firstRun?`<section class="card"><div class="hd"><div><h3>Первый запуск</h3><p>Создайте свои объекты — примеры не подставляются автоматически.</p></div></div><div class="setup-grid">${setupHtml}</div></section>`:`<div class="two"><section class="card"><div class="hd"><div><h3>Узлы</h3><p>${DB.nodes.length} настроено</p></div><button class="gh sm" data-ne="nodes">${ic('plus')}Добавить</button></div>${nodeRows}</section><section class="card"><div class="hd"><div><h3>Пользователи</h3><p>${DB.users.length} создано</p></div><a class="gh sm" href="#users" style="text-decoration:none;color:inherit">Все</a></div>${userRows}</section></div>`}`,()=>{const refreshSystem=async()=>{try{const latest=await api.systemStats();const target=$('#system-stats');if(target)target.innerHTML=systemPanel(latest)}catch(e){const target=$('#system-stats');if(target)target.innerHTML=systemPanel(null,e.message||'Не удалось обновить показатели.')}};const timer=setInterval(refreshSystem,15000);T.push(timer)}];
+  ${firstRun?`<section class="card"><div class="hd"><div><h3>Первый запуск</h3><p>Создайте свои объекты — примеры не подставляются автоматически.</p></div></div><div class="setup-grid">${setupHtml}</div></section>`:`<div class="two"><section class="card"><div class="hd"><div><h3>Узлы</h3><p>${DB.nodes.length} настроено</p></div><button class="gh sm" data-ne="nodes">${ic('plus')}Добавить</button></div>${nodeRows}</section><section class="card"><div class="hd"><div><h3>Пользователи</h3><p>${DB.users.length} создано</p></div><a class="gh sm" href="#users" style="text-decoration:none;color:inherit">Все</a></div>${userRows}</section></div>`}`,()=>{const refreshSystem=async()=>{try{const latest=await api.systemStats();const target=$('#system-stats');if(target)target.innerHTML=systemPanel(latest)}catch(e){const target=$('#system-stats');if(target)target.innerHTML=systemPanel(null,e.message||'Не удалось обновить показатели.')}};const timer=setInterval(refreshSystem,15000);T.push(timer);
+    let trafficRange='1h',trafficRequest=0;
+    const refreshTraffic=async()=>{
+      const chart=$('#traffic-chart'),kpis=$('#traffic-kpis');
+      if(!chart||!kpis)return;
+      const requestId=++trafficRequest;
+      chart.innerHTML='<div class="traffic-empty"><b>Обновляем телеметрию…</b></div>';
+      const params=new URLSearchParams({range:trafficRange});
+      if($('#traffic-node')?.value)params.set('node_id',$('#traffic-node').value);
+      if($('#traffic-squad')?.value)params.set('squad_id',$('#traffic-squad').value);
+      try{
+        const data=await backendRequest('/api/v1/metrics/traffic?'+params.toString());
+        if(requestId!==trafficRequest||!$('#traffic-chart'))return;
+        kpis.innerHTML=trafficSummaryMarkup(data);
+        chart.innerHTML=trafficChartMarkup(data,trafficRange);
+      }catch(error){
+        if(requestId!==trafficRequest||!$('#traffic-chart'))return;
+        kpis.innerHTML=trafficSummaryMarkup(null);
+        chart.innerHTML='<div class="traffic-empty"><b>Не удалось загрузить график</b><span>'+esc(error.message||'Ошибка API метрик')+'</span></div>';
+      }
+    };
+    $('[data-traffic-range]').forEach(button=>button.addEventListener('click',()=>{
+      trafficRange=button.dataset.trafficRange;
+      $('[data-traffic-range]').forEach(item=>{const active=item.dataset.trafficRange===trafficRange;item.classList.toggle('on',active);item.setAttribute('aria-pressed',active?'true':'false')});
+      refreshTraffic();
+    }));
+    $('#traffic-node')?.addEventListener('change',refreshTraffic);
+    $('#traffic-squad')?.addEventListener('change',refreshTraffic);
+    refreshTraffic();
+    T.push(setInterval(refreshTraffic,60000));
+  }];
 }
 /* ================= ПОЛЬЗОВАТЕЛИ ================= */
 const UQ={q:'',st:'all',sq:'',page:1,size:15,sort:'created',dir:'desc',sel:new Set()};let UIDS=[];
