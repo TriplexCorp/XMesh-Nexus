@@ -2196,7 +2196,7 @@ html[data-theme=light] .xray-builder select:not(.sr-native-select){color-scheme:
 .xray-builder.studio-reference-v5:not(.manual-mode) > .xray-config-tabs{
  display:none!important;
 }
-.xray-builder.studio-reference-v5:not(.manual-mode) .xray-context-bar{
+.xray-builder.studio-reference-v5:not(.manual-mode) .sr-inline-context{
  grid-column:1/-1!important;
  grid-row:3!important;
  display:flex!important;align-items:center;justify-content:space-between;
@@ -2277,7 +2277,7 @@ html[data-theme=light] .xray-builder select:not(.sr-native-select){color-scheme:
  }
 }
 @media(max-width:700px){
- .xray-builder.studio-reference-v5:not(.manual-mode) .xray-context-bar{
+ .xray-builder.studio-reference-v5:not(.manual-mode) .sr-inline-context{
   grid-row:auto!important;flex-direction:column;align-items:flex-start;
  }
  .xray-builder.studio-reference-v5:not(.manual-mode) .xray-config-content{
