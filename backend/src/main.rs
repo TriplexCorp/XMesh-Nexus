@@ -2,7 +2,7 @@ mod auth;
 mod core;
 
 use axum::{
-    extract::{Extension, Path, Request, State},
+    extract::{Extension, Path, Query, Request, State},
     http::{header, HeaderMap, HeaderName, HeaderValue, Method, StatusCode, Uri},
     middleware::{self, Next},
     response::{Html, IntoResponse, Redirect, Response},
@@ -69,6 +69,13 @@ struct CoreUpdateRequest {
     version: String,
 }
 
+#[derive(Debug, Deserialize)]
+struct TrafficMetricsQuery {
+    range: Option<String>,
+    node_id: Option<i64>,
+    squad_id: Option<i64>,
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
@@ -118,6 +125,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/settings", get(get_settings).patch(patch_settings))
         .route("/stats", get(get_stats))
         .route("/system/stats", get(get_system_stats))
+        .route("/metrics/traffic", get(get_traffic_metrics))
         .route("/collections/{collection}", get(list_records).post(create_record))
         .route("/collections/{collection}/{id}", patch(update_record).delete(delete_record))
         .route("/core", get(get_core_status))
@@ -548,6 +556,125 @@ async fn get_system_stats(State(state): State<AppState>) -> Json<Value> {
         "sampledAt": sampled_at,
         "scope": "Ресурсы, видимые контейнеру панели; диск — корневая файловая система контейнера"
     }))
+}
+
+async fn get_traffic_metrics(
+    State(state): State<AppState>,
+    Query(query): Query<TrafficMetricsQuery>,
+) -> Result<Json<Value>, ApiError> {
+    let (range, bucket_interval, range_interval, interval_seconds) =
+        match query.range.as_deref().unwrap_or("1h") {
+            "1h" => ("1h", "1 minute", "1 hour", 60_i64),
+            "24h" => ("24h", "15 minutes", "24 hours", 900_i64),
+            _ => return Err(ApiError::new(StatusCode::BAD_REQUEST, "Период должен быть 1h или 24h.")),
+        };
+
+    if query.node_id.is_some_and(|id| id <= 0) || query.squad_id.is_some_and(|id| id <= 0) {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "ID узла и сквада должны быть положительными числами."));
+    }
+
+    // Node identifiers in the hypertable are text versions of panel_records.id.
+    // A squad includes nodes whose assigned Xray profile has at least one inbound
+    // tag in common with that squad's inbound list.
+    let rows = sqlx::query(
+        "WITH selected_nodes AS (
+            SELECT n.id::text AS node_id
+            FROM panel_records n
+            LEFT JOIN panel_records p
+              ON p.collection = 'profiles'
+             AND p.id::text = n.data->>'profileId'
+            WHERE n.collection = 'nodes'
+              AND ($1::BIGINT IS NULL OR n.id = $1)
+              AND (
+                $2::BIGINT IS NULL
+                OR EXISTS (
+                    SELECT 1
+                    FROM panel_records sq
+                    WHERE sq.collection = 'squads'
+                      AND sq.id = $2
+                      AND EXISTS (
+                          SELECT 1
+                          FROM jsonb_array_elements_text(
+                              CASE
+                                WHEN jsonb_typeof(sq.data->'inb') = 'array' THEN sq.data->'inb'
+                                ELSE '[]'::jsonb
+                              END
+                          ) AS squad_tag(tag)
+                          WHERE EXISTS (
+                              SELECT 1
+                              FROM jsonb_array_elements(
+                                  CASE
+                                    WHEN p.data->>'config' IS NOT NULL
+                                      THEN COALESCE((p.data->>'config')::jsonb->'inbounds', '[]'::jsonb)
+                                    ELSE '[]'::jsonb
+                                  END
+                              ) AS profile_inbound(item)
+                              WHERE profile_inbound.item->>'tag' = squad_tag.tag
+                          )
+                      )
+                )
+              )
+        ),
+        per_node_bucket AS (
+            SELECT
+                time_bucket($3::interval, s.sampled_at) AS bucket,
+                s.node_id,
+                AVG(s.rx_bytes_per_sec) AS rx_bytes_per_sec,
+                AVG(s.tx_bytes_per_sec) AS tx_bytes_per_sec,
+                COUNT(*)::BIGINT AS sample_count
+            FROM server_metric_samples s
+            WHERE s.sampled_at >= NOW() - $4::interval
+              AND s.node_id IN (SELECT node_id FROM selected_nodes)
+            GROUP BY 1, 2
+        )
+        SELECT
+            (EXTRACT(EPOCH FROM bucket) * 1000)::BIGINT AS bucket_ms,
+            COALESCE(SUM(rx_bytes_per_sec), 0)::DOUBLE PRECISION AS rx_bytes_per_sec,
+            COALESCE(SUM(tx_bytes_per_sec), 0)::DOUBLE PRECISION AS tx_bytes_per_sec,
+            COUNT(DISTINCT node_id)::BIGINT AS node_count,
+            COALESCE(SUM(sample_count), 0)::BIGINT AS sample_count
+        FROM per_node_bucket
+        GROUP BY bucket
+        ORDER BY bucket ASC"
+    )
+    .bind(query.node_id)
+    .bind(query.squad_id)
+    .bind(bucket_interval)
+    .bind(range_interval)
+    .fetch_all(&state.pool)
+    .await?;
+
+    let mut points = Vec::with_capacity(rows.len());
+    let mut total_samples = 0_i64;
+    let mut latest_node_count = 0_i64;
+
+    for row in &rows {
+        let bucket_ms: i64 = row.try_get("bucket_ms")?;
+        let rx: f64 = row.try_get("rx_bytes_per_sec")?;
+        let tx: f64 = row.try_get("tx_bytes_per_sec")?;
+        let node_count: i64 = row.try_get("node_count")?;
+        let sample_count: i64 = row.try_get("sample_count")?;
+        total_samples = total_samples.saturating_add(sample_count);
+        latest_node_count = node_count;
+        points.push(json!({
+            "bucketMs": bucket_ms,
+            "rxBytesPerSec": rx,
+            "txBytesPerSec": tx,
+            "nodeCount": node_count,
+            "sampleCount": sample_count
+        }));
+    }
+
+    Ok(Json(json!({
+        "range": range,
+        "intervalSeconds": interval_seconds,
+        "nodeId": query.node_id,
+        "squadId": query.squad_id,
+        "dataSource": "server_metric_samples",
+        "sampleCount": total_samples,
+        "latestNodeCount": latest_node_count,
+        "points": points
+    })))
 }
 
 async fn read_cpu_ticks() -> Option<(u64, u64)> {
