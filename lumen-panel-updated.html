@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Lumen — панель Xray</title>
+<title>XMesh Nexus — Infrastructure Control</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -257,7 +257,7 @@ dialog.user-modal .sg{gap:.9rem}
 <body>
 <div class="app">
 <aside>
-  <div class="brand"><div class="logo" id="lg">L</div><b class="bt" id="bn">Lumen</b></div>
+  <div class="brand"><div class="logo" id="lg">X</div><b class="bt" id="bn">XMesh Nexus</b></div>
   <nav id="nav" aria-label="Разделы"></nav>
   <div class="core"><div class="ct"><span class="dot" id="cd" style="--c:var(--mu);animation:none"></span><div><b>Xray-core</b><small id="cs">API не подключён</small></div></div><button id="restart" aria-label="Перезапустить ядро"></button></div>
 </aside>
@@ -297,7 +297,7 @@ const defaultHooks={
 };
 const emptyDB=()=>({
   users:[],nodes:[],profiles:[],hosts:[],squads:[],tpls:[],subs:[],admins:[],tokens:[],srh:[],
-  set:{brand:'Lumen',domain:'',hooks:{...defaultHooks}}
+  set:{brand:'XMesh Nexus',domain:'',hooks:{...defaultHooks}}
 });
 let DB, legacyDemo=false;
 try{DB=JSON.parse(localStorage.getItem('lumenDB2')||'null')}catch(e){DB=null}
@@ -307,7 +307,7 @@ legacyDemo=!!(DB&&Array.isArray(DB.nodes)&&DB.nodes.some(n=>/\.example\.(net|com
 if(!DB||!Array.isArray(DB.users)||legacyDemo) DB=emptyDB();
 else {
   for(const k of ['users','nodes','profiles','hosts','squads','tpls','subs','admins','tokens','srh']) if(!Array.isArray(DB[k])) DB[k]=[];
-  DB.set={brand:'Lumen',domain:'',hooks:{...defaultHooks,...(DB.set?.hooks||{})},...(DB.set||{})};
+  DB.set={brand:'XMesh Nexus',domain:'',hooks:{...defaultHooks,...(DB.set?.hooks||{})},...(DB.set||{})};
   DB.set.hooks={...defaultHooks,...(DB.set?.hooks||{})};
 }
 let sv;const save=()=>{clearTimeout(sv);sv=setTimeout(()=>{try{localStorage.setItem('lumenDB2',JSON.stringify(DB))}catch(e){}},120)};
