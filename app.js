@@ -838,7 +838,7 @@ async function profilesP(){
    $('#xpb-client-preview').value=JSON.stringify(xrayClientSample(),null,2);
    renderJsonHighlight('xpb-preview','xpb-preview-syntax');
    renderJsonHighlight('xpb-client-preview','xpb-client-preview-syntax');
-  }catch(e){$('#xpb-preview').value='';$('#xpb-client-preview').value='';$('#xpb-error').textContent=e.message;const state=$('#xpb-output-state');if(state)state.textContent='Ошибка генерации'}};
+  }catch(e){$('#xpb-preview').value='';$('#xpb-client-preview').value='';renderJsonHighlight('xpb-preview','xpb-preview-syntax');renderJsonHighlight('xpb-client-preview','xpb-client-preview-syntax');$('#xpb-error').textContent=e.message;const state=$('#xpb-output-state');if(state)state.textContent='Ошибка генерации'}};
   const updateVisibility=()=>{
    let proto=$('#xpb-protocol').value,net=$('#xpb-network').value,sec=$('#xpb-security').value;
    const setGroup=(selector,show)=>{const d=$(selector);if(d)d.hidden=!show};
