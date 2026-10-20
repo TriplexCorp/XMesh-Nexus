@@ -601,6 +601,7 @@ async function profilesP(){
  const inp=(id,value,placeholder,extra)=>'<input id="xpb-'+id+'" value="'+(value||'')+'" placeholder="'+(placeholder||'')+'" '+(extra||'')+'>';
  const sel=(id,items)=>'<select id="xpb-'+id+'">'+options(items)+'</select>';
  const group=(title,desc,body,open)=>'<details class="xray-section"'+(open?' open':'')+'><summary><span><b>'+title+'</b><small>'+desc+'</small></span><span class="xray-chevron">⌄</span></summary><div class="xray-section-body">'+body+'</div></details>';
+ const optionGroup=(key,title,desc,body)=>'<section class="xray-option-group" data-xray-option-group="'+key+'"><div class="xray-option-group-head"><div><b>'+title+'</b><small>'+desc+'</small></div></div><div class="xray-option-grid">'+body+'</div></section>';
  const builderHtml='<section class="card xray-builder"><div class="xray-hero"><div><p class="note">XRAY CORE / CONFIGURATION STUDIO</p><h2>XRAY STUDIO</h2><p>Соберите inbound за пару шагов. Тонкие настройки не мешают, пока они не нужны.</p></div><span class="chip" style="--c:var(--a)">JSON BUILDER</span></div>'+
  '<div class="xray-presets"><span class="xray-label">РЕЖИМ РЕДАКТОРА</span><div class="xray-preset-row"><button type="button" class="xray-preset on" data-xray-mode="visual"><b>Конструктор</b><small>Протоколы и параметры</small></button><button type="button" class="xray-preset" data-xray-mode="custom"><b>Server JSON вручную</b><small>Полная конфигурация узла</small></button></div></div>'+
  '<div class="xray-workflow"><div><b>01 · Inbound</b><span>Протокол, порт и транспорт</span></div><div><b>02 · Защита</b><span>TLS, Reality или VLESS Encryption</span></div><div><b>03 · Проверка</b><span>Сверьте серверный и клиентский JSON перед сохранением</span></div></div>'+
@@ -636,29 +637,43 @@ async function profilesP(){
  field('tls-min','Минимальная версия',sel('tls-min',[['1.2','TLS 1.2'],['1.3','TLS 1.3']]))+
  field('tls-max','Максимальная версия',sel('tls-max',[['1.3','TLS 1.3'],['1.2','TLS 1.2']]))+
  '</div>',false)+
- group('Параметры транспорта','Поля меняются в зависимости от выбранного транспорта',
- '<div class="xray-main-grid">'+
+ group('Параметры транспорта','Настройки сгруппированы по типу транспорта; нерелевантные блоки скрываются автоматически',
+ optionGroup('transport-shared','Потоковые транспорты','Общие параметры RAW, WebSocket, XHTTP, gRPC и HTTPUpgrade',
  field('host','Host header',inp('host','','Необязательно'))+
  field('path','Path / service name',inp('path','/','/path или имя gRPC service'))+
  field('xhttp-mode','Режим XHTTP',sel('xhttp-mode',[['auto','auto'],['packet-up','packet-up'],['stream-up','stream-up'],['stream-one','stream-one']]))+
  field('xhttp-padding','XHTTP padding',inp('xhttp-padding','100-1000','Например, 100-1000'))+
  field('grpc-mode','Режим gRPC',sel('grpc-mode',[['gun','gun'],['multi','multi']]))+
  field('kcp-seed','mKCP seed',inp('kcp-seed','','Необязательно'))+
- field('raw-header','RAW header',sel('raw-header',[['none','Без заголовка'],['http','HTTP camouflage']]))+
- field('xdrive-service','XDrive · service',sel('xdrive-service',[['local','Local filesystem'],['google-drive','Google Drive'],['template','Custom HTTP template']]),'XDrive — специализированный транспорт. Для обычного туннеля выбирайте RAW/XHTTP/WebSocket/gRPC; XDrive требует VLESS Encryption и Mux.')+
- field('xdrive-folder','XDrive · remote folder',inp('xdrive-folder','/var/lib/xray/xdrive','Local path or remote folder ID'))+
- field('xdrive-secrets','XDrive · secrets','<textarea id="xpb-xdrive-secrets" rows="3" placeholder="One secret per line"></textarea>')+
- field('xdrive-segment-bytes','XDrive · segment bytes',inp('xdrive-segment-bytes','','0 = core default','type="number" min="0" max="67108864"'))+
- field('xdrive-flush-ms','XDrive · flush interval (ms)',inp('xdrive-flush-ms','','0 = core default','type="number" min="0" max="600000"'))+
- field('xdrive-poll-ms','XDrive · poll interval (ms)',inp('xdrive-poll-ms','','0 = core default','type="number" min="0" max="600000"'))+
- field('xdrive-max-poll-ms','XDrive · max poll interval (ms)',inp('xdrive-max-poll-ms','','0 = core default','type="number" min="0" max="600000"'))+
- field('xdrive-session-ttl','XDrive · session TTL (s)',inp('xdrive-session-ttl','','0 = core default','type="number" min="0" max="86400"'))+
- field('xdrive-concurrency','XDrive · concurrency',inp('xdrive-concurrency','','0 = core default','type="number" min="0" max="1024"'))+
- field('xdrive-eager-ms','XDrive · eager window (ms)',inp('xdrive-eager-ms','','0 = core default','type="number" min="0" max="600000"'))+
- field('xdrive-hole-ms','XDrive · hole timeout (ms)',inp('xdrive-hole-ms','','0 = core default','type="number" min="0" max="600000"'))+
- field('xdrive-mux-concurrency','XDrive · client mux concurrency',inp('xdrive-mux-concurrency','8','1–1024','type="number" min="1" max="1024"'))+
- field('xdrive-template','XDrive · template JSON','<textarea id="xpb-xdrive-template" rows="5" spellcheck="false" placeholder="{ }"></textarea>')+
- '</div>',false)+
+ field('raw-header','RAW header',sel('raw-header',[['none','Без заголовка'],['http','HTTP camouflage']])))+
+ optionGroup('transport-hysteria','Hysteria 2','Аутентификация, UDP и параметры masquerade',
+ field('hy-auth','Аутентификация Hysteria',inp('hy-auth','','Обычно UUID пользователя','autocomplete="off"'))+
+ field('hy-idle','UDP idle timeout',inp('hy-idle','60','Секунды','type="number" min="2" max="600"'))+
+ field('hy-masq-type','Тип masquerade',sel('hy-masq-type',[['','По умолчанию'],['string','Текст'],['file','Каталог файлов'],['proxy','Обратный proxy']]))+
+ field('hy-masq-dir','Каталог masquerade',inp('hy-masq-dir','','Путь к каталогу'))+
+ field('hy-masq-url','URL masquerade',inp('hy-masq-url','','https://example.com'))+
+ field('hy-masq-content','Содержимое masquerade',inp('hy-masq-content','','HTML / текст'))+
+ field('hy-masq-status','HTTP status',inp('hy-masq-status','200','100–599','type="number" min="100" max="599"')))+
+ optionGroup('transport-masque','MASQUE','Адрес назначения, маршрут и необязательная Basic Auth',
+ field('masque-host','MASQUE · host',inp('masque-host','','Host / domain'))+
+ field('masque-path','MASQUE · path',inp('masque-path','/masque','Path'))+
+ field('masque-user','Пользователь Basic Auth',inp('masque-user','','Необязательно'))+
+ field('masque-pass','Пароль Basic Auth',inp('masque-pass','','Необязательно','autocomplete="off"')))+
+ optionGroup('transport-xdrive','XDrive · storage и mux','Параметры удалённого хранилища и управления потоком; доступны только при выборе XDrive',
+ field('xdrive-service','Backend хранилища',sel('xdrive-service',[['local','Local filesystem'],['google-drive','Google Drive'],['template','Custom HTTP template']]))+
+ field('xdrive-folder','Папка / remote ID',inp('xdrive-folder','/var/lib/xray/xdrive','Local path or remote folder ID'))+
+ field('xdrive-secrets','Секреты интеграции','<textarea id="xpb-xdrive-secrets" rows="3" placeholder="Один секрет на строку"></textarea>')+
+ field('xdrive-segment-bytes','Размер сегмента · bytes',inp('xdrive-segment-bytes','','0 = core default','type="number" min="0" max="67108864"'))+
+ field('xdrive-flush-ms','Интервал flush · ms',inp('xdrive-flush-ms','','0 = core default','type="number" min="0" max="600000"'))+
+ field('xdrive-poll-ms','Интервал poll · ms',inp('xdrive-poll-ms','','0 = core default','type="number" min="0" max="600000"'))+
+ field('xdrive-max-poll-ms','Максимальный poll · ms',inp('xdrive-max-poll-ms','','0 = core default','type="number" min="0" max="600000"'))+
+ field('xdrive-session-ttl','Session TTL · seconds',inp('xdrive-session-ttl','','0 = core default','type="number" min="0" max="86400"'))+
+ field('xdrive-concurrency','Параллельные операции',inp('xdrive-concurrency','','0 = core default','type="number" min="0" max="1024"'))+
+ field('xdrive-eager-ms','Eager window · ms',inp('xdrive-eager-ms','','0 = core default','type="number" min="0" max="600000"'))+
+ field('xdrive-hole-ms','Hole timeout · ms',inp('xdrive-hole-ms','','0 = core default','type="number" min="0" max="600000"'))+
+ field('xdrive-mux-concurrency','Client mux concurrency',inp('xdrive-mux-concurrency','8','1–1024','type="number" min="1" max="1024"'))+
+ field('xdrive-template','HTTP template JSON','<textarea id="xpb-xdrive-template" rows="5" spellcheck="false" placeholder="{ }"></textarea>'))
+ ,false)+
  group('Постквантовая защита · VLESS Encryption','ML-KEM-768 — постквантовый вариант аутентификации; X25519 — классический. Сервер и клиент должны использовать парные значения.',
  '<div class="xray-pq-intro"><b>Сгенерировать согласованную пару через Xray-core</b><span>Используется штатная команда <code>xray vlessenc</code>; панель разбирает её текстовый вывод. Значения показываются только в авторизованной панели и попадут в профиль после сохранения.</span></div>'+
  '<div class="xray-main-grid">'+
@@ -669,48 +684,39 @@ async function profilesP(){
  field('vless-decryption','Сервер · settings.decryption',inp('vless-decryption','','Значение decryption из xray vlessenc','autocomplete="off"'))+
  field('vless-encryption','Клиент · users[0].encryption',inp('vless-encryption','','Парное значение encryption','autocomplete="off"'))+
  '</div><p class="note xray-inline-note">Важно: ML-KEM-768 — не отдельный транспорт и не uTLS fingerprint. Он выбирает постквантовый способ аутентификации в VLESS Encryption. Эфемерный обмен также использует гибрид ML-KEM-768/X25519.</p>',false)+
- group('Протокол и клиент','Flow, fingerprint, cipher и специальные параметры',
- '<div class="xray-main-grid">'+
- field('uuid','UUID клиента',inp('uuid','','Нажмите «Сгенерировать UUID»','autocomplete="off"'))+
+ group('Протокол и клиент','Учётные данные, параметры протоколов и системные опции',
+ optionGroup('client-identity','Идентификация и совместимость','Учётная запись, fingerprint и protocol-specific режимы',
+ field('uuid','UUID / credential клиента',inp('uuid','','Нажмите «Сгенерировать UUID»','autocomplete="off"'))+
  field('fingerprint','uTLS fingerprint · клиент','<select id="xpb-fingerprint"><optgroup label="Рекомендуемые">'+options(XRAY_FP_RECOMMENDED.map(x=>[x,x]))+'</optgroup><optgroup label="Современные профили">'+options(XRAY_FP_MODERN.map(x=>[x,x]))+'</optgroup><optgroup label="Дополнительные и legacy">'+options(XRAY_FP_OTHER.map(x=>[x,x]))+'</optgroup></select>')+
  field('flow','VLESS flow',sel('flow',[['','Без flow'],['xtls-rprx-vision','xtls-rprx-vision']]))+
- field('vmess-security','VMess cipher',sel('vmess-security',[['auto','auto'],['aes-128-gcm','aes-128-gcm'],['chacha20-poly1305','chacha20-poly1305'],['none','none']]))+
- field('ss-method','Shadowsocks method',sel('ss-method',[['chacha20-ietf-poly1305','chacha20-ietf-poly1305'],['chacha20-poly1305','chacha20-poly1305'],['xchacha20-poly1305','xchacha20-poly1305'],['aes-128-gcm','aes-128-gcm'],['aes-256-gcm','aes-256-gcm'],['2022-blake3-aes-128-gcm','2022-blake3-aes-128-gcm'],['2022-blake3-aes-256-gcm','2022-blake3-aes-256-gcm'],['2022-blake3-chacha20-poly1305','2022-blake3-chacha20-poly1305']]))+
+ field('vmess-security','VMess cipher',sel('vmess-security',[['auto','auto'],['aes-128-gcm','aes-128-gcm'],['chacha20-poly1305','chacha20-poly1305'],['none','none']])))+
+ optionGroup('client-shadowsocks','Shadowsocks','Метод шифрования и отдельные ключи сервера / пользователя',
+ field('ss-method','Метод шифрования',sel('ss-method',[['chacha20-ietf-poly1305','chacha20-ietf-poly1305'],['chacha20-poly1305','chacha20-poly1305'],['xchacha20-poly1305','xchacha20-poly1305'],['aes-128-gcm','aes-128-gcm'],['aes-256-gcm','aes-256-gcm'],['2022-blake3-aes-128-gcm','2022-blake3-aes-128-gcm'],['2022-blake3-aes-256-gcm','2022-blake3-aes-256-gcm'],['2022-blake3-chacha20-poly1305','2022-blake3-chacha20-poly1305']]))+
+ field('ss-password','Ключ / пароль сервера',inp('ss-password','','Сгенерируйте или введите ключ','autocomplete="off"'))+
+ field('ss-user-password','Ключ пользователя',inp('ss-user-password','','SS2022: Base64-ключ','autocomplete="off"')))+
+ optionGroup('client-local-proxy','SOCKS и Dokodemo-door','Авторизация и адрес локального назначения',
  field('socks-auth','SOCKS authentication',sel('socks-auth',[['noauth','Без авторизации'],['password','Логин / пароль']]))+
- field('doko-address','Dokodemo destination',inp('doko-address','127.0.0.1','127.0.0.1'))+
- field('doko-port','Dokodemo port',inp('doko-port','53','53','type="number" min="1" max="65535"'))+
- field('doko-network','Dokodemo network',sel('doko-network',[['tcp,udp','TCP + UDP'],['tcp','TCP'],['udp','UDP']]))+
- field('ss-password','Shadowsocks · server password',inp('ss-password','','Генерируется кнопкой ниже','autocomplete="off"'))+
- field('ss-user-password','Shadowsocks · user password',inp('ss-user-password','','Ключ пользователя; SS2022 — Base64','autocomplete="off"'))+
- field('wg-secret-key','WireGuard · private key сервера',inp('wg-secret-key','','Сгенерируйте через xray wg','autocomplete="off"'))+
- field('wg-address','WireGuard · адрес интерфейса',inp('wg-address','10.0.0.1/32','CIDR, через запятую'))+
- field('wg-public-key','WireGuard · public key клиента',inp('wg-public-key','','PublicKey из xray wg','autocomplete="off"'))+
- field('wg-pre-shared-key','WireGuard · pre-shared key',inp('wg-pre-shared-key','','Необязательно','autocomplete="off"'))+
- field('wg-allowed-ips','WireGuard · Allowed IPs',inp('wg-allowed-ips','0.0.0.0/0,::/0','CIDR через запятую'))+
- field('wg-keepalive','WireGuard · keepalive',inp('wg-keepalive','0','Секунды','type="number" min="0" max="65535"'))+
- field('wg-mtu','WireGuard · MTU',inp('wg-mtu','1420','1280–65535','type="number" min="1280" max="65535"'))+
- field('hy-auth','Hysteria · transport auth',inp('hy-auth','','Обычно UUID пользователя','autocomplete="off"'))+
- field('hy-idle','Hysteria · UDP idle timeout',inp('hy-idle','60','Секунды','type="number" min="2" max="600"'))+
- field('hy-masq-type','Hysteria · masquerade type',sel('hy-masq-type',[['','По умолчанию'],['string','Текст'],['file','Каталог файлов'],['proxy','Обратный proxy']]))+
- field('hy-masq-dir','Hysteria · masquerade directory',inp('hy-masq-dir','','Путь к каталогу'))+
- field('hy-masq-url','Hysteria · masquerade URL',inp('hy-masq-url','','https://example.com'))+
- field('hy-masq-content','Hysteria · masquerade content',inp('hy-masq-content','','HTML / текст'))+
- field('hy-masq-status','Hysteria · HTTP status',inp('hy-masq-status','200','100–599','type="number" min="100" max="599"'))+
- field('tun-name','TUN · interface name',inp('tun-name','','Пусто — имя выберет ядро'))+
- field('tun-desc','TUN · interface description',inp('tun-desc','Wintun','Для Windows'))+
- field('tun-mtu','TUN · MTU',inp('tun-mtu','1500','576–9000','type="number" min="576" max="9000"'))+
- field('tun-gateway','TUN · gateway',inp('tun-gateway','','CIDR через запятую'))+
- field('tun-dns','TUN · DNS',inp('tun-dns','','IP через запятую'))+
- field('tun-routes','TUN · system routes',inp('tun-routes','','Например, 0.0.0.0/0,::/0'))+
- field('masque-address','MASQUE · interface address',inp('masque-address','10.0.0.1/32','CIDR через запятую'))+
- field('masque-mtu','MASQUE · MTU',inp('masque-mtu','1400','1280–65535','type="number" min="1280" max="65535"'))+
- field('masque-host','MASQUE · host',inp('masque-host','','Host / domain'))+
- field('masque-path','MASQUE · path',inp('masque-path','/masque','Path'))+
- field('masque-user','MASQUE · basic auth user',inp('masque-user','','Необязательно'))+
- field('masque-pass','MASQUE · basic auth password',inp('masque-pass','','Необязательно','autocomplete="off"'))+
- field('loglevel','Log level',sel('loglevel',[['warning','warning'],['error','error'],['none','none'],['info','info'],['debug','debug']]))+
- '</div>',false)+
- '</div>'+
+ field('doko-address','Адрес назначения',inp('doko-address','127.0.0.1','127.0.0.1'))+
+ field('doko-port','Порт назначения',inp('doko-port','53','53','type="number" min="1" max="65535"'))+
+ field('doko-network','Сеть назначения',sel('doko-network',[['tcp,udp','TCP + UDP'],['tcp','TCP'],['udp','UDP']])))+
+ optionGroup('client-wireguard','WireGuard','Ключи peer, адреса, keepalive и MTU',
+ field('wg-secret-key','Private key сервера',inp('wg-secret-key','','Сгенерируйте через xray wg','autocomplete="off"'))+
+ field('wg-address','Адрес интерфейса',inp('wg-address','10.0.0.1/32','CIDR, через запятую'))+
+ field('wg-public-key','Public key клиента',inp('wg-public-key','','PublicKey из xray wg','autocomplete="off"'))+
+ field('wg-pre-shared-key','Pre-shared key',inp('wg-pre-shared-key','','Необязательно','autocomplete="off"'))+
+ field('wg-allowed-ips','Allowed IPs',inp('wg-allowed-ips','0.0.0.0/0,::/0','CIDR через запятую'))+
+ field('wg-keepalive','Keepalive · seconds',inp('wg-keepalive','0','0 = выключено','type="number" min="0" max="65535"'))+
+ field('wg-mtu','MTU',inp('wg-mtu','1420','1280–65535','type="number" min="1280" max="65535"')))+
+ optionGroup('client-tun','TUN interface','Имя интерфейса, IP-адреса, DNS и системные маршруты',
+ field('tun-name','Имя интерфейса',inp('tun-name','','Пусто — имя выберет ядро'))+
+ field('tun-desc','Описание интерфейса',inp('tun-desc','Wintun','Для Windows'))+
+ field('tun-mtu','MTU',inp('tun-mtu','1500','576–9000','type="number" min="576" max="9000"'))+
+ field('tun-gateway','Gateway',inp('tun-gateway','','CIDR через запятую'))+
+ field('tun-dns','DNS',inp('tun-dns','','IP через запятую'))+
+ field('tun-routes','Системные маршруты',inp('tun-routes','','Например, 0.0.0.0/0,::/0')))+
+ optionGroup('client-logging','Диагностика','Уровень детализации журнала',
+ field('loglevel','Уровень логирования',sel('loglevel',[['warning','warning'],['error','error'],['none','none'],['info','info'],['debug','debug']])))
+ ,false)+ '</div>'+
  '<div class="xray-key-actions" id="xpb-generator-actions"><button type="button" class="gh sm" id="xpb-generate-uuid">Сгенерировать UUID</button><button type="button" class="gh sm" id="xpb-generate-ss-password">Сгенерировать пароли Shadowsocks</button></div>'+
  '<section class="xray-output-workspace" aria-label="JSON-конфигурации">'+
  '<div class="xray-output-workspace-head"><div><p class="note">OUTPUT WORKSPACE</p><b>Конфигурации для сервера и клиента</b><small>Отдельные JSON-документы из общей модели параметров. Экспорт не применяет конфиг к работающему ядру.</small></div><span class="xray-output-state" id="xpb-output-state">Предпросмотр готов</span></div>'+
@@ -845,6 +851,10 @@ async function profilesP(){
     if(f.startsWith('hy-'))show=net==='hysteria';
     if(f.startsWith('masque-'))show=proto==='masque'||net==='masque';
     wrap.hidden=!show;
+   });
+   $('[data-xray-option-group]').forEach(section=>{
+    const visibleField=section.querySelector('.f:not([hidden])');
+    section.hidden=!visibleField;
    });
    $$('[data-xray-mode]').forEach(b=>b.classList.toggle('on',b.dataset.xrayMode===(customMode?'custom':'visual')));
   };
