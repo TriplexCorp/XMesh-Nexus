@@ -115,7 +115,12 @@ function field(f,v){
   if(t==='country'){
     const existing=COUNTRIES.find(c=>c.flag===v);
     const current=existing?existing.flag:(v||'');
-    i=`<div class="country-picker"><input class="country-search" type="search" data-country-search placeholder="Поиск страны…" aria-label="Поиск страны" autocomplete="off"><div class="country-selected">${flagView(current,'country-flag-preview')}<span data-country-label>${existing?esc(existing.name):current?esc(current+' Сохранённый флаг'):'Выберите страну…'}</span></div><select name="${f.k}" class="country-select" aria-label="Страна"><option value="">Выберите страну…</option>${current&&!existing?`<option value="${esc(current)}" selected>${esc(current)} Сохранённый флаг</option>`:''}${COUNTRIES.map(c=>`<option value="${c.flag}" data-country-name="${esc(c.name.toLocaleLowerCase('ru'))}" data-country-code="${c.code}"${c.flag===current?' selected':''}>${esc(c.name)} (${c.code})</option>`).join('')}</select><small class="country-hint">В списке ${COUNTRIES.length} стран и территорий. Флаг отображается как изображение, независимо от поддержки эмодзи в системе.</small></div>`;
+    i=\`<div class="country-picker">
+      <div class="country-search-wrap"><input class="country-search" type="search" data-country-search placeholder="Поиск по названию или коду…" aria-label="Поиск страны" autocomplete="off" aria-controls="country-options-\${f.k}" aria-expanded="false"><div class="country-options" id="country-options-\${f.k}" role="listbox" aria-label="Результаты поиска стран" hidden></div></div>
+      <div class="country-selected">\${flagView(current,'country-flag-preview')}<span data-country-label>\${existing?esc(existing.name):current?esc(current+' Сохранённый флаг'):'Выберите страну…'}</span></div>
+      <select name="\${f.k}" class="country-select" aria-label="Страна" tabindex="-1" aria-hidden="true"><option value="">Не выбрана</option>\${current&&!existing?\`<option value="\${esc(current)}" selected>\${esc(current)} Сохранённый флаг</option>\`:''}\${COUNTRIES.map(c=>\`<option value="\${c.flag}" data-country-name="\${esc(c.name.toLocaleLowerCase('ru'))}" data-country-code="\${c.code}"\${c.flag===current?' selected':''}>\${esc(c.name)} (\${c.code})</option>\`).join('')}</select>
+      <small class="country-hint">Поиск по названию страны или ISO-коду. \${COUNTRIES.length} стран и территорий.</small>
+    </div>\`
   }
   else if(t=='sel')i=`<select name="${f.k}">${opt(f.o).map(([a,b])=>`<option value="${esc(a)}"${a==v?' selected':''}>${esc(b)}</option>`).join('')}</select>`;
   else if(t=='multi')i=`<div class="ms">${opt(f.o).map(([a,b])=>`<label class="ck"><input type="checkbox" name="${f.k}" value="${esc(a)}"${(v||[]).map(String).includes(String(a))?' checked':''}><span>${esc(b)}</span></label>`).join('')||'<span class="mu">Нет вариантов</span>'}</div>`;
@@ -1205,8 +1210,71 @@ document.addEventListener('click',async e=>{
   else if(b=g('[data-go]')){dlg.close();location.hash=b.dataset.go}
   else if(g('#pal'))palette();
 });
-document.addEventListener('input',e=>{const search=e.target.closest('[data-country-search]');if(!search)return;const picker=search.closest('.country-picker');const q=search.value.trim().toLocaleLowerCase('ru');const select=picker.querySelector('select[name=flag]');const selected=select.value;for(const option of [...select.options]){if(!option.value)continue;const text=(option.textContent+' '+(option.dataset.countryName||'')+' '+(option.dataset.countryCode||'')).toLocaleLowerCase('ru');option.hidden=!!q&&!text.includes(q)&&option.value!==selected}});
-document.addEventListener('change',e=>{const select=e.target.closest('.country-picker select[name=flag]');if(!select)return;const picker=select.closest('.country-picker');const country=COUNTRIES.find(c=>c.flag===select.value);const preview=picker.querySelector('.country-selected');preview.innerHTML=flagView(select.value,'country-flag-preview')+`<span data-country-label>${country?esc(country.name):select.value?esc(select.value+' Сохранённый флаг'):'Выберите страну…'}</span>`;});
+function renderCountryOptions(picker, query=''){
+ const input=picker.querySelector('[data-country-search]'),select=picker.querySelector('select[name=flag]'),options=picker.querySelector('.country-options');
+ if(!input||!select||!options)return;
+ const q=String(query||'').trim().toLocaleLowerCase('ru');
+ const matches=COUNTRIES.filter(c=>(c.name+' '+c.code).toLocaleLowerCase('ru').includes(q));
+ const selected=select.value;
+ const custom=selected&&!COUNTRIES.some(c=>c.flag===selected)?selected:'';
+ const rows=[];
+ if(!q)rows.push('<button type="button" class="country-option country-option-clear" role="option" data-country-choice="" aria-selected="'+(!selected?'true':'false')+'"><span class="country-option-empty">∅</span><span class="country-option-copy"><b>Не выбрана</b><small>Очистить выбор страны</small></span></button>');
+ if(custom&&(!q||custom.toLocaleLowerCase('ru').includes(q)))rows.push('<button type="button" class="country-option" role="option" data-country-choice="'+esc(custom)+'" aria-selected="true">'+flagView(custom,'country-option-flag')+'<span class="country-option-copy"><b>'+esc(custom)+'</b><small>Сохранённое значение</small></span></button>');
+ rows.push(...matches.slice(0,100).map(c=>'<button type="button" class="country-option" role="option" data-country-choice="'+esc(c.flag)+'" data-country-code="'+c.code+'" aria-selected="'+(c.flag===selected?'true':'false')+'">'+flagView(c.flag,'country-option-flag')+'<span class="country-option-copy"><b>'+esc(c.name)+'</b><small>'+c.code+'</small></span>'+(c.flag===selected?'<span class="country-option-check">✓</span>':'')+'</button>'));
+ if(!rows.length)rows.push('<div class="country-no-results">Страна не найдена. Попробуйте другое название или ISO-код.</div>');
+ options.innerHTML=rows.join('');
+ options.hidden=false;
+ input.setAttribute('aria-expanded','true');
+}
+function closeCountryOptions(picker){
+ const input=picker?.querySelector('[data-country-search]'),options=picker?.querySelector('.country-options');
+ if(options)options.hidden=true;
+ if(input)input.setAttribute('aria-expanded','false');
+}
+document.addEventListener('focusin',e=>{
+ const input=e.target.closest('[data-country-search]');
+ if(!input)return;
+ renderCountryOptions(input.closest('.country-picker'),input.value);
+});
+document.addEventListener('input',e=>{
+ const input=e.target.closest('[data-country-search]');
+ if(!input)return;
+ renderCountryOptions(input.closest('.country-picker'),input.value);
+});
+document.addEventListener('keydown',e=>{
+ const input=e.target.closest('[data-country-search]');
+ if(!input)return;
+ const picker=input.closest('.country-picker'),options=picker?.querySelector('.country-options');
+ if(e.key==='Escape'){closeCountryOptions(picker);return}
+ if(e.key==='ArrowDown'&&options?.hidden){e.preventDefault();renderCountryOptions(picker,input.value)}
+ if(e.key==='Enter'&&options&&!options.hidden){
+  const first=options.querySelector('[data-country-choice]');
+  if(first){e.preventDefault();first.click()}
+ }
+});
+document.addEventListener('click',e=>{
+ const choice=e.target.closest('[data-country-choice]');
+ if(choice){
+  const picker=choice.closest('.country-picker');
+  const select=picker?.querySelector('select[name=flag]');
+  const input=picker?.querySelector('[data-country-search]');
+  if(!picker||!select)return;
+  select.value=choice.dataset.countryChoice||'';
+  if(input)input.value='';
+  select.dispatchEvent(new Event('change',{bubbles:true}));
+  closeCountryOptions(picker);
+  return;
+ }
+ if(!e.target.closest('.country-picker'))document.querySelectorAll('.country-picker').forEach(closeCountryOptions);
+});
+document.addEventListener('change',e=>{
+ const select=e.target.closest('.country-picker select[name=flag]');
+ if(!select)return;
+ const picker=select.closest('.country-picker');
+ const country=COUNTRIES.find(c=>c.flag===select.value);
+ const preview=picker.querySelector('.country-selected');
+ preview.innerHTML=flagView(select.value,'country-flag-preview')+\`<span data-country-label>\${country?esc(country.name):select.value?esc(select.value+' Сохранённый флаг'):'Выберите страну…'}</span>\`;
+});
 document.addEventListener('change',async e=>{const t=e.target;
   if(t.id==='custom-a'||t.id==='custom-b'){if(t.id==='custom-a')C.customA=t.value;else C.customB=t.value;C.accent='custom';if(t.id==='custom-a'){const rgb=t.value.match(/[0-9a-f]{2}/gi).map(v=>parseInt(v,16)/255);const max=Math.max(...rgb),min=Math.min(...rgb),d=max-min;let h=0,s=0,l=(max+min)/2;if(d){s=d/(1-Math.abs(2*l-1));if(max===rgb[0])h=60*(((rgb[1]-rgb[2])/d)%6);else if(max===rgb[1])h=60*((rgb[2]-rgb[0])/d+2);else h=60*((rgb[0]-rgb[1])/d+4);if(h<0)h+=360}C.hue=Math.round(h);C.sat=Math.round(s*100);C.lum=Math.round(l*100);if($('#hue'))$('#hue').value=C.hue;if($('#sat'))$('#sat').value=C.sat;if($('#lum'))$('#lum').value=C.lum;if($('#huev'))$('#huev').textContent=C.hue+'°';if($('#satv'))$('#satv').textContent=C.sat+'%';if($('#lumv'))$('#lumv').textContent=C.lum+'%'}apply();$('[data-ac]').forEach(x=>x.classList.toggle('on',x.dataset.ac==='custom'));return}
   if(t.dataset.tg){const [k,id]=t.dataset.tg.split(':');await api.update(k,id,{disabled:!t.checked});toast(t.checked?'Включено':'Отключено')}
