@@ -2633,3 +2633,240 @@ white-space:nowrap;
 .rail-tooltip[hidden]{display:none!important}
 #brand-panel{scroll-margin-top:1.5rem}
 @media(max-width:760px){.rail-tooltip{display:none!important}}
+
+/* User details overview — organized information hierarchy. */
+dialog.user-modal .box{gap:.95rem}
+dialog.user-modal .user-overview{display:grid;gap:.72rem;min-width:0}
+dialog.user-modal .user-usage-card{
+  display:grid;
+  gap:.55rem;
+  min-width:0;
+  padding:1rem 1.12rem;
+  border:1px solid var(--ln);
+  border-radius:.78rem;
+  background:var(--elevated);
+  box-shadow:inset 0 1px 0 var(--surface-highlight);
+}
+dialog.user-modal .user-usage-heading,
+dialog.user-modal .user-detail-title{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:.65rem;
+  min-width:0;
+}
+dialog.user-modal .user-detail-label{
+  display:inline-flex;
+  align-items:center;
+  gap:.42rem;
+  min-width:0;
+  color:var(--mu);
+  font-size:.76rem;
+  font-weight:720;
+  line-height:1.3;
+}
+dialog.user-modal .user-detail-label>.ic{width:.96rem;height:.96rem;flex:0 0 .96rem;color:var(--a)}
+dialog.user-modal .user-limit-label,
+dialog.user-modal .user-detail-kind{
+  display:inline-flex;
+  align-items:center;
+  flex:0 0 auto;
+  font-size:.69rem;
+  font-weight:650;
+  line-height:1.4;
+  color:var(--mu);
+}
+dialog.user-modal .user-limit-label{
+  padding:.17rem .48rem;
+  border:1px solid var(--ln);
+  border-radius:.45rem;
+  background:var(--s1);
+}
+dialog.user-modal .user-usage-amount{
+  display:flex;
+  align-items:baseline;
+  flex-wrap:wrap;
+  gap:.3rem .7rem;
+  min-width:0;
+}
+dialog.user-modal .user-usage-amount>strong{
+  color:var(--tx);
+  font-size:clamp(1.42rem,2.5vw,1.9rem);
+  font-weight:770;
+  letter-spacing:-.045em;
+  line-height:1.2;
+  font-variant-numeric:tabular-nums;
+}
+dialog.user-modal .user-usage-amount>span{font-size:.8rem;color:var(--mu);line-height:1.35}
+dialog.user-modal .user-usage-progress{margin-top:.12rem;height:.4rem;width:100%;background:var(--s2)}
+dialog.user-modal .user-usage-unlimited{font-size:.72rem;line-height:1.4;color:var(--mu)}
+dialog.user-modal .user-credential-grid{
+  display:grid;
+  grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);
+  align-items:stretch;
+  gap:.72rem;
+  min-width:0;
+}
+dialog.user-modal .user-detail-card{
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  gap:.7rem;
+  min-width:0;
+  padding:.95rem 1rem;
+  border:1px solid var(--ln);
+  border-radius:.78rem;
+  background:var(--elevated);
+  box-shadow:inset 0 1px 0 var(--surface-highlight);
+}
+dialog.user-modal .user-code-row{
+  display:flex;
+  align-items:center;
+  gap:.45rem;
+  min-width:0;
+  margin-top:.05rem;
+}
+dialog.user-modal .user-code-row>code{
+  display:block;
+  flex:1 1 auto;
+  min-width:0;
+  padding:.53rem .65rem;
+  border:1px solid var(--ln);
+  border-radius:.5rem;
+  background:var(--s1);
+  color:var(--tx);
+  font:.78rem/1.4 "IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  letter-spacing:-.012em;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+  white-space:normal;
+  user-select:all;
+}
+dialog.user-modal .user-copy-button{
+  flex:0 0 auto;
+  display:inline-flex;
+  align-items:center;
+  gap:.38rem;
+  min-height:2.3rem;
+  height:2.3rem;
+  padding:0 .64rem;
+  border-radius:.52rem;
+  font-size:.74rem;
+  font-weight:680;
+}
+dialog.user-modal .user-copy-button .ic{width:.91rem;height:.91rem}
+dialog.user-modal .user-detail-card>small{
+  display:block;
+  color:var(--mu);
+  font-size:.72rem;
+  line-height:1.4;
+  overflow-wrap:anywhere;
+}
+dialog.user-modal .user-overview-notice{
+  display:flex;
+  align-items:flex-start;
+  gap:.62rem;
+  min-width:0;
+  margin:0;
+  padding:.58rem .72rem;
+  border:1px solid color-mix(in srgb,var(--a) 12%,var(--ln));
+  border-radius:.64rem;
+  background:color-mix(in srgb,var(--a) 4%,var(--s1));
+  color:var(--mu);
+  font-size:.73rem;
+  line-height:1.5;
+}
+dialog.user-modal .user-overview-notice .ic{
+  width:.97rem;
+  height:.97rem;
+  flex:0 0 .97rem;
+  margin-top:.05rem;
+  color:var(--a);
+}
+dialog.user-modal .user-overview-notice span{min-width:0;overflow-wrap:anywhere}
+dialog.user-modal .user-edit-details{
+  min-width:0;
+  border:1px solid var(--ln);
+  border-radius:.76rem;
+  background:var(--s1);
+  overflow:hidden;
+}
+dialog.user-modal .user-edit-details>summary{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:.7rem;
+  min-height:3.7rem;
+  padding:.72rem .98rem;
+  cursor:pointer;
+  list-style:none;
+  background:var(--elevated);
+  transition:background .16s;
+}
+dialog.user-modal .user-edit-details>summary::-webkit-details-marker{display:none}
+dialog.user-modal .user-edit-details>summary:hover{background:color-mix(in srgb,var(--a) 5%,var(--elevated))}
+dialog.user-modal .user-edit-details>summary:focus-visible{outline:2px solid var(--a);outline-offset:-2px}
+dialog.user-modal .user-edit-trigger{display:flex;align-items:center;gap:.65rem;min-width:0}
+dialog.user-modal .user-edit-trigger>.ic{
+  flex:0 0 1.95rem;
+  width:1.95rem;
+  height:1.95rem;
+  padding:.48rem;
+  border:1px solid var(--ln);
+  border-radius:.54rem;
+  background:var(--s1);
+  color:var(--a);
+}
+dialog.user-modal .user-edit-trigger>span{display:grid;gap:.19rem;min-width:0}
+dialog.user-modal .user-edit-trigger b{color:var(--tx);font-size:.83rem;font-weight:700;line-height:1.3}
+dialog.user-modal .user-edit-trigger small{color:var(--mu);font-size:.72rem;line-height:1.35}
+dialog.user-modal .user-edit-details>summary>.ic{
+  width:1rem;
+  height:1rem;
+  flex:0 0 1rem;
+  color:var(--mu);
+  transition:transform .16s;
+}
+dialog.user-modal .user-edit-details[open]>summary>.ic{transform:rotate(90deg)}
+dialog.user-modal .user-edit-content{padding:1rem;border-top:1px solid var(--ln)}
+dialog.user-modal .user-edit-form{gap:1rem}
+dialog.user-modal .user-edit-form>.r2{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:.8rem;
+  padding:0;
+  border:0;
+  align-items:start;
+}
+dialog.user-modal .user-edit-form>.user-edit-actions{
+  display:flex;
+  justify-content:flex-end;
+  padding:.85rem 0 0;
+  border-top:1px solid var(--ln);
+}
+dialog.user-modal .user-edit-form>.user-edit-actions .btn{width:auto;min-width:10rem}
+dialog.user-modal .user-edit-form>#fe:empty{display:none}
+dialog.user-modal .user-overview-meta{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:.35rem 1rem;
+  flex-wrap:wrap;
+  padding:.12rem .05rem 0;
+  color:var(--mu);
+  font-size:.7rem;
+  line-height:1.45;
+}
+@media(max-width:690px){
+  dialog.user-modal .user-credential-grid{grid-template-columns:minmax(0,1fr)}
+  dialog.user-modal .user-edit-form>.r2{grid-template-columns:minmax(0,1fr)}
+}
+@media(max-width:430px){
+  dialog.user-modal .user-usage-card,
+  dialog.user-modal .user-detail-card{padding:.84rem}
+  dialog.user-modal .user-code-row{align-items:stretch;flex-wrap:wrap}
+  dialog.user-modal .user-code-row>code{flex:1 1 100%}
+  dialog.user-modal .user-copy-button{width:100%;justify-content:center}
+  dialog.user-modal .user-edit-content{padding:.78rem}
+  dialog.user-modal .user-edit-form>.user-edit-actions .btn{width:100%}
+}
