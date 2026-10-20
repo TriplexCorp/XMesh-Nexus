@@ -851,6 +851,8 @@ async function profilesP(){
     if(f.startsWith('masque-'))show=proto==='masque'||net==='masque';
     wrap.hidden=!show;
    });
+   const uuidAction=$('#xpb-generate-uuid')?.closest('.xray-field-action');
+   if(uuidAction)uuidAction.hidden=!['vless','vmess','trojan'].includes(proto);
    const pqGroup=$('.xray-section:has(#xpb-vlessenc-mode)');
    if(pqGroup){
     pqGroup.hidden=proto!=='vless';
@@ -865,6 +867,7 @@ async function profilesP(){
    if(protoGroup)protoGroup.querySelectorAll('[id^="xpb-"]').forEach(el=>{
     const f=el.id.replace('xpb-',''),wrap=el.closest('.f');if(!wrap)return;
     let show=true;
+    if(f==='uuid')show=['vless','vmess','trojan'].includes(proto);
     if(f==='fingerprint')show=sec!=='none'&&['vless','vmess','trojan'].includes(proto)&&net!=='masque';
     if(f==='flow')show=proto==='vless'&&net!=='xdrive';
     if(f==='vmess-security')show=proto==='vmess';
@@ -915,29 +918,29 @@ async function profilesP(){
    const panel=$('[data-xray-config-panel="'+key+'"]');
    if(!button||button.hidden||!panel)return;
    activeConfigTab=key;
-   $('[data-xray-config-tab]').forEach(item=>{
+   $$('[data-xray-config-tab]').forEach(item=>{
     const active=item.dataset.xrayConfigTab===key;
     item.classList.toggle('on',active);
     item.setAttribute('aria-selected',active?'true':'false');
     item.tabIndex=active?0:-1;
    });
-   $('[data-xray-config-panel]').forEach(item=>{item.hidden=item.dataset.xrayConfigPanel!==key});
+   $$('[data-xray-config-panel]').forEach(item=>{item.hidden=item.dataset.xrayConfigPanel!==key});
   };
   const syncConfigTabs=()=>{
-   $('[data-xray-config-panel]').forEach(panel=>{
+   $$('[data-xray-config-panel]').forEach(panel=>{
     if(panel.dataset.xrayConfigPanel==='basic')return;
-    const sections=$('.xray-section',panel);
+    const sections=$$('.xray-section',panel);
     const visible=sections.some(section=>!section.hidden);
     const button=$('[data-xray-config-tab="'+panel.dataset.xrayConfigPanel+'"]');
     if(button)button.hidden=!visible;
    });
    const active=$('[data-xray-config-tab="'+activeConfigTab+'"]');
    if(!active||active.hidden){
-    const first=$('[data-xray-config-tab]').find(button=>!button.hidden);
+    const first=$$('[data-xray-config-tab]').find(button=>!button.hidden);
     if(first)setConfigTab(first.dataset.xrayConfigTab);
    }else setConfigTab(activeConfigTab);
   };
-  $('[data-xray-config-tab]').forEach(button=>button.addEventListener('click',()=>setConfigTab(button.dataset.xrayConfigTab)));
+  $$('[data-xray-config-tab]').forEach(button=>button.addEventListener('click',()=>setConfigTab(button.dataset.xrayConfigTab)));
   setConfigTab('basic');
   const validateCustomJson=()=>{
    const status=$('#xpb-custom-error');
