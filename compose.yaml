@@ -1,0 +1,55 @@
+name: xmesh-nexus
+
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: xmesh
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run ./install.sh first}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Run ./install.sh first}
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./deploy/postgres/10-create-app-user.sh:/docker-entrypoint-initdb.d/10-create-app-user.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d xmesh"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+  panel:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      APP_ADDR: 0.0.0.0:8080
+      STATIC_DIR: /app/static
+      CORE_DATA_DIR: /var/lib/xmesh/core
+      DATABASE_URL: postgresql://xmesh_app:${APP_DB_PASSWORD:?Run ./install.sh first}@db:5432/xmesh
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Run ./install.sh first}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      RUST_LOG: info,tower_http=info,sqlx=warn
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-8080}:8080"
+    volumes:
+      - core_data:/var/lib/xmesh
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  core_data:

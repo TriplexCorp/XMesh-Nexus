@@ -35,7 +35,18 @@ else {
   DB.set={brand:'XMesh Nexus',domain:'',hooks:{...defaultHooks,...(DB.set?.hooks||{})},...(DB.set||{})};
   DB.set.hooks={...defaultHooks,...(DB.set?.hooks||{})};
 }
-let sv;const save=()=>{clearTimeout(sv);sv=setTimeout(()=>{try{localStorage.setItem('xmeshNexusDB',JSON.stringify(DB))}catch(e){}},120)};
+let sv,backendReady=false;const save=()=>{if(backendReady)return;clearTimeout(sv);sv=setTimeout(()=>{try{localStorage.setItem('xmeshNexusDB',JSON.stringify(DB))}catch(e){}},120)};
+async function backendRequest(path,options={}){
+  const headers={...(options.headers||{})};
+  if(options.body&&!headers['Content-Type']&&!headers['content-type'])headers['Content-Type']='application/json';
+  let response;
+  try{response=await fetch(path,{...options,headers,credentials:'same-origin',cache:'no-store'})}
+  catch(e){throw new Error('Не удалось связаться с backend API. Проверьте контейнеры Docker.')}
+  const payload=await response.json().catch(()=>({}));
+  if(response.status===401&&backendReady){backendReady=false;showAuthGate('Сессия завершена. Войдите снова.')}
+  if(!response.ok)throw new Error(payload.error||'Ошибка backend API ('+response.status+').');
+  return payload;
+}
 if(legacyDemo){try{localStorage.removeItem('xmeshNexusDB');localStorage.setItem('xmeshNexusDB',JSON.stringify(DB))}catch(e){}}
 const lat=()=>Promise.resolve();
 const st=u=>u.disabled?'DISABLED':u.hold?'ON_HOLD':(u.limit&&u.used>=u.limit)?'LIMITED':(u.expireAt&&u.expireAt<Date.now())?'EXPIRED':'ACTIVE';
@@ -45,15 +56,13 @@ const tags=()=>DB.profiles.flatMap(p=>inbs(p).map(i=>i.tag));
 const tcol=t=>({vless:'--a',trojan:'--c3',shadowsocks:'--c4'}[DB.profiles.flatMap(inbs).find(x=>x.tag==t)?.protocol]||'--b');
 const uin=u=>[...new Set(DB.squads.filter(s=>u.squads.includes(s.id)).flatMap(s=>s.inb))];
 const api={
-  async list(c,o={}){await lat();let a=DB[c];if(o.f)a=a.filter(o.f);if(o.sort){const k=o.sort,d=o.dir=='desc'?-1:1,v=x=>k=='status'?st(x):x[k];a=[...a].sort((x,y)=>(v(x)>v(y)?1:v(x)<v(y)?-1:0)*d)}const ids=a.map(x=>x.id),total=a.length;if(o.size)a=a.slice((o.page-1)*o.size,o.page*o.size);return{items:a,total,ids}},
-  async create(c,o){await lat();o.id=DB[c].reduce((m,x)=>Math.max(m,x.id),0)+1;DB[c].push(o);save();return o},
-  async update(c,id,p){await lat();const x=DB[c].find(y=>y.id==id);Object.assign(x,p);save();return x},
-  async remove(c,id){await lat();const i=DB[c].findIndex(y=>y.id==id),[x]=DB[c].splice(i,1);save();return x},
-  async bulk(c,ids,fn){await lat();DB[c].filter(x=>ids.has(x.id)).forEach(fn);save()},
-  async stats(){await lat();const U=DB.users,by={};U.forEach(u=>{const status=st(u);by[status]=(by[status]||0)+1});
-    const on=U.filter(isOn),live=DB.nodes.filter(n=>n.state==='ONLINE'&&!n.disabled),nodeOn={};
-    live.forEach(n=>nodeOn[n.id]=0);
-    return{by,total:U.length,online:on.length,conn:null,nodeOn,nOn:live.length,nAll:DB.nodes.length};}
+  async list(c,o={}){await lat();let a=DB[c]||[];if(o.f)a=a.filter(o.f);if(o.sort){const k=o.sort,d=o.dir=='desc'?-1:1,v=x=>k=='status'?st(x):x[k];a=[...a].sort((x,y)=>(v(x)>v(y)?1:v(x)<v(y)?-1:0)*d)}const ids=a.map(x=>x.id),total=a.length;if(o.size)a=a.slice((o.page-1)*o.size,o.page*o.size);return{items:a,total,ids}},
+  async create(c,o){await lat();let row;if(backendReady){row=await backendRequest('/api/v1/collections/'+encodeURIComponent(c),{method:'POST',body:JSON.stringify(o)})}else{o.id=DB[c].reduce((m,x)=>Math.max(m,x.id),0)+1;row=o}DB[c].push(row);save();return row},
+  async update(c,id,p){await lat();const x=DB[c].find(y=>y.id==id);if(!x)throw new Error('Запись не найдена в локальном кеше.');const row=backendReady?await backendRequest('/api/v1/collections/'+encodeURIComponent(c)+'/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify(p)}):{...x,...p};Object.assign(x,row);save();return x},
+  async remove(c,id){await lat();const i=DB[c].findIndex(x=>x.id==id);if(i<0)return null;const old=DB[c][i];if(backendReady)await backendRequest('/api/v1/collections/'+encodeURIComponent(c)+'/'+encodeURIComponent(id),{method:'DELETE'});DB[c].splice(i,1);save();return old},
+  async bulk(c,ids,fn){await lat();for(const x of [...(DB[c]||[])].filter(item=>ids.has(item.id))){fn(x);await this.update(c,x.id,{...x})}save()},
+  async saveSettings(patch){const saved=await backendRequest('/api/v1/settings',{method:'PATCH',body:JSON.stringify(patch)});DB.set={...DB.set,...saved,hooks:{...DB.set.hooks,...(saved.hooks||{})}};return DB.set},
+  async stats(){await lat();const U=DB.users,by={};U.forEach(u=>{const status=st(u);by[status]=(by[status]||0)+1});const on=U.filter(isOn),live=DB.nodes.filter(n=>n.state==='ONLINE'&&!n.disabled),nodeOn={};live.forEach(n=>nodeOn[n.id]=0);return{by,total:U.length,online:on.length,conn:null,nodeOn,nOn:live.length,nAll:DB.nodes.length};}
 };
 
 /* ================= МЕТАДАННЫЕ ================= */
@@ -269,6 +278,9 @@ async function setP(){
   ];
   const choices=(key,items)=>`<div class="seg choice" role="group" aria-label="${key}">${items.map(([v,l])=>`<button type="button" data-ui="${key}" data-value="${v}" class="${(C[key]||CDEFAULT[key])==v?'on':''}">${l}</button>`).join('')}</div>`;
   const tk=await crudCard('tokens');
+  let coreView={desired_version:'latest',installed_version:null,latest_version:null,status:'unknown',progress:null,last_error:null,architecture:'unknown'};
+  try{coreView=await backendRequest('/api/v1/core')}catch(e){coreView.last_error=e.message}
+  const coreLabel=coreView.status=='updating'?'Обновляется':coreView.status=='ready'?'Установлено':coreView.status=='error'?'Ошибка':'Не установлено';
   return [`<div class="appearance-grid">
     <section class="card sg"><div><h3>Цвет и тема</h3><small>Основная палитра интерфейса и брендовые акценты</small></div>
       <div class="setting-row"><div class="setting-copy"><b>Тема</b><small>Автоматически — по настройкам ОС</small></div><div class="setting-control"><div class="seg choice" id="th">${[['dark','Тёмная'],['light','Светлая'],['auto','Авто']].map(([k,l])=>`<button type="button" data-th="${k}" class="${C.theme==k?'on':''}">${l}</button>`).join('')}</div></div></div>
@@ -291,7 +303,13 @@ async function setP(){
   </div>
   <div class="card"><div class="hd"><div><h3>Бренд и домен</h3><p>Имя в меню и домен в ссылках подписки</p></div></div><form data-k="brand" method="dialog" class="sg" style="gap:1rem"><div class="r2" style="display:grid;border:0;padding:0">${field({k:'brand',l:'Название панели',req:1},DB.set.brand)}${field({k:'domain',l:'Домен панели',req:1,ph:'panel.example.com'},DB.set.domain)}</div><div style="border:0;padding:0"><button class="btn">Сохранить</button></div></form></div>
   <div class="card"><div class="hd"><div><h3>Вебхуки</h3><p>События, о которых панель сообщает во внешние сервисы</p></div></div>${Object.entries(DB.set.hooks).map(([k,v])=>`<div class="rowi"><div>${k}</div><label class="sw"><input type="checkbox" data-hk="${k}" ${v?'checked':''} aria-label="${k}"><span></span></label></div>`).join('')}</div>${tk}
-  <div class="card"><div class="hd"><div><h3>Данные панели</h3><p>В этой HTML-версии изменения сохраняются локально в браузере. Экспортируйте JSON перед переносом настроек.</p></div><button class="gh" id="gx">${ic('dl')}Скачать резервную копию</button></div><p class="note">Для реального управления Xray, получения телеметрии и рабочих ссылок подписки потребуется подключить backend/API.</p></div>`]
+  <div class="card" id="core-panel"><div class="hd"><div><h3>Xray-core</h3><p>Установка и обновление бинарника ядра на сервере панели</p></div><span class="chip" id="core-state">${esc(coreLabel)}</span></div>
+    <div class="setting-row"><div class="setting-copy"><b>Установленная версия</b><small id="core-installed">${coreView.installed_version?esc(coreView.installed_version):'Ещё не установлена'}</small></div><div class="setting-copy"><b>Архитектура</b><small id="core-architecture">${esc(coreView.architecture||'—')}</small></div></div>
+    <div class="sg" style="gap:.6rem"><label class="f"><span>Версия для установки</span><input id="core-target" value="${esc(coreView.desired_version||'latest')}" placeholder="latest или v26.10.10" autocomplete="off"><small>Значение latest выбирает самый свежий опубликованный релиз GitHub. По умолчанию используется latest.</small></label></div>
+    <div class="act"><button class="gh" type="button" data-core-refresh>Проверить статус</button><button class="btn" type="button" data-core-update>Установить / обновить</button></div>
+    <div class="history-placeholder" id="core-message">${esc(coreView.last_error||coreView.progress||'Обновление ядра выполняется отдельно от запуска VPN-трафика.')}</div>
+  </div>
+  <div class="card"><div class="hd"><div><h3>Данные панели</h3><p>Настройки и записи хранятся в PostgreSQL. Экспортируйте JSON перед переносом или резервным копированием.</p></div><button class="gh" id="gx">${ic('dl')}Скачать резервную копию</button></div><p class="note">На этом этапе панель и backend управляют данными и бинарником Xray-core. Запуск VPN-трафика и управление удалёнными узлами пока не подключены.</p></div>`]
 }
 
 /* ================= ПАЛИТРА КОМАНД ================= */
@@ -346,6 +364,8 @@ document.addEventListener('click',async e=>{
   else if(g('#rs')){C={...CDEFAULT};apply();render(1);toast('Оформление сброшено')}
   else if(g('#gx')){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(DB,null,2)],{type:'application/json'}));a.download='xmesh-nexus-backup.json';a.click()}
   else if(b=g('[data-cf]')){dlg.close();CF&&CF()}
+  else if(b=g('[data-core-refresh]')){try{await refreshCoreStatus(true)}catch(err){toast(err.message)}}
+  else if(b=g('[data-core-update]')){const target=$('#core-target')?.value.trim()||'latest';b.disabled=true;try{const result=await backendRequest('/api/v1/core/update',{method:'POST',body:JSON.stringify({version:target})});$('#core-message').textContent=result.message||'Обновление запущено';await refreshCoreStatus();setTimeout(()=>refreshCoreStatus().catch(()=>{}),1800)}catch(err){$('#core-message').textContent=err.message;toast(err.message)}finally{b.disabled=false}}
   else if(b=g('[data-pi]')){const x=PI[+b.dataset.pi];if(x){dlg.close();x.r()}}
   else if(g('#more'))modal(`<div class="box"><h2>Разделы</h2>${FLAT.map(([k,i,l])=>`<button class="pi" data-go="${k}">${ic(i)}<span>${l}</span></button>`).join('')}</div>`);
   else if(b=g('[data-go]')){dlg.close();location.hash=b.dataset.go}
@@ -355,7 +375,7 @@ document.addEventListener('change',async e=>{const t=e.target;
   if(t.dataset.tg){const [k,id]=t.dataset.tg.split(':');await api.update(k,id,{disabled:!t.checked});toast(t.checked?'Включено':'Отключено')}
   else if(t.dataset.usq){const [ui,si]=t.dataset.usq.split(':').map(Number),u=DB.users.find(x=>x.id==ui);await api.update('users',ui,{squads:t.checked?[...new Set([...u.squads,si])]:u.squads.filter(x=>x!=si)});toast('Доступ обновлён');render(1);userDrawer(ui,'acc')}
   else if(t.dataset.hw){await api.update('users',+t.dataset.hw,{hwid:+t.value||0});toast('Лимит устройств сохранён');render(1);userDrawer(+t.dataset.hw,'acc')}
-  else if(t.dataset.hk){DB.set.hooks[t.dataset.hk]=t.checked?1:0;save();toast(t.checked?'Событие включено':'Событие отключено')}
+  else if(t.dataset.hk){const old=DB.set.hooks[t.dataset.hk];DB.set.hooks[t.dataset.hk]=t.checked?1:0;try{await api.saveSettings({hooks:{...DB.set.hooks}});toast(t.checked?'Событие включено':'Событие отключено')}catch(err){DB.set.hooks[t.dataset.hk]=old;t.checked=!!old;toast(err.message)}}
   else if(t.dataset.psz){UQ.size=+t.value;UQ.page=1;drawUsers()}
   else if(t.id=='mo'){C.motion=t.checked?1:0;apply()}
   else if(t.id=='tplsel'){const p=DB.tpls.find(x=>x.id==t.value);if(!p)return;const f=$('form[data-k=user]');const set=(k,v)=>{const el=$(`[name=${k}]`,f);if(el)el.value=v};set('limit',p.limit);set('days',p.days);set('strategy',p.strategy);set('hwid',p.hwid);$('[name=hold]',f).checked=p.hold;$$('[name=squads]',f).forEach(c=>c.checked=p.squads.includes(+c.value))}});
@@ -372,12 +392,12 @@ document.addEventListener('submit',async e=>{const f=e.target,k=f.dataset.k;if(!
   else if(k=='ent'){const key=f.dataset.ent,e2=ENT[key],d=read(e2.fs,f),id=f.dataset.id,m=e2.chk?.(d,+id);if(m)return er(m);
     if(id){await api.update(key,id,d);toast('Сохранено')}else{const o=Object.assign({disabled:false,order:DB[key].length+1,created:Date.now(),last:0,used:0,state:'OFFLINE'},d);const c=await api.create(key,o);toast('Создано');if(e2.after?.(c)){render(1);return}}render(1)}
   else if(k=='bsq'){const d=read([{k:'squads',t:'multi'}],f),ids=new Set(UQ.sel);await api.bulk('users',ids,u=>u.squads=[...new Set([...u.squads,...d.squads])]);toast('Сквады добавлены');render(1)}
-  else if(k=='brand'){const d=read([{k:'brand'},{k:'domain'}],f);DB.set.brand=d.brand;DB.set.domain=d.domain;save();brand();toast('Сохранено');e.preventDefault()}});
+  else if(k=='brand'){e.preventDefault();const d=read([{k:'brand'},{k:'domain'}],f);try{await api.saveSettings({brand:d.brand,domain:d.domain});brand();toast('Сохранено')}catch(err){return er(err.message)}}});
 const acts2=ok=>`<div class="act"><button type="button" class="gh" data-x>Отмена</button><button class="btn">${ok}</button></div>`;
 $('#theme').onclick=()=>{C.theme=document.documentElement.dataset.theme=='dark'?'light':'dark';apply();if(cur=='set')render(1)};
 $('#bell').onclick=()=>{const n=[...DB.nodes.filter(x=>nstat(x)=='OFFLINE').map(x=>[x.flag+' '+x.name,'узел не отвечает']),...DB.users.flatMap(u=>st(u)=='ACTIVE'&&u.limit&&u.used/u.limit>.9?[[u.username,`использовал ${Math.round(u.used/u.limit*100)}% трафика`]]:st(u)=='ACTIVE'&&u.expireAt&&u.expireAt-Date.now()<2*DAY?[[u.username,'подписка истекает: '+left(u.expireAt)]]:[]).slice(0,8)];$('#bell .pip')?.remove();
   modal(`<div class="box"><div class="bar2"><h2>Уведомления</h2><button class="ia" data-x style="margin-left:auto" aria-label="Закрыть">${ic('x')}</button></div><div>${n.map(([a,b])=>`<div class="nt"><b>${esc(a)}</b><span class="mu">${b}</span></div>`).join('')||'<p class="note">Новых уведомлений нет.</p>'}</div></div>`,'pop')};
-$('#restart').onclick=()=>toast('Перезапуск требует подключённого backend/API Xray. В автономном HTML он не выполняется.');
+$('#restart').onclick=()=>{location.hash='set';setTimeout(()=>document.querySelector('#core-panel')?.scrollIntoView({behavior:'smooth',block:'start'}),100)};
 
 document.addEventListener('click',e=>{
   const button=e.target.closest('[data-node-grid-mode]');
@@ -397,5 +417,64 @@ document.addEventListener('click',e=>{
 /* ================= СТАРТ ================= */
 $('#si').innerHTML=ic('search');$('#theme').innerHTML=ic('moon').replace('class="ic"','class="ic moon"')+ic('sun').replace('class="ic"','class="ic sun"');
 $('#bell').innerHTML=ic('bell');$('#addb').innerHTML=ic('plus')+'<span class="bt">Пользователь</span>';$('#restart').innerHTML=ic('redo')+'<span class="lbl">Перезапуск</span>';
-apply();brand();matchMedia('(prefers-color-scheme: light)').addEventListener('change',apply);
-addEventListener('hashchange',()=>render());render();
+apply();matchMedia('(prefers-color-scheme: light)').addEventListener('change',apply);
+addEventListener('hashchange',()=>{if(backendReady)render()});
+function showAuthGate(message=''){
+  if($('#xmesh-auth')){if(message)$('#xmesh-auth-error').textContent=message;return}
+  const layer=document.createElement('div');layer.id='xmesh-auth';layer.className='auth-layer';
+  layer.innerHTML=`<form class="auth-card" id="xmesh-auth-form"><div class="auth-mark">X</div><p class="auth-eyebrow">XMESH NEXUS · ADMIN ACCESS</p><h1>Вход в панель</h1><p class="auth-intro">Используйте учётную запись администратора, заданную при установке.</p><label class="f"><span>Логин</span><input name="username" autocomplete="username" required value="admin"></label><label class="f"><span>Пароль</span><input name="password" type="password" autocomplete="current-password" required></label><p id="xmesh-auth-error" class="auth-error">${esc(message)}</p><button type="submit" class="btn auth-submit">Войти</button><p class="auth-foot">Защищённая сессия · PostgreSQL</p></form>`;
+  document.body.appendChild(layer);
+  layer.querySelector('form').addEventListener('submit',async e=>{
+    e.preventDefault();const form=e.currentTarget,button=form.querySelector('button[type=submit]'),error=form.querySelector('#xmesh-auth-error');
+    const username=form.elements.username.value.trim(),password=form.elements.password.value;
+    button.disabled=true;button.textContent='Вход…';error.textContent='';
+    try{
+      const response=await fetch('/api/v1/auth/login',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password})});
+      const payload=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(payload.error||'Не удалось войти.');
+      form.elements.password.value='';
+      await initializePanel();
+    }catch(err){error.textContent=err.message||'Ошибка входа';button.disabled=false;button.textContent='Войти';}
+  });
+}
+async function initializePanel(){
+  const response=await fetch('/api/v1/bootstrap',{credentials:'same-origin',cache:'no-store'});
+  const payload=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(payload.error||'Не удалось загрузить данные backend.');
+  const collections=payload.collections||{};
+  for(const key of ['users','nodes','profiles','hosts','squads','tpls','subs','admins','tokens','srh'])DB[key]=Array.isArray(collections[key])?collections[key]:[];
+  DB.set={...DB.set,...(payload.settings||{}),hooks:{...DB.set.hooks,...(payload.settings?.hooks||{})}};
+  backendReady=true;
+  $('#xmesh-auth')?.remove();
+  brand();render();
+  refreshCoreStatus().catch(()=>{});
+}
+async function bootPanel(){
+  try{
+    const response=await fetch('/api/v1/auth/session',{credentials:'same-origin',cache:'no-store'});
+    if(!response.ok)throw new Error('Backend API не отвечает.');
+    const session=await response.json();
+    if(!session.authenticated){showAuthGate();return}
+    await initializePanel();
+  }catch(err){showAuthGate(err.message||'Не удалось подключиться к backend API.')}
+}
+function coreStateLabel(status){
+  return status==='updating'?'Обновляется':status==='ready'?'Установлено':status==='error'?'Ошибка':'Не установлено';
+}
+function syncCoreBadge(state){
+  const el=$('#cs'),dot=$('#cd');
+  if(el)el.textContent=state.status==='updating'?'Установка Xray-core…':state.installed_version?('Версия '+state.installed_version):state.status==='error'?'Ошибка установки':'Ядро не установлено';
+  if(dot)dot.style.setProperty('--c',state.status==='ready'?'var(--ok)':state.status==='error'?'var(--er)':state.status==='updating'?'var(--wr)':'var(--mu)');
+}
+async function refreshCoreStatus(showToast=false){
+  const state=await backendRequest('/api/v1/core');
+  syncCoreBadge(state);
+  if($('#core-state'))$('#core-state').textContent=coreStateLabel(state.status);
+  if($('#core-installed'))$('#core-installed').textContent=state.installed_version||'Ещё не установлена';
+  if($('#core-architecture'))$('#core-architecture').textContent=state.architecture||'—';
+  if($('#core-message'))$('#core-message').textContent=state.last_error||state.progress||(state.status==='ready'?'Бинарник установлен и прошёл проверку версии. Сам VPN-процесс на этом этапе не запускается.':'Ожидание установки Xray-core.');
+  if(showToast)toast(state.status==='error'?(state.last_error||'Ошибка Xray-core'):state.status==='updating'?'Xray-core обновляется':'Статус Xray-core обновлён');
+  if(state.status==='updating'&&$('#core-panel'))setTimeout(()=>refreshCoreStatus().catch(()=>{}),2200);
+  return state;
+}
+bootPanel().catch(err=>showAuthGate(err.message||'Ошибка запуска панели'));

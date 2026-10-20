@@ -1,0 +1,8 @@
+.env
+.env.*
+!.env.example
+core_data/
+data/
+target/
+*.log
+.DS_Store

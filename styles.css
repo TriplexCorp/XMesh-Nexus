@@ -592,3 +592,33 @@ button:active,.btn:active,.gh:active{transform:translateY(0)}
   .palette-search-field{width:100%;max-width:100%}
   .palette-search-hint{font-size:.72rem}
 }
+
+/* ================= AUTH GATE + XRAY CORE SETTINGS ================= */
+.auth-layer{
+  position:fixed;inset:0;z-index:10000;display:grid;place-items:center;
+  padding:1.25rem;background:rgba(5,6,8,.78);backdrop-filter:blur(22px);
+}
+.auth-card{
+  display:grid;gap:1rem;width:min(100%,28rem);padding:clamp(1.25rem,4vw,2.2rem);
+  border:1px solid var(--ln);border-radius:var(--ui-radius);
+  background:linear-gradient(145deg,color-mix(in srgb,var(--s1) 94%,var(--a) 6%),var(--s1));
+  color:var(--tx);box-shadow:0 36px 100px -35px rgba(0,0,0,.8);
+}
+.auth-mark{display:grid;place-items:center;width:2.8rem;height:2.8rem;border-radius:.7rem;background:linear-gradient(145deg,var(--b),var(--a));color:var(--mark-ink);font-weight:900;font-size:1.35rem}
+.auth-eyebrow{margin:0;color:var(--a);font-size:.68rem;font-weight:800;letter-spacing:.14em}
+.auth-card h1{margin:0;font-size:1.65rem;letter-spacing:-.05em}
+.auth-intro,.auth-foot{margin:0;color:var(--mu);font-size:.86rem;line-height:1.55}
+.auth-card .f{gap:.4rem}
+.auth-card .f>span{font-size:.82rem;color:var(--mu)}
+.auth-card input{width:100%;min-width:0}
+.auth-submit{width:100%;justify-content:center}
+.auth-error{min-height:1rem;margin:0;color:var(--er);font-size:.82rem;overflow-wrap:anywhere}
+.auth-foot{text-align:center;font-size:.74rem}
+#core-panel .setting-row{gap:1rem;flex-wrap:wrap}
+#core-panel .setting-copy{min-width:9rem}
+#core-panel .act{display:flex;gap:.6rem;flex-wrap:wrap}
+#core-panel .act>*{min-width:0}
+@media(max-width:520px){
+  .auth-card{padding:1.2rem}
+  #core-panel .act>*{width:100%;justify-content:center}
+}
