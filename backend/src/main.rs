@@ -3,13 +3,14 @@ mod core;
 
 use axum::{
     extract::{Extension, Path, Request, State},
-    http::{HeaderName, HeaderValue, StatusCode},
+    http::{header, HeaderMap, HeaderName, HeaderValue, Method, StatusCode, Uri},
     middleware::{self, Next},
-    response::{IntoResponse, Response},
+    response::{Html, IntoResponse, Redirect, Response},
     routing::{get, patch, post},
     Json, Router,
 };
 use core::CoreManager;
+use redis::aio::ConnectionManager;
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
 use sqlx::{postgres::PgPoolOptions, PgPool, Row};
@@ -28,6 +29,7 @@ const COLLECTIONS: &[&str] = &[
 #[derive(Clone)]
 pub struct AppState {
     pub pool: PgPool,
+    pub redis: ConnectionManager,
     pub core: CoreManager,
     pub cookie_secure: bool,
 }
@@ -79,11 +81,20 @@ async fn main() -> anyhow::Result<()> {
 
     let database_url = env::var("DATABASE_URL").map_err(|_| anyhow::anyhow!("DATABASE_URL is required"))?;
     let pool = PgPoolOptions::new()
-        .max_connections(20)
+        .max_connections(env::var("DB_MAX_CONNECTIONS").ok().and_then(|v| v.parse().ok()).unwrap_or(20))
         .min_connections(1)
         .acquire_timeout(Duration::from_secs(10))
+        .idle_timeout(Duration::from_secs(600))
+        .max_lifetime(Duration::from_secs(1800))
         .connect(&database_url)
         .await?;
+
+    let redis_url = env::var("REDIS_URL").map_err(|_| anyhow::anyhow!("REDIS_URL is required"))?;
+    let redis_client = redis::Client::open(redis_url)?;
+    let redis: ConnectionManager = redis_client.get_connection_manager().await?;
+    let mut redis_probe = redis.clone();
+    let redis_ping: String = redis::cmd("PING").query_async(&mut redis_probe).await?;
+    anyhow::ensure!(redis_ping == "PONG", "Redis readiness probe failed");
 
     sqlx::migrate!("./migrations").run(&pool).await?;
 
@@ -99,13 +110,14 @@ async fn main() -> anyhow::Result<()> {
         env::var("CORE_DATA_DIR").unwrap_or_else(|_| "/var/lib/xmesh/core".to_owned()),
     );
     let core = CoreManager::new(pool.clone(), core_dir).await?;
-    let state = AppState { pool, core, cookie_secure };
+    let state = AppState { pool, redis, core, cookie_secure };
     state.core.launch_startup_update().await;
 
     let protected = Router::new()
         .route("/bootstrap", get(bootstrap))
         .route("/settings", get(get_settings).patch(patch_settings))
         .route("/stats", get(get_stats))
+        .route("/system/stats", get(get_system_stats))
         .route("/collections/{collection}", get(list_records).post(create_record))
         .route("/collections/{collection}/{id}", patch(update_record).delete(delete_record))
         .route("/core", get(get_core_status))
@@ -122,12 +134,16 @@ async fn main() -> anyhow::Result<()> {
 
     let static_dir = env::var("STATIC_DIR").unwrap_or_else(|_| "/app/static".to_owned());
     let app = Router::new()
+        .route("/", get(panel_entry))
+        .route("/index.html", get(index_redirect))
+        .route("/login", get(login_page))
         .nest("/api/v1", public.merge(protected))
         .fallback_service(ServeDir::new(static_dir).append_index_html_on_directories(true))
         .layer(RequestBodyLimitLayer::new(2 * 1024 * 1024))
         .layer(CompressionLayer::new())
         .layer(TraceLayer::new_for_http())
         .layer(middleware::from_fn(security_headers))
+        .layer(middleware::from_fn(csrf_guard))
         .with_state(state);
 
     let address = env::var("APP_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".to_owned());
@@ -135,6 +151,55 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!(address = %address, "XMesh Nexus API ready");
     axum::serve(listener, app).with_graceful_shutdown(shutdown_signal()).await?;
     Ok(())
+}
+
+async fn panel_entry(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    if !auth::is_authenticated(&state, &headers).await {
+        return Redirect::to("/login").into_response();
+    }
+    let static_dir = env::var("STATIC_DIR").unwrap_or_else(|_| "/app/static".to_owned());
+    match tokio::fs::read_to_string(PathBuf::from(static_dir).join("index.html")).await {
+        Ok(page) => Html(page).into_response(),
+        Err(error) => {
+            tracing::error!(error = %error, "Could not read panel entry page");
+            (StatusCode::INTERNAL_SERVER_ERROR, "Panel assets unavailable").into_response()
+        }
+    }
+}
+
+async fn index_redirect() -> Redirect {
+    Redirect::to("/")
+}
+
+async fn login_page(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    if auth::is_authenticated(&state, &headers).await {
+        return Redirect::to("/").into_response();
+    }
+    let static_dir = env::var("STATIC_DIR").unwrap_or_else(|_| "/app/static".to_owned());
+    match tokio::fs::read_to_string(PathBuf::from(static_dir).join("login.html")).await {
+        Ok(page) => Html(page).into_response(),
+        Err(error) => {
+            tracing::error!(error = %error, "Could not read login page");
+            (StatusCode::INTERNAL_SERVER_ERROR, "Login page unavailable").into_response()
+        }
+    }
+}
+
+async fn csrf_guard(request: Request, next: Next) -> Response {
+    let is_mutation = matches!(*request.method(), Method::POST | Method::PUT | Method::PATCH | Method::DELETE);
+    if is_mutation && request.uri().path().starts_with("/api/v1/") {
+        let origin = request.headers().get(header::ORIGIN).and_then(|value| value.to_str().ok());
+        let host = request.headers().get(header::HOST).and_then(|value| value.to_str().ok());
+        let valid = origin
+            .and_then(|value| value.parse::<Uri>().ok())
+            .and_then(|uri| uri.authority().map(|authority| authority.as_str().to_ascii_lowercase()))
+            .zip(host.map(str::to_ascii_lowercase))
+            .is_some_and(|(origin_authority, request_host)| origin_authority == request_host);
+        if !valid {
+            return (StatusCode::FORBIDDEN, Json(json!({"error": "Запрос отклонён проверкой источника."}))).into_response();
+        }
+    }
+    next.run(request).await
 }
 
 async fn shutdown_signal() {
@@ -160,6 +225,7 @@ async fn security_headers(request: Request, next: Next) -> Response {
     let mut response = next.run(request).await;
     let headers = response.headers_mut();
     headers.insert(HeaderName::from_static("x-content-type-options"), HeaderValue::from_static("nosniff"));
+    headers.insert(HeaderName::from_static("cache-control"), HeaderValue::from_static("no-store"));
     headers.insert(HeaderName::from_static("x-frame-options"), HeaderValue::from_static("DENY"));
     headers.insert(HeaderName::from_static("referrer-policy"), HeaderValue::from_static("same-origin"));
     headers.insert(
@@ -174,12 +240,26 @@ async fn health_live() -> Json<Value> {
 }
 
 async fn health_ready(State(state): State<AppState>) -> impl IntoResponse {
-    match sqlx::query("SELECT 1").execute(&state.pool).await {
-        Ok(_) => (StatusCode::OK, Json(json!({"status": "ready"}))),
-        Err(_) => (
+    let database_ok = sqlx::query("SELECT 1").execute(&state.pool).await.is_ok();
+    let mut redis = state.redis.clone();
+    let redis_ok = redis::cmd("PING").query_async::<String>(&mut redis).await
+        .is_ok_and(|reply| reply == "PONG");
+    if database_ok && redis_ok {
+        (StatusCode::OK, Json(json!({
+            "status": "ready",
+            "dependencies": {"postgresql": "online", "redis": "online"}
+        })))
+    } else {
+        (
             StatusCode::SERVICE_UNAVAILABLE,
-            Json(json!({"status": "not_ready", "error": "database unavailable"})),
-        ),
+            Json(json!({
+                "status": "not_ready",
+                "dependencies": {
+                    "postgresql": if database_ok { "online" } else { "offline" },
+                    "redis": if redis_ok { "online" } else { "offline" }
+                }
+            })),
+        )
     }
 }
 
@@ -387,6 +467,96 @@ async fn get_stats(State(state): State<AppState>) -> Result<Json<Value>, ApiErro
         "nOn": n_on,
         "nAll": nodes.len()
     })))
+}
+
+
+async fn get_system_stats(State(state): State<AppState>) -> Json<Value> {
+    let cpu_before = read_cpu_ticks().await;
+    tokio::time::sleep(Duration::from_millis(220)).await;
+    let cpu_after = read_cpu_ticks().await;
+    let cpu = match (cpu_before, cpu_after) {
+        (Some(before), Some(after)) => {
+            let total_delta = after.0.saturating_sub(before.0);
+            let idle_delta = after.1.saturating_sub(before.1);
+            if total_delta > 0 {
+                Some(((total_delta.saturating_sub(idle_delta)) as f64 * 100.0 / total_delta as f64).clamp(0.0, 100.0))
+            } else { None }
+        }
+        _ => None,
+    };
+
+    let meminfo = tokio::fs::read_to_string("/proc/meminfo").await.unwrap_or_default();
+    let mem_value = |key: &str| -> u64 {
+        meminfo.lines().find_map(|line| {
+            let mut parts = line.split_whitespace();
+            if parts.next()? != key { return None; }
+            parts.next()?.parse::<u64>().ok().map(|kb| kb.saturating_mul(1024))
+        }).unwrap_or(0)
+    };
+    let ram_total = mem_value("MemTotal:");
+    let ram_available = mem_value("MemAvailable:").min(ram_total);
+    let ram_used = ram_total.saturating_sub(ram_available);
+    let ram_percent = if ram_total > 0 { Some(ram_used as f64 * 100.0 / ram_total as f64) } else { None };
+
+    let disk = tokio::process::Command::new("df")
+        .args(["-B1", "-P", "/"])
+        .output().await.ok()
+        .filter(|output| output.status.success())
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .and_then(|output| output.lines().nth(1).map(str::to_owned))
+        .and_then(|line| {
+            let cols = line.split_whitespace().collect::<Vec<_>>();
+            if cols.len() < 6 { return None; }
+            let total = cols[1].parse::<u64>().ok()?;
+            let used = cols[2].parse::<u64>().ok()?;
+            let available = cols[3].parse::<u64>().ok()?;
+            Some(json!({
+                "totalBytes": total, "usedBytes": used, "availableBytes": available,
+                "percent": if total > 0 { Some(used as f64 * 100.0 / total as f64) } else { None },
+                "mount": cols[5]
+            }))
+        });
+
+    let uptime_seconds = tokio::fs::read_to_string("/proc/uptime").await.ok()
+        .and_then(|s| s.split_whitespace().next()?.parse::<f64>().ok())
+        .map(|seconds| seconds as u64);
+    let load = tokio::fs::read_to_string("/proc/loadavg").await.unwrap_or_default();
+    let loads = load.split_whitespace().take(3).filter_map(|v| v.parse::<f64>().ok()).collect::<Vec<_>>();
+    let process_count = match tokio::fs::read_dir("/proc").await {
+        Ok(mut entries) => {
+            let mut count = 0u64;
+            while let Ok(Some(entry)) = entries.next_entry().await {
+                if entry.file_name().to_string_lossy().parse::<u32>().is_ok() { count += 1; }
+            }
+            Some(count)
+        }
+        Err(_) => None,
+    };
+    let db_status = if sqlx::query("SELECT 1").execute(&state.pool).await.is_ok() { "online" } else { "offline" };
+    let sampled_at = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default().as_millis() as u64;
+
+    Json(json!({
+        "cpu": {"percent": cpu},
+        "ram": {"totalBytes": ram_total, "usedBytes": ram_used, "availableBytes": ram_available, "percent": ram_percent},
+        "disk": disk,
+        "uptimeSeconds": uptime_seconds,
+        "loadAverage": {"one": loads.first(), "five": loads.get(1), "fifteen": loads.get(2)},
+        "processCount": process_count,
+        "database": db_status,
+        "sampledAt": sampled_at,
+        "scope": "Ресурсы, видимые контейнеру панели; диск — корневая файловая система контейнера"
+    }))
+}
+
+async fn read_cpu_ticks() -> Option<(u64, u64)> {
+    let stat = tokio::fs::read_to_string("/proc/stat").await.ok()?;
+    let line = stat.lines().find(|line| line.starts_with("cpu "))?;
+    let values = line.split_whitespace().skip(1).take(8).filter_map(|value| value.parse::<u64>().ok()).collect::<Vec<_>>();
+    if values.len() < 4 { return None; }
+    let total = values.iter().copied().fold(0u64, u64::saturating_add);
+    let idle = values[3].saturating_add(*values.get(4).unwrap_or(&0));
+    Some((total, idle))
 }
 
 async fn get_core_status(State(state): State<AppState>) -> Json<core::CoreStatus> {

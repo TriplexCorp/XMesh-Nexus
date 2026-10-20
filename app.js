@@ -62,7 +62,8 @@ const api={
   async remove(c,id){await lat();const i=DB[c].findIndex(x=>x.id==id);if(i<0)return null;const old=DB[c][i];if(backendReady)await backendRequest('/api/v1/collections/'+encodeURIComponent(c)+'/'+encodeURIComponent(id),{method:'DELETE'});DB[c].splice(i,1);save();return old},
   async bulk(c,ids,fn){await lat();for(const x of [...(DB[c]||[])].filter(item=>ids.has(item.id))){fn(x);await this.update(c,x.id,{...x})}save()},
   async saveSettings(patch){const saved=await backendRequest('/api/v1/settings',{method:'PATCH',body:JSON.stringify(patch)});DB.set={...DB.set,...saved,hooks:{...DB.set.hooks,...(saved.hooks||{})}};return DB.set},
-  async stats(){await lat();const U=DB.users,by={};U.forEach(u=>{const status=st(u);by[status]=(by[status]||0)+1});const on=U.filter(isOn),live=DB.nodes.filter(n=>n.state==='ONLINE'&&!n.disabled),nodeOn={};live.forEach(n=>nodeOn[n.id]=0);return{by,total:U.length,online:on.length,conn:null,nodeOn,nOn:live.length,nAll:DB.nodes.length};}
+  async stats(){await lat();const U=DB.users,by={};U.forEach(u=>{const status=st(u);by[status]=(by[status]||0)+1});const on=U.filter(isOn),live=DB.nodes.filter(n=>n.state==='ONLINE'&&!n.disabled),nodeOn={};live.forEach(n=>nodeOn[n.id]=0);return{by,total:U.length,online:on.length,conn:null,nodeOn,nOn:live.length,nAll:DB.nodes.length};},
+  async systemStats(){if(!backendReady)return null;return backendRequest('/api/v1/system/stats')}
 };
 
 /* ================= МЕТАДАННЫЕ ================= */
@@ -80,7 +81,7 @@ const ENT={
   hosts:{t:'Хосты',n:'Точки входа, которые попадают в подписку. Порядок определяет приоритет.',s:'order',nw:'Хост',mv:1,fs:[{k:'remark',l:'Название (remark)',req:1},{k:'address',l:'Адрес',req:1},{k:'port',l:'Порт',t:'num'},{k:'tag',l:'Инбаунд',t:'sel',o:tags},{k:'sni',l:'SNI'},{k:'path',l:'Path'},{k:'sec',l:'Безопасность',t:'sel',o:['reality','tls','none']},{k:'fp',l:'Fingerprint',t:'sel',o:['chrome','firefox','safari','random']},{k:'nodes',l:'Только на узлах',t:'multi',o:()=>DB.nodes.map(n=>[n.id,n.flag+' '+n.name]),h:'Ничего не выбрано — на всех узлах'}],
     def:()=>({port:443,sec:'reality',fp:'chrome',order:DB.hosts.length+1,nodes:[]}),
     cols:[['Название',r=>`<b>${esc(r.remark)}</b>`],['Адрес',r=>`${esc(r.address)}:${r.port}`],['Инбаунд',r=>chip(esc(r.tag),tcol(r.tag))],['SNI',r=>esc(r.sni||'—')],['Узлы',r=>r.nodes.length?r.nodes.map(i=>DB.nodes.find(n=>n.id==i)?.flag).join(' '):'все'],['Вкл.',swc('hosts')]]},
-  nodes:{t:'Узлы',nw:'Узел',s:'id',fs:[{k:'name',l:'Название',req:1},{k:'flag',l:'Флаг (эмодзи)',ph:'🇩🇪'},{k:'addr',l:'Адрес',req:1},{k:'port',l:'Порт ноды',t:'num',req:1},{k:'profileId',l:'Профиль Xray',t:'sel',o:()=>DB.profiles.map(p=>[p.id,p.name])},{k:'mult',l:'Коэффициент трафика',t:'num',h:'1 — без изменений, 2 — считать вдвое'},{k:'limit',l:'Лимит трафика, ГБ',t:'num',h:'0 — без лимита'},{k:'resetDay',l:'День сброса счётчика',t:'num'}],def:()=>({flag:'',mult:1,limit:0,resetDay:1}),
+  nodes:{t:'Узлы',nw:'Узел',s:'id',fs:[{k:'name',l:'Название',req:1},{k:'flag',l:'Страна и флаг',t:'country'},{k:'addr',l:'Адрес',req:1},{k:'port',l:'Порт ноды',t:'num',req:1},{k:'profileId',l:'Профиль Xray',t:'sel',o:()=>DB.profiles.map(p=>[p.id,p.name])},{k:'mult',l:'Коэффициент трафика',t:'num',h:'1 — без изменений, 2 — считать вдвое'},{k:'limit',l:'Лимит трафика, ГБ',t:'num',h:'0 — без лимита'},{k:'resetDay',l:'День сброса счётчика',t:'num'}],def:()=>({flag:'',mult:1,limit:0,resetDay:1}),
     guard:r=>DB.hosts.some(h=>h.nodes.includes(r.id))?'Узел указан в хостах. Уберите его оттуда.':''},
   tpls:{t:'Шаблоны пользователей',n:'Готовые тарифы: выбираются при создании и подставляют лимиты, срок и доступ.',s:'id',nw:'Шаблон',fs:[{k:'name',l:'Название',req:1},{k:'limit',l:'Лимит, ГБ',t:'num',h:'0 — без лимита'},{k:'days',l:'Срок, дней',t:'num',h:'0 — бессрочно'},{k:'strategy',l:'Сброс трафика',t:'sel',o:STRAT},{k:'hwid',l:'Лимит устройств',t:'num'},{k:'squads',l:'Сквады',t:'multi',o:()=>DB.squads.map(s=>[s.id,s.name])},{k:'hold',l:'Отсчёт срока с первого подключения',t:'bool'}],def:()=>({strategy:'NO_RESET',hwid:2,squads:[]}),
     cols:[['Название',r=>`<b>${esc(r.name)}</b>`],['Трафик',r=>r.limit?r.limit+' ГБ':'∞'],['Срок',r=>r.days?r.days+' дн':'∞'],['Устройств',r=>r.hwid],['Сквады',r=>r.squads.map(i=>chip(esc(DB.squads.find(s=>s.id==i)?.name||'?'),'--b')).join(' ')],['Режим',r=>r.hold?chip('on hold','--c3'):'—']]},
@@ -101,11 +102,22 @@ const ENT={
 const FU=[{k:'username',l:'Имя пользователя',req:1,pat:'[A-Za-z0-9_.\\-]{3,32}',h:'3–32 символа: латиница, цифры, _ . -'},{k:'limit',l:'Лимит трафика, ГБ',t:'num',h:'0 — без лимита'},{k:'days',l:'Срок, дней',t:'num',h:'0 — бессрочно'},{k:'strategy',l:'Сброс трафика',t:'sel',o:STRAT},{k:'hwid',l:'Лимит устройств',t:'num'},{k:'tag',l:'Тег',ph:'например, vip'},{k:'squads',l:'Сквады',t:'multi',o:()=>DB.squads.map(s=>[s.id,s.name])},{k:'hold',l:'Отсчёт срока с первого подключения (on hold)',t:'bool'},{k:'desc',l:'Заметка'}];
 const FE=[{k:'username',l:'Имя пользователя',req:1,pat:'[A-Za-z0-9_.\\-]{3,32}'},{k:'limit',l:'Лимит, ГБ',t:'num',h:'0 — без лимита'},{k:'expireAt',l:'Действует до',t:'date',h:'Пусто — бессрочно'},{k:'strategy',l:'Сброс трафика',t:'sel',o:STRAT},{k:'tag',l:'Тег'},{k:'tg',l:'Telegram ID'},{k:'email',l:'Email'},{k:'desc',l:'Заметка'}];
 
+const COUNTRY_CODES='AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW HK HM HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP KE KG KH KH? KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS YE YT ZA ZM ZW'.replace(' KH?','').split(' ');
+const COUNTRY_NAMES=new Intl.DisplayNames(['ru'],{type:'region'});
+const countryFlag=code=>String.fromCodePoint(...code.toUpperCase().split('').map(c=>127397+c.charCodeAt(0)));
+const COUNTRIES=COUNTRY_CODES.map(code=>({code,flag:countryFlag(code),name:COUNTRY_NAMES.of(code)})).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
+const flagView=(value,cls='flag-img')=>{const country=COUNTRIES.find(c=>c.flag===value);return country?`<img class="${cls}" src="https://flagcdn.com/w40/${country.code.toLowerCase()}.png" alt="${country.code}" loading="lazy" decoding="async">`:`<span class="${cls}">${esc(value||'')}</span>`;};
+
 /* ================= ФОРМЫ ================= */
 const opt=o=>(typeof o=='function'?o():o).map(x=>Array.isArray(x)?x:[x,x]);
 function field(f,v){
   let i;const t=f.t||'text';
-  if(t=='sel')i=`<select name="${f.k}">${opt(f.o).map(([a,b])=>`<option value="${esc(a)}"${a==v?' selected':''}>${esc(b)}</option>`).join('')}</select>`;
+  if(t==='country'){
+    const existing=COUNTRIES.find(c=>c.flag===v);
+    const current=existing?existing.flag:(v||'');
+    i=`<div class="country-picker"><input class="country-search" type="search" data-country-search placeholder="Поиск страны…" aria-label="Поиск страны" autocomplete="off"><div class="country-selected">${flagView(current,'country-flag-preview')}<span data-country-label>${existing?esc(existing.name):current?esc(current+' Сохранённый флаг'):'Выберите страну…'}</span></div><select name="${f.k}" class="country-select" aria-label="Страна"><option value="">Выберите страну…</option>${current&&!existing?`<option value="${esc(current)}" selected>${esc(current)} Сохранённый флаг</option>`:''}${COUNTRIES.map(c=>`<option value="${c.flag}" data-country-name="${esc(c.name.toLocaleLowerCase('ru'))}" data-country-code="${c.code}"${c.flag===current?' selected':''}>${esc(c.name)} (${c.code})</option>`).join('')}</select><small class="country-hint">В списке ${COUNTRIES.length} стран и территорий. Флаг отображается как изображение, независимо от поддержки эмодзи в системе.</small></div>`;
+  }
+  else if(t=='sel')i=`<select name="${f.k}">${opt(f.o).map(([a,b])=>`<option value="${esc(a)}"${a==v?' selected':''}>${esc(b)}</option>`).join('')}</select>`;
   else if(t=='multi')i=`<div class="ms">${opt(f.o).map(([a,b])=>`<label class="ck"><input type="checkbox" name="${f.k}" value="${esc(a)}"${(v||[]).map(String).includes(String(a))?' checked':''}><span>${esc(b)}</span></label>`).join('')||'<span class="mu">Нет вариантов</span>'}</div>`;
   else if(t=='area')i=`<textarea name="${f.k}" rows="${f.rows||8}" spellcheck="false">${esc(v)}</textarea>`;
   else if(t=='bool')i=`<span class="sw"><input type="checkbox" name="${f.k}"${v?' checked':''}><span></span></span>`;
@@ -120,13 +132,14 @@ const modal=(h,c='')=>{dlg.className=c;dlg.innerHTML=h;if(!dlg.open)dlg.showModa
 dlg.addEventListener('click',e=>{if(e.target==dlg||e.target.closest('[data-x]'))dlg.close()});
 const confirmBox=(h,ok,fn)=>{CF=fn;modal(`<div class="box"><h2>${h}</h2><div class="act"><button class="gh" data-x>Отмена</button><button class="btn" data-cf>${ok}</button></div></div>`)};
 let tt;const toast=(m,al,fn)=>{const t=$('#toast');t.innerHTML=`<span>${esc(m)}</span>${al?`<button id="ta">${al}</button>`:''}`;if(al)$('#ta').onclick=()=>{fn();t.classList.remove('show')};t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),al?6000:2400)};
-const CDEFAULT={theme:'dark',accent:'mint',ts:1,motion:1,density:'comfortable',surface:'solid',glow:'normal',font:'onest',radius:16,borders:'soft',sidebar:'standard'};
-let C={...CDEFAULT};try{Object.assign(C,JSON.parse(localStorage.xmeshNexusSettings||'{}'))}catch(e){}
-const apply=()=>{const r=document.documentElement;r.dataset.theme=C.theme=='auto'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):C.theme;r.dataset.accent=C.accent;r.dataset.density=C.density||CDEFAULT.density;r.dataset.surface=C.surface||CDEFAULT.surface;r.dataset.glow=C.glow||CDEFAULT.glow;r.dataset.font=C.font||CDEFAULT.font;r.dataset.borders=C.borders||CDEFAULT.borders;r.dataset.sidebar=C.sidebar||CDEFAULT.sidebar;r.style.setProperty('--ts',cl(+C.ts||1,.9,1.3));const radius=cl(+C.radius||16,4,24);r.style.setProperty('--ui-radius',radius+'px');r.style.setProperty('--ui-control-radius',Math.max(5,radius*.72)+'px');r.dataset.motion=C.motion?'on':'off';try{localStorage.xmeshNexusSettings=JSON.stringify(C)}catch(e){}};
+const CDEFAULT={theme:'dark',accent:'emerald',customA:'#60d6a2',customB:'#c3e879',hue:151,sat:62,lum:61,ts:1,motion:1,density:'comfortable',surface:'solid',glow:'normal',font:'onest',radius:16,borders:'soft',sidebar:'standard'};
+let C={...CDEFAULT};try{Object.assign(C,JSON.parse(localStorage.xmeshNexusSettings||'{}'))}catch(e){}if(C.accent==='mint')C.accent='emerald';
+const hslHex=(h,s,l)=>{s/=100;l/=100;const k=n=>(n+h/30)%12,a=s*Math.min(l,1-l),f=n=>{const c=(k(n)+12)%12;return l-a*Math.max(-1,Math.min(c-3,9-c,1))};return '#'+[f(0),f(8),f(4)].map(v=>Math.round(v*255).toString(16).padStart(2,'0')).join('')};
+const apply=()=>{const r=document.documentElement;r.dataset.theme=C.theme=='auto'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):C.theme;r.dataset.accent=C.accent;r.style.setProperty('--custom-a',C.customA||hslHex(+C.hue||151,+C.sat||62,+C.lum||61));r.style.setProperty('--custom-b',C.customB||'#c3e879');if(C.accent==='custom'){const rgb=(C.customA||'#60d6a2').match(/[0-9a-f]{2}/gi).map(v=>parseInt(v,16)/255);const linear=rgb.map(v=>v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4));const lum=.2126*linear[0]+.7152*linear[1]+.0722*linear[2];r.style.setProperty('--btn-text',lum>.42?'#082b1d':'#ffffff')}else r.style.setProperty('--btn-text',r.dataset.theme==='light'?'#ffffff':'#082b1d');r.dataset.density=C.density||CDEFAULT.density;r.dataset.surface=C.surface||CDEFAULT.surface;r.dataset.glow=C.glow||CDEFAULT.glow;r.dataset.font=C.font||CDEFAULT.font;r.dataset.borders=C.borders||CDEFAULT.borders;r.dataset.sidebar=C.sidebar||CDEFAULT.sidebar;r.style.setProperty('--ts',cl(+C.ts||1,.9,1.3));const radius=cl(+C.radius||16,4,24);r.style.setProperty('--ui-radius',radius+'px');r.style.setProperty('--ui-control-radius',Math.max(5,radius*.72)+'px');r.dataset.motion=C.motion?'on':'off';try{localStorage.xmeshNexusSettings=JSON.stringify(C)}catch(e){}};
 const brand=()=>{$('#bn').textContent=DB.set.brand;$('#lg').textContent=(DB.set.brand[0]||'L').toUpperCase()};
 
 let T=[],cur='',RT=0;
-const pages={home:['Дашборд',homeP],users:['Пользователи',usersP],squads:['Сквады',()=>simple(['squads'])],hosts:['Хосты',()=>simple(['hosts'])],nodes:['Узлы',nodesP],templates:['Шаблоны',()=>simple(['tpls','subs'])],profiles:['Профили Xray',()=>simple(['profiles'])],tools:['Диагностика',toolsP],admins:['Администраторы',()=>simple(['admins'])],set:['Настройки',setP]};
+const pages={home:['Дашборд',homeP],users:['Пользователи',usersP],squads:['Сквады',()=>simple(['squads'])],hosts:['Хосты',()=>simple(['hosts'])],nodes:['Узлы',nodesP],templates:['Шаблоны',()=>simple(['tpls','subs'])],profiles:['Профили Xray',profilesP],tools:['Диагностика',toolsP],admins:['Администраторы',()=>simple(['admins'])],set:['Настройки',setP]};
 const skel=()=>`<div class="sk" style="height:7rem"></div><div class="sk" style="height:18rem"></div><div class="sk" style="height:12rem"></div>`;
 $('#nav').innerHTML=NAV.map(([g,a])=>`<div class="g">${g}</div>`+a.map(([k,i,l,p])=>`<a href="#${k}" class="${p?'':'sec'}">${ic(i)}<span class="lbl">${l}</span>${k=='users'?'<em id="unb"></em>':''}</a>`).join('')).join('')+`<button class="more" id="more">${ic('more')}<span class="lbl">Ещё</span></button>`;
 async function render(soft){
@@ -136,11 +149,39 @@ async function render(soft){
   const [h,i]=await f();if(rt!=RT)return;v.classList.toggle('still',!!soft);v.innerHTML=h;i&&i();$('#unb').textContent=DB.users.length;drawBulk();
 }
 
+/* ================= СИСТЕМНЫЕ МЕТРИКИ ================= */
+const sysBytes=n=>{if(!Number.isFinite(+n))return'—';const v=+n;if(v<1024)return fmt(v)+' Б';if(v<1024**2)return fmt(v/1024,1)+' КБ';if(v<1024**3)return fmt(v/1024**2,1)+' МБ';if(v<1024**4)return fmt(v/1024**3,2)+' ГБ';return fmt(v/1024**4,2)+' ТБ'};
+const sysPct=n=>n==null||n===''||!Number.isFinite(+n)?null:Math.max(0,Math.min(100,+n));
+const sysBar=n=>{const p=sysPct(n);return p===null?'<div class="sys-progress"><i style="width:0%"></i></div>':`<div class="sys-progress ${p>=90?'danger':p>=75?'warning':''}"><i style="width:${p}%"></i></div>`};
+const sysUptime=n=>{if(!Number.isFinite(+n))return'—';n=Math.max(0,Math.floor(+n));const d=Math.floor(n/86400),h=Math.floor(n%86400/3600),m=Math.floor(n%3600/60);return d?`${d} д ${h} ч`:h?`${h} ч ${m} мин`:`${m} мин`};
+function systemPanel(s,error=''){
+  if(!s)return `<section class="card system-card"><div class="hd"><div><p class="note">МОНИТОРИНГ</p><h3>Состояние системы</h3><p>${error?esc(error):'Получаем системные показатели…'}</p></div><span class="sys-live"><i></i> Ожидание</span></div><div class="sys-empty">${ic('server')}<span>Метрики станут доступны после подключения к backend.</span></div></section>`;
+  const cpu=sysPct(s.cpu?.percent),ram=sysPct(s.ram?.percent),disk=sysPct(s.disk?.percent);
+  const donut=(key,title,pct,detail,color)=>{
+    const valid=pct!==null,p=valid?pct:0,dash=`${p} ${100-p}`;
+    const tone=valid&&p>=90?'--er':valid&&p>=75?'--wr':color;
+    return `<article class="sys-metric sys-metric-donut"><div class="sys-metric-head"><span>${title}</span><span class="sys-glyph">${key}</span></div><div class="sys-donut-row"><div class="sys-donut"><div class="ringwrap"><svg viewBox="0 0 40 40" role="img" aria-label="${title}: ${valid?fmt(p,1)+'%':'нет данных'}"><circle class="ng-track" cx="20" cy="20" r="16" pathLength="100"></circle><circle class="ng-arc" cx="20" cy="20" r="16" pathLength="100" stroke-dasharray="${dash}" style="--g-color:var(${tone})"></circle></svg><b class="ng-center">${valid?fmt(p,1)+'%':'—'}</b></div></div><div class="sys-donut-info"><b>${valid?'Использовано':'Нет данных'}</b><span>${detail}</span><small>${valid?fmt(Math.max(0,100-p),1)+'% свободно':'Ожидание показаний'}</small></div></div></article>`;
+  };
+  const info=(key,title,value,detail)=>`<article class="sys-metric sys-metric-uptime"><div class="sys-metric-head"><span>${title}</span><span class="sys-glyph">${key}</span></div><div class="sys-value">${value}</div><div class="sys-detail">${detail}</div><div class="sys-uptime-foot"><i></i> Процесс панели работает</div></article>`;
+  const diskDetail=s.disk?`${sysBytes(s.disk.usedBytes)} из ${sysBytes(s.disk.totalBytes)}`:'Нет данных о файловой системе';
+  const ramDetail=s.ram?.totalBytes?`${sysBytes(s.ram.usedBytes)} из ${sysBytes(s.ram.totalBytes)}`:'Нет данных о памяти';
+  const cpuDetail=cpu===null?'Недостаточно данных для расчёта':`Средняя нагрузка: ${s.loadAverage?.one==null?'—':fmt(s.loadAverage.one,2)}`;
+  const dbOnline=s.database==='online';
+  const sampled=s.sampledAt?new Date(s.sampledAt).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'—';
+  return `<section class="card system-card"><div class="hd"><div><p class="note">МОНИТОРИНГ · LIVE</p><h3>Состояние системы</h3><p>Ресурсы и доступность сервисов панели в реальном времени.</p></div><span class="sys-live"><i></i> Обновляется</span></div><div class="sys-grid">
+  ${donut('CPU','Процессор',cpu,cpuDetail,'--a')}
+  ${donut('RAM','Оперативная память',ram,ramDetail,'--b')}
+  ${donut('SSD','Диск',disk,diskDetail,'--c3')}
+  ${info('UP','Время работы',sysUptime(s.uptimeSeconds),`Видимых процессов: ${s.processCount==null?'—':fmt(s.processCount)}`)}
+  </div><div class="sys-details"><div class="sys-detail-item"><span class="sys-detail-label">Средняя нагрузка</span><b>${[s.loadAverage?.one,s.loadAverage?.five,s.loadAverage?.fifteen].map(v=>v==null?'—':fmt(v,2)).join(' / ')}</b><small>1 · 5 · 15 минут</small></div><div class="sys-detail-item"><span class="sys-detail-label">База данных</span><b class="${dbOnline?'sys-ok':'sys-bad'}"><i></i>${dbOnline?'Подключена':'Нет соединения'}</b><small>PostgreSQL · проверка SELECT 1</small></div><div class="sys-detail-item"><span class="sys-detail-label">Последнее обновление</span><b>${sampled}</b><small>Автообновление каждые 15 секунд</small></div></div><p class="sys-note">${esc(s.scope||'Показатели зависят от ресурсов, доступных контейнеру панели.')} Диск показывает файловую систему, смонтированную в контейнер как /.</p></section>`;
+}
+
 /* ================= ДАШБОРД ================= */
 const LV={};DB.nodes.forEach(n=>LV[n.id]={cpu:null,ram:null,mbps:null});
 let ST;
 async function homeP(){
   const stats=ST=await api.stats();
+  let system=null,systemError="";try{system=await api.systemStats()}catch(e){systemError=e.message||"Не удалось получить системные показатели."}
   const totalItems=DB.nodes.length+DB.users.length+DB.profiles.length+DB.hosts.length+DB.squads.length+DB.tpls.length+DB.subs.length+DB.admins.length;
   const firstRun=totalItems===0;
   const counts=[['Узлы',DB.nodes.length],['Пользователи',DB.users.length],['Профили Xray',DB.profiles.length],['Хосты',DB.hosts.length]];
@@ -151,10 +192,11 @@ async function homeP(){
     ['04','Сквад','Объедините inbound в группы доступа.','Создать сквад','squads']
   ];
   const setupHtml=setup.map(([num,title,desc,btn,key])=>`<article class="setup-step"><span class="stepnum">ШАГ ${num}</span><h3>${title}</h3><p>${desc}</p><button class="gh sm" data-ne="${key}">${ic('plus')}${btn}</button></article>`).join('');
-  const nodeRows=DB.nodes.length?DB.nodes.slice(0,6).map(n=>`<div class="rowi"><span class="fg" style="font-size:1.25rem">${esc(n.flag||'')}</span><div><b>${esc(n.name)}</b><br><small class="mu">${esc(n.addr)}${n.port?':'+esc(n.port):''}</small></div>${chip(NS[nstat(n)]?.[0]||'Не проверен',NS[nstat(n)]?.[1]||'--mu')}</div>`).join(''):'<div class="empty"><b>Узлов пока нет</b><span>Добавьте первый сервер, чтобы начать настройку.</span><button class="btn sm" data-ne="nodes">'+ic('plus')+'Добавить узел</button></div>';
+  const nodeRows=DB.nodes.length?DB.nodes.slice(0,6).map(n=>`<div class="rowi"><span class="fg" style="font-size:1.25rem">${flagView(n.flag)}</span><div><b>${esc(n.name)}</b><br><small class="mu">${esc(n.addr)}${n.port?':'+esc(n.port):''}</small></div>${chip(NS[nstat(n)]?.[0]||'Не проверен',NS[nstat(n)]?.[1]||'--mu')}</div>`).join(''):'<div class="empty"><b>Узлов пока нет</b><span>Добавьте первый сервер, чтобы начать настройку.</span><button class="btn sm" data-ne="nodes">'+ic('plus')+'Добавить узел</button></div>';
   const userRows=DB.users.length?DB.users.slice(0,6).map(u=>`<div class="rowi"><button class="who" data-uo="${u.id}"><span class="av" style="background:linear-gradient(135deg,var(--b),var(--a))">${esc((u.username||'?')[0].toUpperCase())}</span><span>${esc(u.username)}</span></button>${chip(STM[st(u)]?.[0]||st(u),'--mu')}</div>`).join(''):'<div class="empty"><b>Пользователей пока нет</b><span>Создайте сквад перед добавлением первого пользователя.</span><button class="gh sm" data-ne="squads">'+ic('plus')+'Создать сквад</button></div>';
   return [`<section class="card"><div class="hd"><div><p class="note">ОБЗОР</p><h3 style="font-size:1.35rem;margin-top:.2rem">${firstRun?'Панель готова к настройке':'Обзор инфраструктуры'}</h3><p>${firstRun?'Добавьте свои серверы и конфигурации. Демонстрационных пользователей, узлов и фиктивной телеметрии здесь нет.':'Сводка по объектам, которые вы добавили в панель.'}</p></div><div class="setting-control"><a class="gh sm" href="#set" style="text-decoration:none;color:inherit">${ic('sliders')}Внешний вид</a></div></div><div class="home-counts">${counts.map(([label,value])=>`<div class="home-count"><b>${value}</b><span>${label}</span></div>`).join('')}</div></section>
-  ${firstRun?`<section class="card"><div class="hd"><div><h3>Первый запуск</h3><p>Создайте свои объекты — примеры не подставляются автоматически.</p></div></div><div class="setup-grid">${setupHtml}</div></section>`:`<div class="two"><section class="card"><div class="hd"><div><h3>Узлы</h3><p>${DB.nodes.length} настроено</p></div><button class="gh sm" data-ne="nodes">${ic('plus')}Добавить</button></div>${nodeRows}</section><section class="card"><div class="hd"><div><h3>Пользователи</h3><p>${DB.users.length} создано</p></div><a class="gh sm" href="#users" style="text-decoration:none;color:inherit">Все</a></div>${userRows}</section></div>`}`,()=>{}];
+  <div id="system-stats">${systemPanel(system,systemError)}</div>
+  ${firstRun?`<section class="card"><div class="hd"><div><h3>Первый запуск</h3><p>Создайте свои объекты — примеры не подставляются автоматически.</p></div></div><div class="setup-grid">${setupHtml}</div></section>`:`<div class="two"><section class="card"><div class="hd"><div><h3>Узлы</h3><p>${DB.nodes.length} настроено</p></div><button class="gh sm" data-ne="nodes">${ic('plus')}Добавить</button></div>${nodeRows}</section><section class="card"><div class="hd"><div><h3>Пользователи</h3><p>${DB.users.length} создано</p></div><a class="gh sm" href="#users" style="text-decoration:none;color:inherit">Все</a></div>${userRows}</section></div>`}`,()=>{const refreshSystem=async()=>{try{const latest=await api.systemStats();const target=$('#system-stats');if(target)target.innerHTML=systemPanel(latest)}catch(e){const target=$('#system-stats');if(target)target.innerHTML=systemPanel(null,e.message||'Не удалось обновить показатели.')}};const timer=setInterval(refreshSystem,15000);T.push(timer)}];
 }
 /* ================= ПОЛЬЗОВАТЕЛИ ================= */
 const UQ={q:'',st:'all',sq:'',page:1,size:15,sort:'created',dir:'desc',sel:new Set()};let UIDS=[];
@@ -201,6 +243,47 @@ function userNew(){
 function exportCsv(){const rows=[['username','status','used_gb','limit_gb','expire','tag','telegram','email','squads','sub_url']].concat(UIDS.map(id=>DB.users.find(u=>u.id==id)).map(u=>[u.username,st(u),u.used,u.limit,u.expireAt?new Date(u.expireAt).toISOString().slice(0,10):'',u.tag,u.tg,u.email,u.squads.map(i=>DB.squads.find(s=>s.id==i)?.name).join('|'),subUrl(u)]));
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n')],{type:'text/csv'}));a.download='users.csv';a.click();toast(`Экспортировано: ${UIDS.length}`)}
 
+/* ================= БЫСТРЫЙ КОНСТРУКТОР ПРОФИЛЯ XRAY ================= */
+function xrayBuilderConfig(){
+  const protocol=$('#xpb-protocol').value,network=$('#xpb-network').value,security=$('#xpb-security').value;
+  const tag=$('#xpb-tag').value.trim()||'inbound-1',port=cl(+$('#xpb-port').value||443,1,65535);
+  const sni=$('#xpb-sni').value.trim()||'example.com',dest=$('#xpb-dest').value.trim()||sni+':443',path=$('#xpb-path').value.trim()||'/';
+  const settings=protocol==='vless'?{clients:[],decryption:''}:protocol==='trojan'?{clients:[]}:{clients:[],network:'tcp,udp',method:'chacha20-ietf-poly1305'};
+  const inbound={tag,listen:'0.0.0.0',port,protocol,settings,streamSettings:{network,security}};
+  if(network==='ws')inbound.streamSettings.wsSettings={path};
+  if(network==='xhttp')inbound.streamSettings.xhttpSettings={path};
+  if(network==='grpc')inbound.streamSettings.grpcSettings={serviceName:path.replace(/^\//,'')||'grpc'};
+  if(security==='tls')inbound.streamSettings.tlsSettings={serverName:sni,alpn:['h2','http/1.1'],certificates:[{certificateFile:'/etc/ssl/xray/fullchain.pem',keyFile:'/etc/ssl/xray/privkey.pem'}]};
+  if(security==='reality')inbound.streamSettings.realitySettings={show:false,dest,xver:0,serverNames:[sni],privateKey:'REPLACE_WITH_XRAY_PRIVATE_KEY',shortIds:['0123456789abcdef']};
+  return {log:{loglevel:'warning'},inbounds:[inbound],outbounds:[{protocol:'freedom',tag:'direct'},{protocol:'blackhole',tag:'blocked'}],routing:{rules:[{type:'field',outboundTag:'direct',inboundTag:[tag]}]}};
+}
+async function profilesP(){
+  const saved=await crudCard('profiles');
+  const builderHtml=`<section class="card xray-builder"><div class="hd"><div><h3>Быстрый конструктор Xray</h3><p>Соберите стартовый профиль без ручного набора JSON. Перед запуском замените шаблонные ключи и сертификаты.</p></div><span class="chip" style="--c:var(--a)">JSON builder</span></div>
+  <div class="xray-builder-grid">
+    <label class="f"><span>Название профиля</span><input id="xpb-name" value="Новый Xray профиль" maxlength="80"></label>
+    <label class="f"><span>Тег inbound</span><input id="xpb-tag" value="inbound-1" maxlength="64"></label>
+    <label class="f"><span>Порт</span><input id="xpb-port" type="number" min="1" max="65535" value="443"></label>
+    <label class="f"><span>Протокол</span><select id="xpb-protocol"><option value="vless">VLESS</option><option value="trojan">Trojan</option><option value="shadowsocks">Shadowsocks</option></select></label>
+    <label class="f"><span>Транспорт</span><select id="xpb-network"><option value="tcp">TCP</option><option value="xhttp">XHTTP</option><option value="ws">WebSocket</option><option value="grpc">gRPC</option></select></label>
+    <label class="f"><span>Защита транспорта</span><select id="xpb-security"><option value="reality">Reality</option><option value="tls">TLS</option><option value="none">Без TLS/Reality</option></select></label>
+    <label class="f"><span>SNI / Server name</span><input id="xpb-sni" value="example.com"></label>
+    <label class="f"><span>Reality destination</span><input id="xpb-dest" value="example.com:443"></label>
+    <label class="f"><span>Path / gRPC service</span><input id="xpb-path" value="/" placeholder="/path"></label>
+  </div>
+  <p class="note">Клиенты намеренно пустые. Reality private key и TLS-сертификаты — шаблонные значения: настройте их под свой сервер. Конструктор создаёт конфигурацию, но сам не меняет запущенный Xray.</p>
+  <label class="f"><span>Предпросмотр JSON</span><textarea id="xpb-preview" class="xray-preview" spellcheck="false" readonly></textarea></label>
+  <div class="act"><button type="button" class="gh" id="xpb-download">Скачать JSON</button><button type="button" class="gh" id="xpb-copy">Копировать JSON</button><button type="button" class="btn" id="xpb-save">Сохранить профиль</button></div><p class="er" id="xpb-error" role="status"></p></section>`;
+  return [builderHtml+saved,()=>{
+    const updatePreview=()=>{try{$('#xpb-preview').value=JSON.stringify(xrayBuilderConfig(),null,2);$('#xpb-error').textContent=''}catch(e){$('#xpb-error').textContent=e.message}};
+    ['xpb-tag','xpb-port','xpb-protocol','xpb-network','xpb-security','xpb-sni','xpb-dest','xpb-path'].forEach(id=>$('#'+id).addEventListener('input',updatePreview));
+    updatePreview();
+    $('#xpb-copy').onclick=async()=>{try{await navigator.clipboard.writeText($('#xpb-preview').value);toast('JSON скопирован')}catch(e){$('#xpb-preview').select();document.execCommand('copy');toast('JSON скопирован')}};
+    $('#xpb-download').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([$('#xpb-preview').value],{type:'application/json'}));a.download=(($('#xpb-name').value||'xray-profile').trim().replace(/[^a-z0-9_-]+/gi,'-')||'xray-profile')+'.json';a.click();URL.revokeObjectURL(a.href)};
+    $('#xpb-save').onclick=async()=>{const name=$('#xpb-name').value.trim();if(!name){$('#xpb-error').textContent='Укажите название профиля.';return}try{const config=$('#xpb-preview').value,data=JSON.parse(config),tags=data.inbounds.map(i=>i.tag);if(!data.inbounds.length||tags.some(t=>!t))throw new Error('У inbound должен быть тег.');if(new Set(tags).size!==tags.length)throw new Error('Теги inbound должны быть уникальными.');if(DB.profiles.some(p=>p.name.toLowerCase()===name.toLowerCase()))throw new Error('Профиль с таким названием уже существует.');const used=DB.profiles.flatMap(inbs).map(i=>i.tag);if(tags.some(t=>used.includes(t)))throw new Error('Такой тег уже используется в другом профиле.');await api.create('profiles',{name,config});toast('Профиль Xray сохранён');await render(1)}catch(e){$('#xpb-error').textContent=e.message||'Не удалось сохранить профиль.'}};
+  }];
+}
+
 /* ================= CRUD-страницы ================= */
 async function crudCard(k){
   const e=ENT[k],{items}=await api.list(k,{sort:e.s});
@@ -226,7 +309,7 @@ async function nodesP(){
   const [r,s]=await Promise.all([api.list('nodes',{sort:'id'}),api.stats()]);ST=s;
   const cards=r.items.map(n=>{
     const ss=nstat(n),p=DB.profiles.find(x=>x.id==n.profileId),l=LV[n.id]||{cpu:null,ram:null,mbps:null},k=n.limit?cl(n.used/n.limit,0,1):0,tc=k>.9?'--er':k>.75?'--wr':'--c3';
-    return `<div class="card nc${n.disabled?' off':''}"><div class="h"><span class="fg">${esc(n.flag||'')}</span><div><b>${esc(n.name)}</b><br><small class="mu">${esc(n.addr)}${n.port?':'+esc(n.port):''}</small></div>${chip(NS[ss]?.[0]||'Не проверен',NS[ss]?.[1]||'--mu')}</div>
+    return `<div class="card nc${n.disabled?' off':''}"><div class="h"><span class="fg">${flagView(n.flag)}</span><div><b>${esc(n.name)}</b><br><small class="mu">${esc(n.addr)}${n.port?':'+esc(n.port):''}</small></div>${chip(NS[ss]?.[0]||'Не проверен',NS[ss]?.[1]||'--mu')}</div>
       <div class="kvg"><div><span>Активные пользователи</span><b>${s.nodeOn[n.id]??0}</b></div><div><span>Профиль Xray</span>${esc(p?.name||'—')}</div></div>
       <div class="node-gauges">
         ${nodeGauge(n,'cpu-'+n.id,'CPU',Number.isFinite(l.cpu)?l.cpu:0,Number.isFinite(l.cpu)?Math.round(l.cpu)+'%':'—',Number.isFinite(l.cpu)?'загрузка':'нет данных','--a')}
@@ -273,8 +356,8 @@ function drawTools(){const e=$('#tr');if(!e)return;const q=TP.q;
 /* ================= НАСТРОЙКИ ================= */
 async function setP(){
   const sw=[
-    ['mint','#c7a66b','#ead7a8','Шампань'],['ocean','#7fb3e8','#6fd8c3','Океан'],['amber','#ebbd7a','#f0899a','Янтарь'],['rose','#f0a0c4','#a0a2f6','Роза'],
-    ['violet','#b7a1ff','#83d9ed','Фиолетовый'],['emerald','#60d6a2','#c3e879','Изумруд'],['cyan','#63dff2','#7fa8ff','Циан'],['ruby','#ff8aa7','#d4a1ff','Рубин']
+    ['emerald','#60d6a2','#c3e879','Изумруд'],['ocean','#7fb3e8','#6fd8c3','Океан'],['amber','#ebbd7a','#f0899a','Янтарь'],['rose','#f0a0c4','#a0a2f6','Роза'],
+    ['violet','#b7a1ff','#83d9ed','Фиолетовый'],['cyan','#63dff2','#7fa8ff','Циан'],['ruby','#ff8aa7','#d4a1ff','Рубин'],['custom',C.customA||'#60d6a2',C.customB||'#c3e879','Своя тема']
   ];
   const choices=(key,items)=>`<div class="seg choice" role="group" aria-label="${key}">${items.map(([v,l])=>`<button type="button" data-ui="${key}" data-value="${v}" class="${(C[key]||CDEFAULT[key])==v?'on':''}">${l}</button>`).join('')}</div>`;
   const tk=await crudCard('tokens');
@@ -285,6 +368,8 @@ async function setP(){
     <section class="card sg"><div><h3>Цвет и тема</h3><small>Основная палитра интерфейса и брендовые акценты</small></div>
       <div class="setting-row"><div class="setting-copy"><b>Тема</b><small>Автоматически — по настройкам ОС</small></div><div class="setting-control"><div class="seg choice" id="th">${[['dark','Тёмная'],['light','Светлая'],['auto','Авто']].map(([k,l])=>`<button type="button" data-th="${k}" class="${C.theme==k?'on':''}">${l}</button>`).join('')}</div></div></div>
       <div class="setting-row"><div class="setting-copy"><b>Акцентный цвет</b><small>Влияет на кнопки, графики и активные элементы</small></div><div class="setting-control" style="gap:.85rem;max-width:18rem">${sw.map(([k,x,y,l])=>`<button class="palette-swatch ${C.accent==k?'on':''}" style="--x:${x};--y:${y}" data-ac="${k}" title="${l}" aria-label="${l}"></button>`).join('')}</div></div>
+      <div class="setting-row"><div class="setting-copy"><b>Своя палитра</b><small>Цветовые «бублики» открывают выбор цвета; ползунки позволяют точно настроить оттенок, насыщенность и яркость.</small></div><div class="setting-control"><div class="color-bubbles"><label class="color-bubble-wrap"><span class="color-bubble"><input type="color" id="custom-a" value="${C.customA||'#60d6a2'}" aria-label="Основной цвет"></span>Основной</label><label class="color-bubble-wrap"><span class="color-bubble"><input type="color" id="custom-b" value="${C.customB||'#c3e879'}" aria-label="Вторичный цвет"></span>Вторичный</label></div></div></div>
+      <div class="color-slider-grid"><label for="hue">Оттенок</label><input type="range" id="hue" min="0" max="360" value="${C.hue??151}"><output id="huev">${C.hue??151}°</output></div><div class="color-slider-grid"><label for="sat">Насыщенность</label><input type="range" id="sat" min="0" max="100" value="${C.sat??62}"><output id="satv">${C.sat??62}%</output></div><div class="color-slider-grid"><label for="lum">Яркость</label><input type="range" id="lum" min="15" max="85" value="${C.lum??61}"><output id="lumv">${C.lum??61}%</output></div>
       <div class="setting-row"><div class="setting-copy"><b>Размер текста</b><small>Можно увеличить интерфейс для большого монитора или уменьшить плотность текста</small></div><div class="setting-control slider-control"><input type="range" id="ts" min="0.9" max="1.3" step="0.05" value="${C.ts}" aria-label="Размер текста"><b id="tsv">${Math.round(C.ts*100)}%</b></div></div>
       <div class="setting-row"><div class="setting-copy"><b>Шрифт</b><small>Выберите нейтральный системный или моноширинный стиль</small></div><div class="setting-control">${choices('font',[['onest','Manrope'],['system','Системный'],['mono','Моно']])}</div></div>
     </section>
@@ -353,7 +438,7 @@ document.addEventListener('click',async e=>{
   else if(b=g('[data-ne]')){const [k,id]=b.dataset.ne.split(':');entForm(k,id)}
   else if(b=g('tr[data-e]')){const [k,id]=b.dataset.e.split(':');entForm(k,id)}
   else if(b=g('[data-mv]')){const [k,id,d]=b.dataset.mv.split(':'),a=[...DB[k]].sort((x,y)=>x.order-y.order),i=a.findIndex(x=>x.id==id),j=i+ +d;if(a[j]){const o=a[i].order;await api.update(k,a[i].id,{order:a[j].order});await api.update(k,a[j].id,{order:o});render(1)}}
-  else if(b=g('[data-del]')){const [k,id]=b.dataset.del.split(':'),e=ENT[k],r=DB[k].find(x=>x.id==id),m=e.guard?.(r);if(m)return $('#fe').textContent=m;if(!b.dataset.s){b.dataset.s=1;b.lastChild.textContent='Точно удалить?';return}await api.remove(k,id);dlg.close();toast('Удалено');render(1)}
+  else if(b=g('[data-del]')){const [k,id]=b.dataset.del.split(':'),e=ENT[k],r=DB[k].find(x=>String(x.id)===id),m=e?.guard?.(r);if(m){const error=$('#fe');if(error)error.textContent=m;else toast(m);return}if(!r){toast('Запись уже удалена или не найдена.');return}confirmBox(`Удалить «${e?.t||k}»?`,'Удалить',async()=>{try{await api.remove(k,id);toast('Запись удалена');await render(1)}catch(err){toast('Не удалось удалить: '+(err.message||'ошибка backend'))}})}
   else if(b=g('[data-nr]')){toast('Перезапуск требует подключённого backend/API Xray. В автономном HTML он не выполняется.')}
   else if(b=g('[data-nt]')){const n=DB.nodes.find(x=>x.id==b.dataset.nt);await api.update('nodes',n.id,{disabled:!n.disabled});toast(`${n.name}: ${n.disabled?'отключён':'включён'}`);render(1)}
   else if(b=g('[data-tt]')){TP.tab=b.dataset.tt;TP.q='';TP.f='';render(1)}
@@ -371,7 +456,10 @@ document.addEventListener('click',async e=>{
   else if(b=g('[data-go]')){dlg.close();location.hash=b.dataset.go}
   else if(g('#pal'))palette();
 });
+document.addEventListener('input',e=>{const search=e.target.closest('[data-country-search]');if(!search)return;const picker=search.closest('.country-picker');const q=search.value.trim().toLocaleLowerCase('ru');const select=picker.querySelector('select[name=flag]');const selected=select.value;for(const option of [...select.options]){if(!option.value)continue;const text=(option.textContent+' '+(option.dataset.countryName||'')+' '+(option.dataset.countryCode||'')).toLocaleLowerCase('ru');option.hidden=!!q&&!text.includes(q)&&option.value!==selected}});
+document.addEventListener('change',e=>{const select=e.target.closest('.country-picker select[name=flag]');if(!select)return;const picker=select.closest('.country-picker');const country=COUNTRIES.find(c=>c.flag===select.value);const preview=picker.querySelector('.country-selected');preview.innerHTML=flagView(select.value,'country-flag-preview')+`<span data-country-label>${country?esc(country.name):select.value?esc(select.value+' Сохранённый флаг'):'Выберите страну…'}</span>`;});
 document.addEventListener('change',async e=>{const t=e.target;
+  if(t.id==='custom-a'||t.id==='custom-b'){if(t.id==='custom-a')C.customA=t.value;else C.customB=t.value;C.accent='custom';if(t.id==='custom-a'){const rgb=t.value.match(/[0-9a-f]{2}/gi).map(v=>parseInt(v,16)/255);const max=Math.max(...rgb),min=Math.min(...rgb),d=max-min;let h=0,s=0,l=(max+min)/2;if(d){s=d/(1-Math.abs(2*l-1));if(max===rgb[0])h=60*(((rgb[1]-rgb[2])/d)%6);else if(max===rgb[1])h=60*((rgb[2]-rgb[0])/d+2);else h=60*((rgb[0]-rgb[1])/d+4);if(h<0)h+=360}C.hue=Math.round(h);C.sat=Math.round(s*100);C.lum=Math.round(l*100);if($('#hue'))$('#hue').value=C.hue;if($('#sat'))$('#sat').value=C.sat;if($('#lum'))$('#lum').value=C.lum;if($('#huev'))$('#huev').textContent=C.hue+'°';if($('#satv'))$('#satv').textContent=C.sat+'%';if($('#lumv'))$('#lumv').textContent=C.lum+'%'}apply();$('[data-ac]').forEach(x=>x.classList.toggle('on',x.dataset.ac==='custom'));return}
   if(t.dataset.tg){const [k,id]=t.dataset.tg.split(':');await api.update(k,id,{disabled:!t.checked});toast(t.checked?'Включено':'Отключено')}
   else if(t.dataset.usq){const [ui,si]=t.dataset.usq.split(':').map(Number),u=DB.users.find(x=>x.id==ui);await api.update('users',ui,{squads:t.checked?[...new Set([...u.squads,si])]:u.squads.filter(x=>x!=si)});toast('Доступ обновлён');render(1);userDrawer(ui,'acc')}
   else if(t.dataset.hw){await api.update('users',+t.dataset.hw,{hwid:+t.value||0});toast('Лимит устройств сохранён');render(1);userDrawer(+t.dataset.hw,'acc')}
@@ -379,7 +467,7 @@ document.addEventListener('change',async e=>{const t=e.target;
   else if(t.dataset.psz){UQ.size=+t.value;UQ.page=1;drawUsers()}
   else if(t.id=='mo'){C.motion=t.checked?1:0;apply()}
   else if(t.id=='tplsel'){const p=DB.tpls.find(x=>x.id==t.value);if(!p)return;const f=$('form[data-k=user]');const set=(k,v)=>{const el=$(`[name=${k}]`,f);if(el)el.value=v};set('limit',p.limit);set('days',p.days);set('strategy',p.strategy);set('hwid',p.hwid);$('[name=hold]',f).checked=p.hold;$$('[name=squads]',f).forEach(c=>c.checked=p.squads.includes(+c.value))}});
-document.addEventListener('input',e=>{if(e.target.id=='ts'){C.ts=+e.target.value;$('#tsv').textContent=Math.round(C.ts*100)+'%';apply()}else if(e.target.id=='radius'){C.radius=+e.target.value;$('#rv').textContent=C.radius+' px';apply()}if(e.target.id=='pq')pdraw(e.target.value)});
+document.addEventListener('input',e=>{if(['hue','sat','lum'].includes(e.target.id)){C.hue=+$('#hue').value;C.sat=+$('#sat').value;C.lum=+$('#lum').value;C.customA=hslHex(C.hue,C.sat,C.lum);C.accent='custom';$('#custom-a').value=C.customA;$('#huev').textContent=C.hue+'°';$('#satv').textContent=C.sat+'%';$('#lumv').textContent=C.lum+'%';apply();$('[data-ac]').forEach(x=>x.classList.toggle('on',x.dataset.ac==='custom'))}else if(e.target.id=='ts'){C.ts=+e.target.value;$('#tsv').textContent=Math.round(C.ts*100)+'%';apply()}else if(e.target.id=='radius'){C.radius=+e.target.value;$('#rv').textContent=C.radius+' px';apply()}if(e.target.id=='pq')pdraw(e.target.value)});
 document.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()=='k'){e.preventDefault();palette();return}
   if(e.target.id=='pq'){if(e.key=='ArrowDown'||e.key=='ArrowUp'){e.preventDefault();const n=Math.min(PI.length,12);PX=(PX+(e.key=='ArrowDown'?1:n-1))%Math.max(n,1);$$('.pi').forEach((x,i)=>x.classList.toggle('on',i==PX));$('.pi.on')?.scrollIntoView({block:'nearest'})}if(e.key=='Enter'){e.preventDefault();const x=PI[PX];if(x){dlg.close();x.r()}}return}
@@ -416,26 +504,13 @@ document.addEventListener('click',e=>{
 
 /* ================= СТАРТ ================= */
 $('#si').innerHTML=ic('search');$('#theme').innerHTML=ic('moon').replace('class="ic"','class="ic moon"')+ic('sun').replace('class="ic"','class="ic sun"');
-$('#bell').innerHTML=ic('bell');$('#addb').innerHTML=ic('plus')+'<span class="bt">Пользователь</span>';$('#restart').setAttribute('aria-label','Настройки Xray-core');$('#restart').innerHTML=ic('code')+'<span class="lbl">Версия</span>';
+$('#bell').innerHTML=ic('bell');$('#addb').innerHTML=ic('plus')+'<span class="bt">Пользователь</span>';
+$('#logout').onclick=async()=>{const button=$('#logout');button.disabled=true;try{await fetch('/api/v1/auth/logout',{method:'POST',credentials:'same-origin',cache:'no-store'});}catch(_){}backendReady=false;location.replace('/login')};$('#restart').setAttribute('aria-label','Настройки Xray-core');$('#restart').innerHTML=ic('code')+'<span class="lbl">Версия</span>';
 apply();matchMedia('(prefers-color-scheme: light)').addEventListener('change',apply);
 addEventListener('hashchange',()=>{if(backendReady)render()});
-function showAuthGate(message=''){
-  if($('#xmesh-auth')){if(message)$('#xmesh-auth-error').textContent=message;return}
-  const layer=document.createElement('div');layer.id='xmesh-auth';layer.className='auth-layer';
-  layer.innerHTML=`<form class="auth-card" id="xmesh-auth-form"><div class="auth-mark">X</div><p class="auth-eyebrow">XMESH NEXUS · ADMIN ACCESS</p><h1>Вход в панель</h1><p class="auth-intro">Используйте учётную запись администратора, заданную при установке.</p><label class="f"><span>Логин</span><input name="username" autocomplete="username" required value="admin"></label><label class="f"><span>Пароль</span><input name="password" type="password" autocomplete="current-password" required></label><p id="xmesh-auth-error" class="auth-error">${esc(message)}</p><button type="submit" class="btn auth-submit">Войти</button><p class="auth-foot">Защищённая сессия · PostgreSQL</p></form>`;
-  document.body.appendChild(layer);
-  layer.querySelector('form').addEventListener('submit',async e=>{
-    e.preventDefault();const form=e.currentTarget,button=form.querySelector('button[type=submit]'),error=form.querySelector('#xmesh-auth-error');
-    const username=form.elements.username.value.trim(),password=form.elements.password.value;
-    button.disabled=true;button.textContent='Вход…';error.textContent='';
-    try{
-      const response=await fetch('/api/v1/auth/login',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password})});
-      const payload=await response.json().catch(()=>({}));
-      if(!response.ok)throw new Error(payload.error||'Не удалось войти.');
-      form.elements.password.value='';
-      await initializePanel();
-    }catch(err){error.textContent=err.message||'Ошибка входа';button.disabled=false;button.textContent='Войти';}
-  });
+function showAuthGate(){
+  backendReady=false;
+  location.replace('/login');
 }
 async function initializePanel(){
   const response=await fetch('/api/v1/bootstrap',{credentials:'same-origin',cache:'no-store'});
@@ -454,9 +529,9 @@ async function bootPanel(){
     const response=await fetch('/api/v1/auth/session',{credentials:'same-origin',cache:'no-store'});
     if(!response.ok)throw new Error('Backend API не отвечает.');
     const session=await response.json();
-    if(!session.authenticated){showAuthGate();return}
+    if(!session.authenticated){location.replace('/login');return}
     await initializePanel();
-  }catch(err){showAuthGate(err.message||'Не удалось подключиться к backend API.')}
+  }catch(err){location.replace('/login?unavailable=1')}
 }
 function coreStateLabel(status){
   return status==='updating'?'Обновляется':status==='ready'?'Установлено':status==='error'?'Ошибка':'Не установлено';

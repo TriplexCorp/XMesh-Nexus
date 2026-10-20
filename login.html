@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#090a0c">
+<title>Вход — XMesh Nexus</title>
+<link rel="stylesheet" href="/login.css">
+<script src="/login.js" defer></script>
+</head>
+<body>
+<main class="login-shell">
+  <section class="login-card" aria-labelledby="login-title">
+    <div class="brand-mark" aria-hidden="true">X</div>
+    <p class="eyebrow">XMESH NEXUS <span>·</span> ADMIN ACCESS</p>
+    <h1 id="login-title">Вход в панель</h1>
+    <p class="intro">Авторизуйтесь, чтобы получить доступ к инфраструктуре.</p>
+    <form id="login-form" autocomplete="on">
+      <label for="username">Логин</label>
+      <input id="username" name="username" autocomplete="username" maxlength="128" required autocapitalize="none" spellcheck="false">
+      <label for="password">Пароль</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" maxlength="1024" required>
+      <p id="login-error" class="error" role="alert" aria-live="polite"></p>
+      <button id="submit" type="submit">Войти <span aria-hidden="true">↗</span></button>
+    </form>
+    <p class="security-note"><span class="status-dot"></span> Защищённая сессия · XMesh Nexus</p>
+  </section>
+  <p class="footer">PRIVATE INFRASTRUCTURE <span>—</span> AUTHORIZED ACCESS ONLY</p>
+</main>
+</body>
+</html>

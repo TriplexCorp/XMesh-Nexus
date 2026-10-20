@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, security/auth-hardening, ui/emerald-theme-xray-builder]
 
 permissions:
   contents: read
@@ -24,12 +24,15 @@ jobs:
           cargo test --manifest-path backend/Cargo.toml
           cargo clippy --manifest-path backend/Cargo.toml --all-targets -- -D warnings
       - name: Check frontend syntax
-        run: node --check app.js
+        run: |
+          node --check app.js
+          node --check login.js
       - name: Validate installer and Docker Compose
         env:
           POSTGRES_PASSWORD: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
           APP_DB_PASSWORD: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
-          ADMIN_PASSWORD: 9876543210abcdef9876543210abcdef9876543210abcdef9876543210abcdef
+          REDIS_PASSWORD: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
+          ADMIN_PASSWORD: 9876543210abcdef9876543210abcdef9876543210abcdef
         run: |
           bash -n install.sh
           sh -n deploy/postgres/10-create-app-user.sh
