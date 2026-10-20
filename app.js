@@ -229,6 +229,52 @@ function read(fs,form){const d={};fs.forEach(f=>{const e=$$(`[name="${f.k}"]`,fo
 
 /* ================= ОБОЛОЧКА ================= */
 const dlg=$('#dlg');let CF;
+/* A single viewport-positioned tooltip avoids clipping inside the scrolling sidebar. */
+const railTip=document.createElement('div');
+railTip.className='rail-tooltip';
+railTip.id='rail-tooltip';
+railTip.setAttribute('role','tooltip');
+railTip.hidden=true;
+document.body.append(railTip);
+let railTipTarget=null;
+function hideRailTip(){
+  if(railTipTarget)railTipTarget.removeAttribute('aria-describedby');
+  railTipTarget=null;
+  railTip.hidden=true;
+}
+function showRailTip(target){
+  if(!target||matchMedia('(max-width:760px)').matches)return hideRailTip();
+  const label=target.dataset.railTip;
+  if(!label)return hideRailTip();
+  if(railTipTarget&&railTipTarget!==target)railTipTarget.removeAttribute('aria-describedby');
+  railTipTarget=target;
+  railTip.textContent=label;
+  railTip.hidden=false;
+  target.setAttribute('aria-describedby','rail-tooltip');
+  const rect=target.getBoundingClientRect();
+  const box=railTip.getBoundingClientRect();
+  const left=Math.min(window.innerWidth-box.width-10,rect.right+12);
+  const top=Math.max(8,Math.min(window.innerHeight-box.height-8,rect.top+(rect.height-box.height)/2));
+  railTip.style.left=Math.max(8,left)+'px';
+  railTip.style.top=top+'px';
+}
+document.addEventListener('pointerover',e=>{
+  const target=e.target.closest?.('[data-rail-tip]');
+  if(target&&target!==railTipTarget)showRailTip(target);
+  else if(!target&&railTipTarget)hideRailTip();
+});
+document.addEventListener('focusin',e=>{
+  const target=e.target.closest?.('[data-rail-tip]');
+  if(target)showRailTip(target);
+  else hideRailTip();
+});
+document.addEventListener('focusout',e=>{
+  if(railTipTarget&&e.target===railTipTarget)hideRailTip();
+});
+document.addEventListener('pointerdown',hideRailTip);
+window.addEventListener('scroll',hideRailTip,true);
+window.addEventListener('resize',hideRailTip);
+
 const modal=(h,c='')=>{dlg.className=c;dlg.innerHTML=h;decorateButtonIcons(dlg);if(!dlg.open)dlg.showModal()};
 dlg.addEventListener('click',e=>{if(e.target==dlg||e.target.closest('[data-x]'))dlg.close()});
 const confirmBox=(h,ok,fn)=>{CF=fn;modal(`<div class="box"><h2>${h}</h2><div class="act"><button class="gh" data-x>Отмена</button><button class="btn" data-cf>${ok}</button></div></div>`)};
@@ -243,12 +289,24 @@ let T=[],cur='',RT=0;
 const pages={home:['Дашборд',homeP],users:['Пользователи',usersP],squads:['Сквады',()=>simple(['squads'])],hosts:['Хосты',()=>simple(['hosts'])],nodes:['Узлы',nodesP],templates:['Шаблоны',()=>simple(['tpls','subs'])],profiles:['XRAY STUDIO',profilesP],tools:['Диагностика',toolsP],admins:['Администраторы',()=>simple(['admins'])],set:['Настройки',setP]};
 const skel=()=>`<div class="sk" style="height:7rem"></div><div class="sk" style="height:18rem"></div><div class="sk" style="height:12rem"></div>`;
 const NAV_SHORT={home:'Главная',users:'Клиенты',hosts:'Хосты',nodes:'Узлы'};
-$('#nav').innerHTML=NAV.map(([g,a])=>`<div class="g">${g}</div>`+a.map(([k,i,l,p])=>`<a href="#${k}" class="${p?'':'sec'}" aria-label="${l}">${ic(i)}<span class="lbl"><span class="nav-label-full">${l}</span><span class="nav-label-short" aria-hidden="true">${NAV_SHORT[k]||l}</span></span>${k=='users'?'<em id="unb"></em>':''}</a>`).join('')).join('')+`<button class="more" id="more" aria-label="Ещё разделы">${ic('more')}<span class="lbl">Ещё</span></button>`;
-async function render(soft){
+$('#nav').innerHTML=NAV.map(([g,a])=>`<div class="g">${g}</div>`+a.map(([k,i,l,p])=>`<a href="#${k}" class="${p?'':'sec'}" aria-label="${l}" data-rail-tip="${l}">${ic(i)}<span class="lbl"><span class="nav-label-full">${l}</span><span class="nav-label-short" aria-hidden="true">${NAV_SHORT[k]||l}</span></span>${k=='users'?'<em id="unb"></em>':''}</a>`).join('')).join('')+`<button class="more" id="more" aria-label="Ещё разделы" data-rail-tip="Ещё разделы">${ic('more')}<span class="lbl">Ещё</span></button>`;
+async let pendingScrollTarget=null;
+function scrollToSettingsTarget(id){
+  const target=document.getElementById(id);
+  if(!target)return false;
+  target.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'});
+  return true;
+}
+function render(soft){
   T.forEach(clearInterval);T=[];cur=location.hash.slice(1);if(!pages[cur])cur='home';const rt=++RT,[t,f]=pages[cur],v=$('#view');
   $('#title').textContent=t;document.title=t+' — '+DB.set.brand;$$('#nav a').forEach(a=>a.classList.toggle('on',a.getAttribute('href')=='#'+cur));
   if(!soft){v.classList.remove('still');v.innerHTML=skel();scrollTo(0,0)}
   const [h,i]=await f();if(rt!=RT)return;v.classList.toggle('still',!!soft);v.innerHTML=h;decorateButtonIcons(v);i&&i();$('#unb').textContent=DB.users.length;drawBulk();
+  if(pendingScrollTarget&&cur==='set'){
+    const target=pendingScrollTarget;
+    pendingScrollTarget=null;
+    requestAnimationFrame(()=>scrollToSettingsTarget(target));
+  }
 }
 
 /* ================= СИСТЕМНЫЕ МЕТРИКИ ================= */
@@ -418,7 +476,7 @@ function userDrawer(id,tab){
     <form data-k="uedit" data-id="${u.id}" method="dialog" class="sg" style="gap:.9rem"><div class="r2" style="display:grid;border:0;padding:0">${FE.slice(0,4).map(f=>field(f,f.k=='expireAt'?u.expireAt:u[f.k])).join('')}</div><div class="r2" style="display:grid;border:0;padding:0">${FE.slice(4).map(f=>field(f,u[f.k])).join('')}</div><p class="er" id="fe" style="border:0;padding:0"></p><div style="border:0;padding:0"><button class="btn" style="width:100%">Сохранить</button></div></form>
     <div class="mu">Создан ${new Date(u.created).toLocaleDateString('ru-RU')} · Админ: ${esc(DB.admins.find(a=>a.id==u.adminId)?.username||'—')}</div>`,
     acc:`<p class="note">Отметьте сквады: доступ меняется сразу.</p><div class="ms">${DB.squads.map(s=>`<label class="ck"><input type="checkbox" data-usq="${u.id}:${s.id}" ${u.squads.includes(s.id)?'checked':''}><span>${esc(s.name)}</span></label>`).join('')}</div><div><span class="mu">Итоговые инбаунды</span><div style="margin-top:.5rem">${uin(u).map(t=>chip(esc(t),tcol(t))).join(' ')||'<span class="mu">Нет доступа</span>'}</div></div><div><span class="mu">Хосты в подписке</span><div style="margin-top:.5rem">${DB.hosts.filter(x=>!x.disabled&&uin(u).includes(x.tag)).map(x=>`<div class="rowi">${esc(x.remark)}<small class="mu" style="margin-left:auto">${esc(x.address)}:${x.port}</small></div>`).join('')||'<span class="mu">Нет подходящих хостов</span>'}</div></div><label class="f"><span>Лимит устройств</span><input type="number" min="0" value="${u.hwid}" data-hw="${u.id}"></label>`,
-    sub:`<div class="history-placeholder"><b style="display:block;color:var(--tx);margin-bottom:.35rem">Подписка ещё не подключена</b>В этой HTML-версии не настроен API, который выпускает рабочие ссылки подписки и QR-коды. Поэтому здесь не показывается фиктивная ссылка.</div><a class="gh" href="#set" style="text-decoration:none;color:inherit;justify-self:start">' + ic('sliders') + 'Настроить домен</a>`,
+    sub:`<div class="history-placeholder"><b style="display:block;color:var(--tx);margin-bottom:.35rem">Подписка ещё не подключена</b>В этой HTML-версии не настроен API, который выпускает рабочие ссылки подписки и QR-коды. Поэтому здесь не показывается фиктивная ссылка.</div><a class="gh" href="#set" data-scroll-target="brand-panel" style="text-decoration:none;color:inherit;justify-self:start">${ic('sliders')}Настроить домен</a>`,
     dev:u.devices.length?u.devices.map(d=>`<div class="rowi"><div><b>${esc(d.model)}</b> ${chip(d.plat,'--c3')}<br><small class="mu">${esc(d.app)} · был ${ago(d.last)}</small></div><button class="ia" data-dd="${u.id}:${d.id}" aria-label="Удалить устройство">${ic('trash')}</button></div>`).join('')+(u.devices.length>u.hwid?`<p class="er">Устройств больше лимита (${u.hwid}).</p>`:''):'<div class="empty">Устройства ещё не подключались</div>'}[UT];
   modal(`<div class="box"><div class="bar2"><div class="who"><span class="av" style="background:hsl(${h} 55% 68%)">${esc(u.username[0].toUpperCase())}</span><div><h2>${esc(u.username)}</h2>${chip(sl,sc)} ${isOn(u)?'<span class="dot"></span>':''}</div></div><button class="ia" data-x style="margin-left:auto" aria-label="Закрыть">${ic('x')}</button></div>
   <div class="acts"><button class="gh sm" data-a="tog" data-u="${u.id}">${u.disabled?'Включить':'Отключить'}</button><button class="gh sm" data-a="rst" data-u="${u.id}">Сбросить трафик</button><button class="gh sm" data-a="ext" data-u="${u.id}">+30 дней</button><button class="dg sm" data-a="del" data-u="${u.id}">${ic('trash')}Удалить</button></div>
@@ -1362,7 +1420,7 @@ async function setP(){
       <div class="setting-row"><div class="setting-copy"><b>Сохранение</b><small>Параметры оформления сохраняются в localStorage этого браузера</small></div><button class="gh sm" id="rs">Сбросить оформление</button></div>
     </section>
   </div>
-  <div class="card"><div class="hd"><div><h3>Бренд и домен</h3><p>Имя в меню и домен в ссылках подписки</p></div></div><form data-k="brand" method="dialog" class="sg" style="gap:1rem"><div class="r2" style="display:grid;border:0;padding:0">${field({k:'brand',l:'Название панели',req:1},DB.set.brand)}${field({k:'domain',l:'Домен панели',req:1,ph:'panel.example.com'},DB.set.domain)}</div><div style="border:0;padding:0"><button class="btn">Сохранить</button></div></form></div>
+  <div class="card" id="brand-panel"><div class="hd"><div><h3>Бренд и домен</h3><p>Имя в меню и домен в ссылках подписки</p></div></div><form data-k="brand" method="dialog" class="sg" style="gap:1rem"><div class="r2" style="display:grid;border:0;padding:0">${field({k:'brand',l:'Название панели',req:1},DB.set.brand)}${field({k:'domain',l:'Домен панели',req:1,ph:'panel.example.com'},DB.set.domain)}</div><div style="border:0;padding:0"><button class="btn">Сохранить</button></div></form></div>
   <div class="card"><div class="hd"><div><h3>Вебхуки</h3><p>События, о которых панель сообщает во внешние сервисы</p></div></div>${Object.entries(DB.set.hooks).map(([k,v])=>`<div class="rowi"><div>${k}</div><label class="sw"><input type="checkbox" data-hk="${k}" ${v?'checked':''} aria-label="${k}"><span></span></label></div>`).join('')}</div>${tk}
   <div class="card" id="core-panel"><div class="hd"><div><h3>Xray-core</h3><p>Установка и обновление бинарника ядра на сервере панели</p></div><span class="chip" id="core-state">${esc(coreLabel)}</span></div>
     <div class="setting-row"><div class="setting-copy"><b>Установленная версия</b><small id="core-installed">${coreView.installed_version?esc(coreView.installed_version):'Ещё не установлена'}</small></div><div class="setting-copy"><b>Архитектура</b><small id="core-architecture">${esc(coreView.architecture||'—')}</small></div></div>
@@ -1390,6 +1448,17 @@ const delUsers=async ids=>{const gone=DB.users.filter(u=>[...ids].some(id=>Strin
 document.addEventListener('click',async e=>{
   const g=s=>e.target.closest(s);let b;
   if(g('.sw')||g('[data-sel]')&&0)return;
+  if(b=g('[data-scroll-target]')){
+    e.preventDefault();
+    pendingScrollTarget=b.dataset.scrollTarget;
+    dlg.close();
+    if(location.hash==='#set'){
+      const target=pendingScrollTarget;
+      pendingScrollTarget=null;
+      requestAnimationFrame(()=>scrollToSettingsTarget(target));
+    }else location.hash='set';
+    return;
+  }
   if(g('[data-nu]'))userNew();
   else if(b=g('[data-uf]')){UQ.st=b.dataset.uf;UQ.page=1;drawUsers()}
   else if(b=g('[data-s]')){const k=b.dataset.s;UQ.dir=UQ.sort==k&&UQ.dir=='asc'?'desc':'asc';UQ.sort=k;drawUsers()}
@@ -1580,7 +1649,7 @@ document.addEventListener('click',e=>{
 /* ================= СТАРТ ================= */
 $('#si').innerHTML=ic('search');$('#theme').innerHTML=ic('moon').replace('class="ic"','class="ic moon"')+ic('sun').replace('class="ic"','class="ic sun"');
 $('#bell').innerHTML=ic('bell');$('#logout').innerHTML=ic('logout')+'<span class="logout-label">Выйти</span>';$('#logout').setAttribute('aria-label','Выйти');$('#addb').innerHTML='<span class="addb-icon">'+ic('plus')+'</span><span class="addb-label">Новый пользователь</span>';
-$('#logout').onclick=async()=>{const button=$('#logout');button.disabled=true;try{await fetch('/api/v1/auth/logout',{method:'POST',credentials:'same-origin',cache:'no-store'});}catch(_){}backendReady=false;location.replace('/login')};$('#restart').setAttribute('aria-label','Настройки Xray-core');$('#restart').innerHTML=ic('code')+'<span class="lbl">Версия</span>';
+$('#logout').onclick=async()=>{const button=$('#logout');button.disabled=true;try{await fetch('/api/v1/auth/logout',{method:'POST',credentials:'same-origin',cache:'no-store'});}catch(_){}backendReady=false;location.replace('/login')};$('#restart').setAttribute('aria-label','Настройки Xray-core');$('#restart').dataset.railTip='Настройки Xray-core';$('#restart').innerHTML=ic('code')+'<span class="lbl">Версия</span>';
 apply();matchMedia('(prefers-color-scheme: light)').addEventListener('change',apply);
 addEventListener('hashchange',()=>{if(backendReady)render()});
 function showAuthGate(){
