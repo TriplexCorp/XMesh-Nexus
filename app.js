@@ -362,7 +362,8 @@ async function profilesP(){
  field('doko-network','Dokodemo network',sel('doko-network',[['tcp,udp','TCP + UDP'],['tcp','TCP'],['udp','UDP']]))+
  field('loglevel','Log level',sel('loglevel',[['warning','warning'],['error','error'],['none','none'],['info','info'],['debug','debug']]))+
  '</div>',false)+
- '<div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-generate-uuid">Сгенерировать UUID</button></div>'+\n '<div class="xray-output-head"><div><b>Предпросмотр JSON</b><small>Обновляется автоматически · не применяет конфигурацию к работающему ядру</small></div><div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-copy">Копировать JSON</button><button type="button" class="gh sm" id="xpb-download">Скачать JSON</button></div></div>'+
+ '<div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-generate-uuid">Сгенерировать UUID</button></div>'+
+ '<div class="xray-output-head"><div><b>Предпросмотр JSON</b><small>Обновляется автоматически · не применяет конфигурацию к работающему ядру</small></div><div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-copy">Копировать JSON</button><button type="button" class="gh sm" id="xpb-download">Скачать JSON</button></div></div>'+
  '<textarea id="xpb-preview" class="xray-preview" spellcheck="false" readonly aria-label="Предпросмотр серверного JSON"></textarea>'+
  '<div class="xray-output-head xray-client-head"><div><b>Клиентский пример</b><small>Outbound с выбранными transport, security и fingerprint</small></div><div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-client-copy">Копировать</button><button type="button" class="gh sm" id="xpb-client-download">Скачать</button></div></div>'+
  '<textarea id="xpb-client-preview" class="xray-preview" spellcheck="false" readonly aria-label="Предпросмотр клиентского JSON"></textarea>'+
