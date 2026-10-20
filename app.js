@@ -526,7 +526,7 @@ async function profilesP(){
  field('grpc-mode','Режим gRPC',sel('grpc-mode',[['gun','gun'],['multi','multi']]))+
  field('kcp-seed','mKCP seed',inp('kcp-seed','','Необязательно'))+
  field('raw-header','RAW header',sel('raw-header',[['none','Без заголовка'],['http','HTTP camouflage']]))+
- field('xdrive-service','XDrive · service',sel('xdrive-service',[['local','Local filesystem'],['google-drive','Google Drive'],['template','Custom HTTP template']]))+
+ field('xdrive-service','XDrive · service',sel('xdrive-service',[['local','Local filesystem'],['google-drive','Google Drive'],['template','Custom HTTP template']]),'XDrive — специализированный транспорт. Для обычного туннеля выбирайте RAW/XHTTP/WebSocket/gRPC; XDrive требует VLESS Encryption и Mux.')+
  field('xdrive-folder','XDrive · remote folder',inp('xdrive-folder','/var/lib/xray/xdrive','Local path or remote folder ID'))+
  field('xdrive-secrets','XDrive · secrets','<textarea id="xpb-xdrive-secrets" rows="3" placeholder="One secret per line"></textarea>')+
  field('xdrive-segment-bytes','XDrive · segment bytes',inp('xdrive-segment-bytes','','0 = core default','type="number" min="0" max="67108864"'))+
@@ -609,7 +609,7 @@ async function profilesP(){
    if(protocol==='vless'&&security==='none')warning='Внимание: публичный VLESS без TLS/Reality не защищает транспорт.';
    if(protocol==='shadowsocks'&&(!$('#xpb-ss-password').value.trim()||!$('#xpb-ss-user-password').value.trim()))warning='Укажите или сгенерируйте оба пароля Shadowsocks перед использованием конфигурации.';
    if(protocol==='wireguard'&&!$('#xpb-wg-secret-key').value.trim())warning='Укажите серверный WireGuard private key (команда xray wg).';
-   if(network==='xdrive'&&!$('#xpb-vless-decryption').value.trim())warning='Для XDrive укажите VLESS Encryption decryption из xray vlessenc; на клиенте нужен парный encryption.';
+   if(network==='xdrive'&&(!$('#xpb-vless-decryption').value.trim()||!$('#xpb-vless-encryption').value.trim()))warning='XDrive требует обе стороны VLESS Encryption: server decryption и client encryption из xray vlessenc.';
    $('#xpb-error').textContent=warning;
    $('#xpb-preview').value=JSON.stringify(xrayBuilderConfig(),null,2);
    $('#xpb-client-preview').value=JSON.stringify(xrayClientSample(),null,2);
@@ -629,7 +629,7 @@ async function profilesP(){
    if(['tun','wireguard','masque','dokodemo-door','tunnel'].includes(proto)&&sec!=='none'&&proto!=='hysteria')force('security','none');
    proto=$('#xpb-protocol').value;net=$('#xpb-network').value;sec=$('#xpb-security').value;
    const networkSelect=$('#xpb-network');
-   if(networkSelect){const noTransport=['tun','wireguard','dokodemo-door','tunnel'].includes(proto);networkSelect.closest('.f').hidden=noTransport;networkSelect.disabled=noTransport;const masqueOption=networkSelect.querySelector('option[value="masque"]');if(masqueOption)masqueOption.disabled=proto!=='masque';}
+   if(networkSelect){const noTransport=['tun','wireguard','dokodemo-door','tunnel'].includes(proto);networkSelect.closest('.f').hidden=noTransport;networkSelect.disabled=noTransport;const masqueOption=networkSelect.querySelector('option[value="masque"]');if(masqueOption)masqueOption.disabled=proto!=='masque';const xdriveOption=networkSelect.querySelector('option[value="xdrive"]');if(xdriveOption)xdriveOption.disabled=proto!=='vless';}
    const securitySelect=$('#xpb-security');
    if(securitySelect){
     const disabled=['tun','wireguard','dokodemo-door','tunnel'].includes(proto);
