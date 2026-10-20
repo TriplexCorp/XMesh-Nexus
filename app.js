@@ -613,7 +613,7 @@ function userDrawer(id,tab){
       </div>
       <p class="user-overview-notice">${ic('link')}<span>Это параметры Xray-подключения, а не готовая подписка. Для выдачи рабочей ссылки потребуется привязать профиль и настроить генератор подписок.</span></p>
     </div>
-    <form data-k="uedit" data-id="${u.id}" method="dialog" class="sg user-edit-form user-inline-editor">
+    <form data-k="uedit" data-id="${u.id}" method="dialog" class="user-edit-form user-inline-editor">
       <div class="user-editor-head">
         <div class="user-editor-title"><h3>Настройки пользователя</h3><small>Редактируйте поля прямо здесь</small></div>
         <button type="submit" class="btn user-save-button">${ic('check')} Сохранить</button>
