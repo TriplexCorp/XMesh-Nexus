@@ -657,7 +657,7 @@ async function profilesP(){
  const group=(title,desc,body)=>'<section class="xray-section"><header class="xray-section-heading"><div><b>'+title+'</b><small>'+desc+'</small></div></header><div class="xray-section-body">'+body+'</div></section>';
  const optionGroup=(key,title,desc,body)=>'<section class="xray-option-group" data-xray-option-group="'+key+'"><div class="xray-option-group-head"><div><b>'+title+'</b><small>'+desc+'</small></div></div><div class="xray-option-grid">'+body+'</div></section>';
  const builderHtml='<section class="card xray-builder"><div class="xray-hero"><div class="xray-heading-copy"><p class="note">XRAY CORE · CONFIGURATOR</p><h2>XRAY STUDIO</h2><p class="xray-hero-description">Настройте inbound — конфигурации сервера и клиента обновятся автоматически.</p></div></div>'+
- '<div class="xray-presets"><div class="xray-preset-row" role="group" aria-label="Режим настройки"><button type="button" class="xray-preset on" data-xray-mode="visual" aria-pressed="true">' + ic('sliders') + '<b>Конструктор</b></button><button type="button" class="xray-preset" data-xray-mode="custom" aria-pressed="false"><b>Ручной JSON</b></button></div><button type="button" class="xray-import-btn" id="xpb-import-trigger">Импорт JSON</button><input type="file" id="xpb-import-file" accept=".json,application/json,text/json" aria-label="Выбрать файл JSON" hidden></div>'+
+ '<div class="xray-presets"><div class="xray-preset-row" role="group" aria-label="Режим настройки"><button type="button" class="xray-preset on" data-xray-mode="visual" aria-pressed="true">' + ic('sliders') + '<b>Конструктор</b></button><button type="button" class="xray-preset" data-xray-mode="custom" aria-pressed="false">' + ic('code') + '<b>Ручной JSON</b></button></div><button type="button" class="xray-import-btn" id="xpb-import-trigger">' + ic('upload') + 'Импорт JSON</button><input type="file" id="xpb-import-file" accept=".json,application/json,text/json" aria-label="Выбрать файл JSON" hidden></div>'+
  '<div class="xray-meta-grid">'+
  field('name','Название профиля',inp('name','VLESS Reality','Например, DE · Reality','maxlength="80" required'))+
  field('tag','Тег inbound',inp('tag','vless-reality','Уникальный tag','maxlength="64"'))+
@@ -684,7 +684,7 @@ async function profilesP(){
  '<div class="xray-config-panel" id="xpb-config-security" data-xray-config-panel="security" hidden>'+
  '<div class="xray-config-panel-title"><div><h3>Защита соединения</h3><p>Показываются только настройки, совместимые с выбранным режимом.</p></div></div>'+
  group('Настройки Reality','Ключи, Short ID и параметры назначения',
- '<div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-generate-keys">Сгенерировать пару ключей</button><button type="button" class="gh sm" id="xpb-generate-short">Новый Short ID</button></div>'+
+ '<div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-generate-keys">' + ic('tool') + 'Сгенерировать пару ключей</button><button type="button" class="gh sm" id="xpb-generate-short">' + ic('redo') + 'Новый Short ID</button></div>'+
  '<div class="xray-key-grid">'+
  field('private-key','Private key · сервер',inp('private-key','','Нажмите «Сгенерировать пару ключей»','autocomplete="off"'))+
  field('public-key','Public key · клиент',inp('public-key','','Заполнится после генерации','autocomplete="off"'))+
@@ -751,7 +751,7 @@ async function profilesP(){
  '<div class="xray-main-grid">'+
  field('vlessenc-mode','Режим VLESS Encryption',sel('vlessenc-mode',[['off','Отключено'],['mlkem768','ML-KEM-768 · постквантовый'],['x25519','X25519 · классический'],['manual','Ручная настройка']]),'Для обычного VLESS без VLESS Encryption выберите «Отключено». XDrive требует включённую функцию.')+
  '</div>'+
- '<div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-generate-vlessenc">Сгенерировать пару на сервере</button><span class="mu">Xray создаст парные server/client значения в своём официальном формате.</span></div>'+
+ '<div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-generate-vlessenc">' + ic('tool') + 'Сгенерировать пару на сервере</button><span class="mu">Xray создаст парные server/client значения в своём официальном формате.</span></div>'+
  '<div class="xray-main-grid">'+
  field('vless-decryption','Сервер · settings.decryption',inp('vless-decryption','','Значение decryption из xray vlessenc','autocomplete="off"'))+
  field('vless-encryption','Клиент · users[0].encryption',inp('vless-encryption','','Парное значение encryption','autocomplete="off"'))+
@@ -762,7 +762,7 @@ async function profilesP(){
  group('Параметры протокола и клиента','Учётные данные и дополнительные параметры выбранного протокола',
  optionGroup('client-identity','Идентификация','UUID, fingerprint и режим протокола',
  field('uuid','UUID / credential клиента',inp('uuid','','UUID клиента','autocomplete="off"'))+
- '<div class="xray-field-action"><button type="button" class="gh sm" id="xpb-generate-uuid">Сгенерировать UUID</button></div>'+
+ '<div class="xray-field-action"><button type="button" class="gh sm" id="xpb-generate-uuid">' + ic('tool') + 'Сгенерировать UUID</button></div>'+
  field('fingerprint','uTLS fingerprint · клиент','<select id="xpb-fingerprint"><optgroup label="Рекомендуемые">'+options(XRAY_FP_RECOMMENDED.map(x=>[x,x]))+'</optgroup><optgroup label="Современные профили">'+options(XRAY_FP_MODERN.map(x=>[x,x]))+'</optgroup><optgroup label="Дополнительные и legacy">'+options(XRAY_FP_OTHER.map(x=>[x,x]))+'</optgroup></select>')+
  field('flow','VLESS flow',sel('flow',[['','Без flow'],['xtls-rprx-vision','xtls-rprx-vision']]))+
  field('vmess-security','VMess cipher',sel('vmess-security',[['auto','auto'],['aes-128-gcm','aes-128-gcm'],['chacha20-poly1305','chacha20-poly1305'],['none','none']])))+
@@ -770,7 +770,7 @@ async function profilesP(){
  field('ss-method','Метод шифрования',sel('ss-method',[['chacha20-ietf-poly1305','chacha20-ietf-poly1305'],['chacha20-poly1305','chacha20-poly1305'],['xchacha20-poly1305','xchacha20-poly1305'],['aes-128-gcm','aes-128-gcm'],['aes-256-gcm','aes-256-gcm'],['2022-blake3-aes-128-gcm','2022-blake3-aes-128-gcm'],['2022-blake3-aes-256-gcm','2022-blake3-aes-256-gcm'],['2022-blake3-chacha20-poly1305','2022-blake3-chacha20-poly1305']]))+
  field('ss-password','Ключ / пароль сервера',inp('ss-password','','Сгенерируйте или введите ключ','autocomplete="off"'))+
  field('ss-user-password','Ключ пользователя',inp('ss-user-password','','SS2022: Base64-ключ','autocomplete="off"'))+
- '<div class="xray-field-action"><button type="button" class="gh sm" id="xpb-generate-ss-password">Сгенерировать пароли</button></div>')+
+ '<div class="xray-field-action"><button type="button" class="gh sm" id="xpb-generate-ss-password">' + ic('tool') + 'Сгенерировать пароли</button></div>')+
  optionGroup('client-local-proxy','SOCKS и Dokodemo-door','Авторизация и адрес локального назначения',
  field('socks-auth','SOCKS authentication',sel('socks-auth',[['noauth','Без авторизации'],['password','Логин / пароль']]))+
  field('doko-address','Адрес назначения',inp('doko-address','127.0.0.1','127.0.0.1'))+
@@ -801,8 +801,8 @@ async function profilesP(){
  '<button type="button" id="xpb-tab-server" class="on" role="tab" aria-selected="true" aria-controls="xpb-output-server" data-xray-output="server">' + ic('server') + '<span class="xray-output-tab-kicker">01 · SERVER</span><b>Server JSON</b><small>Inbound · слушающий узел</small></button>'+
  '<button type="button" id="xpb-tab-client" role="tab" aria-selected="false" aria-controls="xpb-output-client" data-xray-output="client">' + ic('users') + '<span class="xray-output-tab-kicker">02 · CLIENT</span><b>Client JSON</b><small>Outbound · подключение клиента</small></button>'+
  '</div>'+
- '<div class="xray-key-actions xray-output-actions" id="xpb-actions-server"><button type="button" class="gh sm" id="xpb-copy" title="Копировать Server JSON" aria-label="Копировать Server JSON">Копировать</button><button type="button" class="gh sm" id="xpb-download" title="Скачать server.json" aria-label="Скачать server.json">Скачать</button></div>'+
- '<div class="xray-key-actions xray-output-actions" id="xpb-actions-client" hidden><button type="button" class="gh sm" id="xpb-client-copy" title="Копировать Client JSON" aria-label="Копировать Client JSON">Копировать</button><button type="button" class="gh sm" id="xpb-client-download" title="Скачать client.json" aria-label="Скачать client.json">Скачать</button></div>'+
+ '<div class="xray-key-actions xray-output-actions" id="xpb-actions-server"><button type="button" class="gh sm" id="xpb-copy" title="Копировать Server JSON" aria-label="Копировать Server JSON">' + ic('copy') + 'Копировать</button><button type="button" class="gh sm" id="xpb-download" title="Скачать server.json" aria-label="Скачать server.json">Скачать</button></div>'+
+ '<div class="xray-key-actions xray-output-actions" id="xpb-actions-client" hidden><button type="button" class="gh sm" id="xpb-client-copy" title="Копировать Client JSON" aria-label="Копировать Client JSON">' + ic('copy') + 'Копировать</button><button type="button" class="gh sm" id="xpb-client-download" title="Скачать client.json" aria-label="Скачать client.json">Скачать</button></div>'+
  '</div>'+
  '<div class="xray-output-pane" id="xpb-output-server" role="tabpanel" aria-labelledby="xpb-tab-server">'+
  '<div class="xray-output-head" id="xpb-server-output" aria-hidden="true"></div>'+
