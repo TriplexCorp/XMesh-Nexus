@@ -2635,15 +2635,16 @@ white-space:nowrap;
 
 
 /* User drawer: minimal, editable, one coherent workspace. */
-dialog.user-modal{width:min(45rem,calc(100vw - 1.5rem))}
+dialog.user-modal{width:min(68rem,calc(100vw - 2.5rem));max-height:calc(100dvh - 1.5rem)}
 dialog.user-modal .box.user-drawer{
   display:grid;gap:0;min-width:0;max-width:100%;
-  padding:1.18rem 1.28rem;
+  max-height:calc(100dvh - 1.5rem);
+  padding:1.12rem 1.4rem;
   border-radius:.88rem;
 }
 dialog.user-modal .user-head{
   display:flex;align-items:center;justify-content:space-between;
-  flex-wrap:wrap;gap:.7rem;min-width:0;padding-bottom:.96rem;
+  flex-wrap:wrap;gap:.7rem;min-width:0;padding-bottom:.75rem;
 }
 dialog.user-modal .user-head .who{display:flex;align-items:center;gap:.68rem;min-width:0}
 dialog.user-modal .user-head .who>div{min-width:0}
@@ -2656,7 +2657,7 @@ dialog.user-modal .user-head-actions .user-remove{color:var(--mu)}
 dialog.user-modal .user-head-actions .user-remove:hover{color:var(--er);border-color:color-mix(in srgb,var(--er) 35%,var(--ln))}
 dialog.user-modal .user-tabs{
   display:flex;gap:.18rem;flex-wrap:wrap;
-  margin:0 0 .85rem;padding:.18rem;
+  margin:0 0 .65rem;padding:.18rem;
   border-radius:.63rem;border:1px solid var(--ln);background:var(--s2);
 }
 dialog.user-modal .user-tabs button{
@@ -2667,7 +2668,7 @@ dialog.user-modal .user-tabs button{
 dialog.user-modal .user-overview{display:grid;gap:0;min-width:0}
 dialog.user-modal .user-usage-line{
   display:flex;align-items:baseline;flex-wrap:wrap;gap:.3rem .54rem;
-  min-width:0;padding:.35rem 0 .72rem;
+  min-width:0;padding:.28rem 0 .6rem;
 }
 dialog.user-modal .user-usage-line>span{color:var(--mu);font-size:.76rem;font-weight:665}
 dialog.user-modal .user-usage-line>strong{color:var(--tx);font-size:1rem;font-weight:765;line-height:1.3;letter-spacing:-.025em;font-variant-numeric:tabular-nums}
@@ -2704,8 +2705,8 @@ dialog.user-modal .user-save-button{
 dialog.user-modal .user-save-button>.ic{width:.91rem;height:.91rem}
 dialog.user-modal .user-edit-fields,
 dialog.user-modal .user-edit-extra{
-  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:.76rem .8rem;min-width:0;align-items:start;
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:.72rem 1rem;min-width:0;align-items:start;
 }
 dialog.user-modal .user-edit-fields .f,
 dialog.user-modal .user-edit-extra .f{gap:.32rem;min-width:0}
@@ -2855,6 +2856,14 @@ dialog.user-modal .user-cal-renew>button{
 dialog.user-modal .user-renew-error{margin:0;color:var(--er);font-size:.69rem;line-height:1.3}
 dialog.user-modal :is(.user-date-trigger,.user-cal-day,.user-cal-nav button,.user-cal-footer button,.user-id-copy):focus-visible{
   outline:2px solid var(--a);outline-offset:2px;
+}
+@media(min-width:691px) and (max-width:1110px){
+  dialog.user-modal .user-edit-fields,
+  dialog.user-modal .user-edit-extra{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:760px){
+  dialog.user-modal{width:calc(100vw - 1rem);max-height:calc(100dvh - 1rem)}
+  dialog.user-modal .box.user-drawer{max-height:calc(100dvh - 1rem)}
 }
 @media(max-width:690px){
   dialog.user-modal .box.user-drawer{padding:1rem}
