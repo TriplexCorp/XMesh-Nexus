@@ -544,3 +544,51 @@ button:active,.btn:active,.gh:active{transform:translateY(0)}
   .users-search-wrap{grid-column:1/-1}
   .users-toolbar .users-search-field{grid-column:auto}
 }
+
+/* ================= COMMAND PALETTE SEARCH — INPUT CASCADE FIX ================= */
+.palette-search-wrap{display:grid;gap:.4rem;width:100%;min-width:0}
+.palette-search-field{
+  display:flex;
+  align-items:center;
+  gap:.6rem;
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  height:2.8rem;
+  padding:0 .9rem;
+  overflow:hidden;
+}
+.palette-search-field>.ic{flex:0 0 1.2rem;width:1.2rem;height:1.2rem}
+.palette-search-field input#pq{
+  display:block;
+  flex:1 1 0;
+  width:1%;
+  min-width:0;
+  max-width:100%;
+  height:100%;
+  margin:0;
+  padding:0;
+  border:0;
+  border-radius:0;
+  box-shadow:none;
+  background:transparent;
+  outline:0;
+  color:var(--tx);
+  font:inherit;
+  line-height:normal;
+}
+.palette-search-field input#pq:focus{outline:0;box-shadow:none;border:0}
+.palette-search-hint{
+  display:block;
+  min-width:0;
+  padding-inline:.15rem;
+  color:var(--mu);
+  font-size:.74rem;
+  line-height:1.4;
+  letter-spacing:0;
+  overflow-wrap:anywhere;
+}
+@media(max-width:760px){
+  .palette-search-field{width:100%;max-width:100%}
+  .palette-search-hint{font-size:.72rem}
+}
