@@ -20,7 +20,8 @@ const buttonIconFor=value=>{
  if(has(['отмен','закры','cancel','close']))return'x';
  if(has(['установ','запуск','install','start','выдать токен']))return'play';
  if(has(['останов','отключить','stop','pause']))return'pause';
- if(has(['добав','созда','новый','новая','new ','add','create','продл','выдать']))return'plus';
+ if(has(['генерир','создать пару','новый short id','заново','regenerate']))return'tool';
+ if(has(['добав','созда','новый','новая','new ','add','create','продл','выдать'])||text.startsWith('+'))return'plus';
  if(has(['копир','copy','буфер']))return'copy';
  if(has(['скачат','экспорт','резервн','download','export','backup']))return'dl';
  if(has(['импорт','загрузить','upload','import']))return'upload';
@@ -30,8 +31,14 @@ const buttonIconFor=value=>{
  if(has(['фильтр','сортиров','filter']))return'filter';
  if(has(['поиск','найти','search']))return'search';
  if(has(['json','формат','конфиг','код']))return'code';
- if(has(['готово','подтверд','заверш','отправить','перейти','открыть','continue']))return'check';
+ if(has(['защит','security','encryption']))return'shield';
+ if(has(['транспорт','transport','хост','hostname']))return'link';
+ if(has(['клиент','пользователь','users','устройств','device']))return'users';
+ if(has(['сквад','группа','доступ']))return'layers';
+ if(has(['основное','обзор','dashboard','конструктор']))return'tool';
+ if(has(['выбрать все','готово','подтверд','заверш','отправить','перейти','открыть','continue','ок']))return'check';
  if(has(['уведом','событи','notification']))return'bell';
+ if(has(['диагност','метрик','состояние']))return'activity';
  return null;
 };
 function decorateButtonIcons(root){
