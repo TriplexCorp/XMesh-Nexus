@@ -680,9 +680,10 @@ async function profilesP(){
  '</nav><div class="xray-config-content">'+
  '<div class="xray-config-panel" id="xpb-config-basic" data-xray-config-panel="basic">'+
  '<div class="xray-config-panel-title"><div><h3>Основные параметры</h3><p>Выберите протокол inbound, сетевой транспорт, порт и режим TLS/Reality.</p></div><span class="xray-config-required">ОБЯЗАТЕЛЬНОЕ</span></div>'+
- '<div class="xray-main-grid">'+
+ '<div class="xray-main-grid xray-row-2">'+
  field('listen','Адрес прослушивания',inp('listen','0.0.0.0','0.0.0.0'))+
  field('port','Порт inbound',inp('port','443','443','type="number" min="1" max="65535" required'))+
+ '</div><div class="xray-main-grid xray-row-3">'+
  field('protocol','Протокол',sel('protocol',XRAY_PROTOCOLS))+
  field('network','Транспорт',sel('network',XRAY_NETWORKS))+
  field('security','Режим защиты',sel('security',[['reality','Reality'],['tls','TLS'],['none','Без TLS / Reality']]))+
@@ -690,7 +691,7 @@ async function profilesP(){
  '<div class="xray-config-panel" id="xpb-config-security" data-xray-config-panel="security" hidden>'+
  '<div class="xray-config-panel-title"><div><h3>Защита соединения</h3><p>Показываются только настройки, совместимые с выбранным режимом.</p></div></div>'+
  group('Настройки Reality','Ключи, Short ID и параметры назначения',
- '<div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-generate-keys">' + ic('tool') + 'Сгенерировать пару ключей</button><button type="button" class="gh sm" id="xpb-generate-short">' + ic('redo') + 'Новый Short ID</button></div>'+
+ '<div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-generate-keys">' + ic('key') + 'Сгенерировать пару ключей</button><button type="button" class="gh sm" id="xpb-generate-short">' + ic('redo') + 'Новый Short ID</button></div>'+
  '<div class="xray-key-grid">'+
  field('private-key','Private key · сервер',inp('private-key','','Нажмите «Сгенерировать пару ключей»','autocomplete="off"'))+
  field('public-key','Public key · клиент',inp('public-key','','Заполнится после генерации','autocomplete="off"'))+
@@ -748,7 +749,7 @@ async function profilesP(){
  field('xdrive-hole-ms','Hole timeout · ms',inp('xdrive-hole-ms','','0 = core default','type="number" min="0" max="600000"'))+
  field('xdrive-mux-concurrency','Client mux concurrency',inp('xdrive-mux-concurrency','8','1–1024','type="number" min="1" max="1024"'))+
  field('xdrive-template','HTTP template JSON','<textarea id="xpb-xdrive-template" rows="5" spellcheck="false" placeholder="{ }"></textarea>'))
- ,false)+
+ ,false,true)+
  '</div>'+
  '<div class="xray-config-panel" id="xpb-config-encryption" data-xray-config-panel="encryption" hidden>'+
  '<div class="xray-config-panel-title"><div><h3>VLESS Encryption</h3><p>Дополнительный механизм защиты для VLESS. Не является заменой транспорта.</p></div></div>'+
@@ -757,18 +758,18 @@ async function profilesP(){
  '<div class="xray-main-grid">'+
  field('vlessenc-mode','Режим VLESS Encryption',sel('vlessenc-mode',[['off','Отключено'],['mlkem768','ML-KEM-768 · постквантовый'],['x25519','X25519 · классический'],['manual','Ручная настройка']]),'Для обычного VLESS без VLESS Encryption выберите «Отключено». XDrive требует включённую функцию.')+
  '</div>'+
- '<div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-generate-vlessenc">' + ic('tool') + 'Сгенерировать пару на сервере</button><span class="mu">Xray создаст парные server/client значения в своём официальном формате.</span></div>'+
+ '<div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-generate-vlessenc">' + ic('key') + 'Сгенерировать пару на сервере</button><span class="mu">Xray создаст парные server/client значения в своём официальном формате.</span></div>'+
  '<div class="xray-main-grid">'+
  field('vless-decryption','Сервер · settings.decryption',inp('vless-decryption','','Значение decryption из xray vlessenc','autocomplete="off"'))+
  field('vless-encryption','Клиент · users[0].encryption',inp('vless-encryption','','Парное значение encryption','autocomplete="off"'))+
- '</div><p class="note xray-inline-note">Важно: ML-KEM-768 — не отдельный транспорт и не uTLS fingerprint. Он выбирает постквантовый способ аутентификации в VLESS Encryption. Эфемерный обмен также использует гибрид ML-KEM-768/X25519.</p>',false)+
+ '</div><p class="note xray-inline-note">Важно: ML-KEM-768 — не отдельный транспорт и не uTLS fingerprint. Он выбирает постквантовый способ аутентификации в VLESS Encryption. Эфемерный обмен также использует гибрид ML-KEM-768/X25519.</p>',false,true)+
  '</div>'+
  '<div class="xray-config-panel" id="xpb-config-client" data-xray-config-panel="client" hidden>'+
  '<div class="xray-config-panel-title"><div><h3>Протокол и параметры</h3><p>Учётные данные клиента и дополнительные параметры выбранного inbound-протокола.</p></div></div>'+
  group('Параметры протокола и клиента','Учётные данные и дополнительные параметры выбранного протокола',
  optionGroup('client-identity','Идентификация','UUID, fingerprint и режим протокола',
  field('uuid','UUID / credential клиента',inp('uuid','','UUID клиента','autocomplete="off"'))+
- '<div class="xray-field-action"><button type="button" class="gh sm" id="xpb-generate-uuid">' + ic('tool') + 'Сгенерировать UUID</button></div>'+
+ '<div class="xray-field-action"><button type="button" class="gh sm" id="xpb-generate-uuid">' + ic('key') + 'Сгенерировать UUID</button></div>'+
  field('fingerprint','uTLS fingerprint · клиент','<select id="xpb-fingerprint"><optgroup label="Рекомендуемые">'+options(XRAY_FP_RECOMMENDED.map(x=>[x,x]))+'</optgroup><optgroup label="Современные профили">'+options(XRAY_FP_MODERN.map(x=>[x,x]))+'</optgroup><optgroup label="Дополнительные и legacy">'+options(XRAY_FP_OTHER.map(x=>[x,x]))+'</optgroup></select>')+
  field('flow','VLESS flow',sel('flow',[['','Без flow'],['xtls-rprx-vision','xtls-rprx-vision']]))+
  field('vmess-security','VMess cipher',sel('vmess-security',[['auto','auto'],['aes-128-gcm','aes-128-gcm'],['chacha20-poly1305','chacha20-poly1305'],['none','none']])))+
@@ -776,7 +777,7 @@ async function profilesP(){
  field('ss-method','Метод шифрования',sel('ss-method',[['chacha20-ietf-poly1305','chacha20-ietf-poly1305'],['chacha20-poly1305','chacha20-poly1305'],['xchacha20-poly1305','xchacha20-poly1305'],['aes-128-gcm','aes-128-gcm'],['aes-256-gcm','aes-256-gcm'],['2022-blake3-aes-128-gcm','2022-blake3-aes-128-gcm'],['2022-blake3-aes-256-gcm','2022-blake3-aes-256-gcm'],['2022-blake3-chacha20-poly1305','2022-blake3-chacha20-poly1305']]))+
  field('ss-password','Ключ / пароль сервера',inp('ss-password','','Сгенерируйте или введите ключ','autocomplete="off"'))+
  field('ss-user-password','Ключ пользователя',inp('ss-user-password','','SS2022: Base64-ключ','autocomplete="off"'))+
- '<div class="xray-field-action"><button type="button" class="gh sm" id="xpb-generate-ss-password">' + ic('tool') + 'Сгенерировать пароли</button></div>')+
+ '<div class="xray-field-action"><button type="button" class="gh sm" id="xpb-generate-ss-password">' + ic('key') + 'Сгенерировать пароли</button></div>')+
  optionGroup('client-local-proxy','SOCKS и Dokodemo-door','Авторизация и адрес локального назначения',
  field('socks-auth','SOCKS authentication',sel('socks-auth',[['noauth','Без авторизации'],['password','Логин / пароль']]))+
  field('doko-address','Адрес назначения',inp('doko-address','127.0.0.1','127.0.0.1'))+
@@ -799,7 +800,7 @@ async function profilesP(){
  field('tun-routes','Системные маршруты',inp('tun-routes','','Например, 0.0.0.0/0,::/0')))+
  optionGroup('client-logging','Диагностика','Уровень детализации журнала',
  field('loglevel','Уровень логирования',sel('loglevel',[['warning','warning'],['error','error'],['none','none'],['info','info'],['debug','debug']])))
- ,false)+ '</div></div></div></div></div><aside class="xray-output-dock">'+
+ ,false,true)+ '</div></div></div></div></div><aside class="xray-output-dock">'+
  '<section class="xray-output-workspace" aria-label="JSON-конфигурации">'+
  '<div class="xray-output-workspace-head"><div><p class="note">JSON PREVIEW</p><b>Результат конфигурации</b><small>Server JSON и Client JSON обновляются по мере настройки. Экспорт не применяет конфиг к работающему ядру.</small></div><span class="xray-output-state" id="xpb-output-state">Предпросмотр готов</span></div>'+
  '<div class="xray-output-toolbar">'+
