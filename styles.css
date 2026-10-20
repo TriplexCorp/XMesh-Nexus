@@ -2633,239 +2633,240 @@ white-space:nowrap;
 .rail-tooltip[hidden],html:not([data-rail-tips="on"]) .rail-tooltip{display:none!important}
 #brand-panel{scroll-margin-top:1.5rem}
 
-/* User details overview — organized information hierarchy. */
-dialog.user-modal .box{gap:.95rem}
-dialog.user-modal .user-overview{display:grid;gap:.72rem;min-width:0}
-dialog.user-modal .user-usage-card{
-  display:grid;
-  gap:.55rem;
-  min-width:0;
-  padding:1rem 1.12rem;
-  border:1px solid var(--ln);
-  border-radius:.78rem;
-  background:var(--elevated);
-  box-shadow:inset 0 1px 0 var(--surface-highlight);
+
+/* User drawer: minimal, editable, one coherent workspace. */
+dialog.user-modal{width:min(45rem,calc(100vw - 1.5rem))}
+dialog.user-modal .box.user-drawer{
+  display:grid;gap:0;min-width:0;max-width:100%;
+  padding:1.18rem 1.28rem;
+  border-radius:.88rem;
 }
-dialog.user-modal .user-usage-heading,
-dialog.user-modal .user-detail-title{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:.65rem;
-  min-width:0;
+dialog.user-modal .user-head{
+  display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:.7rem;min-width:0;padding-bottom:.96rem;
 }
-dialog.user-modal .user-detail-label{
-  display:inline-flex;
-  align-items:center;
-  gap:.42rem;
-  min-width:0;
-  color:var(--mu);
-  font-size:.76rem;
-  font-weight:720;
-  line-height:1.3;
+dialog.user-modal .user-head .who{display:flex;align-items:center;gap:.68rem;min-width:0}
+dialog.user-modal .user-head .who>div{min-width:0}
+dialog.user-modal .user-head .who h2{font-size:1.07rem;line-height:1.25;letter-spacing:-.03em;overflow-wrap:anywhere}
+dialog.user-modal .user-head-actions{display:flex;align-items:center;gap:.3rem}
+dialog.user-modal .user-head-actions .gh{min-height:2.15rem;height:2.15rem;padding:0 .65rem;font-size:.72rem}
+dialog.user-modal .user-head-actions .ia{display:inline-grid;place-items:center;width:2.15rem;height:2.15rem;flex:0 0 2.15rem}
+dialog.user-modal .user-head-actions .ic{width:.96rem;height:.96rem}
+dialog.user-modal .user-head-actions .user-remove{color:var(--mu)}
+dialog.user-modal .user-head-actions .user-remove:hover{color:var(--er);border-color:color-mix(in srgb,var(--er) 35%,var(--ln))}
+dialog.user-modal .user-tabs{
+  display:flex;gap:.18rem;flex-wrap:wrap;
+  margin:0 0 .85rem;padding:.18rem;
+  border-radius:.63rem;border:1px solid var(--ln);background:var(--s2);
 }
-dialog.user-modal .user-detail-label>.ic{width:.96rem;height:.96rem;flex:0 0 .96rem;color:var(--a)}
-dialog.user-modal .user-limit-label,
-dialog.user-modal .user-detail-kind{
-  display:inline-flex;
-  align-items:center;
-  flex:0 0 auto;
-  font-size:.69rem;
-  font-weight:650;
-  line-height:1.4;
-  color:var(--mu);
-}
-dialog.user-modal .user-limit-label{
-  padding:.17rem .48rem;
-  border:1px solid var(--ln);
+dialog.user-modal .user-tabs button{
+  flex:1 1 auto;min-width:0;min-height:2.22rem;
+  padding:.38rem .65rem;font-size:.74rem;font-weight:680;
   border-radius:.45rem;
-  background:var(--s1);
 }
-dialog.user-modal .user-usage-amount{
-  display:flex;
-  align-items:baseline;
-  flex-wrap:wrap;
-  gap:.3rem .7rem;
-  min-width:0;
+dialog.user-modal .user-overview{display:grid;gap:0;min-width:0}
+dialog.user-modal .user-usage-line{
+  display:flex;align-items:baseline;flex-wrap:wrap;gap:.3rem .54rem;
+  min-width:0;padding:.35rem 0 .72rem;
 }
-dialog.user-modal .user-usage-amount>strong{
-  color:var(--tx);
-  font-size:clamp(1.42rem,2.5vw,1.9rem);
-  font-weight:770;
-  letter-spacing:-.045em;
-  line-height:1.2;
-  font-variant-numeric:tabular-nums;
+dialog.user-modal .user-usage-line>span{color:var(--mu);font-size:.76rem;font-weight:665}
+dialog.user-modal .user-usage-line>strong{color:var(--tx);font-size:1rem;font-weight:765;line-height:1.3;letter-spacing:-.025em;font-variant-numeric:tabular-nums}
+dialog.user-modal .user-usage-line>small{color:var(--mu);font-size:.76rem;line-height:1.3}
+dialog.user-modal .user-action-text{
+  display:inline-flex;align-items:center;gap:.32rem;
+  width:auto;min-height:1.6rem;margin-left:auto;padding:.13rem .25rem;
+  background:transparent;border:0;border-radius:.35rem;
+  color:var(--mu);font-size:.72rem;font-weight:640;cursor:pointer;
 }
-dialog.user-modal .user-usage-amount>span{font-size:.8rem;color:var(--mu);line-height:1.35}
-dialog.user-modal .user-usage-progress{margin-top:.12rem;height:.4rem;width:100%;background:var(--s2)}
-dialog.user-modal .user-usage-unlimited{font-size:.72rem;line-height:1.4;color:var(--mu)}
-dialog.user-modal .user-credential-grid{
-  display:grid;
-  grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);
-  align-items:stretch;
-  gap:.72rem;
-  min-width:0;
+dialog.user-modal .user-action-text:hover{color:var(--a);background:color-mix(in srgb,var(--a) 7%,transparent)}
+dialog.user-modal .user-action-text .ic{width:.87rem;height:.87rem}
+dialog.user-modal .user-usage-track{
+  height:3px;min-height:3px;border-radius:100px;background:var(--s2);
+  overflow:hidden;margin:-.16rem 0 .7rem;
 }
-dialog.user-modal .user-detail-card{
-  display:flex;
-  flex-direction:column;
-  align-items:stretch;
-  gap:.7rem;
-  min-width:0;
-  padding:.95rem 1rem;
-  border:1px solid var(--ln);
-  border-radius:.78rem;
-  background:var(--elevated);
-  box-shadow:inset 0 1px 0 var(--surface-highlight);
+dialog.user-modal .user-usage-track>i{display:block;width:var(--usage);height:100%;background:var(--a);border-radius:inherit}
+dialog.user-modal .user-inline-editor{
+  display:grid;gap:0;min-width:0;padding:0;margin:0;
+  background:transparent;border:0;box-shadow:none;
 }
-dialog.user-modal .user-code-row{
-  display:flex;
-  align-items:center;
-  gap:.45rem;
-  min-width:0;
-  margin-top:.05rem;
+dialog.user-modal .user-editor-head{
+  display:flex;align-items:center;justify-content:space-between;gap:.6rem;
+  border-top:1px solid var(--ln);padding:.82rem 0;
 }
-dialog.user-modal .user-code-row>code{
-  display:block;
-  flex:1 1 auto;
-  min-width:0;
-  padding:.53rem .65rem;
-  border:1px solid var(--ln);
-  border-radius:.5rem;
-  background:var(--s1);
-  color:var(--tx);
-  font:.78rem/1.4 "IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-  letter-spacing:-.012em;
-  overflow-wrap:anywhere;
-  word-break:break-word;
-  white-space:normal;
-  user-select:all;
+dialog.user-modal .user-editor-head h3{
+  margin:0;color:var(--tx);font-size:.86rem;font-weight:735;letter-spacing:-.015em;
 }
-dialog.user-modal .user-copy-button{
-  flex:0 0 auto;
-  display:inline-flex;
-  align-items:center;
-  gap:.38rem;
-  min-height:2.3rem;
-  height:2.3rem;
-  padding:0 .64rem;
-  border-radius:.52rem;
-  font-size:.74rem;
-  font-weight:680;
+dialog.user-modal .user-save-button{
+  display:inline-flex;align-items:center;gap:.34rem;
+  flex:0 0 auto;width:auto;min-height:2.18rem;height:2.18rem;
+  padding:0 .75rem;border-radius:.5rem;font-size:.72rem;font-weight:735;
 }
-dialog.user-modal .user-copy-button .ic{width:.91rem;height:.91rem}
-dialog.user-modal .user-detail-card>small{
-  display:block;
-  color:var(--mu);
-  font-size:.72rem;
-  line-height:1.4;
-  overflow-wrap:anywhere;
+dialog.user-modal .user-save-button>.ic{width:.91rem;height:.91rem}
+dialog.user-modal .user-edit-fields,
+dialog.user-modal .user-edit-extra{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:.76rem .8rem;min-width:0;align-items:start;
 }
-dialog.user-modal .user-overview-notice{
-  display:flex;
-  align-items:flex-start;
-  gap:.62rem;
-  min-width:0;
-  margin:0;
-  padding:.58rem .72rem;
-  border:1px solid color-mix(in srgb,var(--a) 12%,var(--ln));
-  border-radius:.64rem;
-  background:color-mix(in srgb,var(--a) 4%,var(--s1));
-  color:var(--mu);
-  font-size:.73rem;
-  line-height:1.5;
+dialog.user-modal .user-edit-fields .f,
+dialog.user-modal .user-edit-extra .f{gap:.32rem;min-width:0}
+dialog.user-modal .user-edit-fields .f>span,
+dialog.user-modal .user-edit-extra .f>span{
+  color:var(--mu);font-size:.73rem;font-weight:665;line-height:1.3;
 }
-dialog.user-modal .user-overview-notice .ic{
-  width:.97rem;
-  height:.97rem;
-  flex:0 0 .97rem;
-  margin-top:.05rem;
-  color:var(--a);
+dialog.user-modal .user-edit-fields :is(input:not([type=hidden]),select),
+dialog.user-modal .user-edit-extra :is(input:not([type=hidden]),select){
+  min-width:0;width:100%;height:2.42rem;min-height:2.42rem;
+  padding:.4rem .62rem;border:1px solid var(--ln);border-radius:.5rem;
+  background:var(--s2);color:var(--tx);font-size:.79rem;
+  font-weight:560;transition:border-color .16s,box-shadow .16s;
 }
-dialog.user-modal .user-overview-notice span{min-width:0;overflow-wrap:anywhere}
-dialog.user-modal .user-edit-details{
-  min-width:0;
-  border:1px solid var(--ln);
-  border-radius:.76rem;
-  background:var(--s1);
-  overflow:hidden;
+dialog.user-modal .user-edit-fields :is(input:not([type=hidden]),select):focus,
+dialog.user-modal .user-edit-extra :is(input:not([type=hidden]),select):focus{
+  outline:0;border-color:color-mix(in srgb,var(--a) 48%,var(--ln));
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--a) 13%,transparent);
 }
-dialog.user-modal .user-edit-details>summary{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:.7rem;
-  min-height:3.7rem;
-  padding:.72rem .98rem;
-  cursor:pointer;
-  list-style:none;
-  background:var(--elevated);
-  transition:background .16s;
+dialog.user-modal .user-edit-fields .f>small,
+dialog.user-modal .user-edit-extra .f>small{display:none}
+dialog.user-modal .user-more{margin-top:.72rem;border-top:1px solid var(--ln);min-width:0}
+dialog.user-modal .user-more>summary{
+  display:flex;align-items:center;gap:.4rem;list-style:none;
+  min-height:2.3rem;padding:.5rem 0;cursor:pointer;
+  color:var(--tx);font-size:.77rem;font-weight:675;
 }
-dialog.user-modal .user-edit-details>summary::-webkit-details-marker{display:none}
-dialog.user-modal .user-edit-details>summary:hover{background:color-mix(in srgb,var(--a) 5%,var(--elevated))}
-dialog.user-modal .user-edit-details>summary:focus-visible{outline:2px solid var(--a);outline-offset:-2px}
-dialog.user-modal .user-edit-trigger{display:flex;align-items:center;gap:.65rem;min-width:0}
-dialog.user-modal .user-edit-trigger>.ic{
-  flex:0 0 1.95rem;
-  width:1.95rem;
-  height:1.95rem;
-  padding:.48rem;
-  border:1px solid var(--ln);
-  border-radius:.54rem;
-  background:var(--s1);
-  color:var(--a);
+dialog.user-modal .user-more>summary::-webkit-details-marker{display:none}
+dialog.user-modal .user-more>summary small{color:var(--mu);font-size:.69rem;font-weight:520}
+dialog.user-modal .user-more>summary .ic{margin-left:auto;width:.82rem;height:.82rem;color:var(--mu);transition:transform .18s}
+dialog.user-modal .user-more[open]>summary .ic{transform:rotate(90deg)}
+dialog.user-modal .user-edit-extra{padding:.25rem 0 .7rem}
+dialog.user-modal .user-edit-extra .f:has([name="desc"]){grid-column:1/-1}
+dialog.user-modal .user-inline-editor #fe:empty{display:none}
+dialog.user-modal .user-inline-editor #fe:not(:empty){
+  margin:.35rem 0 0;color:var(--er);font-size:.74rem;line-height:1.4;
 }
-dialog.user-modal .user-edit-trigger>span{display:grid;gap:.19rem;min-width:0}
-dialog.user-modal .user-edit-trigger b{color:var(--tx);font-size:.83rem;font-weight:700;line-height:1.3}
-dialog.user-modal .user-edit-trigger small{color:var(--mu);font-size:.72rem;line-height:1.35}
-dialog.user-modal .user-edit-details>summary>.ic{
-  width:1rem;
-  height:1rem;
-  flex:0 0 1rem;
-  color:var(--mu);
-  transition:transform .16s;
-}
-dialog.user-modal .user-edit-details[open]>summary>.ic{transform:rotate(90deg)}
-dialog.user-modal .user-edit-content{padding:1rem;border-top:1px solid var(--ln)}
-dialog.user-modal .user-edit-form{gap:1rem}
-dialog.user-modal .user-edit-form>.r2{
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:.8rem;
-  padding:0;
-  border:0;
-  align-items:start;
-}
-dialog.user-modal .user-edit-form>.user-edit-actions{
-  display:flex;
-  justify-content:flex-end;
-  padding:.85rem 0 0;
+dialog.user-modal .user-identity-row{
+  display:flex;align-items:center;gap:.55rem;
+  min-width:0;margin-top:.27rem;padding:.83rem 0 .58rem;
   border-top:1px solid var(--ln);
 }
-dialog.user-modal .user-edit-form>.user-edit-actions .btn{width:auto;min-width:10rem}
-dialog.user-modal .user-edit-form>#fe:empty{display:none}
+dialog.user-modal .user-identity-row>span{
+  flex:0 0 auto;color:var(--mu);font-size:.72rem;font-weight:670;
+}
+dialog.user-modal .user-identity-row>code{
+  display:block;flex:1 1 auto;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font:.7rem/1.4 "IBM Plex Mono",ui-monospace,monospace;
+  color:var(--tx);text-align:right;user-select:all;
+}
+dialog.user-modal .user-id-copy{
+  display:inline-grid;place-items:center;flex:0 0 1.85rem;
+  width:1.85rem;height:1.85rem;padding:0;
+  border:1px solid var(--ln);border-radius:.45rem;
+  color:var(--mu);background:var(--s2);cursor:pointer;
+}
+dialog.user-modal .user-id-copy:hover{color:var(--a);border-color:color-mix(in srgb,var(--a) 35%,var(--ln))}
+dialog.user-modal .user-id-copy .ic{width:.9rem;height:.9rem}
 dialog.user-modal .user-overview-meta{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:.35rem 1rem;
-  flex-wrap:wrap;
-  padding:.12rem .05rem 0;
-  color:var(--mu);
-  font-size:.7rem;
-  line-height:1.45;
+  display:flex;justify-content:space-between;flex-wrap:wrap;
+  gap:.2rem 1rem;padding:.35rem 0 0;
+  color:var(--mu);font-size:.69rem;line-height:1.35;
+}
+/* Single date control opens a compact calendar; custom renewal is inside it. */
+dialog.user-modal .user-date-field{position:relative;min-width:0}
+dialog.user-modal .user-date-trigger{
+  display:flex;align-items:center;justify-content:flex-start;gap:.4rem;
+  width:100%;min-width:0;min-height:2.42rem;height:2.42rem;
+  padding:0 .57rem;background:var(--s2);color:var(--tx);
+  border:1px solid var(--ln);border-radius:.5rem;
+  cursor:pointer;font-size:.79rem;font-weight:590;white-space:nowrap;
+}
+dialog.user-modal .user-date-trigger:hover,
+dialog.user-modal .user-date-trigger[aria-expanded="true"]{
+  background:color-mix(in srgb,var(--a) 6%,var(--s2));
+  border-color:color-mix(in srgb,var(--a) 44%,var(--ln));
+}
+dialog.user-modal .user-date-trigger>.ic{width:.92rem;height:.92rem;flex:0 0 .92rem;color:var(--a)}
+dialog.user-modal .user-date-trigger>.ic:last-child{
+  width:.78rem;height:.78rem;flex-basis:.78rem;margin-left:auto;color:var(--mu);transform:rotate(90deg)
+}
+dialog.user-modal [data-user-date-label]{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+dialog.user-modal .user-date-calendar{
+  position:absolute;z-index:20;right:0;top:calc(100% + .42rem);
+  display:grid;gap:.48rem;min-width:0;width:min(19.8rem,100%);
+  padding:.72rem;border:1px solid var(--border-strong);
+  border-radius:.67rem;background:var(--s1);
+  box-shadow:0 12px 32px rgba(0,0,0,.35);
+}
+dialog.user-modal .user-date-calendar[hidden],
+dialog.user-modal .user-renew-error[hidden]{display:none!important}
+dialog.user-modal .user-cal-header{display:flex;align-items:center;justify-content:space-between;gap:.4rem}
+dialog.user-modal .user-cal-header strong{
+  color:var(--tx);font-size:.77rem;font-weight:735;text-transform:capitalize
+}
+dialog.user-modal .user-cal-nav{display:flex;gap:.18rem}
+dialog.user-modal .user-cal-nav button{
+  display:grid;place-items:center;width:1.85rem;height:1.85rem;padding:0;
+  border:1px solid var(--ln);border-radius:.43rem;background:var(--s2);
+  color:var(--mu);cursor:pointer;
+}
+dialog.user-modal .user-cal-nav button:hover{color:var(--tx);border-color:var(--border-strong)}
+dialog.user-modal .user-cal-nav .ic{width:.9rem;height:.9rem}
+dialog.user-modal .user-cal-grid{
+  display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:.13rem;
+}
+dialog.user-modal .user-cal-weekday{
+  display:grid;place-items:center;min-height:1.35rem;
+  color:var(--mu);font-size:.62rem;font-weight:670;
+}
+dialog.user-modal .user-cal-empty{min-height:1.88rem}
+dialog.user-modal .user-cal-day{
+  display:grid;place-items:center;min-width:0;min-height:1.88rem;
+  padding:0;border:1px solid transparent;border-radius:.43rem;
+  background:transparent;color:var(--tx);cursor:pointer;font-size:.73rem;
+}
+dialog.user-modal .user-cal-day:hover{background:color-mix(in srgb,var(--a) 10%,var(--s2))}
+dialog.user-modal .user-cal-day.is-today{
+  color:var(--a);border-color:color-mix(in srgb,var(--a) 30%,var(--ln))
+}
+dialog.user-modal .user-cal-day.selected{
+  background:var(--a);color:var(--btn-text);font-weight:760;border-color:var(--a)
+}
+dialog.user-modal .user-cal-footer{
+  display:flex;justify-content:space-between;gap:.3rem;
+  border-top:1px solid var(--ln);padding-top:.42rem;
+}
+dialog.user-modal .user-cal-footer button{
+  min-height:1.85rem;padding:.24rem .58rem;
+  border:1px solid var(--ln);border-radius:.41rem;
+  background:var(--s2);color:var(--mu);font-size:.69rem;font-weight:690;cursor:pointer;
+}
+dialog.user-modal .user-cal-footer button:hover{color:var(--tx);border-color:var(--border-strong)}
+dialog.user-modal .user-cal-renew{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.35rem;
+  padding-top:.43rem;border-top:1px solid var(--ln);
+}
+dialog.user-modal .user-cal-renew>input{
+  min-width:0;width:100%;height:2.1rem;min-height:2.1rem;
+  padding:.35rem .52rem;font-size:.76rem;border:1px solid var(--ln);
+  border-radius:.43rem;background:var(--s2);color:var(--tx);
+}
+dialog.user-modal .user-cal-renew>button{
+  height:2.1rem;min-height:2.1rem;padding:0 .65rem;font-size:.72rem
+}
+dialog.user-modal .user-renew-error{margin:0;color:var(--er);font-size:.69rem;line-height:1.3}
+dialog.user-modal :is(.user-date-trigger,.user-cal-day,.user-cal-nav button,.user-cal-footer button,.user-id-copy):focus-visible{
+  outline:2px solid var(--a);outline-offset:2px;
 }
 @media(max-width:690px){
-  dialog.user-modal .user-credential-grid{grid-template-columns:minmax(0,1fr)}
-  dialog.user-modal .user-edit-form>.r2{grid-template-columns:minmax(0,1fr)}
+  dialog.user-modal .box.user-drawer{padding:1rem}
+  dialog.user-modal .user-head-actions{gap:.15rem}
+  dialog.user-modal .user-head-actions .gh{font-size:.69rem}
+  dialog.user-modal .user-edit-fields,
+  dialog.user-modal .user-edit-extra{grid-template-columns:minmax(0,1fr)}
+  dialog.user-modal .user-date-calendar{position:relative;top:auto;right:auto;width:100%;margin:.35rem 0 0}
 }
 @media(max-width:430px){
-  dialog.user-modal .user-usage-card,
-  dialog.user-modal .user-detail-card{padding:.84rem}
-  dialog.user-modal .user-code-row{align-items:stretch;flex-wrap:wrap}
-  dialog.user-modal .user-code-row>code{flex:1 1 100%}
-  dialog.user-modal .user-copy-button{width:100%;justify-content:center}
-  dialog.user-modal .user-edit-content{padding:.78rem}
-  dialog.user-modal .user-edit-form>.user-edit-actions .btn{width:100%}
+  dialog.user-modal .user-head{align-items:flex-start}
+  dialog.user-modal .user-head-actions{width:100%;justify-content:flex-end}
+  dialog.user-modal .user-tabs button{padding:.35rem .3rem;font-size:.7rem}
+  dialog.user-modal .user-usage-line{gap:.25rem .4rem}
 }
