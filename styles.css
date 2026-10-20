@@ -637,3 +637,11 @@ button:active,.btn:active,.gh:active{transform:translateY(0)}
 [data-theme=light] .card{background:var(--s1);border-color:rgba(18,48,34,.17)}
 [data-theme=light] .note,[data-theme=light] .hd p,[data-theme=light] .setting-copy small{color:#435d4d}
 [data-theme=light] .gh,[data-theme=light] .ib,[data-theme=light] .search{border-color:rgba(18,48,34,.2)}
+
+/* Explicit final palette tokens override the legacy champagne layer above. */
+:root{--bg:#0a1511;--s1:#101f19;--s2:#192b23;--ln:rgba(195,230,210,.14);--tx:#edf7f1;--mu:#afc4b8;--c3:#83bde8;--c4:#e9c17b;--ok:#72dca8;--wr:#e9c17b;--er:#f08d9b;--btn-text:#082b1d;color-scheme:dark}
+html[data-theme=light]{--bg:#f4f8f5;--s1:#ffffff;--s2:#e9f1ec;--ln:rgba(18,48,34,.16);--tx:#152b20;--mu:#435d4d;--c3:#2169a6;--c4:#85570a;--ok:#167544;--wr:#85570a;--er:#a9243d;--btn-text:#ffffff;color-scheme:light}
+html[data-accent=custom]{--a:var(--custom-a);--b:var(--custom-b)}
+html[data-theme=light][data-accent=custom]{--a:var(--custom-a);--b:var(--custom-b)}
+.logo{background:var(--a)!important;color:var(--btn-text)!important;box-shadow:none!important;border:1px solid var(--ln)!important}
+nav a.on{background:var(--s2)!important;box-shadow:none!important}
