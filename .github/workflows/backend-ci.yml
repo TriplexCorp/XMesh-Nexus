@@ -35,6 +35,7 @@ jobs:
           ADMIN_PASSWORD: 9876543210abcdef9876543210abcdef9876543210abcdef
         run: |
           bash -n install.sh
+          bash -n xmeshctl
           sh -n deploy/postgres/10-create-app-user.sh
           docker compose config --quiet
       - name: Build Docker image
