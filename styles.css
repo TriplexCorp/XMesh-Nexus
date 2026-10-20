@@ -828,3 +828,43 @@ nav a.on{background:var(--s2)!important;box-shadow:none!important}
 .xray-user-fingerprint>span{font-size:.82rem}
 .xray-builder .xray-section[hidden]{display:none!important}
 @media(max-width:760px){.xray-workflow{grid-template-columns:1fr}}
+
+
+/* ================= DASHBOARD: RX/TX TIMESERIES ================= */
+.traffic-card{display:grid;gap:1rem;min-width:0}
+.traffic-heading{align-items:flex-start;gap:1rem;flex-wrap:wrap}
+.traffic-period{display:flex;gap:.25rem;padding:.25rem;border:1px solid var(--ln);background:var(--s2);border-radius:.8rem;flex-shrink:0}
+.traffic-period button{padding:.55rem .8rem;border-radius:.55rem;color:var(--mu);font-size:.88rem;white-space:nowrap}
+.traffic-period button.on{background:var(--s1);color:var(--tx);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.traffic-filters{display:grid;grid-template-columns:minmax(12rem,1fr) minmax(12rem,1fr) auto;align-items:end;gap:.8rem}
+.traffic-refresh{display:flex;align-items:center;gap:.45rem;color:var(--mu);font-size:.82rem;white-space:nowrap;padding:.75rem 0}
+.traffic-refresh i,.traffic-uptime-dot{width:.45rem;height:.45rem;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 14%,transparent)}
+.traffic-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.8rem}
+.traffic-kpi{display:grid;gap:.4rem;padding:.9rem 1rem;border:1px solid var(--ln);border-radius:.9rem;background:var(--s2);min-width:0}
+.traffic-kpi>span{display:flex;align-items:center;gap:.5rem;color:var(--mu);font-size:.87rem}
+.traffic-kpi>b{font-size:1.5rem;letter-spacing:-.035em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.traffic-kpi>small{color:var(--mu);font-size:.78rem}
+.traffic-dot{display:inline-block;width:.55rem;height:.55rem;border-radius:50%;flex:0 0 auto}
+.traffic-dot.rx{background:var(--a)}
+.traffic-dot.tx{background:var(--b)}
+.traffic-chart{min-width:0;min-height:12rem;border:1px solid var(--ln);border-radius:.95rem;background:color-mix(in srgb,var(--s2) 62%,transparent);overflow:hidden}
+.traffic-chart-wrap{padding:.9rem .8rem .2rem;min-width:0}
+.traffic-chart-svg{display:block;width:100%;height:auto;overflow:visible}
+.traffic-gridline{stroke:var(--ln);stroke-width:1;stroke-dasharray:3 5}
+.traffic-axis-label{fill:var(--mu);font-size:12px;font-variant-numeric:tabular-nums}
+.traffic-axis-title{fill:var(--mu);font-size:12px}
+.traffic-line{fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.traffic-line.rx{stroke:var(--a)}
+.traffic-line.tx{stroke:var(--b);stroke-dasharray:7 4}
+.traffic-area{stroke:none;opacity:.08}
+.traffic-area.rx{fill:var(--a)}
+.traffic-area.tx{fill:var(--b)}
+.traffic-chart-meta{display:flex;justify-content:space-between;gap:.7rem;flex-wrap:wrap;padding:.3rem .25rem .65rem;color:var(--mu);font-size:.78rem}
+.traffic-empty{display:flex;min-height:12rem;flex-direction:column;align-items:center;justify-content:center;gap:.6rem;text-align:center;padding:1.5rem;max-width:48rem;margin:auto}
+.traffic-empty>b{font-size:1rem;color:var(--tx)}
+.traffic-empty>span{color:var(--mu);line-height:1.55;font-size:.88rem}
+.traffic-empty>small{color:var(--mu);font-size:.78rem}
+.traffic-empty-icon{display:grid;place-items:center;width:2.5rem;height:2.5rem;border:1px solid var(--ln);border-radius:.8rem;color:var(--a);background:var(--s2)}
+.traffic-empty-icon svg{width:1.25rem;height:1.25rem}
+@media(max-width:850px){.traffic-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.traffic-refresh{grid-column:1/-1;padding:.1rem 0}}
+@media(max-width:560px){.traffic-filters,.traffic-kpis{grid-template-columns:1fr}.traffic-period{width:100%}.traffic-period button{flex:1}.traffic-chart-wrap{padding:.5rem .3rem 0}.traffic-axis-label{font-size:14px}.traffic-chart-meta{padding:.6rem .7rem;display:grid}.traffic-kpi>b{font-size:1.35rem}}
