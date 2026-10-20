@@ -1401,28 +1401,42 @@ async function profilesP(){
    let proto=$('#xpb-protocol').value,net=$('#xpb-network').value,sec=$('#xpb-security').value;
    const setGroup=(selector,show)=>{const d=$(selector);if(d)d.hidden=!show};
    const force=(id,value)=>{const e=$('#xpb-'+id);if(e&&e.value!==value)e.value=value};
-   if(proto==='masque'){force('network','masque');force('security','tls')}
-   else if(proto==='hysteria'){force('network','hysteria');force('security','tls')}
-   else if(['tun','wireguard'].includes(proto))force('security','none');
-   else if(net==='masque')force('network','raw');
-   else if(net==='xdrive'&&proto!=='vless')force('network','raw');
-   if(['hysteria','masque'].includes(net)&&sec!=='tls')force('security','tls');
-   if(net==='xdrive'&&v('flow'))force('flow','');
-   if(sec==='reality'&&(!['raw','xhttp','grpc'].includes(net)||!['vless','vmess','trojan'].includes(proto)))force('security',['tun','wireguard','masque','dokodemo-door','tunnel'].includes(proto)?'none':'tls');
-   if(['tun','wireguard','masque','dokodemo-door','tunnel'].includes(proto)&&sec!=='none'&&proto!=='hysteria')force('security','none');
-   proto=$('#xpb-protocol').value;net=$('#xpb-network').value;sec=$('#xpb-security').value;
+
+   // Selecting a protocol filters the network list first. Do not leave
+   // invisible or disabled options selected after switching protocols.
+   const allowedNetworks=xrayAllowedNetworks(proto);
    const networkSelect=$('#xpb-network');
-   if(networkSelect){const noTransport=['tun','wireguard','dokodemo-door','tunnel'].includes(proto);networkSelect.closest('.f').hidden=noTransport;networkSelect.disabled=noTransport;const masqueOption=networkSelect.querySelector('option[value="masque"]');if(masqueOption)masqueOption.disabled=proto!=='masque';const xdriveOption=networkSelect.querySelector('option[value="xdrive"]');if(xdriveOption)xdriveOption.disabled=proto!=='vless';}
+   if(!allowedNetworks.includes(net)){
+    net=allowedNetworks[0];
+    force('network',net);
+   }
+   if(networkSelect){
+    const noTransport=['tun','wireguard','dokodemo-door','tunnel'].includes(proto);
+    networkSelect.closest('.f').hidden=noTransport;
+    networkSelect.disabled=noTransport;
+    [...networkSelect.options].forEach(option=>{
+     const allowed=allowedNetworks.includes(option.value);
+     option.disabled=!allowed;option.hidden=!allowed;
+    });
+   }
    const securitySelect=$('#xpb-security');
+   const allowedSecurity=xrayAllowedSecurity(proto,net);
+   if(!allowedSecurity.includes(sec)){
+    sec=allowedSecurity.includes('tls')&&sec==='reality'?'tls':allowedSecurity[0];
+    force('security',sec);
+   }
+   if(net==='xdrive'&&$('#xpb-flow')?.value)force('flow','');
    if(securitySelect){
-    const disabled=['tun','wireguard','dokodemo-door','tunnel'].includes(proto);
+    const disabled=allowedSecurity.length===1;
     securitySelect.disabled=disabled;
-    const realityOption=securitySelect.querySelector('option[value="reality"]');
-    if(realityOption)realityOption.disabled=!['raw','xhttp','grpc'].includes(net)||!['vless','vmess','trojan'].includes(proto);
-    const tlsOption=securitySelect.querySelector('option[value="tls"]');
-    if(tlsOption)tlsOption.disabled=disabled;
-    const noneOption=securitySelect.querySelector('option[value="none"]');
-    if(noneOption)noneOption.disabled=proto==='hysteria'||net==='hysteria'||proto==='masque'||net==='masque';
+    [...securitySelect.options].forEach(option=>{
+     const allowed=allowedSecurity.includes(option.value);
+     option.disabled=!allowed;option.hidden=!allowed;
+    });
+   }
+   const hint=$('#xpb-context-hint');
+   if(hint){
+    hint.textContent='Показаны настройки, совместимые с выбранным протоколом и транспортом';
    }
    const listenField=$('#xpb-listen')?.closest('.f'),portField=$('#xpb-port')?.closest('.f'),securityField=$('#xpb-security')?.closest('.f');
    if(listenField)listenField.hidden=proto==='tun';
@@ -1435,6 +1449,10 @@ async function profilesP(){
     const f=el.id.replace('xpb-',''),wrap=el.closest('.f');if(!wrap)return;
     let show=true;
     if(f.startsWith('xhttp-'))show=net==='xhttp';
+    if(['xhttp-post-bytes','xhttp-post-interval','xhttp-buffered-posts'].includes(f))
+     show=net==='xhttp'&&['auto','packet-up'].includes($('#xpb-xhttp-mode')?.value||'auto');
+    if(f==='xhttp-stream-secs')
+     show=net==='xhttp'&&['auto','stream-up'].includes($('#xpb-xhttp-mode')?.value||'auto');
     if(f==='grpc-mode')show=net==='grpc';
     if(f==='kcp-seed')show=net==='mkcp';
     if(f==='raw-header')show=net==='raw';
@@ -1469,7 +1487,7 @@ async function profilesP(){
     let show=true;
     if(f==='uuid')show=['vless','vmess','trojan'].includes(proto);
     if(f==='fingerprint')show=sec!=='none'&&['vless','vmess','trojan'].includes(proto)&&net!=='masque';
-    if(f==='flow')show=proto==='vless'&&net!=='xdrive';
+    if(f==='flow')show=proto==='vless'&&net==='raw'&&sec!=='none';
     if(f==='vmess-security')show=proto==='vmess';
     if(['ss-method','ss-password','ss-user-password'].includes(f))show=proto==='shadowsocks';
     if(['socks-auth'].includes(f))show=['socks','mixed'].includes(proto);
