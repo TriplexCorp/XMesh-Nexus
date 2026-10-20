@@ -122,6 +122,33 @@
    if(previewDesc)previewDesc.textContent='Конфигурация обновляется автоматически при изменении параметров.';
 
 
+   // Advanced XHTTP controls are available inline on demand, without another
+   // wizard page or nested navigation. Basic transport controls stay visible.
+   const xhttp=root.querySelector('[data-xray-option-group="transport-xhttp"]');
+   if(xhttp&&!xhttp.querySelector('.sr-xhttp-toggle')){
+     const grid=xhttp.querySelector('.xray-option-grid');
+     const header=xhttp.querySelector('.xray-option-group-head');
+     if(grid&&header){
+       const extras=[...grid.children].filter(el=>!el.querySelector?.('#xpb-xhttp-padding')&&el.classList.contains('f'));
+       // Headings and the help note follow the same disclosure.
+       [...grid.children].forEach(el=>{
+         if(el.classList.contains('xray-xhttp-subtitle')||extras.includes(el))el.classList.add('sr-xhttp-advanced');
+       });
+       xhttp.dataset.xhttpExpanded='false';
+       const toggle=document.createElement('button');
+       toggle.className='sr-xhttp-toggle';
+       toggle.type='button';
+       toggle.setAttribute('aria-expanded','false');
+       toggle.innerHTML='Дополнительные параметры <span aria-hidden="true">⌄</span>';
+       toggle.addEventListener('click',()=>{
+         const open=xhttp.dataset.xhttpExpanded!=='true';
+         xhttp.dataset.xhttpExpanded=String(open);
+         toggle.setAttribute('aria-expanded',String(open));
+         toggle.innerHTML=(open?'Скрыть дополнительные':'Дополнительные параметры')+' <span aria-hidden="true">'+(open?'⌃':'⌄')+'</span>';
+       });
+       header.append(toggle);
+     }
+   }
    // All visual-builder selects use an in-panel accessible menu, avoiding OS popups
    // with unreadable light-on-light options on some Windows/theme combinations.
    root.querySelectorAll('.xray-config-panel select').forEach(select=>{
