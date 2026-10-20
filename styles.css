@@ -786,6 +786,7 @@ nav a.on{background:var(--s2)!important;box-shadow:none!important}
 .xray-main-grid,.xray-key-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.8rem 1rem}
 .xray-builder .f{min-width:0}.xray-builder .f>span{font-weight:600}
 .xray-builder .f input,.xray-builder .f select{width:100%;min-width:0}
+.xray-builder .f textarea{display:block;width:100%;min-width:0;max-width:100%;resize:vertical;min-height:5rem;padding:.75rem;border:1px solid var(--ln);border-radius:.65rem;background:var(--s2);color:var(--tx);font: .9rem/1.45 ui-monospace,SFMono-Regular,Menlo,monospace}
 .xray-builder .f small{display:block;color:var(--mu);font-size:.82rem;margin-top:.25rem}
 .xray-section{border:1px solid var(--ln);border-radius:.9rem;background:color-mix(in srgb,var(--s1) 85%,var(--s2));overflow:hidden}
 .xray-section[hidden]{display:none!important}
