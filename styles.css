@@ -728,3 +728,30 @@ nav a.on{background:var(--s2)!important;box-shadow:none!important}
 .sys-uptime-foot i{width:.45rem;height:.45rem;border-radius:50%;background:var(--c3);box-shadow:0 0 0 3px color-mix(in srgb,var(--c3) 15%,transparent)}
 @media(max-width:1000px){.sys-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.sys-grid{grid-template-columns:1fr}.sys-donut-row{min-height:5.5rem}.sys-donut .ringwrap{width:4.5rem;height:4.5rem}}
+
+
+/* Bulk user actions belong to the users panel, not a floating viewport overlay. */
+.users-panel>.bulk{
+  position:static;
+  inset:auto;
+  z-index:auto;
+  display:none;
+  transform:none;
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  margin:0 0 1rem;
+  padding:.75rem;
+  justify-content:flex-start;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:.5rem;
+  border-radius:14px;
+  box-shadow:none;
+  transition:none;
+}
+.users-panel>.bulk.on{display:flex;transform:none}
+@media(max-width:760px){
+  .users-panel>.bulk{position:static;bottom:auto;left:auto;transform:none;justify-content:flex-start}
+  .users-panel>.bulk.on{transform:none}
+}
