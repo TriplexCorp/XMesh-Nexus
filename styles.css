@@ -645,3 +645,6 @@ html[data-accent=custom]{--a:var(--custom-a);--b:var(--custom-b)}
 html[data-theme=light][data-accent=custom]{--a:var(--custom-a);--b:var(--custom-b)}
 .logo{background:var(--a)!important;color:var(--btn-text)!important;box-shadow:none!important;border:1px solid var(--ln)!important}
 nav a.on{background:var(--s2)!important;box-shadow:none!important}
+
+/* Searchable country and flag selector in the node editor */
+.country-picker{display:grid;gap:.55rem;min-width:0}.country-picker .country-search,.country-picker .country-select{width:100%;min-width:0;background:var(--s2);color:var(--tx);border:1px solid var(--ln);border-radius:11px;padding:.78rem .9rem;font:inherit;outline-offset:2px}.country-picker .country-search:focus,.country-picker .country-select:focus{border-color:var(--a);outline-color:var(--a)}.country-picker .country-select{cursor:pointer}.country-picker .country-select option{background:var(--s1);color:var(--tx);padding:.4rem}.country-picker .country-hint{color:var(--mu);font-size:.78rem;line-height:1.5}.country-picker .country-search::placeholder{color:var(--mu)}
