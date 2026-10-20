@@ -243,7 +243,7 @@ function hideRailTip(){
   railTip.hidden=true;
 }
 function showRailTip(target){
-  if(!target||matchMedia('(max-width:760px)').matches)return hideRailTip();
+  if(!target||!C.railTips)return hideRailTip();
   const label=target.dataset.railTip;
   if(!label)return hideRailTip();
   if(railTipTarget&&railTipTarget!==target)railTipTarget.removeAttribute('aria-describedby');
@@ -253,8 +253,13 @@ function showRailTip(target){
   target.setAttribute('aria-describedby','rail-tooltip');
   const rect=target.getBoundingClientRect();
   const box=railTip.getBoundingClientRect();
-  const left=Math.min(window.innerWidth-box.width-10,rect.right+12);
-  const top=Math.max(8,Math.min(window.innerHeight-box.height-8,rect.top+(rect.height-box.height)/2));
+  const mobileRail=rect.top>window.innerHeight*.7&&window.innerWidth<=760;
+  const left=mobileRail
+    ?Math.min(window.innerWidth-box.width-8,Math.max(8,rect.left+(rect.width-box.width)/2))
+    :Math.min(window.innerWidth-box.width-10,rect.right+12);
+  const top=mobileRail
+    ?Math.max(8,rect.top-box.height-10)
+    :Math.max(8,Math.min(window.innerHeight-box.height-8,rect.top+(rect.height-box.height)/2));
   railTip.style.left=Math.max(8,left)+'px';
   railTip.style.top=top+'px';
 }
@@ -279,10 +284,10 @@ const modal=(h,c='')=>{dlg.className=c;dlg.innerHTML=h;decorateButtonIcons(dlg);
 dlg.addEventListener('click',e=>{if(e.target==dlg||e.target.closest('[data-x]'))dlg.close()});
 const confirmBox=(h,ok,fn)=>{CF=fn;modal(`<div class="box"><h2>${h}</h2><div class="act"><button class="gh" data-x>Отмена</button><button class="btn" data-cf>${ok}</button></div></div>`)};
 let tt;const toast=(m,al,fn)=>{const t=$('#toast');t.innerHTML=`<span>${esc(m)}</span>${al?`<button id="ta">${al}</button>`:''}`;if(al)$('#ta').onclick=()=>{fn();t.classList.remove('show')};t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),al?6000:2400)};
-const CDEFAULT={theme:'dark',accent:'emerald',customA:'#60d6a2',customB:'#c3e879',hue:151,sat:62,lum:61,ts:1,motion:1,density:'comfortable',surface:'solid',glow:'normal',font:'onest',radius:16,borders:'soft',sidebar:'standard',autoCoreRefresh:1,coreRefreshSeconds:30};
-let C={...CDEFAULT};try{Object.assign(C,JSON.parse(localStorage.xmeshNexusSettings||'{}'))}catch(e){}if(C.accent==='mint')C.accent='emerald';
+const CDEFAULT={theme:'dark',accent:'emerald',customA:'#60d6a2',customB:'#c3e879',hue:151,sat:62,lum:61,ts:1,motion:1,density:'comfortable',surface:'solid',glow:'normal',font:'onest',radius:16,borders:'soft',sidebar:'standard',railTips:0,autoCoreRefresh:1,coreRefreshSeconds:30};
+let C={...CDEFAULT};try{Object.assign(C,JSON.parse(localStorage.xmeshNexusSettings||'{}'))}catch(e){}if(C.accent==='mint')C.accent='emerald';C.railTips=C.railTips===true||C.railTips===1?1:0;
 const hslHex=(h,s,l)=>{s/=100;l/=100;const k=n=>(n+h/30)%12,a=s*Math.min(l,1-l),f=n=>{const c=(k(n)+12)%12;return l-a*Math.max(-1,Math.min(c-3,9-c,1))};return '#'+[f(0),f(8),f(4)].map(v=>Math.round(v*255).toString(16).padStart(2,'0')).join('')};
-const apply=()=>{const r=document.documentElement;r.dataset.theme=C.theme=='auto'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):C.theme;r.dataset.accent=C.accent;r.style.setProperty('--custom-a',C.customA||hslHex(+C.hue||151,+C.sat||62,+C.lum||61));r.style.setProperty('--custom-b',C.customB||'#c3e879');if(C.accent==='custom'){const rgb=(C.customA||'#60d6a2').match(/[0-9a-f]{2}/gi).map(v=>parseInt(v,16)/255);const linear=rgb.map(v=>v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4));const lum=.2126*linear[0]+.7152*linear[1]+.0722*linear[2];r.style.setProperty('--btn-text',lum>.42?'#082b1d':'#ffffff')}else r.style.setProperty('--btn-text',r.dataset.theme==='light'?'#ffffff':'#082b1d');r.dataset.density=C.density||CDEFAULT.density;r.dataset.surface=C.surface||CDEFAULT.surface;r.dataset.glow=C.glow||CDEFAULT.glow;r.dataset.font=C.font||CDEFAULT.font;r.dataset.borders=C.borders||CDEFAULT.borders;r.dataset.sidebar=C.sidebar||CDEFAULT.sidebar;r.style.setProperty('--ts',cl(+C.ts||1,.9,1.3));const radius=cl(+C.radius||16,4,24);r.style.setProperty('--ui-radius',radius+'px');r.style.setProperty('--ui-control-radius',Math.max(5,radius*.72)+'px');r.dataset.motion=C.motion?'on':'off';try{localStorage.xmeshNexusSettings=JSON.stringify(C)}catch(e){}};
+const apply=()=>{const r=document.documentElement;r.dataset.theme=C.theme=='auto'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):C.theme;r.dataset.accent=C.accent;r.style.setProperty('--custom-a',C.customA||hslHex(+C.hue||151,+C.sat||62,+C.lum||61));r.style.setProperty('--custom-b',C.customB||'#c3e879');if(C.accent==='custom'){const rgb=(C.customA||'#60d6a2').match(/[0-9a-f]{2}/gi).map(v=>parseInt(v,16)/255);const linear=rgb.map(v=>v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4));const lum=.2126*linear[0]+.7152*linear[1]+.0722*linear[2];r.style.setProperty('--btn-text',lum>.42?'#082b1d':'#ffffff')}else r.style.setProperty('--btn-text',r.dataset.theme==='light'?'#ffffff':'#082b1d');r.dataset.density=C.density||CDEFAULT.density;r.dataset.surface=C.surface||CDEFAULT.surface;r.dataset.glow=C.glow||CDEFAULT.glow;r.dataset.font=C.font||CDEFAULT.font;r.dataset.borders=C.borders||CDEFAULT.borders;r.dataset.sidebar=C.sidebar||CDEFAULT.sidebar;r.dataset.railTips=C.railTips?'on':'off';if(!C.railTips)hideRailTip();r.style.setProperty('--ts',cl(+C.ts||1,.9,1.3));const radius=cl(+C.radius||16,4,24);r.style.setProperty('--ui-radius',radius+'px');r.style.setProperty('--ui-control-radius',Math.max(5,radius*.72)+'px');r.dataset.motion=C.motion?'on':'off';try{localStorage.xmeshNexusSettings=JSON.stringify(C)}catch(e){}};
 const brand=()=>{$('#bn').textContent=DB.set.brand;$('#lg').textContent=(DB.set.brand[0]||'L').toUpperCase()};
 
 let T=[],cur='',RT=0;
@@ -1445,6 +1450,7 @@ async function setP(){
       <div class="setting-row"><div class="setting-copy"><b>Скругление</b><small>От почти прямых углов до мягких округлых форм</small></div><div class="setting-control slider-control"><input type="range" id="radius" min="4" max="24" step="2" value="${cl(+C.radius||16,4,24)}" aria-label="Скругление углов"><b id="rv">${cl(+C.radius||16,4,24)} px</b></div></div>
       <div class="setting-row"><div class="setting-copy"><b>Границы карточек</b><small>Можно убрать линии или сделать их заметнее</small></div><div class="setting-control">${choices('borders',[['off','Без линий'],['soft','Мягкие'],['strong','Яркие']])}</div></div>
       <div class="setting-row"><div class="setting-copy"><b>Боковая панель</b><small>Компактный режим оставляет в основном только иконки</small></div><div class="setting-control">${choices('sidebar',[['standard','Обычная'],['compact','Компактная']])}</div></div>
+      <div class="setting-row"><div class="setting-copy"><b>Подсказки при наведении</b><small>Показывать названия разделов и кнопок боковой панели. Работает в обычном и компактном режимах.</small></div><label class="sw"><input type="checkbox" id="rail-tips" ${C.railTips?'checked':''} aria-label="Подсказки при наведении"><span></span></label></div>
     </section>
     <section class="card sg"><div><h3>Эффекты и движение</h3><small>Настройка фона и анимаций без изменения данных</small></div>
       <div class="setting-row"><div class="setting-copy"><b>Подсветка фона</b><small>Мягкое цветное свечение за панелью</small></div><div class="setting-control">${choices('glow',[['off','Выкл.'],['subtle','Мягкая'],['normal','Средняя'],['rich','Яркая']])}</div></div>
@@ -1641,6 +1647,7 @@ document.addEventListener('change',async e=>{const t=e.target;
   else if(t.dataset.hw){await api.update('users',+t.dataset.hw,{hwid:+t.value||0});toast('Лимит устройств сохранён');render(1);userDrawer(+t.dataset.hw,'acc')}
   else if(t.dataset.hk){const old=DB.set.hooks[t.dataset.hk];DB.set.hooks[t.dataset.hk]=t.checked?1:0;try{await api.saveSettings({hooks:{...DB.set.hooks}});toast(t.checked?'Событие включено':'Событие отключено')}catch(err){DB.set.hooks[t.dataset.hk]=old;t.checked=!!old;toast(err.message)}}
   else if(t.dataset.psz){UQ.size=+t.value;UQ.page=1;drawUsers()}
+  else if(t.id==='rail-tips'){C.railTips=t.checked?1:0;apply()}
   else if(t.id=='mo'){C.motion=t.checked?1:0;apply()}
   else if(t.id=='tplsel'){const p=DB.tpls.find(x=>x.id==t.value);if(!p)return;const f=$('form[data-k=user]');const set=(k,v)=>{const el=$(`[name=${k}]`,f);if(el)el.value=v};set('limit',p.limit);set('days',p.days);set('strategy',p.strategy);set('hwid',p.hwid);$('[name=hold]',f).checked=p.hold;$$('[name=squads]',f).forEach(c=>c.checked=p.squads.includes(+c.value))}});
 document.addEventListener('input',e=>{if(['hue','sat','lum'].includes(e.target.id)){C.hue=+$('#hue').value;C.sat=+$('#sat').value;C.lum=+$('#lum').value;C.customA=hslHex(C.hue,C.sat,C.lum);C.accent='custom';$('#custom-a').value=C.customA;$('#huev').textContent=C.hue+'°';$('#satv').textContent=C.sat+'%';$('#lumv').textContent=C.lum+'%';apply();$$('[data-ac]').forEach(x=>x.classList.toggle('on',x.dataset.ac==='custom'))}else if(e.target.id=='ts'){C.ts=+e.target.value;$('#tsv').textContent=Math.round(C.ts*100)+'%';apply()}else if(e.target.id=='radius'){C.radius=+e.target.value;$('#rv').textContent=C.radius+' px';apply()}if(e.target.id=='pq')pdraw(e.target.value)});
