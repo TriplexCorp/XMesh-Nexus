@@ -11,6 +11,7 @@ const chip=(t,c)=>`<span class="chip" style="--c:var(${c})">${t}</span>`;
 const smooth=p=>{let d=`M${p[0]}`;for(let i=0;i<p.length-1;i++){const a=p[i-1]||p[i],b=p[i],c=p[i+1],e=p[i+2]||c;d+=`C${b[0]+(c[0]-a[0])/6},${b[1]+(c[1]-a[1])/6},${c[0]-(e[0]-b[0])/6},${c[1]-(e[1]-b[1])/6},${c}`}return d};
 const P={
   home:'<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
+  calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/>',
   users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
   layers:'<path d="m12 2 8 4.5v11L12 22l-8-4.5v-11L12 2Z"/><path d="m12 12 8-5.5M12 12 4 6.5M12 12v10"/>',
   link:'<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
@@ -567,7 +568,7 @@ function userDrawer(id,tab){
       <section class="user-usage-card" aria-label="Использование трафика">
         <div class="user-usage-heading">
           <span class="user-detail-label">${ic('activity')} Трафик</span>
-          <span class="user-limit-label">${u.limit?'Лимит '+u.limit+' ГБ':'Без лимита'}</span>
+          <div class="user-usage-actions"><span class="user-limit-label">${u.limit?'Лимит '+u.limit+' ГБ':'Без лимита'}</span><button type="button" class="user-reset-traffic" data-a="rst" data-u="${u.id}" title="Сбросить использованный трафик">${ic('redo')}<span>Сбросить</span></button></div>
         </div>
         <div class="user-usage-amount"><strong>${gb(u.used)}</strong><span>${u.limit?'из '+u.limit+' ГБ':'использовано'}</span></div>
         ${u.limit?`<div class="pb f user-usage-progress${k>=1?' er':k>.85?' wr':''}" style="--w:${Math.min(100,Math.max(0,k*100))}%" role="progressbar" aria-label="Использование трафика" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(Math.min(100,Math.max(0,k*100)))}"><i></i></div>`:'<span class="user-usage-unlimited">Ограничение трафика не установлено</span>'}
@@ -586,23 +587,27 @@ function userDrawer(id,tab){
       </div>
       <p class="user-overview-notice">${ic('link')}<span>Это параметры Xray-подключения, а не готовая подписка. Для выдачи рабочей ссылки потребуется привязать профиль и настроить генератор подписок.</span></p>
     </div>
-    <details class="user-edit-details">
-      <summary><span class="user-edit-trigger">${ic('pen')}<span><b>Изменить параметры</b><small>Лимиты, срок действия и настройки пользователя</small></span></span>${ic('chevronRight')}</summary>
-      <div class="user-edit-content">
-        <form data-k="uedit" data-id="${u.id}" method="dialog" class="sg user-edit-form">
-          <div class="r2">${FE.slice(0,4).map(f=>field(f,f.k=='expireAt'?u.expireAt:u[f.k])).join('')}</div>
-          <div class="r2">${FE.slice(4).map(f=>field(f,u[f.k])).join('')}</div>
-          <p class="er" id="fe" role="status"></p>
-          <div class="user-edit-actions"><button class="btn">Сохранить изменения</button></div>
-        </form>
+    <form data-k="uedit" data-id="${u.id}" method="dialog" class="sg user-edit-form user-inline-editor">
+      <div class="user-editor-head">
+        <div class="user-editor-title"><h3>Настройки пользователя</h3><small>Редактируйте поля прямо здесь</small></div>
+        <button type="submit" class="btn user-save-button">${ic('check')} Сохранить</button>
       </div>
-    </details>
+      <div class="user-edit-fields user-edit-primary">
+        ${FE.slice(0,3).map(f=>field(f,u[f.k])).join('')}
+        ${userDateField(u)}
+      </div>
+      <div class="user-edit-section-label"><b>Дополнительно</b><small>Сброс трафика и контактные данные</small></div>
+      <div class="user-edit-fields user-edit-secondary">
+        ${FE.slice(4).map(f=>field(f,u[f.k])).join('')}
+      </div>
+      <p class="er" id="fe" role="status"></p>
+    </form>
     <div class="user-overview-meta"><span>Создан ${new Date(u.created).toLocaleDateString('ru-RU')}</span><span>Администратор: ${esc(DB.admins.find(a=>a.id==u.adminId)?.username||'—')}</span></div>`,
     acc:`<p class="note">Отметьте сквады: доступ меняется сразу.</p><div class="ms">${DB.squads.map(s=>`<label class="ck"><input type="checkbox" data-usq="${u.id}:${s.id}" ${u.squads.includes(s.id)?'checked':''}><span>${esc(s.name)}</span></label>`).join('')}</div><div><span class="mu">Итоговые инбаунды</span><div style="margin-top:.5rem">${uin(u).map(t=>chip(esc(t),tcol(t))).join(' ')||'<span class="mu">Нет доступа</span>'}</div></div><div><span class="mu">Хосты в подписке</span><div style="margin-top:.5rem">${DB.hosts.filter(x=>!x.disabled&&uin(u).includes(x.tag)).map(x=>`<div class="rowi">${esc(x.remark)}<small class="mu" style="margin-left:auto">${esc(x.address)}:${x.port}</small></div>`).join('')||'<span class="mu">Нет подходящих хостов</span>'}</div></div><label class="f"><span>Лимит устройств</span><input type="number" min="0" value="${u.hwid}" data-hw="${u.id}"></label>`,
     sub:`<div class="history-placeholder"><b style="display:block;color:var(--tx);margin-bottom:.35rem">Подписка ещё не подключена</b>В этой HTML-версии не настроен API, который выпускает рабочие ссылки подписки и QR-коды. Поэтому здесь не показывается фиктивная ссылка.</div><a class="gh" href="#set" data-scroll-target="brand-panel" style="text-decoration:none;color:inherit;justify-self:start">${ic('sliders')}Настроить домен</a>`,
     dev:u.devices.length?u.devices.map(d=>`<div class="rowi"><div><b>${esc(d.model)}</b> ${chip(d.plat,'--c3')}<br><small class="mu">${esc(d.app)} · был ${ago(d.last)}</small></div><button class="ia" data-dd="${u.id}:${d.id}" aria-label="Удалить устройство">${ic('trash')}</button></div>`).join('')+(u.devices.length>u.hwid?`<p class="er">Устройств больше лимита (${u.hwid}).</p>`:''):'<div class="empty">Устройства ещё не подключались</div>'}[UT];
   modal(`<div class="box"><div class="bar2"><div class="who"><span class="av" style="background:hsl(${h} 55% 68%)">${esc(u.username[0].toUpperCase())}</span><div><h2>${esc(u.username)}</h2>${chip(sl,sc)} ${isOn(u)?'<span class="dot"></span>':''}</div></div><button class="ia" data-x style="margin-left:auto" aria-label="Закрыть">${ic('x')}</button></div>
-  <div class="acts"><button class="gh sm" data-a="tog" data-u="${u.id}">${u.disabled?'Включить':'Отключить'}</button><button class="gh sm" data-a="rst" data-u="${u.id}">Сбросить трафик</button><button class="gh sm" data-a="ext" data-u="${u.id}">+30 дней</button><button class="dg sm" data-a="del" data-u="${u.id}">${ic('trash')}Удалить</button></div>
+  <div class="acts user-modal-actions"><button class="gh sm" data-a="tog" data-u="${u.id}">${ic(u.disabled?'play':'pause')}${u.disabled?'Включить':'Отключить'}</button><button class="dg sm" data-a="del" data-u="${u.id}">${ic('trash')}Удалить</button></div>
   <div class="seg" id="dt">${tabs.map(([k,l])=>`<button data-dt="${k}" class="${UT==k?'on':''}">${l}</button>`).join('')}</div>${body}</div>`,'user-modal');
 }
 function userNew(){
