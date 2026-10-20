@@ -274,9 +274,9 @@ async function homeP(){
         chart.innerHTML='<div class="traffic-empty"><b>Не удалось загрузить график</b><span>'+esc(error.message||'Ошибка API метрик')+'</span></div>';
       }
     };
-    $('[data-traffic-range]').forEach(button=>button.addEventListener('click',()=>{
+    $$('[data-traffic-range]').forEach(button=>button.addEventListener('click',()=>{
       trafficRange=button.dataset.trafficRange;
-      $('[data-traffic-range]').forEach(item=>{const active=item.dataset.trafficRange===trafficRange;item.classList.toggle('on',active);item.setAttribute('aria-pressed',active?'true':'false')});
+      $$('[data-traffic-range]').forEach(item=>{const active=item.dataset.trafficRange===trafficRange;item.classList.toggle('on',active);item.setAttribute('aria-pressed',active?'true':'false')});
       refreshTraffic();
     }));
     $('#traffic-node')?.addEventListener('change',refreshTraffic);
