@@ -1571,9 +1571,9 @@ async function profilesP(){
   const renderCustomSyntax=()=>{
    const pre=$('#xpb-custom-syntax');if(!pre)return;
    const source=customArea.value;
-   const issue=jsonDiagnostics?.inspect(source)||null;
+   const issues=jsonDiagnostics?.inspectAll(source)||[];
    const run=(value,start,cls='')=>jsonDiagnostics
-    ?jsonDiagnostics.decorateRun(value,start,cls,issue)
+    ?jsonDiagnostics.decorateRun(value,start,cls,issues)
     :(cls?'<span class="'+cls+'">'+esc(value)+'</span>':esc(value));
    const token=/(\s+)|("(?:\\.|[^"\\])*"(?=\s*:))|("(?:\\.|[^"\\])*")|(-?\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b)|(\btrue\b|\bfalse\b)|(\bnull\b)|([{}\[\],:])/g;
    let out='',last=0,m;
@@ -1587,7 +1587,7 @@ async function profilesP(){
    out+=run(source.slice(last),last);
    pre.innerHTML=out+'\n';
    pre.scrollTop=customArea.scrollTop;pre.scrollLeft=customArea.scrollLeft;
-   jsonDiagnostics?.update(issue);
+   jsonDiagnostics?.update(issues);
   };
   const validateCustomJson=()=>{
    renderCustomSyntax();
@@ -1597,7 +1597,7 @@ async function profilesP(){
     if(!obj||typeof obj!=='object'||Array.isArray(obj))throw new Error('Корень JSON должен быть объектом Xray.');
     if(!Array.isArray(obj.inbounds)||!obj.inbounds.length)throw new Error('Добавьте хотя бы один inbound.');
     status.classList.remove('er');status.classList.add('mu');
-    status.textContent='✓ JSON корректен. Перед сохранением дополнительно проверяются теги, Reality, Shadowsocks 2022 и специальные транспорты.';
+    status.textContent='✓ Синтаксис корректен. Подсказки выше проверяют известные настройки; совместимость подтвердите через xray run -test.';
     status.setAttribute('aria-live','polite');
     customArea.removeAttribute('aria-invalid');
     return obj;
