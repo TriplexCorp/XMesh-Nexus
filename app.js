@@ -496,7 +496,7 @@ async function drawUsers(){
   $('#ut').innerHTML=r.total?`<div class="tw"><table class="tb"><thead><tr><th class="c1"><input type="checkbox" data-sela ${all?'checked':''} aria-label="Выбрать все на странице"></th>${th('username','Пользователь')}${th('status','Статус')}${th('used','Трафик')}${th('expireAt','Срок')}<th>Доступ</th>${th('onlineAt','Был в сети')}</tr></thead><tbody>${r.items.map(u=>{const [sl,sc]=STM[st(u)],k=u.limit?u.used/u.limit:0,h=hs(u.username)%360,on=isOn(u);return `<tr data-id="${u.id}" class="${UQ.sel.has(u.id)?'sel':''}"><td class="c1"><input type="checkbox" data-sel="${u.id}" ${UQ.sel.has(u.id)?'checked':''} aria-label="Выбрать ${esc(u.username)}"></td><td data-l=""><div class="who"><span class="av" style="background:linear-gradient(135deg,hsl(${h} 55% 70%),hsl(${(h+45)%360} 55% 64%))">${esc(u.username[0].toUpperCase())}</span><div>${esc(u.username)} ${u.tag?chip(esc(u.tag),'--c3'):''}<small class="mu">uTLS · ${esc(u.fingerprint||'chrome')}</small>${u.desc?`<small class="mu">${esc(u.desc)}</small>`:''}</div></div></td><td data-l="Статус">${chip(sl,sc)}</td><td data-l="Трафик"><div class="tr">${u.limit?`<div class="pb${k>=1?' er':k>.85?' wr':''}" style="--w:${Math.min(100,k*100)}%"><i></i></div>`:''}<small>${gb(u.used)} / ${u.limit?u.limit+' ГБ':'∞'}</small></div></td><td data-l="Срок"${u.expireAt&&u.expireAt<Date.now()+3*DAY?' class="er"':''}>${u.hold?u.holdDays+' дн после подключения':left(u.expireAt)}</td><td data-l="Доступ">${u.squads.map(i=>chip(esc(DB.squads.find(x=>x.id==i)?.name||'?'),'--b')).join(' ')}</td><td data-l="Был в сети">${on?'<span class="dot"></span> онлайн':ago(u.onlineAt)}</td></tr>`}).join('')}</tbody></table></div><div class="pg"><span>${(UQ.page-1)*UQ.size+1}–${Math.min(r.total,UQ.page*UQ.size)} из ${r.total}</span><select data-psz aria-label="Строк на странице">${[15,30,60].map(n=>`<option${n==UQ.size?' selected':''}>${n}</option>`).join('')}</select><button class="ia" data-pg="-1" ${UQ.page>1?'':'disabled'} aria-label="Назад">${ic('chevronLeft')}</button><button class="ia" data-pg="1" ${UQ.page<pages?'':'disabled'} aria-label="Вперёд">${ic('chevronRight')}</button></div>`:`<div class="empty"><b>Никого не найдено</b><span>Измените поиск или фильтр, либо создайте пользователя.</span><button class="btn sm" data-nu>${ic('plus')}Создать</button></div>`;
   drawBulk();
 }
-function drawBulk(){const b=$('#bulk'),n=UQ.sel.size;if(!b)return;b.classList.toggle('on',n>0&&cur=='users');if(!n){b.innerHTML='';return}b.innerHTML=`<b style="padding:0 .5rem">Выбрано ${n}</b>${UIDS.length>n?`<button class="gh sm" data-bk="all">Выбрать все ${UIDS.length}</button>`:''}<button class="gh sm" data-bk="on">Включить</button><button class="gh sm" data-bk="off">Отключить</button><button class="gh sm" data-bk="reset">Сбросить трафик</button><button class="gh sm" data-bk="ext">+30 дней</button><button class="gh sm" data-bk="sq">В сквад</button><button class="dg sm" data-bk="del">${ic('trash')}Удалить</button><button class="ia" data-bk="clr" aria-label="Снять выбор">${ic('x')}</button>`;decorateButtonIcons(b)}
+function drawBulk(){const b=$('#bulk'),n=UQ.sel.size;if(!b)return;b.classList.toggle('on',n>0&&cur=='users');if(!n){b.innerHTML='';return}b.innerHTML=`<b style="padding:0 .5rem">Выбрано ${n}</b>${UIDS.length>n?`<button class="gh sm" data-bk="all">Выбрать все ${UIDS.length}</button>`:''}<button class="gh sm" data-bk="on">Включить</button><button class="gh sm" data-bk="off">Отключить</button><button class="gh sm" data-bk="reset">Сбросить трафик</button><button class="gh sm" data-bk="ext">${ic('calendar')}Продлить…</button><button class="gh sm" data-bk="sq">В сквад</button><button class="dg sm" data-bk="del">${ic('trash')}Удалить</button><button class="ia" data-bk="clr" aria-label="Снять выбор">${ic('x')}</button>`;decorateButtonIcons(b)}
 const uid=s=>{let h=hs(s),x='';for(let i=0;i<32;i++){h=(h*1664525+1013904223)>>>0;x+=(h>>>24&15).toString(16)}return x.replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/,'$1-$2-$3-$4-$5')};
 let UT='ov';const subUrl=u=>'';
 /* Inline expiry editor: calendar is rendered inside the user dialog, so it
@@ -1673,7 +1673,8 @@ document.addEventListener('click',async e=>{
     if(a=='clr'){UQ.sel.clear();sel()}else if(a=='all'){UIDS.forEach(i=>UQ.sel.add(i));sel()}
     else if(a=='del')confirmBox(`Удалить пользователей: ${n}?`,'Удалить',()=>delUsers(ids));
     else if(a=='sq')modal(`<form class="box" data-k="bsq" method="dialog"><h2>Добавить в сквад</h2><p class="note">Пользователей: ${n}</p>${field({k:'squads',l:'Сквады',t:'multi',o:()=>DB.squads.map(s=>[s.id,s.name])},[])}${acts2('Добавить')}</form>`);
-    else{await api.bulk('users',ids,u=>{if(a=='on')u.disabled=false;if(a=='off')u.disabled=true;if(a=='reset')u.used=0;if(a=='ext')u.expireAt=Math.max(now,u.expireAt||now)+30*DAY});toast({on:'Включены',off:'Отключены',reset:'Трафик сброшен',ext:'Продлено на 30 дней'}[a]+`: ${n}`);render(1)}}
+    else if(a=='ext')modal(`<form class="box bulk-renew-dialog" data-k="bulk-renew" method="dialog"><h2>Продление доступа</h2><p class="note">Выбрано пользователей: ${n}. Срок увеличится на указанное количество дней для каждого пользователя.</p><label class="f"><span>Количество дней</span><input type="number" name="days" min="1" max="36500" step="1" inputmode="numeric" required placeholder="Введите число"><small>От текущей даты окончания, либо от сегодня, если доступ истёк.</small></label><p class="er" id="fe" role="status"></p><div class="act"><button type="button" class="gh" data-x>Отмена</button><button class="btn" type="submit">${ic('calendar')}Продлить</button></div></form>`);
+    else{await api.bulk('users',ids,u=>{if(a=='on')u.disabled=false;if(a=='off')u.disabled=true;if(a=='reset')u.used=0});toast({on:'Включены',off:'Отключены',reset:'Трафик сброшен'}[a]+`: ${n}`);render(1)}}
   else if(b=g('[data-dt]')){userDrawer(+$('[data-a]').dataset.u,b.dataset.dt)}
   else if(b=g('tr[data-id]'))userDrawer(+b.dataset.id,'ov');
   else if(b=g('[data-uo]'))userDrawer(+b.dataset.uo,'dev');
@@ -1684,10 +1685,11 @@ document.addEventListener('click',async e=>{
   else if(b=g('[data-a]')){const id=+b.dataset.u,a=b.dataset.a;
     if(a=='del'){confirmBox('Удалить пользователя?','Удалить',()=>delUsers(new Set([id])));return}
     const u=DB.users.find(x=>x.id==id);if(!u){toast('Пользователь не найден в локальном кеше. Обновите список и повторите.');return}
-    const p=a=='tog'?{disabled:!u.disabled}:a=='rst'?{used:0}:a=='ext'?{expireAt:Math.max(Date.now(),u.expireAt||Date.now())+30*DAY}:{short:Math.floor(Math.random()*2**40).toString(36).padStart(8,'a'),devices:[]};
-    await api.update('users',id,p);toast({tog:'Статус изменён',rst:'Трафик сброшен',ext:'Продлено на 30 дней',rev:'Ссылка перевыпущена'}[a]);render(1);userDrawer(id,a=='rev'?'sub':UT)}
+    const p=a=='tog'?{disabled:!u.disabled}:a=='rst'?{used:0}:a=='rev'?{short:Math.floor(Math.random()*2**40).toString(36).padStart(8,'a'),devices:[]}:null;
+    if(!p)return;
+    await api.update('users',id,p);toast({tog:'Статус изменён',rst:'Трафик сброшен',rev:'Ссылка перевыпущена'}[a]);render(1);userDrawer(id,a=='rev'?'sub':UT)}
   else if(b=g('[data-dd]')){const [ui,di]=b.dataset.dd.split(':').map(Number),u=DB.users.find(x=>x.id==ui);await api.update('users',ui,{devices:u.devices.filter(d=>d.id!=di)});toast('Устройство удалено');if(cur=='tools')drawTools();else userDrawer(ui,'dev')}
-  else if(b=g('[data-qx]')){const u=DB.users.find(x=>x.id==b.dataset.qx);await api.update('users',u.id,{expireAt:Math.max(Date.now(),u.expireAt||Date.now())+30*DAY});toast(`${u.username}: продлено на 30 дней`);render(1)}
+  else if(b=g('[data-qx]')){const u=DB.users.find(x=>x.id==b.dataset.qx);if(u)userDrawer(u.id,'ov')}
   else if(b=g('[data-qr]')){await api.update('users',+b.dataset.qr,{used:0});toast('Трафик сброшен');render(1)}
   else if(b=g('[data-ne]')){const [k,id]=b.dataset.ne.split(':');entForm(k,id)}
   else if(b=g('tr[data-e]')){const [k,id]=b.dataset.e.split(':');entForm(k,id)}
@@ -1829,6 +1831,20 @@ document.addEventListener('submit',async e=>{const f=e.target,k=f.dataset.k;if(!
   else if(k=='uedit'){e.preventDefault();const d=read(FE,f),id=+f.dataset.id;if(DB.users.some(u=>u.username.toLowerCase()==d.username.toLowerCase()&&u.id!=id))return er('Такое имя уже есть.');await api.update('users',id,d);toast('Сохранено');render(1);userDrawer(id,'ov')}
   else if(k=='ent'){const key=f.dataset.ent,e2=ENT[key],d=read(e2.fs,f),id=f.dataset.id,m=e2.chk?.(d,+id);if(m)return er(m);
     if(id){await api.update(key,id,d);toast('Сохранено')}else{const o=Object.assign({disabled:false,order:DB[key].length+1,created:Date.now(),last:0,used:0,state:'OFFLINE'},d);const c=await api.create(key,o);toast('Создано');if(e2.after?.(c)){render(1);return}}render(1)}
+  else if(k=='bulk-renew'){
+    e.preventDefault();
+    const value=f.querySelector('[name="days"]')?.value.trim()||'';
+    const days=/^[1-9]\\d*$/.test(value)?Number(value):NaN;
+    if(!Number.isSafeInteger(days)||days<1||days>36500)return er('Укажите количество дней от 1 до 36500.');
+    const ids=new Set(UQ.sel);
+    if(!ids.size)return er('Сначала выберите пользователей.');
+    try{
+      await api.bulk('users',ids,u=>{u.expireAt=userExtendExpiryTimestamp(u.expireAt,days)});
+      dlg.close();
+      toast('Срок продлён на '+days+' дн. · '+ids.size+' польз.');
+      render(1);
+    }catch(error){return er('Не удалось продлить доступ: '+(error.message||'ошибка API'))}
+  }
   else if(k=='bsq'){const d=read([{k:'squads',t:'multi'}],f),ids=new Set(UQ.sel);await api.bulk('users',ids,u=>u.squads=[...new Set([...u.squads,...d.squads])]);toast('Сквады добавлены');render(1)}
   else if(k=='brand'){e.preventDefault();const d=read([{k:'brand'},{k:'domain'}],f);try{await api.saveSettings({brand:d.brand,domain:d.domain});brand();toast('Сохранено')}catch(err){return er(err.message)}}});
 const acts2=ok=>`<div class="act"><button type="button" class="gh" data-x>Отмена</button><button class="btn">${ok}</button></div>`;
