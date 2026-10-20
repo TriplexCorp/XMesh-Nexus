@@ -151,7 +151,7 @@ async function render(soft){
 
 /* ================= СИСТЕМНЫЕ МЕТРИКИ ================= */
 const sysBytes=n=>{if(!Number.isFinite(+n))return'—';const v=+n;if(v<1024)return fmt(v)+' Б';if(v<1024**2)return fmt(v/1024,1)+' КБ';if(v<1024**3)return fmt(v/1024**2,1)+' МБ';if(v<1024**4)return fmt(v/1024**3,2)+' ГБ';return fmt(v/1024**4,2)+' ТБ'};
-const sysPct=n=>Number.isFinite(+n)?Math.max(0,Math.min(100,+n)):null;
+const sysPct=n=>n==null||n===''||!Number.isFinite(+n)?null:Math.max(0,Math.min(100,+n));
 const sysBar=n=>{const p=sysPct(n);return p===null?'<div class="sys-progress"><i style="width:0%"></i></div>':`<div class="sys-progress ${p>=90?'danger':p>=75?'warning':''}"><i style="width:${p}%"></i></div>`};
 const sysUptime=n=>{if(!Number.isFinite(+n))return'—';n=Math.max(0,Math.floor(+n));const d=Math.floor(n/86400),h=Math.floor(n%86400/3600),m=Math.floor(n%3600/60);return d?`${d} д ${h} ч`:h?`${h} ч ${m} мин`:`${m} мин`};
 function systemPanel(s,error=''){
