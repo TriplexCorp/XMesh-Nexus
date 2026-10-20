@@ -597,7 +597,7 @@ function randomBase64(size){const b=new Uint8Array(size);crypto.getRandomValues(
 async function profilesP(){
  const saved=await crudCard('profiles');
  const options=(items,selected)=>items.map(x=>'<option value="'+x[0]+'"'+(x[0]===selected?' selected':'')+'>'+x[1]+'</option>').join('');
- const field=(id,label,control,help)=>'<label class="f"><span>'+label+'</span>'+control+(help?'<small>'+help+'</small>':'')+'</label>';
+ const field=(id,label,control,help)=>'<label class="f"><span>'+label+'</span>'+control+(help?'<small>'+help+'</small>':'<small class="f-help-empty" aria-hidden="true"></small>')+'</label>';
  const inp=(id,value,placeholder,extra)=>'<input id="xpb-'+id+'" value="'+(value||'')+'" placeholder="'+(placeholder||'')+'" '+(extra||'')+'>';
  const sel=(id,items)=>'<select id="xpb-'+id+'">'+options(items)+'</select>';
  const group=(title,desc,body,open)=>'<details class="xray-section"'+(open?' open':'')+'><summary><span><b>'+title+'</b><small>'+desc+'</small></span><span class="xray-chevron">⌄</span></summary><div class="xray-section-body">'+body+'</div></details>';
