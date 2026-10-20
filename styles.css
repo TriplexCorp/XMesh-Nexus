@@ -1852,12 +1852,18 @@ white-space:nowrap;
     scrollbar-width:thin;
   }
   .xray-builder .xray-config-tabs button{
-    flex:0 0 7.5rem;
-    min-height:3.9rem;
-    padding:.52rem;
-    border-radius:.62rem;
+    flex:0 0 9.1rem;
+    height:2.5rem;
+    min-height:2.5rem;
+    padding:.45rem .58rem;
+    border-radius:.6rem;
   }
   .xray-builder .xray-config-tabs button>b{font-size:.67rem}
+  .xray-builder .xray-config-panel[data-xray-config-panel="basic"] .xray-row-2,
+  .xray-builder .xray-config-panel[data-xray-config-panel="basic"] .xray-row-3{
+    grid-template-columns:minmax(0,1fr);
+    gap:.62rem;
+  }
   .xray-builder .xray-config-content{padding:.78rem;border-radius:.72rem}
   .xray-builder .xray-config-panel{gap:.72rem}
   .xray-builder .xray-config-panel-title h3{font-size:.88rem}
@@ -1870,11 +1876,11 @@ white-space:nowrap;
   .xray-builder .xray-config-panel .xray-field-action{padding:0}
   .xray-builder .xray-output-dock{height:34rem;min-height:30rem;padding:.65rem}
   .xray-builder .xray-output-workspace-head>div>small{max-width:34ch}
-  .xray-builder .xray-output-toolbar{grid-template-columns:minmax(0,1fr)}
+  .xray-builder .xray-output-toolbar{height:auto;min-height:2.5rem;flex-wrap:wrap;gap:.4rem}
   .xray-builder .xray-output-actions{justify-content:flex-end}
-  .xray-builder .xray-output-tabs button{min-height:3.25rem;padding:.48rem}
+  .xray-builder .xray-output-tabs button{height:2.15rem;min-height:2.15rem;padding:0 .56rem}
   .xray-builder .xray-output-tabs button>b{font-size:.72rem}
-  .xray-builder .xray-output-tabs button>small{font-size:.6rem}
+  
   .xray-builder .xray-code-syntax,
   .xray-builder .xray-code-input{padding:.62rem;font-size:.66rem}
   .xray-builder.manual-mode .xray-workspace-layout{
