@@ -805,3 +805,11 @@ nav a.on{background:var(--s2)!important;box-shadow:none!important}
 .xray-builder [hidden]{display:none!important}
 @media(max-width:850px){.xray-preset-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.xray-main-grid,.xray-key-grid,.xray-preset-row{grid-template-columns:minmax(0,1fr)}.xray-section summary{padding:.85rem}.xray-section-body{padding:0 .85rem .9rem}.xray-output-head{align-items:flex-start}.xray-footer>.btn{width:100%}}
+
+/* XRAY Studio: credentials and protocol-aware states */
+.xray-user-credential{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin:.9rem 0 1.1rem;padding:.9rem 1rem;border:1px solid var(--bd);border-radius:12px;background:var(--surface,rgba(127,127,127,.045))}
+.xray-user-credential>div{display:grid;gap:.3rem;min-width:0}
+.xray-user-credential code{font-size:.85rem;overflow-wrap:anywhere;color:var(--tx)}
+.xray-user-credential small{line-height:1.45}
+.xray-user-credential .gh{flex:0 0 auto}
+.xray-section [hidden],.xray-main-grid .f[hidden]{display:none!important}
