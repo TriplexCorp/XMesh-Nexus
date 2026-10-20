@@ -428,8 +428,9 @@ document.addEventListener('click',async e=>{
   else if(b=g('tr[data-id]'))userDrawer(+b.dataset.id,'ov');
   else if(b=g('[data-uo]'))userDrawer(+b.dataset.uo,'dev');
   else if(g('[data-copy]'))copyT($('#lk').value);
-  else if(b=g('[data-a]')){const id=+b.dataset.u,u=DB.users.find(x=>x.id==id),a=b.dataset.a;if(!u)return;
-    if(a=='del'){if(!b.dataset.s){b.dataset.s=1;b.textContent='Нажмите ещё раз';return}return delUsers(new Set([id]))}
+  else if(b=g('[data-a]')){const id=+b.dataset.u,a=b.dataset.a;
+    if(a=='del'){confirmBox('Удалить пользователя?','Удалить',()=>delUsers(new Set([id])));return}
+    const u=DB.users.find(x=>x.id==id);if(!u){toast('Пользователь не найден в локальном кеше. Обновите список и повторите.');return}
     const p=a=='tog'?{disabled:!u.disabled}:a=='rst'?{used:0}:a=='ext'?{expireAt:Math.max(Date.now(),u.expireAt||Date.now())+30*DAY}:{short:Math.floor(Math.random()*2**40).toString(36).padStart(8,'a'),devices:[]};
     await api.update('users',id,p);toast({tog:'Статус изменён',rst:'Трафик сброшен',ext:'Продлено на 30 дней',rev:'Ссылка перевыпущена'}[a]);render(1);userDrawer(id,a=='rev'?'sub':UT)}
   else if(b=g('[data-dd]')){const [ui,di]=b.dataset.dd.split(':').map(Number),u=DB.users.find(x=>x.id==ui);await api.update('users',ui,{devices:u.devices.filter(d=>d.id!=di)});toast('Устройство удалено');if(cur=='tools')drawTools();else userDrawer(ui,'dev')}
