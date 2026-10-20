@@ -323,7 +323,7 @@ function pdraw(q){q=q.toLowerCase();const go=k=>()=>{dlg.close();location.hash=k
 /* ================= СОБЫТИЯ ================= */
 const copyT=t=>(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('Скопировано'),()=>{const i=$('#lk');i.select();document.execCommand('copy');toast('Скопировано')});
 const sel=()=>{$$('#ut tbody tr').forEach(r=>{const i=+r.dataset.id;r.classList.toggle('sel',UQ.sel.has(i));const c=$('[data-sel]',r);if(c)c.checked=UQ.sel.has(i)});const a=$('[data-sela]');if(a)a.checked=$$('#ut tbody tr').every(r=>UQ.sel.has(+r.dataset.id));drawBulk()};
-const delUsers=async ids=>{const gone=DB.users.filter(u=>ids.has(u.id));for(const id of ids)await api.remove('users',id);ids.forEach(i=>UQ.sel.delete(i));toast(`Удалено: ${gone.length}`,'Отменить',async()=>{DB.users.push(...gone);save();render(1)});dlg.close();render(1)};
+const delUsers=async ids=>{const gone=DB.users.filter(u=>ids.has(u.id));for(const id of ids)await api.remove('users',id);ids.forEach(i=>UQ.sel.delete(i));toast(`Удалено: ${gone.length}`,'Отменить',async()=>{try{if(backendReady){for(const user of gone)await api.create('users',user)}else{DB.users.push(...gone);save()}render(1);toast('Пользователи восстановлены')}catch(error){toast('Не удалось восстановить: '+error.message)}});dlg.close();render(1)};
 document.addEventListener('click',async e=>{
   const g=s=>e.target.closest(s);let b;
   if(g('.sw')||g('[data-sel]')&&0)return;
