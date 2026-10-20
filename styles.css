@@ -149,7 +149,8 @@ nav a .ic,nav .more .ic{width:1.08rem;height:1.08rem;opacity:.9}
 nav a:hover,nav .more:hover{color:var(--tx);background:color-mix(in srgb,var(--a) 6%,var(--s2));border-color:color-mix(in srgb,var(--a) 12%,var(--ln))}
 nav a.on{color:var(--tx);background:color-mix(in srgb,var(--a) 10%,var(--s2));border-color:color-mix(in srgb,var(--a) 16%,var(--ln))}
 nav a.on::before{content:"";position:absolute;left:-.81rem;top:.5rem;bottom:.5rem;width:3px;border-radius:0 3px 3px 0;background:var(--a)}
-nav em{margin-left:auto;font-style:normal;font-size:.78rem;font-weight:800}.more{display:none}
+nav em{margin-left:auto;font-style:normal;font-size:.78rem;font-weight:800}.nav-label-short{display:none}
+.more{display:none}
 .core{margin-top:auto;padding:.85rem;border:1px solid var(--ln);border-radius:1rem;background:color-mix(in srgb,var(--s2) 82%,transparent);display:grid;gap:.75rem}
 .ct{display:flex;align-items:center;gap:.7rem}.ct small{display:block;color:var(--mu);font-size:.76rem}
 .core button{min-height:2.35rem;padding:.55rem .7rem;border:1px solid var(--ln);border-radius:.7rem;background:color-mix(in srgb,var(--tx) 4%,transparent);display:flex;align-items:center;justify-content:center;gap:.5rem;transition:background .16s,border-color .16s}
@@ -1930,4 +1931,237 @@ white-space:nowrap;
 .xray-builder #xpb-custom-error.mu{
   border-color:color-mix(in srgb,var(--ok) 25%,var(--ln));
   color:var(--mu);
+}
+
+/* Mobile shell — authoritative rules below legacy desktop component defaults.
+   Keep this block after the general theme/layout declarations so touch UI
+   cannot be accidentally resized by a later desktop selector. */
+@media (max-width:760px){
+  html{
+    font-size:calc(15px * var(--ts,1));
+    -webkit-text-size-adjust:100%;
+    text-size-adjust:100%;
+  }
+  html,body{width:100%;max-width:100%;overflow-x:clip}
+  body{letter-spacing:0}
+  body::before,body::after{display:none}
+  .app{display:block;min-width:0;width:100%}
+  .wrap{
+    box-sizing:border-box;
+    width:100%;
+    max-width:100%;
+    min-width:0;
+    margin:0;
+    padding:
+      .9rem
+      max(.85rem,env(safe-area-inset-right))
+      calc(5.3rem + env(safe-area-inset-bottom))
+      max(.85rem,env(safe-area-inset-left));
+  }
+  .view,.view>*{min-width:0;max-width:100%}
+  .view>*{animation:none}
+  .card,.box{max-width:100%;min-width:0}
+  html[data-surface=glass] .card{
+    background:color-mix(in srgb,var(--s1) 94%,var(--bg));
+    -webkit-backdrop-filter:none;
+    backdrop-filter:none;
+    box-shadow:0 1px 0 color-mix(in srgb,var(--tx) 5%,transparent) inset;
+  }
+  html[data-surface=glass] .card::after{display:none}
+  .card::before{opacity:.3}
+
+  /* A true five-slot mobile navigation instead of desktop-sized menu items. */
+  .app>aside{
+    position:fixed;
+    inset:auto 0 0;
+    z-index:45;
+    display:block;
+    width:100%;
+    min-width:0;
+    height:auto;
+    margin:0;
+    padding:
+      .3rem
+      max(.4rem,env(safe-area-inset-right))
+      max(.3rem,env(safe-area-inset-bottom))
+      max(.4rem,env(safe-area-inset-left));
+    border:0;
+    border-top:1px solid var(--ln);
+    border-radius:0;
+    background:var(--s1);
+    box-shadow:0 -6px 22px rgba(0,0,0,.15);
+    -webkit-backdrop-filter:none;
+    backdrop-filter:none;
+    overflow:visible;
+  }
+  html[data-surface=glass] .app>aside{
+    background:var(--s1);
+    -webkit-backdrop-filter:none;
+    backdrop-filter:none;
+  }
+  .app>aside .brand,.app>aside .core,.app>aside nav .g,.app>aside nav a.sec{display:none}
+  .app>aside nav{
+    display:grid;
+    grid-template-columns:repeat(5,minmax(0,1fr));
+    align-items:stretch;
+    gap:.12rem;
+    width:100%;
+    min-width:0;
+    margin:0;
+    padding:0;
+  }
+  .app>aside nav a,.app>aside nav .more{
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+    gap:.22rem;
+    min-width:0;
+    min-height:3.5rem;
+    height:auto;
+    margin:0;
+    padding:.35rem .12rem .3rem;
+    border-radius:.55rem;
+    text-align:center;
+    font-size:max(11px,.73rem);
+    font-weight:650;
+    line-height:1.18;
+    white-space:nowrap;
+  }
+  .app>aside nav a .ic,.app>aside nav .more .ic{
+    display:block;
+    width:1.3rem;
+    height:1.3rem;
+    flex:0 0 1.3rem;
+  }
+  .app>aside nav .lbl{
+    display:block;
+    min-width:0;
+    max-width:100%;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .app>aside nav .nav-label-full{display:none}
+  .app>aside nav .nav-label-short{display:inline}
+  .app>aside nav a.on::before{display:none}
+
+  /* Readable header without overflowing the four action buttons. */
+  .top{
+    display:flex;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:.5rem;
+    min-width:0;
+    padding:.12rem 0 .75rem;
+    margin:0 0 .85rem;
+  }
+  .top h1{
+    flex:1 1 6rem;
+    min-width:0;
+    margin:0;
+    font-size:clamp(1.13rem,4.4vw,1.35rem);
+    font-weight:750;
+    letter-spacing:-.025em;
+    line-height:1.22;
+    overflow-wrap:anywhere;
+  }
+  .top .tl{
+    flex:0 0 auto;
+    min-width:0;
+    margin-left:auto;
+    gap:.3rem;
+  }
+  .top .tl>.ib,.top .tl>#logout,.top .tl>#addb{
+    display:inline-flex;
+    justify-content:center;
+    align-items:center;
+    flex:0 0 2.32rem;
+    width:2.32rem;
+    min-width:2.32rem;
+    height:2.32rem;
+    min-height:2.32rem;
+    padding:0;
+    border-radius:.58rem;
+  }
+  .top #logout .logout-label{display:none}
+  .top .tl .ic{width:1.12rem;height:1.12rem}
+  .top #pal{
+    order:3;
+    flex:1 0 100%;
+    width:100%;
+    min-width:0;
+    height:2.48rem;
+    padding:0 .75rem;
+    gap:.55rem;
+    font-size:max(12px,.83rem);
+  }
+  .top #pal #si{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    flex:0 0 1.12rem;
+    min-width:1.12rem;
+  }
+  .top #pal>span:not(#si){flex:1 1 auto;min-width:0}
+  .top #pal kbd{display:none}
+
+  /* Touch forms: minimum 16px prevents involuntary iOS Safari zoom. */
+  :where(input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=range]),select,textarea){
+    font-size:max(16px,1rem);
+  }
+  .f>span,.setting-copy>b{font-size:max(13px,.86rem);line-height:1.35}
+  .f small,.setting-copy small,.hd p,.note{
+    font-size:max(12px,.8rem);
+    line-height:1.5;
+    overflow-wrap:anywhere;
+  }
+  .chip{font-size:max(12px,.78rem)}
+  .ngauge .ng-label,.ngauge small,.sys-detail,.sys-donut-info>small,
+  .users-search-hint,.palette-search-hint{
+    font-size:max(12px,.78rem);
+    line-height:1.35;
+  }
+  .users-toolbar .users-search-field input#uq,
+  .palette-search-field input#pq,
+  .country-picker .country-search{
+    font-size:max(16px,1rem);
+  }
+
+  /* Action grids and mobile overlays must contain long translated labels. */
+  .nc .acts{grid-template-columns:repeat(3,minmax(0,1fr));gap:.35rem}
+  .nc .acts .gh{
+    min-width:0;
+    width:100%;
+    gap:.26rem;
+    padding:0 .3rem;
+    font-size:max(11px,.72rem);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .nc .acts .gh>.ic{
+    display:block;
+    width:.95rem;
+    height:.95rem;
+    flex:0 0 .95rem;
+  }
+  .users-toolbar-actions>.gh,.users-toolbar-actions>.btn{
+    min-width:0;
+    font-size:max(12px,.8rem);
+  }
+  .users-panel .bulk{
+    min-width:0;
+    max-width:100%;
+    overflow-wrap:anywhere;
+  }
+  .users-panel .bulk button{min-width:0;white-space:normal}
+  #toast{
+    bottom:calc(5rem + env(safe-area-inset-bottom));
+    max-width:calc(100vw - 1.5rem);
+    overflow-wrap:anywhere;
+    font-size:max(12px,.82rem);
+  }
+  dialog::backdrop{-webkit-backdrop-filter:none;backdrop-filter:none}
+  dialog .box{max-width:100%}
 }
