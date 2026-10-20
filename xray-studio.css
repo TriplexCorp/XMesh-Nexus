@@ -2761,3 +2761,10 @@ body:has(.studio-reference-v5) .wrap{
   transition:none!important;transform:none!important;
  }
 }
+
+
+/* The XHTTP dialog itself is the advanced settings view: no nested disclosure. */
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode)
+.sr-studio-dialog[data-active-panel="transport"] [data-xray-option-group="transport-xhttp"] .sr-xhttp-toggle{
+ display:none!important;
+}
