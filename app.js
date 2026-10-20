@@ -1990,3 +1990,16 @@ function syncCoreAutoRefresh(){
   },seconds*1000);
 }
 bootPanel().catch(err=>showAuthGate(err.message||'Ошибка запуска панели'));
+
+/* Scroll repair: the JSON preview overlays the page with its own scrollable
+   textarea. In visual mode, wheel gestures anywhere over Studio navigate
+   the document; manual JSON editing keeps native scrolling untouched. */
+document.addEventListener('wheel',function(event){
+  if(event.defaultPrevented || event.ctrlKey || event.metaKey || event.shiftKey)return;
+  const builder=event.target.closest?.('.xray-builder:not(.manual-mode)');
+  if(!builder)return;
+  const delta=event.deltaMode===1?event.deltaY*16:event.deltaMode===2?event.deltaY*window.innerHeight:event.deltaY;
+  if(!delta || document.documentElement.scrollHeight<=window.innerHeight+1)return;
+  event.preventDefault();
+  window.scrollBy({top:delta,left:0,behavior:'instant'});
+},{capture:true,passive:false});
