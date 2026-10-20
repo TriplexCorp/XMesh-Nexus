@@ -404,7 +404,7 @@ function xrayClientSample(){
   const userPassword=v('ss-user-password')||(method.startsWith('2022-')?'REPLACE_WITH_VALID_SS2022_USER_KEY':uuid);
   const password=method.startsWith('2022-')?(v('ss-password')||'REPLACE_WITH_VALID_SS2022_SERVER_KEY')+':'+userPassword:userPassword;
   settings={servers:[{address:'SERVER_ADDRESS',port,method,password}]};
- }else if(protocol==='socks')settings={servers:[{address:'SERVER_ADDRESS',port,...(v('socks-auth')==='password'?{users:[{user:(v('name')||'xmesh').toLowerCase().replace(/[^a-z0-9_.-]/g,'-'),pass:uuid}]}:{})}]};
+ }else if(protocol==='socks'||protocol==='mixed')settings={servers:[{address:'SERVER_ADDRESS',port,...(v('socks-auth')==='password'?{users:[{user:(v('name')||'xmesh').toLowerCase().replace(/[^a-z0-9_.-]/g,'-'),pass:uuid}]}:{})}]};
  else if(protocol==='http')settings={address:'SERVER_ADDRESS',port,...(uuid?{user:(v('name')||'xmesh').toLowerCase().replace(/[^a-z0-9_.-]/g,'-'),pass:uuid}:{})};
  else if(protocol==='wireguard')settings={secretKey:'REPLACE_WITH_CLIENT_PRIVATE_KEY',address:['10.0.0.2/32'],peers:[{endpoint:'SERVER_ADDRESS:'+port,publicKey:'REPLACE_WITH_SERVER_PUBLIC_KEY',allowedIPs:['0.0.0.0/0','::/0']}]};
  else if(protocol==='hysteria')settings={version:2,address:'SERVER_ADDRESS',port};
@@ -534,7 +534,7 @@ async function profilesP(){
  '<div class="xray-output-head"><div><b>Полный конфиг Xray</b><small>Можно редактировать inbounds, outbounds, routing, DNS, policy, API и любые поля актуального ядра.</small></div><div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-format-json">Форматировать JSON</button><button type="button" class="gh sm" id="xpb-reset-json">Заново из конструктора</button></div></div>'+
  '<textarea id="xpb-custom-json" class="xray-preview" spellcheck="false" aria-label="Полный JSON-конфиг Xray"></textarea>'+
  '<p class="er" id="xpb-custom-error" role="status">JSON-режим даёт доступ к параметрам, которых нет в визуальном редакторе.</p></div>'+
- '<div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-generate-uuid">Сгенерировать UUID</button><button type="button" class="gh sm" id="xpb-generate-ss-password">Сгенерировать пароли Shadowsocks</button></div>'+
+ '<div class="xray-key-actions" id="xpb-generator-actions"><button type="button" class="gh sm" id="xpb-generate-uuid">Сгенерировать UUID</button><button type="button" class="gh sm" id="xpb-generate-ss-password">Сгенерировать пароли Shadowsocks</button></div>'+
  '<div class="xray-output-head" id="xpb-server-output"><div><b>Предпросмотр JSON</b><small>Обновляется автоматически · не применяет конфигурацию к работающему ядру</small></div><div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-copy">Копировать JSON</button><button type="button" class="gh sm" id="xpb-download">Скачать JSON</button></div></div>'+
  '<textarea id="xpb-preview" class="xray-preview" spellcheck="false" readonly aria-label="Предпросмотр серверного JSON"></textarea>'+
  '<div class="xray-output-head xray-client-head" id="xpb-client-output"><div><b>Клиентский пример</b><small>Outbound с выбранными transport, security и fingerprint</small></div><div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-client-copy">Копировать</button><button type="button" class="gh sm" id="xpb-client-download">Скачать</button></div></div>'+
@@ -579,6 +579,10 @@ async function profilesP(){
     const noneOption=securitySelect.querySelector('option[value="none"]');
     if(noneOption)noneOption.disabled=proto==='hysteria'||net==='hysteria';
    }
+   const listenField=$('#xpb-listen')?.closest('.f'),portField=$('#xpb-port')?.closest('.f'),securityField=$('#xpb-security')?.closest('.f');
+   if(listenField)listenField.hidden=proto==='tun';
+   if(portField)portField.hidden=proto==='tun';
+   if(securityField)securityField.hidden=['tun','wireguard','masque'].includes(proto);
    setGroup('.xray-section:has(#xpb-private-key)',sec==='reality');
    setGroup('.xray-section:has(#xpb-cert)',sec==='tls'&&!['tun','wireguard','masque'].includes(proto));
    const transport=$('.xray-section:has(#xpb-host)');
@@ -632,6 +636,8 @@ async function profilesP(){
    customMode=mode==='custom';
    $('#xpb-visual-mode').hidden=customMode;
    $('#xpb-custom-mode').hidden=!customMode;
+   $('#xpb-generator-actions').hidden=customMode;
+   const tagField=$('#xpb-tag')?.closest('.f');if(tagField)tagField.hidden=customMode;
    $('#xpb-server-output').hidden=customMode;
    $('#xpb-preview').hidden=customMode;
    $('#xpb-client-output').hidden=customMode;
@@ -668,8 +674,8 @@ async function profilesP(){
      if(inbound?.streamSettings?.security==='reality'){
       const rk=inbound.streamSettings.realitySettings||{};
       if(!rk.privateKey||rk.privateKey==='REPLACE_WITH_XRAY_PRIVATE_KEY')throw new Error('Inbound '+(inbound.tag||'(без tag)')+': задайте настоящий Reality privateKey.');
-      const ids=rk.shortIds||rk.shortIds===0?rk.shortIds:[];
-      if(Array.isArray(ids)&&ids.some(id=>String(id).length>16||String(id).length%2||!/^[a-fA-F0-9]*$/.test(String(id))))throw new Error('Inbound '+(inbound.tag||'(без tag)')+': Short ID должен содержать до 16 hex-символов чётной длины.');
+      const ids=rk.shortIds||[];
+      if(!Array.isArray(ids)||ids.some(id=>String(id).length>16||String(id).length%2||!/^[a-fA-F0-9]*$/.test(String(id))))throw new Error('Inbound '+(inbound.tag||'(без tag)')+': Short ID должен быть массивом из hex-значений до 16 символов чётной длины.');
      }
      if(inbound?.protocol==='shadowsocks'){
       const ss=inbound.settings||{};
