@@ -189,6 +189,7 @@
      const draw=()=>{
        menu.replaceChildren();
        [...select.options].forEach((option,index)=>{
+         if(option.hidden)return;
          const item=document.createElement('button');
          item.type='button';item.setAttribute('role','option');
          item.className='sr-v5-menu-item';
@@ -196,7 +197,7 @@
          item.dataset.index=String(index);
          item.setAttribute('aria-selected',String(option.selected));
          item.disabled=option.disabled;
-         if(option.selected)chosen=index;
+         if(option.selected)chosen=menu.childElementCount;
          item.addEventListener('click',()=>choose(index));
          menu.append(item);
        });
@@ -251,12 +252,12 @@
          event.preventDefault();if(menu.hidden)open();
          const opts=items().filter(el=>!el.disabled);
          const target=event.key==='Home'?opts[0]:opts[opts.length-1];
-         target?.focus();if(target)chosen=+target.dataset.index;return;
+         target?.focus();if(target)chosen=items().indexOf(target);return;
        }
        if(event.key==='Enter'||event.key===' '){
          event.preventDefault();
          if(menu.hidden)open();
-         else {const focused=document.activeElement?.closest?.('[role="option"]');choose(focused?+focused.dataset.index:chosen)}
+         else {const focused=document.activeElement?.closest?.('[role="option"]');const option=focused||items()[chosen];if(option)choose(+option.dataset.index)}
        }
      };
      trigger.addEventListener('keydown',keydown);
