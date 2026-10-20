@@ -19,7 +19,7 @@ RUN apt-get update \
     && mkdir -p /app/static /var/lib/xmesh/core \
     && chown -R xmesh:xmesh /app /var/lib/xmesh
 COPY --from=builder /build/backend/target/release/xmesh-api /usr/local/bin/xmesh-api
-COPY index.html styles.css global-hover.css xray-studio.css xray-json-diagnostics.js app.js xray-studio-v5.js xray-studio-dialog.js login.html login.css login.js /app/static/
+COPY index.html styles.css global-hover.css xray-studio.css xray-json-intelligence.js xray-json-diagnostics.js app.js xray-studio-v5.js xray-studio-dialog.js login.html login.css login.js /app/static/
 RUN chown -R xmesh:xmesh /app/static
 USER 10001:10001
 WORKDIR /app
