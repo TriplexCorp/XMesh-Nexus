@@ -930,7 +930,11 @@ async function profilesP(){
    $$('[data-xray-config-panel]').forEach(panel=>{
     if(panel.dataset.xrayConfigPanel==='basic')return;
     const sections=$$('.xray-section',panel);
-    const visible=sections.some(section=>!section.hidden);
+    const visible=sections.some(section=>!section.hidden&&$$('.f',section).some(field=>{
+    if(field.hidden)return false;
+    const subgroup=field.closest('.xray-option-group');
+    return !subgroup||!subgroup.hidden;
+   }));
     const button=$('[data-xray-config-tab="'+panel.dataset.xrayConfigPanel+'"]');
     if(button)button.hidden=!visible;
    });
