@@ -18,7 +18,7 @@ const buttonIconFor=value=>{
  if(has(['удал','delete','remove','отозв']))return'trash';
  if(has(['сохран','save','примен','apply']))return'save';
  if(has(['отмен','закры','cancel','close']))return'x';
- if(has(['установ','запуск','install','start','выдать токен']))return'play';
+ if(has(['установ','запуск','включить','activate','enable','install','start','выдать токен']))return'play';
  if(has(['останов','отключить','stop','pause']))return'pause';
  if(has(['генерир','создать пару','новый short id','заново','regenerate']))return'tool';
  if(has(['добав','созда','новый','новая','new ','add','create','продл','выдать'])||text.startsWith('+'))return'plus';
@@ -1403,7 +1403,7 @@ document.addEventListener('click',async e=>{
   else if(b=g('[data-th]')){C.theme=b.dataset.th;apply();$$('#th button').forEach(x=>x.classList.toggle('on',x==b))}
   else if(b=g('[data-ac]')){C.accent=b.dataset.ac;apply();$$('[data-ac]').forEach(x=>x.classList.toggle('on',x==b))}
   else if(b=g('[data-ui]')){const prop=b.dataset.ui,value=b.dataset.value;if(prop&&value){C[prop]=value;apply();$$(`[data-ui="${prop}"]`).forEach(x=>x.classList.toggle('on',x==b))}}
-  else if(g('#rs')){C={...CDEFAULT};apply();render(1);toast('Оформление сброшено')}
+  else if(g('#rs')){const automation={autoCoreRefresh:C.autoCoreRefresh,coreRefreshSeconds:C.coreRefreshSeconds};C={...CDEFAULT,...automation};apply();syncCoreAutoRefresh();render(1);toast('Оформление сброшено')}
   else if(g('#gx')){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(DB,null,2)],{type:'application/json'}));a.download='xmesh-nexus-backup.json';a.click()}
   else if(b=g('[data-cf]')){dlg.close();CF&&CF()}
   else if(b=g('[data-core-refresh]')){try{await refreshCoreStatus(true)}catch(err){toast(err.message)}}
@@ -1484,7 +1484,7 @@ document.addEventListener('change',async e=>{const t=e.target;
     else C.coreRefreshSeconds=Number(t.value)||30;
     apply();
     syncCoreAutoRefresh();
-    toast(C.autoCoreRefresh?'Автопроверка статуса включена':'Автопроверка статуса выключена');
+    toast(t.id==='auto-core-refresh'?(C.autoCoreRefresh?'Автопроверка статуса включена':'Автопроверка статуса выключена'):'Интервал проверки сохранён');
     return;
   }
   if(t.id==='custom-a'||t.id==='custom-b'){if(t.id==='custom-a')C.customA=t.value;else C.customB=t.value;C.accent='custom';if(t.id==='custom-a'){const rgb=t.value.match(/[0-9a-f]{2}/gi).map(v=>parseInt(v,16)/255);const max=Math.max(...rgb),min=Math.min(...rgb),d=max-min;let h=0,s=0,l=(max+min)/2;if(d){s=d/(1-Math.abs(2*l-1));if(max===rgb[0])h=60*(((rgb[1]-rgb[2])/d)%6);else if(max===rgb[1])h=60*((rgb[2]-rgb[0])/d+2);else h=60*((rgb[0]-rgb[1])/d+4);if(h<0)h+=360}C.hue=Math.round(h);C.sat=Math.round(s*100);C.lum=Math.round(l*100);if($('#hue'))$('#hue').value=C.hue;if($('#sat'))$('#sat').value=C.sat;if($('#lum'))$('#lum').value=C.lum;if($('#huev'))$('#huev').textContent=C.hue+'°';if($('#satv'))$('#satv').textContent=C.sat+'%';if($('#lumv'))$('#lumv').textContent=C.lum+'%'}apply();$$('[data-ac]').forEach(x=>x.classList.toggle('on',x.dataset.ac==='custom'));return}
