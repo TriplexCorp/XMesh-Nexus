@@ -5,7 +5,7 @@
 ## Architecture and data ownership
 
 - **PostgreSQL / TimescaleDB** share one PostgreSQL engine and one database. Regular PostgreSQL tables own business data: panel collections, users, nodes, Xray profiles, hosts, squads, settings, administrators, sessions and durable audit records.
-- **TimescaleDB hypertables** are reserved for high-volume time-series data: server metric samples and operational event history. Migration 0004_timeseries_foundation.sql creates server_metric_samples and panel_events; these are storage foundations for future telemetry/graph APIs, not a claim that remote-node telemetry is already being collected.
+- - **TimescaleDB hypertables** are reserved for high-volume time-series data: server metric samples and operational event history. Migration 0004_timeseries_foundation.sql creates `server_metric_samples` and `panel_events`. The dashboard includes an RX/TX history graph with 1-hour/24-hour ranges and node/squad filters, querying the hypertable directly. However, the remote-node telemetry sender/agent is not implemented yet, so the graph intentionally displays an empty state until real samples are ingested; it never fabricates traffic.
 - **Redis** provides shared login throttling and is reserved for cache, short-lived state and coordination. It is private to the Compose network, password-protected, memory-limited to 128 MiB and intentionally ephemeral. Durable panel data never depends on Redis persistence.
 - PostgreSQL connection pool limits are configurable through DB_MAX_CONNECTIONS (default 20). Readiness checks verify PostgreSQL and Redis; SQL migrations enable TimescaleDB as part of application startup.
 - PostgreSQL custom-format backups include both regular tables and TimescaleDB data. Store copies off-host and test restores before production changes.
@@ -85,6 +85,7 @@ The selector lists recent GitHub releases; pinning is limited to the latest 30 e
 - GET /api/v1/bootstrap — panel collections and settings (authenticated).
 - /api/v1/collections/{collection} — authenticated record CRUD.
 - GET /api/v1/core, GET /api/v1/core/releases, POST /api/v1/core/update — core version management (authenticated).
+- GET /api/v1/metrics/traffic?range=1h|24h&node_id=ID&squad_id=ID — authenticated RX/TX history aggregated from `server_metric_samples` (1-minute buckets for 1h; 15-minute buckets for 24h). `node_id` in the hypertable must be the text form of the panel node record ID. Squad filtering selects nodes whose assigned profile shares at least one inbound tag with the squad.
 
 ## Frontend and design
 
