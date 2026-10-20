@@ -308,14 +308,16 @@ async function syncXrayUserToProfile(user){
  if(!profile)throw new Error('Выбранный Xray-профиль не найден.');
  const config=typeof profile.config==='string'?JSON.parse(profile.config):structuredClone(profile.config||{});
  if(!Array.isArray(config.inbounds))throw new Error('В профиле отсутствует массив inbounds.');
- let changed=0;
+ let changed=0,skipped=[];
  for(const inbound of config.inbounds){
   inbound.settings=inbound.settings||{};
   const email=String(user.username||'xmesh-user').replace(/[<>"]/g,'').slice(0,64);
+  const login=String(user.username||'xmesh').toLowerCase().replace(/[^a-z0-9_.-]/g,'-').slice(0,32)||'xmesh';
   if(inbound.protocol==='vless'){
    const list=inbound.settings.users||(inbound.settings.users=[]);
    if(Array.isArray(inbound.settings.clients)){for(const legacy of inbound.settings.clients){if(legacy.id&&!list.some(x=>x.id===legacy.id))list.push({...legacy})}delete inbound.settings.clients}
-   const flow=inbound.settings.flow||(((inbound.streamSettings?.method||inbound.streamSettings?.network)==='raw'&&['reality','tls'].includes(inbound.streamSettings?.security))?'xtls-rprx-vision':'');if(!list.some(x=>x.id===user.xrayId))list.push({id:user.xrayId,level:0,email,...(flow?{flow}:{})});
+   const flow=inbound.settings.flow||(((inbound.streamSettings?.method||inbound.streamSettings?.network)==='raw'&&['reality','tls'].includes(inbound.streamSettings?.security))?'xtls-rprx-vision':'');
+   if(!list.some(x=>x.id===user.xrayId))list.push({id:user.xrayId,level:0,email,...(flow?{flow}:{})});
    changed++;
   }else if(inbound.protocol==='vmess'){
    const list=inbound.settings.users||(inbound.settings.users=[]);
@@ -324,17 +326,46 @@ async function syncXrayUserToProfile(user){
    changed++;
   }else if(inbound.protocol==='trojan'){
    const list=inbound.settings.clients||(inbound.settings.clients=[]);
-   if(!list.some(x=>x.password===user.xrayId))list.push({password:user.xrayId,email});
+   if(!list.some(x=>x.password===user.xrayId))list.push({password:user.xrayId,email,level:0});
+   changed++;
+  }else if(inbound.protocol==='http'){
+   const list=inbound.settings.users||(inbound.settings.users=[]);
+   if(!list.some(x=>x.pass===user.xrayId||x.user===login))list.push({user:login,pass:user.xrayId});
+   changed++;
+  }else if(inbound.protocol==='socks'||inbound.protocol==='mixed'){
+   inbound.settings.auth='password';
+   const list=inbound.settings.users||(inbound.settings.users=[]);
+   if(!list.some(x=>x.pass===user.xrayId||x.user===login))list.push({user:login,pass:user.xrayId});
+   changed++;
+  }else if(inbound.protocol==='hysteria'){
+   inbound.settings.version=2;
+   const list=inbound.settings.users||(inbound.settings.users=[]);
+   if(!list.some(x=>x.auth===user.xrayId||x.email===email))list.push({auth:user.xrayId,level:0,email});
+   changed++;
+  }else if(inbound.protocol==='masque'){
+   const list=inbound.settings.users||(inbound.settings.users=[]);
+   if(!list.some(x=>x.pass===user.xrayId||x.email===email))list.push({pass:user.xrayId,level:0,email});
+   changed++;
+  }else if(inbound.protocol==='shadowsocks'){
+   const method=String(inbound.settings.method||'chacha20-ietf-poly1305');
+   if(method.startsWith('2022-')){skipped.push(inbound.tag||'Shadowsocks 2022');continue}
+   const list=inbound.settings.users||(inbound.settings.users=[]);
+   if(!list.some(x=>x.password===user.xrayId||x.email===email))list.push({password:user.xrayId,method,level:0,email});
    changed++;
   }
  }
- if(!changed)throw new Error('В профиле нет поддерживаемых inbound (VLESS, VMess или Trojan).');
+ if(!changed){
+  if(skipped.length)throw new Error('Для автоматического подключения к Shadowsocks 2022 нужна отдельная PSK для каждого пользователя. Используйте JSON-редактор и задайте валидный ключ.');
+  throw new Error('В профиле нет подходящих inbound для автоматической учётной записи.');
+ }
  await api.update('profiles',profile.id,{name:profile.name,config:JSON.stringify(config,null,2)});
  profile.config=JSON.stringify(config,null,2);
+ if(skipped.length)toast('Не добавлен автоматически: '+skipped.join(', ')+'. Для SS2022 нужна отдельная PSK.','ОК');
  return changed;
 }
 async function removeXrayUserFromProfiles(user){
  if(!user?.xrayId)return;
+ const email=String(user.username||'').replace(/[<>"]/g,'').slice(0,64);
  for(const profile of DB.profiles){
   try{
    const config=typeof profile.config==='string'?JSON.parse(profile.config):structuredClone(profile.config||{});
@@ -343,7 +374,7 @@ async function removeXrayUserFromProfiles(user){
     const settings=inbound.settings||{};
     for(const key of ['users','clients']){
      if(Array.isArray(settings[key])){
-      const filtered=settings[key].filter(c=>c.id!==user.xrayId&&c.password!==user.xrayId);
+      const filtered=settings[key].filter(c=>c.id!==user.xrayId&&c.password!==user.xrayId&&c.pass!==user.xrayId&&c.auth!==user.xrayId&&(!email||c.email!==email));
       if(filtered.length!==settings[key].length){settings[key]=filtered;changed=true}
      }
     }
@@ -364,7 +395,7 @@ function xrayClientSample(){
  const uuid=v('uuid')||'REPLACE_WITH_USER_UUID';
  const flow=protocol==='vless'&&['tls','reality'].includes(security)&&network==='raw'?v('flow'):'';
  let outProtocol=protocol,settings;
- if(['dokodemo-door','tunnel','tun','mixed'].includes(protocol))return {remarks:$('#xpb-name')?.value.trim()||'XRAY STUDIO client',note:'Для этого inbound нет прямого одноимённого клиентского outbound. Используйте совместимый клиентский протокол или полный JSON-режим.',outbounds:[]};
+ if(['dokodemo-door','tunnel','tun'].includes(protocol))return {remarks:$('#xpb-name')?.value.trim()||'XRAY STUDIO client',note:'Для этого inbound нет прямого одноимённого клиентского outbound. Используйте совместимый клиентский протокол или полный JSON-режим.',outbounds:[]};
  if(protocol==='vless')settings={vnext:[{address:'SERVER_ADDRESS',port,users:[{id:uuid,encryption:'none',...(flow?{flow}:{})}]}]};
  else if(protocol==='vmess')settings={vnext:[{address:'SERVER_ADDRESS',port,users:[{id:uuid,alterId:0,security:v('vmess-security')||'auto'}]}]};
  else if(protocol==='trojan')settings={servers:[{address:'SERVER_ADDRESS',port,password:uuid}]};
@@ -576,6 +607,8 @@ async function profilesP(){
     if(f.startsWith('doko-'))show=['dokodemo-door','tunnel'].includes(proto);
     if(f.startsWith('wg-'))show=proto==='wireguard';
     if(f.startsWith('tun-'))show=proto==='tun';
+    if(f.startsWith('hy-'))show=net==='hysteria';
+    if(f.startsWith('masque-'))show=proto==='masque'||net==='masque';
     wrap.hidden=!show;
    });
    $$('[data-xray-mode]').forEach(b=>b.classList.toggle('on',b.dataset.xrayMode===(customMode?'custom':'visual')));
