@@ -127,6 +127,8 @@
    root.querySelectorAll('.xray-config-panel select').forEach(select=>{
      if(select.classList.contains('sr-native-select'))return;
      select.classList.add('sr-native-select');
+     select.tabIndex=-1;
+     select.setAttribute('aria-hidden','true');
      const hasInputShell=select.parentElement.classList.contains('sr-v5-input');
      const host=hasInputShell?select.parentElement:document.createElement('span');
      if(!hasInputShell){
@@ -238,6 +240,18 @@
      select.addEventListener('change',sync);
      sync();
    });
+   // The core form may force a different network/security without dispatching
+   // a second change event. Reflect these automatic adjustments in menu labels.
+   const syncStudioSelects=()=>{
+     root.querySelectorAll('.sr-native-select').forEach(select=>{
+       const button=select.parentElement?.querySelector('.sr-v5-select-trigger');
+       const label=button?.querySelector('.sr-v5-select-value');
+       if(label)label.textContent=select.selectedOptions[0]?.textContent.trim()||'Выберите';
+       if(button)button.disabled=select.disabled;
+     });
+   };
+   root.addEventListener('input',()=>queueMicrotask(syncStudioSelects));
+   root.addEventListener('change',()=>queueMicrotask(syncStudioSelects));
    // A genuinely functional expansion control for both Server and Client previews.
    const toolbar=root.querySelector('.xray-output-toolbar');
    if(toolbar){
