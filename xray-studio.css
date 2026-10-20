@@ -2032,9 +2032,9 @@ body:has(.studio-reference-v5) .wrap{
   min-width:0;
 }
 .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode){
-  --studio-text-sm:.83rem;
-  --studio-label:.91rem;
-  --studio-control:.96rem;
+  --studio-text-sm:max(13px,.84rem);
+  --studio-label:max(14px,.94rem);
+  --studio-control:max(15px,1.02rem);
   display:grid!important;
   gap:1rem!important;
   font-size:1rem!important;
@@ -2056,12 +2056,12 @@ body:has(.studio-reference-v5) .wrap{
   letter-spacing:-.035em!important;
 }
 .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-hero .xray-hero-description{
-  font-size:.88rem!important;
+  font-size:max(13px,.88rem)!important;
   line-height:1.48!important;
   color:var(--mu)!important;
 }
 .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-presets :is(.xray-preset,.xray-import-btn){
-  font-size:.85rem!important;
+  font-size:max(13px,.85rem)!important;
   min-height:2.7rem!important;
 }
 .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) > .xray-meta-grid{
@@ -2076,13 +2076,13 @@ body:has(.studio-reference-v5) .wrap{
   gap:.5rem!important;
 }
 .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-meta-grid .f > span:first-child{
-  font-size:.86rem!important;
+  font-size:max(14px,.86rem)!important;
   line-height:1.35!important;
   color:var(--tx)!important;
   font-weight:700!important;
 }
 .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-v5-meta-hint{
-  font-size:.77rem!important;
+  font-size:max(12px,.77rem)!important;
   line-height:1.42!important;
   color:var(--mu)!important;
 }
@@ -2091,7 +2091,7 @@ body:has(.studio-reference-v5) .wrap{
 }
 .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-meta-grid .sr-v5-input > input{
   min-height:2.8rem!important;height:2.8rem!important;
-  font-size:.96rem!important;
+  font-size:max(15px,.96rem)!important;
   letter-spacing:0!important;
 }
 .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) > .sr-inline-context{
@@ -2108,7 +2108,7 @@ body:has(.studio-reference-v5) .wrap{
 }
 .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-inline-current{
   color:var(--tx)!important;
-  font-size:.95rem!important;
+  font-size:max(14px,.95rem)!important;
   font-weight:770!important;
   line-height:1.45!important;
   overflow-wrap:anywhere;
@@ -2117,7 +2117,7 @@ body:has(.studio-reference-v5) .wrap{
   content:'●';color:var(--a);margin-right:.7rem;font-size:.67rem;
 }
 .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-inline-hint{
-  font-size:.83rem!important;
+  font-size:max(13px,.83rem)!important;
   line-height:1.45!important;
   color:var(--mu)!important;
   margin-left:auto;
@@ -2185,7 +2185,7 @@ body:has(.studio-reference-v5) .wrap{
   letter-spacing:-.025em!important;
 }
 .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-config-panel-title p{
-  font-size:.84rem!important;
+  font-size:max(13px,.84rem)!important;
   line-height:1.55!important;
   color:var(--mu)!important;
   margin:.18rem 0 0!important;
@@ -2204,7 +2204,7 @@ body:has(.studio-reference-v5) .wrap{
 .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-v5-help{
   min-height:2.4rem!important;
   padding:.48rem .7rem!important;
-  font-size:.82rem!important;
+  font-size:max(13px,.82rem)!important;
   background:var(--s2)!important;
 }
 .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) :is(.xray-section,.xray-option-group):not([hidden]){
@@ -2249,7 +2249,7 @@ body:has(.studio-reference-v5) .wrap{
   color:var(--tx)!important;
 }
 .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-config-panel :is(.xray-section-heading,.xray-option-group-head) small{
-  font-size:.8rem!important;
+  font-size:max(13px,.8rem)!important;
   line-height:1.45!important;
   color:var(--mu)!important;
 }
@@ -2314,13 +2314,13 @@ body:has(.studio-reference-v5) .wrap{
 .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-config-panel :is(.xray-key-actions button,.xray-field-action button){
   min-height:2.55rem!important;
   padding:.5rem .83rem!important;
-  font-size:.86rem!important;
+  font-size:max(13px,.86rem)!important;
   line-height:1.4!important;
   font-weight:650!important;
 }
 .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-inline-note{
   padding:.85rem 1rem!important;
-  font-size:.81rem!important;
+  font-size:max(13px,.81rem)!important;
   line-height:1.55!important;
   color:var(--mu)!important;
   background:var(--s2)!important;
@@ -2332,7 +2332,7 @@ body:has(.studio-reference-v5) .wrap{
 }
 .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-xhttp-note{
   padding:.85rem!important;
-  font-size:.83rem!important;
+  font-size:max(13px,.83rem)!important;
   line-height:1.55!important;
 }
 .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-xhttp-subtitle{
@@ -2386,7 +2386,7 @@ body:has(.studio-reference-v5) .wrap{
   line-height:1.35!important;
 }
 .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-output-workspace-head>div>small{
-  font-size:.82rem!important;
+  font-size:max(13px,.82rem)!important;
   line-height:1.5!important;
 }
 .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-output-state{
@@ -2409,11 +2409,11 @@ body:has(.studio-reference-v5) .wrap{
   background:var(--sr-code)!important;
 }
 .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-code-view :is(pre,textarea){
-  font-size:.88rem!important;
+  font-size:max(14px,.92rem)!important;
   line-height:1.65rem!important;
 }
 .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-v5-gutter-lines span{
-  font-size:.76rem!important;
+  font-size:max(12px,.76rem)!important;
   line-height:1.65rem!important;
   height:1.65rem!important;
   min-height:1.65rem!important;
