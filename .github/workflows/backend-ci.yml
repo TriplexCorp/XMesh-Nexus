@@ -31,7 +31,8 @@ jobs:
         env:
           POSTGRES_PASSWORD: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
           APP_DB_PASSWORD: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
-          ADMIN_PASSWORD: 9876543210abcdef9876543210abcdef9876543210abcdef9876543210abcdef
+          REDIS_PASSWORD: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
+          ADMIN_PASSWORD: 9876543210abcdef9876543210abcdef9876543210abcdef
         run: |
           bash -n install.sh
           sh -n deploy/postgres/10-create-app-user.sh
