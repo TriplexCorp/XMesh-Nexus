@@ -249,7 +249,7 @@ const XRAY_PROTOCOLS=[['vless','VLESS'],['vmess','VMess'],['trojan','Trojan'],['
 const XRAY_NETWORKS=[['raw','RAW / TCP'],['xhttp','XHTTP'],['ws','WebSocket'],['grpc','gRPC'],['httpupgrade','HTTPUpgrade'],['kcp','mKCP']];
 function xrayBuilderConfig(){
  const v=id=>$('#xpb-'+id)?.value||'',protocol=v('protocol'),network=v('network'),security=v('security'),tag=v('tag').trim()||'inbound-1',port=cl(+v('port')||443,1,65535),sni=v('sni').trim(),dest=v('dest').trim()||(sni?sni+':443':'example.com:443'),path=v('path').trim()||'/',uuid=v('uuid')||'';
- const flow=protocol==='vless'&&security==='reality'&&network==='raw'?v('flow'):'';
+ const flow=protocol==='vless'&&['tls','reality'].includes(security)&&network==='raw'?v('flow'):'';
  const clientName=(v('name').trim()||'XMesh client').replace(/[<>"]/g,'').slice(0,64);
  const settings={
   vless:{users:uuid?[{id:uuid,level:0,email:clientName,...(flow?{flow}:{})}]:[],decryption:'none'},
@@ -261,6 +261,7 @@ function xrayBuilderConfig(){
   'dokodemo-door':{address:v('doko-address')||'127.0.0.1',port:cl(+v('doko-port')||53,1,65535),network:v('doko-network')||'tcp,udp',followRedirect:false},
   wireguard:{secretKey:'REPLACE_WITH_WIREGUARD_PRIVATE_KEY',address:['10.0.0.1/32'],peers:[],mtu:1420}
  }[protocol];
+ if(protocol==='vless'&&flow)settings.flow=flow;
  const inbound={tag,listen:v('listen')||'0.0.0.0',port,protocol,settings};
  if(['raw','xhttp','ws','grpc','httpupgrade','kcp'].includes(network)&&!['dokodemo-door','wireguard'].includes(protocol)){
   inbound.streamSettings={network,security};
@@ -288,7 +289,7 @@ async function syncXrayUserToProfile(user){
   if(inbound.protocol==='vless'){
    const list=inbound.settings.users||(inbound.settings.users=[]);
    if(Array.isArray(inbound.settings.clients)){for(const legacy of inbound.settings.clients){if(legacy.id&&!list.some(x=>x.id===legacy.id))list.push({...legacy})}delete inbound.settings.clients}
-   if(!list.some(x=>x.id===user.xrayId))list.push({id:user.xrayId,level:0,email,...(inbound.streamSettings?.security==='reality'&&inbound.streamSettings?.network==='raw'?{flow:'xtls-rprx-vision'}:{})});
+   if(!list.some(x=>x.id===user.xrayId))list.push({id:user.xrayId,level:0,email,...((inbound.settings.flow||(inbound.streamSettings?.network==='raw'&&['reality','tls'].includes(inbound.streamSettings?.security)?'xtls-rprx-vision':''))?{flow:inbound.settings.flow||(inbound.streamSettings?.network==='raw'&&['reality','tls'].includes(inbound.streamSettings?.security)?'xtls-rprx-vision':'')}:{})});
    changed++;
   }else if(inbound.protocol==='vmess'){
    const list=inbound.settings.users||(inbound.settings.users=[]);
@@ -423,7 +424,7 @@ async function profilesP(){
  '<textarea id="xpb-client-preview" class="xray-preview" spellcheck="false" readonly aria-label="Предпросмотр клиентского JSON"></textarea>'+
  '<div class="xray-footer"><p class="er" id="xpb-error" role="status"></p><button type="button" class="btn" id="xpb-save">Сохранить профиль</button></div></section>';
  return [builderHtml+saved,()=>{
-  const updatePreview=()=>{try{const protocol=$('#xpb-protocol').value,network=$('#xpb-network').value,security=$('#xpb-security').value;const compatible=security!=='reality'||['raw','xhttp','grpc'].includes(network);if(!compatible)throw new Error('Reality совместим только с RAW, XHTTP и gRPC. Выберите другой транспорт или TLS.');if(['dokodemo-door','wireguard'].includes(protocol)&&security!=='none')throw new Error('Для этого протокола в этом конструкторе транспортная защита не настраивается.');if(protocol==='vless'&&security==='none')$('#xpb-error').textContent='Внимание: VLESS без TLS/Reality допустим только в доверенной сети либо с VLESS Encryption.';else $('#xpb-error').textContent='';$('#xpb-preview').value=JSON.stringify(xrayBuilderConfig(),null,2);$('#xpb-client-preview').value=JSON.stringify(xrayClientSample(),null,2)}catch(e){$('#xpb-preview').value='';$('#xpb-client-preview').value='';$('#xpb-error').textContent=e.message}};
+  const updatePreview=()=>{try{const protocol=$('#xpb-protocol').value,network=$('#xpb-network').value,security=$('#xpb-security').value;const compatible=security!=='reality'||['raw','xhttp','grpc'].includes(network);if(!compatible)throw new Error('Reality совместим только с RAW, XHTTP и gRPC. Выберите другой транспорт или TLS.');if(['dokodemo-door','wireguard'].includes(protocol)&&security!=='none')throw new Error('Для этого протокола в этом конструкторе транспортная защита не настраивается.');if(security==='reality'){const sid=$('#xpb-short-id').value.trim();if(sid.length>16||sid.length%2||!/^[a-fA-F0-9]*$/.test(sid))throw new Error('Short ID должен содержать 0–16 hex-символов и чётное число знаков.');if(!$('#xpb-sni').value.trim())throw new Error('Для Reality укажите Server name / SNI.');}if(protocol==='vless'&&security==='none')$('#xpb-error').textContent='Внимание: VLESS без TLS/Reality допустим только в доверенной сети либо с VLESS Encryption.';else $('#xpb-error').textContent='';$('#xpb-preview').value=JSON.stringify(xrayBuilderConfig(),null,2);$('#xpb-client-preview').value=JSON.stringify(xrayClientSample(),null,2)}catch(e){$('#xpb-preview').value='';$('#xpb-client-preview').value='';$('#xpb-error').textContent=e.message}};
   const updateVisibility=()=>{
    const sec=$('#xpb-security').value,net=$('#xpb-network').value,proto=$('#xpb-protocol').value;
    const setGroup=(selector,show)=>{const d=$(selector);if(d)d.hidden=!show};
