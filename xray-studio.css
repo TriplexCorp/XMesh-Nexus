@@ -2414,6 +2414,9 @@ body:has(.studio-reference-v5) .wrap{
 }
 .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-v5-gutter-lines span{
   font-size:.76rem!important;
+  line-height:1.65rem!important;
+  height:1.65rem!important;
+  min-height:1.65rem!important;
 }
 .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) > .xray-footer{
   grid-column:1/-1!important;
