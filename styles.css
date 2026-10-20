@@ -856,6 +856,7 @@ nav a.on{background:var(--s2)!important;box-shadow:none!important}
 .traffic-line{fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
 .traffic-line.rx{stroke:var(--a)}
 .traffic-line.tx{stroke:var(--b);stroke-dasharray:7 4}
+.traffic-point{stroke:var(--s1);stroke-width:1;vector-effect:non-scaling-stroke}.traffic-point.rx{fill:var(--a)}.traffic-point.tx{fill:var(--b)}
 .traffic-area{stroke:none;opacity:.08}
 .traffic-area.rx{fill:var(--a)}
 .traffic-area.tx{fill:var(--b)}
