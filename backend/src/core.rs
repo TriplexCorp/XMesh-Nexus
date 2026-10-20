@@ -184,11 +184,12 @@ impl CoreManager {
             return Err("Xray-core ещё не установлен. Установите ядро в разделе «Настройки → Xray-core» и повторите.".to_owned());
         }
 
+        // Official Xray syntax is exactly xray vlessenc. It prints two text key pairs:
+        // one for X25519 authentication and one for ML-KEM-768; there is no JSON flag.
         let output = timeout(
             Duration::from_secs(20),
             Command::new(&binary)
                 .arg("vlessenc")
-                .arg("--json")
                 .stdin(Stdio::null())
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
@@ -209,18 +210,9 @@ impl CoreManager {
             });
         }
 
-        let value: Value = serde_json::from_slice(&output.stdout)
-            .map_err(|_| "Xray-core вернул некорректный JSON от vlessenc.".to_owned())?;
-        for mode in ["x25519", "mlkem768"] {
-            for field in ["decryption", "encryption"] {
-                if value.get(mode).and_then(|pair| pair.get(field)).and_then(Value::as_str)
-                    .is_none_or(|text| text.trim().is_empty())
-                {
-                    return Err(format!("Xray-core не вернул поле {mode}.{field}. Проверьте установленную версию ядра."));
-                }
-            }
-        }
-        Ok(value)
+        let stdout = String::from_utf8(output.stdout)
+            .map_err(|_| "Xray-core вернул невалидный UTF-8 из vlessenc.".to_owned())?;
+        parse_vless_encryption_output(&stdout)
     }
 
     pub async fn available_releases(&self) -> Result<Vec<ReleaseInfo>, String> {
@@ -401,6 +393,58 @@ impl CoreManager {
     }
 }
 
+fn parse_vless_encryption_output(output: &str) -> Result<Value, String> {
+    let mut authentication: Option<&str> = None;
+    let mut x25519 = serde_json::Map::new();
+    let mut mlkem768 = serde_json::Map::new();
+
+    for line in output.lines().map(str::trim) {
+        if line.starts_with("Authentication: X25519") {
+            authentication = Some("x25519");
+            continue;
+        }
+        if line.starts_with("Authentication: ML-KEM-768") {
+            authentication = Some("mlkem768");
+            continue;
+        }
+
+        let Some((key, value)) = line.split_once("\": \"") else {
+            continue;
+        };
+        let Some(key) = key.strip_prefix('"') else {
+            continue;
+        };
+        let Some(value) = value.strip_suffix('"') else {
+            continue;
+        };
+        if !matches!(key, "decryption" | "encryption") || value.trim().is_empty() {
+            continue;
+        }
+
+        let target = match authentication {
+            Some("x25519") => &mut x25519,
+            Some("mlkem768") => &mut mlkem768,
+            _ => continue,
+        };
+        target.insert(key.to_owned(), Value::String(value.to_owned()));
+    }
+
+    for (mode, pair) in [("x25519", &x25519), ("mlkem768", &mlkem768)] {
+        for field in ["decryption", "encryption"] {
+            if pair.get(field).and_then(Value::as_str).is_none_or(str::is_empty) {
+                return Err(format!(
+                    "xray vlessenc: не удалось прочитать {field} для {mode}. Проверьте версию Xray-core и формат его вывода."
+                ));
+            }
+        }
+    }
+
+    Ok(serde_json::json!({
+        "x25519": x25519,
+        "mlkem768": mlkem768
+    }))
+}
+
 fn normalize_version(value: &str) -> Result<String, String> {
     let value = value.trim();
     if value.eq_ignore_ascii_case("latest") {
@@ -495,4 +539,29 @@ mod tests {
         assert!(normalize_version("https://example.com/xray").is_err());
         assert!(normalize_version("").is_err());
     }
+
+    #[test]
+    fn parses_official_vlessenc_text_output_for_both_authentication_modes() {
+        let output = r#"Choose one Authentication to use, do not mix them. Ephemeral key exchange is Post-Quantum safe anyway.
+
+Authentication: X25519, not Post-Quantum
+"decryption": "mlkem768x25519plus.native.600s.server-x25519"
+"encryption": "mlkem768x25519plus.native.0rtt.client-x25519"
+
+Authentication: ML-KEM-768, Post-Quantum
+"decryption": "mlkem768x25519plus.native.600s.server-mlkem"
+"encryption": "mlkem768x25519plus.native.0rtt.client-mlkem"
+"#;
+        let parsed = parse_vless_encryption_output(output).unwrap();
+        assert_eq!(parsed["x25519"]["decryption"], "mlkem768x25519plus.native.600s.server-x25519");
+        assert_eq!(parsed["x25519"]["encryption"], "mlkem768x25519plus.native.0rtt.client-x25519");
+        assert_eq!(parsed["mlkem768"]["decryption"], "mlkem768x25519plus.native.600s.server-mlkem");
+        assert_eq!(parsed["mlkem768"]["encryption"], "mlkem768x25519plus.native.0rtt.client-mlkem");
+    }
+
+    #[test]
+    fn rejects_partial_vlessenc_output() {
+        assert!(parse_vless_encryption_output("Authentication: X25519\n\"decryption\": \"server\"").is_err());
+    }
+
 }
