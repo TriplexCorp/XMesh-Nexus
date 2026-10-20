@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use serde_json::Value;
 use sqlx::PgPool;
 use std::{
     io::{Cursor, Read},
@@ -173,6 +174,54 @@ impl CoreManager {
                 Err(error)
             }
         }
+    }
+
+    /// Generate both supported VLESS Encryption authentication pairs using the installed official Xray binary.
+    /// Secret material is returned only to the authenticated caller and is never written to logs or disk.
+    pub async fn generate_vless_encryption(&self) -> Result<Value, String> {
+        let binary = self.root.join("current").join("xray");
+        if !binary.is_file() {
+            return Err("Xray-core ещё не установлен. Установите ядро в разделе «Настройки → Xray-core» и повторите.".to_owned());
+        }
+
+        let output = timeout(
+            Duration::from_secs(20),
+            Command::new(&binary)
+                .arg("vlessenc")
+                .arg("--json")
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .kill_on_drop(true)
+                .output(),
+        )
+        .await
+        .map_err(|_| "Команда xray vlessenc превысила лимит 20 секунд.".to_owned())?
+        .map_err(|error| format!("Не удалось запустить Xray-core: {error}"))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let detail = stderr.trim();
+            let detail = if detail.len() > 320 { &detail[..320] } else { detail };
+            return Err(if detail.is_empty() {
+                format!("Xray-core завершился с кодом {}.", output.status)
+            } else {
+                format!("xray vlessenc завершился с ошибкой: {detail}")
+            });
+        }
+
+        let value: Value = serde_json::from_slice(&output.stdout)
+            .map_err(|_| "Xray-core вернул некорректный JSON от vlessenc.".to_owned())?;
+        for mode in ["x25519", "mlkem768"] {
+            for field in ["decryption", "encryption"] {
+                if value.get(mode).and_then(|pair| pair.get(field)).and_then(Value::as_str)
+                    .is_none_or(|text| text.trim().is_empty())
+                {
+                    return Err(format!("Xray-core не вернул поле {mode}.{field}. Проверьте установленную версию ядра."));
+                }
+            }
+        }
+        Ok(value)
     }
 
     pub async fn available_releases(&self) -> Result<Vec<ReleaseInfo>, String> {
