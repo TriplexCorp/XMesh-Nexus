@@ -472,9 +472,41 @@ function userDrawer(id,tab){
   const [sl,sc]=STM[st(u)],k=u.limit?u.used/u.limit:0,h=hs(u.username)%360;
   const tabs=[['ov','Обзор'],['acc','Доступ'],['sub','Подписка'],['dev','Устройства '+u.devices.length+'/'+u.hwid]];
   const body={
-    ov:`<div class="bar2"><span class="mu">Использовано</span><b style="margin-left:auto">${gb(u.used)} / ${u.limit?u.limit+' ГБ':'∞'}</b></div><div class="xray-user-credential"><div><span class="mu">Xray credential ID</span><code>${esc(u.xrayId||'Не назначен')}</code><small class="mu">Создаётся автоматически. Для фактического подключения требуется привязка профиля и применение конфигурации к ядру.</small></div>${u.xrayId?`<button type="button" class="gh sm" data-copy-xray-id="${u.id}">Копировать ID</button>`:''}</div><div class="xray-user-fingerprint"><span class="mu">Индивидуальный клиентский fingerprint</span><code>${esc(u.fingerprint||'chrome')}</code><small class="mu">Сохранён отдельно для этого пользователя. Реальная выдача профиля с этим значением появится после подключения генератора подписок.</small></div>${u.limit?`<div class="pb f${k>=1?' er':k>.85?' wr':''}" style="--w:${Math.min(100,k*100)}%"><i></i></div>`:''}<div class="history-placeholder">История расхода за период будет отображаться после подключения сбора статистики. Текущие значения не заменяются расчётной симуляцией.</div>
-    <form data-k="uedit" data-id="${u.id}" method="dialog" class="sg" style="gap:.9rem"><div class="r2" style="display:grid;border:0;padding:0">${FE.slice(0,4).map(f=>field(f,f.k=='expireAt'?u.expireAt:u[f.k])).join('')}</div><div class="r2" style="display:grid;border:0;padding:0">${FE.slice(4).map(f=>field(f,u[f.k])).join('')}</div><p class="er" id="fe" style="border:0;padding:0"></p><div style="border:0;padding:0"><button class="btn" style="width:100%">Сохранить</button></div></form>
-    <div class="mu">Создан ${new Date(u.created).toLocaleDateString('ru-RU')} · Админ: ${esc(DB.admins.find(a=>a.id==u.adminId)?.username||'—')}</div>`,
+    ov:`<div class="user-overview">
+      <section class="user-usage-card" aria-label="Использование трафика">
+        <div class="user-usage-heading">
+          <span class="user-detail-label">${ic('activity')} Трафик</span>
+          <span class="user-limit-label">${u.limit?'Лимит '+u.limit+' ГБ':'Без лимита'}</span>
+        </div>
+        <div class="user-usage-amount"><strong>${gb(u.used)}</strong><span>${u.limit?'из '+u.limit+' ГБ':'использовано'}</span></div>
+        ${u.limit?`<div class="pb f user-usage-progress${k>=1?' er':k>.85?' wr':''}" style="--w:${Math.min(100,Math.max(0,k*100))}%" role="progressbar" aria-label="Использование трафика" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(Math.min(100,Math.max(0,k*100)))}"><i></i></div>`:'<span class="user-usage-unlimited">Ограничение трафика не установлено</span>'}
+      </section>
+      <div class="user-credential-grid">
+        <section class="user-detail-card" aria-label="Идентификатор Xray">
+          <div class="user-detail-title"><span class="user-detail-label">${ic('key')} Xray ID</span><span class="user-detail-kind">UUID</span></div>
+          <div class="user-code-row"><code title="${esc(u.xrayId||'Не назначен')}">${esc(u.xrayId||'Не назначен')}</code>${u.xrayId?`<button type="button" class="gh sm user-copy-button" data-copy-xray-id="${u.id}" aria-label="Копировать Xray ID">${ic('copy')}<span>Копировать</span></button>`:''}</div>
+          <small>Персональный идентификатор подключения</small>
+        </section>
+        <section class="user-detail-card" aria-label="Fingerprint клиента">
+          <div class="user-detail-title"><span class="user-detail-label">${ic('sliders')} Fingerprint</span><span class="user-detail-kind">uTLS</span></div>
+          <div class="user-code-row"><code>${esc(u.fingerprint||'chrome')}</code></div>
+          <small>Отпечаток клиента для этого пользователя</small>
+        </section>
+      </div>
+      <p class="user-overview-notice">${ic('link')}<span>ID и fingerprint сохранены в панели. Подключение заработает после привязки Xray-профиля и настройки выдачи подписок. История расхода появится после подключения сбора статистики.</span></p>
+    </div>
+    <details class="user-edit-details">
+      <summary><span class="user-edit-trigger">${ic('pen')}<span><b>Изменить параметры</b><small>Лимиты, срок действия и настройки пользователя</small></span></span>${ic('chevronRight')}</summary>
+      <div class="user-edit-content">
+        <form data-k="uedit" data-id="${u.id}" method="dialog" class="sg user-edit-form">
+          <div class="r2">${FE.slice(0,4).map(f=>field(f,f.k=='expireAt'?u.expireAt:u[f.k])).join('')}</div>
+          <div class="r2">${FE.slice(4).map(f=>field(f,u[f.k])).join('')}</div>
+          <p class="er" id="fe" role="status"></p>
+          <div class="user-edit-actions"><button class="btn">Сохранить изменения</button></div>
+        </form>
+      </div>
+    </details>
+    <div class="user-overview-meta"><span>Создан ${new Date(u.created).toLocaleDateString('ru-RU')}</span><span>Администратор: ${esc(DB.admins.find(a=>a.id==u.adminId)?.username||'—')}</span></div>`,
     acc:`<p class="note">Отметьте сквады: доступ меняется сразу.</p><div class="ms">${DB.squads.map(s=>`<label class="ck"><input type="checkbox" data-usq="${u.id}:${s.id}" ${u.squads.includes(s.id)?'checked':''}><span>${esc(s.name)}</span></label>`).join('')}</div><div><span class="mu">Итоговые инбаунды</span><div style="margin-top:.5rem">${uin(u).map(t=>chip(esc(t),tcol(t))).join(' ')||'<span class="mu">Нет доступа</span>'}</div></div><div><span class="mu">Хосты в подписке</span><div style="margin-top:.5rem">${DB.hosts.filter(x=>!x.disabled&&uin(u).includes(x.tag)).map(x=>`<div class="rowi">${esc(x.remark)}<small class="mu" style="margin-left:auto">${esc(x.address)}:${x.port}</small></div>`).join('')||'<span class="mu">Нет подходящих хостов</span>'}</div></div><label class="f"><span>Лимит устройств</span><input type="number" min="0" value="${u.hwid}" data-hw="${u.id}"></label>`,
     sub:`<div class="history-placeholder"><b style="display:block;color:var(--tx);margin-bottom:.35rem">Подписка ещё не подключена</b>В этой HTML-версии не настроен API, который выпускает рабочие ссылки подписки и QR-коды. Поэтому здесь не показывается фиктивная ссылка.</div><a class="gh" href="#set" data-scroll-target="brand-panel" style="text-decoration:none;color:inherit;justify-self:start">${ic('sliders')}Настроить домен</a>`,
     dev:u.devices.length?u.devices.map(d=>`<div class="rowi"><div><b>${esc(d.model)}</b> ${chip(d.plat,'--c3')}<br><small class="mu">${esc(d.app)} · был ${ago(d.last)}</small></div><button class="ia" data-dd="${u.id}:${d.id}" aria-label="Удалить устройство">${ic('trash')}</button></div>`).join('')+(u.devices.length>u.hwid?`<p class="er">Устройств больше лимита (${u.hwid}).</p>`:''):'<div class="empty">Устройства ещё не подключались</div>'}[UT];
