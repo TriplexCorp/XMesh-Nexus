@@ -13,65 +13,36 @@ const P={home:'<rect x="3" y="3" width="7" height="9" rx="1.500"/><rect x="14" y
 const ic=n=>`<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${P[n]}</svg>`;
 // Only explicit action buttons receive icons. Navigation tabs, palettes and Xray
 // mode selectors have their own visual language and must never be decorated.
-// Context-aware action glyphs: no mutation of existing icons or control labels.
 const ACTION_ICON_RULES=[
- [/выйти|logout|sign out|log out/i,'logout'],
- [/удал|стереть|очистить|отозвать|delete|remove/i,'trash'],
- [/сохран|применить|save|apply/i,'save'],
- [/отмен|закры|cancel|close/i,'x'],
- [/копир|copy|буфер/i,'copy'],
- [/скача|экспорт|download|export|backup|резервн/i,'dl'],
- [/импорт|загрузить файл|upload|import/i,'upload'],
- [/обнов|перезагруз|синхрон|повтор|провер|refresh|reload|sync|сброс/i,'redo'],
- [/отключ|останов|pause|stop/i,'pause'],
- [/включ|запуст|активир|enable|start/i,'play'],
- [/генер|ключ|uuid|short id|regenerate/i,'tool'],
- [/добав|созда|новый|новая|new\b|add\b|create|продл/i,'plus'],
- [/редакт|изменить|переимен|edit/i,'pen'],
- [/поиск|найти|search/i,'search'],
- [/фильтр|сортир|filter/i,'filter'],
- [/настрой|параметр|settings/i,'sliders'],
- [/уведомлен|событи|notification/i,'bell'],
- [/диагност|метрик|статист|состояние/i,'activity'],
- [/пользоват|клиент|users/i,'users'],
- [/сервер|нода|узел|node|server/i,'server'],
- [/подписк|ссылка|url|link/i,'link'],
- [/транспорт|transport/i,'link'],
- [/защит|безопас|tls|reality|security/i,'shield'],
- [/json|конфиг|код|format|формат/i,'code'],
- [/профил|шаблон|profile/i,'layers'],
- [/документ|файл|file/i,'file'],
- [/назад|back/i,'arrowRight'],
- [/вперёд|далее|next|продолжить/i,'arrowRight'],
- [/готово|подтверд|ok\b|confirm/i,'check']
+ [/^(?:выйти|logout|sign out|log out)$/i,'logout'],
+ [/^(?:сохранить|сохранить профиль|save|применить)$/i,'save'],
+ [/^(?:удалить|удалить профиль|delete|remove)$/i,'trash'],
+ [/^(?:отмена|закрыть|cancel|close)$/i,'x'],
+ [/^(?:добавить|добавить узел|создать|создать сквад|новый пользователь|new|add)$/i,'plus'],
+ [/^(?:копировать(?: id| server json| client json)?|скопировать(?: токен| команду)?|copy)$/i,'copy'],
+ [/^(?:скачать(?: резервную копию| server.json| client.json)?|экспорт|download|export)$/i,'dl'],
+ [/^(?:импорт json|импортировать|import json)$/i,'upload'],
+ [/^(?:проверить статус|обновить|обновить список|сбросить трафик|сбросить оформление|refresh)$/i,'redo'],
+ [/^(?:редактировать|изменить|edit)$/i,'pen'],
+ [/^(?:включить|запустить|установить \/ обновить)$/i,'play'],
+ [/^(?:отключить|остановить)$/i,'pause'],
+ [/^(?:сгенерировать (?:пару ключей|пару на сервере|uuid|пароли)|новый short id)$/i,'tool'],
+ [/^(?:форматировать|форматировать json)$/i,'code'],
+ [/^(?:готово|подтвердить)$/i,'check']
 ];
-const ACTION_ICON_BY_ID={
- logout:'logout',addb:'plus',restart:'sliders',theme:'sun',bell:'bell',pal:'search',
- 'xpb-import-trigger':'upload','xpb-copy':'copy','xpb-download':'dl',
- 'xpb-client-copy':'copy','xpb-client-download':'dl'
-};
 function decorateButtonIcons(root){
  if(!root||!root.querySelectorAll)return;
  const buttons=[];
  if(root.nodeType===1&&root.matches('button'))buttons.push(root);
  buttons.push(...root.querySelectorAll('button'));
  buttons.forEach(button=>{
-  if(button.dataset.actionIcon==='done'||button.querySelector('svg,.ic,.xray-tab-icon'))return;
-  if(button.matches('.palette-swatch,.country-option,.color-bubble,.sw,.swt,[role="switch"]')||button.closest('.palette-swatches,.color-bubbles,.country-options'))return;
-  // Preserve specialized tabs, numbers, and toggle controls without text.
-  const raw=(button.getAttribute('aria-label')||button.getAttribute('title')||button.textContent||'').replace(/\s+/g,' ').trim();
-  if(!raw&&!ACTION_ICON_BY_ID[button.id])return;
-  const label=raw.toLocaleLowerCase('ru');
-  let key=ACTION_ICON_BY_ID[button.id]||ACTION_ICON_RULES.find(([pattern])=>pattern.test(label))?.[1];
-  if(!key){
-   if(button.matches('[data-xray-config-tab]'))key=({basic:'server',security:'shield',transport:'link',encryption:'tool',client:'users'})[button.dataset.xrayConfigTab];
-   else if(button.matches('[data-xray-output]'))key='code';
-   else if(button.matches('[data-xray-mode]'))key=button.dataset.xrayMode==='custom'?'code':'sliders';
-   else if(button.matches('.xray-import-btn'))key='upload';
-   else if(button.matches('.gh,.dg,.btn,.sm,.xray-preset'))key='arrowRight';
-  }
-  if(!key||!P[key])return;
-  button.insertAdjacentHTML('afterbegin',ic(key));
+  if(button.querySelector('.ic,.xray-tab-icon')||button.dataset.actionIcon==='done')return;
+  if(button.closest('.xray-config-tabs,.xray-presets,.xray-output-tabs,.xray-preset-row,.seg,.fl,.swt,.choice,.palette-swatch,.country-picker,.color-bubbles,[role="tablist"]'))return;
+  if(button.matches('.palette-swatch,.xray-preset,.xray-import-btn,[data-xray-config-tab],[data-xray-output],[data-ui],[data-th],[data-ac],[data-uf],[data-s],[data-dt],[data-tt],[data-lv],[data-traffic-range],[data-node-grid-mode],[data-xray-mode]'))return;
+  const label=(button.getAttribute('aria-label')||button.textContent||'').replace(/\s+/g,' ').trim();
+  const icon=ACTION_ICON_RULES.find(([pattern])=>pattern.test(label))?.[1];
+  if(!icon)return;
+  button.insertAdjacentHTML('afterbegin',ic(icon));
   button.dataset.actionIcon='done';
  });
 }
@@ -210,18 +181,7 @@ let T=[],cur='',RT=0;
 const pages={home:['Дашборд',homeP],users:['Пользователи',usersP],squads:['Сквады',()=>simple(['squads'])],hosts:['Хосты',()=>simple(['hosts'])],nodes:['Узлы',nodesP],templates:['Шаблоны',()=>simple(['tpls','subs'])],profiles:['XRAY STUDIO',profilesP],tools:['Диагностика',toolsP],admins:['Администраторы',()=>simple(['admins'])],set:['Настройки',setP]};
 const skel=()=>`<div class="sk" style="height:7rem"></div><div class="sk" style="height:18rem"></div><div class="sk" style="height:12rem"></div>`;
 $('#nav').innerHTML=NAV.map(([g,a])=>`<div class="g">${g}</div>`+a.map(([k,i,l,p])=>`<a href="#${k}" class="${p?'':'sec'}">${ic(i)}<span class="lbl">${l}</span>${k=='users'?'<em id="unb"></em>':''}</a>`).join('')).join('')+`<button class="more" id="more">${ic('more')}<span class="lbl">Ещё</span></button>`;
-async // Keep dynamically rendered action rows decorated without observing the whole page.
-const actionIconObserver=new MutationObserver(records=>{
- for(const record of records){
-  for(const node of record.addedNodes){
-   if(node.nodeType===1&&node.closest?.('#view,#dlg'))decorateButtonIcons(node);
-  }
- }
-});
-actionIconObserver.observe(document.querySelector('#view'),{childList:true,subtree:true});
-actionIconObserver.observe(document.querySelector('#dlg'),{childList:true,subtree:true});
-decorateButtonIcons(document.querySelector('.top'));
-function render(soft){
+async function render(soft){
   T.forEach(clearInterval);T=[];cur=location.hash.slice(1);if(!pages[cur])cur='home';const rt=++RT,[t,f]=pages[cur],v=$('#view');
   $('#title').textContent=t;document.title=t+' — '+DB.set.brand;$$('#nav a').forEach(a=>a.classList.toggle('on',a.getAttribute('href')=='#'+cur));
   if(!soft){v.classList.remove('still');v.innerHTML=skel();scrollTo(0,0)}
