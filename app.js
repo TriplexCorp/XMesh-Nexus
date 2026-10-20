@@ -99,7 +99,7 @@ const ENT={
     cols:[['Название',r=>`<b>${esc(r.name)}</b>`],['Права',r=>chip(r.scope=='read'?'чтение':'запись',r.scope=='read'?'--c3':'--wr')],['Создан',r=>ago(r.created)],['Использован',r=>ago(r.last)]],
     after:o=>{const s='lm_'+Math.random().toString(36).slice(2)+Math.random().toString(36).slice(2);modal(`<div class="box"><h2>Токен создан</h2><p class="note">Скопируйте его сейчас: позже показать его снова будет нельзя.</p><div class="lk"><input id="lk" readonly value="${s}" aria-label="Токен"><button class="gh" data-copy>${ic('copy')}</button></div><div class="act"><button class="btn" data-x>Готово</button></div></div>`);return 1}}
 };
-const FU=[{k:'username',l:'Имя пользователя',req:1,pat:'[A-Za-z0-9_.\\-]{3,32}',h:'3–32 символа: латиница, цифры, _ . -'},{k:'limit',l:'Лимит трафика, ГБ',t:'num',h:'0 — без лимита'},{k:'days',l:'Срок, дней',t:'num',h:'0 — бессрочно'},{k:'strategy',l:'Сброс трафика',t:'sel',o:STRAT},{k:'hwid',l:'Лимит устройств',t:'num'},{k:'tag',l:'Тег',ph:'например, vip'},{k:'squads',l:'Сквады',t:'multi',o:()=>DB.squads.map(s=>[s.id,s.name])},{k:'hold',l:'Отсчёт срока с первого подключения (on hold)',t:'bool'},{k:'desc',l:'Заметка'}];
+const FU=[{k:'username',l:'Имя пользователя',req:1,pat:'[A-Za-z0-9_.\\-]{3,32}',h:'3–32 символа: латиница, цифры, _ . -'},{k:'xrayProfileId',l:'Xray-профиль',t:'sel',o:()=>[['','Не привязывать'],...DB.profiles.map(p=>[String(p.id),p.name])],h:'При выборе панель добавит учётные данные в inbound профиля.'},{k:'limit',l:'Лимит трафика, ГБ',t:'num',h:'0 — без лимита'},{k:'days',l:'Срок, дней',t:'num',h:'0 — бессрочно'},{k:'strategy',l:'Сброс трафика',t:'sel',o:STRAT},{k:'hwid',l:'Лимит устройств',t:'num'},{k:'tag',l:'Тег',ph:'например, vip'},{k:'squads',l:'Сквады',t:'multi',o:()=>DB.squads.map(s=>[s.id,s.name])},{k:'hold',l:'Отсчёт срока с первого подключения (on hold)',t:'bool'},{k:'desc',l:'Заметка'}];
 const FE=[{k:'username',l:'Имя пользователя',req:1,pat:'[A-Za-z0-9_.\\-]{3,32}'},{k:'limit',l:'Лимит, ГБ',t:'num',h:'0 — без лимита'},{k:'expireAt',l:'Действует до',t:'date',h:'Пусто — бессрочно'},{k:'strategy',l:'Сброс трафика',t:'sel',o:STRAT},{k:'tag',l:'Тег'},{k:'tg',l:'Telegram ID'},{k:'email',l:'Email'},{k:'desc',l:'Заметка'}];
 
 const COUNTRY_CODES='AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW HK HM HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP KE KG KH KH? KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS YE YT ZA ZM ZW'.replace(' KH?','').split(' ');
@@ -252,8 +252,8 @@ function xrayBuilderConfig(){
  const flow=protocol==='vless'&&security==='reality'&&network==='raw'?v('flow'):'';
  const clientName=(v('name').trim()||'XMesh client').replace(/[<>"]/g,'').slice(0,64);
  const settings={
-  vless:{clients:uuid?[{id:uuid,level:0,email:clientName,...(flow?{flow}:{})}]:[],decryption:'none'},
-  vmess:{clients:uuid?[{id:uuid,level:0,email:clientName,alterId:0}]:[],default:{alterId:0}},
+  vless:{users:uuid?[{id:uuid,level:0,email:clientName,...(flow?{flow}:{})}]:[],decryption:'none'},
+  vmess:{users:uuid?[{id:uuid,level:0,email:clientName,alterId:0}]:[],default:{alterId:0}},
   trojan:{clients:uuid?[{password:uuid,email:clientName}]:[]},
   shadowsocks:{clients:uuid?[{password:uuid,email:clientName}]:[],network:'tcp,udp',method:v('ss-method')||'chacha20-ietf-poly1305'},
   socks:{auth:v('socks-auth')||'noauth',accounts:uuid?[{user:clientName,password:uuid}]:[],udp:true,ip:'127.0.0.1'},
@@ -275,6 +275,53 @@ function xrayBuilderConfig(){
   if(security==='reality')ss.realitySettings={show:false,target:dest,xver:cl(+v('xver')||0,0,2),serverNames:sni?[sni]:[],privateKey:v('private-key')||'REPLACE_WITH_XRAY_PRIVATE_KEY',shortIds:[(v('short-id')||'').replace(/[^a-fA-F0-9]/g,'').slice(0,16)]};
  }
  return {log:{loglevel:v('loglevel')||'warning'},inbounds:[inbound],outbounds:[{protocol:'freedom',tag:'direct'},{protocol:'blackhole',tag:'blocked'}],routing:{rules:[{type:'field',outboundTag:'direct',inboundTag:[tag]}]}};
+}
+async function syncXrayUserToProfile(user){
+ const profile=DB.profiles.find(p=>String(p.id)===String(user.xrayProfileId));
+ if(!profile)throw new Error('Выбранный Xray-профиль не найден.');
+ const config=typeof profile.config==='string'?JSON.parse(profile.config):structuredClone(profile.config||{});
+ if(!Array.isArray(config.inbounds))throw new Error('В профиле отсутствует массив inbounds.');
+ let changed=0;
+ for(const inbound of config.inbounds){
+  inbound.settings=inbound.settings||{};
+  const email=String(user.username||'xmesh-user').replace(/[<>"]/g,'').slice(0,64);
+  if(inbound.protocol==='vless'){
+   const list=inbound.settings.users||(inbound.settings.users=[]);
+   if(!list.some(x=>x.id===user.xrayId))list.push({id:user.xrayId,level:0,email,...(inbound.streamSettings?.security==='reality'&&inbound.streamSettings?.network==='raw'?{flow:'xtls-rprx-vision'}:{})});
+   changed++;
+  }else if(inbound.protocol==='vmess'){
+   const list=inbound.settings.users||(inbound.settings.users=[]);
+   if(!list.some(x=>x.id===user.xrayId))list.push({id:user.xrayId,level:0,email,alterId:0});
+   changed++;
+  }else if(inbound.protocol==='trojan'){
+   const list=inbound.settings.clients||(inbound.settings.clients=[]);
+   if(!list.some(x=>x.password===user.xrayId))list.push({password:user.xrayId,email});
+   changed++;
+  }
+ }
+ if(!changed)throw new Error('В профиле нет поддерживаемых inbound (VLESS, VMess или Trojan).');
+ await api.update('profiles',profile.id,{name:profile.name,config:JSON.stringify(config,null,2)});
+ profile.config=JSON.stringify(config,null,2);
+ return changed;
+}
+async function removeXrayUserFromProfiles(user){
+ if(!user?.xrayId)return;
+ for(const profile of DB.profiles){
+  try{
+   const config=typeof profile.config==='string'?JSON.parse(profile.config):structuredClone(profile.config||{});
+   let changed=false;
+   for(const inbound of config.inbounds||[]){
+    const settings=inbound.settings||{};
+    for(const key of ['users','clients']){
+     if(Array.isArray(settings[key])){
+      const filtered=settings[key].filter(c=>c.id!==user.xrayId&&c.password!==user.xrayId);
+      if(filtered.length!==settings[key].length){settings[key]=filtered;changed=true}
+     }
+    }
+   }
+   if(changed){await api.update('profiles',profile.id,{name:profile.name,config:JSON.stringify(config,null,2)});profile.config=JSON.stringify(config,null,2)}
+  }catch(err){console.warn('Could not detach Xray credential from profile',profile.name,err)}
+ }
 }
 function xrayClientSample(){
  const v=id=>$('#xpb-'+id)?.value||'',protocol=v('protocol'),network=v('network'),security=v('security'),sni=v('sni').trim()||'example.com',port=cl(+v('port')||443,1,65535),path=v('path')||'/',host=v('host')||sni,uuid=v('uuid'),flow=protocol==='vless'&&security==='reality'&&network==='raw'?v('flow'):'';
@@ -527,7 +574,7 @@ function pdraw(q){q=q.toLowerCase();const go=k=>()=>{dlg.close();location.hash=k
 /* ================= СОБЫТИЯ ================= */
 const copyT=t=>(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('Скопировано'),()=>{const i=$('#lk');i.select();document.execCommand('copy');toast('Скопировано')});
 const sel=()=>{$$('#ut tbody tr').forEach(r=>{const i=+r.dataset.id;r.classList.toggle('sel',UQ.sel.has(i));const c=$('[data-sel]',r);if(c)c.checked=UQ.sel.has(i)});const a=$('[data-sela]');if(a)a.checked=$$('#ut tbody tr').every(r=>UQ.sel.has(+r.dataset.id));drawBulk()};
-const delUsers=async ids=>{const gone=DB.users.filter(u=>[...ids].some(id=>String(id)===String(u.id)));try{for(const id of ids)await api.remove('users',id)}catch(error){toast('Не удалось удалить пользователя: '+(error.message||'ошибка backend'));return}ids.forEach(i=>UQ.sel.delete(i));toast(`Удалено: ${ids.size}`,'Отменить',async()=>{try{if(backendReady){for(const user of gone)await api.create('users',user)}else{DB.users.push(...gone);save()}render(1);toast('Пользователи восстановлены')}catch(error){toast('Не удалось восстановить: '+error.message)}});dlg.close();render(1)};
+const delUsers=async ids=>{const gone=DB.users.filter(u=>[...ids].some(id=>String(id)===String(u.id)));try{for(const user of gone)await removeXrayUserFromProfiles(user);for(const id of ids)await api.remove('users',id)}catch(error){toast('Не удалось удалить пользователя: '+(error.message||'ошибка backend'));return}ids.forEach(i=>UQ.sel.delete(i));toast(`Удалено: ${ids.size}`,'Отменить',async()=>{try{if(backendReady){for(const user of gone)await api.create('users',user)}else{DB.users.push(...gone);save()}render(1);toast('Пользователи восстановлены')}catch(error){toast('Не удалось восстановить: '+error.message)}});dlg.close();render(1)};
 document.addEventListener('click',async e=>{
   const g=s=>e.target.closest(s);let b;
   if(g('.sw')||g('[data-sel]')&&0)return;
@@ -595,8 +642,8 @@ document.addEventListener('keydown',e=>{
   if(e.key=='/'&&!/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)){e.preventDefault();cur=='users'?$('#uq').focus():palette()}});
 document.addEventListener('submit',async e=>{const f=e.target,k=f.dataset.k;if(!k)return;const er=m=>{e.preventDefault();$('#fe')&&($('#fe').textContent=m)};
   if(k=='user'){const d=read(FU,f);if(DB.users.some(u=>u.username.toLowerCase()==d.username.toLowerCase()))return er('Такое имя уже есть. Выберите другое.');if(!d.squads.length)return er('Выберите хотя бы один сквад.');
-    const u={username:d.username,disabled:false,hold:d.hold,holdDays:d.days||30,created:Date.now(),expireAt:d.hold||!d.days?null:Date.now()+d.days*DAY,limit:d.limit,used:0,strategy:d.strategy,tag:d.tag,tg:'',email:'',desc:d.desc,hwid:d.hwid,squads:d.squads,onlineAt:0,adminId:DB.admins.find(a=>a.role==='owner')?.id||null,short:Math.floor(Math.random()*2**40).toString(36).padStart(8,'a'),xrayId:crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=crypto.getRandomValues(new Uint8Array(1))[0]&15;return(c==='x'?r:(r&3|8)).toString(16)}),devices:[]};
-    const c=await api.create('users',u);UQ.q='';UQ.st='all';UQ.sort='created';UQ.dir='desc';toast(`Пользователь ${c.username} создан`);location.hash=='#users'?render(1):location.hash='users';setTimeout(()=>userDrawer(c.id,'sub'),350)}
+    const u={username:d.username,disabled:false,hold:d.hold,holdDays:d.days||30,created:Date.now(),expireAt:d.hold||!d.days?null:Date.now()+d.days*DAY,limit:d.limit,used:0,strategy:d.strategy,tag:d.tag,tg:'',email:'',desc:d.desc,hwid:d.hwid,squads:d.squads,onlineAt:0,adminId:DB.admins.find(a=>a.role==='owner')?.id||null,short:Math.floor(Math.random()*2**40).toString(36).padStart(8,'a'),xrayId:crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=crypto.getRandomValues(new Uint8Array(1))[0]&15;return(c==='x'?r:(r&3|8)).toString(16)}),xrayProfileId:d.xrayProfileId||null,devices:[]};
+    const c=await api.create('users',u);if(c.xrayProfileId){try{await syncXrayUserToProfile(c)}catch(err){toast('Пользователь создан, но профиль Xray не обновлён: '+(err.message||'ошибка'),'ОК')}}UQ.q='';UQ.st='all';UQ.sort='created';UQ.dir='desc';toast(`Пользователь ${c.username} создан`);location.hash=='#users'?render(1):location.hash='users';setTimeout(()=>userDrawer(c.id,'sub'),350)}
   else if(k=='uedit'){e.preventDefault();const d=read(FE,f),id=+f.dataset.id;if(DB.users.some(u=>u.username.toLowerCase()==d.username.toLowerCase()&&u.id!=id))return er('Такое имя уже есть.');await api.update('users',id,d);toast('Сохранено');render(1);userDrawer(id,'ov')}
   else if(k=='ent'){const key=f.dataset.ent,e2=ENT[key],d=read(e2.fs,f),id=f.dataset.id,m=e2.chk?.(d,+id);if(m)return er(m);
     if(id){await api.update(key,id,d);toast('Сохранено')}else{const o=Object.assign({disabled:false,order:DB[key].length+1,created:Date.now(),last:0,used:0,state:'OFFLINE'},d);const c=await api.create(key,o);toast('Создано');if(e2.after?.(c)){render(1);return}}render(1)}
