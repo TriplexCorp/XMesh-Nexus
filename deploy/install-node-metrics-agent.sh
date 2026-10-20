@@ -34,6 +34,7 @@ bash -n "$AGENT_TMP"
 install -m 0750 "$AGENT_TMP" /usr/local/sbin/xmesh-node-metrics
 
 install -d -m 0700 /etc/xmesh-node-metrics
+install -d -m 0700 /var/lib/xmesh-node-metrics
 cat > /etc/xmesh-node-metrics.env <<EOF
 XMESH_API_URL=$API_URL
 XMESH_NODE_ID=$NODE_ID
