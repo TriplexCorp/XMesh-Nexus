@@ -327,7 +327,7 @@ async function removeXrayUserFromProfiles(user){
  }
 }
 function xrayClientSample(){
- const v=id=>$('#xpb-'+id)?.value||'',protocol=v('protocol'),network=v('network'),security=v('security'),sni=v('sni').trim()||'example.com',port=cl(+v('port')||443,1,65535),path=v('path')||'/',host=v('host')||sni,uuid=v('uuid')||'REPLACE_WITH_USER_UUID',flow=protocol==='vless'&&security==='reality'&&network==='raw'?v('flow'):'';
+ const v=id=>$('#xpb-'+id)?.value||'',protocol=v('protocol'),network=v('network'),security=v('security'),sni=v('sni').trim()||'example.com',port=cl(+v('port')||443,1,65535),path=v('path')||'/',host=v('host')||sni,uuid=v('uuid')||'REPLACE_WITH_USER_UUID',flow=protocol==='vless'&&['tls','reality'].includes(security)&&network==='raw'?v('flow'):'';
  let settings;
  if(protocol==='vless')settings={vnext:[{address:'SERVER_ADDRESS',port,users:[{id:uuid,encryption:'none',...(flow?{flow}:{})}]}]};
  else if(protocol==='vmess')settings={vnext:[{address:'SERVER_ADDRESS',port,users:[{id:uuid,alterId:0,security:v('vmess-security')||'auto'}]}]};
