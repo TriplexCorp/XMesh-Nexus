@@ -780,13 +780,13 @@ async fn get_traffic_metrics(
         ),
         per_node_bucket AS (
             SELECT
-                time_bucket(CASE WHEN $3 = '1h' THEN INTERVAL '1 minute' ELSE INTERVAL '15 minutes' END, s.sampled_at) AS bucket,
+                time_bucket(CASE WHEN $3::text = '1h' THEN INTERVAL '1 minute' ELSE INTERVAL '15 minutes' END, s.sampled_at) AS bucket,
                 s.node_id,
                 AVG(s.rx_bytes_per_sec) AS rx_bytes_per_sec,
                 AVG(s.tx_bytes_per_sec) AS tx_bytes_per_sec,
                 COUNT(*)::BIGINT AS sample_count
             FROM server_metric_samples s
-            WHERE s.sampled_at >= NOW() - CASE WHEN $3 = '1h' THEN INTERVAL '1 hour' ELSE INTERVAL '24 hours' END
+            WHERE s.sampled_at >= NOW() - CASE WHEN $3::text = '1h' THEN INTERVAL '1 hour' ELSE INTERVAL '24 hours' END
               AND s.node_id IN (SELECT node_id FROM selected_nodes)
             GROUP BY 1, 2
         )
