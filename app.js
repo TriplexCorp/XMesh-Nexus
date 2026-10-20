@@ -728,7 +728,7 @@ async function profilesP(){
  '</div>'+
  '<div class="xray-output-pane" id="xpb-output-client" role="tabpanel" aria-labelledby="xpb-tab-client" hidden>'+
  '<div class="xray-output-head" id="xpb-client-output"><div><b>Клиентская конфигурация</b><small>Outbound с transport, security, SNI, fingerprint, UUID и encryption</small></div><div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-client-copy">Копировать JSON</button><button type="button" class="gh sm" id="xpb-client-download">Скачать client.json</button></div></div>'+
- '<p class="xray-client-hint">Это клиентский outbound-конфиг, а не серверный inbound. Если адрес узла, UUID или ключи оставлены как placeholders, замените их перед импортом в приложение.</p>'+
+ '<p class="xray-client-hint" id="xpb-client-source-note">Это клиентский outbound-конфиг, а не серверный inbound. Если адрес узла, UUID или ключи оставлены как placeholders, замените их перед импортом в приложение.</p>'+
  '<textarea id="xpb-client-preview" class="xray-preview" spellcheck="false" readonly aria-label="Client JSON"></textarea>'+
  '</div></section>'+
  '<div class="xray-footer"><p class="er" id="xpb-error" role="status"></p><button type="button" class="btn" id="xpb-save">Сохранить профиль</button></div></section>';
@@ -758,8 +758,10 @@ async function profilesP(){
     const dec=$('#xpb-vless-decryption').value.trim(),enc=$('#xpb-vless-encryption').value.trim();
     if(!dec||!enc||dec.startsWith('REPLACE_')||enc.startsWith('REPLACE_'))warning=warning||'VLESS Encryption включён, но пара не заполнена. Нажмите «Сгенерировать пару на сервере» или вставьте оба значения вручную.';
    }
-   if(!$('#xpb-server-address').value.trim())warning=warning||'Client JSON: укажите внешний IP-адрес или домен сервера в поле «Адрес узла».';
-   if(['vless','vmess','trojan'].includes(protocol)&&!$('#xpb-uuid').value.trim())warning=warning||'Не задан ID/credential клиента. Сгенерируйте UUID внизу конструктора.';
+   const completenessWarnings=[];
+   if(!$('#xpb-server-address').value.trim())completenessWarnings.push('Client JSON: укажите внешний IP-адрес или домен сервера в поле «Адрес узла».');
+   if(['vless','vmess','trojan'].includes(protocol)&&!$('#xpb-uuid').value.trim())completenessWarnings.push('Не задан ID/credential клиента. Сгенерируйте UUID внизу конструктора.');
+   if(completenessWarnings.length)warning=[warning,...completenessWarnings].filter(Boolean).join(' ');
    $('#xpb-error').textContent=warning;
    const state=$('#xpb-output-state');if(state)state.textContent=warning?'Проверьте предупреждение':'Предпросмотр готов';
    $('#xpb-preview').value=JSON.stringify(xrayBuilderConfig(),null,2);
@@ -896,6 +898,10 @@ async function profilesP(){
    $('#xpb-preview').hidden=customMode;
    $$('[data-xray-mode]').forEach(b=>b.classList.toggle('on',b.dataset.xrayMode===(customMode?'custom':'visual')));
    setOutput('server');
+   const clientSourceNote=$('#xpb-client-source-note');
+   if(clientSourceNote)clientSourceNote.textContent=customMode
+    ?'Режим Server JSON вручную: Client JSON по-прежнему строится из полей визуального конструктора и не синхронизируется автоматически с произвольными ручными правками. Перед использованием сверьте обе конфигурации.'
+    :'Этот Client JSON — отдельный outbound-конфиг. Адрес узла, UUID, Reality public key / Short ID и другие placeholders нужно заполнить реальными значениями.';
    if(customMode)validateCustomJson();
   };
   $$('[data-xray-mode]').forEach(btn=>btn.addEventListener('click',()=>setMode(btn.dataset.xrayMode)));
