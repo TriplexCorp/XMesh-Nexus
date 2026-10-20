@@ -89,47 +89,54 @@ update_panel() {
     fail "Каталог не является Git-репозиторием. Обновление через CLI недоступно."
     return 1
   fi
-  # The installer may be locally patched by operators. Preserve it outside the
-  # checkout and restore only that one file so a routine update can proceed.
-  # Never silently discard changes to application code or deployment files.
+  # Preserve our locally bootstrapped CLI and any operator installer override.
+  # All other changed/untracked files still block updates; never silently discard app/config edits.
   local status_lines other_changes entry changed_path override_dir stamp
+  local -a allowed_changes=()
   status_lines="$(git -C "$ROOT" status --porcelain --untracked-files=normal)"
   other_changes=""
   if [[ -n "$status_lines" ]]; then
     while IFS= read -r entry; do
       [[ -z "$entry" ]] && continue
       changed_path="${entry:3}"
-      if [[ "$changed_path" != "install.sh" ]]; then
-        other_changes+="$entry"$'\n'
-      fi
+      case "$changed_path" in
+        install.sh|xmeshctl)
+          allowed_changes+=("$changed_path")
+          ;;
+        *)
+          other_changes+="$entry"$'\n'
+          ;;
+      esac
     done <<< "$status_lines"
 
     if [[ -n "$other_changes" ]]; then
-      fail "Найдены локальные изменения кроме install.sh. CLI их не перезапишет:"
+      fail "Найдены локальные изменения кроме install.sh/xmeshctl. CLI их не перезапишет:"
       git -C "$ROOT" status --short
-      warn "Сохрани/закоммить эти файлы вручную и повтори обновление."
+      warn "Сначала отдельно сохрани или закоммить эти изменения, затем повтори обновление."
       return 1
     fi
 
     override_dir="/var/backups/xmesh-nexus-local-overrides"
     stamp="$(date -u +%Y%m%dT%H%M%SZ)"
     if ! mkdir -p "$override_dir"; then
-      fail "Не удалось создать $override_dir для резервной копии локального install.sh."
+      fail "Не удалось создать $override_dir для резервных копий."
       return 1
     fi
     chmod 700 "$override_dir"
-    if ! cp -p "$ROOT/install.sh" "$override_dir/install.sh.$stamp"; then
-      fail "Не удалось сохранить локальный install.sh. Обновление отменено."
+    for changed_path in "${allowed_changes[@]}"; do
+      if ! cp -p "$ROOT/$changed_path" "$override_dir/$changed_path.$stamp"; then
+        fail "Не удалось сохранить локальный $changed_path. Обновление отменено."
+        return 1
+      fi
+      git -C "$ROOT" diff HEAD --binary -- "$changed_path" > "$override_dir/$changed_path.$stamp.patch"
+      chmod 600 "$override_dir/$changed_path.$stamp" "$override_dir/$changed_path.$stamp.patch"
+      warn "Локальный $changed_path сохранён: $override_dir/$changed_path.$stamp"
+    done
+    if ! git -C "$ROOT" stash push --message "xmeshctl preserved local updater/installer overrides at $override_dir/$stamp" -- install.sh xmeshctl >/dev/null; then
+      fail "Не удалось временно сохранить локальные правки в git stash. Копии оставлены в $override_dir."
       return 1
     fi
-    git -C "$ROOT" diff HEAD --binary -- install.sh > "$override_dir/install.sh.$stamp.patch"
-    chmod 600 "$override_dir/install.sh.$stamp" "$override_dir/install.sh.$stamp.patch"
-    if ! git -C "$ROOT" stash push --message "xmeshctl preserved install.sh at $override_dir/install.sh.$stamp" -- install.sh >/dev/null; then
-      fail "Не удалось убрать локальную правку install.sh в stash. Резервная копия: $override_dir/install.sh.$stamp"
-      return 1
-    fi
-    warn "Локальная версия install.sh сохранена: $override_dir/install.sh.$stamp"
-    ok "Локальная правка install.sh сохранена в резервной копии и stash; продолжаю обновление."
+    ok "Локальные правки install.sh/xmeshctl сохранены в резервных копиях и stash; продолжаю обновление."
   fi
 
   local branch upstream
