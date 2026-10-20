@@ -408,7 +408,7 @@ function xrayBuilderConfig(){
  const inbound={tag,protocol,settings};
  if(protocol!=='tun'){inbound.listen=v('listen')||'0.0.0.0';inbound.port=port}
  if(!['tun','wireguard','dokodemo-door','tunnel'].includes(protocol)){
-  const ss={method:network,security};
+  const ss={network,security};
   if(network==='websocket')ss.wsSettings={path,headers:v('host')?{Host:v('host')}: {},heartbeatPeriod:0};
   if(network==='xhttp')ss.xhttpSettings={path,host:v('host'),mode:v('xhttp-mode')||'auto',extra:{xPaddingBytes:v('xhttp-padding')||'100-1000'}};
   if(network==='grpc')ss.grpcSettings={serviceName:path.replace(/^\//,'')||'grpc',multiMode:v('grpc-mode')==='multi'};
@@ -545,7 +545,7 @@ function xrayClientSample(){
   const password=method.startsWith('2022-')?(multiUser?serverPassword+':'+userPassword:serverPassword):(multiUser?userPassword:serverPassword);
   settings={servers:[{address,port,method,password}]};
  }else if(protocol==='socks'||protocol==='mixed')settings={servers:[{address,port,...(v('socks-auth')==='password'?{users:[{user:(v('name')||'xmesh').toLowerCase().replace(/[^a-z0-9_.-]/g,'-'),pass:uuid}]}:{})}]};
- else if(protocol==='http')settings={address,port,...(uuid?{user:(v('name')||'xmesh').toLowerCase().replace(/[^a-z0-9_.-]/g,'-'),pass:uuid}:{})};
+ else if(protocol==='http')settings={servers:[{address,port,...(uuid?{users:[{user:(v('name')||'xmesh').toLowerCase().replace(/[^a-z0-9_.-]/g,'-'),pass:uuid}]}:{})}]};
  else if(protocol==='wireguard')settings={secretKey:'REPLACE_WITH_CLIENT_PRIVATE_KEY',address:['10.0.0.2/32'],peers:[{endpoint:address+':'+port,publicKey:'REPLACE_WITH_SERVER_PUBLIC_KEY',allowedIPs:['0.0.0.0/0','::/0']}]};
  else if(protocol==='hysteria')settings={version:2,address,port};
  else if(protocol==='masque')settings={address,port,remoteDNS:['1.1.1.1','8.8.8.8']};
@@ -553,7 +553,8 @@ function xrayClientSample(){
  if(protocol==='mixed')outProtocol='socks';
  const streamSettings={network,security};
  if(network==='websocket')streamSettings.wsSettings={path,headers:host?{Host:host}:{}};
- if(network==='xhttp')streamSettings.xhttpSettings={path,host,mode:v('xhttp-mode')||'auto'};
+ if(network==='raw')streamSettings.rawSettings={header:v('raw-header')==='http'?{type:'http',request:{version:'1.1',method:'GET',path:[path],headers:{Host:[v('host')||sni||'example.com'],'User-Agent':['Mozilla/5.0'],'Accept-Encoding':['gzip, deflate'],'Connection':['keep-alive']}}}:{type:'none'}};
+ if(network==='xhttp')streamSettings.xhttpSettings={path,host,mode:v('xhttp-mode')||'auto',extra:{xPaddingBytes:v('xhttp-padding')||'100-1000'}};
  if(network==='grpc')streamSettings.grpcSettings={serviceName:path.replace(/^\//,'')||'grpc',multiMode:v('grpc-mode')==='multi'};
  if(network==='httpupgrade')streamSettings.httpupgradeSettings={path,host};
  if(network==='mkcp')streamSettings.kcpSettings={seed:v('kcp-seed')||''};
