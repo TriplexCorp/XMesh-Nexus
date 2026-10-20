@@ -2022,3 +2022,171 @@ html[data-theme=light] .xray-builder select:not(.sr-native-select){color-scheme:
  }
  .xray-builder.studio-reference-v5:not(.manual-mode) .sr-v5-select-menu{max-height:230px}
 }
+
+/* XRAY STUDIO / Contextual editor (single, dependency-driven form).
+   Inherits the panel's original themes, density and radius tokens. */
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode){
+ gap:.65rem!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode)>.xray-config-tabs{display:none!important}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode)>.sr-inline-context{
+ grid-column:1/-1!important;grid-row:3!important;
+ display:flex;flex-wrap:wrap;align-items:center;
+ gap:.45rem 1rem;
+ padding:.55rem .8rem;
+ border:1px solid var(--ln);
+ border-radius:var(--ui-control-radius);
+ background:color-mix(in srgb,var(--s1) 84%,var(--a) 16%);
+ min-width:0!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-inline-current{
+ font-size:.8rem;font-weight:790;color:var(--tx);
+ white-space:normal;overflow-wrap:anywhere;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-inline-current:before{
+ content:"●";font-size:.6rem;color:var(--a);margin-right:.55rem;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-inline-hint{
+ font-size:.74rem;color:var(--mu);
+ margin-left:auto;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode)>.xray-workspace-layout{
+ grid-row:4!important;
+ grid-template-columns:minmax(0,1.55fr) minmax(19rem,.9fr)!important;
+ gap:.8rem!important;
+ align-items:start!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-config-content{
+ padding:0!important;
+ background:transparent!important;
+ border:0!important;
+ border-radius:0!important;
+ box-shadow:none!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-config-panel{
+ background:var(--s1);
+ border:1px solid var(--ln);
+ border-radius:var(--ui-radius);
+ margin:0 0 .6rem;
+ padding:clamp(.65rem,1.05vw,1rem);
+ gap:.8rem!important;
+ box-shadow:none;
+ animation:none!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-config-panel-title{
+ min-height:auto!important;
+ padding:0 0 .55rem!important;
+ gap:.65rem!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-config-panel-title h3{
+ font-size:1rem!important;
+ letter-spacing:-.025em!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-config-panel-title p{
+ font-size:.74rem!important;
+ line-height:1.35!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-v5-heading-icon{
+ width:32px;height:32px;flex-basis:32px;
+ background:color-mix(in srgb,var(--a) 12%,var(--s2));
+ border:1px solid color-mix(in srgb,var(--a) 25%,var(--ln));
+ box-shadow:none!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-v5-heading-icon svg{width:18px;height:18px}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-config-panel .xray-section{
+ padding:0!important;border:0!important;background:transparent!important;
+ border-radius:0!important;box-shadow:none!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-config-panel :is(.xray-section-body,.xray-option-group,.xray-main-grid){
+ gap:.65rem!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-config-panel .xray-section-heading{
+ padding:.3rem 0 .45rem!important;
+ margin:0 0 .3rem!important;
+ background:transparent!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-config-panel .xray-section-heading b{
+ font-size:.85rem!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-config-panel .xray-section-heading small{
+ font-size:.72rem!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-config-panel .xray-option-group{
+ border:0!important;background:transparent!important;padding:.1rem 0!important;
+ border-radius:0!important;overflow:visible!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-config-panel .xray-option-group-head{
+ display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;justify-content:space-between;
+ margin:0 0 .5rem!important;padding:.45rem 0!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-config-panel .xray-option-group-head b{
+ font-size:.82rem!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-config-panel .f{
+ gap:.32rem!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-config-panel .f>span:first-child{
+ font-size:.76rem!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-config-panel .f:has(.sr-v5-input)>small{
+ font-size:.69rem!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-v5-input,
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-v5-select-shell{
+ min-height:37px!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) :is(.sr-v5-input>input,.sr-v5-select-trigger){
+ min-height:36px!important;height:36px!important;font-size:.79rem!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-v5-icon{
+ height:36px!important;flex-basis:35px!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .studio-v3-tip{display:none!important}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-xhttp-note{
+ padding:.6rem .75rem!important;font-size:.7rem!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-xhttp-toggle{
+ display:inline-flex!important;align-items:center;justify-content:center;
+ gap:.3rem;margin-left:auto;padding:.36rem .6rem;
+ min-height:29px;
+ color:var(--tx)!important;background:var(--s2)!important;
+ border:1px solid var(--ln)!important;
+ border-radius:var(--ui-control-radius);
+ font-size:.72rem;font-weight:650;cursor:pointer;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-xhttp-toggle:hover{
+ border-color:var(--a)!important;
+ background:color-mix(in srgb,var(--a) 10%,var(--s2))!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) [data-xhttp-expanded=false] .sr-xhttp-advanced{
+ display:none!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-output-dock{
+ position:sticky!important;top:1rem!important;
+ padding:.8rem!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-code-view{
+ height:clamp(260px,52vh,580px)!important;
+ min-height:260px!important;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode)>.xray-footer{
+ margin-top:0!important;
+}
+@media(max-width:1180px){
+ .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode)>.xray-workspace-layout{
+  grid-template-columns:minmax(0,1fr)!important;
+ }
+ .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-output-dock{
+  position:static!important;
+ }
+ .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-code-view{height:290px!important}
+}
+@media(max-width:780px){
+ .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-inline-hint{
+  margin-left:0;
+ }
+ .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-config-panel .xray-main-grid,
+ .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .xray-config-panel .xray-option-grid{
+  grid-template-columns:minmax(0,1fr)!important;
+ }
+}
