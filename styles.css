@@ -638,11 +638,20 @@ button:active,.btn:active,.gh:active{transform:translateY(0)}
 .top-identity h1{margin:0;min-width:0;overflow-wrap:anywhere}
 .top-eyebrow{display:flex;align-items:center;gap:.48rem;color:var(--mu);font-size:.65rem;font-weight:750;letter-spacing:.115em;line-height:1.2}
 .top-eyebrow-mark{display:inline-block;width:.43rem;height:.43rem;flex:0 0 .43rem;border-radius:50%;background:var(--a);box-shadow:0 0 0 3px color-mix(in srgb,var(--a) 12%,transparent)}
-.top .search{width:clamp(13rem,21vw,21rem);height:2.55rem;background:color-mix(in srgb,var(--s1) 85%,var(--s2));border-color:var(--ln);box-shadow:0 1px 0 var(--surface-highlight) inset}
+.top .search{display:flex;flex:0 1 19rem;width:19rem;min-width:min(15rem,100%);height:2.55rem;gap:.62rem;padding:0 .72rem;background:color-mix(in srgb,var(--s1) 85%,var(--s2));border-color:var(--ln);box-shadow:0 1px 0 var(--surface-highlight) inset}
 .top .search:hover,.top .search:focus-visible{background:var(--s2);border-color:color-mix(in srgb,var(--a) 38%,var(--ln))}
 .top .tl{gap:.5rem;flex:0 0 auto}
 .top .tl>.ib,.top .tl>#logout,.top .tl>#addb{min-height:2.55rem;height:2.55rem}
-.top #pal kbd{display:inline-flex;align-items:center;height:1.35rem;padding:0 .37rem;font-size:.66rem;font-family:"IBM Plex Mono",ui-monospace,monospace;font-weight:550}
+.top #pal .search-glyph{display:inline-flex;align-items:center;justify-content:center;flex:0 0 1.12rem;width:1.12rem;height:1.12rem;color:var(--mu)}
+.top #pal .search-glyph .ic{width:1.12rem;height:1.12rem}
+.top #pal .search-label{display:block;flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;font-size:.79rem;font-weight:560;line-height:1.2;letter-spacing:0;color:var(--mu)}
+.top #pal kbd{display:inline-flex;align-items:center;flex:0 0 auto;height:1.35rem;padding:0 .37rem;font-size:.66rem;font-family:"IBM Plex Mono",ui-monospace,monospace;font-weight:550}
+.top #addb{display:inline-flex;align-items:center;justify-content:center;gap:.58rem;width:auto;min-width:0;padding:.34rem .84rem .34rem .34rem;border:1px solid color-mix(in srgb,var(--a) 29%,var(--ln));border-radius:.68rem;background:color-mix(in srgb,var(--a) 8%,var(--elevated));color:var(--tx);box-shadow:inset 0 1px 0 var(--surface-highlight);white-space:nowrap;font-size:.78rem;font-weight:715;letter-spacing:-.012em;transition:background .16s,border-color .16s,box-shadow .16s}
+.top #addb:hover{background:color-mix(in srgb,var(--a) 13%,var(--elevated));border-color:color-mix(in srgb,var(--a) 47%,var(--ln));box-shadow:0 3px 14px -10px color-mix(in srgb,var(--a) 30%,transparent),inset 0 1px 0 var(--surface-highlight);transform:none}
+.top #addb .addb-icon{display:inline-grid;place-items:center;flex:0 0 1.82rem;width:1.82rem;height:1.82rem;border-radius:.46rem;background:var(--a);color:var(--btn-text)}
+.top #addb .addb-icon .ic{width:1rem;height:1rem;stroke-width:2}
+.top #addb .addb-label{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.25}
+.top #addb:focus-visible{outline:2px solid var(--a);outline-offset:2px}
 @media(min-width:761px) and (max-width:1100px){.top-identity{flex-basis:10rem}}
 
 /* Distinct dashboard hero and measured information hierarchy. */
@@ -2249,6 +2258,9 @@ white-space:nowrap;
     border-radius:.58rem;
   }
   .top #logout .logout-label{display:none}
+  .top #addb .addb-label{display:none}
+  .top .tl>#addb{padding:0;background:var(--a);border-color:var(--a);color:var(--btn-text);box-shadow:none}
+  .top #addb .addb-icon{width:100%;height:100%;flex:1 1 auto;border-radius:inherit;background:transparent;color:inherit}
   .top .tl .ic{width:1.12rem;height:1.12rem}
   .top #pal{
     order:3;
