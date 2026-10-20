@@ -29,7 +29,7 @@ fixCase('{\n  "log": {"loglevel": "warning"},\n  "inbounds": [\n    {\n      "ta
 fixCase('{"inbounds":[{"protocol":"vless",   , "tag":"x"}]}', 'лишнюю запятую');
 fixCase('{"inbounds":[{"protocol":"vless"}],, "log":{}}', 'лишнюю запятую');
 assert.equal(editor.inspect('{"inbounds":[{"protocol":"vless","tag":",,"}]}'),null,'Do not treat commas inside strings as syntax errors');
-assert.match(src,/Безопасное автоисправление не найдено/,'Explain why Hot Fix is hidden when the fix is ambiguous');
+assert.match(src,/Автоматическая правка недоступна/,'Explain why Hot Fix is hidden when the fix is ambiguous');
 
 fixCase('{\n "inbounds" [{"protocol":"vless"}]\n}', 'двоеточие');
 fixCase('{\n "inbounds":[{"protocol":"vless"}]\n "log":{"loglevel":"warning"}\n}', 'запятую');
