@@ -815,3 +815,16 @@ nav a.on{background:var(--s2)!important;box-shadow:none!important}
 .xray-user-credential small{line-height:1.45}
 .xray-user-credential .gh{flex:0 0 auto}
 .xray-section [hidden],.xray-main-grid .f[hidden]{display:none!important}
+
+
+/* ================= XRAY STUDIO: workflow clarity + per-user uTLS ================= */
+.xray-workflow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.65rem}
+.xray-workflow>div,.xray-pq-intro,.xray-user-fingerprint{display:grid;gap:.35rem;padding:.9rem 1rem;border:1px solid var(--ln);border-radius:.8rem;background:var(--s2);min-width:0}
+.xray-workflow b{font-size:.9rem}
+.xray-workflow span,.xray-pq-intro span,.xray-user-fingerprint small{color:var(--mu);font-size:.84rem;line-height:1.5}
+.xray-pq-intro{margin-bottom:.85rem}
+.xray-pq-intro code,.xray-user-fingerprint code{font:500 .86rem/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow-wrap:anywhere}
+.xray-user-fingerprint{margin:.8rem 0}
+.xray-user-fingerprint>span{font-size:.82rem}
+.xray-builder .xray-section[hidden]{display:none!important}
+@media(max-width:760px){.xray-workflow{grid-template-columns:1fr}}
