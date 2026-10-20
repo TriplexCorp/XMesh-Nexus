@@ -1,24 +1,28 @@
 # XMesh Nexus
 
-**XMesh Nexus** is the web-based **control panel** for managing XMesh / Xray VPN infrastructure.
+**XMesh Nexus** is a modern control panel interface for managing Xray-powered VPN infrastructure.
 
-> This repository contains the panel UI only — not an XMesh node, node agent, or server-side daemon.
+> This repository contains the panel frontend only — not an Xray node, node agent, or server-side daemon.
 
-## Entry point
+## Frontend structure
 
-- `index.html` — main control-panel interface
+- `index.html` — application shell and entry point
+- `styles.css` — visual system, themes, responsive layouts, and node-grid density
+- `app.js` — interface behaviour, local prototype data, and client-side interactions
+
+## Design direction
+
+The default interface uses an **Obsidian / Champagne** visual language: graphite surfaces, restrained warm-metal accents, precise typography, subtle depth, and a responsive infrastructure grid. The appearance panel still lets users customise theme, accent, density, surfaces, and motion.
 
 ## Current implementation status
 
-The current HTML is a **frontend prototype**. It stores settings in browser `localStorage` and uses generated demo data. CPU, RAM, speed, node status, and user records shown in the interface are not live telemetry.
+This repository is currently a **frontend prototype**. Settings and prototype state are stored in the browser, and the panel is not yet connected to Xray, Marzban, or a production backend API.
 
-The panel is **not yet connected** to Xray, Marzban, or a production backend API. Node-side services and the control-plane backend are separate components and are not implemented by this frontend repository.
-
-Do not use the current prototype as a production control plane until backend integration, authentication, authorization, and server-side validation are implemented.
+CPU, RAM, throughput, node health, and other live operational telemetry require a real monitoring/backend integration. Do not treat the current UI as a production control plane until authentication, authorisation, backend integration, and server-side validation are implemented.
 
 ## Product identity
 
 - **Product:** XMesh Nexus
-- **Role:** Infrastructure Control Panel
+- **Role:** Xray VPN Infrastructure Control Panel
 - **Descriptor:** Infrastructure Control Platform
 - **Tagline:** One platform. Every node. Total control.
