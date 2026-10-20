@@ -2007,7 +2007,7 @@ html[data-theme=light] .xray-builder.studio-reference-v5 :is(.xray-code-syntax,.
  color:var(--tx)!important;font-weight:780;
 }
 .xray-builder.studio-reference-v5:not(.manual-mode) .sr-v5-menu-item:disabled{
- opacity:.43;cursor:not-allowed;color:var(--mu)!important;
+ opacity:.64;cursor:not-allowed;color:var(--mu)!important;
 }
 .xray-builder.studio-reference-v5:not(.manual-mode) .xray-config-content,
 .xray-builder.studio-reference-v5:not(.manual-mode) .xray-option-group,
