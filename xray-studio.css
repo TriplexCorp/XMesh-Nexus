@@ -3245,3 +3245,71 @@ body:has(.studio-reference-v5) .wrap{
   flex-basis:100%;
  }
 }
+
+
+/* Explainable, multi-issue Xray assistant. Lives in the manual JSON editor. */
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-json-diagnostic{
+ display:flex!important;flex-wrap:wrap!important;align-items:center!important;
+ gap:.55rem!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-json-counters{
+ font-weight:800!important;color:var(--tx)!important;
+ font-size:max(13px,.84rem);white-space:normal;
+ margin-right:.5rem;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-json-issue-list{
+ flex:1 1 100%;width:100%;min-width:0;
+ display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,24rem),1fr));
+ gap:.35rem;border-top:1px solid var(--ln);padding-top:.55rem;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-json-issue-list[hidden]{
+ display:none!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-json-issue{
+ display:flex;align-items:center;gap:.55rem;min-height:2.4rem;
+ width:100%;padding:.48rem .65rem!important;
+ text-align:left!important;background:var(--s1)!important;
+ border:1px solid var(--ln)!important;border-radius:var(--ui-control-radius)!important;
+ cursor:pointer;overflow:hidden;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-json-issue:is(:hover,:focus-visible,.is-selected){
+ border-color:color-mix(in srgb,var(--a) 60%,var(--ln))!important;
+ background:color-mix(in srgb,var(--a) 10%,var(--s1))!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-json-issue-severity{
+ display:inline-flex;align-items:center;flex:0 0 auto;
+ font-size:.7rem;font-weight:800;
+ padding:.22rem .4rem;border-radius:4px;
+ color:var(--mu);background:var(--s2);
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-json-issue-severity:is(.error,.syntax,.structure){
+ color:var(--er);background:color-mix(in srgb,var(--er) 12%,var(--s2));
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-json-issue-severity.warning{
+ color:var(--wr);background:color-mix(in srgb,var(--wr) 12%,var(--s2));
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-json-issue-label{
+ flex:1;min-width:0;line-height:1.4;font-size:max(12px,.78rem);
+ color:var(--tx);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-json-diagnostic .sr-json-more{
+ margin-left:auto;border-color:var(--ln)!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-json-diagnostic[data-state=info]{
+ border-color:var(--ln)!important;background:var(--s2)!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-json-diagnostic[data-state=info] .sr-json-status-icon{
+ background:var(--c3)!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode #xpb-custom-syntax .sr-json-squiggle.is-warning{
+ text-decoration-color:var(--wr)!important;
+ background:color-mix(in srgb,var(--wr) 9%,transparent)!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode #xpb-custom-syntax .sr-json-squiggle.is-info{
+ text-decoration-color:var(--c3)!important;
+ background:color-mix(in srgb,var(--c3) 9%,transparent)!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-json-gutter-number.is-error{
+ color:var(--wr)!important;
+ background:color-mix(in srgb,var(--wr) 10%,transparent)!important;
+}
