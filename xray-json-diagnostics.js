@@ -58,7 +58,9 @@
    if(position===null)return null;
    // Remove one trailing comma before a closing object/array. Only outside strings.
    const commaCandidates=[];
-   for(let i=0;i<source.length;i++){
+   // The parser already pinpoints the invalid neighborhood. Never inspect
+   // every comma in an arbitrarily large JSON file on each keystroke.
+   for(let i=Math.max(0,position-100);i<Math.min(source.length,position+100);i++){
      if(source[i]!==','||!notInsideString(source,i))continue;
      const j=nextNonSpace(source,i+1);
      if(source[j]===']'||source[j]==='}')commaCandidates.push(i);
