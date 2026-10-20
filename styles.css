@@ -2526,3 +2526,17 @@ nav a.on{background:var(--s2)!important;box-shadow:none!important}
     min-height:34rem;
   }
 }
+
+
+/* Keep transport step reachable and explain protocols without transport options. */
+.xray-builder .xray-transport-empty{
+  margin:0;
+  padding:.75rem .85rem;
+  border:1px solid var(--ln);
+  border-radius:.65rem;
+  background:color-mix(in srgb,var(--s2) 78%,transparent);
+  color:var(--mu);
+  font-size:.76rem;
+  line-height:1.45;
+}
+.xray-builder .xray-transport-empty[hidden]{display:none!important}
