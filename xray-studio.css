@@ -2787,16 +2787,16 @@ body:has(.studio-reference-v5) .wrap{
   padding:0!important;
   border:1px solid color-mix(in srgb,var(--a) 32%,var(--ln))!important;
   border-radius:clamp(13px,var(--ui-radius),22px)!important;
-  background:var(--s1)!important;
+  background:color-mix(in srgb,var(--s1) 94%,var(--a) 6%)!important;
   box-shadow:0 34px 110px rgba(0,0,0,.52),
               0 0 0 1px color-mix(in srgb,var(--tx) 7%,transparent) inset,
               0 0 56px color-mix(in srgb,var(--a) 9%,transparent)!important;
   isolation:isolate;
 }
 .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog::backdrop{
-  background:rgba(4,8,15,.63)!important;
-  -webkit-backdrop-filter:blur(13px) saturate(.7)!important;
-  backdrop-filter:blur(13px) saturate(.7)!important;
+  background:rgba(4,8,15,.46)!important;
+  -webkit-backdrop-filter:blur(12px) saturate(.78)!important;
+  backdrop-filter:blur(12px) saturate(.78)!important;
 }
 .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .sr-dialog-shell{
   max-width:none!important;
