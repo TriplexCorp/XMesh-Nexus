@@ -648,3 +648,10 @@ nav a.on{background:var(--s2)!important;box-shadow:none!important}
 
 /* Searchable country and flag selector in the node editor */
 .country-picker{display:grid;gap:.55rem;min-width:0}.country-picker .country-search,.country-picker .country-select{width:100%;min-width:0;background:var(--s2);color:var(--tx);border:1px solid var(--ln);border-radius:11px;padding:.78rem .9rem;font:inherit;outline-offset:2px}.country-picker .country-search:focus,.country-picker .country-select:focus{border-color:var(--a);outline-color:var(--a)}.country-picker .country-select{cursor:pointer}.country-picker .country-select option{background:var(--s1);color:var(--tx);padding:.4rem}.country-picker .country-hint{color:var(--mu);font-size:.78rem;line-height:1.5}.country-picker .country-search::placeholder{color:var(--mu)}
+
+/* Platform-independent country flags: image assets avoid missing flag emoji glyphs on Windows/Linux. */
+.country-picker{display:grid;gap:8px;min-width:0}
+.country-selected{display:flex;align-items:center;gap:10px;min-height:42px;padding:9px 12px;border:1px solid var(--ln);border-radius:12px;background:var(--s1);color:var(--tx);font-size:.92rem}
+.country-flag-preview{width:32px;height:24px;object-fit:cover;border-radius:3px;flex:0 0 auto;box-shadow:0 1px 4px #0003}
+.flag-img{display:inline-block;width:26px;height:19px;object-fit:cover;border-radius:3px;vertical-align:middle;box-shadow:0 1px 4px #0003}
+.country-select{width:100%}
