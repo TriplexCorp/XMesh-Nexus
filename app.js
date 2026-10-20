@@ -1834,7 +1834,7 @@ document.addEventListener('submit',async e=>{const f=e.target,k=f.dataset.k;if(!
   else if(k=='bulk-renew'){
     e.preventDefault();
     const value=f.querySelector('[name="days"]')?.value.trim()||'';
-    const days=/^[1-9]\\d*$/.test(value)?Number(value):NaN;
+    const days=/^[1-9]\d*$/.test(value)?Number(value):NaN;
     if(!Number.isSafeInteger(days)||days<1||days>36500)return er('Укажите количество дней от 1 до 36500.');
     const ids=new Set(UQ.sel);
     if(!ids.size)return er('Сначала выберите пользователей.');
