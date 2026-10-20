@@ -531,7 +531,7 @@ function userCalendarMarkup(year,month,selected){
     return '<button type="button" class="user-cal-day'+(chosen?' selected':'')+(value===today?' is-today':'')+'" data-user-date-day="'+value+'" aria-label="'+esc(label)+'" aria-pressed="'+(chosen?'true':'false')+'">'+day+'</button>';
   }).join('');
   const monthLabel=new Intl.DateTimeFormat('ru-RU',{month:'long',year:'numeric'}).format(new Date(year,month,1));
-  return '<div class="user-cal-header"><strong>'+esc(monthLabel)+'</strong><div class="user-cal-nav"><button type="button" data-user-date-nav="-1" aria-label="Предыдущий месяц">'+ic('chevronLeft')+'</button><button type="button" data-user-date-nav="1" aria-label="Следующий месяц">'+ic('chevronRight')+'</button></div></div><div class="user-cal-grid">'+weekdays+blanks+days+'</div><div class="user-cal-footer"><button type="button" data-user-date-clear>Бессрочно</button><button type="button" data-user-date-today>Сегодня</button></div>';
+  return '<div class="user-cal-header"><strong>'+esc(monthLabel)+'</strong><div class="user-cal-nav"><button type="button" data-user-date-nav="-1" aria-label="Предыдущий месяц">'+ic('chevronLeft')+'</button><button type="button" data-user-date-nav="1" aria-label="Следующий месяц">'+ic('chevronRight')+'</button></div></div><div class="user-cal-grid">'+weekdays+blanks+days+'</div><div class="user-cal-footer"><button type="button" data-user-date-today>Сегодня</button><button type="button" data-user-date-clear>Бессрочно</button></div><div class="user-cal-renew"><input type="number" id="user-renew-days" min="1" max="36500" step="1" inputmode="numeric" aria-label="Продлить на количество дней" placeholder="Добавить дней"><button class="gh" type="button" data-user-renew-apply>Добавить</button></div><p class="er user-renew-error" role="status" hidden></p>';
 }
 function userExtendExpiryYmd(expireAt,days){
   if(!Number.isSafeInteger(days)||days<1||days>36500)throw new Error('Укажите количество дней от 1 до 36500.');
@@ -546,7 +546,7 @@ function userExtendExpiryTimestamp(expireAt,days){
 }
 function userDateField(u){
   const value=userYmd(u.expireAt);
-  return '<div class="f user-date-field"><span id="user-expiry-label">Действует до</span><div class="user-date-controls"><button type="button" class="user-date-trigger" data-user-date-open aria-labelledby="user-expiry-label user-date-display" aria-expanded="false" aria-controls="user-date-calendar">'+ic('calendar')+'<span id="user-date-display" data-user-date-label>'+esc(userDateLabel(value))+'</span>'+ic('down')+'</button><button type="button" class="user-date-extend" data-user-renew-toggle aria-expanded="false" aria-controls="user-renew-panel">'+ic('plus')+'<span>Продлить</span></button></div><input type="hidden" name="expireAt" value="'+esc(value)+'"><div class="user-date-calendar" id="user-date-calendar" role="group" aria-label="Календарь срока действия" hidden></div><div class="user-renew-panel" id="user-renew-panel" hidden><label for="user-renew-days">Добавить дней</label><div class="user-renew-controls"><input type="number" id="user-renew-days" min="1" max="36500" step="1" inputmode="numeric" placeholder="Количество дней"><button type="button" class="gh" data-user-renew-apply>Применить</button></div><small>Дни добавляются к текущей дате окончания, а если срок истёк — к сегодняшнему дню. Затем нажмите «Сохранить».</small><p class="er user-renew-error" role="status" hidden></p></div><small>Выберите дату в календаре или продлите на любое число дней.</small></div>';
+  return '<div class="f user-date-field"><span id="user-expiry-label">Срок действия</span><button type="button" class="user-date-trigger" data-user-date-open aria-labelledby="user-expiry-label user-date-display" aria-expanded="false" aria-controls="user-date-calendar">'+ic('calendar')+'<span id="user-date-display" data-user-date-label>'+esc(userDateLabel(value))+'</span>'+ic('chevronRight')+'</button><input type="hidden" name="expireAt" value="'+esc(value)+'"><div class="user-date-calendar" id="user-date-calendar" role="group" aria-label="Выбор срока действия" hidden></div></div>';
 }
 function closeUserCalendar(picker){
   if(!picker)return;
@@ -575,10 +575,6 @@ function handleUserCalendarAction(button){
   if(!picker)return;
   const cal=picker.querySelector('.user-date-calendar');
   if(button.hasAttribute('data-user-date-open')){
-    const renewPanel=picker.querySelector('.user-renew-panel');
-    const renewToggle=picker.querySelector('[data-user-renew-toggle]');
-    if(renewPanel)renewPanel.hidden=true;
-    if(renewToggle)renewToggle.setAttribute('aria-expanded','false');
     if(!cal.hidden){closeUserCalendar(picker);return}
     const selected=userDateFromYmd(picker.querySelector('[name="expireAt"]').value)||new Date();
     drawUserCalendar(picker,selected);
@@ -602,35 +598,19 @@ function handleUserCalendarAction(button){
 }
 function handleUserRenewalAction(button){
   const picker=button.closest('.user-date-field');
-  if(!picker)return;
-  const panel=picker.querySelector('.user-renew-panel');
-  const toggle=picker.querySelector('[data-user-renew-toggle]');
-  if(button.hasAttribute('data-user-renew-toggle')){
-    const opening=panel.hidden;
-    closeUserCalendar(picker);
-    panel.hidden=!opening;
-    toggle.setAttribute('aria-expanded',String(opening));
-    if(opening)panel.querySelector('#user-renew-days')?.focus();
-    return;
-  }
-  if(!button.hasAttribute('data-user-renew-apply'))return;
+  const panel=picker?.querySelector('.user-date-calendar');
+  if(!picker||!panel||panel.hidden)return;
   const field=panel.querySelector('#user-renew-days');
   const error=panel.querySelector('.user-renew-error');
-  const entered=String(field.value||'').trim();
+  const entered=String(field?.value||'').trim();
   const days=/^[1-9]\d*$/.test(entered)?Number(entered):NaN;
   try{
     const next=userExtendExpiryYmd(picker.querySelector('[name="expireAt"]').value,days);
     setUserCalendarDate(picker,next);
-    panel.hidden=true;
-    toggle.setAttribute('aria-expanded','false');
-    error.hidden=true;
-    error.textContent='';
-    field.value='';
-    toggle.focus();
   }catch(err){
-    error.textContent=err.message||'Укажите корректное количество дней.';
+    error.textContent=err.message||'Укажите количество дней от 1 до 36500.';
     error.hidden=false;
-    field.focus();
+    field?.focus();
   }
 }
 function userDrawer(id,tab){
@@ -1669,7 +1649,7 @@ document.addEventListener('click',async e=>{
   else if(b=g('tr[data-id]'))userDrawer(+b.dataset.id,'ov');
   else if(b=g('[data-uo]'))userDrawer(+b.dataset.uo,'dev');
   else if(b=g('[data-user-date-open],[data-user-date-nav],[data-user-date-day],[data-user-date-today],[data-user-date-clear]')){e.preventDefault();handleUserCalendarAction(b)}
-  else if(b=g('[data-user-renew-toggle],[data-user-renew-apply]')){e.preventDefault();handleUserRenewalAction(b)}
+  else if(b=g('[data-user-renew-apply]')){e.preventDefault();handleUserRenewalAction(b)}
   else if(b=g('[data-copy-xray-id]')){const u=DB.users.find(x=>x.id==+b.dataset.copyXrayId);if(u?.xrayId)copyT(u.xrayId)}
   else if(g('[data-copy]'))copyT($('#lk').value);
   else if(b=g('[data-a]')){const id=+b.dataset.u,a=b.dataset.a;
