@@ -607,7 +607,7 @@ async function profilesP(){
  const sel=(id,items)=>'<select id="xpb-'+id+'">'+options(items)+'</select>';
  const group=(title,desc,body)=>'<section class="xray-section"><header class="xray-section-heading"><div><b>'+title+'</b><small>'+desc+'</small></div></header><div class="xray-section-body">'+body+'</div></section>';
  const optionGroup=(key,title,desc,body)=>'<section class="xray-option-group" data-xray-option-group="'+key+'"><div class="xray-option-group-head"><div><b>'+title+'</b><small>'+desc+'</small></div></div><div class="xray-option-grid">'+body+'</div></section>';
- const builderHtml='<section class="card xray-builder"><div class="xray-hero"><div><p class="note">XRAY CORE / CONFIGURATION STUDIO</p><h2>XRAY STUDIO</h2><p>Соберите inbound за пару шагов. Тонкие настройки не мешают, пока они не нужны.</p></div><span class="chip" style="--c:var(--a)">JSON BUILDER</span></div>'+
+ const builderHtml='<section class="card xray-builder"><div class="xray-hero"><div><h2>XRAY STUDIO</h2></div></div>'+
  '<div class="xray-presets"><span class="xray-label">РЕЖИМ</span><div class="xray-preset-row"><button type="button" class="xray-preset on" data-xray-mode="visual"><b>Конструктор</b></button><button type="button" class="xray-preset" data-xray-mode="custom"><b>Ручной JSON</b></button><button type="button" class="xray-preset" id="xpb-import-trigger"><b>Импорт JSON</b></button><input type="file" id="xpb-import-file" accept=".json,application/json,text/json" hidden></div></div>'+
  '<div class="xray-workspace-layout"><div class="xray-editor-pane">'+
   '<div class="xray-meta-grid">'+
@@ -620,8 +620,8 @@ async function profilesP(){
  '<button type="button" class="on" data-xray-config-tab="basic" role="tab" aria-selected="true" aria-controls="xpb-config-basic"><span>01</span><b>Основное</b><small>Inbound, сеть, порт, защита</small></button>'+
  '<button type="button" data-xray-config-tab="security" role="tab" aria-selected="false" aria-controls="xpb-config-security"><span>02</span><b>Защита</b><small>TLS, Reality, SNI, сертификаты</small></button>'+
  '<button type="button" data-xray-config-tab="transport" role="tab" aria-selected="false" aria-controls="xpb-config-transport"><span>03</span><b>Транспорт</b><small>Транспорт и специальные режимы</small></button>'+
- '<button type="button" data-xray-config-tab="encryption" role="tab" aria-selected="false" aria-controls="xpb-config-encryption"><span>04</span><b>VLESS Encryption</b><small>Режим и пара ключей</small></button>'+
- '<button type="button" data-xray-config-tab="client" role="tab" aria-selected="false" aria-controls="xpb-config-client"><span>05</span><b>Протокол и параметры</b><small>Учётные данные, fingerprint, спец. настройки</small></button>'+
+ '<button type="button" data-xray-config-tab="encryption" role="tab" aria-selected="false" aria-controls="xpb-config-encryption"><span>04</span><b>VLESS Enc.</b><small>Режим и пара ключей</small></button>'+
+ '<button type="button" data-xray-config-tab="client" role="tab" aria-selected="false" aria-controls="xpb-config-client"><span>05</span><b>Протокол</b><small>Учётные данные, fingerprint, спец. настройки</small></button>'+
  '</nav><div class="xray-config-content">'+
  '<div class="xray-config-panel" id="xpb-config-basic" data-xray-config-panel="basic">'+
  '<div class="xray-config-panel-title"><div><h3>Основные параметры</h3><p>Выберите протокол inbound, сетевой транспорт, порт и режим TLS/Reality.</p></div><span class="xray-config-required">ОБЯЗАТЕЛЬНОЕ</span></div>'+
