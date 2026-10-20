@@ -248,23 +248,27 @@ const XRAY_FP=['chrome','firefox','safari','ios','android','edge','360','qq','ra
 const XRAY_PROTOCOLS=[['vless','VLESS'],['vmess','VMess'],['trojan','Trojan'],['shadowsocks','Shadowsocks'],['socks','SOCKS'],['http','HTTP proxy'],['dokodemo-door','Dokodemo-door'],['wireguard','WireGuard']];
 const XRAY_NETWORKS=[['raw','RAW / TCP'],['xhttp','XHTTP'],['ws','WebSocket'],['grpc','gRPC'],['httpupgrade','HTTPUpgrade'],['kcp','mKCP']];
 function xrayBuilderConfig(){
- const v=id=>$('#xpb-'+id)?.value||'',protocol=v('protocol'),network=v('network'),security=v('security'),tag=v('tag').trim()||'inbound-1',port=cl(+v('port')||443,1,65535),sni=v('sni').trim()||'example.com',dest=v('dest').trim()||sni+':443',path=v('path').trim()||'/';
+ const v=id=>$('#xpb-'+id)?.value||'',protocol=v('protocol'),network=v('network'),security=v('security'),tag=v('tag').trim()||'inbound-1',port=cl(+v('port')||443,1,65535),sni=v('sni').trim(),dest=v('dest').trim()||(sni?sni+':443':'example.com:443'),path=v('path').trim()||'/';
  const settings={
- vless:{clients:[],decryption:'none'},vmess:{clients:[],default:{alterId:0}},trojan:{clients:[]},
- shadowsocks:{clients:[],network:'tcp,udp',method:v('ss-method')||'chacha20-ietf-poly1305',password:'REPLACE_WITH_STRONG_PASSWORD'},
- socks:{auth:v('socks-auth')||'noauth',accounts:[],udp:true,ip:'127.0.0.1'},http:{accounts:[],allowTransparent:false},
- 'dokodemo-door':{address:v('doko-address')||'127.0.0.1',port:cl(+v('doko-port')||53,1,65535),network:v('doko-network')||'tcp,udp',followRedirect:false},
- wireguard:{secretKey:'REPLACE_WITH_WIREGUARD_PRIVATE_KEY',address:['10.0.0.1/32'],peers:[],mtu:1420}
+  vless:{clients:[],decryption:'none'},vmess:{clients:[],default:{alterId:0}},
+  trojan:{clients:[]},shadowsocks:{clients:[],network:'tcp,udp',method:v('ss-method')||'chacha20-ietf-poly1305',password:'REPLACE_WITH_STRONG_PASSWORD'},
+  socks:{auth:v('socks-auth')||'noauth',accounts:[],udp:true,ip:'127.0.0.1'},http:{accounts:[],allowTransparent:false},
+  'dokodemo-door':{address:v('doko-address')||'127.0.0.1',port:cl(+v('doko-port')||53,1,65535),network:v('doko-network')||'tcp,udp',followRedirect:false},
+  wireguard:{secretKey:'REPLACE_WITH_WIREGUARD_PRIVATE_KEY',address:['10.0.0.1/32'],peers:[],mtu:1420}
  }[protocol];
- const inbound={tag,listen:v('listen')||'0.0.0.0',port,protocol,settings,streamSettings:{network,security}},ss=inbound.streamSettings;
- if(network==='ws')ss.wsSettings={path,headers:v('host')?{Host:v('host')}:{},heartbeatPeriod:0};
- if(network==='xhttp')ss.xhttpSettings={path,host:v('host'),mode:v('xhttp-mode')||'auto',extra:{xPaddingBytes:v('xhttp-padding')||'100-1000'}};
- if(network==='grpc')ss.grpcSettings={serviceName:path.replace(/^\//,'')||'grpc',multiMode:v('grpc-mode')==='multi'};
- if(network==='httpupgrade')ss.httpupgradeSettings={path,host:v('host')};
- if(network==='kcp')ss.kcpSettings={mtu:1350,tti:20,uplinkCapacity:5,downlinkCapacity:20,congestion:false,readBufferSize:2,writeBufferSize:2,seed:v('kcp-seed')||''};
- if(network==='raw'&&v('raw-header')==='http')ss.rawSettings={header:{type:'http',request:{version:'1.1',method:'GET',path:[path],headers:{Host:[v('host')||sni],'User-Agent':['Mozilla/5.0'],'Accept-Encoding':['gzip, deflate'],'Connection':['keep-alive']}}}};
- if(security==='tls')ss.tlsSettings={serverName:sni,alpn:v('alpn').split(',').map(x=>x.trim()).filter(Boolean),minVersion:v('tls-min')||'1.2',maxVersion:v('tls-max')||'1.3',certificates:[{certificateFile:v('cert')||'/etc/ssl/xray/fullchain.pem',keyFile:v('key')||'/etc/ssl/xray/privkey.pem'}]};
- if(security==='reality')ss.realitySettings={show:false,dest,xver:cl(+v('xver')||0,0,2),serverNames:[sni],privateKey:v('private-key')||'REPLACE_WITH_XRAY_PRIVATE_KEY',shortIds:[(v('short-id')||'0123456789abcdef').replace(/[^a-fA-F0-9]/g,'').slice(0,16)],spiderX:v('spider-x')||'/'};
+ const inbound={tag,listen:v('listen')||'0.0.0.0',port,protocol,settings};
+ if(['raw','xhttp','ws','grpc','httpupgrade','kcp'].includes(network)){
+  inbound.streamSettings={network,security};
+  const ss=inbound.streamSettings;
+  if(network==='ws')ss.wsSettings={path,headers:v('host')?{Host:v('host')}:{},heartbeatPeriod:0};
+  if(network==='xhttp')ss.xhttpSettings={path,host:v('host'),mode:v('xhttp-mode')||'auto',extra:{xPaddingBytes:v('xhttp-padding')||'100-1000'}};
+  if(network==='grpc')ss.grpcSettings={serviceName:path.replace(/^\//,'')||'grpc',multiMode:v('grpc-mode')==='multi'};
+  if(network==='httpupgrade')ss.httpupgradeSettings={path,host:v('host')};
+  if(network==='kcp')ss.kcpSettings={mtu:1350,tti:20,uplinkCapacity:5,downlinkCapacity:20,congestion:false,readBufferSize:2,writeBufferSize:2,seed:v('kcp-seed')||''};
+  if(network==='raw'&&v('raw-header')==='http')ss.rawSettings={header:{type:'http',request:{version:'1.1',method:'GET',path:[path],headers:{Host:[v('host')||sni||'example.com'],'User-Agent':['Mozilla/5.0'],'Accept-Encoding':['gzip, deflate'],'Connection':['keep-alive']}}}};
+  if(security==='tls')ss.tlsSettings={serverName:sni||undefined,alpn:v('alpn').split(',').map(x=>x.trim()).filter(Boolean),minVersion:v('tls-min')||'1.2',maxVersion:v('tls-max')||'1.3',certificates:[{certificateFile:v('cert')||'/etc/ssl/xray/fullchain.pem',keyFile:v('key')||'/etc/ssl/xray/privkey.pem'}]};
+  if(security==='reality')ss.realitySettings={show:false,dest,xver:cl(+v('xver')||0,0,2),serverNames:sni?[sni]:[],privateKey:v('private-key')||'REPLACE_WITH_XRAY_PRIVATE_KEY',shortIds:[(v('short-id')||'').replace(/[^a-fA-F0-9]/g,'').slice(0,16)],spiderX:v('spider-x')||'/'};
+ }
  return {log:{loglevel:v('loglevel')||'warning'},inbounds:[inbound],outbounds:[{protocol:'freedom',tag:'direct'},{protocol:'blackhole',tag:'blocked'}],routing:{rules:[{type:'field',outboundTag:'direct',inboundTag:[tag]}]}};
 }
 function xrayClientSample(){
@@ -274,6 +278,7 @@ function xrayClientSample(){
  else if(protocol==='vmess')settings={vnext:[{address:'SERVER_ADDRESS',port,users:[{id:'REPLACE_WITH_USER_UUID',alterId:0,security:v('vmess-security')||'auto'}]}]};
  else if(protocol==='trojan')settings={servers:[{address:'SERVER_ADDRESS',port,password:'REPLACE_WITH_USER_PASSWORD'}]};
  else if(protocol==='shadowsocks')settings={servers:[{address:'SERVER_ADDRESS',port,method:v('ss-method')||'chacha20-ietf-poly1305',password:'REPLACE_WITH_STRONG_PASSWORD'}]};
+ else if(protocol==='socks'||protocol==='http')settings={servers:[{address:'SERVER_ADDRESS',port,users:[]}]};
  else settings={servers:[{address:'SERVER_ADDRESS',port}]};
  const streamSettings={network,security};
  if(network==='ws')streamSettings.wsSettings={path,headers:host?{Host:host}:{}};
@@ -282,61 +287,108 @@ function xrayClientSample(){
  if(network==='httpupgrade')streamSettings.httpupgradeSettings={path,host};
  if(network==='kcp')streamSettings.kcpSettings={seed:v('kcp-seed')||''};
  if(security==='tls')streamSettings.tlsSettings={serverName:sni,alpn:v('alpn').split(',').map(x=>x.trim()).filter(Boolean),fingerprint:v('fingerprint')||'chrome'};
- if(security==='reality')streamSettings.realitySettings={serverName:sni,fingerprint:v('fingerprint')||'chrome',publicKey:v('public-key')||'REPLACE_WITH_REALITY_PUBLIC_KEY',shortId:v('short-id')||'0123456789abcdef',spiderX:v('spider-x')||'/'};
+ if(security==='reality')streamSettings.realitySettings={serverName:sni,fingerprint:v('fingerprint')||'chrome',publicKey:v('public-key')||'REPLACE_WITH_REALITY_PUBLIC_KEY',shortId:v('short-id')||'REPLACE_SHORT_ID',spiderX:v('spider-x')||'/'};
  return {remarks:$('#xpb-name')?.value.trim()||'XRAY STUDIO client',outbounds:[{tag:'proxy',protocol,settings,streamSettings},{tag:'direct',protocol:'freedom'},{tag:'block',protocol:'blackhole'}],routing:{domainStrategy:'AsIs',rules:[]}};
 }
+async function generateRealityKeyPair(){
+ if(!globalThis.crypto?.subtle)throw new Error('Генерация ключей недоступна в этом браузере. Откройте панель по HTTPS.');
+ try{
+  const pair=await crypto.subtle.generateKey({name:'X25519'},true,['deriveBits']);
+  const pub=new Uint8Array(await crypto.subtle.exportKey('raw',pair.publicKey));
+  const der=new Uint8Array(await crypto.subtle.exportKey('pkcs8',pair.privateKey));
+  const priv=der.slice(-32);
+  const enc=b=>btoa(String.fromCharCode(...b)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  return {privateKey:enc(priv),publicKey:enc(pub)};
+ }catch(e){throw new Error('Браузер не поддерживает X25519 WebCrypto. Сгенерируйте пару командой xray x25519 на сервере.')};
+}
+function randomShortId(){const b=new Uint8Array(8);crypto.getRandomValues(b);return Array.from(b,x=>x.toString(16).padStart(2,'0')).join('')}
 async function profilesP(){
  const saved=await crudCard('profiles');
- const builderHtml='<section class="card xray-builder"><div class="hd"><div><p class="note">XRAY CORE · ADVANCED CONFIGURATION</p><h3>XRAY STUDIO</h3><p>Конструктор серверных inbound и клиентских outbound: протоколы, транспорты, TLS/Reality и uTLS fingerprints.</p></div><span class="chip" style="--c:var(--a)">PRO MODE</span></div>'+
- '<div class="xray-studio-tabs" role="tablist"><button type="button" class="on" data-xray-tab="server">Серверный inbound</button><button type="button" data-xray-tab="client">Клиентский outbound</button></div>'+
- '<div class="xray-builder-grid">'+
- '<label class="f"><span>Название профиля</span><input id="xpb-name" value="XRAY STUDIO profile" maxlength="80"></label>'+
- '<label class="f"><span>Inbound tag</span><input id="xpb-tag" value="inbound-1" maxlength="64"></label>'+
- '<label class="f"><span>Listen address</span><input id="xpb-listen" value="0.0.0.0"></label>'+
- '<label class="f"><span>Порт</span><input id="xpb-port" type="number" min="1" max="65535" value="443"></label>'+
- '<label class="f"><span>Протокол</span><select id="xpb-protocol">'+XRAY_PROTOCOLS.map(x=>'<option value="'+x[0]+'">'+x[1]+'</option>').join('')+'</select></label>'+
- '<label class="f"><span>Транспорт</span><select id="xpb-network">'+XRAY_NETWORKS.map(x=>'<option value="'+x[0]+'"'+(x[0]==='raw'?' selected':'')+'>'+x[1]+'</option>').join('')+'</select></label>'+
- '<label class="f"><span>Безопасность</span><select id="xpb-security"><option value="reality">Reality</option><option value="tls">TLS</option><option value="none">Без TLS/Reality</option></select></label>'+
- '<label class="f"><span>SNI / Server name</span><input id="xpb-sni" value="example.com"></label>'+
- '<label class="f"><span>Host header</span><input id="xpb-host" placeholder="Необязательно"></label>'+
- '<label class="f"><span>Path / service name</span><input id="xpb-path" value="/" placeholder="/path или gRPC service"></label>'+
- '<label class="f"><span>Reality destination</span><input id="xpb-dest" value="example.com:443"></label>'+
- '<label class="f"><span>Reality private key (сервер)</span><input id="xpb-private-key" placeholder="REPLACE_WITH_XRAY_PRIVATE_KEY" autocomplete="off"></label>'+
- '<label class="f"><span>Reality public key (клиент)</span><input id="xpb-public-key" placeholder="Публичный ключ Reality" autocomplete="off"></label>'+
- '<label class="f"><span>Reality short ID</span><input id="xpb-short-id" value="0123456789abcdef" maxlength="16"></label>'+
- '<label class="f"><span>Reality spiderX</span><input id="xpb-spider-x" value="/"></label>'+
- '<label class="f"><span>Reality xver</span><select id="xpb-xver"><option>0</option><option>1</option><option>2</option></select></label>'+
- '<label class="f"><span>TLS certificate file</span><input id="xpb-cert" value="/etc/ssl/xray/fullchain.pem"></label>'+
- '<label class="f"><span>TLS private key file</span><input id="xpb-key" value="/etc/ssl/xray/privkey.pem"></label>'+
- '<label class="f"><span>TLS ALPN</span><input id="xpb-alpn" value="h2,http/1.1" placeholder="h2,http/1.1"></label>'+
- '<label class="f"><span>TLS minimum</span><select id="xpb-tls-min"><option>1.2</option><option>1.3</option></select></label>'+
- '<label class="f"><span>TLS maximum</span><select id="xpb-tls-max"><option>1.3</option><option>1.2</option></select></label>'+
- '<label class="f"><span>uTLS fingerprint (клиент)</span><select id="xpb-fingerprint">'+XRAY_FP.map(x=>'<option value="'+x+'"'+(x==='chrome'?' selected':'')+'>'+x+'</option>').join('')+'</select><small>Fingerprint работает на клиентском outbound, а не на inbound.</small></label>'+
- '<label class="f"><span>VLESS flow (клиент)</span><select id="xpb-flow"><option value="">Без flow</option><option value="xtls-rprx-vision">xtls-rprx-vision</option></select></label>'+
- '<label class="f"><span>VMess cipher (клиент)</span><select id="xpb-vmess-security"><option>auto</option><option>aes-128-gcm</option><option>chacha20-poly1305</option><option>none</option></select></label>'+
- '<label class="f"><span>Shadowsocks method</span><select id="xpb-ss-method"><option>chacha20-ietf-poly1305</option><option>2022-blake3-aes-128-gcm</option><option>2022-blake3-aes-256-gcm</option><option>2022-blake3-chacha20-poly1305</option><option>aes-128-gcm</option><option>aes-256-gcm</option><option>none</option></select></label>'+
- '<label class="f"><span>SOCKS authentication</span><select id="xpb-socks-auth"><option value="noauth">No authentication</option><option value="password">Username / password</option></select></label>'+
- '<label class="f"><span>Dokodemo destination address</span><input id="xpb-doko-address" value="127.0.0.1"></label>'+
- '<label class="f"><span>Dokodemo destination port</span><input id="xpb-doko-port" type="number" min="1" max="65535" value="53"></label>'+
- '<label class="f"><span>Dokodemo network</span><select id="xpb-doko-network"><option>tcp,udp</option><option>tcp</option><option>udp</option></select></label>'+
- '<label class="f"><span>XHTTP mode</span><select id="xpb-xhttp-mode"><option>auto</option><option>packet-up</option><option>stream-up</option><option>stream-one</option></select></label>'+
- '<label class="f"><span>XHTTP padding range</span><input id="xpb-xhttp-padding" value="100-1000"></label>'+
- '<label class="f"><span>gRPC mode</span><select id="xpb-grpc-mode"><option value="gun">gun</option><option value="multi">multi</option></select></label>'+
- '<label class="f"><span>mKCP seed</span><input id="xpb-kcp-seed"></label>'+
- '<label class="f"><span>RAW TCP header</span><select id="xpb-raw-header"><option value="none">None</option><option value="http">HTTP camouflage header</option></select></label>'+
- '<label class="f"><span>Log level</span><select id="xpb-loglevel"><option>warning</option><option>error</option><option>none</option><option>info</option><option>debug</option></select></label></div>'+
- '<div class="xray-studio-note"><b>Важно:</b> uTLS fingerprint — параметр исходящего подключения клиента. Он добавляется в client sample, а не в server inbound. UUID, ключи Reality и пароли — шаблоны. XRAY STUDIO генерирует JSON, но не применяет его автоматически к работающему Xray.</div>'+
- '<section class="xray-output-pane" data-xray-pane="server"><label class="f"><span>Серверный Xray config · JSON</span><textarea id="xpb-preview" class="xray-preview" spellcheck="false" readonly></textarea></label><div class="act"><button type="button" class="gh" id="xpb-download">Скачать server JSON</button><button type="button" class="gh" id="xpb-copy">Копировать server JSON</button><button type="button" class="btn" id="xpb-save">Сохранить профиль</button></div></section>'+
- '<section class="xray-output-pane" data-xray-pane="client" hidden><label class="f"><span>Клиентский outbound sample · JSON</span><textarea id="xpb-client-preview" class="xray-preview" spellcheck="false" readonly></textarea></label><p class="note">Это шаблон, а не готовая подписка. Замените SERVER_ADDRESS, UUID/пароль и публичный Reality key реальными значениями.</p><div class="act"><button type="button" class="gh" id="xpb-client-download">Скачать client JSON</button><button type="button" class="gh" id="xpb-client-copy">Копировать client JSON</button></div></section><p class="er" id="xpb-error" role="status"></p></section>';
+ const options=(items,selected)=>items.map(x=>'<option value="'+x[0]+'"'+(x[0]===selected?' selected':'')+'>'+x[1]+'</option>').join('');
+ const field=(id,label,control,help)=>'<label class="f"><span>'+label+'</span>'+control+(help?'<small>'+help+'</small>':'')+'</label>';
+ const inp=(id,value,placeholder,extra)=>'<input id="xpb-'+id+'" value="'+(value||'')+'" placeholder="'+(placeholder||'')+'" '+(extra||'')+'>';
+ const sel=(id,items)=>'<select id="xpb-'+id+'">'+options(items)+'</select>';
+ const group=(title,desc,body,open)=>'<details class="xray-section"'+(open?' open':'')+'><summary><span><b>'+title+'</b><small>'+desc+'</small></span><span class="xray-chevron">⌄</span></summary><div class="xray-section-body">'+body+'</div></details>';
+ const builderHtml='<section class="card xray-builder"><div class="xray-hero"><div><p class="note">XRAY CORE / CONFIGURATION STUDIO</p><h2>XRAY STUDIO</h2><p>Соберите inbound за пару шагов. Тонкие настройки не мешают, пока они не нужны.</p></div><span class="chip" style="--c:var(--a)">JSON BUILDER</span></div>'+
+ '<div class="xray-presets"><span class="xray-label">БЫСТРЫЙ СТАРТ</span><div class="xray-preset-row"><button type="button" class="xray-preset on" data-xray-preset="reality"><b>VLESS + Reality</b><small>Рекомендуемый старт</small></button><button type="button" class="xray-preset" data-xray-preset="tls"><b>VLESS + TLS</b><small>Сертификат домена</small></button><button type="button" class="xray-preset" data-xray-preset="xhttp"><b>VLESS + XHTTP</b><small>Настройка транспорта</small></button><button type="button" class="xray-preset" data-xray-preset="custom"><b>Своя конфигурация</b><small>Полный контроль</small></button></div></div>'+
+ '<div class="xray-main-grid">'+
+ field('name','Название профиля',inp('name','VLESS Reality','Например, DE · Reality','maxlength="80" required'))+
+ field('tag','Тег inbound',inp('tag','vless-reality','Уникальный tag','maxlength="64" required'))+
+ field('listen','Listen address',inp('listen','0.0.0.0','0.0.0.0'))+
+ field('port','Порт',inp('port','443','443','type="number" min="1" max="65535" required'))+
+ field('protocol','Протокол',sel('protocol',XRAY_PROTOCOLS))+
+ field('network','Транспорт',sel('network',XRAY_NETWORKS))+
+ field('security','Защита',sel('security',[['reality','Reality'],['tls','TLS'],['none','Без TLS / Reality']]))+
+ '</div>'+
+ group('Reality','Ключи, Short ID и параметры маскировки',
+ '<div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-generate-keys">Сгенерировать пару ключей</button><button type="button" class="gh sm" id="xpb-generate-short">Новый Short ID</button></div>'+
+ '<div class="xray-key-grid">'+
+ field('private-key','Private key · сервер',inp('private-key','','Нажмите «Сгенерировать пару ключей»','autocomplete="off"'))+
+ field('public-key','Public key · клиент',inp('public-key','','Заполнится после генерации','autocomplete="off"'))+
+ field('short-id','Short ID',inp('short-id','','До 16 hex-символов','maxlength="16" autocapitalize="off"'))+
+ field('dest','Destination',inp('dest','example.com:443','domain:443'))+
+ field('sni','Server name / SNI',inp('sni','example.com','Домен назначения'))+
+ field('spider-x','SpiderX',inp('spider-x','/','/'))+
+ field('xver','Xver',sel('xver',[['0','0 — по умолчанию'],['1','1'],['2','2']]))+
+ '</div><p class="note xray-inline-note">Ключи генерируются как X25519 в браузере. Для production проверьте совместимость с вашей версией Xray; приватный ключ остаётся в форме и не отправляется на сервер до сохранения JSON.</p>',true)+
+ group('TLS','Сертификаты, ALPN и версии TLS',
+ '<div class="xray-main-grid">'+
+ field('cert','Путь к сертификату',inp('cert','/etc/ssl/xray/fullchain.pem','/path/fullchain.pem'))+
+ field('key','Путь к приватному ключу',inp('key','/etc/ssl/xray/privkey.pem','/path/privkey.pem'))+
+ field('alpn','ALPN',inp('alpn','h2,http/1.1','h2,http/1.1'))+
+ field('tls-min','Минимальная версия',sel('tls-min',[['1.2','TLS 1.2'],['1.3','TLS 1.3']]))+
+ field('tls-max','Максимальная версия',sel('tls-max',[['1.3','TLS 1.3'],['1.2','TLS 1.2']]))+
+ '</div>',false)+
+ group('Параметры транспорта','Поля меняются в зависимости от выбранного транспорта',
+ '<div class="xray-main-grid">'+
+ field('host','Host header',inp('host','','Необязательно'))+
+ field('path','Path / service name',inp('path','/','/path или имя gRPC service'))+
+ field('xhttp-mode','Режим XHTTP',sel('xhttp-mode',[['auto','auto'],['packet-up','packet-up'],['stream-up','stream-up'],['stream-one','stream-one']]))+
+ field('xhttp-padding','XHTTP padding',inp('xhttp-padding','100-1000','Например, 100-1000'))+
+ field('grpc-mode','Режим gRPC',sel('grpc-mode',[['gun','gun'],['multi','multi']]))+
+ field('kcp-seed','mKCP seed',inp('kcp-seed','','Необязательно'))+
+ field('raw-header','RAW header',sel('raw-header',[['none','Без заголовка'],['http','HTTP camouflage']]))+
+ '</div>',false)+
+ group('Протокол и клиент','Flow, fingerprint, cipher и специальные параметры',
+ '<div class="xray-main-grid">'+
+ field('fingerprint','uTLS fingerprint · клиент',sel('fingerprint',XRAY_FP.map(x=>[x,x])))+
+ field('flow','VLESS flow',sel('flow',[['','Без flow'],['xtls-rprx-vision','xtls-rprx-vision']]))+
+ field('vmess-security','VMess cipher',sel('vmess-security',[['auto','auto'],['aes-128-gcm','aes-128-gcm'],['chacha20-poly1305','chacha20-poly1305'],['none','none']]))+
+ field('ss-method','Shadowsocks method',sel('ss-method',[['chacha20-ietf-poly1305','chacha20-ietf-poly1305'],['2022-blake3-aes-128-gcm','2022-blake3-aes-128-gcm'],['2022-blake3-aes-256-gcm','2022-blake3-aes-256-gcm'],['2022-blake3-chacha20-poly1305','2022-blake3-chacha20-poly1305'],['aes-128-gcm','aes-128-gcm'],['aes-256-gcm','aes-256-gcm'],['none','none']]))+
+ field('socks-auth','SOCKS authentication',sel('socks-auth',[['noauth','Без авторизации'],['password','Логин / пароль']]))+
+ field('doko-address','Dokodemo destination',inp('doko-address','127.0.0.1','127.0.0.1'))+
+ field('doko-port','Dokodemo port',inp('doko-port','53','53','type="number" min="1" max="65535"'))+
+ field('doko-network','Dokodemo network',sel('doko-network',[['tcp,udp','TCP + UDP'],['tcp','TCP'],['udp','UDP']]))+
+ field('loglevel','Log level',sel('loglevel',[['warning','warning'],['error','error'],['none','none'],['info','info'],['debug','debug']]))+
+ '</div>',false)+
+ '<div class="xray-output-head"><div><b>Предпросмотр JSON</b><small>Обновляется автоматически · не применяет конфигурацию к работающему ядру</small></div><div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-copy">Копировать JSON</button><button type="button" class="gh sm" id="xpb-download">Скачать JSON</button></div></div>'+
+ '<textarea id="xpb-preview" class="xray-preview" spellcheck="false" readonly aria-label="Предпросмотр серверного JSON"></textarea>'+
+ '<div class="xray-output-head xray-client-head"><div><b>Клиентский пример</b><small>Outbound с выбранными transport, security и fingerprint</small></div><div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-client-copy">Копировать</button><button type="button" class="gh sm" id="xpb-client-download">Скачать</button></div></div>'+
+ '<textarea id="xpb-client-preview" class="xray-preview" spellcheck="false" readonly aria-label="Предпросмотр клиентского JSON"></textarea>'+
+ '<div class="xray-footer"><p class="er" id="xpb-error" role="status"></p><button type="button" class="btn" id="xpb-save">Сохранить профиль</button></div></section>';
  return [builderHtml+saved,()=>{
   const updatePreview=()=>{try{$('#xpb-preview').value=JSON.stringify(xrayBuilderConfig(),null,2);$('#xpb-client-preview').value=JSON.stringify(xrayClientSample(),null,2);$('#xpb-error').textContent=''}catch(e){$('#xpb-error').textContent=e.message}};
-  $$('[id^="xpb-"]').filter(el=>el.tagName==='INPUT'||el.tagName==='SELECT').forEach(el=>{el.addEventListener('input',updatePreview);el.addEventListener('change',updatePreview)});
-  $$('[data-xray-tab]').forEach(btn=>btn.addEventListener('click',()=>{const target=btn.dataset.xrayTab;$$('[data-xray-tab]').forEach(x=>x.classList.toggle('on',x===btn));$$('[data-xray-pane]').forEach(x=>x.hidden=x.dataset.xrayPane!==target)}));
-  updatePreview();
+  const updateVisibility=()=>{
+   const sec=$('#xpb-security').value,net=$('#xpb-network').value,proto=$('#xpb-protocol').value;
+   const setGroup=(selector,show)=>{const d=$(selector);if(d)d.hidden=!show};
+   setGroup('.xray-section:has(#xpb-private-key)',sec==='reality');
+   setGroup('.xray-section:has(#xpb-cert)',sec==='tls');
+   $$('[data-xray-preset]').forEach(b=>b.classList.toggle('on',b.dataset.xrayPreset===(sec==='reality'&&proto==='vless'&&net==='raw'?'reality':sec==='tls'&&proto==='vless'?'tls':net==='xhttp'&&proto==='vless'?'xhttp':'custom')));
+   const transport=$('.xray-section:has(#xpb-host)');
+   if(transport){transport.querySelectorAll('[id^="xpb-"]').forEach(el=>{const f=el.id.replace('xpb-',''),wrap=el.closest('.f');if(!wrap)return;let show=true;if(f==='xhttp-mode'||f==='xhttp-padding')show=net==='xhttp';if(f==='grpc-mode')show=net==='grpc';if(f==='kcp-seed')show=net==='kcp';if(f==='raw-header')show=net==='raw';if(f==='host')show=['ws','xhttp','httpupgrade'].includes(net);if(f==='path')show=['raw','xhttp','ws','grpc','httpupgrade'].includes(net);wrap.hidden=!show})}
+   const protoGroup=$('.xray-section:has(#xpb-fingerprint)');
+   if(protoGroup)protoGroup.querySelectorAll('[id^="xpb-"]').forEach(el=>{const f=el.id.replace('xpb-',''),wrap=el.closest('.f');if(!wrap)return;let show=true;if(f==='fingerprint')show=security!=='none'&&['vless','vmess','trojan'].includes(proto);if(f==='flow')show=proto==='vless';if(f==='vmess-security')show=proto==='vmess';if(f==='ss-method')show=proto==='shadowsocks';if(f==='socks-auth')show=proto==='socks';if(f.startsWith('doko-'))show=proto==='dokodemo-door';wrap.hidden=!show});
+   const secSelect=$('#xpb-security');if(secSelect)secSelect.disabled=proto==='dokodemo-door'||proto==='wireguard';
+  };
+  $$('[id^="xpb-"]').filter(el=>el.tagName==='INPUT'||el.tagName==='SELECT').forEach(el=>{el.addEventListener('input',()=>{updatePreview();updateVisibility()});el.addEventListener('change',()=>{updatePreview();updateVisibility()})});
+  $$('[data-xray-preset]').forEach(btn=>btn.addEventListener('click',()=>{const p=btn.dataset.xrayPreset;$('#xpb-protocol').value='vless';if(p==='reality'){$('#xpb-security').value='reality';$('#xpb-network').value='raw'}if(p==='tls'){$('#xpb-security').value='tls';$('#xpb-network').value='raw'}if(p==='xhttp'){$('#xpb-security').value='reality';$('#xpb-network').value='xhttp'}if(p==='custom'){$('#xpb-protocol').value='vless'}updatePreview();updateVisibility()}));
+  $('#xpb-generate-short').onclick=()=>{$('#xpb-short-id').value=randomShortId();updatePreview();toast('Short ID создан')};
+  $('#xpb-generate-keys').onclick=async()=>{const b=$('#xpb-generate-keys');b.disabled=true;b.textContent='Генерация…';try{const keys=await generateRealityKeyPair();$('#xpb-private-key').value=keys.privateKey;$('#xpb-public-key').value=keys.publicKey;updatePreview();toast('Пара X25519 сгенерирована')}catch(e){$('#xpb-error').textContent=e.message}finally{b.disabled=false;b.textContent='Сгенерировать пару ключей'}};
   const copyText=async id=>{try{await navigator.clipboard.writeText($('#'+id).value);toast('JSON скопирован')}catch(e){$('#'+id).select();document.execCommand('copy');toast('JSON скопирован')}};
   const download=(id,suffix)=>{const a=document.createElement('a'),blob=URL.createObjectURL(new Blob([$('#'+id).value],{type:'application/json'}));a.href=blob;a.download=((($('#xpb-name').value||'xray-studio').trim().replace(/[^a-z0-9_-]+/gi,'-')||'xray-studio')+'-'+suffix+'.json');a.click();setTimeout(()=>URL.revokeObjectURL(blob),1000)};
   $('#xpb-copy').onclick=()=>copyText('xpb-preview');$('#xpb-client-copy').onclick=()=>copyText('xpb-client-preview');$('#xpb-download').onclick=()=>download('xpb-preview','server');$('#xpb-client-download').onclick=()=>download('xpb-client-preview','client');
-  $('#xpb-save').onclick=async()=>{const name=$('#xpb-name').value.trim();if(!name){$('#xpb-error').textContent='Укажите название профиля.';return}try{const config=$('#xpb-preview').value,data=JSON.parse(config),tags=data.inbounds.map(i=>i.tag);if(!data.inbounds.length||tags.some(t=>!t))throw new Error('У inbound должен быть тег.');if(new Set(tags).size!==tags.length)throw new Error('Теги inbound должны быть уникальными.');if(DB.profiles.some(p=>p.name.toLowerCase()===name.toLowerCase()))throw new Error('Профиль с таким названием уже существует.');const used=DB.profiles.flatMap(inbs).map(i=>i.tag);if(tags.some(t=>used.includes(t)))throw new Error('Тег уже используется в другом профиле.');await api.create('profiles',{name,config});toast('Профиль сохранён в XRAY STUDIO');await render(1)}catch(e){$('#xpb-error').textContent=e.message||'Не удалось сохранить профиль.'}};
+  $('#xpb-save').onclick=async()=>{const name=$('#xpb-name').value.trim();if(!name){$('#xpb-error').textContent='Укажите название профиля.';return}try{const config=$('#xpb-preview').value,data=JSON.parse(config),tags=data.inbounds.map(i=>i.tag);if(!data.inbounds.length||tags.some(t=>!t))throw new Error('У inbound должен быть тег.');if(new Set(tags).size!==tags.length)throw new Error('Теги inbound должны быть уникальными.');if(DB.profiles.some(p=>p.name.toLowerCase()===name.toLowerCase()))throw new Error('Профиль с таким названием уже существует.');const used=DB.profiles.flatMap(inbs).map(i=>i.tag);if(tags.some(t=>used.includes(t)))throw new Error('Тег уже используется в другом профиле.');if(data.inbounds[0].streamSettings?.security==='reality'&&(!data.inbounds[0].streamSettings.realitySettings.privateKey||data.inbounds[0].streamSettings.realitySettings.privateKey==='REPLACE_WITH_XRAY_PRIVATE_KEY'))throw new Error('Сначала сгенерируйте или укажите настоящий Reality private key.');await api.create('profiles',{name,config});toast('Профиль сохранён в XRAY STUDIO');await render(1)}catch(e){$('#xpb-error').textContent=e.message||'Не удалось сохранить профиль.'}};
+  updateVisibility();updatePreview();
  }];
 }
 
