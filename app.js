@@ -472,6 +472,92 @@ async function drawUsers(){
 function drawBulk(){const b=$('#bulk'),n=UQ.sel.size;if(!b)return;b.classList.toggle('on',n>0&&cur=='users');if(!n){b.innerHTML='';return}b.innerHTML=`<b style="padding:0 .5rem">Выбрано ${n}</b>${UIDS.length>n?`<button class="gh sm" data-bk="all">Выбрать все ${UIDS.length}</button>`:''}<button class="gh sm" data-bk="on">Включить</button><button class="gh sm" data-bk="off">Отключить</button><button class="gh sm" data-bk="reset">Сбросить трафик</button><button class="gh sm" data-bk="ext">+30 дней</button><button class="gh sm" data-bk="sq">В сквад</button><button class="dg sm" data-bk="del">${ic('trash')}Удалить</button><button class="ia" data-bk="clr" aria-label="Снять выбор">${ic('x')}</button>`;decorateButtonIcons(b)}
 const uid=s=>{let h=hs(s),x='';for(let i=0;i<32;i++){h=(h*1664525+1013904223)>>>0;x+=(h>>>24&15).toString(16)}return x.replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/,'$1-$2-$3-$4-$5')};
 let UT='ov';const subUrl=u=>'';
+/* Inline expiry editor: calendar is rendered inside the user dialog, so it
+   does not escape the dialog's top layer or depend on browser date widgets. */
+const userYmd=value=>{
+  if(!value)return '';
+  const d=value instanceof Date?value:new Date(value);
+  if(!Number.isFinite(d.getTime()))return '';
+  return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
+};
+const userDateFromYmd=value=>{
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(value||''))return null;
+  const [year,month,day]=value.split('-').map(Number);
+  const date=new Date(year,month-1,day,12);
+  return date.getFullYear()===year&&date.getMonth()===month-1&&date.getDate()===day?date:null;
+};
+const userDateLabel=value=>{
+  const d=userDateFromYmd(value);
+  return d?new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'long',year:'numeric'}).format(d):'Бессрочно';
+};
+function userCalendarMarkup(year,month,selected){
+  const offset=(new Date(year,month,1).getDay()+6)%7;
+  const total=new Date(year,month+1,0).getDate();
+  const today=userYmd(new Date());
+  const weekdays=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(day=>'<span class="user-cal-weekday">'+day+'</span>').join('');
+  const blanks=Array.from({length:offset},()=>'<span class="user-cal-empty" aria-hidden="true"></span>').join('');
+  const days=Array.from({length:total},(_,idx)=>{
+    const day=idx+1,value=userYmd(new Date(year,month,day));
+    const chosen=value===selected;
+    const date=new Date(year,month,day);
+    const label=new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'long',year:'numeric'}).format(date);
+    return '<button type="button" class="user-cal-day'+(chosen?' selected':'')+(value===today?' is-today':'')+'" data-user-date-day="'+value+'" aria-label="'+esc(label)+'" aria-pressed="'+(chosen?'true':'false')+'">'+day+'</button>';
+  }).join('');
+  const monthLabel=new Intl.DateTimeFormat('ru-RU',{month:'long',year:'numeric'}).format(new Date(year,month,1));
+  return '<div class="user-cal-header"><strong>'+esc(monthLabel)+'</strong><div class="user-cal-nav"><button type="button" data-user-date-nav="-1" aria-label="Предыдущий месяц">'+ic('chevronLeft')+'</button><button type="button" data-user-date-nav="1" aria-label="Следующий месяц">'+ic('chevronRight')+'</button></div></div><div class="user-cal-grid">'+weekdays+blanks+days+'</div><div class="user-cal-footer"><button type="button" data-user-date-clear>Бессрочно</button><button type="button" data-user-date-today>Сегодня</button></div>';
+}
+function userDateField(u){
+  const value=userYmd(u.expireAt);
+  return '<div class="f user-date-field"><span id="user-expiry-label">Действует до</span><div class="user-date-controls"><button type="button" class="user-date-trigger" data-user-date-open aria-labelledby="user-expiry-label user-date-display" aria-expanded="false" aria-controls="user-date-calendar">'+ic('calendar')+'<span id="user-date-display" data-user-date-label>'+esc(userDateLabel(value))+'</span>'+ic('down')+'</button><button type="button" class="user-date-extend" data-a="ext" data-u="'+u.id+'" title="Продлить срок на 30 дней">'+ic('plus')+'<span>30 дней</span></button></div><input type="hidden" name="expireAt" value="'+esc(value)+'"><div class="user-date-calendar" id="user-date-calendar" role="group" aria-label="Календарь срока действия" hidden></div><small>Выберите дату или оставьте без ограничения</small></div>';
+}
+function closeUserCalendar(picker){
+  if(!picker)return;
+  const cal=picker.querySelector('.user-date-calendar');
+  const toggle=picker.querySelector('[data-user-date-open]');
+  if(cal)cal.hidden=true;
+  if(toggle)toggle.setAttribute('aria-expanded','false');
+}
+function drawUserCalendar(picker,date){
+  const cal=picker.querySelector('.user-date-calendar');
+  const selected=picker.querySelector('[name="expireAt"]').value;
+  const month=new Date(date.getFullYear(),date.getMonth(),1);
+  cal.dataset.month=userYmd(month);
+  cal.innerHTML=userCalendarMarkup(month.getFullYear(),month.getMonth(),selected);
+}
+function setUserCalendarDate(picker,dateValue){
+  const input=picker.querySelector('[name="expireAt"]');
+  const label=picker.querySelector('[data-user-date-label]');
+  input.value=dateValue;
+  label.textContent=userDateLabel(dateValue);
+  closeUserCalendar(picker);
+  picker.querySelector('[data-user-date-open]').focus();
+}
+function handleUserCalendarAction(button){
+  const picker=button.closest('.user-date-field');
+  if(!picker)return;
+  const cal=picker.querySelector('.user-date-calendar');
+  if(button.hasAttribute('data-user-date-open')){
+    if(!cal.hidden){closeUserCalendar(picker);return}
+    const selected=userDateFromYmd(picker.querySelector('[name="expireAt"]').value)||new Date();
+    drawUserCalendar(picker,selected);
+    cal.hidden=false;
+    button.setAttribute('aria-expanded','true');
+    const chosen=cal.querySelector('.user-cal-day.selected,.user-cal-day.is-today,.user-cal-day');
+    chosen?.focus();
+  }else if(button.hasAttribute('data-user-date-nav')){
+    const view=userDateFromYmd(cal.dataset.month)||new Date();
+    const next=new Date(view.getFullYear(),view.getMonth()+Number(button.dataset.userDateNav),1);
+    const direction=button.dataset.userDateNav;
+    drawUserCalendar(picker,next);
+    cal.querySelector('[data-user-date-nav="'+direction+'"]')?.focus();
+  }else if(button.hasAttribute('data-user-date-day')){
+    setUserCalendarDate(picker,button.dataset.userDateDay);
+  }else if(button.hasAttribute('data-user-date-today')){
+    setUserCalendarDate(picker,userYmd(new Date()));
+  }else if(button.hasAttribute('data-user-date-clear')){
+    setUserCalendarDate(picker,'');
+  }
+}
 function userDrawer(id,tab){
   const u=DB.users.find(x=>x.id==id);if(!u)return dlg.close();if(!u.xrayId){u.xrayId=crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=crypto.getRandomValues(new Uint8Array(1))[0]&15;return(c==='x'?r:(r&3|8)).toString(16)});api.update('users',u.id,{xrayId:u.xrayId}).catch(err=>console.warn('Could not persist generated Xray credential',err))}UT=tab||(dlg.open&&dlg.classList.contains('user-modal')?UT:'ov');
   const [sl,sc]=STM[st(u)],k=u.limit?u.used/u.limit:0,h=hs(u.username)%360;
