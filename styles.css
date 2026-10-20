@@ -302,7 +302,8 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--a);border-color:
   .app>aside nav .lbl,
   .app>aside nav em,
   .app>aside nav .g,
-  .app>aside .ct>div{display:none}
+  .app>aside .ct>div,
+  .app>aside .core .lbl{display:none}
   .app>aside nav{width:100%;align-items:stretch}
   .app>aside nav a{justify-content:center;min-height:2.7rem;padding:.68rem}
   .app>aside nav a.on::before{left:-.5rem}
@@ -359,7 +360,8 @@ html[data-sidebar=compact] .app{grid-template-columns:5.7rem minmax(0,1fr)}
   html[data-sidebar=compact] .app>aside nav .lbl,
   html[data-sidebar=compact] .app>aside nav em,
   html[data-sidebar=compact] .app>aside nav .g,
-  html[data-sidebar=compact] .app>aside .ct>div{display:none}
+  html[data-sidebar=compact] .app>aside .ct>div,
+  html[data-sidebar=compact] .app>aside .core .lbl{display:none}
   html[data-sidebar=compact] .app>aside nav{width:100%;align-items:stretch}
   html[data-sidebar=compact] .app>aside nav a{justify-content:center;min-height:2.7rem;padding:.68rem}
   html[data-sidebar=compact] .app>aside nav a.on::before{left:-.5rem}
