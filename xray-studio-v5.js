@@ -121,6 +121,123 @@
    const previewDesc=root.querySelector('.xray-output-workspace-head small');
    if(previewDesc)previewDesc.textContent='Конфигурация обновляется автоматически при изменении параметров.';
 
+
+   // All visual-builder selects use an in-panel accessible menu, avoiding OS popups
+   // with unreadable light-on-light options on some Windows/theme combinations.
+   root.querySelectorAll('.xray-config-panel select').forEach(select=>{
+     if(select.classList.contains('sr-native-select'))return;
+     select.classList.add('sr-native-select');
+     const hasInputShell=select.parentElement.classList.contains('sr-v5-input');
+     const host=hasInputShell?select.parentElement:document.createElement('span');
+     if(!hasInputShell){
+       host.className='sr-v5-select-shell';
+       select.parentNode.insertBefore(host,select);
+       host.append(select);
+     }
+     const trigger=document.createElement('button');
+     trigger.type='button';trigger.className='sr-v5-select-trigger';
+     trigger.setAttribute('aria-haspopup','listbox');
+     trigger.setAttribute('aria-expanded','false');
+     const value=document.createElement('span');value.className='sr-v5-select-value';
+     const arrow=document.createElement('span');arrow.className='sr-v5-select-chevron';arrow.textContent='⌄';
+     trigger.append(value,arrow);
+     const menu=document.createElement('div');
+     menu.className='sr-v5-select-menu';
+     menu.setAttribute('role','listbox');
+     menu.setAttribute('aria-label',select.closest('.f')?.querySelector('span')?.textContent||'Параметр');
+     menu.id='sr-list-'+select.id;
+     trigger.setAttribute('aria-controls',menu.id);
+     menu.hidden=true;
+     host.append(trigger,menu);
+     let chosen=0;
+     const items=()=>[...menu.querySelectorAll('[role="option"]')];
+     const sync=()=>{
+       const option=select.selectedOptions[0];
+       value.textContent=option?option.textContent.trim():'Выберите';
+       trigger.disabled=select.disabled;
+       trigger.setAttribute('aria-disabled',String(select.disabled));
+     };
+     const draw=()=>{
+       menu.replaceChildren();
+       [...select.options].forEach((option,index)=>{
+         const item=document.createElement('button');
+         item.type='button';item.setAttribute('role','option');
+         item.className='sr-v5-menu-item';
+         item.textContent=option.textContent.trim();
+         item.dataset.index=String(index);
+         item.setAttribute('aria-selected',String(option.selected));
+         item.disabled=option.disabled;
+         if(option.selected)chosen=index;
+         item.addEventListener('click',()=>choose(index));
+         menu.append(item);
+       });
+     };
+     const close=(returnFocus=false)=>{
+       menu.hidden=true;
+       host.classList.remove('sr-v5-select-open');
+       trigger.setAttribute('aria-expanded','false');
+       if(returnFocus)trigger.focus();
+     };
+     const open=()=>{
+       document.querySelectorAll('.sr-v5-select-open').forEach(el=>{
+         if(el!==host)el.querySelector('.sr-v5-select-trigger')?.click();
+       });
+       sync();
+       if(trigger.disabled)return;
+       draw();
+       menu.hidden=false;
+       host.classList.add('sr-v5-select-open');
+       trigger.setAttribute('aria-expanded','true');
+       const rect=trigger.getBoundingClientRect();
+       menu.classList.toggle('sr-v5-menu-up',window.innerHeight-rect.bottom<245&&rect.top>245);
+       items()[chosen]?.scrollIntoView({block:'nearest'});
+     };
+     const choose=index=>{
+       const option=select.options[index];
+       if(!option||option.disabled)return;
+       select.value=option.value;
+       select.dispatchEvent(new Event('input',{bubbles:true}));
+       select.dispatchEvent(new Event('change',{bubbles:true}));
+       sync();
+       close(true);
+     };
+     trigger.addEventListener('click',()=>menu.hidden?open():close());
+     const move=direction=>{
+       const opts=items();if(!opts.length)return;
+       let at=chosen;
+       for(let i=0;i<opts.length;i++){
+         at=(at+direction+opts.length)%opts.length;
+         if(!opts[at].disabled){chosen=at;opts[at].focus();opts[at].scrollIntoView({block:'nearest'});return}
+       }
+     };
+     const keydown=event=>{
+       if(event.key==='Escape'){event.preventDefault();close(true);return;}
+       if(event.key==='Tab'){close();return;}
+       if(event.key==='ArrowDown'||event.key==='ArrowUp'){
+         event.preventDefault();
+         if(menu.hidden)open();
+         move(event.key==='ArrowDown'?1:-1);return;
+       }
+       if(event.key==='Home'||event.key==='End'){
+         event.preventDefault();if(menu.hidden)open();
+         const opts=items().filter(el=>!el.disabled);
+         const target=event.key==='Home'?opts[0]:opts[opts.length-1];
+         target?.focus();if(target)chosen=+target.dataset.index;return;
+       }
+       if(event.key==='Enter'||event.key===' '){
+         event.preventDefault();
+         if(menu.hidden)open();
+         else {const focused=document.activeElement?.closest?.('[role="option"]');choose(focused?+focused.dataset.index:chosen)}
+       }
+     };
+     trigger.addEventListener('keydown',keydown);
+     menu.addEventListener('keydown',keydown);
+     document.addEventListener('pointerdown',event=>{
+       if(!menu.hidden&&!host.contains(event.target))close();
+     });
+     select.addEventListener('change',sync);
+     sync();
+   });
    // A genuinely functional expansion control for both Server and Client previews.
    const toolbar=root.querySelector('.xray-output-toolbar');
    if(toolbar){
