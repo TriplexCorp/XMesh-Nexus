@@ -869,3 +869,105 @@ nav a.on{background:var(--s2)!important;box-shadow:none!important}
 .traffic-empty-icon svg{width:1.25rem;height:1.25rem}
 @media(max-width:850px){.traffic-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.traffic-refresh{grid-column:1/-1;padding:.1rem 0}}
 @media(max-width:560px){.traffic-filters,.traffic-kpis{grid-template-columns:1fr}.traffic-period{width:100%}.traffic-period button{flex:1}.traffic-chart-wrap{padding:.5rem .3rem 0}.traffic-axis-label{font-size:14px}.traffic-chart-meta{padding:.6rem .7rem;display:grid}.traffic-kpi>b{font-size:1.35rem}}
+
+
+/* ================= XRAY STUDIO — production workspace redesign ================= */
+.xray-builder{gap:1.2rem;min-width:0}
+.xray-builder .xray-hero{padding:1.35rem 1.45rem;border:1px solid var(--ln);border-radius:1rem;background:linear-gradient(125deg,color-mix(in srgb,var(--a) 8%,var(--s1)),var(--s1) 60%,color-mix(in srgb,var(--b) 6%,var(--s1)));align-items:center}
+.xray-builder .xray-hero h2{font-size:clamp(1.65rem,2vw,2.2rem);letter-spacing:-.045em}
+.xray-builder .xray-hero p:not(.note){margin:0;max-width:52rem;line-height:1.55}
+.xray-builder .xray-hero>.chip{white-space:nowrap;align-self:flex-start}
+.xray-presets{gap:.55rem}
+.xray-preset-row{gap:.75rem}
+.xray-preset{position:relative;min-height:5.25rem;padding:1rem 1.05rem;border-radius:.9rem}
+.xray-preset b{font-size:.94rem}
+.xray-preset small{line-height:1.45}
+.xray-preset.on{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--a) 30%,transparent)}
+.xray-workflow{gap:.75rem}
+.xray-workflow>div{padding:.9rem 1rem;border-radius:.85rem;background:var(--s1)}
+.xray-workflow>div b{font-size:.82rem;letter-spacing:.01em}
+.xray-workflow>div span{font-size:.78rem;line-height:1.45}
+.xray-meta-grid{display:grid;grid-template-columns:minmax(13rem,1fr) minmax(12rem,.85fr) minmax(17rem,1.3fr);gap:.85rem 1rem;align-items:start}
+.xray-builder .xray-main-grid,.xray-builder .xray-key-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:1rem;align-items:start}
+.xray-builder .xray-main-grid>.f,.xray-builder .xray-key-grid>.f{grid-column:span 6;min-width:0;margin:0}
+.xray-builder .xray-main-grid>.f:has(textarea),.xray-builder .xray-key-grid>.f:has(textarea){grid-column:1/-1}
+.xray-builder .f{display:grid;grid-template-rows:auto auto auto;align-content:start;gap:.42rem;min-width:0;margin:0}
+.xray-builder .f>span{display:flex;align-items:flex-end;min-height:2.25rem;font-size:.83rem;line-height:1.3;font-weight:650;letter-spacing:.002em;color:var(--tx)}
+.xray-builder .f input,.xray-builder .f select,.xray-builder .f textarea{box-sizing:border-box;width:100%;min-width:0;min-height:2.75rem;border:1px solid var(--ln);border-radius:.65rem;background:var(--s2);color:var(--tx);padding:.7rem .8rem;font:inherit;font-size:.9rem;line-height:1.35;outline:none;transition:border-color .16s,box-shadow .16s,background .16s}
+.xray-builder .f textarea{min-height:7.5rem;resize:vertical;font: .86rem/1.55 "IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow-wrap:anywhere}
+.xray-builder .f input:focus,.xray-builder .f select:focus,.xray-builder .f textarea:focus,.xray-builder .xray-preview:focus{border-color:var(--a);box-shadow:0 0 0 3px color-mix(in srgb,var(--a) 13%,transparent)}
+.xray-builder .f input:disabled,.xray-builder .f select:disabled{opacity:.6;cursor:not-allowed}
+.xray-builder .f small{display:block;min-height:1.1rem;margin-top:0;color:var(--mu);font-size:.76rem;line-height:1.45;overflow-wrap:anywhere}
+.xray-section{border-radius:.95rem;background:var(--s1);box-shadow:0 1px 0 #00000004}
+.xray-section summary{min-height:4.25rem;padding:1rem 1.15rem;align-items:center}
+.xray-section summary>span:first-child{gap:.3rem}
+.xray-section summary b{font-size:.94rem;letter-spacing:-.01em}
+.xray-section summary small{max-width:58rem;font-size:.8rem;line-height:1.45}
+.xray-section summary:hover{background:color-mix(in srgb,var(--a) 3%,transparent)}
+.xray-chevron{display:grid;place-items:center;flex:0 0 1.8rem;height:1.8rem;border:1px solid var(--ln);border-radius:.55rem;background:var(--s2);font-size:1rem}
+.xray-section-body{gap:1rem;padding:0 1.15rem 1.2rem}
+.xray-section-body>.note,.xray-inline-note{margin:0;color:var(--mu);font-size:.82rem;line-height:1.55}
+.xray-key-actions{align-items:center;gap:.6rem}
+.xray-key-actions .mu{font-size:.79rem;line-height:1.4;max-width:48rem}
+.xray-pq-intro{border-radius:.8rem;background:color-mix(in srgb,var(--a) 4%,var(--s2));padding:1rem 1.05rem}
+.xray-pq-intro b{font-size:.9rem}
+.xray-pq-intro span{font-size:.82rem;line-height:1.55}
+.xray-footer{align-items:center;padding-top:.6rem}
+.xray-footer .er{max-width:64ch;font-size:.83rem;line-height:1.5}
+.xray-output-workspace{display:grid;gap:1rem;min-width:0;padding:1.1rem;border:1px solid var(--ln);border-radius:1.05rem;background:color-mix(in srgb,var(--s1) 86%,var(--s2))}
+.xray-output-workspace-head{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+.xray-output-workspace-head>div{display:grid;gap:.25rem;min-width:0}
+.xray-output-workspace-head .note{font-size:.69rem;letter-spacing:.12em;margin:0}
+.xray-output-workspace-head>div>b{font-size:1.05rem;letter-spacing:-.02em}
+.xray-output-workspace-head>div>small{max-width:65ch;color:var(--mu);font-size:.81rem;line-height:1.5}
+.xray-output-state{flex:0 0 auto;max-width:100%;padding:.45rem .65rem;border:1px solid var(--ln);border-radius:.6rem;color:var(--mu);font-size:.76rem;line-height:1.3;background:var(--s2)}
+.xray-output-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem}
+.xray-output-tabs button{display:grid;align-content:start;justify-items:start;gap:.25rem;min-width:0;min-height:6.2rem;padding:.9rem 1rem;border:1px solid var(--ln);border-radius:.85rem;background:var(--s2);color:var(--tx);text-align:left;cursor:pointer;transition:border-color .16s,background .16s,box-shadow .16s}
+.xray-output-tabs button:hover{border-color:color-mix(in srgb,var(--a) 55%,var(--ln))}
+.xray-output-tabs button.on{border-color:color-mix(in srgb,var(--a) 72%,var(--ln));background:color-mix(in srgb,var(--a) 8%,var(--s1));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--a) 24%,transparent)}
+.xray-output-tabs button[aria-selected="true"] .xray-output-tab-kicker{color:var(--a)}
+.xray-output-tab-kicker{font-size:.68rem;font-weight:750;letter-spacing:.1em;color:var(--mu)}
+.xray-output-tabs button>b{font-size:1rem;letter-spacing:-.015em}
+.xray-output-tabs button>small{font-size:.77rem;color:var(--mu);line-height:1.4}
+.xray-output-pane{display:grid;gap:.8rem;min-width:0}
+.xray-output-pane[hidden],.xray-output-workspace[hidden]{display:none!important}
+.xray-output-pane .xray-output-head{padding:.2rem 0 .75rem;border-top:0;border-bottom:1px solid var(--ln)}
+.xray-output-head>div:first-child{gap:.3rem;min-width:0}
+.xray-output-head>div:first-child>b{font-size:.91rem}
+.xray-output-head small{max-width:64ch;font-size:.78rem;line-height:1.45}
+.xray-output-head .xray-key-actions{justify-content:flex-end}
+.xray-output-pane .xray-preview{display:block;box-sizing:border-box;width:100%;min-width:0;min-height:24rem;max-height:68vh;resize:vertical;padding:1.15rem;border:1px solid var(--ln);border-radius:.85rem;background:var(--bg);color:var(--tx);font: .84rem/1.6 "IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;tab-size:2;white-space:pre;overflow:auto}
+.xray-output-pane .xray-custom-mode{display:grid;gap:.85rem;min-width:0}
+.xray-output-pane .xray-custom-mode[hidden]{display:none!important}
+.xray-output-pane .xray-custom-mode .xray-preview{min-height:34rem}
+.xray-client-hint{padding:.8rem .9rem;margin:0;border:1px solid var(--ln);border-radius:.7rem;background:var(--s2);color:var(--mu);font-size:.8rem;line-height:1.5}
+.xray-builder [hidden]{display:none!important}
+@media(max-width:960px){
+ .xray-meta-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .xray-meta-grid>.f:last-child{grid-column:1/-1}
+ .xray-builder .xray-hero{align-items:flex-start}
+ .xray-builder .xray-main-grid,.xray-builder .xray-key-grid{gap:.85rem}
+ .xray-output-head{align-items:flex-start}
+ .xray-output-head .xray-key-actions{justify-content:flex-start}
+}
+@media(max-width:650px){
+ .xray-builder .xray-hero{padding:1.05rem;align-items:flex-start}
+ .xray-builder .xray-hero>.chip{white-space:normal}
+ .xray-meta-grid{grid-template-columns:minmax(0,1fr)}
+ .xray-meta-grid>.f:last-child{grid-column:auto}
+ .xray-builder .xray-main-grid,.xray-builder .xray-key-grid{grid-template-columns:minmax(0,1fr);gap:.75rem}
+ .xray-builder .xray-main-grid>.f,.xray-builder .xray-key-grid>.f,.xray-builder .xray-main-grid>.f:has(textarea),.xray-builder .xray-key-grid>.f:has(textarea){grid-column:1/-1}
+ .xray-workflow{grid-template-columns:minmax(0,1fr)}
+ .xray-section summary{padding:.9rem}
+ .xray-section-body{padding:0 .9rem 1rem}
+ .xray-output-workspace{padding:.8rem}
+ .xray-output-workspace-head{align-items:flex-start}
+ .xray-output-tabs{grid-template-columns:minmax(0,1fr);gap:.55rem}
+ .xray-output-tabs button{min-height:0;padding:.8rem .9rem}
+ .xray-output-pane .xray-preview{min-height:21rem;max-height:65vh;padding:.85rem;font-size:.76rem}
+ .xray-output-head{display:grid;justify-content:stretch;align-items:start}
+ .xray-output-head .xray-key-actions{display:flex;flex-wrap:wrap}
+ .xray-output-head .xray-key-actions button{flex:1 1 auto}
+ .xray-footer{align-items:stretch}
+ .xray-footer>.btn{width:100%}
+}
