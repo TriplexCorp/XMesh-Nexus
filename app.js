@@ -1528,6 +1528,7 @@ async function profilesP(){
   };
   $('#xpb-vlessenc-mode').addEventListener('change',()=>{selectGeneratedPair();updateVisibility();updatePreview()});
   const customArea=$('#xpb-custom-json');
+  const jsonDiagnostics=window.XrayJsonDiagnostics?.attach(customArea);
   let activeOutput='server';
   const setOutput=target=>{
    if(!['server','client'].includes(target))return;
@@ -1570,18 +1571,23 @@ async function profilesP(){
   const renderCustomSyntax=()=>{
    const pre=$('#xpb-custom-syntax');if(!pre)return;
    const source=customArea.value;
+   const issue=jsonDiagnostics?.inspect(source)||null;
+   const run=(value,start,cls='')=>jsonDiagnostics
+    ?jsonDiagnostics.decorateRun(value,start,cls,issue)
+    :(cls?'<span class="'+cls+'">'+esc(value)+'</span>':esc(value));
    const token=/(\s+)|("(?:\\.|[^"\\])*"(?=\s*:))|("(?:\\.|[^"\\])*")|(-?\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b)|(\btrue\b|\bfalse\b)|(\bnull\b)|([{}\[\],:])/g;
    let out='',last=0,m;
    while((m=token.exec(source))!==null){
-    out+=esc(source.slice(last,m.index));
+    out+=run(source.slice(last,m.index),last);
     const value=m[0];let cls='';
     if(m[2])cls='jx-key';else if(m[3])cls='jx-string';else if(m[4])cls='jx-number';else if(m[5])cls='jx-boolean';else if(m[6])cls='jx-null';else if(m[7])cls='jx-punct';
-    out+=cls?'<span class="'+cls+'">'+esc(value)+'</span>':esc(value);
+    out+=run(value,m.index,cls);
     last=token.lastIndex;
    }
-   out+=esc(source.slice(last));
+   out+=run(source.slice(last),last);
    pre.innerHTML=out+'\n';
    pre.scrollTop=customArea.scrollTop;pre.scrollLeft=customArea.scrollLeft;
+   jsonDiagnostics?.update(issue);
   };
   const validateCustomJson=()=>{
    renderCustomSyntax();
