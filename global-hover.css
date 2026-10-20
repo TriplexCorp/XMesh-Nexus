@@ -1,0 +1,39 @@
+/* Global interaction language: one hover treatment across the panel. */
+@media (hover:hover) and (pointer:fine){
+  :root{
+    --hover-surface:color-mix(in srgb,var(--a) 11%,var(--s1));
+    --hover-stroke:color-mix(in srgb,var(--a) 46%,var(--ln));
+  }
+  :where(button,.btn,.ib,[role="button"],.app>aside nav a,.app>aside nav .more,
+    .seg button,.xray-preset,.xray-import-btn,.xray-config-tabs button,
+    .xray-output-tabs button,dialog button):not(:disabled):not([aria-disabled="true"]){
+    transition:background-color .16s ease,border-color .16s ease,color .16s ease,box-shadow .16s ease,transform .16s ease;
+  }
+  :where(button,.btn,.ib,[role="button"],.app>aside nav a,.app>aside nav .more,
+    .seg button,.xray-preset,.xray-import-btn,.xray-config-tabs button,
+    .xray-output-tabs button,dialog button):not(:disabled):not([aria-disabled="true"]):hover{
+    background-color:var(--hover-surface);
+    border-color:var(--hover-stroke);
+    color:var(--tx);
+    box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--a) 16%,transparent);
+  }
+  /* Sidebar icons remain recognizable even in the narrow rail. */
+  .app>aside nav :is(a,.more):not([aria-disabled="true"]):hover{
+    background:color-mix(in srgb,var(--a) 14%,var(--s1));
+    border-color:var(--hover-stroke);
+  }
+  .app>aside nav :is(a,.more):hover .ic{
+    color:var(--a);
+  }
+  /* Active state is persistent; hover only adds a short highlight. */
+  .app>aside nav a.on:hover{
+    background:color-mix(in srgb,var(--a) 18%,var(--s1));
+  }
+}
+:where(button,.btn,.ib,[role="button"],.app>aside nav a,.app>aside nav .more):focus-visible{
+  outline:2px solid var(--a);
+  outline-offset:2px;
+}
+@media(prefers-reduced-motion:reduce){
+  :where(button,.btn,.ib,[role="button"],.app>aside nav a,.app>aside nav .more){transition:none!important}
+}
