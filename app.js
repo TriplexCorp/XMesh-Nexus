@@ -607,8 +607,8 @@ async function profilesP(){
  const sel=(id,items)=>'<select id="xpb-'+id+'">'+options(items)+'</select>';
  const group=(title,desc,body)=>'<section class="xray-section"><header class="xray-section-heading"><div><b>'+title+'</b><small>'+desc+'</small></div></header><div class="xray-section-body">'+body+'</div></section>';
  const optionGroup=(key,title,desc,body)=>'<section class="xray-option-group" data-xray-option-group="'+key+'"><div class="xray-option-group-head"><div><b>'+title+'</b><small>'+desc+'</small></div></div><div class="xray-option-grid">'+body+'</div></section>';
- const builderHtml='<section class="card xray-builder"><div class="xray-hero"><div><h2>XRAY STUDIO</h2></div></div>'+
- '<div class="xray-presets"><span class="xray-label">РЕЖИМ</span><div class="xray-preset-row"><button type="button" class="xray-preset on" data-xray-mode="visual"><b>Конструктор</b></button><button type="button" class="xray-preset" data-xray-mode="custom"><b>Ручной JSON</b></button><button type="button" class="xray-preset" id="xpb-import-trigger"><b>Импорт JSON</b></button><input type="file" id="xpb-import-file" accept=".json,application/json,text/json" hidden></div></div>'+
+ const builderHtml='<section class="card xray-builder"><div class="xray-hero"><div class="xray-heading-copy"><p class="note">XRAY CORE · CONFIGURATOR</p><h2>XRAY STUDIO</h2><p class="xray-hero-description">Настройте inbound — конфигурации сервера и клиента обновятся автоматически.</p></div></div>'+
+ '<div class="xray-presets"><div class="xray-preset-row" role="group" aria-label="Режим настройки"><button type="button" class="xray-preset on" data-xray-mode="visual" aria-pressed="true"><b>Конструктор</b></button><button type="button" class="xray-preset" data-xray-mode="custom" aria-pressed="false"><b>Ручной JSON</b></button></div><button type="button" class="xray-import-btn" id="xpb-import-trigger">Импорт JSON</button><input type="file" id="xpb-import-file" accept=".json,application/json,text/json" aria-label="Выбрать файл JSON" hidden></div>'+
  '<div class="xray-workspace-layout"><div class="xray-editor-pane">'+
   '<div class="xray-meta-grid">'+
  field('name','Название профиля',inp('name','VLESS Reality','Например, DE · Reality','maxlength="80" required'))+
@@ -620,8 +620,8 @@ async function profilesP(){
  '<button type="button" class="on" data-xray-config-tab="basic" role="tab" aria-selected="true" aria-controls="xpb-config-basic"><span>01</span><b>Основное</b><small>Inbound, сеть, порт, защита</small></button>'+
  '<button type="button" data-xray-config-tab="security" role="tab" aria-selected="false" aria-controls="xpb-config-security"><span>02</span><b>Защита</b><small>TLS, Reality, SNI, сертификаты</small></button>'+
  '<button type="button" data-xray-config-tab="transport" role="tab" aria-selected="false" aria-controls="xpb-config-transport"><span>03</span><b>Транспорт</b><small>Транспорт и специальные режимы</small></button>'+
- '<button type="button" data-xray-config-tab="encryption" role="tab" aria-selected="false" aria-controls="xpb-config-encryption"><span>04</span><b>VLESS Enc.</b><small>Режим и пара ключей</small></button>'+
- '<button type="button" data-xray-config-tab="client" role="tab" aria-selected="false" aria-controls="xpb-config-client"><span>05</span><b>Протокол</b><small>Учётные данные, fingerprint, спец. настройки</small></button>'+
+ '<button type="button" data-xray-config-tab="encryption" role="tab" aria-selected="false" aria-controls="xpb-config-encryption"><span>04</span><b>VLESS Encryption</b><small>Режим и пара ключей</small></button>'+
+ '<button type="button" data-xray-config-tab="client" role="tab" aria-selected="false" aria-controls="xpb-config-client"><span>05</span><b>Протокол и клиент</b><small>Учётные данные, fingerprint, спец. настройки</small></button>'+
  '</nav><div class="xray-config-content">'+
  '<div class="xray-config-panel" id="xpb-config-basic" data-xray-config-panel="basic">'+
  '<div class="xray-config-panel-title"><div><h3>Основные параметры</h3><p>Выберите протокол inbound, сетевой транспорт, порт и режим TLS/Reality.</p></div><span class="xray-config-required">ОБЯЗАТЕЛЬНОЕ</span></div>'+
@@ -746,7 +746,7 @@ async function profilesP(){
  field('loglevel','Уровень логирования',sel('loglevel',[['warning','warning'],['error','error'],['none','none'],['info','info'],['debug','debug']])))
  ,false)+ '</div></div></div></div></div><aside class="xray-output-dock">'+
  '<section class="xray-output-workspace" aria-label="JSON-конфигурации">'+
- '<div class="xray-output-workspace-head"><div><p class="note">OUTPUT WORKSPACE</p><b>Конфигурации для сервера и клиента</b><small>Отдельные JSON-документы из общей модели параметров. Экспорт не применяет конфиг к работающему ядру.</small></div><span class="xray-output-state" id="xpb-output-state">Предпросмотр готов</span></div>'+
+ '<div class="xray-output-workspace-head"><div><p class="note">JSON PREVIEW</p><b>Результат конфигурации</b><small>Server JSON и Client JSON обновляются по мере настройки. Экспорт не применяет конфиг к работающему ядру.</small></div><span class="xray-output-state" id="xpb-output-state">Предпросмотр готов</span></div>'+
  '<div class="xray-output-toolbar">'+
  '<div class="xray-output-tabs" role="tablist" aria-label="Выберите тип JSON">'+
  '<button type="button" id="xpb-tab-server" class="on" role="tab" aria-selected="true" aria-controls="xpb-output-server" data-xray-output="server"><span class="xray-output-tab-kicker">01 · SERVER</span><b>Server JSON</b><small>Inbound · слушающий узел</small></button>'+
@@ -936,7 +936,7 @@ async function profilesP(){
    if(transportUnsupported&&transportPanel)$$('[data-xray-option-group]',transportPanel).forEach(section=>section.hidden=true);
    const hasTransportSettings=!transportUnsupported&&transportPanel&&$$('[data-xray-option-group]',transportPanel).some(section=>!section.hidden&&$$('.f',section).some(field=>!field.hidden));
    if(transportEmpty)transportEmpty.hidden=!!hasTransportSettings;
-   $$('[data-xray-mode]').forEach(b=>b.classList.toggle('on',b.dataset.xrayMode===(customMode?'custom':'visual')));
+   $('[data-xray-mode]').forEach(b=>{const active=b.dataset.xrayMode===(customMode?'custom':'visual');b.classList.toggle('on',active);b.setAttribute('aria-pressed',active?'true':'false')});
    syncConfigTabs();
   };
   let customMode=false,customInitialized=false,customDirty=false,generatedVlessPairs=null;
@@ -1029,7 +1029,7 @@ async function profilesP(){
    const previewView=$('#xpb-preview')?.closest('.xray-code-view');
    if(previewView)previewView.hidden=customMode;
    $('#xpb-preview').hidden=customMode;
-   $$('[data-xray-mode]').forEach(b=>b.classList.toggle('on',b.dataset.xrayMode===(customMode?'custom':'visual')));
+   $('[data-xray-mode]').forEach(b=>{const active=b.dataset.xrayMode===(customMode?'custom':'visual');b.classList.toggle('on',active);b.setAttribute('aria-pressed',active?'true':'false')});
    setOutput('server');
    const clientSourceNote=$('#xpb-client-source-note');
    if(clientSourceNote)clientSourceNote.textContent=customMode
