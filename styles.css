@@ -2773,3 +2773,7 @@ nav a.on{background:var(--s2)!important;box-shadow:none!important}
   .xray-builder .xray-config-panel .xray-field-action{padding:0}
   .xray-builder .xray-output-dock{padding:.48rem}
 }
+
+
+/* The content occupies only the second row beneath the step strip. */
+.xray-builder .xray-config-content{height:auto}
