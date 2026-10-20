@@ -416,7 +416,7 @@ document.addEventListener('click',e=>{
 
 /* ================= СТАРТ ================= */
 $('#si').innerHTML=ic('search');$('#theme').innerHTML=ic('moon').replace('class="ic"','class="ic moon"')+ic('sun').replace('class="ic"','class="ic sun"');
-$('#bell').innerHTML=ic('bell');$('#addb').innerHTML=ic('plus')+'<span class="bt">Пользователь</span>';$('#restart').innerHTML=ic('redo')+'<span class="lbl">Перезапуск</span>';
+$('#bell').innerHTML=ic('bell');$('#addb').innerHTML=ic('plus')+'<span class="bt">Пользователь</span>';$('#restart').setAttribute('aria-label','Настройки Xray-core');$('#restart').innerHTML=ic('code')+'<span class="lbl">Версия</span>';
 apply();matchMedia('(prefers-color-scheme: light)').addEventListener('change',apply);
 addEventListener('hashchange',()=>{if(backendReady)render()});
 function showAuthGate(message=''){
