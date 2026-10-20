@@ -632,7 +632,7 @@ async function profilesP(){
    let warning='';
    if(protocol==='vless'&&security==='none')warning='Внимание: публичный VLESS без TLS/Reality не защищает транспорт.';
    if(protocol==='shadowsocks'&&$('#xpb-ss-method').value==='2022-blake3-chacha20-poly1305'&&$('#xpb-uuid').value.trim())throw new Error('Shadowsocks 2022 ChaCha поддерживает только одного пользователя: очистите UUID или выберите AES-128/AES-256 для нескольких пользователей.');
-   if(protocol==='shadowsocks'&&(!$('#xpb-ss-password').value.trim()||!$('#xpb-ss-user-password').value.trim()))warning='Укажите или сгенерируйте оба пароля Shadowsocks перед использованием конфигурации.';
+   if(protocol==='shadowsocks'){const method=$('#xpb-ss-method').value||'chacha20-ietf-poly1305',hasUuid=!!$('#xpb-uuid').value.trim(),hasServerPass=!!$('#xpb-ss-password').value.trim(),hasUserPass=!!$('#xpb-ss-user-password').value.trim();if(method.startsWith('2022-')&&(!hasServerPass||(hasUuid&&!hasUserPass)))warning=hasUuid?'Укажите server key и user key Shadowsocks 2022 (сгенерируйте оба или введите Base64-ключи).':'Укажите серверный Base64-ключ Shadowsocks 2022.';else if(!hasUuid&&!hasServerPass)warning='Для Shadowsocks без отдельного UUID укажите серверный пароль или нажмите «Сгенерировать пароли Shadowsocks».';}
    if(protocol==='wireguard'&&!$('#xpb-wg-secret-key').value.trim())warning='Укажите серверный WireGuard private key (команда xray wg).';
    if(network==='xdrive'&&(!$('#xpb-vless-decryption').value.trim()||!$('#xpb-vless-encryption').value.trim()))warning='XDrive требует обе стороны VLESS Encryption: server decryption и client encryption из xray vlessenc.';
    $('#xpb-error').textContent=warning;
