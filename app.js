@@ -770,6 +770,82 @@ function validateXDriveTemplate(template){
  if(captures<1)throw new Error('XDrive list.namesRegex должен содержать хотя бы одну capture group.');
  return template;
 }
+
+/* XHTTP transport settings: share validated values across server/client previews. */
+function xrayXhttpSettings(path,host,side){
+ const v=id=>($('#xpb-xhttp-'+id)?.value||'').trim();
+ const extra={xPaddingBytes:($('#xpb-xhttp-padding')?.value||'100-1000').trim()||'100-1000'};
+ const range=(field,name)=>{
+  const raw=v(field);
+  if(!raw)return;
+  if(!/^\d+(?:-\d+)?$/.test(raw))throw new Error('XHTTP '+name+': требуется число или диапазон вида 10-50.');
+  if(raw.includes('-')){
+   const [lo,hi]=raw.split('-').map(Number);
+   if(lo>hi||hi>2147483647)throw new Error('XHTTP '+name+': неверный диапазон.');
+   return raw;
+  }
+  if(Number(raw)>2147483647)throw new Error('XHTTP '+name+': число слишком велико.');
+  return Number(raw);
+ };
+ const optional=(field,key,target=extra)=>{const val=v(field);if(val)target[key]=val};
+ const bool=(field,key)=>{const val=v(field);if(val==='true'||val==='false')extra[key]=val==='true'};
+ const num=(field,key,target=extra)=>{
+  const raw=v(field);
+  if(!raw)return;
+  if(!/^\d+$/.test(raw)||Number(raw)>2147483647)throw new Error('XHTTP '+key+': требуется целое число.');
+  target[key]=Number(raw);
+ };
+ const rng=(field,key,target=extra)=>{const val=range(field,key);if(val!==undefined)target[key]=val};
+ bool('padding-obfs','xPaddingObfsMode');
+ optional('padding-placement','xPaddingPlacement');
+ optional('padding-key','xPaddingKey');
+ optional('padding-header','xPaddingHeader');
+ optional('padding-method','xPaddingMethod');
+ if(side==='server'){
+  bool('no-sse','noSSEHeader');
+  num('buffered-posts','scMaxBufferedPosts');
+  rng('stream-secs','scStreamUpServerSecs');
+  num('server-headers','serverMaxHeaderBytes');
+ }else{
+  optional('uplink-method','uplinkHTTPMethod');
+  bool('no-grpc','noGRPCHeader');
+  rng('post-bytes','scMaxEachPostBytes');
+  rng('post-interval','scMinPostsIntervalMs');
+  optional('session-placement','sessionIDPlacement');
+  optional('session-key','sessionIDKey');
+  optional('seq-placement','seqPlacement');
+  optional('seq-key','seqKey');
+  optional('data-placement','uplinkDataPlacement');
+  optional('data-key','uplinkDataKey');
+  rng('chunk-size','uplinkChunkSize');
+  rng('session-length','sessionIDLength');
+  optional('session-table','sessionIDTable');
+  const xmux={};
+  rng('mux-concurrency','maxConcurrency',xmux);
+  rng('mux-connections','maxConnections',xmux);
+  rng('mux-reuse','cMaxReuseTimes',xmux);
+  rng('mux-requests','hMaxRequestTimes',xmux);
+  rng('mux-seconds','hMaxReusableSecs',xmux);
+  num('mux-keepalive','hKeepAlivePeriod',xmux);
+  if(xmux.maxConcurrency!==undefined&&xmux.maxConnections!==undefined){
+   const upper=val=>typeof val==='string'?Number(val.split('-')[1]):val;
+   if(upper(xmux.maxConcurrency)>0&&upper(xmux.maxConnections)>0)
+    throw new Error('XHTTP xmux: maxConcurrency и maxConnections нельзя включать одновременно.');
+  }
+  if(Object.keys(xmux).length)extra.xmux=xmux;
+ }
+ const config={path,host,mode:v('mode')||'auto',extra};
+ if(side==='client'&&v('headers')){
+  let headers;
+  try{headers=JSON.parse(v('headers'))}catch{throw new Error('XHTTP headers: введите корректный JSON-объект.')}
+  if(!headers||typeof headers!=='object'||Array.isArray(headers)||
+     Object.entries(headers).some(([k,val])=>!k||k==='__proto__'||k==='constructor'||typeof val!=='string'))
+   throw new Error('XHTTP headers: требуется объект вида {"User-Agent":"Mozilla/5.0"}.');
+  config.headers=headers;
+ }
+ return config;
+}
+
 function xrayBuilderConfig(){
  const v=id=>$('#xpb-'+id)?.value||'';
  const protocol=v('protocol')||'vless';
@@ -821,7 +897,7 @@ function xrayBuilderConfig(){
  if(!['tun','wireguard','dokodemo-door','tunnel'].includes(protocol)){
   const ss={network,security};
   if(network==='websocket')ss.wsSettings={path,headers:v('host')?{Host:v('host')}: {},heartbeatPeriod:0};
-  if(network==='xhttp')ss.xhttpSettings={path,host:v('host'),mode:v('xhttp-mode')||'auto',extra:{xPaddingBytes:v('xhttp-padding')||'100-1000'}};
+  if(network==='xhttp')ss.xhttpSettings=xrayXhttpSettings(path,v('host'),'server');
   if(network==='grpc')ss.grpcSettings={serviceName:path.replace(/^\//,'')||'grpc',multiMode:v('grpc-mode')==='multi'};
   if(network==='httpupgrade')ss.httpupgradeSettings={path,host:v('host')};
   if(network==='mkcp')ss.kcpSettings={mtu:1350,tti:20,uplinkCapacity:5,downlinkCapacity:20,congestion:false,readBufferSize:2,writeBufferSize:2,seed:v('kcp-seed')||''};
@@ -965,7 +1041,7 @@ function xrayClientSample(){
  const streamSettings={network,security};
  if(network==='websocket')streamSettings.wsSettings={path,headers:host?{Host:host}:{}};
  if(network==='raw')streamSettings.rawSettings={header:v('raw-header')==='http'?{type:'http',request:{version:'1.1',method:'GET',path:[path],headers:{Host:[v('host')||sni||'example.com'],'User-Agent':['Mozilla/5.0'],'Accept-Encoding':['gzip, deflate'],'Connection':['keep-alive']}}}:{type:'none'}};
- if(network==='xhttp')streamSettings.xhttpSettings={path,host,mode:v('xhttp-mode')||'auto',extra:{xPaddingBytes:v('xhttp-padding')||'100-1000'}};
+ if(network==='xhttp')streamSettings.xhttpSettings=xrayXhttpSettings(path,host,'client');
  if(network==='grpc')streamSettings.grpcSettings={serviceName:path.replace(/^\//,'')||'grpc',multiMode:v('grpc-mode')==='multi'};
  if(network==='httpupgrade')streamSettings.httpupgradeSettings={path,host};
  if(network==='mkcp')streamSettings.kcpSettings={seed:v('kcp-seed')||''};
@@ -1341,7 +1417,7 @@ async function profilesP(){
    if(transport)transport.querySelectorAll('[id^="xpb-"]').forEach(el=>{
     const f=el.id.replace('xpb-',''),wrap=el.closest('.f');if(!wrap)return;
     let show=true;
-    if(['xhttp-mode','xhttp-padding'].includes(f))show=net==='xhttp';
+    if(f.startsWith('xhttp-'))show=net==='xhttp';
     if(f==='grpc-mode')show=net==='grpc';
     if(f==='kcp-seed')show=net==='mkcp';
     if(f==='raw-header')show=net==='raw';
@@ -1357,6 +1433,7 @@ async function profilesP(){
     if(f.startsWith('masque-'))show=proto==='masque'||net==='masque';
     wrap.hidden=!show;
    });
+   setGroup('[data-xray-option-group="transport-xhttp"]',net==='xhttp');
    const uuidAction=$('#xpb-generate-uuid')?.closest('.xray-field-action');
    if(uuidAction)uuidAction.hidden=!['vless','vmess','trojan'].includes(proto);
    const pqGroup=$('.xray-section:has(#xpb-vlessenc-mode)');
