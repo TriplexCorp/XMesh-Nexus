@@ -104,7 +104,7 @@ pub async fn login(
         if locked {
             return Err(ApiError::new(StatusCode::TOO_MANY_REQUESTS, "Слишком много попыток. Повторите вход через 15 минут."));
         }
-        record_failed_login(&state.pool, &username_key).await?;
+        record_failed_login(&state, &username_key).await?;
         return Err(ApiError::new(StatusCode::UNAUTHORIZED, "Неверный логин или пароль."));
     };
     let admin_id: i64 = row.try_get("id")?;
@@ -119,7 +119,7 @@ pub async fn login(
         if locked {
             return Err(ApiError::new(StatusCode::TOO_MANY_REQUESTS, "Слишком много попыток. Повторите вход через 15 минут."));
         }
-        record_failed_login(&state.pool, &username_key).await?;
+        record_failed_login(&state, &username_key).await?;
         return Err(ApiError::new(StatusCode::UNAUTHORIZED, "Неверный логин или пароль."));
     }
     sqlx::query("DELETE FROM auth_login_limits WHERE username_key = $1")
