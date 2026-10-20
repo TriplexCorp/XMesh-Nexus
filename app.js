@@ -609,7 +609,7 @@ async function profilesP(){
  '<div id="xpb-custom-mode" class="xray-custom-mode" hidden>'+
  '<div class="xray-output-head"><div><b>Полный конфиг Xray</b><small>Можно редактировать inbounds, outbounds, routing, DNS, policy, API и любые поля актуального ядра.</small></div><div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-format-json">Форматировать JSON</button><button type="button" class="gh sm" id="xpb-reset-json">Заново из конструктора</button></div></div>'+
  '<textarea id="xpb-custom-json" class="xray-preview" spellcheck="false" aria-label="Полный JSON-конфиг Xray"></textarea>'+
- '<p class="er" id="xpb-custom-error" role="status">JSON-режим даёт доступ к параметрам, которых нет в визуальном редакторе.</p></div>'+
+ '<p class="mu" id="xpb-custom-error" role="status">JSON-режим даёт доступ ко всем полям ядра, включая параметры, которых пока нет в визуальном конструкторе.</p></div>'+
  '<div class="xray-key-actions" id="xpb-generator-actions"><button type="button" class="gh sm" id="xpb-generate-uuid">Сгенерировать UUID</button><button type="button" class="gh sm" id="xpb-generate-ss-password">Сгенерировать пароли Shadowsocks</button></div>'+
  '<div class="xray-output-head" id="xpb-server-output"><div><b>Предпросмотр JSON</b><small>Обновляется автоматически · не применяет конфигурацию к работающему ядру</small></div><div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-copy">Копировать JSON</button><button type="button" class="gh sm" id="xpb-download">Скачать JSON</button></div></div>'+
  '<textarea id="xpb-preview" class="xray-preview" spellcheck="false" readonly aria-label="Предпросмотр серверного JSON"></textarea>'+
@@ -711,13 +711,15 @@ async function profilesP(){
   let customMode=false,customInitialized=false,customDirty=false;
   const customArea=$('#xpb-custom-json');
   const validateCustomJson=()=>{
+   const status=$('#xpb-custom-error');
    try{
     const obj=JSON.parse(customArea.value);
     if(!obj||typeof obj!=='object'||Array.isArray(obj))throw new Error('Корень JSON должен быть объектом Xray.');
     if(!Array.isArray(obj.inbounds)||!obj.inbounds.length)throw new Error('Добавьте хотя бы один inbound.');
-    $('#xpb-custom-error').textContent='JSON синтаксически корректен; сохранение проверит теги и параметры Reality.';
+    status.classList.remove('er');status.classList.add('mu');
+    status.textContent='JSON синтаксически корректен; перед сохранением будут проверены теги, Reality, Shadowsocks 2022 и специальные транспорты.';
     return obj;
-   }catch(e){$('#xpb-custom-error').textContent='Ошибка JSON: '+e.message;return null}
+   }catch(e){status.classList.add('er');status.classList.remove('mu');status.textContent='Ошибка JSON: '+e.message;return null}
   };
   const setMode=mode=>{
    if(mode==='visual'&&customMode&&customDirty){
