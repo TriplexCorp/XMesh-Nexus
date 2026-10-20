@@ -2,12 +2,11 @@
 
 **XMesh Nexus** is the web-based **control panel** for managing XMesh / Xray VPN infrastructure.
 
-> This repository is for the **panel UI** — not an XMesh node, node agent, or server-side daemon.
+> This repository contains the panel UI only — not an XMesh node, node agent, or server-side daemon.
 
-## Entry points
+## Entry point
 
-- `index.html` — main panel page
-- `lumen-panel-updated.html` — same panel under its original filename
+- `index.html` — main control-panel interface
 
 ## Current implementation status
 
