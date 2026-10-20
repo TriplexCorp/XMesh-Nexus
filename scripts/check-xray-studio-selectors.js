@@ -24,7 +24,7 @@ for (let index = 0; index < lines.length; index += 1) {
 const requiredFragments = [
   ['transport tab', 'data-xray-config-tab="transport"'],
   ['transport panel', 'data-xray-config-panel="transport"'],
-  ['contextual transport availability', "transport:networkFieldActive&&$('[data-xray-option-group]'"],
+  ['contextual transport availability', "transport:networkFieldActive&&$$('[data-xray-option-group]'"],
   ['inline editor state', "studioRoot.classList.add('studio-v3','studio-inline')"],
   ['network capability check', 'xrayAllowedNetworks(proto)'],
   ['security capability check', 'xrayAllowedSecurity(proto,net)'],
