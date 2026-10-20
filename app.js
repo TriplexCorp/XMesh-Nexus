@@ -1579,7 +1579,7 @@ document.addEventListener('click',e=>{
 
 /* ================= СТАРТ ================= */
 $('#si').innerHTML=ic('search');$('#theme').innerHTML=ic('moon').replace('class="ic"','class="ic moon"')+ic('sun').replace('class="ic"','class="ic sun"');
-$('#bell').innerHTML=ic('bell');$('#logout').innerHTML=ic('logout')+'<span class="logout-label">Выйти</span>';$('#logout').setAttribute('aria-label','Выйти');$('#addb').innerHTML=ic('plus')+'<span class="bt">Пользователь</span>';
+$('#bell').innerHTML=ic('bell');$('#logout').innerHTML=ic('logout')+'<span class="logout-label">Выйти</span>';$('#logout').setAttribute('aria-label','Выйти');$('#addb').innerHTML='<span class="addb-icon">'+ic('plus')+'</span><span class="addb-label">Новый пользователь</span>';
 $('#logout').onclick=async()=>{const button=$('#logout');button.disabled=true;try{await fetch('/api/v1/auth/logout',{method:'POST',credentials:'same-origin',cache:'no-store'});}catch(_){}backendReady=false;location.replace('/login')};$('#restart').setAttribute('aria-label','Настройки Xray-core');$('#restart').innerHTML=ic('code')+'<span class="lbl">Версия</span>';
 apply();matchMedia('(prefers-color-scheme: light)').addEventListener('change',apply);
 addEventListener('hashchange',()=>{if(backendReady)render()});
@@ -1613,8 +1613,15 @@ function coreStateLabel(status){
   return status==='updating'?'Обновляется':status==='ready'?'Установлено':status==='error'?'Ошибка':'Не установлено';
 }
 function syncCoreBadge(state){
-  const el=$('#cs'),dot=$('#cd');
-  if(el)el.textContent=state.status==='updating'?'Установка Xray-core…':state.installed_version?('Версия '+state.installed_version):state.status==='error'?'Ошибка установки':'Ядро не установлено';
+  const el=$('#cs'),dot=$('#cd'),rail=$('#core-rail-version'),settings=$('#restart');
+  const installed=typeof state.installed_version==='string'?state.installed_version.trim():'';
+  const status=state.status==='updating'?'Установка Xray-core…':installed?('Версия '+installed):state.status==='error'?'Ошибка установки':'Ядро не установлено';
+  if(el)el.textContent=status;
+  if(rail){
+    rail.textContent=installed|| (state.status==='updating'?'Обновление':state.status==='error'?'Ошибка':'—');
+    rail.title='Xray-core · '+status;
+  }
+  if(settings)settings.title='Настройки Xray-core · '+status;
   if(dot)dot.style.setProperty('--c',state.status==='ready'?'var(--ok)':state.status==='error'?'var(--er)':state.status==='updating'?'var(--wr)':'var(--mu)');
 }
 async function refreshCoreStatus(showToast=false){
