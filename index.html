@@ -300,7 +300,7 @@ const emptyDB=()=>({
   set:{brand:'XMesh Nexus',domain:'',hooks:{...defaultHooks}}
 });
 let DB, legacyDemo=false;
-try{DB=JSON.parse(localStorage.getItem('lumenDB2')||'null')}catch(e){DB=null}
+try{DB=JSON.parse(localStorage.getItem('xmeshNexusDB')||'null')}catch(e){DB=null}
 /* Remove the earlier built-in sample data, but preserve user-created records. */
 legacyDemo=!!(DB&&Array.isArray(DB.nodes)&&DB.nodes.some(n=>/\.example\.(net|com|org)$/i.test(String(n.addr||'')))&&
   (DB.set?.domain==='panel.example.com'||(DB.users||[]).some(u=>String(u.email||'').endsWith('@mail.example'))));
@@ -310,8 +310,8 @@ else {
   DB.set={brand:'XMesh Nexus',domain:'',hooks:{...defaultHooks,...(DB.set?.hooks||{})},...(DB.set||{})};
   DB.set.hooks={...defaultHooks,...(DB.set?.hooks||{})};
 }
-let sv;const save=()=>{clearTimeout(sv);sv=setTimeout(()=>{try{localStorage.setItem('lumenDB2',JSON.stringify(DB))}catch(e){}},120)};
-if(legacyDemo){try{localStorage.removeItem('lumenDB2');localStorage.setItem('lumenDB2',JSON.stringify(DB))}catch(e){}}
+let sv;const save=()=>{clearTimeout(sv);sv=setTimeout(()=>{try{localStorage.setItem('xmeshNexusDB',JSON.stringify(DB))}catch(e){}},120)};
+if(legacyDemo){try{localStorage.removeItem('xmeshNexusDB');localStorage.setItem('xmeshNexusDB',JSON.stringify(DB))}catch(e){}}
 const lat=()=>Promise.resolve();
 const st=u=>u.disabled?'DISABLED':u.hold?'ON_HOLD':(u.limit&&u.used>=u.limit)?'LIMITED':(u.expireAt&&u.expireAt<Date.now())?'EXPIRED':'ACTIVE';
 const isOn=u=>st(u)=='ACTIVE'&&u.onlineAt>Date.now()-3e5;
@@ -387,8 +387,8 @@ dlg.addEventListener('click',e=>{if(e.target==dlg||e.target.closest('[data-x]'))
 const confirmBox=(h,ok,fn)=>{CF=fn;modal(`<div class="box"><h2>${h}</h2><div class="act"><button class="gh" data-x>Отмена</button><button class="btn" data-cf>${ok}</button></div></div>`)};
 let tt;const toast=(m,al,fn)=>{const t=$('#toast');t.innerHTML=`<span>${esc(m)}</span>${al?`<button id="ta">${al}</button>`:''}`;if(al)$('#ta').onclick=()=>{fn();t.classList.remove('show')};t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),al?6000:2400)};
 const CDEFAULT={theme:'dark',accent:'mint',ts:1,motion:1,density:'comfortable',surface:'solid',glow:'normal',font:'onest',radius:16,borders:'soft',sidebar:'standard'};
-let C={...CDEFAULT};try{Object.assign(C,JSON.parse(localStorage.lumen||'{}'))}catch(e){}
-const apply=()=>{const r=document.documentElement;r.dataset.theme=C.theme=='auto'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):C.theme;r.dataset.accent=C.accent;r.dataset.density=C.density||CDEFAULT.density;r.dataset.surface=C.surface||CDEFAULT.surface;r.dataset.glow=C.glow||CDEFAULT.glow;r.dataset.font=C.font||CDEFAULT.font;r.dataset.borders=C.borders||CDEFAULT.borders;r.dataset.sidebar=C.sidebar||CDEFAULT.sidebar;r.style.setProperty('--ts',cl(+C.ts||1,.9,1.3));const radius=cl(+C.radius||16,4,24);r.style.setProperty('--ui-radius',radius+'px');r.style.setProperty('--ui-control-radius',Math.max(5,radius*.72)+'px');r.dataset.motion=C.motion?'on':'off';try{localStorage.lumen=JSON.stringify(C)}catch(e){}};
+let C={...CDEFAULT};try{Object.assign(C,JSON.parse(localStorage.xmeshNexusSettings||'{}'))}catch(e){}
+const apply=()=>{const r=document.documentElement;r.dataset.theme=C.theme=='auto'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):C.theme;r.dataset.accent=C.accent;r.dataset.density=C.density||CDEFAULT.density;r.dataset.surface=C.surface||CDEFAULT.surface;r.dataset.glow=C.glow||CDEFAULT.glow;r.dataset.font=C.font||CDEFAULT.font;r.dataset.borders=C.borders||CDEFAULT.borders;r.dataset.sidebar=C.sidebar||CDEFAULT.sidebar;r.style.setProperty('--ts',cl(+C.ts||1,.9,1.3));const radius=cl(+C.radius||16,4,24);r.style.setProperty('--ui-radius',radius+'px');r.style.setProperty('--ui-control-radius',Math.max(5,radius*.72)+'px');r.dataset.motion=C.motion?'on':'off';try{localStorage.xmeshNexusSettings=JSON.stringify(C)}catch(e){}};
 const brand=()=>{$('#bn').textContent=DB.set.brand;$('#lg').textContent=(DB.set.brand[0]||'L').toUpperCase()};
 
 let T=[],cur='',RT=0;
@@ -612,7 +612,7 @@ document.addEventListener('click',async e=>{
   else if(b=g('[data-ac]')){C.accent=b.dataset.ac;apply();$$('[data-ac]').forEach(x=>x.classList.toggle('on',x==b))}
   else if(b=g('[data-ui]')){const prop=b.dataset.ui,value=b.dataset.value;if(prop&&value){C[prop]=value;apply();$$(`[data-ui="${prop}"]`).forEach(x=>x.classList.toggle('on',x==b))}}
   else if(g('#rs')){C={...CDEFAULT};apply();render(1);toast('Оформление сброшено')}
-  else if(g('#gx')){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(DB,null,2)],{type:'application/json'}));a.download='lumen-backup.json';a.click()}
+  else if(g('#gx')){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(DB,null,2)],{type:'application/json'}));a.download='xmesh-nexus-backup.json';a.click()}
   else if(b=g('[data-cf]')){dlg.close();CF&&CF()}
   else if(b=g('[data-pi]')){const x=PI[+b.dataset.pi];if(x){dlg.close();x.r()}}
   else if(g('#more'))modal(`<div class="box"><h2>Разделы</h2>${FLAT.map(([k,i,l])=>`<button class="pi" data-go="${k}">${ic(i)}<span>${l}</span></button>`).join('')}</div>`);
