@@ -16,6 +16,7 @@ assert.match(docker,/COPY [^\n]*xray-studio-dialog\.js[^\n]* \/app\/static\//,'M
 assert.match(dialog,/slot\.append\(panel\)/,'Live field elements must be moved, not copied');
 assert.doesNotMatch(dialog,/cloneNode\s*\(/,'Cloning live fields would desynchronize generated JSON');
 assert.match(dialog,/dialog\.showModal\(\)/,'Settings window must open as true modal');
+assert.match(dialog,/xhttp\.dataset\.xhttpExpanded='true'/,'XHTTP fullscreen settings must show all options directly');
 assert.match(dialog,/dialog\.addEventListener\('close'/,'Window must restore focus on close');
 assert.match(dialog,/if\(button\.hidden\|\|sections\[key\]\.hidden\)return/,'Only compatible sections may be opened');
 for(const name of ['basic','security','transport','encryption','client']){
