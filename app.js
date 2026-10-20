@@ -533,9 +533,20 @@ function userCalendarMarkup(year,month,selected){
   const monthLabel=new Intl.DateTimeFormat('ru-RU',{month:'long',year:'numeric'}).format(new Date(year,month,1));
   return '<div class="user-cal-header"><strong>'+esc(monthLabel)+'</strong><div class="user-cal-nav"><button type="button" data-user-date-nav="-1" aria-label="Предыдущий месяц">'+ic('chevronLeft')+'</button><button type="button" data-user-date-nav="1" aria-label="Следующий месяц">'+ic('chevronRight')+'</button></div></div><div class="user-cal-grid">'+weekdays+blanks+days+'</div><div class="user-cal-footer"><button type="button" data-user-date-clear>Бессрочно</button><button type="button" data-user-date-today>Сегодня</button></div>';
 }
+function userExtendExpiryYmd(expireAt,days){
+  if(!Number.isSafeInteger(days)||days<1||days>36500)throw new Error('Укажите количество дней от 1 до 36500.');
+  const today=userYmd(new Date());
+  const from=userYmd(expireAt);
+  const base=userDateFromYmd(from&&from>today?from:today);
+  return userYmd(new Date(base.getFullYear(),base.getMonth(),base.getDate()+days,12));
+}
+function userExtendExpiryTimestamp(expireAt,days){
+  const date=userDateFromYmd(userExtendExpiryYmd(expireAt,days));
+  return new Date(date.getFullYear(),date.getMonth(),date.getDate(),23,59,59).getTime();
+}
 function userDateField(u){
   const value=userYmd(u.expireAt);
-  return '<div class="f user-date-field"><span id="user-expiry-label">Действует до</span><div class="user-date-controls"><button type="button" class="user-date-trigger" data-user-date-open aria-labelledby="user-expiry-label user-date-display" aria-expanded="false" aria-controls="user-date-calendar">'+ic('calendar')+'<span id="user-date-display" data-user-date-label>'+esc(userDateLabel(value))+'</span>'+ic('down')+'</button><button type="button" class="user-date-extend" data-a="ext" data-u="'+u.id+'" title="Продлить срок на 30 дней">'+ic('plus')+'<span>30 дней</span></button></div><input type="hidden" name="expireAt" value="'+esc(value)+'"><div class="user-date-calendar" id="user-date-calendar" role="group" aria-label="Календарь срока действия" hidden></div><small>Выберите дату или оставьте без ограничения</small></div>';
+  return '<div class="f user-date-field"><span id="user-expiry-label">Действует до</span><div class="user-date-controls"><button type="button" class="user-date-trigger" data-user-date-open aria-labelledby="user-expiry-label user-date-display" aria-expanded="false" aria-controls="user-date-calendar">'+ic('calendar')+'<span id="user-date-display" data-user-date-label>'+esc(userDateLabel(value))+'</span>'+ic('down')+'</button><button type="button" class="user-date-extend" data-user-renew-toggle aria-expanded="false" aria-controls="user-renew-panel">'+ic('plus')+'<span>Продлить</span></button></div><input type="hidden" name="expireAt" value="'+esc(value)+'"><div class="user-date-calendar" id="user-date-calendar" role="group" aria-label="Календарь срока действия" hidden></div><div class="user-renew-panel" id="user-renew-panel" hidden><label for="user-renew-days">Добавить дней</label><div class="user-renew-controls"><input type="number" id="user-renew-days" min="1" max="36500" step="1" inputmode="numeric" placeholder="Количество дней"><button type="button" class="gh" data-user-renew-apply>Применить</button></div><small>Дни добавляются к текущей дате окончания, а если срок истёк — к сегодняшнему дню. Затем нажмите «Сохранить».</small><p class="er user-renew-error" role="status" hidden></p></div><small>Выберите дату в календаре или продлите на любое число дней.</small></div>';
 }
 function closeUserCalendar(picker){
   if(!picker)return;
