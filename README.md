@@ -21,7 +21,7 @@
 - Xray-core version manager in **Settings → Xray-core**. The default target is latest; the service reads official release metadata from the XTLS/Xray-core GitHub project, downloads the expected Linux archive for the container architecture, verifies an advertised SHA-256 digest when GitHub supplies one, runs xray version to check the executable, and switches the active version atomically.
 - API/database readiness probes, Rust CI, and a non-root/read-only application container.
 
-**This first iteration is panel + API + Xray-core binary management only.** It does not start Xray as a VPN traffic service, configure listeners, or install/run agents on remote nodes. CPU/RAM/throughput, node health and client online status are not real telemetry until those integrations are added. The TimescaleDB schema is prepared for ingestion and graphs but no synthetic metrics are generated.
+**Runtime scope:** XMesh Nexus manages panel data and Xray-core binaries; it still does not start Xray as a VPN traffic service or configure active listeners. The optional Linux node metrics agent collects OS-level CPU/RAM/disk and network-interface RX/TX rates plus established TCP connection count. Interface traffic can include SSH, web-server and other services on the same NIC; it is not per-user accounting or guaranteed Xray-only traffic. Node health and online VPN-client counts are not yet inferred from these samples. No synthetic metrics are generated.
 
 ## Installation
 
@@ -71,6 +71,30 @@ Do not delete the postgres_data or core_data volumes during routine updates. Red
 
 **Existing installations:** the database image has changed from vanilla PostgreSQL to TimescaleDB on the same PostgreSQL 18 major version. Take and verify a backup before deploying, keep the existing postgres_data volume, and do not run docker compose down -v. The migration enables the extension and creates additional time-series tables; it does not convert existing business tables into hypertables.
 
+## Node metrics agent and RX/TX dashboard
+
+On the home screen, the TimescaleDB RX/TX chart supports the last hour (1-minute buckets) and last 24 hours (15-minute buckets), with optional node and squad filters. Samples are stored in `server_metric_samples`.
+
+To start collecting real data, open **Nodes**, click **Agent metrics** on a node, and copy the displayed command. Run that command on the corresponding Linux node with root privileges. The panel issues an individual high-entropy token per node; only the SHA-256 hash is stored in PostgreSQL. The plaintext token is displayed once, stored on the node in `/etc/xmesh-node-metrics.env` with root-only permissions, and can be revoked by issuing a replacement token. Deleting the node also removes its token.
+
+The installer enables a systemd timer that samples once per minute. The first run records a baseline; the next run sends the first valid RX/TX rate. The agent automatically detects the network interface used by the default route; pass an optional interface name to the installer to choose another NIC. Use HTTPS for the panel URL. Check the agent on a node with:
+
+~~~bash
+systemctl status xmesh-node-metrics.timer
+journalctl -u xmesh-node-metrics.service -n 30 --no-pager
+~~~
+
+To stop and remove the agent on a node:
+
+~~~bash
+sudo systemctl disable --now xmesh-node-metrics.timer
+sudo rm -f /etc/systemd/system/xmesh-node-metrics.timer /etc/systemd/system/xmesh-node-metrics.service /usr/local/sbin/xmesh-node-metrics /etc/xmesh-node-metrics.env
+sudo rm -rf /var/lib/xmesh-node-metrics
+sudo systemctl daemon-reload
+~~~
+
+The ingest endpoint rejects invalid or revoked node tokens and validates metric bounds. It accepts no browser cookies and only bypasses the panel's same-origin check for a bearer-authenticated request without an Origin header. Treat the bearer token as a secret; rotate it if the node is compromised.
+
 ## Xray-core version management
 
 The stored default is latest. On startup the API attempts to install/update the selected version without preventing the panel API from starting if GitHub is unavailable. In **Settings → Xray-core**, you can also select a specific tag and press **Install / update**. The selected version is stored in PostgreSQL.
@@ -86,6 +110,8 @@ The selector lists recent GitHub releases; pinning is limited to the latest 30 e
 - /api/v1/collections/{collection} — authenticated record CRUD.
 - GET /api/v1/core, GET /api/v1/core/releases, POST /api/v1/core/update — core version management (authenticated).
 - GET /api/v1/metrics/traffic?range=1h|24h&node_id=ID&squad_id=ID — authenticated RX/TX history aggregated from `server_metric_samples` (1-minute buckets for 1h; 15-minute buckets for 24h). `node_id` in the hypertable must be the text form of the panel node record ID. Squad filtering selects nodes whose assigned profile shares at least one inbound tag with the squad.
+- POST /api/v1/nodes/{id}/metrics-token — authenticated token issue/rotation for a node (plaintext returned once).
+- POST /api/v1/metrics/ingest — node-agent bearer authentication; persists a validated sample to TimescaleDB.
 
 ## Frontend and design
 
