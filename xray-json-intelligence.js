@@ -189,14 +189,15 @@ function analyze(source,data){
     // its extended options here, not at the top level.
     const advanced=extra?.type==='object'?extra:xhttp;
     const ap=extra?.type==='object'?xp.concat('extra'):xp;
-    const xmux=prop(advanced,'xmux');
+    const xmux=prop(advanced,'xmux')||prop(xhttp,'xmux');
+    const muxPath=prop(advanced,'xmux')?ap:xp;
     if(xmux){
      if(xmux.type!=='object')add('error','XMUX_TYPE','xmux должен быть объектом.',xmux,ap.concat('xmux'));
      else{
-      wrongKeys(xmux,sets.xmux,ap.concat('xmux'));
+      wrongKeys(xmux,sets.xmux,muxPath.concat('xmux'));
       const mx=prop(xmux,'maxConcurrency'), mc=prop(xmux,'maxConnections');
       const greaterThanZero=n=>{const x=primitive(n);return typeof x==='number'?x>0:typeof x==='string'?Number(x.split('-').at(-1))>0:false};
-      if(greaterThanZero(mx)&&greaterThanZero(mc))add('warning','XMUX_CONFLICT','maxConcurrency и maxConnections одновременно заданы положительными. Проверьте выбор стратегии xmux.',mc,ap.concat('xmux','maxConnections'));
+      if(greaterThanZero(mx)&&greaterThanZero(mc))add('warning','XMUX_CONFLICT','maxConcurrency и maxConnections одновременно заданы положительными. Проверьте выбор стратегии xmux.',mc,muxPath.concat('xmux','maxConnections'));
      }
     }
     for(const field of ['xPaddingBytes','scMaxEachPostBytes','scMinPostsIntervalMs','uplinkChunkSize','sessionIDLength','scStreamUpServerSecs']){
