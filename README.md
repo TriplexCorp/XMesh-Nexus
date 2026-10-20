@@ -49,6 +49,16 @@ docker compose restart panel
 docker compose down
 ~~~
 
+### Interactive terminal CLI
+
+The `xmeshctl` menu lets you check service status, follow logs, restart the panel or stack, create a database backup, check readiness, start/stop services, and update the application from its tracked GitHub branch.
+
+~~~bash
+bash xmeshctl
+~~~
+
+The update action refuses to run with uncommitted local changes, creates a PostgreSQL backup first, fetches GitHub, applies only a fast-forward update, validates Compose configuration, and rebuilds/restarts the stack. It does not delete Docker volumes or reset credentials. If the backup fails or the branch has diverged, the update is stopped so you can investigate safely. Keep off-host copies of backups for disaster recovery.
+
 Create and verify a PostgreSQL custom-format backup, with 14-day local retention:
 
 ~~~bash
