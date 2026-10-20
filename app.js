@@ -22,7 +22,7 @@ const ACTION_ICON_RULES=[
  [/копир|скопировать|copy|буфер/i,'copy'],
  [/скача|экспорт|download|export|резервн.*коп|backup/i,'dl'],
  [/импорт|загрузить файл|upload|import/i,'upload'],
- [/проверить статус|обновить|перезагруз|синхрон|повторить|сбросить|refresh|reload|sync/i,'redo'],
+ [/проверить статус|обновить|перезапуск|перезапустить|перезагруз|синхрон|повторить|сбросить|refresh|reload|sync/i,'redo'],
  [/отключ|останов|pause|stop/i,'pause'],
  [/включ|запуст|активир|enable|start/i,'play'],
  [/генер|создать пару|новый short id|uuid|парол/i,'tool'],
@@ -1128,9 +1128,9 @@ async function profilesP(){
   $('#xpb-generate-short').onclick=()=>{$('#xpb-short-id').value=randomShortId();updatePreview();toast('Short ID создан')};
   $('#xpb-generate-ss-password').onclick=()=>{const method=$('#xpb-ss-method').value||'chacha20-ietf-poly1305';const n=method==='2022-blake3-aes-128-gcm'?16:32;$('#xpb-ss-password').value=randomBase64(n);$('#xpb-ss-user-password').value=randomBase64(n);updatePreview();toast('Пароли Shadowsocks сгенерированы')};
   $('#xpb-generate-uuid').onclick=()=>{const u=crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=crypto.getRandomValues(new Uint8Array(1))[0]&15;return(c==='x'?r:(r&3|8)).toString(16)});$('#xpb-uuid').value=u;updatePreview();toast('UUID создан')};
-  $('#xpb-generate-keys').onclick=async()=>{const b=$('#xpb-generate-keys');b.disabled=true;b.textContent='Генерация…';try{const keys=await generateRealityKeyPair();$('#xpb-private-key').value=keys.privateKey;$('#xpb-public-key').value=keys.publicKey;updatePreview();toast('Пара X25519 сгенерирована')}catch(e){$('#xpb-error').textContent=e.message;toast('Не удалось сгенерировать Reality: '+e.message)}finally{b.disabled=false;b.textContent='Сгенерировать пару ключей'}};
+  $('#xpb-generate-keys').onclick=async()=>{const b=$('#xpb-generate-keys');b.disabled=true;b.lastChild.textContent='Генерация…';try{const keys=await generateRealityKeyPair();$('#xpb-private-key').value=keys.privateKey;$('#xpb-public-key').value=keys.publicKey;updatePreview();toast('Пара X25519 сгенерирована')}catch(e){$('#xpb-error').textContent=e.message;toast('Не удалось сгенерировать Reality: '+e.message)}finally{b.disabled=false;b.lastChild.textContent='Сгенерировать пару ключей'}};
   $('#xpb-generate-vlessenc').onclick=async()=>{
-   const b=$('#xpb-generate-vlessenc');b.disabled=true;const label=b.textContent;b.textContent='Запрос к Xray-core…';
+   const b=$('#xpb-generate-vlessenc');b.disabled=true;const label=b.lastChild.textContent;b.lastChild.textContent='Запрос к Xray-core…';
    try{
     const result=await backendRequest('/api/v1/core/vlessenc',{method:'POST',body:JSON.stringify({})});
     if(!result||!result.x25519||!result.mlkem768||typeof result.x25519.decryption!=='string'||typeof result.mlkem768.encryption!=='string')throw new Error('Xray-core вернул неизвестный формат ответа. Обновите ядро и повторите.');
@@ -1140,7 +1140,7 @@ async function profilesP(){
     selectGeneratedPair();updateVisibility();updatePreview();
     toast(mode==='mlkem768'?'Пара ML-KEM-768 сгенерирована':'Пара X25519 сгенерирована');
    }catch(e){const message=e.message||'Не удалось сгенерировать VLESS Encryption';$('#xpb-error').textContent=message;toast(message);}
-   finally{b.disabled=false;b.textContent=label}
+   finally{b.disabled=false;b.lastChild.textContent=label}
   };
   const copyText=async id=>{try{await navigator.clipboard.writeText($('#'+id).value);toast('JSON скопирован')}catch(e){$('#'+id).select();document.execCommand('copy');toast('JSON скопирован')}};
   const download=(id,suffix)=>{const a=document.createElement('a'),blob=URL.createObjectURL(new Blob([$('#'+id).value],{type:'application/json'}));a.href=blob;a.download=((($('#xpb-name').value||'xray-studio').trim().replace(/[^a-z0-9_-]+/gi,'-')||'xray-studio')+'-'+suffix+'.json');a.click();setTimeout(()=>URL.revokeObjectURL(blob),1000)};
