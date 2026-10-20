@@ -13,22 +13,33 @@ const P={home:'<rect x="3" y="3" width="7" height="9" rx="1.500"/><rect x="14" y
 const ic=n=>`<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${P[n]}</svg>`;
 // Only explicit action buttons receive icons. Navigation tabs, palettes and Xray
 // mode selectors have their own visual language and must never be decorated.
+// Semantic icons for action buttons only. Existing icons and tab controls stay untouched.
 const ACTION_ICON_RULES=[
- [/^(?:выйти|logout|sign out|log out)$/i,'logout'],
- [/^(?:сохранить|сохранить профиль|save|применить)$/i,'save'],
- [/^(?:удалить|удалить профиль|delete|remove)$/i,'trash'],
- [/^(?:отмена|закрыть|cancel|close)$/i,'x'],
- [/^(?:добавить|добавить узел|создать|создать сквад|новый пользователь|new|add)$/i,'plus'],
- [/^(?:копировать(?: id| server json| client json)?|скопировать(?: токен| команду)?|copy)$/i,'copy'],
- [/^(?:скачать(?: резервную копию| server.json| client.json)?|экспорт|download|export)$/i,'dl'],
- [/^(?:импорт json|импортировать|import json)$/i,'upload'],
- [/^(?:проверить статус|обновить|обновить список|сбросить трафик|сбросить оформление|refresh)$/i,'redo'],
- [/^(?:редактировать|изменить|edit)$/i,'pen'],
- [/^(?:включить|запустить|установить \/ обновить)$/i,'play'],
- [/^(?:отключить|остановить)$/i,'pause'],
- [/^(?:сгенерировать (?:пару ключей|пару на сервере|uuid|пароли)|новый short id)$/i,'tool'],
- [/^(?:форматировать|форматировать json)$/i,'code'],
- [/^(?:готово|подтвердить)$/i,'check']
+ [/выйти|logout|sign out|log out/i,'logout'],
+ [/удал|стереть|очистить|отозвать|delete|remove/i,'trash'],
+ [/сохран|применить|save|apply/i,'save'],
+ [/отмен|закры|cancel|close/i,'x'],
+ [/копир|скопировать|copy|буфер/i,'copy'],
+ [/скача|экспорт|download|export|резервн.*коп|backup/i,'dl'],
+ [/импорт|загрузить файл|upload|import/i,'upload'],
+ [/проверить статус|обновить|перезагруз|синхрон|повторить|сбросить|refresh|reload|sync/i,'redo'],
+ [/отключ|останов|pause|stop/i,'pause'],
+ [/включ|запуст|активир|enable|start/i,'play'],
+ [/генер|создать пару|новый short id|uuid|парол/i,'tool'],
+ [/добав|созда|новый|новая|new\b|add\b|create|продл/i,'plus'],
+ [/редакт|изменить|переимен|edit/i,'pen'],
+ [/поиск|найти|search/i,'search'],
+ [/фильтр|filter/i,'filter'],
+ [/настрой|параметр|settings/i,'sliders'],
+ [/уведомлен|событи|notification/i,'bell'],
+ [/диагност|метрик|статист|состояние/i,'activity'],
+ [/сервер|нода|узел|node|server/i,'server'],
+ [/подписк|ссылка|url|link/i,'link'],
+ [/защит|безопас|security/i,'shield'],
+ [/json|конфиг|код|format|формат/i,'code'],
+ [/профил|шаблон|profile/i,'layers'],
+ [/документ|файл|file/i,'file'],
+ [/готово|подтверд|confirm|применить/i,'check']
 ];
 function decorateButtonIcons(root){
  if(!root||!root.querySelectorAll)return;
@@ -36,12 +47,16 @@ function decorateButtonIcons(root){
  if(root.nodeType===1&&root.matches('button'))buttons.push(root);
  buttons.push(...root.querySelectorAll('button'));
  buttons.forEach(button=>{
-  if(button.querySelector('.ic,.xray-tab-icon')||button.dataset.actionIcon==='done')return;
-  if(button.closest('.xray-config-tabs,.xray-presets,.xray-output-tabs,.xray-preset-row,.seg,.fl,.swt,.choice,.palette-swatch,.country-picker,.color-bubbles,[role="tablist"]'))return;
-  if(button.matches('.palette-swatch,.xray-preset,.xray-import-btn,[data-xray-config-tab],[data-xray-output],[data-ui],[data-th],[data-ac],[data-uf],[data-s],[data-dt],[data-tt],[data-lv],[data-traffic-range],[data-node-grid-mode],[data-xray-mode]'))return;
-  const label=(button.getAttribute('aria-label')||button.textContent||'').replace(/\s+/g,' ').trim();
+  if(button.querySelector('svg,.ic,.xray-tab-icon')||button.dataset.actionIcon==='done')return;
+  // These controls are selectors/tabs rather than actions; they have their own layout.
+  if(button.closest('.seg,.fl,.swt,.choice,.palette-swatch,.country-picker,.color-bubbles,[role="tablist"],.xray-presets,.xray-preset-row'))return;
+  if(button.matches('.palette-swatch,.country-option,[role="switch"],[data-ui],[data-th],[data-ac],[data-uf],[data-s],[data-dt],[data-tt],[data-lv],[data-traffic-range],[data-node-grid-mode],[data-xray-mode],[data-xray-config-tab],[data-xray-output]'))return;
+  // Do not decorate arbitrary buttons (e.g. sortable table headings).
+  if(!button.matches('.btn,.gh,.dg,.ib,.ia,.sm,[data-ne],[data-exp],[data-nu],[data-a],[data-bk],[data-core-refresh],[data-core-update]'))return;
+  const label=(button.getAttribute('aria-label')||button.getAttribute('title')||button.textContent||'').replace(/\s+/g,' ').trim();
+  if(!label)return;
   const icon=ACTION_ICON_RULES.find(([pattern])=>pattern.test(label))?.[1];
-  if(!icon)return;
+  if(!icon||!P[icon])return;
   button.insertAdjacentHTML('afterbegin',ic(icon));
   button.dataset.actionIcon='done';
  });
@@ -642,7 +657,7 @@ async function profilesP(){
  const group=(title,desc,body)=>'<section class="xray-section"><header class="xray-section-heading"><div><b>'+title+'</b><small>'+desc+'</small></div></header><div class="xray-section-body">'+body+'</div></section>';
  const optionGroup=(key,title,desc,body)=>'<section class="xray-option-group" data-xray-option-group="'+key+'"><div class="xray-option-group-head"><div><b>'+title+'</b><small>'+desc+'</small></div></div><div class="xray-option-grid">'+body+'</div></section>';
  const builderHtml='<section class="card xray-builder"><div class="xray-hero"><div class="xray-heading-copy"><p class="note">XRAY CORE · CONFIGURATOR</p><h2>XRAY STUDIO</h2><p class="xray-hero-description">Настройте inbound — конфигурации сервера и клиента обновятся автоматически.</p></div></div>'+
- '<div class="xray-presets"><div class="xray-preset-row" role="group" aria-label="Режим настройки"><button type="button" class="xray-preset on" data-xray-mode="visual" aria-pressed="true"><b>Конструктор</b></button><button type="button" class="xray-preset" data-xray-mode="custom" aria-pressed="false"><b>Ручной JSON</b></button></div><button type="button" class="xray-import-btn" id="xpb-import-trigger">Импорт JSON</button><input type="file" id="xpb-import-file" accept=".json,application/json,text/json" aria-label="Выбрать файл JSON" hidden></div>'+
+ '<div class="xray-presets"><div class="xray-preset-row" role="group" aria-label="Режим настройки"><button type="button" class="xray-preset on" data-xray-mode="visual" aria-pressed="true">${ic('sliders')}<b>Конструктор</b></button><button type="button" class="xray-preset" data-xray-mode="custom" aria-pressed="false"><b>Ручной JSON</b></button></div><button type="button" class="xray-import-btn" id="xpb-import-trigger">Импорт JSON</button><input type="file" id="xpb-import-file" accept=".json,application/json,text/json" aria-label="Выбрать файл JSON" hidden></div>'+
  '<div class="xray-meta-grid">'+
  field('name','Название профиля',inp('name','VLESS Reality','Например, DE · Reality','maxlength="80" required'))+
  field('tag','Тег inbound',inp('tag','vless-reality','Уникальный tag','maxlength="64"'))+
@@ -651,11 +666,11 @@ async function profilesP(){
  '<div class="xray-workspace-layout"><div class="xray-editor-pane">'+
  '<div id="xpb-visual-mode">'+
  '<div class="xray-config-steps"><nav class="xray-config-tabs" role="tablist" aria-label="Шаги настройки inbound">'+
- '<button type="button" class="on" data-xray-config-tab="basic" role="tab" aria-selected="true" aria-controls="xpb-config-basic"><span>01</span><b>Основное</b><small>Inbound, сеть, порт, защита</small></button>'+
- '<button type="button" data-xray-config-tab="security" role="tab" aria-selected="false" aria-controls="xpb-config-security"><span>02</span><b>Защита</b><small>TLS, Reality, SNI, сертификаты</small></button>'+
- '<button type="button" data-xray-config-tab="transport" role="tab" aria-selected="false" aria-controls="xpb-config-transport"><span>03</span><b>Транспорт</b><small>Транспорт и специальные режимы</small></button>'+
- '<button type="button" data-xray-config-tab="encryption" role="tab" aria-selected="false" aria-controls="xpb-config-encryption"><span>04</span><b>VLESS Encryption</b><small>Режим и пара ключей</small></button>'+
- '<button type="button" data-xray-config-tab="client" role="tab" aria-selected="false" aria-controls="xpb-config-client"><span>05</span><b>Протокол и клиент</b><small>Учётные данные, fingerprint, спец. настройки</small></button>'+
+ '<button type="button" class="on" data-xray-config-tab="basic" role="tab" aria-selected="true" aria-controls="xpb-config-basic">${ic('server')}<span>01</span><b>Основное</b><small>Inbound, сеть, порт, защита</small></button>'+
+ '<button type="button" data-xray-config-tab="security" role="tab" aria-selected="false" aria-controls="xpb-config-security">${ic('shield')}<span>02</span><b>Защита</b><small>TLS, Reality, SNI, сертификаты</small></button>'+
+ '<button type="button" data-xray-config-tab="transport" role="tab" aria-selected="false" aria-controls="xpb-config-transport">${ic('link')}<span>03</span><b>Транспорт</b><small>Транспорт и специальные режимы</small></button>'+
+ '<button type="button" data-xray-config-tab="encryption" role="tab" aria-selected="false" aria-controls="xpb-config-encryption">${ic('tool')}<span>04</span><b>VLESS Encryption</b><small>Режим и пара ключей</small></button>'+
+ '<button type="button" data-xray-config-tab="client" role="tab" aria-selected="false" aria-controls="xpb-config-client">${ic('users')}<span>05</span><b>Протокол и клиент</b><small>Учётные данные, fingerprint, спец. настройки</small></button>'+
  '</nav><div class="xray-config-content">'+
  '<div class="xray-config-panel" id="xpb-config-basic" data-xray-config-panel="basic">'+
  '<div class="xray-config-panel-title"><div><h3>Основные параметры</h3><p>Выберите протокол inbound, сетевой транспорт, порт и режим TLS/Reality.</p></div><span class="xray-config-required">ОБЯЗАТЕЛЬНОЕ</span></div>'+
@@ -783,8 +798,8 @@ async function profilesP(){
  '<div class="xray-output-workspace-head"><div><p class="note">JSON PREVIEW</p><b>Результат конфигурации</b><small>Server JSON и Client JSON обновляются по мере настройки. Экспорт не применяет конфиг к работающему ядру.</small></div><span class="xray-output-state" id="xpb-output-state">Предпросмотр готов</span></div>'+
  '<div class="xray-output-toolbar">'+
  '<div class="xray-output-tabs" role="tablist" aria-label="Выберите тип JSON">'+
- '<button type="button" id="xpb-tab-server" class="on" role="tab" aria-selected="true" aria-controls="xpb-output-server" data-xray-output="server"><span class="xray-output-tab-kicker">01 · SERVER</span><b>Server JSON</b><small>Inbound · слушающий узел</small></button>'+
- '<button type="button" id="xpb-tab-client" role="tab" aria-selected="false" aria-controls="xpb-output-client" data-xray-output="client"><span class="xray-output-tab-kicker">02 · CLIENT</span><b>Client JSON</b><small>Outbound · подключение клиента</small></button>'+
+ '<button type="button" id="xpb-tab-server" class="on" role="tab" aria-selected="true" aria-controls="xpb-output-server" data-xray-output="server">${ic('server')}<span class="xray-output-tab-kicker">01 · SERVER</span><b>Server JSON</b><small>Inbound · слушающий узел</small></button>'+
+ '<button type="button" id="xpb-tab-client" role="tab" aria-selected="false" aria-controls="xpb-output-client" data-xray-output="client">${ic('users')}<span class="xray-output-tab-kicker">02 · CLIENT</span><b>Client JSON</b><small>Outbound · подключение клиента</small></button>'+
  '</div>'+
  '<div class="xray-key-actions xray-output-actions" id="xpb-actions-server"><button type="button" class="gh sm" id="xpb-copy" title="Копировать Server JSON" aria-label="Копировать Server JSON">Копировать</button><button type="button" class="gh sm" id="xpb-download" title="Скачать server.json" aria-label="Скачать server.json">Скачать</button></div>'+
  '<div class="xray-key-actions xray-output-actions" id="xpb-actions-client" hidden><button type="button" class="gh sm" id="xpb-client-copy" title="Копировать Client JSON" aria-label="Копировать Client JSON">Копировать</button><button type="button" class="gh sm" id="xpb-client-download" title="Скачать client.json" aria-label="Скачать client.json">Скачать</button></div>'+
