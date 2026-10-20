@@ -639,50 +639,40 @@ function userDrawer(id,tab){
   const tabs=[['ov','Обзор'],['acc','Доступ'],['sub','Подписка'],['dev','Устройства '+u.devices.length+'/'+u.hwid]];
   const body={
     ov:`<div class="user-overview">
-      <section class="user-usage-card" aria-label="Использование трафика">
-        <div class="user-usage-heading">
-          <span class="user-detail-label">${ic('activity')} Трафик</span>
-          <div class="user-usage-actions"><span class="user-limit-label">${u.limit?'Лимит '+u.limit+' ГБ':'Без лимита'}</span><button type="button" class="user-reset-traffic" data-a="rst" data-u="${u.id}" title="Сбросить использованный трафик">${ic('redo')}<span>Сбросить</span></button></div>
+      <div class="user-usage-line">
+        <span>Трафик</span>
+        <strong>${gb(u.used)}</strong>
+        <small>${u.limit?'из '+u.limit+' ГБ':'без лимита'}</small>
+        <button type="button" class="user-action-text" data-a="rst" data-u="${u.id}" title="Обнулить использованный трафик">${ic('redo')}<span>Сбросить</span></button>
+      </div>
+      ${u.limit?`<div class="user-usage-track" style="--usage:${Math.min(100,Math.max(0,k*100))}%" role="progressbar" aria-label="Использование трафика" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(Math.min(100,Math.max(0,k*100)))}"><i></i></div>`:''}
+      <form data-k="uedit" data-id="${u.id}" method="dialog" class="user-inline-editor">
+        <div class="user-editor-head"><h3>Параметры</h3><button class="btn user-save-button" type="submit">${ic('check')} Сохранить</button></div>
+        <div class="user-edit-fields">
+          ${field(FE[0],u.username)}
+          ${field(FE[1],u.fingerprint)}
+          ${field(FE[2],u.limit)}
+          ${userDateField(u)}
+          ${field(FE[4],u.strategy)}
         </div>
-        <div class="user-usage-amount"><strong>${gb(u.used)}</strong><span>${u.limit?'из '+u.limit+' ГБ':'использовано'}</span></div>
-        ${u.limit?`<div class="pb f user-usage-progress${k>=1?' er':k>.85?' wr':''}" style="--w:${Math.min(100,Math.max(0,k*100))}%" role="progressbar" aria-label="Использование трафика" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(Math.min(100,Math.max(0,k*100)))}"><i></i></div>`:'<span class="user-usage-unlimited">Ограничение трафика не установлено</span>'}
-      </section>
-      <div class="user-credential-grid">
-        <section class="user-detail-card" aria-label="Идентификатор Xray">
-          <div class="user-detail-title"><span class="user-detail-label">${ic('key')} Xray ID</span><span class="user-detail-kind">UUID</span></div>
-          <div class="user-code-row"><code title="${esc(u.xrayId||'Не назначен')}">${esc(u.xrayId||'Не назначен')}</code>${u.xrayId?`<button type="button" class="gh sm user-copy-button" data-copy-xray-id="${u.id}" aria-label="Копировать Xray ID">${ic('copy')}<span>Копировать</span></button>`:''}</div>
-          <small>Персональный идентификатор подключения</small>
-        </section>
-        <section class="user-detail-card" aria-label="Fingerprint клиента">
-          <div class="user-detail-title"><span class="user-detail-label">${ic('sliders')} Fingerprint</span><span class="user-detail-kind">uTLS</span></div>
-          <div class="user-code-row"><code>${esc(u.fingerprint||'chrome')}</code></div>
-          <small>Отпечаток клиента для этого пользователя</small>
-        </section>
+        <details class="user-more">
+          <summary><span>Контакты и заметки</span><small>Дополнительные поля</small>${ic('chevronRight')}</summary>
+          <div class="user-edit-extra">${FE.slice(5).map(f=>field(f,u[f.k])).join('')}</div>
+        </details>
+        <p class="er" id="fe" role="status"></p>
+      </form>
+      <div class="user-identity-row">
+        <span>Xray ID</span>
+        <code title="${esc(u.xrayId||'Не назначен')}">${esc(u.xrayId||'Не назначен')}</code>
+        ${u.xrayId?`<button type="button" class="user-id-copy" data-copy-xray-id="${u.id}" aria-label="Копировать Xray ID" title="Копировать ID">${ic('copy')}</button>`:''}
       </div>
-      <p class="user-overview-notice">${ic('link')}<span>Это параметры Xray-подключения, а не готовая подписка. Для выдачи рабочей ссылки потребуется привязать профиль и настроить генератор подписок.</span></p>
-    </div>
-    <form data-k="uedit" data-id="${u.id}" method="dialog" class="user-edit-form user-inline-editor">
-      <div class="user-editor-head">
-        <div class="user-editor-title"><h3>Настройки пользователя</h3><small>Редактируйте поля прямо здесь</small></div>
-        <button type="submit" class="btn user-save-button">${ic('check')} Сохранить</button>
-      </div>
-      <div class="user-edit-fields user-edit-primary">
-        ${FE.slice(0,3).map(f=>field(f,u[f.k])).join('')}
-        ${userDateField(u)}
-      </div>
-      <div class="user-edit-section-label"><b>Дополнительно</b><small>Сброс трафика и контактные данные</small></div>
-      <div class="user-edit-fields user-edit-secondary">
-        ${FE.slice(4).map(f=>field(f,u[f.k])).join('')}
-      </div>
-      <p class="er" id="fe" role="status"></p>
-    </form>
-    <div class="user-overview-meta"><span>Создан ${new Date(u.created).toLocaleDateString('ru-RU')}</span><span>Администратор: ${esc(DB.admins.find(a=>a.id==u.adminId)?.username||'—')}</span></div>`,
+      <div class="user-overview-meta"><span>Создан ${new Date(u.created).toLocaleDateString('ru-RU')}</span><span>${esc(DB.admins.find(a=>a.id==u.adminId)?.username||'—')}</span></div>
+    </div>`,
     acc:`<p class="note">Отметьте сквады: доступ меняется сразу.</p><div class="ms">${DB.squads.map(s=>`<label class="ck"><input type="checkbox" data-usq="${u.id}:${s.id}" ${u.squads.includes(s.id)?'checked':''}><span>${esc(s.name)}</span></label>`).join('')}</div><div><span class="mu">Итоговые инбаунды</span><div style="margin-top:.5rem">${uin(u).map(t=>chip(esc(t),tcol(t))).join(' ')||'<span class="mu">Нет доступа</span>'}</div></div><div><span class="mu">Хосты в подписке</span><div style="margin-top:.5rem">${DB.hosts.filter(x=>!x.disabled&&uin(u).includes(x.tag)).map(x=>`<div class="rowi">${esc(x.remark)}<small class="mu" style="margin-left:auto">${esc(x.address)}:${x.port}</small></div>`).join('')||'<span class="mu">Нет подходящих хостов</span>'}</div></div><label class="f"><span>Лимит устройств</span><input type="number" min="0" value="${u.hwid}" data-hw="${u.id}"></label>`,
     sub:`<div class="history-placeholder"><b style="display:block;color:var(--tx);margin-bottom:.35rem">Подписка ещё не подключена</b>В этой HTML-версии не настроен API, который выпускает рабочие ссылки подписки и QR-коды. Поэтому здесь не показывается фиктивная ссылка.</div><a class="gh" href="#set" data-scroll-target="brand-panel" style="text-decoration:none;color:inherit;justify-self:start">${ic('sliders')}Настроить домен</a>`,
     dev:u.devices.length?u.devices.map(d=>`<div class="rowi"><div><b>${esc(d.model)}</b> ${chip(d.plat,'--c3')}<br><small class="mu">${esc(d.app)} · был ${ago(d.last)}</small></div><button class="ia" data-dd="${u.id}:${d.id}" aria-label="Удалить устройство">${ic('trash')}</button></div>`).join('')+(u.devices.length>u.hwid?`<p class="er">Устройств больше лимита (${u.hwid}).</p>`:''):'<div class="empty">Устройства ещё не подключались</div>'}[UT];
-  modal(`<div class="box"><div class="bar2"><div class="who"><span class="av" style="background:hsl(${h} 55% 68%)">${esc(u.username[0].toUpperCase())}</span><div><h2>${esc(u.username)}</h2>${chip(sl,sc)} ${isOn(u)?'<span class="dot"></span>':''}</div></div><button class="ia" data-x style="margin-left:auto" aria-label="Закрыть">${ic('x')}</button></div>
-  <div class="acts user-modal-actions"><button class="gh sm" data-a="tog" data-u="${u.id}">${ic(u.disabled?'play':'pause')}${u.disabled?'Включить':'Отключить'}</button><button class="dg sm" data-a="del" data-u="${u.id}">${ic('trash')}Удалить</button></div>
-  <div class="seg" id="dt">${tabs.map(([k,l])=>`<button data-dt="${k}" class="${UT==k?'on':''}">${l}</button>`).join('')}</div>${body}</div>`,'user-modal');
+  modal(`<div class="box user-drawer"><div class="user-head"><div class="who"><span class="av" style="background:hsl(${h} 55% 68%)">${esc(u.username[0].toUpperCase())}</span><div><h2>${esc(u.username)}</h2>${chip(sl,sc)} ${isOn(u)?'<span class="dot"></span>':''}</div></div><div class="user-head-actions"><button class="gh sm" data-a="tog" data-u="${u.id}">${ic(u.disabled?'play':'pause')}${u.disabled?'Включить':'Отключить'}</button><button class="ia user-remove" data-a="del" data-u="${u.id}" aria-label="Удалить пользователя" title="Удалить">${ic('trash')}</button><button class="ia" data-x aria-label="Закрыть">${ic('x')}</button></div></div>
+  <div class="seg user-tabs" id="dt">${tabs.map(([k,l])=>`<button data-dt="${k}" class="${UT==k?'on':''}">${l}</button>`).join('')}</div>${body}</div>`,'user-modal');
 }
 function userNew(){
   if(!DB.squads.length){modal(`<div class="box"><h2>Сначала создайте сквад</h2><p class="note">Пользователю нужно назначить группу доступа. Создайте сквад, а затем вернитесь к созданию пользователя.</p><div class="act"><button class="gh" data-x>Отмена</button><button class="btn" data-ne="squads">${ic('plus')}Создать сквад</button></div></div>`);return}
