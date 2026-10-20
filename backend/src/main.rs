@@ -725,10 +725,10 @@ async fn get_traffic_metrics(
     State(state): State<AppState>,
     Query(query): Query<TrafficMetricsQuery>,
 ) -> Result<Json<Value>, ApiError> {
-    let (range, bucket_interval, range_interval, interval_seconds) =
+    let (range, interval_seconds) =
         match query.range.as_deref().unwrap_or("1h") {
-            "1h" => ("1h", "1 minute", "1 hour", 60_i64),
-            "24h" => ("24h", "15 minutes", "24 hours", 900_i64),
+            "1h" => ("1h", 60_i64),
+            "24h" => ("24h", 900_i64),
             _ => return Err(ApiError::new(StatusCode::BAD_REQUEST, "Период должен быть 1h или 24h.")),
         };
 
@@ -739,7 +739,8 @@ async fn get_traffic_metrics(
     // Node identifiers in the hypertable are text versions of panel_records.id.
     // A squad includes nodes whose assigned Xray profile has at least one inbound
     // tag in common with that squad's inbound list.
-    let sql_template = "WITH selected_nodes AS (
+    let rows = sqlx::query(
+        "WITH selected_nodes AS (
             SELECT n.id::text AS node_id
             FROM panel_records n
             LEFT JOIN panel_records p
@@ -779,13 +780,13 @@ async fn get_traffic_metrics(
         ),
         per_node_bucket AS (
             SELECT
-                time_bucket($3::interval, s.sampled_at) AS bucket,
+                time_bucket(CASE WHEN $3 = '1h' THEN INTERVAL '1 minute' ELSE INTERVAL '15 minutes' END, s.sampled_at) AS bucket,
                 s.node_id,
                 AVG(s.rx_bytes_per_sec) AS rx_bytes_per_sec,
                 AVG(s.tx_bytes_per_sec) AS tx_bytes_per_sec,
                 COUNT(*)::BIGINT AS sample_count
             FROM server_metric_samples s
-            WHERE s.sampled_at >= NOW() - $4::interval
+            WHERE s.sampled_at >= NOW() - CASE WHEN $3 = '1h' THEN INTERVAL '1 hour' ELSE INTERVAL '24 hours' END
               AND s.node_id IN (SELECT node_id FROM selected_nodes)
             GROUP BY 1, 2
         )
@@ -798,17 +799,12 @@ async fn get_traffic_metrics(
         FROM per_node_bucket
         GROUP BY bucket
         ORDER BY bucket ASC"
-    ;
-    // These intervals are chosen exclusively from the two fixed supported range options above.
-    // Keep them as trusted SQL literals so PostgreSQL receives interval-typed parameters correctly.
-    let sql = sql_template
-        .replace("$3::interval", &format!("'{bucket_interval}'::interval"))
-        .replace("$4::interval", &format!("'{range_interval}'::interval"));
-    let rows = sqlx::query(&sql)
-        .bind(query.node_id)
-        .bind(query.squad_id)
-        .fetch_all(&state.pool)
-        .await?;
+    )
+    .bind(query.node_id)
+    .bind(query.squad_id)
+    .bind(range)
+    .fetch_all(&state.pool)
+    .await?;
 
     let mut points = Vec::with_capacity(rows.len());
     let mut total_samples = 0_i64;
