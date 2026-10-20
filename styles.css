@@ -1032,6 +1032,38 @@ nav a.on{background:color-mix(in srgb,var(--a) 10%,var(--s2));box-shadow:none}
   cursor:pointer;
   transition:background .16s,border-color .16s,color .16s;
 }
+/* Explicit icons in XRAY Studio navigation: fixed geometry, no label collisions. */
+.xray-builder .xray-config-tabs button{
+ grid-template-columns:1.2rem 1.2rem minmax(0,1fr);
+ column-gap:.38rem;
+}
+.xray-builder .xray-config-tabs button>.ic{
+ grid-column:1;
+ grid-row:1;
+ width:1.05rem;
+ height:1.05rem;
+}
+.xray-builder .xray-config-tabs button>span{grid-column:2;grid-row:1}
+.xray-builder .xray-config-tabs button>b{grid-column:1/-1;grid-row:2}
+.xray-builder .xray-output-tabs button{
+ grid-template-columns:1.1rem minmax(0,1fr);
+ column-gap:.42rem;
+}
+.xray-builder .xray-output-tabs button>.ic{
+ grid-column:1;
+ grid-row:1;
+ width:1rem;
+ height:1rem;
+}
+.xray-builder .xray-output-tabs button>b{grid-column:1/-1;grid-row:2}
+.xray-builder .xray-preset-row .xray-preset{
+ display:inline-flex;
+ align-items:center;
+ justify-content:center;
+ gap:.45rem;
+}
+.xray-builder .xray-preset-row .xray-preset>.ic{width:1rem;height:1rem;flex:0 0 1rem}
+.xray-builder .xray-key-actions button>.ic{width:.95rem;height:.95rem;flex:0 0 .95rem}
 .xray-builder .xray-config-tabs button:hover{
   border-color:color-mix(in srgb,var(--a) 48%,var(--ln));
   color:var(--tx);
