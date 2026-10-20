@@ -825,6 +825,10 @@ async function profilesP(){
       const ids=rk.shortIds||[];
       if(!Array.isArray(ids)||ids.some(id=>String(id).length>16||String(id).length%2||!/^[a-fA-F0-9]*$/.test(String(id))))throw new Error('Inbound '+(inbound.tag||'(без tag)')+': Short ID должен быть массивом из hex-значений до 16 символов чётной длины.');
      }
+     if(inbound?.protocol==='vless'&&inbound.settings?.decryption&&inbound.settings.decryption!=='none'){
+      const decryption=String(inbound.settings.decryption);
+      if(decryption.startsWith('REPLACE_')||!decryption.startsWith('mlkem768x25519plus.'))throw new Error('Inbound '+(inbound.tag||'(без tag)')+': задайте корректный VLESS Encryption decryption из xray vlessenc.');
+     }
      if(inbound?.protocol==='shadowsocks'){
       const ss=inbound.settings||{};
       const ssUsersForValidation=Array.isArray(ss.users)?ss.users:[];
