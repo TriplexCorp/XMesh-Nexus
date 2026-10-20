@@ -246,7 +246,7 @@ function exportCsv(){const rows=[['username','status','used_gb','limit_gb','expi
 /* ================= XRAY STUDIO: PROTOCOLS, TRANSPORTS & FINGERPRINTS ================= */
 const XRAY_FP=['chrome','firefox','safari','ios','android','edge','360','qq','random','randomized','randomized-no-sni'];
 const XRAY_PROTOCOLS=[['vless','VLESS'],['vmess','VMess'],['trojan','Trojan'],['shadowsocks','Shadowsocks'],['socks','SOCKS'],['http','HTTP proxy'],['dokodemo-door','Dokodemo-door'],['wireguard','WireGuard']];
-const XRAY_NETWORKS=[['raw','RAW / TCP'],['xhttp','XHTTP'],['ws','WebSocket'],['grpc','gRPC'],['httpupgrade','HTTPUpgrade'],['kcp','mKCP']];
+const XRAY_NETWORKS=[['raw','RAW / TCP'],['xhttp','XHTTP'],['websocket','WebSocket'],['grpc','gRPC'],['httpupgrade','HTTPUpgrade'],['mkcp','mKCP']];
 function xrayBuilderConfig(){
  const v=id=>$('#xpb-'+id)?.value||'',protocol=v('protocol'),network=v('network'),security=v('security'),tag=v('tag').trim()||'inbound-1',port=cl(+v('port')||443,1,65535),sni=v('sni').trim(),dest=v('dest').trim()||(sni?sni+':443':'example.com:443'),path=v('path').trim()||'/',uuid=v('uuid')||'';
  const flow=protocol==='vless'&&['tls','reality'].includes(security)&&network==='raw'?v('flow'):'';
@@ -264,13 +264,13 @@ function xrayBuilderConfig(){
  if(protocol==='vless'&&flow)settings.flow=flow;
  const inbound={tag,listen:v('listen')||'0.0.0.0',port,protocol,settings};
  if(['raw','xhttp','ws','grpc','httpupgrade','kcp'].includes(network)&&!['dokodemo-door','wireguard'].includes(protocol)){
-  inbound.streamSettings={network,security};
+  inbound.streamSettings={method:network,security};
   const ss=inbound.streamSettings;
-  if(network==='ws')ss.wsSettings={path,headers:v('host')?{Host:v('host')}:{},heartbeatPeriod:0};
+  if(network==='websocket')ss.wsSettings={path,headers:v('host')?{Host:v('host')}:{},heartbeatPeriod:0};
   if(network==='xhttp')ss.xhttpSettings={path,host:v('host'),mode:v('xhttp-mode')||'auto',extra:{xPaddingBytes:v('xhttp-padding')||'100-1000'}};
   if(network==='grpc')ss.grpcSettings={serviceName:path.replace(/^\//,'')||'grpc',multiMode:v('grpc-mode')==='multi'};
   if(network==='httpupgrade')ss.httpupgradeSettings={path,host:v('host')};
-  if(network==='kcp')ss.kcpSettings={mtu:1350,tti:20,uplinkCapacity:5,downlinkCapacity:20,congestion:false,readBufferSize:2,writeBufferSize:2,seed:v('kcp-seed')||''};
+  if(network==='mkcp')ss.kcpSettings={mtu:1350,tti:20,uplinkCapacity:5,downlinkCapacity:20,congestion:false,readBufferSize:2,writeBufferSize:2,seed:v('kcp-seed')||''};
   if(network==='raw'&&v('raw-header')==='http')ss.rawSettings={header:{type:'http',request:{version:'1.1',method:'GET',path:[path],headers:{Host:[v('host')||sni||'example.com'],'User-Agent':['Mozilla/5.0'],'Accept-Encoding':['gzip, deflate'],'Connection':['keep-alive']}}}};
   if(security==='tls')ss.tlsSettings={serverName:sni||undefined,alpn:v('alpn').split(',').map(x=>x.trim()).filter(Boolean),minVersion:v('tls-min')||'1.2',maxVersion:v('tls-max')||'1.3',certificates:[{certificateFile:v('cert')||'/etc/ssl/xray/fullchain.pem',keyFile:v('key')||'/etc/ssl/xray/privkey.pem'}]};
   if(security==='reality')ss.realitySettings={show:false,target:dest,xver:cl(+v('xver')||0,0,2),serverNames:sni?[sni]:[],privateKey:v('private-key')||'REPLACE_WITH_XRAY_PRIVATE_KEY',shortIds:[(v('short-id')||'').replace(/[^a-fA-F0-9]/g,'').slice(0,16)]};
@@ -289,7 +289,7 @@ async function syncXrayUserToProfile(user){
   if(inbound.protocol==='vless'){
    const list=inbound.settings.users||(inbound.settings.users=[]);
    if(Array.isArray(inbound.settings.clients)){for(const legacy of inbound.settings.clients){if(legacy.id&&!list.some(x=>x.id===legacy.id))list.push({...legacy})}delete inbound.settings.clients}
-   if(!list.some(x=>x.id===user.xrayId))list.push({id:user.xrayId,level:0,email,...((inbound.settings.flow||(inbound.streamSettings?.network==='raw'&&['reality','tls'].includes(inbound.streamSettings?.security)?'xtls-rprx-vision':''))?{flow:inbound.settings.flow||(inbound.streamSettings?.network==='raw'&&['reality','tls'].includes(inbound.streamSettings?.security)?'xtls-rprx-vision':'')}:{})});
+   if(!list.some(x=>x.id===user.xrayId))list.push({id:user.xrayId,level:0,email,...((inbound.settings.flow||((inbound.streamSettings?.method||inbound.streamSettings?.network)==='raw'&&['reality','tls'].includes(inbound.streamSettings?.security)?'xtls-rprx-vision':''))?{flow:inbound.settings.flow||(inbound.streamSettings?.network==='raw'&&['reality','tls'].includes(inbound.streamSettings?.security)?'xtls-rprx-vision':'')}:{})});
    changed++;
   }else if(inbound.protocol==='vmess'){
    const list=inbound.settings.users||(inbound.settings.users=[]);
@@ -335,12 +335,12 @@ function xrayClientSample(){
  else if(protocol==='shadowsocks')settings={servers:[{address:'SERVER_ADDRESS',port,method:v('ss-method')||'chacha20-ietf-poly1305',password:uuid}]};
  else if(protocol==='socks'||protocol==='http')settings={servers:[{address:'SERVER_ADDRESS',port,users:[{user:($('#xpb-name')?.value||'client').trim(),pass:uuid}]}]};
  else settings={servers:[{address:'SERVER_ADDRESS',port}]};
- const streamSettings={network,security};
- if(network==='ws')streamSettings.wsSettings={path,headers:host?{Host:host}:{}};
+ const streamSettings={method:network,security};
+ if(network==='websocket')streamSettings.wsSettings={path,headers:host?{Host:host}:{}};
  if(network==='xhttp')streamSettings.xhttpSettings={path,host,mode:v('xhttp-mode')||'auto'};
  if(network==='grpc')streamSettings.grpcSettings={serviceName:path.replace(/^\//,'')||'grpc',multiMode:v('grpc-mode')==='multi'};
  if(network==='httpupgrade')streamSettings.httpupgradeSettings={path,host};
- if(network==='kcp')streamSettings.kcpSettings={seed:v('kcp-seed')||''};
+ if(network==='mkcp')streamSettings.kcpSettings={seed:v('kcp-seed')||''};
  if(security==='tls')streamSettings.tlsSettings={serverName:sni,alpn:v('alpn').split(',').map(x=>x.trim()).filter(Boolean),fingerprint:v('fingerprint')||'chrome'};
  if(security==='reality')streamSettings.realitySettings={serverName:sni,fingerprint:v('fingerprint')||'chrome',publicKey:v('public-key')||'REPLACE_WITH_REALITY_PUBLIC_KEY',shortId:v('short-id')||'REPLACE_SHORT_ID',spiderX:v('spider-x')||'/'};
  return {remarks:$('#xpb-name')?.value.trim()||'XRAY STUDIO client',outbounds:[{tag:'proxy',protocol,settings,streamSettings},{tag:'direct',protocol:'freedom'},{tag:'block',protocol:'blackhole'}],routing:{domainStrategy:'AsIs',rules:[]}};
