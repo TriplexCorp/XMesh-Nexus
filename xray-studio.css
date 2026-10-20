@@ -2428,8 +2428,9 @@ body:has(.studio-reference-v5) .wrap{
 }
 .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-v5-save-label small,
 .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) #xpb-error{
-  font-size:.79rem!important;
-  line-height:1.45!important;
+  font-size:max(13px,.82rem)!important;
+  line-height:1.55!important;
+  overflow-wrap:anywhere;
 }
 .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) :is(.sr-v5-reset,#xpb-save){
   min-height:2.7rem!important;
