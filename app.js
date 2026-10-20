@@ -524,6 +524,7 @@ function xrayClientSample(){
  const network=protocol==='hysteria'?'hysteria':protocol==='masque'?'masque':v('network')||'raw';
  const security=['tun','wireguard'].includes(protocol)?'none':['hysteria','masque'].includes(protocol)?'tls':v('security')||'none';
  const sni=v('sni').trim()||'example.com';
+ const address=v('server-address').trim()||'SERVER_ADDRESS';
  const port=protocol==='tun'?0:cl(+v('port')||443,1,65535);
  const path=v('path')||'/';
  const host=v('host')||sni;
@@ -533,24 +534,24 @@ function xrayClientSample(){
  const vlessEncRequired=protocol==='vless'&&(network==='xdrive'||vlessEncMode!=='off');
  let outProtocol=protocol,settings;
  if(['dokodemo-door','tunnel','tun'].includes(protocol))return {remarks:$('#xpb-name')?.value.trim()||'XRAY STUDIO client',note:'Для этого inbound нет прямого одноимённого клиентского outbound. Используйте совместимый клиентский протокол или полный JSON-режим.',outbounds:[]};
- if(protocol==='vless')settings={vnext:[{address:'SERVER_ADDRESS',port,users:[{id:uuid,encryption:vlessEncRequired?(v('vless-encryption').trim()||'REPLACE_WITH_VLESS_ENCRYPTION_CONFIG'):'none',...(flow?{flow}:{})}]}]};
- else if(protocol==='vmess')settings={vnext:[{address:'SERVER_ADDRESS',port,users:[{id:uuid,alterId:0,security:v('vmess-security')||'auto'}]}]};
- else if(protocol==='trojan')settings={servers:[{address:'SERVER_ADDRESS',port,password:uuid}]};
+ if(protocol==='vless')settings={vnext:[{address,port,users:[{id:uuid,encryption:vlessEncRequired?(v('vless-encryption').trim()||'REPLACE_WITH_VLESS_ENCRYPTION_CONFIG'):'none',...(flow?{flow}:{})}]}]};
+ else if(protocol==='vmess')settings={vnext:[{address,port,users:[{id:uuid,alterId:0,security:v('vmess-security')||'auto'}]}]};
+ else if(protocol==='trojan')settings={servers:[{address,port,password:uuid}]};
  else if(protocol==='shadowsocks'){
   const method=v('ss-method')||'chacha20-ietf-poly1305';
   const serverPassword=v('ss-password')||(method.startsWith('2022-')?'REPLACE_WITH_VALID_SS2022_SERVER_KEY':'REPLACE_WITH_STRONG_SERVER_PASSWORD');
   const userPassword=v('ss-user-password')||(method.startsWith('2022-')?'REPLACE_WITH_VALID_SS2022_USER_KEY':uuid);
   const multiUser=Boolean(uuid)&&!(method==='2022-blake3-chacha20-poly1305');
   const password=method.startsWith('2022-')?(multiUser?serverPassword+':'+userPassword:serverPassword):(multiUser?userPassword:serverPassword);
-  settings={servers:[{address:'SERVER_ADDRESS',port,method,password}]};
- }else if(protocol==='socks'||protocol==='mixed')settings={servers:[{address:'SERVER_ADDRESS',port,...(v('socks-auth')==='password'?{users:[{user:(v('name')||'xmesh').toLowerCase().replace(/[^a-z0-9_.-]/g,'-'),pass:uuid}]}:{})}]};
- else if(protocol==='http')settings={address:'SERVER_ADDRESS',port,...(uuid?{user:(v('name')||'xmesh').toLowerCase().replace(/[^a-z0-9_.-]/g,'-'),pass:uuid}:{})};
- else if(protocol==='wireguard')settings={secretKey:'REPLACE_WITH_CLIENT_PRIVATE_KEY',address:['10.0.0.2/32'],peers:[{endpoint:'SERVER_ADDRESS:'+port,publicKey:'REPLACE_WITH_SERVER_PUBLIC_KEY',allowedIPs:['0.0.0.0/0','::/0']}]};
- else if(protocol==='hysteria')settings={version:2,address:'SERVER_ADDRESS',port};
- else if(protocol==='masque')settings={address:'SERVER_ADDRESS',port,remoteDNS:['1.1.1.1','8.8.8.8']};
+  settings={servers:[{address,port,method,password}]};
+ }else if(protocol==='socks'||protocol==='mixed')settings={servers:[{address,port,...(v('socks-auth')==='password'?{users:[{user:(v('name')||'xmesh').toLowerCase().replace(/[^a-z0-9_.-]/g,'-'),pass:uuid}]}:{})}]};
+ else if(protocol==='http')settings={address,port,...(uuid?{user:(v('name')||'xmesh').toLowerCase().replace(/[^a-z0-9_.-]/g,'-'),pass:uuid}:{})};
+ else if(protocol==='wireguard')settings={secretKey:'REPLACE_WITH_CLIENT_PRIVATE_KEY',address:['10.0.0.2/32'],peers:[{endpoint:address+':'+port,publicKey:'REPLACE_WITH_SERVER_PUBLIC_KEY',allowedIPs:['0.0.0.0/0','::/0']}]};
+ else if(protocol==='hysteria')settings={version:2,address,port};
+ else if(protocol==='masque')settings={address,port,remoteDNS:['1.1.1.1','8.8.8.8']};
  else settings={};
  if(protocol==='mixed')outProtocol='socks';
- const streamSettings={method:network,security};
+ const streamSettings={network,security};
  if(network==='websocket')streamSettings.wsSettings={path,headers:host?{Host:host}:{}};
  if(network==='xhttp')streamSettings.xhttpSettings={path,host,mode:v('xhttp-mode')||'auto'};
  if(network==='grpc')streamSettings.grpcSettings={serviceName:path.replace(/^\//,'')||'grpc',multiMode:v('grpc-mode')==='multi'};
@@ -600,11 +601,12 @@ async function profilesP(){
  const sel=(id,items)=>'<select id="xpb-'+id+'">'+options(items)+'</select>';
  const group=(title,desc,body,open)=>'<details class="xray-section"'+(open?' open':'')+'><summary><span><b>'+title+'</b><small>'+desc+'</small></span><span class="xray-chevron">⌄</span></summary><div class="xray-section-body">'+body+'</div></details>';
  const builderHtml='<section class="card xray-builder"><div class="xray-hero"><div><p class="note">XRAY CORE / CONFIGURATION STUDIO</p><h2>XRAY STUDIO</h2><p>Соберите inbound за пару шагов. Тонкие настройки не мешают, пока они не нужны.</p></div><span class="chip" style="--c:var(--a)">JSON BUILDER</span></div>'+
- '<div class="xray-presets"><span class="xray-label">РЕЖИМ РЕДАКТОРА</span><div class="xray-preset-row"><button type="button" class="xray-preset on" data-xray-mode="visual"><b>Визуальный конструктор</b><small>Поля по протоколу</small></button><button type="button" class="xray-preset" data-xray-mode="custom"><b>JSON вручную</b><small>Полный контроль над конфигом</small></button></div></div>'+
+ '<div class="xray-presets"><span class="xray-label">РЕЖИМ РЕДАКТОРА</span><div class="xray-preset-row"><button type="button" class="xray-preset on" data-xray-mode="visual"><b>Конструктор</b><small>Протоколы и параметры</small></button><button type="button" class="xray-preset" data-xray-mode="custom"><b>Server JSON вручную</b><small>Полная конфигурация узла</small></button></div></div>'+
  '<div class="xray-workflow"><div><b>01 · Inbound</b><span>Протокол, порт и транспорт</span></div><div><b>02 · Защита</b><span>TLS, Reality или VLESS Encryption</span></div><div><b>03 · Проверка</b><span>Сверьте серверный и клиентский JSON перед сохранением</span></div></div>'+
- '<div class="xray-main-grid">'+
+ '<div class="xray-meta-grid">'+
  field('name','Название профиля',inp('name','VLESS Reality','Например, DE · Reality','maxlength="80" required'))+
  field('tag','Тег inbound',inp('tag','vless-reality','Уникальный tag','maxlength="64"'))+
+ field('server-address','Адрес узла для Client JSON',inp('server-address','','vpn.example.com или IP','autocomplete="url"'))+
  '</div>'+
  '<div id="xpb-visual-mode">'+
  '<div class="xray-main-grid">'+
@@ -708,15 +710,26 @@ async function profilesP(){
  field('loglevel','Log level',sel('loglevel',[['warning','warning'],['error','error'],['none','none'],['info','info'],['debug','debug']]))+
  '</div>',false)+
  '</div>'+
- '<div id="xpb-custom-mode" class="xray-custom-mode" hidden>'+
- '<div class="xray-output-head"><div><b>Полный конфиг Xray</b><small>Можно редактировать inbounds, outbounds, routing, DNS, policy, API и любые поля актуального ядра.</small></div><div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-custom-copy">Копировать JSON</button><button type="button" class="gh sm" id="xpb-custom-download">Скачать JSON</button><button type="button" class="gh sm" id="xpb-format-json">Форматировать JSON</button><button type="button" class="gh sm" id="xpb-reset-json">Заново из конструктора</button></div></div>'+
- '<textarea id="xpb-custom-json" class="xray-preview" spellcheck="false" aria-label="Полный JSON-конфиг Xray"></textarea>'+
- '<p class="mu" id="xpb-custom-error" role="status">JSON-режим даёт доступ ко всем полям ядра, включая параметры, которых пока нет в визуальном конструкторе.</p></div>'+
  '<div class="xray-key-actions" id="xpb-generator-actions"><button type="button" class="gh sm" id="xpb-generate-uuid">Сгенерировать UUID</button><button type="button" class="gh sm" id="xpb-generate-ss-password">Сгенерировать пароли Shadowsocks</button></div>'+
- '<div class="xray-output-head" id="xpb-server-output"><div><b>Предпросмотр JSON</b><small>Обновляется автоматически · не применяет конфигурацию к работающему ядру</small></div><div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-copy">Копировать JSON</button><button type="button" class="gh sm" id="xpb-download">Скачать JSON</button></div></div>'+
- '<textarea id="xpb-preview" class="xray-preview" spellcheck="false" readonly aria-label="Предпросмотр серверного JSON"></textarea>'+
- '<div class="xray-output-head xray-client-head" id="xpb-client-output"><div><b>Клиентский пример</b><small>Outbound с выбранными transport, security и fingerprint</small></div><div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-client-copy">Копировать</button><button type="button" class="gh sm" id="xpb-client-download">Скачать</button></div></div>'+
- '<textarea id="xpb-client-preview" class="xray-preview" spellcheck="false" readonly aria-label="Предпросмотр клиентского JSON"></textarea>'+
+ '<section class="xray-output-workspace" aria-label="JSON-конфигурации">'+
+ '<div class="xray-output-workspace-head"><div><p class="note">OUTPUT WORKSPACE</p><b>Конфигурации для сервера и клиента</b><small>Отдельные JSON-документы из общей модели параметров. Экспорт не применяет конфиг к работающему ядру.</small></div><span class="xray-output-state" id="xpb-output-state">Предпросмотр готов</span></div>'+
+ '<div class="xray-output-tabs" role="tablist" aria-label="Выберите тип JSON">'+
+ '<button type="button" id="xpb-tab-server" class="on" role="tab" aria-selected="true" aria-controls="xpb-output-server" data-xray-output="server"><span class="xray-output-tab-kicker">01 · SERVER</span><b>Server JSON</b><small>Inbound · слушающий узел</small></button>'+
+ '<button type="button" id="xpb-tab-client" role="tab" aria-selected="false" aria-controls="xpb-output-client" data-xray-output="client"><span class="xray-output-tab-kicker">02 · CLIENT</span><b>Client JSON</b><small>Outbound · подключение клиента</small></button>'+
+ '</div>'+
+ '<div class="xray-output-pane" id="xpb-output-server" role="tabpanel" aria-labelledby="xpb-tab-server">'+
+ '<div class="xray-output-head" id="xpb-server-output"><div><b>Серверная конфигурация</b><small>Полный конфиг Xray: inbounds, outbounds и routing</small></div><div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-copy">Копировать JSON</button><button type="button" class="gh sm" id="xpb-download">Скачать server.json</button></div></div>'+
+ '<textarea id="xpb-preview" class="xray-preview" spellcheck="false" readonly aria-label="Server JSON"></textarea>'+
+ '<div id="xpb-custom-mode" class="xray-custom-mode" hidden>'+
+ '<div class="xray-output-head"><div><b>Полный Server JSON · ручной режим</b><small>Расширенные поля Xray: DNS, policy, API, routing и любые параметры актуального ядра.</small></div><div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-custom-copy">Копировать</button><button type="button" class="gh sm" id="xpb-custom-download">Скачать</button><button type="button" class="gh sm" id="xpb-format-json">Форматировать</button><button type="button" class="gh sm" id="xpb-reset-json">Заново из конструктора</button></div></div>'+
+ '<textarea id="xpb-custom-json" class="xray-preview" spellcheck="false" aria-label="Ручной Server JSON"></textarea>'+
+ '<p class="mu" id="xpb-custom-error" role="status">Синтаксис JSON и обязательные поля проверяются перед сохранением.</p></div>'+
+ '</div>'+
+ '<div class="xray-output-pane" id="xpb-output-client" role="tabpanel" aria-labelledby="xpb-tab-client" hidden>'+
+ '<div class="xray-output-head" id="xpb-client-output"><div><b>Клиентская конфигурация</b><small>Outbound с transport, security, SNI, fingerprint, UUID и encryption</small></div><div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-client-copy">Копировать JSON</button><button type="button" class="gh sm" id="xpb-client-download">Скачать client.json</button></div></div>'+
+ '<p class="xray-client-hint">Это клиентский outbound-конфиг, а не серверный inbound. Если адрес узла, UUID или ключи оставлены как placeholders, замените их перед импортом в приложение.</p>'+
+ '<textarea id="xpb-client-preview" class="xray-preview" spellcheck="false" readonly aria-label="Client JSON"></textarea>'+
+ '</div></section>'+
  '<div class="xray-footer"><p class="er" id="xpb-error" role="status"></p><button type="button" class="btn" id="xpb-save">Сохранить профиль</button></div></section>';
  return [builderHtml+saved,()=>{
   const updatePreview=()=>{try{
@@ -741,9 +754,10 @@ async function profilesP(){
     if(!dec||!enc||dec.startsWith('REPLACE_')||enc.startsWith('REPLACE_'))warning='VLESS Encryption включён, но пара не заполнена. Нажмите «Сгенерировать пару на сервере» или вставьте оба значения вручную.';
    }
    $('#xpb-error').textContent=warning;
+   const state=$('#xpb-output-state');if(state)state.textContent=warning?'Проверьте предупреждение':'Предпросмотр готов';
    $('#xpb-preview').value=JSON.stringify(xrayBuilderConfig(),null,2);
    $('#xpb-client-preview').value=JSON.stringify(xrayClientSample(),null,2);
-  }catch(e){$('#xpb-preview').value='';$('#xpb-client-preview').value='';$('#xpb-error').textContent=e.message}};
+  }catch(e){$('#xpb-preview').value='';$('#xpb-client-preview').value='';$('#xpb-error').textContent=e.message;const state=$('#xpb-output-state');if(state)state.textContent='Ошибка генерации'}};
   const updateVisibility=()=>{
    let proto=$('#xpb-protocol').value,net=$('#xpb-network').value,sec=$('#xpb-security').value;
    const setGroup=(selector,show)=>{const d=$(selector);if(d)d.hidden=!show};
@@ -836,6 +850,20 @@ async function profilesP(){
   };
   $('#xpb-vlessenc-mode').addEventListener('change',()=>{selectGeneratedPair();updateVisibility();updatePreview()});
   const customArea=$('#xpb-custom-json');
+  let activeOutput='server';
+  const setOutput=target=>{
+   if(!['server','client'].includes(target))return;
+   activeOutput=target;
+   $('[data-xray-output]').forEach(button=>{
+    const active=button.dataset.xrayOutput===target;
+    button.classList.toggle('on',active);
+    button.setAttribute('aria-selected',active?'true':'false');
+   });
+   $('#xpb-output-server').hidden=target!=='server';
+   $('#xpb-output-client').hidden=target!=='client';
+  };
+  $('[data-xray-output]').forEach(button=>button.addEventListener('click',()=>setOutput(button.dataset.xrayOutput)));
+  setOutput('server');
   const validateCustomJson=()=>{
    const status=$('#xpb-custom-error');
    try{
@@ -859,9 +887,8 @@ async function profilesP(){
    const tagField=$('#xpb-tag')?.closest('.f');if(tagField)tagField.hidden=customMode;
    $('#xpb-server-output').hidden=customMode;
    $('#xpb-preview').hidden=customMode;
-   $('#xpb-client-output').hidden=customMode;
-   $('#xpb-client-preview').hidden=customMode;
-   $$('[data-xray-mode]').forEach(b=>b.classList.toggle('on',b.dataset.xrayMode===(customMode?'custom':'visual')));
+   $('[data-xray-mode]').forEach(b=>b.classList.toggle('on',b.dataset.xrayMode===(customMode?'custom':'visual')));
+   setOutput('server');
    if(customMode)validateCustomJson();
   };
   $$('[data-xray-mode]').forEach(btn=>btn.addEventListener('click',()=>setMode(btn.dataset.xrayMode)));
