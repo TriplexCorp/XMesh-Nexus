@@ -100,7 +100,39 @@ update_panel() {
       [[ -z "$entry" ]] && continue
       changed_path="${entry:3}"
       if [[ "$changed_path" != "install.sh" ]]; then
-        other_changes+="$entry"
+        other_changes+="$entry"$'\n'
+      fi
+    done <<< "$status_lines"
+
+    if [[ -n "$other_changes" ]]; then
+      fail "Найдены локальные изменения кроме install.sh. CLI их не перезапишет:"
+      git -C "$ROOT" status --short
+      warn "Сохрани/закоммить эти файлы вручную и повтори обновление."
+      return 1
+    fi
+
+    override_dir="/var/backups/xmesh-nexus-local-overrides"
+    stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+    if ! mkdir -p "$override_dir"; then
+      fail "Не удалось создать $override_dir для резервной копии локального install.sh."
+      return 1
+    fi
+    chmod 700 "$override_dir"
+    if ! cp -p "$ROOT/install.sh" "$override_dir/install.sh.$stamp"; then
+      fail "Не удалось сохранить локальный install.sh. Обновление отменено."
+      return 1
+    fi
+    git -C "$ROOT" diff HEAD --binary -- install.sh > "$override_dir/install.sh.$stamp.patch"
+    chmod 600 "$override_dir/install.sh.$stamp" "$override_dir/install.sh.$stamp.patch"
+    if ! git -C "$ROOT" restore --source=HEAD --staged --worktree -- install.sh; then
+      fail "Не удалось восстановить install.sh из Git. Резервная копия: $override_dir/install.sh.$stamp"
+      return 1
+    fi
+    warn "Локальная версия install.sh сохранена: $override_dir/install.sh.$stamp"
+    ok "Рабочая копия install.sh приведена к Git-версии; продолжаю обновление."
+  fi
+
+  local branch upstream
   branch="$(git -C "$ROOT" branch --show-current)"
   if [[ -z "$branch" ]]; then
     fail "Сейчас detached HEAD. Переключись на рабочую ветку перед обновлением."
