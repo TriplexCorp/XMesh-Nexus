@@ -2,12 +2,13 @@ name: xmesh-nexus
 
 services:
   db:
-    image: postgres:18-alpine
+    image: timescale/timescaledb:2.30.0-pg18
     environment:
       POSTGRES_DB: xmesh
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run ./install.sh first}
       APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Run ./install.sh first}
+      TIMESCALEDB_TELEMETRY: "off"
     volumes:
       - postgres_data:/var/lib/postgresql
       - ./deploy/postgres/10-create-app-user.sh:/docker-entrypoint-initdb.d/10-create-app-user.sh:ro
