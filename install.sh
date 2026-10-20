@@ -20,10 +20,13 @@ if [[ ! -f .env ]]; then
   umask 077
   db_password="$(openssl rand -hex 32)"
   app_password="$(openssl rand -hex 32)"
+  redis_password="$(openssl rand -hex 32)"
   admin_password="$(openssl rand -hex 32)"
   cat > .env <<EOF
 POSTGRES_PASSWORD=${db_password}
 APP_DB_PASSWORD=${app_password}
+REDIS_PASSWORD=${redis_password}
+DB_MAX_CONNECTIONS=20
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=${admin_password}
 COOKIE_SECURE=true
@@ -32,6 +35,15 @@ APP_PORT=8080
 EOF
   chmod 600 .env
   created_env=1
+else
+  if ! grep -q '^REDIS_PASSWORD=' .env; then
+    printf '\nREDIS_PASSWORD=%s\n' "$(openssl rand -hex 32)" >> .env
+    echo "Generated REDIS_PASSWORD for the Redis service."
+  fi
+  if ! grep -q '^DB_MAX_CONNECTIONS=' .env; then
+    printf 'DB_MAX_CONNECTIONS=20\n' >> .env
+  fi
+  chmod 600 .env
 fi
 
 docker compose config --quiet
@@ -39,13 +51,16 @@ docker compose up -d --build
 
 echo
 echo "XMesh Nexus panel containers are starting."
+echo "PostgreSQL stores persistent panel data; Redis provides shared login throttling."
+echo "Redis is private to the Compose network and is not published on a host port."
 echo "Panel is bound to 127.0.0.1:8080 by default; put it behind your HTTPS reverse proxy."
 if [[ "$created_env" == "1" ]]; then
   printf 'Initial administrator: %s\n' "admin"
   printf 'Initial password: %s\n' "$admin_password"
   echo "Credentials are stored in .env (permissions 600). Save the password now."
 else
-  echo "Existing .env was kept unchanged. Administrator credentials were not reset."
+  echo "Existing .env was kept; only missing Redis/database tuning settings were added."
+  echo "Administrator credentials were not reset."
 fi
 echo
 docker compose ps

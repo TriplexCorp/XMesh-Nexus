@@ -10,6 +10,7 @@ use axum::{
     Json, Router,
 };
 use core::CoreManager;
+use redis::aio::ConnectionManager;
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
 use sqlx::{postgres::PgPoolOptions, PgPool, Row};
@@ -28,6 +29,7 @@ const COLLECTIONS: &[&str] = &[
 #[derive(Clone)]
 pub struct AppState {
     pub pool: PgPool,
+    pub redis: ConnectionManager,
     pub core: CoreManager,
     pub cookie_secure: bool,
 }
@@ -79,11 +81,20 @@ async fn main() -> anyhow::Result<()> {
 
     let database_url = env::var("DATABASE_URL").map_err(|_| anyhow::anyhow!("DATABASE_URL is required"))?;
     let pool = PgPoolOptions::new()
-        .max_connections(20)
+        .max_connections(env::var("DB_MAX_CONNECTIONS").ok().and_then(|v| v.parse().ok()).unwrap_or(20))
         .min_connections(1)
         .acquire_timeout(Duration::from_secs(10))
+        .idle_timeout(Duration::from_secs(600))
+        .max_lifetime(Duration::from_secs(1800))
         .connect(&database_url)
         .await?;
+
+    let redis_url = env::var("REDIS_URL").map_err(|_| anyhow::anyhow!("REDIS_URL is required"))?;
+    let redis_client = redis::Client::open(redis_url)?;
+    let redis: ConnectionManager = redis_client.get_connection_manager().await?;
+    let mut redis_probe = redis.clone();
+    let redis_ping: String = redis::cmd("PING").query_async(&mut redis_probe).await?;
+    anyhow::ensure!(redis_ping == "PONG", "Redis readiness probe failed");
 
     sqlx::migrate!("./migrations").run(&pool).await?;
 
@@ -99,7 +110,7 @@ async fn main() -> anyhow::Result<()> {
         env::var("CORE_DATA_DIR").unwrap_or_else(|_| "/var/lib/xmesh/core".to_owned()),
     );
     let core = CoreManager::new(pool.clone(), core_dir).await?;
-    let state = AppState { pool, core, cookie_secure };
+    let state = AppState { pool, redis, core, cookie_secure };
     state.core.launch_startup_update().await;
 
     let protected = Router::new()
@@ -229,12 +240,26 @@ async fn health_live() -> Json<Value> {
 }
 
 async fn health_ready(State(state): State<AppState>) -> impl IntoResponse {
-    match sqlx::query("SELECT 1").execute(&state.pool).await {
-        Ok(_) => (StatusCode::OK, Json(json!({"status": "ready"}))),
-        Err(_) => (
+    let database_ok = sqlx::query("SELECT 1").execute(&state.pool).await.is_ok();
+    let mut redis = state.redis.clone();
+    let redis_ok = redis::cmd("PING").query_async::<String>(&mut redis).await
+        .is_ok_and(|reply| reply == "PONG");
+    if database_ok && redis_ok {
+        (StatusCode::OK, Json(json!({
+            "status": "ready",
+            "dependencies": {"postgresql": "online", "redis": "online"}
+        })))
+    } else {
+        (
             StatusCode::SERVICE_UNAVAILABLE,
-            Json(json!({"status": "not_ready", "error": "database unavailable"})),
-        ),
+            Json(json!({
+                "status": "not_ready",
+                "dependencies": {
+                    "postgresql": if database_ok { "online" } else { "offline" },
+                    "redis": if redis_ok { "online" } else { "offline" }
+                }
+            })),
+        )
     }
 }
 

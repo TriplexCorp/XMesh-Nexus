@@ -1,11 +1,14 @@
 # XMesh Nexus
 
-**XMesh Nexus** — self-hosted Xray VPN control panel. The stack uses Rust, Tokio/Axum and PostgreSQL, and runs with Docker Compose.
+**XMesh Nexus** — self-hosted Xray VPN control panel. The stack uses Rust, Tokio/Axum, PostgreSQL 18 and Redis 7, and runs with Docker Compose.
 
 ## Current scope
 
 - Rust API service and PostgreSQL persistence for panel collections: users, nodes, Xray profiles, hosts, squads, templates, administrators, tokens and settings.
-- Persistent records and settings in PostgreSQL (not browser-only `localStorage`).
+- Persistent records, settings, administrator sessions and audit log in PostgreSQL (not browser-only `localStorage`).
+- Redis-backed shared login throttling across panel instances, with PostgreSQL retaining the durable rate-limit fallback.
+- Redis is private to the Compose network, password-protected, memory-limited to 128 MiB and configured as an ephemeral rate-limit store; panel data never depends on Redis persistence.
+- PostgreSQL connection pool limits are configurable through `DB_MAX_CONNECTIONS` (default 20); readiness checks verify both PostgreSQL and Redis.
 - Administrator sign-in with Argon2 password hashing, a dedicated `/login` page, a 12-hour HttpOnly/SameSite session cookie, and an audit log for mutations.
 - Server-side guard for the panel entry point, same-origin validation for state-changing API requests, and persistent account-based login throttling (8 failed attempts within 15 minutes trigger a 15-minute cooldown).
 - TOTP-based two-factor authentication is not part of this patch and remains a recommended next step before exposing the panel to untrusted networks.
@@ -35,6 +38,7 @@ Useful operations:
 docker compose ps
 docker compose logs -f panel
 docker compose logs -f db
+docker compose logs -f redis
 docker compose restart panel
 docker compose down
 ```
@@ -45,7 +49,7 @@ Database backup (writes a SQL dump in the current directory):
 docker compose exec -T db pg_dump -U postgres -d xmesh > xmesh-backup.sql
 ```
 
-Do not delete the `postgres_data` or `core_data` volumes during routine updates.
+Do not delete the `postgres_data` or `core_data` volumes during routine updates. Redis is intentionally ephemeral: its rate-limit counter can reset after a Redis restart, while the PostgreSQL-backed limit remains as a fallback.
 
 ## Xray-core version management
 
@@ -56,7 +60,7 @@ The selector lists recent GitHub releases; pinning is limited to the latest 30 e
 ## API overview
 
 - `GET /api/v1/health/live` — process liveness.
-- `GET /api/v1/health/ready` — database readiness.
+- `GET /api/v1/health/ready` — PostgreSQL and Redis readiness.
 - `GET /api/v1/auth/session`, `POST /api/v1/auth/login`, `POST /api/v1/auth/logout` — admin session.
 - `GET /api/v1/bootstrap` — panel collections and settings (authenticated).
 - `/api/v1/collections/{collection}` — authenticated record CRUD.

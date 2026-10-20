@@ -72,15 +72,26 @@ pub async fn login(
     }
     let username_key = body.username.trim().to_lowercase();
     if username_key.is_empty() {
-        record_failed_login(&state.pool, &username_key).await?;
+        record_failed_login(&state, &username_key).await?;
         return Err(ApiError::new(StatusCode::UNAUTHORIZED, "Неверный логин или пароль."));
     }
-    let locked: bool = sqlx::query_scalar(
+    let mut redis_conn = state.redis.clone();
+    let redis_attempts = redis::cmd("GET")
+        .arg(format!("xmesh:auth:login:{username_key}"))
+        .query_async::<Option<i64>>(&mut redis_conn)
+        .await
+        .unwrap_or(None)
+        .unwrap_or(0);
+    let db_locked: bool = sqlx::query_scalar(
         "SELECT COALESCE((SELECT locked_until > NOW() FROM auth_login_limits WHERE username_key = $1), FALSE)",
     )
     .bind(&username_key)
     .fetch_one(&state.pool)
     .await?;
+    let locked = redis_attempts >= 8 || db_locked;
+    if locked {
+        return Err(ApiError::new(StatusCode::TOO_MANY_REQUESTS, "Слишком много попыток. Повторите вход через 15 минут."));
+    }
     let row = sqlx::query(
         "SELECT id, username, password_hash, is_active \
          FROM panel_auth_users WHERE LOWER(username) = LOWER($1) LIMIT 1",
@@ -115,6 +126,11 @@ pub async fn login(
         .bind(&username_key)
         .execute(&state.pool)
         .await?;
+    let mut redis_conn = state.redis.clone();
+    let _ = redis::cmd("DEL")
+        .arg(format!("xmesh:auth:login:{username_key}"))
+        .query_async::<i64>(&mut redis_conn)
+        .await;
 
     let token = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
     let token_hash = hash_token(&token);
@@ -147,7 +163,16 @@ pub async fn login(
     ))
 }
 
-async fn record_failed_login(pool: &PgPool, username_key: &str) -> Result<(), ApiError> {
+async fn record_failed_login(state: &AppState, username_key: &str) -> Result<(), ApiError> {
+    // Redis provides cross-instance throttling; PostgreSQL remains the durable fallback.
+    let mut redis_conn = state.redis.clone();
+    let redis_key = format!("xmesh:auth:login:{username_key}");
+    if let Ok(attempts) = redis::cmd("INCR").arg(&redis_key).query_async::<i64>(&mut redis_conn).await {
+        if attempts == 1 {
+            let _ = redis::cmd("EXPIRE").arg(&redis_key).arg(900).query_async::<i64>(&mut redis_conn).await;
+        }
+    }
+
     sqlx::query(
         "INSERT INTO auth_login_limits (username_key, attempts, window_started_at, locked_until) \
          VALUES ($1, 1, NOW(), NULL) \
@@ -161,7 +186,7 @@ async fn record_failed_login(pool: &PgPool, username_key: &str) -> Result<(), Ap
                                THEN NOW() + INTERVAL '15 minutes' ELSE NULL END",
     )
     .bind(username_key)
-    .execute(pool)
+    .execute(&state.pool)
     .await?;
     Ok(())
 }
