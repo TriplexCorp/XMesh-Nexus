@@ -89,10 +89,137 @@ update_panel() {
     fail "Каталог не является Git-репозиторием. Обновление через CLI недоступно."
     return 1
   fi
-  if [[ -n "$(git -C "$ROOT" status --porcelain)" ]]; then
-    fail "Есть локальные изменения. Сначала сохрани или закоммить их; CLI не будет их перезаписывать."
-    git -C "$ROOT" status --short
+  # The installer may be locally patched by operators. Preserve it outside the
+  # checkout and restore only that one file so a routine update can proceed.
+  # Never silently discard changes to application code or deployment files.
+  local status_lines other_changes entry changed_path override_dir stamp
+  status_lines="$(git -C "$ROOT" status --porcelain --untracked-files=normal)"
+  other_changes=""
+  if [[ -n "$status_lines" ]]; then
+    while IFS= read -r entry; do
+      [[ -z "$entry" ]] && continue
+      changed_path="${entry:3}"
+      if [[ "$changed_path" != "install.sh" ]]; then
+        other_changes+="$entry"
+  branch="$(git -C "$ROOT" branch --show-current)"
+  if [[ -z "$branch" ]]; then
+    fail "Сейчас detached HEAD. Переключись на рабочую ветку перед обновлением."
     return 1
+  fi
+  upstream="$(git -C "$ROOT" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || true)"
+  if [[ -z "$upstream" ]]; then
+    fail "Для ветки '$branch' не настроена upstream-ветка. Настрой tracking перед обновлением."
+    return 1
+  fi
+
+  printf "\nБудет обновлена ветка %s (upstream: %s), затем пересобран Docker-образ.\n" "$branch" "$upstream"
+  warn "Перед обновлением будет создана резервная копия БД."
+  read -r -p "Продолжить? [y/N] " confirm
+  [[ "$confirm" == "y" || "$confirm" == "Y" ]] || { warn "Обновление отменено."; return 0; }
+
+  backup_database || { fail "Резервное копирование не удалось; обновление отменено."; return 1; }
+
+  say "Получение изменений из GitHub"
+  git -C "$ROOT" fetch --prune
+  local behind
+  behind="$(git -C "$ROOT" rev-list --count "HEAD..${upstream}")"
+  if [[ "$behind" == "0" ]]; then
+    ok "Новых коммитов в upstream нет. Пересобираю текущую версию."
+  else
+    printf "Доступно новых коммитов: %s\n" "$behind"
+    git -C "$ROOT" log --oneline "HEAD..${upstream}" -n 8
+    git -C "$ROOT" pull --ff-only
+  fi
+
+  say "Проверка конфигурации Compose"
+  compose config --quiet
+
+  say "Сборка и запуск обновлённой панели"
+  # Do not use --remove-orphans here: an older database service/container
+  # may still exist under a previous Compose service name. Removing volumes is
+  # never performed by this updater.
+  compose up -d --build
+
+  say "Текущее состояние"
+  compose ps
+  ok "Команда обновления завершена. Проверь логи, если панель не стала healthy."
+}
+
+health_check() {
+  say "Проверка контейнеров и readiness"
+  compose ps
+  if command -v curl >/dev/null 2>&1; then
+    printf "\nGET /api/v1/health/ready: "
+    curl --silent --show-error --max-time 5 --write-out "\nHTTP %{http_code}\n" "http://127.0.0.1:${APP_PORT:-8080}/api/v1/health/ready" || true
+  else
+    warn "curl не установлен; пропускаю HTTP-проверку."
+  fi
+}
+
+main_menu() {
+  require_compose || exit 1
+  while true; do
+    printf "\n${BOLD}${CYAN}XMesh Nexus — Terminal Control${RESET}\n"
+    printf "Каталог: %s\n\n" "$ROOT"
+    printf "  1) Статус сервисов\n"
+    printf "  2) Логи\n"
+    printf "  3) Перезапустить панель / стек\n"
+    printf "  4) Обновить из GitHub и пересобрать\n"
+    printf "  5) Создать резервную копию БД\n"
+    printf "  6) Проверить health endpoint\n"
+    printf "  7) Остановить стек\n"
+    printf "  8) Запустить стек\n"
+    printf "  0) Выход\n\n"
+    read -r -p "Выбери действие: " choice || exit 0
+    case "$choice" in
+      1) show_status; pause ;;
+      2) show_logs; pause ;;
+      3) restart_service; pause ;;
+      4) update_panel; pause ;;
+      5) backup_database; pause ;;
+      6) health_check; pause ;;
+      7)
+        read -r -p "Остановить все сервисы XMesh Nexus? [y/N] " confirm
+        if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then compose stop; ok "Стек остановлен."; fi
+        pause ;;
+      8) compose up -d; compose ps; pause ;;
+      0) exit 0 ;;
+      *) warn "Неизвестный пункт."; pause ;;
+    esac
+  done
+}
+
+main_menu
+\n'
+      fi
+    done <<< "$status_lines"
+
+    if [[ -n "$other_changes" ]]; then
+      fail "Найдены локальные изменения кроме install.sh. CLI их не перезапишет:"
+      git -C "$ROOT" status --short
+      warn "Сохрани/закоммить эти файлы вручную и повтори обновление."
+      return 1
+    fi
+
+    override_dir="/var/backups/xmesh-nexus-local-overrides"
+    stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+    if ! mkdir -p "$override_dir"; then
+      fail "Не удалось создать $override_dir для резервной копии локального install.sh."
+      return 1
+    fi
+    chmod 700 "$override_dir"
+    if ! cp -p "$ROOT/install.sh" "$override_dir/install.sh.$stamp"; then
+      fail "Не удалось сохранить локальный install.sh. Обновление отменено."
+      return 1
+    fi
+    git -C "$ROOT" diff HEAD --binary -- install.sh > "$override_dir/install.sh.$stamp.patch"
+    chmod 600 "$override_dir/install.sh.$stamp" "$override_dir/install.sh.$stamp.patch"
+    if ! git -C "$ROOT" restore --source=HEAD --staged --worktree -- install.sh; then
+      fail "Не удалось восстановить install.sh из Git. Резервная копия: $override_dir/install.sh.$stamp"
+      return 1
+    fi
+    warn "Локальная версия install.sh сохранена: $override_dir/install.sh.$stamp"
+    ok "Рабочая копия install.sh приведена к Git-версии; продолжаю обновление."
   fi
 
   local branch upstream
