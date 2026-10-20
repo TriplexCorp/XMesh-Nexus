@@ -613,28 +613,28 @@ async function profilesP(){
   '<div class="xray-meta-grid">'+
  field('name','Название профиля',inp('name','VLESS Reality','Например, DE · Reality','maxlength="80" required'))+
  field('tag','Тег inbound',inp('tag','vless-reality','Уникальный tag','maxlength="64"'))+
- field('server-address','Адрес узла для Client JSON',inp('server-address','','vpn.example.com или IP','autocomplete="url"'))+
+ field('server-address','Адрес сервера для Client JSON',inp('server-address','','vpn.example.com или IP','autocomplete="url"'))+
  '</div>'+
  '<div id="xpb-visual-mode">'+
  '<div class="xray-config-steps"><nav class="xray-config-tabs" role="tablist" aria-label="Шаги настройки inbound">'+
- '<button type="button" class="on" data-xray-config-tab="basic" role="tab" aria-selected="true" aria-controls="xpb-config-basic"><span>01</span><b>Основное</b><small>Протокол, сеть, порт</small></button>'+
- '<button type="button" data-xray-config-tab="security" role="tab" aria-selected="false" aria-controls="xpb-config-security"><span>02</span><b>Защита</b><small>TLS и Reality</small></button>'+
- '<button type="button" data-xray-config-tab="transport" role="tab" aria-selected="false" aria-controls="xpb-config-transport"><span>03</span><b>Транспорт</b><small>XHTTP, gRPC и другое</small></button>'+
- '<button type="button" data-xray-config-tab="encryption" role="tab" aria-selected="false" aria-controls="xpb-config-encryption"><span>04</span><b>VLESS Encryption</b><small>ML-KEM-768 / X25519</small></button>'+
- '<button type="button" data-xray-config-tab="client" role="tab" aria-selected="false" aria-controls="xpb-config-client"><span>05</span><b>Протокол и клиент</b><small>UUID, fingerprint, ключи</small></button>'+
+ '<button type="button" class="on" data-xray-config-tab="basic" role="tab" aria-selected="true" aria-controls="xpb-config-basic"><span>01</span><b>Основное</b><small>Inbound, сеть, порт, защита</small></button>'+
+ '<button type="button" data-xray-config-tab="security" role="tab" aria-selected="false" aria-controls="xpb-config-security"><span>02</span><b>Защита</b><small>TLS, Reality, SNI, сертификаты</small></button>'+
+ '<button type="button" data-xray-config-tab="transport" role="tab" aria-selected="false" aria-controls="xpb-config-transport"><span>03</span><b>Транспорт</b><small>Транспорт и специальные режимы</small></button>'+
+ '<button type="button" data-xray-config-tab="encryption" role="tab" aria-selected="false" aria-controls="xpb-config-encryption"><span>04</span><b>VLESS Encryption</b><small>Режим и пара ключей</small></button>'+
+ '<button type="button" data-xray-config-tab="client" role="tab" aria-selected="false" aria-controls="xpb-config-client"><span>05</span><b>Протокол и параметры</b><small>Учётные данные, fingerprint, спец. настройки</small></button>'+
  '</nav><div class="xray-config-content">'+
  '<div class="xray-config-panel" id="xpb-config-basic" data-xray-config-panel="basic">'+
- '<div class="xray-config-panel-title"><div><h3>Основные параметры</h3><p>Начните с типа inbound, порта и базовой защиты.</p></div><span class="xray-config-required">ОБЯЗАТЕЛЬНОЕ</span></div>'+
+ '<div class="xray-config-panel-title"><div><h3>Основные параметры</h3><p>Выберите протокол inbound, сетевой транспорт, порт и режим TLS/Reality.</p></div><span class="xray-config-required">ОБЯЗАТЕЛЬНОЕ</span></div>'+
  '<div class="xray-main-grid">'+
  field('listen','Адрес прослушивания',inp('listen','0.0.0.0','0.0.0.0'))+
  field('port','Порт inbound',inp('port','443','443','type="number" min="1" max="65535" required'))+
  field('protocol','Протокол',sel('protocol',XRAY_PROTOCOLS))+
  field('network','Транспорт',sel('network',XRAY_NETWORKS))+
- field('security','Защита транспорта',sel('security',[['reality','Reality'],['tls','TLS'],['none','Без TLS / Reality']]))+
+ field('security','Режим защиты',sel('security',[['reality','Reality'],['tls','TLS'],['none','Без TLS / Reality']]))+
  '</div></div>'+
  '<div class="xray-config-panel" id="xpb-config-security" data-xray-config-panel="security" hidden>'+
  '<div class="xray-config-panel-title"><div><h3>Защита соединения</h3><p>Показываются только настройки, совместимые с выбранным режимом.</p></div></div>'+
- group('Настройки Reality','Ключи и Short ID',
+ group('Настройки Reality','Ключи, Short ID и параметры назначения',
  '<div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-generate-keys">Сгенерировать пару ключей</button><button type="button" class="gh sm" id="xpb-generate-short">Новый Short ID</button></div>'+
  '<div class="xray-key-grid">'+
  field('private-key','Private key · сервер',inp('private-key','','Нажмите «Сгенерировать пару ключей»','autocomplete="off"'))+
@@ -655,8 +655,8 @@ async function profilesP(){
  '</div>',false)+
  '</div>'+
  '<div class="xray-config-panel" id="xpb-config-transport" data-xray-config-panel="transport" hidden>'+
- '<div class="xray-config-panel-title"><div><h3>Настройки транспорта</h3><p>Меняйте транспорт в разделе «Основное». Нерелевантные поля скрываются автоматически.</p></div></div>'+
- '<p id="xpb-transport-empty" class="xray-transport-empty" hidden>Для выбранного протокола дополнительные настройки транспорта не применяются. Выберите VLESS, VMess или Trojan и настройте сеть в шаге «Основное».</p>'+
+ '<div class="xray-config-panel-title"><div><h3>Настройки транспорта</h3><p>Тип сети задаётся в разделе «Основное»; здесь находятся её параметры. Неподходящие поля скрываются автоматически.</p></div></div>'+
+ '<p id="xpb-transport-empty" class="xray-transport-empty" hidden>Для этого протокола отдельные параметры сети недоступны. Настройки транспорта отображаются для поддерживаемых протоколов; при необходимости используйте «Ручной JSON».</p>'+
  group('Транспорт','Параметры зависят от выбранной сети',
  optionGroup('transport-shared','Общие настройки','Поля зависят от выбранного транспорта',
  field('host','HTTP Host / authority',inp('host','','Необязательно'))+
@@ -709,8 +709,8 @@ async function profilesP(){
  '</div><p class="note xray-inline-note">Важно: ML-KEM-768 — не отдельный транспорт и не uTLS fingerprint. Он выбирает постквантовый способ аутентификации в VLESS Encryption. Эфемерный обмен также использует гибрид ML-KEM-768/X25519.</p>',false)+
  '</div>'+
  '<div class="xray-config-panel" id="xpb-config-client" data-xray-config-panel="client" hidden>'+
- '<div class="xray-config-panel-title"><div><h3>Протокол и клиент</h3><p>Учётные данные и параметры, зависящие от выбранного протокола.</p></div></div>'+
- group('Параметры протокола','Учётные данные и совместимость клиента',
+ '<div class="xray-config-panel-title"><div><h3>Протокол и параметры</h3><p>Учётные данные клиента и дополнительные параметры выбранного inbound-протокола.</p></div></div>'+
+ group('Параметры протокола и клиента','Учётные данные и дополнительные параметры выбранного протокола',
  optionGroup('client-identity','Идентификация','UUID, fingerprint и режим протокола',
  field('uuid','UUID / credential клиента',inp('uuid','','UUID клиента','autocomplete="off"'))+
  '<div class="xray-field-action"><button type="button" class="gh sm" id="xpb-generate-uuid">Сгенерировать UUID</button></div>'+
