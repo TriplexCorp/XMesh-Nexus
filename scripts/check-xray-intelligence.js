@@ -34,6 +34,16 @@ bad.inbounds[0].streamSettings.xhttpSettings.path='vpn';
 bad.inbounds[0].streamSettings.xhttpSettings.xmux={maxConcurrency:5,maxConnections:3};
 bad.inbounds[0].settings.decryption='';
 const issues=verify(bad);
+const nestedBad=JSON.parse(JSON.stringify(profile));
+nestedBad.inbounds[0].streamSettings.method='xhttp';
+delete nestedBad.inbounds[0].streamSettings.network;
+nestedBad.inbounds[0].streamSettings.xhttpSettings.extra.xmux={maxConcurrency:4,maxConnections:3};
+assert(verify(nestedBad).some(x=>x.code==='XMUX_CONFLICT'),'Nested XHTTP extra.xmux must be analyzed');
+const methodBad=JSON.parse(JSON.stringify(profile));
+methodBad.inbounds[0].streamSettings.method='websocket';
+delete methodBad.inbounds[0].streamSettings.network;
+assert(verify(methodBad).some(x=>x.code==='REALITY_TRANSPORT'),'Method field must drive transport compatibility');
+
 for(const code of ['SHORTID_FORMAT','XHTTP_MODE','XHTTP_PATH','XMUX_CONFLICT','VLESS_EMPTY_DECRYPTION'])
  assert(issues.some(x=>x.code===code),'Missing '+code);
 assert(issues.length>=5,'Report multiple independent issues');
