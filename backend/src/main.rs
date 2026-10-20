@@ -47,10 +47,10 @@ impl ApiError {
 impl From<sqlx::Error> for ApiError {
     fn from(error: sqlx::Error) -> Self {
         tracing::error!(error = %error, "Database operation failed");
-        if let sqlx::Error::Database(db_error) = &error {
-            if db_error.code().as_deref() == Some("23505") {
-                return Self::new(StatusCode::CONFLICT, "Запись с такими данными уже существует.");
-            }
+        if let sqlx::Error::Database(db_error) = &error
+            && db_error.code().as_deref() == Some("23505")
+        {
+            return Self::new(StatusCode::CONFLICT, "Запись с такими данными уже существует.");
         }
         Self::new(StatusCode::INTERNAL_SERVER_ERROR, "Внутренняя ошибка API.")
     }

@@ -14,7 +14,6 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use sqlx::{PgPool, Row};
-use std::str::FromStr;
 use uuid::Uuid;
 
 const SESSION_COOKIE: &str = "xmesh_session";

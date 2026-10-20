@@ -391,10 +391,10 @@ async fn unpack_release(bytes: &[u8], destination: &Path) -> Result<(), String> 
             if !matches!(name.as_str(), "xray" | "geoip.dat" | "geosite.dat" | "LICENSE" | "README.md") {
                 continue;
             }
-            if let Some(mode) = entry.unix_mode() {
-                if mode & 0o170000 == 0o120000 {
-                    continue;
-                }
+            if let Some(mode) = entry.unix_mode()
+                && mode & 0o170000 == 0o120000
+            {
+                continue;
             }
             let mut contents = Vec::new();
             entry.read_to_end(&mut contents)
