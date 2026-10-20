@@ -609,7 +609,7 @@ async function profilesP(){
  '</div>',false)+
  '</div>'+
  '<div id="xpb-custom-mode" class="xray-custom-mode" hidden>'+
- '<div class="xray-output-head"><div><b>Полный конфиг Xray</b><small>Можно редактировать inbounds, outbounds, routing, DNS, policy, API и любые поля актуального ядра.</small></div><div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-format-json">Форматировать JSON</button><button type="button" class="gh sm" id="xpb-reset-json">Заново из конструктора</button></div></div>'+
+ '<div class="xray-output-head"><div><b>Полный конфиг Xray</b><small>Можно редактировать inbounds, outbounds, routing, DNS, policy, API и любые поля актуального ядра.</small></div><div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-custom-copy">Копировать JSON</button><button type="button" class="gh sm" id="xpb-custom-download">Скачать JSON</button><button type="button" class="gh sm" id="xpb-format-json">Форматировать JSON</button><button type="button" class="gh sm" id="xpb-reset-json">Заново из конструктора</button></div></div>'+
  '<textarea id="xpb-custom-json" class="xray-preview" spellcheck="false" aria-label="Полный JSON-конфиг Xray"></textarea>'+
  '<p class="mu" id="xpb-custom-error" role="status">JSON-режим даёт доступ ко всем полям ядра, включая параметры, которых пока нет в визуальном конструкторе.</p></div>'+
  '<div class="xray-key-actions" id="xpb-generator-actions"><button type="button" class="gh sm" id="xpb-generate-uuid">Сгенерировать UUID</button><button type="button" class="gh sm" id="xpb-generate-ss-password">Сгенерировать пароли Shadowsocks</button></div>'+
@@ -743,6 +743,8 @@ async function profilesP(){
   };
   $$('[data-xray-mode]').forEach(btn=>btn.addEventListener('click',()=>setMode(btn.dataset.xrayMode)));
   customArea.addEventListener('input',()=>{customDirty=true;validateCustomJson()});
+  $('#xpb-custom-copy').onclick=()=>copyText('xpb-custom-json');
+  $('#xpb-custom-download').onclick=()=>download('xpb-custom-json','server');
   $('#xpb-format-json').onclick=()=>{const obj=validateCustomJson();if(obj){customArea.value=JSON.stringify(obj,null,2);customDirty=true;validateCustomJson();toast('JSON отформатирован')}};
   $('#xpb-reset-json').onclick=()=>{if(confirm('Заменить ручной JSON текущим конфигом визуального конструктора?')){customArea.value=$('#xpb-preview').value;customDirty=false;validateCustomJson();toast('JSON обновлён из конструктора')}};
   $$('[id^="xpb-"]').filter(el=>(el.tagName==='INPUT'||el.tagName==='SELECT'||el.tagName==='TEXTAREA')&&!['xpb-custom-json','xpb-preview','xpb-client-preview'].includes(el.id)).forEach(el=>{el.addEventListener('input',()=>{updateVisibility();updatePreview()});el.addEventListener('change',()=>{updateVisibility();updatePreview()})});
