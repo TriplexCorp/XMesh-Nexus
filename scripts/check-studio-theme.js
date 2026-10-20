@@ -24,5 +24,11 @@ assert.match(studio,/html\[data-borders=off\]/,'Border setting integration missi
 assert.match(studio,/html body \.xray-builder\.studio-reference-v5:not\(\.manual-mode\) \[hidden\]\s*\{\s*display:none!important\s*\}/,'Semantic hidden must win over panel and toolbar display rules');
 assert.match(studio,/\.xray-builder\.manual-mode\s*>\s*\.xray-config-tabs\s*\{\s*display:none!important\s*\}/,'Manual JSON must not show visual tabs');
 assert.ok(!studio.includes('body:has(.studio-reference-v5) .top{display:none'),'Studio must not hide the global panel header');
+assert.equal((studio.match(/XRAY STUDIO — readable contextual workspace/g)||[]).length,1,'Only one authoritative contextual editor block is allowed');
+assert.match(studio,/--studio-control:max\(15px,1\.02rem\)/,'Studio inputs must remain readable when UI is scaled down');
+assert.match(studio,/--studio-label:max\(14px,\.94rem\)/,'Studio labels must not become microscopic');
+assert.match(studio,/--studio-text-sm:max\(13px,\.84rem\)/,'Studio help text must remain legible');
+assert.match(studio,/> \.xray-config-tabs\{\s*display:none!important;/,'The contextual editor must not regress to wizard navigation');
+assert.match(studio,/\.sr-v5-gutter-lines span\{[^}]*height:1\.65rem!important/s,'JSON gutter lines must match code line-height');
 assert.equal((studio.match(/\{/g)||[]).length,(studio.match(/\}/g)||[]).length,'CSS braces must balance');
 console.log('XRAY Studio design integration: OK');
