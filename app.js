@@ -9,45 +9,8 @@ const ago=t=>{if(!t)return'никогда';const s=(Date.now()-t)/1e3;return s<6
 const DAY=864e5,left=t=>{if(!t)return'бессрочно';const d=Math.ceil((t-Date.now())/DAY);return d>0?d+' дн':d==0?'истёк сегодня':'истёк '+(-d)+' дн назад'};
 const chip=(t,c)=>`<span class="chip" style="--c:var(${c})">${t}</span>`;
 const smooth=p=>{let d=`M${p[0]}`;for(let i=0;i<p.length-1;i++){const a=p[i-1]||p[i],b=p[i],c=p[i+1],e=p[i+2]||c;d+=`C${b[0]+(c[0]-a[0])/6},${b[1]+(c[1]-a[1])/6},${c[0]-(e[0]-b[0])/6},${c[1]-(e[1]-b[1])/6},${c}`}return d};
-const P={home:'<rect x="3" y="3" width="7" height="9" rx="1.500"/><rect x="14" y="3" width="7" height="5" rx="1.500"/><rect x="14" y="12" width="7" height="9" rx="1.500"/><rect x="3" y="16" width="7" height="5" rx="1.500"/>',users:'<circle cx="9" cy="8" r="3.500"/><path d="M2.500 20c.6-3.600 3.200-5.500 6.500-5.500s5.900 1.900 6.500 5.500M16 4.600a3.500 3.500 0 0 1 0 6.800M18.500 14.800c1.700.7 2.700 2.300 3 4.700"/>',layers:'<path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 13 9 5 9-5"/>',link:'<path d="M10 14a4 4 0 0 0 5.700 0l3-3a4 4 0 0 0-5.700-5.700l-1 1M14 10a4 4 0 0 0-5.700 0l-3 3a4 4 0 0 0 5.700 5.700l1-1"/>',server:'<rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.500h.01M7 16.500h.01"/>',activity:'<path d="M3 12h4l3-8 4 16 3-8h4"/>',file:'<path d="M7 3h7l5 5v13H7V3Z"/><path d="M14 3v5h5"/>',code:'<path d="m8 8-4 4 4 4M16 8l4 4-4 4M13.500 5l-3 14"/>',tool:'<path d="M14 7a4 4 0 0 1 5.500-3.500L16 7l1 3 3 1 3.500-3.500A4 4 0 0 1 14 13l-8 8a2 2 0 0 1-3-3l8-8"/>',shield:'<path d="M12 3 4 6v6c0 4.500 3.400 8 8 9 4.600-1 8-4.500 8-9V6l-8-3Z"/>',sliders:'<path d="M4 7h9M19 7h1M4 17h1M11 17h9"/><circle cx="16" cy="7" r="2.200"/><circle cx="8" cy="17" r="2.200"/>',bell:'<path d="M6 16v-5a6 6 0 1 1 12 0v5l1.500 2h-15L6 16ZM10 21h4"/>',search:'<circle cx="11" cy="11" r="6.500"/><path d="m16 16 4.500 4.500"/>',sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2.500v2M12 19.500v2M2.500 12h2M19.500 12h2M5.300 5.300l1.400 1.400M17.300 17.300l1.400 1.400M5.300 18.700l1.400-1.400M17.300 6.700l1.400-1.400"/>',moon:'<path d="M20 14.500A8 8 0 1 1 9.500 4a6.500 6.500 0 0 0 10.500 10.500Z"/>',redo:'<path d="M20 11a8 8 0 1 0-2.300 5.700M20 4v7h-7"/>',plus:'<path d="M12 5v14M5 12h14"/>',x:'<path d="M6 6l12 12M18 6 6 18"/>',copy:'<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/>',trash:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/>',pause:'<path d="M8 5v14M16 5v14"/>',play:'<path d="M7 4.500v15l12-7.500L7 4.500Z"/>',up:'<path d="m6 15 6-6 6 6"/>',down:'<path d="m6 9 6 6 6-6"/>',more:'<circle cx="5" cy="12" r="1.500"/><circle cx="12" cy="12" r="1.500"/><circle cx="19" cy="12" r="1.500"/>',dl:'<path d="M12 4v11M7 11l5 5 5-5M5 20h14"/>',pen:'<path d="M4 20h4L19 9a2.800 2.800 0 0 0-4-4L4 16v4Z"/>',logout:'<path d="M10 17l5-5-5-5M15 12H3M12 3h6a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3h-6"/>,save:'<path d="M5 3h12l4 4v14H3V3h2Z"/><path d="M7 3v6h10V3M7 21v-7h10v7"/>,refresh:'<path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.6 9A7 7 0 0 1 18 6l2 6M4 12l2 6a7 7 0 0 0 12.4-3"/>,arrow:'<path d="M5 12h14M13 6l6 6-6 6"/>};
+const P={home:'<rect x="3" y="3" width="7" height="9" rx="1.500"/><rect x="14" y="3" width="7" height="5" rx="1.500"/><rect x="14" y="12" width="7" height="9" rx="1.500"/><rect x="3" y="16" width="7" height="5" rx="1.500"/>',users:'<circle cx="9" cy="8" r="3.500"/><path d="M2.500 20c.6-3.600 3.200-5.500 6.500-5.500s5.900 1.900 6.500 5.500M16 4.600a3.500 3.500 0 0 1 0 6.800M18.500 14.800c1.700.7 2.700 2.300 3 4.700"/>',layers:'<path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 13 9 5 9-5"/>',link:'<path d="M10 14a4 4 0 0 0 5.700 0l3-3a4 4 0 0 0-5.700-5.700l-1 1M14 10a4 4 0 0 0-5.700 0l-3 3a4 4 0 0 0 5.700 5.700l1-1"/>',server:'<rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.500h.01M7 16.500h.01"/>',activity:'<path d="M3 12h4l3-8 4 16 3-8h4"/>',file:'<path d="M7 3h7l5 5v13H7V3Z"/><path d="M14 3v5h5"/>',code:'<path d="m8 8-4 4 4 4M16 8l4 4-4 4M13.500 5l-3 14"/>',tool:'<path d="M14 7a4 4 0 0 1 5.500-3.500L16 7l1 3 3 1 3.500-3.500A4 4 0 0 1 14 13l-8 8a2 2 0 0 1-3-3l8-8"/>',shield:'<path d="M12 3 4 6v6c0 4.500 3.400 8 8 9 4.600-1 8-4.500 8-9V6l-8-3Z"/>',sliders:'<path d="M4 7h9M19 7h1M4 17h1M11 17h9"/><circle cx="16" cy="7" r="2.200"/><circle cx="8" cy="17" r="2.200"/>',bell:'<path d="M6 16v-5a6 6 0 1 1 12 0v5l1.500 2h-15L6 16ZM10 21h4"/>',search:'<circle cx="11" cy="11" r="6.500"/><path d="m16 16 4.500 4.500"/>',sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2.500v2M12 19.500v2M2.500 12h2M19.500 12h2M5.300 5.300l1.400 1.400M17.300 17.300l1.400 1.400M5.300 18.700l1.400-1.400M17.300 6.700l1.400-1.400"/>',moon:'<path d="M20 14.500A8 8 0 1 1 9.500 4a6.500 6.500 0 0 0 10.500 10.500Z"/>',redo:'<path d="M20 11a8 8 0 1 0-2.300 5.700M20 4v7h-7"/>',plus:'<path d="M12 5v14M5 12h14"/>',x:'<path d="M6 6l12 12M18 6 6 18"/>',copy:'<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/>',trash:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/>',pause:'<path d="M8 5v14M16 5v14"/>',play:'<path d="M7 4.500v15l12-7.500L7 4.500Z"/>',up:'<path d="m6 15 6-6 6 6"/>',down:'<path d="m6 9 6 6 6-6"/>',more:'<circle cx="5" cy="12" r="1.500"/><circle cx="12" cy="12" r="1.500"/><circle cx="19" cy="12" r="1.500"/>',dl:'<path d="M12 4v11M7 11l5 5 5-5M5 20h14"/>',pen:'<path d="M4 20h4L19 9a2.800 2.800 0 0 0-4-4L4 16v4Z"/>'};
 const ic=n=>`<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${P[n]}</svg>`;
-const buttonIconFor=text=>{
- const s=String(text||'').trim().toLocaleLowerCase('ru');
- if(/выйти|выход|logout|sign out/.test(s))return'logout';
- if(/удалить|удаление|отозвать|очистить/.test(s))return'trash';
- if(/добавить|создать|новый|пользователь|add /.test(s))return'plus';
- if(/копировать|скопировать|copy/.test(s))return'copy';
- if(/скачать|экспорт|резервн|download|export/.test(s))return'dl';
- if(/обновить|проверить|повторить|сбросить|refresh|reset/.test(s))return'refresh';
- if(/настройк|параметр|фильтр/.test(s))return'sliders';
- if(/сохранить|применить|готово|save/.test(s))return'save';
- if(/импорт|загрузить файл/.test(s))return'file';
- if(/форматир|json|код/.test(s))return'code';
- if(/отмена|закрыть|назад|cancel|close/.test(s))return'x';
- if(/запустить|включить|установить|продолжить|start/.test(s))return'play';
- if(/остановить|выключить|пауза|stop/.test(s))return'pause';
- if(/редактир|изменить|править|edit/.test(s))return'pen';
- if(/поиск|искать|search/.test(s))return'search';
- if(/уведомлен|событи/.test(s))return'bell';
- if(/диагност|проверка/.test(s))return'tool';
- if(/тема|светл|тёмн|темн|авто/.test(s))return'sun';
- if(/следующ|вперёд|далее|next/.test(s))return'arrow';
- return null;
-};
-function decorateButtons(root=document){
- const nodes=root.matches?.('button')?[root,...root.querySelectorAll('button')]:root.querySelectorAll?.('button')||[];
- nodes.forEach(button=>{
-  if(button.querySelector('.ic')||button.classList.contains('palette-swatch')||button.classList.contains('sw'))return;
-  const text=button.getAttribute('aria-label')||button.title||button.textContent||'';
-  const key=buttonIconFor(text)||(button.matches('.btn,.gh,.dg,.pi,.ia')?'activity':null);
-  if(!key)return;
-  button.insertAdjacentHTML('afterbegin',ic(key));
-  button.classList.add('has-auto-icon');
- });
-}
-const buttonObserver=new MutationObserver(records=>{for(const record of records)for(const node of record.addedNodes)if(node.nodeType===1)decorateButtons(node)});
-buttonObserver.observe(document.body,{childList:true,subtree:true});
-
 
 /* ================= ДАННЫЕ: пустое хранилище + слой API ================= */
 const PL={iOS:['iPhone','iPad'],Android:['Android'],Windows:['Windows'],macOS:['macOS'],Linux:['Linux']};
@@ -174,22 +137,10 @@ const modal=(h,c='')=>{dlg.className=c;dlg.innerHTML=h;if(!dlg.open)dlg.showModa
 dlg.addEventListener('click',e=>{if(e.target==dlg||e.target.closest('[data-x]'))dlg.close()});
 const confirmBox=(h,ok,fn)=>{CF=fn;modal(`<div class="box"><h2>${h}</h2><div class="act"><button class="gh" data-x>Отмена</button><button class="btn" data-cf>${ok}</button></div></div>`)};
 let tt;const toast=(m,al,fn)=>{const t=$('#toast');t.innerHTML=`<span>${esc(m)}</span>${al?`<button id="ta">${al}</button>`:''}`;if(al)$('#ta').onclick=()=>{fn();t.classList.remove('show')};t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),al?6000:2400)};
-const CDEFAULT={theme:'dark',accent:'emerald',customA:'#60d6a2',customB:'#c3e879',hue:151,sat:62,lum:61,ts:1,motion:1,density:'comfortable',surface:'solid',glow:'normal',font:'onest',radius:16,borders:'soft',sidebar:'standard',autoCoreRefresh:true,coreRefreshSeconds:30};
+const CDEFAULT={theme:'dark',accent:'emerald',customA:'#60d6a2',customB:'#c3e879',hue:151,sat:62,lum:61,ts:1,motion:1,density:'comfortable',surface:'solid',glow:'normal',font:'onest',radius:16,borders:'soft',sidebar:'standard'};
 let C={...CDEFAULT};try{Object.assign(C,JSON.parse(localStorage.xmeshNexusSettings||'{}'))}catch(e){}if(C.accent==='mint')C.accent='emerald';
 const hslHex=(h,s,l)=>{s/=100;l/=100;const k=n=>(n+h/30)%12,a=s*Math.min(l,1-l),f=n=>{const c=(k(n)+12)%12;return l-a*Math.max(-1,Math.min(c-3,9-c,1))};return '#'+[f(0),f(8),f(4)].map(v=>Math.round(v*255).toString(16).padStart(2,'0')).join('')};
 const apply=()=>{const r=document.documentElement;r.dataset.theme=C.theme=='auto'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):C.theme;r.dataset.accent=C.accent;r.style.setProperty('--custom-a',C.customA||hslHex(+C.hue||151,+C.sat||62,+C.lum||61));r.style.setProperty('--custom-b',C.customB||'#c3e879');if(C.accent==='custom'){const rgb=(C.customA||'#60d6a2').match(/[0-9a-f]{2}/gi).map(v=>parseInt(v,16)/255);const linear=rgb.map(v=>v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4));const lum=.2126*linear[0]+.7152*linear[1]+.0722*linear[2];r.style.setProperty('--btn-text',lum>.42?'#082b1d':'#ffffff')}else r.style.setProperty('--btn-text',r.dataset.theme==='light'?'#ffffff':'#082b1d');r.dataset.density=C.density||CDEFAULT.density;r.dataset.surface=C.surface||CDEFAULT.surface;r.dataset.glow=C.glow||CDEFAULT.glow;r.dataset.font=C.font||CDEFAULT.font;r.dataset.borders=C.borders||CDEFAULT.borders;r.dataset.sidebar=C.sidebar||CDEFAULT.sidebar;r.style.setProperty('--ts',cl(+C.ts||1,.9,1.3));const radius=cl(+C.radius||16,4,24);r.style.setProperty('--ui-radius',radius+'px');r.style.setProperty('--ui-control-radius',Math.max(5,radius*.72)+'px');r.dataset.motion=C.motion?'on':'off';try{localStorage.xmeshNexusSettings=JSON.stringify(C)}catch(e){}};
-let coreRefreshTimer=null;
-const syncAutoCoreRefresh=()=>{
- if(coreRefreshTimer)clearInterval(coreRefreshTimer);
- coreRefreshTimer=null;
- if(C.autoCoreRefresh===false)return;
- const seconds=cl(+C.coreRefreshSeconds||30,15,120);
- coreRefreshTimer=setInterval(()=>{if(backendReady&&!document.hidden)refreshCoreStatus().catch(()=>{})},seconds*1000);
-};
-document.addEventListener('change',event=>{
- if(event.target?.id==='auto-core-refresh'){C.autoCoreRefresh=event.target.checked;apply();syncAutoCoreRefresh();toast(C.autoCoreRefresh?'Автообновление включено':'Автообновление выключено')}
- if(event.target?.id==='core-refresh-seconds'){C.coreRefreshSeconds=cl(+event.target.value||30,15,120);apply();syncAutoCoreRefresh();toast('Интервал проверки обновлён')}
-});
 const brand=()=>{$('#bn').textContent=DB.set.brand;$('#lg').textContent=(DB.set.brand[0]||'L').toUpperCase()};
 
 let T=[],cur='',RT=0;
@@ -200,7 +151,7 @@ async function render(soft){
   T.forEach(clearInterval);T=[];cur=location.hash.slice(1);if(!pages[cur])cur='home';const rt=++RT,[t,f]=pages[cur],v=$('#view');
   $('#title').textContent=t;document.title=t+' — '+DB.set.brand;$$('#nav a').forEach(a=>a.classList.toggle('on',a.getAttribute('href')=='#'+cur));
   if(!soft){v.classList.remove('still');v.innerHTML=skel();scrollTo(0,0)}
-  const [h,i]=await f();if(rt!=RT)return;v.classList.toggle('still',!!soft);v.innerHTML=h;i&&i();$('#unb').textContent=DB.users.length;drawBulk();decorateButtons(v);
+  const [h,i]=await f();if(rt!=RT)return;v.classList.toggle('still',!!soft);v.innerHTML=h;i&&i();$('#unb').textContent=DB.users.length;drawBulk();
 }
 
 /* ================= СИСТЕМНЫЕ МЕТРИКИ ================= */
@@ -1310,9 +1261,7 @@ async function setP(){
     <section class="card sg"><div><h3>Эффекты и движение</h3><small>Настройка фона и анимаций без изменения данных</small></div>
       <div class="setting-row"><div class="setting-copy"><b>Подсветка фона</b><small>Мягкое цветное свечение за панелью</small></div><div class="setting-control">${choices('glow',[['off','Выкл.'],['subtle','Мягкая'],['normal','Средняя'],['rich','Яркая']])}</div></div>
       <div class="setting-row"><div class="setting-copy"><b>Анимации</b><small>Отключите движение и переходы, если они отвлекают</small></div><label class="sw"><input type="checkbox" id="mo" ${C.motion?'checked':''} aria-label="Анимации"><span></span></label></div>
-      <div class="setting-row"><div class="setting-copy"><b>Автообновление статуса Xray-core</b><small>Панель сама проверяет состояние ядра в фоне, пока она открыта</small></div><label class="sw"><input type="checkbox" id="auto-core-refresh" ${C.autoCoreRefresh!==false?'checked':''} aria-label="Автообновление статуса Xray-core"><span></span></label></div>
-      <div class="setting-row"><div class="setting-copy"><b>Интервал проверки</b><small>Чем меньше интервал, тем быстрее обновляется статус</small></div><div class="setting-control"><select id="core-refresh-seconds" aria-label="Интервал проверки">${[[15,'15 секунд'],[30,'30 секунд'],[60,'1 минута'],[120,'2 минуты']].map(([v,l])=>`<option value="${v}" ${+(C.coreRefreshSeconds||30)===v?'selected':''}>${l}</option>`).join('')}</select></div></div>
-      <div class="setting-row"><div class="setting-copy"><b>Сохранение</b><small>Параметры оформления и автоматизации сохраняются в этом браузере</small></div><button class="gh sm" id="rs">${ic('redo')}Сбросить настройки</button></div>
+      <div class="setting-row"><div class="setting-copy"><b>Сохранение</b><small>Параметры оформления сохраняются в localStorage этого браузера</small></div><button class="gh sm" id="rs">Сбросить оформление</button></div>
     </section>
   </div>
   <div class="card"><div class="hd"><div><h3>Бренд и домен</h3><p>Имя в меню и домен в ссылках подписки</p></div></div><form data-k="brand" method="dialog" class="sg" style="gap:1rem"><div class="r2" style="display:grid;border:0;padding:0">${field({k:'brand',l:'Название панели',req:1},DB.set.brand)}${field({k:'domain',l:'Домен панели',req:1,ph:'panel.example.com'},DB.set.domain)}</div><div style="border:0;padding:0"><button class="btn">Сохранить</button></div></form></div>
@@ -1521,9 +1470,8 @@ document.addEventListener('click',e=>{
 });
 
 /* ================= СТАРТ ================= */
-decorateButtons(document);$('#si').innerHTML=ic('search');$('#theme').innerHTML=ic('moon').replace('class="ic"','class="ic moon"')+ic('sun').replace('class="ic"','class="ic sun"');
+$('#si').innerHTML=ic('search');$('#theme').innerHTML=ic('moon').replace('class="ic"','class="ic moon"')+ic('sun').replace('class="ic"','class="ic sun"');
 $('#bell').innerHTML=ic('bell');$('#addb').innerHTML=ic('plus')+'<span class="bt">Пользователь</span>';
-$('#logout').innerHTML=ic('logout')+'<span class="lbl">Выйти</span>';
 $('#logout').onclick=async()=>{const button=$('#logout');button.disabled=true;try{await fetch('/api/v1/auth/logout',{method:'POST',credentials:'same-origin',cache:'no-store'});}catch(_){}backendReady=false;location.replace('/login')};$('#restart').setAttribute('aria-label','Настройки Xray-core');$('#restart').innerHTML=ic('code')+'<span class="lbl">Версия</span>';
 apply();matchMedia('(prefers-color-scheme: light)').addEventListener('change',apply);
 addEventListener('hashchange',()=>{if(backendReady)render()});
@@ -1542,7 +1490,6 @@ async function initializePanel(){
   $('#xmesh-auth')?.remove();
   brand();render();
   refreshCoreStatus().catch(()=>{});
-  syncAutoCoreRefresh();
 }
 async function bootPanel(){
   try{
