@@ -287,7 +287,7 @@ function xrayBuilderConfig(){
  if(protocol==='vless'&&security!=='none'&&network==='raw'&&v('flow'))settings.users[0]&& (settings.users[0].flow=v('flow'));
  const inbound={tag,protocol,settings};
  if(protocol!=='tun'){inbound.listen=v('listen')||'0.0.0.0';inbound.port=port}
- if(!['tun','wireguard'].includes(protocol)){
+ if(!['tun','wireguard','dokodemo-door','tunnel'].includes(protocol)){
   const ss={method:network,security};
   if(network==='websocket')ss.wsSettings={path,headers:v('host')?{Host:v('host')}: {},heartbeatPeriod:0};
   if(network==='xhttp')ss.xhttpSettings={path,host:v('host'),mode:v('xhttp-mode')||'auto',extra:{xPaddingBytes:v('xhttp-padding')||'100-1000'}};
@@ -565,12 +565,14 @@ async function profilesP(){
    else if(['tun','wireguard'].includes(proto))force('security','none');
    else if(net==='masque')force('network','raw');
    if(['hysteria'].includes(net)&&sec!=='tls')force('security','tls');
+   if(sec==='reality'&&(!['raw','xhttp','grpc'].includes(net)||!['vless','vmess','trojan'].includes(proto)))force('security',['tun','wireguard','masque','dokodemo-door','tunnel'].includes(proto)?'none':'tls');
+   if(['tun','wireguard','masque','dokodemo-door','tunnel'].includes(proto)&&sec!=='none'&&proto!=='hysteria')force('security','none');
    proto=$('#xpb-protocol').value;net=$('#xpb-network').value;sec=$('#xpb-security').value;
    const networkSelect=$('#xpb-network');
-   if(networkSelect){const noTransport=['tun','wireguard'].includes(proto);networkSelect.closest('.f').hidden=noTransport;networkSelect.disabled=noTransport;const masqueOption=networkSelect.querySelector('option[value="masque"]');if(masqueOption)masqueOption.disabled=proto!=='masque';}
+   if(networkSelect){const noTransport=['tun','wireguard','dokodemo-door','tunnel'].includes(proto);networkSelect.closest('.f').hidden=noTransport;networkSelect.disabled=noTransport;const masqueOption=networkSelect.querySelector('option[value="masque"]');if(masqueOption)masqueOption.disabled=proto!=='masque';}
    const securitySelect=$('#xpb-security');
    if(securitySelect){
-    const disabled=['tun','wireguard','masque'].includes(proto);
+    const disabled=['tun','wireguard','masque','dokodemo-door','tunnel'].includes(proto);
     securitySelect.disabled=disabled;
     const realityOption=securitySelect.querySelector('option[value="reality"]');
     if(realityOption)realityOption.disabled=!['raw','xhttp','grpc'].includes(net)||!['vless','vmess','trojan'].includes(proto);
