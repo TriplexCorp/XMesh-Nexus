@@ -30,6 +30,8 @@ jobs:
           node --check xray-studio-v5.js
       - name: Verify packaged frontend assets
         run: node scripts/check-static-assets.js
+      - name: Check shared Studio theme and CSS structure
+        run: node scripts/check-studio-theme.js
       - name: Check XRAY Studio selector safety
         run: node scripts/check-xray-studio-selectors.js
       - name: Validate installer and Docker Compose
