@@ -156,18 +156,23 @@ const sysBar=n=>{const p=sysPct(n);return p===null?'<div class="sys-progress"><i
 const sysUptime=n=>{if(!Number.isFinite(+n))return'—';n=Math.max(0,Math.floor(+n));const d=Math.floor(n/86400),h=Math.floor(n%86400/3600),m=Math.floor(n%3600/60);return d?`${d} д ${h} ч`:h?`${h} ч ${m} мин`:`${m} мин`};
 function systemPanel(s,error=''){
   if(!s)return `<section class="card system-card"><div class="hd"><div><p class="note">МОНИТОРИНГ</p><h3>Состояние системы</h3><p>${error?esc(error):'Получаем системные показатели…'}</p></div><span class="sys-live"><i></i> Ожидание</span></div><div class="sys-empty">${ic('server')}<span>Метрики станут доступны после подключения к backend.</span></div></section>`;
-  const cpu=s.cpu?.percent,ram=s.ram?.percent,disk=s.disk?.percent;
-  const metric=(key,title,value,detail,pct,unit='')=>`<article class="sys-metric"><div class="sys-metric-head"><span>${title}</span><span class="sys-glyph">${key}</span></div><div class="sys-value">${value}</div><div class="sys-detail">${detail}</div>${sysBar(pct)}<div class="sys-foot"><span>${pct===null?'Нет данных':fmt(pct,1)+'% использовано'}</span><span>${unit}</span></div></article>`;
+  const cpu=sysPct(s.cpu?.percent),ram=sysPct(s.ram?.percent),disk=sysPct(s.disk?.percent);
+  const donut=(key,title,pct,detail,color)=>{
+    const valid=pct!==null,p=valid?pct:0,dash=`${p} ${100-p}`;
+    const tone=valid&&p>=90?'--er':valid&&p>=75?'--wr':color;
+    return `<article class="sys-metric sys-metric-donut"><div class="sys-metric-head"><span>${title}</span><span class="sys-glyph">${key}</span></div><div class="sys-donut-row"><div class="sys-donut"><div class="ringwrap"><svg viewBox="0 0 40 40" role="img" aria-label="${title}: ${valid?fmt(p,1)+'%':'нет данных'}"><circle class="ng-track" cx="20" cy="20" r="16" pathLength="100"></circle><circle class="ng-arc" cx="20" cy="20" r="16" pathLength="100" stroke-dasharray="${dash}" style="--g-color:var(${tone})"></circle></svg><b class="ng-center">${valid?fmt(p,1)+'%':'—'}</b></div></div><div class="sys-donut-info"><b>${valid?'Использовано':'Нет данных'}</b><span>${detail}</span><small>${valid?fmt(Math.max(0,100-p),1)+'% свободно':'Ожидание показаний'}</small></div></div></article>`;
+  };
+  const info=(key,title,value,detail)=>`<article class="sys-metric sys-metric-uptime"><div class="sys-metric-head"><span>${title}</span><span class="sys-glyph">${key}</span></div><div class="sys-value">${value}</div><div class="sys-detail">${detail}</div><div class="sys-uptime-foot"><i></i> Процесс панели работает</div></article>`;
   const diskDetail=s.disk?`${sysBytes(s.disk.usedBytes)} из ${sysBytes(s.disk.totalBytes)}`:'Нет данных о файловой системе';
   const ramDetail=s.ram?.totalBytes?`${sysBytes(s.ram.usedBytes)} из ${sysBytes(s.ram.totalBytes)}`:'Нет данных о памяти';
-  const cpuDetail=cpu==null?'Недостаточно данных для расчёта':`Средняя нагрузка: ${s.loadAverage?.one==null?'—':fmt(s.loadAverage.one,2)}`;
+  const cpuDetail=cpu===null?'Недостаточно данных для расчёта':`Средняя нагрузка: ${s.loadAverage?.one==null?'—':fmt(s.loadAverage.one,2)}`;
   const dbOnline=s.database==='online';
   const sampled=s.sampledAt?new Date(s.sampledAt).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'—';
   return `<section class="card system-card"><div class="hd"><div><p class="note">МОНИТОРИНГ · LIVE</p><h3>Состояние системы</h3><p>Ресурсы и доступность сервисов панели в реальном времени.</p></div><span class="sys-live"><i></i> Обновляется</span></div><div class="sys-grid">
-  ${metric('CPU','Процессор',cpu==null?'—':fmt(cpu,1)+'%',cpuDetail,cpu,'')}
-  ${metric('RAM','Оперативная память',ram==null?'—':fmt(ram,1)+'%',ramDetail,ram,'')}
-  ${metric('SSD','Диск',disk==null?'—':fmt(disk,1)+'%',diskDetail,disk,'корень контейнера')}
-  ${metric('UP','Время работы',sysUptime(s.uptimeSeconds),`Процессов видно: ${s.processCount==null?'—':fmt(s.processCount)}`,null,'uptime')}
+  ${donut('CPU','Процессор',cpu,cpuDetail,'--a')}
+  ${donut('RAM','Оперативная память',ram,ramDetail,'--b')}
+  ${donut('SSD','Диск',disk,diskDetail,'--c3')}
+  ${info('UP','Время работы',sysUptime(s.uptimeSeconds),`Видимых процессов: ${s.processCount==null?'—':fmt(s.processCount)}`)}
   </div><div class="sys-details"><div class="sys-detail-item"><span class="sys-detail-label">Средняя нагрузка</span><b>${[s.loadAverage?.one,s.loadAverage?.five,s.loadAverage?.fifteen].map(v=>v==null?'—':fmt(v,2)).join(' / ')}</b><small>1 · 5 · 15 минут</small></div><div class="sys-detail-item"><span class="sys-detail-label">База данных</span><b class="${dbOnline?'sys-ok':'sys-bad'}"><i></i>${dbOnline?'Подключена':'Нет соединения'}</b><small>PostgreSQL · проверка SELECT 1</small></div><div class="sys-detail-item"><span class="sys-detail-label">Последнее обновление</span><b>${sampled}</b><small>Автообновление каждые 15 секунд</small></div></div><p class="sys-note">${esc(s.scope||'Показатели зависят от ресурсов, доступных контейнеру панели.')} Диск показывает файловую систему, смонтированную в контейнер как /.</p></section>`;
 }
 
