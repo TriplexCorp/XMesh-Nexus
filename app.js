@@ -99,8 +99,8 @@ const ENT={
     cols:[['Название',r=>`<b>${esc(r.name)}</b>`],['Права',r=>chip(r.scope=='read'?'чтение':'запись',r.scope=='read'?'--c3':'--wr')],['Создан',r=>ago(r.created)],['Использован',r=>ago(r.last)]],
     after:o=>{const s='lm_'+Math.random().toString(36).slice(2)+Math.random().toString(36).slice(2);modal(`<div class="box"><h2>Токен создан</h2><p class="note">Скопируйте его сейчас: позже показать его снова будет нельзя.</p><div class="lk"><input id="lk" readonly value="${s}" aria-label="Токен"><button class="gh" data-copy>${ic('copy')}</button></div><div class="act"><button class="btn" data-x>Готово</button></div></div>`);return 1}}
 };
-const FU=[{k:'username',l:'Имя пользователя',req:1,pat:'[A-Za-z0-9_.\\-]{3,32}',h:'3–32 символа: латиница, цифры, _ . -'},{k:'xrayProfileId',l:'Xray-профиль',t:'sel',o:()=>[['','Не привязывать'],...DB.profiles.map(p=>[String(p.id),p.name])],h:'При выборе панель добавит учётные данные в inbound профиля.'},{k:'limit',l:'Лимит трафика, ГБ',t:'num',h:'0 — без лимита'},{k:'days',l:'Срок, дней',t:'num',h:'0 — бессрочно'},{k:'strategy',l:'Сброс трафика',t:'sel',o:STRAT},{k:'hwid',l:'Лимит устройств',t:'num'},{k:'tag',l:'Тег',ph:'например, vip'},{k:'squads',l:'Сквады',t:'multi',o:()=>DB.squads.map(s=>[s.id,s.name])},{k:'hold',l:'Отсчёт срока с первого подключения (on hold)',t:'bool'},{k:'desc',l:'Заметка'}];
-const FE=[{k:'username',l:'Имя пользователя',req:1,pat:'[A-Za-z0-9_.\\-]{3,32}'},{k:'limit',l:'Лимит, ГБ',t:'num',h:'0 — без лимита'},{k:'expireAt',l:'Действует до',t:'date',h:'Пусто — бессрочно'},{k:'strategy',l:'Сброс трафика',t:'sel',o:STRAT},{k:'tag',l:'Тег'},{k:'tg',l:'Telegram ID'},{k:'email',l:'Email'},{k:'desc',l:'Заметка'}];
+const FU=[{k:'username',l:'Имя пользователя',req:1,pat:'[A-Za-z0-9_.\\-]{3,32}',h:'3–32 символа: латиница, цифры, _ . -'},{k:'xrayProfileId',l:'Xray-профиль',t:'sel',o:()=>[['','Не привязывать'],...DB.profiles.map(p=>[String(p.id),p.name])],h:'При выборе панель добавит учётные данные в inbound профиля.'},{k:'fingerprint',l:'uTLS fingerprint пользователя',t:'sel',o:()=>Array.from(new Set(['chrome','firefox','safari','ios','android','edge','random','randomized','randomizednoalpn','unsafe',...XRAY_FP])).map(x=>[x,x]),h:'Индивидуальный fingerprint клиентского профиля для этого пользователя.'},{k:'limit',l:'Лимит трафика, ГБ',t:'num',h:'0 — без лимита'},{k:'days',l:'Срок, дней',t:'num',h:'0 — бессрочно'},{k:'strategy',l:'Сброс трафика',t:'sel',o:STRAT},{k:'hwid',l:'Лимит устройств',t:'num'},{k:'tag',l:'Тег',ph:'например, vip'},{k:'squads',l:'Сквады',t:'multi',o:()=>DB.squads.map(s=>[s.id,s.name])},{k:'hold',l:'Отсчёт срока с первого подключения (on hold)',t:'bool'},{k:'desc',l:'Заметка'}];
+const FE=[{k:'username',l:'Имя пользователя',req:1,pat:'[A-Za-z0-9_.\\-]{3,32}'},{k:'fingerprint',l:'uTLS fingerprint пользователя',t:'sel',o:()=>Array.from(new Set(['chrome','firefox','safari','ios','android','edge','random','randomized','randomizednoalpn','unsafe',...XRAY_FP])).map(x=>[x,x]),h:'Персональный fingerprint пользователя.'},{k:'limit',l:'Лимит, ГБ',t:'num',h:'0 — без лимита'},{k:'expireAt',l:'Действует до',t:'date',h:'Пусто — бессрочно'},{k:'strategy',l:'Сброс трафика',t:'sel',o:STRAT},{k:'tag',l:'Тег'},{k:'tg',l:'Telegram ID'},{k:'email',l:'Email'},{k:'desc',l:'Заметка'}];
 
 const COUNTRY_CODES='AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW HK HM HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP KE KG KH KH? KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS YE YT ZA ZM ZW'.replace(' KH?','').split(' ');
 const COUNTRY_NAMES=new Intl.DisplayNames(['ru'],{type:'region'});
@@ -214,7 +214,7 @@ async function drawUsers(){
   $('#uf').innerHTML=[['all','Все',s.total],['ONLINE','Онлайн',s.online],['ACTIVE','Активные',s.by.ACTIVE||0],['ON_HOLD','Ожидают',s.by.ON_HOLD||0],['LIMITED','Лимит',s.by.LIMITED||0],['EXPIRED','Истёк',s.by.EXPIRED||0],['DISABLED','Отключены',s.by.DISABLED||0]].map(([k,l,n])=>`<button data-uf="${k}" class="${UQ.st==k?'on':''}">${l}<b>${n}</b></button>`).join('');
   const th=(k,l)=>`<th><button data-s="${k}">${l}${UQ.sort==k?(UQ.dir=='asc'?' ↑':' ↓'):''}</button></th>`;
   const all=r.items.length&&r.items.every(u=>UQ.sel.has(u.id));
-  $('#ut').innerHTML=r.total?`<div class="tw"><table class="tb"><thead><tr><th class="c1"><input type="checkbox" data-sela ${all?'checked':''} aria-label="Выбрать все на странице"></th>${th('username','Пользователь')}${th('status','Статус')}${th('used','Трафик')}${th('expireAt','Срок')}<th>Доступ</th>${th('onlineAt','Был в сети')}</tr></thead><tbody>${r.items.map(u=>{const [sl,sc]=STM[st(u)],k=u.limit?u.used/u.limit:0,h=hs(u.username)%360,on=isOn(u);return `<tr data-id="${u.id}" class="${UQ.sel.has(u.id)?'sel':''}"><td class="c1"><input type="checkbox" data-sel="${u.id}" ${UQ.sel.has(u.id)?'checked':''} aria-label="Выбрать ${esc(u.username)}"></td><td data-l=""><div class="who"><span class="av" style="background:linear-gradient(135deg,hsl(${h} 55% 70%),hsl(${(h+45)%360} 55% 64%))">${esc(u.username[0].toUpperCase())}</span><div>${esc(u.username)} ${u.tag?chip(esc(u.tag),'--c3'):''}${u.desc?`<small class="mu">${esc(u.desc)}</small>`:''}</div></div></td><td data-l="Статус">${chip(sl,sc)}</td><td data-l="Трафик"><div class="tr">${u.limit?`<div class="pb${k>=1?' er':k>.85?' wr':''}" style="--w:${Math.min(100,k*100)}%"><i></i></div>`:''}<small>${gb(u.used)} / ${u.limit?u.limit+' ГБ':'∞'}</small></div></td><td data-l="Срок"${u.expireAt&&u.expireAt<Date.now()+3*DAY?' class="er"':''}>${u.hold?u.holdDays+' дн после подключения':left(u.expireAt)}</td><td data-l="Доступ">${u.squads.map(i=>chip(esc(DB.squads.find(x=>x.id==i)?.name||'?'),'--b')).join(' ')}</td><td data-l="Был в сети">${on?'<span class="dot"></span> онлайн':ago(u.onlineAt)}</td></tr>`}).join('')}</tbody></table></div><div class="pg"><span>${(UQ.page-1)*UQ.size+1}–${Math.min(r.total,UQ.page*UQ.size)} из ${r.total}</span><select data-psz aria-label="Строк на странице">${[15,30,60].map(n=>`<option${n==UQ.size?' selected':''}>${n}</option>`).join('')}</select><button class="ia" data-pg="-1" ${UQ.page>1?'':'disabled'} aria-label="Назад">${ic('up').replace('<svg','<svg style="transform:rotate(-90deg)"')}</button><button class="ia" data-pg="1" ${UQ.page<pages?'':'disabled'} aria-label="Вперёд">${ic('up').replace('<svg','<svg style="transform:rotate(90deg)"')}</button></div>`:`<div class="empty"><b>Никого не найдено</b><span>Измените поиск или фильтр, либо создайте пользователя.</span><button class="btn sm" data-nu>${ic('plus')}Создать</button></div>`;
+  $('#ut').innerHTML=r.total?`<div class="tw"><table class="tb"><thead><tr><th class="c1"><input type="checkbox" data-sela ${all?'checked':''} aria-label="Выбрать все на странице"></th>${th('username','Пользователь')}${th('status','Статус')}${th('used','Трафик')}${th('expireAt','Срок')}<th>Доступ</th>${th('onlineAt','Был в сети')}</tr></thead><tbody>${r.items.map(u=>{const [sl,sc]=STM[st(u)],k=u.limit?u.used/u.limit:0,h=hs(u.username)%360,on=isOn(u);return `<tr data-id="${u.id}" class="${UQ.sel.has(u.id)?'sel':''}"><td class="c1"><input type="checkbox" data-sel="${u.id}" ${UQ.sel.has(u.id)?'checked':''} aria-label="Выбрать ${esc(u.username)}"></td><td data-l=""><div class="who"><span class="av" style="background:linear-gradient(135deg,hsl(${h} 55% 70%),hsl(${(h+45)%360} 55% 64%))">${esc(u.username[0].toUpperCase())}</span><div>${esc(u.username)} ${u.tag?chip(esc(u.tag),'--c3'):''}<small class="mu">uTLS · ${esc(u.fingerprint||'chrome')}</small>${u.desc?`<small class="mu">${esc(u.desc)}</small>`:''}</div></div></td><td data-l="Статус">${chip(sl,sc)}</td><td data-l="Трафик"><div class="tr">${u.limit?`<div class="pb${k>=1?' er':k>.85?' wr':''}" style="--w:${Math.min(100,k*100)}%"><i></i></div>`:''}<small>${gb(u.used)} / ${u.limit?u.limit+' ГБ':'∞'}</small></div></td><td data-l="Срок"${u.expireAt&&u.expireAt<Date.now()+3*DAY?' class="er"':''}>${u.hold?u.holdDays+' дн после подключения':left(u.expireAt)}</td><td data-l="Доступ">${u.squads.map(i=>chip(esc(DB.squads.find(x=>x.id==i)?.name||'?'),'--b')).join(' ')}</td><td data-l="Был в сети">${on?'<span class="dot"></span> онлайн':ago(u.onlineAt)}</td></tr>`}).join('')}</tbody></table></div><div class="pg"><span>${(UQ.page-1)*UQ.size+1}–${Math.min(r.total,UQ.page*UQ.size)} из ${r.total}</span><select data-psz aria-label="Строк на странице">${[15,30,60].map(n=>`<option${n==UQ.size?' selected':''}>${n}</option>`).join('')}</select><button class="ia" data-pg="-1" ${UQ.page>1?'':'disabled'} aria-label="Назад">${ic('up').replace('<svg','<svg style="transform:rotate(-90deg)"')}</button><button class="ia" data-pg="1" ${UQ.page<pages?'':'disabled'} aria-label="Вперёд">${ic('up').replace('<svg','<svg style="transform:rotate(90deg)"')}</button></div>`:`<div class="empty"><b>Никого не найдено</b><span>Измените поиск или фильтр, либо создайте пользователя.</span><button class="btn sm" data-nu>${ic('plus')}Создать</button></div>`;
   drawBulk();
 }
 function drawBulk(){const b=$('#bulk'),n=UQ.sel.size;if(!b)return;b.classList.toggle('on',n>0&&cur=='users');if(!n){b.innerHTML='';return}b.innerHTML=`<b style="padding:0 .5rem">Выбрано ${n}</b>${UIDS.length>n?`<button class="gh sm" data-bk="all">Выбрать все ${UIDS.length}</button>`:''}<button class="gh sm" data-bk="on">Включить</button><button class="gh sm" data-bk="off">Отключить</button><button class="gh sm" data-bk="reset">Сбросить трафик</button><button class="gh sm" data-bk="ext">+30 дней</button><button class="gh sm" data-bk="sq">В сквад</button><button class="dg sm" data-bk="del">${ic('trash')}Удалить</button><button class="ia" data-bk="clr" aria-label="Снять выбор">${ic('x')}</button>`}
@@ -225,7 +225,7 @@ function userDrawer(id,tab){
   const [sl,sc]=STM[st(u)],k=u.limit?u.used/u.limit:0,h=hs(u.username)%360;
   const tabs=[['ov','Обзор'],['acc','Доступ'],['sub','Подписка'],['dev','Устройства '+u.devices.length+'/'+u.hwid]];
   const body={
-    ov:`<div class="bar2"><span class="mu">Использовано</span><b style="margin-left:auto">${gb(u.used)} / ${u.limit?u.limit+' ГБ':'∞'}</b></div><div class="xray-user-credential"><div><span class="mu">Xray credential ID</span><code>${esc(u.xrayId||'Не назначен')}</code><small class="mu">Создаётся автоматически. Для фактического подключения требуется привязка профиля и применение конфигурации к ядру.</small></div>${u.xrayId?`<button type="button" class="gh sm" data-copy-xray-id="${u.id}">Копировать ID</button>`:''}</div>${u.limit?`<div class="pb f${k>=1?' er':k>.85?' wr':''}" style="--w:${Math.min(100,k*100)}%"><i></i></div>`:''}<div class="history-placeholder">История расхода за период будет отображаться после подключения сбора статистики. Текущие значения не заменяются расчётной симуляцией.</div>
+    ov:`<div class="bar2"><span class="mu">Использовано</span><b style="margin-left:auto">${gb(u.used)} / ${u.limit?u.limit+' ГБ':'∞'}</b></div><div class="xray-user-credential"><div><span class="mu">Xray credential ID</span><code>${esc(u.xrayId||'Не назначен')}</code><small class="mu">Создаётся автоматически. Для фактического подключения требуется привязка профиля и применение конфигурации к ядру.</small></div>${u.xrayId?`<button type="button" class="gh sm" data-copy-xray-id="${u.id}">Копировать ID</button>`:''}</div><div class="xray-user-fingerprint"><span class="mu">Индивидуальный клиентский fingerprint</span><code>${esc(u.fingerprint||'chrome')}</code><small class="mu">Сохранён отдельно для этого пользователя. Реальная выдача профиля с этим значением появится после подключения генератора подписок.</small></div>${u.limit?`<div class="pb f${k>=1?' er':k>.85?' wr':''}" style="--w:${Math.min(100,k*100)}%"><i></i></div>`:''}<div class="history-placeholder">История расхода за период будет отображаться после подключения сбора статистики. Текущие значения не заменяются расчётной симуляцией.</div>
     <form data-k="uedit" data-id="${u.id}" method="dialog" class="sg" style="gap:.9rem"><div class="r2" style="display:grid;border:0;padding:0">${FE.slice(0,4).map(f=>field(f,f.k=='expireAt'?u.expireAt:u[f.k])).join('')}</div><div class="r2" style="display:grid;border:0;padding:0">${FE.slice(4).map(f=>field(f,u[f.k])).join('')}</div><p class="er" id="fe" style="border:0;padding:0"></p><div style="border:0;padding:0"><button class="btn" style="width:100%">Сохранить</button></div></form>
     <div class="mu">Создан ${new Date(u.created).toLocaleDateString('ru-RU')} · Админ: ${esc(DB.admins.find(a=>a.id==u.adminId)?.username||'—')}</div>`,
     acc:`<p class="note">Отметьте сквады: доступ меняется сразу.</p><div class="ms">${DB.squads.map(s=>`<label class="ck"><input type="checkbox" data-usq="${u.id}:${s.id}" ${u.squads.includes(s.id)?'checked':''}><span>${esc(s.name)}</span></label>`).join('')}</div><div><span class="mu">Итоговые инбаунды</span><div style="margin-top:.5rem">${uin(u).map(t=>chip(esc(t),tcol(t))).join(' ')||'<span class="mu">Нет доступа</span>'}</div></div><div><span class="mu">Хосты в подписке</span><div style="margin-top:.5rem">${DB.hosts.filter(x=>!x.disabled&&uin(u).includes(x.tag)).map(x=>`<div class="rowi">${esc(x.remark)}<small class="mu" style="margin-left:auto">${esc(x.address)}:${x.port}</small></div>`).join('')||'<span class="mu">Нет подходящих хостов</span>'}</div></div><label class="f"><span>Лимит устройств</span><input type="number" min="0" value="${u.hwid}" data-hw="${u.id}"></label>`,
@@ -286,6 +286,8 @@ function xrayBuilderConfig(){
  const dest=v('dest').trim()||(sni?sni+':443':'example.com:443');
  const path=v('path').trim()||'/';
  const uuid=v('uuid').trim();
+ const vlessEncMode=v('vlessenc-mode')||'off';
+ const vlessEncRequired=protocol==='vless'&&(network==='xdrive'||vlessEncMode!=='off');
  const clientName=(v('name').trim()||'XMesh client').replace(/[<>"]/g,'').slice(0,64);
  const email=clientName||'xmesh-client';
  const login=(v('name').trim()||'xmesh').toLowerCase().replace(/[^a-z0-9_.-]/g,'-').slice(0,32)||'xmesh';
@@ -301,7 +303,7 @@ function xrayBuilderConfig(){
   catch(e){throw new Error(e.message.startsWith('XDrive')?e.message:'XDrive template должен быть корректным JSON: '+e.message)}
  }
  const settings={
-  vless:{users:uuid?[{id:uuid,level:0,email,...(network==='raw'&&['tls','reality'].includes(security)&&v('flow')?{flow:v('flow')}:{})}]:[],decryption:network==='xdrive'?(v('vless-decryption').trim()||'REPLACE_WITH_VLESS_ENCRYPTION_CONFIG'):'none'},
+  vless:{users:uuid?[{id:uuid,level:0,email,...(network==='raw'&&['tls','reality'].includes(security)&&v('flow')?{flow:v('flow')}:{})}]:[],decryption:vlessEncRequired?(v('vless-decryption').trim()||'REPLACE_WITH_VLESS_ENCRYPTION_CONFIG'):'none'},
   vmess:{users:uuid?[{id:uuid,level:0,email,alterId:0}]:[],default:{alterId:0}},
   trojan:{clients:uuid?[{password:uuid,email,level:0}]:[]},
   shadowsocks:{network:'tcp,udp',method:ssMethod,...(ss2022||!uuid?{password:ssServerPassword}:{}),...(uuid?{users:[{password:ssUserPassword,...(ss2022?{}:{method:ssMethod}),level:0,email}]}:{})},
@@ -440,9 +442,11 @@ function xrayClientSample(){
  const host=v('host')||sni;
  const uuid=v('uuid')||'REPLACE_WITH_USER_UUID';
  const flow=protocol==='vless'&&['tls','reality'].includes(security)&&network==='raw'?v('flow'):'';
+ const vlessEncMode=v('vlessenc-mode')||'off';
+ const vlessEncRequired=protocol==='vless'&&(network==='xdrive'||vlessEncMode!=='off');
  let outProtocol=protocol,settings;
  if(['dokodemo-door','tunnel','tun'].includes(protocol))return {remarks:$('#xpb-name')?.value.trim()||'XRAY STUDIO client',note:'Для этого inbound нет прямого одноимённого клиентского outbound. Используйте совместимый клиентский протокол или полный JSON-режим.',outbounds:[]};
- if(protocol==='vless')settings={vnext:[{address:'SERVER_ADDRESS',port,users:[{id:uuid,encryption:network==='xdrive'?(v('vless-encryption').trim()||'REPLACE_WITH_VLESS_ENCRYPTION_CONFIG'):'none',...(flow?{flow}:{})}]}]};
+ if(protocol==='vless')settings={vnext:[{address:'SERVER_ADDRESS',port,users:[{id:uuid,encryption:vlessEncRequired?(v('vless-encryption').trim()||'REPLACE_WITH_VLESS_ENCRYPTION_CONFIG'):'none',...(flow?{flow}:{})}]}]};
  else if(protocol==='vmess')settings={vnext:[{address:'SERVER_ADDRESS',port,users:[{id:uuid,alterId:0,security:v('vmess-security')||'auto'}]}]};
  else if(protocol==='trojan')settings={servers:[{address:'SERVER_ADDRESS',port,password:uuid}]};
  else if(protocol==='shadowsocks'){
@@ -510,6 +514,7 @@ async function profilesP(){
  const group=(title,desc,body,open)=>'<details class="xray-section"'+(open?' open':'')+'><summary><span><b>'+title+'</b><small>'+desc+'</small></span><span class="xray-chevron">⌄</span></summary><div class="xray-section-body">'+body+'</div></details>';
  const builderHtml='<section class="card xray-builder"><div class="xray-hero"><div><p class="note">XRAY CORE / CONFIGURATION STUDIO</p><h2>XRAY STUDIO</h2><p>Соберите inbound за пару шагов. Тонкие настройки не мешают, пока они не нужны.</p></div><span class="chip" style="--c:var(--a)">JSON BUILDER</span></div>'+
  '<div class="xray-presets"><span class="xray-label">РЕЖИМ РЕДАКТОРА</span><div class="xray-preset-row"><button type="button" class="xray-preset on" data-xray-mode="visual"><b>Визуальный конструктор</b><small>Поля по протоколу</small></button><button type="button" class="xray-preset" data-xray-mode="custom"><b>JSON вручную</b><small>Полный контроль над конфигом</small></button></div></div>'+
+ '<div class="xray-workflow"><div><b>01 · Inbound</b><span>Протокол, порт и транспорт</span></div><div><b>02 · Защита</b><span>TLS, Reality или VLESS Encryption</span></div><div><b>03 · Проверка</b><span>Сверьте серверный и клиентский JSON перед сохранением</span></div></div>'+
  '<div class="xray-main-grid">'+
  field('name','Название профиля',inp('name','VLESS Reality','Например, DE · Reality','maxlength="80" required'))+
  field('tag','Тег inbound',inp('tag','vless-reality','Уникальный tag','maxlength="64"'))+
@@ -564,13 +569,21 @@ async function profilesP(){
  field('xdrive-mux-concurrency','XDrive · client mux concurrency',inp('xdrive-mux-concurrency','8','1–1024','type="number" min="1" max="1024"'))+
  field('xdrive-template','XDrive · template JSON','<textarea id="xpb-xdrive-template" rows="5" spellcheck="false" placeholder="{ }"></textarea>')+
  '</div>',false)+
+ group('Постквантовая защита · VLESS Encryption','ML-KEM-768 — постквантовый вариант аутентификации; X25519 — классический. Сервер и клиент должны использовать парные значения.',
+ '<div class="xray-pq-intro"><b>Сгенерировать согласованную пару через Xray-core</b><span>Используется установленный бинарник <code>xray vlessenc --json</code>. Значения показываются только в авторизованной панели; профиль сохранится лишь после нажатия «Сохранить профиль».</span></div>'+
+ '<div class="xray-main-grid">'+
+ field('vlessenc-mode','Режим VLESS Encryption',sel('vlessenc-mode',[['off','Отключено'],['mlkem768','ML-KEM-768 · постквантовый'],['x25519','X25519 · классический'],['manual','Ручная настройка']]),'Для обычного VLESS без VLESS Encryption выберите «Отключено». XDrive требует включённую функцию.')+
+ '</div>'+
+ '<div class="xray-key-actions"><button type="button" class="gh sm" id="xpb-generate-vlessenc">Сгенерировать пару на сервере</button><span class="mu">Xray создаст парные server/client значения в своём официальном формате.</span></div>'+
+ '<div class="xray-main-grid">'+
+ field('vless-decryption','Сервер · settings.decryption',inp('vless-decryption','','Значение decryption из xray vlessenc','autocomplete="off"'))+
+ field('vless-encryption','Клиент · users[0].encryption',inp('vless-encryption','','Парное значение encryption','autocomplete="off"'))+
+ '</div><p class="note xray-inline-note">Важно: ML-KEM-768 — не отдельный транспорт и не uTLS fingerprint. Он выбирает постквантовый способ аутентификации в VLESS Encryption. Эфемерный обмен также использует гибрид ML-KEM-768/X25519.</p>',false)+
  group('Протокол и клиент','Flow, fingerprint, cipher и специальные параметры',
  '<div class="xray-main-grid">'+
  field('uuid','UUID клиента',inp('uuid','','Нажмите «Сгенерировать UUID»','autocomplete="off"'))+
  field('fingerprint','uTLS fingerprint · клиент','<select id="xpb-fingerprint"><optgroup label="Рекомендуемые">'+options(XRAY_FP_RECOMMENDED.map(x=>[x,x]))+'</optgroup><optgroup label="Современные профили">'+options(XRAY_FP_MODERN.map(x=>[x,x]))+'</optgroup><optgroup label="Дополнительные и legacy">'+options(XRAY_FP_OTHER.map(x=>[x,x]))+'</optgroup></select>')+
  field('flow','VLESS flow',sel('flow',[['','Без flow'],['xtls-rprx-vision','xtls-rprx-vision']]))+
- field('vless-decryption','VLESS Encryption · server',inp('vless-decryption','','Вывод xray vlessenc для сервера','autocomplete="off"'))+
- field('vless-encryption','VLESS Encryption · client',inp('vless-encryption','','Вывод xray vlessenc для клиента','autocomplete="off"'))+
  field('vmess-security','VMess cipher',sel('vmess-security',[['auto','auto'],['aes-128-gcm','aes-128-gcm'],['chacha20-poly1305','chacha20-poly1305'],['none','none']]))+
  field('ss-method','Shadowsocks method',sel('ss-method',[['chacha20-ietf-poly1305','chacha20-ietf-poly1305'],['chacha20-poly1305','chacha20-poly1305'],['xchacha20-poly1305','xchacha20-poly1305'],['aes-128-gcm','aes-128-gcm'],['aes-256-gcm','aes-256-gcm'],['2022-blake3-aes-128-gcm','2022-blake3-aes-128-gcm'],['2022-blake3-aes-256-gcm','2022-blake3-aes-256-gcm'],['2022-blake3-chacha20-poly1305','2022-blake3-chacha20-poly1305']]))+
  field('socks-auth','SOCKS authentication',sel('socks-auth',[['noauth','Без авторизации'],['password','Логин / пароль']]))+
@@ -634,7 +647,12 @@ async function profilesP(){
    if(protocol==='shadowsocks'&&$('#xpb-ss-method').value==='2022-blake3-chacha20-poly1305'&&$('#xpb-uuid').value.trim())throw new Error('Shadowsocks 2022 ChaCha поддерживает только одного пользователя: очистите UUID или выберите AES-128/AES-256 для нескольких пользователей.');
    if(protocol==='shadowsocks'){const method=$('#xpb-ss-method').value||'chacha20-ietf-poly1305',hasUuid=!!$('#xpb-uuid').value.trim(),hasServerPass=!!$('#xpb-ss-password').value.trim(),hasUserPass=!!$('#xpb-ss-user-password').value.trim();if(method.startsWith('2022-')&&(!hasServerPass||(hasUuid&&!hasUserPass)))warning=hasUuid?'Укажите server key и user key Shadowsocks 2022 (сгенерируйте оба или введите Base64-ключи).':'Укажите серверный Base64-ключ Shadowsocks 2022.';else if(!hasUuid&&!hasServerPass)warning='Для Shadowsocks без отдельного UUID укажите серверный пароль или нажмите «Сгенерировать пароли Shadowsocks».';}
    if(protocol==='wireguard'&&!$('#xpb-wg-secret-key').value.trim())warning='Укажите серверный WireGuard private key (команда xray wg).';
-   if(network==='xdrive'&&(!$('#xpb-vless-decryption').value.trim()||!$('#xpb-vless-encryption').value.trim()))warning='XDrive требует обе стороны VLESS Encryption: server decryption и client encryption из xray vlessenc.';
+   const pqMode=$('#xpb-vlessenc-mode')?.value||'off';
+   if(network==='xdrive'&&pqMode==='off')warning='XDrive требует VLESS Encryption: выберите ML-KEM-768, X25519 или ручную настройку.';
+   else if(protocol==='vless'&&(pqMode!=='off'||network==='xdrive')){
+    const dec=$('#xpb-vless-decryption').value.trim(),enc=$('#xpb-vless-encryption').value.trim();
+    if(!dec||!enc||dec.startsWith('REPLACE_')||enc.startsWith('REPLACE_'))warning='VLESS Encryption включён, но пара не заполнена. Нажмите «Сгенерировать пару на сервере» или вставьте оба значения вручную.';
+   }
    $('#xpb-error').textContent=warning;
    $('#xpb-preview').value=JSON.stringify(xrayBuilderConfig(),null,2);
    $('#xpb-client-preview').value=JSON.stringify(xrayClientSample(),null,2);
@@ -692,13 +710,22 @@ async function profilesP(){
     if(f.startsWith('masque-'))show=proto==='masque'||net==='masque';
     wrap.hidden=!show;
    });
+   const pqGroup=$('.xray-section:has(#xpb-vlessenc-mode)');
+   if(pqGroup){
+    pqGroup.hidden=proto!=='vless';
+    const mode=$('#xpb-vlessenc-mode')?.value||'off';
+    const required=proto==='vless'&&(net==='xdrive'||mode!=='off');
+    const decryption=$('#xpb-vless-decryption')?.closest('.f');
+    const encryption=$('#xpb-vless-encryption')?.closest('.f');
+    if(decryption)decryption.hidden=!required;
+    if(encryption)encryption.hidden=!required;
+   }
    const protoGroup=$('.xray-section:has(#xpb-fingerprint)');
    if(protoGroup)protoGroup.querySelectorAll('[id^="xpb-"]').forEach(el=>{
     const f=el.id.replace('xpb-',''),wrap=el.closest('.f');if(!wrap)return;
     let show=true;
     if(f==='fingerprint')show=sec!=='none'&&['vless','vmess','trojan'].includes(proto)&&net!=='masque';
     if(f==='flow')show=proto==='vless'&&net!=='xdrive';
-    if(f.startsWith('vless-'))show=proto==='vless'&&net==='xdrive';
     if(f==='vmess-security')show=proto==='vmess';
     if(['ss-method','ss-password','ss-user-password'].includes(f))show=proto==='shadowsocks';
     if(['socks-auth'].includes(f))show=['socks','mixed'].includes(proto);
@@ -711,7 +738,16 @@ async function profilesP(){
    });
    $$('[data-xray-mode]').forEach(b=>b.classList.toggle('on',b.dataset.xrayMode===(customMode?'custom':'visual')));
   };
-  let customMode=false,customInitialized=false,customDirty=false;
+  let customMode=false,customInitialized=false,customDirty=false,generatedVlessPairs=null;
+  const selectGeneratedPair=()=>{
+   const mode=$('#xpb-vlessenc-mode')?.value||'off';
+   if(!generatedVlessPairs||!['x25519','mlkem768'].includes(mode))return;
+   const pair=generatedVlessPairs[mode];
+   if(!pair||typeof pair.decryption!=='string'||typeof pair.encryption!=='string')return;
+   $('#xpb-vless-decryption').value=pair.decryption;
+   $('#xpb-vless-encryption').value=pair.encryption;
+  };
+  $('#xpb-vlessenc-mode').addEventListener('change',()=>{selectGeneratedPair();updateVisibility();updatePreview()});
   const customArea=$('#xpb-custom-json');
   const validateCustomJson=()=>{
    const status=$('#xpb-custom-error');
@@ -752,6 +788,19 @@ async function profilesP(){
   $('#xpb-generate-ss-password').onclick=()=>{const method=$('#xpb-ss-method').value||'chacha20-ietf-poly1305';const n=method==='2022-blake3-aes-128-gcm'?16:32;$('#xpb-ss-password').value=randomBase64(n);$('#xpb-ss-user-password').value=randomBase64(n);updatePreview();toast('Пароли Shadowsocks сгенерированы')};
   $('#xpb-generate-uuid').onclick=()=>{const u=crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=crypto.getRandomValues(new Uint8Array(1))[0]&15;return(c==='x'?r:(r&3|8)).toString(16)});$('#xpb-uuid').value=u;updatePreview();toast('UUID создан')};
   $('#xpb-generate-keys').onclick=async()=>{const b=$('#xpb-generate-keys');b.disabled=true;b.textContent='Генерация…';try{const keys=await generateRealityKeyPair();$('#xpb-private-key').value=keys.privateKey;$('#xpb-public-key').value=keys.publicKey;updatePreview();toast('Пара X25519 сгенерирована')}catch(e){$('#xpb-error').textContent=e.message}finally{b.disabled=false;b.textContent='Сгенерировать пару ключей'}};
+  $('#xpb-generate-vlessenc').onclick=async()=>{
+   const b=$('#xpb-generate-vlessenc');b.disabled=true;const label=b.textContent;b.textContent='Запрос к Xray-core…';
+   try{
+    const result=await backendRequest('/api/v1/core/vlessenc',{method:'POST',body:JSON.stringify({})});
+    if(!result||!result.x25519||!result.mlkem768||typeof result.x25519.decryption!=='string'||typeof result.mlkem768.encryption!=='string')throw new Error('Xray-core вернул неизвестный формат ответа. Обновите ядро и повторите.');
+    generatedVlessPairs=result;
+    let mode=$('#xpb-vlessenc-mode').value;
+    if(!['x25519','mlkem768'].includes(mode)){mode='mlkem768';$('#xpb-vlessenc-mode').value=mode}
+    selectGeneratedPair();updateVisibility();updatePreview();
+    toast(mode==='mlkem768'?'Пара ML-KEM-768 сгенерирована':'Пара X25519 сгенерирована');
+   }catch(e){$('#xpb-error').textContent=e.message||'Не удалось сгенерировать VLESS Encryption';}
+   finally{b.disabled=false;b.textContent=label}
+  };
   const copyText=async id=>{try{await navigator.clipboard.writeText($('#'+id).value);toast('JSON скопирован')}catch(e){$('#'+id).select();document.execCommand('copy');toast('JSON скопирован')}};
   const download=(id,suffix)=>{const a=document.createElement('a'),blob=URL.createObjectURL(new Blob([$('#'+id).value],{type:'application/json'}));a.href=blob;a.download=((($('#xpb-name').value||'xray-studio').trim().replace(/[^a-z0-9_-]+/gi,'-')||'xray-studio')+'-'+suffix+'.json');a.click();setTimeout(()=>URL.revokeObjectURL(blob),1000)};
   $('#xpb-copy').onclick=()=>copyText('xpb-preview');$('#xpb-client-copy').onclick=()=>copyText('xpb-client-preview');$('#xpb-download').onclick=()=>download('xpb-preview','server');$('#xpb-client-download').onclick=()=>download('xpb-client-preview','client');
@@ -1008,7 +1057,7 @@ document.addEventListener('keydown',e=>{
   if(e.key=='/'&&!/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)){e.preventDefault();cur=='users'?$('#uq').focus():palette()}});
 document.addEventListener('submit',async e=>{const f=e.target,k=f.dataset.k;if(!k)return;const er=m=>{e.preventDefault();$('#fe')&&($('#fe').textContent=m)};
   if(k=='user'){const d=read(FU,f);if(DB.users.some(u=>u.username.toLowerCase()==d.username.toLowerCase()))return er('Такое имя уже есть. Выберите другое.');if(!d.squads.length)return er('Выберите хотя бы один сквад.');
-    const u={username:d.username,disabled:false,hold:d.hold,holdDays:d.days||30,created:Date.now(),expireAt:d.hold||!d.days?null:Date.now()+d.days*DAY,limit:d.limit,used:0,strategy:d.strategy,tag:d.tag,tg:'',email:'',desc:d.desc,hwid:d.hwid,squads:d.squads,onlineAt:0,adminId:DB.admins.find(a=>a.role==='owner')?.id||null,short:Math.floor(Math.random()*2**40).toString(36).padStart(8,'a'),xrayId:crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=crypto.getRandomValues(new Uint8Array(1))[0]&15;return(c==='x'?r:(r&3|8)).toString(16)}),xrayProfileId:d.xrayProfileId||null,devices:[]};
+    const u={username:d.username,disabled:false,hold:d.hold,holdDays:d.days||30,created:Date.now(),expireAt:d.hold||!d.days?null:Date.now()+d.days*DAY,limit:d.limit,used:0,strategy:d.strategy,tag:d.tag,tg:'',email:'',desc:d.desc,hwid:d.hwid,fingerprint:d.fingerprint||'chrome',squads:d.squads,onlineAt:0,adminId:DB.admins.find(a=>a.role==='owner')?.id||null,short:Math.floor(Math.random()*2**40).toString(36).padStart(8,'a'),xrayId:crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=crypto.getRandomValues(new Uint8Array(1))[0]&15;return(c==='x'?r:(r&3|8)).toString(16)}),xrayProfileId:d.xrayProfileId||null,devices:[]};
     const c=await api.create('users',u);if(c.xrayProfileId){try{await syncXrayUserToProfile(c)}catch(err){toast('Пользователь создан, но профиль Xray не обновлён: '+(err.message||'ошибка'),'ОК')}}UQ.q='';UQ.st='all';UQ.sort='created';UQ.dir='desc';toast(`Пользователь ${c.username} создан`);location.hash=='#users'?render(1):location.hash='users';setTimeout(()=>userDrawer(c.id,'sub'),350)}
   else if(k=='uedit'){e.preventDefault();const d=read(FE,f),id=+f.dataset.id;if(DB.users.some(u=>u.username.toLowerCase()==d.username.toLowerCase()&&u.id!=id))return er('Такое имя уже есть.');await api.update('users',id,d);toast('Сохранено');render(1);userDrawer(id,'ov')}
   else if(k=='ent'){const key=f.dataset.ent,e2=ENT[key],d=read(e2.fs,f),id=f.dataset.id,m=e2.chk?.(d,+id);if(m)return er(m);
