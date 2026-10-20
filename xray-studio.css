@@ -2190,3 +2190,97 @@ html[data-theme=light] .xray-builder select:not(.sr-native-select){color-scheme:
   grid-template-columns:minmax(0,1fr)!important;
  }
 }
+
+
+/* Contextual Studio — a single reactive editor, not a five-page wizard. */
+.xray-builder.studio-reference-v5:not(.manual-mode) > .xray-config-tabs{
+ display:none!important;
+}
+.xray-builder.studio-reference-v5:not(.manual-mode) .xray-context-bar{
+ grid-column:1/-1!important;
+ grid-row:3!important;
+ display:flex!important;align-items:center;justify-content:space-between;
+ flex-wrap:wrap;gap:.45rem 1rem;
+ min-height:2.65rem;padding:.55rem .85rem!important;
+ border:1px solid var(--ln);border-radius:var(--ui-control-radius);
+ background:color-mix(in srgb,var(--s1) 90%,var(--a) 10%);
+ font-size:.79rem;color:var(--mu);
+}
+.xray-builder.studio-reference-v5:not(.manual-mode) #xpb-context-selected{
+ color:var(--tx);font-weight:750;
+}
+.xray-builder.studio-reference-v5:not(.manual-mode) .xray-workspace-layout{
+ grid-row:4!important;align-items:start!important;
+ grid-template-columns:minmax(0,1.48fr) minmax(0,1fr)!important;
+}
+.xray-builder.studio-reference-v5:not(.manual-mode) .xray-config-content{
+ display:block!important;padding:.85rem!important;
+ border:1px solid var(--ln)!important;
+ background:var(--s1)!important;
+}
+.xray-builder.studio-reference-v5:not(.manual-mode) .xray-config-steps,
+.xray-builder.studio-reference-v5:not(.manual-mode) .xray-editor-pane{
+ min-height:0!important;height:auto!important;overflow:visible!important;
+}
+.xray-builder.studio-reference-v5:not(.manual-mode) .xray-config-panel{
+ margin:0!important;padding:.75rem 0!important;
+ gap:.7rem!important;border:0!important;background:transparent!important;
+}
+.xray-builder.studio-reference-v5:not(.manual-mode) .xray-config-panel + .xray-config-panel:not([hidden]){
+ border-top:1px solid var(--ln)!important;
+ margin-top:.6rem!important;padding-top:1.15rem!important;
+}
+.xray-builder.studio-reference-v5:not(.manual-mode) .xray-config-panel-title{
+ min-height:2.5rem!important;padding:0 0 .65rem!important;
+ gap:.7rem!important;
+}
+.xray-builder.studio-reference-v5:not(.manual-mode) .xray-config-panel-title h3{
+ font-size:1.05rem!important;
+}
+.xray-builder.studio-reference-v5:not(.manual-mode) .xray-config-panel-title p{
+ font-size:.73rem!important;
+}
+.xray-builder.studio-reference-v5:not(.manual-mode) .sr-v5-heading-icon{
+ flex:0 0 2rem!important;width:2rem!important;height:2rem!important;
+}
+.xray-builder.studio-reference-v5:not(.manual-mode) .sr-v5-heading-icon svg{
+ width:1rem;height:1rem;
+}
+.xray-builder.studio-reference-v5:not(.manual-mode) .xray-section:not([hidden]){
+ background:transparent!important;border:0!important;
+ padding:.25rem 0!important;
+}
+.xray-builder.studio-reference-v5:not(.manual-mode) .xray-config-panel .xray-main-grid,
+.xray-builder.studio-reference-v5:not(.manual-mode) .xray-config-panel .xray-option-grid{
+ gap:.65rem!important;
+}
+.xray-builder.studio-reference-v5:not(.manual-mode) .xray-option-group:not([hidden]){
+ background:transparent!important;
+ border:0!important;padding:.4rem 0!important;
+}
+.xray-builder.studio-reference-v5:not(.manual-mode) .xray-option-group-head{
+ margin:0 0 .65rem!important;padding-bottom:.5rem!important;
+}
+.xray-builder.studio-reference-v5:not(.manual-mode) .xray-xhttp-subtitle{
+ font-size:.78rem!important;
+ margin:.2rem 0 0!important;padding:.6rem 0 .2rem!important;
+}
+.xray-builder.studio-reference-v5:not(.manual-mode) .xray-code-view{
+ height:clamp(18rem,39vh,28rem)!important;min-height:18rem!important;
+}
+.xray-builder.studio-reference-v5:not(.manual-mode) [hidden]{
+ display:none!important;
+}
+@media(max-width:1080px){
+ .xray-builder.studio-reference-v5:not(.manual-mode) .xray-workspace-layout{
+  grid-template-columns:minmax(0,1fr)!important;
+ }
+}
+@media(max-width:700px){
+ .xray-builder.studio-reference-v5:not(.manual-mode) .xray-context-bar{
+  grid-row:auto!important;flex-direction:column;align-items:flex-start;
+ }
+ .xray-builder.studio-reference-v5:not(.manual-mode) .xray-config-content{
+  padding:.65rem!important;
+ }
+}
