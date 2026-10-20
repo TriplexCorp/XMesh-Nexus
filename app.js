@@ -1008,7 +1008,7 @@ async function profilesP(){
   const renderCustomSyntax=()=>{
    const pre=$('#xpb-custom-syntax');if(!pre)return;
    const source=customArea.value;
-   const token=/(\\s+)|("(?:\\\\.|[^"\\\\])*"(?=\\s*:))|("(?:\\\\.|[^"\\\\])*")|(-?\\b\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?\\b)|(\\btrue\\b|\\bfalse\\b)|(\\bnull\\b)|([{}\\[\\],:])/g;
+   const token=/(\s+)|("(?:\\.|[^"\\])*"(?=\s*:))|("(?:\\.|[^"\\])*")|(-?\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b)|(\btrue\b|\bfalse\b)|(\bnull\b)|([{}\[\],:])/g;
    let out='',last=0,m;
    while((m=token.exec(source))!==null){
     out+=esc(source.slice(last,m.index));
@@ -1018,7 +1018,7 @@ async function profilesP(){
     last=token.lastIndex;
    }
    out+=esc(source.slice(last));
-   pre.innerHTML=out+'\\n';
+   pre.innerHTML=out+'\n';
    pre.scrollTop=customArea.scrollTop;pre.scrollLeft=customArea.scrollLeft;
   };
   const validateCustomJson=()=>{
@@ -1035,9 +1035,9 @@ async function profilesP(){
     return obj;
    }catch(e){
     status.classList.add('er');status.classList.remove('mu');
-    const match=String(e.message).match(/(?:position|at position)\\s+(\\d+)/i);
+    const match=String(e.message).match(/(?:position|at position)\s+(\d+)/i);
     let detail=e.message;
-    if(match){const pos=Number(match[1]),before=customArea.value.slice(0,pos),line=before.split('\\n').length,col=pos-(before.lastIndexOf('\\n')+1)+1;detail+=' · строка '+line+', столбец '+col}
+    if(match){const pos=Number(match[1]),before=customArea.value.slice(0,pos),line=before.split('\n').length,col=pos-(before.lastIndexOf('\n')+1)+1;detail+=' · строка '+line+', столбец '+col}
     status.textContent='✕ Ошибка JSON: '+detail;
     customArea.setAttribute('aria-invalid','true');
     return null
