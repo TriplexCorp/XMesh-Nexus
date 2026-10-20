@@ -213,6 +213,7 @@ async fn security_headers(request: Request, next: Next) -> Response {
     let mut response = next.run(request).await;
     let headers = response.headers_mut();
     headers.insert(HeaderName::from_static("x-content-type-options"), HeaderValue::from_static("nosniff"));
+    headers.insert(HeaderName::from_static("cache-control"), HeaderValue::from_static("no-store"));
     headers.insert(HeaderName::from_static("x-frame-options"), HeaderValue::from_static("DENY"));
     headers.insert(HeaderName::from_static("referrer-policy"), HeaderValue::from_static("same-origin"));
     headers.insert(
