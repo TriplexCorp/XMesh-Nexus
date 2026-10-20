@@ -657,7 +657,7 @@ async function profilesP(){
  field('xdrive-template','XDrive · template JSON','<textarea id="xpb-xdrive-template" rows="5" spellcheck="false" placeholder="{ }"></textarea>')+
  '</div>',false)+
  group('Постквантовая защита · VLESS Encryption','ML-KEM-768 — постквантовый вариант аутентификации; X25519 — классический. Сервер и клиент должны использовать парные значения.',
- '<div class="xray-pq-intro"><b>Сгенерировать согласованную пару через Xray-core</b><span>Используется установленный бинарник <code>xray vlessenc --json</code>. Значения показываются только в авторизованной панели; профиль сохранится лишь после нажатия «Сохранить профиль».</span></div>'+
+ '<div class="xray-pq-intro"><b>Сгенерировать согласованную пару через Xray-core</b><span>Используется штатная команда <code>xray vlessenc</code>; панель разбирает её текстовый вывод. Значения показываются только в авторизованной панели и попадут в профиль после сохранения.</span></div>'+
  '<div class="xray-main-grid">'+
  field('vlessenc-mode','Режим VLESS Encryption',sel('vlessenc-mode',[['off','Отключено'],['mlkem768','ML-KEM-768 · постквантовый'],['x25519','X25519 · классический'],['manual','Ручная настройка']]),'Для обычного VLESS без VLESS Encryption выберите «Отключено». XDrive требует включённую функцию.')+
  '</div>'+
