@@ -29,6 +29,9 @@ jobs:
           node --check login.js
           node --check xray-studio-v5.js
           node --check xray-studio-dialog.js
+          node --check xray-json-diagnostics.js
+      - name: Test manual JSON line diagnostics and Hot Fix
+        run: node scripts/check-json-diagnostics.js
       - name: Verify packaged frontend assets
         run: node scripts/check-static-assets.js
       - name: Check shared Studio theme and CSS structure
