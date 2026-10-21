@@ -22,6 +22,7 @@ if [[ ! -f .env ]]; then
   app_password="$(openssl rand -hex 32)"
   redis_password="$(openssl rand -hex 32)"
   admin_password="$(openssl rand -hex 32)"
+  totp_key="$(openssl rand -hex 32)"
   cat > .env <<EOF
 POSTGRES_PASSWORD=${db_password}
 APP_DB_PASSWORD=${app_password}
@@ -29,6 +30,7 @@ REDIS_PASSWORD=${redis_password}
 DB_MAX_CONNECTIONS=20
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=${admin_password}
+TOTP_ENCRYPTION_KEY=${totp_key}
 COOKIE_SECURE=true
 APP_BIND=127.0.0.1
 APP_PORT=8080
@@ -39,6 +41,10 @@ else
   if ! grep -q '^REDIS_PASSWORD=' .env; then
     printf '\nREDIS_PASSWORD=%s\n' "$(openssl rand -hex 32)" >> .env
     echo "Generated REDIS_PASSWORD for the Redis service."
+  fi
+  if ! grep -q '^TOTP_ENCRYPTION_KEY=' .env; then
+    printf 'TOTP_ENCRYPTION_KEY=%s\n' "$(openssl rand -hex 32)" >> .env
+    echo "Generated a persistent MFA encryption key. Back up this key securely."
   fi
   if ! grep -q '^DB_MAX_CONNECTIONS=' .env; then
     printf 'DB_MAX_CONNECTIONS=20\n' >> .env
