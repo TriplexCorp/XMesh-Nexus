@@ -1753,7 +1753,17 @@ async function crudCard(k){
 }
 async function simple(ks){const h=await Promise.all(ks.map(crudCard));return [h.join('')]}
 function entForm(k,id){const e=ENT[k],o=id?DB[k].find(x=>x.id==id):e.def?e.def():{};
-  modal(`<form class="box" data-k="ent" data-ent="${k}" data-id="${id||''}" method="dialog"><h2>${id?'Изменить':'Новый'}: ${e.nw.toLowerCase()}</h2>${e.fs.map(f=>field(f,o[f.k])).join('')}<p class="er" id="fe"></p><div class="act">${id?`<button type="button" class="dg" data-del="${k}:${id}" style="margin-right:auto">${ic('trash')}Удалить</button>`:''}<button type="button" class="gh" data-x>Отмена</button><button class="btn">Сохранить</button></div></form>`,k=='profiles'||k=='subs'?'wide':'')}
+  const standardFields=e.fs.map(f=>field(f,o[f.k])).join('');
+  const rotationFields=e.fs.slice(-2).map(f=>field(f,o[f.k])).join('');
+  const userOptions=DB.users.filter(u=>st(u)==='ACTIVE').map(u=>`<option value="${u.id}">${esc(u.username)}</option>`).join('');
+  const rotationProbe=id&&o.rotationEnabled
+    ?`<div class="node-rotation-probe"><label class="f"><span>Проверка на пользователе</span><select data-node-rotation-user>${userOptions||'<option value="">Нет активных пользователей</option>'}</select></label><button type="button" class="gh sm" data-node-rotation-probe="${id}" ${userOptions?'':'disabled'}>${ic('refresh')}Получить следующий IP</button><output data-node-rotation-result aria-live="polite"></output><small>Тест изменяет счётчик ротации этого пользователя. Выдача подписок будет подключена отдельно.</small></div>`
+    :'';
+  const fields=k==='nodes'
+    ?e.fs.slice(0,-2).map(f=>field(f,o[f.k])).join('')+`<details class="node-rotation-editor" ${o.rotationEnabled?'open':''}><summary>${ic('layers')}<span><b>IP-ротация</b><small>${o.rotationEnabled?nodeRotationIPs(o).length+' адресов в пуле':'Не используется · дополнительные адреса одной VM'}</small></span></summary><div class="node-rotation-editor-body">${rotationFields}${rotationProbe}</div></details>`
+    :standardFields;
+  modal(`<form class="box" data-k="ent" data-ent="${k}" data-id="${id||''}" method="dialog"><h2>${id?'Изменить':'Новый'}: ${e.nw.toLowerCase()}</h2>${fields}<p class="er" id="fe"></p><div class="act">${id?`<button type="button" class="dg" data-del="${k}:${id}" style="margin-right:auto">${ic('trash')}Удалить</button>`:''}<button type="button" class="gh" data-x>Отмена</button><button class="btn">Сохранить</button></div></form>`,k=='profiles'||k=='subs'?'wide':'')
+}
 
 /* ================= УЗЛЫ ================= */
 function nodeGauge(n,key,label,pct,center,detail,color){
@@ -1771,7 +1781,7 @@ async function nodesP(){
     const ss=nstat(n),p=DB.profiles.find(x=>x.id==n.profileId),l=LV[n.id]||{cpu:null,ram:null,mbps:null},k=n.limit?cl(n.used/n.limit,0,1):0,tc=k>.9?'--er':k>.75?'--wr':'--c3';
     return `<div class="card nc${n.disabled?' off':''}"><div class="h"><span class="fg">${flagView(n.flag)}</span><div><b>${esc(n.name)}</b><br><small class="mu">${esc(n.addr)}${n.port?':'+esc(n.port):''}</small></div>${chip(NS[ss]?.[0]||'Не проверен',NS[ss]?.[1]||'--mu')}</div>
       <div class="kvg"><div><span>Активные пользователи</span><b>${s.nodeOn[n.id]??0}</b></div><div><span>XRAY STUDIO</span>${esc(p?.name||'—')}</div></div>
-      <div class="node-ip-rotation" aria-label="IP-ротация"><span class="node-ip-indicator" aria-hidden="true"></span><span>${n.rotationEnabled?'IP-ротация · '+nodeRotationIPs(n).length+' адресов':'IP-ротация отключена'}</span></div>
+      ${n.rotationEnabled?`<div class="node-ip-rotation active" aria-label="Пул IP-ротации"><span class="node-ip-indicator" aria-hidden="true"></span><span>IP-пул · ${nodeRotationIPs(n).length} адресов</span></div>`:''}
       <div class="node-gauges">
         ${nodeGauge(n,'cpu-'+n.id,'CPU',Number.isFinite(l.cpu)?l.cpu:0,Number.isFinite(l.cpu)?Math.round(l.cpu)+'%':'—',Number.isFinite(l.cpu)?'загрузка':'нет данных','--a')}
         ${nodeGauge(n,'ram-'+n.id,'RAM',Number.isFinite(l.ram)?l.ram:0,Number.isFinite(l.ram)?Math.round(l.ram)+'%':'—',Number.isFinite(l.ram)?'занято':'нет данных','--b')}
@@ -1944,6 +1954,19 @@ document.addEventListener('click',async e=>{
   else if(b=g('[data-copy-metrics-install]')){
     const field=$('#metrics-install-command');
     if(field){try{await navigator.clipboard.writeText(field.value);toast('Команда скопирована')}catch(error){field.focus();field.select();document.execCommand('copy');toast('Команда скопирована')}}
+  }
+  else if(b=g('[data-node-rotation-probe]')){
+    const nodeId=Number(b.dataset.nodeRotationProbe);
+    const userId=Number(b.closest('.node-rotation-editor')?.querySelector('[data-node-rotation-user]')?.value);
+    const result=b.closest('.node-rotation-editor')?.querySelector('[data-node-rotation-result]');
+    if(!Number.isSafeInteger(userId)||userId<1){toast('Выберите активного пользователя для проверки.');return}
+    b.disabled=true;
+    if(result)result.textContent='Получение адреса…';
+    try{
+      const r=await backendRequest('/api/v1/nodes/'+encodeURIComponent(nodeId)+'/rotation/next',{method:'POST',body:JSON.stringify({userId})});
+      if(result)result.textContent=r.address;
+    }catch(error){if(result)result.textContent=error.message||'Не удалось получить адрес.'}
+    finally{b.disabled=false}
   }
   else if(b=g('[data-nr]')){toast('Перезапуск требует подключённого backend/API Xray. В автономном HTML он не выполняется.')}
   else if(b=g('[data-nt]')){const n=DB.nodes.find(x=>x.id==b.dataset.nt);await api.update('nodes',n.id,{disabled:!n.disabled});toast(`${n.name}: ${n.disabled?'отключён':'включён'}`);render(1)}
