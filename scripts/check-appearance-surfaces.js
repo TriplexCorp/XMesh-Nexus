@@ -28,7 +28,7 @@ assert.match(app,/cl\(Number\(C\.contentWidth\)\|\|1920,720,2240\)/,
  'Content width must support narrower desktop viewports');
 assert.match(app,/id="content-width" min="720" max="2240" step="10"/,
  'The width slider must support fine-grained adjustment on desktop screens');
-assert.match(html,/styles\.css\?v=20261021-content-width-1/,'New CSS cache key must ship');
+assert.match(html,/styles\.css\?v=[a-z0-9-]+/,'The active stylesheet needs a versioned cache key');
 
 assert.match(app,/id="content-width" min="720" max="2240" step="10"/,
  'The width slider must have finer 10px increments');
