@@ -345,7 +345,7 @@ function scrollToSettingsTarget(id){
 }
 async function render(soft){
   T.forEach(clearInterval);T=[];cur=location.hash.slice(1);if(!pages[cur])cur='home';const rt=++RT,[t,f]=pages[cur],v=$('#view');
-  $('#title').textContent=t;document.title=t+' — '+DB.set.brand;$$('#nav a').forEach(a=>a.classList.toggle('on',a.getAttribute('href')=='#'+cur));
+  $('#title').textContent=t;document.title=(window.XMeshI18n?.translate(t)||t)+' — '+DB.set.brand;$$('#nav a').forEach(a=>a.classList.toggle('on',a.getAttribute('href')=='#'+cur));
   if(!soft){v.classList.remove('still');v.innerHTML=skel();scrollTo(0,0)}
   const [h,i]=await f();if(rt!=RT)return;v.classList.toggle('still',!!soft);v.innerHTML=h;decorateButtonIcons(v);i&&i();$('#unb').textContent=DB.users.length;drawBulk();
   if(pendingScrollTarget&&cur==='set'){
@@ -1837,6 +1837,10 @@ async function setP(){
   try{coreView=await backendRequest('/api/v1/core')}catch(e){coreView.last_error=e.message}
   const coreLabel=coreView.status=='updating'?'Обновляется':coreView.status=='ready'?'Установлено':coreView.status=='error'?'Ошибка':'Не установлено';
   return [`<div class="appearance-grid">
+    <section class="card sg" style="grid-column:1/-1"><div><h3>Язык интерфейса</h3><small>Язык панели управления. Применяется только в этом браузере.</small></div>
+      <div class="setting-row"><div class="setting-copy"><b>Язык панели</b><small>Выберите Русский или English. Язык клиентского портала настраивается отдельно.</small></div>
+      <div class="setting-control"><select id="ui-language" aria-label="Язык панели" style="min-width:11rem"><option value="ru" ${window.XMeshI18n?.getLanguage()==='ru'?'selected':''}>Русский</option><option value="en" ${window.XMeshI18n?.getLanguage()==='en'?'selected':''}>English</option></select></div></div>
+    </section>
     <section class="card sg"><div><h3>Цвет и тема</h3><small>Основная палитра интерфейса и брендовые акценты</small></div>
       <div class="setting-row"><div class="setting-copy"><b>Тема</b><small>Автоматически — по настройкам ОС</small></div><div class="setting-control"><div class="seg choice" id="th">${[['dark','Тёмная'],['light','Светлая'],['auto','Авто']].map(([k,l])=>`<button type="button" data-th="${k}" class="${C.theme==k?'on':''}">${l}</button>`).join('')}</div></div></div>
       <div class="setting-row"><div class="setting-copy"><b>Акцентный цвет</b><small>Влияет на кнопки, графики и активные элементы</small></div><div class="setting-control" style="gap:.85rem;max-width:18rem">${sw.map(([k,x,y,l])=>`<button class="palette-swatch ${C.accent==k?'on':''}" style="--x:${x};--y:${y}" data-ac="${k}" title="${l}" aria-label="${l}"></button>`).join('')}</div></div>
@@ -2052,6 +2056,11 @@ document.addEventListener('change',e=>{
  preview.innerHTML=flagView(select.value,'country-flag-preview')+`<span data-country-label>${country?esc(country.name):select.value?esc(select.value+' Сохранённый флаг'):'Выберите страну…'}</span>`;
 });
 document.addEventListener('change',async e=>{const t=e.target;
+  if(t.id==='ui-language'){
+    window.XMeshI18n?.setLanguage(t.value);
+    render(1);
+    return;
+  }
   if(t.id==='auto-core-refresh'||t.id==='core-refresh-seconds'){
     if(t.id==='auto-core-refresh')C.autoCoreRefresh=t.checked?1:0;
     else C.coreRefreshSeconds=Number(t.value)||30;
