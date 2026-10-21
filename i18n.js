@@ -144,6 +144,8 @@ window.XMeshI18n=(()=>{
     'Язык панели':'Panel language','Язык интерфейса':'Interface language',
     'Язык панели управления. Применяется только в этом браузере.':
       'Control panel language. Applies only in this browser.',
+    'Выберите Русский или English. Язык клиентского портала настраивается отдельно.':
+      'Choose Russian or English. The client portal language is configured separately.',
     'Русский':'Русский','Английский':'English',
     // Nodes, hosts, squads, templates, users
     'Сетка':'Grid','Плотно':'Dense','Крупно':'Large',
@@ -387,7 +389,7 @@ window.XMeshI18n=(()=>{
   };
   const isProtected=node=>{
     const el=node.nodeType===3?node.parentElement:node;
-    return !!el?.closest?.('script,style,pre,code,textarea,[contenteditable],[translate="no"],[data-no-translate],.user-username,.country-name');
+    return !!el?.closest?.('script,style,pre,code,textarea,[contenteditable],[translate="no"],[data-no-translate],[data-subscription-preview],.user-username,.country-name');
   };
   const renderText=node=>{
     if(isProtected(node)||!node.nodeValue||!/[а-яё]/i.test(node.nodeValue)&&!originalText.has(node))return;
