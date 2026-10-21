@@ -69,6 +69,12 @@ pub(crate) fn validate(object: &Map<String, Value>) -> Result<(), ApiError> {
             }
         }
     }
+    if let Some(v) = object.get("subscriptionAppsTitle") {
+        let title = v.as_str().ok_or_else(|| bad("Заголовок приложений должен быть строкой."))?;
+        if title.chars().count() > 80 || title.chars().any(char::is_control) {
+            return Err(bad("Заголовок приложений должен быть короче 80 символов."));
+        }
+    }
     for key in ["subscriptionLogoUrl", "subscriptionSupportUrl"] {
         if let Some(v) = object.get(key) {
             let url = v.as_str().ok_or_else(|| bad("Ссылка должна быть строкой."))?;
@@ -102,6 +108,43 @@ pub(crate) fn validate(object: &Map<String, Value>) -> Result<(), ApiError> {
             }
         }
     }
+    if let Some(value) = object.get("subscriptionCustomClients") {
+        let clients = value.as_array().ok_or_else(|| bad("Свои приложения должны быть массивом."))?;
+        if clients.len() > 32 { return Err(bad("Можно добавить не более 32 своих приложений.")); }
+        let mut ids = std::collections::HashSet::new();
+        for client in clients {
+            let record = client.as_object().ok_or_else(|| bad("Приложение должно быть объектом."))?;
+            if record.len() != 5 || record.keys().any(|key|
+                !["id", "name", "platforms", "url", "enabled"].contains(&key.as_str())
+            ) {
+                return Err(bad("Неизвестное или отсутствующее поле приложения."));
+            }
+            let id = record.get("id").and_then(Value::as_str)
+                .ok_or_else(|| bad("Некорректный ID приложения."))?;
+            if !id.starts_with("custom-") || id.len() > 32 || id.len() < 8 ||
+                !id["custom-".len()..].bytes().all(|b| b.is_ascii_digit()) ||
+                !ids.insert(id)
+            {
+                return Err(bad("Некорректный или повторяющийся ID приложения."));
+            }
+            let name = record.get("name").and_then(Value::as_str)
+                .ok_or_else(|| bad("Некорректное название приложения."))?;
+            let platforms = record.get("platforms").and_then(Value::as_str)
+                .ok_or_else(|| bad("Некорректное описание платформ."))?;
+            if name.trim().is_empty() || name.chars().count() > 80 ||
+                name.chars().any(char::is_control) || platforms.chars().count() > 120 ||
+                platforms.chars().any(char::is_control)
+            {
+                return Err(bad("Название или платформы приложения содержат недопустимые символы."));
+            }
+            let url = record.get("url").and_then(Value::as_str)
+                .ok_or_else(|| bad("Ссылка приложения должна быть строкой."))?;
+            if !safe_https_url(url) { return Err(bad("Укажите корректную HTTPS-ссылку своего приложения.")); }
+            if !record.get("enabled").is_some_and(Value::is_boolean) {
+                return Err(bad("Состояние приложения должно быть переключателем."));
+            }
+        }
+    }
     Ok(())
 }
 
@@ -123,5 +166,28 @@ mod tests {
         assert!(!accepts(json!({"subscriptionRadius":33})));
         assert!(!accepts(json!({"subscriptionBackground":"red"})));
         assert!(!accepts(json!({"subscriptionShowApps":"yes"})));
+        assert!(accepts(json!({"subscriptionAppsTitle":"Поддерживаемые клиенты",
+            "subscriptionCustomClients":[{"id":"custom-1","name":"My Client",
+            "platforms":"Android · iOS","url":"https://example.com/install",
+            "enabled":true}]})));
+        assert!(accepts(json!({"subscriptionCustomClients":[]})));
+        assert!(!accepts(json!({"subscriptionAppsTitle":true})));
+        assert!(!accepts(json!({"subscriptionAppsTitle":"x".repeat(81)})));
+        assert!(!accepts(json!({"subscriptionCustomClients":[{"id":"custom-1",
+            "name":"", "platforms":"iOS","url":"","enabled":true}]})));
+        assert!(!accepts(json!({"subscriptionCustomClients":[{"id":"custom-1",
+            "name":"Custom","platforms":"","url":"javascript:alert(1)","enabled":true}]})));
+        assert!(!accepts(json!({"subscriptionCustomClients":[{"id":"custom-1",
+            "name":"Client A","platforms":"","url":"","enabled":true},
+            {"id":"custom-1","name":"Client B","platforms":"","url":"","enabled":false}]})));
+        assert!(!accepts(json!({"subscriptionCustomClients":[{"id":"custom-2",
+            "name":"Client","platforms":"","url":"","enabled":"yes"}]})));
+        assert!(!accepts(json!({"subscriptionCustomClients":[{"id":"custom-2",
+            "name":"Client","platforms":"","url":"","enabled":true,
+            "html":"<script>alert(1)</script>"}]})));
+        assert!(!accepts(json!({"subscriptionCustomClients":vec![json!({
+            "id":"custom-1","name":"Client","platforms":"","url":"","enabled":true
+        }); 33]})));
+
     }
 }
