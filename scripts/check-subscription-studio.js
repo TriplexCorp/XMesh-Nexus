@@ -41,6 +41,51 @@ assert.match(src,/preview\.dataset\.portalTheme=d\.subscriptionTheme/);
 assert.match(rust,/"subscriptionTheme", &\["dark", "light"\]/);
 assert.match(view,/name="subscriptionShowTraffic"/);
 assert.match(view,/name="subscriptionShowExpiry"/);
+for(const setting of [
+ 'subscriptionBackground','subscriptionCardColor','subscriptionTextColor',
+ 'subscriptionLayout','subscriptionCardStyle','subscriptionFont','subscriptionRadius',
+ 'subscriptionHero','subscriptionCta','subscriptionLogoUrl','subscriptionSupportLabel',
+ 'subscriptionSupportUrl','subscriptionClientLayout','subscriptionShowApps','subscriptionShowQr',
+ 'subscriptionShowCopy','subscriptionShowDevices','subscriptionShowStatus','subscriptionShowSupport'
+])assert(view.includes('name="'+setting+'"'),'Missing studio setting '+setting);
+assert.equal(studio.clientCatalog.length,16,'Show a deliberate finite client catalog');
+for(const key of ['happ','incy','v2raytun','v2rayn','v2rayng','streisand','hiddify','nekobox','shadowrocket']){
+ assert(view.includes('name="subClient_'+key+'"'),'Missing app visibility setting '+key);
+ assert(view.includes('name="subClientLink_'+key+'"'),'Missing app HTTPS-link field '+key);
+}
+const [overridden]=studio.create({
+ subscriptionClients:{happ:false,incy:true},
+ subscriptionClientLinks:{incy:'https://example.com/download?platform=ios'},
+ subscriptionLogoUrl:'https://example.com/logo.png',
+ subscriptionHero:'<script>alert(1)</script>'
+},async()=>{},()=>{},{users:0,nodes:0});
+assert.doesNotMatch(overridden,/name="subClient_happ" checked/);
+assert.match(overridden,/name="subClient_incy" checked/);
+assert.match(overridden,/&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+assert(studio.validHttps('https://example.com/download'));
+assert(!studio.validHttps('javascript:alert(1)'));
+assert(!studio.validHttps('https://user:pass@example.com'));
+assert(!studio.validHttps('http://example.com'));
+assert(!studio.validHttps('https://example.com:443'));
+assert(!studio.validHttps('https://localhost\\evil.test'));
+for(const value of ['div','section','label','span']){
+ const opens=(view.match(new RegExp('<'+value+'(?:[ >])','g'))||[]).length;
+ const closes=(view.match(new RegExp('</'+value+'>','g'))||[]).length;
+ assert.equal(opens,closes,'HTML preview needs balanced '+value+' markup');
+}
+assert.match(src,/subscriptionClients:Object\.fromEntries\(clientCatalog/);
+assert.match(src,/subscriptionClientLinks:Object\.fromEntries\(clientCatalog/);
+assert.match(src,/enabled=clientCatalog\.filter/);
+assert.match(src,/data-client-preset/);
+assert.match(rust,/mod subscription_settings;/);
+const validation=fs.readFileSync('backend/src/subscription_settings.rs','utf8');
+assert.match(validation,/pub\(crate\) fn validate/);
+assert.match(validation,/"subscriptionClients"/);
+assert.match(validation,/"subscriptionClientLinks"/);
+assert.match(validation,/"subscriptionLogoUrl"/);
+assert.match(validation,/safe_https_url/);
+assert.match(css,/\.subscription-client-editor/);
+assert.match(css,/\.subscription-preview-apps/);
 assert.match(view,/name="subscriptionPlacement"/);
 assert.match(view,/name="nodePlacement"/);
 assert.match(view,/name="deploymentServerB"/);
