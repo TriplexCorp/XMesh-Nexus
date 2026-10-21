@@ -108,3 +108,15 @@
 .subscription-preview-caption{font-size:.73rem;color:var(--st-muted);line-height:1.6;margin:0}
 @media(max-width:1180px){.subscription-studio-layout{grid-template-columns:minmax(0,1fr)}.subscription-studio-side{position:static;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start}.subscription-preview-label{grid-column:1/-1}.subscription-preview-caption{grid-column:2}.subscription-preview{grid-row:2/span 2}.subscription-studio-stats{grid-column:2}}
 @media(max-width:780px){.subscription-studio-side{display:grid;grid-template-columns:1fr}.subscription-preview,.subscription-studio-stats,.subscription-preview-label,.subscription-preview-caption{grid-column:1;grid-row:auto}.subscription-studio-pair{grid-template-columns:1fr}.subscription-topology{grid-template-columns:1fr}.subscription-role{grid-template-columns:2.1rem minmax(0,1fr)}.subscription-role strong,.subscription-role .subscription-field{grid-column:2;justify-self:start}.subscription-studio-intro .btn{width:100%}}
+
+/* Client portal appearance is independent from the panel theme. */
+.subscription-preview[data-portal-theme=light]{
+  background:radial-gradient(ellipse at 92% 3%,color-mix(in srgb,var(--portal-accent) 15%,transparent),transparent 60%),#f5f6f8;
+  color:#19232d;border-color:#d6dde3;
+}
+.subscription-preview[data-portal-theme=light] .subscription-preview-hero p,
+.subscription-preview[data-portal-theme=light] .subscription-preview-meta small,
+.subscription-preview[data-portal-theme=light] footer{color:#647484}
+.subscription-preview[data-portal-theme=light] .subscription-preview-meta>div{border-color:#d5dce4;background:#fff}
+.subscription-preview[data-portal-theme=light] .subscription-preview-progress{background:#e8ebef}
+.subscription-preview[data-portal-theme=light] .subscription-preview-cta{color:#16202a}
