@@ -144,6 +144,44 @@ for(const theme of [["lime","Лайм","Lime"],["terracotta","Терракота
  const catalog=fs.readFileSync('i18n.js','utf8');
  assert(catalog.includes('["'+name+'","'+en+'"]'),'Missing RU/EN label for '+id);
 }
+
+// Smooth appearance transitions must not reintroduce full-theme work on every frame.
+assert.match(css,/\.wrap:has\(#view \.appearance-layout\)\{\s*transition:max-width/,
+ 'Workspace width needs a gently eased transition');
+assert.match(css,/@media\(prefers-reduced-motion:reduce\)\{/,
+ 'OS reduced-motion preferences must disable the added transitions');
+assert.match(css,/html\[data-motion=on\] \.appearance-layout\{/,
+ 'Motion must respect the panel animation toggle');
+assert.match(css,/::-webkit-slider-thumb/);
+assert.match(css,/::-moz-range-thumb/);
+assert.match(app,/initializeAppearanceRanges\(v\)/,
+ 'Appearance tracks must fill to their saved values on render');
+assert.match(app,/syncAppearanceRangeProgress\(e\.target\)/,
+ 'Track progress must update during slider movement');
+const rangeLogic=app.slice(app.indexOf('const syncAppearanceRangeProgress='),
+ app.indexOf('const brand=()=>'));
+assert(rangeLogic.startsWith('const syncAppearanceRangeProgress='));
+const updateProgress=new Function(rangeLogic+
+ ';return {syncAppearanceRangeProgress,initializeAppearanceRanges};')();
+let fill=null,count=0;
+const range={
+ min:'720',max:'3000',value:'1860',matches:s=>s==='.appearance-layout input[type="range"]',
+ style:{setProperty:(key,value)=>{assert.equal(key,'--range-pct');fill=value;count++}}
+};
+updateProgress.syncAppearanceRangeProgress(range);
+assert.equal(fill,'50.00%','Saved halfway width must fill half of its track');
+range.value='3000';
+updateProgress.syncAppearanceRangeProgress(range);
+assert.equal(fill,'100.00%','Max width must fill entire range');
+range.value='720';
+updateProgress.syncAppearanceRangeProgress(range);
+assert.equal(fill,'0.00%','Min width must clear range fill');
+const nonAppearance={...range,matches:()=>false};
+updateProgress.syncAppearanceRangeProgress(nonAppearance);
+assert.equal(count,3,'Unrelated sliders should not trigger appearance updates');
+const root={querySelectorAll:()=>[range]};
+updateProgress.initializeAppearanceRanges(root);
+assert.equal(count,4,'Saved slider progress must hydrate after page rendering');
 // Appearance uses two balanced columns and the locale selector is global.
 assert.match(app,/<div class="appearance-layout">/,'Aligned appearance workspace must exist');
 assert.match(app,/appearance-column/,'Appearance cards must use two columns');

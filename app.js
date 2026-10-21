@@ -399,6 +399,18 @@ const updatePaletteColor=(t)=>{
  }
  return true;
 };
+// Keep the accent-colored range track in sync with the actual value.
+// This only sets one element-local CSS variable and never applies the full theme.
+const syncAppearanceRangeProgress=input=>{
+ if(!input?.matches?.('.appearance-layout input[type="range"]'))return;
+ const min=Number(input.min),max=Number(input.max),value=Number(input.value);
+ if(!Number.isFinite(min)||!Number.isFinite(max)||!Number.isFinite(value)||max<=min)return;
+ const percent=Math.max(0,Math.min(100,(value-min)/(max-min)*100));
+ input.style.setProperty('--range-pct',percent.toFixed(2)+'%');
+};
+const initializeAppearanceRanges=root=>{
+ root.querySelectorAll('.appearance-layout input[type="range"]').forEach(syncAppearanceRangeProgress);
+};
 const brand=()=>{$('#bn').textContent=DB.set.brand;$('#lg').textContent=(DB.set.brand[0]||'L').toUpperCase()};
 
 let T=[],cur='',RT=0;
@@ -418,7 +430,7 @@ async function render(soft){
   T.forEach(clearInterval);T=[];cur=location.hash.slice(1);if(!pages[cur])cur='home';const rt=++RT,[t,f]=pages[cur],v=$('#view');
   $('#title').textContent=t;document.title=(window.XMeshI18n?.translate(t)||t)+' — '+DB.set.brand;$$('#nav a').forEach(a=>a.classList.toggle('on',a.getAttribute('href')=='#'+cur));
   if(!soft){v.classList.remove('still');v.innerHTML=skel();scrollTo(0,0)}
-  const [h,i]=await f();if(rt!=RT)return;v.classList.toggle('still',!!soft);v.innerHTML=h;decorateButtonIcons(v);i&&i();window.XMeshMfa?.mount(v);$('#unb').textContent=DB.users.length;drawBulk();
+  const [h,i]=await f();if(rt!=RT)return;v.classList.toggle('still',!!soft);v.innerHTML=h;decorateButtonIcons(v);i&&i();initializeAppearanceRanges(v);window.XMeshMfa?.mount(v);$('#unb').textContent=DB.users.length;drawBulk();
   if(pendingScrollTarget&&cur==='set'){
     const target=pendingScrollTarget;
     pendingScrollTarget=null;
@@ -2231,7 +2243,7 @@ document.addEventListener('change',async e=>{const t=e.target;
   else if(t.id==='rail-tips'){C.railTips=t.checked?1:0;apply()}
   else if(t.id=='mo'){C.motion=t.checked?1:0;apply()}
   else if(t.id=='tplsel'){const p=DB.tpls.find(x=>x.id==t.value);if(!p)return;const f=$('form[data-k=user]');const set=(k,v)=>{const el=$(`[name=${k}]`,f);if(el)el.value=v};set('limit',p.limit);set('days',p.days);set('strategy',p.strategy);set('hwid',p.hwid);$('[name=hold]',f).checked=p.hold;$$('[name=squads]',f).forEach(c=>c.checked=p.squads.includes(+c.value))}});
-document.addEventListener('input',e=>{if(updatePaletteColor(e.target))return;if(['hue','sat','lum'].includes(e.target.id)){
+document.addEventListener('input',e=>{syncAppearanceRangeProgress(e.target);if(updatePaletteColor(e.target))return;if(['hue','sat','lum'].includes(e.target.id)){
   paletteDraft.h=+$('#hue').value;paletteDraft.s=+$('#sat').value;paletteDraft.l=+$('#lum').value;
   paletteDraft.a=hslHex(paletteDraft.h,paletteDraft.s,paletteDraft.l);paintPaletteDraft();
 }else if(e.target.id=='ts'){C.ts=+e.target.value;$('#tsv').textContent=Math.round(C.ts*100)+'%';apply()}else if(e.target.id=='radius'){C.radius=+e.target.value;$('#rv').textContent=C.radius+' px';apply()}
