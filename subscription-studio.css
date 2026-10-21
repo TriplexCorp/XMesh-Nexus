@@ -1,0 +1,110 @@
+/* SUBSCRIPTION STUDIO — isolated layout and scoped design tokens. */
+.subscription-studio{
+  --st-ink:var(--tx);
+  --st-muted:var(--mu);
+  --st-border:var(--ln);
+  --st-accent:var(--a);
+  display:grid;gap:1.2rem;min-width:0;width:100%;
+}
+.subscription-studio-intro{
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;
+  gap:1.3rem;padding:.35rem 0 .3rem;
+}
+.subscription-studio-intro h2{
+  margin:.3rem 0 .4rem;font-size:clamp(1.5rem,2vw,2.25rem);
+  line-height:1.1;letter-spacing:-.045em;
+}
+.subscription-studio-intro p{margin:0;color:var(--st-muted);font-size:.875rem;max-width:56rem;line-height:1.55}
+.subscription-studio-intro .btn{min-height:2.7rem;flex:0 0 auto}
+.subscription-studio-kicker{font-size:.7rem;letter-spacing:.15em;font-weight:780;color:var(--a)}
+.subscription-studio-notice{
+  margin:0;color:var(--st-muted);border:1px solid var(--st-border);
+  border-left:3px solid var(--a);border-radius:var(--ui-control-radius);
+  background:var(--s2);padding:.85rem 1rem;line-height:1.55;font-size:.8rem;
+}
+.subscription-studio-notice b{color:var(--st-ink)}
+.subscription-studio-layout{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(20rem,.8fr);gap:1.2rem;align-items:start;min-width:0}
+.subscription-studio-main{display:grid;gap:1.1rem;min-width:0}
+.subscription-studio-section{display:grid;gap:1.25rem;min-width:0;padding:1.25rem}
+.subscription-studio-heading{display:flex;gap:.95rem;align-items:center;border-bottom:1px solid var(--st-border);padding-bottom:1rem}
+.subscription-studio-heading>span{
+  width:2.4rem;height:2.4rem;display:grid;place-items:center;flex:0 0 auto;
+  background:color-mix(in srgb,var(--a) 10%,var(--s2));
+  border:1px solid color-mix(in srgb,var(--a) 26%,var(--ln));
+  border-radius:var(--ui-control-radius);color:var(--a);font-weight:750;font-size:.78rem
+}
+.subscription-studio-heading h3{font-size:1.04rem;font-weight:760;margin:0 0 .25rem}
+.subscription-studio-heading p{font-size:.79rem;color:var(--st-muted);margin:0;line-height:1.5}
+.subscription-studio-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.95rem;min-width:0}
+.subscription-studio .subscription-field{min-width:0;margin:0}
+.subscription-studio .subscription-field input,.subscription-studio .subscription-field textarea,.subscription-studio .subscription-field select{
+  width:100%;max-width:100%;min-width:0;
+}
+.subscription-studio .subscription-field input[type=color]{height:2.75rem;padding:.25rem;cursor:pointer}
+.subscription-studio-url{display:grid;gap:.45rem;background:var(--s2);padding:1rem;border:1px dashed var(--st-border);border-radius:var(--ui-control-radius)}
+.subscription-studio-url span{font-size:.72rem;color:var(--st-muted)}
+.subscription-studio-url code{overflow-wrap:anywhere;font-size:.85rem;color:var(--st-ink)}
+.subscription-roles{display:grid;gap:.65rem}
+.subscription-role{
+  display:grid;grid-template-columns:2.4rem minmax(0,1fr) auto;
+  gap:.85rem;align-items:center;padding:.75rem .85rem;border:1px solid var(--st-border);
+  border-radius:var(--ui-control-radius);background:var(--s2);min-width:0
+}
+.subscription-role-icon{display:grid;place-items:center;width:2.4rem;height:2.4rem;color:var(--a);font-size:1.1rem}
+.subscription-role>div:not(.subscription-field){display:grid;gap:.2rem;min-width:0}
+.subscription-role b{font-size:.83rem}
+.subscription-role small{font-size:.7rem;color:var(--st-muted);line-height:1.4}
+.subscription-role strong{font-size:.75rem;color:var(--a);white-space:nowrap}
+.subscription-role .subscription-field{max-width:10rem}
+.subscription-role .subscription-field>span{display:none}
+.subscription-role .subscription-field select{min-height:2.4rem}
+.subscription-topology{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.65rem}
+.subscription-topology-item{
+  border:1px solid var(--st-border);border-radius:var(--ui-control-radius);
+  padding:.85rem;display:grid;gap:.3rem;min-width:0
+}
+.subscription-topology-item span{color:var(--a);font-size:.65rem;font-weight:800;letter-spacing:.08em}
+.subscription-topology-item b{font-size:.81rem;overflow-wrap:anywhere}
+.subscription-topology-item small{font-size:.69rem;color:var(--st-muted);overflow-wrap:anywhere}
+.subscription-studio-toolbar{display:flex;gap:.8rem;align-items:center;flex-wrap:wrap}
+.subscription-studio-toolbar small{font-size:.75rem;color:var(--st-muted);flex:1;line-height:1.45}
+.subscription-display-options{display:flex;align-items:center;gap:.65rem 1.4rem;flex-wrap:wrap}
+.subscription-display-options label{display:flex;align-items:center;gap:.55rem;font-size:.81rem;color:var(--st-ink);cursor:pointer}
+.subscription-display-options input{width:1rem;height:1rem;accent-color:var(--a)}
+.subscription-studio-side{display:grid;gap:1rem;min-width:0;position:sticky;top:1rem}
+.subscription-preview-label{display:flex;justify-content:space-between;align-items:center;gap:.8rem;font-size:.82rem}
+.subscription-preview-label span{color:var(--st-muted);font-size:.71rem}
+.subscription-preview{
+  --portal-accent:#e8bb78;
+  position:relative;display:grid;gap:1.65rem;background:
+  radial-gradient(ellipse at 92% 3%,color-mix(in srgb,var(--portal-accent) 16%,transparent),transparent 55%),
+  #0c131b;
+  color:#ecf3f6;padding:clamp(1.25rem,2vw,2rem);border-radius:calc(var(--ui-radius) + 4px);
+  border:1px solid #293541;min-height:27rem;
+  box-shadow:0 16px 55px rgba(0,0,0,.18)
+}
+.subscription-preview-brand{display:flex;gap:.75rem;align-items:center;font-weight:760;font-size:1.08rem;overflow-wrap:anywhere}
+.subscription-preview-brand>span{
+  width:2.3rem;height:2.3rem;border-radius:11px;display:grid;place-items:center;
+  background:var(--portal-accent);color:#10171e;flex:0 0 auto;font-size:1.15rem;
+}
+.subscription-preview-hero{display:grid;gap:.45rem}
+.subscription-preview-hero h3{font-size:clamp(1.2rem,1.7vw,1.6rem);letter-spacing:-.035em;margin:0}
+.subscription-preview-hero p{margin:0;color:#a9bac4;font-size:.82rem;line-height:1.5;overflow-wrap:anywhere}
+.subscription-preview-ok{color:var(--portal-accent);font-size:.75rem}
+.subscription-preview-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.7rem}
+.subscription-preview-meta>div{display:grid;gap:.5rem;border:1px solid #30404b;border-radius:12px;padding:.9rem}
+.subscription-preview-meta small{font-size:.74rem;color:#a9bac4}
+.subscription-preview-meta b{font-size:.9rem}
+.subscription-preview-meta>[hidden]{display:none}
+.subscription-preview-progress{height:.3rem;border-radius:10px;background:#30404b;overflow:hidden}
+.subscription-preview-progress i{display:block;width:12.4%;height:100%;background:var(--portal-accent);border-radius:10px}
+.subscription-preview-cta{background:var(--portal-accent);color:#121b22;text-align:center;padding:.95rem;border-radius:12px;font-size:.85rem;font-weight:800}
+.subscription-preview footer{color:#a9bac4;font-size:.72rem;overflow-wrap:anywhere}
+.subscription-studio-stats{display:grid;grid-template-columns:1fr 1fr;gap:.8rem}
+.subscription-studio-stats>div{display:flex;justify-content:space-between;align-items:center;padding:1rem;gap:.5rem;border:1px solid var(--st-border);border-radius:var(--ui-control-radius);font-size:.8rem}
+.subscription-studio-stats small{color:var(--st-muted)}
+.subscription-studio-stats b{font-size:1.1rem}
+.subscription-preview-caption{font-size:.73rem;color:var(--st-muted);line-height:1.6;margin:0}
+@media(max-width:1180px){.subscription-studio-layout{grid-template-columns:minmax(0,1fr)}.subscription-studio-side{position:static;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start}.subscription-preview-label{grid-column:1/-1}.subscription-preview-caption{grid-column:2}.subscription-preview{grid-row:2/span 2}.subscription-studio-stats{grid-column:2}}
+@media(max-width:780px){.subscription-studio-side{display:grid;grid-template-columns:1fr}.subscription-preview,.subscription-studio-stats,.subscription-preview-label,.subscription-preview-caption{grid-column:1;grid-row:auto}.subscription-studio-pair{grid-template-columns:1fr}.subscription-topology{grid-template-columns:1fr}.subscription-role{grid-template-columns:2.1rem minmax(0,1fr)}.subscription-role strong,.subscription-role .subscription-field{grid-column:2;justify-self:start}.subscription-studio-intro .btn{width:100%}}
