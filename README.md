@@ -63,7 +63,7 @@ a properly secured proxy configuration.
 
 ## Administrator two-factor authentication (TOTP)
 
-From **Settings → Two-factor authentication**, an administrator can enroll their
+From **System → Security** (also linked at the top of **Settings**), an administrator can enroll their
 own account after re-entering their current password. Enter the Base32 secret
 into an authenticator supporting standard TOTP (e.g., Aegis, 2FAS, Google
 Authenticator), then confirm a 6-digit code. Only after successful confirmation
