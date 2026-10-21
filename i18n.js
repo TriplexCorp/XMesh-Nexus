@@ -327,6 +327,140 @@ window.XMeshI18n=(()=>{
       'Preview uses demo data only. Real configurations, personal tokens, and the public portal will be handled by a separate service.',
     'Поддержка':'Support','Мобильные':'Mobile','Универсальные':'Universal',
     'Компьютер':'Desktop',
+    // Additional dashboard, metrics, onboarding and user controls
+    'ИНФРАСТРУКТУРА / ОБЗОР':'INFRASTRUCTURE / OVERVIEW',
+    'Ресурсы и доступность сервисов панели в реальном времени.':
+      'Infrastructure resources and service availability in real time.',
+    'МОНИТОРИНГ':'MONITORING','МОНИТОРИНГ · LIVE':'MONITORING · LIVE',
+    'Обновляем телеметрию…':'Refreshing telemetry…',
+    'Загрузка графика…':'Loading chart…','Загрузка показаний…':'Loading readings…',
+    'Последнее обновление':'Last updated',
+    'Пока нет данных RX/TX':'No RX/TX data yet',
+    'Нет данных по серверам':'No server metrics available',
+    'Персональный трафик Xray':'Per-user Xray traffic',
+    'Скорость сетевого интерфейса узлов. При работе других сервисов их трафик тоже попадёт в измерения.':
+      'Node network interface speed. Traffic from other services on these hosts is included.',
+    'Данные только из персональных счётчиков Xray. Общий трафик VPS не используется.':
+      'Data comes from per-user Xray counters, not total VPS traffic.',
+    'Данные панели':'Panel data',
+    'Подходящие серверы не назначены':'No matching servers assigned',
+    'Не удалось получить статистику':'Could not retrieve statistics',
+    'Не удалось загрузить график':'Could not load chart',
+    'График появится после получения персональных счётчиков Xray от нод.':
+      'The chart will appear when nodes report per-user Xray counters.',
+    'Автообновление каждые 15 секунд':'Refresh every 15 seconds',
+    'Автообновление · 60 сек':'Auto refresh · 60 s',
+    'По серверам':'By server','Все сквады':'All squads','Все узлы':'All nodes',
+    'База данных':'Database','Процесс панели работает':'Panel process is running',
+    'Выбрать все':'Select all','Сбросить выбор':'Clear selection',
+    'Экспорт CSV':'Export CSV','Создать сквад':'Create squad',
+    'В сквад':'To squad','Добавить в сквад':'Add to squad',
+    'Скачать':'Download','Скачано':'Downloaded','Отправлено':'Sent',
+    'Скопировать команду':'Copy command','Команда для Linux-узла (root)':
+      'Command for Linux node (root)',
+    'Скопируйте его сейчас: позже показать его снова будет нельзя.':
+      'Copy it now: it will not be shown again.',
+    'При необходимости подставит параметры из сохранённого шаблона':
+      'Use values from a saved template when available',
+    'Измените поиск или фильтр, либо создайте пользователя.':
+      'Change your search or filters, or create a user.',
+    'Поиск по имени · тегу · email · ссылке · Telegram ID':
+      'Search by name · tag · email · link · Telegram ID',
+    'Введите название страницы, действие или пользователя':
+      'Search for a page, action, or user',
+    'Поиск по названию страны или ISO-коду.':
+      'Search by country name or ISO code.',
+    'Очистить выбор страны':'Clear country selection',
+    'Все поля доступны сразу':'All settings are directly editable',
+    'Продлить':'Extend','Продлить…':'Extend…','Продление доступа':'Extend access',
+    'Количество дней':'Number of days',
+    'От текущей даты окончания, либо от сегодня, если доступ истёк.':
+      'From the current expiry date, or today if access has already expired.',
+    'Сбросить трафик':'Reset traffic','Лимит устройств':'Device limit',
+    'Устройства (HWID)':'Devices (HWID)','Подключённых устройств пока нет':
+      'No connected devices yet',
+    'Количество устройств превышает лимит':'Device count exceeds limit',
+    'Доступ':'Access','Бессрочно':'Never expires',
+    'Сквады и подключение':'Squads and connection',
+    'Пользователи':'Users','Пользователей пока нет':'No users yet',
+    'Никого не найдено':'No matching users',
+    'Пользователю нужно назначить группу доступа. Создайте сквад, а затем вернитесь к созданию пользователя.':
+      'Users need an access group. Create a squad, then return to user creation.',
+    'Сквады ещё не созданы':'No squads created yet',
+    'Подписка':'Subscription','Сервис подписок будет отдельным компонентом. Оформление и размещение настраиваются в SUBSCRIPTION STUDIO.':
+      'The subscription service will be a separate component. Its design and deployment are configured in SUBSCRIPTION STUDIO.',
+    'Выберите протокол inbound, сетевой транспорт, порт и режим TLS/Reality.':
+      'Choose the inbound protocol, network transport, port, and TLS/Reality mode.',
+    'Показываются только настройки, совместимые с выбранным режимом.':
+      'Only settings compatible with the chosen mode are shown.',
+    'XRAY-CORE / ПРОФИЛЬ INBOUND':'XRAY-CORE / INBOUND PROFILE',
+    'Конструктор подключения':'Connection builder','Конструктор':'Builder',
+    'Настройте inbound — конфигурации сервера и клиента обновятся автоматически.':
+      'Configure the inbound — server and client configurations update automatically.',
+    'Результат конфигурации':'Configuration output',
+    'Настройки обновляются автоматически':'Settings update automatically',
+    'Server JSON и Client JSON обновляются по мере настройки. Экспорт не применяет конфиг к работающему ядру.':
+      'Server JSON and Client JSON update as you configure settings. Exporting does not apply changes to the running core.',
+    'Полный Server JSON · ручной режим':'Full Server JSON · manual mode',
+    'Ручной JSON':'Manual JSON',
+    'Предпросмотр готов':'Preview ready',
+    'Синтаксис JSON и обязательные поля проверяются перед сохранением.':
+      'JSON syntax and required fields are checked before saving.',
+    'Расширенные поля Xray: DNS, policy, API, routing и любые параметры актуального ядра.':
+      'Advanced Xray fields: DNS, policy, API, routing, and all options supported by the current core.',
+    'Затем сохраните профиль в коллекцию':'Then save the profile to the collection',
+    'Как это работает?':'How does it work?',
+    'Проверьте настройки':'Review settings',
+    'XRAY STUDIO / НАСТРОЙКИ ПОДКЛЮЧЕНИЯ':'XRAY STUDIO / CONNECTION SETTINGS',
+    'Изменения сразу отражаются в Server JSON и Client JSON.':
+      'Changes are reflected immediately in Server JSON and Client JSON.',
+    'Настройки применяются к предпросмотру автоматически.':
+      'The preview updates automatically.',
+    'Откройте только нужный раздел. Конфигурация обновляется автоматически.':
+      'Open only the sections you need. The configuration updates automatically.',
+    'Параметры подключения':'Connection parameters',
+    'Настройки TLS':'TLS settings',
+    'Сертификат, ALPN и версия TLS':'Certificate, ALPN, and TLS version',
+    'Настройки Reality':'Reality settings',
+    'Ключи, Short ID и параметры назначения':'Keys, Short IDs, and destination options',
+    'Защита соединения':'Connection security',
+    'Параметры протокола и клиента':'Protocol and client parameters',
+    'Пара ключей':'Key pair',
+    'Серверный decryption и клиентский encryption':'Server decryption and client encryption',
+    'Проверка':'Validation','Копировать':'Copy',
+    'Сгенерировать UUID':'Generate UUID','Сгенерировать пароли':'Generate passwords',
+    'Сгенерировать пару ключей':'Generate key pair',
+    'Сгенерировать пару на сервере':'Generate pair on server',
+    'Новый Short ID':'New Short ID',
+    'Импорт JSON':'Import JSON','Заново из конструктора':'Regenerate from builder',
+    'Настройки подключения':'Connection settings',
+    'Обновить':'Refresh','Заменить':'Replace',
+    'Нет активных inbound':'No active inbounds',
+    'Нет вариантов':'No options',
+    'ОБЯЗАТЕЛЬНОЕ':'REQUIRED',
+    'От текущей даты':'From the current date',
+    'Первый запуск':'First run',
+    'Изумруд':'Emerald','Океан':'Ocean','Янтарь':'Amber','Роза':'Rose',
+    'Фиолетовый':'Violet','Циан':'Cyan','Рубин':'Ruby',
+    'Сегодня':'Today','Ожидание':'Waiting',
+    'Пн':'Mon','Вт':'Tue','Ср':'Wed','Чт':'Thu','Пт':'Fri','Сб':'Sat','Вс':'Sun',
+    'Загрузка данных…':'Loading data…','Загружаем данные…':'Loading data…',
+    'Показать':'Show','Скрыть':'Hide','Выбрать файл':'Choose file',
+    'Пользователю нужно назначить группу доступа.':
+      'The user needs an access group.',
+    'Путь':'Path','Сеть':'Network','Аутентификация':'Authentication',
+    'Адрес интерфейса':'Interface address','Порт назначения':'Destination port',
+    'Логин / пароль':'Username / password',
+    'Метод шифрования':'Encryption method',
+    'Учетные данные':'Credentials',
+    'HTTP-заголовки':'HTTP headers',
+    'Предупреждения':'Warnings',
+    'Ручная настройка':'Manual setup','Ручной режим':'Manual mode',
+    'Сохранить изменения':'Save changes',
+    'Удаление':'Deletion',
+    'Сгенерировать согласованную пару через Xray-core':
+      'Generate a matching pair using Xray-core',
+    'Новая конфигурация':'New configuration'
     // Login
     'Вход — XMesh Nexus':'Sign in — XMesh Nexus',
     'Вход в панель':'Sign in to the panel',
