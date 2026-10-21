@@ -105,3 +105,39 @@ jobs:
           docker compose config --quiet
       - name: Build Docker image
         run: docker build -f backend/Dockerfile -t xmesh-nexus:ci .
+
+
+  integration:
+    name: API authentication integration
+    runs-on: ubuntu-latest
+    needs: rust
+    env:
+      POSTGRES_PASSWORD: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      APP_DB_PASSWORD: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
+      REDIS_PASSWORD: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: 9876543210abcdef9876543210abcdef9876543210abcdef
+      TOTP_ENCRYPTION_KEY: 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+      COOKIE_SECURE: "false"
+    steps:
+      - uses: actions/checkout@v7
+      - name: Start disposable PostgreSQL, Redis and XMesh API
+        run: docker compose up --build -d
+      - name: Wait for database migrations and healthy API
+        run: |
+          for i in $(seq 1 120); do
+            if curl --fail --silent http://127.0.0.1:8080/api/v1/health/ready >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose logs --tail=120 panel
+          exit 1
+      - name: Exercise real RBAC, MFA and revocation API
+        run: python3 scripts/test-auth-integration.py
+      - name: Container diagnostics on failure
+        if: failure()
+        run: docker compose logs --tail=180
+      - name: Remove disposable CI database
+        if: always()
+        run: docker compose down --volumes --remove-orphans
