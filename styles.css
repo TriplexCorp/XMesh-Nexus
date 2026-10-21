@@ -1826,3 +1826,88 @@ dialog.user-modal .user-legend-dot{width:.55rem;height:.55rem;border-radius:50%}
 dialog.user-modal .user-legend-dot.is-down{background:var(--a)}
 dialog.user-modal .user-legend-dot.is-up{background:color-mix(in srgb,var(--a) 35%,var(--s2))}
 @media(max-width:510px){dialog.user-modal .user-chart-empty-ring,dialog.user-modal .user-traffic-main-donut{width:5.4rem;height:5.4rem;flex-basis:5.4rem}}
+
+
+/* Nodes density modes — responsive to the actual page width, not viewport.
+   auto-fit collapsed empty tracks, so with 3 nodes all choices looked alike.
+   Fixed column counts make layout choices observable; data-node-count caps
+   columns to avoid a useless blank fourth column for 1–3 nodes. */
+.nodes-page{
+  display:grid;
+  gap:var(--view-gap,1rem);
+  min-width:0;
+  width:100%;
+  container:nodes-grid / inline-size;
+}
+.nodes-page>.nodes{
+  display:grid;
+  min-width:0;
+  grid-template-columns:minmax(0,1fr);
+  grid-auto-rows:auto;
+  align-items:stretch;
+}
+.nodes-page>.nodes>.nc{min-width:0}
+.nodes-page>.nodes[data-grid-mode=compact]{
+  gap:.6rem;
+}
+.nodes-page>.nodes[data-grid-mode=compact]>.nc{
+  padding:.7rem;
+  gap:.67rem;
+}
+.nodes-page>.nodes[data-grid-mode=compact] .node-gauges{
+  gap:.35rem;
+}
+.nodes-page>.nodes[data-grid-mode=spacious]{
+  gap:1.2rem;
+}
+.nodes-page>.nodes[data-grid-mode=spacious]>.nc{
+  padding:calc(var(--card-pad,1rem) + .35rem);
+  gap:1.2rem;
+}
+@container nodes-grid (min-width:32rem){
+  .nodes-page>.nodes[data-grid-mode=compact],
+  .nodes-page>.nodes[data-grid-mode=standard]{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .nodes-page>.nodes[data-grid-mode=spacious]{
+    grid-template-columns:minmax(0,1fr);
+  }
+  .nodes-page>.nodes[data-node-count="1"]{
+    grid-template-columns:minmax(0,1fr);
+  }
+}
+@container nodes-grid (min-width:52rem){
+  .nodes-page>.nodes[data-grid-mode=compact]{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+  .nodes-page>.nodes[data-grid-mode=standard],
+  .nodes-page>.nodes[data-grid-mode=spacious]{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .nodes-page>.nodes[data-node-count="1"]{
+    grid-template-columns:minmax(0,1fr);
+  }
+  .nodes-page>.nodes[data-node-count="2"]{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+@container nodes-grid (min-width:70rem){
+  .nodes-page>.nodes[data-grid-mode=compact]{
+    grid-template-columns:repeat(4,minmax(0,1fr));
+  }
+  .nodes-page>.nodes[data-grid-mode=standard]{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+  .nodes-page>.nodes[data-grid-mode=spacious]{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .nodes-page>.nodes[data-node-count="1"]{
+    grid-template-columns:minmax(0,1fr);
+  }
+  .nodes-page>.nodes[data-node-count="2"]{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .nodes-page>.nodes[data-node-count="3"][data-grid-mode=compact]{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+}
