@@ -17,6 +17,8 @@ jobs:
       - name: Test xmeshctl first-try confirmation
         run: |
           bash -n xmeshctl
+          bash -n scripts/check-xmeshctl-confirm.sh
+          bash scripts/check-xmeshctl-confirm.sh
   rust:
     runs-on: ubuntu-latest
     steps:
