@@ -67,6 +67,6 @@ assert.doesNotMatch(portal,/tr:\['Abonelik aktif'/);
 assert.doesNotMatch(portal,/vi:\['Gói đăng ký/);
 assert.match(backend,/"subscriptionLanguage", &\["ru", "en"\]/);
 assert.match(html,/<script src="i18n\.js[^"]*"><\/script>\s*<script src="subscription-studio\.js/);
-assert.match(login,/<script src="\/i18n\.js[^"]*" defer><\/script>\s*<script src="\/login\.js"/);
+assert.match(login,/<script src="\/i18n\.js[^"]*" defer><\/script>\s*<script src="\/login\.js[^"]*" defer><\/script>/);
 assert.match(docker,/COPY index\.html[^\n]*i18n\.js/);
 console.log('RU/EN panel locale persistence, safe reversible translations, independent portal locale: OK');
