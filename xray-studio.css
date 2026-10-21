@@ -2480,22 +2480,59 @@ body:has(.studio-reference-v5) .wrap{
 .xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode){
  gap:.8rem!important;
 }
+/* One grid row owns both panel heights. Do not size JSON by viewport height. */
 .xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) .xray-workspace-layout{
- align-items:start!important;
+ align-items:stretch!important;
  grid-template-columns:minmax(0,1.48fr) minmax(24rem,1fr)!important;
  gap:1rem!important;
 }
 .xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) .xray-output-dock{
- align-self:start!important;
+ align-self:stretch!important;
  position:sticky!important;
  top:1rem!important;
  margin-top:0!important;
+ height:100%!important;
+ min-height:0!important;
+ display:flex!important;
+ flex-direction:column!important;
 }
 .xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) .xray-config-content{
  display:flex!important;
  flex-direction:column!important;
  gap:1rem!important;
  padding:1.15rem 1.3rem!important;
+}
+/* Stretch the entire left form chain to the common row bottom. */
+.xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) :is(
+ .xray-editor-pane,
+ #xpb-visual-mode,
+ .xray-config-steps,
+ .xray-config-content
+){
+ height:100%!important;
+ min-height:0!important;
+}
+/* Header and controls keep natural height; code occupies exactly the remainder. */
+.xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) .xray-output-workspace{
+ display:grid!important;
+ grid-template-rows:auto auto minmax(0,1fr)!important;
+ flex:1 1 auto!important;
+ height:100%!important;
+ min-height:0!important;
+ overflow:hidden!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) .xray-output-pane:not([hidden]){
+ height:100%!important;
+ min-height:0!important;
+ grid-template-rows:minmax(0,1fr)!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) .xray-output-pane#xpb-output-client:not([hidden]){
+ grid-template-rows:auto minmax(0,1fr)!important;
+}
+.xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode):not(.sr-v5-expanded) .xray-code-view{
+ height:100%!important;
+ min-height:15rem!important;
+ max-height:none!important;
 }
 .xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) #xpb-config-basic{
  width:100%!important;
@@ -2727,9 +2764,28 @@ body:has(.studio-reference-v5) .wrap{
 @media(max-width:1250px){
  .xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) .xray-workspace-layout{
   grid-template-columns:minmax(0,1fr)!important;
+  align-items:start!important;
  }
  .xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) .xray-output-dock{
   position:static!important;
+  align-self:start!important;
+  height:auto!important;
+ }
+ .xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) :is(
+  .xray-editor-pane,#xpb-visual-mode,.xray-config-steps,.xray-config-content
+ ){
+  height:auto!important;
+ }
+ .xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) .xray-output-workspace{
+  height:auto!important;
+  grid-template-rows:auto auto minmax(18rem,1fr)!important;
+ }
+ .xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode) .xray-output-pane:not([hidden]){
+  min-height:18rem!important;
+ }
+ .xray-builder.studio-reference-v5.studio-inline.studio-drawer-layout:not(.manual-mode):not(.sr-v5-expanded) .xray-code-view{
+  height:clamp(19rem,43vh,32rem)!important;
+  min-height:19rem!important;
  }
  .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .xray-main-grid,
  .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog .xray-key-grid,
