@@ -255,6 +255,10 @@ window.XMeshSubscriptionStudio = (() => {
         $('[data-subscription-description]').textContent=d.subscriptionDescription;
         $('[data-subscription-traffic-label]').textContent=copy[1];
         $('[data-subscription-expiry-label]').textContent=copy[2];
+        const sampleUsage=$('[data-subscription-traffic] b');
+        const sampleDate=$('[data-subscription-expiry] b');
+        if(sampleUsage)sampleUsage.textContent=d.subscriptionLanguage==='en'?'12.4 / 100 GB':'12,4 / 100 ГБ';
+        if(sampleDate)sampleDate.textContent=d.subscriptionLanguage==='en'?'Dec 31, 2026':'31.12.2026';
         $('[data-subscription-connect]').textContent=d.subscriptionCta||copy[3];
         $('[data-subscription-footer]').textContent=d.subscriptionFooter;
         $('[data-subscription-traffic]').hidden=!d.subscriptionShowTraffic;
