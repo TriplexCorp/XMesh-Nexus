@@ -370,9 +370,16 @@ html[data-sidebar=compact] .app{grid-template-columns:5.7rem minmax(0,1fr)}
   html[data-sidebar=compact] .app>aside .core-rail-version{display:block}
 }
 .appearance-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,22rem),1fr));gap:var(--view-gap);align-items:start}
-.appearance-layout{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--view-gap);align-items:start}
-.appearance-column{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--view-gap);min-width:0}
-.appearance-column>.card{min-width:0}
+.appearance-layout{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--view-gap);align-items:stretch}
+.appearance-column{display:contents}
+.appearance-column>.card{min-width:0;height:100%;align-self:stretch}
+/* Place both columns on the same grid rows rather than two independent masonry stacks. */
+.appearance-column:first-child>.card:nth-child(1){grid-area:1/1}
+.appearance-column:nth-child(2)>.card:nth-child(1){grid-area:1/2}
+.appearance-column:first-child>.card:nth-child(2){grid-area:2/1}
+.appearance-column:nth-child(2)>.card:nth-child(2){grid-area:2/2}
+.appearance-column:first-child>.card:nth-child(3){grid-area:3/1}
+.appearance-column:nth-child(2)>.card:nth-child(3){grid-area:3/2}
 .appearance-card-heading h3{margin:0}
 .appearance-card-heading small{display:block;margin-top:.22rem;color:var(--mu);line-height:1.5}
 .appearance-layout .setting-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(10rem,1fr);align-items:center;gap:1.1rem;min-height:3.3rem}
@@ -384,7 +391,7 @@ html[data-sidebar=compact] .app{grid-template-columns:5.7rem minmax(0,1fr)}
 .appearance-layout .setting-row .sw,.appearance-layout .setting-row #rs{justify-self:end}
 .appearance-layout .palette-swatch{flex:0 0 auto}
 .appearance-layout .color-slider-grid{grid-template-columns:minmax(6rem,1fr) minmax(5rem,2.8fr) 3.5rem}
-@media(max-width:1120px){.appearance-layout{grid-template-columns:1fr}}
+@media(max-width:1120px){.appearance-layout{grid-template-columns:1fr}.appearance-column>.card:nth-child(n){grid-area:auto}}
 @media(max-width:650px){.appearance-layout .setting-row{grid-template-columns:1fr;gap:.55rem}.appearance-layout .setting-control{justify-content:flex-start}.appearance-layout .setting-row .sw,.appearance-layout .setting-row #rs{justify-self:start}}
 
 .choice{display:flex;flex-wrap:wrap;gap:.35rem;width:fit-content;max-width:100%}
