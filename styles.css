@@ -441,7 +441,7 @@ dialog.user-modal .sg{gap:.9rem}
 
 
 /* ================= XMESH NEXUS · GRID & LAYOUT REFINEMENT ================= */
-.wrap{max-width:132rem}
+.wrap{max-width:var(--panel-content-max,120rem)}
 .view{gap:clamp(.9rem,1.05vw,1.35rem)}
 .two{grid-template-columns:minmax(0,1.6fr) minmax(min(100%,19rem),.85fr);align-items:start}
 .two.b{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -618,7 +618,7 @@ nav a.on .ic{color:var(--a)}
 .core{background:var(--s2);border:1px solid var(--ln);box-shadow:none}
 .core button{border:1px solid var(--ln);background:color-mix(in srgb,var(--tx) 3%,var(--s2))}
 .core button:hover{background:color-mix(in srgb,var(--a) 10%,var(--s2));border-color:color-mix(in srgb,var(--a) 20%,var(--ln))}
-.wrap{max-width:132rem;padding:2rem clamp(1.3rem,2.6vw,3rem) 4rem}
+.wrap{max-width:var(--panel-content-max,120rem);padding:2rem clamp(1.3rem,2.6vw,3rem) 4rem}
 .top{gap:1rem;margin-bottom:1.6rem;padding-bottom:1.28rem;border-bottom:1px solid var(--ln);align-items:center}
 h1{font-size:1.55rem;font-weight:780;letter-spacing:-.045em;line-height:1.15}
 h3{font-size:1rem;font-weight:700;letter-spacing:-.025em}
