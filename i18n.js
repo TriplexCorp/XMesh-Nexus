@@ -460,7 +460,7 @@ window.XMeshI18n=(()=>{
     'Удаление':'Deletion',
     'Сгенерировать согласованную пару через Xray-core':
       'Generate a matching pair using Xray-core',
-    'Новая конфигурация':'New configuration'
+    'Новая конфигурация':'New configuration',
     // Login
     'Вход — XMesh Nexus':'Sign in — XMesh Nexus',
     'Вход в панель':'Sign in to the panel',
