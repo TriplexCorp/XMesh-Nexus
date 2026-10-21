@@ -58,6 +58,6 @@ assert.match(src,/textarea\.addEventListener\('scroll'/,'Line numbers should scr
 assert.match(css,/text-decoration-style:wavy!important/,'Error must have a wavy underline');
 assert.match(css,/\.sr-json-gutter-number\.is-error/,'Error line number must be marked');
 assert.match(css,/grid-template-rows:auto auto minmax\(0,1fr\) auto!important/,'Diagnostic bar needs its own row');
-assert.match(html,/<script src="xray-json-diagnostics\.js[^"]*"><\/script>\s*(?:<script src="subscription-studio\.js[^"]*"><\/script>\s*)?<script src="app\.js/,'Diagnostics must load before the editor');
+assert.match(html,/<script src="xray-json-diagnostics\.js[^"]*"><\/script>\s*(?:<script src="i18n\.js[^"]*"><\/script>\s*)?(?:<script src="subscription-studio\.js[^"]*"><\/script>\s*)?<script src="app\.js/,'Diagnostics must load before the editor');
 assert.match(dock,/COPY [^\n]*xray-json-diagnostics\.js[^\n]* \/app\/static\//,'Docker image must include diagnostics');
 console.log('Manual JSON line validation / gutter / Hot Fix: OK');
