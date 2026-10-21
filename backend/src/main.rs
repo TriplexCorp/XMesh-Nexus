@@ -1,5 +1,6 @@
 mod auth;
 mod core;
+mod node_rotation;
 
 use axum::{
     extract::{Extension, Path, Query, Request, State},
@@ -159,6 +160,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/metrics/traffic", get(get_traffic_metrics))
         .route("/users/{id}/traffic", get(get_user_traffic))
         .route("/nodes/{id}/metrics-token", post(create_node_metrics_token))
+        .route("/nodes/{id}/rotation/next", post(node_rotation::rotate_next))
         .route("/collections/{collection}", get(list_records).post(create_record))
         .route("/collections/{collection}/{id}", patch(update_record).delete(delete_record))
         .route("/core", get(get_core_status))
@@ -418,6 +420,15 @@ async fn delete_record(
     let result = row_to_record(&row)?;
     if collection == "nodes" {
         sqlx::query("DELETE FROM node_metric_auth WHERE node_id = $1")
+            .bind(id)
+            .execute(&state.pool)
+            .await?;
+        sqlx::query("DELETE FROM node_ip_rotation_cursors WHERE node_id = $1")
+            .bind(id)
+            .execute(&state.pool)
+            .await?;
+    } else if collection == "users" {
+        sqlx::query("DELETE FROM node_ip_rotation_cursors WHERE user_id = $1")
             .bind(id)
             .execute(&state.pool)
             .await?;
@@ -1075,6 +1086,9 @@ fn validate_collection(collection: &str) -> Result<(), ApiError> {
 fn validate_record(collection: &str, data: &Value) -> Result<(), ApiError> {
     let object = data.as_object()
         .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Запись должна быть JSON-объектом."))?;
+    if collection == "nodes" {
+        node_rotation::validate_node(data)?;
+    }
     if collection == "users" {
         let username = object.get("username").and_then(Value::as_str)
             .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Имя пользователя обязательно."))?;
