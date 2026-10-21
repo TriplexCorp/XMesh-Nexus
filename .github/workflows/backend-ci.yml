@@ -58,6 +58,8 @@ jobs:
         run: node scripts/check-i18n.js
       - name: Check subscription studio and independent deployment blueprint
         run: node scripts/check-subscription-studio.js
+      - name: Verify real admin RBAC, authentication boundaries and CSP
+        run: node scripts/check-admin-security.js
       - name: Check generic branding in tracked files
         run: node scripts/check-white-label.js
       - name: Check appearance surface choices and migration
