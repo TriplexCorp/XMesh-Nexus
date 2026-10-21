@@ -53,6 +53,29 @@ fn enforce_collection(actor: &auth::AuthUser, collection: &str, write: bool) -> 
 }
 
 
+
+#[cfg(test)]
+mod authorization_tests {
+    use super::*;
+    #[test]
+    fn viewers_cannot_mutate_collections_or_sensitive_operations() {
+        let viewer = auth::AuthUser { id: 3, username: "viewer".into(), role: "viewer".into() };
+        let admin = auth::AuthUser { id: 2, username: "admin".into(), role: "admin".into() };
+        let owner = auth::AuthUser { id: 1, username: "owner".into(), role: "owner".into() };
+        assert!(require_mutation(&viewer).is_err());
+        assert!(require_mutation(&admin).is_ok());
+        assert!(require_mutation(&owner).is_ok());
+        assert!(require_owner(&viewer).is_err());
+        assert!(require_owner(&admin).is_err());
+        assert!(require_owner(&owner).is_ok());
+        assert!(enforce_collection(&viewer, "users", false).is_ok());
+        assert!(enforce_collection(&viewer, "users", true).is_err());
+        assert!(enforce_collection(&admin, "users", true).is_ok());
+        assert!(enforce_collection(&owner, "tokens", true).is_err());
+        assert!(enforce_collection(&owner, "admins", false).is_err());
+    }
+}
+
 #[derive(Clone)]
 pub struct AppState {
     pub pool: PgPool,
