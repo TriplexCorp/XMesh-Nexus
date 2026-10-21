@@ -2228,8 +2228,8 @@ document.addEventListener('click',async e=>{
   else if(b=g('[data-nt]')){const n=DB.nodes.find(x=>x.id==b.dataset.nt);await api.update('nodes',n.id,{disabled:!n.disabled});toast(`${n.name}: ${n.disabled?'отключён':'включён'}`);render(1)}
   else if(b=g('[data-tt]')){TP.tab=b.dataset.tt;TP.q='';TP.f='';render(1)}
   else if(b=g('[data-lv]')){}
-  else if(b=g('[data-th]')){C.theme=b.dataset.th;apply();syncSubscriptionTheme();$('#th button').forEach(x=>x.classList.toggle('on',x==b))}
-  else if(b=g('[data-ac]')){C.accent=b.dataset.ac;apply();syncSubscriptionTheme();$('[data-ac]').forEach(x=>{const active=x===b;x.classList.toggle('on',active);x.setAttribute('aria-pressed',String(active))})}
+  else if(b=g('[data-th]')){C.theme=b.dataset.th;apply();syncSubscriptionTheme();$$('#th button').forEach(x=>x.classList.toggle('on',x==b))}
+  else if(b=g('[data-ac]')){C.accent=b.dataset.ac;apply();syncSubscriptionTheme();$$('[data-ac]').forEach(x=>{const active=x===b;x.classList.toggle('on',active);x.setAttribute('aria-pressed',String(active))})}
    else if(g('#palette-apply')){C.customA=paletteDraft.a;C.customB=paletteDraft.b;C.hue=paletteDraft.h;C.sat=paletteDraft.s;C.lum=paletteDraft.l;C.accent='custom';apply();syncSubscriptionTheme();render(1);toast('Палитра применена')}
    else if(g('#palette-cancel')){resetPaletteDraft();render(1)}
   else if(b=g('[data-ui]')){const prop=b.dataset.ui,value=b.dataset.value;if(prop&&value&&(prop!=='surface'||['solid','glass','raised'].includes(value))){C[prop]=value;apply();document.querySelectorAll(`[data-ui="${prop}"]`).forEach(x=>{const active=x.dataset.value===value;x.classList.toggle('on',active);x.setAttribute('aria-pressed',String(active))})}}
