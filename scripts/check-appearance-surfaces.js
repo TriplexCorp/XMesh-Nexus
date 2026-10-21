@@ -16,8 +16,8 @@ for(const [input,expected] of [['flat','solid'],['bogus','solid'],[null,'solid']
  assert.equal(normalize({surface:input}),expected,'Appearance migration failed: '+input);
 }
 assert.match(app,/prop!=='surface'\|\|\['solid','glass','raised'\]\.includes\(value\)/,'Event handler must reject removed Flat style');
-assert.match(html,/styles\.css\?v=20261021-surface-3/,'Update CSS cache key');
-assert.match(html,/app\.js\?v=20261021-surface-4/,'Update JS cache key');
+assert.match(html,/styles\.css\?v=20261021-node-action-1/,'Update CSS cache key');
+assert.match(html,/app\.js\?v=20261021-node-action-1/,'Update JS cache key');
 // The UI formerly changed C.surface but tried to call .forEach on $()
 // (one element), leaving the previous choice visibly highlighted.
 const beginning=app.indexOf("else if(b=g('[data-ui]'))");
