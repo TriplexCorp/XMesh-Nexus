@@ -23,6 +23,7 @@ const SESSION_SECONDS: i64 = 12 * 60 * 60;
 pub struct AuthUser {
     pub id: i64,
     pub username: String,
+    pub role: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -93,7 +94,7 @@ pub async fn login(
         return Err(ApiError::new(StatusCode::TOO_MANY_REQUESTS, "Слишком много попыток. Повторите вход через 15 минут."));
     }
     let row = sqlx::query(
-        "SELECT id, username, password_hash, is_active \
+        "SELECT id, username, role, password_hash, is_active \
          FROM panel_auth_users WHERE LOWER(username) = LOWER($1) LIMIT 1",
     )
     .bind(body.username.trim())
@@ -109,6 +110,7 @@ pub async fn login(
     };
     let admin_id: i64 = row.try_get("id")?;
     let username: String = row.try_get("username")?;
+    let role: String = row.try_get("role")?;
     let password_hash: String = row.try_get("password_hash")?;
     let is_active: bool = row.try_get("is_active")?;
 
@@ -159,7 +161,7 @@ pub async fn login(
     Ok((
         StatusCode::OK,
         headers,
-        Json(json!({"authenticated": true, "user": {"id": admin_id, "username": username}})),
+        Json(json!({"authenticated": true, "user": {"id": admin_id, "username": username, "role": role}})),
     ))
 }
 
@@ -257,7 +259,7 @@ pub async fn require_session(
 async fn user_from_headers(state: &AppState, headers: &HeaderMap) -> Option<AuthUser> {
     let token = cookie_token(headers)?;
     let row = sqlx::query(
-        "SELECT a.id, a.username \
+        "SELECT a.id, a.username, a.role \
          FROM panel_sessions s \
          JOIN panel_auth_users a ON a.id = s.admin_id \
          WHERE s.token_hash = $1 AND s.expires_at > NOW() AND a.is_active = TRUE",
@@ -269,6 +271,7 @@ async fn user_from_headers(state: &AppState, headers: &HeaderMap) -> Option<Auth
     Some(AuthUser {
         id: row.try_get("id").ok()?,
         username: row.try_get("username").ok()?,
+        role: row.try_get("role").ok()?,
     })
 }
 
