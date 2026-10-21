@@ -97,6 +97,14 @@ assert.match(view,/&lt;script&gt;/);
 assert.match(view,/Экспорт схемы JSON/);
 assert.match(view,/отдельном сервисе/);
 assert.match(app,/subscription:\['SUBSCRIPTION STUDIO',subscriptionStudioP\]/);
+assert.match(app,/field\(\{k:'subscriptionBrand',l:'Название подписки'/,
+ 'General Settings must have a distinct subscription name field');
+assert.match(app,/DB\.set\.subscriptionBrand\|\|''/,
+ 'Subscription name field must read the same persisted key as Studio');
+assert.match(app,/read\(\[\{k:'brand'\},\{k:'domain'\},\{k:'subscriptionBrand'\},\{k:'subscriptionDomain'\}\],f\)/,
+ 'Brand form must save both independent names and both domains');
+assert.match(view,/Название подписки/,'Studio must use the same label as General Settings');
+assert.match(rust,/\("subscriptionBrand", 80\)/,'Rust must validate saved subscription name');
 assert.match(app,/subscriptionDomain.*DB.set.subscriptionDomain/);
 assert.match(app,/api.saveSettings\(d\)/,'General settings must save both independent domains');
 assert.match(rust,/"subscriptionDomain"\s*\|\s*"subscriptionPath"/);
