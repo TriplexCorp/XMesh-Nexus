@@ -171,6 +171,15 @@ const nstat=n=>n.disabled?'DISABLED':n.state;
 const NAV=[['Обзор',[['home','home','Дашборд',1]]],['Управление',[['users','users','Пользователи',1],['squads','layers','Сквады'],['hosts','link','Хосты',1],['nodes','server','Узлы',1],['templates','file','Шаблоны'],['profiles','code','XRAY STUDIO']]],['Инструменты',[['tools','tool','Диагностика']]],['Система',[['admins','shield','Админы'],['set','sliders','Настройки']]]];
 const FLAT=NAV.flatMap(g=>g[1]);
 const swc=k=>r=>`<label class="sw"><input type="checkbox" data-tg="${k}:${r.id}" ${r.disabled?'':'checked'} aria-label="Включено"><span></span></label>`;
+const nodeRotationIPs = node => String(node?.rotationIps||'').split(/\r?\n/).map(ip=>ip.trim()).filter(Boolean);
+const nodeRotationValidate = data => {
+  const ips=nodeRotationIPs(data);
+  if(ips.length>64)return 'Можно добавить не более 64 IP-адресов.';
+  if(new Set(ips).size!==ips.length)return 'В пуле ротации есть одинаковые IP-адреса.';
+  if(ips.some(ip=>/\s/.test(ip)))return 'Введите каждый IP на отдельной строке, без порта и пробелов.';
+  if(data.rotationEnabled&&ips.length<2)return 'Для включения ротации добавьте минимум два разных IP-адреса.';
+  return '';
+};
 const ENT={
   squads:{t:'Сквады',n:'Набор инбаундов: что именно получает пользователь в подписке.',s:'id',nw:'Сквад',fs:[{k:'name',l:'Название',req:1},{k:'desc',l:'Описание'},{k:'inb',l:'Инбаунды (из профилей Xray)',t:'multi',o:tags}],
     cols:[['Название',r=>`<b>${esc(r.name)}</b><br><span class="mu">${esc(r.desc)}</span>`],['Инбаунды',r=>r.inb.map(t=>chip(esc(t),tcol(t))).join(' ')||'—'],['Пользователей',r=>DB.users.filter(u=>u.squads.includes(r.id)).length]],
@@ -178,7 +187,11 @@ const ENT={
   hosts:{t:'Хосты',n:'Точки входа, которые попадают в подписку. Порядок определяет приоритет.',s:'order',nw:'Хост',mv:1,fs:[{k:'remark',l:'Название (remark)',req:1},{k:'address',l:'Адрес',req:1},{k:'port',l:'Порт',t:'num'},{k:'tag',l:'Инбаунд',t:'sel',o:tags},{k:'sni',l:'SNI'},{k:'path',l:'Path'},{k:'sec',l:'Безопасность',t:'sel',o:['reality','tls','none']},{k:'fp',l:'Fingerprint',t:'sel',o:['chrome','firefox','safari','random']},{k:'nodes',l:'Только на узлах',t:'multi',o:()=>DB.nodes.map(n=>[n.id,n.flag+' '+n.name]),h:'Ничего не выбрано — на всех узлах'}],
     def:()=>({port:443,sec:'reality',fp:'chrome',order:DB.hosts.length+1,nodes:[]}),
     cols:[['Название',r=>`<b>${esc(r.remark)}</b>`],['Адрес',r=>`${esc(r.address)}:${r.port}`],['Инбаунд',r=>chip(esc(r.tag),tcol(r.tag))],['SNI',r=>esc(r.sni||'—')],['Узлы',r=>r.nodes.length?r.nodes.map(i=>DB.nodes.find(n=>n.id==i)?.flag).join(' '):'все'],['Вкл.',swc('hosts')]]},
-  nodes:{t:'Узлы',nw:'Узел',s:'id',fs:[{k:'name',l:'Название',req:1},{k:'flag',l:'Страна и флаг',t:'country'},{k:'addr',l:'Адрес',req:1},{k:'port',l:'Порт ноды',t:'num',req:1},{k:'profileId',l:'XRAY STUDIO',t:'sel',o:()=>DB.profiles.map(p=>[p.id,p.name])},{k:'mult',l:'Коэффициент трафика',t:'num',h:'1 — без изменений, 2 — считать вдвое'},{k:'limit',l:'Лимит трафика, ГБ',t:'num',h:'0 — без лимита'},{k:'resetDay',l:'День сброса счётчика',t:'num'}],def:()=>({flag:'',mult:1,limit:0,resetDay:1}),
+  nodes:{t:'Узлы',nw:'Узел',s:'id',fs:[{k:'name',l:'Название',req:1},{k:'flag',l:'Страна и флаг',t:'country'},{k:'addr',l:'Адрес',req:1},{k:'port',l:'Порт ноды',t:'num',req:1},{k:'profileId',l:'XRAY STUDIO',t:'sel',o:()=>DB.profiles.map(p=>[p.id,p.name])},{k:'mult',l:'Коэффициент трафика',t:'num',h:'1 — без изменений, 2 — считать вдвое'},{k:'limit',l:'Лимит трафика, ГБ',t:'num',h:'0 — без лимита'},{k:'resetDay',l:'День сброса счётчика',t:'num'},
+    {k:'rotationEnabled',l:'Ротация IP-адресов',t:'bool',h:'При каждом запросе генератора подписки выбирается следующий адрес из пула.'},
+    {k:'rotationIps',l:'Пул внешних IP-адресов',t:'area',rows:7,h:'Один IPv4 или IPv6 на строку. Добавляйте только IP, реально назначенные VPS и доступные клиентам. До 64 адресов. Основной адрес узла остаётся прежним.'}],
+    def:()=>({flag:'',mult:1,limit:0,resetDay:1,rotationEnabled:false,rotationIps:''}),
+    chk:nodeRotationValidate,
     guard:r=>DB.hosts.some(h=>h.nodes.includes(r.id))?'Узел указан в хостах. Уберите его оттуда.':''},
   tpls:{t:'Шаблоны пользователей',n:'Готовые тарифы: выбираются при создании и подставляют лимиты, срок и доступ.',s:'id',nw:'Шаблон',fs:[{k:'name',l:'Название',req:1},{k:'limit',l:'Лимит, ГБ',t:'num',h:'0 — без лимита'},{k:'days',l:'Срок, дней',t:'num',h:'0 — бессрочно'},{k:'strategy',l:'Сброс трафика',t:'sel',o:STRAT},{k:'hwid',l:'Лимит устройств',t:'num'},{k:'squads',l:'Сквады',t:'multi',o:()=>DB.squads.map(s=>[s.id,s.name])},{k:'hold',l:'Отсчёт срока с первого подключения',t:'bool'}],def:()=>({strategy:'NO_RESET',hwid:2,squads:[]}),
     cols:[['Название',r=>`<b>${esc(r.name)}</b>`],['Трафик',r=>r.limit?r.limit+' ГБ':'∞'],['Срок',r=>r.days?r.days+' дн':'∞'],['Устройств',r=>r.hwid],['Сквады',r=>r.squads.map(i=>chip(esc(DB.squads.find(s=>s.id==i)?.name||'?'),'--b')).join(' ')],['Режим',r=>r.hold?chip('on hold','--c3'):'—']]},
@@ -1758,6 +1771,7 @@ async function nodesP(){
     const ss=nstat(n),p=DB.profiles.find(x=>x.id==n.profileId),l=LV[n.id]||{cpu:null,ram:null,mbps:null},k=n.limit?cl(n.used/n.limit,0,1):0,tc=k>.9?'--er':k>.75?'--wr':'--c3';
     return `<div class="card nc${n.disabled?' off':''}"><div class="h"><span class="fg">${flagView(n.flag)}</span><div><b>${esc(n.name)}</b><br><small class="mu">${esc(n.addr)}${n.port?':'+esc(n.port):''}</small></div>${chip(NS[ss]?.[0]||'Не проверен',NS[ss]?.[1]||'--mu')}</div>
       <div class="kvg"><div><span>Активные пользователи</span><b>${s.nodeOn[n.id]??0}</b></div><div><span>XRAY STUDIO</span>${esc(p?.name||'—')}</div></div>
+      <div class="node-ip-rotation" aria-label="IP-ротация"><span class="node-ip-indicator" aria-hidden="true"></span><span>${n.rotationEnabled?'IP-ротация · '+nodeRotationIPs(n).length+' адресов':'IP-ротация отключена'}</span></div>
       <div class="node-gauges">
         ${nodeGauge(n,'cpu-'+n.id,'CPU',Number.isFinite(l.cpu)?l.cpu:0,Number.isFinite(l.cpu)?Math.round(l.cpu)+'%':'—',Number.isFinite(l.cpu)?'загрузка':'нет данных','--a')}
         ${nodeGauge(n,'ram-'+n.id,'RAM',Number.isFinite(l.ram)?l.ram:0,Number.isFinite(l.ram)?Math.round(l.ram)+'%':'—',Number.isFinite(l.ram)?'занято':'нет данных','--b')}
