@@ -91,6 +91,35 @@ assert.match(app,/paletteDraft\.a=hslHex/,'Hue slider must modify draft instead 
 assert.match(app,/class="palette-preset/,'Curated color options must have labelled preview tiles');
 for(const name of ['sapphire','teal','coral','indigo','copper','glacier','graphite'])
  assert(css.includes('[data-accent='+name+']'),'Curated theme missing '+name);
+// Confirm custom colors without triggering the browser-native color selector.
+const customMarkup=app.slice(app.indexOf('async function setP()'),app.indexOf('/* ================= ПАЛИТРА КОМАНД'));
+assert.doesNotMatch(customMarkup,/<input type="color"/,'Native color popup must be absent');
+assert.match(customMarkup,/class="palette-hex-fields"/,'Custom palette must offer HEX inputs');
+assert(css.includes('.appearance-layout .color-slider-grid{display:grid;'),
+ 'HSL rows must not be overridden by generic card flex rules');
+const colorCode=app.slice(app.indexOf('const updatePaletteColor='),app.indexOf('const brand=()=>'));
+assert(colorCode.startsWith('const updatePaletteColor='));
+let previewCount=0;
+const draft={a:'#112233',b:'#445566',h:0,s:0,l:0};
+const updateHex=new Function('paletteDraft','paletteHsl','paintPaletteDraft',
+ colorCode+'return updatePaletteColor;')(draft,()=>({h:150,s:55,l:66}),()=>{previewCount++});
+const classes=new Set(),attrs={};
+const control={id:'custom-a',value:'#ABC',classList:{
+ toggle:(name,active)=>active?classes.add(name):classes.delete(name)
+},setAttribute:(key,value)=>{attrs[key]=value}};
+assert.equal(updateHex(control),true);
+assert.equal(draft.a,'#112233','Partial HEX must not be applied');
+assert.equal(previewCount,0,'Incomplete input must not repaint theme');
+assert.equal(attrs['aria-invalid'],'true');
+control.value='#abcdef';
+assert.equal(updateHex(control),true);
+assert.equal(draft.a,'#ABCDEF');
+assert.equal(previewCount,1);
+assert.equal(attrs['aria-invalid'],'false');
+control.id='custom-b';control.value='13579b';
+updateHex(control);
+assert.equal(draft.b,'#13579B');
+assert.equal(draft.a,'#ABCDEF','Second color must not modify first');
 // Appearance uses two balanced columns and the locale selector is global.
 assert.match(app,/<div class="appearance-layout">/,'Aligned appearance workspace must exist');
 assert.match(app,/appearance-column/,'Appearance cards must use two columns');
