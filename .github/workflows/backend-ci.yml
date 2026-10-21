@@ -52,6 +52,8 @@ jobs:
         run: node scripts/check-node-create-action.js
       - name: Check responsive Nodes grid and density buttons
         run: node scripts/check-node-grid-layout.js
+      - name: Check Nodes IP rotation and Rust resolver integration
+        run: node scripts/check-node-ip-rotation.js
       - name: Check shared Studio theme and CSS structure
         run: node scripts/check-studio-theme.js
       - name: Check modal settings editor
