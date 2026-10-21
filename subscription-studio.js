@@ -36,11 +36,11 @@ window.XMeshSubscriptionStudio = (() => {
   const defaultClients = Object.freeze(Object.fromEntries(clientCatalog.map(([key],index)=>[key,index<7])));
   const validHttps = value => {
     if(!value)return true;
-    if(value.length>512||/[\s\\]/.test(value)||!value.startsWith('https://'))return false;
-    try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password&&!u.port&&
-      u.hostname && !u.hash && !u.hostname.includes(':') && !u.hostname.endsWith('.') &&
-      u.hostname.split('.').every(s=>/^[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?$/i.test(s));
-    }catch(_){return false}
+    if(value.length>512||/[^\x21-\x7e]/.test(value)||value.includes('\\')||
+       value.includes('#')||!value.startsWith('https://'))return false;
+    const authority=value.slice(8).split(/[/?]/,1)[0];
+    if(!authority||/[:@]/.test(authority))return false;
+    return authority.split('.').every(s=>s.length<=63&&/^[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?$/i.test(s));
   };
   const themeColors = {
     dark:{subscriptionBackground:'#0c131b',subscriptionCardColor:'#15212b',subscriptionTextColor:'#ecf3f6'},
