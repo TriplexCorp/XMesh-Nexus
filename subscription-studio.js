@@ -12,6 +12,7 @@ window.XMeshSubscriptionStudio = (() => {
     subscriptionLayout:'standard',subscriptionCardStyle:'soft',subscriptionFont:'system',subscriptionRadius:16,
     subscriptionHero:'',subscriptionCta:'',subscriptionLogoUrl:'',subscriptionSupportLabel:'Поддержка',
     subscriptionSupportUrl:'',subscriptionClientLayout:'grid',
+    subscriptionAppsTitle:'',subscriptionCustomClients:[],
     subscriptionShowStatus:true,subscriptionShowApps:true,subscriptionShowQr:true,
     subscriptionShowCopy:true,subscriptionShowSupport:false,subscriptionShowDevices:false
   };
@@ -34,6 +35,34 @@ window.XMeshSubscriptionStudio = (() => {
     ['clashverge','Clash Verge Rev','Windows · macOS · Linux','Компьютер']
   ]);
   const defaultClients = Object.freeze(Object.fromEntries(clientCatalog.map(([key],index)=>[key,index<7])));
+  // The control plane stores a simple, versionable catalog. No live download
+  // or deep-link generation happens here; the external delivery service will
+  // decide which client transports it can actually support.
+  const maxCustomClients=32;
+  const appsHeading = lang => lang==='en'?'Connection apps':'Приложения для подключения';
+  const nextCustomClientId = clients => {
+    const used=new Set(clients.map(x=>x.id));
+    let n=1;
+    while(used.has('custom-'+n))n++;
+    return 'custom-'+n;
+  };
+  const renderCustomClient = (client,open=false) => {
+    const name=String(client.name||'');
+    const platforms=String(client.platforms||'');
+    const url=String(client.url||'');
+    return '<div class="subscription-client-row subscription-client-custom" data-custom-client-row data-custom-client-id="'+esc(client.id)+'">'+
+      '<div class="subscription-custom-header"><label class="subscription-client-toggle" title="Показывать приложение">'+
+      '<input type="checkbox" data-custom-field="enabled" aria-label="Показывать приложение"'+(client.enabled?' checked':'')+'>'+
+      '<span class="subscription-client-symbol" data-custom-client-symbol>'+esc((name||'APP').slice(0,2))+'</span></label>'+
+      '<label class="f subscription-field subscription-custom-name"><span>Название приложения</span>'+
+      '<input type="text" data-custom-field="name" maxlength="80" required value="'+esc(name)+'" placeholder="Мой клиент" autocomplete="off" spellcheck="false"></label>'+
+      '<button type="button" class="gh sm subscription-custom-remove" data-custom-client-remove aria-label="Удалить приложение">Удалить</button></div>'+
+      '<details class="subscription-client-details"'+(open?' open':'')+'><summary>Платформы и ссылка</summary>'+
+      '<div class="subscription-custom-details">'+
+      '<label class="f subscription-field"><span>Платформы</span><input data-custom-field="platforms" type="text" maxlength="120" value="'+esc(platforms)+'" placeholder="iOS · Android · Windows" autocomplete="off" spellcheck="false"></label>'+
+      '<label class="f subscription-field"><span>HTTPS-адрес установки</span><input data-custom-field="url" type="url" maxlength="512" value="'+esc(url)+'" placeholder="https://example.com/app" autocomplete="off" spellcheck="false"><small>Необязательно. Ссылка сохраняется для будущего сервиса подписок.</small></label>'+
+      '</div></details></div>';
+  };
   const validHttps = value => {
     if(!value)return true;
     if(value.length>512||/[^\x21-\x7e]/.test(value)||value.includes('\\')||
@@ -72,6 +101,7 @@ window.XMeshSubscriptionStudio = (() => {
     for(const key of Object.keys(currentPalette))if(settings?.[key]===undefined)data[key]=currentPalette[key];
     data.subscriptionClients={...defaultClients,...(settings?.subscriptionClients||{})};
     data.subscriptionClientLinks={...(settings?.subscriptionClientLinks||{})};
+    data.subscriptionCustomClients=Array.isArray(settings?.subscriptionCustomClients)?settings.subscriptionCustomClients.slice(0,maxCustomClients):[];
 
     if(!slot.some(([id])=>id===data.subscriptionPlacement)) data.subscriptionPlacement='a';
     if(!slot.some(([id])=>id===data.nodePlacement)) data.nodePlacement='a';
@@ -156,6 +186,7 @@ window.XMeshSubscriptionStudio = (() => {
       '</div></section>',
       '<section class="card subscription-studio-section">',
       '<div class="subscription-studio-heading"><span>05</span><div><h3>Клиентские приложения</h3><p>Выбирайте, какие программы показать пользователю, и задавайте собственные ссылки на установку.</p></div></div>',
+      field('subscriptionAppsTitle','Заголовок раздела приложений',data.subscriptionAppsTitle,'Оставьте пустым, чтобы использовать стандартный заголовок на языке клиента.',{placeholder:'Приложения для подключения',max:80}),
       '<div class="subscription-studio-toolbar"><span class="subscription-client-counter" data-subscription-client-count>—</span><div class="subscription-client-actions">',
       '<button type="button" class="gh sm" data-client-preset="all">Включить все</button>',
       '<button type="button" class="gh sm" data-client-preset="none">Отключить все</button>',
@@ -166,6 +197,8 @@ window.XMeshSubscriptionStudio = (() => {
         '<div class="subscription-client-row" data-client-row="'+key+'"><label class="subscription-client-toggle"><input type="checkbox" name="subClient_'+key+'"'+(data.subscriptionClients[key]?' checked':'')+'><span class="subscription-client-symbol">'+esc(label.slice(0,2))+'</span><span class="subscription-client-name"><b>'+esc(label)+'</b><small>'+esc(platform)+'</small></span></label>'+
         '<details class="subscription-client-details"><summary>Ссылка</summary><label class="f subscription-field"><span>HTTPS-адрес установки</span><input name="subClientLink_'+key+'" type="url" maxlength="512" value="'+esc(data.subscriptionClientLinks[key]||'')+'" placeholder="https://example.com/app" autocomplete="off" spellcheck="false"><small>Необязательно. Адрес не подставляется автоматически.</small></label></details></div>'
       ).join('')+'</div>',
+      '<div class="subscription-custom-toolbar"><div><b>Свои приложения</b><small>Собственные названия, платформы и адреса установки</small></div><button type="button" class="gh sm" data-custom-client-add>+ Добавить приложение</button></div>',
+      '<div class="subscription-client-editor" data-custom-client-editor>'+data.subscriptionCustomClients.map(client=>renderCustomClient(client)).join('')+'</div>',
       '<p class="subscription-preview-caption">Это настройки каталога для будущего отдельного Subscription Service. Включение приложения не гарантирует совместимость конкретного формата конфигурации — она будет определяться генератором подписок.</p>',
       '</section></div>',
       '<aside class="subscription-studio-side">',
@@ -179,7 +212,7 @@ window.XMeshSubscriptionStudio = (() => {
       '</div>',
       '<div class="subscription-preview-cta" data-subscription-connect></div>',
       '<div class="subscription-preview-quick" data-subscription-quick><span data-subscription-copy>Копировать ссылку</span><span data-subscription-qr>QR</span><span data-subscription-devices>Устройства</span></div>',
-      '<section class="subscription-preview-apps" data-subscription-apps><header>Приложения для подключения</header><div data-subscription-app-list></div></section>',
+      '<section class="subscription-preview-apps" data-subscription-apps><header data-subscription-apps-title>Приложения для подключения</header><div data-subscription-app-list></div></section>',
       '<div class="subscription-preview-support" data-subscription-support></div>',
       '<footer data-subscription-footer></footer></div>',
       '<div class="subscription-studio-stats"><div><small>Пользователей</small><b>'+esc(counts.users)+'</b></div><div><small>Узлов</small><b>'+esc(counts.nodes)+'</b></div></div>',
@@ -190,6 +223,14 @@ window.XMeshSubscriptionStudio = (() => {
       const form=document.getElementById('subscription-studio-form');
       if(!form)return;
       const $ = s=>form.querySelector(s);
+      const customRows=()=>[...form.querySelectorAll('[data-custom-client-row]')];
+      const readCustomClients=()=>customRows().map(row=>({
+        id:row.dataset.customClientId,
+        name:row.querySelector('[data-custom-field="name"]').value.trim(),
+        platforms:row.querySelector('[data-custom-field="platforms"]').value.trim(),
+        url:row.querySelector('[data-custom-field="url"]').value.trim(),
+        enabled:row.querySelector('[data-custom-field="enabled"]').checked
+      }));
       const read = () => ({
         subscriptionDomain:input(form,'subscriptionDomain').value.trim().toLowerCase(),
         subscriptionPath:input(form,'subscriptionPath').value.trim(),
@@ -218,6 +259,8 @@ window.XMeshSubscriptionStudio = (() => {
         subscriptionSupportLabel:input(form,'subscriptionSupportLabel').value.trim(),
         subscriptionSupportUrl:input(form,'subscriptionSupportUrl').value.trim(),
         subscriptionClientLayout:input(form,'subscriptionClientLayout').value,
+        subscriptionAppsTitle:input(form,'subscriptionAppsTitle').value.trim(),
+        subscriptionCustomClients:readCustomClients(),
         subscriptionShowStatus:input(form,'subscriptionShowStatus').checked,
         subscriptionShowApps:input(form,'subscriptionShowApps').checked,
         subscriptionShowQr:input(form,'subscriptionShowQr').checked,
@@ -271,11 +314,14 @@ window.XMeshSubscriptionStudio = (() => {
         $('[data-subscription-devices]').hidden=!d.subscriptionShowDevices;
         quick.hidden=!(d.subscriptionShowCopy||d.subscriptionShowQr||d.subscriptionShowDevices);
         const enabled=clientCatalog.filter(([id])=>d.subscriptionClients[id]);
-        $('[data-subscription-client-count]').textContent='Активно: '+enabled.length+' из '+clientCatalog.length;
+        const customEnabled=d.subscriptionCustomClients.filter(client=>client.enabled&&client.name);
+        const allEnabled=[...enabled,...customEnabled.map(client=>[client.id,client.name,client.platforms])];
+        $('[data-subscription-client-count]').textContent='Активно: '+allEnabled.length+' из '+(clientCatalog.length+d.subscriptionCustomClients.length);
         const apps=$('[data-subscription-apps]');
-        apps.hidden=!d.subscriptionShowApps||!enabled.length;
+        apps.hidden=!d.subscriptionShowApps||!allEnabled.length;
+        $('[data-subscription-apps-title]').textContent=d.subscriptionAppsTitle||appsHeading(d.subscriptionLanguage);
         apps.dataset.clientLayout=d.subscriptionClientLayout;
-        $('[data-subscription-app-list]').innerHTML=enabled.map(([id,label,platform])=>
+        $('[data-subscription-app-list]').innerHTML=allEnabled.map(([id,label,platform])=>
           '<div class="subscription-preview-app"><span>'+esc(label.slice(0,2))+'</span><div><b>'+esc(label)+'</b><small>'+esc(platform)+'</small></div></div>'
         ).join('');
         const support=$('[data-subscription-support]');
@@ -301,11 +347,35 @@ window.XMeshSubscriptionStudio = (() => {
         }
         draw();
       });
+      $('[data-custom-client-add]').addEventListener('click',()=>{
+        const current=readCustomClients();
+        if(current.length>=maxCustomClients){notify('Можно добавить не более 32 своих приложений.');return;}
+        const client={id:nextCustomClientId(current),name:'',platforms:'',url:'',enabled:true};
+        const editor=$('[data-custom-client-editor]');
+        editor.insertAdjacentHTML('beforeend',renderCustomClient(client,true));
+        const added=editor.lastElementChild;
+        added.querySelector('[data-custom-field="name"]').focus();
+        draw();
+      });
+      $('[data-custom-client-editor]').addEventListener('click',event=>{
+        const button=event.target.closest('[data-custom-client-remove]');
+        if(!button)return;
+        button.closest('[data-custom-client-row]').remove();
+        draw();
+      });
+      $('[data-custom-client-editor]').addEventListener('input',event=>{
+        if(!event.target.matches('[data-custom-field="name"]'))return;
+        const row=event.target.closest('[data-custom-client-row]');
+        row.querySelector('[data-custom-client-symbol]').textContent=(event.target.value||'APP').slice(0,2);
+      });
       form.querySelectorAll('[data-client-preset]').forEach(button=>button.addEventListener('click',()=>{
         const mode=button.dataset.clientPreset;
         for(const [id] of clientCatalog){
           input(form,'subClient_'+id).checked=mode==='all'||(mode==='default'&&defaultClients[id]);
         }
+        if(mode!=='default')customRows().forEach(row=>{
+          row.querySelector('[data-custom-field="enabled"]').checked=mode==='all';
+        });
         draw();
       }));
       form.addEventListener('submit',async event=>{
@@ -320,6 +390,19 @@ window.XMeshSubscriptionStudio = (() => {
         }
         for(const [id,url] of Object.entries(draft.subscriptionClientLinks)){
           if(!validHttps(url)){notify('Некорректная ссылка для '+id+'. Используйте HTTPS.');return;}
+        }
+        if(draft.subscriptionAppsTitle.length>80||/[\u0000-\u001f\u007f]/.test(draft.subscriptionAppsTitle)){
+          notify('Заголовок приложений должен быть короче 80 символов.');return;
+        }
+        if(draft.subscriptionCustomClients.length>maxCustomClients){
+          notify('Не более 32 своих приложений.');return;
+        }
+        for(const client of draft.subscriptionCustomClients){
+          if(!client.name||[...client.name].length>80||[...client.platforms].length>120||
+             /[\u0000-\u001f\u007f]/.test(client.name+client.platforms)){
+            notify('Заполните название приложения (до 80 символов) и проверьте платформы.');return;
+          }
+          if(!validHttps(client.url)){notify('Некорректная HTTPS-ссылка для '+client.name);return;}
         }
         for(const key of ['subscriptionHero','subscriptionCta','subscriptionSupportLabel']){
           if(/[\u0000-\u001f\u007f]/.test(draft[key])){notify('Заголовки не должны содержать управляющих символов.');return;}
@@ -344,5 +427,5 @@ window.XMeshSubscriptionStudio = (() => {
     };
     return [markup,mount];
   }
-  return {create,defaults,hostnameOK,pathOK,clientCatalog,validHttps};
+  return {create,defaults,hostnameOK,pathOK,clientCatalog,validHttps,renderCustomClient,nextCustomClientId,maxCustomClients,appsHeading};
 })();
