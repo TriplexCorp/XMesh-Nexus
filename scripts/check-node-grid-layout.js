@@ -24,7 +24,16 @@ assert(columns.includes('.nodes-page>.nodes[data-node-count="3"][data-grid-mode=
 for(const mode of ['compact','spacious']){
  assert(css.includes('.nodes-page>.nodes[data-grid-mode='+mode+']>.nc{'),'Density must affect cards, not only grid columns');
 }
-assert.match(html,/styles\.css\?v=20261021-node-grid-1/);
+// Low node counts must still have three visually distinct density choices.
+for(const [mode,width] of [['compact',22],['standard',30],['spacious',40]]){
+ assert.match(css,new RegExp('\\\\.nodes-page>\\\\.nodes\\\\[data-node-count="1"\\\\]\\\\[data-grid-mode='+mode+'\\\\]\\\\{\\\\s*grid-template-columns:minmax\\\\\\(0,'+width+'rem\\\\\\);'),
+  'One node must show a different card width for '+mode);
+}
+assert.match(css,/data-node-count="2"\\]\\[data-grid-mode=spacious\\]\\{\\s*grid-template-columns:minmax\\(0,min\\(100%,40rem\\)\\)/,
+ 'Two nodes need a spacious single-column layout');
+assert.match(css,/data-node-count="3"\\]\\[data-grid-mode=standard\\]\\{\\s*grid-template-columns:repeat\\(2,minmax\\(0,1fr\\)\\)/,
+ 'Three nodes must display fewer standard columns than compact columns');
+assert.match(html,/styles\\.css\\?v=20261021-node-grid-2/);
 assert.match(html,/app\.js\?v=20261021-node-grid-1/);
 assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length,'CSS brace balance');
 new Function(app);
