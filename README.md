@@ -196,6 +196,23 @@ planning example; actual nodes stay managed individually under **Nodes**.
 Optional descriptions of servers B/C and the complete blueprint can be exported
 as JSON for later integration.
 
+The **portal designer** also supports independent layout, card treatment, font,
+corner radius, background/card/text colors, optional HTTPS logo, heading/CTA
+copy, support link, and switches for status, applications, QR placeholder,
+copy-link button, devices and support blocks. Changes appear in a **demo-only
+live preview** before saving.
+
+**Application directory:** The admin may independently enable/disable Happ,
+Incy, v2rayTun, v2rayN, v2rayNG, Streisand, Hiddify, NekoBox, Shadowrocket,
+FlClash, Stash, sing-box, V2Box, Loon, Mihomo Party, and Clash Verge Rev.
+Optional per-app HTTPS installation links are stored in PostgreSQL with the
+portal blueprint; the panel does not hardcode vendor URLs, download packages,
+execute deep links, or assert that an app supports every transport. An empty
+selection is allowed and hides the preview directory. Future subscription
+runtime implementations should consume these settings through authenticated
+integration, validate links on their side, and implement client-specific
+subscription formats separately.
+
 **Repository boundaries:** This repository contains the control plane only.
 The public subscription service (with token verification, subscription output,
 client-side portal, and future per-user IP rotation integration) and the
