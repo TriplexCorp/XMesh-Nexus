@@ -57,8 +57,8 @@ assert.match(panel,/\['security','shield-check','Безопасность'\]/,
  'Account security must have a visible sidebar entry');
 assert.match(panel,/security:\['Безопасность',securityP\]/,
  'Security section must route to dedicated MFA workspace');
-assert.match(panel,/href="#security"/,
- 'General settings must link directly to account security');
+assert.doesNotMatch(panel,/href="#security"/,
+ 'Account security must exist only on its dedicated page, not in general settings');
 assert.match(panel,/function securityP\(\)/,
  'A dedicated account security page must exist');
 assert.doesNotMatch(panel,/window\.XMeshMfa\?\.panel\(\)\|\|''/,
