@@ -524,7 +524,7 @@ async fn patch_settings(
         }
     }
     for (key, choices) in [
-        ("subscriptionLanguage", &["ru", "en", "tr", "vi"][..]),
+        ("subscriptionLanguage", &["ru", "en"][..]),
         ("subscriptionTheme", &["dark", "light"][..]),
         ("subscriptionPlacement", &["a", "b", "c"][..]),
         ("nodePlacement", &["a", "b", "c"][..]),
