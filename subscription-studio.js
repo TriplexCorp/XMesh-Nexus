@@ -7,7 +7,44 @@ window.XMeshSubscriptionStudio = (() => {
     subscriptionBrand:'', subscriptionDescription:'Настройки подключения и информация о подписке.',
     subscriptionFooter:'', subscriptionAccent:'#e8bb78', subscriptionLanguage:'ru', subscriptionTheme:'dark',
     subscriptionShowTraffic:true, subscriptionShowExpiry:true,
-    subscriptionPlacement:'a', nodePlacement:'a', deploymentServerB:'', deploymentServerC:''
+    subscriptionPlacement:'a', nodePlacement:'a', deploymentServerB:'', deploymentServerC:'',
+    subscriptionBackground:'#0c131b',subscriptionCardColor:'#15212b',subscriptionTextColor:'#ecf3f6',
+    subscriptionLayout:'standard',subscriptionCardStyle:'soft',subscriptionFont:'system',subscriptionRadius:16,
+    subscriptionHero:'',subscriptionCta:'',subscriptionLogoUrl:'',subscriptionSupportLabel:'Поддержка',
+    subscriptionSupportUrl:'',subscriptionClientLayout:'grid',
+    subscriptionShowStatus:true,subscriptionShowApps:true,subscriptionShowQr:true,
+    subscriptionShowCopy:true,subscriptionShowSupport:false,subscriptionShowDevices:false
+  };
+  const clientCatalog = Object.freeze([
+    ['happ','Happ','iOS · Android · Windows · macOS','Универсальные'],
+    ['incy','Incy','iOS · Android','Универсальные'],
+    ['v2raytun','v2rayTun','iOS · Android','Мобильные'],
+    ['v2rayn','v2rayN','Windows · Linux · macOS','Компьютер'],
+    ['v2rayng','v2rayNG','Android','Мобильные'],
+    ['streisand','Streisand','iOS','Мобильные'],
+    ['hiddify','Hiddify','iOS · Android · Windows · macOS · Linux','Универсальные'],
+    ['nekobox','NekoBox','Android','Мобильные'],
+    ['shadowrocket','Shadowrocket','iOS','Мобильные'],
+    ['flclash','FlClash','Windows · macOS · Linux · Android','Универсальные'],
+    ['stash','Stash','iOS','Мобильные'],
+    ['singbox','sing-box','iOS · Android · Desktop','Универсальные'],
+    ['v2box','V2Box','iOS · Android','Мобильные'],
+    ['loon','Loon','iOS','Мобильные'],
+    ['mihomo','Mihomo Party','Desktop','Компьютер'],
+    ['clashverge','Clash Verge Rev','Windows · macOS · Linux','Компьютер']
+  ]);
+  const defaultClients = Object.freeze(Object.fromEntries(clientCatalog.map(([key],index)=>[key,index<7])));
+  const validHttps = value => {
+    if(!value)return true;
+    if(value.length>512||/[\s\\]/.test(value)||!value.startsWith('https://'))return false;
+    try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password&&!u.port&&
+      u.hostname && !u.hash && !u.hostname.includes(':') && !u.hostname.endsWith('.') &&
+      u.hostname.split('.').every(s=>/^[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?$/i.test(s));
+    }catch(_){return false}
+  };
+  const themeColors = {
+    dark:{subscriptionBackground:'#0c131b',subscriptionCardColor:'#15212b',subscriptionTextColor:'#ecf3f6'},
+    light:{subscriptionBackground:'#f5f6f8',subscriptionCardColor:'#ffffff',subscriptionTextColor:'#19232d'}
   };
   const esc = x => String(x ?? '').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const hostnameOK = v => !v || (v.length <= 253 && /^[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?)*$/i.test(v));
@@ -31,6 +68,11 @@ window.XMeshSubscriptionStudio = (() => {
   const input = (form,name) => form.elements.namedItem(name);
   function create(settings,save,notify,counts) {
     const data = {...defaults,...settings};
+    const currentPalette=themeColors[data.subscriptionTheme]||themeColors.dark;
+    for(const key of Object.keys(currentPalette))if(settings?.[key]===undefined)data[key]=currentPalette[key];
+    data.subscriptionClients={...defaultClients,...(settings?.subscriptionClients||{})};
+    data.subscriptionClientLinks={...(settings?.subscriptionClientLinks||{})};
+
     if(!slot.some(([id])=>id===data.subscriptionPlacement)) data.subscriptionPlacement='a';
     if(!slot.some(([id])=>id===data.nodePlacement)) data.nodePlacement='a';
     const markup = [
