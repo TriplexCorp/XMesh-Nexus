@@ -51,6 +51,7 @@ const P={
   key:'<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6M15.5 7.5l3 3L22 7l-3-3"/>',
   lock:'<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
   globe:'<circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10Z"/>',
+  languages:'<path d="m5 8 6 6"/><path d="m4 14 6-6 2-3H2"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/>',
   terminal:'<rect x="2" y="3" width="20" height="18" rx="2"/><path d="m7 9 3 3-3 3m6 0h4"/>',
   sparkles:'<path d="m12 3 1.9 5.6L19.5 10.5l-5.6 1.9L12 18l-1.9-5.6-5.6-1.9 5.6-1.9L12 3ZM19 17l.7 2.3L22 20l-2.3.7L19 23l-.7-2.3L16 20l2.3-.7L19 17Z"/>'
 };
@@ -2235,7 +2236,10 @@ document.addEventListener('change',e=>{
 function syncTopLanguage(){
   const selected=window.XMeshI18n?.getLanguage()==='en'?'en':'ru';
   const trigger=$('#language-trigger');
-  if(trigger)trigger.innerHTML=ic('globe')+'<span class="top-language-label">'+selected.toUpperCase()+'</span>'+ic('down');
+  if(trigger){
+    trigger.innerHTML=ic('languages')+'<span class="top-language-label">'+selected.toUpperCase()+'</span>'+ic('down');
+    trigger.setAttribute('aria-label',selected==='en'?'Interface language':'Язык интерфейса');
+  }
   document.querySelectorAll('#language-menu [data-panel-language]').forEach(button=>{
     const active=button.dataset.panelLanguage===selected;
     button.classList.toggle('on',active);
