@@ -120,16 +120,19 @@ pub async fn enabled(state: &AppState, id: i64) -> Result<bool, ApiError> {
     Ok(sqlx::query_scalar::<_, bool>("SELECT enabled FROM panel_totp WHERE admin_id=$1")
         .bind(id).fetch_optional(&state.pool).await?.unwrap_or(false))
 }
-pub async fn new_challenge(state: &AppState, id: i64) -> Result<String, ApiError> {
-    // A missing encryption key is never allowed to bypass an enabled factor.
+pub async fn new_challenge_in_transaction(
+    state:&AppState,
+    tx:&mut sqlx::Transaction<'_,sqlx::Postgres>,
+    id:i64,
+)->Result<String,ApiError> {
+    // Account lock is held by the caller; changing a password cannot
+    // revoke a challenge before this insertion finishes.
     let _=cipher(state)?;
     let challenge=format!("{}{}",Uuid::new_v4().simple(),Uuid::new_v4().simple());
-    let mut tx=state.pool.begin().await?;
     sqlx::query("DELETE FROM panel_mfa_challenges WHERE admin_id=$1 OR expires_at<NOW()")
-        .bind(id).execute(&mut *tx).await?;
+        .bind(id).execute(&mut **tx).await?;
     sqlx::query("INSERT INTO panel_mfa_challenges (token_hash,admin_id,expires_at) VALUES ($1,$2,NOW()+INTERVAL '5 minutes')")
-        .bind(hash(&challenge)).bind(id).execute(&mut *tx).await?;
-    tx.commit().await?;
+        .bind(hash(&challenge)).bind(id).execute(&mut **tx).await?;
     Ok(challenge)
 }
 pub async fn status(State(state): State<AppState>,Extension(actor): Extension<AuthUser>)
@@ -158,6 +161,18 @@ pub async fn setup(State(state): State<AppState>,Extension(actor): Extension<Aut
 pub async fn confirm(State(state): State<AppState>,Extension(actor): Extension<AuthUser>,
     headers:HeaderMap,Json(body):Json<CodeRequest>) -> Result<Json<Value>,ApiError> {
     let mut tx=state.pool.begin().await?;
+    // Lock the account before the TOTP record, and recheck that this session
+    // has not already been revoked by a password or role change.
+    let active=sqlx::query("SELECT id FROM panel_auth_users WHERE id=$1 AND is_active=TRUE FOR UPDATE")
+        .bind(actor.id).fetch_optional(&mut *tx).await?;
+    let live=if let Some(token_hash)=auth::session_token_hash(&headers) {
+        sqlx::query_scalar::<_,bool>(
+            "SELECT EXISTS(SELECT 1 FROM panel_sessions WHERE admin_id=$1 AND token_hash=$2 AND expires_at>NOW())"
+        ).bind(actor.id).bind(token_hash).fetch_one(&mut *tx).await?
+    } else {false};
+    if active.is_none() || !live {
+        return Err(err(StatusCode::UNAUTHORIZED,"Сессия истекла. Войдите снова."));
+    }
     let row=sqlx::query("SELECT secret_encrypted,enabled,setup_attempts FROM panel_totp \
           WHERE admin_id=$1 AND (pending_expires_at>NOW()) FOR UPDATE")
         .bind(actor.id).fetch_optional(&mut *tx).await?
@@ -199,6 +214,16 @@ pub async fn disable(State(state): State<AppState>,Extension(actor): Extension<A
     headers:HeaderMap,Json(body):Json<DisableRequest>) -> Result<Json<Value>,ApiError> {
     guarded_password(&state,actor.id,&body.password).await?;
     let mut tx=state.pool.begin().await?;
+    let active=sqlx::query("SELECT id FROM panel_auth_users WHERE id=$1 AND is_active=TRUE FOR UPDATE")
+        .bind(actor.id).fetch_optional(&mut *tx).await?;
+    let live=if let Some(token_hash)=auth::session_token_hash(&headers) {
+        sqlx::query_scalar::<_,bool>(
+            "SELECT EXISTS(SELECT 1 FROM panel_sessions WHERE admin_id=$1 AND token_hash=$2 AND expires_at>NOW())"
+        ).bind(actor.id).bind(token_hash).fetch_one(&mut *tx).await?
+    } else {false};
+    if active.is_none() || !live || !password_is_valid(&state,actor.id,&body.password).await? {
+        return Err(err(StatusCode::UNAUTHORIZED,"Учётная запись изменилась. Войдите снова."));
+    }
     let row=sqlx::query("SELECT secret_encrypted,last_used_step FROM panel_totp \
       WHERE admin_id=$1 AND enabled=TRUE FOR UPDATE").bind(actor.id)
       .fetch_optional(&mut *tx).await?
@@ -228,40 +253,55 @@ pub async fn disable(State(state): State<AppState>,Extension(actor): Extension<A
     super::audit(&state.pool,&actor.username,"mfa.disabled",None,None,json!({})).await;
     Ok(Json(json!({"enabled":false})))
 }
-pub async fn verify_challenge(State(state): State<AppState>,
+pub async fn verify_challenge(State(state):State<AppState>,
     Json(body):Json<ChallengeRequest>)
-    -> Result<(StatusCode,HeaderMap,Json<Value>),ApiError> {
-    if body.challenge.len()!=64 || !body.challenge.bytes().all(|x|x.is_ascii_hexdigit()){
+    ->Result<(StatusCode,HeaderMap,Json<Value>),ApiError> {
+    if body.challenge.len()!=64 || !body.challenge.bytes().all(|x|x.is_ascii_hexdigit()) {
         return Err(err(StatusCode::UNAUTHORIZED,INVALID_CODE));
     }
+    let token_hash=hash(&body.challenge);
     let mut tx=state.pool.begin().await?;
+    // Find the administrator without locking the challenge yet: locking the
+    // challenge before the administrator can deadlock with credential updates.
+    let id=sqlx::query_scalar::<_,i64>(
+        "SELECT admin_id FROM panel_mfa_challenges WHERE token_hash=$1 AND expires_at>NOW()"
+    ).bind(&token_hash).fetch_optional(&mut *tx).await?
+        .ok_or_else(||err(StatusCode::UNAUTHORIZED,"Подтверждение истекло. Войдите снова."))?;
+    let account=sqlx::query("SELECT username,role,is_active FROM panel_auth_users WHERE id=$1 FOR UPDATE")
+        .bind(id).fetch_optional(&mut *tx).await?
+        .ok_or_else(||err(StatusCode::UNAUTHORIZED,"Войдите снова."))?;
+    if !account.try_get::<bool,_>("is_active")? {
+        return Err(err(StatusCode::UNAUTHORIZED,"Войдите снова."));
+    }
+    // Another transaction could have revoked this challenge while we waited
+    // for the administrator lock; therefore re-check it under its own lock.
     let challenge=sqlx::query("SELECT admin_id,attempts FROM panel_mfa_challenges \
        WHERE token_hash=$1 AND expires_at>NOW() FOR UPDATE")
-       .bind(hash(&body.challenge)).fetch_optional(&mut *tx).await?
+       .bind(&token_hash).fetch_optional(&mut *tx).await?
        .ok_or_else(||err(StatusCode::UNAUTHORIZED,"Подтверждение истекло. Войдите снова."))?;
+    if challenge.try_get::<i64,_>("admin_id")?!=id {
+        return Err(err(StatusCode::UNAUTHORIZED,"Войдите снова."));
+    }
     let attempts:i32=challenge.try_get("attempts")?;
-    if attempts>=5{return Err(err(StatusCode::TOO_MANY_REQUESTS,"Слишком много попыток. Начните вход заново."));}
-    let id:i64=challenge.try_get("admin_id")?;
-    let user=sqlx::query("SELECT a.username,a.role,a.is_active,t.secret_encrypted,t.last_used_step \
-      FROM panel_auth_users a JOIN panel_totp t ON t.admin_id=a.id \
-      WHERE a.id=$1 AND t.enabled=TRUE FOR UPDATE OF t")
+    if attempts>=5 {return Err(err(StatusCode::TOO_MANY_REQUESTS,"Слишком много попыток. Начните вход заново."));}
+    let username:String=account.try_get("username")?;
+    let role:String=account.try_get("role")?;
+    let factor=sqlx::query("SELECT secret_encrypted,last_used_step FROM panel_totp \
+       WHERE admin_id=$1 AND enabled=TRUE FOR UPDATE")
        .bind(id).fetch_optional(&mut *tx).await?
        .ok_or_else(||err(StatusCode::UNAUTHORIZED,"Войдите снова."))?;
-    if !user.try_get::<bool,_>("is_active")? {return Err(err(StatusCode::UNAUTHORIZED,"Войдите снова."));}
-    let username:String=user.try_get("username")?;
-    let role:String=user.try_get("role")?;
-    let encrypted:String=user.try_get("secret_encrypted")?;
+    let encrypted:String=factor.try_get("secret_encrypted")?;
     let secret=decrypt(&state,&encrypted)?;
-    let last:i64=user.try_get("last_used_step")?;
+    let last:i64=factor.try_get("last_used_step")?;
     let step=matching_step(&secret,&body.code,last,current_seconds());
     let recovery=if step.is_none(){recovery_hash(&body.code)}else{None};
-    let valid_recovery=if let Some(ref hashed)=recovery{
+    let valid_recovery=if let Some(ref hashed)=recovery {
         sqlx::query("DELETE FROM panel_totp_recovery WHERE admin_id=$1 AND code_hash=$2 RETURNING code_hash")
             .bind(id).bind(hashed).fetch_optional(&mut *tx).await?.is_some()
     } else {false};
     if step.is_none() && !valid_recovery {
         sqlx::query("UPDATE panel_mfa_challenges SET attempts=attempts+1 WHERE token_hash=$1")
-            .bind(hash(&body.challenge)).execute(&mut *tx).await?;
+            .bind(&token_hash).execute(&mut *tx).await?;
         tx.commit().await?;
         auth::record_failed_login(&state,&username.to_ascii_lowercase()).await?;
         return Err(err(StatusCode::UNAUTHORIZED,INVALID_CODE));
@@ -272,9 +312,11 @@ pub async fn verify_challenge(State(state): State<AppState>,
     }
     sqlx::query("DELETE FROM panel_mfa_challenges WHERE admin_id=$1")
         .bind(id).execute(&mut *tx).await?;
+    // Session insertion and consumption of the one-time factor are atomic.
+    let response=auth::issue_session_in_transaction(&state,&mut tx,id,&username,&role).await?;
     tx.commit().await?;
     auth::clear_failed_login(&state,&username.to_ascii_lowercase()).await?;
-    auth::issue_session(&state,id,&username,&role).await
+    Ok(response)
 }
 #[cfg(test)]
 mod tests {

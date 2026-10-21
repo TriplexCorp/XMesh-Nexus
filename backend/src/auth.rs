@@ -124,14 +124,31 @@ pub async fn login(
         record_failed_login(&state, &username_key).await?;
         return Err(ApiError::new(StatusCode::UNAUTHORIZED, "Неверный логин или пароль."));
     }
+    // Serialize successful password authentication with account mutations.
+    // Revoking a password or role must never be followed by a stale login.
+    let mut tx=state.pool.begin().await?;
+    let current=sqlx::query(
+        "SELECT username,role,password_hash,is_active FROM panel_auth_users WHERE id=$1 FOR UPDATE"
+    ).bind(admin_id).fetch_optional(&mut *tx).await?
+        .ok_or_else(||ApiError::new(StatusCode::UNAUTHORIZED,"Войдите снова."))?;
+    let current_username:String=current.try_get("username")?;
+    let current_role:String=current.try_get("role")?;
+    let current_hash:String=current.try_get("password_hash")?;
+    let active:bool=current.try_get("is_active")?;
+    if !active || current_hash!=password_hash || current_username!=username || current_role!=role {
+        return Err(ApiError::new(StatusCode::UNAUTHORIZED,"Учётная запись изменилась. Войдите снова."));
+    }
     if crate::mfa::enabled(&state,admin_id).await? {
-        let challenge=crate::mfa::new_challenge(&state,admin_id).await?;
+        let challenge=crate::mfa::new_challenge_in_transaction(&state,&mut tx,admin_id).await?;
+        tx.commit().await?;
         return Ok((StatusCode::OK,HeaderMap::new(),Json(json!({
             "mfaRequired":true,"challenge":challenge
         }))));
     }
+    let response=issue_session_in_transaction(&state,&mut tx,admin_id,&username,&role).await?;
+    tx.commit().await?;
     clear_failed_login(&state,&username_key).await?;
-    issue_session(&state,admin_id,&username,&role).await
+    Ok(response)
 }
 
 pub(crate) async fn is_rate_limited(state:&AppState,username_key:&str)->Result<bool,ApiError>{
@@ -158,13 +175,15 @@ pub(crate) async fn clear_failed_login(state:&AppState,username_key:&str)->Resul
     Ok(())
 }
 
-pub(crate) async fn issue_session(
-    state:&AppState,admin_id:i64,username:&str,role:&str,
+pub(crate) async fn issue_session_in_transaction(
+    state:&AppState,
+    tx:&mut sqlx::Transaction<'_,sqlx::Postgres>,
+    admin_id:i64,username:&str,role:&str,
 )->Result<(StatusCode,HeaderMap,Json<Value>),ApiError>{
     let token = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
     let token_hash = hash_token(&token);
     sqlx::query("DELETE FROM panel_sessions WHERE expires_at < NOW()")
-        .execute(&state.pool)
+        .execute(&mut **tx)
         .await?;
     sqlx::query(
         "INSERT INTO panel_sessions (token_hash, admin_id, expires_at) \
@@ -172,11 +191,11 @@ pub(crate) async fn issue_session(
     )
     .bind(token_hash)
     .bind(admin_id)
-    .execute(&state.pool)
+    .execute(&mut **tx)
     .await?;
     sqlx::query("UPDATE panel_auth_users SET last_login_at = NOW() WHERE id = $1")
         .bind(admin_id)
-        .execute(&state.pool)
+        .execute(&mut **tx)
         .await?;
 
     let mut headers = HeaderMap::new();
