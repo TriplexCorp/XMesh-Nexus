@@ -124,6 +124,17 @@ pub async fn login(
         record_failed_login(&state, &username_key).await?;
         return Err(ApiError::new(StatusCode::UNAUTHORIZED, "Неверный логин или пароль."));
     }
+    if crate::mfa::enabled(&state,admin_id).await? {
+        let challenge=crate::mfa::new_challenge(&state,admin_id).await?;
+        return Ok((StatusCode::OK,HeaderMap::new(),Json(json!({
+            "mfaRequired":true,"challenge":challenge
+        }))));
+    }
+    clear_failed_login(&state,&username_key).await?;
+    issue_session(&state,admin_id,&username,&role).await
+}
+
+pub(crate) async fn clear_failed_login(state:&AppState,username_key:&str)->Result<(),ApiError>{
     sqlx::query("DELETE FROM auth_login_limits WHERE username_key = $1")
         .bind(&username_key)
         .execute(&state.pool)
@@ -134,6 +145,12 @@ pub async fn login(
         .query_async::<i64>(&mut redis_conn)
         .await;
 
+    Ok(())
+}
+
+pub(crate) async fn issue_session(
+    state:&AppState,admin_id:i64,username:&str,role:&str,
+)->Result<(StatusCode,HeaderMap,Json<Value>),ApiError>{
     let token = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
     let token_hash = hash_token(&token);
     sqlx::query("DELETE FROM panel_sessions WHERE expires_at < NOW()")
@@ -165,7 +182,7 @@ pub async fn login(
     ))
 }
 
-async fn record_failed_login(state: &AppState, username_key: &str) -> Result<(), ApiError> {
+pub(crate) async fn record_failed_login(state: &AppState, username_key: &str) -> Result<(), ApiError> {
     // Redis provides cross-instance throttling; PostgreSQL remains the durable fallback.
     let mut redis_conn = state.redis.clone();
     let redis_key = format!("xmesh:auth:login:{username_key}");
@@ -275,6 +292,9 @@ async fn user_from_headers(state: &AppState, headers: &HeaderMap) -> Option<Auth
     })
 }
 
+pub(crate) fn session_token_hash(headers:&HeaderMap)->Option<String>{
+    cookie_token(headers).map(|token| hash_token(&token))
+}
 fn cookie_token(headers: &HeaderMap) -> Option<String> {
     let raw = headers.get(header::COOKIE)?.to_str().ok()?;
     let value = raw
