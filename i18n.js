@@ -569,6 +569,8 @@ window.XMeshI18n=(()=>{
     ["Палитра применена","Palette applied"]
   ];
   for(const [ru,en] of curatedPaletteTranslations)dict.set(ru,en);
+  dict.set("Выберите два оттенка и проверьте предпросмотр. Сохранение — только по кнопке «Применить палитру».",
+    "Choose two colors and preview them. Save only with the Apply palette button.");
   const dynamic=[
     [/^(\d+)\s+узлов настроено\. CPU, RAM и скорость требуют подключённого мониторинга\.$/i,
       (_,n)=>n+' nodes configured. CPU, RAM, and speed require connected monitoring.'],

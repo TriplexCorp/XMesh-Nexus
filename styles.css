@@ -407,6 +407,12 @@ html[data-sidebar=compact] .app{grid-template-columns:5.7rem minmax(0,1fr)}
 .appearance-layout .setting-row .sw,.appearance-layout .setting-row #rs{justify-self:end}
 .appearance-layout .palette-swatch{flex:0 0 auto}
 
+
+/* A proper pair of color controls replaces the oversized circular inputs. */
+.appearance-layout .color-bubbles{gap:.9rem}
+.appearance-layout .color-bubble-wrap{font-weight:650;gap:.5rem}
+.appearance-layout .color-bubble{width:5rem;height:2.9rem;border-radius:.7rem;border:2px solid var(--s1);outline:1px solid var(--ln);box-shadow:inset 0 1px 0 var(--surface-highlight)}
+.appearance-layout .color-bubble:focus-within{outline:2px solid var(--a);outline-offset:2px}
 /* Shared grid rows and a compact gallery of named, coordinated color themes. */
 .appearance-layout .appearance-preset-row{grid-template-columns:minmax(0,1fr);gap:.85rem;align-items:start}
 .appearance-preset-row .setting-copy{min-width:0}
