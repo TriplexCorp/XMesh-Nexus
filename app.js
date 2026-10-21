@@ -133,7 +133,7 @@ else {
   DB.set={brand:'XMesh Nexus',domain:'',hooks:{...defaultHooks,...(DB.set?.hooks||{})},...(DB.set||{})};
   DB.set.hooks={...defaultHooks,...(DB.set?.hooks||{})};
 }
-let sv,backendReady=false;const save=()=>{if(backendReady)return;clearTimeout(sv);sv=setTimeout(()=>{try{localStorage.setItem('xmeshNexusDB',JSON.stringify(DB))}catch(e){}},120)};
+let sv,backendReady=false,sessionUser=null;const save=()=>{if(backendReady)return;clearTimeout(sv);sv=setTimeout(()=>{try{localStorage.setItem('xmeshNexusDB',JSON.stringify(DB))}catch(e){}},120)};
 async function backendRequest(path,options={}){
   const headers={...(options.headers||{})};
   if(options.body&&!headers['Content-Type']&&!headers['content-type'])headers['Content-Type']='application/json';
@@ -155,9 +155,9 @@ const tcol=t=>({vless:'--a',trojan:'--c3',shadowsocks:'--c4'}[DB.profiles.flatMa
 const uin=u=>[...new Set(DB.squads.filter(s=>u.squads.includes(s.id)).flatMap(s=>s.inb))];
 const api={
   async list(c,o={}){await lat();let a=DB[c]||[];if(o.f)a=a.filter(o.f);if(o.sort){const k=o.sort,d=o.dir=='desc'?-1:1,v=x=>k=='status'?st(x):x[k];a=[...a].sort((x,y)=>(v(x)>v(y)?1:v(x)<v(y)?-1:0)*d)}const ids=a.map(x=>x.id),total=a.length;if(o.size)a=a.slice((o.page-1)*o.size,o.page*o.size);return{items:a,total,ids}},
-  async create(c,o){await lat();let row;if(backendReady){row=await backendRequest('/api/v1/collections/'+encodeURIComponent(c),{method:'POST',body:JSON.stringify(o)})}else{o.id=DB[c].reduce((m,x)=>Math.max(m,x.id),0)+1;row=o}DB[c].push(row);save();return row},
-  async update(c,id,p){await lat();const x=DB[c].find(y=>y.id==id);if(!x)throw new Error('Запись не найдена в локальном кеше.');const row=backendReady?await backendRequest('/api/v1/collections/'+encodeURIComponent(c)+'/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify(p)}):{...x,...p};Object.assign(x,row);save();return x},
-  async remove(c,id){await lat();const i=DB[c].findIndex(x=>x.id==id);const old=i>=0?DB[c][i]:null;if(backendReady){await backendRequest('/api/v1/collections/'+encodeURIComponent(c)+'/'+encodeURIComponent(id),{method:'DELETE'});}else if(i<0){throw new Error('Запись не найдена в локальном кеше.');}if(i>=0)DB[c].splice(i,1);save();return old},
+  async create(c,o){await lat();let row;if(backendReady){const path=c==='admins'?'/api/v1/admins':'/api/v1/collections/'+encodeURIComponent(c);const body=c==='admins'?{username:o.username,password:o.password,role:o.role}:o;row=await backendRequest(path,{method:'POST',body:JSON.stringify(body)})}else{if(c==='admins')throw new Error('Для создания администратора требуется доступ к Rust API.');o.id=DB[c].reduce((m,x)=>Math.max(m,x.id),0)+1;row=o}DB[c].push(row);save();return row},
+  async update(c,id,p){await lat();const x=DB[c].find(y=>y.id==id);if(!x)throw new Error('Запись не найдена в локальном кеше.');const path=c==='admins'?'/api/v1/admins/'+encodeURIComponent(id):'/api/v1/collections/'+encodeURIComponent(c)+'/'+encodeURIComponent(id);const row=backendReady?await backendRequest(path,{method:'PATCH',body:JSON.stringify(p)}):{...x,...p};Object.assign(x,row);save();return x},
+  async remove(c,id){await lat();const i=DB[c].findIndex(x=>x.id==id);const old=i>=0?DB[c][i]:null;if(backendReady){const path=c==='admins'?'/api/v1/admins/'+encodeURIComponent(id):'/api/v1/collections/'+encodeURIComponent(c)+'/'+encodeURIComponent(id);await backendRequest(path,{method:'DELETE'});}else if(i<0){throw new Error('Запись не найдена в локальном кеше.');}if(i>=0)DB[c].splice(i,1);save();return old},
   async bulk(c,ids,fn){await lat();for(const x of [...(DB[c]||[])].filter(item=>ids.has(item.id))){fn(x);await this.update(c,x.id,{...x})}save()},
   async saveSettings(patch){const saved=await backendRequest('/api/v1/settings',{method:'PATCH',body:JSON.stringify(patch)});DB.set={...DB.set,...saved,hooks:{...DB.set.hooks,...(saved.hooks||{})}};return DB.set},
   async stats(){await lat();const U=DB.users,by={};U.forEach(u=>{const status=st(u);by[status]=(by[status]||0)+1});const on=U.filter(isOn),live=DB.nodes.filter(n=>n.state==='ONLINE'&&!n.disabled),nodeOn={};live.forEach(n=>nodeOn[n.id]=0);return{by,total:U.length,online:on.length,conn:null,nodeOn,nOn:live.length,nAll:DB.nodes.length};},
@@ -202,10 +202,19 @@ const ENT={
     chk:(d,id)=>{let j;try{j=JSON.parse(d.config)}catch(e){return'Некорректный JSON: '+e.message}if(!Array.isArray(j.inbounds)||!j.inbounds.length)return'В конфиге нет массива inbounds.';const t=j.inbounds.map(i=>i.tag);if(t.some(x=>!x))return'У каждого инбаунда должен быть tag.';if(new Set(t).size!=t.length)return'Теги инбаундов должны быть уникальными.';const ot=DB.profiles.filter(p=>p.id!=id).flatMap(p=>inbs(p).map(i=>i.tag));if(t.some(x=>ot.includes(x)))return'Тег уже используется в другом профиле.'},
     cols:[['Название',r=>`<b>${esc(r.name)}</b>`],['Инбаунды',r=>inbs(r).map(i=>chip(esc(i.tag)+' · '+i.port,tcol(i.tag))).join(' ')||'—'],['Узлов',r=>DB.nodes.filter(n=>n.profileId==r.id).length]],
     guard:r=>DB.nodes.some(n=>n.profileId==r.id)?'Профиль назначен узлам. Сначала смените профиль у этих узлов.':''},
-  admins:{t:'Администраторы',n:'Роли ограничивают действия. Лимиты считаются по пользователям, созданным администратором.',s:'id',nw:'Админ',fs:[{k:'username',l:'Логин',req:1,pat:'[A-Za-z0-9_.\\-]{3,24}'},{k:'role',l:'Роль',t:'sel',o:[['owner','Владелец'],['admin','Админ'],['viewer','Наблюдатель']]},{k:'maxUsers',l:'Максимум пользователей',t:'num',h:'0 — без ограничений'},{k:'maxGB',l:'Максимум трафика, ГБ',t:'num'},{k:'tg',l:'Telegram'}],def:()=>({role:'admin',maxUsers:100,maxGB:0}),
-    chk:(d,id)=>DB.admins.some(a=>a.username.toLowerCase()==d.username.toLowerCase()&&a.id!=id)?'Такой логин уже есть.':'',
-    cols:[['Логин',r=>`<b>${esc(r.username)}</b>`],['Роль',r=>chip({owner:'Владелец',admin:'Админ',viewer:'Наблюдатель'}[r.role],{owner:'--c4',admin:'--a',viewer:'--mu'}[r.role])],['Пользователей',r=>{const n=DB.users.filter(u=>u.adminId==r.id).length;return n+(r.maxUsers?' / '+r.maxUsers:'')}],['Трафик',r=>gb(DB.users.filter(u=>u.adminId==r.id).reduce((a,u)=>a+u.used,0))],['Вход',r=>ago(r.last)],['Вкл.',swc('admins')]],
-    guard:r=>r.role=='owner'?'Владельца удалить нельзя.':DB.users.some(u=>u.adminId==r.id)?'За администратором закреплены пользователи.':''},
+  admins:{t:'Администраторы',n:'Реальные учётные записи входа. Права проверяются Rust API, а не интерфейсом.',s:'id',nw:'Администратор',
+    fs:[{k:'username',l:'Логин',req:1,pat:'[A-Za-z0-9_.\\-]{3,64}'},
+      {k:'password',l:'Новый пароль (от 16 символов)',t:'password',h:'Для новой записи обязателен. При редактировании оставьте пустым, чтобы сохранить пароль.'},
+      {k:'role',l:'Роль',t:'sel',o:[['owner','Владелец'],['admin','Администратор'],['viewer','Наблюдатель']]},
+      {k:'is_active',l:'Разрешить вход',t:'bool'}],
+    def:()=>({role:'admin',is_active:true}),
+    chk:(d,id)=>DB.admins.some(a=>a.username.toLowerCase()===d.username.toLowerCase()&&a.id!==id)?'Такой логин уже есть.':'',
+    cols:[['Логин',r=>`<b>${esc(r.username)}</b>`],
+      ['Роль',r=>chip({owner:'Владелец',admin:'Администратор',viewer:'Наблюдатель'}[r.role]||r.role,{owner:'--c4',admin:'--a',viewer:'--mu'}[r.role])],
+      ['Статус',r=>r.is_active===false?'Отключён':'Активен'],
+      ['Вход',r=>ago(r.last)]],
+    guard:r=>r.id===sessionUser?.id?'Нельзя удалить собственную учётную запись.':'',
+  },
   tokens:{t:'API-токены',n:'Для интеграций: бот оплаты, мониторинг, скрипты.',s:'id',nw:'Токен',fs:[{k:'name',l:'Название',req:1},{k:'scope',l:'Права',t:'sel',o:[['read','Только чтение'],['write','Чтение и запись']]}],def:()=>({scope:'read'}),
     cols:[['Название',r=>`<b>${esc(r.name)}</b>`],['Права',r=>chip(r.scope=='read'?'чтение':'запись',r.scope=='read'?'--c3':'--wr')],['Создан',r=>ago(r.created)],['Использован',r=>ago(r.last)]],
     after:o=>{const s='lm_'+Math.random().toString(36).slice(2)+Math.random().toString(36).slice(2);modal(`<div class="box"><h2>Токен создан</h2><p class="note">Скопируйте его сейчас: позже показать его снова будет нельзя.</p><div class="lk"><input id="lk" readonly value="${s}" aria-label="Токен"><button class="gh" data-copy>${ic('copy')}</button></div><div class="act"><button class="btn" data-x>Готово</button></div></div>`);return 1}}
@@ -237,7 +246,7 @@ function field(f,v){
   else if(t=='multi')i=`<div class="ms">${opt(f.o).map(([a,b])=>`<label class="ck"><input type="checkbox" name="${f.k}" value="${esc(a)}"${(v||[]).map(String).includes(String(a))?' checked':''}><span>${esc(b)}</span></label>`).join('')||'<span class="mu">Нет вариантов</span>'}</div>`;
   else if(t=='area')i=`<textarea name="${f.k}" rows="${f.rows||8}" spellcheck="false">${esc(v)}</textarea>`;
   else if(t=='bool')i=`<span class="sw"><input type="checkbox" name="${f.k}"${v?' checked':''}><span></span></span>`;
-  else i=`<input name="${f.k}" type="${t=='num'?'number':t=='date'?'date':'text'}"${t=='num'?' min="0" step="any"':''}${f.req?' required':''}${f.pat?` pattern="${f.pat}"`:''} value="${esc(t=='date'&&v?new Date(v).toLocaleDateString('sv'):v)}" placeholder="${esc(f.ph||'')}" autocomplete="off">`;
+  else i=`<input name="${f.k}" type="${t=='num'?'number':t=='date'?'date':t=='password'?'password':'text'}"${t=='num'?' min="0" step="any"':''}${f.req?' required':''}${f.pat?` pattern="${f.pat}"`:''} value="${esc(t=='date'&&v?new Date(v).toLocaleDateString('sv'):v)}" placeholder="${esc(f.ph||'')}" autocomplete="off">`;
   const g=t=='multi'?'div':'label';return `<${g} class="f"><span>${f.l}</span>${i}${f.h?`<small>${f.h}</small>`:''}</${g}>`;
 }
 function read(fs,form){const d={};fs.forEach(f=>{const e=$$(`[name="${f.k}"]`,form);if(f.t=='multi')d[f.k]=e.filter(x=>x.checked).map(x=>isNaN(+x.value)?x.value:+x.value);else if(f.t=='bool')d[f.k]=e[0].checked;else if(f.t=='num')d[f.k]=+e[0].value||0;else if(f.t=='date')d[f.k]=e[0].value?new Date(e[0].value+'T23:59:59').getTime():null;else if(f.t=='sel')d[f.k]=isNaN(+e[0].value)?e[0].value:+e[0].value;else d[f.k]=e[0].value.trim()});return d}
@@ -1755,7 +1764,7 @@ async function crudCard(k){
 }
 async function simple(ks){const h=await Promise.all(ks.map(crudCard));return [h.join('')]}
 function entForm(k,id){const e=ENT[k],o=id?DB[k].find(x=>x.id==id):e.def?e.def():{};
-  const standardFields=e.fs.map(f=>field(f,o[f.k])).join('');
+  const standardFields=e.fs.map(f=>field(f,k==='admins'&&f.k==='password'?'':o[f.k])).join('');
   const rotationFields=e.fs.slice(-2).map(f=>field(f,o[f.k])).join('');
   const userOptions=DB.users.filter(u=>st(u)==='ACTIVE').map(u=>`<option value="${u.id}">${esc(u.username)}</option>`).join('');
   const rotationProbe=id&&o.rotationEnabled
@@ -2093,8 +2102,14 @@ document.addEventListener('submit',async e=>{const f=e.target,k=f.dataset.k;if(!
     const u={username:d.username,disabled:false,hold:d.hold,holdDays:d.days||30,created:Date.now(),expireAt:d.hold||!d.days?null:Date.now()+d.days*DAY,limit:d.limit,used:0,strategy:d.strategy,tag:d.tag,tg:'',email:'',desc:d.desc,hwid:d.hwid,fingerprint:d.fingerprint||'chrome',squads:d.squads,onlineAt:0,adminId:DB.admins.find(a=>a.role==='owner')?.id||null,short:Math.floor(Math.random()*2**40).toString(36).padStart(8,'a'),xrayId:crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=crypto.getRandomValues(new Uint8Array(1))[0]&15;return(c==='x'?r:(r&3|8)).toString(16)}),xrayProfileId:d.xrayProfileId||null,devices:[]};
     const c=await api.create('users',u);if(c.xrayProfileId){try{await syncXrayUserToProfile(c)}catch(err){toast('Пользователь создан, но профиль Xray не обновлён: '+(err.message||'ошибка'),'ОК')}}UQ.q='';UQ.st='all';UQ.sort='created';UQ.dir='desc';toast(`Пользователь ${c.username} создан`);location.hash=='#users'?render(1):location.hash='users';setTimeout(()=>userDrawer(c.id,'sub'),350)}
   else if(k=='uedit'){e.preventDefault();const d=read(FE,f),id=+f.dataset.id;if(DB.users.some(u=>u.username.toLowerCase()==d.username.toLowerCase()&&u.id!=id))return er('Такое имя уже есть.');await api.update('users',id,d);toast('Сохранено');render(1);userDrawer(id,'ov')}
-  else if(k=='ent'){const key=f.dataset.ent,e2=ENT[key],d=read(e2.fs,f),id=f.dataset.id,m=e2.chk?.(d,+id);if(m)return er(m);
-    if(id){await api.update(key,id,d);toast('Сохранено')}else{const o=Object.assign({disabled:false,order:DB[key].length+1,created:Date.now(),last:0,used:0,state:'OFFLINE'},d);const c=await api.create(key,o);toast('Создано');if(e2.after?.(c)){render(1);return}}render(1)}
+  else if(k=='ent'){e.preventDefault();const key=f.dataset.ent,e2=ENT[key],d=read(e2.fs,f),id=f.dataset.id,m=e2.chk?.(d,+id);if(m)return er(m);
+    if(key==='admins'){
+      if(!id&&d.password.length<16)return er('Для нового администратора требуется пароль минимум 16 символов.');
+      if(id&&!d.password)delete d.password;
+      d.isActive=d.is_active;delete d.is_active;
+    }
+    try{if(id){await api.update(key,id,d);toast('Сохранено')}else{const o=Object.assign({disabled:false,order:DB[key].length+1,created:Date.now(),last:0,used:0,state:'OFFLINE'},d);const c=await api.create(key,o);toast('Создано');if(e2.after?.(c)){render(1);return}}render(1)}
+    catch(error){er(error.message||'Не удалось сохранить запись.')}}
   else if(k=='bulk-renew'){
     e.preventDefault();
     const value=f.querySelector('[name="days"]')?.value.trim()||'';
@@ -2161,6 +2176,12 @@ async function bootPanel(){
     if(!response.ok)throw new Error('Backend API не отвечает.');
     const session=await response.json();
     if(!session.authenticated){location.replace('/login');return}
+    sessionUser=session.user||null;
+    document.documentElement.dataset.accessRole=sessionUser?.role||'viewer';
+    if(sessionUser?.role!=='owner'){
+      document.querySelector('a[href="#admins"]')?.remove();
+      if(location.hash==='#admins')location.hash='#home';
+    }
     await initializePanel();
   }catch(err){location.replace('/login?unavailable=1')}
 }
