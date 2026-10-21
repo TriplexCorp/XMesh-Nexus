@@ -25,7 +25,11 @@ pub(crate) struct CreateAccount {
     username: String,
     password: String,
     role: String,
+    #[serde(default = "default_active")]
+    is_active: bool,
 }
+
+fn default_active() -> bool { true }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -97,9 +101,9 @@ pub(crate) async fn create(
     validate_role(&body.role)?;
     let hashed = password_hash(&body.password)?;
     let row = sqlx::query(
-        "INSERT INTO panel_auth_users (username, password_hash, role) VALUES ($1,$2,$3) RETURNING id",
+        "INSERT INTO panel_auth_users (username, password_hash, role, is_active) VALUES ($1,$2,$3,$4) RETURNING id",
     )
-    .bind(&body.username).bind(&hashed).bind(&body.role)
+    .bind(&body.username).bind(&hashed).bind(&body.role).bind(body.is_active)
     .fetch_one(&state.pool).await?;
     let id: i64 = row.try_get("id")?;
     super::audit(&state.pool, &actor.username, "admin.created", Some("admins"), Some(id),
