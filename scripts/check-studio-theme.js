@@ -8,11 +8,16 @@ const read=(p)=>fs.readFileSync(path.join(root,p),'utf8');
 const html=read('index.html');
 const base=read('styles.css');
 const studio=read('xray-studio.css');
+const app=read('app.js');
 const docker=read('backend/Dockerfile');
 const links=[...html.matchAll(/href="([^"]*xray-studio[^"]*\.css(?:\?[^"]*)?)"/g)];
 assert.equal(links.length,1,'Exactly one XRAY Studio stylesheet must be linked');
 assert.match(links[0][1],/^xray-studio\.css(?:\?.*)?$/);
 assert.equal((base.match(/\.xray-builder/g)||[]).length,0,'Global CSS must not duplicate Studio layout rules');
+assert.match(app,/const builderHtml='<section class="xray-builder">/,'Studio must have an independent layout root');
+assert.doesNotMatch(app,/class="card xray-builder"/,'The Studio root must not inherit GLASS .card::before/.card::after overlays');
+assert.match(base,/html\[data-surface=glass\] \.card::after/,'Glass card overlay regression check must match real global rule');
+
 assert.match(docker,/COPY [^\n]*xray-studio\.css[^\n]* \/app\/static\//,'Studio CSS must ship in Docker');
 assert.match(studio,/--sr-accent:var\(--a\)/,'Use the shared accent');
 for(const variable of ['--bg','--s1','--s2','--ln','--tx','--mu','--ok']){
