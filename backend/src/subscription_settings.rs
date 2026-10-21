@@ -24,7 +24,7 @@ fn safe_https_url(value: &str) -> bool {
     if value.len() > 512 || !value.starts_with("https://")
         || !value.is_ascii() || value.bytes().any(|b| b <= 0x20 || b == 0x7f || b == b'\\')
         || value.contains('#') { return false; }
-    let authority = value["https://".len()..].split('/').next().unwrap_or("");
+    let authority = value["https://".len()..].split(['/', '?']).next().unwrap_or("");
     if authority.is_empty() || authority.contains('@') || authority.contains(':') ||
         authority.starts_with('.') || authority.ends_with('.') || authority.contains("..") { return false; }
     authority.split('.').all(|label| {
