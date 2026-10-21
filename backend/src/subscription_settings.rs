@@ -79,8 +79,8 @@ pub(crate) fn validate(object: &Map<String, Value>) -> Result<(), ApiError> {
         "subscriptionShowStatus", "subscriptionShowApps", "subscriptionShowQr",
         "subscriptionShowCopy", "subscriptionShowSupport", "subscriptionShowDevices",
     ] {
-        if let Some(v) = object.get(key) {
-            if !v.is_boolean() { return Err(bad("Параметры видимости должны быть переключателями.")); }
+        if let Some(v) = object.get(key) && !v.is_boolean() {
+            return Err(bad("Параметры видимости должны быть переключателями."));
         }
     }
     if let Some(v) = object.get("subscriptionClients") {
