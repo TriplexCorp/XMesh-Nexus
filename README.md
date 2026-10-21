@@ -121,6 +121,44 @@ The selector lists recent GitHub releases; pinning is limited to the latest 30 e
 
 The UI intentionally avoids presenting generated node telemetry as live operational data.
 
+## Per-node IP pools and per-user address rotation
+
+Open **Nodes → Edit → IP-ротация**. Enable the feature and enter one public IPv4 or IPv6
+address per line (2–64 unique addresses). The primary node address remains unchanged.
+All addresses must actually be routed to that VM and serve the same VPN inbound
+(port, TLS/Reality, and credentials); the panel does **not** provision extra network
+addresses or change OS networking.
+
+The Rust backend stores a separate round-robin cursor for each `(node_id, user_id)`
+in PostgreSQL (migration `0007_node_ip_rotation.sql`). It uses a transaction and
+row lock to prevent duplicate allocations under concurrent refreshes. Each call
+skips the last issued address when the pool has changed; disabling rotation
+falls back to the node's primary address. The cursor survives restarts.
+
+Authenticated test/integration endpoint (admin cookie + same-origin POST required):
+
+```http
+POST /api/v1/nodes/123/rotation/next
+Content-Type: application/json
+
+{"userId":456}
+```
+
+Response: `{"nodeId":123,"userId":456,"address":"203.0.113.4","rotationEnabled":true,"poolSize":10}`.
+This endpoint requires an active user and a non-disabled node and is **not** an
+unauthenticated subscription endpoint. The IPs in examples are documentation-only.
+
+**Integration status:** The current XMesh Nexus repository does not yet generate
+public client subscriptions (`subUrl` is still a placeholder). The rotation
+engine, settings, validation, persisted cursor, and authenticated test endpoint
+are implemented; **a client's subscription refresh will not rotate its
+address until a real subscription generator calls
+`node_rotation::resolve_address` exactly once per node and user per refresh**.
+The generator must substitute only the outbound address, retain the intended
+SNI/Host/Reality fields, properly format IPv6 URLs, and disable caching
+(`Cache-Control: no-store`). Refreshes, not live established connections,
+are the rotation boundary; client apps can also cache subscriptions.
+
 ### Updating frontend assets
 
 The dashboard CSS and JavaScript are baked into the `panel` Docker image via `backend/Dockerfile`. Running `git pull` alone does **not** update the UI served by an existing container. After pulling changes, rebuild and recreate the panel:
