@@ -46,6 +46,8 @@ jobs:
         run: node scripts/check-xray-intelligence.js
       - name: Verify packaged frontend assets
         run: node scripts/check-static-assets.js
+      - name: Check appearance surface choices and migration
+        run: node scripts/check-appearance-surfaces.js
       - name: Check shared Studio theme and CSS structure
         run: node scripts/check-studio-theme.js
       - name: Check modal settings editor
