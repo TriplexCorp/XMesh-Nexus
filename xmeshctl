@@ -28,7 +28,18 @@ confirm_yes() {
       warn "Не удалось прочитать подтверждение. Действие отменено."
       return 1
     fi
-    answer="${answer//
+    # Strip carriage returns (CRLF from terminal/paste) and surrounding spaces.
+    answer="${answer//$'\015'/}"
+    answer="${answer#"${answer%%[![:space:]]*}"}"
+    answer="${answer%"${answer##*[![:space:]]}"}"
+    case "${answer,,}" in
+      y|yes|д|да) return 0 ;;
+      n|no|н|нет|'') return 1 ;;
+      *) warn "Непонятный ответ. Введи y (да) или n (нет)." ;;
+    esac
+  done
+}
+
 require_compose() {
   if ! command -v docker >/dev/null 2>&1; then
     fail "Docker не найден."
