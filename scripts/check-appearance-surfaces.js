@@ -26,8 +26,8 @@ assert(!wrapLimits.some(rule=>/max-width:(?:132rem|2112px)/.test(rule)),
  'Static desktop width caps must not override the slider');
 assert.match(app,/cl\(Number\(C\.contentWidth\)\|\|1920,720,2240\)/,
  'Content width must support narrower desktop viewports');
-assert.match(app,/id="content-width" min="720" max="2240" step="40"/,
- 'The slider must offer visibly smaller widths on ordinary desktop screens');
+assert.match(app,/id="content-width" min="720" max="2240" step="10"/,
+ 'The width slider must support fine-grained adjustment on desktop screens');
 assert.match(html,/styles\.css\?v=20261021-content-width-1/,'New CSS cache key must ship');
 
 assert.match(app,/id="content-width" min="720" max="2240" step="10"/,
