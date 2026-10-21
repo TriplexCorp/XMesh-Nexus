@@ -101,7 +101,7 @@ window.XMeshSubscriptionStudio = (() => {
     if(data.subscriptionSyncPanelTheme!==false&&panelTheme())Object.assign(data,panelTheme());
     const currentPalette=themeColors[data.subscriptionTheme]||themeColors.dark;
     for(const key of Object.keys(currentPalette))if(settings?.[key]===undefined&&data.subscriptionSyncPanelTheme===false)data[key]=currentPalette[key];
-    data.subscriptionRadius=Math.max(1,Math.min(48,Math.round(Number(data.subscriptionRadius)||16)));
+    data.subscriptionRadius=Math.max(1,Math.min(36,Math.round(Number(data.subscriptionRadius)||16)));
     data.subscriptionClients={...defaultClients,...(settings?.subscriptionClients||{})};
     data.subscriptionClientLinks={...(settings?.subscriptionClientLinks||{})};
     data.subscriptionCustomClients=Array.isArray(settings?.subscriptionCustomClients)?settings.subscriptionCustomClients.slice(0,maxCustomClients):[];
@@ -164,7 +164,7 @@ window.XMeshSubscriptionStudio = (() => {
       '<label class="f subscription-field"><span>Карточки</span><select name="subscriptionCardStyle"><option value="soft"'+(data.subscriptionCardStyle==='soft'?' selected':'')+'>Мягкие</option><option value="outline"'+(data.subscriptionCardStyle==='outline'?' selected':'')+'>С контуром</option><option value="flat"'+(data.subscriptionCardStyle==='flat'?' selected':'')+'>Без фона</option></select></label>',
       '</div><div class="subscription-studio-pair">',
       '<label class="f subscription-field"><span>Шрифт</span><select name="subscriptionFont"><option value="system"'+(data.subscriptionFont==='system'?' selected':'')+'>Системный</option><option value="manrope"'+(data.subscriptionFont==='manrope'?' selected':'')+'>Manrope</option><option value="mono"'+(data.subscriptionFont==='mono'?' selected':'')+'>Моноширинный</option></select></label>',
-      '<label class="f subscription-field"><span>Скругление: <output data-subscription-radius>'+Number(data.subscriptionRadius)+'</output> px</span><input type="range" name="subscriptionRadius" min="1" max="48" step="1" value="'+Number(data.subscriptionRadius)+'"></label>',
+      '<label class="f subscription-field"><span>Скругление: <output data-subscription-radius>'+Number(data.subscriptionRadius)+'</output> px</span><input type="range" name="subscriptionRadius" min="1" max="36" step="1" value="'+Number(data.subscriptionRadius)+'"></label>',
       '</div>',
       '<div class="subscription-studio-pair subscription-color-grid">',
       field('subscriptionBackground','Фон портала',data.subscriptionBackground,'Основной цвет страницы.',{color:true}),
