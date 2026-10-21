@@ -19,16 +19,16 @@ assert.match(app,/prop!=='surface'\|\|\['solid','glass','raised'\]\.includes\(va
 assert.match(html,/styles\.css\?v=[a-z0-9-]+/,'Styles must retain a cache-busting version');
 assert.match(html,/app\.js\?v=[a-z0-9-]+/,'Application script must retain a cache-busting version');
 
-const wrapLimits=[...css.matchAll(/\\.wrap\\s*\\{[^}]*max-width:[^;}]+/g)].map(match=>match[0]);
+const wrapLimits=[...css.matchAll(/\.wrap\s*\{[^}]*max-width:[^;}]+/g)].map(match=>match[0]);
 assert(wrapLimits.filter(rule=>rule.includes('var(--panel-content-max')).length>=3,
  'All desktop .wrap width rules must use the runtime setting, including later theme overrides');
 assert(!wrapLimits.some(rule=>/max-width:(?:132rem|2112px)/.test(rule)),
  'Static desktop width caps must not override the slider');
-assert.match(app,/cl\\(Number\\(C\\.contentWidth\\)\\|\\|1920,720,2240\\)/,
+assert.match(app,/cl\(Number\(C\.contentWidth\)\|\|1920,720,2240\)/,
  'Content width must support narrower desktop viewports');
 assert.match(app,/id="content-width" min="720" max="2240" step="40"/,
  'The slider must offer visibly smaller widths on ordinary desktop screens');
-assert.match(html,/styles\\.css\\?v=20261021-content-width-1/,'New CSS cache key must ship');
+assert.match(html,/styles\.css\?v=20261021-content-width-1/,'New CSS cache key must ship');
 // Appearance uses two balanced columns and the locale selector is global.
 assert.match(app,/<div class="appearance-layout">/,'Aligned appearance workspace must exist');
 assert.match(app,/appearance-column/,'Appearance cards must use two columns');
