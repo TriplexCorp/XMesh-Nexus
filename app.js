@@ -360,6 +360,28 @@ const saveContentWidth=()=>{
  paintContentWidth();
  try{localStorage.xmeshNexusSettings=JSON.stringify(C)}catch(e){}
 };
+// Custom palette inputs are a draft until explicitly confirmed by the user.
+const paletteDraft={a:C.customA||'#60d6a2',b:C.customB||'#c3e879',h:C.hue??151,s:C.sat??62,l:C.lum??61};
+const resetPaletteDraft=()=>Object.assign(paletteDraft,{a:C.customA||'#60d6a2',b:C.customB||'#c3e879',h:C.hue??151,s:C.sat??62,l:C.lum??61});
+const paletteHsl=hex=>{
+ const [r,g,b]=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255);
+ const max=Math.max(r,g,b),min=Math.min(r,g,b),delta=max-min;
+ let h=0,s=0,l=(max+min)/2;
+ if(delta){s=delta/(1-Math.abs(2*l-1));if(max===r)h=((g-b)/delta)%6;else if(max===g)h=(b-r)/delta+2;else h=(r-g)/delta+4;h=(h*60+360)%360;}
+ return {h:Math.round(h),s:Math.round(s*100),l:Math.round(l*100)};
+};
+const paintPaletteDraft=()=>{
+ const panel=$('#palette-draft-preview');
+ if(panel){panel.style.setProperty('--x',paletteDraft.a);panel.style.setProperty('--y',paletteDraft.b);}
+ for(const [key,id,suffix] of [['h','hue','°'],['s','sat','%'],['l','lum','%']]){
+  const slider=$('#'+id),out=$('#'+id+'v');
+  if(slider)slider.value=paletteDraft[key];
+  if(out)out.textContent=paletteDraft[key]+suffix;
+ }
+ const primary=$('#custom-a'),secondary=$('#custom-b');
+ if(primary)primary.value=paletteDraft.a;
+ if(secondary)secondary.value=paletteDraft.b;
+};
 const brand=()=>{$('#bn').textContent=DB.set.brand;$('#lg').textContent=(DB.set.brand[0]||'L').toUpperCase()};
 
 let T=[],cur='',RT=0;
@@ -1900,10 +1922,12 @@ async function setP(){
     </div>
       <div class="setting-row"><div class="setting-copy"><b>Тема</b><small>Автоматически — по настройкам ОС</small></div><div class="setting-control"><div class="seg choice" id="th">${[['dark','Тёмная'],['light','Светлая'],['auto','Авто']].map(([k,l])=>`<button type="button" data-th="${k}" class="${C.theme==k?'on':''}">${l}</button>`).join('')}</div></div></div>
       <div class="setting-row appearance-preset-row"><div class="setting-copy"><b>Цветовые темы</b><small>Подобранные сочетания для светлого и тёмного оформления</small></div><div class="palette-preset-grid" role="group" aria-label="Цветовые темы">${sw.map(([k,x,y,l])=>`<button type="button" class="palette-preset ${C.accent===k?'on':''}" data-ac="${k}" aria-pressed="${C.accent===k?'true':'false'}" style="--x:${x};--y:${y}"><span class="palette-preset-demo" aria-hidden="true"><i></i><em></em><b></b></span><span class="palette-preset-foot"><span>${l}</span><span class="palette-preset-tick">${ic('check')}</span></span></button>`).join('')}</div></div>
-      <div class="setting-row"><div class="setting-copy"><b>Своя палитра</b><small>Цветовые «бублики» открывают выбор цвета; ползунки позволяют точно настроить оттенок, насыщенность и яркость.</small></div><div class="setting-control"><div class="color-bubbles"><label class="color-bubble-wrap"><span class="color-bubble"><input type="color" id="custom-a" value="${C.customA||'#60d6a2'}" aria-label="Основной цвет"></span>Основной</label><label class="color-bubble-wrap"><span class="color-bubble"><input type="color" id="custom-b" value="${C.customB||'#c3e879'}" aria-label="Вторичный цвет"></span>Вторичный</label></div></div></div>
+      <div class="setting-row"><div class="setting-copy"><b>Своя палитра</b><small>Цветовые «бублики» открывают выбор цвета; ползунки позволяют точно настроить оттенок, насыщенность и яркость.</small></div><div class="setting-control"><div class="color-bubbles"><label class="color-bubble-wrap"><span class="color-bubble"><input type="color" id="custom-a" value="${paletteDraft.a}" aria-label="Основной цвет"></span>Основной</label><label class="color-bubble-wrap"><span class="color-bubble"><input type="color" id="custom-b" value="${paletteDraft.b}" aria-label="Вторичный цвет"></span>Вторичный</label></div></div></div>
     </section>
     <section class="card sg"><div class="appearance-card-heading"><h3>Точная настройка цвета</h3><small>Оттенок, насыщенность и яркость собственной палитры</small></div>
-      <div class="color-slider-grid"><label for="hue">Оттенок</label><input type="range" id="hue" min="0" max="360" value="${C.hue??151}"><output id="huev">${C.hue??151}°</output></div><div class="color-slider-grid"><label for="sat">Насыщенность</label><input type="range" id="sat" min="0" max="100" value="${C.sat??62}"><output id="satv">${C.sat??62}%</output></div><div class="color-slider-grid"><label for="lum">Яркость</label><input type="range" id="lum" min="15" max="85" value="${C.lum??61}"><output id="lumv">${C.lum??61}%</output></div>
+      <div class="color-slider-grid"><label for="hue">Оттенок</label><input type="range" id="hue" min="0" max="360" value="${paletteDraft.h}"><output id="huev">${paletteDraft.h}°</output></div><div class="color-slider-grid"><label for="sat">Насыщенность</label><input type="range" id="sat" min="0" max="100" value="${paletteDraft.s}"><output id="satv">${paletteDraft.s}%</output></div><div class="color-slider-grid"><label for="lum">Яркость</label><input type="range" id="lum" min="15" max="85" value="${paletteDraft.l}"><output id="lumv">${paletteDraft.l}%</output></div>
+      <div class="palette-draft-preview" id="palette-draft-preview" style="--x:${paletteDraft.a};--y:${paletteDraft.b}"><span class="palette-draft-samples"><i></i><i></i></span><span><b>Предпросмотр своей палитры</b><small>Цвета не изменятся до подтверждения</small></span></div>
+      <div class="palette-draft-actions"><button class="gh sm" type="button" id="palette-cancel">Отмена</button><button class="btn" type="button" id="palette-apply">Применить палитру</button></div>
     </section>
     <section class="card sg"><div class="appearance-card-heading"><h3>Типографика</h3><small>Размер и начертание текста</small></div>
       <div class="setting-row"><div class="setting-copy"><b>Размер текста</b><small>Можно увеличить интерфейс для большого монитора или уменьшить плотность текста</small></div><div class="setting-control slider-control"><input type="range" id="ts" min="0.9" max="1.3" step="0.05" value="${C.ts}" aria-label="Размер текста"><b id="tsv">${Math.round(C.ts*100)}%</b></div></div>
@@ -2044,9 +2068,11 @@ document.addEventListener('click',async e=>{
   else if(b=g('[data-tt]')){TP.tab=b.dataset.tt;TP.q='';TP.f='';render(1)}
   else if(b=g('[data-lv]')){}
   else if(b=g('[data-th]')){C.theme=b.dataset.th;apply();$$('#th button').forEach(x=>x.classList.toggle('on',x==b))}
-  else if(b=g('[data-ac]')){C.accent=b.dataset.ac;apply();$$('[data-ac]').forEach(x=>x.classList.toggle('on',x==b))}
+  else if(b=g('[data-ac]')){C.accent=b.dataset.ac;apply();$$('[data-ac]').forEach(x=>{const active=x===b;x.classList.toggle('on',active);x.setAttribute('aria-pressed',String(active))})}
+   else if(g('#palette-apply')){C.customA=paletteDraft.a;C.customB=paletteDraft.b;C.hue=paletteDraft.h;C.sat=paletteDraft.s;C.lum=paletteDraft.l;C.accent='custom';apply();render(1);toast('Палитра применена')}
+   else if(g('#palette-cancel')){resetPaletteDraft();render(1)}
   else if(b=g('[data-ui]')){const prop=b.dataset.ui,value=b.dataset.value;if(prop&&value&&(prop!=='surface'||['solid','glass','raised'].includes(value))){C[prop]=value;apply();document.querySelectorAll(`[data-ui="${prop}"]`).forEach(x=>{const active=x.dataset.value===value;x.classList.toggle('on',active);x.setAttribute('aria-pressed',String(active))})}}
-  else if(g('#rs')){const automation={autoCoreRefresh:C.autoCoreRefresh,coreRefreshSeconds:C.coreRefreshSeconds};C={...CDEFAULT,...automation};apply();syncCoreAutoRefresh();render(1);toast('Оформление сброшено')}
+  else if(g('#rs')){const automation={autoCoreRefresh:C.autoCoreRefresh,coreRefreshSeconds:C.coreRefreshSeconds};C={...CDEFAULT,...automation};resetPaletteDraft();apply();syncCoreAutoRefresh();render(1);toast('Оформление сброшено')}
   else if(g('#gx')){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(DB,null,2)],{type:'application/json'}));a.download='xmesh-nexus-backup.json';a.click()}
   else if(b=g('[data-cf]')){dlg.close();CF&&CF()}
   else if(b=g('[data-core-refresh]')){try{await refreshCoreStatus(true)}catch(err){toast(err.message)}}
@@ -2172,7 +2198,12 @@ document.addEventListener('change',async e=>{const t=e.target;
     toast(t.id==='auto-core-refresh'?(C.autoCoreRefresh?'Автопроверка статуса включена':'Автопроверка статуса выключена'):'Интервал проверки сохранён');
     return;
   }
-  if(t.id==='custom-a'||t.id==='custom-b'){if(t.id==='custom-a')C.customA=t.value;else C.customB=t.value;C.accent='custom';if(t.id==='custom-a'){const rgb=t.value.match(/[0-9a-f]{2}/gi).map(v=>parseInt(v,16)/255);const max=Math.max(...rgb),min=Math.min(...rgb),d=max-min;let h=0,s=0,l=(max+min)/2;if(d){s=d/(1-Math.abs(2*l-1));if(max===rgb[0])h=60*(((rgb[1]-rgb[2])/d)%6);else if(max===rgb[1])h=60*((rgb[2]-rgb[0])/d+2);else h=60*((rgb[0]-rgb[1])/d+4);if(h<0)h+=360}C.hue=Math.round(h);C.sat=Math.round(s*100);C.lum=Math.round(l*100);if($('#hue'))$('#hue').value=C.hue;if($('#sat'))$('#sat').value=C.sat;if($('#lum'))$('#lum').value=C.lum;if($('#huev'))$('#huev').textContent=C.hue+'°';if($('#satv'))$('#satv').textContent=C.sat+'%';if($('#lumv'))$('#lumv').textContent=C.lum+'%'}apply();$$('[data-ac]').forEach(x=>x.classList.toggle('on',x.dataset.ac==='custom'));return}
+  if(t.id==='custom-a'||t.id==='custom-b'){
+    if(t.id==='custom-a'){paletteDraft.a=t.value;Object.assign(paletteDraft,paletteHsl(t.value));}
+    else paletteDraft.b=t.value;
+    paintPaletteDraft();
+    return;
+  }
   if(t.dataset.tg){const [k,id]=t.dataset.tg.split(':');await api.update(k,id,{disabled:!t.checked});toast(t.checked?'Включено':'Отключено')}
   else if(t.dataset.usq){const [ui,si]=t.dataset.usq.split(':').map(Number),u=DB.users.find(x=>x.id==ui);await api.update('users',ui,{squads:t.checked?[...new Set([...u.squads,si])]:u.squads.filter(x=>x!=si)});toast('Доступ обновлён');render(1);userDrawer(ui,'acc')}
   else if(t.dataset.hw){await api.update('users',+t.dataset.hw,{hwid:+t.value||0});toast('Лимит устройств сохранён');render(1);userDrawer(+t.dataset.hw,'acc')}
@@ -2181,7 +2212,10 @@ document.addEventListener('change',async e=>{const t=e.target;
   else if(t.id==='rail-tips'){C.railTips=t.checked?1:0;apply()}
   else if(t.id=='mo'){C.motion=t.checked?1:0;apply()}
   else if(t.id=='tplsel'){const p=DB.tpls.find(x=>x.id==t.value);if(!p)return;const f=$('form[data-k=user]');const set=(k,v)=>{const el=$(`[name=${k}]`,f);if(el)el.value=v};set('limit',p.limit);set('days',p.days);set('strategy',p.strategy);set('hwid',p.hwid);$('[name=hold]',f).checked=p.hold;$$('[name=squads]',f).forEach(c=>c.checked=p.squads.includes(+c.value))}});
-document.addEventListener('input',e=>{if(['hue','sat','lum'].includes(e.target.id)){C.hue=+$('#hue').value;C.sat=+$('#sat').value;C.lum=+$('#lum').value;C.customA=hslHex(C.hue,C.sat,C.lum);C.accent='custom';$('#custom-a').value=C.customA;$('#huev').textContent=C.hue+'°';$('#satv').textContent=C.sat+'%';$('#lumv').textContent=C.lum+'%';apply();$$('[data-ac]').forEach(x=>x.classList.toggle('on',x.dataset.ac==='custom'))}else if(e.target.id=='ts'){C.ts=+e.target.value;$('#tsv').textContent=Math.round(C.ts*100)+'%';apply()}else if(e.target.id=='radius'){C.radius=+e.target.value;$('#rv').textContent=C.radius+' px';apply()}
+document.addEventListener('input',e=>{if(['hue','sat','lum'].includes(e.target.id)){
+  paletteDraft.h=+$('#hue').value;paletteDraft.s=+$('#sat').value;paletteDraft.l=+$('#lum').value;
+  paletteDraft.a=hslHex(paletteDraft.h,paletteDraft.s,paletteDraft.l);paintPaletteDraft();
+}else if(e.target.id=='ts'){C.ts=+e.target.value;$('#tsv').textContent=Math.round(C.ts*100)+'%';apply()}else if(e.target.id=='radius'){C.radius=+e.target.value;$('#rv').textContent=C.radius+' px';apply()}
  else if(e.target.id==='content-width'){C.contentWidth=cl(Number(e.target.value)||1920,720,2240);$('#content-width-value').textContent=C.contentWidth+' px';previewContentWidth()}
  else if(e.target.id==='gap-scale'){C.gapScale=+e.target.value;$('#gap-scale-value').textContent=Math.round(C.gapScale*100)+'%';apply()}
  if(e.target.id=='pq')pdraw(e.target.value)});
