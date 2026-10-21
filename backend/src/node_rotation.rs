@@ -149,10 +149,11 @@ pub(crate) struct RotateRequest {
 /// The subscription server must call the resolver on an authenticated code path.
 pub(crate) async fn rotate_next(
     State(state): State<AppState>,
-    Extension(_actor): Extension<auth::AuthUser>,
+    Extension(actor): Extension<auth::AuthUser>,
     Path(node_id): Path<i64>,
     Json(request): Json<RotateRequest>,
 ) -> Result<impl axum::response::IntoResponse, ApiError> {
+    super::require_mutation(&actor)?;
     let (address, enabled, pool_size) =
         resolve_address(&state, node_id, request.user_id).await?;
     Ok((
