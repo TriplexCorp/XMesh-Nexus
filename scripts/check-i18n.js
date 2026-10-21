@@ -50,6 +50,7 @@ api.setLanguage('en');
 assert.equal(text.nodeValue,'Settings','Switching back to English must still work');
 assert.match(app,/data-panel-language="\$\{value\}"/,'RU/EN controls must live in palette card');
 assert.match(app,/data-panel-language/,'Language buttons must exist');
+assert.match(app,/window\.XMeshMfa\?\.panel\(\)/);
 assert.match(app,/class="settings-appearance-header"/,'Locale selector should be part of appearance header');
 assert.match(app,/window\.XMeshI18n\?\.setLanguage\(button\.dataset\.panelLanguage\)/,
  'Locale selection must use persisted localization preference');

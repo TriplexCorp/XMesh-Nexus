@@ -16,8 +16,8 @@ for(const [input,expected] of [['flat','solid'],['bogus','solid'],[null,'solid']
  assert.equal(normalize({surface:input}),expected,'Appearance migration failed: '+input);
 }
 assert.match(app,/prop!=='surface'\|\|\['solid','glass','raised'\]\.includes\(value\)/,'Event handler must reject removed Flat style');
-assert.match(html,/styles\.css\?v=20261021-settings-language-1/,'Update CSS cache key');
-assert.match(html,/app\.js\?v=20261021-auth-security-1/,'Update JS cache key');
+assert.match(html,/styles\.css\?v=20261021-mfa-1/,'Update CSS cache key');
+assert.match(html,/app\.js\?v=20261021-auth-security-2/,'Update JS cache key');
 // The appearance grid must remain three normal cards; language is integrated into its first card.
 assert.match(app,/<div class="appearance-grid">\s*<section class="card sg"><div class="settings-appearance-header">/,
   'Language setting must not add a full-width card before theme settings');
