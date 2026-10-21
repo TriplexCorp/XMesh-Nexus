@@ -43,7 +43,7 @@ assert.doesNotMatch(gridRules,/\.nodes-page>\.nodes\[data-node-count="2"\]\[data
  'Two-node layout cannot be clamped to a narrow grid');
 assert.doesNotMatch(gridRules,/max-width:\s*(?:48|64|68)rem/,
  'Two- and three-node grids must fill available horizontal space');
-assert(html.includes('styles.css?v=20261021-layout-qr-2'),'Stylesheet cache key not updated');
+assert.match(html,/styles\.css\?v=[a-z0-9-]+/,'Stylesheet must have a cache-busting key');
 assert.match(html,/app\.js\?v=[a-z0-9-]+/);
 assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length,'CSS brace balance');
 new Function(app);

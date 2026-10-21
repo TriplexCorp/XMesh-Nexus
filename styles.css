@@ -438,6 +438,15 @@ html[data-sidebar=compact] .app{grid-template-columns:5.7rem minmax(0,1fr)}
 
 .appearance-layout .color-slider-grid{grid-template-columns:minmax(6rem,1fr) minmax(5rem,2.8fr) 3.5rem}
 @media(max-width:1120px){.appearance-layout{grid-template-columns:1fr}.appearance-column:first-child>.card:nth-child(n),.appearance-column:nth-child(2)>.card:nth-child(n){grid-area:auto}}
+
+/* The slider can shrink the workspace on a wide monitor: use its actual width,
+   not the browser viewport width, to decide when paired cards should stack. */
+#view:has(.appearance-layout){container-type:inline-size;container-name:appearance-view}
+@container appearance-view (max-width:70rem){
+ .appearance-layout{grid-template-columns:minmax(0,1fr)}
+ .appearance-column:first-child>.card:nth-child(n),
+ .appearance-column:nth-child(2)>.card:nth-child(n){grid-area:auto}
+}
 @media(max-width:650px){.appearance-layout .setting-row{grid-template-columns:1fr;gap:.55rem}.appearance-layout .setting-control{justify-content:flex-start}.appearance-layout .setting-row .sw,.appearance-layout .setting-row #rs{justify-self:start}}
 
 .choice{display:flex;flex-wrap:wrap;gap:.35rem;width:fit-content;max-width:100%}

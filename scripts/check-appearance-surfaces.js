@@ -72,6 +72,25 @@ widthFns.saveContentWidth();
 assert.equal(frameQueue.size,0,'Committing must cancel a pending stale frame');
 assert.equal(values.get('--panel-content-max'),'1711px');
 assert.equal(storageWrites,1,'Final width must be stored once');
+// Appearance grid must pair cards on real grid rows, including when the panel width changes.
+assert.match(css,/\.appearance-column\{display:contents\}/,'Independent masonry columns must be flattened');
+for(const rule of [
+ '.appearance-column:first-child>.card:nth-child(1){grid-area:1/1}',
+ '.appearance-column:nth-child(2)>.card:nth-child(1){grid-area:1/2}',
+ '.appearance-column:first-child>.card:nth-child(2){grid-area:2/1}',
+ '.appearance-column:nth-child(2)>.card:nth-child(2){grid-area:2/2}',
+ '.appearance-column:first-child>.card:nth-child(3){grid-area:3/1}',
+ '.appearance-column:nth-child(2)>.card:nth-child(3){grid-area:3/2}'
+])assert(css.includes(rule),'Aligned card row missing: '+rule);
+assert.match(css,/@container appearance-view \(max-width:70rem\)/,'Narrow workspace width must stack cards even on a large monitor');
+assert.match(app,/id="palette-apply"/,'Custom palette must have an Apply button');
+assert.match(app,/id="palette-cancel"/,'Custom palette must have a Cancel button');
+assert.match(app,/const paletteDraft=/,'Palette editor must use draft state');
+assert.match(app,/C\.customA=paletteDraft\.a;/,'Custom palette must commit only on confirmation');
+assert.match(app,/paletteDraft\.a=hslHex/,'Hue slider must modify draft instead of live accent');
+assert.match(app,/class="palette-preset/,'Curated color options must have labelled preview tiles');
+for(const name of ['sapphire','teal','coral','indigo','copper','glacier','graphite'])
+ assert(css.includes('[data-accent='+name+']'),'Curated theme missing '+name);
 // Appearance uses two balanced columns and the locale selector is global.
 assert.match(app,/<div class="appearance-layout">/,'Aligned appearance workspace must exist');
 assert.match(app,/appearance-column/,'Appearance cards must use two columns');
