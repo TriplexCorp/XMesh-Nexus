@@ -1925,7 +1925,11 @@ async function setP(){
     ['indigo','#a5a9f6','#cab3ff','Индиго'],
     ['copper','#d9ae80','#edc6a1','Медь'],
     ['glacier','#83c9e9','#c5eaf1','Ледник'],
-    ['graphite','#aab9c9','#d6c8dc','Графит']
+    ['graphite','#aab9c9','#d6c8dc','Графит'],
+    ['lime','#c8ed7a','#86d79c','Лайм'],
+    ['terracotta','#e9a086','#f2c68e','Терракота'],
+    ['orchid','#d99dde','#f1b5da','Орхидея'],
+    ['aurora','#74dbc5','#a49ceb','Аврора']
   ];
   const choices=(key,items)=>`<div class="seg choice" role="group" aria-label="${key}">${items.map(([v,l])=>`<button type="button" data-ui="${key}" data-value="${v}" class="${(C[key]||CDEFAULT[key])==v?'on':''}" aria-pressed="${(C[key]||CDEFAULT[key])==v?'true':'false'}">${l}</button>`).join('')}</div>`;
   const tk=`<section class="card"><div class="hd"><div><h3>API-токены</h3><p>Выдача API-токенов для интеграций ещё не реализована.</p></div></div><p class="note">Не создавайте токены через этот раздел: безопасность доступа к API будет добавлена отдельным этапом.</p></section>`;

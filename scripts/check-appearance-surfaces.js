@@ -120,6 +120,21 @@ control.id='custom-b';control.value='13579b';
 updateHex(control);
 assert.equal(draft.b,'#13579B');
 assert.equal(draft.a,'#ABCDEF','Second color must not modify first');
+
+// Palette layout: six columns at the user's desktop width, with no incomplete third row.
+const paletteCode=app.slice(app.indexOf('  const sw=[',app.indexOf('async function setP()')),
+ app.indexOf('  const choices=',app.indexOf('async function setP()')));
+const palettePresets=[...paletteCode.matchAll(/\['([a-z]+)','(#[0-9a-f]{6})','(#[0-9a-f]{6})','([^']+)'\]/g)];
+assert.equal(palettePresets.length,18,'The gallery must contain exactly 18 presets (three rows of six)');
+assert.equal(new Set(palettePresets.map(match=>match[1])).size,18,'Preset keys must be unique');
+for(const theme of [["lime","Лайм","Lime"],["terracotta","Терракота","Terracotta"],["orchid","Орхидея","Orchid"],["aurora","Аврора","Aurora"]]){
+ const [id,name,en]=theme;
+ assert(palettePresets.some(match=>match[1]===id&&match[4]===name),'Missing Russian-labelled preset '+id);
+ assert(css.includes('[data-accent='+id+']'),'Missing dark-mode theme '+id);
+ assert(css.includes('[data-theme=light][data-accent='+id+']'),'Missing light-mode theme '+id);
+ const catalog=fs.readFileSync('i18n.js','utf8');
+ assert(catalog.includes('["'+name+'","'+en+'"]'),'Missing RU/EN label for '+id);
+}
 // Appearance uses two balanced columns and the locale selector is global.
 assert.match(app,/<div class="appearance-layout">/,'Aligned appearance workspace must exist');
 assert.match(app,/appearance-column/,'Appearance cards must use two columns');
