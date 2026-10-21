@@ -528,10 +528,10 @@ async fn patch_settings(
         }
     }
     for key in ["subscriptionShowTraffic", "subscriptionShowExpiry"] {
-        if let Some(value) = object.get(key) {
-            if !value.is_boolean() {
-                return Err(ApiError::new(StatusCode::BAD_REQUEST, format!("Поле {key} должно быть переключателем.")));
-            }
+        if let Some(value) = object.get(key)
+            && !value.is_boolean()
+        {
+            return Err(ApiError::new(StatusCode::BAD_REQUEST, format!("Поле {key} должно быть переключателем.")));
         }
     }
     if let Some(hooks) = object.get("hooks") {
