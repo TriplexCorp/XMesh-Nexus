@@ -182,7 +182,8 @@ assert.match(rust,/"deploymentServerB"/);
 assert.match(rust,/"subscriptionPlacement", &\["a", "b", "c"\]/);
 assert(!rust.includes('.route("/s/'),'The management panel must not implement public subscription serving');
 assert.match(html,/subscription-studio\.js\?v=[a-z0-9-]+/,'Subscription Studio JavaScript must use a cache-busting version');
-assert.match(html,/subscription-studio\.css\?v=20261021-sync-theme-1/);
+assert.match(html,/<link\s+rel="stylesheet"\s+href="subscription-studio\.css\?v=[a-zA-Z0-9._-]+"\s*\/?>/,
+ 'Subscription Studio stylesheet must retain a cache-busting version');
 assert.match(docker,/subscription-studio\.css subscription-studio\.js/);
 assert.match(css,/\.subscription-studio-layout/);
 assert.match(css,/@media\(max-width:780px\)/);
