@@ -134,6 +134,16 @@ pub async fn login(
     issue_session(&state,admin_id,&username,&role).await
 }
 
+pub(crate) async fn is_rate_limited(state:&AppState,username_key:&str)->Result<bool,ApiError>{
+    let mut conn=state.redis.clone();
+    let count=redis::cmd("GET").arg(format!("xmesh:auth:login:{username_key}"))
+        .query_async::<Option<i64>>(&mut conn).await.unwrap_or(None).unwrap_or(0);
+    let locked:bool=sqlx::query_scalar(
+        "SELECT COALESCE((SELECT locked_until>NOW() FROM auth_login_limits WHERE username_key=$1),FALSE)"
+    ).bind(username_key).fetch_one(&state.pool).await?;
+    Ok(count>=8 || locked)
+}
+
 pub(crate) async fn clear_failed_login(state:&AppState,username_key:&str)->Result<(),ApiError>{
     sqlx::query("DELETE FROM auth_login_limits WHERE username_key = $1")
         .bind(&username_key)
