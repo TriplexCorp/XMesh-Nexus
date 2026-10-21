@@ -18,7 +18,7 @@
 - Administrator sign-in with Argon2 password hashing, a dedicated /login page, a 12-hour HttpOnly/SameSite session cookie, and an audit log for mutations.
 - Real SQL-backed administrator accounts with owner/admin/viewer roles. The server, not the UI, checks permissions on every write, core update and settings change. The owner may create accounts, change passwords/roles, or disable accounts. Such changes revoke existing sessions; the last active owner cannot be removed. Existing authenticated accounts migrate to owner to preserve access.
 - Server-side guard for the panel entry point, same-origin validation for state-changing API requests, and persistent account-based login throttling (8 failed attempts within 15 minutes trigger a 15-minute cooldown).
-- TOTP-based two-factor authentication with recovery codes is planned for the next security phase; it is not enabled yet.
+- Optional administrator TOTP two-factor authentication is supported. Enabled accounts must provide an authenticator or one-time recovery code after password verification, before a panel session is issued.
 - Xray-core version manager in **Settings → Xray-core**. The default target is latest; the service reads official release metadata from the XTLS/Xray-core GitHub project, downloads the expected Linux archive for the container architecture, verifies an advertised SHA-256 digest when GitHub supplies one, runs xray version to check the executable, and switches the active version atomically.
 - API/database readiness probes, Rust CI, and a non-root/read-only application container.
 
@@ -48,8 +48,8 @@ or active state revokes that account's sessions. Account password hashes are
 never returned to the frontend or audit log. Account creation requires a
 16–1024-character password. An owner cannot delete or demote their own account.
 
-**Not yet implemented:** TOTP two-factor authentication and backup codes,
-real API bearer tokens for integrations, granular per-collection permissions,
+**Not yet implemented:** real API bearer tokens for integrations,
+granular per-collection permissions,
 per-admin user quotas, and full browser/integration penetration testing.
 Former settings UI generated a fake token string; it has been replaced with
 an explicit disabled-state notice, and the legacy `tokens` collection is
@@ -60,6 +60,43 @@ cross-origin mutation requests using Fetch Metadata and Origin/Host checks,
 and refuses missing or expired sessions. TLS is still provided by the
 operator's reverse proxy. Do not publicly expose a panel without HTTPS and
 a properly secured proxy configuration.
+
+## Administrator two-factor authentication (TOTP)
+
+From **Settings → Two-factor authentication**, an administrator can enroll their
+own account after re-entering their current password. Enter the Base32 secret
+into an authenticator supporting standard TOTP (e.g., Aegis, 2FAS, Google
+Authenticator), then confirm a 6-digit code. Only after successful confirmation
+does the account require a second factor at login. The 10 high-entropy recovery
+codes are shown once, and each code can be used for a single login (or to
+disable the second factor along with the password). Save them offline.
+
+Security properties:
+- Each 20-byte TOTP secret is encrypted at rest using AES-256-GCM with an
+  independent persistent `TOTP_ENCRYPTION_KEY`. Authentication fails closed for
+  enabled accounts if the key is missing or wrong. PostgreSQL backups do NOT
+  include this key; back it up securely and separately.
+- TOTP uses RFC 6238 HMAC-SHA1, six digits, 30-second periods and a ±1 window.
+  Accepted time steps cannot be reused. Use NTP on the host for correct time.
+- Password-only requests create short-lived (5 minute), bounded-attempt MFA
+  challenges, never authenticated sessions. Recovery codes are stored only as
+  hashes. Enrollment is valid for 10 minutes and requires a valid code.
+- Enabling and disabling MFA revoke other active sessions. Disabling requires
+  the current password AND a TOTP or unused recovery code. Repeated wrong
+  attempts are rate-limited via Redis and PostgreSQL.
+- API endpoints: `GET /api/v1/auth/mfa/status`, `POST .../setup`,
+  `POST .../confirm`, `POST .../disable` (all session-protected);
+  `POST .../verify` (challenge + factor before session issuance).
+
+**Deployment and upgrades:** fresh `./install.sh` installs a random
+`TOTP_ENCRYPTION_KEY` in the mode-0600 `.env`. On existing installations
+**run `./install.sh` once** to add the key without resetting previous passwords
+or database volumes. For manual Compose upgrades, generate the key with
+`openssl rand -hex 32` and append `TOTP_ENCRYPTION_KEY=<value>` to `.env`
+before restarting. Keep this value unchanged when rebuilding containers,
+restoring backups or moving hosts. Losing the key makes existing enabled
+TOTP accounts inaccessible until the original key is restored; there is no
+password-only bypass. Never commit the key to GitHub.
 
 ## Installation
 
