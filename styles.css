@@ -2237,3 +2237,50 @@ dialog.user-modal .user-legend-dot.is-up{background:color-mix(in srgb,var(--a) 3
 #mfa-panel .act{display:flex;gap:.6rem;flex-wrap:wrap;justify-content:flex-start}
 #mfa-secret,#mfa-recovery-codes{font-family:ui-monospace,Consolas,monospace;font-size:.85rem}
 #mfa-recovery-codes{max-width:28rem;width:100%;resize:vertical}
+
+
+/* XMesh unified dialog motion: centered windows rise softly, side panels slide
+   from the edge, and exits retain the top layer through allow-discrete. */
+#dlg{
+ --modal-off:translateY(16px) scale(.982);
+ opacity:0;transform:var(--modal-off);
+ animation:none!important;
+ transition:opacity .24s cubic-bezier(.2,.75,.25,1),
+  transform .32s cubic-bezier(.18,.82,.24,1),
+  display .32s allow-discrete,overlay .32s allow-discrete;
+}
+#dlg[open]{opacity:1;transform:translateY(0) scale(1)}
+#dlg.side{--modal-off:translateX(35px);animation:none!important}
+#dlg.pop,#dlg.pal{--modal-off:translateY(-12px) scale(.982)}
+#dlg::backdrop{
+ opacity:0;animation:none!important;
+ transition:opacity .32s ease,display .32s allow-discrete,overlay .32s allow-discrete;
+}
+#dlg[open]::backdrop{opacity:1}
+@starting-style{
+ #dlg[open]{opacity:0;transform:var(--modal-off)}
+ #dlg[open]::backdrop{opacity:0}
+}
+/* Every dialog action shares one responsive motion curve. */
+html[data-motion=on] #dlg :is(.btn,.gh,.ia,.dg){
+ transition:transform .18s cubic-bezier(.2,.8,.25,1),
+ background-color .2s ease,border-color .2s ease,box-shadow .2s ease,color .2s ease;
+}
+html[data-motion=on] #dlg :is(.btn,.gh,.ia,.dg):not(:disabled):hover{transform:translateY(-1px)}
+html[data-motion=on] #dlg :is(.btn,.gh,.ia,.dg):not(:disabled):active{transform:scale(.975)}
+html[data-motion=on] #dlg :is(input,textarea,select){
+ transition:border-color .2s ease,box-shadow .2s ease,background-color .2s ease;
+}
+#dlg .btn:disabled{opacity:.58;cursor:wait}
+html[data-motion=off] #dlg,
+html[data-motion=off] #dlg::backdrop{animation:none!important;transition:none!important}
+html[data-motion=off] #dlg{transform:none!important;opacity:1}
+html[data-motion=off] #dlg::backdrop{opacity:1}
+@media(prefers-reduced-motion:reduce){
+ #dlg,#dlg::backdrop{transition:none!important;animation:none!important}
+ #dlg{transform:none!important;opacity:1}
+ #dlg::backdrop{opacity:1}
+ html[data-motion=on] #dlg :is(.btn,.gh,.ia,.dg,input,textarea,select){transition:none!important}
+ html[data-motion=on] #dlg :is(.btn,.gh,.ia,.dg):not(:disabled):hover,
+ html[data-motion=on] #dlg :is(.btn,.gh,.ia,.dg):not(:disabled):active{transform:none}
+}

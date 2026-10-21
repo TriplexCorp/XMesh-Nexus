@@ -328,7 +328,18 @@ document.addEventListener('pointerdown',hideRailTip);
 window.addEventListener('scroll',hideRailTip,true);
 window.addEventListener('resize',hideRailTip);
 
-const modal=(h,c='')=>{dlg.className=c;dlg.innerHTML=h;decorateButtonIcons(dlg);if(!dlg.open)dlg.showModal()};
+// Native modal semantics, unified entrance/exit transitions and subtle content swaps.
+const modal=(h,c='')=>{
+ const replacing=dlg.open;
+ dlg.className=c;dlg.innerHTML=h;decorateButtonIcons(dlg);
+ if(!replacing)dlg.showModal();
+ else if(C.motion&&typeof dlg.firstElementChild?.animate==='function'&&!matchMedia('(prefers-reduced-motion: reduce)').matches){
+  dlg.firstElementChild.animate([
+   {opacity:.6,transform:'translateY(7px) scale(.988)'},
+   {opacity:1,transform:'translateY(0) scale(1)'}
+  ],{duration:220,easing:'cubic-bezier(.2,.8,.25,1)'});
+ }
+};
 dlg.addEventListener('click',e=>{if(e.target==dlg||e.target.closest('[data-x]'))dlg.close()});
 const confirmBox=(h,ok,fn)=>{CF=fn;modal(`<div class="box"><h2>${h}</h2><div class="act"><button class="gh" data-x>Отмена</button><button class="btn" data-cf>${ok}</button></div></div>`)};
 let tt;const toast=(m,al,fn)=>{const t=$('#toast');t.innerHTML=`<span>${esc(m)}</span>${al?`<button id="ta">${al}</button>`:''}`;if(al)$('#ta').onclick=()=>{fn();t.classList.remove('show')};t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),al?6000:2400)};
@@ -2288,9 +2299,36 @@ document.addEventListener('keydown',e=>{
   if(e.target.id=='pq'){if(e.key=='ArrowDown'||e.key=='ArrowUp'){e.preventDefault();const n=Math.min(PI.length,12);PX=(PX+(e.key=='ArrowDown'?1:n-1))%Math.max(n,1);$$('.pi').forEach((x,i)=>x.classList.toggle('on',i==PX));$('.pi.on')?.scrollIntoView({block:'nearest'})}if(e.key=='Enter'){e.preventDefault();const x=PI[PX];if(x){dlg.close();x.r()}}return}
   if(e.key=='/'&&!/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)){e.preventDefault();cur=='users'?$('#uq').focus():palette()}});
 document.addEventListener('submit',async e=>{const f=e.target,k=f.dataset.k;if(!k)return;const er=m=>{e.preventDefault();$('#fe')&&($('#fe').textContent=m)};
-  if(k=='user'){const d=read(FU,f);if(DB.users.some(u=>u.username.toLowerCase()==d.username.toLowerCase()))return er('Такое имя уже есть. Выберите другое.');if(!d.squads.length)return er('Выберите хотя бы один сквад.');
+  if(k=='user'){
+    e.preventDefault();
+    // Prevent premature method=dialog closure, duplicate clicks and stale dialogs.
+    if(f.dataset.creating==='1')return;
+    const d=read(FU,f);
+    if(DB.users.some(u=>u.username.toLowerCase()==d.username.toLowerCase()))return er('Такое имя уже есть. Выберите другое.');
+    if(!d.squads.length)return er('Выберите хотя бы один сквад.');
     const u={username:d.username,disabled:false,hold:d.hold,holdDays:d.days||30,created:Date.now(),expireAt:d.hold||!d.days?null:Date.now()+d.days*DAY,limit:d.limit,used:0,strategy:d.strategy,tag:d.tag,tg:'',email:'',desc:d.desc,hwid:d.hwid,fingerprint:d.fingerprint||'chrome',squads:d.squads,onlineAt:0,adminId:DB.admins.find(a=>a.role==='owner')?.id||null,short:Math.floor(Math.random()*2**40).toString(36).padStart(8,'a'),xrayId:crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=crypto.getRandomValues(new Uint8Array(1))[0]&15;return(c==='x'?r:(r&3|8)).toString(16)}),xrayProfileId:d.xrayProfileId||null,devices:[]};
-    const c=await api.create('users',u);if(c.xrayProfileId){try{await syncXrayUserToProfile(c)}catch(err){toast('Пользователь создан, но профиль Xray не обновлён: '+(err.message||'ошибка'),'ОК')}}UQ.q='';UQ.st='all';UQ.sort='created';UQ.dir='desc';toast(`Пользователь ${c.username} создан`);location.hash=='#users'?render(1):location.hash='users';setTimeout(()=>userDrawer(c.id,'sub'),350)}
+    const submitButton=f.querySelector('.act .btn');
+    f.dataset.creating='1';
+    if(submitButton)submitButton.disabled=true;
+    try{
+      const c=await api.create('users',u);
+      let xrayWarning='';
+      if(c.xrayProfileId){
+        try{await syncXrayUserToProfile(c)}
+        catch(error){xrayWarning='Профиль Xray не обновлён: '+(error.message||'ошибка')}
+      }
+      UQ.q='';UQ.st='all';UQ.sort='created';UQ.dir='desc';UQ.page=1;
+      dlg.close();
+      if(location.hash==='#users')render(1);
+      else location.hash='users';
+      // Open details only when the user chooses the toast action.
+      toast(xrayWarning||`Пользователь ${c.username} создан`,'Открыть',()=>userDrawer(c.id,'ov'));
+    }catch(error){er('Не удалось создать пользователя: '+(error.message||'ошибка API'))}
+    finally{
+      delete f.dataset.creating;
+      if(submitButton?.isConnected)submitButton.disabled=false;
+    }
+  }
   else if(k=='uedit'){e.preventDefault();const d=read(FE,f),id=+f.dataset.id;if(DB.users.some(u=>u.username.toLowerCase()==d.username.toLowerCase()&&u.id!=id))return er('Такое имя уже есть.');await api.update('users',id,d);toast('Сохранено');render(1);userDrawer(id,'ov')}
   else if(k=='ent'){e.preventDefault();const key=f.dataset.ent,e2=ENT[key],d=read(e2.fs,f),id=f.dataset.id,m=e2.chk?.(d,+id);if(m)return er(m);
     if(key==='admins'){
