@@ -1,5 +1,6 @@
 mod admin_accounts;
 mod auth;
+mod mfa;
 mod core;
 mod node_rotation;
 mod subscription_settings;
@@ -82,6 +83,7 @@ pub struct AppState {
     pub redis: ConnectionManager,
     pub core: CoreManager,
     pub cookie_secure: bool,
+    pub totp_key: Option<[u8;32]>,
 }
 
 #[derive(Debug)]
@@ -196,11 +198,20 @@ async fn main() -> anyhow::Result<()> {
         env::var("CORE_DATA_DIR").unwrap_or_else(|_| "/var/lib/xmesh/core".to_owned()),
     );
     let core = CoreManager::new(pool.clone(), core_dir).await?;
-    let state = AppState { pool, redis, core, cookie_secure };
+    let totp_key=env::var("TOTP_ENCRYPTION_KEY").ok().filter(|s|!s.trim().is_empty())
+        .map(|raw|mfa::decode_key(&raw)).transpose()?;
+    if totp_key.is_none() {
+        tracing::warn!("TOTP_ENCRYPTION_KEY is not configured: MFA enrollment is unavailable");
+    }
+    let state = AppState { pool, redis, core, cookie_secure, totp_key };
     state.core.launch_startup_update().await;
 
     let protected = Router::new()
         .route("/bootstrap", get(bootstrap))
+        .route("/auth/mfa/status", get(mfa::status))
+        .route("/auth/mfa/setup", post(mfa::setup))
+        .route("/auth/mfa/confirm", post(mfa::confirm))
+        .route("/auth/mfa/disable", post(mfa::disable))
         .route("/settings", get(get_settings).patch(patch_settings))
         .route("/stats", get(get_stats))
         .route("/system/stats", get(get_system_stats))
@@ -224,6 +235,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/metrics/ingest", post(ingest_node_metrics))
         .route("/auth/session", get(auth::session))
         .route("/auth/login", post(auth::login))
+        .route("/auth/mfa/verify", post(mfa::verify_challenge))
         .route("/auth/logout", post(auth::logout));
 
     let static_dir = env::var("STATIC_DIR").unwrap_or_else(|_| "/app/static".to_owned());
