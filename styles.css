@@ -1912,11 +1912,11 @@ dialog.user-modal .user-legend-dot.is-up{background:color-mix(in srgb,var(--a) 3
   }
 }
 
-/* Nodes grid: preserve visible density changes with 1–3 real nodes.
-   The general node-count caps above made compact/standard (3 nodes) and
-   standard/spacious (2 nodes) resolve to the same column widths. */
+/* With a single configured node, keep cards readable rather than stretching
+   one information card across the entire desktop. With 2+ nodes, the full
+   container width belongs to the grid; don't cap width or downgrade the
+   Standard three-node layout to two columns. */
 @container nodes-grid (min-width:32rem){
-  /* With a single node the card width, not the column count, communicates density. */
   .nodes-page>.nodes[data-node-count="1"][data-grid-mode=compact]{
     grid-template-columns:minmax(0,22rem);
   }
@@ -1925,25 +1925,6 @@ dialog.user-modal .user-legend-dot.is-up{background:color-mix(in srgb,var(--a) 3
   }
   .nodes-page>.nodes[data-node-count="1"][data-grid-mode=spacious]{
     grid-template-columns:minmax(0,40rem);
-  }
-  /* Spacious is deliberately one larger card per row for two-node setups. */
-  .nodes-page>.nodes[data-node-count="2"][data-grid-mode=spacious]{
-    grid-template-columns:minmax(0,min(100%,40rem));
-  }
-}
-@container nodes-grid (min-width:52rem){
-  .nodes-page>.nodes[data-node-count="2"][data-grid-mode=compact]{
-    grid-template-columns:repeat(2,minmax(0,1fr));
-    max-width:48rem;
-  }
-  .nodes-page>.nodes[data-node-count="2"][data-grid-mode=standard]{
-    grid-template-columns:repeat(2,minmax(0,1fr));
-    max-width:64rem;
-  }
-  /* Three nodes must not make Standard look identical to Compact at 70rem+. */
-  .nodes-page>.nodes[data-node-count="3"][data-grid-mode=standard]{
-    grid-template-columns:repeat(2,minmax(0,1fr));
-    max-width:68rem;
   }
 }
 
