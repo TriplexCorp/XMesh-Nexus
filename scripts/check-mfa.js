@@ -18,20 +18,20 @@ for(const field of ['panel_totp','panel_totp_recovery','panel_mfa_challenges'])a
 for(const path of ['auth/mfa/status','auth/mfa/setup','auth/mfa/confirm','auth/mfa/disable','auth/mfa/verify'])
  assert(main.includes(path),'MFA route missing '+path);
 assert.match(main,/mfa::decode_key/);
-assert.match(main,/pub totp_key: Option<\[u8; ?32\]>/);
+assert.match(main,/pub totp_key: Option<\[u8;\s*32\]>/);
 assert.match(rust,/Aes256Gcm/,'TOTP secrets must be encrypted at rest');
 assert.match(rust,/\.encrypt\(/);
 assert.match(rust,/\.decrypt\(/);
-assert.match(rust,/matching_step\(.*last/);
+assert.match(rust,/matching_step\s*\([\s\S]{0,180}last/);
 assert.match(rust,/ct_eq/,'TOTP equality must use constant-time comparison');
 assert.match(rust,/panel_totp_recovery/);
 assert.match(rust,/DELETE FROM panel_totp_recovery.*RETURNING code_hash/);
-assert.match(rust,/attempts>=5/,'MFA login challenges must limit attempts');
+assert.match(rust,/attempts\s*>=\s*5/,'MFA login challenges must limit attempts');
 assert.match(rust,/password_is_valid/,'TOTP enrollment/disable must require password');
 assert.match(rust,/last_used_step/,'TOTP codes must not be reusable');
 assert.match(rust,/recoveryCodes/,'Recovery codes must be displayed only at first enrollment');
 assert.match(rust,/WHERE admin_id=\$1 AND token_hash<>/,'Existing other sessions should be revoked on enabling');
-assert.match(auth,/mfa::enabled\(&state,admin_id\)/);
+assert.match(auth,/mfa::enabled\(\s*&state,\s*admin_id\s*\)/);
 const passwordSegment=auth.slice(auth.indexOf('let verified'),auth.indexOf('pub(crate) async fn clear_failed_login'));
 assert(passwordSegment.indexOf('mfa::enabled')<passwordSegment.indexOf('issue_session'),
  'Authenticated session must only be created after an enabled MFA check');
