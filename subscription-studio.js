@@ -5,7 +5,7 @@ window.XMeshSubscriptionStudio = (() => {
   const defaults = {
     subscriptionDomain:'', subscriptionPath:'/s',
     subscriptionBrand:'', subscriptionDescription:'Всё просто работает.',
-    subscriptionFooter:'', subscriptionAccent:'#e8bb78', subscriptionLanguage:'ru',
+    subscriptionFooter:'', subscriptionAccent:'#e8bb78', subscriptionLanguage:'ru', subscriptionTheme:'dark',
     subscriptionShowTraffic:true, subscriptionShowExpiry:true,
     subscriptionPlacement:'a', nodePlacement:'a', deploymentServerB:'', deploymentServerC:''
   };
@@ -73,6 +73,8 @@ window.XMeshSubscriptionStudio = (() => {
       '<div class="subscription-studio-pair">',
       field('subscriptionAccent','Акцентный цвет',data.subscriptionAccent,'Цвет кнопок и индикаторов.',{color:true}),
       choice('subscriptionLanguage',data.subscriptionLanguage,[['ru','Русский'],['en','English'],['tr','Türkçe'],['vi','Tiếng Việt']]),
+      '</div><div class="subscription-studio-pair">',
+      '<label class="f subscription-field"><span>Тема клиентского портала</span><select name="subscriptionTheme"><option value="dark"'+(data.subscriptionTheme!=='light'?' selected':'')+'>Тёмная</option><option value="light"'+(data.subscriptionTheme==='light'?' selected':'')+'>Светлая</option></select></label>',
       '</div>',
       field('subscriptionFooter','Нижняя подпись',data.subscriptionFooter,'Например, адрес поддержки.',{placeholder:'Поддержка: @yourbot',max:160}),
       '<div class="subscription-display-options">',
@@ -106,6 +108,7 @@ window.XMeshSubscriptionStudio = (() => {
         subscriptionFooter:input(form,'subscriptionFooter').value.trim(),
         subscriptionAccent:input(form,'subscriptionAccent').value,
         subscriptionLanguage:input(form,'subscriptionLanguage').value,
+        subscriptionTheme:input(form,'subscriptionTheme').value,
         subscriptionShowTraffic:input(form,'subscriptionShowTraffic').checked,
         subscriptionShowExpiry:input(form,'subscriptionShowExpiry').checked,
         subscriptionPlacement:input(form,'subscriptionPlacement').value,
@@ -119,6 +122,7 @@ window.XMeshSubscriptionStudio = (() => {
           ? 'https://'+d.subscriptionDomain+d.subscriptionPath+'/<token>':'Укажите домен и путь';
         const preview=$('[data-subscription-preview]');
         preview.style.setProperty('--portal-accent',d.subscriptionAccent);
+        preview.dataset.portalTheme=d.subscriptionTheme;
         $('[data-subscription-brand]').textContent=d.subscriptionBrand||settings.brand||'VPN';
         $('[data-subscription-active]').textContent=copy[0];
         $('[data-subscription-description]').textContent=d.subscriptionDescription;
