@@ -1306,6 +1306,25 @@ white-space:nowrap;
  --sr-ruler:#8491a5;
  --sr-scale:1;
 }
+/* The Studio root is a layout surface, not a card.
+   GLASS adds ::before/::after and backdrop blur to all .card elements.
+   When the builder resets its border radius, those effects become visible
+   as hard 90-degree rectangular plates behind the rounded inner panels. */
+html[data-surface=glass] .xray-builder.studio-reference-v5.card{
+  background:transparent!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  -webkit-backdrop-filter:none!important;
+  backdrop-filter:none!important;
+  isolation:auto!important;
+}
+html[data-surface=glass] .xray-builder.studio-reference-v5.card::before,
+html[data-surface=glass] .xray-builder.studio-reference-v5.card::after{
+  content:none!important;
+  display:none!important;
+}
+
 html[data-density=compact] .xray-builder.studio-reference-v5{--sr-scale:.88}
 html[data-density=spacious] .xray-builder.studio-reference-v5{--sr-scale:1.13}
 html[data-theme=light] .xray-builder.studio-reference-v5{
