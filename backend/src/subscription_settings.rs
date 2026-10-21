@@ -57,7 +57,7 @@ pub(crate) fn validate(object: &Map<String, Value>) -> Result<(), ApiError> {
     }
     if let Some(v) = object.get("subscriptionRadius") {
         let radius = v.as_i64().ok_or_else(|| bad("Скругление должно быть целым числом."))?;
-        if !(1..=48).contains(&radius) { return Err(bad("Скругление должно быть от 1 до 48 пикселей.")); }
+        if !(1..=36).contains(&radius) { return Err(bad("Скругление должно быть от 1 до 36 пикселей.")); }
     }
     for (key, max) in [
         ("subscriptionHero", 100), ("subscriptionCta", 80), ("subscriptionSupportLabel", 80),
@@ -165,9 +165,9 @@ mod tests {
         assert!(!accepts(json!({"subscriptionLogoUrl":"https://user:pass@example.com/logo.png"})));
         assert!(!accepts(json!({"subscriptionSupportUrl":"http://example.com"})));
         assert!(accepts(json!({"subscriptionRadius":29})));
-        assert!(accepts(json!({"subscriptionRadius":48})));
+        assert!(accepts(json!({"subscriptionRadius":36})));
         assert!(!accepts(json!({"subscriptionRadius":0})));
-        assert!(!accepts(json!({"subscriptionRadius":49})));
+        assert!(!accepts(json!({"subscriptionRadius":37})));
         assert!(accepts(json!({"subscriptionSyncPanelTheme":true})));
         assert!(!accepts(json!({"subscriptionSyncPanelTheme":"yes"})));
         assert!(!accepts(json!({"subscriptionBackground":"red"})));
