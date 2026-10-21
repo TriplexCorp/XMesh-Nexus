@@ -223,6 +223,16 @@ live preview** before saving.
 **Application directory:** The admin may independently enable/disable Happ,
 Incy, v2rayTun, v2rayN, v2rayNG, Streisand, Hiddify, NekoBox, Shadowrocket,
 FlClash, Stash, sing-box, V2Box, Loon, Mihomo Party, and Clash Verge Rev.
+Admins can also create up to **32 custom client applications** in the same
+Subscription Studio section, specifying a display name, platforms, an optional
+HTTPS installation URL, and whether to show the app. Custom entries can be
+edited or removed without touching the 16 built-in clients. The list heading
+(`subscriptionAppsTitle`) can be replaced with a service-specific caption,
+such as "Supported clients"; leave it empty for a language-aware default.
+All entries are stored under `subscriptionCustomClients` in PostgreSQL.
+The Rust API validates unique IDs, text lengths, boolean flags and HTTPS links,
+and the live preview renders all enabled apps with HTML escaping.
+
 Optional per-app HTTPS installation links are stored in PostgreSQL with the
 portal blueprint; the panel does not hardcode vendor URLs, download packages,
 execute deep links, or assert that an app supports every transport. An empty
