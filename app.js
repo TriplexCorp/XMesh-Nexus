@@ -344,9 +344,9 @@ dlg.addEventListener('click',e=>{if(e.target==dlg||e.target.closest('[data-x]'))
 const confirmBox=(h,ok,fn)=>{CF=fn;modal(`<div class="box"><h2>${h}</h2><div class="act"><button class="gh" data-x>Отмена</button><button class="btn" data-cf>${ok}</button></div></div>`)};
 let tt;const toast=(m,al,fn)=>{const t=$('#toast');t.innerHTML=`<span>${esc(m)}</span>${al?`<button id="ta">${al}</button>`:''}`;if(al)$('#ta').onclick=()=>{fn();t.classList.remove('show')};t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),al?6000:2400)};
 const CDEFAULT={theme:'dark',accent:'emerald',customA:'#60d6a2',customB:'#c3e879',hue:151,sat:62,lum:61,ts:1,motion:1,density:'comfortable',surface:'solid',glow:'normal',font:'onest',radius:16,borders:'soft',sidebar:'standard',railTips:0,contentWidth:1920,gapScale:1,autoCoreRefresh:1,coreRefreshSeconds:30};
-let C={...CDEFAULT};try{Object.assign(C,JSON.parse(localStorage.xmeshNexusSettings||'{}'))}catch(e){}if(C.accent==='mint')C.accent='emerald';if(!['solid','glass','raised'].includes(C.surface))C.surface='solid';C.railTips=C.railTips===true||C.railTips===1?1:0;
+let C={...CDEFAULT};try{Object.assign(C,JSON.parse(localStorage.xmeshNexusSettings||'{}'))}catch(e){}if(C.accent==='mint')C.accent='emerald';if(!['solid','glass','raised'].includes(C.surface))C.surface='solid';C.railTips=C.railTips===true||C.railTips===1?1:0;C.ts=cl(Number(C.ts)||1,.9,2);C.rangePrecision=C.rangePrecision===10?10:1;
 const hslHex=(h,s,l)=>{s/=100;l/=100;const k=n=>(n+h/30)%12,a=s*Math.min(l,1-l),f=n=>{const c=(k(n)+12)%12;return l-a*Math.max(-1,Math.min(c-3,9-c,1))};return '#'+[f(0),f(8),f(4)].map(v=>Math.round(v*255).toString(16).padStart(2,'0')).join('')};
-const apply=()=>{const r=document.documentElement;r.dataset.theme=C.theme=='auto'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):C.theme;r.dataset.accent=C.accent;r.style.setProperty('--custom-a',C.customA||hslHex(+C.hue||151,+C.sat||62,+C.lum||61));r.style.setProperty('--custom-b',C.customB||'#c3e879');if(C.accent==='custom'){const rgb=(C.customA||'#60d6a2').match(/[0-9a-f]{2}/gi).map(v=>parseInt(v,16)/255);const linear=rgb.map(v=>v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4));const lum=.2126*linear[0]+.7152*linear[1]+.0722*linear[2];r.style.setProperty('--btn-text',lum>.42?'#082b1d':'#ffffff')}else r.style.setProperty('--btn-text',r.dataset.theme==='light'?'#ffffff':'#082b1d');r.dataset.density=C.density||CDEFAULT.density;r.dataset.surface=C.surface||CDEFAULT.surface;r.dataset.glow=C.glow||CDEFAULT.glow;r.dataset.font=C.font||CDEFAULT.font;r.dataset.borders=C.borders||CDEFAULT.borders;r.dataset.sidebar=C.sidebar||CDEFAULT.sidebar;r.dataset.railTips=C.railTips?'on':'off';if(!C.railTips)hideRailTip();r.style.setProperty('--ts',cl(+C.ts||1,.9,5));const radius=cl(+C.radius||16,4,36);r.style.setProperty('--ui-radius',radius+'px');r.style.setProperty('--ui-control-radius',Math.max(5,radius*.72)+'px');r.dataset.motion=C.motion?'on':'off';
+const apply=()=>{const r=document.documentElement;r.dataset.theme=C.theme=='auto'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):C.theme;r.dataset.accent=C.accent;r.style.setProperty('--custom-a',C.customA||hslHex(+C.hue||151,+C.sat||62,+C.lum||61));r.style.setProperty('--custom-b',C.customB||'#c3e879');if(C.accent==='custom'){const rgb=(C.customA||'#60d6a2').match(/[0-9a-f]{2}/gi).map(v=>parseInt(v,16)/255);const linear=rgb.map(v=>v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4));const lum=.2126*linear[0]+.7152*linear[1]+.0722*linear[2];r.style.setProperty('--btn-text',lum>.42?'#082b1d':'#ffffff')}else r.style.setProperty('--btn-text',r.dataset.theme==='light'?'#ffffff':'#082b1d');r.dataset.density=C.density||CDEFAULT.density;r.dataset.surface=C.surface||CDEFAULT.surface;r.dataset.glow=C.glow||CDEFAULT.glow;r.dataset.font=C.font||CDEFAULT.font;r.dataset.borders=C.borders||CDEFAULT.borders;r.dataset.sidebar=C.sidebar||CDEFAULT.sidebar;r.dataset.railTips=C.railTips?'on':'off';if(!C.railTips)hideRailTip();r.style.setProperty('--ts',cl(+C.ts||1,.9,2));const radius=cl(+C.radius||16,4,36);r.style.setProperty('--ui-radius',radius+'px');r.style.setProperty('--ui-control-radius',Math.max(5,radius*.72)+'px');r.dataset.motion=C.motion?'on':'off';
 r.style.setProperty('--panel-content-max',cl(Number(C.contentWidth)||1920,720,3000)+'px');
 const baseGap=C.density==='compact'?.75:C.density==='spacious'?1.45:1.1;
 r.style.setProperty('--view-gap',(baseGap*cl(Number(C.gapScale)||1,.8,1.4))+'rem');
@@ -420,14 +420,26 @@ const syncRangeProgress=input=>{
  const percent=Math.max(0,Math.min(100,(value-min)/(max-min)*100));
  input.style.setProperty('--range-pct',percent.toFixed(2)+'%');
 };
-const initializeRangeProgress=root=>{
- root.querySelectorAll('input[type="range"]').forEach(syncRangeProgress);
+const configureRangePrecision=input=>{
+ if(!input?.matches?.('input[type="range"]'))return;
+ if(!input.dataset.baseStep)input.dataset.baseStep=input.getAttribute('step')||'1';
+ const base=Number(input.dataset.baseStep);
+ if(!Number.isFinite(base)||base<=0)return;
+ input.step=String(Number((base*C.rangePrecision).toPrecision(12)));
+ syncRangeProgress(input);
 };
+const initializeRangeProgress=root=>{
+ root.querySelectorAll('input[type="range"]').forEach(configureRangePrecision);
+};
+const updateVisibleRangePrecision=()=>{
+ document.querySelectorAll('input[type="range"]').forEach(configureRangePrecision);
+};
+
 // No serialization or full appearance recomputation in a range-input event.
 let appearanceControlsFrame=0;
 const paintAppearanceControls=()=>{
  const style=document.documentElement.style;
- style.setProperty('--ts',cl(Number(C.ts)||1,.9,5));
+ style.setProperty('--ts',cl(Number(C.ts)||1,.9,2));
  const radius=cl(Number(C.radius)||16,4,36);
  style.setProperty('--ui-radius',radius+'px');
  style.setProperty('--ui-control-radius',Math.max(5,radius*.72)+'px');
@@ -2002,7 +2014,7 @@ async function setP(){
       <div class="palette-draft-actions"><button class="gh sm" type="button" id="palette-cancel">Отмена</button><button class="btn" type="button" id="palette-apply">Применить палитру</button></div>
     </section>
     <section class="card sg"><div class="appearance-card-heading"><h3>Типографика</h3><small>Размер и начертание текста</small></div>
-      <div class="setting-row"><div class="setting-copy"><b>Масштаб интерфейса</b><small>Точное масштабирование от 90% до 500% с шагом 1%. Для возврата к стандартному размеру установите 100%.</small></div><div class="setting-control slider-control"><input type="range" id="ts" min="0.9" max="5" step="0.01" value="${C.ts}" aria-label="Масштаб интерфейса"><b id="tsv">${Math.round(C.ts*100)}%</b></div></div>
+      <div class="setting-row"><div class="setting-copy"><b>Масштаб интерфейса</b><small>Масштаб от 90% до 200%. Для возврата к стандартному размеру установите 100%.</small></div><div class="setting-control slider-control"><input type="range" id="ts" min="0.9" max="2" step="0.01" value="${C.ts}" aria-label="Масштаб интерфейса"><b id="tsv">${Math.round(C.ts*100)}%</b></div></div>
       <div class="setting-row"><div class="setting-copy"><b>Шрифт</b><small>Выберите нейтральный системный или моноширинный стиль</small></div><div class="setting-control">${choices('font',[['onest','Manrope'],['system','Системный'],['mono','Моно']])}</div></div>
     </section>
 </div><div class="appearance-column">
@@ -2016,6 +2028,7 @@ async function setP(){
     </section>
 <section class="card sg">
     <div class="appearance-card-heading"><h3>Рабочее пространство</h3><small>Ширина панели и интервалы между разделами</small></div>
+    <div class="setting-row"><div class="setting-copy"><b>Точность ползунков</b><small>Точно — шаг 1, с привязкой — шаг 10. Для процентных настроек используются соответствующие шаги в процентах.</small></div><div class="setting-control"><select id="range-precision" aria-label="Точность ползунков"><option value="1" ${C.rangePrecision===1?'selected':''}>Точно · 1</option><option value="10" ${C.rangePrecision===10?'selected':''}>С привязкой · 10</option></select></div></div>
     <div class="setting-row"><div class="setting-copy"><b>Ширина содержимого</b><small>Максимальная ширина рабочей области до 3000 px. На узком экране она ограничена размером окна.</small></div><div class="setting-control slider-control"><input type="range" id="content-width" min="720" max="3000" step="1" value="${C.contentWidth||1920}" aria-label="Ширина содержимого"><b id="content-width-value">${C.contentWidth||1920} px</b></div></div>
     <div class="setting-row"><div class="setting-copy"><b>Интервалы</b><small>Расстояние между карточками и блоками интерфейса</small></div><div class="setting-control slider-control"><input type="range" id="gap-scale" min="0.8" max="1.4" step="0.01" value="${C.gapScale||1}" aria-label="Расстояние между карточками"><b id="gap-scale-value">${Math.round((C.gapScale||1)*100)}%</b></div></div>
   </section>
@@ -2258,12 +2271,23 @@ document.addEventListener('click',e=>{
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeTopLanguage()});
 document.addEventListener('change',async e=>{const t=e.target;
   syncRangeProgress(t);
+  if(t.id==='range-precision'){
+    C.rangePrecision=t.value==='10'?10:1;
+    updateVisibleRangePrecision();
+    if(C.rangePrecision===10){
+      const width=$('#content-width');
+      if(width){C.contentWidth=cl(Math.round(C.contentWidth/10)*10,720,3000);width.value=C.contentWidth;$('#content-width-value').textContent=C.contentWidth+' px';syncRangeProgress(width);paintContentWidth();}
+    }
+    try{localStorage.xmeshNexusSettings=JSON.stringify(C)}catch(e){}
+    return;
+  }
   if(['ts','radius','gap-scale'].includes(t.id)){
     saveAppearanceControls();
     return;
   }
   if(t.id==='content-width'){
     C.contentWidth=cl(Number(t.value)||1920,720,3000);
+    if(C.rangePrecision===10)C.contentWidth=Math.round(C.contentWidth/10)*10;
     saveContentWidth();
     return;
   }
@@ -2290,8 +2314,8 @@ document.addEventListener('change',async e=>{const t=e.target;
 document.addEventListener('input',e=>{syncRangeProgress(e.target);if(updatePaletteColor(e.target))return;if(['hue','sat','lum'].includes(e.target.id)){
   paletteDraft.h=+$('#hue').value;paletteDraft.s=+$('#sat').value;paletteDraft.l=+$('#lum').value;
   paletteDraft.a=hslHex(paletteDraft.h,paletteDraft.s,paletteDraft.l);paintPaletteDraft();
-}else if(e.target.id=='ts'){C.ts=+e.target.value;$('#tsv').textContent=Math.round(C.ts*100)+'%';previewAppearanceControls()}else if(e.target.id=='radius'){C.radius=+e.target.value;$('#rv').textContent=C.radius+' px';previewAppearanceControls()}
- else if(e.target.id==='content-width'){C.contentWidth=cl(Number(e.target.value)||1920,720,3000);$('#content-width-value').textContent=C.contentWidth+' px';previewContentWidth()}
+}else if(e.target.id=='ts'){C.ts=cl(+e.target.value,.9,2);$('#tsv').textContent=Math.round(C.ts*100)+'%';previewAppearanceControls()}else if(e.target.id=='radius'){C.radius=+e.target.value;$('#rv').textContent=C.radius+' px';previewAppearanceControls()}
+ else if(e.target.id==='content-width'){C.contentWidth=cl(Number(e.target.value)||1920,720,3000);if(C.rangePrecision===10)C.contentWidth=Math.round(C.contentWidth/10)*10;$('#content-width-value').textContent=C.contentWidth+' px';previewContentWidth()}
  else if(e.target.id==='gap-scale'){C.gapScale=+e.target.value;$('#gap-scale-value').textContent=Math.round(C.gapScale*100)+'%';previewAppearanceControls()}
  if(e.target.id=='pq')pdraw(e.target.value)});
 document.addEventListener('keydown',e=>{
