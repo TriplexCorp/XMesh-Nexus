@@ -159,6 +159,32 @@ SNI/Host/Reality fields, properly format IPv6 URLs, and disable caching
 (`Cache-Control: no-store`). Refreshes, not live established connections,
 are the rotation boundary; client apps can also cache subscriptions.
 
+## SUBSCRIPTION STUDIO — control-plane only
+
+Open **SUBSCRIPTION STUDIO** in the management navigation. Configure a separate
+subscription hostname/path, portal brand, description, language (RU/EN/TR/VI),
+accent, footer, and visibility of traffic/expiration. Settings are validated
+by the Rust API and stored centrally in PostgreSQL. **Settings → Brand and
+domains** also has independent fields for the panel and subscription domains.
+
+The **LEGO topology builder** is a deployment blueprint, not a provisioning
+wizard. Server A hosts the management panel; assign future subscription service
+and node roles independently to A, B, or C. Thus one VPS, shared VPS groups,
+and three separate servers are all expressible. The selected node role is a
+planning example; actual nodes stay managed individually under **Nodes**.
+Optional descriptions of servers B/C and the complete blueprint can be exported
+as JSON for later integration.
+
+**Repository boundaries:** This repository contains the control plane only.
+The public subscription service (with token verification, subscription output,
+client-side portal, and future per-user IP rotation integration) and the
+remote node runtime/agent will be implemented in **separate repositories**.
+Configuring a domain does not serve a subscription, issue a usable link,
+deploy a reverse proxy, configure a remote host, or start Xray. In particular,
+the existing subscription URL field remains empty until the separate service
+and its authenticated integration are implemented. No public subscription
+API has been added to the panel.
+
 ### Updating frontend assets
 
 The dashboard CSS and JavaScript are baked into the `panel` Docker image via `backend/Dockerfile`. Running `git pull` alone does **not** update the UI served by an existing container. After pulling changes, rebuild and recreate the panel:
