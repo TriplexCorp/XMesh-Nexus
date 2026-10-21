@@ -2022,6 +2022,24 @@ dialog.user-modal .user-legend-dot.is-up{background:color-mix(in srgb,var(--a) 3
 
 /* Self-service TOTP security card: independent of appearance grid. */
 #mfa-panel .hd{align-items:center}
+.mfa-enrollment{display:grid;grid-template-columns:minmax(12rem,16rem) minmax(0,1fr);gap:1.6rem;
+ align-items:start;max-width:53rem;margin-top:1rem}
+.mfa-qr-column{display:grid;gap:.6rem}
+.mfa-qr-frame{aspect-ratio:1/1;width:min(100%,16rem);padding:.65rem;border-radius:1rem;
+ background:#fff;border:1px solid rgba(255,255,255,.3);display:grid;place-items:center;
+ color:#202124;font-size:.82rem;text-align:center;overflow:hidden}
+.mfa-qr-frame svg{display:block;width:100%;height:auto}
+.mfa-qr-caption{color:var(--mu);font-size:.83rem;line-height:1.55}
+.mfa-qr-instructions{min-width:0;display:grid;gap:.8rem}
+.mfa-qr-instructions h4{margin:0}
+.mfa-qr-instructions .note{margin:0}
+.mfa-manual{border:1px solid var(--ln);border-radius:var(--ui-control-radius);padding:.8rem}
+.mfa-manual summary{cursor:pointer;color:var(--tx);font-weight:650}
+.mfa-manual .f{display:grid;gap:.4rem;margin-top:.85rem}
+.mfa-manual input{min-width:0;max-width:100%;font-family:ui-monospace,Consolas,monospace}
+.mfa-manual .act{margin-top:.65rem}
+.mfa-qr-instructions #mfa-confirm{display:grid;gap:.65rem}
+@media(max-width:650px){.mfa-enrollment{grid-template-columns:1fr}.mfa-qr-frame{width:min(100%,15rem)}}
 #mfa-panel .sg{display:grid;gap:.7rem;max-width:32rem}
 .mfa-details{margin:.7rem 0}
 .mfa-details summary{cursor:pointer;font-weight:600;color:var(--tx)}

@@ -526,6 +526,21 @@ window.XMeshI18n=(()=>{
     ["Обновите панель и страницу браузера. Скрипт mfa-ui.js не загружен.","Update the panel and refresh this page. The mfa-ui.js script did not load."]
   ];
   for(const [ru,en] of securityPageTranslations)dict.set(ru,en);
+  const qrTranslations=[
+    ["QR-код для Google Authenticator","QR code for Google Authenticator"],
+    ["QR-код недоступен — используйте ручной ввод.","QR code unavailable — enter the key manually."],
+    ["1. Откройте Google Authenticator, нажмите «+» и выберите «Сканировать QR-код».","1. Open Google Authenticator, tap '+' and select 'Scan a QR code'."],
+    ["Подключение приложения","Connect an authenticator app"],
+    ["Отсканируйте QR-код камерой телефона. Также поддерживаются 2FAS, Aegis и другие приложения TOTP.","Scan the QR code with your phone. 2FAS, Aegis and other TOTP apps are also supported."],
+    ["Не получается сканировать? Ввести ключ вручную","Cannot scan? Enter a key manually"],
+    ["Секретный ключ","Secret key"],
+    ["Копировать ключ","Copy key"],
+    ["2. Код из Google Authenticator","2. Code from Google Authenticator"],
+    ["2FA включится только после подтверждения кода. На подтверждение есть 10 минут.","2FA is enabled only after you verify the code, within 10 minutes."],
+    ["Язык интерфейса","Interface language"],
+    ["Выбор языка","Choose language"]
+  ];
+  for(const [ru,en] of qrTranslations)dict.set(ru,en);
   const dynamic=[
     [/^(\d+)\s+узлов настроено\. CPU, RAM и скорость требуют подключённого мониторинга\.$/i,
       (_,n)=>n+' nodes configured. CPU, RAM, and speed require connected monitoring.'],

@@ -41,8 +41,35 @@ async function mount(root){
   const value=name=>form.elements.namedItem(name)?.value.trim()||'';
   if(form.id==='mfa-start'){
    submit(form,'setup',{password:value('password')},data=>{
-    body.innerHTML='<div class="sg mfa-setup"><p class="note">Добавьте запись в Google Authenticator, 2FAS или Aegis. Секрет показывается только сейчас.</p><label class="f"><span>Секрет TOTP</span><input id="mfa-secret" readonly value="'+escapeHtml(data.secret)+'"></label><div class="act"><button class="gh sm" type="button" data-mfa-copy="secret">Копировать секрет</button><button class="gh sm" type="button" data-mfa-copy="uri">Копировать ссылку импорта</button></div><form id="mfa-confirm" class="sg"><label class="f"><span>Код приложения</span><input name="code" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" required></label><button class="btn" type="submit">Включить 2FA</button></form><p class="note">Подтвердите код в течение 10 минут. До этого 2FA не включена.</p></div>';
+    // The provisioning URI and TOTP secret remain in the browser; no external QR service.
     card.dataset.uri=data.otpauth;
+    body.innerHTML='<div class="mfa-enrollment">'+
+      '<div class="mfa-qr-column"><div class="mfa-qr-frame" id="mfa-qr" role="img" aria-label="QR-код для Google Authenticator"></div>'+
+      '<span class="mfa-qr-caption">1. Откройте Google Authenticator, нажмите «+» и выберите «Сканировать QR-код».</span></div>'+
+      '<div class="mfa-qr-instructions"><h4>Подключение приложения</h4>'+
+      '<p class="note">Отсканируйте QR-код камерой телефона. Также поддерживаются 2FAS, Aegis и другие приложения TOTP.</p>'+
+      '<details class="mfa-manual"><summary>Не получается сканировать? Ввести ключ вручную</summary>'+
+      '<label class="f"><span>Секретный ключ</span><input id="mfa-secret" readonly value="'+escapeHtml(data.secret)+'" autocomplete="off"></label>'+
+      '<div class="act"><button class="gh sm" type="button" data-mfa-copy="secret">Копировать ключ</button>'+
+      '<button class="gh sm" type="button" data-mfa-copy="uri">Копировать ссылку импорта</button></div></details>'+
+      '<form id="mfa-confirm" class="sg"><label class="f"><span>2. Код из Google Authenticator</span>'+
+      '<input name="code" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" required placeholder="000000"></label>'+
+      '<button class="btn" type="submit">Включить 2FA</button></form>'+
+      '<p class="note">2FA включится только после подтверждения кода. На подтверждение есть 10 минут.</p></div></div>';
+    try{
+      const Qr=window.qrcodegen?.QrCode;
+      if(!Qr)throw new Error('QR generator unavailable');
+      const qr=Qr.encodeText(data.otpauth,Qr.Ecc.MEDIUM),pad=4,modules=[];
+      for(let y=0;y<qr.size;y++)for(let x=0;x<qr.size;x++){
+        if(qr.getModule(x,y))modules.push('M'+(x+pad)+','+(y+pad)+'h1v1h-1z');
+      }
+      const size=qr.size+pad*2;
+      body.querySelector('#mfa-qr').innerHTML='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+size+' '+size+'" shape-rendering="crispEdges" aria-hidden="true" focusable="false">'+
+       '<rect width="100%" height="100%" fill="#fff"/><path d="'+modules.join('')+'" fill="#101010"/></svg>';
+    }catch(ex){
+      body.querySelector('#mfa-qr').textContent='QR-код недоступен — используйте ручной ввод.';
+      body.querySelector('.mfa-manual').open=true;
+    }
     body.querySelector('[name=code]').focus();
    });
   }else if(form.id==='mfa-confirm'){
