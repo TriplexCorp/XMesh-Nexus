@@ -153,6 +153,11 @@ pub(crate) async fn update(
     // Permissions or credentials change invalidates existing sessions immediately.
     if hashed.is_some() || role != current_role || !new_active {
         sqlx::query("DELETE FROM panel_sessions WHERE admin_id=$1").bind(id).execute(&mut *tx).await?;
+        // Password changes, role updates and account disablement must also
+        // revoke pending password-verified MFA challenges. Otherwise an old
+        // challenge could mint a fresh session after credentials are rotated.
+        sqlx::query("DELETE FROM panel_mfa_challenges WHERE admin_id=$1")
+            .bind(id).execute(&mut *tx).await?;
     }
     tx.commit().await?;
     super::audit(&state.pool, &actor.username, "admin.updated",Some("admins"),Some(id),
@@ -181,6 +186,8 @@ pub(crate) async fn delete(
             .bind(id).fetch_one(&mut *tx).await?;
         if remaining==0 { return Err(ApiError::new(StatusCode::CONFLICT,"Нельзя удалить последнего активного владельца.")); }
     }
+    sqlx::query("DELETE FROM panel_mfa_challenges WHERE admin_id=$1")
+        .bind(id).execute(&mut *tx).await?;
     sqlx::query("DELETE FROM panel_auth_users WHERE id=$1").bind(id).execute(&mut *tx).await?;
     tx.commit().await?;
     super::audit(&state.pool,&actor.username,"admin.deleted",Some("admins"),Some(id),
