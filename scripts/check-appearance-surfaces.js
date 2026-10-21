@@ -217,19 +217,65 @@ assert.equal(saveCount,1,'Final appearance state must save once');
 /* The user sees steps in pixels or percentages; fractional multipliers must
    advance by 0.01 for one percentage point, not by a whole multiplier. */
 for(const [id,min,max,step] of [
- ['ts','0.9','5','0.01'],['radius','4','36','1'],
+ ['ts','0.9','2','0.01'],['radius','0','48','1'],
  ['content-width','720','3000','1'],['gap-scale','0.8','1.4','0.01'],
  ['hue','0','360','1'],['sat','0','100','1'],['lum','15','85','1']
 ]){
  assert.match(app,new RegExp('id="'+id+'" min="'+min+'" max="'+max+'" step="'+step+'"'),
   'Incorrect range settings for '+id);
 }
-assert.match(app,/cl\(\+C\.ts\|\|1,\.9,5\)/,'Stored scale must support 500%');
-assert.match(app,/cl\(Number\(C\.ts\)\|\|1,\.9,5\)/,'Scale preview must support 500%');
-assert.match(app,/cl\(\+C\.radius\|\|16,4,36\)/,'Applied radius must support 36px');
-assert.match(app,/cl\(Number\(C\.radius\)\|\|16,4,36\)/,'Radius preview must support 36px');
+assert.match(app,/cl\(\+C\.ts\|\|1,\.9,2\)/,'Stored scale must cap at 200%');
+assert.match(app,/cl\(Number\(C\.ts\)\|\|1,\.9,2\)/,'Scale preview must cap at 200%');
+assert(app.includes("Number(C.radius):16,0,48"),'Applied radius must support 0..48px without false fallback for zero');
+assert.match(app,/const radius=cl\(Number\.isFinite\(Number\(C\.radius\)\)\?Number\(C\.radius\):16,0,48\)/,'Radius preview must support 0..48px');
 assert.doesNotMatch(app,/id="ts" min="0.9" max="1.3"/);
-assert.doesNotMatch(app,/id="radius" min="4" max="24"/);
+assert.doesNotMatch(app,/id="radius" min="4" max="36"/);
+
+// Appearance slider precision must be independent of its minimum:
+// 4px + 10 used to produce 4,14,24,34; now it snaps to absolute tens.
+const precisionStart=app.indexOf('const APPEARANCE_RANGE_IDS=');
+const precisionEnd=app.indexOf('// No serialization or full appearance recomputation',precisionStart);
+assert(precisionStart>0&&precisionEnd>precisionStart);
+const precisionCode=app.slice(precisionStart,precisionEnd);
+const precisionState={rangePrecision:10};
+const precisionLib=new Function('C','cl','syncRangeProgress',
+ precisionCode+'return {configureRangePrecision,snapAppearanceSlider,commitAppearanceNumber};')(
+ precisionState,(x,a,b)=>Math.min(b,Math.max(a,x)),()=>{});
+const mockSlider=(id,min,max,value,step='1')=>({
+ id,min:String(min),max:String(max),value:String(value),step,dataset:{},
+ matches:selector=>selector==='input[type="range"]',
+ getAttribute:key=>key==='step'?step:null
+});
+const radiusRange=mockSlider('radius',0,48,47.3);
+precisionLib.configureRangePrecision(radiusRange);
+assert.equal(radiusRange.step,'any','Coarse mode must not use a min-offset HTML range step');
+precisionLib.snapAppearanceSlider(radiusRange);
+assert.equal(Number(radiusRange.value),48,'Coarse radius must reach the 48px upper bound');
+for(const [raw,expected] of [[0,0],[16,20],[27,30],[41,40],[46,48]]){
+ radiusRange.value=String(raw);precisionLib.snapAppearanceSlider(radiusRange);
+ assert.equal(Number(radiusRange.value),expected,'Coarse radius '+raw);
+}
+const widthRange=mockSlider('content-width',720,3000,2558);
+precisionLib.configureRangePrecision(widthRange);
+precisionLib.snapAppearanceSlider(widthRange);
+assert.equal(Number(widthRange.value),2560,'Width must snap to absolute tens');
+const scaleRange=mockSlider('ts',.9,2,1.13,'0.01');
+precisionLib.configureRangePrecision(scaleRange);
+precisionLib.snapAppearanceSlider(scaleRange);
+assert.equal(Number(scaleRange.value),1.1,'Text/UI scale should use 10% increments in coarse mode');
+precisionState.rangePrecision=1;
+precisionLib.configureRangePrecision(scaleRange);
+scaleRange.value='1.13';precisionLib.snapAppearanceSlider(scaleRange);
+assert.equal(Number(scaleRange.value),1.13,'Fine mode should allow 113%');
+radiusRange.value='17';precisionLib.configureRangePrecision(radiusRange);
+assert.equal(Number(radiusRange.value),17,'Switching precision must not overwrite a custom value');
+assert.match(app,/data-appearance-value="radius"/);
+assert.match(app,/data-appearance-value="ts"/);
+assert.match(app,/data-appearance-value="content-width"/);
+assert.match(app,/data-appearance-value="gap-scale"/);
+assert.match(app,/commitAppearanceNumber\(t\)/,'Exact numeric values must be saved');
+assert.match(app,/r\.style\.setProperty\('--ui-control-radius',radius\+'px'\)/,
+ 'Configured radius should apply consistently to buttons');
 // Appearance uses two balanced columns and the locale selector is global.
 assert.match(app,/<div class="appearance-layout">/,'Aligned appearance workspace must exist');
 assert.match(app,/appearance-column/,'Appearance cards must use two columns');
