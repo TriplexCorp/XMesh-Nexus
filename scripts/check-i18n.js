@@ -48,16 +48,19 @@ assert.equal(text.nodeValue,'Настройки','Locale switching must restore 
 assert.equal(store.value,'ru','Preference must persist in browser');
 api.setLanguage('en');
 assert.equal(text.nodeValue,'Settings','Switching back to English must still work');
-assert.match(app,/data-panel-language="\$\{value\}"/,'RU/EN controls must live in palette card');
+assert.match(html,/id="language-trigger"/,'Language control must live in the global header');
+assert.match(html,/id="language-menu"/,'Header language menu must exist');
+assert.match(app,/function syncTopLanguage\(\)/,'Global language menu must reflect saved locale');
+assert.doesNotMatch(app,/settings-language-toggle/,'Locale selector must not remain in appearance settings');
 assert.match(app,/data-panel-language/,'Language buttons must exist');
 assert.match(app,/window\.XMeshMfa\?\.panel\(\)/);
-assert.match(app,/class="settings-appearance-header"/,'Locale selector should be part of appearance header');
+assert.match(app,/class="settings-appearance-header"/,'Appearance header must remain intact');
 assert.match(app,/window\.XMeshI18n\?\.setLanguage\(button\.dataset\.panelLanguage\)/,
  'Locale selection must use persisted localization preference');
 assert.doesNotMatch(app,/grid-column:1\/-1"><div><h3>Язык интерфейса/,
  'A separate full-width language card must not disrupt the settings layout');
-assert.match(app,/aria-pressed="\$\{window\.XMeshI18n/,
- 'RU and EN buttons must expose current visual state');
+assert.match(html,/aria-pressed="false"/,
+ 'RU and EN buttons must expose selected-state semantics');
 assert.match(app,/const panelIsEnglish=/,'Panel number and date formatting must follow locale');
 assert.match(src,/#bn,#lg/,'User-defined panel brand should never be translated');
 assert.match(portal,/d.subscriptionLanguage==='en'\?'12.4 \/ 100 GB'/,

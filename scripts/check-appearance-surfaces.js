@@ -18,12 +18,15 @@ for(const [input,expected] of [['flat','solid'],['bogus','solid'],[null,'solid']
 assert.match(app,/prop!=='surface'\|\|\['solid','glass','raised'\]\.includes\(value\)/,'Event handler must reject removed Flat style');
 assert.match(html,/styles\.css\?v=[a-z0-9-]+/,'Styles must retain a cache-busting version');
 assert.match(html,/app\.js\?v=[a-z0-9-]+/,'Application script must retain a cache-busting version');
-// The appearance grid must remain three normal cards; language is integrated into its first card.
-assert.match(app,/<div class="appearance-grid">\s*<section class="card sg"><div class="settings-appearance-header">/,
-  'Language setting must not add a full-width card before theme settings');
-assert.match(css,/\.settings-language-toggle\{/,'Compact language toggle styling must exist');
-assert.doesNotMatch(app,/<section class="card sg" style="grid-column:1\/-1"/,
-  'Settings must not contain a full-width locale card');
+// Appearance uses two balanced columns and the locale selector is global.
+assert.match(app,/<div class="appearance-layout">/,'Aligned appearance workspace must exist');
+assert.match(app,/appearance-column/,'Appearance cards must use two columns');
+assert.match(css,/\.appearance-layout\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+assert.match(app,/id="content-width"/,'Workspace width setting must be present');
+assert.match(app,/id="gap-scale"/,'Card spacing setting must be present');
+assert.match(app,/setProperty\('--panel-content-max'/,'Workspace width must affect layout');
+assert.match(app,/setProperty\('--view-gap'/,'Card spacing must affect layout');
+assert.doesNotMatch(app,/settings-language-toggle/,'Locale selector must not be in appearance settings');
 // The UI formerly changed C.surface but tried to call .forEach on $()
 // (one element), leaving the previous choice visibly highlighted.
 const beginning=app.indexOf("else if(b=g('[data-ui]'))");

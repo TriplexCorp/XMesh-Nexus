@@ -63,6 +63,12 @@ assert.match(panel,/function securityP\(\)/,
  'A dedicated account security page must exist');
 assert.doesNotMatch(panel,/window\.XMeshMfa\?\.panel\(\)\|\|''/,
  'MFA must not be hidden at the end of the long appearance settings page');
+assert.match(mfaUi,/qrcodegen\?\.QrCode/,'MFA enrollment must generate the QR in the browser');
+assert.match(mfaUi,/encodeText\(data\.otpauth/,'QR must encode the backend provisioning URI');
+assert.match(mfaUi,/mfa-manual/,'Manual TOTP key must remain available');
+assert.match(html,/qr-code\.js\?v=/,'QR encoder must be bundled with the frontend');
+assert(html.indexOf('qr-code.js')<html.indexOf('mfa-ui.js'),'QR generator must load before MFA');
+assert.match(docker,/qr-code\.js/,'Docker must package the local QR encoder');
 assert.match(mfaUi,/<form id="mfa-start"/,
  '2FA enrollment form must be directly visible when disabled');
 assert.match(html,/mfa-ui\.js\?v=/);

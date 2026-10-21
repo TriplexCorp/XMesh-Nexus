@@ -63,10 +63,11 @@ a properly secured proxy configuration.
 
 ## Administrator two-factor authentication (TOTP)
 
-From **System → Security** (also linked at the top of **Settings**), an administrator can enroll their
-own account after re-entering their current password. Enter the Base32 secret
-into an authenticator supporting standard TOTP (e.g., Aegis, 2FAS, Google
-Authenticator), then confirm a 6-digit code. Only after successful confirmation
+From **System → Security**, an administrator can enroll their
+own account after re-entering their current password. Scan the QR code using Google Authenticator, 2FAS, Aegis, or another compatible
+TOTP app. If you cannot scan it, use the manual Base32 key instead.
+The QR is generated locally with a bundled MIT-licensed encoder without external
+image requests. Confirm a six-digit code to finish enrollment. Only after successful confirmation
 does the account require a second factor at login. The 10 high-entropy recovery
 codes are shown once, and each code can be used for a single login (or to
 disable the second factor along with the password). Save them offline.
