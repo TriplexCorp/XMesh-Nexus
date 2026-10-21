@@ -121,6 +121,27 @@ The selector lists recent GitHub releases; pinning is limited to the latest 30 e
 
 The UI intentionally avoids presenting generated node telemetry as live operational data.
 
+### JavaScript tooling (Node.js 24)
+
+The XMesh Nexus backend is written in **Rust** and the frontend runs in the **browser**.
+Node.js is needed **only for local frontend checks and GitHub Actions**, not by the
+running panel container or a VPN node. The supported tooling version is declared
+in `.node-version` (`24`) and enforced in CI using `actions/setup-node@v7`.
+Use a Node.js version manager or a local Node.js 24 installation to run tests:
+
+```bash
+node --version
+node --check app.js
+node --check subscription-studio.js
+node scripts/check-subscription-studio.js
+node scripts/check-node-grid-layout.js
+```
+
+There is no `package.json`, npm dependency install or Node.js runtime in the
+Rust/Debian production Docker image; the Node.js version does not affect Xray.
+
+
+
 ## Per-node IP pools and per-user address rotation
 
 Open **Nodes → Edit → IP-ротация**. Enable the feature and enter one public IPv4 or IPv6
