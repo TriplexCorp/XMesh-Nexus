@@ -505,6 +505,8 @@ window.XMeshI18n=(()=>{
     'Shadowsocks 2022:','XDrive: неизвестный','Выдать новый токен метрик','Скачано ',
     'Для ','удалён из актуальных версий Xray-core.'
   ];
+  const finalUiTranslations=[["Добавить","Add"],["1 · 5 · 15 минут","1 · 5 · 15 minutes"],["Для этого протокола отдельные параметры сети недоступны. Настройки транспорта отображаются для поддерживаемых протоколов; при необходимости используйте «Ручной JSON».","Separate network settings are unavailable for this protocol. Transport settings are shown for supported protocols; use Manual JSON if needed."],["Это клиентский outbound-конфиг, а не серверный inbound. Если адрес узла, UUID или ключи оставлены как placeholders, замените их перед импортом в приложение.","This is a client outbound config, not a server inbound. Replace placeholder node addresses, UUIDs, and keys before importing it into an app."],["; панель разбирает её текстовый вывод. Значения показываются только в авторизованной панели и попадут в профиль после сохранения.","; the panel parses its output. Values are shown only in the authenticated panel and are applied to the profile when saved."],["· Публичный сервис подписок и серверные ноды будут разработаны отдельно. Сохранение здесь не запускает сервер и не публикует ссылки.","· The public subscription service and server nodes will be developed separately. Saving here does not start servers or publish links."]];
+  for(const [ru,en] of finalUiTranslations)dict.set(ru,en);
   const dynamic=[
     [/^(\d+)\s+узлов настроено\. CPU, RAM и скорость требуют подключённого мониторинга\.$/i,
       (_,n)=>n+' nodes configured. CPU, RAM, and speed require connected monitoring.'],
