@@ -9,6 +9,12 @@ on:
 permissions:
   contents: read
 
+# During rapid development, only the newest run on a branch needs to build
+# the expensive Docker image. PR runs remain independent.
+concurrency:
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
+
 jobs:
   cli:
     runs-on: ubuntu-latest
