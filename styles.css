@@ -408,6 +408,21 @@ html[data-sidebar=compact] .app{grid-template-columns:5.7rem minmax(0,1fr)}
 .appearance-layout .palette-swatch{flex:0 0 auto}
 
 
+
+/* Inline HEX color palette picker with a live sample, no native OS popup. */
+.appearance-layout .palette-hex-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.7rem;width:100%;padding:0;border:0;min-width:0}
+.palette-hex-field{min-width:0;display:grid;gap:.43rem;color:var(--mu);font-size:.79rem;font-weight:650}
+.palette-hex-editor{display:flex;align-items:center;min-width:0;gap:.5rem;padding:.4rem .55rem;border-radius:var(--ui-control-radius);border:1px solid var(--ln);background:var(--s2);transition:border-color .16s}
+.palette-hex-editor:focus-within{border-color:var(--a);box-shadow:0 0 0 2px color-mix(in srgb,var(--a) 13%,transparent)}
+.palette-hex-editor i{display:block;flex:none;width:1.7rem;height:1.7rem;border-radius:.48rem;border:1px solid color-mix(in srgb,var(--tx) 17%,var(--ln));background:var(--picked)}
+.palette-hex-editor input[type=text]{flex:1;min-width:0;width:100%;padding:.27rem 0;border:0;box-shadow:none;background:transparent;color:var(--tx);font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.84rem;text-transform:uppercase}
+.palette-hex-editor input[type=text]:focus{outline:none;border:0;box-shadow:none}
+.palette-hex-editor input.invalid{color:var(--er)}
+/* Override generic .sg>div flex behavior to keep all HSL controls aligned. */
+.appearance-layout .color-slider-grid{display:grid;grid-template-columns:minmax(5.7rem,.75fr) minmax(0,2.4fr) 3.25rem;align-items:center;gap:.75rem;width:100%;min-width:0}
+.appearance-layout .color-slider-grid input[type=range]{width:100%;min-width:0;max-width:none}
+.appearance-layout .color-slider-grid output{justify-self:end;min-width:2.7rem}
+@media(max-width:660px){.appearance-layout .palette-hex-fields{grid-template-columns:1fr}.appearance-layout .color-slider-grid{grid-template-columns:5.1rem minmax(0,1fr) 3rem}}
 /* A proper pair of color controls replaces the oversized circular inputs. */
 .appearance-layout .color-bubbles{gap:.9rem}
 .appearance-layout .color-bubble-wrap{font-weight:650;gap:.5rem}
