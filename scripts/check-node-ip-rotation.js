@@ -18,7 +18,7 @@ assert.match(app,/data-node-rotation-probe/,'Node editor must provide an authent
 assert.match(app,/nodeRotationIPs\(n\)\.length/,'Node card must show real pool size');
 assert.match(css,/\.node-rotation-editor>summary/,'Node rotation section needs visual affordance');
 assert.match(html,/app\.js\?v=20261021-node-ip-rotation-1/);
-assert.match(html,/styles\.css\?v=20261021-node-ip-rotation-1/);
+assert.match(html,/styles\.css\?v=20261021-node-grid-3/);
 
 assert.match(backend,/mod node_rotation;/);
 assert.match(backend,/node_rotation::validate_node\(data\)\?/);
