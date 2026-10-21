@@ -569,8 +569,10 @@ window.XMeshI18n=(()=>{
     ["Палитра применена","Palette applied"]
   ];
   for(const [ru,en] of curatedPaletteTranslations)dict.set(ru,en);
-  dict.set("Выберите два оттенка и проверьте предпросмотр. Сохранение — только по кнопке «Применить палитру».",
-    "Choose two colors and preview them. Save only with the Apply palette button.");
+  dict.set("Введите HEX или настройте цвет ползунками. Палитра изменится только после подтверждения.",
+    "Enter HEX values or adjust colors with sliders. The palette changes only after confirmation.");
+  dict.set("HEX основного цвета","Primary color HEX");
+  dict.set("HEX вторичного цвета","Secondary color HEX");
   const dynamic=[
     [/^(\d+)\s+узлов настроено\. CPU, RAM и скорость требуют подключённого мониторинга\.$/i,
       (_,n)=>n+' nodes configured. CPU, RAM, and speed require connected monitoring.'],
