@@ -464,7 +464,8 @@ async fn patch_settings(
         if !matches!(key.as_str(), "brand" | "domain" | "hooks"
                 | "subscriptionDomain" | "subscriptionPath" | "subscriptionBrand"
                 | "subscriptionDescription" | "subscriptionFooter" | "subscriptionAccent"
-                | "subscriptionLanguage" | "subscriptionPlacement" | "subscriptionShowTraffic"
+                | "subscriptionLanguage" | "subscriptionPlacement" | "nodePlacement"
+                | "deploymentServerB" | "deploymentServerC" | "subscriptionShowTraffic"
                 | "subscriptionShowExpiry") {
             return Err(ApiError::new(StatusCode::BAD_REQUEST, format!("Неизвестное поле настроек: {key}")));
         }
@@ -500,7 +501,7 @@ async fn patch_settings(
             return Err(ApiError::new(StatusCode::BAD_REQUEST, "Путь конфликтует со служебными маршрутами панели."));
         }
     }
-    for (key, max_len) in [("subscriptionBrand", 80), ("subscriptionDescription", 240), ("subscriptionFooter", 160)] {
+    for (key, max_len) in [("subscriptionBrand", 80), ("subscriptionDescription", 240), ("subscriptionFooter", 160), ("deploymentServerB", 253), ("deploymentServerC", 253)] {
         if let Some(value) = object.get(key) {
             let text = value.as_str().ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, format!("Поле {key} должно быть текстом.")))?;
             if text.chars().count() > max_len || text.chars().any(char::is_control) {
@@ -516,7 +517,8 @@ async fn patch_settings(
     }
     for (key, choices) in [
         ("subscriptionLanguage", &["ru", "en", "tr", "vi"][..]),
-        ("subscriptionPlacement", &["panel", "edge"][..]),
+        ("subscriptionPlacement", &["a", "b", "c"][..]),
+        ("nodePlacement", &["a", "b", "c"][..]),
     ] {
         if let Some(value) = object.get(key) {
             let text = value.as_str().ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, format!("Некорректное поле {key}.")))?;
