@@ -1997,3 +1997,15 @@ dialog.user-modal .user-legend-dot.is-up{background:color-mix(in srgb,var(--a) 3
   font-size:.73rem;line-height:1.2;font-weight:700;letter-spacing:.03em}
 .settings-language-toggle button:focus-visible{outline:2px solid var(--a);outline-offset:2px}
 @media(max-width:420px){.settings-appearance-header{flex-wrap:wrap}}
+
+/* Self-service TOTP security card: independent of appearance grid. */
+#mfa-panel .hd{align-items:center}
+#mfa-panel .sg{display:grid;gap:.7rem;max-width:32rem}
+.mfa-details{margin:.7rem 0}
+.mfa-details summary{cursor:pointer;font-weight:600;color:var(--tx)}
+.mfa-details .sg{margin-top:.8rem}
+#mfa-panel .f input{width:100%}
+#mfa-panel .er{min-height:1rem}
+#mfa-panel .act{display:flex;gap:.6rem;flex-wrap:wrap;justify-content:flex-start}
+#mfa-secret,#mfa-recovery-codes{font-family:ui-monospace,Consolas,monospace;font-size:.85rem}
+#mfa-recovery-codes{max-width:28rem;width:100%;resize:vertical}
