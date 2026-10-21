@@ -16,12 +16,50 @@
 - Persistent records, settings, administrator sessions and audit log in PostgreSQL (not browser-only localStorage).
 - Redis-backed shared login throttling across panel instances, with PostgreSQL retaining the durable rate-limit fallback.
 - Administrator sign-in with Argon2 password hashing, a dedicated /login page, a 12-hour HttpOnly/SameSite session cookie, and an audit log for mutations.
+- Real SQL-backed administrator accounts with owner/admin/viewer roles. The server, not the UI, checks permissions on every write, core update and settings change. The owner may create accounts, change passwords/roles, or disable accounts. Such changes revoke existing sessions; the last active owner cannot be removed. Existing authenticated accounts migrate to owner to preserve access.
 - Server-side guard for the panel entry point, same-origin validation for state-changing API requests, and persistent account-based login throttling (8 failed attempts within 15 minutes trigger a 15-minute cooldown).
-- TOTP-based two-factor authentication is not part of this patch and remains a recommended next step before exposing the panel to untrusted networks.
+- TOTP-based two-factor authentication with recovery codes is planned for the next security phase; it is not enabled yet.
 - Xray-core version manager in **Settings → Xray-core**. The default target is latest; the service reads official release metadata from the XTLS/Xray-core GitHub project, downloads the expected Linux archive for the container architecture, verifies an advertised SHA-256 digest when GitHub supplies one, runs xray version to check the executable, and switches the active version atomically.
 - API/database readiness probes, Rust CI, and a non-root/read-only application container.
 
 **Runtime scope:** XMesh Nexus manages panel data and Xray-core binaries; it still does not start Xray as a VPN traffic service or configure active listeners. The optional Linux node metrics agent collects OS-level CPU/RAM/disk and network-interface RX/TX rates plus established TCP connection count. Interface traffic can include SSH, web-server and other services on the same NIC; it is not per-user accounting or guaranteed Xray-only traffic. Node health and online VPN-client counts are not yet inferred from these samples. No synthetic metrics are generated.
+
+## Administration hardening — first phase
+
+The **Administrators** section now manages actual `panel_auth_users` login accounts,
+not the old decorative `panel_records('admins')` entries. After the
+`0008_admin_rbac.sql` migration, existing sign-in accounts are retained as
+**owner**. Historical placeholder records in `panel_records('admins')` are
+intentionally *not* promoted to login accounts. The owner must issue a new
+password for each real account. Existing sessions remain valid until they
+expire, but roles are read from PostgreSQL on every request.
+
+Server authorization:
+- **Owner** — all panel CRUD, admin account creation/update/deletion, branding,
+  settings, Xray-core installation and node metrics-token issuance.
+- **Admin** — operational collection CRUD, VLESS Encryption generation and
+  authorized IP rotation tests. Cannot change global settings, manage
+  authentication accounts, or issue node credentials.
+- **Viewer** — read-only panel data and metrics. All mutations are denied by
+  the Rust API, irrespective of hidden or enabled browser controls.
+
+The last active owner is protected. Changing an account's role, password,
+or active state revokes that account's sessions. Account password hashes are
+never returned to the frontend or audit log. Account creation requires a
+16–1024-character password. An owner cannot delete or demote their own account.
+
+**Not yet implemented:** TOTP two-factor authentication and backup codes,
+real API bearer tokens for integrations, granular per-collection permissions,
+per-admin user quotas, and full browser/integration penetration testing.
+Former settings UI generated a fake token string; it has been replaced with
+an explicit disabled-state notice, and the legacy `tokens` collection is
+blocked by the API. Never use legacy token-like strings as credentials.
+
+The HTTP API sends a restrictive Content Security Policy (CSP), rejects
+cross-origin mutation requests using Fetch Metadata and Origin/Host checks,
+and refuses missing or expired sessions. TLS is still provided by the
+operator's reverse proxy. Do not publicly expose a panel without HTTPS and
+a properly secured proxy configuration.
 
 ## Installation
 
