@@ -447,6 +447,76 @@ dialog.user-modal .sg{gap:.9rem}
 .node-grid-controls .seg button{white-space:nowrap}
 .bar2>.note{flex:1 1 18rem}
 .bar2>.btn{flex:0 0 auto}
+
+/* Nodes: clear primary action aligned with the top-bar New User control.
+   Uses global surface/accent tokens for Classic, Glass, Raised and light themes. */
+.nodes-toolbar .node-create-action{
+  appearance:none;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 auto;
+  gap:.62rem;
+  min-height:2.65rem;
+  padding:.32rem .94rem .32rem .36rem;
+  border:1px solid color-mix(in srgb,var(--a) 35%,var(--ln));
+  border-radius:.72rem;
+  background:color-mix(in srgb,var(--a) 9%,var(--elevated));
+  color:var(--tx);
+  font:inherit;
+  font-size:max(12px,.82rem);
+  font-weight:750;
+  letter-spacing:-.012em;
+  line-height:1.15;
+  white-space:nowrap;
+  cursor:pointer;
+  box-shadow:inset 0 1px 0 var(--surface-highlight);
+  transition:background .17s ease,border-color .17s ease,box-shadow .17s ease,transform .17s ease;
+}
+.nodes-toolbar .node-create-icon{
+  display:inline-grid;
+  place-items:center;
+  flex:0 0 1.94rem;
+  width:1.94rem;
+  height:1.94rem;
+  border-radius:.47rem;
+  background:var(--a);
+  color:var(--btn-text);
+  box-shadow:inset 0 1px 0 color-mix(in srgb,white 24%,transparent);
+}
+.nodes-toolbar .node-create-icon .ic{width:1.08rem;height:1.08rem;stroke-width:2.2}
+.nodes-toolbar .node-create-label{display:block;white-space:nowrap}
+.nodes-toolbar .node-create-action:hover{
+  transform:translateY(-1px);
+  background:color-mix(in srgb,var(--a) 16%,var(--elevated));
+  border-color:color-mix(in srgb,var(--a) 68%,var(--ln));
+  box-shadow:0 8px 19px -12px color-mix(in srgb,var(--a) 40%,transparent),
+    inset 0 1px 0 var(--surface-highlight);
+}
+.nodes-toolbar .node-create-action:active{
+  transform:translateY(0);
+  box-shadow:inset 0 1px 0 var(--surface-highlight);
+}
+.nodes-toolbar .node-create-action:focus-visible{
+  outline:2px solid var(--a);
+  outline-offset:3px;
+}
+.nodes-toolbar .node-create-action:disabled{
+  opacity:.5;
+  cursor:not-allowed;
+  transform:none;
+}
+@media(max-width:760px){
+  .nodes-toolbar .node-create-action{margin-left:auto}
+}
+@media(max-width:390px){
+  .nodes-toolbar .node-create-action{width:100%;margin-left:0}
+}
+@media(prefers-reduced-motion:reduce){
+  .nodes-toolbar .node-create-action{transition:none}
+  .nodes-toolbar .node-create-action:hover{transform:none}
+}
+
 .home-counts{align-items:stretch}
 .home-count{display:flex;flex-direction:column;justify-content:center;min-height:6rem;transition:border-color .2s,background .2s}
 .home-count:hover{border-color:color-mix(in srgb,var(--a) 25%,var(--ln));background:color-mix(in srgb,var(--a) 3%,transparent)}
