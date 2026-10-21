@@ -25,7 +25,13 @@ for(const name of ['basic','security','transport','encryption','client']){
 assert.match(css,/\.sr-studio-launch:is\(:hover,:focus-visible\)/,'Interactive launcher hover/focus missing');
 assert.match(css,/\.sr-studio-dialog::backdrop/,'Full-screen dialog backdrop missing');
 assert.match(css,/\.sr-studio-dialog\[open\]/,'Dialog open state missing');
-assert.match(css,/\.sr-studio-dialog:not\(\[open\]\)/,'Closed dialog must remain hidden');
+assert.doesNotMatch(css,/\.sr-studio-dialog:not\(\[open\]\)\{\s*display:none!important/,
+ 'Forced immediate display:none would prevent the closing transition');
+assert.match(css,/\.sr-studio-dialog\[open\]/,'Open state must remain present');
+assert.match(css,/display \.32s allow-discrete,overlay \.32s allow-discrete/,
+ 'Closing window must keep its native display/top-layer until transition ends');
+assert.match(css,/@starting-style\{/,'Opening must be animated consistently');
+assert.match(css,/html\[data-motion=off\] \.sr-studio-dialog/,'Respect appearance motion toggle');
 assert.match(css,/\.sr-studio-dialog\[data-active-panel="transport"\]/,'Transport settings overlay missing');
 // Both sides share one auto-sized grid row on wide screens.
 const equalHeightBlock=css.match(/\.studio-drawer-layout:not\(\.manual-mode\) \.xray-workspace-layout\{([^}]+)\}/);

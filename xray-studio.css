@@ -2623,12 +2623,8 @@ body:has(.studio-reference-v5) .wrap{
  box-sizing:border-box!important;
  z-index:9999;
 }
-.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog:not([open]){
- display:none!important;
-}
-.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog[open]{
- display:block!important;
-}
+/* Keep display/overlay controlled by the native dialog lifecycle. Explicit
+   display:none!important would cut off the animated closing transition. */
 .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog::backdrop{
  background:rgba(0,0,0,.72);
  backdrop-filter:blur(7px);
@@ -3368,4 +3364,45 @@ body:has(.studio-reference-v5) .wrap{
 .xray-builder.studio-reference-v5.studio-inline.manual-mode .sr-json-gutter-number.is-error{
  color:var(--wr)!important;
  background:color-mix(in srgb,var(--wr) 10%,transparent)!important;
+}
+
+
+/* Unified XMesh modal motion also applies to the independent XRAY STUDIO
+   contextual settings dialog. Native top-layer and focus semantics preserved. */
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog{
+ opacity:0;transform:translateY(16px) scale(.984);
+ animation:none!important;
+ transition:opacity .24s cubic-bezier(.2,.75,.25,1),
+  transform .32s cubic-bezier(.18,.82,.24,1),
+  display .32s allow-discrete,overlay .32s allow-discrete;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog[open]{
+ opacity:1;transform:translateY(0) scale(1);
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog::backdrop{
+ opacity:0;
+ animation:none!important;
+ transition:opacity .32s ease,display .32s allow-discrete,overlay .32s allow-discrete;
+}
+.xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog[open]::backdrop{opacity:1}
+@starting-style{
+ .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog[open]{
+  opacity:0;transform:translateY(16px) scale(.984);
+ }
+ .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog[open]::backdrop{opacity:0}
+}
+html[data-motion=on] .sr-studio-dialog :is(.sr-dialog-close,.sr-dialog-done){
+ transition:transform .18s cubic-bezier(.2,.8,.25,1),
+  background-color .2s ease,border-color .2s ease,box-shadow .2s ease;
+}
+html[data-motion=on] .sr-studio-dialog :is(.sr-dialog-close,.sr-dialog-done):hover{transform:translateY(-1px)}
+html[data-motion=on] .sr-studio-dialog :is(.sr-dialog-close,.sr-dialog-done):active{transform:scale(.975)}
+html[data-motion=off] .sr-studio-dialog,
+html[data-motion=off] .sr-studio-dialog::backdrop{animation:none!important;transition:none!important;transform:none!important;opacity:1}
+@media(prefers-reduced-motion:reduce){
+ .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog,
+ .xray-builder.studio-reference-v5.studio-inline:not(.manual-mode) .sr-studio-dialog::backdrop{animation:none!important;transition:none!important;transform:none!important;opacity:1}
+ html[data-motion=on] .sr-studio-dialog :is(.sr-dialog-close,.sr-dialog-done){transition:none!important}
+ html[data-motion=on] .sr-studio-dialog :is(.sr-dialog-close,.sr-dialog-done):hover,
+ html[data-motion=on] .sr-studio-dialog :is(.sr-dialog-close,.sr-dialog-done):active{transform:none}
 }

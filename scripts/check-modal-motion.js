@@ -27,4 +27,9 @@ assert.match(css,/html\[data-motion=off\] #dlg/);
 assert.match(css,/@media\(prefers-reduced-motion:reduce\)/);
 assert.match(html,/app\.js\?v=20261021-dialog-motion-1/);
 assert.match(html,/styles\.css\?v=20261021-dialog-motion-1/);
+const studioCss=fs.readFileSync('xray-studio.css','utf8');
+assert.match(studioCss,/\.sr-studio-dialog\[open\]::backdrop\{opacity:1\}/,
+ 'XRAY STUDIO must use the same modal overlay fade');
+assert.match(studioCss,/\.sr-studio-dialog::backdrop\{[\s\S]*?overlay \.32s allow-discrete/,
+ 'XRAY Studio backdrop must animate on closing');
 console.log('User creation, dialog open/exit animations and accessibility controls: OK');
