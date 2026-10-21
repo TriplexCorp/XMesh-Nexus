@@ -110,7 +110,7 @@ window.XMeshSubscriptionStudio = (() => {
       '</section>',
       '<section class="card subscription-studio-section">',
       '<div class="subscription-studio-heading"><span>03</span><div><h3>Клиентский портал</h3><p>Собственная тема, независимая от внешнего вида панели.</p></div></div>',
-      field('subscriptionBrand','Название сервиса',data.subscriptionBrand,'Пустое значение — использовать бренд панели.',{placeholder:'Название вашего сервиса',max:80}),
+      field('subscriptionBrand','Название подписки',data.subscriptionBrand,'Пустое значение — использовать бренд панели.',{placeholder:'Название вашего сервиса',max:80}),
       field('subscriptionDescription','Описание',data.subscriptionDescription,'Короткий текст на главной странице.',{area:true,max:240}),
       '<div class="subscription-studio-pair">',
       field('subscriptionAccent','Акцентный цвет',data.subscriptionAccent,'Цвет кнопок и индикаторов.',{color:true}),
