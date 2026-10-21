@@ -23,6 +23,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - name: Use Node.js 24 for JavaScript checks
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -34,6 +39,8 @@ jobs:
           cargo clippy --manifest-path backend/Cargo.toml --all-targets -- -D warnings
       - name: Check frontend syntax
         run: |
+          node --version
+          test "$(node -p 'process.versions.node.split(".")[0]')" = "24"
           node --check app.js
           node --check subscription-studio.js
           node --check login.js
