@@ -44,7 +44,7 @@ assert.doesNotMatch(gridRules,/\.nodes-page>\.nodes\[data-node-count="2"\]\[data
 assert.doesNotMatch(gridRules,/max-width:\s*(?:48|64|68)rem/,
  'Two- and three-node grids must fill available horizontal space');
 assert(html.includes('styles.css?v=20261021-node-grid-3'),'Stylesheet cache key not updated');
-assert.match(html,/app\.js\?v=20261021-sub-brand-1/);
+assert.match(html,/app\.js\?v=20261021-i18n-1/);
 assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length,'CSS brace balance');
 new Function(app);
 
