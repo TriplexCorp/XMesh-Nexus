@@ -204,7 +204,28 @@ window.XMeshSubscriptionStudio = (() => {
         subscriptionPlacement:input(form,'subscriptionPlacement').value,
         nodePlacement:input(form,'nodePlacement').value,
         deploymentServerB:input(form,'deploymentServerB').value.trim(),
-        deploymentServerC:input(form,'deploymentServerC').value.trim()
+        deploymentServerC:input(form,'deploymentServerC').value.trim(),
+        subscriptionBackground:input(form,'subscriptionBackground').value,
+        subscriptionCardColor:input(form,'subscriptionCardColor').value,
+        subscriptionTextColor:input(form,'subscriptionTextColor').value,
+        subscriptionLayout:input(form,'subscriptionLayout').value,
+        subscriptionCardStyle:input(form,'subscriptionCardStyle').value,
+        subscriptionFont:input(form,'subscriptionFont').value,
+        subscriptionRadius:Number(input(form,'subscriptionRadius').value),
+        subscriptionHero:input(form,'subscriptionHero').value.trim(),
+        subscriptionCta:input(form,'subscriptionCta').value.trim(),
+        subscriptionLogoUrl:input(form,'subscriptionLogoUrl').value.trim(),
+        subscriptionSupportLabel:input(form,'subscriptionSupportLabel').value.trim(),
+        subscriptionSupportUrl:input(form,'subscriptionSupportUrl').value.trim(),
+        subscriptionClientLayout:input(form,'subscriptionClientLayout').value,
+        subscriptionShowStatus:input(form,'subscriptionShowStatus').checked,
+        subscriptionShowApps:input(form,'subscriptionShowApps').checked,
+        subscriptionShowQr:input(form,'subscriptionShowQr').checked,
+        subscriptionShowCopy:input(form,'subscriptionShowCopy').checked,
+        subscriptionShowSupport:input(form,'subscriptionShowSupport').checked,
+        subscriptionShowDevices:input(form,'subscriptionShowDevices').checked,
+        subscriptionClients:Object.fromEntries(clientCatalog.map(([id])=>[id,input(form,'subClient_'+id).checked])),
+        subscriptionClientLinks:Object.fromEntries(clientCatalog.map(([id])=>[id,input(form,'subClientLink_'+id).value.trim()]).filter(([,url])=>url))
       });
       const draw = () => {
         const d=read(),copy=locale[d.subscriptionLanguage]||locale.ru;
@@ -212,16 +233,50 @@ window.XMeshSubscriptionStudio = (() => {
           ? 'https://'+d.subscriptionDomain+d.subscriptionPath+'/<token>':'Укажите домен и путь';
         const preview=$('[data-subscription-preview]');
         preview.style.setProperty('--portal-accent',d.subscriptionAccent);
+        preview.style.setProperty('--portal-bg',d.subscriptionBackground);
+        preview.style.setProperty('--portal-card',d.subscriptionCardColor);
+        preview.style.setProperty('--portal-text',d.subscriptionTextColor);
+        preview.style.setProperty('--portal-radius',d.subscriptionRadius+'px');
         preview.dataset.portalTheme=d.subscriptionTheme;
+        preview.dataset.portalLayout=d.subscriptionLayout;
+        preview.dataset.portalCards=d.subscriptionCardStyle;
+        preview.dataset.portalFont=d.subscriptionFont;
+        $('[data-subscription-radius]').textContent=d.subscriptionRadius;
         $('[data-subscription-brand]').textContent=d.subscriptionBrand||settings.brand||'VPN';
-        $('[data-subscription-active]').textContent=copy[0];
+        const logo=$('[data-subscription-logo]'),symbol=$('[data-subscription-logo-symbol]');
+        const logoUrl=validHttps(d.subscriptionLogoUrl)?d.subscriptionLogoUrl:'';
+        if(logoUrl){
+          if(logo.getAttribute('src')!==logoUrl)logo.src=logoUrl;
+          logo.hidden=false;symbol.hidden=true;
+        }else{
+          logo.hidden=true;logo.removeAttribute('src');symbol.hidden=false;
+        }
+        $('[data-subscription-active]').textContent=d.subscriptionHero||copy[0];
         $('[data-subscription-description]').textContent=d.subscriptionDescription;
         $('[data-subscription-traffic-label]').textContent=copy[1];
         $('[data-subscription-expiry-label]').textContent=copy[2];
-        $('[data-subscription-connect]').textContent=copy[3];
+        $('[data-subscription-connect]').textContent=d.subscriptionCta||copy[3];
         $('[data-subscription-footer]').textContent=d.subscriptionFooter;
         $('[data-subscription-traffic]').hidden=!d.subscriptionShowTraffic;
         $('[data-subscription-expiry]').hidden=!d.subscriptionShowExpiry;
+        $('[data-subscription-ok]').hidden=!d.subscriptionShowStatus;
+        $('[data-subscription-active]').hidden=!d.subscriptionShowStatus;
+        const quick=$('[data-subscription-quick]');
+        $('[data-subscription-copy]').hidden=!d.subscriptionShowCopy;
+        $('[data-subscription-qr]').hidden=!d.subscriptionShowQr;
+        $('[data-subscription-devices]').hidden=!d.subscriptionShowDevices;
+        quick.hidden=!(d.subscriptionShowCopy||d.subscriptionShowQr||d.subscriptionShowDevices);
+        const enabled=clientCatalog.filter(([id])=>d.subscriptionClients[id]);
+        $('[data-subscription-client-count]').textContent='Активно: '+enabled.length+' из '+clientCatalog.length;
+        const apps=$('[data-subscription-apps]');
+        apps.hidden=!d.subscriptionShowApps||!enabled.length;
+        apps.dataset.clientLayout=d.subscriptionClientLayout;
+        $('[data-subscription-app-list]').innerHTML=enabled.map(([id,label,platform])=>
+          '<div class="subscription-preview-app"><span>'+esc(label.slice(0,2))+'</span><div><b>'+esc(label)+'</b><small>'+esc(platform)+'</small></div></div>'
+        ).join('');
+        const support=$('[data-subscription-support]');
+        support.textContent=d.subscriptionSupportLabel||'Поддержка';
+        support.hidden=!d.subscriptionShowSupport;
         const labels={a:'Панель',b:'',c:''};
         labels[d.subscriptionPlacement]+=(labels[d.subscriptionPlacement]?' + ':'')+'Подписки';
         labels[d.nodePlacement]+=(labels[d.nodePlacement]?' + ':'')+'VPN-ноды';
@@ -231,7 +286,24 @@ window.XMeshSubscriptionStudio = (() => {
         ).join('');
       };
       form.addEventListener('input',draw);
-      form.addEventListener('change',draw);
+      form.addEventListener('change',event=>{
+        if(event.target.name==='subscriptionTheme'){
+          const from=themeColors[event.target.value==='light'?'dark':'light'];
+          const to=themeColors[event.target.value]||themeColors.dark;
+          for(const key of Object.keys(to)){
+            const target=input(form,key);
+            if(target.value.toLowerCase()===from[key])target.value=to[key];
+          }
+        }
+        draw();
+      });
+      form.querySelectorAll('[data-client-preset]').forEach(button=>button.addEventListener('click',()=>{
+        const mode=button.dataset.clientPreset;
+        for(const [id] of clientCatalog){
+          input(form,'subClient_'+id).checked=mode==='all'||(mode==='default'&&defaultClients[id]);
+        }
+        draw();
+      }));
       form.addEventListener('submit',async event=>{
         event.preventDefault();
         const draft=read();
@@ -239,6 +311,15 @@ window.XMeshSubscriptionStudio = (() => {
         if(!pathOK(draft.subscriptionPath)){notify('Некорректный путь подписки');return;}
         for(const key of ['deploymentServerB','deploymentServerC'])
           if(draft[key] && (draft[key].length>253 || /[\u0000-\u001f\u007f]/.test(draft[key]))) {notify('Некорректное описание сервера');return;}
+        for(const key of ['subscriptionLogoUrl','subscriptionSupportUrl']){
+          if(!validHttps(draft[key])){notify('Укажите корректную HTTPS-ссылку без логина и порта.');return;}
+        }
+        for(const [id,url] of Object.entries(draft.subscriptionClientLinks)){
+          if(!validHttps(url)){notify('Некорректная ссылка для '+id+'. Используйте HTTPS.');return;}
+        }
+        for(const key of ['subscriptionHero','subscriptionCta','subscriptionSupportLabel']){
+          if(/[\u0000-\u001f\u007f]/.test(draft[key])){notify('Заголовки не должны содержать управляющих символов.');return;}
+        }
         const button=form.closest('.subscription-studio').querySelector('.subscription-studio-intro button');
         button.disabled=true;
         try {await save(draft);notify('Настройки SUBSCRIPTION STUDIO сохранены');}
@@ -259,5 +340,5 @@ window.XMeshSubscriptionStudio = (() => {
     };
     return [markup,mount];
   }
-  return {create,defaults,hostnameOK,pathOK};
+  return {create,defaults,hostnameOK,pathOK,clientCatalog,validHttps};
 })();
