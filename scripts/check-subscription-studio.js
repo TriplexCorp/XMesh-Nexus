@@ -48,7 +48,42 @@ for(const setting of [
  'subscriptionSupportUrl','subscriptionClientLayout','subscriptionShowApps','subscriptionShowQr',
  'subscriptionShowCopy','subscriptionShowDevices','subscriptionShowStatus','subscriptionShowSupport'
 ])assert(view.includes('name="'+setting+'"'),'Missing studio setting '+setting);
-assert.equal(studio.clientCatalog.length,16,'Show a deliberate finite client catalog');
+assert.equal(studio.clientCatalog.length,16,'Built-in client catalog must remain intact');
+assert.equal(studio.maxCustomClients,32,'Custom client limit must be bounded');
+assert.equal(studio.nextCustomClientId([]),'custom-1');
+assert.equal(studio.nextCustomClientId([{id:'custom-1'},{id:'custom-3'}]),'custom-2');
+assert.equal(studio.appsHeading('ru'),'Приложения для подключения');
+assert.equal(studio.appsHeading('en'),'Connection apps');
+assert(view.includes('name="subscriptionAppsTitle"'),'Catalog section title must be editable');
+assert(view.includes('data-custom-client-add'),'Custom client add button must exist');
+assert(view.includes('data-custom-client-editor'),'Custom client editor container must exist');
+const [customView]=studio.create({
+ subscriptionAppsTitle:'Поддерживаемые клиенты',
+ subscriptionCustomClients:[
+  {id:'custom-1',name:'My & <Custom> "App"',platforms:'iOS · Android',
+   url:'https://example.com/download?os=ios&app=test',enabled:true},
+  {id:'custom-2',name:'Disabled Client',platforms:'Windows',url:'',enabled:false}
+ ]
+},async()=>{},()=>{},{users:0,nodes:0});
+assert.match(customView,/name="subscriptionAppsTitle"[^>]*value="Поддерживаемые клиенты"/);
+assert.match(customView,/data-custom-client-id="custom-1"/);
+assert.match(customView,/data-custom-client-id="custom-2"/);
+assert.match(customView,/data-custom-field="enabled" aria-label="Показывать приложение" checked/);
+assert.match(customView,/My &amp; &lt;Custom&gt; &quot;App&quot;/);
+assert.match(customView,/https:\/\/example\.com\/download\?os=ios&amp;app=test/);
+assert.doesNotMatch(customView,/My & <Custom>/);
+assert.match(src,/subscriptionCustomClients:readCustomClients\(\)/);
+assert.match(src,/data-subscription-apps-title/);
+assert.match(src,/allEnabled=\[\.\.\.enabled,\.\.\.customEnabled/);
+assert.match(src,/data-custom-client-remove/);
+assert.match(src,/customRows\(\)\.forEach/);
+const rendered=studio.renderCustomClient({
+ id:'custom-11',name:'Injected"><svg onload=alert(1)>',
+ platforms:'iOS',url:'',enabled:false},true);
+assert.match(rendered,/&quot;&gt;&lt;svg onload=alert\(1\)&gt;/);
+assert(!rendered.includes('"><svg'),'Custom values must remain escaped in HTML');
+assert.match(rendered,/data-custom-client-id="custom-11"/);
+
 for(const key of ['happ','incy','v2raytun','v2rayn','v2rayng','streisand','hiddify','nekobox','shadowrocket']){
  assert(view.includes('name="subClient_'+key+'"'),'Missing app visibility setting '+key);
  assert(view.includes('name="subClientLink_'+key+'"'),'Missing app HTTPS-link field '+key);
@@ -82,10 +117,16 @@ const validation=fs.readFileSync('backend/src/subscription_settings.rs','utf8');
 assert.match(validation,/pub\(crate\) fn validate/);
 assert.match(validation,/"subscriptionClients"/);
 assert.match(validation,/"subscriptionClientLinks"/);
+assert.match(validation,/"subscriptionCustomClients"/);
+assert.match(validation,/"subscriptionAppsTitle"/);
+assert.match(validation,/HashSet/,'Custom app IDs must be unique');
+assert.match(rust,/"subscriptionAppsTitle"\s*\|\s*"subscriptionCustomClients"/);
 assert.match(validation,/"subscriptionLogoUrl"/);
 assert.match(validation,/safe_https_url/);
 assert.match(css,/\.subscription-client-editor/);
 assert.match(css,/\.subscription-preview-apps/);
+assert.match(css,/\.subscription-custom-toolbar/);
+assert.match(css,/\.subscription-custom-header/);
 assert.match(view,/name="subscriptionPlacement"/);
 assert.match(view,/name="nodePlacement"/);
 assert.match(view,/name="deploymentServerB"/);
