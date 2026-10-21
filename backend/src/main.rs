@@ -264,11 +264,23 @@ async fn csrf_guard(request: Request, next: Next) -> Response {
             .and_then(|value| value.to_str().ok())
             .is_some_and(|value| value.strip_prefix("Bearer ").is_some_and(|token| !token.trim().is_empty()));
     if is_mutation && request.uri().path().starts_with("/api/v1/") && !agent_bearer {
+        // Sec-Fetch-Site stops same-site but cross-origin form and fetch attacks.
+        // Older clients still have to supply a matching Origin.
+        if request.headers().get("sec-fetch-site").and_then(|v| v.to_str().ok())
+            .is_some_and(|site| !matches!(site, "same-origin" | "none"))
+        {
+            return (StatusCode::FORBIDDEN, Json(json!({"error": "Запрос из другого источника запрещён."}))).into_response();
+        }
         let origin = request.headers().get(header::ORIGIN).and_then(|value| value.to_str().ok());
         let host = request.headers().get(header::HOST).and_then(|value| value.to_str().ok());
         let valid = origin
             .and_then(|value| value.parse::<Uri>().ok())
-            .and_then(|uri| uri.authority().map(|authority| authority.as_str().to_ascii_lowercase()))
+            .and_then(|uri| {
+                if !matches!(uri.scheme_str(), Some("https") | Some("http")) || uri.query().is_some() {
+                    return None;
+                }
+                uri.authority().map(|authority| authority.as_str().to_ascii_lowercase())
+            })
             .zip(host.map(str::to_ascii_lowercase))
             .is_some_and(|(origin_authority, request_host)| origin_authority == request_host);
         if !valid {
@@ -304,6 +316,10 @@ async fn security_headers(request: Request, next: Next) -> Response {
     headers.insert(HeaderName::from_static("cache-control"), HeaderValue::from_static("no-store"));
     headers.insert(HeaderName::from_static("x-frame-options"), HeaderValue::from_static("DENY"));
     headers.insert(HeaderName::from_static("referrer-policy"), HeaderValue::from_static("same-origin"));
+    headers.insert(
+        HeaderName::from_static("content-security-policy"),
+        HeaderValue::from_static("default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; font-src 'self' data:; connect-src 'self'; form-action 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'"),
+    );
     headers.insert(
         HeaderName::from_static("permissions-policy"),
         HeaderValue::from_static("camera=(), microphone=(), geolocation=()"),
