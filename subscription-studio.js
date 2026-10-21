@@ -61,13 +61,13 @@ window.XMeshSubscriptionStudio = (() => {
   const slot = [['a','Сервер A'],['b','Сервер B'],['c','Сервер C']];
   const locale = {
     ru:['Подписка активна','Трафик','Действует до','Настройка подключения','Скопировать ссылку'],
-    en:['Subscription active','Traffic','Expires','Connection settings','Copy link'],
-    tr:['Abonelik aktif','Trafik','Bitiş','Bağlantı ayarları','Bağlantıyı kopyala'],
-    vi:['Gói đăng ký đang hoạt động','Lưu lượng','Ngày hết hạn','Cài đặt kết nối','Sao chép liên kết']
+    en:['Subscription active','Traffic','Expires','Connection settings','Copy link']
+
   };
   const input = (form,name) => form.elements.namedItem(name);
   function create(settings,save,notify,counts) {
     const data = {...defaults,...settings};
+    if(!['ru','en'].includes(data.subscriptionLanguage))data.subscriptionLanguage='ru';
     const currentPalette=themeColors[data.subscriptionTheme]||themeColors.dark;
     for(const key of Object.keys(currentPalette))if(settings?.[key]===undefined)data[key]=currentPalette[key];
     data.subscriptionClients={...defaultClients,...(settings?.subscriptionClients||{})};
@@ -114,7 +114,7 @@ window.XMeshSubscriptionStudio = (() => {
       field('subscriptionDescription','Описание',data.subscriptionDescription,'Короткий текст на главной странице.',{area:true,max:240}),
       '<div class="subscription-studio-pair">',
       field('subscriptionAccent','Акцентный цвет',data.subscriptionAccent,'Цвет кнопок и индикаторов.',{color:true}),
-      choice('subscriptionLanguage',data.subscriptionLanguage,[['ru','Русский'],['en','English'],['tr','Türkçe'],['vi','Tiếng Việt']]),
+      choice('subscriptionLanguage',data.subscriptionLanguage,[['ru','Русский'],['en','English']]),
       '</div><div class="subscription-studio-pair">',
       '<label class="f subscription-field"><span>Тема клиентского портала</span><select name="subscriptionTheme"><option value="dark"'+(data.subscriptionTheme!=='light'?' selected':'')+'>Тёмная</option><option value="light"'+(data.subscriptionTheme==='light'?' selected':'')+'>Светлая</option></select></label>',
       '</div>',
