@@ -1985,3 +1985,15 @@ dialog.user-modal .user-legend-dot.is-up{background:color-mix(in srgb,var(--a) 3
 .node-rotation-probe>.gh{justify-self:start}
 .node-rotation-probe output{display:block;min-height:1.2rem;overflow-wrap:anywhere;font-family:"IBM Plex Mono",monospace;color:var(--a);font-size:.85rem}
 .node-rotation-probe small{color:var(--mu);font-size:.77rem;line-height:1.4}
+
+/* Appearance: language selection belongs to the existing palette header.
+   Do not add a wide settings card or change the three-column grid. */
+.settings-appearance-header{display:flex;justify-content:space-between;align-items:flex-start;gap:.65rem;min-width:0}
+.settings-appearance-header>div:first-child{flex:1;min-width:0}
+.settings-appearance-header>div:first-child small{line-height:1.4}
+.settings-language-toggle{flex:0 0 auto;display:inline-flex;align-items:center;flex-wrap:nowrap;gap:.1rem;
+  padding:.15rem;border:1px solid var(--ln);border-radius:.65rem;background:var(--s2)}
+.settings-language-toggle button{min-width:2.1rem;padding:.3rem .35rem;border-radius:.45rem;
+  font-size:.73rem;line-height:1.2;font-weight:700;letter-spacing:.03em}
+.settings-language-toggle button:focus-visible{outline:2px solid var(--a);outline-offset:2px}
+@media(max-width:420px){.settings-appearance-header{flex-wrap:wrap}}
