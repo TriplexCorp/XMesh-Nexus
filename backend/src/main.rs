@@ -464,7 +464,7 @@ async fn patch_settings(
         if !matches!(key.as_str(), "brand" | "domain" | "hooks"
                 | "subscriptionDomain" | "subscriptionPath" | "subscriptionBrand"
                 | "subscriptionDescription" | "subscriptionFooter" | "subscriptionAccent"
-                | "subscriptionLanguage" | "subscriptionPlacement" | "nodePlacement"
+                | "subscriptionLanguage" | "subscriptionTheme" | "subscriptionPlacement" | "nodePlacement"
                 | "deploymentServerB" | "deploymentServerC" | "subscriptionShowTraffic"
                 | "subscriptionShowExpiry") {
             return Err(ApiError::new(StatusCode::BAD_REQUEST, format!("Неизвестное поле настроек: {key}")));
@@ -517,6 +517,7 @@ async fn patch_settings(
     }
     for (key, choices) in [
         ("subscriptionLanguage", &["ru", "en", "tr", "vi"][..]),
+        ("subscriptionTheme", &["dark", "light"][..]),
         ("subscriptionPlacement", &["a", "b", "c"][..]),
         ("nodePlacement", &["a", "b", "c"][..]),
     ] {
