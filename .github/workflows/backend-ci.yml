@@ -56,6 +56,8 @@ jobs:
         run: |
           bash -n install.sh
           bash -n xmeshctl
+          bash -n scripts/check-xmeshctl-confirm.sh
+          bash scripts/check-xmeshctl-confirm.sh
           bash -n deploy/node-metrics-agent.sh
           bash -n deploy/install-node-metrics-agent.sh
           sh -n deploy/postgres/10-create-app-user.sh
