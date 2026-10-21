@@ -549,7 +549,7 @@ window.XMeshI18n=(()=>{
     ["Рабочее пространство","Workspace"],
     ["Ширина панели и интервалы между разделами","Panel width and spacing between sections"],
     ["Ширина содержимого","Content width"],
-    ["Максимальная ширина рабочей области. На узком экране она ограничена размером окна.","Maximum workspace width; narrower screens limit it to the available viewport."],
+    ["Максимальная ширина рабочей области до 3000 px. На узком экране она ограничена размером окна.","Maximum workspace width up to 3000 px; narrower screens limit it to the available viewport."],
     ["Интервалы","Spacing"],
     ["Расстояние между карточками и блоками интерфейса","Distance between cards and interface sections"],
     ["Расстояние между карточками","Spacing between cards"]

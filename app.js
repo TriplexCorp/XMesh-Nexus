@@ -336,7 +336,7 @@ const CDEFAULT={theme:'dark',accent:'emerald',customA:'#60d6a2',customB:'#c3e879
 let C={...CDEFAULT};try{Object.assign(C,JSON.parse(localStorage.xmeshNexusSettings||'{}'))}catch(e){}if(C.accent==='mint')C.accent='emerald';if(!['solid','glass','raised'].includes(C.surface))C.surface='solid';C.railTips=C.railTips===true||C.railTips===1?1:0;
 const hslHex=(h,s,l)=>{s/=100;l/=100;const k=n=>(n+h/30)%12,a=s*Math.min(l,1-l),f=n=>{const c=(k(n)+12)%12;return l-a*Math.max(-1,Math.min(c-3,9-c,1))};return '#'+[f(0),f(8),f(4)].map(v=>Math.round(v*255).toString(16).padStart(2,'0')).join('')};
 const apply=()=>{const r=document.documentElement;r.dataset.theme=C.theme=='auto'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):C.theme;r.dataset.accent=C.accent;r.style.setProperty('--custom-a',C.customA||hslHex(+C.hue||151,+C.sat||62,+C.lum||61));r.style.setProperty('--custom-b',C.customB||'#c3e879');if(C.accent==='custom'){const rgb=(C.customA||'#60d6a2').match(/[0-9a-f]{2}/gi).map(v=>parseInt(v,16)/255);const linear=rgb.map(v=>v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4));const lum=.2126*linear[0]+.7152*linear[1]+.0722*linear[2];r.style.setProperty('--btn-text',lum>.42?'#082b1d':'#ffffff')}else r.style.setProperty('--btn-text',r.dataset.theme==='light'?'#ffffff':'#082b1d');r.dataset.density=C.density||CDEFAULT.density;r.dataset.surface=C.surface||CDEFAULT.surface;r.dataset.glow=C.glow||CDEFAULT.glow;r.dataset.font=C.font||CDEFAULT.font;r.dataset.borders=C.borders||CDEFAULT.borders;r.dataset.sidebar=C.sidebar||CDEFAULT.sidebar;r.dataset.railTips=C.railTips?'on':'off';if(!C.railTips)hideRailTip();r.style.setProperty('--ts',cl(+C.ts||1,.9,1.3));const radius=cl(+C.radius||16,4,24);r.style.setProperty('--ui-radius',radius+'px');r.style.setProperty('--ui-control-radius',Math.max(5,radius*.72)+'px');r.dataset.motion=C.motion?'on':'off';
-r.style.setProperty('--panel-content-max',cl(Number(C.contentWidth)||1920,720,2240)+'px');
+r.style.setProperty('--panel-content-max',cl(Number(C.contentWidth)||1920,720,3000)+'px');
 const baseGap=C.density==='compact'?.75:C.density==='spacious'?1.45:1.1;
 r.style.setProperty('--view-gap',(baseGap*cl(Number(C.gapScale)||1,.8,1.4))+'rem');
 try{localStorage.xmeshNexusSettings=JSON.stringify(C)}catch(e){}};
@@ -344,7 +344,7 @@ try{localStorage.xmeshNexusSettings=JSON.stringify(C)}catch(e){}};
 // update unrelated CSS/theme attributes or serialize localStorage every pixel.
 let contentWidthFrame=0;
 const paintContentWidth=()=>{
- const next=Math.round(cl(Number(C.contentWidth)||1920,720,2240))+'px';
+ const next=Math.round(cl(Number(C.contentWidth)||1920,720,3000))+'px';
  const style=document.documentElement.style;
  if(style.getPropertyValue('--panel-content-max')!==next)style.setProperty('--panel-content-max',next);
 };
@@ -1965,7 +1965,7 @@ async function setP(){
     </section>
 <section class="card sg">
     <div class="appearance-card-heading"><h3>Рабочее пространство</h3><small>Ширина панели и интервалы между разделами</small></div>
-    <div class="setting-row"><div class="setting-copy"><b>Ширина содержимого</b><small>Максимальная ширина рабочей области. На узком экране она ограничена размером окна.</small></div><div class="setting-control slider-control"><input type="range" id="content-width" min="720" max="2240" step="10" value="${C.contentWidth||1920}" aria-label="Ширина содержимого"><b id="content-width-value">${C.contentWidth||1920} px</b></div></div>
+    <div class="setting-row"><div class="setting-copy"><b>Ширина содержимого</b><small>Максимальная ширина рабочей области до 3000 px. На узком экране она ограничена размером окна.</small></div><div class="setting-control slider-control"><input type="range" id="content-width" min="720" max="3000" step="10" value="${C.contentWidth||1920}" aria-label="Ширина содержимого"><b id="content-width-value">${C.contentWidth||1920} px</b></div></div>
     <div class="setting-row"><div class="setting-copy"><b>Интервалы</b><small>Расстояние между карточками и блоками интерфейса</small></div><div class="setting-control slider-control"><input type="range" id="gap-scale" min="0.8" max="1.4" step="0.1" value="${C.gapScale||1}" aria-label="Расстояние между карточками"><b id="gap-scale-value">${Math.round((C.gapScale||1)*100)}%</b></div></div>
   </section>
     <section class="card sg"><div><h3>Эффекты и движение</h3><small>Настройка фона и анимаций без изменения данных</small></div>
@@ -2207,7 +2207,7 @@ document.addEventListener('click',e=>{
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeTopLanguage()});
 document.addEventListener('change',async e=>{const t=e.target;
   if(t.id==='content-width'){
-    C.contentWidth=cl(Number(t.value)||1920,720,2240);
+    C.contentWidth=cl(Number(t.value)||1920,720,3000);
     saveContentWidth();
     return;
   }
@@ -2235,7 +2235,7 @@ document.addEventListener('input',e=>{if(updatePaletteColor(e.target))return;if(
   paletteDraft.h=+$('#hue').value;paletteDraft.s=+$('#sat').value;paletteDraft.l=+$('#lum').value;
   paletteDraft.a=hslHex(paletteDraft.h,paletteDraft.s,paletteDraft.l);paintPaletteDraft();
 }else if(e.target.id=='ts'){C.ts=+e.target.value;$('#tsv').textContent=Math.round(C.ts*100)+'%';apply()}else if(e.target.id=='radius'){C.radius=+e.target.value;$('#rv').textContent=C.radius+' px';apply()}
- else if(e.target.id==='content-width'){C.contentWidth=cl(Number(e.target.value)||1920,720,2240);$('#content-width-value').textContent=C.contentWidth+' px';previewContentWidth()}
+ else if(e.target.id==='content-width'){C.contentWidth=cl(Number(e.target.value)||1920,720,3000);$('#content-width-value').textContent=C.contentWidth+' px';previewContentWidth()}
  else if(e.target.id==='gap-scale'){C.gapScale=+e.target.value;$('#gap-scale-value').textContent=Math.round(C.gapScale*100)+'%';apply()}
  if(e.target.id=='pq')pdraw(e.target.value)});
 document.addEventListener('keydown',e=>{

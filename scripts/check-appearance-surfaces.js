@@ -24,13 +24,13 @@ assert(wrapLimits.filter(rule=>rule.includes('var(--panel-content-max')).length>
  'All desktop .wrap width rules must use the runtime setting, including later theme overrides');
 assert(!wrapLimits.some(rule=>/max-width:(?:132rem|2112px)/.test(rule)),
  'Static desktop width caps must not override the slider');
-assert.match(app,/cl\(Number\(C\.contentWidth\)\|\|1920,720,2240\)/,
+assert.match(app,/cl\(Number\(C\.contentWidth\)\|\|1920,720,3000\)/,
  'Content width must support narrower desktop viewports');
-assert.match(app,/id="content-width" min="720" max="2240" step="10"/,
+assert.match(app,/id="content-width" min="720" max="3000" step="10"/,
  'The width slider must support fine-grained adjustment on desktop screens');
 assert.match(html,/styles\.css\?v=[a-z0-9-]+/,'The active stylesheet needs a versioned cache key');
 
-assert.match(app,/id="content-width" min="720" max="2240" step="10"/,
+assert.match(app,/id="content-width" min="720" max="3000" step="10"/,
  'The width slider must have finer 10px increments');
 assert.match(app,/const previewContentWidth=\(\)=>/,'Width changes must have a dedicated preview scheduler');
 assert.match(app,/contentWidthFrame=requestAnimationFrame\(/,'Only one preview layout change per animation frame');
@@ -61,7 +61,7 @@ const frameContext={
 };
 const widthFns=new Function(...Object.keys(frameContext),
  previewCode+';return {previewContentWidth,saveContentWidth,C};')(...Object.values(frameContext));
-for(let w=721;w<=2201;w+=10){widthFns.C.contentWidth=w;widthFns.previewContentWidth();}
+for(let w=721;w<=2991;w+=10){widthFns.C.contentWidth=w;widthFns.previewContentWidth();}
 assert.equal(frameQueue.size,1,'Burst of input events must be coalesced to one frame');
 assert.equal(storageWrites,0,'No storage writes while dragging');
 assert.equal(styleWrites,0,'No layout writes before the scheduled frame');
@@ -72,6 +72,15 @@ widthFns.saveContentWidth();
 assert.equal(frameQueue.size,0,'Committing must cancel a pending stale frame');
 assert.equal(values.get('--panel-content-max'),'1711px');
 assert.equal(storageWrites,1,'Final width must be stored once');
+widthFns.C.contentWidth=3000;
+widthFns.previewContentWidth();
+[...frameQueue.values()][0]();frameQueue.clear();
+assert.equal(values.get('--panel-content-max'),'3000px',
+ 'Ultrawide screens must support the full 3000px content width');
+widthFns.C.contentWidth=3150;
+widthFns.saveContentWidth();
+assert.equal(values.get('--panel-content-max'),'3000px',
+ 'The setting must clamp widths larger than 3000px');
 // Appearance grid must pair cards on real grid rows, including when the panel width changes.
 assert.match(css,/\.appearance-column\{display:contents\}/,'Independent masonry columns must be flattened');
 for(const rule of [
