@@ -552,7 +552,7 @@ async fn patch_settings(
         if !matches!(key.as_str(), "brand" | "domain" | "hooks"
                 | "subscriptionDomain" | "subscriptionPath" | "subscriptionBrand"
                 | "subscriptionDescription" | "subscriptionFooter" | "subscriptionAccent"
-                | "subscriptionLanguage" | "subscriptionTheme" | "subscriptionPlacement" | "nodePlacement"
+                | "subscriptionLanguage" | "subscriptionTheme" | "subscriptionSyncPanelTheme" | "subscriptionPlacement" | "nodePlacement"
                 | "deploymentServerB" | "deploymentServerC" | "subscriptionShowTraffic"
                 | "subscriptionShowExpiry" | "subscriptionBackground" | "subscriptionCardColor"
                 | "subscriptionTextColor" | "subscriptionLayout" | "subscriptionCardStyle"
