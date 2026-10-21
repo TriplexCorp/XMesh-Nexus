@@ -1967,3 +1967,40 @@ dialog.user-modal .user-legend-dot.is-up{background:color-mix(in srgb,var(--a) 3
 }
 .nc .node-ip-rotation.active{color:var(--tx)}
 .nc .node-ip-rotation.active .node-ip-indicator{background:var(--ok);opacity:1}
+
+/* Rotation editor keeps the optional pool out of the primary node form. */
+.node-rotation-editor{
+  border:1px solid var(--ln);
+  border-radius:var(--ui-radius);
+  background:var(--s2);
+  overflow:hidden;
+}
+.node-rotation-editor>summary{
+  display:flex;
+  align-items:center;
+  gap:.75rem;
+  padding:1rem 1.1rem;
+  cursor:pointer;
+  list-style:none;
+  user-select:none;
+}
+.node-rotation-editor>summary::-webkit-details-marker{display:none}
+.node-rotation-editor>summary .ic{color:var(--a);width:1.15rem;height:1.15rem;flex:0 0 auto}
+.node-rotation-editor>summary>span{display:grid;gap:.18rem;min-width:0}
+.node-rotation-editor>summary b{font-weight:650;font-size:.92rem}
+.node-rotation-editor>summary small{color:var(--mu);font-size:.78rem;line-height:1.4}
+.node-rotation-editor>summary::after{
+  content:"⌄";
+  margin-left:auto;
+  color:var(--mu);
+  font-size:1.2rem;
+  transition:transform .16s;
+}
+.node-rotation-editor[open]>summary::after{transform:rotate(180deg)}
+.node-rotation-editor>summary:focus-visible{outline:2px solid var(--a);outline-offset:-2px}
+.node-rotation-editor-body{padding:0 1.1rem 1.1rem;display:grid;gap:1rem}
+.node-rotation-editor-body textarea{width:100%;min-height:9rem;font-family:"IBM Plex Mono",monospace;font-size:.85rem}
+.node-rotation-probe{display:grid;gap:.7rem;padding-top:.6rem;border-top:1px solid var(--ln)}
+.node-rotation-probe>.gh{justify-self:start}
+.node-rotation-probe output{display:block;min-height:1.2rem;overflow-wrap:anywhere;font-family:"IBM Plex Mono",monospace;color:var(--a);font-size:.85rem}
+.node-rotation-probe small{color:var(--mu);font-size:.77rem;line-height:1.4}
