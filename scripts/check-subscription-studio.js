@@ -31,6 +31,24 @@ const [view,init]=studio.create({
   nodePlacement:'b'
 },async()=>{},()=>{},{users:3,nodes:8});
 assert.equal(typeof init,'function');
+const linkedPalette={
+ subscriptionAccent:'#4488cc',subscriptionTheme:'light',
+ subscriptionBackground:'#f7f9fc',subscriptionCardColor:'#ffffff',subscriptionTextColor:'#203040'
+};
+const [linkedView]=studio.create({subscriptionAccent:'#e8bb78'},async()=>{},()=>{},{users:0,nodes:0},()=>linkedPalette);
+assert.match(linkedView,/name="subscriptionAccent"[^>]*value="#4488cc"/,
+ 'Linked portal preview must use the current panel accent');
+assert.match(linkedView,/name="subscriptionTheme"[^>]*>[\s\S]*?value="light" selected/,
+ 'Linked portal must follow panel light/dark mode');
+assert.match(linkedView,/name="subscriptionSyncPanelTheme" checked/,
+ 'New subscription appearance defaults to linked panel theme');
+const [customPaletteView]=studio.create({subscriptionSyncPanelTheme:false,subscriptionAccent:'#ff0022'},
+ async()=>{},()=>{},{users:0,nodes:0},()=>linkedPalette);
+assert.match(customPaletteView,/name="subscriptionAccent"[^>]*value="#ff0022"/,
+ 'Independent portal theme must preserve a custom accent');
+assert.doesNotMatch(customPaletteView,/name="subscriptionSyncPanelTheme" checked/,
+ 'Explicit opt-out must remain unchecked');
+
 assert.match(view,/SUBSCRIPTION STUDIO/);
 assert.match(view,/name="subscriptionDomain"/);
 assert.match(view,/name="subscriptionPath"/);
