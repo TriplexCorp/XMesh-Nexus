@@ -2318,3 +2318,31 @@ aside #logout .ic{width:1.12rem;height:1.12rem;flex-shrink:0}
   *{scrollbar-width:thin;scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track)}
 }
 .top-language-trigger>.ic:first-child{width:1.18rem;height:1.18rem;stroke-width:1.9}
+
+/* Exact numeric input next to each customizable Appearance slider. */
+.appearance-layout .slider-control .precision-number{
+ display:inline-flex;align-items:center;justify-content:flex-end;
+ width:6.2rem;max-width:38%;min-width:5.2rem;flex:0 0 auto;
+ height:2.65rem;padding:0 .65rem;gap:.27rem;
+ border:1px solid var(--ln);border-radius:var(--ui-control-radius);
+ background:var(--s2);color:var(--tx);font-variant-numeric:tabular-nums;
+ transition:border-color .16s ease,background .16s ease,box-shadow .16s ease;
+}
+.appearance-layout .slider-control .precision-number:focus-within{
+ border-color:var(--a);
+ box-shadow:0 0 0 2px color-mix(in srgb,var(--a) 12%,transparent);
+}
+.appearance-layout .slider-control .precision-number input[type=number]{
+ appearance:textfield;-moz-appearance:textfield;
+ flex:1 1 auto;display:block;width:100%;min-width:0;max-width:none;
+ height:100%;min-height:0;margin:0;padding:0;
+ border:0;border-radius:0;outline:0;box-shadow:none;
+ background:transparent;font:inherit;font-size:.83rem;font-weight:750;
+ color:inherit;text-align:right;font-variant-numeric:tabular-nums;
+}
+.appearance-layout .slider-control .precision-number input[type=number]:focus{outline:none;box-shadow:none;border:0}
+.appearance-layout .slider-control .precision-number input[type=number]::-webkit-inner-spin-button,
+.appearance-layout .slider-control .precision-number input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.appearance-layout .slider-control .precision-number span{font-size:.74rem;color:var(--mu);font-weight:650}
+.appearance-layout .slider-control input[type=range]{flex:1 1 auto;width:100%;min-width:3rem}
+@media(max-width:520px){.appearance-layout .slider-control .precision-number{width:5.6rem;min-width:5.2rem}}
