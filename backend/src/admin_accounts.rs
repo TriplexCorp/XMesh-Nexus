@@ -64,7 +64,9 @@ fn password_hash(password: &str) -> Result<String, ApiError> {
 
 pub(crate) async fn accounts(pool: &PgPool) -> Result<Vec<Value>, ApiError> {
     let rows = sqlx::query(
-        "SELECT id, username, role, is_active, created_at, last_login_at \
+        "SELECT id, username, role, is_active, \
+           (EXTRACT(EPOCH FROM created_at)*1000)::BIGINT AS created_ms, \
+           (EXTRACT(EPOCH FROM last_login_at)*1000)::BIGINT AS last_ms \
          FROM panel_auth_users ORDER BY id",
     )
     .fetch_all(pool).await?;
@@ -73,8 +75,8 @@ pub(crate) async fn accounts(pool: &PgPool) -> Result<Vec<Value>, ApiError> {
         "username": row.try_get::<String, _>("username")?,
         "role": row.try_get::<String, _>("role")?,
         "disabled": !row.try_get::<bool, _>("is_active")?,
-        "last": row.try_get::<Option<chrono::DateTime<chrono::Utc>>, _>("last_login_at")?.map(|t| t.timestamp_millis()),
-        "created": row.try_get::<chrono::DateTime<chrono::Utc>, _>("created_at")?.timestamp_millis()
+        "last": row.try_get::<Option<i64>, _>("last_ms")?,
+        "created": row.try_get::<i64, _>("created_ms")?
     }))).collect()
 }
 
