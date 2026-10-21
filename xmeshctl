@@ -20,22 +20,46 @@ pause() { printf "\nНажми Enter, чтобы продолжить..."; read 
 
 # Accept terminal CRLF and pasted values without treating invisible spaces as
 # a negative reply. Unknown input is re-prompted instead of silently cancelling.
+# Normalize only known terminal wrappers; never accept arbitrary strings
+# merely because they contain "y".
+normalize_confirmation() {
+  local input="$1"
+  local paste_open=$'\033[200~' paste_close=$'\033[201~'
+  input="${input//$'\r'/}"
+  input="${input//$'\ufeff'/}"
+  input="${input//$'\u200b'/}"
+  input="${input//$'\u00a0'/ }"
+  input="${input#"${input%%[![:space:]]*}"}"
+  input="${input%"${input##*[![:space:]]}"}"
+  # SSH terminal paste wrappers can be invisible even if the user typed
+  # an ordinary Latin "y" according to the on-screen echo.
+  if [[ "$input" == "$paste_open"*"$paste_close" ]]; then
+    input="${input#"$paste_open"}"
+    input="${input%"$paste_close"}"
+    input="${input#"${input%%[![:space:]]*}"}"
+    input="${input%"${input##*[![:space:]]}"}"
+  fi
+  REPLY="$input"
+}
+
 confirm_yes() {
-  local prompt="${1:-Продолжить? [y/N] }" answer
+  local prompt="${1:-Продолжить? [y/N] }" answer normalized answer_quoted
   while true; do
     if ! IFS= read -r -p "$prompt" answer; then
       printf '\n' >&2
       warn "Не удалось прочитать подтверждение. Действие отменено."
       return 1
     fi
-    # Strip carriage returns (CRLF from terminal/paste) and surrounding spaces.
-    answer="${answer//$'\015'/}"
-    answer="${answer#"${answer%%[![:space:]]*}"}"
-    answer="${answer%"${answer##*[![:space:]]}"}"
-    case "${answer,,}" in
-      y|yes|д|да|Д|Да|ДА) return 0 ;;
-      n|no|н|нет|Н|Нет|НЕТ|'') return 1 ;;
-      *) warn "Непонятный ответ. Введи y (да) или n (нет)." ;;
+    normalize_confirmation "$answer"
+    normalized="$REPLY"
+    case "$normalized" in
+      y|Y|yes|YES|Yes|д|Д|да|Да|ДА) return 0 ;;
+      n|N|no|NO|No|н|Н|нет|Нет|НЕТ|'') return 1 ;;
+      *)
+        # %q renders invisible bytes visibly and never executes them.
+        printf -v answer_quoted '%q' "$answer"
+        warn "Непонятный ответ (получено: $answer_quoted). Введи y (да) или n (нет)."
+        ;;
     esac
   done
 }
