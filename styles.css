@@ -457,38 +457,36 @@ html[data-motion=on] .appearance-layout .setting-row{
 html[data-motion=on] .appearance-layout .slider-control:focus-within b{
  color:var(--a);transform:translateY(-1px);
 }
-/* Animated range: the thumb stays at the pointer while the workspace catches up.
-   WebKit/Firefox tracks share an exact percentage via --range-pct. */
-.appearance-layout input[type="range"]{
- -webkit-appearance:none;appearance:none;
- width:100%;min-width:0;height:7px;border-radius:999px;padding:0;
- background:linear-gradient(to right,
-  var(--a) 0%,var(--a) var(--range-pct,0%),
-  color-mix(in srgb,var(--mu) 26%,var(--s2)) var(--range-pct,0%),
-  color-mix(in srgb,var(--mu) 26%,var(--s2)) 100%);
- box-shadow:inset 0 1px 2px rgba(0,0,0,.23);
- cursor:pointer;
+/* One animated range system for all controls in the dashboard and studios. */
+input[type="range"]{
+ -webkit-appearance:none;appearance:none;display:block;width:100%;min-width:0;
+ height:7px;padding:0;border:0;border-radius:999px;
+ background:linear-gradient(to right,var(--a) 0%,var(--a) var(--range-pct,0%),
+ color-mix(in srgb,var(--mu) 26%,var(--s2)) var(--range-pct,0%),
+ color-mix(in srgb,var(--mu) 26%,var(--s2)) 100%);
+ box-shadow:inset 0 1px 2px rgba(0,0,0,.23);cursor:pointer;
 }
-.appearance-layout input[type="range"]::-webkit-slider-thumb{
- -webkit-appearance:none;appearance:none;
- width:17px;height:17px;border-radius:50%;
- border:3px solid var(--s1);background:var(--a);
+input[type="range"]::-webkit-slider-runnable-track{height:7px;border-radius:999px;background:transparent}
+input[type="range"]::-moz-range-track{height:7px;border-radius:999px;background:transparent}
+input[type="range"]::-webkit-slider-thumb{
+ -webkit-appearance:none;appearance:none;width:17px;height:17px;margin-top:-5px;
+ border:3px solid var(--s1);border-radius:50%;background:var(--a);
  box-shadow:0 0 0 1px color-mix(in srgb,var(--a) 70%,var(--ln)),0 3px 8px -3px rgba(0,0,0,.4);
+}
+input[type="range"]::-moz-range-thumb{
+ width:11px;height:11px;border:3px solid var(--s1);border-radius:50%;background:var(--a);
+ box-shadow:0 0 0 1px color-mix(in srgb,var(--a) 70%,var(--ln)),0 3px 8px -3px rgba(0,0,0,.4);
+}
+html[data-motion=on] input[type="range"]::-webkit-slider-thumb,
+html[data-motion=on] input[type="range"]::-moz-range-thumb{
  transition:transform .17s ease,box-shadow .17s ease,background-color .2s ease;
 }
-.appearance-layout input[type="range"]::-moz-range-thumb{
- width:11px;height:11px;border-radius:50%;
- border:3px solid var(--s1);background:var(--a);
- box-shadow:0 0 0 1px color-mix(in srgb,var(--a) 70%,var(--ln)),0 3px 8px -3px rgba(0,0,0,.4);
- transition:transform .17s ease,box-shadow .17s ease,background-color .2s ease;
-}
-.appearance-layout input[type="range"]:hover::-webkit-slider-thumb,
-.appearance-layout input[type="range"]:focus-visible::-webkit-slider-thumb{transform:scale(1.15)}
-.appearance-layout input[type="range"]:hover::-moz-range-thumb,
-.appearance-layout input[type="range"]:focus-visible::-moz-range-thumb{transform:scale(1.15)}
-.appearance-layout input[type="range"]:active::-webkit-slider-thumb{transform:scale(1.23)}
-.appearance-layout input[type="range"]:active::-moz-range-thumb{transform:scale(1.23)}
-.appearance-layout input[type="range"]:focus-visible{outline:2px solid var(--a);outline-offset:6px}
+html[data-motion=on] input[type="range"]:is(:hover,:focus-visible)::-webkit-slider-thumb{transform:scale(1.15)}
+html[data-motion=on] input[type="range"]:is(:hover,:focus-visible)::-moz-range-thumb{transform:scale(1.15)}
+html[data-motion=on] input[type="range"]:active::-webkit-slider-thumb{transform:scale(1.23)}
+html[data-motion=on] input[type="range"]:active::-moz-range-thumb{transform:scale(1.23)}
+input[type="range"]:focus-visible{outline:2px solid var(--a);outline-offset:6px}
+input[type="range"]:disabled{cursor:not-allowed;opacity:.5}
 @media(prefers-reduced-motion:reduce){
  html[data-motion=on] .wrap:has(#view .appearance-layout),
  html[data-motion=on] .appearance-layout,
@@ -496,12 +494,11 @@ html[data-motion=on] .appearance-layout .slider-control:focus-within b{
  html[data-motion=on] .appearance-layout .seg button,
  html[data-motion=on] .appearance-layout .setting-row,
  .appearance-layout .slider-control b,
- .appearance-layout input[type="range"]::-webkit-slider-thumb,
- .appearance-layout input[type="range"]::-moz-range-thumb{transition:none!important}
- .appearance-layout input[type="range"]:hover::-webkit-slider-thumb,
- .appearance-layout input[type="range"]:hover::-moz-range-thumb{transform:none}
+ html[data-motion=on] input[type="range"]::-webkit-slider-thumb,
+ html[data-motion=on] input[type="range"]::-moz-range-thumb{transition:none!important}
+ html[data-motion=on] input[type="range"]:is(:hover,:focus-visible)::-webkit-slider-thumb,
+ html[data-motion=on] input[type="range"]:is(:hover,:focus-visible)::-moz-range-thumb{transform:none}
 }
-
 /* A proper pair of color controls replaces the oversized circular inputs. */
 .appearance-layout .color-bubbles{gap:.9rem}
 .appearance-layout .color-bubble-wrap{font-weight:650;gap:.5rem}

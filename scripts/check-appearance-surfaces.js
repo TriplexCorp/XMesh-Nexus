@@ -154,34 +154,65 @@ assert.match(css,/html\[data-motion=on\] \.appearance-layout\{/,
  'Motion must respect the panel animation toggle');
 assert.match(css,/::-webkit-slider-thumb/);
 assert.match(css,/::-moz-range-thumb/);
-assert.match(app,/initializeAppearanceRanges\(v\)/,
+assert.match(app,/initializeRangeProgress\(v\)/,
  'Appearance tracks must fill to their saved values on render');
-assert.match(app,/syncAppearanceRangeProgress\(e\.target\)/,
+assert.match(app,/syncRangeProgress\(e\.target\)/,
  'Track progress must update during slider movement');
-const rangeLogic=app.slice(app.indexOf('const syncAppearanceRangeProgress='),
+const rangeLogic=app.slice(app.indexOf('const syncRangeProgress='),
  app.indexOf('const brand=()=>'));
-assert(rangeLogic.startsWith('const syncAppearanceRangeProgress='));
+assert(rangeLogic.startsWith('const syncRangeProgress='));
 const updateProgress=new Function(rangeLogic+
- ';return {syncAppearanceRangeProgress,initializeAppearanceRanges};')();
+ ';return {syncRangeProgress,initializeRangeProgress};')();
 let fill=null,count=0;
 const range={
- min:'720',max:'3000',value:'1860',matches:s=>s==='.appearance-layout input[type="range"]',
+ min:'720',max:'3000',value:'1860',matches:s=>s==='input[type="range"]',
  style:{setProperty:(key,value)=>{assert.equal(key,'--range-pct');fill=value;count++}}
 };
-updateProgress.syncAppearanceRangeProgress(range);
+updateProgress.syncRangeProgress(range);
 assert.equal(fill,'50.00%','Saved halfway width must fill half of its track');
 range.value='3000';
-updateProgress.syncAppearanceRangeProgress(range);
+updateProgress.syncRangeProgress(range);
 assert.equal(fill,'100.00%','Max width must fill entire range');
 range.value='720';
-updateProgress.syncAppearanceRangeProgress(range);
+updateProgress.syncRangeProgress(range);
 assert.equal(fill,'0.00%','Min width must clear range fill');
 const nonAppearance={...range,matches:()=>false};
-updateProgress.syncAppearanceRangeProgress(nonAppearance);
-assert.equal(count,3,'Unrelated sliders should not trigger appearance updates');
+updateProgress.syncRangeProgress(nonAppearance);
+assert.equal(count,3,'Non-range elements should not trigger range updates');
 const root={querySelectorAll:()=>[range]};
-updateProgress.initializeAppearanceRanges(root);
+updateProgress.initializeRangeProgress(root);
 assert.equal(count,4,'Saved slider progress must hydrate after page rendering');
+
+// Common range styles must include SUBSCRIPTION STUDIO, not only appearance page.
+const subscriptionJs=fs.readFileSync('subscription-studio.js','utf8');
+assert.match(subscriptionJs,/type="range" name="subscriptionRadius"/);
+assert.match(css,/^input\[type="range"\]\{/m);
+assert.match(css,/^input\[type="range"\]::-webkit-slider-thumb\{/m);
+assert.match(css,/^input\[type="range"\]::-moz-range-thumb\{/m);
+assert.match(css,/html\[data-motion=on\] input\[type="range"\]/);
+assert.match(app,/const saveAppearanceControls=\(\)=>/);
+assert.match(app,/\['ts','radius','gap-scale'\]\.includes\(t\.id\)/);
+for(const key of ['ts','radius','gap-scale']){
+ const handler=app.match(new RegExp("e\\.target\\.id(?:===|==)'"+key+"'\\)\\{([^}]+)\\}"))?.[1];
+ assert(handler?.includes('previewAppearanceControls()')&&!handler.includes('apply()'),
+  key+' must not trigger full theme serialization on drag');
+}
+const fineAdjust=app.slice(app.indexOf('let appearanceControlsFrame=0;'),app.indexOf('const brand=()=>'));
+const pending=new Map(),cssValues=new Map();let id=0,saveCount=0;
+const appearance=new Function('C','document','requestAnimationFrame','cancelAnimationFrame','cl','apply',
+ fineAdjust+'return {previewAppearanceControls,saveAppearanceControls};')(
+ {ts:1.2,radius:16,gapScale:1,density:'comfortable'},
+ {documentElement:{style:{setProperty:(key,value)=>cssValues.set(key,value)}}},
+ fn=>{const frame=++id;pending.set(frame,fn);return frame},frame=>pending.delete(frame),
+ (v,min,max)=>Math.max(min,Math.min(max,v)),()=>{saveCount++});
+for(let n=0;n<60;n++)appearance.previewAppearanceControls();
+assert.equal(pending.size,1,'Input bursts must coalesce into one layout preview');
+assert.equal(saveCount,0,'No full apply during dragging');
+[...pending.values()][0]();pending.clear();
+assert.equal(cssValues.get('--ui-radius'),'16px');
+assert.equal(cssValues.get('--ts'),1.2);
+appearance.saveAppearanceControls();
+assert.equal(saveCount,1,'Final appearance state must save once');
 // Appearance uses two balanced columns and the locale selector is global.
 assert.match(app,/<div class="appearance-layout">/,'Aligned appearance workspace must exist');
 assert.match(app,/appearance-column/,'Appearance cards must use two columns');

@@ -401,15 +401,37 @@ const updatePaletteColor=(t)=>{
 };
 // Keep the accent-colored range track in sync with the actual value.
 // This only sets one element-local CSS variable and never applies the full theme.
-const syncAppearanceRangeProgress=input=>{
- if(!input?.matches?.('.appearance-layout input[type="range"]'))return;
+// Common track fill for every native slider in the panel and studios.
+const syncRangeProgress=input=>{
+ if(!input?.matches?.('input[type="range"]'))return;
  const min=Number(input.min),max=Number(input.max),value=Number(input.value);
  if(!Number.isFinite(min)||!Number.isFinite(max)||!Number.isFinite(value)||max<=min)return;
  const percent=Math.max(0,Math.min(100,(value-min)/(max-min)*100));
  input.style.setProperty('--range-pct',percent.toFixed(2)+'%');
 };
-const initializeAppearanceRanges=root=>{
- root.querySelectorAll('.appearance-layout input[type="range"]').forEach(syncAppearanceRangeProgress);
+const initializeRangeProgress=root=>{
+ root.querySelectorAll('input[type="range"]').forEach(syncRangeProgress);
+};
+// No serialization or full appearance recomputation in a range-input event.
+let appearanceControlsFrame=0;
+const paintAppearanceControls=()=>{
+ const style=document.documentElement.style;
+ style.setProperty('--ts',cl(Number(C.ts)||1,.9,1.3));
+ const radius=cl(Number(C.radius)||16,4,24);
+ style.setProperty('--ui-radius',radius+'px');
+ style.setProperty('--ui-control-radius',Math.max(5,radius*.72)+'px');
+ const baseGap=C.density==='compact'?.75:C.density==='spacious'?1.45:1.1;
+ style.setProperty('--view-gap',(baseGap*cl(Number(C.gapScale)||1,.8,1.4))+'rem');
+};
+const previewAppearanceControls=()=>{
+ if(appearanceControlsFrame)return;
+ appearanceControlsFrame=requestAnimationFrame(()=>{
+  appearanceControlsFrame=0;paintAppearanceControls();
+ });
+};
+const saveAppearanceControls=()=>{
+ if(appearanceControlsFrame){cancelAnimationFrame(appearanceControlsFrame);appearanceControlsFrame=0;}
+ apply();
 };
 const brand=()=>{$('#bn').textContent=DB.set.brand;$('#lg').textContent=(DB.set.brand[0]||'L').toUpperCase()};
 
@@ -430,7 +452,7 @@ async function render(soft){
   T.forEach(clearInterval);T=[];cur=location.hash.slice(1);if(!pages[cur])cur='home';const rt=++RT,[t,f]=pages[cur],v=$('#view');
   $('#title').textContent=t;document.title=(window.XMeshI18n?.translate(t)||t)+' — '+DB.set.brand;$$('#nav a').forEach(a=>a.classList.toggle('on',a.getAttribute('href')=='#'+cur));
   if(!soft){v.classList.remove('still');v.innerHTML=skel();scrollTo(0,0)}
-  const [h,i]=await f();if(rt!=RT)return;v.classList.toggle('still',!!soft);v.innerHTML=h;decorateButtonIcons(v);i&&i();initializeAppearanceRanges(v);window.XMeshMfa?.mount(v);$('#unb').textContent=DB.users.length;drawBulk();
+  const [h,i]=await f();if(rt!=RT)return;v.classList.toggle('still',!!soft);v.innerHTML=h;decorateButtonIcons(v);i&&i();initializeRangeProgress(v);window.XMeshMfa?.mount(v);$('#unb').textContent=DB.users.length;drawBulk();
   if(pendingScrollTarget&&cur==='set'){
     const target=pendingScrollTarget;
     pendingScrollTarget=null;
@@ -1963,14 +1985,14 @@ async function setP(){
       <div class="palette-draft-actions"><button class="gh sm" type="button" id="palette-cancel">Отмена</button><button class="btn" type="button" id="palette-apply">Применить палитру</button></div>
     </section>
     <section class="card sg"><div class="appearance-card-heading"><h3>Типографика</h3><small>Размер и начертание текста</small></div>
-      <div class="setting-row"><div class="setting-copy"><b>Размер текста</b><small>Можно увеличить интерфейс для большого монитора или уменьшить плотность текста</small></div><div class="setting-control slider-control"><input type="range" id="ts" min="0.9" max="1.3" step="0.05" value="${C.ts}" aria-label="Размер текста"><b id="tsv">${Math.round(C.ts*100)}%</b></div></div>
+      <div class="setting-row"><div class="setting-copy"><b>Размер текста</b><small>Можно увеличить интерфейс для большого монитора или уменьшить плотность текста</small></div><div class="setting-control slider-control"><input type="range" id="ts" min="0.9" max="1.3" step="0.01" value="${C.ts}" aria-label="Размер текста"><b id="tsv">${Math.round(C.ts*100)}%</b></div></div>
       <div class="setting-row"><div class="setting-copy"><b>Шрифт</b><small>Выберите нейтральный системный или моноширинный стиль</small></div><div class="setting-control">${choices('font',[['onest','Manrope'],['system','Системный'],['mono','Моно']])}</div></div>
     </section>
 </div><div class="appearance-column">
     <section class="card sg"><div><h3>Композиция</h3><small>Плотность, радиусы и вид карточек</small></div>
       <div class="setting-row"><div class="setting-copy"><b>Плотность</b><small>От компактной таблицы до просторных карточек</small></div><div class="setting-control">${choices('density',[['compact','Компактно'],['comfortable','Стандарт'],['spacious','Свободно']])}</div></div>
       <div class="setting-row"><div class="setting-copy"><b>Стиль карточек</b><small>Классический, стеклянный или объёмный вид</small></div><div class="setting-control">${choices('surface',[['solid','Классика'],['glass','Glass'],['raised','Объём']])}</div></div>
-      <div class="setting-row"><div class="setting-copy"><b>Скругление</b><small>От почти прямых углов до мягких округлых форм</small></div><div class="setting-control slider-control"><input type="range" id="radius" min="4" max="24" step="2" value="${cl(+C.radius||16,4,24)}" aria-label="Скругление углов"><b id="rv">${cl(+C.radius||16,4,24)} px</b></div></div>
+      <div class="setting-row"><div class="setting-copy"><b>Скругление</b><small>От почти прямых углов до мягких округлых форм</small></div><div class="setting-control slider-control"><input type="range" id="radius" min="4" max="24" step="1" value="${cl(+C.radius||16,4,24)}" aria-label="Скругление углов"><b id="rv">${cl(+C.radius||16,4,24)} px</b></div></div>
       <div class="setting-row"><div class="setting-copy"><b>Границы карточек</b><small>Можно убрать линии или сделать их заметнее</small></div><div class="setting-control">${choices('borders',[['off','Без линий'],['soft','Мягкие'],['strong','Яркие']])}</div></div>
       <div class="setting-row"><div class="setting-copy"><b>Боковая панель</b><small>Компактный режим оставляет в основном только иконки</small></div><div class="setting-control">${choices('sidebar',[['standard','Обычная'],['compact','Компактная']])}</div></div>
       <div class="setting-row"><div class="setting-copy"><b>Подсказки при наведении</b><small>Показывать названия разделов и кнопок боковой панели. Работает в обычном и компактном режимах.</small></div><label class="sw"><input type="checkbox" id="rail-tips" ${C.railTips?'checked':''} aria-label="Подсказки при наведении"><span></span></label></div>
@@ -1978,7 +2000,7 @@ async function setP(){
 <section class="card sg">
     <div class="appearance-card-heading"><h3>Рабочее пространство</h3><small>Ширина панели и интервалы между разделами</small></div>
     <div class="setting-row"><div class="setting-copy"><b>Ширина содержимого</b><small>Максимальная ширина рабочей области до 3000 px. На узком экране она ограничена размером окна.</small></div><div class="setting-control slider-control"><input type="range" id="content-width" min="720" max="3000" step="10" value="${C.contentWidth||1920}" aria-label="Ширина содержимого"><b id="content-width-value">${C.contentWidth||1920} px</b></div></div>
-    <div class="setting-row"><div class="setting-copy"><b>Интервалы</b><small>Расстояние между карточками и блоками интерфейса</small></div><div class="setting-control slider-control"><input type="range" id="gap-scale" min="0.8" max="1.4" step="0.1" value="${C.gapScale||1}" aria-label="Расстояние между карточками"><b id="gap-scale-value">${Math.round((C.gapScale||1)*100)}%</b></div></div>
+    <div class="setting-row"><div class="setting-copy"><b>Интервалы</b><small>Расстояние между карточками и блоками интерфейса</small></div><div class="setting-control slider-control"><input type="range" id="gap-scale" min="0.8" max="1.4" step="0.05" value="${C.gapScale||1}" aria-label="Расстояние между карточками"><b id="gap-scale-value">${Math.round((C.gapScale||1)*100)}%</b></div></div>
   </section>
     <section class="card sg"><div><h3>Эффекты и движение</h3><small>Настройка фона и анимаций без изменения данных</small></div>
       <div class="setting-row"><div class="setting-copy"><b>Подсветка фона</b><small>Мягкое цветное свечение за панелью</small></div><div class="setting-control">${choices('glow',[['off','Выкл.'],['subtle','Мягкая'],['normal','Средняя'],['rich','Яркая']])}</div></div>
@@ -2218,6 +2240,11 @@ document.addEventListener('click',e=>{
 });
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeTopLanguage()});
 document.addEventListener('change',async e=>{const t=e.target;
+  syncRangeProgress(t);
+  if(['ts','radius','gap-scale'].includes(t.id)){
+    saveAppearanceControls();
+    return;
+  }
   if(t.id==='content-width'){
     C.contentWidth=cl(Number(t.value)||1920,720,3000);
     saveContentWidth();
@@ -2243,12 +2270,12 @@ document.addEventListener('change',async e=>{const t=e.target;
   else if(t.id==='rail-tips'){C.railTips=t.checked?1:0;apply()}
   else if(t.id=='mo'){C.motion=t.checked?1:0;apply()}
   else if(t.id=='tplsel'){const p=DB.tpls.find(x=>x.id==t.value);if(!p)return;const f=$('form[data-k=user]');const set=(k,v)=>{const el=$(`[name=${k}]`,f);if(el)el.value=v};set('limit',p.limit);set('days',p.days);set('strategy',p.strategy);set('hwid',p.hwid);$('[name=hold]',f).checked=p.hold;$$('[name=squads]',f).forEach(c=>c.checked=p.squads.includes(+c.value))}});
-document.addEventListener('input',e=>{syncAppearanceRangeProgress(e.target);if(updatePaletteColor(e.target))return;if(['hue','sat','lum'].includes(e.target.id)){
+document.addEventListener('input',e=>{syncRangeProgress(e.target);if(updatePaletteColor(e.target))return;if(['hue','sat','lum'].includes(e.target.id)){
   paletteDraft.h=+$('#hue').value;paletteDraft.s=+$('#sat').value;paletteDraft.l=+$('#lum').value;
   paletteDraft.a=hslHex(paletteDraft.h,paletteDraft.s,paletteDraft.l);paintPaletteDraft();
-}else if(e.target.id=='ts'){C.ts=+e.target.value;$('#tsv').textContent=Math.round(C.ts*100)+'%';apply()}else if(e.target.id=='radius'){C.radius=+e.target.value;$('#rv').textContent=C.radius+' px';apply()}
+}else if(e.target.id=='ts'){C.ts=+e.target.value;$('#tsv').textContent=Math.round(C.ts*100)+'%';previewAppearanceControls()}else if(e.target.id=='radius'){C.radius=+e.target.value;$('#rv').textContent=C.radius+' px';previewAppearanceControls()}
  else if(e.target.id==='content-width'){C.contentWidth=cl(Number(e.target.value)||1920,720,3000);$('#content-width-value').textContent=C.contentWidth+' px';previewContentWidth()}
- else if(e.target.id==='gap-scale'){C.gapScale=+e.target.value;$('#gap-scale-value').textContent=Math.round(C.gapScale*100)+'%';apply()}
+ else if(e.target.id==='gap-scale'){C.gapScale=+e.target.value;$('#gap-scale-value').textContent=Math.round(C.gapScale*100)+'%';previewAppearanceControls()}
  if(e.target.id=='pq')pdraw(e.target.value)});
 document.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()=='k'){e.preventDefault();palette();return}
