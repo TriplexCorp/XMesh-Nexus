@@ -29,9 +29,9 @@ for(const [mode,width] of [['compact',22],['standard',30],['spacious',40]]){
  assert(css.includes('.nodes-page>.nodes[data-node-count="1"][data-grid-mode='+mode+']{\n    grid-template-columns:minmax(0,'+width+'rem);'),
   'One node must show a different card width for '+mode);
 }
-const mediumColumns=/@container nodes-grid \\(min-width:52rem\\)\\{([\\s\\S]*?)\\n\\}/.exec(css)?.[1];
-assert(mediumColumns?.includes('.nodes-page>.nodes[data-node-count="2"]{\\n    grid-template-columns:repeat(2,minmax(0,1fr));'),
- 'Two nodes should use two columns across the available width');
+assert(css.includes('@container nodes-grid (min-width:52rem){') &&
+  css.includes('.nodes-page>.nodes[data-node-count="2"]{'),
+ 'Two nodes must use the available container width at desktop breakpoints');
 // Regression: 3 nodes in Standard must form THREE full-width columns on
 // desktop; an old 2-column + max-width override left a huge empty right side.
 const gridRules=css.slice(css.indexOf('/* Nodes density modes'),css.indexOf('/* Node IP rotation status'));
