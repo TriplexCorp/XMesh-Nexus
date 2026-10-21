@@ -42,7 +42,7 @@ assert.match(auth,/WHERE id=\$1 FOR UPDATE/);
 assert.match(auth,/current_hash\s*!=\s*password_hash/);
 assert.match(auth,/new_challenge_in_transaction/);
 assert.match(auth,/issue_session_in_transaction/);
-assert.match(rust,/let account=sqlx::query\("SELECT username,role,is_active FROM panel_auth_users WHERE id=\$1 FOR UPDATE"\)/);
+assert.match(rust,/let account\s*=\s*sqlx::query\(\s*"SELECT username,role,is_active FROM panel_auth_users WHERE id=\$1 FOR UPDATE"/);
 assert.match(rust,/auth::issue_session_in_transaction\(\s*&state\s*,\s*&mut tx[\s\S]*?tx\.commit\(\)\.await/);
 assert.match(rust,/active\.is_none\(\)\s*\|\|\s*!live/);
 const passwordSegment=auth.slice(auth.indexOf('let verified'),auth.indexOf('pub(crate) async fn clear_failed_login'));
