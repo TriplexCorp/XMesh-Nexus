@@ -450,6 +450,28 @@ const initializeRangeProgress=root=>{
 const updateVisibleRangePrecision=()=>{
  document.querySelectorAll('input[type="range"]').forEach(configureRangePrecision);
 };
+/* The coarse slider uses step="any" to preserve the full 48px endpoint.
+   Provide explicit keyboard increments so Arrow keys never get stuck. */
+document.addEventListener('keydown',e=>{
+ const input=e.target;
+ if(C.rangePrecision!==10||!input?.matches?.('input[type="range"]')||!APPEARANCE_RANGE_IDS.has(input.id))return;
+ const directions={ArrowRight:1,ArrowUp:1,ArrowLeft:-1,ArrowDown:-1,PageUp:1,PageDown:-1};
+ const dir=directions[e.key];
+ if(dir===undefined&&e.key!=='Home'&&e.key!=='End')return;
+ const factor=(input.id==='ts'||input.id==='gap-scale')?100:1;
+ const min=Math.round(Number(input.min)*factor),max=Math.round(Number(input.max)*factor);
+ const current=Math.round(Number(input.value)*factor);
+ let next;
+ if(e.key==='Home')next=min;
+ else if(e.key==='End')next=max;
+ else if(dir>0)next=cl(Math.floor(current/10)*10+10,min,max);
+ else next=cl(Math.ceil(current/10)*10-10,min,max);
+ if(next===current)return;
+ e.preventDefault();
+ input.value=String(next/factor);
+ input.dispatchEvent(new Event('input',{bubbles:true}));
+ input.dispatchEvent(new Event('change',{bubbles:true}));
+});
 const APPEARANCE_FIELDS={
  ts:{output:'tsv',unitFactor:100,min:90,max:200},
  radius:{output:'rv',unitFactor:1,min:0,max:48},
