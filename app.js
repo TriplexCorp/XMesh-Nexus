@@ -379,14 +379,25 @@ const paintPaletteDraft=()=>{
   if(out)out.textContent=paletteDraft[key]+suffix;
  }
  const primary=$('#custom-a'),secondary=$('#custom-b');
- if(primary)primary.value=paletteDraft.a;
- if(secondary)secondary.value=paletteDraft.b;
+ if(primary){primary.value=paletteDraft.a;primary.classList.remove('invalid');primary.setAttribute('aria-invalid','false')}
+ if(secondary){secondary.value=paletteDraft.b;secondary.classList.remove('invalid');secondary.setAttribute('aria-invalid','false')}
+ $('#palette-preview-a')?.style.setProperty('--picked',paletteDraft.a);
+ $('#palette-preview-b')?.style.setProperty('--picked',paletteDraft.b);
 };
 const updatePaletteColor=(t)=>{
  if(t.id!=='custom-a'&&t.id!=='custom-b')return false;
- if(t.id==='custom-a'){paletteDraft.a=t.value;Object.assign(paletteDraft,paletteHsl(t.value));}
- else paletteDraft.b=t.value;
- paintPaletteDraft();return true;
+ const raw=String(t.value||'').trim();
+ const valid=/^#?[a-f0-9]{6}$/i.test(raw);
+ t.classList.toggle('invalid',!valid);
+ t.setAttribute('aria-invalid',String(!valid));
+ // Keep incomplete HEX input available while the user types.
+ if(valid){
+  const hex='#'+raw.replace(/^#/,'').toUpperCase();
+  if(t.id==='custom-a'){paletteDraft.a=hex;Object.assign(paletteDraft,paletteHsl(hex));}
+  else paletteDraft.b=hex;
+  paintPaletteDraft();
+ }
+ return true;
 };
 const brand=()=>{$('#bn').textContent=DB.set.brand;$('#lg').textContent=(DB.set.brand[0]||'L').toUpperCase()};
 
@@ -1928,7 +1939,7 @@ async function setP(){
     </div>
       <div class="setting-row"><div class="setting-copy"><b>Тема</b><small>Автоматически — по настройкам ОС</small></div><div class="setting-control"><div class="seg choice" id="th">${[['dark','Тёмная'],['light','Светлая'],['auto','Авто']].map(([k,l])=>`<button type="button" data-th="${k}" class="${C.theme==k?'on':''}">${l}</button>`).join('')}</div></div></div>
       <div class="setting-row appearance-preset-row"><div class="setting-copy"><b>Цветовые темы</b><small>Подобранные сочетания для светлого и тёмного оформления</small></div><div class="palette-preset-grid" role="group" aria-label="Цветовые темы">${sw.map(([k,x,y,l])=>`<button type="button" class="palette-preset ${C.accent===k?'on':''}" data-ac="${k}" aria-pressed="${C.accent===k?'true':'false'}" style="--x:${x};--y:${y}"><span class="palette-preset-demo" aria-hidden="true"><i></i><em></em><b></b></span><span class="palette-preset-foot"><span>${l}</span><span class="palette-preset-tick">${ic('check')}</span></span></button>`).join('')}</div></div>
-      <div class="setting-row"><div class="setting-copy"><b>Своя палитра</b><small>Выберите два оттенка и проверьте предпросмотр. Сохранение — только по кнопке «Применить палитру».</small></div><div class="setting-control"><div class="color-bubbles"><label class="color-bubble-wrap"><span class="color-bubble"><input type="color" id="custom-a" value="${paletteDraft.a}" aria-label="Основной цвет"></span>Основной</label><label class="color-bubble-wrap"><span class="color-bubble"><input type="color" id="custom-b" value="${paletteDraft.b}" aria-label="Вторичный цвет"></span>Вторичный</label></div></div></div>
+      <div class="setting-row"><div class="setting-copy"><b>Своя палитра</b><small>Введите HEX или настройте цвет ползунками. Палитра изменится только после подтверждения.</small></div><div class="setting-control"><div class="palette-hex-fields"><label class="palette-hex-field"><span>Основной</span><span class="palette-hex-editor"><i id="palette-preview-a" aria-hidden="true" style="--picked:${paletteDraft.a}"></i><input type="text" id="custom-a" value="${paletteDraft.a}" autocomplete="off" spellcheck="false" maxlength="7" aria-label="HEX основного цвета" placeholder="#74DDB1"></span></label><label class="palette-hex-field"><span>Вторичный</span><span class="palette-hex-editor"><i id="palette-preview-b" aria-hidden="true" style="--picked:${paletteDraft.b}"></i><input type="text" id="custom-b" value="${paletteDraft.b}" autocomplete="off" spellcheck="false" maxlength="7" aria-label="HEX вторичного цвета" placeholder="#C6E985"></span></label></div></div></div>
     </section>
     <section class="card sg"><div class="appearance-card-heading"><h3>Точная настройка цвета</h3><small>Оттенок, насыщенность и яркость собственной палитры</small></div>
       <div class="color-slider-grid"><label for="hue">Оттенок</label><input type="range" id="hue" min="0" max="360" value="${paletteDraft.h}"><output id="huev">${paletteDraft.h}°</output></div><div class="color-slider-grid"><label for="sat">Насыщенность</label><input type="range" id="sat" min="0" max="100" value="${paletteDraft.s}"><output id="satv">${paletteDraft.s}%</output></div><div class="color-slider-grid"><label for="lum">Яркость</label><input type="range" id="lum" min="15" max="85" value="${paletteDraft.l}"><output id="lumv">${paletteDraft.l}%</output></div>
@@ -2204,7 +2215,10 @@ document.addEventListener('change',async e=>{const t=e.target;
     toast(t.id==='auto-core-refresh'?(C.autoCoreRefresh?'Автопроверка статуса включена':'Автопроверка статуса выключена'):'Интервал проверки сохранён');
     return;
   }
-  if(updatePaletteColor(t))return;
+  if(updatePaletteColor(t)){
+    if(t.classList.contains('invalid')){t.value=t.id==='custom-a'?paletteDraft.a:paletteDraft.b;t.classList.remove('invalid');t.setAttribute('aria-invalid','false')}
+    return;
+  }
   if(t.dataset.tg){const [k,id]=t.dataset.tg.split(':');await api.update(k,id,{disabled:!t.checked});toast(t.checked?'Включено':'Отключено')}
   else if(t.dataset.usq){const [ui,si]=t.dataset.usq.split(':').map(Number),u=DB.users.find(x=>x.id==ui);await api.update('users',ui,{squads:t.checked?[...new Set([...u.squads,si])]:u.squads.filter(x=>x!=si)});toast('Доступ обновлён');render(1);userDrawer(ui,'acc')}
   else if(t.dataset.hw){await api.update('users',+t.dataset.hw,{hwid:+t.value||0});toast('Лимит устройств сохранён');render(1);userDrawer(+t.dataset.hw,'acc')}
