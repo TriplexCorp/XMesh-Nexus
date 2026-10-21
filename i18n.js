@@ -556,6 +556,19 @@ window.XMeshI18n=(()=>{
   ];
   for(const [ru,en] of appearanceLayoutTranslations)dict.set(ru,en);
 
+  const curatedPaletteTranslations=[
+    ["Цветовые темы","Color themes"],
+    ["Подобранные сочетания для светлого и тёмного оформления","Curated combinations for light and dark modes"],
+    ["Сапфир","Sapphire"],["Бирюза","Teal"],["Коралл","Coral"],
+    ["Индиго","Indigo"],["Медь","Copper"],["Ледник","Glacier"],["Графит","Graphite"],
+    ["Изумруд","Emerald"],["Океан","Ocean"],["Янтарь","Amber"],["Роза","Rose"],
+    ["Фиолетовый","Violet"],["Циан","Cyan"],["Рубин","Ruby"],
+    ["Предпросмотр своей палитры","Custom palette preview"],
+    ["Цвета не изменятся до подтверждения","Colors will not change until confirmed"],
+    ["Применить палитру","Apply palette"],
+    ["Палитра применена","Palette applied"]
+  ];
+  for(const [ru,en] of curatedPaletteTranslations)dict.set(ru,en);
   const dynamic=[
     [/^(\d+)\s+узлов настроено\. CPU, RAM и скорость требуют подключённого мониторинга\.$/i,
       (_,n)=>n+' nodes configured. CPU, RAM, and speed require connected monitoring.'],
