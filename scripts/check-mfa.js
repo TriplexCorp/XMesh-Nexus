@@ -53,6 +53,18 @@ assert.match(login,/\/api\/v1\/auth\/mfa\/verify/);
 assert.match(loginHtml,/id="mfa-step"/);
 assert.match(panel,/window\.XMeshMfa\?\.panel/);
 assert.match(panel,/window\.XMeshMfa\?\.mount/);
+assert.match(panel,/\['security','shield-check','Безопасность'\]/,
+ 'Account security must have a visible sidebar entry');
+assert.match(panel,/security:\['Безопасность',securityP\]/,
+ 'Security section must route to dedicated MFA workspace');
+assert.match(panel,/href="#security"/,
+ 'General settings must link directly to account security');
+assert.match(panel,/function securityP\(\)/,
+ 'A dedicated account security page must exist');
+assert.doesNotMatch(panel,/window\.XMeshMfa\?\.panel\(\)\|\|''/,
+ 'MFA must not be hidden at the end of the long appearance settings page');
+assert.match(mfaUi,/<form id="mfa-start"/,
+ '2FA enrollment form must be directly visible when disabled');
 assert.match(html,/mfa-ui\.js\?v=/);
 assert.match(docker,/mfa-ui\.js/);
 assert.match(compose,/TOTP_ENCRYPTION_KEY/);

@@ -169,7 +169,7 @@ const STM={ACTIVE:['Активен','--ok'],DISABLED:['Отключён','--mu']
 const NS={ONLINE:['Онлайн','--ok'],OFFLINE:['Не отвечает','--er'],CONNECTING:['Подключение','--wr'],DISABLED:['Отключён','--mu']};
 const STRAT=[['NO_RESET','Не сбрасывать'],['DAY','Каждый день'],['WEEK','Каждую неделю'],['MONTH','Каждый месяц']];
 const nstat=n=>n.disabled?'DISABLED':n.state;
-const NAV=[['Обзор',[['home','home','Дашборд',1]]],['Управление',[['users','users','Пользователи',1],['squads','layers','Сквады'],['hosts','link','Хосты',1],['nodes','server','Узлы',1],['templates','file','Шаблоны'],['profiles','code','XRAY STUDIO'],['subscription','globe','SUBSCRIPTION STUDIO']]],['Инструменты',[['tools','tool','Диагностика']]],['Система',[['admins','shield','Админы'],['set','sliders','Настройки']]]];
+const NAV=[['Обзор',[['home','home','Дашборд',1]]],['Управление',[['users','users','Пользователи',1],['squads','layers','Сквады'],['hosts','link','Хосты',1],['nodes','server','Узлы',1],['templates','file','Шаблоны'],['profiles','code','XRAY STUDIO'],['subscription','globe','SUBSCRIPTION STUDIO']]],['Инструменты',[['tools','tool','Диагностика']]],['Система',[['admins','shield','Админы'],['security','shield-check','Безопасность'],['set','sliders','Настройки']]]];
 const FLAT=NAV.flatMap(g=>g[1]);
 const swc=k=>r=>`<label class="sw"><input type="checkbox" data-tg="${k}:${r.id}" ${r.disabled?'':'checked'} aria-label="Включено"><span></span></label>`;
 const nodeRotationIPs = node => String(node?.rotationIps||'').split(/\r?\n/).map(ip=>ip.trim()).filter(Boolean);
@@ -340,7 +340,7 @@ const brand=()=>{$('#bn').textContent=DB.set.brand;$('#lg').textContent=(DB.set.
 
 let T=[],cur='',RT=0;
 const subscriptionStudioP=()=>window.XMeshSubscriptionStudio.create(DB.set,patch=>api.saveSettings(patch),toast,{users:DB.users.length,nodes:DB.nodes.length});
-const pages={home:['Дашборд',homeP],users:['Пользователи',usersP],squads:['Сквады',()=>simple(['squads'])],hosts:['Хосты',()=>simple(['hosts'])],nodes:['Узлы',nodesP],templates:['Шаблоны',()=>simple(['tpls','subs'])],profiles:['XRAY STUDIO',profilesP],subscription:['SUBSCRIPTION STUDIO',subscriptionStudioP],tools:['Диагностика',toolsP],admins:['Администраторы',()=>simple(['admins'])],set:['Настройки',setP]};
+const pages={home:['Дашборд',homeP],users:['Пользователи',usersP],squads:['Сквады',()=>simple(['squads'])],hosts:['Хосты',()=>simple(['hosts'])],nodes:['Узлы',nodesP],templates:['Шаблоны',()=>simple(['tpls','subs'])],profiles:['XRAY STUDIO',profilesP],subscription:['SUBSCRIPTION STUDIO',subscriptionStudioP],tools:['Диагностика',toolsP],admins:['Администраторы',()=>simple(['admins'])],security:['Безопасность',securityP],set:['Настройки',setP]};
 const skel=()=>`<div class="sk" style="height:7rem"></div><div class="sk" style="height:18rem"></div><div class="sk" style="height:12rem"></div>`;
 const NAV_SHORT={home:'Главная',users:'Клиенты',hosts:'Хосты',nodes:'Узлы',subscription:'Подписка'};
 $('#nav').innerHTML=NAV.map(([g,a])=>`<div class="g">${g}</div>`+a.map(([k,i,l,p])=>`<a href="#${k}" class="${p?'':'sec'}" aria-label="${l}" data-rail-tip="${l}">${ic(i)}<span class="lbl"><span class="nav-label-full">${l}</span><span class="nav-label-short" aria-hidden="true">${NAV_SHORT[k]||l}</span></span>${k=='users'?'<em id="unb"></em>':''}</a>`).join('')).join('')+`<button class="more" id="more" aria-label="Ещё разделы" data-rail-tip="Ещё разделы">${ic('more')}<span class="lbl">Ещё</span></button>`;
@@ -1833,6 +1833,19 @@ function drawTools(){const e=$('#tr');if(!e)return;const q=TP.q;
   else if(TP.tab=='srh'){const a=DB.srh.filter(x=>(!TP.f||x.code==TP.f)&&(x.user+x.ip+x.app).toLowerCase().includes(q));e.innerHTML=a.length?`<div class="tw"><table class="tb"><thead><tr><th>Время</th><th>Пользователь</th><th>IP</th><th>Приложение</th><th>Формат</th><th>Код</th></tr></thead><tbody>${a.slice(0,80).map(x=>`<tr><td data-l="Время">${ago(x.t)}</td><td data-l="Пользователь">${esc(x.user)}</td><td data-l="IP">${x.ip}</td><td data-l="Приложение">${esc(x.app)}</td><td data-l="Формат">${chip(x.fmt,'--c3')}</td><td data-l="Код">${chip(x.code,x.code==200?'--ok':x.code==429?'--wr':'--er')}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Ничего не найдено</div>'}
   else{const lc={info:'--c3',warn:'--wr',error:'--er'};e.innerHTML=`<div class="logs">${LOGS.filter(x=>(TP.lv=='all'||x.l==TP.lv)&&x.m.toLowerCase().includes(q)).slice(0,120).map(x=>`<div class="ll"><time>${x.t}</time>${chip(x.l,lc[x.l])}<span>${esc(x.m)}</span></div>`).join('')||'<div class="empty"><b>Логов пока нет</b><span>Записи появятся после подключения источника логов Xray.</span></div>'}</div>`}}
 
+/* ================= БЕЗОПАСНОСТЬ ================= */
+function securityP(){
+  const factor=window.XMeshMfa?.panel()||
+    '<section class="card" role="alert"><h3>Не удалось загрузить настройки 2FA</h3><p>Обновите панель и страницу браузера. Скрипт mfa-ui.js не загружен.</p></section>';
+  return [`<div class="security-workspace">
+    <div class="security-overview">
+      <div><p class="note">АККАУНТ / БЕЗОПАСНОСТЬ</p><h2>Безопасность аккаунта</h2>
+      <p>Управляйте защитой входа в панель. Настройки относятся к вашей учётной записи администратора.</p></div>
+    </div>
+    ${factor}
+  </div>`];
+}
+
 /* ================= НАСТРОЙКИ ================= */
 async function setP(){
   const sw=[
@@ -1844,7 +1857,12 @@ async function setP(){
   let coreView={desired_version:'latest',installed_version:null,latest_version:null,status:'unknown',progress:null,last_error:null,architecture:'unknown'};
   try{coreView=await backendRequest('/api/v1/core')}catch(e){coreView.last_error=e.message}
   const coreLabel=coreView.status=='updating'?'Обновляется':coreView.status=='ready'?'Установлено':coreView.status=='error'?'Ошибка':'Не установлено';
-  return [`<div class="appearance-grid">
+  return [`<section class="card settings-security-link">
+    <div class="hd"><div><h3>Безопасность аккаунта</h3>
+    <p>Двухфакторная аутентификация (2FA), резервные коды и защита входа.</p></div>
+    <a class="gh sm" href="#security">${ic('shield-check')} Открыть безопасность</a></div>
+  </section>
+  <div class="appearance-grid">
     <section class="card sg"><div class="settings-appearance-header">
       <div><h3>Цвет и тема</h3><small>Основная палитра интерфейса и брендовые акценты</small></div>
       <div class="seg settings-language-toggle" role="group" aria-label="Язык интерфейса">
@@ -1872,7 +1890,6 @@ async function setP(){
       <div class="setting-row"><div class="setting-copy"><b>Сохранение</b><small>Параметры оформления сохраняются в localStorage этого браузера</small></div><button class="gh sm" id="rs">Сбросить оформление</button></div>
     </section>
   </div>
-  ${window.XMeshMfa?.panel()||''}
   <div class="card" id="brand-panel"><div class="hd"><div><h3>Бренд и домены</h3><p>Отдельные названия и домены панели управления и подписки</p></div></div><form data-k="brand" method="dialog" class="sg" style="gap:1rem"><div class="r2" style="display:grid;border:0;padding:0">${field({k:'brand',l:'Название панели',req:1},DB.set.brand)}${field({k:'domain',l:'Домен панели',req:1,ph:'panel.example.com'},DB.set.domain)}${field({k:'subscriptionBrand',l:'Название подписки',ph:'Название вашего сервиса',h:'Название клиентского портала. Если пусто — используется название панели. Изменяется также в SUBSCRIPTION STUDIO.'},DB.set.subscriptionBrand||'')}${field({k:'subscriptionDomain',l:'Домен подписки',ph:'sub.example.com',h:'Независим от домена панели. Оформление и размещение — в SUBSCRIPTION STUDIO.'},DB.set.subscriptionDomain||'')}</div><div style="border:0;padding:0"><button class="btn">Сохранить</button></div></form></div>
   <div class="card"><div class="hd"><div><h3>Вебхуки</h3><p>События, о которых панель сообщает во внешние сервисы</p></div></div>${Object.entries(DB.set.hooks).map(([k,v])=>`<div class="rowi"><div>${k}</div><label class="sw"><input type="checkbox" data-hk="${k}" ${v?'checked':''} aria-label="${k}"><span></span></label></div>`).join('')}</div>${tk}
   <div class="card" id="core-panel"><div class="hd"><div><h3>Xray-core</h3><p>Установка и обновление бинарника ядра на сервере панели</p></div><span class="chip" id="core-state">${esc(coreLabel)}</span></div>

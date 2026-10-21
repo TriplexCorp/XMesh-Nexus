@@ -24,7 +24,7 @@ async function mount(root){
   }else if(status.enabled){
    body.innerHTML='<details class="mfa-details"><summary>Отключить 2FA</summary><form id="mfa-disable" class="sg"><label class="f"><span>Текущий пароль</span><input type="password" name="password" autocomplete="current-password" maxlength="1024" required></label><label class="f"><span>Код приложения или резервный код</span><input name="code" autocomplete="one-time-code" maxlength="40" required></label><button class="gh" type="submit">Подтвердить отключение</button></form></details>';
   }else{
-   body.innerHTML='<details class="mfa-details"><summary>Настроить 2FA</summary><form id="mfa-start" class="sg"><label class="f"><span>Подтвердите текущий пароль</span><input type="password" name="password" autocomplete="current-password" maxlength="1024" required></label><button class="btn" type="submit">Начать подключение</button></form></details>';
+   body.innerHTML='<div class="mfa-setup-intro"><h4>Подключить 2FA</h4><p class="note">Подтвердите пароль, затем добавьте аккаунт в приложение-аутентификатор.</p></div><form id="mfa-start" class="sg"><label class="f"><span>Подтвердите текущий пароль</span><input type="password" name="password" autocomplete="current-password" maxlength="1024" required></label><button class="btn" type="submit">Начать подключение</button></form>';
   }
  };
  async function submit(form,path,values,onSuccess){
