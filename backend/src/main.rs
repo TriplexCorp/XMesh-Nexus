@@ -437,6 +437,18 @@ async fn delete_record(
     Ok(Json(result))
 }
 
+fn valid_public_hostname(value: &str) -> bool {
+    if value.len() > 253 || value.is_empty() || value.contains("..") || !value.is_ascii() {
+        return false;
+    }
+    value.split('.').all(|part| {
+        !part.is_empty() && part.len() <= 63
+            && part.bytes().next().is_some_and(|c| c.is_ascii_alphanumeric())
+            && part.bytes().last().is_some_and(|c| c.is_ascii_alphanumeric())
+            && part.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-')
+    })
+}
+
 async fn get_settings(State(state): State<AppState>) -> Result<Json<Value>, ApiError> {
     Ok(Json(read_settings(&state.pool).await?))
 }
@@ -449,7 +461,11 @@ async fn patch_settings(
     let object = patch.as_object()
         .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Настройки должны быть JSON-объектом."))?;
     for key in object.keys() {
-        if !matches!(key.as_str(), "brand" | "domain" | "hooks") {
+        if !matches!(key.as_str(), "brand" | "domain" | "hooks"
+                | "subscriptionDomain" | "subscriptionPath" | "subscriptionBrand"
+                | "subscriptionDescription" | "subscriptionFooter" | "subscriptionAccent"
+                | "subscriptionLanguage" | "subscriptionPlacement" | "subscriptionShowTraffic"
+                | "subscriptionShowExpiry") {
             return Err(ApiError::new(StatusCode::BAD_REQUEST, format!("Неизвестное поле настроек: {key}")));
         }
     }
@@ -463,6 +479,57 @@ async fn patch_settings(
         let value = domain.as_str().ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Домен должен быть строкой."))?;
         if value.chars().count() > 253 || value.chars().any(char::is_whitespace) {
             return Err(ApiError::new(StatusCode::BAD_REQUEST, "Указан некорректный домен."));
+        }
+    }
+    if let Some(domain) = object.get("subscriptionDomain") {
+        let value = domain.as_str().ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Домен подписки должен быть строкой."))?;
+        if !value.is_empty() && !valid_public_hostname(value) {
+            return Err(ApiError::new(StatusCode::BAD_REQUEST, "Некорректный домен подписки. Укажите только hostname без схемы, пути и порта."));
+        }
+    }
+    if let Some(path) = object.get("subscriptionPath") {
+        let value = path.as_str().ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Путь подписки должен быть строкой."))?;
+        if value.len() < 2 || value.len() > 64 || !value.starts_with('/')
+            || value.ends_with('/') || value.contains("//")
+            || value.split('/').skip(1).any(|segment| segment.is_empty() || segment == "." || segment == "..")
+            || !value.bytes().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'/' | b'-' | b'_'))
+        {
+            return Err(ApiError::new(StatusCode::BAD_REQUEST, "Путь должен начинаться с / и состоять из латиницы, цифр, - и _."));
+        }
+        if value.starts_with("/api") || value.starts_with("/login") {
+            return Err(ApiError::new(StatusCode::BAD_REQUEST, "Путь конфликтует со служебными маршрутами панели."));
+        }
+    }
+    for (key, max_len) in [("subscriptionBrand", 80), ("subscriptionDescription", 240), ("subscriptionFooter", 160)] {
+        if let Some(value) = object.get(key) {
+            let text = value.as_str().ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, format!("Поле {key} должно быть текстом.")))?;
+            if text.chars().count() > max_len || text.chars().any(char::is_control) {
+                return Err(ApiError::new(StatusCode::BAD_REQUEST, format!("Некорректное значение поля {key}.")));
+            }
+        }
+    }
+    if let Some(color) = object.get("subscriptionAccent") {
+        let text = color.as_str().ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Цвет подписки должен быть строкой."))?;
+        if text.len() != 7 || !text.starts_with('#') || !text[1..].bytes().all(|c| c.is_ascii_hexdigit()) {
+            return Err(ApiError::new(StatusCode::BAD_REQUEST, "Цвет подписки должен быть в формате #RRGGBB."));
+        }
+    }
+    for (key, choices) in [
+        ("subscriptionLanguage", &["ru", "en", "tr", "vi"][..]),
+        ("subscriptionPlacement", &["panel", "edge"][..]),
+    ] {
+        if let Some(value) = object.get(key) {
+            let text = value.as_str().ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, format!("Некорректное поле {key}.")))?;
+            if !choices.contains(&text) {
+                return Err(ApiError::new(StatusCode::BAD_REQUEST, format!("Недопустимое значение {key}.")));
+            }
+        }
+    }
+    for key in ["subscriptionShowTraffic", "subscriptionShowExpiry"] {
+        if let Some(value) = object.get(key) {
+            if !value.is_boolean() {
+                return Err(ApiError::new(StatusCode::BAD_REQUEST, format!("Поле {key} должно быть переключателем.")));
+            }
         }
     }
     if let Some(hooks) = object.get("hooks") {
