@@ -2284,3 +2284,11 @@ html[data-motion=off] #dlg::backdrop{opacity:1}
  html[data-motion=on] #dlg :is(.btn,.gh,.ia,.dg):not(:disabled):hover,
  html[data-motion=on] #dlg :is(.btn,.gh,.ia,.dg):not(:disabled):active{transform:none}
 }
+
+/* Account action belongs to the navigation rail, not the page creation toolbar. */
+aside .sidebar-account{margin-top:.55rem;padding:.55rem .75rem .75rem;border-top:1px solid var(--ln)}
+aside #logout{display:flex;align-items:center;justify-content:flex-start;gap:.65rem;width:100%;min-height:2.55rem;padding:.55rem .75rem;border:1px solid transparent;border-radius:var(--ui-control-radius);font:inherit;font-size:.83rem;font-weight:650;white-space:nowrap;color:var(--mu);background:transparent;box-shadow:none;cursor:pointer;transition:color .18s,background .18s,border-color .18s}
+aside #logout:hover{color:var(--er);background:color-mix(in srgb,var(--er) 7%,var(--s1));border-color:color-mix(in srgb,var(--er) 22%,transparent)}
+aside #logout:focus-visible{outline:2px solid var(--a);outline-offset:2px}
+aside #logout .ic{width:1.12rem;height:1.12rem;flex-shrink:0}
+@media(max-width:760px){aside .sidebar-account{padding:.5rem}.sidebar-account #logout{justify-content:center;padding:.5rem}.sidebar-account #logout .logout-label{display:none}}
