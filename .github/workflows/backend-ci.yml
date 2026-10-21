@@ -35,6 +35,7 @@ jobs:
       - name: Check frontend syntax
         run: |
           node --check app.js
+          node --check subscription-studio.js
           node --check login.js
           node --check xray-studio-v5.js
           node --check xray-studio-dialog.js
@@ -46,6 +47,8 @@ jobs:
         run: node scripts/check-xray-intelligence.js
       - name: Verify packaged frontend assets
         run: node scripts/check-static-assets.js
+      - name: Check subscription studio and independent deployment blueprint
+        run: node scripts/check-subscription-studio.js
       - name: Check appearance surface choices and migration
         run: node scripts/check-appearance-surfaces.js
       - name: Check New Node button rendering and handler
