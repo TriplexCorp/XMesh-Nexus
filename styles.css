@@ -344,7 +344,6 @@ body::after{background:radial-gradient(circle,color-mix(in srgb,var(--b) var(--g
 html[data-surface=glass] .card{background:color-mix(in srgb,var(--s1) 72%,transparent);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
 html[data-surface=glass] .app>aside{background:color-mix(in srgb,var(--s1) 64%,transparent)}
 html[data-surface=raised] .card{background:color-mix(in srgb,var(--s1) 94%,var(--a) 6%);box-shadow:0 14px 36px -26px rgba(0,0,0,.72),0 1px 0 color-mix(in srgb,var(--tx) 3%,transparent) inset}
-html[data-surface=flat] .card{box-shadow:none;background:var(--s1)}
 html[data-borders=off] .card,html[data-borders=off] .box{border-color:transparent}
 html[data-borders=strong] .card{border-color:color-mix(in srgb,var(--a) 34%,var(--ln))}
 html[data-borders=strong] .box{border-color:color-mix(in srgb,var(--a) 27%,var(--ln))}
@@ -550,7 +549,6 @@ kbd{background:var(--s2);border:1px solid var(--ln);color:var(--mu)}
 .card,.box{border-radius:var(--ui-radius);border-color:var(--ln)}
 .card{position:relative;background:var(--s1);border-color:var(--ln);border-radius:var(--ui-radius);box-shadow:var(--shadow-card)}
 .card::before{content:"";position:absolute;pointer-events:none;left:1rem;right:1rem;top:0;height:1px;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--a) 16%,transparent),transparent);opacity:.54}
-html[data-surface=flat] .card{background:var(--s1);box-shadow:none}
 html[data-surface=glass] .card{
   position:relative;
   isolation:isolate;
