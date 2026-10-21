@@ -48,6 +48,8 @@ jobs:
         run: node scripts/check-static-assets.js
       - name: Check appearance surface choices and migration
         run: node scripts/check-appearance-surfaces.js
+      - name: Check New Node button rendering and handler
+        run: node scripts/check-node-create-action.js
       - name: Check shared Studio theme and CSS structure
         run: node scripts/check-studio-theme.js
       - name: Check modal settings editor
