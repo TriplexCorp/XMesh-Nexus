@@ -33,8 +33,8 @@ assert(css.includes('.nodes-page>.nodes[data-node-count="2"][data-grid-mode=spac
  'Two nodes need a spacious single-column layout');
 assert(css.includes('.nodes-page>.nodes[data-node-count="3"][data-grid-mode=standard]{\n    grid-template-columns:repeat(2,minmax(0,1fr));'),
  'Three nodes must display fewer standard columns than compact columns');
-assert(html.includes('styles.css?v=20261021-node-grid-2'),'Stylesheet cache key not updated');
-assert.match(html,/app\.js\?v=20261021-node-grid-1/);
+assert(html.includes('styles.css?v=20261021-node-ip-rotation-1'),'Stylesheet cache key not updated');
+assert.match(html,/app\.js\?v=20261021-node-ip-rotation-1/);
 assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length,'CSS brace balance');
 new Function(app);
 
