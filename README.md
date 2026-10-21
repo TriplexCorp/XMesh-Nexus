@@ -121,6 +121,24 @@ The selector lists recent GitHub releases; pinning is limited to the latest 30 e
 
 The UI intentionally avoids presenting generated node telemetry as live operational data.
 
+### RU / EN panel localization
+
+Choose **Settings → Interface language → Русский / English** to switch the
+administrator interface (navigation, Settings, login, editable fields,
+Subscription Studio, and common XRAY STUDIO labels). The choice is stored in
+this browser under `xmeshNexusLanguage`; it does not change other
+administrators' preferences or the panel's database records. The portal's
+`subscriptionLanguage` is configured independently in **SUBSCRIPTION
+STUDIO** and accepts only `ru` or `en`.
+
+The shared `i18n.js` dictionary translates presentation strings at render
+time, including late-added dialogs and tooltips. JSON source, textareas,
+subscription demo preview with its own language, user-entered values, and
+record identifiers are left unchanged. To add or improve translations,
+extend the dictionary and the `scripts/check-i18n.js` regression test. The
+bundles are shipped as static browser assets; Node.js is not needed on the
+production panel server.
+
 ### JavaScript tooling (Node.js 24)
 
 The XMesh Nexus backend is written in **Rust** and the frontend runs in the **browser**.
@@ -183,7 +201,7 @@ are the rotation boundary; client apps can also cache subscriptions.
 ## SUBSCRIPTION STUDIO — control-plane only
 
 Open **SUBSCRIPTION STUDIO** in the management navigation. Configure a separate
-subscription hostname/path, portal brand, description, language (RU/EN/TR/VI),
+subscription hostname/path, portal brand, description, language (RU/EN),
 accent, footer, and visibility of traffic/expiration. Settings are validated
 by the Rust API and stored centrally in PostgreSQL. **Settings → Brand and
 domains** also has independent fields for the panel and subscription domains.
