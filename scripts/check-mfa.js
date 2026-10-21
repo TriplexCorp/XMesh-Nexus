@@ -3,6 +3,7 @@
 const fs=require('node:fs'),assert=require('node:assert/strict');
 const rust=fs.readFileSync('backend/src/mfa.rs','utf8');
 const auth=fs.readFileSync('backend/src/auth.rs','utf8');
+const admins=fs.readFileSync('backend/src/admin_accounts.rs','utf8');
 const main=fs.readFileSync('backend/src/main.rs','utf8');
 const sql=fs.readFileSync('backend/migrations/0009_totp.sql','utf8');
 const login=fs.readFileSync('login.js','utf8');
@@ -32,6 +33,10 @@ assert.match(rust,/last_used_step/,'TOTP codes must not be reusable');
 assert.match(rust,/recoveryCodes/,'Recovery codes must be displayed only at first enrollment');
 assert.match(rust,/WHERE admin_id=\$1 AND token_hash<>/,'Existing other sessions should be revoked on enabling');
 assert.match(auth,/mfa::enabled\(\s*&state,\s*admin_id\s*\)/);
+assert.match(admins,/DELETE FROM panel_mfa_challenges WHERE admin_id=\$1/,
+ 'Credential changes must revoke any outstanding password-verified MFA challenge');
+assert.match(admins,/hashed\.is_some\(\) \|\| role != current_role \|\| !new_active/,
+ 'Any password, role or activation change must invalidate login challenges');
 const passwordSegment=auth.slice(auth.indexOf('let verified'),auth.indexOf('pub(crate) async fn clear_failed_login'));
 assert(passwordSegment.indexOf('mfa::enabled')<passwordSegment.indexOf('issue_session'),
  'Authenticated session must only be created after an enabled MFA check');
