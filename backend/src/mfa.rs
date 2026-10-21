@@ -86,6 +86,17 @@ fn new_recovery_codes() -> Vec<String> {
         let raw=hex::encode_upper(bytes);format!("{}-{}-{}-{}",&raw[..8],&raw[8..16],&raw[16..24],&raw[24..32])
     }).collect()
 }
+async fn guarded_password(state:&AppState,id:i64,password:&str)->Result<(),ApiError>{
+    let key=format!("mfa-action:{id}");
+    if auth::is_rate_limited(state,&key).await? {
+        return Err(err(StatusCode::TOO_MANY_REQUESTS,"Слишком много попыток. Попробуйте через 15 минут."));
+    }
+    if !password_is_valid(state,id,password).await? {
+        auth::record_failed_login(state,&key).await?;
+        return Err(err(StatusCode::UNAUTHORIZED,"Неверный пароль администратора."));
+    }
+    Ok(())
+}
 async fn password_is_valid(state: &AppState, id: i64, password: &str) -> Result<bool, ApiError> {
     if password.is_empty() || password.len()>1024 {return Ok(false);}
     let row=sqlx::query("SELECT password_hash FROM panel_auth_users WHERE id=$1 AND is_active=TRUE")
@@ -131,9 +142,7 @@ pub async fn status(State(state): State<AppState>,Extension(actor): Extension<Au
 }
 pub async fn setup(State(state): State<AppState>,Extension(actor): Extension<AuthUser>,
     Json(body):Json<SetupRequest>) -> Result<Json<Value>,ApiError> {
-    if !password_is_valid(&state,actor.id,&body.password).await? {
-        return Err(err(StatusCode::UNAUTHORIZED,"Неверный пароль администратора."));
-    }
+    guarded_password(&state,actor.id,&body.password).await?;
     let mut secret=[0u8;20]; OsRng.fill_bytes(&mut secret);
     let encrypted=encrypt(&state,&secret)?;
     let current=enabled(&state,actor.id).await?;
@@ -143,6 +152,7 @@ pub async fn setup(State(state): State<AppState>,Extension(actor): Extension<Aut
          DO UPDATE SET secret_encrypted=EXCLUDED.secret_encrypted,enabled=FALSE, \
          pending_expires_at=EXCLUDED.pending_expires_at,setup_attempts=0,last_used_step=-1 WHERE panel_totp.enabled=FALSE")
         .bind(actor.id).bind(encrypted).execute(&state.pool).await?;
+    auth::clear_failed_login(&state,&format!("mfa-action:{}",actor.id)).await?;
     let b32=base32(&secret);
     let label=actor.username.bytes().map(|c|if c.is_ascii_alphanumeric()||b"_.-".contains(&c){(c as char).to_string()}else{format!("%{c:02X}")}).collect::<String>();
     let uri=format!("otpauth://totp/XMesh%20Nexus:{label}?secret={b32}&issuer=XMesh%20Nexus&algorithm=SHA1&digits=6&period=30");
@@ -190,9 +200,7 @@ pub async fn confirm(State(state): State<AppState>,Extension(actor): Extension<A
 
 pub async fn disable(State(state): State<AppState>,Extension(actor): Extension<AuthUser>,
     headers:HeaderMap,Json(body):Json<DisableRequest>) -> Result<Json<Value>,ApiError> {
-    if !password_is_valid(&state,actor.id,&body.password).await? {
-        return Err(err(StatusCode::UNAUTHORIZED,"Неверный пароль администратора."));
-    }
+    guarded_password(&state,actor.id,&body.password).await?;
     let mut tx=state.pool.begin().await?;
     let row=sqlx::query("SELECT secret_encrypted,last_used_step FROM panel_totp \
       WHERE admin_id=$1 AND enabled=TRUE FOR UPDATE").bind(actor.id)
@@ -208,6 +216,8 @@ pub async fn disable(State(state): State<AppState>,Extension(actor): Extension<A
           .bind(actor.id).bind(code_hash).fetch_optional(&mut *tx).await?.is_some()
     } else {false};
     if step.is_none() && !valid_recovery {
+        tx.rollback().await?;
+        auth::record_failed_login(&state,&format!("mfa-action:{}",actor.id)).await?;
         return Err(err(StatusCode::UNAUTHORIZED,INVALID_CODE));
     }
     sqlx::query("DELETE FROM panel_totp WHERE admin_id=$1").bind(actor.id).execute(&mut *tx).await?;
@@ -217,6 +227,7 @@ pub async fn disable(State(state): State<AppState>,Extension(actor): Extension<A
           .bind(actor.id).bind(current).execute(&mut *tx).await?;
     }
     tx.commit().await?;
+    auth::clear_failed_login(&state,&format!("mfa-action:{}",actor.id)).await?;
     super::audit(&state.pool,&actor.username,"mfa.disabled",None,None,json!({})).await;
     Ok(Json(json!({"enabled":false})))
 }
