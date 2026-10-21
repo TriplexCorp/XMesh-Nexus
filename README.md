@@ -199,7 +199,7 @@ The UI intentionally avoids presenting generated node telemetry as live operatio
 
 ### RU / EN panel localization
 
-Choose **Settings → Interface language → Русский / English** to switch the
+Choose the **globe icon beside Sign out** and select Русский or English to switch the
 administrator interface (navigation, Settings, login, editable fields,
 Subscription Studio, and common XRAY STUDIO labels). The choice is stored in
 this browser under `xmeshNexusLanguage`; it does not change other

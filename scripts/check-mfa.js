@@ -63,6 +63,13 @@ assert.match(panel,/function securityP\(\)/,
  'A dedicated account security page must exist');
 assert.doesNotMatch(panel,/window\.XMeshMfa\?\.panel\(\)\|\|''/,
  'MFA must not be hidden at the end of the long appearance settings page');
+const qrcodeSource=fs.readFileSync('qr-code.js','utf8');
+const qrcodegen=new Function(qrcodeSource+';return qrcodegen;')();
+const qr=qrcodegen.QrCode.encodeText(
+ 'otpauth://totp/XMesh%20Nexus:test?secret=JBSWY3DPEHPK3PXP&issuer=XMesh%20Nexus&digits=6&period=30',
+ qrcodegen.QrCode.Ecc.MEDIUM
+);
+assert(qr.size>=21 && qr.getModule(0,0), 'Bundled QR encoder must render a valid TOTP provisioning QR');
 assert.match(mfaUi,/qrcodegen\?\.QrCode/,'MFA enrollment must generate the QR in the browser');
 assert.match(mfaUi,/encodeText\(data\.otpauth/,'QR must encode the backend provisioning URI');
 assert.match(mfaUi,/mfa-manual/,'Manual TOTP key must remain available');
