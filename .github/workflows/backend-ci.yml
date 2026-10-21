@@ -56,6 +56,8 @@ jobs:
         run: node scripts/check-static-assets.js
       - name: Check subscription studio and independent deployment blueprint
         run: node scripts/check-subscription-studio.js
+      - name: Check generic branding in tracked files
+        run: node scripts/check-white-label.js
       - name: Check appearance surface choices and migration
         run: node scripts/check-appearance-surfaces.js
       - name: Check New Node button rendering and handler
