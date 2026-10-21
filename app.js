@@ -340,6 +340,26 @@ r.style.setProperty('--panel-content-max',cl(Number(C.contentWidth)||1920,720,22
 const baseGap=C.density==='compact'?.75:C.density==='spacious'?1.45:1.1;
 r.style.setProperty('--view-gap',(baseGap*cl(Number(C.gapScale)||1,.8,1.4))+'rem');
 try{localStorage.xmeshNexusSettings=JSON.stringify(C)}catch(e){}};
+// Width preview is kept off the full appearance pipeline: dragging must not
+// update unrelated CSS/theme attributes or serialize localStorage every pixel.
+let contentWidthFrame=0;
+const paintContentWidth=()=>{
+ const next=Math.round(cl(Number(C.contentWidth)||1920,720,2240))+'px';
+ const style=document.documentElement.style;
+ if(style.getPropertyValue('--panel-content-max')!==next)style.setProperty('--panel-content-max',next);
+};
+const previewContentWidth=()=>{
+ if(contentWidthFrame)return;
+ contentWidthFrame=requestAnimationFrame(()=>{
+  contentWidthFrame=0;
+  paintContentWidth();
+ });
+};
+const saveContentWidth=()=>{
+ if(contentWidthFrame){cancelAnimationFrame(contentWidthFrame);contentWidthFrame=0;}
+ paintContentWidth();
+ try{localStorage.xmeshNexusSettings=JSON.stringify(C)}catch(e){}
+};
 const brand=()=>{$('#bn').textContent=DB.set.brand;$('#lg').textContent=(DB.set.brand[0]||'L').toUpperCase()};
 
 let T=[],cur='',RT=0;
@@ -1888,7 +1908,7 @@ async function setP(){
     </section>
 <section class="card sg">
     <div class="appearance-card-heading"><h3>Рабочее пространство</h3><small>Ширина панели и интервалы между разделами</small></div>
-    <div class="setting-row"><div class="setting-copy"><b>Ширина содержимого</b><small>Максимальная ширина рабочей области. На узком экране она ограничена размером окна.</small></div><div class="setting-control slider-control"><input type="range" id="content-width" min="720" max="2240" step="40" value="${C.contentWidth||1920}" aria-label="Ширина содержимого"><b id="content-width-value">${C.contentWidth||1920} px</b></div></div>
+    <div class="setting-row"><div class="setting-copy"><b>Ширина содержимого</b><small>Максимальная ширина рабочей области. На узком экране она ограничена размером окна.</small></div><div class="setting-control slider-control"><input type="range" id="content-width" min="720" max="2240" step="10" value="${C.contentWidth||1920}" aria-label="Ширина содержимого"><b id="content-width-value">${C.contentWidth||1920} px</b></div></div>
     <div class="setting-row"><div class="setting-copy"><b>Интервалы</b><small>Расстояние между карточками и блоками интерфейса</small></div><div class="setting-control slider-control"><input type="range" id="gap-scale" min="0.8" max="1.4" step="0.1" value="${C.gapScale||1}" aria-label="Расстояние между карточками"><b id="gap-scale-value">${Math.round((C.gapScale||1)*100)}%</b></div></div>
   </section>
     <section class="card sg"><div><h3>Эффекты и движение</h3><small>Настройка фона и анимаций без изменения данных</small></div>
@@ -2127,6 +2147,11 @@ document.addEventListener('click',e=>{
 });
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeTopLanguage()});
 document.addEventListener('change',async e=>{const t=e.target;
+  if(t.id==='content-width'){
+    C.contentWidth=cl(Number(t.value)||1920,720,2240);
+    saveContentWidth();
+    return;
+  }
   if(t.id==='auto-core-refresh'||t.id==='core-refresh-seconds'){
     if(t.id==='auto-core-refresh')C.autoCoreRefresh=t.checked?1:0;
     else C.coreRefreshSeconds=Number(t.value)||30;
@@ -2145,7 +2170,7 @@ document.addEventListener('change',async e=>{const t=e.target;
   else if(t.id=='mo'){C.motion=t.checked?1:0;apply()}
   else if(t.id=='tplsel'){const p=DB.tpls.find(x=>x.id==t.value);if(!p)return;const f=$('form[data-k=user]');const set=(k,v)=>{const el=$(`[name=${k}]`,f);if(el)el.value=v};set('limit',p.limit);set('days',p.days);set('strategy',p.strategy);set('hwid',p.hwid);$('[name=hold]',f).checked=p.hold;$$('[name=squads]',f).forEach(c=>c.checked=p.squads.includes(+c.value))}});
 document.addEventListener('input',e=>{if(['hue','sat','lum'].includes(e.target.id)){C.hue=+$('#hue').value;C.sat=+$('#sat').value;C.lum=+$('#lum').value;C.customA=hslHex(C.hue,C.sat,C.lum);C.accent='custom';$('#custom-a').value=C.customA;$('#huev').textContent=C.hue+'°';$('#satv').textContent=C.sat+'%';$('#lumv').textContent=C.lum+'%';apply();$$('[data-ac]').forEach(x=>x.classList.toggle('on',x.dataset.ac==='custom'))}else if(e.target.id=='ts'){C.ts=+e.target.value;$('#tsv').textContent=Math.round(C.ts*100)+'%';apply()}else if(e.target.id=='radius'){C.radius=+e.target.value;$('#rv').textContent=C.radius+' px';apply()}
- else if(e.target.id==='content-width'){C.contentWidth=+e.target.value;$('#content-width-value').textContent=C.contentWidth+' px';apply()}
+ else if(e.target.id==='content-width'){C.contentWidth=cl(Number(e.target.value)||1920,720,2240);$('#content-width-value').textContent=C.contentWidth+' px';previewContentWidth()}
  else if(e.target.id==='gap-scale'){C.gapScale=+e.target.value;$('#gap-scale-value').textContent=Math.round(C.gapScale*100)+'%';apply()}
  if(e.target.id=='pq')pdraw(e.target.value)});
 document.addEventListener('keydown',e=>{

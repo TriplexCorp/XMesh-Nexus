@@ -29,6 +29,49 @@ assert.match(app,/cl\(Number\(C\.contentWidth\)\|\|1920,720,2240\)/,
 assert.match(app,/id="content-width" min="720" max="2240" step="40"/,
  'The slider must offer visibly smaller widths on ordinary desktop screens');
 assert.match(html,/styles\.css\?v=20261021-content-width-1/,'New CSS cache key must ship');
+
+assert.match(app,/id="content-width" min="720" max="2240" step="10"/,
+ 'The width slider must have finer 10px increments');
+assert.match(app,/const previewContentWidth=\(\)=>/,'Width changes must have a dedicated preview scheduler');
+assert.match(app,/contentWidthFrame=requestAnimationFrame\(/,'Only one preview layout change per animation frame');
+assert.match(app,/const saveContentWidth=\(\)=>/,'Width must persist on final change');
+const dragBranch=app.match(/else if\(e\.target\.id==='content-width'\)\{[^}]+\}/)?.[0];
+assert(dragBranch?.includes('previewContentWidth()')&&!dragBranch.includes('apply()'),
+ 'Dragging may only preview width; never invoke the heavyweight appearance updater');
+const changeBranch=app.match(/if\(t\.id==='content-width'\)\{[\s\S]*?\n  \}/)?.[0];
+assert(changeBranch?.includes('saveContentWidth()'),'Final width must be saved when the user releases the slider');
+// Execute the real width preview and save implementation with a virtual frame
+// queue to catch regressions that restore per-input storage writes.
+const previewCode=app.slice(app.indexOf('let contentWidthFrame=0;'),
+ app.indexOf('const brand=()=>'));
+assert(previewCode.includes('paintContentWidth'));
+const frameQueue=new Map();
+let nextFrame=0,storageWrites=0,styleWrites=0;
+const values=new Map();
+const fakeStyle={
+ getPropertyValue:key=>values.get(key)||'',
+ setProperty:(key,value)=>{styleWrites++;values.set(key,value)}
+};
+const frameContext={
+ C:{contentWidth:1920},cl:(n,a,b)=>Math.min(b,Math.max(a,n)),
+ document:{documentElement:{style:fakeStyle}},
+ requestAnimationFrame:fn=>{const id=++nextFrame;frameQueue.set(id,fn);return id},
+ cancelAnimationFrame:id=>frameQueue.delete(id),
+ localStorage:{set xmeshNexusSettings(value){storageWrites++;}}
+};
+const widthFns=new Function(...Object.keys(frameContext),
+ previewCode+';return {previewContentWidth,saveContentWidth,C};')(...Object.values(frameContext));
+for(let w=721;w<=2201;w+=10){widthFns.C.contentWidth=w;widthFns.previewContentWidth();}
+assert.equal(frameQueue.size,1,'Burst of input events must be coalesced to one frame');
+assert.equal(storageWrites,0,'No storage writes while dragging');
+assert.equal(styleWrites,0,'No layout writes before the scheduled frame');
+[...frameQueue.values()][0]();frameQueue.clear();
+assert.equal(styleWrites,1,'A frame must repaint width only once');
+widthFns.C.contentWidth=1711;widthFns.previewContentWidth();
+widthFns.saveContentWidth();
+assert.equal(frameQueue.size,0,'Committing must cancel a pending stale frame');
+assert.equal(values.get('--panel-content-max'),'1711px');
+assert.equal(storageWrites,1,'Final width must be stored once');
 // Appearance uses two balanced columns and the locale selector is global.
 assert.match(app,/<div class="appearance-layout">/,'Aligned appearance workspace must exist');
 assert.match(app,/appearance-column/,'Appearance cards must use two columns');
