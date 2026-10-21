@@ -5,7 +5,7 @@ window.XMeshSubscriptionStudio = (() => {
   const defaults = {
     subscriptionDomain:'', subscriptionPath:'/s',
     subscriptionBrand:'', subscriptionDescription:'Настройки подключения и информация о подписке.',
-    subscriptionFooter:'', subscriptionAccent:'#e8bb78', subscriptionLanguage:'ru', subscriptionTheme:'dark',
+    subscriptionFooter:'', subscriptionAccent:'#e8bb78', subscriptionSyncPanelTheme:true, subscriptionLanguage:'ru', subscriptionTheme:'dark',
     subscriptionShowTraffic:true, subscriptionShowExpiry:true,
     subscriptionPlacement:'a', nodePlacement:'a', deploymentServerB:'', deploymentServerC:'',
     subscriptionBackground:'#0c131b',subscriptionCardColor:'#15212b',subscriptionTextColor:'#ecf3f6',
@@ -94,11 +94,14 @@ window.XMeshSubscriptionStudio = (() => {
 
   };
   const input = (form,name) => form.elements.namedItem(name);
-  function create(settings,save,notify,counts) {
+  function create(settings,save,notify,counts,getPanelTheme) {
     const data = {...defaults,...settings};
     if(!['ru','en'].includes(data.subscriptionLanguage))data.subscriptionLanguage='ru';
+    const panelTheme=()=>typeof getPanelTheme==='function'?getPanelTheme():null;
+    if(data.subscriptionSyncPanelTheme!==false&&panelTheme())Object.assign(data,panelTheme());
     const currentPalette=themeColors[data.subscriptionTheme]||themeColors.dark;
-    for(const key of Object.keys(currentPalette))if(settings?.[key]===undefined)data[key]=currentPalette[key];
+    for(const key of Object.keys(currentPalette))if(settings?.[key]===undefined&&data.subscriptionSyncPanelTheme===false)data[key]=currentPalette[key];
+    data.subscriptionRadius=Math.max(1,Math.min(48,Math.round(Number(data.subscriptionRadius)||16)));
     data.subscriptionClients={...defaultClients,...(settings?.subscriptionClients||{})};
     data.subscriptionClientLinks={...(settings?.subscriptionClientLinks||{})};
     data.subscriptionCustomClients=Array.isArray(settings?.subscriptionCustomClients)?settings.subscriptionCustomClients.slice(0,maxCustomClients):[];
@@ -139,9 +142,10 @@ window.XMeshSubscriptionStudio = (() => {
       '<div class="subscription-studio-toolbar"><button type="button" class="gh sm" data-subscription-export>Экспорт схемы JSON</button><small>Схема — описание архитектуры, не автоустановка серверов.</small></div>',
       '</section>',
       '<section class="card subscription-studio-section">',
-      '<div class="subscription-studio-heading"><span>03</span><div><h3>Клиентский портал</h3><p>Собственная тема, независимая от внешнего вида панели.</p></div></div>',
+      '<div class="subscription-studio-heading"><span>03</span><div><h3>Клиентский портал</h3><p>Синхронизация с темой панели или отдельная палитра.</p></div></div>',
       field('subscriptionBrand','Название подписки',data.subscriptionBrand,'Пустое значение — использовать бренд панели.',{placeholder:'Название вашего сервиса',max:80}),
       field('subscriptionDescription','Описание',data.subscriptionDescription,'Короткий текст на главной странице.',{area:true,max:240}),
+      '<label class="subscription-theme-sync"><input type="checkbox" name="subscriptionSyncPanelTheme"'+(data.subscriptionSyncPanelTheme!==false?' checked':'')+'> <span><b>Синхронизировать с темой панели</b><small>Акцент, светлый/тёмный режим, фон, карточки и цвет текста. Выключите для своего оформления.</small></span></label>',
       '<div class="subscription-studio-pair">',
       field('subscriptionAccent','Акцентный цвет',data.subscriptionAccent,'Цвет кнопок и индикаторов.',{color:true}),
       choice('subscriptionLanguage',data.subscriptionLanguage,[['ru','Русский'],['en','English']]),
@@ -160,7 +164,7 @@ window.XMeshSubscriptionStudio = (() => {
       '<label class="f subscription-field"><span>Карточки</span><select name="subscriptionCardStyle"><option value="soft"'+(data.subscriptionCardStyle==='soft'?' selected':'')+'>Мягкие</option><option value="outline"'+(data.subscriptionCardStyle==='outline'?' selected':'')+'>С контуром</option><option value="flat"'+(data.subscriptionCardStyle==='flat'?' selected':'')+'>Без фона</option></select></label>',
       '</div><div class="subscription-studio-pair">',
       '<label class="f subscription-field"><span>Шрифт</span><select name="subscriptionFont"><option value="system"'+(data.subscriptionFont==='system'?' selected':'')+'>Системный</option><option value="manrope"'+(data.subscriptionFont==='manrope'?' selected':'')+'>Manrope</option><option value="mono"'+(data.subscriptionFont==='mono'?' selected':'')+'>Моноширинный</option></select></label>',
-      '<label class="f subscription-field"><span>Скругление: <output data-subscription-radius>'+Number(data.subscriptionRadius)+'</output> px</span><input type="range" name="subscriptionRadius" min="0" max="36" step="1" value="'+Number(data.subscriptionRadius)+'"></label>',
+      '<label class="f subscription-field"><span>Скругление: <output data-subscription-radius>'+Number(data.subscriptionRadius)+'</output> px</span><input type="range" name="subscriptionRadius" min="1" max="48" step="1" value="'+Number(data.subscriptionRadius)+'"></label>',
       '</div>',
       '<div class="subscription-studio-pair subscription-color-grid">',
       field('subscriptionBackground','Фон портала',data.subscriptionBackground,'Основной цвет страницы.',{color:true}),
@@ -231,6 +235,20 @@ window.XMeshSubscriptionStudio = (() => {
         url:row.querySelector('[data-custom-field="url"]').value.trim(),
         enabled:row.querySelector('[data-custom-field="enabled"]').checked
       }));
+      const applyPanelTheme=()=>{
+        const linked=input(form,'subscriptionSyncPanelTheme').checked;
+        if(linked){
+          const theme=panelTheme();
+          if(theme)for(const [key,value] of Object.entries(theme)){
+            const field=input(form,key);
+            if(field)field.value=value;
+          }
+        }
+        for(const key of ['subscriptionAccent','subscriptionTheme','subscriptionBackground','subscriptionCardColor','subscriptionTextColor']){
+          const field=input(form,key);
+          if(field)field.disabled=linked;
+        }
+      };
       const read = () => ({
         subscriptionDomain:input(form,'subscriptionDomain').value.trim().toLowerCase(),
         subscriptionPath:input(form,'subscriptionPath').value.trim(),
@@ -238,6 +256,7 @@ window.XMeshSubscriptionStudio = (() => {
         subscriptionDescription:input(form,'subscriptionDescription').value.trim(),
         subscriptionFooter:input(form,'subscriptionFooter').value.trim(),
         subscriptionAccent:input(form,'subscriptionAccent').value,
+        subscriptionSyncPanelTheme:input(form,'subscriptionSyncPanelTheme').checked,
         subscriptionLanguage:input(form,'subscriptionLanguage').value,
         subscriptionTheme:input(form,'subscriptionTheme').value,
         subscriptionShowTraffic:input(form,'subscriptionShowTraffic').checked,
@@ -271,6 +290,7 @@ window.XMeshSubscriptionStudio = (() => {
         subscriptionClientLinks:Object.fromEntries(clientCatalog.map(([id])=>[id,input(form,'subClientLink_'+id).value.trim()]).filter(([,url])=>url))
       });
       const draw = () => {
+        applyPanelTheme();
         const d=read(),copy=locale[d.subscriptionLanguage]||locale.ru;
         $('[data-subscription-link]').textContent=d.subscriptionDomain && pathOK(d.subscriptionPath)
           ? 'https://'+d.subscriptionDomain+d.subscriptionPath+'/<token>':'Укажите домен и путь';
@@ -337,7 +357,7 @@ window.XMeshSubscriptionStudio = (() => {
       };
       form.addEventListener('input',draw);
       form.addEventListener('change',event=>{
-        if(event.target.name==='subscriptionTheme'){
+        if(event.target.name==='subscriptionTheme'&&!input(form,'subscriptionSyncPanelTheme').checked){
           const from=themeColors[event.target.value==='light'?'dark':'light'];
           const to=themeColors[event.target.value]||themeColors.dark;
           for(const key of Object.keys(to)){
@@ -380,6 +400,7 @@ window.XMeshSubscriptionStudio = (() => {
       }));
       form.addEventListener('submit',async event=>{
         event.preventDefault();
+        applyPanelTheme();
         const draft=read();
         if(!hostnameOK(draft.subscriptionDomain)){notify('Некорректный домен подписки');return;}
         if(!pathOK(draft.subscriptionPath)){notify('Некорректный путь подписки');return;}
