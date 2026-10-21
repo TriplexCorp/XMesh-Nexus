@@ -24,7 +24,12 @@
   <header class="top">
     <div class="top-identity"><span class="top-eyebrow" aria-hidden="true"><span class="top-eyebrow-mark"></span>XMESH / WORKSPACE</span><h1 id="title"></h1></div>
     <button class="search" id="pal" type="button" aria-label="Поиск и команды"><span id="si" class="search-glyph"></span><span class="search-label">Поиск и команды</span><kbd>Ctrl K</kbd></button>
-    <div class="tl"><button class="ib" id="theme" aria-label="Сменить тему"></button><button class="ib" id="bell" aria-label="Уведомления"></button><button class="btn" id="logout" type="button">Выйти</button><button class="btn" type="button" data-nu id="addb" aria-label="Добавить пользователя"></button></div>
+    <div class="tl"><button class="ib" id="theme" aria-label="Сменить тему"></button><button class="ib" id="bell" aria-label="Уведомления"></button><div class="top-language" id="top-language">
+      <button class="ib top-language-trigger" id="language-trigger" type="button" aria-label="Язык интерфейса" aria-haspopup="true" aria-expanded="false" aria-controls="language-menu"></button>
+      <div class="top-language-menu" id="language-menu" role="group" aria-label="Выбор языка" hidden>
+        <button type="button" data-panel-language="ru" aria-pressed="false">Русский <span>RU</span></button>
+        <button type="button" data-panel-language="en" aria-pressed="false">English <span>EN</span></button>
+      </div></div><button class="btn" id="logout" type="button">Выйти</button><button class="btn" type="button" data-nu id="addb" aria-label="Добавить пользователя"></button></div>
   </header>
   <main id="view" class="view"></main>
 </div>

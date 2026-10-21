@@ -1857,17 +1857,10 @@ async function setP(){
   let coreView={desired_version:'latest',installed_version:null,latest_version:null,status:'unknown',progress:null,last_error:null,architecture:'unknown'};
   try{coreView=await backendRequest('/api/v1/core')}catch(e){coreView.last_error=e.message}
   const coreLabel=coreView.status=='updating'?'Обновляется':coreView.status=='ready'?'Установлено':coreView.status=='error'?'Ошибка':'Не установлено';
-  return [`<section class="card settings-security-link">
-    <div class="hd"><div><h3>Безопасность аккаунта</h3>
-    <p>Двухфакторная аутентификация (2FA), резервные коды и защита входа.</p></div>
-    <a class="gh sm" href="#security">${ic('shield-check')} Открыть безопасность</a></div>
-  </section>
-  <div class="appearance-grid">
+  return [`  <div class="appearance-grid">
     <section class="card sg"><div class="settings-appearance-header">
       <div><h3>Цвет и тема</h3><small>Основная палитра интерфейса и брендовые акценты</small></div>
-      <div class="seg settings-language-toggle" role="group" aria-label="Язык интерфейса">
-        ${[['ru','RU','Русский'],['en','EN','English']].map(([value,caption,label])=>`<button type="button" data-panel-language="${value}" class="${window.XMeshI18n?.getLanguage()===value?'on':''}" aria-pressed="${window.XMeshI18n?.getLanguage()===value?'true':'false'}" aria-label="${label}" title="${label}">${caption}</button>`).join('')}
-      </div>
+    </div>
     </div>
       <div class="setting-row"><div class="setting-copy"><b>Тема</b><small>Автоматически — по настройкам ОС</small></div><div class="setting-control"><div class="seg choice" id="th">${[['dark','Тёмная'],['light','Светлая'],['auto','Авто']].map(([k,l])=>`<button type="button" data-th="${k}" class="${C.theme==k?'on':''}">${l}</button>`).join('')}</div></div></div>
       <div class="setting-row"><div class="setting-copy"><b>Акцентный цвет</b><small>Влияет на кнопки, графики и активные элементы</small></div><div class="setting-control" style="gap:.85rem;max-width:18rem">${sw.map(([k,x,y,l])=>`<button class="palette-swatch ${C.accent==k?'on':''}" style="--x:${x};--y:${y}" data-ac="${k}" title="${l}" aria-label="${l}"></button>`).join('')}</div></div>
@@ -2082,14 +2075,43 @@ document.addEventListener('change',e=>{
  const preview=picker.querySelector('.country-selected');
  preview.innerHTML=flagView(select.value,'country-flag-preview')+`<span data-country-label>${country?esc(country.name):select.value?esc(select.value+' Сохранённый флаг'):'Выберите страну…'}</span>`;
 });
+function syncTopLanguage(){
+  const selected=window.XMeshI18n?.getLanguage()==='en'?'en':'ru';
+  const trigger=$('#language-trigger');
+  if(trigger)trigger.innerHTML=ic('globe')+'<span class="top-language-label">'+selected.toUpperCase()+'</span>'+ic('down');
+  document.querySelectorAll('#language-menu [data-panel-language]').forEach(button=>{
+    const active=button.dataset.panelLanguage===selected;
+    button.classList.toggle('on',active);
+    button.setAttribute('aria-pressed',String(active));
+  });
+}
+function closeTopLanguage(){
+  const menu=$('#language-menu'),trigger=$('#language-trigger');
+  if(menu)menu.hidden=true;
+  if(trigger)trigger.setAttribute('aria-expanded','false');
+}
 document.addEventListener('click',e=>{
-  const button=e.target.closest('button[data-panel-language]');
-  if(!button)return;
-  if(!['ru','en'].includes(button.dataset.panelLanguage))return;
-  if(window.XMeshI18n?.getLanguage()===button.dataset.panelLanguage)return;
-  window.XMeshI18n?.setLanguage(button.dataset.panelLanguage);
-  render(1);
+  const trigger=e.target.closest('#language-trigger');
+  if(trigger){
+    const menu=$('#language-menu');
+    menu.hidden=!menu.hidden;
+    trigger.setAttribute('aria-expanded',String(!menu.hidden));
+    return;
+  }
+  const button=e.target.closest('#language-menu button[data-panel-language]');
+  if(button){
+    closeTopLanguage();
+    if(!['ru','en'].includes(button.dataset.panelLanguage))return;
+    if(window.XMeshI18n?.getLanguage()!==button.dataset.panelLanguage){
+      window.XMeshI18n?.setLanguage(button.dataset.panelLanguage);
+      syncTopLanguage();
+      render(1);
+    }
+    return;
+  }
+  if(!e.target.closest('#top-language'))closeTopLanguage();
 });
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeTopLanguage()});
 document.addEventListener('change',async e=>{const t=e.target;
   if(t.id==='auto-core-refresh'||t.id==='core-refresh-seconds'){
     if(t.id==='auto-core-refresh')C.autoCoreRefresh=t.checked?1:0;
@@ -2165,7 +2187,7 @@ document.addEventListener('click',e=>{
 
 /* ================= СТАРТ ================= */
 $('#si').innerHTML=ic('search');$('#theme').innerHTML=ic('moon').replace('class="ic"','class="ic moon"')+ic('sun').replace('class="ic"','class="ic sun"');
-$('#bell').innerHTML=ic('bell');$('#logout').innerHTML=ic('logout')+'<span class="logout-label">Выйти</span>';$('#logout').setAttribute('aria-label','Выйти');$('#addb').innerHTML='<span class="addb-icon">'+ic('plus')+'</span><span class="addb-label">Новый пользователь</span>';
+$('#bell').innerHTML=ic('bell');syncTopLanguage();$('#logout').innerHTML=ic('logout')+'<span class="logout-label">Выйти</span>';$('#logout').setAttribute('aria-label','Выйти');$('#addb').innerHTML='<span class="addb-icon">'+ic('plus')+'</span><span class="addb-label">Новый пользователь</span>';
 $('#logout').onclick=async()=>{const button=$('#logout');button.disabled=true;try{await fetch('/api/v1/auth/logout',{method:'POST',credentials:'same-origin',cache:'no-store'});}catch(_){}backendReady=false;location.replace('/login')};$('#restart').setAttribute('aria-label','Настройки Xray-core');$('#restart').dataset.railTip='Настройки Xray-core';$('#restart').innerHTML=ic('code')+'<span class="lbl">Версия</span>';
 apply();matchMedia('(prefers-color-scheme: light)').addEventListener('change',apply);
 addEventListener('hashchange',()=>{if(backendReady)render()});
