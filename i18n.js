@@ -544,7 +544,7 @@ window.XMeshI18n=(()=>{
   };
   const isProtected=node=>{
     const el=node.nodeType===3?node.parentElement:node;
-    return !!el?.closest?.('script,style,pre,code,textarea,[contenteditable],[translate="no"],[data-no-translate],[data-subscription-preview],.user-username,.country-name');
+    return !!el?.closest?.('script,style,pre,code,textarea,[contenteditable],[translate="no"],[data-no-translate],[data-subscription-preview],#bn,#lg,.who,.nc .h b,.user-username,.user-name,.country-name');
   };
   const renderText=node=>{
     if(isProtected(node)||!node.nodeValue||!/[а-яё]/i.test(node.nodeValue)&&!originalText.has(node))return;
