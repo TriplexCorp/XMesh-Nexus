@@ -65,13 +65,10 @@ fn code_at(secret: &[u8], step: u64) -> String {
 fn matching_step(secret: &[u8], input: &str, last: i64, now: i64) -> Option<i64> {
     if input.len()!=6 || !input.bytes().all(|x|x.is_ascii_digit()) {return None;}
     let step=now.div_euclid(MFA_WINDOW);
-    for candidate in [step-1,step,step+1] {
-        if candidate>last && candidate>=0
-            && bool::from(code_at(secret,candidate as u64).as_bytes().ct_eq(input.as_bytes())) {
-            return Some(candidate);
-        }
-    }
-    None
+    [step-1,step,step+1].into_iter().find(|&candidate|
+        candidate>last && candidate>=0 &&
+        bool::from(code_at(secret,candidate as u64).as_bytes().ct_eq(input.as_bytes()))
+    )
 }
 fn current_seconds() -> i64 {std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
     .unwrap_or_default().as_secs() as i64}
