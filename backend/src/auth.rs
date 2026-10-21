@@ -146,7 +146,7 @@ pub(crate) async fn is_rate_limited(state:&AppState,username_key:&str)->Result<b
 
 pub(crate) async fn clear_failed_login(state:&AppState,username_key:&str)->Result<(),ApiError>{
     sqlx::query("DELETE FROM auth_login_limits WHERE username_key = $1")
-        .bind(&username_key)
+        .bind(username_key)
         .execute(&state.pool)
         .await?;
     let mut redis_conn = state.redis.clone();
