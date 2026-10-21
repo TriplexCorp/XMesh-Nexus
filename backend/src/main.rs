@@ -1,3 +1,4 @@
+mod admin_accounts;
 mod auth;
 mod core;
 mod node_rotation;
@@ -29,6 +30,28 @@ use tower_http::{
 const COLLECTIONS: &[&str] = &[
     "users", "nodes", "profiles", "hosts", "squads", "tpls", "subs", "admins", "tokens", "srh",
 ];
+
+/// Roles are re-read from SQL for each request; changing or disabling an admin
+/// invalidates their sessions. Never trust role fields from the browser.
+fn require_mutation(actor: &auth::AuthUser) -> Result<(), ApiError> {
+    if matches!(actor.role.as_str(), "owner" | "admin") { Ok(()) }
+    else { Err(ApiError::new(StatusCode::FORBIDDEN, "Недостаточно прав: доступ только для чтения.")) }
+}
+
+fn require_owner(actor: &auth::AuthUser) -> Result<(), ApiError> {
+    admin_accounts::require_owner(actor)
+}
+
+fn enforce_collection(actor: &auth::AuthUser, collection: &str, write: bool) -> Result<(), ApiError> {
+    if matches!(collection, "admins" | "tokens") {
+        return Err(ApiError::new(
+            StatusCode::FORBIDDEN,
+            "Используйте защищённый раздел администраторов. API-токены пока не реализованы.",
+        ));
+    }
+    if write { require_mutation(actor) } else { Ok(()) }
+}
+
 
 #[derive(Clone)]
 pub struct AppState {
@@ -161,6 +184,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/metrics/traffic", get(get_traffic_metrics))
         .route("/users/{id}/traffic", get(get_user_traffic))
         .route("/nodes/{id}/metrics-token", post(create_node_metrics_token))
+        .route("/admins", get(admin_accounts::list).post(admin_accounts::create))
+        .route("/admins/{id}", patch(admin_accounts::update).delete(admin_accounts::delete))
         .route("/nodes/{id}/rotation/next", post(node_rotation::rotate_next))
         .route("/collections/{collection}", get(list_records).post(create_record))
         .route("/collections/{collection}/{id}", patch(update_record).delete(delete_record))
@@ -314,13 +339,18 @@ async fn health_ready(State(state): State<AppState>) -> impl IntoResponse {
     }
 }
 
-async fn bootstrap(State(state): State<AppState>) -> Result<Json<Value>, ApiError> {
+async fn bootstrap(State(state): State<AppState>, Extension(actor): Extension<auth::AuthUser>) -> Result<Json<Value>, ApiError> {
     let mut collections = Map::new();
     for collection in COLLECTIONS {
-        collections.insert(
-            (*collection).to_owned(),
-            Value::Array(load_records(&state.pool, collection).await?),
-        );
+        let records = if *collection == "admins" {
+            if actor.role == "owner" { admin_accounts::accounts(&state.pool).await? } else { Vec::new() }
+        } else if *collection == "tokens" {
+            // API tokens remain unimplemented, not credentials. Never surface legacy placeholders.
+            Vec::new()
+        } else {
+            load_records(&state.pool, collection).await?
+        };
+        collections.insert((*collection).to_owned(), Value::Array(records));
     }
     let settings = read_settings(&state.pool).await?;
     Ok(Json(json!({
@@ -332,9 +362,11 @@ async fn bootstrap(State(state): State<AppState>) -> Result<Json<Value>, ApiErro
 
 async fn list_records(
     State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
     Path(collection): Path<String>,
 ) -> Result<Json<Value>, ApiError> {
     validate_collection(&collection)?;
+    enforce_collection(&actor, &collection, false)?;
     let items = load_records(&state.pool, &collection).await?;
     let ids = items.iter().filter_map(|item| item.get("id").cloned()).collect::<Vec<_>>();
     let total = items.len();
@@ -348,6 +380,7 @@ async fn create_record(
     Json(mut data): Json<Value>,
 ) -> Result<(StatusCode, Json<Value>), ApiError> {
     validate_collection(&collection)?;
+    enforce_collection(&actor, &collection, true)?;
     data.as_object_mut().ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Запись должна быть JSON-объектом."))?
         .remove("id");
     validate_record(&collection, &data)?;
@@ -372,6 +405,7 @@ async fn update_record(
     Json(mut patch): Json<Value>,
 ) -> Result<Json<Value>, ApiError> {
     validate_collection(&collection)?;
+    enforce_collection(&actor, &collection, true)?;
     let patch_object = patch.as_object_mut()
         .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Обновление должно быть JSON-объектом."))?;
     patch_object.remove("id");
@@ -410,6 +444,7 @@ async fn delete_record(
     Path((collection, id)): Path<(String, i64)>,
 ) -> Result<Json<Value>, ApiError> {
     validate_collection(&collection)?;
+    enforce_collection(&actor, &collection, true)?;
     let row = sqlx::query(
         "DELETE FROM panel_records WHERE collection = $1 AND id = $2 RETURNING id, data",
     )
@@ -459,6 +494,7 @@ async fn patch_settings(
     Extension(actor): Extension<auth::AuthUser>,
     Json(patch): Json<Value>,
 ) -> Result<Json<Value>, ApiError> {
+    require_owner(&actor)?;
     let object = patch.as_object()
         .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Настройки должны быть JSON-объектом."))?;
     for key in object.keys() {
@@ -699,6 +735,7 @@ async fn create_node_metrics_token(
     Extension(actor): Extension<auth::AuthUser>,
     Path(id): Path<i64>,
 ) -> Result<(StatusCode, Json<Value>), ApiError> {
+    require_owner(&actor)?;
     if id <= 0 {
         return Err(ApiError::new(StatusCode::BAD_REQUEST, "ID узла должен быть положительным числом."));
     }
@@ -1082,6 +1119,7 @@ async fn generate_vless_encryption(
     State(state): State<AppState>,
     Extension(actor): Extension<auth::AuthUser>,
 ) -> Result<Json<Value>, ApiError> {
+    require_mutation(&actor)?;
     let generated = state.core.generate_vless_encryption().await
         .map_err(|error| ApiError::new(StatusCode::SERVICE_UNAVAILABLE, error))?;
 
@@ -1103,6 +1141,7 @@ async fn update_core(
     Extension(actor): Extension<auth::AuthUser>,
     Json(body): Json<CoreUpdateRequest>,
 ) -> Result<(StatusCode, Json<Value>), ApiError> {
+    require_owner(&actor)?;
     let target = state.core.set_desired_version(&body.version).await
         .map_err(|error| ApiError::new(StatusCode::BAD_REQUEST, error))?;
     audit(&state.pool, &actor.username, "xray_core.update_requested", None, None, json!({"version": target})).await;
