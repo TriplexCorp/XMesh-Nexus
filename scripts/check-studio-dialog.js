@@ -27,7 +27,13 @@ assert.match(css,/\.sr-studio-dialog::backdrop/,'Full-screen dialog backdrop mis
 assert.match(css,/\.sr-studio-dialog\[open\]/,'Dialog open state missing');
 assert.match(css,/\.sr-studio-dialog:not\(\[open\]\)/,'Closed dialog must remain hidden');
 assert.match(css,/\.sr-studio-dialog\[data-active-panel="transport"\]/,'Transport settings overlay missing');
-assert.match(css,/\.xray-workspace-layout\{\s*align-items:start!important/,'JSON and main editor must align at top');
+// Both sides share one auto-sized grid row on wide screens.
+const equalHeightBlock=css.match(/\.studio-drawer-layout:not\(\.manual-mode\) \.xray-workspace-layout\{([^}]+)\}/);
+assert(equalHeightBlock&&/align-items:stretch!important/.test(equalHeightBlock[1]),'Editor and JSON must stretch to the same row height');
+const dockBlock=css.match(/\.studio-drawer-layout:not\(\.manual-mode\) \.xray-output-dock\{([^}]+)\}/);
+assert(dockBlock&&/align-self:stretch!important/.test(dockBlock[1])&&/height:100%!important/.test(dockBlock[1]),'JSON panel must reach the editor bottom');
+assert.match(css,/\.studio-drawer-layout:not\(\.manual-mode\):not\(\.sr-v5-expanded\) \.xray-code-view\{\s*height:100%!important/,'Code viewport must fill remaining available panel height');
+assert.match(css,/@media\(max-width:1250px\)\{\s*\.xray-builder\.studio-reference-v5\.studio-inline\.studio-drawer-layout:not\(\.manual-mode\) \.xray-workspace-layout\{\s*grid-template-columns:minmax\(0,1fr\)!important;\s*align-items:start!important;/,'Stacked mobile layout must keep natural card heights');
 assert.match(css,/width:min\(1700px,calc\(100vw - 72px\)\)!important/,'Dialog must leave a visible margin around the panel');
 assert.match(css,/-webkit-backdrop-filter:blur\(12px\) saturate\(\.78\)!important/,'Modal must blur the underlying app');
 assert.match(css,/\.studio-inline\.manual-mode\s*>\s*\.xray-workspace-layout/,'Manual JSON must use the same Studio shell');
