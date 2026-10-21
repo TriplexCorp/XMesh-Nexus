@@ -370,6 +370,23 @@ html[data-sidebar=compact] .app{grid-template-columns:5.7rem minmax(0,1fr)}
   html[data-sidebar=compact] .app>aside .core-rail-version{display:block}
 }
 .appearance-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,22rem),1fr));gap:var(--view-gap);align-items:start}
+.appearance-layout{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--view-gap);align-items:start}
+.appearance-column{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--view-gap);min-width:0}
+.appearance-column>.card{min-width:0}
+.appearance-card-heading h3{margin:0}
+.appearance-card-heading small{display:block;margin-top:.22rem;color:var(--mu);line-height:1.5}
+.appearance-layout .setting-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(10rem,1fr);align-items:center;gap:1.1rem;min-height:3.3rem}
+.appearance-layout .setting-copy{min-width:0}
+.appearance-layout .setting-control{min-width:0;justify-content:flex-end}
+.appearance-layout .setting-control.slider-control{width:100%;min-width:0}
+.appearance-layout .slider-control input{flex:1;min-width:4rem}
+.appearance-layout .slider-control b{font-variant-numeric:tabular-nums;white-space:nowrap;font-size:.82rem}
+.appearance-layout .setting-row .sw,.appearance-layout .setting-row #rs{justify-self:end}
+.appearance-layout .palette-swatch{flex:0 0 auto}
+.appearance-layout .color-slider-grid{grid-template-columns:minmax(6rem,1fr) minmax(5rem,2.8fr) 3.5rem}
+@media(max-width:1120px){.appearance-layout{grid-template-columns:1fr}}
+@media(max-width:650px){.appearance-layout .setting-row{grid-template-columns:1fr;gap:.55rem}.appearance-layout .setting-control{justify-content:flex-start}.appearance-layout .setting-row .sw,.appearance-layout .setting-row #rs{justify-self:start}}
+
 .choice{display:flex;flex-wrap:wrap;gap:.35rem;width:fit-content;max-width:100%}
 .choice button{white-space:nowrap}
 .palette-swatch{width:2.1rem;height:2.1rem;padding:0;border-radius:50%;background:linear-gradient(135deg,var(--x),var(--y));border:2px solid color-mix(in srgb,var(--s1) 65%,transparent);box-shadow:0 0 0 1px var(--ln);transition:transform .2s,box-shadow .2s}

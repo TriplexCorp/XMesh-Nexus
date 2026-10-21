@@ -1857,7 +1857,8 @@ async function setP(){
   let coreView={desired_version:'latest',installed_version:null,latest_version:null,status:'unknown',progress:null,last_error:null,architecture:'unknown'};
   try{coreView=await backendRequest('/api/v1/core')}catch(e){coreView.last_error=e.message}
   const coreLabel=coreView.status=='updating'?'Обновляется':coreView.status=='ready'?'Установлено':coreView.status=='error'?'Ошибка':'Не установлено';
-  return [`  <div class="appearance-grid">
+  return [`<div class="appearance-layout">
+<div class="appearance-column">
     <section class="card sg"><div class="settings-appearance-header">
       <div><h3>Цвет и тема</h3><small>Основная палитра интерфейса и брендовые акценты</small></div>
     </div>
@@ -1865,10 +1866,15 @@ async function setP(){
       <div class="setting-row"><div class="setting-copy"><b>Тема</b><small>Автоматически — по настройкам ОС</small></div><div class="setting-control"><div class="seg choice" id="th">${[['dark','Тёмная'],['light','Светлая'],['auto','Авто']].map(([k,l])=>`<button type="button" data-th="${k}" class="${C.theme==k?'on':''}">${l}</button>`).join('')}</div></div></div>
       <div class="setting-row"><div class="setting-copy"><b>Акцентный цвет</b><small>Влияет на кнопки, графики и активные элементы</small></div><div class="setting-control" style="gap:.85rem;max-width:18rem">${sw.map(([k,x,y,l])=>`<button class="palette-swatch ${C.accent==k?'on':''}" style="--x:${x};--y:${y}" data-ac="${k}" title="${l}" aria-label="${l}"></button>`).join('')}</div></div>
       <div class="setting-row"><div class="setting-copy"><b>Своя палитра</b><small>Цветовые «бублики» открывают выбор цвета; ползунки позволяют точно настроить оттенок, насыщенность и яркость.</small></div><div class="setting-control"><div class="color-bubbles"><label class="color-bubble-wrap"><span class="color-bubble"><input type="color" id="custom-a" value="${C.customA||'#60d6a2'}" aria-label="Основной цвет"></span>Основной</label><label class="color-bubble-wrap"><span class="color-bubble"><input type="color" id="custom-b" value="${C.customB||'#c3e879'}" aria-label="Вторичный цвет"></span>Вторичный</label></div></div></div>
+    </section>
+    <section class="card sg"><div class="appearance-card-heading"><h3>Точная настройка цвета</h3><small>Оттенок, насыщенность и яркость собственной палитры</small></div>
       <div class="color-slider-grid"><label for="hue">Оттенок</label><input type="range" id="hue" min="0" max="360" value="${C.hue??151}"><output id="huev">${C.hue??151}°</output></div><div class="color-slider-grid"><label for="sat">Насыщенность</label><input type="range" id="sat" min="0" max="100" value="${C.sat??62}"><output id="satv">${C.sat??62}%</output></div><div class="color-slider-grid"><label for="lum">Яркость</label><input type="range" id="lum" min="15" max="85" value="${C.lum??61}"><output id="lumv">${C.lum??61}%</output></div>
+    </section>
+    <section class="card sg"><div class="appearance-card-heading"><h3>Типографика</h3><small>Размер и начертание текста</small></div>
       <div class="setting-row"><div class="setting-copy"><b>Размер текста</b><small>Можно увеличить интерфейс для большого монитора или уменьшить плотность текста</small></div><div class="setting-control slider-control"><input type="range" id="ts" min="0.9" max="1.3" step="0.05" value="${C.ts}" aria-label="Размер текста"><b id="tsv">${Math.round(C.ts*100)}%</b></div></div>
       <div class="setting-row"><div class="setting-copy"><b>Шрифт</b><small>Выберите нейтральный системный или моноширинный стиль</small></div><div class="setting-control">${choices('font',[['onest','Manrope'],['system','Системный'],['mono','Моно']])}</div></div>
     </section>
+</div><div class="appearance-column">
     <section class="card sg"><div><h3>Композиция</h3><small>Плотность, радиусы и вид карточек</small></div>
       <div class="setting-row"><div class="setting-copy"><b>Плотность</b><small>От компактной таблицы до просторных карточек</small></div><div class="setting-control">${choices('density',[['compact','Компактно'],['comfortable','Стандарт'],['spacious','Свободно']])}</div></div>
       <div class="setting-row"><div class="setting-copy"><b>Стиль карточек</b><small>Классический, стеклянный или объёмный вид</small></div><div class="setting-control">${choices('surface',[['solid','Классика'],['glass','Glass'],['raised','Объём']])}</div></div>
@@ -1882,7 +1888,7 @@ async function setP(){
       <div class="setting-row"><div class="setting-copy"><b>Анимации</b><small>Отключите движение и переходы, если они отвлекают</small></div><label class="sw"><input type="checkbox" id="mo" ${C.motion?'checked':''} aria-label="Анимации"><span></span></label></div>
       <div class="setting-row"><div class="setting-copy"><b>Сохранение</b><small>Параметры оформления сохраняются в localStorage этого браузера</small></div><button class="gh sm" id="rs">Сбросить оформление</button></div>
     </section>
-  </div>
+</div></div>
   <div class="card" id="brand-panel"><div class="hd"><div><h3>Бренд и домены</h3><p>Отдельные названия и домены панели управления и подписки</p></div></div><form data-k="brand" method="dialog" class="sg" style="gap:1rem"><div class="r2" style="display:grid;border:0;padding:0">${field({k:'brand',l:'Название панели',req:1},DB.set.brand)}${field({k:'domain',l:'Домен панели',req:1,ph:'panel.example.com'},DB.set.domain)}${field({k:'subscriptionBrand',l:'Название подписки',ph:'Название вашего сервиса',h:'Название клиентского портала. Если пусто — используется название панели. Изменяется также в SUBSCRIPTION STUDIO.'},DB.set.subscriptionBrand||'')}${field({k:'subscriptionDomain',l:'Домен подписки',ph:'sub.example.com',h:'Независим от домена панели. Оформление и размещение — в SUBSCRIPTION STUDIO.'},DB.set.subscriptionDomain||'')}</div><div style="border:0;padding:0"><button class="btn">Сохранить</button></div></form></div>
   <div class="card"><div class="hd"><div><h3>Вебхуки</h3><p>События, о которых панель сообщает во внешние сервисы</p></div></div>${Object.entries(DB.set.hooks).map(([k,v])=>`<div class="rowi"><div>${k}</div><label class="sw"><input type="checkbox" data-hk="${k}" ${v?'checked':''} aria-label="${k}"><span></span></label></div>`).join('')}</div>${tk}
   <div class="card" id="core-panel"><div class="hd"><div><h3>Xray-core</h3><p>Установка и обновление бинарника ядра на сервере панели</p></div><span class="chip" id="core-state">${esc(coreLabel)}</span></div>
