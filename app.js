@@ -215,9 +215,7 @@ const ENT={
       ['Вход',r=>ago(r.last)]],
     guard:r=>r.id===sessionUser?.id?'Нельзя удалить собственную учётную запись.':'',
   },
-  tokens:{t:'API-токены',n:'Для интеграций: бот оплаты, мониторинг, скрипты.',s:'id',nw:'Токен',fs:[{k:'name',l:'Название',req:1},{k:'scope',l:'Права',t:'sel',o:[['read','Только чтение'],['write','Чтение и запись']]}],def:()=>({scope:'read'}),
-    cols:[['Название',r=>`<b>${esc(r.name)}</b>`],['Права',r=>chip(r.scope=='read'?'чтение':'запись',r.scope=='read'?'--c3':'--wr')],['Создан',r=>ago(r.created)],['Использован',r=>ago(r.last)]],
-    after:o=>{const s='lm_'+Math.random().toString(36).slice(2)+Math.random().toString(36).slice(2);modal(`<div class="box"><h2>Токен создан</h2><p class="note">Скопируйте его сейчас: позже показать его снова будет нельзя.</p><div class="lk"><input id="lk" readonly value="${s}" aria-label="Токен"><button class="gh" data-copy>${ic('copy')}</button></div><div class="act"><button class="btn" data-x>Готово</button></div></div>`);return 1}}
+
 };
 const FU=[{k:'username',l:'Имя пользователя',req:1,pat:'[A-Za-z0-9_.\\-]{3,32}',h:'3–32 символа: латиница, цифры, _ . -'},{k:'xrayProfileId',l:'Xray-профиль',t:'sel',o:()=>[['','Не привязывать'],...DB.profiles.map(p=>[String(p.id),p.name])],h:'При выборе панель добавит учётные данные в inbound профиля.'},{k:'fingerprint',l:'uTLS fingerprint пользователя',t:'sel',o:()=>Array.from(new Set(['chrome','firefox','safari','ios','android','edge','random','randomized','randomizednoalpn','unsafe',...XRAY_FP])).map(x=>[x,x]),h:'Индивидуальный fingerprint клиентского профиля для этого пользователя.'},{k:'limit',l:'Лимит трафика, ГБ',t:'num',h:'0 — без лимита'},{k:'days',l:'Срок, дней',t:'num',h:'0 — бессрочно'},{k:'strategy',l:'Сброс трафика',t:'sel',o:STRAT},{k:'hwid',l:'Лимит устройств',t:'num'},{k:'tag',l:'Тег',ph:'например, vip'},{k:'squads',l:'Сквады',t:'multi',o:()=>DB.squads.map(s=>[s.id,s.name])},{k:'hold',l:'Отсчёт срока с первого подключения (on hold)',t:'bool'},{k:'desc',l:'Заметка'}];
 const FE=[{k:'username',l:'Имя пользователя',req:1,pat:'[A-Za-z0-9_.\\-]{3,32}'},{k:'fingerprint',l:'uTLS fingerprint пользователя',t:'sel',o:()=>Array.from(new Set(['chrome','firefox','safari','ios','android','edge','random','randomized','randomizednoalpn','unsafe',...XRAY_FP])).map(x=>[x,x]),h:'Персональный fingerprint пользователя.'},{k:'limit',l:'Лимит, ГБ',t:'num',h:'0 — без лимита'},{k:'expireAt',l:'Действует до',t:'date',h:'Пусто — бессрочно'},{k:'strategy',l:'Сброс трафика',t:'sel',o:STRAT},{k:'tag',l:'Тег'},{k:'tg',l:'Telegram ID'},{k:'email',l:'Email'},{k:'desc',l:'Заметка'}];
@@ -1842,7 +1840,7 @@ async function setP(){
     ['violet','#b7a1ff','#83d9ed','Фиолетовый'],['cyan','#63dff2','#7fa8ff','Циан'],['ruby','#ff8aa7','#d4a1ff','Рубин'],['custom',C.customA||'#60d6a2',C.customB||'#c3e879','Своя тема']
   ];
   const choices=(key,items)=>`<div class="seg choice" role="group" aria-label="${key}">${items.map(([v,l])=>`<button type="button" data-ui="${key}" data-value="${v}" class="${(C[key]||CDEFAULT[key])==v?'on':''}" aria-pressed="${(C[key]||CDEFAULT[key])==v?'true':'false'}">${l}</button>`).join('')}</div>`;
-  const tk=await crudCard('tokens');
+  const tk=`<section class="card"><div class="hd"><div><h3>API-токены</h3><p>Выдача API-токенов для интеграций ещё не реализована.</p></div></div><p class="note">Не создавайте токены через этот раздел: безопасность доступа к API будет добавлена отдельным этапом.</p></section>`;
   let coreView={desired_version:'latest',installed_version:null,latest_version:null,status:'unknown',progress:null,last_error:null,architecture:'unknown'};
   try{coreView=await backendRequest('/api/v1/core')}catch(e){coreView.last_error=e.message}
   const coreLabel=coreView.status=='updating'?'Обновляется':coreView.status=='ready'?'Установлено':coreView.status=='error'?'Ошибка':'Не установлено';
