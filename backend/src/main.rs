@@ -1,6 +1,7 @@
 mod auth;
 mod core;
 mod node_rotation;
+mod subscription_settings;
 
 use axum::{
     extract::{Extension, Path, Query, Request, State},
@@ -466,7 +467,14 @@ async fn patch_settings(
                 | "subscriptionDescription" | "subscriptionFooter" | "subscriptionAccent"
                 | "subscriptionLanguage" | "subscriptionTheme" | "subscriptionPlacement" | "nodePlacement"
                 | "deploymentServerB" | "deploymentServerC" | "subscriptionShowTraffic"
-                | "subscriptionShowExpiry") {
+                | "subscriptionShowExpiry" | "subscriptionBackground" | "subscriptionCardColor"
+                | "subscriptionTextColor" | "subscriptionLayout" | "subscriptionCardStyle"
+                | "subscriptionFont" | "subscriptionRadius" | "subscriptionClientLayout"
+                | "subscriptionHero" | "subscriptionCta" | "subscriptionSupportLabel"
+                | "subscriptionLogoUrl" | "subscriptionSupportUrl" | "subscriptionShowStatus"
+                | "subscriptionShowApps" | "subscriptionShowQr" | "subscriptionShowCopy"
+                | "subscriptionShowSupport" | "subscriptionShowDevices"
+                | "subscriptionClients" | "subscriptionClientLinks") {
             return Err(ApiError::new(StatusCode::BAD_REQUEST, format!("Неизвестное поле настроек: {key}")));
         }
     }
@@ -535,6 +543,7 @@ async fn patch_settings(
             return Err(ApiError::new(StatusCode::BAD_REQUEST, format!("Поле {key} должно быть переключателем.")));
         }
     }
+    subscription_settings::validate(object)?;
     if let Some(hooks) = object.get("hooks") {
         let hooks = hooks.as_object().ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Вебхуки должны быть объектом."))?;
         let allowed = [
