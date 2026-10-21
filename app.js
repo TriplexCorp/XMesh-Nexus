@@ -1963,7 +1963,13 @@ async function setP(){
     ['lime','#c8ed7a','#86d79c','Лайм'],
     ['terracotta','#e9a086','#f2c68e','Терракота'],
     ['orchid','#d99dde','#f1b5da','Орхидея'],
-    ['aurora','#74dbc5','#a49ceb','Аврора']
+    ['aurora','#74dbc5','#a49ceb','Аврора'],
+    ['sakura','#f8aac6','#f2d6ad','Сакура'],
+    ['storm','#8fafd2','#c4b1e8','Шторм'],
+    ['flame','#ff9276','#f5c260','Пламя'],
+    ['sage','#a8d7ac','#d0e5b7','Шалфей'],
+    ['midnight','#7398ed','#af86ce','Полночь'],
+    ['tropical','#4ed5bc','#f6c787','Тропики']
   ];
   const choices=(key,items)=>`<div class="seg choice" role="group" aria-label="${key}">${items.map(([v,l])=>`<button type="button" data-ui="${key}" data-value="${v}" class="${(C[key]||CDEFAULT[key])==v?'on':''}" aria-pressed="${(C[key]||CDEFAULT[key])==v?'true':'false'}">${l}</button>`).join('')}</div>`;
   const tk=`<section class="card"><div class="hd"><div><h3>API-токены</h3><p>Выдача API-токенов для интеграций ещё не реализована.</p></div></div><p class="note">Не создавайте токены через этот раздел: безопасность доступа к API будет добавлена отдельным этапом.</p></section>`;

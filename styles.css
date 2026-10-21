@@ -162,6 +162,18 @@
 [data-theme=light][data-accent=orchid]{--a:#823e95;--b:#a13778}
 [data-accent=aurora]{--a:#74dbc5;--b:#a49ceb}
 [data-theme=light][data-accent=aurora]{--a:#187a6a;--b:#6153b1}
+[data-accent=sakura]{--a:#f8aac6;--b:#f2d6ad}
+[data-theme=light][data-accent=sakura]{--a:#ad467a;--b:#b17b35}
+[data-accent=storm]{--a:#8fafd2;--b:#c4b1e8}
+[data-theme=light][data-accent=storm]{--a:#3f6b9b;--b:#7655a2}
+[data-accent=flame]{--a:#ff9276;--b:#f5c260}
+[data-theme=light][data-accent=flame]{--a:#b9432c;--b:#a57719}
+[data-accent=sage]{--a:#a8d7ac;--b:#d0e5b7}
+[data-theme=light][data-accent=sage]{--a:#477e4e;--b:#637d38}
+[data-accent=midnight]{--a:#7398ed;--b:#af86ce}
+[data-theme=light][data-accent=midnight]{--a:#3757ad;--b:#804ba3}
+[data-accent=tropical]{--a:#4ed5bc;--b:#f6c787}
+[data-theme=light][data-accent=tropical]{--a:#087e73;--b:#a76b24}
 *{box-sizing:border-box;margin:0;padding:0}
 html{font-size:calc(clamp(14px,.25vw + 13px,16px)*var(--ts,1))}
 body{

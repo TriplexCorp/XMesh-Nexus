@@ -26,11 +26,11 @@ assert(!wrapLimits.some(rule=>/max-width:(?:132rem|2112px)/.test(rule)),
  'Static desktop width caps must not override the slider');
 assert.match(app,/cl\(Number\(C\.contentWidth\)\|\|1920,720,3000\)/,
  'Content width must support narrower desktop viewports');
-assert.match(app,/id="content-width" min="720" max="3000" step="10"/,
+assert.match(app,/id="content-width" min="720" max="3000" step="1"/,
  'The width slider must support fine-grained adjustment on desktop screens');
 assert.match(html,/styles\.css\?v=[a-z0-9-]+/,'The active stylesheet needs a versioned cache key');
 
-assert.match(app,/id="content-width" min="720" max="3000" step="10"/,
+assert.match(app,/id="content-width" min="720" max="3000" step="1"/,
  'The width slider must have finer 10px increments');
 assert.match(app,/const previewContentWidth=\(\)=>/,'Width changes must have a dedicated preview scheduler');
 assert.match(app,/contentWidthFrame=requestAnimationFrame\(/,'Only one preview layout change per animation frame');
@@ -130,13 +130,13 @@ updateHex(control);
 assert.equal(draft.b,'#13579B');
 assert.equal(draft.a,'#ABCDEF','Second color must not modify first');
 
-// Palette layout: six columns at the user's desktop width, with no incomplete third row.
+// Palette layout: the 8-column ultrawide gallery has three complete rows of 8 presets.
 const paletteCode=app.slice(app.indexOf('  const sw=[',app.indexOf('async function setP()')),
  app.indexOf('  const choices=',app.indexOf('async function setP()')));
 const palettePresets=[...paletteCode.matchAll(/\['([a-z]+)','(#[0-9a-f]{6})','(#[0-9a-f]{6})','([^']+)'\]/g)];
-assert.equal(palettePresets.length,18,'The gallery must contain exactly 18 presets (three rows of six)');
-assert.equal(new Set(palettePresets.map(match=>match[1])).size,18,'Preset keys must be unique');
-for(const theme of [["lime","Лайм","Lime"],["terracotta","Терракота","Terracotta"],["orchid","Орхидея","Orchid"],["aurora","Аврора","Aurora"]]){
+assert.equal(palettePresets.length,24,'The gallery must contain 24 presets (three rows of eight on ultrawide displays)');
+assert.equal(new Set(palettePresets.map(match=>match[1])).size,24,'Preset keys must be unique');
+for(const theme of [["lime","Лайм","Lime"],["terracotta","Терракота","Terracotta"],["orchid","Орхидея","Orchid"],["aurora","Аврора","Aurora"],["sakura","Сакура","Sakura"],["storm","Шторм","Storm"],["flame","Пламя","Flame"],["sage","Шалфей","Sage"],["midnight","Полночь","Midnight"],["tropical","Тропики","Tropics"]]){
  const [id,name,en]=theme;
  assert(palettePresets.some(match=>match[1]===id&&match[4]===name),'Missing Russian-labelled preset '+id);
  assert(css.includes('[data-accent='+id+']'),'Missing dark-mode theme '+id);
