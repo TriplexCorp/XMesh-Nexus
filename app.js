@@ -345,9 +345,9 @@ dlg.addEventListener('click',e=>{if(e.target==dlg||e.target.closest('[data-x]'))
 const confirmBox=(h,ok,fn)=>{CF=fn;modal(`<div class="box"><h2>${h}</h2><div class="act"><button class="gh" data-x>Отмена</button><button class="btn" data-cf>${ok}</button></div></div>`)};
 let tt;const toast=(m,al,fn)=>{const t=$('#toast');t.innerHTML=`<span>${esc(m)}</span>${al?`<button id="ta">${al}</button>`:''}`;if(al)$('#ta').onclick=()=>{fn();t.classList.remove('show')};t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),al?6000:2400)};
 const CDEFAULT={theme:'dark',accent:'emerald',customA:'#60d6a2',customB:'#c3e879',hue:151,sat:62,lum:61,ts:1,motion:1,density:'comfortable',surface:'solid',glow:'normal',font:'onest',radius:16,borders:'soft',sidebar:'standard',railTips:0,contentWidth:1920,gapScale:1,autoCoreRefresh:1,coreRefreshSeconds:30};
-let C={...CDEFAULT};try{Object.assign(C,JSON.parse(localStorage.xmeshNexusSettings||'{}'))}catch(e){}if(C.accent==='mint')C.accent='emerald';if(!['solid','glass','raised'].includes(C.surface))C.surface='solid';C.railTips=C.railTips===true||C.railTips===1?1:0;C.ts=cl(Number(C.ts)||1,.9,2);C.radius=cl(Number.isFinite(Number(C.radius))?Number(C.radius):16,0,48);C.rangePrecision=C.rangePrecision===10?10:1;
+let C={...CDEFAULT};try{Object.assign(C,JSON.parse(localStorage.xmeshNexusSettings||'{}'))}catch(e){}if(C.accent==='mint')C.accent='emerald';if(!['solid','glass','raised'].includes(C.surface))C.surface='solid';C.railTips=C.railTips===true||C.railTips===1?1:0;C.ts=cl(Number(C.ts)||1,.9,2);C.radius=cl(Number.isFinite(Number(C.radius))?Number(C.radius):16,1,48);C.rangePrecision=C.rangePrecision===10?10:1;
 const hslHex=(h,s,l)=>{s/=100;l/=100;const k=n=>(n+h/30)%12,a=s*Math.min(l,1-l),f=n=>{const c=(k(n)+12)%12;return l-a*Math.max(-1,Math.min(c-3,9-c,1))};return '#'+[f(0),f(8),f(4)].map(v=>Math.round(v*255).toString(16).padStart(2,'0')).join('')};
-const apply=()=>{const r=document.documentElement;r.dataset.theme=C.theme=='auto'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):C.theme;r.dataset.accent=C.accent;r.style.setProperty('--custom-a',C.customA||hslHex(+C.hue||151,+C.sat||62,+C.lum||61));r.style.setProperty('--custom-b',C.customB||'#c3e879');if(C.accent==='custom'){const rgb=(C.customA||'#60d6a2').match(/[0-9a-f]{2}/gi).map(v=>parseInt(v,16)/255);const linear=rgb.map(v=>v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4));const lum=.2126*linear[0]+.7152*linear[1]+.0722*linear[2];r.style.setProperty('--btn-text',lum>.42?'#082b1d':'#ffffff')}else r.style.setProperty('--btn-text',r.dataset.theme==='light'?'#ffffff':'#082b1d');r.dataset.density=C.density||CDEFAULT.density;r.dataset.surface=C.surface||CDEFAULT.surface;r.dataset.glow=C.glow||CDEFAULT.glow;r.dataset.font=C.font||CDEFAULT.font;r.dataset.borders=C.borders||CDEFAULT.borders;r.dataset.sidebar=C.sidebar||CDEFAULT.sidebar;r.dataset.railTips=C.railTips?'on':'off';if(!C.railTips)hideRailTip();r.style.setProperty('--ts',cl(+C.ts||1,.9,2));const radius=cl(Number.isFinite(Number(C.radius))?Number(C.radius):16,0,48);r.style.setProperty('--ui-radius',radius+'px');r.style.setProperty('--ui-control-radius',radius+'px');r.dataset.motion=C.motion?'on':'off';
+const apply=()=>{const r=document.documentElement;r.dataset.theme=C.theme=='auto'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):C.theme;r.dataset.accent=C.accent;r.style.setProperty('--custom-a',C.customA||hslHex(+C.hue||151,+C.sat||62,+C.lum||61));r.style.setProperty('--custom-b',C.customB||'#c3e879');if(C.accent==='custom'){const rgb=(C.customA||'#60d6a2').match(/[0-9a-f]{2}/gi).map(v=>parseInt(v,16)/255);const linear=rgb.map(v=>v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4));const lum=.2126*linear[0]+.7152*linear[1]+.0722*linear[2];r.style.setProperty('--btn-text',lum>.42?'#082b1d':'#ffffff')}else r.style.setProperty('--btn-text',r.dataset.theme==='light'?'#ffffff':'#082b1d');r.dataset.density=C.density||CDEFAULT.density;r.dataset.surface=C.surface||CDEFAULT.surface;r.dataset.glow=C.glow||CDEFAULT.glow;r.dataset.font=C.font||CDEFAULT.font;r.dataset.borders=C.borders||CDEFAULT.borders;r.dataset.sidebar=C.sidebar||CDEFAULT.sidebar;r.dataset.railTips=C.railTips?'on':'off';if(!C.railTips)hideRailTip();r.style.setProperty('--ts',cl(+C.ts||1,.9,2));const radius=cl(Number.isFinite(Number(C.radius))?Number(C.radius):16,1,48);r.style.setProperty('--ui-radius',radius+'px');r.style.setProperty('--ui-control-radius',radius+'px');r.dataset.motion=C.motion?'on':'off';
 r.style.setProperty('--panel-content-max',cl(Number(C.contentWidth)||1920,720,3000)+'px');
 const baseGap=C.density==='compact'?.75:C.density==='spacious'?1.45:1.1;
 r.style.setProperty('--view-gap',(baseGap*cl(Number(C.gapScale)||1,.8,1.4))+'rem');
@@ -424,7 +424,7 @@ const syncRangeProgress=input=>{
 // Only Appearance sliders use the 1/10 precision setting. Other studios retain
 // their protocol-defined step sizes. Coarse values snap to absolute tens, not
 // to (minimum + N * 10), and both endpoints remain reachable.
-const APPEARANCE_RANGE_IDS=new Set(['ts','radius','content-width','gap-scale','hue','sat','lum']);
+const APPEARANCE_RANGE_IDS=new Set(['ts','content-width','gap-scale','hue','sat','lum']);
 const configureRangePrecision=input=>{
  if(!input?.matches?.('input[type="range"]'))return;
  if(APPEARANCE_RANGE_IDS.has(input.id)){
@@ -452,7 +452,7 @@ const updateVisibleRangePrecision=()=>{
 };
 const APPEARANCE_FIELDS={
  ts:{output:'tsv',unitFactor:100,min:90,max:200},
- radius:{output:'rv',unitFactor:1,min:0,max:48},
+ radius:{output:'rv',unitFactor:1,min:1,max:48},
  'content-width':{output:'content-width-value',unitFactor:1,min:720,max:3000},
  'gap-scale':{output:'gap-scale-value',unitFactor:100,min:80,max:140}
 };
@@ -489,7 +489,7 @@ let appearanceControlsFrame=0;
 const paintAppearanceControls=()=>{
  const style=document.documentElement.style;
  style.setProperty('--ts',cl(Number(C.ts)||1,.9,2));
- const radius=cl(Number.isFinite(Number(C.radius))?Number(C.radius):16,0,48);
+ const radius=cl(Number.isFinite(Number(C.radius))?Number(C.radius):16,1,48);
  style.setProperty('--ui-radius',radius+'px');
  style.setProperty('--ui-control-radius',radius+'px');
  const baseGap=C.density==='compact'?.75:C.density==='spacious'?1.45:1.1;
@@ -508,7 +508,34 @@ const saveAppearanceControls=()=>{
 const brand=()=>{$('#bn').textContent=DB.set.brand;$('#lg').textContent=(DB.set.brand[0]||'L').toUpperCase()};
 
 let T=[],cur='',RT=0;
-const subscriptionStudioP=()=>window.XMeshSubscriptionStudio.create(DB.set,patch=>api.saveSettings(patch),toast,{users:DB.users.length,nodes:DB.nodes.length});
+// The panel theme is browser-local; subscription appearance is saved via API.
+const panelSubscriptionTheme=()=>{
+ const root=document.documentElement,style=getComputedStyle(root);
+ const color=(token,fallback)=>{
+  const value=style.getPropertyValue(token).trim();
+  return /^#[\da-f]{6}$/i.test(value)?value.toLowerCase():fallback;
+ };
+ return {
+  subscriptionAccent:color('--a','#74ddb1'),
+  subscriptionTheme:root.dataset.theme==='light'?'light':'dark',
+  subscriptionBackground:color('--bg','#0a0e14'),
+  subscriptionCardColor:color('--s1','#131923'),
+  subscriptionTextColor:color('--tx','#edf3f5')
+ };
+};
+let subscriptionThemeSync=Promise.resolve();
+const syncSubscriptionTheme=()=>{
+ if(!backendReady||sessionUser?.role!=='owner'||DB.set.subscriptionSyncPanelTheme===false)return subscriptionThemeSync;
+ document.querySelector('.subscription-studio form')?.dispatchEvent(new Event('change',{bubbles:true}));
+ subscriptionThemeSync=subscriptionThemeSync.catch(()=>{}).then(async()=>{
+  if(DB.set.subscriptionSyncPanelTheme===false)return;
+  const theme=panelSubscriptionTheme();
+  const patch=Object.fromEntries(Object.entries(theme).filter(([key,value])=>DB.set[key]!==value));
+  if(Object.keys(patch).length)await api.saveSettings(patch);
+ }).catch(error=>toast('Не удалось синхронизировать тему подписки: '+(error.message||'API')));
+ return subscriptionThemeSync;
+};
+const subscriptionStudioP=()=>window.XMeshSubscriptionStudio.create(DB.set,patch=>api.saveSettings(patch),toast,{users:DB.users.length,nodes:DB.nodes.length},panelSubscriptionTheme);
 const pages={home:['Дашборд',homeP],users:['Пользователи',usersP],squads:['Сквады',()=>simple(['squads'])],hosts:['Хосты',()=>simple(['hosts'])],nodes:['Узлы',nodesP],templates:['Шаблоны',()=>simple(['tpls','subs'])],profiles:['XRAY STUDIO',profilesP],subscription:['SUBSCRIPTION STUDIO',subscriptionStudioP],tools:['Диагностика',toolsP],admins:['Администраторы',()=>simple(['admins'])],security:['Безопасность',securityP],set:['Настройки',setP]};
 const skel=()=>`<div class="sk" style="height:7rem"></div><div class="sk" style="height:18rem"></div><div class="sk" style="height:12rem"></div>`;
 const NAV_SHORT={home:'Главная',users:'Клиенты',hosts:'Хосты',nodes:'Узлы',subscription:'Подписка'};
@@ -2070,14 +2097,14 @@ async function setP(){
     <section class="card sg"><div><h3>Композиция</h3><small>Плотность, радиусы и вид карточек</small></div>
       <div class="setting-row"><div class="setting-copy"><b>Плотность</b><small>От компактной таблицы до просторных карточек</small></div><div class="setting-control">${choices('density',[['compact','Компактно'],['comfortable','Стандарт'],['spacious','Свободно']])}</div></div>
       <div class="setting-row"><div class="setting-copy"><b>Стиль карточек</b><small>Классический, стеклянный или объёмный вид</small></div><div class="setting-control">${choices('surface',[['solid','Классика'],['glass','Glass'],['raised','Объём']])}</div></div>
-      <div class="setting-row"><div class="setting-copy"><b>Скругление</b><small>От 0 до 48 px. Одно значение для кнопок и карточек.</small></div><div class="setting-control slider-control"><input type="range" id="radius" min="0" max="48" step="1" value="${C.radius}" aria-label="Скругление углов"><label class="precision-number"><input type="number" id="rv" data-appearance-value="radius" min="0" max="48" step="1" value="${C.radius}" aria-label="Точное скругление углов"><span>px</span></label></div></div>
+      <div class="setting-row"><div class="setting-copy"><b>Скругление</b><small>От 1 до 48 px с точным шагом 1 независимо от режима остальных ползунков.</small></div><div class="setting-control slider-control"><input type="range" id="radius" min="1" max="48" step="1" value="${C.radius}" aria-label="Скругление углов"><label class="precision-number"><input type="number" id="rv" data-appearance-value="radius" min="1" max="48" step="1" value="${C.radius}" aria-label="Точное скругление углов"><span>px</span></label></div></div>
       <div class="setting-row"><div class="setting-copy"><b>Границы карточек</b><small>Можно убрать линии или сделать их заметнее</small></div><div class="setting-control">${choices('borders',[['off','Без линий'],['soft','Мягкие'],['strong','Яркие']])}</div></div>
       <div class="setting-row"><div class="setting-copy"><b>Боковая панель</b><small>Компактный режим оставляет в основном только иконки</small></div><div class="setting-control">${choices('sidebar',[['standard','Обычная'],['compact','Компактная']])}</div></div>
       <div class="setting-row"><div class="setting-copy"><b>Подсказки при наведении</b><small>Показывать названия разделов и кнопок боковой панели. Работает в обычном и компактном режимах.</small></div><label class="sw"><input type="checkbox" id="rail-tips" ${C.railTips?'checked':''} aria-label="Подсказки при наведении"><span></span></label></div>
     </section>
 <section class="card sg">
     <div class="appearance-card-heading"><h3>Рабочее пространство</h3><small>Ширина панели и интервалы между разделами</small></div>
-    <div class="setting-row"><div class="setting-copy"><b>Точность ползунков</b><small>Шаг 1 или привязка к круглым десяткам. В соседнее поле можно ввести любое точное значение.</small></div><div class="setting-control"><select id="range-precision" aria-label="Точность ползунков"><option value="1" ${C.rangePrecision===1?'selected':''}>Точно · 1</option><option value="10" ${C.rangePrecision===10?'selected':''}>С привязкой · 10</option></select></div></div>
+    <div class="setting-row"><div class="setting-copy"><b>Точность ползунков</b><small>Шаг 1 или 10 для остальных ползунков. Скругление всегда настраивается по 1 px.</small></div><div class="setting-control"><select id="range-precision" aria-label="Точность ползунков"><option value="1" ${C.rangePrecision===1?'selected':''}>Точно · 1</option><option value="10" ${C.rangePrecision===10?'selected':''}>С привязкой · 10</option></select></div></div>
     <div class="setting-row"><div class="setting-copy"><b>Ширина содержимого</b><small>Максимальная ширина рабочей области до 3000 px. На узком экране она ограничена размером окна.</small></div><div class="setting-control slider-control"><input type="range" id="content-width" min="720" max="3000" step="1" value="${C.contentWidth||1920}" aria-label="Ширина содержимого"><label class="precision-number"><input type="number" id="content-width-value" data-appearance-value="content-width" min="720" max="3000" step="1" value="${C.contentWidth||1920}" aria-label="Точная ширина содержимого"><span>px</span></label></div></div>
     <div class="setting-row"><div class="setting-copy"><b>Интервалы</b><small>Расстояние между карточками и блоками интерфейса</small></div><div class="setting-control slider-control"><input type="range" id="gap-scale" min="0.8" max="1.4" step="0.01" value="${C.gapScale||1}" aria-label="Расстояние между карточками"><label class="precision-number"><input type="number" id="gap-scale-value" data-appearance-value="gap-scale" min="80" max="140" step="1" value="${Math.round((C.gapScale||1)*100)}" aria-label="Точный интервал между карточками"><span>%</span></label></div></div>
   </section>
@@ -2201,12 +2228,12 @@ document.addEventListener('click',async e=>{
   else if(b=g('[data-nt]')){const n=DB.nodes.find(x=>x.id==b.dataset.nt);await api.update('nodes',n.id,{disabled:!n.disabled});toast(`${n.name}: ${n.disabled?'отключён':'включён'}`);render(1)}
   else if(b=g('[data-tt]')){TP.tab=b.dataset.tt;TP.q='';TP.f='';render(1)}
   else if(b=g('[data-lv]')){}
-  else if(b=g('[data-th]')){C.theme=b.dataset.th;apply();$$('#th button').forEach(x=>x.classList.toggle('on',x==b))}
-  else if(b=g('[data-ac]')){C.accent=b.dataset.ac;apply();$$('[data-ac]').forEach(x=>{const active=x===b;x.classList.toggle('on',active);x.setAttribute('aria-pressed',String(active))})}
-   else if(g('#palette-apply')){C.customA=paletteDraft.a;C.customB=paletteDraft.b;C.hue=paletteDraft.h;C.sat=paletteDraft.s;C.lum=paletteDraft.l;C.accent='custom';apply();render(1);toast('Палитра применена')}
+  else if(b=g('[data-th]')){C.theme=b.dataset.th;apply();syncSubscriptionTheme();$('#th button').forEach(x=>x.classList.toggle('on',x==b))}
+  else if(b=g('[data-ac]')){C.accent=b.dataset.ac;apply();syncSubscriptionTheme();$('[data-ac]').forEach(x=>{const active=x===b;x.classList.toggle('on',active);x.setAttribute('aria-pressed',String(active))})}
+   else if(g('#palette-apply')){C.customA=paletteDraft.a;C.customB=paletteDraft.b;C.hue=paletteDraft.h;C.sat=paletteDraft.s;C.lum=paletteDraft.l;C.accent='custom';apply();syncSubscriptionTheme();render(1);toast('Палитра применена')}
    else if(g('#palette-cancel')){resetPaletteDraft();render(1)}
   else if(b=g('[data-ui]')){const prop=b.dataset.ui,value=b.dataset.value;if(prop&&value&&(prop!=='surface'||['solid','glass','raised'].includes(value))){C[prop]=value;apply();document.querySelectorAll(`[data-ui="${prop}"]`).forEach(x=>{const active=x.dataset.value===value;x.classList.toggle('on',active);x.setAttribute('aria-pressed',String(active))})}}
-  else if(g('#rs')){const automation={autoCoreRefresh:C.autoCoreRefresh,coreRefreshSeconds:C.coreRefreshSeconds};C={...CDEFAULT,...automation};resetPaletteDraft();apply();syncCoreAutoRefresh();render(1);toast('Оформление сброшено')}
+  else if(g('#rs')){const automation={autoCoreRefresh:C.autoCoreRefresh,coreRefreshSeconds:C.coreRefreshSeconds};C={...CDEFAULT,...automation};resetPaletteDraft();apply();syncSubscriptionTheme();syncCoreAutoRefresh();render(1);toast('Оформление сброшено')}
   else if(g('#gx')){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(DB,null,2)],{type:'application/json'}));a.download='xmesh-nexus-backup.json';a.click()}
   else if(b=g('[data-cf]')){dlg.close();CF&&CF()}
   else if(b=g('[data-core-refresh]')){try{await refreshCoreStatus(true)}catch(err){toast(err.message)}}
@@ -2388,7 +2415,7 @@ document.addEventListener('keydown',e=>{
 document.addEventListener('input',e=>{snapAppearanceSlider(e.target);syncRangeProgress(e.target);if(updatePaletteColor(e.target))return;if(['hue','sat','lum'].includes(e.target.id)){
   paletteDraft.h=+$('#hue').value;paletteDraft.s=+$('#sat').value;paletteDraft.l=+$('#lum').value;
   paletteDraft.a=hslHex(paletteDraft.h,paletteDraft.s,paletteDraft.l);paintPaletteDraft();
-}else if(e.target.id=='ts'){C.ts=cl(+e.target.value,.9,2);showAppearanceNumber('ts');previewAppearanceControls()}else if(e.target.id=='radius'){C.radius=cl(+e.target.value,0,48);showAppearanceNumber('radius');previewAppearanceControls()}
+}else if(e.target.id=='ts'){C.ts=cl(+e.target.value,.9,2);showAppearanceNumber('ts');previewAppearanceControls()}else if(e.target.id=='radius'){C.radius=cl(+e.target.value,1,48);showAppearanceNumber('radius');previewAppearanceControls()}
  else if(e.target.id==='content-width'){C.contentWidth=cl(Number(e.target.value)||1920,720,3000);showAppearanceNumber('content-width');previewContentWidth()}
  else if(e.target.id==='gap-scale'){C.gapScale=+e.target.value;showAppearanceNumber('gap-scale');previewAppearanceControls()}
  if(e.target.id=='pq')pdraw(e.target.value)});
@@ -2453,7 +2480,7 @@ document.addEventListener('submit',async e=>{const f=e.target,k=f.dataset.k;if(!
   else if(k=='bsq'){const d=read([{k:'squads',t:'multi'}],f),ids=new Set(UQ.sel);await api.bulk('users',ids,u=>u.squads=[...new Set([...u.squads,...d.squads])]);toast('Сквады добавлены');render(1)}
   else if(k=='brand'){e.preventDefault();const d=read([{k:'brand'},{k:'domain'},{k:'subscriptionBrand'},{k:'subscriptionDomain'}],f);try{await api.saveSettings(d);brand();toast('Названия и домены сохранены')}catch(err){return er(err.message)}}});
 const acts2=ok=>`<div class="act"><button type="button" class="gh" data-x>Отмена</button><button class="btn">${ok}</button></div>`;
-$('#theme').onclick=()=>{C.theme=document.documentElement.dataset.theme=='dark'?'light':'dark';apply();if(cur=='set')render(1)};
+$('#theme').onclick=()=>{C.theme=document.documentElement.dataset.theme=='dark'?'light':'dark';apply();syncSubscriptionTheme();if(cur=='set')render(1)};
 $('#bell').onclick=()=>{const n=[...DB.nodes.filter(x=>nstat(x)=='OFFLINE').map(x=>[x.flag+' '+x.name,'узел не отвечает']),...DB.users.flatMap(u=>st(u)=='ACTIVE'&&u.limit&&u.used/u.limit>.9?[[u.username,`использовал ${Math.round(u.used/u.limit*100)}% трафика`]]:st(u)=='ACTIVE'&&u.expireAt&&u.expireAt-Date.now()<2*DAY?[[u.username,'подписка истекает: '+left(u.expireAt)]]:[]).slice(0,8)];$('#bell .pip')?.remove();
   modal(`<div class="box"><div class="bar2"><h2>Уведомления</h2><button class="ia" data-x style="margin-left:auto" aria-label="Закрыть">${ic('x')}</button></div><div>${n.map(([a,b])=>`<div class="nt"><b>${esc(a)}</b><span class="mu">${b}</span></div>`).join('')||'<p class="note">Новых уведомлений нет.</p>'}</div></div>`,'pop')};
 $('#restart').onclick=()=>{location.hash='set';setTimeout(()=>document.querySelector('#core-panel')?.scrollIntoView({behavior:'smooth',block:'start'}),100)};
@@ -2491,6 +2518,7 @@ async function initializePanel(){
   for(const key of ['users','nodes','profiles','hosts','squads','tpls','subs','admins','tokens','srh'])DB[key]=Array.isArray(collections[key])?collections[key]:[];
   DB.set={...DB.set,...(payload.settings||{}),hooks:{...DB.set.hooks,...(payload.settings?.hooks||{})}};
   backendReady=true;
+  if(sessionUser?.role==='owner')syncSubscriptionTheme();
   $('#xmesh-auth')?.remove();
   brand();render();
   refreshCoreStatus().catch(()=>{});
