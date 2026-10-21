@@ -217,7 +217,7 @@ assert.equal(saveCount,1,'Final appearance state must save once');
 /* The user sees steps in pixels or percentages; fractional multipliers must
    advance by 0.01 for one percentage point, not by a whole multiplier. */
 for(const [id,min,max,step] of [
- ['ts','0.9','2','0.01'],['radius','1','48','1'],
+ ['ts','0.9','2','0.01'],['radius','1','36','1'],
  ['content-width','720','3000','1'],['gap-scale','0.8','1.4','0.01'],
  ['hue','0','360','1'],['sat','0','100','1'],['lum','15','85','1']
 ]){
@@ -226,10 +226,10 @@ for(const [id,min,max,step] of [
 }
 assert.match(app,/cl\(\+C\.ts\|\|1,\.9,2\)/,'Stored scale must cap at 200%');
 assert.match(app,/cl\(Number\(C\.ts\)\|\|1,\.9,2\)/,'Scale preview must cap at 200%');
-assert(app.includes("Number(C.radius):16,1,48"),'Applied radius must support 1..48px without false fallback for zero');
-assert.match(app,/const radius=cl\(Number\.isFinite\(Number\(C\.radius\)\)\?Number\(C\.radius\):16,1,48\)/,'Radius preview must support 1..48px');
+assert(app.includes("Number(C.radius):16,1,36"),'Applied radius must support 1..36px without false fallback for zero');
+assert.match(app,/const radius=cl\(Number\.isFinite\(Number\(C\.radius\)\)\?Number\(C\.radius\):16,1,36\)/,'Radius preview must support 1..36px');
 assert.doesNotMatch(app,/id="ts" min="0.9" max="1.3"/);
-assert.doesNotMatch(app,/id="radius" min="4" max="36"/);
+assert.doesNotMatch(app,/id="radius" min="1" max="48"/);
 
 // Appearance slider precision must be independent of its minimum:
 // 4px + 10 used to produce 4,14,24,34; now it snaps to absolute tens.
@@ -246,12 +246,12 @@ const mockSlider=(id,min,max,value,step='1')=>({
  matches:selector=>selector==='input[type="range"]',
  getAttribute:key=>key==='step'?step:null
 });
-const radiusRange=mockSlider('radius',1,48,29);
+const radiusRange=mockSlider('radius',1,36,29);
 precisionLib.configureRangePrecision(radiusRange);
 assert.equal(radiusRange.step,'1','Radius keeps 1px precision in either mode');
 precisionLib.snapAppearanceSlider(radiusRange);
 assert.equal(Number(radiusRange.value),29,'Coarse mode must preserve an exact 29px radius');
-for(const [raw,expected] of [[1,1],[16,16],[27,27],[29,29],[41,41],[48,48]]){
+for(const [raw,expected] of [[1,1],[16,16],[27,27],[29,29],[34,34],[36,36]]){
  radiusRange.value=String(raw);precisionLib.snapAppearanceSlider(radiusRange);
  assert.equal(Number(radiusRange.value),expected,'Coarse radius '+raw);
 }
