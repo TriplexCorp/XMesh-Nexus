@@ -541,6 +541,21 @@ window.XMeshI18n=(()=>{
     ["Выбор языка","Choose language"]
   ];
   for(const [ru,en] of qrTranslations)dict.set(ru,en);
+  const appearanceLayoutTranslations=[
+    ["Точная настройка цвета","Fine-tune colors"],
+    ["Оттенок, насыщенность и яркость собственной палитры","Hue, saturation and brightness of your custom palette"],
+    ["Типографика","Typography"],
+    ["Размер и начертание текста","Text size and typeface"],
+    ["Рабочее пространство","Workspace"],
+    ["Ширина панели и интервалы между разделами","Panel width and spacing between sections"],
+    ["Ширина содержимого","Content width"],
+    ["Ограничение ширины интерфейса на больших мониторах","Maximum content width on large monitors"],
+    ["Интервалы","Spacing"],
+    ["Расстояние между карточками и блоками интерфейса","Distance between cards and interface sections"],
+    ["Расстояние между карточками","Spacing between cards"]
+  ];
+  for(const [ru,en] of appearanceLayoutTranslations)dict.set(ru,en);
+
   const dynamic=[
     [/^(\d+)\s+узлов настроено\. CPU, RAM и скорость требуют подключённого мониторинга\.$/i,
       (_,n)=>n+' nodes configured. CPU, RAM, and speed require connected monitoring.'],
