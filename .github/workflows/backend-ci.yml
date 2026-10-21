@@ -66,6 +66,8 @@ jobs:
         run: node scripts/check-subscription-studio.js
       - name: Verify real admin RBAC, authentication boundaries and CSP
         run: node scripts/check-admin-security.js
+      - name: Verify TOTP enrollment, MFA login and recovery security
+        run: node scripts/check-mfa.js
       - name: Check generic branding in tracked files
         run: node scripts/check-white-label.js
       - name: Check appearance surface choices and migration
