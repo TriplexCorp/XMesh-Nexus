@@ -54,6 +54,8 @@ jobs:
         run: node scripts/check-xray-intelligence.js
       - name: Verify packaged frontend assets
         run: node scripts/check-static-assets.js
+      - name: Validate RU/EN panel and portal localization
+        run: node scripts/check-i18n.js
       - name: Check subscription studio and independent deployment blueprint
         run: node scripts/check-subscription-studio.js
       - name: Check generic branding in tracked files
