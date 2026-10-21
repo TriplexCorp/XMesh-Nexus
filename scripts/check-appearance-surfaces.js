@@ -213,6 +213,23 @@ assert.equal(cssValues.get('--ui-radius'),'16px');
 assert.equal(cssValues.get('--ts'),1.2);
 appearance.saveAppearanceControls();
 assert.equal(saveCount,1,'Final appearance state must save once');
+
+/* The user sees steps in pixels or percentages; fractional multipliers must
+   advance by 0.01 for one percentage point, not by a whole multiplier. */
+for(const [id,min,max,step] of [
+ ['ts','0.9','5','0.01'],['radius','4','36','1'],
+ ['content-width','720','3000','1'],['gap-scale','0.8','1.4','0.01'],
+ ['hue','0','360','1'],['sat','0','100','1'],['lum','15','85','1']
+]){
+ assert.match(app,new RegExp('id="'+id+'" min="'+min+'" max="'+max+'" step="'+step+'"'),
+  'Incorrect range settings for '+id);
+}
+assert.match(app,/cl\(\+C\.ts\|\|1,\.9,5\)/,'Stored scale must support 500%');
+assert.match(app,/cl\(Number\(C\.ts\)\|\|1,\.9,5\)/,'Scale preview must support 500%');
+assert.match(app,/cl\(\+C\.radius\|\|16,4,36\)/,'Applied radius must support 36px');
+assert.match(app,/cl\(Number\(C\.radius\)\|\|16,4,36\)/,'Radius preview must support 36px');
+assert.doesNotMatch(app,/id="ts" min="0.9" max="1.3"/);
+assert.doesNotMatch(app,/id="radius" min="4" max="24"/);
 // Appearance uses two balanced columns and the locale selector is global.
 assert.match(app,/<div class="appearance-layout">/,'Aligned appearance workspace must exist');
 assert.match(app,/appearance-column/,'Appearance cards must use two columns');

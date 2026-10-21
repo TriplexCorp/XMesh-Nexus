@@ -160,7 +160,7 @@ window.XMeshSubscriptionStudio = (() => {
       '<label class="f subscription-field"><span>Карточки</span><select name="subscriptionCardStyle"><option value="soft"'+(data.subscriptionCardStyle==='soft'?' selected':'')+'>Мягкие</option><option value="outline"'+(data.subscriptionCardStyle==='outline'?' selected':'')+'>С контуром</option><option value="flat"'+(data.subscriptionCardStyle==='flat'?' selected':'')+'>Без фона</option></select></label>',
       '</div><div class="subscription-studio-pair">',
       '<label class="f subscription-field"><span>Шрифт</span><select name="subscriptionFont"><option value="system"'+(data.subscriptionFont==='system'?' selected':'')+'>Системный</option><option value="manrope"'+(data.subscriptionFont==='manrope'?' selected':'')+'>Manrope</option><option value="mono"'+(data.subscriptionFont==='mono'?' selected':'')+'>Моноширинный</option></select></label>',
-      '<label class="f subscription-field"><span>Скругление: <output data-subscription-radius>'+Number(data.subscriptionRadius)+'</output> px</span><input type="range" name="subscriptionRadius" min="0" max="32" step="2" value="'+Number(data.subscriptionRadius)+'"></label>',
+      '<label class="f subscription-field"><span>Скругление: <output data-subscription-radius>'+Number(data.subscriptionRadius)+'</output> px</span><input type="range" name="subscriptionRadius" min="0" max="36" step="1" value="'+Number(data.subscriptionRadius)+'"></label>',
       '</div>',
       '<div class="subscription-studio-pair subscription-color-grid">',
       field('subscriptionBackground','Фон портала',data.subscriptionBackground,'Основной цвет страницы.',{color:true}),

@@ -577,6 +577,9 @@ window.XMeshI18n=(()=>{
     "Enter HEX values or adjust colors with sliders. The palette changes only after confirmation.");
   dict.set("HEX основного цвета","Primary color HEX");
   dict.set("HEX вторичного цвета","Secondary color HEX");
+  dict.set("Масштаб интерфейса","Interface scale");
+  dict.set("Точное масштабирование от 90% до 500% с шагом 1%. Для возврата к стандартному размеру установите 100%.",
+    "Precise scaling from 90% to 500% in 1% increments. Set 100% to restore the default size.");
   const dynamic=[
     [/^(\d+)\s+узлов настроено\. CPU, RAM и скорость требуют подключённого мониторинга\.$/i,
       (_,n)=>n+' nodes configured. CPU, RAM, and speed require connected monitoring.'],
