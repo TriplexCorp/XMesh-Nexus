@@ -29,8 +29,8 @@ assert.match(css, /\.nodes-toolbar \.node-create-action\{[^}]*background:color-m
  'Action must follow the selected theme surface');
 assert.match(css, /@media\(max-width:390px\)\{\s*\.nodes-toolbar \.node-create-action\{width:100%;margin-left:0\}/,
  'New Node button must fit narrow phones');
-assert.match(html,/styles\.css\?v=20261021-node-grid-3/,'Update CSS cache');
-assert.match(html,/app\.js\?v=20261021-i18n-2/,'Update JS cache');
+assert.match(html,/styles\.css\?v=20261021-settings-language-1/,'Update CSS cache');
+assert.match(html,/app\.js\?v=20261021-settings-language-1/,'Update JS cache');
 assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length,'CSS braces must remain balanced');
 new Function(app);
 console.log('Node action: visuals, responsive styling and create handler OK');
