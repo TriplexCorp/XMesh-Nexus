@@ -63,7 +63,7 @@ gap:.14rem;
 min-width:0;
 padding:.18rem;
 border:1px solid var(--ln);
-border-radius:var(--ui-control-radius);
+border-radius:.63rem;
 background:var(--elevated);
 }
 .xray-builder .xray-preset{
@@ -224,7 +224,7 @@ width:1.2rem;
 height:1.2rem;
 min-width:1.2rem;
 border:1px solid var(--ln);
-border-radius:var(--ui-control-radius);
+border-radius:calc(var(--ui-control-radius) * .65);
 background:color-mix(in srgb,var(--bg) 60%,transparent);
 color:var(--mu);
 font-size:.6rem;
