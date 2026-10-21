@@ -1,107 +1,24 @@
 # XMesh Nexus
 
-**XMesh Nexus** — self-hosted Xray VPN control panel. The stack uses Rust, Tokio/Axum, TimescaleDB on PostgreSQL 18, and Redis 7, and runs with Docker Compose.
+**Документация:** **Русский** · [English](README.en.md)
 
-## Architecture and data ownership
+**XMesh Nexus** — самостоятельная панель управления VPN-инфраструктурой на базе Xray. В проект входят веб-интерфейс, API на Rust (Tokio/Axum), PostgreSQL 18 с расширением TimescaleDB, Redis 7 и развёртывание через Docker Compose.
 
-- **PostgreSQL / TimescaleDB** share one PostgreSQL engine and one database. Regular PostgreSQL tables own business data: panel collections, users, nodes, Xray profiles, hosts, squads, settings, administrators, sessions and durable audit records.
-- **TimescaleDB hypertables** store high-volume time-series data: server metric samples and operational event history. Migration 0004 creates `server_metric_samples` and `panel_events`. The dashboard's RX/TX chart reads the hypertable directly and supports 1-hour/24-hour ranges plus node/squad filters. Install the optional per-node Linux metrics agent from **Nodes → Agent metrics** to start populating the chart. Without an agent, the graph shows an explicit empty state; it never fabricates traffic.
-- **Redis** provides shared login throttling and is reserved for cache, short-lived state and coordination. It is private to the Compose network, password-protected, memory-limited to 128 MiB and intentionally ephemeral. Durable panel data never depends on Redis persistence.
-- PostgreSQL connection pool limits are configurable through DB_MAX_CONNECTIONS (default 20). Readiness checks verify PostgreSQL and Redis; SQL migrations enable TimescaleDB as part of application startup.
-- PostgreSQL custom-format backups include both regular tables and TimescaleDB data. Store copies off-host and test restores before production changes.
+> **Статус проекта:** в этом репозитории реализуется **Control Plane** — панель управления и хранение конфигурации. Это **не** готовый сервер VPN-трафика и **не** публичный сервис подписок. Панель пока не запускает Xray как VPN-службу и не создаёт рабочие публичные ссылки на подписку. Эти компоненты требуют отдельной реализации и интеграции.
 
-## Current scope
+## Возможности
 
-- Rust API service and PostgreSQL persistence for panel collections: users, nodes, Xray profiles, hosts, squads, templates, administrators, tokens and settings.
-- Persistent records, settings, administrator sessions and audit log in PostgreSQL (not browser-only localStorage).
-- Redis-backed shared login throttling across panel instances, with PostgreSQL retaining the durable rate-limit fallback.
-- Administrator sign-in with Argon2 password hashing, a dedicated /login page, a 12-hour HttpOnly/SameSite session cookie, and an audit log for mutations.
-- Real SQL-backed administrator accounts with owner/admin/viewer roles. The server, not the UI, checks permissions on every write, core update and settings change. The owner may create accounts, change passwords/roles, or disable accounts. Such changes revoke existing sessions; the last active owner cannot be removed. Existing authenticated accounts migrate to owner to preserve access.
-- Server-side guard for the panel entry point, same-origin validation for state-changing API requests, and persistent account-based login throttling (8 failed attempts within 15 minutes trigger a 15-minute cooldown).
-- Optional administrator TOTP two-factor authentication is supported. Enabled accounts must provide an authenticator or one-time recovery code after password verification, before a panel session is issued.
-- Xray-core version manager in **Settings → Xray-core**. The default target is latest; the service reads official release metadata from the XTLS/Xray-core GitHub project, downloads the expected Linux archive for the container architecture, verifies an advertised SHA-256 digest when GitHub supplies one, runs xray version to check the executable, and switches the active version atomically.
-- API/database readiness probes, Rust CI, and a non-root/read-only application container.
+- **Управление инфраструктурой:** пользователи, узлы, хосты, сквады, профили Xray, шаблоны и общие настройки. Основные данные хранятся на сервере в PostgreSQL, а не только в браузере.
+- **XRAY STUDIO:** интерфейс настройки профилей и конфигураций Xray, включая ручное редактирование JSON. Наличие конструктора не означает, что панель уже запускает сконфигурированные inbound на удалённых узлах.
+- **SUBSCRIPTION STUDIO:** отдельное название и домен подписки, оформление портала, список клиентских приложений, предпросмотр и экспорт схемы размещения сервисов. Публичная выдача подписок ещё не реализована.
+- **Статистика:** график RX/TX за 1 и 24 часа, фильтры по узлам и сквадам, TimescaleDB и дополнительный Linux-агент сбора метрик.
+- **Безопасность:** роли owner/admin/viewer, серверная проверка прав, Argon2, защищённые сессии, ограничения попыток входа, журнал действий и необязательная двухфакторная аутентификация TOTP.
+- **Оформление:** светлая и тёмная темы, цветовые палитры, собственные HEX-цвета, анимации, настройка плотности, ширины содержимого и скруглений.
+- **RU / EN:** русский и английский языки панели; язык клиентского портала настраивается независимо.
 
-**Runtime scope:** XMesh Nexus manages panel data and Xray-core binaries; it still does not start Xray as a VPN traffic service or configure active listeners. The optional Linux node metrics agent collects OS-level CPU/RAM/disk and network-interface RX/TX rates plus established TCP connection count. Interface traffic can include SSH, web-server and other services on the same NIC; it is not per-user accounting or guaranteed Xray-only traffic. Node health and online VPN-client counts are not yet inferred from these samples. No synthetic metrics are generated.
+## Быстрый запуск
 
-## Administration hardening — first phase
-
-The **Administrators** section now manages actual `panel_auth_users` login accounts,
-not the old decorative `panel_records('admins')` entries. After the
-`0008_admin_rbac.sql` migration, existing sign-in accounts are retained as
-**owner**. Historical placeholder records in `panel_records('admins')` are
-intentionally *not* promoted to login accounts. The owner must issue a new
-password for each real account. Existing sessions remain valid until they
-expire, but roles are read from PostgreSQL on every request.
-
-Server authorization:
-- **Owner** — all panel CRUD, admin account creation/update/deletion, branding,
-  settings, Xray-core installation and node metrics-token issuance.
-- **Admin** — operational collection CRUD, VLESS Encryption generation and
-  authorized IP rotation tests. Cannot change global settings, manage
-  authentication accounts, or issue node credentials.
-- **Viewer** — read-only panel data and metrics. All mutations are denied by
-  the Rust API, irrespective of hidden or enabled browser controls.
-
-The last active owner is protected. Changing an account's role, password,
-or active state revokes that account's sessions. Account password hashes are
-never returned to the frontend or audit log. Account creation requires a
-16–1024-character password. An owner cannot delete or demote their own account.
-
-**Not yet implemented:** real API bearer tokens for integrations,
-granular per-collection permissions,
-per-admin user quotas, and full browser/integration penetration testing.
-Former settings UI generated a fake token string; it has been replaced with
-an explicit disabled-state notice, and the legacy `tokens` collection is
-blocked by the API. Never use legacy token-like strings as credentials.
-
-The HTTP API sends a restrictive Content Security Policy (CSP), rejects
-cross-origin mutation requests using Fetch Metadata and Origin/Host checks,
-and refuses missing or expired sessions. TLS is still provided by the
-operator's reverse proxy. Do not publicly expose a panel without HTTPS and
-a properly secured proxy configuration.
-
-## Administrator two-factor authentication (TOTP)
-
-From **System → Security**, an administrator can enroll their
-own account after re-entering their current password. Scan the QR code using Google Authenticator, 2FAS, Aegis, or another compatible
-TOTP app. If you cannot scan it, use the manual Base32 key instead.
-The QR is generated locally with a bundled MIT-licensed encoder without external
-image requests. Confirm a six-digit code to finish enrollment. Only after successful confirmation
-does the account require a second factor at login. The 10 high-entropy recovery
-codes are shown once, and each code can be used for a single login (or to
-disable the second factor along with the password). Save them offline.
-
-Security properties:
-- Each 20-byte TOTP secret is encrypted at rest using AES-256-GCM with an
-  independent persistent `TOTP_ENCRYPTION_KEY`. Authentication fails closed for
-  enabled accounts if the key is missing or wrong. PostgreSQL backups do NOT
-  include this key; back it up securely and separately.
-- TOTP uses RFC 6238 HMAC-SHA1, six digits, 30-second periods and a ±1 window.
-  Accepted time steps cannot be reused. Use NTP on the host for correct time.
-- Password-only requests create short-lived (5 minute), bounded-attempt MFA
-  challenges, never authenticated sessions. Recovery codes are stored only as
-  hashes. Enrollment is valid for 10 minutes and requires a valid code.
-- Enabling and disabling MFA revoke other active sessions. Disabling requires
-  the current password AND a TOTP or unused recovery code. Repeated wrong
-  attempts are rate-limited via Redis and PostgreSQL.
-- API endpoints: `GET /api/v1/auth/mfa/status`, `POST .../setup`,
-  `POST .../confirm`, `POST .../disable` (all session-protected);
-  `POST .../verify` (challenge + factor before session issuance).
-
-**Deployment and upgrades:** fresh `./install.sh` installs a random
-`TOTP_ENCRYPTION_KEY` in the mode-0600 `.env`. On existing installations
-**run `./install.sh` once** to add the key without resetting previous passwords
-or database volumes. For manual Compose upgrades, generate the key with
-`openssl rand -hex 32` and append `TOTP_ENCRYPTION_KEY=<value>` to `.env`
-before restarting. Keep this value unchanged when rebuilding containers,
-restoring backups or moving hosts. Losing the key makes existing enabled
-TOTP accounts inaccessible until the original key is restored; there is no
-password-only bypass. Never commit the key to GitHub.
-
-## Installation
-
-Prerequisites: a Linux VPS with Docker Engine, the Docker Compose plugin, Git and OpenSSL.
+Для установки понадобится Linux-сервер с **Docker Engine, Docker Compose plugin, Git и OpenSSL**.
 
 ~~~bash
 git clone https://github.com/TriplexCorp/XMesh-Nexus.git
@@ -110,11 +27,11 @@ chmod +x install.sh
 ./install.sh
 ~~~
 
-The script creates a restricted .env with random database and administrator secrets if one does not already exist, validates the Compose configuration, builds the Rust image and starts the stack. On first install it prints the initial administrator credentials once; save them. The file is kept with mode 0600.
+Установщик создаёт `.env` с ограниченными правами доступа и случайными секретами, проверяет конфигурацию Compose, собирает Rust-приложение и запускает сервисы. Данные первоначального администратора показываются **один раз** — сохраните их в надёжном месте. Для `.env` используются права `0600`.
 
-The app listens on 127.0.0.1:8080 by default. Keep it private and configure your HTTPS reverse proxy to forward requests there. The session cookie is Secure by default because the production deployment is expected to use HTTPS. For temporary local-only testing without HTTPS, set COOKIE_SECURE=false in .env and restart the panel.
+По умолчанию панель доступна только на **`127.0.0.1:8080`**. Для работы извне настройте свой обратный прокси с HTTPS и перенаправлением на этот адрес. **Не открывайте** порт API напрямую в интернет. В рабочей конфигурации cookie сессии защищены флагом `Secure`. Для временного локального тестирования без HTTPS можно выставить `COOKIE_SECURE=false` в `.env` и перезапустить сервис; не применяйте это значение на публичном сервере.
 
-Useful operations:
+### Основные команды
 
 ~~~bash
 docker compose ps
@@ -125,42 +42,120 @@ docker compose restart panel
 docker compose down
 ~~~
 
-### Interactive terminal CLI
+`docker compose down` без `-v` не удаляет тома данных. **Не запускайте `docker compose down -v` при обычных обновлениях:** так можно потерять PostgreSQL и другие постоянные данные.
 
-The `xmeshctl` menu lets you check service status, follow logs, restart the panel or stack, create a database backup, check readiness, start/stop services, and update the application from its tracked GitHub branch.
+### Терминальный помощник xmeshctl
 
 ~~~bash
 bash xmeshctl
 ~~~
 
-The update action refuses to run with uncommitted local changes, creates a PostgreSQL backup first, fetches GitHub, applies only a fast-forward update, validates Compose configuration, and rebuilds/restarts the stack. It does not delete Docker volumes or reset credentials. If the backup fails or the branch has diverged, the update is stopped so you can investigate safely. Keep off-host copies of backups for disaster recovery.
+Меню `xmeshctl` позволяет проверить состояние сервисов, просмотреть логи, выполнить перезапуск, создать резервную копию, проверить доступность API, остановить или запустить стек и обновить панель с отслеживаемой ветки GitHub.
 
-Create and verify a PostgreSQL custom-format backup, with 14-day local retention:
+При обновлении CLI:
+
+1. Отказывается продолжать работу при несохранённых локальных изменениях.
+2. Создаёт резервную копию PostgreSQL.
+3. Получает обновления Git и принимает только `fast-forward`.
+4. Проверяет Docker Compose и пересобирает/перезапускает сервисы.
+
+Если создание копии не удалось или история ветки разошлась, обновление останавливается. Томы и учётные данные не сбрасываются.
+
+## Архитектура и хранение данных
+
+| Компонент | Назначение |
+| --- | --- |
+| **Rust / Tokio / Axum** | API панели, авторизация, проверка прав, управление данными и версиями Xray-core |
+| **PostgreSQL 18** | Пользователи, узлы, профили, хосты, сквады, настройки, администраторы, сессии и постоянный аудит |
+| **TimescaleDB** | Временные ряды метрик и эксплуатационных событий |
+| **Redis 7** | Общие ограничения попыток входа, временное состояние, кеш и координация |
+| **Docker Compose** | Развёртывание контейнеров и постоянных томов |
+| **Linux-агент метрик** | Дополнительный сбор системных показателей на узлах |
+
+TimescaleDB работает **внутри того же экземпляра PostgreSQL**, а не как вторая самостоятельная база. Миграция `0004` создаёт `server_metric_samples` и `panel_events`. Бизнес-таблицы остаются обычными таблицами PostgreSQL.
+
+Redis изолирован сетью Compose, защищён паролем и ограничен по памяти (128 МиБ). Его данные намеренно временные: постоянные записи и данные панели не зависят от сохранности Redis. Для ограничения частоты входов предусмотрен устойчивый резервный механизм в PostgreSQL.
+
+Максимальное число соединений в пуле БД можно менять через `DB_MAX_CONNECTIONS` (по умолчанию 20). Проверка готовности панели учитывает доступность PostgreSQL и Redis.
+
+### Резервное копирование
 
 ~~~bash
 bash deploy/backup-postgres.sh
 ~~~
 
-The script writes a permission-restricted dump to ./backups. Copy backups off the VPS as well; a local backup does not protect against loss of the server or its disk. To change retention or destination, set BACKUP_RETENTION_DAYS or BACKUP_DIR for the script process.
+Скрипт создаёт резервную копию PostgreSQL в custom-format в каталоге `./backups`, устанавливает ограниченные права и по умолчанию хранит локальные копии 14 дней. Параметры `BACKUP_RETENTION_DAYS` и `BACKUP_DIR` позволяют изменить срок или путь.
 
-Do not delete the postgres_data or core_data volumes during routine updates. Redis is intentionally ephemeral: its rate-limit counter can reset after a Redis restart, while the PostgreSQL-backed limit remains as a fallback.
+**Обязательно храните копии за пределами VPS и проверяйте восстановление.** Локальная копия не защитит от потери сервера. Резервная копия PostgreSQL включает данные TimescaleDB, но **не включает** `TOTP_ENCRYPTION_KEY` из `.env`.
 
-**Existing installations:** the database image has changed from vanilla PostgreSQL to TimescaleDB on the same PostgreSQL 18 major version. Take and verify a backup before deploying, keep the existing postgres_data volume, and do not run docker compose down -v. The migration enables the extension and creates additional time-series tables; it does not convert existing business tables into hypertables.
+Если обновляете старую установку с обычного PostgreSQL на образ TimescaleDB той же основной версии PostgreSQL 18, сначала проверьте резервную копию, сохраните существующий том `postgres_data` и не удаляйте тома при переходе. Миграция подключает расширение и создаёт таблицы временных рядов, не превращая существующие бизнес-таблицы в гипертаблицы.
 
-## Node metrics agent and RX/TX dashboard
+## Администрирование и безопасность
 
-On the home screen, the TimescaleDB RX/TX chart supports the last hour (1-minute buckets) and last 24 hours (15-minute buckets), with optional node and squad filters. Samples are stored in `server_metric_samples`.
+### Права доступа
 
-To start collecting real data, open **Nodes**, click **Agent metrics** on a node, and copy the displayed command. Run that command on the corresponding Linux node with root privileges. The panel issues an individual high-entropy token per node; only the SHA-256 hash is stored in PostgreSQL. The plaintext token is displayed once, stored on the node in `/etc/xmesh-node-metrics.env` with root-only permissions, and can be revoked by issuing a replacement token. Deleting the node also removes its token.
+В разделе **«Администраторы»** используются реальные аккаунты `panel_auth_users`, а не декоративные записи из устаревшей коллекции администраторов.
 
-The installer enables a systemd timer that samples once per minute. The first run records a baseline; the next run sends the first valid RX/TX rate. The agent automatically detects the network interface used by the default route; pass an optional interface name to the installer to choose another NIC. Use HTTPS for the panel URL. Check the agent on a node with:
+| Роль | Возможности |
+| --- | --- |
+| **Owner** | Управление всеми коллекциями, учётными записями администраторов, глобальными настройками, Xray-core и выдачей токенов агентам узлов |
+| **Admin** | Разрешённые операции над рабочими коллекциями, генерация ключей VLESS Encryption, разрешённые проверки IP-ротации |
+| **Viewer** | Просмотр панели и метрик без права изменять данные |
+
+Ограничения проверяются **на стороне Rust API**. Скрытие кнопок в интерфейсе не заменяет авторизацию.
+
+Аккаунт нельзя создать с паролем короче 16 или длиннее 1024 символов. Изменение роли, пароля или состояния администратора отзывает его действующие сессии. Последнего активного владельца нельзя удалить; владелец не может удалить или понизить собственную учётную запись.
+
+Сервер применяет Argon2 для паролей, ограничивает попытки входа (8 неудачных попыток за 15 минут → пауза 15 минут), использует cookie-сессии `HttpOnly / SameSite` сроком 12 часов, журналирует изменения, задаёт ограничительную CSP и проверяет Origin / Fetch Metadata для изменяющих API-запросов.
+
+После миграции `0008_admin_rbac.sql` существующие аккаунты входа сохраняются как **owner**, чтобы не потерять доступ. Старые записи `panel_records('admins')` автоматически не становятся аккаунтами входа.
+
+**Пока не реализованы:** полноценные API bearer-токены интеграций, детальные права отдельно по каждой коллекции, квоты пользователей на администратора и полноценное тестирование на проникновение. Прежний демонстрационный генератор токенов отключён; устаревшие строки, похожие на токены, **не являются действительными ключами доступа**.
+
+### Двухфакторная аутентификация TOTP
+
+В разделе **«Система → Безопасность»** администратор может включить TOTP после повторного ввода текущего пароля. QR-код генерируется локально — без обращения к внешнему сервису изображений. Подойдут приложения, поддерживающие TOTP, например Aegis, 2FAS и Google Authenticator.
+
+После подтверждения шестизначного кода система выдаёт **10 одноразовых кодов восстановления**, которые показываются только один раз. Сохраните их отдельно от сервера.
+
+Особенности реализации:
+
+- Секрет TOTP размером 20 байт хранится зашифрованным с помощью **AES-256-GCM** и постоянного ключа `TOTP_ENCRYPTION_KEY`.
+- Алгоритм: RFC 6238, HMAC-SHA1, шесть цифр, период 30 секунд, окно ±1 период; использованный период нельзя применить повторно.
+- Проверка пароля создаёт короткий MFA-челлендж на 5 минут, **не** полноценную сессию.
+- Коды восстановления хранятся в виде хешей.
+- Включение/выключение TOTP отзывает остальные сессии. Для отключения требуются пароль и код TOTP или неиспользованный резервный код.
+- Нужна корректная синхронизация времени на сервере (NTP).
+
+При новой установке `./install.sh` генерирует ключ TOTP в `.env`. Для существующих установок можно один раз выполнить установщик, не удаляя базу и пароли. При ручной настройке:
+
+~~~bash
+openssl rand -hex 32
+~~~
+
+Сохраните результат в `TOTP_ENCRYPTION_KEY` внутри `.env` до перезапуска панели. **Никогда не публикуйте ключ в GitHub.** При его утрате действующие TOTP-аккаунты могут стать недоступны, пока ключ не восстановлен. Нельзя рассчитывать на обход TOTP одним паролем.
+
+## Узлы, агент метрик и графики RX/TX
+
+Дашборд отображает временные ряды RX/TX за **1 час** (агрегация по минутам) и **24 часа** (агрегация по 15 минутам). Можно фильтровать по узлу и скваду. Данные берутся из `server_metric_samples`, а не генерируются для демонстрации.
+
+Чтобы начать сбор, откройте **«Узлы → Метрики агента»**, скопируйте команду установки и выполните её на соответствующем Linux-узле с правами root.
+
+- Для каждого узла выдаётся отдельный криптографически стойкий токен; в PostgreSQL хранится только его SHA-256-хеш.
+- Исходный токен показывается один раз и размещается на узле в `/etc/xmesh-node-metrics.env` с правами только для root.
+- Удаление узла удаляет его токен; новый токен отзывает предыдущий.
+- Таймер systemd запускает агент раз в минуту. Первый замер задаёт базовую точку; следующий позволяет вычислить скорость.
+- По умолчанию агент использует сетевой интерфейс маршрута по умолчанию; при установке можно выбрать другой.
+- Endpoint приёма проверяет токен и пределы метрик. Для узла используйте HTTPS.
+
+Проверка агента:
 
 ~~~bash
 systemctl status xmesh-node-metrics.timer
 journalctl -u xmesh-node-metrics.service -n 30 --no-pager
 ~~~
 
-To stop and remove the agent on a node:
+Удаление агента с узла:
 
 ~~~bash
 sudo systemctl disable --now xmesh-node-metrics.timer
@@ -169,171 +164,174 @@ sudo rm -rf /var/lib/xmesh-node-metrics
 sudo systemctl daemon-reload
 ~~~
 
-The ingest endpoint rejects invalid or revoked node tokens and validates metric bounds. It accepts no browser cookies and only bypasses the panel's same-origin check for a bearer-authenticated request without an Origin header. Treat the bearer token as a secret; rotate it if the node is compromised.
+**Ограничение:** RX/TX сетевого интерфейса включает потенциально весь трафик узла (например, SSH и веб-сервер), а не только VPN. Это **не** достоверный учёт трафика каждого пользователя или исключительно Xray. Число TCP-соединений не равно количеству подключённых VPN-клиентов; система не выдаёт эти значения за одно и то же.
 
-## Xray-core version management
+## Управление версией Xray-core
 
-The stored default is latest. On startup the API attempts to install/update the selected version without preventing the panel API from starting if GitHub is unavailable. In **Settings → Xray-core**, you can also select a specific tag and press **Install / update**. The selected version is stored in PostgreSQL.
+В **«Настройки → Xray-core»** можно выбрать последнюю или конкретную доступную версию. Сервис получает сведения об официальных релизах XTLS/Xray-core, скачивает подходящий Linux-архив, проверяет SHA-256, **если контрольная сумма предоставлена в метаданных**, проверяет исполняемый файл командой `xray version` и переключает активную версию атомарно.
 
-The selector lists recent GitHub releases; pinning is limited to the latest 30 entries returned by the GitHub API. Only Linux x86_64, ARM64 and ARM32 binaries are handled. The executable and its data files live in the persistent core_data volume. Updating the binary does not launch the VPN process.
+Поддерживаются Linux **x86_64, ARM64 и ARM32**. Выбор закреплённой версии ограничен последними 30 релизами, возвращаемыми GitHub API. Бинарный файл и данные находятся в постоянном томе `core_data`.
 
-## API overview
+Если GitHub временно недоступен, неудачная попытка обновления Xray при запуске не должна препятствовать запуску API панели.
 
-- GET /api/v1/health/live — process liveness.
-- GET /api/v1/health/ready — PostgreSQL and Redis readiness.
-- GET /api/v1/auth/session, POST /api/v1/auth/login, POST /api/v1/auth/logout — admin session.
-- GET /api/v1/bootstrap — panel collections and settings (authenticated).
-- /api/v1/collections/{collection} — authenticated record CRUD.
-- GET /api/v1/core, GET /api/v1/core/releases, POST /api/v1/core/update — core version management (authenticated).
-- GET /api/v1/metrics/traffic?range=1h|24h&node_id=ID&squad_id=ID — authenticated RX/TX history aggregated from `server_metric_samples` (1-minute buckets for 1h; 15-minute buckets for 24h). `node_id` in the hypertable must be the text form of the panel node record ID. Squad filtering selects nodes whose assigned profile shares at least one inbound tag with the squad.
-- POST /api/v1/nodes/{id}/metrics-token — authenticated token issue/rotation for a node (plaintext returned once).
-- POST /api/v1/metrics/ingest — node-agent bearer authentication; persists a validated sample to TimescaleDB.
+**Важно:** установка бинарника Xray сама по себе **не запускает VPN-службу и не создаёт слушающие порты**.
 
-## Frontend and design
+## IP-ротация для пользователей
 
-- index.html — application shell.
-- styles.css — responsive Obsidian / Champagne design system and themes.
-- app.js — panel UI, authenticated API client and Xray-core controls.
+В **«Узлы → Изменить → IP-ротация»** можно включить пул из **2–64 уникальных публичных IPv4/IPv6-адресов**, по одному на строку. Основной адрес узла остаётся неизменным.
 
-The UI intentionally avoids presenting generated node telemetry as live operational data.
+Все адреса должны действительно маршрутизироваться на соответствующую ВМ и обслуживать один и тот же VPN inbound (порт, TLS/Reality и необходимые ключи). Панель не выдаёт новые адреса и не настраивает сетевой стек операционной системы.
 
-### RU / EN panel localization
+В PostgreSQL хранится отдельный курсор round-robin для пары `(node_id, user_id)`. Транзакции и блокировки строк обеспечивают корректную выдачу адресов при параллельных запросах. Курсор переживает перезапуски.
 
-Choose the **globe icon beside Sign out** and select Русский or English to switch the
-administrator interface (navigation, Settings, login, editable fields,
-Subscription Studio, and common XRAY STUDIO labels). The choice is stored in
-this browser under `xmeshNexusLanguage`; it does not change other
-administrators' preferences or the panel's database records. The portal's
-`subscriptionLanguage` is configured independently in **SUBSCRIPTION
-STUDIO** and accepts only `ru` or `en`.
+Для проверки предусмотрен авторизованный endpoint:
 
-The shared `i18n.js` dictionary translates presentation strings at render
-time, including late-added dialogs and tooltips. JSON source, textareas,
-subscription demo preview with its own language, user-entered values, and
-record identifiers are left unchanged. To add or improve translations,
-extend the dictionary and the `scripts/check-i18n.js` regression test. The
-bundles are shipped as static browser assets; Node.js is not needed on the
-production panel server.
-
-### JavaScript tooling (Node.js 24)
-
-The XMesh Nexus backend is written in **Rust** and the frontend runs in the **browser**.
-Node.js is needed **only for local frontend checks and GitHub Actions**, not by the
-running panel container or a VPN node. The supported tooling version is declared
-in `.node-version` (`24`) and enforced in CI using `actions/setup-node@v7`.
-Use a Node.js version manager or a local Node.js 24 installation to run tests:
-
-```bash
-node --version
-node --check app.js
-node --check subscription-studio.js
-node scripts/check-subscription-studio.js
-node scripts/check-node-grid-layout.js
-```
-
-There is no `package.json`, npm dependency install or Node.js runtime in the
-Rust/Debian production Docker image; the Node.js version does not affect Xray.
-
-
-
-## Per-node IP pools and per-user address rotation
-
-Open **Nodes → Edit → IP-ротация**. Enable the feature and enter one public IPv4 or IPv6
-address per line (2–64 unique addresses). The primary node address remains unchanged.
-All addresses must actually be routed to that VM and serve the same VPN inbound
-(port, TLS/Reality, and credentials); the panel does **not** provision extra network
-addresses or change OS networking.
-
-The Rust backend stores a separate round-robin cursor for each `(node_id, user_id)`
-in PostgreSQL (migration `0007_node_ip_rotation.sql`). It uses a transaction and
-row lock to prevent duplicate allocations under concurrent refreshes. Each call
-skips the last issued address when the pool has changed; disabling rotation
-falls back to the node's primary address. The cursor survives restarts.
-
-Authenticated test/integration endpoint (admin cookie + same-origin POST required):
-
-```http
+~~~http
 POST /api/v1/nodes/123/rotation/next
 Content-Type: application/json
 
 {"userId":456}
-```
+~~~
 
-Response: `{"nodeId":123,"userId":456,"address":"203.0.113.4","rotationEnabled":true,"poolSize":10}`.
-This endpoint requires an active user and a non-disabled node and is **not** an
-unauthenticated subscription endpoint. The IPs in examples are documentation-only.
+Пример ответа:
 
-**Integration status:** The current XMesh Nexus repository does not yet generate
-public client subscriptions (`subUrl` is still a placeholder). The rotation
-engine, settings, validation, persisted cursor, and authenticated test endpoint
-are implemented; **a client's subscription refresh will not rotate its
-address until a real subscription generator calls
-`node_rotation::resolve_address` exactly once per node and user per refresh**.
-The generator must substitute only the outbound address, retain the intended
-SNI/Host/Reality fields, properly format IPv6 URLs, and disable caching
-(`Cache-Control: no-store`). Refreshes, not live established connections,
-are the rotation boundary; client apps can also cache subscriptions.
+~~~json
+{"nodeId":123,"userId":456,"address":"203.0.113.4","rotationEnabled":true,"poolSize":10}
+~~~
 
-## SUBSCRIPTION STUDIO — control-plane only
+Примеры адресов не являются реальными адресами серверов. Endpoint требует активного пользователя, включённого узла и авторизованной сессии с соответствующими правами.
 
-Open **SUBSCRIPTION STUDIO** in the management navigation. Configure a separate
-subscription hostname/path, portal brand, description, language (RU/EN),
-accent, footer, and visibility of traffic/expiration. Settings are validated
-by the Rust API and stored centrally in PostgreSQL. **Settings → Brand and
-domains** also has independent fields for the panel and subscription domains.
+**Текущее ограничение:** интеграция с публичным генератором подписок ещё не реализована. Получение нового IP при обновлении подписки заработает только тогда, когда отдельный генератор вызовет `node_rotation::resolve_address` один раз для каждого пользователя и узла за одно обновление. Менять нужно адрес подключения, сохраняя корректные SNI/Host/Reality, формат IPv6 и запрет кеширования (`Cache-Control: no-store`). Существующие соединения не переключаются автоматически.
 
-The **LEGO topology builder** is a deployment blueprint, not a provisioning
-wizard. Server A hosts the management panel; assign future subscription service
-and node roles independently to A, B, or C. Thus one VPS, shared VPS groups,
-and three separate servers are all expressible. The selected node role is a
-planning example; actual nodes stay managed individually under **Nodes**.
-Optional descriptions of servers B/C and the complete blueprint can be exported
-as JSON for later integration.
+## SUBSCRIPTION STUDIO
 
-The **portal designer** also supports independent layout, card treatment, font,
-corner radius, background/card/text colors, optional HTTPS logo, heading/CTA
-copy, support link, and switches for status, applications, QR placeholder,
-copy-link button, devices and support blocks. Changes appear in a **demo-only
-live preview** before saving.
+Раздел **SUBSCRIPTION STUDIO** управляет **схемой будущего сервиса подписок**, а не публичной выдачей ссылок.
 
-**Application directory:** The admin may independently enable/disable Happ,
-Incy, v2rayTun, v2rayN, v2rayNG, Streisand, Hiddify, NekoBox, Shadowrocket,
-FlClash, Stash, sing-box, V2Box, Loon, Mihomo Party, and Clash Verge Rev.
-Admins can also create up to **32 custom client applications** in the same
-Subscription Studio section, specifying a display name, platforms, an optional
-HTTPS installation URL, and whether to show the app. Custom entries can be
-edited or removed without touching the 16 built-in clients. The list heading
-(`subscriptionAppsTitle`) can be replaced with a service-specific caption,
-such as "Supported clients"; leave it empty for a language-aware default.
-All entries are stored under `subscriptionCustomClients` in PostgreSQL.
-The Rust API validates unique IDs, text lengths, boolean flags and HTTPS links,
-and the live preview renders all enabled apps with HTML escaping.
+Можно настроить:
 
-Optional per-app HTTPS installation links are stored in PostgreSQL with the
-portal blueprint; the panel does not hardcode vendor URLs, download packages,
-execute deep links, or assert that an app supports every transport. An empty
-selection is allowed and hides the preview directory. Future subscription
-runtime implementations should consume these settings through authenticated
-integration, validate links on their side, and implement client-specific
-subscription formats separately.
+- Отдельные название, домен и путь подписки — независимо от имени и домена панели.
+- Язык портала: русский или английский.
+- Акцент, светлую/тёмную тему, собственные фон, карточки, цвет текста, шрифт, логотип (HTTPS), заголовки и ссылки поддержки.
+- Скругление элементов портала **1–36 px с шагом 1 px**.
+- Отображение статуса, трафика, срока действия, QR-блока, копирования ссылки, списка приложений, устройств и поддержки.
+- Вид списка приложений и пользовательский заголовок, например «Поддерживаемые клиенты».
+- До **32 собственных клиентских приложений** дополнительно к 16 встроенным, с названием, платформами, необязательной HTTPS-ссылкой и флагом видимости.
 
-**Repository boundaries:** This repository contains the control plane only.
-The public subscription service (with token verification, subscription output,
-client-side portal, and future per-user IP rotation integration) and the
-remote node runtime/agent will be implemented in **separate repositories**.
-Configuring a domain does not serve a subscription, issue a usable link,
-deploy a reverse proxy, configure a remote host, or start Xray. In particular,
-the existing subscription URL field remains empty until the separate service
-and its authenticated integration are implemented. No public subscription
-API has been added to the panel.
+Встроенный каталог включает Happ, Incy, v2rayTun, v2rayN, v2rayNG, Streisand, Hiddify, NekoBox, Shadowrocket, FlClash, Stash, sing-box, V2Box, Loon, Mihomo Party и Clash Verge Rev.
 
-### Updating frontend assets
+### Синхронизация темы с панелью
 
-The dashboard CSS and JavaScript are baked into the `panel` Docker image via `backend/Dockerfile`. Running `git pull` alone does **not** update the UI served by an existing container. After pulling changes, rebuild and recreate the panel:
+Параметр **«Синхронизировать с темой панели»** включён по умолчанию. Он переносит акцентный цвет панели, тёмный/светлый режим, цвета фона, карточек и текста в сохраняемые настройки подписки.
 
-```bash
+Например, если выбрать синюю палитру панели, предпросмотр и сохранённый шаблон подписки также получат синий акцент. Для полностью самостоятельного дизайна подписки выключите переключатель: тогда можно задавать независимые цвета.
+
+**Граница ответственности:** синхронизация меняет сохранённый шаблон на стороне панели. Она **не публикует** сайт подписки и не изменяет автоматически отдельный сервис, пока он не подключён к этим настройкам.
+
+### Схема размещения LEGO
+
+В конструкторе топологии сервер **A** содержит панель управления; размещение будущего сервиса подписок и узлов можно условно назначить серверам **A/B/C**. Схема описывает варианты: один VPS, несколько совместно используемых VPS или три отдельных сервера. Её можно экспортировать в JSON.
+
+Это **не** установщик удалённых серверов и не автоматическое развёртывание узлов. Реальные узлы продолжают настраиваться отдельно.
+
+### Ограничения сервиса подписок
+
+Текущий репозиторий **не** предоставляет публичный endpoint подписки, проверку токена подписчика, генерацию клиентских JSON-конфигураций или работающий личный кабинет по ссылке. Поле публичного URL остаётся пустым/заглушкой до реализации отдельного сервиса и его защищённой интеграции с панелью.
+
+Назначение домена в интерфейсе не выпускает TLS-сертификат, не конфигурирует обратный прокси и не запускает Xray. Параметры портала сохраняются в PostgreSQL и проверяются Rust API.
+
+## Дизайн и персонализация
+
+Панель поддерживает светлую/тёмную темы, набор цветовых палитр и настройку собственных HEX-цветов, три стиля карточек (**«Классика», Glass и «Объём»**), анимации, компактную боковую панель, подсказки при наведении и точную настройку интерфейса.
+
+- **Масштаб:** 90–200%.
+- **Ширина содержимого:** 720–3000 px.
+- **Скругление кнопок и карточек:** **1–36 px**, всегда с шагом **1 px**. Можно выбрать ровно **29 px**.
+- **Другие основные ползунки:** режимы точности 1/10 и поле ручного ввода числового значения.
+
+Настройки оформления администратора хранятся в браузере (`xmeshNexusSettings`). Централизованные настройки подписки сохраняются через API в PostgreSQL. Параметры разных администраторов в браузере не следует путать с общими настройками сервиса подписок.
+
+### Русский и английский интерфейс
+
+Нажмите значок **перевода/языков** в верхней панели и выберите **Русский** или **English**. Выбор сохраняется в текущем браузере под ключом `xmeshNexusLanguage` и не меняет предпочтения остальных администраторов.
+
+Локализация реализована через `i18n.js` и охватывает навигацию, настройки, вход, типовые окна, Subscription Studio и многие подписи XRAY STUDIO. Пользовательские значения, JSON-конфигурации, идентификаторы записей и предпросмотр подписки с собственным языком намеренно не переводятся.
+
+Чтобы дополнить словарь, обновите `i18n.js` и проверку `scripts/check-i18n.js`.
+
+## Основные API-маршруты
+
+| Маршрут | Назначение |
+| --- | --- |
+| `GET /api/v1/health/live` | Жизнеспособность процесса |
+| `GET /api/v1/health/ready` | Готовность PostgreSQL и Redis |
+| `GET /api/v1/auth/session` | Текущая сессия администратора |
+| `POST /api/v1/auth/login` и `/logout` | Вход и выход |
+| `GET /api/v1/bootstrap` | Данные и настройки панели (с авторизацией) |
+| `/api/v1/collections/{collection}` | Операции над коллекциями с проверкой прав |
+| `GET /api/v1/core`, `/core/releases` | Состояние и релизы Xray-core |
+| `POST /api/v1/core/update` | Установка/обновление Xray-core |
+| `GET /api/v1/metrics/traffic?range=1h` | Агрегированные метрики RX/TX, также доступно `24h` |
+| `POST /api/v1/nodes/{id}/metrics-token` | Выдача или ротация токена агента |
+| `POST /api/v1/metrics/ingest` | Приём метрик с bearer-аутентификацией агента |
+
+Маршруты администратора требуют входа и соответствующей роли. Для MFA дополнительно доступны `/api/v1/auth/mfa/status`, `/setup`, `/confirm`, `/disable` и `/verify`.
+
+## Структура проекта
+
+- `index.html` — каркас панели.
+- `styles.css` — адаптивная дизайн-система, темы и основные элементы.
+- `app.js` — интерфейс, клиент API и общие действия панели.
+- `subscription-studio.js` / `subscription-studio.css` — конструктор схемы подписки и предпросмотр.
+- `xray-studio*.js` / `xray-studio.css` — части интерфейса XRAY STUDIO.
+- `i18n.js` — локализация RU/EN.
+- `backend/` — Rust API, SQL-миграции, Dockerfile.
+- `deploy/` — развёртывание, резервное копирование и агент метрик.
+- `scripts/` — проверки интерфейса и интеграций.
+- `xmeshctl`, `install.sh`, `compose.yaml` — эксплуатация и установка.
+
+### Разработка и проверки
+
+Для фронтенд-проверок используйте **Node.js 24** (версия указана в `.node-version`):
+
+~~~bash
+node --version
+node --check app.js
+node --check subscription-studio.js
+node scripts/check-appearance-surfaces.js
+node scripts/check-subscription-studio.js
+node scripts/check-xray-studio-selectors.js
+~~~
+
+Node.js нужен только для локальных проверок и GitHub Actions: **работающая панель использует Rust**, а интерфейс запускается в браузере. Установка `npm`-пакетов для обычной работы сервера не нужна.
+
+Проверка Rust:
+
+~~~bash
+cargo test --manifest-path backend/Cargo.toml
+cargo clippy --manifest-path backend/Cargo.toml --all-targets -- -D warnings
+~~~
+
+### Обновление вручную
+
+CSS и JavaScript включаются в Docker-образ панели при сборке. **Одного `git pull` недостаточно**, чтобы обновить интерфейс в уже запущенном контейнере:
+
+~~~bash
 git pull --ff-only origin main
 docker compose up -d --build panel
-```
+~~~
 
-Preserve database volumes. A hard browser refresh may still be needed after the container is recreated. CI verifies that every HTML-referenced local CSS/JS asset is included in the runtime image.
+Не удаляйте тома базы данных. После пересоздания контейнера иногда требуется принудительно обновить страницу в браузере.
+
+## Важные ограничения
+
+XMesh Nexus активно разрабатывается. Перед эксплуатацией учитывайте текущие границы реализации:
+
+- Панель **не запускает активный Xray VPN-трафик** и не разворачивает инбаунды на удалённых узлах.
+- SUBSCRIPTION STUDIO — **редактор схемы и настроек**, а не готовый публичный сервис подписок.
+- Метрики сетевого интерфейса нельзя выдавать за индивидуальный VPN-трафик пользователя.
+- Ротация IP уже имеет серверную логику и проверочный endpoint, но ещё требует интеграции с будущим генератором подписок.
+- Для публичного размещения нужен правильно защищённый HTTPS-прокси; наличие авторизации в панели не отменяет необходимости настройки безопасности инфраструктуры.
+
+---
+
+**XMesh Nexus** · [English documentation](README.en.md) · [Исходный код](https://github.com/TriplexCorp/XMesh-Nexus)
