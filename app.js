@@ -2504,7 +2504,7 @@ document.addEventListener('click',e=>{
 $('#si').innerHTML=ic('search');$('#theme').innerHTML=ic('moon').replace('class="ic"','class="ic moon"')+ic('sun').replace('class="ic"','class="ic sun"');
 $('#bell').innerHTML=ic('bell');syncTopLanguage();$('#logout').innerHTML=ic('logout')+'<span class="logout-label">Выйти</span>';$('#logout').setAttribute('aria-label','Выйти');$('#addb').innerHTML='<span class="addb-icon">'+ic('plus')+'</span><span class="addb-label">Новый пользователь</span>';
 $('#logout').onclick=async()=>{const button=$('#logout');button.disabled=true;try{await fetch('/api/v1/auth/logout',{method:'POST',credentials:'same-origin',cache:'no-store'});}catch(_){}backendReady=false;location.replace('/login')};$('#restart').setAttribute('aria-label','Настройки Xray-core');$('#restart').dataset.railTip='Настройки Xray-core';$('#restart').innerHTML=ic('code')+'<span class="lbl">Версия</span>';
-apply();matchMedia('(prefers-color-scheme: light)').addEventListener('change',apply);
+apply();matchMedia('(prefers-color-scheme: light)').addEventListener('change',()=>{apply();if(C.theme==='auto')syncSubscriptionTheme()});
 addEventListener('hashchange',()=>{if(backendReady)render()});
 function showAuthGate(){
   backendReady=false;
