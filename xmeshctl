@@ -18,6 +18,245 @@ warn() { printf "${YELLOW}! ${RESET}%s\n" "$*"; }
 fail() { printf "${RED}✗${RESET} %s\n" "$*" >&2; }
 pause() { printf "\nНажми Enter, чтобы продолжить..."; read -r _ || true; }
 
+# Accept terminal CRLF and pasted values without treating invisible spaces as
+# a negative reply. Unknown input is re-prompted instead of silently cancelling.
+confirm_yes() {
+  local prompt="${1:-Продолжить? [y/N] }" answer
+  while true; do
+    if ! IFS= read -r -p "$prompt" answer; then
+      printf '\n' >&2
+      warn "Не удалось прочитать подтверждение. Действие отменено."
+      return 1
+    fi
+    answer="${answer//
+require_compose() {
+  if ! command -v docker >/dev/null 2>&1; then
+    fail "Docker не найден."
+    return 1
+  fi
+  if ! docker compose version >/dev/null 2>&1; then
+    fail "Не найден Docker Compose plugin (docker compose)."
+    return 1
+  fi
+  if [[ ! -f "$ROOT/compose.yaml" && ! -f "$ROOT/docker-compose.yml" ]]; then
+    fail "Не найден compose.yaml / docker-compose.yml в $ROOT."
+    return 1
+  fi
+}
+
+compose() { docker compose "$@"; }
+
+show_status() {
+  say "Состояние сервисов"
+  compose ps
+  printf "\n"
+  if compose ps --status running --services 2>/dev/null | grep -qx panel; then
+    printf "API readiness: "
+    if command -v curl >/dev/null 2>&1 && curl --silent --show-error --max-time 3 http://127.0.0.1:"${APP_PORT:-8080}"/api/v1/health/ready >/dev/null 2>&1; then
+      ok "endpoint отвечает"
+    else
+      warn "не удалось подтвердить readiness через localhost (возможно, нужен HTTPS proxy или другой APP_PORT)"
+    fi
+  fi
+}
+
+show_logs() {
+  printf "\n1) Панель\n2) PostgreSQL\n3) Redis\n4) Все сервисы\n0) Назад\n"
+  read -r -p "Выбери сервис: " choice
+  case "$choice" in
+    1) compose logs --tail=150 -f panel ;;
+    2) compose logs --tail=150 -f db ;;
+    3) compose logs --tail=150 -f redis ;;
+    4) compose logs --tail=100 -f ;;
+    0) return ;;
+    *) warn "Неизвестный пункт." ;;
+  esac
+}
+
+restart_service() {
+  printf "\n1) Только панель\n2) Весь стек\n0) Назад\n"
+  read -r -p "Что перезапустить: " choice
+  case "$choice" in
+    1) compose restart panel; ok "Панель перезапущена." ;;
+    2) compose restart; ok "Перезапуск стека выполнен." ;;
+    0) return ;;
+    *) warn "Неизвестный пункт." ;;
+  esac
+}
+
+backup_database() {
+  local backup_script="$ROOT/deploy/backup-postgres.sh"
+  if [[ ! -f "$backup_script" ]]; then
+    fail "Не найден $backup_script."
+    return 1
+  fi
+  say "Создание и проверка резервной копии PostgreSQL"
+  bash "$backup_script"
+  ok "Скрипт резервного копирования завершён."
+}
+
+update_panel() {
+  if ! git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    fail "Каталог не является Git-репозиторием. Обновление через CLI недоступно."
+    return 1
+  fi
+  local branch upstream
+  branch="$(git -C "$ROOT" branch --show-current)"
+  if [[ -z "$branch" ]]; then
+    fail "Сейчас detached HEAD. Переключись на рабочую ветку перед обновлением."
+    return 1
+  fi
+  upstream="$(git -C "$ROOT" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || true)"
+  if [[ -z "$upstream" ]]; then
+    fail "Для ветки '$branch' не настроена upstream-ветка. Настрой tracking перед обновлением."
+    return 1
+  fi
+
+  printf "\nБудет обновлена ветка %s (upstream: %s), затем пересобран Docker-образ.\n" "$branch" "$upstream"
+  warn "Перед обновлением будет создана резервная копия БД."
+  if ! confirm_yes "Продолжить? [y/N] "; then
+    warn "Обновление отменено."
+    return 0
+  fi
+
+  # Preserve our locally bootstrapped CLI and any operator installer override.
+  # All other changed/untracked files still block updates; never silently discard app/config edits.
+  local status_lines other_changes entry changed_path override_dir stamp
+  local -a allowed_changes=()
+  status_lines="$(git -C "$ROOT" status --porcelain --untracked-files=normal)"
+  other_changes=""
+  if [[ -n "$status_lines" ]]; then
+    while IFS= read -r entry; do
+      [[ -z "$entry" ]] && continue
+      changed_path="${entry:3}"
+      case "$changed_path" in
+        install.sh|xmeshctl)
+          allowed_changes+=("$changed_path")
+          ;;
+        *)
+          other_changes+="$entry"$'\n'
+          ;;
+      esac
+    done <<< "$status_lines"
+
+    if [[ -n "$other_changes" ]]; then
+      fail "Найдены локальные изменения кроме install.sh/xmeshctl. CLI их не перезапишет:"
+      git -C "$ROOT" status --short
+      warn "Сначала отдельно сохрани или закоммить эти изменения, затем повтори обновление."
+      return 1
+    fi
+
+    override_dir="/var/backups/xmesh-nexus-local-overrides"
+    stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+    if ! mkdir -p "$override_dir"; then
+      fail "Не удалось создать $override_dir для резервных копий."
+      return 1
+    fi
+    chmod 700 "$override_dir"
+    for changed_path in "${allowed_changes[@]}"; do
+      if ! cp -p "$ROOT/$changed_path" "$override_dir/$changed_path.$stamp"; then
+        fail "Не удалось сохранить локальный $changed_path. Обновление отменено."
+        return 1
+      fi
+      git -C "$ROOT" diff HEAD --binary -- "$changed_path" > "$override_dir/$changed_path.$stamp.patch"
+      chmod 600 "$override_dir/$changed_path.$stamp" "$override_dir/$changed_path.$stamp.patch"
+      warn "Локальный $changed_path сохранён: $override_dir/$changed_path.$stamp"
+    done
+    if ! git -C "$ROOT" stash push --message "xmeshctl preserved local updater/installer overrides at $override_dir/$stamp" -- install.sh xmeshctl >/dev/null; then
+      fail "Не удалось временно сохранить локальные правки в git stash. Копии оставлены в $override_dir."
+      return 1
+    fi
+    ok "Локальные правки install.sh/xmeshctl сохранены в резервных копиях и stash; продолжаю обновление."
+  fi
+
+  backup_database || { fail "Резервное копирование не удалось; обновление отменено."; return 1; }
+
+  say "Получение изменений из GitHub"
+  git -C "$ROOT" fetch --prune
+  local behind
+  behind="$(git -C "$ROOT" rev-list --count "HEAD..${upstream}")"
+  if [[ "$behind" == "0" ]]; then
+    ok "Новых коммитов в upstream нет. Пересобираю текущую версию."
+  else
+    printf "Доступно новых коммитов: %s\n" "$behind"
+    git -C "$ROOT" log --oneline "HEAD..${upstream}" -n 8
+    git -C "$ROOT" pull --ff-only
+  fi
+
+  say "Проверка конфигурации Compose"
+  compose config --quiet
+
+  say "Сборка и запуск обновлённой панели"
+  # Do not use --remove-orphans here: an older database service/container
+  # may still exist under a previous Compose service name. Removing volumes is
+  # never performed by this updater.
+  compose up -d --build
+
+  say "Текущее состояние"
+  compose ps
+  ok "Команда обновления завершена. Проверь логи, если панель не стала healthy."
+}
+
+health_check() {
+  say "Проверка контейнеров и readiness"
+  compose ps
+  if command -v curl >/dev/null 2>&1; then
+    printf "\nGET /api/v1/health/ready: "
+    curl --silent --show-error --max-time 5 --write-out "\nHTTP %{http_code}\n" "http://127.0.0.1:${APP_PORT:-8080}/api/v1/health/ready" || true
+  else
+    warn "curl не установлен; пропускаю HTTP-проверку."
+  fi
+}
+
+main_menu() {
+  require_compose || exit 1
+  while true; do
+    printf "\n${BOLD}${CYAN}XMesh Nexus — Terminal Control${RESET}\n"
+    printf "Каталог: %s\n\n" "$ROOT"
+    printf "  1) Статус сервисов\n"
+    printf "  2) Логи\n"
+    printf "  3) Перезапустить панель / стек\n"
+    printf "  4) Обновить из GitHub и пересобрать\n"
+    printf "  5) Создать резервную копию БД\n"
+    printf "  6) Проверить health endpoint\n"
+    printf "  7) Остановить стек\n"
+    printf "  8) Запустить стек\n"
+    printf "  0) Выход\n\n"
+    read -r -p "Выбери действие: " choice || exit 0
+    case "$choice" in
+      1) show_status; pause ;;
+      2) show_logs; pause ;;
+      3) restart_service; pause ;;
+      4) update_panel; pause ;;
+      5) backup_database; pause ;;
+      6) health_check; pause ;;
+      7)
+        if confirm_yes "Остановить все сервисы XMesh Nexus? [y/N] "; then
+          compose stop
+          ok "Стек остановлен."
+        else
+          warn "Остановка отменена."
+        fi
+        pause ;;
+      8) compose up -d; compose ps; pause ;;
+      0) exit 0 ;;
+      *) warn "Неизвестный пункт."; pause ;;
+    esac
+  done
+}
+
+main_menu
+\r'/}"
+    answer="${answer#"${answer%%[![:space:]]*}"}"
+    answer="${answer%"${answer##*[![:space:]]}"}"
+    case "${answer,,}" in
+      y|yes|д|да) return 0 ;;
+      n|no|н|нет|'') return 1 ;;
+      *) warn "Непонятный ответ. Введи y (да) или n (нет)." ;;
+    esac
+  done
+}
+
 require_compose() {
   if ! command -v docker >/dev/null 2>&1; then
     fail "Docker не найден."
@@ -228,4 +467,7 @@ main_menu() {
   done
 }
 
-main_menu
+# Sourcing xmeshctl from CLI regression tests must not start Docker.
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main_menu
+fi
