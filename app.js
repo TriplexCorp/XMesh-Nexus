@@ -3,10 +3,11 @@ const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelecto
 const cl=(v,a,b)=>Math.min(b,Math.max(a,v));
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const hs=s=>[...String(s)].reduce((a,c)=>(a*31+c.charCodeAt(0))>>>0,7);
-const fmt=(v,d=0)=>(+v).toLocaleString('ru-RU',{minimumFractionDigits:d,maximumFractionDigits:d});
-const gb=v=>v>=1024?fmt(v/1024,2)+' ТБ':v>=10?fmt(v,1)+' ГБ':v>=1?fmt(v,2)+' ГБ':fmt(v*1024)+' МБ';
-const ago=t=>{if(!t)return'никогда';const s=(Date.now()-t)/1e3;return s<60?'только что':s<3600?(s/60|0)+' мин назад':s<86400?(s/3600|0)+' ч назад':(s/86400|0)+' дн назад'};
-const DAY=864e5,left=t=>{if(!t)return'бессрочно';const d=Math.ceil((t-Date.now())/DAY);return d>0?d+' дн':d==0?'истёк сегодня':'истёк '+(-d)+' дн назад'};
+const panelIsEnglish=()=>window.XMeshI18n?.getLanguage()==='en';
+const fmt=(v,d=0)=>(+v).toLocaleString(panelIsEnglish()?'en-US':'ru-RU',{minimumFractionDigits:d,maximumFractionDigits:d});
+const gb=v=>{const en=panelIsEnglish(),unit=en?[' TB',' GB',' MB']:[' ТБ',' ГБ',' МБ'];return v>=1024?fmt(v/1024,2)+unit[0]:v>=10?fmt(v,1)+unit[1]:v>=1?fmt(v,2)+unit[1]:fmt(v*1024)+unit[2]};
+const ago=t=>{if(!t)return panelIsEnglish()?'never':'никогда';const s=(Date.now()-t)/1e3;return panelIsEnglish()?(s<60?'just now':s<3600?(s/60|0)+' min ago':s<86400?(s/3600|0)+' h ago':(s/86400|0)+' days ago'):(s<60?'только что':s<3600?(s/60|0)+' мин назад':s<86400?(s/3600|0)+' ч назад':(s/86400|0)+' дн назад')};
+const DAY=864e5,left=t=>{if(!t)return panelIsEnglish()?'never':'бессрочно';const d=Math.ceil((t-Date.now())/DAY);return panelIsEnglish()?(d>0?d+' days':d===0?'expires today':'expired '+(-d)+' days ago'):(d>0?d+' дн':d===0?'истёк сегодня':'истёк '+(-d)+' дн назад')};
 const chip=(t,c)=>`<span class="chip" style="--c:var(${c})">${t}</span>`;
 const smooth=p=>{let d=`M${p[0]}`;for(let i=0;i<p.length-1;i++){const a=p[i-1]||p[i],b=p[i],c=p[i+1],e=p[i+2]||c;d+=`C${b[0]+(c[0]-a[0])/6},${b[1]+(c[1]-a[1])/6},${c[0]-(e[0]-b[0])/6},${c[1]-(e[1]-b[1])/6},${c}`}return d};
 const P={
