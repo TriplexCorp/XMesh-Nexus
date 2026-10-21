@@ -74,6 +74,7 @@ pub(crate) async fn accounts(pool: &PgPool) -> Result<Vec<Value>, ApiError> {
         "id": row.try_get::<i64, _>("id")?,
         "username": row.try_get::<String, _>("username")?,
         "role": row.try_get::<String, _>("role")?,
+        "is_active": row.try_get::<bool, _>("is_active")?,
         "disabled": !row.try_get::<bool, _>("is_active")?,
         "last": row.try_get::<Option<i64>, _>("last_ms")?,
         "created": row.try_get::<i64, _>("created_ms")?
