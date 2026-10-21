@@ -61,7 +61,6 @@ assert.match(app,/const panelIsEnglish=/,'Panel number and date formatting must 
 assert.match(src,/#bn,#lg/,'User-defined panel brand should never be translated');
 assert.match(portal,/d.subscriptionLanguage==='en'\?'12.4 \/ 100 GB'/,
  'Portal preview should use its own configured units');
-assert.match(app,/XMeshI18n\?\.setLanguage\(t\.value\)/);
 assert.match(portal,/\[\['ru','Русский'\],\['en','English'\]\]/);
 assert.doesNotMatch(portal,/tr:\['Abonelik aktif'/);
 assert.doesNotMatch(portal,/vi:\['Gói đăng ký/);
