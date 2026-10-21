@@ -36,6 +36,12 @@ assert.match(view,/name="subscriptionDomain"/);
 assert.match(view,/name="subscriptionPath"/);
 assert.match(view,/name="subscriptionBrand"/);
 assert.match(view,/name="subscriptionAccent"/);
+assert.match(view,/name="subscriptionSyncPanelTheme"/);
+assert.match(src,/const applyPanelTheme=/);
+assert.match(src,/subscriptionSyncPanelTheme:input\(form,'subscriptionSyncPanelTheme'\)\.checked/);
+assert.match(app,/const syncSubscriptionTheme=/);
+assert.match(app,/syncSubscriptionTheme\(\)/);
+assert.match(rust,/"subscriptionSyncPanelTheme"/);
 assert.match(view,/name="subscriptionTheme"/);
 assert.match(src,/preview\.dataset\.portalTheme=d\.subscriptionTheme/);
 assert.match(rust,/"subscriptionTheme", &\["dark", "light"\]/);
@@ -52,7 +58,7 @@ assert.equal(studio.clientCatalog.length,16,'Built-in client catalog must remain
 assert.equal(studio.maxCustomClients,32,'Custom client limit must be bounded');
 
 // Subscription Studio uses the same one-pixel precision as the main radius slider.
-assert.match(src,/name="subscriptionRadius" min="0" max="36" step="1"/);
+assert.match(src,/name="subscriptionRadius" min="1" max="48" step="1"/);
 
 assert.equal(studio.nextCustomClientId([]),'custom-1');
 assert.equal(studio.nextCustomClientId([{id:'custom-1'},{id:'custom-3'}]),'custom-2');
@@ -158,7 +164,7 @@ assert.match(rust,/"deploymentServerB"/);
 assert.match(rust,/"subscriptionPlacement", &\["a", "b", "c"\]/);
 assert(!rust.includes('.route("/s/'),'The management panel must not implement public subscription serving');
 assert.match(html,/subscription-studio\.js\?v=[a-z0-9-]+/,'Subscription Studio JavaScript must use a cache-busting version');
-assert.match(html,/subscription-studio\.css\?v=20261021-custom-apps-1/);
+assert.match(html,/subscription-studio\.css\?v=20261021-sync-theme-1/);
 assert.match(docker,/subscription-studio\.css subscription-studio\.js/);
 assert.match(css,/\.subscription-studio-layout/);
 assert.match(css,/@media\(max-width:780px\)/);
