@@ -76,7 +76,7 @@ assert.equal(studio.clientCatalog.length,16,'Built-in client catalog must remain
 assert.equal(studio.maxCustomClients,32,'Custom client limit must be bounded');
 
 // Subscription Studio uses the same one-pixel precision as the main radius slider.
-assert.match(src,/name="subscriptionRadius" min="1" max="48" step="1"/);
+assert.match(src,/name="subscriptionRadius" min="1" max="36" step="1"/);
 
 assert.equal(studio.nextCustomClientId([]),'custom-1');
 assert.equal(studio.nextCustomClientId([{id:'custom-1'},{id:'custom-3'}]),'custom-2');
