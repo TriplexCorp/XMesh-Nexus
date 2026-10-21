@@ -214,3 +214,22 @@
   .subscription-custom-name{flex-basis:calc(100% - 4.5rem)}
   .subscription-custom-remove{margin-left:auto}
 }
+
+/* Portal theme linkage, visually grouped with the portal palette. */
+.subscription-theme-sync{
+ display:flex;align-items:flex-start;gap:.75rem;padding:.88rem 1rem;
+ border:1px solid color-mix(in srgb,var(--a) 24%,var(--ln));
+ border-radius:var(--ui-control-radius);
+ background:color-mix(in srgb,var(--a) 5%,var(--s1));
+ color:var(--tx);cursor:pointer;
+}
+.subscription-theme-sync input[type=checkbox]{
+ margin:.3rem 0 0;flex:0 0 auto;accent-color:var(--a);
+ width:1.05rem;height:1.05rem;
+}
+.subscription-theme-sync span{display:grid;gap:.28rem;min-width:0}
+.subscription-theme-sync b{font-size:.86rem;font-weight:750}
+.subscription-theme-sync small{color:var(--mu);line-height:1.45;font-size:.76rem}
+.subscription-studio .subscription-field :is(input,select):disabled{
+ opacity:.66;cursor:not-allowed;
+}
