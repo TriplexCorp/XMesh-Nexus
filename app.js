@@ -1806,7 +1806,7 @@ async function setP(){
     ['emerald','#60d6a2','#c3e879','Изумруд'],['ocean','#7fb3e8','#6fd8c3','Океан'],['amber','#ebbd7a','#f0899a','Янтарь'],['rose','#f0a0c4','#a0a2f6','Роза'],
     ['violet','#b7a1ff','#83d9ed','Фиолетовый'],['cyan','#63dff2','#7fa8ff','Циан'],['ruby','#ff8aa7','#d4a1ff','Рубин'],['custom',C.customA||'#60d6a2',C.customB||'#c3e879','Своя тема']
   ];
-  const choices=(key,items)=>`<div class="seg choice" role="group" aria-label="${key}">${items.map(([v,l])=>`<button type="button" data-ui="${key}" data-value="${v}" class="${(C[key]||CDEFAULT[key])==v?'on':''}">${l}</button>`).join('')}</div>`;
+  const choices=(key,items)=>`<div class="seg choice" role="group" aria-label="${key}">${items.map(([v,l])=>`<button type="button" data-ui="${key}" data-value="${v}" class="${(C[key]||CDEFAULT[key])==v?'on':''}" aria-pressed="${(C[key]||CDEFAULT[key])==v?'true':'false'}">${l}</button>`).join('')}</div>`;
   const tk=await crudCard('tokens');
   let coreView={desired_version:'latest',installed_version:null,latest_version:null,status:'unknown',progress:null,last_error:null,architecture:'unknown'};
   try{coreView=await backendRequest('/api/v1/core')}catch(e){coreView.last_error=e.message}
@@ -1937,7 +1937,7 @@ document.addEventListener('click',async e=>{
   else if(b=g('[data-lv]')){}
   else if(b=g('[data-th]')){C.theme=b.dataset.th;apply();$$('#th button').forEach(x=>x.classList.toggle('on',x==b))}
   else if(b=g('[data-ac]')){C.accent=b.dataset.ac;apply();$$('[data-ac]').forEach(x=>x.classList.toggle('on',x==b))}
-  else if(b=g('[data-ui]')){const prop=b.dataset.ui,value=b.dataset.value;if(prop&&value&&(prop!=='surface'||['solid','glass','raised'].includes(value))){C[prop]=value;apply();$(`[data-ui="${prop}"]`).forEach(x=>x.classList.toggle('on',x==b))}}
+  else if(b=g('[data-ui]')){const prop=b.dataset.ui,value=b.dataset.value;if(prop&&value&&(prop!=='surface'||['solid','glass','raised'].includes(value))){C[prop]=value;apply();document.querySelectorAll(`[data-ui="${prop}"]`).forEach(x=>{const active=x.dataset.value===value;x.classList.toggle('on',active);x.setAttribute('aria-pressed',String(active))})}}
   else if(g('#rs')){const automation={autoCoreRefresh:C.autoCoreRefresh,coreRefreshSeconds:C.coreRefreshSeconds};C={...CDEFAULT,...automation};apply();syncCoreAutoRefresh();render(1);toast('Оформление сброшено')}
   else if(g('#gx')){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(DB,null,2)],{type:'application/json'}));a.download='xmesh-nexus-backup.json';a.click()}
   else if(b=g('[data-cf]')){dlg.close();CF&&CF()}
