@@ -1873,8 +1873,20 @@ function securityP(){
 /* ================= НАСТРОЙКИ ================= */
 async function setP(){
   const sw=[
-    ['emerald','#60d6a2','#c3e879','Изумруд'],['ocean','#7fb3e8','#6fd8c3','Океан'],['amber','#ebbd7a','#f0899a','Янтарь'],['rose','#f0a0c4','#a0a2f6','Роза'],
-    ['violet','#b7a1ff','#83d9ed','Фиолетовый'],['cyan','#63dff2','#7fa8ff','Циан'],['ruby','#ff8aa7','#d4a1ff','Рубин'],['custom',C.customA||'#60d6a2',C.customB||'#c3e879','Своя тема']
+    ['emerald','#74ddb1','#c6e985','Изумруд'],
+    ['ocean','#7fb3e8','#6fd8c3','Океан'],
+    ['amber','#ebbd7a','#f0899a','Янтарь'],
+    ['rose','#f0a0c4','#a0a2f6','Роза'],
+    ['violet','#b7a1ff','#83d9ed','Фиолетовый'],
+    ['cyan','#63dff2','#7fa8ff','Циан'],
+    ['ruby','#ff8aa7','#d4a1ff','Рубин'],
+    ['sapphire','#87aaff','#aed6ff','Сапфир'],
+    ['teal','#5ed4c4','#a7e4d9','Бирюза'],
+    ['coral','#ff9e8b','#fbd0a6','Коралл'],
+    ['indigo','#a5a9f6','#cab3ff','Индиго'],
+    ['copper','#d9ae80','#edc6a1','Медь'],
+    ['glacier','#83c9e9','#c5eaf1','Ледник'],
+    ['graphite','#aab9c9','#d6c8dc','Графит']
   ];
   const choices=(key,items)=>`<div class="seg choice" role="group" aria-label="${key}">${items.map(([v,l])=>`<button type="button" data-ui="${key}" data-value="${v}" class="${(C[key]||CDEFAULT[key])==v?'on':''}" aria-pressed="${(C[key]||CDEFAULT[key])==v?'true':'false'}">${l}</button>`).join('')}</div>`;
   const tk=`<section class="card"><div class="hd"><div><h3>API-токены</h3><p>Выдача API-токенов для интеграций ещё не реализована.</p></div></div><p class="note">Не создавайте токены через этот раздел: безопасность доступа к API будет добавлена отдельным этапом.</p></section>`;
@@ -1887,7 +1899,7 @@ async function setP(){
       <div><h3>Цвет и тема</h3><small>Основная палитра интерфейса и брендовые акценты</small></div>
     </div>
       <div class="setting-row"><div class="setting-copy"><b>Тема</b><small>Автоматически — по настройкам ОС</small></div><div class="setting-control"><div class="seg choice" id="th">${[['dark','Тёмная'],['light','Светлая'],['auto','Авто']].map(([k,l])=>`<button type="button" data-th="${k}" class="${C.theme==k?'on':''}">${l}</button>`).join('')}</div></div></div>
-      <div class="setting-row"><div class="setting-copy"><b>Акцентный цвет</b><small>Влияет на кнопки, графики и активные элементы</small></div><div class="setting-control" style="gap:.85rem;max-width:18rem">${sw.map(([k,x,y,l])=>`<button class="palette-swatch ${C.accent==k?'on':''}" style="--x:${x};--y:${y}" data-ac="${k}" title="${l}" aria-label="${l}"></button>`).join('')}</div></div>
+      <div class="setting-row appearance-preset-row"><div class="setting-copy"><b>Цветовые темы</b><small>Подобранные сочетания для светлого и тёмного оформления</small></div><div class="palette-preset-grid" role="group" aria-label="Цветовые темы">${sw.map(([k,x,y,l])=>`<button type="button" class="palette-preset ${C.accent===k?'on':''}" data-ac="${k}" aria-pressed="${C.accent===k?'true':'false'}" style="--x:${x};--y:${y}"><span class="palette-preset-demo" aria-hidden="true"><i></i><em></em><b></b></span><span class="palette-preset-foot"><span>${l}</span><span class="palette-preset-tick">${ic('check')}</span></span></button>`).join('')}</div></div>
       <div class="setting-row"><div class="setting-copy"><b>Своя палитра</b><small>Цветовые «бублики» открывают выбор цвета; ползунки позволяют точно настроить оттенок, насыщенность и яркость.</small></div><div class="setting-control"><div class="color-bubbles"><label class="color-bubble-wrap"><span class="color-bubble"><input type="color" id="custom-a" value="${C.customA||'#60d6a2'}" aria-label="Основной цвет"></span>Основной</label><label class="color-bubble-wrap"><span class="color-bubble"><input type="color" id="custom-b" value="${C.customB||'#c3e879'}" aria-label="Вторичный цвет"></span>Вторичный</label></div></div></div>
     </section>
     <section class="card sg"><div class="appearance-card-heading"><h3>Точная настройка цвета</h3><small>Оттенок, насыщенность и яркость собственной палитры</small></div>
