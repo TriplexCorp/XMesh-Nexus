@@ -51,6 +51,9 @@ assert.equal(text.nodeValue,'Settings','Switching back to English must still wor
 assert.match(html,/id="language-trigger"/,'Language control must live in the global header');
 assert.match(html,/id="language-menu"/,'Header language menu must exist');
 assert.match(app,/function syncTopLanguage\(\)/,'Global language menu must reflect saved locale');
+assert.match(app,/languages:'<path/,'Language control must use a recognizable translation glyph');
+assert.match(app,/trigger\.innerHTML=ic\('languages'\)/,'Header must render the translation icon');
+assert.doesNotMatch(app,/trigger\.innerHTML=ic\('globe'\)/,'Legacy globe icon must not be used for locale switching');
 assert.doesNotMatch(app,/settings-language-toggle/,'Locale selector must not remain in appearance settings');
 assert.match(app,/data-panel-language/,'Language buttons must exist');
 assert.match(app,/window\.XMeshMfa\?\.panel\(\)/);
