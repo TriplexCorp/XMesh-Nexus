@@ -1946,3 +1946,24 @@ dialog.user-modal .user-legend-dot.is-up{background:color-mix(in srgb,var(--a) 3
     max-width:68rem;
   }
 }
+
+/* Node IP rotation status: quiet, consistent with the existing card hierarchy. */
+.nc .node-ip-rotation{
+  display:flex;
+  align-items:center;
+  gap:.48rem;
+  font-size:.78rem;
+  line-height:1.4;
+  color:var(--mu);
+  padding:.1rem 0;
+}
+.nc .node-ip-indicator{
+  width:.42rem;
+  height:.42rem;
+  border-radius:50%;
+  flex:0 0 auto;
+  background:var(--mu);
+  opacity:.6;
+}
+.nc .node-ip-rotation.active{color:var(--tx)}
+.nc .node-ip-rotation.active .node-ip-indicator{background:var(--ok);opacity:1}
