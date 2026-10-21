@@ -32,6 +32,9 @@ const api=env.window.XMeshI18n;
 assert.equal(api.getLanguage(),'en');
 assert.equal(api.translate('Узлы'),'Nodes');
 assert.equal(api.translate('Название подписки'),'Subscription name');
+assert.equal(api.translate('Неверный логин или пароль.'),'Incorrect username or password.');
+assert.equal(api.translate('Повторяющееся поле «tag»: Xray/JSON использует последнее значение, предыдущее будет потеряно.'),
+ 'Duplicate field «tag»: Xray/JSON uses the last value; earlier values are lost.');
 assert.equal(api.translate('Название вашего сервиса'),'Your service name');
 assert.equal(api.translate('3 узлов настроено. CPU, RAM и скорость требуют подключённого мониторинга.'),
  '3 nodes configured. CPU, RAM, and speed require connected monitoring.');
@@ -46,6 +49,10 @@ assert.equal(store.value,'ru','Preference must persist in browser');
 api.setLanguage('en');
 assert.equal(text.nodeValue,'Settings','Switching back to English must still work');
 assert.match(app,/id="ui-language"/);
+assert.match(app,/const panelIsEnglish=/,'Panel number and date formatting must follow locale');
+assert.match(src,/#bn,#lg/,'User-defined panel brand should never be translated');
+assert.match(portal,/d.subscriptionLanguage==='en'\?'12.4 \/ 100 GB'/,
+ 'Portal preview should use its own configured units');
 assert.match(app,/XMeshI18n\?\.setLanguage\(t\.value\)/);
 assert.match(portal,/\[\['ru','Русский'\],\['en','English'\]\]/);
 assert.doesNotMatch(portal,/tr:\['Abonelik aktif'/);
