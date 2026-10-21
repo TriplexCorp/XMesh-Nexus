@@ -54,7 +54,7 @@ assert.match(view,/отдельном сервисе/);
 assert.match(app,/subscription:\['SUBSCRIPTION STUDIO',subscriptionStudioP\]/);
 assert.match(app,/subscriptionDomain.*DB.set.subscriptionDomain/);
 assert.match(app,/api.saveSettings\(d\)/,'General settings must save both independent domains');
-assert.match(rust,/"subscriptionDomain" \| "subscriptionPath"/);
+assert.match(rust,/"subscriptionDomain"\s*\|\s*"subscriptionPath"/);
 assert.match(rust,/"nodePlacement"/);
 assert.match(rust,/"deploymentServerB"/);
 assert.match(rust,/"subscriptionPlacement", &\["a", "b", "c"\]/);
