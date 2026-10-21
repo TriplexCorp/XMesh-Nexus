@@ -31,9 +31,18 @@ for(const [mode,width] of [['compact',22],['standard',30],['spacious',40]]){
 }
 assert(css.includes('.nodes-page>.nodes[data-node-count="2"][data-grid-mode=spacious]{\n    grid-template-columns:minmax(0,min(100%,40rem));'),
  'Two nodes need a spacious single-column layout');
-assert(css.includes('.nodes-page>.nodes[data-node-count="3"][data-grid-mode=standard]{\n    grid-template-columns:repeat(2,minmax(0,1fr));'),
- 'Three nodes must display fewer standard columns than compact columns');
-assert(html.includes('styles.css?v=20261021-node-ip-rotation-1'),'Stylesheet cache key not updated');
+// Regression: 3 nodes in Standard must form THREE full-width columns on
+// desktop; an old 2-column + max-width override left a huge empty right side.
+const gridRules=css.slice(css.indexOf('/* Nodes density modes'),css.indexOf('/* Node IP rotation status'));
+assert(gridRules.includes('.nodes-page>.nodes[data-grid-mode=standard]{\n    grid-template-columns:repeat(3,minmax(0,1fr));'),
+ 'Standard grid must use three columns at 70rem+');
+assert.doesNotMatch(gridRules,/\.nodes-page>\.nodes\[data-node-count="3"\]\[data-grid-mode=standard\]\s*\{/,
+ 'Three-node Standard cannot override the desktop 3-column grid');
+assert.doesNotMatch(gridRules,/\.nodes-page>\.nodes\[data-node-count="2"\]\[data-grid-mode=(?:standard|compact|spacious)\]\s*\{/,
+ 'Two-node layout cannot be clamped to a narrow grid');
+assert.doesNotMatch(gridRules,/max-width:\s*(?:48|64|68)rem/,
+ 'Two- and three-node grids must fill available horizontal space');
+assert(html.includes('styles.css?v=20261021-node-grid-3'),'Stylesheet cache key not updated');
 assert.match(html,/app\.js\?v=20261021-node-ip-rotation-1/);
 assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length,'CSS brace balance');
 new Function(app);
