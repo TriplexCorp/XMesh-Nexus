@@ -33,8 +33,8 @@ confirm_yes() {
     answer="${answer#"${answer%%[![:space:]]*}"}"
     answer="${answer%"${answer##*[![:space:]]}"}"
     case "${answer,,}" in
-      y|yes|д|да) return 0 ;;
-      n|no|н|нет|'') return 1 ;;
+      y|yes|д|да|Д|Да|ДА) return 0 ;;
+      n|no|н|нет|Н|Нет|НЕТ|'') return 1 ;;
       *) warn "Непонятный ответ. Введи y (да) или n (нет)." ;;
     esac
   done
