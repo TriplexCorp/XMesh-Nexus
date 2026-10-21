@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#071b15">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400..800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=20261021-dialog-motion-1">
+<link rel="stylesheet" href="styles.css?v=20261021-sidebar-logout-1">
 <link rel="stylesheet" href="global-hover.css">
 <link rel="stylesheet" href="subscription-studio.css?v=20261021-custom-apps-1">
 <link rel="stylesheet" href="xray-studio.css?v=20261021-dialog-motion-1">
@@ -19,6 +19,7 @@
   <div class="brand"><div class="logo" id="lg">X</div><b class="bt" id="bn">XMesh Nexus</b></div>
   <nav id="nav" aria-label="Разделы"></nav>
   <div class="core"><div class="ct"><span class="dot" id="cd" style="--c:var(--mu);animation:none"></span><div><b>Xray-core</b><small id="cs">API не подключён</small></div></div><button id="restart" aria-label="Настройки Xray-core"></button><small id="core-rail-version" class="core-rail-version" aria-live="polite">—</small></div>
+  <div class="sidebar-account"><button class="sidebar-logout" id="logout" type="button" title="Выйти из панели">Выйти</button></div>
 </aside>
 <div class="wrap">
   <header class="top">
@@ -29,7 +30,7 @@
       <div class="top-language-menu" id="language-menu" role="group" aria-label="Выбор языка" hidden>
         <button type="button" data-panel-language="ru" aria-pressed="false">Русский <span>RU</span></button>
         <button type="button" data-panel-language="en" aria-pressed="false">English <span>EN</span></button>
-      </div></div><button class="btn" id="logout" type="button">Выйти</button><button class="btn" type="button" data-nu id="addb" aria-label="Добавить пользователя"></button></div>
+      </div></div><button class="btn" type="button" data-nu id="addb" aria-label="Добавить пользователя"></button></div>
   </header>
   <main id="view" class="view"></main>
 </div>
