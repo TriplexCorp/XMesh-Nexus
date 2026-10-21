@@ -4,7 +4,7 @@
 window.XMeshSubscriptionStudio = (() => {
   const defaults = {
     subscriptionDomain:'', subscriptionPath:'/s',
-    subscriptionBrand:'', subscriptionDescription:'Всё просто работает.',
+    subscriptionBrand:'', subscriptionDescription:'Настройки подключения и информация о подписке.',
     subscriptionFooter:'', subscriptionAccent:'#e8bb78', subscriptionLanguage:'ru', subscriptionTheme:'dark',
     subscriptionShowTraffic:true, subscriptionShowExpiry:true,
     subscriptionPlacement:'a', nodePlacement:'a', deploymentServerB:'', deploymentServerC:''
@@ -68,7 +68,7 @@ window.XMeshSubscriptionStudio = (() => {
       '</section>',
       '<section class="card subscription-studio-section">',
       '<div class="subscription-studio-heading"><span>03</span><div><h3>Клиентский портал</h3><p>Собственная тема, независимая от внешнего вида панели.</p></div></div>',
-      field('subscriptionBrand','Название сервиса',data.subscriptionBrand,'Пустое значение — использовать бренд панели.',{placeholder:'Silentium VPN',max:80}),
+      field('subscriptionBrand','Название сервиса',data.subscriptionBrand,'Пустое значение — использовать бренд панели.',{placeholder:'Название вашего сервиса',max:80}),
       field('subscriptionDescription','Описание',data.subscriptionDescription,'Короткий текст на главной странице.',{area:true,max:240}),
       '<div class="subscription-studio-pair">',
       field('subscriptionAccent','Акцентный цвет',data.subscriptionAccent,'Цвет кнопок и индикаторов.',{color:true}),
