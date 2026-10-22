@@ -123,12 +123,11 @@ const emptyDB=()=>({
   users:[],nodes:[],profiles:[],hosts:[],squads:[],tpls:[],subs:[],admins:[],tokens:[],srh:[],
   set:{brand:'XMesh Nexus',domain:'',hooks:{...defaultHooks}}
 });
-let DB, legacyDemo=false;
+let DB;
 try{DB=JSON.parse(localStorage.getItem('xmeshNexusDB')||'null')}catch(e){DB=null}
-/* Remove the earlier built-in sample data, but preserve user-created records. */
-legacyDemo=!!(DB&&Array.isArray(DB.nodes)&&DB.nodes.some(n=>/\.example\.(net|com|org)$/i.test(String(n.addr||'')))&&
-  (DB.set?.domain==='panel.example.com'||(DB.users||[]).some(u=>String(u.email||'').endsWith('@mail.example'))));
-if(!DB||!Array.isArray(DB.users)||legacyDemo) DB=emptyDB();
+// Never delete user data based on example-looking addresses or email fields.
+// The authenticated PostgreSQL backend remains the authoritative data source.
+if(!DB||!Array.isArray(DB.users)) DB=emptyDB();
 else {
   for(const k of ['users','nodes','profiles','hosts','squads','tpls','subs','admins','tokens','srh']) if(!Array.isArray(DB[k])) DB[k]=[];
   DB.set={brand:'XMesh Nexus',domain:'',hooks:{...defaultHooks,...(DB.set?.hooks||{})},...(DB.set||{})};
@@ -146,7 +145,6 @@ async function backendRequest(path,options={}){
   if(!response.ok)throw new Error(payload.error||'Ошибка backend API ('+response.status+').');
   return payload;
 }
-if(legacyDemo){try{localStorage.removeItem('xmeshNexusDB');localStorage.setItem('xmeshNexusDB',JSON.stringify(DB))}catch(e){}}
 const lat=()=>Promise.resolve();
 const st=u=>u.disabled?'DISABLED':u.hold?'ON_HOLD':(u.limit&&u.used>=u.limit)?'LIMITED':(u.expireAt&&u.expireAt<Date.now())?'EXPIRED':'ACTIVE';
 const isOn=u=>st(u)=='ACTIVE'&&u.onlineAt>Date.now()-3e5;
