@@ -1173,7 +1173,7 @@ function xrayBuilderConfig(){
   if(security==='reality')ss.realitySettings={show:false,target:dest,xver:cl(+v('xver')||0,0,2),serverNames:sni?[sni]:[],privateKey:v('private-key')||'REPLACE_WITH_XRAY_PRIVATE_KEY',shortIds:[(v('short-id')||'').replace(/[^a-fA-F0-9]/g,'').slice(0,16)]};
   inbound.streamSettings=ss;
  }
- return {log:{loglevel:v('loglevel')||'warning'},inbounds:[inbound],outbounds:[{protocol:'freedom',tag:'direct'},{protocol:'blackhole',tag:'blocked'}],routing:{rules:[{type:'field',outboundTag:'direct',inboundTag:[tag]}]}};
+ return {log:{loglevel:v('loglevel')||'warning'},stats:{},policy:{levels:{'0':{statsUserUplink:true,statsUserDownlink:true}}},inbounds:[inbound],outbounds:[{protocol:'freedom',tag:'direct'},{protocol:'blackhole',tag:'blocked'}],routing:{rules:[{type:'field',outboundTag:'direct',inboundTag:[tag]}]}};
 }
 async function syncXrayUserToProfile(user){
  const profile=DB.profiles.find(p=>String(p.id)===String(user.xrayProfileId));
@@ -1183,7 +1183,10 @@ async function syncXrayUserToProfile(user){
  let changed=0,skipped=[];
  for(const inbound of config.inbounds){
   inbound.settings=inbound.settings||{};
-  const email=String(user.username||'xmesh-user').replace(/[<>"]/g,'').slice(0,64);
+  // Xray counts per email. Encode both the numeric user and inbound tag
+  // into the Xray stats identity, so each inbound gets an independent user counter.
+  // Do not guess this intersection from separate aggregate counters.
+  const email='xmesh-u'+Number(user.id)+'--'+encodeURIComponent(String(inbound.tag||''));
   const login=String(user.username||'xmesh').toLowerCase().replace(/[^a-z0-9_.-]/g,'-').slice(0,32)||'xmesh';
   if(inbound.protocol==='vless'){
    const list=inbound.settings.users||(inbound.settings.users=[]);
@@ -1490,7 +1493,7 @@ async function profilesP(){
  '<div class="xray-config-panel-title"><div><h3>Протокол и параметры</h3><p>Учётные данные клиента и дополнительные параметры выбранного inbound-протокола.</p></div></div>'+
  group('Параметры протокола и клиента','Учётные данные и дополнительные параметры выбранного протокола',
  optionGroup('client-identity','Идентификация','UUID, fingerprint и режим протокола',
- field('uuid','UUID / credential клиента',inp('uuid','','UUID клиента','autocomplete="off"'))+
+ field('uuid','UUID · только пример клиента',inp('uuid','','Для реальных пользователей UUID создаётся автоматически','autocomplete="off"'),'Новый UUID генерируется Rust API отдельно для каждого пользователя при создании. В серверном шаблоне общий UUID не сохраняется.')+
  '<div class="xray-field-action"><button type="button" class="gh sm" id="xpb-generate-uuid">' + ic('key') + 'Сгенерировать UUID</button></div>'+
  field('fingerprint','uTLS fingerprint · клиент','<select id="xpb-fingerprint"><optgroup label="Рекомендуемые">'+options(XRAY_FP_RECOMMENDED.map(x=>[x,x]))+'</optgroup><optgroup label="Современные профили">'+options(XRAY_FP_MODERN.map(x=>[x,x]))+'</optgroup><optgroup label="Дополнительные и legacy">'+options(XRAY_FP_OTHER.map(x=>[x,x]))+'</optgroup></select>')+
  field('flow','VLESS flow',sel('flow',[['','Без flow'],['xtls-rprx-vision','xtls-rprx-vision']]))+
