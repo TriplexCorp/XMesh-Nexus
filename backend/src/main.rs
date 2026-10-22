@@ -311,6 +311,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/{part1}/{part2}/{part3}/{part4}/{part5}/{part6}/{part7}/{token}", get(user_subscriptions::portal_route))
         .route("/{part1}/{part2}/{part3}/{part4}/{part5}/{part6}/{part7}/{part8}/{token}", get(user_subscriptions::portal_route))
         .nest("/api/v1", public.merge(protected).fallback(|| async { StatusCode::NOT_FOUND }))
+        .nest_service("/flags", ServeDir::new(format!("{static_dir}/flags")))
         .fallback_service(ServeDir::new(static_dir).append_index_html_on_directories(false))
         .layer(RequestBodyLimitLayer::new(2 * 1024 * 1024))
         .layer(CompressionLayer::new())
