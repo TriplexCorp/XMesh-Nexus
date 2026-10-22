@@ -31,9 +31,10 @@ assert.equal(auto(options({...db,hosts:[host(7,'FR','fr.example.net')]},'DE_VLES
   '203.0.113.4','Unrelated inbound host may not contaminate Client JSON');
 assert.equal(auto(options({nodes:[node(1,'192.168.1.4',3)],hosts:[],profiles:[profile]},'DE_VLESS')),null,
   'Refuse private-only endpoint');
-assert.match(app,/id="xpb-server-address-source"/);
-assert.match(app,/addressSource\.addEventListener\('change'/);
-assert.match(app,/addressField\.addEventListener\('input'/);
-assert.match(app,/const port=protocol==='tun'\?0:\(endpoint\?\.port\|\|/);
+// The v3 form was retired; keep testing real host resolution above and the
+// active Studio V4 editor separately from removed xpb DOM wiring.
+const active=fs.readFileSync('xray-studio-v4.js','utf8');
+assert.match(active,/window\.XMeshStudioV4=/);
+assert.match(active,/data-v="source"/);
 assert.doesNotMatch(app,/location\.hostname.*server-address/);
 console.log('XRAY STUDIO client endpoint auto-fill: host-first, node fallback, ambiguity, private IP rejection and manual override OK');
