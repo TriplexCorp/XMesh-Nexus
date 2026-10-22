@@ -72,3 +72,20 @@ pub async fn claim(State(state):State<AppState>,Json(input):Json<Claim>)->Result
  tx.commit().await?;
  Ok(Json(json!({"nodeId":node_id,"enrolled":true})))
 }
+
+#[cfg(test)]
+mod tests {
+ use super::*;
+ use ed25519_dalek::{SigningKey, Signer};
+ #[test]
+ fn enrollment_proof_binds_token_and_public_key() {
+  let secret=SigningKey::from_bytes(&[11u8;32]);
+  let pubhex=hex::encode(secret.verifying_key().to_bytes());
+  let token="a".repeat(64);
+  let message=format!("XMESH-ENROLL-V1\n{}\n{}\n",token,pubhex);
+  let signature=secret.sign(message.as_bytes());
+  assert!(secret.verifying_key().verify(message.as_bytes(),&signature).is_ok());
+  let altered=format!("XMESH-ENROLL-V1\n{}\n{}\n","b".repeat(64),pubhex);
+  assert!(secret.verifying_key().verify(altered.as_bytes(),&signature).is_err());
+ }
+}
