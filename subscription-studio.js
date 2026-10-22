@@ -145,7 +145,7 @@ window.XMeshSubscriptionStudio = (() => {
       '<div class="subscription-studio-heading"><span>03</span><div><h3>Клиентский портал</h3><p>Синхронизация с темой панели или отдельная палитра.</p></div></div>',
       field('subscriptionBrand','Название подписки',data.subscriptionBrand,'Пустое значение — использовать бренд панели.',{placeholder:'Название вашего сервиса',max:80}),
       field('subscriptionDescription','Описание (RU)',data.subscriptionDescription,'Текст на русском.',{area:true,max:240}),
-      field('subscriptionDescriptionEn','Описание (EN)',data.subscriptionDescriptionEn,'English description. Leave blank for the default English text.',{area:true,max:240}),
+      field('subscriptionDescriptionEn','Описание (EN)',data.subscriptionDescriptionEn,'Английский текст; пустое поле — стандартное описание на английском.',{area:true,max:240}),
       '<label class="subscription-theme-sync"><input type="checkbox" name="subscriptionSyncPanelTheme"'+(data.subscriptionSyncPanelTheme!==false?' checked':'')+'> <span><b>Синхронизировать с темой панели</b><small>Акцент, светлый/тёмный режим, фон, карточки и цвет текста. Выключите для своего оформления.</small></span></label>',
       '<div class="subscription-studio-pair">',
       field('subscriptionAccent','Акцентный цвет',data.subscriptionAccent,'Цвет кнопок и индикаторов.',{color:true}),
@@ -154,7 +154,7 @@ window.XMeshSubscriptionStudio = (() => {
       '<label class="f subscription-field"><span>Тема клиентского портала</span><select name="subscriptionTheme"><option value="dark"'+(data.subscriptionTheme!=='light'?' selected':'')+'>Тёмная</option><option value="light"'+(data.subscriptionTheme==='light'?' selected':'')+'>Светлая</option></select></label>',
       '</div>',
       field('subscriptionFooter','Нижняя подпись (RU)',data.subscriptionFooter,'Например, адрес поддержки.',{placeholder:'Поддержка: @yourbot',max:160}),
-      field('subscriptionFooterEn','Footer text (EN)',data.subscriptionFooterEn,'Отдельная подпись для английского языка.',{max:160}),
+      field('subscriptionFooterEn','Нижняя подпись (EN)',data.subscriptionFooterEn,'Отдельная подпись для английского языка.',{max:160}),
       '<div class="subscription-display-options">',
       '<label><input type="checkbox" name="subscriptionShowTraffic"'+(data.subscriptionShowTraffic?' checked':'')+'> Показывать трафик</label>',
       '<label><input type="checkbox" name="subscriptionShowExpiry"'+(data.subscriptionShowExpiry?' checked':'')+'> Показывать срок доступа</label>',
@@ -176,12 +176,12 @@ window.XMeshSubscriptionStudio = (() => {
       '<div class="subscription-studio-heading subscription-studio-subheading"><span>✦</span><div><h3>Персонализация</h3><p>Свой логотип, заголовки и контакты.</p></div></div>',
       field('subscriptionLogoUrl','URL логотипа',data.subscriptionLogoUrl,'Только HTTPS. Оставьте пустым для стандартной пиктограммы.',{placeholder:'https://example.com/logo.png',max:512}),
       field('subscriptionHero','Заголовок статуса (RU)',data.subscriptionHero,'Оставьте пустым для стандартного текста.',{placeholder:'Ваша подписка активна',max:100}),
-      field('subscriptionHeroEn','Status heading (EN)',data.subscriptionHeroEn,'Английский вариант. Оставьте пустым для стандартного текста.',{max:100}),
+      field('subscriptionHeroEn','Заголовок статуса (EN)',data.subscriptionHeroEn,'Английский вариант. Оставьте пустым для стандартного текста.',{max:100}),
       field('subscriptionCta','Текст подключения (RU)',data.subscriptionCta,'Пустое поле — стандартный перевод.',{placeholder:'Подключить устройство',max:80}),
-      field('subscriptionCtaEn','Connection button (EN)',data.subscriptionCtaEn,'Английский текст подключения.',{max:80}),
+      field('subscriptionCtaEn','Кнопка подключения (EN)',data.subscriptionCtaEn,'Английский текст подключения.',{max:80}),
       '<div class="subscription-studio-pair">',
       field('subscriptionSupportLabel','Название поддержки (RU)',data.subscriptionSupportLabel,'Например, Связаться с нами.',{placeholder:'Поддержка',max:80}),
-      field('subscriptionSupportLabelEn','Support label (EN)',data.subscriptionSupportLabelEn,'Английское название поддержки.',{max:80}),
+      field('subscriptionSupportLabelEn','Название поддержки (EN)',data.subscriptionSupportLabelEn,'Английское название поддержки.',{max:80}),
       field('subscriptionSupportUrl','Ссылка поддержки',data.subscriptionSupportUrl,'HTTPS-ссылка на сайт или чат.',{placeholder:'https://example.com/help',max:512}),
       '</div>',
       '<div class="subscription-studio-heading subscription-studio-subheading"><span>◈</span><div><h3>Блоки страницы</h3><p>Каждый элемент включается независимо.</p></div></div>',
@@ -196,7 +196,7 @@ window.XMeshSubscriptionStudio = (() => {
       '<section class="card subscription-studio-section">',
       '<div class="subscription-studio-heading"><span>05</span><div><h3>Клиентские приложения</h3><p>Выбирайте, какие программы показать пользователю, и задавайте собственные ссылки на установку.</p></div></div>',
       field('subscriptionAppsTitle','Заголовок приложений (RU)',data.subscriptionAppsTitle,'Пустое значение — перевод по умолчанию.',{placeholder:'Приложения для подключения',max:80}),
-      field('subscriptionAppsTitleEn','Apps heading (EN)',data.subscriptionAppsTitleEn,'Английский заголовок раздела.',{max:80}),
+      field('subscriptionAppsTitleEn','Заголовок приложений (EN)',data.subscriptionAppsTitleEn,'Английский заголовок раздела.',{max:80}),
       '<div class="subscription-studio-toolbar"><span class="subscription-client-counter" data-subscription-client-count>—</span><div class="subscription-client-actions">',
       '<button type="button" class="gh sm" data-client-preset="all">Включить все</button>',
       '<button type="button" class="gh sm" data-client-preset="none">Отключить все</button>',
@@ -387,6 +387,7 @@ window.XMeshSubscriptionStudio = (() => {
       });
       form.addEventListener('input',draw);
       form.addEventListener('change',event=>{
+        if(event.target.name==='subscriptionLanguage' && ['ru','en'].includes(event.target.value))previewLanguage=event.target.value;
         if(event.target.name==='subscriptionTheme'&&!input(form,'subscriptionSyncPanelTheme').checked){
           const from=themeColors[event.target.value==='light'?'dark':'light'];
           const to=themeColors[event.target.value]||themeColors.dark;
