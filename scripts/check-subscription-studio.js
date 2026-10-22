@@ -195,7 +195,17 @@ assert(!rust.includes('.route("/s/'),'The management panel must not implement pu
 assert.match(html,/subscription-studio\.js\?v=[a-z0-9-]+/,'Subscription Studio JavaScript must use a cache-busting version');
 assert.match(html,/<link\s+rel="stylesheet"\s+href="subscription-studio\.css\?v=[a-zA-Z0-9._-]+"\s*\/?>/,
  'Subscription Studio stylesheet must retain a cache-busting version');
-assert.match(docker,/subscription-studio\.css subscription-studio\.js/);
+assert.match(docker,/subscription-studio\.css subscription-public\.css subscription-studio\.js subscription-portal\.js/);
+const template=fs.readFileSync('backend/src/subscription_template.html','utf8');
+const portalCss=fs.readFileSync('subscription-public.css','utf8');
+const portalJs=fs.readFileSync('subscription-portal.js','utf8');
+new Function(portalJs);
+for(const cls of ['subscription-preview','subscription-preview-brand','subscription-preview-hero','subscription-preview-meta','subscription-preview-progress','subscription-preview-cta','subscription-preview-quick','subscription-preview-support']) {
+  assert(template.includes(cls), 'Live subscription missing preview component: '+cls);
+}
+assert.match(template,/href="\/subscription-studio\.css"/,'Live portal must use the same shared preview stylesheet');
+assert.match(portalCss,/subscription-public-shell/,'Live layout requires its mobile-safe shell');
+assert.match(fs.readFileSync('backend/src/user_subscriptions.rs','utf8'),/include_str!\("subscription_template\.html"\)/,'Backend must use shared portal template');
 assert.match(css,/\.subscription-studio-layout/);
 assert.match(css,/@media\(max-width:780px\)/);
 assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length);
