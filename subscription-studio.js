@@ -75,7 +75,7 @@ window.XMeshSubscriptionStudio = (() => {
   };
   const esc = x => String(x ?? '').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const hostnameOK = v => !v || (v.length <= 253 && /^[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?)*$/i.test(v));
-  const pathOK = v => v.length <= 64 && /^\/[a-z0-9_-]+(?:\/[a-z0-9_-]+)*$/i.test(v) && !/^\/(?:api|login)(?:\/|$)/i.test(v);
+  const pathOK = v => v.length <= 64 && v.split('/').length <= 9 && /^\/[a-z0-9_-]+(?:\/[a-z0-9_-]+)*$/i.test(v) && !/^\/(?:api|login|dashboard)(?:\/|$)/i.test(v);
   const field = (name,label,value,help,opts) => '<label class="f subscription-field"><span>'+label+'</span>'+
     (opts && opts.area ? '<textarea name="'+name+'" rows="2" maxlength="'+(opts.max||240)+'">'+esc(value)+'</textarea>' :
      '<input name="'+name+'" type="'+(opts && opts.color?'color':'text')+'" '+(opts&&opts.max?'maxlength="'+opts.max+'"':'')+
