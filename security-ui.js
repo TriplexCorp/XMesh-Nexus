@@ -26,12 +26,12 @@ async function mount(root){
   ];
   body.innerHTML='<div class="security-subheading"><h4>Политика авторизации</h4><p>Управляется владельцем панели. Значения сохраняются в PostgreSQL и проверяются API.</p></div>'+
   '<form id="security-policy-form"><div class="security-settings-grid">'+fields.map(f=>setting(...f,p,readonly)).join('')+
-  '<label class="security-setting security-url-setting"><span><b>Дополнительный адрес дашборда</b><small>Дополнительный URL входа. Не заменяет HTTPS и авторизацию. Основной адрес / остаётся доступным.</small></span><span class="security-path-controls"><input name="dashboardPath" type="text" minlength="15" maxlength="75" pattern="/dashboard/[A-Za-z0-9_-]{4,64}" value="'+esc(p.dashboardPath)+'" '+(readonly?'disabled':'')+' required><button type="button" class="gh" data-security-copy-path>Копировать ссылку</button></span></label></div>'+
+  '<label class="security-setting security-url-setting"><span><b>Путь входа в панель</b><small>Единственная точка входа в интерфейс. После сохранения старый адрес перестаёт работать. Путь не заменяет HTTPS и авторизацию.</small></span><span class="security-path-controls"><input name="dashboardPath" type="text" minlength="15" maxlength="75" pattern="/dashboard/[A-Za-z0-9_-]{4,64}" value="'+esc(p.dashboardPath)+'" '+(readonly?'disabled':'')+' required><button type="button" class="gh" data-security-copy-path>Копировать ссылку</button></span></label></div>'+
   (readonly?'<p class="note">Редактирование доступно только владельцу (owner).</p>':'<div class="security-policy-actions"><button type="submit" class="btn">Сохранить политику</button><button type="button" class="gh" data-security-reset>Вернуть значения по умолчанию</button></div>')+'</form>'+
   '<div class="security-subheading"><h4>Мои активные сессии</h4><p>При необходимости завершите другие входы в панель.</p></div>'+
   '<div class="security-sessions">'+(sessionRes.sessions||[]).map(s=>'<div class="security-session"><span><b>'+(s.current?'Текущая сессия':'Сессия №'+esc(s.id))+'</b><small>Последняя активность: '+esc(new Date(s.lastActivity).toLocaleString())+' · Истекает: '+esc(new Date(s.expiresAt).toLocaleString())+'</small></span><button type="button" class="gh sm" data-security-revoke="'+esc(s.id)+'">'+(s.current?'Завершить':'Отозвать')+'</button></div>').join('')+
   '<div class="security-policy-actions"><button type="button" class="gh" data-security-revoke-others>Завершить все другие сессии</button></div></div>'+
-  '<div class="security-policy-footnote">Изменение пути не скрывает API и не заменяет ограничения доступа на обратном прокси. Для полной смены базового URL потребуется отдельная настройка HTTPS-прокси.</div>';
+  '<div class="security-policy-footnote">Адрес снижает обнаруживаемость страницы входа, но не является паролем. API должен оставаться защищённым независимо от URL. Используйте длинный непредсказуемый путь и HTTPS.</div>';
  };
  try{await load()}catch(e){fail(e);body.innerHTML='<button class="gh" type="button" data-security-retry>Повторить загрузку</button>'}
  host.addEventListener('click',async e=>{
@@ -54,7 +54,7 @@ async function mount(root){
     if(!confirm('Завершить выбранную сессию?'))return;
     const id=btn.dataset.securityRevoke;
     const out=await request('sessions/'+encodeURIComponent(id),{method:'DELETE'});
-    if(out.current){location.replace('/login');return}
+    if(out.current){location.replace(location.pathname);return}
     await load();
    }
   }catch(ex){fail(ex)}
@@ -66,7 +66,7 @@ async function mount(root){
   for(const key of Object.keys(defaults)){const el=form.elements.namedItem(key);patch[key]=key==='dashboardPath'?el.value.trim():Number(el.value)}
   if(!form.reportValidity())return;
   const btn=form.querySelector('[type=submit]');if(btn)btn.disabled=true;
-  try{await request('policy',{method:'PATCH',body:JSON.stringify(patch)});await load()}catch(ex){fail(ex);if(btn?.isConnected)btn.disabled=false}
+  try{await request('policy',{method:'PATCH',body:JSON.stringify(patch)});if(location.pathname!==patch.dashboardPath){location.replace(patch.dashboardPath);return}await load()}catch(ex){fail(ex);if(btn?.isConnected)btn.disabled=false}
  });
 }
 window.XMeshSecurity={panel,mount};
