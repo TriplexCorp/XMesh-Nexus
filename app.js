@@ -225,7 +225,8 @@ const COUNTRY_CODES='AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE
 const COUNTRY_NAMES=new Intl.DisplayNames(['ru'],{type:'region'});
 const countryFlag=code=>String.fromCodePoint(...code.toUpperCase().split('').map(c=>127397+c.charCodeAt(0)));
 const COUNTRIES=COUNTRY_CODES.map(code=>({code,flag:countryFlag(code),name:COUNTRY_NAMES.of(code)})).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
-const flagView=(value,cls='flag-img')=>{const country=COUNTRIES.find(c=>c.flag===value);return country?`<img class="${cls}" src="https://flagcdn.com/w40/${country.code.toLowerCase()}.png" alt="${country.code}" loading="lazy" decoding="async">`:`<span class="${cls}">${esc(value||'')}</span>`;};
+const NORTH_KOREA_FLAG='<svg viewBox="0 0 32 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="#024fa2" d="M0 0h32v20H0z"/><path fill="#fff" d="M0 3h32v14H0z"/><path fill="#ed1c27" d="M0 4h32v12H0z"/><circle cx="10" cy="10" r="4.3" fill="#fff"/><path fill="#ed1c27" d="M10 6l.95 2.76h2.9l-2.35 1.7.9 2.74L10 11.5l-2.4 1.7.9-2.74-2.35-1.7h2.9z"/></svg>';
+const flagView=(value,cls='flag-img')=>{const country=COUNTRIES.find(c=>c.flag===value);if(country?.code==='KP')return `<span class="${cls} north-korea-flag" role="img" aria-label="${esc(country.name)}">${NORTH_KOREA_FLAG}</span>`;return country?`<img class="${cls}" src="https://flagcdn.com/w40/${country.code.toLowerCase()}.png" alt="${esc(country.name)}" loading="lazy" decoding="async">`:`<span class="${cls}">${esc(value||'')}</span>`;};
 
 /* ================= ФОРМЫ ================= */
 const opt=o=>(typeof o=='function'?o():o).map(x=>Array.isArray(x)?x:[x,x]);
@@ -2268,7 +2269,7 @@ function renderCountryOptions(picker, query=''){
  const input=picker.querySelector('[data-country-search]'),select=picker.querySelector('input.country-value[name=flag]'),options=picker.querySelector('.country-options');
  if(!input||!select||!options)return;
  const q=String(query||'').trim().toLocaleLowerCase('ru');
- const matches=COUNTRIES.filter(c=>(c.name+' '+c.code).toLocaleLowerCase('ru').includes(q));
+ const matches=COUNTRIES.filter(c=>(c.name+' '+c.code+(c.code==='KP'?' Северная Корея КНДР North Korea DPRK':'')).toLocaleLowerCase('ru').includes(q));
  const selected=select.value;
  const custom=selected&&!COUNTRIES.some(c=>c.flag===selected)?selected:'';
  const rows=[];
@@ -2475,15 +2476,47 @@ document.addEventListener('submit',async e=>{const f=e.target,k=f.dataset.k;if(!
       if(submitButton?.isConnected)submitButton.disabled=false;
     }
   }
-  else if(k=='uedit'){e.preventDefault();const d=read(FE,f),id=+f.dataset.id;if(DB.users.some(u=>u.username.toLowerCase()==d.username.toLowerCase()&&u.id!=id))return er('Такое имя уже есть.');await api.update('users',id,d);toast('Сохранено');render(1);userDrawer(id,'ov')}
+  else if(k=='uedit'){
+    e.preventDefault();
+    if(f.dataset.saving==='1')return;
+    const d=read(FE,f),id=+f.dataset.id;
+    if(DB.users.some(u=>u.username.toLowerCase()==d.username.toLowerCase()&&u.id!=id))return er('Такое имя уже есть.');
+    const button=f.querySelector('[type="submit"]');f.dataset.saving='1';if(button)button.disabled=true;
+    try{
+      await api.update('users',id,d);
+      if(dlg.open&&dlg.contains(f))dlg.close();
+      toast('Изменения сохранены');render(1);
+    }catch(error){er('Не удалось сохранить пользователя: '+(error.message||'ошибка API'))}
+    finally{delete f.dataset.saving;if(button?.isConnected)button.disabled=false}
+  }
   else if(k=='ent'){e.preventDefault();const key=f.dataset.ent,e2=ENT[key],d=read(e2.fs,f),id=f.dataset.id,m=e2.chk?.(d,+id);if(m)return er(m);
     if(key==='admins'){
       if(!id&&d.password.length<16)return er('Для нового администратора требуется пароль минимум 16 символов.');
       if(id&&!d.password)delete d.password;
       d.isActive=d.is_active;delete d.is_active;
     }
-    try{if(id){await api.update(key,id,d);toast('Сохранено')}else{const o=Object.assign({disabled:false,order:DB[key].length+1,created:Date.now(),last:0,used:0,state:'OFFLINE'},d);const c=await api.create(key,o);toast('Создано');if(e2.after?.(c)){render(1);return}}render(1)}
-    catch(error){er(error.message||'Не удалось сохранить запись.')}}
+    // Keep the dialog open on API failure; close exactly once on success.
+    if(f.dataset.saving==='1')return;
+    const submitButton=f.querySelector('button[type="submit"],.act .btn');
+    f.dataset.saving='1';
+    if(submitButton)submitButton.disabled=true;
+    try{
+      let created=null;
+      if(id){await api.update(key,id,d)}
+      else{
+        const o=Object.assign({disabled:false,order:DB[key].length+1,created:Date.now(),last:0,used:0,state:'OFFLINE'},d);
+        created=await api.create(key,o);
+      }
+      if(dlg.open&&dlg.contains(f))dlg.close();
+      toast(id?'Сохранено':'Создано');
+      // Respect the existing optional post-create workflow without reopening this form.
+      if(created&&e2.after?.(created))return render(1);
+      render(1);
+    }catch(error){er(error.message||'Не удалось сохранить запись.')}
+    finally{
+      delete f.dataset.saving;
+      if(submitButton?.isConnected)submitButton.disabled=false;
+    }}
   else if(k=='bulk-renew'){
     e.preventDefault();
     const value=f.querySelector('[name="days"]')?.value.trim()||'';
@@ -2498,7 +2531,20 @@ document.addEventListener('submit',async e=>{const f=e.target,k=f.dataset.k;if(!
       render(1);
     }catch(error){return er('Не удалось продлить доступ: '+(error.message||'ошибка API'))}
   }
-  else if(k=='bsq'){const d=read([{k:'squads',t:'multi'}],f),ids=new Set(UQ.sel);await api.bulk('users',ids,u=>u.squads=[...new Set([...u.squads,...d.squads])]);toast('Сквады добавлены');render(1)}
+  else if(k=='bsq'){
+    e.preventDefault();
+    if(f.dataset.saving==='1')return;
+    const d=read([{k:'squads',t:'multi'}],f),ids=new Set(UQ.sel);
+    if(!ids.size)return er('Выберите пользователей.');
+    if(!d.squads.length)return er('Выберите хотя бы один сквад.');
+    const button=f.querySelector('[type="submit"],.act .btn');f.dataset.saving='1';if(button)button.disabled=true;
+    try{
+      await api.bulk('users',ids,u=>u.squads=[...new Set([...u.squads,...d.squads])]);
+      if(dlg.open&&dlg.contains(f))dlg.close();
+      toast('Сквады добавлены');render(1);
+    }catch(error){er('Не удалось добавить в сквад: '+(error.message||'ошибка API'))}
+    finally{delete f.dataset.saving;if(button?.isConnected)button.disabled=false}
+  }
   else if(k=='brand'){e.preventDefault();const d=read([{k:'brand'},{k:'domain'},{k:'subscriptionBrand'},{k:'subscriptionDomain'}],f);try{await api.saveSettings(d);brand();toast('Названия и домены сохранены')}catch(err){return er(err.message)}}});
 const acts2=ok=>`<div class="act"><button type="button" class="gh" data-x>Отмена</button><button class="btn">${ok}</button></div>`;
 $('#theme').onclick=()=>{C.theme=document.documentElement.dataset.theme=='dark'?'light':'dark';apply();syncSubscriptionTheme();if(cur=='set')render(1)};
