@@ -648,7 +648,7 @@ dialog.user-modal .sg{gap:.9rem}
   min-height:2.65rem;
   padding:.32rem .94rem .32rem .36rem;
   border:1px solid color-mix(in srgb,var(--a) 35%,var(--ln));
-  border-radius:var(--ui-control-radius)
+  border-radius:var(--ui-control-radius);
   background:color-mix(in srgb,var(--a) 9%,var(--elevated));
   color:var(--tx);
   font:inherit;
