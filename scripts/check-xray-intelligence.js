@@ -74,7 +74,7 @@ assert.match(engine.decorateRun('<script>',0,'jx-string',null),/&lt;script&gt;/)
 assert.match(engine.decorateRun('abc',0,'jx-string',[{start:1,end:2,message:'bad',severity:'warning'}]),/is-warning/);
 assert.match(intelligence,/MAX_BYTES=900000/,'Cap expensive semantic analysis');
 assert.match(diagnostics,/sr-json-issue-list/,'Issue list must exist');
-assert.match(app,/jsonDiagnostics\?\.inspectAll\(source\)/,'Builder invokes semantic engine');
+assert.match(fs.readFileSync('xray-studio-v4.js','utf8'),/XrayJsonIntelligence\?\.analyze\?\.\(source,obj\)/,'Active Studio v4 invokes semantic engine');
 assert.match(html,/<script src="xray-json-intelligence\.js[^"]*"><\/script>\s*<script src="xray-json-diagnostics\.js/);
 assert.match(docker,/COPY [^\n]*xray-json-intelligence\.js[^\n]* \/app\/static\//);
 console.log('Intelligent Xray JSON validation: OK');
