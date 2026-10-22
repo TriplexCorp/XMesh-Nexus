@@ -104,6 +104,7 @@ jobs:
           APP_DB_PASSWORD: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
           REDIS_PASSWORD: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
           ADMIN_PASSWORD: 9876543210abcdef9876543210abcdef9876543210abcdef
+          DASHBOARD_PATH: /dashboard/0123456789abcdef0123456789abcdef0123456789abcdef
         run: |
           bash -n install.sh
           bash -n xmeshctl
@@ -112,6 +113,8 @@ jobs:
           bash -n deploy/node-metrics-agent.sh
           bash -n deploy/install-node-metrics-agent.sh
           sh -n deploy/postgres/10-create-app-user.sh
+          mkdir -p deploy/runtime
+          printf '%s\\n' "$DASHBOARD_PATH" > deploy/runtime/dashboard-path
           docker compose config --quiet
       - name: Build Docker image
         run: docker build -f backend/Dockerfile -t xmesh-nexus:ci .
@@ -129,10 +132,15 @@ jobs:
       ADMIN_PASSWORD: 9876543210abcdef9876543210abcdef9876543210abcdef
       TOTP_ENCRYPTION_KEY: 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
       COOKIE_SECURE: "false"
+      DASHBOARD_PATH: /dashboard/0123456789abcdef0123456789abcdef0123456789abcdef
     steps:
       - uses: actions/checkout@v7
       - name: Start disposable PostgreSQL, Redis and XMesh API
-        run: docker compose up --build -d
+        run: |
+          mkdir -p deploy/runtime
+          printf '%s\\n' "$DASHBOARD_PATH" > deploy/runtime/dashboard-path
+          chmod 0666 deploy/runtime/dashboard-path
+          docker compose up --build -d
       - name: Wait for database migrations and healthy API
         run: |
           for i in $(seq 1 120); do
