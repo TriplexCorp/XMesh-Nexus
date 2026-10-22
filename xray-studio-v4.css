@@ -315,3 +315,13 @@
  .sv-studio .sv-topbar>.sv-actions{flex-wrap:wrap}
  .sv-studio .sv-legacy .xm-tools-grid{grid-template-columns:minmax(0,1fr)}
 }
+
+/* Compact template library & expanded utilities. */
+.sv-studio .sv-dialog:has(.sv-template-choice){width:min(660px,96vw)}
+.sv-studio .sv-dialog:has(.sv-template-choice) [data-v="overlayBody"]{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.55rem;margin-top:1rem}
+.sv-studio .sv-template-choice{display:flex;flex-direction:column;gap:.25rem;align-items:flex-start;min-height:3.5rem;text-align:left;margin:0;padding:.75rem}
+.sv-studio .sv-template-choice strong{font-size:.85rem}
+.sv-studio .sv-template-choice small{font-size:.72rem;color:var(--vmute);font-weight:450}
+.sv-studio .sv-tools{scrollbar-width:thin}
+.sv-studio .sv-legacy .xm-tools-grid .sv-toolitem{min-height:2.8rem}
+@media(max-width:580px){.sv-studio .sv-dialog:has(.sv-template-choice) [data-v="overlayBody"]{grid-template-columns:1fr}}
