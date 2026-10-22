@@ -74,7 +74,10 @@ pub(crate) fn build(mut proxies:Vec<Value>,setting:&Value)->Result<Value,String>
         let address=outbound["settings"]["vnext"][0]["address"].as_str().unwrap_or("");
         if address.is_empty(){return Err("Не указан публичный адрес сервера".into())}
         let code=country(outbound);
-        let tag=format!("xmesh-{code}-{:04}",i+1);
+        let label=outbound["tag"].as_str().unwrap_or("").chars()
+            .filter(|c|!c.is_control()).take(48).collect::<String>();
+        let tag=if label.is_empty(){format!("xmesh-{code}-{:04}",i+1)}
+            else{format!("xmesh-{code}-{:04} {label}",i+1)};
         if !used.insert(tag.clone()){return Err("Дублирующийся тег Xray".into())}
         outbound.as_object_mut().ok_or("Неверная структура outbound")?.remove("xmeshCountry");
         outbound["tag"]=json!(tag);
@@ -191,7 +194,7 @@ mod tests{
  }
  #[test] fn one_node_uses_direct_tag_without_empty_balancers(){
   let c=build(vec![outbound("PL")],&json!({})).unwrap();
-  assert_eq!(c["routing"]["rules"][3]["outboundTag"],"xmesh-PL-0001");
+  assert!(c["routing"]["rules"][3]["outboundTag"].as_str().unwrap().starts_with("xmesh-PL-0001"));
   assert!(c.get("observatory").is_none());
  }
  #[test] fn insecure_public_vless_is_rejected(){
