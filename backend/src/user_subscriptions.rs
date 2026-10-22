@@ -84,8 +84,8 @@ fn vless_link(user:&Value, inbound:&Value, host:&Value)->Option<String>{
  if let Some(config)=transport{
   if let Some(path)=nonempty(host,"path").or_else(||nonempty(config,"path")){opts.push(format!("path={}",encode_component(path)))}
   if let Some(h)=nonempty(host,"host").or_else(||nonempty(host,"externalHost")){opts.push(format!("host={}",encode_component(h)))}
-  if network=="grpc"{if let Some(service)=nonempty(config,"serviceName"){opts.push(format!("serviceName={}",encode_component(service)))}}
-  if network=="xhttp"{if let Some(mode)=nonempty(config,"mode"){opts.push(format!("mode={}",encode_component(mode)))}}
+  if network=="grpc" && let Some(service)=nonempty(config,"serviceName"){opts.push(format!("serviceName={}",encode_component(service)))}
+  if network=="xhttp" && let Some(mode)=nonempty(config,"mode"){opts.push(format!("mode={}",encode_component(mode)))}
  }
  if security!="none"{
   let sni=nonempty(host,"sni").or_else(||nonempty(host,"externalSNI"))
@@ -198,23 +198,6 @@ pub async fn serve(State(state):State<AppState>,Path(token):Path<String>)->Resul
  response.headers_mut().insert(header::REFERRER_POLICY,"no-referrer".parse().unwrap());
  Ok(response)
 }
-#[cfg(test)]
-mod tests{
- use super::*;
- #[test] fn secret_format(){assert!(valid_token(&"a".repeat(64)));assert!(!valid_token(&"G".repeat(64)));assert_ne!(token_hash("a"),token_hash("b"));}
- #[test] fn encrypted_token_round_trip_and_identity_binding(){
-   // This regression test deliberately keeps the stateful integration path out
-   // of a unit test; authenticated route/DB tests cover the actual storage.
-   let token="a".repeat(64);assert!(valid_token(&token));
-   assert_ne!(token_hash(&token),token);
- }
- #[test] fn invalid_reality_not_exported(){
- let user=json!({"xrayId":"550e8400-e29b-41d4-a716-446655440000"});
- let inbound=json!({"protocol":"vless","port":443,"streamSettings":{"network":"xhttp","security":"reality","realitySettings":{"serverNames":["example.org"]}}});
- let host=json!({"address":"vpn.example.org"});
- assert!(vless_link(&user,&inbound,&host).is_none());
- }
-}
 
 fn escape_html(input:&str)->String{
  input.replace('&',"&amp;").replace('<',"&lt;").replace('>',"&gt;")
@@ -273,16 +256,14 @@ pub async fn rewrite_subscription_path(
 )->Response{
  if req.method()==Method::GET {
   let path=req.uri().path().to_owned();
-  if let Some((prefix,token))=path.rsplit_once('/') {
-   if valid_token(token) && !prefix.starts_with("/api/") {
-    if let Ok(settings)=crate::read_settings(&state.pool).await {
-     let configured=studio_string(&settings,"subscriptionPath","/s").trim_end_matches('/');
-     if prefix==configured {
-      let query=req.uri().query().map(|q|format!("?{q}")).unwrap_or_default();
-      if let Ok(uri)=format!("/api/v1/portal/{token}{query}").parse::<Uri>(){
-       *req.uri_mut()=uri;
-      }
-     }
+  if let Some((prefix,token))=path.rsplit_once('/')
+    && valid_token(token) && !prefix.starts_with("/api/")
+    && let Ok(settings)=crate::read_settings(&state.pool).await {
+   let configured=studio_string(&settings,"subscriptionPath","/s").trim_end_matches('/');
+   if prefix==configured {
+    let query=req.uri().query().map(|q|format!("?{q}")).unwrap_or_default();
+    if let Ok(uri)=format!("/api/v1/portal/{token}{query}").parse::<Uri>(){
+     *req.uri_mut()=uri;
     }
    }
   }
@@ -394,4 +375,22 @@ pub async fn portal(
  let mut response=Html(html).into_response();
  response.headers_mut().insert(header::CACHE_CONTROL,"private, no-store".parse().unwrap());
  Ok(response)
+}
+
+#[cfg(test)]
+mod tests{
+ use super::*;
+ #[test] fn secret_format(){assert!(valid_token(&"a".repeat(64)));assert!(!valid_token(&"G".repeat(64)));assert_ne!(token_hash("a"),token_hash("b"));}
+ #[test] fn encrypted_token_round_trip_and_identity_binding(){
+   // This regression test deliberately keeps the stateful integration path out
+   // of a unit test; authenticated route/DB tests cover the actual storage.
+   let token="a".repeat(64);assert!(valid_token(&token));
+   assert_ne!(token_hash(&token),token);
+ }
+ #[test] fn invalid_reality_not_exported(){
+ let user=json!({"xrayId":"550e8400-e29b-41d4-a716-446655440000"});
+ let inbound=json!({"protocol":"vless","port":443,"streamSettings":{"network":"xhttp","security":"reality","realitySettings":{"serverNames":["example.org"]}}});
+ let host=json!({"address":"vpn.example.org"});
+ assert!(vless_link(&user,&inbound,&host).is_none());
+ }
 }
