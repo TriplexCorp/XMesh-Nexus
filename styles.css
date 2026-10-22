@@ -2482,121 +2482,83 @@ aside #logout .ic{width:1.12rem;height:1.12rem;flex-shrink:0}
 @media(prefers-reduced-motion:reduce){.xmesh-action-feedback{transition:none} }
 
 
-/* Security Center — spacious desktop workspace, compact controls, native responsive flow. */
+/* Security Center — one consistent grid for MFA, policy and sessions. */
 .security-workspace{
- width:100%!important;max-width:1720px!important;margin-inline:auto!important;
- display:grid!important;grid-template-columns:minmax(340px,.8fr) minmax(0,1.2fr)!important;
- align-items:start;gap:1rem!important;min-width:0;
-}
-.security-workspace>.security-overview{grid-column:1/-1;padding:.35rem .2rem .45rem}
-.security-workspace>.security-overview h2{font-size:clamp(1.35rem,1.8vw,1.85rem);margin:.25rem 0}
-.security-workspace>.security-overview p:last-child{max-width:75ch;color:var(--mu);line-height:1.55}
-.security-workspace>#mfa-panel{grid-column:1;min-width:0;margin:0}
-.security-workspace>#security-advanced{grid-column:2;min-width:0;margin:0}
-.security-workspace #mfa-panel.mfa-security-card,
-.security-workspace #security-advanced{
- padding:clamp(1rem,1.4vw,1.55rem)!important;
- border-radius:var(--ui-radius,16px)!important;
-}
-.security-workspace .security-settings-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem}
-.security-workspace .security-setting{padding:.85rem;gap:.65rem;min-width:0}
-.security-workspace .security-setting b{font-size:.83rem}
-.security-workspace .security-setting small{font-size:.72rem}
-.security-workspace .security-number input{width:4.4rem}
-.security-workspace .security-policy-actions{margin-top:.9rem}
-.security-workspace .security-subheading{margin-top:1.15rem}
-.security-workspace .security-session{padding:.75rem .85rem}
-.security-workspace .security-session small{overflow-wrap:anywhere}
-.security-workspace .security-path-controls{width:100%}
-@media(max-width:1400px){
- .security-workspace{grid-template-columns:minmax(310px,.85fr) minmax(0,1.15fr)!important}
- .security-workspace .security-settings-grid{grid-template-columns:minmax(0,1fr)}
-}
-@media(max-width:950px){
- .security-workspace{display:flex!important;flex-direction:column;max-width:780px!important}
- .security-workspace>.security-overview,
- .security-workspace>#mfa-panel,
- .security-workspace>#security-advanced{width:100%;min-width:0}
- .security-workspace .security-settings-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-}
-@media(max-width:620px){
- .security-workspace .security-settings-grid{grid-template-columns:minmax(0,1fr)}
- .security-workspace .security-setting{flex-wrap:wrap;align-items:flex-start}
- .security-workspace .security-number{margin-left:auto}
- .security-workspace .security-session{flex-wrap:wrap}
-}
-
-
-/* Security Center v2 — balanced hierarchy, separate sessions, no dead columns */
-.security-workspace{
-  width:min(100%,1480px)!important;max-width:1480px!important;
-  margin-inline:auto!important;
-  display:grid!important;
-  grid-template-columns:minmax(320px,.78fr) minmax(0,1.22fr)!important;
-  gap:1rem!important;align-items:start!important;
+  width:min(100%,1480px);max-width:1480px;margin-inline:auto;
+  display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);
+  gap:1rem;align-items:stretch;min-width:0;
 }
 .security-workspace>.security-overview{
-  grid-column:1/-1!important;
-  padding:.2rem 0 .45rem!important;
+  grid-column:1/-1;grid-row:1;
+  padding:.25rem 0 .35rem;margin:0;min-width:0;
 }
 .security-workspace>.security-overview h2{
-  font-size:clamp(1.45rem,2vw,1.9rem)!important;
-  line-height:1.2;letter-spacing:-.035em;
+  font-size:clamp(1.45rem,2vw,1.9rem);line-height:1.2;
+  letter-spacing:-.035em;margin:.25rem 0 .4rem;
 }
-.security-workspace>.security-overview p:last-child{max-width:68ch}
-.security-workspace>#mfa-panel{
-  grid-column:1!important;grid-row:2!important;
-  padding:1.3rem!important;min-width:0;
+.security-workspace>.security-overview p:last-child{
+  max-width:68ch;color:var(--mu);line-height:1.55;margin:0;
 }
+.security-workspace>#mfa-panel,
 .security-workspace>#security-advanced{
-  grid-column:2!important;grid-row:2!important;
-  padding:1.3rem!important;min-width:0;
+  grid-row:2;min-width:0;min-height:100%;margin:0;
+  padding:1.3rem;border-radius:var(--ui-radius,16px);
 }
+.security-workspace>#mfa-panel{grid-column:1}
+.security-workspace>#security-advanced{grid-column:2}
 .security-workspace>#security-sessions-panel{
-  grid-column:1/-1!important;grid-row:3!important;
-  min-width:0;padding:1.2rem 1.3rem!important;
-  border-radius:var(--ui-radius,16px)!important;
+  grid-column:1/-1;grid-row:3;min-width:0;margin:0;
+  padding:1.25rem 1.3rem;border-radius:var(--ui-radius,16px);
 }
+.security-workspace #mfa-panel>.hd,
 .security-workspace #security-advanced>.hd,
-.security-workspace #security-sessions-panel>.hd{margin-bottom:.65rem}
-.security-workspace #security-advanced .security-subheading:first-child{display:none}
-.security-workspace .security-settings-grid{gap:.55rem!important}
+.security-workspace #security-sessions-panel>.hd{margin:0 0 .9rem}
+.security-workspace .security-settings-grid{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem;
+}
 .security-workspace .security-setting{
-  padding:.78rem .86rem!important;
-  border-radius:var(--ui-control-radius,14px)!important;
-  gap:.5rem!important;
+  min-width:0;padding:.82rem;gap:.65rem;
+  border-radius:var(--ui-control-radius);
 }
-.security-workspace .security-setting>span:first-child{gap:.25rem}
-.security-workspace .security-number{gap:.25rem}
-.security-workspace .security-number input{width:4.25rem!important}
-.security-workspace .security-url-setting{
-  padding:.9rem!important;
-}
-.security-workspace .security-policy-actions{align-items:center}
+.security-workspace .security-setting>span:first-child{gap:.25rem;min-width:0}
+.security-workspace .security-setting b{font-size:.83rem}
+.security-workspace .security-setting small{font-size:.72rem}
+.security-workspace .security-number{gap:.25rem;flex:0 0 auto}
+.security-workspace .security-number input{width:4.25rem}
+.security-workspace .security-url-setting{padding:.9rem}
+.security-workspace .security-path-controls{width:100%;max-width:100%}
+.security-workspace .security-path-controls input{min-width:0;flex:1}
+.security-workspace .security-policy-actions{display:flex;align-items:center;gap:.65rem;flex-wrap:wrap;margin-top:1rem}
+.security-workspace .security-policy-footnote{font-size:.72rem;margin-top:.85rem}
 .security-workspace .security-sessions{
   display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem;
 }
-.security-workspace .security-session{background:var(--s2);min-width:0}
-.security-workspace .security-sessions>.security-policy-actions{grid-column:1/-1;margin-top:.3rem}
+.security-workspace .security-session{min-width:0;background:var(--s2);padding:.8rem .9rem}
+.security-workspace .security-session small{overflow-wrap:anywhere}
+.security-workspace .security-sessions>.security-policy-actions{grid-column:1/-1}
 .security-workspace #mfa-panel .mfa-security-content{gap:.75rem}
-.security-workspace #mfa-panel .mfa-security-heading{margin-bottom:.8rem}
-.security-workspace #mfa-panel .mfa-security-icon{border-radius:var(--ui-control-radius,14px)}
-.security-workspace .security-policy-footnote{font-size:.72rem;margin-top:.85rem}
-@media(max-width:1200px){
- .security-workspace{grid-template-columns:minmax(290px,.8fr) minmax(0,1.2fr)!important}
- .security-workspace .security-settings-grid{grid-template-columns:1fr!important}
+.security-workspace #mfa-panel .mfa-security-icon{border-radius:var(--ui-control-radius)}
+@media(max-width:1250px){
+  .security-workspace{grid-template-columns:minmax(0,1fr) minmax(0,1.35fr)}
+  .security-workspace .security-settings-grid{grid-template-columns:minmax(0,1fr)}
 }
 @media(max-width:900px){
- .security-workspace{grid-template-columns:minmax(0,1fr)!important}
- .security-workspace>.security-overview{grid-column:1!important;grid-row:1!important}
- .security-workspace>#mfa-panel{grid-column:1!important;grid-row:2!important}
- .security-workspace>#security-advanced{grid-column:1!important;grid-row:3!important}
- .security-workspace>#security-sessions-panel{grid-column:1!important;grid-row:4!important}
- .security-workspace .security-settings-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .security-workspace{grid-template-columns:minmax(0,1fr)}
+  .security-workspace>.security-overview{grid-column:1;grid-row:1}
+  .security-workspace>#mfa-panel{grid-column:1;grid-row:2}
+  .security-workspace>#security-advanced{grid-column:1;grid-row:3}
+  .security-workspace>#security-sessions-panel{grid-column:1;grid-row:4}
+  .security-workspace .security-settings-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media(max-width:600px){
- .security-workspace .security-settings-grid,.security-workspace .security-sessions{grid-template-columns:1fr!important}
- .security-workspace #mfa-panel,.security-workspace #security-advanced,.security-workspace #security-sessions-panel{padding:1rem!important}
+  .security-workspace .security-settings-grid,
+  .security-workspace .security-sessions{grid-template-columns:minmax(0,1fr)}
+  .security-workspace #mfa-panel,
+  .security-workspace #security-advanced,
+  .security-workspace #security-sessions-panel{padding:1rem}
+  .security-workspace .security-setting{flex-wrap:wrap;align-items:flex-start}
+  .security-workspace .security-number{margin-left:auto}
+  .security-workspace .security-session{flex-wrap:wrap}
 }
 
 /* The logo is independent from the button palette. */
