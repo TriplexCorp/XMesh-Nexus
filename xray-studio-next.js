@@ -103,7 +103,8 @@ function refresh(){
 refreshFields();
 serverError='';clientError='';
 try{server=JSON.stringify(mode==='manual'?JSON.parse(v('manual')):config(),null,2)}catch(e){server='';serverError=e.message}
-try{client=JSON.stringify(clientConfig(),null,2)}catch(e){client='';clientError=e.message}
+if(mode==='manual'){client='';clientError='В ручном режиме клиентский JSON не генерируется из произвольного Server JSON. Используйте персональный экспорт пользователя.'}
+else try{client=JSON.stringify(clientConfig(),null,2)}catch(e){client='';clientError=e.message}
 const current=tab==='server'?server:client;
 $(root,'output').textContent=current||(tab==='server'?'Server JSON пока недоступен':'Client JSON пока недоступен');
 const problem=tab==='server'?serverError:clientError;
@@ -112,7 +113,7 @@ $(root,'diagnostics').textContent=problem||'';
 }
 function switchMode(next){
 if(mode===next)return;
-if(next==='manual'&&!manualDirty)set('manual',server||JSON.stringify(config(),null,2));
+if(next==='manual'&&!manualDirty)set('manual',server||'{\n  "inbounds": []\n}');
 mode=next;
 root.querySelectorAll('[data-xm-visual]').forEach(x=>x.hidden=next!=='visual');
 root.querySelectorAll('[data-xm-manual]').forEach(x=>x.hidden=next!=='manual');
