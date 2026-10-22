@@ -10,7 +10,7 @@ use axum::{
     extract::{Extension, Path, Query, Request, State},
     http::{header, HeaderMap, HeaderName, HeaderValue, Method, StatusCode, Uri},
     middleware::{self, Next},
-    response::{Html, IntoResponse, Redirect, Response},
+    response::{IntoResponse, Response},
     routing::{get, patch, post},
     Json, Router,
 };
@@ -250,7 +250,6 @@ async fn main() -> anyhow::Result<()> {
         .route("/login", get(|| async { StatusCode::NOT_FOUND }))
         .route("/login.html", get(|| async { StatusCode::NOT_FOUND }))
         .route("/dashboard/{slug}", get(security::dashboard_entry))
-        
         .nest("/api/v1", public.merge(protected))
         .fallback_service(ServeDir::new(static_dir).append_index_html_on_directories(false))
         .layer(RequestBodyLimitLayer::new(2 * 1024 * 1024))
