@@ -9,6 +9,7 @@ mod node_runtime;
 mod node_enrollment;
 mod subscription_settings;
 mod user_subscriptions;
+mod subscription_json;
 
 use axum::{
     extract::{Extension, Path, Query, Request, State},
