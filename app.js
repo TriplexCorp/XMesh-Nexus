@@ -1352,7 +1352,7 @@ async function profilesP(){
  const field=(id,label,control,help)=>'<label class="f"><span>'+label+'</span>'+control+(help?'<small>'+help+'</small>':'')+'</label>';
  const inp=(id,value,placeholder,extra)=>'<input id="xpb-'+id+'" value="'+(value||'')+'" placeholder="'+(placeholder||'')+'" '+(extra||'')+'>';
  const sel=(id,items)=>'<select id="xpb-'+id+'">'+options(items)+'</select>';
- const group=(title,desc,body,_legacy,compact=false)=>'<section class="xray-section'+(compact?' xray-section-compact':'')+'">'+(compact?'':'<header class="xray-section-heading"><div><b>'+title+'</b><small>'+desc+'</small></div></header>')+'<div class="xray-section-body">'+body+'</div></section>';
+ const group=(title,desc,body,compact=false)=>'<section class="xray-section'+(compact?' xray-section-compact':'')+'">'+(compact?'':'<header class="xray-section-heading"><div><b>'+title+'</b><small>'+desc+'</small></div></header>')+'<div class="xray-section-body">'+body+'</div></section>';
  const optionGroup=(key,title,desc,body)=>'<section class="xray-option-group" data-xray-option-group="'+key+'"><div class="xray-option-group-head"><div><b>'+title+'</b><small>'+desc+'</small></div></div><div class="xray-option-grid">'+body+'</div></section>';
  /* Studio owns its layout; never apply .card (GLASS injects square overlays). */
  const builderHtml='<section class="xray-builder"><div class="xray-hero"><div class="xray-heading-copy"><p class="note">XRAY-CORE / ПРОФИЛЬ INBOUND</p><h2>Конструктор подключения</h2><p class="xray-hero-description">Настройте inbound — конфигурации сервера и клиента обновятся автоматически.</p></div></div>'+
@@ -2020,7 +2020,7 @@ async function nodesP(){
         ${nodeGauge(n,'traffic-'+n.id,'Трафик',n.limit?k*100:0,n.limit?Math.round(k*100)+'%':'∞',n.limit?`${gb(n.used)} / ${gb(n.limit)}`:`${gb(n.used)} · без лимита`,tc)}
       </div>
       <div class="mb node-speed"><div><span>Текущая скорость</span><b id="nm${n.id}">${Number.isFinite(l.mbps)?fmt(l.mbps)+' Мбит/с':'—'}</b></div><div class="pb f" style="--w:${Number.isFinite(l.mbps)?cl(l.mbps/240*100,0,100):0}%" id="npm${n.id}"><i></i></div></div>
-      <div class="acts"><button class="gh sm" data-metrics-token="${n.id}" title="Настроить Ed25519-аутентификацию и мониторинг узла">${ic('activity')}Настроить метрики</button><button class="gh sm" data-nr="${n.id}">${ic('redo')}Перезапуск</button><button class="gh sm" data-nt="${n.id}">${ic(n.disabled?'play':'pause')}${n.disabled?'Включить':'Отключить'}</button><button class="gh sm" data-ne="nodes:${n.id}">${ic('pen')}Изменить</button></div></div>`;
+      <div class="acts"><button class="gh sm" data-node-metrics="${n.id}" title="Настроить Ed25519-аутентификацию и мониторинг узла">${ic('activity')}Настроить метрики</button><button class="gh sm" data-nr="${n.id}">${ic('redo')}Перезапуск</button><button class="gh sm" data-nt="${n.id}">${ic(n.disabled?'play':'pause')}${n.disabled?'Включить':'Отключить'}</button><button class="gh sm" data-ne="nodes:${n.id}">${ic('pen')}Изменить</button></div></div>`;
   }).join('');
   const empty=`<div class="card empty"><b>Узлов пока нет</b><span>Список начнёт заполняться после добавления ваших серверов.</span><button class="btn sm" data-ne="nodes">${ic('plus')}Добавить узел</button></div>`;
   const gridMode=getNodeGridMode();
@@ -2221,8 +2221,8 @@ document.addEventListener('click',async e=>{
   else if(b=g('tr[data-e]')){const [k,id]=b.dataset.e.split(':');entForm(k,id)}
   else if(b=g('[data-mv]')){const [k,id,d]=b.dataset.mv.split(':'),a=[...DB[k]].sort((x,y)=>x.order-y.order),i=a.findIndex(x=>x.id==id),j=i+ +d;if(a[j]){const o=a[i].order;await api.update(k,a[i].id,{order:a[j].order});await api.update(k,a[j].id,{order:o});render(1)}}
   else if(b=g('[data-del]')){const [k,id]=b.dataset.del.split(':'),e=ENT[k],r=DB[k].find(x=>String(x.id)===id),m=e?.guard?.(r);if(m){const error=$('#fe');if(error)error.textContent=m;else toast(m);return}if(!r){toast('Запись уже удалена или не найдена.');return}confirmBox(`Удалить «${e?.t||k}»?`,'Удалить',async()=>{try{await api.remove(k,id);toast('Запись удалена');await render(1)}catch(err){toast('Не удалось удалить: '+(err.message||'ошибка backend'))}})}
-  else if(b=g('[data-metrics-token]')){
-    const id=Number(b.dataset.metricsToken),node=DB.nodes.find(n=>Number(n.id)===id);
+  else if(b=g('[data-node-metrics]')){
+    const id=Number(b.dataset.nodeMetrics),node=DB.nodes.find(n=>Number(n.id)===id);
     if(!node){toast('Узел не найден.');return}
     if(location.protocol!=='https:'){toast('Открой панель через HTTPS для управления идентичностью узла.');return}
     const shellQuote=value=>"'"+String(value).replace(/'/g,"'\\''")+"'";
