@@ -344,10 +344,10 @@ const modal=(h,c='')=>{
 dlg.addEventListener('click',e=>{if(e.target==dlg||e.target.closest('[data-x]'))dlg.close()});
 const confirmBox=(h,ok,fn)=>{CF=fn;modal(`<div class="box"><h2>${h}</h2><div class="act"><button class="gh" data-x>Отмена</button><button class="btn" data-cf>${ok}</button></div></div>`)};
 let tt;const toast=(m,al,fn)=>{const t=$('#toast');t.innerHTML=`<span>${esc(m)}</span>${al?`<button id="ta">${al}</button>`:''}`;if(al)$('#ta').onclick=()=>{fn();t.classList.remove('show')};t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),al?6000:2400)};
-const CDEFAULT={theme:'dark',accent:'emerald',customA:'#60d6a2',customB:'#c3e879',hue:151,sat:62,lum:61,ts:1,motion:1,density:'comfortable',surface:'solid',glow:'normal',font:'onest',radius:16,borders:'soft',sidebar:'standard',railTips:0,contentWidth:1920,gapScale:1,autoCoreRefresh:1,coreRefreshSeconds:30};
-let C={...CDEFAULT};try{Object.assign(C,JSON.parse(localStorage.xmeshNexusSettings||'{}'))}catch(e){}if(C.accent==='mint')C.accent='emerald';if(!['solid','glass','raised'].includes(C.surface))C.surface='solid';C.railTips=C.railTips===true||C.railTips===1?1:0;C.ts=cl(Number(C.ts)||1,.9,2);C.radius=cl(Number.isFinite(Number(C.radius))?Number(C.radius):16,1,36);C.rangePrecision=C.rangePrecision===10?10:1;
+const CDEFAULT={theme:'dark',accent:'emerald',customA:'#60d6a2',customB:'#c3e879',hue:151,sat:62,lum:61,ts:1,textSize:100,textPrecision:1,motion:1,density:'comfortable',surface:'solid',glow:'normal',font:'onest',radius:16,borders:'soft',sidebar:'standard',railTips:0,contentWidth:1920,gapScale:1,autoCoreRefresh:1,coreRefreshSeconds:30};
+let C={...CDEFAULT};try{Object.assign(C,JSON.parse(localStorage.xmeshNexusSettings||'{}'))}catch(e){}if(C.accent==='mint')C.accent='emerald';if(!['solid','glass','raised'].includes(C.surface))C.surface='solid';C.railTips=C.railTips===true||C.railTips===1?1:0;C.ts=cl(Number(C.ts)||1,.9,2);C.radius=cl(Number.isFinite(Number(C.radius))?Number(C.radius):16,1,36);C.rangePrecision=C.rangePrecision===10?10:1;C.textSize=cl(Math.round(Number(C.textSize)||100),75,160);C.textPrecision=C.textPrecision===10?10:1;
 const hslHex=(h,s,l)=>{s/=100;l/=100;const k=n=>(n+h/30)%12,a=s*Math.min(l,1-l),f=n=>{const c=(k(n)+12)%12;return l-a*Math.max(-1,Math.min(c-3,9-c,1))};return '#'+[f(0),f(8),f(4)].map(v=>Math.round(v*255).toString(16).padStart(2,'0')).join('')};
-const apply=()=>{const r=document.documentElement;r.dataset.theme=C.theme=='auto'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):C.theme;r.dataset.accent=C.accent;r.style.setProperty('--custom-a',C.customA||hslHex(+C.hue||151,+C.sat||62,+C.lum||61));r.style.setProperty('--custom-b',C.customB||'#c3e879');if(C.accent==='custom'){const rgb=(C.customA||'#60d6a2').match(/[0-9a-f]{2}/gi).map(v=>parseInt(v,16)/255);const linear=rgb.map(v=>v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4));const lum=.2126*linear[0]+.7152*linear[1]+.0722*linear[2];r.style.setProperty('--btn-text',lum>.42?'#082b1d':'#ffffff')}else r.style.setProperty('--btn-text',r.dataset.theme==='light'?'#ffffff':'#082b1d');r.dataset.density=C.density||CDEFAULT.density;r.dataset.surface=C.surface||CDEFAULT.surface;r.dataset.glow=C.glow||CDEFAULT.glow;r.dataset.font=C.font||CDEFAULT.font;r.dataset.borders=C.borders||CDEFAULT.borders;r.dataset.sidebar=C.sidebar||CDEFAULT.sidebar;r.dataset.railTips=C.railTips?'on':'off';if(!C.railTips)hideRailTip();r.style.setProperty('--ts',cl(+C.ts||1,.9,2));const radius=cl(Number.isFinite(Number(C.radius))?Number(C.radius):16,1,36);r.style.setProperty('--ui-radius',radius+'px');r.style.setProperty('--ui-control-radius',radius+'px');r.dataset.motion=C.motion?'on':'off';
+const apply=()=>{const r=document.documentElement;r.dataset.theme=C.theme=='auto'?(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):C.theme;r.dataset.accent=C.accent;r.style.setProperty('--custom-a',C.customA||hslHex(+C.hue||151,+C.sat||62,+C.lum||61));r.style.setProperty('--custom-b',C.customB||'#c3e879');if(C.accent==='custom'){const rgb=(C.customA||'#60d6a2').match(/[0-9a-f]{2}/gi).map(v=>parseInt(v,16)/255);const linear=rgb.map(v=>v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4));const lum=.2126*linear[0]+.7152*linear[1]+.0722*linear[2];r.style.setProperty('--btn-text',lum>.42?'#082b1d':'#ffffff')}else r.style.setProperty('--btn-text',r.dataset.theme==='light'?'#ffffff':'#082b1d');r.dataset.density=C.density||CDEFAULT.density;r.dataset.surface=C.surface||CDEFAULT.surface;r.dataset.glow=C.glow||CDEFAULT.glow;r.dataset.font=C.font||CDEFAULT.font;r.dataset.borders=C.borders||CDEFAULT.borders;r.dataset.sidebar=C.sidebar||CDEFAULT.sidebar;r.dataset.railTips=C.railTips?'on':'off';if(!C.railTips)hideRailTip();r.style.setProperty('--ts',cl(+C.ts||1,.9,2));r.style.setProperty('--text-size-scale',C.textSize/100);const radius=cl(Number.isFinite(Number(C.radius))?Number(C.radius):16,1,36);r.style.setProperty('--ui-radius',radius+'px');r.style.setProperty('--ui-control-radius',radius+'px');r.dataset.motion=C.motion?'on':'off';
 r.style.setProperty('--panel-content-max',cl(Number(C.contentWidth)||1920,720,3000)+'px');
 const baseGap=C.density==='compact'?.75:C.density==='spacious'?1.45:1.1;
 r.style.setProperty('--view-gap',(baseGap*cl(Number(C.gapScale)||1,.8,1.4))+'rem');
@@ -424,12 +424,12 @@ const syncRangeProgress=input=>{
 // Only Appearance sliders use the 1/10 precision setting. Other studios retain
 // their protocol-defined step sizes. Coarse values snap to absolute tens, not
 // to (minimum + N * 10), and both endpoints remain reachable.
-const APPEARANCE_RANGE_IDS=new Set(['ts','content-width','gap-scale','hue','sat','lum']);
+const APPEARANCE_RANGE_IDS=new Set(['ts','text-size','content-width','gap-scale','hue','sat','lum']);
 const configureRangePrecision=input=>{
  if(!input?.matches?.('input[type="range"]'))return;
  if(APPEARANCE_RANGE_IDS.has(input.id)){
   if(!input.dataset.baseStep)input.dataset.baseStep=input.getAttribute('step')||'1';
-  input.step=C.rangePrecision===10?'any':input.dataset.baseStep;
+  input.step=(input.id==='text-size'?C.textPrecision:C.rangePrecision)===10?'any':input.dataset.baseStep;
  }
  syncRangeProgress(input);
 };
@@ -439,7 +439,7 @@ const snapAppearanceSlider=input=>{
  const min=Math.round(Number(input.min)*factor),max=Math.round(Number(input.max)*factor);
  const raw=Number(input.value)*factor;
  if(!Number.isFinite(raw))return;
- const step=C.rangePrecision===10?10:1;
+ const step=(input.id==='text-size'?C.textPrecision:C.rangePrecision)===10?10:1;
  // Explicit endpoints: e.g. 48px remains reachable in the 10px mode.
  const next=raw<=min?min:raw>=max?max:cl(Math.round(raw/step)*step,min,max);
  input.value=String(Number((next/factor).toFixed(4)));
@@ -452,6 +452,7 @@ const updateVisibleRangePrecision=()=>{
 };
 const APPEARANCE_FIELDS={
  ts:{output:'tsv',unitFactor:100,min:90,max:200},
+ 'text-size':{output:'text-size-value',unitFactor:1,min:75,max:160},
  radius:{output:'rv',unitFactor:1,min:1,max:36},
  'content-width':{output:'content-width-value',unitFactor:1,min:720,max:3000},
  'gap-scale':{output:'gap-scale-value',unitFactor:100,min:80,max:140}
@@ -459,7 +460,7 @@ const APPEARANCE_FIELDS={
 const showAppearanceNumber=id=>{
  const f=APPEARANCE_FIELDS[id],input=f&&$('#'+f.output);
  if(!input||input===document.activeElement)return;
- const stored=id==='ts'?C.ts:id==='radius'?C.radius:id==='content-width'?C.contentWidth:C.gapScale;
+ const stored=id==='ts'?C.ts:id==='text-size'?C.textSize:id==='radius'?C.radius:id==='content-width'?C.contentWidth:C.gapScale;
  input.value=String(Math.round(stored*f.unitFactor));
 };
 const commitAppearanceNumber=input=>{
@@ -467,13 +468,14 @@ const commitAppearanceNumber=input=>{
  if(!f)return false;
  let n=input.valueAsNumber;
  if(!Number.isFinite(n)){
-  input.value=String(Math.round((id==='ts'?C.ts:id==='radius'?C.radius:id==='content-width'?C.contentWidth:C.gapScale)*f.unitFactor));
+  input.value=String(Math.round((id==='ts'?C.ts:id==='text-size'?C.textSize:id==='radius'?C.radius:id==='content-width'?C.contentWidth:C.gapScale)*f.unitFactor));
   return true;
  }
  n=cl(Math.round(n),f.min,f.max);
  input.value=String(n);
  const value=n/f.unitFactor;
  if(id==='ts')C.ts=value;
+ else if(id==='text-size')C.textSize=value;
  else if(id==='radius')C.radius=value;
  else if(id==='content-width')C.contentWidth=value;
  else C.gapScale=value;
@@ -488,7 +490,7 @@ const commitAppearanceNumber=input=>{
 let appearanceControlsFrame=0;
 const paintAppearanceControls=()=>{
  const style=document.documentElement.style;
- style.setProperty('--ts',cl(Number(C.ts)||1,.9,2));
+ style.setProperty('--ts',cl(Number(C.ts)||1,.9,2));style.setProperty('--text-size-scale',C.textSize/100);
  const radius=cl(Number.isFinite(Number(C.radius))?Number(C.radius):16,1,36);
  style.setProperty('--ui-radius',radius+'px');
  style.setProperty('--ui-control-radius',radius+'px');
@@ -2092,6 +2094,8 @@ async function setP(){
     </section>
     <section class="card sg"><div class="appearance-card-heading"><h3>Типографика</h3><small>Размер и начертание текста</small></div>
       <div class="setting-row"><div class="setting-copy"><b>Масштаб интерфейса</b><small>Масштаб от 90% до 200%. Для возврата к стандартному размеру установите 100%.</small></div><div class="setting-control slider-control"><input type="range" id="ts" min="0.9" max="2" step="0.01" value="${C.ts}" aria-label="Масштаб интерфейса"><label class="precision-number"><input type="number" id="tsv" data-appearance-value="ts" min="90" max="200" step="1" value="${Math.round(C.ts*100)}" aria-label="Точный масштаб интерфейса"><span>%</span></label></div></div>
+      <div class="setting-row"><div class="setting-copy"><b>Размер текста</b><small>Отдельно от масштаба интерфейса · 75–160%, точность 1 процентный пункт</small></div><div class="setting-control slider-control"><input type="range" id="text-size" min="75" max="160" step="1" value="${C.textSize}" aria-label="Размер текста"><label class="precision-number"><input type="number" id="text-size-value" data-appearance-value="text-size" min="75" max="160" step="1" value="${C.textSize}" aria-label="Точный размер текста"><span>%</span></label></div></div>
+      <div class="setting-row"><div class="setting-copy"><b>Привязка размера текста</b><small>Точность 1% или привязка к десяткам. Можно вводить любое число вручную.</small></div><div class="setting-control"><select id="text-precision" aria-label="Привязка размера текста"><option value="1" ${C.textPrecision===1?'selected':''}>Шаг 1</option><option value="10" ${C.textPrecision===10?'selected':''}>Привязка 10</option></select></div></div>
       <div class="setting-row"><div class="setting-copy"><b>Шрифт</b><small>Выберите нейтральный системный или моноширинный стиль</small></div><div class="setting-control">${choices('font',[['onest','Manrope'],['system','Системный'],['mono','Моно']])}</div></div>
     </section>
 </div><div class="appearance-column">
@@ -2351,6 +2355,7 @@ document.addEventListener('click',e=>{
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeTopLanguage()});
 document.addEventListener('change',async e=>{const t=e.target;
   syncRangeProgress(t);
+  if(t.id==='text-precision'){C.textPrecision=t.value==='10'?10:1;updateVisibleRangePrecision();try{localStorage.xmeshNexusSettings=JSON.stringify(C)}catch(e){}return;}
   if(t.id==='range-precision'){
     C.rangePrecision=t.value==='10'?10:1;
     updateVisibleRangePrecision();
@@ -2362,7 +2367,7 @@ document.addEventListener('change',async e=>{const t=e.target;
     commitAppearanceNumber(t);
     return;
   }
-  if(['ts','radius','gap-scale'].includes(t.id)){
+  if(['ts','text-size','radius','gap-scale'].includes(t.id)){
     saveAppearanceControls();
     return;
   }
@@ -2395,7 +2400,7 @@ document.addEventListener('change',async e=>{const t=e.target;
    Provide explicit keyboard increments so Arrow keys never get stuck. */
 document.addEventListener('keydown',e=>{
  const input=e.target;
- if(C.rangePrecision!==10||!input?.matches?.('input[type="range"]')||!APPEARANCE_RANGE_IDS.has(input.id))return;
+ if((input?.id==='text-size'?C.textPrecision:C.rangePrecision)!==10||!input?.matches?.('input[type="range"]')||!APPEARANCE_RANGE_IDS.has(input.id))return;
  const directions={ArrowRight:1,ArrowUp:1,ArrowLeft:-1,ArrowDown:-1,PageUp:1,PageDown:-1};
  const dir=directions[e.key];
  if(dir===undefined&&e.key!=='Home'&&e.key!=='End')return;
@@ -2416,7 +2421,7 @@ document.addEventListener('keydown',e=>{
 document.addEventListener('input',e=>{snapAppearanceSlider(e.target);syncRangeProgress(e.target);if(updatePaletteColor(e.target))return;if(['hue','sat','lum'].includes(e.target.id)){
   paletteDraft.h=+$('#hue').value;paletteDraft.s=+$('#sat').value;paletteDraft.l=+$('#lum').value;
   paletteDraft.a=hslHex(paletteDraft.h,paletteDraft.s,paletteDraft.l);paintPaletteDraft();
-}else if(e.target.id=='ts'){C.ts=cl(+e.target.value,.9,2);showAppearanceNumber('ts');previewAppearanceControls()}else if(e.target.id=='radius'){C.radius=cl(+e.target.value,1,36);showAppearanceNumber('radius');previewAppearanceControls()}
+}else if(e.target.id=='ts'){C.ts=cl(+e.target.value,.9,2);showAppearanceNumber('ts');previewAppearanceControls()}else if(e.target.id==='text-size'){C.textSize=cl(Math.round(Number(e.target.value)),75,160);showAppearanceNumber('text-size');previewAppearanceControls()}else if(e.target.id=='radius'){C.radius=cl(+e.target.value,1,36);showAppearanceNumber('radius');previewAppearanceControls()}
  else if(e.target.id==='content-width'){C.contentWidth=cl(Number(e.target.value)||1920,720,3000);showAppearanceNumber('content-width');previewContentWidth()}
  else if(e.target.id==='gap-scale'){C.gapScale=+e.target.value;showAppearanceNumber('gap-scale');previewAppearanceControls()}
  if(e.target.id=='pq')pdraw(e.target.value)});
