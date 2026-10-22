@@ -78,6 +78,8 @@ jobs:
         run: node scripts/check-appearance-surfaces.js
       - name: Check New Node button rendering and handler
         run: node scripts/check-node-create-action.js
+      - name: Check optional node hosting and local flags in notifications
+        run: node scripts/check-node-hosting-notifications.js
       - name: Enforce tech-debt cleanup and compatibility boundaries
         run: node scripts/check-tech-debt.js
       - name: Verify CRUD dialogs close after success and DPRK flag renders offline
