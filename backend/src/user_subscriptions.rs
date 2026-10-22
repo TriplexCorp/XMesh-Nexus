@@ -38,6 +38,17 @@ fn decrypt_token(state:&AppState,user_id:i64,encoded:&str,expected_hash:&str)->R
  Ok(token)
 }
 fn bad(msg:&'static str)->ApiError {ApiError::new(StatusCode::BAD_REQUEST,msg)}
+fn studio_url(settings:&Value,token:&str)->String{
+ let domain=settings.get("subscriptionDomain").and_then(Value::as_str)
+  .filter(|s|!s.is_empty()).or_else(||settings.get("domain").and_then(Value::as_str)
+  .filter(|s|!s.is_empty()));
+ let path=settings.get("subscriptionPath").and_then(Value::as_str).filter(|p|p.starts_with('/'))
+  .unwrap_or("/s").trim_end_matches('/');
+ match domain {
+  Some(host)=>format!("https://{host}{path}/{token}"),
+  None=>format!("{path}/{token}"),
+ }
+}
 fn token_hash(token:&str)->String{hex::encode(Sha256::digest(token.as_bytes()))}
 fn valid_token(token:&str)->bool{token.len()==64&&token.bytes().all(|c|c.is_ascii_hexdigit()&&!c.is_ascii_uppercase())}
 fn nonempty<'a>(obj:&'a Value,key:&str)->Option<&'a str>{obj.get(key).and_then(Value::as_str).filter(|s|!s.is_empty())}
@@ -110,7 +121,8 @@ pub async fn create(State(state):State<AppState>,Extension(actor):Extension<Auth
    token_ciphertext=EXCLUDED.token_ciphertext,created_at=NOW()")
   .bind(id).bind(token_hash(&token)).bind(encrypted).execute(&state.pool).await?;
  crate::audit(&state.pool,&actor.username,"subscription.rotated",Some("users"),Some(id),json!({})).await;
- Ok(Json(json!({"token":token,"userId":id})))
+ let settings=crate::read_settings(&state.pool).await?;
+ Ok(Json(json!({"token":token,"userId":id,"url":studio_url(&settings,&token)})))
 }
 pub async fn status(
  State(state):State<AppState>,Extension(actor):Extension<AuthUser>,Path(id):Path<i64>,
@@ -127,7 +139,9 @@ pub async fn status(
   Some(value)=>Some(decrypt_token(&state,id,&value,&hash)?),
   None=>None
  };
- Ok(Json(json!({"enabled":true,"legacy":token.is_none(),"token":token})))
+ let settings=crate::read_settings(&state.pool).await?;
+ let url=token.as_deref().map(|value|studio_url(&settings,value));
+ Ok(Json(json!({"enabled":true,"legacy":token.is_none(),"token":token,"url":url})))
 }
 pub async fn revoke(State(state):State<AppState>,Extension(actor):Extension<AuthUser>,Path(id):Path<i64>)
  ->Result<Json<Value>,ApiError>{
