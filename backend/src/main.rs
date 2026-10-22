@@ -1,6 +1,7 @@
 mod admin_accounts;
 mod auth;
 mod mfa;
+mod security;
 mod core;
 mod node_rotation;
 mod subscription_settings;
@@ -212,6 +213,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/auth/mfa/setup", post(mfa::setup))
         .route("/auth/mfa/confirm", post(mfa::confirm))
         .route("/auth/mfa/disable", post(mfa::disable))
+        .route("/security/policy", get(security::get_settings).patch(security::update_settings))
+        .route("/security/sessions", get(security::sessions))
+        .route("/security/sessions/others", post(security::revoke_other_sessions))
+        .route("/security/sessions/{id}", axum::routing::delete(security::revoke_session))
         .route("/settings", get(get_settings).patch(patch_settings))
         .route("/stats", get(get_stats))
         .route("/system/stats", get(get_system_stats))
@@ -242,6 +247,7 @@ async fn main() -> anyhow::Result<()> {
     let app = Router::new()
         .route("/", get(panel_entry))
         .route("/index.html", get(index_redirect))
+        .route("/dashboard/{slug}", get(security::dashboard_entry))
         .route("/login", get(login_page))
         .nest("/api/v1", public.merge(protected))
         .fallback_service(ServeDir::new(static_dir).append_index_html_on_directories(true))
