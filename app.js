@@ -168,7 +168,7 @@ const STM={ACTIVE:['Активен','--ok'],DISABLED:['Отключён','--mu']
 const NS={ONLINE:['Онлайн','--ok'],OFFLINE:['Не отвечает','--er'],CONNECTING:['Подключение','--wr'],DISABLED:['Отключён','--mu']};
 const STRAT=[['NO_RESET','Не сбрасывать'],['DAY','Каждый день'],['WEEK','Каждую неделю'],['MONTH','Каждый месяц']];
 const nstat=n=>n.disabled?'DISABLED':n.state;
-const NAV=[['Обзор',[['home','home','Дашборд',1]]],['Управление',[['users','users','Пользователи',1],['squads','layers','Сквады'],['hosts','link','Хосты',1],['nodes','server','Узлы',1],['templates','file','Шаблоны'],['profiles','code','XRAY STUDIO'],['subscription','globe','SUBSCRIPTION STUDIO']]],['Инструменты',[['tools','tool','Диагностика']]],['Система',[['admins','shield','Админы'],['security','shield-check','Безопасность'],['set','sliders','Настройки']]]];
+const NAV=[['Обзор',[['home','home','Дашборд',1],['statistics','chart-no-axes-combined','Статистика',1]]],['Управление',[['users','users','Пользователи',1],['squads','layers','Сквады'],['hosts','link','Хосты',1],['nodes','server','Узлы',1],['templates','file','Шаблоны'],['profiles','code','XRAY STUDIO'],['subscription','globe','SUBSCRIPTION STUDIO']]],['Инструменты',[['tools','tool','Диагностика']]],['Система',[['admins','shield','Админы'],['security','shield-check','Безопасность'],['set','sliders','Настройки']]]];
 const FLAT=NAV.flatMap(g=>g[1]);
 const swc=k=>r=>`<label class="sw"><input type="checkbox" data-tg="${k}:${r.id}" ${r.disabled?'':'checked'} aria-label="Включено"><span></span></label>`;
 const nodeRotationIPs = node => String(node?.rotationIps||'').split(/\r?\n/).map(ip=>ip.trim()).filter(Boolean);
@@ -540,7 +540,7 @@ const syncSubscriptionTheme=()=>{
  return subscriptionThemeSync;
 };
 const subscriptionStudioP=()=>window.XMeshSubscriptionStudio.create(DB.set,patch=>api.saveSettings(patch),toast,{users:DB.users.length,nodes:DB.nodes.length},panelSubscriptionTheme);
-const pages={home:['Дашборд',homeP],users:['Пользователи',usersP],squads:['Сквады',()=>simple(['squads'])],hosts:['Хосты',()=>simple(['hosts'])],nodes:['Узлы',nodesP],templates:['Шаблоны',()=>simple(['tpls','subs'])],profiles:['XRAY STUDIO',profilesP],subscription:['SUBSCRIPTION STUDIO',subscriptionStudioP],tools:['Диагностика',toolsP],admins:['Администраторы',()=>simple(['admins'])],security:['Безопасность',securityP],set:['Настройки',setP]};
+const pages={home:['Дашборд',homeP],statistics:['Статистика',statisticsP],users:['Пользователи',usersP],squads:['Сквады',()=>simple(['squads'])],hosts:['Хосты',()=>simple(['hosts'])],nodes:['Узлы',nodesP],templates:['Шаблоны',()=>simple(['tpls','subs'])],profiles:['XRAY STUDIO',profilesP],subscription:['SUBSCRIPTION STUDIO',subscriptionStudioP],tools:['Диагностика',toolsP],admins:['Администраторы',()=>simple(['admins'])],security:['Безопасность',securityP],set:['Настройки',setP]};
 const skel=()=>`<div class="sk" style="height:7rem"></div><div class="sk" style="height:18rem"></div><div class="sk" style="height:12rem"></div>`;
 const NAV_SHORT={home:'Главная',users:'Клиенты',hosts:'Хосты',nodes:'Узлы',subscription:'Подписка'};
 $('#nav').innerHTML=NAV.map(([g,a])=>`<div class="g">${g}</div>`+a.map(([k,i,l,p])=>`<a href="#${k}" class="${p?'':'sec'}" aria-label="${l}" data-rail-tip="${l}">${ic(i)}<span class="lbl"><span class="nav-label-full">${l}</span><span class="nav-label-short" aria-hidden="true">${NAV_SHORT[k]||l}</span></span>${k=='users'?'<em id="unb"></em>':''}</a>`).join('')).join('')+`<button class="more" id="more" aria-label="Ещё разделы" data-rail-tip="Ещё разделы">${ic('more')}<span class="lbl">Ещё</span></button>`;
@@ -561,6 +561,108 @@ async function render(soft){
     pendingScrollTarget=null;
     requestAnimationFrame(()=>scrollToSettingsTarget(target));
   }
+}
+
+
+/* ================= СТАТИСТИКА ИНФРАСТРУКТУРЫ ================= */
+// Data originates exclusively from the authenticated API; missing/stale readings
+// are distinct from zero. The control-plane container isn't the host VPS.
+const statsValue=(v,unit='')=>v===null||v===undefined||!Number.isFinite(Number(v))
+  ?'Нет данных':fmt(Number(v),1)+unit;
+const statsBytes=v=>v===null||v===undefined||!Number.isFinite(Number(v))
+ ?'Нет данных':sysBytes(Number(v));
+const statsMetric=(label,value,hint='')=>`<div class="stats-tile"><small>${esc(label)}</small><strong>${esc(String(value))}</strong>${hint?`<span>${esc(hint)}</span>`:''}</div>`;
+const statsRow=(label,value)=>`<div class="stats-kv"><span>${esc(label)}</span><b>${esc(String(value))}</b></div>`;
+const statsSpark=(points,key)=> {
+ const values=(Array.isArray(points)?points:[]).map(p=>Number(p[key])).filter(Number.isFinite);
+ if(values.length<2)return '<p class="note">История появится после первых измерений.</p>';
+ const top=Math.max(1,...values),n=values.length-1;
+ const coords=values.map((v,i)=>(i/n*100).toFixed(2)+','+(100-v/top*95).toFixed(2)).join(' ');
+ return `<svg class="stats-spark" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="История скорости за выбранный период"><polyline points="${coords}" fill="none" stroke="currentColor" stroke-width="1.7" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+};
+function statisticsP(){
+ const markup=`<div class="stats-dashboard" id="stats-dashboard">
+  <div class="stats-heading"><div><h2>Статистика инфраструктуры</h2><p class="note">Реальные измерения. CPU steal показывает долю времени, которую виртуальная машина ожидала процессор гипервизора.</p></div>
+   <div class="act"><select id="stats-period" aria-label="Период графиков"><option value="1h">1 час</option><option value="24h">24 часа</option></select><button class="gh" id="stats-refresh" type="button">${ic('refresh-cw')} Обновить</button></div></div>
+  <div id="stats-status" class="note" role="status" aria-live="polite">Получение измерений…</div>
+  <div id="stats-summary" class="stats-overview-grid"></div>
+  <div class="stats-layout">
+   <section class="card"><div class="hd"><div><h3>Скорость сети</h3><p>Сумма показаний подключённых узлов, RX и TX. История TimescaleDB.</p></div></div><div id="stats-trend"></div></section>
+   <section class="card"><div class="hd"><div><h3>Control Plane</h3><p>Метрики контейнера панели, не всей физической машины.</p></div></div><div id="stats-control"></div></section>
+  </div>
+  <section class="card"><div class="hd"><div><h3>Узлы и виртуализация</h3><p>CPU, steal time, RAM, диски, сеть, активные соединения и свежесть данных.</p></div></div><div id="stats-nodes" class="stats-node-grid"></div></section>
+  <p class="note">Новые показатели появляются только после установки обновлённого агента. Отсутствующие измерения и устаревшие показания не заменяются нулями.</p>
+ </div>`;
+ const init=()=>{
+  let generation=0;
+  const refresh=async()=>{
+   const generationAtStart=++generation,status=$('#stats-status');
+   const button=$('#stats-refresh');if(button)button.disabled=true;
+   if(status)status.textContent='Обновление измерений…';
+   try{
+    const period=$('#stats-period')?.value||'1h';
+    const [overview,sys,traffic]=await Promise.all([
+      backendRequest('/api/v1/statistics/overview'),
+      api.systemStats(),
+      backendRequest('/api/v1/metrics/traffic?range='+period)
+    ]);
+    if(generationAtStart!==generation||cur!=='statistics')return;
+    const nodes=Array.isArray(overview.nodes)?overview.nodes:[];
+    const fresh=nodes.filter(n=>n.latest&&!n.latest.stale);
+    const validNumbers=(key)=>fresh.map(n=>Number(n.latest[key])).filter(n=>Number.isFinite(n));
+    const steals=fresh.map(n=>n.latest.cpuStealPercent).filter(v=>v!==null&&v!==undefined&&Number.isFinite(Number(v))).map(Number);
+    const stealAvg=steals.length?steals.reduce((a,b)=>a+b,0)/steals.length:null;
+    const rx=fresh.reduce((sum,n)=>sum+(Number(n.latest.rxBytesPerSec)||0),0);
+    const tx=fresh.reduce((sum,n)=>sum+(Number(n.latest.txBytesPerSec)||0),0);
+    const tiles=[
+      ['Узлы',String(overview.totalNodes??nodes.length),fresh.length+' передают свежие данные'],
+      ['Пользователи',String(overview.totalUsers??'—'),'Учетные записи панели'],
+      ['CPU steal',statsValue(stealAvg,'%'),steals.length?steals.length+' узлов с показаниями':'Данные агента отсутствуют'],
+      ['RX',fresh.length?statsBytes(rx)+'/с':'Нет данных','Скорость получения'],
+      ['TX',fresh.length?statsBytes(tx)+'/с':'Нет данных','Скорость отправки'],
+      ['User × inbound',String(overview.inboundTraffic?.counters??0),'Записей фактического учета'],
+      ['Uplink',statsBytes(overview.inboundTraffic?.uplinkBytes),'Трафик, подтвержденный узлами'],
+      ['Downlink',statsBytes(overview.inboundTraffic?.downlinkBytes),'Трафик, подтвержденный узлами']
+    ];
+    $('#stats-summary').innerHTML=tiles.map(x=>statsMetric(...x)).join('');
+    const control=[
+      ['CPU',statsValue(sys.cpu?.percent,'%')],['RAM',statsValue(sys.ram?.percent,'%')],
+      ['ОЗУ занято',statsBytes(sys.ram?.usedBytes)],['ОЗУ всего',statsBytes(sys.ram?.totalBytes)],
+      ['Диск',statsValue(sys.disk?.percent,'%')],['Диск занят',statsBytes(sys.disk?.usedBytes)],
+      ['Загрузка 1/5/15',Array.isArray([sys.loadAverage?.one,sys.loadAverage?.five,sys.loadAverage?.fifteen])?[sys.loadAverage?.one,sys.loadAverage?.five,sys.loadAverage?.fifteen].map(v=>statsValue(v)).join(' / '):'Нет данных'],
+      ['Процессы',statsValue(sys.processCount)],['PostgreSQL',sys.database==='online'?'Онлайн':'Не отвечает'],
+      ['Uptime',sys.uptimeSeconds==null?'Нет данных':Math.floor(sys.uptimeSeconds/3600)+' ч']
+    ];
+    $('#stats-control').innerHTML='<div class="stats-kvs">'+control.map(x=>statsRow(...x)).join('')+'</div>';
+    const points=traffic.points||[];
+    const latest=points[points.length-1]||{};
+    $('#stats-trend').innerHTML='<div class="stats-trend-grid"><div><b>RX</b><strong>'+ (points.length?statsBytes(latest.rxBytesPerSec)+'/с':'Нет данных')+'</strong>'+statsSpark(points,'rxBytesPerSec')+'</div><div><b>TX</b><strong>'+(points.length?statsBytes(latest.txBytesPerSec)+'/с':'Нет данных')+'</strong>'+statsSpark(points,'txBytesPerSec')+'</div></div><small class="note">Измерений: '+esc(String(traffic.sampleCount??0))+' · Источник: TimescaleDB</small>';
+    $('#stats-nodes').innerHTML=nodes.length?nodes.map(n=>{
+      const v=n.latest,stale=v?.stale,ok=v&&!stale;
+      const head=flagView(n.flag)+' <b>'+esc(n.name)+'</b>'+(n.hosting?'<small>'+esc(n.hosting)+'</small>':'');
+      const values=[
+        ['CPU',statsValue(ok?v.cpuPercent:null,'%')],
+        ['Steal time',statsValue(ok?v.cpuStealPercent:null,'%')],
+        ['RAM',statsBytes(ok?v.ramUsedBytes:null)+' / '+statsBytes(ok?v.ramTotalBytes:null)],
+        ['Диск',statsBytes(ok?v.diskUsedBytes:null)+' / '+statsBytes(ok?v.diskTotalBytes:null)],
+        ['RX',ok?statsBytes(v.rxBytesPerSec)+'/с':'Нет данных'],
+        ['TX',ok?statsBytes(v.txBytesPerSec)+'/с':'Нет данных'],
+        ['TCP соединения',statsValue(ok?v.activeConnections:null)],
+        ['Онлайн клиенты',statsValue(ok?v.onlineClients:null)]
+      ];
+      const last=v?.sampledAt?new Date(v.sampledAt).toLocaleString():'Нет измерений';
+      return '<article class="stats-node"><div class="stats-node-head">'+head+'</div><span class="stats-node-status">'+(ok?'Свежие данные':stale?'Данные устарели':'Нет телеметрии')+' · '+esc(last)+'</span><div class="stats-kvs">'+values.map(x=>statsRow(...x)).join('')+'</div></article>';
+    }).join(''):'<p class="note">Узлы пока не созданы.</p>';
+    if(status)status.textContent='Данные обновлены · '+new Date().toLocaleTimeString();
+   }catch(error){if(status)status.textContent='Не удалось обновить статистику: '+(error.message||'Ошибка API')}
+   finally{if(button?.isConnected)button.disabled=false}
+  };
+  $('#stats-refresh')?.addEventListener('click',()=>{void refresh()});
+  $('#stats-period')?.addEventListener('change',()=>{void refresh()});
+  void refresh();
+  T.push(setInterval(()=>{if(cur==='statistics')void refresh()},30000));
+ };
+ return Promise.resolve([markup,init]);
 }
 
 /* ================= СИСТЕМНЫЕ МЕТРИКИ ================= */
