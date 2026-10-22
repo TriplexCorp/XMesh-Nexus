@@ -566,7 +566,29 @@ async function render(soft){
   T.forEach(clearInterval);T=[];cur=location.hash.slice(1);if(!pages[cur])cur='home';const rt=++RT,[t,f]=pages[cur],v=$('#view');
   $('#title').textContent=t;document.title=(window.XMeshI18n?.translate(t)||t)+' — '+DB.set.brand;$$('#nav a').forEach(a=>a.classList.toggle('on',a.getAttribute('href')=='#'+cur));
   if(!soft){v.classList.remove('still');v.innerHTML=skel();scrollTo(0,0)}
-  const [h,i]=await f();if(rt!=RT)return;v.classList.toggle('still',!!soft);v.innerHTML=h;decorateButtonIcons(v);i&&i();initializeRangeProgress(v);window.XMeshMfa?.mount(v);window.XMeshSecurity?.mount(v);$('#unb').textContent=DB.users.length;drawBulk();
+  try{
+    const [h,i]=await f();if(rt!==RT)return;
+    v.classList.toggle('still',!!soft);v.innerHTML=h;
+    decorateButtonIcons(v);
+    if(i)i();
+    initializeRangeProgress(v);
+    window.XMeshMfa?.mount(v);window.XMeshSecurity?.mount(v);
+    $('#unb').textContent=DB.users.length;drawBulk();
+  }catch(error){
+    if(rt!==RT)return;
+    console.error('XMesh page render failed:',cur,error);
+    v.classList.remove('still');
+    v.replaceChildren();
+    const panel=document.createElement('section');
+    panel.className='card';
+    panel.style.cssText='max-width:850px;margin:2rem auto;padding:1.5rem';
+    const title=document.createElement('h2');title.textContent='Не удалось открыть раздел';
+    const details=document.createElement('p');details.className='er';details.textContent=error?.message||String(error);
+    const help=document.createElement('p');help.className='note';help.textContent='Данные не изменены. Можно повторить загрузку или открыть другой раздел.';
+    const retry=document.createElement('button');retry.className='btn';retry.textContent='Повторить загрузку';retry.addEventListener('click',()=>render(false));
+    panel.append(title,details,help,retry);v.append(panel);
+    return;
+  }
   if(pendingScrollTarget&&cur==='set'){
     const target=pendingScrollTarget;
     pendingScrollTarget=null;
@@ -1541,6 +1563,7 @@ async function generateRealityKeyPair(){
 function randomShortId(){const b=new Uint8Array(8);crypto.getRandomValues(b);return Array.from(b,x=>x.toString(16).padStart(2,'0')).join('')}
 function randomBase64(size){const b=new Uint8Array(size);crypto.getRandomValues(b);return btoa(Array.from(b,x=>String.fromCharCode(x)).join(''))}
 async function profilesP(){
+ if(!window.XMeshStudio?.view||!window.XMeshStudio?.mount)throw new Error('Модуль XRAY STUDIO не загрузился. Проверьте /xray-studio-next.js и обновите страницу без кеша.');
  const saved=await crudCard('profiles');
  return [window.XMeshStudio.view()+saved,()=>{
    const root=document.getElementById('xm-studio');
