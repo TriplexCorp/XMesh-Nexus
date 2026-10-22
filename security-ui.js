@@ -37,8 +37,8 @@ async function mount(root){
    title.textContent=e.action||'Неизвестное действие';actor.textContent='Администратор: '+(e.actor||'—')+(e.collection?' · '+e.collection:'');
    left.append(title,actor);
    const date=document.createElement('time');
-   date.dateTime=e.createdAt||'';
-   const when=new Date(e.createdAt);date.textContent=Number.isNaN(when.getTime())?'Дата неизвестна':when.toLocaleString();
+   const when=new Date(e.createdAtMs);
+   date.dateTime=Number.isNaN(when.getTime())?'':when.toISOString();date.textContent=Number.isNaN(when.getTime())?'Дата неизвестна':when.toLocaleString();
    item.append(left,date);list.append(item);
   }
  };
