@@ -3,7 +3,7 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const src=fs.readFileSync('xray-json-diagnostics.js','utf8');
-const app=fs.readFileSync('app.js','utf8');
+const studio=fs.readFileSync('xray-studio-v4.js','utf8');
 const html=fs.readFileSync('index.html','utf8');
 const dock=fs.readFileSync('backend/Dockerfile','utf8');
 new Function(src);
@@ -46,10 +46,14 @@ assert.match(editor.decorateRun('<img src=x>',0,'jx-string',{
  start:0,end:1,message:'<script>alert(1)</script>'
 }),/&lt;script&gt;/,'Error tooltips must escape untrusted source');
 assert.doesNotMatch(editor.decorateRun('<img src=x>',0,'jx-string',null),/<img/,'Editor tokens must escape markup');
-assert.match(app,/XrayJsonDiagnostics\?\.attach\(customArea\)/,'Builder must attach diagnostics');
-assert.match(app,/jsonDiagnostics\.decorateRun/,'Builder must paint inline squiggles in syntax layer');
-assert.match(app,/jsonDiagnostics\?\.update\(issues\)/,'Builder must update all live diagnostics');
-assert.match(app,/jsonDiagnostics\.decorateRun\(value,start,cls,issues\)/,'Builder highlights multiple issues simultaneously');
+// XRAY STUDIO v4 owns the JSON editor. The diagnostic utility remains testable
+// independently, while Studio paints its own syntax and structural markers.
+assert.match(studio,/data-v="source"/,'Studio must expose a JSON textarea');
+assert.match(studio,/data-v="highlight"/,'Studio must expose a syntax layer');
+assert.match(studio,/data-v="gutter"/,'Studio must expose line numbers');
+assert.match(studio,/function paint\\(\\)/,'Studio must update syntax and diagnostics');
+assert.match(studio,/XrayJsonIntelligence\\?\\.analyze/,'Studio must run structural diagnostics');
+assert.match(studio,/sv-invalid-line/,'Studio must highlight invalid lines');
 assert.match(src,/setRangeText\(proposal\.replacement,proposal\.start,proposal\.end,'end'\)/,'Hot Fix must edit only affected range');
 assert.match(src,/textarea\.dispatchEvent\(new Event\('input'/,'Hot Fix must notify existing validators and JSON state');
 assert.match(src,/Math\.floor\(\(scroll-topPad\)\/lineHeight\)/,'Line gutter must use virtualized visible lines');
