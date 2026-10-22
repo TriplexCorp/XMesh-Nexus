@@ -2573,3 +2573,19 @@ html[data-font=nunito] body{font-family:"Nunito Sans",system-ui,-apple-system,"S
 html[data-font=plex] body{font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
 html[data-font=roboto] body{font-family:Roboto,system-ui,-apple-system,"Segoe UI",sans-serif}
 html[data-font=pt] body{font-family:"PT Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
+
+
+/* Typography picker: responsive tiles rather than cramped segmented buttons */
+.appearance-layout .choice:has([data-ui="font"]){
+ display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+ width:min(100%,27rem);max-width:100%;gap:.4rem;
+ padding:.35rem;border-radius:var(--ui-radius,12px)
+}
+.appearance-layout .choice [data-ui="font"]{
+ min-width:0;min-height:2.3rem;padding:.45rem .65rem;
+ text-align:center;white-space:normal;line-height:1.25
+}
+.appearance-layout .setting-row:has([data-ui="font"]){align-items:start}
+.appearance-layout .setting-row:has([data-ui="font"]) .setting-control{width:100%;justify-content:flex-end}
+@media(max-width:650px){.appearance-layout .choice:has([data-ui="font"]){width:100%}}
+@media(max-width:360px){.appearance-layout .choice:has([data-ui="font"]){grid-template-columns:repeat(2,minmax(0,1fr))}}
