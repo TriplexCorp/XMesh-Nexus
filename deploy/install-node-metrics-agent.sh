@@ -2,28 +2,27 @@
 set -Eeuo pipefail
 
 if [[ "${EUID}" -ne 0 ]]; then
-  echo "Run with sudo: sudo bash $0 <https-panel-origin> <node-id> <token> [interface]" >&2
+  echo "Run with sudo: sudo bash $0 <https-panel-origin> <node-id> [interface]" >&2
   exit 1
 fi
-if [[ "$#" -lt 3 || "$#" -gt 4 ]]; then
-  echo "Usage: $0 <https-panel-origin> <node-id> <token> [interface]" >&2
+if [[ "$#" -lt 2 || "$#" -gt 3 ]]; then
+  echo "Usage: $0 <https-panel-origin> <node-id> [interface]" >&2
   exit 2
 fi
 
 API_URL="${1%/}"
 NODE_ID="$2"
-TOKEN="$3"
-INTERFACE="${4:-auto}"
+INTERFACE="${3:-auto}"
 
 [[ "$API_URL" =~ ^https://[A-Za-z0-9.-]+(:[0-9]{1,5})?$ ]] || {
   echo "Panel URL must be an HTTPS origin, e.g. https://panel.example.com" >&2
   exit 2
 }
 [[ "$NODE_ID" =~ ^[1-9][0-9]*$ ]] || { echo "Node ID must be a positive integer" >&2; exit 2; }
-[[ "$TOKEN" =~ ^xm_[0-9a-f]{64}$ ]] || { echo "Metrics token format is invalid. Generate a token in the XMesh panel." >&2; exit 2; }
 [[ "$INTERFACE" == "auto" || "$INTERFACE" =~ ^[A-Za-z0-9_.:-]+$ ]] || { echo "Invalid network interface name" >&2; exit 2; }
 
 command -v curl >/dev/null 2>&1 || { echo "curl is required" >&2; exit 1; }
+command -v openssl >/dev/null 2>&1 || { echo "OpenSSL is required for Ed25519 signing" >&2; exit 1; }
 command -v systemctl >/dev/null 2>&1 || { echo "systemd is required" >&2; exit 1; }
 
 RAW_BASE="https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy"
@@ -38,10 +37,26 @@ install -d -m 0700 /var/lib/xmesh-node-metrics
 cat > /etc/xmesh-node-metrics.env <<EOF
 XMESH_API_URL=$API_URL
 XMESH_NODE_ID=$NODE_ID
-XMESH_METRICS_TOKEN=$TOKEN
+XMESH_METRICS_PRIVATE_KEY=/etc/xmesh-node-metrics/node.key
 XMESH_INTERFACE=$INTERFACE
 EOF
 chmod 0600 /etc/xmesh-node-metrics.env
+
+# The private signing key never leaves the node and is never passed as an argv
+# argument or persisted in the control plane. Never rotate it implicitly.
+private_key=/etc/xmesh-node-metrics/node.key
+if [[ ! -e "$private_key" ]]; then
+  tmp_key="$(mktemp /etc/xmesh-node-metrics/.key.XXXXXXXX)"
+  trap 'rm -f "$AGENT_TMP" "$tmp_key"' EXIT
+  openssl genpkey -algorithm Ed25519 -out "$tmp_key"
+  chmod 0600 "$tmp_key"
+  mv -n "$tmp_key" "$private_key"
+fi
+chmod 0600 "$private_key"
+public_key="$(openssl pkey -in "$private_key" -pubout -outform DER | tail -c 32 | od -An -tx1 -v | tr -d ' \\n')"
+[[ "${#public_key}" -eq 64 && "$public_key" =~ ^[0-9a-f]+$ ]] || {
+  echo "Cannot extract Ed25519 public key" >&2; exit 1;
+}
 
 cat > /etc/systemd/system/xmesh-node-metrics.service <<'EOF'
 [Unit]
@@ -90,4 +105,7 @@ echo "Network interface: $INTERFACE (auto detects the default-route interface)"
 echo "The first run saves a baseline. The first real rate sample arrives after the next timer interval."
 echo "Check with: systemctl status xmesh-node-metrics.timer"
 echo "Logs: journalctl -u xmesh-node-metrics.service -n 20 --no-pager"
-echo "The bearer token is stored in /etc/xmesh-node-metrics.env (root-only permissions)."
+echo "Ed25519 public key (register on the node in XMesh Nexus):"
+echo "$public_key"
+echo "Until you register it in the panel, signed requests will be rejected (401)."
+echo "The private key is stored on this node only (mode 600)."
