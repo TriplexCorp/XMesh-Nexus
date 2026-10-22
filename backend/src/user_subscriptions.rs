@@ -214,41 +214,59 @@ fn studio_color(settings:&Value,key:&str,default:&str)->String{
   v.to_owned()
  }else{default.to_owned()}
 }
+fn app_item(label:&str,platform:&str,url:&str)->String{
+ let icon=label.chars().take(2).collect::<String>();
+ let content=format!("<span>{}</span><div><b>{}</b><small>{}</small></div>",
+  escape_html(&icon),escape_html(label),escape_html(platform));
+ if url.starts_with("https://") && !url.contains(['"', '<', '>']) {
+  format!("<a class=\"subscription-preview-app\" href=\"{}\" target=\"_blank\" rel=\"noopener noreferrer\">{}</a>",
+   escape_html(url),content)
+ }else{
+  format!("<div class=\"subscription-preview-app\">{}</div>",content)
+ }
+}
 fn app_catalog(settings:&Value,language:&str)->String{
  let mut apps=String::new();
  let known=[
-  ("happ","Happ"),("incy","Incy"),("v2raytun","v2rayTun"),("v2rayn","v2rayN"),
-  ("v2rayng","v2rayNG"),("streisand","Streisand"),("hiddify","Hiddify"),
-  ("nekobox","NekoBox"),("shadowrocket","Shadowrocket"),("flclash","FlClash"),
-  ("stash","Stash"),("singbox","sing-box"),("v2box","V2Box"),("loon","Loon"),
-  ("mihomo","Mihomo Party"),("clashverge","Clash Verge")
+  ("happ","Happ","iOS · Android · Windows · macOS"),
+  ("incy","Incy","iOS · Android"),
+  ("v2raytun","v2rayTun","iOS · Android"),
+  ("v2rayn","v2rayN","Windows · Linux · macOS"),
+  ("v2rayng","v2rayNG","Android"),
+  ("streisand","Streisand","iOS"),
+  ("hiddify","Hiddify","iOS · Android · Windows · macOS · Linux"),
+  ("nekobox","NekoBox","Android"),
+  ("shadowrocket","Shadowrocket","iOS"),
+  ("flclash","FlClash","Windows · macOS · Linux · Android"),
+  ("stash","Stash","iOS"),
+  ("singbox","sing-box","iOS · Android · Desktop"),
+  ("v2box","V2Box","iOS · Android"),
+  ("loon","Loon","iOS"),
+  ("mihomo","Mihomo Party","Desktop"),
+  ("clashverge","Clash Verge","Windows · macOS · Linux")
  ];
  let enabled=settings.get("subscriptionClients");
  let links=settings.get("subscriptionClientLinks");
- for (name,label) in known {
-  if enabled.and_then(|v|v.get(name)).and_then(Value::as_bool)!=Some(true){continue}
-  let url=links.and_then(|v|v.get(name)).and_then(Value::as_str).unwrap_or("");
-  if !url.starts_with("https://"){continue}
-  apps.push_str(&format!("<a class=\"client\" href=\"{}\" rel=\"noopener noreferrer\" target=\"_blank\">{}</a>",
-   escape_html(url),escape_html(label)));
+ for (index,(id,label,platform)) in known.into_iter().enumerate() {
+  let visible=enabled.and_then(|v|v.get(id)).and_then(Value::as_bool).unwrap_or(index<7);
+  if !visible{continue}
+  let url=links.and_then(|v|v.get(id)).and_then(Value::as_str).unwrap_or("");
+  apps.push_str(&app_item(label,platform,url));
  }
  if let Some(custom)=settings.get("subscriptionCustomClients").and_then(Value::as_array){
-  for item in custom {
+  for item in custom{
    if item.get("enabled").and_then(Value::as_bool)!=Some(true){continue}
    let label=studio_string(item,"name","");
-   let url=studio_string(item,"url","");
-   if label.is_empty()||!url.starts_with("https://"){continue}
-   apps.push_str(&format!("<a class=\"client\" href=\"{}\" rel=\"noopener noreferrer\" target=\"_blank\">{}</a>",
-    escape_html(url),escape_html(label)));
+   if label.is_empty(){continue}
+   apps.push_str(&app_item(label,studio_string(item,"platforms",""),studio_string(item,"url","")));
   }
  }
  if apps.is_empty(){return String::new()}
  let title=studio_string(settings,if language=="en"{"subscriptionAppsTitleEn"}else{"subscriptionAppsTitle"},
   if language=="en"{"Connection apps"}else{"Приложения для подключения"});
- format!("<section class=\"section\"><h2>{}</h2><div class=\"apps {}\">{}</div></section>",
-  escape_html(title),
-  if studio_string(settings,"subscriptionClientLayout","grid")=="list"{"list"}else{"grid"},
-  apps)
+ let layout=if studio_string(settings,"subscriptionClientLayout","grid")=="list"{"list"}else{"grid"};
+ format!("<section class=\"subscription-preview-apps\" data-client-layout=\"{}\"><header>{}</header><div>{}</div></section>",
+  layout,escape_html(title),apps)
 }
 // Match the exact persisted Studio path. Unknown public routes are never
 // treated as subscriptions, even though the router supports variable prefixes.
@@ -292,92 +310,134 @@ pub async fn portal(
  let summary=studio_string(&settings,if en{"subscriptionDescriptionEn"}else{"subscriptionDescription"},
   if en{"Your secure connection"}else{"Настройки подключения и информация о подписке."});
  let footer=studio_string(&settings,if en{"subscriptionFooterEn"}else{"subscriptionFooter"},"");
- let link=studio_url(&settings,&token);
- let safe_link=escape_html(&link);
- let bg=studio_color(&settings,"subscriptionBackground","#0c131b");
- let card=studio_color(&settings,"subscriptionCardColor","#15212b");
- let fg=studio_color(&settings,"subscriptionTextColor","#ecf3f6");
- let accent=studio_color(&settings,"subscriptionAccent","#7be5b4");
- let radius=settings.get("subscriptionRadius").and_then(Value::as_u64).unwrap_or(16).clamp(1,36);
- let status=if active{if en{"Active"}else{"Активна"}}else{if en{"Inactive"}else{"Неактивна"}};
- let mut sections=String::new();
- if studio_enabled(&settings,"subscriptionShowStatus",true){
-  sections.push_str(&format!("<p class=\"status {}\">● {}</p>",if active{"ok"}else{"off"},status));
- }
- let used=user.get("used").and_then(Value::as_f64).or_else(||user.get("used").and_then(Value::as_i64).map(|v|v as f64)).unwrap_or(0.0).max(0.0);
- let limit=user.get("limit").and_then(Value::as_f64).or_else(||user.get("limit").and_then(Value::as_i64).map(|v|v as f64)).unwrap_or(0.0).max(0.0);
+ let used=user.get("used").and_then(Value::as_f64)
+  .or_else(||user.get("used").and_then(Value::as_i64).map(|v|v as f64))
+  .unwrap_or(0.0).max(0.0);
+ let limit=user.get("limit").and_then(Value::as_f64)
+  .or_else(||user.get("limit").and_then(Value::as_i64).map(|v|v as f64))
+  .unwrap_or(0.0).max(0.0);
+ let mut metrics=String::new();
  if studio_enabled(&settings,"subscriptionShowTraffic",true){
-  sections.push_str(&format!("<div class=\"kv\"><span>{}</span><strong>{:.2} GB / {}</strong></div>",
-   if en{"Traffic"}else{"Трафик"},used,if limit>0.0{format!("{limit:.2} GB")}else{if en{"Unlimited"}else{"Без лимита"}.to_owned()}));
+  let remaining=if limit>0.0{
+   format!("{:.2} / {:.2} {}",used,limit,if en{"GB"}else{"ГБ"})
+  }else{
+   format!("{:.2} {} / {}",used,if en{"GB"}else{"ГБ"},if en{"Unlimited"}else{"Без лимита"})
+  };
+  let pct=if limit>0.0{(used/limit*100.0).clamp(0.0,100.0)}else{0.0};
+  metrics.push_str(&format!(
+   "<div data-subscription-traffic><small>{}</small><b>{}</b><div class=\"subscription-preview-progress\"><i style=\"width:{pct:.1}%\"></i></div></div>",
+   if en{"Traffic"}else{"Трафик"},escape_html(&remaining)));
  }
  if studio_enabled(&settings,"subscriptionShowExpiry",true){
   let expiry=user.get("expireAt").and_then(Value::as_i64).unwrap_or(0);
-  sections.push_str(&format!("<div class=\"kv\"><span>{}</span><strong class=\"expiry\" data-expiry=\"{}\">{}</strong></div>",
-   if en{"Expires"}else{"Действует до"},expiry,if expiry>0{"—"}else{if en{"Unlimited"}else{"Без срока"}}));
+  metrics.push_str(&format!(
+   "<div data-subscription-expiry><small>{}</small><b data-expiry=\"{}\">{}</b></div>",
+   if en{"Expires"}else{"Действует до"},expiry,if expiry>0{"—"}else{if en{"Unlimited"}else{"Бессрочно"}}));
  }
- if studio_enabled(&settings,"subscriptionShowDevices",false){
-  let max=user.get("hwid").and_then(Value::as_i64).unwrap_or(0);
-  if max>0{sections.push_str(&format!("<div class=\"kv\"><span>{}</span><strong>{max}</strong></div>",if en{"Device limit"}else{"Лимит устройств"}))}
+ if !metrics.is_empty(){
+  metrics=format!("<div class=\"subscription-preview-meta\" data-subscription-metrics>{metrics}</div>");
  }
+ let raw_link=format!("{}?raw=1",studio_url(&settings,&token));
+ let mut quick=String::new();
+ let mut qr=String::new();
+ let mut devices=String::new();
+ let mut cta=String::new();
+ let mut apps=String::new();
  if active{
-  let label=studio_string(&settings,if en{"subscriptionCtaEn"}else{"subscriptionCta"},if en{"Connection link"}else{"Ссылка для подключения"});
-  sections.push_str(&format!("<div class=\"section\"><h2>{}</h2><input class=\"link\" id=\"subscription-link\" readonly value=\"{}\" aria-label=\"Subscription link\">",escape_html(label),safe_link));
+  let button=studio_string(&settings,if en{"subscriptionCtaEn"}else{"subscriptionCta"},
+   if en{"Connect"}else{"Подключиться"});
+  cta=format!("<a class=\"subscription-preview-cta\" href=\"{}\" title=\"{}\">{}</a><input type=\"hidden\" id=\"subscription-link\" value=\"{}\">",
+   escape_html(&raw_link),if en{"Open subscription configuration"}else{"Открыть конфигурацию подписки"},
+   escape_html(button),escape_html(&raw_link));
   if studio_enabled(&settings,"subscriptionShowCopy",true){
-   sections.push_str(&format!("<button type=\"button\" id=\"copy-link\">{}</button>",if en{"Copy link"}else{"Скопировать ссылку"}));
+   quick.push_str(&format!("<button type=\"button\" id=\"copy-link\">{}</button>",
+    if en{"Copy link"}else{"Скопировать ссылку"}));
   }
   if studio_enabled(&settings,"subscriptionShowQr",true){
-   sections.push_str("<div id=\"subscription-qr\" aria-label=\"QR code\"></div>");
+   quick.push_str("<button type=\"button\" id=\"toggle-qr\" aria-controls=\"subscription-qr\" aria-expanded=\"false\">QR</button>");
+   qr="<div id=\"subscription-qr\" class=\"subscription-preview-qr\" hidden aria-label=\"QR-код подписки\"></div>".to_owned();
   }
-  sections.push_str("</div>");
-  if studio_enabled(&settings,"subscriptionShowApps",true){sections.push_str(&app_catalog(&settings,lang))}
- }else{sections.push_str(if en{"<p>Contact support to restore access.</p>"}else{"<p>Для восстановления доступа обратитесь в поддержку.</p>"})}
- if studio_enabled(&settings,"subscriptionShowSupport",false){
-  let url=studio_string(&settings,"subscriptionSupportUrl","");
-  if url.starts_with("https://"){
-   sections.push_str(&format!("<p><a class=\"support\" rel=\"noopener noreferrer\" href=\"{}\">{}</a></p>",
-    escape_html(url),escape_html(studio_string(&settings,if en{"subscriptionSupportLabelEn"}else{"subscriptionSupportLabel"},if en{"Support"}else{"Поддержка"}))));
+  if studio_enabled(&settings,"subscriptionShowDevices",false){
+   quick.push_str(&format!("<button type=\"button\" id=\"toggle-devices\" aria-controls=\"subscription-devices\" aria-expanded=\"false\">{}</button>",if en{"Devices"}else{"Устройства"}));
+   let maximum=user.get("hwid").and_then(Value::as_i64).unwrap_or(0);
+   let used=user.get("devices").and_then(Value::as_array).map(|d|d.len()).unwrap_or(0);
+   devices=format!("<div id=\"subscription-devices\" class=\"subscription-public-devices\" hidden>{}: {} · {}: {}</div>",
+    if en{"Connected devices"}else{"Подключённые устройства"},used,
+    if en{"Limit"}else{"Лимит"},if maximum>0{maximum.to_string()}else{if en{"Unlimited"}else{"Без лимита"}.to_owned()});
   }
+  if !quick.is_empty(){quick=format!("<div class=\"subscription-preview-quick\">{quick}</div>")}
+  if studio_enabled(&settings,"subscriptionShowApps",true){apps=app_catalog(&settings,lang)}
+ }else{
+  cta=format!("<div class=\"subscription-preview-cta\" aria-disabled=\"true\">{}</div>",
+   if en{"Subscription inactive"}else{"Подписка неактивна"});
  }
+ let support=if studio_enabled(&settings,"subscriptionShowSupport",false){
+  let url=studio_string(&settings,"subscriptionSupportUrl","");
+  let label=escape_html(studio_string(&settings,
+   if en{"subscriptionSupportLabelEn"}else{"subscriptionSupportLabel"},
+   if en{"Support"}else{"Поддержка"}));
+  if url.starts_with("https://"){
+   format!("<a class=\"subscription-preview-support\" href=\"{}\" rel=\"noopener noreferrer\" target=\"_blank\">{label}</a>",escape_html(url))
+  }else{
+   format!("<div class=\"subscription-preview-support\">{label}</div>")
+  }
+ }else{String::new()};
  let logo=studio_string(&settings,"subscriptionLogoUrl","");
- let logo_markup=if logo.starts_with("https://"){format!("<img class=\"logo\" src=\"{}\" alt=\"\">",escape_html(logo))}else{String::new()};
- let lang_url=format!("?lang={}",if en{"ru"}else{"en"});
- let layout=studio_string(&settings,"subscriptionLayout","standard");
- let card_style=studio_string(&settings,"subscriptionCardStyle","soft");
- let card_css=match card_style {
-  "outline"=>"background:transparent;box-shadow:none;",
-  "flat"=>"box-shadow:none;border-color:transparent;",
-  _=>""
+ let logo_markup=if logo.starts_with("https://"){
+  format!("<img src=\"{}\" alt=\"\" class=\"subscription-preview-logo\">",escape_html(logo))
+ }else{"<span aria-hidden=\"true\">✦</span>".to_owned()};
+ let visible_status=studio_enabled(&settings,"subscriptionShowStatus",true);
+ let status_dot=if visible_status{
+  format!("<span class=\"subscription-preview-ok\" style=\"color:{}\">●</span>",
+   if active{"var(--portal-accent)"}else{"#ef8888"})
+ }else{String::new()};
+ let title=if active{
+  studio_string(&settings,if en{"subscriptionHeroEn"}else{"subscriptionHero"},
+   if en{"Subscription active"}else{"Подписка активна"})
+ }else if en{"Subscription inactive"}else{"Подписка неактивна"};
+ let footer=studio_string(&settings,if en{"subscriptionFooterEn"}else{"subscriptionFooter"},"");
+ let logo_brand=studio_string(&settings,"subscriptionBrand",
+  studio_string(&settings,"brand","XMesh Nexus"));
+ let background=studio_color(&settings,"subscriptionBackground","#0c131b");
+ let card_color=studio_color(&settings,"subscriptionCardColor","#15212b");
+ let text_color=studio_color(&settings,"subscriptionTextColor","#ecf3f6");
+ let accent=studio_color(&settings,"subscriptionAccent","#7be5b4");
+ let radius=settings.get("subscriptionRadius").and_then(Value::as_u64).unwrap_or(16).clamp(1,36);
+ let allowed=|key:&str,valid:&[&str],default:&str| -> String{
+  let value=studio_string(&settings,key,default);
+  if valid.contains(&value){value.to_owned()}else{default.to_owned()}
  };
- let font_css=match studio_string(&settings,"subscriptionFont","system"){
-  "mono"=>"ui-monospace,SFMono-Regular,Consolas,monospace",
-  "manrope"=>"Manrope,system-ui,Arial,sans-serif",
-  _=>"system-ui,Arial,sans-serif"
- };
- let html=format!(r#"<!doctype html><html lang="{lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
- <meta name="referrer" content="no-referrer"><title>{brand}</title><style>
- :root{{--bg:{bg};--card:{card};--text:{fg};--accent:{accent};--radius:{radius}px}}
- *{{box-sizing:border-box}}body{{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:16px/1.6 {font_css};padding:clamp(16px,5vw,80px)}}
- main{{max-width:{max_width};margin:0 auto}}.panel{{background:var(--card);border:1px solid #ffffff22;border-radius:var(--radius);padding:clamp(22px,4vw,42px);box-shadow:0 18px 50px #0002;{card_css}}}
- header{{display:flex;justify-content:space-between;align-items:center;gap:20px}}.logo{{max-height:56px;max-width:180px;object-fit:contain}}
- h1{{font-size:clamp(27px,4vw,42px);line-height:1.2;margin:20px 0 8px}}h2{{font-size:18px}}.muted,footer{{opacity:.7}}
- .status{{font-weight:700}}.ok{{color:var(--accent)}}.off{{color:#ff8a8a}}
- .kv{{display:flex;justify-content:space-between;gap:10px;border-top:1px solid #ffffff18;padding:12px 0;flex-wrap:wrap}}
- .section{{padding-top:18px;margin-top:18px;border-top:1px solid #ffffff18}}
- .link{{width:100%;border:1px solid #ffffff33;border-radius:10px;background:transparent;color:inherit;padding:13px;font-size:14px}}
- button,.client,.support,.lang{{display:inline-flex;align-items:center;justify-content:center;min-height:43px;padding:9px 17px;border-radius:10px;border:1px solid #ffffff30;background:transparent;color:inherit;text-decoration:none;cursor:pointer}}
- button{{margin-top:10px;background:var(--accent);color:#0c131b;border:0;font-weight:700}}
- .apps{{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:10px}}.apps.list{{grid-template-columns:1fr}}.client:hover,.support:hover{{border-color:var(--accent)}}
- #subscription-qr{{margin-top:18px;max-width:260px}}#subscription-qr svg{{width:100%;height:auto;background:#fff;padding:12px;border-radius:10px}}
- footer{{margin-top:20px;text-align:center}}@media(max-width:520px){{.kv{{display:block}}}}
- </style><script src="/qr-code.js" defer></script><script src="/subscription-portal.js" defer></script></head>
- <body><main><div class="panel"><header><div>{logo_markup}<strong>{brand}</strong></div>
- <a class="lang" href="{lang_url}">{switch_label}</a></header><h1>{title}</h1>
- <p class="muted">{summary}</p>{sections}</div><footer>{footer}</footer></main></body></html>"#,
- lang=lang,brand=escape_html(brand),bg=bg,card=card,fg=fg,accent=accent,radius=radius,
- max_width=if layout=="compact"{"660px"}else if layout=="centered"{"760px"}else{"960px"},
- font_css=font_css,card_css=card_css,
- logo_markup=logo_markup,lang_url=lang_url,switch_label=if en{"Русский"}else{"English"},
- title=escape_html(title),summary=escape_html(summary),sections=sections,footer=escape_html(footer));
+ let mut html=include_str!("subscription_template.html").to_owned();
+ let changes=[
+  ("{{LANG}}",lang.to_owned()),
+  ("{{BRAND}}",escape_html(logo_brand)),
+  ("{{ACCENT}}",accent),("{{BACKGROUND}}",background),
+  ("{{CARD_COLOR}}",card_color),("{{TEXT_COLOR}}",text_color),
+  ("{{RADIUS}}",radius.to_string()),
+  ("{{THEME}}",allowed("subscriptionTheme",&["dark","light"],"dark")),
+  ("{{LAYOUT}}",allowed("subscriptionLayout",&["standard","centered","compact"],"standard")),
+  ("{{CARD_STYLE}}",allowed("subscriptionCardStyle",&["soft","outline","flat"],"soft")),
+  ("{{FONT}}",allowed("subscriptionFont",&["system","manrope","mono"],"system")),
+  ("{{LOGO}}",logo_markup),
+  ("{{RU_SELECTED}}",if en{String::new()}else{"on".to_owned()}),
+  ("{{EN_SELECTED}}",if en{"on".to_owned()}else{String::new()}),
+  ("{{RU_CURRENT}}",if en{"false"}else{"page"}.to_owned()),
+  ("{{EN_CURRENT}}",if en{"page"}else{"false"}.to_owned()),
+  ("{{STATUS_DOT}}",status_dot),
+  ("{{HERO}}",escape_html(title)),
+  ("{{DESCRIPTION}}",escape_html(studio_string(&settings,
+   if en{"subscriptionDescriptionEn"}else{"subscriptionDescription"},
+   if en{"Connection setup and subscription information."}else{"Настройки подключения и информация о подписке."}))),
+  ("{{METRICS}}",metrics),
+  ("{{CTA}}",cta),
+  ("{{QUICK_ACTIONS}}",quick),
+  ("{{QR}}",qr),
+  ("{{DEVICE_INFO}}",devices),
+  ("{{APPS}}",apps),
+  ("{{SUPPORT}}",support),
+  ("{{FOOTER}}",escape_html(footer)),
+ ];
+ for (marker,value) in changes {html=html.replace(marker,&value);}
  let mut response=Html(html).into_response();
  response.headers_mut().insert(header::CACHE_CONTROL,"private, no-store".parse().unwrap());
  Ok(response)
