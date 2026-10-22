@@ -638,6 +638,26 @@ mod tests{
   assert!(data["routing"]["rules"][3]["outboundTag"].as_str().unwrap().starts_with("xmesh-ZZ-0001"));
   assert_eq!(data["inbounds"][0]["protocol"],"socks");
  }
+ #[test] fn xhttp_device_profiles_are_applied_only_to_selected_device(){
+  let user=json!({"xrayId":"550e8400-e29b-41d4-a716-446655440000"});
+  let inbound=json!({"tag":"DE","protocol":"vless","port":443,
+   "xmesh":{"xhttpDeviceProfiles":{
+      "iOS":{"mode":"packet-up","uplinkHTTPMethod":"POST","xmux":{"cMaxReuseTimes":0}},
+      "Windows":{"mode":"stream-up","xmux":{"cMaxReuseTimes":64}}
+   }},
+   "settings":{"decryption":"none"},
+   "streamSettings":{"network":"xhttp","security":"tls",
+    "tlsSettings":{"serverName":"vpn.example.org"},
+    "xhttpSettings":{"path":"/x","mode":"auto"}}});
+  let host=json!({"address":"vpn.example.org","sni":"vpn.example.org"});
+  let ios=vless_outbound(&user,&inbound,&host,"ios").unwrap();
+  let windows=vless_outbound(&user,&inbound,&host,"windows").unwrap();
+  let automatic=vless_outbound(&user,&inbound,&host,"auto").unwrap();
+  assert_eq!(ios["streamSettings"]["xhttpSettings"]["mode"],"packet-up");
+  assert_eq!(windows["streamSettings"]["xhttpSettings"]["mode"],"stream-up");
+  assert_eq!(automatic["streamSettings"]["xhttpSettings"]["mode"],"auto");
+  assert_eq!(windows["streamSettings"]["xhttpSettings"]["xmux"]["cMaxReuseTimes"],64);
+ }
  #[test] fn invalid_reality_not_exported(){
  let user=json!({"xrayId":"550e8400-e29b-41d4-a716-446655440000"});
  let inbound=json!({"protocol":"vless","port":443,"streamSettings":{"network":"xhttp","security":"reality","realitySettings":{"serverNames":["example.org"]}}});
