@@ -1565,6 +1565,26 @@ mod tests {
     }
 
     #[test]
+    fn studio_subscription_routes_do_not_conflict_with_dashboard_or_flag_assets() {
+        use super::AppState;
+        use axum::{http::StatusCode, routing::get, Router};
+        use tower_http::services::ServeDir;
+        let mut app = Router::<AppState>::new()
+            .route("/dashboard/{slug}", get(|| async { StatusCode::OK }))
+            .nest_service("/flags", ServeDir::new("/app/static/flags"));
+        for count in 1..=8 {
+            let mut path = String::new();
+            for index in 1..=count {
+                path.push_str(&format!("/{{part{index}}}"));
+            }
+            path.push_str("/{token}");
+            app = app.route(&path, get(|| async { StatusCode::OK }));
+        }
+        // Building this router must not panic at runtime due to path conflicts.
+        drop(app);
+    }
+
+    #[test]
     fn numeric_json_fields_are_read_safely() {
         assert_eq!(number(&json!({"used":12}), "used"), Some(12));
         assert_eq!(number(&json!({"used":12.5}), "used"), Some(12));
