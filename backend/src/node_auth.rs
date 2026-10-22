@@ -132,8 +132,7 @@ pub async fn enroll(
     tx.commit().await?;
     crate::audit(&state.pool,&actor.username,"node_metrics.key_enrolled",Some("nodes"),Some(node_id),
         json!({"algorithm":"Ed25519"})).await;
-    Ok((StatusCode::CREATED,Json(json!({"nodeId":node_id,"authentication":"ed25519",
-        "authentication":"ed25519"}))))
+    Ok((StatusCode::CREATED,Json(json!({"nodeId":node_id,"authentication":"ed25519"}))))
 }
 
 pub async fn revoke(
