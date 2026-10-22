@@ -302,14 +302,14 @@ async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str)->Result
    let matched:Vec<&Value>=hosts.iter().filter(|h|h.get("disabled")!=Some(&Value::Bool(true))&&nonempty(h,"tag")==Some(tag)).collect();
    if !matched.is_empty(){
     for host in matched{
-     if let Some(link)=vless_link(&user,inbound,host) && let Some(outbound)=vless_outbound(&user,inbound,host,device){
+     if let Some(link)=vless_link(user,inbound,host) && let Some(outbound)=vless_outbound(user,inbound,host,device){
       outbounds.push(outbound);links.push(link)
      }
     }
    }else{
     for node in nodes.iter().filter(|n|n.get("profileId")==profile.get("id")&&n.get("disabled")!=Some(&Value::Bool(true))){
      let host=json!({"address":node.get("publicAddress").or_else(||node.get("externalAddress")).or_else(||node.get("addr")),"port":inbound.get("port"),"remark":node.get("name"),"country":node.get("country")});
-     if let Some(link)=vless_link(&user,inbound,&host) && let Some(outbound)=vless_outbound(&user,inbound,&host,device){
+     if let Some(link)=vless_link(user,inbound,&host) && let Some(outbound)=vless_outbound(user,inbound,&host,device){
       outbounds.push(outbound);links.push(link)
      }
     }
