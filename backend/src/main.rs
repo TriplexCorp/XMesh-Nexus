@@ -162,7 +162,6 @@ struct UserTrafficSample {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
 struct UserInboundTrafficSample {
     #[serde(alias="user_id")]
     user_id: i64,
