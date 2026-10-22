@@ -24,6 +24,32 @@ const request=async(path,options={})=>{
 const setting=(name,title,detail,min,max,unit,policy,disabled)=>'<label class="security-setting"><span><b>'+title+'</b><small>'+detail+'</small></span><span class="security-number"><input name="'+name+'" type="number" min="'+min+'" max="'+max+'" step="1" value="'+esc(policy[name])+'" '+(disabled?'disabled':'')+' required><em>'+unit+'</em></span></label>';
 const panel=()=>'<section class="card" id="security-advanced"><div class="hd"><div><h3>Политика входа</h3><p>Время сессии, ограничения входа и защищённый адрес</p></div></div><div id="security-advanced-body" class="security-loading">Загрузка политик безопасности…</div><p id="security-advanced-error" class="er" role="alert" aria-live="polite"></p></section><section class="card" id="security-sessions-panel"><div class="hd"><div><h3>Активные сессии</h3><p>Управление входами и устройствами</p></div></div><div id="security-sessions-body"></div></section>';
 async function mount(root){
+ let auditEvents=[],auditLoaded=false;
+ const renderAudit=()=>{
+  const list=root.querySelector('#security-audit-list');if(!list)return;
+  const term=(root.querySelector('[data-security-audit-search]')?.value||'').toLocaleLowerCase();
+  list.replaceChildren();
+  const events=auditEvents.filter(x=>[x.actor,x.action,x.collection].join(' ').toLocaleLowerCase().includes(term));
+  if(!events.length){const empty=document.createElement('p');empty.className='security-audit-empty';empty.textContent=term?'По запросу событий не найдено.':'Событий пока нет.';list.append(empty);return}
+  for(const e of events){
+   const item=document.createElement('div');item.className='security-audit-event';
+   const left=document.createElement('div'),title=document.createElement('strong'),actor=document.createElement('small');
+   title.textContent=e.action||'Неизвестное действие';actor.textContent='Администратор: '+(e.actor||'—')+(e.collection?' · '+e.collection:'');
+   left.append(title,actor);
+   const date=document.createElement('time');
+   date.dateTime=e.createdAt||'';
+   const when=new Date(e.createdAt);date.textContent=Number.isNaN(when.getTime())?'Дата неизвестна':when.toLocaleString();
+   item.append(left,date);list.append(item);
+  }
+ };
+ const loadAudit=async()=>{
+  const list=root.querySelector('#security-audit-list');if(!list)return;
+  list.textContent='Загрузка журнала…';
+  try{const result=await request('audit');auditEvents=Array.isArray(result.events)?result.events:[];auditLoaded=true;renderAudit()}
+  catch(e){auditLoaded=false;list.textContent='Журнал недоступен: '+(e.message||String(e))}
+ };
+ root.querySelector('[data-security-audit-search]')?.addEventListener('input',renderAudit);
+ root.querySelector('[data-security-audit-refresh]')?.addEventListener('click',loadAudit);
  const center=root.querySelector('.security-center');
  if(center){
   const tabs=[...center.querySelectorAll('[data-security-tab]')];
@@ -31,6 +57,7 @@ async function mount(root){
   const selectTab=(name,focus=false)=>{
    for(const tab of tabs){const active=tab.dataset.securityTab===name;tab.setAttribute('aria-selected',String(active));tab.tabIndex=active?0:-1;if(active&&focus)tab.focus()}
    for(const pane of panes)pane.hidden=pane.dataset.securityPane!==name;
+   if(name==='audit'&&!auditLoaded)void loadAudit();
   };
   center.addEventListener('click',e=>{const tab=e.target.closest('[data-security-tab]');if(tab&&center.contains(tab))selectTab(tab.dataset.securityTab)});
   center.querySelector('.security-center-tabs')?.addEventListener('keydown',e=>{
