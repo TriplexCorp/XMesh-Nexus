@@ -60,7 +60,7 @@ pub(crate) fn validate(object: &Map<String, Value>) -> Result<(), ApiError> {
         if !(1..=36).contains(&radius) { return Err(bad("Скругление должно быть от 1 до 36 пикселей.")); }
     }
     for (key, max) in [
-        ("subscriptionHero", 100), ("subscriptionCta", 80), ("subscriptionSupportLabel", 80),
+        ("subscriptionHero", 100), ("subscriptionHeroEn", 100), ("subscriptionCta", 80), ("subscriptionCtaEn", 80), ("subscriptionSupportLabel", 80), ("subscriptionSupportLabelEn", 80),
     ] {
         if let Some(v) = object.get(key) {
             let text = v.as_str().ok_or_else(|| bad("Название блока должно быть текстом."))?;
@@ -69,10 +69,12 @@ pub(crate) fn validate(object: &Map<String, Value>) -> Result<(), ApiError> {
             }
         }
     }
-    if let Some(v) = object.get("subscriptionAppsTitle") {
-        let title = v.as_str().ok_or_else(|| bad("Заголовок приложений должен быть строкой."))?;
-        if title.chars().count() > 80 || title.chars().any(char::is_control) {
-            return Err(bad("Заголовок приложений должен быть короче 80 символов."));
+    for key in ["subscriptionAppsTitle","subscriptionAppsTitleEn"] {
+        if let Some(v) = object.get(key) {
+            let title = v.as_str().ok_or_else(|| bad("Заголовок приложений должен быть строкой."))?;
+            if title.chars().count() > 80 || title.chars().any(char::is_control) {
+                return Err(bad("Заголовок приложений должен быть короче 80 символов."));
+            }
         }
     }
     for key in ["subscriptionLogoUrl", "subscriptionSupportUrl"] {
@@ -169,6 +171,9 @@ mod tests {
         assert!(!accepts(json!({"subscriptionRadius":0})));
         assert!(!accepts(json!({"subscriptionRadius":37})));
         assert!(accepts(json!({"subscriptionSyncPanelTheme":true})));
+        assert!(accepts(json!({"subscriptionAppsTitleEn":"Connection apps","subscriptionHeroEn":"Active"})));
+        assert!(!accepts(json!({"subscriptionAppsTitleEn":"<script>\u0000</script>"})));
+        assert!(!accepts(json!({"subscriptionHeroEn":false})));
         assert!(!accepts(json!({"subscriptionSyncPanelTheme":"yes"})));
         assert!(!accepts(json!({"subscriptionBackground":"red"})));
         assert!(!accepts(json!({"subscriptionShowApps":"yes"})));
