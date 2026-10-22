@@ -6,7 +6,7 @@ const fs=require('node:fs');
 const assert=require('node:assert/strict');
 const app=fs.readFileSync('app.js','utf8');
 const html=fs.readFileSync('index.html','utf8');
-const cssFiles=['styles.css','xray-studio.css','subscription-studio.css'];
+const cssFiles=['styles.css','xray-studio-v4.css','subscription-studio.css'];
 const css=Object.fromEntries(cssFiles.map(file=>[file,fs.readFileSync(file,'utf8')]));
 
 assert((app.match(/setProperty\('--ui-control-radius'/g)||[]).length>=2,
@@ -29,8 +29,8 @@ const controls=[
 '.top .tl>.ib,.top .tl>#addb',
 'dialog.user-modal .user-save-button',
 'dialog.user-modal .user-cal-nav button',
-'.xray-builder .xray-config-tabs button',
-'.xray-builder .xray-output-actions button'
+'.sv-tabs button',
+'.sv-studio button'
 ];
 const found=new Set();
 for(const [file,contents] of Object.entries(css)){
@@ -46,5 +46,6 @@ for(const [file,contents] of Object.entries(css)){
      file+': hardcoded radius '+value+' for '+selector);
  }
 }
-for(const selector of controls)assert(found.has(selector),'Missing shared button radius: '+selector);
+for(const selector of controls.filter(x=>!x.startsWith('.sv-')))assert(found.has(selector),'Missing shared button radius: '+selector);
+assert.match(css['xray-studio-v4.css'],/--vround:var\(--ui-control-radius/,'Studio v4 controls must inherit the shared radius');
 console.log('Button-radius consistency checks passed');
