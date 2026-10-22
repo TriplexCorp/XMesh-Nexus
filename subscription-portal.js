@@ -15,12 +15,11 @@
   const input = document.getElementById('subscription-link');
   if (!input) return;
 
-  document.getElementById('copy-link')?.addEventListener('click', async event => {
+  async function copySubscription(button) {
     try {
       await navigator.clipboard.writeText(input.value);
-      event.currentTarget.textContent = language === 'en' ? 'Copied!' : 'Скопировано!';
+      button.textContent = language === 'en' ? 'HTTPS link copied!' : 'HTTPS-ссылка скопирована!';
     } catch {
-      // Old browsers may need the native text selection fallback.
       const temporary = document.createElement('textarea');
       temporary.value = input.value;
       temporary.style.position = 'fixed';
@@ -29,10 +28,16 @@
       temporary.select();
       const copied = document.execCommand('copy');
       temporary.remove();
-      event.currentTarget.textContent = copied
-        ? (language === 'en' ? 'Copied!' : 'Скопировано!')
+      button.textContent = copied
+        ? (language === 'en' ? 'HTTPS link copied!' : 'HTTPS-ссылка скопирована!')
         : (language === 'en' ? 'Copy not available' : 'Не удалось скопировать');
     }
+  }
+  document.getElementById('connect-link')?.addEventListener('click', event => {
+    void copySubscription(event.currentTarget);
+  });
+  document.getElementById('copy-link')?.addEventListener('click', event => {
+    void copySubscription(event.currentTarget);
   });
 
   function showQr(target) {
