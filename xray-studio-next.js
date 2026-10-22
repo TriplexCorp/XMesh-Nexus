@@ -43,7 +43,8 @@ const syncSections=()=>{
  root.querySelectorAll('[data-xm-manual]').forEach(el=>el.hidden=mode!=='manual');
  const editor=root.querySelector('.xm-editor-tabs');if(editor)editor.hidden=mode!=='visual';
  root.querySelectorAll('.xm-editor-tabs button').forEach(b=>b.classList.toggle('is-active',b.dataset.xmAction===({basic:'basicTab',security:'securityTab',client:'clientTab'}[editorTab])));
- root.classList.toggle('xm-show-preview',true);
+ root.classList.toggle('xm-show-preview',mode==='visual');
+ root.classList.toggle('xm-manual-mode',mode==='manual');
 };
 const v=id=>$(root,id)?.value?.trim()||'';
 const set=(id,value)=>{const e=$(root,id);if(e)e.value=value};
@@ -115,7 +116,7 @@ function refresh(){
 refreshFields();
 serverError='';clientError='';
 try{server=JSON.stringify(mode==='manual'?JSON.parse(v('manual')):config(),null,2)}catch(e){server='';serverError=e.message}
-if(mode==='manual'){client='';clientError='В ручном режиме клиентский JSON не генерируется из произвольного Server JSON. Используйте персональный экспорт пользователя.'}
+if(mode==='manual'){client='';clientError='В ручном режиме экспортируйте клиентский JSON из профиля пользователя.';if(tab==='client'){tab='server';root.querySelectorAll('.xm-tab').forEach(x=>x.classList.toggle('is-active',x.dataset.xmAction==='server'))}}
 else try{client=JSON.stringify(clientConfig(),null,2)}catch(e){client='';clientError=e.message}
 const current=tab==='server'?server:client;
 const saveStatus=$(root,'saveStatus');
@@ -141,7 +142,7 @@ const actions={
 basicTab:()=>{editorTab='basic';syncSections()},
 securityTab:()=>{editorTab='security';syncSections()},
 clientTab:()=>{editorTab='client';syncSections()},
-new:()=>{selectedId=null;set('name','Новый профиль');set('tag','vless-main');mode='visual';manualDirty=false;editorTab='basic';root.querySelectorAll('[data-xm-action="visual"],[data-xm-action="manual"]').forEach(b=>b.classList.toggle('is-active',b.dataset.xmAction==='visual'));refreshList();syncSections();refresh()},
+new:()=>{selectedId=null;set('name','Новый профиль');set('tag','vless-main');mode='visual';manualDirty=false;editorTab='basic';root.querySelectorAll('[data-xm-action="visual"],[data-xm-action="manual"]').forEach(b=>b.classList.toggle('is-active',b.dataset.xmAction==='visual'));refreshList();syncSections();refresh();root.querySelector('[data-xm="name"]')?.focus()},
 duplicate:()=>{selectedId=null;set('name',v('name')+' — копия');refreshList();ctx.toast('Введите уникальный тег для копии')},
 
 visual:()=>switchMode('visual'),manual:()=>switchMode('manual'),
