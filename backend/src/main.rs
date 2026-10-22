@@ -1326,6 +1326,16 @@ fn validate_record(collection: &str, data: &Value) -> Result<(), ApiError> {
         .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Запись должна быть JSON-объектом."))?;
     if collection == "nodes" {
         node_rotation::validate_node(data)?;
+        if let Some(hosting) = object.get("hosting") {
+            let value = hosting.as_str().ok_or_else(|| ApiError::new(
+                StatusCode::BAD_REQUEST, "Название хостинга должно быть строкой."
+            ))?;
+            if value.chars().count() > 100 || value.chars().any(char::is_control) {
+                return Err(ApiError::new(
+                    StatusCode::BAD_REQUEST, "Название хостинга не должно превышать 100 символов или содержать управляющие символы."
+                ));
+            }
+        }
     }
     if collection == "users" {
         let username = object.get("username").and_then(Value::as_str)
