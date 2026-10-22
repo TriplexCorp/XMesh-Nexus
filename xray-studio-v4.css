@@ -157,3 +157,5 @@
 .sv-core-diagnostics[data-status=bad]{color:var(--er,#f28a9b);background:color-mix(in srgb,var(--er,#f28a9b) 6%,var(--vpanel))}
 .sv-core-diagnostics[data-status=ok]{color:var(--ok,#57d6a4)}
 .sv-gutter{color:var(--vmute)}
+
+.sv-highlight .sv-invalid-line{display:inline-block;min-width:100%;background:color-mix(in srgb,var(--er,#f28a9b) 10%,transparent);text-decoration:underline wavy var(--er,#f28a9b);text-underline-offset:.17em;text-decoration-thickness:1px}
