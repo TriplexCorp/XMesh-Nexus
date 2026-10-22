@@ -572,6 +572,27 @@ mod tests{
    let token="a".repeat(64);assert!(valid_token(&token));
    assert_ne!(token_hash(&token),token);
  }
+ #[test] fn native_json_is_structured_and_never_leaks_reality_private_key(){
+  let user=json!({"xrayId":"550e8400-e29b-41d4-a716-446655440000"});
+  let inbound=json!({"tag":"SWEDEN","protocol":"vless","port":443,
+   "settings":{"flow":"xtls-rprx-vision"},
+   "streamSettings":{"network":"xhttp","security":"reality",
+    "xhttpSettings":{"path":"/stream","mode":"stream-up","xmux":{"cMaxReuseTimes":64}},
+    "realitySettings":{"privateKey":"SERVER_PRIVATE_KEY_MUST_NEVER_LEAK",
+     "serverNames":["vpn.example.org"],"shortIds":["abcd"]}}});
+  let host=json!({"address":"vpn.example.org","publicKey":"PUBLIC_KEY",
+   "externalSNI":"vpn.example.org","shortId":"abcd","remark":"Sweden"});
+  let outbound=vless_outbound(&user,&inbound,&host).expect("Reality public metadata is complete");
+  let data=native_xray_config(vec![outbound]);
+  let rendered=serde_json::to_string(&data).expect("serialize Xray JSON");
+  assert!(!rendered.contains("SERVER_PRIVATE_KEY_MUST_NEVER_LEAK"));
+  assert_eq!(data["outbounds"][0]["settings"]["vnext"][0]["users"][0]["id"],user["xrayId"]);
+  assert_eq!(data["outbounds"][0]["streamSettings"]["xhttpSettings"]["mode"],"stream-up");
+  assert_eq!(data["outbounds"][0]["streamSettings"]["xhttpSettings"]["xmux"]["cMaxReuseTimes"],64);
+  assert_eq!(data["outbounds"][0]["streamSettings"]["realitySettings"]["publicKey"],"PUBLIC_KEY");
+  assert_eq!(data["routing"]["rules"][2]["outboundTag"],"Sweden");
+  assert_eq!(data["inbounds"][0]["protocol"],"socks");
+ }
  #[test] fn invalid_reality_not_exported(){
  let user=json!({"xrayId":"550e8400-e29b-41d4-a716-446655440000"});
  let inbound=json!({"protocol":"vless","port":443,"streamSettings":{"network":"xhttp","security":"reality","realitySettings":{"serverNames":["example.org"]}}});
