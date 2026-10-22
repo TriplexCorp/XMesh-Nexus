@@ -80,12 +80,16 @@ bash deploy/ensure-totp-key.sh .env
 # Configure a root-owned host-only watcher to atomically synchronize the path into .env.
 if [[ "$(id -u)" == 0 ]] && command -v systemctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]]; then
   repo_dir="$(pwd -P)"
+  # Install a root-owned copy outside the Git checkout. The privileged
+  # systemd service must never execute mutable code from the repository.
+  install -d -o root -g root -m 0755 /usr/local/libexec
+  install -o root -g root -m 0750 deploy/sync-dashboard-env.sh /usr/local/libexec/xmesh-sync-dashboard-env
   cat > /etc/systemd/system/xmesh-dashboard-env.service <<EOF
 [Unit]
 Description=Synchronize XMesh dashboard URL into .env
 [Service]
 Type=oneshot
-ExecStart=/bin/bash ${repo_dir}/deploy/sync-dashboard-env.sh ${repo_dir}
+ExecStart=/usr/local/libexec/xmesh-sync-dashboard-env ${repo_dir}
 EOF
   cat > /etc/systemd/system/xmesh-dashboard-env.path <<EOF
 [Unit]
