@@ -252,6 +252,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/auth/mfa/confirm", post(mfa::confirm))
         .route("/auth/mfa/disable", post(mfa::disable))
         .route("/security/policy", get(security::get_settings).patch(security::update_settings))
+        .route("/security/audit", get(security::audit_events))
         .route("/security/sessions", get(security::sessions))
         .route("/security/sessions/others", post(security::revoke_other_sessions))
         .route("/security/sessions/{id}", axum::routing::delete(security::revoke_session))
