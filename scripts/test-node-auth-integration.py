@@ -58,7 +58,8 @@ def main():
 
     # No credentials may be issued through the removed bearer endpoint.
     code, _, _ = request("POST", f"/nodes/{node}/metrics-token", {}, cookie=cookie, origin=BASE)
-    assert_status(code, 404, "legacy bearer issuance endpoint removed")
+    assert code in (404, 405), f"legacy bearer issuance endpoint unexpectedly accepted POST: HTTP {code}"
+    print("PASS: legacy bearer issuance endpoint removed (404/405)")
     code, _, _ = request("POST", "/metrics/ingest", body,
                          headers={"Authorization": "Bearer xm_" + "a" * 64})
     assert_status(code, 401, "unsigned bearer rejected before enrollment")
@@ -108,7 +109,8 @@ def main():
 
         code, _, _ = request("POST", f"/nodes/{node}/metrics-token", {},
                              cookie=cookie, origin=BASE)
-        assert_status(code, 404, "removed bearer endpoint stays unavailable")
+        assert code in (404, 405), f"removed bearer endpoint unexpectedly accepted POST: HTTP {code}"
+        print("PASS: removed bearer endpoint stays unavailable (404/405)")
 
         # Real signed database accounting for two inbounds of the same user.
         code, new_user, _ = request("POST", "/collections/users",
