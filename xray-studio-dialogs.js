@@ -11,6 +11,7 @@ function request(spec={}){
   dlg.setAttribute('aria-describedby','xm-studio-modal-description');
   const shell=document.createElement('form');
   shell.method='dialog';
+  shell.noValidate=true;
   shell.className='xm-studio-modal-shell';
   const make=(tag,cls,txt)=>{const el=document.createElement(tag);if(cls)el.className=cls;if(txt!=null)el.textContent=txt;return el};
   const head=make('div','xm-studio-modal-head');
