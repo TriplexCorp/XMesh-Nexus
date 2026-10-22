@@ -61,6 +61,8 @@ assert(!/\.subscription-preview\{\s*--portal-accent:/.test(css),
  'Public subscription must not override its server-supplied accent');
 assert(!/\.subscription-preview\{\s*--portal-bg:/.test(css),
  'Public subscription must not override its server-supplied background');
+assert(!/\.subscription-preview\{\s*--portal-secondary:/.test(css),
+ 'Public subscription must not override its server-supplied secondary accent');
 assert.match(css,/\.subscription-studio\{\s*--portal-accent:/,
  'Demo defaults must only be scoped to Subscription Studio');
 const [customPaletteView]=studio.create({subscriptionSyncPanelTheme:false,subscriptionAccent:'#ff0022'},
