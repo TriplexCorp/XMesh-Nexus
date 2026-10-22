@@ -10,21 +10,22 @@ const hex=n=>{const a=new Uint8Array(n);crypto.getRandomValues(a);return Array.f
 function view(){
 return '<section class="xm-studio" id="xm-studio">'+
 '<header class="xm-head"><div><div class="xm-eyebrow">XRAY STUDIO / CONFIGURATION</div><h2>Конфигурация подключения</h2><p>Только необходимые параметры. Проверка и результат — рядом.</p></div><div class="xm-modes"><button type="button" class="xm-mode is-active" data-xm-action="visual">Конструктор</button><button type="button" class="xm-mode" data-xm-action="manual">Ручной JSON</button><button type="button" class="xm-mode" data-xm-action="import">Импорт JSON</button><input type="file" data-xm="file" accept=".json,application/json" hidden></div></header>'+
+'<nav class="xm-steps" aria-label="Разделы конструктора" data-xm-steps><button type="button" class="xm-step is-active" data-xm-step="profile" aria-current="step"><span>01</span>Профиль</button><button type="button" class="xm-step" data-xm-step="connection"><span>02</span>Соединение</button><button type="button" class="xm-step" data-xm-step="security"><span>03</span>Защита</button><button type="button" class="xm-step" data-xm-step="client"><span>04</span>Клиент</button></nav>'+ 
 '<div class="xm-layout"><div class="xm-editor">'+
-'<section class="xm-panel"><div class="xm-section-title"><span>01</span><div><h3>Профиль</h3><p>Название и уникальный идентификатор inbound</p></div></div><div class="xm-fields xm-two">'+inp('name','Название','Новый профиль')+inp('tag','Тег inbound','vless-main')+'</div></section>'+
-'<section class="xm-panel" data-xm-visual><div class="xm-section-title"><span>02</span><div><h3>Соединение</h3><p>Протокол, транспорт и порт сервера</p></div></div><div class="xm-fields xm-three">'+
+'<section class="xm-panel" data-xm-panel="profile"><div class="xm-section-title"><span>01</span><div><h3>Профиль</h3><p>Название и уникальный идентификатор inbound</p></div></div><div class="xm-fields xm-two">'+inp('name','Название','Новый профиль')+inp('tag','Тег inbound','vless-main')+'</div></section>'+
+'<section class="xm-panel" data-xm-visual data-xm-panel="connection"><div class="xm-section-title"><span>02</span><div><h3>Соединение</h3><p>Протокол, транспорт и порт сервера</p></div></div><div class="xm-fields xm-three">'+
 select('protocol','Протокол',[['vless','VLESS'],['vmess','VMess'],['trojan','Trojan'],['shadowsocks','Shadowsocks']])+
 select('transport','Транспорт',[['xhttp','XHTTP'],['raw','TCP / RAW'],['ws','WebSocket'],['grpc','gRPC']])+
 select('security','Защита',[['reality','Reality'],['tls','TLS'],['none','Без TLS']])+
 '</div><div class="xm-fields xm-two">'+inp('listen','Слушать','0.0.0.0')+inp('port','Порт',443,'number')+'</div></section>'+
-'<section class="xm-panel" data-xm-visual><div class="xm-section-title"><span>03</span><div><h3>Защита и транспорт</h3><p>Показываются только относящиеся к подключению настройки</p></div></div>'+
+'<section class="xm-panel" data-xm-visual data-xm-panel="security"><div class="xm-section-title"><span>03</span><div><h3>Защита и транспорт</h3><p>Показываются только относящиеся к подключению настройки</p></div></div>'+
 '<div class="xm-fields xm-two" data-xm-section="reality">'+inp('sni','Server Name / SNI','www.microsoft.com')+inp('target','Reality target','www.microsoft.com:443')+inp('private','Reality private key','','text','Нужен серверный X25519 private key')+inp('public','Reality public key','','text','Нужен клиентскому JSON')+inp('short','Short ID','','text')+'</div>'+
 '<div class="xm-inline" data-xm-section="reality"><button type="button" class="xm-quiet" data-xm-action="keys">Сгенерировать Reality ключи</button><button type="button" class="xm-quiet" data-xm-action="short">Новый Short ID</button></div>'+
 '<div class="xm-fields xm-two" data-xm-section="tls">'+inp('tlsSni','TLS Server Name','')+inp('cert','Путь сертификата','/etc/ssl/xray/fullchain.pem')+inp('key','Путь закрытого ключа','/etc/ssl/xray/privkey.pem')+'</div>'+
 '<div class="xm-fields xm-two" data-xm-section="web">'+inp('path','Path','/xhttp')+inp('host','HTTP Host','')+'</div>'+
 '<div class="xm-fields xm-two" data-xm-section="vless">'+select('encMode','VLESS Encryption',[['none','Отключено'],['mlkem','ML-KEM-768']])+inp('decryption','Server decryption','')+inp('encryption','Client encryption','')+'</div><div class="xm-inline" data-xm-section="vless"><button type="button" class="xm-quiet" data-xm-action="vlessenc">Получить VLESS Encryption ключи через Xray-core</button></div>'+
 '<div class="xm-fields xm-two" data-xm-section="shadowsocks">'+select('ssMethod','Метод',[['chacha20-ietf-poly1305','ChaCha20-Poly1305'],['aes-256-gcm','AES-256-GCM']])+inp('password','Пароль','')+'</div>'+
-'</section><section class="xm-panel" data-xm-visual><div class="xm-section-title"><span>04</span><div><h3>Клиент</h3><p>Адрес подключения и тестовые параметры Client JSON</p></div></div>'+
+'</section><section class="xm-panel" data-xm-visual data-xm-panel="client"><div class="xm-section-title"><span>04</span><div><h3>Клиент</h3><p>Адрес подключения и тестовые параметры Client JSON</p></div></div>'+
 '<div class="xm-fields xm-two">'+select('endpoint','Публичный адрес',[['manual','Ввести вручную']])+inp('address','Домен или IP','','text','Не подставляем адрес панели или внутренний IP')+inp('clientPort','Публичный порт','443','number')+inp('clientId','UUID / пароль',uuid())+'</div>'+
 '<p class="xm-hint">Профиль сервера сохраняется без добавления тестового клиента. Реальные пользователи привязываются отдельно.</p></section>'+
 '<section class="xm-panel" data-xm-manual hidden><div class="xm-section-title"><span>JSON</span><div><h3>Полный серверный JSON</h3><p>Редактирование без скрытой конвертации или потери полей</p></div></div><textarea data-xm="manual" class="xm-manual" spellcheck="false" aria-label="Полный JSON сервера"></textarea><div class="xm-inline"><button class="xm-quiet" type="button" data-xm-action="format">Форматировать</button><button class="xm-quiet" type="button" data-xm-action="fromVisual">Заново из конструктора</button></div></section>'+
@@ -33,6 +34,18 @@ select('security','Защита',[['reality','Reality'],['tls','TLS'],['none','�
 }
 function mount(root,ctx){
 let mode='visual',tab='server',server='',client='',serverError='',clientError='',manualDirty=false,busy=false,endpointList=[];
+let step='connection';
+const chooseStep=next=>{
+ if(!['profile','connection','security','client'].includes(next))return;
+ step=next;
+ root.querySelectorAll('[data-xm-panel]').forEach(el=>{el.hidden=mode!=='visual'||el.dataset.xmPanel!==step});
+ root.querySelectorAll('[data-xm-step]').forEach(el=>{
+  const selected=el.dataset.xmStep===step;
+  el.classList.toggle('is-active',selected);
+  if(selected)el.setAttribute('aria-current','step');else el.removeAttribute('aria-current');
+ });
+ const nav=root.querySelector('[data-xm-steps]');if(nav)nav.hidden=mode!=='visual';
+};
 const v=id=>$(root,id)?.value?.trim()||'';
 const set=(id,value)=>{const e=$(root,id);if(e)e.value=value};
 const info=(msg,bad=false)=>{const el=$(root,'status');if(el){el.textContent=msg;el.dataset.bad=bad?'1':'0'}};
@@ -117,6 +130,7 @@ if(next==='manual'&&!manualDirty)set('manual',server||'{\n  "inbounds": []\n}');
 mode=next;
 root.querySelectorAll('[data-xm-visual]').forEach(x=>x.hidden=next!=='visual');
 root.querySelectorAll('[data-xm-manual]').forEach(x=>x.hidden=next!=='manual');
+chooseStep(step);
 root.querySelectorAll('[data-xm-action="visual"],[data-xm-action="manual"]').forEach(b=>b.classList.toggle('is-active',b.dataset.xmAction===next));
 refresh();
 }
@@ -145,12 +159,12 @@ ctx.toast('Профиль сохранён');await ctx.render();
 }catch(e){ctx.toast('Не удалось сохранить: '+e.message);$(root,'diagnostics').textContent=e.message;info('Ошибка сохранения',true)}
 finally{busy=false;button.disabled=false}}
 };
-root.addEventListener('click',event=>{const el=event.target.closest('[data-xm-action]');if(!el||!root.contains(el))return;event.preventDefault();Promise.resolve(actions[el.dataset.xmAction]?.()).catch(e=>ctx.toast(e.message))});
+root.addEventListener('click',event=>{const selected=event.target.closest('[data-xm-step]');if(selected&&root.contains(selected)){event.preventDefault();chooseStep(selected.dataset.xmStep);return}const el=event.target.closest('[data-xm-action]');if(!el||!root.contains(el))return;event.preventDefault();Promise.resolve(actions[el.dataset.xmAction]?.()).catch(e=>ctx.toast(e.message))});
 root.addEventListener('input',event=>{if(event.target?.dataset.xm==='manual')manualDirty=true;refresh()});
 root.addEventListener('change',event=>{if(event.target?.dataset.xm==='endpoint'){const ep=currentEndpoint();if(ep){set('address',ep.address||'');set('clientPort',ep.port||443)}}refresh()});
 $(root,'file').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{if(file.size>1024*1024)throw Error('JSON больше 1 МБ');const raw=await file.text();const parsed=JSON.parse(raw);validation(parsed);set('manual',JSON.stringify(parsed,null,2));manualDirty=true;switchMode('manual');refresh();ctx.toast('JSON импортирован')}catch(ex){ctx.toast('Ошибка импорта: '+ex.message)}finally{e.target.value=''}});
 root.addEventListener('keydown',e=>{if(e.key==='Escape')root.classList.remove('xm-expanded');if(e.key==='Tab'&&e.target===$(root,'manual')){e.preventDefault();const t=e.target,start=t.selectionStart;t.setRangeText('  ',start,t.selectionEnd,'end');manualDirty=true;refresh()}});
-set('short',hex(8));refreshEndpoints();refresh();
+set('short',hex(8));refreshEndpoints();chooseStep('connection');refresh();
 }
 return {view,mount};
 })();
