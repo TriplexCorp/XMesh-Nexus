@@ -17,7 +17,7 @@ window.XMeshI18n=(()=>{
     'СИСТЕМА':'SYSTEM','Система':'System',
     'Дашборд':'Dashboard','Главная':'Home','Пользователи':'Users',
     'Клиенты':'Clients','Сквады':'Squads','Хосты':'Hosts','Узлы':'Nodes',
-    'Шаблоны':'Templates','Диагностика':'Diagnostics','Администраторы':'Administrators',
+    'Шаблоны':'Templates','Диагностика':'Diagnostics','Администраторы':'Administrators','Админы':'Admins',
     'Настройки':'Settings','Подписка':'Subscription','Ещё':'More',
     'Ещё разделы':'More sections','Поиск и команды':'Search and commands',
     'Сменить тему':'Switch theme','Уведомления':'Notifications',
@@ -559,6 +559,21 @@ window.XMeshI18n=(()=>{
   ];
   for(const [ru,en] of advancedSecurityTranslations)dict.set(ru,en);
 
+  const securityCenterTranslations=[
+    ['Безопасность аккаунта','Account security'],
+    ['АККАУНТ / БЕЗОПАСНОСТЬ','ACCOUNT / SECURITY'],
+    ['Двухфакторная защита вашего аккаунта, серверные правила входа и управление активными сессиями.','Two-factor authentication, server-side sign-in rules and active session management.'],
+    ['Путь входа в панель','Dashboard access path'],
+    ['Единственная точка входа в интерфейс. После сохранения старый адрес перестаёт работать. Путь не заменяет HTTPS и авторизацию.','Dashboard entry path. Saving a new path invalidates the previous one. This does not replace HTTPS or authentication.'],
+    ['Адрес снижает обнаруживаемость страницы входа, но не является паролем. API должен оставаться защищённым независимо от URL. Используйте длинный непредсказуемый путь и HTTPS.','An obscure entry path is not a password. The API must remain protected regardless of URL. Use a long random path and HTTPS.'],
+    ['Ссылка на панель скопирована.','Dashboard link copied.'],
+    ['Настройки безопасности успешно сохранены.','Security settings saved successfully.'],
+    ['Настройки сохранены. Открываем новый адрес панели.','Settings saved. Opening the updated dashboard URL.'],
+    ['Остальные сессии завершены.','Other sessions terminated.'],
+    ['Сессия отозвана.','Session revoked.'],
+    ['Значения по умолчанию подставлены. Нажмите «Сохранить политику» для применения.','Default values restored in the form. Select Save policy to apply.']
+  ];
+  for(const [ru,en] of securityCenterTranslations)dict.set(ru,en);
   const securityAdvancedTranslations=[["Расширенная защита","Advanced security"],["Настройки сервера и активные сеансы администраторов","Server settings and administrator sessions"],["Загрузка политик безопасности…","Loading security policies…"],["Политика авторизации","Authentication policy"],["Управляется владельцем панели. Значения сохраняются в PostgreSQL и проверяются API.","Managed by the panel owner. Values are stored in PostgreSQL and enforced by the API."],["Срок действия сессии","Session lifetime"],["Максимальное время входа. Применяется к новым сессиям.","Absolute session duration. Applies to new sign-ins."],["Таймаут бездействия","Idle timeout"],["0 — не завершать сессию из-за бездействия.","0 — disable automatic sign-out due to inactivity."],["Сессий на администратора","Sessions per administrator"],["Ограничение количества одновременно действующих входов.","Maximum concurrent signed-in sessions."],["Попыток входа","Failed login attempts"],["После этого числа ошибок вход временно блокируется.","Sign-in is temporarily blocked after this many failed attempts."],["Время блокировки","Lockout duration"],["Период ограничения после превышения попыток.","Lockout time and counting window."],["Дополнительный адрес дашборда","Additional dashboard URL"],["Дополнительный URL входа. Не заменяет HTTPS и авторизацию. Основной адрес / остаётся доступным.","An additional dashboard entry URL. It does not replace HTTPS or authentication. The primary / entry remains available."],["Копировать ссылку","Copy link"],["Редактирование доступно только владельцу (owner).","Only the owner may edit the security policy."],["Сохранить политику","Save policy"],["Вернуть значения по умолчанию","Restore defaults"],["Мои активные сессии","My active sessions"],["При необходимости завершите другие входы в панель.","Revoke other signed-in sessions when needed."],["Текущая сессия","Current session"],["Завершить","Sign out"],["Отозвать","Revoke"],["Завершить все другие сессии","Sign out all other sessions"],["Изменение пути не скрывает API и не заменяет ограничения доступа на обратном прокси. Для полной смены базового URL потребуется отдельная настройка HTTPS-прокси.","Changing the path does not hide the API or replace reverse-proxy access controls. A full base URL change requires additional HTTPS proxy configuration."],["Повторить загрузку","Retry loading"],["Ссылка на дашборд скопирована.","Dashboard link copied."],["час.","hr"],["мин.","min"],["шт.","items"],["раз","tries"]];
   for(const [ru,en] of securityAdvancedTranslations)dict.set(ru,en);
   const qrTranslations=[
