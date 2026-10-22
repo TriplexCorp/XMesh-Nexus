@@ -25,7 +25,7 @@ pub struct SecurityPolicy {
 impl Default for SecurityPolicy {
     fn default() -> Self {
         Self { session_hours:12, idle_minutes:0, max_sessions:5,
-            login_attempts:8, lockout_minutes:15, dashboard_path:"/dashboard/nexus".into() }
+            login_attempts:8, lockout_minutes:15, dashboard_path:std::env::var("DASHBOARD_PATH").unwrap_or_else(|_| "/dashboard/nexus".into()) }
     }
 }
 impl SecurityPolicy {
@@ -86,6 +86,13 @@ pub async fn update_settings(State(state):State<AppState>,Extension(actor):Exten
     sqlx::query("INSERT INTO app_settings(key,value) VALUES ('security',$1) \
         ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,updated_at=NOW()")
         .bind(data).execute(&state.pool).await?;
+    // The container cannot open host .env. It only writes a dedicated, limited-scope mirror.
+    if let Ok(path)=std::env::var("DASHBOARD_PATH_MIRROR") {
+        tokio::fs::write(path,format!("{}\n",policy.dashboard_path)).await.map_err(|error| {
+            tracing::error!(%error,"Dashboard path mirror sync failed");
+            ApiError::new(StatusCode::INTERNAL_SERVER_ERROR,"Настройка сохранена в базе, но синхронизация .env не удалась.")
+        })?;
+    }
     crate::audit(&state.pool,&actor.username,"security.policy.updated",None,None,json!({
         "sessionHours":policy.session_hours,"idleMinutes":policy.idle_minutes,
         "maxSessions":policy.max_sessions,"loginAttempts":policy.login_attempts,
