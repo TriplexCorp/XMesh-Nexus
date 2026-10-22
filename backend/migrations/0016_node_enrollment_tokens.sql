@@ -1,0 +1,1 @@
+CREATE TABLE node_enrollment_tokens (token_hash TEXT PRIMARY KEY, node_id BIGINT NOT NULL, expires_at TIMESTAMPTZ NOT NULL, consumed_at TIMESTAMPTZ); CREATE INDEX node_enrollment_tokens_expiry ON node_enrollment_tokens(expires_at);
