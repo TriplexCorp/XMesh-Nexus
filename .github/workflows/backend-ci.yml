@@ -16,6 +16,14 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'push' }}
 
 jobs:
+  subscription-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Check backend independently from frontend regression tests
+        working-directory: backend
+        run: cargo test --lib --locked --no-default-features || cargo test --bin xmesh-api --no-default-features
   cli:
     runs-on: ubuntu-latest
     steps:
