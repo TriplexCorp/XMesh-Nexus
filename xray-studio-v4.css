@@ -108,3 +108,53 @@
 .sv-legacy .xm-tools-grid button[data-tool="policy"]{border-left:3px solid #d981b3}
 .sv-legacy .xm-tools-grid button[data-tool="outbounds"]{border-left:3px solid #e3a763}
 .sv-legacy .xm-tools-grid button[data-tool="validate"]{border-left:3px solid #a87df0}
+
+
+/* Studio v4 polish: desktop reference alignment, readable density, prevent global nav/card rules leaking in. */
+.sv-studio{font-size:14px!important;gap:13px!important}
+.sv-studio .sv-title{padding:10px 3px 18px!important;align-items:center!important}
+.sv-studio .sv-title h2{font-size:clamp(25px,1.75vw,32px)!important}
+.sv-studio .sv-title small{font-size:13px!important}
+.sv-studio .sv-mainnav{padding:8px 0 14px!important;align-items:center!important;flex-wrap:wrap!important}
+.sv-studio .sv-navtags{display:flex!important;flex-direction:row!important;align-items:center!important;gap:5px!important;flex-wrap:wrap!important}
+.sv-studio .sv-navtags>button{width:auto!important;flex:none!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;padding:10px 15px!important;min-height:42px!important;font-size:13px!important}
+.sv-studio .sv-navtools{margin-left:auto}
+.sv-studio .sv-columns{height:clamp(610px,calc(100dvh - 265px),980px)!important;grid-template-columns:minmax(430px,1.63fr) minmax(355px,.98fr) minmax(220px,.55fr)!important;align-items:stretch!important;gap:12px!important}
+.sv-studio.sv-hide-tools .sv-columns{grid-template-columns:minmax(0,1.7fr) minmax(355px,1fr)!important}
+.sv-studio .sv-codepanel,.sv-studio .sv-constructor,.sv-studio .sv-tools{height:100%!important;min-height:0!important;box-shadow:0 8px 30px -24px #0009}
+.sv-studio .sv-codebar{min-height:54px!important}
+.sv-studio .sv-codesurface{font-size:13px!important;line-height:1.75!important}
+.sv-studio .sv-codeholder textarea,.sv-studio .sv-highlight{padding:15px 16px!important}
+.sv-studio .sv-constructor>header{padding:18px 15px 12px!important}
+.sv-studio .sv-constructor h3{font-size:16px!important}
+.sv-studio .sv-constructor>header p{font-size:12px!important}
+.sv-studio .sv-tabs{display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;align-items:center!important;justify-content:flex-start!important;width:100%!important;gap:4px!important;padding:4px 10px 13px!important;overflow-x:auto!important}
+.sv-studio .sv-tabs>button{display:inline-flex!important;align-items:center!important;justify-content:center!important;white-space:nowrap!important;min-width:max-content!important;width:auto!important;min-height:35px!important;padding:8px 10px!important;font-size:12px!important;flex:0 0 auto!important;border-radius:var(--ui-control-radius,10px)!important}
+.sv-studio .sv-tabs>button.active{border:1px solid var(--sv-accent)!important;background:color-mix(in srgb,var(--sv-accent) 14%,var(--sv-panel))!important}
+.sv-studio .sv-formbody{padding:16px!important}
+.sv-studio .sv-field{font-size:12px!important;gap:7px!important;margin-bottom:14px!important}
+.sv-studio .sv-field input,.sv-studio .sv-field select{font-size:13px!important;min-height:43px!important}
+.sv-studio .sv-tools{padding:15px 12px!important;gap:12px!important}
+.sv-studio .sv-toolhead h3{font-size:14px!important}
+.sv-studio .sv-tools>p{font-size:12px!important}
+.sv-studio .sv-legacy .xm-tools-grid{display:flex!important;flex-direction:column!important;gap:9px!important}
+.sv-studio .sv-legacy .xm-tools-grid .sv-toolitem{display:flex!important;align-items:center!important;gap:10px!important;width:100%!important;min-height:64px!important;text-align:left!important;padding:10px!important;border:1px solid var(--sv-stroke)!important;background:var(--sv-input)!important;border-radius:var(--ui-control-radius,12px)!important}
+.sv-studio .sv-legacy .xm-tools-grid .sv-toolitem:hover{border-color:var(--sv-accent)!important}
+.sv-toolicon{flex:none;display:grid;place-items:center;width:39px;height:42px;border-radius:10px;font-size:24px;font-weight:760;background:color-mix(in srgb,var(--sv-accent) 19%,var(--sv-panel));color:var(--sv-accent)}
+.sv-tool-shortid .sv-toolicon{background:#653a82;color:#edb8ff}
+.sv-tool-dns .sv-toolicon{background:#224b77;color:#9ccaff}
+.sv-tool-routing .sv-toolicon{background:#174a47;color:#83e7c3}
+.sv-tool-policy .sv-toolicon{background:#73355e;color:#ffa3d5}
+.sv-tool-outbounds .sv-toolicon{background:#684922;color:#ffce88}
+.sv-tool-validate .sv-toolicon{background:#493473;color:#d2b3ff}
+.sv-toolcopy{flex:1;min-width:0;display:grid;gap:3px;overflow-wrap:anywhere}
+.sv-toolcopy strong{font-weight:750;font-size:12px;color:var(--sv-text)}
+.sv-toolcopy small{font-size:11px;font-weight:450;line-height:1.4;color:var(--sv-muted)}
+.sv-toolarrow{font-size:20px;color:var(--sv-muted)}
+.sv-secondary-tools{display:flex;flex-wrap:wrap;gap:6px;border-top:1px solid var(--sv-stroke);padding-top:12px}
+.sv-secondary-tools .xm-tools-heading{width:100%;font-size:11px;color:var(--sv-muted)}
+.sv-secondary-tools>.xm-quiet{min-height:31px!important;padding:5px 8px!important;width:auto!important;font-size:10px!important}
+.sv-studio .sv-template{margin-top:auto!important}
+@media(max-width:1500px){.sv-studio .sv-columns{grid-template-columns:minmax(390px,1.4fr) minmax(335px,1fr) minmax(208px,.65fr)!important}}
+@media(max-width:1200px){.sv-studio .sv-columns,.sv-studio.sv-hide-tools .sv-columns{grid-template-columns:minmax(0,1.2fr) minmax(300px,1fr)!important;height:auto!important}.sv-studio .sv-codepanel,.sv-studio .sv-constructor{height:650px!important}.sv-studio .sv-tools{height:auto!important;grid-column:1/-1}.sv-studio .sv-legacy .xm-tools-grid{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important}}
+@media(max-width:850px){.sv-studio .sv-columns,.sv-studio.sv-hide-tools .sv-columns{grid-template-columns:minmax(0,1fr)!important}.sv-studio .sv-tools{grid-column:1!important}.sv-studio .sv-codepanel{height:550px!important}.sv-studio .sv-constructor{height:520px!important}.sv-studio .sv-legacy .xm-tools-grid{grid-template-columns:minmax(0,1fr)!important}}
