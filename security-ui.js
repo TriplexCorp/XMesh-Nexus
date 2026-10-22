@@ -1,0 +1,67 @@
+(()=>{
+'use strict';
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const defaults={sessionHours:12,idleMinutes:0,maxSessions:5,loginAttempts:8,lockoutMinutes:15,dashboardPath:'/dashboard/nexus'};
+const request=async(path,options={})=>{
+ const r=await fetch('/api/v1/security/'+path,{credentials:'same-origin',cache:'no-store',...options,headers:{...(options.body?{'Content-Type':'application/json'}:{}),...(options.headers||{})}});
+ const j=await r.json().catch(()=>({}));
+ if(!r.ok)throw Error(j.error||'Ошибка настроек безопасности');
+ return j;
+};
+const setting=(name,title,detail,min,max,unit,policy,disabled)=>'<label class="security-setting"><span><b>'+title+'</b><small>'+detail+'</small></span><span class="security-number"><input name="'+name+'" type="number" min="'+min+'" max="'+max+'" step="1" value="'+esc(policy[name])+'" '+(disabled?'disabled':'')+' required><em>'+unit+'</em></span></label>';
+const panel=()=>'<section class="card" id="security-advanced"><div class="hd"><div><h3>Расширенная защита</h3><p>Настройки сервера и активные сеансы администраторов</p></div><span class="chip">Control Plane</span></div><div id="security-advanced-body" class="security-loading">Загрузка политик безопасности…</div><p id="security-advanced-error" class="er" role="alert" aria-live="polite"></p></section>';
+async function mount(root){
+ const host=root.querySelector('#security-advanced');if(!host)return;
+ const body=host.querySelector('#security-advanced-body'),error=host.querySelector('#security-advanced-error');
+ const fail=e=>error.textContent=e?.message||String(e);
+ const load=async()=>{
+  const [res,sessionRes]=await Promise.all([request('policy'),request('sessions')]);
+  const p={...defaults,...res.policy},readonly=!res.canEdit;
+  const fields=[
+    ['sessionHours','Срок действия сессии','Максимальное время входа. Применяется к новым сессиям.',1,168,'час.'],
+    ['idleMinutes','Таймаут бездействия','0 — не завершать сессию из-за бездействия.',0,1440,'мин.'],
+    ['maxSessions','Сессий на администратора','Ограничение количества одновременно действующих входов.',1,20,'шт.'],
+    ['loginAttempts','Попыток входа','После этого числа ошибок вход временно блокируется.',3,15,'раз'],
+    ['lockoutMinutes','Время блокировки','Период ограничения после превышения попыток.',5,120,'мин.']
+  ];
+  body.innerHTML='<div class="security-subheading"><h4>Политика авторизации</h4><p>Управляется владельцем панели. Значения сохраняются в PostgreSQL и проверяются API.</p></div>'+
+  '<form id="security-policy-form"><div class="security-settings-grid">'+fields.map(f=>setting(...f,p,readonly)).join('')+
+  '<label class="security-setting security-url-setting"><span><b>Адрес панели</b><small>Дополнительный URL входа. Не заменяет HTTPS и авторизацию. Старый адрес / пока остаётся доступным.</small></span><input name="dashboardPath" type="text" minlength="15" maxlength="75" pattern="/dashboard/[A-Za-z0-9_-]{4,64}" value="'+esc(p.dashboardPath)+'" '+(readonly?'disabled':'')+' required></label></div>'+
+  (readonly?'<p class="note">Редактирование доступно только владельцу (owner).</p>':'<div class="security-policy-actions"><button type="submit" class="btn">Сохранить политику</button><button type="button" class="gh" data-security-reset>Вернуть значения по умолчанию</button></div>')+'</form>'+
+  '<div class="security-subheading"><h4>Мои активные сессии</h4><p>При необходимости завершите другие входы в панель.</p></div>'+
+  '<div class="security-sessions">'+(sessionRes.sessions||[]).map(s=>'<div class="security-session"><span><b>'+(s.current?'Текущая сессия':'Сессия №'+esc(s.id))+'</b><small>Последняя активность: '+esc(new Date(s.lastActivity).toLocaleString())+' · Истекает: '+esc(new Date(s.expiresAt).toLocaleString())+'</small></span><button type="button" class="gh sm" data-security-revoke="'+esc(s.id)+'">'+(s.current?'Завершить':'Отозвать')+'</button></div>').join('')+
+  '<div class="security-policy-actions"><button type="button" class="gh" data-security-revoke-others>Завершить все другие сессии</button></div></div>'+
+  '<div class="security-policy-footnote">Изменение пути не скрывает API и не заменяет ограничения доступа на обратном прокси. Для полной смены базового URL потребуется отдельная настройка HTTPS-прокси.</div>';
+ };
+ try{await load()}catch(e){fail(e);body.innerHTML='<button class="gh" type="button" data-security-retry>Повторить загрузку</button>'}
+ host.addEventListener('click',async e=>{
+  const btn=e.target.closest('button');if(!btn)return;
+  try{
+   if(btn.matches('[data-security-retry]')){error.textContent='';await load()}
+   else if(btn.matches('[data-security-reset]')){
+    const form=host.querySelector('#security-policy-form');if(!form)return;
+    for(const [key,value] of Object.entries(defaults))if(form.elements.namedItem(key))form.elements.namedItem(key).value=value;
+   }else if(btn.matches('[data-security-revoke-others]')){
+    if(!confirm('Завершить все остальные сессии вашей учётной записи?'))return;
+    await request('sessions/others',{method:'POST'});await load();
+   }else if(btn.matches('[data-security-revoke]')){
+    if(!confirm('Завершить выбранную сессию?'))return;
+    const id=btn.dataset.securityRevoke;
+    const out=await request('sessions/'+encodeURIComponent(id),{method:'DELETE'});
+    if(out.current){location.replace('/login');return}
+    await load();
+   }
+  }catch(ex){fail(ex)}
+ });
+ host.addEventListener('submit',async e=>{
+  if(e.target.id!=='security-policy-form')return;
+  e.preventDefault();error.textContent='';
+  const form=e.target,patch={};
+  for(const key of Object.keys(defaults)){const el=form.elements.namedItem(key);patch[key]=key==='dashboardPath'?el.value.trim():Number(el.value)}
+  if(!form.reportValidity())return;
+  const btn=form.querySelector('[type=submit]');if(btn)btn.disabled=true;
+  try{await request('policy',{method:'PATCH',body:JSON.stringify(patch)});await load()}catch(ex){fail(ex);if(btn?.isConnected)btn.disabled=false}
+ });
+}
+window.XMeshSecurity={panel,mount};
+})();
