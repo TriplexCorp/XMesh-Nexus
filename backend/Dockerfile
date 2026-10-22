@@ -6,6 +6,14 @@ COPY backend/src ./src
 COPY backend/migrations ./migrations
 RUN cargo build --release
 
+# Offline-at-runtime flag bundle, pinned at build time. No browser/CDN requests.
+FROM node:24-bookworm-slim AS flag-assets
+WORKDIR /flags
+RUN npm pack flag-icons@7.5.0 --silent \
+    && tar -xzf flag-icons-7.5.0.tgz \
+    && test -s package/flags/4x3/kp.svg \
+    && test -s package/flags/4x3/de.svg
+
 FROM debian:bookworm-slim AS runtime
 ENV APP_ADDR=0.0.0.0:8080 \
     STATIC_DIR=/app/static \
@@ -19,6 +27,9 @@ RUN apt-get update \
     && mkdir -p /app/static /var/lib/xmesh/core \
     && chown -R xmesh:xmesh /app /var/lib/xmesh
 COPY --from=builder /build/backend/target/release/xmesh-api /usr/local/bin/xmesh-api
+COPY --from=flag-assets /flags/package/flags/4x3/ /app/static/flags/
+# MIT license for bundled flag-icons assets.
+COPY --from=flag-assets /flags/package/LICENSE /app/static/flags/LICENSE
 COPY index.html styles.css global-hover.css i18n.js subscription-studio.css subscription-studio.js qr-code.js mfa-ui.js security-ui.js xray-studio.css xray-json-intelligence.js xray-json-diagnostics.js app.js xray-studio-v5.js xray-studio-dialog.js login.html login.css login.js /app/static/
 RUN chown -R xmesh:xmesh /app/static
 USER 10001:10001
