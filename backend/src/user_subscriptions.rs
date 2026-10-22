@@ -12,7 +12,7 @@ fn nonempty<'a>(obj:&'a Value,key:&str)->Option<&'a str>{obj.get(key).and_then(V
 fn port(v:&Value)->Option<u16>{v.as_u64().and_then(|p|u16::try_from(p).ok()).filter(|p|*p>0)}
 fn endpoint(host:&Value)->Option<&str>{
  let a=["externalAddress","address","publicAddress","addr"].into_iter().find_map(|k|nonempty(host,k))?;
- if a.contains([' ','/','@','?','#','\\'])||a=="localhost"||a=="0.0.0.0"||a.starts_with("127.")||a.starts_with("10.")||a.starts_with("192.168.")||a.starts_with("172.16.") {return None}
+ if a.chars().any(|c|matches!(c,' '|'/'|'@'|'?'|'#'|'\\'))||a=="localhost"||a=="0.0.0.0"||a.starts_with("127.")||a.starts_with("10.")||a.starts_with("192.168.")||a.starts_with("172.16.") {return None}
  Some(a)
 }
 fn encode_component(s:&str)->String{
@@ -40,6 +40,7 @@ fn vless_link(user:&Value, inbound:&Value, host:&Value)->Option<String>{
   if let Some(path)=nonempty(host,"path").or_else(||nonempty(config,"path")){opts.push(format!("path={}",encode_component(path)))}
   if let Some(h)=nonempty(host,"host").or_else(||nonempty(host,"externalHost")){opts.push(format!("host={}",encode_component(h)))}
   if network=="grpc"{if let Some(service)=nonempty(config,"serviceName"){opts.push(format!("serviceName={}",encode_component(service)))}}
+  if network=="xhttp"{if let Some(mode)=nonempty(config,"mode"){opts.push(format!("mode={}",encode_component(mode)))}}
  }
  if security!="none"{
   let sni=nonempty(host,"sni").or_else(||nonempty(host,"externalSNI"))
