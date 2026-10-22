@@ -1,4 +1,8 @@
 /* XMesh design tokens: single source of truth for dark, light, and all accents. */
+/* Brand mark uses neutral contrast, never the emerald button ink. */
+:root{--logo-ink:#101820}
+[data-theme=light]{--logo-ink:#ffffff}
+
 :root{
   --bg: #0a0e14;
   --s1: #131923;
@@ -2594,3 +2598,6 @@ aside #logout .ic{width:1.12rem;height:1.12rem;flex-shrink:0}
  .security-workspace .security-settings-grid,.security-workspace .security-sessions{grid-template-columns:1fr!important}
  .security-workspace #mfa-panel,.security-workspace #security-advanced,.security-workspace #security-sessions-panel{padding:1rem!important}
 }
+
+/* The logo is independent from the button palette. */
+aside .brand .logo,#lg.logo{color:var(--logo-ink)!important}
