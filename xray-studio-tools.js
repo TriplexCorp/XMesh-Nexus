@@ -302,7 +302,10 @@ const operations={
     if(response.transport==='grpc')streamSettings.grpcSettings={serviceName:'grpc'};
     doc.inbounds.push({tag:response.tag,listen:'127.0.0.1',port:Number(response.port),protocol:response.protocol,settings,streamSettings});
    },'Inbound «'+response.tag+'» создан. Настройте защиту перед публикацией.');
-   if(ok)focusJsonSection('tag','Inbound '+response.tag);
+   if(ok){
+    const fragment='"tag": '+JSON.stringify(response.tag),pos=area.value.lastIndexOf(fragment);
+    if(pos>=0){area.focus();area.setSelectionRange(pos,pos+fragment.length);status('Inbound «'+response.tag+'» создан — настройте защиту в JSON')}
+   }
   }catch(e){status('Ошибка: '+e.message);notify(e.message)}
  },
  async xhttp(){
