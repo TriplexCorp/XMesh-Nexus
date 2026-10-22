@@ -159,8 +159,8 @@ fn vless_outbound(user:&Value,inbound:&Value,host:&Value)->Option<Value>{
    _=>&[][..]
   };
   for key in fields {
-   if let Some(v)=config.get(*key) {
-    if v.is_string()||v.is_boolean()||v.is_number(){transport[*key]=v.clone()}
+   if let Some(v)=config.get(*key).filter(|v|v.is_string()||v.is_boolean()||v.is_number()){
+    transport[*key]=v.clone()
    }
   }
   if network=="xhttp"{
@@ -285,14 +285,16 @@ pub async fn serve(State(state):State<AppState>,Path(token):Path<String>,Query(o
    if !tags.contains(tag){continue}
    let matched:Vec<&Value>=hosts.iter().filter(|h|h.get("disabled")!=Some(&Value::Bool(true))&&nonempty(h,"tag")==Some(tag)).collect();
    if !matched.is_empty(){
-    for host in matched{if let Some(link)=vless_link(&user,inbound,host){
-      if let Some(outbound)=vless_outbound(&user,inbound,host){outbounds.push(outbound);links.push(link)}
-     }}
+    for host in matched{
+     if let Some(link)=vless_link(&user,inbound,host) && let Some(outbound)=vless_outbound(&user,inbound,host){
+      outbounds.push(outbound);links.push(link)
+     }
+    }
    }else{
     for node in nodes.iter().filter(|n|n.get("profileId")==profile.get("id")&&n.get("disabled")!=Some(&Value::Bool(true))){
      let host=json!({"address":node.get("publicAddress").or_else(||node.get("externalAddress")).or_else(||node.get("addr")),"port":inbound.get("port"),"remark":node.get("name")});
-     if let Some(link)=vless_link(&user,inbound,&host){
-      if let Some(outbound)=vless_outbound(&user,inbound,&host){outbounds.push(outbound);links.push(link)}
+     if let Some(link)=vless_link(&user,inbound,&host) && let Some(outbound)=vless_outbound(&user,inbound,&host){
+      outbounds.push(outbound);links.push(link)
      }
     }
    }
