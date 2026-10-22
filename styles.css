@@ -2652,3 +2652,23 @@ html[data-font=pt] body{font-family:"PT Sans",system-ui,-apple-system,"Segoe UI"
  .security-center-tabs button>span{font-size:1rem}
 }
 @media(prefers-reduced-motion:reduce){.security-center-tabs button{transition:none}}
+
+
+.security-audit-head{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;margin-bottom:1rem}
+.security-audit-head .gh{flex:none}
+.security-audit-search{display:flex;flex-direction:column;gap:.4rem;font-size:.78rem;font-weight:650;margin-bottom:1rem}
+.security-audit-search input{
+ width:min(100%,35rem);min-height:2.65rem;
+ padding:.55rem .8rem;border:1px solid var(--ln);
+ border-radius:var(--ui-control-radius,10px);background:var(--s2);color:var(--tx);
+ font:inherit;
+}
+.security-audit-search input:focus-visible{outline:2px solid var(--a);outline-offset:2px}
+.security-audit-list{display:flex;flex-direction:column;gap:.45rem}
+.security-audit-event{display:flex;justify-content:space-between;gap:1rem;align-items:center;padding:.8rem 1rem;background:var(--s2);border:1px solid var(--ln);border-radius:var(--ui-control-radius,10px)}
+.security-audit-event>div{min-width:0;display:flex;flex-direction:column;gap:.25rem}
+.security-audit-event strong{font-size:.8rem;overflow-wrap:anywhere}
+.security-audit-event small,.security-audit-event time{font-size:.73rem;color:var(--mu)}
+.security-audit-event time{white-space:nowrap;font-variant-numeric:tabular-nums}
+.security-audit-empty{padding:1.2rem;color:var(--mu)}
+@media(max-width:600px){.security-audit-event{flex-direction:column;align-items:flex-start}.security-audit-event time{white-space:normal}}
