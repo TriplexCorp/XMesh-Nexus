@@ -1563,10 +1563,10 @@ async function generateRealityKeyPair(){
 function randomShortId(){const b=new Uint8Array(8);crypto.getRandomValues(b);return Array.from(b,x=>x.toString(16).padStart(2,'0')).join('')}
 function randomBase64(size){const b=new Uint8Array(size);crypto.getRandomValues(b);return btoa(Array.from(b,x=>String.fromCharCode(x)).join(''))}
 async function profilesP(){
- if(!window.XMeshStudio?.view||!window.XMeshStudio?.mount)throw new Error('Модуль XRAY STUDIO не загрузился. Проверьте /xray-studio-next.js и обновите страницу без кеша.');
- return [window.XMeshStudio.view(),()=>{
-   const root=document.getElementById('xm-studio');
-   if(root)window.XMeshStudio.mount(root,{
+ if(!window.XMeshStudioV4?.view||!window.XMeshStudioV4?.mount)throw new Error('XRAY STUDIO не загрузился: проверьте /xray-studio-v4.js');
+ return [window.XMeshStudioV4.view(),()=>{
+   const root=document.getElementById('xm-studio-v4');
+   if(root)window.XMeshStudioV4.mount(root,{
      DB,api,render:()=>render(1),toast,
      realityKeys:()=>generateRealityKeyPair(),
      apiRequest:(path,options)=>backendRequest(path,options)
