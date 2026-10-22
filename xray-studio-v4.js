@@ -237,7 +237,45 @@ function showPopup(title,kind){
  if(kind==='profiles'){
  const create=document.createElement('button');create.className='sv-dialogitem';create.textContent='+ Новый профиль';create.onclick=()=>{if(input.value!==saved&&!confirm('Открыть новый профиль без сохранения изменений?'))return;id=null;name='Новый профиль';inboundIndex=outIndex=0;saved='';update(defaultDoc());input.dispatchEvent(new Event('xmesh:reset-history'));get('overlay').hidden=true};body.append(create);
  for(const p of ctx.DB.profiles||[]){const b=document.createElement('button');b.className='sv-dialogitem';b.textContent=p.name;b.onclick=()=>{if(input.value!==saved&&!confirm('Потерять несохранённые изменения?'))return;try{const d=typeof p.config==='string'?JSON.parse(p.config):p.config;id=p.id;name=p.name;inboundIndex=outIndex=0;input.value=pretty(d);saved=input.value;paint();input.dispatchEvent(new Event('xmesh:reset-history'));get('overlay').hidden=true}catch(err){notify(err.message)}};body.append(b)}
- }else{for(const [kind,label] of [['base','VLESS + XHTTP'],['reality','VLESS + Reality'],['raw','VLESS + TCP']]){const b=document.createElement('button');b.className='sv-dialogitem';b.textContent=label;b.onclick=()=>{if(input.value!==saved&&!confirm('Заменить несохранённую конфигурацию?'))return;const d=defaultDoc();if(kind==='reality'){d.inbounds[0].streamSettings.security='reality';d.inbounds[0].streamSettings.realitySettings={target:'example.com:443',serverNames:['example.com'],privateKey:'',shortIds:[]}}if(kind==='raw')d.inbounds[0].streamSettings={network:'raw',security:'none'};inboundIndex=0;update(d);input.dispatchEvent(new Event('xmesh:reset-history'));get('overlay').hidden=true};body.append(b)}}
+ }else{
+ const templates=[
+  ['base','VLESS · XHTTP','Черновик VLESS с XHTTP'],
+  ['reality','VLESS · Reality + XHTTP','Шаблон Reality с пустым приватным ключом'],
+  ['raw','VLESS · RAW/TCP','Только для доверенной сети без TLS'],
+  ['tls','VLESS · TLS + XHTTP','Требует сертификаты'],
+  ['ws','VLESS · WebSocket + TLS','Для HTTP reverse proxy'],
+  ['grpc','VLESS · gRPC + TLS','gRPC serviceName'],
+  ['vmess','VMess · WebSocket + TLS','Клиентов добавляет панель'],
+  ['trojan','Trojan · TLS','Клиентов добавляет панель'],
+  ['ss','Shadowsocks 2022','Заполните метод и ключ'],
+  ['hysteria','Hysteria2','Требует TLS и параметры пользователей'],
+  ['socks','SOCKS inbound','Локальный вход'],
+  ['http','HTTP inbound','Локальный HTTP proxy']
+ ];
+ for(const [kind,label,description] of templates){
+  const b=document.createElement('button');b.className='sv-dialogitem sv-template-choice';
+  const strong=document.createElement('strong');strong.textContent=label;
+  const small=document.createElement('small');small.textContent=description;
+  b.append(strong,small);
+  b.onclick=()=>{
+   if(input.value!==saved&&!confirm('Заменить несохранённую конфигурацию?'))return;
+   const d=defaultDoc(),ib=d.inbounds[0],ss=ib.streamSettings;
+   if(kind==='reality'){ss.security='reality';ss.realitySettings={target:'example.com:443',serverNames:['example.com'],privateKey:'',shortIds:[]}}
+   if(kind==='raw')ib.streamSettings={network:'raw',security:'none'};
+   if(kind==='tls'){ss.security='tls';ss.tlsSettings={certificates:[]}}
+   if(kind==='ws'){ib.streamSettings={network:'ws',security:'tls',wsSettings:{path:'/ws'},tlsSettings:{certificates:[]}}}
+   if(kind==='grpc'){ib.streamSettings={network:'grpc',security:'tls',grpcSettings:{serviceName:'xray'},tlsSettings:{certificates:[]}}}
+   if(kind==='vmess'||kind==='trojan'){ib.protocol=kind;ib.settings={users:[]};ib.streamSettings={network:kind==='vmess'?'ws':'raw',security:'tls',tlsSettings:{certificates:[]}};if(kind==='vmess')ib.streamSettings.wsSettings={path:'/ws'}}
+   if(kind==='ss'){ib.protocol='shadowsocks';ib.settings={network:'tcp,udp',method:'2022-blake3-aes-128-gcm',password:''};ib.streamSettings={network:'raw',security:'none'}}
+   if(kind==='hysteria'){ib.protocol='hysteria';ib.settings={version:2,users:[]};ib.streamSettings={network:'hysteria',security:'tls',hysteriaSettings:{version:2},tlsSettings:{certificates:[]}}}
+   if(kind==='socks'){ib.protocol='socks';ib.listen='127.0.0.1';ib.port=10808;ib.settings={auth:'noauth',accounts:[],udp:true};ib.streamSettings={network:'raw',security:'none'}}
+   if(kind==='http'){ib.protocol='http';ib.listen='127.0.0.1';ib.port=10809;ib.settings={accounts:[]};ib.streamSettings={network:'raw',security:'none'}}
+   ib.tag=kind+'-main';
+   inboundIndex=0;name=label;id=null;update(d);input.dispatchEvent(new Event('xmesh:reset-history'));get('overlay').hidden=true;
+   notify('Шаблон открыт. Заполните обязательные параметры и проверьте ядром Xray-core.');
+  };body.append(b);
+ }
+ }
  get('overlay').hidden=false;
 }
 function reportCore(message,line=null,success=false){
