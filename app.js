@@ -1084,8 +1084,8 @@ function userDrawer(id,tab){
         <button type="button" class="btn sm" data-user-client-json="${u.id}">${ic('file-code')} Готовые Client JSON</button>
         <div class="user-section-divider"></div>
         <div class="user-pane-heading user-sub-heading"><div><h3>Подписка</h3></div></div>
-        <p class="user-sub-note">Уникальная ссылка на VLESS-подписку. При повторной выдаче старая ссылка автоматически отзывается. Клиент получает только разрешённые серверы.</p>
-        <div class="act"><button type="button" class="btn sm" data-user-sub-create="${u.id}">${ic('link')} Создать / обновить ссылку</button><button type="button" class="gh sm" data-user-sub-revoke="${u.id}">${ic('shield-off')} Отозвать подписку</button></div>
+        <p class="user-sub-note">Постоянная ссылка на подписку. Домен, путь, оформление и приложения управляются в SUBSCRIPTION STUDIO.</p>
+        <div class="user-subscription-state" data-user-sub-state="${u.id}" role="status" aria-live="polite"><span class="user-canvas-muted">Загружаем ссылку…</span></div>
         <a class="user-inline-link" href="#subscription" data-x>${ic('globe')} SUBSCRIPTION STUDIO</a>
       </section>
       <section class="user-pane user-pane-insights" aria-label="Статистика и устройства">
@@ -1100,6 +1100,31 @@ function userDrawer(id,tab){
     <footer class="user-canvas-foot"><span>Создан ${new Date(u.created).toLocaleDateString('ru-RU')}</span><span>Администратор: ${esc(DB.admins.find(a=>a.id==u.adminId)?.username||'—')}</span></footer>
   </div>`,'user-modal');
   void loadUserTrafficStats(u.id);
+  void loadUserSubscription(u.id);
+}
+async function loadUserSubscription(id){
+  const target=$('[data-user-sub-state="'+id+'"]');
+  if(!target)return;
+  try{
+    const result=await backendRequest('/api/v1/users/'+encodeURIComponent(id)+'/subscription');
+    // A response from an older dialog must not overwrite a newer one.
+    if(!target.isConnected)return;
+    if(result.token&&result.url){
+      const url=new URL(result.url,location.origin).href;
+      target.innerHTML='<label class="f"><span>'+(panelIsEnglish()?'Subscription URL':'Ссылка подписки')+'</span><input type="text" class="user-subscription-url" value="'+esc(url)+'" readonly spellcheck="false" autocomplete="off"></label>'+
+        '<div class="act"><button type="button" class="btn sm" data-user-sub-copy="'+id+'">'+ic('copy')+(panelIsEnglish()?'Copy':'Скопировать')+'</button>'+
+        '<button type="button" class="gh sm" data-user-sub-open="'+id+'">'+ic('external-link')+(panelIsEnglish()?'Open portal':'Открыть страницу')+'</button>'+
+        '<button type="button" class="gh sm" data-user-sub-create="'+id+'">'+ic('refresh-cw')+(panelIsEnglish()?'Rotate link':'Перевыпустить')+'</button>'+
+        '<button type="button" class="gh sm" data-user-sub-revoke="'+id+'">'+ic('shield-off')+(panelIsEnglish()?'Revoke':'Отозвать')+'</button></div>';
+    }else{
+      const message=result.legacy?(panelIsEnglish()?'Old link remains active, but its secret cannot be recovered. Rotate it once to enable persistent display.':'Старая ссылка продолжает действовать, но её секрет нельзя восстановить из хеша. Один раз перевыпустите её для постоянного отображения.'):(panelIsEnglish()?'No subscription has been issued yet.':'Подписка ещё не создана.');
+      target.innerHTML='<p class="user-sub-note">'+esc(message)+'</p><div class="act"><button type="button" class="btn sm" data-user-sub-create="'+id+'">'+ic('link')+(result.legacy?(panelIsEnglish()?'Rotate legacy link':'Перевыпустить старую ссылку'):(panelIsEnglish()?'Create subscription':'Создать подписку'))+'</button>'+
+        (result.legacy?'<button type="button" class="gh sm" data-user-sub-revoke="'+id+'">'+ic('shield-off')+(panelIsEnglish()?'Revoke':'Отозвать')+'</button>':'')+'</div>';
+    }
+  }catch(error){
+    if(!target.isConnected)return;
+    target.textContent=(panelIsEnglish()?'Subscription loading error: ':'Ошибка загрузки подписки: ')+(error.message||'API');
+  }
 }
 // Usernames: cryptographically random, readable and comfortably below 32 chars.
 const USERNAME_ADJECTIVES=['silent','cosmic','silver','hidden','rapid','midnight','stellar','shadow','gentle','arctic','velvet','lunar','mystic','amber','crystal','steady','bright','frozen','swift','nebula'];
@@ -1821,24 +1846,30 @@ document.addEventListener('click',async e=>{
   else if(b=g('[data-user-renew-apply]')){e.preventDefault();handleUserRenewalAction(b)}
   else if(b=g('[data-user-sub-create]')){
     const id=Number(b.dataset.userSubCreate);
-    if(!confirm(panelIsEnglish()?'Generate a subscription link? The previous link, if any, will be revoked.':'Создать ссылку подписки? Если прежняя ссылка существует, она перестанет работать.'))return;
+    const existing=$('[data-user-sub-state="'+id+'"] .user-subscription-url');
+    if(existing&&!confirm(panelIsEnglish()?'Rotate this link? The old subscription will stop working.':'Перевыпустить ссылку? Прежняя подписка сразу перестанет работать.'))return;
+    if(!existing&&b.textContent.includes('старую')&&!confirm('Старая ссылка перестанет работать. Продолжить?'))return;
     b.disabled=true;
     try{
-      const result=await backendRequest('/api/v1/users/'+encodeURIComponent(id)+'/subscription',{method:'POST'});
-      const link=location.origin+'/api/v1/sub/'+result.token;
-      modal('<div class="box"><div class="bar2"><h2>Ссылка подписки</h2><button type="button" class="ia" data-x aria-label="Закрыть">'+ic('x')+'</button></div><p class="note">Ссылка является секретом доступа. Скопируйте её сейчас: панель не хранит токен в открытом виде.</p><textarea readonly spellcheck="false" id="user-generated-sub" rows="3">'+esc(link)+'</textarea><div class="act"><button type="button" class="btn" data-copy-user-sub>'+ic('copy')+' Скопировать ссылку</button></div></div>','wide');
+      await backendRequest('/api/v1/users/'+encodeURIComponent(id)+'/subscription',{method:'POST'});
+      await loadUserSubscription(id);
+      toast(panelIsEnglish()?'Subscription saved':'Подписка сохранена');
     }catch(error){toast('Ошибка подписки: '+(error.message||'API'))}
     finally{b.disabled=false}
   }
-  else if(b=g('[data-copy-user-sub]')){
-    const field=$('#user-generated-sub');
-    if(field){try{await navigator.clipboard.writeText(field.value);toast('Ссылка скопирована')}catch(_){field.select();document.execCommand('copy');toast('Ссылка скопирована')}}
+  else if(b=g('[data-user-sub-copy]')){
+    const el=$('[data-user-sub-state="'+b.dataset.userSubCopy+'"] .user-subscription-url');
+    if(el){try{await navigator.clipboard.writeText(el.value);toast(panelIsEnglish()?'Link copied':'Ссылка скопирована')}catch(_){el.focus();el.select();document.execCommand('copy');toast('Ссылка выделена')}}
+  }
+  else if(b=g('[data-user-sub-open]')){
+    const el=$('[data-user-sub-state="'+b.dataset.userSubOpen+'"] .user-subscription-url');
+    if(el){const url=new URL(el.value);if(url.protocol==='https:'||url.origin===location.origin)window.open(url.href,'_blank','noopener,noreferrer')}
   }
   else if(b=g('[data-user-sub-revoke]')){
     const id=Number(b.dataset.userSubRevoke);
-    if(!confirm('Отозвать подписку? Все ранее выданные ссылки этого пользователя перестанут работать.'))return;
+    if(!confirm(panelIsEnglish()?'Revoke this subscription? Its URL will stop working.':'Отозвать подписку? Ссылка сразу перестанет работать.'))return;
     b.disabled=true;
-    try{await backendRequest('/api/v1/users/'+encodeURIComponent(id)+'/subscription',{method:'DELETE'});toast('Доступ по ссылке отозван')}
+    try{await backendRequest('/api/v1/users/'+encodeURIComponent(id)+'/subscription',{method:'DELETE'});await loadUserSubscription(id);toast(panelIsEnglish()?'Subscription revoked':'Подписка отозвана')}
     catch(error){toast('Ошибка: '+(error.message||'API'))}finally{b.disabled=false}
   }
   else if(b=g('[data-user-client-json]')){
