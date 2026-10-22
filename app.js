@@ -2193,21 +2193,39 @@ document.addEventListener('click',async e=>{
   else if(b=g('[data-metrics-token]')){
     const id=Number(b.dataset.metricsToken),node=DB.nodes.find(n=>Number(n.id)===id);
     if(!node){toast('Узел не найден.');return}
-    if(location.protocol!=='https:'){toast('Открой панель через HTTPS перед созданием токена агента.');return}
-    if(!confirm('Выдать новый токен метрик для «'+node.name+'»? Если агент уже установлен, прежний токен будет немедленно отозван и его нужно будет заменить на узле.'))return;
+    if(location.protocol!=='https:'){toast('Открой панель через HTTPS для управления идентичностью узла.');return}
+    const shellQuote=value=>"'"+String(value).replace(/'/g,"'\\''")+"'";
+    const installUrl='https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy/install-node-metrics-agent.sh';
+    const command='curl --proto "=https" --tlsv1.2 -fsSL '+shellQuote(installUrl)+' -o /tmp/xmesh-node-metrics-install.sh\\nsudo bash /tmp/xmesh-node-metrics-install.sh '+shellQuote(location.origin)+' '+shellQuote(String(id));
+    const html='<div class="box"><div class="bar2"><h2>Защищённый агент · '+esc(node.name)+'</h2><button class="ia" data-x aria-label="Закрыть">'+ic('x')+'</button></div>'+
+      '<p class="note">Каждый узел получает собственный приватный Ed25519-ключ. Панель хранит только публичный ключ; токен Bearer не требуется. Подписываются тело запроса, время и случайный nonce.</p>'+
+      '<label class="f"><span>1. Установите агент на Linux-узле (root)</span><textarea id="metrics-install-command" rows="3" spellcheck="false" readonly>'+esc(command)+'</textarea><small>В конце установки агент покажет публичный ключ. Не передавайте приватный ключ в панель.</small></label>'+
+      '<div class="act"><button type="button" class="gh" data-copy-metrics-install>'+ic('copy')+'Скопировать команду</button></div>'+
+      '<label class="f"><span>2. Публичный Ed25519-ключ узла (64 hex-символа)</span><input id="metrics-public-key" autocomplete="off" spellcheck="false" maxlength="64" placeholder="Вставьте публичный ключ, показанный в терминале"></label>'+
+      '<p class="note">При регистрации ключа прежний Bearer-токен этого узла немедленно отзывается. Если уже установлен агент со старым токеном, сначала настройте новый агент.</p>'+
+      '<div class="act"><button type="button" class="gh" data-node-key-revoke="'+id+'">'+ic('shield-off')+'Отозвать доступ узла</button>'+
+      '<button type="button" class="btn" data-node-key-enroll="'+id+'">'+ic('shield-check')+'Активировать защищённый агент</button></div></div>';
+    modal(html,'wide');
+  }
+  else if(b=g('[data-node-key-enroll]')){
+    const id=Number(b.dataset.nodeKeyEnroll),input=$('#metrics-public-key'),publicKey=(input?.value||'').trim();
+    if(!/^[0-9a-f]{64}$/.test(publicKey)){toast('Требуется публичный Ed25519-ключ из 64 строчных hex-символов.');input?.focus();return}
+    if(!confirm('Активировать Ed25519 для узла '+id+'? Старый Bearer-токен будет отозван немедленно.'))return;
     b.disabled=true;
     try{
-      const issued=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/metrics-token',{method:'POST',body:JSON.stringify({})});
-      const shellQuote=value=>"'"+String(value).replace(/'/g,"'\\''")+"'";
-      const installUrl='https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy/install-node-metrics-agent.sh';
-      const command='curl -fsSL '+shellQuote(installUrl)+' -o /tmp/xmesh-node-metrics-install.sh\nsudo bash /tmp/xmesh-node-metrics-install.sh '+shellQuote(location.origin)+' '+shellQuote(String(id))+' '+shellQuote(issued.token);
-      const html='<div class="box"><div class="bar2"><h2>Агент метрик · '+esc(node.name)+'</h2><button class="ia" data-x aria-label="Закрыть">'+ic('x')+'</button></div>'+
-        '<p class="note">Токен выдан. Скопируйте токен и команду сейчас: позже показать токен повторно нельзя. Новый токен немедленно отзывает старый.</p>'+
-        '<label class="f"><span>Bearer-токен · '+id+'</span><div class="lk"><input id="lk" readonly value="'+esc(issued.token)+'" aria-label="Токен агента"><button class="gh" data-copy aria-label="Скопировать токен">'+ic('copy')+'</button></div></label>'+
-        '<label class="f"><span>Команда для Linux-узла (root)</span><textarea id="metrics-install-command" rows="3" spellcheck="false" readonly>'+esc(command)+'</textarea><small>Узел должен иметь исходящий HTTPS-доступ к панели и GitHub. Агент использует systemd timer с интервалом в минуту.</small></label>'+
-        '<div class="act"><button type="button" class="gh" data-copy-metrics-install>'+ic('copy')+'Скопировать команду</button><button type="button" class="btn" data-x>Готово</button></div></div>';
-      modal(html,'wide');
-    }catch(error){toast('Не удалось создать токен агента: '+(error.message||'ошибка API'))}
+      await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/metrics-key',{method:'POST',body:JSON.stringify({publicKey})});
+      toast('Ed25519 активирован. Bearer-токен отозван.');$('#metrics-public-key').value='';
+    }catch(error){toast('Не удалось зарегистрировать ключ: '+(error.message||'ошибка API'))}
+    finally{b.disabled=false}
+  }
+  else if(b=g('[data-node-key-revoke]')){
+    const id=Number(b.dataset.nodeKeyRevoke);
+    if(!confirm('Отозвать ВСЕ учётные данные узла '+id+'? Отправка метрик остановится до регистрации нового ключа.'))return;
+    b.disabled=true;
+    try{
+      await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/metrics-key',{method:'DELETE'});
+      toast('Все учётные данные узла отозваны.');
+    }catch(error){toast('Не удалось отозвать ключ: '+(error.message||'ошибка API'))}
     finally{b.disabled=false}
   }
   else if(b=g('[data-copy-metrics-install]')){
