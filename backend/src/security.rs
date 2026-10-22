@@ -47,7 +47,7 @@ impl SecurityPolicy {
                 "Путь должен иметь вид /dashboard/ваше-имя."));
         };
         if !(4..=64).contains(&slug.len())
-            || !slug.bytes().all(|b|b.is_ascii_alphanumeric()||b=='-' as u8||b=='_' as u8) {
+            || !slug.bytes().all(|b|b.is_ascii_alphanumeric()||b==b'-'||b==b'_') {
             return Err(ApiError::new(StatusCode::BAD_REQUEST,
                 "После /dashboard/ используйте 4–64 символа: латиницу, цифры, дефис или _.")); 
         }
