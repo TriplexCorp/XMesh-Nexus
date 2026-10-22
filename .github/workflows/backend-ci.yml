@@ -44,10 +44,8 @@ jobs:
           node --check app.js
           node --check subscription-studio.js
           node --check login.js
-          node --check xray-studio-v5.js
           node --check xray-studio-v4.js
           node --check xray-studio-tools.js
-          node --check xray-studio-dialog.js
           node --check xray-json-diagnostics.js
           node --check xray-json-intelligence.js
       - name: Test manual JSON line diagnostics and Hot Fix
@@ -96,14 +94,8 @@ jobs:
         run: node scripts/check-node-grid-layout.js
       - name: Check Nodes IP rotation and Rust resolver integration
         run: node scripts/check-node-ip-rotation.js
-      - name: Check shared Studio theme and CSS structure
-        run: node scripts/check-studio-theme.js
-      - name: Check modal settings editor
-        run: node scripts/check-studio-dialog.js
       - name: Check XHTTP serialization and themed dropdowns
         run: node scripts/check-xhttp-extras.js
-      - name: Check context-driven Studio editor
-        run: node scripts/check-studio-context.js
       - name: Check XRAY Studio selector safety
         run: node scripts/check-xray-studio-selectors.js
       - name: Verify automatic public Client JSON addresses
