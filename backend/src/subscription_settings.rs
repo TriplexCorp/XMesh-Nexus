@@ -46,8 +46,8 @@ pub(crate) fn validate(object: &Map<String, Value>) -> Result<(), ApiError> {
     }
     for (key, values) in [
         ("subscriptionLayout", &["standard", "centered", "compact"][..]),
-        ("subscriptionCardStyle", &["soft", "outline", "flat"][..]),
-        ("subscriptionFont", &["system", "manrope", "mono"][..]),
+        ("subscriptionCardStyle", &["soft", "outline", "flat", "glass", "raised"][..]),
+        ("subscriptionFont", &["system", "manrope", "mono", "onest", "inter", "golos", "rubik", "nunito", "plex", "roboto", "pt", "montserrat", "ubuntu", "opensans", "source", "fira", "jost"][..]),
         ("subscriptionClientLayout", &["grid", "list"][..]),
     ] {
         if let Some(v) = object.get(key) {
