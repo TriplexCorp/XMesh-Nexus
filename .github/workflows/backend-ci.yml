@@ -98,6 +98,8 @@ jobs:
         run: node scripts/check-studio-context.js
       - name: Check XRAY Studio selector safety
         run: node scripts/check-xray-studio-selectors.js
+      - name: Verify automatic public Client JSON addresses
+        run: node scripts/check-xray-endpoint-autofill.js
       # Run source-contract assertions before rustfmt mutates the CI checkout.
       # Runtime Rust tests and Clippy still run before the Docker build.
       - name: Format Rust sources
