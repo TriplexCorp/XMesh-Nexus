@@ -99,6 +99,15 @@ pub async fn authenticate(
         return Ok(());
     }
 
+    // Legacy credentials are disabled on new installations. Existing installations
+    // can opt into temporary compatibility until every node is enrolled.
+    let legacy_allowed = std::env::var("ALLOW_LEGACY_NODE_BEARER")
+        .map(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "true" | "1" | "yes"))
+        .unwrap_or(false);
+    if !legacy_allowed {
+        return Err(error("Bearer-авторизация узлов отключена политикой безопасности."));
+    }
+
     // Legacy mode for nodes not enrolled in Ed25519. Kept ONLY for a safe,
     // per-node migration; registering a key removes this credential.
     let token = headers.get(axum::http::header::AUTHORIZATION)
