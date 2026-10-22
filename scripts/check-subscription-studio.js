@@ -49,6 +49,13 @@ assert.match(customPaletteView,/name="subscriptionAccent"[^>]*value="#ff0022"/,
 assert.doesNotMatch(customPaletteView,/name="subscriptionSyncPanelTheme" checked/,
  'Explicit opt-out must remain unchecked');
 
+assert.match(view,/data-portal-language="ru"/,'Visitors must be able to select Russian within the portal preview');
+assert.match(view,/data-portal-language="en"/,'Visitors must be able to select English within the portal preview');
+assert.match(view,/name="subscriptionDescriptionEn"/,'English custom copy must be independently editable');
+assert.match(view,/name="subscriptionAppsTitleEn"/,'Apps heading must support the English locale');
+assert.match(src,/if\(next!=='ru'&&next!=='en'\)return/,'Untrusted locale values must be rejected');
+assert.match(src,/previewRoot\.lang=lang/,'Portal preview must set its own lang, not the admin language');
+assert.match(src,/\$\('\[data-subscription-description\]'\)\.textContent=/,'Custom copy must use textContent, not untrusted HTML');
 assert.match(view,/SUBSCRIPTION STUDIO/);
 assert.match(view,/name="subscriptionDomain"/);
 assert.match(view,/name="subscriptionPath"/);
@@ -148,7 +155,7 @@ assert.match(validation,/"subscriptionClientLinks"/);
 assert.match(validation,/"subscriptionCustomClients"/);
 assert.match(validation,/"subscriptionAppsTitle"/);
 assert.match(validation,/HashSet/,'Custom app IDs must be unique');
-assert.match(rust,/"subscriptionAppsTitle"\s*\|\s*"subscriptionCustomClients"/);
+assert.match(rust,/"subscriptionAppsTitle"\s*\|\s*"subscriptionAppsTitleEn"\s*\|\s*"subscriptionCustomClients"/);
 assert.match(validation,/"subscriptionLogoUrl"/);
 assert.match(validation,/safe_https_url/);
 assert.match(css,/\.subscription-client-editor/);
