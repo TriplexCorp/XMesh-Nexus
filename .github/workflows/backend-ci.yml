@@ -114,7 +114,7 @@ jobs:
           bash -n deploy/install-node-metrics-agent.sh
           sh -n deploy/postgres/10-create-app-user.sh
           mkdir -p deploy/runtime
-          printf '%s\\n' "$DASHBOARD_PATH" > deploy/runtime/dashboard-path
+          printf '%s\n' "$DASHBOARD_PATH" > deploy/runtime/dashboard-path
           docker compose config --quiet
       - name: Build Docker image
         run: docker build -f backend/Dockerfile -t xmesh-nexus:ci .
@@ -139,7 +139,7 @@ jobs:
       - name: Start disposable PostgreSQL, Redis and XMesh API
         run: |
           mkdir -p deploy/runtime
-          printf '%s\\n' "$DASHBOARD_PATH" > deploy/runtime/dashboard-path
+          printf '%s\n' "$DASHBOARD_PATH" > deploy/runtime/dashboard-path
           chmod 0666 deploy/runtime/dashboard-path
           docker compose up --build -d
       - name: Wait for database migrations and healthy API
