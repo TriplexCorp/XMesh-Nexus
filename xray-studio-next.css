@@ -137,3 +137,53 @@
  .xm-studio .xm-library,.xm-studio .xm-main,.xm-studio .xm-preview{grid-column:1}
  .xm-studio .xm-three,.xm-studio .xm-two{grid-template-columns:minmax(0,1fr)}
 }
+
+
+/* XRAY STUDIO v4 — single-task workspace. No simultaneous editor/JSON duplication. */
+.xm-studio{gap:0!important;font-size:14px!important}
+.xm-studio .xm-head{padding:8px 0 16px!important;margin:0 0 10px!important}
+.xm-studio .xm-head h2{font-size:clamp(23px,1.8vw,31px)!important}
+.xm-studio .xm-workspace-tools{display:flex;align-items:center;gap:12px;padding:10px 0 14px;border-bottom:1px solid var(--ln);margin-bottom:14px;min-width:0}
+.xm-studio .xm-current-name{font-size:14px;font-weight:750;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.xm-studio .xm-tool-actions{display:flex;gap:7px;flex-wrap:wrap;margin-left:auto;justify-content:flex-end}
+.xm-studio .xm-workspace-tools .xm-quiet{font-size:12px;min-height:38px;padding:8px 12px}
+.xm-studio .xm-layout{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:14px!important;align-items:start!important}
+.xm-studio .xm-library{display:none!important;min-height:0!important}
+.xm-studio.xm-library-open .xm-layout{grid-template-columns:minmax(230px,300px) minmax(0,1fr)!important}
+.xm-studio.xm-library-open .xm-library{display:flex!important;grid-column:1;grid-row:1}
+.xm-studio .xm-main{grid-column:1!important;grid-row:1;min-height:clamp(450px,62vh,780px)!important;padding:20px!important}
+.xm-studio.xm-library-open .xm-main{grid-column:2!important;grid-row:1}
+.xm-studio .xm-main-header{padding-bottom:12px;border-bottom:1px solid var(--ln)}
+.xm-studio .xm-main-header h3{font-size:18px!important}
+.xm-studio .xm-main-header p{font-size:13px!important}
+.xm-studio .xm-editor-tabs{display:flex!important;width:fit-content;max-width:100%;padding:4px;gap:5px;margin:5px 0 6px}
+.xm-studio .xm-editor-tabs[hidden]{display:none!important}
+.xm-studio .xm-editor-tabs button{padding:10px 20px!important;min-width:120px;font-size:13px!important}
+.xm-studio .xm-editor{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));align-content:start;gap:14px;min-width:0}
+.xm-studio .xm-editor>.xm-panel{grid-column:1/-1!important;background:transparent!important;border:0!important;padding:14px 0!important;border-radius:0!important}
+.xm-studio .xm-editor>[data-xm-panel="profile"]{padding-bottom:18px!important;border-bottom:1px solid var(--ln)!important}
+.xm-studio .xm-section-title{border:0!important;padding:0!important;margin:0 0 18px!important}
+.xm-studio .xm-section-title h3{font-size:15px!important}
+.xm-studio .xm-section-title p{font-size:12px!important}
+.xm-studio .xm-field input,.xm-studio .xm-field select{min-height:46px!important;font-size:14px!important}
+.xm-studio .xm-manual{width:100%!important;min-height:clamp(420px,62vh,840px)!important;resize:vertical;font-size:13px!important;line-height:1.7!important}
+.xm-studio .xm-preview{grid-column:1!important;grid-row:2!important;position:relative!important;top:auto!important;min-height:0!important}
+.xm-studio .xm-preview[hidden]{display:none!important}
+.xm-studio.xm-preview-open .xm-layout{grid-template-columns:minmax(0,1fr)!important}
+.xm-studio.xm-preview-open .xm-preview{display:flex!important}
+.xm-studio.xm-preview-open .xm-preview pre{max-height:60vh;min-height:350px;font-size:13px}
+.xm-studio.xm-library-open .xm-preview{grid-column:2!important}
+.xm-studio.xm-json-mode .xm-preview{display:none!important}
+.xm-studio .xm-footer{padding:14px 0!important;margin-top:8px!important}
+.xm-studio .xm-footer .btn{min-height:44px;padding-inline:22px}
+@media(max-width:850px){
+ .xm-studio.xm-library-open .xm-layout{grid-template-columns:minmax(0,1fr)!important}
+ .xm-studio.xm-library-open .xm-library{grid-column:1;grid-row:1}
+ .xm-studio .xm-main,.xm-studio.xm-library-open .xm-main{grid-column:1!important;grid-row:auto!important}
+ .xm-studio .xm-preview,.xm-studio.xm-library-open .xm-preview{grid-column:1!important;grid-row:auto!important}
+ .xm-studio .xm-workspace-tools{flex-wrap:wrap}
+ .xm-studio .xm-tool-actions{margin-left:0;width:100%;justify-content:flex-start}
+ .xm-studio .xm-two,.xm-studio .xm-three{grid-template-columns:minmax(0,1fr)!important}
+ .xm-studio .xm-editor-tabs{width:100%!important}
+ .xm-studio .xm-editor-tabs button{min-width:0;flex:1;padding:10px 6px!important}
+}
