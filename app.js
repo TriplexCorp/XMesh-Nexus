@@ -1258,6 +1258,13 @@ async function removeXrayUserFromProfiles(user){
   }catch(err){console.warn('Could not detach Xray credential from profile',profile.name,err)}
  }
 }
+const xrayClientLocalDefaults=()=>({
+ dns:{queryStrategy:'UseIPv4',servers:['1.1.1.1']},
+ inbounds:[
+  {listen:'127.0.0.1',port:10808,protocol:'socks',settings:{auth:'noauth',udp:true},sniffing:{enabled:true,destOverride:['http','tls','quic']},tag:'socks'},
+  {listen:'127.0.0.1',port:10809,protocol:'http',settings:{},sniffing:{enabled:true,destOverride:['http','tls','quic']},tag:'http'}
+ ]
+});
 function xrayClientSample(){
  const v=id=>$('#xpb-'+id)?.value||'';
  const protocol=v('protocol')||'vless';
@@ -1273,7 +1280,7 @@ function xrayClientSample(){
  const vlessEncMode=v('vlessenc-mode')||'off';
  const vlessEncRequired=protocol==='vless'&&(network==='xdrive'||vlessEncMode!=='off');
  let outProtocol=protocol,settings;
- if(['dokodemo-door','tunnel','tun'].includes(protocol))return {remarks:$('#xpb-name')?.value.trim()||'XRAY STUDIO client',note:'Для этого inbound нет прямого одноимённого клиентского outbound. Используйте совместимый клиентский протокол или полный JSON-режим.',outbounds:[]};
+ if(['dokodemo-door','tunnel','tun'].includes(protocol))return {...xrayClientLocalDefaults(),remarks:$('#xpb-name')?.value.trim()||'XRAY STUDIO client',note:'Для этого inbound нет прямого одноимённого клиентского outbound. Используйте совместимый клиентский протокол или полный JSON-режим.',outbounds:[]};
  if(protocol==='vless')settings={vnext:[{address,port,users:[{id:uuid,encryption:vlessEncRequired?(v('vless-encryption').trim()||'REPLACE_WITH_VLESS_ENCRYPTION_CONFIG'):'none',...(flow?{flow}:{})}]}]};
  else if(protocol==='vmess')settings={vnext:[{address,port,users:[{id:uuid,alterId:0,security:v('vmess-security')||'auto'}]}]};
  else if(protocol==='trojan')settings={servers:[{address,port,password:uuid}]};
@@ -1320,12 +1327,8 @@ function xrayClientSample(){
  if(!['wireguard'].includes(protocol))outbound.streamSettings=streamSettings;
  if(network==='xdrive')outbound.mux={enabled:true,concurrency:cl(+v('xdrive-mux-concurrency')||8,1,1024)};
  return {
+  ...xrayClientLocalDefaults(),
   remarks:$('#xpb-name')?.value.trim()||'XRAY STUDIO client',
-  dns:{queryStrategy:'UseIPv4',servers:['1.1.1.1']},
-  inbounds:[
-   {listen:'127.0.0.1',port:10808,protocol:'socks',settings:{auth:'noauth',udp:true},sniffing:{enabled:true,destOverride:['http','tls','quic']},tag:'socks'},
-   {listen:'127.0.0.1',port:10809,protocol:'http',settings:{},sniffing:{enabled:true,destOverride:['http','tls','quic']},tag:'http'}
-  ],
   outbounds:[outbound,{tag:'direct',protocol:'freedom'},{tag:'block',protocol:'blackhole'}],
   routing:{domainStrategy:'AsIs',rules:[]}
  };
