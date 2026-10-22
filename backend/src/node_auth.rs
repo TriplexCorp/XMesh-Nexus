@@ -1,6 +1,6 @@
 //! Per-node proof-of-possession authentication for telemetry.
 //! Ed25519 keys are registered by an authenticated owner; only public keys
-//! are stored. Once enrolled, a node's legacy bearer token is revoked.
+//! are stored. Only signed requests can authenticate telemetry.
 //! The signed message binds method, path, node, timestamp, nonce and raw body.
 use crate::{auth::AuthUser, ApiError, AppState};
 use axum::{extract::{Extension, Path, State}, http::{HeaderMap, StatusCode}, Json};
@@ -76,56 +76,23 @@ fn verified_signature(
 pub async fn authenticate(
     state: &AppState, headers: &HeaderMap, node_id: i64, raw_body: &[u8],
 ) -> Result<(), ApiError> {
-    let enrolled = sqlx::query("SELECT public_key FROM node_metric_keys WHERE node_id=$1")
-        .bind(node_id).fetch_optional(&state.pool).await?;
-    if let Some(row) = enrolled {
-        // A signed node MUST NOT downgrade to bearer authentication.
-        let key: String = row.try_get("public_key")?;
-        let now = SystemTime::now().duration_since(UNIX_EPOCH)
-            .map_err(|_|error("Ошибка времени сервера."))?.as_secs() as i64;
-        let nonce = verified_signature(&key, headers, node_id, raw_body, now)?;
-        // PostgreSQL unique (node, nonce) rejects even simultaneous replays.
-        let inserted = sqlx::query(
-            "INSERT INTO node_metric_nonces(node_id, nonce) VALUES($1, $2) ON CONFLICT DO NOTHING"
-        ).bind(node_id).bind(nonce).execute(&state.pool).await?;
-        if inserted.rows_affected() != 1 {
-            return Err(error("Повторное использование подписанного запроса запрещено."));
-        }
-        sqlx::query("UPDATE node_metric_keys SET last_seen_at=NOW() WHERE node_id=$1")
-            .bind(node_id).execute(&state.pool).await?;
-        // Limit replay-table growth; a timestamp over two minutes old is rejected.
-        sqlx::query("DELETE FROM node_metric_nonces WHERE used_at<NOW()-INTERVAL '10 minutes'")
-            .execute(&state.pool).await?;
-        return Ok(());
+    let row = sqlx::query("SELECT public_key FROM node_metric_keys WHERE node_id=$1")
+        .bind(node_id).fetch_optional(&state.pool).await?
+        .ok_or_else(|| error("Для узла не зарегистрирован публичный Ed25519-ключ."))?;
+    let key: String = row.try_get("public_key")?;
+    let now = SystemTime::now().duration_since(UNIX_EPOCH)
+        .map_err(|_| error("Ошибка времени сервера."))?.as_secs() as i64;
+    let nonce = verified_signature(&key, headers, node_id, raw_body, now)?;
+    let inserted = sqlx::query(
+        "INSERT INTO node_metric_nonces(node_id, nonce) VALUES($1, $2) ON CONFLICT DO NOTHING"
+    ).bind(node_id).bind(nonce).execute(&state.pool).await?;
+    if inserted.rows_affected() != 1 {
+        return Err(error("Повторное использование подписанного запроса запрещено."));
     }
-
-    // Legacy credentials are disabled on new installations. Existing installations
-    // can opt into temporary compatibility until every node is enrolled.
-    let legacy_allowed = std::env::var("ALLOW_LEGACY_NODE_BEARER")
-        .map(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "true" | "1" | "yes"))
-        .unwrap_or(false);
-    if !legacy_allowed {
-        return Err(error("Bearer-авторизация узлов отключена политикой безопасности."));
-    }
-
-    // Legacy mode for nodes not enrolled in Ed25519. Kept ONLY for a safe,
-    // per-node migration; registering a key removes this credential.
-    let token = headers.get(axum::http::header::AUTHORIZATION)
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.strip_prefix("Bearer "))
-        .filter(|v| v.len() == 67
-            && v.starts_with("xm_")
-            && v[3..].bytes().all(|b| b.is_ascii_hexdigit()))
-        .ok_or_else(||error("Требуется аутентификация узла."))?;
-    let token_hash = hex::encode(Sha256::digest(token.as_bytes()));
-    let accepted: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM node_metric_auth a
-         JOIN panel_records n ON n.collection='nodes' AND n.id=a.node_id
-         WHERE a.node_id=$1 AND a.token_hash=$2)"
-    ).bind(node_id).bind(token_hash).fetch_one(&state.pool).await?;
-    if !accepted {
-        return Err(error("Токен агента недействителен или отозван."));
-    }
+    sqlx::query("UPDATE node_metric_keys SET last_seen_at=NOW() WHERE node_id=$1")
+        .bind(node_id).execute(&state.pool).await?;
+    sqlx::query("DELETE FROM node_metric_nonces WHERE used_at<NOW()-INTERVAL '10 minutes'")
+        .execute(&state.pool).await?;
     Ok(())
 }
 
@@ -149,7 +116,7 @@ pub async fn enroll(
         ApiError::new(StatusCode::BAD_REQUEST,"Неверный публичный Ed25519-ключ.")
     )?;
     let mut tx=state.pool.begin().await?;
-    // Serialize enrollment with credential issuance on the same node row.
+    // Serialize enrollment and key rotation on the node row.
     let exists=sqlx::query("SELECT id FROM panel_records WHERE collection='nodes' AND id=$1 FOR UPDATE")
         .bind(node_id).fetch_optional(&mut *tx).await?;
     if exists.is_none() {
@@ -160,15 +127,13 @@ pub async fn enroll(
          ON CONFLICT(node_id) DO UPDATE SET public_key=EXCLUDED.public_key,
             enrolled_at=NOW(),last_seen_at=NULL"
     ).bind(node_id).bind(&request.public_key).execute(&mut *tx).await?;
-    sqlx::query("DELETE FROM node_metric_auth WHERE node_id=$1")
-        .bind(node_id).execute(&mut *tx).await?;
     sqlx::query("DELETE FROM node_metric_nonces WHERE node_id=$1")
         .bind(node_id).execute(&mut *tx).await?;
     tx.commit().await?;
     crate::audit(&state.pool,&actor.username,"node_metrics.key_enrolled",Some("nodes"),Some(node_id),
-        json!({"algorithm":"Ed25519","legacyBearerRevoked":true})).await;
+        json!({"algorithm":"Ed25519"})).await;
     Ok((StatusCode::CREATED,Json(json!({"nodeId":node_id,"authentication":"ed25519",
-        "legacyBearerRevoked":true}))))
+        "authentication":"ed25519"}))))
 }
 
 pub async fn revoke(
@@ -181,9 +146,6 @@ pub async fn revoke(
     }
     let mut tx=state.pool.begin().await?;
     let deleted=sqlx::query("DELETE FROM node_metric_keys WHERE node_id=$1")
-        .bind(node_id).execute(&mut *tx).await?;
-    // No downgrade on revoke; remove any legacy token too.
-    sqlx::query("DELETE FROM node_metric_auth WHERE node_id=$1")
         .bind(node_id).execute(&mut *tx).await?;
     sqlx::query("DELETE FROM node_metric_nonces WHERE node_id=$1")
         .bind(node_id).execute(&mut *tx).await?;
