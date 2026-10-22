@@ -173,7 +173,9 @@ assert.match(view,/value="b" selected/);
 assert(!view.includes('<script>alert(1)</script>'),'User-provided studio content must be escaped');
 assert.match(view,/&lt;script&gt;/);
 assert.match(view,/Экспорт схемы JSON/);
-assert.match(view,/отдельном сервисе/);
+assert.match(view,/Оформление действующей страницы подписки/);
+assert.match(fs.readFileSync("backend/src/user_subscriptions.rs","utf8"),/subscriptionClientLinks/);
+assert.match(fs.readFileSync("backend/src/user_subscriptions.rs","utf8"),/subscriptionPath/);
 assert.match(app,/subscription:\['SUBSCRIPTION STUDIO',subscriptionStudioP\]/);
 assert.match(app,/field\(\{k:'subscriptionBrand',l:'Название подписки'/,
  'General Settings must have a distinct subscription name field');
