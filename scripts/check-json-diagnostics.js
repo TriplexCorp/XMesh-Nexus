@@ -51,8 +51,8 @@ assert.doesNotMatch(editor.decorateRun('<img src=x>',0,'jx-string',null),/<img/,
 assert.match(studio,/data-v="source"/,'Studio must expose a JSON textarea');
 assert.match(studio,/data-v="highlight"/,'Studio must expose a syntax layer');
 assert.match(studio,/data-v="gutter"/,'Studio must expose line numbers');
-assert.match(studio,/function paint\\(\\)/,'Studio must update syntax and diagnostics');
-assert.match(studio,/XrayJsonIntelligence\\?\\.analyze/,'Studio must run structural diagnostics');
+assert.match(studio,/function paint\(\)/,'Studio must update syntax and diagnostics');
+assert.match(studio,/XrayJsonIntelligence\?\.analyze/,'Studio must run structural diagnostics');
 assert.match(studio,/sv-invalid-line/,'Studio must highlight invalid lines');
 assert.match(src,/setRangeText\(proposal\.replacement,proposal\.start,proposal\.end,'end'\)/,'Hot Fix must edit only affected range');
 assert.match(src,/textarea\.dispatchEvent\(new Event\('input'/,'Hot Fix must notify existing validators and JSON state');
