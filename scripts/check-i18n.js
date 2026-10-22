@@ -73,8 +73,10 @@ assert.match(html,/aria-pressed="false"/,
  'RU and EN buttons must expose selected-state semantics');
 assert.match(app,/const panelIsEnglish=/,'Panel number and date formatting must follow locale');
 assert.match(src,/#bn,#lg/,'User-defined panel brand should never be translated');
-assert.match(portal,/d.subscriptionLanguage==='en'\?'12.4 \/ 100 GB'/,
- 'Portal preview should use its own configured units');
+assert.match(portal,/english\?'12.4 \/ 100 GB'/,
+ 'Portal preview units must follow the customer-selected language, not the admin preference');
+assert.match(portal,/previewRoot\.lang=lang/,'Portal must set its own language');
+assert.match(portal,/previewLanguage=next/,'Customer-selected language must update the preview');
 assert.match(portal,/\[\['ru','Русский'\],\['en','English'\]\]/);
 assert.doesNotMatch(portal,/tr:\['Abonelik aktif'/);
 assert.doesNotMatch(portal,/vi:\['Gói đăng ký/);
