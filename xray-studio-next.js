@@ -9,7 +9,8 @@ const uuid=()=>{if(globalThis.crypto?.randomUUID)return crypto.randomUUID();if(!
 const hex=n=>{const a=new Uint8Array(n);crypto.getRandomValues(a);return Array.from(a,x=>x.toString(16).padStart(2,'0')).join('')};
 function view(){
 return '<section class="xm-studio" id="xm-studio">'+
-'<header class="xm-head"><div><div class="xm-eyebrow">XRAY STUDIO / CONFIGURATION</div><h2>Редактор профиля</h2><p>Создайте конфигурацию Xray и сохраните её для использования на узлах.</p></div><div class="xm-modes"><button type="button" class="xm-mode is-active" data-xm-action="visual">Конструктор</button><button type="button" class="xm-mode" data-xm-action="manual">Ручной JSON</button><button type="button" class="xm-mode" data-xm-action="import">Импорт JSON</button><input type="file" data-xm="file" accept=".json,application/json" hidden></div></header>'+
+'<header class="xm-head"><div><div class="xm-eyebrow">XRAY STUDIO / CONFIGURATION</div><h2>Редактор профиля</h2><p>Создайте конфигурацию Xray и сохраните её для использования на узлах.</p></div><div class="xm-modes"><button type="button" class="xm-mode is-active" data-xm-action="visual">Конструктор</button><button type="button" class="xm-mode" data-xm-action="manual">Редактор JSON</button><input type="file" data-xm="file" accept=".json,application/json" hidden></div></header>'+
+'<div class="xm-workspace-tools"><button type="button" class="xm-quiet" data-xm-action="toggleLibrary" aria-expanded="false">☰ Профили</button><span class="xm-current-name" data-xm="currentLabel">Новый профиль</span><div class="xm-tool-actions"><button type="button" class="xm-quiet" data-xm-action="check">Проверить</button><button type="button" class="xm-quiet" data-xm-action="formatCurrent">Форматировать</button><button type="button" class="xm-quiet" data-xm-action="import">Импорт</button><button type="button" class="xm-quiet" data-xm-action="download">Экспорт</button><button type="button" class="xm-quiet" data-xm-action="togglePreview">Просмотр JSON</button></div></div>'+ 
 '<div class="xm-layout"><aside class="xm-library"><header class="xm-library-header"><div><h3>Профили</h3><small data-xm="count">0</small></div><button type="button" class="xm-primary-icon" data-xm-action="new" title="Новый профиль" aria-label="Новый профиль">+</button></header><label class="xm-search-label"><span>Поиск профилей</span><input data-xm="search" type="search" placeholder="Поиск по профилям…"></label><div class="xm-profile-list" data-xm="list" aria-label="Сохранённые профили"></div></aside><div class="xm-main"><div class="xm-main-header"><div><h3>Редактирование профиля</h3><p>Параметры подключения обновляют JSON автоматически.</p></div><button type="button" class="xm-quiet" data-xm-action="duplicate">Дублировать</button></div><nav class="xm-editor-tabs" aria-label="Разделы редактора"><button type="button" data-xm-action="basicTab" class="is-active">Основное</button><button type="button" data-xm-action="securityTab">Защита и транспорт</button><button type="button" data-xm-action="clientTab">Клиент</button></nav><div class="xm-editor">'+
 
 '<section class="xm-panel" data-xm-panel="profile"><div class="xm-section-title"><span>01</span><div><h3>Профиль</h3><p>Имя конфигурации и идентификатор inbound</p></div></div><div class="xm-fields xm-two">'+inp('name','Название','Новый профиль')+inp('tag','Тег inbound','vless-main')+'</div></section>'+
@@ -34,17 +35,24 @@ select('security','Защита',[['reality','Reality'],['tls','TLS'],['none','�
 }
 function mount(root,ctx){
 let mode='visual',tab='server',server='',client='',serverError='',clientError='',manualDirty=false,busy=false,endpointList=[];
-let editorTab='basic',selectedId=null,previewOpen=true;
+let libraryOpen=false;
+let editorTab='basic',selectedId=null,previewOpen=false;
 const syncSections=()=>{
+ root.classList.toggle('xm-json-mode',mode==='manual');
+ root.classList.toggle('xm-library-open',libraryOpen);
+ root.classList.toggle('xm-preview-open',mode==='visual'&&previewOpen);
+ const lib=root.querySelector('[data-xm-action="toggleLibrary"]');
+ if(lib)lib.setAttribute('aria-expanded',String(libraryOpen));
  root.querySelectorAll('[data-xm-panel]').forEach(el=>{
   const part=el.dataset.xmPanel;
   el.hidden=mode!=='visual'||(editorTab==='basic'?!['profile','connection'].includes(part):editorTab==='security'?part!=='security':part!=='client');
  });
  root.querySelectorAll('[data-xm-manual]').forEach(el=>el.hidden=mode!=='manual');
- const editor=root.querySelector('.xm-editor-tabs');if(editor)editor.hidden=mode!=='visual';
+ const nav=root.querySelector('.xm-editor-tabs');if(nav)nav.hidden=mode!=='visual';
  root.querySelectorAll('.xm-editor-tabs button').forEach(b=>b.classList.toggle('is-active',b.dataset.xmAction===({basic:'basicTab',security:'securityTab',client:'clientTab'}[editorTab])));
- root.classList.toggle('xm-show-preview',mode==='visual');
- root.classList.toggle('xm-manual-mode',mode==='manual');
+ const preview=root.querySelector('.xm-preview');if(preview)preview.hidden=mode!=='visual'||!previewOpen;
+ const previewButton=root.querySelector('[data-xm-action="togglePreview"]');
+ if(previewButton){previewButton.textContent=previewOpen?'Закрыть предпросмотр':'Просмотр JSON';previewButton.setAttribute('aria-expanded',String(previewOpen))}
 };
 const v=id=>$(root,id)?.value?.trim()||'';
 const set=(id,value)=>{const e=$(root,id);if(e)e.value=value};
@@ -119,6 +127,7 @@ try{server=JSON.stringify(mode==='manual'?JSON.parse(v('manual')):config(),null,
 if(mode==='manual'){client='';clientError='В ручном режиме экспортируйте клиентский JSON из профиля пользователя.';if(tab==='client'){tab='server';root.querySelectorAll('.xm-tab').forEach(x=>x.classList.toggle('is-active',x.dataset.xmAction==='server'))}}
 else try{client=JSON.stringify(clientConfig(),null,2)}catch(e){client='';clientError=e.message}
 const current=tab==='server'?server:client;
+const currentLabel=$(root,'currentLabel');if(currentLabel)currentLabel.textContent=v('name')||'Без названия';
 const saveStatus=$(root,'saveStatus');
 if(saveStatus)saveStatus.textContent=serverError?'Проверьте параметры сервера: '+serverError:(selectedId!==null?'Редактируется существующий профиль · изменения ещё не сохранены':'Новый профиль · изменения не применяются к узлам автоматически');
 $(root,'output').textContent=current||(tab==='server'?'Server JSON пока недоступен':'Client JSON пока недоступен');
@@ -139,10 +148,14 @@ refresh();
 }
 const download=()=>{const data=tab==='server'?server:client;if(!data)return;const url=URL.createObjectURL(new Blob([data],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download=(v('name').replace(/[^a-z0-9-]+/gi,'-')||'xray')+'-'+tab+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
 const actions={
+toggleLibrary:()=>{libraryOpen=!libraryOpen;syncSections()},
+togglePreview:()=>{if(mode==='manual'){switchMode('visual');return}previewOpen=!previewOpen;syncSections()},
+check:()=>{try{const data=mode==='manual'?JSON.parse(v('manual')):config();validation(data);ctx.toast('JSON проверен: основные параметры корректны')}catch(e){ctx.toast('Ошибка: '+e.message);info(e.message,true)}},
+formatCurrent:()=>{if(mode==='manual'){actions.format();return}ctx.toast('Конфигурация конструктора уже отформатирована')},
 basicTab:()=>{editorTab='basic';syncSections()},
 securityTab:()=>{editorTab='security';syncSections()},
 clientTab:()=>{editorTab='client';syncSections()},
-new:()=>{selectedId=null;set('name','Новый профиль');set('tag','vless-main');mode='visual';manualDirty=false;editorTab='basic';root.querySelectorAll('[data-xm-action="visual"],[data-xm-action="manual"]').forEach(b=>b.classList.toggle('is-active',b.dataset.xmAction==='visual'));refreshList();syncSections();refresh();root.querySelector('[data-xm="name"]')?.focus()},
+new:()=>{libraryOpen=false;selectedId=null;set('name','Новый профиль');set('tag','vless-main');mode='visual';manualDirty=false;editorTab='basic';root.querySelectorAll('[data-xm-action="visual"],[data-xm-action="manual"]').forEach(b=>b.classList.toggle('is-active',b.dataset.xmAction==='visual'));refreshList();syncSections();refresh();root.querySelector('[data-xm="name"]')?.focus()},
 duplicate:()=>{selectedId=null;set('name',v('name')+' — копия');refreshList();ctx.toast('Введите уникальный тег для копии')},
 
 visual:()=>switchMode('visual'),manual:()=>switchMode('manual'),
@@ -187,6 +200,7 @@ const refreshList=()=>{
 };
 const loadProfile=id=>{
  const p=ctx.DB.profiles.find(item=>String(item.id)===String(id));if(!p)return;
+ libraryOpen=false;
  selectedId=p.id;set('name',p.name||'');
  const obj=typeof p.config==='string'?JSON.parse(p.config):p.config;
  const inbound=obj.inbounds?.[0];set('tag',inbound?.tag||'');
