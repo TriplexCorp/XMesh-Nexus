@@ -710,3 +710,91 @@
  .sv-studio .sv-profile-card{transform:none!important;transition:none}
  .sv-studio .sv-page-tabs button{transition:none}
 }
+
+
+/* XRAY STUDIO action sheets. A single design system for create/edit/confirm. */
+.xm-studio-modal{
+ --xm-dialog-accent:var(--a,#75dbb3);
+ color:var(--tx,#f1f5f9);
+ padding:0;
+ width:min(36rem,calc(100vw - 2rem));
+ max-width:calc(100vw - 2rem);
+ max-height:min(90dvh,800px);
+ overflow:auto;
+ background:var(--s1,#151e2a);
+ border:1px solid color-mix(in srgb,var(--ln,#344052) 84%,var(--xm-dialog-accent));
+ border-radius:var(--ui-radius,20px);
+ box-shadow:0 24px 85px rgba(0,0,0,.4),0 0 0 1px rgba(255,255,255,.02);
+ font-family:inherit;
+ font-size:inherit;
+ line-height:1.5;
+}
+.xm-studio-modal::backdrop{
+ background:rgba(2,5,11,.76);
+ backdrop-filter:blur(7px);
+ -webkit-backdrop-filter:blur(7px);
+}
+.xm-studio-modal *{box-sizing:border-box}
+.xm-studio-modal-shell{padding:1.35rem 1.45rem 1.25rem}
+.xm-studio-modal-head{display:flex;align-items:flex-start;gap:.85rem;position:relative;padding:0 2rem 1.15rem 0;border-bottom:1px solid var(--ln,#344052)}
+.xm-studio-modal-mark{
+ display:grid;place-items:center;flex:none;width:2.7rem;height:2.7rem;
+ background:color-mix(in srgb,var(--xm-dialog-accent) 12%,var(--s1,#151e2a));
+ color:var(--xm-dialog-accent);border:1px solid color-mix(in srgb,var(--xm-dialog-accent) 28%,var(--ln,#344052));
+ border-radius:var(--ui-control-radius,12px)
+}
+.xm-studio-modal-mark svg{width:1.35rem;height:1.35rem}
+.xm-studio-modal-copy{min-width:0;flex:1}
+.xm-studio-modal-eyebrow{font-size:.67rem;letter-spacing:.11em;font-weight:800;color:var(--xm-dialog-accent)}
+.xm-studio-modal h2{font-size:1.2rem;font-weight:800;letter-spacing:-.025em;line-height:1.3;margin:.25rem 0 .35rem}
+.xm-studio-modal-copy p{font-size:.78rem;line-height:1.6;color:var(--mu,#9bacc0);margin:0}
+.xm-studio-modal .xm-studio-modal-close{
+ position:absolute;right:0;top:0;display:grid;place-items:center;width:2rem;height:2rem;
+ border:1px solid var(--ln,#344052);border-radius:var(--ui-control-radius,10px);
+ background:var(--s2,#1e293b);color:var(--mu,#9bacc0);
+ font-size:1.2rem;cursor:pointer;
+}
+.xm-studio-modal .xm-studio-modal-close:hover{color:var(--tx,#fff);border-color:var(--xm-dialog-accent)}
+.xm-studio-modal-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.95rem;margin-top:1.25rem}
+.xm-studio-modal-field{display:flex;flex-direction:column;align-items:stretch;gap:.36rem;min-width:0}
+.xm-studio-modal-field.is-wide{grid-column:1/-1}
+.xm-studio-modal-label{color:var(--tx,#fff);font-size:.76rem;font-weight:750}
+.xm-studio-modal :is(input,select,textarea){
+ width:100%;min-height:2.8rem;
+ border:1px solid var(--ln,#344052);border-radius:var(--ui-control-radius,10px);
+ background:var(--s2,#202c38);color:var(--tx,#fff);
+ padding:.63rem .82rem;font:inherit;font-size:.82rem;outline:none;
+ transition:border-color .18s,box-shadow .18s;
+}
+.xm-studio-modal textarea{min-height:8rem;resize:vertical;font-family:ui-monospace,Consolas,monospace}
+.xm-studio-modal :is(input,select,textarea):focus{border-color:var(--xm-dialog-accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--xm-dialog-accent) 13%,transparent)}
+.xm-studio-modal [aria-invalid=true]{border-color:var(--er,#f28a9b)}
+.xm-studio-modal .xm-studio-modal-help{font-size:.7rem;color:var(--mu,#9bacc0)}
+.xm-studio-modal .xm-studio-modal-error,.xm-studio-modal .xm-studio-modal-global-error{font-size:.72rem;color:var(--er,#f28a9b);margin:0}
+.xm-studio-modal [hidden]{display:none!important}
+.xm-studio-modal-notice{
+ margin-top:1.1rem;padding:.75rem .85rem;
+ border:1px solid color-mix(in srgb,var(--xm-dialog-accent) 20%,var(--ln,#344052));
+ background:color-mix(in srgb,var(--xm-dialog-accent) 6%,var(--s1,#151e2a));
+ color:var(--mu,#9bacc0);font-size:.75rem;line-height:1.55;
+ border-radius:var(--ui-control-radius,10px)
+}
+.xm-studio-modal-global-error{padding-top:.5rem!important}
+.xm-studio-modal-footer{display:flex;gap:.6rem;justify-content:flex-end;padding-top:1.2rem;margin-top:1.25rem;border-top:1px solid var(--ln,#344052)}
+.xm-studio-modal .xm-studio-modal-footer button{
+ min-height:2.7rem;padding:.65rem 1.05rem;border-radius:var(--ui-control-radius,10px);
+ font:inherit;font-size:.8rem;font-weight:750;cursor:pointer;
+ transition:transform .18s,background .18s,border-color .18s;
+}
+.xm-studio-modal .xm-studio-modal-cancel{background:var(--s2,#1e293b);color:var(--tx,#fff);border:1px solid var(--ln,#344052)}
+.xm-studio-modal .xm-studio-modal-accept{background:var(--xm-dialog-accent);color:var(--btn-text,#061813);border:1px solid var(--xm-dialog-accent);min-width:8rem}
+.xm-studio-modal .xm-studio-modal-accept.is-danger{background:var(--er,#f28a9b);color:#15191f;border-color:var(--er,#f28a9b)}
+.xm-studio-modal .xm-studio-modal-footer button:hover{transform:translateY(-1px)}
+.xm-studio-modal .xm-studio-modal-footer button:focus-visible,.xm-studio-modal .xm-studio-modal-close:focus-visible{outline:2px solid var(--xm-dialog-accent);outline-offset:3px}
+@media(max-width:580px){
+ .xm-studio-modal-shell{padding:1rem}
+ .xm-studio-modal-fields{grid-template-columns:1fr}
+ .xm-studio-modal-field{grid-column:1/-1}
+ .xm-studio-modal-footer button{flex:1}
+}
+@media(prefers-reduced-motion:reduce){.xm-studio-modal .xm-studio-modal-footer button{transition:none;transform:none!important}}
