@@ -359,3 +359,25 @@
 .sv-studio .sv-inline-tools .sv-tool-routing{--tool-color:#69c7c8}
 .sv-studio .sv-inline-tools .sv-tool-inbound{--tool-color:var(--vaccent)}
 @media(prefers-reduced-motion:reduce){.sv-studio .sv-inline-tools .sv-toolitem{transform:none!important}}
+
+
+/* Inline Reality diagnostics with a single explicit repair action. */
+.sv-studio .sv-inline-tools .sv-tool-issue[hidden]{display:none!important}
+.sv-studio .sv-inline-tools .sv-tool-issue{
+ display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;
+ gap:.45rem .9rem;margin-top:.45rem;padding:.45rem .65rem;
+ border:1px solid color-mix(in srgb,var(--er,#f28a9b) 35%,var(--vline));
+ border-radius:var(--vround);background:color-mix(in srgb,var(--er,#f28a9b) 7%,var(--vpanel));
+ color:var(--vtext);font-size:.76rem;line-height:1.45;
+}
+.sv-studio .sv-inline-tools .sv-tool-issue>span{flex:1;min-width:min(19rem,100%)}
+.sv-studio .sv-inline-tools .sv-tool-issue button{
+ flex:none;min-height:2rem;padding:.35rem .65rem;
+ border:1px solid color-mix(in srgb,var(--er,#f28a9b) 38%,var(--vline));
+ border-radius:var(--vround);background:var(--vfield);
+ color:var(--vtext);font-size:.76rem;font-weight:700;
+}
+.sv-studio .sv-inline-tools .sv-tool-issue button:hover{border-color:var(--er,#f28a9b)}
+.sv-studio .sv-inline-tools .sv-tool-issue button:focus-visible{outline:2px solid var(--vaccent);outline-offset:2px}
+.sv-studio .sv-inline-tools .xm-tools-status:not(:empty){padding-top:.3rem}
+@media(max-width:640px){.sv-studio .sv-inline-tools .sv-tool-issue{align-items:stretch}.sv-studio .sv-inline-tools .sv-tool-issue button{width:100%}}
