@@ -24,6 +24,24 @@ const request=async(path,options={})=>{
 const setting=(name,title,detail,min,max,unit,policy,disabled)=>'<label class="security-setting"><span><b>'+title+'</b><small>'+detail+'</small></span><span class="security-number"><input name="'+name+'" type="number" min="'+min+'" max="'+max+'" step="1" value="'+esc(policy[name])+'" '+(disabled?'disabled':'')+' required><em>'+unit+'</em></span></label>';
 const panel=()=>'<section class="card" id="security-advanced"><div class="hd"><div><h3>Политика входа</h3><p>Время сессии, ограничения входа и защищённый адрес</p></div></div><div id="security-advanced-body" class="security-loading">Загрузка политик безопасности…</div><p id="security-advanced-error" class="er" role="alert" aria-live="polite"></p></section><section class="card" id="security-sessions-panel"><div class="hd"><div><h3>Активные сессии</h3><p>Управление входами и устройствами</p></div></div><div id="security-sessions-body"></div></section>';
 async function mount(root){
+ const center=root.querySelector('.security-center');
+ if(center){
+  const tabs=[...center.querySelectorAll('[data-security-tab]')];
+  const panes=[...center.querySelectorAll('[data-security-pane]')];
+  const selectTab=(name,focus=false)=>{
+   for(const tab of tabs){const active=tab.dataset.securityTab===name;tab.setAttribute('aria-selected',String(active));tab.tabIndex=active?0:-1;if(active&&focus)tab.focus()}
+   for(const pane of panes)pane.hidden=pane.dataset.securityPane!==name;
+  };
+  center.addEventListener('click',e=>{const tab=e.target.closest('[data-security-tab]');if(tab&&center.contains(tab))selectTab(tab.dataset.securityTab)});
+  center.querySelector('.security-center-tabs')?.addEventListener('keydown',e=>{
+   if(!['ArrowRight','ArrowLeft','Home','End'].includes(e.key))return;
+   const i=tabs.indexOf(document.activeElement);if(i<0)return;
+   e.preventDefault();
+   const next=e.key==='Home'?0:e.key==='End'?tabs.length-1:e.key==='ArrowRight'?(i+1)%tabs.length:(i+tabs.length-1)%tabs.length;
+   selectTab(tabs[next].dataset.securityTab,true);
+  });
+  selectTab('auth');
+ }
  const host=root.querySelector('#security-advanced');if(!host)return;
  const body=host.querySelector('#security-advanced-body'),error=host.querySelector('#security-advanced-error');
  const fail=e=>{error.textContent=e?.message||String(e);announce(error.textContent,'error')};
