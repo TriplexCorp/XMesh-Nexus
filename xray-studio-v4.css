@@ -9,11 +9,10 @@
 .sv-studio button.sv-primary{background:var(--vaccent);color:var(--btn-text);border-color:var(--vaccent);padding-inline:22px;font-weight:750}
 .sv-title{display:flex;min-height:26px;align-items:center}
 .sv-subtitle{font-size:12px;color:var(--vmute);margin:0}
-.sv-mainnav{display:none}
+.sv-mainnav{grid-area:modes;display:flex;align-items:center;min-width:0;background:var(--vpanel);border:1px solid var(--vline);border-radius:var(--vround);padding:5px;overflow-x:auto}.sv-navtags{display:flex;align-items:center;gap:4px;min-width:max-content}.sv-navtags button{flex:none;background:transparent;border:1px solid transparent;min-height:36px;padding:7px 11px;white-space:nowrap}.sv-navtags button.active{border-color:var(--vaccent);color:var(--vaccent);background:color-mix(in srgb,var(--vaccent) 12%,var(--vpanel))}
 .sv-workspace{display:grid;grid-template-columns:minmax(0,1.52fr) minmax(380px,.96fr) 278px;grid-template-rows:auto minmax(590px,calc(100dvh - 255px));grid-template-areas:"modes actions tools" "editor constructor tools";gap:12px;align-items:stretch;min-width:0}
 .sv-studio .sv-workspace>.sv-actions{grid-area:actions;display:flex;align-items:center;justify-content:flex-end;gap:7px;padding:4px 0;min-width:0;flex-wrap:wrap}
 .sv-studio .sv-workspace>.sv-actions button{min-height:37px;padding:7px 10px}
-.sv-workspace::before{content:"{ }  Редактор JSON        ◫  Конструктор        ✓  Проверка        ◉  Предпросмотр";grid-area:modes;display:flex;align-items:center;white-space:pre;overflow:hidden;text-overflow:ellipsis;padding:10px 14px;background:var(--vpanel);border:1px solid var(--vline);border-radius:var(--vround);font-size:12px;color:var(--vmute)}
 /* Grid has two explicit columns plus sidebar; maintain existing DOM children */
 .sv-columns{display:contents}
 .sv-codepanel,.sv-constructor,.sv-tools{min-width:0;min-height:0;border:1px solid var(--vline);border-radius:var(--ui-radius,14px);background:var(--vpanel);overflow:hidden}
@@ -100,5 +99,5 @@
 .sv-hide-tools .sv-workspace{grid-template-columns:minmax(0,1.55fr) minmax(350px,1fr);grid-template-areas:"modes actions" "editor constructor"}
 @media(max-width:1420px){.sv-workspace{grid-template-columns:minmax(0,1.25fr) minmax(330px,1fr) 230px}.sv-toolcopy small{font-size:10px}}
 @media(max-width:1120px){.sv-workspace,.sv-hide-tools .sv-workspace{grid-template-columns:minmax(0,1.25fr) minmax(290px,1fr);grid-template-rows:auto 620px auto;grid-template-areas:"modes actions" "editor constructor" "tools tools"}.sv-tools{height:auto}.sv-legacy .xm-tools-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.sv-template{margin-top:0}.sv-studio .sv-workspace>.sv-actions{justify-content:flex-end}}
-@media(max-width:760px){.sv-workspace,.sv-hide-tools .sv-workspace{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto 520px 540px auto;grid-template-areas:"modes" "actions" "editor" "constructor" "tools"}.sv-workspace::before{font-size:10px}.sv-studio .sv-workspace>.sv-actions{justify-content:flex-start}.sv-tools{grid-area:tools}.sv-two{grid-template-columns:minmax(0,1fr)}.sv-legacy .xm-tools-grid{grid-template-columns:minmax(0,1fr)}.sv-minimap{display:none}.sv-bottom{flex-wrap:wrap}}
+@media(max-width:760px){.sv-workspace,.sv-hide-tools .sv-workspace{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto 520px 540px auto;grid-template-areas:"modes" "actions" "editor" "constructor" "tools"}.sv-navtags button{font-size:10px;padding:6px 8px}.sv-studio .sv-workspace>.sv-actions{justify-content:flex-start}.sv-tools{grid-area:tools}.sv-two{grid-template-columns:minmax(0,1fr)}.sv-legacy .xm-tools-grid{grid-template-columns:minmax(0,1fr)}.sv-minimap{display:none}.sv-bottom{flex-wrap:wrap}}
 @media(prefers-reduced-motion:reduce){.sv-studio *{animation:none!important;transition:none!important}}
