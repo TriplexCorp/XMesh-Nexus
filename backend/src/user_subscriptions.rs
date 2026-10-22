@@ -116,9 +116,23 @@ fn vless_outbound(user:&Value,inbound:&Value,host:&Value)->Option<Value>{
  let network=nonempty(stream,"network").unwrap_or("tcp");
  let uuid=nonempty(user,"xrayId")?;
  let tag=nonempty(host,"remark").or_else(||nonempty(inbound,"tag")).unwrap_or(address);
- let client=if let Some(flow)=inbound.get("settings").and_then(|v|nonempty(v,"flow")){
-  json!({"id":uuid,"encryption":"none","flow":flow})
- }else{json!({"id":uuid,"encryption":"none"})};
+ let country=nonempty(host,"countryCode").or_else(||nonempty(host,"country"))
+  .or_else(||nonempty(host,"region")).unwrap_or("ZZ");
+
+ // The server's VLESS decryption string is NOT a client encryption string.
+ // Only explicitly provided client-side encryption material may be exported.
+ let server_decryption=inbound.get("settings").and_then(|v|nonempty(v,"decryption")).unwrap_or("none");
+ let client_encryption=nonempty(host,"clientEncryption")
+  .or_else(||nonempty(host,"externalClientEncryption"))
+  .or_else(||nonempty(user,"vlessEncryption"))
+  .or_else(||inbound.get("silentium").and_then(|v|nonempty(v,"clientEncryption")))
+  .unwrap_or("none");
+ if server_decryption!="none" && client_encryption=="none"{return None}
+ let mut client=json!({"id":uuid,"encryption":client_encryption});
+ // Flow must only be included when the inbound actually supports it.
+ if let Some(flow)=inbound.get("settings").and_then(|v|nonempty(v,"flow")){
+  client["flow"]=json!(flow);
+ }
  let mut outbound_stream=json!({"network":network,"security":security});
  if security=="reality"{
   let server=stream.get("realitySettings").unwrap_or(&Value::Null);
@@ -182,30 +196,10 @@ fn vless_outbound(user:&Value,inbound:&Value,host:&Value)->Option<Value>{
   else if network=="grpc"{outbound_stream["grpcSettings"]=transport}
  }
  Some(json!({
-  "tag":tag,"protocol":"vless",
+  "tag":tag,"xmeshCountry":country,"protocol":"vless",
   "settings":{"vnext":[{"address":address,"port":port,"users":[client]}]},
   "streamSettings":outbound_stream
  }))
-}
-fn native_xray_config(outbounds:Vec<Value>)->Value{
- let primary=outbounds.first().and_then(|v|v.get("tag")).and_then(Value::as_str).unwrap_or("proxy").to_owned();
- let mut all=outbounds;
- all.push(json!({"tag":"direct","protocol":"freedom"}));
- all.push(json!({"tag":"block","protocol":"blackhole"}));
- json!({
-  "log":{"loglevel":"warning"},
-  "dns":{"servers":["1.1.1.1"]},
-  "inbounds":[
-   {"tag":"socks","listen":"127.0.0.1","port":10808,"protocol":"socks","settings":{"auth":"noauth","udp":true}},
-   {"tag":"http","listen":"127.0.0.1","port":10809,"protocol":"http"}
-  ],
-  "outbounds":all,
-  "routing":{"domainStrategy":"AsIs","rules":[
-   {"type":"field","ip":["geoip:private"],"outboundTag":"direct"},
-   {"type":"field","domain":["geosite:private"],"outboundTag":"direct"},
-   {"type":"field","inboundTag":["socks","http"],"outboundTag":primary}
-  ]}
- })
 }
 async fn record(state:&AppState,id:i64)->Result<Value,ApiError>{
  let row=sqlx::query("SELECT data FROM panel_records WHERE collection='users' AND id=$1")
@@ -292,7 +286,7 @@ pub async fn serve(State(state):State<AppState>,Path(token):Path<String>,Query(o
     }
    }else{
     for node in nodes.iter().filter(|n|n.get("profileId")==profile.get("id")&&n.get("disabled")!=Some(&Value::Bool(true))){
-     let host=json!({"address":node.get("publicAddress").or_else(||node.get("externalAddress")).or_else(||node.get("addr")),"port":inbound.get("port"),"remark":node.get("name")});
+     let host=json!({"address":node.get("publicAddress").or_else(||node.get("externalAddress")).or_else(||node.get("addr")),"port":inbound.get("port"),"remark":node.get("name"),"country":node.get("country")});
      if let Some(link)=vless_link(&user,inbound,&host) && let Some(outbound)=vless_outbound(&user,inbound,&host){
       outbounds.push(outbound);links.push(link)
      }
@@ -312,8 +306,13 @@ pub async fn serve(State(state):State<AppState>,Path(token):Path<String>,Query(o
  let mut response=if legacy{
   links.join("\n").into_response()
  }else{
-  let body=serde_json::to_string_pretty(&native_xray_config(outbounds))
-   .map_err(|_|ApiError::new(StatusCode::INTERNAL_SERVER_ERROR,"Could not generate Xray JSON"))?;
+  let settings=crate::read_settings(&state.pool).await?;
+  let json=crate::subscription_json::build(outbounds,&settings).map_err(|message|{
+    tracing::warn!(user_id=id, error=%message,"Subscription JSON could not be generated");
+    ApiError::new(StatusCode::SERVICE_UNAVAILABLE,message)
+  })?;
+  let body=serde_json::to_string_pretty(&json)
+   .map_err(|_|ApiError::new(StatusCode::INTERNAL_SERVER_ERROR,"Could not serialize Xray JSON"))?;
   body.into_response()
  };
  response.headers_mut().insert(header::CONTENT_TYPE,if legacy{
