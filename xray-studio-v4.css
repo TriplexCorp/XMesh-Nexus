@@ -150,3 +150,10 @@
 .sv-studio .sv-workspace>.sv-actions button{font-weight:570}
 @media(max-width:1420px){.sv-workspace{grid-template-columns:minmax(0,1.25fr) minmax(340px,1fr) minmax(190px,.55fr)}}
 @media(prefers-reduced-motion:reduce){.sv-studio *{animation:none!important;transition:none!important}}
+
+
+/* Diagnostics reported by installed Xray-core. Never fabricate source locations. */
+.sv-core-diagnostics{flex:none;max-height:8rem;overflow:auto;padding:.7rem 1rem;font-size:.8rem;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere;border-top:1px solid var(--vline)}
+.sv-core-diagnostics[data-status=bad]{color:var(--er,#f28a9b);background:color-mix(in srgb,var(--er,#f28a9b) 6%,var(--vpanel))}
+.sv-core-diagnostics[data-status=ok]{color:var(--ok,#57d6a4)}
+.sv-gutter{color:var(--vmute)}
