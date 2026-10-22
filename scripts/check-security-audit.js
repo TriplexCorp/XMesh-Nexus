@@ -52,10 +52,11 @@ assert.match(main,/subscriptionDescriptionEn/);
 assert.match(main,/subscriptionFooterEn/);
 assert.match(main,/"subscriptionAppsTitleEn"/);
 
-// Appearance precision must be independent from workspace scale.
-assert.match(app,/id="text-size" min="75" max="160" step="1"/);
-assert.match(app,/id="text-precision"/);
-assert.match(css,/var\(--text-size-scale,1\)/);
-assert.match(app,/C\.textPrecision/);
+// A unified interface scale replaces the removed duplicate text-scaling control.
+// Appearance precision is controlled by a separate common rangePrecision policy.
+assert.doesNotMatch(app,/id="text-size"/);
+assert.doesNotMatch(css,/--text-size-scale/);
+assert.match(css,/var\(--ts,1\)/);
+assert.match(app,/C\.rangePrecision/);
 assert.match(html,/subscription-studio\.js\?v=/);
 console.log('Security audit guards: auth, sessions, CSRF, CSP, static routing, HTML escaping, portal locale, text precision: OK');
