@@ -623,7 +623,7 @@ async fn patch_settings(
                 | "subscriptionLogoUrl" | "subscriptionSupportUrl" | "subscriptionShowStatus"
                 | "subscriptionShowApps" | "subscriptionShowQr" | "subscriptionShowCopy"
                 | "subscriptionShowSupport" | "subscriptionShowDevices"
-                | "subscriptionClients" | "subscriptionClientLinks"
+                | "subscriptionJson" | "subscriptionClients" | "subscriptionClientLinks"
                 | "subscriptionAppsTitle" | "subscriptionAppsTitleEn" | "subscriptionCustomClients") {
             return Err(ApiError::new(StatusCode::BAD_REQUEST, format!("Неизвестное поле настроек: {key}")));
         }
