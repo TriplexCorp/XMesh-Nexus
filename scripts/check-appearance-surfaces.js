@@ -203,13 +203,13 @@ for(const key of ['ts','radius','gap-scale']){
   key+' must not trigger full theme serialization on drag');
 }
 const fineAdjust=app.slice(app.indexOf('let appearanceControlsFrame=0;'),app.indexOf('const brand=()=>'));
-const pending=new Map(),cssValues=new Map();let id=0,saveCount=0;
-const appearance=new Function('C','document','requestAnimationFrame','cancelAnimationFrame','cl','apply',
+const pending=new Map(),cssValues=new Map();let id=0,saveCount=0,themeSyncCount=0;
+const appearance=new Function('C','document','requestAnimationFrame','cancelAnimationFrame','cl','apply','syncSubscriptionTheme',
  fineAdjust+'return {previewAppearanceControls,saveAppearanceControls};')(
  {ts:1.2,radius:16,gapScale:1,density:'comfortable'},
  {documentElement:{style:{setProperty:(key,value)=>cssValues.set(key,value)}}},
  fn=>{const frame=++id;pending.set(frame,fn);return frame},frame=>pending.delete(frame),
- (v,min,max)=>Math.max(min,Math.min(max,v)),()=>{saveCount++});
+ (v,min,max)=>Math.max(min,Math.min(max,v)),()=>{saveCount++},()=>{themeSyncCount++});
 for(let n=0;n<60;n++)appearance.previewAppearanceControls();
 assert.equal(pending.size,1,'Input bursts must coalesce into one layout preview');
 assert.equal(saveCount,0,'No full apply during dragging');
@@ -218,6 +218,7 @@ assert.equal(cssValues.get('--ui-radius'),'16px');
 assert.equal(cssValues.get('--ts'),1.2);
 appearance.saveAppearanceControls();
 assert.equal(saveCount,1,'Final appearance state must save once');
+assert.equal(themeSyncCount,1,'Final appearance change must also sync the linked subscription theme');
 
 /* The user sees steps in pixels or percentages; fractional multipliers must
    advance by 0.01 for one percentage point, not by a whole multiplier. */
