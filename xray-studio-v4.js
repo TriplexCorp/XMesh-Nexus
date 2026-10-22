@@ -32,7 +32,7 @@ function migrateInboundProtocol(inbound,next){
 const defaultDoc=()=>({log:{loglevel:'warning'},inbounds:[{tag:'vless-main',listen:'127.0.0.1',port:443,protocol:'vless',settings:{users:[],decryption:'none'},streamSettings:{network:'xhttp',security:'none',xhttpSettings:{path:'/xhttp',mode:'auto'}}}],outbounds:[{tag:'direct',protocol:'freedom'}],routing:{domainStrategy:'AsIs',rules:[]}});
 function view(){return [
 '<section id="xm-studio-v4" class="sv-studio">',
-'<header class="sv-title"><p class="sv-subtitle">JSON-редактор и инструменты Xray. Новые inbound без TLS/REALITY создаются на 127.0.0.1 — откройте внешний доступ только после настройки защиты.</p></header>',
+'<header class="sv-title"><p class="sv-subtitle">Серверные конфигурации Xray. Редактируйте JSON, используйте инструменты и проверяйте результат перед сохранением.</p></header>',
 
 
 '<div class="sv-topbar"><nav class="sv-page-tabs" aria-label="Рабочие разделы XRAY STUDIO">',
