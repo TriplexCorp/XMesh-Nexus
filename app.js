@@ -2202,7 +2202,7 @@ document.addEventListener('click',async e=>{
       '<label class="f"><span>1. Установите агент на Linux-узле (root)</span><textarea id="metrics-install-command" rows="3" spellcheck="false" readonly>'+esc(command)+'</textarea><small>В конце установки агент покажет публичный ключ. Не передавайте приватный ключ в панель.</small></label>'+
       '<div class="act"><button type="button" class="gh" data-copy-metrics-install>'+ic('copy')+'Скопировать команду</button></div>'+
       '<label class="f"><span>2. Публичный Ed25519-ключ узла (64 hex-символа)</span><input id="metrics-public-key" autocomplete="off" spellcheck="false" maxlength="64" placeholder="Вставьте публичный ключ, показанный в терминале"></label>'+
-      '<p class="note">При регистрации ключа прежний Bearer-токен этого узла немедленно отзывается. Если уже установлен агент со старым токеном, сначала настройте новый агент.</p>'+
+      '<p class="note">После регистрации Ed25519-ключа узел сможет отправлять метрики. Без зарегистрированного публичного ключа запросы отклоняются.</p>'+
       '<div class="act"><button type="button" class="gh" data-node-key-revoke="'+id+'">'+ic('shield-off')+'Отозвать доступ узла</button>'+
       '<button type="button" class="btn" data-node-key-enroll="'+id+'">'+ic('shield-check')+'Активировать защищённый агент</button></div></div>';
     modal(html,'wide');
@@ -2210,11 +2210,11 @@ document.addEventListener('click',async e=>{
   else if(b=g('[data-node-key-enroll]')){
     const id=Number(b.dataset.nodeKeyEnroll),input=$('#metrics-public-key'),publicKey=(input?.value||'').trim();
     if(!/^[0-9a-f]{64}$/.test(publicKey)){toast('Требуется публичный Ed25519-ключ из 64 строчных hex-символов.');input?.focus();return}
-    if(!confirm('Активировать Ed25519 для узла '+id+'? Старый Bearer-токен будет отозван немедленно.'))return;
+    if(!confirm('Активировать Ed25519 для узла '+id+'? Если ключ уже существует, предыдущий ключ перестанет работать.'))return;
     b.disabled=true;
     try{
       await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/metrics-key',{method:'POST',body:JSON.stringify({publicKey})});
-      toast('Ed25519 активирован. Bearer-токен отозван.');$('#metrics-public-key').value='';
+      toast('Ed25519 активирован. Подписанные запросы разрешены.');$('#metrics-public-key').value='';
     }catch(error){toast('Не удалось зарегистрировать ключ: '+(error.message||'ошибка API'))}
     finally{b.disabled=false}
   }
