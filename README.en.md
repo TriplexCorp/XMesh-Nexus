@@ -47,7 +47,7 @@ expire, but roles are read from PostgreSQL on every request.
 
 Server authorization:
 - **Owner** — all panel CRUD, admin account creation/update/deletion, branding,
-  settings, Xray-core installation and node metrics-token issuance.
+  settings, Xray-core installation and Ed25519 node enrollment.
 - **Admin** — operational collection CRUD, VLESS Encryption generation and
   authorized IP rotation tests. Cannot change global settings, manage
   authentication accounts, or issue node credentials.
@@ -220,7 +220,7 @@ sudo rm -rf /var/lib/xmesh-node-metrics
 sudo systemctl daemon-reload
 ~~~
 
-The ingest endpoint rejects invalid or revoked node tokens and validates metric bounds. It accepts no browser cookies and only bypasses the panel's same-origin check for a bearer-authenticated request without an Origin header. Treat the bearer token as a secret; rotate it if the node is compromised.
+The ingest endpoint requires a registered Ed25519 public key and validates each signature, nonce, timestamp and body digest. Bearer credentials are not accepted.
 
 ## Xray-core version management
 
@@ -237,8 +237,8 @@ The selector lists recent GitHub releases; pinning is limited to the latest 30 e
 - /api/v1/collections/{collection} — authenticated record CRUD.
 - GET /api/v1/core, GET /api/v1/core/releases, POST /api/v1/core/update — core version management (authenticated).
 - GET /api/v1/metrics/traffic?range=1h|24h&node_id=ID&squad_id=ID — authenticated RX/TX history aggregated from `server_metric_samples` (1-minute buckets for 1h; 15-minute buckets for 24h). `node_id` in the hypertable must be the text form of the panel node record ID. Squad filtering selects nodes whose assigned profile shares at least one inbound tag with the squad.
-- POST /api/v1/nodes/{id}/metrics-token — authenticated token issue/rotation for a node (plaintext returned once).
-- POST /api/v1/metrics/ingest — node-agent bearer authentication; persists a validated sample to TimescaleDB.
+- POST /api/v1/nodes/{id}/metrics-key — Ed25519 public key enrollment/rotation (owner).
+- POST /api/v1/metrics/ingest — Ed25519-signed authentication; persists a validated sample to TimescaleDB.
 
 ## Frontend and design
 
