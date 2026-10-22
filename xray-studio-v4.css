@@ -215,3 +215,33 @@
 .sv-studio .sv-advanced[open] summary::before{transform:rotate(90deg)}
 .sv-studio .sv-advanced textarea{width:100%;min-height:8rem;resize:vertical;border:1px solid var(--vline);border-radius:var(--vround);background:var(--vfield);color:var(--vtext);padding:.7rem;font:500 .78rem/1.55 ui-monospace,SFMono-Regular,Consolas,monospace;tab-size:2}
 .sv-studio .sv-advanced .sv-field{margin:.8rem 0}
+
+
+/* Density pass: scale-aware compact controls, without shrinking user typography. */
+.sv-studio .sv-constructor>header{padding:.7rem .85rem .35rem}
+.sv-studio .sv-constructor>header h3{margin:0 0 .12rem}
+.sv-studio .sv-constructor>header p{margin:0}
+.sv-studio .sv-constructor nav.sv-tabs{padding:0 .65rem;gap:.12rem}
+.sv-studio .sv-constructor nav.sv-tabs>button{min-height:2.25rem;padding:.4rem .65rem}
+.sv-studio .sv-formbody{padding:.65rem .8rem}
+.sv-studio .sv-formbody h4{margin:.35rem 0 .55rem;font-size:.85rem}
+.sv-studio .sv-formbody .sv-sectionhead{margin-bottom:.6rem;padding-bottom:.4rem}
+.sv-studio .sv-formbody .sv-field{margin-bottom:.55rem;gap:.22rem}
+.sv-studio .sv-formbody .sv-field input,.sv-studio .sv-formbody .sv-field select{min-height:2.12rem;padding:.38rem .65rem}
+.sv-studio .sv-formbody .sv-two{gap:.35rem .65rem}
+.sv-studio .sv-formbody .sv-inbound-summary{padding:.48rem .7rem}
+.sv-studio .sv-inbound-summary~.sv-two,.sv-studio .sv-inbound-summary~[data-when],.sv-studio .sv-inbound-summary~.sv-note{padding-inline:.7rem}
+.sv-studio .sv-formbody [data-when]>h4{margin:.5rem 0 .4rem}
+.sv-studio .sv-formbody .sv-note{padding:.5rem .65rem;margin:.55rem 0}
+.sv-studio .sv-outbound-preview{margin-top:.65rem;padding:.55rem .65rem}
+.sv-studio .sv-outbound-preview .sv-sectionhead{margin-bottom:.35rem}
+.sv-studio .sv-outbound-row{min-height:2.25rem;padding:.4rem .65rem}
+.sv-studio .sv-advanced{margin:.5rem 0 0;padding-top:.45rem}
+.sv-studio .sv-advanced summary{padding:.25rem 0}
+.sv-studio .sv-tools{padding:.7rem;gap:.55rem}
+.sv-studio .sv-legacy .xm-tools-grid{gap:.3rem}
+.sv-studio .sv-legacy .xm-tools-grid .sv-toolitem{min-height:2.95rem;padding:.4rem .55rem;gap:.5rem}
+.sv-studio .sv-toolicon{flex-basis:2rem;height:2rem}
+.sv-studio .sv-template{padding:.6rem;margin-top:auto}
+.sv-studio .sv-codebar{min-height:2.65rem}
+.sv-studio .sv-codestatus{min-height:2rem;padding:.35rem .55rem}
