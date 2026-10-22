@@ -232,7 +232,19 @@ function validate(d){if(!Array.isArray(d.inbounds)||!d.inbounds.length)throw Err
  if((x.protocol==='vmess'||x.protocol==='trojan')&&!Array.isArray(x.settings?.users))throw Error(x.protocol.toUpperCase()+' inbound требует settings.users (массив).');
  if(x.protocol==='hysteria'&&(x.settings?.version!==2||x.streamSettings?.network!=='hysteria'))throw Error('Hysteria2 требует settings.version=2 и transport hysteria.');
  if(x.protocol==='shadowsocks'&&(!x.settings?.method||!x.settings?.password))throw Error('Shadowsocks: необходимо указать method и password в серверном JSON.');
-if(!x.tag||tags.has(x.tag))throw Error('Пустой или повторяющийся tag inbound');tags.add(x.tag);if(!Number.isInteger(x.port)||x.port<1||x.port>65535)throw Error('Некорректный порт '+x.tag);if(x.streamSettings?.security==='reality'){const r=x.streamSettings.realitySettings||{};if(!r.privateKey||!(r.target||r.dest)||!r.serverNames?.length)throw Error('Reality: укажите ключ, target и SNI')}}}
+if(!x.tag||tags.has(x.tag))throw Error('Пустой или повторяющийся tag inbound');tags.add(x.tag);if(!Number.isInteger(x.port)||x.port<1||x.port>65535)throw Error('Некорректный порт '+x.tag);if(x.streamSettings?.security==='reality'){
+ const r=x.streamSettings.realitySettings||{};
+ if(!['raw','xhttp','grpc'].includes(x.streamSettings.network||'raw'))throw Error('REALITY допускает только RAW, XHTTP и gRPC для '+x.tag);
+ if(!r.privateKey||!(r.target||r.dest)||!Array.isArray(r.serverNames)||!r.serverNames.length)throw Error('Reality: укажите privateKey, target и SNI для '+x.tag);
+ if(!Array.isArray(r.shortIds)||!r.shortIds.length)throw Error('Reality: добавьте хотя бы один Short ID для '+x.tag);
+ const ids=new Set();
+ for(const value of r.shortIds){
+  if(typeof value!=='string'||!/^(?:[0-9a-fA-F]{2}){0,8}$/.test(value))throw Error('Reality '+x.tag+': неверный Short ID '+JSON.stringify(value)+'. Нажмите Short ID, чтобы исправить.');
+  if(ids.has(value.toLowerCase()))throw Error('Reality '+x.tag+': повторяющийся Short ID '+JSON.stringify(value));
+  ids.add(value.toLowerCase());
+ }
+ }
+}}
 function showPopup(title,kind){
  const body=get('overlayBody');body.replaceChildren();get('overlayTitle').textContent=title;
  if(kind==='profiles'){
