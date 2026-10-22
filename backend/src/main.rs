@@ -269,6 +269,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/core", get(get_core_status))
         .route("/core/releases", get(get_core_releases))
         .route("/core/update", post(update_core))
+        .route("/panel/update", post(request_panel_update).get(get_panel_update_status))
         .route("/core/vlessenc", post(generate_vless_encryption))
         .route_layer(middleware::from_fn_with_state(state.clone(), auth::require_session));
 
@@ -1213,6 +1214,55 @@ async fn update_core(
         "status": "updating",
         "message": "Обновление Xray-core запущено."
     }))))
+}
+
+/// Only an authenticated owner may request an upgrade. The application never
+/// executes shell commands or receives the Docker socket: a root-owned systemd
+/// worker watches one fixed-value request file and performs a DB backup first.
+async fn request_panel_update(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+) -> Result<(StatusCode, Json<Value>), ApiError> {
+    require_owner(&actor)?;
+    let request_file=env::var("PANEL_UPDATE_REQUEST").map_err(|_|ApiError::new(
+        StatusCode::SERVICE_UNAVAILABLE,"Web-обновления недоступны: настройте host systemd worker через install.sh."
+    ))?;
+    let status_file=env::var("PANEL_UPDATE_STATUS").map_err(|_|ApiError::new(
+        StatusCode::SERVICE_UNAVAILABLE,"Web-обновления недоступны: нет файла состояния."
+    ))?;
+    let status=tokio::fs::read_to_string(&status_file).await.map_err(|_|ApiError::new(
+        StatusCode::SERVICE_UNAVAILABLE,"Хостовый updater не инициализирован."
+    ))?;
+    if status.trim()=="running" {
+        return Err(ApiError::new(StatusCode::CONFLICT,"Обновление уже выполняется."));
+    }
+    tokio::fs::write(&request_file,b"update\n").await.map_err(|error|{
+        tracing::error!(%error,"Panel update request could not be written");
+        ApiError::new(StatusCode::SERVICE_UNAVAILABLE,"Не удалось передать запрос хостовому updater.")
+    })?;
+    audit(&state.pool,&actor.username,"panel.update_requested",None,None,json!({"source":"owner_web"})).await;
+    Ok((StatusCode::ACCEPTED,Json(json!({
+        "status":"queued",
+        "message":"Запрос передан в системный updater. БД будет скопирована до обновления."
+    }))))
+}
+
+async fn get_panel_update_status(
+    Extension(actor): Extension<auth::AuthUser>,
+) -> Result<Json<Value>, ApiError> {
+    require_owner(&actor)?;
+    let state=match env::var("PANEL_UPDATE_STATUS") {
+        Ok(path)=>tokio::fs::read_to_string(path).await.unwrap_or_else(|_|"unavailable".into()),
+        Err(_)=>"unavailable".into(),
+    };
+    let status=match state.trim() {
+        "running"=>"running",
+        "success"=>"success",
+        "failed"=>"failed",
+        "idle"=>"idle",
+        _=>"unavailable",
+    };
+    Ok(Json(json!({"status":status})))
 }
 
 async fn read_settings(pool: &PgPool) -> Result<Value, ApiError> {
