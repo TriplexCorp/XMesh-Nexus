@@ -151,6 +151,8 @@ jobs:
           done
           docker compose logs --tail=120 panel
           exit 1
+      - name: Exercise signed node identity, tamper resistance, replay and bearer downgrade
+        run: python3 scripts/test-node-auth-integration.py
       - name: Exercise real RBAC, MFA and revocation API
         run: python3 scripts/test-auth-integration.py
       - name: Container diagnostics on failure
