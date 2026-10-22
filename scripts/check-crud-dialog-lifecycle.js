@@ -30,7 +30,7 @@ assert.match(renewal,/dlg\.close\(\)/, 'bulk renewal closes after completion');
 assert.match(renewal,/catch\(error\)/, 'bulk renewal reports server errors');
 
 const rendererStart=app.indexOf('const flagView=');
-const rendererEnd=app.indexOf('\n',rendererStart);
+const rendererEnd=app.indexOf('\n};',rendererStart)+3;
 assert(rendererStart!==-1 && rendererEnd>rendererStart, 'Missing local SVG flag renderer');
 const flagView=new Function('COUNTRIES','esc',app.slice(rendererStart,rendererEnd)+'\nreturn flagView;')(
   [{code:'KP',name:'Северная Корея',flag:'🇰🇵'},{code:'DE',name:'Германия',flag:'🇩🇪'}],
