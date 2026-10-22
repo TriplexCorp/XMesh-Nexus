@@ -1,6 +1,7 @@
 /* XRAY STUDIO v4 — integrated JSON, constructor and Tools. UI uses the active theme tokens. */
 .sv-studio{--sv-bg:var(--bg);--sv-panel:var(--s1);--sv-input:var(--s2);--sv-stroke:var(--ln);--sv-text:var(--tx);--sv-muted:var(--mu);--sv-accent:var(--a);color:var(--sv-text);font-size:13px;min-width:0;width:100%;display:flex;flex-direction:column;gap:10px;box-sizing:border-box}
 .sv-studio *, .sv-studio *::before,.sv-studio *::after{box-sizing:border-box}
+.sv-studio [hidden]{display:none!important}
 .sv-studio button,.sv-studio input,.sv-studio select{font:inherit}
 .sv-studio button{cursor:pointer}
 .sv-studio [hidden]{display:none!important}
