@@ -12,7 +12,40 @@ const snapshot=()=>{if(area.value!==last){undo.push(last);if(undo.length>80)undo
 const update=()=>{const undoButton=host.querySelector('[data-tool="undo"]'),redoButton=host.querySelector('[data-tool="redo"]');if(undoButton)undoButton.disabled=undo.length===0;if(redoButton)redoButton.disabled=redo.length===0};
 const commit=(value,msg)=>{snapshot();const from=area.value;if(value===from)return;undo.push(from);if(undo.length>80)undo.shift();redo=[];area.value=value;last=value;area.dispatchEvent(new Event('input',{bubbles:true}));area.focus();update();notify(msg||'JSON обновлён')};
 const parse=()=>{try{const x=JSON.parse(area.value);if(!x||typeof x!=='object'||Array.isArray(x))throw Error('Корень должен быть объектом');return x}catch(e){throw Error('Исправьте синтаксис JSON перед применением: '+e.message)}};
-const getInbound=(data)=>{if(!Array.isArray(data.inbounds)||!data.inbounds.length)throw Error('В конфигурации нет inbound');if(data.inbounds.length===1)return data.inbounds[0];const tags=data.inbounds.map((x,i)=>i+': '+(x.tag||'(без тега)'));const answer=prompt('Выберите inbound по индексу:\n'+tags.join('\n'),'0');if(answer===null)return null;const i=Number(answer);if(!Number.isInteger(i)||i<0||i>=data.inbounds.length)throw Error('Неверный индекс inbound');return data.inbounds[i]};
+const dialog=window.XMeshStudioDialogs;
+const ensureDialogs=()=>{if(!dialog?.request||!dialog?.confirm)throw Error('Диалоговый модуль XRAY STUDIO не загрузился. Обновите страницу без кеша.')};
+const getInbound=(data,index=0)=>{
+ if(!Array.isArray(data.inbounds)||!data.inbounds.length)throw Error('В конфигурации нет inbound');
+ const item=data.inbounds[index];if(!item)throw Error('Выбранный inbound отсутствует');return item;
+};
+async function chooseInbound(){
+ ensureDialogs();
+ const source=area.value,data=parse();
+ if(!Array.isArray(data.inbounds)||!data.inbounds.length)throw Error('В конфигурации нет inbound');
+ if(data.inbounds.length===1)return {index:0,source,tag:data.inbounds[0].tag};
+ const result=await dialog.request({
+  title:'Выберите inbound',
+  description:'Укажите соединение, к которому нужно применить инструмент. Другие inbound не изменятся.',
+  confirmLabel:'Продолжить',
+  fields:[{name:'index',label:'Входящее соединение',type:'select',wide:true,value:'0',
+   options:data.inbounds.map((x,i)=>({value:String(i),label:(x.tag||'Inbound '+(i+1))+' · '+String(x.protocol||'unknown').toUpperCase()+' · порт '+(x.port||'—')}))}]
+ });
+ if(!result)return null;
+ const index=Number(result.index);
+ if(!Number.isInteger(index)||index<0||index>=data.inbounds.length)throw Error('Некорректный inbound');
+ return {index,source,tag:data.inbounds[index].tag};
+}
+async function mutateInbound(fn,label){
+ try{
+  const selected=await chooseInbound();if(!selected)return false;
+  if(area.value!==selected.source){notify('JSON изменился во время выбора inbound. Повторите действие.');return false}
+  return mutate(d=>{
+   const ib=getInbound(d,selected.index);
+   if(ib.tag!==selected.tag)throw Error('Выбранный inbound изменился');
+   return fn(ib,d);
+  },label);
+ }catch(e){status('Ошибка: '+e.message);notify(e.message);return false}
+}
 const mutate=(fn,label)=>{try{const data=parse(),before=JSON.stringify(data),changed=fn(data);if(changed===false)return false;const after=JSON.stringify(data);if(after===before){status('Без изменений');notify('Изменений нет');return false}commit(JSON.stringify(data,null,2),label);status(label);return true}catch(e){status('Ошибка: '+e.message);notify(e.message);return false}};
 const freshUUID=()=>{if(crypto.randomUUID)return crypto.randomUUID();const a=new Uint8Array(16);crypto.getRandomValues(a);a[6]=a[6]&15|64;a[8]=a[8]&63|128;const h=Array.from(a,b=>b.toString(16).padStart(2,'0')).join('');return [h.slice(0,8),h.slice(8,12),h.slice(12,16),h.slice(16,20),h.slice(20)].join('-')};
 const hex=(n)=>{const a=new Uint8Array(n);crypto.getRandomValues(a);return Array.from(a,b=>b.toString(16).padStart(2,'0')).join('')};
@@ -61,11 +94,7 @@ const repairIds=(list,append)=>{
    if(!shortIdValid(value)||used.has(normalized))bad.add(i);
    else used.add(normalized);
  }
- if(bad.size){
-   const first=list[[...bad][0]];
-   if(!confirm('В REALITY обнаружено '+bad.size+' некорректных или повторяющихся Short ID (например, '+JSON.stringify(first)+'). Исправить только эти значения случайными HEX ID? Клиентам со старыми ID понадобится обновление.'))return null;
-   return list.map((x,i)=>bad.has(i)?newShortId(used):x);
- }
+ if(bad.size)return list.map((x,i)=>bad.has(i)?newShortId(used):x);
  if(append||!list.length)return [...list,newShortId(used)];
  return [...list];
 };
