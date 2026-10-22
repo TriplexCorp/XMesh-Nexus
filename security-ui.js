@@ -1,6 +1,19 @@
 (()=>{
 'use strict';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const announce=(message,kind='success')=>{
+ let box=document.getElementById('xmesh-action-feedback');
+ if(!box){
+  box=document.createElement('div');box.id='xmesh-action-feedback';
+  box.setAttribute('role','status');box.setAttribute('aria-live','polite');
+  document.body.appendChild(box);
+ }
+ box.className='xmesh-action-feedback '+(kind==='error'?'is-error':'is-success');
+ box.textContent=message;box.classList.add('visible');
+ if(announce.timer)clearTimeout(announce.timer);
+ announce.timer=setTimeout(()=>box.classList.remove('visible'),4200);
+};
+window.XMeshFeedback=announce;
 const defaults={sessionHours:1,idleMinutes:15,maxSessions:1,loginAttempts:3,lockoutMinutes:15,dashboardPath:''};
 const request=async(path,options={})=>{
  const r=await fetch('/api/v1/security/'+path,{credentials:'same-origin',cache:'no-store',...options,headers:{...(options.body?{'Content-Type':'application/json'}:{}),...(options.headers||{})}});
@@ -13,7 +26,7 @@ const panel=()=>'<section class="card" id="security-advanced"><div class="hd"><d
 async function mount(root){
  const host=root.querySelector('#security-advanced');if(!host)return;
  const body=host.querySelector('#security-advanced-body'),error=host.querySelector('#security-advanced-error');
- const fail=e=>error.textContent=e?.message||String(e);
+ const fail=e=>{error.textContent=e?.message||String(e);announce(error.textContent,'error')};
  const load=async()=>{
   const [res,sessionRes]=await Promise.all([request('policy'),request('sessions')]);
   const p={...defaults,...res.policy},readonly=!res.canEdit;
@@ -41,21 +54,22 @@ async function mount(root){
     const value=host.querySelector('[name="dashboardPath"]')?.value.trim();
     if(!value)return;
     await navigator.clipboard.writeText(location.origin+value);
-    error.textContent='Ссылка на дашборд скопирована.';
+    error.textContent='';announce('Ссылка на панель скопирована.');
    }
    else if(btn.matches('[data-security-retry]')){error.textContent='';await load()}
    else if(btn.matches('[data-security-reset]')){
     const form=host.querySelector('#security-policy-form');if(!form)return;
     for(const [key,value] of Object.entries(defaults))if(key!=='dashboardPath'&&form.elements.namedItem(key))form.elements.namedItem(key).value=value;
+    announce('Значения по умолчанию подставлены. Нажмите «Сохранить политику» для применения.');
    }else if(btn.matches('[data-security-revoke-others]')){
     if(!confirm('Завершить все остальные сессии вашей учётной записи?'))return;
-    await request('sessions/others',{method:'POST'});await load();
+    await request('sessions/others',{method:'POST'});await load();announce('Остальные сессии завершены.');
    }else if(btn.matches('[data-security-revoke]')){
     if(!confirm('Завершить выбранную сессию?'))return;
     const id=btn.dataset.securityRevoke;
     const out=await request('sessions/'+encodeURIComponent(id),{method:'DELETE'});
     if(out.current){location.replace(location.pathname);return}
-    await load();
+    await load();announce('Сессия отозвана.');
    }
   }catch(ex){fail(ex)}
  });
@@ -66,7 +80,15 @@ async function mount(root){
   for(const key of Object.keys(defaults)){const el=form.elements.namedItem(key);patch[key]=key==='dashboardPath'?el.value.trim():Number(el.value)}
   if(!form.reportValidity())return;
   const btn=form.querySelector('[type=submit]');if(btn)btn.disabled=true;
-  try{await request('policy',{method:'PATCH',body:JSON.stringify(patch)});if(location.pathname!==patch.dashboardPath){location.replace(patch.dashboardPath);return}await load()}catch(ex){fail(ex);if(btn?.isConnected)btn.disabled=false}
+  try{
+   await request('policy',{method:'PATCH',body:JSON.stringify(patch)});
+   announce('Настройки безопасности успешно сохранены.');
+   if(location.pathname!==patch.dashboardPath){
+    announce('Настройки сохранены. Открываем новый адрес панели.');
+    location.replace(patch.dashboardPath);return;
+   }
+   await load();
+  }catch(ex){fail(ex)}finally{if(btn?.isConnected)btn.disabled=false}
  });
 }
 window.XMeshSecurity={panel,mount};
