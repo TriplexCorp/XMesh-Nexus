@@ -1,7 +1,7 @@
 (()=>{
 'use strict';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const defaults={sessionHours:12,idleMinutes:0,maxSessions:5,loginAttempts:8,lockoutMinutes:15,dashboardPath:'/dashboard/nexus'};
+const defaults={sessionHours:12,idleMinutes:0,maxSessions:5,loginAttempts:8,lockoutMinutes:15,dashboardPath:''};
 const request=async(path,options={})=>{
  const r=await fetch('/api/v1/security/'+path,{credentials:'same-origin',cache:'no-store',...options,headers:{...(options.body?{'Content-Type':'application/json'}:{}),...(options.headers||{})}});
  const j=await r.json().catch(()=>({}));
@@ -46,7 +46,7 @@ async function mount(root){
    else if(btn.matches('[data-security-retry]')){error.textContent='';await load()}
    else if(btn.matches('[data-security-reset]')){
     const form=host.querySelector('#security-policy-form');if(!form)return;
-    for(const [key,value] of Object.entries(defaults))if(form.elements.namedItem(key))form.elements.namedItem(key).value=value;
+    for(const [key,value] of Object.entries(defaults))if(key!=='dashboardPath'&&form.elements.namedItem(key))form.elements.namedItem(key).value=value;
    }else if(btn.matches('[data-security-revoke-others]')){
     if(!confirm('Завершить все остальные сессии вашей учётной записи?'))return;
     await request('sessions/others',{method:'POST'});await load();
