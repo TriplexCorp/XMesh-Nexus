@@ -78,7 +78,7 @@ fn vless_link(user:&Value, inbound:&Value, host:&Value)->Option<String>{
  let client_encryption=nonempty(host,"clientEncryption")
   .or_else(||nonempty(host,"externalClientEncryption"))
   .or_else(||nonempty(user,"vlessEncryption"))
-  .or_else(||inbound.get("silentium").and_then(|v|nonempty(v,"clientEncryption")))
+  .or_else(||inbound.get("xmesh").and_then(|v|nonempty(v,"clientEncryption")))
   .unwrap_or("none");
  let server_decryption=inbound.get("settings").and_then(|v|nonempty(v,"decryption")).unwrap_or("none");
  if server_decryption!="none"&&client_encryption=="none"{return None}
@@ -136,7 +136,7 @@ fn vless_outbound(user:&Value,inbound:&Value,host:&Value)->Option<Value>{
  let client_encryption=nonempty(host,"clientEncryption")
   .or_else(||nonempty(host,"externalClientEncryption"))
   .or_else(||nonempty(user,"vlessEncryption"))
-  .or_else(||inbound.get("silentium").and_then(|v|nonempty(v,"clientEncryption")))
+  .or_else(||inbound.get("xmesh").and_then(|v|nonempty(v,"clientEncryption")))
   .unwrap_or("none");
  if server_decryption!="none" && client_encryption=="none"{return None}
  let mut client=json!({"id":uuid,"encryption":client_encryption});
