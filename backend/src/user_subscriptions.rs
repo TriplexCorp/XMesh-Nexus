@@ -115,7 +115,8 @@ pub async fn create(State(state):State<AppState>,Extension(actor):Extension<Auth
  crate::require_mutation(&actor)?;
  if id<=0{return Err(bad("Invalid user ID"))}
  let _user=record(&state,id).await?;
- let token=format!("{}{}",Uuid::new_v4().simple(),Uuid::new_v4().simple());
+ let mut secret=[0u8;32];OsRng.fill_bytes(&mut secret);
+ let token=hex::encode(secret);
  let encrypted=encrypt_token(&state,id,&token)?;
  sqlx::query("INSERT INTO user_subscription_tokens(user_id,token_hash,token_ciphertext) VALUES($1,$2,$3)
   ON CONFLICT(user_id) DO UPDATE SET token_hash=EXCLUDED.token_hash,
