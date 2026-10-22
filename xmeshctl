@@ -225,6 +225,12 @@ update_panel() {
     fail "Не удалось проверить ключ 2FA; обновление остановлено до пересборки."
     return 1
   fi
+  # Upgrade existing installations with new installer-managed environment settings.
+  # install.sh preserves existing credentials and the MFA encryption key.
+  if ! bash "$ROOT/install.sh" --prepare-only; then
+    fail "Не удалось подготовить конфигурацию установки."
+    return 1
+  fi
   compose config --quiet
 
   say "Сборка и запуск обновлённой панели"
