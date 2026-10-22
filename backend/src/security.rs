@@ -1,7 +1,7 @@
 //! Account security policy persisted in PostgreSQL.
 //! This is an owner-managed configuration, not browser-only UI state.
 //! Dashboard path is an additional entrypoint; it is NOT an authorization boundary.
-use crate::{admin_accounts, auth::AuthUser, ApiError, AppState};
+use crate::{admin_accounts, auth::{self, AuthUser}, ApiError, AppState};
 use axum::{
     extract::{Extension, Path, State},
     http::{HeaderMap, StatusCode},
