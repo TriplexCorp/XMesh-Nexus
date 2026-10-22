@@ -5,7 +5,7 @@ const escapeHtml=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 const $=(r,k)=>r.querySelector('[data-v="'+k+'"]');
 const field=(k,title,type='text')=>'<label class="sv-field"><span>'+title+'</span><input data-field="'+k+'" type="'+type+'" autocomplete="off"></label>';
 const select=(k,title,values)=>'<label class="sv-field"><span>'+title+'</span><select data-field="'+k+'">'+values.map(a=>'<option value="'+a[0]+'">'+a[1]+'</option>').join('')+'</select></label>';
-const defaultDoc=()=>({log:{loglevel:'warning'},inbounds:[{tag:'vless-main',listen:'0.0.0.0',port:443,protocol:'vless',settings:{clients:[],decryption:'none'},streamSettings:{network:'xhttp',security:'none',xhttpSettings:{path:'/xhttp',mode:'auto'}}}],outbounds:[{tag:'direct',protocol:'freedom'}],routing:{domainStrategy:'AsIs',rules:[]}});
+const defaultDoc=()=>({log:{loglevel:'warning'},inbounds:[{tag:'vless-main',listen:'0.0.0.0',port:443,protocol:'vless',settings:{users:[],decryption:'none'},streamSettings:{network:'xhttp',security:'none',xhttpSettings:{path:'/xhttp',mode:'auto'}}}],outbounds:[{tag:'direct',protocol:'freedom'}],routing:{domainStrategy:'AsIs',rules:[]}});
 function view(){return [
 '<section id="xm-studio-v4" class="sv-studio">',
 '<header class="sv-title"><p class="sv-subtitle">Редактируйте конфигурации Xray в реальном времени. JSON и конструктор синхронизированы.</p></header>',
@@ -154,7 +154,7 @@ async function action(a){
  case 'reset':if(confirm('Сбросить несохранённые изменения?')){input.value=saved||pretty(defaultDoc());paint();input.dispatchEvent(new Event('xmesh:reset-history'))}return;
  case 'undo':root.querySelector('[data-tool="undo"]')?.click();return;
  case 'redo':root.querySelector('[data-tool="redo"]')?.click();return;
- case 'add-inbound':mutate(d=>{d.inbounds??=[];let i=1;while(d.inbounds.some(x=>x.tag==='inbound-'+i))i++;d.inbounds.push({tag:'inbound-'+i,listen:'0.0.0.0',port:443,protocol:'vless',settings:{clients:[],decryption:'none'},streamSettings:{network:'raw',security:'none'}});inboundIndex=d.inbounds.length-1});return;
+ case 'add-inbound':mutate(d=>{d.inbounds??=[];let i=1;while(d.inbounds.some(x=>x.tag==='inbound-'+i))i++;d.inbounds.push({tag:'inbound-'+i,listen:'0.0.0.0',port:443,protocol:'vless',settings:{users:[],decryption:'none'},streamSettings:{network:'raw',security:'none'}});inboundIndex=d.inbounds.length-1});return;
  case 'remove-inbound':if(confirm('Удалить выбранный inbound?'))mutate(d=>{d.inbounds.splice(inboundIndex,1);inboundIndex=Math.max(inboundIndex-1,0)});return;
  case 'add-outbound':mutate(d=>{d.outbounds??=[];let i=1;while(d.outbounds.some(x=>x.tag==='outbound-'+i))i++;d.outbounds.push({tag:'outbound-'+i,protocol:'freedom'});outIndex=d.outbounds.length-1});return;
  case 'remove-outbound':if(confirm('Удалить выбранный outbound?'))mutate(d=>{d.outbounds.splice(outIndex,1);outIndex=Math.max(outIndex-1,0)});return;
