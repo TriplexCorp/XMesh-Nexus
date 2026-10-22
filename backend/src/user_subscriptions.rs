@@ -3,7 +3,6 @@ use axum::{extract::{Extension,Path,State,Query,OriginalUri},http::{header,Statu
 use serde_json::{json,Value};
 use sha2::{Digest,Sha256};
 use sqlx::Row;
-use uuid::Uuid;
 use std::collections::HashMap;
 use aes_gcm::{aead::{Aead, KeyInit, Payload, OsRng, rand_core::RngCore}, Aes256Gcm, Nonce};
 
