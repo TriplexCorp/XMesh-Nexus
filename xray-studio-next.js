@@ -5,7 +5,7 @@ const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 const $=(root,id)=>root.querySelector('[data-xm="'+id+'"]');
 const inp=(id,title,value='',type='text',hint='')=>'<label class="xm-field"><span>'+title+'</span><input data-xm="'+id+'" type="'+type+'" value="'+esc(value)+'" autocomplete="off">'+(hint?'<small>'+hint+'</small>':'')+'</label>';
 const select=(id,title,choices)=>'<label class="xm-field"><span>'+title+'</span><select data-xm="'+id+'">'+choices.map(a=>'<option value="'+esc(a[0])+'">'+esc(a[1])+'</option>').join('')+'</select></label>';
-const uuid=()=>crypto.randomUUID();
+const uuid=()=>{if(globalThis.crypto?.randomUUID)return crypto.randomUUID();if(!globalThis.crypto?.getRandomValues)return '';const b=new Uint8Array(16);crypto.getRandomValues(b);b[6]=(b[6]&15)|64;b[8]=(b[8]&63)|128;const h=Array.from(b,x=>x.toString(16).padStart(2,'0')).join('');return h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20)};
 const hex=n=>{const a=new Uint8Array(n);crypto.getRandomValues(a);return Array.from(a,x=>x.toString(16).padStart(2,'0')).join('')};
 function view(){
 return '<section class="xm-studio" id="xm-studio">'+
