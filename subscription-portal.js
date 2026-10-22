@@ -5,6 +5,12 @@
   const input = document.getElementById('subscription-link');
   const button = document.getElementById('copy-link');
   const qrTarget = document.getElementById('subscription-qr');
+  document.querySelectorAll('[data-expiry]').forEach(el => {
+    const ms = Number(el.dataset.expiry);
+    if (Number.isFinite(ms) && ms > 0) {
+      el.textContent = new Intl.DateTimeFormat(document.documentElement.lang === 'en' ? 'en-GB' : 'ru-RU', {dateStyle:'medium'}).format(new Date(ms));
+    }
+  });
   if (!input) return;
   if (button) button.addEventListener('click', async () => {
     try {
