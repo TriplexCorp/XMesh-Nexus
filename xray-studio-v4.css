@@ -158,3 +158,11 @@
 @media(max-width:1500px){.sv-studio .sv-columns{grid-template-columns:minmax(390px,1.4fr) minmax(335px,1fr) minmax(208px,.65fr)!important}}
 @media(max-width:1200px){.sv-studio .sv-columns,.sv-studio.sv-hide-tools .sv-columns{grid-template-columns:minmax(0,1.2fr) minmax(300px,1fr)!important;height:auto!important}.sv-studio .sv-codepanel,.sv-studio .sv-constructor{height:650px!important}.sv-studio .sv-tools{height:auto!important;grid-column:1/-1}.sv-studio .sv-legacy .xm-tools-grid{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important}}
 @media(max-width:850px){.sv-studio .sv-columns,.sv-studio.sv-hide-tools .sv-columns{grid-template-columns:minmax(0,1fr)!important}.sv-studio .sv-tools{grid-column:1!important}.sv-studio .sv-codepanel{height:550px!important}.sv-studio .sv-constructor{height:520px!important}.sv-studio .sv-legacy .xm-tools-grid{grid-template-columns:minmax(0,1fr)!important}}
+
+
+/* Global application header already displays XRAY STUDIO. Do not duplicate it. */
+.sv-studio .sv-title>div:first-child>p,.sv-studio .sv-title>div:first-child>h2{display:none!important}
+.sv-studio .sv-title{min-height:51px!important;padding:4px 2px 10px!important}
+.sv-studio .sv-title small{font-size:12px!important}
+.sv-studio .sv-title .sv-actions{margin-left:auto}
+.sv-studio .sv-codebar .sv-dot{box-shadow:0 0 0 3px color-mix(in srgb,var(--ok,#42d7a0) 12%,transparent)}
