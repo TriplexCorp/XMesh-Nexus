@@ -56,6 +56,18 @@ for(const [ru,en] of [
  ['Название профиля','Profile name'],
  ['Криптографический генератор недоступен. Используйте HTTPS.','Cryptographic random generator unavailable. Use HTTPS.']
 ])assert.equal(api.translate(ru),en,'Missing English translation for '+ru);
+// Statistics dashboard must remain fully readable under EN, including the dynamic cards.
+for(const [ru,en] of [
+ ['Статистика инфраструктуры','Infrastructure statistics'],
+ ['Метрики контейнера панели, не всей физической машины.','Metrics of the panel container, not the entire physical machine.'],
+ ['Скорость сети','Network speed'],
+ ['Учетные записи панели','Panel accounts'],
+ ['Данные агента отсутствуют','Agent data unavailable'],
+ ['Данные устарели','Data is stale'],
+ ['TCP соединения','TCP connections']
+])assert.equal(api.translate(ru),en,'Statistics translation missing: '+ru);
+assert.match(app,/reporting fresh data/,'Live node counters must support English');
+assert.match(app,/Data updated/,'Refresh status must support English');
 api.apply(document);
 assert.equal(text.nodeValue,'Settings');
 assert.equal(raw.nodeValue,'CustomerServiceABC');
