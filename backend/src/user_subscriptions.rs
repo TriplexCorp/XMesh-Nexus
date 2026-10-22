@@ -343,11 +343,22 @@ pub async fn portal(
  let logo_markup=if logo.starts_with("https://"){format!("<img class=\"logo\" src=\"{}\" alt=\"\">",escape_html(logo))}else{String::new()};
  let lang_url=format!("?lang={}",if en{"ru"}else{"en"});
  let layout=studio_string(&settings,"subscriptionLayout","standard");
+ let card_style=studio_string(&settings,"subscriptionCardStyle","soft");
+ let card_css=match card_style {
+  "outline"=>"background:transparent;box-shadow:none;",
+  "flat"=>"box-shadow:none;border-color:transparent;",
+  _=>""
+ };
+ let font_css=match studio_string(&settings,"subscriptionFont","system"){
+  "mono"=>"ui-monospace,SFMono-Regular,Consolas,monospace",
+  "manrope"=>"Manrope,system-ui,Arial,sans-serif",
+  _=>"system-ui,Arial,sans-serif"
+ };
  let html=format!(r#"<!doctype html><html lang="{lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
  <meta name="referrer" content="no-referrer"><title>{brand}</title><style>
  :root{{--bg:{bg};--card:{card};--text:{fg};--accent:{accent};--radius:{radius}px}}
- *{{box-sizing:border-box}}body{{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:16px/1.6 system-ui,Arial,sans-serif;padding:clamp(16px,5vw,80px)}}
- main{{max-width:{max_width};margin:0 auto}}.panel{{background:var(--card);border:1px solid #ffffff22;border-radius:var(--radius);padding:clamp(22px,4vw,42px);box-shadow:0 18px 50px #0002}}
+ *{{box-sizing:border-box}}body{{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:16px/1.6 {font_css};padding:clamp(16px,5vw,80px)}}
+ main{{max-width:{max_width};margin:0 auto}}.panel{{background:var(--card);border:1px solid #ffffff22;border-radius:var(--radius);padding:clamp(22px,4vw,42px);box-shadow:0 18px 50px #0002;{card_css}}}
  header{{display:flex;justify-content:space-between;align-items:center;gap:20px}}.logo{{max-height:56px;max-width:180px;object-fit:contain}}
  h1{{font-size:clamp(27px,4vw,42px);line-height:1.2;margin:20px 0 8px}}h2{{font-size:18px}}.muted,footer{{opacity:.7}}
  .status{{font-weight:700}}.ok{{color:var(--accent)}}.off{{color:#ff8a8a}}
@@ -365,6 +376,7 @@ pub async fn portal(
  <p class="muted">{summary}</p>{sections}</div><footer>{footer}</footer></main></body></html>"#,
  lang=lang,brand=escape_html(brand),bg=bg,card=card,fg=fg,accent=accent,radius=radius,
  max_width=if layout=="compact"{"660px"}else if layout=="centered"{"760px"}else{"960px"},
+ font_css=font_css,card_css=card_css,
  logo_markup=logo_markup,lang_url=lang_url,switch_label=if en{"Русский"}else{"English"},
  title=escape_html(title),summary=escape_html(summary),sections=sections,footer=escape_html(footer));
  let mut response=Html(html).into_response();
