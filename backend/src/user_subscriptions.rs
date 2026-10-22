@@ -585,14 +585,14 @@ mod tests{
   let host=json!({"address":"vpn.example.org","publicKey":"PUBLIC_KEY",
    "externalSNI":"vpn.example.org","shortId":"abcd","remark":"Sweden"});
   let outbound=vless_outbound(&user,&inbound,&host).expect("Reality public metadata is complete");
-  let data=native_xray_config(vec![outbound]);
+  let data=crate::subscription_json::build(vec![outbound],&json!({})).expect("build client config");
   let rendered=serde_json::to_string(&data).expect("serialize Xray JSON");
   assert!(!rendered.contains("SERVER_PRIVATE_KEY_MUST_NEVER_LEAK"));
   assert_eq!(data["outbounds"][0]["settings"]["vnext"][0]["users"][0]["id"],user["xrayId"]);
   assert_eq!(data["outbounds"][0]["streamSettings"]["xhttpSettings"]["mode"],"stream-up");
   assert_eq!(data["outbounds"][0]["streamSettings"]["xhttpSettings"]["xmux"]["cMaxReuseTimes"],64);
   assert_eq!(data["outbounds"][0]["streamSettings"]["realitySettings"]["publicKey"],"PUBLIC_KEY");
-  assert_eq!(data["routing"]["rules"][2]["outboundTag"],"Sweden");
+  assert_eq!(data["routing"]["rules"][3]["outboundTag"],"xmesh-ZZ-0001");
   assert_eq!(data["inbounds"][0]["protocol"],"socks");
  }
  #[test] fn invalid_reality_not_exported(){
