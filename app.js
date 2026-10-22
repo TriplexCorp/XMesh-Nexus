@@ -859,6 +859,12 @@ function userTrafficDonutsMarkup(payload){
   const chart='<div class="user-traffic-visual"><div class="user-traffic-main-donut" style="--down-share:'+downloadShare.toFixed(3)+'%" role="img" aria-label="Скачано '+userTrafficBytes(down)+', загружено '+userTrafficBytes(up)+'"><div><small>Всего</small><strong>'+userTrafficBytes(total)+'</strong></div></div><div class="user-traffic-legend"><div><span class="user-legend-dot is-down"></span><span>Скачано</span><b>'+userTrafficBytes(down)+'</b></div><div><span class="user-legend-dot is-up"></span><span>Отправлено</span><b>'+userTrafficBytes(up)+'</b></div><small>Серверов с данными: '+servers.length+'</small></div></div>';
   return chart+(total===0?'<p class="user-server-pending">Счётчики подключены, но трафик пока не зарегистрирован.</p>':'')+'<div class="user-server-grid">'+cards+'</div><small class="user-server-source">Данные только из персональных счётчиков Xray. Общий трафик VPS не используется.</small>';
 }
+function userInboundTrafficMarkup(payload){
+ const rows=Array.isArray(payload?.inbounds)?payload.inbounds.filter(r=>r&&typeof r.inboundTag==='string'&&Number.isFinite(+r.uplinkBytes)&&Number.isFinite(+r.downlinkBytes)): [];
+ if(!rows.length)return '<section class="user-inbound-stats"><h4>Трафик по inbound</h4><p class="note">Пока нет персональных счётчиков по inbound. Обычный Xray StatsService отдаёт пользователя и inbound отдельно; эти общие значения нельзя перемножать или распределять искусственно. Требуется агент, передающий реальные счётчики userInboundTraffic.</p></section>';
+ const cards=rows.map(r=>'<div class="user-inbound-item"><div><b>'+esc(r.inboundTag)+'</b><small>'+esc(r.nodeName||'Узел #'+r.nodeId)+'</small></div><div><b>'+userTrafficBytes(+r.uplinkBytes + +r.downlinkBytes)+'</b><small>↑ '+userTrafficBytes(r.uplinkBytes)+' · ↓ '+userTrafficBytes(r.downlinkBytes)+'</small></div></div>').join('');
+ return '<section class="user-inbound-stats"><h4>Трафик по inbound</h4><div class="user-inbound-grid">'+cards+'</div><small class="user-server-source">Только фактические подписанные измерения узлов; не прибавляются повторно к общему трафику пользователя.</small></section>';
+}
 async function loadUserTrafficStats(userId){
   const container=dlg.querySelector('[data-user-traffic-id="'+userId+'"]');
   if(!container)return;
@@ -869,7 +875,7 @@ async function loadUserTrafficStats(userId){
   try{
     const payload=await backendRequest('/api/v1/users/'+encodeURIComponent(userId)+'/traffic');
     if(dlg.open&&container.isConnected&&dlg.contains(container)){
-      container.innerHTML=userTrafficDonutsMarkup(payload);
+      container.innerHTML=userTrafficDonutsMarkup(payload)+userInboundTrafficMarkup(payload);
     }
   }catch(error){
     if(dlg.open&&container.isConnected&&dlg.contains(container)){
