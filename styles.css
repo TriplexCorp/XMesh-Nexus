@@ -2672,3 +2672,11 @@ html[data-font=pt] body{font-family:"PT Sans",system-ui,-apple-system,"Segoe UI"
 .security-audit-event time{white-space:nowrap;font-variant-numeric:tabular-nums}
 .security-audit-empty{padding:1.2rem;color:var(--mu)}
 @media(max-width:600px){.security-audit-event{flex-direction:column;align-items:flex-start}.security-audit-event time{white-space:normal}}
+
+/* Additional Cyrillic-capable interface typography */
+html[data-font=montserrat] body{font-family:Montserrat,system-ui,sans-serif}
+html[data-font=ubuntu] body{font-family:Ubuntu,system-ui,sans-serif}
+html[data-font=opensans] body{font-family:"Open Sans",system-ui,sans-serif}
+html[data-font=source] body{font-family:"Source Sans 3",system-ui,sans-serif}
+html[data-font=fira] body{font-family:"Fira Sans",system-ui,sans-serif}
+html[data-font=jost] body{font-family:Jost,system-ui,sans-serif}
