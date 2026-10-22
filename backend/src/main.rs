@@ -369,7 +369,7 @@ async fn security_headers(request: Request, next: Next) -> Response {
     headers.insert(HeaderName::from_static("referrer-policy"), HeaderValue::from_static("same-origin"));
     headers.insert(
         HeaderName::from_static("content-security-policy"),
-        HeaderValue::from_static("default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; font-src 'self' data:; connect-src 'self'; form-action 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'"),
+        HeaderValue::from_static("default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' https: data:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self'; form-action 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'"),
     );
     headers.insert(
         HeaderName::from_static("permissions-policy"),
