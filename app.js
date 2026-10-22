@@ -1078,9 +1078,45 @@ function userDrawer(id,tab){
   </div>`,'user-modal');
   void loadUserTrafficStats(u.id);
 }
+// Usernames: cryptographically random, readable and comfortably below 32 chars.
+const USERNAME_ADJECTIVES=['silent','cosmic','silver','hidden','rapid','midnight','stellar','shadow','gentle','arctic','velvet','lunar','mystic','amber','crystal','steady','bright','frozen','swift','nebula'];
+const USERNAME_NOUNS=['ninja','falcon','voyager','comet','raven','panda','tiger','orbit','phoenix','fox','otter','dragon','sparrow','pilot','meteor','cipher','pioneer','wolf','echo','nebula'];
+function randomUsername(){
+  if(!globalThis.crypto?.getRandomValues)throw new Error('Безопасная генерация недоступна: требуется HTTPS.');
+  const words=new Uint32Array(2);
+  crypto.getRandomValues(words);
+  const bytes=new Uint8Array(5);
+  crypto.getRandomValues(bytes);
+  const suffix=Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
+  return (USERNAME_ADJECTIVES[words[0]%USERNAME_ADJECTIVES.length]+'_'+USERNAME_NOUNS[words[1]%USERNAME_NOUNS.length]+'_'+suffix).slice(0,32);
+}
+function generateAvailableUsername(current=''){
+  const taken=new Set(DB.users.map(user=>String(user.username||'').toLowerCase()));
+  for(let attempt=0;attempt<30;attempt++){
+    const name=randomUsername();
+    if(name!==current&& !taken.has(name.toLowerCase()))return name;
+  }
+  throw new Error('Не удалось подобрать уникальное имя. Повторите попытку.');
+}
+document.addEventListener('click',event=>{
+  const button=event.target.closest('[data-generate-username]');
+  if(!button)return;
+  const form=button.closest('form[data-k="user"]');
+  const input=form?.querySelector('[name="username"]');
+  if(!input)return;
+  event.preventDefault();
+  try{
+    input.value=generateAvailableUsername(input.value);
+    input.dispatchEvent(new Event('input',{bubbles:true}));
+    input.focus();
+    input.setSelectionRange(input.value.length,input.value.length);
+    const error=form.querySelector('#fe');
+    if(error)error.textContent='';
+  }catch(error){toast(error.message||'Не удалось сгенерировать имя')}
+});
 function userNew(){
   if(!DB.squads.length){modal(`<div class="box"><h2>Сначала создайте сквад</h2><p class="note">Пользователю нужно назначить группу доступа. Создайте сквад, а затем вернитесь к созданию пользователя.</p><div class="act"><button class="gh" data-x>Отмена</button><button class="btn" data-ne="squads">${ic('plus')}Создать сквад</button></div></div>`);return}
-  const fs=FU;modal(`<form class="box" data-k="user" method="dialog"><h2>Новый пользователь</h2><label class="f"><span>Шаблон</span><select id="tplsel"><option value="">Без шаблона</option>${DB.tpls.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select><small>При необходимости подставит параметры из сохранённого шаблона</small></label>${fs.map(f=>field(f,{limit:0,days:0,strategy:'NO_RESET',hwid:0,squads:[]}[f.k])).join('')}<p class="er" id="fe"></p><div class="act"><button type="button" class="gh" data-x>Отмена</button><button class="btn">Создать</button></div></form>`,'wide');
+  const fs=FU;modal(`<form class="box" data-k="user" method="dialog"><h2>Новый пользователь</h2><label class="f"><span>Шаблон</span><select id="tplsel"><option value="">Без шаблона</option>${DB.tpls.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select><small>При необходимости подставит параметры из сохранённого шаблона</small></label>${fs.map(f=>{const markup=field(f,{limit:0,days:0,strategy:'NO_RESET',hwid:0,squads:[]}[f.k]);return f.k==='username'?markup.replace('<span>Имя пользователя</span>','<span style="display:flex;align-items:center;justify-content:space-between;gap:.6rem">Имя пользователя <button type="button" class="gh sm" data-generate-username title="Сгенерировать случайное уникальное имя" aria-label="Сгенерировать имя пользователя" style="display:inline-flex;align-items:center;gap:.35rem">'+ic('refresh-cw')+' Сгенерировать</button></span>'):markup}).join('')}<p class="er" id="fe"></p><div class="act"><button type="button" class="gh" data-x>Отмена</button><button class="btn">Создать</button></div></form>`,'wide');
   setTimeout(()=>$('[name=username]')?.focus(),60);
 }
 function exportCsv(){const rows=[['username','status','used_gb','limit_gb','expire','tag','telegram','email','squads','sub_url']].concat(UIDS.map(id=>DB.users.find(u=>u.id==id)).map(u=>[u.username,st(u),u.used,u.limit,u.expireAt?new Date(u.expireAt).toISOString().slice(0,10):'',u.tag,u.tg,u.email,u.squads.map(i=>DB.squads.find(s=>s.id==i)?.name).join('|'),subUrl(u)]));
