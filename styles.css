@@ -2409,3 +2409,9 @@ aside #logout .ic{width:1.12rem;height:1.12rem;flex-shrink:0}
 .security-session small{color:var(--mu);font-size:.75rem;line-height:1.45}
 .security-policy-footnote{margin-top:1.2rem;border-top:1px solid var(--ln);padding-top:.85rem;font-size:.76rem;line-height:1.6;color:var(--mu)}
 @media(max-width:760px){.security-settings-grid{grid-template-columns:1fr}.security-setting{align-items:flex-start}#security-advanced{padding:1rem}.security-session{flex-wrap:wrap}}
+
+/* Alternate dashboard URL: exact link and separate copy action. */
+.security-path-controls{display:flex;align-items:center;gap:.65rem;width:min(100%,44rem)}
+.security-url-setting .security-path-controls input{flex:1 1 auto;width:100%;min-width:0}
+.security-path-controls button{flex-shrink:0;min-height:2.7rem;border-radius:var(--ui-control-radius)}
+@media(max-width:540px){.security-path-controls{flex-wrap:wrap}.security-path-controls button{width:100%}}
