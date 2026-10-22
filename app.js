@@ -225,8 +225,11 @@ const COUNTRY_CODES='AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE
 const COUNTRY_NAMES=new Intl.DisplayNames(['ru'],{type:'region'});
 const countryFlag=code=>String.fromCodePoint(...code.toUpperCase().split('').map(c=>127397+c.charCodeAt(0)));
 const COUNTRIES=COUNTRY_CODES.map(code=>({code,flag:countryFlag(code),name:COUNTRY_NAMES.of(code)})).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
-const NORTH_KOREA_FLAG='<svg viewBox="0 0 32 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="#024fa2" d="M0 0h32v20H0z"/><path fill="#fff" d="M0 3h32v14H0z"/><path fill="#ed1c27" d="M0 4h32v12H0z"/><circle cx="10" cy="10" r="4.3" fill="#fff"/><path fill="#ed1c27" d="M10 6l.95 2.76h2.9l-2.35 1.7.9 2.74L10 11.5l-2.4 1.7.9-2.74-2.35-1.7h2.9z"/></svg>';
-const flagView=(value,cls='flag-img')=>{const country=COUNTRIES.find(c=>c.flag===value);if(country?.code==='KP')return `<span class="${cls} north-korea-flag" role="img" aria-label="${esc(country.name)}">${NORTH_KOREA_FLAG}</span>`;return country?`<img class="${cls}" src="https://flagcdn.com/w40/${country.code.toLowerCase()}.png" alt="${esc(country.name)}" loading="lazy" decoding="async">`:`<span class="${cls}">${esc(value||'')}</span>`;};
+// Country flags are bundled in the Docker image. No external CDN at runtime.
+const flagView=(value,cls='flag-img')=>{
+ const country=COUNTRIES.find(c=>c.flag===value);
+ return country?`<img class="${cls}" src="/flags/${country.code.toLowerCase()}.svg" alt="${esc(country.name)}" loading="lazy" decoding="async">`:`<span class="${cls}">${esc(value||'')}</span>`;
+};
 
 /* ================= ФОРМЫ ================= */
 const opt=o=>(typeof o=='function'?o():o).map(x=>Array.isArray(x)?x:[x,x]);
@@ -1307,7 +1310,16 @@ function xrayClientSample(){
  const outbound={tag:'proxy',protocol:outProtocol,settings};
  if(!['wireguard'].includes(protocol))outbound.streamSettings=streamSettings;
  if(network==='xdrive')outbound.mux={enabled:true,concurrency:cl(+v('xdrive-mux-concurrency')||8,1,1024)};
- return {remarks:$('#xpb-name')?.value.trim()||'XRAY STUDIO client',outbounds:[outbound,{tag:'direct',protocol:'freedom'},{tag:'block',protocol:'blackhole'}],routing:{domainStrategy:'AsIs',rules:[]}};
+ return {
+  remarks:$('#xpb-name')?.value.trim()||'XRAY STUDIO client',
+  dns:{queryStrategy:'UseIPv4',servers:['1.1.1.1']},
+  inbounds:[
+   {listen:'127.0.0.1',port:10808,protocol:'socks',settings:{auth:'noauth',udp:true},sniffing:{enabled:true,destOverride:['http','tls','quic']},tag:'socks'},
+   {listen:'127.0.0.1',port:10809,protocol:'http',settings:{},sniffing:{enabled:true,destOverride:['http','tls','quic']},tag:'http'}
+  ],
+  outbounds:[outbound,{tag:'direct',protocol:'freedom'},{tag:'block',protocol:'blackhole'}],
+  routing:{domainStrategy:'AsIs',rules:[]}
+ };
 }
 async function generateRealityKeyPair(){
  if(!globalThis.crypto?.subtle)throw new Error('Генерация ключей недоступна в этом браузере. Откройте панель по HTTPS.');
