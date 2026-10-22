@@ -1,6 +1,4 @@
-//! Validation for admin-defined subscription-portal appearance and client catalog.
-//! This config is a blueprint. Public subscription delivery belongs to a
-//! separate service and is not implemented in this repository.
+//! Validation for the live public subscription portal and client catalog.
 use crate::ApiError;
 use axum::http::StatusCode;
 use serde_json::{Map, Value};
@@ -37,7 +35,7 @@ fn safe_https_url(value: &str) -> bool {
 
 pub(crate) fn validate(object: &Map<String, Value>) -> Result<(), ApiError> {
     for key in [
-        "subscriptionBackground", "subscriptionCardColor", "subscriptionTextColor",
+        "subscriptionBackground", "subscriptionCardColor", "subscriptionTextColor", "subscriptionSecondaryAccent",
     ] {
         if let Some(v) = object.get(key) {
             let text = v.as_str().ok_or_else(|| bad("Цвет должен быть текстом в формате #RRGGBB."))?;
