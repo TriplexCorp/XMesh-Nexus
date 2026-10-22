@@ -46,3 +46,21 @@
 @media(max-width:1180px){.xm-layout{grid-template-columns:minmax(0,1fr)}.xm-preview{position:static}.xm-preview pre{max-height:550px;min-height:300px}}
 @media(max-width:720px){.xm-three,.xm-two{grid-template-columns:minmax(0,1fr)}.xm-head{align-items:flex-start}.xm-preview-head{align-items:flex-start}.xm-footer{bottom:0}}
 @media(prefers-reduced-motion:reduce){.xm-studio *{transition:none!important;animation:none!important}}
+
+/* Focused Studio workflow: show one configuration step at a time. */
+.xm-studio .xm-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.45rem;margin:-.1rem 0 0}
+.xm-studio .xm-step{display:flex;align-items:center;justify-content:center;gap:.55rem;min-height:2.85rem;padding:.55rem .7rem;border:1px solid var(--ln);border-radius:var(--ui-control-radius,12px);background:var(--s1);color:var(--mu);font:inherit;font-size:.8rem;font-weight:650;cursor:pointer;transition:background .18s,border-color .18s,color .18s}
+.xm-studio .xm-step>span{display:inline-grid;place-items:center;min-width:1.5rem;height:1.5rem;border-radius:.4rem;background:var(--s2);color:var(--mu);font-size:.68rem}
+.xm-studio .xm-step:is(:hover,:focus-visible){border-color:var(--a);color:var(--tx)}
+.xm-studio .xm-step.is-active{border-color:color-mix(in srgb,var(--a) 55%,var(--ln));background:color-mix(in srgb,var(--a) 10%,var(--s1));color:var(--tx)}
+.xm-studio .xm-step.is-active>span{background:var(--a);color:var(--bg)}
+.xm-studio .xm-layout{grid-template-columns:minmax(0,1.15fr) minmax(320px,.85fr)}
+.xm-studio .xm-editor{min-height:320px}
+.xm-studio .xm-panel{padding:1.25rem}
+.xm-studio .xm-preview pre{min-height:290px;max-height:55vh}
+.xm-studio .xm-footer{position:relative;bottom:auto;box-shadow:none;padding:.6rem .9rem}
+.xm-studio .xm-footer p{max-width:55ch}
+.xm-studio [data-xm-panel][hidden]{display:none!important}
+@media(min-width:1400px){.xm-studio .xm-preview{top:1rem}}
+@media(max-width:1100px){.xm-studio .xm-layout{grid-template-columns:minmax(0,1fr)}.xm-studio .xm-steps{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.xm-studio .xm-steps{gap:.35rem}.xm-studio .xm-step{font-size:.73rem;padding:.4rem}.xm-studio .xm-panel{padding:1rem}.xm-studio .xm-footer{align-items:stretch}.xm-studio .xm-footer .btn{width:100%}}
