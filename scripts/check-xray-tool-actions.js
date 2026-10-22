@@ -30,10 +30,10 @@ function harness(documentValue,{confirmValue=true,realityKeys}={}){
    addEventListener(name,fn){(listeners[name]??=[]).push(fn)},
    dispatchEvent(e){for(const fn of listeners[e.type]||[])fn(e)}
  };
- const status={textContent:''};
+ const status={textContent:''},issue={hidden:true},issueMessage={textContent:''};
  const host={
    innerHTML:'',click:null,
-   querySelector(q){return q==='[data-tool-status]'?status:null},
+   querySelector(q){return ({'[data-tool-status]':status,'[data-tool-issue]':issue,'[data-tool-issue-message]':issueMessage})[q]||null},
    addEventListener(type,fn){if(type==='click')this.click=fn}
  };
  const root={querySelector(q){
@@ -56,7 +56,7 @@ function harness(documentValue,{confirmValue=true,realityKeys}={}){
    realityKeys:realityKeys||(async()=>({privateKey:'generated-private',publicKey:'generated-public'}))
  });
  return {
-   area,host,status,calls,confirmCalls,clipboard,
+   area,host,status,issue,issueMessage,calls,confirmCalls,clipboard,
    run(tool){host.click({target:{closest:()=>({dataset:{tool}})}})},
    doc(){return JSON.parse(area.value)}
  };
@@ -67,7 +67,8 @@ const tick=async()=>{for(let n=0;n<12;n++)await Promise.resolve()};
 
 async function run(){
  const initial=harness(sample());
- assert.equal((initial.host.innerHTML.match(/data-tool="/g)||[]).length,6,'only six useful actions are visible');
+ assert.equal((initial.host.innerHTML.match(/class="sv-toolitem /g)||[]).length,6,'only six main actions are visible');
+ assert.equal(initial.issue.hidden,false,'broken ID visible as contextual warning');
  assert.deepEqual(['reality','shortid','xhttp','dns','routing','inbound'].map(x=>initial.host.innerHTML.includes('data-tool="'+x+'"')),[true,true,true,true,true,true]);
 
  const repair=harness(sample());
@@ -77,6 +78,31 @@ async function run(){
  assert.equal(ids(repair.doc())[1],'0123456789abcdef','existing valid ID retained');
  assert.equal(repair.confirmCalls.length,1,'unsafe migration requires consent');
  assert.equal(repair.doc().inbounds[0].settings.users.length,0,'unrelated inbound settings unchanged');
+
+ const oneClick=harness(sample());
+ oneClick.run('repair-shortids');
+ assert.equal(ids(oneClick.doc()).length,2);
+ assert.ok(ids(oneClick.doc()).every(validShortId));
+ assert.equal(oneClick.issue.hidden,true,'repair clears inline warning immediately');
+ assert.equal(oneClick.confirmCalls.length,1,'one explicit confirmation for repair');
+
+ const oneClickNo=harness(sample(),{confirmValue:false});
+ const oneClickBefore=oneClickNo.area.value;
+ oneClickNo.run('repair-shortids');
+ assert.equal(oneClickNo.area.value,oneClickBefore,'cancel one-click repair preserves JSON');
+
+ const clean=sample();clean.inbounds[0].streamSettings.realitySettings.shortIds=['aabbccdd'];
+ const stable=harness(clean,{confirmValue:false,realityKeys:async()=>{throw Error('must not generate')}});
+ stable.run('reality');await tick();
+ assert.equal(stable.area.value,JSON.stringify(clean,null,2),'existing valid Reality is idempotent');
+ assert.ok(!stable.calls.some(v=>v.includes('Reality настроен')),'no false success on an idempotent action');
+ assert.equal(stable.confirmCalls.length,1,'rotation requires explicit choice');
+
+ const keyRecovery=sample();keyRecovery.inbounds[0].streamSettings.realitySettings.shortIds=['admin'];
+ const preserved=harness(keyRecovery,{confirmValue:false});
+ const protectedKey=preserved.doc().inbounds[0].streamSettings.realitySettings.privateKey;
+ preserved.run('reality');await tick();
+ assert.equal(preserved.doc().inbounds[0].streamSettings.realitySettings.privateKey,protectedKey,'refusing rekey never rotates existing key');
 
  const cancel=harness(sample(),{confirmValue:false});
  const old=cancel.area.value;
@@ -132,6 +158,6 @@ async function run(){
  assert.equal(invalid.area.value,invalidBefore,'malformed JSON cannot be changed by tool');
  assert.ok(!invalid.calls.some(v=>/обновлен|добавлен/i.test(v)),'malformed JSON cannot produce success');
 
- console.log('XRAY STUDIO JSON tools: 14 regression scenarios passed.');
+ console.log('XRAY STUDIO JSON tools: contextual repair, key preservation and regression cases passed.');
 }
 run().catch(e=>{console.error(e);process.exitCode=1});
