@@ -302,6 +302,14 @@ async fn main() -> anyhow::Result<()> {
         .route("/login", get(|| async { StatusCode::NOT_FOUND }))
         .route("/login.html", get(|| async { StatusCode::NOT_FOUND }))
         .route("/dashboard/{slug}", get(security::dashboard_entry))
+        .route("/{part1}/{token}", get(user_subscriptions::portal_route))
+        .route("/{part1}/{part2}/{token}", get(user_subscriptions::portal_route))
+        .route("/{part1}/{part2}/{part3}/{token}", get(user_subscriptions::portal_route))
+        .route("/{part1}/{part2}/{part3}/{part4}/{token}", get(user_subscriptions::portal_route))
+        .route("/{part1}/{part2}/{part3}/{part4}/{part5}/{token}", get(user_subscriptions::portal_route))
+        .route("/{part1}/{part2}/{part3}/{part4}/{part5}/{part6}/{token}", get(user_subscriptions::portal_route))
+        .route("/{part1}/{part2}/{part3}/{part4}/{part5}/{part6}/{part7}/{token}", get(user_subscriptions::portal_route))
+        .route("/{part1}/{part2}/{part3}/{part4}/{part5}/{part6}/{part7}/{part8}/{token}", get(user_subscriptions::portal_route))
         .nest("/api/v1", public.merge(protected).fallback(|| async { StatusCode::NOT_FOUND }))
         .fallback_service(ServeDir::new(static_dir).append_index_html_on_directories(false))
         .layer(RequestBodyLimitLayer::new(2 * 1024 * 1024))
@@ -309,7 +317,6 @@ async fn main() -> anyhow::Result<()> {
         .layer(TraceLayer::new_for_http())
         .layer(middleware::from_fn(security_headers))
         .layer(middleware::from_fn(csrf_guard))
-        .layer(middleware::from_fn_with_state(state.clone(), user_subscriptions::rewrite_subscription_path))
         .with_state(state);
 
     let address = env::var("APP_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".to_owned());
