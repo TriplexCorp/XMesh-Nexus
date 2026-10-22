@@ -48,11 +48,16 @@ const shortIdValid=value=>typeof value==='string'&&/^(?:[0-9a-fA-F]{2}){0,8}$/.t
 const newShortId=used=>{for(let n=0;n<32;n++){const candidate=hex(8);if(!used.has(candidate)){used.add(candidate);return candidate}}throw Error('Не удалось получить уникальный Short ID')};
 const repairIds=(list,append)=>{
  if(!Array.isArray(list))throw Error('realitySettings.shortIds должен быть массивом');
- const used=new Set(list.filter(shortIdValid).map(x=>x.toLowerCase()));
- const invalid=list.filter(x=>!shortIdValid(x));
- if(invalid.length){
-   if(!confirm('В REALITY обнаружено '+invalid.length+' некорректных Short ID (например, '+JSON.stringify(invalid[0])+'). Заменить только повреждённые значения на случайные HEX ID? Клиентам со старыми значениями понадобится обновление.'))return null;
-   return list.map(x=>shortIdValid(x)?x:newShortId(used));
+ const used=new Set(),bad=new Set();
+ for(let i=0;i<list.length;i++){
+   const value=list[i],normalized=typeof value==='string'?value.toLowerCase():'';
+   if(!shortIdValid(value)||used.has(normalized))bad.add(i);
+   else used.add(normalized);
+ }
+ if(bad.size){
+   const first=list[[...bad][0]];
+   if(!confirm('В REALITY обнаружено '+bad.size+' некорректных или повторяющихся Short ID (например, '+JSON.stringify(first)+'). Исправить только эти значения случайными HEX ID? Клиентам со старыми ID понадобится обновление.'))return null;
+   return list.map((x,i)=>bad.has(i)?newShortId(used):x);
  }
  if(append||!list.length)return [...list,newShortId(used)];
  return [...list];
@@ -64,6 +69,7 @@ async function setReality(){
    const current=inbound.streamSettings||{},transport=current.network||'raw';
    if(!['raw','xhttp','grpc'].includes(transport))throw Error('REALITY поддерживает только RAW, XHTTP или gRPC. Сначала измените транспорт.');
  }catch(e){status('Ошибка: '+e.message);notify(e.message);return}
+ const originalSource=area.value;
  const current=inbound.streamSettings?.realitySettings||{};
  let target=current.target||current.dest||'';
  if(!target){target=prompt('Укажите REALITY target (HTTPS-домен:порт). Проверьте SNI и доступность целевого сайта:', 'www.microsoft.com:443');if(target===null)return}
@@ -79,6 +85,7 @@ async function setReality(){
  try{ids=repairIds(current.shortIds??[],false);if(ids===null)return}catch(e){notify(e.message);return}
  try{
    const keys=await realityKeys();
+   if(area.value!==originalSource){notify('JSON изменился во время генерации ключей. Повторите операцию Reality для текущего документа.');return}
    if(!keys?.privateKey||!keys?.publicKey)throw Error('Генератор Reality не вернул пару ключей');
    const ok=mutate(doc=>{
      const obj=getInbound(doc);if(!obj)return false;
