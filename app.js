@@ -2140,6 +2140,12 @@ async function setP(){
     <div class="act"><button class="gh" type="button" data-core-refresh>Проверить статус</button><button class="btn" type="button" data-core-update>Установить / обновить</button></div>
     <div class="history-placeholder" id="core-message">${esc(coreView.last_error||coreView.progress||'Обновление ядра выполняется отдельно от запуска VPN-трафика.')}</div>
   </div>
+  <div class="card" id="panel-update-card">
+    <div class="hd"><div><h3>Обновление XMesh Nexus</h3><p>Обновление панели из GitHub main с резервной копией PostgreSQL и пересборкой Docker.</p></div><span class="chip">Owner</span></div>
+    <p class="note">Обновление выполняет отдельный системный сервис. У веб-панели нет доступа к Docker socket и произвольным командам. Во время обновления соединение с интерфейсом прервётся.</p>
+    <div class="act"><button type="button" class="gh" data-panel-update-status>Проверить состояние</button><button type="button" class="btn" data-panel-update>Обновить панель</button></div>
+    <div class="history-placeholder" id="panel-update-message">Для веб-обновления требуется установить системный сервис через install.sh.</div>
+  </div>
   <div class="card"><div class="hd"><div><h3>Данные панели</h3><p>Настройки и записи хранятся в PostgreSQL. Экспортируйте JSON перед переносом или резервным копированием.</p></div><button class="gh" id="gx">${ic('dl')}Скачать резервную копию</button></div><p class="note">На этом этапе панель и backend управляют данными и бинарником Xray-core. Запуск VPN-трафика и управление удалёнными узлами пока не подключены.</p></div>`]
 }
 
@@ -2270,6 +2276,25 @@ document.addEventListener('click',async e=>{
   else if(g('#rs')){const automation={autoCoreRefresh:C.autoCoreRefresh,coreRefreshSeconds:C.coreRefreshSeconds};C={...CDEFAULT,...automation};resetPaletteDraft();apply();syncSubscriptionTheme();syncCoreAutoRefresh();render(1);toast('Оформление сброшено')}
   else if(g('#gx')){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(DB,null,2)],{type:'application/json'}));a.download='xmesh-nexus-backup.json';a.click()}
   else if(b=g('[data-cf]')){dlg.close();CF&&CF()}
+  else if(b=g('[data-panel-update-status]')){
+    b.disabled=true;
+    try{
+      const state=await backendRequest('/api/v1/panel/update');
+      const labels={idle:'Обновление не запущено.',running:'Обновление выполняется на сервере…',success:'Обновление завершено. Перезагрузите страницу.',failed:'Ошибка обновления. Проверьте journalctl -u xmesh-panel-update.service',unavailable:'Системный сервис обновления недоступен. Выполните bash install.sh от root.'};
+      const target=$('#panel-update-message');if(target)target.textContent=labels[state.status]||state.status;
+    }catch(err){const target=$('#panel-update-message');if(target)target.textContent=err.message}
+    finally{b.disabled=false}
+  }
+  else if(b=g('[data-panel-update]')){
+    if(!confirm('Обновить XMesh Nexus из origin/main? Сначала резервная копия PostgreSQL, затем пересборка Docker и перезапуск. Продолжить?'))return;
+    b.disabled=true;
+    try{
+      const result=await backendRequest('/api/v1/panel/update',{method:'POST',body:JSON.stringify({})});
+      const target=$('#panel-update-message');if(target)target.textContent=result.message||'Запрос принят.';
+      toast('Обновление передано системному сервису');
+    }catch(err){const target=$('#panel-update-message');if(target)target.textContent=err.message;toast(err.message)}
+    finally{b.disabled=false}
+  }
   else if(b=g('[data-core-refresh]')){try{await refreshCoreStatus(true)}catch(err){toast(err.message)}}
   else if(b=g('[data-core-update]')){const target=$('#core-target')?.value.trim()||'latest';b.disabled=true;try{const result=await backendRequest('/api/v1/core/update',{method:'POST',body:JSON.stringify({version:target})});$('#core-message').textContent=result.message||'Обновление запущено';await refreshCoreStatus();setTimeout(()=>refreshCoreStatus().catch(()=>{}),1800)}catch(err){$('#core-message').textContent=err.message;toast(err.message)}finally{b.disabled=false}}
   else if(b=g('[data-pi]')){const x=PI[+b.dataset.pi];if(x){dlg.close();x.r()}}
