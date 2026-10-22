@@ -32,6 +32,13 @@ const api=env.window.XMeshI18n;
 assert.equal(api.getLanguage(),'en');
 assert.equal(api.translate('Узлы'),'Nodes');
 assert.equal(api.translate('Название подписки'),'Subscription name');
+assert.equal(api.translate('QR-код для приложения-аутентификатора'),
+ 'QR code for an authenticator app');
+assert.equal(api.translate('2. Шестизначный код из приложения-аутентификатора'),
+ '2. Six-digit code from your authenticator app');
+assert.equal(api.translate('Нет возможности сканировать? Добавить вручную'),
+ "Can't scan the QR code? Add the account manually");
+
 assert.equal(api.translate('Неверный логин или пароль.'),'Incorrect username or password.');
 assert.equal(api.translate('Повторяющееся поле «tag»: Xray/JSON использует последнее значение, предыдущее будет потеряно.'),
  'Duplicate field «tag»: Xray/JSON uses the last value; earlier values are lost.');
