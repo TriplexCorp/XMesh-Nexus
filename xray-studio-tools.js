@@ -13,7 +13,7 @@ const update=()=>{const undoButton=host.querySelector('[data-tool="undo"]'),redo
 const commit=(value,msg)=>{snapshot();const from=area.value;if(value===from)return;undo.push(from);if(undo.length>80)undo.shift();redo=[];area.value=value;last=value;area.dispatchEvent(new Event('input',{bubbles:true}));area.focus();update();notify(msg||'JSON обновлён')};
 const parse=()=>{try{const x=JSON.parse(area.value);if(!x||typeof x!=='object'||Array.isArray(x))throw Error('Корень должен быть объектом');return x}catch(e){throw Error('Исправьте синтаксис JSON перед применением: '+e.message)}};
 const getInbound=(data)=>{if(!Array.isArray(data.inbounds)||!data.inbounds.length)throw Error('В конфигурации нет inbound');if(data.inbounds.length===1)return data.inbounds[0];const tags=data.inbounds.map((x,i)=>i+': '+(x.tag||'(без тега)'));const answer=prompt('Выберите inbound по индексу:\n'+tags.join('\n'),'0');if(answer===null)return null;const i=Number(answer);if(!Number.isInteger(i)||i<0||i>=data.inbounds.length)throw Error('Неверный индекс inbound');return data.inbounds[i]};
-const mutate=(fn,label)=>{try{const data=parse(),changed=fn(data);if(changed===false)return;commit(JSON.stringify(data,null,2),label)}catch(e){notify(e.message)}};
+const mutate=(fn,label)=>{try{const data=parse(),before=JSON.stringify(data),changed=fn(data);if(changed===false)return;const after=JSON.stringify(data);if(after===before){status('Изменений нет: настройки уже присутствуют');notify('Ничего не изменено');return}commit(JSON.stringify(data,null,2),label)}catch(e){status(e.message);notify(e.message)}};
 const freshUUID=()=>{if(crypto.randomUUID)return crypto.randomUUID();const a=new Uint8Array(16);crypto.getRandomValues(a);a[6]=a[6]&15|64;a[8]=a[8]&63|128;const h=Array.from(a,b=>b.toString(16).padStart(2,'0')).join('');return [h.slice(0,8),h.slice(8,12),h.slice(12,16),h.slice(16,20),h.slice(20)].join('-')};
 const hex=(n)=>{const a=new Uint8Array(n);crypto.getRandomValues(a);return Array.from(a,b=>b.toString(16).padStart(2,'0')).join('')};
 const snippets={
@@ -49,7 +49,20 @@ const operations={
  find(){const q=prompt('Найти текст в JSON:');if(!q)return;const pos=area.value.toLowerCase().indexOf(q.toLowerCase(),area.selectionEnd);const i=pos>=0?pos:area.value.toLowerCase().indexOf(q.toLowerCase());if(i>=0){area.focus();area.setSelectionRange(i,i+q.length);status('Найдено: '+q)}else status('Совпадений нет')},
  validate(){const button=root.querySelector('[data-action="check"]');if(button){button.click();return}try{const data=parse();const issues=window.XrayJsonIntelligence?.analyze?.(area.value,data)||[];const errors=issues.filter(i=>i.severity==='error');const warn=issues.filter(i=>i.severity==='warning');status(errors.length+' ошибок · '+warn.length+' предупреждений');if(errors[0]){const x=errors[0];area.focus();if(Number.isInteger(x.start))area.setSelectionRange(x.start,x.end||x.start+1)}notify(errors.length?'Найдены ошибки в JSON':'Синтаксис JSON корректен; полная проверка требует Xray-core')}catch(e){status(e.message);notify(e.message)}},
  async reality(){try{const keys=await realityKeys();mutate(d=>{const inbound=getInbound(d);if(!inbound)return false;inbound.streamSettings??={};inbound.streamSettings.security='reality';inbound.streamSettings.realitySettings??={show:false,serverNames:[],shortIds:[]};const rs=inbound.streamSettings.realitySettings;if(rs.privateKey&&!confirm('Заменить существующий Reality privateKey у выбранного inbound?'))return false;rs.privateKey=keys.privateKey;status('Ключ вставлен в Reality выбранного inbound. Public key скопируйте для клиента: '+keys.publicKey)},'Reality X25519 обновлён');try{await navigator.clipboard.writeText(keys.publicKey);notify('Reality privateKey применён, publicKey скопирован')}catch{notify('Reality privateKey применён. Public key: '+keys.publicKey)}}catch(e){notify(e.message)}},
- shortid(){mutate(d=>{const inbound=getInbound(d);if(!inbound)return false;inbound.streamSettings??={};inbound.streamSettings.realitySettings??={show:false,serverNames:[]};const a=inbound.streamSettings.realitySettings;a.shortIds??=[];a.shortIds.push(hex(8))},'Short ID добавлен')},
+ shortid(){mutate(d=>{const inbound=getInbound(d);if(!inbound)return false;
+  const stream=inbound.streamSettings;
+  if(!stream||stream.security!=='reality')throw Error('Short ID применим только к inbound с security: reality. Сначала настройте Reality.');
+  const reality=stream.realitySettings;
+  if(!reality||typeof reality!=='object'||Array.isArray(reality))throw Error('Отсутствует realitySettings. Сначала настройте Reality.');
+  const existing=reality.shortIds??[];
+  if(!Array.isArray(existing))throw Error('realitySettings.shortIds должен быть массивом.');
+  const invalid=existing.find(x=>typeof x!=='string'||!/^(?:[0-9a-fA-F]{2}){0,8}$/.test(x));
+  if(invalid!==undefined)throw Error('В shortIds уже есть неверный элемент '+JSON.stringify(invalid)+'. Удалите его вручную: Short ID должен содержать чётное число шестнадцатеричных символов (до 16).');
+  const used=new Set(existing.map(x=>x.toLowerCase()));
+  let candidate;for(let i=0;i<16;i++){candidate=hex(8);if(!used.has(candidate))break}
+  if(used.has(candidate))throw Error('Не удалось создать уникальный Short ID.');
+  reality.shortIds=[...existing,candidate];
+ },'Уникальный Reality Short ID добавлен')},
  dns(){mutate(d=>{d.dns??=clone(snippets.dns)},'DNS добавлен')},
  routing(){mutate(d=>{d.routing??=clone(snippets.routing)},'Routing добавлен')},
  policy(){mutate(d=>{d.policy??=clone(snippets.policy);d.stats??=clone(snippets.stats)},'Policy и Stats добавлены')},
