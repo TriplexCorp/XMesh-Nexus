@@ -2506,12 +2506,12 @@ document.addEventListener('click',e=>{
 /* ================= СТАРТ ================= */
 $('#si').innerHTML=ic('search');$('#theme').innerHTML=ic('moon').replace('class="ic"','class="ic moon"')+ic('sun').replace('class="ic"','class="ic sun"');
 $('#bell').innerHTML=ic('bell');syncTopLanguage();$('#logout').innerHTML=ic('logout')+'<span class="logout-label">Выйти</span>';$('#logout').setAttribute('aria-label','Выйти');$('#addb').innerHTML='<span class="addb-icon">'+ic('plus')+'</span><span class="addb-label">Новый пользователь</span>';
-$('#logout').onclick=async()=>{const button=$('#logout');button.disabled=true;try{await fetch('/api/v1/auth/logout',{method:'POST',credentials:'same-origin',cache:'no-store'});}catch(_){}backendReady=false;location.replace('/login')};$('#restart').setAttribute('aria-label','Настройки Xray-core');$('#restart').dataset.railTip='Настройки Xray-core';$('#restart').innerHTML=ic('code')+'<span class="lbl">Версия</span>';
+$('#logout').onclick=async()=>{const button=$('#logout');button.disabled=true;try{await fetch('/api/v1/auth/logout',{method:'POST',credentials:'same-origin',cache:'no-store'});}catch(_){}backendReady=false;location.replace(location.pathname)};$('#restart').setAttribute('aria-label','Настройки Xray-core');$('#restart').dataset.railTip='Настройки Xray-core';$('#restart').innerHTML=ic('code')+'<span class="lbl">Версия</span>';
 apply();matchMedia('(prefers-color-scheme: light)').addEventListener('change',()=>{apply();if(C.theme==='auto')syncSubscriptionTheme()});
 addEventListener('hashchange',()=>{if(backendReady)render()});
 function showAuthGate(){
   backendReady=false;
-  location.replace('/login');
+  location.replace(location.pathname);
 }
 async function initializePanel(){
   const response=await fetch('/api/v1/bootstrap',{credentials:'same-origin',cache:'no-store'});
@@ -2532,7 +2532,7 @@ async function bootPanel(){
     const response=await fetch('/api/v1/auth/session',{credentials:'same-origin',cache:'no-store'});
     if(!response.ok)throw new Error('Backend API не отвечает.');
     const session=await response.json();
-    if(!session.authenticated){location.replace('/login');return}
+    if(!session.authenticated){location.replace(location.pathname);return}
     sessionUser=session.user||null;
     document.documentElement.dataset.accessRole=sessionUser?.role||'viewer';
     if(sessionUser?.role!=='owner'){
@@ -2540,7 +2540,7 @@ async function bootPanel(){
       if(location.hash==='#admins')location.hash='#home';
     }
     await initializePanel();
-  }catch(err){location.replace('/login?unavailable=1')}
+  }catch(err){location.replace(location.pathname+'?unavailable=1')}
 }
 function coreStateLabel(status){
   return status==='updating'?'Обновляется':status==='ready'?'Установлено':status==='error'?'Ошибка':'Не установлено';
