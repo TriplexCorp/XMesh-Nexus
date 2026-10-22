@@ -22,7 +22,7 @@ const sample=()=>({
  outbounds:[{tag:'direct',protocol:'freedom'}],routing:{domainStrategy:'AsIs',rules:[]}
 });
 
-function harness(documentValue,{confirmValue=true,confirmHandler,realityKeys}={}){
+function harness(documentValue,{confirmValue=true,confirmHandler,requestValues,realityKeys}={}){
  const calls=[],listeners={},confirmCalls=[],clipboard=[];
  const area={
    value:JSON.stringify(documentValue,null,2),selectionStart:0,selectionEnd:0,
@@ -52,7 +52,7 @@ function harness(documentValue,{confirmValue=true,confirmHandler,realityKeys}={}
   async confirm(spec){confirmCalls.push(spec.title||spec.description||'confirm');return confirmHandler?confirmHandler(spec.title||spec.description||''):confirmValue},
   async request(spec){
    if(!confirmValue)return null;
-   return Object.fromEntries((spec.fields||[]).map(field=>[field.name,String(field.value??'')]));
+   return Object.fromEntries((spec.fields||[]).map(field=>[field.name,String(requestValues?.[field.name]??field.value??'')]));
   }
  };
  vm.runInNewContext(source,environment,{filename:'xray-studio-tools.js'});
@@ -176,6 +176,27 @@ async function run(){
  assert.deepEqual(inbound.doc().inbounds[1].settings,{users:[],decryption:'none'},'new VLESS uses users, not clients');
  assert.equal(inbound.doc().inbounds[1].listen,'127.0.0.1','unencrypted inbound draft must not be exposed publicly');
 
+
+
+ const canceledCreate=harness(sample(),{confirmValue:false});
+ const beforeCreate=canceledCreate.area.value;
+ await canceledCreate.run('inbound');
+ assert.equal(canceledCreate.area.value,beforeCreate,'cancel new inbound never changes JSON');
+
+ const vmessCreate=harness(sample(),{requestValues:{tag:'vmess-unique',protocol:'vmess',port:'445',transport:'ws'}});
+ await vmessCreate.run('inbound');
+ const vm=vmessCreate.doc().inbounds.at(-1);
+ assert.equal(vm.tag,'vmess-unique','custom modal sets inbound tag');
+ assert.equal(vm.protocol,'vmess','custom modal sets protocol');
+ assert.equal(vm.listen,'127.0.0.1','new modal always uses safe listen address');
+ assert.equal(vm.port,445,'modal port is numeric');
+ assert.deepEqual(vm.settings,{users:[]},'VMess uses settings.users');
+ assert.equal(vm.streamSettings.wsSettings.path,'/ws','transport-specific settings generated');
+
+ const duplicateTag=harness(sample(),{requestValues:{tag:'vless-main'}});
+ const priorTag=duplicateTag.area.value;
+ await duplicateTag.run('inbound');
+ assert.equal(duplicateTag.area.value,priorTag,'duplicate inbound tag is rejected without mutation');
 
  const generated=harness(noReality);
  await generated.run('reality');await tick();
