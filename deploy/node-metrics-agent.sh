@@ -46,14 +46,14 @@ chmod 700 "$state_dir"
 
 if [[ ! -r "$state_file" ]]; then
   tmp_state="$state_file.$$"
-  printf '%s %s %s %s %s\n' "$now" "$rx_now" "$tx_now" "$cpu_total_now" "$cpu_idle_now" > "$tmp_state"
+  printf '%s %s %s %s %s %s\n' "$now" "$rx_now" "$tx_now" "$cpu_total_now" "$cpu_idle_now" "$cpu_steal" > "$tmp_state"
   chmod 600 "$tmp_state"
   mv "$tmp_state" "$state_file"
   echo "Baseline saved; the first rate sample will be sent after the next timer run."
   exit 0
 fi
 
-read -r last_time last_rx last_tx last_cpu_total last_cpu_idle < "$state_file"
+read -r last_time last_rx last_tx last_cpu_total last_cpu_idle last_cpu_steal < "$state_file"
 elapsed=$((now - last_time))
 if (( elapsed < 1 )); then
   echo "Skipping sample: elapsed interval is too short."
@@ -76,6 +76,11 @@ tx_rate=$(((tx_now - last_tx) / elapsed))
 cpu_total_delta=$((cpu_total_now - last_cpu_total))
 cpu_idle_delta=$((cpu_idle_now - last_cpu_idle))
 cpu_pct="null"
+steal_pct="null"
+# Old five-column state files are upgraded without making up a steal baseline.
+if [[ "${last_cpu_steal:-}" =~ ^[0-9]+$ ]] && (( cpu_total_delta > 0 && cpu_steal >= last_cpu_steal )); then
+  steal_pct="$(awk -v total="$cpu_total_delta" -v steal="$((cpu_steal-last_cpu_steal))" 'BEGIN {value=steal*100/total; if(value<0)value=0; if(value>100)value=100; printf "%.2f",value}')"
+fi
 if (( cpu_total_delta > 0 )); then
   cpu_pct="$(awk -v total="$cpu_total_delta" -v idle="$cpu_idle_delta" 'BEGIN { value=(total-idle)*100/total; if(value<0)value=0; if(value>100)value=100; printf "%.2f", value }')"
 fi
@@ -92,8 +97,8 @@ if command -v ss >/dev/null 2>&1; then
 fi
 [[ "$active_connections" =~ ^[0-9]+$ ]] || active_connections=0
 
-payload="$(printf '{"node_id":%s,"cpu_percent":%s,"ram_used_bytes":%s,"ram_total_bytes":%s,"disk_used_bytes":%s,"disk_total_bytes":%s,"rx_bytes_per_sec":%s,"tx_bytes_per_sec":%s,"active_connections":%s,"metrics":{"interface":"%s","rateIntervalSeconds":%s}}' \
-  "$XMESH_NODE_ID" "$cpu_pct" "$mem_used_bytes" "$mem_total_bytes" "${disk_used_bytes:-0}" "${disk_total_bytes:-0}" "$rx_rate" "$tx_rate" "$active_connections" "$XMESH_INTERFACE" "$elapsed")"
+payload="$(printf '{"node_id":%s,"cpu_percent":%s,"cpu_steal_percent":%s,"ram_used_bytes":%s,"ram_total_bytes":%s,"disk_used_bytes":%s,"disk_total_bytes":%s,"rx_bytes_per_sec":%s,"tx_bytes_per_sec":%s,"active_connections":%s,"metrics":{"interface":"%s","rateIntervalSeconds":%s}}' \
+  "$XMESH_NODE_ID" "$cpu_pct" "$steal_pct" "$mem_used_bytes" "$mem_total_bytes" "${disk_used_bytes:-0}" "${disk_total_bytes:-0}" "$rx_rate" "$tx_rate" "$active_connections" "$XMESH_INTERFACE" "$elapsed")"
 
 # Optional Xray StatsService counters, joined accurately using the unique
 # per-user/per-inbound Xray email assigned by XRAY STUDIO.
