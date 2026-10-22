@@ -5,6 +5,30 @@ const escapeHtml=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 const $=(r,k)=>r.querySelector('[data-v="'+k+'"]');
 const field=(k,title,type='text')=>'<label class="sv-field"><span>'+title+'</span><input data-field="'+k+'" type="'+type+'" autocomplete="off"></label>';
 const select=(k,title,values)=>'<label class="sv-field"><span>'+title+'</span><select data-field="'+k+'">'+values.map(a=>'<option value="'+a[0]+'">'+a[1]+'</option>').join('')+'</select></label>';
+const inboundSettingsFor=(protocol)=>{
+ switch(protocol){
+  case 'vless':return {users:[],decryption:'none'};
+  case 'vmess':return {clients:[]};
+  case 'trojan':return {clients:[]};
+  case 'shadowsocks':return {method:'2022-blake3-aes-128-gcm',password:''};
+  default:throw Error('Неподдерживаемый протокол '+protocol);
+ }
+};
+const newInbound=(protocol='vless',tag='inbound-1')=>({
+ tag,listen:'0.0.0.0',port:443,protocol,
+ settings:inboundSettingsFor(protocol),
+ streamSettings:{network:'raw',security:'none'}
+});
+function migrateInboundProtocol(inbound,next){
+ if(inbound.protocol===next)return;
+ const previous=inbound.protocol;
+ const currentSettings=inbound.settings||{};
+ const userCount=(currentSettings.users||currentSettings.clients||[]).length;
+ if(userCount&&!confirm('Смена протокола удалит '+userCount+' пользователей из настроек inbound. Продолжить?'))throw Error('Смена протокола отменена.');
+ if(!confirm('Переключить '+previous+' на '+next+'? Специфичные настройки предыдущего протокола будут заменены.'))throw Error('Смена протокола отменена.');
+ inbound.protocol=next;inbound.settings=inboundSettingsFor(next);
+ if(next==='shadowsocks')alert('Укажите надёжный пароль Shadowsocks в JSON. Без ключа конфигурация не пройдёт проверку Xray-core.');
+}
 const defaultDoc=()=>({log:{loglevel:'warning'},inbounds:[{tag:'vless-main',listen:'0.0.0.0',port:443,protocol:'vless',settings:{users:[],decryption:'none'},streamSettings:{network:'xhttp',security:'none',xhttpSettings:{path:'/xhttp',mode:'auto'}}}],outbounds:[{tag:'direct',protocol:'freedom'}],routing:{domainStrategy:'AsIs',rules:[]}});
 function view(){return [
 '<section id="xm-studio-v4" class="sv-studio">',
@@ -38,6 +62,14 @@ function paint(){
  const source=input.value;
  if(validatedSource!==source){diagnosticsLine=null;get('coreIssues').hidden=true}
  const obj=hasValidJSON();
+ if(!obj && diagnosticsLine===null){
+  try{JSON.parse(source)}catch(error){
+   const msg=String(error.message||'');
+   const line=msg.match(/line\s+(\d+)/i),position=msg.match(/position\s+(\d+)/i);
+   diagnosticsLine=line?Number(line[1]):position?source.slice(0,Number(position[1])).split('\n').length:null;
+   if(diagnosticsLine)validatedSource=source;
+  }
+ }
  const issues=obj?(window.XrayJsonIntelligence?.analyze?.(source,obj)||[]):[];
  const structuralErrors=issues.filter(x=>x.severity==='error');
  const byLine=new Map();
@@ -121,7 +153,7 @@ function formChanged(el){
  if(k==='tag')ib.tag=el.value;
  if(k==='port')ib.port=Number(el.value);
  if(k==='listen')ib.listen=el.value;
- if(k==='protocol')ib.protocol=el.value;
+ if(k==='protocol')migrateInboundProtocol(ib,el.value);
  if(k==='transport')ss.network=el.value;
  if(k==='security')ss.security=el.value;
  if(['target','sni','private','shortid'].includes(k)){const r=ss.realitySettings??={show:false,serverNames:[],shortIds:[]};if(k==='target')r.target=el.value;if(k==='sni')r.serverNames=[el.value];if(k==='private')r.privateKey=el.value;if(k==='shortid')r.shortIds=[el.value]}
@@ -187,7 +219,7 @@ async function action(a){
  case 'reset':if(confirm('Сбросить несохранённые изменения?')){input.value=saved||pretty(defaultDoc());paint();input.dispatchEvent(new Event('xmesh:reset-history'))}return;
  case 'undo':root.querySelector('[data-tool="undo"]')?.click();return;
  case 'redo':root.querySelector('[data-tool="redo"]')?.click();return;
- case 'add-inbound':mutate(d=>{d.inbounds??=[];let i=1;while(d.inbounds.some(x=>x.tag==='inbound-'+i))i++;d.inbounds.push({tag:'inbound-'+i,listen:'0.0.0.0',port:443,protocol:'vless',settings:{users:[],decryption:'none'},streamSettings:{network:'raw',security:'none'}});inboundIndex=d.inbounds.length-1});return;
+ case 'add-inbound':mutate(d=>{d.inbounds??=[];let i=1;while(d.inbounds.some(x=>x.tag==='inbound-'+i))i++;d.inbounds.push(newInbound('vless','inbound-'+i));inboundIndex=d.inbounds.length-1});return;
  case 'remove-inbound':if(confirm('Удалить выбранный inbound?'))mutate(d=>{d.inbounds.splice(inboundIndex,1);inboundIndex=Math.max(inboundIndex-1,0)});return;
  case 'add-outbound':mutate(d=>{d.outbounds??=[];let i=1;while(d.outbounds.some(x=>x.tag==='outbound-'+i))i++;d.outbounds.push({tag:'outbound-'+i,protocol:'freedom'});outIndex=d.outbounds.length-1});return;
  case 'remove-outbound':if(confirm('Удалить выбранный outbound?'))mutate(d=>{d.outbounds.splice(outIndex,1);outIndex=Math.max(outIndex-1,0)});return;
