@@ -70,6 +70,8 @@ jobs:
         run: node scripts/check-modal-motion.js
       - name: Verify TOTP enrollment, MFA login and recovery security
         run: node scripts/check-mfa.js
+      - name: Verify persistent MFA key migration safety
+        run: bash scripts/check-mfa-key.sh
       - name: Check generic branding in tracked files
         run: node scripts/check-white-label.js
       - name: Check appearance surface choices and migration
