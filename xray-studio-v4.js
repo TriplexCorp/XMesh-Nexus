@@ -25,14 +25,9 @@ const newInbound=(protocol='vless',tag='inbound-1')=>({
 function migrateInboundProtocol(inbound,next){
  if(inbound.protocol===next)return;
  const previous=inbound.protocol;
- const currentSettings=inbound.settings||{};
- const userCount=(currentSettings.users||currentSettings.clients||[]).length;
- if(userCount&&!confirm('Смена протокола удалит '+userCount+' пользователей из настроек inbound. Продолжить?'))throw Error('Смена протокола отменена.');
- if(!confirm('Переключить '+previous+' на '+next+'? Специфичные настройки предыдущего протокола будут заменены.'))throw Error('Смена протокола отменена.');
  inbound.protocol=next;inbound.settings=inboundSettingsFor(next);
  if(next==='hysteria')inbound.streamSettings={network:'hysteria',security:'tls',hysteriaSettings:{version:2}};
  else if(previous==='hysteria')inbound.streamSettings={network:'raw',security:'none'};
- if(next==='shadowsocks')alert('Укажите надёжный пароль Shadowsocks в JSON. Без ключа конфигурация не пройдёт проверку Xray-core.');
 }
 const defaultDoc=()=>({log:{loglevel:'warning'},inbounds:[{tag:'vless-main',listen:'127.0.0.1',port:443,protocol:'vless',settings:{users:[],decryption:'none'},streamSettings:{network:'xhttp',security:'none',xhttpSettings:{path:'/xhttp',mode:'auto'}}}],outbounds:[{tag:'direct',protocol:'freedom'}],routing:{domainStrategy:'AsIs',rules:[]}});
 function view(){return [
@@ -69,6 +64,10 @@ const input=get('source'),gutter=get('gutter'),highlight=get('highlight'),minima
 let name='Новый профиль',id=null,inboundIndex=0,outIndex=0,saved='',locked=false,tools=true;
 let diagnosticsLine=null,validatedSource=null;
 const notify=msg=>ctx.toast?.(msg);
+const studioDialog=window.XMeshStudioDialogs;
+const approve=async spec=>{if(!studioDialog?.confirm)throw Error('Диалоги XRAY STUDIO не загружены');return studioDialog.confirm(spec)};
+const unsavedApproval=async description=>input.value===saved||await approve({title:'Несохранённые изменения',description,notice:'Изменения в текущем JSON будут потеряны. При необходимости сначала сохраните профиль.',danger:true,confirmLabel:'Продолжить без сохранения',cancelLabel:'Вернуться'});
+
 let activePage='editor';
 function setPage(page){
  activePage=page;
@@ -80,8 +79,8 @@ function setPage(page){
  for(const b of root.querySelectorAll('.sv-page-tabs button')){const selected=b.dataset.action===(editor?'studio-editor':'profiles');b.classList.toggle('active',selected);if(selected)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')}
  if(!editor)renderProfiles();
 }
-function openProfile(p){
- if(input.value!==saved&&!confirm('Есть несохранённые изменения. Открыть другой профиль?'))return;
+async function openProfile(p){
+ if(!await unsavedApproval('Открыть «'+(p.name||'профиль')+'» вместо текущего черновика?'))return;
  try{
   const d=typeof p.config==='string'?JSON.parse(p.config):p.config;
   id=p.id;name=p.name;inboundIndex=outIndex=0;
@@ -89,8 +88,8 @@ function openProfile(p){
   setPage('editor');
  }catch(err){notify('Не удалось открыть профиль: '+err.message)}
 }
-function newProfile(){
- if(input.value!==saved&&!confirm('Есть несохранённые изменения. Создать новый профиль?'))return;
+async function newProfile(){
+ if(!await unsavedApproval('Создать новый профиль вместо текущего черновика?'))return;
  id=null;name='Новый профиль';inboundIndex=outIndex=0;
  input.value=pretty(defaultDoc());saved=input.value;paint();input.dispatchEvent(new Event('xmesh:reset-history'));setPage('editor');
 }
@@ -170,7 +169,7 @@ function renderProfiles(){
   del.setAttribute('aria-label','Удалить профиль '+(p.name||'Без названия'));
   del.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 4h4M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>';
   del.onclick=async()=>{
-   if(!confirm('Удалить профиль «'+(p.name||'Без названия')+'»? Действие необратимо.'))return;
+   if(!await approve({title:'Удалить профиль?',description:'Профиль «'+(p.name||'Без названия')+'» будет удалён из библиотеки.',notice:'Действие необратимо. Проверьте назначения профиля рабочим узлам.',danger:true,confirmLabel:'Удалить профиль',cancelLabel:'Отмена'}))return;
    del.disabled=true;
    try{
     await ctx.api.remove('profiles',p.id);
@@ -272,11 +271,24 @@ function update(d){input.value=pretty(d);input.dispatchEvent(new Event('input',{
 function mutate(fn){try{const d=json();fn(d);update(d)}catch(err){notify('Изменение не применено: '+err.message)}}
 function currentInbound(d){const ib=selected(d.inbounds,inboundIndex);if(!ib)throw Error('Выберите inbound');return ib}
 function currentOut(d){const ob=selected(d.outbounds,outIndex);if(!ob)throw Error('Выберите outbound');return ob}
-function formChanged(el){
+async function formChanged(el){
  if(locked||!el.dataset.field)return;const k=el.dataset.field;
  if(k==='name'){name=el.value;get('saveState').textContent='Имя профиля будет сохранено при сохранении';return}
  if(k==='inboundSelect'){inboundIndex=Number(el.value);sync(json());return}
  if(k==='outSelect'){outIndex=Number(el.value);sync(json());return}
+ if(k==='protocol'){
+  try{
+   const before=json(),ib=currentInbound(before);
+   if(ib.protocol!==el.value){
+    const count=(ib.settings?.users||ib.settings?.clients||[]).length;
+    const ok=await approve({title:'Изменить протокол inbound?',
+      description:'Переключить «'+(ib.tag||'inbound')+'» с '+String(ib.protocol).toUpperCase()+' на '+el.value.toUpperCase()+'?',
+      notice:'Специфичные настройки прежнего протокола будут заменены.'+(count?' Текущих пользователей: '+count+'.':''),
+      danger:count>0,confirmLabel:'Сменить протокол',cancelLabel:'Отмена'});
+    if(!ok){sync(json());return}
+   }
+  }catch(e){notify(e.message);sync(json());return}
+ }
  mutate(d=>{
  if(k==='log')(d.log??={}).loglevel=el.value;
  else if(k==='strategy'||k==='routeStrategy')(d.routing??={rules:[]}).domainStrategy=el.value;
@@ -302,6 +314,7 @@ function formChanged(el){
  if(k==='certificate'||k==='key'){const tls=ss.tlsSettings??={certificates:[{}]};tls.certificates??=[{}];tls.certificates[0]??={};tls.certificates[0][k==='certificate'?'certificateFile':'keyFile']=el.value}
  }
  });
+ if(k==='protocol'&&el.value==='shadowsocks')notify('Shadowsocks: укажите надёжный ключ перед публикацией.');
 }
 function validate(d){if(!Array.isArray(d.inbounds)||!d.inbounds.length)throw Error('Нужен хотя бы один inbound');const tags=new Set();for(const x of d.inbounds){
  if(x.protocol==='vless'&&!Array.isArray(x.settings?.users))throw Error('VLESS inbound требует settings.users (массив).');
