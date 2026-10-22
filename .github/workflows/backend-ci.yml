@@ -72,6 +72,8 @@ jobs:
         run: node scripts/check-mfa.js
       - name: Verify persistent MFA key migration safety
         run: bash scripts/check-mfa-key.sh
+      - name: Verify advanced security policies and active-session controls
+        run: node scripts/check-security-center.js
       - name: Check generic branding in tracked files
         run: node scripts/check-white-label.js
       - name: Check appearance surface choices and migration
