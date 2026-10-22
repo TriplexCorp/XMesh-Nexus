@@ -1475,7 +1475,7 @@ async function profilesP(){
  field('xdrive-hole-ms','Hole timeout · ms',inp('xdrive-hole-ms','','0 = core default','type="number" min="0" max="600000"'))+
  field('xdrive-mux-concurrency','Client mux concurrency',inp('xdrive-mux-concurrency','8','1–1024','type="number" min="1" max="1024"'))+
  field('xdrive-template','HTTP template JSON','<textarea id="xpb-xdrive-template" rows="5" spellcheck="false" placeholder="{ }"></textarea>'))
- ,false,true)+
+ ,true)+
  '</div>'+
  '<div class="xray-config-panel" id="xpb-config-encryption" data-xray-config-panel="encryption" hidden>'+
  '<div class="xray-config-panel-title"><div><h3>VLESS Encryption</h3><p>Дополнительный механизм защиты для VLESS. Не является заменой транспорта.</p></div></div>'+
@@ -1488,7 +1488,7 @@ async function profilesP(){
  '<div class="xray-main-grid">'+
  field('vless-decryption','Сервер · settings.decryption',inp('vless-decryption','','Значение decryption из xray vlessenc','autocomplete="off"'))+
  field('vless-encryption','Клиент · users[0].encryption',inp('vless-encryption','','Парное значение encryption','autocomplete="off"'))+
- '</div><p class="note xray-inline-note">Важно: ML-KEM-768 — не отдельный транспорт и не uTLS fingerprint. Он выбирает постквантовый способ аутентификации в VLESS Encryption. Эфемерный обмен также использует гибрид ML-KEM-768/X25519.</p>',false,true)+
+ '</div><p class="note xray-inline-note">Важно: ML-KEM-768 — не отдельный транспорт и не uTLS fingerprint. Он выбирает постквантовый способ аутентификации в VLESS Encryption. Эфемерный обмен также использует гибрид ML-KEM-768/X25519.</p>',true)+
  '</div>'+
  '<div class="xray-config-panel" id="xpb-config-client" data-xray-config-panel="client" hidden>'+
  '<div class="xray-config-panel-title"><div><h3>Протокол и параметры</h3><p>Учётные данные клиента и дополнительные параметры выбранного inbound-протокола.</p></div></div>'+
@@ -1526,7 +1526,7 @@ async function profilesP(){
  field('tun-routes','Системные маршруты',inp('tun-routes','','Например, 0.0.0.0/0,::/0')))+
  optionGroup('client-logging','Диагностика','Уровень детализации журнала',
  field('loglevel','Уровень логирования',sel('loglevel',[['warning','warning'],['error','error'],['none','none'],['info','info'],['debug','debug']])))
- ,false,true)+ '</div></div></div></div></div><aside class="xray-output-dock">'+
+ ,true)+ '</div></div></div></div></div><aside class="xray-output-dock">'+
  '<section class="xray-output-workspace" aria-label="JSON-конфигурации">'+
  '<div class="xray-output-workspace-head"><div><p class="note">JSON PREVIEW</p><b>Результат конфигурации</b><small>Server JSON и Client JSON обновляются по мере настройки. Экспорт не применяет конфиг к работающему ядру.</small></div><span class="xray-output-state" id="xpb-output-state">Предпросмотр готов</span></div>'+
  '<div class="xray-output-toolbar">'+
