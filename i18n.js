@@ -517,7 +517,7 @@ window.XMeshI18n=(()=>{
     ["Безопасность","Security"],
     ["Безопасность аккаунта","Account security"],
     ["АККАУНТ / БЕЗОПАСНОСТЬ","ACCOUNT / SECURITY"],
-    ["Управляйте защитой входа в панель. Настройки относятся к вашей учётной записи администратора.","Manage sign-in security. These settings apply to your administrator account."],
+    ["Двухфакторная защита вашего аккаунта, серверные правила входа и управление активными сессиями.","Two-factor protection for your account, server-side sign-in policies and active session management."],
     ["Двухфакторная аутентификация (2FA), резервные коды и защита входа.","Two-factor authentication (2FA), recovery codes and sign-in protection."],
     ["Открыть безопасность","Open security"],
     ["Подключить 2FA","Set up 2FA"],
