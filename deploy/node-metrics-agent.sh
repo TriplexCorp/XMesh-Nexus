@@ -64,7 +64,7 @@ fi
 # rather than inventing a zero-rate sample.
 if (( rx_now < last_rx || tx_now < last_tx )); then
   tmp_state="$state_file.$$"
-  printf '%s %s %s %s %s\n' "$now" "$rx_now" "$tx_now" "$cpu_total_now" "$cpu_idle_now" > "$tmp_state"
+  printf '%s %s %s %s %s %s\n' "$now" "$rx_now" "$tx_now" "$cpu_total_now" "$cpu_idle_now" "$cpu_steal" > "$tmp_state"
   chmod 600 "$tmp_state"
   mv "$tmp_state" "$state_file"
   echo "Network counters reset; baseline refreshed."
@@ -139,6 +139,6 @@ curl --fail --silent --show-error --max-time 12 \
   -H "Content-Type: application/json" \
   --data-binary "$payload" >/dev/null
 tmp_state="$state_file.$$"
-printf '%s %s %s %s %s\n' "$now" "$rx_now" "$tx_now" "$cpu_total_now" "$cpu_idle_now" > "$tmp_state"
+printf '%s %s %s %s %s %s\n' "$now" "$rx_now" "$tx_now" "$cpu_total_now" "$cpu_idle_now" "$cpu_steal" > "$tmp_state"
 chmod 600 "$tmp_state"
 mv "$tmp_state" "$state_file"
