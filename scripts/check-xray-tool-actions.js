@@ -89,7 +89,7 @@ async function run(){
  assert.equal(ids(dupe.doc())[0],'aabb');
  assert.equal(new Set(ids(dupe.doc())).size,2,'duplicate shortId repaired');
 
- const noReality=sample();noReality.inbounds[0].streamSettings.security='none';
+ const noReality=sample();noReality.inbounds[0].streamSettings.security='none';delete noReality.inbounds[0].streamSettings.realitySettings;
  const blocked=harness(noReality);const blockedBefore=blocked.area.value;
  blocked.run('shortid');
  assert.equal(blocked.area.value,blockedBefore,'tool does not silently enable Reality');
