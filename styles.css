@@ -2346,3 +2346,42 @@ aside #logout .ic{width:1.12rem;height:1.12rem;flex-shrink:0}
 .appearance-layout .slider-control .precision-number span{font-size:.74rem;color:var(--mu);font-weight:650}
 .appearance-layout .slider-control input[type=range]{flex:1 1 auto;width:100%;min-width:3rem}
 @media(max-width:520px){.appearance-layout .slider-control .precision-number{width:5.6rem;min-width:5.2rem}}
+
+/* Account security: a focused workspace, with clear server readiness states. */
+.security-workspace{width:100%;max-width:1080px;margin-inline:auto;min-width:0}
+#mfa-panel.mfa-security-card{padding:1.35rem 1.45rem}
+#mfa-panel .mfa-security-heading{display:flex;align-items:center;gap:1rem;justify-content:space-between;margin-bottom:.65rem}
+#mfa-panel .mfa-security-title{display:flex;align-items:center;gap:.85rem;min-width:0}
+#mfa-panel .mfa-security-title h3{margin:0 0 .25rem}
+#mfa-panel .mfa-security-title p{margin:0;color:var(--mu);font-size:.82rem}
+#mfa-panel .mfa-security-icon{display:grid;place-items:center;width:2.65rem;height:2.65rem;flex-shrink:0;
+ color:var(--a);background:color-mix(in srgb,var(--a) 9%,var(--s2));
+ border:1px solid color-mix(in srgb,var(--a) 23%,var(--ln));border-radius:var(--ui-control-radius)}
+#mfa-panel #mfa-state{flex-shrink:0}
+#mfa-panel #mfa-state[data-status=enabled]{color:var(--a);border-color:color-mix(in srgb,var(--a) 35%,var(--ln))}
+#mfa-panel #mfa-state[data-status=unavailable]{color:var(--mu);background:var(--s2)}
+#mfa-panel .mfa-security-content{display:grid;gap:1rem}
+#mfa-panel .mfa-security-content>.note{max-width:52rem;line-height:1.6;margin:0}
+#mfa-panel .mfa-unavailable{border-top:1px solid var(--ln);padding-top:1.1rem;display:grid;gap:1rem;max-width:52rem}
+#mfa-panel .mfa-unavailable-heading h4{font-size:1rem;margin:0 0 .4rem}
+#mfa-panel .mfa-unavailable-heading p{color:var(--mu);margin:0;line-height:1.65}
+#mfa-panel .mfa-unavailable-actions{display:grid;gap:.8rem}
+#mfa-panel .mfa-unavailable-actions>div{display:flex;align-items:flex-start;gap:.8rem}
+#mfa-panel .mfa-unavailable-actions p{margin:.15rem 0 0;line-height:1.55}
+#mfa-panel .mfa-step-number{display:grid;place-items:center;flex-shrink:0;min-width:2rem;height:2rem;
+ border:1px solid var(--ln);border-radius:calc(var(--ui-control-radius) * .65);
+ color:var(--a);background:var(--s2);font-size:.73rem;font-weight:800}
+#mfa-panel .mfa-terminal{display:flex;align-items:center;justify-content:space-between;gap:.8rem;
+ width:fit-content;max-width:100%;min-width:min(100%,22rem);padding:.55rem .65rem .55rem .95rem;
+ background:var(--s2);border:1px solid var(--ln);border-radius:var(--ui-control-radius)}
+#mfa-panel .mfa-terminal code{font-size:.87rem;color:var(--tx);overflow-wrap:anywhere;user-select:all}
+#mfa-panel .mfa-repair-hint{font-size:.82rem;color:var(--mu);line-height:1.6;margin:0}
+#mfa-panel .mfa-key-warning{max-width:100%;border-top:1px solid var(--ln);padding-top:.8rem}
+#mfa-panel .mfa-key-warning summary{cursor:pointer;color:var(--tx);font-weight:650}
+#mfa-panel .mfa-key-warning p{color:var(--mu);font-size:.82rem;line-height:1.65}
+@media(max-width:640px){
+ #mfa-panel.mfa-security-card{padding:1rem}
+ #mfa-panel .mfa-security-heading{align-items:flex-start;flex-wrap:wrap}
+ #mfa-panel .mfa-security-title{gap:.6rem}
+ #mfa-panel .mfa-terminal{width:100%}
+}
