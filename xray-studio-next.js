@@ -118,6 +118,8 @@ try{server=JSON.stringify(mode==='manual'?JSON.parse(v('manual')):config(),null,
 if(mode==='manual'){client='';clientError='В ручном режиме клиентский JSON не генерируется из произвольного Server JSON. Используйте персональный экспорт пользователя.'}
 else try{client=JSON.stringify(clientConfig(),null,2)}catch(e){client='';clientError=e.message}
 const current=tab==='server'?server:client;
+const saveStatus=$(root,'saveStatus');
+if(saveStatus)saveStatus.textContent=serverError?'Проверьте параметры сервера: '+serverError:(selectedId!==null?'Редактируется существующий профиль · изменения ещё не сохранены':'Новый профиль · изменения не применяются к узлам автоматически');
 $(root,'output').textContent=current||(tab==='server'?'Server JSON пока недоступен':'Client JSON пока недоступен');
 const problem=tab==='server'?serverError:clientError;
 info(problem?'Исправьте параметры':'Предпросмотр готов',!!problem);
@@ -139,7 +141,7 @@ const actions={
 basicTab:()=>{editorTab='basic';syncSections()},
 securityTab:()=>{editorTab='security';syncSections()},
 clientTab:()=>{editorTab='client';syncSections()},
-new:()=>{selectedId=null;set('name','Новый профиль');set('tag','vless-main');mode='visual';manualDirty=false;editorTab='basic';refreshList();syncSections();refresh()},
+new:()=>{selectedId=null;set('name','Новый профиль');set('tag','vless-main');mode='visual';manualDirty=false;editorTab='basic';root.querySelectorAll('[data-xm-action="visual"],[data-xm-action="manual"]').forEach(b=>b.classList.toggle('is-active',b.dataset.xmAction==='visual'));refreshList();syncSections();refresh()},
 duplicate:()=>{selectedId=null;set('name',v('name')+' — копия');refreshList();ctx.toast('Введите уникальный тег для копии')},
 
 visual:()=>switchMode('visual'),manual:()=>switchMode('manual'),
