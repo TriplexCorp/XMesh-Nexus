@@ -612,7 +612,7 @@ async fn patch_settings(
     for key in object.keys() {
         if !matches!(key.as_str(), "brand" | "domain" | "hooks"
                 | "subscriptionDomain" | "subscriptionPath" | "subscriptionBrand"
-                | "subscriptionDescription" | "subscriptionDescriptionEn" | "subscriptionFooter" | "subscriptionFooterEn" | "subscriptionAccent"
+                | "subscriptionDescription" | "subscriptionDescriptionEn" | "subscriptionFooter" | "subscriptionFooterEn" | "subscriptionAccent" | "subscriptionSecondaryAccent"
                 | "subscriptionLanguage" | "subscriptionTheme" | "subscriptionSyncPanelTheme" | "subscriptionPlacement" | "nodePlacement"
                 | "deploymentServerB" | "deploymentServerC" | "subscriptionShowTraffic"
                 | "subscriptionShowExpiry" | "subscriptionBackground" | "subscriptionCardColor"
