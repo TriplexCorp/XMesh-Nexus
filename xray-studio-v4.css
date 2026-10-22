@@ -342,3 +342,20 @@
 .sv-studio .sv-codepanel .sv-codesurface{min-height:0;flex:1}
 .sv-studio .sv-tools{display:none!important}
 @media(max-width:760px){.sv-studio .sv-codepanel{height:max(30rem,calc(100dvh - 240px))}}
+
+
+/* Distinct, scale-aware JSON tool buttons with restrained semantic accents. */
+.sv-studio .sv-inline-tools .xm-tools-grid{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.sv-studio .sv-inline-tools .sv-toolitem{--tool-color:var(--vaccent);--tool-tint:color-mix(in srgb,var(--tool-color) 9%,var(--vpanel));display:inline-flex;gap:.52rem;align-items:center;justify-content:flex-start;min-height:2.55rem;padding:.36rem .78rem .36rem .38rem;border:1px solid color-mix(in srgb,var(--tool-color) 28%,var(--vline));border-radius:var(--vround);background:var(--tool-tint);color:var(--vtext);font-weight:650;font-size:.76rem;transition:background .18s,border-color .18s,transform .18s}
+.sv-studio .sv-inline-tools .sv-toolitem:hover{background:color-mix(in srgb,var(--tool-color) 15%,var(--vpanel));border-color:var(--tool-color);transform:translateY(-1px);color:var(--vtext)}
+.sv-studio .sv-inline-tools .sv-toolitem:focus-visible{outline:2px solid var(--tool-color);outline-offset:2px}
+.sv-studio .sv-inline-tools .sv-tool-glyph{display:grid;place-items:center;flex:none;width:1.85rem;height:1.85rem;border-radius:calc(var(--vround) - 3px);background:color-mix(in srgb,var(--tool-color) 17%,var(--vpanel));color:var(--tool-color)}
+.sv-studio .sv-inline-tools .sv-tool-glyph svg{width:1rem;height:1rem;display:block}
+.sv-studio .sv-inline-tools .sv-tool-label{white-space:nowrap}
+.sv-studio .sv-inline-tools .sv-tool-reality{--tool-color:#69d6ae}
+.sv-studio .sv-inline-tools .sv-tool-shortid{--tool-color:#ba94f2}
+.sv-studio .sv-inline-tools .sv-tool-xhttp{--tool-color:#72b5f6}
+.sv-studio .sv-inline-tools .sv-tool-dns{--tool-color:#e4ae69}
+.sv-studio .sv-inline-tools .sv-tool-routing{--tool-color:#69c7c8}
+.sv-studio .sv-inline-tools .sv-tool-inbound{--tool-color:var(--vaccent)}
+@media(prefers-reduced-motion:reduce){.sv-studio .sv-inline-tools .sv-toolitem{transform:none!important}}
