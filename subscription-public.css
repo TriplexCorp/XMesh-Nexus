@@ -1,0 +1,52 @@
+/* The production page deliberately uses the exact same .subscription-preview
+   component and design tokens as SUBSCRIPTION STUDIO.
+   Only the page shell and functional controls are styled here. */
+:root{color-scheme:dark;--ui-radius:16px;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+*{box-sizing:border-box}
+body.subscription-public{margin:0;min-height:100vh;background:#0b1016;color:var(--portal-text,#ecf3f6);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+.subscription-public-shell{width:min(100% - 32px,980px);margin:clamp(16px,4vh,55px) auto;padding-bottom:32px}
+.subscription-public .subscription-preview{gap:clamp(20px,3vw,30px);padding:clamp(22px,4vw,38px);min-height:0;box-shadow:0 18px 55px #0003;font-size:16px}
+.subscription-public .subscription-preview-brand{gap:12px;flex-wrap:wrap}
+.subscription-public .subscription-preview-brand>b{font-size:clamp(17px,2.1vw,21px)}
+.subscription-public .subscription-preview-brand>span,.subscription-public .subscription-preview-brand>img{width:44px;height:44px}
+.subscription-public .subscription-preview-languages{margin-left:auto}
+.subscription-public .subscription-preview-languages a{display:grid;place-items:center;min-height:31px;min-width:37px;padding:5px 9px;border-radius:calc(var(--portal-radius)*.46);font-size:13px;color:var(--portal-text);font-weight:800;text-decoration:none}
+.subscription-public .subscription-preview-languages a.on{background:var(--portal-accent);color:var(--portal-bg)}
+.subscription-public .subscription-preview-languages a:focus-visible{outline:2px solid var(--portal-accent);outline-offset:2px}
+.subscription-public .subscription-preview-hero h3{font-size:clamp(25px,3.1vw,32px)}
+.subscription-public .subscription-preview-hero p{font-size:14px;line-height:1.55}
+.subscription-public .subscription-preview-meta>div{padding:16px;gap:10px}
+.subscription-public .subscription-preview-meta b{font-size:16px}
+.subscription-public .subscription-preview-meta small{font-size:13px}
+.subscription-public .subscription-preview-progress{height:6px}
+.subscription-public .subscription-preview-cta{appearance:none;display:block;width:100%;border:0;text-decoration:none;font:inherit;font-weight:800;font-size:16px;padding:18px 20px;border-radius:var(--portal-radius);cursor:pointer;background:var(--portal-accent);color:#0c171d;text-align:center}
+.subscription-public .subscription-preview-cta:hover{filter:brightness(1.06)}
+.subscription-public .subscription-preview-cta:focus-visible{outline:3px solid var(--portal-text);outline-offset:4px}
+.subscription-public .subscription-preview-quick{gap:8px}
+.subscription-public .subscription-preview-quick button{appearance:none;background:transparent;font:inherit;font-size:13px;cursor:pointer;color:var(--portal-text);border:1px solid color-mix(in srgb,var(--portal-text) 19%,transparent);padding:9px 14px;min-height:43px;border-radius:var(--portal-radius)}
+.subscription-public .subscription-preview-quick button:hover{border-color:var(--portal-accent)}
+.subscription-public .subscription-preview-quick button:focus-visible{outline:2px solid var(--portal-accent);outline-offset:3px}
+.subscription-public .subscription-preview-apps{gap:14px}
+.subscription-public .subscription-preview-apps>div{gap:10px}
+.subscription-public .subscription-preview-app{font:inherit;color:var(--portal-text);text-decoration:none;border-radius:10px;padding:6px}
+.subscription-public .subscription-preview-app:hover{background:color-mix(in srgb,var(--portal-accent) 9%,transparent)}
+.subscription-public .subscription-preview-app b{font-size:13px}
+.subscription-public .subscription-preview-app small{font-size:11px}
+.subscription-public .subscription-preview-support{display:block;text-decoration:none;color:var(--portal-accent);padding:12px}
+.subscription-public .subscription-preview-support:hover{border-color:var(--portal-accent)}
+.subscription-public .subscription-preview-qr{width:fit-content;max-width:270px;padding:12px;background:#fff;border-radius:var(--portal-radius)}
+.subscription-public .subscription-preview-qr svg{width:100%;height:auto;display:block}
+.subscription-public .subscription-preview-qr[hidden],.subscription-public [hidden]{display:none!important}
+.subscription-public .subscription-preview footer{font-size:13px}
+.subscription-public .subscription-public-devices{border:1px solid color-mix(in srgb,var(--portal-text) 19%,transparent);padding:12px 16px;border-radius:var(--portal-radius);font-size:13px}
+.subscription-public .subscription-preview[data-portal-layout=compact]{gap:14px;padding:20px}
+.subscription-public .subscription-preview[data-portal-layout=centered] .subscription-preview-hero{text-align:center}
+.subscription-public .subscription-preview[data-portal-theme=light] .subscription-preview-quick button{border-color:#c9d3dc}
+@media(max-width:620px){
+ .subscription-public-shell{width:calc(100% - 20px);margin:10px auto}
+ .subscription-public .subscription-preview{padding:21px;gap:20px}
+ .subscription-public .subscription-preview-meta{grid-template-columns:1fr}
+ .subscription-public .subscription-preview-brand>b{font-size:17px}
+ .subscription-public .subscription-preview-hero h3{font-size:25px}
+ .subscription-public .subscription-preview-apps>div{grid-template-columns:1fr}
+}
