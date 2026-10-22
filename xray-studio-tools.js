@@ -209,7 +209,19 @@ const refreshIssues=()=>{
 const operations={
  undo(){if(!undo.length)return;redo.push(area.value);const value=undo.pop();area.value=value;last=value;area.dispatchEvent(new Event('input',{bubbles:true}));update()},
  redo(){if(!redo.length)return;undo.push(area.value);area.value=redo.pop();last=area.value;area.dispatchEvent(new Event('input',{bubbles:true}));update()},
- find(){const q=prompt('Найти текст в JSON:');if(!q)return;const pos=area.value.toLowerCase().indexOf(q.toLowerCase(),area.selectionEnd);const i=pos>=0?pos:area.value.toLowerCase().indexOf(q.toLowerCase());if(i>=0){area.focus();area.setSelectionRange(i,i+q.length);status('Найдено: '+q)}else status('Совпадений нет')},
+ async find(){
+  try{
+   ensureDialogs();
+   const response=await dialog.request({title:'Поиск в JSON',description:'Найдите нужный параметр в текущей конфигурации.',confirmLabel:'Найти',
+     fields:[{name:'query',label:'Текст для поиска',value:'',wide:true,required:true,placeholder:'Например, realitySettings'}]});
+   if(!response)return;
+   const q=response.query;
+   const pos=area.value.toLowerCase().indexOf(q.toLowerCase(),area.selectionEnd);
+   const i=pos>=0?pos:area.value.toLowerCase().indexOf(q.toLowerCase());
+   if(i>=0){area.focus();area.setSelectionRange(i,i+q.length);status('Найдено: '+q)}
+   else status('Совпадений нет');
+  }catch(e){notify(e.message)}
+ },
  validate(){const button=root.querySelector('[data-action="check"]');if(button){button.click();return}try{const data=parse();const issues=window.XrayJsonIntelligence?.analyze?.(area.value,data)||[];const errors=issues.filter(i=>i.severity==='error');const warn=issues.filter(i=>i.severity==='warning');status(errors.length+' ошибок · '+warn.length+' предупреждений');if(errors[0]){const x=errors[0];area.focus();if(Number.isInteger(x.start))area.setSelectionRange(x.start,x.end||x.start+1)}notify(errors.length?'Найдены ошибки в JSON':'Синтаксис JSON корректен; полная проверка требует Xray-core')}catch(e){status(e.message);notify(e.message)}},
  async reality(){return setReality()},
  async 'repair-shortids'(){
@@ -293,11 +305,63 @@ const operations={
    if(ok)focusJsonSection('tag','Inbound '+response.tag);
   }catch(e){status('Ошибка: '+e.message);notify(e.message)}
  },
- xhttp(){let existed=false;const ok=mutate(d=>{const inbound=getInbound(d);if(!inbound)return false;const ss=inbound.streamSettings??={};if(ss.network==='xhttp'&&ss.xhttpSettings&&typeof ss.xhttpSettings==='object'){existed=true;return false}if(ss.network!=='xhttp'&&ss.network!=='raw'&&!confirm('Сменить транспорт выбранного inbound на XHTTP?'))return false;ss.network='xhttp';ss.xhttpSettings??={path:'/xhttp',mode:'auto'}},'XHTTP добавлен');if(existed||ok)focusJsonSection('xhttpSettings','XHTTP')},
- vlessens(){mutate(d=>{const inbound=getInbound(d);if(!inbound)return false;if(inbound.protocol!=='vless')throw Error('VLESS Encryption доступен только для VLESS');const current=inbound.settings?.decryption||'none';const value=prompt('Серверный decryption из xray vlessenc. Безопасно отменить:',current);if(value===null)return false;(inbound.settings??={users:[]}).decryption=value.trim()||'none'},'VLESS Encryption обновлён')},
- finalmask(){mutate(d=>{const inbound=getInbound(d);if(!inbound)return false;const current=inbound.streamSettings?.finalmask||{};const raw=prompt('FinalMask JSON для streamSettings.finalmask:',JSON.stringify(current,null,2));if(raw===null)return false;const value=JSON.parse(raw);if(!value||typeof value!=='object'||Array.isArray(value))throw Error('FinalMask должен быть объектом');inbound.streamSettings??={};if(Object.keys(value).length)inbound.streamSettings.finalmask=value;else delete inbound.streamSettings.finalmask},'FinalMask обновлён')},
+ async xhttp(){
+  try{
+   const selected=await chooseInbound();if(!selected)return;
+   if(area.value!==selected.source){notify('JSON изменился; повторите действие.');return}
+   const current=getInbound(parse(),selected.index).streamSettings||{};
+   const existing=current.network==='xhttp'&&current.xhttpSettings&&typeof current.xhttpSettings==='object';
+   if(existing){focusJsonSection('xhttpSettings','XHTTP');return}
+   if(current.network!=='xhttp'&&current.network!=='raw'){
+    const allowed=await dialog.confirm({title:'Изменить транспорт?',
+      description:'Переключить inbound «'+selected.tag+'» с '+current.network+' на XHTTP? Настройки предыдущего транспорта сохранятся в JSON, но перестанут применяться.',
+      confirmLabel:'Переключить на XHTTP'});
+    if(!allowed)return;
+   }
+   if(area.value!==selected.source){notify('JSON изменился; повторите действие.');return}
+   const ok=mutate(doc=>{
+    const inbound=getInbound(doc,selected.index);if(inbound.tag!==selected.tag)throw Error('Inbound изменился');
+    const ss=inbound.streamSettings??={};
+    ss.network='xhttp';ss.xhttpSettings??={path:'/xhttp',mode:'auto'};
+   },'XHTTP настроен');
+   if(ok)focusJsonSection('xhttpSettings','XHTTP');
+  }catch(e){status('Ошибка: '+e.message);notify(e.message)}
+ },
+ async vlessens(){
+  try{
+   ensureDialogs();
+   const selected=await chooseInbound();if(!selected)return;
+   const inbound=getInbound(parse(),selected.index);
+   if(inbound.protocol!=='vless')throw Error('VLESS Encryption доступен только для VLESS');
+   const response=await dialog.request({title:'VLESS Encryption',description:'Укажите серверный decryption. Для ML-KEM используйте результат xray vlessenc.',
+    confirmLabel:'Применить',fields:[{name:'decryption',label:'Серверный decryption',wide:true,value:inbound.settings?.decryption||'none',required:true}]});
+   if(!response)return;
+   if(area.value!==selected.source){notify('Конфигурация изменилась. Повторите действие.');return}
+   mutate(doc=>{const ib=getInbound(doc,selected.index);if(ib.tag!==selected.tag)throw Error('Inbound изменился');(ib.settings??={users:[]}).decryption=response.decryption},'VLESS Encryption обновлён');
+  }catch(e){notify(e.message)}
+ },
+ async finalmask(){
+  try{
+   ensureDialogs();
+   const selected=await chooseInbound();if(!selected)return;
+   const current=getInbound(parse(),selected.index).streamSettings?.finalmask||{};
+   const response=await dialog.request({title:'FinalMask',description:'Редактируйте отдельный объект streamSettings.finalmask. Перед применением проверьте поддержку параметров ядром Xray.',
+    confirmLabel:'Применить',fields:[{name:'json',label:'FinalMask JSON',type:'textarea',wide:true,rows:8,value:JSON.stringify(current,null,2),required:true,validate:v=>{try{const parsed=JSON.parse(v);return !parsed||typeof parsed!=='object'||Array.isArray(parsed)?'Требуется JSON-объект':''}catch{return 'Некорректный JSON'}}}]});
+   if(!response)return;
+   if(area.value!==selected.source){notify('Конфигурация изменилась. Повторите действие.');return}
+   const value=JSON.parse(response.json);
+   mutate(doc=>{const ib=getInbound(doc,selected.index);if(ib.tag!==selected.tag)throw Error('Inbound изменился');ib.streamSettings??={};if(Object.keys(value).length)ib.streamSettings.finalmask=value;else delete ib.streamSettings.finalmask},'FinalMask обновлён');
+  }catch(e){notify(e.message)}
+ },
  hysteria(){mutate(d=>{d.inbounds??=[];const tag='hysteria-'+(d.inbounds.length+1);if(d.inbounds.some(x=>x.tag===tag))throw Error('Тег уже занят');d.inbounds.push({tag,listen:'127.0.0.1',port:4433,protocol:'hysteria',settings:{version:2,users:[]},streamSettings:{network:'hysteria',security:'tls',hysteriaSettings:{version:2},tlsSettings:{certificates:[]}}});notify('Заполните TLS-сертификаты и пользователей, затем проверьте ядром Xray-core.')},'Черновик Hysteria2 создан')},
- uuid(){const value=freshUUID();navigator.clipboard?.writeText(value).then(()=>notify('UUID скопирован')).catch(()=>prompt('Скопируйте UUID:',value))||prompt('Скопируйте UUID:',value)},
+ async uuid(){
+  const value=freshUUID();
+  try{await navigator.clipboard.writeText(value);notify('UUID скопирован')}
+  catch{
+   if(!dialog?.request){notify('Не удалось скопировать UUID: '+value);return}
+   await dialog.request({title:'UUID создан',description:'Скопируйте UUID вручную.',confirmLabel:'Закрыть',fields:[{name:'uuid',label:'UUID',value,wide:true,readonly:true,trim:false}]});
+  }
+ },
  backup(){const blob=new Blob([area.value],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='xray-config.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)},
   format(){try{commit(JSON.stringify(parse(),null,2),'JSON отформатирован')}catch(e){notify(e.message)}}
 };
