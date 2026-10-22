@@ -193,3 +193,10 @@
 .sv-studio .sv-tools{background:color-mix(in srgb,var(--sv-panel) 95%,var(--sv-bg))!important}
 .sv-studio .sv-codebar{background:var(--sv-panel)}
 @media(max-width:1190px){.sv-studio .sv-inbound-summary~.sv-two,.sv-studio .sv-inbound-summary~[data-when],.sv-studio .sv-inbound-summary~.sv-note{padding-left:10px;padding-right:10px}}
+
+
+.sv-studio .sv-minimap{flex:0 0 62px;align-self:stretch;overflow:hidden;margin:0;padding:9px 4px;border-left:1px solid var(--sv-stroke);background:color-mix(in srgb,var(--sv-bg) 87%,var(--sv-panel));font:2.25px/3.6px ui-monospace,Consolas,monospace;letter-spacing:-.08em;white-space:pre;opacity:.85;user-select:none;pointer-events:none}
+.sv-studio .sv-minimap .sv-key{color:#60c7eb}.sv-studio .sv-minimap .sv-string{color:#ff888e}
+.sv-studio .sv-codebar [data-v="dirty"]{font-size:11px;font-weight:670}
+.sv-studio .sv-codebar [data-v="dirty"]:not(:empty){border-radius:8px;padding:5px 8px;background:var(--sv-input)}
+@media(max-width:900px){.sv-studio .sv-minimap{display:none!important}}
