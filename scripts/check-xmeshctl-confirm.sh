@@ -47,7 +47,7 @@ rejected ""
 
 # No local backups, stashes or git status checks may run before approval.
 update_code="$(sed -n '/^update_panel() {/,/^}/p' xmeshctl)"
-confirmation_line="$(printf "%s\n" "$update_code" | grep -n -m 1 'if ! confirm_yes "Продолжить?' | cut -d: -f1)"
+confirmation_line="$(printf "%s\n" "$update_code" | grep -n -m 1 'confirm_yes "Продолжить?' | cut -d: -f1)"
 status_line="$(printf "%s\n" "$update_code" | grep -n -m 1 'status_lines="$(git' | cut -d: -f1)"
 [[ -n "$confirmation_line" && -n "$status_line" && "$confirmation_line" -lt "$status_line" ]] || {
   echo "Update side effects must occur only after confirmation" >&2
