@@ -259,14 +259,7 @@ pub async fn revoke(State(state):State<AppState>,Extension(actor):Extension<Auth
  crate::audit(&state.pool,&actor.username,"subscription.revoked",Some("users"),Some(id),json!({})).await;
  Ok(Json(json!({"revoked":true})))
 }
-pub async fn serve(State(state):State<AppState>,Path(token):Path<String>,Query(options):Query<HashMap<String,String>>)->Result<Response,ApiError>{
- if !valid_token(&token){return Err(ApiError::new(StatusCode::NOT_FOUND,"Subscription not found"))}
- let row=sqlx::query("SELECT user_id FROM user_subscription_tokens WHERE token_hash=$1")
-  .bind(token_hash(&token)).fetch_optional(&state.pool).await?.ok_or_else(||ApiError::new(StatusCode::NOT_FOUND,"Subscription not found"))?;
- let id:i64=row.try_get("user_id")?;
- let user=record(&state,id).await?;
- let now=std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as i64;
- if crate::user_status(&user,now)!="ACTIVE"{return Err(ApiError::new(StatusCode::FORBIDDEN,"Subscription inactive"))}
+async fn collect_user_outbounds(state:&AppState,user:&Value)->Result<(Vec<String>,Vec<Value>),ApiError>{
  let squads=crate::load_records(&state.pool,"squads").await?;
  let profiles=crate::load_records(&state.pool,"profiles").await?;
  let hosts=crate::load_records(&state.pool,"hosts").await?;
@@ -306,6 +299,28 @@ pub async fn serve(State(state):State<AppState>,Path(token):Path<String>,Query(o
   }
  }
  if links.is_empty(){return Err(ApiError::new(StatusCode::SERVICE_UNAVAILABLE,"No valid public VLESS endpoints configured"))}
+ Ok((links,outbounds))
+}
+pub async fn admin_client_json(
+ State(state):State<AppState>,Extension(actor):Extension<AuthUser>,Path(id):Path<i64>,
+)->Result<Json<Value>,ApiError>{
+ crate::require_mutation(&actor)?;
+ let user=record(&state,id).await?;
+ let (_,proxies)=collect_user_outbounds(&state,&user).await?;
+ let setting=crate::read_settings(&state.pool).await?;
+ let profile=crate::subscription_json::build(proxies,&setting)
+  .map_err(|detail|ApiError::new(StatusCode::BAD_REQUEST,detail))?;
+ Ok(Json(profile))
+}
+pub async fn serve(State(state):State<AppState>,Path(token):Path<String>,Query(options):Query<HashMap<String,String>>)->Result<Response,ApiError>{
+ if !valid_token(&token){return Err(ApiError::new(StatusCode::NOT_FOUND,"Subscription not found"))}
+ let row=sqlx::query("SELECT user_id FROM user_subscription_tokens WHERE token_hash=$1")
+  .bind(token_hash(&token)).fetch_optional(&state.pool).await?.ok_or_else(||ApiError::new(StatusCode::NOT_FOUND,"Subscription not found"))?;
+ let id:i64=row.try_get("user_id")?;
+ let user=record(&state,id).await?;
+ let now=std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as i64;
+ if crate::user_status(&user,now)!="ACTIVE"{return Err(ApiError::new(StatusCode::FORBIDDEN,"Subscription inactive"))}
+ let (links,mut outbounds)=collect_user_outbounds(&state,&user).await?;
  // Native Xray JSON is the default for new HTTPS subscriptions.
  // Existing link-list users may explicitly request ?format=vless.
  let legacy=options.get("format").is_some_and(|v|v=="vless");
