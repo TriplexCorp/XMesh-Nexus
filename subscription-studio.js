@@ -351,6 +351,8 @@ window.XMeshSubscriptionStudio = (() => {
         $('[data-subscription-ok]').hidden=!d.subscriptionShowStatus;
         $('[data-subscription-active]').hidden=!d.subscriptionShowStatus;
         const quick=$('[data-subscription-quick]');
+        $('[data-subscription-copy]').textContent=copy[4];
+        $('[data-subscription-devices]').textContent=english?'Devices':'Устройства';
         $('[data-subscription-copy]').hidden=!d.subscriptionShowCopy;
         $('[data-subscription-qr]').hidden=!d.subscriptionShowQr;
         $('[data-subscription-devices]').hidden=!d.subscriptionShowDevices;
