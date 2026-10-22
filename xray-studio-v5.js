@@ -124,6 +124,33 @@
 
    // Advanced XHTTP controls are available inline on demand, without another
    // wizard page or nested navigation. Basic transport controls stay visible.
+   // Surface actionable address guidance while keeping the form compact.
+   const source=root.querySelector('#xpb-server-address-source');
+   const address=root.querySelector('#xpb-server-address');
+   const addressField=address?.closest('.f');
+   if(addressField){
+     const status=document.createElement('p');
+     status.className='sr-v6-address-status';
+     status.setAttribute('role','status');
+     addressField.after(status);
+     const refresh=()=>{
+       const manual=source?.value==='manual',valid=Boolean(address?.value.trim());
+       status.dataset.kind=valid?'ready':'missing';
+       status.textContent=manual?(valid?'Ручной адрес используется в Client JSON':'Введите публичный IP или домен'):
+         (valid?'Публичный адрес определён из выбранного источника':'Нет публичного адреса — выберите хост, узел или ручной ввод');
+     };
+     source?.addEventListener('change',()=>queueMicrotask(refresh));
+     address?.addEventListener('input',refresh);
+     root.querySelector('#xpb-tag')?.addEventListener('input',()=>queueMicrotask(refresh));
+     queueMicrotask(refresh);
+   }
+   root.addEventListener('keydown',event=>{
+     if(event.key==='Escape'&&root.classList.contains('sr-v5-expanded')){
+       root.classList.remove('sr-v5-expanded');
+       const button=root.querySelector('.sr-v5-expand');
+       if(button){button.setAttribute('aria-expanded','false');button.title='Развернуть JSON';button.setAttribute('aria-label','Развернуть JSON')}
+     }
+   });
    const xhttp=root.querySelector('[data-xray-option-group="transport-xhttp"]');
    if(xhttp&&!xhttp.querySelector('.sr-xhttp-toggle')){
      const grid=xhttp.querySelector('.xray-option-grid');
