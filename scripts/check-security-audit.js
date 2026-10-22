@@ -1,0 +1,61 @@
+#!/usr/bin/env node
+'use strict';
+const fs=require('node:fs');
+const assert=require('node:assert/strict');
+const read=p=>fs.readFileSync(p,'utf8');
+const app=read('app.js'),html=read('index.html'),css=read('styles.css');
+const studio=read('subscription-studio.js');
+const main=read('backend/src/main.rs');
+const auth=read('backend/src/auth.rs');
+const mfa=read('backend/src/mfa.rs');
+const security=read('backend/src/security.rs');
+const subs=read('backend/src/subscription_settings.rs');
+const migration=read('backend/migrations/0011_global_auth_budget.sql');
+new Function(app);new Function(studio);
+
+// Authentication: server-side protections, session lifetime and revocation.
+assert.match(main,/route_layer\(middleware::from_fn_with_state\(state\.clone\(\), auth::require_session\)\)/);
+assert.match(main,/fn require_owner/);
+assert.match(main,/middleware::from_fn\(csrf_guard\)/);
+assert.match(main,/content-security-policy/);
+assert.match(main,/script-src 'self'/);
+assert.doesNotMatch(main,/script-src '[^']*unsafe-inline/);
+assert.match(main,/append_index_html_on_directories\(false\)/);
+assert.match(auth,/HttpOnly; SameSite=Strict; Max-Age=/);
+assert.match(auth,/state\.cookie_secure/);
+assert.match(auth,/policy\.session_hours/);
+assert.match(auth,/policy\.idle_minutes/);
+assert.match(auth,/policy\.max_sessions/);
+assert.match(auth,/policy\.lockout_minutes/);
+assert.match(auth,/auth_global_limits/);
+assert.match(migration,/auth_global_limits/);
+assert.match(auth,/global_attempts>=240/);
+assert.match(auth,/DELETE FROM auth_login_limits/);
+assert.match(security,/require_owner\(&actor\)/);
+assert.match(security,/admin_id=\$1 AND token_hash<>\$2/);
+assert.match(security,/WHERE id=\$1 AND admin_id=\$2/);
+assert.match(mfa,/encrypt\(&state,&secret\)/);
+assert.match(mfa,/panel_mfa_challenges/);
+
+// Client DOM sinks: user-controlled text is encoded and language strictly whitelisted.
+assert.match(app,/\$\{esc\(al\)\}/,'Toast action labels must be HTML-escaped');
+assert.match(studio,/data-portal-language="ru"/);
+assert.match(studio,/data-portal-language="en"/);
+assert.match(studio,/if\(next!=='ru'&&next!=='en'\)return/);
+assert.match(studio,/previewRoot\.lang=lang/);
+assert.match(studio,/\$\('\[data-subscription-description\]'\)\.textContent/);
+assert.match(studio,/\+esc\(label\)\+/);
+assert.match(subs,/subscriptionHeroEn/);
+assert.match(subs,/subscriptionAppsTitleEn/);
+assert.match(subs,/text\.chars\(\)\.any\(char::is_control\)/);
+assert.match(main,/subscriptionDescriptionEn/);
+assert.match(main,/subscriptionFooterEn/);
+assert.match(main,/"subscriptionAppsTitleEn"/);
+
+// Appearance precision must be independent from workspace scale.
+assert.match(app,/id="text-size" min="75" max="160" step="1"/);
+assert.match(app,/id="text-precision"/);
+assert.match(css,/var\(--text-size-scale,1\)/);
+assert.match(app,/C\.textPrecision/);
+assert.match(html,/subscription-studio\.js\?v=/);
+console.log('Security audit guards: auth, sessions, CSRF, CSP, static routing, HTML escaping, portal locale, text precision: OK');
