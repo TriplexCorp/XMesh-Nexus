@@ -13,7 +13,7 @@ assert.match(app,/function statisticsP\(\)/);
 assert.match(app,/\/api\/v1\/statistics\/overview/);
 assert.match(app,/\/api\/v1\/metrics\/traffic\?range=/);
 assert.match(app,/CPU steal/);
-assert.match(app,/v\.stale/);
+assert.match(app,/v\?\.stale/);
 assert.match(app,/statsValue\(ok\?v\.cpuStealPercent:null,'%'/);
 assert.match(app,/Нет данных/);
 assert.match(backend,/route\("\/statistics\/overview", get\(get_statistics_overview\)\)/);
