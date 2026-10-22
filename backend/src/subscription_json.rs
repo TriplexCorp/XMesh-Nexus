@@ -136,6 +136,27 @@ pub(crate) fn build(mut proxies:Vec<Value>,setting:&Value)->Result<Value,String>
     Ok(config)
 }
 
+/// Reject unknown or unsafe JSON Engine configuration instead of silently
+/// accepting privileged raw Xray fields from the appearance settings API.
+pub(crate) fn validate_settings(settings:&Value)->Result<(),String>{
+ let object=settings.as_object().ok_or("JSON Engine settings must be an object")?;
+ if object.len()>16{return Err("Too many JSON Engine settings".into())}
+ for (key,value) in object{
+  match key.as_str(){
+   "dns"=>{if !["cloudflare","yandex","system"].contains(&value.as_str().unwrap_or("")){return Err("Unsupported DNS provider".into())}},
+   "queryStrategy"=>{if !["UseIPv4","UseIPv6","UseIP"].contains(&value.as_str().unwrap_or("")){return Err("Invalid DNS query strategy".into())}},
+   "routingStrategy"=>{if !["AsIs","IPIfNonMatch","IPOnDemand"].contains(&value.as_str().unwrap_or("")){return Err("Invalid routing strategy".into())}},
+   "balance"=>{if !["leastPing","roundRobin","random","off"].contains(&value.as_str().unwrap_or("")){return Err("Invalid balancer strategy".into())}},
+   "smart"|"sniffing"|"dnsRouting"=>{if !value.is_boolean(){return Err(format!("{key} must be boolean"))}},
+   "socksPort"|"httpPort"=>{let p=value.as_u64().unwrap_or(0);if !(1024..=65535).contains(&p){return Err("Invalid local proxy port".into())}},
+   _=>return Err(format!("Unknown JSON Engine setting: {key}"))
+  }
+ }
+ if object.get("socksPort").and_then(Value::as_u64)==object.get("httpPort").and_then(Value::as_u64)
+   && object.get("socksPort").is_some(){return Err("SOCKS and HTTP ports must be distinct".into())}
+ Ok(())
+}
+
 #[cfg(test)]
 mod tests{
  use super::*;
@@ -183,6 +204,11 @@ mod tests{
   b["settings"]["vnext"][0]["address"]=json!("203.0.113.8");
   let c=build(vec![a,b],&json!({})).unwrap();
   assert_eq!(c["outbounds"].as_array().unwrap().len(),5);
+ }
+ #[test] fn reject_unsafe_settings(){
+  assert!(validate_settings(&json!({"route":[{"outboundTag":"direct"}]})).is_err());
+  assert!(validate_settings(&json!({"dns":"cloudflare","smart":true})).is_ok());
+  assert!(validate_settings(&json!({"balance":"unavailable"})).is_err());
  }
  #[test] fn reject_same_local_ports(){
   assert!(build(vec![outbound("RU")],&json!({"subscriptionJson":{
