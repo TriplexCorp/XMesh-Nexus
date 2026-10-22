@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+umask 077
 
 if [[ "${EUID}" -ne 0 ]]; then
   echo "Run with sudo: sudo bash $0 <https-panel-origin> <node-id> [interface]" >&2
@@ -30,10 +31,18 @@ AGENT_TMP="$(mktemp)"
 trap 'rm -f "$AGENT_TMP"' EXIT
 curl --fail --silent --show-error --location "$RAW_BASE/node-metrics-agent.sh" -o "$AGENT_TMP"
 bash -n "$AGENT_TMP"
-install -m 0750 "$AGENT_TMP" /usr/local/sbin/xmesh-node-metrics
+install -o root -g root -m 0755 "$AGENT_TMP" /usr/local/sbin/xmesh-node-metrics
 
-install -d -m 0700 /etc/xmesh-node-metrics
-install -d -m 0700 /var/lib/xmesh-node-metrics
+# Run telemetry as a dedicated unprivileged account, not root.
+if ! getent group xmesh-metrics >/dev/null; then
+  groupadd --system xmesh-metrics
+fi
+if ! id -u xmesh-metrics >/dev/null 2>&1; then
+  useradd --system --no-create-home --shell /usr/sbin/nologin \
+    --gid xmesh-metrics xmesh-metrics
+fi
+install -d -o root -g xmesh-metrics -m 0750 /etc/xmesh-node-metrics
+install -d -o xmesh-metrics -g xmesh-metrics -m 0700 /var/lib/xmesh-node-metrics
 cat > /etc/xmesh-node-metrics.env <<EOF
 XMESH_API_URL=$API_URL
 XMESH_NODE_ID=$NODE_ID
@@ -52,7 +61,8 @@ if [[ ! -e "$private_key" ]]; then
   chmod 0600 "$tmp_key"
   mv -n "$tmp_key" "$private_key"
 fi
-chmod 0600 "$private_key"
+chown root:xmesh-metrics "$private_key"
+chmod 0640 "$private_key"
 public_key="$(openssl pkey -in "$private_key" -pubout -outform DER | tail -c 32 | od -An -tx1 -v | tr -d '[:space:]')"
 [[ "${#public_key}" -eq 64 && "$public_key" =~ ^[0-9a-f]+$ ]] || {
   echo "Cannot extract Ed25519 public key" >&2; exit 1;
@@ -68,10 +78,16 @@ Wants=network-online.target
 Type=oneshot
 EnvironmentFile=/etc/xmesh-node-metrics.env
 ExecStart=/usr/local/sbin/xmesh-node-metrics
-User=root
-Group=root
+User=xmesh-metrics
+Group=xmesh-metrics
 UMask=0077
 NoNewPrivileges=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictSUIDSGID=true
+LockPersonality=true
+ProtectClock=true
+ProtectHostname=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
@@ -108,4 +124,4 @@ echo "Logs: journalctl -u xmesh-node-metrics.service -n 20 --no-pager"
 echo "Ed25519 public key (register on the node in XMesh Nexus):"
 echo "$public_key"
 echo "Until you register it in the panel, signed requests will be rejected (401)."
-echo "The private key is stored on this node only (mode 600)."
+echo "The private key stays on the node (root:xmesh-metrics, mode 0640)."
