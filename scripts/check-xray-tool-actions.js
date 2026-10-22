@@ -22,7 +22,7 @@ const sample=()=>({
  outbounds:[{tag:'direct',protocol:'freedom'}],routing:{domainStrategy:'AsIs',rules:[]}
 });
 
-function harness(documentValue,{confirmValue=true,realityKeys}={}){
+function harness(documentValue,{confirmValue=true,confirmHandler,realityKeys}={}){
  const calls=[],listeners={},confirmCalls=[],clipboard=[];
  const area={
    value:JSON.stringify(documentValue,null,2),selectionStart:0,selectionEnd:0,
@@ -47,7 +47,7 @@ function harness(documentValue,{confirmValue=true,realityKeys}={}){
    crypto:webcrypto,
    navigator:{clipboard:{async writeText(x){clipboard.push(x)}}},
    prompt:(question,fallback)=>fallback??null,
-   confirm:question=>{confirmCalls.push(question);return confirmValue},
+   confirm:question=>{confirmCalls.push(question);return confirmHandler?confirmHandler(question):confirmValue},
    Event:class Event{constructor(type){this.type=type}}
  };
  vm.runInNewContext(source,environment,{filename:'xray-studio-tools.js'});
@@ -131,6 +131,23 @@ async function run(){
  assert.equal(new Set(ids(dupe.doc())).size,2,'duplicate shortId repaired');
 
  const noReality=sample();noReality.inbounds[0].streamSettings.security='none';delete noReality.inbounds[0].streamSettings.realitySettings;
+ const preserveAndRepair=sample();
+ const noRotation=harness(preserveAndRepair,{confirmHandler:question=>!question.includes('НОВУЮ пару')});
+ noRotation.run('reality');await tick();
+ assert.equal(noRotation.doc().inbounds[0].streamSettings.realitySettings.privateKey,'existing-valid-key','existing private key survives routine repairs');
+ assert.ok(ids(noRotation.doc()).every(validShortId),'invalid Short ID repaired without key rotation');
+ assert.ok(noRotation.calls.some(m=>m.includes('privateKey сохранён')),'visible confirmation of key preservation');
+
+ let resolveDelayed;
+ const delayedKeys=new Promise(resolve=>{resolveDelayed=resolve});
+ const delayed=harness(noReality,{realityKeys:()=>delayedKeys});
+ delayed.run('reality');
+ delayed.area.value=JSON.stringify({...noReality,log:{loglevel:'debug'}},null,2);
+ resolveDelayed({privateKey:'late-private',publicKey:'late-public'});
+ await tick();
+ assert.equal(delayed.doc().inbounds[0].streamSettings.security,'none','stale asynchronous Reality response cannot overwrite new JSON');
+ assert.ok(!delayed.calls.some(m=>m.includes('Reality настроен')),'no false success after stale async response');
+
  const blocked=harness(noReality);const blockedBefore=blocked.area.value;
  blocked.run('shortid');
  assert.equal(blocked.area.value,blockedBefore,'tool does not silently enable Reality');
