@@ -186,6 +186,29 @@ async fn main() -> anyhow::Result<()> {
     anyhow::ensure!(redis_ping == "PONG", "Redis readiness probe failed");
 
     sqlx::migrate!("./migrations").run(&pool).await?;
+    // Preserve an existing custom dashboard path on upgrades. Migrate only the
+    // former hardcoded default; the database remains authoritative thereafter.
+    if let Ok(from_env)=env::var("DASHBOARD_PATH") {
+        let current:Option<Value>=sqlx::query_scalar(
+            "SELECT value FROM app_settings WHERE key='security'"
+        ).fetch_optional(&pool).await?;
+        if let Some(mut policy_json)=current {
+            if policy_json.get("dashboardPath").and_then(Value::as_str)==Some("/dashboard/nexus") {
+                policy_json["dashboardPath"]=Value::String(from_env);
+                sqlx::query("UPDATE app_settings SET value=$1,updated_at=NOW() WHERE key='security'")
+                    .bind(policy_json).execute(&pool).await?;
+            }
+        }
+    }
+    // Sync the effective database path to a dedicated host-visible mirror.
+    // The panel never gets write access to the host's .env or other secrets.
+    let active_path=security::get_policy(&pool).await
+        .map_err(|e|anyhow::anyhow!("Invalid dashboard policy: {}",e.message))?
+        .dashboard_path;
+    if let Ok(mirror)=env::var("DASHBOARD_PATH_MIRROR") {
+        tokio::fs::write(mirror,format!("{active_path}\n")).await?;
+    }
+
 
     let admin_username = env::var("ADMIN_USERNAME").unwrap_or_else(|_| "admin".to_owned());
     let admin_password = env::var("ADMIN_PASSWORD")
