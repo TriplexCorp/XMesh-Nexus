@@ -519,6 +519,7 @@ const previewAppearanceControls=()=>{
 const saveAppearanceControls=()=>{
  if(appearanceControlsFrame){cancelAnimationFrame(appearanceControlsFrame);appearanceControlsFrame=0;}
  apply();
+ syncSubscriptionTheme();
 };
 const brand=()=>{$('#bn').textContent=DB.set.brand;$('#lg').textContent=(DB.set.brand[0]||'L').toUpperCase()};
 
@@ -540,10 +541,14 @@ const panelSubscriptionTheme=()=>{
  };
  return {
   subscriptionAccent:color('--a','#74ddb1'),
+  subscriptionSecondaryAccent:color('--b','#c6e985'),
   subscriptionTheme:root.dataset.theme==='light'?'light':'dark',
   subscriptionBackground:color('--bg','#0a0e14'),
   subscriptionCardColor:color('--s1','#131923'),
-  subscriptionTextColor:color('--tx','#edf3f5')
+  subscriptionTextColor:color('--tx','#edf3f5'),
+  subscriptionFont:C.font||'system',
+  subscriptionRadius:Math.round(cl(Number(C.radius)||16,1,36)),
+  subscriptionCardStyle:C.surface==='glass'?'glass':C.surface==='raised'?'raised':'soft'
  };
 };
 let subscriptionThemeSync=Promise.resolve();
@@ -2026,7 +2031,7 @@ document.addEventListener('click',async e=>{
   else if(b=g('[data-ac]')){C.accent=b.dataset.ac;apply();syncSubscriptionTheme();$$('[data-ac]').forEach(x=>{const active=x===b;x.classList.toggle('on',active);x.setAttribute('aria-pressed',String(active))})}
    else if(g('#palette-apply')){C.customA=paletteDraft.a;C.customB=paletteDraft.b;C.hue=paletteDraft.h;C.sat=paletteDraft.s;C.lum=paletteDraft.l;C.accent='custom';apply();syncSubscriptionTheme();render(1);toast('Палитра применена')}
    else if(g('#palette-cancel')){resetPaletteDraft();render(1)}
-  else if(b=g('[data-ui]')){const prop=b.dataset.ui,value=b.dataset.value;if(prop&&value&&(prop!=='surface'||['solid','glass','raised'].includes(value))){C[prop]=value;apply();document.querySelectorAll(`[data-ui="${prop}"]`).forEach(x=>{const active=x.dataset.value===value;x.classList.toggle('on',active);x.setAttribute('aria-pressed',String(active))})}}
+  else if(b=g('[data-ui]')){const prop=b.dataset.ui,value=b.dataset.value;if(prop&&value&&(prop!=='surface'||['solid','glass','raised'].includes(value))){C[prop]=value;apply();if(prop==='font'||prop==='surface')syncSubscriptionTheme();document.querySelectorAll(`[data-ui="${prop}"]`).forEach(x=>{const active=x.dataset.value===value;x.classList.toggle('on',active);x.setAttribute('aria-pressed',String(active))})}}
   else if(g('#rs')){const automation={autoCoreRefresh:C.autoCoreRefresh,coreRefreshSeconds:C.coreRefreshSeconds};C={...CDEFAULT,...automation};resetPaletteDraft();apply();syncSubscriptionTheme();syncCoreAutoRefresh();render(1);toast('Оформление сброшено')}
   else if(g('#gx')){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(DB,null,2)],{type:'application/json'}));a.download='xmesh-nexus-backup.json';a.click()}
   else if(b=g('[data-cf]')){dlg.close();CF&&CF()}
