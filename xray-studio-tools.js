@@ -221,7 +221,42 @@ const operations={
  policy(){mutate(d=>{d.policy??=clone(snippets.policy);d.stats??=clone(snippets.stats)},'Policy и Stats добавлены')},
  outbounds(){mutate(d=>{d.outbounds??=[];const existing=new Set(d.outbounds.map(x=>x.tag));for(const x of snippets.outbounds)if(!existing.has(x.tag))d.outbounds.push(clone(x))},'Outbounds добавлены')},
  log(){mutate(d=>{d.log??=clone(snippets.log)},'Логирование добавлено')},
- inbound(){mutate(d=>{d.inbounds??=[];const tag=prompt('Тег нового inbound:','new-inbound');if(tag===null)return false;if(!/^[\w.-]{1,64}$/.test(tag)||d.inbounds.some(i=>i.tag===tag))throw Error('Тег пустой, невалидный или уже существует');d.inbounds.push({tag,listen:'127.0.0.1',port:443,protocol:'vless',settings:{users:[],decryption:'none'},streamSettings:{network:'raw',security:'none'}})},'Новый локальный inbound создан. Перед публикацией настройте защиту.')},
+ async inbound(){
+  try{
+   ensureDialogs();
+   const source=area.value,data=parse();
+   const existing=Array.isArray(data.inbounds)?data.inbounds:[];
+   let candidate='vless-main',n=2;
+   while(existing.some(i=>i.tag===candidate))candidate='vless-'+n++;
+   const response=await dialog.request({
+    eyebrow:'XRAY STUDIO / INBOUNDS',
+    title:'Новое входящее соединение',
+    description:'Создайте inbound с понятным именем. После создания его настройки откроются в JSON-редакторе.',
+    confirmLabel:'Создать inbound',
+    notice:'Безопасный старт: новый inbound прослушивает только 127.0.0.1. Публичный адрес и TLS/Reality настраиваются отдельно. Сохранение профиля не перезапускает Xray.',
+    fields:[
+     {name:'tag',label:'Тег inbound',wide:true,value:candidate,required:true,maxLength:64,help:'Уникальный идентификатор. Латинские буквы, цифры, точки, дефисы и подчёркивания.',pattern:'[A-Za-z0-9_.-]{1,64}',patternMessage:'Допустимы только A–Z, цифры, _ . -',validate:value=>existing.some(i=>i.tag===value)?'Inbound с таким тегом уже существует':''},
+     {name:'protocol',label:'Протокол',type:'select',value:'vless',options:[{value:'vless',label:'VLESS'},{value:'vmess',label:'VMess'},{value:'trojan',label:'Trojan'}]},
+     {name:'port',label:'Локальный порт',type:'number',value:'443',required:true,min:1,max:65535,help:'От 1 до 65535'},
+     {name:'transport',label:'Транспорт',type:'select',wide:true,value:'raw',options:[{value:'raw',label:'RAW / TCP'},{value:'xhttp',label:'XHTTP'},{value:'ws',label:'WebSocket'},{value:'grpc',label:'gRPC'}]}
+    ]
+   });
+   if(!response)return;
+   if(source!==area.value){notify('JSON изменился, пока окно было открыто. Повторите создание inbound.');return}
+   const ok=mutate(doc=>{
+    doc.inbounds??=[];
+    if(!Array.isArray(doc.inbounds))throw Error('inbounds должен быть массивом');
+    if(doc.inbounds.some(i=>i.tag===response.tag))throw Error('Тег inbound уже занят');
+    const settings=response.protocol==='vless'?{clients:[],decryption:'none'}:{clients:[]};
+    const streamSettings={network:response.transport,security:'none'};
+    if(response.transport==='xhttp')streamSettings.xhttpSettings={path:'/xhttp',mode:'auto'};
+    if(response.transport==='ws')streamSettings.wsSettings={path:'/ws'};
+    if(response.transport==='grpc')streamSettings.grpcSettings={serviceName:'grpc'};
+    doc.inbounds.push({tag:response.tag,listen:'127.0.0.1',port:Number(response.port),protocol:response.protocol,settings,streamSettings});
+   },'Inbound «'+response.tag+'» создан. Настройте защиту перед публикацией.');
+   if(ok)focusJsonSection('tag','Inbound '+response.tag);
+  }catch(e){status('Ошибка: '+e.message);notify(e.message)}
+ },
  xhttp(){let existed=false;const ok=mutate(d=>{const inbound=getInbound(d);if(!inbound)return false;const ss=inbound.streamSettings??={};if(ss.network==='xhttp'&&ss.xhttpSettings&&typeof ss.xhttpSettings==='object'){existed=true;return false}if(ss.network!=='xhttp'&&ss.network!=='raw'&&!confirm('Сменить транспорт выбранного inbound на XHTTP?'))return false;ss.network='xhttp';ss.xhttpSettings??={path:'/xhttp',mode:'auto'}},'XHTTP добавлен');if(existed||ok)focusJsonSection('xhttpSettings','XHTTP')},
  vlessens(){mutate(d=>{const inbound=getInbound(d);if(!inbound)return false;if(inbound.protocol!=='vless')throw Error('VLESS Encryption доступен только для VLESS');const current=inbound.settings?.decryption||'none';const value=prompt('Серверный decryption из xray vlessenc. Безопасно отменить:',current);if(value===null)return false;(inbound.settings??={users:[]}).decryption=value.trim()||'none'},'VLESS Encryption обновлён')},
  finalmask(){mutate(d=>{const inbound=getInbound(d);if(!inbound)return false;const current=inbound.streamSettings?.finalmask||{};const raw=prompt('FinalMask JSON для streamSettings.finalmask:',JSON.stringify(current,null,2));if(raw===null)return false;const value=JSON.parse(raw);if(!value||typeof value!=='object'||Array.isArray(value))throw Error('FinalMask должен быть объектом');inbound.streamSettings??={};if(Object.keys(value).length)inbound.streamSettings.finalmask=value;else delete inbound.streamSettings.finalmask},'FinalMask обновлён')},
