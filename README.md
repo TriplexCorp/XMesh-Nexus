@@ -331,7 +331,7 @@ Content-Type: application/json
 - `styles.css` — адаптивная дизайн-система, темы и основные элементы.
 - `app.js` — интерфейс, клиент API и общие действия панели.
 - `subscription-studio.js` / `subscription-studio.css` — конструктор схемы подписки и предпросмотр.
-- `xray-studio*.js` / `xray-studio.css` — части интерфейса XRAY STUDIO.
+- `xray-studio-v4.js` / `xray-studio-v4.css` / `xray-studio-tools.js` — части интерфейса XRAY STUDIO.
 - `i18n.js` — локализация RU/EN.
 - `backend/` — Rust API, SQL-миграции, Dockerfile.
 - `deploy/` — развёртывание, резервное копирование и агент метрик.
