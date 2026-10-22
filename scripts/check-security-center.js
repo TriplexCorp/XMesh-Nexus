@@ -30,7 +30,7 @@ assert.match(auth,/policy\.idle_minutes/);
 assert.match(auth,/policy\.max_sessions/);
 assert.match(auth,/policy\.login_attempts/);
 assert.match(auth,/policy\.lockout_minutes/);
-assert.match(auth,/make_session_cookie\(&token, state\.cookie_secure, policy\.session_hours\*3600\)/);
+assert.match(auth,/make_session_cookie\(\s*&token\s*,\s*state\.cookie_secure\s*,\s*policy\.session_hours\s*\*\s*3600\s*,?\s*\)/);
 assert.match(sql,/ADD COLUMN IF NOT EXISTS id/);
 assert.match(sql,/ADD COLUMN IF NOT EXISTS last_seen_at/);
 console.log('Advanced security center and enforced policy contracts: OK');
