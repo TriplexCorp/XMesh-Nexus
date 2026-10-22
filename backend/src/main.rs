@@ -512,6 +512,10 @@ async fn delete_record(
             .bind(id)
             .execute(&state.pool)
             .await?;
+        sqlx::query("DELETE FROM node_metric_keys WHERE node_id = $1")
+            .bind(id).execute(&state.pool).await?;
+        sqlx::query("DELETE FROM node_metric_nonces WHERE node_id = $1")
+            .bind(id).execute(&state.pool).await?;
         sqlx::query("DELETE FROM node_ip_rotation_cursors WHERE node_id = $1")
             .bind(id)
             .execute(&state.pool)
