@@ -316,11 +316,24 @@ async fn main() -> anyhow::Result<()> {
 
 async fn csrf_guard(request: Request, next: Next) -> Response {
     let is_mutation = matches!(*request.method(), Method::POST | Method::PUT | Method::PATCH | Method::DELETE);
-    let agent_credential = request.uri().path() == "/api/v1/metrics/ingest"
-        && request.headers().get(header::ORIGIN).is_none()
+    // Only cookie-less machine-to-machine endpoints bypass browser Origin validation.
+    // Each endpoint enforces its own strong authentication (signed Ed25519 or
+    // single-use short-lived enrollment token) before performing any mutation.
+    // Never exempt a request carrying a session cookie or an Origin header.
+    let path = request.uri().path();
+    let machine_request = request.headers().get(header::ORIGIN).is_none()
         && request.headers().get(header::COOKIE).is_none()
-        && request.headers().contains_key("x-xmesh-signature");
-    if is_mutation && request.uri().path().starts_with("/api/v1/") && !agent_credential {
+        && request.headers().get("sec-fetch-site").is_none()
+        && match path {
+            "/api/v1/metrics/ingest" | "/api/v1/node/heartbeat" =>
+                request.headers().contains_key("x-xmesh-signature"),
+            "/api/v1/node/enroll" =>
+                request.headers().get(header::CONTENT_TYPE)
+                    .and_then(|value| value.to_str().ok())
+                    .is_some_and(|value| value.eq_ignore_ascii_case("application/json")),
+            _ => false,
+        };
+    if is_mutation && request.uri().path().starts_with("/api/v1/") && !machine_request {
         // Sec-Fetch-Site stops same-site but cross-origin form and fetch attacks.
         // Older clients still have to supply a matching Origin.
         if request.headers().get("sec-fetch-site").and_then(|v| v.to_str().ok())
