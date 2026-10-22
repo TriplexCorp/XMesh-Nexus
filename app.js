@@ -1658,13 +1658,25 @@ function drawTools(){const e=$('#tr');if(!e)return;const q=TP.q;
 function securityP(){
   const factor=window.XMeshMfa?.panel()||
     '<section class="card" role="alert"><h3>Не удалось загрузить настройки 2FA</h3><p>Обновите панель и страницу браузера. Скрипт mfa-ui.js не загружен.</p></section>';
-  return [`<div class="security-workspace">
-    <div class="security-overview">
-      <div><p class="note">АККАУНТ / БЕЗОПАСНОСТЬ</p><h2>Безопасность аккаунта</h2>
-      <p>Двухфакторная защита вашего аккаунта, серверные правила входа и управление активными сессиями.</p></div>
+  return [`<div class="security-workspace security-center">
+    <header class="security-overview">
+      <div><p class="note">XMESH NEXUS / SECURITY CENTER</p><h2>Центр безопасности</h2>
+      <p>Управление входом, защищёнными сессиями и доступом к панели.</p></div>
+    </header>
+    <nav class="security-center-tabs" aria-label="Разделы безопасности" role="tablist">
+      <button type="button" role="tab" id="security-tab-auth" aria-selected="true" aria-controls="security-pane-auth" data-security-tab="auth"><span>◈</span> Авторизация и 2FA</button>
+      <button type="button" role="tab" id="security-tab-access" aria-selected="false" aria-controls="security-pane-access" data-security-tab="access" tabindex="-1"><span>▣</span> Сессии и доступ</button>
+      <button type="button" role="tab" id="security-tab-audit" aria-selected="false" aria-controls="security-pane-audit" data-security-tab="audit" tabindex="-1"><span>◎</span> Мониторинг</button>
+      <button type="button" role="tab" id="security-tab-infra" aria-selected="false" aria-controls="security-pane-infra" data-security-tab="infra" tabindex="-1"><span>◇</span> Инфраструктура</button>
+    </nav>
+    <div class="security-center-pane" id="security-pane-auth" role="tabpanel" aria-labelledby="security-tab-auth" data-security-pane="auth">${factor}</div>
+    <div class="security-center-pane" id="security-pane-access" role="tabpanel" aria-labelledby="security-tab-access" data-security-pane="access" hidden>${window.XMeshSecurity?.panel()||''}</div>
+    <div class="security-center-pane" id="security-pane-audit" role="tabpanel" aria-labelledby="security-tab-audit" data-security-pane="audit" hidden>
+      <section class="card security-center-information"><h3>Мониторинг безопасности</h3><p>Управление журналами и уведомлениями о входах требует отдельного серверного аудита. Пока система не предоставляет подтверждённый журнал безопасности, события здесь не отображаются.</p><div class="security-future-list"><span>Журнал действий администраторов <em>Требует API</em></span><span>Уведомления о новых входах <em>Требует API</em></span><span>Экспорт событий <em>Требует API</em></span></div></section>
     </div>
-    ${factor}
-    ${window.XMeshSecurity?.panel()||''}
+    <div class="security-center-pane" id="security-pane-infra" role="tabpanel" aria-labelledby="security-tab-infra" data-security-pane="infra" hidden>
+      <section class="card security-center-information"><h3>Защита инфраструктуры</h3><p>Для безопасного управления токенами, сетевыми ограничениями и настройками TLS необходимы серверные проверки и контроль прав. Неактивные механизмы не показываются как включённые.</p><div class="security-future-list"><span>IP allowlist для админов <em>Требует API</em></span><span>Политика API-токенов <em>Требует API</em></span><span>Проверка HTTPS и заголовков <em>Требует API</em></span></div></section>
+    </div>
   </div>`];
 }
 
