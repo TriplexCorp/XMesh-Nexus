@@ -2196,7 +2196,7 @@ document.addEventListener('click',async e=>{
     if(location.protocol!=='https:'){toast('Открой панель через HTTPS для управления идентичностью узла.');return}
     const shellQuote=value=>"'"+String(value).replace(/'/g,"'\\''")+"'";
     const installUrl='https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy/install-node-metrics-agent.sh';
-    const command='curl --proto "=https" --tlsv1.2 -fsSL '+shellQuote(installUrl)+' -o /tmp/xmesh-node-metrics-install.sh\nsudo bash /tmp/xmesh-node-metrics-install.sh '+shellQuote(location.origin)+' '+shellQuote(String(id));
+    const command='install_script="$(mktemp /tmp/xmesh-agent.XXXXXXXX)"\ncurl --proto "=https" --tlsv1.2 -fsSL '+shellQuote(installUrl)+' -o "$install_script" && sudo bash "$install_script" '+shellQuote(location.origin)+' '+shellQuote(String(id))+'\nrm -f "$install_script"';
     const html='<div class="box"><div class="bar2"><h2>Защищённый агент · '+esc(node.name)+'</h2><button class="ia" data-x aria-label="Закрыть">'+ic('x')+'</button></div>'+
       '<p class="note">Каждый узел получает собственный приватный Ed25519-ключ. Панель хранит только публичный ключ; токен Bearer не требуется. Подписываются тело запроса, время и случайный nonce.</p>'+
       '<label class="f"><span>1. Установите агент на Linux-узле (root)</span><textarea id="metrics-install-command" rows="3" spellcheck="false" readonly>'+esc(command)+'</textarea><small>В конце установки агент покажет публичный ключ. Не передавайте приватный ключ в панель.</small></label>'+
