@@ -56,13 +56,12 @@ def main():
     node = created["id"]
     body = {"node_id": node, "cpu_percent": 25.5, "metrics": {"unit": "signed-test"}}
 
-    code, issued, _ = request("POST", f"/nodes/{node}/metrics-token", {},
-                               cookie=cookie, origin=BASE)
-    assert_status(code, 201, "legacy bearer issued")
-    token = issued["token"]
+    # No credentials may be issued through the removed bearer endpoint.
+    code, _, _ = request("POST", f"/nodes/{node}/metrics-token", {}, cookie=cookie, origin=BASE)
+    assert_status(code, 404, "legacy bearer issuance endpoint removed")
     code, _, _ = request("POST", "/metrics/ingest", body,
-                         headers={"Authorization": "Bearer " + token})
-    assert_status(code, 201, "legacy bearer works before enrollment")
+                         headers={"Authorization": "Bearer xm_" + "a" * 64})
+    assert_status(code, 401, "unsigned bearer rejected before enrollment")
 
     with tempfile.TemporaryDirectory() as directory:
         keyfile = Path(directory) / "key.pem"
@@ -77,8 +76,8 @@ def main():
         assert_status(code, 201, "owner enrolls signing key")
 
         code, _, _ = request("POST", "/metrics/ingest", body,
-                             headers={"Authorization": "Bearer " + token})
-        assert_status(code, 401, "enrollment revokes old bearer")
+                             headers={"Authorization": "Bearer xm_" + "a" * 64})
+        assert_status(code, 401, "bearer rejected after enrollment")
 
         raw = json.dumps(body, separators=(",", ":")).encode()
         ts = int(time.time())
@@ -109,7 +108,7 @@ def main():
 
         code, _, _ = request("POST", f"/nodes/{node}/metrics-token", {},
                              cookie=cookie, origin=BASE)
-        assert_status(code, 409, "signed node cannot downgrade to bearer")
+        assert_status(code, 404, "removed bearer endpoint stays unavailable")
 
         code, _, _ = request("DELETE", f"/nodes/{node}/metrics-key",
                              cookie=cookie, origin=BASE)
