@@ -1084,7 +1084,8 @@ function userDrawer(id,tab){
         <button type="button" class="btn sm" data-user-client-json="${u.id}">${ic('file-code')} Готовые Client JSON</button>
         <div class="user-section-divider"></div>
         <div class="user-pane-heading user-sub-heading"><div><h3>Подписка</h3></div></div>
-        <p class="user-sub-note">Сервис подписок будет отдельным компонентом. Оформление и размещение настраиваются в SUBSCRIPTION STUDIO.</p>
+        <p class="user-sub-note">Уникальная ссылка на VLESS-подписку. При повторной выдаче старая ссылка автоматически отзывается. Клиент получает только разрешённые серверы.</p>
+        <div class="act"><button type="button" class="btn sm" data-user-sub-create="${u.id}">${ic('link')} Создать / обновить ссылку</button><button type="button" class="gh sm" data-user-sub-revoke="${u.id}">${ic('shield-off')} Отозвать подписку</button></div>
         <a class="user-inline-link" href="#subscription" data-x>${ic('globe')} SUBSCRIPTION STUDIO</a>
       </section>
       <section class="user-pane user-pane-insights" aria-label="Статистика и устройства">
@@ -1818,6 +1819,28 @@ document.addEventListener('click',async e=>{
   else if(b=g('[data-uo]'))userDrawer(+b.dataset.uo,'dev');
   else if(b=g('[data-user-date-open],[data-user-date-nav],[data-user-date-day],[data-user-date-today],[data-user-date-clear]')){e.preventDefault();handleUserCalendarAction(b)}
   else if(b=g('[data-user-renew-apply]')){e.preventDefault();handleUserRenewalAction(b)}
+  else if(b=g('[data-user-sub-create]')){
+    const id=Number(b.dataset.userSubCreate);
+    if(!confirm(panelIsEnglish()?'Generate a subscription link? The previous link, if any, will be revoked.':'Создать ссылку подписки? Если прежняя ссылка существует, она перестанет работать.'))return;
+    b.disabled=true;
+    try{
+      const result=await backendRequest('/api/v1/users/'+encodeURIComponent(id)+'/subscription',{method:'POST'});
+      const link=location.origin+'/api/v1/sub/'+result.token;
+      modal('<div class="box"><div class="bar2"><h2>Ссылка подписки</h2><button type="button" class="ia" data-x aria-label="Закрыть">'+ic('x')+'</button></div><p class="note">Ссылка является секретом доступа. Скопируйте её сейчас: панель не хранит токен в открытом виде.</p><textarea readonly spellcheck="false" id="user-generated-sub" rows="3">'+esc(link)+'</textarea><div class="act"><button type="button" class="btn" data-copy-user-sub>'+ic('copy')+' Скопировать ссылку</button></div></div>','wide');
+    }catch(error){toast('Ошибка подписки: '+(error.message||'API'))}
+    finally{b.disabled=false}
+  }
+  else if(b=g('[data-copy-user-sub]')){
+    const field=$('#user-generated-sub');
+    if(field){try{await navigator.clipboard.writeText(field.value);toast('Ссылка скопирована')}catch(_){field.select();document.execCommand('copy');toast('Ссылка скопирована')}}
+  }
+  else if(b=g('[data-user-sub-revoke]')){
+    const id=Number(b.dataset.userSubRevoke);
+    if(!confirm('Отозвать подписку? Все ранее выданные ссылки этого пользователя перестанут работать.'))return;
+    b.disabled=true;
+    try{await backendRequest('/api/v1/users/'+encodeURIComponent(id)+'/subscription',{method:'DELETE'});toast('Доступ по ссылке отозван')}
+    catch(error){toast('Ошибка: '+(error.message||'API'))}finally{b.disabled=false}
+  }
   else if(b=g('[data-user-client-json]')){
     e.preventDefault();
     const user=DB.users.find(x=>x.id===Number(b.dataset.userClientJson));
