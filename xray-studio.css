@@ -3420,9 +3420,8 @@ html[data-motion=off] .sr-studio-dialog::backdrop{animation:none!important;trans
 .xray-builder .xray-meta-grid select{
  color:var(--tx)!important;
  background-color:var(--s1)!important;
- color-scheme:dark;
 }
-.xray-builder .xray-meta-grid select option{background:#18212e;color:#f2f5fa}
+.xray-builder .xray-meta-grid select option{background:var(--s1);color:var(--tx)}
 .xray-builder .xray-output-state{
  max-width:16rem;
  overflow-wrap:anywhere;
