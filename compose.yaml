@@ -61,6 +61,8 @@ services:
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Run ./install.sh first}
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      DASHBOARD_PATH: ${DASHBOARD_PATH:?Run ./install.sh first}
+      DASHBOARD_PATH_MIRROR: /run/xmesh/dashboard-path
       TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:-}
       RUST_LOG: info,tower_http=info,sqlx=warn
     depends_on:
@@ -72,6 +74,7 @@ services:
       - "${APP_BIND:-127.0.0.1}:${APP_PORT:-8080}:8080"
     volumes:
       - core_data:/var/lib/xmesh
+      - ./deploy/runtime/dashboard-path:/run/xmesh/dashboard-path:rw
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=64m,mode=1777
