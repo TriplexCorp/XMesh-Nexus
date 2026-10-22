@@ -1,7 +1,7 @@
 /* XMesh Studio 2026 — standalone editor; no legacy presentation adapters. */
 window.XMeshStudio=(()=>{
 'use strict';
-const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;':'&quot;'}[c]));
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const $=(root,id)=>root.querySelector('[data-xm="'+id+'"]');
 const inp=(id,title,value='',type='text',hint='')=>'<label class="xm-field"><span>'+title+'</span><input data-xm="'+id+'" type="'+type+'" value="'+esc(value)+'" autocomplete="off">'+(hint?'<small>'+hint+'</small>':'')+'</label>';
 const select=(id,title,choices)=>'<label class="xm-field"><span>'+title+'</span><select data-xm="'+id+'">'+choices.map(a=>'<option value="'+esc(a[0])+'">'+esc(a[1])+'</option>').join('')+'</select></label>';
