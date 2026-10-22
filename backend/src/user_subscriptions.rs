@@ -320,15 +320,11 @@ pub async fn serve(State(state):State<AppState>,Path(token):Path<String>,Query(o
  let user=record(&state,id).await?;
  let now=std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as i64;
  if crate::user_status(&user,now)!="ACTIVE"{return Err(ApiError::new(StatusCode::FORBIDDEN,"Subscription inactive"))}
- let (links,mut outbounds)=collect_user_outbounds(&state,&user).await?;
+ let (links,outbounds)=collect_user_outbounds(&state,&user).await?;
  // Native Xray JSON is the default for new HTTPS subscriptions.
  // Existing link-list users may explicitly request ?format=vless.
  let legacy=options.get("format").is_some_and(|v|v=="vless");
- for (i,outbound) in outbounds.iter_mut().enumerate(){
-  if let Some(tag)=outbound.get("tag").and_then(Value::as_str){
-   outbound["tag"]=json!(format!("{}-{}",tag,i+1));
-  }
- }
+
  let mut response=if legacy{
   links.join("\n").into_response()
  }else{
