@@ -22,7 +22,7 @@ const request=async(path,options={})=>{
  return j;
 };
 const setting=(name,title,detail,min,max,unit,policy,disabled)=>'<label class="security-setting"><span><b>'+title+'</b><small>'+detail+'</small></span><span class="security-number"><input name="'+name+'" type="number" min="'+min+'" max="'+max+'" step="1" value="'+esc(policy[name])+'" '+(disabled?'disabled':'')+' required><em>'+unit+'</em></span></label>';
-const panel=()=>'<section class="card" id="security-advanced"><div class="hd"><div><h3>Расширенная защита</h3><p>Настройки сервера и активные сеансы администраторов</p></div><span class="chip">Control Plane</span></div><div id="security-advanced-body" class="security-loading">Загрузка политик безопасности…</div><p id="security-advanced-error" class="er" role="alert" aria-live="polite"></p></section>';
+const panel=()=>'<section class="card" id="security-advanced"><div class="hd"><div><h3>Политика входа</h3><p>Время сессии, ограничения входа и защищённый адрес</p></div></div><div id="security-advanced-body" class="security-loading">Загрузка политик безопасности…</div><p id="security-advanced-error" class="er" role="alert" aria-live="polite"></p></section><section class="card" id="security-sessions-panel"><div class="hd"><div><h3>Активные сессии</h3><p>Управление входами и устройствами</p></div></div><div id="security-sessions-body"></div></section>';
 async function mount(root){
  const host=root.querySelector('#security-advanced');if(!host)return;
  const body=host.querySelector('#security-advanced-body'),error=host.querySelector('#security-advanced-error');
@@ -45,9 +45,17 @@ async function mount(root){
   '<div class="security-sessions">'+(sessionRes.sessions||[]).map(s=>'<div class="security-session"><span><b>'+(s.current?'Текущая сессия':'Сессия №'+esc(s.id))+'</b><small>Последняя активность: '+esc(new Date(s.lastActivity).toLocaleString())+' · Истекает: '+esc(new Date(s.expiresAt).toLocaleString())+'</small></span><button type="button" class="gh sm" data-security-revoke="'+esc(s.id)+'">'+(s.current?'Завершить':'Отозвать')+'</button></div>').join('')+
   '<div class="security-policy-actions"><button type="button" class="gh" data-security-revoke-others>Завершить все другие сессии</button></div></div>'+
   '<div class="security-policy-footnote">Адрес снижает обнаруживаемость страницы входа, но не является паролем. API должен оставаться защищённым независимо от URL. Используйте длинный непредсказуемый путь и HTTPS.</div>';
+  const sessionsBody=root.querySelector('#security-sessions-body');
+  const sessionHeading=[...body.querySelectorAll('.security-subheading')].find(el=>el.querySelector('h4')?.textContent==='Мои активные сессии');
+  const sessionList=body.querySelector('.security-sessions');
+  if(sessionsBody&&sessionList){
+    sessionsBody.replaceChildren();
+    if(sessionHeading)sessionHeading.remove();
+    sessionsBody.append(sessionList);
+  }
  };
  try{await load()}catch(e){fail(e);body.innerHTML='<button class="gh" type="button" data-security-retry>Повторить загрузку</button>'}
- host.addEventListener('click',async e=>{
+ root.addEventListener('click',async e=>{
   const btn=e.target.closest('button');if(!btn)return;
   try{
    if(btn.matches('[data-security-copy-path]')){
