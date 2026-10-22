@@ -145,6 +145,8 @@ struct NodeMetricsIngestRequest {
     metrics: Option<Value>,
     #[serde(default, alias = "userTraffic")]
     user_traffic: Option<Vec<UserTrafficSample>>,
+    #[serde(default, alias = "userInboundTraffic")]
+    user_inbound_traffic: Option<Vec<UserInboundTrafficSample>>,
 }
 
 /// Cumulative Xray byte counters scoped to a real panel user and the reporting node.
@@ -156,6 +158,19 @@ struct UserTrafficSample {
     #[serde(alias = "uplinkBytes")]
     uplink_bytes: i64,
     #[serde(alias = "downlinkBytes")]
+    downlink_bytes: i64,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct UserInboundTrafficSample {
+    #[serde(alias="user_id")]
+    user_id: i64,
+    #[serde(alias="inbound_tag")]
+    inbound_tag: String,
+    #[serde(alias="uplink_bytes")]
+    uplink_bytes: i64,
+    #[serde(alias="downlink_bytes")]
     downlink_bytes: i64,
 }
 
@@ -823,6 +838,22 @@ async fn ingest_node_metrics(
         }
     }
 
+    let inbound_samples = body.user_inbound_traffic.unwrap_or_default();
+    if inbound_samples.len() > 4096 {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST,"Не более 4096 inbound-счётчиков за один пакет."));
+    }
+    let mut inbound_seen = std::collections::HashSet::new();
+    for sample in &inbound_samples {
+        if sample.user_id <= 0 || sample.uplink_bytes < 0 || sample.downlink_bytes < 0
+            || sample.inbound_tag.is_empty() || sample.inbound_tag.len() > 128
+            || sample.inbound_tag.chars().any(char::is_control)
+            || !inbound_seen.insert((sample.user_id, sample.inbound_tag.as_str()))
+        {
+            return Err(ApiError::new(StatusCode::BAD_REQUEST,
+                "Некорректная или дублирующаяся запись userInboundTraffic."));
+        }
+    }
+
     let node_id = body.node_id.to_string();
     let sampled_at: i64 = sqlx::query_scalar(
         "INSERT INTO server_metric_samples (
@@ -881,11 +912,38 @@ async fn ingest_node_metrics(
     }
 
 
+    if !inbound_samples.is_empty() {
+        // An inbound's aggregate traffic MUST NEVER be interpreted as per-user traffic.
+        // Signed node agents report cumulative counters scoped to a real user+inbound.
+        let serialized = serde_json::to_value(&inbound_samples)
+            .map_err(|_|ApiError::new(StatusCode::BAD_REQUEST,"Некорректный userInboundTraffic."))?;
+        sqlx::query(
+            "INSERT INTO user_inbound_traffic_totals AS totals (
+                node_id,user_id,inbound_tag,last_uplink_bytes,last_downlink_bytes,
+                uplink_bytes,downlink_bytes,observations,updated_at
+            )
+            SELECT $1,s.user_id,s.inbound_tag,s.uplink_bytes,s.downlink_bytes,0,0,1,NOW()
+            FROM jsonb_to_recordset($2::jsonb)
+                AS s(user_id BIGINT,inbound_tag TEXT,uplink_bytes BIGINT,downlink_bytes BIGINT)
+            JOIN panel_records u ON u.collection='users' AND u.id=s.user_id
+            ON CONFLICT(node_id,user_id,inbound_tag) DO UPDATE SET
+                uplink_bytes=totals.uplink_bytes+
+                    GREATEST(EXCLUDED.last_uplink_bytes-totals.last_uplink_bytes,0),
+                downlink_bytes=totals.downlink_bytes+
+                    GREATEST(EXCLUDED.last_downlink_bytes-totals.last_downlink_bytes,0),
+                last_uplink_bytes=EXCLUDED.last_uplink_bytes,
+                last_downlink_bytes=EXCLUDED.last_downlink_bytes,
+                observations=totals.observations+1,
+                updated_at=NOW()"
+        ).bind(body.node_id).bind(serialized).execute(&state.pool).await?;
+    }
+
     Ok((StatusCode::CREATED, Json(json!({
         "status": "accepted",
         "nodeId": body.node_id,
         "sampledAt": sampled_at,
-        "userTrafficSamples": user_traffic.len()
+        "userTrafficSamples": user_traffic.len(),
+        "userInboundTrafficSamples": inbound_samples.len()
     }))))
 }
 
@@ -945,6 +1003,24 @@ async fn get_user_traffic(
             "updatedAtMs": row.try_get::<i64, _>("updated_at_ms")?
         }));
     }
+    let inbound_rows = sqlx::query(
+        "SELECT t.node_id,t.inbound_tag,t.uplink_bytes,t.downlink_bytes,t.observations,
+                COALESCE(NULLIF(n.data->>'name',''),'Узел #'||t.node_id::text) AS node_name
+         FROM user_inbound_traffic_totals t
+         LEFT JOIN panel_records n ON n.collection='nodes' AND n.id=t.node_id
+         WHERE t.user_id=$1 ORDER BY (t.uplink_bytes+t.downlink_bytes) DESC,t.inbound_tag"
+    ).bind(user_id).fetch_all(&state.pool).await?;
+    let mut inbound_totals=Vec::with_capacity(inbound_rows.len());
+    for r in inbound_rows {
+        inbound_totals.push(json!({
+            "nodeId":r.try_get::<i64,_>("node_id")?,
+            "nodeName":r.try_get::<String,_>("node_name")?,
+            "inboundTag":r.try_get::<String,_>("inbound_tag")?,
+            "uplinkBytes":r.try_get::<i64,_>("uplink_bytes")?,
+            "downlinkBytes":r.try_get::<i64,_>("downlink_bytes")?,
+            "observations":r.try_get::<i64,_>("observations")?
+        }));
+    }
     Ok(Json(json!({
         "userId": user_id,
         "dataSource": "user_node_traffic_totals",
@@ -952,7 +1028,9 @@ async fn get_user_traffic(
         "sampleCount": servers.len(),
         "totalUplinkBytes": uplink,
         "totalDownlinkBytes": downlink,
-        "servers": servers
+        "servers": servers,
+        "inbounds": inbound_totals,
+        "inboundAccounting": "independent_signed_user_inbound_counters"
     })))
 }
 
