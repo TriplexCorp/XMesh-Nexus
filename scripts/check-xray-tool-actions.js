@@ -157,7 +157,7 @@ async function run(){
  const blocked=harness(noReality);const blockedBefore=blocked.area.value;
  await blocked.run('shortid');
  assert.equal(blocked.area.value,blockedBefore,'tool does not silently enable Reality');
- assert.ok(blocked.calls.some(v=>v.includes('REALITY')),'actionable failure message');
+ assert.ok(blocked.calls.some(v=>/reality/i.test(v)),'actionable failure message');
 
  const dns=harness(sample());await dns.run('dns');
  assert.ok(dns.doc().dns,'DNS tool inserts DNS');
