@@ -23,9 +23,13 @@ fn error(message: &'static str) -> ApiError {
     ApiError::new(StatusCode::UNAUTHORIZED, message)
 }
 
-pub(crate) fn canonical(node_id: i64, timestamp: i64, nonce: &str, body: &[u8]) -> String {
+pub(crate) fn canonical_for(path: &str, node_id: i64, timestamp: i64, nonce: &str, body: &[u8]) -> String {
     let digest = hex::encode(Sha256::digest(body));
-    format!("XMESH1\nPOST\n/api/v1/metrics/ingest\n{node_id}\n{timestamp}\n{nonce}\n{digest}\n")
+    format!("XMESH1\nPOST\n{path}\n{node_id}\n{timestamp}\n{nonce}\n{digest}\n")
+}
+
+pub(crate) fn canonical(node_id: i64, timestamp: i64, nonce: &str, body: &[u8]) -> String {
+    canonical_for("/api/v1/metrics/ingest", node_id, timestamp, nonce, body)
 }
 
 fn valid_nonce(nonce: &str) -> bool {
@@ -37,7 +41,7 @@ fn check_timestamp(timestamp: i64, now: i64) -> bool {
 }
 
 fn verified_signature(
-    public_key: &str, headers: &HeaderMap, node_id: i64, raw_body: &[u8], now: i64,
+    public_key: &str, headers: &HeaderMap, node_id: i64, raw_body: &[u8], now: i64, path: &str,
 ) -> Result<String, ApiError> {
     let timestamp_raw = headers.get("x-xmesh-timestamp").and_then(|x| x.to_str().ok())
         .ok_or_else(|| error("Требуется подписанный запрос от узла."))?;
@@ -68,7 +72,7 @@ fn verified_signature(
         .and_then(|data| data.try_into().ok())
         .ok_or_else(|| error("Недопустимая подпись запроса."))?;
     let signature = Signature::from_bytes(&signature_data);
-    verifying_key.verify(canonical(node_id, timestamp, nonce, raw_body).as_bytes(), &signature)
+    verifying_key.verify(canonical_for(path, node_id, timestamp, nonce, raw_body).as_bytes(), &signature)
         .map_err(|_|error("Подпись запроса не прошла проверку."))?;
     Ok(nonce.to_owned())
 }
@@ -76,13 +80,19 @@ fn verified_signature(
 pub async fn authenticate(
     state: &AppState, headers: &HeaderMap, node_id: i64, raw_body: &[u8],
 ) -> Result<(), ApiError> {
+    authenticate_for(state, headers, node_id, raw_body, "/api/v1/metrics/ingest").await
+}
+
+pub async fn authenticate_for(
+    state: &AppState, headers: &HeaderMap, node_id: i64, raw_body: &[u8], path: &str,
+) -> Result<(), ApiError> {
     let row = sqlx::query("SELECT public_key FROM node_metric_keys WHERE node_id=$1")
         .bind(node_id).fetch_optional(&state.pool).await?
         .ok_or_else(|| error("Для узла не зарегистрирован публичный Ed25519-ключ."))?;
     let key: String = row.try_get("public_key")?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)
         .map_err(|_| error("Ошибка времени сервера."))?.as_secs() as i64;
-    let nonce = verified_signature(&key, headers, node_id, raw_body, now)?;
+    let nonce = verified_signature(&key, headers, node_id, raw_body, now, path)?;
     let inserted = sqlx::query(
         "INSERT INTO node_metric_nonces(node_id, nonce) VALUES($1, $2) ON CONFLICT DO NOTHING"
     ).bind(node_id).bind(nonce).execute(&state.pool).await?;
@@ -182,9 +192,9 @@ mod tests {
         headers.insert("x-xmesh-timestamp",timestamp.to_string().parse().unwrap());
         headers.insert("x-xmesh-nonce",nonce.parse().unwrap());
         headers.insert("x-xmesh-signature",hex::encode(sig.to_bytes()).parse().unwrap());
-        assert!(verified_signature(&public,&headers,42,raw,timestamp).is_ok());
-        assert!(verified_signature(&public,&headers,43,raw,timestamp).is_err());
-        assert!(verified_signature(&public,&headers,42,br#"{"node_id":43}"#,timestamp).is_err());
-        assert!(verified_signature(&public,&headers,42,raw,timestamp+121).is_err());
+        assert!(verified_signature(&public,&headers,42,raw,timestamp,"/api/v1/metrics/ingest").is_ok());
+        assert!(verified_signature(&public,&headers,43,raw,timestamp,"/api/v1/metrics/ingest").is_err());
+        assert!(verified_signature(&public,&headers,42,br#"{"node_id":43}"#,timestamp,"/api/v1/metrics/ingest").is_err());
+        assert!(verified_signature(&public,&headers,42,raw,timestamp+121,"/api/v1/metrics/ingest").is_err());
     }
 }
