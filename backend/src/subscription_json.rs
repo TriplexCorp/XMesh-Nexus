@@ -17,7 +17,19 @@ fn port(config:&Value,key:&str,default:u16)->u16{
 fn country(outbound:&Value)->String{
     let code=outbound.get("xmeshCountry").and_then(Value::as_str).unwrap_or("ZZ");
     let code=code.trim().to_ascii_uppercase();
-    if code.len()==2&&code.bytes().all(|c|c.is_ascii_alphabetic()){code}else{"ZZ".to_string()}
+    if code.len()==2 && code.bytes().all(|c|c.is_ascii_alphabetic()) && code!="ZZ"{return code}
+    // Preserve country grouping when the admin uses a flag in the server label.
+    let label=outbound.get("tag").and_then(Value::as_str).unwrap_or("");
+    let mut flags=label.chars();
+    if let (Some(a),Some(b))=(flags.next(),flags.next()){
+        let ia=a as u32;let ib=b as u32;
+        if (0x1f1e6..=0x1f1ff).contains(&ia)&&(0x1f1e6..=0x1f1ff).contains(&ib){
+            let left=char::from_u32(u32::from(b'A')+ia-0x1f1e6).unwrap_or('Z');
+            let right=char::from_u32(u32::from(b'A')+ib-0x1f1e6).unwrap_or('Z');
+            return format!("{left}{right}")
+        }
+    }
+    "ZZ".to_owned()
 }
 fn secure_vless(outbound:&Value)->bool {
     let user=&outbound["settings"]["vnext"][0]["users"][0];
@@ -197,6 +209,12 @@ mod tests{
   assert!(c.get("observatory").is_none());
   assert!(!c["outbounds"].as_array().unwrap().iter().any(|v|v["tag"]=="dns-out"));
   assert!(c["dns"]["servers"][0].as_str().unwrap().contains("yandex"));
+ }
+ #[test] fn flag_prefix_groups_country_without_explicit_code(){
+  let mut a=outbound("ZZ");a["tag"]=json!("🇵🇱Польша-1");
+  let mut b=outbound("ZZ");b["tag"]=json!("🇵🇱Польша-2");
+  let c=build(vec![a,b],&json!({})).unwrap();
+  assert_eq!(c["routing"]["balancers"][0]["tag"],"PL_AUTO");
  }
  #[test] fn duplicated_public_ip_does_not_delete_nodes(){
   let mut a=outbound("DE");let mut b=outbound("PL");
