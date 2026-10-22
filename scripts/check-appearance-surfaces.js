@@ -297,7 +297,7 @@ const beginning=app.indexOf("else if(b=g('[data-ui]'))");
 const ending=app.indexOf("\n  else if(g('#rs'))",beginning);
 assert(beginning>=0&&ending>beginning,'Appearance event handler must be present');
 const eventHandler=app.slice(beginning,ending).replace("else if(b=g('[data-ui]'))","if(b)");
-const run=new Function('b','C','apply','document',eventHandler);
+const run=new Function('b','C','apply','document','syncSubscriptionTheme',eventHandler);
 function button(value,selected){
  const classes=new Set(selected?['on']:[]);
  const attrs={};
@@ -314,15 +314,16 @@ const doc={querySelectorAll:selector=>{
  assert.equal(selector,'[data-ui="surface"]');
  return buttons;
 }};
-let applied=0;
+let applied=0,uiThemeSyncs=0;
 for(const [index,value] of ['glass','raised','solid'].entries()){
- run(buttons.find(x=>x.dataset.value===value),C,()=>{applied++},doc);
+ run(buttons.find(x=>x.dataset.value===value),C,()=>{applied++},doc,()=>{uiThemeSyncs++});
  assert.equal(C.surface,value,'The surface value must update');
  assert.equal(buttons.filter(x=>x.classList.contains('on')).length,1,'Exactly one choice must be highlighted');
  assert.equal(buttons.find(x=>x.classList.contains('on')).dataset.value,value,'Highlight must follow selected style');
  for(const button of buttons)assert.equal(button.getAttribute('aria-pressed'),String(button.dataset.value===value),'ARIA state must follow selection');
 }
 assert.equal(applied,3);
+assert.equal(uiThemeSyncs,3,'Panel surface switches must update linked subscription appearance');
 assert.match(app,/aria-pressed="\$\{\(C\[key\]\|\|CDEFAULT\[key\]\)==v\?'true':'false'\}/,'Initial selection must expose aria-pressed');
 new Function(app);
 console.log('Appearance surface choices, visual state and migration: OK');
