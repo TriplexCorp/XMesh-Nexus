@@ -527,8 +527,16 @@ let T=[],cur='',RT=0;
 const panelSubscriptionTheme=()=>{
  const root=document.documentElement,style=getComputedStyle(root);
  const color=(token,fallback)=>{
-  const value=style.getPropertyValue(token).trim();
-  return /^#[\da-f]{6}$/i.test(value)?value.toLowerCase():fallback;
+  // CSS variables may be RGB or nested custom properties; never silently
+  // persist an unrelated fallback accent when the owner changes the theme.
+  let value=style.getPropertyValue(token).trim();
+  for(let depth=0;depth<3&&/^var\(--[\w-]+\)$/.test(value);depth++){
+    value=style.getPropertyValue(value.slice(4,-1)).trim();
+  }
+  if(/^#[\da-f]{6}$/i.test(value))return value.toLowerCase();
+  const match=/^rgba?\(\s*(\d{1,3})[\s,]+(\d{1,3})[\s,]+(\d{1,3})(?:[\s,/]+[\d.]+)?\s*\)$/i.exec(value);
+  if(match)return '#'+match.slice(1,4).map(part=>Math.max(0,Math.min(255,+part)).toString(16).padStart(2,'0')).join('');
+  return fallback;
  };
  return {
   subscriptionAccent:color('--a','#74ddb1'),
@@ -541,7 +549,8 @@ const panelSubscriptionTheme=()=>{
 let subscriptionThemeSync=Promise.resolve();
 const syncSubscriptionTheme=()=>{
  if(!backendReady||sessionUser?.role!=='owner'||DB.set.subscriptionSyncPanelTheme===false)return subscriptionThemeSync;
- document.querySelector('.subscription-studio form')?.dispatchEvent(new Event('change',{bubbles:true}));
+ // Serialize writes, but always read the current appearance after apply()
+ // rather than a stale snapshot from another theme or browser session.
  subscriptionThemeSync=subscriptionThemeSync.catch(()=>{}).then(async()=>{
   if(DB.set.subscriptionSyncPanelTheme===false)return;
   const theme=panelSubscriptionTheme();
