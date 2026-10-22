@@ -944,6 +944,10 @@ function userDrawer(id,tab){
         <div class="user-host-list">${hostMarkup}</div>
         <div class="user-dev-limit"><label class="f"><span>Лимит устройств</span><input type="number" min="0" value="${u.hwid}" data-hw="${u.id}" aria-label="Лимит устройств"></label></div>
         <div class="user-section-divider"></div>
+        <div class="user-pane-heading user-sub-heading"><div><h3>Подключения</h3></div></div>
+        <p class="user-sub-note">Готовый Client JSON собирается из UUID этого пользователя, доступных inbound и публичных хостов.</p>
+        <button type="button" class="btn sm" data-user-client-json="${u.id}">${ic('file-code')} Готовые Client JSON</button>
+        <div class="user-section-divider"></div>
         <div class="user-pane-heading user-sub-heading"><div><h3>Подписка</h3></div></div>
         <p class="user-sub-note">Сервис подписок будет отдельным компонентом. Оформление и размещение настраиваются в SUBSCRIPTION STUDIO.</p>
         <a class="user-inline-link" href="#subscription" data-x>${ic('globe')} SUBSCRIPTION STUDIO</a>
@@ -2282,6 +2286,33 @@ document.addEventListener('click',async e=>{
   else if(b=g('[data-uo]'))userDrawer(+b.dataset.uo,'dev');
   else if(b=g('[data-user-date-open],[data-user-date-nav],[data-user-date-day],[data-user-date-today],[data-user-date-clear]')){e.preventDefault();handleUserCalendarAction(b)}
   else if(b=g('[data-user-renew-apply]')){e.preventDefault();handleUserRenewalAction(b)}
+  else if(b=g('[data-user-client-json]')){
+    e.preventDefault();
+    const user=DB.users.find(x=>x.id===Number(b.dataset.userClientJson));
+    if(!user||!window.XMeshClientConfig){toast('Генератор Client JSON недоступен.');return}
+    const entries=window.XMeshClientConfig.generate(user,DB);
+    window.xmeshGeneratedUserConfigs=entries;
+    modal('<div class="box"><div class="bar2"><div><h2>Готовые Client JSON · '+esc(user.username)+'</h2><p class="note">Адрес, UUID и настройки подключений взяты из записей панели. Неполные конфигурации нельзя экспортировать.</p></div><button type="button" class="ia" data-x aria-label="Закрыть">'+ic('x')+'</button></div>'+
+      (entries.length?entries.map((entry,i)=>'<div class="user-client-export-row"><div><b>'+esc(entry.name)+'</b><small>'+esc(entry.tag)+'</small>'+(entry.error?'<p class="er">'+esc(entry.error)+'</p>':'')</div><div class="act">'+(entry.json?'<button class="gh sm" data-user-client-copy="'+i+'">'+ic('copy')+'Копировать</button><button class="gh sm" data-user-client-download="'+i+'">'+ic('download')+'Скачать</button>':'<small class="mu">Требуется настройка</small>')+'</div></div>').join(''):
+      '<p class="note">Для пользователя пока нет подходящих публичных хостов. Назначьте сквад с inbound, затем добавьте хост с тем же тегом.</p>')+
+      '<p class="note">Генерация выполняется для администратора. Публичная выдача подписок требует отдельного сервиса.</p></div>','wide');
+  }
+  else if(b=g('[data-user-client-copy]')){
+    const entry=window.xmeshGeneratedUserConfigs?.[Number(b.dataset.userClientCopy)];
+    if(entry?.json){
+      try{await navigator.clipboard.writeText(JSON.stringify(entry.json,null,2));toast('Готовый Client JSON скопирован')}
+      catch(err){toast('Не удалось скопировать: '+(err.message||'нет доступа к буферу'))}
+    }
+  }
+  else if(b=g('[data-user-client-download]')){
+    const entry=window.xmeshGeneratedUserConfigs?.[Number(b.dataset.userClientDownload)];
+    if(entry?.json){
+      const filename=String(entry.name||'client').replace(/[^a-z0-9_-]/gi,'-').slice(0,70)||'client';
+      const blob=new Blob([JSON.stringify(entry.json,null,2)],{type:'application/json'});
+      const link=document.createElement('a'),url=URL.createObjectURL(blob);
+      link.href=url;link.download=filename+'-client.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    }
+  }
   else if(b=g('[data-user-traffic-refresh]')){e.preventDefault();void loadUserTrafficStats(+b.dataset.userTrafficRefresh)}
   else if(b=g('[data-copy-xray-id]')){const u=DB.users.find(x=>x.id==+b.dataset.copyXrayId);if(u?.xrayId)copyT(u.xrayId)}
   else if(g('[data-copy]'))copyT($('#lk').value);
