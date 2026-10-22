@@ -245,3 +245,22 @@
 .sv-studio .sv-template{padding:.6rem;margin-top:auto}
 .sv-studio .sv-codebar{min-height:2.65rem}
 .sv-studio .sv-codestatus{min-height:2rem;padding:.35rem .55rem}
+
+
+/* Dense but readable studio; controls honor the global root-scale. */
+.sv-studio .sv-profile-card{display:flex;align-items:stretch;gap:.4rem;min-width:0}
+.sv-studio .sv-profile-card .sv-profile-row{flex:1;min-width:0}
+.sv-studio .sv-profile-delete{align-self:stretch;padding:.45rem .8rem;border:1px solid var(--vline);background:var(--vpanel);color:var(--er,#f58ba1);font-size:.75rem}
+.sv-studio .sv-profile-delete:hover{border-color:var(--er,#f58ba1)}
+.sv-studio .sv-constructor>header{padding:.55rem .75rem .25rem}
+.sv-studio .sv-constructor nav.sv-tabs>button{min-height:2rem;padding:.32rem .55rem}
+.sv-studio .sv-formbody{padding:.55rem .7rem}
+.sv-studio .sv-formbody .sv-field{margin-bottom:.45rem}
+.sv-studio .sv-formbody .sv-field input,.sv-studio .sv-formbody .sv-field select{min-height:2rem}
+.sv-studio .sv-formbody [data-when]>h4{margin:.4rem 0 .25rem}
+.sv-studio .sv-formbody .sv-two{gap:.25rem .5rem}
+.sv-studio .sv-inbound-summary{padding:.4rem .65rem}
+.sv-studio .sv-outbound-preview{margin-top:.45rem}
+.sv-studio .sv-tools{padding:.55rem}
+.sv-studio .sv-legacy .xm-tools-grid{gap:.25rem}
+.sv-studio .sv-legacy .xm-tools-grid .sv-toolitem{min-height:2.65rem}
