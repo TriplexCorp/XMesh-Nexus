@@ -104,6 +104,21 @@ async function run(){
  preserved.run('reality');await tick();
  assert.equal(preserved.doc().inbounds[0].streamSettings.realitySettings.privateKey,protectedKey,'refusing rekey never rotates existing key');
 
+
+ const many=sample(),another=JSON.parse(JSON.stringify(sample().inbounds[0]));
+ another.tag='second';another.streamSettings.realitySettings.shortIds=['admin','eedd','eedd'];
+ many.inbounds.push(another);
+ const multiRepair=harness(many);multiRepair.run('repair-shortids');
+ assert.ok(multiRepair.doc().inbounds.every(ib=>ib.streamSettings.realitySettings.shortIds.every(validShortId)),'repair covers all Reality inbounds');
+ assert.equal(new Set(multiRepair.doc().inbounds[1].streamSettings.realitySettings.shortIds).size,3,'duplicates repaired');
+ assert.equal(multiRepair.doc().inbounds[1].streamSettings.realitySettings.shortIds[1],'eedd','valid ID retained');
+
+ const validDoc=sample();validDoc.inbounds[0].streamSettings.realitySettings.shortIds=['aabbccdd'];
+ const validRepair=harness(validDoc),pristine=validRepair.area.value;
+ validRepair.run('repair-shortids');
+ assert.equal(validRepair.area.value,pristine,'repair of healthy IDs is a no-op');
+ assert.equal(validRepair.issue.hidden,true,'healthy IDs show no warning');
+
  const cancel=harness(sample(),{confirmValue:false});
  const old=cancel.area.value;
  cancel.run('shortid');
@@ -136,6 +151,8 @@ async function run(){
  const inbound=harness(sample());inbound.run('inbound');
  assert.equal(inbound.doc().inbounds.length,2);
  assert.deepEqual(inbound.doc().inbounds[1].settings,{users:[],decryption:'none'},'new VLESS uses users, not clients');
+ assert.equal(inbound.doc().inbounds[1].listen,'127.0.0.1','unencrypted inbound draft must not be exposed publicly');
+
 
  const generated=harness(noReality);
  generated.run('reality');await tick();
