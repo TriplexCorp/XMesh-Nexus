@@ -149,7 +149,31 @@ pub async fn dashboard_entry(State(state):State<AppState>,Path(slug):Path<String
     if format!("/dashboard/{slug}")!=policy.dashboard_path {
         return StatusCode::NOT_FOUND.into_response();
     }
-    crate::panel_entry(State(state),headers).await
+    if !crate::auth::is_authenticated(&state,&headers).await {
+        return axum::response::Redirect::to("/login").into_response();
+    }
+    let static_dir=std::env::var("STATIC_DIR").unwrap_or_else(|_|"/app/static".to_string());
+    let content=match tokio::fs::read_to_string(std::path::PathBuf::from(static_dir).join("index.html")).await {
+        Ok(body)=>body,
+        Err(error)=>{
+            tracing::error!(%error,"Could not read dashboard entry HTML");
+            return (StatusCode::INTERNAL_SERVER_ERROR,"Panel assets unavailable").into_response();
+        }
+    };
+    // The dashboard alias is a nested URL. Asset URLs in the regular /
+    // entry page are relative; rebase only the HTML copy served at the alias.
+    // The canonical root HTML and links remain untouched.
+    let mut html=content;
+    for asset in [
+        "styles.css","global-hover.css","subscription-studio.css","xray-studio.css",
+        "xray-json-intelligence.js","xray-json-diagnostics.js","i18n.js",
+        "subscription-studio.js","qr-code.js","mfa-ui.js","security-ui.js",
+        "app.js","xray-studio-v5.js","xray-studio-dialog.js"
+    ] {
+        html=html.replace(&format!("href=\"{asset}"),&format!("href=\"/{asset}"));
+        html=html.replace(&format!("src=\"{asset}"),&format!("src=\"/{asset}"));
+    }
+    axum::response::Html(html).into_response()
 }
 
 #[cfg(test)]
