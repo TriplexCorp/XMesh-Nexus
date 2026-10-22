@@ -6,6 +6,13 @@
 
 > **Project status:** The repository currently implements the management/control plane, not a ready-to-run VPN traffic service or public subscription server. See [Scope and limitations](#current-scope) and [Subscription Studio](#subscription-studio--control-plane-only) before deploying.
 
+## Recent interface and security updates (October 2026)
+
+- **SUBSCRIPTION STUDIO:** the customer-facing **preview** lets visitors choose **RU / EN**, independently of the administrator language. The blueprint includes separately editable, server-validated bilingual headings, descriptions, CTAs, support labels and footers. The public Subscription Service is maintained separately; this does **not** automatically deploy the switcher to an existing public portal.
+- **Personalization:** independent **text size 75–160% at 1-percentage-point precision**, manual numeric input and a separate 1/10 snapping selector, without coupling text size to workspace width.
+- **Security:** a durable global cross-username failed-login budget, stale login-attempt cleanup, accurate session activity tracking, HTML encoding of toast action labels, and restricted static index fallback.
+- **Audit:** [findings, limitations and operational checklist (Russian)](docs/SECURITY_AUDIT_2026-10-22.md). Static checks do not replace runtime penetration testing.
+
 ## Architecture and data ownership
 
 - **PostgreSQL / TimescaleDB** share one PostgreSQL engine and one database. Regular PostgreSQL tables own business data: panel collections, users, nodes, Xray profiles, hosts, squads, settings, administrators, sessions and durable audit records.
