@@ -176,6 +176,36 @@ impl CoreManager {
         }
     }
 
+
+    /// Validate configuration with the same locally installed Xray binary used by the control plane.
+    /// Uses standard input: no config files, shell, server sockets or executable user input.
+    pub async fn validate_json(&self, source: &str) -> Result<(bool, String, String), String> {
+        use tokio::io::AsyncWriteExt;
+        if source.len() > 512 * 1024 {
+            return Err("Конфигурация превышает лимит проверки 512 КиБ.".to_owned());
+        }
+        let binary = self.root.join("current").join("xray");
+        if !binary.is_file() {
+            return Err("Установленное ядро Xray-core недоступно для проверки.".to_owned());
+        }
+        let mut child = Command::new(&binary)
+            .args(["run", "-test", "-format=json", "-config=stdin:"])
+            .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped())
+            .kill_on_drop(true).spawn()
+            .map_err(|_| "Не удалось запустить валидатор Xray-core.".to_owned())?;
+        let mut stdin = child.stdin.take().ok_or("Нет stdin у валидатора Xray.")?;
+        let input = source.as_bytes().to_vec();
+        let writer = tokio::spawn(async move { stdin.write_all(&input).await });
+        let output = timeout(Duration::from_secs(8), child.wait_with_output()).await
+            .map_err(|_| "Проверка Xray-core превысила 8 секунд.".to_owned())?
+            .map_err(|_| "Ошибка запуска валидатора Xray-core.".to_owned())?;
+        let _ = writer.await;
+        let ok = output.status.success();
+        let stdout = String::from_utf8_lossy(&output.stdout).chars().take(3000).collect();
+        let stderr = String::from_utf8_lossy(&output.stderr).chars().take(5000).collect();
+        Ok((ok, stdout, stderr))
+    }
+
     /// Generate both supported VLESS Encryption authentication pairs using the installed official Xray binary.
     /// Secret material is returned only to the authenticated caller and is never written to logs or disk.
     pub async fn generate_vless_encryption(&self) -> Result<Value, String> {
