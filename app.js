@@ -2290,7 +2290,10 @@ document.addEventListener('click',async e=>{
     e.preventDefault();
     const user=DB.users.find(x=>x.id===Number(b.dataset.userClientJson));
     if(!user||!window.XMeshClientConfig){toast('Генератор Client JSON недоступен.');return}
-    const entries=window.XMeshClientConfig.generate(user,DB);
+    let entries;
+    b.disabled=true;
+    try{entries=await window.XMeshClientConfig.generate(user,DB)}catch(error){toast('Ошибка Client JSON: '+error.message);b.disabled=false;return}
+    finally{b.disabled=false}
     window.xmeshGeneratedUserConfigs=entries;
     modal('<div class="box"><div class="bar2"><div><h2>Готовые Client JSON · '+esc(user.username)+'</h2><p class="note">Адрес, UUID и настройки подключений взяты из записей панели. Неполные конфигурации нельзя экспортировать.</p></div><button type="button" class="ia" data-x aria-label="Закрыть">'+ic('x')+'</button></div>'+
       (entries.length?entries.map((entry,i)=>'<div class="user-client-export-row"><div><b>'+esc(entry.name)+'</b><small>'+esc(entry.tag)+'</small>'+(entry.error?'<p class="er">'+esc(entry.error)+'</p>':'')</div><div class="act">'+(entry.json?'<button class="gh sm" data-user-client-copy="'+i+'">'+ic('copy')+'Копировать</button><button class="gh sm" data-user-client-download="'+i+'">'+ic('download')+'Скачать</button>':'<small class="mu">Требуется настройка</small>')+'</div></div>').join(''):
