@@ -21,16 +21,14 @@ for (let index = 0; index < lines.length; index += 1) {
 }
 
 // Keep the primary transport step and panel from disappearing in refactors.
+const studioSource = fs.readFileSync(path.join(__dirname, '..', 'xray-studio-v4.js'), 'utf8');
 const requiredFragments = [
-  ['transport tab', 'data-xray-config-tab="transport"'],
-  ['transport panel', 'data-xray-config-panel="transport"'],
-  ['contextual transport availability', "transport:networkFieldActive&&$$('[data-xray-option-group]'"],
-  ['inline editor state', "studioRoot.classList.add('studio-v3','studio-inline')"],
-  ['network capability check', 'xrayAllowedNetworks(proto)'],
-  ['security capability check', 'xrayAllowedSecurity(proto,net)'],
+  ['transport selection', "select('transport','Транспорт'"],
+  ['active Studio editor', 'data-v="source"'],
+  ['security selection', "select('security','Защита'"],
 ];
 for (const [label, fragment] of requiredFragments) {
-  if (!source.includes(fragment)) issues.push('app.js: required ' + label + ' marker is missing');
+  if (!studioSource.includes(fragment)) issues.push('xray-studio-v4.js: required ' + label + ' marker is missing');
 }
 
 if (issues.length) {
