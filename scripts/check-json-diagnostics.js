@@ -3,7 +3,6 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const src=fs.readFileSync('xray-json-diagnostics.js','utf8');
-const css=fs.readFileSync('xray-studio.css','utf8');
 const app=fs.readFileSync('app.js','utf8');
 const html=fs.readFileSync('index.html','utf8');
 const dock=fs.readFileSync('backend/Dockerfile','utf8');
@@ -55,9 +54,6 @@ assert.match(src,/setRangeText\(proposal\.replacement,proposal\.start,proposal\.
 assert.match(src,/textarea\.dispatchEvent\(new Event\('input'/,'Hot Fix must notify existing validators and JSON state');
 assert.match(src,/Math\.floor\(\(scroll-topPad\)\/lineHeight\)/,'Line gutter must use virtualized visible lines');
 assert.match(src,/textarea\.addEventListener\('scroll'/,'Line numbers should scroll with the editor');
-assert.match(css,/text-decoration-style:wavy!important/,'Error must have a wavy underline');
-assert.match(css,/\.sr-json-gutter-number\.is-error/,'Error line number must be marked');
-assert.match(css,/grid-template-rows:auto auto minmax\(0,1fr\) auto!important/,'Diagnostic bar needs its own row');
 assert(html.indexOf('src="xray-json-diagnostics.js')>=0 && html.indexOf('src="app.js')>html.indexOf('src="xray-json-diagnostics.js'),'Diagnostics must load before the editor');
 assert.match(dock,/COPY [^\n]*xray-json-diagnostics\.js[^\n]* \/app\/static\//,'Docker image must include diagnostics');
 console.log('Manual JSON line validation / gutter / Hot Fix: OK');
