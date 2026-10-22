@@ -523,6 +523,7 @@ pub async fn portal(
  let card_color=studio_color(&settings,"subscriptionCardColor","#15212b");
  let text_color=studio_color(&settings,"subscriptionTextColor","#ecf3f6");
  let accent=studio_color(&settings,"subscriptionAccent","#7be5b4");
+ let secondary=studio_color(&settings,"subscriptionSecondaryAccent","#c6e985");
  let radius=settings.get("subscriptionRadius").and_then(Value::as_u64).unwrap_or(16).clamp(1,36);
  let allowed=|key:&str,valid:&[&str],default:&str| -> String{
   let value=studio_string(&settings,key,default);
@@ -532,13 +533,13 @@ pub async fn portal(
  let changes=[
   ("{{LANG}}",lang.to_owned()),
   ("{{BRAND}}",escape_html(logo_brand)),
-  ("{{ACCENT}}",accent),("{{BACKGROUND}}",background),
+  ("{{ACCENT}}",accent),("{{SECONDARY_ACCENT}}",secondary),("{{BACKGROUND}}",background),
   ("{{CARD_COLOR}}",card_color),("{{TEXT_COLOR}}",text_color),
   ("{{RADIUS}}",radius.to_string()),
   ("{{THEME}}",allowed("subscriptionTheme",&["dark","light"],"dark")),
   ("{{LAYOUT}}",allowed("subscriptionLayout",&["standard","centered","compact"],"standard")),
-  ("{{CARD_STYLE}}",allowed("subscriptionCardStyle",&["soft","outline","flat"],"soft")),
-  ("{{FONT}}",allowed("subscriptionFont",&["system","manrope","mono"],"system")),
+  ("{{CARD_STYLE}}",allowed("subscriptionCardStyle",&["soft","outline","flat","glass","raised"],"soft")),
+  ("{{FONT}}",allowed("subscriptionFont",&["system","manrope","mono","onest","inter","golos","rubik","nunito","plex","roboto","pt","montserrat","ubuntu","opensans","source","fira","jost"],"system")),
   ("{{LOGO}}",logo_markup),
   ("{{RU_SELECTED}}",if en{String::new()}else{"on".to_owned()}),
   ("{{EN_SELECTED}}",if en{"on".to_owned()}else{String::new()}),
