@@ -3406,3 +3406,39 @@ html[data-motion=off] .sr-studio-dialog::backdrop{animation:none!important;trans
  html[data-motion=on] .sr-studio-dialog :is(.sr-dialog-close,.sr-dialog-done):hover,
  html[data-motion=on] .sr-studio-dialog :is(.sr-dialog-close,.sr-dialog-done):active{transform:none}
 }
+
+
+/* XRAY STUDIO: compact metadata and predictable preview layout */
+.xray-builder .xray-meta-grid{
+ display:grid!important;
+ grid-template-columns:repeat(2,minmax(0,1fr))!important;
+ gap:.75rem!important;
+ align-items:start!important;
+}
+.xray-builder .xray-meta-grid>.f{min-width:0!important;margin:0!important}
+.xray-builder .xray-meta-grid>.f :is(input,select){width:100%;min-width:0}
+.xray-builder .xray-meta-grid select{
+ color:var(--tx)!important;
+ background-color:var(--s1)!important;
+ color-scheme:dark;
+}
+.xray-builder .xray-meta-grid select option{background:#18212e;color:#f2f5fa}
+.xray-builder .xray-output-state{
+ max-width:16rem;
+ overflow-wrap:anywhere;
+}
+.xray-builder #xpb-error:not(:empty){
+ display:block;
+ padding:.7rem .85rem;
+ border:1px solid color-mix(in srgb,var(--wr) 35%,var(--ln));
+ border-radius:var(--ui-control-radius);
+ background:color-mix(in srgb,var(--wr) 7%,transparent);
+ line-height:1.5;
+ white-space:pre-wrap;
+}
+.xray-builder .xray-output-dock{min-width:0}
+.xray-builder .xray-output-workspace{min-width:0}
+.xray-builder .xray-code-view{min-width:0}
+@media(max-width:900px){
+ .xray-builder .xray-meta-grid{grid-template-columns:minmax(0,1fr)!important}
+}
