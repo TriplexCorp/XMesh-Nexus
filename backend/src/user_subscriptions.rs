@@ -75,7 +75,18 @@ fn vless_link(user:&Value, inbound:&Value, host:&Value)->Option<String>{
  if !["tls","reality","none"].contains(&security){return None}
  let network=nonempty(stream,"network").unwrap_or("tcp");
  if !["tcp","raw","xhttp","ws","grpc"].contains(&network){return None}
+ let client_encryption=nonempty(host,"clientEncryption")
+  .or_else(||nonempty(host,"externalClientEncryption"))
+  .or_else(||nonempty(user,"vlessEncryption"))
+  .or_else(||inbound.get("silentium").and_then(|v|nonempty(v,"clientEncryption")))
+  .unwrap_or("none");
+ let server_decryption=inbound.get("settings").and_then(|v|nonempty(v,"decryption")).unwrap_or("none");
+ if server_decryption!="none"&&client_encryption=="none"{return None}
+ if security=="none"&&!client_encryption.starts_with("mlkem768x25519plus."){return None}
  let mut opts=vec![format!("type={}",encode_component(network)),format!("security={}",security)];
+ if client_encryption!="none"{
+  opts.push(format!("encryption={}",encode_component(client_encryption)));
+ }
  let settings=inbound.get("settings").unwrap_or(&Value::Null);
  if let Some(flow)=nonempty(settings,"flow"){opts.push(format!("flow={}",encode_component(flow)))}
  let transport=match network{"xhttp"=>stream.get("xhttpSettings"),"ws"=>stream.get("wsSettings"),"grpc"=>stream.get("grpcSettings"),_=>None};
