@@ -304,12 +304,6 @@ pub async fn portal(
  let lang=if options.get("lang").is_some_and(|s|s=="en"){"en"} else if options.get("lang").is_some_and(|s|s=="ru"){"ru"}
  else {studio_string(&settings,"subscriptionLanguage","ru")};
  let en=lang=="en";
- let brand=studio_string(&settings,"subscriptionBrand","XMesh Nexus");
- let title=studio_string(&settings,if en{"subscriptionHeroEn"}else{"subscriptionHero"},
-  if en{"Your subscription"}else{"Ваша подписка"});
- let summary=studio_string(&settings,if en{"subscriptionDescriptionEn"}else{"subscriptionDescription"},
-  if en{"Your secure connection"}else{"Настройки подключения и информация о подписке."});
- let footer=studio_string(&settings,if en{"subscriptionFooterEn"}else{"subscriptionFooter"},"");
  let used=user.get("used").and_then(Value::as_f64)
   .or_else(||user.get("used").and_then(Value::as_i64).map(|v|v as f64))
   .unwrap_or(0.0).max(0.0);
@@ -341,7 +335,7 @@ pub async fn portal(
  let mut quick=String::new();
  let mut qr=String::new();
  let mut devices=String::new();
- let mut cta=String::new();
+ let cta;
  let mut apps=String::new();
  if active{
   let button=studio_string(&settings,if en{"subscriptionCtaEn"}else{"subscriptionCta"},
