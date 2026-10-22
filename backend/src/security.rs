@@ -24,8 +24,8 @@ pub struct SecurityPolicy {
 }
 impl Default for SecurityPolicy {
     fn default() -> Self {
-        Self { session_hours:12, idle_minutes:0, max_sessions:5,
-            login_attempts:8, lockout_minutes:15, dashboard_path:std::env::var("DASHBOARD_PATH").unwrap_or_else(|_| "/dashboard/nexus".into()) }
+        Self { session_hours:1, idle_minutes:15, max_sessions:1,
+            login_attempts:3, lockout_minutes:15, dashboard_path:std::env::var("DASHBOARD_PATH").unwrap_or_else(|_| "/dashboard/nexus".into()) }
     }
 }
 impl SecurityPolicy {
