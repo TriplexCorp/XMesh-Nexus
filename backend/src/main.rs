@@ -272,6 +272,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/core/update", post(update_core))
         .route("/panel/update", post(request_panel_update).get(get_panel_update_status))
         .route("/core/vlessenc", post(generate_vless_encryption))
+        .route("/core/validate", post(validate_xray_configuration))
         .route_layer(middleware::from_fn_with_state(state.clone(), auth::require_session));
 
     let public = Router::new()
@@ -1258,6 +1259,31 @@ async fn get_core_releases(State(state): State<AppState>) -> Result<Json<Value>,
     let releases = state.core.available_releases().await
         .map_err(|error| ApiError::new(StatusCode::BAD_GATEWAY, error))?;
     Ok(Json(json!({"items": releases})))
+}
+
+#[derive(Debug, Deserialize)]
+struct CoreValidationRequest { config: String }
+
+async fn validate_xray_configuration(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+    Json(body): Json<CoreValidationRequest>,
+) -> Result<Json<Value>, ApiError> {
+    require_mutation(&actor)?;
+    if body.config.len() > 512 * 1024 {
+        return Err(ApiError::new(StatusCode::PAYLOAD_TOO_LARGE, "Конфигурация слишком большая."));
+    }
+    // Syntax errors are mapped precisely by the browser JSON parser; never claim
+    // that Xray reports a line when it only reports a semantic error.
+    let _: Value = serde_json::from_str(&body.config)
+        .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Некорректный JSON. Исправьте синтаксис в редакторе."))?;
+    let (valid, stdout, stderr) = state.core.validate_json(&body.config).await
+        .map_err(|msg| ApiError::new(StatusCode::SERVICE_UNAVAILABLE, msg))?;
+    Ok(Json(json!({
+        "valid": valid, "engine": "xray-core",
+        "stdout": stdout, "stderr": stderr,
+        "message": if valid { "Конфигурация принята установленным Xray-core." } else { "Xray-core отклонил конфигурацию." }
+    })))
 }
 
 async fn generate_vless_encryption(
