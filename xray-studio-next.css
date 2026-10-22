@@ -187,3 +187,17 @@
  .xm-studio .xm-editor-tabs{width:100%!important}
  .xm-studio .xm-editor-tabs button{min-width:0;flex:1;padding:10px 6px!important}
 }
+
+
+/* XRAY STUDIO Tools: action groups for the manual JSON workspace */
+.xm-studio .xm-json-tools{display:grid;gap:10px;padding:12px 14px;margin:0 0 14px;background:var(--s2);border:1px solid var(--ln);border-radius:var(--ui-radius,15px)}
+.xm-studio .xm-tools-heading{display:flex;align-items:baseline;flex-wrap:wrap;gap:12px}
+.xm-studio .xm-tools-heading strong{letter-spacing:.085em;font-size:12px;color:var(--a)}
+.xm-studio .xm-tools-heading span,.xm-studio .xm-tools-status{font-size:12px;color:var(--mu);line-height:1.5}
+.xm-studio .xm-tools-grid{display:flex;gap:7px;flex-wrap:wrap}
+.xm-studio .xm-tools-grid .xm-quiet{min-height:36px;font-size:12px;padding:7px 11px;background:var(--s1);border:1px solid var(--ln)}
+.xm-studio .xm-tools-grid .xm-quiet:hover{border-color:var(--a);color:var(--tx)}
+.xm-studio .xm-tools-grid .xm-quiet:disabled{opacity:.35;cursor:not-allowed}
+.xm-studio .xm-tools-status{margin:0;overflow-wrap:anywhere}
+.xm-studio .xm-tools-status:empty{display:none}
+@media(max-width:700px){.xm-studio .xm-json-tools{padding:10px}.xm-studio .xm-tools-heading{gap:5px}}
