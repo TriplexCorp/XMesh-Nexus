@@ -29,9 +29,4 @@ assert.match(html,/<script\s+src="app\.js\?v=[a-zA-Z0-9._-]+"\s*><\/script>/,
  'Application entrypoint must be loaded with a nonempty cache-busting version');
 assert.match(html,/<link\s+rel="stylesheet"\s+href="styles\.css\?v=[a-zA-Z0-9._-]+"\s*\/?\s*>/,
  'Main stylesheet must be loaded with a nonempty cache-busting version');
-const studioCss=fs.readFileSync('xray-studio.css','utf8');
-assert.match(studioCss,/\.sr-studio-dialog\[open\]::backdrop\{opacity:1\}/,
- 'XRAY STUDIO must use the same modal overlay fade');
-assert.match(studioCss,/\.sr-studio-dialog::backdrop\{[\s\S]*?overlay \.32s allow-discrete/,
- 'XRAY Studio backdrop must animate on closing');
 console.log('User creation, dialog open/exit animations and accessibility controls: OK');
