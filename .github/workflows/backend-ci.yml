@@ -76,6 +76,8 @@ jobs:
         run: bash scripts/check-mfa-key.sh
       - name: Verify advanced security policies and active-session controls
         run: node scripts/check-security-center.js
+      - name: Audit authentication, portal isolation and HTML sinks
+        run: node scripts/check-security-audit.js
       - name: Check generic branding in tracked files
         run: node scripts/check-white-label.js
       - name: Check appearance surface choices and migration
