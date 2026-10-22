@@ -325,3 +325,20 @@
 .sv-studio .sv-tools{scrollbar-width:thin}
 .sv-studio .sv-legacy .xm-tools-grid .sv-toolitem{min-height:2.8rem}
 @media(max-width:580px){.sv-studio .sv-dialog:has(.sv-template-choice) [data-v="overlayBody"]{grid-template-columns:1fr}}
+
+
+/* JSON workspace: one editor with native inline utilities, no blank right rail. */
+.sv-studio .sv-workspace,.sv-studio.sv-hide-tools .sv-workspace{
+ display:block;min-height:0;overflow:hidden;border:1px solid var(--vline);
+ border-radius:var(--ui-radius,14px);background:var(--vpanel)
+}
+.sv-studio .sv-codepanel{display:flex;flex-direction:column;height:max(36rem,calc(100dvh - 215px));border:0;border-radius:0}
+.sv-studio .sv-inline-tools{flex:none;padding:.48rem .75rem;border-bottom:1px solid var(--vline);background:var(--vpanel)}
+.sv-studio .sv-inline-tools .xm-tools-grid{display:flex;flex-direction:row;align-items:center;gap:.35rem;flex-wrap:wrap}
+.sv-studio .sv-inline-tools .sv-toolitem{width:auto;min-height:2.15rem;padding:.35rem .75rem;display:inline-flex;align-items:center;justify-content:center;background:var(--vfield);border:1px solid var(--vline);border-radius:var(--vround);font-size:.75rem;font-weight:650;white-space:nowrap}
+.sv-studio .sv-inline-tools .sv-toolitem:hover{border-color:var(--vaccent);color:var(--vaccent)}
+.sv-studio .sv-inline-tools .xm-tools-status{display:block;font-size:.72rem;color:var(--vmute)}
+.sv-studio .sv-inline-tools .xm-tools-status:empty{display:none}
+.sv-studio .sv-codepanel .sv-codesurface{min-height:0;flex:1}
+.sv-studio .sv-tools{display:none!important}
+@media(max-width:760px){.sv-studio .sv-codepanel{height:max(30rem,calc(100dvh - 240px))}}
