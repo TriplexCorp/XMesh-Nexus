@@ -648,12 +648,13 @@ async fn patch_settings(
         let value = path.as_str().ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Путь подписки должен быть строкой."))?;
         if value.len() < 2 || value.len() > 64 || !value.starts_with('/')
             || value.ends_with('/') || value.contains("//")
+            || value.split('/').skip(1).count()>8
             || value.split('/').skip(1).any(|segment| segment.is_empty() || segment == "." || segment == "..")
             || !value.bytes().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'/' | b'-' | b'_'))
         {
             return Err(ApiError::new(StatusCode::BAD_REQUEST, "Путь должен начинаться с / и состоять из латиницы, цифр, - и _."));
         }
-        if value.starts_with("/api") || value.starts_with("/login") {
+        if value.starts_with("/api") || value.starts_with("/login") || value.starts_with("/dashboard") {
             return Err(ApiError::new(StatusCode::BAD_REQUEST, "Путь конфликтует со служебными маршрутами панели."));
         }
     }
