@@ -55,3 +55,85 @@
 @media(max-width:1150px){.xm-layout{grid-template-columns:minmax(185px,.65fr) minmax(0,1.35fr)}.xm-preview{grid-column:1/-1;min-height:300px}.xm-preview pre{min-height:240px;max-height:440px}}
 @media(max-width:750px){.xm-layout{grid-template-columns:minmax(0,1fr)}.xm-library,.xm-main,.xm-preview{grid-column:1}.xm-profile-list{max-height:190px}.xm-three,.xm-two{grid-template-columns:minmax(0,1fr)}.xm-head{align-items:flex-start}.xm-modes{flex-wrap:wrap}.xm-footer{flex-wrap:wrap}}
 @media(prefers-reduced-motion:reduce){.xm-studio *{transition:none!important;animation:none!important}}
+
+
+/* XRAY STUDIO refinement: real desktop reading scale and useful viewport height */
+.xm-studio{
+ font-size:14px;
+ gap:14px;
+}
+.xm-studio .xm-head{padding:8px 2px 17px}
+.xm-studio .xm-head h2{font-size:clamp(23px,1.7vw,30px);line-height:1.2}
+.xm-studio .xm-head p{font-size:13px}
+.xm-studio .xm-layout{
+ grid-template-columns:minmax(220px,.64fr) minmax(440px,1.55fr) minmax(320px,1fr);
+ align-items:start;
+ gap:14px;
+}
+.xm-studio .xm-library,.xm-studio .xm-main,.xm-studio .xm-preview{
+ min-height:0;
+ box-shadow:0 7px 22px -25px rgba(0,0,0,.45);
+}
+.xm-studio .xm-library{padding:16px;gap:14px}
+.xm-studio .xm-library-header h3,.xm-studio .xm-main-header h3{font-size:16px}
+.xm-studio .xm-list-empty{font-size:13px;line-height:1.6}
+.xm-studio .xm-main{padding:16px;gap:14px}
+.xm-studio .xm-main-header p{font-size:12px}
+.xm-studio .xm-editor-tabs button{font-size:13px;min-height:42px}
+.xm-studio .xm-profile-item{padding:13px}
+.xm-studio .xm-profile-item strong{font-size:13px}
+.xm-studio .xm-profile-item small{font-size:12px}
+.xm-studio .xm-section-title h3{font-size:14px}
+.xm-studio .xm-section-title p{font-size:12px}
+.xm-studio .xm-panel{padding:16px}
+.xm-studio .xm-fields{gap:13px}
+.xm-studio .xm-field{font-size:12px;gap:7px}
+.xm-studio .xm-field input,.xm-studio .xm-field select{
+ min-height:43px;
+ font-size:14px;
+ padding:10px 12px;
+}
+.xm-studio .xm-field small,.xm-studio .xm-hint{font-size:12px}
+.xm-studio .xm-quiet,.xm-studio .xm-mode,.xm-studio .xm-tab{font-size:12px;min-height:38px}
+.xm-studio .xm-preview-head{padding:15px}
+.xm-studio .xm-preview-head strong{font-size:14px}
+.xm-studio .xm-preview-head [data-xm=status]{font-size:12px}
+.xm-studio .xm-preview pre{
+ min-height:320px;
+ max-height:min(64vh,700px);
+ font-size:12px;
+ line-height:1.7;
+ padding:16px;
+}
+.xm-studio .xm-preview-tools{padding:13px}
+.xm-studio .xm-footer p{font-size:12px}
+.xm-studio .xm-search-label input{font-size:13px;min-height:42px}
+/* Manual JSON is an editor, not two copies of the same text. */
+.xm-studio.xm-manual-mode .xm-layout{
+ grid-template-columns:minmax(225px,.32fr) minmax(0,1fr)!important;
+}
+.xm-studio.xm-manual-mode .xm-main{grid-column:2;min-height:min(72vh,700px)}
+.xm-studio.xm-manual-mode .xm-preview{display:none!important}
+.xm-studio.xm-manual-mode .xm-editor{display:block}
+.xm-studio.xm-manual-mode .xm-manual{
+ min-height:clamp(420px,60vh,740px);
+ width:100%;
+ font-size:13px;
+ line-height:1.65;
+ padding:16px;
+}
+.xm-studio.xm-manual-mode .xm-main-header p{max-width:56ch}
+@media(max-width:1480px){
+ .xm-studio .xm-layout{grid-template-columns:minmax(180px,.57fr) minmax(360px,1.4fr) minmax(270px,1fr)}
+}
+@media(max-width:1160px){
+ .xm-studio .xm-layout{grid-template-columns:minmax(200px,.55fr) minmax(0,1.45fr)}
+ .xm-studio .xm-preview{grid-column:1/-1}
+ .xm-studio.xm-manual-mode .xm-layout{grid-template-columns:minmax(200px,.55fr) minmax(0,1.45fr)!important}
+}
+@media(max-width:760px){
+ .xm-studio .xm-layout,.xm-studio.xm-manual-mode .xm-layout{grid-template-columns:minmax(0,1fr)!important}
+ .xm-studio.xm-manual-mode .xm-main{grid-column:1}
+ .xm-studio .xm-library,.xm-studio .xm-main,.xm-studio .xm-preview{grid-column:1}
+ .xm-studio .xm-three,.xm-studio .xm-two{grid-template-columns:minmax(0,1fr)}
+}
