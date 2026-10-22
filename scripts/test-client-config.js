@@ -45,11 +45,9 @@ const gen=require('../client-config.js');
  const noHost=await gen.generate(user,{...db,hosts:[],nodes:[{id:3,profileId:1,addr:'203.0.113.8'}]});
  assert.equal(noHost.length,1);
  assert.equal(noHost[0].json.outbounds[0].settings.vnext[0].address,'203.0.113.8');
- const noKey=gen.build(user,{...host,publicKey:''},
-  {...inbound,streamSettings:{network:'raw',security:'reality',realitySettings:{shortIds:['aa'],serverNames:['www.example.com']}}});
- assert.fail('No key must throw');
-})().catch(error=>{
- if(error.message!=='Reality: требуются публичный ключ, Short ID и SNI. Добавьте publicKey в публичные настройки хоста.'){
-  console.error(error);process.exitCode=1;
- }else console.log('Per-user Marzban-style Client JSON, auto Reality key, DNS/routing, access controls: PASS');
-});
+ assert.throws(()=>gen.build(user,{...host,publicKey:''},
+  {...inbound,streamSettings:{network:'raw',security:'reality',realitySettings:{shortIds:['aa'],serverNames:['www.example.com']}}}),
+  /Reality: требуются публичный ключ/,
+  'Absent public key must fail closed');
+ console.log('Per-user Marzban-style Client JSON, auto Reality key, DNS/routing, access controls: PASS');
+})().catch(error=>{console.error(error);process.exitCode=1});
