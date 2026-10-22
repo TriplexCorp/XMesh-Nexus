@@ -1554,7 +1554,7 @@ async function profilesP(){
  '<div class="xray-meta-grid">'+
  field('name','Название профиля',inp('name','VLESS Reality','Например, DE · Reality','maxlength="80" required'))+
  field('tag','Тег inbound',inp('tag','vless-reality','Уникальный tag','maxlength="64"'))+
- field('server-address-source','Адрес подключения · источник','<select id="xpb-server-address-source" aria-label="Источник адреса Client JSON"><option value="auto">Автоматически из хостов и узлов</option><option value="manual">Ввести вручную</option></select>','Хосты подписки имеют приоритет над адресами узлов. Если подходящих адресов несколько, выберите нужный.')+
+ field('server-address-source','Источник клиентского адреса','<select id="xpb-server-address-source" aria-label="Источник адреса Client JSON"><option value="auto">Автоматически из хостов и узлов</option><option value="manual">Ввести вручную</option></select>','Хосты подписки имеют приоритет над адресами узлов. Если подходящих адресов несколько, выберите нужный.')+
  field('server-address','Публичный адрес для Client JSON',inp('server-address','','Определится автоматически','autocomplete="off"'),'Используется только для клиентского outbound. Домен панели и внутренний IP никогда не подставляются автоматически.')+
  '</div>'+
  '<div class="xray-workspace-layout"><div class="xray-editor-pane">'+
@@ -1867,11 +1867,19 @@ async function profilesP(){
    if(completenessWarnings.length)warning=[warning,...completenessWarnings].filter(Boolean).join(' ');
    $('#xpb-error').textContent=warning;
    const state=$('#xpb-output-state');if(state)state.textContent=warning?'Проверьте предупреждение':'Предпросмотр готов';
-   $('#xpb-preview').value=JSON.stringify(xrayBuilderConfig(),null,2);
-   $('#xpb-client-preview').value=JSON.stringify(xrayClientSample(),null,2);
+   let serverError=null,clientError=null;
+   try{$('#xpb-preview').value=JSON.stringify(xrayBuilderConfig(),null,2)}catch(error){serverError=error;$('#xpb-preview').value=''}
+   try{$('#xpb-client-preview').value=JSON.stringify(xrayClientSample(),null,2)}catch(error){clientError=error;$('#xpb-client-preview').value=''}
    renderJsonHighlight('xpb-preview','xpb-preview-syntax');
    renderJsonHighlight('xpb-client-preview','xpb-client-preview-syntax');
-  }catch(e){$('#xpb-preview').value='';$('#xpb-client-preview').value='';renderJsonHighlight('xpb-preview','xpb-preview-syntax');renderJsonHighlight('xpb-client-preview','xpb-client-preview-syntax');$('#xpb-error').textContent=e.message;const state=$('#xpb-output-state');if(state)state.textContent='Ошибка генерации'}};
+   if(serverError||clientError){
+    $('#xpb-error').textContent=[warning,serverError&&'Server JSON: '+serverError.message,clientError&&'Client JSON: '+clientError.message].filter(Boolean).join(' ');
+    if(state)state.textContent=serverError?'Ошибка Server JSON':'Ошибка Client JSON';
+   }
+  }catch(e){
+   $('#xpb-error').textContent='Параметры: '+(e.message||String(e));
+   const state=$('#xpb-output-state');if(state)state.textContent='Ошибка параметров';
+  }};
   const updateVisibility=()=>{
    let proto=$('#xpb-protocol').value,net=$('#xpb-network').value,sec=$('#xpb-security').value;
    const setGroup=(selector,show)=>{const d=$(selector);if(d)d.hidden=!show};
