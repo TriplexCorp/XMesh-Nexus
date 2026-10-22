@@ -2589,3 +2589,66 @@ html[data-font=pt] body{font-family:"PT Sans",system-ui,-apple-system,"Segoe UI"
 .appearance-layout .setting-row:has([data-ui="font"]) .setting-control{width:100%;justify-content:flex-end}
 @media(max-width:650px){.appearance-layout .choice:has([data-ui="font"]){width:100%}}
 @media(max-width:360px){.appearance-layout .choice:has([data-ui="font"]){grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+
+/* Security Center uses one consistent workspace instead of tall uneven cards. */
+.security-workspace.security-center{
+ width:min(100%,1400px);max-width:1400px;margin:0 auto;
+ display:flex;flex-direction:column;gap:1rem;
+}
+.security-workspace.security-center>.security-overview{
+ width:100%;max-width:none;grid-column:auto;grid-row:auto;margin:0 0 .25rem;
+}
+.security-center-tabs{
+ display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+ gap:.5rem;padding:.4rem;
+ background:var(--s1);border:1px solid var(--ln);
+ border-radius:var(--ui-radius,16px);
+}
+.security-center-tabs button{
+ display:flex;align-items:center;justify-content:center;gap:.6rem;
+ min-width:0;min-height:3.1rem;padding:.55rem .7rem;
+ border:1px solid transparent;border-radius:var(--ui-control-radius,10px);
+ background:transparent;color:var(--mu);font:inherit;
+ font-size:.83rem;font-weight:720;cursor:pointer;
+ transition:background .18s,border-color .18s,color .18s;
+}
+.security-center-tabs button>span{font-size:1.25rem;font-weight:700;color:var(--mu)}
+.security-center-tabs button:hover{background:var(--s2);color:var(--tx)}
+.security-center-tabs button[aria-selected=true]{
+ background:color-mix(in srgb,var(--a) 10%,var(--s2));
+ border-color:color-mix(in srgb,var(--a) 37%,var(--ln));
+ color:var(--tx);
+}
+.security-center-tabs button[aria-selected=true]>span{color:var(--a)}
+.security-center-tabs button:focus-visible{outline:2px solid var(--a);outline-offset:2px}
+.security-workspace.security-center>.security-center-pane{
+ min-width:0;width:100%;max-width:none;display:block;
+}
+.security-workspace.security-center>.security-center-pane[hidden]{display:none!important}
+.security-center-pane>#mfa-panel,.security-center-pane>#security-advanced,.security-center-pane>#security-sessions-panel{
+ width:100%;max-width:none;min-height:0;margin:0 0 1rem;
+ grid-column:auto;grid-row:auto;
+}
+.security-center-pane .security-settings-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.security-center-pane .security-sessions{grid-template-columns:repeat(auto-fill,minmax(min(100%,24rem),1fr))}
+.security-center-information{min-height:16rem;padding:1.45rem}
+.security-center-information h3{font-size:1.1rem;margin:0 0 .45rem}
+.security-center-information p{max-width:55rem;color:var(--mu);font-size:.84rem;line-height:1.65;margin:0 0 1rem}
+.security-future-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,18rem),1fr));gap:.7rem}
+.security-future-list>span{
+ display:flex;justify-content:space-between;align-items:center;gap:1rem;
+ padding:.9rem;border:1px solid var(--ln);border-radius:var(--ui-control-radius,10px);
+ background:var(--s2);color:var(--tx);font-size:.8rem;font-weight:650;
+}
+.security-future-list em{font-size:.69rem;color:var(--mu);font-style:normal;white-space:nowrap}
+@media(max-width:900px){
+ .security-center-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .security-center-pane .security-settings-grid{grid-template-columns:1fr}
+}
+@media(max-width:540px){
+ .security-center-tabs{gap:.3rem}
+ .security-center-tabs button{font-size:.72rem;padding:.45rem .3rem;gap:.3rem}
+ .security-center-tabs button>span{font-size:1rem}
+}
+@media(prefers-reduced-motion:reduce){.security-center-tabs button{transition:none}}
