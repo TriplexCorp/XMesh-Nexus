@@ -855,7 +855,7 @@ async function drawUsers(){
 }
 function drawBulk(){const b=$('#bulk'),n=UQ.sel.size;if(!b)return;b.classList.toggle('on',n>0&&cur=='users');if(!n){b.innerHTML='';return}b.innerHTML=`<b style="padding:0 .5rem">Выбрано ${n}</b>${UIDS.length>n?`<button class="gh sm" data-bk="all">Выбрать все ${UIDS.length}</button>`:''}<button class="gh sm" data-bk="on">Включить</button><button class="gh sm" data-bk="off">Отключить</button><button class="gh sm" data-bk="reset">Сбросить трафик</button><button class="gh sm" data-bk="ext">${ic('calendar')}Продлить…</button><button class="gh sm" data-bk="sq">В сквад</button><button class="dg sm" data-bk="del">${ic('trash')}Удалить</button><button class="ia" data-bk="clr" aria-label="Снять выбор">${ic('x')}</button>`;decorateButtonIcons(b)}
 const uid=s=>{let h=hs(s),x='';for(let i=0;i<32;i++){h=(h*1664525+1013904223)>>>0;x+=(h>>>24&15).toString(16)}return x.replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/,'$1-$2-$3-$4-$5')};
-let UT='ov';const subUrl=u=>'';
+let UT='ov';
 /* Inline expiry editor: calendar is rendered inside the user dialog, so it
    does not escape the dialog's top layer or depend on browser date widgets. */
 const userYmd=value=>{
@@ -1167,8 +1167,26 @@ function userNew(){
   const fs=FU;modal(`<form class="box" data-k="user" method="dialog"><h2>Новый пользователь</h2><label class="f"><span>Шаблон</span><select id="tplsel"><option value="">Без шаблона</option>${DB.tpls.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select><small>При необходимости подставит параметры из сохранённого шаблона</small></label>${fs.map(f=>{const markup=field(f,{limit:0,days:0,strategy:'NO_RESET',hwid:0,squads:[]}[f.k]);return f.k==='username'?markup.replace('<span>Имя пользователя</span>','<span style="display:flex;align-items:center;justify-content:space-between;gap:.6rem">Имя пользователя <button type="button" class="gh sm" data-generate-username title="Сгенерировать случайное уникальное имя" aria-label="Сгенерировать имя пользователя" style="display:inline-flex;align-items:center;gap:.35rem">'+ic('redo')+' Сгенерировать</button></span>'):markup}).join('')}<p class="er" id="fe"></p><div class="act"><button type="button" class="gh" data-x>Отмена</button><button class="btn">Создать</button></div></form>`,'wide');
   setTimeout(()=>$('[name=username]')?.focus(),60);
 }
-function exportCsv(){const rows=[['username','status','used_gb','limit_gb','expire','tag','telegram','email','squads','sub_url']].concat(UIDS.map(id=>DB.users.find(u=>u.id==id)).map(u=>[u.username,st(u),u.used,u.limit,u.expireAt?new Date(u.expireAt).toISOString().slice(0,10):'',u.tag,u.tg,u.email,u.squads.map(i=>DB.squads.find(s=>s.id==i)?.name).join('|'),subUrl(u)]));
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n')],{type:'text/csv'}));a.download='users.csv';a.click();toast(`Экспортировано: ${UIDS.length}`)}
+async function exportCsv(){
+  if(!confirm(panelIsEnglish()?'CSV may include secret subscription links. Export to a trusted device?':'CSV может содержать секретные ссылки подписок. Экспортировать на доверенное устройство?'))return;
+  const users=UIDS.map(id=>DB.users.find(u=>u.id==id)).filter(Boolean);
+  const links=[];
+  for(let i=0;i<users.length;i+=10){
+    const batch=await Promise.all(users.slice(i,i+10).map(async u=>{
+      try{
+        const result=await backendRequest('/api/v1/users/'+encodeURIComponent(u.id)+'/subscription');
+        return result.url?new URL(result.url,location.origin).href:'';
+      }catch{return ''}
+    }));
+    links.push(...batch);
+  }
+  const rows=[['username','status','used_gb','limit_gb','expire','tag','telegram','email','squads','sub_url']]
+    .concat(users.map((u,i)=>[u.username,st(u),u.used,u.limit,u.expireAt?new Date(u.expireAt).toISOString().slice(0,10):'',u.tag,u.tg,u.email,u.squads.map(id=>DB.squads.find(s=>s.id==id)?.name).join('|'),links[i]]));
+  const blob=new Blob(['\ufeff'+rows.map(r=>r.map(c=>'"'+String(c??'').replace(/"/g,'""')+'"').join(',')).join('\n')],{type:'text/csv'});
+  const url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download='users.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);
+  toast((panelIsEnglish()?'Exported: ':'Экспортировано: ')+users.length);
+}
 
 /* ================= XRAY STUDIO: PROTOCOLS, TRANSPORTS & FINGERPRINTS ================= */
 const XRAY_FP_RECOMMENDED=["chrome","firefox","safari","ios","android","edge","360","qq","random","randomized","randomizednoalpn","unsafe"];
