@@ -134,7 +134,6 @@ jobs:
       ADMIN_PASSWORD: 9876543210abcdef9876543210abcdef9876543210abcdef
       TOTP_ENCRYPTION_KEY: 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
       COOKIE_SECURE: "false"
-      ALLOW_LEGACY_NODE_BEARER: "true"
       DASHBOARD_PATH: /dashboard/0123456789abcdef0123456789abcdef0123456789abcdef
     steps:
       - uses: actions/checkout@v7
@@ -154,7 +153,7 @@ jobs:
           done
           docker compose logs --tail=120 panel
           exit 1
-      - name: Exercise signed node identity, tamper resistance, replay and bearer downgrade
+      - name: Exercise signed node identity, tamper resistance and replay rejection
         run: python3 scripts/test-node-auth-integration.py
       - name: Exercise real RBAC, MFA and revocation API
         run: python3 scripts/test-auth-integration.py
