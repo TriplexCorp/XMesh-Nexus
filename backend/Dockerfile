@@ -1,10 +1,18 @@
 # syntax=docker/dockerfile:1.7
 FROM rust:1.99.1-bookworm AS builder
 WORKDIR /build/backend
+ENV CARGO_INCREMENTAL=0
 COPY backend/Cargo.toml ./Cargo.toml
 COPY backend/src ./src
 COPY backend/migrations ./migrations
-RUN cargo build --release
+# Keep dependency downloads and compiled artifacts between Docker builds.
+# Mounting target as a cache requires copying the final binary outside it.
+RUN --mount=type=cache,id=xmesh-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,id=xmesh-cargo-git,target=/usr/local/cargo/git,sharing=locked \
+    --mount=type=cache,id=xmesh-cargo-target,target=/build/backend/target,sharing=locked \
+    cargo build --release \
+    && mkdir -p /build/output \
+    && cp target/release/xmesh-api /build/output/xmesh-api
 
 # Offline-at-runtime flag bundle, pinned at build time. No browser/CDN requests.
 FROM node:24-bookworm-slim AS flag-assets
@@ -26,7 +34,7 @@ RUN apt-get update \
     && useradd --system --uid 10001 --gid xmesh --home-dir /nonexistent --shell /usr/sbin/nologin xmesh \
     && mkdir -p /app/static /var/lib/xmesh/core \
     && chown -R xmesh:xmesh /app /var/lib/xmesh
-COPY --from=builder /build/backend/target/release/xmesh-api /usr/local/bin/xmesh-api
+COPY --from=builder /build/output/xmesh-api /usr/local/bin/xmesh-api
 COPY --from=flag-assets /flags/package/flags/4x3/ /app/static/flags/
 # MIT license for bundled flag-icons assets.
 COPY --from=flag-assets /flags/package/LICENSE /app/static/flags/LICENSE
