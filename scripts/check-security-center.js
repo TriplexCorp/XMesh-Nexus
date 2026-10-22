@@ -7,7 +7,7 @@ const html=fs.readFileSync('index.html','utf8');
 const auth=fs.readFileSync('backend/src/auth.rs','utf8');
 const policy=fs.readFileSync('backend/src/security.rs','utf8');
 const main=fs.readFileSync('backend/src/main.rs','utf8');
-const sql=fs.readFileSync('backend/migrations/0010_security_sessions.sql','utf8');
+const sql=fs.readFileSync('backend/migrations/0010_security_controls.sql','utf8');
 new Function(ui);new Function(app);
 for(const name of ['sessionHours','idleMinutes','maxSessions','loginAttempts','lockoutMinutes','dashboardPath'])
  assert(ui.includes(name),'Missing form control: '+name);
