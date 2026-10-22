@@ -40,13 +40,38 @@
 .sv-codestatus label{display:flex;align-items:center;gap:4px;margin-left:auto}
 .sv-codestatus input{accent-color:var(--vaccent)}
 .sv-wrap .sv-highlight,.sv-wrap .sv-codeholder textarea{white-space:pre-wrap;overflow-wrap:anywhere}
-.sv-constructor>header{padding:0.8125rem 0.8125rem 0.5625rem}
+.sv-constructor>header{padding:.9rem .85rem .35rem}
 .sv-constructor h3{margin:0 0 4px;font-weight:750;font-size:0.9375rem}
 .sv-constructor>header p,.sv-tools>p{color:var(--vmute);font-size:0.6875rem;margin:0}
-.sv-tabs{display:flex;align-items:center;gap:4px;overflow-x:auto;padding:0.25rem 0.6875rem 0.75rem;scrollbar-width:thin;flex-shrink:0}
-.sv-tabs button{white-space:nowrap;flex:none;border:1px solid transparent;background:transparent;font-size:0.6875rem;padding:0.4375rem 0.5rem;min-height:2rem}
-.sv-tabs button.active{background:color-mix(in srgb,var(--vaccent) 13%,var(--vpanel));border-color:var(--vaccent);color:var(--vaccent)}
-.sv-formbody{flex:1;min-height:0;overflow:auto;padding:0.75rem;border-top:1px solid var(--vline);scrollbar-width:thin}
+/* Scoped tabs: global nav styles must not turn them into a vertical menu. */
+.sv-studio .sv-constructor nav.sv-tabs{
+ display:flex;flex-direction:row;align-items:center;justify-content:flex-start;
+ flex-wrap:nowrap;gap:.25rem;width:100%;min-width:0;
+ padding:.35rem .7rem .65rem;margin:0;
+ overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;flex:0 0 auto;
+ border:0;background:transparent;
+}
+.sv-studio .sv-constructor nav.sv-tabs>button{
+ display:inline-flex;align-items:center;justify-content:center;
+ position:static;flex:0 0 auto;width:auto;max-width:none;min-width:0;
+ margin:0;min-height:2.25rem;padding:.48rem .7rem;
+ border:1px solid transparent;border-radius:var(--vround);
+ background:transparent;color:var(--vmute);
+ font-size:.78rem;font-weight:690;line-height:1.2;white-space:nowrap;
+ transition:color .16s,background-color .16s,border-color .16s;
+}
+.sv-studio .sv-constructor nav.sv-tabs>button:hover{
+ color:var(--vtext);background:var(--vfield);
+}
+.sv-studio .sv-constructor nav.sv-tabs>button.active{
+ color:var(--vaccent);border-color:var(--vaccent);
+ background:color-mix(in srgb,var(--vaccent) 12%,var(--vpanel));
+}
+.sv-studio .sv-constructor nav.sv-tabs>button:focus-visible{
+ outline:2px solid var(--vaccent);outline-offset:2px;
+}
+
+.sv-formbody{flex:1;min-height:0;overflow:auto;padding:.85rem;border-top:1px solid var(--vline);scrollbar-width:thin}
 .sv-formbody h4{font-size:0.8125rem;margin:7px 0 10px}
 .sv-sectionhead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
 .sv-sectionhead h4{margin:0;font-size:0.75rem}
