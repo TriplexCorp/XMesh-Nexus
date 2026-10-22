@@ -8,6 +8,7 @@ mod node_auth;
 mod node_runtime;
 mod node_enrollment;
 mod subscription_settings;
+mod user_subscriptions;
 
 use axum::{
     extract::{Extension, Path, Query, Request, State},
@@ -266,6 +267,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/users/{id}/traffic", get(get_user_traffic))
         .route("/nodes/{id}/metrics-key", post(node_auth::enroll).delete(node_auth::revoke))
         .route("/nodes/{id}/runtime", get(node_runtime::status))
+        .route("/users/{id}/subscription", post(user_subscriptions::create).delete(user_subscriptions::revoke))
         .route("/nodes/{id}/enrollment", post(node_enrollment::issue))
         .route("/admins", get(admin_accounts::list).post(admin_accounts::create))
         .route("/admins/{id}", patch(admin_accounts::update).delete(admin_accounts::delete))
@@ -286,6 +288,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/metrics/ingest", post(ingest_node_metrics))
         .route("/node/heartbeat", post(node_runtime::heartbeat))
         .route("/node/enroll", post(node_enrollment::claim))
+        .route("/sub/{token}", get(user_subscriptions::serve))
         .route("/auth/session", get(auth::session))
         .route("/auth/login", post(auth::login))
         .route("/auth/mfa/verify", post(mfa::verify_challenge))
