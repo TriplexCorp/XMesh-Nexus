@@ -37,7 +37,10 @@ assert.match(sql,/ADD COLUMN IF NOT EXISTS id/);
 assert.match(sql,/last_seen_at/);
 for(const route of ['/security/policy','/security/sessions','/security/sessions/others','/security/sessions/{id}','/dashboard/{slug}'])
  assert(main.includes(route),'Missing server route '+route);
-assert.match(backend,/Dashboard path is an additional entrypoint/,'A path must not be presented as authentication');
+assert.match(backend,/Dashboard path is the sole HTML entrypoint/,'Dashboard path must be a single HTML entrypoint');
+assert.match(main,/\.route\("\/", get\(\|\| async \{ StatusCode::NOT_FOUND \}\)\)/,'Root must not serve the panel');
+assert.match(main,/\.route\("\/login", get\(\|\| async \{ StatusCode::NOT_FOUND \}\)\)/,'Default login path must be closed');
+assert.match(backend,/join\("login.html"\)/,'Only the custom entrypoint may serve login HTML');
 assert.match(backend,/crate::auth::is_authenticated/,'Alternate dashboard must require authentication');
 assert.match(backend,/html=html\.replace/,'Nested dashboard entry must resolve root assets');
 assert.match(html,/security-ui\.js\?v=/);
