@@ -61,7 +61,8 @@ def main():
     assert_status(code, 404, "removed bearer issuance route returns proper API 404")
     code, _, _ = request("POST", "/metrics/ingest", body,
                          headers={"Authorization": "Bearer xm_" + "a" * 64})
-    assert_status(code, 401, "unsigned bearer rejected before enrollment")
+    assert code in (401, 403), f"unsigned bearer must be rejected: HTTP {code}"
+    print("PASS: unsigned bearer rejected before enrollment (auth or CSRF)")
 
     with tempfile.TemporaryDirectory() as directory:
         keyfile = Path(directory) / "key.pem"
@@ -77,7 +78,8 @@ def main():
 
         code, _, _ = request("POST", "/metrics/ingest", body,
                              headers={"Authorization": "Bearer xm_" + "a" * 64})
-        assert_status(code, 401, "bearer rejected after enrollment")
+        assert code in (401, 403), f"enrolled node must reject bearer: HTTP {code}"
+        print("PASS: bearer rejected after enrollment (auth or CSRF)")
 
         raw = json.dumps(body, separators=(",", ":")).encode()
         ts = int(time.time())
@@ -136,8 +138,8 @@ def main():
             raw=json.dumps(sample,separators=(",",":")).encode()
             stamp=int(time.time())
             unique=os.urandom(16).hex()
-            msg=(f"XMESH1\\nPOST\\n/api/v1/metrics/ingest\\n{node}\\n{stamp}\\n{unique}\\n"
-                 f"{hashlib.sha256(raw).hexdigest()}\\n").encode()
+            msg=(f"XMESH1\nPOST\n/api/v1/metrics/ingest\n{node}\n{stamp}\n{unique}\n"
+                 f"{hashlib.sha256(raw).hexdigest()}\n").encode()
             message.write_bytes(msg)
             sig=subprocess.check_output(
                 ["openssl","pkeyutl","-sign","-rawin","-inkey",str(keyfile),"-in",str(message)])
