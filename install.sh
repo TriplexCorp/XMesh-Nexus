@@ -39,7 +39,6 @@ COOKIE_SECURE=true
 APP_BIND=127.0.0.1
 APP_PORT=8080
 DASHBOARD_PATH=${new_dashboard_path}
-ALLOW_LEGACY_NODE_BEARER=false
 EOF
   chmod 600 .env
   created_env=1
@@ -47,12 +46,6 @@ else
   if ! grep -q '^REDIS_PASSWORD=' .env; then
     printf '\nREDIS_PASSWORD=%s\n' "$(openssl rand -hex 32)" >> .env
     echo "Generated REDIS_PASSWORD for the Redis service."
-  fi
-  # Preserve the existing bearer agents until the owner enrolls Ed25519 keys.
-  # Fresh installations use signed requests only.
-  if ! grep -q '^ALLOW_LEGACY_NODE_BEARER=' .env; then
-    printf 'ALLOW_LEGACY_NODE_BEARER=true\n' >> .env
-    echo 'Legacy node bearer temporarily enabled for existing agents; disable after migration.'
   fi
   if ! grep -q '^DB_MAX_CONNECTIONS=' .env; then
     printf 'DB_MAX_CONNECTIONS=20\n' >> .env
