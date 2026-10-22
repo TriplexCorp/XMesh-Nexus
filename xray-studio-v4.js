@@ -345,8 +345,8 @@ async function action(a){
  case 'remove-inbound':if(confirm('Удалить выбранный inbound?'))mutate(d=>{d.inbounds.splice(inboundIndex,1);inboundIndex=Math.max(inboundIndex-1,0)});return;
  case 'add-outbound':mutate(d=>{d.outbounds??=[];let i=1;while(d.outbounds.some(x=>x.tag==='outbound-'+i))i++;d.outbounds.push({tag:'outbound-'+i,protocol:'freedom'});outIndex=d.outbounds.length-1});return;
  case 'remove-outbound':if(confirm('Удалить выбранный outbound?'))mutate(d=>{d.outbounds.splice(outIndex,1);outIndex=Math.max(outIndex-1,0)});return;
- case 'shortid':mutate(d=>{const ib=currentInbound(d),r=(ib.streamSettings??={}).realitySettings??={show:false,serverNames:[],shortIds:[]};r.shortIds??=[];r.shortIds.push(bytes(8))});return;
- case 'reality':try{const pair=await ctx.realityKeys();if(!pair?.privateKey)throw Error('Ключ не сгенерирован');mutate(d=>{const ss=currentInbound(d).streamSettings??={};ss.security='reality';const r=ss.realitySettings??={show:false,serverNames:[],shortIds:[]};if(r.privateKey&&!confirm('Перезаписать privateKey?'))throw Error('Отменено');r.privateKey=pair.privateKey});try{await navigator.clipboard.writeText(pair.publicKey);notify('Public Key скопирован')}catch{notify('Public Key: '+pair.publicKey)}}catch(err){notify(err.message)}return;
+ case 'shortid':root.querySelector('[data-tool="shortid"]')?.click();return;
+ case 'reality':root.querySelector('[data-tool="reality"]')?.click();return;
  }
 }
 root.addEventListener('click',ev=>{const quick=ev.target.closest('[data-quick-outbound]');if(quick){outIndex=Number(quick.dataset.quickOutbound);root.querySelector('[data-tab="outbound"]')?.click();const d=hasValidJSON();if(d)sync(d);return}const b=ev.target.closest('[data-action]');if(b){ev.preventDefault();Promise.resolve(action(b.dataset.action)).catch(x=>notify(x.message))}const tab=ev.target.closest('[data-tab]');if(tab){root.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x===tab));root.querySelectorAll('[data-section]').forEach(x=>x.hidden=x.dataset.section!==tab.dataset.tab)}});
