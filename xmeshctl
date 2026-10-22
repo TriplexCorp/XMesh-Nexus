@@ -149,7 +149,7 @@ update_panel() {
 
   printf "\nБудет обновлена ветка %s (upstream: %s), затем пересобран Docker-образ.\n" "$branch" "$upstream"
   warn "Перед обновлением будет создана резервная копия БД."
-  if ! confirm_yes "Продолжить? [y/N] "; then
+  if [[ "${XMESH_WEB_UPDATE:-0}" != "1" ]] && ! confirm_yes "Продолжить? [y/N] "; then
     warn "Обновление отменено."
     return 0
   fi
@@ -317,5 +317,14 @@ main_menu() {
 
 # Unit tests may source this script without starting Docker or the menu.
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
-  main_menu
+  if [[ "${1:-}" == "--web-update" ]]; then
+    if [[ "$(id -u)" != 0 ]]; then
+      fail "Web update worker requires root-owned systemd service."
+      exit 1
+    fi
+    require_compose
+    XMESH_WEB_UPDATE=1 update_panel
+  else
+    main_menu
+  fi
 fi
