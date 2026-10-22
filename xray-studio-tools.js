@@ -68,10 +68,10 @@ async function setReality(){
    documentValue=parse();inbound=getInbound(documentValue);if(!inbound)return;
    const stream=inbound.streamSettings||{},transport=stream.network||'raw';
    if(!['raw','xhttp','grpc'].includes(transport))throw Error('REALITY поддерживает только RAW, XHTTP или gRPC. Сначала измените транспорт.');
-   if(inbound.protocol!=='vless'&&inbound.protocol!=='trojan')throw Error('Настройка Reality для '+inbound.protocol+' через этот инструмент не поддерживается: используйте ручной JSON и проверку ядром.');
  }catch(e){status('Ошибка: '+e.message);notify(e.message);return}
  const originalSource=area.value;
  const selectedTag=inbound.tag;
+ const selectedIndex=documentValue.inbounds.indexOf(inbound);
  const existing=inbound.streamSettings?.realitySettings||{};
  let target=existing.target||existing.dest||'';
  if(!target){
@@ -100,8 +100,8 @@ async function setReality(){
    if(generate&&(!keys?.privateKey||!keys?.publicKey))throw Error('Генератор Reality не вернул пару ключей');
    const ok=mutate(doc=>{
      // Protect the selected inbound when the user has several profiles.
-     const updated=doc.inbounds.find(x=>x.tag===selectedTag);
-     if(!updated)throw Error('Выбранный inbound исчез из JSON');
+     const updated=doc.inbounds[selectedIndex];
+     if(!updated||updated.tag!==selectedTag)throw Error('Выбранный inbound изменился, отмените операцию и выберите его снова');
      const ss=updated.streamSettings??={};
      ss.security='reality';
      const rs=ss.realitySettings??={};
