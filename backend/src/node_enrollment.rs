@@ -45,11 +45,15 @@ pub async fn claim(State(state):State<AppState>,Json(input):Json<Claim>)->Result
   .bind(node_id).fetch_optional(&mut *tx).await?;
  if node.is_none(){return Err(ApiError::new(StatusCode::NOT_FOUND,"Node not found"))}
  // Refuse accidental credential rotation. Owner can revoke an old key first.
- let existing=sqlx::query("SELECT node_id FROM node_metric_keys WHERE node_id=$1")
+ let existing=sqlx::query("SELECT public_key FROM node_metric_keys WHERE node_id=$1")
   .bind(node_id).fetch_optional(&mut *tx).await?;
- if existing.is_some(){return Err(ApiError::new(StatusCode::CONFLICT,"Node already enrolled. Revoke its previous key first."))}
- sqlx::query("INSERT INTO node_metric_keys(node_id,public_key) VALUES($1,$2)")
-  .bind(node_id).bind(&input.public_key).execute(&mut *tx).await?;
+ if let Some(row)=existing {
+  let key:String=row.try_get("public_key")?;
+  if key!=input.public_key {return Err(ApiError::new(StatusCode::CONFLICT,"Node already enrolled with another key. Revoke its previous key first."))}
+ } else {
+  sqlx::query("INSERT INTO node_metric_keys(node_id,public_key) VALUES($1,$2)")
+   .bind(node_id).bind(&input.public_key).execute(&mut *tx).await?;
+ }
  sqlx::query("UPDATE node_enrollment_tokens SET consumed_at=NOW() WHERE token_hash=$1")
   .bind(hash).execute(&mut *tx).await?;
  tx.commit().await?;
