@@ -1,0 +1,36 @@
+#!/usr/bin/env node
+'use strict';
+const fs=require('node:fs'),assert=require('node:assert/strict');
+const ui=fs.readFileSync('security-ui.js','utf8');
+const app=fs.readFileSync('app.js','utf8');
+const html=fs.readFileSync('index.html','utf8');
+const auth=fs.readFileSync('backend/src/auth.rs','utf8');
+const policy=fs.readFileSync('backend/src/security.rs','utf8');
+const main=fs.readFileSync('backend/src/main.rs','utf8');
+const sql=fs.readFileSync('backend/migrations/0010_security_sessions.sql','utf8');
+new Function(ui);new Function(app);
+for(const name of ['sessionHours','idleMinutes','maxSessions','loginAttempts','lockoutMinutes','dashboardPath'])
+ assert(ui.includes(name),'Missing form control: '+name);
+assert.match(ui,/canEdit/);
+assert.match(ui,/request\('policy'/);
+assert.match(ui,/request\('sessions'/);
+assert.match(ui,/sessions\/others/);
+assert.match(ui,/method:'DELETE'/);
+assert.match(ui,/form\.reportValidity/);
+assert.match(html,/security-ui\.js\?v=/);
+assert.match(app,/window\.XMeshSecurity\?\.panel\(\)/);
+assert.match(app,/window\.XMeshSecurity\?\.mount\(v\)/);
+assert.match(main,/\/security\/policy/);
+assert.match(main,/\/security\/sessions/);
+assert.match(policy,/require_owner\(&actor\)/);
+assert.match(policy,/dashboard_entry/);
+assert.match(policy,/get_policy/);
+assert.match(auth,/policy\.session_hours/);
+assert.match(auth,/policy\.idle_minutes/);
+assert.match(auth,/policy\.max_sessions/);
+assert.match(auth,/policy\.login_attempts/);
+assert.match(auth,/policy\.lockout_minutes/);
+assert.match(auth,/make_session_cookie\(&token, state\.cookie_secure, policy\.session_hours\*3600\)/);
+assert.match(sql,/ADD COLUMN IF NOT EXISTS id/);
+assert.match(sql,/ADD COLUMN IF NOT EXISTS last_seen_at/);
+console.log('Advanced security center and enforced policy contracts: OK');
