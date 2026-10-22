@@ -11,7 +11,7 @@ if(params.has('unavailable'))error.textContent='Сервис авторизац�
 (async()=>{
   try{
     const response=await fetch('/api/v1/auth/session',{credentials:'same-origin',cache:'no-store'});
-    if(response.ok){const session=await response.json();if(session.authenticated)location.replace('/');}
+    if(response.ok){const session=await response.json();if(session.authenticated)location.replace(location.pathname);}
   }catch(_){}
 })();
 function showMfa(next){
@@ -64,7 +64,7 @@ form.addEventListener('submit',async event=>{
       form.elements.password.value='';
       mfaCode.value='';
       challenge=null;
-      location.replace('/');
+      location.replace(location.pathname);
     } else throw new Error('Сервер не подтвердил вход.');
   }catch(e){
     error.textContent=e.message||'Не удалось связаться с сервером.';
