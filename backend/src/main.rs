@@ -445,8 +445,13 @@ async fn create_record(
 ) -> Result<(StatusCode, Json<Value>), ApiError> {
     validate_collection(&collection)?;
     enforce_collection(&actor, &collection, true)?;
-    data.as_object_mut().ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Запись должна быть JSON-объектом."))?
-        .remove("id");
+    let object=data.as_object_mut().ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Запись должна быть JSON-объектом."))?;
+    object.remove("id");
+    // Authoritative, unpredictable, immutable per-user Xray identity. Never trust
+    // a client-provided UUID for a newly created account.
+    if collection=="users" {
+        object.insert("xrayId".into(),Value::String(Uuid::new_v4().to_string()));
+    }
     validate_record(&collection, &data)?;
 
     let row = sqlx::query(
@@ -483,6 +488,13 @@ async fn update_record(
     let mut data: Value = existing.try_get("data")?;
     let object = data.as_object_mut()
         .ok_or_else(|| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Повреждён формат записи."))?;
+    if collection=="users" {
+        if let Some(existing_id)=object.get("xrayId").and_then(Value::as_str) {
+            if !existing_id.is_empty() && patch_object.get("xrayId").is_some_and(|v|v.as_str()!=Some(existing_id)) {
+                return Err(ApiError::new(StatusCode::FORBIDDEN,"Xray UUID пользователя нельзя менять через общий API."));
+            }
+        }
+    }
     for (key, value) in patch_object.clone() {
         object.insert(key, value);
     }
