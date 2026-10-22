@@ -433,7 +433,8 @@ input.addEventListener('click',paint);input.addEventListener('keyup',paint);
 input.addEventListener('keydown',ev=>{if(ev.key==='Tab'){ev.preventDefault();const i=input.selectionStart;input.setRangeText('  ',i,input.selectionEnd,'end');input.dispatchEvent(new Event('input',{bubbles:true}))}if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='s'){ev.preventDefault();save()}});
 get('wrap').addEventListener('change',ev=>root.classList.toggle('sv-wrap',ev.target.checked));
 get('upload').addEventListener('change',async ev=>{const f=ev.target.files?.[0];if(!f)return;try{if(f.size>2e6)throw Error('Файл больше 2 МБ');const raw=await f.text();JSON.parse(raw);if(input.value!==saved&&!confirm('Заменить текущий черновик?'))return;input.value=raw;paint();input.dispatchEvent(new Event('xmesh:reset-history'));notify('JSON импортирован')}catch(err){notify(err.message)}finally{ev.target.value=''}});
-input.value=pretty(defaultDoc());saved='';paint();root.querySelector('[data-tab="inbound"]')?.click();window.XMeshJsonTools?.setup(root,{toast:notify,realityKeys:ctx.realityKeys});
+input.value=pretty(defaultDoc());saved='';paint();root.querySelector('[data-tab="inbound"]')?.click();renderProfiles();
+window.XMeshJsonTools?.setup(root,{toast:notify,realityKeys:ctx.realityKeys});
 }
 return {view,mount};
 })();
