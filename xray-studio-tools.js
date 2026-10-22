@@ -365,7 +365,7 @@ const operations={
  backup(){const blob=new Blob([area.value],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='xray-config.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)},
   format(){try{commit(JSON.stringify(parse(),null,2),'JSON отформатирован')}catch(e){notify(e.message)}}
 };
-host.addEventListener('click',e=>{const b=e.target.closest('[data-tool]');if(b&&operations[b.dataset.tool])Promise.resolve(operations[b.dataset.tool]()).catch(x=>notify(x.message))});
+host.addEventListener('click',e=>{const b=e.target.closest('[data-tool]');if(b&&operations[b.dataset.tool])return Promise.resolve(operations[b.dataset.tool]()).catch(x=>notify(x.message))});
 area.addEventListener('input',()=>{snapshot();refreshIssues()});
 area.addEventListener('xmesh:reset-history',()=>{undo=[];redo=[];last=area.value;update()});
 area.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key.toLowerCase()==='z'){e.preventDefault();operations.undo()}if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==='y'||e.shiftKey&&e.key.toLowerCase()==='z')){e.preventDefault();operations.redo() }});
