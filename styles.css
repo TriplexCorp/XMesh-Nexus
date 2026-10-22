@@ -2419,3 +2419,13 @@ aside #logout .ic{width:1.12rem;height:1.12rem;flex-shrink:0}
 /* Self-contained DPRK flag: never depends on third-party image loading. */
 .north-korea-flag{display:inline-flex!important;align-items:center;justify-content:center;overflow:hidden;vertical-align:middle}
 .north-korea-flag svg{display:block;width:100%;height:100%;flex:none}
+
+/* Actual per-user/per-inbound Xray telemetry (no inferred node-wide traffic). */
+.user-inbound-stats{margin-top:1.1rem;padding-top:1rem;border-top:1px solid var(--ln)}
+.user-inbound-stats h4{font-weight:750;margin:0 0 .55rem}
+.user-inbound-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:.65rem}
+.user-inbound-item{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.9rem 1rem;border:1px solid var(--ln);border-radius:var(--ui-card-radius,16px);background:var(--s1)}
+.user-inbound-item>div{display:flex;flex-direction:column;gap:.2rem;min-width:0}
+.user-inbound-item>div:last-child{text-align:right;flex-shrink:0}
+.user-inbound-item b{font-size:.88rem;overflow-wrap:anywhere}
+.user-inbound-item small{color:var(--mu);font-size:.76rem}
