@@ -3,13 +3,13 @@ use axum::{extract::{Extension,Path,State},http::StatusCode,Json};
 use serde::Deserialize;
 use serde_json::{json,Value};
 use sha2::{Digest,Sha256};
-use ed25519_dalek::VerifyingKey;
+use ed25519_dalek::{VerifyingKey, Signature, Verifier};
 use sqlx::Row;
 use uuid::Uuid;
 
 #[derive(Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
-pub struct Claim { token:String, public_key:String }
+pub struct Claim { token:String, public_key:String, proof:String }
 
 pub async fn issue(State(state):State<AppState>,Extension(actor):Extension<AuthUser>,Path(node_id):Path<i64>)
  ->Result<Json<Value>,ApiError>{
@@ -35,6 +35,19 @@ pub async fn claim(State(state):State<AppState>,Json(input):Json<Claim>)->Result
  let raw:[u8;32]=hex::decode(&input.public_key).ok().and_then(|v|v.try_into().ok())
   .ok_or_else(||ApiError::new(StatusCode::BAD_REQUEST,"Invalid public key"))?;
  VerifyingKey::from_bytes(&raw).map_err(|_|ApiError::new(StatusCode::BAD_REQUEST,"Invalid public key"))?;
+ // The claimant must prove possession of the private key, not merely supply a public key.
+ // The token and key are both bound to this protocol-specific signed message.
+ if input.proof.len()!=128 || !input.proof.bytes().all(|b|b.is_ascii_hexdigit()&&!b.is_ascii_uppercase()) {
+  return Err(ApiError::new(StatusCode::BAD_REQUEST,"Invalid Ed25519 enrollment proof"));
+ }
+ let signature_bytes:[u8;64]=hex::decode(&input.proof).ok().and_then(|v|v.try_into().ok())
+  .ok_or_else(||ApiError::new(StatusCode::BAD_REQUEST,"Invalid Ed25519 enrollment proof"))?;
+ let signature=Signature::from_bytes(&signature_bytes);
+ let challenge=format!("XMESH-ENROLL-V1\\n{}\\n{}\\n",input.token,input.public_key);
+ let key=VerifyingKey::from_bytes(&raw)
+  .map_err(|_|ApiError::new(StatusCode::BAD_REQUEST,"Invalid Ed25519 public key"))?;
+ key.verify(challenge.as_bytes(),&signature)
+  .map_err(|_|ApiError::new(StatusCode::UNAUTHORIZED,"Enrollment key ownership proof failed"))?;
  let hash=hex::encode(Sha256::digest(input.token.as_bytes()));
  let mut tx=state.pool.begin().await?;
  let row=sqlx::query("SELECT node_id FROM node_enrollment_tokens WHERE token_hash=$1 AND consumed_at IS NULL AND expires_at>NOW() FOR UPDATE")
