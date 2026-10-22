@@ -4,8 +4,7 @@ export LC_ALL=C
 
 : "${XMESH_API_URL:?XMESH_API_URL is required}"
 : "${XMESH_NODE_ID:?XMESH_NODE_ID is required}"
-# Signed Ed25519 keys are preferred. Existing bearer-only agents stay supported
-# until the owner enrolls a public key for this node.
+# Signed Ed25519 requests are mandatory for every telemetry node.
 XMESH_METRICS_PRIVATE_KEY="${XMESH_METRICS_PRIVATE_KEY:-/etc/xmesh-node-metrics/node.key}"
 XMESH_API_URL="${XMESH_API_URL%/}"
 XMESH_INTERFACE="${XMESH_INTERFACE:-auto}"
@@ -96,37 +95,26 @@ fi
 payload="$(printf '{"node_id":%s,"cpu_percent":%s,"ram_used_bytes":%s,"ram_total_bytes":%s,"disk_used_bytes":%s,"disk_total_bytes":%s,"rx_bytes_per_sec":%s,"tx_bytes_per_sec":%s,"active_connections":%s,"metrics":{"interface":"%s","rateIntervalSeconds":%s}}' \
   "$XMESH_NODE_ID" "$cpu_pct" "$mem_used_bytes" "$mem_total_bytes" "${disk_used_bytes:-0}" "${disk_total_bytes:-0}" "$rx_rate" "$tx_rate" "$active_connections" "$XMESH_INTERFACE" "$elapsed")"
 
-if [[ -f "$XMESH_METRICS_PRIVATE_KEY" ]]; then
-  [[ -r "$XMESH_METRICS_PRIVATE_KEY" ]] || { echo "Private key is not readable" >&2; exit 1; }
-  command -v openssl >/dev/null || { echo "OpenSSL is required for signed metrics" >&2; exit 1; }
-  timestamp="$(date +%s)"
-  nonce="$(openssl rand -hex 16)"
-  payload_hash="$(printf '%s' "$payload" | openssl dgst -sha256 -r | awk '{print $1}')"
-  signed_file="$(mktemp "$state_dir/sign.XXXXXXXX")"
-  trap 'rm -f "$signed_file"' EXIT
-  printf 'XMESH1\nPOST\n/api/v1/metrics/ingest\n%s\n%s\n%s\n%s\n' \
-    "$XMESH_NODE_ID" "$timestamp" "$nonce" "$payload_hash" > "$signed_file"
-  signature="$(openssl pkeyutl -sign -rawin -inkey "$XMESH_METRICS_PRIVATE_KEY" \
-    -in "$signed_file" | od -An -tx1 -v | tr -d ' \n')"
-  [[ "${#signature}" -eq 128 ]] || { echo "Ed25519 signing failed" >&2; exit 1; }
-  curl --fail --silent --show-error --max-time 12 \
-    -X POST "$XMESH_API_URL/api/v1/metrics/ingest" \
-    -H "X-XMesh-Timestamp: $timestamp" \
-    -H "X-XMesh-Nonce: $nonce" \
-    -H "X-XMesh-Signature: $signature" \
-    -H "Content-Type: application/json" \
-    --data-binary "$payload" >/dev/null
-elif [[ -n "${XMESH_METRICS_TOKEN:-}" ]]; then
-  curl --fail --silent --show-error --max-time 12 \
-    -X POST "$XMESH_API_URL/api/v1/metrics/ingest" \
-    -H "Authorization: Bearer $XMESH_METRICS_TOKEN" \
-    -H "Content-Type: application/json" \
-    --data-binary "$payload" >/dev/null
-else
-  echo "Missing Ed25519 key and legacy bearer credential." >&2
-  exit 1
-fi
-
+[[ -r "$XMESH_METRICS_PRIVATE_KEY" ]] || { echo "Missing readable Ed25519 private key." >&2; exit 1; }
+[[ -r "$XMESH_METRICS_PRIVATE_KEY" ]] || { echo "Private key is not readable" >&2; exit 1; }
+command -v openssl >/dev/null || { echo "OpenSSL is required for signed metrics" >&2; exit 1; }
+timestamp="$(date +%s)"
+nonce="$(openssl rand -hex 16)"
+payload_hash="$(printf '%s' "$payload" | openssl dgst -sha256 -r | awk '{print $1}')"
+signed_file="$(mktemp "$state_dir/sign.XXXXXXXX")"
+trap 'rm -f "$signed_file"' EXIT
+printf 'XMESH1\nPOST\n/api/v1/metrics/ingest\n%s\n%s\n%s\n%s\n' \
+  "$XMESH_NODE_ID" "$timestamp" "$nonce" "$payload_hash" > "$signed_file"
+signature="$(openssl pkeyutl -sign -rawin -inkey "$XMESH_METRICS_PRIVATE_KEY" \
+  -in "$signed_file" | od -An -tx1 -v | tr -d ' \n')"
+[[ "${#signature}" -eq 128 ]] || { echo "Ed25519 signing failed" >&2; exit 1; }
+curl --fail --silent --show-error --max-time 12 \
+  -X POST "$XMESH_API_URL/api/v1/metrics/ingest" \
+  -H "X-XMesh-Timestamp: $timestamp" \
+  -H "X-XMesh-Nonce: $nonce" \
+  -H "X-XMesh-Signature: $signature" \
+  -H "Content-Type: application/json" \
+  --data-binary "$payload" >/dev/null
 tmp_state="$state_file.$$"
 printf '%s %s %s %s %s\n' "$now" "$rx_now" "$tx_now" "$cpu_total_now" "$cpu_idle_now" > "$tmp_state"
 chmod 600 "$tmp_state"
