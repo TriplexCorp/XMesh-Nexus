@@ -1263,14 +1263,56 @@ const xrayClientLocalDefaults=()=>({
   {listen:'127.0.0.1',port:10809,protocol:'http',settings:{},sniffing:{enabled:true,destOverride:['http','tls','quic']},tag:'http'}
  ]
 });
+// Public client endpoints originate only from configured Hosts/Nodes. Never
+// derive them from window.location (the panel domain may not serve the VPN).
+// A Host is an explicit client-facing endpoint and outranks a node's management
+// address. Ambiguous mappings must be selected rather than guessed.
+function xrayStudioEndpointOptions(db,tag){
+ const records=[],nodes=Array.isArray(db?.nodes)?db.nodes:[],hosts=Array.isArray(db?.hosts)?db.hosts:[],profiles=Array.isArray(db?.profiles)?db.profiles:[];
+ const cleanAddress=value=>{
+  const v=String(value||'').trim();
+  if(!v||v==='0.0.0.0'||v==='::'||v==='127.0.0.1'||v==='localhost'||v==='[::1]'||/\s|[/?#@\\]/.test(v))return '';
+  // URL schemes or port suffixes are not valid addresses in Xray outbound.
+  if(v.includes('://')||(/^\[[^\]]+\]:\d+$/.test(v))||(/^[^:]+:\d+$/.test(v)))return '';
+  return v;
+ };
+ const validPort=value=>Number.isSafeInteger(+value)&&+value>0&&+value<=65535?+value:null;
+ const selectedTag=String(tag||'').trim();
+ const hostMatches=hosts.filter(h=>!h.disabled&&String(h.tag||'').trim()===selectedTag);
+ for(const h of hostMatches){
+  const address=cleanAddress(h.externalAddress||h.address);
+  if(!address)continue;
+  // A host without an explicit node restriction is a shared public endpoint
+  // for this inbound tag, not a cue to infer the panel domain.
+  records.push({key:'host:'+h.id,kind:'host',address,port:validPort(h.externalPort||h.port),name:String(h.remark||h.address),sni:String(h.sni||'').trim(),host:String(h.host||'').trim(),path:String(h.path||'').trim()});
+ }
+ const profileMatches=new Set(profiles.filter(p=>{
+  try{return (typeof p.config==='string'?JSON.parse(p.config):p.config)?.inbounds?.some(i=>i.tag===selectedTag)}catch{return false}
+ }).map(p=>Number(p.id)));
+ for(const n of nodes){
+  if(profileMatches.size&&!profileMatches.has(Number(n.profileId)))continue;
+  const address=cleanAddress(n.externalAddress||n.publicAddress||n.addr);
+  if(!address)continue;
+  records.push({key:'node:'+n.id,kind:'node',address,port:null,name:String(n.name||n.addr),sni:'',host:'',path:''});
+ }
+ return records;
+}
+function xrayStudioAutoEndpoint(candidates){
+ const hosts=candidates.filter(c=>c.kind==='host');
+ if(hosts.length===1)return hosts[0];
+ if(hosts.length>1)return null; // Multiple CDN hosts: explicitly choose.
+ const nodes=candidates.filter(c=>c.kind==='node');
+ return nodes.length===1?nodes[0]:null;
+}
 function xrayClientSample(){
  const v=id=>$('#xpb-'+id)?.value||'';
  const protocol=v('protocol')||'vless';
  const network=protocol==='hysteria'?'hysteria':protocol==='masque'?'masque':v('network')||'raw';
  const security=['tun','wireguard'].includes(protocol)?'none':['hysteria','masque'].includes(protocol)?'tls':v('security')||'none';
  const sni=v('sni').trim()||'example.com';
+ const endpoint=window.xrayStudioSelectedEndpoint||null;
  const address=v('server-address').trim()||'SERVER_ADDRESS';
- const port=protocol==='tun'?0:cl(+v('port')||443,1,65535);
+ const port=protocol==='tun'?0:(endpoint?.port||cl(+v('port')||443,1,65535));
  const path=v('path')||'/';
  const host=v('host')||sni;
  const uuid=v('uuid')||'REPLACE_WITH_USER_UUID';
@@ -1358,7 +1400,8 @@ async function profilesP(){
  '<div class="xray-meta-grid">'+
  field('name','Название профиля',inp('name','VLESS Reality','Например, DE · Reality','maxlength="80" required'))+
  field('tag','Тег inbound',inp('tag','vless-reality','Уникальный tag','maxlength="64"'))+
- field('server-address','Адрес сервера для Client JSON',inp('server-address','','vpn.example.com или IP','autocomplete="url"'))+
+ field('server-address-source','Адрес подключения · источник','<select id="xpb-server-address-source" aria-label="Источник адреса Client JSON"><option value="auto">Автоматически из хостов и узлов</option><option value="manual">Ввести вручную</option></select>','Хосты подписки имеют приоритет над адресами узлов. Если подходящих адресов несколько, выберите нужный.')+
+ field('server-address','Публичный адрес для Client JSON',inp('server-address','','Определится автоматически','autocomplete="off"'),'Используется только для клиентского outbound. Домен панели и внутренний IP никогда не подставляются автоматически.')+
  '</div>'+
  '<div class="xray-workspace-layout"><div class="xray-editor-pane">'+
  '<div id="xpb-visual-mode">'+
@@ -1605,6 +1648,40 @@ async function profilesP(){
     $('#xpb-error').textContent=message;toast(message);
    }finally{event.target.value=''}
   });
+  const addressSource=$('#xpb-server-address-source'),addressField=$('#xpb-server-address');
+  let endpointCandidates=[],selectedEndpoint=null,lastAutoAddress='';
+  const syncEndpointSource=()=>{
+    const old=addressSource.value||'auto',tag=$('#xpb-tag').value.trim();
+    endpointCandidates=xrayStudioEndpointOptions(DB,tag);
+    addressSource.innerHTML='<option value="auto">Автоматически из хостов и узлов</option>'+
+      endpointCandidates.map(c=>'<option value="'+esc(c.key)+'">'+esc((c.kind==='host'?'Хост':'Узел')+' · '+c.name+' · '+c.address+(c.port?':'+c.port:''))+'</option>').join('')+
+      '<option value="manual">Ввести вручную</option>';
+    addressSource.value=old==='auto'||old==='manual'||endpointCandidates.some(x=>x.key===old)?old:'auto';
+    const mode=addressSource.value;
+    selectedEndpoint=mode==='auto'?xrayStudioAutoEndpoint(endpointCandidates):endpointCandidates.find(c=>c.key===mode)||null;
+    window.xrayStudioSelectedEndpoint=selectedEndpoint;
+    if(mode!=='manual'){
+      lastAutoAddress=selectedEndpoint?.address||'';
+      addressField.value=lastAutoAddress;
+      addressField.readOnly=Boolean(selectedEndpoint);
+      addressField.placeholder=selectedEndpoint?'Автоматически заполнено':'Выберите хост или узел';
+    }else{
+      addressField.readOnly=false;
+      addressField.placeholder='Публичный домен или IP';
+    }
+  };
+  addressSource.addEventListener('change',()=>{
+    if(addressSource.value==='manual'&&addressField.value===lastAutoAddress)addressField.value='';
+    syncEndpointSource();updatePreview();
+  });
+  addressField.addEventListener('input',()=>{
+    if(addressSource.value!=='manual'&&addressField.value!==lastAutoAddress){
+      addressSource.value='manual';
+      syncEndpointSource();
+    }
+  });
+  $('#xpb-tag').addEventListener('input',()=>{if(addressSource.value!=='manual')syncEndpointSource();updatePreview()});
+  syncEndpointSource();
   const updatePreview=()=>{try{
    const protocol=$('#xpb-protocol').value,network=$('#xpb-network').value,security=$('#xpb-security').value;
    if(security==='reality'&&(!['raw','xhttp','grpc'].includes(network)||!['vless','vmess','trojan'].includes(protocol)))throw new Error('Reality в визуальном конструкторе доступен для VLESS/VMess/Trojan с RAW, XHTTP или gRPC.');
@@ -1631,7 +1708,7 @@ async function profilesP(){
     if(!dec||!enc||dec.startsWith('REPLACE_')||enc.startsWith('REPLACE_'))warning=warning||'VLESS Encryption включён, но пара не заполнена. Нажмите «Сгенерировать пару на сервере» или вставьте оба значения вручную.';
    }
    const completenessWarnings=[];
-   if(!$('#xpb-server-address').value.trim())completenessWarnings.push('Client JSON: укажите внешний IP-адрес или домен сервера в поле «Адрес узла».');
+   if(!$('#xpb-server-address').value.trim())completenessWarnings.push('Client JSON: добавьте хост с нужным inbound или выберите узел; при нескольких адресах укажите конкретный источник.');
    if(['vless','vmess','trojan'].includes(protocol)&&!$('#xpb-uuid').value.trim())completenessWarnings.push('Не задан ID/credential клиента. Сгенерируйте UUID внизу конструктора.');
    if(completenessWarnings.length)warning=[warning,...completenessWarnings].filter(Boolean).join(' ');
    $('#xpb-error').textContent=warning;
@@ -1874,7 +1951,7 @@ async function profilesP(){
    const clientSourceNote=$('#xpb-client-source-note');
    if(clientSourceNote)clientSourceNote.textContent=customMode
     ?'Режим Server JSON вручную: Client JSON по-прежнему строится из полей визуального конструктора и не синхронизируется автоматически с произвольными ручными правками. Перед использованием сверьте обе конфигурации.'
-    :'Этот Client JSON — отдельный outbound-конфиг. Адрес узла, UUID, Reality public key / Short ID и другие placeholders нужно заполнить реальными значениями.';
+     :'Client JSON использует адрес выбранного хоста или узла. UUID конкретного пользователя и криптографические ключи должны соответствовать его конфигурации.';
    if(customMode)validateCustomJson();
   };
   $$('[data-xray-mode]').forEach(btn=>btn.addEventListener('click',()=>setMode(btn.dataset.xrayMode)));
