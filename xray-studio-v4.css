@@ -7,15 +7,15 @@
 .sv-studio button:hover{background:var(--vfield);border-color:var(--vaccent)}
 .sv-studio button:focus-visible,.sv-studio :is(input,select,textarea):focus-visible{outline:2px solid var(--vaccent);outline-offset:2px}
 .sv-studio button.sv-primary{background:var(--vaccent);color:var(--btn-text);border-color:var(--vaccent);padding-inline:1.375rem;font-weight:750}
-.sv-title{display:flex;min-height:1.625rem;align-items:center}
+.sv-title{display:flex;min-height:1.625rem;align-items:center;padding:0 0 .1rem}.sv-subtitle{letter-spacing:.005em}
 .sv-subtitle{font-size:0.75rem;color:var(--vmute);margin:0}
-.sv-mainnav{grid-area:modes;display:flex;align-items:center;min-width:0;background:var(--vpanel);border:1px solid var(--vline);border-radius:var(--vround);padding:0.3125rem;overflow-x:auto}.sv-navtags{display:flex;align-items:center;gap:4px;min-width:max-content}.sv-navtags button{flex:none;background:transparent;border:1px solid transparent;min-height:2.25rem;padding:0.4375rem 0.6875rem;white-space:nowrap}.sv-navtags button.active{border-color:var(--vaccent);color:var(--vaccent);background:color-mix(in srgb,var(--vaccent) 12%,var(--vpanel))}
-.sv-workspace{display:grid;grid-template-columns:minmax(0,1.52fr) minmax(380px,.96fr) 278px;grid-template-rows:auto minmax(590px,calc(100dvh - 255px));grid-template-areas:"modes actions tools" "editor constructor tools";gap:12px;align-items:stretch;min-width:0}
+.sv-mainnav{grid-area:modes;display:flex;align-items:center;min-width:0;background:var(--vpanel);border:1px solid var(--vline);border-radius:var(--vround);padding:.25rem .4rem;overflow-x:auto;scrollbar-width:thin}.sv-navtags{display:flex;align-items:center;gap:.35rem;min-width:max-content}.sv-navtags button{flex:none;background:transparent;border:0;border-bottom:2px solid transparent;border-radius:.35rem .35rem 0 0;min-height:2.3rem;padding:.46rem .95rem;white-space:nowrap;transition:background .15s,color .15s,border-color .15s}.sv-navtags button.active{border-bottom-color:var(--vaccent);color:var(--vaccent);background:color-mix(in srgb,var(--vaccent) 9%,var(--vpanel))}
+.sv-workspace{display:grid;grid-template-columns:minmax(0,1.44fr) minmax(380px,1.06fr) minmax(205px,.44fr);grid-template-rows:auto minmax(590px,calc(100dvh - 255px));grid-template-areas:"modes actions tools" "editor constructor tools";gap:12px;align-items:stretch;min-width:0}
 .sv-studio .sv-workspace>.sv-actions{grid-area:actions;display:flex;align-items:center;justify-content:flex-end;gap:7px;padding:0.25rem 0;min-width:0;flex-wrap:wrap}
 .sv-studio .sv-workspace>.sv-actions button{min-height:2.3125rem;padding:0.4375rem 0.625rem}
 /* Grid has two explicit columns plus sidebar; maintain existing DOM children */
 .sv-columns{display:contents}
-.sv-codepanel,.sv-constructor,.sv-tools{min-width:0;min-height:0;border:1px solid var(--vline);border-radius:var(--ui-radius,14px);background:var(--vpanel);overflow:hidden}
+.sv-codepanel,.sv-constructor,.sv-tools{min-width:0;min-height:0;border:1px solid color-mix(in srgb,var(--vline) 84%,transparent);border-radius:var(--ui-radius,14px);background:var(--vpanel);overflow:hidden}
 .sv-codepanel{grid-area:editor;display:flex;flex-direction:column}
 .sv-constructor{grid-area:constructor;display:flex;flex-direction:column}
 .sv-tools{grid-area:tools;display:flex;flex-direction:column;gap:10px;padding:0.875rem;overflow-y:auto;scrollbar-width:thin}
@@ -40,7 +40,7 @@
 .sv-codestatus label{display:flex;align-items:center;gap:4px;margin-left:auto}
 .sv-codestatus input{accent-color:var(--vaccent)}
 .sv-wrap .sv-highlight,.sv-wrap .sv-codeholder textarea{white-space:pre-wrap;overflow-wrap:anywhere}
-.sv-constructor>header{padding:.9rem .85rem .35rem}
+.sv-constructor>header{padding:1rem 1.1rem .55rem}
 .sv-constructor h3{margin:0 0 4px;font-weight:750;font-size:0.9375rem}
 .sv-constructor>header p,.sv-tools>p{color:var(--vmute);font-size:0.6875rem;margin:0}
 /* Scoped tabs: global nav styles must not turn them into a vertical menu. */
@@ -71,7 +71,7 @@
  outline:2px solid var(--vaccent);outline-offset:2px;
 }
 
-.sv-formbody{flex:1;min-height:0;overflow:auto;padding:.85rem;border-top:1px solid var(--vline);scrollbar-width:thin}
+.sv-formbody{flex:1;min-height:0;overflow:auto;padding:1.05rem 1.1rem;border-top:1px solid var(--vline);scrollbar-width:thin}
 .sv-formbody h4{font-size:0.8125rem;margin:7px 0 10px}
 .sv-sectionhead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
 .sv-sectionhead h4{margin:0;font-size:0.75rem}
@@ -125,4 +125,28 @@
 @media(max-width:1420px){.sv-workspace{grid-template-columns:minmax(0,1.25fr) minmax(330px,1fr) 230px}.sv-toolcopy small{font-size:0.625rem}}
 @media(max-width:1120px){.sv-workspace,.sv-hide-tools .sv-workspace{grid-template-columns:minmax(0,1.25fr) minmax(290px,1fr);grid-template-rows:auto 620px auto;grid-template-areas:"modes actions" "editor constructor" "tools tools"}.sv-tools{height:auto}.sv-legacy .xm-tools-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.sv-template{margin-top:0}.sv-studio .sv-workspace>.sv-actions{justify-content:flex-end}}
 @media(max-width:760px){.sv-workspace,.sv-hide-tools .sv-workspace{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto 520px 540px auto;grid-template-areas:"modes" "actions" "editor" "constructor" "tools"}.sv-navtags button{font-size:0.625rem;padding:0.375rem 0.5rem}.sv-studio .sv-workspace>.sv-actions{justify-content:flex-start}.sv-tools{grid-area:tools}.sv-two{grid-template-columns:minmax(0,1fr)}.sv-legacy .xm-tools-grid{grid-template-columns:minmax(0,1fr)}.sv-minimap{display:none}.sv-bottom{flex-wrap:wrap}}
+
+/* Minimal workspace: thin navigation, low-contrast surfaces, readable form hierarchy. */
+.sv-studio .sv-constructor nav.sv-tabs{border-bottom:1px solid var(--vline);padding:.15rem .8rem 0;gap:.2rem}
+.sv-studio .sv-constructor nav.sv-tabs>button{border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;min-height:2.65rem;padding:.55rem .75rem;font-size:.78rem;font-weight:650;letter-spacing:0}
+.sv-studio .sv-constructor nav.sv-tabs>button:hover{background:transparent;color:var(--vtext)}
+.sv-studio .sv-constructor nav.sv-tabs>button.active{border:0;border-bottom:2px solid var(--vaccent);background:transparent;color:var(--vaccent)}
+.sv-studio .sv-formbody .sv-sectionhead{margin-bottom:.85rem;padding-bottom:.55rem;border-bottom:1px solid color-mix(in srgb,var(--vline) 60%,transparent)}
+.sv-studio .sv-inbound-summary{background:var(--vpanel);border-color:var(--vline);padding:.85rem 1rem}
+.sv-studio .sv-inbound-summary~.sv-two,.sv-studio .sv-inbound-summary~[data-when],.sv-studio .sv-inbound-summary~.sv-note{background:var(--vpanel);padding-inline:1rem}
+.sv-studio .sv-inbound-summary~.sv-two input,.sv-studio .sv-inbound-summary~.sv-two select,.sv-studio .sv-inbound-summary~[data-when] input{background:var(--vfield)}
+.sv-studio .sv-field{gap:.38rem;margin-bottom:.85rem;font-size:.77rem}
+.sv-studio .sv-field input,.sv-studio .sv-field select{min-height:2.4rem}
+.sv-studio .sv-outbound-preview{margin-top:1.15rem}
+.sv-studio .sv-outbound-row{background:color-mix(in srgb,var(--vfield) 78%,var(--vpanel))!important}
+.sv-studio .sv-legacy .xm-tools-grid{gap:.48rem}
+.sv-studio .sv-legacy .xm-tools-grid .sv-toolitem{border-color:color-mix(in srgb,var(--vline) 72%,transparent);min-height:3.4rem}
+.sv-studio .sv-tools{padding:.95rem;gap:.85rem}
+.sv-studio .sv-toolicon{flex-basis:2.25rem;height:2.25rem;font-size:1.15rem}
+.sv-studio .sv-codebar{min-height:3rem}
+.sv-studio .sv-codesurface{font-size:.9rem}
+.sv-studio .sv-codebar small{background:transparent;color:var(--vmute)}
+.sv-studio .sv-workspace>.sv-actions{align-content:center}
+.sv-studio .sv-workspace>.sv-actions button{font-weight:570}
+@media(max-width:1420px){.sv-workspace{grid-template-columns:minmax(0,1.25fr) minmax(340px,1fr) minmax(190px,.55fr)}}
 @media(prefers-reduced-motion:reduce){.sv-studio *{animation:none!important;transition:none!important}}
