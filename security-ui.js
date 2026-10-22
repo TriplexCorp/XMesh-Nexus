@@ -26,7 +26,7 @@ async function mount(root){
   ];
   body.innerHTML='<div class="security-subheading"><h4>Политика авторизации</h4><p>Управляется владельцем панели. Значения сохраняются в PostgreSQL и проверяются API.</p></div>'+
   '<form id="security-policy-form"><div class="security-settings-grid">'+fields.map(f=>setting(...f,p,readonly)).join('')+
-  '<label class="security-setting security-url-setting"><span><b>Адрес панели</b><small>Дополнительный URL входа. Не заменяет HTTPS и авторизацию. Старый адрес / пока остаётся доступным.</small></span><input name="dashboardPath" type="text" minlength="15" maxlength="75" pattern="/dashboard/[A-Za-z0-9_-]{4,64}" value="'+esc(p.dashboardPath)+'" '+(readonly?'disabled':'')+' required></label></div>'+
+  '<label class="security-setting security-url-setting"><span><b>Дополнительный адрес дашборда</b><small>Дополнительный URL входа. Не заменяет HTTPS и авторизацию. Основной адрес / остаётся доступным.</small></span><span class="security-path-controls"><input name="dashboardPath" type="text" minlength="15" maxlength="75" pattern="/dashboard/[A-Za-z0-9_-]{4,64}" value="'+esc(p.dashboardPath)+'" '+(readonly?'disabled':'')+' required><button type="button" class="gh" data-security-copy-path>Копировать ссылку</button></span></label></div>'+
   (readonly?'<p class="note">Редактирование доступно только владельцу (owner).</p>':'<div class="security-policy-actions"><button type="submit" class="btn">Сохранить политику</button><button type="button" class="gh" data-security-reset>Вернуть значения по умолчанию</button></div>')+'</form>'+
   '<div class="security-subheading"><h4>Мои активные сессии</h4><p>При необходимости завершите другие входы в панель.</p></div>'+
   '<div class="security-sessions">'+(sessionRes.sessions||[]).map(s=>'<div class="security-session"><span><b>'+(s.current?'Текущая сессия':'Сессия №'+esc(s.id))+'</b><small>Последняя активность: '+esc(new Date(s.lastActivity).toLocaleString())+' · Истекает: '+esc(new Date(s.expiresAt).toLocaleString())+'</small></span><button type="button" class="gh sm" data-security-revoke="'+esc(s.id)+'">'+(s.current?'Завершить':'Отозвать')+'</button></div>').join('')+
@@ -37,7 +37,13 @@ async function mount(root){
  host.addEventListener('click',async e=>{
   const btn=e.target.closest('button');if(!btn)return;
   try{
-   if(btn.matches('[data-security-retry]')){error.textContent='';await load()}
+   if(btn.matches('[data-security-copy-path]')){
+    const value=host.querySelector('[name="dashboardPath"]')?.value.trim();
+    if(!value)return;
+    await navigator.clipboard.writeText(location.origin+value);
+    error.textContent='Ссылка на дашборд скопирована.';
+   }
+   else if(btn.matches('[data-security-retry]')){error.textContent='';await load()}
    else if(btn.matches('[data-security-reset]')){
     const form=host.querySelector('#security-policy-form');if(!form)return;
     for(const [key,value] of Object.entries(defaults))if(form.elements.namedItem(key))form.elements.namedItem(key).value=value;
