@@ -15,6 +15,8 @@ if ! command -v openssl >/dev/null 2>&1; then
   exit 1
 fi
 
+prepare_only=0
+if [[ "${1:-}" == "--prepare-only" ]]; then prepare_only=1; fi
 created_env=0
 # The URL slug is 192 random bits, generated once and preserved on reinstall.
 new_dashboard_path="/dashboard/$(openssl rand -hex 24)"
@@ -98,6 +100,11 @@ EOF
   systemctl enable --now xmesh-dashboard-env.path
 else
   echo 'Warning: automatic .env synchronization requires root and systemd on the host.' >&2
+fi
+
+if [[ "$prepare_only" == "1" ]]; then
+  echo "Installer environment settings prepared."
+  exit 0
 fi
 
 docker compose config --quiet
