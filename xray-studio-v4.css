@@ -159,3 +159,21 @@
 .sv-gutter{color:var(--vmute)}
 
 .sv-highlight .sv-invalid-line{display:inline;background:color-mix(in srgb,var(--er,#f28a9b) 10%,transparent);text-decoration:underline wavy var(--er,#f28a9b);text-underline-offset:.17em;text-decoration-thickness:1px}
+
+/* Dedicated profile library, kept separate from the JSON editing workspace. */
+.sv-studio .sv-page-tabs{display:flex;align-items:center;gap:.4rem;border-bottom:1px solid var(--vline);padding:.15rem 0 .6rem}
+.sv-studio .sv-page-tabs button{background:transparent;border:1px solid transparent;color:var(--vmute);font-weight:650;padding:.55rem 1rem;min-height:2.45rem}
+.sv-studio .sv-page-tabs button.active{background:color-mix(in srgb,var(--vaccent) 10%,var(--vpanel));border-color:color-mix(in srgb,var(--vaccent) 44%,var(--vline));color:var(--vaccent)}
+.sv-studio .sv-page-tabs button span{font-variant-numeric:tabular-nums;opacity:.75;margin-left:.25rem}
+.sv-profiles-page{border:1px solid var(--vline);background:var(--vpanel);border-radius:var(--ui-radius,14px);padding:1.5rem;min-height:24rem}
+.sv-profiles-page>header{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1.3rem}
+.sv-profiles-page h2{font-size:1.25rem;margin:0 0 .25rem}
+.sv-profiles-page p{color:var(--vmute);margin:0;font-size:.8rem}
+.sv-profiles-search{background:var(--vfield);border:1px solid var(--vline);border-radius:var(--vround);color:var(--vtext);min-height:2.55rem;width:min(100%,29rem);padding:.65rem .85rem;font:inherit;margin:0 0 1.15rem}
+.sv-profiles-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,18rem),1fr));gap:.7rem}
+.sv-studio .sv-profile-row{display:flex;align-items:center;gap:.65rem;flex-wrap:wrap;text-align:left;padding:1rem;min-height:4.5rem;background:var(--vfield);border:1px solid var(--vline)}
+.sv-profile-row strong{font-size:.9rem;flex-basis:100%}
+.sv-profile-row span:nth-child(2){font-size:.72rem;color:var(--vmute)}
+.sv-profile-row span:last-child{margin-left:auto;color:var(--vaccent)}
+.sv-profiles-empty{padding:2rem 0!important}
+@media(max-width:700px){.sv-profiles-page{padding:1rem}.sv-profiles-page>header{align-items:flex-start;flex-direction:column}}
