@@ -1,6 +1,6 @@
 'use strict';
-// Admin-only subscription delivery blueprint. Public serving is intentionally
-// NOT part of XMesh Nexus; the subscription service lives in another repository.
+// Studio settings are used by the live subscription portal and URL issuer.
+// Separate-server placement remains an architecture plan until a reverse proxy is configured.
 window.XMeshSubscriptionStudio = (() => {
   const defaults = {
     subscriptionDomain:'', subscriptionPath:'/s',
@@ -35,9 +35,7 @@ window.XMeshSubscriptionStudio = (() => {
     ['clashverge','Clash Verge Rev','Windows · macOS · Linux','Компьютер']
   ]);
   const defaultClients = Object.freeze(Object.fromEntries(clientCatalog.map(([key],index)=>[key,index<7])));
-  // The control plane stores a simple, versionable catalog. No live download
-  // or deep-link generation happens here; the external delivery service will
-  // decide which client transports it can actually support.
+  // The live portal renders only enabled clients with validated HTTPS download links.
   const maxCustomClients=32;
   const appsHeading = lang => lang==='en'?'Connection apps':'Приложения для подключения';
   const nextCustomClientId = clients => {
@@ -60,7 +58,7 @@ window.XMeshSubscriptionStudio = (() => {
       '<details class="subscription-client-details"'+(open?' open':'')+'><summary>Платформы и ссылка</summary>'+
       '<div class="subscription-custom-details">'+
       '<label class="f subscription-field"><span>Платформы</span><input data-custom-field="platforms" type="text" maxlength="120" value="'+esc(platforms)+'" placeholder="iOS · Android · Windows" autocomplete="off" spellcheck="false"></label>'+
-      '<label class="f subscription-field"><span>HTTPS-адрес установки</span><input data-custom-field="url" type="url" maxlength="512" value="'+esc(url)+'" placeholder="https://example.com/app" autocomplete="off" spellcheck="false"><small>Необязательно. Ссылка сохраняется для будущего сервиса подписок.</small></label>'+
+      '<label class="f subscription-field"><span>HTTPS-адрес установки</span><input data-custom-field="url" type="url" maxlength="512" value="'+esc(url)+'" placeholder="https://example.com/app" autocomplete="off" spellcheck="false"><small>Необязательно. Ссылка показывается на реальной странице подписки.</small></label>'+
       '</div></details></div>';
   };
   const validHttps = value => {
@@ -111,7 +109,7 @@ window.XMeshSubscriptionStudio = (() => {
     const markup = [
       '<div class="subscription-studio">',
       '<header class="subscription-studio-intro"><div><span class="subscription-studio-kicker">XMESH NEXUS / DELIVERY</span><h2>SUBSCRIPTION STUDIO</h2>',
-      '<p>Управление дизайном, доменом и схемой размещения будущего сервиса подписок.</p></div>',
+      '<p>Оформление действующей страницы подписки, её публичный URL и каталог приложений.</p></div>',
       '<button type="submit" form="subscription-studio-form" class="btn">'+
         '<span aria-hidden="true">✓</span> Сохранить настройки</button></header>',
       '<p class="subscription-studio-notice"><b>Конструктор управления</b> · Публичный сервис подписок и серверные ноды будут разработаны отдельно. Сохранение здесь не запускает сервер и не публикует ссылки.</p>',
@@ -123,13 +121,13 @@ window.XMeshSubscriptionStudio = (() => {
       field('subscriptionDomain','Домен подписки',data.subscriptionDomain,'HTTPS и DNS настраиваются на сервере выдачи.',{placeholder:'sub.example.com',max:253}),
       field('subscriptionPath','Публичный путь',data.subscriptionPath,'Например /s или /subscription.',{placeholder:'/s',max:64}),
       '</div>',
-      '<div class="subscription-studio-url"><span>Будущий формат ссылки</span><code data-subscription-link>Укажите домен подписки</code></div>',
+      '<div class="subscription-studio-url"><span>Формат персональной ссылки</span><code data-subscription-link>Укажите домен подписки</code></div>',
       '</section>',
       '<section class="card subscription-studio-section">',
       '<div class="subscription-studio-heading"><span>02</span><div><h3>Архитектура LEGO</h3><p>Три роли, три условных сервера. Можно разместить всё вместе или разнести.</p></div></div>',
       '<div class="subscription-roles">',
       '<div class="subscription-role"><span class="subscription-role-icon">▦</span><div><b>Панель управления</b><small>Control plane • XMesh Nexus</small></div><strong>Сервер A</strong></div>',
-      '<div class="subscription-role"><span class="subscription-role-icon">↗</span><div><b>Сервис подписок</b><small>Отдельный будущий репозиторий</small></div>',
+      '<div class="subscription-role"><span class="subscription-role-icon">↗</span><div><b>Сервис подписок</b><small>Публичная выдача через XMesh Nexus</small></div>',
       choice('subscriptionPlacement',data.subscriptionPlacement,slot),'</div>',
       '<div class="subscription-role"><span class="subscription-role-icon">⌘</span><div><b>VPN-ноды</b><small>Пример топологии; реальные ноды задаются в «Узлах»</small></div>',
       choice('nodePlacement',data.nodePlacement,slot),'</div>',
@@ -209,7 +207,7 @@ window.XMeshSubscriptionStudio = (() => {
       ).join('')+'</div>',
       '<div class="subscription-custom-toolbar"><div><b>Свои приложения</b><small>Собственные названия, платформы и адреса установки</small></div><button type="button" class="gh sm" data-custom-client-add>+ Добавить приложение</button></div>',
       '<div class="subscription-client-editor" data-custom-client-editor>'+data.subscriptionCustomClients.map(client=>renderCustomClient(client)).join('')+'</div>',
-      '<p class="subscription-preview-caption">Это настройки каталога для будущего отдельного Subscription Service. Включение приложения не гарантирует совместимость конкретного формата конфигурации — она будет определяться генератором подписок.</p>',
+      '<p class="subscription-preview-caption">Каталог отображается на реальной странице пользователя. Приложения без HTTPS-ссылки не показываются; совместимость VLESS зависит от конкретного клиента.</p>',
       '</section></div>',
       '<aside class="subscription-studio-side">',
       '<div class="subscription-preview-label"><b>Предпросмотр</b><span>Демо-контент</span></div>',
@@ -226,7 +224,7 @@ window.XMeshSubscriptionStudio = (() => {
       '<div class="subscription-preview-support" data-subscription-support></div>',
       '<footer data-subscription-footer></footer></div>',
       '<div class="subscription-studio-stats"><div><small>Пользователей</small><b>'+esc(counts.users)+'</b></div><div><small>Узлов</small><b>'+esc(counts.nodes)+'</b></div></div>',
-      '<p class="subscription-preview-caption">Макет без пользовательских данных. Реальные конфигурации, персональные токены и публичный портал появятся в отдельном сервисе.</p>',
+      '<p class="subscription-preview-caption">Предпросмотр без пользовательских данных. Реальная страница и ссылка доступны в карточке пользователя. Для другого домена настройте DNS и HTTPS reverse proxy.</p>',
       '</aside></form></div>'
     ].join('');
     const mount = () => {
