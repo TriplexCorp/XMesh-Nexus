@@ -28,6 +28,7 @@ pub(crate) fn canonical_for(path: &str, node_id: i64, timestamp: i64, nonce: &st
     format!("XMESH1\nPOST\n{path}\n{node_id}\n{timestamp}\n{nonce}\n{digest}\n")
 }
 
+#[cfg(test)]
 pub(crate) fn canonical(node_id: i64, timestamp: i64, nonce: &str, body: &[u8]) -> String {
     canonical_for("/api/v1/metrics/ingest", node_id, timestamp, nonce, body)
 }
