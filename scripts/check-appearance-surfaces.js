@@ -191,7 +191,11 @@ assert.match(css,/^input\[type="range"\]::-webkit-slider-thumb\{/m);
 assert.match(css,/^input\[type="range"\]::-moz-range-thumb\{/m);
 assert.match(css,/html\[data-motion=on\] input\[type="range"\]/);
 assert.match(app,/const saveAppearanceControls=\(\)=>/);
-assert.match(app,/\['ts','radius','gap-scale'\]\.includes\(t\.id\)/);
+assert.match(app,/\['ts','text-size','radius','gap-scale'\]\.includes\(t\.id\)/);
+assert.match(app,/id="text-size" min="75" max="160" step="1"/,'Independent text slider must have 1-point precision');
+assert.match(app,/id="text-precision"/,'Text slider must have its own 1 vs 10 snapping control');
+assert.match(app,/C\.textPrecision===10\?10:1/,'Text precision must be saved separately');
+assert.match(css,/--text-size-scale/,'Text scaling must be applied in CSS');
 for(const key of ['ts','radius','gap-scale']){
  const handler=app.match(new RegExp("e\\.target\\.id(?:===|==)'"+key+"'\\)\\{([^}]+)\\}"))?.[1];
  assert(handler?.includes('previewAppearanceControls()')&&!handler.includes('apply()'),
