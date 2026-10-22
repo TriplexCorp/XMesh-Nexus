@@ -150,7 +150,7 @@
 
 /* Live preview of the future standalone subscription service. */
 .subscription-studio{
-  --portal-accent:#e8bb78;--portal-bg:#0c131b;--portal-card:#15212b;--portal-text:#ecf3f6;--portal-radius:16px;
+  --portal-accent:#e8bb78;--portal-secondary:#c6e985;--portal-bg:#0c131b;--portal-card:#15212b;--portal-text:#ecf3f6;--portal-radius:16px;
 }
 .subscription-preview{
   background:radial-gradient(ellipse at 92% 3%,color-mix(in srgb,var(--portal-accent) 16%,transparent),transparent 55%),var(--portal-bg);
@@ -254,7 +254,6 @@
 /* Shared XMesh appearance. The same tokens are used in the Studio preview
    and by the public portal, including the secondary palette and surfaces. */
 .subscription-preview{
-  --portal-secondary:var(--portal-accent);
   background:
     radial-gradient(ellipse at 90% 5%,color-mix(in srgb,var(--portal-secondary) 12%,transparent),transparent 57%),
     radial-gradient(ellipse at 4% 98%,color-mix(in srgb,var(--portal-accent) 7%,transparent),transparent 68%),
