@@ -3,7 +3,7 @@
    Only the page shell and functional controls are styled here. */
 :root{color-scheme:dark;--ui-radius:16px;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
 *{box-sizing:border-box}
-body.subscription-public{margin:0;min-height:100vh;background:#0b1016;color:var(--portal-text,#ecf3f6);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+body.subscription-public{margin:0;min-height:100vh;background:var(--portal-bg,#0b1016);color:var(--portal-text,#ecf3f6);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
 .subscription-public-shell{width:min(100% - 32px,980px);margin:clamp(16px,4vh,55px) auto;padding-bottom:32px}
 .subscription-public .subscription-preview{gap:clamp(20px,3vw,30px);padding:clamp(22px,4vw,38px);min-height:0;box-shadow:0 18px 55px #0003;font-size:16px}
 .subscription-public .subscription-preview-brand{gap:12px;flex-wrap:wrap}
