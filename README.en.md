@@ -95,8 +95,14 @@ Security properties:
 
 **Deployment and upgrades:** fresh `./install.sh` installs a random
 `TOTP_ENCRYPTION_KEY` in the mode-0600 `.env`. On existing installations
-**run `./install.sh` once** to add the key without resetting previous passwords
-or database volumes. For manual Compose upgrades, generate the key with
+**update the panel first, then run `bash xmeshctl` and choose option 9,
+"Check and enable 2FA"**. This validates or safely provisions a missing/empty
+key and recreates only the panel container so Compose injects the new variable.
+Routine updates also validate the key. Existing valid keys are never replaced,
+and database volumes and admin credentials are preserved.
+If you previously enrolled MFA and lost the original key, restore the
+original `.env` backup rather than generating a new key; a replacement
+cannot decrypt already-enrolled TOTP secrets. For manual setup, generate the key with
 `openssl rand -hex 32` and append `TOTP_ENCRYPTION_KEY=<value>` to `.env`
 before restarting. Keep this value unchanged when rebuilding containers,
 restoring backups or moving hosts. Losing the key makes existing enabled
