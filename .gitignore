@@ -7,3 +7,6 @@ target/
 *.log
 .DS_Store
 /backups/
+
+# Host-only writable dashboard path mirror; never commit deployment state.
+/deploy/runtime/
