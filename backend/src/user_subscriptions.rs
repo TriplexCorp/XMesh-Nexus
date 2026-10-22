@@ -104,6 +104,99 @@ fn vless_link(user:&Value, inbound:&Value, host:&Value)->Option<String>{
  let name=nonempty(host,"remark").unwrap_or(address);
  Some(format!("vless://{}@{}:{}?{}#{}",uuid,address,actual_port,opts.join("&"),encode_component(name)))
 }
+// Client-native Xray outbound: build from explicitly allowed public values,
+// not from server-side streamSettings containing Reality private keys.
+fn vless_outbound(user:&Value,inbound:&Value,host:&Value)->Option<Value>{
+ vless_link(user,inbound,host)?;
+ let address=endpoint(host)?;
+ let port=["externalPort","port"].into_iter().find_map(|key|host.get(key).and_then(self::port))
+   .or_else(||inbound.get("port").and_then(self::port))?;
+ let stream=inbound.get("streamSettings")?;
+ let security=nonempty(stream,"security").unwrap_or("none");
+ let network=nonempty(stream,"network").unwrap_or("tcp");
+ let uuid=nonempty(user,"xrayId")?;
+ let tag=nonempty(host,"remark").or_else(||nonempty(inbound,"tag")).unwrap_or(address);
+ let client=if let Some(flow)=inbound.get("settings").and_then(|v|nonempty(v,"flow")){
+  json!({"id":uuid,"encryption":"none","flow":flow})
+ }else{json!({"id":uuid,"encryption":"none"})};
+ let mut outbound_stream=json!({"network":network,"security":security});
+ if security=="reality"{
+  let server=stream.get("realitySettings").unwrap_or(&Value::Null);
+  let sni=nonempty(host,"sni").or_else(||nonempty(host,"externalSNI"))
+   .or_else(||server.get("serverNames").and_then(Value::as_array).and_then(|v|v.first()).and_then(Value::as_str))?;
+  let key=nonempty(host,"publicKey").or_else(||nonempty(host,"realityPublicKey"))
+   .or_else(||nonempty(inbound,"publicKey")).or_else(||nonempty(server,"publicKey"))?;
+  let sid=nonempty(host,"shortId").or_else(||nonempty(host,"externalShortId"))
+   .or_else(||server.get("shortIds").and_then(Value::as_array).and_then(|v|v.first()).and_then(Value::as_str))?;
+  outbound_stream["realitySettings"]=json!({
+   "serverName":sni,"publicKey":key,"shortId":sid,
+   "fingerprint":nonempty(host,"fp").or_else(||nonempty(host,"fingerprint")).unwrap_or("chrome"),
+   "spiderX":nonempty(host,"spiderX").unwrap_or("/")
+  });
+ }else if security=="tls"{
+  let sni=nonempty(host,"sni").or_else(||nonempty(host,"externalSNI"))
+   .or_else(||stream.get("tlsSettings").and_then(|v|nonempty(v,"serverName")))?;
+  let mut tls=json!({"serverName":sni});
+  if let Some(alpn)=stream.get("tlsSettings").and_then(|v|v.get("alpn"))
+   && let Some(values)=alpn.as_array(){
+   tls["alpn"]=json!(values);
+  }
+  outbound_stream["tlsSettings"]=tls;
+ }
+ let config=match network{
+  "xhttp"=>stream.get("xhttpSettings"),
+  "ws"=>stream.get("wsSettings"),
+  "grpc"=>stream.get("grpcSettings"),
+  "raw"=>stream.get("rawSettings"),
+  "tcp"=>stream.get("tcpSettings"),
+  _=>None
+ };
+ let mut transport=json!({});
+ if let Some(config)=config{
+  if network=="xhttp"||network=="ws"||network=="grpc"{
+   for key in ["path","host","mode","serviceName"]{
+    if let Some(v)=nonempty(config,key){transport[key]=json!(v)}
+   }
+  }
+ }
+ if let Some(path)=nonempty(host,"path") && network!="grpc"{
+  transport["path"]=json!(path);
+ }
+ if let Some(hostname)=nonempty(host,"host").or_else(||nonempty(host,"externalHost")){
+  if network=="ws"{transport["headers"]=json!({"Host":hostname})}
+  else if network=="xhttp"{transport["host"]=json!(hostname)}
+ }
+ if transport.as_object().is_some_and(|o|!o.is_empty()){
+  if network=="xhttp"{outbound_stream["xhttpSettings"]=transport}
+  else if network=="ws"{outbound_stream["wsSettings"]=transport}
+  else if network=="grpc"{outbound_stream["grpcSettings"]=transport}
+ }
+ Some(json!({
+  "tag":tag,"protocol":"vless",
+  "settings":{"vnext":[{"address":address,"port":port,"users":[client]}]},
+  "streamSettings":outbound_stream
+ }))
+}
+fn native_xray_config(outbounds:Vec<Value>)->Value{
+ let primary=outbounds.first().and_then(|v|v.get("tag")).and_then(Value::as_str).unwrap_or("proxy").to_owned();
+ let mut all=outbounds;
+ all.push(json!({"tag":"direct","protocol":"freedom"}));
+ all.push(json!({"tag":"block","protocol":"blackhole"}));
+ json!({
+  "log":{"loglevel":"warning"},
+  "dns":{"servers":["1.1.1.1"]},
+  "inbounds":[
+   {"tag":"socks","listen":"127.0.0.1","port":10808,"protocol":"socks","settings":{"auth":"noauth","udp":true}},
+   {"tag":"http","listen":"127.0.0.1","port":10809,"protocol":"http"}
+  ],
+  "outbounds":all,
+  "routing":{"domainStrategy":"AsIs","rules":[
+   {"type":"field","ip":["geoip:private"],"outboundTag":"direct"},
+   {"type":"field","domain":["geosite:private"],"outboundTag":"direct"},
+   {"type":"field","inboundTag":["socks","http"],"outboundTag":primary}
+  ]}
+ })
+}
 async fn record(state:&AppState,id:i64)->Result<Value,ApiError>{
  let row=sqlx::query("SELECT data FROM panel_records WHERE collection='users' AND id=$1")
   .bind(id).fetch_optional(&state.pool).await?.ok_or_else(||ApiError::new(StatusCode::NOT_FOUND,"User not found"))?;
@@ -151,7 +244,7 @@ pub async fn revoke(State(state):State<AppState>,Extension(actor):Extension<Auth
  crate::audit(&state.pool,&actor.username,"subscription.revoked",Some("users"),Some(id),json!({})).await;
  Ok(Json(json!({"revoked":true})))
 }
-pub async fn serve(State(state):State<AppState>,Path(token):Path<String>)->Result<Response,ApiError>{
+pub async fn serve(State(state):State<AppState>,Path(token):Path<String>,Query(options):Query<HashMap<String,String>>)->Result<Response,ApiError>{
  if !valid_token(&token){return Err(ApiError::new(StatusCode::NOT_FOUND,"Subscription not found"))}
  let row=sqlx::query("SELECT user_id FROM user_subscription_tokens WHERE token_hash=$1")
   .bind(token_hash(&token)).fetch_optional(&state.pool).await?.ok_or_else(||ApiError::new(StatusCode::NOT_FOUND,"Subscription not found"))?;
@@ -172,6 +265,7 @@ pub async fn serve(State(state):State<AppState>,Path(token):Path<String>)->Resul
   }
  }
  let mut links=Vec::<String>::new();
+ let mut outbounds=Vec::<Value>::new();
  for profile in &profiles{
   let cfg=match profile.get("config"){Some(Value::String(raw))=>serde_json::from_str::<Value>(raw).ok(),Some(v)=>Some(v.clone()),None=>None};
   let Some(cfg)=cfg else{continue};
@@ -181,18 +275,33 @@ pub async fn serve(State(state):State<AppState>,Path(token):Path<String>)->Resul
    if !tags.contains(tag){continue}
    let matched:Vec<&Value>=hosts.iter().filter(|h|h.get("disabled")!=Some(&Value::Bool(true))&&nonempty(h,"tag")==Some(tag)).collect();
    if !matched.is_empty(){
-    for host in matched{if let Some(link)=vless_link(&user,inbound,host){links.push(link)}}
+    for host in matched{if let Some(link)=vless_link(&user,inbound,host){
+      if let Some(outbound)=vless_outbound(&user,inbound,host){outbounds.push(outbound);links.push(link)}
+     }}
    }else{
     for node in nodes.iter().filter(|n|n.get("profileId")==profile.get("id")&&n.get("disabled")!=Some(&Value::Bool(true))){
      let host=json!({"address":node.get("publicAddress").or_else(||node.get("externalAddress")).or_else(||node.get("addr")),"port":inbound.get("port"),"remark":node.get("name")});
-     if let Some(link)=vless_link(&user,inbound,&host){links.push(link)}
+     if let Some(link)=vless_link(&user,inbound,&host){
+      if let Some(outbound)=vless_outbound(&user,inbound,&host){outbounds.push(outbound);links.push(link)}
+     }
     }
    }
   }
  }
  if links.is_empty(){return Err(ApiError::new(StatusCode::SERVICE_UNAVAILABLE,"No valid public VLESS endpoints configured"))}
- let mut response=links.join("\n").into_response();
- response.headers_mut().insert(header::CONTENT_TYPE,"text/plain; charset=utf-8".parse().unwrap());
+ // Native Xray JSON is the default for new HTTPS subscriptions.
+ // Existing link-list users may explicitly request ?format=vless.
+ let legacy=options.get("format").is_some_and(|v|v=="vless");
+ let mut response=if legacy{
+  links.join("\n").into_response()
+ }else{
+  let body=serde_json::to_string_pretty(&native_xray_config(outbounds))
+   .map_err(|_|ApiError::new(StatusCode::INTERNAL_SERVER_ERROR,"Could not generate Xray JSON"))?;
+  body.into_response()
+ };
+ response.headers_mut().insert(header::CONTENT_TYPE,if legacy{
+  "text/plain; charset=utf-8".parse().unwrap()
+ }else{"application/json; charset=utf-8".parse().unwrap()});
  response.headers_mut().insert(header::CACHE_CONTROL,"no-store, private".parse().unwrap());
  response.headers_mut().insert(header::REFERRER_POLICY,"no-referrer".parse().unwrap());
  Ok(response)
@@ -289,7 +398,7 @@ pub async fn portal(
  if !valid_token(&token){return Err(ApiError::new(StatusCode::NOT_FOUND,"Subscription not found"))}
  let accept=headers.get(header::ACCEPT).and_then(|v|v.to_str().ok()).unwrap_or("");
  if !accept.contains("text/html") || options.get("raw").is_some_and(|v|v=="1") {
-  return serve(State(state),Path(token)).await;
+  return serve(State(state),Path(token),Query(options)).await;
  }
  let hash=token_hash(&token);
  let row=sqlx::query("SELECT user_id FROM user_subscription_tokens WHERE token_hash=$1")
@@ -331,7 +440,7 @@ pub async fn portal(
  if !metrics.is_empty(){
   metrics=format!("<div class=\"subscription-preview-meta\" data-subscription-metrics>{metrics}</div>");
  }
- let raw_link=format!("{}?raw=1",studio_url(&settings,&token));
+ let raw_link=format!("{}?format=json",studio_url(&settings,&token));
  let mut quick=String::new();
  let mut qr=String::new();
  let mut devices=String::new();
@@ -340,8 +449,8 @@ pub async fn portal(
  if active{
   let button=studio_string(&settings,if en{"subscriptionCtaEn"}else{"subscriptionCta"},
    if en{"Connect"}else{"Подключиться"});
-  cta=format!("<a class=\"subscription-preview-cta\" href=\"{}\" title=\"{}\">{}</a><input type=\"hidden\" id=\"subscription-link\" value=\"{}\">",
-   escape_html(&raw_link),if en{"Open subscription configuration"}else{"Открыть конфигурацию подписки"},
+  cta=format!("<button type=\"button\" class=\"subscription-preview-cta\" id=\"connect-link\" title=\"{}\">{}</button><input type=\"hidden\" id=\"subscription-link\" value=\"{}\">",
+   if en{"Copy HTTPS subscription link"}else{"Скопировать HTTPS-ссылку подписки"},
    escape_html(button),escape_html(&raw_link));
   if studio_enabled(&settings,"subscriptionShowCopy",true){
    quick.push_str(&format!("<button type=\"button\" id=\"copy-link\">{}</button>",
