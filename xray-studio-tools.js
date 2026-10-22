@@ -63,41 +63,59 @@ const repairIds=(list,append)=>{
  return [...list];
 };
 async function setReality(){
- let d,inbound;
+ let documentValue,inbound;
  try{
-   d=parse();inbound=getInbound(d);if(!inbound)return;
-   const current=inbound.streamSettings||{},transport=current.network||'raw';
+   documentValue=parse();inbound=getInbound(documentValue);if(!inbound)return;
+   const stream=inbound.streamSettings||{},transport=stream.network||'raw';
    if(!['raw','xhttp','grpc'].includes(transport))throw Error('REALITY поддерживает только RAW, XHTTP или gRPC. Сначала измените транспорт.');
+   if(inbound.protocol!=='vless'&&inbound.protocol!=='trojan')throw Error('Настройка Reality для '+inbound.protocol+' через этот инструмент не поддерживается: используйте ручной JSON и проверку ядром.');
  }catch(e){status('Ошибка: '+e.message);notify(e.message);return}
  const originalSource=area.value;
- const current=inbound.streamSettings?.realitySettings||{};
- let target=current.target||current.dest||'';
- if(!target){target=prompt('Укажите REALITY target (HTTPS-домен:порт). Проверьте SNI и доступность целевого сайта:', 'www.microsoft.com:443');if(target===null)return}
+ const selectedTag=inbound.tag;
+ const existing=inbound.streamSettings?.realitySettings||{};
+ let target=existing.target||existing.dest||'';
+ if(!target){
+   target=prompt('Укажите собственный REALITY target (HTTPS-домен:порт). Проверьте SNI и доступность сайта:', 'www.microsoft.com:443');
+   if(target===null)return;
+ }
  target=target.trim();
  const match=target.match(/^([a-zA-Z0-9.-]+):(\d{1,5})$/);
  if(!match||Number(match[2])<1||Number(match[2])>65535||!match[1].includes('.')||match[1].includes('..')){
    notify('REALITY target должен иметь формат домен:порт, например www.microsoft.com:443');return;
  }
- const existingSni=Array.isArray(current.serverNames)?current.serverNames.filter(v=>typeof v==='string'&&v.trim()):[];
- const sni=existingSni.length?existingSni:[match[1]];
- if(current.privateKey&&!confirm('Заменить существующий privateKey REALITY? Клиентские public keys придётся обновить.'))return;
+ const savedSni=Array.isArray(existing.serverNames)?existing.serverNames.filter(v=>typeof v==='string'&&v.trim()):[];
+ const sni=savedSni.length?savedSni:[match[1]];
+ const oldPrivate=typeof existing.privateKey==='string'?existing.privateKey.trim():'';
+ const usablePrivate=oldPrivate.length>0&&!/REPLACE|YOUR[_-]?KEY|example/i.test(oldPrivate);
+ // Default is always to preserve working keys. Rotation requires explicit consent.
+ let generate=!usablePrivate;
+ if(usablePrivate){
+   generate=confirm('REALITY уже имеет privateKey. Сгенерировать НОВУЮ пару X25519? Это отключит старые клиентские public keys. Нажмите «Отмена», чтобы сохранить существующий ключ и только проверить параметры.');
+ }
  let ids;
- try{ids=repairIds(current.shortIds??[],false);if(ids===null)return}catch(e){notify(e.message);return}
+ try{ids=repairIds(existing.shortIds??[],false);if(ids===null)return}catch(e){notify(e.message);return}
  try{
-   const keys=await realityKeys();
-   if(area.value!==originalSource){notify('JSON изменился во время генерации ключей. Повторите операцию Reality для текущего документа.');return}
-   if(!keys?.privateKey||!keys?.publicKey)throw Error('Генератор Reality не вернул пару ключей');
+   const keys=generate?await realityKeys():null;
+   if(area.value!==originalSource){notify('JSON изменился за время операции. Ничего не заменено; повторите действие.');return}
+   if(generate&&(!keys?.privateKey||!keys?.publicKey))throw Error('Генератор Reality не вернул пару ключей');
    const ok=mutate(doc=>{
-     const obj=getInbound(doc);if(!obj)return false;
-     const ss=obj.streamSettings??={};ss.security='reality';
+     // Protect the selected inbound when the user has several profiles.
+     const updated=doc.inbounds.find(x=>x.tag===selectedTag);
+     if(!updated)throw Error('Выбранный inbound исчез из JSON');
+     const ss=updated.streamSettings??={};
+     ss.security='reality';
      const rs=ss.realitySettings??={};
      if(!rs.target&&!rs.dest)rs.target=target;
      rs.show=rs.show??false;
      if(!Array.isArray(rs.serverNames)||!rs.serverNames.length)rs.serverNames=sni;
-     rs.shortIds=ids;rs.privateKey=keys.privateKey;
-   },'Reality: ключи, target, SNI и Short ID настроены');
+     rs.shortIds=ids;
+     if(generate)rs.privateKey=keys.privateKey;
+   },generate?'REALITY настроен: ключи и Short ID созданы':'REALITY: существующий privateKey сохранён');
    if(!ok)return;
-   try{await navigator.clipboard.writeText(keys.publicKey);notify('Reality настроен, publicKey скопирован. Проверьте Xray-core.')}catch{notify('Reality настроен. Скопируйте publicKey: '+keys.publicKey)}
+   if(generate){
+     try{await navigator.clipboard.writeText(keys.publicKey);notify('REALITY обновлён; новый publicKey скопирован. Проверьте Xray-core.')}
+     catch{notify('REALITY обновлён. Скопируйте новый publicKey: '+keys.publicKey)}
+   }else notify('REALITY: действующий privateKey сохранён, проверьте конфигурацию ядром.');
  }catch(e){status('Ошибка: '+e.message);notify(e.message)}
 }
 
