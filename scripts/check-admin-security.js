@@ -30,7 +30,10 @@ assert.match(getHandler('list_records'),/enforce_collection\(&actor, &collection
 assert.match(getHandler('bootstrap'),/admin_accounts::accounts\(&state\.pool\)/);
 assert.match(getHandler('patch_settings'),/require_owner\(&actor\)/);
 assert.match(getHandler('update_core'),/require_owner\(&actor\)/);
-assert.match(getHandler('create_node_metrics_token'),/require_owner\(&actor\)/);
+const nodeAuth=fs.readFileSync('backend/src/node_auth.rs','utf8');
+assert.match(nodeAuth,/crate::require_owner\(&actor\)/,'Ed25519 key management must require owner');
+assert.doesNotMatch(main,/create_node_metrics_token/,'Legacy node Bearer issuance must be removed');
+assert.doesNotMatch(main,/nodes\/\{id\}\/metrics-token/,'Legacy token endpoint must remain absent');
 assert.match(getHandler('generate_vless_encryption'),/require_mutation\(&actor\)/);
 assert.match(fs.readFileSync('backend/src/node_rotation.rs','utf8'),/super::require_mutation\(&actor\)/);
 assert.match(accounts,/WHERE role='owner' FOR UPDATE/);
