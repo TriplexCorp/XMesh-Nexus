@@ -23,6 +23,21 @@ for(const selector of [
  '.nodes-toolbar .node-create-action:hover{',
  '.nodes-toolbar .node-create-action:focus-visible{'
 ])assert(css.includes(selector),'Missing action styling: '+selector);
+// A missing CSS semicolon silently invalidates the configured radius and the
+// following background declaration. Validate the *full* button declaration.
+const nodeActionRule=css.match(/\.nodes-toolbar \.node-create-action\{([^}]*)\}/s);
+assert(nodeActionRule,'Missing New Node CSS rule');
+assert.match(nodeActionRule[1],/border-radius:\s*var\(--ui-control-radius\)\s*;/,
+ 'New Node button must consume the shared 1–36 px control radius with a valid semicolon');
+assert.match(nodeActionRule[1],/background:color-mix\(in srgb,var\(--a\) 9%,var\(--elevated\)\);/,
+ 'Following surface declaration must remain independent of border-radius');
+const radiusLines=css.split(/\r?\n/);
+for(let i=0;i<radiusLines.length-1;i++){
+  if(/^\s*border-radius\s*:/.test(radiusLines[i])
+    && !/[;}]\s*(?:\/\/.*)?$/.test(radiusLines[i])
+    && /^\s*[a-z-]+\s*:/.test(radiusLines[i+1]))
+    assert.fail('Unterminated border-radius declaration before another CSS property at styles.css line '+(i+1));
+}
 assert.match(css, /\.nodes-toolbar \.node-create-icon\{[^}]*background:var\(--a\);[^}]*color:var\(--btn-text\);/s,
  'Icon must follow the active accent theme');
 assert.match(css, /\.nodes-toolbar \.node-create-action\{[^}]*background:color-mix\(in srgb,var\(--a\) 9%,var\(--elevated\)\);/s,
