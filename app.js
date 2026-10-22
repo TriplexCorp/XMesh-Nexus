@@ -669,7 +669,7 @@ function statisticsP(){
     $('#stats-control').innerHTML='<div class="stats-kvs">'+control.map(x=>statsRow(...x)).join('')+'</div>';
     const points=traffic.points||[];
     const latest=points[points.length-1]||{};
-    $('#stats-trend').innerHTML='<div class="stats-trend-grid"><div><b>RX</b><strong>'+ (points.length?statsBytes(latest.rxBytesPerSec)+'/с':'Нет данных')+'</strong>'+statsSpark(points,'rxBytesPerSec')+'</div><div><b>TX</b><strong>'+(points.length?statsBytes(latest.txBytesPerSec)+'/с':'Нет данных')+'</strong>'+statsSpark(points,'txBytesPerSec')+'</div></div><small class="note">'+(panelIsEnglish()?'Samples: ':'Измерений: ')+esc(String(traffic.sampleCount??0))+(panelIsEnglish()?' · Source: TimescaleDB</small>':' · Источник: TimescaleDB</small>')';
+    $('#stats-trend').innerHTML='<div class="stats-trend-grid"><div><b>RX</b><strong>'+ (points.length?statsBytes(latest.rxBytesPerSec)+'/с':'Нет данных')+'</strong>'+statsSpark(points,'rxBytesPerSec')+'</div><div><b>TX</b><strong>'+(points.length?statsBytes(latest.txBytesPerSec)+'/с':'Нет данных')+'</strong>'+statsSpark(points,'txBytesPerSec')+'</div></div><small class="note">'+(panelIsEnglish()?'Samples: ':'Измерений: ')+esc(String(traffic.sampleCount??0))+(panelIsEnglish()?' · Source: TimescaleDB</small>':' · Источник: TimescaleDB</small>');
     $('#stats-nodes').innerHTML=nodes.length?nodes.map(n=>{
       const v=n.latest,stale=v?.stale,ok=v&&!stale;
       const head=flagView(n.flag)+' <b>'+esc(n.name)+'</b>'+(n.hosting?'<small>'+esc(n.hosting)+'</small>':'');
