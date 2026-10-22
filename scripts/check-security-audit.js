@@ -14,7 +14,7 @@ const migration=read('backend/migrations/0011_global_auth_budget.sql');
 new Function(app);new Function(studio);
 
 // Authentication: server-side protections, session lifetime and revocation.
-assert.match(main,/route_layer\(\s*middleware::from_fn_with_state\(\s*state\.clone\(\)\s*,\s*auth::require_session\s*\)\s*\)/);
+assert.match(main,/route_layer\(\s*middleware::from_fn_with_state\(\s*state\.clone\(\)\s*,\s*auth::require_session\s*,?\s*\)\s*\)/);
 assert.match(main,/fn require_owner/);
 assert.match(main,/middleware::from_fn\(\s*csrf_guard\s*\)/);
 assert.match(main,/content-security-policy/);
