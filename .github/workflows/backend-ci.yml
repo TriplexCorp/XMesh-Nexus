@@ -37,12 +37,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-      - name: Format Rust sources
-        run: cargo fmt --manifest-path backend/Cargo.toml
-      - name: Test and lint
-        run: |
-          cargo test --manifest-path backend/Cargo.toml
-          cargo clippy --manifest-path backend/Cargo.toml --all-targets -- -D warnings
       - name: Check frontend syntax
         run: |
           node --version
@@ -98,6 +92,14 @@ jobs:
         run: node scripts/check-studio-context.js
       - name: Check XRAY Studio selector safety
         run: node scripts/check-xray-studio-selectors.js
+      # Run source-contract assertions before rustfmt mutates the CI checkout.
+      # Runtime Rust tests and Clippy still run before the Docker build.
+      - name: Format Rust sources
+        run: cargo fmt --manifest-path backend/Cargo.toml
+      - name: Test and lint
+        run: |
+          cargo test --manifest-path backend/Cargo.toml
+          cargo clippy --manifest-path backend/Cargo.toml --all-targets -- -D warnings
       - name: Validate installer and Docker Compose
         env:
           POSTGRES_PASSWORD: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
