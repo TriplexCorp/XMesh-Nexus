@@ -269,6 +269,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/nodes/{id}/metrics-key", post(node_auth::enroll).delete(node_auth::revoke))
         .route("/nodes/{id}/runtime", get(node_runtime::status))
         .route("/users/{id}/subscription", get(user_subscriptions::status).post(user_subscriptions::create).delete(user_subscriptions::revoke))
+        .route("/users/{id}/client-json", get(user_subscriptions::admin_client_json))
         .route("/nodes/{id}/enrollment", post(node_enrollment::issue))
         .route("/admins", get(admin_accounts::list).post(admin_accounts::create))
         .route("/admins/{id}", patch(admin_accounts::update).delete(admin_accounts::delete))
