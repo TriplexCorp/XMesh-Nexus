@@ -137,8 +137,7 @@ fn vless_outbound(user:&Value,inbound:&Value,host:&Value)->Option<Value>{
   let sni=nonempty(host,"sni").or_else(||nonempty(host,"externalSNI"))
    .or_else(||stream.get("tlsSettings").and_then(|v|nonempty(v,"serverName")))?;
   let mut tls=json!({"serverName":sni});
-  if let Some(alpn)=stream.get("tlsSettings").and_then(|v|v.get("alpn"))
-   && let Some(values)=alpn.as_array(){
+  if let Some(values)=stream.get("tlsSettings").and_then(|v|v.get("alpn")).and_then(Value::as_array){
    tls["alpn"]=json!(values);
   }
   outbound_stream["tlsSettings"]=tls;
@@ -153,9 +152,20 @@ fn vless_outbound(user:&Value,inbound:&Value,host:&Value)->Option<Value>{
  };
  let mut transport=json!({});
  if let Some(config)=config{
-  if network=="xhttp"||network=="ws"||network=="grpc"{
-   for key in ["path","host","mode","serviceName"]{
-    if let Some(v)=nonempty(config,key){transport[key]=json!(v)}
+  let fields=match network{
+   "xhttp"=>&["path","host","mode","xPaddingBytes","scMaxEachPostBytes","scMinPostsIntervalMs"][..],
+   "ws"=>&["path"][..],
+   "grpc"=>&["serviceName","multiMode"][..],
+   _=>&[][..]
+  };
+  for key in fields {
+   if let Some(v)=config.get(*key) {
+    if v.is_string()||v.is_boolean()||v.is_number(){transport[*key]=v.clone()}
+   }
+  }
+  if network=="xhttp"{
+   for key in ["xmux","headers"]{
+    if let Some(value)=config.get(key).filter(|v|v.is_object()){transport[key]=value.clone()}
    }
   }
  }
@@ -292,6 +302,11 @@ pub async fn serve(State(state):State<AppState>,Path(token):Path<String>,Query(o
  // Native Xray JSON is the default for new HTTPS subscriptions.
  // Existing link-list users may explicitly request ?format=vless.
  let legacy=options.get("format").is_some_and(|v|v=="vless");
+ for (i,outbound) in outbounds.iter_mut().enumerate(){
+  if let Some(tag)=outbound.get("tag").and_then(Value::as_str){
+   outbound["tag"]=json!(format!("{}-{}",tag,i+1));
+  }
+ }
  let mut response=if legacy{
   links.join("\n").into_response()
  }else{
@@ -397,7 +412,8 @@ pub async fn portal(
 )->Result<Response,ApiError>{
  if !valid_token(&token){return Err(ApiError::new(StatusCode::NOT_FOUND,"Subscription not found"))}
  let accept=headers.get(header::ACCEPT).and_then(|v|v.to_str().ok()).unwrap_or("");
- if !accept.contains("text/html") || options.get("raw").is_some_and(|v|v=="1") {
+ if !accept.contains("text/html") || options.get("raw").is_some_and(|v|v=="1")
+  || options.contains_key("format") {
   return serve(State(state),Path(token),Query(options)).await;
  }
  let hash=token_hash(&token);
