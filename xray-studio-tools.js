@@ -46,7 +46,7 @@ const operations={
  policy(){mutate(d=>{d.policy??=clone(snippets.policy);d.stats??=clone(snippets.stats)},'Policy и Stats добавлены')},
  outbounds(){mutate(d=>{d.outbounds??=[];const existing=new Set(d.outbounds.map(x=>x.tag));for(const x of snippets.outbounds)if(!existing.has(x.tag))d.outbounds.push(clone(x))},'Outbounds добавлены')},
  log(){mutate(d=>{d.log??=clone(snippets.log)},'Логирование добавлено')},
- inbound(){mutate(d=>{d.inbounds??=[];const tag=prompt('Тег нового inbound:','new-inbound');if(tag===null)return false;if(!/^[\w.-]{1,64}$/.test(tag)||d.inbounds.some(i=>i.tag===tag))throw Error('Тег пустой, невалидный или уже существует');d.inbounds.push({tag,listen:'0.0.0.0',port:443,protocol:'vless',settings:{clients:[],decryption:'none'},streamSettings:{network:'raw',security:'none'}})},'Новый inbound добавлен'),
+ inbound(){mutate(d=>{d.inbounds??=[];const tag=prompt('Тег нового inbound:','new-inbound');if(tag===null)return false;if(!/^[\w.-]{1,64}$/.test(tag)||d.inbounds.some(i=>i.tag===tag))throw Error('Тег пустой, невалидный или уже существует');d.inbounds.push({tag,listen:'0.0.0.0',port:443,protocol:'vless',settings:{clients:[],decryption:'none'},streamSettings:{network:'raw',security:'none'}})},'Новый inbound добавлен')},
  xhttp(){mutate(d=>{const inbound=getInbound(d);if(!inbound)return false;inbound.streamSettings??={};if(inbound.streamSettings.network!=='xhttp'&&inbound.streamSettings.network!=='raw'&&!confirm('Сменить транспорт выбранного inbound на XHTTP?'))return false;inbound.streamSettings.network='xhttp';inbound.streamSettings.xhttpSettings??={path:'/xhttp',mode:'auto'}},'XHTTP добавлен')},
  format(){try{commit(JSON.stringify(parse(),null,2),'JSON отформатирован')}catch(e){notify(e.message)}}
 };
