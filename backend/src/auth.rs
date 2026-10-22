@@ -17,7 +17,6 @@ use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
 const SESSION_COOKIE: &str = "xmesh_session";
-const SESSION_SECONDS: i64 = 12 * 60 * 60;
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct AuthUser {
@@ -71,6 +70,7 @@ pub async fn login(
     if body.username.len() > 128 || body.password.len() > 1024 {
         return Err(ApiError::new(StatusCode::UNAUTHORIZED, "Неверный логин или пароль."));
     }
+    let policy=crate::security::get_policy(&state.pool).await?;
     let username_key = body.username.trim().to_lowercase();
     if username_key.is_empty() {
         record_failed_login(&state, &username_key).await?;
@@ -89,9 +89,9 @@ pub async fn login(
     .bind(&username_key)
     .fetch_one(&state.pool)
     .await?;
-    let locked = redis_attempts >= 8 || db_locked;
+    let locked = redis_attempts >= policy.login_attempts || db_locked;
     if locked {
-        return Err(ApiError::new(StatusCode::TOO_MANY_REQUESTS, "Слишком много попыток. Повторите вход через 15 минут."));
+        return Err(ApiError::new(StatusCode::TOO_MANY_REQUESTS, format!("Слишком много попыток. Повторите вход через {} минут.",policy.lockout_minutes)));
     }
     let row = sqlx::query(
         "SELECT id, username, role, password_hash, is_active \
@@ -103,7 +103,7 @@ pub async fn login(
 
     let Some(row) = row else {
         if locked {
-            return Err(ApiError::new(StatusCode::TOO_MANY_REQUESTS, "Слишком много попыток. Повторите вход через 15 минут."));
+            return Err(ApiError::new(StatusCode::TOO_MANY_REQUESTS, format!("Слишком много попыток. Повторите вход через {} минут.",policy.lockout_minutes)));
         }
         record_failed_login(&state, &username_key).await?;
         return Err(ApiError::new(StatusCode::UNAUTHORIZED, "Неверный логин или пароль."));
@@ -119,7 +119,7 @@ pub async fn login(
     let verified = Argon2::default().verify_password(body.password.as_bytes(), &parsed_hash).is_ok();
     if !is_active || !verified {
         if locked {
-            return Err(ApiError::new(StatusCode::TOO_MANY_REQUESTS, "Слишком много попыток. Повторите вход через 15 минут."));
+            return Err(ApiError::new(StatusCode::TOO_MANY_REQUESTS, format!("Слишком много попыток. Повторите вход через {} минут.",policy.lockout_minutes)));
         }
         record_failed_login(&state, &username_key).await?;
         return Err(ApiError::new(StatusCode::UNAUTHORIZED, "Неверный логин или пароль."));
@@ -158,7 +158,8 @@ pub(crate) async fn is_rate_limited(state:&AppState,username_key:&str)->Result<b
     let locked:bool=sqlx::query_scalar(
         "SELECT COALESCE((SELECT locked_until>NOW() FROM auth_login_limits WHERE username_key=$1),FALSE)"
     ).bind(username_key).fetch_one(&state.pool).await?;
-    Ok(count>=8 || locked)
+    let policy=crate::security::get_policy(&state.pool).await?;
+    Ok(count>=policy.login_attempts || locked)
 }
 
 pub(crate) async fn clear_failed_login(state:&AppState,username_key:&str)->Result<(),ApiError>{
@@ -180,19 +181,27 @@ pub(crate) async fn issue_session_in_transaction(
     tx:&mut sqlx::Transaction<'_,sqlx::Postgres>,
     admin_id:i64,username:&str,role:&str,
 )->Result<(StatusCode,HeaderMap,Json<Value>),ApiError>{
+    let policy=crate::security::get_policy(&state.pool).await?;
     let token = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
     let token_hash = hash_token(&token);
     sqlx::query("DELETE FROM panel_sessions WHERE expires_at < NOW()")
         .execute(&mut **tx)
         .await?;
     sqlx::query(
-        "INSERT INTO panel_sessions (token_hash, admin_id, expires_at) \
-         VALUES ($1, $2, NOW() + INTERVAL '12 hours')",
+        "INSERT INTO panel_sessions (token_hash, admin_id, expires_at, last_seen_at) \
+         VALUES ($1, $2, NOW() + make_interval(secs=>$3::double precision), NOW())",
     )
-    .bind(token_hash)
+    .bind(&token_hash)
     .bind(admin_id)
+    .bind((policy.session_hours*3600) as f64)
     .execute(&mut **tx)
     .await?;
+    // Successful logins are serialized with the locked account row.
+    // Drop oldest sessions to enforce the administrator-configured cap.
+    sqlx::query("DELETE FROM panel_sessions WHERE token_hash IN (\
+        SELECT token_hash FROM panel_sessions WHERE admin_id=$1 \
+        ORDER BY created_at DESC,token_hash DESC OFFSET $2)")
+        .bind(admin_id).bind(policy.max_sessions).execute(&mut **tx).await?;
     sqlx::query("UPDATE panel_auth_users SET last_login_at = NOW() WHERE id = $1")
         .bind(admin_id)
         .execute(&mut **tx)
@@ -201,7 +210,7 @@ pub(crate) async fn issue_session_in_transaction(
     let mut headers = HeaderMap::new();
     headers.insert(
         header::SET_COOKIE,
-        make_session_cookie(&token, state.cookie_secure)
+        make_session_cookie(&token, state.cookie_secure, policy.session_hours*3600)
             .map_err(|_| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Не удалось создать сессию."))?,
     );
     Ok((
@@ -213,6 +222,7 @@ pub(crate) async fn issue_session_in_transaction(
 
 pub(crate) async fn record_failed_login(state: &AppState, username_key: &str) -> Result<(), ApiError> {
     // Redis provides cross-instance throttling; PostgreSQL remains the durable fallback.
+    let policy=crate::security::get_policy(&state.pool).await?;
     let mut redis_conn = state.redis.clone();
     let redis_key = format!("xmesh:auth:login:{username_key}");
     if let Ok(attempts) = redis::cmd("INCR")
@@ -223,7 +233,7 @@ pub(crate) async fn record_failed_login(state: &AppState, username_key: &str) ->
     {
         let _ = redis::cmd("EXPIRE")
             .arg(&redis_key)
-            .arg(900)
+            .arg(policy.lockout_minutes*60)
             .query_async::<i64>(&mut redis_conn)
             .await;
     }
@@ -234,13 +244,15 @@ pub(crate) async fn record_failed_login(state: &AppState, username_key: &str) ->
          ON CONFLICT (username_key) DO UPDATE SET \
            attempts = CASE WHEN auth_login_limits.window_started_at < NOW() - INTERVAL '15 minutes' \
                            THEN 1 ELSE auth_login_limits.attempts + 1 END, \
-           window_started_at = CASE WHEN auth_login_limits.window_started_at < NOW() - INTERVAL '15 minutes' \
+           window_started_at = CASE WHEN auth_login_limits.window_started_at < NOW() - make_interval(secs=>$2::double precision) \
                                      THEN NOW() ELSE auth_login_limits.window_started_at END, \
-           locked_until = CASE WHEN (CASE WHEN auth_login_limits.window_started_at < NOW() - INTERVAL '15 minutes' \
-                                          THEN 1 ELSE auth_login_limits.attempts + 1 END) >= 8 \
-                               THEN NOW() + INTERVAL '15 minutes' ELSE NULL END",
+           locked_until = CASE WHEN (CASE WHEN auth_login_limits.window_started_at < NOW() - make_interval(secs=>$2::double precision) \
+                                          THEN 1 ELSE auth_login_limits.attempts + 1 END) >= $3 \
+                               THEN NOW() + make_interval(secs=>$2::double precision) ELSE NULL END",
     )
     .bind(username_key)
+    .bind((policy.lockout_minutes*60) as f64)
+    .bind(policy.login_attempts)
     .execute(&state.pool)
     .await?;
     Ok(())
@@ -304,16 +316,24 @@ pub async fn require_session(
 
 async fn user_from_headers(state: &AppState, headers: &HeaderMap) -> Option<AuthUser> {
     let token = cookie_token(headers)?;
+    let policy=crate::security::get_policy(&state.pool).await.ok()?;
     let row = sqlx::query(
         "SELECT a.id, a.username, a.role \
          FROM panel_sessions s \
          JOIN panel_auth_users a ON a.id = s.admin_id \
-         WHERE s.token_hash = $1 AND s.expires_at > NOW() AND a.is_active = TRUE",
+         WHERE s.token_hash = $1 AND s.expires_at > NOW() AND a.is_active = TRUE \
+         AND s.created_at > NOW() - make_interval(secs=>$2::double precision) \
+         AND ($3::double precision=0 OR COALESCE(s.last_seen_at,s.created_at) > NOW() - make_interval(secs=>$3::double precision))",
     )
     .bind(hash_token(&token))
+    .bind((policy.session_hours*3600) as f64)
+    .bind((policy.idle_minutes*60) as f64)
     .fetch_optional(&state.pool)
     .await
     .ok()??;
+    let _=sqlx::query("UPDATE panel_sessions SET last_seen_at=NOW() \
+        WHERE token_hash=$1 AND COALESCE(last_seen_at,created_at)<NOW()-INTERVAL '60 seconds'")
+        .bind(hash_token(&token)).execute(&state.pool).await;
     Some(AuthUser {
         id: row.try_get("id").ok()?,
         username: row.try_get("username").ok()?,
@@ -340,9 +360,9 @@ fn hash_token(token: &str) -> String {
     hex::encode(Sha256::digest(token.as_bytes()))
 }
 
-fn make_session_cookie(token: &str, secure: bool) -> Result<HeaderValue, axum::http::header::InvalidHeaderValue> {
+fn make_session_cookie(token: &str, secure: bool, session_seconds:i64) -> Result<HeaderValue, axum::http::header::InvalidHeaderValue> {
     HeaderValue::from_str(&format!(
-        "{SESSION_COOKIE}={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={SESSION_SECONDS}{}",
+        "{SESSION_COOKIE}={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={session_seconds}{}",
         if secure { "; Secure" } else { "" }
     ))
 }
