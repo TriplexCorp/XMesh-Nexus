@@ -2036,7 +2036,7 @@ function securityP(){
   return [`<div class="security-workspace">
     <div class="security-overview">
       <div><p class="note">АККАУНТ / БЕЗОПАСНОСТЬ</p><h2>Безопасность аккаунта</h2>
-      <p>Управляйте защитой входа в панель. Настройки относятся к вашей учётной записи администратора.</p></div>
+      <p>Двухфакторная защита вашего аккаунта, серверные правила входа и управление активными сессиями.</p></div>
     </div>
     ${factor}
     ${window.XMeshSecurity?.panel()||''}
