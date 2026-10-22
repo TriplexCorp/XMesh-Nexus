@@ -487,12 +487,13 @@ async fn update_record(
     let mut data: Value = existing.try_get("data")?;
     let object = data.as_object_mut()
         .ok_or_else(|| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Повреждён формат записи."))?;
-    if collection=="users" {
-        if let Some(existing_id)=object.get("xrayId").and_then(Value::as_str) {
-            if !existing_id.is_empty() && patch_object.get("xrayId").is_some_and(|v|v.as_str()!=Some(existing_id)) {
-                return Err(ApiError::new(StatusCode::FORBIDDEN,"Xray UUID пользователя нельзя менять через общий API."));
-            }
-        }
+    if collection == "users"
+        && let Some(existing_id) = object.get("xrayId").and_then(Value::as_str)
+        && !existing_id.is_empty()
+        && patch_object.get("xrayId").is_some_and(|v| v.as_str() != Some(existing_id))
+    {
+        return Err(ApiError::new(StatusCode::FORBIDDEN,
+            "Xray UUID пользователя нельзя менять через общий API."));
     }
     for (key, value) in patch_object.clone() {
         object.insert(key, value);
