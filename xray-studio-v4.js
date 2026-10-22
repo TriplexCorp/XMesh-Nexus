@@ -18,7 +18,7 @@ const inboundSettingsFor=(protocol)=>{
  }
 };
 const newInbound=(protocol='vless',tag='inbound-1')=>({
- tag,listen:'0.0.0.0',port:443,protocol,
+ tag,listen:'127.0.0.1',port:443,protocol,
  settings:inboundSettingsFor(protocol),
  streamSettings:{network:'raw',security:'none'}
 });
@@ -34,10 +34,10 @@ function migrateInboundProtocol(inbound,next){
  else if(previous==='hysteria')inbound.streamSettings={network:'raw',security:'none'};
  if(next==='shadowsocks')alert('Укажите надёжный пароль Shadowsocks в JSON. Без ключа конфигурация не пройдёт проверку Xray-core.');
 }
-const defaultDoc=()=>({log:{loglevel:'warning'},inbounds:[{tag:'vless-main',listen:'0.0.0.0',port:443,protocol:'vless',settings:{users:[],decryption:'none'},streamSettings:{network:'xhttp',security:'none',xhttpSettings:{path:'/xhttp',mode:'auto'}}}],outbounds:[{tag:'direct',protocol:'freedom'}],routing:{domainStrategy:'AsIs',rules:[]}});
+const defaultDoc=()=>({log:{loglevel:'warning'},inbounds:[{tag:'vless-main',listen:'127.0.0.1',port:443,protocol:'vless',settings:{users:[],decryption:'none'},streamSettings:{network:'xhttp',security:'none',xhttpSettings:{path:'/xhttp',mode:'auto'}}}],outbounds:[{tag:'direct',protocol:'freedom'}],routing:{domainStrategy:'AsIs',rules:[]}});
 function view(){return [
 '<section id="xm-studio-v4" class="sv-studio">',
-'<header class="sv-title"><p class="sv-subtitle">Редактируйте конфигурации Xray в реальном времени. JSON и конструктор синхронизированы.</p></header>',
+'<header class="sv-title"><p class="sv-subtitle">JSON-редактор и инструменты Xray. Новые inbound без TLS/REALITY создаются на 127.0.0.1 — откройте внешний доступ только после настройки защиты.</p></header>',
 
 
 '<div class="sv-topbar"><nav class="sv-page-tabs" aria-label="Разделы XRAY STUDIO"><button class="active" type="button" data-action="studio-editor" aria-current="page">Редактор</button><button type="button" data-action="profiles">Профили <span data-v="profilesCount"></span></button></nav><div class="sv-actions"><button type="button" data-action="check">Проверить</button><button type="button" data-action="templates">Шаблоны</button><button type="button" data-action="import">Импорт</button><button type="button" data-action="export">Экспорт</button><button class="sv-primary" type="button" data-action="save">Сохранить</button></div></div>',
