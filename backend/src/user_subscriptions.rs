@@ -1,10 +1,9 @@
 use crate::{auth::AuthUser,ApiError,AppState};
-use axum::{extract::{Extension,Path,State,Query,Request},http::{header,StatusCode,Method,Uri,HeaderMap},response::{Html,IntoResponse,Response},Json};
+use axum::{extract::{Extension,Path,State,Query,OriginalUri},http::{header,StatusCode,HeaderMap},response::{Html,IntoResponse,Response},Json};
 use serde_json::{json,Value};
 use sha2::{Digest,Sha256};
 use sqlx::Row;
 use uuid::Uuid;
-use axum::middleware::Next;
 use std::collections::HashMap;
 use aes_gcm::{aead::{Aead, KeyInit, Payload, OsRng, rand_core::RngCore}, Aes256Gcm, Nonce};
 
@@ -251,24 +250,19 @@ fn app_catalog(settings:&Value,language:&str)->String{
   if studio_string(settings,"subscriptionClientLayout","grid")=="list"{"list"}else{"grid"},
   apps)
 }
-pub async fn rewrite_subscription_path(
- State(state):State<AppState>,mut req:Request,next:Next,
-)->Response{
- if req.method()==Method::GET {
-  let path=req.uri().path().to_owned();
-  if let Some((prefix,token))=path.rsplit_once('/')
-    && valid_token(token) && !prefix.starts_with("/api/")
-    && let Ok(settings)=crate::read_settings(&state.pool).await {
-   let configured=studio_string(&settings,"subscriptionPath","/s").trim_end_matches('/');
-   if prefix==configured {
-    let query=req.uri().query().map(|q|format!("?{q}")).unwrap_or_default();
-    if let Ok(uri)=format!("/api/v1/portal/{token}{query}").parse::<Uri>(){
-     *req.uri_mut()=uri;
-    }
-   }
-  }
- }
- next.run(req).await
+// Match the exact persisted Studio path. Unknown public routes are never
+// treated as subscriptions, even though the router supports variable prefixes.
+pub async fn portal_route(
+ State(state):State<AppState>,OriginalUri(uri):OriginalUri,
+ headers:HeaderMap,Query(options):Query<HashMap<String,String>>,
+)->Result<Response,ApiError>{
+ let (prefix,token)=uri.path().rsplit_once('/').ok_or_else(||
+  ApiError::new(StatusCode::NOT_FOUND,"Subscription not found"))?;
+ if !valid_token(token){return Err(ApiError::new(StatusCode::NOT_FOUND,"Subscription not found"))}
+ let settings=crate::read_settings(&state.pool).await?;
+ let configured=studio_string(&settings,"subscriptionPath","/s").trim_end_matches('/');
+ if prefix!=configured {return Err(ApiError::new(StatusCode::NOT_FOUND,"Subscription not found"))}
+ portal(State(state),Path(token.to_owned()),headers,Query(options)).await
 }
 pub async fn portal(
  State(state):State<AppState>,Path(token):Path<String>,
