@@ -557,18 +557,18 @@ async fn patch_settings(
     for key in object.keys() {
         if !matches!(key.as_str(), "brand" | "domain" | "hooks"
                 | "subscriptionDomain" | "subscriptionPath" | "subscriptionBrand"
-                | "subscriptionDescription" | "subscriptionFooter" | "subscriptionAccent"
+                | "subscriptionDescription" | "subscriptionDescriptionEn" | "subscriptionFooter" | "subscriptionFooterEn" | "subscriptionAccent"
                 | "subscriptionLanguage" | "subscriptionTheme" | "subscriptionSyncPanelTheme" | "subscriptionPlacement" | "nodePlacement"
                 | "deploymentServerB" | "deploymentServerC" | "subscriptionShowTraffic"
                 | "subscriptionShowExpiry" | "subscriptionBackground" | "subscriptionCardColor"
                 | "subscriptionTextColor" | "subscriptionLayout" | "subscriptionCardStyle"
                 | "subscriptionFont" | "subscriptionRadius" | "subscriptionClientLayout"
-                | "subscriptionHero" | "subscriptionCta" | "subscriptionSupportLabel"
+                | "subscriptionHero" | "subscriptionHeroEn" | "subscriptionCta" | "subscriptionCtaEn" | "subscriptionSupportLabel" | "subscriptionSupportLabelEn"
                 | "subscriptionLogoUrl" | "subscriptionSupportUrl" | "subscriptionShowStatus"
                 | "subscriptionShowApps" | "subscriptionShowQr" | "subscriptionShowCopy"
                 | "subscriptionShowSupport" | "subscriptionShowDevices"
                 | "subscriptionClients" | "subscriptionClientLinks"
-                | "subscriptionAppsTitle" | "subscriptionCustomClients") {
+                | "subscriptionAppsTitle" | "subscriptionAppsTitleEn" | "subscriptionCustomClients") {
             return Err(ApiError::new(StatusCode::BAD_REQUEST, format!("Неизвестное поле настроек: {key}")));
         }
     }
@@ -603,7 +603,7 @@ async fn patch_settings(
             return Err(ApiError::new(StatusCode::BAD_REQUEST, "Путь конфликтует со служебными маршрутами панели."));
         }
     }
-    for (key, max_len) in [("subscriptionBrand", 80), ("subscriptionDescription", 240), ("subscriptionFooter", 160), ("deploymentServerB", 253), ("deploymentServerC", 253)] {
+    for (key, max_len) in [("subscriptionBrand", 80), ("subscriptionDescription", 240), ("subscriptionDescriptionEn", 240), ("subscriptionFooter", 160), ("subscriptionFooterEn", 160), ("deploymentServerB", 253), ("deploymentServerC", 253)] {
         if let Some(value) = object.get(key) {
             let text = value.as_str().ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, format!("Поле {key} должно быть текстом.")))?;
             if text.chars().count() > max_len || text.chars().any(char::is_control) {
