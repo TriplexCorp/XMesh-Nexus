@@ -1621,7 +1621,7 @@ async function nodesP(){
         ${nodeGauge(n,'traffic-'+n.id,'Трафик',n.limit?k*100:0,n.limit?Math.round(k*100)+'%':'∞',n.limit?`${gb(n.used)} / ${gb(n.limit)}`:`${gb(n.used)} · без лимита`,tc)}
       </div>
       <div class="mb node-speed"><div><span>Текущая скорость</span><b id="nm${n.id}">${Number.isFinite(l.mbps)?fmt(l.mbps)+' Мбит/с':'—'}</b></div><div class="pb f" style="--w:${Number.isFinite(l.mbps)?cl(l.mbps/240*100,0,100):0}%" id="npm${n.id}"><i></i></div></div>
-      <div class="acts"><button class="gh sm" data-node-metrics="${n.id}" title="Настроить Ed25519-аутентификацию и мониторинг узла">${ic('activity')}Настроить метрики</button><button class="gh sm" data-nr="${n.id}">${ic('redo')}Перезапуск</button><button class="gh sm" data-nt="${n.id}">${ic(n.disabled?'play':'pause')}${n.disabled?'Включить':'Отключить'}</button><button class="gh sm" data-ne="nodes:${n.id}">${ic('pen')}Изменить</button></div></div>`;
+      <div class="acts"><button class="gh sm" data-node-bootstrap="${n.id}">${ic('link')}Подключить ноду</button><button class="gh sm" data-node-metrics="${n.id}" title="Настроить Ed25519-аутентификацию и мониторинг узла">${ic('activity')}Настроить метрики</button><button class="gh sm" data-nr="${n.id}">${ic('redo')}Перезапуск</button><button class="gh sm" data-nt="${n.id}">${ic(n.disabled?'play':'pause')}${n.disabled?'Включить':'Отключить'}</button><button class="gh sm" data-ne="nodes:${n.id}">${ic('pen')}Изменить</button></div></div>`;
   }).join('');
   const empty=`<div class="card empty"><b>Узлов пока нет</b><span>Список начнёт заполняться после добавления ваших серверов.</span><button class="btn sm" data-ne="nodes">${ic('plus')}Добавить узел</button></div>`;
   const gridMode=getNodeGridMode();
@@ -1864,6 +1864,21 @@ document.addEventListener('click',async e=>{
   else if(b=g('tr[data-e]')){const [k,id]=b.dataset.e.split(':');entForm(k,id)}
   else if(b=g('[data-mv]')){const [k,id,d]=b.dataset.mv.split(':'),a=[...DB[k]].sort((x,y)=>x.order-y.order),i=a.findIndex(x=>x.id==id),j=i+ +d;if(a[j]){const o=a[i].order;await api.update(k,a[i].id,{order:a[j].order});await api.update(k,a[j].id,{order:o});render(1)}}
   else if(b=g('[data-del]')){const [k,id]=b.dataset.del.split(':'),e=ENT[k],r=DB[k].find(x=>String(x.id)===id),m=e?.guard?.(r);if(m){const error=$('#fe');if(error)error.textContent=m;else toast(m);return}if(!r){toast('Запись уже удалена или не найдена.');return}confirmBox(`Удалить «${e?.t||k}»?`,'Удалить',async()=>{try{await api.remove(k,id);toast('Запись удалена');await render(1)}catch(err){toast('Не удалось удалить: '+(err.message||'ошибка backend'))}})}
+  else if(b=g('[data-node-bootstrap]')){
+    const id=Number(b.dataset.nodeBootstrap);
+    if(location.protocol!=='https:'){toast('Для подключения требуется HTTPS');return}
+    b.disabled=true;
+    try{
+      const issued=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/enrollment',{method:'POST'});
+      const url='https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/main/bootstrap.sh';
+      const command='curl --proto "=https" --tlsv1.2 -fsSLo /tmp/xmesh-bootstrap.sh '+url+' && sudo bash /tmp/xmesh-bootstrap.sh '+location.origin+' '+id+' '+issued.token;
+      modal('<div class="box"><div class="bar2"><h2>Подключение XMesh Node</h2><button class="ia" data-x aria-label="Закрыть">'+ic('x')+'</button></div><p class="note">Одноразовая команда действует 10 минут. Выполните её на целевом VPS с Docker. Публичный ключ зарегистрируется автоматически. Не публикуйте эту команду.</p><textarea id="node-bootstrap-command" readonly spellcheck="false" rows="4">'+esc(command)+'</textarea><div class="act"><button type="button" class="btn" data-copy-node-bootstrap>'+ic('copy')+'Скопировать команду</button></div><p class="note">Установка начнёт с безопасного тестового порта 8443, не заменяя существующий Nginx на 443.</p></div>','wide');
+    }catch(error){toast('Ошибка выдачи команды: '+(error.message||'API'))}
+    finally{b.disabled=false}
+  }
+  else if(b=g('[data-copy-node-bootstrap]')){
+    const el=$('#node-bootstrap-command');if(el){try{await navigator.clipboard.writeText(el.value);toast('Команда скопирована')}catch(_){el.select();document.execCommand('copy');toast('Команда скопирована')}}
+  }
   else if(b=g('[data-node-metrics]')){
     const id=Number(b.dataset.nodeMetrics),node=DB.nodes.find(n=>Number(n.id)===id);
     if(!node){toast('Узел не найден.');return}
