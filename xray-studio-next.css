@@ -92,3 +92,82 @@
 .xm-studio.xm-expanded .xm-preview{position:fixed!important;top:2.5vh!important}
 @media(max-width:1100px){.xm-studio .xm-editor{grid-template-columns:minmax(0,1fr)}.xm-studio .xm-editor>[data-xm-panel]{grid-column:1}}
 @media(max-width:700px){.xm-studio .xm-command-actions,.xm-studio .xm-command-actions>.xm-quiet{width:100%}.xm-studio .xm-command-actions>.xm-quiet{flex:1}.xm-studio .xm-head{align-items:flex-start}}
+
+
+/* XRAY STUDIO — professional, restrained workspace */
+.xm-studio{gap:0!important}
+.xm-studio .xm-head{padding:.2rem 0 1.15rem!important;margin-bottom:1.1rem!important;border-bottom:1px solid var(--ln)}
+.xm-studio .xm-head h2{font-size:clamp(1.35rem,1.55vw,1.75rem)!important;letter-spacing:-.03em!important;margin:.25rem 0!important}
+.xm-studio .xm-head p{font-size:.8rem!important}
+.xm-studio .xm-commandbar{
+ padding:.65rem 0!important;margin:0 0 .9rem!important;
+ background:transparent!important;border:0!important;border-radius:0!important;
+ border-bottom:1px solid var(--ln)!important;
+}
+.xm-studio .xm-command-copy strong{font-size:.9rem!important}
+.xm-studio .xm-command-copy span{font-size:.74rem!important}
+.xm-studio .xm-command-actions{gap:.45rem!important}
+.xm-studio .xm-command-actions>.xm-quiet{
+ padding:.5rem .85rem!important;font-weight:600!important;
+ border-radius:var(--ui-control-radius,12px)!important;
+}
+.xm-studio .xm-editor{
+ grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr)!important;
+ align-items:start!important;gap:1rem!important
+}
+.xm-studio .xm-panel{
+ padding:1.1rem 1.2rem!important;
+ background:var(--s1)!important;
+ border:1px solid var(--ln)!important;
+ box-shadow:none!important;
+ border-radius:var(--ui-radius,16px)!important;
+}
+.xm-studio .xm-section-title{
+ gap:.7rem!important;
+ padding-bottom:.85rem!important;margin-bottom:.9rem!important;
+ border-bottom:1px solid var(--ln)!important;
+ align-items:center!important
+}
+.xm-studio .xm-section-title>span{
+ flex-basis:1.7rem!important;width:1.7rem!important;height:1.7rem!important;
+ background:var(--s2)!important;color:var(--mu)!important;
+ border-radius:calc(var(--ui-control-radius,12px)*.65)!important
+}
+.xm-studio .xm-section-title h3{font-size:.92rem!important}
+.xm-studio .xm-section-title p{font-size:.71rem!important}
+.xm-studio .xm-fields{gap:.7rem!important}
+.xm-studio .xm-field{font-size:.76rem!important}
+.xm-studio .xm-field input,.xm-studio .xm-field select{
+ min-height:2.7rem!important;padding:.62rem .8rem!important;
+ font-weight:500!important;
+ background:var(--s2)!important;
+ border:1px solid var(--ln)!important;
+ box-shadow:none!important
+}
+.xm-studio .xm-field input:focus-visible,.xm-studio .xm-field select:focus-visible{border-color:var(--a)!important}
+.xm-studio .xm-preview{
+ background:var(--s1)!important;box-shadow:none!important;border:1px solid var(--ln)!important;
+ border-radius:var(--ui-radius,16px)!important
+}
+.xm-studio .xm-footer{
+ margin-top:1rem!important;padding:.7rem 0!important;
+ background:transparent!important;border:0!important;border-top:1px solid var(--ln)!important;
+ border-radius:0!important
+}
+.xm-studio .xm-footer .btn{min-height:2.65rem!important}
+.xm-saved-profiles{margin-top:2.3rem;padding-top:1.2rem;border-top:1px solid var(--ln)}
+.xm-saved-heading{margin-bottom:1rem}
+.xm-saved-heading h3{font-size:1.1rem;margin:0 0 .25rem}
+.xm-saved-heading p{font-size:.8rem;color:var(--mu);margin:0}
+.xm-saved-profiles>.card{border:1px solid var(--ln)!important;background:var(--s1)!important;box-shadow:none!important}
+.xm-saved-profiles>.card>.hd{display:none!important}
+.xm-saved-profiles .empty{padding:1.7rem!important;min-height:145px!important}
+.xm-saved-profiles .empty button{display:none!important}
+@media(max-width:1100px){
+ .xm-studio .xm-editor{grid-template-columns:minmax(0,1fr)!important}
+}
+@media(max-width:650px){
+ .xm-studio .xm-commandbar{align-items:stretch!important}
+ .xm-studio .xm-command-actions>.xm-quiet{flex:1 1 auto!important;width:auto!important}
+ .xm-studio .xm-panel{padding:.95rem!important}
+}
