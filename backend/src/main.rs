@@ -245,10 +245,12 @@ async fn main() -> anyhow::Result<()> {
 
     let static_dir = env::var("STATIC_DIR").unwrap_or_else(|_| "/app/static".to_owned());
     let app = Router::new()
-        .route("/", get(panel_entry))
-        .route("/index.html", get(index_redirect))
+        .route("/", get(|| async { StatusCode::NOT_FOUND }))
+        .route("/index.html", get(|| async { StatusCode::NOT_FOUND }))
+        .route("/login", get(|| async { StatusCode::NOT_FOUND }))
+        .route("/login.html", get(|| async { StatusCode::NOT_FOUND }))
         .route("/dashboard/{slug}", get(security::dashboard_entry))
-        .route("/login", get(login_page))
+        
         .nest("/api/v1", public.merge(protected))
         .fallback_service(ServeDir::new(static_dir).append_index_html_on_directories(false))
         .layer(RequestBodyLimitLayer::new(2 * 1024 * 1024))
@@ -263,38 +265,6 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!(address = %address, "XMesh Nexus API ready");
     axum::serve(listener, app).with_graceful_shutdown(shutdown_signal()).await?;
     Ok(())
-}
-
-async fn panel_entry(State(state): State<AppState>, headers: HeaderMap) -> Response {
-    if !auth::is_authenticated(&state, &headers).await {
-        return Redirect::to("/login").into_response();
-    }
-    let static_dir = env::var("STATIC_DIR").unwrap_or_else(|_| "/app/static".to_owned());
-    match tokio::fs::read_to_string(PathBuf::from(static_dir).join("index.html")).await {
-        Ok(page) => Html(page).into_response(),
-        Err(error) => {
-            tracing::error!(error = %error, "Could not read panel entry page");
-            (StatusCode::INTERNAL_SERVER_ERROR, "Panel assets unavailable").into_response()
-        }
-    }
-}
-
-async fn index_redirect() -> Redirect {
-    Redirect::to("/")
-}
-
-async fn login_page(State(state): State<AppState>, headers: HeaderMap) -> Response {
-    if auth::is_authenticated(&state, &headers).await {
-        return Redirect::to("/").into_response();
-    }
-    let static_dir = env::var("STATIC_DIR").unwrap_or_else(|_| "/app/static".to_owned());
-    match tokio::fs::read_to_string(PathBuf::from(static_dir).join("login.html")).await {
-        Ok(page) => Html(page).into_response(),
-        Err(error) => {
-            tracing::error!(error = %error, "Could not read login page");
-            (StatusCode::INTERNAL_SERVER_ERROR, "Login page unavailable").into_response()
-        }
-    }
 }
 
 async fn csrf_guard(request: Request, next: Next) -> Response {
