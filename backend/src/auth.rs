@@ -242,7 +242,7 @@ pub(crate) async fn record_failed_login(state: &AppState, username_key: &str) ->
         "INSERT INTO auth_login_limits (username_key, attempts, window_started_at, locked_until) \
          VALUES ($1, 1, NOW(), NULL) \
          ON CONFLICT (username_key) DO UPDATE SET \
-           attempts = CASE WHEN auth_login_limits.window_started_at < NOW() - INTERVAL '15 minutes' \
+           attempts = CASE WHEN auth_login_limits.window_started_at < NOW() - make_interval(secs=>$2::double precision) \
                            THEN 1 ELSE auth_login_limits.attempts + 1 END, \
            window_started_at = CASE WHEN auth_login_limits.window_started_at < NOW() - make_interval(secs=>$2::double precision) \
                                      THEN NOW() ELSE auth_login_limits.window_started_at END, \
