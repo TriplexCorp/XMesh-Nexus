@@ -5,6 +5,7 @@ mod security;
 mod core;
 mod node_rotation;
 mod node_auth;
+mod node_runtime;
 mod subscription_settings;
 
 use axum::{
@@ -263,6 +264,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/metrics/traffic", get(get_traffic_metrics))
         .route("/users/{id}/traffic", get(get_user_traffic))
         .route("/nodes/{id}/metrics-key", post(node_auth::enroll).delete(node_auth::revoke))
+        .route("/nodes/{id}/runtime", get(node_runtime::status))
         .route("/admins", get(admin_accounts::list).post(admin_accounts::create))
         .route("/admins/{id}", patch(admin_accounts::update).delete(admin_accounts::delete))
         .route("/nodes/{id}/rotation/next", post(node_rotation::rotate_next))
@@ -280,6 +282,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/health/live", get(health_live))
         .route("/health/ready", get(health_ready))
         .route("/metrics/ingest", post(ingest_node_metrics))
+        .route("/node/heartbeat", post(node_runtime::heartbeat))
         .route("/auth/session", get(auth::session))
         .route("/auth/login", post(auth::login))
         .route("/auth/mfa/verify", post(mfa::verify_challenge))
