@@ -75,7 +75,6 @@
 .subscription-preview-label{display:flex;justify-content:space-between;align-items:center;gap:.8rem;font-size:.82rem}
 .subscription-preview-label span{color:var(--st-muted);font-size:.71rem}
 .subscription-preview{
-  --portal-accent:#e8bb78;
   position:relative;display:grid;gap:1.65rem;background:
   radial-gradient(ellipse at 92% 3%,color-mix(in srgb,var(--portal-accent) 16%,transparent),transparent 55%),
   #0c131b;
@@ -150,7 +149,10 @@
 .subscription-client-row:has(input:not(:checked)) .subscription-client-symbol{opacity:.65}
 
 /* Live preview of the future standalone subscription service. */
-.subscription-preview{--portal-bg:#0c131b;--portal-card:#15212b;--portal-text:#ecf3f6;--portal-radius:16px;
+.subscription-studio{
+  --portal-accent:#e8bb78;--portal-bg:#0c131b;--portal-card:#15212b;--portal-text:#ecf3f6;--portal-radius:16px;
+}
+.subscription-preview{
   background:radial-gradient(ellipse at 92% 3%,color-mix(in srgb,var(--portal-accent) 16%,transparent),transparent 55%),var(--portal-bg);
   color:var(--portal-text);
   border-radius:var(--portal-radius);
