@@ -132,6 +132,7 @@ jobs:
       ADMIN_PASSWORD: 9876543210abcdef9876543210abcdef9876543210abcdef
       TOTP_ENCRYPTION_KEY: 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
       COOKIE_SECURE: "false"
+      ALLOW_LEGACY_NODE_BEARER: "true"
       DASHBOARD_PATH: /dashboard/0123456789abcdef0123456789abcdef0123456789abcdef
     steps:
       - uses: actions/checkout@v7
