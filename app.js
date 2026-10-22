@@ -1870,8 +1870,8 @@ document.addEventListener('click',async e=>{
     b.disabled=true;
     try{
       const issued=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/enrollment',{method:'POST'});
-      const url='https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/main/bootstrap.sh';
-      const command='curl --proto "=https" --tlsv1.2 -fsSLo /tmp/xmesh-bootstrap.sh '+url+' && sudo bash /tmp/xmesh-bootstrap.sh '+location.origin+' '+id+' '+issued.token;
+      const url='https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/main/bootstrap.sh?xmesh_refresh='+Date.now();
+      const command='curl --proto "=https" --tlsv1.2 -H "Cache-Control: no-cache" -fsSLo /tmp/xmesh-bootstrap.sh '+url+' && grep -q "Installing Docker Engine and Compose from Docker" /tmp/xmesh-bootstrap.sh && sudo bash /tmp/xmesh-bootstrap.sh '+location.origin+' '+id+' '+issued.token;
       modal('<div class="box"><div class="bar2"><h2>Подключение XMesh Node</h2><button class="ia" data-x aria-label="Закрыть">'+ic('x')+'</button></div><p class="note">Одноразовая команда действует 10 минут. Выполните её на целевом VPS с Docker. Ключ зарегистрируется автоматически. XMesh Node и агент метрик установятся вместе. Не публикуйте эту команду.</p><textarea id="node-bootstrap-command" readonly spellcheck="false" rows="4">'+esc(command)+'</textarea><div class="act"><button type="button" class="btn" data-copy-node-bootstrap>'+ic('copy')+'Скопировать команду</button></div><p class="note">Установка объединяет ноду и мониторинг CPU/RAM/RX/TX. Существующий Nginx на 443 не затрагивается.</p></div>','wide');
     }catch(error){toast('Ошибка выдачи команды: '+(error.message||'API'))}
     finally{b.disabled=false}
