@@ -9,7 +9,7 @@ let undo=[],redo=[],last=area.value;
 const clone=o=>JSON.parse(JSON.stringify(o));
 const notify=(m)=>toast?.(m);
 const snapshot=()=>{if(area.value!==last){undo.push(last);if(undo.length>80)undo.shift();last=area.value;redo=[]}update()};
-const update=()=>{host.querySelector('[data-tool="undo"]').disabled=undo.length===0;host.querySelector('[data-tool="redo"]').disabled=redo.length===0};
+const update=()=>{const undoButton=host.querySelector('[data-tool="undo"]'),redoButton=host.querySelector('[data-tool="redo"]');if(undoButton)undoButton.disabled=undo.length===0;if(redoButton)redoButton.disabled=redo.length===0};
 const commit=(value,msg)=>{snapshot();const from=area.value;if(value===from)return;undo.push(from);if(undo.length>80)undo.shift();redo=[];area.value=value;last=value;area.dispatchEvent(new Event('input',{bubbles:true}));area.focus();update();notify(msg||'JSON обновлён')};
 const parse=()=>{try{const x=JSON.parse(area.value);if(!x||typeof x!=='object'||Array.isArray(x))throw Error('Корень должен быть объектом');return x}catch(e){throw Error('Исправьте синтаксис JSON перед применением: '+e.message)}};
 const getInbound=(data)=>{if(!Array.isArray(data.inbounds)||!data.inbounds.length)throw Error('В конфигурации нет inbound');if(data.inbounds.length===1)return data.inbounds[0];const tags=data.inbounds.map((x,i)=>i+': '+(x.tag||'(без тега)'));const answer=prompt('Выберите inbound по индексу:\n'+tags.join('\n'),'0');if(answer===null)return null;const i=Number(answer);if(!Number.isInteger(i)||i<0||i>=data.inbounds.length)throw Error('Неверный индекс inbound');return data.inbounds[i]};
