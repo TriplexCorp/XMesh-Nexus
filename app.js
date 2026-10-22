@@ -551,7 +551,7 @@ async function render(soft){
   T.forEach(clearInterval);T=[];cur=location.hash.slice(1);if(!pages[cur])cur='home';const rt=++RT,[t,f]=pages[cur],v=$('#view');
   $('#title').textContent=t;document.title=(window.XMeshI18n?.translate(t)||t)+' — '+DB.set.brand;$$('#nav a').forEach(a=>a.classList.toggle('on',a.getAttribute('href')=='#'+cur));
   if(!soft){v.classList.remove('still');v.innerHTML=skel();scrollTo(0,0)}
-  const [h,i]=await f();if(rt!=RT)return;v.classList.toggle('still',!!soft);v.innerHTML=h;decorateButtonIcons(v);i&&i();initializeRangeProgress(v);window.XMeshMfa?.mount(v);$('#unb').textContent=DB.users.length;drawBulk();
+  const [h,i]=await f();if(rt!=RT)return;v.classList.toggle('still',!!soft);v.innerHTML=h;decorateButtonIcons(v);i&&i();initializeRangeProgress(v);window.XMeshMfa?.mount(v);window.XMeshSecurity?.mount(v);$('#unb').textContent=DB.users.length;drawBulk();
   if(pendingScrollTarget&&cur==='set'){
     const target=pendingScrollTarget;
     pendingScrollTarget=null;
@@ -2039,6 +2039,7 @@ function securityP(){
       <p>Управляйте защитой входа в панель. Настройки относятся к вашей учётной записи администратора.</p></div>
     </div>
     ${factor}
+    ${window.XMeshSecurity?.panel()||''}
   </div>`];
 }
 
