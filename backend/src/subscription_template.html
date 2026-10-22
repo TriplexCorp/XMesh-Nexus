@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="{{LANG}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="color-scheme" content="dark light">
+  <title>{{BRAND}}</title>
+  <link rel="stylesheet" href="/subscription-studio.css">
+  <link rel="stylesheet" href="/subscription-public.css">
+  <style>
+  :root{
+    --portal-accent:{{ACCENT}};
+    --portal-bg:{{BACKGROUND}};
+    --portal-card:{{CARD_COLOR}};
+    --portal-text:{{TEXT_COLOR}};
+    --portal-radius:{{RADIUS}}px;
+  }
+  </style>
+  <script src="/qr-code.js" defer></script>
+  <script src="/subscription-portal.js" defer></script>
+</head>
+<body class="subscription-public">
+<main class="subscription-public-shell">
+  <div class="subscription-preview" data-portal-theme="{{THEME}}" data-portal-layout="{{LAYOUT}}" data-portal-cards="{{CARD_STYLE}}" data-portal-font="{{FONT}}">
+    <header class="subscription-preview-brand">
+      {{LOGO}}
+      <b>{{BRAND}}</b>
+      <nav class="subscription-preview-languages" aria-label="Язык / Language">
+        <a href="?lang=ru" lang="ru" class="{{RU_SELECTED}}" aria-current="{{RU_CURRENT}}">RU</a>
+        <a href="?lang=en" lang="en" class="{{EN_SELECTED}}" aria-current="{{EN_CURRENT}}">EN</a>
+      </nav>
+    </header>
+    <section class="subscription-preview-hero">
+      {{STATUS_DOT}}
+      <h3>{{HERO}}</h3>
+      <p>{{DESCRIPTION}}</p>
+    </section>
+    {{METRICS}}
+    {{CTA}}
+    {{QUICK_ACTIONS}}
+    {{QR}}
+    {{DEVICE_INFO}}
+    {{APPS}}
+    {{SUPPORT}}
+    <footer>{{FOOTER}}</footer>
+  </div>
+</main>
+</body>
+</html>
