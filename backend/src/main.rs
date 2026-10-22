@@ -4,10 +4,12 @@ mod mfa;
 mod security;
 mod core;
 mod node_rotation;
+mod node_auth;
 mod subscription_settings;
 
 use axum::{
     extract::{Extension, Path, Query, Request, State},
+    body::Bytes,
     http::{header, HeaderMap, HeaderName, HeaderValue, Method, StatusCode, Uri},
     middleware::{self, Next},
     response::{IntoResponse, Response},
@@ -245,6 +247,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/metrics/traffic", get(get_traffic_metrics))
         .route("/users/{id}/traffic", get(get_user_traffic))
         .route("/nodes/{id}/metrics-token", post(create_node_metrics_token))
+        .route("/nodes/{id}/metrics-key", post(node_auth::enroll).delete(node_auth::revoke))
         .route("/admins", get(admin_accounts::list).post(admin_accounts::create))
         .route("/admins/{id}", patch(admin_accounts::update).delete(admin_accounts::delete))
         .route("/nodes/{id}/rotation/next", post(node_rotation::rotate_next))
@@ -290,12 +293,14 @@ async fn main() -> anyhow::Result<()> {
 
 async fn csrf_guard(request: Request, next: Next) -> Response {
     let is_mutation = matches!(*request.method(), Method::POST | Method::PUT | Method::PATCH | Method::DELETE);
-    let agent_bearer = request.uri().path() == "/api/v1/metrics/ingest"
+    let agent_credential = request.uri().path() == "/api/v1/metrics/ingest"
         && request.headers().get(header::ORIGIN).is_none()
-        && request.headers().get(header::AUTHORIZATION)
+        && request.headers().get(header::COOKIE).is_none()
+        && (request.headers().get(header::AUTHORIZATION)
             .and_then(|value| value.to_str().ok())
-            .is_some_and(|value| value.strip_prefix("Bearer ").is_some_and(|token| !token.trim().is_empty()));
-    if is_mutation && request.uri().path().starts_with("/api/v1/") && !agent_bearer {
+            .is_some_and(|value| value.starts_with("Bearer "))
+            || request.headers().contains_key("x-xmesh-signature"));
+    if is_mutation && request.uri().path().starts_with("/api/v1/") && !agent_credential {
         // Sec-Fetch-Site stops same-site but cross-origin form and fetch attacks.
         // Older clients still have to supply a matching Origin.
         if request.headers().get("sec-fetch-site").and_then(|v| v.to_str().ok())
@@ -797,6 +802,15 @@ async fn create_node_metrics_token(
         return Err(ApiError::new(StatusCode::NOT_FOUND, "Узел не найден."));
     }
 
+    // Explicitly reject downgrade to bearer on signed-enrolled nodes.
+    let signed_enrolled: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM node_metric_keys WHERE node_id=$1)"
+    ).bind(id).fetch_one(&state.pool).await?;
+    if signed_enrolled {
+        return Err(ApiError::new(StatusCode::CONFLICT,
+            "Узел использует Ed25519. Bearer-токены запрещены до явного отзыва ключа."));
+    }
+
     // 2 UUIDv4 values provide a high-entropy bearer token. Only its SHA-256 hash is persisted.
     let token = format!("xm_{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
     let token_hash = hex::encode(Sha256::digest(token.as_bytes()));
@@ -829,17 +843,16 @@ async fn create_node_metrics_token(
 async fn ingest_node_metrics(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Json(body): Json<NodeMetricsIngestRequest>,
+    raw_body: Bytes,
 ) -> Result<(StatusCode, Json<Value>), ApiError> {
+    let body: NodeMetricsIngestRequest = serde_json::from_slice(&raw_body)
+        .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST,"Некорректный JSON метрик."))?;
     if body.node_id <= 0 {
         return Err(ApiError::new(StatusCode::BAD_REQUEST, "node_id должен быть положительным числом."));
     }
-    let token = headers.get(header::AUTHORIZATION)
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.strip_prefix("Bearer "))
-        .map(str::trim)
-        .filter(|value| !value.is_empty() && value.len() <= 256)
-        .ok_or_else(|| ApiError::new(StatusCode::UNAUTHORIZED, "Требуется Bearer-токен агента метрик."))?;
+    // The node must authenticate before untrusted samples are recorded.
+    // Signed nodes cannot fall back to their old bearer credential.
+    node_auth::authenticate(&state, &headers, body.node_id, &raw_body).await?;
 
     let metrics = body.metrics.unwrap_or_else(|| json!({}));
     if !metrics.is_object() || serde_json::to_vec(&metrics).map(|v| v.len()).unwrap_or(usize::MAX) > 32 * 1024 {
@@ -858,22 +871,6 @@ async fn ingest_node_metrics(
         return Err(ApiError::new(StatusCode::BAD_REQUEST, "Одно или несколько значений метрик выходят за допустимые пределы."));
     }
 
-    let token_hash = hex::encode(Sha256::digest(token.as_bytes()));
-    let token_valid: bool = sqlx::query_scalar(
-        "SELECT EXISTS (
-            SELECT 1
-            FROM node_metric_auth a
-            JOIN panel_records n ON n.collection = 'nodes' AND n.id = a.node_id
-            WHERE a.node_id = $1 AND a.token_hash = $2
-        )"
-    )
-    .bind(body.node_id)
-    .bind(token_hash)
-    .fetch_one(&state.pool)
-    .await?;
-    if !token_valid {
-        return Err(ApiError::new(StatusCode::UNAUTHORIZED, "Токен агента недействителен или отозван."));
-    }
 
     let user_traffic = body.user_traffic.unwrap_or_default();
     if user_traffic.len() > 2048 {
