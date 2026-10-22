@@ -42,6 +42,13 @@ const icons={
 };
 host.innerHTML='<div class="xm-tools-grid">'+featured.map(id=>{const item=tools.find(x=>x[0]===id),meta=details[id];return '<button type="button" class="sv-toolitem sv-tool-'+id+'" data-tool="'+id+'" title="'+meta[0]+'" aria-label="'+meta[0]+'"><span class="sv-tool-glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+icons[id]+'</svg></span><span class="sv-tool-label">'+item[1].replace(/^[^A-Za-zА-Яа-яЁё0-9]+/,'')+'</span></button>'}).join('')+'</div><div class="sv-tool-issue" data-tool-issue hidden><span data-tool-issue-message></span><button type="button" data-tool="repair-shortids">Исправить Short ID</button></div><span data-tool-status class="xm-tools-status" role="status" aria-live="polite"></span>';
 const status=msg=>{const e=host.querySelector('[data-tool-status]');if(e)e.textContent=msg};
+const focusJsonSection=(key,title=key)=>{
+ const find='"'+key+'"',pos=area.value.indexOf(find);
+ if(pos<0)return false;
+ area.focus();area.setSelectionRange(pos,pos+find.length);
+ status(title+': редактируйте параметры в JSON');
+ return true;
+};
 const insertAtCursor=(value)=>{const start=area.selectionStart,end=area.selectionEnd;commit(area.value.slice(0,start)+value+area.value.slice(end),'Вставлено в редактор');area.setSelectionRange(start,start+value.length)};
 
 const shortIdValid=value=>typeof value==='string'&&/^(?:[0-9a-fA-F]{2}){0,8}$/.test(value);
@@ -180,13 +187,13 @@ const operations={
    const ids=repairIds(rs.shortIds??[],true);
    if(ids===null)return false;rs.shortIds=ids;
  },'Reality Short ID проверены и обновлены')},
- dns(){mutate(d=>{d.dns??=clone(snippets.dns)},'DNS добавлен')},
- routing(){mutate(d=>{d.routing??=clone(snippets.routing)},'Routing добавлен')},
+ dns(){let existed=false;const ok=mutate(d=>{if(d.dns&&typeof d.dns==='object'){existed=true;return false}d.dns=clone(snippets.dns)},'DNS добавлен');if(existed||ok)focusJsonSection('dns','DNS')},
+ routing(){let existed=false;const ok=mutate(d=>{if(d.routing&&typeof d.routing==='object'){existed=true;return false}d.routing=clone(snippets.routing)},'Routing добавлен');if(existed||ok)focusJsonSection('routing','Routing')},
  policy(){mutate(d=>{d.policy??=clone(snippets.policy);d.stats??=clone(snippets.stats)},'Policy и Stats добавлены')},
  outbounds(){mutate(d=>{d.outbounds??=[];const existing=new Set(d.outbounds.map(x=>x.tag));for(const x of snippets.outbounds)if(!existing.has(x.tag))d.outbounds.push(clone(x))},'Outbounds добавлены')},
  log(){mutate(d=>{d.log??=clone(snippets.log)},'Логирование добавлено')},
  inbound(){mutate(d=>{d.inbounds??=[];const tag=prompt('Тег нового inbound:','new-inbound');if(tag===null)return false;if(!/^[\w.-]{1,64}$/.test(tag)||d.inbounds.some(i=>i.tag===tag))throw Error('Тег пустой, невалидный или уже существует');d.inbounds.push({tag,listen:'127.0.0.1',port:443,protocol:'vless',settings:{users:[],decryption:'none'},streamSettings:{network:'raw',security:'none'}})},'Новый локальный inbound создан. Перед публикацией настройте защиту.')},
- xhttp(){mutate(d=>{const inbound=getInbound(d);if(!inbound)return false;inbound.streamSettings??={};if(inbound.streamSettings.network!=='xhttp'&&inbound.streamSettings.network!=='raw'&&!confirm('Сменить транспорт выбранного inbound на XHTTP?'))return false;inbound.streamSettings.network='xhttp';inbound.streamSettings.xhttpSettings??={path:'/xhttp',mode:'auto'}},'XHTTP добавлен')},
+ xhttp(){let existed=false;const ok=mutate(d=>{const inbound=getInbound(d);if(!inbound)return false;const ss=inbound.streamSettings??={};if(ss.network==='xhttp'&&ss.xhttpSettings&&typeof ss.xhttpSettings==='object'){existed=true;return false}if(ss.network!=='xhttp'&&ss.network!=='raw'&&!confirm('Сменить транспорт выбранного inbound на XHTTP?'))return false;ss.network='xhttp';ss.xhttpSettings??={path:'/xhttp',mode:'auto'}},'XHTTP добавлен');if(existed||ok)focusJsonSection('xhttpSettings','XHTTP')},
  vlessens(){mutate(d=>{const inbound=getInbound(d);if(!inbound)return false;if(inbound.protocol!=='vless')throw Error('VLESS Encryption доступен только для VLESS');const current=inbound.settings?.decryption||'none';const value=prompt('Серверный decryption из xray vlessenc. Безопасно отменить:',current);if(value===null)return false;(inbound.settings??={users:[]}).decryption=value.trim()||'none'},'VLESS Encryption обновлён')},
  finalmask(){mutate(d=>{const inbound=getInbound(d);if(!inbound)return false;const current=inbound.streamSettings?.finalmask||{};const raw=prompt('FinalMask JSON для streamSettings.finalmask:',JSON.stringify(current,null,2));if(raw===null)return false;const value=JSON.parse(raw);if(!value||typeof value!=='object'||Array.isArray(value))throw Error('FinalMask должен быть объектом');inbound.streamSettings??={};if(Object.keys(value).length)inbound.streamSettings.finalmask=value;else delete inbound.streamSettings.finalmask},'FinalMask обновлён')},
  hysteria(){mutate(d=>{d.inbounds??=[];const tag='hysteria-'+(d.inbounds.length+1);if(d.inbounds.some(x=>x.tag===tag))throw Error('Тег уже занят');d.inbounds.push({tag,listen:'127.0.0.1',port:4433,protocol:'hysteria',settings:{version:2,users:[]},streamSettings:{network:'hysteria',security:'tls',hysteriaSettings:{version:2},tlsSettings:{certificates:[]}}});notify('Заполните TLS-сертификаты и пользователей, затем проверьте ядром Xray-core.')},'Черновик Hysteria2 создан')},
