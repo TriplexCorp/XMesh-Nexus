@@ -42,15 +42,15 @@ else
     printf '\nREDIS_PASSWORD=%s\n' "$(openssl rand -hex 32)" >> .env
     echo "Generated REDIS_PASSWORD for the Redis service."
   fi
-  if ! grep -q '^TOTP_ENCRYPTION_KEY=' .env; then
-    printf 'TOTP_ENCRYPTION_KEY=%s\n' "$(openssl rand -hex 32)" >> .env
-    echo "Generated a persistent MFA encryption key. Back up this key securely."
-  fi
   if ! grep -q '^DB_MAX_CONNECTIONS=' .env; then
     printf 'DB_MAX_CONNECTIONS=20\n' >> .env
   fi
   chmod 600 .env
 fi
+
+# Existing installations may contain an empty TOTP_ENCRYPTION_KEY.
+# Verify without replacing a nonempty key (which is required to decrypt existing TOTP secrets).
+bash deploy/ensure-totp-key.sh .env
 
 docker compose config --quiet
 docker compose up -d --build
@@ -65,7 +65,7 @@ if [[ "$created_env" == "1" ]]; then
   printf 'Initial password: %s\n' "$admin_password"
   echo "Credentials are stored in .env (permissions 600). Save the password now."
 else
-  echo "Existing .env was kept; only missing Redis/database tuning settings were added."
+  echo "Existing .env was preserved; missing service settings were repaired safely."
   echo "Administrator credentials were not reset."
 fi
 echo
