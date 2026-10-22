@@ -861,9 +861,10 @@ async fn get_statistics_overview(State(state): State<AppState>) -> Result<Json<V
         ).fetch_one(&state.pool).await?;
         (row.try_get("entries")?,row.try_get("up")?,row.try_get("down")?)
     };
+    let total_nodes=nodes.len();
     Ok(Json(json!({
         "nodes":nodes,
-        "totalNodes":nodes.len(),
+        "totalNodes":total_nodes,
         "totalUsers":users,
         "inboundTraffic":{"counters":inbound.0,"uplinkBytes":inbound.1,"downlinkBytes":inbound.2},
         "source":"signed_node_metrics",
