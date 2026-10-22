@@ -65,6 +65,21 @@ and refuses missing or expired sessions. TLS is still provided by the
 operator's reverse proxy. Do not publicly expose a panel without HTTPS and
 a properly secured proxy configuration.
 
+### Advanced security policy
+
+**Security → Advanced protection** provides server-side PostgreSQL-backed controls:
+
+- **Session lifetime:** 1–168 hours, affecting newly created cookies and sessions and enforced on subsequent requests.
+- **Inactivity timeout:** 0–1440 minutes (0 disables idle expiry).
+- **Simultaneous sessions:** 1–20 per administrator; older sessions are revoked when new ones exceed the limit.
+- **Login attempts:** 3–15 failures, with a 5–120-minute lockout period.
+- **Additional dashboard entry URL:** `/dashboard/slug` (ASCII letters, numbers, hyphens and underscores).
+- **My sessions:** inspect active sign-ins, revoke any session, or sign out all other sessions.
+
+Only **owner** accounts may edit the security policy. Active sessions are scoped to the signed-in administrator.
+
+**The dashboard path is an extra entrypoint, not a security boundary.** The authenticated root route and API remain accessible. Reverse-proxy URL masking, HTTPS, IP restrictions and deployment base-path changes must be configured separately.
+
 ## Administrator two-factor authentication (TOTP)
 
 From **System → Security**, an administrator can enroll their
