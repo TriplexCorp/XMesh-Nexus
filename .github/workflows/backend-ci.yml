@@ -80,6 +80,8 @@ jobs:
         run: node scripts/check-node-create-action.js
       - name: Verify CRUD dialogs close after success and DPRK flag renders offline
         run: node scripts/check-crud-dialog-lifecycle.js
+      - name: Verify Xray per-user per-inbound metrics collector
+        run: python3 scripts/test-xray-stats-collector.py
       - name: Check responsive Nodes grid and density buttons
         run: node scripts/check-node-grid-layout.js
       - name: Check Nodes IP rotation and Rust resolver integration
