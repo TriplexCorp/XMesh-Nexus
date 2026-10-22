@@ -1375,8 +1375,7 @@ function xrayClientSample(){
  return {
   ...xrayClientLocalDefaults(),
   remarks:$('#xpb-name')?.value.trim()||'XRAY STUDIO client',
-  outbounds:[outbound,{tag:'direct',protocol:'freedom'},{tag:'block',protocol:'blackhole'}],
-  routing:{domainStrategy:'AsIs',rules:[]}
+  ...window.XMeshClientConfig.base(outbound)
  };
 }
 async function generateRealityKeyPair(){
