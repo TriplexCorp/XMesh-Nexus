@@ -1127,9 +1127,9 @@ function xrayBuilderConfig(){
   catch(e){throw new Error(e.message.startsWith('XDrive')?e.message:'XDrive template должен быть корректным JSON: '+e.message)}
  }
  const settings={
-  vless:{users:uuid?[{id:uuid,level:0,email,...(network==='raw'&&['tls','reality'].includes(security)&&v('flow')?{flow:v('flow')}:{})}]:[],decryption:vlessEncRequired?(v('vless-decryption').trim()||'REPLACE_WITH_VLESS_ENCRYPTION_CONFIG'):'none'},
-  vmess:{users:uuid?[{id:uuid,level:0,email,alterId:0}]:[],default:{alterId:0}},
-  trojan:{clients:uuid?[{password:uuid,email,level:0}]:[]},
+  vless:{users:[],decryption:vlessEncRequired?(v('vless-decryption').trim()||'REPLACE_WITH_VLESS_ENCRYPTION_CONFIG'):'none'},
+  vmess:{users:[],default:{alterId:0}},
+  trojan:{clients:[]},
   shadowsocks:{network:'tcp,udp',method:ssMethod,...(ss2022||!uuid?{password:ssServerPassword}:{}),...(uuid?{users:[{password:ssUserPassword,...(ss2022?{}:{method:ssMethod}),level:0,email}]}:{})},
   socks:{auth:v('socks-auth')||'noauth',users:(v('socks-auth')==='password'&&uuid)?[{user:login,pass:uuid}]:[],udp:true,ip:'127.0.0.1'},
   mixed:{auth:v('socks-auth')||'noauth',users:(v('socks-auth')==='password'&&uuid)?[{user:login,pass:uuid}]:[],udp:true,ip:'127.0.0.1'},
