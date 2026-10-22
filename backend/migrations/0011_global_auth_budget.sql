@@ -4,3 +4,5 @@ CREATE TABLE IF NOT EXISTS auth_global_limits (
   minute_start TIMESTAMPTZ PRIMARY KEY,
   attempts BIGINT NOT NULL CHECK (attempts >= 0)
 );
+CREATE INDEX IF NOT EXISTS auth_login_limits_window_idx
+  ON auth_login_limits(window_started_at);
