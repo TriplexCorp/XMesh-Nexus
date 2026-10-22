@@ -134,6 +134,7 @@ struct TrafficMetricsQuery {
 struct NodeMetricsIngestRequest {
     node_id: i64,
     cpu_percent: Option<f64>,
+    cpu_steal_percent: Option<f64>,
     ram_used_bytes: Option<i64>,
     ram_total_bytes: Option<i64>,
     disk_used_bytes: Option<i64>,
@@ -257,6 +258,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/settings", get(get_settings).patch(patch_settings))
         .route("/stats", get(get_stats))
         .route("/system/stats", get(get_system_stats))
+        .route("/statistics/overview", get(get_statistics_overview))
         .route("/metrics/traffic", get(get_traffic_metrics))
         .route("/users/{id}/traffic", get(get_user_traffic))
         .route("/nodes/{id}/metrics-key", post(node_auth::enroll).delete(node_auth::revoke))
@@ -806,6 +808,69 @@ async fn get_system_stats(State(state): State<AppState>) -> Json<Value> {
     }))
 }
 
+/// Read-only dashboard overview from actual TimescaleDB measurements.
+/// Samples older than 5 minutes are reported stale, never as live zeroes.
+async fn get_statistics_overview(State(state): State<AppState>) -> Result<Json<Value>, ApiError> {
+    let records = load_records(&state.pool, "nodes").await?;
+    let mut nodes = Vec::with_capacity(records.len());
+    for node in records {
+        let id = node.get("id").and_then(Value::as_i64).unwrap_or(0);
+        if id <= 0 { continue; }
+        let sample = sqlx::query(
+            "SELECT cpu_percent, ram_used_bytes, ram_total_bytes, disk_used_bytes, disk_total_bytes,
+                    rx_bytes_per_sec,tx_bytes_per_sec,active_connections,online_clients,metrics,
+                    (EXTRACT(EPOCH FROM sampled_at)*1000)::BIGINT AS sampled_at_ms
+             FROM server_metric_samples WHERE node_id=$1 ORDER BY sampled_at DESC LIMIT 1"
+        ).bind(id.to_string()).fetch_optional(&state.pool).await?;
+        let current = if let Some(row) = sample {
+            let metric: Value = row.try_get("metrics")?;
+            let sampled_at: i64 = row.try_get("sampled_at_ms")?;
+            Some(json!({
+                "cpuPercent":row.try_get::<Option<f64>,_>("cpu_percent")?,
+                "cpuStealPercent":metric.get("cpuStealPercent"),
+                "ramUsedBytes":row.try_get::<Option<i64>,_>("ram_used_bytes")?,
+                "ramTotalBytes":row.try_get::<Option<i64>,_>("ram_total_bytes")?,
+                "diskUsedBytes":row.try_get::<Option<i64>,_>("disk_used_bytes")?,
+                "diskTotalBytes":row.try_get::<Option<i64>,_>("disk_total_bytes")?,
+                "rxBytesPerSec":row.try_get::<Option<f64>,_>("rx_bytes_per_sec")?,
+                "txBytesPerSec":row.try_get::<Option<f64>,_>("tx_bytes_per_sec")?,
+                "activeConnections":row.try_get::<Option<i32>,_>("active_connections")?,
+                "onlineClients":row.try_get::<Option<i32>,_>("online_clients")?,
+                "sampledAt":sampled_at,
+                "stale":std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default().as_millis() as i64 - sampled_at > 300_000
+            }))
+        } else { None };
+        nodes.push(json!({
+            "id":id,
+            "name":node.get("name").and_then(Value::as_str).unwrap_or("Узел"),
+            "hosting":node.get("hosting"),
+            "flag":node.get("flag"),
+            "disabled":node.get("disabled"),
+            "latest":current
+        }));
+    }
+    let users: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM panel_records WHERE collection='users'")
+        .fetch_one(&state.pool).await?;
+    let inbound: (i64,i64,i64) = {
+        let row=sqlx::query(
+            "SELECT COUNT(*)::BIGINT AS entries,
+                    COALESCE(SUM(uplink_bytes),0)::BIGINT AS up,
+                    COALESCE(SUM(downlink_bytes),0)::BIGINT AS down
+             FROM user_inbound_traffic_totals"
+        ).fetch_one(&state.pool).await?;
+        (row.try_get("entries")?,row.try_get("up")?,row.try_get("down")?)
+    };
+    Ok(Json(json!({
+        "nodes":nodes,
+        "totalNodes":nodes.len(),
+        "totalUsers":users,
+        "inboundTraffic":{"counters":inbound.0,"uplinkBytes":inbound.1,"downlinkBytes":inbound.2},
+        "source":"signed_node_metrics",
+        "staleAfterSeconds":300
+    })))
+}
+
 async fn ingest_node_metrics(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -820,11 +885,20 @@ async fn ingest_node_metrics(
     // Telemetry requires a registered Ed25519 identity.
     node_auth::authenticate(&state, &headers, body.node_id, &raw_body).await?;
 
-    let metrics = body.metrics.unwrap_or_else(|| json!({}));
+    let mut metrics = body.metrics.unwrap_or_else(|| json!({}));
+    if let Some(steal) = body.cpu_steal_percent {
+        if !steal.is_finite() || !(0.0..=100.0).contains(&steal) {
+            return Err(ApiError::new(StatusCode::BAD_REQUEST,"Некорректное значение CPU steal time."));
+        }
+        if let Some(map) = metrics.as_object_mut() {
+            map.insert("cpuStealPercent".into(),json!(steal));
+        }
+    }
     if !metrics.is_object() || serde_json::to_vec(&metrics).map(|v| v.len()).unwrap_or(usize::MAX) > 32 * 1024 {
         return Err(ApiError::new(StatusCode::BAD_REQUEST, "metrics должен быть JSON-объектом не больше 32 КиБ."));
     }
     if body.cpu_percent.is_some_and(|value| !value.is_finite() || !(0.0..=100.0).contains(&value))
+        || body.cpu_steal_percent.is_some_and(|value| !value.is_finite() || !(0.0..=100.0).contains(&value))
         || body.ram_used_bytes.is_some_and(|value| value < 0)
         || body.ram_total_bytes.is_some_and(|value| value < 0)
         || body.disk_used_bytes.is_some_and(|value| value < 0)
