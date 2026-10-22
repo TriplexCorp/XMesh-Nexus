@@ -37,5 +37,5 @@ assert(!('scMaxBufferedPosts' in client.extra),'Server-only setting must not lea
 assert.throws(()=>create({'xhttp-mux-connections':'4','xhttp-mux-concurrency':'8'},'client'),/нельзя включать/);
 assert.throws(()=>create({'xhttp-post-bytes':'50-10'},'client'),/диапазон/);
 assert.throws(()=>create({'xhttp-headers':'{"X":3}'},'client'),/требуется объект/);
-assert.match(app,/data-xray-option-group="transport-xhttp"/,'XHTTP section must be conditional');
+assert.match(fs.readFileSync('xray-studio-v4.js','utf8'),/\['xhttp','XHTTP'\]/,'Active Studio must expose XHTTP transport');
 console.log('XRAY Studio XHTTP serializer and themed selects: OK');
