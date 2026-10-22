@@ -101,6 +101,29 @@ pub async fn update_settings(State(state):State<AppState>,Extension(actor):Exten
     Ok(Json(json!({"policy":policy,"canEdit":true})))
 }
 
+/// Owner-only metadata from the existing server-side audit log.
+/// Detail JSON is intentionally not exposed: older entries may contain secrets.
+pub async fn audit_events(State(state):State<AppState>,Extension(actor):Extension<AuthUser>)
+    -> Result<Json<Value>,ApiError> {
+    admin_accounts::require_owner(&actor)?;
+    let rows=sqlx::query(
+        "SELECT id,actor,action,collection,record_id,created_at \
+         FROM panel_audit_log ORDER BY created_at DESC,id DESC LIMIT 100"
+    ).fetch_all(&state.pool).await?;
+    let events=rows.iter().map(|row|->Result<Value,ApiError>{
+        let created:chrono::DateTime<chrono::Utc>=row.try_get("created_at")?;
+        Ok(json!({
+            "id":row.try_get::<i64,_>("id")?,
+            "actor":row.try_get::<String,_>("actor")?,
+            "action":row.try_get::<String,_>("action")?,
+            "collection":row.try_get::<Option<String>,_>("collection")?,
+            "recordId":row.try_get::<Option<i64>,_>("record_id")?,
+            "createdAt":created,
+        }))
+    }).collect::<Result<Vec<_>,_>>()?;
+    Ok(Json(json!({"events":events,"limit":100})))
+}
+
 pub async fn sessions(State(state):State<AppState>,Extension(actor):Extension<AuthUser>,
     headers:HeaderMap)->Result<Json<Value>,ApiError>{
     let active=auth::session_token_hash(&headers);
