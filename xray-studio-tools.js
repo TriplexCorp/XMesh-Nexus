@@ -26,8 +26,8 @@ const snippets={
 };
 const tools=[
  ['undo','↶ Отменить'],['redo','↷ Повторить'],['find','⌕ Поиск'],['validate','✓ Проверить'],
- ['reality','Reality X25519'],['shortid','Short ID'],
- ['dns','DNS'],['routing','Routing'],['policy','Policy / Stats'],['outbounds','Outbounds'],['log','Log'],
+ ['reality','✦ Reality X25519'],['shortid','♯ Short ID'],
+ ['dns','◉ DNS'],['routing','⇄ Routing'],['policy','▥ Policy / Stats'],['outbounds','⬡ Outbounds'],['log','Log'],
  ['inbound','Новый inbound'],['xhttp','XHTTP настройки'],['format','Форматировать']
 ];
 host.innerHTML='<div class="xm-tools-heading"><strong>TOOLS</strong><span>Правки применяются к текущему JSON. Ctrl+Z / Ctrl+Y — история.</span></div><div class="xm-tools-grid">'+tools.map(([id,label])=>'<button type="button" class="xm-quiet" data-tool="'+id+'">'+label+'</button>').join('')+'</div><p data-tool-status class="xm-tools-status" role="status"></p>';
@@ -51,6 +51,7 @@ const operations={
 };
 host.addEventListener('click',e=>{const b=e.target.closest('[data-tool]');if(b&&operations[b.dataset.tool])Promise.resolve(operations[b.dataset.tool]()).catch(x=>notify(x.message))});
 area.addEventListener('input',snapshot);
+area.addEventListener('xmesh:reset-history',()=>{undo=[];redo=[];last=area.value;update()});
 area.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key.toLowerCase()==='z'){e.preventDefault();operations.undo()}if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==='y'||e.shiftKey&&e.key.toLowerCase()==='z')){e.preventDefault();operations.redo() }});
 update();
 }
