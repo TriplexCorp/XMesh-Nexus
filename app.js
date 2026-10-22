@@ -1607,9 +1607,12 @@ const NODE_GRID_KEY='xmeshNexusGridView';
 const getNodeGridMode=()=>{try{const mode=localStorage.getItem(NODE_GRID_KEY);return ['compact','standard','spacious'].includes(mode)?mode:'standard'}catch(e){return 'standard'}};
 async function nodesP(){
   const [r,s]=await Promise.all([api.list('nodes',{sort:'id'}),api.stats()]);ST=s;
+  const runtime=new Map(await Promise.all(r.items.map(async n=>{
+    try{return [n.id,await backendRequest('/api/v1/nodes/'+encodeURIComponent(n.id)+'/runtime')]}catch(_){return [n.id,null]}
+  })));
   const cards=r.items.map(n=>{
     const ss=nstat(n),p=DB.profiles.find(x=>x.id==n.profileId),l=LV[n.id]||{cpu:null,ram:null,mbps:null},k=n.limit?cl(n.used/n.limit,0,1):0,tc=k>.9?'--er':k>.75?'--wr':'--c3';
-    return `<div class="card nc${n.disabled?' off':''}"><div class="h"><span class="fg">${flagView(n.flag)}</span><div><b>${esc(n.name)}</b><br><small class="mu">${esc(n.addr)}${n.port?':'+esc(n.port):''}</small>${n.hosting?.trim()?`<span class="node-hosting" title="Хостинг">${ic('building-2')}${esc(n.hosting.trim())}</span>`:''}</div>${chip(NS[ss]?.[0]||'Не проверен',NS[ss]?.[1]||'--mu')}</div>
+    return `<div class="card nc${n.disabled?' off':''}"><div class="h"><span class="fg">${flagView(n.flag)}</span><div><b>${esc(n.name)}</b><br><small class="mu">${esc(n.addr)}${n.port?':'+esc(n.port):''}</small>${n.hosting?.trim()?`<span class="node-hosting" title="Хостинг">${ic('building-2')}${esc(n.hosting.trim())}</span>`:''}</div>${runtime.get(n.id)?.connected?chip('Node online','--ok'):runtime.get(n.id)?.lastSeenAt?chip('Node offline','--er'):chip('Node not linked','--mu')}</div>
       <div class="kvg"><div><span>Активные пользователи</span><b>${s.nodeOn[n.id]??0}</b></div><div><span>XRAY STUDIO</span>${esc(p?.name||'—')}</div></div>
       ${n.rotationEnabled?`<div class="node-ip-rotation active" aria-label="Пул IP-ротации"><span class="node-ip-indicator" aria-hidden="true"></span><span>IP-пул · ${nodeRotationIPs(n).length} адресов</span></div>`:''}
       <div class="node-gauges">
