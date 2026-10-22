@@ -5,14 +5,14 @@ window.XMeshSubscriptionStudio = (() => {
   const defaults = {
     subscriptionDomain:'', subscriptionPath:'/s',
     subscriptionBrand:'', subscriptionDescription:'Настройки подключения и информация о подписке.',
-    subscriptionFooter:'', subscriptionAccent:'#e8bb78', subscriptionSyncPanelTheme:true, subscriptionLanguage:'ru', subscriptionTheme:'dark',
+    subscriptionDescriptionEn:'', subscriptionFooter:'',subscriptionFooterEn:'', subscriptionAccent:'#e8bb78', subscriptionSyncPanelTheme:true, subscriptionLanguage:'ru', subscriptionTheme:'dark',
     subscriptionShowTraffic:true, subscriptionShowExpiry:true,
     subscriptionPlacement:'a', nodePlacement:'a', deploymentServerB:'', deploymentServerC:'',
     subscriptionBackground:'#0c131b',subscriptionCardColor:'#15212b',subscriptionTextColor:'#ecf3f6',
     subscriptionLayout:'standard',subscriptionCardStyle:'soft',subscriptionFont:'system',subscriptionRadius:16,
-    subscriptionHero:'',subscriptionCta:'',subscriptionLogoUrl:'',subscriptionSupportLabel:'Поддержка',
+    subscriptionHero:'',subscriptionHeroEn:'',subscriptionCta:'',subscriptionCtaEn:'',subscriptionLogoUrl:'',subscriptionSupportLabel:'Поддержка',subscriptionSupportLabelEn:'',
     subscriptionSupportUrl:'',subscriptionClientLayout:'grid',
-    subscriptionAppsTitle:'',subscriptionCustomClients:[],
+    subscriptionAppsTitle:'',subscriptionAppsTitleEn:'',subscriptionCustomClients:[],
     subscriptionShowStatus:true,subscriptionShowApps:true,subscriptionShowQr:true,
     subscriptionShowCopy:true,subscriptionShowSupport:false,subscriptionShowDevices:false
   };
@@ -144,7 +144,8 @@ window.XMeshSubscriptionStudio = (() => {
       '<section class="card subscription-studio-section">',
       '<div class="subscription-studio-heading"><span>03</span><div><h3>Клиентский портал</h3><p>Синхронизация с темой панели или отдельная палитра.</p></div></div>',
       field('subscriptionBrand','Название подписки',data.subscriptionBrand,'Пустое значение — использовать бренд панели.',{placeholder:'Название вашего сервиса',max:80}),
-      field('subscriptionDescription','Описание',data.subscriptionDescription,'Короткий текст на главной странице.',{area:true,max:240}),
+      field('subscriptionDescription','Описание (RU)',data.subscriptionDescription,'Текст на русском.',{area:true,max:240}),
+      field('subscriptionDescriptionEn','Описание (EN)',data.subscriptionDescriptionEn,'English description. Leave blank for the default English text.',{area:true,max:240}),
       '<label class="subscription-theme-sync"><input type="checkbox" name="subscriptionSyncPanelTheme"'+(data.subscriptionSyncPanelTheme!==false?' checked':'')+'> <span><b>Синхронизировать с темой панели</b><small>Акцент, светлый/тёмный режим, фон, карточки и цвет текста. Выключите для своего оформления.</small></span></label>',
       '<div class="subscription-studio-pair">',
       field('subscriptionAccent','Акцентный цвет',data.subscriptionAccent,'Цвет кнопок и индикаторов.',{color:true}),
@@ -152,7 +153,8 @@ window.XMeshSubscriptionStudio = (() => {
       '</div><div class="subscription-studio-pair">',
       '<label class="f subscription-field"><span>Тема клиентского портала</span><select name="subscriptionTheme"><option value="dark"'+(data.subscriptionTheme!=='light'?' selected':'')+'>Тёмная</option><option value="light"'+(data.subscriptionTheme==='light'?' selected':'')+'>Светлая</option></select></label>',
       '</div>',
-      field('subscriptionFooter','Нижняя подпись',data.subscriptionFooter,'Например, адрес поддержки.',{placeholder:'Поддержка: @yourbot',max:160}),
+      field('subscriptionFooter','Нижняя подпись (RU)',data.subscriptionFooter,'Например, адрес поддержки.',{placeholder:'Поддержка: @yourbot',max:160}),
+      field('subscriptionFooterEn','Footer text (EN)',data.subscriptionFooterEn,'Отдельная подпись для английского языка.',{max:160}),
       '<div class="subscription-display-options">',
       '<label><input type="checkbox" name="subscriptionShowTraffic"'+(data.subscriptionShowTraffic?' checked':'')+'> Показывать трафик</label>',
       '<label><input type="checkbox" name="subscriptionShowExpiry"'+(data.subscriptionShowExpiry?' checked':'')+'> Показывать срок доступа</label>',
@@ -173,10 +175,13 @@ window.XMeshSubscriptionStudio = (() => {
       '</div>',
       '<div class="subscription-studio-heading subscription-studio-subheading"><span>✦</span><div><h3>Персонализация</h3><p>Свой логотип, заголовки и контакты.</p></div></div>',
       field('subscriptionLogoUrl','URL логотипа',data.subscriptionLogoUrl,'Только HTTPS. Оставьте пустым для стандартной пиктограммы.',{placeholder:'https://example.com/logo.png',max:512}),
-      field('subscriptionHero','Свой заголовок статуса',data.subscriptionHero,'Пустое поле — стандартный текст выбранного языка.',{placeholder:'Ваша подписка активна',max:100}),
-      field('subscriptionCta','Текст кнопки подключения',data.subscriptionCta,'Пустое поле — стандартный перевод.',{placeholder:'Подключить устройство',max:80}),
+      field('subscriptionHero','Заголовок статуса (RU)',data.subscriptionHero,'Оставьте пустым для стандартного текста.',{placeholder:'Ваша подписка активна',max:100}),
+      field('subscriptionHeroEn','Status heading (EN)',data.subscriptionHeroEn,'Английский вариант. Оставьте пустым для стандартного текста.',{max:100}),
+      field('subscriptionCta','Текст подключения (RU)',data.subscriptionCta,'Пустое поле — стандартный перевод.',{placeholder:'Подключить устройство',max:80}),
+      field('subscriptionCtaEn','Connection button (EN)',data.subscriptionCtaEn,'Английский текст подключения.',{max:80}),
       '<div class="subscription-studio-pair">',
-      field('subscriptionSupportLabel','Название поддержки',data.subscriptionSupportLabel,'Например, Связаться с нами.',{placeholder:'Поддержка',max:80}),
+      field('subscriptionSupportLabel','Название поддержки (RU)',data.subscriptionSupportLabel,'Например, Связаться с нами.',{placeholder:'Поддержка',max:80}),
+      field('subscriptionSupportLabelEn','Support label (EN)',data.subscriptionSupportLabelEn,'Английское название поддержки.',{max:80}),
       field('subscriptionSupportUrl','Ссылка поддержки',data.subscriptionSupportUrl,'HTTPS-ссылка на сайт или чат.',{placeholder:'https://example.com/help',max:512}),
       '</div>',
       '<div class="subscription-studio-heading subscription-studio-subheading"><span>◈</span><div><h3>Блоки страницы</h3><p>Каждый элемент включается независимо.</p></div></div>',
@@ -190,7 +195,8 @@ window.XMeshSubscriptionStudio = (() => {
       '</div></section>',
       '<section class="card subscription-studio-section">',
       '<div class="subscription-studio-heading"><span>05</span><div><h3>Клиентские приложения</h3><p>Выбирайте, какие программы показать пользователю, и задавайте собственные ссылки на установку.</p></div></div>',
-      field('subscriptionAppsTitle','Заголовок раздела приложений',data.subscriptionAppsTitle,'Оставьте пустым, чтобы использовать стандартный заголовок на языке клиента.',{placeholder:'Приложения для подключения',max:80}),
+      field('subscriptionAppsTitle','Заголовок приложений (RU)',data.subscriptionAppsTitle,'Пустое значение — перевод по умолчанию.',{placeholder:'Приложения для подключения',max:80}),
+      field('subscriptionAppsTitleEn','Apps heading (EN)',data.subscriptionAppsTitleEn,'Английский заголовок раздела.',{max:80}),
       '<div class="subscription-studio-toolbar"><span class="subscription-client-counter" data-subscription-client-count>—</span><div class="subscription-client-actions">',
       '<button type="button" class="gh sm" data-client-preset="all">Включить все</button>',
       '<button type="button" class="gh sm" data-client-preset="none">Отключить все</button>',
@@ -208,7 +214,7 @@ window.XMeshSubscriptionStudio = (() => {
       '<aside class="subscription-studio-side">',
       '<div class="subscription-preview-label"><b>Предпросмотр</b><span>Демо-контент</span></div>',
       '<div class="subscription-preview" data-subscription-preview>',
-      '<div class="subscription-preview-brand"><span data-subscription-logo-symbol>✦</span><img data-subscription-logo alt="" hidden><b data-subscription-brand></b></div>',
+      '<div class="subscription-preview-brand"><span data-subscription-logo-symbol>✦</span><img data-subscription-logo alt="" hidden><b data-subscription-brand></b><div class="subscription-preview-languages" role="group" aria-label="Language / Язык"><button type="button" data-portal-language="ru" aria-pressed="true" lang="ru">RU</button><button type="button" data-portal-language="en" aria-pressed="false" lang="en">EN</button></div></div>',
       '<div class="subscription-preview-hero"><span class="subscription-preview-ok" data-subscription-ok>●</span><h3 data-subscription-active></h3><p data-subscription-description></p></div>',
       '<div class="subscription-preview-meta" data-subscription-metrics>',
       '<div data-subscription-traffic><small data-subscription-traffic-label></small><b>12,4 / 100 ГБ</b><div class="subscription-preview-progress"><i></i></div></div>',
@@ -254,7 +260,9 @@ window.XMeshSubscriptionStudio = (() => {
         subscriptionPath:input(form,'subscriptionPath').value.trim(),
         subscriptionBrand:input(form,'subscriptionBrand').value.trim(),
         subscriptionDescription:input(form,'subscriptionDescription').value.trim(),
+        subscriptionDescriptionEn:input(form,'subscriptionDescriptionEn').value.trim(),
         subscriptionFooter:input(form,'subscriptionFooter').value.trim(),
+        subscriptionFooterEn:input(form,'subscriptionFooterEn').value.trim(),
         subscriptionAccent:input(form,'subscriptionAccent').value,
         subscriptionSyncPanelTheme:input(form,'subscriptionSyncPanelTheme').checked,
         subscriptionLanguage:input(form,'subscriptionLanguage').value,
@@ -273,12 +281,16 @@ window.XMeshSubscriptionStudio = (() => {
         subscriptionFont:input(form,'subscriptionFont').value,
         subscriptionRadius:Number(input(form,'subscriptionRadius').value),
         subscriptionHero:input(form,'subscriptionHero').value.trim(),
+        subscriptionHeroEn:input(form,'subscriptionHeroEn').value.trim(),
         subscriptionCta:input(form,'subscriptionCta').value.trim(),
+        subscriptionCtaEn:input(form,'subscriptionCtaEn').value.trim(),
         subscriptionLogoUrl:input(form,'subscriptionLogoUrl').value.trim(),
         subscriptionSupportLabel:input(form,'subscriptionSupportLabel').value.trim(),
+        subscriptionSupportLabelEn:input(form,'subscriptionSupportLabelEn').value.trim(),
         subscriptionSupportUrl:input(form,'subscriptionSupportUrl').value.trim(),
         subscriptionClientLayout:input(form,'subscriptionClientLayout').value,
         subscriptionAppsTitle:input(form,'subscriptionAppsTitle').value.trim(),
+        subscriptionAppsTitleEn:input(form,'subscriptionAppsTitleEn').value.trim(),
         subscriptionCustomClients:readCustomClients(),
         subscriptionShowStatus:input(form,'subscriptionShowStatus').checked,
         subscriptionShowApps:input(form,'subscriptionShowApps').checked,
@@ -289,9 +301,19 @@ window.XMeshSubscriptionStudio = (() => {
         subscriptionClients:Object.fromEntries(clientCatalog.map(([id])=>[id,input(form,'subClient_'+id).checked])),
         subscriptionClientLinks:Object.fromEntries(clientCatalog.map(([id])=>[id,input(form,'subClientLink_'+id).value.trim()]).filter(([,url])=>url))
       });
+      let previewLanguage=data.subscriptionLanguage;
       const draw = () => {
         applyPanelTheme();
-        const d=read(),copy=locale[d.subscriptionLanguage]||locale.ru;
+        const d=read();
+        if(!['ru','en'].includes(previewLanguage))previewLanguage='ru';
+        const lang=previewLanguage,english=lang==='en',copy=locale[lang];
+        const previewRoot=$('[data-subscription-preview]');
+        previewRoot.lang=lang;
+        form.querySelectorAll('[data-portal-language]').forEach(button=>{
+          const active=button.dataset.portalLanguage===lang;
+          button.setAttribute('aria-pressed',String(active));
+          button.classList.toggle('on',active);
+        });
         $('[data-subscription-link]').textContent=d.subscriptionDomain && pathOK(d.subscriptionPath)
           ? 'https://'+d.subscriptionDomain+d.subscriptionPath+'/<token>':'Укажите домен и путь';
         const preview=$('[data-subscription-preview]');
@@ -314,16 +336,16 @@ window.XMeshSubscriptionStudio = (() => {
         }else{
           logo.hidden=true;logo.removeAttribute('src');symbol.hidden=false;
         }
-        $('[data-subscription-active]').textContent=d.subscriptionHero||copy[0];
-        $('[data-subscription-description]').textContent=d.subscriptionDescription;
+        $('[data-subscription-active]').textContent=(english?d.subscriptionHeroEn:d.subscriptionHero)||copy[0];
+        $('[data-subscription-description]').textContent=(english?d.subscriptionDescriptionEn:d.subscriptionDescription)||(english?'Connection setup and subscription information.':'Настройки подключения и информация о подписке.');
         $('[data-subscription-traffic-label]').textContent=copy[1];
         $('[data-subscription-expiry-label]').textContent=copy[2];
         const sampleUsage=$('[data-subscription-traffic] b');
         const sampleDate=$('[data-subscription-expiry] b');
-        if(sampleUsage)sampleUsage.textContent=d.subscriptionLanguage==='en'?'12.4 / 100 GB':'12,4 / 100 ГБ';
-        if(sampleDate)sampleDate.textContent=d.subscriptionLanguage==='en'?'Dec 31, 2026':'31.12.2026';
-        $('[data-subscription-connect]').textContent=d.subscriptionCta||copy[3];
-        $('[data-subscription-footer]').textContent=d.subscriptionFooter;
+        if(sampleUsage)sampleUsage.textContent=english?'12.4 / 100 GB':'12,4 / 100 ГБ';
+        if(sampleDate)sampleDate.textContent=english?'Dec 31, 2026':'31.12.2026';
+        $('[data-subscription-connect]').textContent=(english?d.subscriptionCtaEn:d.subscriptionCta)||copy[3];
+        $('[data-subscription-footer]').textContent=english?d.subscriptionFooterEn:d.subscriptionFooter;
         $('[data-subscription-traffic]').hidden=!d.subscriptionShowTraffic;
         $('[data-subscription-expiry]').hidden=!d.subscriptionShowExpiry;
         $('[data-subscription-ok]').hidden=!d.subscriptionShowStatus;
@@ -339,13 +361,13 @@ window.XMeshSubscriptionStudio = (() => {
         $('[data-subscription-client-count]').textContent='Активно: '+allEnabled.length+' из '+(clientCatalog.length+d.subscriptionCustomClients.length);
         const apps=$('[data-subscription-apps]');
         apps.hidden=!d.subscriptionShowApps||!allEnabled.length;
-        $('[data-subscription-apps-title]').textContent=d.subscriptionAppsTitle||appsHeading(d.subscriptionLanguage);
+        $('[data-subscription-apps-title]').textContent=(english?d.subscriptionAppsTitleEn:d.subscriptionAppsTitle)||appsHeading(lang);
         apps.dataset.clientLayout=d.subscriptionClientLayout;
         $('[data-subscription-app-list]').innerHTML=allEnabled.map(([id,label,platform])=>
           '<div class="subscription-preview-app"><span>'+esc(label.slice(0,2))+'</span><div><b>'+esc(label)+'</b><small>'+esc(platform)+'</small></div></div>'
         ).join('');
         const support=$('[data-subscription-support]');
-        support.textContent=d.subscriptionSupportLabel||'Поддержка';
+        support.textContent=(english?d.subscriptionSupportLabelEn:d.subscriptionSupportLabel)||(english?'Support':'Поддержка');
         support.hidden=!d.subscriptionShowSupport;
         const labels={a:'Панель',b:'',c:''};
         labels[d.subscriptionPlacement]+=(labels[d.subscriptionPlacement]?' + ':'')+'Подписки';
@@ -355,6 +377,14 @@ window.XMeshSubscriptionStudio = (() => {
           '<div class="subscription-topology-item"><span>'+esc('SERVER '+id.toUpperCase())+'</span><b>'+esc(labels[id])+'</b><small>'+esc(names[id])+'</small></div>'
         ).join('');
       };
+      form.addEventListener('click',event=>{
+        const button=event.target.closest('[data-portal-language]');
+        if(!button || !form.contains(button))return;
+        const next=button.dataset.portalLanguage;
+        if(next!=='ru'&&next!=='en')return;
+        previewLanguage=next;
+        draw();
+      });
       form.addEventListener('input',draw);
       form.addEventListener('change',event=>{
         if(event.target.name==='subscriptionTheme'&&!input(form,'subscriptionSyncPanelTheme').checked){
@@ -425,7 +455,7 @@ window.XMeshSubscriptionStudio = (() => {
           }
           if(!validHttps(client.url)){notify('Некорректная HTTPS-ссылка для '+client.name);return;}
         }
-        for(const key of ['subscriptionHero','subscriptionCta','subscriptionSupportLabel']){
+        for(const key of ['subscriptionHero','subscriptionHeroEn','subscriptionCta','subscriptionCtaEn','subscriptionSupportLabel','subscriptionSupportLabelEn','subscriptionDescriptionEn','subscriptionFooterEn','subscriptionAppsTitleEn']){
           if(/[\u0000-\u001f\u007f]/.test(draft[key])){notify('Заголовки не должны содержать управляющих символов.');return;}
         }
         const button=form.closest('.subscription-studio').querySelector('.subscription-studio-intro button');
