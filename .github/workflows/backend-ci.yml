@@ -52,6 +52,8 @@ jobs:
         run: node scripts/check-json-diagnostics.js
       - name: Test Xray semantic intelligence
         run: node scripts/check-xray-intelligence.js
+      - name: Test XRAY STUDIO editor tools and Reality Short ID recovery
+        run: node scripts/check-xray-tool-actions.js
       - name: Enforce active XRAY STUDIO entrypoint and remove stale assets
         run: node scripts/check-xray-active-entrypoint.js
       - name: Verify packaged frontend assets
