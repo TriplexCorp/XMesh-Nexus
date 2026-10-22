@@ -1,0 +1,45 @@
+# XMesh Nexus — обновление панели и учёт трафика
+
+## Веб-обновление
+
+В настройках под Xray-core расположен блок «Обновление XMesh Nexus».
+Только owner может отправить POST /api/v1/panel/update. API записывает фиксированное
+значение update в выделенный файл, но не запускает shell и не имеет Docker socket.
+Отдельная root-owned systemd служба xmesh-panel-update.service вызывает
+xmeshctl --web-update с flock и полным PostgreSQL backup перед pull/rebuild.
+GET /api/v1/panel/update показывает idle/running/success/failed.
+Установка host helper: sudo bash install.sh в каталоге проекта.
+Лог: sudo journalctl -u xmesh-panel-update.service -n 80 --no-pager
+Или: sudo tail -n 80 /var/log/xmesh-nexus/update.log
+
+## Локальные флаги
+
+На этапе сборки Docker-образа копируются SVG из фиксированного пакета
+flag-icons@7.5.0 (MIT) в /app/static/flags/. В браузере они загружаются
+исключительно с /flags/<iso>.svg на домене панели, без сторонних CDN.
+Повторная загрузка извне нужна только при сборке нового Docker-образа.
+
+## Персональные счётчики Xray по inbound
+
+Панель создаёт отдельный Xray UUID для каждого пользователя на сервере.
+При добавлении этого пользователя к inbound Xray StatsService получает
+уникальный email-счётчик xmesh-u<userId>--<encodeURIComponent(inboundTag)>.
+Тем самым Xray измеряет пользователя на каждом inbound отдельно.
+XRAY STUDIO включает stats:{} и policy.levels.0.statsUserUplink/Downlink
+в новых серверных шаблонах. Xray API StatsService нужно дополнительно
+включить и разрешить только на 127.0.0.1:10085 (или локально доступной
+агенту loopback-точке). Никогда не открывайте этот API в интернет.
+
+На узле агент использует xray api statsquery --server=127.0.0.1:10085
+и доверенный локальный python3 parser. Показания отправляются в подписанных
+Ed25519-пакетах userInboundTraffic и userTraffic. Сервер накапливает
+монотонные дельты отдельно для user x inbound x node в PostgreSQL.
+Если Xray StatsService недоступен, данные пользователя не выдумываются.
+Для Dockerized Xray может потребоваться интеграция агента в ту же сеть.
+
+## Client JSON
+
+XRAY STUDIO формирует Client JSON с dns.queryStrategy=UseIPv4,
+dns.servers=[1.1.1.1], SOCKS 127.0.0.1:10808 (noauth, UDP) и HTTP
+127.0.0.1:10809 (пустые settings). На обоих — sniffing http/tls/quic.
+Оба локальных прокси привязаны только к loopback.
