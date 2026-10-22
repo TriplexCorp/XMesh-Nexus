@@ -73,6 +73,18 @@ if [[ "$(id -u)" == 0 ]]; then
   chown 10001:10001 deploy/runtime/dashboard-path
 fi
 
+# A single fixed-value request file is the only update permission exposed to the API.
+# Docker socket, git checkout and the privileged worker remain host-only.
+for marker in panel-update-request panel-update-status; do
+  if [[ ! -f "deploy/runtime/$marker" ]]; then
+    printf 'idle\n' > "deploy/runtime/$marker"
+  fi
+  if [[ "$(id -u)" == 0 ]]; then
+    chown 10001:10001 "deploy/runtime/$marker"
+  fi
+  chmod 600 "deploy/runtime/$marker"
+done
+
 # Existing installations may contain an empty TOTP_ENCRYPTION_KEY.
 # Verify without replacing a nonempty key (which is required to decrypt existing TOTP secrets).
 bash deploy/ensure-totp-key.sh .env
@@ -100,8 +112,27 @@ Unit=xmesh-dashboard-env.service
 [Install]
 WantedBy=multi-user.target
 EOF
+  install -o root -g root -m 0750 deploy/update-panel-host.sh /usr/local/libexec/xmesh-update-panel
+  cat > /etc/systemd/system/xmesh-panel-update.service <<EOF
+[Unit]
+Description=Update XMesh Nexus after authenticated owner request
+After=docker.service
+[Service]
+Type=oneshot
+TimeoutStartSec=0
+ExecStart=/usr/local/libexec/xmesh-update-panel ${repo_dir}
+EOF
+  cat > /etc/systemd/system/xmesh-panel-update.path <<EOF
+[Unit]
+Description=Watch owner-authorized XMesh update requests
+[Path]
+PathChanged=${repo_dir}/deploy/runtime/panel-update-request
+Unit=xmesh-panel-update.service
+[Install]
+WantedBy=multi-user.target
+EOF
   systemctl daemon-reload
-  systemctl enable --now xmesh-dashboard-env.path
+  systemctl enable --now xmesh-dashboard-env.path xmesh-panel-update.path
 else
   echo 'Warning: automatic .env synchronization requires root and systemd on the host.' >&2
 fi
