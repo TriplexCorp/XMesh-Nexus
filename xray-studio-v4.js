@@ -123,7 +123,7 @@ async function checkWithCore(){
  const source=input.value;
  get('valid').textContent='Проверяет установленный Xray-core…';
  try{
-  const reply=await ctx.apiRequest('/api/core/validate',{method:'POST',body:JSON.stringify({config:source})});
+  const reply=await ctx.apiRequest('/api/v1/core/validate',{method:'POST',body:JSON.stringify({config:source})});
   if(source!==input.value)return;
   const valid=reply.valid===true,output=[reply.stderr,reply.stdout].filter(Boolean).join(' ').trim();
   const candidate=output.match(/(?:line|строка)\\s+(\\d+)(?:\\D|$)/i);
