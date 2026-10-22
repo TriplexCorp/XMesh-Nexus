@@ -96,7 +96,6 @@ payload="$(printf '{"node_id":%s,"cpu_percent":%s,"ram_used_bytes":%s,"ram_total
   "$XMESH_NODE_ID" "$cpu_pct" "$mem_used_bytes" "$mem_total_bytes" "${disk_used_bytes:-0}" "${disk_total_bytes:-0}" "$rx_rate" "$tx_rate" "$active_connections" "$XMESH_INTERFACE" "$elapsed")"
 
 [[ -r "$XMESH_METRICS_PRIVATE_KEY" ]] || { echo "Missing readable Ed25519 private key." >&2; exit 1; }
-[[ -r "$XMESH_METRICS_PRIVATE_KEY" ]] || { echo "Private key is not readable" >&2; exit 1; }
 command -v openssl >/dev/null || { echo "OpenSSL is required for signed metrics" >&2; exit 1; }
 timestamp="$(date +%s)"
 nonce="$(openssl rand -hex 16)"
