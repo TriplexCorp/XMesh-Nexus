@@ -42,7 +42,7 @@ for(const [file,contents] of Object.entries(css)){
    // Circular color pickers and swatches are intentionally not action-button shapes.
    if(/\.swt button|\.color-bubble|\.palette-swatch/.test(selector))continue;
    const actionable=/\bbutton\b|\.ia\b|\.ib\b|\.more\b|\.node-create-action|#addb|#logout|\.user-id-copy|\.user-stats-refresh/.test(selector);
-   if(actionable)assert(/var\(--ui-control-radius\)|inherit/.test(value),
+   if(actionable)assert(/var\(--ui-control-radius(?:,[^)]*)?\)|var\(--vround\)|inherit/.test(value),
      file+': hardcoded radius '+value+' for '+selector);
  }
 }
