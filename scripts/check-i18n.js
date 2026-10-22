@@ -45,6 +45,17 @@ assert.equal(api.translate('Повторяющееся поле «tag»: Xray/JS
 assert.equal(api.translate('Название вашего сервиса'),'Your service name');
 assert.equal(api.translate('3 узлов настроено. CPU, RAM и скорость требуют подключённого мониторинга.'),
  '3 nodes configured. CPU, RAM, and speed require connected monitoring.');
+// Regression coverage for formerly mixed RU/EN surfaces.
+for(const [ru,en] of [
+ ['16 вариантов шрифта с поддержкой кириллицы. Выбор применяется ко всей панели и сохраняется в настройках','16 Cyrillic-compatible fonts. The choice applies across the panel and is saved in settings.'],
+ ['Премиум клиенты','Premium clients'],
+ ['Поиск пользователей','Search users'],
+ ['Рабочие разделы XRAY STUDIO','XRAY STUDIO workspaces'],
+ ['Новый адрес сгенерирован. Сохраните политику, чтобы применить его.','New path generated. Save the policy to apply it.'],
+ ['Ошибка настроек безопасности','Security settings error'],
+ ['Название профиля','Profile name'],
+ ['Криптографический генератор недоступен. Используйте HTTPS.','Cryptographic random generator unavailable. Use HTTPS.']
+])assert.equal(api.translate(ru),en,'Missing English translation for '+ru);
 api.apply(document);
 assert.equal(text.nodeValue,'Settings');
 assert.equal(raw.nodeValue,'CustomerServiceABC');
