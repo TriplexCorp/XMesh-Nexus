@@ -526,6 +526,39 @@ window.XMeshI18n=(()=>{
     ["Обновите панель и страницу браузера. Скрипт mfa-ui.js не загружен.","Update the panel and refresh this page. The mfa-ui.js script did not load."]
   ];
   for(const [ru,en] of securityPageTranslations)dict.set(ru,en);
+
+  const advancedSecurityTranslations=[
+    ["Расширенная защита","Advanced security"],
+    ["Настройки сервера и активные сеансы администраторов","Server settings and administrator sessions"],
+    ["Загрузка политик безопасности…","Loading security policies…"],
+    ["Политика авторизации","Authentication policy"],
+    ["Управляется владельцем панели. Значения сохраняются в PostgreSQL и проверяются API.","Managed by the panel owner. Values are saved in PostgreSQL and enforced by the API."],
+    ["Срок действия сессии","Session lifetime"],
+    ["Максимальное время входа. Применяется к новым сессиям.","Maximum login lifetime. Applied to new sessions."],
+    ["Таймаут бездействия","Idle timeout"],
+    ["0 — не завершать сессию из-за бездействия.","0 disables inactivity-based expiration."],
+    ["Сессий на администратора","Sessions per administrator"],
+    ["Ограничение количества одновременно действующих входов.","Limits the number of simultaneous sessions."],
+    ["Попыток входа","Login attempts"],
+    ["После этого числа ошибок вход временно блокируется.","Sign-in is temporarily blocked after this many failures."],
+    ["Время блокировки","Lockout duration"],
+    ["Период ограничения после превышения попыток.","Time blocked after the failed-login threshold is exceeded."],
+    ["Адрес панели","Dashboard URL"],
+    ["Дополнительный URL входа. Не заменяет HTTPS и авторизацию. Старый адрес / пока остаётся доступным.","Additional dashboard entry URL. It does not replace HTTPS or authentication. The original / route remains available."],
+    ["Редактирование доступно только владельцу (owner).","Only the owner can change these settings."],
+    ["Сохранить политику","Save policy"],
+    ["Вернуть значения по умолчанию","Restore defaults"],
+    ["Мои активные сессии","My active sessions"],
+    ["При необходимости завершите другие входы в панель.","Review and revoke your other sign-ins when needed."],
+    ["Текущая сессия","Current session"],
+    ["Отозвать","Revoke"],
+    ["Завершить","End session"],
+    ["Завершить все другие сессии","Sign out all other sessions"],
+    ["Повторить загрузку","Retry"],
+    ["Изменение пути не скрывает API и не заменяет ограничения доступа на обратном прокси. Для полной смены базового URL потребуется отдельная настройка HTTPS-прокси.","Changing the path does not hide the API or replace reverse-proxy access controls. A complete base-URL change requires separate HTTPS reverse-proxy configuration."],
+  ];
+  for(const [ru,en] of advancedSecurityTranslations)dict.set(ru,en);
+
   const qrTranslations=[
     ["QR-код для приложения-аутентификатора","QR code for an authenticator app"],
     ["QR-код недоступен — используйте ручной ввод.","QR code unavailable — enter the key manually."],
