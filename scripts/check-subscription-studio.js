@@ -55,6 +55,8 @@ assert.match(view,/name="subscriptionDescriptionEn"/,'English custom copy must b
 assert.match(view,/name="subscriptionAppsTitleEn"/,'Apps heading must support the English locale');
 assert.match(src,/if\(next!=='ru'&&next!=='en'\)return/,'Untrusted locale values must be rejected');
 assert.match(src,/previewRoot\.lang=lang/,'Portal preview must set its own lang, not the admin language');
+assert.match(src,/textContent=copy\[4\]/,'Copy-link action must follow the visitor locale');
+assert.match(src,/english\?'Devices':'Устройства'/,'Device action must follow the visitor locale');
 assert.match(src,/\$\('\[data-subscription-description\]'\)\.textContent=/,'Custom copy must use textContent, not untrusted HTML');
 assert.match(view,/SUBSCRIPTION STUDIO/);
 assert.match(view,/name="subscriptionDomain"/);
