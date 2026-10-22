@@ -527,15 +527,15 @@ window.XMeshI18n=(()=>{
   ];
   for(const [ru,en] of securityPageTranslations)dict.set(ru,en);
   const qrTranslations=[
-    ["QR-код для Google Authenticator","QR code for Google Authenticator"],
+    ["QR-код для приложения-аутентификатора","QR code for an authenticator app"],
     ["QR-код недоступен — используйте ручной ввод.","QR code unavailable — enter the key manually."],
-    ["1. Откройте Google Authenticator, нажмите «+» и выберите «Сканировать QR-код».","1. Open Google Authenticator, tap '+' and select 'Scan a QR code'."],
-    ["Подключение приложения","Connect an authenticator app"],
-    ["Отсканируйте QR-код камерой телефона. Также поддерживаются 2FAS, Aegis и другие приложения TOTP.","Scan the QR code with your phone. 2FAS, Aegis and other TOTP apps are also supported."],
-    ["Не получается сканировать? Ввести ключ вручную","Cannot scan? Enter a key manually"],
+    ["1. Откройте приложение-аутентификатор и добавьте аккаунт с помощью QR-кода.","1. Open your authenticator app and add an account using the QR code."],
+    ["Настройка приложения-аутентификатора","Set up an authenticator app"],
+    ["Используйте любое приложение с поддержкой одноразовых кодов TOTP: например, Google Authenticator, Microsoft Authenticator, 2FAS или Aegis. Сканируйте QR-код в самом приложении.","Use any app that supports TOTP one-time codes, such as Google Authenticator, Microsoft Authenticator, 2FAS, or Aegis. Scan the QR code inside the app."],
+    ["Нет возможности сканировать? Добавить вручную","Can't scan the QR code? Add the account manually"],
     ["Секретный ключ","Secret key"],
     ["Копировать ключ","Copy key"],
-    ["2. Код из Google Authenticator","2. Code from Google Authenticator"],
+    ["2. Шестизначный код из приложения-аутентификатора","2. Six-digit code from your authenticator app"],
     ["2FA включится только после подтверждения кода. На подтверждение есть 10 минут.","2FA is enabled only after you verify the code, within 10 minutes."],
     ["Язык интерфейса","Interface language"],
     ["Выбор языка","Choose language"]
