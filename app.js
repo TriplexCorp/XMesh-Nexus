@@ -648,9 +648,9 @@ function statisticsP(){
     const rx=fresh.reduce((sum,n)=>sum+(Number(n.latest.rxBytesPerSec)||0),0);
     const tx=fresh.reduce((sum,n)=>sum+(Number(n.latest.txBytesPerSec)||0),0);
     const tiles=[
-      ['Узлы',String(overview.totalNodes??nodes.length),fresh.length+' передают свежие данные'],
+      ['Узлы',String(overview.totalNodes??nodes.length),(panelIsEnglish()?fresh.length+' reporting fresh data':fresh.length+' передают свежие данные')],
       ['Пользователи',String(overview.totalUsers??'—'),'Учетные записи панели'],
-      ['CPU steal',statsValue(stealAvg,'%'),steals.length?steals.length+' узлов с показаниями':'Данные агента отсутствуют'],
+      ['CPU steal',statsValue(stealAvg,'%'),steals.length?(panelIsEnglish()?steals.length+' nodes reporting':steals.length+' узлов с показаниями'):'Данные агента отсутствуют'],
       ['RX',fresh.length?statsBytes(rx)+'/с':'Нет данных','Скорость получения'],
       ['TX',fresh.length?statsBytes(tx)+'/с':'Нет данных','Скорость отправки'],
       ['User × inbound',String(overview.inboundTraffic?.counters??0),'Записей фактического учета'],
@@ -664,7 +664,7 @@ function statisticsP(){
       ['Диск',statsValue(sys.disk?.percent,'%')],['Диск занят',statsBytes(sys.disk?.usedBytes)],
       ['Загрузка 1/5/15',Array.isArray([sys.loadAverage?.one,sys.loadAverage?.five,sys.loadAverage?.fifteen])?[sys.loadAverage?.one,sys.loadAverage?.five,sys.loadAverage?.fifteen].map(v=>statsValue(v)).join(' / '):'Нет данных'],
       ['Процессы',statsValue(sys.processCount)],['PostgreSQL',sys.database==='online'?'Онлайн':'Не отвечает'],
-      ['Uptime',sys.uptimeSeconds==null?'Нет данных':Math.floor(sys.uptimeSeconds/3600)+' ч']
+      ['Uptime',sys.uptimeSeconds==null?'Нет данных':Math.floor(sys.uptimeSeconds/3600)+(panelIsEnglish()?' h':' ч')]
     ];
     $('#stats-control').innerHTML='<div class="stats-kvs">'+control.map(x=>statsRow(...x)).join('')+'</div>';
     const points=traffic.points||[];
@@ -683,11 +683,11 @@ function statisticsP(){
         ['TCP соединения',statsValue(ok?v.activeConnections:null)],
         ['Онлайн клиенты',statsValue(ok?v.onlineClients:null)]
       ];
-      const last=v?.sampledAt?new Date(v.sampledAt).toLocaleString():'Нет измерений';
+      const last=v?.sampledAt?new Date(v.sampledAt).toLocaleString(panelIsEnglish()?'en-US':'ru-RU'):'Нет измерений';
       return '<article class="stats-node"><div class="stats-node-head">'+head+'</div><span class="stats-node-status">'+(ok?'Свежие данные':stale?'Данные устарели':'Нет телеметрии')+' · '+esc(last)+'</span><div class="stats-kvs">'+values.map(x=>statsRow(...x)).join('')+'</div></article>';
     }).join(''):'<p class="note">Узлы пока не созданы.</p>';
-    if(status)status.textContent='Данные обновлены · '+new Date().toLocaleTimeString();
-   }catch(error){if(status)status.textContent='Не удалось обновить статистику: '+(error.message||'Ошибка API')}
+    if(status)status.textContent=(panelIsEnglish()?'Data updated · ':'Данные обновлены · ')+new Date().toLocaleTimeString(panelIsEnglish()?'en-US':'ru-RU');
+   }catch(error){if(status)status.textContent=(panelIsEnglish()?'Unable to refresh statistics: ':'Не удалось обновить статистику: ')+(error.message||(panelIsEnglish()?'API error':'Ошибка API'))}
    finally{if(button?.isConnected)button.disabled=false}
   };
   $('#stats-refresh')?.addEventListener('click',()=>{void refresh()});
