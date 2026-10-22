@@ -2476,3 +2476,48 @@ aside #logout .ic{width:1.12rem;height:1.12rem;flex-shrink:0}
 @media(max-width:1200px){.stats-overview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.stats-layout{grid-template-columns:1fr}}
 @media(max-width:700px){.stats-overview-grid,.stats-node-grid,.stats-trend-grid{grid-template-columns:1fr}.stats-heading{flex-direction:column}.xmesh-action-feedback{bottom:.85rem;left:.85rem;right:.85rem}}
 @media(prefers-reduced-motion:reduce){.xmesh-action-feedback{transition:none} }
+
+
+/* Security Center — spacious desktop workspace, compact controls, native responsive flow. */
+.security-workspace{
+ width:100%!important;max-width:1720px!important;margin-inline:auto!important;
+ display:grid!important;grid-template-columns:minmax(340px,.8fr) minmax(0,1.2fr)!important;
+ align-items:start;gap:1rem!important;min-width:0;
+}
+.security-workspace>.security-overview{grid-column:1/-1;padding:.35rem .2rem .45rem}
+.security-workspace>.security-overview h2{font-size:clamp(1.35rem,1.8vw,1.85rem);margin:.25rem 0}
+.security-workspace>.security-overview p:last-child{max-width:75ch;color:var(--mu);line-height:1.55}
+.security-workspace>#mfa-panel{grid-column:1;min-width:0;margin:0}
+.security-workspace>#security-advanced{grid-column:2;min-width:0;margin:0}
+.security-workspace #mfa-panel.mfa-security-card,
+.security-workspace #security-advanced{
+ padding:clamp(1rem,1.4vw,1.55rem)!important;
+ border-radius:var(--ui-radius,16px)!important;
+}
+.security-workspace .security-settings-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem}
+.security-workspace .security-setting{padding:.85rem;gap:.65rem;min-width:0}
+.security-workspace .security-setting b{font-size:.83rem}
+.security-workspace .security-setting small{font-size:.72rem}
+.security-workspace .security-number input{width:4.4rem}
+.security-workspace .security-policy-actions{margin-top:.9rem}
+.security-workspace .security-subheading{margin-top:1.15rem}
+.security-workspace .security-session{padding:.75rem .85rem}
+.security-workspace .security-session small{overflow-wrap:anywhere}
+.security-workspace .security-path-controls{width:100%}
+@media(max-width:1400px){
+ .security-workspace{grid-template-columns:minmax(310px,.85fr) minmax(0,1.15fr)!important}
+ .security-workspace .security-settings-grid{grid-template-columns:minmax(0,1fr)}
+}
+@media(max-width:950px){
+ .security-workspace{display:flex!important;flex-direction:column;max-width:780px!important}
+ .security-workspace>.security-overview,
+ .security-workspace>#mfa-panel,
+ .security-workspace>#security-advanced{width:100%;min-width:0}
+ .security-workspace .security-settings-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:620px){
+ .security-workspace .security-settings-grid{grid-template-columns:minmax(0,1fr)}
+ .security-workspace .security-setting{flex-wrap:wrap;align-items:flex-start}
+ .security-workspace .security-number{margin-left:auto}
+ .security-workspace .security-session{flex-wrap:wrap}
+}
