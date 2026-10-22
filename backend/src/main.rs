@@ -793,6 +793,13 @@ async fn create_node_metrics_token(
     Path(id): Path<i64>,
 ) -> Result<(StatusCode, Json<Value>), ApiError> {
     require_owner(&actor)?;
+    let legacy_allowed = env::var("ALLOW_LEGACY_NODE_BEARER")
+        .map(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "true" | "1" | "yes"))
+        .unwrap_or(false);
+    if !legacy_allowed {
+        return Err(ApiError::new(StatusCode::FORBIDDEN,
+            "Новые Bearer-токены узлов запрещены. Используйте Ed25519."));
+    }
     if id <= 0 {
         return Err(ApiError::new(StatusCode::BAD_REQUEST, "ID узла должен быть положительным числом."));
     }
