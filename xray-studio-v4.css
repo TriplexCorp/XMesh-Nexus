@@ -205,3 +205,13 @@
 .sv-studio .sv-workspace,.sv-studio.sv-hide-tools .sv-workspace{grid-template-columns:minmax(0,1fr);grid-template-rows:520px minmax(420px,auto) auto;grid-template-areas:"editor" "constructor" "tools"}
 .sv-studio.sv-hide-tools .sv-workspace{grid-template-areas:"editor" "constructor"}
 }
+
+
+/* Progressive disclosure for protocol-specific advanced configuration. */
+.sv-studio .sv-advanced{margin:1rem 0 .25rem;border-top:1px solid var(--vline);padding-top:.85rem}
+.sv-studio .sv-advanced summary{cursor:pointer;list-style:none;color:var(--vmute);font-size:.8rem;font-weight:650;padding:.3rem 0}
+.sv-studio .sv-advanced summary::-webkit-details-marker{display:none}
+.sv-studio .sv-advanced summary::before{content:"›";display:inline-block;margin-right:.5rem;transition:transform .15s}
+.sv-studio .sv-advanced[open] summary::before{transform:rotate(90deg)}
+.sv-studio .sv-advanced textarea{width:100%;min-height:8rem;resize:vertical;border:1px solid var(--vline);border-radius:var(--vround);background:var(--vfield);color:var(--vtext);padding:.7rem;font:500 .78rem/1.55 ui-monospace,SFMono-Regular,Consolas,monospace;tab-size:2}
+.sv-studio .sv-advanced .sv-field{margin:.8rem 0}
