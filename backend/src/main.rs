@@ -19,7 +19,6 @@ use axum::{
 use core::CoreManager;
 use redis::aio::ConnectionManager;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use uuid::Uuid;
 use serde_json::{json, Map, Value};
 use sqlx::{postgres::PgPoolOptions, PgPool, Row};
@@ -246,7 +245,6 @@ async fn main() -> anyhow::Result<()> {
         .route("/system/stats", get(get_system_stats))
         .route("/metrics/traffic", get(get_traffic_metrics))
         .route("/users/{id}/traffic", get(get_user_traffic))
-        .route("/nodes/{id}/metrics-token", post(create_node_metrics_token))
         .route("/nodes/{id}/metrics-key", post(node_auth::enroll).delete(node_auth::revoke))
         .route("/admins", get(admin_accounts::list).post(admin_accounts::create))
         .route("/admins/{id}", patch(admin_accounts::update).delete(admin_accounts::delete))
@@ -296,10 +294,7 @@ async fn csrf_guard(request: Request, next: Next) -> Response {
     let agent_credential = request.uri().path() == "/api/v1/metrics/ingest"
         && request.headers().get(header::ORIGIN).is_none()
         && request.headers().get(header::COOKIE).is_none()
-        && (request.headers().get(header::AUTHORIZATION)
-            .and_then(|value| value.to_str().ok())
-            .is_some_and(|value| value.starts_with("Bearer "))
-            || request.headers().contains_key("x-xmesh-signature"));
+        && request.headers().contains_key("x-xmesh-signature");
     if is_mutation && request.uri().path().starts_with("/api/v1/") && !agent_credential {
         // Sec-Fetch-Site stops same-site but cross-origin form and fetch attacks.
         // Older clients still have to supply a matching Origin.
@@ -508,10 +503,6 @@ async fn delete_record(
     .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Запись не найдена."))?;
     let result = row_to_record(&row)?;
     if collection == "nodes" {
-        sqlx::query("DELETE FROM node_metric_auth WHERE node_id = $1")
-            .bind(id)
-            .execute(&state.pool)
-            .await?;
         sqlx::query("DELETE FROM node_metric_keys WHERE node_id = $1")
             .bind(id).execute(&state.pool).await?;
         sqlx::query("DELETE FROM node_metric_nonces WHERE node_id = $1")
@@ -787,70 +778,6 @@ async fn get_system_stats(State(state): State<AppState>) -> Json<Value> {
     }))
 }
 
-async fn create_node_metrics_token(
-    State(state): State<AppState>,
-    Extension(actor): Extension<auth::AuthUser>,
-    Path(id): Path<i64>,
-) -> Result<(StatusCode, Json<Value>), ApiError> {
-    require_owner(&actor)?;
-    let legacy_allowed = env::var("ALLOW_LEGACY_NODE_BEARER")
-        .map(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "true" | "1" | "yes"))
-        .unwrap_or(false);
-    if !legacy_allowed {
-        return Err(ApiError::new(StatusCode::FORBIDDEN,
-            "Новые Bearer-токены узлов запрещены. Используйте Ed25519."));
-    }
-    if id <= 0 {
-        return Err(ApiError::new(StatusCode::BAD_REQUEST, "ID узла должен быть положительным числом."));
-    }
-    let node_exists: bool = sqlx::query_scalar(
-        "SELECT EXISTS (SELECT 1 FROM panel_records WHERE collection = 'nodes' AND id = $1)"
-    )
-    .bind(id)
-    .fetch_one(&state.pool)
-    .await?;
-    if !node_exists {
-        return Err(ApiError::new(StatusCode::NOT_FOUND, "Узел не найден."));
-    }
-
-    // Explicitly reject downgrade to bearer on signed-enrolled nodes.
-    let signed_enrolled: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM node_metric_keys WHERE node_id=$1)"
-    ).bind(id).fetch_one(&state.pool).await?;
-    if signed_enrolled {
-        return Err(ApiError::new(StatusCode::CONFLICT,
-            "Узел использует Ed25519. Bearer-токены запрещены до явного отзыва ключа."));
-    }
-
-    // 2 UUIDv4 values provide a high-entropy bearer token. Only its SHA-256 hash is persisted.
-    let token = format!("xm_{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
-    let token_hash = hex::encode(Sha256::digest(token.as_bytes()));
-    sqlx::query(
-        "INSERT INTO node_metric_auth (node_id, token_hash) VALUES ($1, $2)
-         ON CONFLICT (node_id) DO UPDATE
-           SET token_hash = EXCLUDED.token_hash, created_at = NOW(), last_seen_at = NULL"
-    )
-    .bind(id)
-    .bind(&token_hash)
-    .execute(&state.pool)
-    .await?;
-
-    audit(
-        &state.pool,
-        &actor.username,
-        "node_metrics.token_rotated",
-        Some("nodes"),
-        Some(id),
-        json!({"tokenStoredAs": "sha256"}),
-    ).await;
-
-    Ok((StatusCode::CREATED, Json(json!({
-        "nodeId": id,
-        "token": token,
-        "message": "Токен показывается только один раз. Сохраните его на узле."
-    }))))
-}
-
 async fn ingest_node_metrics(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -862,7 +789,7 @@ async fn ingest_node_metrics(
         return Err(ApiError::new(StatusCode::BAD_REQUEST, "node_id должен быть положительным числом."));
     }
     // The node must authenticate before untrusted samples are recorded.
-    // Signed nodes cannot fall back to their old bearer credential.
+    // Telemetry requires a registered Ed25519 identity.
     node_auth::authenticate(&state, &headers, body.node_id, &raw_body).await?;
 
     let metrics = body.metrics.unwrap_or_else(|| json!({}));
@@ -953,10 +880,6 @@ async fn ingest_node_metrics(
         .await?;
     }
 
-    sqlx::query("UPDATE node_metric_auth SET last_seen_at = NOW() WHERE node_id = $1")
-        .bind(body.node_id)
-        .execute(&state.pool)
-        .await?;
 
     Ok((StatusCode::CREATED, Json(json!({
         "status": "accepted",
