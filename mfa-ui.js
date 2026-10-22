@@ -11,16 +11,32 @@ async function call(action,body){
  if(!response.ok)throw new Error(result.error||'Ошибка двухфакторной защиты.');
  return result;
 }
-const panel=()=>'<section class="card" id="mfa-panel"><div class="hd"><div><h3>Двухфакторная аутентификация</h3><p>Дополнительная защита входа · TOTP</p></div><span class="chip" id="mfa-state">Загрузка…</span></div><p class="note">Для входа потребуется код приложения-аутентификатора. Сохраните резервные коды на случай потери телефона.</p><div id="mfa-body"></div><p class="er" id="mfa-error" role="alert" aria-live="polite"></p></section>';
+const panel=()=>'<section class="card mfa-security-card" id="mfa-panel">'+
+ '<div class="hd mfa-security-heading"><div class="mfa-security-title">'+
+ '<span class="mfa-security-icon" aria-hidden="true"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg></span>'+
+ '<div><h3>Двухфакторная аутентификация</h3><p>Подтверждение входа одноразовым кодом · TOTP</p></div></div>'+
+ '<span class="chip" id="mfa-state" aria-live="polite">Проверка…</span></div>'+
+ '<div class="mfa-security-content"><p class="note">Дополнительная защита учётной записи. После включения понадобится код приложения-аутентификатора; сохраните резервные коды для восстановления доступа.</p>'+
+ '<div id="mfa-body"></div><p class="er" id="mfa-error" role="alert" aria-live="polite"></p></div></section>';
 async function mount(root){
  const card=root.querySelector('#mfa-panel');if(!card)return;
  const body=card.querySelector('#mfa-body'),state=card.querySelector('#mfa-state'),error=card.querySelector('#mfa-error');
  const setError=text=>{error.textContent=text||''};
  const display=async()=>{
   const status=await call('status');
-  state.textContent=status.enabled?'Включена':'Выключена';
+  state.textContent=!status.available?'Нужна настройка':status.enabled?'Включена':'Выключена';
+  state.dataset.status=!status.available?'unavailable':status.enabled?'enabled':'disabled';
   if(!status.available){
-   body.textContent='Добавьте постоянный TOTP_ENCRYPTION_KEY в .env и перезапустите панель.';
+   body.innerHTML='<div class="mfa-unavailable">'+
+    '<div class="mfa-unavailable-heading"><h4>Защита ожидает настройки сервера</h4>'+
+    '<p>Панель пока не получила постоянный ключ шифрования TOTP. Из браузера включить 2FA небезопасно: ключ должен храниться только на сервере.</p></div>'+
+    '<div class="mfa-unavailable-actions"><div><span class="mfa-step-number">01</span><p>Откройте терминал VPS и перейдите в каталог XMesh Nexus.</p></div>'+
+    '<div><span class="mfa-step-number">02</span><p>Запустите терминальное меню панели и выберите <strong>пункт 9 — «Проверить и включить 2FA»</strong>.</p></div></div>'+
+    '<div class="mfa-terminal"><code>bash xmeshctl</code><button class="gh sm" type="button" data-mfa-copy="repair">Копировать</button></div>'+
+    '<p class="mfa-repair-hint">После проверки ключа панель будет пересоздана с правильной конфигурацией. Обновите эту страницу и включите 2FA, подтвердив код в приложении.</p>'+
+    '<details class="mfa-key-warning"><summary>Уже использовали 2FA раньше?</summary>'+
+    '<p>Если прежний ключ TOTP_ENCRYPTION_KEY был утрачен, восстановите <strong>именно оригинальный</strong> ключ из резервной копии .env. Новый ключ не сможет расшифровать существующие TOTP-секреты. Не публикуйте .env и ключи в поддержке или GitHub.</p></details>'+
+    '</div>';
   }else if(status.enabled){
    body.innerHTML='<details class="mfa-details"><summary>Отключить 2FA</summary><form id="mfa-disable" class="sg"><label class="f"><span>Текущий пароль</span><input type="password" name="password" autocomplete="current-password" maxlength="1024" required></label><label class="f"><span>Код приложения или резервный код</span><input name="code" autocomplete="one-time-code" maxlength="40" required></label><button class="gh" type="submit">Подтвердить отключение</button></form></details>';
   }else{
@@ -87,7 +103,7 @@ async function mount(root){
   const copy=event.target.closest('[data-mfa-copy]');
   if(!copy)return;
   const type=copy.dataset.mfaCopy;
-  const val=type==='secret'?body.querySelector('#mfa-secret')?.value:type==='uri'?card.dataset.uri:body.querySelector('#mfa-recovery-codes')?.value;
+  const val=type==='repair'?'bash xmeshctl':type==='secret'?body.querySelector('#mfa-secret')?.value:type==='uri'?card.dataset.uri:body.querySelector('#mfa-recovery-codes')?.value;
   if(!val)return;
   try{await navigator.clipboard.writeText(val);copy.textContent='Скопировано';}
   catch{setError('Не удалось скопировать. Выделите и скопируйте текст вручную.');}
