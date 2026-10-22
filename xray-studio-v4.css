@@ -93,3 +93,17 @@
 @media(max-width:1190px){.sv-columns{grid-template-columns:minmax(0,1.35fr) minmax(300px,1fr);height:auto;min-height:590px}.sv-codepanel,.sv-constructor{min-height:640px}.sv-tools{grid-column:1/-1;min-height:120px}.sv-legacy .xm-tools-grid{flex-direction:row;flex-wrap:wrap}.sv-legacy .xm-tools-grid button{width:auto}.sv-hide-tools .sv-columns{grid-template-columns:minmax(0,1.35fr) minmax(300px,1fr)}.sv-title{flex-wrap:wrap}}
 @media(max-width:820px){.sv-columns,.sv-hide-tools .sv-columns{grid-template-columns:minmax(0,1fr)}.sv-codepanel{min-height:480px}.sv-constructor{min-height:430px}.sv-tools{grid-column:1}.sv-mainnav{align-items:flex-start;flex-wrap:wrap}.sv-bottom{flex-wrap:wrap}.sv-bottom>div{width:100%;justify-content:flex-end}.sv-two{grid-template-columns:minmax(0,1fr)}}
 @media(prefers-reduced-motion:reduce){.sv-studio *{animation:none!important;transition:none!important}}
+
+
+/* Approved mockup: compact server-only Tools, with history still available from editor toolbar. */
+.sv-legacy [data-tool="undo"],.sv-legacy [data-tool="redo"],
+.sv-legacy [data-tool="find"],.sv-legacy [data-tool="format"],
+.sv-legacy [data-tool="inbound"],.sv-legacy [data-tool="xhttp"],
+.sv-legacy [data-tool="log"]{display:none!important}
+.sv-legacy .xm-tools-grid button[data-tool="reality"]{border-left:3px solid #34cc93}
+.sv-legacy .xm-tools-grid button[data-tool="shortid"]{border-left:3px solid #ae7cf0}
+.sv-legacy .xm-tools-grid button[data-tool="dns"]{border-left:3px solid #669eeb}
+.sv-legacy .xm-tools-grid button[data-tool="routing"]{border-left:3px solid #57c6a5}
+.sv-legacy .xm-tools-grid button[data-tool="policy"]{border-left:3px solid #d981b3}
+.sv-legacy .xm-tools-grid button[data-tool="outbounds"]{border-left:3px solid #e3a763}
+.sv-legacy .xm-tools-grid button[data-tool="validate"]{border-left:3px solid #a87df0}
