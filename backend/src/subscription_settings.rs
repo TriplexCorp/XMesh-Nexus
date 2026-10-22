@@ -172,7 +172,7 @@ mod tests {
         assert!(!accepts(json!({"subscriptionRadius":37})));
         assert!(accepts(json!({"subscriptionSyncPanelTheme":true})));
         assert!(accepts(json!({"subscriptionAppsTitleEn":"Connection apps","subscriptionHeroEn":"Active"})));
-        assert!(!accepts(json!({"subscriptionAppsTitleEn":"<script>\u0000</script>"})));
+        assert!(!accepts(json!({"subscriptionAppsTitleEn":"<script>\u{0000}</script>"})));
         assert!(!accepts(json!({"subscriptionHeroEn":false})));
         assert!(!accepts(json!({"subscriptionSyncPanelTheme":"yes"})));
         assert!(!accepts(json!({"subscriptionBackground":"red"})));
