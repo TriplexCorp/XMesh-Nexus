@@ -2563,3 +2563,13 @@ aside #logout .ic{width:1.12rem;height:1.12rem;flex-shrink:0}
 
 /* The logo is independent from the button palette. */
 aside .brand .logo,#lg.logo{color:var(--logo-ink)!important}
+
+
+/* Additional globally selectable Cyrillic-capable UI fonts */
+html[data-font=inter] body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
+html[data-font=golos] body{font-family:"Golos Text",system-ui,-apple-system,"Segoe UI",sans-serif}
+html[data-font=rubik] body{font-family:Rubik,system-ui,-apple-system,"Segoe UI",sans-serif}
+html[data-font=nunito] body{font-family:"Nunito Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
+html[data-font=plex] body{font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
+html[data-font=roboto] body{font-family:Roboto,system-ui,-apple-system,"Segoe UI",sans-serif}
+html[data-font=pt] body{font-family:"PT Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
