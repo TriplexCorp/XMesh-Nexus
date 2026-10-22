@@ -192,12 +192,11 @@ async fn main() -> anyhow::Result<()> {
         let current:Option<Value>=sqlx::query_scalar(
             "SELECT value FROM app_settings WHERE key='security'"
         ).fetch_optional(&pool).await?;
-        if let Some(mut policy_json)=current {
-            if policy_json.get("dashboardPath").and_then(Value::as_str)==Some("/dashboard/nexus") {
+        if let Some(mut policy_json)=current
+            && policy_json.get("dashboardPath").and_then(Value::as_str)==Some("/dashboard/nexus") {
                 policy_json["dashboardPath"]=Value::String(from_env);
                 sqlx::query("UPDATE app_settings SET value=$1,updated_at=NOW() WHERE key='security'")
                     .bind(policy_json).execute(&pool).await?;
-            }
         }
     }
     // Sync the effective database path to a dedicated host-visible mirror.
