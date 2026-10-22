@@ -109,6 +109,9 @@ def main():
         "POST", "/auth/mfa/verify", {"challenge": pending["challenge"], "code": codes[0]})
     check(status, 200, "recovery code login")
     assert signed_in["authenticated"] and mfa_cookie
+    # maxSessions=1 is the strict default: the new MFA session revokes the
+    # previous owner cookie. Critical mutations must use the current session.
+    owner_cookie = mfa_cookie
     check(api("POST", "/auth/mfa/verify",
               {"challenge": pending["challenge"], "code": codes[0]})[0], 401,
           "MFA challenge cannot replay")
