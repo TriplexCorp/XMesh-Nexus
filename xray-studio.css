@@ -3442,3 +3442,84 @@ html[data-motion=off] .sr-studio-dialog::backdrop{animation:none!important;trans
 @media(max-width:900px){
  .xray-builder .xray-meta-grid{grid-template-columns:minmax(0,1fr)!important}
 }
+
+
+/* XRAY STUDIO — streamlined workspace, October 2026 */
+.xray-builder.studio-reference-v5{
+ --studio-line:color-mix(in srgb,var(--tx) 11%,transparent);
+ gap:.85rem!important;
+}
+.xray-builder.studio-reference-v5>.xray-hero{padding:.15rem 0!important}
+.xray-builder.studio-reference-v5 .xray-heading-copy{gap:.16rem!important}
+.xray-builder.studio-reference-v5 .xray-hero h2{font-size:clamp(1.32rem,1.5vw,1.75rem)!important;letter-spacing:-.035em!important}
+.xray-builder.studio-reference-v5 .xray-hero-description{font-size:.79rem!important}
+.xray-builder.studio-reference-v5>.xray-meta-grid{
+ grid-column:1/-1!important;
+ display:grid!important;
+ grid-template-columns:repeat(2,minmax(0,1fr))!important;
+ gap:.65rem .85rem!important;
+ padding:1rem!important;
+ border:1px solid var(--studio-line)!important;
+ border-radius:var(--ui-radius,16px)!important;
+ background:var(--s1)!important;
+}
+.xray-builder.studio-reference-v5>.xray-meta-grid>.f{min-width:0!important;padding:0!important}
+.xray-builder.studio-reference-v5>.xray-meta-grid>.f small{
+ font-size:.72rem!important;line-height:1.35!important;opacity:.8
+}
+.xray-builder.studio-reference-v5 .xray-workspace-layout{
+ align-items:start!important;gap:.85rem!important;min-width:0!important;
+}
+.xray-builder.studio-reference-v5 .xray-editor-pane,
+.xray-builder.studio-reference-v5 .xray-output-dock{
+ min-width:0!important;
+}
+.xray-builder.studio-reference-v5 .xray-config-panel-title{
+ margin-bottom:.7rem!important;padding-bottom:.7rem!important;
+ border-bottom:1px solid var(--studio-line)!important;
+}
+.xray-builder.studio-reference-v5 .xray-config-panel-title h3{
+ letter-spacing:-.015em!important;
+}
+.xray-builder.studio-reference-v5 .xray-output-workspace{
+ border:1px solid var(--studio-line)!important;
+ border-radius:var(--ui-radius,16px)!important;
+ overflow:hidden!important;
+}
+.xray-builder.studio-reference-v5 .xray-output-workspace-head{
+ padding:.85rem 1rem!important;
+}
+.xray-builder.studio-reference-v5 .xray-output-toolbar{
+ gap:.5rem!important;
+}
+.xray-builder.studio-reference-v5 .xray-footer{
+ gap:.75rem!important;min-width:0!important;
+}
+.xray-builder.studio-reference-v5 .sr-v6-address-status{
+ grid-column:2;
+ margin:-.35rem 0 0!important;
+ font-size:.73rem;
+ line-height:1.45;
+ color:var(--mu);
+}
+.xray-builder.studio-reference-v5 .sr-v6-address-status[data-kind="missing"]{color:var(--wr)}
+.xray-builder.studio-reference-v5 .sr-v6-address-status[data-kind="ready"]{color:var(--ok)}
+.xray-builder.studio-reference-v5 .xray-meta-grid>.f:nth-child(4)>small.sr-v5-meta-hint{display:none}
+.xray-builder.studio-reference-v5 .xray-option-group{
+ border-color:var(--studio-line)!important;
+}
+.xray-builder.studio-reference-v5 .xray-option-group-head{gap:.4rem!important}
+@media(min-width:1450px){
+ .xray-builder.studio-reference-v5 .xray-workspace-layout{
+  grid-template-columns:minmax(0,1.18fr) minmax(370px,.82fr)!important;
+ }
+}
+@media(max-width:1050px){
+ .xray-builder.studio-reference-v5>.xray-meta-grid{
+  grid-template-columns:minmax(0,1fr)!important;
+ }
+ .xray-builder.studio-reference-v5 .sr-v6-address-status{grid-column:1}
+}
+@media(prefers-reduced-motion:reduce){
+ .xray-builder.studio-reference-v5 *{scroll-behavior:auto!important}
+}
