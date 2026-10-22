@@ -53,7 +53,7 @@ if [[ ! -e "$private_key" ]]; then
   mv -n "$tmp_key" "$private_key"
 fi
 chmod 0600 "$private_key"
-public_key="$(openssl pkey -in "$private_key" -pubout -outform DER | tail -c 32 | od -An -tx1 -v | tr -d ' \\n')"
+public_key="$(openssl pkey -in "$private_key" -pubout -outform DER | tail -c 32 | od -An -tx1 -v | tr -d '[:space:]')"
 [[ "${#public_key}" -eq 64 && "$public_key" =~ ^[0-9a-f]+$ ]] || {
   echo "Cannot extract Ed25519 public key" >&2; exit 1;
 }
