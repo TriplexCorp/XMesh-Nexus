@@ -250,7 +250,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/dashboard/{slug}", get(security::dashboard_entry))
         .route("/login", get(login_page))
         .nest("/api/v1", public.merge(protected))
-        .fallback_service(ServeDir::new(static_dir).append_index_html_on_directories(true))
+        .fallback_service(ServeDir::new(static_dir).append_index_html_on_directories(false))
         .layer(RequestBodyLimitLayer::new(2 * 1024 * 1024))
         .layer(CompressionLayer::new())
         .layer(TraceLayer::new_for_http())
