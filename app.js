@@ -1272,6 +1272,8 @@ function xrayStudioEndpointOptions(db,tag){
  const cleanAddress=value=>{
   const v=String(value||'').trim();
   if(!v||v==='0.0.0.0'||v==='::'||v==='127.0.0.1'||v==='localhost'||v==='[::1]'||/\s|[/?#@\\]/.test(v))return '';
+  // Management-only addresses are never advertised as client endpoints.
+  if(/^(?:10\.|127\.|169\.254\.|192\.168\.|0\.|172\.(?:1[6-9]|2[0-9]|3[01])\.|100\.(?:6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.)/.test(v)||/^\[?(?:fc|fd|fe80|::1)/i.test(v))return '';
   // URL schemes or port suffixes are not valid addresses in Xray outbound.
   if(v.includes('://')||(/^\[[^\]]+\]:\d+$/.test(v))||(/^[^:]+:\d+$/.test(v)))return '';
   return v;
@@ -1309,12 +1311,12 @@ function xrayClientSample(){
  const protocol=v('protocol')||'vless';
  const network=protocol==='hysteria'?'hysteria':protocol==='masque'?'masque':v('network')||'raw';
  const security=['tun','wireguard'].includes(protocol)?'none':['hysteria','masque'].includes(protocol)?'tls':v('security')||'none';
- const sni=v('sni').trim()||'example.com';
  const endpoint=window.xrayStudioSelectedEndpoint||null;
+ const sni=endpoint?.sni||v('sni').trim()||'example.com';
  const address=v('server-address').trim()||'SERVER_ADDRESS';
  const port=protocol==='tun'?0:(endpoint?.port||cl(+v('port')||443,1,65535));
- const path=v('path')||'/';
- const host=v('host')||sni;
+ const path=endpoint?.path||v('path')||'/';
+ const host=endpoint?.host||v('host')||sni;
  const uuid=v('uuid')||'REPLACE_WITH_USER_UUID';
  const flow=protocol==='vless'&&['tls','reality'].includes(security)&&network==='raw'?v('flow'):'';
  const vlessEncMode=v('vlessenc-mode')||'off';
