@@ -1565,7 +1565,8 @@ function randomBase64(size){const b=new Uint8Array(size);crypto.getRandomValues(
 async function profilesP(){
  if(!window.XMeshStudio?.view||!window.XMeshStudio?.mount)throw new Error('Модуль XRAY STUDIO не загрузился. Проверьте /xray-studio-next.js и обновите страницу без кеша.');
  const saved=await crudCard('profiles');
- return [window.XMeshStudio.view()+saved,()=>{
+ const savedSection='<section class="xm-saved-profiles"><div class="xm-saved-heading"><h3>Сохранённые профили</h3><p>Конфигурации, доступные для назначения узлам и сквадам.</p></div>'+saved+'</section>';
+ return [window.XMeshStudio.view()+savedSection,()=>{
    const root=document.getElementById('xm-studio');
    if(root)window.XMeshStudio.mount(root,{
      DB,api,render:()=>render(1),toast,
