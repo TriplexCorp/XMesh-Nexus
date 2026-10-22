@@ -8,9 +8,9 @@ const select=(k,title,values)=>'<label class="sv-field"><span>'+title+'</span><s
 const inboundSettingsFor=(protocol)=>{
  switch(protocol){
   case 'vless':return {users:[],decryption:'none'};
-  case 'vmess':return {clients:[]};
-  case 'trojan':return {clients:[]};
-  case 'shadowsocks':return {method:'2022-blake3-aes-128-gcm',password:''};
+  case 'vmess':return {users:[]};
+  case 'trojan':return {users:[]};
+  case 'shadowsocks':return {network:'tcp,udp',method:'2022-blake3-aes-128-gcm',password:''};
   default:throw Error('Неподдерживаемый протокол '+protocol);
  }
 };
@@ -164,7 +164,7 @@ function formChanged(el){
 }
 function validate(d){if(!Array.isArray(d.inbounds)||!d.inbounds.length)throw Error('Нужен хотя бы один inbound');const tags=new Set();for(const x of d.inbounds){
  if(x.protocol==='vless'&&!Array.isArray(x.settings?.users))throw Error('VLESS inbound требует settings.users (массив).');
- if((x.protocol==='vmess'||x.protocol==='trojan')&&!Array.isArray(x.settings?.clients))throw Error(x.protocol.toUpperCase()+' inbound требует settings.clients (массив).');
+ if((x.protocol==='vmess'||x.protocol==='trojan')&&!Array.isArray(x.settings?.users))throw Error(x.protocol.toUpperCase()+' inbound требует settings.users (массив).');
  if(x.protocol==='shadowsocks'&&(!x.settings?.method||!x.settings?.password))throw Error('Shadowsocks: необходимо указать method и password в серверном JSON.');
 if(!x.tag||tags.has(x.tag))throw Error('Пустой или повторяющийся tag inbound');tags.add(x.tag);if(!Number.isInteger(x.port)||x.port<1||x.port>65535)throw Error('Некорректный порт '+x.tag);if(x.streamSettings?.security==='reality'){const r=x.streamSettings.realitySettings||{};if(!r.privateKey||!(r.target||r.dest)||!r.serverNames?.length)throw Error('Reality: укажите ключ, target и SNI')}}}
 function showPopup(title,kind){
