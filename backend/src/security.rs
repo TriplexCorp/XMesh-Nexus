@@ -1,6 +1,6 @@
 //! Account security policy persisted in PostgreSQL.
 //! This is an owner-managed configuration, not browser-only UI state.
-//! Dashboard path is an additional entrypoint; it is NOT an authorization boundary.
+//! Dashboard path is the sole HTML entrypoint; authentication is still mandatory.
 use crate::{admin_accounts, auth::{self, AuthUser}, ApiError, AppState};
 use axum::{
     extract::{Extension, Path, State},
@@ -150,7 +150,11 @@ pub async fn dashboard_entry(State(state):State<AppState>,Path(slug):Path<String
         return StatusCode::NOT_FOUND.into_response();
     }
     if !crate::auth::is_authenticated(&state,&headers).await {
-        return axum::response::Redirect::to("/login").into_response();
+        let static_dir=std::env::var("STATIC_DIR").unwrap_or_else(|_|"/app/static".to_string());
+        return match tokio::fs::read_to_string(std::path::PathBuf::from(static_dir).join("login.html")).await {
+            Ok(html)=>axum::response::Html(html).into_response(),
+            Err(error)=>{tracing::error!(%error,"Could not read login HTML");StatusCode::INTERNAL_SERVER_ERROR.into_response()}
+        };
     }
     let static_dir=std::env::var("STATIC_DIR").unwrap_or_else(|_|"/app/static".to_string());
     let content=match tokio::fs::read_to_string(std::path::PathBuf::from(static_dir).join("index.html")).await {
