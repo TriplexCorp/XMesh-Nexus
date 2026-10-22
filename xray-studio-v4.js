@@ -34,7 +34,9 @@ function view(){return [
 '<section id="xm-studio-v4" class="sv-studio">',
 '<header class="sv-title"><p class="sv-subtitle">Редактируйте конфигурации Xray в реальном времени. JSON и конструктор синхронизированы.</p></header>',
 
-'<div class="sv-workspace"><nav class="sv-mainnav" aria-label="Действия XRAY STUDIO"><div class="sv-navtags"><button class="active" type="button" data-action="focus-code">{ } Редактор JSON</button><button type="button" data-action="focus-form">◫ Конструктор</button><button type="button" data-action="check">✓ Проверка</button><button type="button" data-action="expand">◉ Предпросмотр</button></div></nav><div class="sv-actions"><button type="button" data-action="profiles">Профили</button><button type="button" data-action="templates">Шаблоны</button><button type="button" data-action="import">Импорт</button><button type="button" data-action="export">Экспорт</button><button class="sv-primary" type="button" data-action="save">Сохранить</button></div><div class="sv-columns"><section class="sv-codepanel"><header class="sv-codebar"><span><b class="sv-dot"></b> config.json <small data-v="dirty">Черновик</small></span><div><button type="button" data-action="undo" aria-label="Отменить">↶</button><button type="button" data-action="redo" aria-label="Повторить">↷</button><button type="button" data-action="format">Форматировать</button><button type="button" data-action="check">Проверить</button><button type="button" data-action="expand">⛶</button></div></header>',
+'<nav class="sv-page-tabs" aria-label="Разделы XRAY STUDIO"><button class="active" type="button" data-action="studio-editor" aria-current="page">Редактор</button><button type="button" data-action="profiles">Профили <span data-v="profilesCount"></span></button></nav>',
+'<section class="sv-profiles-page" data-v="profilesPage" hidden><header><div><h2>Профили Xray</h2><p>Сохранённые конфигурации для назначения узлам и сквадам</p></div><button class="sv-primary" type="button" data-action="new-profile">+ Новый профиль</button></header><input class="sv-profiles-search" data-v="profilesSearch" type="search" placeholder="Поиск по названию профиля" aria-label="Поиск профилей"><div class="sv-profiles-list" data-v="profilesList"></div></section>',
+'<div class="sv-workspace"><nav class="sv-mainnav" aria-label="Действия XRAY STUDIO"><div class="sv-navtags"><button class="active" type="button" data-action="focus-code">{ } Редактор JSON</button><button type="button" data-action="focus-form">◫ Конструктор</button><button type="button" data-action="check">✓ Проверка</button><button type="button" data-action="expand">◉ Предпросмотр</button></div></nav><div class="sv-actions"><button type="button" data-action="templates">Шаблоны</button><button type="button" data-action="import">Импорт</button><button type="button" data-action="export">Экспорт</button><button class="sv-primary" type="button" data-action="save">Сохранить</button></div><div class="sv-columns"><section class="sv-codepanel"><header class="sv-codebar"><span><b class="sv-dot"></b> config.json <small data-v="dirty">Черновик</small></span><div><button type="button" data-action="undo" aria-label="Отменить">↶</button><button type="button" data-action="redo" aria-label="Повторить">↷</button><button type="button" data-action="format">Форматировать</button><button type="button" data-action="check">Проверить</button><button type="button" data-action="expand">⛶</button></div></header>',
 '<div class="sv-codesurface"><pre class="sv-gutter" data-v="gutter" aria-hidden="true"></pre><div class="sv-codeholder"><pre class="sv-highlight" data-v="highlight" aria-hidden="true"></pre><textarea data-v="source" data-xm="manual" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Серверный JSON"></textarea></div><pre class="sv-minimap" data-v="minimap" aria-hidden="true"></pre></div><div class="sv-core-diagnostics" data-v="coreIssues" role="status" aria-live="polite" hidden></div><footer class="sv-codestatus"><span data-v="position">Строка 1, столбец 1</span><span>JSON</span><span data-v="valid">Проверка...</span><label><input type="checkbox" data-v="wrap"> Перенос строк</label></footer></section>',
 '<section class="sv-constructor"><header><h3>Конструктор конфигурации</h3><p>Изменения параметров синхронизируются с JSON.</p></header><nav class="sv-tabs"><button type="button" data-tab="basic" class="active">Основные</button><button type="button" data-tab="inbound">Входящие</button><button type="button" data-tab="outbound">Исходящие</button><button type="button" data-tab="routing">Маршрутизация</button><button type="button" data-tab="extra">Дополнительно</button></nav>',
 '<div class="sv-formbody"><div data-section="basic"><h4>Общие параметры</h4>',field('name','Название профиля'),'<div class="sv-two">',select('log','Логирование',[['warning','warning'],['info','info'],['debug','debug'],['error','error'],['none','none']]),select('strategy','Domain strategy',[['AsIs','AsIs'],['IPIfNonMatch','IPIfNonMatch'],['IPOnDemand','IPOnDemand']]),'</div><p data-v="summary" class="sv-muted"></p><p class="sv-note">Пользователи и UUID создаются автоматически вне XRAY STUDIO.</p></div>',
@@ -54,6 +56,46 @@ const input=get('source'),gutter=get('gutter'),highlight=get('highlight'),minima
 let name='Новый профиль',id=null,inboundIndex=0,outIndex=0,saved='',locked=false,tools=true;
 let diagnosticsLine=null,validatedSource=null;
 const notify=msg=>ctx.toast?.(msg);
+let activePage='editor';
+function setPage(page){
+ activePage=page;
+ const editor=page==='editor';
+ get('profilesPage').hidden=editor;
+ root.querySelector('.sv-workspace').hidden=!editor;
+ root.querySelector('.sv-bottom').hidden=!editor;
+ for(const b of root.querySelectorAll('.sv-page-tabs button')){const selected=b.dataset.action===(editor?'studio-editor':'profiles');b.classList.toggle('active',selected);if(selected)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')}
+ if(!editor)renderProfiles();
+}
+function openProfile(p){
+ if(input.value!==saved&&!confirm('Есть несохранённые изменения. Открыть другой профиль?'))return;
+ try{
+  const d=typeof p.config==='string'?JSON.parse(p.config):p.config;
+  id=p.id;name=p.name;inboundIndex=outIndex=0;
+  input.value=pretty(d);saved=input.value;paint();input.dispatchEvent(new Event('xmesh:reset-history'));
+  setPage('editor');
+ }catch(err){notify('Не удалось открыть профиль: '+err.message)}
+}
+function newProfile(){
+ if(input.value!==saved&&!confirm('Есть несохранённые изменения. Создать новый профиль?'))return;
+ id=null;name='Новый профиль';inboundIndex=outIndex=0;
+ input.value=pretty(defaultDoc());saved=input.value;paint();input.dispatchEvent(new Event('xmesh:reset-history'));setPage('editor');
+}
+function renderProfiles(){
+ const all=ctx.DB.profiles||[];
+ const search=get('profilesSearch').value.trim().toLocaleLowerCase();
+ const list=get('profilesList');list.replaceChildren();
+ get('profilesCount').textContent=String(all.length);
+ const found=all.filter(p=>(p.name||'').toLocaleLowerCase().includes(search));
+ if(!found.length){const empty=document.createElement('p');empty.className='sv-profiles-empty';empty.textContent=search?'Профили не найдены.':'Профилей пока нет. Создайте первый профиль.';list.append(empty);return}
+ for(const p of found){
+  const button=document.createElement('button');button.type='button';button.className='sv-profile-row';
+  const title=document.createElement('strong');title.textContent=p.name||'Без названия';
+  const meta=document.createElement('span');meta.textContent='Открыть конфигурацию';
+  const arrow=document.createElement('span');arrow.textContent='→';arrow.setAttribute('aria-hidden','true');
+  button.append(title,meta,arrow);button.addEventListener('click',()=>openProfile(p));list.append(button);
+ }
+}
+get('profilesSearch').addEventListener('input',renderProfiles);
 const json=()=>{const d=JSON.parse(input.value);if(!d||typeof d!=='object'||Array.isArray(d))throw Error('JSON должен быть объектом');return d};
 const hasValidJSON=()=>{try{return json()}catch{return null}};
 const pretty=d=>JSON.stringify(d,null,2);
@@ -210,7 +252,9 @@ async function action(a){
  switch(a){
  case 'focus-code':input.focus();return;
  case 'focus-form':root.querySelector('[data-tab="inbound"]')?.click();root.querySelector('.sv-constructor')?.scrollIntoView?.({block:'nearest'});return;
- case 'profiles':return showPopup('Профили','profiles');
+ case 'profiles':setPage('profiles');return;
+ case 'studio-editor':setPage('editor');return;
+ case 'new-profile':newProfile();return;
  case 'templates':return showPopup('Шаблоны','templates');
  case 'close':get('overlay').hidden=true;return;
  case 'save':return save();
