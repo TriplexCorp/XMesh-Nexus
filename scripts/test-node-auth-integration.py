@@ -110,6 +110,56 @@ def main():
                              cookie=cookie, origin=BASE)
         assert_status(code, 404, "removed bearer endpoint stays unavailable")
 
+        # Real signed database accounting for two inbounds of the same user.
+        code, new_user, _ = request("POST", "/collections/users",
+            {"username": "ci_inbound_signed", "xrayId": "00000000-0000-0000-0000-000000000000"},
+            cookie=cookie, origin=BASE)
+        assert_status(code, 201, "create signed traffic user with backend-generated identity")
+        user_id = new_user["id"]
+        assert new_user["xrayId"] != "00000000-0000-0000-0000-000000000000"
+        import uuid
+        uuid.UUID(new_user["xrayId"])
+
+        def report_signed(inbound_a, inbound_b):
+            sample={
+                "node_id":node,
+                "userInboundTraffic":[
+                    {"userId":user_id,"inboundTag":"DE_VLESS",
+                     "uplinkBytes":inbound_a[0],"downlinkBytes":inbound_a[1]},
+                    {"userId":user_id,"inboundTag":"CDN_DE",
+                     "uplinkBytes":inbound_b[0],"downlinkBytes":inbound_b[1]}
+                ],
+                "userTraffic":[{"userId":user_id,
+                    "uplinkBytes":inbound_a[0]+inbound_b[0],
+                    "downlinkBytes":inbound_a[1]+inbound_b[1]}]
+            }
+            raw=json.dumps(sample,separators=(",",":")).encode()
+            stamp=int(time.time())
+            unique=os.urandom(16).hex()
+            msg=(f"XMESH1\\nPOST\\n/api/v1/metrics/ingest\\n{node}\\n{stamp}\\n{unique}\\n"
+                 f"{hashlib.sha256(raw).hexdigest()}\\n").encode()
+            message.write_bytes(msg)
+            sig=subprocess.check_output(
+                ["openssl","pkeyutl","-sign","-rawin","-inkey",str(keyfile),"-in",str(message)])
+            hdr={"X-XMesh-Timestamp":str(stamp),"X-XMesh-Nonce":unique,
+                 "X-XMesh-Signature":sig.hex()}
+            return request("POST","/metrics/ingest",sample,headers=hdr)
+
+        assert_status(report_signed((50,90),(25,35))[0],201,"first per-inbound baseline")
+        assert_status(report_signed((100,120),(35,65))[0],201,"second per-inbound delta")
+        code,traffic,_=request("GET",f"/users/{user_id}/traffic",cookie=cookie)
+        assert_status(code,200,"read real per-user inbound breakdown")
+        by_tag={x["inboundTag"]:x for x in traffic["inbounds"]}
+        assert by_tag["DE_VLESS"]["uplinkBytes"]==50
+        assert by_tag["DE_VLESS"]["downlinkBytes"]==30
+        assert by_tag["CDN_DE"]["uplinkBytes"]==10
+        assert by_tag["CDN_DE"]["downlinkBytes"]==30
+        assert traffic["totalUplinkBytes"]==60
+        assert traffic["totalDownlinkBytes"]==60
+        code,_,_=request("DELETE",f"/collections/users/{user_id}",
+                         cookie=cookie,origin=BASE)
+        assert_status(code,200,"clean up inbound stats user")
+
         code, _, _ = request("DELETE", f"/nodes/{node}/metrics-key",
                              cookie=cookie, origin=BASE)
         assert_status(code, 200, "owner revokes signed identity")
