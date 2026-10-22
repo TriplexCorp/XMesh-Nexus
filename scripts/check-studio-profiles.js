@@ -38,9 +38,9 @@ const ctx={DB:{profiles},api:{async remove(collection,id){
 }}};
 const notified=[],opened=[];
 let createCount=0,approved=true,paintCalls=0;
-const construct=new Function('ctx','get','document','openProfile','newProfile','confirm','input','paint','notify','id','name','saved',
+const construct=new Function('ctx','get','document','openProfile','newProfile','approve','input','paint','notify','id','name','saved',
  body+'\nreturn {renderProfiles,describeProfile};');
-const api=construct(ctx,get,document,p=>opened.push(p.id),()=>{createCount++},()=>approved,
+const api=construct(ctx,get,document,p=>opened.push(p.id),()=>{createCount++},async()=>approved,
  {value:'{}'},()=>{paintCalls++},x=>notified.push(x),4,'Germany VLESS','{}');
 const list=()=>elements.profilesList.children;
 const getChildren=(el,klass)=>el.children.filter(x=>x.className?.split(' ').includes(klass));
