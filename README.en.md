@@ -80,7 +80,7 @@ a properly secured proxy configuration.
 - **Inactivity timeout:** 0–1440 minutes (0 disables idle expiry).
 - **Simultaneous sessions:** 1–20 per administrator; older sessions are revoked when new ones exceed the limit.
 - **Login attempts:** 3–15 failures, with a 5–120-minute lockout period.
-- **Additional dashboard entry URL:** `/dashboard/slug` (ASCII letters, numbers, hyphens and underscores).
+- **Sole dashboard/login entry URL:** `/dashboard/slug` (ASCII letters, numbers, hyphens and underscores).
 - **My sessions:** inspect active sign-ins, revoke any session, or sign out all other sessions.
 
 Only **owner** accounts may edit the security policy. Active sessions are scoped to the signed-in administrator.
@@ -98,7 +98,7 @@ In **System → Security**, the panel provides real server-enforced controls sto
 | Concurrent sessions per administrator | 1–20 | 5 |
 | Failed login attempts before lockout | 3–15 | 8 |
 | Lockout duration and attempt window | 5–120 minutes | 15 min |
-| Additional dashboard entry URL | `/dashboard/slug` (4–64 characters after the prefix) | `/dashboard/nexus` |
+| Sole dashboard/login entry URL | `/dashboard/slug` (4–64 characters after the prefix) | randomly generated on installation |
 
 On new sign-ins, the server enforces the session limit and revokes oldest sessions beyond the configured cap. A stricter lifetime also limits previously issued sessions on subsequent requests. The UI lists session creation, recent activity and expiration. An administrator can revoke a selected session or all their other sessions. Session management is scoped to the signed-in account.
 
@@ -407,3 +407,7 @@ docker compose up -d --build panel
 ```
 
 Preserve database volumes. A hard browser refresh may still be needed after the container is recreated. CI verifies that every HTML-referenced local CSS/JS asset is included in the runtime image.
+
+### Private dashboard entrypoint
+
+`./install.sh` generates a unique 192-bit `/dashboard/<48 hex>` entrypoint on first setup, saves it in `.env`, and displays it in the terminal. Reinstallation preserves the existing value. On root + systemd hosts, changes made through the security UI are synchronized into `.env` by a host-only watcher and a dedicated single-value mirror without giving the container write access to other secrets. PostgreSQL remains the source of effective policy. Without systemd, automatic `.env` synchronization is unavailable. A secret URL is not a substitute for authentication, MFA, HTTPS, or network restrictions.
