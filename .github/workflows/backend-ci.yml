@@ -78,6 +78,8 @@ jobs:
         run: node scripts/check-appearance-surfaces.js
       - name: Check New Node button rendering and handler
         run: node scripts/check-node-create-action.js
+      - name: Enforce tech-debt cleanup and compatibility boundaries
+        run: node scripts/check-tech-debt.js
       - name: Verify CRUD dialogs close after success and DPRK flag renders offline
         run: node scripts/check-crud-dialog-lifecycle.js
       - name: Verify Xray per-user per-inbound metrics collector
