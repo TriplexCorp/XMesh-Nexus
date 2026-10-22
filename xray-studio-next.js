@@ -59,8 +59,8 @@ const config=()=>{
 const proto=v('protocol'),sec=v('security'),net=v('transport'),tag=v('tag'),port=Number(v('port'));
 if(!tag||! /^[\w.-]{1,64}$/.test(tag))throw Error('Тег: 1–64 символа, латиница, цифры, точка, _ или -.');
 if(!Number.isInteger(port)||port<1||port>65535)throw Error('Порт inbound должен быть от 1 до 65535.');
-const settings=proto==='vless'?{clients:[],decryption:v('encMode')==='mlkem'?v('decryption'):'none'}:
-proto==='vmess'?{clients:[]}:proto==='trojan'?{clients:[]}: {method:v('ssMethod'),password:v('password'),network:'tcp,udp'};
+const settings=proto==='vless'?{users:[],decryption:v('encMode')==='mlkem'?v('decryption'):'none'}:
+proto==='vmess'?{users:[]}:proto==='trojan'?{clients:[]}: {method:v('ssMethod'),password:v('password'),network:'tcp,udp'};
 const inbound={tag,listen:v('listen')||'0.0.0.0',port,protocol:proto,settings};
 const stream={network:net,security:sec};
 if(net==='xhttp')stream.xhttpSettings={path:v('path')||'/xhttp',mode:'auto',...(v('host')?{host:v('host')}:{})};
