@@ -24,6 +24,7 @@ INTERFACE="${3:-auto}"
 
 command -v curl >/dev/null 2>&1 || { echo "curl is required" >&2; exit 1; }
 command -v openssl >/dev/null 2>&1 || { echo "OpenSSL is required for Ed25519 signing" >&2; exit 1; }
+command -v python3 >/dev/null 2>&1 || { echo "Python 3 is required for verified Xray StatsService parsing" >&2; exit 1; }
 command -v systemctl >/dev/null 2>&1 || { echo "systemd is required" >&2; exit 1; }
 
 RAW_BASE="https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy"
@@ -32,6 +33,14 @@ trap 'rm -f "$AGENT_TMP"' EXIT
 curl --fail --silent --show-error --location "$RAW_BASE/node-metrics-agent.sh" -o "$AGENT_TMP"
 bash -n "$AGENT_TMP"
 install -o root -g root -m 0755 "$AGENT_TMP" /usr/local/sbin/xmesh-node-metrics
+# Versioned collector is installed as a root-owned read-only program. It has
+# no network privileges and runs only as the dedicated xmesh-metrics user.
+COLLECTOR_TMP="$(mktemp)"
+trap 'rm -f "$AGENT_TMP" "$COLLECTOR_TMP"' EXIT
+curl --fail --silent --show-error --location "$RAW_BASE/xray-stats-collector.py" -o "$COLLECTOR_TMP"
+python3 -m py_compile "$COLLECTOR_TMP"
+install -d -o root -g root -m 0755 /usr/local/libexec
+install -o root -g root -m 0755 "$COLLECTOR_TMP" /usr/local/libexec/xmesh-xray-stats-collector.py
 
 # Run telemetry as a dedicated unprivileged account, not root.
 if ! getent group xmesh-metrics >/dev/null; then
@@ -48,6 +57,7 @@ XMESH_API_URL=$API_URL
 XMESH_NODE_ID=$NODE_ID
 XMESH_METRICS_PRIVATE_KEY=/etc/xmesh-node-metrics/node.key
 XMESH_INTERFACE=$INTERFACE
+XMESH_XRAY_API_ADDRESS=127.0.0.1:10085
 EOF
 chmod 0600 /etc/xmesh-node-metrics.env
 
