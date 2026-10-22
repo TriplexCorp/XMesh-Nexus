@@ -337,8 +337,8 @@ if(!x.tag||tags.has(x.tag))throw Error('Пустой или повторяющи
 function showPopup(title,kind){
  const body=get('overlayBody');body.replaceChildren();get('overlayTitle').textContent=title;
  if(kind==='profiles'){
- const create=document.createElement('button');create.className='sv-dialogitem';create.textContent='+ Новый профиль';create.onclick=()=>{if(input.value!==saved&&!confirm('Открыть новый профиль без сохранения изменений?'))return;id=null;name='Новый профиль';inboundIndex=outIndex=0;saved='';update(defaultDoc());input.dispatchEvent(new Event('xmesh:reset-history'));get('overlay').hidden=true};body.append(create);
- for(const p of ctx.DB.profiles||[]){const b=document.createElement('button');b.className='sv-dialogitem';b.textContent=p.name;b.onclick=()=>{if(input.value!==saved&&!confirm('Потерять несохранённые изменения?'))return;try{const d=typeof p.config==='string'?JSON.parse(p.config):p.config;id=p.id;name=p.name;inboundIndex=outIndex=0;input.value=pretty(d);saved=input.value;paint();input.dispatchEvent(new Event('xmesh:reset-history'));get('overlay').hidden=true}catch(err){notify(err.message)}};body.append(b)}
+ const create=document.createElement('button');create.className='sv-dialogitem';create.textContent='+ Новый профиль';create.onclick=async()=>{if(!await unsavedApproval('Открыть новый профиль без сохранения изменений?'))return;id=null;name='Новый профиль';inboundIndex=outIndex=0;saved='';update(defaultDoc());input.dispatchEvent(new Event('xmesh:reset-history'));get('overlay').hidden=true};body.append(create);
+ for(const p of ctx.DB.profiles||[]){const b=document.createElement('button');b.className='sv-dialogitem';b.textContent=p.name;b.onclick=async()=>{if(!await unsavedApproval('Открыть другой профиль без сохранения изменений?'))return;try{const d=typeof p.config==='string'?JSON.parse(p.config):p.config;id=p.id;name=p.name;inboundIndex=outIndex=0;input.value=pretty(d);saved=input.value;paint();input.dispatchEvent(new Event('xmesh:reset-history'));get('overlay').hidden=true}catch(err){notify(err.message)}};body.append(b)}
  }else{
  const templates=[
   ['base','VLESS · XHTTP','Черновик VLESS с XHTTP'],
@@ -359,8 +359,8 @@ function showPopup(title,kind){
   const strong=document.createElement('strong');strong.textContent=label;
   const small=document.createElement('small');small.textContent=description;
   b.append(strong,small);
-  b.onclick=()=>{
-   if(input.value!==saved&&!confirm('Заменить несохранённую конфигурацию?'))return;
+  b.onclick=async()=>{
+   if(!await unsavedApproval('Применить шаблон поверх текущего черновика?'))return;
    const d=defaultDoc(),ib=d.inbounds[0],ss=ib.streamSettings;
    if(kind==='reality'){ss.security='reality';ss.realitySettings={target:'example.com:443',serverNames:['example.com'],privateKey:'',shortIds:[]}}
    if(kind==='raw')ib.streamSettings={network:'raw',security:'none'};
@@ -417,7 +417,7 @@ async function action(a){
  case 'focus-form':root.querySelector('[data-tab="inbound"]')?.click();root.querySelector('.sv-constructor')?.scrollIntoView?.({block:'nearest'});return;
  case 'profiles':setPage('profiles');return;
  case 'studio-editor':setPage('editor');return;
- case 'new-profile':newProfile();return;
+ case 'new-profile':return newProfile();
  case 'templates':return showPopup('Шаблоны','templates');
  case 'close':get('overlay').hidden=true;return;
  case 'save':return save();
@@ -427,25 +427,25 @@ async function action(a){
  case 'check':return checkWithCore();
  
  case 'expand':root.classList.toggle('sv-expand');return;
- case 'reset':if(confirm('Сбросить несохранённые изменения?')){input.value=saved||pretty(defaultDoc());paint();input.dispatchEvent(new Event('xmesh:reset-history'))}return;
+ case 'reset':if(await approve({title:'Сбросить изменения?',description:'Вернуться к последней сохранённой версии JSON?',notice:'Все изменения после сохранения будут потеряны.',danger:true,confirmLabel:'Сбросить изменения'})){input.value=saved||pretty(defaultDoc());paint();input.dispatchEvent(new Event('xmesh:reset-history'))}return;
  case 'undo':root.querySelector('[data-tool="undo"]')?.click();return;
  case 'redo':root.querySelector('[data-tool="redo"]')?.click();return;
- case 'add-inbound':mutate(d=>{d.inbounds??=[];let i=1;while(d.inbounds.some(x=>x.tag==='inbound-'+i))i++;d.inbounds.push(newInbound('vless','inbound-'+i));inboundIndex=d.inbounds.length-1});return;
- case 'remove-inbound':if(confirm('Удалить выбранный inbound?'))mutate(d=>{d.inbounds.splice(inboundIndex,1);inboundIndex=Math.max(inboundIndex-1,0)});return;
+ case 'add-inbound':root.querySelector('[data-tool="inbound"]')?.click();return;
+ case 'remove-inbound':if(await approve({title:'Удалить inbound?',description:'Выбранный inbound будет удалён из JSON.',notice:'Клиенты, использующие этот тег, могут потерять доступ.',danger:true,confirmLabel:'Удалить inbound'}))mutate(d=>{d.inbounds.splice(inboundIndex,1);inboundIndex=Math.max(inboundIndex-1,0)});return;
  case 'add-outbound':mutate(d=>{d.outbounds??=[];let i=1;while(d.outbounds.some(x=>x.tag==='outbound-'+i))i++;d.outbounds.push({tag:'outbound-'+i,protocol:'freedom'});outIndex=d.outbounds.length-1});return;
- case 'remove-outbound':if(confirm('Удалить выбранный outbound?'))mutate(d=>{d.outbounds.splice(outIndex,1);outIndex=Math.max(outIndex-1,0)});return;
+ case 'remove-outbound':if(await approve({title:'Удалить outbound?',description:'Исходящее соединение будет удалено из конфигурации.',notice:'Проверьте правила маршрутизации с этим тегом.',danger:true,confirmLabel:'Удалить outbound'}))mutate(d=>{d.outbounds.splice(outIndex,1);outIndex=Math.max(outIndex-1,0)});return;
  case 'shortid':root.querySelector('[data-tool="shortid"]')?.click();return;
  case 'reality':root.querySelector('[data-tool="reality"]')?.click();return;
  }
 }
 root.addEventListener('click',ev=>{const quick=ev.target.closest('[data-quick-outbound]');if(quick){outIndex=Number(quick.dataset.quickOutbound);root.querySelector('[data-tab="outbound"]')?.click();const d=hasValidJSON();if(d)sync(d);return}const b=ev.target.closest('[data-action]');if(b){ev.preventDefault();Promise.resolve(action(b.dataset.action)).catch(x=>notify(x.message))}const tab=ev.target.closest('[data-tab]');if(tab){root.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x===tab));root.querySelectorAll('[data-section]').forEach(x=>x.hidden=x.dataset.section!==tab.dataset.tab)}});
-root.addEventListener('change',ev=>{if(ev.target.matches('[data-field]'))formChanged(ev.target)});
+root.addEventListener('change',ev=>{if(ev.target.matches('[data-field]'))Promise.resolve(formChanged(ev.target)).catch(err=>notify(err.message))});
 input.addEventListener('input',paint);
 input.addEventListener('scroll',()=>{highlight.scrollTop=input.scrollTop;highlight.scrollLeft=input.scrollLeft;gutter.scrollTop=input.scrollTop});
 input.addEventListener('click',paint);input.addEventListener('keyup',paint);
 input.addEventListener('keydown',ev=>{if(ev.key==='Tab'){ev.preventDefault();const i=input.selectionStart;input.setRangeText('  ',i,input.selectionEnd,'end');input.dispatchEvent(new Event('input',{bubbles:true}))}if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='s'){ev.preventDefault();save()}});
 get('wrap').addEventListener('change',ev=>root.classList.toggle('sv-wrap',ev.target.checked));
-get('upload').addEventListener('change',async ev=>{const f=ev.target.files?.[0];if(!f)return;try{if(f.size>2e6)throw Error('Файл больше 2 МБ');const raw=await f.text();JSON.parse(raw);if(input.value!==saved&&!confirm('Заменить текущий черновик?'))return;input.value=raw;paint();input.dispatchEvent(new Event('xmesh:reset-history'));notify('JSON импортирован')}catch(err){notify(err.message)}finally{ev.target.value=''}});
+get('upload').addEventListener('change',async ev=>{const f=ev.target.files?.[0];if(!f)return;try{if(f.size>2e6)throw Error('Файл больше 2 МБ');const raw=await f.text();JSON.parse(raw);if(!await unsavedApproval('Импортировать JSON вместо текущего черновика?'))return;input.value=raw;paint();input.dispatchEvent(new Event('xmesh:reset-history'));notify('JSON импортирован')}catch(err){notify(err.message)}finally{ev.target.value=''}});
 input.value=pretty(defaultDoc());saved='';paint();root.querySelector('[data-tab="inbound"]')?.click();renderProfiles();
 window.XMeshJsonTools?.setup(root,{toast:notify,realityKeys:ctx.realityKeys});
 }
