@@ -71,6 +71,18 @@ pub async fn login(
         return Err(ApiError::new(StatusCode::UNAUTHORIZED, "Неверный логин или пароль."));
     }
     let policy=crate::security::get_policy(&state.pool).await?;
+    // Password-spray guard: per-username counters cannot bound random-username
+    // abuse. This DB-backed minute budget survives Redis outages.
+    // Under sustained attack it deliberately rejects new logins to protect
+    // the control plane's API and Argon2 capacity.
+    let global_attempts:i64=sqlx::query_scalar(
+        "SELECT COALESCE((SELECT attempts FROM auth_global_limits \
+         WHERE minute_start=date_trunc('minute',NOW())),0)"
+    ).fetch_one(&state.pool).await?;
+    if global_attempts>=240 {
+        return Err(ApiError::new(StatusCode::TOO_MANY_REQUESTS,
+            "Слишком много попыток входа в панель. Повторите позже."));
+    }
     let username_key = body.username.trim().to_lowercase();
     if username_key.is_empty() {
         record_failed_login(&state, &username_key).await?;
@@ -222,6 +234,21 @@ pub(crate) async fn issue_session_in_transaction(
 
 pub(crate) async fn record_failed_login(state: &AppState, username_key: &str) -> Result<(), ApiError> {
     // Redis provides cross-instance throttling; PostgreSQL remains the durable fallback.
+    let global_count:i64=sqlx::query_scalar(
+        "INSERT INTO auth_global_limits(minute_start,attempts) \
+         VALUES(date_trunc('minute',NOW()),1) \
+         ON CONFLICT(minute_start) DO UPDATE \
+         SET attempts=auth_global_limits.attempts+1 RETURNING attempts"
+    ).fetch_one(&state.pool).await?;
+    if global_count==1 {
+        // Bound accumulated counters from random, nonexistent usernames.
+        sqlx::query("DELETE FROM auth_global_limits WHERE minute_start<NOW()-INTERVAL '3 hours'")
+            .execute(&state.pool).await?;
+        sqlx::query("DELETE FROM auth_login_limits \
+            WHERE window_started_at<NOW()-INTERVAL '48 hours' \
+            AND (locked_until IS NULL OR locked_until<NOW())")
+            .execute(&state.pool).await?;
+    }
     let policy=crate::security::get_policy(&state.pool).await?;
     let mut redis_conn = state.redis.clone();
     let redis_key = format!("xmesh:auth:login:{username_key}");
