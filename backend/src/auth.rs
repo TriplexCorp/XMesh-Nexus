@@ -332,7 +332,7 @@ async fn user_from_headers(state: &AppState, headers: &HeaderMap) -> Option<Auth
     .await
     .ok()??;
     let _=sqlx::query("UPDATE panel_sessions SET last_seen_at=NOW() \
-        WHERE token_hash=$1 AND COALESCE(last_seen_at,created_at)<NOW()-INTERVAL '60 seconds'")
+        WHERE token_hash=$1")
         .bind(hash_token(&token)).execute(&state.pool).await;
     Some(AuthUser {
         id: row.try_get("id").ok()?,
