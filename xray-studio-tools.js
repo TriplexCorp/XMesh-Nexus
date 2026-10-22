@@ -40,7 +40,7 @@ const icons={
  routing:'<path d="M4 7h14l-3-3m3 3-3 3M20 17H6l3-3m-3 3 3 3"/>',
  inbound:'<path d="M12 3v13m-5-5 5 5 5-5M4 19h16"/>'
 };
-host.innerHTML='<div class="xm-tools-grid">'+featured.map(id=>{const item=tools.find(x=>x[0]===id),meta=details[id];return '<button type="button" class="sv-toolitem sv-tool-'+id+'" data-tool="'+id+'" title="'+meta[0]+'" aria-label="'+meta[0]+'"><span class="sv-tool-glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+icons[id]+'</svg></span><span class="sv-tool-label">'+item[1].replace(/^[^A-Za-zА-Яа-яЁё0-9]+/,'')+'</span></button>'}).join('')+'</div><span data-tool-status class="xm-tools-status" role="status"></span>';
+host.innerHTML='<div class="xm-tools-grid">'+featured.map(id=>{const item=tools.find(x=>x[0]===id),meta=details[id];return '<button type="button" class="sv-toolitem sv-tool-'+id+'" data-tool="'+id+'" title="'+meta[0]+'" aria-label="'+meta[0]+'"><span class="sv-tool-glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+icons[id]+'</svg></span><span class="sv-tool-label">'+item[1].replace(/^[^A-Za-zА-Яа-яЁё0-9]+/,'')+'</span></button>'}).join('')+'</div><div class="sv-tool-issue" data-tool-issue hidden><span data-tool-issue-message></span><button type="button" data-tool="repair-shortids">Исправить Short ID</button></div><span data-tool-status class="xm-tools-status" role="status" aria-live="polite"></span>';
 const status=msg=>{const e=host.querySelector('[data-tool-status]');if(e)e.textContent=msg};
 const insertAtCursor=(value)=>{const start=area.selectionStart,end=area.selectionEnd;commit(area.value.slice(0,start)+value+area.value.slice(end),'Вставлено в редактор');area.setSelectionRange(start,start+value.length)};
 
@@ -100,12 +100,59 @@ async function setReality(){
    try{await navigator.clipboard.writeText(keys.publicKey);notify('Reality настроен, publicKey скопирован. Проверьте Xray-core.')}catch{notify('Reality настроен. Скопируйте publicKey: '+keys.publicKey)}
  }catch(e){status('Ошибка: '+e.message);notify(e.message)}
 }
+
+const invalidRealityIds=data=>{
+ const result=[];
+ if(!Array.isArray(data.inbounds))return result;
+ data.inbounds.forEach((inbound,index)=>{
+  if(inbound?.streamSettings?.security!=='reality')return;
+  const list=inbound.streamSettings.realitySettings?.shortIds;
+  if(!Array.isArray(list))return;
+  const seen=new Set();
+  list.forEach((id,i)=>{
+   const normal=typeof id==='string'?id.toLowerCase():'';
+   if(!shortIdValid(id)||seen.has(normal))result.push({index,position:i});
+   else seen.add(normal);
+  });
+ });
+ return result;
+};
+const replaceBadIds=list=>{
+ const used=new Set();
+ return list.map(id=>{
+  const key=typeof id==='string'?id.toLowerCase():'';
+  if(shortIdValid(id)&&!used.has(key)){used.add(key);return id}
+  return newShortId(used);
+ });
+};
+const refreshIssues=()=>{
+ const container=host.querySelector('[data-tool-issue]');
+ if(!container)return;
+ let data;
+ try{if(area.value.length>512*1024){container.hidden=true;return}data=parse()}catch{container.hidden=true;return}
+ const problems=invalidRealityIds(data);
+ container.hidden=!problems.length;
+ if(problems.length){
+  const message=host.querySelector('[data-tool-issue-message]');
+  if(message)message.textContent='Найдено '+problems.length+' неверных или повторяющихся Short ID в REALITY. Исправить автоматически?';
+ }
+};
 const operations={
  undo(){if(!undo.length)return;redo.push(area.value);const value=undo.pop();area.value=value;last=value;area.dispatchEvent(new Event('input',{bubbles:true}));update()},
  redo(){if(!redo.length)return;undo.push(area.value);area.value=redo.pop();last=area.value;area.dispatchEvent(new Event('input',{bubbles:true}));update()},
  find(){const q=prompt('Найти текст в JSON:');if(!q)return;const pos=area.value.toLowerCase().indexOf(q.toLowerCase(),area.selectionEnd);const i=pos>=0?pos:area.value.toLowerCase().indexOf(q.toLowerCase());if(i>=0){area.focus();area.setSelectionRange(i,i+q.length);status('Найдено: '+q)}else status('Совпадений нет')},
  validate(){const button=root.querySelector('[data-action="check"]');if(button){button.click();return}try{const data=parse();const issues=window.XrayJsonIntelligence?.analyze?.(area.value,data)||[];const errors=issues.filter(i=>i.severity==='error');const warn=issues.filter(i=>i.severity==='warning');status(errors.length+' ошибок · '+warn.length+' предупреждений');if(errors[0]){const x=errors[0];area.focus();if(Number.isInteger(x.start))area.setSelectionRange(x.start,x.end||x.start+1)}notify(errors.length?'Найдены ошибки в JSON':'Синтаксис JSON корректен; полная проверка требует Xray-core')}catch(e){status(e.message);notify(e.message)}},
  async reality(){return setReality()},
+ 'repair-shortids'(){mutate(d=>{
+   const problems=invalidRealityIds(d);
+   if(!problems.length){notify('Некорректных Short ID нет');return false}
+   const inboundIds=[...new Set(problems.map(x=>x.index))];
+   if(!confirm('Исправить '+problems.length+' некорректных/повторяющихся Short ID в '+inboundIds.length+' inbound? Остальные данные сохранятся. Клиентам со старыми Short ID потребуется обновление.'))return false;
+   for(const index of inboundIds){
+    const rs=d.inbounds[index].streamSettings.realitySettings;
+    rs.shortIds=replaceBadIds(rs.shortIds);
+   }
+ },'Некорректные Reality Short ID исправлены')},
  shortid(){mutate(d=>{
    const inbound=getInbound(d);if(!inbound)return false;
    const ss=inbound.streamSettings;
@@ -130,10 +177,10 @@ const operations={
   format(){try{commit(JSON.stringify(parse(),null,2),'JSON отформатирован')}catch(e){notify(e.message)}}
 };
 host.addEventListener('click',e=>{const b=e.target.closest('[data-tool]');if(b&&operations[b.dataset.tool])Promise.resolve(operations[b.dataset.tool]()).catch(x=>notify(x.message))});
-area.addEventListener('input',snapshot);
+area.addEventListener('input',()=>{snapshot();refreshIssues()});
 area.addEventListener('xmesh:reset-history',()=>{undo=[];redo=[];last=area.value;update()});
 area.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key.toLowerCase()==='z'){e.preventDefault();operations.undo()}if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==='y'||e.shiftKey&&e.key.toLowerCase()==='z')){e.preventDefault();operations.redo() }});
-update();
+update();refreshIssues();
 }
 return {setup};
 })();
