@@ -117,7 +117,7 @@ fn vless_link(user:&Value, inbound:&Value, host:&Value)->Option<String>{
 }
 // Client-native Xray outbound: build from explicitly allowed public values,
 // not from server-side streamSettings containing Reality private keys.
-fn vless_outbound(user:&Value,inbound:&Value,host:&Value)->Option<Value>{
+fn vless_outbound(user:&Value,inbound:&Value,host:&Value,device:&str)->Option<Value>{
  vless_link(user,inbound,host)?;
  let address=endpoint(host)?;
  let port=["externalPort","port"].into_iter().find_map(|key|host.get(key).and_then(self::port))
@@ -201,6 +201,24 @@ fn vless_outbound(user:&Value,inbound:&Value,host:&Value)->Option<Value>{
   if network=="ws"{transport["headers"]=json!({"Host":hostname})}
   else if network=="xhttp"{transport["host"]=json!(hostname)}
  }
+ // Device profiles are client-side transport overrides only; never copy
+ // the entire server inbound or any Reality private material.
+ if network=="xhttp" && (device=="ios"||device=="windows"){
+  let profile_key=if device=="ios"{"iOS"}else{"Windows"};
+  let profile=inbound.get("xmesh").and_then(|v|v.get("xhttpDeviceProfiles"))
+    .or_else(||inbound.get("xhttpDeviceProfiles"))
+    .and_then(|v|v.get(profile_key));
+  if let Some(profile)=profile {
+   for key in ["mode","uplinkHTTPMethod","scMaxEachPostBytes","scMinPostsIntervalMs"]{
+    if let Some(value)=profile.get(key).filter(|v|v.is_string()||v.is_number()){
+     transport[key]=value.clone();
+    }
+   }
+   if let Some(xmux)=profile.get("xmux").filter(|v|v.is_object()){
+    transport["xmux"]=xmux.clone();
+   }
+  }
+ }
  if transport.as_object().is_some_and(|o|!o.is_empty()){
   if network=="xhttp"{outbound_stream["xhttpSettings"]=transport}
   else if network=="ws"{outbound_stream["wsSettings"]=transport}
@@ -259,7 +277,7 @@ pub async fn revoke(State(state):State<AppState>,Extension(actor):Extension<Auth
  crate::audit(&state.pool,&actor.username,"subscription.revoked",Some("users"),Some(id),json!({})).await;
  Ok(Json(json!({"revoked":true})))
 }
-async fn collect_user_outbounds(state:&AppState,user:&Value)->Result<(Vec<String>,Vec<Value>),ApiError>{
+async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str)->Result<(Vec<String>,Vec<Value>),ApiError>{
  let squads=crate::load_records(&state.pool,"squads").await?;
  let profiles=crate::load_records(&state.pool,"profiles").await?;
  let hosts=crate::load_records(&state.pool,"hosts").await?;
@@ -284,14 +302,14 @@ async fn collect_user_outbounds(state:&AppState,user:&Value)->Result<(Vec<String
    let matched:Vec<&Value>=hosts.iter().filter(|h|h.get("disabled")!=Some(&Value::Bool(true))&&nonempty(h,"tag")==Some(tag)).collect();
    if !matched.is_empty(){
     for host in matched{
-     if let Some(link)=vless_link(&user,inbound,host) && let Some(outbound)=vless_outbound(&user,inbound,host){
+     if let Some(link)=vless_link(&user,inbound,host) && let Some(outbound)=vless_outbound(&user,inbound,host,device){
       outbounds.push(outbound);links.push(link)
      }
     }
    }else{
     for node in nodes.iter().filter(|n|n.get("profileId")==profile.get("id")&&n.get("disabled")!=Some(&Value::Bool(true))){
      let host=json!({"address":node.get("publicAddress").or_else(||node.get("externalAddress")).or_else(||node.get("addr")),"port":inbound.get("port"),"remark":node.get("name"),"country":node.get("country")});
-     if let Some(link)=vless_link(&user,inbound,&host) && let Some(outbound)=vless_outbound(&user,inbound,&host){
+     if let Some(link)=vless_link(&user,inbound,&host) && let Some(outbound)=vless_outbound(&user,inbound,&host,device){
       outbounds.push(outbound);links.push(link)
      }
     }
@@ -303,10 +321,12 @@ async fn collect_user_outbounds(state:&AppState,user:&Value)->Result<(Vec<String
 }
 pub async fn admin_client_json(
  State(state):State<AppState>,Extension(actor):Extension<AuthUser>,Path(id):Path<i64>,
+ Query(options):Query<HashMap<String,String>>,
 )->Result<Json<Value>,ApiError>{
  crate::require_mutation(&actor)?;
  let user=record(&state,id).await?;
- let (_,proxies)=collect_user_outbounds(&state,&user).await?;
+ let device=options.get("device").map(String::as_str).unwrap_or("auto");
+ let (_,proxies)=collect_user_outbounds(&state,&user,device).await?;
  let setting=crate::read_settings(&state.pool).await?;
  let profile=crate::subscription_json::build(proxies,&setting)
   .map_err(|detail|ApiError::new(StatusCode::BAD_REQUEST,detail))?;
@@ -320,7 +340,8 @@ pub async fn serve(State(state):State<AppState>,Path(token):Path<String>,Query(o
  let user=record(&state,id).await?;
  let now=std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as i64;
  if crate::user_status(&user,now)!="ACTIVE"{return Err(ApiError::new(StatusCode::FORBIDDEN,"Subscription inactive"))}
- let (links,outbounds)=collect_user_outbounds(&state,&user).await?;
+ let device=options.get("device").map(String::as_str).unwrap_or("auto");
+ let (links,outbounds)=collect_user_outbounds(&state,&user,device).await?;
  // Native Xray JSON is the default for new HTTPS subscriptions.
  // Existing link-list users may explicitly request ?format=vless.
  let legacy=options.get("format").is_some_and(|v|v=="vless");
@@ -606,7 +627,7 @@ mod tests{
      "serverNames":["vpn.example.org"],"shortIds":["abcd"]}}});
   let host=json!({"address":"vpn.example.org","publicKey":"PUBLIC_KEY",
    "externalSNI":"vpn.example.org","shortId":"abcd","remark":"Sweden"});
-  let outbound=vless_outbound(&user,&inbound,&host).expect("Reality public metadata is complete");
+  let outbound=vless_outbound(&user,&inbound,&host,"auto").expect("Reality public metadata is complete");
   let data=crate::subscription_json::build(vec![outbound],&json!({})).expect("build client config");
   let rendered=serde_json::to_string(&data).expect("serialize Xray JSON");
   assert!(!rendered.contains("SERVER_PRIVATE_KEY_MUST_NEVER_LEAK"));
