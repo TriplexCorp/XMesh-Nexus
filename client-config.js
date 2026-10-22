@@ -78,6 +78,23 @@
   }
   return result;
  }
+ async function publicKeyFromPrivate(value){
+  const encoded=nonempty(value);
+  if(!encoded)return '';
+  if(!/^[a-zA-Z0-9_-]{42,44}$/.test(encoded))throw new Error('Reality privateKey имеет неизвестный формат X25519.');
+  const binary=atob(encoded.replace(/-/g,'+').replace(/_/g,'/')+'='.repeat((4-encoded.length%4)%4));
+  const raw=Uint8Array.from(binary,c=>c.charCodeAt(0));
+  if(raw.length!==32)throw new Error('Reality privateKey должен содержать 32 байта.');
+  const subtle=global.crypto?.subtle;
+  if(!subtle)throw new Error('Для автоматического Reality publicKey откройте панель по HTTPS.');
+  // RFC 8410 PKCS#8 X25519 private-key encoding (never exported to JSON).
+  const der=new Uint8Array([0x30,0x2e,0x02,0x01,0x00,0x30,0x05,0x06,0x03,0x2b,0x65,0x6e,0x04,0x22,0x04,0x20,...raw]);
+  const privateKey=await subtle.importKey('pkcs8',der,{name:'X25519'},false,['deriveBits']);
+  const basepoint=new Uint8Array(32);basepoint[0]=9;
+  const publicBase=await subtle.importKey('raw',basepoint,{name:'X25519'},false,[]);
+  const derived=new Uint8Array(await subtle.deriveBits({name:'X25519',public:publicBase},privateKey,256));
+  return btoa(String.fromCharCode(...derived)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+ }
  function build(user,host,inbound){
   if(!validUUID(user?.xrayId))throw new Error('У пользователя отсутствует действительный UUID. Создайте/обновите его через сервер XMesh.');
   const endpoint=address(host?.externalAddress||host?.address||host?.publicAddress||host?.addr);
@@ -108,7 +125,7 @@
   if(protocol!=='shadowsocks'||inbound.streamSettings)outbound.streamSettings=stream(inbound,host);
   return base(outbound);
  }
- function generate(user,db){
+ async function generate(user,db){
   const allowed=new Set((Array.isArray(db?.squads)?db.squads:[])
    .filter(s=>(user.squads||[]).some(id=>String(id)===String(s.id)))
    .flatMap(s=>Array.isArray(s.inb)?s.inb:[]).map(String));
@@ -119,16 +136,30 @@
    for(const inbound of Array.isArray(parsed?.inbounds)?parsed.inbounds:[]){
     if(!allowed.has(String(inbound.tag)))continue;
     const hosts=(Array.isArray(db.hosts)?db.hosts:[]).filter(h=>!h.disabled&&String(h.tag)===String(inbound.tag));
-    for(const host of hosts){
+    const associatedNodes=(Array.isArray(db.nodes)?db.nodes:[]).filter(n=>String(n.profileId)===String(profile.id));
+    const candidates=hosts.length?hosts:associatedNodes.map(n=>({
+      id:'node:'+n.id,remark:n.name,address:n.publicAddress||n.externalAddress||n.addr,
+      port:inbound.port,sni:inbound.streamSettings?.realitySettings?.serverNames?.[0]||''
+    }));
+    for(const host of candidates){
      const item={name:(host.remark||host.address||inbound.tag),tag:inbound.tag,hostId:host.id};
-     try{item.json=build(user,host,inbound)}catch(err){item.error=err.message}
+     try{
+      const runtimeHost={...host};
+      const reality=obj(inbound.streamSettings?.realitySettings);
+      if(inbound.streamSettings?.security==='reality'
+        && !nonempty(runtimeHost.publicKey||runtimeHost.realityPublicKey||inbound.publicKey||reality.publicKey)
+        && nonempty(reality.privateKey)){
+        runtimeHost.publicKey=await publicKeyFromPrivate(reality.privateKey);
+      }
+      item.json=build(user,runtimeHost,inbound);
+     }catch(err){item.error=err.message}
      entries.push(item);
     }
    }
   }
   return entries;
  }
- const api={generate,build,defaults,base};
+ const api={generate,build,defaults,base,publicKeyFromPrivate};
  if(typeof module!=='undefined'&&module.exports)module.exports=api;
  global.XMeshClientConfig=api;
 })(typeof window!=='undefined'?window:globalThis);
