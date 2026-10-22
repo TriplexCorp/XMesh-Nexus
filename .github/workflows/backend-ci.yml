@@ -51,6 +51,7 @@ jobs:
           test "$(node -p 'process.versions.node.split(".")[0]')" = "24"
           node --check app.js
           node --check subscription-studio.js
+          node --check subscription-portal.js
           node --check login.js
           node --check xray-studio-v4.js
           node --check xray-studio-tools.js
