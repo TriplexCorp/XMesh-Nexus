@@ -29,18 +29,18 @@ const renewal=section("else if(k=='bulk-renew')","else if(k=='bsq')");
 assert.match(renewal,/dlg\.close\(\)/, 'bulk renewal closes after completion');
 assert.match(renewal,/catch\(error\)/, 'bulk renewal reports server errors');
 
-const countryStart=app.indexOf('const NORTH_KOREA_FLAG='),countryEnd=app.indexOf('\n',app.indexOf('const flagView=',countryStart));
-assert(countryStart!==-1&&countryEnd>countryStart,'Missing DPRK SVG renderer');
-const source=app.slice(countryStart,countryEnd);
-const flagView=new Function('COUNTRIES','esc',source+'\nreturn flagView;')(
-  [{code:'KP',name:'Северная Корея',flag:'🇰🇵'}],
+const rendererStart=app.indexOf('const flagView=');
+const rendererEnd=app.indexOf('\n',rendererStart);
+assert(rendererStart!==-1 && rendererEnd>rendererStart, 'Missing local SVG flag renderer');
+const flagView=new Function('COUNTRIES','esc',app.slice(rendererStart,rendererEnd)+'\nreturn flagView;')(
+  [{code:'KP',name:'Северная Корея',flag:'🇰🇵'},{code:'DE',name:'Германия',flag:'🇩🇪'}],
   x=>String(x).replace(/&/g,'&amp;').replace(/</g,'&lt;')
 );
-const html=flagView('🇰🇵');
-assert.match(html,/<svg[^>]+viewBox="0 0 32 20"/);
-assert.match(html,/north-korea-flag/);
-assert.doesNotMatch(html,/flagcdn/, 'DPRK flag must not rely on external images');
-assert.match(css,/\.north-korea-flag svg/);
+for(const [flag,iso] of [['🇰🇵','kp'],['🇩🇪','de']]){
+  const html=flagView(flag);
+  assert(html.includes('/flags/'+iso+'.svg'),'Flag '+iso+' must be served locally');
+  assert(!/flagcdn|https?:\/\//.test(html),'Flags must never depend on external CDN');
+}
+assert(!app.includes('flagcdn.com'),'No flag CDN URLs in UI');
 assert.match(app,/c\.code==='KP'\?' Северная Корея КНДР North Korea DPRK'/);
-assert.match(app,/\bKP\b/, 'ISO KP must remain in supported countries');
-console.log('CRUD dialog lifecycle (create/edit/renew/squad), submit dedupe, and offline DPRK flag: OK');
+console.log('CRUD dialog lifecycle (create/edit/renew/squad), submit dedupe, and local SVG country flags: OK');
