@@ -2521,3 +2521,76 @@ aside #logout .ic{width:1.12rem;height:1.12rem;flex-shrink:0}
  .security-workspace .security-number{margin-left:auto}
  .security-workspace .security-session{flex-wrap:wrap}
 }
+
+
+/* Security Center v2 — balanced hierarchy, separate sessions, no dead columns */
+.security-workspace{
+  width:min(100%,1480px)!important;max-width:1480px!important;
+  margin-inline:auto!important;
+  display:grid!important;
+  grid-template-columns:minmax(320px,.78fr) minmax(0,1.22fr)!important;
+  gap:1rem!important;align-items:start!important;
+}
+.security-workspace>.security-overview{
+  grid-column:1/-1!important;
+  padding:.2rem 0 .45rem!important;
+}
+.security-workspace>.security-overview h2{
+  font-size:clamp(1.45rem,2vw,1.9rem)!important;
+  line-height:1.2;letter-spacing:-.035em;
+}
+.security-workspace>.security-overview p:last-child{max-width:68ch}
+.security-workspace>#mfa-panel{
+  grid-column:1!important;grid-row:2!important;
+  padding:1.3rem!important;min-width:0;
+}
+.security-workspace>#security-advanced{
+  grid-column:2!important;grid-row:2!important;
+  padding:1.3rem!important;min-width:0;
+}
+.security-workspace>#security-sessions-panel{
+  grid-column:1/-1!important;grid-row:3!important;
+  min-width:0;padding:1.2rem 1.3rem!important;
+  border-radius:var(--ui-radius,16px)!important;
+}
+.security-workspace #security-advanced>.hd,
+.security-workspace #security-sessions-panel>.hd{margin-bottom:.65rem}
+.security-workspace #security-advanced .security-subheading:first-child{display:none}
+.security-workspace .security-settings-grid{gap:.55rem!important}
+.security-workspace .security-setting{
+  padding:.78rem .86rem!important;
+  border-radius:var(--ui-control-radius,14px)!important;
+  gap:.5rem!important;
+}
+.security-workspace .security-setting>span:first-child{gap:.25rem}
+.security-workspace .security-number{gap:.25rem}
+.security-workspace .security-number input{width:4.25rem!important}
+.security-workspace .security-url-setting{
+  padding:.9rem!important;
+}
+.security-workspace .security-policy-actions{align-items:center}
+.security-workspace .security-sessions{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem;
+}
+.security-workspace .security-session{background:var(--s2);min-width:0}
+.security-workspace .security-sessions>.security-policy-actions{grid-column:1/-1;margin-top:.3rem}
+.security-workspace #mfa-panel .mfa-security-content{gap:.75rem}
+.security-workspace #mfa-panel .mfa-security-heading{margin-bottom:.8rem}
+.security-workspace #mfa-panel .mfa-security-icon{border-radius:var(--ui-control-radius,14px)}
+.security-workspace .security-policy-footnote{font-size:.72rem;margin-top:.85rem}
+@media(max-width:1200px){
+ .security-workspace{grid-template-columns:minmax(290px,.8fr) minmax(0,1.2fr)!important}
+ .security-workspace .security-settings-grid{grid-template-columns:1fr!important}
+}
+@media(max-width:900px){
+ .security-workspace{grid-template-columns:minmax(0,1fr)!important}
+ .security-workspace>.security-overview{grid-column:1!important;grid-row:1!important}
+ .security-workspace>#mfa-panel{grid-column:1!important;grid-row:2!important}
+ .security-workspace>#security-advanced{grid-column:1!important;grid-row:3!important}
+ .security-workspace>#security-sessions-panel{grid-column:1!important;grid-row:4!important}
+ .security-workspace .security-settings-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
+@media(max-width:600px){
+ .security-workspace .security-settings-grid,.security-workspace .security-sessions{grid-template-columns:1fr!important}
+ .security-workspace #mfa-panel,.security-workspace #security-advanced,.security-workspace #security-sessions-panel{padding:1rem!important}
+}
