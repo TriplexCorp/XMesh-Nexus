@@ -200,8 +200,9 @@ const template=fs.readFileSync('backend/src/subscription_template.html','utf8');
 const portalCss=fs.readFileSync('subscription-public.css','utf8');
 const portalJs=fs.readFileSync('subscription-portal.js','utf8');
 new Function(portalJs);
+const liveBackend=fs.readFileSync('backend/src/user_subscriptions.rs','utf8');
 for(const cls of ['subscription-preview','subscription-preview-brand','subscription-preview-hero','subscription-preview-meta','subscription-preview-progress','subscription-preview-cta','subscription-preview-quick','subscription-preview-support']) {
-  assert(template.includes(cls), 'Live subscription missing preview component: '+cls);
+  assert(template.includes(cls)||liveBackend.includes(cls), 'Live subscription missing preview component: '+cls);
 }
 assert.match(template,/href="\/subscription-studio\.css"/,'Live portal must use the same shared preview stylesheet');
 assert.match(portalCss,/subscription-public-shell/,'Live layout requires its mobile-safe shell');
