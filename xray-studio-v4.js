@@ -94,27 +94,97 @@ function newProfile(){
  id=null;name='Новый профиль';inboundIndex=outIndex=0;
  input.value=pretty(defaultDoc());saved=input.value;paint();input.dispatchEvent(new Event('xmesh:reset-history'));setPage('editor');
 }
+function describeProfile(p){
+ try{
+  const raw=typeof p.config==='string'?JSON.parse(p.config):p.config;
+  if(!raw||typeof raw!=='object'||Array.isArray(raw))throw Error('Неверная структура');
+  const inbound=Array.isArray(raw.inbounds)?raw.inbounds:[];
+  const outbound=Array.isArray(raw.outbounds)?raw.outbounds:[];
+  const protocols=[...new Set(inbound.map(x=>String(x?.protocol||'').toUpperCase()).filter(Boolean))];
+  const security=[...new Set(inbound.map(x=>x?.streamSettings?.security).filter(x=>x&&x!=='none'))];
+  const transport=[...new Set(inbound.map(x=>x?.streamSettings?.network).filter(Boolean))];
+  const tags=inbound.map(x=>String(x?.tag||'')).filter(Boolean);
+  return {valid:true,inbound:inbound.length,outbound:outbound.length,protocols,security,transport,tags};
+ }catch{
+  return {valid:false,inbound:0,outbound:0,protocols:[],security:[],transport:[],tags:[]};
+ }
+}
+const profileEl=(tag,cls,text)=>{const el=document.createElement(tag);if(cls)el.className=cls;if(text!==undefined)el.textContent=String(text);return el};
 function renderProfiles(){
- const all=ctx.DB.profiles||[];
+ const all=Array.isArray(ctx.DB.profiles)?ctx.DB.profiles:[];
  const search=get('profilesSearch').value.trim().toLocaleLowerCase();
  const list=get('profilesList');list.replaceChildren();
  get('profilesCount').textContent=String(all.length);
- const found=all.filter(p=>(p.name||'').toLocaleLowerCase().includes(search));
- if(!found.length){const empty=document.createElement('p');empty.className='sv-profiles-empty';empty.textContent=search?'Профили не найдены.':'Профилей пока нет. Создайте первый профиль.';list.append(empty);return}
+ get('profilesTotal').textContent=String(all.length);
+ const current=all.find(p=>String(p.id)===String(id)&&id!=null);
+ get('profilesActive').textContent=current?'Открыт: '+(current.name||'Без названия'):'Нет открытого профиля';
+ const found=all.filter(p=>{
+  if(!search)return true;
+  const info=describeProfile(p);
+  return [p.name,...info.tags,...info.protocols,...info.transport].join(' ').toLocaleLowerCase().includes(search);
+ });
+ get('profilesFound').textContent=search?'Найдено: '+found.length+' из '+all.length:'Показано: '+all.length;
+ if(!found.length){
+  const empty=profileEl('div','sv-library-empty');
+  const symbol=profileEl('span','sv-library-empty-symbol');
+  symbol.innerHTML='<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="13" y="14" width="38" height="10" rx="3"/><rect x="13" y="29" width="38" height="10" rx="3"/><rect x="13" y="44" width="38" height="10" rx="3"/><path d="M21 19h.01M21 34h.01M21 49h.01"/></svg>';
+  const title=profileEl('h3','',search?'Совпадений не найдено':'Здесь появятся ваши профили');
+  const desc=profileEl('p','',search?'Попробуйте другой запрос — можно искать по названию, тегу и протоколу.':'Создайте первый профиль Xray, затем откройте его для настройки конфигурации.');
+  const btn=profileEl('button','sv-library-empty-action',search?'Очистить поиск':'Создать первый профиль');
+  btn.type='button';
+  btn.onclick=search?()=>{get('profilesSearch').value='';renderProfiles();get('profilesSearch').focus()}:newProfile;
+  empty.append(symbol,title,desc,btn);list.append(empty);return;
+ }
  for(const p of found){
-  const button=document.createElement('button');button.type='button';button.className='sv-profile-row';
-  const title=document.createElement('strong');title.textContent=p.name||'Без названия';
-  const meta=document.createElement('span');meta.textContent='Открыть конфигурацию';
-  const arrow=document.createElement('span');arrow.textContent='→';arrow.setAttribute('aria-hidden','true');
-  button.append(title,meta,arrow);button.addEventListener('click',()=>openProfile(p));
-  const card=document.createElement('div');card.className='sv-profile-card';card.append(button);
-  const del=document.createElement('button');del.type='button';del.className='sv-profile-delete';del.textContent='Удалить';
-  del.setAttribute('aria-label','Удалить профиль '+(p.name||''));
+  const info=describeProfile(p);
+  const selected=id!=null&&String(p.id)===String(id);
+  const card=profileEl('article','sv-profile-card'+(selected?' is-current':''));
+  const heading=profileEl('div','sv-profile-top');
+  const emblem=profileEl('span','sv-profile-emblem');
+  emblem.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4" width="17" height="6" rx="1.5"/><rect x="3.5" y="14" width="17" height="6" rx="1.5"/><path d="M7 7h.01M7 17h.01M11 7h6M11 17h6"/></svg>';
+  const titles=profileEl('div','sv-profile-titles');
+  const nameEl=profileEl('h3','',p.name||'Без названия');nameEl.title=p.name||'Без названия';
+  const subtitle=profileEl('p','',info.valid?(info.tags[0]||'Конфигурация Xray'):'Конфигурация требует проверки');
+  titles.append(nameEl,subtitle);
+  const active=profileEl('span','sv-profile-state'+(selected?' is-current':''),selected?'Открыт':info.valid?'Сохранён':'Ошибка JSON');
+  heading.append(emblem,titles,active);
+  const chips=profileEl('div','sv-profile-chips');
+  for(const protocol of info.protocols.slice(0,3))chips.append(profileEl('span','sv-profile-chip is-protocol',protocol));
+  for(const security of info.security.slice(0,2))chips.append(profileEl('span','sv-profile-chip is-security',security.toUpperCase()));
+  if(!info.protocols.length)chips.append(profileEl('span','sv-profile-chip',info.valid?'Нет inbound':'Требует проверки'));
+  const stats=profileEl('div','sv-profile-stats');
+  const first=profileEl('div','sv-profile-stat');
+  first.append(profileEl('strong','',info.inbound),profileEl('span','','Входящих'));
+  const second=profileEl('div','sv-profile-stat');
+  second.append(profileEl('strong','',info.outbound),profileEl('span','','Исходящих'));
+  const third=profileEl('div','sv-profile-stat');
+  third.append(profileEl('strong','',info.transport[0]?.toUpperCase()||'—'),profileEl('span','','Транспорт'));
+  stats.append(first,second,third);
+  const footer=profileEl('div','sv-profile-footer');
+  const open=profileEl('button','sv-profile-open','Открыть профиль');
+  open.type='button';open.setAttribute('aria-label','Открыть '+(p.name||'профиль'));
+  open.append(profileEl('span','sv-open-arrow','→'));
+  open.onclick=()=>openProfile(p);
+  const del=profileEl('button','sv-profile-delete');
+  del.type='button';del.title='Удалить профиль';
+  del.setAttribute('aria-label','Удалить профиль '+(p.name||'Без названия'));
+  del.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 4h4M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>';
   del.onclick=async()=>{
    if(!confirm('Удалить профиль «'+(p.name||'Без названия')+'»? Действие необратимо.'))return;
-   try{await ctx.api.remove('profiles',p.id);if(id===p.id){id=null;name='Новый профиль';saved='';}notify('Профиль удалён');renderProfiles();}
-   catch(error){notify('Ошибка удаления: '+error.message)}
-  };card.append(del);list.append(card);
+   del.disabled=true;
+   try{
+    await ctx.api.remove('profiles',p.id);
+    if(id!=null&&String(id)===String(p.id)){
+     id=null;name='Новый профиль';saved='';
+     paint();
+    }
+    notify('Профиль удалён');
+    renderProfiles();
+   }catch(error){del.disabled=false;notify('Ошибка удаления: '+error.message)}
+  };
+  footer.append(open,del);
+  card.append(heading,chips,stats,footer);
+  list.append(card);
  }
 }
 get('profilesSearch').addEventListener('input',renderProfiles);
@@ -326,7 +396,7 @@ async function checkWithCore(){
   get('valid').dataset.status=valid?'ok':'bad';
  }catch(err){if(source!==input.value)return;reportCore('Проверка ядром недоступна: '+err.message)}
 }
-async function save(){try{const d=json();validate(d);if(!name.trim())throw Error('Укажите название профиля');const body={name:name.trim(),config:pretty(d)};if(id!=null)await ctx.api.update('profiles',id,body);else await ctx.api.create('profiles',body);saved=input.value;paint();notify('Профиль сохранён');await ctx.render?.()}catch(err){notify('Не удалось сохранить: '+err.message)}}
+async function save(){try{const d=json();validate(d);if(!name.trim())throw Error('Укажите название профиля');const body={name:name.trim(),config:pretty(d)};if(id!=null)await ctx.api.update('profiles',id,body);else {const created=await ctx.api.create('profiles',body);id=created.id}saved=input.value;paint();renderProfiles();notify('Профиль сохранён')}catch(err){notify('Не удалось сохранить: '+err.message)}}
 const bytes=n=>{const b=new Uint8Array(n);crypto.getRandomValues(b);return Array.from(b,v=>v.toString(16).padStart(2,'0')).join('')};
 async function action(a){
  switch(a){
