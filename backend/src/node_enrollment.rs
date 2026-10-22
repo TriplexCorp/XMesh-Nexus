@@ -43,7 +43,7 @@ pub async fn claim(State(state):State<AppState>,Json(input):Json<Claim>)->Result
  let signature_bytes:[u8;64]=hex::decode(&input.proof).ok().and_then(|v|v.try_into().ok())
   .ok_or_else(||ApiError::new(StatusCode::BAD_REQUEST,"Invalid Ed25519 enrollment proof"))?;
  let signature=Signature::from_bytes(&signature_bytes);
- let challenge=format!("XMESH-ENROLL-V1\\n{}\\n{}\\n",input.token,input.public_key);
+ let challenge=format!("XMESH-ENROLL-V1\n{}\n{}\n",input.token,input.public_key);
  let key=VerifyingKey::from_bytes(&raw)
   .map_err(|_|ApiError::new(StatusCode::BAD_REQUEST,"Invalid Ed25519 public key"))?;
  key.verify(challenge.as_bytes(),&signature)
