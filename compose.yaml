@@ -63,6 +63,8 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
       DASHBOARD_PATH: ${DASHBOARD_PATH:?Run ./install.sh first}
       DASHBOARD_PATH_MIRROR: /run/xmesh/dashboard-path
+      PANEL_UPDATE_REQUEST: /run/xmesh/panel-update-request
+      PANEL_UPDATE_STATUS: /run/xmesh/panel-update-status
       TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:-}
       RUST_LOG: info,tower_http=info,sqlx=warn
     depends_on:
@@ -75,6 +77,8 @@ services:
     volumes:
       - core_data:/var/lib/xmesh
       - ./deploy/runtime/dashboard-path:/run/xmesh/dashboard-path:rw
+      - ./deploy/runtime/panel-update-request:/run/xmesh/panel-update-request:rw
+      - ./deploy/runtime/panel-update-status:/run/xmesh/panel-update-status:ro
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=64m,mode=1777
