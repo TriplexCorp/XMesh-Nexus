@@ -32,7 +32,15 @@ const tools=[
 ];
 const details={reality:['Ключи X25519 для Reality','key-round'],shortid:['Генерация Short ID','hash'],dns:['Настройка DNS-серверов','globe'],routing:['Правила маршрутизации','route'],policy:['Политики и статистика','chart-no-axes-column'],outbounds:['Исходящие соединения','network'],validate:['Проверка через Xray-core','shield-check'],xhttp:['Транспорт XHTTP','network'],vlessens:['Серверный VLESS Encryption','shield'],finalmask:['Маскировка потоков','layers'],hysteria:['Шаблон Hysteria2','radio'],uuid:['Скопировать UUID','fingerprint'],backup:['Экспорт текущего JSON','download'],inbound:['Добавить серверный inbound','plus']};
 const featured=['reality','shortid','xhttp','dns','routing','inbound'];
-host.innerHTML='<div class="xm-tools-grid">'+featured.map(id=>{const item=tools.find(x=>x[0]===id),meta=details[id];return '<button type="button" class="sv-toolitem sv-tool-'+id+'" data-tool="'+id+'" title="'+meta[0]+'">'+item[1].replace(/^[^A-Za-zА-Яа-яЁё0-9]+/,'')+'</button>'}).join('')+'</div><span data-tool-status class="xm-tools-status" role="status"></span>';
+const icons={
+ reality:'<path d="M12 2 4 6v6c0 5 3.5 8 8 10 4.5-2 8-5 8-10V6l-8-4Z"/><path d="m9 12 2 2 4-4"/>',
+ shortid:'<path d="M5 9h14M4 15h14M11 3 7 21M17 3l-4 18"/>',
+ xhttp:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/>',
+ dns:'<rect x="3" y="3" width="18" height="8" rx="2"/><rect x="3" y="13" width="18" height="8" rx="2"/><path d="M7 7h.01M7 17h.01M11 7h6M11 17h6"/>',
+ routing:'<path d="M4 7h14l-3-3m3 3-3 3M20 17H6l3-3m-3 3 3 3"/>',
+ inbound:'<path d="M12 3v13m-5-5 5 5 5-5M4 19h16"/>'
+};
+host.innerHTML='<div class="xm-tools-grid">'+featured.map(id=>{const item=tools.find(x=>x[0]===id),meta=details[id];return '<button type="button" class="sv-toolitem sv-tool-'+id+'" data-tool="'+id+'" title="'+meta[0]+'" aria-label="'+meta[0]+'"><span class="sv-tool-glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+icons[id]+'</svg></span><span class="sv-tool-label">'+item[1].replace(/^[^A-Za-zА-Яа-яЁё0-9]+/,'')+'</span></button>'}).join('')+'</div><span data-tool-status class="xm-tools-status" role="status"></span>';
 const status=msg=>{const e=host.querySelector('[data-tool-status]');if(e)e.textContent=msg};
 const insertAtCursor=(value)=>{const start=area.selectionStart,end=area.selectionEnd;commit(area.value.slice(0,start)+value+area.value.slice(end),'Вставлено в редактор');area.setSelectionRange(start,start+value.length)};
 const operations={
