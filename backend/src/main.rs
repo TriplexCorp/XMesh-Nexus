@@ -163,13 +163,13 @@ struct UserTrafficSample {
 
 #[derive(Debug, Deserialize, Serialize)]
 struct UserInboundTrafficSample {
-    #[serde(alias="user_id")]
+    #[serde(alias="userId")]
     user_id: i64,
-    #[serde(alias="inbound_tag")]
+    #[serde(alias="inboundTag")]
     inbound_tag: String,
-    #[serde(alias="uplink_bytes")]
+    #[serde(alias="uplinkBytes")]
     uplink_bytes: i64,
-    #[serde(alias="downlink_bytes")]
+    #[serde(alias="downlinkBytes")]
     downlink_bytes: i64,
 }
 
