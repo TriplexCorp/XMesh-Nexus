@@ -60,15 +60,15 @@ async function mount(root){
     // The provisioning URI and TOTP secret remain in the browser; no external QR service.
     card.dataset.uri=data.otpauth;
     body.innerHTML='<div class="mfa-enrollment">'+
-      '<div class="mfa-qr-column"><div class="mfa-qr-frame" id="mfa-qr" role="img" aria-label="QR-код для Google Authenticator"></div>'+
-      '<span class="mfa-qr-caption">1. Откройте Google Authenticator, нажмите «+» и выберите «Сканировать QR-код».</span></div>'+
-      '<div class="mfa-qr-instructions"><h4>Подключение приложения</h4>'+
-      '<p class="note">Отсканируйте QR-код камерой телефона. Также поддерживаются 2FAS, Aegis и другие приложения TOTP.</p>'+
-      '<details class="mfa-manual"><summary>Не получается сканировать? Ввести ключ вручную</summary>'+
+      '<div class="mfa-qr-column"><div class="mfa-qr-frame" id="mfa-qr" role="img" aria-label="QR-код для приложения-аутентификатора"></div>'+
+      '<span class="mfa-qr-caption">1. Откройте приложение-аутентификатор и добавьте аккаунт с помощью QR-кода.</span></div>'+
+      '<div class="mfa-qr-instructions"><h4>Настройка приложения-аутентификатора</h4>'+
+      '<p class="note">Используйте любое приложение с поддержкой одноразовых кодов TOTP: например, Google Authenticator, Microsoft Authenticator, 2FAS или Aegis. Сканируйте QR-код в самом приложении.</p>'+
+      '<details class="mfa-manual"><summary>Нет возможности сканировать? Добавить вручную</summary>'+
       '<label class="f"><span>Секретный ключ</span><input id="mfa-secret" readonly value="'+escapeHtml(data.secret)+'" autocomplete="off"></label>'+
       '<div class="act"><button class="gh sm" type="button" data-mfa-copy="secret">Копировать ключ</button>'+
       '<button class="gh sm" type="button" data-mfa-copy="uri">Копировать ссылку импорта</button></div></details>'+
-      '<form id="mfa-confirm" class="sg"><label class="f"><span>2. Код из Google Authenticator</span>'+
+      '<form id="mfa-confirm" class="sg"><label class="f"><span>2. Шестизначный код из приложения-аутентификатора</span>'+
       '<input name="code" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" required placeholder="000000"></label>'+
       '<button class="btn" type="submit">Включить 2FA</button></form>'+
       '<p class="note">2FA включится только после подтверждения кода. На подтверждение есть 10 минут.</p></div></div>';
