@@ -191,11 +191,12 @@ assert.match(css,/^input\[type="range"\]::-webkit-slider-thumb\{/m);
 assert.match(css,/^input\[type="range"\]::-moz-range-thumb\{/m);
 assert.match(css,/html\[data-motion=on\] input\[type="range"\]/);
 assert.match(app,/const saveAppearanceControls=\(\)=>/);
-assert.match(app,/\['ts','text-size','radius','gap-scale'\]\.includes\(t\.id\)/);
-assert.match(app,/id="text-size" min="75" max="160" step="1"/,'Independent text slider must have 1-point precision');
-assert.match(app,/id="text-precision"/,'Text slider must have its own 1 vs 10 snapping control');
-assert.match(app,/C\.textPrecision===10\?10:1/,'Text precision must be saved separately');
-assert.match(css,/--text-size-scale/,'Text scaling must be applied in CSS');
+assert.match(app,/\['ts','radius','gap-scale'\]\.includes\(t\.id\)/);
+assert.match(app,/id="ts" min="0.9" max="2" step="0.01"/,'Unified interface scale must advance by 1%');
+assert.match(app,/id="tsv" data-appearance-value="ts" min="90" max="200" step="1"/,
+ 'Scale must support exact numeric 1% adjustment');
+assert.doesNotMatch(app,/id="text-size"/,'Duplicate text scaling control must not reappear');
+assert.doesNotMatch(css,/--text-size-scale/,'Text must inherit unified interface scale only');
 for(const key of ['ts','radius','gap-scale']){
  const handler=app.match(new RegExp("e\\.target\\.id(?:===|==)'"+key+"'\\)\\{([^}]+)\\}"))?.[1];
  assert(handler?.includes('previewAppearanceControls()')&&!handler.includes('apply()'),
@@ -266,7 +267,7 @@ assert.equal(Number(widthRange.value),2560,'Width must snap to absolute tens');
 const scaleRange=mockSlider('ts',.9,2,1.13,'0.01');
 precisionLib.configureRangePrecision(scaleRange);
 precisionLib.snapAppearanceSlider(scaleRange);
-assert.equal(Number(scaleRange.value),1.1,'Text/UI scale should use 10% increments in coarse mode');
+assert.equal(Number(scaleRange.value),1.13,'Unified interface scale must retain 1% precision even in coarse mode');
 precisionState.rangePrecision=1;
 precisionLib.configureRangePrecision(scaleRange);
 scaleRange.value='1.13';precisionLib.snapAppearanceSlider(scaleRange);
