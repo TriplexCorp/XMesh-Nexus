@@ -45,6 +45,8 @@ jobs:
           node --check subscription-studio.js
           node --check login.js
           node --check xray-studio-v5.js
+          node --check xray-studio-v4.js
+          node --check xray-studio-tools.js
           node --check xray-studio-dialog.js
           node --check xray-json-diagnostics.js
           node --check xray-json-intelligence.js
@@ -52,6 +54,8 @@ jobs:
         run: node scripts/check-json-diagnostics.js
       - name: Test Xray semantic intelligence
         run: node scripts/check-xray-intelligence.js
+      - name: Enforce active XRAY STUDIO entrypoint and remove stale assets
+        run: node scripts/check-xray-active-entrypoint.js
       - name: Verify packaged frontend assets
         run: node scripts/check-static-assets.js
       - name: Validate RU/EN panel and portal localization
