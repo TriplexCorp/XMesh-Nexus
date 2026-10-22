@@ -35,7 +35,7 @@ const hasValidJSON=()=>{try{return json()}catch{return null}};
 const pretty=d=>JSON.stringify(d,null,2);
 const codeColor=source=>{const rx=/"(?:\\.|[^"\\])*"(?=\s*:)|"(?:\\.|[^"\\])*"|\b(?:true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g;let result='',i=0,m;while((m=rx.exec(source))){result+=escapeHtml(source.slice(i,m.index));const token=m[0];const next=source.slice(m.index+token.length);const c=token[0]==='"'?( /^\s*:/.test(next)?'key':'string'):/^(?:true|false|null)$/.test(token)?'boolean':'number';result+='<span class="sv-'+c+'">'+escapeHtml(token)+'</span>';i=m.index+token.length}return result+escapeHtml(source.slice(i))+'\n'};
 function paint(){
- const source=input.value;if(validatedSource!==source){diagnosticsLine=null;get('coreIssues').hidden=true}highlight.innerHTML=codeColor(source);minimap.innerHTML=codeColor(source.split('\n').slice(0,180).join('\n'));gutter.textContent=Array.from({length:Math.min(source.split('\n').length,10000)},(_,i)=>i+1).map(n=>diagnosticsLine===n?'⚠ '+n:n).join('\n');
+ const source=input.value;if(validatedSource!==source){diagnosticsLine=null;get('coreIssues').hidden=true}highlight.innerHTML=codeColor(source).split('\n').map((part,i)=>diagnosticsLine===i+1?'<span class="sv-invalid-line">'+part+'</span>':part).join('\n');minimap.innerHTML=codeColor(source.split('\n').slice(0,180).join('\n'));gutter.textContent=Array.from({length:Math.min(source.split('\n').length,10000)},(_,i)=>i+1).map(n=>diagnosticsLine===n?'⚠ '+n:n).join('\n');
  const parts=source.slice(0,input.selectionStart).split('\n');get('position').textContent='Строка '+parts.length+', столбец '+(parts.at(-1).length+1);
  const dirty=(input.value!==saved);get('dirty').textContent=dirty?'● Не сохранено':'✓ Сохранено';get('saveState').textContent=dirty?'Есть несохранённые изменения':'Конфигурация сохранена';
  const obj=hasValidJSON();if(obj){const issues=window.XrayJsonIntelligence?.analyze?.(input.value,obj)||[];const errors=issues.filter(x=>x.severity==='error');get('valid').textContent=errors.length?errors.length+' структурных ошибок':'✓ JSON корректен';get('valid').dataset.status=errors.length?'bad':'ok';sync(obj)}else{get('valid').textContent='Ошибка синтаксиса JSON';get('valid').dataset.status='bad';get('sync').textContent='Исправьте JSON, чтобы изменить параметры конструктором'}
@@ -116,8 +116,9 @@ async function checkWithCore(){
  let documentValue;
  try{documentValue=json()}
  catch(err){
-  const message=String(err.message),m=message.match(/line\\s+(\\d+)/i);
-  reportCore('Ошибка синтаксиса JSON: '+message,m?Number(m[1]):null);
+  const message=String(err.message),m=message.match(/line\\s+(\\d+)/i),position=message.match(/position\\s+(\\d+)/i);
+  const positionLine=position?input.value.slice(0,Number(position[1])).split('\n').length:null;
+  reportCore('Ошибка синтаксиса JSON: '+message,m?Number(m[1]):positionLine);
   return;
  }
  const source=input.value;
