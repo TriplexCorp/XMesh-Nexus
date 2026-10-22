@@ -11,7 +11,7 @@ for(const name of active){
  assert(docker.includes(name),'Docker does not package active asset: '+name);
 }
 assert(html.includes('src="/xray-studio-v4.js'),'Unexpected Studio entrypoint');
-assert(html.includes('href="xray-studio-v4.css'),'Unexpected Studio stylesheet');
+assert(html.includes('href="/xray-studio-v4.css'),'Unexpected Studio stylesheet');
 assert(html.indexOf('xray-studio-tools.js')<html.indexOf('xray-studio-v4.js'),'Tools must load before studio');
 assert(app.includes('window.XMeshStudioV4.view()')&&app.includes('window.XMeshStudioV4.mount'),'App must mount V4');
 assert(security.includes('"xray-studio-v4.js"')&&security.includes('"xray-studio-v4.css"'),'Dashboard alias must rewrite Studio assets');
