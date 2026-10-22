@@ -32,8 +32,9 @@ const [view,init]=studio.create({
 },async()=>{},()=>{},{users:3,nodes:8});
 assert.equal(typeof init,'function');
 const linkedPalette={
- subscriptionAccent:'#4488cc',subscriptionTheme:'light',
- subscriptionBackground:'#f7f9fc',subscriptionCardColor:'#ffffff',subscriptionTextColor:'#203040'
+ subscriptionAccent:'#4488cc',subscriptionSecondaryAccent:'#f0a560',subscriptionTheme:'light',
+ subscriptionBackground:'#f7f9fc',subscriptionCardColor:'#ffffff',subscriptionTextColor:'#203040',
+ subscriptionFont:'inter',subscriptionRadius:27,subscriptionCardStyle:'glass'
 };
 const [linkedView]=studio.create({subscriptionAccent:'#e8bb78'},async()=>{},()=>{},{users:0,nodes:0},()=>linkedPalette);
 assert.match(linkedView,/name="subscriptionAccent"[^>]*value="#4488cc"/,
@@ -42,6 +43,26 @@ assert.match(linkedView,/name="subscriptionTheme"[^>]*>[\s\S]*?value="light" sel
  'Linked portal must follow panel light/dark mode');
 assert.match(linkedView,/name="subscriptionSyncPanelTheme" checked/,
  'New subscription appearance defaults to linked panel theme');
+assert.match(linkedView,/name="subscriptionSecondaryAccent"[^>]*value="#f0a560"/,
+ 'Linked portal must inherit the secondary accent as well');
+assert.match(linkedView,/name="subscriptionRadius"[^>]*value="27"/,
+ 'Linked portal must inherit corner rounding');
+assert.match(linkedView,/name="subscriptionFont"[^>]*>[\s\S]*?value="inter" selected/,
+ 'Linked portal must inherit the panel font');
+assert.match(linkedView,/name="subscriptionCardStyle"[^>]*>[\s\S]*?value="glass" selected/,
+ 'Linked portal must inherit glass surface style');
+assert.match(app,/subscriptionSecondaryAccent:color\('--b'/);
+assert.match(app,/subscriptionFont:C\.font/);
+assert.match(app,/subscriptionRadius:Math\.round/);
+assert.match(app,/subscriptionCardStyle:C\.surface/);
+assert.match(app,/if\(prop==='font'\|\|prop==='surface'\)syncSubscriptionTheme\(\)/);
+assert.match(app,/const saveAppearanceControls=\(\)=>\{[\s\S]*?syncSubscriptionTheme\(\)/);
+assert(!/\.subscription-preview\{\s*--portal-accent:/.test(css),
+ 'Public subscription must not override its server-supplied accent');
+assert(!/\.subscription-preview\{\s*--portal-bg:/.test(css),
+ 'Public subscription must not override its server-supplied background');
+assert.match(css,/\.subscription-studio\{\s*--portal-accent:/,
+ 'Demo defaults must only be scoped to Subscription Studio');
 const [customPaletteView]=studio.create({subscriptionSyncPanelTheme:false,subscriptionAccent:'#ff0022'},
  async()=>{},()=>{},{users:0,nodes:0},()=>linkedPalette);
 assert.match(customPaletteView,/name="subscriptionAccent"[^>]*value="#ff0022"/,
@@ -75,7 +96,7 @@ assert.match(rust,/"subscriptionTheme", &\["dark", "light"\]/);
 assert.match(view,/name="subscriptionShowTraffic"/);
 assert.match(view,/name="subscriptionShowExpiry"/);
 for(const setting of [
- 'subscriptionBackground','subscriptionCardColor','subscriptionTextColor',
+ 'subscriptionBackground','subscriptionCardColor','subscriptionTextColor','subscriptionSecondaryAccent',
  'subscriptionLayout','subscriptionCardStyle','subscriptionFont','subscriptionRadius',
  'subscriptionHero','subscriptionCta','subscriptionLogoUrl','subscriptionSupportLabel',
  'subscriptionSupportUrl','subscriptionClientLayout','subscriptionShowApps','subscriptionShowQr',
