@@ -1906,32 +1906,28 @@ document.addEventListener('click',async e=>{
   }
   else if(b=g('[data-user-client-json]')){
     e.preventDefault();
-    const user=DB.users.find(x=>x.id===Number(b.dataset.userClientJson));
-    if(!user||!window.XMeshClientConfig){toast('Генератор Client JSON недоступен.');return}
-    let entries;
+    const user=DB.users.find(u=>u.id===Number(b.dataset.userClientJson));
+    if(!user)return;
     b.disabled=true;
-    try{entries=await window.XMeshClientConfig.generate(user,DB)}catch(error){toast('Ошибка Client JSON: '+error.message);b.disabled=false;return}
+    try{
+      const config=await backendRequest('/api/v1/users/'+encodeURIComponent(user.id)+'/client-json');
+      window.xmeshGeneratedClientJson=config;
+      modal('<div class="box"><div class="bar2"><div><h2>Клиентский Xray JSON · '+esc(user.username)+'</h2><p class="note">Конфигурация из единого серверного JSON Engine с настройками SUBSCRIPTION STUDIO.</p></div><button type="button" class="ia" data-x aria-label="Закрыть">'+ic('x')+'</button></div>'+
+        '<textarea id="xmesh-generated-client-json" spellcheck="false" readonly rows="20" style="width:100%;font-family:monospace;min-height:400px;resize:vertical">'+esc(JSON.stringify(config,null,2))+'</textarea>'+
+        '<div class="act"><button type="button" class="btn" data-user-client-json-copy>'+ic('copy')+' Копировать JSON</button><button type="button" class="gh" data-user-client-json-download>'+ic('download')+' Скачать JSON</button></div></div>','wide');
+    }catch(error){toast('Ошибка Client JSON: '+(error.message||'API'))}
     finally{b.disabled=false}
-    window.xmeshGeneratedUserConfigs=entries;
-    modal('<div class="box"><div class="bar2"><div><h2>Готовые Client JSON · '+esc(user.username)+'</h2><p class="note">Адрес, UUID и настройки подключений взяты из записей панели. Неполные конфигурации нельзя экспортировать.</p></div><button type="button" class="ia" data-x aria-label="Закрыть">'+ic('x')+'</button></div>'+
-      (entries.length?entries.map((entry,i)=>'<div class="user-client-export-row"><div><b>'+esc(entry.name)+'</b><small>'+esc(entry.tag)+'</small>'+(entry.error?'<p class="er">'+esc(entry.error)+'</p>':'')+'</div><div class="act">'+(entry.json?'<button class="gh sm" data-user-client-copy="'+i+'">'+ic('copy')+'Копировать</button><button class="gh sm" data-user-client-download="'+i+'">'+ic('download')+'Скачать</button>':'<small class="mu">Требуется настройка</small>')+'</div></div>').join(''):
-      '<p class="note">Для пользователя пока нет подходящих публичных хостов. Назначьте сквад с inbound, затем добавьте хост с тем же тегом.</p>')+
-      '<p class="note">Генерация выполняется для администратора. Публичная выдача подписок требует отдельного сервиса.</p></div>','wide');
   }
-  else if(b=g('[data-user-client-copy]')){
-    const entry=window.xmeshGeneratedUserConfigs?.[Number(b.dataset.userClientCopy)];
-    if(entry?.json){
-      try{await navigator.clipboard.writeText(JSON.stringify(entry.json,null,2));toast('Готовый Client JSON скопирован')}
-      catch(err){toast('Не удалось скопировать: '+(err.message||'нет доступа к буферу'))}
-    }
+  else if(b=g('[data-user-client-json-copy]')){
+    const config=window.xmeshGeneratedClientJson;
+    if(config){try{await navigator.clipboard.writeText(JSON.stringify(config,null,2));toast('Client JSON скопирован')}catch(error){toast('Не удалось скопировать JSON')}}
   }
-  else if(b=g('[data-user-client-download]')){
-    const entry=window.xmeshGeneratedUserConfigs?.[Number(b.dataset.userClientDownload)];
-    if(entry?.json){
-      const filename=String(entry.name||'client').replace(/[^a-z0-9_-]/gi,'-').slice(0,70)||'client';
-      const blob=new Blob([JSON.stringify(entry.json,null,2)],{type:'application/json'});
-      const link=document.createElement('a'),url=URL.createObjectURL(blob);
-      link.href=url;link.download=filename+'-client.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  else if(b=g('[data-user-client-json-download]')){
+    const config=window.xmeshGeneratedClientJson;
+    if(config){
+      const blob=new Blob([JSON.stringify(config,null,2)],{type:'application/json'});
+      const url=URL.createObjectURL(blob),link=document.createElement('a');
+      link.href=url;link.download='xmesh-client.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),5000);
     }
   }
   else if(b=g('[data-user-traffic-refresh]')){e.preventDefault();void loadUserTrafficStats(+b.dataset.userTrafficRefresh)}
