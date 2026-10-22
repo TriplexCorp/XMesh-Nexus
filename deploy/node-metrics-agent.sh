@@ -95,6 +95,25 @@ fi
 payload="$(printf '{"node_id":%s,"cpu_percent":%s,"ram_used_bytes":%s,"ram_total_bytes":%s,"disk_used_bytes":%s,"disk_total_bytes":%s,"rx_bytes_per_sec":%s,"tx_bytes_per_sec":%s,"active_connections":%s,"metrics":{"interface":"%s","rateIntervalSeconds":%s}}' \
   "$XMESH_NODE_ID" "$cpu_pct" "$mem_used_bytes" "$mem_total_bytes" "${disk_used_bytes:-0}" "${disk_total_bytes:-0}" "$rx_rate" "$tx_rate" "$active_connections" "$XMESH_INTERFACE" "$elapsed")"
 
+# Optional Xray StatsService counters, joined accurately using the unique
+# per-user/per-inbound Xray email assigned by XRAY STUDIO.
+# A stock Xray user counter shared across inbounds cannot be split accurately.
+XRAY_API_ADDRESS="${XMESH_XRAY_API_ADDRESS:-127.0.0.1:10085}"
+if [[ "$XRAY_API_ADDRESS" =~ ^127\.0\.0\.1:[0-9]{1,5}$ ]] &&
+   command -v xray >/dev/null 2>&1 &&
+   command -v python3 >/dev/null 2>&1 &&
+   [[ -r /usr/local/libexec/xmesh-xray-stats-collector.py ]]; then
+  # No -reset: PostgreSQL stores monotonic deltas. The Xray stats API must be
+  # configured on loopback; if absent, do not invent user traffic.
+  if stats_json="$(timeout 6 xray api statsquery --server="$XRAY_API_ADDRESS" -pattern 'user>>>xmesh-u' 2>/dev/null)"; then
+    if stats_fragment="$(printf '%s' "$stats_json" | python3 /usr/local/libexec/xmesh-xray-stats-collector.py 2>/dev/null)"; then
+      if [[ "$stats_fragment" == ,* ]]; then
+        payload="${payload%\}}$stats_fragment}"
+      fi
+    fi
+  fi
+fi
+
 [[ -r "$XMESH_METRICS_PRIVATE_KEY" ]] || { echo "Missing readable Ed25519 private key." >&2; exit 1; }
 command -v openssl >/dev/null || { echo "OpenSSL is required for signed metrics" >&2; exit 1; }
 timestamp="$(date +%s)"
