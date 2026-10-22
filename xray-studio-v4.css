@@ -166,3 +166,30 @@
 .sv-studio .sv-title small{font-size:12px!important}
 .sv-studio .sv-title .sv-actions{margin-left:auto}
 .sv-studio .sv-codebar .sv-dot{box-shadow:0 0 0 3px color-mix(in srgb,var(--ok,#42d7a0) 12%,transparent)}
+
+
+/* Final approved-layout refinement: coherent inset cards and IDE-like editor. */
+.sv-studio .sv-columns{gap:12px!important}
+.sv-studio .sv-constructor{background:color-mix(in srgb,var(--sv-panel) 93%,var(--sv-bg))!important}
+.sv-studio .sv-formbody{padding:12px!important}
+.sv-studio .sv-formbody>[data-section="inbound"]{padding:1px}
+.sv-studio .sv-sectionhead{padding:6px 2px 13px;border-bottom:1px solid var(--sv-stroke);margin-bottom:12px}
+.sv-studio .sv-sectionhead h4{font-size:14px!important}
+.sv-studio .sv-inbound-summary{display:flex;align-items:center;gap:10px;padding:13px 12px;background:var(--sv-input);border:1px solid var(--sv-stroke);border-radius:var(--ui-control-radius,12px) var(--ui-control-radius,12px) 0 0;margin-top:10px;border-bottom:0}
+.sv-studio .sv-inbound-summary strong{font-size:14px;font-weight:750;overflow-wrap:anywhere}
+.sv-studio .sv-inbound-summary .sv-statusmark{width:10px;height:10px;flex:0 0 10px;border-radius:50%;background:var(--ok,#48db9a)}
+.sv-studio .sv-protobadge{background:color-mix(in srgb,var(--sv-accent) 19%,var(--sv-panel));color:var(--sv-accent);border-radius:40px;padding:4px 9px;font-size:11px;font-weight:760}
+.sv-studio .sv-inbound-summary button{margin-left:auto!important;min-height:28px!important;padding:4px 8px!important;background:transparent!important;border-color:transparent!important;color:var(--er,#ec697e)!important}
+.sv-studio .sv-inbound-summary~.sv-two,.sv-studio .sv-inbound-summary~[data-when],.sv-studio .sv-inbound-summary~.sv-note{padding-left:12px;padding-right:12px;background:var(--sv-input);border-left:1px solid var(--sv-stroke);border-right:1px solid var(--sv-stroke);margin:0!important;padding-top:10px}
+.sv-studio .sv-inbound-summary~[data-when]{border-top:0!important}
+.sv-studio .sv-inbound-summary~.sv-note{border-radius:0 0 var(--ui-control-radius,12px) var(--ui-control-radius,12px);padding-bottom:13px;border-bottom:1px solid var(--sv-stroke)}
+.sv-studio .sv-inbound-summary~.sv-two .sv-field input,.sv-studio .sv-inbound-summary~.sv-two .sv-field select,.sv-studio .sv-inbound-summary~[data-when] .sv-field input{background:var(--sv-panel)!important}
+.sv-studio .sv-codesurface{font-size:14px!important;line-height:1.7!important}
+.sv-studio .sv-gutter{flex-basis:52px!important;padding-right:12px!important}
+.sv-studio .sv-codeholder textarea,.sv-studio .sv-highlight{padding-left:19px!important}
+.sv-studio .sv-codestatus{font-size:12px!important}
+.sv-studio .sv-toolcopy strong{font-size:13px!important}
+.sv-studio .sv-toolcopy small{font-size:11.5px!important}
+.sv-studio .sv-tools{background:color-mix(in srgb,var(--sv-panel) 95%,var(--sv-bg))!important}
+.sv-studio .sv-codebar{background:var(--sv-panel)}
+@media(max-width:1190px){.sv-studio .sv-inbound-summary~.sv-two,.sv-studio .sv-inbound-summary~[data-when],.sv-studio .sv-inbound-summary~.sv-note{padding-left:10px;padding-right:10px}}
