@@ -53,7 +53,7 @@ function harness(documentValue,{confirmValue=true,realityKeys}={}){
  vm.runInNewContext(source,environment,{filename:'xray-studio-tools.js'});
  win.XMeshJsonTools.setup(root,{
    toast:text=>calls.push(text),
-   realityKeys:realityKeys||async()=>({privateKey:'generated-private',publicKey:'generated-public'})
+   realityKeys:realityKeys||(async()=>({privateKey:'generated-private',publicKey:'generated-public'}))
  });
  return {
    area,host,status,calls,confirmCalls,clipboard,
