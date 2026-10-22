@@ -73,6 +73,17 @@ assert(qr.size>=21 && qr.getModule(0,0), 'Bundled QR encoder must render a valid
 assert.match(mfaUi,/qrcodegen\?\.QrCode/,'MFA enrollment must generate the QR in the browser');
 assert.match(mfaUi,/encodeText\(data\.otpauth/,'QR must encode the backend provisioning URI');
 assert.match(mfaUi,/mfa-manual/,'Manual TOTP key must remain available');
+assert.match(mfaUi,/QR-код для приложения-аутентификатора/,
+ 'QR code accessible name must be vendor-neutral');
+assert.match(mfaUi,/2\. Шестизначный код из приложения-аутентификатора/,
+ 'Enrollment must accept a code from any compatible TOTP app');
+assert.match(mfaUi,/любое приложение с поддержкой одноразовых кодов TOTP/,
+ 'Enrollment must explain standards-based compatibility');
+assert.match(mfaUi,/Microsoft Authenticator/,
+ 'Examples should include multiple popular authenticators');
+assert.doesNotMatch(mfaUi,/(QR-код для Google Authenticator|Код из Google Authenticator|Откройте Google Authenticator)/,
+ 'Instructions must never imply that only Google authenticator works');
+
 assert.match(html,/qr-code\.js\?v=/,'QR encoder must be bundled with the frontend');
 assert(html.indexOf('qr-code.js')<html.indexOf('mfa-ui.js'),'QR generator must load before MFA');
 assert.match(docker,/qr-code\.js/,'Docker must package the local QR encoder');
