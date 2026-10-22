@@ -1,7 +1,7 @@
 (()=>{
 'use strict';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const defaults={sessionHours:12,idleMinutes:0,maxSessions:5,loginAttempts:8,lockoutMinutes:15,dashboardPath:''};
+const defaults={sessionHours:1,idleMinutes:15,maxSessions:1,loginAttempts:3,lockoutMinutes:15,dashboardPath:''};
 const request=async(path,options={})=>{
  const r=await fetch('/api/v1/security/'+path,{credentials:'same-origin',cache:'no-store',...options,headers:{...(options.body?{'Content-Type':'application/json'}:{}),...(options.headers||{})}});
  const j=await r.json().catch(()=>({}));
