@@ -5,7 +5,7 @@ window.XMeshSubscriptionStudio = (() => {
   const defaults = {
     subscriptionDomain:'', subscriptionPath:'/s',
     subscriptionBrand:'', subscriptionDescription:'Настройки подключения и информация о подписке.',
-    subscriptionDescriptionEn:'', subscriptionFooter:'',subscriptionFooterEn:'', subscriptionAccent:'#e8bb78', subscriptionSyncPanelTheme:true, subscriptionLanguage:'ru', subscriptionTheme:'dark',
+    subscriptionDescriptionEn:'', subscriptionFooter:'',subscriptionFooterEn:'', subscriptionAccent:'#e8bb78',subscriptionSecondaryAccent:'#c6e985', subscriptionSyncPanelTheme:true, subscriptionLanguage:'ru', subscriptionTheme:'dark',
     subscriptionShowTraffic:true, subscriptionShowExpiry:true,
     subscriptionPlacement:'a', nodePlacement:'a', deploymentServerB:'', deploymentServerC:'',
     subscriptionBackground:'#0c131b',subscriptionCardColor:'#15212b',subscriptionTextColor:'#ecf3f6',
@@ -146,6 +146,7 @@ window.XMeshSubscriptionStudio = (() => {
       '<label class="subscription-theme-sync"><input type="checkbox" name="subscriptionSyncPanelTheme"'+(data.subscriptionSyncPanelTheme!==false?' checked':'')+'> <span><b>Синхронизировать с темой панели</b><small>Акцент, светлый/тёмный режим, фон, карточки и цвет текста. Выключите для своего оформления.</small></span></label>',
       '<div class="subscription-studio-pair">',
       field('subscriptionAccent','Акцентный цвет',data.subscriptionAccent,'Цвет кнопок и индикаторов.',{color:true}),
+      field('subscriptionSecondaryAccent','Дополнительный цвет',data.subscriptionSecondaryAccent,'Второй цвет палитры панели.',{color:true}),
       choice('subscriptionLanguage',data.subscriptionLanguage,[['ru','Русский'],['en','English']]),
       '</div><div class="subscription-studio-pair">',
       '<label class="f subscription-field"><span>Тема клиентского портала</span><select name="subscriptionTheme"><option value="dark"'+(data.subscriptionTheme!=='light'?' selected':'')+'>Тёмная</option><option value="light"'+(data.subscriptionTheme==='light'?' selected':'')+'>Светлая</option></select></label>',
@@ -160,9 +161,9 @@ window.XMeshSubscriptionStudio = (() => {
       '<div class="subscription-studio-heading"><span>04</span><div><h3>Дизайн и композиция</h3><p>Настройка каждой детали клиентской страницы без кода.</p></div></div>',
       '<div class="subscription-studio-pair">',
       '<label class="f subscription-field"><span>Компоновка</span><select name="subscriptionLayout"><option value="standard"'+(data.subscriptionLayout==='standard'?' selected':'')+'>Классическая</option><option value="centered"'+(data.subscriptionLayout==='centered'?' selected':'')+'>По центру</option><option value="compact"'+(data.subscriptionLayout==='compact'?' selected':'')+'>Компактная</option></select></label>',
-      '<label class="f subscription-field"><span>Карточки</span><select name="subscriptionCardStyle"><option value="soft"'+(data.subscriptionCardStyle==='soft'?' selected':'')+'>Мягкие</option><option value="outline"'+(data.subscriptionCardStyle==='outline'?' selected':'')+'>С контуром</option><option value="flat"'+(data.subscriptionCardStyle==='flat'?' selected':'')+'>Без фона</option></select></label>',
+      '<label class="f subscription-field"><span>Карточки</span><select name="subscriptionCardStyle"><option value="soft"'+(data.subscriptionCardStyle==='soft'?' selected':'')+'>Мягкие</option><option value="outline"'+(data.subscriptionCardStyle==='outline'?' selected':'')+'>С контуром</option><option value="flat"'+(data.subscriptionCardStyle==='flat'?' selected':'')+'>Без фона</option><option value="glass"'+(data.subscriptionCardStyle==='glass'?' selected':'')+'>Стекло</option><option value="raised"'+(data.subscriptionCardStyle==='raised'?' selected':'')+'>Объёмные</option></select></label>',
       '</div><div class="subscription-studio-pair">',
-      '<label class="f subscription-field"><span>Шрифт</span><select name="subscriptionFont"><option value="system"'+(data.subscriptionFont==='system'?' selected':'')+'>Системный</option><option value="manrope"'+(data.subscriptionFont==='manrope'?' selected':'')+'>Manrope</option><option value="mono"'+(data.subscriptionFont==='mono'?' selected':'')+'>Моноширинный</option></select></label>',
+      '<label class="f subscription-field"><span>Шрифт</span><select name="subscriptionFont"><option value="onest"'+(data.subscriptionFont==='onest'?' selected':'')+'>Onest</option><option value="inter"'+(data.subscriptionFont==='inter'?' selected':'')+'>Inter</option><option value="golos"'+(data.subscriptionFont==='golos'?' selected':'')+'>Golos Text</option><option value="rubik"'+(data.subscriptionFont==='rubik'?' selected':'')+'>Rubik</option><option value="nunito"'+(data.subscriptionFont==='nunito'?' selected':'')+'>Nunito Sans</option><option value="plex"'+(data.subscriptionFont==='plex'?' selected':'')+'>IBM Plex Sans</option><option value="roboto"'+(data.subscriptionFont==='roboto'?' selected':'')+'>Roboto</option><option value="pt"'+(data.subscriptionFont==='pt'?' selected':'')+'>PT Sans</option><option value="montserrat"'+(data.subscriptionFont==='montserrat'?' selected':'')+'>Montserrat</option><option value="ubuntu"'+(data.subscriptionFont==='ubuntu'?' selected':'')+'>Ubuntu</option><option value="opensans"'+(data.subscriptionFont==='opensans'?' selected':'')+'>Open Sans</option><option value="source"'+(data.subscriptionFont==='source'?' selected':'')+'>Source Sans 3</option><option value="fira"'+(data.subscriptionFont==='fira'?' selected':'')+'>Fira Sans</option><option value="jost"'+(data.subscriptionFont==='jost'?' selected':'')+'>Jost</option><option value="manrope"'+(data.subscriptionFont==='manrope'?' selected':'')+'>Manrope</option><option value="system"'+(data.subscriptionFont==='system'?' selected':'')+'>Системный</option><option value="mono"'+(data.subscriptionFont==='mono'?' selected':'')+'>Моноширинный</option></select></label>',
       '<label class="f subscription-field"><span>Скругление: <output data-subscription-radius>'+Number(data.subscriptionRadius)+'</output> px</span><input type="range" name="subscriptionRadius" min="1" max="36" step="1" value="'+Number(data.subscriptionRadius)+'"></label>',
       '</div>',
       '<div class="subscription-studio-pair subscription-color-grid">',
@@ -246,7 +247,7 @@ window.XMeshSubscriptionStudio = (() => {
             if(field)field.value=value;
           }
         }
-        for(const key of ['subscriptionAccent','subscriptionTheme','subscriptionBackground','subscriptionCardColor','subscriptionTextColor']){
+        for(const key of ['subscriptionAccent','subscriptionSecondaryAccent','subscriptionTheme','subscriptionBackground','subscriptionCardColor','subscriptionTextColor','subscriptionFont','subscriptionRadius','subscriptionCardStyle']){
           const field=input(form,key);
           if(field)field.disabled=linked;
         }
@@ -260,6 +261,7 @@ window.XMeshSubscriptionStudio = (() => {
         subscriptionFooter:input(form,'subscriptionFooter').value.trim(),
         subscriptionFooterEn:input(form,'subscriptionFooterEn').value.trim(),
         subscriptionAccent:input(form,'subscriptionAccent').value,
+        subscriptionSecondaryAccent:input(form,'subscriptionSecondaryAccent').value,
         subscriptionSyncPanelTheme:input(form,'subscriptionSyncPanelTheme').checked,
         subscriptionLanguage:input(form,'subscriptionLanguage').value,
         subscriptionTheme:input(form,'subscriptionTheme').value,
@@ -314,6 +316,7 @@ window.XMeshSubscriptionStudio = (() => {
           ? 'https://'+d.subscriptionDomain+d.subscriptionPath+'/<token>':'Укажите домен и путь';
         const preview=$('[data-subscription-preview]');
         preview.style.setProperty('--portal-accent',d.subscriptionAccent);
+        preview.style.setProperty('--portal-secondary',d.subscriptionSecondaryAccent);
         preview.style.setProperty('--portal-bg',d.subscriptionBackground);
         preview.style.setProperty('--portal-card',d.subscriptionCardColor);
         preview.style.setProperty('--portal-text',d.subscriptionTextColor);
