@@ -295,7 +295,7 @@ const operations={
     doc.inbounds??=[];
     if(!Array.isArray(doc.inbounds))throw Error('inbounds должен быть массивом');
     if(doc.inbounds.some(i=>i.tag===response.tag))throw Error('Тег inbound уже занят');
-    const settings=response.protocol==='vless'?{clients:[],decryption:'none'}:{clients:[]};
+    const settings=response.protocol==='vless'?{users:[],decryption:'none'}:{users:[]};
     const streamSettings={network:response.transport,security:'none'};
     if(response.transport==='xhttp')streamSettings.xhttpSettings={path:'/xhttp',mode:'auto'};
     if(response.transport==='ws')streamSettings.wsSettings={path:'/ws'};
