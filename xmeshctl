@@ -218,7 +218,13 @@ update_panel() {
     git -C "$ROOT" pull --ff-only
   fi
 
-  say "Проверка конфигурации Compose"
+  say "Проверка MFA и конфигурации Compose"
+  # Existing upgrades previously skipped installer-based MFA provisioning.
+  # A configured key must never be replaced: it encrypts enrolled TOTP secrets.
+  if ! bash "$ROOT/deploy/ensure-totp-key.sh" "$ROOT/.env"; then
+    fail "Не удалось проверить ключ 2FA; обновление остановлено до пересборки."
+    return 1
+  fi
   compose config --quiet
 
   say "Сборка и запуск обновлённой панели"
@@ -230,6 +236,26 @@ update_panel() {
   say "Текущее состояние"
   compose ps
   ok "Команда обновления завершена. Проверь логи, если панель не стала healthy."
+}
+
+repair_mfa() {
+  require_compose || return 1
+  if ! command -v openssl >/dev/null 2>&1; then
+    fail "Для настройки 2FA требуется OpenSSL."
+    return 1
+  fi
+  say "Проверка постоянного ключа двухфакторной защиты"
+  warn "Существующий TOTP_ENCRYPTION_KEY не будет заменён."
+  warn "Если 2FA ранее работала, а ключ утерян, восстанови оригинал из резервной копии."
+  if ! confirm_yes "Проверить ключ и пересоздать контейнер панели? [y/N] "; then
+    warn "Действие отменено."
+    return 0
+  fi
+  bash "$ROOT/deploy/ensure-totp-key.sh" "$ROOT/.env" || return 1
+  compose config --quiet || return 1
+  # docker compose restart alone does NOT inject changed environment values.
+  compose up -d --no-deps --force-recreate panel
+  ok "Ключ MFA проверен, контейнер пересоздан. Обнови страницу «Безопасность»."
 }
 
 health_check() {
@@ -256,6 +282,7 @@ main_menu() {
     printf "  6) Проверить health endpoint\n"
     printf "  7) Остановить стек\n"
     printf "  8) Запустить стек\n"
+    printf "  9) Проверить и включить 2FA (MFA)\n"
     printf "  0) Выход\n\n"
     read -r -p "Выбери действие: " choice || exit 0
     case "$choice" in
@@ -274,6 +301,7 @@ main_menu() {
         fi
         pause ;;
       8) compose up -d; compose ps; pause ;;
+      9) repair_mfa; pause ;;
       0) exit 0 ;;
       *) warn "Неизвестный пункт."; pause ;;
     esac
