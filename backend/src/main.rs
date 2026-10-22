@@ -267,7 +267,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/users/{id}/traffic", get(get_user_traffic))
         .route("/nodes/{id}/metrics-key", post(node_auth::enroll).delete(node_auth::revoke))
         .route("/nodes/{id}/runtime", get(node_runtime::status))
-        .route("/users/{id}/subscription", post(user_subscriptions::create).delete(user_subscriptions::revoke))
+        .route("/users/{id}/subscription", get(user_subscriptions::status).post(user_subscriptions::create).delete(user_subscriptions::revoke))
         .route("/nodes/{id}/enrollment", post(node_enrollment::issue))
         .route("/admins", get(admin_accounts::list).post(admin_accounts::create))
         .route("/admins/{id}", patch(admin_accounts::update).delete(admin_accounts::delete))
@@ -289,6 +289,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/node/heartbeat", post(node_runtime::heartbeat))
         .route("/node/enroll", post(node_enrollment::claim))
         .route("/sub/{token}", get(user_subscriptions::serve))
+        .route("/portal/{token}", get(user_subscriptions::portal))
         .route("/auth/session", get(auth::session))
         .route("/auth/login", post(auth::login))
         .route("/auth/mfa/verify", post(mfa::verify_challenge))
@@ -308,6 +309,7 @@ async fn main() -> anyhow::Result<()> {
         .layer(TraceLayer::new_for_http())
         .layer(middleware::from_fn(security_headers))
         .layer(middleware::from_fn(csrf_guard))
+        .layer(middleware::from_fn_with_state(state.clone(), user_subscriptions::rewrite_subscription_path))
         .with_state(state);
 
     let address = env::var("APP_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".to_owned());
