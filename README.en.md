@@ -80,6 +80,25 @@ Only **owner** accounts may edit the security policy. Active sessions are scoped
 
 **The dashboard path is an extra entrypoint, not a security boundary.** The authenticated root route and API remain accessible. Reverse-proxy URL masking, HTTPS, IP restrictions and deployment base-path changes must be configured separately.
 
+## Advanced security policies and active sessions
+
+In **System → Security**, the panel provides real server-enforced controls stored in PostgreSQL under `app_settings.security`. Only an **owner** may change the global policy. Other administrators can view it and manage their **own** active sessions.
+
+| Control | Range | Default |
+| --- | --- | --- |
+| Absolute session lifetime | 1–168 hours | 12 h |
+| Idle timeout | 0–1440 minutes (0 = disabled) | Disabled |
+| Concurrent sessions per administrator | 1–20 | 5 |
+| Failed login attempts before lockout | 3–15 | 8 |
+| Lockout duration and attempt window | 5–120 minutes | 15 min |
+| Additional dashboard entry URL | `/dashboard/slug` (4–64 characters after the prefix) | `/dashboard/nexus` |
+
+On new sign-ins, the server enforces the session limit and revokes oldest sessions beyond the configured cap. A stricter lifetime also limits previously issued sessions on subsequent requests. The UI lists session creation, recent activity and expiration. An administrator can revoke a selected session or all their other sessions. Session management is scoped to the signed-in account.
+
+The alternative dashboard URL is active immediately and **does not disable** `/`, kept as a recovery route. A different URL is *not* an access-control mechanism. To restrict public entry points, configure your own HTTPS reverse proxy carefully, preserving static asset and authenticated API routes.
+
+Endpoints: `GET/PATCH /api/v1/security/policy`, `GET /api/v1/security/sessions`, `DELETE /api/v1/security/sessions/{id}`, and `POST /api/v1/security/sessions/others`. All endpoints require authentication; policy updates require the owner role.
+
 ## Administrator two-factor authentication (TOTP)
 
 From **System → Security**, an administrator can enroll their
