@@ -51,7 +51,7 @@ else
   # Preserve the existing bearer agents until the owner enrolls Ed25519 keys.
   # Fresh installations use signed requests only.
   if ! grep -q '^ALLOW_LEGACY_NODE_BEARER=' .env; then
-    printf 'ALLOW_LEGACY_NODE_BEARER=true\\n' >> .env
+    printf 'ALLOW_LEGACY_NODE_BEARER=true\n' >> .env
     echo 'Legacy node bearer temporarily enabled for existing agents; disable after migration.'
   fi
   if ! grep -q '^DB_MAX_CONNECTIONS=' .env; then
