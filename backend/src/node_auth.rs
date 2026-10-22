@@ -25,7 +25,7 @@ fn error(message: &'static str) -> ApiError {
 
 pub(crate) fn canonical(node_id: i64, timestamp: i64, nonce: &str, body: &[u8]) -> String {
     let digest = hex::encode(Sha256::digest(body));
-    format!("XMESH1\\nPOST\\n/api/v1/metrics/ingest\\n{node_id}\\n{timestamp}\\n{nonce}\\n{digest}\\n")
+    format!("XMESH1\nPOST\n/api/v1/metrics/ingest\n{node_id}\n{timestamp}\n{nonce}\n{digest}\n")
 }
 
 fn valid_nonce(nonce: &str) -> bool {
@@ -191,7 +191,7 @@ mod tests {
     #[test]
     fn message_binds_method_path_identity_nonce_timestamp_and_body() {
         let a=canonical(42,1_800_000_000,"00112233445566778899aabbccddeeff",br#"{"node_id":42}"#);
-        assert!(a.starts_with("XMESH1\\nPOST\\n/api/v1/metrics/ingest\\n42\\n1800000000\\n"));
+        assert!(a.starts_with("XMESH1\nPOST\n/api/v1/metrics/ingest\n42\n1800000000\n"));
         assert_ne!(a,canonical(43,1_800_000_000,"00112233445566778899aabbccddeeff",br#"{"node_id":42}"#));
         assert_ne!(a,canonical(42,1_800_000_000,"00112233445566778899aabbccddeeff",br#"{"node_id":43}"#));
         assert!(valid_nonce("00112233445566778899aabbccddeeff"));
