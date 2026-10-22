@@ -11,6 +11,9 @@ new Function(app);
 assert.doesNotMatch(app,/\blegacyDemo\b/);
 assert.doesNotMatch(app,/localStorage\.removeItem\('xmeshNexusDB'\)/);
 assert.doesNotMatch(app,/\b_legacy\b/);
+assert.doesNotMatch(app,/,false,true\)/,'Retired Studio positional argument must not return');
+assert.match(app,/const group=\(title,desc,body,compact=false\)=>/);
+assert((app.match(/,true\)\+/g)||[]).length>=2,'Compact XRAY STUDIO blocks must preserve their layout');
 
 // The former bearer credential UI has become Ed25519 enrollment.
 assert.doesNotMatch(app,/data-metrics-token|dataset\.metricsToken/);
