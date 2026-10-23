@@ -478,7 +478,7 @@ pub async fn serve(State(state):State<AppState>,Path(token):Path<String>,
   response.headers_mut().insert("profile-title",encoded);
  }
  if let Some(url)=settings.get("subscriptionSupportUrl").and_then(Value::as_str) {
-  if url.starts_with("https://") && !url.contains(['\\r','\\n']) {
+  if url.starts_with("https://") && !url.contains(['\r','\n']) {
    if let Ok(value)=header::HeaderValue::from_str(url){response.headers_mut().insert("support-url",value);}
   }
  }
