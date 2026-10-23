@@ -405,6 +405,8 @@ fn build_offline_policy(config:&Value, users:&[Value], node_id:i64, now_ms:i64,
         let used_gb=user.get("used").and_then(Value::as_f64).unwrap_or(0.0).max(0.0);
         // Use floor for both limits and remaining capacity: never round quota up.
         let used_bytes=(used_gb * 1_073_741_824.0).floor().clamp(0.0,i64::MAX as f64) as i64;
+        let limit_bytes=(limit_gb.max(0.0)*1_073_741_824.0).floor()
+            .clamp(0.0,i64::MAX as f64) as i64;
         let remaining=if limit_gb.is_finite() && limit_gb>0.0 {
             let remaining_gb=(limit_gb-used_gb).max(0.0);
             Some((remaining_gb*1_073_741_824.0).floor().clamp(0.0,i64::MAX as f64) as i64)
@@ -414,7 +416,7 @@ fn build_offline_policy(config:&Value, users:&[Value], node_id:i64, now_ms:i64,
         user_policies.push(json!({
             "userId":user_id,"xrayId":uuid.to_string(),
             "expireAtMs":expires,"panelUsedBytes":used_bytes,
-            "offlineBudgetBytes":offline_budget
+            "limitBytes":limit_bytes,"offlineBudgetBytes":offline_budget
         }));
     }
     user_policies.sort_by_key(|item|item.get("userId").and_then(Value::as_i64).unwrap_or(0));
