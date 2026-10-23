@@ -4759,3 +4759,8 @@ dialog#dlg.squad-wide .squad-preview-nodes{grid-column:1/-1}
 dialog#dlg.squad-wide .squad-preview-stat{padding:13px 15px}
 dialog#dlg.squad-wide .squad-preview-section{min-width:0}
 @media(max-width:720px){dialog#dlg.squad-wide > form.box{padding:14px}dialog#dlg.squad-wide .squad-editor-layout{grid-template-columns:minmax(0,1fr)}dialog#dlg.squad-wide [data-squad-preview]{grid-template-columns:minmax(0,1fr)}dialog#dlg.squad-wide .squad-preview-nodes{grid-column:auto}}
+
+/* More vertical space for large node IP pools. */
+dialog#dlg.node-wide .node-ip-section textarea[name="rotationIps"]{height:240px;min-height:200px;max-height:min(52dvh,520px);resize:vertical}
+@media(max-height:700px) and (min-width:1101px){dialog#dlg.node-wide .node-ip-section textarea[name="rotationIps"]{height:150px;min-height:120px}}
+@media(max-width:700px){dialog#dlg.node-wide .node-ip-section textarea[name="rotationIps"]{height:220px;min-height:160px}}
