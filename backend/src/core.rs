@@ -259,6 +259,30 @@ impl CoreManager {
             .collect())
     }
 
+    /// Fetch every public Xray-core release, including prereleases, in GitHub
+    /// pagination order. Drafts are intentionally excluded.
+    pub async fn all_node_releases(&self) -> Result<Vec<ReleaseInfo>, String> {
+        let mut all=Vec::new();
+        for page in 1..=20u32 {
+            let url=format!("https://api.github.com/repos/XTLS/Xray-core/releases?per_page=100&page={page}");
+            let batch=self.client.get(&url)
+                .header(reqwest::header::ACCEPT,"application/vnd.github+json")
+                .timeout(Duration::from_secs(20))
+                .send().await.map_err(|e|format!("GitHub releases unavailable: {e}"))?
+                .error_for_status().map_err(|e|format!("GitHub releases returned an error: {e}"))?
+                .json::<Vec<GithubRelease>>().await
+                .map_err(|e|format!("Invalid GitHub release response: {e}"))?;
+            let count=batch.len();
+            all.extend(batch.into_iter().filter(|r|!r.draft).map(|r|ReleaseInfo{
+                version:r.tag_name,published_at:r.published_at,
+                prerelease:r.prerelease,url:r.html_url,
+            }));
+            if count<100{break}
+            if page==20{return Err("Too many releases to enumerate safely".into())}
+        }
+        Ok(all)
+    }
+
     async fn install_inner(&self, target: &str) -> Result<(String, String), String> {
         let releases = self.fetch_releases().await?;
         let latest = releases
