@@ -114,12 +114,15 @@ pub fn apply(node: &Value, config: &mut Value) -> Result<Option<Value>, ApiError
             "direct"=>return Err(invalid("GeoData: profile needs a 'direct' freedom outbound.")),
             _=>return Err(invalid("GeoData: allowed actions are block and direct."))
         };
-        rules.push(json!({"type":"field",key:[value],"outboundTag":outbound}));
+        let mut rule=json!({"type":"field","outboundTag":outbound});
+        rule[key]=json!([value]);
+        rules.push(rule);
     }
     if !rules.is_empty() {
         outbounds.push(json!({"tag":"xmesh_geo_block","protocol":"blackhole"}));
-        let routing=config.get_mut("routing")
-            .and_then(Value::as_object_mut).ok_or_else(||invalid("GeoData: routing must be an object."))?;
+        let routing=config.as_object_mut().ok_or_else(||invalid("GeoData: Xray config must be an object."))?
+            .entry("routing").or_insert_with(||json!({}));
+        let routing=routing.as_object_mut().ok_or_else(||invalid("GeoData: routing must be an object."))?;
         let existing=routing.entry("rules").or_insert_with(||json!([]));
         let existing=existing.as_array_mut().ok_or_else(||invalid("GeoData: routing.rules must be an array."))?;
         // StatsService inbound must remain the first rule. Other node rules win
