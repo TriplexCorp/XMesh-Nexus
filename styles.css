@@ -2822,3 +2822,39 @@ dialog.user-modal .user-sub-note,dialog.user-modal .user-traffic-empty p{line-he
   dialog.user-modal .user-edit-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media(max-width:440px){dialog.user-modal .user-edit-fields{grid-template-columns:minmax(0,1fr)}}
+
+/* Node editor: use available desktop width instead of the old constrained dialog. */
+dialog#dlg.node-wide,dialog.node-wide{
+  box-sizing:border-box!important;
+  width:min(1750px,calc(100vw - 44px))!important;
+  inline-size:min(1750px,calc(100vw - 44px))!important;
+  max-width:calc(100vw - 44px)!important;
+  max-inline-size:calc(100vw - 44px)!important;
+  padding:0!important;
+}
+dialog.node-wide .box{box-sizing:border-box;width:100%;min-width:0;padding:clamp(18px,1.6vw,30px);max-height:calc(100dvh - 40px)}
+dialog.node-wide .node-form-layout{
+  width:100%;
+  grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1.12fr);
+  column-gap:clamp(16px,1.35vw,28px);
+  align-items:start;
+}
+dialog.node-wide :is(.node-main-section,.node-ip-section,.node-billing-section,.node-form-grid,.node-billing-fields){box-sizing:border-box;min-width:0}
+dialog.node-wide .node-main-section .node-form-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}
+dialog.node-wide .node-billing-fields{grid-template-columns:repeat(2,minmax(0,1fr));gap:.9rem}
+dialog.node-wide :is(.node-ip-section,.node-billing-section){padding:clamp(14px,1.1vw,22px)}
+dialog.node-wide :is(input,select,textarea){box-sizing:border-box;width:100%;min-width:0;max-width:100%}
+dialog.node-wide .node-billing-fields .f:has([name="billingDueDate"]),
+dialog.node-wide .node-billing-fields .f:has([name="billingProviderUrl"]),
+dialog.node-wide .node-billing-fields .f:has([name="billingNote"]){grid-column:1/-1}
+dialog.node-wide .node-billing-fields .f small,
+dialog.node-wide .node-ip-hint,
+dialog.node-wide .node-form-grid .f small{overflow-wrap:anywhere;line-height:1.5}
+dialog.node-wide .country-picker{min-width:0;width:100%}
+dialog.node-wide .country-picker :is(input,.country-selected){box-sizing:border-box;width:100%;min-width:0}
+@media(max-width:1150px){dialog.node-wide .node-form-layout{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:750px){
+  dialog#dlg.node-wide,dialog.node-wide{width:calc(100vw - 12px)!important;inline-size:calc(100vw - 12px)!important;max-width:calc(100vw - 12px)!important}
+  dialog.node-wide .node-form-layout{grid-template-columns:minmax(0,1fr)}
+}
+@media(max-width:480px){dialog.node-wide .node-main-section .node-form-grid,dialog.node-wide .node-billing-fields{grid-template-columns:minmax(0,1fr)}}
