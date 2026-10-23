@@ -93,7 +93,7 @@ fn vless_link(user:&Value, inbound:&Value, host:&Value, device:&str)->Option<Str
  if let Some(config)=transport{
   if let Some(path)=nonempty(host,"path").or_else(||nonempty(config,"path")){opts.push(format!("path={}",encode_component(path)))}
   if let Some(h)=nonempty(host,"host").or_else(||nonempty(host,"externalHost")){opts.push(format!("host={}",encode_component(h)))}
-  if network=="grpc" && let Some(service)=nonempty(config,"serviceName"){opts.push(format!("serviceName={}",encode_component(service)))}
+  if network=="grpc" && let Some(service)=nonempty(host,"serviceName").or_else(||nonempty(config,"serviceName")){opts.push(format!("serviceName={}",encode_component(service)))}
   if network=="xhttp" {
    let platform=match device{"ios"=>Some("iOS"),"windows"=>Some("Windows"),_=>None};
    let profile=platform.and_then(|key|{
@@ -102,6 +102,12 @@ fn vless_link(user:&Value, inbound:&Value, host:&Value, device:&str)->Option<Str
    });
    let mode=profile.and_then(|v|nonempty(v,"mode")).or_else(||nonempty(config,"mode"));
    if let Some(mode)=mode{opts.push(format!("mode={}",encode_component(mode)))}
+  }
+ }
+ if security=="tls"{
+  if let Some(alpn)=nonempty(host,"alpn"){
+   let values:Vec<&str>=alpn.split(',').map(str::trim).filter(|s|!s.is_empty()&&s.len()<=32&&s.bytes().all(|b|b.is_ascii_alphanumeric()||b"/.-_".contains(&b))).collect();
+   if !values.is_empty(){opts.push(format!("alpn={}",encode_component(&values.join(","))))}
   }
  }
  if security!="none"{
@@ -115,10 +121,11 @@ fn vless_link(user:&Value, inbound:&Value, host:&Value, device:&str)->Option<Str
   let pbk=nonempty(host,"publicKey").or_else(||nonempty(host,"realityPublicKey"))
    .or_else(||nonempty(inbound,"publicKey")).or_else(||nonempty(reality,"publicKey"))?;
   let sid=nonempty(host,"shortId").or_else(||nonempty(host,"externalShortId"))
-   .or_else(||reality.get("shortIds").and_then(Value::as_array).and_then(|a|a.first()).and_then(Value::as_str))?;
+   .or_else(||reality.get("shortIds").and_then(Value::as_array).and_then(|a|a.first()).and_then(Value::as_str)).unwrap_or("");
   opts.push(format!("pbk={}",encode_component(pbk)));
   opts.push(format!("sid={}",encode_component(sid)));
   opts.push(format!("fp={}",encode_component(nonempty(host,"fp").or_else(||nonempty(host,"fingerprint")).unwrap_or("chrome"))));
+  if let Some(spider)=nonempty(host,"spiderX"){opts.push(format!("spx={}",encode_component(spider)))}
  }
  let name=nonempty(host,"remark").unwrap_or(address);
  Some(format!("vless://{}@{}:{}?{}#{}",uuid,address,actual_port,opts.join("&"),encode_component(name)))
@@ -170,9 +177,13 @@ fn vless_outbound(user:&Value,inbound:&Value,host:&Value,device:&str)->Option<Va
   let sni=nonempty(host,"sni").or_else(||nonempty(host,"externalSNI"))
    .or_else(||stream.get("tlsSettings").and_then(|v|nonempty(v,"serverName")))?;
   let mut tls=json!({"serverName":sni});
-  if let Some(values)=stream.get("tlsSettings").and_then(|v|v.get("alpn")).and_then(Value::as_array){
+  if let Some(value)=nonempty(host,"alpn"){
+   let values:Vec<&str>=value.split(',').map(str::trim).filter(|s|!s.is_empty()&&s.len()<=32&&s.bytes().all(|b|b.is_ascii_alphanumeric()||b"/.-_".contains(&b))).collect();
+   if !values.is_empty(){tls["alpn"]=json!(values)}
+  }else if let Some(values)=stream.get("tlsSettings").and_then(|v|v.get("alpn")).and_then(Value::as_array){
    tls["alpn"]=json!(values);
   }
+  if let Some(fp)=nonempty(host,"fp").or_else(||nonempty(host,"fingerprint")){tls["fingerprint"]=json!(fp)}
   outbound_stream["tlsSettings"]=tls;
  }
  let config=match network{
@@ -208,6 +219,9 @@ fn vless_outbound(user:&Value,inbound:&Value,host:&Value,device:&str)->Option<Va
  if let Some(hostname)=nonempty(host,"host").or_else(||nonempty(host,"externalHost")){
   if network=="ws"{transport["headers"]=json!({"Host":hostname})}
   else if network=="xhttp"{transport["host"]=json!(hostname)}
+ }
+ if network=="grpc"{
+  if let Some(service)=nonempty(host,"serviceName"){transport["serviceName"]=json!(service)}
  }
  // Device profiles are client-side transport overrides only; never copy
  // the entire server inbound or any Reality private material.
