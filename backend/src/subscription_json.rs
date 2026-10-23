@@ -292,7 +292,7 @@ mod tests{
     "dns":"cloudflare","dnsRouting":true}})).unwrap();
   assert_eq!(c["dns"]["servers"][0],"1.1.1.1");
   assert_eq!(c["routing"]["rules"][2]["outboundTag"],"dns-out");
-  assert_eq!(c["routing"]["rules"][2]["outboundTag"],"xmesh-NL-0001");
+  assert_eq!(c["routing"]["rules"][3]["outboundTag"],"xmesh-NL-0001");
   assert!(c["outbounds"].as_array().unwrap().iter().any(|o|o["tag"]=="dns-out"));
  }
  #[test] fn multiserver_fallback_uses_smart_not_direct(){
