@@ -1,0 +1,21 @@
+#!/usr/bin/env node
+'use strict';
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const app=fs.readFileSync('app.js','utf8');
+const css=fs.readFileSync('styles.css','utf8');
+const runtime=fs.readFileSync('backend/src/node_runtime.rs','utf8');
+assert.match(app,/data-node-card-id/);
+assert.match(app,/data-node-runtime-state/);
+assert.match(app,/data-node-xray-version/);
+assert.match(app,/async function refreshNodeRuntime\(\)/);
+assert.match(app,/Promise\.all\(\[refreshNodeMetrics\(\),refreshNodeRuntime\(\)\]\)/);
+assert.match(app,/setInterval\(\(\)=>\{void poll\(\)\},5000\)/);
+assert.match(app,/if\(!runtime\?\.connected\)/,'Stale heartbeats must never mark a node active');
+assert.match(app,/runtime\.xrayRunning===true&&runtime\.routerRunning===true/,'Both Xray and router must be running');
+assert.match(app,/version\.textContent=text/,'Remote version must be inserted as text');
+assert.match(css,/\.node-runtime-online/);
+assert.match(css,/\.node-runtime-offline/);
+assert.match(runtime,/"xrayVersion":row\.try_get/);
+assert.match(runtime,/received_at > NOW\(\) - INTERVAL '150 seconds'/);
+console.log('Live Xray and node state contract: OK');
