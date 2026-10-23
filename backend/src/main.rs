@@ -290,6 +290,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/health/ready", get(health_ready))
         .route("/metrics/ingest", post(ingest_node_metrics))
         .route("/node/heartbeat", post(node_runtime::heartbeat))
+        .route("/node/desired-config", post(node_runtime::desired_config))
         .route("/node/enroll", post(node_enrollment::claim))
         .route("/sub/{token}", get(user_subscriptions::serve))
         .route("/portal/{token}", get(user_subscriptions::portal))
@@ -341,7 +342,7 @@ async fn csrf_guard(request: Request, next: Next) -> Response {
         && request.headers().get(header::COOKIE).is_none()
         && request.headers().get("sec-fetch-site").is_none()
         && match path {
-            "/api/v1/metrics/ingest" | "/api/v1/node/heartbeat" =>
+            "/api/v1/metrics/ingest" | "/api/v1/node/heartbeat" | "/api/v1/node/desired-config" =>
                 request.headers().contains_key("x-xmesh-signature"),
             "/api/v1/node/enroll" =>
                 request.headers().get(header::CONTENT_TYPE)
