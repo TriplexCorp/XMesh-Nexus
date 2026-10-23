@@ -1999,10 +1999,6 @@ const nodeRuntimeState=(node,runtime)=>{
   if(runtime.routerRunning===false)return {label:'Маршрутизатор остановлен',kind:'offline'};
   return {label:'Состояние неизвестно',kind:'unknown'};
 };
-const renderNodeRuntime=(node,runtime)=>{
-  const status=nodeRuntimeState(node,runtime);
-  return '<span class="node-runtime-pill node-runtime-'+status.kind+'"><span class="node-runtime-dot" aria-hidden="true"></span>'+esc(status.label)+'</span>';
-};
 const updateNodeRuntimeBadges=(node,runtime)=>{
   const card=$('[data-node-card-id="'+node.id+'"]');
   if(!card)return;
