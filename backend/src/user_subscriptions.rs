@@ -162,9 +162,7 @@ fn vless_outbound(user:&Value,inbound:&Value,host:&Value,device:&str)->Option<Va
   if network=="ws"{transport["headers"]=json!({"Host":hostname})}
   else if network=="xhttp"{transport["host"]=json!(hostname)}
  }
- if network=="grpc"{
-  if let Some(service)=nonempty(host,"serviceName"){transport["serviceName"]=json!(service)}
- }
+ if network=="grpc" && let Some(service)=nonempty(host,"serviceName"){transport["serviceName"]=json!(service)}
  // Device profiles are client-side transport overrides only; never copy
  // the entire server inbound or any Reality private material.
  if network=="xhttp" && (device=="ios"||device=="windows"){
