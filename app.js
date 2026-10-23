@@ -2120,7 +2120,7 @@ const getNodeGridMode=()=>{try{const mode=localStorage.getItem(NODE_GRID_KEY);re
 // Render independent runtime and Xray health badges. Only fresh, authenticated
 // agent heartbeats can mark a node as active; a configured node is not online.
 const nodeRuntimeState=(node,runtime)=>{
-  if(node.disabled)return {label:'Отключена',kind:'disabled'};
+  if(node.disabled)return {label:node.disabledReason==='traffic_limit'?'Лимит исчерпан':'Отключена',kind:node.disabledReason==='traffic_limit'?'offline':'disabled'};
   if(!runtime?.connected)return {label:runtime?.lastSeenAt?'Нет связи':'Не подключена',kind:'offline'};
   if(runtime.xrayRunning===true&&runtime.routerRunning===true)return {label:'Активна',kind:'online'};
   if(runtime.xrayRunning===false)return {label:'Xray остановлен',kind:'offline'};
@@ -3112,7 +3112,12 @@ $('#bell').onclick=()=>{
   if(busy)return;
   busy=true;refresh.disabled=true;
   output.innerHTML='<p class="note">Проверяем состояние нод и уведомления…</p>';
-  const nodes=[...DB.nodes],users=[...DB.users],today=Date.now();
+  let freshNodes=DB.nodes;
+  try{
+   const list=await backendRequest('/api/v1/collections/nodes');
+   if(Array.isArray(list?.items)){freshNodes=list.items;DB.nodes=list.items}
+  }catch(error){console.warn('Node notification refresh failed',error)}
+  const nodes=[...freshNodes],users=[...DB.users],today=Date.now();
   // A missing heartbeat means "unknown", not that Xray is definitely offline.
   // Failed API requests are reported as unavailable, never a fake disconnected state.
   const statuses=new Map(await Promise.all(nodes.filter(n=>!n.disabled).map(async n=>{
@@ -3134,6 +3139,15 @@ $('#bell').onclick=()=>{
    return [{group:'Аренда серверов',severity:due<today?'critical':'warning',node:n,
     message:(due<today?'Аренда просрочена':'До окончания аренды '+days+' дн.')+' · '+date+' · '+(Number(n.billingPrice)||0)+' '+(n.billingCurrency||'EUR')}];
   });
+  const quotas=nodes.flatMap(n=>{
+   if(n.disabledReason!=='traffic_limit')return [];
+   const limit=Number(n.limit)||0;
+   return [{group:'Лимиты трафика',severity:'critical',node:n,
+    message:'Лимит '+(limit?fmt(limit,2)+' ГБ':'исчерпан')+
+      ' · нода автоматически отключена'+
+      (n.trafficLimitReachedAt?' · '+new Date(n.trafficLimitReachedAt).toLocaleString('ru-RU'):'')+
+      '. Остановка Xray проверяется управляющим агентом.'}];
+  });
   const infrastructure=nodes.flatMap(n=>{
    if(n.disabled)return [];
    const status=statuses.get(String(n.id));
@@ -3153,8 +3167,8 @@ $('#bell').onclick=()=>{
    if(u.expireAt&&u.expireAt>today&&u.expireAt-today<2*DAY)return [{group:'Пользователи',severity:'warning',title:u.username,message:'Подписка скоро истечёт · '+left(u.expireAt)}];
    return [];
   });
-  const items=[...rent,...infrastructure,...expiringUsers];
-  const groups=['Состояние инфраструктуры','Аренда серверов','Пользователи'];
+  const items=[...quotas,...rent,...infrastructure,...expiringUsers];
+  const groups=['Лимиты трафика','Состояние инфраструктуры','Аренда серверов','Пользователи'];
   const body=groups.map(group=>{
    const entries=items.filter(item=>item.group===group);
    if(!entries.length)return '';
@@ -3195,6 +3209,59 @@ $('#bell').innerHTML=ic('bell');syncTopLanguage();$('#logout').innerHTML=ic('log
 $('#logout').onclick=async()=>{const button=$('#logout');button.disabled=true;try{await fetch('/api/v1/auth/logout',{method:'POST',credentials:'same-origin',cache:'no-store'});}catch(_){}backendReady=false;location.replace(location.pathname)};$('#restart').setAttribute('aria-label','Настройки Xray-core');$('#restart').dataset.railTip='Настройки Xray-core';$('#restart').innerHTML=ic('code')+'<span class="lbl">Версия</span>';
 apply();matchMedia('(prefers-color-scheme: light)').addEventListener('change',()=>{apply();if(C.theme==='auto')syncSubscriptionTheme()});
 addEventListener('hashchange',()=>{if(backendReady)render()});
+// Persistent quota notifications are read from PostgreSQL, not a transient
+// browser timer or client-only threshold. Polling discovers events even if
+// another administrator is editing a node on a different device.
+let nodeQuotaPoller=null,nodeQuotaBusy=false;
+let acknowledgedQuotaEvents=new Set();
+function showNodeQuotaBell(){
+ const flagged=DB.nodes.some(n=>n.disabledReason==='traffic_limit');
+ const bell=$('#bell');
+ if(!bell)return;
+ bell.title=flagged?'Критично: исчерпан лимит трафика узла':'Уведомления';
+ if(flagged && !bell.querySelector('.pip')){
+  const dot=document.createElement('span');dot.className='pip';
+  dot.setAttribute('aria-label','Есть критические уведомления');
+  bell.append(dot);
+ }
+ if(!flagged)bell.querySelector('.pip')?.remove();
+}
+function startNodeQuotaNotifications(){
+ if(nodeQuotaPoller!==null)clearInterval(nodeQuotaPoller);
+ acknowledgedQuotaEvents=new Set(DB.nodes.filter(n=>n.disabledReason==='traffic_limit')
+  .map(n=>String(n.id)+':'+String(n.trafficLimitReachedAt||'')));
+ showNodeQuotaBell();
+ nodeQuotaPoller=setInterval(async()=>{
+  if(!backendReady||nodeQuotaBusy)return;
+  nodeQuotaBusy=true;
+  try{
+   const result=await backendRequest('/api/v1/collections/nodes');
+   if(!Array.isArray(result?.items))return;
+   for(const node of result.items){
+    if(node.disabledReason!=='traffic_limit')continue;
+    const key=String(node.id)+':'+String(node.trafficLimitReachedAt||'');
+    if(!acknowledgedQuotaEvents.has(key)){
+     acknowledgedQuotaEvents.add(key);
+     toast('КРИТИЧНО: '+(node.name||'Узел')+
+      ' — лимит трафика исчерпан, запрошена остановка Xray');
+    }
+   }
+   DB.nodes=result.items;
+   showNodeQuotaBell();
+   if(cur==='nodes'){
+    // Update the disabled state without erasing live gauge data.
+    for(const node of result.items){
+     const status=$('[data-node-card-id="'+node.id+'"] [data-node-runtime-state]');
+     if(status&&node.disabledReason==='traffic_limit'){
+      status.className='node-runtime-pill node-runtime-offline';
+      status.textContent='Лимит исчерпан';
+     }
+    }
+   }
+  }catch(error){console.warn('Traffic cutoff notification check unavailable',error)}
+  finally{nodeQuotaBusy=false}
+ },10000);
+}
 function showAuthGate(){
   backendReady=false;
   location.replace(location.pathname);
@@ -3212,6 +3279,7 @@ async function initializePanel(){
   brand();render();
   refreshCoreStatus().catch(()=>{});
   syncCoreAutoRefresh();
+  startNodeQuotaNotifications();
 }
 async function bootPanel(){
   try{
