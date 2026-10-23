@@ -272,9 +272,11 @@ pub(crate) fn validate_client_balancers(value:&Value)->Result<(),String>{
    for field in ["probeURL","connectivity"]{
     if let Some(value)=obj.get(field){
      let url=value.as_str().ok_or("Адрес проверки должен быть строкой")?;
-     if url.len()>256 || !url.starts_with("https://") ||
+     let allowed_scheme=url.starts_with("https://")
+       || (field=="connectivity" && url.starts_with("http://"));
+     if url.len()>256 || !allowed_scheme ||
        !url.is_ascii() || url.bytes().any(|c|c<=32||c==127||c==b'\\'||c==b'@')
-       || url.contains('#'){return Err("Требуется безопасный HTTPS URL проверки".into())}
+       || url.contains('#'){return Err("Некорректный URL проверки".into())}
     }
    }
   }
