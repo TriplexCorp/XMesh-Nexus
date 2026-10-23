@@ -4876,3 +4876,32 @@ dialog#dlg.node-wide .node-main-section .country-picker-dropdown .country-option
 .stats-dashboard #stats-control .stats-control-rings{align-self:center}
 .stats-dashboard #stats-control .stats-kvs{min-width:0}
 @media(max-width:850px){.stats-dashboard #stats-control{grid-template-columns:minmax(0,1fr)}}
+
+/* GeoData is a full-width second workspace row, preserving three original zones. */
+dialog#dlg.node-wide > form.box > .node-form-layout{
+  grid-template-areas:"primary ips billing" "geo geo geo";
+}
+dialog#dlg.node-wide .node-geo-section{grid-area:geo;min-width:0}
+dialog#dlg.node-wide .node-geo-fields{
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:.8rem 1rem;align-items:start;
+}
+dialog#dlg.node-wide .node-geo-fields > .f{min-width:0}
+dialog#dlg.node-wide .node-geo-fields > .f:has(textarea){grid-column:span 1}
+dialog#dlg.node-wide .node-geo-fields textarea{
+  font-family:ui-monospace,SFMono-Regular,Consolas,monospace;
+  min-height:100px;max-height:280px;resize:vertical;line-height:1.5;
+}
+dialog#dlg.node-wide .node-geo-fields small{overflow-wrap:anywhere}
+@media(max-width:1150px){
+  dialog#dlg.node-wide > form.box > .node-form-layout{
+    grid-template-areas:"primary ips" "billing billing" "geo geo";
+  }
+  dialog#dlg.node-wide .node-geo-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:750px){
+  dialog#dlg.node-wide > form.box > .node-form-layout{
+    grid-template-areas:"primary" "ips" "billing" "geo";
+  }
+  dialog#dlg.node-wide .node-geo-fields{grid-template-columns:minmax(0,1fr)}
+}
