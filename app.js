@@ -260,7 +260,7 @@ const ENT={
     chk:data=>{
       const issue=nodeRotationValidate(data);if(issue)return issue;
       const interval=Number(data.rotationIntervalHours||24);
-      if(!Number.isInteger(interval)||interval<1||interval>720)return 'Интервал IP-ротации должен быть от 1 до 720 часов.';
+      if(data.rotationEnabled&&(!Number.isInteger(interval)||interval<1||interval>720))return 'Интервал IP-ротации должен быть от 1 до 720 часов.';
       const port=Number(data.xrayLocalPort||0),nodePort=Number(data.port||0);
       if(port&&(!Number.isInteger(port)||port<1||port>65535))return 'Локальный порт Xray должен быть от 1 до 65535.';
       if(port&&port===nodePort)return 'Порт Xray должен отличаться от порта XMesh Node на том же сетевом интерфейсе.';
@@ -2374,7 +2374,7 @@ document.addEventListener('click',event=>{
 
 function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id)===String(id)):e.def?e.def():{});
   const standardFields=e.fs.map(f=>field(f,k==='admins'&&f.k==='password'?'':o[f.k])).join('');
-  const rotationFields=e.fs.filter(f=>['rotationEnabled','rotationIntervalHours','rotationIps'].includes(f.k)).map(f=>field(f,o[f.k])).join('');
+  const rotationFields=e.fs.filter(f=>['rotationEnabled','rotationIntervalHours','rotationIps'].includes(f.k)).map(f=>field(f,f.k==='rotationIntervalHours'?(o[f.k]??24):o[f.k])).join('');
   const billingFields=e.fs.filter(f=>f.k.startsWith('billing')).map(f=>f.k==='billingDueDate'
     ?'<div class="f node-date-field"><span>Оплачено до</span><button type="button" class="user-date-trigger" data-node-date-open aria-expanded="false">'+ic('calendar')+'<span data-node-date-label>'+esc(o.billingDueDate?userDateLabel(o.billingDueDate):'Выберите дату')+'</span>'+ic('chevronRight')+'</button><input type="hidden" name="billingDueDate" value="'+esc(o.billingDueDate||'')+'"><div class="user-date-calendar" data-node-date-calendar hidden></div></div>'
     :field(f,o[f.k])).join('');
