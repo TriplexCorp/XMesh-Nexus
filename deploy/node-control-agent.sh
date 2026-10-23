@@ -59,7 +59,7 @@ import json,sys
 try:
  with open(sys.argv[1],encoding="utf-8") as stream: data=json.load(stream)
  if not isinstance(data,dict):raise ValueError("Not an object")
- result={key:data.get(key) for key in ("state","checkedAt","files","lastError")}
+ result={key:data.get(key) for key in ("state","checkedAt","files","lastError","refreshRevision")}
  print(json.dumps(result,separators=(",",":")))
 except (OSError,ValueError,TypeError):
  print("null")
