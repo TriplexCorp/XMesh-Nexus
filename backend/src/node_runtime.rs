@@ -80,24 +80,10 @@ pub async fn request_restart(
     State(state): State<AppState>,
     axum::extract::Extension(actor): axum::extract::Extension<crate::auth::AuthUser>,
     Path(node_id): Path<i64>,
-    Json(body): Json<XrayVersionRequest>,
 ) -> Result<(StatusCode,Json<Value>),ApiError> {
     crate::require_mutation(&actor)?;
     if node_id<=0 {
         return Err(ApiError::new(StatusCode::BAD_REQUEST,"Invalid node ID"));
-    }
-    let target=body.version.trim();
-    if target.len()>64 || target.is_empty() ||
-       !target.bytes().all(|c|c.is_ascii_alphanumeric()||b"._+-".contains(&c)){
-       return Err(ApiError::new(StatusCode::BAD_REQUEST,"Некорректная версия Xray"));
-    }
-    // Validate against authoritative published releases, not arbitrary user
-    // strings. This also allows official prereleases.
-    let releases=state.core.all_node_releases().await.map_err(|msg|
-        ApiError::new(StatusCode::BAD_GATEWAY,msg))?;
-    if !releases.iter().any(|r|r.version==target){
-       return Err(ApiError::new(StatusCode::BAD_REQUEST,
-           "Выбранная версия отсутствует среди официальных релизов Xray"));
     }
     let node=sqlx::query_scalar::<_,Value>(
         "SELECT data FROM panel_records WHERE collection='nodes' AND id=$1"
