@@ -112,7 +112,47 @@ def main():
         code, _, _ = request("POST", f"/nodes/{node}/metrics-token", {},
                              cookie=cookie, origin=BASE)
         assert code in (404, 405), f"removed bearer endpoint must remain disabled: HTTP {code}"
-    print("PASS: removed bearer route remains disabled")
+        print("PASS: removed bearer route remains disabled")
+
+        # Restart requests use a separate signed control channel; a metrics
+        # identity cannot execute unapproved commands or access another node.
+        def signed_post(path, data):
+            raw=json.dumps(data,separators=(",",":")).encode()
+            stamp=int(time.time())
+            unique=os.urandom(16).hex()
+            canonical=(f"XMESH1\nPOST\n/api/v1{path}\n{node}\n{stamp}\n{unique}\n"
+                       f"{hashlib.sha256(raw).hexdigest()}\n").encode()
+            message.write_bytes(canonical)
+            sig=subprocess.check_output([
+                "openssl","pkeyutl","-sign","-rawin","-inkey",str(keyfile),"-in",str(message)
+            ])
+            headers={"X-XMesh-Timestamp":str(stamp),"X-XMesh-Nonce":unique,
+                     "X-XMesh-Signature":sig.hex()}
+            return request("POST",path,data,headers=headers)
+
+        code,_,_=request("POST",f"/nodes/{node}/restart",{},cookie=cookie,origin=BASE)
+        assert_status(code,409,"restart refused without live control agent")
+        code,_,_=signed_post("/node/heartbeat",{
+            "node_id":node,"version":"control-v1.0",
+            "xray_running":True,"router_running":True})
+        assert_status(code,200,"signed control heartbeat accepted")
+        code,restart,_=request("POST",f"/nodes/{node}/restart",{},cookie=cookie,origin=BASE)
+        assert_status(code,202,"admin queued an authenticated restart")
+        restart_id=restart["id"]
+        code,dup,_=request("POST",f"/nodes/{node}/restart",{},cookie=cookie,origin=BASE)
+        assert_status(code,409,"duplicate in-flight restart refused")
+        code,pending,_=signed_post("/node/restart/poll",{"node_id":node})
+        assert_status(code,200,"signed node claims restart")
+        assert pending["command"]=={"id":restart_id,"action":"restart_xray"}
+        code,again,_=signed_post("/node/restart/poll",{"node_id":node})
+        assert_status(code,200,"claimed command cannot execute twice")
+        assert again["command"] is None
+        code,_,_=signed_post("/node/restart/ack",{"node_id":node,"command_id":restart_id,
+            "success":True,"detail":"systemd confirmed Xray active"})
+        assert_status(code,200,"signed node acknowledges restart")
+        code,restart_status,_=request("GET",f"/nodes/{node}/restart",cookie=cookie)
+        assert_status(code,200,"admin sees confirmed restart")
+        assert restart_status["state"]=="succeeded" and restart_status["id"]==restart_id
 
         # Real signed database accounting for two inbounds of the same user.
         code, new_user, _ = request("POST", "/collections/users",
@@ -160,6 +200,22 @@ def main():
         assert by_tag["CDN_DE"]["downlinkBytes"]==30
         assert traffic["totalUplinkBytes"]==60
         assert traffic["totalDownlinkBytes"]==60
+        code,users,_=request("GET","/collections/users",cookie=cookie)
+        assert_status(code,200,"panel exposes metered user GiB")
+        metered=next(u for u in users["items"] if u["id"]==user_id)
+        assert abs(metered["used"]-(120/(1024**3)))<1e-9
+        code,_,_=request("PATCH",f"/collections/users/{user_id}",{"used":0},
+                         cookie=cookie,origin=BASE)
+        assert_status(code,200,"traffic reset clears meter totals but keeps Xray baselines")
+        code,after_reset,_=request("GET",f"/users/{user_id}/traffic",cookie=cookie)
+        assert_status(code,200,"read reset metered traffic")
+        assert after_reset["totalUplinkBytes"]==0
+        assert after_reset["totalDownlinkBytes"]==0
+        assert_status(report_signed((150,170),(45,95))[0],201,"next Xray delta after reset")
+        code,users,_=request("GET","/collections/users",cookie=cookie)
+        used=next(u["used"] for u in users["items"] if u["id"]==user_id)
+        assert abs(used-(120/(1024**3)))<1e-9
+
         code,_,_=request("DELETE",f"/collections/users/{user_id}",
                          cookie=cookie,origin=BASE)
         assert_status(code,200,"clean up inbound stats user")
