@@ -468,6 +468,39 @@ pub async fn serve(State(state):State<AppState>,Path(token):Path<String>,
  response.headers_mut().insert(header::CACHE_CONTROL,"no-store, private".parse().unwrap());
  response.headers_mut().insert(header::REFERRER_POLICY,"no-referrer".parse().unwrap());
  response.headers_mut().insert(header::VARY,"User-Agent, Accept".parse().unwrap());
+ // Client metadata: these are advisory headers and never change the native Xray JSON body.
+ // Never reflect untrusted settings into HTTP headers without HeaderValue validation.
+ let title=studio_string(&settings,"subscriptionBrand",studio_string(&settings,"brand","XMesh Nexus"));
+ if let Ok(encoded)=header::HeaderValue::from_str(&format!("base64:{}",{
+  use base64::Engine as _;
+  base64::engine::general_purpose::STANDARD.encode(title.as_bytes())
+ })) {
+  response.headers_mut().insert("profile-title",encoded);
+ }
+ if let Some(url)=settings.get("subscriptionSupportUrl").and_then(Value::as_str) {
+  if url.starts_with("https://") && !url.contains(['\\r','\\n']) {
+   if let Ok(value)=header::HeaderValue::from_str(url){response.headers_mut().insert("support-url",value);}
+  }
+ }
+ if let Some(announcement)=settings.get("subscriptionAnnouncement").and_then(Value::as_str) {
+  if !announcement.trim().is_empty() {
+   use base64::Engine as _;
+   let encoded=base64::engine::general_purpose::STANDARD.encode(announcement.as_bytes());
+   if let Ok(value)=header::HeaderValue::from_str(&format!("base64:{encoded}")) {
+    response.headers_mut().insert("subscription-announcement",value);
+   }
+  }
+ }
+ let interval=settings.get("subscriptionUpdateInterval").and_then(Value::as_u64).unwrap_or(24).clamp(1,168);
+ response.headers_mut().insert("profile-update-interval",header::HeaderValue::from_str(&interval.to_string()).unwrap());
+ // User limits are expressed in GiB in panel records; the conventional subscription-userinfo
+ // header expects bytes and Unix seconds.
+ let used=user.get("used").and_then(Value::as_f64).or_else(||user.get("used").and_then(Value::as_i64).map(|v|v as f64)).unwrap_or(0.0).max(0.0);
+ let limit=user.get("limit").and_then(Value::as_f64).or_else(||user.get("limit").and_then(Value::as_i64).map(|v|v as f64)).unwrap_or(0.0).max(0.0);
+ let expiry=user.get("expireAt").and_then(Value::as_i64).unwrap_or(0);
+ let to_bytes=|gib:f64| -> u64 {if gib.is_finite(){(gib*1073741824.0).min(u64::MAX as f64) as u64}else{0}};
+ let info=format!("upload=0; download={}; total={}; expire={}",to_bytes(used),to_bytes(limit),if expiry>1_000_000_000_000{expiry/1000}else{expiry});
+ if let Ok(value)=header::HeaderValue::from_str(&info){response.headers_mut().insert("subscription-userinfo",value);}
  Ok(response)
 }
 
