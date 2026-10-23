@@ -74,10 +74,9 @@ pub(crate) fn build(mut proxies:Vec<Value>,setting:&Value)->Result<Value,String>
         let address=outbound["settings"]["vnext"][0]["address"].as_str().unwrap_or("");
         if address.is_empty(){return Err("Не указан публичный адрес сервера".into())}
         let code=country(outbound);
-        let label=outbound["tag"].as_str().unwrap_or("").chars()
-            .filter(|c|!c.is_control()).take(48).collect::<String>();
-        let tag=if label.is_empty(){format!("xmesh-{code}-{:04}",i+1)}
-            else{format!("xmesh-{code}-{:04} {label}",i+1)};
+        // Xray routing tags are internal identifiers, never display labels.
+        // Keep them stable, unique and ASCII-only regardless of host names.
+        let tag=format!("xmesh-{code}-{:04}",i+1);
         if !used.insert(tag.clone()){return Err("Дублирующийся тег Xray".into())}
         outbound.as_object_mut().ok_or("Неверная структура outbound")?.remove("xmeshCountry");
         outbound["tag"]=json!(tag);
@@ -191,6 +190,24 @@ mod tests{
   assert_eq!(config["observatory"]["subjectSelector"][0],"xmesh-");
   assert_ne!(config["outbounds"][0]["tag"],config["outbounds"][1]["tag"]);
   assert!(config["outbounds"][0].get("xmeshCountry").is_none());
+ }
+ #[test] fn unicode_host_label_never_leaks_into_routing_tags(){
+  let mut a=outbound("NL");a["tag"]=json!("Нидерланды 🥷");
+  let mut b=outbound("NL");b["tag"]=json!("Другой CDN 🇳🇱");
+  let c=build(vec![a,b],&json!({})).unwrap();
+  assert_eq!(c["outbounds"][0]["tag"],"xmesh-NL-0001");
+  assert_eq!(c["outbounds"][1]["tag"],"xmesh-NL-0002");
+  assert_eq!(c["routing"]["balancers"][0]["tag"],"NL_AUTO");
+  for outbound in c["outbounds"].as_array().unwrap(){
+   assert!(outbound["tag"].as_str().unwrap().is_ascii());
+  }
+  assert_eq!(c["routing"]["rules"][3]["balancerTag"],"SMART");
+ }
+ #[test] fn unicode_single_host_default_route_is_ascii(){
+  let mut a=outbound("ZZ");a["tag"]=json!("Нидерланды");
+  let c=build(vec![a],&json!({})).unwrap();
+  assert_eq!(c["outbounds"][0]["tag"],"xmesh-ZZ-0001");
+  assert_eq!(c["routing"]["rules"][3]["outboundTag"],"xmesh-ZZ-0001");
  }
  #[test] fn one_node_uses_direct_tag_without_empty_balancers(){
   let c=build(vec![outbound("PL")],&json!({})).unwrap();
