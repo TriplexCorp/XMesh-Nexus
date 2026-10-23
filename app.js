@@ -942,6 +942,11 @@ const statsSpark=(points,key)=> {
  const coords=values.map((v,i)=>(i/n*100).toFixed(2)+','+(100-v/top*95).toFixed(2)).join(' ');
  return `<svg class="stats-spark" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="История скорости за выбранный период"><polyline points="${coords}" fill="none" stroke="currentColor" stroke-width="1.7" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 };
+const statsRing=(label,percent,accent)=> {
+ const valid=percent!==null&&percent!==undefined&&Number.isFinite(Number(percent));
+ const pct=valid?Math.max(0,Math.min(100,Number(percent))):0;
+ return '<div class="stats-ring-card" style="--ring-color:'+accent+';--ring-value:'+pct+'%"><div class="stats-ring"><strong>'+(valid?esc(fmt(pct,1))+'%':'—')+'</strong></div><span>'+esc(label)+'</span></div>';
+};
 function statisticsP(){
  const markup=`<div class="stats-dashboard" id="stats-dashboard">
   <div class="stats-heading"><div><h2>Статистика инфраструктуры</h2><p class="note">Реальные измерения. CPU steal показывает долю времени, которую виртуальная машина ожидала процессор гипервизора.</p></div>
@@ -1013,7 +1018,7 @@ function statisticsP(){
         ['Онлайн клиенты',statsValue(ok?v.onlineClients:null)]
       ];
       const last=v?.sampledAt?new Date(v.sampledAt).toLocaleString(panelIsEnglish()?'en-US':'ru-RU'):'Нет измерений';
-      return '<article class="stats-node"><div class="stats-node-head">'+head+'</div><span class="stats-node-status">'+(ok?'Свежие данные':stale?'Данные устарели':'Нет телеметрии')+' · '+esc(last)+'</span><div class="stats-kvs">'+values.map(x=>statsRow(...x)).join('')+'</div></article>';
+      return '<article class="stats-node"><div class="stats-node-head">'+head+'</div><span class="stats-node-status">'+(ok?'Свежие данные':stale?'Данные устарели':'Нет телеметрии')+' · '+esc(last)+'</span><div class="stats-node-rings">'+statsRing('CPU',ok?v.cpuPercent:null,'#6f9bff')+statsRing('Steal time',ok?v.cpuStealPercent:null,'#f3ae63')+statsRing('RAM',ok&&v.ramTotalBytes>0?v.ramUsedBytes/v.ramTotalBytes*100:null,'#c294e8')+statsRing('Диск',ok&&v.diskTotalBytes>0?v.diskUsedBytes/v.diskTotalBytes*100:null,'#44c9b6')+'</div><div class="stats-kvs">'+values.map(x=>statsRow(...x)).join('')+'</div></article>';
     }).join(''):'<p class="note">Узлы пока не созданы.</p>';
     if(status)status.textContent=(panelIsEnglish()?'Data updated · ':'Данные обновлены · ')+new Date().toLocaleTimeString(panelIsEnglish()?'en-US':'ru-RU');
    }catch(error){if(status)status.textContent=(panelIsEnglish()?'Unable to refresh statistics: ':'Не удалось обновить статистику: ')+(error.message||(panelIsEnglish()?'API error':'Ошибка API'))}
