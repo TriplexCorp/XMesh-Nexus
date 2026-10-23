@@ -1883,9 +1883,13 @@ document.addEventListener('click',async e=>{
     if(!existing&&b.textContent.includes('старую')&&!confirm('Старая ссылка перестанет работать. Продолжить?'))return;
     b.disabled=true;
     try{
-      await backendRequest('/api/v1/users/'+encodeURIComponent(id)+'/subscription',{method:'POST'});
+      const result=await backendRequest('/api/v1/users/'+encodeURIComponent(id)+'/subscription',{method:'POST'});
       await loadUserSubscription(id);
-      toast(panelIsEnglish()?'Subscription saved':'Подписка сохранена');
+      if(result.readiness?.ready===false){
+        toast((panelIsEnglish()?'Link created, but connections are not ready: ':'Ссылка создана, но подключения не готовы: ')+(result.readiness.warning||'Проверьте XRAY STUDIO и сквады.'));
+      }else{
+        toast(panelIsEnglish()?'Subscription saved':'Подписка сохранена');
+      }
     }catch(error){toast('Ошибка подписки: '+(error.message||'API'))}
     finally{b.disabled=false}
   }
