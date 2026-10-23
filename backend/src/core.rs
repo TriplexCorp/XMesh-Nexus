@@ -64,13 +64,15 @@ struct GithubAsset {
 }
 
 #[derive(Clone)]
+type ReleaseCache = Arc<RwLock<Option<(std::time::Instant, Vec<ReleaseInfo>)>>>;
+
 pub struct CoreManager {
     pool: PgPool,
     root: PathBuf,
     state: Arc<RwLock<CoreStatus>>,
     update_lock: Arc<Mutex<()>>,
     client: reqwest::Client,
-    node_release_cache: Arc<RwLock<Option<(std::time::Instant, Vec<ReleaseInfo>)>>>,
+    node_release_cache: ReleaseCache,
 }
 
 impl CoreManager {
@@ -267,9 +269,8 @@ impl CoreManager {
         // One release dropdown + one install request must not consume the
         // unauthenticated GitHub API rate limit twice. Cache the official
         // catalog for ten minutes across admin sessions.
-        if let Some((read_at,releases))=self.node_release_cache.read().await.as_ref(){
-            if read_at.elapsed()<Duration::from_secs(600){return Ok(releases.clone())}
-        }
+        if let Some((read_at,releases))=self.node_release_cache.read().await.as_ref()
+            && read_at.elapsed()<Duration::from_secs(600){return Ok(releases.clone())}
         let mut all=Vec::new();
         for page in 1..=20u32 {
             let url=format!("https://api.github.com/repos/XTLS/Xray-core/releases?per_page=100&page={page}");
