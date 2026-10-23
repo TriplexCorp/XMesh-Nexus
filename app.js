@@ -1354,6 +1354,19 @@ function userInboundTrafficMarkup(payload){
  const cards=rows.map(r=>'<div class="user-inbound-item"><div><b>'+esc(r.inboundTag)+'</b><small>'+esc(r.nodeName||'Узел #'+r.nodeId)+'</small></div><div><b>'+userTrafficBytes(+r.uplinkBytes + +r.downlinkBytes)+'</b><small>↑ '+userTrafficBytes(r.uplinkBytes)+' · ↓ '+userTrafficBytes(r.downlinkBytes)+'</small></div></div>').join('');
  return '<section class="user-inbound-stats"><h4>Трафик по inbound</h4><div class="user-inbound-grid">'+cards+'</div><small class="user-server-source">Только фактические подписанные измерения узлов; не прибавляются повторно к общему трафику пользователя.</small></section>';
 }
+let userTrafficAutoGeneration=0;
+function startUserTrafficAutoRefresh(userId){
+  const generation=++userTrafficAutoGeneration;
+  const tick=async()=>{
+    if(generation!==userTrafficAutoGeneration||!dlg.open||
+       !dlg.querySelector('[data-user-traffic-id="'+userId+'"]'))return;
+    await loadUserTrafficStats(userId);
+    if(generation===userTrafficAutoGeneration&&dlg.open&&
+       dlg.querySelector('[data-user-traffic-id="'+userId+'"]'))
+      setTimeout(tick,15000);
+  };
+  setTimeout(tick,15000);
+}
 async function loadUserTrafficStats(userId){
   const container=dlg.querySelector('[data-user-traffic-id="'+userId+'"]');
   if(!container)return;
@@ -1467,6 +1480,7 @@ function userDrawer(id,tab){
     <footer class="user-canvas-foot"><span>Создан ${new Date(u.created).toLocaleDateString('ru-RU')}</span><span>Администратор: ${esc(DB.admins.find(a=>a.id==u.adminId)?.username||'—')}</span></footer>
   </div>`,'user-modal');
   void loadUserTrafficStats(u.id);
+  startUserTrafficAutoRefresh(u.id);
   void loadUserSubscription(u.id);
 }
 async function loadUserSubscription(id){
