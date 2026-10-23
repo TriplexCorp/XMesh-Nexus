@@ -1793,6 +1793,11 @@ async function hostDeriveRealityPublic(form){
 function hostEditorRefresh(form,changedProfile=false){
   if(!form||form.dataset.ent!=='hosts')return;
   const get=k=>form.elements.namedItem(k);
+  const draft=!!get('disabled')?.checked;
+  for(const name of ['remark','address']){
+    const input=get(name);
+    if(input)input.required=!draft;
+  }
   const profile=hostProfile(get('profileId')?.value);
   const inboundSelect=get('tag');
   const candidates=profile?inbs(profile):[];
