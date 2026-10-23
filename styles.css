@@ -3898,3 +3898,13 @@ dialog.user-modal .user-server-details>b::before{
 .stats-ring{width:clamp(54px,5vw,78px);aspect-ratio:1;border-radius:50%;display:grid;place-items:center;background:radial-gradient(closest-side,var(--s2) 72%,transparent 74%),conic-gradient(var(--ring-color) var(--ring-value),color-mix(in srgb,var(--mu) 16%,transparent) 0)}
 .stats-ring strong{font-size:clamp(.8rem,1vw,1.05rem);font-weight:800;color:var(--tx)}
 @media(max-width:620px){.stats-node-rings{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Readable statistics gauges: larger rings and a solid inner disc. */
+.stats-node-rings{gap:12px}
+.stats-ring-card{padding:18px 8px;gap:10px}
+.stats-ring{width:clamp(72px,6vw,96px);position:relative;isolation:isolate;background:conic-gradient(var(--ring-color) var(--ring-value),color-mix(in srgb,var(--mu) 18%,transparent) 0)}
+.stats-ring-center{position:absolute;inset:10px;border-radius:50%;display:grid;place-items:center;background:var(--s2);z-index:1}
+.stats-ring strong{font-size:clamp(.92rem,1.15vw,1.16rem);font-variant-numeric:tabular-nums;white-space:nowrap;letter-spacing:-.025em}
+.stats-control-rings{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:4px 0 20px}
+@media(max-width:850px){.stats-node-rings{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:500px){.stats-control-rings{grid-template-columns:repeat(2,minmax(0,1fr))}}
