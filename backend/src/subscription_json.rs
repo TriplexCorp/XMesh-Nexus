@@ -394,6 +394,63 @@ mod tests{
    "realitySettings":{"serverName":"example.com","publicKey":"public","shortId":"aa"},
    "xhttpSettings":{"path":"/test","mode":"stream-up"}}})
  }
+ #[test] fn custom_groups_select_exact_hosts_and_keep_server_profiles(){
+  let mut nl=outbound("NL");nl["xmeshSourceKey"]=json!("host:101");
+  nl["tag"]=json!("Нидерланды");
+  let mut de=outbound("DE");de["xmeshSourceKey"]=json!("host:102");
+  de["tag"]=json!("Германия");
+  let mut pl=outbound("PL");pl["xmeshSourceKey"]=json!("host:103");
+  pl["tag"]=json!("Польша");
+  let settings=json!({"clientBalancers":[{
+    "tag":"DE_BEST","remark":"🇩🇪 Лучший — Германия {STATUS_EMOJI}",
+    "serverDescription":"Быстрый маршрут",
+    "selector":["host:102","host:103"],"strategy":"leastPing",
+    "hideSelectedInbounds":false,"enabled":true,
+    "observatory":{"probeInterval":"20s","probeTimeout":"2s","sampling":5,
+      "probeURL":"https://www.gstatic.com/generate_204",
+      "connectivity":"https://cp.cloudflare.com/generate_204"}
+  }]});
+  let list=build_feed(vec![nl,de,pl],&settings).unwrap();
+  let profiles=list.as_array().unwrap();
+  assert_eq!(profiles.len(),4);
+  assert_eq!(profiles[0]["remarks"],"🇩🇪 Лучший — Германия {STATUS_EMOJI}");
+  assert_eq!(profiles[0]["routing"]["balancers"][0]["tag"],"DE_BEST");
+  assert_eq!(profiles[0]["routing"]["balancers"][0]["selector"],
+    json!(["xmesh-DE-0001","xmesh-PL-0002"]));
+  assert_eq!(profiles[0]["observatory"]["probeInterval"],"20s");
+  assert_eq!(profiles[1]["remarks"],"Нидерланды");
+  for profile in profiles {
+   assert!(profile.get("xmeshSourceKey").is_none());
+   assert!(profile.get("xmeshBalancer").is_none());
+   assert!(profile["outbounds"].as_array().unwrap().iter()
+    .all(|o|o.get("xmeshSourceKey").is_none()));
+  }
+ }
+ #[test] fn hiding_selected_sources_only_hides_their_individual_profiles(){
+  let mut nl=outbound("NL");nl["xmeshSourceKey"]=json!("host:101");
+  let mut de=outbound("DE");de["xmeshSourceKey"]=json!("host:102");
+  let settings=json!({"clientBalancers":[{
+   "tag":"DE_AUTO","remark":"Германия","serverDescription":"",
+   "selector":["host:102"],"strategy":"leastPing",
+   "hideSelectedInbounds":true
+  }]});
+  let list=build_feed(vec![nl,de],&settings).unwrap();
+  assert_eq!(list.as_array().unwrap().len(),2);
+  assert_eq!(list[0]["remarks"],"Германия");
+  assert!(list[0]["routing"].get("balancers").is_none());
+  assert_eq!(list[1]["outbounds"][0]["tag"],"xmesh-NL-0001");
+ }
+ #[test] fn no_custom_group_is_added_when_explicit_list_empty(){
+  let list=build_feed(vec![outbound("NL"),outbound("PL")],
+   &json!({"clientBalancers":[],"subscriptionJson":{"smart":true}})).unwrap();
+  assert_eq!(list.as_array().unwrap().len(),2);
+  assert!(list[0]["routing"].get("balancers").is_none());
+ }
+ #[test] fn custom_balancer_validation_rejects_duplicate_tags(){
+  let row=json!({"tag":"AUTO","remark":"Auto","serverDescription":"",
+   "strategy":"leastPing","selector":["host:1"]});
+  assert!(validate_client_balancers(&json!([row.clone(),row])).is_err());
+ }
  #[test] fn feed_exposes_one_full_json_profile_per_server(){
   let mut nl=outbound("NL"); nl["tag"]=json!("🇳🇱 Нидерланды");
   let mut pl=outbound("PL"); pl["tag"]=json!("🇵🇱 Польша");
