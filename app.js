@@ -196,8 +196,9 @@ const ENT={
     {k:'tag',l:'Inbound',t:'sel',o:tags},
     {k:'nodes',l:'Назначенные ноды',t:'multi',o:()=>DB.nodes.map(n=>[n.id,n.name])},
     {k:'disabled',l:'Отключить выдачу хоста в подписках',t:'bool'},
-    {k:'remark',l:'Название в подписке',req:1},
+    {k:'remark',l:'Название сервера в приложении (Remarks)',req:1,h:'Например: Нидерланды. Это имя увидит клиент Happ; технические теги Xray формируются отдельно.'},
     {k:'address',l:'Публичный адрес',req:1},
+    {k:'countryCode',l:'Страна (код из двух букв)',ph:'NL, DE, SE…',h:'Необязательно. Для Нидерландов укажите NL. Влияет на автогруппировку и имя технического outbound.'},
     {k:'port',l:'Публичный порт',t:'num'},
     {k:'sni',l:'SNI (переопределение)',ph:'Из inbound, если пусто'},
     {k:'host',l:'HTTP Host (переопределение)',ph:'Из inbound, если пусто'},
@@ -1851,10 +1852,12 @@ function hostEditorRefresh(form,changedProfile=false){
   const preview=form.querySelector('[data-host-resolved]');
   if(preview){
     preview.innerHTML=
+      show('Название в Happ',val('remark')||'Введите название слева')+
       show('XRAY STUDIO',profile?.name||'Не выбран')+
       show('Inbound',inbound?.tag||'Не выбран')+
       show('Протокол / транспорт',inbound?(inbound.protocol+' / '+(stream.network||'tcp')):'—')+
       show('Защита',securityName)+
+      show('Страна (ISO)',val('countryCode').toUpperCase()||'Авто из названия / ZZ')+
       show('Публичный endpoint',val('address')?val('address')+':'+(val('port')||'443'):'Выберите ноду')+
       show('SNI',sni)+
       show('Путь',val('path')||xhttp.path||stream.wsSettings?.path||'—')+
@@ -1866,6 +1869,7 @@ function hostEditorRefresh(form,changedProfile=false){
   else if(!inbound)warnings.push('У профиля нет выбранного inbound.');
   else if(inbound.protocol!=='vless')warnings.push('Для подписок сейчас поддерживается только VLESS.');
   if(requiredNodes.length===0)warnings.push('Выберите ноду с действующим профилем XRAY STUDIO, иначе хост не будет выдан в подписке.');
+  if(val('countryCode')&&!/^[A-Za-z]{2}$/.test(val('countryCode')))warnings.push('Код страны должен состоять из двух латинских букв, например NL.');
   if(mismatched.length)warnings.push('Несовместимые ноды: '+mismatched.map(n=>!n?'нода удалена':n.name+' (ID '+n.id+': '+(n.disabled?'отключена':hostProfile(n.profileId)?'назначен профиль «'+hostProfile(n.profileId).name+'»':'профиль ID '+(n.profileId||'не назначен')+' отсутствует')+')').join(', ')+'. Назначьте нодам существующий XRAY-профиль и только затем сохраняйте хост.');
   if(security==='reality'&&!realityKey)warnings.push('REALITY publicKey отсутствует: укажите публичную часть ключа в расширенных настройках. Приватный ключ сюда не вставляйте.');
   if(security==='reality'&&!sni)warnings.push('Не указан SNI для REALITY.');
@@ -1894,7 +1898,7 @@ function hostEditorMarkup(o,e){
   const p=field(f('profileId'),selectedProfile?.id||'');
   const inboundOptions=selectedProfile?inbs(selectedProfile).map(i=>[i.tag,i.tag+' · '+i.protocol]):[];
   const tag=field({...f('tag'),o:inboundOptions},o.tag||inboundOptions[0]?.[0]||'');
-  const basic=['remark','address','port'].map(k=>field(f(k),o[k])).join('');
+  const basic=['remark','address','port','countryCode'].map(k=>field(f(k),o[k])).join('');
   const nodes=field(f('nodes'),o.nodes||[])+field(f('disabled'),!!o.disabled);
   const advanced=['sni','host','path','fp','publicKey','shortId','spiderX','alpn','serviceName','clientEncryption'].map(k=>field(f(k),o[k]??'')).join('');
   return '<div class="host-editor-layout"><section class="host-editor-main"><div class="node-form-section-title">01 · Подключение</div>'+
@@ -1903,8 +1907,8 @@ function hostEditorMarkup(o,e){
     '<div class="node-form-section-title">03 · Назначение</div>'+nodes+
     '<small class="note" data-host-count></small></section>'+
     '<section class="host-editor-side"><div class="node-form-section-title">Клиентское подключение</div>'+
-    '<p class="node-ip-hint">Итоговая конфигурация наследуется из inbound; приватные серверные ключи не экспортируются.</p>'+
-    '<div class="host-resolved" data-host-resolved></div><p class="host-validation" data-host-warnings role="status"></p><button type="button" class="gh sm" data-host-repair hidden></button><button type="button" class="gh sm" data-host-link-profile hidden></button>'+
+    '<p class="node-ip-hint">Имя сервера берётся из поля Remarks. Сетевые параметры наследуются из inbound; приватные ключи не экспортируются.</p>'+
+    '<div class="host-resolved" data-host-resolved></div><p class="host-validation" data-host-warnings role="status" hidden></p><button type="button" class="gh sm" data-host-repair hidden></button><button type="button" class="gh sm" data-host-link-profile hidden></button><p class="node-ip-hint">Важно: предпросмотр показывает ожидаемые клиентские настройки, но не подтверждает применение профиля, добавление UUID в Xray или доступность порта на ноде.</p>'+
     '<details class="host-advanced"><summary>Расширенные переопределения '+ic('chevron-down')+'</summary>'+
     '<p class="node-ip-hint">Пустые поля наследуются из профиля. Используйте только при нестандартной схеме.</p>'+
     '<div class="host-advanced-fields">'+advanced+'</div>'+
@@ -1959,8 +1963,8 @@ async function nodesP(){
     const rx=numberOrNull(m?.rxBytesPerSec),tx=numberOrNull(m?.txBytesPerSec);
     const l={cpu:Number.isFinite(cpu)?cpu:null,ram:Number.isFinite(ramUsed)&&Number.isFinite(ramTotal)&&ramTotal>0?ramUsed/ramTotal*100:null,mbps:Number.isFinite(rx)&&Number.isFinite(tx)?(rx+tx)*8/1e6:null};
     const k=n.limit?cl(n.used/n.limit,0,1):0,tc=k>.9?'--er':k>.75?'--wr':'--c3';
-    return `<div class="card nc${n.disabled?' off':''}"><div class="h"><span class="fg">${flagView(n.flag)}</span><div><b>${esc(n.name)}</b><br><small class="mu">${esc(n.addr)}${n.port?':'+esc(n.port):''}</small>${n.hosting?.trim()?`<span class="node-hosting" title="Хостинг">${ic('building-2')}${esc(n.hosting.trim())}</span>`:''}</div>${runtime.get(n.id)?.connected?chip(panelIsEnglish()?'Node online':'Нода подключена','--ok'):runtime.get(n.id)?.lastSeenAt?chip(panelIsEnglish()?'Node offline':'Нода не в сети','--er'):chip(panelIsEnglish()?'Node not linked':'Нода не подключена','--mu')}</div>
-      <div class="kvg"><div><span>Активные пользователи</span><b>${s.nodeOn[n.id]??0}</b></div><div><span>XRAY STUDIO</span>${p?esc(p.name):n.profileId?'<span class="er">Профиль ID '+esc(n.profileId)+' не найден</span>':'—'}</div></div>
+    return `<div class="card nc${n.disabled?' off':''}"><div class="h"><span class="fg">${flagView(n.flag)}</span><div><b>${esc(n.name)}</b><br><small class="mu">${esc(n.addr)}${n.port?':'+esc(n.port):''}</small>${n.hosting?.trim()?`<span class="node-hosting" title="Хостинг">${ic('building-2')}${esc(n.hosting.trim())}</span>`:''}</div>${runtime.get(n.id)?.connected?chip(panelIsEnglish()?'Node agent online':'Агент ноды онлайн','--ok'):runtime.get(n.id)?.lastSeenAt?chip(panelIsEnglish()?'Node offline':'Нода не в сети','--er'):chip(panelIsEnglish()?'Agent not connected':'Агент не подключён','--mu')}</div>
+      <div class="kvg"><div><span>Активные пользователи</span><b>${s.nodeOn[n.id]??0}</b></div><div><span>XRAY STUDIO</span>${p?esc(p.name)+'<br><small class="mu">Применение профиля не подтверждено</small>':n.profileId?'<span class="er">Профиль ID '+esc(n.profileId)+' не найден</span>':'—'}</div></div>
       ${n.rotationEnabled?`<div class="node-ip-rotation active" aria-label="Пул IP-ротации"><span class="node-ip-indicator" aria-hidden="true"></span><span>IP-пул · ${nodeRotationIPs(n).length} адресов</span></div>`:''}
       <div class="node-gauges">
         ${nodeGauge(n,'cpu-'+n.id,'CPU',Number.isFinite(l.cpu)?l.cpu:0,Number.isFinite(l.cpu)?Math.round(l.cpu)+'%':'—',Number.isFinite(l.cpu)?'загрузка':'нет данных','--a')}
