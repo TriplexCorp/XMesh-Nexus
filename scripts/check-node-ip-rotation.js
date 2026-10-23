@@ -13,7 +13,7 @@ const css=fs.readFileSync('styles.css','utf8');
 assert.match(app,/k:'rotationEnabled'.*t:'bool'/,'Node editor must expose an enable switch');
 assert.match(app,/k:'rotationIps'.*t:'area'/,'Node editor must expose IP address pool');
 assert.match(app,/chk:data=>\{\s*const issue=nodeRotationValidate\(data\)/,'Node form must validate before submitting');
-assert.match(app,/class="node-rotation-editor"/,'Optional node rotation must be collapsible');
+assert.match(app,/class="node-rotation-editor-body"/,'Node rotation fields must remain grouped in the redesigned editor');
 assert.match(app,/data-node-rotation-probe/,'Node editor must provide an authenticated test');
 assert.match(app,/nodeRotationIPs\(n\)\.length/,'Node card must show real pool size');
 assert.match(css,/\.node-rotation-editor>summary/,'Node rotation section needs visual affordance');
