@@ -110,12 +110,12 @@ EOF
 
 cat > /etc/systemd/system/xmesh-node-metrics.timer <<'EOF'
 [Unit]
-Description=Send XMesh node metrics once per minute
+Description=Send XMesh node metrics every five seconds
 
 [Timer]
-OnBootSec=20s
-OnUnitActiveSec=60s
-AccuracySec=5s
+OnBootSec=5s
+OnUnitInactiveSec=5s
+AccuracySec=1s
 Persistent=true
 Unit=xmesh-node-metrics.service
 
