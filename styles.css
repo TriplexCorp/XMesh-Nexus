@@ -4813,3 +4813,31 @@ dialog#dlg.node-wide .node-main-section .country-picker-dropdown .country-option
 .notification-workspace .notification-dismiss:hover,.notification-workspace .notification-dismiss:focus-visible{opacity:1;background:var(--s2)}
 .notification-workspace .notification-header [data-notifications-clear]{width:auto;min-width:0;padding:.45em .7em;white-space:nowrap;gap:.4em}
 @media(max-width:560px){.notification-workspace .notification-header [data-notifications-clear]{font-size:.8em}}
+
+/* Professional notification hierarchy: compact cards, clear metadata and actions */
+.notification-workspace .notification-header{padding:.95em 1.15em;gap:.55em}
+.notification-workspace .notification-heading h2{font-size:1.1em!important}
+.notification-workspace .notification-heading small{font-size:.77em}
+.notification-workspace .notification-group{padding:.25em .85em .45em}
+.notification-workspace .notification-group + .notification-group{border-top:1px solid var(--ln)}
+.notification-workspace .notification-group h3{padding:.85em .55em .5em;font-size:.7em!important;letter-spacing:.07em}
+.notification-workspace .notification-item{
+  grid-template-columns:.35em minmax(0,1fr) 1.8em;
+  gap:.7em;margin:0;padding:.75em .55em .85em;
+  border-radius:.6em;align-items:start;
+}
+.notification-workspace .notification-title{gap:.55em}
+.notification-workspace .notification-node-label{font-size:.91em!important;font-weight:690}
+.notification-workspace .notification-node-label small{font-size:.78em!important}
+.notification-workspace .notification-item p{font-size:.82em!important;line-height:1.5;color:var(--tx);opacity:.85;margin:.45em 0 .35em}
+.notification-workspace .notification-when{
+  font-size:.71em;color:var(--mu);letter-spacing:.01em;
+  margin-top:.3em;font-variant-numeric:tabular-nums;
+}
+.notification-workspace .notification-dismiss{opacity:.5;transition:opacity .18s ease,background .18s ease}
+.notification-workspace .notification-item:hover .notification-dismiss,.notification-workspace .notification-dismiss:focus-visible{opacity:1}
+.notification-workspace .notification-header [data-notifications-clear]{
+  font-size:.75em!important;font-weight:550;width:auto;min-height:2.3em;height:2.3em;
+  border:1px solid var(--ln);background:transparent;color:var(--mu);
+}
+.notification-workspace .notification-header [data-notifications-clear]:hover{color:var(--tx);background:var(--s2)}
