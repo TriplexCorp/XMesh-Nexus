@@ -3908,3 +3908,10 @@ dialog.user-modal .user-server-details>b::before{
 .stats-control-rings{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:4px 0 20px}
 @media(max-width:850px){.stats-node-rings{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:500px){.stats-control-rings{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Statistics: avoid stretching the network chart to match the taller Control Plane. */
+.stats-layout{align-items:start}
+.stats-layout>.card{align-self:start}
+.stats-layout #stats-trend{min-height:0}
+.stats-layout .stats-spark{height:clamp(9rem,13vw,13rem)}
+@media(max-width:900px){.stats-layout{grid-template-columns:1fr}}
