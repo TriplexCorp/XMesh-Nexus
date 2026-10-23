@@ -2288,7 +2288,7 @@ function squadEditorMarkup(o,e){
   }).join('');
   return '<div class="squad-editor-layout">'+
     '<section class="squad-editor-main" aria-label="Параметры сквада">'+
-      '<div class="node-form-section-title">Основное</div>+
+      '<div class="node-form-section-title">Основное</div>'+
       '<div class="squad-editor-fields">'+field(e.fs.find(x=>x.k==='name'),o.name||'')+field(e.fs.find(x=>x.k==='desc'),o.desc||'')+'</div>'+
       '</section><section class="squad-editor-connections" aria-label="Подключения сквада">'+
       '<div class="node-form-section-title">Подключения</div>'+
