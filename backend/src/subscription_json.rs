@@ -226,7 +226,7 @@ mod tests{
   let config=build(vec![outbound("DE"),outbound("DE"),outbound("PL")],&json!({})).unwrap();
   assert_eq!(config["routing"]["balancers"][0]["tag"],"DE_AUTO");
   assert_eq!(config["routing"]["balancers"][1]["tag"],"SMART");
-  assert_eq!(config["routing"]["rules"][3]["balancerTag"],"SMART");
+  assert_eq!(config["routing"]["rules"][2]["balancerTag"],"SMART");
   assert_eq!(config["observatory"]["subjectSelector"][0],"xmesh-");
   assert_ne!(config["outbounds"][0]["tag"],config["outbounds"][1]["tag"]);
   assert!(config["outbounds"][0].get("xmeshCountry").is_none());
@@ -241,20 +241,20 @@ mod tests{
   for outbound in c["outbounds"].as_array().unwrap(){
    assert!(outbound["tag"].as_str().unwrap().is_ascii());
   }
-  assert_eq!(c["routing"]["rules"][3]["balancerTag"],"SMART");
+  assert_eq!(c["routing"]["rules"][2]["balancerTag"],"SMART");
  }
  #[test] fn unicode_single_host_default_route_is_ascii(){
   let mut a=outbound("ZZ");a["tag"]=json!("Нидерланды");
   let c=build(vec![a],&json!({})).unwrap();
   assert_eq!(c["outbounds"][0]["tag"],"xmesh-NL-0001");
-  assert_eq!(c["routing"]["rules"][3]["outboundTag"],"xmesh-NL-0001");
+  assert_eq!(c["routing"]["rules"][2]["outboundTag"],"xmesh-NL-0001");
  }
  #[test] fn host_remark_is_displayed_without_polluting_xray_tags(){
   let mut a=outbound("ZZ");a["tag"]=json!("Нидерланды");
   let c=build(vec![a],&json!({})).unwrap();
   assert_eq!(c["remarks"],"Нидерланды");
   assert_eq!(c["outbounds"][0]["tag"],"xmesh-NL-0001");
-  assert_eq!(c["routing"]["rules"][3]["outboundTag"],"xmesh-NL-0001");
+  assert_eq!(c["routing"]["rules"][2]["outboundTag"],"xmesh-NL-0001");
  }
  #[test] fn arbitrary_unicode_label_stays_only_in_display_remark(){
   let mut a=outbound("ZZ");a["tag"]=json!("🌍 Premium Zone");
@@ -264,7 +264,7 @@ mod tests{
  }
  #[test] fn one_node_uses_direct_tag_without_empty_balancers(){
   let c=build(vec![outbound("PL")],&json!({})).unwrap();
-  assert!(c["routing"]["rules"][3]["outboundTag"].as_str().unwrap().starts_with("xmesh-PL-0001"));
+  assert!(c["routing"]["rules"][2]["outboundTag"].as_str().unwrap().starts_with("xmesh-PL-0001"));
   assert!(c.get("observatory").is_none());
  }
  #[test] fn default_json_has_working_dns_and_fails_closed_to_proxy(){
@@ -292,7 +292,7 @@ mod tests{
     "dns":"cloudflare","dnsRouting":true}})).unwrap();
   assert_eq!(c["dns"]["servers"][0],"1.1.1.1");
   assert_eq!(c["routing"]["rules"][2]["outboundTag"],"dns-out");
-  assert_eq!(c["routing"]["rules"][3]["outboundTag"],"xmesh-NL-0001");
+  assert_eq!(c["routing"]["rules"][2]["outboundTag"],"xmesh-NL-0001");
   assert!(c["outbounds"].as_array().unwrap().iter().any(|o|o["tag"]=="dns-out"));
  }
  #[test] fn multiserver_fallback_uses_smart_not_direct(){
