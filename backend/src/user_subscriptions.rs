@@ -745,7 +745,7 @@ mod tests{
   assert_eq!(data["outbounds"][0]["streamSettings"]["xhttpSettings"]["mode"],"stream-up");
   assert_eq!(data["outbounds"][0]["streamSettings"]["xhttpSettings"]["xmux"]["cMaxReuseTimes"],64);
   assert_eq!(data["outbounds"][0]["streamSettings"]["realitySettings"]["publicKey"],"PUBLIC_KEY");
-  assert!(data["routing"]["rules"][3]["outboundTag"].as_str().unwrap().starts_with("xmesh-SE-0001"));
+  assert!(data["routing"]["rules"][2]["outboundTag"].as_str().unwrap().starts_with("xmesh-SE-0001"));
   assert_eq!(data["remarks"],"Sweden");
   assert_eq!(data["inbounds"][0]["protocol"],"socks");
  }
