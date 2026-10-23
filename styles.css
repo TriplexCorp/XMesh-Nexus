@@ -4764,3 +4764,11 @@ dialog#dlg.squad-wide .squad-preview-section{min-width:0}
 dialog#dlg.node-wide .node-ip-section textarea[name="rotationIps"]{height:240px;min-height:200px;max-height:min(52dvh,520px);resize:vertical}
 @media(max-height:700px) and (min-width:1101px){dialog#dlg.node-wide .node-ip-section textarea[name="rotationIps"]{height:150px;min-height:120px}}
 @media(max-width:700px){dialog#dlg.node-wide .node-ip-section textarea[name="rotationIps"]{height:220px;min-height:160px}}
+
+/* Country selector: one search field with an inline selected-country preview. */
+dialog#dlg.node-wide .node-main-section .country-picker{display:grid;grid-template-columns:minmax(0,1fr);gap:0;position:relative}
+dialog#dlg.node-wide .node-main-section .country-search-wrap{grid-area:1/1;min-width:0}
+dialog#dlg.node-wide .node-main-section .country-search{padding-right:48%;height:2.65rem;min-height:2.65rem}
+dialog#dlg.node-wide .node-main-section .country-selected{grid-area:1/1;justify-self:end;align-self:center;z-index:1;max-width:47%;padding:0 12px 0 10px;pointer-events:none;border-left:1px solid var(--ln);min-height:1.5rem;white-space:nowrap}
+dialog#dlg.node-wide .node-main-section .country-selected [data-country-label]{font-size:.8rem}
+dialog#dlg.node-wide .node-main-section .country-options{left:0;right:auto;width:min(360px,100%);max-height:260px}
