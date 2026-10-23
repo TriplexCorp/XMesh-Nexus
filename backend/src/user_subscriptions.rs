@@ -266,20 +266,28 @@ pub async fn revoke(State(state):State<AppState>,Extension(actor):Extension<Auth
 }
 // Hosts are now edited inside XRAY STUDIO but remain in the existing
 // PostgreSQL collection. Legacy tag-only records continue to work.
+// Legacy UI records can store numeric references as JSON strings. Compare
+// canonical positive identifiers rather than raw JSON types.
+fn record_id(value:&Value)->Option<i64>{
+ value.as_i64().or_else(||value.as_str()?.parse::<i64>().ok()).filter(|id|*id>0)
+}
+fn same_record_id(left:Option<&Value>,right:Option<&Value>)->bool{
+ left.and_then(record_id).is_some_and(|id|Some(id)==right.and_then(record_id))
+}
 fn host_for_profile(host:&Value,tag:&str,profile:&Value,nodes:&[Value])->bool {
  if host.get("disabled").and_then(Value::as_bool)==Some(true) || nonempty(host,"tag")!=Some(tag){
   return false;
  }
- if let Some(profile_id)=host.get("profileId").and_then(Value::as_i64)
-    && Some(profile_id)!=profile.get("id").and_then(Value::as_i64){
+ if host.get("profileId").is_some_and(|id|!id.is_null())
+    && !same_record_id(host.get("profileId"),profile.get("id")){
   return false;
  }
  let pinned=host.get("nodes").and_then(Value::as_array);
  if let Some(pins)=pinned && !pins.is_empty(){
   return nodes.iter().any(|node| {
    node.get("disabled").and_then(Value::as_bool)!=Some(true)
-    && node.get("profileId")==profile.get("id")
-    && pins.iter().any(|selected|selected.as_i64()==node.get("id").and_then(Value::as_i64))
+    && same_record_id(node.get("profileId"),profile.get("id"))
+    && pins.iter().any(|selected|same_record_id(Some(selected),node.get("id")))
   });
  }
  true
@@ -293,7 +301,7 @@ fn direct_host_node<'a>(host: &Value, profile: &Value, nodes: &'a [Value]) -> Op
   if node.get("disabled").and_then(Value::as_bool)==Some(true)
     || node.get("profileId")!=profile.get("id"){return false}
   if let Some(ids)=pins
-    && !ids.iter().any(|id|id.as_i64()==node.get("id").and_then(Value::as_i64)){return false}
+    && !ids.iter().any(|id|same_record_id(Some(id),node.get("id"))){return false}
   ["addr","externalAddress","publicAddress"].iter()
    .any(|key|nonempty(node,key).and_then(|s|s.parse::<std::net::IpAddr>().ok())==Some(address))
  }).collect();
@@ -344,7 +352,7 @@ async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str,rotate:b
    let security=nonempty(stream,"security").unwrap_or("none");
    let reality=stream.get("realitySettings").unwrap_or(&Value::Null);
    let has_public_key=nonempty(reality,"publicKey").is_some() || nonempty(inbound,"publicKey").is_some();
-   let assigned_nodes=nodes.iter().filter(|n|n.get("profileId")==profile.get("id")
+   let assigned_nodes=nodes.iter().filter(|n|same_record_id(n.get("profileId"),profile.get("id"))
       && n.get("disabled")!=Some(&Value::Bool(true))).count();
    tracing::info!(profile_id=?(profile.get("id").and_then(serde_json::Value::as_i64)),
      inbound_tag=%tag, security=%security, assigned_nodes,
@@ -354,8 +362,8 @@ async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str,rotate:b
    // configured public host is disabled or pinned to a different node.
    let any_explicit_host=hosts.iter().any(|h|
     nonempty(h,"tag")==Some(tag) &&
-    (h.get("profileId").and_then(Value::as_i64).is_none()
-      || h.get("profileId")==profile.get("id")));
+    (h.get("profileId").is_none_or(Value::is_null)
+      || same_record_id(h.get("profileId"),profile.get("id"))));
    let matched:Vec<&Value>=hosts.iter()
     .filter(|h|host_for_profile(h,tag,profile,&nodes)).collect();
    if !matched.is_empty(){
@@ -380,7 +388,7 @@ async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str,rotate:b
      }
     }
    }else if !any_explicit_host{
-    for node in nodes.iter().filter(|n|n.get("profileId")==profile.get("id")&&n.get("disabled")!=Some(&Value::Bool(true))){
+    for node in nodes.iter().filter(|n|same_record_id(n.get("profileId"),profile.get("id"))&&n.get("disabled")!=Some(&Value::Bool(true))){
      let host=json!({"address":node.get("publicAddress").or_else(||node.get("externalAddress")).or_else(||node.get("addr")),"port":node.get("port").or_else(||inbound.get("port")),"remark":node.get("name"),"country":node.get("country")});
      if let Some(mut outbound)=vless_outbound(user,inbound,&host,device){
       if let Some(id)=node.get("id").and_then(Value::as_i64){
@@ -738,6 +746,13 @@ mod tests{
   assert_eq!(direct_host_node(&host,&profile,&nodes).unwrap()["id"],10);
   assert!(direct_host_node(&json!({"address":"cdn.example.org","nodes":[10]}),&profile,&nodes).is_none());
   assert!(direct_host_node(&json!({"address":"13.143.175.130","nodes":[10]}),&profile,&nodes).is_none());
+ }
+ #[test] fn mixed_string_and_number_ids_keep_public_hosts_connected(){
+  let profile=json!({"id":22});
+  let nodes=vec![json!({"id":21,"profileId":"22","addr":"13.143.175.131","disabled":false})];
+  let host=json!({"tag":"vless-main-2","profileId":"22","nodes":["21"],"address":"13.143.175.131"});
+  assert!(host_for_profile(&host,"vless-main-2",&profile,&nodes));
+  assert_eq!(direct_host_node(&host,&profile,&nodes).unwrap()["id"],21);
  }
  #[test] fn hosts_respect_profile_and_node_assignment(){
   let profile=json!({"id":7});
