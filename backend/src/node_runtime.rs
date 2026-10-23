@@ -66,6 +66,47 @@ pub async fn status(
     }
 }
 
+// Populate Xray VLESS inbound users from the authoritative panel users and squads.
+// XRAY STUDIO owns transports/security; panel users own runtime UUID authorization.
+fn provision_vless_users(config:&mut Value,users:&[Value],squads:&[Value],now_ms:i64) -> Result<(),ApiError> {
+    let inbounds=config.get_mut("inbounds").and_then(Value::as_array_mut)
+        .ok_or_else(||ApiError::new(StatusCode::CONFLICT,"Profile has no inbounds."))?;
+    for inbound in inbounds {
+        if inbound.get("protocol").and_then(Value::as_str)!=Some("vless"){continue}
+        let tag=inbound.get("tag").and_then(Value::as_str).unwrap_or("");
+        if tag.is_empty(){return Err(ApiError::new(StatusCode::CONFLICT,"VLESS inbound has no tag."))}
+        let mut allowed=std::collections::HashSet::new();
+        for squad in squads {
+            let selected=squad.get("inb").and_then(Value::as_array)
+                .is_some_and(|tags|tags.iter().any(|item|item.as_str()==Some(tag)));
+            if selected {
+                if let Some(id)=squad.get("id").and_then(Value::as_i64){allowed.insert(id);}
+            }
+        }
+        let mut entries=Vec::new();
+        let mut seen=std::collections::HashSet::new();
+        for user in users {
+            if crate::user_status(user,now_ms)!="ACTIVE"{continue}
+            let authorized=user.get("squads").and_then(Value::as_array)
+                .is_some_and(|ids|ids.iter().any(|id|id.as_i64().is_some_and(|id|allowed.contains(&id))));
+            if !authorized{continue}
+            let Some(id)=user.get("xrayId").and_then(Value::as_str)else{continue};
+            let Ok(uuid)=uuid::Uuid::parse_str(id)else{continue};
+            if !seen.insert(uuid){continue}
+            let record_id=user.get("id").and_then(Value::as_i64).unwrap_or(0);
+            entries.push(json!({"id":uuid.to_string(),"level":0,
+                "email":format!("user-{record_id}@xmesh.invalid")}));
+        }
+        let settings=inbound.get_mut("settings").and_then(Value::as_object_mut)
+            .ok_or_else(||ApiError::new(StatusCode::CONFLICT,"VLESS inbound settings missing."))?;
+        // Legacy "clients" overrides "users" in Xray-core. Remove the stale
+        // alias so dynamic users cannot be shadowed by an old empty list.
+        settings.remove("clients");
+        settings.insert("users".to_owned(),Value::Array(entries));
+    }
+    Ok(())
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct DesiredConfigRequest { node_id: i64 }
@@ -111,6 +152,43 @@ pub async fn desired_config(
     let object=inbound.as_object_mut().ok_or_else(||ApiError::new(StatusCode::CONFLICT,"Invalid inbound."))?;
     object.insert("listen".to_owned(),json!("127.0.0.1"));
     object.insert("port".to_owned(),json!(port));
+    let users=crate::load_records(&state.pool,"users").await?;
+    let squads=crate::load_records(&state.pool,"squads").await?;
+    let now=std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default().as_millis() as i64;
+    provision_vless_users(&mut config,&users,&squads,now)?;
     let digest=hex::encode(sha2::Sha256::digest(serde_json::to_vec(&config).unwrap_or_default()));
     Ok(Json(json!({"nodeId":request.node_id,"profileId":profile_id,"listen":"127.0.0.1","port":port,"revision":digest,"config":config})))
+}
+
+#[cfg(test)]
+mod provision_tests {
+    use super::*;
+    #[test]
+    fn runtime_inbound_contains_only_active_assigned_uuids(){
+        let mut config=json!({"inbounds":[{"protocol":"vless","tag":"NL",
+            "settings":{"decryption":"none","clients":[]}}]});
+        let now=1_800_000_000_000_i64;
+        let users=vec![
+            json!({"id":1,"xrayId":"550e8400-e29b-41d4-a716-446655440000","squads":[4]}),
+            json!({"id":2,"xrayId":"550e8400-e29b-41d4-a716-446655440001","squads":[4],"disabled":true}),
+            json!({"id":3,"xrayId":"550e8400-e29b-41d4-a716-446655440002","squads":[5]}),
+            json!({"id":4,"xrayId":"550e8400-e29b-41d4-a716-446655440003","squads":[4],"expireAt":now-1})
+        ];
+        let squads=vec![json!({"id":4,"inb":["NL"]}),json!({"id":5,"inb":["SE"]})];
+        provision_vless_users(&mut config,&users,&squads,now).unwrap();
+        let settings=&config["inbounds"][0]["settings"];
+        assert!(settings.get("clients").is_none());
+        assert_eq!(settings["users"].as_array().unwrap().len(),1);
+        assert_eq!(settings["users"][0]["id"],"550e8400-e29b-41d4-a716-446655440000");
+        assert_eq!(settings["decryption"],"none");
+    }
+    #[test]
+    fn same_user_in_multiple_matching_squads_is_not_duplicated(){
+        let mut config=json!({"inbounds":[{"protocol":"vless","tag":"NL","settings":{"users":[]}}]});
+        let users=vec![json!({"id":1,"xrayId":"550e8400-e29b-41d4-a716-446655440000","squads":[4,5]})];
+        let squads=vec![json!({"id":4,"inb":["NL"]}),json!({"id":5,"inb":["NL"]})];
+        provision_vless_users(&mut config,&users,&squads,1_800_000_000_000).unwrap();
+        assert_eq!(config["inbounds"][0]["settings"]["users"].as_array().unwrap().len(),1);
+    }
 }
