@@ -528,10 +528,11 @@ async fn update_record(
         .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Обновление должно быть JSON-объектом."))?;
     patch_object.remove("id");
 
-    let existing = sqlx::query("SELECT data FROM panel_records WHERE collection = $1 AND id = $2")
+    let mut tx=state.pool.begin().await?;
+    let existing = sqlx::query("SELECT data FROM panel_records WHERE collection = $1 AND id = $2 FOR UPDATE")
         .bind(&collection)
         .bind(id)
-        .fetch_optional(&state.pool)
+        .fetch_optional(&mut *tx)
         .await?
         .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Запись не найдена."))?;
     let mut data: Value = existing.try_get("data")?;
@@ -551,6 +552,16 @@ async fn update_record(
     validate_record(&collection, &data)?;
     if collection == "hosts" { validate_host_binding(&state.pool, &data).await?; }
 
+    // Admin traffic reset sets the new baseline without corrupting the
+    // last-seen Xray monotonic counters. The next delta still counts correctly.
+    if collection=="users" && patch_object.contains_key("used") {
+        sqlx::query(
+            "UPDATE user_node_traffic_totals SET uplink_bytes=0,downlink_bytes=0 WHERE user_id=$1"
+        ).bind(id).execute(&mut *tx).await?;
+        sqlx::query(
+            "UPDATE user_inbound_traffic_totals SET uplink_bytes=0,downlink_bytes=0 WHERE user_id=$1"
+        ).bind(id).execute(&mut *tx).await?;
+    }
     let row = sqlx::query(
         "UPDATE panel_records SET data = $3, updated_at = NOW() \
          WHERE collection = $1 AND id = $2 RETURNING id, data",
@@ -558,8 +569,9 @@ async fn update_record(
     .bind(&collection)
     .bind(id)
     .bind(data)
-    .fetch_one(&state.pool)
+    .fetch_one(&mut *tx)
     .await?;
+    tx.commit().await?;
     let result = row_to_record(&row)?;
     audit(&state.pool, &actor.username, "update", Some(&collection), Some(id), json!({})).await;
     Ok(Json(result))
