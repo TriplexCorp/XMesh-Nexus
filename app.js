@@ -180,7 +180,7 @@ const nodeIpValid=address=>{
 };
 const nodeRotationValidate = data => {
   const ips=nodeRotationIPs(data);
-  if(ips.length>64)return 'Можно добавить не более 64 IP-адресов.';
+  if(ips.length>256)return 'Можно добавить не более 256 IP-адресов.';
   if(new Set(ips).size!==ips.length)return 'В пуле ротации есть одинаковые IP-адреса.';
   if(ips.some(ip=>/\s/.test(ip)))return 'Введите каждый IP на отдельной строке, без порта и пробелов.';
   if(ips.some(ip=>!nodeIpValid(ip)))return 'IP-пул принимает только корректные IPv4 и IPv6, по одному адресу на строку.';
@@ -254,7 +254,7 @@ const ENT={
     {k:'billingProviderUrl',l:'Сайт провайдера',ph:'https://provider.example'},
     {k:'billingNote',l:'Примечание по оплате'},
     {k:'rotationEnabled',l:'Ротация IP-адресов',t:'bool',h:'Пул IP-адресов для подключений узла. Используйте только назначенные серверу адреса.'},
-    {k:'rotationIps',l:'Пул внешних IP-адресов',t:'area',rows:7,h:'Один IPv4 или IPv6 на строку. Добавляйте только IP, реально назначенные VPS и доступные клиентам. До 64 адресов. Основной адрес узла остаётся прежним.'}],
+    {k:'rotationIps',l:'Пул внешних IP-адресов',t:'area',rows:7,h:'Один IPv4 или IPv6 на строку. Добавляйте только IP, реально назначенные VPS и доступные клиентам. До 256 адресов. Основной адрес узла остаётся прежним.'}],
     def:()=>({flag:'',mult:1,limit:0,resetDay:1,rotationEnabled:false,rotationIps:'',billingCurrency:'EUR',billingPeriod:'monthly',billingRemindDays:7,billingPrice:0}),
     chk:data=>{
       const issue=nodeRotationValidate(data);if(issue)return issue;
@@ -2407,7 +2407,7 @@ function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id
     :'';
   const hostWizard=k==='hosts'?'<div class="host-quick"><label class="f"><span>Быстро заполнить из узла</span><select data-host-node-preset><option value="">Выберите сервер…</option>'+DB.nodes.map(n=>'<option value="'+esc(String(n.id))+'">'+esc(n.name)+' · '+esc(n.addr||'')+'</option>').join('')+'</select></label><p class="note">Подставит адрес, порт и привязку. Остальные поля сохранятся.</p></div>':'';
   const fields=k==='squads'?squadEditorMarkup(o,e):k==='hosts'?hostEditorMarkup(o,e):k==='nodes'
-    ?'<div class="node-form-layout"><section class="node-main-section"><div class="node-form-section-title">Основные параметры</div><p class="node-section-intro">Подключение, профиль Xray и ограничения узла</p><div class="node-form-grid">'+nodeMainFields+'</div></section>'+`<section class="node-ip-section"><div class="node-form-section-title">IP-пул и ротация</div><div class="node-ip-hint">Адреса должны принадлежать этому VPS и быть доступны извне.</div><div class="node-rotation-editor-body">${rotationFields}<div class="node-pool-toolbar"><span data-node-pool-count>Адресов: ${nodeRotationIPs(o).length} / 64</span><button type="button" class="gh sm" data-node-pool-normalize>Убрать повторы</button><button type="button" class="gh sm" data-node-pool-clear>Очистить</button></div><output data-node-pool-feedback aria-live="polite"></output>${rotationProbe}</div></section><section class="node-billing-section"><div class="node-form-section-title">Инфрабиллинг</div><p class="node-ip-hint">Стоимость, аренда и напоминания</p><div class="node-billing-fields">${billingFields}</div></section></div>`
+    ?'<div class="node-form-layout"><section class="node-main-section"><div class="node-form-section-title">Основные параметры</div><p class="node-section-intro">Подключение, профиль Xray и ограничения узла</p><div class="node-form-grid">'+nodeMainFields+'</div></section>'+`<section class="node-ip-section"><div class="node-form-section-title">IP-пул и ротация</div><div class="node-ip-hint">Адреса должны принадлежать этому VPS и быть доступны извне.</div><div class="node-rotation-editor-body">${rotationFields}<div class="node-pool-toolbar"><span data-node-pool-count>Адресов: ${nodeRotationIPs(o).length} / 256</span><button type="button" class="gh sm" data-node-pool-normalize>Убрать повторы</button><button type="button" class="gh sm" data-node-pool-clear>Очистить</button></div><output data-node-pool-feedback aria-live="polite"></output>${rotationProbe}</div></section><section class="node-billing-section"><div class="node-form-section-title">Инфрабиллинг</div><p class="node-ip-hint">Стоимость, аренда и напоминания</p><div class="node-billing-fields">${billingFields}</div></section></div>`
     :standardFields;
   modal(`<form class="box" data-k="ent" data-ent="${k}" data-id="${id||''}" method="dialog"><h2>${id?'Изменить':'Новый'}: ${e.nw.toLowerCase()}</h2>${fields}<p class="er" id="fe"></p><div class="act">${id?`<button type="button" class="dg" data-del="${k}:${id}" style="margin-right:auto">${ic('trash')}Удалить</button>`:''}${k==='hosts'&&id?`<button type="button" class="gh" data-host-duplicate="${id}">${ic('copy')}Дублировать</button>`:''}<button type="button" class="gh" data-x>Отмена</button><button class="btn">Сохранить</button></div></form>`,k==='nodes'?'node-wide':k==='hosts'?'host-wide':k==='squads'?'squad-wide':k=='profiles'||k=='subs'?'wide':'');
   if(k==='squads')squadEditorRefresh(dlg.querySelector('form[data-ent="squads"]'));
@@ -2730,8 +2730,8 @@ document.addEventListener('input',e=>{
   if(!e.target.matches('form[data-ent="nodes"] [name="rotationIps"]'))return;
   const form=e.target.closest('form'),count=form?.querySelector('[data-node-pool-count]'),feedback=form?.querySelector('[data-node-pool-feedback]');
   const ips=String(e.target.value).split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
-  if(count)count.textContent='Адресов: '+ips.length+' / 64';
-  if(feedback)feedback.textContent=ips.length>64?'Превышен лимит 64 адресов.':new Set(ips).size!==ips.length?'В пуле есть повторяющиеся адреса.':ips.some(ip=>!nodeIpValid(ip))?'Некорректный IPv4/IPv6: указывайте адреса без портов и доменов.':'';
+  if(count)count.textContent='Адресов: '+ips.length+' / 256';
+  if(feedback)feedback.textContent=ips.length>256?'Превышен лимит 256 адресов.':new Set(ips).size!==ips.length?'В пуле есть повторяющиеся адреса.':ips.some(ip=>!nodeIpValid(ip))?'Некорректный IPv4/IPv6: указывайте адреса без портов и доменов.':'';
 });
 document.addEventListener('click',async e=>{
   const g=s=>e.target.closest(s);let b;
