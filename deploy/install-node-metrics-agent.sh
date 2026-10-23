@@ -164,9 +164,9 @@ cat > /etc/systemd/system/xmesh-node-control.timer <<'EOF'
 Description=Poll XMesh restart commands with signed node identity
 
 [Timer]
-OnBootSec=25s
-OnUnitActiveSec=20s
-AccuracySec=5s
+OnBootSec=5s
+OnUnitInactiveSec=5s
+AccuracySec=1s
 Persistent=true
 Unit=xmesh-node-control.service
 
