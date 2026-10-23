@@ -168,7 +168,7 @@ const STM={ACTIVE:['Активен','--ok'],DISABLED:['Отключён','--mu']
 const NS={ONLINE:['Онлайн','--ok'],OFFLINE:['Не отвечает','--er'],CONNECTING:['Подключение','--wr'],DISABLED:['Отключён','--mu']};
 const STRAT=[['NO_RESET','Не сбрасывать'],['DAY','Каждый день'],['WEEK','Каждую неделю'],['MONTH','Каждый месяц']];
 const nstat=n=>n.disabled?'DISABLED':n.state;
-const NAV=[['Обзор',[['home','home','Дашборд',1],['statistics','chart-no-axes-combined','Статистика',1]]],['Управление',[['users','users','Пользователи',1],['squads','layers','Сквады'],['hosts','globe-2','Хосты'],['nodes','server','Узлы',1],['templates','file','Шаблоны'],['profiles','code','XRAY STUDIO'],['subscription','globe','SUBSCRIPTION STUDIO']]],['Инструменты',[['tools','tool','Диагностика']]],['Система',[['admins','shield','Админы'],['security','shield-check','Безопасность'],['set','sliders','Настройки']]]];
+const NAV=[['Обзор',[['home','home','Дашборд',1],['statistics','chart-no-axes-combined','Статистика',1]]],['Управление',[['users','users','Пользователи',1],['squads','layers','Сквады'],['hosts','globe-2','Хосты'],['nodes','server','Узлы',1],['templates','file','Шаблоны'],['profiles','code','XRAY STUDIO'],['subscription','globe','SUBSCRIPTION STUDIO'],['balancers','network','Балансировщики']]],['Инструменты',[['tools','tool','Диагностика']]],['Система',[['admins','shield','Админы'],['security','shield-check','Безопасность'],['set','sliders','Настройки']]]];
 const FLAT=NAV.flatMap(g=>g[1]);
 const swc=k=>r=>`<label class="sw"><input type="checkbox" data-tg="${k}:${r.id}" ${r.disabled?'':'checked'} aria-label="Включено"><span></span></label>`;
 const nodeRotationIPs = node => String(node?.rotationIps||'').split(/\r?\n/).map(ip=>ip.trim()).filter(Boolean);
@@ -688,7 +688,52 @@ const syncSubscriptionTheme=()=>{
  return subscriptionThemeSync;
 };
 const subscriptionStudioP=()=>window.XMeshSubscriptionStudio.create(DB.set,patch=>api.saveSettings(patch),toast,{users:DB.users.length,nodes:DB.nodes.length},panelSubscriptionTheme);
-const pages={home:['Дашборд',homeP],statistics:['Статистика',statisticsP],users:['Пользователи',usersP],squads:['Сквады',()=>simple(['squads'])],hosts:['Хосты',()=>simple(['hosts'])],nodes:['Узлы',nodesP],templates:['Шаблоны',()=>simple(['tpls','subs'])],profiles:['XRAY STUDIO',profilesP],subscription:['SUBSCRIPTION STUDIO',subscriptionStudioP],tools:['Диагностика',toolsP],admins:['Администраторы',()=>simple(['admins'])],security:['Безопасность',securityP],set:['Настройки',setP]};
+// Balancers are an explicit subscription feature, never inferred from node count.
+// Keeping this as a separate workspace prevents accidental SMART activation.
+const balancersP=async()=>{
+ const setting=DB.set.subscriptionJson||{};
+ const active=setting.smart===true && setting.balance!=='off';
+ const strategy=['leastPing','roundRobin','random'].includes(setting.balance)?setting.balance:'leastPing';
+ const markup=`<section class="balancer-workspace">
+   <div class="balancer-intro"><div><h2>Балансировщики</h2><p>Узлы и хосты работают независимо. SMART подключается только по вашему решению.</p></div>
+   <span class="balancer-state ${active?'is-on':''}" id="balancer-current-state">${active?'SMART включён':'Отключено'}</span></div>
+   <div class="card balancer-settings"><div class="balancer-primary">
+    <div><h3>SMART · автоматический выбор</h3><p>Объединяет доступные подключения в один виртуальный маршрут. Без него клиентский JSON использует первый маршрут по умолчанию, а остальные подключения сохраняются как отдельные outbound.</p></div>
+    <label class="balancer-switch"><input type="checkbox" id="balancer-enabled" ${active?'checked':''} aria-label="Включить SMART балансировщик"><span class="balancer-switch-track"></span></label>
+   </div>
+   <label class="f balancer-strategy"><span>Стратегия выбора</span>
+     <select id="balancer-strategy" ${active?'':'disabled'}>
+       <option value="leastPing" ${strategy==='leastPing'?'selected':''}>Наименьшая задержка</option>
+       <option value="roundRobin" ${strategy==='roundRobin'?'selected':''}>По очереди</option>
+       <option value="random" ${strategy==='random'?'selected':''}>Случайный сервер</option>
+     </select>
+   </label>
+   <div class="balancer-actions"><p id="balancer-description">Изменение вступит в силу после сохранения. Это не перезапускает Xray на узлах.</p>
+     <button class="btn" type="button" id="balancer-save">${ic('save')}Сохранить настройки</button>
+   </div></div>
+   <p class="note">Создание нового узла не активирует балансировку. Доступность серверов и привязки хостов настраиваются в разделах «Узлы» и «Хосты».</p>
+ </section>`;
+ return [markup,()=>{
+   const enabled=$('#balancer-enabled'),select=$('#balancer-strategy'),button=$('#balancer-save');
+   if(!enabled||!select||!button)return;
+   enabled.addEventListener('change',()=>{select.disabled=!enabled.checked});
+   button.addEventListener('click',async()=>{
+     button.disabled=true;
+     try{
+       // PATCH replaces subscriptionJson, so preserve every unrelated DNS field.
+       const current=DB.set.subscriptionJson||{};
+       const smart=enabled.checked;
+       const balance=smart?select.value:'off';
+       await api.saveSettings({subscriptionJson:{...current,smart,balance}});
+       const state=$('#balancer-current-state');
+       if(state){state.textContent=smart?'SMART включён':'Отключено';state.classList.toggle('is-on',smart)}
+       toast(smart?'SMART балансировщик включён':'SMART балансировщик отключён');
+     }catch(error){toast('Не удалось сохранить балансировщик: '+(error.message||'ошибка'))}
+     finally{button.disabled=false}
+   });
+ }];
+};
+const pages={home:['Дашборд',homeP],statistics:['Статистика',statisticsP],users:['Пользователи',usersP],squads:['Сквады',()=>simple(['squads'])],hosts:['Хосты',()=>simple(['hosts'])],nodes:['Узлы',nodesP],templates:['Шаблоны',()=>simple(['tpls','subs'])],profiles:['XRAY STUDIO',profilesP],subscription:['SUBSCRIPTION STUDIO',subscriptionStudioP],balancers:['Балансировщики',balancersP],tools:['Диагностика',toolsP],admins:['Администраторы',()=>simple(['admins'])],security:['Безопасность',securityP],set:['Настройки',setP]};
 const skel=()=>`<div class="sk" style="height:7rem"></div><div class="sk" style="height:18rem"></div><div class="sk" style="height:12rem"></div>`;
 const NAV_SHORT={home:'Главная',users:'Клиенты',nodes:'Узлы',subscription:'Подписка'};
 $('#nav').innerHTML=NAV.map(([g,a])=>`<div class="g">${g}</div>`+a.map(([k,i,l,p])=>`<a href="#${k}" class="${p?'':'sec'}" aria-label="${l}" data-rail-tip="${l}">${ic(i)}<span class="lbl"><span class="nav-label-full">${l}</span><span class="nav-label-short" aria-hidden="true">${NAV_SHORT[k]||l}</span></span>${k=='users'?'<em id="unb"></em>':''}</a>`).join('')).join('')+`<button class="more" id="more" aria-label="Ещё разделы" data-rail-tip="Ещё разделы">${ic('more')}<span class="lbl">Ещё</span></button>`;
