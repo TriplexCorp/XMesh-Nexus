@@ -142,7 +142,17 @@ fn proxy_outbound(user:&Value,inbound:&Value,host:&Value,device:&str)->Option<Va
   },
   "shadowsocks"=>{
    let method=inbound.get("settings").and_then(|v|nonempty(v,"method"))?;
-   let password=if method.starts_with("2022-"){nonempty(user,"ssPassword")?}else{uuid};
+   let password=if method.starts_with("2022-"){
+    // Xray SS2022 multi-user requires ServerPSK:UserPSK on outbound.
+    let server=inbound.get("settings").and_then(|v|nonempty(v,"password"))?;
+    let client=nonempty(user,"ssPassword")?;
+    use base64::Engine as _;
+    let decode=|value:&str|base64::engine::general_purpose::STANDARD.decode(value).ok();
+    let len=if method=="2022-blake3-aes-128-gcm"{16}else{32};
+    if decode(server).as_ref().is_none_or(|v|v.len()!=len)
+     || decode(client).as_ref().is_none_or(|v|v.len()!=len){return None}
+    format!("{server}:{client}")
+   }else{uuid.to_owned()};
    json!({"address":address,"port":port,"method":method,"password":password})
   },
   "hysteria"=>{
@@ -849,6 +859,21 @@ mod tests{
    assert_eq!(auth,user["xrayId"],"{protocol}");
    assert!(crate::subscription_json::build_feed(vec![proxy],&json!({})).is_ok());
   }
+ }
+ #[test] fn ss2022_user_key_and_server_key_are_both_required(){
+  use base64::Engine as _;
+  let encode=|byte:u8|base64::engine::general_purpose::STANDARD.encode([byte;32]);
+  let server=encode(7);let client=encode(8);
+  let user=json!({"xrayId":"550e8400-e29b-41d4-a716-446655440000","ssPassword":client});
+  let inbound=json!({"protocol":"shadowsocks",
+   "settings":{"method":"2022-blake3-aes-256-gcm","password":server},
+   "streamSettings":{"network":"raw","security":"none"}});
+  let host=json!({"address":"vpn.example.org","externalPort":443});
+  let proxy=proxy_outbound(&user,&inbound,&host,"auto").unwrap();
+  assert_eq!(proxy["settings"]["password"],json!(format!("{server}:{client}")));
+  let mut broken=inbound.clone();
+  broken["settings"]["password"]=json!("invalid-base64");
+  assert!(proxy_outbound(&user,&broken,&host,"auto").is_none());
  }
  #[test] fn insecure_trojan_and_missing_ss2022_key_fail_closed(){
   let user=json!({"xrayId":"550e8400-e29b-41d4-a716-446655440000"});
