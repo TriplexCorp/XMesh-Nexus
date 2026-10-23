@@ -51,6 +51,12 @@ pub(crate) fn validate_node(value: &Value) -> Result<(), ApiError> {
         Some(Value::Bool(value)) => *value,
         _ => return Err(invalid("Ротация IP должна быть включена или выключена.")),
     };
+    if let Some(value) = value.get("rotationIntervalHours") {
+        let hours = value.as_i64().ok_or_else(|| invalid("Интервал IP-ротации должен быть целым числом часов."))?;
+        if !(1..=720).contains(&hours) {
+            return Err(invalid("Интервал IP-ротации должен быть от 1 до 720 часов."));
+        }
+    }
     let pool = parse_pool(value)?;
     if enabled && pool.len() < 2 {
         return Err(invalid("Для включения ротации укажите хотя бы два различных IP-адреса."));
@@ -213,6 +219,9 @@ mod tests {
         assert!(parse_pool(&json!({"rotationIps":"127.0.0.1"})).is_err());
         assert!(validate_node(&json!({"rotationEnabled":true,"rotationIps":"1.1.1.1"})).is_err());
         assert!(validate_node(&json!({"rotationEnabled":true,"rotationIps":"1.1.1.1\n9.9.9.9"})).is_ok());
+        assert!(validate_node(&json!({"rotationIntervalHours":0})).is_err());
+        assert!(validate_node(&json!({"rotationIntervalHours":721})).is_err());
+        assert!(validate_node(&json!({"rotationIntervalHours":24})).is_ok());
     }
     #[test]
     fn sticky_lease_reuses_until_expiry_or_pool_change() {
