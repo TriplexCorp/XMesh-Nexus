@@ -6,6 +6,7 @@ const {spawnSync}=require('node:child_process');
 
 const api=fs.readFileSync('backend/src/main.rs','utf8');
 const runtime=fs.readFileSync('backend/src/node_runtime.rs','utf8');
+const migration=fs.readFileSync('backend/migrations/0024_node_agent_updates.sql','utf8');
 const agent=fs.readFileSync('deploy/node-control-agent.sh','utf8');
 const updater=fs.readFileSync('deploy/update-node-control-agent.sh','utf8');
 const installer=fs.readFileSync('deploy/install-node-metrics-agent.sh','utf8');
@@ -21,6 +22,7 @@ assert.match(runtime,/crate::require_mutation\(&actor\)/);
 assert.match(runtime,/version LIKE 'control-v4\.%'/);
 assert.match(runtime,/VALUES\(\$1,'update_agent',\$2,\$3\)/);
 assert.match(runtime,/pub const CONTROL_AGENT_VERSION/);
+assert.match(migration,/CHECK \(action IN \('restart_xray', 'update_xray', 'update_agent'\)\)/);
 assert.match(agent,/AGENT_VERSION="control-v4[.]0[.]0"/);
 assert.match(agent,/if action not in \("restart_xray","update_xray","update_agent"\)/);
 assert.match(agent,/systemctl start --wait xmesh-node-agent-upgrade[.]service/);
