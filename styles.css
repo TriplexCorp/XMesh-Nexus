@@ -4867,3 +4867,12 @@ dialog#dlg.node-wide .node-main-section .country-picker-dropdown .country-option
 .node-main-section .node-traffic-reset-status{grid-column:1/-1;min-height:0}
 .node-main-section .node-traffic-reset-status:empty{display:none}
 @media(max-width:480px){.node-main-section .node-reset-action{grid-template-columns:minmax(0,1fr)}.node-main-section .node-traffic-reset-button{justify-self:start}}
+
+/* Statistics: no dead column below the RX/TX charts.
+   Place the control-plane summary on its own compact full-width row. */
+.stats-dashboard .stats-layout{grid-template-columns:minmax(0,1fr);align-items:start}
+.stats-dashboard .stats-layout>.card{align-self:auto;min-width:0}
+.stats-dashboard #stats-control{display:grid;grid-template-columns:minmax(270px,1fr) minmax(0,2fr);gap:1.25rem;align-items:start}
+.stats-dashboard #stats-control .stats-control-rings{align-self:center}
+.stats-dashboard #stats-control .stats-kvs{min-width:0}
+@media(max-width:850px){.stats-dashboard #stats-control{grid-template-columns:minmax(0,1fr)}}
