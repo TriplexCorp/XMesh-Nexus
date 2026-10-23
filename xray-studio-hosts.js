@@ -70,6 +70,10 @@ window.XMeshStudioHosts=(()=>{
         check.checked=Array.isArray(h?.nodes)&&h.nodes.map(String).includes(String(n.id));
         label.append(check,text('span','',n.name||'Узел '+n.id));nodes.append(label);
       }
+      const missingPins=(h?.nodes||[]).filter(id=>!connected().some(n=>String(n.id)===String(id)));
+      if(missingPins.length){
+        nodes.append(text('p','sv-endpoint-warning','Сохранены привязки к другим узлам: '+missingPins.join(', ')+'. Они не будут сброшены автоматически.'));
+      }
       if(!connected().length)nodes.append(text('p','sv-muted','Узлы пока не привязаны к профилю.'));
       qs('[data-endpoint-editor]').hidden=false;
       qs('[data-endpoint-editor]').scrollIntoView?.({behavior:'smooth',block:'nearest'});
@@ -82,6 +86,12 @@ window.XMeshStudioHosts=(()=>{
       if([...address].some(c=>' /@?#'.includes(c)||c==='\\')||address.length>253)return ctx.notify('Некорректный адрес сервера.');
       const nodeIds=[...qs('[data-endpoint-nodes]').querySelectorAll('input:checked')].map(x=>Number(x.value));
       const old=editing==null?null:hosts().find(h=>String(h.id)===String(editing));
+      // A legacy host may be pinned to nodes no longer in this profile.
+      // Do not silently broaden its access by discarding those associations.
+      for(const savedId of old?.nodes||[]){
+        if(!connected().some(node=>String(node.id)===String(savedId)) &&
+           !nodeIds.some(id=>String(id)===String(savedId))) nodeIds.push(savedId);
+      }
       if(editing!=null&&!old)return ctx.notify('Подключение не найдено.');
       const data={remark,address,port,tag:tag(),profileId:profile(),
         sni:value('sni'),host:value('host'),path:value('path'),fp:value('fp'),
