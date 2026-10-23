@@ -506,6 +506,18 @@ async fn create_record(
     if collection=="users" {
         object.insert("xrayId".into(),Value::String(Uuid::new_v4().to_string()));
     }
+    // A quota reason is only valid for an actually disabled node. Updating
+    // a node must not carry a stale reason into its next saved revision.
+    // Never auto-start a quota-stopped node: an operator must enable it.
+    if collection == "nodes"
+        && data.get("disabled").and_then(Value::as_bool) == Some(false)
+        && data.get("disabledReason").and_then(Value::as_str) == Some("traffic_limit")
+    {
+        if let Some(obj) = data.as_object_mut() {
+            obj.remove("disabledReason");
+            obj.remove("trafficLimitReachedAt");
+        }
+    }
     validate_record(&collection, &data)?;
     if collection == "hosts" { validate_host_binding(&state.pool, &data).await?; }
 
