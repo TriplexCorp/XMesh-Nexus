@@ -4857,3 +4857,13 @@ dialog#dlg.node-wide .node-main-section .country-picker-dropdown .country-option
 @keyframes xray-release-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.xray-release-dialog .xray-release-spinner{animation:none}.xray-release-dialog .xray-release-row{transition:none}}
 .xray-release-dialog .xray-release-empty{color:var(--mu);padding:1rem;text-align:center;font-size:.88rem}
+
+/* Node reset is a separate maintenance action, not a neighbor of Delete. */
+.node-main-section .node-reset-action{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.45rem .8rem;align-items:center;margin-top:1rem;padding:.8rem .85rem;border:1px solid var(--ln);border-radius:.75rem;background:var(--s2)}
+.node-reset-copy{display:flex;flex-direction:column;gap:.2rem;min-width:0}
+.node-reset-copy strong{font-size:.8rem;font-weight:650;color:var(--tx)}
+.node-reset-copy span{font-size:.73rem;line-height:1.4;color:var(--mu);overflow-wrap:anywhere}
+.node-main-section .node-traffic-reset-button{margin:0;white-space:nowrap;align-self:center;min-height:2.3rem}
+.node-main-section .node-traffic-reset-status{grid-column:1/-1;min-height:0}
+.node-main-section .node-traffic-reset-status:empty{display:none}
+@media(max-width:480px){.node-main-section .node-reset-action{grid-template-columns:minmax(0,1fr)}.node-main-section .node-traffic-reset-button{justify-self:start}}
