@@ -64,9 +64,13 @@ restart_xray(){
 # Only the specifically managed container may be upgraded. A non-managed
 # Xray, arbitrary Docker container or remote-selected image is never modified.
 update_managed_xray(){
+ local version="${1:?Pinned Xray version required}"
+ [[ "$version" =~ ^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$ ]] || {
+  detail='Invalid pinned release version';return 1
+ }
  command -v docker >/dev/null || { detail='Docker not installed';return 1; }
  local name=xmesh-managed-xray
- local image=ghcr.io/xtls/xray-core:latest
+ local image="ghcr.io/xtls/xray-core:$version"
  local config=/var/lib/xmesh-xray-sync/config.json
  # The reconciliation worker uses this same lock. Never race deployments.
  [[ -d /var/lib/xmesh-xray-sync ]] || { detail='Managed Xray state missing';return 1; }
@@ -85,7 +89,7 @@ update_managed_xray(){
  new_image="$(docker image inspect -f '{{.Id}}' "$image")" || return 1
  [[ "$new_image" =~ ^sha256:[0-9a-f]{64}$ ]] || { detail='Invalid new image identity';return 1; }
  if [[ "$old_image" == "$new_image" ]];then
-  detail='Xray image already up to date';return 0
+  detail="Xray $version already installed";return 0
  fi
  if ! timeout 25 docker run --rm --network none --user 0:0 --cap-drop ALL \
   --security-opt no-new-privileges --entrypoint xray \
@@ -100,7 +104,7 @@ update_managed_xray(){
   run -config /etc/xray/config.json >/dev/null;then
    sleep 3
    if docker inspect -f '{{.State.Running}}' "$name" 2>/dev/null | grep -qx true;then
-    detail='Managed Xray image updated and running';return 0
+    detail="Xray $version installed and running";return 0
    fi
  fi
  docker rm -f "$name" >/dev/null 2>&1 || true
@@ -184,15 +188,20 @@ action=cmd.get("action")
 if action not in ("restart_xray","update_xray"):sys.exit(2)
 value=cmd.get("id")
 if not isinstance(value,int) or isinstance(value,bool) or value<=0:sys.exit(2)
-print(str(value)+" "+action)
+version=cmd.get("targetVersion")
+if action=="update_xray":
+ if not isinstance(version,str) or not __import__("re").fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,63}",version):sys.exit(2)
+else:
+ version="-"
+print(str(value)+" "+action+" "+version)
 ')"
 [[ -n "$command_info" ]] || exit 0
-read -r command_id action <<< "$command_info"
+read -r command_id action target_version <<< "$command_info"
 [[ "$command_id" =~ ^[1-9][0-9]*$ ]] || exit 2
 success=false
 detail='Command failed'
 if [[ "$action" == update_xray ]];then
- if update_managed_xray;then success=true;fi
+ if update_managed_xray "$target_version";then success=true;fi
 elif [[ "$action" == restart_xray ]];then
  if restart_xray;then
   success=true
