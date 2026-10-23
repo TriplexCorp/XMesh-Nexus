@@ -99,6 +99,11 @@ fn provision_vless_users(config:&mut Value,users:&[Value],squads:&[Value],now_ms
         }
         let settings=inbound.get_mut("settings").and_then(Value::as_object_mut)
             .ok_or_else(||ApiError::new(StatusCode::CONFLICT,"VLESS inbound settings missing."))?;
+        // Current Xray requires explicit decryption: "none" for plain VLESS.
+        // Preserve configured post-quantum decryption values verbatim.
+        if settings.get("decryption").and_then(Value::as_str).is_none_or(|s|s.trim().is_empty()) {
+            settings.insert("decryption".to_owned(),json!("none"));
+        }
         // Legacy "clients" overrides "users" in Xray-core. Remove the stale
         // alias so dynamic users cannot be shadowed by an old empty list.
         settings.remove("clients");
@@ -167,7 +172,7 @@ mod provision_tests {
     #[test]
     fn runtime_inbound_contains_only_active_assigned_uuids(){
         let mut config=json!({"inbounds":[{"protocol":"vless","tag":"NL",
-            "settings":{"decryption":"none","clients":[]}}]});
+            "settings":{"decryption":"","clients":[]}}]});
         let now=1_800_000_000_000_i64;
         let users=vec![
             json!({"id":1,"xrayId":"550e8400-e29b-41d4-a716-446655440000","squads":[4]}),
