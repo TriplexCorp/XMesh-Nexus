@@ -126,7 +126,7 @@ fn proxy_outbound(user:&Value,inbound:&Value,host:&Value,device:&str)->Option<Va
   return vless_outbound(user,inbound,host,device)
  }
  let protocol=nonempty(inbound,"protocol")?;
- if !["vmess","trojan","shadowsocks","hysteria"].contains(&protocol){return None}
+ if !["vmess","trojan","shadowsocks","hysteria","masque"].contains(&protocol){return None}
  let address=endpoint(host)?;
  let port=["externalPort","port"].into_iter().find_map(|key|host.get(key).and_then(self::port))
   .or_else(||inbound.get("port").and_then(self::port))?;
@@ -155,6 +155,11 @@ fn proxy_outbound(user:&Value,inbound:&Value,host:&Value,device:&str)->Option<Va
    }else{uuid.to_owned()};
    json!({"address":address,"port":port,"method":method,"password":password})
   },
+  "masque"=>{
+   let network=stream.get("method").or_else(||stream.get("network")).and_then(Value::as_str)?;
+   if network!="masque" || security!="tls"{return None}
+   json!({"address":address,"port":port})
+  },
   "hysteria"=>{
    let network=stream.get("method").or_else(||stream.get("network")).and_then(Value::as_str)?;
    if network!="hysteria" || security!="tls"{return None}
@@ -163,6 +168,21 @@ fn proxy_outbound(user:&Value,inbound:&Value,host:&Value,device:&str)->Option<Va
   _=>return None
  };
  let mut stream=stream;
+ if protocol=="masque"{
+  // MASQUE uses HTTP Basic username/password in transport settings, not UUID
+  // in its outbound settings. The server uses the same stat email as username.
+  let record_id=user.get("id").and_then(Value::as_i64)?;
+  if record_id<=0{return None}
+  let tag=nonempty(inbound,"tag")?;
+  let encoded=tag.bytes().map(|b|{
+   if b.is_ascii_alphanumeric() || matches!(b,b'-'|b'_'|b'.'|b'~'){
+    (b as char).to_string()
+   }else{format!("%{b:02X}")}
+  }).collect::<String>();
+  if !stream["masqueSettings"].is_object(){stream["masqueSettings"]=json!({})}
+  stream["masqueSettings"]["user"]=json!(format!("xmesh-u{record_id}--{encoded}"));
+  stream["masqueSettings"]["pass"]=json!(uuid);
+ }
  if protocol=="hysteria"{
   if !stream["hysteriaSettings"].is_object(){stream["hysteriaSettings"]=json!({})}
   stream["hysteriaSettings"]["version"]=json!(2);
