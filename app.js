@@ -310,11 +310,10 @@ function field(f,v){
   if(t==='country'){
     const existing=COUNTRIES.find(c=>c.flag===v);
     const current=existing?existing.flag:(v||'');
-    i=`<div class="country-picker">
-      <div class="country-search-wrap"><input class="country-search" type="search" data-country-search placeholder="${existing?esc(existing.name):'Найти страну…'}" aria-label="Поиск страны" autocomplete="off" aria-controls="country-options-${f.k}" aria-expanded="false"><div class="country-options" id="country-options-${f.k}" role="listbox" aria-label="Результаты поиска стран" hidden></div></div>
-      <div class="country-selected">${flagView(current,'country-flag-preview')}<span data-country-label>${existing?esc(existing.name):current?esc(current+' Сохранённый флаг'):'Выберите страну…'}</span></div>
+    i=`<div class="country-picker country-picker-dropdown">
+      <button type="button" class="country-trigger" data-country-trigger aria-haspopup="listbox" aria-expanded="false" aria-controls="country-options-${f.k}"><span class="country-trigger-value">${flagView(current,'country-flag-preview')}<span data-country-label>${existing?esc(existing.name):current?esc(current+' Сохранённый флаг'):'Выберите страну…'}</span></span><span class="country-trigger-chevron">⌄</span></button>
+      <div class="country-dropdown" hidden><div class="country-search-wrap"><input class="country-search" type="search" data-country-search placeholder="Поиск страны или кода…" aria-label="Поиск страны" autocomplete="off" aria-controls="country-options-${f.k}" aria-expanded="false"></div><div class="country-options" id="country-options-${f.k}" role="listbox" aria-label="Результаты поиска стран" hidden></div></div>
       <input type="hidden" name="${f.k}" class="country-value" value="${esc(current)}">
-      <small class="country-hint">Поиск по названию страны или ISO-коду. ${COUNTRIES.length} стран и территорий.</small>
     </div>`
   }
   else if(t=='sel')i=`<select name="${f.k}">${opt(f.o).map(([a,b])=>`<option value="${esc(a)}"${a==v?' selected':''}>${esc(b)}</option>`).join('')}</select>`;
@@ -3187,13 +3186,22 @@ function renderCountryOptions(picker, query=''){
  if(!rows.length)rows.push('<div class="country-no-results">Страна не найдена. Попробуйте другое название или ISO-код.</div>');
  options.innerHTML=rows.join('');
  options.hidden=false;
+ const dropdown=picker.querySelector('.country-dropdown');if(dropdown)dropdown.hidden=false;
+ const trigger=picker.querySelector('[data-country-trigger]');if(trigger)trigger.setAttribute('aria-expanded','true');
  input.setAttribute('aria-expanded','true');
 }
 function closeCountryOptions(picker){
  const input=picker?.querySelector('[data-country-search]'),options=picker?.querySelector('.country-options');
  if(options)options.hidden=true;
+ const dropdown=picker?.querySelector('.country-dropdown');if(dropdown)dropdown.hidden=true;
+ const trigger=picker?.querySelector('[data-country-trigger]');if(trigger)trigger.setAttribute('aria-expanded','false');
  if(input)input.setAttribute('aria-expanded','false');
 }
+document.addEventListener('click',e=>{
+ const trigger=e.target.closest('[data-country-trigger]');
+ if(trigger){const picker=trigger.closest('.country-picker');const dropdown=picker?.querySelector('.country-dropdown');if(!dropdown)return;const opened=!dropdown.hidden;if(opened){closeCountryOptions(picker)}else{renderCountryOptions(picker,'');const input=picker.querySelector('[data-country-search]');if(input){input.value='';input.focus()}}return}
+ if(!e.target.closest('.country-picker'))document.querySelectorAll('.country-picker-dropdown').forEach(closeCountryOptions);
+});
 document.addEventListener('focusin',e=>{
  const input=e.target.closest('[data-country-search]');
  if(!input)return;
