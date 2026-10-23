@@ -94,8 +94,13 @@ fn provision_vless_users(config:&mut Value,users:&[Value],squads:&[Value],now_ms
             let Ok(uuid)=uuid::Uuid::parse_str(id)else{continue};
             if !seen.insert(uuid){continue}
             let record_id=user.get("id").and_then(Value::as_i64).unwrap_or(0);
+            let encoded_tag=tag.bytes().map(|b|{
+                if b.is_ascii_alphanumeric() || matches!(b,b'-'|b'_'|b'.'|b'~'){
+                    (b as char).to_string()
+                }else{format!("%{b:02X}")}
+            }).collect::<String>();
             entries.push(json!({"id":uuid.to_string(),"level":0,
-                "email":format!("user-{record_id}@xmesh.invalid")}));
+                "email":format!("xmesh-u{record_id}--{encoded_tag}")}));
         }
         let settings=inbound.get_mut("settings").and_then(Value::as_object_mut)
             .ok_or_else(||ApiError::new(StatusCode::CONFLICT,"VLESS inbound settings missing."))?;
@@ -104,11 +109,26 @@ fn provision_vless_users(config:&mut Value,users:&[Value],squads:&[Value],now_ms
         if settings.get("decryption").and_then(Value::as_str).is_none_or(|s|s.trim().is_empty()) {
             settings.insert("decryption".to_owned(),json!("none"));
         }
-        // Legacy "clients" overrides "users" in Xray-core. Remove the stale
-        // alias so dynamic users cannot be shadowed by an old empty list.
-        settings.remove("clients");
-        settings.insert("users".to_owned(),Value::Array(entries));
+        // Inbound VLESS uses settings.clients, unlike outbound VLESS which uses
+        // settings.vnext[].users. Never confuse the two schemas.
+        settings.remove("users");
+        settings.insert("clients".to_owned(),Value::Array(entries));
     }
+    // Keep Xray StatsService private to the node: no public API listeners.
+    if config.get("api").is_some_and(|api|!api.is_null()){
+        return Err(ApiError::new(StatusCode::CONFLICT,"XRAY STUDIO profile already defines an API. Remove the conflicting API or use the dedicated node telemetry configuration."));
+    }
+    config["api"]=json!({"tag":"xmesh_stats_api","listen":"127.0.0.1:10085","services":["StatsService"]});
+    config["stats"]=json!({});
+    let object=config.as_object_mut().ok_or_else(||ApiError::new(StatusCode::CONFLICT,"Invalid Xray profile JSON"))?;
+    let policy=object.entry("policy").or_insert_with(||json!({}));
+    let po=policy.as_object_mut().ok_or_else(||ApiError::new(StatusCode::CONFLICT,"Invalid policy field"))?;
+    let levels=po.entry("levels").or_insert_with(||json!({}));
+    let lo=levels.as_object_mut().ok_or_else(||ApiError::new(StatusCode::CONFLICT,"Invalid policy.levels"))?;
+    let level=lo.entry("0").or_insert_with(||json!({}));
+    let lvl=level.as_object_mut().ok_or_else(||ApiError::new(StatusCode::CONFLICT,"Invalid policy level 0"))?;
+    lvl.insert("statsUserUplink".into(),json!(true));
+    lvl.insert("statsUserDownlink".into(),json!(true));
     Ok(())
 }
 
@@ -183,10 +203,21 @@ mod provision_tests {
         let squads=vec![json!({"id":4,"inb":["NL"]}),json!({"id":5,"inb":["SE"]})];
         provision_vless_users(&mut config,&users,&squads,now).unwrap();
         let settings=&config["inbounds"][0]["settings"];
-        assert!(settings.get("clients").is_none());
-        assert_eq!(settings["users"].as_array().unwrap().len(),1);
-        assert_eq!(settings["users"][0]["id"],"550e8400-e29b-41d4-a716-446655440000");
+        assert!(settings.get("users").is_none());
+        assert_eq!(settings["clients"].as_array().unwrap().len(),1);
+        assert_eq!(settings["clients"][0]["id"],"550e8400-e29b-41d4-a716-446655440000");
+        assert_eq!(settings["clients"][0]["email"],"xmesh-u1--NL");
+        assert_eq!(config["api"]["listen"],"127.0.0.1:10085");
+        assert_eq!(config["policy"]["levels"]["0"]["statsUserUplink"],true);
         assert_eq!(settings["decryption"],"none");
+    }
+    #[test]
+    fn stats_email_escapes_non_ascii_inbound_tag(){
+        let mut config=json!({"inbounds":[{"protocol":"vless","tag":"CDN NL","settings":{}}]});
+        let users=vec![json!({"id":7,"xrayId":"550e8400-e29b-41d4-a716-446655440000","squads":[4]})];
+        let squads=vec![json!({"id":4,"inb":["CDN NL"]})];
+        provision_vless_users(&mut config,&users,&squads,1_800_000_000_000).unwrap();
+        assert_eq!(config["inbounds"][0]["settings"]["clients"][0]["email"],"xmesh-u7--CDN%20NL");
     }
     #[test]
     fn same_user_in_multiple_matching_squads_is_not_duplicated(){
@@ -194,6 +225,6 @@ mod provision_tests {
         let users=vec![json!({"id":1,"xrayId":"550e8400-e29b-41d4-a716-446655440000","squads":[4,5]})];
         let squads=vec![json!({"id":4,"inb":["NL"]}),json!({"id":5,"inb":["NL"]})];
         provision_vless_users(&mut config,&users,&squads,1_800_000_000_000).unwrap();
-        assert_eq!(config["inbounds"][0]["settings"]["users"].as_array().unwrap().len(),1);
+        assert_eq!(config["inbounds"][0]["settings"]["clients"].as_array().unwrap().len(),1);
     }
 }
