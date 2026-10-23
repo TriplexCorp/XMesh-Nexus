@@ -70,7 +70,12 @@ update_managed_xray(){
  }
  command -v docker >/dev/null || { detail='Docker not installed';return 1; }
  local name=xmesh-managed-xray
- local image="ghcr.io/xtls/xray-core:$version"
+ # Official GitHub tags are v26.x.y; GHCR uses 26.x.y (without v).
+ local image_tag="${version#v}"
+ [[ "$image_tag" =~ ^[0-9]+[.][0-9]+[.][0-9]+([._+-][A-Za-z0-9._+-]+)?$ ]] || {
+  detail='Release tag has no compatible official GHCR image';return 1
+ }
+ local image="ghcr.io/xtls/xray-core:$image_tag"
  local config=/var/lib/xmesh-xray-sync/config.json
  # The reconciliation worker uses this same lock. Never race deployments.
  [[ -d /var/lib/xmesh-xray-sync ]] || { detail='Managed Xray state missing';return 1; }
