@@ -1497,7 +1497,10 @@ fn validate_collection(collection: &str) -> Result<(), ApiError> {
 // A public Host is not a standalone Xray profile. Its inbound must come from
 // the selected profile, and each assigned node must actually run that profile.
 async fn validate_host_binding(pool: &PgPool, host: &Value) -> Result<(), ApiError> {
-    let bad = |message| ApiError::new(StatusCode::BAD_REQUEST, message);
+    // Disabled hosts are allowed to remain drafts and can always be switched off.
+    // Re-enabling them validates the full runtime profile/node relationship.
+    if host.get("disabled").and_then(Value::as_bool) == Some(true) { return Ok(()); }
+    let bad = |message: &'static str| ApiError::new(StatusCode::BAD_REQUEST, message);
     let profile_id = host.get("profileId").and_then(Value::as_i64)
         .filter(|id| *id > 0)
         .ok_or_else(|| bad("Хосту необходимо назначить XRAY STUDIO профиль."))?;
