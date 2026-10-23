@@ -6,6 +6,7 @@ mod core;
 mod node_rotation;
 mod node_auth;
 mod node_runtime;
+mod node_policy;
 mod node_enrollment;
 mod subscription_settings;
 mod user_subscriptions;
@@ -91,6 +92,7 @@ pub struct AppState {
     pub core: CoreManager,
     pub cookie_secure: bool,
     pub totp_key: Option<[u8;32]>,
+    pub node_policy_signer: std::sync::Arc<node_policy::PolicySigner>,
 }
 
 #[derive(Debug)]
@@ -241,13 +243,14 @@ async fn main() -> anyhow::Result<()> {
     let core_dir = PathBuf::from(
         env::var("CORE_DATA_DIR").unwrap_or_else(|_| "/var/lib/xmesh/core".to_owned()),
     );
+    let node_policy_signer = std::sync::Arc::new(node_policy::PolicySigner::load(&core_dir.join("node-policy-ed25519.key"))?);
     let core = CoreManager::new(pool.clone(), core_dir).await?;
     let totp_key=env::var("TOTP_ENCRYPTION_KEY").ok().filter(|s|!s.trim().is_empty())
         .map(|raw|mfa::decode_key(&raw)).transpose()?;
     if totp_key.is_none() {
         tracing::warn!("TOTP_ENCRYPTION_KEY is not configured: MFA enrollment is unavailable");
     }
-    let state = AppState { pool, redis, core, cookie_secure, totp_key };
+    let state = AppState { pool, redis, core, cookie_secure, totp_key, node_policy_signer };
     state.core.launch_startup_update().await;
 
     let protected = Router::new()
