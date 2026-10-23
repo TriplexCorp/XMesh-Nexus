@@ -1865,7 +1865,7 @@ function hostEditorRefresh(form,changedProfile=false){
   if(!profile)warnings.push('Выберите XRAY-профиль.');
   else if(!inbound)warnings.push('У профиля нет выбранного inbound.');
   else if(inbound.protocol!=='vless')warnings.push('Для подписок сейчас поддерживается только VLESS.');
-  if(requiredNodes.length===0)warnings.push('Выберите ноду, иначе хост не будет привязан к рабочему серверу.');
+  if(requiredNodes.length===0)warnings.push('Выберите ноду с действующим профилем XRAY STUDIO, иначе хост не будет выдан в подписке.');
   if(mismatched.length)warnings.push('Несовместимые ноды: '+mismatched.map(n=>!n?'нода удалена':n.name+' (ID '+n.id+': '+(n.disabled?'отключена':hostProfile(n.profileId)?'назначен профиль «'+hostProfile(n.profileId).name+'»':'профиль ID '+(n.profileId||'не назначен')+' отсутствует')+')').join(', ')+'. Назначьте нодам существующий XRAY-профиль и только затем сохраняйте хост.');
   if(security==='reality'&&!realityKey)warnings.push('REALITY publicKey отсутствует: укажите публичную часть ключа в расширенных настройках. Приватный ключ сюда не вставляйте.');
   if(security==='reality'&&!sni)warnings.push('Не указан SNI для REALITY.');
@@ -1877,6 +1877,11 @@ function hostEditorRefresh(form,changedProfile=false){
     repair.hidden=!target;
     if(target){repair.dataset.hostRepair=String(target.id);repair.textContent='Изменить профиль ноды «'+target.name+'»';}
   }
+  const link=form.querySelector('[data-host-link-profile]');
+  if(link){const target=mismatched.find(n=>n&&!n.disabled&&profile);
+    link.hidden=!target;
+    if(target){link.dataset.hostLinkProfile=String(target.id);link.textContent='Назначить «'+profile.name+'» ноде «'+target.name+'»';}
+  }
   const count=form.querySelector('[data-host-count]');
   if(count)count.textContent=requiredNodes.length+' нод привязано';
 }
@@ -1885,7 +1890,7 @@ function hostEditorMarkup(o,e){
   const selectedProfile=hostProfile(o.profileId)||fromTag||DB.profiles[0];
   const fields=e.fs;
   const f=k=>fields.find(x=>x.k===k);
-  const preset='<label class="f"><span>Быстро заполнить из ноды</span><select data-host-node-preset><option value="">Выберите сервер…</option>'+DB.nodes.map(n=>'<option value="'+esc(n.id)+'">'+esc(n.name)+' · '+esc(n.addr||'')+' · '+esc(n.port||443)+'</option>').join('')+'</select></label>';
+  const preset='<label class="f"><span>Быстро заполнить из ноды</span><select data-host-node-preset><option value="">Выберите сервер…</option>'+DB.nodes.map(n=>'<option value="'+esc(n.id)+'">'+esc(n.name)+' · '+esc(n.addr||'')+' · '+esc(n.port||443)+(hostProfile(n.profileId)?'':' · ⚠ Профиль отсутствует')+'</option>').join('')+'</select></label>';
   const p=field(f('profileId'),selectedProfile?.id||'');
   const inboundOptions=selectedProfile?inbs(selectedProfile).map(i=>[i.tag,i.tag+' · '+i.protocol]):[];
   const tag=field({...f('tag'),o:inboundOptions},o.tag||inboundOptions[0]?.[0]||'');
@@ -1899,7 +1904,7 @@ function hostEditorMarkup(o,e){
     '<small class="note" data-host-count></small></section>'+
     '<section class="host-editor-side"><div class="node-form-section-title">Клиентское подключение</div>'+
     '<p class="node-ip-hint">Итоговая конфигурация наследуется из inbound; приватные серверные ключи не экспортируются.</p>'+
-    '<div class="host-resolved" data-host-resolved></div><p class="host-validation" data-host-warnings role="status"></p><button type="button" class="gh sm" data-host-repair hidden></button>'+
+    '<div class="host-resolved" data-host-resolved></div><p class="host-validation" data-host-warnings role="status"></p><button type="button" class="gh sm" data-host-repair hidden></button><button type="button" class="gh sm" data-host-link-profile hidden></button>'+
     '<details class="host-advanced"><summary>Расширенные переопределения '+ic('chevron-down')+'</summary>'+
     '<p class="node-ip-hint">Пустые поля наследуются из профиля. Используйте только при нестандартной схеме.</p>'+
     '<div class="host-advanced-fields">'+advanced+'</div>'+
@@ -2314,6 +2319,13 @@ document.addEventListener('click',async e=>{
       const profile=hostProfile(node.profileId),inbound=profile?inbs(profile).find(i=>i.protocol==='vless'):null;
       entForm('hosts',null,{remark:node.name||'Новый хост',address:node.addr||'',port:node.port||443,
         profileId:profile?.id||DB.profiles[0]?.id||0,tag:inbound?.tag||'',nodes:[node.id],fp:'',order:DB.hosts.length+1});
+    }
+  }
+  else if(b=g('[data-host-link-profile]')){
+    const form=b.closest('form[data-ent="hosts"]'),node=DB.nodes.find(n=>String(n.id)===b.dataset.hostLinkProfile),profile=hostProfile(form?.elements.namedItem('profileId')?.value);
+    if(node&&profile){
+      const ok=await window.XMeshStudioDialogs?.confirm?.({title:'Изменить XRAY-профиль ноды?',description:'Ноде «'+node.name+'» будет назначен профиль «'+profile.name+'». Это меняет серверную привязку, а не только хост. Проверьте совместимость конфигурации с нодой.',confirmLabel:'Назначить профиль',cancelLabel:'Отмена',danger:false});
+      if(ok){try{await api.update('nodes',node.id,{profileId:profile.id});hostEditorRefresh(form);toast('Профиль ноды обновлён. Проверьте применение Xray-конфигурации на сервере.')}catch(error){toast('Не удалось изменить профиль ноды: '+error.message)}}
     }
   }
   else if(b=g('[data-host-repair]')){const node=DB.nodes.find(n=>String(n.id)===b.dataset.hostRepair);if(node){toast('Откройте настройки ноды и назначьте нужный XRAY-профиль. Несохранённые поля хоста не сохраняются.');entForm('nodes',node.id);}}
