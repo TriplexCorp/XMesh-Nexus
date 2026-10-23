@@ -880,6 +880,22 @@ mod tests{
    assert!(crate::subscription_json::build_feed(vec![proxy],&json!({})).is_ok());
   }
  }
+ #[test] fn masque_client_basic_auth_matches_provisioned_user(){
+  let user=json!({"id":42,"xrayId":"550e8400-e29b-41d4-a716-446655440000"});
+  let inbound=json!({"tag":"CDN NL","protocol":"masque",
+   "settings":{"address":["10.0.0.1/24"]},
+   "streamSettings":{"method":"masque","security":"tls",
+    "tlsSettings":{"serverName":"vpn.example.org"},
+    "masqueSettings":{"path":"/.well-known/masque/ip/{target}/{ipproto}/",
+      "user":"SERVER_SECRET_SHOULD_NOT_BE_COPIED",
+      "pass":"SERVER_SECRET_SHOULD_NOT_BE_COPIED"}}});
+  let host=json!({"address":"vpn.example.org","externalPort":443});
+  let proxy=proxy_outbound(&user,&inbound,&host,"auto").unwrap();
+  assert_eq!(proxy["streamSettings"]["masqueSettings"]["user"],"xmesh-u42--CDN%20NL");
+  assert_eq!(proxy["streamSettings"]["masqueSettings"]["pass"],user["xrayId"]);
+  assert!(!proxy.to_string().contains("SERVER_SECRET_SHOULD_NOT_BE_COPIED"));
+  assert!(crate::subscription_json::build_feed(vec![proxy],&json!({})).is_ok());
+ }
  #[test] fn ss2022_user_key_and_server_key_are_both_required(){
   use base64::Engine as _;
   let encode=|byte:u8|base64::engine::general_purpose::STANDARD.encode([byte;32]);
