@@ -100,6 +100,41 @@ fi
 payload="$(printf '{"node_id":%s,"cpu_percent":%s,"cpu_steal_percent":%s,"ram_used_bytes":%s,"ram_total_bytes":%s,"disk_used_bytes":%s,"disk_total_bytes":%s,"rx_bytes_per_sec":%s,"tx_bytes_per_sec":%s,"active_connections":%s,"metrics":{"interface":"%s","rateIntervalSeconds":%s,"rxTotalBytes":%s,"txTotalBytes":%s}}' \
   "$XMESH_NODE_ID" "$cpu_pct" "$steal_pct" "$mem_used_bytes" "$mem_total_bytes" "${disk_used_bytes:-0}" "${disk_total_bytes:-0}" "$rx_rate" "$tx_rate" "$active_connections" "$XMESH_INTERFACE" "$elapsed" "$rx_now" "$tx_now")"
 
+# Prefer durable counters published by the root-owned policy guard.
+# The unprivileged metrics collector never receives Docker socket access.
+SNAPSHOT=/run/xmesh-node-user-metrics.json
+SNAPSHOT_LOADED=false
+if [[ -r "$SNAPSHOT" ]];then
+  if snapshot_fragment="$(python3 - "$SNAPSHOT" "$XMESH_NODE_ID" <<'PY'
+import json,sys,time
+try:
+ with open(sys.argv[1],encoding="utf-8") as stream:data=json.load(stream)
+ now=int(time.time()*1000)
+ assert type(data.get("nodeId")) is int and data["nodeId"]==int(sys.argv[2])
+ stamp=data.get("sampledAtMs")
+ assert type(stamp) is int and 0<=now-stamp<=30000
+ users=data.get("userTraffic")
+ inbounds=data.get("userInboundTraffic")
+ assert isinstance(users,list) and len(users)<=4096
+ assert isinstance(inbounds,list) and len(inbounds)<=4096
+ for item in users:
+  assert type(item.get("userId")) is int and item["userId"]>0
+  assert all(type(item.get(k)) is int and 0<=item[k]<2**63 for k in ("uplinkBytes","downlinkBytes"))
+ for item in inbounds:
+  assert type(item.get("userId")) is int and item["userId"]>0
+  assert isinstance(item.get("inboundTag"),str) and 0<len(item["inboundTag"])<=128
+  assert all(type(item.get(k)) is int and 0<=item[k]<2**63 for k in ("uplinkBytes","downlinkBytes"))
+ print(',"userTraffic":'+json.dumps(users,separators=(",",":"))+
+       ',"userInboundTraffic":'+json.dumps(inbounds,separators=(",",":")))
+except (AssertionError,ValueError,TypeError,KeyError,OSError):
+ sys.exit(1)
+PY
+)";then
+    payload="${payload%\}}$snapshot_fragment}"
+    SNAPSHOT_LOADED=true
+  fi
+fi
+if [[ "$SNAPSHOT_LOADED" != true ]];then
 # Optional Xray StatsService counters. Missing Xray CLI or inaccessible API
 # must never be reported as successful per-user traffic collection.
 XRAY_API_ADDRESS="${XMESH_XRAY_API_ADDRESS:-127.0.0.1:10085}"
@@ -132,6 +167,7 @@ if [[ "$XRAY_API_ADDRESS" =~ ^127\.0\.0\.1:[0-9]{1,5}$ ]] &&
 else
   echo "XMesh: Xray StatsService collection is not configured." >&2
 fi
+fi # End fallback for missing root-owned metrics snapshot.
 
 [[ -r "$XMESH_METRICS_PRIVATE_KEY" ]] || { echo "Missing readable Ed25519 private key." >&2; exit 1; }
 command -v openssl >/dev/null || { echo "OpenSSL is required for signed metrics" >&2; exit 1; }
