@@ -321,18 +321,20 @@ async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str)->Result
 }
 pub async fn admin_client_json(
  State(state):State<AppState>,Extension(actor):Extension<AuthUser>,Path(id):Path<i64>,
- Query(options):Query<HashMap<String,String>>,
+ headers:HeaderMap,Query(options):Query<HashMap<String,String>>,
 )->Result<Json<Value>,ApiError>{
  crate::require_mutation(&actor)?;
  let user=record(&state,id).await?;
- let device=options.get("device").map(String::as_str).unwrap_or("auto");
+ let device=crate::subscription_user_agent::negotiate(&headers,&options)
+  .map_err(bad)?.device.as_str();
  let (_,proxies)=collect_user_outbounds(&state,&user,device).await?;
  let setting=crate::read_settings(&state.pool).await?;
  let profile=crate::subscription_json::build(proxies,&setting)
   .map_err(|detail|ApiError::new(StatusCode::BAD_REQUEST,detail))?;
  Ok(Json(profile))
 }
-pub async fn serve(State(state):State<AppState>,Path(token):Path<String>,Query(options):Query<HashMap<String,String>>)->Result<Response,ApiError>{
+pub async fn serve(State(state):State<AppState>,Path(token):Path<String>,
+ headers:HeaderMap,Query(options):Query<HashMap<String,String>>)->Result<Response,ApiError>{
  if !valid_token(&token){return Err(ApiError::new(StatusCode::NOT_FOUND,"Subscription not found"))}
  let row=sqlx::query("SELECT user_id FROM user_subscription_tokens WHERE token_hash=$1")
   .bind(token_hash(&token)).fetch_optional(&state.pool).await?.ok_or_else(||ApiError::new(StatusCode::NOT_FOUND,"Subscription not found"))?;
@@ -340,11 +342,12 @@ pub async fn serve(State(state):State<AppState>,Path(token):Path<String>,Query(o
  let user=record(&state,id).await?;
  let now=std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as i64;
  if crate::user_status(&user,now)!="ACTIVE"{return Err(ApiError::new(StatusCode::FORBIDDEN,"Subscription inactive"))}
- let device=options.get("device").map(String::as_str).unwrap_or("auto");
- let (links,outbounds)=collect_user_outbounds(&state,&user,device).await?;
- // Native Xray JSON is the default for new HTTPS subscriptions.
- // Existing link-list users may explicitly request ?format=vless.
- let legacy=options.get("format").is_some_and(|v|v=="vless");
+ // Resolve content and XHTTP transport profile from the VPN client's
+ // actual User-Agent. Explicit query parameters remain optional overrides.
+ let client=crate::subscription_user_agent::negotiate(&headers,&options)
+  .map_err(bad)?;
+ let (links,outbounds)=collect_user_outbounds(&state,&user,client.device.as_str()).await?;
+ let legacy=client.format==crate::subscription_user_agent::Format::Vless;
 
  let mut response=if legacy{
   links.join("\n").into_response()
@@ -363,6 +366,7 @@ pub async fn serve(State(state):State<AppState>,Path(token):Path<String>,Query(o
  }else{"application/json; charset=utf-8".parse().unwrap()});
  response.headers_mut().insert(header::CACHE_CONTROL,"no-store, private".parse().unwrap());
  response.headers_mut().insert(header::REFERRER_POLICY,"no-referrer".parse().unwrap());
+ response.headers_mut().insert(header::VARY,"User-Agent, Accept".parse().unwrap());
  Ok(response)
 }
 
@@ -456,9 +460,13 @@ pub async fn portal(
 )->Result<Response,ApiError>{
  if !valid_token(&token){return Err(ApiError::new(StatusCode::NOT_FOUND,"Subscription not found"))}
  let accept=headers.get(header::ACCEPT).and_then(|v|v.to_str().ok()).unwrap_or("");
- if !accept.contains("text/html") || options.get("raw").is_some_and(|v|v=="1")
-  || options.contains_key("format") {
-  return serve(State(state),Path(token),Query(options)).await;
+ let client=crate::subscription_user_agent::negotiate(&headers,&options).map_err(bad)?;
+ // A VPN client's fingerprint wins even if its HTTP stack advertises HTML.
+ // For a regular browser, the same bare HTTPS link displays the portal.
+ if client.known_app || !accept.to_ascii_lowercase().contains("text/html")
+  || options.get("raw").is_some_and(|v|v=="1")
+  || options.contains_key("format") || options.contains_key("device") {
+  return serve(State(state),Path(token),headers,Query(options)).await;
  }
  let hash=token_hash(&token);
  let row=sqlx::query("SELECT user_id FROM user_subscription_tokens WHERE token_hash=$1")
@@ -500,7 +508,9 @@ pub async fn portal(
  if !metrics.is_empty(){
   metrics=format!("<div class=\"subscription-preview-meta\" data-subscription-metrics>{metrics}</div>");
  }
- let raw_link=format!("{}?format=json",studio_url(&settings,&token));
+ // Show/copy one canonical HTTPS subscription URL. The requesting app's
+ // User-Agent decides the JSON/link format and device profile.
+ let raw_link=studio_url(&settings,&token);
  let mut quick=String::new();
  let mut qr=String::new();
  let mut devices=String::new();
