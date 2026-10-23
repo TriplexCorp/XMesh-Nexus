@@ -46,7 +46,7 @@ function fixture({nodes=[],users=[],getStatus=async()=>({connected:true,xrayRunn
  assert.equal(first.calls.length,1,'Dialog opens synchronously');
  assert.equal(first.button.expanded,'true');
  await settle();
- assert.deepEqual(requests,['/api/v1/nodes/21/runtime']);
+ assert.deepEqual(requests,['/api/v1/collections/nodes','/api/v1/nodes/21/runtime']);
  assert.match(first.content.innerHTML,/Xray остановлен/);
  assert.match(first.content.innerHTML,/Нидерланды/);
  assert.match(first.content.innerHTML,/Cloud &lt;VPS&gt;/);
