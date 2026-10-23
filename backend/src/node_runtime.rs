@@ -362,7 +362,7 @@ fn provision_proxy_users(config:&mut Value,users:&[Value],squads:&[Value],now_ms
         .ok_or_else(||ApiError::new(StatusCode::CONFLICT,"Profile has no inbounds."))?;
     for inbound in inbounds {
         let protocol=inbound.get("protocol").and_then(Value::as_str).unwrap_or("").to_owned();
-        if !["vless","vmess","trojan","shadowsocks","hysteria"].contains(&protocol.as_str()){continue}
+        if !["vless","vmess","trojan","shadowsocks","hysteria","masque"].contains(&protocol.as_str()){continue}
         let ss_method=inbound.get("settings").and_then(|v|v.get("method"))
             .and_then(Value::as_str).unwrap_or("").to_owned();
         if protocol=="shadowsocks" && ss_method.is_empty(){continue}
@@ -395,6 +395,7 @@ fn provision_proxy_users(config:&mut Value,users:&[Value],squads:&[Value],now_ms
                 "vless"|"vmess"=>json!({"id":uuid.to_string(),"level":0,"email":email}),
                 "trojan"=>json!({"password":uuid.to_string(),"level":0,"email":email}),
                 "hysteria"=>json!({"auth":uuid.to_string(),"level":0,"email":email}),
+                "masque"=>json!({"pass":uuid.to_string(),"level":0,"email":email}),
                 "shadowsocks"=>{
                     // SS2022 passwords must be valid PSKs; never use a plain UUID
                     // as a 2022 cipher key. Require an explicit per-user key.
