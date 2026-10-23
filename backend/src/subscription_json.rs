@@ -243,7 +243,7 @@ mod tests{
  #[test] fn unicode_host_label_never_leaks_into_routing_tags(){
   let mut a=outbound("NL");a["tag"]=json!("Нидерланды 🥷");
   let mut b=outbound("NL");b["tag"]=json!("Другой CDN 🇳🇱");
-  let c=build(vec![a,b],&json!({})).unwrap();
+  let c=build(vec![a,b],&json!({"subscriptionJson":{"smart":true}})).unwrap();
   assert_eq!(c["outbounds"][0]["tag"],"xmesh-NL-0001");
   assert_eq!(c["outbounds"][1]["tag"],"xmesh-NL-0002");
   assert_eq!(c["routing"]["balancers"][0]["tag"],"NL_AUTO");
@@ -305,7 +305,7 @@ mod tests{
   assert!(c["outbounds"].as_array().unwrap().iter().any(|o|o["tag"]=="dns-out"));
  }
  #[test] fn multiserver_fallback_uses_smart_not_direct(){
-  let c=build(vec![outbound("NL"),outbound("DE")],&json!({})).unwrap();
+  let c=build(vec![outbound("NL"),outbound("DE")],&json!({"subscriptionJson":{"smart":true}})).unwrap();
   assert_eq!(c["routing"]["rules"][2]["balancerTag"],"SMART");
   assert!(c["routing"]["rules"][2].get("outboundTag").is_none());
  }
@@ -328,7 +328,7 @@ mod tests{
  #[test] fn flag_prefix_groups_country_without_explicit_code(){
   let mut a=outbound("ZZ");a["tag"]=json!("🇵🇱Польша-1");
   let mut b=outbound("ZZ");b["tag"]=json!("🇵🇱Польша-2");
-  let c=build(vec![a,b],&json!({})).unwrap();
+  let c=build(vec![a,b],&json!({"subscriptionJson":{"smart":true}})).unwrap();
   assert_eq!(c["routing"]["balancers"][0]["tag"],"PL_AUTO");
  }
  #[test] fn duplicated_public_ip_does_not_delete_nodes(){
