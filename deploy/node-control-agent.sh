@@ -96,6 +96,10 @@ update_managed_xray(){
   detail='Managed Xray container not found';return 1
  fi
  [[ -f "$config" ]] || { detail='Managed Xray config not found';return 1; }
+ local geo_mount=()
+ if compgen -G "/var/lib/xmesh-xray-sync/assets/*.dat" >/dev/null;then
+  geo_mount=(-e XRAY_LOCATION_ASSET=/usr/local/share/xray -v /var/lib/xmesh-xray-sync/assets:/usr/local/share/xray:ro)
+ fi
  local old_image new_image
  old_image="$(docker inspect -f '{{.Image}}' "$name")" || return 1
  [[ "$old_image" =~ ^sha256:[0-9a-f]{64}$ ]] || { detail='Invalid previous image identity';return 1; }
@@ -110,14 +114,14 @@ update_managed_xray(){
  fi
  if ! timeout 25 docker run --rm --network none --user 0:0 --cap-drop ALL \
   --security-opt no-new-privileges --entrypoint xray \
-  -v "$config:/etc/xray/config.json:ro" "$new_image" \
+  -v "$config:/etc/xray/config.json:ro" "${geo_mount[@]}" "$new_image" \
   run -test -config /etc/xray/config.json >/dev/null;then
   detail='New Xray image failed config validation';return 1
  fi
  docker rm -f "$name" >/dev/null || { detail='Could not stop previous Xray';return 1; }
  if docker run -d --name "$name" --restart unless-stopped --network host \
   --user 0:0 --read-only --security-opt no-new-privileges --cap-drop ALL \
-  -v "$config:/etc/xray/config.json:ro" "$new_image" \
+  -v "$config:/etc/xray/config.json:ro" "${geo_mount[@]}" "$new_image" \
   run -config /etc/xray/config.json >/dev/null;then
    sleep 3
    if docker inspect -f '{{.State.Running}}' "$name" 2>/dev/null | grep -qx true;then
@@ -131,7 +135,7 @@ update_managed_xray(){
  # Roll back to the exact locally cached prior image, never a moving tag.
  if docker run -d --name "$name" --restart unless-stopped --network host \
   --user 0:0 --read-only --security-opt no-new-privileges --cap-drop ALL \
-  -v "$config:/etc/xray/config.json:ro" "$old_image" \
+  -v "$config:/etc/xray/config.json:ro" "${geo_mount[@]}" "$old_image" \
   run -config /etc/xray/config.json >/dev/null;then
    detail='New image failed health check; previous image restored'
  else
