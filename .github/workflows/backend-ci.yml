@@ -112,6 +112,8 @@ jobs:
         run: node scripts/check-user-fingerprint-ownership.js
       - name: Verify opt-in balancers and separate settings workspace
         run: node scripts/check-balancers-workspace.js
+      - name: Verify cumulative node network traffic accounting
+        run: node scripts/check-node-network-traffic.js
       - name: Check live node Xray version and status feedback
         run: node scripts/check-node-live-status.js
       - name: Check responsive Nodes grid and density buttons
