@@ -95,7 +95,7 @@ pub async fn request_restart(
     let active=sqlx::query_scalar::<_,bool>(
         "SELECT EXISTS(SELECT 1 FROM node_runtime_heartbeats
          WHERE node_id=$1 AND received_at > NOW()-INTERVAL '90 seconds'
-           AND (version LIKE 'control-v1%' OR version LIKE 'control-v2%' OR version LIKE 'control-v3%'))"
+           AND (version LIKE 'control-v1%' OR version LIKE 'control-v2%' OR version LIKE 'control-v3%' OR version LIKE 'control-v4%'))"
     ).bind(node_id).fetch_one(&state.pool).await?;
     if !active {
         return Err(ApiError::new(StatusCode::CONFLICT,
@@ -163,7 +163,7 @@ pub async fn request_xray_update(
     let active=sqlx::query_scalar::<_,bool>(
         "SELECT EXISTS(SELECT 1 FROM node_runtime_heartbeats
          WHERE node_id=$1 AND received_at>NOW()-INTERVAL '90 seconds'
-           AND version LIKE 'control-v3%')"
+           AND (version LIKE 'control-v3%' OR version LIKE 'control-v4%'))"
     ).bind(node_id).fetch_one(&state.pool).await?;
     if !active {
         return Err(ApiError::new(StatusCode::CONFLICT,
@@ -185,6 +185,55 @@ pub async fn request_xray_update(
         Some("nodes"),Some(node_id),json!({"commandId":id,"targetVersion":target})).await;
     Ok((StatusCode::ACCEPTED,Json(json!({"id":id,"nodeId":node_id,
         "action":"update_xray","targetVersion":target,"state":"pending"}))))
+}
+
+// Remote agent upgrades are a fixed local action, never a command string or URL.
+// Only v4+ nodes understand this action. Older nodes need one bootstrap upgrade.
+pub const CONTROL_AGENT_VERSION: &str = "control-v4.0.0";
+
+pub async fn request_agent_update(
+    State(state): State<AppState>,
+    axum::extract::Extension(actor): axum::extract::Extension<crate::auth::AuthUser>,
+    Path(node_id): Path<i64>,
+) -> Result<(StatusCode,Json<Value>),ApiError> {
+    crate::require_mutation(&actor)?;
+    if node_id<=0 {return Err(ApiError::new(StatusCode::BAD_REQUEST,"Invalid node ID"))}
+    let node=sqlx::query_scalar::<_,Value>(
+        "SELECT data FROM panel_records WHERE collection='nodes' AND id=$1"
+    ).bind(node_id).fetch_optional(&state.pool).await?
+      .ok_or_else(||ApiError::new(StatusCode::NOT_FOUND,"Node not found"))?;
+    if node.get("disabled").and_then(Value::as_bool)==Some(true){
+        return Err(ApiError::new(StatusCode::CONFLICT,
+           "Отключённая нода не принимает команды. Сначала восстановите работу узла."));
+    }
+    let active:bool=sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM node_runtime_heartbeats
+          WHERE node_id=$1 AND received_at>NOW()-INTERVAL '65 seconds'
+            AND (version LIKE 'control-v4.%' OR version LIKE 'control-v5.%'))"
+    ).bind(node_id).fetch_one(&state.pool).await?;
+    if !active{
+        return Err(ApiError::new(StatusCode::CONFLICT,
+          "На ноде нет активного агента с поддержкой самообновления (control-v4+). Старый агент нужно один раз обновить штатным скриптом по SSH."));
+    }
+    sqlx::query(
+        "UPDATE node_restart_commands SET state='failed',
+         result='Command expired before delivery',finished_at=NOW()
+         WHERE node_id=$1 AND state IN ('pending','claimed')
+           AND requested_at<NOW()-INTERVAL '180 seconds'"
+    ).bind(node_id).execute(&state.pool).await?;
+    let id=sqlx::query_scalar::<_,i64>(
+        "INSERT INTO node_restart_commands(node_id,action,requested_by,target_version)
+         VALUES($1,'update_agent',$2,$3) ON CONFLICT DO NOTHING RETURNING id"
+    ).bind(node_id).bind(&actor.username).bind(CONTROL_AGENT_VERSION)
+      .fetch_optional(&state.pool).await?
+      .ok_or_else(||ApiError::new(StatusCode::CONFLICT,
+         "Узел уже выполняет другую команду управления."))?;
+    crate::audit(&state.pool,&actor.username,"node.agent.update.requested",
+       Some("nodes"),Some(node_id),json!({"commandId":id,"targetVersion":CONTROL_AGENT_VERSION})).await;
+    Ok((StatusCode::ACCEPTED,Json(json!({
+       "id":id,"nodeId":node_id,"action":"update_agent",
+       "targetVersion":CONTROL_AGENT_VERSION,"state":"pending"
+    }))))
 }
 
 pub async fn restart_status(
