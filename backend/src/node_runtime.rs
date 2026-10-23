@@ -367,6 +367,50 @@ fn provision_vless_users(config:&mut Value,users:&[Value],squads:&[Value],now_ms
     Ok(())
 }
 
+// Offline policy is deliberately conservative: every active node receives at
+// most its fraction of the currently unspent global user allowance (capped to
+// 64 MiB per node) for a disconnected period. This is NOT a replacement for a
+// centrally reserved multi-node quota ledger.
+fn build_offline_policy(config:&Value, users:&[Value], node_id:i64, now_ms:i64,
+    digest:&str, active_nodes:i64)->Value {
+    let allowed:std::collections::HashSet<String>=config.get("inbounds")
+        .and_then(Value::as_array).into_iter().flatten()
+        .flat_map(|inbound|inbound.pointer("/settings/clients")
+            .and_then(Value::as_array).into_iter().flatten())
+        .filter_map(|client|client.get("id").and_then(Value::as_str))
+        .filter_map(|uuid|uuid::Uuid::parse_str(uuid).ok().map(|id|id.to_string()))
+        .collect();
+    let mut user_policies=Vec::new();
+    for user in users {
+        let Some(uuid)=user.get("xrayId").and_then(Value::as_str)
+            .and_then(|id|uuid::Uuid::parse_str(id).ok()) else{continue};
+        if !allowed.contains(&uuid.to_string()) {continue}
+        let Some(user_id)=user.get("id").and_then(Value::as_i64).filter(|id|*id>0)else{continue};
+        let expires=crate::number(user,"expireAt").unwrap_or(0).max(0);
+        let limit_gb=user.get("limit").and_then(Value::as_f64).unwrap_or(0.0);
+        let used_gb=user.get("used").and_then(Value::as_f64).unwrap_or(0.0).max(0.0);
+        // Use floor for both limits and remaining capacity: never round quota up.
+        let used_bytes=(used_gb * 1_073_741_824.0).floor().clamp(0.0,i64::MAX as f64) as i64;
+        let remaining=if limit_gb.is_finite() && limit_gb>0.0 {
+            let remaining_gb=(limit_gb-used_gb).max(0.0);
+            Some((remaining_gb*1_073_741_824.0).floor().clamp(0.0,i64::MAX as f64) as i64)
+        } else {None};
+        let offline_budget=remaining.map(|bytes|
+            (bytes/active_nodes.max(1)).min(64*1024*1024));
+        user_policies.push(json!({
+            "userId":user_id,"xrayId":uuid.to_string(),
+            "expireAtMs":expires,"panelUsedBytes":used_bytes,
+            "offlineBudgetBytes":offline_budget
+        }));
+    }
+    user_policies.sort_by_key(|item|item.get("userId").and_then(Value::as_i64).unwrap_or(0));
+    json!({
+        "version":1,"nodeId":node_id,"issuedAtMs":now_ms,
+        "validUntilMs":now_ms.saturating_add(7*24*60*60*1000),
+        "configSha256":digest,"users":user_policies
+    })
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct DesiredConfigRequest { node_id: i64 }
@@ -422,12 +466,39 @@ pub async fn desired_config(
         .unwrap_or_default().as_millis() as i64;
     provision_vless_users(&mut config,&users,&squads,now)?;
     let digest=hex::encode(sha2::Sha256::digest(serde_json::to_vec(&config).unwrap_or_default()));
-    Ok(Json(json!({"nodeId":request.node_id,"profileId":profile_id,"listen":"127.0.0.1","port":port,"revision":digest,"config":config})))
+    // Conserve offline allowances across all currently enabled nodes. Large
+    // deployments should replace this bound with server-side reserved leases.
+    let nodes=crate::load_records(&state.pool,"nodes").await?;
+    let active_nodes=nodes.iter().filter(|node|
+        node.get("disabled").and_then(Value::as_bool)!=Some(true)).count().max(1) as i64;
+    let policy=build_offline_policy(&config,&users,request.node_id,now,&digest,active_nodes);
+    let signature=state.node_policy_signer.sign(&policy)
+        .map_err(|_|ApiError::new(StatusCode::INTERNAL_SERVER_ERROR,"Node policy signing failed."))?;
+    Ok(Json(json!({
+        "nodeId":request.node_id,"profileId":profile_id,
+        "listen":"127.0.0.1","port":port,"revision":digest,"config":config,
+        "policy":policy,"policySignature":signature,
+        "policyPublicKey":state.node_policy_signer.public_key()
+    })))
 }
 
 #[cfg(test)]
 mod provision_tests {
     use super::*;
+    #[test]
+    fn offline_budget_is_conservative_and_scoped_to_authorized_users(){
+        let cfg=json!({"inbounds":[{"settings":{"clients":[{"id":"550e8400-e29b-41d4-a716-446655440000"}]}}]});
+        let u=vec![
+            json!({"id":1,"xrayId":"550e8400-e29b-41d4-a716-446655440000","limit":1.0,"used":0.5,"expireAt":1800000010000_i64}),
+            json!({"id":2,"xrayId":"550e8400-e29b-41d4-a716-446655440001","limit":1.0,"used":0.0})
+        ];
+        let policy=build_offline_policy(&cfg,&u,12,1800000000000_i64,&"a".repeat(64),2);
+        assert_eq!(policy["users"].as_array().unwrap().len(),1);
+        assert_eq!(policy["users"][0]["offlineBudgetBytes"],64*1024*1024);
+        assert_eq!(policy["users"][0]["expireAtMs"],1800000010000_i64);
+        assert_eq!(policy["users"][0]["panelUsedBytes"],536870912);
+        assert_eq!(policy["nodeId"],12);
+    }
     #[test]
     fn runtime_inbound_contains_only_active_assigned_uuids(){
         let mut config=json!({"inbounds":[{"protocol":"vless","tag":"NL",
