@@ -1659,7 +1659,7 @@ fn user_status(user: &Value, now_ms: i64) -> &'static str {
     }
     let limit = user.get("limit").and_then(Value::as_f64).unwrap_or(0.0);
     let used = user.get("used").and_then(Value::as_f64).unwrap_or(0.0);
-    if limit > 0 && used >= limit {
+    if limit > 0.0 && used >= limit {
         return "LIMITED";
     }
     let expire_at = number(user, "expireAt").unwrap_or(0);
