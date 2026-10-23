@@ -150,10 +150,22 @@ pub async fn request_xray_update(
     State(state): State<AppState>,
     axum::extract::Extension(actor): axum::extract::Extension<crate::auth::AuthUser>,
     Path(node_id): Path<i64>,
+    Json(body): Json<XrayVersionRequest>,
 ) -> Result<(StatusCode,Json<Value>),ApiError> {
     crate::require_mutation(&actor)?;
     if node_id<=0 {
         return Err(ApiError::new(StatusCode::BAD_REQUEST,"Invalid node ID"));
+    }
+    let target=body.version.trim();
+    if target.len()>64 || target.is_empty() ||
+       !target.bytes().all(|c|c.is_ascii_alphanumeric()||b"._+-".contains(&c)){
+       return Err(ApiError::new(StatusCode::BAD_REQUEST,"Некорректная версия Xray"));
+    }
+    let releases=state.core.all_node_releases().await.map_err(|msg|
+        ApiError::new(StatusCode::BAD_GATEWAY,msg))?;
+    if !releases.iter().any(|r|r.version==target){
+       return Err(ApiError::new(StatusCode::BAD_REQUEST,
+           "Выбранная версия отсутствует среди официальных релизов Xray"));
     }
     let node=sqlx::query_scalar::<_,Value>(
         "SELECT data FROM panel_records WHERE collection='nodes' AND id=$1"
@@ -181,7 +193,7 @@ pub async fn request_xray_update(
     let id=sqlx::query_scalar::<_,i64>(
         "INSERT INTO node_restart_commands(node_id,action,requested_by,target_version)
          VALUES($1,'update_xray',$2,$3) ON CONFLICT DO NOTHING RETURNING id"
-    ).bind(node_id).bind(&actor.username).fetch_optional(&state.pool).await?
+    ).bind(node_id).bind(&actor.username).bind(target).fetch_optional(&state.pool).await?
       .ok_or_else(||ApiError::new(StatusCode::CONFLICT,"Узел уже выполняет команду управления."))?;
     crate::audit(&state.pool,&actor.username,"node.xray.update.requested",
         Some("nodes"),Some(node_id),json!({"commandId":id,"targetVersion":target})).await;
