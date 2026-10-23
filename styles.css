@@ -4130,3 +4130,21 @@ dialog#dlg.host-wide>form.box>.act{
  dialog#dlg.host-wide .host-public-panel{grid-area:public}
  dialog#dlg.host-wide .host-editor-layout>.host-editor-side{grid-area:preview}
 }
+
+@media(max-width:1179px){
+ dialog#dlg.host-wide .host-editor-layout>.host-editor-main{
+   display:flex;flex-direction:column;align-items:stretch;gap:12px;min-width:0;
+ }
+ dialog#dlg.host-wide .host-editor-main .host-connect-fields,
+ dialog#dlg.host-wide .host-editor-main .host-public-fields,
+ dialog#dlg.host-wide .host-editor-main .host-assignment-fields{
+   width:100%;min-width:0;
+ }
+}
+@media(max-width:620px){
+ dialog#dlg.host-wide .host-connect-fields,
+ dialog#dlg.host-wide .host-public-fields,
+ dialog#dlg.host-wide .host-assignment-fields{
+   display:grid;grid-template-columns:minmax(0,1fr);gap:12px
+ }
+}
