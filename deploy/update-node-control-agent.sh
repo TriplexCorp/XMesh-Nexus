@@ -27,11 +27,21 @@ curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 \
  https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/main/deploy/xmesh-xray-sync.sh -o "$sync_tmp"
 bash -n "$sync_tmp"
 grep -q 'pinned-image' "$sync_tmp" || { echo "Downloaded sync worker lacks image pin support" >&2;exit 1; }
+grep -q 'xmesh-policy-guard.py' "$sync_tmp" || { echo "Sync worker cannot enforce offline policy" >&2;exit 1; }
+policy_tmp="$(mktemp)"
+trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp"' EXIT
+curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 \
+ https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/main/deploy/xmesh-policy-guard.py -o "$policy_tmp"
+python3 -m py_compile "$policy_tmp"
+grep -q 'check_signature' "$policy_tmp" || { echo "Policy verifier lacks Ed25519 verification" >&2;exit 1; }
 if [[ -f /usr/local/sbin/xmesh-node-control ]];then
  cp -p /usr/local/sbin/xmesh-node-control /usr/local/sbin/xmesh-node-control.bak
 fi
 cp -p /usr/local/sbin/xmesh-xray-sync /usr/local/sbin/xmesh-xray-sync.bak
+install -d -o root -g root -m 0755 /usr/local/libexec
+install -o root -g root -m 0700 "$policy_tmp" /usr/local/libexec/xmesh-policy-guard.py
 install -o root -g root -m 0700 "$sync_tmp" /usr/local/sbin/xmesh-xray-sync
+install -d -o root -g root -m 0700 /var/lib/xmesh-xray-sync
 install -o root -g root -m 0700 "$tmp" /usr/local/sbin/xmesh-node-control
 install -d -o root -g root -m 0700 /var/lib/xmesh-node-control
 # Existing hardened systemd service must be allowed to persist the shutdown
@@ -58,4 +68,5 @@ systemctl daemon-reload
 systemctl enable xmesh-node-control.timer
 systemctl restart xmesh-node-control.timer
 systemctl start xmesh-node-control.service
-echo "Signed XMesh control-v3 and pinned-image synchronizer installed; control polls every 5 seconds."
+echo "Signed node control, offline policy verifier and pinned Xray synchronizer installed."
+echo "Check reconciliation: systemctl start xmesh-xray-sync.service && journalctl -u xmesh-xray-sync.service -n 30 --no-pager"
