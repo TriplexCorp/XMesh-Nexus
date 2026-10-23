@@ -1319,7 +1319,21 @@ function userTrafficDonutsMarkup(payload){
   const servers=Array.isArray(payload?.servers)?payload.servers.filter(r=>
     r&&Number.isFinite(+r.nodeId)&&Number.isFinite(+r.uplinkBytes)&&Number.isFinite(+r.downlinkBytes)
     &&+r.uplinkBytes>=0&&+r.downlinkBytes>=0):[];
-  if(!servers.length)return '<div class="user-chart-empty"><div class="user-chart-empty-ring" aria-hidden="true"><span>—</span></div><div class="user-chart-empty-copy"><b>Нет данных по серверам</b><p>График появится после получения персональных счётчиков Xray от нод.</p><small>Трафик VPS не подменяет статистику пользователя.</small></div></div>';
+  if(!servers.length){
+    const collectors=Array.isArray(payload?.collectors)?payload.collectors:[];
+    const now=Date.now();
+    const current=collectors.filter(r=>Number.isFinite(+r.sampledAtMs)&&now-(+r.sampledAtMs)<90000);
+    const ready=current.filter(r=>r.status==='verified'||r.status==='direct');
+    const failed=current.filter(r=>r.status==='unavailable');
+    const names=failed.slice(0,3).map(r=>esc(r.name||'Узел #'+r.nodeId)).join(', ');
+    const title=ready.length?'Счётчики работают, но трафика пользователя пока нет':
+      failed.length?'Сбор трафика Xray на нодах недоступен':
+      'Нет подтверждённых пользовательских счётчиков';
+    const help=ready.length?'Проверьте, что пользователь подключается именно с этим Xray ID и входит в назначенный сквад. Первое измерение создаёт базовую отметку; далее новые байты учитываются автоматически.':
+      failed.length?'Агент отправляет сетевые метрики VPS, но не получает статистику Xray. Проверьте xmesh-node-user-meter.timer, docker exec xmesh-managed-xray xray api statsquery и журналы служб на нодах'+(names?' ('+names+')':'')+'.':
+      'Ноды не прислали свежую подтверждённую статистику Xray. Проверьте таймер xmesh-node-user-meter и службу xmesh-node-metrics на подключённых нодах.';
+    return '<div class="user-chart-empty"><div class="user-chart-empty-ring" aria-hidden="true"><span>—</span></div><div class="user-chart-empty-copy"><b>'+title+'</b><p>'+help+'</p><small>Статус подтверждён подписанными метриками. Общий трафик VPS не считается трафиком пользователя.</small></div></div>';
+  }
   const up=servers.reduce((sum,r)=>sum+Number(r.uplinkBytes),0);
   const down=servers.reduce((sum,r)=>sum+Number(r.downlinkBytes),0);
   const total=up+down;
