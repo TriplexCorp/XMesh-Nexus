@@ -129,7 +129,7 @@
   }
   const outbound={tag:'proxy',protocol,settings};
   if(protocol!=='shadowsocks'||inbound.streamSettings)outbound.streamSettings=stream(inbound,host);
-  return base(outbound);
+  return {...base(outbound),remarks:nonempty(host.remark)||endpoint};
  }
  async function generate(user,db){
   const allowed=new Set((Array.isArray(db?.squads)?db.squads:[])
