@@ -22,7 +22,10 @@ assert.match(subscriptions,/let mut response=Json\(json\)\.into_response\(\)/,
 assert.doesNotMatch(subscriptions,/vless_link\(|links\.join\(|use_vless_feed\(/,
  'Legacy URI generation and fallback must remain removed');
 const negotiation=fs.readFileSync('backend/src/subscription_user_agent.rs','utf8');
-assert.match(negotiation,/let format=Format::Json/);
-assert.doesNotMatch(negotiation,/Format::Vless|enum Format \{Json, Vless\}/);
-assert.match(negotiation,/"json"=>Format::Json/);
+assert.doesNotMatch(negotiation,/\bFormat\b|contains_key\("format"\)|options\.get\("format"\)/,
+ 'Do not negotiate a format: JSON is the only response type');
+assert.doesNotMatch(subscriptions,/Format::|options\.get\("format"\)|options\.contains_key\("format"\)/,
+ 'Feed generation must not support a format selector');
+assert.match(negotiation,/options\.get\("device"\)/,
+ 'Keep device-specific XHTTP configuration');
 console.log('Dedicated opt-in balancer workspace: OK');
