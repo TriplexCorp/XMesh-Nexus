@@ -221,6 +221,8 @@ def main():
         def report_signed(inbound_a, inbound_b):
             sample={
                 "node_id":node,
+                "userStatsStatus":"verified",
+                "userStatsAtMs":int(time.time()*1000),
                 "userInboundTraffic":[
                     {"userId":user_id,"inboundTag":"DE_VLESS",
                      "uplinkBytes":inbound_a[0],"downlinkBytes":inbound_a[1]},
@@ -245,8 +247,10 @@ def main():
 
         assert_status(report_signed((50,90),(25,35))[0],201,"first per-inbound baseline")
         assert_status(report_signed((100,120),(35,65))[0],201,"second per-inbound delta")
+        assert_status(report_signed((100,120),(35,65))[0],201,"idempotent cumulative replay on new signed request")
         code,traffic,_=request("GET",f"/users/{user_id}/traffic",cookie=cookie)
         assert_status(code,200,"read real per-user inbound breakdown")
+        assert any(c["nodeId"]==node and c["status"]=="verified" for c in traffic["collectors"])
         by_tag={x["inboundTag"]:x for x in traffic["inbounds"]}
         assert by_tag["DE_VLESS"]["uplinkBytes"]==50
         assert by_tag["DE_VLESS"]["downlinkBytes"]==30
