@@ -251,7 +251,7 @@ pub(crate) fn validate_client_balancers(value:&Value)->Result<(),String>{
   for key in selected{
    let key=key.as_str().ok_or("Неверный ID сервера")?;
    if key.len()>160 || !(key.starts_with("host:")||key.starts_with("node:"))
-    || !key.bytes().all(|c|c.is_ascii_alphanumeric()||b"_:-".contains(&c))
+    || key.chars().any(char::is_control)
     || !sources.insert(key){return Err("Некорректный или повторяющийся сервер".into())}
   }
   if let Some(o)=row.get("observatory"){
