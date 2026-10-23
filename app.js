@@ -2815,6 +2815,48 @@ document.addEventListener('click',async e=>{
     }catch(error){if(result)result.textContent=error.message||'Не удалось получить адрес.'}
     finally{b.disabled=false}
   }
+  else if(b=g('[data-agent-update]')){
+    const id=Number(b.dataset.agentUpdate),node=DB.nodes.find(n=>Number(n.id)===id);
+    if(!node){toast('Узел не найден.');return}
+    if(b.dataset.loading==='1')return;
+    b.dataset.loading='1';b.disabled=true;
+    const original=b.innerHTML;
+    try{
+      const runtime=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/runtime');
+      if(!runtime.connected)throw new Error('Нет свежей связи с управляющим агентом. Проверьте подключение ноды.');
+      if(!/^control-v(?:4|5)\./.test(String(runtime.version||''))){
+        throw new Error('Agent '+(runtime.version||'неизвестной версии')+' не поддерживает дистанционное самообновление. Требуется один раз установить Agent v4 штатным скриптом на ноде; затем SSH больше не нужен.');
+      }
+      const confirmed=await panelConfirm(
+        'Обновить управляющий Agent на «'+node.name+'»? Нода самостоятельно загрузит фиксированные компоненты XMesh из официальных репозиториев и проверит установку. Ed25519-ключ и настройки останутся на месте.',
+        {title:'Обновить Agent · '+node.name,confirmLabel:'Обновить Agent'}
+      );
+      if(!confirmed)return;
+      b.textContent='Обновление Agent…';
+      const request=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/agent-update',{
+        method:'POST',body:JSON.stringify({})
+      });
+      toast('Команда обновления Agent отправлена ноде.');
+      const deadline=Date.now()+180000;
+      let status=null;
+      while(Date.now()<deadline){
+        await new Promise(resolve=>setTimeout(resolve,3000));
+        status=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/restart');
+        if(status.id!==request.id)throw new Error('Очередь команд ноды изменилась.');
+        if(status.state==='succeeded')break;
+        if(status.state==='failed')throw new Error(status.result||'Agent не смог завершить обновление.');
+      }
+      if(status?.state!=='succeeded')throw new Error('Agent не подтвердил установку в течение трёх минут.');
+      const observed=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/runtime');
+      if(!observed.connected)throw new Error('Обновление завершено, но свежий heartbeat ноды пока не получен.');
+      toast(node.name+': '+(status.result||'Agent успешно обновлён'));
+      if(cur==='nodes')updateNodeRuntimeBadges(node,observed);
+    }catch(error){toast('Обновление Agent: '+(error.message||'ошибка API'))}
+    finally{
+      delete b.dataset.loading;
+      if(b.isConnected){b.disabled=false;b.innerHTML=original}
+    }
+  }
   else if(b=g('[data-xray-update]')){
     const id=Number(b.dataset.xrayUpdate),node=DB.nodes.find(n=>Number(n.id)===id);
     if(!node){toast('Узел не найден.');return}
