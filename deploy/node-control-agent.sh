@@ -149,11 +149,17 @@ stop_xray(){
   # Prevent Docker from automatically starting the container after reboot.
   timeout 15 docker update --restart=no xmesh-managed-xray >/dev/null || return 1
   timeout 30 docker stop xmesh-managed-xray >/dev/null || return 1
+  [[ "$(docker inspect -f '{{.State.Running}}' xmesh-managed-xray)" == false ]] || {
+   echo "CRITICAL: Xray container still running after stop" >&2;return 1
+  }
   printf 'docker\n' > "$MARKER"
  else
   # systemd units must stay disabled across reboots until the panel allows
   # traffic again. Never stop arbitrary remote-specified services.
   timeout 30 systemctl disable --now "$UNIT" >/dev/null || return 1
+  if systemctl is-active --quiet "$UNIT";then
+   echo "CRITICAL: systemd Xray still active after stop" >&2;return 1
+  fi
   printf 'systemd\n' > "$MARKER"
  fi
  chmod 600 "$MARKER"
