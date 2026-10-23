@@ -2750,8 +2750,8 @@ document.addEventListener('click',async e=>{
     b.dataset.loading='1';b.disabled=true;
     try{
       const runtime=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/runtime');
-      if(!runtime.connected||!String(runtime.version||'').startsWith('control-v2')){
-        throw new Error('Нужен управляющий агент control-v2. Переустановите агент узла.');
+      if(!runtime.connected||!String(runtime.version||'').startsWith('control-v3')){
+        throw new Error('Для выбора версии требуется управляющий агент control-v3. Обновите агент ноды.');
       }
       const catalog=await backendRequest('/api/v1/nodes/xray-releases');
       const releases=Array.isArray(catalog.items)?catalog.items:[];
