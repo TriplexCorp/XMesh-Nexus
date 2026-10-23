@@ -1334,11 +1334,18 @@ function handleUserRenewalAction(button){
 /* Per-user accounting is only rendered from authenticated node counter telemetry.
    Never derive a user's consumption from node-wide RX/TX interface speeds. */
 const userTrafficBytes=v=>sysBytes(Number.isFinite(+v)&&+v>=0?+v:0);
-const USER_SERVER_COLORS=['#6EA8FF','#A78BFA','#FF73B3','#2FD084','#F6C35B','#42D6D0','#FF9552','#E55BFF','#EF5A70','#7ED957','#4F8CFF','#E9A6FF'];
+// Stable, varied server accents; neighboring nodes are not restricted to a short palette.
 function userServerColor(id){
-  const key=String(id??'unknown');let hash=2166136261;
-  for(let i=0;i<key.length;i++)hash=Math.imul(hash^key.charCodeAt(i),16777619);
-  return USER_SERVER_COLORS[(hash>>>0)%USER_SERVER_COLORS.length];
+  const key=String(id??'unknown');let h=2166136261;
+  for(const c of key)h=Math.imul(h^c.codePointAt(0),16777619)>>>0;
+  const hue=h%360,sat=68+((h>>>12)%20),light=53+((h>>>20)%11);
+  return 'hsl('+hue+' '+sat+'% '+light+'%)';
+}
+function userServerGradient(id){
+  const key=String(id??'unknown');let h=2166136261;
+  for(const c of key)h=Math.imul(h^c.codePointAt(0),16777619)>>>0;
+  const hue=h%360,other=(hue+30+((h>>>8)%75))%360;
+  return 'linear-gradient('+(120+h%100)+'deg,hsl('+hue+' 86% 70%),hsl('+other+' 79% 48%))';
 }
 function userServerSegments(servers){
   const sum=servers.reduce((n,r)=>n+Math.max(0,+r.uplinkBytes + +r.downlinkBytes),0);
