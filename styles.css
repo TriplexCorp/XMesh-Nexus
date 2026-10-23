@@ -2858,3 +2858,14 @@ dialog.node-wide .country-picker :is(input,.country-selected){box-sizing:border-
   dialog.node-wide .node-form-layout{grid-template-columns:minmax(0,1fr)}
 }
 @media(max-width:480px){dialog.node-wide .node-main-section .node-form-grid,dialog.node-wide .node-billing-fields{grid-template-columns:minmax(0,1fr)}}
+
+/* Node endpoint on a single row and reusable branded lease calendar. */
+dialog.node-wide .node-address-port{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,3fr) minmax(100px,1fr);gap:1rem;min-width:0}
+dialog.node-wide .node-address-port .f{min-width:0}
+dialog.node-wide .node-date-field{grid-column:1/-1;position:relative;min-width:0}
+dialog.node-wide .node-date-field .user-date-trigger{width:100%;display:flex;align-items:center;justify-content:flex-start;gap:.6rem;min-width:0}
+dialog.node-wide .node-date-field .user-date-trigger [data-node-date-label]{flex:1;text-align:left}
+dialog.node-wide .node-date-field .user-date-calendar{position:absolute;top:calc(100% + 8px);left:0;z-index:30;width:min(360px,100%);max-width:100%;box-sizing:border-box;box-shadow:0 18px 40px #0007;background:var(--s1);border:1px solid var(--ln);border-radius:var(--ui-radius)}
+dialog.node-wide .node-date-field .user-date-calendar[hidden]{display:none!important}
+dialog.node-wide .node-billing-section{overflow:visible}
+@media(max-width:490px){dialog.node-wide .node-address-port{grid-template-columns:minmax(0,1fr) 110px;gap:.5rem}}
