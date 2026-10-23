@@ -4673,3 +4673,53 @@ dialog#dlg.squad-wide > form.box > .act{padding-top:12px}
  dialog#dlg.squad-wide .squad-editor-toolbar{grid-template-columns:1fr 1fr}
  dialog#dlg.squad-wide .squad-inbound-search{grid-column:1/-1}
 }
+
+/* Squad editor v3: two functional columns and a full-width impact summary. */
+dialog#dlg.squad-wide{width:min(980px,calc(100vw - 32px))!important;inline-size:min(980px,calc(100vw - 32px))!important}
+dialog#dlg.squad-wide .squad-editor-layout{
+  display:grid;
+  grid-template-columns:minmax(0,.85fr) minmax(0,1.35fr);
+  gap:12px;
+  align-items:start;
+}
+dialog#dlg.squad-wide .squad-editor-layout > section{
+  border-radius:12px;
+  padding:16px 18px;
+  gap:12px;
+  min-height:0;
+}
+dialog#dlg.squad-wide .squad-editor-side{grid-column:1/-1}
+dialog#dlg.squad-wide [data-squad-preview]{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:12px 18px;
+  align-items:start;
+}
+dialog#dlg.squad-wide .squad-preview-stats{
+  grid-column:1/-1;
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:8px;
+}
+dialog#dlg.squad-wide .squad-preview-section{
+  min-width:0;
+  margin:0;
+  padding:10px 0 0;
+}
+dialog#dlg.squad-wide .squad-preview-warnings,
+dialog#dlg.squad-wide .squad-preview-ready{grid-column:1/-1}
+dialog#dlg.squad-wide .squad-editor-toolbar{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+}
+dialog#dlg.squad-wide .squad-inbound-search{flex:1 1 210px;min-width:180px}
+dialog#dlg.squad-wide .squad-inbound-list{max-height:220px}
+@media(max-width:700px){
+ dialog#dlg.squad-wide .squad-editor-layout{grid-template-columns:minmax(0,1fr)}
+ dialog#dlg.squad-wide .squad-editor-side{grid-column:auto}
+ dialog#dlg.squad-wide [data-squad-preview]{grid-template-columns:minmax(0,1fr)}
+ dialog#dlg.squad-wide .squad-preview-stats{grid-column:auto;grid-template-columns:repeat(2,minmax(0,1fr))}
+ dialog#dlg.squad-wide .squad-preview-warnings,
+ dialog#dlg.squad-wide .squad-preview-ready{grid-column:auto}
+}
