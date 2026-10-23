@@ -80,7 +80,7 @@ window.XMeshSubscriptionStudio = (() => {
   const pathOK = v => v.length <= 64 && v.split('/').length <= 9 && /^\/[a-z0-9_-]+(?:\/[a-z0-9_-]+)*$/i.test(v) && !/^\/(?:api|login|dashboard)(?:\/|$)/i.test(v);
   const field = (name,label,value,help,opts) => '<label class="f subscription-field"><span>'+label+'</span>'+
     (opts && opts.area ? '<textarea name="'+name+'" rows="2" maxlength="'+(opts.max||240)+'">'+esc(value)+'</textarea>' :
-     '<input name="'+name+'" type="'+(opts && opts.color?'color':'text')+'" '+(opts&&opts.max?'maxlength="'+opts.max+'"':'')+
+     '<input name="'+name+'" type="'+(opts && opts.color?'color':opts && opts.type==='number'?'number':'text')+'" '+(opts&&opts.max?'maxlength="'+opts.max+'"':'')+
       ' value="'+esc(value)+'" placeholder="'+esc((opts&&opts.placeholder)||'')+'" autocomplete="off" spellcheck="false">')+
     (help?'<small>'+help+'</small>':'')+'</label>';
   const choice = (name,selected,choices) => '<label class="f subscription-field"><span>'+
