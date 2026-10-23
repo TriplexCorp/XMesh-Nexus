@@ -13,7 +13,7 @@ for(const filename of migrations){
  assert(!versions.has(version),'Duplicate SQLx migration version '+version+': '+versions.get(version)+' and '+filename);
  versions.set(version,filename);
 }
-assert(versions.has(20) && versions.has(21),'Xray update migrations must exist');
+assert(versions.has(20) && versions.has(21) && versions.has(23),'Xray update migrations must exist');
 const migration=fs.readFileSync('backend/migrations/0020_managed_xray_updates.sql','utf8');
 assert.match(migration,/update_xray/);
 const api=fs.readFileSync('backend/src/node_runtime.rs','utf8');
@@ -22,10 +22,11 @@ const agent=fs.readFileSync('deploy/node-control-agent.sh','utf8');
 const frontend=fs.readFileSync('app.js','utf8');
 assert.match(router,/\/nodes\/\{id\}\/xray-update/);
 assert.match(api,/pub async fn request_xray_update/);
-assert.match(api,/version LIKE 'control-v2%'/);
+assert.match(api,/version LIKE 'control-v3%'/);
 assert.match(api,/node\.xray\.update\.requested/);
 assert.match(agent,/update_managed_xray\(\)/);
-assert.match(agent,/ghcr\.io\/xtls\/xray-core:latest/);
+assert.match(agent,/ghcr\.io\/xtls\/xray-core:\$image_tag/);
+assert.doesNotMatch(agent,/local image=ghcr\.io\/xtls\/xray-core:latest/);
 assert.match(agent,/xmesh-managed-xray/);
 assert.match(agent,/run -test -config \/etc\/xray\/config\.json/);
 assert.match(agent,/previous image restored/);
