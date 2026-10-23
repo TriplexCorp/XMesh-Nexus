@@ -492,6 +492,7 @@ async fn create_record(
         object.insert("xrayId".into(),Value::String(Uuid::new_v4().to_string()));
     }
     validate_record(&collection, &data)?;
+    if collection == "hosts" { validate_host_binding(&state.pool, &data).await?; }
 
     // User and initial subscription must be one atomic operation: never create
     // an account whose subscription secret could not be persisted.
@@ -548,6 +549,7 @@ async fn update_record(
         object.insert(key, value);
     }
     validate_record(&collection, &data)?;
+    if collection == "hosts" { validate_host_binding(&state.pool, &data).await?; }
 
     let row = sqlx::query(
         "UPDATE panel_records SET data = $3, updated_at = NOW() \
@@ -1490,6 +1492,61 @@ fn validate_collection(collection: &str) -> Result<(), ApiError> {
     } else {
         Err(ApiError::new(StatusCode::NOT_FOUND, "Неизвестная коллекция."))
     }
+}
+
+// A public Host is not a standalone Xray profile. Its inbound must come from
+// the selected profile, and each assigned node must actually run that profile.
+async fn validate_host_binding(pool: &PgPool, host: &Value) -> Result<(), ApiError> {
+    let bad = |message| ApiError::new(StatusCode::BAD_REQUEST, message);
+    let profile_id = host.get("profileId").and_then(Value::as_i64)
+        .filter(|id| *id > 0)
+        .ok_or_else(|| bad("Хосту необходимо назначить XRAY STUDIO профиль."))?;
+    let tag = host.get("tag").and_then(Value::as_str)
+        .filter(|tag| !tag.is_empty() && tag.len() <= 150)
+        .ok_or_else(|| bad("Выберите inbound из XRAY STUDIO."))?;
+    let address = host.get("address").and_then(Value::as_str)
+        .filter(|value| !value.is_empty() && value.len() <= 253
+            && !value.chars().any(|ch| ch.is_control() || ch.is_whitespace() || "/@?#\\".contains(ch)))
+        .ok_or_else(|| bad("Некорректный публичный адрес хоста."))?;
+    if address == "localhost" || address == "0.0.0.0" || address.starts_with("127.") {
+        return Err(bad("Для подписки нужен публичный адрес ноды."));
+    }
+    let port = host.get("port").and_then(Value::as_u64).unwrap_or(0);
+    if !(1..=65535).contains(&port) { return Err(bad("Укажите публичный порт 1–65535.")); }
+    let nodes = host.get("nodes").and_then(Value::as_array)
+        .filter(|nodes| !nodes.is_empty() && nodes.len() <= 64)
+        .ok_or_else(|| bad("Привяжите хост к одной или нескольким нодам."))?;
+    let profiles = load_records(pool, "profiles").await?;
+    let profile = profiles.iter().find(|profile| profile.get("id").and_then(Value::as_i64) == Some(profile_id))
+        .ok_or_else(|| bad("Выбранный XRAY STUDIO профиль отсутствует."))?;
+    let config = profile.get("config").and_then(Value::as_str)
+        .and_then(|raw| serde_json::from_str::<Value>(raw).ok())
+        .ok_or_else(|| bad("Сохранённая конфигурация XRAY STUDIO недействительна."))?;
+    let inbound = config.get("inbounds").and_then(Value::as_array)
+        .and_then(|items| items.iter().find(|inbound| inbound.get("tag").and_then(Value::as_str) == Some(tag)))
+        .ok_or_else(|| bad("Выбранный inbound отсутствует в XRAY STUDIO профиле."))?;
+    if inbound.get("protocol").and_then(Value::as_str) != Some("vless") {
+        return Err(bad("Генератор подписок пока поддерживает VLESS inbound."));
+    }
+    let all_nodes = load_records(pool, "nodes").await?;
+    for node_id in nodes {
+        let id = node_id.as_i64().ok_or_else(|| bad("Некорректная привязка ноды."))?;
+        let node = all_nodes.iter().find(|node| node.get("id").and_then(Value::as_i64) == Some(id))
+            .ok_or_else(|| bad("Одна из привязанных нод не найдена."))?;
+        if node.get("disabled").and_then(Value::as_bool) == Some(true)
+            || node.get("profileId").and_then(Value::as_i64) != Some(profile_id)
+        {
+            return Err(bad("Профиль привязанной ноды не совпадает с XRAY-профилем хоста. Обновите профиль в разделе «Узлы»."));
+        }
+    }
+    let reality = inbound.get("streamSettings").and_then(|v| v.get("realitySettings"));
+    if inbound.get("streamSettings").and_then(|v| v.get("security")).and_then(Value::as_str) == Some("reality") {
+        let key = host.get("publicKey").and_then(Value::as_str).filter(|s| !s.is_empty())
+            .or_else(|| inbound.get("publicKey").and_then(Value::as_str))
+            .or_else(|| reality.and_then(|v|v.get("publicKey")).and_then(Value::as_str));
+        if key.is_none() { return Err(bad("Отсутствует REALITY publicKey. Добавьте публичный ключ в расширенных настройках хоста.")); }
+    }
+    Ok(())
 }
 
 fn validate_record(collection: &str, data: &Value) -> Result<(), ApiError> {
