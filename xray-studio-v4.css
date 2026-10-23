@@ -33,6 +33,33 @@
 .sv-highlight::-webkit-scrollbar{display:none}
 .sv-codeholder textarea{z-index:2;resize:none;outline:0;color:transparent!important;-webkit-text-fill-color:transparent;caret-color:var(--vtext);box-shadow:none!important}
 .sv-codeholder textarea::selection{background:color-mix(in srgb,var(--vaccent) 35%,transparent)}
+
+/* Keep the transparent input layer pixel-aligned with the syntax overlay.
+   Global form typography and font themes must never affect only one layer. */
+.sv-studio .sv-codesurface{
+  --sv-code-font:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;
+}
+.sv-studio .sv-codeholder > :is(.sv-highlight,textarea){
+  box-sizing:border-box;
+  font-family:var(--sv-code-font)!important;
+  font-size:inherit!important;
+  font-weight:400!important;
+  font-style:normal!important;
+  line-height:inherit!important;
+  letter-spacing:normal!important;
+  word-spacing:normal!important;
+  font-variant-ligatures:none!important;
+  font-feature-settings:"liga" 0,"calt" 0!important;
+  text-transform:none!important;
+  text-indent:0!important;
+  text-shadow:none!important;
+  text-rendering:auto!important;
+}
+.sv-studio .sv-codeholder > textarea::selection{
+  color:transparent!important;
+  -webkit-text-fill-color:transparent!important;
+}
+
 .sv-key{color:#79d1f5}.sv-string{color:#ef939b}.sv-number{color:#a5df99}.sv-boolean{color:#cfafff}
 .sv-minimap{flex:0 0 55px;overflow:hidden;margin:0;padding:0.625rem 0.1875rem;border-left:1px solid var(--vline);font:0.125rem/0.23125rem ui-monospace,monospace;white-space:pre;opacity:.8;pointer-events:none}
 .sv-codestatus{display:flex;align-items:center;gap:12px;padding:0.5rem 0.6875rem;border-top:1px solid var(--vline);min-height:2.3125rem;font-size:0.6875rem;color:var(--vmute);flex-wrap:wrap}
