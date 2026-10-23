@@ -789,7 +789,7 @@ async fn patch_settings(
             return Err(ApiError::new(StatusCode::BAD_REQUEST, "Путь конфликтует со служебными маршрутами панели."));
         }
     }
-    for (key, max_len) in [("subscriptionBrand", 80), ("subscriptionAnnouncement", 240), ("subscriptionDescription", 240), ("subscriptionDescriptionEn", 240), ("subscriptionFooter", 160), ("subscriptionFooterEn", 160), ("deploymentServerB", 253), ("deploymentServerC", 253)] {
+    for (key, max_len) in [("subscriptionBrand", 80), ("subscriptionDescription", 240), ("subscriptionDescriptionEn", 240), ("subscriptionFooter", 160), ("subscriptionFooterEn", 160), ("deploymentServerB", 253), ("deploymentServerC", 253)] {
         if let Some(value) = object.get(key) {
             let text = value.as_str().ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, format!("Поле {key} должно быть текстом.")))?;
             if text.chars().count() > max_len || text.chars().any(char::is_control) {
@@ -821,6 +821,12 @@ async fn patch_settings(
             && !value.is_boolean()
         {
             return Err(ApiError::new(StatusCode::BAD_REQUEST, format!("Поле {key} должно быть переключателем.")));
+        }
+    }
+    if let Some(value) = object.get("subscriptionAnnouncement") {
+        let message = value.as_str().ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Анонсы должны быть текстом."))?;
+        if message.chars().count() > 4000 || message.chars().any(|c| c.is_control() && c != '\n' && c != '\r') {
+            return Err(ApiError::new(StatusCode::BAD_REQUEST, "Анонсы: максимум 4000 символов, разделитель — отдельная строка ---." ));
         }
     }
     if let Some(value) = object.get("subscriptionUpdateInterval") {
