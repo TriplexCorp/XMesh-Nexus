@@ -365,7 +365,7 @@ async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str)->Result
     }
    }else if !any_explicit_host{
     for node in nodes.iter().filter(|n|n.get("profileId")==profile.get("id")&&n.get("disabled")!=Some(&Value::Bool(true))){
-     let host=json!({"address":node.get("publicAddress").or_else(||node.get("externalAddress")).or_else(||node.get("addr")),"port":inbound.get("port"),"remark":node.get("name"),"country":node.get("country")});
+     let host=json!({"address":node.get("publicAddress").or_else(||node.get("externalAddress")).or_else(||node.get("addr")),"port":node.get("port").or_else(||inbound.get("port")),"remark":node.get("name"),"country":node.get("country")});
      if let Some(link)=vless_link(user,inbound,&host,device) && let Some(outbound)=vless_outbound(user,inbound,&host,device){
       outbounds.push(outbound);links.push(link)
      }
@@ -383,7 +383,7 @@ async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str)->Result
   }else{
    "Не найдены рабочие VLESS-подключения: проверьте сквады, теги inbound, UUID пользователя, адреса и порты публичных хостов, Reality и привязку профилей."
   };
-  tracing::warn!(reason, squad_count=ids.len(), inbound_count=tags.len(), profile_count=profiles.len(), host_count=hosts.len(), node_count=nodes.len(),"Subscription has no valid endpoints");
+  tracing::warn!(reason, squad_count=ids.len(), inbound_count=tags.len(), profile_count=profiles.len(), host_count=hosts.len(), node_count=nodes.len(), user_id=user.get("id").and_then(Value::as_i64), "Subscription has no valid endpoints");
   return Err(ApiError::new(StatusCode::SERVICE_UNAVAILABLE,reason))
  }
  Ok((links,outbounds))
