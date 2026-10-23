@@ -698,7 +698,7 @@ const balancersP=async()=>{
    <div class="balancer-intro"><div><h2>Балансировщики</h2><p>Узлы и хосты работают независимо. SMART подключается только по вашему решению.</p></div>
    <span class="balancer-state ${active?'is-on':''}" id="balancer-current-state">${active?'SMART включён':'Отключено'}</span></div>
    <div class="card balancer-settings"><div class="balancer-primary">
-    <div><h3>SMART · автоматический выбор</h3><p>Объединяет доступные подключения в один виртуальный маршрут. Когда SMART выключен, подписка выдаёт отдельные серверы VLESS, а не объединённый JSON-профиль. Для ручного JSON остаётся ?format=json.</p></div>
+    <div><h3>SMART · автоматический выбор</h3><p>Объединяет доступные подключения в один виртуальный маршрут. Подписка всегда отдаёт JSON. При выключенном SMART все серверы остаются отдельными outbound без автоматического выбора; при включённом появляется маршрутизация через балансировщик.</p></div>
     <label class="balancer-switch"><input type="checkbox" id="balancer-enabled" ${active?'checked':''} aria-label="Включить SMART балансировщик"><span class="balancer-switch-track"></span></label>
    </div>
    <label class="f balancer-strategy"><span>Стратегия выбора</span>
