@@ -2394,11 +2394,7 @@ document.addEventListener('click',async e=>{
       const issued=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/enrollment',{method:'POST'});
       const url='https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/b39465b5e1eb0a5e07a9b104cde70f4ff0f38bdb/bootstrap.sh';
       const command='curl --proto "=https" --tlsv1.2 -H "Cache-Control: no-cache" -fsSLo /tmp/xmesh-bootstrap.sh '+url+' && grep -q "Installing Docker Engine and Compose from Docker" /tmp/xmesh-bootstrap.sh && sudo bash /tmp/xmesh-bootstrap.sh '+location.origin+' '+id+' '+(Number(DB.nodes.find(node=>Number(node.id)===id)?.port)||8443);
-      modal('<div class="box node-bootstrap-dialog"><div class="bar2 node-bootstrap-heading"><div><h2>Подключение XMesh Node</h2><p class="note">Безопасная установка и регистрация узла</p></div><button class="ia" data-x aria-label="Закрыть">'+ic('x')+'</button></div>'+
-        '<div class="node-bootstrap-body"><p class="note">Выполните команду на VPS. Когда установщик запросит токен, вставьте его в скрытый ввод терминала. Токен действует 10 минут и не включён в команду.</p>'+
-        '<div class="node-bootstrap-field"><div class="node-bootstrap-label"><strong>1. Команда установки</strong><button type="button" class="gh sm" data-copy-node-bootstrap>'+ic('copy')+'Скопировать</button></div><pre class="node-bootstrap-code"><code id="node-bootstrap-command">'+esc(command)+'</code></pre></div>'+
-        '<div class="node-bootstrap-field"><div class="node-bootstrap-label"><strong>2. Одноразовый токен</strong><button type="button" class="gh sm" data-copy-node-token>'+ic('copy')+'Скопировать</button></div><input id="node-bootstrap-token" type="password" readonly autocomplete="off" aria-label="Одноразовый токен подключения" value="'+esc(issued.token)+'"><small class="note">Не передавайте токен третьим лицам.</small></div>'+
-        '<p class="note node-bootstrap-footnote">Установщик настроит XMesh Node, мониторинг и синхронизацию Xray. Для применения конфигурации назначьте XRAY STUDIO профиль и локальный порт узла.</p></div></div>','wide');
+      modal('<div class="box"><div class="bar2"><h2>Подключение XMesh Node</h2><button class="ia" data-x aria-label="Закрыть">'+ic('x')+'</button></div><p class="note">Сначала выполните команду на VPS. Когда установщик попросит токен, вставьте его в скрытый ввод терминала. Токен действует 10 минут и не включён в команду. Нода, мониторинг и синхронизация Xray установятся вместе. При назначенном XRAY-профиле и локальном порте Xray агент будет получать конфигурацию с панели и проверять её перед применением.</p><textarea id="node-bootstrap-command" readonly spellcheck="false" rows="4">'+esc(command)+'</textarea><label class="f"><span>Одноразовый токен подключения (не передавайте третьим лицам)</span><input id="node-bootstrap-token" type="password" readonly autocomplete="off" value="'+esc(issued.token)+'"></label><div class="act"><button type="button" class="gh" data-copy-node-token>'+ic('copy')+'Скопировать токен</button><button type="button" class="btn" data-copy-node-bootstrap>'+ic('copy')+'Скопировать команду</button></div><p class="note">Установка объединяет XMesh Node, метрики и агент Xray. Xray запускается на локальном порту, указанном в панели; изменения подхватываются агентом. На TCP/443 остаётся один внешний слушатель — XMesh Node.</p></div>','wide');
     }catch(error){toast('Ошибка выдачи команды: '+(error.message||'API'))}
     finally{b.disabled=false}
   }
@@ -2406,7 +2402,7 @@ document.addEventListener('click',async e=>{
     const el=$('#node-bootstrap-token');if(el){try{await navigator.clipboard.writeText(el.value);toast('Токен скопирован')}catch(_){toast('Не удалось скопировать токен')}}
   }
   else if(b=g('[data-copy-node-bootstrap]')){
-    const el=$('#node-bootstrap-command');if(el){try{await navigator.clipboard.writeText(el.textContent);toast('Команда скопирована')}catch(_){toast('Не удалось скопировать команду')}}
+    const el=$('#node-bootstrap-command');if(el){try{await navigator.clipboard.writeText(el.value);toast('Команда скопирована')}catch(_){el.select();document.execCommand('copy');toast('Команда скопирована')}}
   }
   else if(b=g('[data-node-metrics]')){
     const id=Number(b.dataset.nodeMetrics),node=DB.nodes.find(n=>Number(n.id)===id);
