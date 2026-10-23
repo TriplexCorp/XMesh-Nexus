@@ -440,28 +440,45 @@ const panelConfirm=(message,{danger=false,title='Подтверждение',con
 });
 const confirmBox=(h,ok,fn)=>{CF=fn;modal(`<div class="box"><h2>${h}</h2><div class="act"><button class="gh" data-x>Отмена</button><button class="btn" data-cf>${ok}</button></div></div>`)};
 let tt;const toast=(m,al,fn)=>{
- const openDialogs=[...document.querySelectorAll('dialog[open]')];
- const host=openDialogs.at(-1);
- // A modal is in the browser top layer; a document-level toast would sit behind it.
- const target=host?.querySelector('.box, .xm-action-confirm-box')||host;
- let t=target?.querySelector('.toast-dialog');
- if(host&&!t){
-   t=document.createElement('div');
-   t.className='toast-dialog';
-   t.setAttribute('aria-live','polite');
-   target.prepend(t);
+ // A manual popover participates in the browser top layer above modal dialogs.
+ // A document-level fixed toast cannot reliably appear above showModal().
+ let t=document.getElementById('xmesh-feedback-toast');
+ if(!t){
+  t=document.createElement('div');
+  t.id='xmesh-feedback-toast';
+  t.className='toast-dialog';
+  t.setAttribute('popover','manual');
+  t.setAttribute('aria-live','polite');
+  document.body.append(t);
  }
- if(!t)t=$('#toast');
- if(!t)return;
  const msg=String(m||'');
  const isError=/ошиб|не удалось|нельзя|отказ|ошибк|недоступ|превыш|запрещ/i.test(msg);
  t.classList.toggle('toast-error',isError);
  t.classList.toggle('toast-success',!isError);
  t.innerHTML=`<span class="toast-state-icon" aria-hidden="true">${ic(isError?'alert-circle':'check-circle')}</span><span>${esc(msg)}</span>${al?'<button type="button" class="toast-action">'+esc(al)+'</button>':''}`;
- if(al)t.querySelector('.toast-action').onclick=()=>{fn?.();t.classList.remove('show')};
+ const close=()=>{t.classList.remove('show');if(t.matches(':popover-open'))t.hidePopover()};
+ if(al)t.querySelector('.toast-action').onclick=()=>{fn?.();close()};
  t.setAttribute('role',isError?'alert':'status');
- t.classList.remove('show');void t.offsetWidth;t.classList.add('show');
- clearTimeout(tt);tt=setTimeout(()=>{t.classList.remove('show');if(t.classList.contains('toast-dialog'))t.remove()},al?6000:3600);
+ // Place feedback directly below the active dialog; outside dialogs, use
+ // the standard bottom-center position. Clamp to the viewport on small screens.
+ const host=[...document.querySelectorAll('dialog[open]')].at(-1);
+ t.classList.toggle('toast-below-dialog',!!host);
+ if(!t.matches(':popover-open'))t.showPopover();
+ t.classList.remove('show');
+ if(host){
+  const rect=host.getBoundingClientRect();
+  const height=t.getBoundingClientRect().height||44;
+  const below=rect.bottom+12;
+  const above=rect.top-height-12;
+  const top=below+height<=innerHeight-12?below:above>=12?above:Math.max(12,innerHeight-height-12);
+  t.style.setProperty('--toast-top',top+'px');
+  t.style.setProperty('--toast-left',Math.min(innerWidth-16,Math.max(16,rect.left+rect.width/2))+'px');
+ }else{
+  t.style.removeProperty('--toast-top');
+  t.style.removeProperty('--toast-left');
+ }
+ void t.offsetWidth;t.classList.add('show');
+ clearTimeout(tt);tt=setTimeout(close,al?6000:3600);
 };
 const CDEFAULT={theme:'dark',accent:'emerald',customA:'#60d6a2',customB:'#c3e879',hue:151,sat:62,lum:61,ts:1,motion:1,density:'comfortable',surface:'solid',glow:'normal',font:'onest',radius:16,borders:'soft',sidebar:'standard',railTips:0,contentWidth:1920,gapScale:1,autoCoreRefresh:1,coreRefreshSeconds:30};
 let C={...CDEFAULT};try{Object.assign(C,JSON.parse(localStorage.xmeshNexusSettings||'{}'))}catch(e){}if(C.accent==='mint')C.accent='emerald';if(!['solid','glass','raised'].includes(C.surface))C.surface='solid';C.railTips=C.railTips===true||C.railTips===1?1:0;C.ts=cl(Number(C.ts)||1,.9,2);C.radius=cl(Number.isFinite(Number(C.radius))?Number(C.radius):16,1,36);// Remove legacy split-text preferences: the unified interface scale controls text and UI together.
