@@ -2725,3 +2725,16 @@ dialog.node-wide [data-node-pool-feedback]:empty{display:none}
 dialog.node-wide .node-ip-section .f{min-width:0}
 @media(max-width:850px){dialog.node-wide .node-form-layout{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:560px){dialog.node-wide .node-main-section .node-form-grid{grid-template-columns:minmax(0,1fr)}}
+
+/* Large user-detail workspace, unaffected by generic dialog sizing. */
+dialog.user-modal{width:min(1440px,calc(100vw - 3rem))!important;max-width:1440px!important}
+dialog.user-modal .user-canvas-grid{grid-template-columns:minmax(340px,1.1fr) minmax(340px,1fr) minmax(340px,1fr)}
+dialog.user-modal .user-pane{padding-inline:1.3rem}
+dialog.user-modal .user-subscription-url{min-width:0}
+.users-panel .user-row-actions-head{width:156px;text-align:right}
+.users-panel .user-row-actions{display:flex;align-items:center;justify-content:flex-end;gap:.4rem;white-space:nowrap}
+.users-panel .user-row-actions button{min-height:2rem;padding:.38rem .65rem;font-size:.73rem}
+.users-panel .user-row-actions .user-row-delete{color:var(--er);padding-inline:.55rem}
+.users-panel .user-row-actions .user-row-delete:hover{border-color:var(--er)}
+@media(max-width:1200px){dialog.user-modal .user-canvas-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:800px){dialog.user-modal{width:calc(100vw - 1rem)!important}dialog.user-modal .user-canvas-grid{grid-template-columns:minmax(0,1fr)}dialog.user-modal .user-pane{padding-inline:.85rem}}
