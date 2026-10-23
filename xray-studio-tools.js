@@ -338,11 +338,10 @@ const operations={
    const selected=await chooseInbound();if(!selected)return;
    const inbound=getInbound(parse(),selected.index);
    if(inbound.protocol!=='vless')throw Error('XTLS Vision доступен только для VLESS.');
-   const users=inbound.settings?.users||inbound.settings?.clients||[];
-   const active=users.some(u=>u.flow==='xtls-rprx-vision')||inbound.settings?.flow==='xtls-rprx-vision';
+   const active=inbound.settings?.flow==='xtls-rprx-vision';
    const response=await dialog.request({
     title:'XTLS Vision — сервер и подписка',
-    description:'Flow применяется к существующим пользователям inbound и наследуется новыми пользователями при выдаче подписки. Выберите none для отключения.',
+    description:'Записывает flow в settings.flow выбранного VLESS inbound. Генератор подписок наследует его для клиентского outbound.',
     confirmLabel:'Применить',
     fields:[{name:'flow',label:'Flow (xtls-rprx-vision или none)',value:active?'xtls-rprx-vision':'xtls-rprx-vision',wide:true,required:true,validate:v=>['xtls-rprx-vision','none'].includes(v)?'':'Допустимо xtls-rprx-vision или none'}]
    });
@@ -351,19 +350,14 @@ const operations={
    mutate(doc=>{
     const ib=getInbound(doc,selected.index);
     if(ib.tag!==selected.tag||ib.protocol!=='vless')throw Error('Выбранный inbound изменился');
-    const settings=ib.settings??={users:[]};
-    const list=settings.users||settings.clients||[];
-    if(!Array.isArray(list))throw Error('Некорректный список пользователей VLESS');
-    if(response.flow==='none'){
-     delete settings.flow;
-     for(const user of list)delete user.flow;
-    }else{
-     // Internal default for the subscription generator; not a server-wide Xray setting.
-     ib.xmesh??={};ib.xmesh.clientFlow='xtls-rprx-vision';
-     for(const user of list)user.flow='xtls-rprx-vision';
-    }
-    if(response.flow==='none'&&ib.xmesh)delete ib.xmesh.clientFlow;
-   },'XTLS Vision настроен для сервера и подписки');
+    const settings=ib.settings??={clients:[]};
+    if(response.flow==='none')delete settings.flow;
+    else settings.flow='xtls-rprx-vision';
+    // Remove the obsolete studio-only default so settings.flow is the single source of truth.
+    if(ib.xmesh)delete ib.xmesh.clientFlow;
+    // Existing per-user overrides must not conflict with the inbound default.
+    for(const user of [...(Array.isArray(settings.users)?settings.users:[]),...(Array.isArray(settings.clients)?settings.clients:[])])delete user.flow;
+   },'XTLS Vision записан в settings.flow и будет передан в подписку');
   }catch(e){notify(e.message)}
  },
  async vlessens(){
