@@ -2988,20 +2988,97 @@ dialog#dlg.node-wide .node-form-layout{
   dialog#dlg.node-wide > form.box,dialog#dlg.user-modal > .box.user-canvas{min-height:0}
 }
 
-/* Unified, grouped infrastructure and subscription notifications. */
-dialog.pop:has(.notification-workspace){width:min(480px,calc(100vw - 24px))!important;max-width:480px}
-.notification-workspace{min-width:0;max-height:min(75dvh,680px);overflow-y:auto}
-.notification-sections{display:grid;gap:1rem}
-.notification-group{min-width:0;display:grid;gap:.5rem}
-.notification-group h3{display:flex;align-items:center;justify-content:space-between;margin:.35rem 0 0;font-size:.8rem;font-weight:760;color:var(--mu)}
-.notification-group h3 span{font-variant-numeric:tabular-nums;color:var(--tx);background:var(--s2);border:1px solid var(--ln);padding:.1rem .4rem;border-radius:999px}
-.notification-item{display:grid;grid-template-columns:8px minmax(0,1fr);gap:.75rem;align-items:start;padding:.8rem;border:1px solid var(--ln);border-radius:var(--ui-radius);background:var(--s2);min-width:0}
-.notification-item b{display:block;font-size:.82rem;overflow-wrap:anywhere}
-.notification-item p{margin:.28rem 0 0;color:var(--mu);font-size:.74rem;line-height:1.5;overflow-wrap:anywhere}
-.notification-status-dot{height:8px;width:8px;margin-top:.35rem;border-radius:50%;background:var(--mu)}
-.notification-warning .notification-status-dot{background:var(--wr)}
-.notification-critical .notification-status-dot{background:var(--er)}
-.notification-neutral .notification-status-dot{background:var(--mu)}
+/* Notification center: compact, scale-independent popover. Overrides global
+   panel typography/spacing so the menu never becomes a full-screen card. */
+dialog#dlg.pop:has(> .notification-workspace){
+  width:min(432px,calc(100vw - 24px))!important;
+  max-width:min(432px,calc(100vw - 24px))!important;
+  min-width:0!important;
+  max-height:min(620px,calc(100dvh - 88px));
+  margin:64px 16px auto auto!important;
+  overflow:hidden;
+}
+dialog#dlg.pop > .notification-workspace{
+  width:100%;min-width:0;max-width:100%;min-height:0;
+  display:flex;flex-direction:column;gap:0;
+  padding:0;border-radius:16px;
+  max-height:min(620px,calc(100dvh - 88px));overflow:hidden;
+  font-size:13px;line-height:1.4;
+}
+.notification-workspace .notification-header{
+  display:flex;align-items:center;gap:8px;flex:none;flex-wrap:nowrap;
+  padding:14px 16px;border-bottom:1px solid var(--ln);margin:0;
+}
+.notification-workspace .notification-heading{flex:1;min-width:0}
+.notification-workspace .notification-heading h2{
+  font-size:16px!important;line-height:1.25;margin:0;font-weight:760;
+}
+.notification-workspace .notification-heading small{
+  display:block;margin-top:2px;font-size:11px;color:var(--mu);
+}
+.notification-workspace .notification-header :is(.gh,.ia){
+  flex:none;min-width:30px;width:30px;min-height:30px;height:30px;
+  padding:6px;border-radius:9px;
+}
+.notification-workspace .notification-header .ic{width:15px;height:15px}
+.notification-workspace .notification-sections{
+  display:flex;flex-direction:column;gap:0;
+  overflow:auto;overscroll-behavior:contain;min-height:0;
+  scrollbar-width:thin;padding:4px 0 8px;
+}
+.notification-workspace .notification-group{display:block;min-width:0}
+.notification-workspace .notification-group h3{
+  display:flex;align-items:center;gap:7px;
+  margin:0;padding:10px 16px 5px;
+  font-size:10px!important;line-height:1.2;font-weight:760;
+  letter-spacing:.065em;text-transform:uppercase;color:var(--mu);
+}
+.notification-workspace .notification-group h3 span{
+  font-size:10px;font-variant-numeric:tabular-nums;font-weight:600;
+  color:var(--mu);background:transparent;border:0;padding:0;
+}
+.notification-workspace .notification-item{
+  display:grid;grid-template-columns:5px minmax(0,1fr);gap:10px;align-items:start;
+  margin:0 8px;padding:9px 8px 10px;border:0;border-radius:8px;
+  background:transparent;min-width:0;
+}
+.notification-workspace .notification-item + .notification-item{
+  border-top:1px solid var(--ln);border-radius:0;
+}
+.notification-workspace .notification-item:hover{background:var(--s2)}
+.notification-workspace .notification-status-dot{
+  width:5px;height:5px;margin-top:7px;border-radius:50%;background:var(--mu);
+}
+.notification-workspace .notification-warning .notification-status-dot{background:var(--wr)}
+.notification-workspace .notification-critical .notification-status-dot{background:var(--er)}
+.notification-workspace .notification-neutral .notification-status-dot{background:var(--mu)}
+.notification-workspace .notification-title{
+  display:flex;align-items:center;gap:8px;min-width:0;line-height:1.3;
+}
+.notification-workspace .notification-country-flag{
+  width:19px!important;height:14px!important;object-fit:cover;border-radius:3px;flex:none;margin:0;
+}
+.notification-workspace .notification-node-label{
+  display:flex;flex-direction:column;gap:1px;min-width:0;
+  font-size:12px!important;font-weight:740;overflow-wrap:anywhere;
+}
+.notification-workspace .notification-node-label small{
+  font-size:10px!important;color:var(--mu);font-weight:450;
+}
+.notification-workspace .notification-item b{display:block;font-size:12px!important;font-weight:740}
+.notification-workspace .notification-item p{
+  margin:4px 0 0;line-height:1.38;font-size:11px!important;color:var(--mu);
+  overflow-wrap:anywhere;
+}
+.notification-workspace .notification-empty{font-size:12px!important;padding:18px 16px}
+@media(max-width:540px){
+  dialog#dlg.pop:has(> .notification-workspace){
+    margin:54px 8px auto auto!important;
+    width:calc(100vw - 16px)!important;max-width:calc(100vw - 16px)!important;
+    max-height:calc(100dvh - 62px);
+  }
+  dialog#dlg.pop > .notification-workspace{max-height:calc(100dvh - 62px)}
+}
 
 /* Compact node editor: content-driven height, no empty 690px spacer.
    User cards retain their own sizing; node fields and the shared calendar stay intact. */
