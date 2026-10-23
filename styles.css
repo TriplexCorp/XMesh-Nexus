@@ -3890,3 +3890,11 @@ dialog.user-modal .user-server-details>b::before{
   box-shadow:none;
 }
 .av::before,.av::after{content:none!important}
+
+/* Statistics · same circular visual language as node overview */
+.stats-node-rings{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:18px 0}
+.stats-ring-card{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;min-width:0;padding:15px 6px;border:1px solid var(--ln);border-radius:12px;background:var(--s2);text-align:center}
+.stats-ring-card>span{font-size:.79rem;font-weight:700;color:var(--tx)}
+.stats-ring{width:clamp(54px,5vw,78px);aspect-ratio:1;border-radius:50%;display:grid;place-items:center;background:radial-gradient(closest-side,var(--s2) 72%,transparent 74%),conic-gradient(var(--ring-color) var(--ring-value),color-mix(in srgb,var(--mu) 16%,transparent) 0)}
+.stats-ring strong{font-size:clamp(.8rem,1vw,1.05rem);font-weight:800;color:var(--tx)}
+@media(max-width:620px){.stats-node-rings{grid-template-columns:repeat(2,minmax(0,1fr))}}
