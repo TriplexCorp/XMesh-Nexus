@@ -16,4 +16,11 @@ assert.doesNotMatch(studio,/name="json_balance"/,'Strategy belongs in its own wo
 assert.match(engine,/let smart=enabled\(opts,"smart",false\)/);
 assert.match(engine,/if smart && tags\.len\(\)>1 && balance!="off"/);
 assert.match(engine,/fn balancers_are_opt_in_and_servers_remain_distinct/);
+const subscriptions=fs.readFileSync('backend/src/user_subscriptions.rs','utf8');
+assert.match(subscriptions,/fn use_vless_feed\(/,
+ 'Subscription delivery must choose between independent servers and native JSON');
+assert.match(subscriptions,/!options\.contains_key\("format"\) && !crate::subscription_json::smart_enabled\(settings\)/,
+ 'Disabled SMART must return separate links unless JSON is explicitly requested');
+assert.match(subscriptions,/fn no_smart_shows_standalone_servers_for_happ\(/,
+ 'Keep a Rust regression test for Happ with SMART off');
 console.log('Dedicated opt-in balancer workspace: OK');
