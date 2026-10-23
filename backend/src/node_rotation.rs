@@ -13,7 +13,7 @@ use std::{collections::HashSet, net::IpAddr};
 
 use crate::{auth, user_status, ApiError, AppState};
 
-const MAX_POOL: usize = 64;
+const MAX_POOL: usize = 256;
 
 fn invalid(message: &str) -> ApiError {
     ApiError::new(StatusCode::BAD_REQUEST, message)
@@ -23,7 +23,7 @@ pub(crate) fn parse_pool(value: &Value) -> Result<Vec<IpAddr>, ApiError> {
     let Some(raw) = value.get("rotationIps") else { return Ok(Vec::new()) };
     let source = raw.as_str().ok_or_else(|| invalid("Пул ротации должен быть текстом: один IP в каждой строке."))?;
     if source.len() > 4096 {
-        return Err(invalid("Слишком большой список IP-адресов (максимум 64)."));
+        return Err(invalid("Слишком большой список IP-адресов (максимум 256)."));
     }
     let mut seen = HashSet::new();
     let mut addresses = Vec::new();
@@ -39,7 +39,7 @@ pub(crate) fn parse_pool(value: &Value) -> Result<Vec<IpAddr>, ApiError> {
         }
         addresses.push(ip);
         if addresses.len() > MAX_POOL {
-            return Err(invalid("В пуле ротации допускается не более 64 IP-адресов."));
+            return Err(invalid("В пуле ротации допускается не более 256 IP-адресов."));
         }
     }
     Ok(addresses)
