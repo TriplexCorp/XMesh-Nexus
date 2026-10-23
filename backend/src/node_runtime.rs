@@ -66,6 +66,144 @@ pub async fn status(
     }
 }
 
+// A metrics agent is read-only; restarts need a separate, signed control agent.
+// Requests are queued, claimed by exactly one authenticated node, and acknowledged
+// only after systemd reports a confirmed result. No shell commands are accepted.
+pub async fn request_restart(
+    State(state): State<AppState>,
+    axum::extract::Extension(actor): axum::extract::Extension<crate::auth::AuthUser>,
+    Path(node_id): Path<i64>,
+) -> Result<(StatusCode,Json<Value>),ApiError> {
+    crate::require_mutation(&actor)?;
+    if node_id<=0 {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST,"Invalid node ID"));
+    }
+    let node=sqlx::query_scalar::<_,Value>(
+        "SELECT data FROM panel_records WHERE collection='nodes' AND id=$1"
+    ).bind(node_id).fetch_optional(&state.pool).await?
+        .ok_or_else(||ApiError::new(StatusCode::NOT_FOUND,"Node not found"))?;
+    if node.get("disabled").and_then(Value::as_bool)==Some(true) {
+        return Err(ApiError::new(StatusCode::CONFLICT,"Node is disabled."));
+    }
+    let active=sqlx::query_scalar::<_,bool>(
+        "SELECT EXISTS(SELECT 1 FROM node_runtime_heartbeats
+         WHERE node_id=$1 AND received_at > NOW()-INTERVAL '90 seconds'
+           AND version LIKE 'control-v1%')"
+    ).bind(node_id).fetch_one(&state.pool).await?;
+    if !active {
+        return Err(ApiError::new(StatusCode::CONFLICT,
+            "У ноды нет подключённого управляющего агента. Агент метрик не умеет перезапускать Xray. Установите новую версию агента через «Подключить ноду и метрики»."));
+    }
+    // A stale command must fail visibly; it must NEVER be executed later.
+    sqlx::query(
+        "UPDATE node_restart_commands SET state='failed',
+         result='Управляющий агент не подтвердил выполнение вовремя',finished_at=NOW()
+         WHERE node_id=$1 AND state IN ('pending','claimed')
+           AND requested_at<NOW()-INTERVAL '180 seconds'"
+    ).bind(node_id).execute(&state.pool).await?;
+    let row=sqlx::query_scalar::<_,i64>(
+        "INSERT INTO node_restart_commands(node_id,requested_by)
+         VALUES($1,$2) RETURNING id"
+    ).bind(node_id).bind(&actor.username).fetch_one(&state.pool).await?;
+    crate::audit(&state.pool,&actor.username,"node.restart.requested",Some("nodes"),Some(node_id),
+        json!({"commandId":row})).await;
+    Ok((StatusCode::ACCEPTED,Json(json!({"id":row,"nodeId":node_id,"state":"pending"}))))
+}
+
+pub async fn restart_status(
+    State(state): State<AppState>,Path(node_id):Path<i64>,
+)->Result<Json<Value>,ApiError>{
+    let exists=sqlx::query_scalar::<_,i64>(
+        "SELECT id FROM panel_records WHERE collection='nodes' AND id=$1"
+    ).bind(node_id).fetch_optional(&state.pool).await?;
+    if exists.is_none(){return Err(ApiError::new(StatusCode::NOT_FOUND,"Node not found"))}
+    sqlx::query(
+        "UPDATE node_restart_commands SET state='failed',
+         result='Управляющий агент не подтвердил выполнение вовремя',finished_at=NOW()
+         WHERE node_id=$1 AND state IN ('pending','claimed')
+           AND requested_at<NOW()-INTERVAL '180 seconds'"
+    ).bind(node_id).execute(&state.pool).await?;
+    let item=sqlx::query(
+        "SELECT id,state,result,requested_by,
+          (EXTRACT(EPOCH FROM requested_at)*1000)::BIGINT AS requested_ms,
+          (EXTRACT(EPOCH FROM finished_at)*1000)::BIGINT AS finished_ms
+         FROM node_restart_commands WHERE node_id=$1 ORDER BY id DESC LIMIT 1"
+    ).bind(node_id).fetch_optional(&state.pool).await?;
+    Ok(Json(match item {
+        Some(row)=>json!({
+            "id":row.try_get::<i64,_>("id")?,
+            "nodeId":node_id,
+            "state":row.try_get::<String,_>("state")?,
+            "result":row.try_get::<String,_>("result")?,
+            "requestedBy":row.try_get::<String,_>("requested_by")?,
+            "requestedAt":row.try_get::<i64,_>("requested_ms")?,
+            "finishedAt":row.try_get::<Option<i64>,_>("finished_ms")?
+        }),
+        None=>json!({"nodeId":node_id,"state":"none"})
+    }))
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NodeCommandPoll { node_id:i64 }
+
+pub async fn poll_restart(
+    State(state):State<AppState>,headers:HeaderMap,body:Bytes,
+)->Result<Json<Value>,ApiError>{
+    let request:NodeCommandPoll=serde_json::from_slice(&body)
+        .map_err(|_|ApiError::new(StatusCode::BAD_REQUEST,"Invalid command poll."))?;
+    if request.node_id<=0{return Err(ApiError::new(StatusCode::BAD_REQUEST,"Invalid node ID"))}
+    node_auth::authenticate_for(
+        &state,&headers,request.node_id,&body,"/api/v1/node/restart/poll"
+    ).await?;
+    sqlx::query(
+        "UPDATE node_restart_commands SET state='failed',
+         result='Command expired before delivery',finished_at=NOW()
+         WHERE node_id=$1 AND state='pending'
+           AND requested_at<NOW()-INTERVAL '180 seconds'"
+    ).bind(request.node_id).execute(&state.pool).await?;
+    let row=sqlx::query_scalar::<_,i64>(
+        "UPDATE node_restart_commands SET state='claimed',claimed_at=NOW()
+         WHERE id=(SELECT id FROM node_restart_commands WHERE node_id=$1
+           AND state='pending' ORDER BY id FOR UPDATE SKIP LOCKED LIMIT 1)
+         RETURNING id"
+    ).bind(request.node_id).fetch_optional(&state.pool).await?;
+    Ok(Json(json!({"command":row.map(|id|json!({"id":id,"action":"restart_xray"}))})))
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NodeCommandAck {
+    node_id:i64,
+    command_id:i64,
+    success:bool,
+    detail:String
+}
+
+pub async fn acknowledge_restart(
+    State(state):State<AppState>,headers:HeaderMap,body:Bytes,
+)->Result<Json<Value>,ApiError>{
+    let report:NodeCommandAck=serde_json::from_slice(&body)
+        .map_err(|_|ApiError::new(StatusCode::BAD_REQUEST,"Invalid command acknowledgement."))?;
+    if report.node_id<=0 || report.command_id<=0 || report.detail.len()>256
+        || report.detail.chars().any(char::is_control) {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST,"Invalid command details."));
+    }
+    node_auth::authenticate_for(
+        &state,&headers,report.node_id,&body,"/api/v1/node/restart/ack"
+    ).await?;
+    let state_name=if report.success{"succeeded"}else{"failed"};
+    let done=sqlx::query_scalar::<_,i64>(
+        "UPDATE node_restart_commands SET state=$3,result=$4,finished_at=NOW()
+         WHERE node_id=$1 AND id=$2 AND state='claimed' RETURNING id"
+    ).bind(report.node_id).bind(report.command_id).bind(state_name).bind(&report.detail)
+        .fetch_optional(&state.pool).await?;
+    if done.is_none(){
+        return Err(ApiError::new(StatusCode::CONFLICT,"Restart command is no longer pending acknowledgement."));
+    }
+    Ok(Json(json!({"accepted":true})))
+}
+
 // Populate Xray VLESS inbound users from the authoritative panel users and squads.
 // XRAY STUDIO owns transports/security; panel users own runtime UUID authorization.
 fn provision_vless_users(config:&mut Value,users:&[Value],squads:&[Value],now_ms:i64) -> Result<(),ApiError> {
