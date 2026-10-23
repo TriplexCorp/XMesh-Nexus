@@ -3617,6 +3617,7 @@ $('#bell').onclick=()=>{
   const key=button.dataset.notificationDismiss;
   if(notificationState[key])notificationState[key].hidden=true;
   saveNotifications();
+  showNodeQuotaBell();
   button.closest('.notification-item')?.remove();
   for(const group of output.querySelectorAll('.notification-group')){
    const count=group.querySelectorAll('.notification-item').length;
@@ -3631,6 +3632,7 @@ $('#bell').onclick=()=>{
    if(notificationState[key])notificationState[key].hidden=true;
   }
   saveNotifications();
+  showNodeQuotaBell();
   output.innerHTML='<p class="note notification-empty">Уведомления очищены.</p>';
  });
  refresh.addEventListener('click',()=>{void updateNotifications()});
@@ -3666,16 +3668,21 @@ addEventListener('hashchange',()=>{if(backendReady)render()});
 let nodeQuotaPoller=null,nodeQuotaBusy=false;
 let acknowledgedQuotaEvents=new Set();
 function showNodeQuotaBell(){
- const flagged=DB.nodes.some(n=>n.disabledReason==='traffic_limit');
  const bell=$('#bell');
  if(!bell)return;
- bell.title=flagged?'Критично: исчерпан лимит трафика узла':'Уведомления';
- if(flagged && !bell.querySelector('.pip')){
+ const pending=DB.nodes.some(n=>{
+  if(n.disabledReason!=='traffic_limit')return false;
+  const key=notificationId({group:'Лимиты трафика',node:n});
+  return !notificationState[key]?.hidden;
+ });
+ bell.title=pending?'Есть непрочитанные критические уведомления':'Уведомления';
+ bell.setAttribute('aria-label',bell.title);
+ if(pending&&!bell.querySelector('.pip')){
   const dot=document.createElement('span');dot.className='pip';
   dot.setAttribute('aria-label','Есть критические уведомления');
   bell.append(dot);
  }
- if(!flagged)bell.querySelector('.pip')?.remove();
+ if(!pending)bell.querySelector('.pip')?.remove();
 }
 function startNodeQuotaNotifications(){
  if(nodeQuotaPoller!==null)clearInterval(nodeQuotaPoller);
