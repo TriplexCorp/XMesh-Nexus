@@ -17,7 +17,7 @@
 | **SUBSCRIPTION STUDIO** | Domain/name, portal appearance, client-app catalog, JSON and balancer settings | DNS, HTTPS and reverse-proxy routing are operator responsibilities |
 | **Statistics** | Node RX/TX and system metrics; per-user/per-inbound traffic counters and diagnostic pages | Xray StatsService and up-to-date agents must report real samples |
 | **Security** | Server-enforced owner/admin/viewer roles, Argon2, sessions, rate limiting, TOTP, audit log | This is not a claim of a complete penetration test or guaranteed vulnerability-free deployment |
-| **IP pools** | Up to **256 addresses**, validation and persisted per-node/per-user round-robin cursor | Automatic rotation is **not yet integrated into public subscription generation** |
+| **IP pools** | Up to **256 addresses**, validation and persisted per-node/per-user round-robin cursor | Public native JSON uses sticky per-user/per-node IP rotation for unambiguous direct endpoints |
 
 ## Architecture and responsibilities
 
@@ -107,9 +107,9 @@ Guides: [autonomous nodes](docs/AUTONOMOUS_NODES.md), [panel updates and per-use
 
 ### Per-node IP pool and rotation
 
-The editor accepts **2–256 distinct public IPv4/IPv6 addresses** when rotation is enabled. Addresses must already exist on the VPS and serve the intended VPN endpoint; the panel does not provision them. **The Rust backend currently also limits the pool text field to 4,096 bytes**, so a list of 256 long IPv6 strings might be rejected even though it is within the address-count limit.
+The editor accepts **2–256 distinct public IPv4/IPv6 addresses** when rotation is enabled. Addresses must already exist on the VPS and serve the intended VPN endpoint; the panel does not provision them. The backend accepts **16,384 bytes** of pool text, including up to 256 full-length IPv6 addresses.
 
-A PostgreSQL round-robin cursor is maintained per `(node_id, user_id)`. An authorized test endpoint exists at `POST /api/v1/nodes/{id}/rotation/next`. **The current public subscription handler does not invoke this rotation resolver**, so automatic address changes on subscription refresh should not be advertised as implemented.
+A PostgreSQL round-robin cursor is maintained per `(node_id, user_id)`. An authorized test endpoint exists at `POST /api/v1/nodes/{id}/rotation/next`. The public native Xray JSON handler uses a **sticky per-user/per-node address lease**. The default interval is **24 hours**, configurable from 1 to 720 hours in the node editor. Refreshes within the interval reuse the previous IP; after expiry, a transactional row lock advances the pool. Creating the token and generating an administrator preview never advance rotation. Only unambiguous direct-node host IPs or node-based fallback endpoints are rewritten; CDN domains, external proxies and ambiguous host mappings are intentionally left unchanged. Existing sessions are not interrupted.
 
 ## Administration and security
 
@@ -145,7 +145,7 @@ Principal directories/files: `app.js`, `styles.css`, `xray-studio-v4.js`, `subsc
 
 1. **Managed VPN nodes require XMesh-Node, real Xray and correctly configured VPS networking.** Panel settings alone are not applied-state confirmation.
 2. **Public subscriptions exist, but client assembly is currently VLESS-focused and native-Xray-JSON-only.**
-3. **The persisted IP rotation engine is not wired into the public subscription handler.**
+3. **IP rotation is integrated into the public native JSON feed for unambiguous direct-node endpoints only.** CDN and external proxy hostnames are intentionally excluded.
 4. **Per-user offline enforcement is bounded, not a strict global quota guarantee across disconnected nodes.**
 5. **Operators must configure DNS, HTTPS reverse proxy, VPS addresses and agent updates.**
 6. **Network-interface RX/TX is not the same as Xray per-user accounting.**
