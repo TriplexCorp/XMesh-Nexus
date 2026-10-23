@@ -741,7 +741,7 @@ async fn patch_settings(
         .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Настройки должны быть JSON-объектом."))?;
     for key in object.keys() {
         if !matches!(key.as_str(), "brand" | "domain" | "hooks"
-                | "subscriptionDomain" | "subscriptionPath" | "subscriptionBrand" | "subscriptionAnnouncement" | "subscriptionUpdateInterval"
+                | "subscriptionDomain" | "subscriptionPath" | "subscriptionBrand" | "subscriptionAnnouncement" | "subscriptionUpdateInterval" | "subscriptionAnnouncementRotationHours"
                 | "subscriptionDescription" | "subscriptionDescriptionEn" | "subscriptionFooter" | "subscriptionFooterEn" | "subscriptionAccent" | "subscriptionSecondaryAccent"
                 | "subscriptionLanguage" | "subscriptionTheme" | "subscriptionSyncPanelTheme" | "subscriptionPlacement" | "nodePlacement"
                 | "deploymentServerB" | "deploymentServerC" | "subscriptionShowTraffic"
@@ -827,6 +827,12 @@ async fn patch_settings(
         let message = value.as_str().ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Анонсы должны быть текстом."))?;
         if message.chars().count() > 4000 || message.chars().any(|c| c.is_control() && c != '\n' && c != '\r') {
             return Err(ApiError::new(StatusCode::BAD_REQUEST, "Анонсы: максимум 4000 символов, разделитель — отдельная строка ---." ));
+        }
+    }
+    if let Some(value) = object.get("subscriptionAnnouncementRotationHours") {
+        let hours = value.as_u64().ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Период ротации анонсов должен быть целым числом часов."))?;
+        if !(1..=720).contains(&hours) {
+            return Err(ApiError::new(StatusCode::BAD_REQUEST, "Период ротации анонсов должен быть от 1 до 720 часов."));
         }
     }
     if let Some(value) = object.get("subscriptionUpdateInterval") {
