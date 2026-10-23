@@ -2780,3 +2780,45 @@ dialog.node-wide .node-billing-section input,dialog.node-wide .node-billing-sect
 @media(max-width:1250px){dialog.node-wide .node-form-layout{grid-template-columns:repeat(2,minmax(0,1fr))}.users-panel .users-advanced-filters{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:850px){dialog.node-wide .node-form-layout{grid-template-columns:minmax(0,1fr)}.users-panel .users-advanced-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:500px){dialog.node-wide .node-main-section .node-form-grid,dialog.node-wide .node-billing-fields,.users-panel .users-advanced-filters{grid-template-columns:minmax(0,1fr)}}
+
+/* User dialog sizing: override both old 54rem rules and browser dialog max-inline-size.
+   The modal uses available viewport space, independent of configured panel content width. */
+dialog#dlg.user-modal,dialog.user-modal{
+  box-sizing:border-box!important;
+  inline-size:min(1680px,calc(100vw - 48px))!important;
+  width:min(1680px,calc(100vw - 48px))!important;
+  max-inline-size:calc(100vw - 48px)!important;
+  max-width:1680px!important;
+  min-width:0!important;
+  padding:0!important;
+}
+dialog.user-modal .box.user-canvas{box-sizing:border-box;width:100%;min-width:0}
+dialog.user-modal .user-canvas-grid{
+  grid-template-columns:minmax(0,1.25fr) minmax(0,1fr) minmax(0,1.1fr);
+  width:100%;
+}
+dialog.user-modal .user-pane{min-width:0;padding-inline:clamp(16px,1.35vw,25px)}
+dialog.user-modal .user-pane-settings{padding-left:0}
+dialog.user-modal .user-pane-insights{padding-right:0}
+dialog.user-modal .user-edit-fields{grid-template-columns:repeat(2,minmax(0,1fr));gap:.8rem 1rem}
+dialog.user-modal .user-edit-fields :is(input,select,textarea){box-sizing:border-box;min-width:0;width:100%;max-width:100%}
+dialog.user-modal .user-notes-field textarea{
+  white-space:pre-wrap!important;
+  overflow-wrap:anywhere!important;
+  word-break:break-word;
+  overflow-x:hidden!important;
+  resize:vertical;
+  min-height:130px;
+}
+dialog.user-modal .user-host-line,dialog.user-modal .user-traffic-empty,dialog.user-modal .user-sub-link-card{min-width:0;overflow-wrap:anywhere}
+dialog.user-modal .user-sub-note,dialog.user-modal .user-traffic-empty p{line-height:1.55}
+@media(max-width:1100px){
+  dialog.user-modal .user-canvas-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:760px){
+  dialog#dlg.user-modal,dialog.user-modal{inline-size:calc(100vw - 12px)!important;width:calc(100vw - 12px)!important;max-inline-size:calc(100vw - 12px)!important}
+  dialog.user-modal .user-canvas-grid{grid-template-columns:minmax(0,1fr)}
+  dialog.user-modal .user-pane{padding-inline:0;border-right:0}
+  dialog.user-modal .user-edit-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:440px){dialog.user-modal .user-edit-fields{grid-template-columns:minmax(0,1fr)}}
