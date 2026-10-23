@@ -2422,7 +2422,7 @@ function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id
     ?'<div class="f node-date-field"><span>Оплачено до</span><button type="button" class="user-date-trigger" data-node-date-open aria-expanded="false">'+ic('calendar')+'<span data-node-date-label>'+esc(o.billingDueDate?userDateLabel(o.billingDueDate):'Выберите дату')+'</span>'+ic('chevronRight')+'</button><input type="hidden" name="billingDueDate" value="'+esc(o.billingDueDate||'')+'"><div class="user-date-calendar" data-node-date-calendar hidden></div></div>'
     :field(f,o[f.k])).join('');
   const nodeCoreFields=e.fs.filter(f=>!f.k.startsWith('billing')&&!f.k.startsWith('geo')&&!['rotationEnabled','rotationIntervalHours','rotationIps'].includes(f.k));
-  const nodeGeoFields=e.fs.filter(f=>f.k.startsWith('geo')).map(f=>field(f,f.k==='geoUpdateHours'?(o[f.k]??24):f.k==='geoBlockAds'?(o[f.k]??true):o[f.k]??'')).join('');
+  // GeoData belongs to its own node service dialog, never the general editor.
   // Keep tab / screen-reader order in sync with the wide four-column layout.
   // New fields remain supported and follow the explicitly grouped core fields.
   const nodeCoreOrder=['name','hosting','flag','profileId','addr','port','xrayLocalPort','mult','limit','resetDay'];
@@ -2441,7 +2441,7 @@ function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id
     :'';
   const hostWizard=k==='hosts'?'<div class="host-quick"><label class="f"><span>Быстро заполнить из узла</span><select data-host-node-preset><option value="">Выберите сервер…</option>'+DB.nodes.map(n=>'<option value="'+esc(String(n.id))+'">'+esc(n.name)+' · '+esc(n.addr||'')+'</option>').join('')+'</select></label><p class="note">Подставит адрес, порт и привязку. Остальные поля сохранятся.</p></div>':'';
   const fields=k==='squads'?squadEditorMarkup(o,e):k==='hosts'?hostEditorMarkup(o,e):k==='nodes'
-    ?'<div class="node-form-layout"><section class="node-main-section"><div class="node-form-section-title">Основные параметры</div><p class="node-section-intro">Подключение, профиль Xray и ограничения узла</p><div class="node-form-grid">'+nodeMainFields+'</div>'+nodeResetAction+'</section>'+`<section class="node-ip-section"><div class="node-form-section-title">IP-пул и ротация</div><div class="node-ip-hint">Адреса должны принадлежать этому VPS и быть доступны извне.</div><div class="node-rotation-editor-body">${rotationFields}<div class="node-pool-toolbar"><span data-node-pool-count>Адресов: ${nodeRotationIPs(o).length} / 256</span><button type="button" class="gh sm" data-node-pool-normalize>Убрать повторы</button><button type="button" class="gh sm" data-node-pool-clear>Очистить</button></div><output data-node-pool-feedback aria-live="polite"></output>${rotationProbe}</div></section><section class="node-geo-section"><div class="node-form-section-title">GeoData и маршрутизация</div><p class="node-ip-hint">GeoSite/GeoIP скачивает сама нода. Правила применяются раньше общих правил профиля, но после StatsService.</p><div class="node-geo-fields">${nodeGeoFields}</div><p class="node-ip-hint">После сохранения обновите Agent; применение подтверждается на ноде.</p></section><section class="node-billing-section"><div class="node-form-section-title">Инфрабиллинг</div><p class="node-ip-hint">Стоимость, аренда и напоминания</p><div class="node-billing-fields">${billingFields}</div></section></div>`
+    ?'<div class="node-form-layout"><section class="node-main-section"><div class="node-form-section-title">Основные параметры</div><p class="node-section-intro">Подключение, профиль Xray и ограничения узла</p><div class="node-form-grid">'+nodeMainFields+'</div>'+nodeResetAction+'</section>'+`<section class="node-ip-section"><div class="node-form-section-title">IP-пул и ротация</div><div class="node-ip-hint">Адреса должны принадлежать этому VPS и быть доступны извне.</div><div class="node-rotation-editor-body">${rotationFields}<div class="node-pool-toolbar"><span data-node-pool-count>Адресов: ${nodeRotationIPs(o).length} / 256</span><button type="button" class="gh sm" data-node-pool-normalize>Убрать повторы</button><button type="button" class="gh sm" data-node-pool-clear>Очистить</button></div><output data-node-pool-feedback aria-live="polite"></output>${rotationProbe}</div></section><section class="node-billing-section"><div class="node-form-section-title">Инфрабиллинг</div><p class="node-ip-hint">Стоимость, аренда и напоминания</p><div class="node-billing-fields">${billingFields}</div></section></div>`
     :standardFields;
   modal(`<form class="box" data-k="ent" data-ent="${k}" data-id="${id||''}" method="dialog"><h2>${id?'Изменить':'Новый'}: ${e.nw.toLowerCase()}</h2>${fields}<p class="er" id="fe"></p><div class="act">${id?`<button type="button" class="dg" data-del="${k}:${id}" style="margin-right:auto">${ic('trash')}Удалить</button>`:''}${k==='hosts'&&id?`<button type="button" class="gh" data-host-duplicate="${id}">${ic('copy')}Дублировать</button>`:''}<button type="button" class="gh" data-x>Отмена</button><button class="btn">Сохранить</button></div></form>`,k==='nodes'?'node-wide':k==='hosts'?'host-wide':k==='squads'?'squad-wide':k=='profiles'||k=='subs'?'wide':'');
   if(k==='squads')squadEditorRefresh(dlg.querySelector('form[data-ent="squads"]'));
@@ -2536,7 +2536,7 @@ async function nodesP(){
         ${nodeGauge(n,'traffic-'+n.id,'Трафик сети',n.limit?k*100:0,trafficGb===null?'—':n.limit?Math.round(k*100)+'%':'∞',trafficGb===null?'нет данных':(n.limit?`${gb(trafficGb)} / ${gb(n.limit)}`:`${gb(trafficGb)} · без лимита`)+(nodeTrafficFactor(n)!==1?` · ×${nodeTrafficFactor(n)} (учётный)`:''),tc)}
       </div>
       <div class="mb node-speed"><div><span>Текущая скорость</span><b id="nm${n.id}">${Number.isFinite(l.mbps)?fmt(l.mbps)+' Мбит/с':'—'}</b></div><div class="pb f" style="--w:${Number.isFinite(l.mbps)?cl(l.mbps/240*100,0,100):0}%" id="npm${n.id}"><i></i></div></div>
-      <div class="acts"><button class="gh sm" data-node-bootstrap="${n.id}">${ic('link')}Подключить ноду и метрики</button><button class="gh sm" data-nr="${n.id}" ${n.disabled?'disabled title="Сначала включите узел после восстановления лимита"':''}>${ic('redo')}Перезапуск</button><button class="gh sm" data-xray-update="${n.id}">${ic('upload')}Обновить Xray</button><button class="gh sm" data-agent-update="${n.id}" title="Обновить управляющий Agent через подтверждённую команду ноде">${ic("refresh-cw")}Обновить Agent</button><button class="gh sm" data-nt="${n.id}">${ic(n.disabled?'play':'pause')}${n.disabled?'Включить':'Отключить'}</button><button class="gh sm" data-ne="nodes:${n.id}">${ic('pen')}Изменить</button><button class="gh sm" data-node-create-host="${n.id}">${ic('globe')}Создать хост</button></div></div>`;
+      <div class="acts"><button class="gh sm" data-node-bootstrap="${n.id}">${ic('link')}Подключить ноду и метрики</button><button class="gh sm" data-nr="${n.id}" ${n.disabled?'disabled title="Сначала включите узел после восстановления лимита"':''}>${ic('redo')}Перезапуск</button><button class="gh sm" data-xray-update="${n.id}">${ic('upload')}Обновить Xray</button><button class="gh sm" data-agent-update="${n.id}" title="Обновить управляющий Agent через подтверждённую команду ноде">${ic("refresh-cw")}Обновить Agent</button><button type="button" class="gh sm node-geodata-open" data-node-geodata="${n.id}" title="Настройки GeoData и ручное обновление файлов на этом узле">${ic("globe")}Обновить GeoData</button><button class="gh sm" data-nt="${n.id}">${ic(n.disabled?'play':'pause')}${n.disabled?'Включить':'Отключить'}</button><button class="gh sm" data-ne="nodes:${n.id}">${ic('pen')}Изменить</button><button class="gh sm" data-node-create-host="${n.id}">${ic('globe')}Создать хост</button></div></div>`;
   }).join('');
   const empty=`<div class="card empty"><b>Узлов пока нет</b><span>Список начнёт заполняться после добавления ваших серверов.</span><button class="btn sm" data-ne="nodes">${ic('plus')}Добавить узел</button></div>`;
   const gridMode=getNodeGridMode();
@@ -2775,6 +2775,19 @@ document.addEventListener('input',e=>{
 });
 document.addEventListener('click',async e=>{
   const g=s=>e.target.closest(s);let b;
+  if(b=g('[data-node-geodata]')){
+    e.preventDefault();
+    const node=DB.nodes.find(item=>Number(item.id)===Number(b.dataset.nodeGeodata));
+    if(!node){toast('Узел не найден.');return}
+    if(!window.XMeshNodeGeoData?.open){toast('Не удалось загрузить окно GeoData. Обновите панель.');return}
+    window.XMeshNodeGeoData.open({
+      node, modal, apiRequest:backendRequest,
+      updateNode:(patch)=>api.update('nodes',node.id,patch),
+      notify:toast,
+      afterSave:()=>{if(cur==='nodes')void render(1);}
+    });
+    return;
+  }
   if(b=g('[data-row-sub-copy]')){
     e.preventDefault();
     const id=Number(b.dataset.rowSubCopy);b.disabled=true;
@@ -3480,7 +3493,7 @@ document.addEventListener('submit',async e=>{const f=e.target,k=f.dataset.k;if(!
     }catch(error){er('Не удалось сохранить пользователя: '+(error.message||'ошибка API'))}
     finally{delete f.dataset.saving;if(button?.isConnected)button.disabled=false}
   }
-  else if(k=='ent'){e.preventDefault();const key=f.dataset.ent,e2=ENT[key],d=read(e2.fs,f),id=f.dataset.id,m=e2.chk?.(d,+id);if(m)return er(m);
+  else if(k=='ent'){e.preventDefault();const key=f.dataset.ent,e2=ENT[key],d=read(key==='nodes'?e2.fs.filter(field=>!field.k.startsWith('geo')):e2.fs,f),id=f.dataset.id,m=e2.chk?.(d,+id);if(m)return er(m);
     if(key==='admins'){
       if(!id&&d.password.length<16)return er('Для нового администратора требуется пароль минимум 16 символов.');
       if(id&&!d.password)delete d.password;
