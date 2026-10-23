@@ -582,6 +582,9 @@ async fn delete_record(
                 let count = nodes.len();
                 nodes.retain(|v| v.as_i64() != Some(id) && v.as_str() != Some(&id.to_string()));
                 if nodes.len() != count {
+                    // Empty host node lists mean "all nodes": disable the host instead
+                    // of accidentally exposing it on every remaining node.
+                    if nodes.is_empty() { data["disabled"] = Value::Bool(true); }
                     sqlx::query("UPDATE panel_records SET data = $1 WHERE collection = 'hosts' AND id = $2")
                         .bind(&data).bind(host_id).execute(&mut *tx).await?;
                 }
@@ -601,7 +604,7 @@ async fn delete_record(
         sqlx::query("DELETE FROM node_metric_keys WHERE node_id = $1")
             .bind(id).execute(&mut *tx).await?;
         sqlx::query("DELETE FROM node_metric_nonces WHERE node_id = $1")
-            .bind(id).execute(&state.pool).await?;
+            .bind(id).execute(&mut *tx).await?;
         sqlx::query("DELETE FROM node_ip_rotation_cursors WHERE node_id = $1")
             .bind(id)
             .execute(&mut *tx)
@@ -609,7 +612,7 @@ async fn delete_record(
     } else if collection == "users" {
         sqlx::query("DELETE FROM node_ip_rotation_cursors WHERE user_id = $1")
             .bind(id)
-            .execute(&state.pool)
+            .execute(&mut *tx)
             .await?;
     }
     tx.commit().await?;
