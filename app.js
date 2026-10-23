@@ -2824,7 +2824,7 @@ document.addEventListener('click',async e=>{
     try{
       const runtime=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/runtime');
       if(!runtime.connected)throw new Error('Нет свежей связи с управляющим агентом. Проверьте подключение ноды.');
-      if(!/^control-v(?:4|5)\./.test(String(runtime.version||''))){
+      if(!/^control-v4[.]/.test(String(runtime.version||''))){
         throw new Error('Agent '+(runtime.version||'неизвестной версии')+' не поддерживает дистанционное самообновление. Требуется один раз установить Agent v4 штатным скриптом на ноде; затем SSH больше не нужен.');
       }
       const confirmed=await panelConfirm(
@@ -2847,9 +2847,14 @@ document.addEventListener('click',async e=>{
         if(status.state==='failed')throw new Error(status.result||'Agent не смог завершить обновление.');
       }
       if(status?.state!=='succeeded')throw new Error('Agent не подтвердил установку в течение трёх минут.');
-      const observed=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/runtime');
-      if(!observed.connected)throw new Error('Обновление завершено, но свежий heartbeat ноды пока не получен.');
-      toast(node.name+': '+(status.result||'Agent успешно обновлён'));
+      let observed=null;
+      for(let attempt=0;attempt<8;attempt++){
+        observed=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/runtime');
+        if(observed.connected&&observed.version===request.targetVersion)break;
+        await new Promise(resolve=>setTimeout(resolve,2500));
+      }
+      toast(node.name+': '+(status.result||'Agent успешно обновлён')+
+        (observed?.version!==request.targetVersion?' · ожидается новый heartbeat':''));
       if(cur==='nodes')updateNodeRuntimeBadges(node,observed);
     }catch(error){toast('Обновление Agent: '+(error.message||'ошибка API'))}
     finally{
