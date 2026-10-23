@@ -13,7 +13,7 @@ window.XMeshSubscriptionStudio = (() => {
     subscriptionHero:'',subscriptionHeroEn:'',subscriptionCta:'',subscriptionCtaEn:'',subscriptionLogoUrl:'',subscriptionSupportLabel:'Поддержка',subscriptionSupportLabelEn:'',
     subscriptionSupportUrl:'',subscriptionClientLayout:'grid',
     subscriptionJson:{dns:'cloudflare',queryStrategy:'UseIPv4',routingStrategy:'IPIfNonMatch',
-      balance:'leastPing',smart:true,sniffing:true,dnsRouting:true,socksPort:10808,httpPort:10809},
+      balance:'leastPing',smart:true,sniffing:true,dnsRouting:false,socksPort:10808,httpPort:10809},
     subscriptionAppsTitle:'',subscriptionAppsTitleEn:'',subscriptionCustomClients:[],
     subscriptionShowStatus:true,subscriptionShowApps:true,subscriptionShowQr:true,
     subscriptionShowCopy:true,subscriptionShowSupport:false,subscriptionShowDevices:false
@@ -198,7 +198,7 @@ window.XMeshSubscriptionStudio = (() => {
       '<div class="subscription-studio-heading"><span>05</span><div><h3>XRAY JSON ENGINE</h3><p>Параметры клиентской подписки, DNS и автовыбора.</p></div></div>',
       '<div class="subscription-studio-pair">',
       '<label class="f subscription-field"><span>DNS</span><select name="json_dns">'+
-        [['cloudflare','Cloudflare DoH'],['yandex','Yandex DoH'],['system','Системный DNS']].map(([key,title])=>'<option value="'+key+'"'+(data.subscriptionJson.dns===key?' selected':'')+'>'+title+'</option>').join('')+'</select></label>',
+        [['cloudflare','Cloudflare · 1.1.1.1 (надёжный режим)'],['cloudflare_doh','Cloudflare · DoH по IP (расширенный)'],['yandex','Yandex · DoH'],['system','Системный DNS']].map(([key,title])=>'<option value="'+key+'"'+(data.subscriptionJson.dns===key?' selected':'')+'>'+title+'</option>').join('')+'</select></label>',
       '<label class="f subscription-field"><span>DNS Query Strategy</span><select name="json_queryStrategy">'+
         [['UseIPv4','IPv4'],['UseIPv6','IPv6'],['UseIP','IPv4 + IPv6']].map(([key,title])=>'<option value="'+key+'"'+(data.subscriptionJson.queryStrategy===key?' selected':'')+'>'+title+'</option>').join('')+'</select></label>',
       '</div><div class="subscription-studio-pair">',
@@ -213,8 +213,11 @@ window.XMeshSubscriptionStudio = (() => {
       '<div class="subscription-display-options subscription-visibility">',
       '<label><input type="checkbox" name="json_smart"'+(data.subscriptionJson.smart?' checked':'')+'> SMART при нескольких серверах</label>',
       '<label><input type="checkbox" name="json_sniffing"'+(data.subscriptionJson.sniffing?' checked':'')+'> Sniffing</label>',
-      '<label><input type="checkbox" name="json_dnsRouting"'+(data.subscriptionJson.dnsRouting?' checked':'')+'> DNS Outbound</label>',
-      '</div><p class="note">Незащищённые подключения не публикуются. Серверы с одинаковым IP сохраняются.</p>',
+      '<label><input type="checkbox" name="json_dnsRouting"'+(data.subscriptionJson.dnsRouting?' checked':'')+'> Перехватывать DNS-запросы (расширенный режим)</label>',
+      '</div><p class="note">По умолчанию DNS — 1.1.1.1 без дополнительного DNS outbound. '+
+      'Обычный интернет-трафик по-прежнему направляется через VLESS, а не напрямую. '+
+      'Перехват DNS:53 в отдельный DNS outbound включайте только если он действительно необходим. '+
+      'Незащищённые подключения не публикуются. Серверы с одинаковым IP сохраняются.</p>',
       '</section>',
       '<section class="card subscription-studio-section">',
       '<div class="subscription-studio-heading"><span>06</span><div><h3>Клиентские приложения</h3><p>Выбирайте, какие программы показать пользователю, и задавайте собственные ссылки на установку.</p></div></div>',
