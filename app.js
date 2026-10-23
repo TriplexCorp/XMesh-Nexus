@@ -2864,7 +2864,7 @@ document.addEventListener('click',async e=>{
     b.dataset.loading='1';b.disabled=true;
     try{
       const runtime=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/runtime');
-      if(!runtime.connected||!String(runtime.version||'').startsWith('control-v3')){
+      if(!runtime.connected||!/^control-v(?:3|4)[.]/.test(String(runtime.version||''))){
         throw new Error('Для выбора версии требуется управляющий агент control-v3. Обновите агент ноды.');
       }
       const catalog=await backendRequest('/api/v1/nodes/xray-releases');
@@ -2903,7 +2903,7 @@ document.addEventListener('click',async e=>{
      b.dataset.loading='1';b.disabled=true;
      try{
        const state=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/runtime');
-       if(!state.connected||!/^control-v[12]/.test(String(state.version||''))){
+       if(!state.connected||!/^control-v[1-9]/.test(String(state.version||''))){
          throw new Error('Нет управляющего агента. Агент метрик не выполняет перезапуск: обновите его через «Подключить ноду и метрики».');
        }
        const confirmed=await panelConfirm(
