@@ -581,13 +581,17 @@ pub async fn desired_config(
     let now=std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default().as_millis() as i64;
     provision_proxy_users(&mut config,&users,&squads,now)?;
+    // GeoData is node-scoped, not persisted into a shared XRAY STUDIO profile.
+    let geo_data=crate::node_geodata::apply(&node,&mut config)?;
     let digest=hex::encode(sha2::Sha256::digest(serde_json::to_vec(&config).unwrap_or_default()));
     // Conserve offline allowances across all currently enabled nodes. Large
     // deployments should replace this bound with server-side reserved leases.
     let nodes=crate::load_records(&state.pool,"nodes").await?;
     let active_nodes=nodes.iter().filter(|node|
         node.get("disabled").and_then(Value::as_bool)!=Some(true)).count().max(1) as i64;
-    let policy=build_offline_policy(&config,&users,request.node_id,now,&digest,active_nodes);
+    let mut policy=build_offline_policy(&config,&users,request.node_id,now,&digest,active_nodes);
+    // Metadata is covered by the existing Ed25519 node-policy signature.
+    if let Some(manifest)=geo_data { policy["geoData"]=manifest; }
     let signature=state.node_policy_signer.sign(&policy)
         .map_err(|_|ApiError::new(StatusCode::INTERNAL_SERVER_ERROR,"Node policy signing failed."))?;
     Ok(Json(json!({
