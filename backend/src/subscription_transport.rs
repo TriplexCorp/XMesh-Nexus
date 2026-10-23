@@ -49,8 +49,9 @@ const GRPC_FIELDS:&[&str]=&["serviceName","authority","multiMode","user_agent",
 const HTTPUPGRADE_FIELDS:&[&str]=&["path","host"];
 const RAW_FIELDS:&[&str]=&["header"];
 const HYSTERIA_FIELDS:&[&str]=&["version","udpIdleTimeout"];
+const MASQUE_FIELDS:&[&str]=&["path"];
 const KCP_FIELDS:&[&str]=&[
-    "mtu","tti","uplinkCapacity","downlinkCapacity","cwndMultiplier","maxSendingWindow"
+    "mtu","tti","uplinkCapacity","downlinkCapacity","cwndMultiplier","maxSendingWindow","header","seed"
 ];
 
 fn object_or_json(value:&Value)->Option<Value>{
@@ -63,9 +64,8 @@ fn effective_xhttp(config:&Value)->Value{
     let Some(extra)=config.get("extra").and_then(object_or_json) else{return config.clone()};
     let mut effective=extra;
     for key in ["host","path","mode"]{
-        if let Some(v)=config.get(key).filter(|v|v.is_string()){
-            effective[key]=v.clone();
-        }
+        effective[key]=config.get(key).filter(|v|v.is_string())
+            .cloned().unwrap_or_else(||json!(""));
     }
     effective
 }
@@ -87,6 +87,7 @@ fn client_transport(stream:&Value,inbound:&Value,host:&Value,device:&str,network
         "raw"|"tcp"=>("rawSettings",RAW_FIELDS),
         "mkcp"|"kcp"=>("kcpSettings",KCP_FIELDS),
         "hysteria"=>("hysteriaSettings",HYSTERIA_FIELDS),
+        "masque"=>("masqueSettings",MASQUE_FIELDS),
         _=>return json!({})
     };
     let mut config=stream.get(settings_key).cloned().unwrap_or_else(||json!({}));
@@ -130,6 +131,14 @@ fn client_transport(stream:&Value,inbound:&Value,host:&Value,device:&str,network
     if network=="grpc" {
         if let Some(service)=field(host,"serviceName"){transport["serviceName"]=json!(service)}
     }
+    if network=="masque" {
+        if let Some(extra)=client_metadata(inbound,host,"clientMasqueSettings"){
+            merge_allowed(&mut transport,extra,&["host","headers","xmux"]);
+        }
+        if let Some(hostname)=field(host,"host").or_else(||field(host,"externalHost")){
+            transport["host"]=json!(hostname);
+        }
+    }
     transport
 }
 
@@ -138,7 +147,8 @@ pub(crate) fn client_stream(inbound:&Value,host:&Value,device:&str)->Option<Valu
     let security=field(stream,"security").unwrap_or("none");
     let network=field(stream,"method").or_else(||field(stream,"network")).unwrap_or("raw");
     if !["none","tls","reality"].contains(&security){return None}
-    if !["raw","tcp","xhttp","ws","websocket","grpc","httpupgrade","mkcp","kcp","hysteria"].contains(&network){return None}
+    if !["raw","tcp","xhttp","ws","websocket","grpc","httpupgrade","mkcp","kcp","hysteria","masque"].contains(&network){return None}
+    if network=="masque" && (security!="tls" || field(inbound,"protocol")!=Some("masque")){return None}
     if security=="reality" && !["raw","tcp","xhttp","grpc"].contains(&network){return None}
     let mut out=if field(stream,"method").is_some(){json!({"security":security,"method":network})}
         else{json!({"security":security,"network":network})};
@@ -199,7 +209,8 @@ pub(crate) fn client_stream(inbound:&Value,host:&Value,device:&str)->Option<Valu
         let field=match network{
             "raw"|"tcp"=>"rawSettings","xhttp"=>"xhttpSettings","ws"|"websocket"=>"wsSettings",
             "grpc"=>"grpcSettings","httpupgrade"=>"httpupgradeSettings",
-            "mkcp"|"kcp"=>"kcpSettings","hysteria"=>"hysteriaSettings",_=>return None
+            "mkcp"|"kcp"=>"kcpSettings","hysteria"=>"hysteriaSettings",
+            "masque"=>"masqueSettings",_=>return None
         };
         out[field]=transport;
     }
