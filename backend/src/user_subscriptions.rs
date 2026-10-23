@@ -349,6 +349,16 @@ async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str)->Result
   for inbound in inbounds{
    let Some(tag)=nonempty(inbound,"tag")else{continue};
    if !tags.contains(tag){continue}
+   let stream=inbound.get("streamSettings").unwrap_or(&Value::Null);
+   let security=nonempty(stream,"security").unwrap_or("none");
+   let reality=stream.get("realitySettings").unwrap_or(&Value::Null);
+   let has_public_key=nonempty(reality,"publicKey").is_some() || nonempty(inbound,"publicKey").is_some();
+   let assigned_nodes=nodes.iter().filter(|n|n.get("profileId")==profile.get("id")
+      && n.get("disabled")!=Some(&Value::Bool(true))).count();
+   tracing::info!(profile_id=?profile.get("id").and_then(Value::as_i64),
+     inbound_tag=%tag, security=%security, assigned_nodes,
+     reality_public_key_in_profile=has_public_key,
+     "Subscription endpoint candidate");
    // Do not silently fall back to a node's raw address when an explicitly
    // configured public host is disabled or pinned to a different node.
    let any_explicit_host=hosts.iter().any(|h|
@@ -370,6 +380,9 @@ async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str)->Result
       outbounds.push(outbound);links.push(link)
      }
     }
+   }else if any_explicit_host{
+    tracing::warn!(inbound_tag=%tag, profile_id=?profile.get("id").and_then(Value::as_i64),
+      "Subscription explicit host exists but none matches enabled profile/node binding");
    }
   }
  }
