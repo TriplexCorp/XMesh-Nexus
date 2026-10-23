@@ -33,4 +33,4 @@ jobs:
       - uses: actions/checkout@v4
       - name: Compile and test GeoData policy
         working-directory: backend
-        run: cargo test node_geodata --locked
+        run: cargo test node_geodata
