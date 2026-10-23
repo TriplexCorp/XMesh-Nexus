@@ -12,7 +12,7 @@ assert.match(backend,/>= \(data->>'limit'\)::numeric\*1073741824/);
 assert.match(backend,/data->>'disabled'\)::boolean,false\)=false/,
  'Cutoff must happen exactly once per enabled node');
 assert.match(backend,/disabledReason.*traffic_limit/);
-assert.match(backend,/Лимит трафика узла исчерпан/);
+assert.match(app,/лимит трафика исчерпан/);
 assert.match(runtime,/enforceStop":true/);
 assert.match(runtime,/enforceStop":false/);
 assert.match(runtime,/Node disabled: Xray configuration updates blocked/);
