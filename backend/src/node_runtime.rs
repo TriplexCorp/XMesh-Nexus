@@ -53,7 +53,7 @@ pub async fn status(
     let record = sqlx::query(
         "SELECT version,router_running,xray_running,xray_version,
                 (EXTRACT(EPOCH FROM received_at)*1000)::BIGINT AS received_ms,
-                received_at > NOW() - INTERVAL '150 seconds' AS fresh
+                received_at > NOW() - INTERVAL '65 seconds' AS fresh
          FROM node_runtime_heartbeats WHERE node_id=$1"
     ).bind(node_id).fetch_optional(&state.pool).await?;
     match record {
