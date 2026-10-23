@@ -676,7 +676,7 @@ async fn patch_settings(
                 | "subscriptionLogoUrl" | "subscriptionSupportUrl" | "subscriptionShowStatus"
                 | "subscriptionShowApps" | "subscriptionShowQr" | "subscriptionShowCopy"
                 | "subscriptionShowSupport" | "subscriptionShowDevices"
-                | "subscriptionJson" | "subscriptionClients" | "subscriptionClientLinks"
+                | "subscriptionJson" | "clientBalancers" | "subscriptionClients" | "subscriptionClientLinks"
                 | "subscriptionAppsTitle" | "subscriptionAppsTitleEn" | "subscriptionCustomClients") {
             return Err(ApiError::new(StatusCode::BAD_REQUEST, format!("Неизвестное поле настроек: {key}")));
         }
@@ -748,6 +748,10 @@ async fn patch_settings(
         }
     }
     subscription_settings::validate(object)?;
+    if let Some(groups)=object.get("clientBalancers"){
+        subscription_json::validate_client_balancers(groups)
+            .map_err(|error|ApiError::new(StatusCode::BAD_REQUEST,error))?;
+    }
     if let Some(hooks) = object.get("hooks") {
         let hooks = hooks.as_object().ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Вебхуки должны быть объектом."))?;
         let allowed = [
