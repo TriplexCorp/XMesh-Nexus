@@ -2330,21 +2330,24 @@ function squadEditorRefresh(form){
     ['Назначенные ноды',nodeIds.size],
     ['Пользователи',users.length]
   ].map(([label,value])=>'<div class="squad-preview-stat"><b>'+value+'</b><small>'+label+'</small></div>').join('');
-  const hostList=hosts.length?hosts.slice(0,6).map(h=>
-    '<div class="squad-preview-line"><b>'+esc(h.remark||h.tag||'Хост')+'</b><small>'+esc(h.address||'Адрес не задан')+'</small></div>'
-  ).join('')+(hosts.length>6?'<small class="squad-help">И ещё '+(hosts.length-6)+' хост.</small>':''):
+  const hostList=hosts.length?hosts.slice(0,8).map(h=>
+    '<div class="squad-preview-line"><b>'+esc(h.remark||h.tag||'Хост')+'</b><small>'+esc(h.address||'Адрес не задан')+' · '+esc(h.tag||'Без тега')+' · '+(Array.isArray(h.nodes)?h.nodes.length:0)+' нод</small></div>'
+  ).join('')+(hosts.length>8?'<small class="squad-help">И ещё '+(hosts.length-8)+' хост.</small>':''):
     '<p class="squad-help">Для выбранных inbound нет включённых хостов.</p>';
-  const userList=users.length?users.slice(0,5).map(u=>'<span class="squad-user-chip">'+esc(u.username)+'</span>').join('')+
-    (users.length>5?'<span class="squad-user-chip">+'+(users.length-5)+'</span>':''):
+  const userList=users.length?users.slice(0,12).map(u=>'<span class="squad-user-chip">'+esc(u.username)+'</span>').join('')+
+    (users.length>12?'<span class="squad-user-chip">+'+(users.length-12)+'</span>':''):
     '<span class="squad-help">Пользователи ещё не назначены.</span>';
   const warnings=[];
   if(!selected.length)warnings.push('Не выбраны inbound: сквад не предоставит подключения.');
   if(missing.length)warnings.push('Отсутствуют в XRAY STUDIO: '+missing.join(', '));
   if(uncovered.length)warnings.push('Нет включённых хостов для: '+uncovered.join(', '));
   if(hosts.some(h=>!Array.isArray(h.nodes)||!h.nodes.length))warnings.push('У некоторых хостов не назначены ноды.');
+  const assignedNodes=[...nodeIds].map(id=>DB.nodes.find(n=>String(n.id)===id)).filter(Boolean);
+  const nodeList=assignedNodes.length?assignedNodes.slice(0,8).map(n=>'<span class="squad-user-chip">'+esc(n.name||n.addr||String(n.id))+'</span>').join(''):'<span class="squad-help">Нет назначенных нод</span>';
   preview.innerHTML='<div class="squad-preview-stats">'+stats+'</div>'+
     '<div class="squad-preview-section"><b>Хосты, соответствующие выбору</b><div class="squad-preview-list">'+hostList+'</div></div>'+
     '<div class="squad-preview-section"><b>Затронутые пользователи</b><div class="squad-user-list">'+userList+'</div></div>'+
+    '<div class="squad-preview-section squad-preview-nodes"><b>Связанные ноды</b><div class="squad-user-list">'+nodeList+'</div></div>'+
     (warnings.length?'<div class="squad-preview-warnings" role="note">'+warnings.map(w=>'<p>'+ic('alert-triangle')+esc(w)+'</p>').join('')+'</div>':'<p class="squad-preview-ready">'+ic('check')+'Связи в панели найдены. Доступность серверов проверяется отдельно.</p>');
 }
 document.addEventListener('input',event=>{
