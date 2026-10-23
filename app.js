@@ -2014,7 +2014,7 @@ async function nodesP(){
         ${nodeGauge(n,'traffic-'+n.id,'Трафик',n.limit?k*100:0,n.limit?Math.round(k*100)+'%':'∞',n.limit?`${gb(n.used)} / ${gb(n.limit)}`:`${gb(n.used)} · без лимита`,tc)}
       </div>
       <div class="mb node-speed"><div><span>Текущая скорость</span><b id="nm${n.id}">${Number.isFinite(l.mbps)?fmt(l.mbps)+' Мбит/с':'—'}</b></div><div class="pb f" style="--w:${Number.isFinite(l.mbps)?cl(l.mbps/240*100,0,100):0}%" id="npm${n.id}"><i></i></div></div>
-      <div class="acts"><button class="gh sm" data-node-bootstrap="${n.id}">${ic('link')}Подключить ноду и метрики</button><button class="gh sm" data-nr="${n.id}">${ic('redo')}Перезапуск</button><button class="gh sm" data-nt="${n.id}">${ic(n.disabled?'play':'pause')}${n.disabled?'Включить':'Отключить'}</button><button class="gh sm" data-ne="nodes:${n.id}">${ic('pen')}Изменить</button><button class="gh sm" data-node-create-host="${n.id}">${ic('globe')}Создать хост</button></div></div>`;
+      <div class="acts"><button class="gh sm" data-node-bootstrap="${n.id}">${ic('link')}Подключить ноду и метрики</button><button class="gh sm" data-nr="${n.id}">${ic('redo')}Перезапуск</button><button class="gh sm" data-xray-update="${n.id}">${ic('upload')}Обновить Xray</button><button class="gh sm" data-nt="${n.id}">${ic(n.disabled?'play':'pause')}${n.disabled?'Включить':'Отключить'}</button><button class="gh sm" data-ne="nodes:${n.id}">${ic('pen')}Изменить</button><button class="gh sm" data-node-create-host="${n.id}">${ic('globe')}Создать хост</button></div></div>`;
   }).join('');
   const empty=`<div class="card empty"><b>Узлов пока нет</b><span>Список начнёт заполняться после добавления ваших серверов.</span><button class="btn sm" data-ne="nodes">${ic('plus')}Добавить узел</button></div>`;
   const gridMode=getNodeGridMode();
@@ -2485,6 +2485,40 @@ document.addEventListener('click',async e=>{
     }catch(error){if(result)result.textContent=error.message||'Не удалось получить адрес.'}
     finally{b.disabled=false}
   }
+  else if(b=g('[data-xray-update]')){
+    const id=Number(b.dataset.xrayUpdate),node=DB.nodes.find(n=>Number(n.id)===id);
+    if(!node){toast('Узел не найден.');return}
+    if(b.dataset.loading==='1')return;
+    b.dataset.loading='1';b.disabled=true;
+    try{
+      const runtime=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/runtime');
+      if(!runtime.connected||!String(runtime.version||'').startsWith('control-v2')){
+        throw new Error('Нужен управляющий агент control-v2. Переустановите агент узла.');
+      }
+      const confirmed=await panelConfirm(
+        'Установить актуальный образ Xray на «'+node.name+'»? Обновление доступно только для xmesh-managed-xray. Перед запуском агент проверит конфигурацию, а при неудаче восстановит предыдущий образ. Активные подключения могут прерваться.',
+        {title:'Обновление Xray на узле',confirmLabel:'Обновить Xray'}
+      );
+      if(!confirmed)return;
+      const request=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/xray-update',{
+        method:'POST',body:JSON.stringify({})
+      });
+      toast('Обновление поставлено в очередь. Ожидаем результат узла.');
+      const deadline=Date.now()+180000;
+      let status=null;
+      while(Date.now()<deadline){
+        await new Promise(resolve=>setTimeout(resolve,3000));
+        status=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/restart');
+        if(status.id!==request.id)throw new Error('Очередь команд изменилась.');
+        if(status.state==='succeeded')break;
+        if(status.state==='failed')throw new Error(status.result||'Ошибка обновления');
+      }
+      if(status?.state!=='succeeded')throw new Error('Узел не подтвердил обновление за три минуты.');
+      toast(node.name+': '+(status.result||'обновление успешно'));
+      if(cur==='nodes')render(1);
+    }catch(error){toast('Обновление Xray: '+(error.message||'ошибка API'))}
+    finally{delete b.dataset.loading;b.disabled=false}
+  }
   else if(b=g('[data-nr]')){
      const id=Number(b.dataset.nr),node=DB.nodes.find(n=>Number(n.id)===id);
      if(!node){toast('Нода больше не существует. Обновите список.');return}
@@ -2492,7 +2526,7 @@ document.addEventListener('click',async e=>{
      b.dataset.loading='1';b.disabled=true;
      try{
        const state=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/runtime');
-       if(!state.connected||!String(state.version||'').startsWith('control-v1')){
+       if(!state.connected||!/^control-v[12]/.test(String(state.version||''))){
          throw new Error('Нет управляющего агента. Агент метрик не выполняет перезапуск: обновите его через «Подключить ноду и метрики».');
        }
        const confirmed=await panelConfirm(
