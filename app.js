@@ -1196,16 +1196,24 @@ async function drawUsers(){
   drawBulk();
 }
 function drawBulk(){const b=$('#bulk'),n=UQ.sel.size;if(!b)return;b.classList.toggle('on',n>0&&cur=='users');if(!n){b.innerHTML='';return}b.innerHTML=`<b style="padding:0 .5rem">Выбрано ${n}</b>${UIDS.length>n?`<button class="gh sm" data-bk="all">Выбрать все ${UIDS.length}</button>`:''}<button class="gh sm" data-bk="on">Включить</button><button class="gh sm" data-bk="off">Отключить</button><button class="gh sm" data-bk="reset">Сбросить трафик</button><button class="gh sm" data-bk="ext">${ic('calendar')}Продлить…</button><button class="gh sm" data-bk="sq">В сквад</button><button class="dg sm" data-bk="del">${ic('trash')}Удалить</button><button class="ia" data-bk="clr" aria-label="Снять выбор">${ic('x')}</button>`;decorateButtonIcons(b)}
-const USER_AVATAR_PALETTE=[
-  ['#ff9b65','#e95e83'],['#76a8ff','#6c70d9'],['#49d5b1','#168c9c'],
-  ['#f3b85b','#e5774b'],['#bc8dff','#8058c8'],['#f17da5','#b953a2'],
-  ['#7fc98b','#3b9d8a'],['#6bbbe8','#5279cc'],['#d5a67d','#a56883'],
-  ['#e89fd8','#9574c9'],['#a4c766','#63a47a'],['#e8a07d','#d26c65']
-];
+// Deterministic, high-variation Telegram-inspired gradients (no color flicker).
 function userAvatarStyle(u){
-  const key=String(u?.id??u?.username??'');
-  const hash=hs(key),colors=USER_AVATAR_PALETTE[hash%USER_AVATAR_PALETTE.length];
-  return 'background:linear-gradient(145deg,'+colors[0]+','+colors[1]+');color:#fff';
+  const key=String(u?.id??u?.username??'unknown');
+  let h=2166136261;
+  for(const c of key)h=Math.imul(h^c.codePointAt(0),16777619)>>>0;
+  const hue=h%360;
+  const spread=28+((h>>>9)%66);
+  const hue2=(hue+spread)%360;
+  const hue3=(hue+Math.round(spread*.42))%360;
+  const sat=66+((h>>>16)%20);
+  const light=57+((h>>>22)%9);
+  const angle=115+(h%105);
+  return 'background-color:hsl('+hue+' '+sat+'% '+light+'%);'+
+    'background-image:linear-gradient('+angle+'deg,'+
+    'hsl('+hue+' '+sat+'% '+(light+8)+'%) 0%,'+
+    'hsl('+hue3+' '+Math.min(92,sat+5)+'% '+light+'%) 48%,'+
+    'hsl('+hue2+' '+sat+'% '+(light-13)+'%) 100%);'+
+    'color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.32)';
 }
 const uid=s=>{let h=hs(s),x='';for(let i=0;i<32;i++){h=(h*1664525+1013904223)>>>0;x+=(h>>>24&15).toString(16)}return x.replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/,'$1-$2-$3-$4-$5')};
 let UT='ov';
