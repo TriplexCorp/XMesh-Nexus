@@ -209,6 +209,39 @@ pub(crate) fn build(mut proxies:Vec<Value>,setting:&Value)->Result<Value,String>
     Ok(config)
 }
 
+/// Public subscription feed: each independently selectable server must be its
+/// own complete Xray JSON document in the returned JSON array. A monolithic
+/// config with multiple outbounds appears as just one item in Happ.
+/// SMART, when explicitly enabled, is offered as an *additional* item, never
+/// a replacement for the individual country/server choices.
+pub(crate) fn build_feed(proxies:Vec<Value>,settings:&Value)->Result<Value,String>{
+ if proxies.is_empty(){return Err("Нет доступных клиентских подключений".into())}
+ if proxies.len()>256{return Err("Превышен лимит подключений в одной подписке".into())}
+ let smart=smart_enabled(settings);
+ let mut entries=Vec::with_capacity(proxies.len()+usize::from(smart && proxies.len()>1));
+ if smart && proxies.len()>1 {
+  entries.push(build(proxies.clone(),settings)?);
+ }
+ // The same DNS/XHTTP/Reality settings are included in each standalone item.
+ // Stable source order and the original host remark are preserved.
+ let mut standalone_settings=settings.clone();
+ if let Some(opts)=standalone_settings.get_mut("subscriptionJson").and_then(Value::as_object_mut){
+  opts.insert("smart".to_owned(),Value::Bool(false));
+  opts.insert("balance".to_owned(),Value::String("off".to_owned()));
+ }
+ for proxy in proxies {
+  let cfg=build(vec![proxy],&standalone_settings)?;
+  if cfg["routing"].get("balancers").is_some()
+    || cfg.get("observatory").is_some()
+    || cfg["routing"]["rules"].as_array().is_some_and(|rules|
+      rules.iter().any(|rule|rule.get("balancerTag").is_some())) {
+   return Err("Одиночный сервер содержит запрещённый балансировщик".into());
+  }
+  entries.push(cfg);
+ }
+ Ok(Value::Array(entries))
+}
+
 /// Reject unknown or unsafe JSON Engine configuration instead of silently
 /// accepting privileged raw Xray fields from the appearance settings API.
 pub(crate) fn validate_settings(settings:&Value)->Result<(),String>{
@@ -240,6 +273,34 @@ mod tests{
    "streamSettings":{"security":"reality","network":"xhttp",
    "realitySettings":{"serverName":"example.com","publicKey":"public","shortId":"aa"},
    "xhttpSettings":{"path":"/test","mode":"stream-up"}}})
+ }
+ #[test] fn feed_exposes_one_full_json_profile_per_server(){
+  let mut nl=outbound("NL"); nl["tag"]=json!("🇳🇱 Нидерланды");
+  let mut pl=outbound("PL"); pl["tag"]=json!("🇵🇱 Польша");
+  let entries=build_feed(vec![nl,pl],&json!({})).unwrap();
+  let entries=entries.as_array().unwrap();
+  assert_eq!(entries.len(),2);
+  for (idx,entry) in entries.iter().enumerate(){
+   assert_eq!(entry["outbounds"].as_array().unwrap().len(),3);
+   assert_eq!(entry["outbounds"][0]["protocol"],"vless");
+   assert_eq!(entry["outbounds"][1]["tag"],"direct");
+   assert!(entry["routing"].get("balancers").is_none());
+   assert!(entry.get("observatory").is_none());
+   assert_eq!(entry["routing"]["rules"][2]["outboundTag"],
+     json!(format!("xmesh-{}-0001",if idx==0{"NL"}else{"PL"})));
+  }
+  assert_eq!(entries[0]["remarks"],"🇳🇱 Нидерланды");
+  assert_eq!(entries[1]["remarks"],"🇵🇱 Польша");
+ }
+ #[test] fn smart_is_an_optional_additional_profile(){
+  let entries=build_feed(vec![outbound("NL"),outbound("PL")],
+    &json!({"subscriptionJson":{"smart":true,"balance":"leastPing"}})).unwrap();
+  let arr=entries.as_array().unwrap();
+  assert_eq!(arr.len(),3);
+  assert_eq!(arr[0]["remarks"],"XMesh SMART");
+  assert!(arr[0]["routing"]["balancers"].is_array());
+  assert!(arr[1]["routing"].get("balancers").is_none());
+  assert!(arr[2]["routing"].get("balancers").is_none());
  }
  #[test] fn disabled_smart_never_emits_balancer_or_observatory(){
   for settings in [
