@@ -2,412 +2,154 @@
 
 **Documentation:** [Русский](README.md) · **English**
 
-**XMesh Nexus** is a self-hosted control plane for managing Xray-oriented VPN infrastructure. It provides a Rust/Axum API, a responsive web panel, PostgreSQL 18 + TimescaleDB, Redis 7, and Docker Compose deployment.
+**XMesh Nexus** is a self-hosted Xray-core infrastructure management panel for users, nodes, hosts, squads, XRAY STUDIO, subscriptions, monitoring and administration. The API is built with **Rust (Tokio/Axum)**, persistent data uses **PostgreSQL 18 + TimescaleDB**, ephemeral state uses **Redis 7**, and the panel is deployed with Docker Compose.
 
-> **Project status:** The repository currently implements the management/control plane, not a ready-to-run VPN traffic service or public subscription server. See [Scope and limitations](#current-scope) and [Subscription Studio](#subscription-studio--control-plane-only) before deploying.
+> **Source-code status as of October 23, 2026:** this is an actively developed project. The repository **does** include public subscription endpoints, native Xray client JSON generation, managed-node integration and Xray-derived user traffic accounting. Running VPN traffic still requires a separately installed [XMesh-Node](https://github.com/TriplexCorp/XMesh-Node) runtime on each VPS, working Xray configuration and correct networking. A feature existing in the code or UI does not prove that a particular node has applied it successfully.
 
-## Recent interface and security updates (October 2026)
+## Implementation status
 
-- **SUBSCRIPTION STUDIO:** the customer-facing **preview** lets visitors choose **RU / EN**, independently of the administrator language. The blueprint includes separately editable, server-validated bilingual headings, descriptions, CTAs, support labels and footers. The public Subscription Service is maintained separately; this does **not** automatically deploy the switcher to an existing public portal.
-- **Personalization:** independent **text size 75–160% at 1-percentage-point precision**, manual numeric input and a separate 1/10 snapping selector, without coupling text size to workspace width.
-- **Security:** a durable global cross-username failed-login budget, stale login-attempt cleanup, accurate session activity tracking, HTML encoding of toast action labels, and restricted static index fallback.
-- **Audit:** [findings, limitations and operational checklist (Russian)](docs/SECURITY_AUDIT_2026-10-22.md). Static checks do not replace runtime penetration testing.
-
-## Architecture and data ownership
-
-- **PostgreSQL / TimescaleDB** share one PostgreSQL engine and one database. Regular PostgreSQL tables own business data: panel collections, users, nodes, Xray profiles, hosts, squads, settings, administrators, sessions and durable audit records.
-- **TimescaleDB hypertables** store high-volume time-series data: server metric samples and operational event history. Migration 0004 creates `server_metric_samples` and `panel_events`. The dashboard's RX/TX chart reads the hypertable directly and supports 1-hour/24-hour ranges plus node/squad filters. Install the optional per-node Linux metrics agent from **Nodes → Agent metrics** to start populating the chart. Without an agent, the graph shows an explicit empty state; it never fabricates traffic.
-- **Redis** provides shared login throttling and is reserved for cache, short-lived state and coordination. It is private to the Compose network, password-protected, memory-limited to 128 MiB and intentionally ephemeral. Durable panel data never depends on Redis persistence.
-- PostgreSQL connection pool limits are configurable through DB_MAX_CONNECTIONS (default 20). Readiness checks verify PostgreSQL and Redis; SQL migrations enable TimescaleDB as part of application startup.
-- PostgreSQL custom-format backups include both regular tables and TimescaleDB data. Store copies off-host and test restores before production changes.
-
-## Current scope
-
-- Rust API service and PostgreSQL persistence for panel collections: users, nodes, Xray profiles, hosts, squads, templates, administrators, tokens and settings.
-- Persistent records, settings, administrator sessions and audit log in PostgreSQL (not browser-only localStorage).
-- Redis-backed shared login throttling across panel instances, with PostgreSQL retaining the durable rate-limit fallback.
-- Administrator sign-in with Argon2 password hashing, a dedicated /login page, a 12-hour HttpOnly/SameSite session cookie, and an audit log for mutations.
-- Real SQL-backed administrator accounts with owner/admin/viewer roles. The server, not the UI, checks permissions on every write, core update and settings change. The owner may create accounts, change passwords/roles, or disable accounts. Such changes revoke existing sessions; the last active owner cannot be removed. Existing authenticated accounts migrate to owner to preserve access.
-- Server-side guard for the panel entry point, same-origin validation for state-changing API requests, and persistent account-based login throttling (8 failed attempts within 15 minutes trigger a 15-minute cooldown).
-- Optional administrator TOTP two-factor authentication is supported. Enabled accounts must provide an authenticator or one-time recovery code after password verification, before a panel session is issued.
-- Xray-core version manager in **Settings → Xray-core**. The default target is latest; the service reads official release metadata from the XTLS/Xray-core GitHub project, downloads the expected Linux archive for the container architecture, verifies an advertised SHA-256 digest when GitHub supplies one, runs xray version to check the executable, and switches the active version atomically.
-- API/database readiness probes, Rust CI, and a non-root/read-only application container.
-
-**Runtime scope:** XMesh Nexus manages panel data and Xray-core binaries; it still does not start Xray as a VPN traffic service or configure active listeners. The optional Linux node metrics agent collects OS-level CPU/RAM/disk and network-interface RX/TX rates plus established TCP connection count. Interface traffic can include SSH, web-server and other services on the same NIC; it is not per-user accounting or guaranteed Xray-only traffic. Node health and online VPN-client counts are not yet inferred from these samples. No synthetic metrics are generated.
-
-## Administration hardening — first phase
-
-The **Administrators** section now manages actual `panel_auth_users` login accounts,
-not the old decorative `panel_records('admins')` entries. After the
-`0008_admin_rbac.sql` migration, existing sign-in accounts are retained as
-**owner**. Historical placeholder records in `panel_records('admins')` are
-intentionally *not* promoted to login accounts. The owner must issue a new
-password for each real account. Existing sessions remain valid until they
-expire, but roles are read from PostgreSQL on every request.
-
-Server authorization:
-- **Owner** — all panel CRUD, admin account creation/update/deletion, branding,
-  settings, Xray-core installation and Ed25519 node enrollment.
-- **Admin** — operational collection CRUD, VLESS Encryption generation and
-  authorized IP rotation tests. Cannot change global settings, manage
-  authentication accounts, or issue node credentials.
-- **Viewer** — read-only panel data and metrics. All mutations are denied by
-  the Rust API, irrespective of hidden or enabled browser controls.
-
-The last active owner is protected. Changing an account's role, password,
-or active state revokes that account's sessions. Account password hashes are
-never returned to the frontend or audit log. Account creation requires a
-16–1024-character password. An owner cannot delete or demote their own account.
-
-**Not yet implemented:** real API bearer tokens for integrations,
-granular per-collection permissions,
-per-admin user quotas, and full browser/integration penetration testing.
-Former settings UI generated a fake token string; it has been replaced with
-an explicit disabled-state notice, and the legacy `tokens` collection is
-blocked by the API. Never use legacy token-like strings as credentials.
-
-The HTTP API sends a restrictive Content Security Policy (CSP), rejects
-cross-origin mutation requests using Fetch Metadata and Origin/Host checks,
-and refuses missing or expired sessions. TLS is still provided by the
-operator's reverse proxy. Do not publicly expose a panel without HTTPS and
-a properly secured proxy configuration.
-
-### Advanced security policy
-
-**Security → Advanced protection** provides server-side PostgreSQL-backed controls:
-
-- **Session lifetime:** 1–168 hours, affecting newly created cookies and sessions and enforced on subsequent requests.
-- **Inactivity timeout:** 0–1440 minutes (0 disables idle expiry).
-- **Simultaneous sessions:** 1–20 per administrator; older sessions are revoked when new ones exceed the limit.
-- **Login attempts:** 3–15 failures, with a 5–120-minute lockout period.
-- **Sole dashboard/login entry URL:** `/dashboard/slug` (ASCII letters, numbers, hyphens and underscores).
-- **My sessions:** inspect active sign-ins, revoke any session, or sign out all other sessions.
-
-Only **owner** accounts may edit the security policy. Active sessions are scoped to the signed-in administrator.
-
-**The dashboard path is an extra entrypoint, not a security boundary.** The authenticated root route and API remain accessible. Reverse-proxy URL masking, HTTPS, IP restrictions and deployment base-path changes must be configured separately.
-
-## Advanced security policies and active sessions
-
-In **System → Security**, the panel provides real server-enforced controls stored in PostgreSQL under `app_settings.security`. Only an **owner** may change the global policy. Other administrators can view it and manage their **own** active sessions.
-
-| Control | Range | Default |
+| Area | Implemented | Prerequisites / limits |
 | --- | --- | --- |
-| Absolute session lifetime | 1–168 hours | 12 h |
-| Idle timeout | 0–1440 minutes (0 = disabled) | Disabled |
-| Concurrent sessions per administrator | 1–20 | 5 |
-| Failed login attempts before lockout | 3–15 | 8 |
-| Lockout duration and attempt window | 5–120 minutes | 15 min |
-| Sole dashboard/login entry URL | `/dashboard/slug` (4–64 characters after the prefix) | randomly generated on installation |
+| **Control plane** | Web panel, Rust API, server-side storage of users, nodes, hosts, squads and settings | A saved panel state is not proof of applied node state |
+| **XRAY STUDIO** | Editable and validated Xray JSON, profile tools, inbound/host/node associations | The public subscription generator does not support every protocol offered by the editor |
+| **Managed nodes** | Ed25519 enrollment, signed requests, heartbeats, desired configuration, restart/update commands | Node-side execution is provided by [XMesh-Node](https://github.com/TriplexCorp/XMesh-Node) |
+| **Subscriptions** | Token issuing/revocation, public URL, HTML portal, native Xray JSON, RU/EN, User-Agent device negotiation | Public outbound generation is currently **VLESS-oriented** and needs valid user, squad, profile and endpoint data |
+| **SUBSCRIPTION STUDIO** | Domain/name, portal appearance, client-app catalog, JSON and balancer settings | DNS, HTTPS and reverse-proxy routing are operator responsibilities |
+| **Statistics** | Node RX/TX and system metrics; per-user/per-inbound traffic counters and diagnostic pages | Xray StatsService and up-to-date agents must report real samples |
+| **Security** | Server-enforced owner/admin/viewer roles, Argon2, sessions, rate limiting, TOTP, audit log | This is not a claim of a complete penetration test or guaranteed vulnerability-free deployment |
+| **IP pools** | Up to **256 addresses**, validation and persisted per-node/per-user round-robin cursor | Automatic rotation is **not yet integrated into public subscription generation** |
 
-On new sign-ins, the server enforces the session limit and revokes oldest sessions beyond the configured cap. A stricter lifetime also limits previously issued sessions on subsequent requests. The UI lists session creation, recent activity and expiration. An administrator can revoke a selected session or all their other sessions. Session management is scoped to the signed-in account.
+## Architecture and responsibilities
 
-The alternative dashboard URL is active immediately and **does not disable** `/`, kept as a recovery route. A different URL is *not* an access-control mechanism. To restrict public entry points, configure your own HTTPS reverse proxy carefully, preserving static asset and authenticated API routes.
+- **XMesh Nexus (this repository):** management UI, API, PostgreSQL records, public subscription handlers and signed desired-state policies.
+- **[XMesh-Node](https://github.com/TriplexCorp/XMesh-Node):** node-side Xray runtime, desired-configuration reconciliation, signed-policy validation and local enforcement.
+- **Metrics/control agents:** contact the panel over outbound HTTPS with Ed25519-signed requests; no inbound administrative port is required on the node.
+- **PostgreSQL with TimescaleDB:** one database for business records and time-series data. **Redis:** temporary state and login throttling.
+- **Xray-core on the VPS nodes** handles VPN traffic. A core binary managed within the panel container is **not** itself a running VPN listener.
 
-Endpoints: `GET/PATCH /api/v1/security/policy`, `GET /api/v1/security/sessions`, `DELETE /api/v1/security/sessions/{id}`, and `POST /api/v1/security/sessions/others`. All endpoints require authentication; policy updates require the owner role.
+### Saved settings are not the same as applied changes
 
-## Administrator two-factor authentication (TOTP)
+The panel provides `POST /api/v1/node/desired-config` with a desired Xray configuration, revision and signed policy. A separate node worker validates, tests and applies this data. **Automatic local-port mapping currently requires exactly one inbound in the assigned XRAY STUDIO profile**; do not assume arbitrary multi-inbound profiles work through that path.
 
-From **System → Security**, an administrator can enroll their
-own account after re-entering their current password. Scan the QR code using Google Authenticator, 2FAS, Aegis, or another compatible
-TOTP app. If you cannot scan it, use the manual Base32 key instead.
-The QR is generated locally with a bundled MIT-licensed encoder without external
-image requests. Confirm a six-digit code to finish enrollment. Only after successful confirmation
-does the account require a second factor at login. The 10 high-entropy recovery
-codes are shown once, and each code can be used for a single login (or to
-disable the second factor along with the password). Save them offline.
+Restart and update requests are asynchronous. A successfully queued request is not a verified restart: inspect agent heartbeat, operation status and the actual Xray process. See [autonomous nodes and signed policies](docs/AUTONOMOUS_NODES.md).
 
-Security properties:
-- Each 20-byte TOTP secret is encrypted at rest using AES-256-GCM with an
-  independent persistent `TOTP_ENCRYPTION_KEY`. Authentication fails closed for
-  enabled accounts if the key is missing or wrong. PostgreSQL backups do NOT
-  include this key; back it up securely and separately.
-- TOTP uses RFC 6238 HMAC-SHA1, six digits, 30-second periods and a ±1 window.
-  Accepted time steps cannot be reused. Use NTP on the host for correct time.
-- Password-only requests create short-lived (5 minute), bounded-attempt MFA
-  challenges, never authenticated sessions. Recovery codes are stored only as
-  hashes. Enrollment is valid for 10 minutes and requires a valid code.
-- Enabling and disabling MFA revoke other active sessions. Disabling requires
-  the current password AND a TOTP or unused recovery code. Repeated wrong
-  attempts are rate-limited via Redis and PostgreSQL.
-- API endpoints: `GET /api/v1/auth/mfa/status`, `POST .../setup`,
-  `POST .../confirm`, `POST .../disable` (all session-protected);
-  `POST .../verify` (challenge + factor before session issuance).
+## Install the panel
 
-**Deployment and upgrades:** fresh `./install.sh` installs a random
-`TOTP_ENCRYPTION_KEY` in the mode-0600 `.env`. On existing installations
-**update the panel first, then run `bash xmeshctl` and choose option 9,
-"Check and enable 2FA"**. This validates or safely provisions a missing/empty
-key and recreates only the panel container so Compose injects the new variable.
-Routine updates also validate the key. Existing valid keys are never replaced,
-and database volumes and admin credentials are preserved.
-If you previously enrolled MFA and lost the original key, restore the
-original `.env` backup rather than generating a new key; a replacement
-cannot decrypt already-enrolled TOTP secrets. For manual setup, generate the key with
-`openssl rand -hex 32` and append `TOTP_ENCRYPTION_KEY=<value>` to `.env`
-before restarting. Keep this value unchanged when rebuilding containers,
-restoring backups or moving hosts. Losing the key makes existing enabled
-TOTP accounts inaccessible until the original key is restored; there is no
-password-only bypass. Never commit the key to GitHub.
+Requirements: Linux, Docker Engine, Docker Compose plugin, Git and OpenSSL.
 
-## Installation
-
-Prerequisites: a Linux VPS with Docker Engine, the Docker Compose plugin, Git and OpenSSL.
-
-~~~bash
+```bash
 git clone https://github.com/TriplexCorp/XMesh-Nexus.git
 cd XMesh-Nexus
 chmod +x install.sh
 ./install.sh
-~~~
+```
 
-The script creates a restricted .env with random database and administrator secrets if one does not already exist, validates the Compose configuration, builds the Rust image and starts the stack. On first install it prints the initial administrator credentials once; save them. The file is kept with mode 0600.
+The installer provisions `.env`, secrets, the initial administrator and a dashboard entry path. Store the credentials and keys securely. Never commit `.env` or subscription tokens.
 
-The app listens on 127.0.0.1:8080 by default. Keep it private and configure your HTTPS reverse proxy to forward requests there. The session cookie is Secure by default because the production deployment is expected to use HTTPS. For temporary local-only testing without HTTPS, set COOKIE_SECURE=false in .env and restart the panel.
-
-Useful operations:
-
-~~~bash
-docker compose ps
-docker compose logs -f panel
-docker compose logs -f db
-docker compose logs -f redis
-docker compose restart panel
-docker compose down
-~~~
-
-### Interactive terminal CLI
-
-The `xmeshctl` menu lets you check service status, follow logs, restart the panel or stack, create a database backup, check readiness, start/stop services, and update the application from its tracked GitHub branch.
-
-~~~bash
-bash xmeshctl
-~~~
-
-The update action refuses to run with uncommitted local changes, creates a PostgreSQL backup first, fetches GitHub, applies only a fast-forward update, validates Compose configuration, and rebuilds/restarts the stack. It does not delete Docker volumes or reset credentials. If the backup fails or the branch has diverged, the update is stopped so you can investigate safely. Keep off-host copies of backups for disaster recovery.
-
-Create and verify a PostgreSQL custom-format backup, with 14-day local retention:
-
-~~~bash
-bash deploy/backup-postgres.sh
-~~~
-
-The script writes a permission-restricted dump to ./backups. Copy backups off the VPS as well; a local backup does not protect against loss of the server or its disk. To change retention or destination, set BACKUP_RETENTION_DAYS or BACKUP_DIR for the script process.
-
-Do not delete the postgres_data or core_data volumes during routine updates. Redis is intentionally ephemeral: its rate-limit counter can reset after a Redis restart, while the PostgreSQL-backed limit remains as a fallback.
-
-**Existing installations:** the database image has changed from vanilla PostgreSQL to TimescaleDB on the same PostgreSQL 18 major version. Take and verify a backup before deploying, keep the existing postgres_data volume, and do not run docker compose down -v. The migration enables the extension and creates additional time-series tables; it does not convert existing business tables into hypertables.
-
-## Node metrics agent and RX/TX dashboard
-
-On the home screen, the TimescaleDB RX/TX chart supports the last hour (1-minute buckets) and last 24 hours (15-minute buckets), with optional node and squad filters. Samples are stored in `server_metric_samples`.
-
-To start collecting real data, open **Nodes**, click **Agent metrics** on a node, and copy the displayed command. Run that command on the corresponding Linux node with root privileges. The panel issues an individual high-entropy token per node; only the SHA-256 hash is stored in PostgreSQL. The plaintext token is displayed once, stored on the node in `/etc/xmesh-node-metrics.env` with root-only permissions, and can be revoked by issuing a replacement token. Deleting the node also removes its token.
-
-The installer enables a systemd timer that samples once per minute. The first run records a baseline; the next run sends the first valid RX/TX rate. The agent automatically detects the network interface used by the default route; pass an optional interface name to the installer to choose another NIC. Use HTTPS for the panel URL. Check the agent on a node with:
-
-~~~bash
-systemctl status xmesh-node-metrics.timer
-journalctl -u xmesh-node-metrics.service -n 30 --no-pager
-~~~
-
-To stop and remove the agent on a node:
-
-~~~bash
-sudo systemctl disable --now xmesh-node-metrics.timer
-sudo rm -f /etc/systemd/system/xmesh-node-metrics.timer /etc/systemd/system/xmesh-node-metrics.service /usr/local/sbin/xmesh-node-metrics /etc/xmesh-node-metrics.env
-sudo rm -rf /var/lib/xmesh-node-metrics
-sudo systemctl daemon-reload
-~~~
-
-The ingest endpoint requires a registered Ed25519 public key and validates each signature, nonce, timestamp and body digest. Bearer credentials are not accepted.
-
-## Xray-core version management
-
-The stored default is latest. On startup the API attempts to install/update the selected version without preventing the panel API from starting if GitHub is unavailable. In **Settings → Xray-core**, you can also select a specific tag and press **Install / update**. The selected version is stored in PostgreSQL.
-
-The selector lists recent GitHub releases; pinning is limited to the latest 30 entries returned by the GitHub API. Only Linux x86_64, ARM64 and ARM32 binaries are handled. The executable and its data files live in the persistent core_data volume. Updating the binary does not launch the VPN process.
-
-## API overview
-
-- GET /api/v1/health/live — process liveness.
-- GET /api/v1/health/ready — PostgreSQL and Redis readiness.
-- GET /api/v1/auth/session, POST /api/v1/auth/login, POST /api/v1/auth/logout — admin session.
-- GET /api/v1/bootstrap — panel collections and settings (authenticated).
-- /api/v1/collections/{collection} — authenticated record CRUD.
-- GET /api/v1/core, GET /api/v1/core/releases, POST /api/v1/core/update — core version management (authenticated).
-- GET /api/v1/metrics/traffic?range=1h|24h&node_id=ID&squad_id=ID — authenticated RX/TX history aggregated from `server_metric_samples` (1-minute buckets for 1h; 15-minute buckets for 24h). `node_id` in the hypertable must be the text form of the panel node record ID. Squad filtering selects nodes whose assigned profile shares at least one inbound tag with the squad.
-- POST /api/v1/nodes/{id}/metrics-key — Ed25519 public key enrollment/rotation (owner).
-- POST /api/v1/metrics/ingest — Ed25519-signed authentication; persists a validated sample to TimescaleDB.
-
-## Frontend and design
-
-
-## Interface customization
-
-Appearance settings support curated accent palettes, editable HEX colors,
-dark/light mode, three card treatments (Classic, Glass and Raised), responsive
-workspace width (720–3000 px), motion preferences and shared control/card
-corner radius. **The radius range is 1–36 px with a permanent 1 px step**,
-so values such as 29 px are available regardless of other slider precision
-settings. Text/UI scale is 90–200%, and the main sliders provide direct
-numeric input alongside 1/10 precision modes.
-
-The panel and Subscription Studio may share colors through the optional theme
-sync. This sync updates the **saved subscription blueprint** via authenticated
-API; the public portal remains a separately implemented service.
-
-- index.html — application shell.
-- styles.css — responsive design system, accent palettes, motion and shared corner-radius controls.
-- app.js — panel UI, authenticated API client and Xray-core controls.
-
-The UI intentionally avoids presenting generated node telemetry as live operational data.
-
-### RU / EN panel localization
-
-Choose the **Languages icon in the top toolbar** and select Русский or English to switch the
-administrator interface (navigation, Settings, login, editable fields,
-Subscription Studio, and common XRAY STUDIO labels). The choice is stored in
-this browser under `xmeshNexusLanguage`; it does not change other
-administrators' preferences or the panel's database records. The portal's
-`subscriptionLanguage` is configured independently in **SUBSCRIPTION
-STUDIO** and accepts only `ru` or `en`.
-
-The shared `i18n.js` dictionary translates presentation strings at render
-time, including late-added dialogs and tooltips. JSON source, textareas,
-subscription demo preview with its own language, user-entered values, and
-record identifiers are left unchanged. To add or improve translations,
-extend the dictionary and the `scripts/check-i18n.js` regression test. The
-bundles are shipped as static browser assets; Node.js is not needed on the
-production panel server.
-
-### JavaScript tooling (Node.js 24)
-
-The XMesh Nexus backend is written in **Rust** and the frontend runs in the **browser**.
-Node.js is needed **only for local frontend checks and GitHub Actions**, not by the
-running panel container or a VPN node. The supported tooling version is declared
-in `.node-version` (`24`) and enforced in CI using `actions/setup-node@v7`.
-Use a Node.js version manager or a local Node.js 24 installation to run tests:
+By default, the host exposes the panel on **`127.0.0.1:8080`**. Put an **HTTPS reverse proxy** in front of it, keep the admin API private and do not expose PostgreSQL or Redis to the internet. Keep `COOKIE_SECURE=true` in production.
 
 ```bash
-node --version
-node --check app.js
-node --check subscription-studio.js
-node scripts/check-subscription-studio.js
-node scripts/check-node-grid-layout.js
+docker compose ps
+docker compose logs --tail=100 panel
+docker compose logs --tail=100 db
+bash xmeshctl
 ```
 
-There is no `package.json`, npm dependency install or Node.js runtime in the
-Rust/Debian production Docker image; the Node.js version does not affect Xray.
+The `xmeshctl` helper supports operational checks, logs, backups and updates. **Do not use `docker compose down -v` for routine upgrades**: it deletes persistent volumes.
 
+### Update
 
-
-## Per-node IP pools and per-user address rotation
-
-Open **Nodes → Edit → IP-ротация**. Enable the feature and enter one public IPv4 or IPv6
-address per line (2–64 unique addresses). The primary node address remains unchanged.
-All addresses must actually be routed to that VM and serve the same VPN inbound
-(port, TLS/Reality, and credentials); the panel does **not** provision extra network
-addresses or change OS networking.
-
-The Rust backend stores a separate round-robin cursor for each `(node_id, user_id)`
-in PostgreSQL (migration `0007_node_ip_rotation.sql`). It uses a transaction and
-row lock to prevent duplicate allocations under concurrent refreshes. Each call
-skips the last issued address when the pool has changed; disabling rotation
-falls back to the node's primary address. The cursor survives restarts.
-
-Authenticated test/integration endpoint (admin cookie + same-origin POST required):
-
-```http
-POST /api/v1/nodes/123/rotation/next
-Content-Type: application/json
-
-{"userId":456}
-```
-
-Response: `{"nodeId":123,"userId":456,"address":"203.0.113.4","rotationEnabled":true,"poolSize":10}`.
-This endpoint requires an active user and a non-disabled node and is **not** an
-unauthenticated subscription endpoint. The IPs in examples are documentation-only.
-
-**Integration status:** The current XMesh Nexus repository does not yet generate
-public client subscriptions (`subUrl` is still a placeholder). The rotation
-engine, settings, validation, persisted cursor, and authenticated test endpoint
-are implemented; **a client's subscription refresh will not rotate its
-address until a real subscription generator calls
-`node_rotation::resolve_address` exactly once per node and user per refresh**.
-The generator must substitute only the outbound address, retain the intended
-SNI/Host/Reality fields, properly format IPv6 URLs, and disable caching
-(`Cache-Control: no-store`). Refreshes, not live established connections,
-are the rotation boundary; client apps can also cache subscriptions.
-
-## SUBSCRIPTION STUDIO — control-plane only
-
-Open **SUBSCRIPTION STUDIO** in the management navigation. Configure a separate
-subscription hostname/path, portal brand, description, language (RU/EN),
-accent, footer, and visibility of traffic/expiration. Settings are validated
-by the Rust API and stored centrally in PostgreSQL. **Settings → Brand and
-domains** also has independent fields for the panel and subscription domains.
-
-The **LEGO topology builder** is a deployment blueprint, not a provisioning
-wizard. Server A hosts the management panel; assign future subscription service
-and node roles independently to A, B, or C. Thus one VPS, shared VPS groups,
-and three separate servers are all expressible. The selected node role is a
-planning example; actual nodes stay managed individually under **Nodes**.
-Optional descriptions of servers B/C and the complete blueprint can be exported
-as JSON for later integration.
-
-The **portal designer** supports independent layout, card treatment, font,
-corner radius (1–36 px), background/card/text colors, optional HTTPS logo, heading/CTA
-copy, support link, and switches for status, applications, QR placeholder,
-copy-link button, devices and support blocks. Changes appear in a **demo-only
-live preview** before saving. **Sync with panel theme** is enabled by default
-and copies the current panel's accent, dark/light mode, background, card and
-text colors into centrally saved subscription settings. Disable this option
-to preserve an independent portal palette. This setting does **not**
-automatically deploy a separate public subscription website.
-
-**Application directory:** The admin may independently enable/disable Happ,
-Incy, v2rayTun, v2rayN, v2rayNG, Streisand, Hiddify, NekoBox, Shadowrocket,
-FlClash, Stash, sing-box, V2Box, Loon, Mihomo Party, and Clash Verge Rev.
-Admins can also create up to **32 custom client applications** in the same
-Subscription Studio section, specifying a display name, platforms, an optional
-HTTPS installation URL, and whether to show the app. Custom entries can be
-edited or removed without touching the 16 built-in clients. The list heading
-(`subscriptionAppsTitle`) can be replaced with a service-specific caption,
-such as "Supported clients"; leave it empty for a language-aware default.
-All entries are stored under `subscriptionCustomClients` in PostgreSQL.
-The Rust API validates unique IDs, text lengths, boolean flags and HTTPS links,
-and the live preview renders all enabled apps with HTML escaping.
-
-Optional per-app HTTPS installation links are stored in PostgreSQL with the
-portal blueprint; the panel does not hardcode vendor URLs, download packages,
-execute deep links, or assert that an app supports every transport. An empty
-selection is allowed and hides the preview directory. Future subscription
-runtime implementations should consume these settings through authenticated
-integration, validate links on their side, and implement client-specific
-subscription formats separately.
-
-**Repository boundaries:** This repository contains the control plane only.
-The public subscription service (with token verification, subscription output,
-client-side portal, and future per-user IP rotation integration) and the
-remote node runtime/agent will be implemented in **separate repositories**.
-Configuring a domain does not serve a subscription, issue a usable link,
-deploy a reverse proxy, configure a remote host, or start Xray. In particular,
-the existing subscription URL field remains empty until the separate service
-and its authenticated integration are implemented. No public subscription
-API has been added to the panel.
-
-### Updating frontend assets
-
-The dashboard CSS and JavaScript are baked into the `panel` Docker image via `backend/Dockerfile`. Running `git pull` alone does **not** update the UI served by an existing container. After pulling changes, rebuild and recreate the panel:
+Frontend assets are baked into the panel image. A `git pull` alone does not refresh the running container:
 
 ```bash
 git pull --ff-only origin main
-docker compose up -d --build panel
+docker compose up -d --build
 ```
 
-Preserve database volumes. A hard browser refresh may still be needed after the container is recreated. CI verifies that every HTML-referenced local CSS/JS asset is included in the runtime image.
+Back up first, then check panel logs and node health. Updating the control plane **does not automatically prove that every node runtime is current**. See [panel updates and telemetry](docs/PANEL_UPDATE_AND_TELEMETRY.md).
 
-### Private dashboard entrypoint
+### Backup and persistent secrets
 
-`./install.sh` generates a unique 192-bit `/dashboard/<48 hex>` entrypoint on first setup, saves it in `.env`, and displays it in the terminal. Reinstallation preserves the existing value. On root + systemd hosts, changes made through the security UI are synchronized into `.env` by a host-only watcher and a dedicated single-value mirror without giving the container write access to other secrets. PostgreSQL remains the source of effective policy. Without systemd, automatic `.env` synchronization is unavailable. A secret URL is not a substitute for authentication, MFA, HTTPS, or network restrictions.
+```bash
+bash deploy/backup-postgres.sh
+```
+
+Keep tested copies **off-host**. PostgreSQL backups do **not** include `TOTP_ENCRYPTION_KEY` from `.env` or the panel's separate node-policy signing key. Back up these keys securely and preserve them across upgrades. Losing them can affect TOTP access, stored subscription-link decryption or trust by enrolled nodes.
+
+## Public subscriptions and client JSON
+
+Implemented Rust APIs include:
+
+- Create/read/revoke a user subscription: `/api/v1/users/{id}/subscription` (authenticated).
+- **`GET /api/v1/sub/{token}`**: publicly accessible native Xray JSON, gated by the subscription token and user status.
+- **`GET /api/v1/portal/{token}`**: HTML subscription portal. A configured public portal path is also supported.
+- Client **User-Agent** detection for transport/device profiles, including iOS and Windows, with optional explicit device override.
+- Outbound assembly from **user → squads → XRAY STUDIO inbound → host/node**, including optional native Xray JSON balancers.
+- A user whose subscription is not active cannot retrieve an active client JSON feed.
+
+**Current protocol scope:** the public outbound assembler in `user_subscriptions.rs` builds **VLESS** client connections. VMess, Trojan, Shadowsocks and other protocol editors existing in XRAY STUDIO **do not imply those protocols are supported by the public subscription endpoint**. This endpoint outputs native Xray JSON; it is not a general URI/base64/Clash/Sing-box subscription-format service.
+
+A newly issued token may exist before any usable endpoint is configured: the API reports readiness separately. Publishing the URL requires working DNS, a trusted TLS certificate and reverse-proxy routes. A link being present does **not** prove VPN connectivity.
+
+### SUBSCRIPTION STUDIO
+
+The studio customizes the **implemented** portal: independent branding, RU/EN content, colors, optional logo, status/traffic/expiry cards, QR and copy-link, support links and built-in/custom client apps. Public HTML and JavaScript portal components are included in this repository. The editor preview is still a preview; the deployed view depends on saved settings and a reachable runtime endpoint.
+
+## Nodes, enforcement and telemetry
+
+**Node policies:** the control plane issues a signed envelope containing the Xray configuration digest. XMesh-Node validates it and keeps the last successfully applied state. Its local guard can enforce subscription expiration and bounded traffic usage while the panel is unavailable. This is **not an exact global quota guarantee across multiple disconnected nodes**: offline budgets are conservative and reconciliation can lag. Verify traffic blocking on a disposable test UUID; do not mistake a disabled UI label for confirmed disconnection.
+
+**Node metrics:** the Linux agent reports CPU, memory, disk and network RX/TX to TimescaleDB. Network-interface counters may include SSH or other services and must **not** be used as per-user VPN usage.
+
+**User traffic:** separately reported Xray StatsService counters are attributed to user, inbound and node. This requires a functioning managed Xray, local StatsService and updated collectors/agents. The first trusted sample becomes the baseline; earlier unobserved traffic is not reconstructed. Missing counters are not proof of zero usage.
+
+Guides: [autonomous nodes](docs/AUTONOMOUS_NODES.md), [panel updates and per-user accounting](docs/PANEL_UPDATE_AND_TELEMETRY.md), [Ed25519 node identity](docs/SECURITY_NODE_IDENTITY.md).
+
+### Per-node IP pool and rotation
+
+The editor accepts **2–256 distinct public IPv4/IPv6 addresses** when rotation is enabled. Addresses must already exist on the VPS and serve the intended VPN endpoint; the panel does not provision them. **The Rust backend currently also limits the pool text field to 4,096 bytes**, so a list of 256 long IPv6 strings might be rejected even though it is within the address-count limit.
+
+A PostgreSQL round-robin cursor is maintained per `(node_id, user_id)`. An authorized test endpoint exists at `POST /api/v1/nodes/{id}/rotation/next`. **The current public subscription handler does not invoke this rotation resolver**, so automatic address changes on subscription refresh should not be advertised as implemented.
+
+## Administration and security
+
+- **Owner / admin / viewer**, enforced by the Rust API.
+- Argon2 password hashing, HttpOnly/SameSite sessions, login-attempt throttling and an audit trail.
+- Optional **TOTP MFA** with standard authenticator apps and one-time recovery codes.
+- Session lifetime, idle timeout and concurrent-session controls.
+- A configured `/dashboard/...` login path; **a hidden path is not an authorization boundary**, nor a replacement for network access controls.
+- **Ed25519-signed node requests** with anti-replay protections.
+
+**Not guaranteed:** zero vulnerabilities, a complete infrastructure penetration test, perfectly strict cross-node offline quotas, or public-client support for every Xray protocol.
+
+See [security audit and remaining risks](docs/SECURITY_AUDIT_2026-10-22.md) and [technical debt](docs/TECH_DEBT_AUDIT.md).
+
+## Frontend and developer checks
+
+The panel has RU/EN localization, light/dark themes, color customization, animation and layout controls. These primarily affect **presentation**, not the deployed Xray runtime.
+
+Use **Node.js 24** for local frontend checks (the production backend is Rust; browser assets do not require a Node.js server):
+
+```bash
+node --check app.js
+node scripts/check-node-ip-rotation.js
+node scripts/check-node-editor-layout.js
+node scripts/check-subscription-studio.js
+node scripts/check-static-assets.js
+cargo test --manifest-path backend/Cargo.toml
+```
+
+Principal directories/files: `app.js`, `styles.css`, `xray-studio-v4.js`, `subscription-studio.js`, `backend/src/`, `deploy/`, `scripts/`. CI and unit checks cover only part of the product; they do **not** replace testing real node deployments and VPN clients.
+
+## Known limitations at a glance
+
+1. **Managed VPN nodes require XMesh-Node, real Xray and correctly configured VPS networking.** Panel settings alone are not applied-state confirmation.
+2. **Public subscriptions exist, but client assembly is currently VLESS-focused and native-Xray-JSON-only.**
+3. **The persisted IP rotation engine is not wired into the public subscription handler.**
+4. **Per-user offline enforcement is bounded, not a strict global quota guarantee across disconnected nodes.**
+5. **Operators must configure DNS, HTTPS reverse proxy, VPS addresses and agent updates.**
+6. **Network-interface RX/TX is not the same as Xray per-user accounting.**
+
+---
+
+[Русская документация](README.md) · [Autonomous node guide](docs/AUTONOMOUS_NODES.md) · [GitHub: XMesh-Node](https://github.com/TriplexCorp/XMesh-Node)
