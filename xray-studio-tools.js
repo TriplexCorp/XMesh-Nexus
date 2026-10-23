@@ -336,25 +336,34 @@ const operations={
   try{
    ensureDialogs();
    const selected=await chooseInbound();if(!selected)return;
-   const current=getInbound(parse(),selected.index);
-   if(current.protocol!=='vless')throw Error('XTLS Vision доступен только для VLESS.');
-   const users=current.settings?.users||current.settings?.clients||[];
-   if(!Array.isArray(users)||!users.length)throw Error('В inbound нет пользователей. Добавьте VLESS users и повторите.');
+   const inbound=getInbound(parse(),selected.index);
+   if(inbound.protocol!=='vless')throw Error('XTLS Vision доступен только для VLESS.');
+   const users=inbound.settings?.users||inbound.settings?.clients||[];
+   const active=users.some(u=>u.flow==='xtls-rprx-vision')||inbound.settings?.flow==='xtls-rprx-vision';
    const response=await dialog.request({
-    title:'XTLS rprx Vision',
-    description:'Установить flow xtls-rprx-vision для всех VLESS users выбранного inbound. Совместимость с XHTTP и VLESS Encryption зависит от версии Xray-core и клиента; проверьте итоговую конфигурацию ядром.',
+    title:'XTLS Vision — сервер и подписка',
+    description:'Flow применяется к существующим пользователям inbound и наследуется новыми пользователями при выдаче подписки. Выберите none для отключения.',
     confirmLabel:'Применить',
-    fields:[{name:'flow',label:'Flow',value:'xtls-rprx-vision',readonly:true,wide:true}]
+    fields:[{name:'flow',label:'Flow (xtls-rprx-vision или none)',value:active?'xtls-rprx-vision':'xtls-rprx-vision',wide:true,required:true,validate:v=>['xtls-rprx-vision','none'].includes(v)?'':'Допустимо xtls-rprx-vision или none'}]
    });
    if(!response)return;
    if(area.value!==selected.source){notify('JSON изменился; повторите настройку Vision.');return}
    mutate(doc=>{
     const ib=getInbound(doc,selected.index);
     if(ib.tag!==selected.tag||ib.protocol!=='vless')throw Error('Выбранный inbound изменился');
-    const list=ib.settings?.users||ib.settings?.clients;
-    if(!Array.isArray(list)||!list.length)throw Error('Нет пользователей VLESS');
-    for(const user of list)user.flow='xtls-rprx-vision';
-   },'XTLS Vision применён к пользователям');
+    const settings=ib.settings??={users:[]};
+    const list=settings.users||settings.clients||[];
+    if(!Array.isArray(list))throw Error('Некорректный список пользователей VLESS');
+    if(response.flow==='none'){
+     delete settings.flow;
+     for(const user of list)delete user.flow;
+    }else{
+     // Internal default for the subscription generator; not a server-wide Xray setting.
+     ib.xmesh??={};ib.xmesh.clientFlow='xtls-rprx-vision';
+     for(const user of list)user.flow='xtls-rprx-vision';
+    }
+    if(response.flow==='none'&&ib.xmesh)delete ib.xmesh.clientFlow;
+   },'XTLS Vision настроен для сервера и подписки');
   }catch(e){notify(e.message)}
  },
  async vlessens(){
@@ -363,11 +372,26 @@ const operations={
    const selected=await chooseInbound();if(!selected)return;
    const inbound=getInbound(parse(),selected.index);
    if(inbound.protocol!=='vless')throw Error('VLESS Encryption доступен только для VLESS');
-   const response=await dialog.request({title:'VLESS Encryption',description:'Укажите серверный decryption. Для ML-KEM используйте результат xray vlessenc.',
-    confirmLabel:'Применить',fields:[{name:'decryption',label:'Серверный decryption',wide:true,value:inbound.settings?.decryption||'none',required:true}]});
+   const response=await dialog.request({
+    title:'VLESS Encryption — сервер и клиент',
+    description:'Вставьте парные значения из xray vlessenc. Серверный decryption никогда не отправляется в подписку. Клиентский encryption передаётся в VLESS outbound.',
+    confirmLabel:'Применить',
+    fields:[
+     {name:'decryption',label:'Серверный decryption',wide:true,value:inbound.settings?.decryption||'none',required:true},
+     {name:'encryption',label:'Клиентский encryption',wide:true,value:inbound.xmesh?.clientEncryption||'none',required:true}
+    ]
+   });
    if(!response)return;
-   if(area.value!==selected.source){notify('Конфигурация изменилась. Повторите действие.');return}
-   mutate(doc=>{const ib=getInbound(doc,selected.index);if(ib.tag!==selected.tag)throw Error('Inbound изменился');(ib.settings??={users:[]}).decryption=response.decryption},'VLESS Encryption обновлён');
+   const server=response.decryption.trim(),client=response.encryption.trim();
+   if((server==='none')!==(client==='none'))throw Error('Для VLESS Encryption укажите оба парных значения или none в обоих полях.');
+   if(!server||!client)throw Error('Оба значения обязательны.');
+   if(server!=='none'&&(!server.startsWith('mlkem768x25519plus.')||!client.startsWith('mlkem768x25519plus.')))throw Error('Ожидается парная конфигурация ML-KEM-768 из xray vlessenc.');
+   if(area.value!==selected.source){notify('JSON изменился; повторите действие.');return}
+   mutate(doc=>{
+    const ib=getInbound(doc,selected.index);if(ib.tag!==selected.tag||ib.protocol!=='vless')throw Error('Inbound изменился');
+    (ib.settings??={users:[]}).decryption=server;
+    ib.xmesh??={};ib.xmesh.clientEncryption=client;
+   },'VLESS Encryption: сервер и клиент настроены');
   }catch(e){notify(e.message)}
  },
  async finalmask(){
