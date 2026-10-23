@@ -348,7 +348,8 @@ async fn csrf_guard(request: Request, next: Next) -> Response {
         && request.headers().get(header::COOKIE).is_none()
         && request.headers().get("sec-fetch-site").is_none()
         && match path {
-            "/api/v1/metrics/ingest" | "/api/v1/node/heartbeat" | "/api/v1/node/desired-config" =>
+            "/api/v1/metrics/ingest" | "/api/v1/node/heartbeat" | "/api/v1/node/desired-config"
+            | "/api/v1/node/restart/poll" | "/api/v1/node/restart/ack" =>
                 request.headers().contains_key("x-xmesh-signature"),
             "/api/v1/node/enroll" =>
                 request.headers().get(header::CONTENT_TYPE)
