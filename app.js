@@ -724,7 +724,13 @@ const balancersP=async()=>{
   root.innerHTML=draft.length?draft.map((item,index)=>{
    const selected=new Set(item.selector||[]);
    const obs=item.observatory||{};
-   const visible=(choices.length?choices.map(c=>
+   // Never drop a saved selection just because its node is temporarily
+   // unavailable or no longer listed. The administrator must uncheck it.
+   const missing=[...selected].filter(key=>!choices.some(c=>c.key===key));
+   const sourceChoices=[...choices,...missing.map(key=>({
+      key,label:'Недоступный сервер · '+key,meta:'Сохранённый выбор, проверьте привязку'
+   }))];
+   const visible=(sourceChoices.length?sourceChoices.map(c=>
       '<label class="balancer-source"><input type="checkbox" data-balancer-source="'+esc(c.key)+'"'+(selected.has(c.key)?' checked':'')+'>'+
       '<span><strong>'+esc(c.label)+'</strong><small>'+esc(c.meta)+'</small></span></label>').join(''):
       '<p class="note">Добавьте хосты или узлы и назначьте им профиль XRAY STUDIO.</p>');
