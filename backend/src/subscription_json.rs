@@ -186,6 +186,18 @@ pub(crate) fn build(mut proxies:Vec<Value>,setting:&Value)->Result<Value,String>
         "outbounds":proxies,
         "routing":routing
     });
+    // A disabled balancer is a hard guarantee, not just a UI preference.
+    // Fail closed if a future routing feature accidentally inserts an automatic
+    // selector or an observatory when SMART has not been explicitly enabled.
+    if !smart || balance=="off" || tags.len()<=1 {
+        let r=&config["routing"];
+        if r.get("balancers").is_some()
+            || r["rules"].as_array().is_some_and(|rules|
+                rules.iter().any(|rule|rule.get("balancerTag").is_some()))
+            || config.get("observatory").is_some() {
+            return Err("В JSON обнаружена балансировка, хотя SMART отключён".into());
+        }
+    }
     if observation{
         config["observatory"]=json!({
             "subjectSelector":["xmesh-"],
@@ -228,6 +240,23 @@ mod tests{
    "streamSettings":{"security":"reality","network":"xhttp",
    "realitySettings":{"serverName":"example.com","publicKey":"public","shortId":"aa"},
    "xhttpSettings":{"path":"/test","mode":"stream-up"}}})
+ }
+ #[test] fn disabled_smart_never_emits_balancer_or_observatory(){
+  for settings in [
+   json!({}),
+   json!({"subscriptionJson":{"smart":false,"balance":"leastPing"}}),
+   json!({"subscriptionJson":{"smart":false,"balance":"roundRobin"}}),
+   json!({"subscriptionJson":{"smart":false,"balance":"random"}}),
+   json!({"subscriptionJson":{"smart":true,"balance":"off"}}),
+  ]{
+   let cfg=build(vec![outbound("NL"),outbound("PL"),outbound("DE")],&settings).unwrap();
+   assert!(cfg["routing"].get("balancers").is_none());
+   assert!(cfg.get("observatory").is_none());
+   assert!(cfg["routing"]["rules"].as_array().unwrap().iter()
+     .all(|r|r.get("balancerTag").is_none()));
+   assert_eq!(cfg["routing"]["rules"][2]["outboundTag"],"xmesh-NL-0001");
+   assert_eq!(cfg["outbounds"].as_array().unwrap().len(),5);
+  }
  }
  #[test] fn explicit_smart_state_controls_feed_delivery(){
   assert!(!smart_enabled(&json!({})));
