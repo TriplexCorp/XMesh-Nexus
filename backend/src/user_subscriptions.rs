@@ -371,6 +371,14 @@ async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str)->Result
     for host in matched{
      if let Some(link)=vless_link(user,inbound,host,device) && let Some(outbound)=vless_outbound(user,inbound,host,device){
       outbounds.push(outbound);links.push(link)
+     }else{
+      let reality=inbound.get("streamSettings").and_then(|s|s.get("realitySettings")).unwrap_or(&Value::Null);
+      let missing_key=nonempty(host,"publicKey").or_else(||nonempty(host,"realityPublicKey"))
+        .or_else(||nonempty(inbound,"publicKey")).or_else(||nonempty(reality,"publicKey")).is_none();
+      let no_uuid=nonempty(user,"xrayId").and_then(|id|uuid::Uuid::parse_str(id).ok()).is_none();
+      tracing::warn!(inbound_tag=%tag, missing_reality_public_key=missing_key,
+        invalid_user_uuid=no_uuid, host_has_address=endpoint(host).is_some(),
+        "Subscription public host could not produce client VLESS outbound");
      }
     }
    }else if !any_explicit_host{
