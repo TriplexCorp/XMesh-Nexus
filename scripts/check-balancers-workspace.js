@@ -44,4 +44,8 @@ assert.match(app,/data-balancer-source/);
 assert.match(app,/hideSelectedInbounds/);
 assert.match(subscriptions,/format!\("host:\{id\}"\)/);
 assert.match(subscriptions,/format!\("node:\{id\}:\{tag\}"\)/);
+assert.match(engine,/fn round_robin_and_random_never_require_missing_observatory\(\)/,
+ 'roundRobin and random must never request an unavailable Observatory');
+assert.match(engine,/fn least_ping_preserves_observatory_and_fallback\(\)/,
+ 'leastPing must retain its explicit Observatory and fallback');
 console.log('Dedicated opt-in balancer workspace: OK');
