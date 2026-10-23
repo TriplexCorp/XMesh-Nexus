@@ -154,6 +154,36 @@ def main():
         assert_status(code,200,"admin sees confirmed restart")
         assert restart_status["state"]=="succeeded" and restart_status["id"]==restart_id
 
+        # v1 agents cannot self-update. v4 can receive only a fixed signed action.
+        code,_,_=request("POST",f"/nodes/{node}/agent-update",{},
+                         cookie=cookie,origin=BASE)
+        assert_status(code,409,"legacy control agent cannot run unknown update action")
+        code,_,_=signed_post("/node/heartbeat",{
+            "node_id":node,"version":"control-v4.0.0",
+            "xray_running":True,"router_running":True})
+        assert_status(code,200,"new control-v4 heartbeat accepted")
+        code,_,_=request("POST",f"/nodes/{node}/agent-update",
+            {"command":"rm -rf /"},cookie=cookie,origin=BASE)
+        assert code in (400,422), f"arbitrary updater commands must be rejected: HTTP {code}"
+        code,agent_command,_=request("POST",f"/nodes/{node}/agent-update",{},
+                                    cookie=cookie,origin=BASE)
+        assert_status(code,202,"admin queued a fixed agent self-update")
+        assert agent_command["targetVersion"]=="control-v4.0.0"
+        code,_,_=request("POST",f"/nodes/{node}/restart",{},
+                         cookie=cookie,origin=BASE)
+        assert_status(code,409,"agent update prevents overlapping restart commands")
+        code,polled,_=signed_post("/node/restart/poll",{"node_id":node})
+        assert_status(code,200,"signed v4 node receives agent update")
+        assert polled["command"]=={
+            "id":agent_command["id"],"action":"update_agent","targetVersion":"control-v4.0.0"}
+        code,_,_=signed_post("/node/restart/ack",{
+            "node_id":node,"command_id":agent_command["id"],
+            "success":True,"detail":"Agent control-v4.0.0 installed and verified"})
+        assert_status(code,200,"signed node confirms agent update")
+        code,last_command,_=request("GET",f"/nodes/{node}/restart",cookie=cookie)
+        assert_status(code,200,"admin reads confirmed agent-update status")
+        assert last_command["state"]=="succeeded" and last_command["action"]=="update_agent"
+
         # Real signed database accounting for two inbounds of the same user.
         code, new_user, _ = request("POST", "/collections/users",
             {"username": "ci_inbound_signed", "xrayId": "00000000-0000-0000-0000-000000000000"},
