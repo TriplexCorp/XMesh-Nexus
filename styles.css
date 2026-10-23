@@ -3446,3 +3446,60 @@ dialog#dlg > .node-setup{
 .xray-release-dialog .xray-release-info{font-size:.9rem;color:var(--mu);margin:.25rem 0}
 .xray-release-dialog a{font-size:.85rem;color:var(--a)}
 .xray-release-dialog .xm-action-confirm-actions{margin-top:1.25rem}
+
+
+/* User workspace · landscape-first card, with no trailing empty chin.
+   At desktop sizes only the content columns scroll; the shell stays centered. */
+@media (min-width: 1101px) and (min-height: 580px) {
+  dialog#dlg.user-modal,dialog.user-modal{
+    width:min(1160px,calc(100vw - 44px))!important;
+    inline-size:min(1160px,calc(100vw - 44px))!important;
+    max-width:1160px!important;
+    max-inline-size:calc(100vw - 44px)!important;
+    height:min(700px,calc(100dvh - 36px));
+    max-height:calc(100dvh - 36px);
+  }
+  dialog.user-modal .box.user-canvas{
+    height:100%;
+    max-height:100%;
+    min-height:0;
+    overflow:hidden;
+    display:grid;
+    grid-template-rows:auto auto minmax(0,1fr) auto;
+    padding:16px 20px 10px;
+  }
+  dialog.user-modal .user-canvas-grid{
+    min-height:0;
+    overflow:hidden;
+    align-items:stretch;
+    grid-template-columns:minmax(0,1.18fr) minmax(0,1fr) minmax(0,1fr);
+  }
+  dialog.user-modal .user-pane{
+    min-height:0;
+    min-width:0;
+    overflow-y:auto;
+    overflow-x:hidden;
+    overscroll-behavior:contain;
+    scrollbar-width:thin;
+    padding:12px 16px;
+  }
+  dialog.user-modal .user-pane-settings{padding-left:0}
+  dialog.user-modal .user-pane-insights{padding-right:0}
+  dialog.user-modal .user-head{padding-bottom:11px}
+  dialog.user-modal .user-overview-band{padding-block:9px}
+  dialog.user-modal .user-edit-fields{gap:9px 10px}
+  dialog.user-modal .user-notes-field textarea{min-height:78px;max-height:160px}
+  dialog.user-modal .user-canvas-foot{
+    min-height:30px;
+    padding:8px 0 0;
+    margin:0;
+  }
+}
+/* Smaller screens fall back to the natural-height, scrollable dialog.
+   Never force clipped columns or a fixed card height on touch devices. */
+@media (max-width:1100px), (max-height:579px) {
+  dialog.user-modal{height:auto;max-height:calc(100dvh - 12px)}
+  dialog.user-modal .box.user-canvas{height:auto;max-height:calc(100dvh - 12px);overflow-y:auto}
+  dialog.user-modal .user-canvas-grid{overflow:visible}
+  dialog.user-modal .user-pane{overflow:visible}
+}
