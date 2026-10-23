@@ -497,22 +497,6 @@ async fn create_record(
         object.insert("xrayId".into(),Value::String(Uuid::new_v4().to_string()));
     }
     validate_record(&collection, &data)?;
-    if collection=="nodes" && data.get("disabled").and_then(Value::as_bool)==Some(false) {
-        // Do not let a button click reactivate an exhausted node. Raise the
-        // cap first or explicitly reset its accounting baseline.
-        let consumed=sqlx::query_scalar::<_,Option<i64>>(
-            "SELECT rx_bytes+tx_bytes FROM node_network_traffic_totals WHERE node_id=$1"
-        ).bind(id).fetch_optional(&mut *tx).await?.flatten().unwrap_or(0);
-        let cap=data.get("limit").and_then(Value::as_f64).unwrap_or(0.0);
-        if cap>0.0 && (consumed as f64)>=cap*1073741824.0 {
-            return Err(ApiError::new(StatusCode::CONFLICT,
-                "Лимит трафика узла исчерпан. Увеличьте лимит перед включением."));
-        }
-        if let Some(obj)=data.as_object_mut(){
-            obj.remove("disabledReason");
-            obj.remove("trafficLimitReachedAt");
-        }
-    }
     if collection == "hosts" { validate_host_binding(&state.pool, &data).await?; }
 
     // User and initial subscription must be one atomic operation: never create
@@ -578,11 +562,12 @@ async fn reset_node_network_traffic(
     tx.commit().await?;
     audit(&state.pool,&actor.username,"node_traffic_reset",Some("nodes"),Some(node_id),
         json!({"nodePreviouslyQuotaStopped":was_quota_stopped})).await;
+    let updated:Value=row.try_get("data")?;
     Ok(Json(json!({
         "nodeId":node_id,
         "networkRxBytes":0,
         "networkTxBytes":0,
-        "resetAt":row.try_get::<Value,_>("data")?["trafficLastResetAt"],
+        "resetAt":updated["trafficLastResetAt"],
         "disabled":old.get("disabled").and_then(Value::as_bool)==Some(true),
         "counterPresent":previous.is_some(),
         "xrayStarted":false
