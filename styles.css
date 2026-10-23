@@ -3083,3 +3083,46 @@ dialog .toast-dialog.toast-success .toast-state-icon{color:var(--a)}
 dialog .toast-dialog.toast-error{border-color:var(--er)}
 dialog .toast-dialog.toast-error .toast-state-icon{color:var(--er)}
 dialog .toast-dialog .toast-action{margin-left:auto;color:var(--a);white-space:nowrap}
+
+
+/* XMesh Hosts 2.0 — compact, profile-driven endpoint editor. */
+dialog#dlg.host-wide{
+  width:min(1040px,calc(100vw - 32px));
+  max-width:calc(100vw - 32px);
+  max-height:calc(100dvh - 28px);
+  padding:0;
+  overflow:hidden;
+}
+dialog#dlg.host-wide>form.box{width:100%;max-width:100%;height:auto;max-height:calc(100dvh - 28px);overflow:auto;box-sizing:border-box;padding:1.25rem 1.4rem;display:flex;flex-direction:column;gap:.8rem}
+dialog#dlg.host-wide>form.box>h2{margin:0 0 .2rem;font-size:1.22rem}
+.host-editor-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1rem;align-items:start}
+.host-editor-layout>section{min-width:0;display:flex;flex-direction:column;gap:.75rem;padding:1rem;border:1px solid var(--ln);border-radius:var(--ui-radius);background:var(--s1)}
+.host-editor-layout .node-form-section-title{margin:.3rem 0 0;font-weight:700;font-size:.86rem}
+.host-editor-layout .node-form-section-title:not(:first-child){padding-top:.8rem;border-top:1px solid var(--ln)}
+.host-editor-layout .f{min-width:0;margin:0}
+.host-editor-layout .f>span:first-child{font-size:.78rem}
+.host-editor-layout .f input,.host-editor-layout .f select{width:100%;box-sizing:border-box}
+.host-editor-layout .node-ip-hint{line-height:1.5;margin:0;font-size:.77rem;color:var(--mu)}
+.host-editor-layout .ms{display:flex;flex-wrap:wrap;gap:.5rem}
+.host-editor-layout .ms label{max-width:100%;flex:0 1 auto;min-width:0}
+.host-resolved{display:grid;gap:0;padding:.1rem .8rem;border:1px solid var(--ln);border-radius:var(--ui-control-radius);background:var(--s2)}
+.host-resolved-line{display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:.62rem 0;border-bottom:1px solid var(--ln);min-width:0;font-size:.78rem}
+.host-resolved-line:last-child{border:0}
+.host-resolved-line>span{color:var(--mu)}
+.host-resolved-line>b{font-size:.79rem;text-align:right;min-width:0;overflow-wrap:anywhere}
+.host-validation:not([hidden]){border:1px solid var(--wr,var(--ln));border-radius:var(--ui-control-radius);padding:.8rem .9rem;color:var(--tx);background:var(--s2);font-size:.78rem;line-height:1.55;margin:0}
+.host-advanced{border-top:1px solid var(--ln);padding-top:.75rem}
+.host-advanced>summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:.6rem;font-size:.84rem;font-weight:700;padding:.55rem .1rem}
+.host-advanced>summary::-webkit-details-marker{display:none}
+.host-advanced>summary svg{width:1rem;height:1rem;transition:transform .2s}
+.host-advanced[open]>summary svg{transform:rotate(180deg)}
+.host-advanced-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem;margin:1rem 0}
+.host-advanced-fields .f:has([name="publicKey"]),.host-advanced-fields .f:has([name="clientEncryption"]){grid-column:1/-1}
+dialog#dlg.host-wide .act{position:sticky;bottom:0;background:var(--s1);padding-top:.8rem;border-top:1px solid var(--ln);z-index:5}
+@media(max-width:780px){
+  dialog#dlg.host-wide{width:calc(100vw - 12px);max-width:calc(100vw - 12px)}
+  dialog#dlg.host-wide>form.box{max-height:calc(100dvh - 12px);padding:.8rem}
+  .host-editor-layout{grid-template-columns:minmax(0,1fr)}
+  .host-advanced-fields{grid-template-columns:minmax(0,1fr)}
+  .host-advanced-fields .f:has([name="publicKey"]),.host-advanced-fields .f:has([name="clientEncryption"]){grid-column:auto}
+}
