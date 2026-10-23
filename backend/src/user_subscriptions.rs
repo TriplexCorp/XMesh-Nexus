@@ -459,13 +459,9 @@ pub async fn portal(
  headers:HeaderMap,Query(options):Query<HashMap<String,String>>,
 )->Result<Response,ApiError>{
  if !valid_token(&token){return Err(ApiError::new(StatusCode::NOT_FOUND,"Subscription not found"))}
- let accept=headers.get(header::ACCEPT).and_then(|v|v.to_str().ok()).unwrap_or("");
- let client=crate::subscription_user_agent::negotiate(&headers,&options).map_err(bad)?;
- // A VPN client's fingerprint wins even if its HTTP stack advertises HTML.
- // For a regular browser, the same bare HTTPS link displays the portal.
- if client.known_app || !accept.to_ascii_lowercase().contains("text/html")
-  || options.get("raw").is_some_and(|v|v=="1")
-  || options.contains_key("format") || options.contains_key("device") {
+ // A single permanent HTTPS URL is a portal for browsers and a
+ // negotiated JSON/VLESS subscription for the VPN client's User-Agent.
+ if crate::subscription_user_agent::wants_feed(&headers,&options).map_err(bad)? {
   return serve(State(state),Path(token),headers,Query(options)).await;
  }
  let hash=token_hash(&token);
