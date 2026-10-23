@@ -1708,7 +1708,7 @@ async function crudCard(k){
   return `<div class="card"><div class="hd"><div><h3>${e.t}</h3><p>${e.n||''}</p></div><button class="btn sm" data-ne="${k}">${ic('plus')}${e.nw}</button></div>${items.length?`<div class="tw"><table class="tb"><thead><tr>${e.cols.map(c=>`<th>${c[0]}</th>`).join('')}${e.mv?'<th></th>':''}</tr></thead><tbody>${items.map((r,i)=>`<tr data-e="${k}:${r.id}">${e.cols.map(c=>`<td data-l="${c[0]}">${c[1](r)}</td>`).join('')}${e.mv?`<td data-l="Порядок"><button class="ia" data-mv="${k}:${r.id}:-1" ${i?'':'disabled'} aria-label="Выше">${ic('up')}</button><button class="ia" data-mv="${k}:${r.id}:1" ${i<items.length-1?'':'disabled'} aria-label="Ниже">${ic('down')}</button></td>`:''}</tr>`).join('')}</tbody></table></div>`:`<div class="empty"><b>${emptyLabel}</b><span>${emptyHint}</span><button class="gh sm" data-ne="${k}">${ic('plus')}${e.nw}</button></div>`}</div>`
 }
 async function simple(ks){const h=await Promise.all(ks.map(crudCard));return [h.join('')]}
-function entForm(k,id){const e=ENT[k],o=id?DB[k].find(x=>x.id==id):e.def?e.def():{};
+function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id)===String(id)):e.def?e.def():{});
   const standardFields=e.fs.map(f=>field(f,k==='admins'&&f.k==='password'?'':o[f.k])).join('');
   const rotationFields=e.fs.filter(f=>['rotationEnabled','rotationIps'].includes(f.k)).map(f=>field(f,o[f.k])).join('');
   const billingFields=e.fs.filter(f=>f.k.startsWith('billing')).map(f=>f.k==='billingDueDate'
@@ -1722,10 +1722,11 @@ function entForm(k,id){const e=ENT[k],o=id?DB[k].find(x=>x.id==id):e.def?e.def()
   const rotationProbe=id&&o.rotationEnabled
     ?`<div class="node-rotation-probe"><label class="f"><span>Проверка на пользователе</span><select data-node-rotation-user>${userOptions||'<option value="">Нет активных пользователей</option>'}</select></label><button type="button" class="gh sm" data-node-rotation-probe="${id}" ${userOptions?'':'disabled'}>${ic('redo')}Получить следующий IP</button><output data-node-rotation-result aria-live="polite"></output><small>Тест изменяет счётчик ротации этого пользователя. Выдача подписок будет подключена отдельно.</small></div>`
     :'';
+  const hostWizard=k==='hosts'?'<div class="host-quick"><label class="f"><span>Быстро заполнить из узла</span><select data-host-node-preset><option value="">Выберите сервер…</option>'+DB.nodes.map(n=>'<option value="'+esc(String(n.id))+'">'+esc(n.name)+' · '+esc(n.addr||'')+'</option>').join('')+'</select></label><p class="note">Подставит адрес, порт и привязку. Остальные поля сохранятся.</p></div>':'';
   const fields=k==='nodes'
     ?'<div class="node-form-layout"><section class="node-main-section"><div class="node-form-section-title">Основные параметры</div><div class="node-form-grid">'+nodeMainFields+'</div></section>'+`<section class="node-ip-section"><div class="node-form-section-title">IP-пул и ротация</div><div class="node-ip-hint">Адреса должны принадлежать этому VPS и быть доступны извне.</div><div class="node-rotation-editor-body">${rotationFields}<div class="node-pool-toolbar"><span data-node-pool-count>Адресов: ${nodeRotationIPs(o).length} / 64</span><button type="button" class="gh sm" data-node-pool-normalize>Убрать повторы</button><button type="button" class="gh sm" data-node-pool-clear>Очистить</button></div><output data-node-pool-feedback aria-live="polite"></output>${rotationProbe}</div></section><section class="node-billing-section"><div class="node-form-section-title">Инфрабиллинг</div><p class="node-ip-hint">Стоимость, аренда и напоминания</p><div class="node-billing-fields">${billingFields}</div></section></div>`
-    :standardFields;
-  modal(`<form class="box" data-k="ent" data-ent="${k}" data-id="${id||''}" method="dialog"><h2>${id?'Изменить':'Новый'}: ${e.nw.toLowerCase()}</h2>${fields}<p class="er" id="fe"></p><div class="act">${id?`<button type="button" class="dg" data-del="${k}:${id}" style="margin-right:auto">${ic('trash')}Удалить</button>`:''}<button type="button" class="gh" data-x>Отмена</button><button class="btn">Сохранить</button></div></form>`,k==='nodes'?'node-wide':k=='profiles'||k=='subs'?'wide':'')
+    :hostWizard+standardFields;
+  modal(`<form class="box" data-k="ent" data-ent="${k}" data-id="${id||''}" method="dialog"><h2>${id?'Изменить':'Новый'}: ${e.nw.toLowerCase()}</h2>${fields}<p class="er" id="fe"></p><div class="act">${id?`<button type="button" class="dg" data-del="${k}:${id}" style="margin-right:auto">${ic('trash')}Удалить</button>`:''}${k==='hosts'&&id?`<button type="button" class="gh" data-host-duplicate="${id}">${ic('copy')}Дублировать</button>`:''}<button type="button" class="gh" data-x>Отмена</button><button class="btn">Сохранить</button></div></form>`,k==='nodes'?'node-wide':k=='profiles'||k=='subs'?'wide':'')
 }
 
 /* ================= УЗЛЫ ================= */
@@ -2098,6 +2099,7 @@ document.addEventListener('click',async e=>{
   else if(b=g('[data-dd]')){const [ui,di]=b.dataset.dd.split(':').map(Number),u=DB.users.find(x=>x.id==ui);await api.update('users',ui,{devices:u.devices.filter(d=>d.id!=di)});toast('Устройство удалено');if(cur=='tools')drawTools();else userDrawer(ui,'dev')}
   else if(b=g('[data-qx]')){const u=DB.users.find(x=>x.id==b.dataset.qx);if(u)userDrawer(u.id,'ov')}
   else if(b=g('[data-qr]')){await api.update('users',+b.dataset.qr,{used:0});toast('Трафик сброшен');render(1)}
+  else if(b=g('[data-host-duplicate]')){const host=DB.hosts.find(h=>String(h.id)===b.dataset.hostDuplicate);if(host){const {id,...copy}=host;entForm('hosts',null,{...copy,remark:(copy.remark||'Хост')+' · копия',order:DB.hosts.length+1});}}
   else if(b=g('[data-ne]')){const [k,id]=b.dataset.ne.split(':');entForm(k,id)}
   else if(b=g('tr[data-e]')){const [k,id]=b.dataset.e.split(':');entForm(k,id)}
   else if(b=g('[data-mv]')){const [k,id,d]=b.dataset.mv.split(':'),a=[...DB[k]].sort((x,y)=>x.order-y.order),i=a.findIndex(x=>x.id==id),j=i+ +d;if(a[j]){const o=a[i].order;await api.update(k,a[i].id,{order:a[j].order});await api.update(k,a[j].id,{order:o});render(1)}}
@@ -2319,6 +2321,18 @@ document.addEventListener('click',e=>{
 });
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeTopLanguage()});
 document.addEventListener('change',async e=>{const t=e.target;
+  if(t.matches('[data-host-node-preset]')){
+    const node=DB.nodes.find(n=>String(n.id)===t.value),form=t.closest('form');
+    if(node&&form){
+      const address=form.elements.namedItem('address'),port=form.elements.namedItem('port');
+      if(address)address.value=node.addr||'';
+      if(port)port.value=node.port||443;
+      const checkbox=[...form.querySelectorAll('input[type=checkbox]')].find(x=>x.value===String(node.id));
+      if(checkbox){form.querySelectorAll('input[type=checkbox]').forEach(x=>{if(DB.nodes.some(n=>String(n.id)===x.value))x.checked=x===checkbox;});}
+      toast('Адрес и порт подставлены из узла');
+    }
+    return;
+  }
   syncRangeProgress(t);
   if(t.id==='range-precision'){
     C.rangePrecision=t.value==='10'?10:1;
