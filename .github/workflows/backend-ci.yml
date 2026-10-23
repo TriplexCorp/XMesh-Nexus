@@ -96,6 +96,8 @@ jobs:
         run: node scripts/check-node-create-action.js
       - name: Check optional node hosting and local flags in notifications
         run: node scripts/check-node-hosting-notifications.js
+      - name: Test live notification bell, loading, refresh and failed node status handling
+        run: node scripts/check-notification-center.js
       - name: Verify infrastructure statistics, steal time and save feedback
         run: node scripts/check-statistics-feedback.js
       - name: Enforce tech-debt cleanup and compatibility boundaries
