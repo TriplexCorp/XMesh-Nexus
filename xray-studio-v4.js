@@ -29,6 +29,7 @@ function migrateInboundProtocol(inbound,next){
  if(next==='hysteria')inbound.streamSettings={network:'hysteria',security:'tls',hysteriaSettings:{version:2}};
  else if(previous==='hysteria')inbound.streamSettings={network:'raw',security:'none'};
 }
+function generateRealityShortId(){const bytes=new Uint8Array(8);crypto.getRandomValues(bytes);return Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');}
 const defaultDoc=()=>({log:{loglevel:'warning'},inbounds:[{tag:'vless-main',listen:'127.0.0.1',port:443,protocol:'vless',settings:{users:[],decryption:'none'},streamSettings:{network:'xhttp',security:'none',xhttpSettings:{path:'/xhttp',mode:'auto'}}}],outbounds:[{tag:'direct',protocol:'freedom'}],routing:{domainStrategy:'AsIs',rules:[]}});
 function view(){return [
 '<section id="xm-studio-v4" class="sv-studio">',
@@ -314,7 +315,7 @@ async function formChanged(el){
  if(k==='xhttpExtra'){let parsed;try{parsed=JSON.parse(el.value)}catch{throw Error('Некорректный JSON в xhttpSettings.extra')}if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))throw Error('xhttpSettings.extra должен быть JSON-объектом');(ss.xhttpSettings??={path:'/xhttp',mode:'auto'}).extra=parsed}
 
  if(k==='transport')ss.network=el.value;
- if(k==='security')ss.security=el.value;
+ if(k==='security'){ss.security=el.value;if(el.value==='reality'){const r=ss.realitySettings??={show:false,serverNames:[],shortIds:[]};if(!Array.isArray(r.shortIds)||r.shortIds.length===0)r.shortIds=[generateRealityShortId()];}}
  if(['target','sni','private','shortid'].includes(k)){const r=ss.realitySettings??={show:false,serverNames:[],shortIds:[]};if(k==='target')r.target=el.value;if(k==='sni')r.serverNames=[el.value];if(k==='private')r.privateKey=el.value;if(k==='shortid')r.shortIds=[el.value]}
  if(k==='path')(ss.xhttpSettings??={mode:'auto'}).path=el.value;if(k==='xhttpMode')(ss.xhttpSettings??={path:'/xhttp'}).mode=el.value;
  if(k==='certificate'||k==='key'){const tls=ss.tlsSettings??={certificates:[{}]};tls.certificates??=[{}];tls.certificates[0]??={};tls.certificates[0][k==='certificate'?'certificateFile':'keyFile']=el.value}
@@ -368,7 +369,7 @@ function showPopup(title,kind){
   b.onclick=async()=>{
    if(!await unsavedApproval('Применить шаблон поверх текущего черновика?'))return;
    const d=defaultDoc(),ib=d.inbounds[0],ss=ib.streamSettings;
-   if(kind==='reality'){ss.security='reality';ss.realitySettings={target:'example.com:443',serverNames:['example.com'],privateKey:'',shortIds:[]}}
+   if(kind==='reality'){ss.security='reality';ss.realitySettings={target:'example.com:443',serverNames:['example.com'],privateKey:'',shortIds:[generateRealityShortId()]}}
    if(kind==='raw')ib.streamSettings={network:'raw',security:'none'};
    if(kind==='tls'){ss.security='tls';ss.tlsSettings={certificates:[]}}
    if(kind==='ws'){ib.streamSettings={network:'ws',security:'tls',wsSettings:{path:'/ws'},tlsSettings:{certificates:[]}}}
