@@ -3867,3 +3867,14 @@ dialog.user-modal .user-server-details>b::before{
   background:var(--server-color,var(--a));margin-right:.4rem;vertical-align:middle;
 }
 dialog.user-modal .user-server-item{border-color:color-mix(in srgb,var(--server-color,var(--a)) 20%,var(--ln))}
+
+/* Server-specific gradient finish, preserving each node's exact traffic share. */
+dialog.user-modal .user-server-donut{
+  background:
+    radial-gradient(closest-side,var(--s1) 64%,transparent 66%),
+    conic-gradient(var(--server-color,var(--a)) 0 var(--traffic-share),
+      color-mix(in srgb,var(--server-color,var(--a)) 14%,var(--s2)) var(--traffic-share) 100%);
+}
+dialog.user-modal .user-server-details>b::before{
+  background:var(--server-gradient,var(--server-color,var(--a)));
+}
