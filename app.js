@@ -2146,6 +2146,7 @@ const updateNodeRuntimeBadges=(node,runtime)=>{
 async function nodesP(){
   const [r,s,overview]=await Promise.all([api.list('nodes',{sort:'id'}),api.stats(),backendRequest('/api/v1/statistics/overview').catch(()=>null)]);ST=s;
   const latestMetrics=new Map((overview?.nodes||[]).map(n=>[Number(n.id),n.latest&&!n.latest.stale?n.latest:null]));
+  const networkTotals=new Map((overview?.nodes||[]).map(n=>[Number(n.id),n]));
   const runtime=new Map(await Promise.all(r.items.map(async n=>{
     try{return [n.id,await backendRequest('/api/v1/nodes/'+encodeURIComponent(n.id)+'/runtime')]}catch(_){return [n.id,null]}
   })));
@@ -2157,15 +2158,21 @@ async function nodesP(){
     const l={cpu:Number.isFinite(cpu)?cpu:null,ram:Number.isFinite(ramUsed)&&Number.isFinite(ramTotal)&&ramTotal>0?ramUsed/ramTotal*100:null,mbps:Number.isFinite(rx)&&Number.isFinite(tx)?(rx+tx)*8/1e6:null};
     // Keep the live gauge cache consistent with the TimescaleDB data used
     // by the Statistics page. drawNodeLive() must not wipe fresh gauges.
+    const totalNode=networkTotals.get(Number(n.id));
+    const rxTotal=totalNode?.networkRxBytes,txTotal=totalNode?.networkTxBytes;
+    const bytes=rxTotal===null||rxTotal===undefined||txTotal===null||txTotal===undefined?null:
+      Math.max(0,Number(rxTotal)+Number(txTotal));
+    l.networkTotalBytes=Number.isFinite(bytes)?bytes:null;
     LV[n.id]=l;
-    const k=n.limit?cl(n.used/n.limit,0,1):0,tc=k>.9?'--er':k>.75?'--wr':'--c3';
+    const trafficGb=l.networkTotalBytes===null?null:l.networkTotalBytes/1073741824;
+    const k=n.limit&&trafficGb!==null?cl(trafficGb/n.limit,0,1):0,tc=k>.9?'--er':k>.75?'--wr':'--c3';
     return `<div class="card nc${n.disabled?' off':''}" data-node-card-id="${n.id}"><div class="h"><span class="fg">${flagView(n.flag)}</span><div class="node-identity"><b>${esc(n.name)}</b><br><small class="mu">${esc(n.addr)}${n.port?':'+esc(n.port):''}</small>${n.hosting?.trim()?`<span class="node-hosting" title="Хостинг">${ic('building-2')}${esc(n.hosting.trim())}</span>`:''}</div><div class="node-live-badges"><span class="node-xray-version" data-node-xray-version title="Версия по последнему heartbeat">${runtime.get(n.id)?.xrayVersion?'Xray '+esc(runtime.get(n.id).xrayVersion):'Xray —'}</span><span data-node-runtime-state class="node-runtime-pill node-runtime-${nodeRuntimeState(n,runtime.get(n.id)).kind}"><span class="node-runtime-dot" aria-hidden="true"></span>${esc(nodeRuntimeState(n,runtime.get(n.id)).label)}</span></div></div>
       <div class="kvg"><div><span>Активные пользователи</span><b>${s.nodeOn[n.id]??0}</b></div><div><span>XRAY STUDIO</span>${p?esc(p.name)+'<br><small class="mu">Применение профиля не подтверждено</small>':n.profileId?'<span class="er">Профиль ID '+esc(n.profileId)+' не найден</span>':'—'}</div></div>
       ${n.rotationEnabled?`<div class="node-ip-rotation active" aria-label="Пул IP-ротации"><span class="node-ip-indicator" aria-hidden="true"></span><span>IP-пул · ${nodeRotationIPs(n).length} адресов</span></div>`:''}
       <div class="node-gauges">
         ${nodeGauge(n,'cpu-'+n.id,'CPU',Number.isFinite(l.cpu)?l.cpu:0,Number.isFinite(l.cpu)?Math.round(l.cpu)+'%':'—',Number.isFinite(l.cpu)?'загрузка':'нет данных','--a')}
         ${nodeGauge(n,'ram-'+n.id,'RAM',Number.isFinite(l.ram)?l.ram:0,Number.isFinite(l.ram)?Math.round(l.ram)+'%':'—',Number.isFinite(l.ram)?'занято':'нет данных','--b')}
-        ${nodeGauge(n,'traffic-'+n.id,'Трафик',n.limit?k*100:0,n.limit?Math.round(k*100)+'%':'∞',n.limit?`${gb(n.used)} / ${gb(n.limit)}`:`${gb(n.used)} · без лимита`,tc)}
+        ${nodeGauge(n,'traffic-'+n.id,'Трафик сети',n.limit?k*100:0,trafficGb===null?'—':n.limit?Math.round(k*100)+'%':'∞',trafficGb===null?'нет данных':n.limit?`${gb(trafficGb)} / ${gb(n.limit)}`:`${gb(trafficGb)} · без лимита`,tc)}
       </div>
       <div class="mb node-speed"><div><span>Текущая скорость</span><b id="nm${n.id}">${Number.isFinite(l.mbps)?fmt(l.mbps)+' Мбит/с':'—'}</b></div><div class="pb f" style="--w:${Number.isFinite(l.mbps)?cl(l.mbps/240*100,0,100):0}%" id="npm${n.id}"><i></i></div></div>
       <div class="acts"><button class="gh sm" data-node-bootstrap="${n.id}">${ic('link')}Подключить ноду и метрики</button><button class="gh sm" data-nr="${n.id}">${ic('redo')}Перезапуск</button><button class="gh sm" data-xray-update="${n.id}">${ic('upload')}Обновить Xray</button><button class="gh sm" data-nt="${n.id}">${ic(n.disabled?'play':'pause')}${n.disabled?'Включить':'Отключить'}</button><button class="gh sm" data-ne="nodes:${n.id}">${ic('pen')}Изменить</button><button class="gh sm" data-node-create-host="${n.id}">${ic('globe')}Создать хост</button></div></div>`;
@@ -2185,15 +2192,20 @@ async function refreshNodeMetrics(){
     const overview=await backendRequest('/api/v1/statistics/overview');
     if(cur!=='nodes')return;
     const metrics=new Map((overview?.nodes||[]).map(n=>[Number(n.id),n.latest&&!n.latest.stale?n.latest:null]));
+    const totals=new Map((overview?.nodes||[]).map(n=>[Number(n.id),n]));
     DB.nodes.forEach(n=>{
       const m=metrics.get(Number(n.id));
+      const t=totals.get(Number(n.id));
       const val=v=>v===null||v===undefined?null:Number(v);
       const cpu=val(m?.cpuPercent),used=val(m?.ramUsedBytes),total=val(m?.ramTotalBytes);
       const rx=val(m?.rxBytesPerSec),tx=val(m?.txBytesPerSec);
       LV[n.id]={
         cpu:Number.isFinite(cpu)?cpu:null,
         ram:Number.isFinite(used)&&Number.isFinite(total)&&total>0?used/total*100:null,
-        mbps:Number.isFinite(rx)&&Number.isFinite(tx)?(rx+tx)*8/1e6:null
+        mbps:Number.isFinite(rx)&&Number.isFinite(tx)?(rx+tx)*8/1e6:null,
+        networkTotalBytes:t?.networkRxBytes===null||t?.networkRxBytes===undefined||
+          t?.networkTxBytes===null||t?.networkTxBytes===undefined?null:
+          Math.max(0,Number(t.networkRxBytes)+Number(t.networkTxBytes))
       };
     });
     updateNodeGauges();
@@ -2228,8 +2240,11 @@ function updateNodeGauges(){DB.nodes.forEach(n=>{
   const l=LV[n.id]||{cpu:null,ram:null,mbps:null};
   const metrics=[['cpu-'+n.id,l.cpu,'загрузка'],['ram-'+n.id,l.ram,'занято']];
   metrics.forEach(([key,value,detail])=>setNodeGauge(key,Number.isFinite(value)?value:0,Number.isFinite(value)?Math.round(value)+'%':'—',Number.isFinite(value)?detail:'нет данных'));
-  const traffic=n.limit?cl(n.used/n.limit*100,0,100):0,tc=traffic>90?'--er':traffic>75?'--wr':'--c3';
-  setNodeGauge('traffic-'+n.id,traffic,n.limit?Math.round(traffic)+'%':'∞',n.limit?`${gb(n.used)} / ${gb(n.limit)}`:`${gb(n.used)} · без лимита`);
+  const total=l.networkTotalBytes;
+  const trafficGb=Number.isFinite(total)?total/1073741824:null;
+  const traffic=n.limit&&trafficGb!==null?cl(trafficGb/n.limit*100,0,100):0,tc=traffic>90?'--er':traffic>75?'--wr':'--c3';
+  setNodeGauge('traffic-'+n.id,traffic,trafficGb===null?'—':n.limit?Math.round(traffic)+'%':'∞',
+    trafficGb===null?'нет данных':n.limit?`${gb(trafficGb)} / ${gb(n.limit)}`:`${gb(trafficGb)} · без лимита`);
   const ta=$('#ngarc-traffic-'+n.id);if(ta)ta.style.setProperty('--g-color',`var(${tc})`);
   const speed=$('#nm'+n.id),bar=$('#npm'+n.id);if(speed)speed.textContent=Number.isFinite(l.mbps)?fmt(l.mbps)+' Мбит/с':'—';if(bar)bar.style.setProperty('--w',Number.isFinite(l.mbps)?cl(l.mbps/240*100,0,100)+'%':'0%');
 });}
