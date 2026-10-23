@@ -150,7 +150,7 @@ pub(crate) fn client_stream(inbound:&Value,host:&Value,device:&str)->Option<Valu
     if !["raw","tcp","xhttp","ws","websocket","grpc","httpupgrade","mkcp","kcp","hysteria","masque"].contains(&network){return None}
     if network=="masque" && (security!="tls" || field(inbound,"protocol")!=Some("masque")){return None}
     if security=="reality" && !["raw","tcp","xhttp","grpc"].contains(&network){return None}
-    let mut out=if field(stream,"method").is_some(){json!({"security":security,"method":network})}
+    let mut out=if field(stream,"method").is_some() || ["hysteria","masque"].contains(&network){json!({"security":security,"method":network})}
         else{json!({"security":security,"network":network})};
     if security=="reality"{
         let reality=stream.get("realitySettings").unwrap_or(&Value::Null);
@@ -271,6 +271,15 @@ mod tests{
         assert!(body.contains("\"password\":\"PUB\""));
         assert!(!body.contains("SECRET")&&!body.contains("secret:443")&&!body.contains("PRIVATE"));
         assert!(c.get("finalmask").is_none());
+    }
+    #[test] fn kcp_seed_and_header_are_shared_but_proxy_protocol_is_server_only(){
+        let inbound=json!({"streamSettings":{"network":"mkcp","security":"none",
+          "kcpSettings":{"header":{"type":"wechat-video"},"seed":"shared-secret",
+           "acceptProxyProtocol":true,"mtu":1350}}});
+        let result=client_stream(&inbound,&json!({}),"auto").unwrap();
+        assert_eq!(result["kcpSettings"]["seed"],"shared-secret");
+        assert_eq!(result["kcpSettings"]["header"]["type"],"wechat-video");
+        assert!(result["kcpSettings"].get("acceptProxyProtocol").is_none());
     }
     #[test] fn transports_strip_inbound_only_keys(){
         for (method,key) in [("ws","wsSettings"),("httpupgrade","httpupgradeSettings"),
