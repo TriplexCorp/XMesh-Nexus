@@ -42,6 +42,18 @@ python3 -m py_compile "$COLLECTOR_TMP"
 install -d -o root -g root -m 0755 /usr/local/libexec
 install -o root -g root -m 0755 "$COLLECTOR_TMP" /usr/local/libexec/xmesh-xray-stats-collector.py
 
+# The fixed upgrade command is installed before the managed Xray sync worker.
+# It is NOT executed during initial enrollment.
+UPGRADER_TMP="$(mktemp)"
+trap 'rm -f "$AGENT_TMP" "$COLLECTOR_TMP" "$UPGRADER_TMP"' EXIT
+curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 "$RAW_BASE/update-node-control-agent.sh" -o "$UPGRADER_TMP"
+bash -n "$UPGRADER_TMP"
+grep -q 'xmesh-node-agent-upgrade.service' "$UPGRADER_TMP" || {
+  echo "Invalid remote agent updater" >&2; exit 1;
+}
+install -o root -g root -m 0700 "$UPGRADER_TMP" /usr/local/sbin/.xmesh-update-agent.new
+mv -f /usr/local/sbin/.xmesh-update-agent.new /usr/local/sbin/xmesh-update-agent
+
 # Run telemetry as a dedicated unprivileged account, not root.
 if ! getent group xmesh-metrics >/dev/null; then
   groupadd --system xmesh-metrics
@@ -212,6 +224,34 @@ AccuracySec=1s
 Unit=xmesh-node-user-meter.service
 [Install]
 WantedBy=timers.target
+EOF
+
+
+# A control-v4 node may run this local, audited, fixed upgrade service.
+# The privileged updater is separate from the strongly confined command poller.
+cat >/etc/systemd/system/xmesh-node-agent-upgrade.service <<'EOF'
+[Unit]
+Description=XMesh node agent verified self-update
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/xmesh-update-agent --remote
+User=root
+Group=root
+UMask=0077
+TimeoutStartSec=150s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ReadWritePaths=/usr/local/sbin /usr/local/libexec /etc/systemd/system /var/lib/xmesh-node-control /var/lib/xmesh-xray-sync /run
 EOF
 
 systemctl daemon-reload
