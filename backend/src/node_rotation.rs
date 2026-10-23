@@ -22,7 +22,7 @@ fn invalid(message: &str) -> ApiError {
 pub(crate) fn parse_pool(value: &Value) -> Result<Vec<IpAddr>, ApiError> {
     let Some(raw) = value.get("rotationIps") else { return Ok(Vec::new()) };
     let source = raw.as_str().ok_or_else(|| invalid("Пул ротации должен быть текстом: один IP в каждой строке."))?;
-    if source.len() > 4096 {
+    if source.len() > 16384 {
         return Err(invalid("Слишком большой список IP-адресов (максимум 256)."));
     }
     let mut seen = HashSet::new();
@@ -73,6 +73,36 @@ pub(crate) async fn resolve_address(
     node_id: i64,
     user_id: i64,
 ) -> Result<(String, bool, usize), ApiError> {
+    resolve_address_inner(state, node_id, user_id, false).await
+}
+
+/// Public subscriptions are sticky for a bounded interval, while the
+/// administrator's explicit /rotation/next endpoint advances immediately.
+/// The same row lock serializes all selections across replicas.
+pub(crate) async fn resolve_subscription_address(
+    state: &AppState,
+    node_id: i64,
+    user_id: i64,
+) -> Result<String, ApiError> {
+    Ok(resolve_address_inner(state, node_id, user_id, true).await?.0)
+}
+
+fn interval_hours(node: &Value) -> i64 {
+    node.get("rotationIntervalHours").and_then(Value::as_i64)
+        .filter(|hours| (1..=720).contains(hours)).unwrap_or(24)
+}
+
+fn reusable_address(pool: &[IpAddr], previous: &str, elapsed_seconds: i64, hours: i64) -> bool {
+    elapsed_seconds >= 0 && elapsed_seconds < hours * 3600
+        && pool.iter().any(|ip| ip.to_string() == previous)
+}
+
+async fn resolve_address_inner(
+    state: &AppState,
+    node_id: i64,
+    user_id: i64,
+    sticky: bool,
+) -> Result<(String, bool, usize), ApiError> {
     let node_row = sqlx::query("SELECT data FROM panel_records WHERE collection='nodes' AND id=$1")
         .bind(node_id)
         .fetch_optional(&state.pool)
@@ -115,7 +145,7 @@ pub(crate) async fn resolve_address(
     .execute(&mut *tx)
     .await?;
     let row = sqlx::query(
-        "SELECT next_index, last_ip FROM node_ip_rotation_cursors \
+        "SELECT next_index, last_ip, EXTRACT(EPOCH FROM (NOW()-updated_at))::BIGINT AS elapsed_seconds FROM node_ip_rotation_cursors \
          WHERE node_id=$1 AND user_id=$2 FOR UPDATE",
     )
     .bind(node_id)
@@ -124,6 +154,11 @@ pub(crate) async fn resolve_address(
     .await?;
     let index: i64 = row.try_get("next_index")?;
     let last_ip: String = row.try_get("last_ip")?;
+    let elapsed: i64 = row.try_get("elapsed_seconds")?;
+    if sticky && reusable_address(&pool, &last_ip, elapsed, interval_hours(&node)) {
+        tx.commit().await?;
+        return Ok((last_ip, true, pool.len()));
+    }
     let (chosen_index, address) = choose(&pool, index, &last_ip);
     sqlx::query(
         "UPDATE node_ip_rotation_cursors SET next_index=$3, last_ip=$4, updated_at=NOW() \
@@ -178,6 +213,17 @@ mod tests {
         assert!(parse_pool(&json!({"rotationIps":"127.0.0.1"})).is_err());
         assert!(validate_node(&json!({"rotationEnabled":true,"rotationIps":"1.1.1.1"})).is_err());
         assert!(validate_node(&json!({"rotationEnabled":true,"rotationIps":"1.1.1.1\n9.9.9.9"})).is_ok());
+    }
+    #[test]
+    fn sticky_lease_reuses_until_expiry_or_pool_change() {
+        let pool = parse_pool(&json!({"rotationIps":"13.143.175.129\n13.143.175.130"})).unwrap();
+        assert!(reusable_address(&pool, "13.143.175.129", 3599, 1));
+        assert!(!reusable_address(&pool, "13.143.175.129", 3600, 1));
+        assert!(!reusable_address(&pool, "13.143.175.131", 60, 24));
+        assert!(!reusable_address(&pool, "", 60, 24));
+        assert_eq!(interval_hours(&json!({})), 24);
+        assert_eq!(interval_hours(&json!({"rotationIntervalHours":12})), 12);
+        assert_eq!(interval_hours(&json!({"rotationIntervalHours":0})), 24);
     }
     #[test]
     fn rotates_without_repeating_last_address() {
