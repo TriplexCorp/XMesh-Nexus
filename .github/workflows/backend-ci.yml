@@ -53,6 +53,7 @@ jobs:
           node --check subscription-studio.js
           node --check subscription-portal.js
           node --check login.js
+          node --check xray-studio-hosts.js
           node --check xray-studio-v4.js
           node --check xray-studio-tools.js
           node --check xray-json-diagnostics.js
@@ -63,6 +64,8 @@ jobs:
         run: node scripts/check-xray-intelligence.js
       - name: Test XRAY STUDIO editor tools and Reality Short ID recovery
         run: node scripts/check-xray-tool-actions.js
+      - name: Verify XRAY STUDIO public endpoint integration
+        run: node scripts/check-xray-studio-hosts.js
       - name: Enforce active XRAY STUDIO entrypoint and remove stale assets
         run: node scripts/check-xray-active-entrypoint.js
       - name: Verify packaged frontend assets
