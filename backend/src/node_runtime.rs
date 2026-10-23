@@ -210,6 +210,18 @@ pub async fn poll_restart(
     node_auth::authenticate_for(
         &state,&headers,request.node_id,&body,"/api/v1/node/restart/poll"
     ).await?;
+    // Quota/manual disable is authoritative. A node is not merely hidden in
+    // the UI: the signed control agent MUST stop Xray before processing any
+    // restart/update command. Repeat the directive until it is enforced.
+    let disabled=sqlx::query_scalar::<_,bool>(
+        "SELECT COALESCE((data->>'disabled')::boolean,false)
+         FROM panel_records WHERE collection='nodes' AND id=$1"
+    ).bind(request.node_id).fetch_optional(&state.pool).await?
+     .ok_or_else(||ApiError::new(StatusCode::NOT_FOUND,"Node not found"))?;
+    if disabled {
+        return Ok(Json(json!({"command":null,"enforceStop":true})));
+    }
+
     sqlx::query(
         "UPDATE node_restart_commands SET state='failed',
          result='Command expired before delivery',finished_at=NOW()
@@ -227,7 +239,7 @@ pub async fn poll_restart(
             "action":row.try_get::<String,_>("action")?})),
         None=>None
     };
-    Ok(Json(json!({"command":command})))
+    Ok(Json(json!({"command":command,"enforceStop":false})))
 }
 
 #[derive(Deserialize)]
@@ -351,6 +363,10 @@ pub async fn desired_config(
         "SELECT data FROM panel_records WHERE collection='nodes' AND id=$1"
     ).bind(request.node_id).fetch_optional(&state.pool).await?
       .ok_or_else(||ApiError::new(StatusCode::NOT_FOUND,"Node not found."))?;
+    if node.get("disabled").and_then(Value::as_bool)==Some(true){
+        return Err(ApiError::new(StatusCode::FORBIDDEN,
+            "Node disabled: Xray configuration updates blocked."));
+    }
     let port = node.get("xrayLocalPort").and_then(|v|v.as_u64())
         .filter(|p| *p>0 && *p<=65535)
         .ok_or_else(||ApiError::new(StatusCode::CONFLICT,"Set a valid local Xray port on the node."))?;
