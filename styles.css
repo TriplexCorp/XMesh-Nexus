@@ -2936,3 +2936,54 @@ dialog.node-wide .node-date-field .user-date-calendar{width:min(320px,calc(100vw
 dialog.node-wide .node-date-field .user-cal-renew{display:none}
 dialog.node-wide .node-date-field .user-cal-grid{grid-template-columns:repeat(7,minmax(0,1fr))}
 dialog.node-wide .node-date-field .user-date-trigger{min-height:2.45rem}
+
+/* Shared node/user editor frame: identical outer dimensions and viewport behavior.
+   Keep layouts independent internally but never give the modals different widths. */
+dialog#dlg:is(.node-wide,.user-modal){
+  box-sizing:border-box!important;
+  width:min(1680px,calc(100vw - 48px))!important;
+  inline-size:min(1680px,calc(100vw - 48px))!important;
+  min-width:0!important;
+  max-width:calc(100vw - 48px)!important;
+  max-inline-size:calc(100vw - 48px)!important;
+  min-height:min(690px,calc(100dvh - 32px))!important;
+  max-height:calc(100dvh - 32px)!important;
+  height:auto;
+  padding:0!important;
+  margin:auto;
+  overflow:hidden;
+}
+dialog#dlg.node-wide > form.box,
+dialog#dlg.user-modal > .box.user-canvas{
+  box-sizing:border-box;
+  width:100%;
+  height:100%;
+  min-height:min(690px,calc(100dvh - 32px));
+  max-height:calc(100dvh - 32px);
+  overflow-y:auto;
+  overflow-x:hidden;
+}
+dialog#dlg.node-wide > form.box{
+  display:flex;
+  flex-direction:column;
+  gap:1rem;
+}
+dialog#dlg.node-wide > form.box > .node-form-layout{flex:1 0 auto;align-content:start}
+dialog#dlg.node-wide > form.box > .act{margin-top:auto}
+dialog#dlg.node-wide .node-form-layout{
+  grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1.12fr);
+}
+@media(max-width:1150px){
+  dialog#dlg.node-wide .node-form-layout{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:760px){
+  dialog#dlg:is(.node-wide,.user-modal){
+    width:calc(100vw - 12px)!important;
+    inline-size:calc(100vw - 12px)!important;
+    max-width:calc(100vw - 12px)!important;
+    max-inline-size:calc(100vw - 12px)!important;
+    min-height:0!important;
+  }
+  dialog#dlg.node-wide .node-form-layout{grid-template-columns:minmax(0,1fr)}
+  dialog#dlg.node-wide > form.box,dialog#dlg.user-modal > .box.user-canvas{min-height:0}
+}
