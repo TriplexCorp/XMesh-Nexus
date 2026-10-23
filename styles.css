@@ -3087,7 +3087,7 @@ dialog .toast-dialog .toast-action{margin-left:auto;color:var(--a);white-space:n
 
 /* XMesh Hosts 2.0 — compact, profile-driven endpoint editor. */
 dialog#dlg.host-wide{
-  width:min(1040px,calc(100vw - 32px));
+  width:min(1180px,calc(100vw - 32px));
   max-width:calc(100vw - 32px);
   max-height:calc(100dvh - 28px);
   padding:0;
@@ -3131,3 +3131,11 @@ dialog#dlg.host-wide .act{position:sticky;bottom:0;background:var(--s1);padding-
 .nc .acts [data-node-create-host]{grid-column:1/-1}
 
 .host-editor-layout .f[hidden]{display:none!important}
+
+/* Host diagnostic actions exist only when there is an actionable mismatch.
+   Prevent theme button display rules from overriding the native hidden state. */
+dialog#dlg.host-wide [data-host-repair][hidden],
+dialog#dlg.host-wide [data-host-link-profile][hidden],
+dialog#dlg.host-wide [data-host-warnings][hidden]{display:none!important}
+dialog#dlg.host-wide [data-host-repair],
+dialog#dlg.host-wide [data-host-link-profile]{min-height:36px;white-space:normal;text-align:left}
