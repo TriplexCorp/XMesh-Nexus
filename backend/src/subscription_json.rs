@@ -141,15 +141,21 @@ pub(crate) fn build(mut proxies:Vec<Value>,setting:&Value)->Result<Value,String>
             let members=&countries[&code];
             if members.len()<2 || code=="ZZ"{continue}
             let tag=format!("{code}_AUTO");
-            balancers.push(json!({
+            let mut balancer=json!({
                 "tag":tag,"selector":[format!("xmesh-{code}-")],
-                "fallbackTag":members[0],"strategy":{"type":balance}
-            }));
+                "strategy":{"type":balance}
+            });
+            // Xray requires an Observatory when fallbackTag is present,
+            // even for roundRobin/random. Only leastPing configures one.
+            if balance=="leastPing"{balancer["fallbackTag"]=json!(members[0])}
+            balancers.push(balancer);
         }
-        balancers.push(json!({
+        let mut balancer=json!({
             "tag":"SMART","selector":["xmesh-"],
-            "fallbackTag":first,"strategy":{"type":balance}
-        }));
+            "strategy":{"type":balance}
+        });
+        if balance=="leastPing"{balancer["fallbackTag"]=json!(first)}
+        balancers.push(balancer);
         observation=balance=="leastPing";
         rules.push(json!({"type":"field","inboundTag":["socks","http"],"balancerTag":"SMART"}));
     }else{
@@ -328,10 +334,14 @@ pub(crate) fn build_feed(proxies:Vec<Value>,settings:&Value)->Result<Value,Strin
     let first=config["outbounds"][0]["tag"].clone();
     let tags:Vec<Value>=config["outbounds"].as_array().unwrap().iter()
      .filter(|p|p["protocol"]=="vless").map(|p|p["tag"].clone()).collect();
-    config["routing"]["balancers"]=json!([{
-     "tag":row["tag"],"selector":tags,"fallbackTag":first,
-     "strategy":{"type":row["strategy"]}
-    }]);
+    let strategy=row["strategy"].as_str().unwrap_or("random");
+    let mut balancer=json!({
+     "tag":row["tag"],"selector":tags,
+     "strategy":{"type":strategy}
+    });
+    // Prevent "core: not all dependencies are resolved" on roundRobin/random.
+    if strategy=="leastPing"{balancer["fallbackTag"]=first}
+    config["routing"]["balancers"]=json!([balancer]);
     if let Some(rules)=config["routing"]["rules"].as_array_mut(){
      for rule in rules{
       if rule.get("balancerTag").is_some(){rule["balancerTag"]=row["tag"].clone()}
@@ -395,6 +405,35 @@ mod tests{
    "streamSettings":{"security":"reality","network":"xhttp",
    "realitySettings":{"serverName":"example.com","publicKey":"public","shortId":"aa"},
    "xhttpSettings":{"path":"/test","mode":"stream-up"}}})
+ }
+ #[test] fn round_robin_and_random_never_require_missing_observatory(){
+  for strategy in ["roundRobin","random"]{
+   let settings=json!({"subscriptionJson":{"smart":true,"balance":strategy}});
+   let cfg=build(vec![outbound("NL"),outbound("PL")],&settings).unwrap();
+   assert!(cfg.get("observatory").is_none());
+   for balancer in cfg["routing"]["balancers"].as_array().unwrap(){
+    assert!(balancer.get("fallbackTag").is_none());
+    assert_eq!(balancer["strategy"]["type"],strategy);
+   }
+   let mut nl=outbound("NL");nl["xmeshSourceKey"]=json!("host:1");
+   let mut pl=outbound("PL");pl["xmeshSourceKey"]=json!("host:2");
+   let custom=json!({"clientBalancers":[{
+    "tag":"AUTO_1","remark":"🇪🇺 Европа","serverDescription":"",
+    "selector":["host:1","host:2"],"strategy":strategy,"enabled":true
+   }]});
+   let feed=build_feed(vec![nl,pl],&custom).unwrap();
+   let group=&feed[0];
+   assert!(group.get("observatory").is_none());
+   assert!(group["routing"]["balancers"][0].get("fallbackTag").is_none());
+   assert_eq!(group["routing"]["balancers"][0]["strategy"]["type"],strategy);
+   assert_eq!(group["routing"]["rules"][2]["balancerTag"],"AUTO_1");
+  }
+ }
+ #[test] fn least_ping_preserves_observatory_and_fallback(){
+  let settings=json!({"subscriptionJson":{"smart":true,"balance":"leastPing"}});
+  let cfg=build(vec![outbound("NL"),outbound("PL")],&settings).unwrap();
+  assert!(cfg.get("observatory").is_some());
+  assert_eq!(cfg["routing"]["balancers"][0]["fallbackTag"],"xmesh-NL-0001");
  }
  #[test] fn custom_groups_select_exact_hosts_and_keep_server_profiles(){
   let mut nl=outbound("NL");nl["xmeshSourceKey"]=json!("host:101");
