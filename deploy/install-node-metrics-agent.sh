@@ -156,7 +156,7 @@ ProtectKernelTunables=true
 ProtectControlGroups=true
 RestrictSUIDSGID=true
 LockPersonality=true
-ReadWritePaths=/run
+ReadWritePaths=/run -/var/lib/xmesh-xray-sync
 EOF
 
 cat > /etc/systemd/system/xmesh-node-control.timer <<'EOF'
