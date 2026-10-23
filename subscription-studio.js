@@ -13,7 +13,7 @@ window.XMeshSubscriptionStudio = (() => {
     subscriptionHero:'',subscriptionHeroEn:'',subscriptionCta:'',subscriptionCtaEn:'',subscriptionLogoUrl:'',subscriptionSupportLabel:'Поддержка',subscriptionSupportLabelEn:'',
     subscriptionSupportUrl:'',subscriptionClientLayout:'grid',
     subscriptionJson:{dns:'cloudflare',queryStrategy:'UseIPv4',routingStrategy:'IPIfNonMatch',
-      balance:'leastPing',smart:true,sniffing:true,dnsRouting:false,socksPort:10808,httpPort:10809},
+      balance:'leastPing',smart:false,sniffing:true,dnsRouting:false,socksPort:10808,httpPort:10809},
     subscriptionAppsTitle:'',subscriptionAppsTitleEn:'',subscriptionCustomClients:[],
     subscriptionShowStatus:true,subscriptionShowApps:true,subscriptionShowQr:true,
     subscriptionShowCopy:true,subscriptionShowSupport:false,subscriptionShowDevices:false
@@ -195,15 +195,13 @@ window.XMeshSubscriptionStudio = (() => {
       '<label><input type="checkbox" name="subscriptionShowSupport"'+(data.subscriptionShowSupport?' checked':'')+'> Кнопка поддержки</label>',
       '</div></section>',
       '<section class="card subscription-studio-section">',
-      '<div class="subscription-studio-heading"><span>05</span><div><h3>XRAY JSON ENGINE</h3><p>Параметры клиентской подписки, DNS и автовыбора.</p></div></div>',
+      '<div class="subscription-studio-heading"><span>05</span><div><h3>XRAY JSON ENGINE</h3><p>Клиентский JSON, DNS и локальные подключения. Балансировка настраивается отдельно.</p></div></div>',
       '<div class="subscription-studio-pair">',
       '<label class="f subscription-field"><span>DNS</span><select name="json_dns">'+
         [['cloudflare','Cloudflare · 1.1.1.1 (надёжный режим)'],['cloudflare_doh','Cloudflare · DoH по IP (расширенный)'],['yandex','Yandex · DoH'],['system','Системный DNS']].map(([key,title])=>'<option value="'+key+'"'+(data.subscriptionJson.dns===key?' selected':'')+'>'+title+'</option>').join('')+'</select></label>',
       '<label class="f subscription-field"><span>DNS Query Strategy</span><select name="json_queryStrategy">'+
         [['UseIPv4','IPv4'],['UseIPv6','IPv6'],['UseIP','IPv4 + IPv6']].map(([key,title])=>'<option value="'+key+'"'+(data.subscriptionJson.queryStrategy===key?' selected':'')+'>'+title+'</option>').join('')+'</select></label>',
       '</div><div class="subscription-studio-pair">',
-      '<label class="f subscription-field"><span>Стратегия SMART</span><select name="json_balance">'+
-        [['leastPing','Минимальная задержка'],['roundRobin','По очереди'],['random','Случайный выбор'],['off','Отключена']].map(([key,title])=>'<option value="'+key+'"'+(data.subscriptionJson.balance===key?' selected':'')+'>'+title+'</option>').join('')+'</select></label>',
       '<label class="f subscription-field"><span>Маршрутизация доменов</span><select name="json_routingStrategy">'+
         [['IPIfNonMatch','IPIfNonMatch'],['AsIs','AsIs'],['IPOnDemand','IPOnDemand']].map(([key,title])=>'<option value="'+key+'"'+(data.subscriptionJson.routingStrategy===key?' selected':'')+'>'+title+'</option>').join('')+'</select></label>',
       '</div><div class="subscription-studio-pair">',
@@ -211,7 +209,6 @@ window.XMeshSubscriptionStudio = (() => {
       '<label class="f subscription-field"><span>HTTP-порт</span><input type="number" name="json_httpPort" min="1024" max="65535" step="1" value="'+data.subscriptionJson.httpPort+'"></label>',
       '</div>',
       '<div class="subscription-display-options subscription-visibility">',
-      '<label><input type="checkbox" name="json_smart"'+(data.subscriptionJson.smart?' checked':'')+'> SMART при нескольких серверах</label>',
       '<label><input type="checkbox" name="json_sniffing"'+(data.subscriptionJson.sniffing?' checked':'')+'> Sniffing</label>',
       '<label><input type="checkbox" name="json_dnsRouting"'+(data.subscriptionJson.dnsRouting?' checked':'')+'> Перехватывать DNS-запросы (расширенный режим)</label>',
       '</div><p class="note">По умолчанию DNS — 1.1.1.1 без дополнительного DNS outbound. '+
@@ -284,8 +281,8 @@ window.XMeshSubscriptionStudio = (() => {
         subscriptionJson:{
           dns:input(form,'json_dns').value,queryStrategy:input(form,'json_queryStrategy').value,
           routingStrategy:input(form,'json_routingStrategy').value,
-          balance:input(form,'json_balance').value,
-          smart:input(form,'json_smart').checked,sniffing:input(form,'json_sniffing').checked,
+          balance:data.subscriptionJson.balance,
+          smart:data.subscriptionJson.smart,sniffing:input(form,'json_sniffing').checked,
           dnsRouting:input(form,'json_dnsRouting').checked,
           socksPort:Number(input(form,'json_socksPort').value),
           httpPort:Number(input(form,'json_httpPort').value)
