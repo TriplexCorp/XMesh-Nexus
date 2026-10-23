@@ -3129,3 +3129,5 @@ dialog#dlg.host-wide .act{position:sticky;bottom:0;background:var(--s1);padding-
 
 /* One coherent full-width action for creating an endpoint from the node card. */
 .nc .acts [data-node-create-host]{grid-column:1/-1}
+
+.host-editor-layout .f[hidden]{display:none!important}
