@@ -1989,6 +1989,36 @@ function nodeGauge(n,key,label,pct,center,detail,color){
 }
 const NODE_GRID_KEY='xmeshNexusGridView';
 const getNodeGridMode=()=>{try{const mode=localStorage.getItem(NODE_GRID_KEY);return ['compact','standard','spacious'].includes(mode)?mode:'standard'}catch(e){return 'standard'}};
+// Render independent runtime and Xray health badges. Only fresh, authenticated
+// agent heartbeats can mark a node as active; a configured node is not online.
+const nodeRuntimeState=(node,runtime)=>{
+  if(node.disabled)return {label:'Отключена',kind:'disabled'};
+  if(!runtime?.connected)return {label:runtime?.lastSeenAt?'Нет связи':'Не подключена',kind:'offline'};
+  if(runtime.xrayRunning===true&&runtime.routerRunning===true)return {label:'Активна',kind:'online'};
+  if(runtime.xrayRunning===false)return {label:'Xray остановлен',kind:'offline'};
+  if(runtime.routerRunning===false)return {label:'Маршрутизатор остановлен',kind:'offline'};
+  return {label:'Состояние неизвестно',kind:'unknown'};
+};
+const renderNodeRuntime=(node,runtime)=>{
+  const status=nodeRuntimeState(node,runtime);
+  return '<span class="node-runtime-pill node-runtime-'+status.kind+'"><span class="node-runtime-dot" aria-hidden="true"></span>'+esc(status.label)+'</span>';
+};
+const updateNodeRuntimeBadges=(node,runtime)=>{
+  const card=$('[data-node-card-id="'+node.id+'"]');
+  if(!card)return;
+  const pill=card.querySelector('[data-node-runtime-state]');
+  const version=card.querySelector('[data-node-xray-version]');
+  const status=nodeRuntimeState(node,runtime);
+  if(pill){pill.className='node-runtime-pill node-runtime-'+status.kind;pill.replaceChildren();
+    const dot=document.createElement('span');dot.className='node-runtime-dot';dot.setAttribute('aria-hidden','true');
+    pill.append(dot,document.createTextNode(status.label));
+  }
+  if(version){
+    const text=runtime?.xrayVersion?('Xray '+runtime.xrayVersion):'Xray —';
+    version.textContent=text;
+    version.title=runtime?.xrayVersion?'Версия Xray по последнему heartbeat':'Версия Xray пока не получена';
+  }
+};
 async function nodesP(){
   const [r,s,overview]=await Promise.all([api.list('nodes',{sort:'id'}),api.stats(),backendRequest('/api/v1/statistics/overview').catch(()=>null)]);ST=s;
   const latestMetrics=new Map((overview?.nodes||[]).map(n=>[Number(n.id),n.latest&&!n.latest.stale?n.latest:null]));
@@ -2005,8 +2035,8 @@ async function nodesP(){
     // by the Statistics page. drawNodeLive() must not wipe fresh gauges.
     LV[n.id]=l;
     const k=n.limit?cl(n.used/n.limit,0,1):0,tc=k>.9?'--er':k>.75?'--wr':'--c3';
-    return `<div class="card nc${n.disabled?' off':''}"><div class="h"><span class="fg">${flagView(n.flag)}</span><div><b>${esc(n.name)}</b><br><small class="mu">${esc(n.addr)}${n.port?':'+esc(n.port):''}</small>${n.hosting?.trim()?`<span class="node-hosting" title="Хостинг">${ic('building-2')}${esc(n.hosting.trim())}</span>`:''}</div>${runtime.get(n.id)?.connected?chip(panelIsEnglish()?'Node agent online':'Агент ноды онлайн','--ok'):runtime.get(n.id)?.lastSeenAt?chip(panelIsEnglish()?'Node offline':'Нода не в сети','--er'):chip(panelIsEnglish()?'Agent not connected':'Агент не подключён','--mu')}</div>
-      <div class="kvg"><div><span>Активные пользователи</span><b>${s.nodeOn[n.id]??0}</b></div><div><span>XRAY STUDIO</span>${p?esc(p.name)+'<br><small class="mu">Применение профиля не подтверждено</small>':n.profileId?'<span class="er">Профиль ID '+esc(n.profileId)+' не найден</span>':'—'}<br><small class="mu">Xray: ${esc(runtime.get(n.id)?.xrayVersion||'версия не определена')}</small></div></div>
+    return `<div class="card nc${n.disabled?' off':''}" data-node-card-id="${n.id}"><div class="h"><span class="fg">${flagView(n.flag)}</span><div class="node-identity"><b>${esc(n.name)}</b><br><small class="mu">${esc(n.addr)}${n.port?':'+esc(n.port):''}</small>${n.hosting?.trim()?`<span class="node-hosting" title="Хостинг">${ic('building-2')}${esc(n.hosting.trim())}</span>`:''}</div><div class="node-live-badges"><span class="node-xray-version" data-node-xray-version title="Версия по последнему heartbeat">${runtime.get(n.id)?.xrayVersion?'Xray '+esc(runtime.get(n.id).xrayVersion):'Xray —'}</span><span data-node-runtime-state class="node-runtime-pill node-runtime-${nodeRuntimeState(n,runtime.get(n.id)).kind}"><span class="node-runtime-dot" aria-hidden="true"></span>${esc(nodeRuntimeState(n,runtime.get(n.id)).label)}</span></div></div>
+      <div class="kvg"><div><span>Активные пользователи</span><b>${s.nodeOn[n.id]??0}</b></div><div><span>XRAY STUDIO</span>${p?esc(p.name)+'<br><small class="mu">Применение профиля не подтверждено</small>':n.profileId?'<span class="er">Профиль ID '+esc(n.profileId)+' не найден</span>':'—'}</div></div>
       ${n.rotationEnabled?`<div class="node-ip-rotation active" aria-label="Пул IP-ротации"><span class="node-ip-indicator" aria-hidden="true"></span><span>IP-пул · ${nodeRotationIPs(n).length} адресов</span></div>`:''}
       <div class="node-gauges">
         ${nodeGauge(n,'cpu-'+n.id,'CPU',Number.isFinite(l.cpu)?l.cpu:0,Number.isFinite(l.cpu)?Math.round(l.cpu)+'%':'—',Number.isFinite(l.cpu)?'загрузка':'нет данных','--a')}
@@ -2045,13 +2075,27 @@ async function refreshNodeMetrics(){
     updateNodeGauges();
   }catch(error){console.warn('Could not refresh node metrics',error)}
 }
+async function refreshNodeRuntime(){
+  if(cur!=='nodes')return;
+  const nodes=DB.nodes.filter(n=>document.querySelector('[data-node-card-id="'+n.id+'"]'));
+  await Promise.all(nodes.map(async n=>{
+    try{
+      const runtime=await backendRequest('/api/v1/nodes/'+encodeURIComponent(n.id)+'/runtime');
+      if(cur==='nodes')updateNodeRuntimeBadges(n,runtime);
+    }catch(error){
+      // A failed status request is not evidence that the node is online.
+      if(cur==='nodes')updateNodeRuntimeBadges(n,null);
+      console.warn('Node runtime status unavailable',n.id,error);
+    }
+  }));
+}
 function drawNodeLive(){
   updateNodeGauges();
   let busy=false;
   const poll=async()=>{
     if(cur!=='nodes'||document.hidden||busy)return;
     busy=true;
-    try{await refreshNodeMetrics()}finally{busy=false}
+    try{await Promise.all([refreshNodeMetrics(),refreshNodeRuntime()])}finally{busy=false}
   };
   void poll();
   T.push(setInterval(()=>{void poll()},5000));
