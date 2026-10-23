@@ -454,7 +454,7 @@ input.addEventListener('keydown',ev=>{if(ev.key==='Tab'){ev.preventDefault();con
 get('wrap').addEventListener('change',ev=>root.classList.toggle('sv-wrap',ev.target.checked));
 get('upload').addEventListener('change',async ev=>{const f=ev.target.files?.[0];if(!f)return;try{if(f.size>2e6)throw Error('Файл больше 2 МБ');const raw=await f.text();JSON.parse(raw);if(!await unsavedApproval('Импортировать JSON вместо текущего черновика?'))return;input.value=raw;paint();input.dispatchEvent(new Event('xmesh:reset-history'));notify('JSON импортирован')}catch(err){notify(err.message)}finally{ev.target.value=''}});
 input.value=pretty(defaultDoc());saved='';paint();root.querySelector('[data-tab="inbound"]')?.click();renderProfiles();
-window.XMeshJsonTools?.setup(root,{toast:notify,realityKeys:ctx.realityKeys});
+window.XMeshJsonTools?.setup(root,{toast:notify,realityKeys:ctx.realityKeys,apiRequest:ctx.apiRequest});
 }
 return {view,mount};
 })();
