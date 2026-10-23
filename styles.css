@@ -3836,3 +3836,23 @@ dialog#dlg.node-wide #fe:not(:empty){margin:0}
   dialog#dlg.node-wide .node-billing-fields{grid-template-columns:minmax(0,1fr)}
   dialog#dlg.node-wide .node-billing-fields > *{grid-column:1/-1}
 }
+
+
+/* Keep country search + selected flag on the same baseline as neighbouring
+   primary fields, instead of making the entire first row twice as tall. */
+@media(min-width:1321px){
+  dialog#dlg.node-wide .node-main-section .country-picker{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    gap:.45rem;
+    align-items:start;
+  }
+  dialog#dlg.node-wide .node-main-section .country-picker > .country-hint{
+    grid-column:1/-1;
+  }
+  dialog#dlg.node-wide .node-main-section .country-options{
+    right:auto;
+    width:min(320px,calc(100vw - 72px));
+    max-width:none;
+  }
+}
