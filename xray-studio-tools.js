@@ -59,15 +59,17 @@ const snippets={
 };
 const tools=[
  ['undo','↶ Отменить'],['redo','↷ Повторить'],['find','⌕ Поиск'],['validate','✓ Проверить'],
- ['reality','✦ Reality X25519'],['shortid','♯ Short ID'],
+ ['reality','✦ Reality X25519'],['shortid','♯ Short ID'],['vision','XTLS Vision'],
  ['dns','◉ DNS'],['routing','⇄ Routing'],['policy','▥ Policy / Stats'],['outbounds','⬡ Outbounds'],['log','Log'],
  ['inbound','Новый inbound'],['xhttp','XHTTP настройки'],['vlessens','VLESS Encryption'],['finalmask','FinalMask'],['hysteria','Hysteria2 inbound'],['uuid','UUID (скопировать)'],['backup','Скачать JSON'],['format','Форматировать']
 ];
-const details={reality:['Ключи X25519 для Reality','key-round'],shortid:['Генерация Short ID','hash'],dns:['Настройка DNS-серверов','globe'],routing:['Правила маршрутизации','route'],policy:['Политики и статистика','chart-no-axes-column'],outbounds:['Исходящие соединения','network'],validate:['Проверка через Xray-core','shield-check'],xhttp:['Транспорт XHTTP','network'],vlessens:['Серверный VLESS Encryption','shield'],finalmask:['Маскировка потоков','layers'],hysteria:['Шаблон Hysteria2','radio'],uuid:['Скопировать UUID','fingerprint'],backup:['Экспорт текущего JSON','download'],inbound:['Добавить серверный inbound','plus']};
-const featured=['reality','shortid','xhttp','dns','routing','inbound'];
+const details={reality:['Ключи X25519 для Reality','key-round'],shortid:['Генерация Short ID','hash'],vision:['XTLS rprx Vision','shield-check'],dns:['Настройка DNS-серверов','globe'],routing:['Правила маршрутизации','route'],policy:['Политики и статистика','chart-no-axes-column'],outbounds:['Исходящие соединения','network'],validate:['Проверка через Xray-core','shield-check'],xhttp:['Транспорт XHTTP','network'],vlessens:['Серверный VLESS Encryption','shield'],finalmask:['Маскировка потоков','layers'],hysteria:['Шаблон Hysteria2','radio'],uuid:['Скопировать UUID','fingerprint'],backup:['Экспорт текущего JSON','download'],inbound:['Добавить серверный inbound','plus']};
+const featured=['reality','shortid','vlessens','vision','xhttp','dns','routing','inbound'];
 const icons={
  reality:'<path d="M12 2 4 6v6c0 5 3.5 8 8 10 4.5-2 8-5 8-10V6l-8-4Z"/><path d="m9 12 2 2 4-4"/>',
  shortid:'<path d="M5 9h14M4 15h14M11 3 7 21M17 3l-4 18"/>',
+ vlessens:'<path d="M12 2 4 6v6c0 5 3.5 8 8 10 4.5-2 8-5 8-10V6l-8-4Z"/><path d="M8 12h8M12 8v8"/>',
+ vision:'<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
  xhttp:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/>',
  dns:'<rect x="3" y="3" width="18" height="8" rx="2"/><rect x="3" y="13" width="18" height="8" rx="2"/><path d="M7 7h.01M7 17h.01M11 7h6M11 17h6"/>',
  routing:'<path d="M4 7h14l-3-3m3 3-3 3M20 17H6l3-3m-3 3 3 3"/>',
@@ -329,6 +331,31 @@ const operations={
    },'XHTTP настроен');
    if(ok)focusJsonSection('xhttpSettings','XHTTP');
   }catch(e){status('Ошибка: '+e.message);notify(e.message)}
+ },
+ async vision(){
+  try{
+   ensureDialogs();
+   const selected=await chooseInbound();if(!selected)return;
+   const current=getInbound(parse(),selected.index);
+   if(current.protocol!=='vless')throw Error('XTLS Vision доступен только для VLESS.');
+   const users=current.settings?.users||current.settings?.clients||[];
+   if(!Array.isArray(users)||!users.length)throw Error('В inbound нет пользователей. Добавьте VLESS users и повторите.');
+   const response=await dialog.request({
+    title:'XTLS rprx Vision',
+    description:'Установить flow xtls-rprx-vision для всех VLESS users выбранного inbound. Совместимость с XHTTP и VLESS Encryption зависит от версии Xray-core и клиента; проверьте итоговую конфигурацию ядром.',
+    confirmLabel:'Применить',
+    fields:[{name:'flow',label:'Flow',value:'xtls-rprx-vision',readonly:true,wide:true}]
+   });
+   if(!response)return;
+   if(area.value!==selected.source){notify('JSON изменился; повторите настройку Vision.');return}
+   mutate(doc=>{
+    const ib=getInbound(doc,selected.index);
+    if(ib.tag!==selected.tag||ib.protocol!=='vless')throw Error('Выбранный inbound изменился');
+    const list=ib.settings?.users||ib.settings?.clients;
+    if(!Array.isArray(list)||!list.length)throw Error('Нет пользователей VLESS');
+    for(const user of list)user.flow='xtls-rprx-vision';
+   },'XTLS Vision применён к пользователям');
+  }catch(e){notify(e.message)}
  },
  async vlessens(){
   try{
