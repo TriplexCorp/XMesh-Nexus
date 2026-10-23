@@ -1866,11 +1866,17 @@ function hostEditorRefresh(form,changedProfile=false){
   else if(!inbound)warnings.push('У профиля нет выбранного inbound.');
   else if(inbound.protocol!=='vless')warnings.push('Для подписок сейчас поддерживается только VLESS.');
   if(requiredNodes.length===0)warnings.push('Выберите ноду, иначе хост не будет привязан к рабочему серверу.');
-  if(mismatched.length)warnings.push('Профиль ноды не совпадает с профилем хоста: '+mismatched.map(n=>n?.name||'не найдена').join(', ')+'. Исправьте профиль в разделе «Узлы».');
+  if(mismatched.length)warnings.push('Несовместимые ноды: '+mismatched.map(n=>!n?'нода удалена':n.name+' (ID '+n.id+': '+(n.disabled?'отключена':hostProfile(n.profileId)?'назначен профиль «'+hostProfile(n.profileId).name+'»':'профиль ID '+(n.profileId||'не назначен')+' отсутствует')+')').join(', ')+'. Назначьте нодам существующий XRAY-профиль и только затем сохраняйте хост.');
   if(security==='reality'&&!realityKey)warnings.push('REALITY publicKey отсутствует: укажите публичную часть ключа в расширенных настройках. Приватный ключ сюда не вставляйте.');
   if(security==='reality'&&!sni)warnings.push('Не указан SNI для REALITY.');
   const warning=form.querySelector('[data-host-warnings]');
   if(warning){warning.textContent=warnings.join(' ');warning.hidden=!warnings.length;}
+  const repair=form.querySelector('[data-host-repair]');
+  if(repair){
+    const target=mismatched.find(n=>n&&(!hostProfile(n.profileId)||String(n.profileId)!==String(profile?.id)));
+    repair.hidden=!target;
+    if(target){repair.dataset.hostRepair=String(target.id);repair.textContent='Изменить профиль ноды «'+target.name+'»';}
+  }
   const count=form.querySelector('[data-host-count]');
   if(count)count.textContent=requiredNodes.length+' нод привязано';
 }
@@ -1893,7 +1899,7 @@ function hostEditorMarkup(o,e){
     '<small class="note" data-host-count></small></section>'+
     '<section class="host-editor-side"><div class="node-form-section-title">Клиентское подключение</div>'+
     '<p class="node-ip-hint">Итоговая конфигурация наследуется из inbound; приватные серверные ключи не экспортируются.</p>'+
-    '<div class="host-resolved" data-host-resolved></div><p class="host-validation" data-host-warnings role="status"></p>'+
+    '<div class="host-resolved" data-host-resolved></div><p class="host-validation" data-host-warnings role="status"></p><button type="button" class="gh sm" data-host-repair hidden></button>'+
     '<details class="host-advanced"><summary>Расширенные переопределения '+ic('chevron-down')+'</summary>'+
     '<p class="node-ip-hint">Пустые поля наследуются из профиля. Используйте только при нестандартной схеме.</p>'+
     '<div class="host-advanced-fields">'+advanced+'</div>'+
@@ -2310,6 +2316,7 @@ document.addEventListener('click',async e=>{
         profileId:profile?.id||DB.profiles[0]?.id||0,tag:inbound?.tag||'',nodes:[node.id],fp:'',order:DB.hosts.length+1});
     }
   }
+  else if(b=g('[data-host-repair]')){const node=DB.nodes.find(n=>String(n.id)===b.dataset.hostRepair);if(node){toast('Откройте настройки ноды и назначьте нужный XRAY-профиль. Несохранённые поля хоста не сохраняются.');entForm('nodes',node.id);}}
   else if(b=g('[data-host-duplicate]')){const host=DB.hosts.find(h=>String(h.id)===b.dataset.hostDuplicate);if(host){const {id,...copy}=host;entForm('hosts',null,{...copy,remark:(copy.remark||'Хост')+' · копия',order:DB.hosts.length+1});}}
   else if(b=g('[data-ne]')){const [k,id]=b.dataset.ne.split(':');entForm(k,id)}
   else if(b=g('tr[data-e]')){const [k,id]=b.dataset.e.split(':');entForm(k,id)}
