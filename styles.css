@@ -3448,58 +3448,127 @@ dialog#dlg > .node-setup{
 .xray-release-dialog .xm-action-confirm-actions{margin-top:1.25rem}
 
 
-/* User workspace · landscape-first card, with no trailing empty chin.
-   At desktop sizes only the content columns scroll; the shell stays centered. */
-@media (min-width: 1101px) and (min-height: 580px) {
-  dialog#dlg.user-modal,dialog.user-modal{
-    width:min(1160px,calc(100vw - 44px))!important;
-    inline-size:min(1160px,calc(100vw - 44px))!important;
-    max-width:1160px!important;
-    max-inline-size:calc(100vw - 44px)!important;
-    height:min(700px,calc(100dvh - 36px));
-    max-height:calc(100dvh - 36px);
-  }
-  dialog.user-modal .box.user-canvas{
-    height:100%;
-    max-height:100%;
-    min-height:0;
-    overflow:hidden;
-    display:grid;
-    grid-template-rows:auto auto minmax(0,1fr) auto;
-    padding:16px 20px 10px;
-  }
-  dialog.user-modal .user-canvas-grid{
-    min-height:0;
-    overflow:hidden;
-    align-items:stretch;
-    grid-template-columns:minmax(0,1.18fr) minmax(0,1fr) minmax(0,1fr);
-  }
-  dialog.user-modal .user-pane{
-    min-height:0;
-    min-width:0;
-    overflow-y:auto;
-    overflow-x:hidden;
-    overscroll-behavior:contain;
-    scrollbar-width:thin;
-    padding:12px 16px;
-  }
-  dialog.user-modal .user-pane-settings{padding-left:0}
-  dialog.user-modal .user-pane-insights{padding-right:0}
-  dialog.user-modal .user-head{padding-bottom:11px}
-  dialog.user-modal .user-overview-band{padding-block:9px}
-  dialog.user-modal .user-edit-fields{gap:9px 10px}
-  dialog.user-modal .user-notes-field textarea{min-height:78px;max-height:160px}
-  dialog.user-modal .user-canvas-foot{
-    min-height:30px;
-    padding:8px 0 0;
-    margin:0;
+/* User workspace: restore the full-size editor. Natural height and one scroll
+   surface keep the content readable at customized dashboard zoom levels. */
+dialog#dlg.user-modal,dialog.user-modal{
+  box-sizing:border-box!important;
+  width:min(1760px,calc(100vw - 36px))!important;
+  inline-size:min(1760px,calc(100vw - 36px))!important;
+  max-width:calc(100vw - 36px)!important;
+  max-inline-size:calc(100vw - 36px)!important;
+  min-height:0!important;
+  height:auto!important;
+  max-height:calc(100dvh - 28px)!important;
+  margin:auto;
+  overflow:hidden;
+}
+dialog#dlg.user-modal > .box.user-canvas{
+  box-sizing:border-box;
+  width:100%;
+  min-height:0!important;
+  height:auto!important;
+  max-height:calc(100dvh - 28px);
+  display:grid;
+  grid-template-rows:none;
+  padding:clamp(20px,1.6vw,30px) clamp(22px,2vw,38px) 18px;
+  overflow-x:hidden;
+  overflow-y:auto;
+  scrollbar-width:thin;
+}
+dialog.user-modal .user-canvas-grid{
+  grid-template-columns:minmax(0,1.18fr) minmax(0,1fr) minmax(0,1.05fr);
+  align-items:start;
+  min-height:0;
+  overflow:visible;
+}
+dialog.user-modal .user-pane{
+  min-height:0;
+  padding:20px clamp(18px,1.5vw,28px);
+  overflow:visible;
+}
+dialog.user-modal .user-pane-settings{padding-left:0}
+dialog.user-modal .user-pane-insights{padding-right:0}
+dialog.user-modal .user-head{padding-bottom:18px}
+dialog.user-modal .user-head .av{width:3rem;height:3rem;flex-basis:3rem}
+dialog.user-modal .user-head .who h2{font-size:1.3rem}
+dialog.user-modal .user-head-actions .gh{font-size:.86rem;min-height:2.55rem;height:2.55rem}
+dialog.user-modal .user-head-actions .ia{width:2.55rem;height:2.55rem;flex-basis:2.55rem}
+dialog.user-modal .user-overview-band{padding-block:14px;gap:.6rem 1.5rem}
+dialog.user-modal .user-usage-line>strong{font-size:1.32rem}
+dialog.user-modal .user-usage-line>span,
+dialog.user-modal .user-usage-line>small,
+dialog.user-modal .user-identity-row>span{font-size:.85rem}
+dialog.user-modal .user-identity-row code{font-size:.86rem}
+dialog.user-modal .user-action-text{font-size:.83rem}
+dialog.user-modal .user-usage-track{height:5px;min-height:5px}
+dialog.user-modal .user-pane-heading h3{font-size:1.06rem}
+dialog.user-modal .user-pane-heading p{font-size:.85rem}
+dialog.user-modal .user-edit-fields .f>span,
+dialog.user-modal .user-dev-limit .f>span{font-size:.85rem}
+dialog.user-modal .user-edit-fields :is(input:not([type=hidden]),select),
+dialog.user-modal .user-date-trigger{
+  min-height:2.65rem;
+  height:2.65rem;
+  font-size:.92rem;
+}
+dialog.user-modal .user-notes-field textarea{min-height:124px;font-size:.92rem}
+dialog.user-modal .user-note-meta,
+dialog.user-modal .user-edit-dirty{font-size:.81rem}
+dialog.user-modal .user-save-button{min-height:2.55rem;height:2.55rem;font-size:.89rem}
+dialog.user-modal .user-section-label{font-size:.85rem}
+dialog.user-modal .user-squad-option{font-size:.85rem;min-height:2.1rem}
+dialog.user-modal .user-host-line{font-size:.86rem}
+dialog.user-modal .user-host-line small{font-size:.78rem}
+dialog.user-modal .user-canvas-muted,
+dialog.user-modal .user-sub-note{font-size:.85rem}
+dialog.user-modal .user-dev-limit input{height:2.55rem;min-height:2.55rem;font-size:.9rem}
+dialog.user-modal .user-inline-link{font-size:.85rem}
+dialog.user-modal .user-traffic-empty b,
+dialog.user-modal .user-chart-empty-copy b{font-size:.9rem}
+dialog.user-modal .user-traffic-empty p,
+dialog.user-modal .user-chart-empty-copy p,
+dialog.user-modal .user-server-totals,
+dialog.user-modal .user-traffic-legend>div span:not(.user-legend-dot){font-size:.82rem}
+dialog.user-modal .user-chart-empty-copy small,
+dialog.user-modal .user-traffic-legend>small,
+dialog.user-modal .user-server-source{font-size:.78rem}
+dialog.user-modal .user-device-line b{font-size:.88rem}
+dialog.user-modal .user-device-line small{font-size:.8rem}
+dialog.user-modal .user-canvas-foot{padding-top:14px;font-size:.79rem}
+
+/* Keep each section spacious instead of squeezing three panes into a small dialog. */
+@media(max-width:1199px){
+  dialog.user-modal .user-canvas-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  dialog.user-modal .user-pane-access{border-right:0;padding-right:0}
+  dialog.user-modal .user-pane-insights{
+    grid-column:1/-1;
+    border-top:1px solid var(--ln);
+    border-right:0;
+    padding:20px 0;
   }
 }
-/* Smaller screens fall back to the natural-height, scrollable dialog.
-   Never force clipped columns or a fixed card height on touch devices. */
-@media (max-width:1100px), (max-height:579px) {
-  dialog.user-modal{height:auto;max-height:calc(100dvh - 12px)}
-  dialog.user-modal .box.user-canvas{height:auto;max-height:calc(100dvh - 12px);overflow-y:auto}
-  dialog.user-modal .user-canvas-grid{overflow:visible}
-  dialog.user-modal .user-pane{overflow:visible}
+@media(max-width:760px){
+  dialog#dlg.user-modal,dialog.user-modal{
+    width:calc(100vw - 12px)!important;
+    inline-size:calc(100vw - 12px)!important;
+    max-width:calc(100vw - 12px)!important;
+    max-inline-size:calc(100vw - 12px)!important;
+    max-height:calc(100dvh - 12px)!important;
+  }
+  dialog#dlg.user-modal > .box.user-canvas{
+    padding:16px;
+    max-height:calc(100dvh - 12px);
+  }
+  dialog.user-modal .user-canvas-grid{grid-template-columns:minmax(0,1fr)}
+  dialog.user-modal .user-pane{
+    grid-column:1;
+    padding:18px 0;
+    border-right:0;
+    border-bottom:1px solid var(--ln);
+  }
+  dialog.user-modal .user-pane-insights{border-bottom:0}
+  dialog.user-modal .user-edit-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:440px){
+  dialog.user-modal .user-edit-fields{grid-template-columns:minmax(0,1fr)}
 }
