@@ -125,7 +125,9 @@ systemctl restart xmesh-node-control.timer
 systemctl restart xmesh-node-metrics.timer
 systemctl enable xmesh-node-user-meter.timer
 systemctl restart xmesh-node-user-meter.timer
-systemctl start xmesh-node-user-meter.service || true
+if ! systemctl start xmesh-node-user-meter.service; then
+  echo "WARNING: Xray user sampler is not ready. Check: journalctl -u xmesh-node-user-meter.service -n 50 --no-pager" >&2
+fi
 systemctl start xmesh-node-control.service
 echo "Signed node control, offline policy verifier and pinned Xray synchronizer installed."
 echo "Check reconciliation: systemctl start xmesh-xray-sync.service && journalctl -u xmesh-xray-sync.service -n 30 --no-pager"
