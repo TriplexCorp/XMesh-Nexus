@@ -1,0 +1,36 @@
+name: GeoData backend and UI checks
+on:
+  push:
+    paths:
+      - 'backend/src/node_geodata.rs'
+      - 'backend/src/node_runtime.rs'
+      - 'backend/src/main.rs'
+      - 'backend/migrations/0025_node_geodata_status.sql'
+      - 'app.js'
+      - 'styles.css'
+      - '.github/workflows/geodata-check.yml'
+  pull_request:
+    paths:
+      - 'backend/src/node_geodata.rs'
+      - 'backend/src/node_runtime.rs'
+      - 'app.js'
+  workflow_dispatch:
+jobs:
+  app-and-shell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check dashboard JavaScript
+        run: node --check app.js
+      - name: Check installed agents
+        run: |
+          bash -n deploy/node-control-agent.sh
+          bash -n deploy/update-node-control-agent.sh
+  backend:
+    runs-on: ubuntu-latest
+    container: rust:1.99.1-bookworm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and test GeoData policy
+        working-directory: backend
+        run: cargo test node_geodata --locked
