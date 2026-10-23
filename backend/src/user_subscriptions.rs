@@ -327,7 +327,11 @@ async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str)->Result
     .filter(|h|host_for_profile(h,tag,profile,&nodes)).collect();
    if !matched.is_empty(){
     for host in matched{
-     if let Some(outbound)=vless_outbound(user,inbound,host,device){
+     if let Some(mut outbound)=vless_outbound(user,inbound,host,device){
+      // Persist a stable selector identity independent of display name/order.
+      if let Some(id)=host.get("id").and_then(Value::as_i64){
+       outbound["xmeshSourceKey"]=json!(format!("host:{id}"));
+      }
       outbounds.push(outbound)
      }else{
       let reality=inbound.get("streamSettings").and_then(|s|s.get("realitySettings")).unwrap_or(&Value::Null);
@@ -342,7 +346,10 @@ async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str)->Result
    }else if !any_explicit_host{
     for node in nodes.iter().filter(|n|n.get("profileId")==profile.get("id")&&n.get("disabled")!=Some(&Value::Bool(true))){
      let host=json!({"address":node.get("publicAddress").or_else(||node.get("externalAddress")).or_else(||node.get("addr")),"port":node.get("port").or_else(||inbound.get("port")),"remark":node.get("name"),"country":node.get("country")});
-     if let Some(outbound)=vless_outbound(user,inbound,&host,device){
+     if let Some(mut outbound)=vless_outbound(user,inbound,&host,device){
+      if let Some(id)=node.get("id").and_then(Value::as_i64){
+       outbound["xmeshSourceKey"]=json!(format!("node:{id}:{tag}"));
+      }
       outbounds.push(outbound)
      }
     }
