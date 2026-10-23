@@ -13,7 +13,8 @@ assert.match(app,/subscriptionJson:\{\.\.\.\(DB\.set\.subscriptionJson\|\|\{\}\)
 assert.match(studio,/balance:'leastPing',smart:false/);
 assert.doesNotMatch(studio,/name="json_smart"/,'Balancer switch belongs in its own workspace');
 assert.doesNotMatch(studio,/name="json_balance"/,'Strategy belongs in its own workspace');
-assert.match(engine,/let smart=enabled\(opts,"smart",false\)/);
+assert.match(engine,/let smart=smart_enabled\(setting\)/);
+assert.match(engine,/enabled\(opts,"smart",false\)/);
 assert.match(engine,/if smart && tags\.len\(\)>1 && balance!="off"/);
 assert.match(engine,/fn balancers_are_opt_in_and_servers_remain_distinct/);
 const subscriptions=fs.readFileSync('backend/src/user_subscriptions.rs','utf8');
