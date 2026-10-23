@@ -98,9 +98,18 @@ fn vless_outbound(user:&Value,inbound:&Value,host:&Value,device:&str)->Option<Va
  if server_decryption!="none" && client_encryption=="none"{return None}
  let mut client=json!({"id":uuid,"encryption":client_encryption});
  // Flow must only be included when the inbound actually supports it.
- if let Some(flow)=inbound.get("settings").and_then(|v|nonempty(v,"flow")){
-  client["flow"]=json!(flow);
- }
+ // Resolve flow for the actual user, then the profile's explicit subscription default.
+ // Never invent Vision for an inbound where it has not been configured.
+ let flow=inbound.get("settings").and_then(|v|v.get("users").or_else(||v.get("clients")))
+  .and_then(Value::as_array)
+  .and_then(|users|users.iter().find(|entry|{
+   nonempty(entry,"id")==Some(uuid) || nonempty(entry,"email")==nonempty(user,"username")
+  }))
+  .and_then(|entry|nonempty(entry,"flow"))
+  .or_else(||inbound.get("xmesh").and_then(|v|nonempty(v,"clientFlow")))
+  .or_else(||inbound.get("settings").and_then(|v|nonempty(v,"flow")));
+ if let Some(flow)=flow.filter(|v|*v!="none"){client["flow"]=json!(flow);}
+
  let mut outbound_stream=json!({"network":network,"security":security});
  if security=="reality"{
   let server=stream.get("realitySettings").unwrap_or(&Value::Null);
