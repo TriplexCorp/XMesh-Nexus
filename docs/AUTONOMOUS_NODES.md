@@ -1,0 +1,105 @@
+# Autonomous XMesh nodes (signed offline-policy v1)
+
+The XMesh-Node repository contains the deployed `xmesh-xray-sync.sh` and
+`xmesh-policy-guard.py`. XMesh Nexus exposes
+`POST /api/v1/node/desired-config`, authenticated with the **node's**
+Ed25519 key, and signs the **response policy** with a separate persistent
+Control Plane Ed25519 key.
+
+## Deployment order
+
+1. Back up the PostgreSQL volume, Xray node state and
+   `/var/lib/xmesh/core/node-policy-ed25519.key`. **Never regenerate that
+   signing key on ordinary panel updates.**
+2. Update and rebuild XMesh Nexus first:
+
+   ```bash
+   cd /root/XMesh-Nexus
+   git pull --ff-only origin main
+   docker compose up -d --build
+   docker compose logs --tail=60 panel
+   ```
+
+3. On each **already enrolled** node, install the updated worker, controller,
+   unprivileged telemetry agent and policy guard:
+
+   ```bash
+   curl --proto '=https' --tlsv1.2 -fsSL \
+     https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy/update-node-control-agent.sh \
+     -o /root/xmesh-node-update.sh
+   bash /root/xmesh-node-update.sh
+   systemctl start xmesh-xray-sync.service
+   journalctl -u xmesh-xray-sync.service -n 50 --no-pager
+   ```
+
+   New node enrollments through XMesh-Node `bootstrap.sh` also install the
+   verifier automatically. Do not remove the existing node key or re-enroll.
+
+4. Verify that `/var/lib/xmesh-xray-sync/policy-envelope.json` and
+   `policy-public-key` exist (never paste their entire content into support
+   chats; the config may contain Reality secrets), and that
+   `xmesh-managed-xray` is running. Test expiry and a disabled node against
+   a **disposable** test UUID before rolling out to production.
+
+## Security and behavior
+
+- Node-to-panel traffic is **outbound HTTPS**. The node's Ed25519 key signs
+  the HTTP method/path/body/time/nonce. The panel rejects replays.
+- Panel replies include `policy`, `policySignature` and
+  `policyPublicKey`; the agent checks signature, node identity, lifetime
+  and an SHA-256 hash of the exact Xray JSON. A key learned during a
+  verified first HTTPS connection is **pinned**, and unexpected rotation is
+  rejected. A pinned key must be rotated manually with explicit owner
+  authorization; NEVER automatically delete the pin on mismatch.
+- Only a validated candidate which has passed Xray validation and
+  successfully started is promoted to the offline policy snapshot.
+- Upon failure to reach the panel, an enrolled node loads the **last
+  committed signed** policy. Expired VLESS UUIDs are removed from the
+  local managed Xray configuration. Previously revoked UUIDs are not
+  restored by a repeat of the same signed policy.
+- For finite user traffic limits the panel issues a *conservative offline
+  budget* of up to 64 MiB per node, divided by the number of active nodes.
+  Local StatsService counters are checked on each reconciliation; when
+  exhausted the relevant UUID is removed. When counters are unavailable
+  while disconnected, **limited users are blocked**, rather than receiving
+  unmetered traffic. Unlimited users can continue while offline, with
+  subscription expiry still enforced.
+- The policy has a seven-day signed validity window. Expired finite-budget
+  policies are not renewed offline.
+- A root-only local worker reads Xray container counters. Its persistent
+  per-user/per-inbound cumulative journal survives Xray restarts and short
+  panel outages. It publishes a `0640 root:xmesh-metrics` snapshot under
+  `/run/xmesh-node-user-metrics.json` for the low-privilege metrics agent,
+  which uploads **cumulative** counters over signed HTTPS. Transient
+  five-second CPU/rate samples are not replayed; cumulative usage is.
+- For full-node shutdown the controller persists
+  `/var/lib/xmesh-node-control/forced-stop` only after checking the
+  managed Xray container or configured systemd service actually stopped.
+  Ordinary desired-config reconciliation respects this marker.
+
+## Limits of the current implementation
+
+**This is NOT a mathematically strict global quota guarantee across
+multiple disconnected nodes.** The offline allowance is bounded and
+conservative; exact multi-node maximums require server-side reserved,
+transactional quota leases and reconciliation of each lease. A rapidly
+changing user limit or a manually reset traffic counter may require a new
+acknowledged panel accounting revision before an offline-exhausted user can
+be safely re-enabled.
+
+Xray user removals currently redeploy the managed container rather than
+hot-unregistering clients via HandlerService, so remaining connections can
+briefly reconnect. A failed Xray config validation/deployment preserves
+or attempts to roll back the previous working configuration.
+
+## Diagnosis
+
+```bash
+systemctl status xmesh-node-control.timer xmesh-xray-sync.timer xmesh-node-metrics.timer --no-pager
+journalctl -u xmesh-xray-sync.service -u xmesh-node-control.service -n 80 --no-pager
+docker inspect -f '{{.State.Running}}' xmesh-managed-xray
+stat -c '%a %U:%G %n' /var/lib/xmesh-xray-sync/policy-public-key /var/lib/xmesh-xray-sync/policy-usage.json
+```
+
+Do not disable signature verification, grant the metrics user access to the
+Docker socket, or remove the `forced-stop` file to "fix" an outage.
