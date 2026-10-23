@@ -65,6 +65,15 @@ pub(crate) fn detect(headers:&HeaderMap)->Client{
   else {Device::Auto};
  Client{format,device,known_app}
 }
+/// The canonical subscription URL serves a portal to ordinary browsers,
+/// and a client configuration to VPN applications, with no query required.
+pub(crate) fn wants_feed(headers:&HeaderMap,options:&HashMap<String,String>)->Result<bool,&'static str>{
+ let app=negotiate(headers,options)?;
+ let html=headers.get(header::ACCEPT).and_then(|v|v.to_str().ok())
+  .unwrap_or("").to_ascii_lowercase().contains("text/html");
+ Ok(app.known_app||!html||options.get("raw").is_some_and(|v|v=="1")
+  ||options.contains_key("format")||options.contains_key("device"))
+}
 pub(crate) fn negotiate(
  headers:&HeaderMap,options:&HashMap<String,String>
 )->Result<Client,&'static str>{
@@ -137,6 +146,17 @@ mod tests{
   assert_eq!(selected.format,Format::Json);assert_eq!(selected.device,Device::Ios);
   overrides.insert("device".to_owned(),"unknown".to_owned());
   assert!(negotiate(&headers,&overrides).is_err());
+ }
+ #[test] fn bare_https_url_negotiates_portal_or_feed(){
+  let empty=HashMap::new();
+  let browser=headers("Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X)","text/html,application/xhtml+xml");
+  assert!(!wants_feed(&browser,&empty).unwrap());
+  let client=headers("Mozilla/5.0 (iPhone) Happ/26.7.28","text/html,application/xhtml+xml");
+  assert!(wants_feed(&client,&empty).unwrap());
+  assert!(wants_feed(&headers("v2rayNG/1.10 Android","*/*"),&empty).unwrap());
+  let mut options=HashMap::new();options.insert("format".to_string(),"json".to_string());
+  assert!(wants_feed(&browser,&options).unwrap());
+  assert!(wants_feed(&headers("curl/8","*/*"),&empty).unwrap());
  }
  #[test] fn unknown_agents_default_json_with_generic_transport(){
   let unknown=detect(&headers("Go-http-client/2.0","*/*"));
