@@ -191,10 +191,15 @@ pub async fn request_xray_update(
 // Only v4+ nodes understand this action. Older nodes need one bootstrap upgrade.
 pub const CONTROL_AGENT_VERSION: &str = "control-v4.0.0";
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AgentUpdateRequest {}
+
 pub async fn request_agent_update(
     State(state): State<AppState>,
     axum::extract::Extension(actor): axum::extract::Extension<crate::auth::AuthUser>,
     Path(node_id): Path<i64>,
+    Json(_body): Json<AgentUpdateRequest>,
 ) -> Result<(StatusCode,Json<Value>),ApiError> {
     crate::require_mutation(&actor)?;
     if node_id<=0 {return Err(ApiError::new(StatusCode::BAD_REQUEST,"Invalid node ID"))}
