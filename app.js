@@ -1104,10 +1104,11 @@ function userDrawer(id,tab){
             ${field(FE[2],u.limit)}
             ${userDateField(u)}
             ${field(FE[4],u.strategy)}
-            ${FE.slice(5).map(f=>field(f,u[f.k])).join('')}
+            ${FE.slice(5).filter(f=>f.k!=='desc').map(f=>field(f,u[f.k])).join('')}
+            <label class="f user-notes-field"><span>Заметка</span><textarea name="desc" rows="4" spellcheck="true" placeholder="Дополнительная информация о пользователе…" data-user-note>${esc(u.desc||'')}</textarea><small class="user-note-meta"><span>Внутренняя заметка администратора</span><span data-user-note-count>${Array.from(u.desc||'').length} символов</span></small></label>
           </div>
           <p class="er" id="fe" role="status"></p>
-          <div class="user-editor-actions"><button type="submit" class="btn user-save-button">${ic('check')} Сохранить изменения</button></div>
+          <div class="user-editor-actions"><span class="user-edit-dirty" data-user-edit-dirty role="status" aria-live="polite"></span><button type="submit" class="btn user-save-button">${ic('check')} Сохранить изменения</button></div>
         </form>
       </section>
       <section class="user-pane user-pane-access" aria-label="Доступ и подписка">
@@ -1869,6 +1870,16 @@ function pdraw(q){q=q.toLowerCase();const go=k=>()=>{dlg.close();location.hash=k
 const copyT=t=>(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('Скопировано'),()=>{const i=$('#lk');i.select();document.execCommand('copy');toast('Скопировано')});
 const sel=()=>{$$('#ut tbody tr').forEach(r=>{const i=+r.dataset.id;r.classList.toggle('sel',UQ.sel.has(i));const c=$('[data-sel]',r);if(c)c.checked=UQ.sel.has(i)});const a=$('[data-sela]');if(a)a.checked=$$('#ut tbody tr').every(r=>UQ.sel.has(+r.dataset.id));drawBulk()};
 const delUsers=async ids=>{const gone=DB.users.filter(u=>[...ids].some(id=>String(id)===String(u.id)));try{for(const user of gone)await removeXrayUserFromProfiles(user);for(const id of ids)await api.remove('users',id)}catch(error){toast('Не удалось удалить пользователя: '+(error.message||'ошибка backend'));return}ids.forEach(i=>UQ.sel.delete(i));toast(`Удалено: ${ids.size}`,'Отменить',async()=>{try{if(backendReady){for(const user of gone)await api.create('users',user)}else{DB.users.push(...gone);save()}render(1);toast('Пользователи восстановлены')}catch(error){toast('Не удалось восстановить: '+error.message)}});dlg.close();render(1)};
+document.addEventListener('input',e=>{
+  const form=e.target.closest('form[data-k="uedit"]');
+  if(!form)return;
+  if(e.target.matches('[data-user-note]')){
+    const count=form.querySelector('[data-user-note-count]');
+    if(count)count.textContent=Array.from(e.target.value).length+' символов';
+  }
+  const dirty=form.querySelector('[data-user-edit-dirty]');
+  if(dirty)dirty.textContent='Есть несохранённые изменения';
+});
 document.addEventListener('input',e=>{
   if(!e.target.matches('form[data-ent="nodes"] [name="rotationIps"]'))return;
   const form=e.target.closest('form'),count=form?.querySelector('[data-node-pool-count]'),feedback=form?.querySelector('[data-node-pool-feedback]');
