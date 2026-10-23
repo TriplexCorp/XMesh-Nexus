@@ -42,7 +42,8 @@ const finalCss=css.slice(css.lastIndexOf('/* Host editor v5.'));
 assert(finalCss.length>2000,'Missing canonical layout stylesheet');
 assert(finalCss.includes('grid-template-areas:"primary overrides preview"'),
  'All three zones must occupy one grid row');
-assert(!finalCss.includes('"overrides overrides"'),'No separate overrides row');
+const desktopCss=finalCss.split('@media(max-width:1260px)')[0];
+assert(!desktopCss.includes('"overrides overrides"'),'No separate overrides row on desktop');
 assert(finalCss.includes('position:static!important'),
  'Bottom buttons must not cover the settings');
 assert(finalCss.includes('@media(max-width:760px)'),
