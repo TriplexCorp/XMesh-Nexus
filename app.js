@@ -344,6 +344,26 @@ const modal=(h,c='')=>{
  }
 };
 dlg.addEventListener('click',e=>{if(e.target==dlg||e.target.closest('[data-x]'))dlg.close()});
+// Non-destructive branded confirmation: a second dialog preserves the editing form.
+const panelConfirm=(message,{danger=false,title='Подтверждение',confirmLabel='Продолжить'}={})=>new Promise(resolve=>{
+ const dialog=document.createElement('dialog');
+ dialog.className='xm-action-confirm';
+ const box=document.createElement('div');box.className='xm-action-confirm-box';
+ const iconWrap=document.createElement('div');iconWrap.className='xm-action-confirm-icon';
+ iconWrap.innerHTML=ic(danger?'alert-triangle':'shield-check');
+ const heading=document.createElement('h2');heading.textContent=title;
+ const body=document.createElement('p');body.textContent=message;
+ const actions=document.createElement('div');actions.className='xm-action-confirm-actions';
+ const cancel=document.createElement('button');cancel.type='button';cancel.className='gh';cancel.textContent='Отмена';
+ const accept=document.createElement('button');accept.type='button';accept.className=danger?'dg':'btn';accept.textContent=confirmLabel;
+ actions.append(cancel,accept);box.append(iconWrap,heading,body,actions);dialog.append(box);document.body.append(dialog);
+ let settled=false;
+ const finish=value=>{if(settled)return;settled=true;resolve(value);dialog.close();dialog.remove()};
+ cancel.addEventListener('click',()=>finish(false));accept.addEventListener('click',()=>finish(true));
+ dialog.addEventListener('cancel',ev=>{ev.preventDefault();finish(false)});
+ dialog.addEventListener('click',ev=>{if(ev.target===dialog)finish(false)});
+ dialog.showModal();cancel.focus();
+});
 const confirmBox=(h,ok,fn)=>{CF=fn;modal(`<div class="box"><h2>${h}</h2><div class="act"><button class="gh" data-x>Отмена</button><button class="btn" data-cf>${ok}</button></div></div>`)};
 let tt;const toast=(m,al,fn)=>{
  const t=$('#toast');if(!t)return;
@@ -1180,7 +1200,7 @@ function userNew(){
   setTimeout(()=>$('[name=username]')?.focus(),60);
 }
 async function exportCsv(){
-  if(!confirm(panelIsEnglish()?'CSV may include secret subscription links. Export to a trusted device?':'CSV может содержать секретные ссылки подписок. Экспортировать на доверенное устройство?'))return;
+  if(!await panelConfirm(panelIsEnglish()?'CSV may include secret subscription links. Export to a trusted device?':'CSV может содержать секретные ссылки подписок. Экспортировать на доверенное устройство?'))return;
   const users=UIDS.map(id=>DB.users.find(u=>u.id==id)).filter(Boolean);
   const links=[];
   for(let i=0;i<users.length;i+=10){
@@ -1880,7 +1900,7 @@ document.addEventListener('click',async e=>{
   if(b=g('[data-node-pool-clear]')){
     e.preventDefault();
     const field=b.closest('form')?.querySelector('[name="rotationIps"]');
-    if(field&&(!field.value.trim()||confirm('Очистить весь IP-пул? Изменение применится после сохранения узла.'))){field.value='';field.dispatchEvent(new Event('input',{bubbles:true}));}
+    if(field&&(!field.value.trim()||await panelConfirm('Очистить весь IP-пул? Изменение применится после сохранения узла.',{danger:true,title:'Очистка IP-пула',confirmLabel:'Очистить'}))){field.value='';field.dispatchEvent(new Event('input',{bubbles:true}));}
     return;
   }
   if(g('.sw')||g('[data-sel]')&&0)return;
@@ -1916,8 +1936,8 @@ document.addEventListener('click',async e=>{
   else if(b=g('[data-user-sub-create]')){
     const id=Number(b.dataset.userSubCreate);
     const existing=$('[data-user-sub-state="'+id+'"] .user-subscription-url');
-    if(existing&&!confirm(panelIsEnglish()?'Rotate this link? The old subscription will stop working.':'Перевыпустить ссылку? Прежняя подписка сразу перестанет работать.'))return;
-    if(!existing&&b.textContent.includes('старую')&&!confirm('Старая ссылка перестанет работать. Продолжить?'))return;
+    if(existing&&!await panelConfirm(panelIsEnglish()?'Rotate this link? The old subscription will stop working.':'Перевыпустить ссылку? Прежняя подписка сразу перестанет работать.'))return;
+    if(!existing&&b.textContent.includes('старую')&&!await panelConfirm('Старая ссылка перестанет работать. Продолжить?',{danger:true,title:'Перевыпуск ссылки'}))return;
     b.disabled=true;
     try{
       const result=await backendRequest('/api/v1/users/'+encodeURIComponent(id)+'/subscription',{method:'POST'});
@@ -1940,7 +1960,7 @@ document.addEventListener('click',async e=>{
   }
   else if(b=g('[data-user-sub-revoke]')){
     const id=Number(b.dataset.userSubRevoke);
-    if(!confirm(panelIsEnglish()?'Revoke this subscription? Its URL will stop working.':'Отозвать подписку? Ссылка сразу перестанет работать.'))return;
+    if(!await panelConfirm(panelIsEnglish()?'Revoke this subscription? Its URL will stop working.':'Отозвать подписку? Ссылка сразу перестанет работать.'))return;
     b.disabled=true;
     try{await backendRequest('/api/v1/users/'+encodeURIComponent(id)+'/subscription',{method:'DELETE'});await loadUserSubscription(id);toast(panelIsEnglish()?'Subscription revoked':'Подписка отозвана')}
     catch(error){toast('Ошибка: '+(error.message||'API'))}finally{b.disabled=false}
@@ -2025,7 +2045,7 @@ document.addEventListener('click',async e=>{
   else if(b=g('[data-node-key-enroll]')){
     const id=Number(b.dataset.nodeKeyEnroll),input=$('#metrics-public-key'),publicKey=(input?.value||'').trim();
     if(!/^[0-9a-f]{64}$/.test(publicKey)){toast('Требуется публичный Ed25519-ключ из 64 строчных hex-символов.');input?.focus();return}
-    if(!confirm('Активировать Ed25519 для узла '+id+'? Если ключ уже существует, предыдущий ключ перестанет работать.'))return;
+    if(!await panelConfirm('Активировать Ed25519 для узла '+id+'? Если ключ уже существует, предыдущий ключ перестанет работать.'))return;
     b.disabled=true;
     try{
       await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/metrics-key',{method:'POST',body:JSON.stringify({publicKey})});
@@ -2035,7 +2055,7 @@ document.addEventListener('click',async e=>{
   }
   else if(b=g('[data-node-key-revoke]')){
     const id=Number(b.dataset.nodeKeyRevoke);
-    if(!confirm('Отозвать ВСЕ учётные данные узла '+id+'? Отправка метрик остановится до регистрации нового ключа.'))return;
+    if(!await panelConfirm('Отозвать ВСЕ учётные данные узла '+id+'? Отправка метрик остановится до регистрации нового ключа.'))return;
     b.disabled=true;
     try{
       await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/metrics-key',{method:'DELETE'});
@@ -2082,7 +2102,7 @@ document.addEventListener('click',async e=>{
     finally{b.disabled=false}
   }
   else if(b=g('[data-panel-update]')){
-    if(!confirm('Обновить XMesh Nexus из origin/main? Сначала резервная копия PostgreSQL, затем пересборка Docker и перезапуск. Продолжить?'))return;
+    if(!await panelConfirm('Обновить XMesh Nexus из origin/main? Сначала резервная копия PostgreSQL, затем пересборка Docker и перезапуск. Продолжить?'))return;
     b.disabled=true;
     try{
       const result=await backendRequest('/api/v1/panel/update',{method:'POST',body:JSON.stringify({})});
