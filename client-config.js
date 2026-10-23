@@ -104,7 +104,13 @@
   if(!actualPort)throw new Error('У хоста отсутствует корректный публичный порт.');
   let settings;
   if(protocol==='vless'){
-   const userEntry={id:user.xrayId,encryption:'none'};
+   const encryption=nonempty(host.clientEncryption)||nonempty(host.externalClientEncryption)
+    ||nonempty(user.vlessEncryption)||nonempty(inbound.xmesh?.clientEncryption)||'none';
+   const decryption=nonempty(inbound.settings?.decryption)||'none';
+   if(decryption!=='none'&&encryption==='none')throw new Error('VLESS Encryption активен на сервере, но в хосте не указан клиентский encryption.');
+   if(obj(inbound.streamSettings).security==='none'&&!encryption.startsWith('mlkem768x25519plus.'))
+    throw new Error('VLESS без TLS/REALITY требует VLESS Encryption.');
+   const userEntry={id:user.xrayId,encryption};
    const flow=nonempty(inbound.settings?.flow);
    if(flow)userEntry.flow=flow;
    settings={vnext:[{address:endpoint,port:actualPort,users:[userEntry]}]};
@@ -135,12 +141,17 @@
    let parsed;try{parsed=typeof profile.config==='string'?JSON.parse(profile.config):profile.config}catch{continue}
    for(const inbound of Array.isArray(parsed?.inbounds)?parsed.inbounds:[]){
     if(!allowed.has(String(inbound.tag)))continue;
-    const hosts=(Array.isArray(db.hosts)?db.hosts:[]).filter(h=>!h.disabled&&String(h.tag)===String(inbound.tag));
-    const associatedNodes=(Array.isArray(db.nodes)?db.nodes:[]).filter(n=>String(n.profileId)===String(profile.id));
-    const candidates=hosts.length?hosts:associatedNodes.map(n=>({
+    const allHosts=(Array.isArray(db.hosts)?db.hosts:[]).filter(h=>String(h.tag)===String(inbound.tag)
+      &&(h.profileId==null||String(h.profileId)===String(profile.id)));
+    const associatedNodes=(Array.isArray(db.nodes)?db.nodes:[]).filter(n=>!n.disabled&&String(n.profileId)===String(profile.id));
+    const hosts=allHosts.filter(h=>!h.disabled && (!Array.isArray(h.nodes)||!h.nodes.length
+      ||h.nodes.some(id=>associatedNodes.some(n=>String(n.id)===String(id)))));
+    // When a host is explicitly disabled or pinned elsewhere, never silently
+    // re-publish the node's unprotected raw address as an alternative.
+    const candidates=hosts.length?hosts:(allHosts.length?[]:associatedNodes.map(n=>({
       id:'node:'+n.id,remark:n.name,address:n.publicAddress||n.externalAddress||n.addr,
       port:inbound.port,sni:inbound.streamSettings?.realitySettings?.serverNames?.[0]||''
-    }));
+    })));
     for(const host of candidates){
      const item={name:(host.remark||host.address||inbound.tag),tag:inbound.tag,hostId:host.id};
      try{
