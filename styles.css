@@ -4197,3 +4197,100 @@ dialog#dlg.host-wide>form.box>.act{
     grid-column:1/-1;
   }
 }
+
+
+/* User details · centered, spacious three-panel workspace. */
+/* Match the node editor's generous desktop footprint without changing any
+   user form fields, actions, statistics, or subscription behaviour. */
+dialog#dlg.user-modal{
+  box-sizing:border-box!important;
+  position:fixed;
+  top:50%!important;
+  bottom:auto!important;
+  left:0!important;
+  right:0!important;
+  translate:0 -50%;
+  margin:0 auto!important;
+  width:min(2240px,calc(100vw - 40px))!important;
+  inline-size:min(2240px,calc(100vw - 40px))!important;
+  max-width:calc(100vw - 40px)!important;
+  max-inline-size:calc(100vw - 40px)!important;
+  height:fit-content!important;
+  min-height:0!important;
+  max-height:calc(100dvh - 28px)!important;
+  padding:0!important;
+  overflow:hidden;
+}
+dialog#dlg.user-modal > .box.user-canvas{
+  box-sizing:border-box;
+  width:100%;
+  height:auto!important;
+  min-height:0!important;
+  max-height:calc(100dvh - 28px)!important;
+  padding:clamp(18px,1.15vw,28px)!important;
+  overflow-x:hidden;
+  overflow-y:auto;
+  scrollbar-width:thin;
+}
+dialog#dlg.user-modal .user-canvas-grid{
+  display:grid;
+  grid-template-columns:minmax(0,1.18fr) minmax(0,1fr) minmax(0,1.1fr);
+  align-items:stretch;
+  gap:clamp(12px,.9vw,20px);
+  min-width:0;
+  width:100%;
+  padding:clamp(12px,.8vw,18px) 0;
+}
+dialog#dlg.user-modal .user-pane{
+  box-sizing:border-box;
+  min-width:0;
+  padding:clamp(16px,1vw,24px)!important;
+  border:1px solid var(--ln)!important;
+  border-radius:var(--ui-radius);
+  background:color-mix(in srgb,var(--s2) 32%,var(--s1));
+  align-content:start;
+  overflow:visible;
+}
+dialog#dlg.user-modal .user-pane-settings,
+dialog#dlg.user-modal .user-pane-insights{
+  padding-inline:clamp(16px,1vw,24px)!important;
+}
+dialog#dlg.user-modal .user-head{
+  padding-bottom:clamp(12px,.8vw,18px);
+}
+dialog#dlg.user-modal .user-canvas-foot{
+  padding-top:clamp(10px,.65vw,16px);
+}
+@media(max-width:1199px){
+  dialog#dlg.user-modal .user-canvas-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  dialog#dlg.user-modal .user-pane-insights{
+    grid-column:1/-1;
+  }
+}
+@media(max-width:760px){
+  dialog#dlg.user-modal{
+    width:calc(100vw - 12px)!important;
+    inline-size:calc(100vw - 12px)!important;
+    max-width:calc(100vw - 12px)!important;
+    max-inline-size:calc(100vw - 12px)!important;
+    max-height:calc(100dvh - 12px)!important;
+  }
+  dialog#dlg.user-modal > .box.user-canvas{
+    max-height:calc(100dvh - 12px)!important;
+    padding:12px!important;
+  }
+  dialog#dlg.user-modal .user-canvas-grid{
+    grid-template-columns:minmax(0,1fr);
+    gap:10px;
+    padding:12px 0;
+  }
+  dialog#dlg.user-modal .user-pane,
+  dialog#dlg.user-modal .user-pane-settings,
+  dialog#dlg.user-modal .user-pane-insights{
+    grid-column:1;
+    padding:14px!important;
+    border:1px solid var(--ln)!important;
+  }
+}
