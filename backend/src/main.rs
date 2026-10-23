@@ -155,6 +155,10 @@ struct NodeMetricsIngestRequest {
     user_traffic: Option<Vec<UserTrafficSample>>,
     #[serde(default, alias = "userInboundTraffic")]
     user_inbound_traffic: Option<Vec<UserInboundTrafficSample>>,
+    #[serde(default, alias = "userStatsStatus")]
+    user_stats_status: Option<String>,
+    #[serde(default, alias = "userStatsAtMs")]
+    user_stats_at_ms: Option<i64>,
 }
 
 /// Cumulative Xray byte counters scoped to a real panel user and the reporting node.
@@ -1055,6 +1059,20 @@ async fn ingest_node_metrics(
     node_auth::authenticate(&state, &headers, body.node_id, &raw_body).await?;
 
     let mut metrics = body.metrics.unwrap_or_else(|| json!({}));
+    if let Some(status) = body.user_stats_status.as_deref() {
+        if !matches!(status, "verified" | "direct" | "unavailable") {
+            return Err(ApiError::new(StatusCode::BAD_REQUEST,"Некорректный статус персонального учёта."));
+        }
+        if let Some(map) = metrics.as_object_mut() {
+            map.insert("userStatsStatus".into(),json!(status));
+            if let Some(at) = body.user_stats_at_ms {
+                if at < 0 {
+                    return Err(ApiError::new(StatusCode::BAD_REQUEST,"Некорректное время пользовательских счётчиков."));
+                }
+                map.insert("userStatsAtMs".into(),json!(at));
+            }
+        }
+    }
     if let Some(steal) = body.cpu_steal_percent {
         if !steal.is_finite() || !(0.0..=100.0).contains(&steal) {
             return Err(ApiError::new(StatusCode::BAD_REQUEST,"Некорректное значение CPU steal time."));
@@ -1355,7 +1373,34 @@ async fn get_user_traffic(
             "observations":r.try_get::<i64,_>("observations")?
         }));
     }
+    // Distinguish a truly idle user from an unreachable Xray StatsService.
+    // The last signed sample on each node is advisory; it is never counted as usage.
+    let collector_rows = sqlx::query(
+        "SELECT n.id AS node_id,
+                COALESCE(NULLIF(n.data->>'name',''),'Узел #'||n.id::text) AS node_name,
+                last_sample.status,
+                last_sample.sampled_at_ms
+         FROM panel_records n
+         LEFT JOIN LATERAL (
+             SELECT sm.metrics->>'userStatsStatus' AS status,
+                    (EXTRACT(EPOCH FROM sm.sampled_at)*1000)::BIGINT AS sampled_at_ms
+             FROM server_metric_samples sm
+             WHERE sm.node_id=n.id::text
+             ORDER BY sm.sampled_at DESC LIMIT 1
+         ) last_sample ON TRUE
+         WHERE n.collection='nodes' ORDER BY n.id"
+    ).fetch_all(&state.pool).await?;
+    let mut collectors=Vec::with_capacity(collector_rows.len());
+    for row in collector_rows {
+        collectors.push(json!({
+            "nodeId":row.try_get::<i64,_>("node_id")?,
+            "name":row.try_get::<String,_>("node_name")?,
+            "status":row.try_get::<Option<String>,_>("status")?,
+            "sampledAtMs":row.try_get::<Option<i64>,_>("sampled_at_ms")?
+        }));
+    }
     Ok(Json(json!({
+        "collectors":collectors,
         "userId": user_id,
         "dataSource": "user_node_traffic_totals",
         "accounting": "monotonic_counter_deltas",
