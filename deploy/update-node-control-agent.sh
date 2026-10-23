@@ -36,15 +36,21 @@ curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 \
  https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/main/deploy/xmesh-policy-guard.py -o "$policy_tmp"
 python3 -m py_compile "$policy_tmp"
 grep -q 'check_signature' "$policy_tmp" || { echo "Policy verifier lacks Ed25519 verification" >&2;exit 1; }
+geo_tmp="$(mktemp)"
+trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp"' EXIT
+curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 \
+ https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/main/deploy/xmesh-geodata-sync.py -o "$geo_tmp"
+python3 -m py_compile "$geo_tmp"
+grep -q 'MAX_FILE_BYTES' "$geo_tmp" || { echo "GeoData synchronizer lacks size bounds" >&2;exit 1; }
 metrics_tmp="$(mktemp)"
-trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$metrics_tmp"' EXIT
+trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp"' EXIT
 curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 \
  https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy/node-metrics-agent.sh -o "$metrics_tmp"
 bash -n "$metrics_tmp"
 grep -q 'xmesh-node-user-metrics.json' "$metrics_tmp" || { echo "Metrics agent cannot read autonomous counters" >&2;exit 1; }
 # Validate the updater itself before changing any installed components.
 self_tmp="$(mktemp)"
-trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$metrics_tmp" "$self_tmp"' EXIT
+trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp" "$self_tmp"' EXIT
 curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 \
  https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy/update-node-control-agent.sh -o "$self_tmp"
 bash -n "$self_tmp"
@@ -56,6 +62,8 @@ cp -p /usr/local/sbin/xmesh-xray-sync /usr/local/sbin/xmesh-xray-sync.bak
 install -d -o root -g root -m 0755 /usr/local/libexec
 install -o root -g root -m 0700 "$policy_tmp" /usr/local/libexec/.xmesh-policy-guard.new
 mv -f /usr/local/libexec/.xmesh-policy-guard.new /usr/local/libexec/xmesh-policy-guard.py
+install -o root -g root -m 0700 "$geo_tmp" /usr/local/libexec/.xmesh-geodata-sync.new
+mv -f /usr/local/libexec/.xmesh-geodata-sync.new /usr/local/libexec/xmesh-geodata-sync.py
 install -o root -g root -m 0700 "$sync_tmp" /usr/local/sbin/.xmesh-xray-sync.new
 mv -f /usr/local/sbin/.xmesh-xray-sync.new /usr/local/sbin/xmesh-xray-sync
 install -d -o root -g root -m 0700 /var/lib/xmesh-xray-sync
