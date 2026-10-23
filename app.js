@@ -2187,7 +2187,11 @@ const getNodeGridMode=()=>{try{const mode=localStorage.getItem(NODE_GRID_KEY);re
 // Render independent runtime and Xray health badges. Only fresh, authenticated
 // agent heartbeats can mark a node as active; a configured node is not online.
 const nodeRuntimeState=(node,runtime)=>{
-  if(node.disabled)return node.disabledReason==='traffic_limit' ? {label:runtime?.connected&&runtime?.xrayRunning===true?'Остановка ожидается':'Лимит исчерпан',kind:'offline'} : {label:'Отключена',kind:'disabled'};
+  if(node.disabled){
+    if(!runtime?.connected)return {label:'Остановка не подтверждена',kind:'offline'};
+    if(runtime.xrayRunning!==false)return {label:'Остановка ожидается',kind:'offline'};
+    return {label:node.disabledReason==='traffic_limit'?'Лимит исчерпан · Xray остановлен':'Отключена · Xray остановлен',kind:'disabled'};
+  }
   if(!runtime?.connected)return {label:runtime?.lastSeenAt?'Нет связи':'Не подключена',kind:'offline'};
   if(runtime.xrayRunning===true&&runtime.routerRunning===true)return {label:'Активна',kind:'online'};
   if(runtime.xrayRunning===false)return {label:'Xray остановлен',kind:'offline'};
