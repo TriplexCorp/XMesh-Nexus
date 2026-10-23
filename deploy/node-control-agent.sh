@@ -11,6 +11,7 @@ export LC_ALL=C
 [[ "$XMESH_API_URL" == https://* ]] || exit 2
 XMESH_API_URL="${XMESH_API_URL%/}"
 KEY="${XMESH_METRICS_PRIVATE_KEY:-/etc/xmesh-node-metrics/node.key}"
+AGENT_VERSION="control-v4.0.0"
 UNIT="${XMESH_XRAY_UNIT:-xray.service}"
 # Only root-owned local configuration can choose a unit. Remote responses never do.
 [[ "$UNIT" =~ ^[A-Za-z0-9_.@-]+\.service$ ]] || { echo "Invalid systemd unit" >&2; exit 2; }
@@ -51,7 +52,7 @@ heartbeat(){
  fi
  version="$(printf '%s\n' "$raw" | awk 'NR==1 && $1=="Xray" {print $2}')"
  [[ "$version" =~ ^[A-Za-z0-9._+-]{1,40}$ ]] || version=''
- signed_post '/api/v1/node/heartbeat' "{\"node_id\":$XMESH_NODE_ID,\"version\":\"control-v3.0\",\"xray_version\":\"$version\",\"xray_running\":$xr,\"router_running\":$xr}" >/dev/null
+ signed_post '/api/v1/node/heartbeat' "{\"node_id\":$XMESH_NODE_ID,\"version\":\"$AGENT_VERSION\",\"xray_version\":\"$version\",\"xray_running\":$xr,\"router_running\":$xr}" >/dev/null
 }
 restart_xray(){
  if docker inspect xmesh-managed-xray >/dev/null 2>&1;then
@@ -210,7 +211,7 @@ obj=json.load(sys.stdin)
 cmd=obj.get("command")
 if not cmd:sys.exit(0)
 action=cmd.get("action")
-if action not in ("restart_xray","update_xray"):sys.exit(2)
+if action not in ("restart_xray","update_xray","update_agent"):sys.exit(2)
 value=cmd.get("id")
 if not isinstance(value,int) or isinstance(value,bool) or value<=0:sys.exit(2)
 version=cmd.get("targetVersion")
@@ -227,6 +228,32 @@ success=false
 detail='Command failed'
 if [[ "$action" == update_xray ]];then
  if update_managed_xray "$target_version";then success=true;fi
+elif [[ "$action" == update_agent ]];then
+ # Fixed root-owned systemd service. The panel cannot supply commands, URLs,
+ # arguments, service names, or scripts. systemd gives the updater its own
+ # filesystem write permissions, not the control worker.
+ if ! systemctl cat xmesh-node-agent-upgrade.service >/dev/null 2>&1;then
+  detail='Agent updater service missing; reinstall control-v4 first'
+ elif timeout 150 systemctl start --wait xmesh-node-agent-upgrade.service &&
+      grep -q '^AGENT_VERSION="control-v4.0.0"
+ if restart_xray;then
+  success=true
+  detail='Xray restart confirmed'
+ else
+  detail='Xray restart failed or runtime missing'
+ fi
+else
+ exit 2
+fi
+signed_post '/api/v1/node/restart/ack' \
+ "{\"node_id\":$XMESH_NODE_ID,\"command_id\":$command_id,\"success\":$success,\"detail\":\"$detail\"}" >/dev/null
+heartbeat
+ /usr/local/sbin/xmesh-node-control;then
+  success=true
+  detail='Agent control-v4.0.0 installed and verified'
+ else
+  detail='Agent update failed; inspect xmesh-node-agent-upgrade.service'
+ fi
 elif [[ "$action" == restart_xray ]];then
  if restart_xray;then
   success=true
