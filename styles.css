@@ -3052,3 +3052,34 @@ dialog#dlg.node-wide .node-billing-section .node-ip-hint{margin-bottom:.5rem}
   dialog#dlg.node-wide{width:calc(100vw - 12px)!important;inline-size:calc(100vw - 12px)!important;max-width:calc(100vw - 12px)!important}
   dialog#dlg.node-wide > form.box > .node-form-layout{grid-template-columns:minmax(0,1fr)}
 }
+
+/* Dialog-scoped action feedback: keep messages in the active top-layer dialog. */
+dialog .toast-dialog{
+  position:sticky;
+  top:0;
+  z-index:100;
+  display:flex;
+  align-items:center;
+  gap:.55rem;
+  min-width:0;
+  max-width:100%;
+  padding:.65rem .85rem;
+  border:1px solid var(--ln);
+  border-radius:var(--ui-control-radius);
+  background:var(--s2);
+  color:var(--tx);
+  box-shadow:0 8px 24px rgba(0,0,0,.25);
+  font-size:.81rem;
+  line-height:1.45;
+  overflow-wrap:anywhere;
+  opacity:0;
+  transform:translateY(-6px);
+  transition:opacity .18s ease,transform .18s ease;
+  pointer-events:none;
+}
+dialog .toast-dialog.show{opacity:1;transform:translateY(0);pointer-events:auto}
+dialog .toast-dialog .toast-state-icon{display:inline-flex;flex:0 0 auto}
+dialog .toast-dialog.toast-success .toast-state-icon{color:var(--a)}
+dialog .toast-dialog.toast-error{border-color:var(--er)}
+dialog .toast-dialog.toast-error .toast-state-icon{color:var(--er)}
+dialog .toast-dialog .toast-action{margin-left:auto;color:var(--a);white-space:nowrap}
