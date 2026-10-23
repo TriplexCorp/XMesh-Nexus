@@ -531,7 +531,10 @@ mod provision_tests {
         assert_eq!(settings["clients"].as_array().unwrap().len(),1);
         assert_eq!(settings["clients"][0]["id"],"550e8400-e29b-41d4-a716-446655440000");
         assert_eq!(settings["clients"][0]["email"],"xmesh-u1--NL");
-        assert_eq!(config["api"]["listen"],"127.0.0.1:10085");
+        assert_eq!(config["api"]["tag"],"xmesh_stats_api");
+        assert_eq!(config["inbounds"][1]["listen"],"127.0.0.1");
+        assert_eq!(config["inbounds"][1]["port"],10085);
+        assert_eq!(config["routing"]["rules"][0]["outboundTag"],"xmesh_stats_api");
         assert_eq!(config["policy"]["levels"]["0"]["statsUserUplink"],true);
         assert_eq!(settings["decryption"],"none");
     }
