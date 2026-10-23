@@ -3234,25 +3234,45 @@ dialog#dlg #node-bootstrap-command{
   white-space:pre-wrap;overflow-wrap:anywhere;
   line-height:1.55;resize:vertical;
 }
-/* All dialog feedback appears at the bottom, never in the heading. */
-dialog#dlg .box:has(> .toast-dialog){position:relative}
-dialog .toast-dialog{
+/* Shared copy/save/error feedback. Rendered in the browser top layer via
+   Popover API, so it does not alter or overlap the modal's content flow. */
+#xmesh-feedback-toast[popover]{
   position:fixed!important;
-  top:auto!important;bottom:clamp(16px,4vh,40px)!important;
-  left:50%!important;right:auto!important;
-  width:max-content;max-width:min(460px,calc(100vw - 32px))!important;
-  margin:0!important;padding:.65rem .9rem;
-  font-size:.9em;line-height:1.4;
-  border-radius:.7rem;
-  transform:translate(-50%,8px)!important;
+  inset:auto!important;
+  top:auto!important;
+  bottom:clamp(16px,4vh,40px)!important;
+  left:50%!important;
+  right:auto!important;
+  margin:0!important;
+  box-sizing:border-box;
+  display:flex;align-items:center;gap:.6em;
+  width:max-content;max-width:min(460px,calc(100vw - 32px));
+  padding:.65em .95em;
+  border:1px solid var(--ln);
+  border-radius:var(--ui-control-radius,12px);
+  background:var(--s2);
+  color:var(--tx);
+  box-shadow:0 12px 32px rgba(0,0,0,.35);
+  font-size:.9rem;line-height:1.4;overflow-wrap:anywhere;
+  opacity:0;
+  transform:translate(-50%,8px);
+  transition:opacity .18s ease,transform .18s ease;
   pointer-events:none;
 }
-dialog .toast-dialog.show{
-  transform:translate(-50%,0)!important;
-  pointer-events:auto;
+#xmesh-feedback-toast[popover]:not(:popover-open){display:none}
+#xmesh-feedback-toast[popover].toast-below-dialog{
+  top:var(--toast-top)!important;
+  bottom:auto!important;
+  left:var(--toast-left)!important;
 }
+#xmesh-feedback-toast[popover].show{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+#xmesh-feedback-toast .toast-state-icon{display:inline-flex;flex:0 0 auto}
+#xmesh-feedback-toast.toast-success .toast-state-icon{color:var(--a)}
+#xmesh-feedback-toast.toast-error{border-color:var(--er)}
+#xmesh-feedback-toast.toast-error .toast-state-icon{color:var(--er)}
+#xmesh-feedback-toast .toast-action{margin-left:auto;color:var(--a);white-space:nowrap}
 @media(max-width:600px){
   dialog#dlg:has(#node-bootstrap-command){width:calc(100vw - 16px)!important;max-width:calc(100vw - 16px)!important}
   dialog#dlg:has(#node-bootstrap-command) > .box{padding:16px}
-  dialog .toast-dialog{bottom:16px!important}
+  #xmesh-feedback-toast[popover]{bottom:16px!important;max-width:calc(100vw - 20px)}
 }
