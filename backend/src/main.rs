@@ -1468,13 +1468,50 @@ async fn read_settings(pool: &PgPool) -> Result<Value, ApiError> {
         })))
 }
 
+// Panel quotas are expressed in GiB; signed node counters are bytes.
+// Keep the manually configured baseline in panel_records and overlay actual,
+// monotonic signed user counters on reads. Never use node-wide RX/TX here.
+pub(crate) fn add_metered_usage(user: &mut Value, bytes: i64) {
+    let base=user.get("used").and_then(Value::as_f64).unwrap_or(0.0).max(0.0);
+    let measured=(bytes.max(0) as f64)/1_073_741_824.0;
+    if let Some(object)=user.as_object_mut(){
+        object.insert("used".into(),json!(base+measured));
+        object.insert("meteredUsedGb".into(),json!(measured));
+    }
+}
+
+pub(crate) async fn user_metered_bytes(pool: &PgPool, user_id: i64) -> Result<i64,ApiError> {
+    let bytes: i64=sqlx::query_scalar(
+        "SELECT COALESCE(SUM(uplink_bytes + downlink_bytes),0)::BIGINT
+         FROM user_node_traffic_totals WHERE user_id=$1"
+    ).bind(user_id).fetch_one(pool).await?;
+    Ok(bytes.max(0))
+}
+
 async fn load_records(pool: &PgPool, collection: &str) -> Result<Vec<Value>, ApiError> {
     validate_collection(collection)?;
     let rows = sqlx::query("SELECT id, data FROM panel_records WHERE collection = $1 ORDER BY id")
         .bind(collection)
         .fetch_all(pool)
         .await?;
-    rows.iter().map(row_to_record).collect()
+    let mut records=rows.iter().map(row_to_record).collect::<Result<Vec<_>,_>>()?;
+    if collection=="users" && !records.is_empty(){
+        // One grouped query, not one SQL request per user.
+        let totals=sqlx::query(
+            "SELECT user_id, COALESCE(SUM(uplink_bytes+downlink_bytes),0)::BIGINT AS bytes
+             FROM user_node_traffic_totals GROUP BY user_id"
+        ).fetch_all(pool).await?;
+        let traffic=totals.into_iter().filter_map(|row|{
+            Some((row.try_get::<i64,_>("user_id").ok()?,
+                  row.try_get::<i64,_>("bytes").ok()?))
+        }).collect::<std::collections::HashMap<_,_>>();
+        for user in &mut records {
+            if let Some(id)=user.get("id").and_then(Value::as_i64){
+                add_metered_usage(user,*traffic.get(&id).unwrap_or(&0));
+            }
+        }
+    }
+    Ok(records)
 }
 
 fn row_to_record(row: &sqlx::postgres::PgRow) -> Result<Value, ApiError> {
@@ -1605,8 +1642,8 @@ fn user_status(user: &Value, now_ms: i64) -> &'static str {
     if user.get("hold").and_then(Value::as_bool) == Some(true) {
         return "ON_HOLD";
     }
-    let limit = number(user, "limit").unwrap_or(0);
-    let used = number(user, "used").unwrap_or(0);
+    let limit = user.get("limit").and_then(Value::as_f64).unwrap_or(0.0);
+    let used = user.get("used").and_then(Value::as_f64).unwrap_or(0.0);
     if limit > 0 && used >= limit {
         return "LIMITED";
     }
@@ -1680,6 +1717,17 @@ mod tests {
         drop(app);
     }
 
+    #[test]
+    fn metered_usage_is_added_in_gib_not_raw_bytes() {
+        let mut user=json!({"id":21,"used":0.0,"limit":2});
+        super::add_metered_usage(&mut user,1_073_741_824);
+        assert_eq!(user["used"],1.0);
+        assert_eq!(user["meteredUsedGb"],1.0);
+        assert_eq!(super::user_status(&user,1_800_000_000_000),"ACTIVE");
+        super::add_metered_usage(&mut user,1_073_741_824);
+        assert_eq!(user["used"],2.0);
+        assert_eq!(super::user_status(&user,1_800_000_000_000),"LIMITED");
+    }
     #[test]
     fn numeric_json_fields_are_read_safely() {
         assert_eq!(number(&json!({"used":12}), "used"), Some(12));
