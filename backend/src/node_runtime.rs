@@ -214,7 +214,7 @@ pub async fn request_agent_update(
     let active:bool=sqlx::query_scalar(
         "SELECT EXISTS(SELECT 1 FROM node_runtime_heartbeats
           WHERE node_id=$1 AND received_at>NOW()-INTERVAL '65 seconds'
-            AND (version LIKE 'control-v4.%' OR version LIKE 'control-v5.%'))"
+            AND version LIKE 'control-v4.%')"
     ).bind(node_id).fetch_one(&state.pool).await?;
     if !active{
         return Err(ApiError::new(StatusCode::CONFLICT,
