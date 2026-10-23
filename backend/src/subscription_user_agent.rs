@@ -5,8 +5,6 @@ use std::collections::HashMap;
 use axum::http::{header, HeaderMap};
 
 #[derive(Debug,Clone,Copy,PartialEq,Eq)]
-pub(crate) enum Format {Json}
-#[derive(Debug,Clone,Copy,PartialEq,Eq)]
 pub(crate) enum Device {Auto, Ios, Windows}
 
 impl Device {
@@ -17,7 +15,6 @@ impl Device {
 
 #[derive(Debug,Clone,Copy,PartialEq,Eq)]
 pub(crate) struct Client {
- pub(crate) format:Format,
  pub(crate) device:Device,
  pub(crate) known_app:bool,
 }
@@ -49,8 +46,6 @@ pub(crate) fn detect(headers:&HeaderMap)->Client{
  let clash=has_agent_token(&ua,"clash")||has_agent_token(&ua,"mihomo");
  let known_app=happ||incy||v2raytun||v2rayn||v2rayng||streisand
   ||shadowrocket||v2box||nekobox||hiddify||singbox||clash;
- // All supported clients receive native Xray JSON, never legacy URI feeds.
- let format=Format::Json;
  let ios=ua.contains("iphone")||ua.contains("ipad")||ua.contains("ipod")
   ||has_agent_token(&ua,"ios")||ua.contains("cfnetwork");
  let windows=ua.contains("windows")||ua.contains("win64")||ua.contains("win32");
@@ -62,7 +57,7 @@ pub(crate) fn detect(headers:&HeaderMap)->Client{
   else if streisand||shadowrocket{Device::Ios}
   else if v2rayn{Device::Windows}
   else {Device::Auto};
- Client{format,device,known_app}
+ Client{device,known_app}
 }
 /// The canonical subscription URL serves a portal to ordinary browsers,
 /// and a client configuration to VPN applications, with no query required.
@@ -71,18 +66,12 @@ pub(crate) fn wants_feed(headers:&HeaderMap,options:&HashMap<String,String>)->Re
  let html=headers.get(header::ACCEPT).and_then(|v|v.to_str().ok())
   .unwrap_or("").to_ascii_lowercase().contains("text/html");
  Ok(app.known_app||!html||options.get("raw").is_some_and(|v|v=="1")
-  ||options.contains_key("format")||options.contains_key("device"))
+  ||options.contains_key("device"))
 }
 pub(crate) fn negotiate(
  headers:&HeaderMap,options:&HashMap<String,String>
 )->Result<Client,&'static str>{
  let mut selected=detect(headers);
- if let Some(format)=options.get("format"){
-  selected.format=match format.to_ascii_lowercase().as_str(){
-   "json"=>Format::Json,
-   _=>return Err("Неподдерживаемый формат подписки")
-  }
- }
  if let Some(device)=options.get("device"){
   selected.device=match device.to_ascii_lowercase().as_str(){
    "ios"=>Device::Ios,
@@ -105,23 +94,23 @@ mod tests{
  }
  #[test] fn happ_detects_ios_windows_without_hardcoded_device(){
   let iphone=detect(&headers("Happ/26.7.28 (iPhone; iOS 18.5)","*/*"));
-  assert_eq!(iphone.format,Format::Json);assert_eq!(iphone.device,Device::Ios);
+  assert_eq!(iphone.device,Device::Ios);
   let desktop=detect(&headers("Happ/26.7.28 (Windows NT 10.0; Win64; x64)","*/*"));
-  assert_eq!(desktop.format,Format::Json);assert_eq!(desktop.device,Device::Windows);
+  assert_eq!(desktop.device,Device::Windows);
   assert_eq!(detect(&headers("Happ/26.7.28","*/*")).device,Device::Auto);
  }
  #[test] fn incy_and_v2raytun_are_native_json(){
-  assert_eq!(detect(&headers("Incy/1.0 (iPad; iOS 19)","*/*")).format,Format::Json);
+  assert_eq!(detect(&headers("Incy/1.0 (iPad; iOS 19)","*/*")).device,Device::Ios);
   assert_eq!(detect(&headers("v2raytun/3.0 (Android 15)","*/*")).device,Device::Auto);
  }
  #[test] fn all_known_apps_receive_native_json_and_correct_platform(){
   let ios=detect(&headers("Streisand/1.2","text/html"));
-  assert_eq!(ios.format,Format::Json);assert_eq!(ios.device,Device::Ios);
+  assert_eq!(ios.device,Device::Ios);
   assert!(ios.known_app);
   let android=detect(&headers("v2rayNG/1.10 (Android 15)","*/*"));
-  assert_eq!(android.format,Format::Json);assert_eq!(android.device,Device::Auto);
+  assert_eq!(android.device,Device::Auto);
   let windows=detect(&headers("v2rayN/7.7","*/*"));
-  assert_eq!(windows.format,Format::Json);assert_eq!(windows.device,Device::Windows);
+  assert_eq!(windows.device,Device::Windows);
   let linux=detect(&headers("v2rayN/7.7 (Linux)","*/*"));
   assert_eq!(linux.device,Device::Auto);
  }
@@ -133,17 +122,13 @@ mod tests{
  #[test] fn app_mozilla_fingerprint_remains_app(){
   let agent=detect(&headers("Mozilla/5.0 (Windows NT 10.0) Happ/26.7.28","text/html"));
   assert!(agent.known_app);
-  assert_eq!(agent.format,Format::Json);
  }
  #[test] fn explicit_overrides_and_invalid_values(){
   let headers=headers("v2rayNG/1.1 Android","*/*");
   let mut overrides=HashMap::new();
-  overrides.insert("format".to_owned(),"json".to_owned());
   overrides.insert("device".to_owned(),"ios".to_owned());
   let selected=negotiate(&headers,&overrides).unwrap();
-  assert_eq!(selected.format,Format::Json);assert_eq!(selected.device,Device::Ios);
-  overrides.insert("format".to_owned(),"vless".to_owned());
-  assert!(negotiate(&headers,&overrides).is_err());
+  assert_eq!(selected.device,Device::Ios);
   overrides.insert("format".to_owned(),"json".to_owned());
   overrides.insert("device".to_owned(),"unknown".to_owned());
   assert!(negotiate(&headers,&overrides).is_err());
@@ -155,13 +140,13 @@ mod tests{
   let client=headers("Mozilla/5.0 (iPhone) Happ/26.7.28","text/html,application/xhtml+xml");
   assert!(wants_feed(&client,&empty).unwrap());
   assert!(wants_feed(&headers("v2rayNG/1.10 Android","*/*"),&empty).unwrap());
-  let mut options=HashMap::new();options.insert("format".to_string(),"json".to_string());
+  let mut options=HashMap::new();options.insert("device".to_string(),"ios".to_string());
   assert!(wants_feed(&browser,&options).unwrap());
   assert!(wants_feed(&headers("curl/8","*/*"),&empty).unwrap());
  }
  #[test] fn unknown_agents_default_json_with_generic_transport(){
   let unknown=detect(&headers("Go-http-client/2.0","*/*"));
-  assert_eq!(unknown.device,Device::Auto);assert_eq!(unknown.format,Format::Json);
+  assert_eq!(unknown.device,Device::Auto);
   assert!(!unknown.known_app);
  }
  #[test] fn disallow_substring_false_positives(){
