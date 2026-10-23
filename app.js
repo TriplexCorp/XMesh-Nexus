@@ -2227,31 +2227,31 @@ function hostEditorMarkup(o,e){
   const basic=['remark','address','port','countryCode'].map(k=>field(f(k),o[k])).join('');
   const nodes=field(f('nodes'),o.nodes||[])+field(f('disabled'),!!o.disabled);
   const advanced=['sni','host','path','fp','publicKey','shortId','spiderX','alpn','serviceName','clientEncryption'].map(k=>field(f(k),o[k]??'')).join('');
+  // Three permanent, side-by-side editing zones. Keep all input names and
+  // actions unchanged so the existing save and live-preview logic still work.
   return '<div class="host-editor-layout">'+
-    '<section class="host-editor-main host-connect-panel">'+
+    '<section class="host-editor-main host-primary-panel" aria-label="Подключение и назначение">'+
     '<div class="node-form-section-title">01 · Подключение</div>'+
-    '<p class="node-ip-hint">Выберите ноду, профиль XRAY STUDIO и inbound.</p>'+
-    '<div class="host-connect-fields">'+preset+p+tag+'</div></section>'+
-    '<section class="host-editor-main host-public-panel">'+
+    '<div class="host-connect-fields">'+preset+p+tag+'</div>'+
     '<div class="node-form-section-title">02 · Публичная точка</div>'+
     '<div class="host-public-fields">'+basic+'</div>'+
     '<div class="node-form-section-title">03 · Назначение</div>'+
     '<div class="host-assignment-fields">'+nodes+'</div>'+
     '<small class="note" data-host-count></small></section>'+
-    '<section class="host-editor-side">'+
+    '<section class="host-advanced host-advanced-panel" aria-label="Расширенные переопределения">'+
+    '<div class="host-advanced-heading"><div class="node-form-section-title">04 · Расширенные переопределения</div>'+
+    '<p class="node-ip-hint">Пустые поля наследуются из XRAY STUDIO.</p></div>'+
+    '<div class="host-advanced-fields">'+advanced+'</div>'+
+    '<div class="host-advanced-actions"><button type="button" class="gh sm" data-host-clear-overrides>'+ic('rotate-ccw')+'Сбросить переопределения</button></div></section>'+
+    '<section class="host-editor-side" aria-label="Клиентское подключение">'+
     '<div class="node-form-section-title">Клиентское подключение</div>'+
-    '<p class="node-ip-hint">Предпросмотр конфигурации из XRAY STUDIO. Приватные ключи не экспортируются.</p>'+
+    '<p class="node-ip-hint">Предпросмотр из XRAY STUDIO. Приватные ключи не экспортируются.</p>'+
     '<div class="host-resolved" data-host-resolved></div>'+
     '<p class="node-ip-hint" data-host-runtime role="status" aria-live="polite"></p>'+
     '<p class="host-validation" data-host-warnings role="status" hidden></p>'+
     '<button type="button" class="gh sm" data-host-repair hidden></button>'+
     '<button type="button" class="gh sm" data-host-link-profile hidden></button>'+
-    '<p class="node-ip-hint">Предпросмотр не подтверждает применение профиля, добавление UUID в Xray или доступность порта.</p></section>'+
-    '<section class="host-advanced host-advanced-panel" aria-label="Расширенные переопределения">'+
-    '<div class="host-advanced-heading"><div class="node-form-section-title">04 · Расширенные переопределения</div>'+
-    '<p class="node-ip-hint">Пустые поля наследуются из XRAY STUDIO. Все настройки доступны без раскрытия.</p></div>'+
-    '<div class="host-advanced-fields">'+advanced+'</div>'+
-    '<div class="host-advanced-actions"><button type="button" class="gh sm" data-host-clear-overrides>'+ic('rotate-ccw')+'Сбросить переопределения</button></div></section></div>';
+    '<p class="node-ip-hint host-preview-disclaimer">Предпросмотр не подтверждает применение профиля, добавление UUID или доступность порта.</p></section></div>';
 }
 function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id)===String(id)):e.def?e.def():{});
   const standardFields=e.fs.map(f=>field(f,k==='admins'&&f.k==='password'?'':o[f.k])).join('');
