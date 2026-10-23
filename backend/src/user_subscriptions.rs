@@ -454,12 +454,16 @@ pub async fn serve(State(state):State<AppState>,Path(token):Path<String>,
  let client=crate::subscription_user_agent::negotiate(&headers,&options)
   .map_err(bad)?;
  let (links,outbounds)=collect_user_outbounds(&state,&user,client.device.as_str()).await?;
- let legacy=client.format==crate::subscription_user_agent::Format::Vless;
+ let settings=crate::read_settings(&state.pool).await?;
+ // Without an enabled balancer, deliver individually named VLESS entries.
+ // A monolithic Xray JSON is treated by Happ as one profile even when it
+ // contains multiple proxy outbounds. Explicit ?format=json always wins.
+ let legacy=client.format==crate::subscription_user_agent::Format::Vless
+    || (!options.contains_key("format") && !crate::subscription_json::smart_enabled(&settings));
 
  let mut response=if legacy{
   links.join("\n").into_response()
  }else{
-  let settings=crate::read_settings(&state.pool).await?;
   let json=crate::subscription_json::build(outbounds,&settings).map_err(|message|{
     tracing::warn!(user_id=id, error=%message,"Subscription JSON could not be generated");
     ApiError::new(StatusCode::SERVICE_UNAVAILABLE,message)
