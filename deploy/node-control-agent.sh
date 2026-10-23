@@ -36,36 +36,104 @@ signed_post(){
    -H "X-XMesh-Signature: $signature" \
    -H "Content-Type: application/json" --data-binary "$payload"
 }
-# Heartbeat verifies actual service state; the telemetry daemon is separate.
-if systemctl is-active --quiet "$UNIT"; then xr=true;else xr=false;fi
-heartbeat="{\"node_id\":$XMESH_NODE_ID,\"version\":\"control-v1.0\",\"xray_running\":$xr,\"router_running\":$xr}"
-signed_post '/api/v1/node/heartbeat' "$heartbeat" >/dev/null
-
+# Report the actual runtime, whether native systemd or the XMesh-managed container.
+xray_running(){
+ if docker inspect -f '{{.State.Running}}' xmesh-managed-xray 2>/dev/null | grep -qx true; then return 0; fi
+ systemctl is-active --quiet "$UNIT"
+}
+heartbeat(){
+ local xr=false
+ if xray_running;then xr=true;fi
+ signed_post '/api/v1/node/heartbeat' "{\"node_id\":$XMESH_NODE_ID,\"version\":\"control-v2.0\",\"xray_running\":$xr,\"router_running\":$xr}" >/dev/null
+}
+restart_xray(){
+ if docker inspect xmesh-managed-xray >/dev/null 2>&1;then
+  timeout 35 docker restart xmesh-managed-xray >/dev/null &&
+   docker inspect -f '{{.State.Running}}' xmesh-managed-xray | grep -qx true
+ else
+  timeout 35 systemctl restart "$UNIT" && systemctl is-active --quiet "$UNIT"
+ fi
+}
+# Only the specifically managed container may be upgraded. A non-managed
+# Xray, arbitrary Docker container or remote-selected image is never modified.
+update_managed_xray(){
+ command -v docker >/dev/null || { detail='Docker not installed';return 1; }
+ local name=xmesh-managed-xray
+ local image=ghcr.io/xtls/xray-core:latest
+ local config=/var/lib/xmesh-xray-sync/config.json
+ if ! docker inspect "$name" >/dev/null 2>&1;then
+  detail='Managed Xray container not found';return 1
+ fi
+ [[ -f "$config" ]] || { detail='Managed Xray config not found';return 1; }
+ local old_image new_image
+ old_image="$(docker inspect -f '{{.Image}}' "$name")" || return 1
+ [[ "$old_image" =~ ^sha256:[0-9a-f]{64}$ ]] || { detail='Invalid previous image identity';return 1; }
+ if ! timeout 75 docker pull "$image" >/dev/null;then
+  detail='Xray image download failed';return 1
+ fi
+ new_image="$(docker image inspect -f '{{.Id}}' "$image")" || return 1
+ [[ "$new_image" =~ ^sha256:[0-9a-f]{64}$ ]] || { detail='Invalid new image identity';return 1; }
+ if [[ "$old_image" == "$new_image" ]];then
+  detail='Xray image already up to date';return 0
+ fi
+ if ! timeout 25 docker run --rm --network none --user 0:0 --cap-drop ALL \
+  --security-opt no-new-privileges --entrypoint xray \
+  -v "$config:/etc/xray/config.json:ro" "$new_image" \
+  run -test -config /etc/xray/config.json >/dev/null;then
+  detail='New Xray image failed config validation';return 1
+ fi
+ docker rm -f "$name" >/dev/null || { detail='Could not stop previous Xray';return 1; }
+ if docker run -d --name "$name" --restart unless-stopped --network host \
+  --user 0:0 --read-only --security-opt no-new-privileges --cap-drop ALL \
+  -v "$config:/etc/xray/config.json:ro" "$new_image" \
+  run -config /etc/xray/config.json >/dev/null;then
+   sleep 3
+   if docker inspect -f '{{.State.Running}}' "$name" 2>/dev/null | grep -qx true;then
+    detail='Managed Xray image updated and running';return 0
+   fi
+ fi
+ docker rm -f "$name" >/dev/null 2>&1 || true
+ # Roll back to the exact locally cached prior image, never a moving tag.
+ if docker run -d --name "$name" --restart unless-stopped --network host \
+  --user 0:0 --read-only --security-opt no-new-privileges --cap-drop ALL \
+  -v "$config:/etc/xray/config.json:ro" "$old_image" \
+  run -config /etc/xray/config.json >/dev/null;then
+   detail='New image failed health check; previous image restored'
+ else
+   detail='New image failed; automatic rollback also failed'
+ fi
+ return 1
+}
+heartbeat
 reply="$(signed_post '/api/v1/node/restart/poll' "{\"node_id\":$XMESH_NODE_ID}")"
-# Parse untrusted JSON, never source it or execute any response string.
-command_id="$(printf '%s' "$reply" | python3 -c '
+command_info="$(printf '%s' "$reply" | python3 -c '
 import json,sys
 obj=json.load(sys.stdin)
 cmd=obj.get("command")
 if not cmd:sys.exit(0)
-if cmd.get("action")!="restart_xray":sys.exit(2)
+action=cmd.get("action")
+if action not in ("restart_xray","update_xray"):sys.exit(2)
 value=cmd.get("id")
 if not isinstance(value,int) or isinstance(value,bool) or value<=0:sys.exit(2)
-print(value)
+print(str(value)+" "+action)
 ')"
-[[ -n "$command_id" ]] || exit 0
+[[ -n "$command_info" ]] || exit 0
+read -r command_id action <<< "$command_info"
 [[ "$command_id" =~ ^[1-9][0-9]*$ ]] || exit 2
-
 success=false
-detail='systemd restart failed'
-if timeout 35 systemctl restart "$UNIT" && systemctl is-active --quiet "$UNIT"; then
- success=true
- detail='systemd confirmed Xray active'
-elif ! systemctl cat "$UNIT" >/dev/null 2>&1;then
- detail='Xray systemd unit missing'
+detail='Command failed'
+if [[ "$action" == update_xray ]];then
+ if update_managed_xray;then success=true;fi
+elif [[ "$action" == restart_xray ]];then
+ if restart_xray;then
+  success=true
+  detail='Xray restart confirmed'
+ else
+  detail='Xray restart failed or runtime missing'
+ fi
+else
+ exit 2
 fi
 signed_post '/api/v1/node/restart/ack' \
  "{\"node_id\":$XMESH_NODE_ID,\"command_id\":$command_id,\"success\":$success,\"detail\":\"$detail\"}" >/dev/null
-if systemctl is-active --quiet "$UNIT";then xr=true;else xr=false;fi
-heartbeat="{\"node_id\":$XMESH_NODE_ID,\"version\":\"control-v1.0\",\"xray_running\":$xr,\"router_running\":$xr}"
-signed_post '/api/v1/node/heartbeat' "$heartbeat" >/dev/null
+heartbeat
