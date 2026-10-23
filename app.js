@@ -446,6 +446,9 @@ const selectNodeXrayRelease=(node,releases,installed)=>new Promise(resolve=>{
  const description=document.createElement('p');
  description.textContent='Выберите официальный релиз, включая предварительные версии. Установка может прервать соединения. Текущая версия: '+(installed||'неизвестно');
  const label=document.createElement('label');label.className='f';label.textContent='Версия для установки';
+ const search=document.createElement('input');search.type='search';search.className='xray-release-search';
+ search.placeholder='Поиск версии, например 26.9 или 26.10';
+ search.setAttribute('aria-label','Поиск релиза Xray');
  const select=document.createElement('select');select.className='xray-release-select';
  select.setAttribute('aria-label','Выбрать версию Xray');
  for(const r of releases){
@@ -470,8 +473,23 @@ const selectNodeXrayRelease=(node,releases,installed)=>new Promise(resolve=>{
   }else{link.removeAttribute('href');link.hidden=true}
   accept.disabled=!item||item.version===installed;
  };
- select.addEventListener('change',update);update();
- label.append(select);box.append(title,description,label,info,link,actions);
+ select.addEventListener('change',update);
+ search.addEventListener('input',()=>{
+  const query=search.value.trim().toLowerCase();
+  let visible=0;
+  for(const option of select.options){
+   const matches=!query||option.value.toLowerCase().includes(query);
+   option.hidden=!matches;option.disabled=!matches;
+   if(matches)visible++;
+  }
+  const picked=Array.from(select.options).find(o=>!o.disabled);
+  if(picked&&select.selectedOptions[0]?.disabled)select.value=picked.value;
+  if(!visible)select.selectedIndex=-1;
+  update();
+  if(!visible)info.textContent='Версии по запросу не найдены';
+ });
+ update();
+ label.append(search,select);box.append(title,description,label,info,link,actions);
  actions.append(cancel,accept);dialog.append(box);document.body.append(dialog);
  let finished=false;
  const finish=v=>{if(finished)return;finished=true;resolve(v);dialog.close();dialog.remove()};
