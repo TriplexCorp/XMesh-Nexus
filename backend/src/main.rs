@@ -1238,6 +1238,23 @@ async fn ingest_node_metrics(
         // Counter resets start a new baseline, never subtract or fabricate usage.
         let serialized = serde_json::to_value(&user_traffic)
             .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Некорректный userTraffic."))?;
+        // Only a positive delta from an authenticated per-user Xray counter
+        // constitutes activity. Repeated idle samples must NOT refresh onlineAt.
+        // Preserve the last activity timestamp across node restarts and resets.
+        sqlx::query(
+            "UPDATE panel_records AS u
+             SET data=jsonb_set(u.data,'{onlineAt}',to_jsonb($3::BIGINT),true),
+                 updated_at=NOW()
+             FROM jsonb_to_recordset($2::jsonb)
+                  AS sample(user_id BIGINT,uplink_bytes BIGINT,downlink_bytes BIGINT)
+             LEFT JOIN user_node_traffic_totals AS previous
+                  ON previous.node_id=$1 AND previous.user_id=sample.user_id
+             WHERE u.collection='users' AND u.id=sample.user_id
+               AND previous.user_id IS NOT NULL
+               AND (sample.uplink_bytes>previous.last_uplink_bytes
+                    OR sample.downlink_bytes>previous.last_downlink_bytes)"
+        ).bind(body.node_id).bind(&serialized).bind(sampled_at)
+         .execute(&state.pool).await?;
         sqlx::query(
             "INSERT INTO user_node_traffic_totals AS totals (
                 node_id, user_id, last_uplink_bytes, last_downlink_bytes,
