@@ -482,10 +482,16 @@ pub async fn serve(State(state):State<AppState>,Path(token):Path<String>,
    if let Ok(value)=header::HeaderValue::from_str(url){response.headers_mut().insert("support-url",value);}
   }
  }
+ // Rotate announcements by UTC day; all requests within one day receive the same text.
+ // A line containing only "---" separates announcements. Plain text stays compatible.
  if let Some(announcement)=settings.get("subscriptionAnnouncement").and_then(Value::as_str) {
-  if !announcement.trim().is_empty() {
+  let messages:Vec<&str>=announcement.split("\n---\n").map(str::trim).filter(|s|!s.is_empty()).collect();
+  if !messages.is_empty() {
+   let day=std::time::SystemTime::now()
+    .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs()/86_400;
+   let selected=messages[(day % messages.len() as u64) as usize];
    use base64::Engine as _;
-   let encoded=base64::engine::general_purpose::STANDARD.encode(announcement.as_bytes());
+   let encoded=base64::engine::general_purpose::STANDARD.encode(selected.as_bytes());
    if let Ok(value)=header::HeaderValue::from_str(&format!("base64:{encoded}")) {
     response.headers_mut().insert("announce",value);
    }
