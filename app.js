@@ -1765,6 +1765,19 @@ function hostEditorRefresh(form,changedProfile=false){
     inboundSelect.innerHTML=candidates.map(i=>'<option value="'+esc(i.tag)+'">'+esc(i.tag+' · '+(i.protocol||'?')+' · '+(i.streamSettings?.network||'tcp'))+'</option>').join('');
     if(candidates.some(i=>i.tag===previous))inboundSelect.value=previous;
   }
+  // On a fresh Host, choose the unique compatible node automatically.
+  const selectedNodes=[...form.querySelectorAll('[name="nodes"]:checked')];
+  if(!selectedNodes.length && profile && !form.dataset.id){
+    const compatible=DB.nodes.filter(n=>!n.disabled&&String(n.profileId)===String(profile.id));
+    if(compatible.length===1){
+      const node=compatible[0];
+      form.querySelectorAll('[name="nodes"]').forEach(input=>{input.checked=String(input.value)===String(node.id)});
+      for(const [key,value] of [['address',node.addr||''],['port',node.port||443],['remark',node.name||'']]){
+        const input=form.elements.namedItem(key);
+        if(input&&!String(input.value||'').trim())input.value=String(value);
+      }
+    }
+  }
   const inbound=candidates.find(i=>i.tag===inboundSelect?.value);
   const stream=inbound?.streamSettings||{};
   const security=stream.security||'none';
@@ -1877,7 +1890,7 @@ async function nodesP(){
     const l={cpu:Number.isFinite(cpu)?cpu:null,ram:Number.isFinite(ramUsed)&&Number.isFinite(ramTotal)&&ramTotal>0?ramUsed/ramTotal*100:null,mbps:Number.isFinite(rx)&&Number.isFinite(tx)?(rx+tx)*8/1e6:null};
     const k=n.limit?cl(n.used/n.limit,0,1):0,tc=k>.9?'--er':k>.75?'--wr':'--c3';
     return `<div class="card nc${n.disabled?' off':''}"><div class="h"><span class="fg">${flagView(n.flag)}</span><div><b>${esc(n.name)}</b><br><small class="mu">${esc(n.addr)}${n.port?':'+esc(n.port):''}</small>${n.hosting?.trim()?`<span class="node-hosting" title="Хостинг">${ic('building-2')}${esc(n.hosting.trim())}</span>`:''}</div>${runtime.get(n.id)?.connected?chip(panelIsEnglish()?'Node online':'Нода подключена','--ok'):runtime.get(n.id)?.lastSeenAt?chip(panelIsEnglish()?'Node offline':'Нода не в сети','--er'):chip(panelIsEnglish()?'Node not linked':'Нода не подключена','--mu')}</div>
-      <div class="kvg"><div><span>Активные пользователи</span><b>${s.nodeOn[n.id]??0}</b></div><div><span>XRAY STUDIO</span>${esc(p?.name||'—')}</div></div>
+      <div class="kvg"><div><span>Активные пользователи</span><b>${s.nodeOn[n.id]??0}</b></div><div><span>XRAY STUDIO</span>${p?esc(p.name):n.profileId?'<span class="er">Профиль ID '+esc(n.profileId)+' не найден</span>':'—'}</div></div>
       ${n.rotationEnabled?`<div class="node-ip-rotation active" aria-label="Пул IP-ротации"><span class="node-ip-indicator" aria-hidden="true"></span><span>IP-пул · ${nodeRotationIPs(n).length} адресов</span></div>`:''}
       <div class="node-gauges">
         ${nodeGauge(n,'cpu-'+n.id,'CPU',Number.isFinite(l.cpu)?l.cpu:0,Number.isFinite(l.cpu)?Math.round(l.cpu)+'%':'—',Number.isFinite(l.cpu)?'загрузка':'нет данных','--a')}
