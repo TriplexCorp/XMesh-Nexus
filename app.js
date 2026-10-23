@@ -212,7 +212,7 @@ const ENT={
       if(data.billingProviderUrl&&!/^https:\/\//.test(data.billingProviderUrl))return 'Укажите HTTPS-ссылку провайдера.';
       return '';
     },
-    guard:r=>DB.hosts.some(h=>h.nodes.includes(r.id))?'Узел указан в хостах. Уберите его оттуда.':''},
+    guard:r=>''},
   tpls:{t:'Шаблоны пользователей',n:'Готовые тарифы: выбираются при создании и подставляют лимиты, срок и доступ.',s:'id',nw:'Шаблон',fs:[{k:'name',l:'Название',req:1},{k:'limit',l:'Лимит, ГБ',t:'num',h:'0 — без лимита'},{k:'days',l:'Срок, дней',t:'num',h:'0 — бессрочно'},{k:'strategy',l:'Сброс трафика',t:'sel',o:STRAT},{k:'hwid',l:'Лимит устройств',t:'num'},{k:'squads',l:'Сквады',t:'multi',o:()=>DB.squads.map(s=>[s.id,s.name])},{k:'hold',l:'Отсчёт срока с первого подключения',t:'bool'}],def:()=>({strategy:'NO_RESET',hwid:2,squads:[]}),
     cols:[['Название',r=>`<b>${esc(r.name)}</b>`],['Трафик',r=>r.limit?r.limit+' ГБ':'∞'],['Срок',r=>r.days?r.days+' дн':'∞'],['Устройств',r=>r.hwid],['Сквады',r=>r.squads.map(i=>chip(esc(DB.squads.find(s=>s.id==i)?.name||'?'),'--b')).join(' ')],['Режим',r=>r.hold?chip('on hold','--c3'):'—']]},
   subs:{t:'Шаблоны подписки',n:'Что получает клиентское приложение: формат и содержимое конфигурации.',s:'id',nw:'Шаблон',fs:[{k:'name',l:'Название',req:1},{k:'fmt',l:'Формат',t:'sel',o:FMT},{k:'content',l:'Содержимое',t:'area',rows:9}],def:()=>({fmt:'XRAY_JSON',content:'{}'}),
@@ -2080,7 +2080,7 @@ document.addEventListener('click',async e=>{
   else if(b=g('[data-ne]')){const [k,id]=b.dataset.ne.split(':');entForm(k,id)}
   else if(b=g('tr[data-e]')){const [k,id]=b.dataset.e.split(':');entForm(k,id)}
   else if(b=g('[data-mv]')){const [k,id,d]=b.dataset.mv.split(':'),a=[...DB[k]].sort((x,y)=>x.order-y.order),i=a.findIndex(x=>x.id==id),j=i+ +d;if(a[j]){const o=a[i].order;await api.update(k,a[i].id,{order:a[j].order});await api.update(k,a[j].id,{order:o});render(1)}}
-  else if(b=g('[data-del]')){const [k,id]=b.dataset.del.split(':'),e=ENT[k],r=DB[k].find(x=>String(x.id)===id),m=e?.guard?.(r);if(m){const error=$('#fe');if(error)error.textContent=m;else toast(m);return}if(!r){toast('Запись уже удалена или не найдена.');return}confirmBox(`Удалить «${e?.t||k}»?`,'Удалить',async()=>{try{await api.remove(k,id);toast('Запись удалена');await render(1)}catch(err){toast('Не удалось удалить: '+(err.message||'ошибка backend'))}})}
+  else if(b=g('[data-del]')){const [k,id]=b.dataset.del.split(':'),e=ENT[k],r=DB[k].find(x=>String(x.id)===id),m=e?.guard?.(r);if(m){const error=$('#fe');if(error)error.textContent=m;else toast(m);return}if(!r){toast('Запись уже удалена или не найдена.');return}const linked=k==='nodes'?DB.hosts.filter(h=>Array.isArray(h.nodes)&&h.nodes.some(nodeId=>String(nodeId)===String(id))):[];const question=linked.length?`Удалить узел «${r.name}»? Он будет отвязан от ${linked.length} хост(ов). Хосты без других привязанных узлов будут отключены. Самих хостов не удаляем.`:`Удалить «${e?.t||k}»?`;confirmBox(question,'Удалить',async()=>{try{await api.remove(k,id);toast('Запись удалена');await render(1)}catch(err){toast('Не удалось удалить: '+(err.message||'ошибка backend'))}})}
   else if(b=g('[data-node-bootstrap]')){
     const id=Number(b.dataset.nodeBootstrap);
     if(location.protocol!=='https:'){toast('Для подключения требуется HTTPS');return}
