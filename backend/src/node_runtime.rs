@@ -633,6 +633,34 @@ mod provision_tests {
         assert_eq!(config["inbounds"][0]["settings"]["clients"][0]["email"],"xmesh-u7--CDN%20NL");
     }
     #[test]
+    fn node_multi_protocol_users_match_client_credentials_and_never_include_disabled(){
+        use base64::Engine as _;
+        let psk=base64::engine::general_purpose::STANDARD.encode([7u8;32]);
+        let mut config=json!({"inbounds":[
+          {"tag":"VM","protocol":"vmess","settings":{}},
+          {"tag":"TR","protocol":"trojan","settings":{}},
+          {"tag":"SS","protocol":"shadowsocks","settings":{"method":"aes-256-gcm"}},
+          {"tag":"SS22","protocol":"shadowsocks","settings":{
+              "method":"2022-blake3-aes-256-gcm","password":psk}},
+          {"tag":"HY","protocol":"hysteria","settings":{"version":2}},
+          {"tag":"MQ","protocol":"masque","settings":{"address":["10.0.0.1/24"]}}
+        ]});
+        let active=json!({"id":7,"xrayId":"550e8400-e29b-41d4-a716-446655440000",
+            "squads":[4],"ssPassword":psk});
+        let blocked=json!({"id":8,"xrayId":"550e8400-e29b-41d4-a716-446655440001",
+            "squads":[4],"disabled":true});
+        let squads=vec![json!({"id":4,"inb":["VM","TR","SS","SS22","HY","MQ"]})];
+        provision_proxy_users(&mut config,&[active,blocked],&squads,1_800_000_000_000).unwrap();
+        for (i,expected) in ["id","password","password","password","auth","pass"].iter().enumerate(){
+            let users=&config["inbounds"][i]["settings"]["users"];
+            assert_eq!(users.as_array().unwrap().len(),1);
+            assert!(users[0].get(*expected).is_some());
+        }
+        assert_eq!(config["inbounds"][3]["settings"]["users"][0]["password"],psk);
+        assert!(config["inbounds"][3]["settings"]["users"][0].get("method").is_none());
+        assert_eq!(config["inbounds"][5]["settings"]["users"][0]["email"],"xmesh-u7--MQ");
+    }
+    #[test]
     fn same_user_in_multiple_matching_squads_is_not_duplicated(){
         let mut config=json!({"inbounds":[{"protocol":"vless","tag":"NL","settings":{"users":[]}}]});
         let users=vec![json!({"id":1,"xrayId":"550e8400-e29b-41d4-a716-446655440000","squads":[4,5]})];
