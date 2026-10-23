@@ -94,7 +94,21 @@ fn client_transport(stream:&Value,inbound:&Value,host:&Value,device:&str,network
     if network=="tcp" && config.as_object().is_some_and(|m|m.is_empty()){
         config=stream.get("tcpSettings").cloned().unwrap_or_else(||json!({}));
     }
-    if network=="xhttp"{config=effective_xhttp(&config)}
+    if network=="xhttp"{
+        config=effective_xhttp(&config);
+        // Do not silently pretend newly introduced Xray-core options have
+        // been synchronized. Values may be sensitive: log key names only.
+        if let Some(object)=config.as_object(){
+            for key in object.keys(){
+                if !XHTTP_FIELDS.contains(&key.as_str())
+                    && !["scStreamUpServerSecs","scMaxBufferedPosts","serverMaxHeaderBytes",
+                         "downloadSettings","extra"].contains(&key.as_str()){
+                    tracing::warn!(xhttp_field=%key,
+                        "Xray XHTTP parameter requires an explicit client projection rule");
+                }
+            }
+        }
+    }
     let mut transport=pick(&config,fields);
     if network=="xhttp"{
         // These three are structured types, never JSON-encoded strings.
