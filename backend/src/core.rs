@@ -70,6 +70,7 @@ pub struct CoreManager {
     state: Arc<RwLock<CoreStatus>>,
     update_lock: Arc<Mutex<()>>,
     client: reqwest::Client,
+    node_release_cache: Arc<RwLock<Option<(std::time::Instant, Vec<ReleaseInfo>)>>>,
 }
 
 impl CoreManager {
@@ -106,6 +107,7 @@ impl CoreManager {
             })),
             update_lock: Arc::new(Mutex::new(())),
             client,
+            node_release_cache: Arc::new(RwLock::new(None)),
         })
     }
 
@@ -262,6 +264,12 @@ impl CoreManager {
     /// Fetch every public Xray-core release, including prereleases, in GitHub
     /// pagination order. Drafts are intentionally excluded.
     pub async fn all_node_releases(&self) -> Result<Vec<ReleaseInfo>, String> {
+        // One release dropdown + one install request must not consume the
+        // unauthenticated GitHub API rate limit twice. Cache the official
+        // catalog for ten minutes across admin sessions.
+        if let Some((read_at,releases))=self.node_release_cache.read().await.as_ref(){
+            if read_at.elapsed()<Duration::from_secs(600){return Ok(releases.clone())}
+        }
         let mut all=Vec::new();
         for page in 1..=20u32 {
             let url=format!("https://api.github.com/repos/XTLS/Xray-core/releases?per_page=100&page={page}");
@@ -280,6 +288,8 @@ impl CoreManager {
             if count<100{break}
             if page==20{return Err("Too many releases to enumerate safely".into())}
         }
+        *self.node_release_cache.write().await=
+            Some((std::time::Instant::now(),all.clone()));
         Ok(all)
     }
 
