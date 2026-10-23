@@ -42,9 +42,16 @@ xray_running(){
  systemctl is-active --quiet "$UNIT"
 }
 heartbeat(){
- local xr=false
+ local xr=false version='' raw=''
  if xray_running;then xr=true;fi
- signed_post '/api/v1/node/heartbeat' "{\"node_id\":$XMESH_NODE_ID,\"version\":\"control-v2.0\",\"xray_running\":$xr,\"router_running\":$xr}" >/dev/null
+ if docker inspect -f '{{.State.Running}}' xmesh-managed-xray 2>/dev/null | grep -qx true;then
+  raw="$(timeout 5 docker exec xmesh-managed-xray xray version 2>/dev/null || true)"
+ elif command -v xray >/dev/null 2>&1;then
+  raw="$(timeout 5 xray version 2>/dev/null || true)"
+ fi
+ version="$(printf '%s\n' "$raw" | awk 'NR==1 && $1=="Xray" {print $2}')"
+ [[ "$version" =~ ^[A-Za-z0-9._+-]{1,40}$ ]] || version=''
+ signed_post '/api/v1/node/heartbeat' "{\"node_id\":$XMESH_NODE_ID,\"version\":\"control-v2.0\",\"xray_version\":\"$version\",\"xray_running\":$xr,\"router_running\":$xr}" >/dev/null
 }
 restart_xray(){
  if docker inspect xmesh-managed-xray >/dev/null 2>&1;then
