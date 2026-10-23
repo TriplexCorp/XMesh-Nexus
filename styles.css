@@ -3572,3 +3572,27 @@ dialog.user-modal .user-canvas-foot{padding-top:14px;font-size:.79rem}
 @media(max-width:440px){
   dialog.user-modal .user-edit-fields{grid-template-columns:minmax(0,1fr)}
 }
+
+/* Node agent identity: readable but secondary to node name and Xray state. */
+.nodes-page .nc .node-agent-version{
+  display:inline-flex;
+  align-items:center;
+  margin-top:.28rem;
+  padding:.15rem .48rem;
+  border:1px solid var(--ln);
+  border-radius:var(--ui-control-radius);
+  background:color-mix(in srgb,var(--s2) 78%,transparent);
+  color:var(--mu);
+  font-size:.74rem;
+  font-weight:650;
+  line-height:1.25;
+  font-variant-numeric:tabular-nums;
+}
+.nodes-page .nc [data-agent-update]{
+  color:var(--a);
+  border-color:color-mix(in srgb,var(--a) 25%,var(--ln));
+}
+.nodes-page .nc [data-agent-update]:hover{
+  background:color-mix(in srgb,var(--a) 10%,var(--s2));
+}
+.nodes-page .nc [data-agent-update]:disabled{cursor:progress;opacity:.7}
