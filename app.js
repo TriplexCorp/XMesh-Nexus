@@ -903,7 +903,7 @@ async function usersP(){
     <label>Срок <select data-user-filter="expiry"><option value="">Любой срок</option><option value="eternal"${UQ.expiry==='eternal'?' selected':''}>Бессрочно</option><option value="3"${UQ.expiry==='3'?' selected':''}>До 3 дней</option><option value="7"${UQ.expiry==='7'?' selected':''}>До 7 дней</option><option value="30"${UQ.expiry==='30'?' selected':''}>До 30 дней</option></select></label>
     <button type="button" class="gh sm" data-user-filter-reset>Сбросить фильтры</button>
   </div><div class="bulk" id="bulk" role="toolbar" aria-label="Массовые действия"></div><div id="ut"></div></div>`,()=>{drawUsers();let h;$('#uq').oninput=e=>{clearTimeout(h);h=setTimeout(()=>{UQ.q=e.target.value.trim().toLowerCase();UQ.page=1;drawUsers()},200)};$('#usq').onchange=e=>{UQ.sq=e.target.value;UQ.page=1;drawUsers()};
-    $('[data-user-filter]').forEach(el=>el.onchange=()=>{UQ[el.dataset.userFilter]=el.value;UQ.page=1;drawUsers()});
+    $$('[data-user-filter]').forEach(el=>el.onchange=()=>{UQ[el.dataset.userFilter]=el.value;UQ.page=1;drawUsers()});
     $('[data-user-filter-reset]').onclick=()=>{for(const key of ['sq','inbound','tag','fp','node','expiry'])UQ[key]='';UQ.page=1;render(1)};
   }];
 }
