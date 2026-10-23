@@ -934,7 +934,23 @@ async fn get_statistics_overview(State(state): State<AppState>) -> Result<Json<V
                     .unwrap_or_default().as_millis() as i64 - sampled_at > 300_000
             }))
         } else { None };
+        let traffic=sqlx::query(
+            "SELECT rx_bytes, tx_bytes, observations,
+                    (EXTRACT(EPOCH FROM updated_at)*1000)::BIGINT AS updated_at_ms
+             FROM node_network_traffic_totals WHERE node_id=$1"
+        ).bind(id).fetch_optional(&state.pool).await?;
+        let (network_rx,network_tx,network_samples,network_updated)=if let Some(t)=traffic{
+            (Some(t.try_get::<i64,_>("rx_bytes")?),
+             Some(t.try_get::<i64,_>("tx_bytes")?),
+             Some(t.try_get::<i64,_>("observations")?),
+             Some(t.try_get::<i64,_>("updated_at_ms")?))
+        }else{(None,None,None,None)};
         nodes.push(json!({
+            "networkRxBytes":network_rx,
+            "networkTxBytes":network_tx,
+            "networkObservations":network_samples,
+            "networkUpdatedAt":network_updated,
+            "networkTrafficSource":"interface_counters_since_first_sample",
             "id":id,
             "name":node.get("name").and_then(Value::as_str).unwrap_or("Узел"),
             "hosting":node.get("hosting"),
@@ -1035,6 +1051,27 @@ async fn ingest_node_metrics(
         }
     }
 
+    // Node-wide traffic accounting is separate from authenticated per-user
+    // Xray counters. Require both monotonic NIC counters and an interface ID.
+    // Older metrics agents simply omit these fields until upgraded.
+    let network_sample=match (
+        metrics.get("rxTotalBytes"),metrics.get("txTotalBytes"),metrics.get("interface")
+    ){
+        (None,None,_)=>None,
+        (Some(rx),Some(tx),Some(interface))=>{
+            let rx=rx.as_i64().filter(|n|*n>=0)
+                .ok_or_else(||ApiError::new(StatusCode::BAD_REQUEST,"Недопустимый rxTotalBytes"))?;
+            let tx=tx.as_i64().filter(|n|*n>=0)
+                .ok_or_else(||ApiError::new(StatusCode::BAD_REQUEST,"Недопустимый txTotalBytes"))?;
+            let interface=interface.as_str().filter(|name|!name.is_empty()
+                && name.len()<=64 && name.bytes().all(|c|
+                    c.is_ascii_alphanumeric() || b"_.:-".contains(&c)))
+                .ok_or_else(||ApiError::new(StatusCode::BAD_REQUEST,"Недопустимый сетевой интерфейс"))?;
+            Some((rx,tx,interface.to_owned()))
+        }
+        _=>return Err(ApiError::new(StatusCode::BAD_REQUEST,
+            "Счётчики RX/TX ноды должны передаваться вместе с интерфейсом"))
+    };
     let node_id = body.node_id.to_string();
     let sampled_at: i64 = sqlx::query_scalar(
         "INSERT INTO server_metric_samples (
@@ -1059,6 +1096,32 @@ async fn ingest_node_metrics(
     .bind(metrics)
     .fetch_one(&state.pool)
     .await?;
+
+    if let Some((rx,tx,interface))=network_sample{
+        // The first sample is a baseline, not historical traffic. A reboot or
+        // switch to another NIC resets the baseline without a negative delta.
+        sqlx::query(
+            "INSERT INTO node_network_traffic_totals AS totals (
+                 node_id,interface_name,last_rx_bytes,last_tx_bytes,
+                 rx_bytes,tx_bytes,observations,updated_at
+             ) VALUES ($1,$2,$3,$4,0,0,1,NOW())
+             ON CONFLICT (node_id) DO UPDATE SET
+               rx_bytes=totals.rx_bytes+
+                 CASE WHEN totals.interface_name=EXCLUDED.interface_name
+                   THEN GREATEST(EXCLUDED.last_rx_bytes-totals.last_rx_bytes,0)
+                   ELSE 0 END,
+               tx_bytes=totals.tx_bytes+
+                 CASE WHEN totals.interface_name=EXCLUDED.interface_name
+                   THEN GREATEST(EXCLUDED.last_tx_bytes-totals.last_tx_bytes,0)
+                   ELSE 0 END,
+               interface_name=EXCLUDED.interface_name,
+               last_rx_bytes=EXCLUDED.last_rx_bytes,
+               last_tx_bytes=EXCLUDED.last_tx_bytes,
+               observations=totals.observations+1,
+               updated_at=NOW()"
+        ).bind(body.node_id).bind(interface).bind(rx).bind(tx)
+         .execute(&state.pool).await?;
+    }
 
     if !user_traffic.is_empty() {
         // One atomic UPSERT for the full node batch. Initial samples establish a
