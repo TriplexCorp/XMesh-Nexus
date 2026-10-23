@@ -1646,7 +1646,7 @@ function entForm(k,id){const e=ENT[k],o=id?DB[k].find(x=>x.id==id):e.def?e.def()
     ?`<div class="node-rotation-probe"><label class="f"><span>Проверка на пользователе</span><select data-node-rotation-user>${userOptions||'<option value="">Нет активных пользователей</option>'}</select></label><button type="button" class="gh sm" data-node-rotation-probe="${id}" ${userOptions?'':'disabled'}>${ic('redo')}Получить следующий IP</button><output data-node-rotation-result aria-live="polite"></output><small>Тест изменяет счётчик ротации этого пользователя. Выдача подписок будет подключена отдельно.</small></div>`
     :'';
   const fields=k==='nodes'
-    ?'<div class="node-form-grid">'+e.fs.slice(0,-2).map(f=>field(f,o[f.k])).join('')+'</div>'+`<details class="node-rotation-editor" ${o.rotationEnabled?'open':''}><summary>${ic('layers')}<span><b>IP-ротация</b><small>${o.rotationEnabled?nodeRotationIPs(o).length+' адресов в пуле':'Не используется · дополнительные адреса одной VM'}</small></span></summary><div class="node-rotation-editor-body">${rotationFields}${rotationProbe}</div></details>`
+    ?'<div class="node-form-layout"><section class="node-main-section"><div class="node-form-section-title">Основные параметры</div><div class="node-form-grid">'+e.fs.slice(0,-2).map(f=>field(f,o[f.k])).join('')+'</div></section>'+`<section class="node-ip-section"><div class="node-form-section-title">IP-пул и ротация</div><div class="node-ip-hint">Адреса должны принадлежать этому VPS и быть доступны извне.</div><div class="node-rotation-editor-body">${rotationFields}<div class="node-pool-toolbar"><span data-node-pool-count>Адресов: ${nodeRotationIPs(o).length} / 64</span><button type="button" class="gh sm" data-node-pool-normalize>Убрать повторы</button><button type="button" class="gh sm" data-node-pool-clear>Очистить</button></div><output data-node-pool-feedback aria-live="polite"></output>${rotationProbe}</div></section></div>`
     :standardFields;
   modal(`<form class="box" data-k="ent" data-ent="${k}" data-id="${id||''}" method="dialog"><h2>${id?'Изменить':'Новый'}: ${e.nw.toLowerCase()}</h2>${fields}<p class="er" id="fe"></p><div class="act">${id?`<button type="button" class="dg" data-del="${k}:${id}" style="margin-right:auto">${ic('trash')}Удалить</button>`:''}<button type="button" class="gh" data-x>Отмена</button><button class="btn">Сохранить</button></div></form>`,k==='nodes'?'node-wide':k=='profiles'||k=='subs'?'wide':'')
 }
@@ -1842,8 +1842,27 @@ function pdraw(q){q=q.toLowerCase();const go=k=>()=>{dlg.close();location.hash=k
 const copyT=t=>(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('Скопировано'),()=>{const i=$('#lk');i.select();document.execCommand('copy');toast('Скопировано')});
 const sel=()=>{$$('#ut tbody tr').forEach(r=>{const i=+r.dataset.id;r.classList.toggle('sel',UQ.sel.has(i));const c=$('[data-sel]',r);if(c)c.checked=UQ.sel.has(i)});const a=$('[data-sela]');if(a)a.checked=$$('#ut tbody tr').every(r=>UQ.sel.has(+r.dataset.id));drawBulk()};
 const delUsers=async ids=>{const gone=DB.users.filter(u=>[...ids].some(id=>String(id)===String(u.id)));try{for(const user of gone)await removeXrayUserFromProfiles(user);for(const id of ids)await api.remove('users',id)}catch(error){toast('Не удалось удалить пользователя: '+(error.message||'ошибка backend'));return}ids.forEach(i=>UQ.sel.delete(i));toast(`Удалено: ${ids.size}`,'Отменить',async()=>{try{if(backendReady){for(const user of gone)await api.create('users',user)}else{DB.users.push(...gone);save()}render(1);toast('Пользователи восстановлены')}catch(error){toast('Не удалось восстановить: '+error.message)}});dlg.close();render(1)};
+document.addEventListener('input',e=>{
+  if(!e.target.matches('form[data-ent="nodes"] [name="rotationIps"]'))return;
+  const form=e.target.closest('form'),count=form?.querySelector('[data-node-pool-count]'),feedback=form?.querySelector('[data-node-pool-feedback]');
+  const ips=String(e.target.value).split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean);
+  if(count)count.textContent='Адресов: '+ips.length+' / 64';
+  if(feedback)feedback.textContent=ips.length>64?'Превышен лимит 64 адресов.':new Set(ips).size!==ips.length?'В пуле есть повторяющиеся адреса.':'';
+});
 document.addEventListener('click',async e=>{
   const g=s=>e.target.closest(s);let b;
+  if(b=g('[data-node-pool-normalize]')){
+    e.preventDefault();
+    const form=b.closest('form'),field=form?.querySelector('[name="rotationIps"]');
+    if(field){field.value=[...new Set(String(field.value).split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean))].join('\\n');field.dispatchEvent(new Event('input',{bubbles:true}));toast('Повторы удалены');}
+    return;
+  }
+  if(b=g('[data-node-pool-clear]')){
+    e.preventDefault();
+    const field=b.closest('form')?.querySelector('[name="rotationIps"]');
+    if(field&&(!field.value.trim()||confirm('Очистить весь IP-пул? Изменение применится после сохранения узла.'))){field.value='';field.dispatchEvent(new Event('input',{bubbles:true}));}
+    return;
+  }
   if(g('.sw')||g('[data-sel]')&&0)return;
   if(b=g('[data-scroll-target]')){
     e.preventDefault();
