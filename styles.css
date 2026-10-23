@@ -3931,3 +3931,124 @@ dialog#dlg.host-wide .host-editor-layout{grid-template-columns:minmax(0,1.2fr) m
  dialog#dlg.host-wide .host-editor-main>[data-host-count]{grid-column:1/-1}
  dialog#dlg.host-wide>form.box{max-height:calc(100dvh - 48px)}
 }
+
+/* Host editor v3: balanced horizontal workspace.
+   Separate the preview from the overrides so neither becomes a tall sidebar. */
+dialog#dlg.host-wide{
+  width:min(1840px,calc(100vw - 40px))!important;
+  max-width:calc(100vw - 40px)!important;
+  max-height:calc(100dvh - 28px)!important;
+}
+dialog#dlg.host-wide>form.box{
+  box-sizing:border-box;
+  max-height:calc(100dvh - 28px)!important;
+  min-height:0;
+  overflow-y:auto;
+  overflow-x:hidden;
+  padding:clamp(18px,1.5vw,28px)!important;
+  scrollbar-width:thin;
+}
+dialog#dlg.host-wide .host-editor-layout{
+  display:grid;
+  grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);
+  grid-template-areas:"configuration preview" "overrides overrides";
+  align-items:start;
+  gap:clamp(14px,1.2vw,24px);
+  min-width:0;
+}
+dialog#dlg.host-wide .host-editor-layout>.host-editor-main{
+  grid-area:configuration;
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px 18px;
+  align-items:start;
+  align-content:start;
+  padding:clamp(18px,1.2vw,24px);
+}
+dialog#dlg.host-wide .host-editor-main>.node-form-section-title,
+dialog#dlg.host-wide .host-editor-main>.node-ip-hint,
+dialog#dlg.host-wide .host-editor-main>[data-host-count]{
+  grid-column:1/-1;
+}
+dialog#dlg.host-wide .host-editor-main .node-form-section-title:not(:first-child){
+  margin-top:6px;
+}
+dialog#dlg.host-wide .host-editor-layout>.host-editor-side{
+  grid-area:preview;
+  padding:clamp(18px,1.2vw,24px);
+}
+dialog#dlg.host-wide .host-editor-layout>.host-advanced-panel{
+  grid-area:overrides;
+  display:block;
+  padding:clamp(18px,1.2vw,24px);
+  border:1px solid var(--ln);
+  border-radius:var(--ui-radius);
+  background:var(--s1);
+  min-width:0;
+}
+dialog#dlg.host-wide .host-advanced-heading{
+  margin-bottom:16px;
+}
+dialog#dlg.host-wide .host-advanced-heading .node-form-section-title{
+  margin:0 0 6px;
+  padding:0;
+  border:0;
+}
+dialog#dlg.host-wide .host-advanced-fields{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  align-items:start;
+  gap:16px 18px;
+  margin:0;
+}
+dialog#dlg.host-wide .host-advanced-fields .f:has([name="publicKey"]),
+dialog#dlg.host-wide .host-advanced-fields .f:has([name="clientEncryption"]){
+  grid-column:span 2;
+}
+dialog#dlg.host-wide .host-advanced-actions{
+  display:flex;
+  justify-content:flex-end;
+  padding-top:18px;
+}
+dialog#dlg.host-wide .host-editor-layout :is(input,select,textarea){
+  box-sizing:border-box;
+  min-width:0;
+  max-width:100%;
+}
+dialog#dlg.host-wide>form.box>.act{
+  position:sticky;
+  bottom:0;
+  z-index:10;
+  flex-shrink:0;
+  margin:0;
+  padding:14px 0 0;
+  border-top:1px solid var(--ln);
+  background:var(--s1);
+}
+@media(max-width:1250px){
+  dialog#dlg.host-wide .host-advanced-fields{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+@media(max-width:900px){
+  dialog#dlg.host-wide .host-editor-layout{
+    grid-template-columns:minmax(0,1fr);
+    grid-template-areas:"configuration" "preview" "overrides";
+  }
+}
+@media(max-width:620px){
+  dialog#dlg.host-wide{
+    width:calc(100vw - 12px)!important;
+    max-width:calc(100vw - 12px)!important;
+  }
+  dialog#dlg.host-wide>form.box{padding:16px!important}
+  dialog#dlg.host-wide .host-editor-main{
+    grid-template-columns:minmax(0,1fr);
+  }
+  dialog#dlg.host-wide .host-editor-main>*,dialog#dlg.host-wide .host-advanced-fields>*{
+    grid-column:1/-1!important;
+  }
+  dialog#dlg.host-wide .host-advanced-fields{
+    grid-template-columns:minmax(0,1fr);
+  }
+}
