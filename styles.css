@@ -3915,3 +3915,8 @@ dialog.user-modal .user-server-details>b::before{
 .stats-layout #stats-trend{min-height:0}
 .stats-layout .stats-spark{height:clamp(9rem,13vw,13rem)}
 @media(max-width:900px){.stats-layout{grid-template-columns:1fr}}
+
+/* Hosts: wider, landscape-oriented editor on desktop. */
+dialog#dlg.host-wide{width:min(1480px,calc(100vw - 40px))!important;max-width:calc(100vw - 40px)}
+dialog#dlg.host-wide .host-editor-layout{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:1.25rem}
+@media(max-width:820px){dialog#dlg.host-wide{width:calc(100vw - 20px)!important;max-width:calc(100vw - 20px)}dialog#dlg.host-wide .host-editor-layout{grid-template-columns:minmax(0,1fr)}}
