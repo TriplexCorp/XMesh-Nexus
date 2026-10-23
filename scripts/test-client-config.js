@@ -48,15 +48,15 @@ const gen=require('../client-config.js');
  assert.equal(noHost.length,1);
  assert.equal(noHost[0].json.outbounds[0].settings.vnext[0].address,'203.0.113.8');
  const incorrectHost={...host,profileId:99};
- const inaccessible=await gen.generate(user,{...db,hosts:[incorrectHost]});
+ const inaccessible=await gen.generate(user,{...db,hosts:[incorrectHost],nodes:[{id:3,profileId:1,addr:'203.0.113.8'}]});
  assert.equal(inaccessible.length,1,'No eligible host means fallback to explicitly assigned node');
- assert.equal(inaccessible[0].json.outbounds[0].settings.vnext[0].address,'192.168.0.5');
+ assert.equal(inaccessible[0].json.outbounds[0].settings.vnext[0].address,'203.0.113.8');
  const blocked=await gen.generate(user,{...db,hosts:[{...host,disabled:true}]});
  assert.equal(blocked.length,0,'Disabled host prevents raw-node fallback');
  const pqInbound={...inbound,settings:{decryption:'mlkem768x25519plus.native.example'}};
  assert.throws(()=>gen.build(user,host,pqInbound),/VLESS Encryption/,
   'Do not produce unusable plaintext client when server requires post-quantum encryption');
- const pq=gen.build(user,{...host,clientEncryption:'mlkem768x25519plus.native.client'},pqInbound);
+ const pq=gen.build(user,{...host,publicKey:expected,clientEncryption:'mlkem768x25519plus.native.client'},pqInbound);
  assert.equal(pq.outbounds[0].settings.vnext[0].users[0].encryption,'mlkem768x25519plus.native.client');
  assert.throws(()=>gen.build(user,{...host,publicKey:''},
   {...inbound,streamSettings:{network:'raw',security:'reality',realitySettings:{shortIds:['aa'],serverNames:['www.example.com']}}}),
