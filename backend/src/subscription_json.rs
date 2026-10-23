@@ -29,6 +29,27 @@ fn country(outbound:&Value)->String{
             return format!("{left}{right}")
         }
     }
+    // Legacy Hosts often have only a human-readable country name. Infer
+    // familiar locations without requiring users to enter ISO codes twice.
+    let normalized=label.trim().to_lowercase();
+    for (name,code) in [
+        ("нидерланды","NL"),("netherlands","NL"),("holland","NL"),
+        ("швеция","SE"),("sweden","SE"),
+        ("германия","DE"),("germany","DE"),
+        ("польша","PL"),("poland","PL"),
+        ("эстония","EE"),("estonia","EE"),
+        ("финляндия","FI"),("finland","FI"),
+        ("россия","RU"),("russia","RU"),
+        ("франция","FR"),("france","FR"),
+        ("сша","US"),("united states","US"),
+        ("великобритания","GB"),("united kingdom","GB"),
+        ("испания","ES"),("spain","ES"),
+    ] {
+        if normalized==name || normalized.starts_with(&format!("{name} "))
+            || normalized.starts_with(&format!("{name}-")) {
+            return code.to_owned();
+        }
+    }
     "ZZ".to_owned()
 }
 fn secure_vless(outbound:&Value)->bool {
@@ -64,6 +85,12 @@ pub(crate) fn build(mut proxies:Vec<Value>,setting:&Value)->Result<Value,String>
     let mut used=HashSet::new();
     let mut countries:HashMap<String,Vec<String>>=HashMap::new();
     let mut tags=Vec::new();
+    // An Xray routing tag is not a human-readable server name. Preserve
+    // the host's real subscription remark separately for GUI clients.
+    let display_names:Vec<String>=proxies.iter().map(|p|
+        p.get("tag").and_then(Value::as_str).unwrap_or("").trim().chars()
+            .filter(|c|!c.is_control()).take(100).collect()
+    ).collect();
     for (i,outbound) in proxies.iter_mut().enumerate(){
         if outbound["protocol"]!="vless"{
             return Err("Неподдерживаемый протокол в клиентском JSON".into())
@@ -132,7 +159,15 @@ pub(crate) fn build(mut proxies:Vec<Value>,setting:&Value)->Result<Value,String>
     }
     let mut routing=json!({"domainStrategy":routing_strategy,"rules":rules});
     if !balancers.is_empty(){routing["balancers"]=json!(balancers)}
+    let display_name=if display_names.len()==1 && !display_names[0].is_empty(){
+        display_names[0].clone()
+    }else{
+        setting.get("subscriptionName").and_then(Value::as_str)
+            .filter(|s|!s.is_empty() && s.chars().count()<=100)
+            .unwrap_or("XMesh SMART").to_owned()
+    };
     let mut config=json!({
+        "remarks":display_name,
         "log":{"loglevel":"warning"},
         "dns":{"queryStrategy":query_strategy,"servers":[dns_server]},
         "inbounds":inbounds,
@@ -206,8 +241,21 @@ mod tests{
  #[test] fn unicode_single_host_default_route_is_ascii(){
   let mut a=outbound("ZZ");a["tag"]=json!("Нидерланды");
   let c=build(vec![a],&json!({})).unwrap();
+  assert_eq!(c["outbounds"][0]["tag"],"xmesh-NL-0001");
+  assert_eq!(c["routing"]["rules"][3]["outboundTag"],"xmesh-NL-0001");
+ }
+ #[test] fn host_remark_is_displayed_without_polluting_xray_tags(){
+  let mut a=outbound("ZZ");a["tag"]=json!("Нидерланды");
+  let c=build(vec![a],&json!({})).unwrap();
+  assert_eq!(c["remarks"],"Нидерланды");
+  assert_eq!(c["outbounds"][0]["tag"],"xmesh-NL-0001");
+  assert_eq!(c["routing"]["rules"][3]["outboundTag"],"xmesh-NL-0001");
+ }
+ #[test] fn arbitrary_unicode_label_stays_only_in_display_remark(){
+  let mut a=outbound("ZZ");a["tag"]=json!("🌍 Premium Zone");
+  let c=build(vec![a],&json!({})).unwrap();
+  assert_eq!(c["remarks"],"🌍 Premium Zone");
   assert_eq!(c["outbounds"][0]["tag"],"xmesh-ZZ-0001");
-  assert_eq!(c["routing"]["rules"][3]["outboundTag"],"xmesh-ZZ-0001");
  }
  #[test] fn one_node_uses_direct_tag_without_empty_balancers(){
   let c=build(vec![outbound("PL")],&json!({})).unwrap();
