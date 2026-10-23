@@ -81,7 +81,7 @@ pub(crate) fn build(mut proxies:Vec<Value>,setting:&Value)->Result<Value,String>
     let query_strategy=option(opts,"queryStrategy",&["UseIPv4","UseIPv6","UseIP"],"UseIPv4");
     let routing_strategy=option(opts,"routingStrategy",&["AsIs","IPIfNonMatch","IPOnDemand"],"IPIfNonMatch");
     let balance=option(opts,"balance",&["leastPing","roundRobin","random","off"],"leastPing");
-    let smart=enabled(opts,"smart",true);
+    let smart=enabled(opts,"smart",false);
     let sniffing=enabled(opts,"sniffing",true);
     let dns_out=enabled(opts,"dnsRouting",false);
     let socks_port=port(opts,"socksPort",10808);
@@ -222,8 +222,17 @@ mod tests{
    "realitySettings":{"serverName":"example.com","publicKey":"public","shortId":"aa"},
    "xhttpSettings":{"path":"/test","mode":"stream-up"}}})
  }
+ #[test] fn balancers_are_opt_in_and_servers_remain_distinct(){
+  let config=build(vec![outbound("NL"),outbound("PL")],&json!({})).unwrap();
+  assert!(config["routing"].get("balancers").is_none());
+  assert!(config.get("observatory").is_none());
+  assert_eq!(config["outbounds"].as_array().unwrap().len(),4);
+  assert_eq!(config["outbounds"][0]["tag"],"xmesh-NL-0001");
+  assert_eq!(config["outbounds"][1]["tag"],"xmesh-PL-0002");
+  assert_eq!(config["routing"]["rules"][2]["outboundTag"],"xmesh-NL-0001");
+ }
  #[test] fn smart_balancer_observatory_and_country(){
-  let config=build(vec![outbound("DE"),outbound("DE"),outbound("PL")],&json!({})).unwrap();
+  let config=build(vec![outbound("DE"),outbound("DE"),outbound("PL")],&json!({"subscriptionJson":{"smart":true}})).unwrap();
   assert_eq!(config["routing"]["balancers"][0]["tag"],"DE_AUTO");
   assert_eq!(config["routing"]["balancers"][1]["tag"],"SMART");
   assert_eq!(config["routing"]["rules"][2]["balancerTag"],"SMART");
