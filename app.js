@@ -1197,23 +1197,26 @@ async function drawUsers(){
 }
 function drawBulk(){const b=$('#bulk'),n=UQ.sel.size;if(!b)return;b.classList.toggle('on',n>0&&cur=='users');if(!n){b.innerHTML='';return}b.innerHTML=`<b style="padding:0 .5rem">Выбрано ${n}</b>${UIDS.length>n?`<button class="gh sm" data-bk="all">Выбрать все ${UIDS.length}</button>`:''}<button class="gh sm" data-bk="on">Включить</button><button class="gh sm" data-bk="off">Отключить</button><button class="gh sm" data-bk="reset">Сбросить трафик</button><button class="gh sm" data-bk="ext">${ic('calendar')}Продлить…</button><button class="gh sm" data-bk="sq">В сквад</button><button class="dg sm" data-bk="del">${ic('trash')}Удалить</button><button class="ia" data-bk="clr" aria-label="Снять выбор">${ic('x')}</button>`;decorateButtonIcons(b)}
 // Deterministic, high-variation Telegram-inspired gradients (no color flicker).
-function userAvatarStyle(u){
+// Spread avatar hues across known users, preventing near-identical neighbors.
+function userAvatarHue(u){
   const key=String(u?.id??u?.username??'unknown');
-  let h=2166136261;
-  for(const c of key)h=Math.imul(h^c.codePointAt(0),16777619)>>>0;
-  const hue=h%360;
-  const spread=28+((h>>>9)%66);
-  const hue2=(hue+spread)%360;
-  const hue3=(hue+Math.round(spread*.42))%360;
-  const sat=66+((h>>>16)%20);
-  const light=57+((h>>>22)%9);
-  const angle=115+(h%105);
-  return 'background-color:hsl('+hue+' '+sat+'% '+light+'%);'+
+  const ids=(DB?.users||[]).map(x=>String(x.id??x.username??'unknown')).sort();
+  const index=ids.indexOf(key);
+  if(index>=0)return (24+index*137.507764)%360;
+  return (hs(key)*137.507764)%360;
+}
+function userAvatarStyle(u){
+  const hue=userAvatarHue(u);
+  const key=String(u?.id??u?.username??'unknown'),hash=hs(key);
+  const secondary=(hue+32+(hash%30))%360;
+  const angle=125+(hash%90);
+  // Deep saturated gradients keep white initials legible on every avatar.
+  return 'background-color:hsl('+hue+' 73% 40%);'+
     'background-image:linear-gradient('+angle+'deg,'+
-    'hsl('+hue+' '+sat+'% '+(light+8)+'%) 0%,'+
-    'hsl('+hue3+' '+Math.min(92,sat+5)+'% '+light+'%) 48%,'+
-    'hsl('+hue2+' '+sat+'% '+(light-13)+'%) 100%);'+
-    'color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.32)';
+    'hsl('+hue+' 77% 53%) 0%,'+
+    'hsl('+((hue+18)%360)+' 78% 43%) 52%,'+
+    'hsl('+secondary+' 75% 31%) 100%);'+
+    'color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.48)';
 }
 const uid=s=>{let h=hs(s),x='';for(let i=0;i<32;i++){h=(h*1664525+1013904223)>>>0;x+=(h>>>24&15).toString(16)}return x.replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/,'$1-$2-$3-$4-$5')};
 let UT='ov';
