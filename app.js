@@ -2459,7 +2459,40 @@ document.addEventListener('click',async e=>{
     }catch(error){if(result)result.textContent=error.message||'Не удалось получить адрес.'}
     finally{b.disabled=false}
   }
-  else if(b=g('[data-nr]')){toast('Перезапуск требует подключённого backend/API Xray. В автономном HTML он не выполняется.')}
+  else if(b=g('[data-nr]')){
+     const id=Number(b.dataset.nr),node=DB.nodes.find(n=>Number(n.id)===id);
+     if(!node){toast('Нода больше не существует. Обновите список.');return}
+     if(b.dataset.loading==='1')return;
+     b.dataset.loading='1';b.disabled=true;
+     try{
+       const state=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/runtime');
+       if(!state.connected||!String(state.version||'').startsWith('control-v1')){
+         throw new Error('Нет управляющего агента. Агент метрик не выполняет перезапуск: обновите его через «Подключить ноду и метрики».');
+       }
+       const confirmed=await panelConfirm(
+         'Перезапустить Xray на ноде «'+node.name+'»? Подключения клиентов кратковременно прервутся.',
+         {title:'Перезапуск Xray',confirmLabel:'Перезапустить'}
+       );
+       if(!confirmed)return;
+       const request=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/restart',{
+         method:'POST',body:JSON.stringify({})
+       });
+       toast('Команда отправлена. Ожидаем подтверждения агента ноды.');
+       const deadline=Date.now()+180000;
+       let result=null;
+       while(Date.now()<deadline){
+         await new Promise(resolve=>setTimeout(resolve,2500));
+         result=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/restart');
+         if(result.id!==request.id)throw new Error('Состояние команды изменилось. Обновите раздел узлов.');
+         if(result.state==='succeeded')break;
+         if(result.state==='failed')throw new Error(result.result||'Перезапуск не подтверждён.');
+       }
+       if(result?.state!=='succeeded')throw new Error('Агент не подтвердил перезапуск в течение трёх минут.');
+       toast(node.name+': Xray перезапущен и проверен управляющим агентом.');
+       if(cur==='nodes')render(1);
+     }catch(error){toast('Не удалось перезапустить Xray: '+(error.message||'ошибка API'))}
+     finally{delete b.dataset.loading;if(b.isConnected)b.disabled=false}
+   }
   else if(b=g('[data-nt]')){const n=DB.nodes.find(x=>x.id==b.dataset.nt);await api.update('nodes',n.id,{disabled:!n.disabled});toast(`${n.name}: ${n.disabled?'отключён':'включён'}`);render(1)}
   else if(b=g('[data-tt]')){TP.tab=b.dataset.tt;TP.q='';TP.f='';render(1)}
   else if(b=g('[data-lv]')){}
