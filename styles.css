@@ -3126,3 +3126,6 @@ dialog#dlg.host-wide .act{position:sticky;bottom:0;background:var(--s1);padding-
   .host-advanced-fields{grid-template-columns:minmax(0,1fr)}
   .host-advanced-fields .f:has([name="publicKey"]),.host-advanced-fields .f:has([name="clientEncryption"]){grid-column:auto}
 }
+
+/* One coherent full-width action for creating an endpoint from the node card. */
+.nc .acts [data-node-create-host]{grid-column:1/-1}
