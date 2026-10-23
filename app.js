@@ -441,66 +441,58 @@ const panelConfirm=(message,{danger=false,title='Подтверждение',con
  dialog.showModal();cancel.focus();
 });
 // Explicit release picker, preserving the existing page and its scroll state.
-const selectNodeXrayRelease=(node,releases,installed)=>new Promise(resolve=>{
+// Open immediately. Resolve releases asynchronously inside the dialog.
+const selectNodeXrayRelease=(node,load,installed)=>new Promise(resolve=>{
  const dialog=document.createElement('dialog');dialog.className='xm-action-confirm xray-release-dialog';
  const box=document.createElement('div');box.className='xm-action-confirm-box';
  const title=document.createElement('h2');title.textContent='Версия Xray · '+(node.name||'Узел');
- const description=document.createElement('p');
- description.textContent='Выберите официальный релиз, включая предварительные версии. Установка может прервать соединения. Текущая версия: '+(installed||'неизвестно');
- const label=document.createElement('label');label.className='f';label.textContent='Версия для установки';
- const search=document.createElement('input');search.type='search';search.className='xray-release-search';
- search.placeholder='Поиск версии, например 26.9 или 26.10';
- search.setAttribute('aria-label','Поиск релиза Xray');
- const select=document.createElement('select');select.className='xray-release-select';
- select.setAttribute('aria-label','Выбрать версию Xray');
- for(const r of releases){
-  if(!/^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/.test(r.version))continue;
-  const opt=document.createElement('option');opt.value=r.version;
-  opt.textContent=r.version+(r.prerelease?' · Pre-release':' · Stable')+
-    (r.version.replace(/^v/,'')===String(installed||'').replace(/^v/,'')?' · Установлена':'');
-  select.append(opt);
- }
+ const description=document.createElement('p');description.textContent='Текущая версия: '+(installed||'определяем…')+' · Установка может прервать соединения.';
+ const search=document.createElement('input');search.type='search';search.className='xray-release-search';search.placeholder='Поиск версии Xray';search.setAttribute('aria-label','Поиск релиза Xray');search.disabled=true;
+ const status=document.createElement('p');status.className='xray-release-loading';status.setAttribute('role','status');status.innerHTML='<span class="xray-release-spinner" aria-hidden="true"></span><span>Загружаем официальные релизы…</span>';
+ const list=document.createElement('div');list.className='xray-release-list';list.setAttribute('role','radiogroup');list.setAttribute('aria-label','Версии Xray');
  const info=document.createElement('p');info.className='xray-release-info';
+ const link=document.createElement('a');link.target='_blank';link.rel='noopener noreferrer';link.textContent='Открыть релиз на GitHub ↗';link.hidden=true;
  const actions=document.createElement('div');actions.className='xm-action-confirm-actions';
  const cancel=document.createElement('button');cancel.type='button';cancel.className='gh';cancel.textContent='Отмена';
- const accept=document.createElement('button');accept.type='button';accept.className='btn';accept.textContent='Установить версию';
- const link=document.createElement('a');link.target='_blank';link.rel='noopener noreferrer';link.textContent='Релиз на GitHub ↗';
- const update=()=>{
-  const item=releases.find(x=>x.version===select.value);
-  info.textContent=item?(item.prerelease?'Предварительный релиз · ':'Стабильный релиз · ')+
-    (item.published_at||'Дата не указана'):'Выберите версию';
-  const safe=String(item?.url||'');
-  if(/^https:\/\/github\.com\/XTLS\/Xray-core\/releases\/tag\/[A-Za-z0-9._+%-]+$/i.test(safe)){
-   link.href=safe;link.hidden=false;
-  }else{link.removeAttribute('href');link.hidden=true}
-  accept.disabled=!item||
-    item.version.replace(/^v/,'')===String(installed||'').replace(/^v/,'');
- };
- select.addEventListener('change',update);
- search.addEventListener('input',()=>{
-  const query=search.value.trim().toLowerCase();
-  let visible=0;
-  for(const option of select.options){
-   const matches=!query||option.value.toLowerCase().includes(query);
-   option.hidden=!matches;option.disabled=!matches;
-   if(matches)visible++;
-  }
-  const picked=Array.from(select.options).find(o=>!o.disabled);
-  if(picked&&select.selectedOptions[0]?.disabled)select.value=picked.value;
-  if(!visible)select.selectedIndex=-1;
-  update();
-  if(!visible)info.textContent='Версии по запросу не найдены';
- });
- update();
- label.append(search,select);box.append(title,description,label,info,link,actions);
- actions.append(cancel,accept);dialog.append(box);document.body.append(dialog);
- let finished=false;
+ const accept=document.createElement('button');accept.type='button';accept.className='btn';accept.textContent='Установить версию';accept.disabled=true;
+ actions.append(cancel,accept);box.append(title,description,search,status,list,info,link,actions);dialog.append(box);document.body.append(dialog);
+ let finished=false,releases=[],selected='';
  const finish=v=>{if(finished)return;finished=true;resolve(v);dialog.close();dialog.remove()};
- cancel.addEventListener('click',()=>finish(null));
- accept.addEventListener('click',()=>finish(select.value));
+ const render=()=>{
+  list.replaceChildren();
+  const query=search.value.trim().toLowerCase();
+  const matches=releases.filter(r=>r.version.toLowerCase().includes(query));
+  if(!matches.length){const empty=document.createElement('p');empty.className='xray-release-empty';empty.textContent='По вашему запросу версии не найдены';list.append(empty)}
+  for(const item of matches){
+   const installedHere=item.version.replace(/^v/,'')===String(installed||'').replace(/^v/,'');
+   const row=document.createElement('button');row.type='button';row.className='xray-release-row'+(selected===item.version?' is-selected':'');
+   row.setAttribute('role','radio');row.setAttribute('aria-checked',String(selected===item.version));
+   const name=document.createElement('strong');name.textContent=item.version;
+   const meta=document.createElement('span');meta.className='xray-release-meta';meta.textContent=installedHere?'Установлена':item.prerelease?'Предварительная':'Стабильная';
+   row.append(name,meta);row.addEventListener('click',()=>{selected=item.version;render()});list.append(row);
+  }
+  const chosen=releases.find(r=>r.version===selected);
+  const installedChosen=selected.replace(/^v/,'')===String(installed||'').replace(/^v/,'');
+  accept.disabled=!chosen||installedChosen;
+  info.textContent=chosen?(chosen.prerelease?'Предварительный релиз':'Стабильный релиз')+' · '+(chosen.published_at||'Дата не указана'):'Выберите версию из списка';
+  const url=String(chosen?.url||'');
+  if(/^https:\/\/github\.com\/XTLS\/Xray-core\/releases\/tag\/[A-Za-z0-9._+%-]+$/i.test(url)){link.href=url;link.hidden=false}
+  else{link.removeAttribute('href');link.hidden=true}
+ };
+ search.addEventListener('input',render);
+ cancel.addEventListener('click',()=>finish(null));accept.addEventListener('click',()=>finish(selected));
  dialog.addEventListener('cancel',e=>{e.preventDefault();finish(null)});
  dialog.addEventListener('click',e=>{if(e.target===dialog)finish(null)});
- dialog.showModal();select.focus();
+ dialog.showModal();
+ Promise.resolve().then(load).then(result=>{
+  if(finished)return;
+  installed=result.installed||installed;releases=(result.releases||[]).filter(r=>/^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/.test(r.version));
+  status.remove();search.disabled=false;
+  if(!releases.length){info.textContent='Не удалось получить список релизов. Повторите попытку.';return}
+  selected=releases.find(r=>r.version.replace(/^v/,'')===String(installed||'').replace(/^v/,''))?.version||releases.find(r=>!r.prerelease)?.version||releases[0].version;
+  description.textContent='Текущая версия: '+(installed||'неизвестно')+' · Установка может прервать соединения.';
+  render();search.focus();
+ }).catch(error=>{if(finished)return;status.remove();info.textContent='Не удалось загрузить версии: '+(error.message||'ошибка сети');});
 });
 const confirmBox=(h,ok,fn)=>{CF=fn;modal(`<div class="box"><h2>${h}</h2><div class="act"><button class="gh" data-x>Отмена</button><button class="btn" data-cf>${ok}</button></div></div>`)};
 let tt;const toast=(m,al,fn)=>{
@@ -3072,14 +3064,14 @@ document.addEventListener('click',async e=>{
     if(b.dataset.loading==='1')return;
     b.dataset.loading='1';b.disabled=true;
     try{
-      const runtime=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/runtime');
-      if(!runtime.connected||!/^control-v(?:3|4)[.]/.test(String(runtime.version||''))){
-        throw new Error('Для выбора версии требуется управляющий агент control-v3. Обновите агент ноды.');
-      }
-      const catalog=await backendRequest('/api/v1/nodes/xray-releases');
-      const releases=Array.isArray(catalog.items)?catalog.items:[];
-      if(!releases.length)throw new Error('Не удалось получить официальные релизы Xray.');
-      const version=await selectNodeXrayRelease(node,releases,runtime.xrayVersion);
+      const version=await selectNodeXrayRelease(node,async()=>{
+        const runtime=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/runtime');
+        if(!runtime.connected||!/^control-v(?:3|4)[.]/.test(String(runtime.version||''))){
+          throw new Error('Для выбора версии требуется управляющий агент control-v3. Обновите агент ноды.');
+        }
+        const catalog=await backendRequest('/api/v1/nodes/xray-releases');
+        return {installed:runtime.xrayVersion,releases:Array.isArray(catalog.items)?catalog.items:[]};
+      });
       if(!version)return;
       const confirmed=await panelConfirm(
         'Установить Xray '+version+' на «'+node.name+'»? Управляемый Docker-агент проверит конфигурацию и при ошибке попытается восстановить предыдущий образ. Активные подключения могут прерваться.',
