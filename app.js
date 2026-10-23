@@ -455,7 +455,7 @@ const selectNodeXrayRelease=(node,releases,installed)=>new Promise(resolve=>{
   if(!/^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/.test(r.version))continue;
   const opt=document.createElement('option');opt.value=r.version;
   opt.textContent=r.version+(r.prerelease?' · Pre-release':' · Stable')+
-    (r.version===installed?' · Установлена':'');
+    (r.version.replace(/^v/,'')===String(installed||'').replace(/^v/,'')?' · Установлена':'');
   select.append(opt);
  }
  const info=document.createElement('p');info.className='xray-release-info';
@@ -471,7 +471,8 @@ const selectNodeXrayRelease=(node,releases,installed)=>new Promise(resolve=>{
   if(/^https:\/\/github\.com\/XTLS\/Xray-core\/releases\/tag\/[A-Za-z0-9._+%-]+$/i.test(safe)){
    link.href=safe;link.hidden=false;
   }else{link.removeAttribute('href');link.hidden=true}
-  accept.disabled=!item||item.version===installed;
+  accept.disabled=!item||
+    item.version.replace(/^v/,'')===String(installed||'').replace(/^v/,'');
  };
  select.addEventListener('change',update);
  search.addEventListener('input',()=>{
