@@ -178,7 +178,9 @@ systemctl daemon-reload
 systemctl enable --now xmesh-node-control.timer
 
 systemctl daemon-reload
-systemctl enable --now xmesh-node-metrics.timer
+# Restart an existing timer so upgrades immediately pick up the new cadence.
+systemctl enable xmesh-node-metrics.timer
+systemctl restart xmesh-node-metrics.timer
 
 echo "XMesh node metrics agent installed."
 echo "Node ID: $NODE_ID"
