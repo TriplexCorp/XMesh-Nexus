@@ -52,6 +52,7 @@ if ! id -u xmesh-metrics >/dev/null 2>&1; then
 fi
 install -d -o root -g xmesh-metrics -m 0750 /etc/xmesh-node-metrics
 install -d -o xmesh-metrics -g xmesh-metrics -m 0700 /var/lib/xmesh-node-metrics
+install -d -o root -g root -m 0700 /var/lib/xmesh-node-control
 cat > /etc/xmesh-node-metrics.env <<EOF
 XMESH_API_URL=$API_URL
 XMESH_NODE_ID=$NODE_ID
@@ -156,7 +157,7 @@ ProtectKernelTunables=true
 ProtectControlGroups=true
 RestrictSUIDSGID=true
 LockPersonality=true
-ReadWritePaths=/run -/var/lib/xmesh-xray-sync
+ReadWritePaths=/run -/var/lib/xmesh-xray-sync /var/lib/xmesh-node-control
 EOF
 
 cat > /etc/systemd/system/xmesh-node-control.timer <<'EOF'
