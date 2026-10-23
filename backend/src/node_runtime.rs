@@ -314,9 +314,7 @@ fn provision_vless_users(config:&mut Value,users:&[Value],squads:&[Value],now_ms
         for squad in squads {
             let selected=squad.get("inb").and_then(Value::as_array)
                 .is_some_and(|tags|tags.iter().any(|item|item.as_str()==Some(tag)));
-            if selected {
-                if let Some(id)=squad.get("id").and_then(Value::as_i64){allowed.insert(id);}
-            }
+            if selected && let Some(id)=squad.get("id").and_then(Value::as_i64){allowed.insert(id);}
         }
         let mut entries=Vec::new();
         let mut seen=std::collections::HashSet::new();
