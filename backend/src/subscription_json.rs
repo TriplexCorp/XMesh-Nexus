@@ -67,18 +67,23 @@ pub(crate) fn build(mut proxies:Vec<Value>,setting:&Value)->Result<Value,String>
     if proxies.is_empty(){return Err("Нет доступных клиентских подключений".into())}
     if proxies.len()>256{return Err("Превышен лимит подключений в одной подписке".into())}
     let opts=setting.get("subscriptionJson").unwrap_or(&Value::Null);
-    let dns_mode=option(opts,"dns",&["cloudflare","yandex","system"],"cloudflare");
+    let dns_mode=option(opts,"dns",&["cloudflare","cloudflare_doh","yandex","system"],"cloudflare");
+    // Plain-IP Cloudflare DNS is the compatibility default: no DoH bootstrap
+    // hostname or TLS dependency during initial connectivity. Existing saved
+    // "cloudflare" selections also migrate to this reliable mode.
+    // IP-addressed DoH is a separate explicit opt-in, avoiding bootstrap loops.
     let dns_server=match dns_mode {
+        "cloudflare_doh"=>"https://1.1.1.1/dns-query",
         "yandex"=>"https://common.dot.dns.yandex.net/dns-query",
         "system"=>"localhost",
-        _=>"https://cloudflare-dns.com/dns-query"
+        _=>"1.1.1.1"
     };
     let query_strategy=option(opts,"queryStrategy",&["UseIPv4","UseIPv6","UseIP"],"UseIPv4");
     let routing_strategy=option(opts,"routingStrategy",&["AsIs","IPIfNonMatch","IPOnDemand"],"IPIfNonMatch");
     let balance=option(opts,"balance",&["leastPing","roundRobin","random","off"],"leastPing");
     let smart=enabled(opts,"smart",true);
     let sniffing=enabled(opts,"sniffing",true);
-    let dns_out=enabled(opts,"dnsRouting",true);
+    let dns_out=enabled(opts,"dnsRouting",false);
     let socks_port=port(opts,"socksPort",10808);
     let http_port=port(opts,"httpPort",10809);
     if socks_port==http_port{return Err("Локальные SOCKS и HTTP порты совпадают".into())}
@@ -192,7 +197,7 @@ pub(crate) fn validate_settings(settings:&Value)->Result<(),String>{
  if object.len()>16{return Err("Too many JSON Engine settings".into())}
  for (key,value) in object{
   match key.as_str(){
-   "dns"=>{if !["cloudflare","yandex","system"].contains(&value.as_str().unwrap_or("")){return Err("Unsupported DNS provider".into())}},
+   "dns"=>{if !["cloudflare","cloudflare_doh","yandex","system"].contains(&value.as_str().unwrap_or("")){return Err("Unsupported DNS provider".into())}},
    "queryStrategy"=>{if !["UseIPv4","UseIPv6","UseIP"].contains(&value.as_str().unwrap_or("")){return Err("Invalid DNS query strategy".into())}},
    "routingStrategy"=>{if !["AsIs","IPIfNonMatch","IPOnDemand"].contains(&value.as_str().unwrap_or("")){return Err("Invalid routing strategy".into())}},
    "balance"=>{if !["leastPing","roundRobin","random","off"].contains(&value.as_str().unwrap_or("")){return Err("Invalid balancer strategy".into())}},
@@ -261,6 +266,39 @@ mod tests{
   let c=build(vec![outbound("PL")],&json!({})).unwrap();
   assert!(c["routing"]["rules"][3]["outboundTag"].as_str().unwrap().starts_with("xmesh-PL-0001"));
   assert!(c.get("observatory").is_none());
+ }
+ #[test] fn default_json_has_working_dns_and_fails_closed_to_proxy(){
+  let c=build(vec![outbound("NL")],&json!({})).unwrap();
+  assert_eq!(c["dns"]["servers"][0],"1.1.1.1");
+  assert_eq!(c["routing"]["rules"].as_array().unwrap().len(),3);
+  assert_eq!(c["routing"]["rules"][2]["outboundTag"],"xmesh-NL-0001");
+  assert_eq!(c["routing"]["rules"][2]["inboundTag"],json!(["socks","http"]));
+  assert!(!c["outbounds"].as_array().unwrap().iter().any(|o|o["tag"]=="dns-out"));
+  assert!(!c["routing"]["rules"].as_array().unwrap().iter().any(|r|
+    r.get("outboundTag")==Some(&json!("direct"))&&r.as_object().is_some_and(|m|m.len()==2)
+  ));
+ }
+ #[test] fn old_cloudflare_dns_selection_is_migrated_away_from_hostname_doh(){
+  let c=build(vec![outbound("NL")],&json!({"subscriptionJson":{"dns":"cloudflare"}})).unwrap();
+  assert_eq!(c["dns"]["servers"][0],"1.1.1.1");
+ }
+ #[test] fn doh_can_be_enabled_without_dns_bootstrap_hostname(){
+  let c=build(vec![outbound("NL")],&json!({"subscriptionJson":{"dns":"cloudflare_doh"}})).unwrap();
+  assert_eq!(c["dns"]["servers"][0],"https://1.1.1.1/dns-query");
+  assert_eq!(c["routing"]["rules"][2]["outboundTag"],"xmesh-NL-0001");
+ }
+ #[test] fn explicit_dns_interception_keeps_separate_proxy_fallback(){
+  let c=build(vec![outbound("NL")],&json!({"subscriptionJson":{
+    "dns":"cloudflare","dnsRouting":true}})).unwrap();
+  assert_eq!(c["dns"]["servers"][0],"1.1.1.1");
+  assert_eq!(c["routing"]["rules"][2]["outboundTag"],"dns-out");
+  assert_eq!(c["routing"]["rules"][3]["outboundTag"],"xmesh-NL-0001");
+  assert!(c["outbounds"].as_array().unwrap().iter().any(|o|o["tag"]=="dns-out"));
+ }
+ #[test] fn multiserver_fallback_uses_smart_not_direct(){
+  let c=build(vec![outbound("NL"),outbound("DE")],&json!({})).unwrap();
+  assert_eq!(c["routing"]["rules"][2]["balancerTag"],"SMART");
+  assert!(c["routing"]["rules"][2].get("outboundTag").is_none());
  }
  #[test] fn insecure_public_vless_is_rejected(){
   let mut x=outbound("PL");x["streamSettings"]["security"]=json!("none");
