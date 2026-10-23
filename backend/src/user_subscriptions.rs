@@ -196,6 +196,10 @@ async fn record(state:&AppState,id:i64)->Result<Value,ApiError>{
  let row=sqlx::query("SELECT data FROM panel_records WHERE collection='users' AND id=$1")
   .bind(id).fetch_optional(&state.pool).await?.ok_or_else(||ApiError::new(StatusCode::NOT_FOUND,"User not found"))?;
  let mut user:Value=row.try_get("data")?;
+ // panel_records.id is authoritative; older user JSON documents may not
+ // contain an id field. IP rotation must never depend on that optional copy.
+ if !user.is_object(){return Err(ApiError::new(StatusCode::INTERNAL_SERVER_ERROR,"Invalid user record"))}
+ user["id"]=json!(id);
  let measured=crate::user_metered_bytes(&state.pool,id).await?;
  crate::add_metered_usage(&mut user,measured);
  Ok(user)
@@ -312,10 +316,14 @@ async fn apply_ip_rotation(
  state:&AppState, user:&Value, node:&Value, outbound:&mut Value, enabled:bool
 )->Result<(),ApiError>{
  if !enabled || node.get("rotationEnabled").and_then(Value::as_bool)!=Some(true){return Ok(())}
- let node_id=node.get("id").and_then(Value::as_i64).filter(|id|*id>0)
-   .ok_or_else(||ApiError::new(StatusCode::SERVICE_UNAVAILABLE,"Invalid rotation node identity"))?;
- let user_id=user.get("id").and_then(Value::as_i64).filter(|id|*id>0)
-   .ok_or_else(||ApiError::new(StatusCode::SERVICE_UNAVAILABLE,"Invalid subscription user identity"))?;
+ let Some(node_id)=node.get("id").and_then(record_id) else {
+  tracing::warn!("Skipping IP rotation: node record has no valid id");
+  return Ok(());
+ };
+ let Some(user_id)=user.get("id").and_then(record_id) else {
+  tracing::warn!(node_id,"Skipping IP rotation: user record has no valid id");
+  return Ok(());
+ };
  // Rotation is an optional delivery enhancement. A stale cursor table or a
  // transient database failure must not take the entire public subscription
  // offline. Preserve the already validated host address on failure.
