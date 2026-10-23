@@ -203,7 +203,7 @@ const ENT={
     {k:'sni',l:'SNI (переопределение)',ph:'Из inbound, если пусто'},
     {k:'host',l:'HTTP Host (переопределение)',ph:'Из inbound, если пусто'},
     {k:'path',l:'Путь транспорта (переопределение)',ph:'Из inbound, если пусто'},
-    {k:'fp',l:'uTLS fingerprint',t:'sel',o:[['','По умолчанию (chrome)'],['chrome','Chrome'],['firefox','Firefox'],['safari','Safari'],['ios','iOS'],['random','Random']]},
+    {k:'fp',l:'uTLS fingerprint',t:'sel',o:[['','По умолчанию (chrome)'],...Array.from(new Set([...XRAY_FP_RECOMMENDED,...XRAY_FP_MODERN,...XRAY_FP_OTHER])).map(fp=>[fp,fp])]},
     {k:'publicKey',l:'REALITY publicKey (клиентский)',ph:'Если отсутствует в inbound'},
     {k:'shortId',l:'REALITY shortId',ph:'Первый ShortID inbound'},
     {k:'spiderX',l:'REALITY spiderX',ph:'/'},
