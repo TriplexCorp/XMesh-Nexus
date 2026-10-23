@@ -19,6 +19,46 @@ flag-icons@7.5.0 (MIT) в /app/static/flags/. В браузере они заг�
 исключительно с /flags/<iso>.svg на домене панели, без сторонних CDN.
 Повторная загрузка извне нужна только при сборке нового Docker-образа.
 
+
+## Персональный учёт: обязательное обновление каждой ноды (октябрь 2026)
+
+Сетевые RX/TX ноды — **не** расход пользователя. Персональный трафик поступает
+из Xray StatsService с отдельным email-счётчиком для каждого пользователя/inbound.
+На управляемой ноде `xmesh-node-user-meter.timer` каждые 10 секунд запускает
+root-only сборщик `xmesh-policy-guard.py sample`: он запрашивает StatsService внутри
+`xmesh-managed-xray`, накапливает монотонные значения в
+`/var/lib/xmesh-xray-sync/policy-usage.json` и публикует доступный только
+группе `xmesh-metrics` снимок `/run/xmesh-node-user-metrics.json`.
+Снимки не считаются подтверждёнными, если старше 30 секунд.
+`xmesh-node-metrics` передаёт их подписанным запросом; PostgreSQL считает
+положительные дельты и не списывает трафик VPS на отдельных пользователей.
+
+После обновления панели **на каждой ноде** необходимо переустановить
+управляющий агент без смены Ed25519-ключа:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy/update-node-control-agent.sh | sudo bash
+sudo systemctl start xmesh-node-user-meter.service
+sudo systemctl status xmesh-node-user-meter.timer xmesh-node-metrics.timer --no-pager
+sudo journalctl -u xmesh-node-user-meter.service -u xmesh-node-metrics.service -n 80 --no-pager
+```
+
+Проверка сырого счётчика Xray на ноде (не публикуйте вывод без необходимости,
+он содержит внутренние идентификаторы пользователей):
+
+```bash
+sudo docker exec xmesh-managed-xray xray api statsquery --server=127.0.0.1:10085 -pattern 'user>>>xmesh-u'
+```
+
+Наличие статуса `verified` или `direct` означает, что агенты смогли
+собрать текущий снимок. `unavailable` означает, что метрики ноды отправляются,
+но персональные Xray-счётчики недоступны. **Отсутствие персональных записей не
+является нулевым расходом**: Xray обычно создаёт user-счётчики только после
+фактического трафика. Первая отправка в PostgreSQL задаёт исходный baseline;
+исторический расход до начала подтверждённого сбора не восстанавливается
+искусственно. Далее трафик сохраняется при перезапуске контейнера, а одинаковые
+повторные снимки не удваивают счётчики.
+
 ## Персональные счётчики Xray по inbound
 
 Панель создаёт отдельный Xray UUID для каждого пользователя на сервере.
