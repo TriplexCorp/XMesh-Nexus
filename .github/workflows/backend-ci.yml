@@ -108,6 +108,8 @@ jobs:
         run: python3 scripts/test-xray-stats-collector.py
       - name: Check managed Xray update safety and SQLx migration uniqueness
         run: node scripts/check-managed-xray-update.js
+      - name: Ensure client fingerprint is configured at hosts, not users
+        run: node scripts/check-user-fingerprint-ownership.js
       - name: Verify opt-in balancers and separate settings workspace
         run: node scripts/check-balancers-workspace.js
       - name: Check live node Xray version and status feedback
