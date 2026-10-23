@@ -75,6 +75,11 @@ fn secure_proxy(outbound:&Value)->bool {
         "hysteria"=>security=="tls" && settings["version"]==2
             && outbound["streamSettings"]["hysteriaSettings"]["auth"]
                 .as_str().is_some_and(|s|!s.is_empty()),
+        "masque"=>security=="tls"
+            && outbound["streamSettings"]["masqueSettings"]["user"]
+                .as_str().is_some_and(|s|!s.is_empty())
+            && outbound["streamSettings"]["masqueSettings"]["pass"]
+                .as_str().is_some_and(|s|!s.is_empty()),
         _=>false
     }
 }
@@ -352,7 +357,7 @@ pub(crate) fn build_feed(proxies:Vec<Value>,settings:&Value)->Result<Value,Strin
     // must not leak into a manually selected combination.
     let first=config["outbounds"][0]["tag"].clone();
     let tags:Vec<Value>=config["outbounds"].as_array().unwrap().iter()
-     .filter(|p|["vless","vmess","trojan","shadowsocks","hysteria"].contains(&p["protocol"].as_str().unwrap_or(""))).map(|p|p["tag"].clone()).collect();
+     .filter(|p|["vless","vmess","trojan","shadowsocks","hysteria","masque"].contains(&p["protocol"].as_str().unwrap_or(""))).map(|p|p["tag"].clone()).collect();
     let strategy=row["strategy"].as_str().unwrap_or("random");
     let mut balancer=json!({
      "tag":row["tag"],"selector":tags,
