@@ -169,7 +169,7 @@ pub(crate) fn build(mut proxies:Vec<Value>,setting:&Value)->Result<Value,String>
     }else{
         setting.get("subscriptionName").and_then(Value::as_str)
             .filter(|s|!s.is_empty() && s.chars().count()<=100)
-            .unwrap_or("XMesh SMART").to_owned()
+            .unwrap_or(if smart && tags.len()>1 && balance!="off" {"XMesh SMART"}else{"XMesh Servers"}).to_owned()
     };
     let mut config=json!({
         "remarks":display_name,
