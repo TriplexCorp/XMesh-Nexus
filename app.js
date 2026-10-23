@@ -235,7 +235,13 @@ const ENT={
     cols:[['Название',r=>'<b>'+esc(r.remark)+'</b>'],['Адрес',r=>esc(r.address)+':'+esc(r.port)],['Профиль / inbound',r=>{
       const p=DB.profiles.find(p=>String(p.id)===String(r.profileId));
       return (p?esc(p.name)+' · ':'')+chip(esc(r.tag),tcol(r.tag));
-    }],['Привязки',r=>Array.isArray(r.nodes)&&r.nodes.length?r.nodes.map(i=>flagView(DB.nodes.find(n=>String(n.id)===String(i))?.flag)).join(' '):'не заданы'],['Вкл.',swc('hosts')]]},
+    }],['Привязки',r=>Array.isArray(r.nodes)&&r.nodes.length?r.nodes.map(i=>flagView(DB.nodes.find(n=>String(n.id)===String(i))?.flag)).join(' '):'не заданы'],
+      ['Готовность',r=>{const p=hostProfile(r.profileId),i=p&&hostInbound(p.id,r.tag);
+        if(!p||!i)return chip('Профиль / inbound отсутствует','--er');
+        if(!Array.isArray(r.nodes)||!r.nodes.length||r.nodes.some(id=>!DB.nodes.some(n=>String(n.id)===String(id)&&String(n.profileId)===String(p.id)&&!n.disabled)))return chip('Ошибка привязки нод','--er');
+        if(i.streamSettings?.security==='reality'&&!(r.publicKey||i.publicKey||i.streamSettings?.realitySettings?.publicKey))return chip('Нет REALITY publicKey','--wr');
+        return chip(r.disabled?'Выключен':'Настроен',r.disabled?'--mu':'--ok');
+      }],['Вкл.',swc('hosts')]]},
   nodes:{t:'Узлы',nw:'Узел',s:'id',fs:[{k:'name',l:'Название',req:1},{k:'hosting',l:'Хостинг (необязательно)',h:'Например: Cloudrix, Hetzner, OVH. Отображается в карточке узла.'},{k:'flag',l:'Страна и флаг',t:'country'},{k:'addr',l:'Адрес',req:1},{k:'port',l:'Порт ноды',t:'num',req:1},{k:'profileId',l:'XRAY STUDIO',t:'sel',o:()=>DB.profiles.map(p=>[p.id,p.name])},{k:'xrayLocalPort',l:'Локальный порт Xray',t:'num',h:'Планируемый порт Xray на 127.0.0.1; не является публичным портом ноды. Настройка пока не применяется автоматически.'},{k:'mult',l:'Коэффициент трафика',t:'num',h:'1 — без изменений, 2 — считать вдвое'},{k:'limit',l:'Лимит трафика, ГБ',t:'num',h:'0 — без лимита'},{k:'resetDay',l:'День сброса счётчика',t:'num'},
     {k:'billingPrice',l:'Стоимость аренды',t:'num'},
     {k:'billingCurrency',l:'Валюта',t:'sel',o:[['EUR','EUR · €'],['USD','USD · $'],['RUB','RUB · ₽'],['PLN','PLN · zł'],['GBP','GBP · £']]},
