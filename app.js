@@ -172,11 +172,18 @@ const NAV=[['Обзор',[['home','home','Дашборд',1],['statistics','char
 const FLAT=NAV.flatMap(g=>g[1]);
 const swc=k=>r=>`<label class="sw"><input type="checkbox" data-tg="${k}:${r.id}" ${r.disabled?'':'checked'} aria-label="Включено"><span></span></label>`;
 const nodeRotationIPs = node => String(node?.rotationIps||'').split(/\r?\n/).map(ip=>ip.trim()).filter(Boolean);
+const nodeIpValid=address=>{
+  const ip=String(address||'').trim();
+  if(/^((25[0-5]|2[0-4]\\d|1?\\d?\\d)\\.){3}(25[0-5]|2[0-4]\\d|1?\\d?\\d)$/.test(ip))return true;
+  if(!ip.includes(':')||!/^[0-9a-fA-F:.]+$/.test(ip))return false;
+  try{return new URL('http://['+ip+']/').hostname.startsWith('[')}catch{return false}
+};
 const nodeRotationValidate = data => {
   const ips=nodeRotationIPs(data);
   if(ips.length>64)return 'Можно добавить не более 64 IP-адресов.';
   if(new Set(ips).size!==ips.length)return 'В пуле ротации есть одинаковые IP-адреса.';
   if(ips.some(ip=>/\s/.test(ip)))return 'Введите каждый IP на отдельной строке, без порта и пробелов.';
+  if(ips.some(ip=>!nodeIpValid(ip)))return 'IP-пул принимает только корректные IPv4 и IPv6, по одному адресу на строку.';
   if(data.rotationEnabled&&ips.length<2)return 'Для включения ротации добавьте минимум два разных IP-адреса.';
   return '';
 };
@@ -1867,7 +1874,7 @@ document.addEventListener('input',e=>{
   const form=e.target.closest('form'),count=form?.querySelector('[data-node-pool-count]'),feedback=form?.querySelector('[data-node-pool-feedback]');
   const ips=String(e.target.value).split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
   if(count)count.textContent='Адресов: '+ips.length+' / 64';
-  if(feedback)feedback.textContent=ips.length>64?'Превышен лимит 64 адресов.':new Set(ips).size!==ips.length?'В пуле есть повторяющиеся адреса.':'';
+  if(feedback)feedback.textContent=ips.length>64?'Превышен лимит 64 адресов.':new Set(ips).size!==ips.length?'В пуле есть повторяющиеся адреса.':ips.some(ip=>!nodeIpValid(ip))?'Некорректный IPv4/IPv6: указывайте адреса без портов и доменов.':'';
 });
 document.addEventListener('click',async e=>{
   const g=s=>e.target.closest(s);let b;
