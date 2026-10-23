@@ -151,7 +151,7 @@ fn vless_outbound(user:&Value,inbound:&Value,host:&Value,device:&str)->Option<Va
  let mut transport=json!({});
  if let Some(config)=config{
   let fields=match network{
-   "xhttp"=>&["path","host","mode","xPaddingBytes","scMaxEachPostBytes","scMinPostsIntervalMs"][..],
+   "xhttp"=>&["path","host","mode","xPaddingBytes","xPaddingObfsMode","xPaddingKey","xPaddingHeader","xPaddingPlacement","xPaddingMethod","seqPlacement","seqKey","sessionIDPlacement","sessionIDKey","sessionIDTable","sessionIDLength","sessionPlacement","sessionKey","uplinkHTTPMethod","uplinkDataPlacement","uplinkDataKey","scMaxEachPostBytes","scMinPostsIntervalMs"][..],
    "ws"=>&["path"][..],
    "grpc"=>&["serviceName","multiMode"][..],
    _=>&[][..]
