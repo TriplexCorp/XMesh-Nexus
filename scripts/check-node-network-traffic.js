@@ -18,7 +18,7 @@ assert.match(api,/networkRxBytes/);
 assert.match(api,/networkTxBytes/);
 assert.match(app,/networkTotalBytes/);
 assert.match(app,/Трафик сети/);
-const section=app.slice(app.indexOf('async function nodesP()'),app.indexOf('\/\* ================= ДИАГНОСТИКА'));
+const section=app.slice(app.indexOf('async function nodesP()'),app.indexOf('/* ================= ДИАГНОСТИКА'));
 assert.doesNotMatch(section,/n\.used/,'Node traffic gauge must not use a static DB field');
 assert.match(migration,/node_id BIGINT PRIMARY KEY/);
 console.log('Node NIC RX/TX accounting and live UI: OK');
