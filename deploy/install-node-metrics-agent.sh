@@ -145,7 +145,7 @@ ExecStart=/usr/local/sbin/xmesh-node-control
 User=root
 Group=root
 UMask=0077
-TimeoutStartSec=65s
+TimeoutStartSec=175s
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
@@ -175,7 +175,8 @@ WantedBy=timers.target
 EOF
 
 systemctl daemon-reload
-systemctl enable --now xmesh-node-control.timer
+systemctl enable xmesh-node-control.timer
+systemctl restart xmesh-node-control.timer
 
 systemctl daemon-reload
 # Restart an existing timer so upgrades immediately pick up the new cadence.
