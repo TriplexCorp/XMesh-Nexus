@@ -2763,3 +2763,20 @@ dialog.user-modal .user-editor-actions{display:flex;align-items:center;justify-c
 dialog.user-modal .user-edit-dirty{font-size:.71rem;color:var(--wr)}
 dialog.user-modal .user-edit-dirty:empty{display:none}
 @media(max-width:500px){dialog.user-modal .user-edit-fields{grid-template-columns:minmax(0,1fr)}dialog.user-modal .user-edit-fields .user-notes-field{grid-column:1}}
+
+/* Three-column infrastructure workspace with room for long fields. */
+dialog.node-wide{width:min(1540px,calc(100vw - 2rem))!important;max-width:1540px!important}
+dialog.node-wide .node-form-layout{grid-template-columns:minmax(440px,1.4fr) minmax(300px,.9fr) minmax(300px,.9fr);gap:1.35rem}
+dialog.node-wide .node-main-section .node-form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+dialog.node-wide .node-billing-section{min-width:0;border:1px solid var(--ln);border-radius:var(--ui-radius);padding:1rem;background:color-mix(in srgb,var(--s2) 65%,var(--s1))}
+dialog.node-wide .node-billing-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.85rem}
+dialog.node-wide .node-billing-fields .f{min-width:0}
+dialog.node-wide .node-billing-fields .f:nth-last-child(-n+2){grid-column:1/-1}
+dialog.node-wide .node-billing-section input,dialog.node-wide .node-billing-section select{width:100%;min-width:0}
+.users-panel .users-advanced-filters{display:grid;grid-template-columns:repeat(5,minmax(130px,1fr)) auto;gap:.65rem;align-items:end;margin:0 0 1rem}
+.users-panel .users-advanced-filters label{display:grid;min-width:0;gap:.3rem;font-size:.74rem;color:var(--mu)}
+.users-panel .users-advanced-filters select{width:100%;min-width:0;min-height:2.3rem;border:1px solid var(--ln);border-radius:var(--ui-control-radius);background:var(--s2);color:var(--tx);padding:.4rem .55rem}
+.users-panel .users-advanced-filters button{min-height:2.3rem;white-space:nowrap}
+@media(max-width:1250px){dialog.node-wide .node-form-layout{grid-template-columns:repeat(2,minmax(0,1fr))}.users-panel .users-advanced-filters{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:850px){dialog.node-wide .node-form-layout{grid-template-columns:minmax(0,1fr)}.users-panel .users-advanced-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:500px){dialog.node-wide .node-main-section .node-form-grid,dialog.node-wide .node-billing-fields,.users-panel .users-advanced-filters{grid-template-columns:minmax(0,1fr)}}
