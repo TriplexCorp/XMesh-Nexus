@@ -62,6 +62,29 @@ fn secure_vless(outbound:&Value)->bool {
         _=>false
     }
 }
+fn secure_proxy(outbound:&Value)->bool {
+    let protocol=outbound["protocol"].as_str().unwrap_or("");
+    let security=outbound["streamSettings"]["security"].as_str().unwrap_or("none");
+    let settings=&outbound["settings"];
+    match protocol {
+        "vless"=>secure_vless(outbound),
+        "vmess"=> settings["id"].as_str().is_some_and(|s|!s.is_empty()),
+        "trojan"=> security!="none" && settings["password"].as_str().is_some_and(|s|!s.is_empty()),
+        "shadowsocks"=> settings["password"].as_str().is_some_and(|s|!s.is_empty())
+            && settings["method"].as_str().is_some_and(|s|!s.is_empty()),
+        "hysteria"=>security=="tls" && settings["version"]==2
+            && outbound["streamSettings"]["hysteriaSettings"]["auth"]
+                .as_str().is_some_and(|s|!s.is_empty()),
+        _=>false
+    }
+}
+fn proxy_address(outbound:&Value)->&str {
+    if outbound["protocol"]=="vless" {
+        outbound["settings"]["vnext"][0]["address"].as_str().unwrap_or("")
+    }else{
+        outbound["settings"]["address"].as_str().unwrap_or("")
+    }
+}
 /// The actual routing mode saved in SUBSCRIPTION STUDIO / Balancers.
 /// An absent setting does not implicitly turn SMART on when more nodes appear.
 pub(crate) fn smart_enabled(settings:&Value)->bool{
@@ -104,13 +127,10 @@ pub(crate) fn build(mut proxies:Vec<Value>,setting:&Value)->Result<Value,String>
             .filter(|c|!c.is_control()).take(100).collect()
     ).collect();
     for (i,outbound) in proxies.iter_mut().enumerate(){
-        if outbound["protocol"]!="vless"{
-            return Err("Неподдерживаемый протокол в клиентском JSON".into())
+        if !secure_proxy(outbound) {
+            return Err("Некорректные или недостаточно защищённые учётные данные прокси".into())
         }
-        if !secure_vless(outbound) {
-            return Err("Обнаружено VLESS-подключение без TLS/REALITY или VLESS Encryption".into())
-        }
-        let address=outbound["settings"]["vnext"][0]["address"].as_str().unwrap_or("");
+        let address=proxy_address(outbound);
         if address.is_empty(){return Err("Не указан публичный адрес сервера".into())}
         let code=country(outbound);
         // Xray routing tags are internal identifiers, never display labels.
@@ -332,7 +352,7 @@ pub(crate) fn build_feed(proxies:Vec<Value>,settings:&Value)->Result<Value,Strin
     // must not leak into a manually selected combination.
     let first=config["outbounds"][0]["tag"].clone();
     let tags:Vec<Value>=config["outbounds"].as_array().unwrap().iter()
-     .filter(|p|p["protocol"]=="vless").map(|p|p["tag"].clone()).collect();
+     .filter(|p|["vless","vmess","trojan","shadowsocks","hysteria"].contains(&p["protocol"].as_str().unwrap_or(""))).map(|p|p["tag"].clone()).collect();
     let strategy=row["strategy"].as_str().unwrap_or("random");
     let mut balancer=json!({
      "tag":row["tag"],"selector":tags,
