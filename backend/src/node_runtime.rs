@@ -88,7 +88,7 @@ pub async fn request_restart(
     let active=sqlx::query_scalar::<_,bool>(
         "SELECT EXISTS(SELECT 1 FROM node_runtime_heartbeats
          WHERE node_id=$1 AND received_at > NOW()-INTERVAL '90 seconds'
-           AND version LIKE 'control-v1%')"
+           AND (version LIKE 'control-v1%' OR version LIKE 'control-v2%'))"
     ).bind(node_id).fetch_one(&state.pool).await?;
     if !active {
         return Err(ApiError::new(StatusCode::CONFLICT,
