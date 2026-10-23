@@ -4052,3 +4052,81 @@ dialog#dlg.host-wide>form.box>.act{
     grid-template-columns:minmax(0,1fr);
   }
 }
+
+/* Host editor v4: truly horizontal three-column top + one compact bottom row. */
+@media(min-width:1180px){
+ dialog#dlg.host-wide{
+   width:min(1960px,calc(100vw - 32px))!important;
+   max-width:calc(100vw - 32px)!important;
+ }
+ dialog#dlg.host-wide .host-editor-layout{
+   grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.08fr);
+   grid-template-areas:"connect public preview" "overrides overrides overrides";
+   gap:14px;
+ }
+ dialog#dlg.host-wide .host-editor-layout>.host-connect-panel{
+   grid-area:connect;
+ }
+ dialog#dlg.host-wide .host-editor-layout>.host-public-panel{
+   grid-area:public;
+ }
+ dialog#dlg.host-wide .host-editor-layout>.host-editor-side{grid-area:preview}
+ dialog#dlg.host-wide .host-editor-layout>.host-editor-main{
+   display:flex;
+   flex-direction:column;
+   gap:11px;
+   padding:18px;
+   min-width:0;
+ }
+ dialog#dlg.host-wide .host-connect-fields,
+ dialog#dlg.host-wide .host-public-fields,
+ dialog#dlg.host-wide .host-assignment-fields{
+   display:grid;
+   grid-template-columns:repeat(2,minmax(0,1fr));
+   align-items:start;
+   gap:12px;
+   width:100%;
+ }
+ dialog#dlg.host-wide .host-connect-fields>[data-host-node-preset],
+ dialog#dlg.host-wide .host-connect-fields>.f:first-child,
+ dialog#dlg.host-wide .host-assignment-fields>.f:has([name="nodes"]){
+   grid-column:1/-1;
+ }
+ dialog#dlg.host-wide .host-editor-main .node-form-section-title:not(:first-child){
+   width:100%;
+   padding-top:12px;
+   border-top:1px solid var(--ln);
+ }
+ dialog#dlg.host-wide .host-editor-layout>.host-advanced-panel{grid-area:overrides;padding:18px}
+ dialog#dlg.host-wide .host-advanced-fields{
+   grid-template-columns:repeat(5,minmax(0,1fr));
+   gap:12px 14px;
+ }
+ dialog#dlg.host-wide .host-advanced-fields .f:has([name="publicKey"]),
+ dialog#dlg.host-wide .host-advanced-fields .f:has([name="clientEncryption"]){grid-column:span 2}
+ dialog#dlg.host-wide .host-advanced-actions{padding-top:10px}
+ dialog#dlg.host-wide .host-editor-layout .node-ip-hint{font-size:.76rem}
+}
+@media(min-width:901px) and (max-width:1179px){
+ dialog#dlg.host-wide .host-editor-layout{
+   grid-template-columns:repeat(2,minmax(0,1fr));
+   grid-template-areas:"connect public" "preview preview" "overrides overrides";
+ }
+ dialog#dlg.host-wide .host-connect-panel{grid-area:connect}
+ dialog#dlg.host-wide .host-public-panel{grid-area:public}
+ dialog#dlg.host-wide .host-editor-layout>.host-editor-side{grid-area:preview}
+ dialog#dlg.host-wide .host-connect-fields,
+ dialog#dlg.host-wide .host-public-fields,
+ dialog#dlg.host-wide .host-assignment-fields{
+   display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px
+ }
+}
+@media(max-width:900px){
+ dialog#dlg.host-wide .host-editor-layout{
+   grid-template-columns:minmax(0,1fr);
+   grid-template-areas:"connect" "public" "preview" "overrides";
+ }
+ dialog#dlg.host-wide .host-connect-panel{grid-area:connect}
+ dialog#dlg.host-wide .host-public-panel{grid-area:public}
+ dialog#dlg.host-wide .host-editor-layout>.host-editor-side{grid-area:preview}
+}
