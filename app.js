@@ -1121,7 +1121,23 @@ async function homeP(){
     ['04','Сквад','Объедините inbound в группы доступа.','Создать сквад','squads']
   ];
   const setupHtml=setup.map(([num,title,desc,btn,key])=>`<article class="setup-step"><span class="stepnum">ШАГ ${num}</span><h3>${title}</h3><p>${desc}</p><button class="gh sm" data-ne="${key}">${ic('plus')}${btn}</button></article>`).join('');
-  const nodeRows=DB.nodes.length?DB.nodes.slice(0,6).map(n=>`<div class="rowi"><span class="fg" style="font-size:1.25rem">${flagView(n.flag)}</span><div><b>${esc(n.name)}</b><br><small class="mu">${esc(n.addr)}${n.port?':'+esc(n.port):''}</small></div>${chip(NS[nstat(n)]?.[0]||'Не проверен',NS[nstat(n)]?.[1]||'--mu')}</div>`).join(''):'<div class="empty"><b>Узлов пока нет</b><span>Добавьте первый сервер, чтобы начать настройку.</span><button class="btn sm" data-ne="nodes">'+ic('plus')+'Добавить узел</button></div>';
+  // Dashboard health comes from the agent runtime, never the legacy persisted node.state.
+  const homeRuntime=new Map(await Promise.all(DB.nodes.slice(0,6).map(async n=>{
+    try{return [Number(n.id),await backendRequest('/api/v1/nodes/'+encodeURIComponent(n.id)+'/runtime')]}
+    catch(_){return [Number(n.id),null]}
+  })));
+  const homeNodeStatus=n=>{
+    if(n.disabled)return ['Отключён','--mu'];
+    const runtime=homeRuntime.get(Number(n.id));
+    if(runtime?.connected===true){
+      if(runtime.xrayRunning===false)return ['Xray остановлен','--wr'];
+      if(runtime.routerRunning===false)return ['Маршрутизатор остановлен','--wr'];
+      return ['Агент онлайн','--ok'];
+    }
+    if(runtime?.connected===false)return ['Нет связи с агентом','--er'];
+    return ['Статус неизвестен','--mu'];
+  };
+  const nodeRows=DB.nodes.length?DB.nodes.slice(0,6).map(n=>`<div class="rowi"><span class="fg" style="font-size:1.25rem">${flagView(n.flag)}</span><div><b>${esc(n.name)}</b><br><small class="mu">${esc(n.addr)}${n.port?':'+esc(n.port):''}</small></div>${chip(...homeNodeStatus(n))}</div>`).join(''):'<div class="empty"><b>Узлов пока нет</b><span>Добавьте первый сервер, чтобы начать настройку.</span><button class="btn sm" data-ne="nodes">'+ic('plus')+'Добавить узел</button></div>';
   const userRows=DB.users.length?DB.users.slice(0,6).map(u=>`<div class="rowi"><button class="who" data-uo="${u.id}"><span class="av" style="${userAvatarStyle(u)}">${esc((u.username||'?')[0].toUpperCase())}</span><span>${esc(u.username)}</span></button>${chip(STM[st(u)]?.[0]||st(u),'--mu')}</div>`).join(''):'<div class="empty"><b>Пользователей пока нет</b><span>Создайте сквад перед добавлением первого пользователя.</span><button class="gh sm" data-ne="squads">'+ic('plus')+'Создать сквад</button></div>';
   return [`<section class="card home-overview"><div class="hd"><div><p class="note">ИНФРАСТРУКТУРА / ОБЗОР</p><h3>${firstRun?'Панель готова к настройке':'Обзор инфраструктуры'}</h3><p>${firstRun?'Добавьте свои серверы и конфигурации. Демонстрационных пользователей, узлов и фиктивной телеметрии здесь нет.':'Сводка по объектам, которые вы добавили в панель.'}</p></div><div class="setting-control"><a class="gh sm" href="#set" style="text-decoration:none;color:inherit">${ic('sliders')}Внешний вид</a></div></div><div class="home-counts">${counts.map(([label,value,glyph])=>`<div class="home-count"><span class="home-count-glyph" aria-hidden="true">${ic(glyph)}</span><b>${value}</b><span class="home-count-label">${label}</span></div>`).join('')}</div></section>
   <section class="card traffic-card" id="traffic-card">
