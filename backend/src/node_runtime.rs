@@ -111,7 +111,7 @@ pub async fn request_restart(
     let row=sqlx::query_scalar::<_,i64>(
         "INSERT INTO node_restart_commands(node_id,requested_by)
          VALUES($1,$2) ON CONFLICT DO NOTHING RETURNING id"
-    ).bind(node_id).bind(&actor.username).bind(target).fetch_optional(&state.pool).await?
+    ).bind(node_id).bind(&actor.username).fetch_optional(&state.pool).await?
       .ok_or_else(||ApiError::new(StatusCode::CONFLICT,"Узел уже выполняет команду управления."))?;
     crate::audit(&state.pool,&actor.username,"node.restart.requested",Some("nodes"),Some(node_id),
         json!({"commandId":row})).await;
