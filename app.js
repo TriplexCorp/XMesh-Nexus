@@ -1696,13 +1696,19 @@ async function simple(ks){const h=await Promise.all(ks.map(crudCard));return [h.
 function entForm(k,id){const e=ENT[k],o=id?DB[k].find(x=>x.id==id):e.def?e.def():{};
   const standardFields=e.fs.map(f=>field(f,k==='admins'&&f.k==='password'?'':o[f.k])).join('');
   const rotationFields=e.fs.filter(f=>['rotationEnabled','rotationIps'].includes(f.k)).map(f=>field(f,o[f.k])).join('');
-  const billingFields=e.fs.filter(f=>f.k.startsWith('billing')).map(f=>field(f,o[f.k])).join('');
+  const billingFields=e.fs.filter(f=>f.k.startsWith('billing')).map(f=>f.k==='billingDueDate'
+    ?'<div class="f node-date-field"><span>Оплачено до</span><button type="button" class="user-date-trigger" data-node-date-open aria-expanded="false">'+ic('calendar')+'<span data-node-date-label>'+esc(o.billingDueDate?userDateLabel(o.billingDueDate):'Выберите дату')+'</span>'+ic('chevronRight')+'</button><input type="hidden" name="billingDueDate" value="'+esc(o.billingDueDate||'')+'"><div class="user-date-calendar" data-node-date-calendar hidden></div></div>'
+    :field(f,o[f.k])).join('');
+  const nodeCoreFields=e.fs.filter(f=>!f.k.startsWith('billing')&&!['rotationEnabled','rotationIps'].includes(f.k));
+  const nodeMainFields=nodeCoreFields.map(f=>f.k==='addr'
+    ?'<div class="node-address-port">'+field(f,o[f.k])+field(nodeCoreFields.find(x=>x.k==='port'),o.port)+'</div>'
+    :f.k==='port'?'':field(f,o[f.k])).join('');
   const userOptions=DB.users.filter(u=>st(u)==='ACTIVE').map(u=>`<option value="${u.id}">${esc(u.username)}</option>`).join('');
   const rotationProbe=id&&o.rotationEnabled
     ?`<div class="node-rotation-probe"><label class="f"><span>Проверка на пользователе</span><select data-node-rotation-user>${userOptions||'<option value="">Нет активных пользователей</option>'}</select></label><button type="button" class="gh sm" data-node-rotation-probe="${id}" ${userOptions?'':'disabled'}>${ic('redo')}Получить следующий IP</button><output data-node-rotation-result aria-live="polite"></output><small>Тест изменяет счётчик ротации этого пользователя. Выдача подписок будет подключена отдельно.</small></div>`
     :'';
   const fields=k==='nodes'
-    ?'<div class="node-form-layout"><section class="node-main-section"><div class="node-form-section-title">Основные параметры</div><div class="node-form-grid">'+e.fs.filter(f=>!f.k.startsWith('billing')&&!['rotationEnabled','rotationIps'].includes(f.k)).map(f=>field(f,o[f.k])).join('')+'</div></section>'+`<section class="node-ip-section"><div class="node-form-section-title">IP-пул и ротация</div><div class="node-ip-hint">Адреса должны принадлежать этому VPS и быть доступны извне.</div><div class="node-rotation-editor-body">${rotationFields}<div class="node-pool-toolbar"><span data-node-pool-count>Адресов: ${nodeRotationIPs(o).length} / 64</span><button type="button" class="gh sm" data-node-pool-normalize>Убрать повторы</button><button type="button" class="gh sm" data-node-pool-clear>Очистить</button></div><output data-node-pool-feedback aria-live="polite"></output>${rotationProbe}</div></section><section class="node-billing-section"><div class="node-form-section-title">Инфрабиллинг</div><p class="node-ip-hint">Стоимость, аренда и напоминания</p><div class="node-billing-fields">${billingFields}</div></section></div>`
+    ?'<div class="node-form-layout"><section class="node-main-section"><div class="node-form-section-title">Основные параметры</div><div class="node-form-grid">'+nodeMainFields+'</div></section>'+`<section class="node-ip-section"><div class="node-form-section-title">IP-пул и ротация</div><div class="node-ip-hint">Адреса должны принадлежать этому VPS и быть доступны извне.</div><div class="node-rotation-editor-body">${rotationFields}<div class="node-pool-toolbar"><span data-node-pool-count>Адресов: ${nodeRotationIPs(o).length} / 64</span><button type="button" class="gh sm" data-node-pool-normalize>Убрать повторы</button><button type="button" class="gh sm" data-node-pool-clear>Очистить</button></div><output data-node-pool-feedback aria-live="polite"></output>${rotationProbe}</div></section><section class="node-billing-section"><div class="node-form-section-title">Инфрабиллинг</div><p class="node-ip-hint">Стоимость, аренда и напоминания</p><div class="node-billing-fields">${billingFields}</div></section></div>`
     :standardFields;
   modal(`<form class="box" data-k="ent" data-ent="${k}" data-id="${id||''}" method="dialog"><h2>${id?'Изменить':'Новый'}: ${e.nw.toLowerCase()}</h2>${fields}<p class="er" id="fe"></p><div class="act">${id?`<button type="button" class="dg" data-del="${k}:${id}" style="margin-right:auto">${ic('trash')}Удалить</button>`:''}<button type="button" class="gh" data-x>Отмена</button><button class="btn">Сохранить</button></div></form>`,k==='nodes'?'node-wide':k=='profiles'||k=='subs'?'wide':'')
 }
@@ -1977,6 +1983,28 @@ document.addEventListener('click',async e=>{
   else if(b=g('[data-dt]')){userDrawer(+$('[data-a]').dataset.u,b.dataset.dt)}
   else if(b=g('tr[data-id]'))userDrawer(+b.dataset.id,'ov');
   else if(b=g('[data-uo]'))userDrawer(+b.dataset.uo,'dev');
+  else if(b=g('[data-node-date-open],[data-node-date-calendar] [data-user-date-nav],[data-node-date-calendar] [data-user-date-day],[data-node-date-calendar] [data-user-date-today],[data-node-date-calendar] [data-user-date-clear]')){
+    e.preventDefault();
+    const picker=b.closest('.node-date-field'),cal=picker?.querySelector('[data-node-date-calendar]'),input=picker?.querySelector('[name="billingDueDate"]'),trigger=picker?.querySelector('[data-node-date-open]');
+    if(!cal||!input)return;
+    const renderMonth=date=>{
+      const month=new Date(date.getFullYear(),date.getMonth(),1);
+      cal.dataset.month=userYmd(month);
+      cal.innerHTML=userCalendarMarkup(month.getFullYear(),month.getMonth(),input.value);
+    };
+    if(b.hasAttribute('data-node-date-open')){
+      if(cal.hidden){renderMonth(userDateFromYmd(input.value)||new Date());cal.hidden=false;trigger.setAttribute('aria-expanded','true')}
+      else{cal.hidden=true;trigger.setAttribute('aria-expanded','false')}
+    }else if(b.hasAttribute('data-user-date-nav')){
+      const current=userDateFromYmd(cal.dataset.month)||new Date();
+      renderMonth(new Date(current.getFullYear(),current.getMonth()+Number(b.dataset.userDateNav),1));
+    }else{
+      const value=b.hasAttribute('data-user-date-clear')?'':b.hasAttribute('data-user-date-today')?userYmd(new Date()):b.dataset.userDateDay;
+      input.value=value;
+      picker.querySelector('[data-node-date-label]').textContent=value?userDateLabel(value):'Выберите дату';
+      cal.hidden=true;trigger.setAttribute('aria-expanded','false');trigger.focus();
+    }
+  }
   else if(b=g('[data-user-date-open],[data-user-date-nav],[data-user-date-day],[data-user-date-today],[data-user-date-clear]')){e.preventDefault();handleUserCalendarAction(b)}
   else if(b=g('[data-user-renew-apply]')){e.preventDefault();handleUserRenewalAction(b)}
   else if(b=g('[data-user-sub-create]')){
