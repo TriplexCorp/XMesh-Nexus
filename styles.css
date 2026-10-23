@@ -2706,3 +2706,22 @@ dialog.user-modal .user-sub-actions .user-sub-revoke{color:var(--er)}
 @media(max-width:1060px){dialog.user-modal .user-canvas-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
 @media(max-width:760px){dialog.user-modal{width:calc(100vw - 1rem)}dialog.user-modal .user-canvas-grid{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:420px){dialog.user-modal .user-sub-link-row{flex-wrap:wrap}dialog.user-modal .user-sub-link-row .user-sub-copy-main{width:100%}}
+
+/* Node workspace: wide main configuration and permanently visible IP tools. */
+dialog.node-wide{width:min(1180px,calc(100vw - 2rem))!important;max-width:1180px}
+dialog.node-wide .box{padding:1.5rem;gap:1rem}
+dialog.node-wide .node-form-layout{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(320px,.85fr);gap:1.5rem;align-items:start}
+dialog.node-wide .node-main-section,dialog.node-wide .node-ip-section{min-width:0}
+dialog.node-wide .node-main-section .node-form-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem 1.15rem}
+dialog.node-wide .node-form-section-title{font-size:.85rem;font-weight:750;margin-bottom:.7rem;color:var(--tx)}
+dialog.node-wide .node-ip-section{border:1px solid var(--ln);border-radius:var(--ui-radius);padding:1rem;background:var(--s2)}
+dialog.node-wide .node-ip-hint{font-size:.72rem;line-height:1.45;color:var(--mu);margin-bottom:.85rem}
+dialog.node-wide .node-rotation-editor-body{display:grid;gap:.8rem}
+dialog.node-wide .node-rotation-editor-body textarea{min-height:9rem;resize:vertical}
+dialog.node-wide .node-pool-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:.45rem}
+dialog.node-wide .node-pool-toolbar span{font-size:.72rem;color:var(--mu);margin-right:auto}
+dialog.node-wide [data-node-pool-feedback]{font-size:.72rem;color:var(--wr)}
+dialog.node-wide [data-node-pool-feedback]:empty{display:none}
+dialog.node-wide .node-ip-section .f{min-width:0}
+@media(max-width:850px){dialog.node-wide .node-form-layout{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:560px){dialog.node-wide .node-main-section .node-form-grid{grid-template-columns:minmax(0,1fr)}}
