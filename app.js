@@ -2030,7 +2030,14 @@ async function refreshNodeMetrics(){
 }
 function drawNodeLive(){
   updateNodeGauges();
-  T.push(setInterval(()=>{void refreshNodeMetrics()},20000));
+  let busy=false;
+  const poll=async()=>{
+    if(cur!=='nodes'||document.hidden||busy)return;
+    busy=true;
+    try{await refreshNodeMetrics()}finally{busy=false}
+  };
+  void poll();
+  T.push(setInterval(()=>{void poll()},5000));
 }
 function updateNodeGauges(){DB.nodes.forEach(n=>{
   const l=LV[n.id]||{cpu:null,ram:null,mbps:null};
