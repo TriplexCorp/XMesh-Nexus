@@ -4723,3 +4723,26 @@ dialog#dlg.squad-wide .squad-inbound-list{max-height:220px}
  dialog#dlg.squad-wide .squad-preview-warnings,
  dialog#dlg.squad-wide .squad-preview-ready{grid-column:auto}
 }
+
+/* Squad editor v4: compact, balanced two-column editing surface. */
+dialog#dlg.squad-wide{width:min(1060px,calc(100vw - 32px))!important;inline-size:min(1060px,calc(100vw - 32px))!important}
+dialog#dlg.squad-wide > form.box{padding:18px 20px 14px;gap:12px}
+dialog#dlg.squad-wide .squad-editor-layout{grid-template-columns:minmax(0,.92fr) minmax(0,1.08fr);gap:12px;align-items:stretch}
+dialog#dlg.squad-wide .squad-editor-layout > section{padding:16px;gap:10px}
+dialog#dlg.squad-wide .squad-editor-main{display:flex;flex-direction:column}
+dialog#dlg.squad-wide .squad-editor-fields{grid-template-columns:1fr;align-content:start}
+dialog#dlg.squad-wide .squad-editor-connections{display:flex;flex-direction:column}
+dialog#dlg.squad-wide .squad-inbound-list{max-height:200px}
+dialog#dlg.squad-wide .squad-editor-side{grid-column:1/-1}
+dialog#dlg.squad-wide [data-squad-preview]{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px 18px}
+dialog#dlg.squad-wide .squad-preview-stats{grid-column:1/-1;grid-template-columns:repeat(4,minmax(0,1fr))}
+dialog#dlg.squad-wide .squad-preview-section{padding-top:10px}
+dialog#dlg.squad-wide .squad-inbound-copy small{overflow-wrap:anywhere}
+dialog#dlg.squad-wide .squad-inbound-hosts{white-space:nowrap}
+@media(max-width:720px){
+ dialog#dlg.squad-wide .squad-editor-layout{grid-template-columns:minmax(0,1fr)}
+ dialog#dlg.squad-wide .squad-editor-side{grid-column:auto}
+ dialog#dlg.squad-wide [data-squad-preview]{grid-template-columns:minmax(0,1fr)}
+ dialog#dlg.squad-wide .squad-preview-stats{grid-column:auto;grid-template-columns:repeat(2,minmax(0,1fr))}
+ dialog#dlg.squad-wide .squad-preview-warnings,dialog#dlg.squad-wide .squad-preview-ready{grid-column:auto}
+}
