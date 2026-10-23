@@ -191,9 +191,44 @@ const ENT={
   squads:{t:'Сквады',n:'Набор инбаундов: что именно получает пользователь в подписке.',s:'id',nw:'Сквад',fs:[{k:'name',l:'Название',req:1},{k:'desc',l:'Описание'},{k:'inb',l:'Инбаунды (из профилей Xray)',t:'multi',o:tags}],
     cols:[['Название',r=>`<b>${esc(r.name)}</b><br><span class="mu">${esc(r.desc)}</span>`],['Инбаунды',r=>r.inb.map(t=>chip(esc(t),tcol(t))).join(' ')||'—'],['Пользователей',r=>DB.users.filter(u=>u.squads.includes(r.id)).length]],
     guard:r=>DB.users.some(u=>u.squads.includes(r.id))?'В скваде есть пользователи. Сначала переведите их в другой сквад.':''},
-  hosts:{t:'Хосты',n:'Точки входа, которые попадают в подписку. Порядок определяет приоритет.',s:'order',nw:'Хост',mv:1,fs:[{k:'remark',l:'Название (remark)',req:1},{k:'address',l:'Адрес',req:1},{k:'port',l:'Порт',t:'num'},{k:'tag',l:'Инбаунд',t:'sel',o:tags},{k:'sni',l:'SNI'},{k:'path',l:'Path'},{k:'sec',l:'Безопасность',t:'sel',o:['reality','tls','none']},{k:'fp',l:'Fingerprint',t:'sel',o:['chrome','firefox','safari','random']},{k:'nodes',l:'Только на узлах',t:'multi',o:()=>DB.nodes.map(n=>[n.id,(COUNTRIES.find(c=>c.flag===n.flag)?.code||'—')+' · '+n.name]),h:'Ничего не выбрано — на всех узлах'}],
-    def:()=>({port:443,sec:'reality',fp:'chrome',order:DB.hosts.length+1,nodes:[]}),
-    cols:[['Название',r=>`<b>${esc(r.remark)}</b>`],['Адрес',r=>`${esc(r.address)}:${r.port}`],['Инбаунд',r=>chip(esc(r.tag),tcol(r.tag))],['SNI',r=>esc(r.sni||'—')],['Узлы',r=>r.nodes.length?r.nodes.map(i=>flagView(DB.nodes.find(n=>n.id==i)?.flag)).join(' '):'все'],['Вкл.',swc('hosts')]]},
+  hosts:{t:'Хосты',n:'Публичные точки входа: наследование XRAY STUDIO, назначение нод и точечные переопределения для клиентов.',s:'order',nw:'Хост',mv:1,fs:[
+    {k:'profileId',l:'Профиль XRAY STUDIO',t:'sel',o:()=>DB.profiles.map(p=>[p.id,p.name])},
+    {k:'tag',l:'Inbound',t:'sel',o:tags},
+    {k:'nodes',l:'Назначенные ноды',t:'multi',o:()=>DB.nodes.map(n=>[n.id,n.name])},
+    {k:'remark',l:'Название в подписке',req:1},
+    {k:'address',l:'Публичный адрес',req:1},
+    {k:'port',l:'Публичный порт',t:'num'},
+    {k:'sni',l:'SNI (переопределение)',ph:'Из inbound, если пусто'},
+    {k:'host',l:'HTTP Host (переопределение)',ph:'Из inbound, если пусто'},
+    {k:'path',l:'Путь транспорта (переопределение)',ph:'Из inbound, если пусто'},
+    {k:'fp',l:'uTLS fingerprint',t:'sel',o:[['','По умолчанию (chrome)'],['chrome','Chrome'],['firefox','Firefox'],['safari','Safari'],['ios','iOS'],['random','Random']]},
+    {k:'publicKey',l:'REALITY publicKey (клиентский)',ph:'Если отсутствует в inbound'},
+    {k:'shortId',l:'REALITY shortId',ph:'Первый ShortID inbound'},
+    {k:'spiderX',l:'REALITY spiderX',ph:'/'},
+    {k:'alpn',l:'TLS ALPN',ph:'h2,http/1.1'},
+    {k:'serviceName',l:'gRPC serviceName',ph:'Из inbound'},
+    {k:'clientEncryption',l:'VLESS Encryption (клиент)',ph:'Наследуется из inbound или пользователя'}
+  ],
+    def:()=>({port:443,fp:'',order:DB.hosts.length+1,nodes:[],profileId:DB.profiles[0]?.id||0}),
+    chk:d=>{
+      if(!d.remark.trim()||!d.address.trim())return 'Укажите название и публичный адрес.';
+      if(!Number.isInteger(d.port)||d.port<1||d.port>65535)return 'Публичный порт должен быть от 1 до 65535.';
+      const profile=DB.profiles.find(p=>String(p.id)===String(d.profileId));
+      if(!profile)return 'Выберите существующий профиль XRAY STUDIO.';
+      const inbound=inbs(profile).find(i=>i.tag===d.tag);
+      if(!inbound)return 'Выберите inbound из назначенного XRAY-профиля.';
+      if(inbound.protocol!=='vless')return 'Генератор подписок пока поддерживает только VLESS. Выберите VLESS inbound.';
+      if(!d.nodes.length)return 'Назначьте хотя бы одну ноду с выбранным профилем.';
+      const bad=d.nodes.map(id=>DB.nodes.find(n=>String(n.id)===String(id))).find(n=>!n||n.disabled||String(n.profileId)!==String(profile.id));
+      if(bad)return 'Одна из нод не использует выбранный XRAY-профиль или отключена. Исправьте привязку ноды.';
+      if(d.publicKey&&!/^[A-Za-z0-9_-]{43,44}$/.test(d.publicKey))return 'REALITY publicKey должен быть в формате X25519 base64url (43–44 символа).';
+      if(d.shortId&&(!/^[\da-fA-F]*$/.test(d.shortId)||d.shortId.length>16||d.shortId.length%2!==0))return 'REALITY shortId должен быть чётной длины, hex до 16 символов.';
+      return '';
+    },
+    cols:[['Название',r=>'<b>'+esc(r.remark)+'</b>'],['Адрес',r=>esc(r.address)+':'+esc(r.port)],['Профиль / inbound',r=>{
+      const p=DB.profiles.find(p=>String(p.id)===String(r.profileId));
+      return (p?esc(p.name)+' · ':'')+chip(esc(r.tag),tcol(r.tag));
+    }],['Привязки',r=>Array.isArray(r.nodes)&&r.nodes.length?r.nodes.map(i=>flagView(DB.nodes.find(n=>String(n.id)===String(i))?.flag)).join(' '):'не заданы'],['Вкл.',swc('hosts')]]},
   nodes:{t:'Узлы',nw:'Узел',s:'id',fs:[{k:'name',l:'Название',req:1},{k:'hosting',l:'Хостинг (необязательно)',h:'Например: Cloudrix, Hetzner, OVH. Отображается в карточке узла.'},{k:'flag',l:'Страна и флаг',t:'country'},{k:'addr',l:'Адрес',req:1},{k:'port',l:'Порт ноды',t:'num',req:1},{k:'profileId',l:'XRAY STUDIO',t:'sel',o:()=>DB.profiles.map(p=>[p.id,p.name])},{k:'xrayLocalPort',l:'Локальный порт Xray',t:'num',h:'Планируемый порт Xray на 127.0.0.1; не является публичным портом ноды. Настройка пока не применяется автоматически.'},{k:'mult',l:'Коэффициент трафика',t:'num',h:'1 — без изменений, 2 — считать вдвое'},{k:'limit',l:'Лимит трафика, ГБ',t:'num',h:'0 — без лимита'},{k:'resetDay',l:'День сброса счётчика',t:'num'},
     {k:'billingPrice',l:'Стоимость аренды',t:'num'},
     {k:'billingCurrency',l:'Валюта',t:'sel',o:[['EUR','EUR · €'],['USD','USD · $'],['RUB','RUB · ₽'],['PLN','PLN · zł'],['GBP','GBP · £']]},
