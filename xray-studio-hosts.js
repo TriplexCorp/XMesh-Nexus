@@ -17,7 +17,11 @@ window.XMeshStudioHosts=(()=>{
      '<div class="sv-two">'+field('Внешний SNI','sni','vpn.example.com')+field('Host','host','cdn.example.com')+'</div>'+
      '<div class="sv-two">'+field('Path','path','/xhttp')+
       '<label class="sv-field"><span>Fingerprint</span><select data-endpoint="fp"><option value="">По умолчанию</option><option value="chrome">Chrome</option><option value="firefox">Firefox</option><option value="safari">Safari</option><option value="ios">iOS</option></select></label></div>'+
-     '<div class="sv-two">'+field('REALITY Public Key','publicKey')+field('REALITY Short ID','shortId')+'</div></details>'+
+     '<div class="sv-two">'+field('ALPN','alpn','h2,http/1.1')+field('gRPC Service Name','serviceName','service')+'</div>'+
+     '<div class="sv-two">'+field('REALITY Public Key','publicKey')+field('REALITY Short ID','shortId')+'</div>'+
+     '<div class="sv-two">'+field('REALITY Spider X','spiderX','/')+field('Код страны','countryCode','DE')+'</div>'+
+     '<div class="sv-two">'+field('VLESS Encryption клиента','clientEncryption','Пусто — наследовать из inbound')+'</div>'+
+     '<p class="sv-muted">Пустые значения наследуются от inbound. Клиентский VLESS Encryption не равен серверному decryption.</p></details>'+
      '<div class="sv-endpoint-nodes"><b>Доступные узлы</b><p>Без выбора — все узлы текущего профиля.</p><div data-endpoint-nodes></div></div>'+
      '<footer><button type="button" class="sv-primary" data-endpoint-action="save">Сохранить подключение</button><button type="button" data-endpoint-action="cancel">Отмена</button></footer></div></section>';
   }
@@ -61,7 +65,7 @@ window.XMeshStudioHosts=(()=>{
       if(profile()==null||!tag()){ctx.notify('Сначала сохраните профиль и выберите inbound.');return}
       editing=h?.id??null;
       qs('[data-endpoint-title]').textContent=h?'Изменить подключение':'Новое подключение';
-      for(const k of ['remark','address','sni','host','path','fp','publicKey','shortId'])set(k,h?.[k]||'');
+      for(const k of ['remark','address','sni','host','path','fp','publicKey','shortId','alpn','serviceName','spiderX','countryCode','clientEncryption'])set(k,h?.[k]||'');
       set('port',h?.port||443);set('enabled',h?.disabled?'no':'yes');
       const nodes=qs('[data-endpoint-nodes]');nodes.replaceChildren();
       for(const n of connected()){
@@ -84,6 +88,8 @@ window.XMeshStudioHosts=(()=>{
       if(!remark||!address)return ctx.notify('Укажите название и публичный адрес.');
       if(!Number.isInteger(port)||port<1||port>65535)return ctx.notify('Некорректный внешний порт.');
       if([...address].some(c=>' /@?#'.includes(c)||c==='\\')||address.length>253)return ctx.notify('Некорректный адрес сервера.');
+      if(value('countryCode')&&!/^[A-Za-z]{2}$/.test(value('countryCode')))return ctx.notify('Страна: укажите двухбуквенный код, например DE.');
+      if(value('alpn')&&!value('alpn').split(',').every(x=>/^[a-zA-Z0-9/._-]{1,32}$/.test(x.trim())))return ctx.notify('ALPN: неверный формат.');
       const nodeIds=[...qs('[data-endpoint-nodes]').querySelectorAll('input:checked')].map(x=>Number(x.value));
       const old=editing==null?null:hosts().find(h=>String(h.id)===String(editing));
       // A legacy host may be pinned to nodes no longer in this profile.
@@ -96,6 +102,8 @@ window.XMeshStudioHosts=(()=>{
       const data={remark,address,port,tag:tag(),profileId:profile(),
         sni:value('sni'),host:value('host'),path:value('path'),fp:value('fp'),
         publicKey:value('publicKey'),shortId:value('shortId'),
+        alpn:value('alpn'),serviceName:value('serviceName'),spiderX:value('spiderX'),
+        countryCode:value('countryCode').toUpperCase(),clientEncryption:value('clientEncryption'),
         nodes:nodeIds,disabled:value('enabled')==='no'};
       try{
         if(old)await ctx.api.update('hosts',old.id,data);
