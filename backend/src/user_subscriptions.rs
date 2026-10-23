@@ -58,82 +58,24 @@ fn endpoint(host:&Value)->Option<&str>{
  if a.chars().any(|c|matches!(c,' '|'/'|'@'|'?'|'#'|'\\'))||a=="localhost"||a=="0.0.0.0"||a.starts_with("127.")||a.starts_with("10.")||a.starts_with("192.168.")||a.starts_with("172.16.") {return None}
  Some(a)
 }
-fn encode_component(s:&str)->String{
- let mut result=String::new();
- for c in s.bytes(){if c.is_ascii_alphanumeric()||b"-._~".contains(&c){result.push(c as char)}else{result.push_str(&format!("%{c:02X}"))}}
- result
-}
-fn vless_link(user:&Value, inbound:&Value, host:&Value, device:&str)->Option<String>{
- if nonempty(inbound,"protocol")?!="vless"{return None}
- let uuid=nonempty(user,"xrayId")?;
- if uuid::Uuid::parse_str(uuid).is_err(){return None}
- let address=endpoint(host)?;
- let actual_port=["externalPort","port"].into_iter().find_map(|k|host.get(k).and_then(port))
-   .or_else(||inbound.get("port").and_then(port))?;
- let stream=inbound.get("streamSettings")?;
- let security=nonempty(stream,"security").unwrap_or("none");
- if !["tls","reality","none"].contains(&security){return None}
- let network=nonempty(stream,"network").unwrap_or("tcp");
- if !["tcp","raw","xhttp","ws","grpc"].contains(&network){return None}
- let client_encryption=nonempty(host,"clientEncryption")
-  .or_else(||nonempty(host,"externalClientEncryption"))
-  .or_else(||nonempty(user,"vlessEncryption"))
-  .or_else(||inbound.get("xmesh").and_then(|v|nonempty(v,"clientEncryption")))
-  .unwrap_or("none");
- let server_decryption=inbound.get("settings").and_then(|v|nonempty(v,"decryption")).unwrap_or("none");
- if server_decryption!="none"&&client_encryption=="none"{return None}
- if security=="none"&&!client_encryption.starts_with("mlkem768x25519plus."){return None}
- let mut opts=vec![format!("type={}",encode_component(network)),format!("security={}",security)];
- if client_encryption!="none"{
-  opts.push(format!("encryption={}",encode_component(client_encryption)));
- }
- let settings=inbound.get("settings").unwrap_or(&Value::Null);
- if let Some(flow)=nonempty(settings,"flow"){opts.push(format!("flow={}",encode_component(flow)))}
- let transport=match network{"xhttp"=>stream.get("xhttpSettings"),"ws"=>stream.get("wsSettings"),"grpc"=>stream.get("grpcSettings"),_=>None};
- if let Some(config)=transport{
-  if let Some(path)=nonempty(host,"path").or_else(||nonempty(config,"path")){opts.push(format!("path={}",encode_component(path)))}
-  if let Some(h)=nonempty(host,"host").or_else(||nonempty(host,"externalHost")){opts.push(format!("host={}",encode_component(h)))}
-  if network=="grpc" && let Some(service)=nonempty(host,"serviceName").or_else(||nonempty(config,"serviceName")){opts.push(format!("serviceName={}",encode_component(service)))}
-  if network=="xhttp" {
-   let platform=match device{"ios"=>Some("iOS"),"windows"=>Some("Windows"),_=>None};
-   let profile=platform.and_then(|key|{
-    inbound.get("xmesh").and_then(|v|v.get("xhttpDeviceProfiles"))
-     .or_else(||inbound.get("xhttpDeviceProfiles")).and_then(|v|v.get(key))
-   });
-   let mode=profile.and_then(|v|nonempty(v,"mode")).or_else(||nonempty(config,"mode"));
-   if let Some(mode)=mode{opts.push(format!("mode={}",encode_component(mode)))}
-  }
- }
- if security=="tls"{
-  if let Some(alpn)=nonempty(host,"alpn"){
-   let values:Vec<&str>=alpn.split(',').map(str::trim).filter(|s|!s.is_empty()&&s.len()<=32&&s.bytes().all(|b|b.is_ascii_alphanumeric()||b"/.-_".contains(&b))).collect();
-   if !values.is_empty(){opts.push(format!("alpn={}",encode_component(&values.join(","))))}
-  }
- }
- if security!="none"{
-  let sni=nonempty(host,"sni").or_else(||nonempty(host,"externalSNI"))
-   .or_else(||stream.get("realitySettings").and_then(|v|v.get("serverNames")).and_then(Value::as_array).and_then(|a|a.first()).and_then(Value::as_str))
-   .or_else(||stream.get("tlsSettings").and_then(|v|nonempty(v,"serverName")))?;
-  opts.push(format!("sni={}",encode_component(sni)));
- }
- if security=="reality"{
-  let reality=stream.get("realitySettings").unwrap_or(&Value::Null);
-  let pbk=nonempty(host,"publicKey").or_else(||nonempty(host,"realityPublicKey"))
-   .or_else(||nonempty(inbound,"publicKey")).or_else(||nonempty(reality,"publicKey"))?;
-  let sid=nonempty(host,"shortId").or_else(||nonempty(host,"externalShortId"))
-   .or_else(||reality.get("shortIds").and_then(Value::as_array).and_then(|a|a.first()).and_then(Value::as_str)).unwrap_or("");
-  opts.push(format!("pbk={}",encode_component(pbk)));
-  opts.push(format!("sid={}",encode_component(sid)));
-  opts.push(format!("fp={}",encode_component(nonempty(host,"fp").or_else(||nonempty(host,"fingerprint")).unwrap_or("chrome"))));
-  if let Some(spider)=nonempty(host,"spiderX"){opts.push(format!("spx={}",encode_component(spider)))}
- }
- let name=nonempty(host,"remark").unwrap_or(address);
- Some(format!("vless://{}@{}:{}?{}#{}",uuid,address,actual_port,opts.join("&"),encode_component(name)))
-}
 // Client-native Xray outbound: build from explicitly allowed public values,
 // not from server-side streamSettings containing Reality private keys.
 fn vless_outbound(user:&Value,inbound:&Value,host:&Value,device:&str)->Option<Value>{
- vless_link(user,inbound,host,device)?;
+ if nonempty(inbound,"protocol")?!="vless"{return None}
+ if uuid::Uuid::parse_str(nonempty(user,"xrayId")?).is_err(){return None}
+ let stream_check=inbound.get("streamSettings")?;
+ let security_check=nonempty(stream_check,"security").unwrap_or("none");
+ let network_check=nonempty(stream_check,"network").unwrap_or("tcp");
+ if !["tls","reality","none"].contains(&security_check)
+   || !["tcp","raw","xhttp","ws","grpc"].contains(&network_check){return None}
+ if security_check=="none"{
+  let enc=nonempty(host,"clientEncryption")
+   .or_else(||nonempty(host,"externalClientEncryption"))
+   .or_else(||nonempty(user,"vlessEncryption"))
+   .or_else(||inbound.get("xmesh").and_then(|v|nonempty(v,"clientEncryption")))
+   .unwrap_or("none");
+  if !enc.starts_with("mlkem768x25519plus."){return None}
+ }
  let address=endpoint(host)?;
  let port=["externalPort","port"].into_iter().find_map(|key|host.get(key).and_then(self::port))
    .or_else(||inbound.get("port").and_then(self::port))?;
@@ -344,7 +286,7 @@ fn host_for_profile(host:&Value,tag:&str,profile:&Value,nodes:&[Value])->bool {
  }
  true
 }
-async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str)->Result<(Vec<String>,Vec<Value>),ApiError>{
+async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str)->Result<Vec<Value>,ApiError>{
  let squads=crate::load_records(&state.pool,"squads").await?;
  let profiles=crate::load_records(&state.pool,"profiles").await?;
  let hosts=crate::load_records(&state.pool,"hosts").await?;
@@ -357,7 +299,6 @@ async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str)->Result
    for tag in items.iter().filter_map(Value::as_str){tags.insert(tag.to_owned());}
   }
  }
- let mut links=Vec::<String>::new();
  let mut outbounds=Vec::<Value>::new();
  for profile in &profiles{
   let cfg=match profile.get("config"){Some(Value::String(raw))=>serde_json::from_str::<Value>(raw).ok(),Some(v)=>Some(v.clone()),None=>None};
@@ -386,8 +327,8 @@ async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str)->Result
     .filter(|h|host_for_profile(h,tag,profile,&nodes)).collect();
    if !matched.is_empty(){
     for host in matched{
-     if let Some(link)=vless_link(user,inbound,host,device) && let Some(outbound)=vless_outbound(user,inbound,host,device){
-      outbounds.push(outbound);links.push(link)
+     if let Some(outbound)=vless_outbound(user,inbound,host,device){
+      outbounds.push(outbound)
      }else{
       let reality=inbound.get("streamSettings").and_then(|s|s.get("realitySettings")).unwrap_or(&Value::Null);
       let missing_key=nonempty(host,"publicKey").or_else(||nonempty(host,"realityPublicKey"))
@@ -401,8 +342,8 @@ async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str)->Result
    }else if !any_explicit_host{
     for node in nodes.iter().filter(|n|n.get("profileId")==profile.get("id")&&n.get("disabled")!=Some(&Value::Bool(true))){
      let host=json!({"address":node.get("publicAddress").or_else(||node.get("externalAddress")).or_else(||node.get("addr")),"port":node.get("port").or_else(||inbound.get("port")),"remark":node.get("name"),"country":node.get("country")});
-     if let Some(link)=vless_link(user,inbound,&host,device) && let Some(outbound)=vless_outbound(user,inbound,&host,device){
-      outbounds.push(outbound);links.push(link)
+     if let Some(outbound)=vless_outbound(user,inbound,&host,device){
+      outbounds.push(outbound)
      }
     }
    }else if any_explicit_host{
@@ -411,7 +352,7 @@ async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str)->Result
    }
   }
  }
- if links.is_empty(){
+ if outbounds.is_empty(){
   let reason=if ids.is_empty() || tags.is_empty(){
    "У пользователя нет доступных inbound: назначьте сквад с нужными inbound."
   }else if profiles.is_empty(){
@@ -424,7 +365,7 @@ async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str)->Result
   tracing::warn!(reason, squad_count=ids.len(), inbound_count=tags.len(), profile_count=profiles.len(), host_count=hosts.len(), node_count=nodes.len(), user_id=?(user.get("id").and_then(serde_json::Value::as_i64)), "Subscription has no valid endpoints");
   return Err(ApiError::new(StatusCode::SERVICE_UNAVAILABLE,reason))
  }
- Ok((links,outbounds))
+ Ok(outbounds)
 }
 pub async fn admin_client_json(
  State(state):State<AppState>,Extension(actor):Extension<AuthUser>,Path(id):Path<i64>,
@@ -434,21 +375,11 @@ pub async fn admin_client_json(
  let user=record(&state,id).await?;
  let device=crate::subscription_user_agent::negotiate(&headers,&options)
   .map_err(bad)?.device.as_str();
- let (_,proxies)=collect_user_outbounds(&state,&user,device).await?;
+ let proxies=collect_user_outbounds(&state,&user,device).await?;
  let setting=crate::read_settings(&state.pool).await?;
  let profile=crate::subscription_json::build(proxies,&setting)
   .map_err(|detail|ApiError::new(StatusCode::BAD_REQUEST,detail))?;
  Ok(Json(profile))
-}
-// Standalone subscriptions are intentionally link lists so clients such as
-// Happ show individual named servers instead of one XMesh Servers JSON entry.
-fn use_vless_feed(
- client:&crate::subscription_user_agent::Client,
- options:&HashMap<String,String>,
- settings:&Value,
-)->bool{
- client.format==crate::subscription_user_agent::Format::Vless
-  || (!options.contains_key("format") && !crate::subscription_json::smart_enabled(settings))
 }
 pub async fn serve(State(state):State<AppState>,Path(token):Path<String>,
  headers:HeaderMap,Query(options):Query<HashMap<String,String>>)->Result<Response,ApiError>{
@@ -463,27 +394,17 @@ pub async fn serve(State(state):State<AppState>,Path(token):Path<String>,
  // actual User-Agent. Explicit query parameters remain optional overrides.
  let client=crate::subscription_user_agent::negotiate(&headers,&options)
   .map_err(bad)?;
- let (links,outbounds)=collect_user_outbounds(&state,&user,client.device.as_str()).await?;
+ let outbounds=collect_user_outbounds(&state,&user,client.device.as_str()).await?;
  let settings=crate::read_settings(&state.pool).await?;
- // Without an enabled balancer, deliver individually named VLESS entries.
- // A monolithic Xray JSON is treated by Happ as one profile even when it
- // contains multiple proxy outbounds. Explicit ?format=json always wins.
- let legacy=use_vless_feed(&client,&options,&settings);
-
- let mut response=if legacy{
-  links.join("\n").into_response()
- }else{
-  let json=crate::subscription_json::build(outbounds,&settings).map_err(|message|{
-    tracing::warn!(user_id=id, error=%message,"Subscription JSON could not be generated");
-    ApiError::new(StatusCode::SERVICE_UNAVAILABLE,message)
-  })?;
-  let body=serde_json::to_string_pretty(&json)
-   .map_err(|_|ApiError::new(StatusCode::INTERNAL_SERVER_ERROR,"Could not serialize Xray JSON"))?;
-  body.into_response()
- };
- response.headers_mut().insert(header::CONTENT_TYPE,if legacy{
-  "text/plain; charset=utf-8".parse().unwrap()
- }else{"application/json; charset=utf-8".parse().unwrap()});
+ // Native Xray JSON is the only supported subscription format.
+ // A disabled SMART selector changes routing, never the wire representation.
+ let json=crate::subscription_json::build(outbounds,&settings).map_err(|message|{
+  tracing::warn!(user_id=id, error=%message,"Subscription JSON could not be generated");
+  ApiError::new(StatusCode::SERVICE_UNAVAILABLE,message)
+ })?;
+ let mut response=Json(json).into_response();
+ response.headers_mut().insert(header::CONTENT_TYPE,
+  "application/json; charset=utf-8".parse().unwrap());
  response.headers_mut().insert(header::CACHE_CONTROL,"no-store, private".parse().unwrap());
  response.headers_mut().insert(header::REFERRER_POLICY,"no-referrer".parse().unwrap());
  response.headers_mut().insert(header::VARY,"User-Agent, Accept".parse().unwrap());
@@ -736,21 +657,6 @@ pub async fn portal(
 #[cfg(test)]
 mod tests{
  use super::*;
- #[test] fn no_smart_shows_standalone_servers_for_happ(){
-  use crate::subscription_user_agent::{Client,Device,Format};
-  let happ=Client{format:Format::Json,device:Device::Auto,known_app:true};
-  let mut options=HashMap::new();
-  assert!(use_vless_feed(&happ,&options,&json!({})));
-  assert!(use_vless_feed(&happ,&options,
-    &json!({"subscriptionJson":{"smart":false,"balance":"leastPing"}})));
-  assert!(!use_vless_feed(&happ,&options,
-    &json!({"subscriptionJson":{"smart":true,"balance":"leastPing"}})));
-  // Explicit JSON import stays supported for users who need raw JSON.
-  options.insert("format".to_string(),"json".to_string());
-  assert!(!use_vless_feed(&happ,&options,&json!({})));
-  let vless=Client{format:Format::Vless,device:Device::Auto,known_app:true};
-  assert!(use_vless_feed(&vless,&options,&json!({})));
- }
  #[test] fn secret_format(){assert!(valid_token(&"a".repeat(64)));assert!(!valid_token(&"G".repeat(64)));assert_ne!(token_hash("a"),token_hash("b"));}
  #[test] fn encrypted_token_round_trip_and_identity_binding(){
    // This regression test deliberately keeps the stateful integration path out
@@ -812,15 +718,11 @@ mod tests{
   assert_eq!(windows["streamSettings"]["xhttpSettings"]["mode"],"stream-up");
   assert_eq!(automatic["streamSettings"]["xhttpSettings"]["mode"],"auto");
   assert_eq!(windows["streamSettings"]["xhttpSettings"]["xmux"]["cMaxReuseTimes"],64);
-  let ios_uri=vless_link(&user,&inbound,&host,"ios").unwrap();
-  let windows_uri=vless_link(&user,&inbound,&host,"windows").unwrap();
-  assert!(ios_uri.contains("mode=packet-up"));
-  assert!(windows_uri.contains("mode=stream-up"));
  }
  #[test] fn invalid_reality_not_exported(){
  let user=json!({"xrayId":"550e8400-e29b-41d4-a716-446655440000"});
  let inbound=json!({"protocol":"vless","port":443,"streamSettings":{"network":"xhttp","security":"reality","realitySettings":{"serverNames":["example.org"]}}});
  let host=json!({"address":"vpn.example.org"});
- assert!(vless_link(&user,&inbound,&host,"auto").is_none());
+ assert!(vless_outbound(&user,&inbound,&host,"auto").is_none());
  }
 }
