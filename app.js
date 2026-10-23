@@ -1315,6 +1315,22 @@ function handleUserRenewalAction(button){
 /* Per-user accounting is only rendered from authenticated node counter telemetry.
    Never derive a user's consumption from node-wide RX/TX interface speeds. */
 const userTrafficBytes=v=>sysBytes(Number.isFinite(+v)&&+v>=0?+v:0);
+const USER_SERVER_COLORS=['#6EA8FF','#A78BFA','#FF73B3','#2FD084','#F6C35B','#42D6D0','#FF9552','#E55BFF','#EF5A70','#7ED957','#4F8CFF','#E9A6FF'];
+function userServerColor(id){
+  const key=String(id??'unknown');let hash=2166136261;
+  for(let i=0;i<key.length;i++)hash=Math.imul(hash^key.charCodeAt(i),16777619);
+  return USER_SERVER_COLORS[(hash>>>0)%USER_SERVER_COLORS.length];
+}
+function userServerSegments(servers){
+  const sum=servers.reduce((n,r)=>n+Math.max(0,+r.uplinkBytes + +r.downlinkBytes),0);
+  if(!sum)return 'conic-gradient(var(--ln) 0% 100%)';
+  let cursor=0;
+  return 'conic-gradient('+servers.map(r=>{
+    const end=cursor+Math.max(0,+r.uplinkBytes + +r.downlinkBytes)/sum*100;
+    const piece=userServerColor(r.nodeId)+' '+cursor.toFixed(4)+'% '+end.toFixed(4)+'%';
+    cursor=end;return piece;
+  }).join(',')+')';
+}
 function userTrafficDonutsMarkup(payload){
   const servers=Array.isArray(payload?.servers)?payload.servers.filter(r=>
     r&&Number.isFinite(+r.nodeId)&&Number.isFinite(+r.uplinkBytes)&&Number.isFinite(+r.downlinkBytes)
@@ -1342,10 +1358,10 @@ function userTrafficDonutsMarkup(payload){
     const share=total?Math.min(100,Math.max(0,amount/total*100)):0;
     const percent=total?fmt(share,share<1?1:0):'0';
     const seen=Number.isFinite(+r.updatedAtMs)?new Date(+r.updatedAtMs).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
-    return '<article class="user-server-item"><div class="user-server-donut" style="--traffic-share:'+share.toFixed(3)+'%" role="img" aria-label="'+esc(String(r.name||'Узел #'+r.nodeId))+': '+percent+'% пользовательского трафика"><span>'+percent+'%</span></div><div class="user-server-details"><b title="'+esc(r.name||'Узел #'+r.nodeId)+'">'+esc(r.name||'Узел #'+r.nodeId)+'</b><strong>'+userTrafficBytes(amount)+'</strong><small>↑ '+userTrafficBytes(r.uplinkBytes)+' · ↓ '+userTrafficBytes(r.downlinkBytes)+'</small><span class="user-server-updated">Срез '+esc(seen)+'</span></div></article>';
+    return '<article class="user-server-item"><div class="user-server-donut" style="--traffic-share:'+share.toFixed(3)+'%;--server-color:'+userServerColor(r.nodeId)+'" role="img" aria-label="'+esc(String(r.name||'Узел #'+r.nodeId))+': '+percent+'% пользовательского трафика"><span>'+percent+'%</span></div><div class="user-server-details"><b title="'+esc(r.name||'Узел #'+r.nodeId)+'">'+esc(r.name||'Узел #'+r.nodeId)+'</b><strong>'+userTrafficBytes(amount)+'</strong><small>↑ '+userTrafficBytes(r.uplinkBytes)+' · ↓ '+userTrafficBytes(r.downlinkBytes)+'</small><span class="user-server-updated">Срез '+esc(seen)+'</span></div></article>';
   }).join('');
   const downloadShare=total?down/total*100:0;
-  const chart='<div class="user-traffic-visual"><div class="user-traffic-main-donut" style="--down-share:'+downloadShare.toFixed(3)+'%" role="img" aria-label="Скачано '+userTrafficBytes(down)+', загружено '+userTrafficBytes(up)+'"><div><small>Всего</small><strong>'+userTrafficBytes(total)+'</strong></div></div><div class="user-traffic-legend"><div><span class="user-legend-dot is-down"></span><span>Скачано</span><b>'+userTrafficBytes(down)+'</b></div><div><span class="user-legend-dot is-up"></span><span>Отправлено</span><b>'+userTrafficBytes(up)+'</b></div><small>Серверов с данными: '+servers.length+'</small></div></div>';
+  const chart='<div class="user-traffic-visual"><div class="user-traffic-main-donut" style="--server-gradient:'+userServerSegments(servers)+'" role="img" aria-label="Скачано '+userTrafficBytes(down)+', загружено '+userTrafficBytes(up)+'"><div><small>Всего</small><strong>'+userTrafficBytes(total)+'</strong></div></div><div class="user-traffic-legend"><div><span class="user-legend-dot is-down"></span><span>Скачано</span><b>'+userTrafficBytes(down)+'</b></div><div><span class="user-legend-dot is-up"></span><span>Отправлено</span><b>'+userTrafficBytes(up)+'</b></div><small>Серверов с данными: '+servers.length+'</small></div></div>';
   return chart+(total===0?'<p class="user-server-pending">Счётчики подключены, но трафик пока не зарегистрирован.</p>':'')+'<div class="user-server-grid">'+cards+'</div><small class="user-server-source">Данные только из персональных счётчиков Xray. Общий трафик VPS не используется.</small>';
 }
 function userInboundTrafficMarkup(payload){
