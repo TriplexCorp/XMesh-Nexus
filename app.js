@@ -2405,7 +2405,7 @@ function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id
       '</div>':field(f,o[f.k])).join('');
   const userOptions=DB.users.filter(u=>st(u)==='ACTIVE').map(u=>`<option value="${u.id}">${esc(u.username)}</option>`).join('');
   const rotationProbe=id&&o.rotationEnabled
-    ?`<div class="node-rotation-probe"><label class="f"><span>Проверка на пользователе</span><select data-node-rotation-user>${userOptions||'<option value="">Нет активных пользователей</option>'}</select></label><button type="button" class="gh sm" data-node-rotation-probe="${id}" ${userOptions?'':'disabled'}>${ic('redo')}Получить следующий IP</button><output data-node-rotation-result aria-live="polite"></output><small>Тест изменяет счётчик ротации этого пользователя. Выдача подписок будет подключена отдельно.</small></div>`
+    ?`<div class="node-rotation-probe"><label class="f"><span>Проверка на пользователе</span><select data-node-rotation-user>${userOptions||'<option value="">Нет активных пользователей</option>'}</select></label><button type="button" class="gh sm" data-node-rotation-probe="${id}" ${userOptions?'':'disabled'}>${ic('redo')}Получить следующий IP</button><output data-node-rotation-result aria-live="polite"></output><small>Тест переключает адрес выбранного пользователя. Публичная подписка использует закреплённый IP до следующего интервала ротации.</small></div>`
     :'';
   const hostWizard=k==='hosts'?'<div class="host-quick"><label class="f"><span>Быстро заполнить из узла</span><select data-host-node-preset><option value="">Выберите сервер…</option>'+DB.nodes.map(n=>'<option value="'+esc(String(n.id))+'">'+esc(n.name)+' · '+esc(n.addr||'')+'</option>').join('')+'</select></label><p class="note">Подставит адрес, порт и привязку. Остальные поля сохранятся.</p></div>':'';
   const fields=k==='squads'?squadEditorMarkup(o,e):k==='hosts'?hostEditorMarkup(o,e):k==='nodes'
@@ -3007,8 +3007,9 @@ document.addEventListener('click',async e=>{
   }
   else if(b=g('[data-node-rotation-probe]')){
     const nodeId=Number(b.dataset.nodeRotationProbe);
-    const userId=Number(b.closest('.node-rotation-editor')?.querySelector('[data-node-rotation-user]')?.value);
-    const result=b.closest('.node-rotation-editor')?.querySelector('[data-node-rotation-result]');
+    const editor=b.closest('.node-ip-section');
+    const userId=Number(editor?.querySelector('[data-node-rotation-user]')?.value);
+    const result=editor?.querySelector('[data-node-rotation-result]');
     if(!Number.isSafeInteger(userId)||userId<1){toast('Выберите активного пользователя для проверки.');return}
     b.disabled=true;
     if(result)result.textContent='Получение адреса…';
