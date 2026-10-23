@@ -3431,3 +3431,18 @@ dialog#dlg > .node-setup{
 .node-traffic-reset-help{font-size:.78rem;line-height:1.45;color:var(--mu)}
 .node-traffic-reset-status{display:block;font-size:.8rem;line-height:1.4;color:var(--ok)}
 @media(max-width:600px){.node-traffic-reset-button{width:100%}}
+
+/* Pinned Xray release picker for managed nodes. */
+.xray-release-dialog .xm-action-confirm-box{width:min(92vw,520px);max-width:520px}
+.xray-release-dialog .f{display:flex;flex-direction:column;gap:.5rem;margin:1rem 0}
+.xray-release-dialog .xray-release-search,
+.xray-release-dialog .xray-release-select{
+  display:block;width:100%;min-height:2.65rem;padding:.65rem .85rem;
+  border:1px solid var(--ln);border-radius:.7rem;
+  color:var(--tx);background:var(--s2);font:inherit
+}
+.xray-release-dialog .xray-release-search:focus-visible,
+.xray-release-dialog .xray-release-select:focus-visible{outline:2px solid var(--a);outline-offset:2px}
+.xray-release-dialog .xray-release-info{font-size:.9rem;color:var(--mu);margin:.25rem 0}
+.xray-release-dialog a{font-size:.85rem;color:var(--a)}
+.xray-release-dialog .xm-action-confirm-actions{margin-top:1.25rem}
