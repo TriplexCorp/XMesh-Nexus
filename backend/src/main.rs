@@ -492,14 +492,23 @@ async fn create_record(
     }
     validate_record(&collection, &data)?;
 
+    // User and initial subscription must be one atomic operation: never create
+    // an account whose subscription secret could not be persisted.
+    let mut tx = state.pool.begin().await?;
     let row = sqlx::query(
         "INSERT INTO panel_records (collection, data) VALUES ($1, $2) RETURNING id, data",
     )
     .bind(&collection)
     .bind(data)
-    .fetch_one(&state.pool)
+    .fetch_one(&mut *tx)
     .await?;
     let result = row_to_record(&row)?;
+    if collection == "users" {
+        let id = result.get("id").and_then(Value::as_i64)
+            .ok_or_else(|| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Created user has no ID"))?;
+        user_subscriptions::provision_new_user(&state, id, &mut tx).await?;
+    }
+    tx.commit().await?;
     let record_id = result.get("id").and_then(Value::as_i64);
     audit(&state.pool, &actor.username, "create", Some(&collection), record_id, json!({})).await;
     Ok((StatusCode::CREATED, Json(result)))
