@@ -255,7 +255,10 @@ fn vless_outbound(user:&Value,inbound:&Value,host:&Value,device:&str)->Option<Va
 async fn record(state:&AppState,id:i64)->Result<Value,ApiError>{
  let row=sqlx::query("SELECT data FROM panel_records WHERE collection='users' AND id=$1")
   .bind(id).fetch_optional(&state.pool).await?.ok_or_else(||ApiError::new(StatusCode::NOT_FOUND,"User not found"))?;
- row.try_get("data").map_err(Into::into)
+ let mut user:Value=row.try_get("data")?;
+ let measured=crate::user_metered_bytes(&state.pool,id).await?;
+ crate::add_metered_usage(&mut user,measured);
+ Ok(user)
 }
 // Provision a new user's subscription atomically with their account creation.
 // Never expose the bearer secret in the user record or logs.
