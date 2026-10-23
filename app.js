@@ -1743,6 +1743,87 @@ async function crudCard(k){
   return `<div class="card"><div class="hd"><div><h3>${e.t}</h3><p>${e.n||''}</p></div><button class="btn sm" data-ne="${k}">${ic('plus')}${e.nw}</button></div>${items.length?`<div class="tw"><table class="tb"><thead><tr>${e.cols.map(c=>`<th>${c[0]}</th>`).join('')}${e.mv?'<th></th>':''}</tr></thead><tbody>${items.map((r,i)=>`<tr data-e="${k}:${r.id}">${e.cols.map(c=>`<td data-l="${c[0]}">${c[1](r)}</td>`).join('')}${e.mv?`<td data-l="Порядок"><button class="ia" data-mv="${k}:${r.id}:-1" ${i?'':'disabled'} aria-label="Выше">${ic('up')}</button><button class="ia" data-mv="${k}:${r.id}:1" ${i<items.length-1?'':'disabled'} aria-label="Ниже">${ic('down')}</button></td>`:''}</tr>`).join('')}</tbody></table></div>`:`<div class="empty"><b>${emptyLabel}</b><span>${emptyHint}</span><button class="gh sm" data-ne="${k}">${ic('plus')}${e.nw}</button></div>`}</div>`
 }
 async function simple(ks){const h=await Promise.all(ks.map(crudCard));return [h.join('')]}
+/* Host = client-facing endpoint, not a second Xray server configuration.
+   Resolve inherited values for preview only; never expose server privateKey. */
+function hostProfile(profileId){return DB.profiles.find(p=>String(p.id)===String(profileId))}
+function hostInbound(profileId,tag){return inbs(hostProfile(profileId)||{}).find(i=>i.tag===tag)}
+function hostEditorRefresh(form,changedProfile=false){
+  if(!form||form.dataset.ent!=='hosts')return;
+  const get=k=>form.elements.namedItem(k);
+  const profile=hostProfile(get('profileId')?.value);
+  const inboundSelect=get('tag');
+  const candidates=profile?inbs(profile):[];
+  const previous=inboundSelect?.value;
+  if(inboundSelect && (changedProfile||![...inboundSelect.options].every((o,i)=>i<candidates.length&&o.value===candidates[i].tag))){
+    inboundSelect.innerHTML=candidates.map(i=>'<option value="'+esc(i.tag)+'">'+esc(i.tag+' · '+(i.protocol||'?')+' · '+(i.streamSettings?.network||'tcp'))+'</option>').join('');
+    if(candidates.some(i=>i.tag===previous))inboundSelect.value=previous;
+  }
+  const inbound=candidates.find(i=>i.tag===inboundSelect?.value);
+  const stream=inbound?.streamSettings||{};
+  const security=stream.security||'none';
+  const reality=stream.realitySettings||{};
+  const tls=stream.tlsSettings||{};
+  const xhttp=stream.xhttpSettings||{};
+  const val=k=>String(get(k)?.value||'').trim();
+  const securityName=security==='reality'?'REALITY':security==='tls'?'TLS':security;
+  const sni=val('sni')||reality.serverNames?.[0]||tls.serverName||'';
+  const inheritedKey=reality.publicKey||inbound?.publicKey||'';
+  const realityKey=val('publicKey')||inheritedKey;
+  const shortId=val('shortId')||reality.shortIds?.[0]||'';
+  const requiredNodes=[...form.querySelectorAll('[name="nodes"]:checked')].map(el=>DB.nodes.find(n=>String(n.id)===el.value));
+  const mismatched=requiredNodes.filter(n=>!n||n.disabled||!profile||String(n.profileId)!==String(profile.id));
+  const show=(label,value)=>'<div class="host-resolved-line"><span>'+esc(label)+'</span><b>'+esc(String(value||'—'))+'</b></div>';
+  const preview=form.querySelector('[data-host-resolved]');
+  if(preview){
+    preview.innerHTML=
+      show('XRAY STUDIO',profile?.name||'Не выбран')+
+      show('Inbound',inbound?.tag||'Не выбран')+
+      show('Протокол / транспорт',inbound?(inbound.protocol+' / '+(stream.network||'tcp')):'—')+
+      show('Защита',securityName)+
+      show('Публичный endpoint',val('address')?val('address')+':'+(val('port')||'443'):'Выберите ноду')+
+      show('SNI',sni)+
+      show('Путь',val('path')||xhttp.path||stream.wsSettings?.path||'—')+
+      show('REALITY publicKey',security==='reality'?(realityKey?'Задан':'Отсутствует'):'Не требуется')+
+      show('ShortID',security==='reality'?(shortId?'Задан':'Не задан'):'Не требуется');
+  }
+  const warnings=[];
+  if(!profile)warnings.push('Выберите XRAY-профиль.');
+  else if(!inbound)warnings.push('У профиля нет выбранного inbound.');
+  else if(inbound.protocol!=='vless')warnings.push('Для подписок сейчас поддерживается только VLESS.');
+  if(requiredNodes.length===0)warnings.push('Выберите ноду, иначе хост не будет привязан к рабочему серверу.');
+  if(mismatched.length)warnings.push('Профиль ноды не совпадает с профилем хоста: '+mismatched.map(n=>n?.name||'не найдена').join(', ')+'. Исправьте профиль в разделе «Узлы».');
+  if(security==='reality'&&!realityKey)warnings.push('REALITY publicKey отсутствует: укажите публичную часть ключа в расширенных настройках. Приватный ключ сюда не вставляйте.');
+  if(security==='reality'&&!sni)warnings.push('Не указан SNI для REALITY.');
+  const warning=form.querySelector('[data-host-warnings]');
+  if(warning){warning.textContent=warnings.join(' ');warning.hidden=!warnings.length;}
+  const count=form.querySelector('[data-host-count]');
+  if(count)count.textContent=requiredNodes.length+' нод привязано';
+}
+function hostEditorMarkup(o,e){
+  const fromTag=DB.profiles.find(p=>inbs(p).some(i=>i.tag===o.tag));
+  const selectedProfile=hostProfile(o.profileId)||fromTag||DB.profiles[0];
+  const fields=e.fs;
+  const f=k=>fields.find(x=>x.k===k);
+  const preset='<label class="f"><span>Быстро заполнить из ноды</span><select data-host-node-preset><option value="">Выберите сервер…</option>'+DB.nodes.map(n=>'<option value="'+esc(n.id)+'">'+esc(n.name)+' · '+esc(n.addr||'')+' · '+esc(n.port||443)+'</option>').join('')+'</select></label>';
+  const p=field(f('profileId'),selectedProfile?.id||'');
+  const inboundOptions=selectedProfile?inbs(selectedProfile).map(i=>[i.tag,i.tag+' · '+i.protocol]):[];
+  const tag=field({...f('tag'),o:inboundOptions},o.tag||inboundOptions[0]?.[0]||'');
+  const basic=['remark','address','port'].map(k=>field(f(k),o[k])).join('');
+  const nodes=field(f('nodes'),o.nodes||[]);
+  const advanced=['sni','host','path','fp','publicKey','shortId','spiderX','alpn','serviceName','clientEncryption'].map(k=>field(f(k),o[k]??'')).join('');
+  return '<div class="host-editor-layout"><section class="host-editor-main"><div class="node-form-section-title">01 · Подключение</div>'+
+    '<p class="node-ip-hint">Выберите ноду и inbound — остальное берётся из XRAY STUDIO.</p>'+preset+p+tag+
+    '<div class="node-form-section-title">02 · Публичная точка</div>'+basic+
+    '<div class="node-form-section-title">03 · Назначение</div>'+nodes+
+    '<small class="note" data-host-count></small></section>'+
+    '<section class="host-editor-side"><div class="node-form-section-title">Клиентское подключение</div>'+
+    '<p class="node-ip-hint">Итоговая конфигурация наследуется из inbound; приватные серверные ключи не экспортируются.</p>'+
+    '<div class="host-resolved" data-host-resolved></div><p class="host-validation" data-host-warnings role="status"></p>'+
+    '<details class="host-advanced"><summary>Расширенные переопределения '+ic('chevron-down')+'</summary>'+
+    '<p class="node-ip-hint">Пустые поля наследуются из профиля. Используйте только при нестандартной схеме.</p>'+
+    '<div class="host-advanced-fields">'+advanced+'</div>'+
+    '<button type="button" class="gh sm" data-host-clear-overrides>'+ic('rotate-ccw')+'Сбросить переопределения</button></details></section></div>';
+}
 function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id)===String(id)):e.def?e.def():{});
   const standardFields=e.fs.map(f=>field(f,k==='admins'&&f.k==='password'?'':o[f.k])).join('');
   const rotationFields=e.fs.filter(f=>['rotationEnabled','rotationIps'].includes(f.k)).map(f=>field(f,o[f.k])).join('');
@@ -1758,10 +1839,11 @@ function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id
     ?`<div class="node-rotation-probe"><label class="f"><span>Проверка на пользователе</span><select data-node-rotation-user>${userOptions||'<option value="">Нет активных пользователей</option>'}</select></label><button type="button" class="gh sm" data-node-rotation-probe="${id}" ${userOptions?'':'disabled'}>${ic('redo')}Получить следующий IP</button><output data-node-rotation-result aria-live="polite"></output><small>Тест изменяет счётчик ротации этого пользователя. Выдача подписок будет подключена отдельно.</small></div>`
     :'';
   const hostWizard=k==='hosts'?'<div class="host-quick"><label class="f"><span>Быстро заполнить из узла</span><select data-host-node-preset><option value="">Выберите сервер…</option>'+DB.nodes.map(n=>'<option value="'+esc(String(n.id))+'">'+esc(n.name)+' · '+esc(n.addr||'')+'</option>').join('')+'</select></label><p class="note">Подставит адрес, порт и привязку. Остальные поля сохранятся.</p></div>':'';
-  const fields=k==='nodes'
+  const fields=k==='hosts'?hostEditorMarkup(o,e):k==='nodes'
     ?'<div class="node-form-layout"><section class="node-main-section"><div class="node-form-section-title">Основные параметры</div><div class="node-form-grid">'+nodeMainFields+'</div></section>'+`<section class="node-ip-section"><div class="node-form-section-title">IP-пул и ротация</div><div class="node-ip-hint">Адреса должны принадлежать этому VPS и быть доступны извне.</div><div class="node-rotation-editor-body">${rotationFields}<div class="node-pool-toolbar"><span data-node-pool-count>Адресов: ${nodeRotationIPs(o).length} / 64</span><button type="button" class="gh sm" data-node-pool-normalize>Убрать повторы</button><button type="button" class="gh sm" data-node-pool-clear>Очистить</button></div><output data-node-pool-feedback aria-live="polite"></output>${rotationProbe}</div></section><section class="node-billing-section"><div class="node-form-section-title">Инфрабиллинг</div><p class="node-ip-hint">Стоимость, аренда и напоминания</p><div class="node-billing-fields">${billingFields}</div></section></div>`
-    :hostWizard+standardFields;
-  modal(`<form class="box" data-k="ent" data-ent="${k}" data-id="${id||''}" method="dialog"><h2>${id?'Изменить':'Новый'}: ${e.nw.toLowerCase()}</h2>${fields}<p class="er" id="fe"></p><div class="act">${id?`<button type="button" class="dg" data-del="${k}:${id}" style="margin-right:auto">${ic('trash')}Удалить</button>`:''}${k==='hosts'&&id?`<button type="button" class="gh" data-host-duplicate="${id}">${ic('copy')}Дублировать</button>`:''}<button type="button" class="gh" data-x>Отмена</button><button class="btn">Сохранить</button></div></form>`,k==='nodes'?'node-wide':k=='profiles'||k=='subs'?'wide':'')
+    :standardFields;
+  modal(`<form class="box" data-k="ent" data-ent="${k}" data-id="${id||''}" method="dialog"><h2>${id?'Изменить':'Новый'}: ${e.nw.toLowerCase()}</h2>${fields}<p class="er" id="fe"></p><div class="act">${id?`<button type="button" class="dg" data-del="${k}:${id}" style="margin-right:auto">${ic('trash')}Удалить</button>`:''}${k==='hosts'&&id?`<button type="button" class="gh" data-host-duplicate="${id}">${ic('copy')}Дублировать</button>`:''}<button type="button" class="gh" data-x>Отмена</button><button class="btn">Сохранить</button></div></form>`,k==='nodes'?'node-wide':k==='hosts'?'host-wide':k=='profiles'||k=='subs'?'wide':'');
+  if(k==='hosts')hostEditorRefresh(dlg.querySelector('form[data-ent="hosts"]'));
 }
 
 /* ================= УЗЛЫ ================= */
