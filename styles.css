@@ -2680,3 +2680,9 @@ html[data-font=opensans] body{font-family:"Open Sans",system-ui,sans-serif}
 html[data-font=source] body{font-family:"Source Sans 3",system-ui,sans-serif}
 html[data-font=fira] body{font-family:"Fira Sans",system-ui,sans-serif}
 html[data-font=jost] body{font-family:Jost,system-ui,sans-serif}
+
+/* Responsive, horizontal node settings dialog. */
+dialog.node-wide{width:min(920px,calc(100vw - 2rem))!important;max-width:none}
+dialog.node-wide .node-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem 1.25rem;align-items:start}
+dialog.node-wide .node-rotation-editor{min-width:0}
+@media(max-width:680px){dialog.node-wide{width:calc(100vw - 1rem)!important}dialog.node-wide .node-form-grid{grid-template-columns:minmax(0,1fr)}}
