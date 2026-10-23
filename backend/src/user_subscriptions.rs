@@ -118,6 +118,52 @@ fn vless_outbound(user:&Value,inbound:&Value,host:&Value,device:&str)->Option<Va
   "streamSettings":outbound_stream
  }))
 }
+// Native outbound credentials follow the protocol schema, never the inbound
+// settings shape. The node provisions these per-user credentials from xrayId.
+// Shadowsocks-2022 requires a separately provisioned per-user key.
+fn proxy_outbound(user:&Value,inbound:&Value,host:&Value,device:&str)->Option<Value>{
+ if nonempty(inbound,"protocol")==Some("vless"){
+  return vless_outbound(user,inbound,host,device)
+ }
+ let protocol=nonempty(inbound,"protocol")?;
+ if !["vmess","trojan","shadowsocks","hysteria"].contains(&protocol){return None}
+ let address=endpoint(host)?;
+ let port=["externalPort","port"].into_iter().find_map(|key|host.get(key).and_then(self::port))
+  .or_else(||inbound.get("port").and_then(self::port))?;
+ let stream=crate::subscription_transport::client_stream(inbound,host,device)?;
+ let security=stream["security"].as_str().unwrap_or("none");
+ let uuid=nonempty(user,"xrayId")?;
+ if uuid::Uuid::parse_str(uuid).is_err(){return None}
+ let settings=match protocol{
+  "vmess"=>json!({"address":address,"port":port,"id":uuid,"security":"auto"}),
+  "trojan"=>{
+   if security=="none"{return None}
+   json!({"address":address,"port":port,"password":uuid})
+  },
+  "shadowsocks"=>{
+   let method=inbound.get("settings").and_then(|v|nonempty(v,"method"))?;
+   let password=if method.starts_with("2022-"){nonempty(user,"ssPassword")?}else{uuid};
+   json!({"address":address,"port":port,"method":method,"password":password})
+  },
+  "hysteria"=>{
+   let network=stream.get("method").or_else(||stream.get("network")).and_then(Value::as_str)?;
+   if network!="hysteria" || security!="tls"{return None}
+   json!({"address":address,"port":port,"version":2})
+  },
+  _=>return None
+ };
+ let mut stream=stream;
+ if protocol=="hysteria"{
+  if !stream["hysteriaSettings"].is_object(){stream["hysteriaSettings"]=json!({})}
+  stream["hysteriaSettings"]["version"]=json!(2);
+  stream["hysteriaSettings"]["auth"]=json!(uuid);
+ }
+ let tag=nonempty(host,"remark").or_else(||nonempty(inbound,"tag")).unwrap_or(address);
+ let country=nonempty(host,"countryCode").or_else(||nonempty(host,"country"))
+  .or_else(||nonempty(host,"region")).unwrap_or("ZZ");
+ Some(json!({"tag":tag,"xmeshCountry":country,"protocol":protocol,
+   "settings":settings,"streamSettings":stream}))
+}
 async fn record(state:&AppState,id:i64)->Result<Value,ApiError>{
  let row=sqlx::query("SELECT data FROM panel_records WHERE collection='users' AND id=$1")
   .bind(id).fetch_optional(&state.pool).await?.ok_or_else(||ApiError::new(StatusCode::NOT_FOUND,"User not found"))?;
@@ -302,7 +348,7 @@ async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str,rotate:b
     .filter(|h|host_for_profile(h,tag,profile,&nodes)).collect();
    if !matched.is_empty(){
     for host in matched{
-     if let Some(mut outbound)=vless_outbound(user,inbound,host,device){
+     if let Some(mut outbound)=proxy_outbound(user,inbound,host,device){
       // Persist a stable selector identity independent of display name/order.
       if let Some(id)=host.get("id").and_then(Value::as_i64){
        outbound["xmeshSourceKey"]=json!(format!("host:{id}"));
@@ -318,7 +364,7 @@ async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str,rotate:b
       let no_uuid=nonempty(user,"xrayId").and_then(|id|uuid::Uuid::parse_str(id).ok()).is_none();
       tracing::warn!(inbound_tag=%tag, missing_reality_public_key=missing_key,
         invalid_user_uuid=no_uuid, host_has_address=endpoint(host).is_some(),
-        "Subscription public host could not produce client VLESS outbound");
+        "Subscription public host could not produce an authorized client outbound");
      }
     }
    }else if !any_explicit_host{
@@ -346,7 +392,7 @@ async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str,rotate:b
   }else if hosts.is_empty() && nodes.is_empty(){
    "Нет публичных хостов или узлов. Добавьте адрес подключения в XRAY STUDIO."
   }else{
-   "Не найдены рабочие VLESS-подключения: проверьте сквады, теги inbound, UUID пользователя, адреса и порты публичных хостов, Reality и привязку профилей."
+   "Не найдены рабочие подключения: проверьте сквады, теги inbound, UUID пользователя, адреса и порты публичных хостов, Reality и привязку профилей."
   };
   tracing::warn!(reason, squad_count=ids.len(), inbound_count=tags.len(), profile_count=profiles.len(), host_count=hosts.len(), node_count=nodes.len(), user_id=?(user.get("id").and_then(serde_json::Value::as_i64)), "Subscription has no valid endpoints");
   return Err(ApiError::new(StatusCode::SERVICE_UNAVAILABLE,reason))
