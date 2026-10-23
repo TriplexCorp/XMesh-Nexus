@@ -156,6 +156,7 @@ jobs:
           bash scripts/check-xmeshctl-confirm.sh
           bash -n deploy/node-metrics-agent.sh
           bash -n deploy/install-node-metrics-agent.sh
+          bash -n deploy/update-node-control-agent.sh
           sh -n deploy/postgres/10-create-app-user.sh
           mkdir -p deploy/runtime
           printf '%s\n' "$DASHBOARD_PATH" > deploy/runtime/dashboard-path
