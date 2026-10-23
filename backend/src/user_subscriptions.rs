@@ -257,7 +257,16 @@ pub async fn create(State(state):State<AppState>,Extension(actor):Extension<Auth
   .bind(id).bind(token_hash(&token)).bind(encrypted).execute(&state.pool).await?;
  crate::audit(&state.pool,&actor.username,"subscription.rotated",Some("users"),Some(id),json!({})).await;
  let settings=crate::read_settings(&state.pool).await?;
- Ok(Json(json!({"token":token,"userId":id,"url":studio_url(&settings,&token)})))
+ // A link can exist before nodes are fully configured. Report that distinction
+ // explicitly instead of presenting an unusable subscription as ready.
+ let readiness=match collect_user_outbounds(&state,&_user,"generic").await {
+  Ok((links,_))=>json!({"ready":true,"connections":links.len()}),
+  Err(error)=>{
+   tracing::warn!(user_id=id, reason=%error.message,"Subscription link created without usable endpoints");
+   json!({"ready":false,"connections":0,"warning":error.message})
+  }
+ };
+ Ok(Json(json!({"token":token,"userId":id,"url":studio_url(&settings,&token),"readiness":readiness})))
 }
 pub async fn status(
  State(state):State<AppState>,Extension(actor):Extension<AuthUser>,Path(id):Path<i64>,
@@ -351,7 +360,19 @@ async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str)->Result
    }
   }
  }
- if links.is_empty(){return Err(ApiError::new(StatusCode::SERVICE_UNAVAILABLE,"No valid public VLESS endpoints configured"))}
+ if links.is_empty(){
+  let reason=if ids.is_empty() || tags.is_empty(){
+   "У пользователя нет доступных inbound: назначьте сквад с нужными inbound."
+  }else if profiles.is_empty(){
+   "Нет XRAY-профилей. Создайте и сохраните профиль с inbound."
+  }else if hosts.is_empty() && nodes.is_empty(){
+   "Нет публичных хостов или узлов. Добавьте адрес подключения в XRAY STUDIO."
+  }else{
+   "Не найдены рабочие VLESS-подключения: проверьте сквады, теги inbound, UUID пользователя, адреса и порты публичных хостов, Reality и привязку профилей."
+  };
+  tracing::warn!(reason, squad_count=ids.len(), inbound_count=tags.len(), profile_count=profiles.len(), host_count=hosts.len(), node_count=nodes.len(),"Subscription has no valid endpoints");
+  return Err(ApiError::new(StatusCode::SERVICE_UNAVAILABLE,reason))
+ }
  Ok((links,outbounds))
 }
 pub async fn admin_client_json(
