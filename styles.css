@@ -3217,14 +3217,42 @@ dialog#dlg.host-wide [data-host-warnings][hidden]{display:none!important}
 dialog#dlg.host-wide [data-host-repair],
 dialog#dlg.host-wide [data-host-link-profile]{min-height:36px;white-space:normal;text-align:left}
 
-/* Compact copy confirmations inside the dialog top layer. Do not alter modal layout. */
-dialog .box:has(> .toast-dialog){position:relative}
-dialog .toast-dialog{
-  position:absolute;top:.7rem;right:2.8rem;left:auto;
-  width:max-content;max-width:min(22rem,calc(100% - 4rem));
-  padding:.45rem .7rem;font-size:.85em;line-height:1.35;
-  border-radius:.6rem;box-shadow:0 8px 24px rgba(0,0,0,.25);
-  margin:0;pointer-events:none;
+/* Node connection dialog: preserve its original controls, allow readable commands. */
+dialog#dlg:has(#node-bootstrap-command){
+  width:min(860px,calc(100vw - 32px))!important;
+  max-width:calc(100vw - 32px)!important;
+  max-height:calc(100dvh - 32px);
+  overflow:auto;
 }
-dialog .toast-dialog .toast-state-icon{flex:none}
-@media(max-width:560px){dialog .toast-dialog{right:2.5rem;max-width:calc(100% - 3rem)}}
+dialog#dlg:has(#node-bootstrap-command) > .box{
+  box-sizing:border-box;width:100%;max-width:100%;min-width:0;
+  padding:clamp(18px,2vw,30px);
+}
+dialog#dlg #node-bootstrap-command{
+  box-sizing:border-box;width:100%;min-width:0;
+  min-height:9em;max-height:35dvh;
+  white-space:pre-wrap;overflow-wrap:anywhere;
+  line-height:1.55;resize:vertical;
+}
+/* All dialog feedback appears at the bottom, never in the heading. */
+dialog#dlg .box:has(> .toast-dialog){position:relative}
+dialog .toast-dialog{
+  position:fixed!important;
+  top:auto!important;bottom:clamp(16px,4vh,40px)!important;
+  left:50%!important;right:auto!important;
+  width:max-content;max-width:min(460px,calc(100vw - 32px))!important;
+  margin:0!important;padding:.65rem .9rem;
+  font-size:.9em;line-height:1.4;
+  border-radius:.7rem;
+  transform:translate(-50%,8px)!important;
+  pointer-events:none;
+}
+dialog .toast-dialog.show{
+  transform:translate(-50%,0)!important;
+  pointer-events:auto;
+}
+@media(max-width:600px){
+  dialog#dlg:has(#node-bootstrap-command){width:calc(100vw - 16px)!important;max-width:calc(100vw - 16px)!important}
+  dialog#dlg:has(#node-bootstrap-command) > .box{padding:16px}
+  dialog .toast-dialog{bottom:16px!important}
+}
