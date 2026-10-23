@@ -1233,6 +1233,13 @@ async fn ingest_node_metrics(
              SELECT 1 FROM node_network_traffic_totals t
              WHERE t.node_id=$1
                AND (t.rx_bytes::numeric+t.tx_bytes::numeric)
+                   * CASE
+                       WHEN jsonb_typeof(data->'mult')='number'
+                         AND (data->>'mult')::numeric > 0
+                         AND (data->>'mult')::numeric <= 1000
+                       THEN (data->>'mult')::numeric
+                       ELSE 1
+                     END
                    >= (data->>'limit')::numeric*1073741824
            )
          RETURNING data->>'name' AS node_name,
