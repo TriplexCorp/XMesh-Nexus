@@ -38,7 +38,7 @@ assert.match(mfa,/encrypt\(\s*&state\s*,\s*&secret\s*\)/);
 assert.match(mfa,/panel_mfa_challenges/);
 
 // Client DOM sinks: user-controlled text is encoded and language strictly whitelisted.
-assert.match(app,/\$\{esc\(al\)\}/,'Toast action labels must be HTML-escaped');
+assert.match(app,/(?:\$\{esc\(al\)\}|\+esc\(al\)\+)/,'Toast action labels must be HTML-escaped');
 assert.match(studio,/data-portal-language="ru"/);
 assert.match(studio,/data-portal-language="en"/);
 assert.match(studio,/if\(next!=='ru'&&next!=='en'\)return/);
