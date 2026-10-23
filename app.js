@@ -1984,6 +1984,9 @@ async function nodesP(){
     const cpu=numberOrNull(m?.cpuPercent),ramUsed=numberOrNull(m?.ramUsedBytes),ramTotal=numberOrNull(m?.ramTotalBytes);
     const rx=numberOrNull(m?.rxBytesPerSec),tx=numberOrNull(m?.txBytesPerSec);
     const l={cpu:Number.isFinite(cpu)?cpu:null,ram:Number.isFinite(ramUsed)&&Number.isFinite(ramTotal)&&ramTotal>0?ramUsed/ramTotal*100:null,mbps:Number.isFinite(rx)&&Number.isFinite(tx)?(rx+tx)*8/1e6:null};
+    // Keep the live gauge cache consistent with the TimescaleDB data used
+    // by the Statistics page. drawNodeLive() must not wipe fresh gauges.
+    LV[n.id]=l;
     const k=n.limit?cl(n.used/n.limit,0,1):0,tc=k>.9?'--er':k>.75?'--wr':'--c3';
     return `<div class="card nc${n.disabled?' off':''}"><div class="h"><span class="fg">${flagView(n.flag)}</span><div><b>${esc(n.name)}</b><br><small class="mu">${esc(n.addr)}${n.port?':'+esc(n.port):''}</small>${n.hosting?.trim()?`<span class="node-hosting" title="Хостинг">${ic('building-2')}${esc(n.hosting.trim())}</span>`:''}</div>${runtime.get(n.id)?.connected?chip(panelIsEnglish()?'Node agent online':'Агент ноды онлайн','--ok'):runtime.get(n.id)?.lastSeenAt?chip(panelIsEnglish()?'Node offline':'Нода не в сети','--er'):chip(panelIsEnglish()?'Agent not connected':'Агент не подключён','--mu')}</div>
       <div class="kvg"><div><span>Активные пользователи</span><b>${s.nodeOn[n.id]??0}</b></div><div><span>XRAY STUDIO</span>${p?esc(p.name)+'<br><small class="mu">Применение профиля не подтверждено</small>':n.profileId?'<span class="er">Профиль ID '+esc(n.profileId)+' не найден</span>':'—'}</div></div>
@@ -2006,7 +2009,30 @@ function setNodeGauge(key,pct,center,detail){
   if(val)val.textContent=center;
   if(sub)sub.textContent=detail;
 }
-function drawNodeLive(){DB.nodes.forEach(n=>{
+async function refreshNodeMetrics(){
+  try{
+    const overview=await backendRequest('/api/v1/statistics/overview');
+    if(cur!=='nodes')return;
+    const metrics=new Map((overview?.nodes||[]).map(n=>[Number(n.id),n.latest&&!n.latest.stale?n.latest:null]));
+    DB.nodes.forEach(n=>{
+      const m=metrics.get(Number(n.id));
+      const val=v=>v===null||v===undefined?null:Number(v);
+      const cpu=val(m?.cpuPercent),used=val(m?.ramUsedBytes),total=val(m?.ramTotalBytes);
+      const rx=val(m?.rxBytesPerSec),tx=val(m?.txBytesPerSec);
+      LV[n.id]={
+        cpu:Number.isFinite(cpu)?cpu:null,
+        ram:Number.isFinite(used)&&Number.isFinite(total)&&total>0?used/total*100:null,
+        mbps:Number.isFinite(rx)&&Number.isFinite(tx)?(rx+tx)*8/1e6:null
+      };
+    });
+    updateNodeGauges();
+  }catch(error){console.warn('Could not refresh node metrics',error)}
+}
+function drawNodeLive(){
+  updateNodeGauges();
+  T.push(setInterval(()=>{void refreshNodeMetrics()},20000));
+}
+function updateNodeGauges(){DB.nodes.forEach(n=>{
   const l=LV[n.id]||{cpu:null,ram:null,mbps:null};
   const metrics=[['cpu-'+n.id,l.cpu,'загрузка'],['ram-'+n.id,l.ram,'занято']];
   metrics.forEach(([key,value,detail])=>setNodeGauge(key,Number.isFinite(value)?value:0,Number.isFinite(value)?Math.round(value)+'%':'—',Number.isFinite(value)?detail:'нет данных'));
