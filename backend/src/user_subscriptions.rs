@@ -754,7 +754,7 @@ mod tests{
   assert_eq!(data["outbounds"][0]["settings"]["vnext"][0]["users"][0]["id"],user["xrayId"]);
   assert_eq!(data["outbounds"][0]["streamSettings"]["xhttpSettings"]["mode"],"stream-up");
   assert_eq!(data["outbounds"][0]["streamSettings"]["xhttpSettings"]["xmux"]["cMaxReuseTimes"],64);
-  assert_eq!(data["outbounds"][0]["streamSettings"]["realitySettings"]["publicKey"],"PUBLIC_KEY");
+  assert_eq!(data["outbounds"][0]["streamSettings"]["realitySettings"]["password"],"PUBLIC_KEY");
   assert!(data["routing"]["rules"][2]["outboundTag"].as_str().unwrap().starts_with("xmesh-SE-0001"));
   assert_eq!(data["remarks"],"Sweden");
   assert_eq!(data["inbounds"][0]["protocol"],"socks");
@@ -807,6 +807,57 @@ mod tests{
   assert_eq!(windows["streamSettings"]["xhttpSettings"]["mode"],"stream-up");
   assert_eq!(automatic["streamSettings"]["xhttpSettings"]["mode"],"auto");
   assert_eq!(windows["streamSettings"]["xhttpSettings"]["xmux"]["cMaxReuseTimes"],64);
+ }
+ #[test] fn extended_xhttp_obfs_and_server_secrets_are_projected_safely(){
+  let user=json!({"xrayId":"550e8400-e29b-41d4-a716-446655440000"});
+  let inbound=json!({"tag":"DE","protocol":"vless","port":5011,
+   "settings":{"decryption":"none"},"streamSettings":{"network":"xhttp","security":"reality",
+    "realitySettings":{"privateKey":"SECRET_PRIVATE","publicKey":"PUB",
+      "serverNames":["example.org"],"shortIds":["abcd"]},
+    "xhttpSettings":{"path":"/stream","xPaddingObfsMode":true,"xPaddingKey":"x-token",
+      "xPaddingHeader":"X-Request-Token","xPaddingMethod":"tokenish",
+      "xPaddingPlacement":"header","seqPlacement":"query","seqKey":"segment",
+      "sessionIDPlacement":"cookie","sessionIDKey":"session_id",
+      "sessionIDTable":"Base62","sessionIDLength":"16-48",
+      "scStreamUpServerSecs":"30-60"}}});
+  let host=json!({"address":"vpn.example.org","externalPort":443});
+  let proxy=proxy_outbound(&user,&inbound,&host,"auto").unwrap();
+  let feed=crate::subscription_json::build_feed(vec![proxy],&json!({})).unwrap();
+  let x=&feed[0]["outbounds"][0]["streamSettings"]["xhttpSettings"];
+  assert_eq!(x["xPaddingObfsMode"],true);
+  assert_eq!(x["xPaddingPlacement"],"header");
+  assert_eq!(x["sessionIDPlacement"],"cookie");
+  assert_eq!(x["sessionIDLength"],"16-48");
+  assert!(x.get("scStreamUpServerSecs").is_none());
+  assert!(!feed.to_string().contains("SECRET_PRIVATE"));
+ }
+ #[test] fn per_user_multi_protocol_credentials_match_node_conventions(){
+  let user=json!({"xrayId":"550e8400-e29b-41d4-a716-446655440000"});
+  let host=json!({"address":"vpn.example.org","externalPort":443});
+  for (protocol,settings,field) in [
+   ("vmess",json!({}),"id"),("trojan",json!({}),"password"),
+   ("shadowsocks",json!({"method":"aes-256-gcm"}),"password"),
+   ("hysteria",json!({"version":2}),"auth")
+  ]{
+   let method=if protocol=="hysteria"{"hysteria"}else{"xhttp"};
+   let inbound=json!({"protocol":protocol,"tag":"N","settings":settings,
+    "streamSettings":{"network":method,"security":"tls",
+      "tlsSettings":{"serverName":"example.org"}}});
+   let proxy=proxy_outbound(&user,&inbound,&host,"auto").unwrap();
+   let auth=if protocol=="hysteria"{&proxy["streamSettings"]["hysteriaSettings"][field]}
+     else{&proxy["settings"][field]};
+   assert_eq!(auth,user["xrayId"],"{protocol}");
+   assert!(crate::subscription_json::build_feed(vec![proxy],&json!({})).is_ok());
+  }
+ }
+ #[test] fn insecure_trojan_and_missing_ss2022_key_fail_closed(){
+  let user=json!({"xrayId":"550e8400-e29b-41d4-a716-446655440000"});
+  let host=json!({"address":"vpn.example.org","externalPort":443});
+  let trojan=json!({"protocol":"trojan","streamSettings":{"network":"raw","security":"none"}});
+  assert!(proxy_outbound(&user,&trojan,&host,"auto").is_none());
+  let ss=json!({"protocol":"shadowsocks","settings":{"method":"2022-blake3-aes-256-gcm"},
+   "streamSettings":{"network":"raw","security":"none"}});
+  assert!(proxy_outbound(&user,&ss,&host,"auto").is_none());
  }
  #[test] fn invalid_reality_not_exported(){
  let user=json!({"xrayId":"550e8400-e29b-41d4-a716-446655440000"});
