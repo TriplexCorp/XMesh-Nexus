@@ -1,0 +1,31 @@
+#!/usr/bin/env node
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs');
+const backend=fs.readFileSync('backend/src/main.rs','utf8');
+const runtime=fs.readFileSync('backend/src/node_runtime.rs','utf8');
+const agent=fs.readFileSync('deploy/node-control-agent.sh','utf8');
+const updater=fs.readFileSync('deploy/update-node-control-agent.sh','utf8');
+const app=fs.readFileSync('app.js','utf8');
+assert.match(backend,/NODE TRAFFIC LIMIT EXHAUSTED/);
+assert.match(backend,/node_network_traffic_totals t/);
+assert.match(backend,/>= \(data->>'limit'\)::numeric\*1073741824/);
+assert.match(backend,/data->>'disabled'\)::boolean,false\)=false/,
+ 'Cutoff must happen exactly once per enabled node');
+assert.match(backend,/disabledReason.*traffic_limit/);
+assert.match(backend,/Лимит трафика узла исчерпан/);
+assert.match(runtime,/enforceStop":true/);
+assert.match(runtime,/enforceStop":false/);
+assert.match(runtime,/Node disabled: Xray configuration updates blocked/);
+assert.match(agent,/stop_xray\(\)/);
+assert.match(agent,/resume_xray\(\)/);
+assert.match(agent,/docker update --restart=no/);
+assert.match(agent,/systemctl disable --now/);
+assert.match(agent,/if \[\[ "\$enforce_stop" == true \]\]/);
+assert.match(agent,/\[\[ -f "\$MARKER" \]\]/);
+assert.match(updater,/OnUnitInactiveSec=5s/);
+assert.match(updater,/ReadWritePaths=\/var\/lib\/xmesh-node-control/);
+assert.match(app,/trafficLimitReachedAt/);
+assert.match(app,/ОСТАНОВКА XRAY НЕ ПОДТВЕРЖДЕНА/);
+assert.match(app,/КРИТИЧНО:/);
+assert.match(app,/startNodeQuotaNotifications\(\)/);
+console.log('Fail-closed automatic quota shutdown and persistent alert contract OK');
