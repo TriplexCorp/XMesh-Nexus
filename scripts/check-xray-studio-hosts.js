@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 'use strict';
-const assert=require('node:assert/strict'),fs=require('node:fs');
-global.window={};
-require('../xray-studio-hosts.js');
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+globalThis.window={};
+await import('../xray-studio-hosts.js');
 const module=window.XMeshStudioHosts;
 assert.equal(typeof module?.mount,'function');
 const view=module.view();
