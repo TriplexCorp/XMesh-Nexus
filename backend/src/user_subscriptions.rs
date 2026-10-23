@@ -243,6 +243,19 @@ async fn record(state:&AppState,id:i64)->Result<Value,ApiError>{
   .bind(id).fetch_optional(&state.pool).await?.ok_or_else(||ApiError::new(StatusCode::NOT_FOUND,"User not found"))?;
  row.try_get("data").map_err(Into::into)
 }
+// Provision a new user's subscription atomically with their account creation.
+// Never expose the bearer secret in the user record or logs.
+pub(crate) async fn provision_new_user(
+ state:&AppState,id:i64,tx:&mut sqlx::Transaction<'_,sqlx::Postgres>
+)->Result<(),ApiError>{
+ let mut secret=[0u8;32];OsRng.fill_bytes(&mut secret);
+ let token=hex::encode(secret);
+ let encrypted=encrypt_token(state,id,&token)?;
+ sqlx::query("INSERT INTO user_subscription_tokens(user_id,token_hash,token_ciphertext) VALUES($1,$2,$3)")
+  .bind(id).bind(token_hash(&token)).bind(encrypted)
+  .execute(&mut **tx).await?;
+ Ok(())
+}
 pub async fn create(State(state):State<AppState>,Extension(actor):Extension<AuthUser>,Path(id):Path<i64>)
  ->Result<Json<Value>,ApiError>{
  crate::require_mutation(&actor)?;
