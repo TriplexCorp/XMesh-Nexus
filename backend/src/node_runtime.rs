@@ -80,10 +80,24 @@ pub async fn request_restart(
     State(state): State<AppState>,
     axum::extract::Extension(actor): axum::extract::Extension<crate::auth::AuthUser>,
     Path(node_id): Path<i64>,
+    Json(body): Json<XrayVersionRequest>,
 ) -> Result<(StatusCode,Json<Value>),ApiError> {
     crate::require_mutation(&actor)?;
     if node_id<=0 {
         return Err(ApiError::new(StatusCode::BAD_REQUEST,"Invalid node ID"));
+    }
+    let target=body.version.trim();
+    if target.len()>64 || target.is_empty() ||
+       !target.bytes().all(|c|c.is_ascii_alphanumeric()||b"._+-".contains(&c)){
+       return Err(ApiError::new(StatusCode::BAD_REQUEST,"Некорректная версия Xray"));
+    }
+    // Validate against authoritative published releases, not arbitrary user
+    // strings. This also allows official prereleases.
+    let releases=state.core.all_node_releases().await.map_err(|msg|
+        ApiError::new(StatusCode::BAD_GATEWAY,msg))?;
+    if !releases.iter().any(|r|r.version==target){
+       return Err(ApiError::new(StatusCode::BAD_REQUEST,
+           "Выбранная версия отсутствует среди официальных релизов Xray"));
     }
     let node=sqlx::query_scalar::<_,Value>(
         "SELECT data FROM panel_records WHERE collection='nodes' AND id=$1"
@@ -111,7 +125,7 @@ pub async fn request_restart(
     let row=sqlx::query_scalar::<_,i64>(
         "INSERT INTO node_restart_commands(node_id,requested_by)
          VALUES($1,$2) ON CONFLICT DO NOTHING RETURNING id"
-    ).bind(node_id).bind(&actor.username).fetch_optional(&state.pool).await?
+    ).bind(node_id).bind(&actor.username).bind(target).fetch_optional(&state.pool).await?
       .ok_or_else(||ApiError::new(StatusCode::CONFLICT,"Узел уже выполняет команду управления."))?;
     crate::audit(&state.pool,&actor.username,"node.restart.requested",Some("nodes"),Some(node_id),
         json!({"commandId":row})).await;
@@ -120,6 +134,18 @@ pub async fn request_restart(
 
 // Only an authenticated administrator can queue a fixed managed-container update.
 // The node never receives an arbitrary command, image URL, or shell snippet.
+pub async fn available_xray_releases(
+    State(state):State<AppState>,
+)->Result<Json<Value>,ApiError>{
+    let releases=state.core.all_node_releases().await.map_err(|msg|
+        ApiError::new(StatusCode::BAD_GATEWAY,msg))?;
+    Ok(Json(json!({"items":releases})))
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct XrayVersionRequest{version:String}
+
 pub async fn request_xray_update(
     State(state): State<AppState>,
     axum::extract::Extension(actor): axum::extract::Extension<crate::auth::AuthUser>,
@@ -153,14 +179,14 @@ pub async fn request_xray_update(
            AND requested_at<NOW()-INTERVAL '180 seconds'"
     ).bind(node_id).execute(&state.pool).await?;
     let id=sqlx::query_scalar::<_,i64>(
-        "INSERT INTO node_restart_commands(node_id,action,requested_by)
-         VALUES($1,'update_xray',$2) ON CONFLICT DO NOTHING RETURNING id"
+        "INSERT INTO node_restart_commands(node_id,action,requested_by,target_version)
+         VALUES($1,'update_xray',$2,$3) ON CONFLICT DO NOTHING RETURNING id"
     ).bind(node_id).bind(&actor.username).fetch_optional(&state.pool).await?
       .ok_or_else(||ApiError::new(StatusCode::CONFLICT,"Узел уже выполняет команду управления."))?;
     crate::audit(&state.pool,&actor.username,"node.xray.update.requested",
-        Some("nodes"),Some(node_id),json!({"commandId":id})).await;
+        Some("nodes"),Some(node_id),json!({"commandId":id,"targetVersion":target})).await;
     Ok((StatusCode::ACCEPTED,Json(json!({"id":id,"nodeId":node_id,
-        "action":"update_xray","state":"pending"}))))
+        "action":"update_xray","targetVersion":target,"state":"pending"}))))
 }
 
 pub async fn restart_status(
@@ -177,7 +203,7 @@ pub async fn restart_status(
            AND requested_at<NOW()-INTERVAL '180 seconds'"
     ).bind(node_id).execute(&state.pool).await?;
     let item=sqlx::query(
-        "SELECT id,action,state,result,requested_by,
+        "SELECT id,action,target_version,state,result,requested_by,
           (EXTRACT(EPOCH FROM requested_at)*1000)::BIGINT AS requested_ms,
           (EXTRACT(EPOCH FROM finished_at)*1000)::BIGINT AS finished_ms
          FROM node_restart_commands WHERE node_id=$1 ORDER BY id DESC LIMIT 1"
@@ -186,6 +212,7 @@ pub async fn restart_status(
         Some(row)=>json!({
             "id":row.try_get::<i64,_>("id")?,
             "action":row.try_get::<String,_>("action")?,
+            "targetVersion":row.try_get::<Option<String>,_>("target_version")?,
             "nodeId":node_id,
             "state":row.try_get::<String,_>("state")?,
             "result":row.try_get::<String,_>("result")?,
@@ -232,11 +259,12 @@ pub async fn poll_restart(
         "UPDATE node_restart_commands SET state='claimed',claimed_at=NOW()
          WHERE id=(SELECT id FROM node_restart_commands WHERE node_id=$1
            AND state='pending' ORDER BY id FOR UPDATE SKIP LOCKED LIMIT 1)
-         RETURNING id,action"
+         RETURNING id,action,target_version"
     ).bind(request.node_id).fetch_optional(&state.pool).await?;
     let command=match row {
         Some(row)=>Some(json!({"id":row.try_get::<i64,_>("id")?,
-            "action":row.try_get::<String,_>("action")?})),
+            "action":row.try_get::<String,_>("action")?,
+            "targetVersion":row.try_get::<Option<String>,_>("target_version")?})),
         None=>None
     };
     Ok(Json(json!({"command":command,"enforceStop":false})))
