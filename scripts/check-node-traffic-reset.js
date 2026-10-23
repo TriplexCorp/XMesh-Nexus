@@ -1,0 +1,28 @@
+#!/usr/bin/env node
+'use strict';
+const fs=require('node:fs'),assert=require('node:assert/strict');
+const api=fs.readFileSync('backend/src/main.rs','utf8');
+const ui=fs.readFileSync('app.js','utf8');
+const css=fs.readFileSync('styles.css','utf8');
+assert.match(api,/\.route\("\/nodes\/\{id\}\/traffic\/reset", post\(reset_node_network_traffic\)\)/);
+const reset=api.slice(api.indexOf('async fn reset_node_network_traffic('),api.indexOf('async fn update_record('));
+assert.match(reset,/require_mutation\(&actor\)/);
+assert.match(reset,/enforce_collection\(&actor, "nodes", true\)/);
+assert.match(reset,/FOR UPDATE/);
+assert.match(reset,/SET rx_bytes=0,tx_bytes=0,updated_at=NOW\(\)/);
+assert.doesNotMatch(reset,/SET\s+last_rx_bytes\s*=/);
+assert.doesNotMatch(reset,/SET\s+last_tx_bytes\s*=/);
+assert.match(reset,/node_traffic_reset/);
+assert.match(reset,/nodePreviouslyQuotaStopped/);
+assert.match(reset,/trafficLastResetAt/);
+assert.match(reset,/xrayStarted":false/);
+assert.doesNotMatch(reset,/disabled.*false/);
+assert.match(ui,/data-node-reset-traffic/);
+assert.match(ui,/Сбросить трафик/);
+assert.match(ui,/panelConfirm\(/);
+assert.match(ui,/\/api\/v1\/nodes\/.*traffic\/reset/);
+assert.match(ui,/\[data-node-reset-feedback\]/);
+assert.match(css,/\.node-traffic-reset-button/);
+const create=api.slice(api.indexOf('async fn create_record('),api.indexOf('async fn reset_node_network_traffic('));
+assert.doesNotMatch(create,/\.bind\(id\).*node_network_traffic_totals/s);
+console.log('Node traffic reset contract: OK');
