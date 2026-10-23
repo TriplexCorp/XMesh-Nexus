@@ -2416,7 +2416,7 @@ document.addEventListener('click',async e=>{
     b.disabled=true;
     try{
       const issued=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/enrollment',{method:'POST'});
-      const url='https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/b39465b5e1eb0a5e07a9b104cde70f4ff0f38bdb/bootstrap.sh';
+      const url='https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/4b228c10dd5d1d85395d998d9de3b9b269019f9c/bootstrap.sh';
       const command='curl --proto "=https" --tlsv1.2 -H "Cache-Control: no-cache" -fsSLo /tmp/xmesh-bootstrap.sh '+url+' && grep -q "Installing Docker Engine and Compose from Docker" /tmp/xmesh-bootstrap.sh && sudo bash /tmp/xmesh-bootstrap.sh '+location.origin+' '+id+' '+(Number(DB.nodes.find(node=>Number(node.id)===id)?.port)||8443);
       modal('<div class="box node-setup"><div class="bar2 node-setup-head"><div><h2>Подключение узла</h2><p>Два шага для установки XMesh Node</p></div><button class="ia" data-x aria-label="Закрыть">'+ic('x')+'</button></div>'+
         '<section class="node-setup-step"><div class="node-setup-step-title"><span class="node-setup-number">1</span><div><h3>Команда для VPS</h3><p>Скопируйте и запустите в терминале сервера.</p></div></div><textarea id="node-bootstrap-command" readonly spellcheck="false" rows="4" aria-label="Команда установки">'+esc(command)+'</textarea><button type="button" class="btn node-setup-copy" data-copy-node-bootstrap>'+ic('copy')+'Скопировать команду</button></section>'+
