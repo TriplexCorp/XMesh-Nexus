@@ -63,9 +63,9 @@ struct GithubAsset {
     digest: Option<String>,
 }
 
-#[derive(Clone)]
 type ReleaseCache = Arc<RwLock<Option<(std::time::Instant, Vec<ReleaseInfo>)>>>;
 
+#[derive(Clone)]
 pub struct CoreManager {
     pool: PgPool,
     root: PathBuf,
