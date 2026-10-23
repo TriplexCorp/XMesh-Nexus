@@ -217,6 +217,8 @@ if not isinstance(value,int) or isinstance(value,bool) or value<=0:sys.exit(2)
 version=cmd.get("targetVersion")
 if action=="update_xray":
  if not isinstance(version,str) or not __import__("re").fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,63}",version):sys.exit(2)
+elif action=="update_agent":
+ if not isinstance(version,str) or not __import__("re").fullmatch(r"control-v[0-9]+[.][0-9]+[.][0-9]+",version):sys.exit(2)
 else:
  version="-"
 print(str(value)+" "+action+" "+version)
@@ -229,28 +231,14 @@ detail='Command failed'
 if [[ "$action" == update_xray ]];then
  if update_managed_xray "$target_version";then success=true;fi
 elif [[ "$action" == update_agent ]];then
- # Fixed root-owned systemd service. The panel cannot supply commands, URLs,
- # arguments, service names, or scripts. systemd gives the updater its own
- # filesystem write permissions, not the control worker.
+ # Only the installed systemd unit may update the agent. The API does not
+ # provide executable commands, paths or URLs.
  if ! systemctl cat xmesh-node-agent-upgrade.service >/dev/null 2>&1;then
   detail='Agent updater service missing; reinstall control-v4 first'
  elif timeout 150 systemctl start --wait xmesh-node-agent-upgrade.service &&
-      grep -q '^AGENT_VERSION="control-v4.0.0"
- if restart_xray;then
+      grep -Fxq "AGENT_VERSION=\"$target_version\"" /usr/local/sbin/xmesh-node-control;then
   success=true
-  detail='Xray restart confirmed'
- else
-  detail='Xray restart failed or runtime missing'
- fi
-else
- exit 2
-fi
-signed_post '/api/v1/node/restart/ack' \
- "{\"node_id\":$XMESH_NODE_ID,\"command_id\":$command_id,\"success\":$success,\"detail\":\"$detail\"}" >/dev/null
-heartbeat
- /usr/local/sbin/xmesh-node-control;then
-  success=true
-  detail='Agent control-v4.0.0 installed and verified'
+  detail='Agent installed and version verified'
  else
   detail='Agent update failed; inspect xmesh-node-agent-upgrade.service'
  fi
