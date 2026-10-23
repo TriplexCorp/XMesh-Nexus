@@ -3423,3 +3423,11 @@ dialog#dlg > .node-setup{
  .balancer-editor{padding:1rem!important}
  .balancer-savebar .btn{width:100%}
 }
+
+/* Manual node traffic reset sits beside its quota setting in the node editor. */
+.node-traffic-limit-control{display:flex;flex-direction:column;gap:.45rem;min-width:0}
+.node-traffic-limit-control>.f{width:100%;min-width:0}
+.node-traffic-reset-button{align-self:flex-start;min-height:2.2rem}
+.node-traffic-reset-help{font-size:.78rem;line-height:1.45;color:var(--mu)}
+.node-traffic-reset-status{display:block;font-size:.8rem;line-height:1.4;color:var(--ok)}
+@media(max-width:600px){.node-traffic-reset-button{width:100%}}
