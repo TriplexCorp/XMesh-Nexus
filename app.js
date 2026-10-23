@@ -202,9 +202,9 @@ const ENT={
     def:()=>({flag:'',mult:1,limit:0,resetDay:1,rotationEnabled:false,rotationIps:'',billingCurrency:'EUR',billingPeriod:'monthly',billingRemindDays:7,billingPrice:0}),
     chk:data=>{
       const issue=nodeRotationValidate(data);if(issue)return issue;
-      if(data.billingDueDate&&!/^\\d{4}-\\d{2}-\\d{2}$/.test(data.billingDueDate))return 'Укажите дату аренды в формате ГГГГ-ММ-ДД.';
+      if(data.billingDueDate&&!/^\d{4}-\d{2}-\d{2}$/.test(data.billingDueDate))return 'Укажите дату аренды в формате ГГГГ-ММ-ДД.';
       if(data.billingDueDate&&Number.isNaN(Date.parse(data.billingDueDate+'T00:00:00Z')))return 'Некорректная дата окончания аренды.';
-      if(data.billingProviderUrl&&!/^https:\/\/[^\\s/]+(?:\/[^\\s]*)?$/.test(data.billingProviderUrl))return 'Ссылка провайдера должна начинаться с https://';
+      if(data.billingProviderUrl&&!/^https:\/\/[^\s/]+(?:\/[^\s]*)?$/.test(data.billingProviderUrl))return 'Ссылка провайдера должна начинаться с https://';
       return '';
     },
     guard:r=>DB.hosts.some(h=>h.nodes.includes(r.id))?'Узел указан в хостах. Уберите его оттуда.':''},
@@ -2447,7 +2447,7 @@ const nodeNotificationTitle=node=>flagView(node.flag,'notification-country-flag'
   '<span class="notification-node-label">'+esc(node.name)+(node.hosting?.trim()?'<small>'+esc(node.hosting.trim())+'</small>':'')+'</span>';
 $('#bell').onclick=()=>{
  const notifications=[
-  ...DB.nodes.filter(n=>n.billingDueDate&&/^\\d{4}-\\d{2}-\\d{2}$/.test(n.billingDueDate)).filter(n=>{
+  ...DB.nodes.filter(n=>n.billingDueDate&&/^\d{4}-\d{2}-\d{2}$/.test(n.billingDueDate)).filter(n=>{
     const diff=Date.parse(n.billingDueDate+'T23:59:59Z')-Date.now();
     return diff<=(Math.max(0,Number(n.billingRemindDays)||0)+1)*DAY;
   }).map(n=>({title:esc(n.name)+' · аренда',message:'Аренда VPS до '+esc(n.billingDueDate)+' · '+esc(String(n.billingPrice||0))+' '+esc(n.billingCurrency||'EUR')})),
