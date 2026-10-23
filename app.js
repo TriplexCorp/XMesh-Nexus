@@ -1886,6 +1886,28 @@ function hostEditorRefresh(form,changedProfile=false){
     link.hidden=!target;
     if(target){link.dataset.hostLinkProfile=String(target.id);link.textContent='Назначить «'+profile.name+'» ноде «'+target.name+'»';}
   }
+  const runtimeStatus=form.querySelector('[data-host-runtime]');
+  if(runtimeStatus){
+    const ids=requiredNodes.filter(Boolean).map(n=>String(n.id)).sort();
+    const key=ids.join(',');
+    if(runtimeStatus.dataset.probeKey!==key){
+      runtimeStatus.dataset.probeKey=key;
+      runtimeStatus.textContent=ids.length?'Проверяю агент и Xray на выбранных нодах…':'Состояние Xray: выберите ноду.';
+      if(ids.length)void Promise.all(ids.map(async id=>{
+        const node=DB.nodes.find(n=>String(n.id)===id);
+        try {
+          const state=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/runtime');
+          if(!state.connected)return (node?.name||id)+': нет свежей связи с агентом';
+          if(state.xrayRunning===false)return (node?.name||id)+': агент онлайн, Xray остановлен';
+          if(state.routerRunning===false)return (node?.name||id)+': агент онлайн, маршрутизатор остановлен';
+          return (node?.name||id)+': агент онлайн'+(state.xrayRunning===true?', Xray запущен':'')+'; применённый профиль не подтверждён';
+        }catch(_){return (node?.name||id)+': состояние агента неизвестно'}
+      })).then(states=>{
+        if(form.isConnected&&runtimeStatus.dataset.probeKey===key)
+          runtimeStatus.textContent='Статус нод: '+states.join(' • ');
+      });
+    }
+  }
   const count=form.querySelector('[data-host-count]');
   if(count)count.textContent=requiredNodes.length+' нод привязано';
 }
@@ -1908,7 +1930,7 @@ function hostEditorMarkup(o,e){
     '<small class="note" data-host-count></small></section>'+
     '<section class="host-editor-side"><div class="node-form-section-title">Клиентское подключение</div>'+
     '<p class="node-ip-hint">Имя сервера берётся из поля Remarks. Сетевые параметры наследуются из inbound; приватные ключи не экспортируются.</p>'+
-    '<div class="host-resolved" data-host-resolved></div><p class="host-validation" data-host-warnings role="status" hidden></p><button type="button" class="gh sm" data-host-repair hidden></button><button type="button" class="gh sm" data-host-link-profile hidden></button><p class="node-ip-hint">Важно: предпросмотр показывает ожидаемые клиентские настройки, но не подтверждает применение профиля, добавление UUID в Xray или доступность порта на ноде.</p>'+
+    '<div class="host-resolved" data-host-resolved></div><p class="node-ip-hint" data-host-runtime role="status" aria-live="polite"></p><p class="host-validation" data-host-warnings role="status" hidden></p><button type="button" class="gh sm" data-host-repair hidden></button><button type="button" class="gh sm" data-host-link-profile hidden></button><p class="node-ip-hint">Важно: предпросмотр показывает ожидаемые клиентские настройки, но не подтверждает применение профиля, добавление UUID в Xray или доступность порта на ноде.</p>'+
     '<details class="host-advanced"><summary>Расширенные переопределения '+ic('chevron-down')+'</summary>'+
     '<p class="node-ip-hint">Пустые поля наследуются из профиля. Используйте только при нестандартной схеме.</p>'+
     '<div class="host-advanced-fields">'+advanced+'</div>'+
