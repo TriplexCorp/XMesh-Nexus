@@ -285,6 +285,26 @@ pub async fn revoke(State(state):State<AppState>,Extension(actor):Extension<Auth
  crate::audit(&state.pool,&actor.username,"subscription.revoked",Some("users"),Some(id),json!({})).await;
  Ok(Json(json!({"revoked":true})))
 }
+// Hosts are now edited inside XRAY STUDIO but remain in the existing
+// PostgreSQL collection. Legacy tag-only records continue to work.
+fn host_for_profile(host:&Value,tag:&str,profile:&Value,nodes:&[Value])->bool {
+ if host.get("disabled").and_then(Value::as_bool)==Some(true) || nonempty(host,"tag")!=Some(tag){
+  return false;
+ }
+ if let Some(profile_id)=host.get("profileId").and_then(Value::as_i64)
+    && Some(profile_id)!=profile.get("id").and_then(Value::as_i64){
+  return false;
+ }
+ let pinned=host.get("nodes").and_then(Value::as_array);
+ if let Some(pins)=pinned && !pins.is_empty(){
+  return nodes.iter().any(|node| {
+   node.get("disabled").and_then(Value::as_bool)!=Some(true)
+    && node.get("profileId")==profile.get("id")
+    && pins.iter().any(|selected|selected.as_i64()==node.get("id").and_then(Value::as_i64))
+  });
+ }
+ true
+}
 async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str)->Result<(Vec<String>,Vec<Value>),ApiError>{
  let squads=crate::load_records(&state.pool,"squads").await?;
  let profiles=crate::load_records(&state.pool,"profiles").await?;
@@ -307,14 +327,21 @@ async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str)->Result
   for inbound in inbounds{
    let Some(tag)=nonempty(inbound,"tag")else{continue};
    if !tags.contains(tag){continue}
-   let matched:Vec<&Value>=hosts.iter().filter(|h|h.get("disabled")!=Some(&Value::Bool(true))&&nonempty(h,"tag")==Some(tag)).collect();
+   // Do not silently fall back to a node's raw address when an explicitly
+   // configured public host is disabled or pinned to a different node.
+   let any_explicit_host=hosts.iter().any(|h|
+    nonempty(h,"tag")==Some(tag) &&
+    (h.get("profileId").and_then(Value::as_i64).is_none()
+      || h.get("profileId")==profile.get("id")));
+   let matched:Vec<&Value>=hosts.iter()
+    .filter(|h|host_for_profile(h,tag,profile,&nodes)).collect();
    if !matched.is_empty(){
     for host in matched{
      if let Some(link)=vless_link(user,inbound,host,device) && let Some(outbound)=vless_outbound(user,inbound,host,device){
       outbounds.push(outbound);links.push(link)
      }
     }
-   }else{
+   }else if !any_explicit_host{
     for node in nodes.iter().filter(|n|n.get("profileId")==profile.get("id")&&n.get("disabled")!=Some(&Value::Bool(true))){
      let host=json!({"address":node.get("publicAddress").or_else(||node.get("externalAddress")).or_else(||node.get("addr")),"port":inbound.get("port"),"remark":node.get("name"),"country":node.get("country")});
      if let Some(link)=vless_link(user,inbound,&host,device) && let Some(outbound)=vless_outbound(user,inbound,&host,device){
@@ -651,6 +678,19 @@ mod tests{
   assert_eq!(data["outbounds"][0]["streamSettings"]["realitySettings"]["publicKey"],"PUBLIC_KEY");
   assert!(data["routing"]["rules"][3]["outboundTag"].as_str().unwrap().starts_with("xmesh-ZZ-0001"));
   assert_eq!(data["inbounds"][0]["protocol"],"socks");
+ }
+ #[test] fn hosts_respect_profile_and_node_assignment(){
+  let profile=json!({"id":7});
+  let nodes=vec![json!({"id":10,"profileId":7,"disabled":false}),
+   json!({"id":11,"profileId":8,"disabled":false})];
+  assert!(host_for_profile(&json!({"tag":"PL","nodes":[]}),"PL",&profile,&nodes));
+  assert!(host_for_profile(&json!({"tag":"PL","nodes":[10]}),"PL",&profile,&nodes));
+  assert!(!host_for_profile(&json!({"tag":"PL","nodes":[11]}),"PL",&profile,&nodes));
+  assert!(!host_for_profile(&json!({"tag":"PL","profileId":8}),"PL",&profile,&nodes));
+  assert!(!host_for_profile(&json!({"tag":"PL","disabled":true}),"PL",&profile,&nodes));
+  assert!(!host_for_profile(&json!({"tag":"DE","nodes":[]}),"PL",&profile,&nodes));
+  let disabled=vec![json!({"id":10,"profileId":7,"disabled":true})];
+  assert!(!host_for_profile(&json!({"tag":"PL","nodes":[10]}),"PL",&profile,&disabled));
  }
  #[test] fn xhttp_device_profiles_are_applied_only_to_selected_device(){
   let user=json!({"xrayId":"550e8400-e29b-41d4-a716-446655440000"});
