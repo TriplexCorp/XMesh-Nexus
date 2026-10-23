@@ -79,7 +79,7 @@ window.XMeshStudioHosts=(()=>{
       if(profile()==null||!tag())return ctx.notify('Сначала сохраните профиль.');
       if(!remark||!address)return ctx.notify('Укажите название и публичный адрес.');
       if(!Number.isInteger(port)||port<1||port>65535)return ctx.notify('Некорректный внешний порт.');
-      if(/[\s/@?#\\]/.test(address)||address.length>253)return ctx.notify('Некорректный адрес сервера.');
+      if([...address].some(c=>' /@?#'.includes(c)||c==='\\')||address.length>253)return ctx.notify('Некорректный адрес сервера.');
       const nodeIds=[...qs('[data-endpoint-nodes]').querySelectorAll('input:checked')].map(x=>Number(x.value));
       const old=editing==null?null:hosts().find(h=>String(h.id)===String(editing));
       if(editing!=null&&!old)return ctx.notify('Подключение не найдено.');
