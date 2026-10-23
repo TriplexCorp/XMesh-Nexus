@@ -440,6 +440,16 @@ pub async fn admin_client_json(
   .map_err(|detail|ApiError::new(StatusCode::BAD_REQUEST,detail))?;
  Ok(Json(profile))
 }
+// Standalone subscriptions are intentionally link lists so clients such as
+// Happ show individual named servers instead of one XMesh Servers JSON entry.
+fn use_vless_feed(
+ client:&crate::subscription_user_agent::Client,
+ options:&HashMap<String,String>,
+ settings:&Value,
+)->bool{
+ client.format==crate::subscription_user_agent::Format::Vless
+  || (!options.contains_key("format") && !crate::subscription_json::smart_enabled(settings))
+}
 pub async fn serve(State(state):State<AppState>,Path(token):Path<String>,
  headers:HeaderMap,Query(options):Query<HashMap<String,String>>)->Result<Response,ApiError>{
  if !valid_token(&token){return Err(ApiError::new(StatusCode::NOT_FOUND,"Subscription not found"))}
@@ -458,8 +468,7 @@ pub async fn serve(State(state):State<AppState>,Path(token):Path<String>,
  // Without an enabled balancer, deliver individually named VLESS entries.
  // A monolithic Xray JSON is treated by Happ as one profile even when it
  // contains multiple proxy outbounds. Explicit ?format=json always wins.
- let legacy=client.format==crate::subscription_user_agent::Format::Vless
-    || (!options.contains_key("format") && !crate::subscription_json::smart_enabled(&settings));
+ let legacy=use_vless_feed(&client,&options,&settings);
 
  let mut response=if legacy{
   links.join("\n").into_response()
@@ -727,6 +736,21 @@ pub async fn portal(
 #[cfg(test)]
 mod tests{
  use super::*;
+ #[test] fn no_smart_shows_standalone_servers_for_happ(){
+  use crate::subscription_user_agent::{Client,Device,Format};
+  let happ=Client{format:Format::Json,device:Device::Auto,known_app:true};
+  let mut options=HashMap::new();
+  assert!(use_vless_feed(&happ,&options,&json!({})));
+  assert!(use_vless_feed(&happ,&options,
+    &json!({"subscriptionJson":{"smart":false,"balance":"leastPing"}})));
+  assert!(!use_vless_feed(&happ,&options,
+    &json!({"subscriptionJson":{"smart":true,"balance":"leastPing"}})));
+  // Explicit JSON import stays supported for users who need raw JSON.
+  options.insert("format".to_string(),"json".to_string());
+  assert!(!use_vless_feed(&happ,&options,&json!({})));
+  let vless=Client{format:Format::Vless,device:Device::Auto,known_app:true};
+  assert!(use_vless_feed(&vless,&options,&json!({})));
+ }
  #[test] fn secret_format(){assert!(valid_token(&"a".repeat(64)));assert!(!valid_token(&"G".repeat(64)));assert_ne!(token_hash("a"),token_hash("b"));}
  #[test] fn encrypted_token_round_trip_and_identity_binding(){
    // This regression test deliberately keeps the stateful integration path out
