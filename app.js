@@ -746,7 +746,7 @@ const balancersP=async()=>{
       field('Таймаут','probeTimeout',obs.probeTimeout||'2s','2s',5)+
       field('Выборка','sampling',String(obs.sampling||5),'5',2)+
       field('Проверочный HTTPS URL','probeURL',obs.probeURL||'https://www.gstatic.com/generate_204','https://...',256)+
-      field('Проверка связности','connectivity',obs.connectivity||'https://cp.cloudflare.com/generate_204','https://...',256)+
+      field('Проверка связности','connectivity',obs.connectivity||'http://cp.cloudflare.com/generate_204','https://...',256)+
       '</div><p class="note">Xray поддерживает probeInterval и probeUrl. Таймаут, выборка и связность сохраняются как настройки группы, но не передаются в неподдерживаемые поля Xray.</p></details>'+
    '</section>';
   }).join(''):'<div class="balancer-empty"><strong>Балансировщиков пока нет</strong><p>Добавьте любую комбинацию серверов. Одиночные подключения работают независимо.</p></div>';
@@ -778,7 +778,7 @@ const balancersP=async()=>{
    draft.push({tag:'AUTO_'+next,remark:'Новый балансировщик',serverDescription:'',
     enabled:true,strategy:'leastPing',selector:[],hideSelectedInbounds:false,
     observatory:{probeInterval:'20s',probeTimeout:'2s',sampling:5,
-    probeURL:'https://www.gstatic.com/generate_204',connectivity:'https://cp.cloudflare.com/generate_204'}});
+    probeURL:'https://www.gstatic.com/generate_204',connectivity:'http://cp.cloudflare.com/generate_204'}});
    view();
    list.lastElementChild?.scrollIntoView({behavior:'smooth',block:'nearest'});
   });
