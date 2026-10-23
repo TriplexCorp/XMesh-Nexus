@@ -2507,6 +2507,11 @@ async function nodesP(){
   })));
   const cards=r.items.map(n=>{
     const ss=nstat(n),p=DB.profiles.find(x=>x.id==n.profileId),m=latestMetrics.get(Number(n.id));
+    const geoRuntime=runtime.get(n.id);
+    const geoStatus=geoRuntime?.connected?geoRuntime?.geoData:null;
+    const geoLabels={current:'файлы актуальны',pending:'применяется',error:'ошибка обновления',rolled_back:'откат'};
+    const geoLabel=geoStatus?.state?geoLabels[geoStatus.state]||'статус неизвестен':'ожидает агента';
+    const geoFileCount=geoStatus?.files&&typeof geoStatus.files==='object'?Object.keys(geoStatus.files).length:0;
     const numberOrNull=v=>v===null||v===undefined?null:Number(v);
     const cpu=numberOrNull(m?.cpuPercent),ramUsed=numberOrNull(m?.ramUsedBytes),ramTotal=numberOrNull(m?.ramTotalBytes);
     const rx=numberOrNull(m?.rxBytesPerSec),tx=numberOrNull(m?.txBytesPerSec);
@@ -2523,7 +2528,7 @@ async function nodesP(){
     const k=n.limit&&trafficGb!==null?cl(trafficGb/n.limit,0,1):0,tc=k>.9?'--er':k>.75?'--wr':'--c3';
     return `<div class="card nc${n.disabled?' off':''}" data-node-card-id="${n.id}"><div class="h"><span class="fg">${flagView(n.flag)}</span><div class="node-identity"><b>${esc(n.name)}</b><br><small class="mu">${esc(n.addr)}${n.port?':'+esc(n.port):''}</small>${n.hosting?.trim()?`<span class="node-hosting" title="Хостинг">${ic('building-2')}${esc(n.hosting.trim())}</span>`:''}<span class="node-agent-version" data-node-agent-version title="Версия управляющего агента">${runtime.get(n.id)?.version?"Agent "+esc(runtime.get(n.id).version.replace(/^control-v/,"v")):"Agent —"}</span></div><div class="node-live-badges"><span class="node-xray-version" data-node-xray-version title="Версия по последнему heartbeat">${runtime.get(n.id)?.xrayVersion?'Xray '+esc(runtime.get(n.id).xrayVersion):'Xray —'}</span><span data-node-runtime-state class="node-runtime-pill node-runtime-${nodeRuntimeState(n,runtime.get(n.id)).kind}"><span class="node-runtime-dot" aria-hidden="true"></span>${esc(nodeRuntimeState(n,runtime.get(n.id)).label)}</span></div></div>
       <div class="kvg"><div><span>Активные пользователи</span><b>${s.nodeOn[n.id]??0}</b></div><div><span>XRAY STUDIO</span>${p?esc(p.name)+'<br><small class="mu">Применение профиля не подтверждено</small>':n.profileId?'<span class="er">Профиль ID '+esc(n.profileId)+' не найден</span>':'—'}</div></div>
-      ${n.geoEnabled?`<div class="node-ip-rotation active" title="GeoData задана; применение зависит от синхронизации агента"><span class="node-ip-indicator" aria-hidden="true"></span><span>GeoData · ${n.geoBlockAds?'блокировка рекламы':'свои правила'}</span></div>`:''}
+      ${n.geoEnabled?`<div class="node-ip-rotation active" title="${esc(geoStatus?.lastError||'Подтверждение от управляющего агента, не проверка фактической блокировки рекламы')}"><span class="node-ip-indicator" aria-hidden="true"></span><span>GeoData · ${esc(geoLabel)}${geoFileCount?' · '+geoFileCount+' файла(ов)':''}</span></div>`:''}
       ${n.rotationEnabled?`<div class="node-ip-rotation active" aria-label="Пул IP-ротации"><span class="node-ip-indicator" aria-hidden="true"></span><span>IP-пул · ${nodeRotationIPs(n).length} адресов</span></div>`:''}
       <div class="node-gauges">
         ${nodeGauge(n,'cpu-'+n.id,'CPU',Number.isFinite(l.cpu)?l.cpu:0,Number.isFinite(l.cpu)?Math.round(l.cpu)+'%':'—',Number.isFinite(l.cpu)?'загрузка':'нет данных','--a')}
