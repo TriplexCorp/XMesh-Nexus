@@ -2288,12 +2288,11 @@ function squadEditorMarkup(o,e){
   }).join('');
   return '<div class="squad-editor-layout">'+
     '<section class="squad-editor-main" aria-label="Параметры сквада">'+
-      '<div class="node-form-section-title">Основные параметры</div>'+
-      '<p class="squad-help">Название и описание видны администраторам. Сквад объединяет inbound для пользователей.</p>'+
+      '<div class="node-form-section-title">Основное</div>+
       '<div class="squad-editor-fields">'+field(e.fs.find(x=>x.k==='name'),o.name||'')+field(e.fs.find(x=>x.k==='desc'),o.desc||'')+'</div>'+
       '</section><section class="squad-editor-connections" aria-label="Подключения сквада">'+
       '<div class="node-form-section-title">Подключения</div>'+
-      '<div class="squad-section-heading"><div><b>Доступные inbound</b><small>Теги из XRAY STUDIO, без изменения серверной конфигурации</small></div><span class="squad-selected-count" data-squad-selected>0 выбрано</span></div>'+
+      '<div class="squad-section-heading"><div><b>Inbound из XRAY STUDIO</b></div><span class="squad-selected-count" data-squad-selected>0 выбрано</span></div>'+
       '<div class="squad-editor-toolbar">'+
         '<label class="search squad-inbound-search">'+ic('search')+'<input type="search" data-squad-search placeholder="Найти inbound или профиль…" autocomplete="off" aria-label="Поиск inbound"></label>'+
         '<button type="button" class="gh sm" data-squad-select="all">Выбрать все</button>'+
@@ -2301,11 +2300,11 @@ function squadEditorMarkup(o,e){
       '</div>'+
       '<div class="squad-inbound-list">'+(rows||'<div class="squad-inbound-empty">В XRAY STUDIO пока нет inbound. Создайте профиль, чтобы назначить доступ.</div>')+'</div>'+
       '<p class="squad-inbound-empty" data-squad-no-results hidden>Ничего не найдено</p>'+
-      '<p class="squad-help">Одинаковый тег в нескольких профилях отображается один раз: сквад хранит именно тег, а не отдельную привязку к профилю.</p>'+
+      '<p class="squad-help">Повторяющиеся теги объединяются. Конфигурация Xray не изменяется.</p>'+
     '</section>'+
     '<section class="squad-editor-side" aria-label="Предпросмотр и влияние">'+
-      '<div class="node-form-section-title">Доступ и диагностика</div>'+
-      '<p class="squad-help">Показывает связи в панели. Не подтверждает применение конфигурации на нодах.</p>'+
+      '<div class="node-form-section-title">Влияние на подписки</div>'+
+      ''+
       '<div data-squad-preview role="status" aria-live="polite"></div>'+
     '</section>'+
   '</div>';
