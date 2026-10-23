@@ -174,7 +174,7 @@ const swc=k=>r=>`<label class="sw"><input type="checkbox" data-tg="${k}:${r.id}"
 const nodeRotationIPs = node => String(node?.rotationIps||'').split(/\r?\n/).map(ip=>ip.trim()).filter(Boolean);
 const nodeIpValid=address=>{
   const ip=String(address||'').trim();
-  if(/^((25[0-5]|2[0-4]\\d|1?\\d?\\d)\\.){3}(25[0-5]|2[0-4]\\d|1?\\d?\\d)$/.test(ip))return true;
+  if(/^((25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(25[0-5]|2[0-4]\d|1?\d?\d)$/.test(ip))return true;
   if(!ip.includes(':')||!/^[0-9a-fA-F:.]+$/.test(ip))return false;
   try{return new URL('http://['+ip+']/').hostname.startsWith('[')}catch{return false}
 };
