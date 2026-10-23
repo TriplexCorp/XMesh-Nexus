@@ -2235,10 +2235,12 @@ function hostEditorMarkup(o,e){
     '<section class="host-editor-side"><div class="node-form-section-title">Клиентское подключение</div>'+
     '<p class="node-ip-hint">Имя сервера берётся из поля Remarks. Сетевые параметры наследуются из inbound; приватные ключи не экспортируются.</p>'+
     '<div class="host-resolved" data-host-resolved></div><p class="node-ip-hint" data-host-runtime role="status" aria-live="polite"></p><p class="host-validation" data-host-warnings role="status" hidden></p><button type="button" class="gh sm" data-host-repair hidden></button><button type="button" class="gh sm" data-host-link-profile hidden></button><p class="node-ip-hint">Важно: предпросмотр показывает ожидаемые клиентские настройки, но не подтверждает применение профиля, добавление UUID в Xray или доступность порта на ноде.</p>'+
-    '<details class="host-advanced" open><summary>Расширенные переопределения '+ic('chevron-down')+'</summary>'+
-    '<p class="node-ip-hint">Пустые поля наследуются из профиля. Используйте только при нестандартной схеме.</p>'+
+    '</section>'+
+    '<section class="host-advanced host-advanced-panel" aria-label="Расширенные переопределения">'+
+    '<div class="host-advanced-heading"><div class="node-form-section-title">03 · Расширенные переопределения</div>'+
+    '<p class="node-ip-hint">Пустые поля наследуются из XRAY STUDIO. Меняйте только параметры, которые действительно отличаются от профиля.</p></div>'+
     '<div class="host-advanced-fields">'+advanced+'</div>'+
-    '<button type="button" class="gh sm" data-host-clear-overrides>'+ic('rotate-ccw')+'Сбросить переопределения</button></details></section></div>';
+    '<div class="host-advanced-actions"><button type="button" class="gh sm" data-host-clear-overrides>'+ic('rotate-ccw')+'Сбросить переопределения</button></div></section></div>';
 }
 function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id)===String(id)):e.def?e.def():{});
   const standardFields=e.fs.map(f=>field(f,k==='admins'&&f.k==='password'?'':o[f.k])).join('');
