@@ -69,7 +69,7 @@ fn effective_xhttp(config:&Value)->Value{
     }
     effective
 }
-fn device_xhttp(inbound:&Value,device:&str)->Option<&Value>{
+fn device_xhttp<'a>(inbound:&'a Value,device:&str)->Option<&'a Value>{
     let name=match device{"ios"=>"iOS","windows"=>"Windows",_=>return None};
     inbound.get("xmesh").and_then(|v|v.get("xhttpDeviceProfiles"))
         .or_else(||inbound.get("xhttpDeviceProfiles"))
