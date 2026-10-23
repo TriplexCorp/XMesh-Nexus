@@ -471,19 +471,35 @@ fn provision_proxy_users(config:&mut Value,users:&[Value],squads:&[Value],now_ms
 // centrally reserved multi-node quota ledger.
 fn build_offline_policy(config:&Value, users:&[Value], node_id:i64, now_ms:i64,
     digest:&str, active_nodes:i64)->Value {
-    let allowed:std::collections::HashSet<String>=config.get("inbounds")
+    // The authoritative provisioner now supports VLESS clients and
+    // users arrays for VMess, Trojan, Shadowsocks, Hysteria and MASQUE.
+    // Build offline allowances from the actual provisioned runtime accounts,
+    // including non-UUID credentials (Shadowsocks 2022).
+    let accounts:Vec<&Value>=config.get("inbounds")
         .and_then(Value::as_array).into_iter().flatten()
-        .flat_map(|inbound|inbound.pointer("/settings/clients")
-            .and_then(Value::as_array).into_iter().flatten())
-        .filter_map(|client|client.get("id").and_then(Value::as_str))
-        .filter_map(|uuid|uuid::Uuid::parse_str(uuid).ok().map(|id|id.to_string()))
+        .flat_map(|inbound|{
+            ["clients","users"].into_iter()
+                .flat_map(move |field|inbound.get("settings")
+                    .and_then(|v|v.get(field)).and_then(Value::as_array)
+                    .into_iter().flatten())
+        }).collect();
+    let allowed_uuids:std::collections::HashSet<String>=accounts.iter()
+        .flat_map(|account|["id","password","auth","pass"].into_iter()
+            .filter_map(|key|account.get(key).and_then(Value::as_str)))
+        .filter_map(|secret|uuid::Uuid::parse_str(secret).ok().map(|id|id.to_string()))
         .collect();
+    let allowed_user_ids:std::collections::HashSet<i64>=accounts.iter()
+        .filter_map(|account|account.get("email").and_then(Value::as_str))
+        .filter_map(|email|email.strip_prefix("xmesh-u"))
+        .filter_map(|rest|rest.split_once("--").and_then(|(id,_)|id.parse::<i64>().ok()))
+        .filter(|id|*id>0).collect();
     let mut user_policies=Vec::new();
     for user in users {
         let Some(uuid)=user.get("xrayId").and_then(Value::as_str)
             .and_then(|id|uuid::Uuid::parse_str(id).ok()) else{continue};
-        if !allowed.contains(&uuid.to_string()) {continue}
         let Some(user_id)=user.get("id").and_then(Value::as_i64).filter(|id|*id>0)else{continue};
+        if !allowed_uuids.contains(&uuid.to_string())
+            && !allowed_user_ids.contains(&user_id){continue}
         let expires=crate::number(user,"expireAt").unwrap_or(0).max(0);
         let limit_gb=user.get("limit").and_then(Value::as_f64).unwrap_or(0.0);
         let used_gb=user.get("used").and_then(Value::as_f64).unwrap_or(0.0).max(0.0);
@@ -631,6 +647,23 @@ mod provision_tests {
         let squads=vec![json!({"id":4,"inb":["CDN NL"]})];
         provision_proxy_users(&mut config,&users,&squads,1_800_000_000_000).unwrap();
         assert_eq!(config["inbounds"][0]["settings"]["clients"][0]["email"],"xmesh-u7--CDN%20NL");
+    }
+    #[test]
+    fn offline_policy_counts_multi_protocol_accounts_including_ss2022(){
+        let config=json!({"inbounds":[
+            {"settings":{"users":[
+                {"id":"550e8400-e29b-41d4-a716-446655440000","email":"xmesh-u7--VM"},
+                {"password":"BASE64_NON_UUID","email":"xmesh-u8--SS22"}]}}]});
+        let users=vec![
+            json!({"id":7,"xrayId":"550e8400-e29b-41d4-a716-446655440000"}),
+            json!({"id":8,"xrayId":"550e8400-e29b-41d4-a716-446655440001"}),
+            json!({"id":9,"xrayId":"550e8400-e29b-41d4-a716-446655440002"})];
+        let policy=build_offline_policy(&config,&users,1,1_800_000_000_000,
+            &"a".repeat(64),1);
+        let entries=policy["users"].as_array().unwrap();
+        assert_eq!(entries.len(),2);
+        assert_eq!(entries[0]["userId"],7);
+        assert_eq!(entries[1]["userId"],8);
     }
     #[test]
     fn node_multi_protocol_users_match_client_credentials_and_never_include_disabled(){
