@@ -132,7 +132,8 @@ pub fn apply(node: &Value, config: &mut Value) -> Result<Option<Value>, ApiError
                 .is_some_and(|tags|tags.iter().any(|t|t.as_str()==Some("xmesh_stats_in")))).count();
         existing.splice(offset..offset,rules);
     }
-    Ok(Some(json!({"version":1,"intervalHours":hours,"files":sources})))
+    let refresh_revision=node.get("geoRefreshRevision").and_then(Value::as_u64).unwrap_or(0);
+    Ok(Some(json!({"version":1,"intervalHours":hours,"refreshRevision":refresh_revision,"files":sources})))
 }
 
 #[cfg(test)]
