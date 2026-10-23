@@ -42,6 +42,13 @@ curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 \
  https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy/node-metrics-agent.sh -o "$metrics_tmp"
 bash -n "$metrics_tmp"
 grep -q 'xmesh-node-user-metrics.json' "$metrics_tmp" || { echo "Metrics agent cannot read autonomous counters" >&2;exit 1; }
+# Validate the updater itself before changing any installed components.
+self_tmp="$(mktemp)"
+trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$metrics_tmp" "$self_tmp"' EXIT
+curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 \
+ https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy/update-node-control-agent.sh -o "$self_tmp"
+bash -n "$self_tmp"
+grep -q 'xmesh-node-agent-upgrade.service' "$self_tmp" || { echo "Invalid agent updater" >&2; exit 1; }
 if [[ -f /usr/local/sbin/xmesh-node-control ]];then
  cp -p /usr/local/sbin/xmesh-node-control /usr/local/sbin/xmesh-node-control.bak
 fi
@@ -162,12 +169,6 @@ if ! systemctl start xmesh-node-user-meter.service; then
 fi
 # Keep the fixed updater script current for the next panel-driven upgrade.
 # Replace atomically because this script can itself be executing.
-self_tmp="$(mktemp)"
-trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$metrics_tmp" "$self_tmp"' EXIT
-curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 \
- https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy/update-node-control-agent.sh -o "$self_tmp"
-bash -n "$self_tmp"
-grep -q 'xmesh-node-agent-upgrade.service' "$self_tmp" || { echo "Invalid agent updater" >&2; exit 1; }
 install -o root -g root -m 0700 "$self_tmp" /usr/local/sbin/.xmesh-update-agent.new
 mv -f /usr/local/sbin/.xmesh-update-agent.new /usr/local/sbin/xmesh-update-agent
 if [[ "$MODE" != --remote ]]; then
