@@ -2231,15 +2231,15 @@ function hostEditorMarkup(o,e){
   // actions unchanged so the existing save and live-preview logic still work.
   return '<div class="host-editor-layout">'+
     '<section class="host-editor-main host-primary-panel" aria-label="Подключение и назначение">'+
-    '<div class="node-form-section-title">01 · Подключение</div>'+
+    '<div class="node-form-section-title">Подключение</div>'+
     '<div class="host-connect-fields">'+preset+p+tag+'</div>'+
-    '<div class="node-form-section-title">02 · Публичная точка</div>'+
+    '<div class="node-form-section-title">Публичная точка</div>'+
     '<div class="host-public-fields">'+basic+'</div>'+
-    '<div class="node-form-section-title">03 · Назначение</div>'+
+    '<div class="node-form-section-title">Назначение</div>'+
     '<div class="host-assignment-fields">'+nodes+'</div>'+
     '<small class="note" data-host-count></small></section>'+
     '<section class="host-advanced host-advanced-panel" aria-label="Расширенные переопределения">'+
-    '<div class="host-advanced-heading"><div class="node-form-section-title">04 · Расширенные переопределения</div>'+
+    '<div class="host-advanced-heading"><div class="node-form-section-title">Расширенные переопределения</div>'+
     '<p class="node-ip-hint">Пустые поля наследуются из XRAY STUDIO.</p></div>'+
     '<div class="host-advanced-fields">'+advanced+'</div>'+
     '<div class="host-advanced-actions"><button type="button" class="gh sm" data-host-clear-overrides>'+ic('rotate-ccw')+'Сбросить переопределения</button></div></section>'+
