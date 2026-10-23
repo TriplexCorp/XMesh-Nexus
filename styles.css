@@ -4325,7 +4325,7 @@ dialog#dlg.squad-wide > form.box > h2{
 }
 dialog#dlg.squad-wide .squad-editor-layout{
   display:grid;
-  grid-template-columns:minmax(0,1.28fr) minmax(0,1fr);
+  grid-template-columns:minmax(0,.88fr) minmax(0,1.22fr) minmax(0,1fr);
   gap:12px;
   min-width:0;
   align-items:stretch;
@@ -4624,3 +4624,11 @@ dialog#dlg.squad-wide > form.box > .act{
   dialog#dlg.squad-wide .squad-inbound-hosts{display:none}
   dialog#dlg.squad-wide .squad-editor-toolbar .gh{flex:1 1 auto}
 }
+
+/* Squad editor: three always-visible horizontal workspaces. */
+dialog#dlg.squad-wide .box{width:min(1280px,calc(100vw - 40px));max-width:none}
+dialog#dlg.squad-wide .squad-editor-layout{grid-template-columns:minmax(0,.88fr) minmax(0,1.22fr) minmax(0,1fr);align-items:stretch}
+dialog#dlg.squad-wide .squad-editor-layout>section{min-width:0}
+dialog#dlg.squad-wide .squad-inbound-list{max-height:min(39dvh,360px)}
+@media(max-width:1050px){dialog#dlg.squad-wide .squad-editor-layout{grid-template-columns:repeat(2,minmax(0,1fr))}dialog#dlg.squad-wide .squad-editor-side{grid-column:1/-1}}
+@media(max-width:680px){dialog#dlg.squad-wide .box{width:calc(100vw - 20px)}dialog#dlg.squad-wide .squad-editor-layout{grid-template-columns:minmax(0,1fr)}dialog#dlg.squad-wide .squad-editor-side{grid-column:auto}}
