@@ -9,6 +9,7 @@ mod node_runtime;
 mod node_enrollment;
 mod subscription_settings;
 mod user_subscriptions;
+mod subscription_user_agent;
 mod subscription_json;
 
 use axum::{
