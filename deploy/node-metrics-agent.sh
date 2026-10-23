@@ -103,7 +103,7 @@ payload="$(printf '{"node_id":%s,"cpu_percent":%s,"cpu_steal_percent":%s,"ram_us
 # Optional Xray StatsService counters. Missing Xray CLI or inaccessible API
 # must never be reported as successful per-user traffic collection.
 XRAY_API_ADDRESS="${XMESH_XRAY_API_ADDRESS:-127.0.0.1:10085}"
-if [[ "$XRAY_API_ADDRESS" =~ ^127\\.0\\.0\\.1:[0-9]{1,5}$ ]] &&
+if [[ "$XRAY_API_ADDRESS" =~ ^127\.0\.0\.1:[0-9]{1,5}$ ]] &&
    command -v python3 >/dev/null 2>&1 &&
    [[ -r /usr/local/libexec/xmesh-xray-stats-collector.py ]]; then
   XRAY_CLI="$(command -v xray || true)"
@@ -119,7 +119,7 @@ if [[ "$XRAY_API_ADDRESS" =~ ^127\\.0\\.0\\.1:[0-9]{1,5}$ ]] &&
     if stats_json="$(timeout 6 "$XRAY_CLI" api statsquery --server="$XRAY_API_ADDRESS" -pattern 'user>>>xmesh-u' 2>"$stats_error")"; then
       if stats_fragment="$(printf '%s' "$stats_json" | python3 /usr/local/libexec/xmesh-xray-stats-collector.py)"; then
         if [[ "$stats_fragment" == ,* ]]; then
-          payload="${payload%\\}}$stats_fragment}"
+          payload="${payload%\}}$stats_fragment}"
         fi
       else
         echo "XMesh: Xray user stats response could not be parsed." >&2
