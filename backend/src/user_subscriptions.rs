@@ -355,7 +355,7 @@ async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str)->Result
    let has_public_key=nonempty(reality,"publicKey").is_some() || nonempty(inbound,"publicKey").is_some();
    let assigned_nodes=nodes.iter().filter(|n|n.get("profileId")==profile.get("id")
       && n.get("disabled")!=Some(&Value::Bool(true))).count();
-   tracing::info!(profile_id=?(profile.get("id").and_then(Value::as_i64)),
+   tracing::info!(profile_id=?(profile.get("id").and_then(serde_json::Value::as_i64)),
      inbound_tag=%tag, security=%security, assigned_nodes,
      reality_public_key_in_profile=has_public_key,
      "Subscription endpoint candidate");
@@ -389,7 +389,7 @@ async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str)->Result
      }
     }
    }else if any_explicit_host{
-    tracing::warn!(inbound_tag=%tag, profile_id=?(profile.get("id").and_then(Value::as_i64)),
+    tracing::warn!(inbound_tag=%tag, profile_id=?(profile.get("id").and_then(serde_json::Value::as_i64)),
       "Subscription explicit host exists but none matches enabled profile/node binding");
    }
   }
@@ -404,7 +404,7 @@ async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str)->Result
   }else{
    "Не найдены рабочие VLESS-подключения: проверьте сквады, теги inbound, UUID пользователя, адреса и порты публичных хостов, Reality и привязку профилей."
   };
-  tracing::warn!(reason, squad_count=ids.len(), inbound_count=tags.len(), profile_count=profiles.len(), host_count=hosts.len(), node_count=nodes.len(), user_id=?(user.get("id").and_then(Value::as_i64)), "Subscription has no valid endpoints");
+  tracing::warn!(reason, squad_count=ids.len(), inbound_count=tags.len(), profile_count=profiles.len(), host_count=hosts.len(), node_count=nodes.len(), user_id=?(user.get("id").and_then(serde_json::Value::as_i64)), "Subscription has no valid endpoints");
   return Err(ApiError::new(StatusCode::SERVICE_UNAVAILABLE,reason))
  }
  Ok((links,outbounds))
