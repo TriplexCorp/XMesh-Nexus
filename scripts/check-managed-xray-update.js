@@ -32,7 +32,7 @@ assert.match(agent,/run -test -config \/etc\/xray\/config\.json/);
 assert.match(agent,/previous image restored/);
 assert.doesNotMatch(agent,/\beval\b/,'Never evaluate remote commands');
 assert.match(frontend,/data-xray-update/);
-assert.match(frontend,/Обновление Xray на узле/);
+assert.match(frontend,/const selectNodeXrayRelease=/);
 const lint=spawnSync('bash',['-n','deploy/node-control-agent.sh'],{encoding:'utf8'});
 assert.equal(lint.status,0,'Control agent shell syntax: '+lint.stderr);
 console.log('Xray managed update safety and SQLx migration uniqueness: OK');
