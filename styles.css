@@ -4805,3 +4805,11 @@ dialog#dlg.node-wide .node-main-section .country-picker-dropdown .country-option
   box-sizing:border-box;
   width:100%;
 }
+
+/* Notification timestamps and acknowledgement controls */
+.notification-workspace .notification-item{grid-template-columns:.4em minmax(0,1fr) 2em}
+.notification-workspace .notification-when{display:block;margin-top:.45em;color:var(--mu);font-size:.78em;font-variant-numeric:tabular-nums}
+.notification-workspace .notification-dismiss{align-self:start;opacity:.7;min-width:1.9em;min-height:1.9em;padding:.3em;border-radius:.55em}
+.notification-workspace .notification-dismiss:hover,.notification-workspace .notification-dismiss:focus-visible{opacity:1;background:var(--s2)}
+.notification-workspace .notification-header [data-notifications-clear]{width:auto;min-width:0;padding:.45em .7em;white-space:nowrap;gap:.4em}
+@media(max-width:560px){.notification-workspace .notification-header [data-notifications-clear]{font-size:.8em}}
