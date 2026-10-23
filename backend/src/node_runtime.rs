@@ -110,8 +110,9 @@ pub async fn request_restart(
     ).bind(node_id).execute(&state.pool).await?;
     let row=sqlx::query_scalar::<_,i64>(
         "INSERT INTO node_restart_commands(node_id,requested_by)
-         VALUES($1,$2) RETURNING id"
-    ).bind(node_id).bind(&actor.username).fetch_one(&state.pool).await?;
+         VALUES($1,$2) ON CONFLICT DO NOTHING RETURNING id"
+    ).bind(node_id).bind(&actor.username).fetch_optional(&state.pool).await?
+      .ok_or_else(||ApiError::new(StatusCode::CONFLICT,"Узел уже выполняет команду управления."))?;
     crate::audit(&state.pool,&actor.username,"node.restart.requested",Some("nodes"),Some(node_id),
         json!({"commandId":row})).await;
     Ok((StatusCode::ACCEPTED,Json(json!({"id":row,"nodeId":node_id,"state":"pending"}))))
@@ -153,8 +154,9 @@ pub async fn request_xray_update(
     ).bind(node_id).execute(&state.pool).await?;
     let id=sqlx::query_scalar::<_,i64>(
         "INSERT INTO node_restart_commands(node_id,action,requested_by)
-         VALUES($1,'update_xray',$2) RETURNING id"
-    ).bind(node_id).bind(&actor.username).fetch_one(&state.pool).await?;
+         VALUES($1,'update_xray',$2) ON CONFLICT DO NOTHING RETURNING id"
+    ).bind(node_id).bind(&actor.username).fetch_optional(&state.pool).await?
+      .ok_or_else(||ApiError::new(StatusCode::CONFLICT,"Узел уже выполняет команду управления."))?;
     crate::audit(&state.pool,&actor.username,"node.xray.update.requested",
         Some("nodes"),Some(node_id),json!({"commandId":id})).await;
     Ok((StatusCode::ACCEPTED,Json(json!({"id":id,"nodeId":node_id,
