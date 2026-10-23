@@ -1645,8 +1645,8 @@ function entForm(k,id){const e=ENT[k],o=id?DB[k].find(x=>x.id==id):e.def?e.def()
     :'';
   const fields=k==='nodes'
     ?e.fs.slice(0,-2).map(f=>field(f,o[f.k])).join('')+`<details class="node-rotation-editor" ${o.rotationEnabled?'open':''}><summary>${ic('layers')}<span><b>IP-ротация</b><small>${o.rotationEnabled?nodeRotationIPs(o).length+' адресов в пуле':'Не используется · дополнительные адреса одной VM'}</small></span></summary><div class="node-rotation-editor-body">${rotationFields}${rotationProbe}</div></details>`
-    :standardFields;
-  modal(`<form class="box" data-k="ent" data-ent="${k}" data-id="${id||''}" method="dialog"><h2>${id?'Изменить':'Новый'}: ${e.nw.toLowerCase()}</h2>${fields}<p class="er" id="fe"></p><div class="act">${id?`<button type="button" class="dg" data-del="${k}:${id}" style="margin-right:auto">${ic('trash')}Удалить</button>`:''}<button type="button" class="gh" data-x>Отмена</button><button class="btn">Сохранить</button></div></form>`,k=='profiles'||k=='subs'?'wide':'')
+    :k==='nodes'?'<div class="node-form-grid">'+standardFields+'</div>':standardFields;
+  modal(`<form class="box" data-k="ent" data-ent="${k}" data-id="${id||''}" method="dialog"><h2>${id?'Изменить':'Новый'}: ${e.nw.toLowerCase()}</h2>${fields}<p class="er" id="fe"></p><div class="act">${id?`<button type="button" class="dg" data-del="${k}:${id}" style="margin-right:auto">${ic('trash')}Удалить</button>`:''}<button type="button" class="gh" data-x>Отмена</button><button class="btn">Сохранить</button></div></form>`,k==='nodes'?'node-wide':k=='profiles'||k=='subs'?'wide':'')
 }
 
 /* ================= УЗЛЫ ================= */
