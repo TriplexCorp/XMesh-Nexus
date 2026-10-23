@@ -195,10 +195,23 @@ const ENT={
     def:()=>({port:443,sec:'reality',fp:'chrome',order:DB.hosts.length+1,nodes:[]}),
     cols:[['Название',r=>`<b>${esc(r.remark)}</b>`],['Адрес',r=>`${esc(r.address)}:${r.port}`],['Инбаунд',r=>chip(esc(r.tag),tcol(r.tag))],['SNI',r=>esc(r.sni||'—')],['Узлы',r=>r.nodes.length?r.nodes.map(i=>flagView(DB.nodes.find(n=>n.id==i)?.flag)).join(' '):'все'],['Вкл.',swc('hosts')]]},
   nodes:{t:'Узлы',nw:'Узел',s:'id',fs:[{k:'name',l:'Название',req:1},{k:'hosting',l:'Хостинг (необязательно)',h:'Например: Cloudrix, Hetzner, OVH. Отображается в карточке узла.'},{k:'flag',l:'Страна и флаг',t:'country'},{k:'addr',l:'Адрес',req:1},{k:'port',l:'Порт ноды',t:'num',req:1},{k:'profileId',l:'XRAY STUDIO',t:'sel',o:()=>DB.profiles.map(p=>[p.id,p.name])},{k:'mult',l:'Коэффициент трафика',t:'num',h:'1 — без изменений, 2 — считать вдвое'},{k:'limit',l:'Лимит трафика, ГБ',t:'num',h:'0 — без лимита'},{k:'resetDay',l:'День сброса счётчика',t:'num'},
+    {k:'billingPrice',l:'Стоимость аренды',t:'num'},
+    {k:'billingCurrency',l:'Валюта',t:'sel',o:[['EUR','EUR · €'],['USD','USD · $'],['RUB','RUB · ₽'],['PLN','PLN · zł'],['GBP','GBP · £']]},
+    {k:'billingDueDate',l:'Оплачено до',ph:'ГГГГ-ММ-ДД'},
+    {k:'billingPeriod',l:'Период оплаты',t:'sel',o:[['monthly','Ежемесячно'],['quarterly','Раз в 3 месяца'],['yearly','Ежегодно'],['custom','Другой']]},
+    {k:'billingRemindDays',l:'Напомнить за, дней',t:'num'},
+    {k:'billingProviderUrl',l:'Сайт провайдера',ph:'https://provider.example'},
+    {k:'billingNote',l:'Примечание по оплате'},
     {k:'rotationEnabled',l:'Ротация IP-адресов',t:'bool',h:'Пул IP-адресов для подключений узла. Используйте только назначенные серверу адреса.'},
     {k:'rotationIps',l:'Пул внешних IP-адресов',t:'area',rows:7,h:'Один IPv4 или IPv6 на строку. Добавляйте только IP, реально назначенные VPS и доступные клиентам. До 64 адресов. Основной адрес узла остаётся прежним.'}],
-    def:()=>({flag:'',mult:1,limit:0,resetDay:1,rotationEnabled:false,rotationIps:''}),
-    chk:nodeRotationValidate,
+    def:()=>({flag:'',mult:1,limit:0,resetDay:1,rotationEnabled:false,rotationIps:'',billingCurrency:'EUR',billingPeriod:'monthly',billingRemindDays:7,billingPrice:0}),
+    chk:data=>{
+      const issue=nodeRotationValidate(data);if(issue)return issue;
+      if(data.billingDueDate&&!/^\d{4}-\d{2}-\d{2}$/.test(data.billingDueDate))return 'Дата аренды: ГГГГ-ММ-ДД.';
+      if(data.billingDueDate&&!Number.isFinite(Date.parse(data.billingDueDate+'T00:00:00Z')))return 'Некорректная дата аренды.';
+      if(data.billingProviderUrl&&!/^https:\/\//.test(data.billingProviderUrl))return 'Укажите HTTPS-ссылку провайдера.';
+      return '';
+    },
     guard:r=>DB.hosts.some(h=>h.nodes.includes(r.id))?'Узел указан в хостах. Уберите его оттуда.':''},
   tpls:{t:'Шаблоны пользователей',n:'Готовые тарифы: выбираются при создании и подставляют лимиты, срок и доступ.',s:'id',nw:'Шаблон',fs:[{k:'name',l:'Название',req:1},{k:'limit',l:'Лимит, ГБ',t:'num',h:'0 — без лимита'},{k:'days',l:'Срок, дней',t:'num',h:'0 — бессрочно'},{k:'strategy',l:'Сброс трафика',t:'sel',o:STRAT},{k:'hwid',l:'Лимит устройств',t:'num'},{k:'squads',l:'Сквады',t:'multi',o:()=>DB.squads.map(s=>[s.id,s.name])},{k:'hold',l:'Отсчёт срока с первого подключения',t:'bool'}],def:()=>({strategy:'NO_RESET',hwid:2,squads:[]}),
     cols:[['Название',r=>`<b>${esc(r.name)}</b>`],['Трафик',r=>r.limit?r.limit+' ГБ':'∞'],['Срок',r=>r.days?r.days+' дн':'∞'],['Устройств',r=>r.hwid],['Сквады',r=>r.squads.map(i=>chip(esc(DB.squads.find(s=>s.id==i)?.name||'?'),'--b')).join(' ')],['Режим',r=>r.hold?chip('on hold','--c3'):'—']]},
@@ -1682,13 +1695,14 @@ async function crudCard(k){
 async function simple(ks){const h=await Promise.all(ks.map(crudCard));return [h.join('')]}
 function entForm(k,id){const e=ENT[k],o=id?DB[k].find(x=>x.id==id):e.def?e.def():{};
   const standardFields=e.fs.map(f=>field(f,k==='admins'&&f.k==='password'?'':o[f.k])).join('');
-  const rotationFields=e.fs.slice(-2).map(f=>field(f,o[f.k])).join('');
+  const rotationFields=e.fs.filter(f=>['rotationEnabled','rotationIps'].includes(f.k)).map(f=>field(f,o[f.k])).join('');
+  const billingFields=e.fs.filter(f=>f.k.startsWith('billing')).map(f=>field(f,o[f.k])).join('');
   const userOptions=DB.users.filter(u=>st(u)==='ACTIVE').map(u=>`<option value="${u.id}">${esc(u.username)}</option>`).join('');
   const rotationProbe=id&&o.rotationEnabled
     ?`<div class="node-rotation-probe"><label class="f"><span>Проверка на пользователе</span><select data-node-rotation-user>${userOptions||'<option value="">Нет активных пользователей</option>'}</select></label><button type="button" class="gh sm" data-node-rotation-probe="${id}" ${userOptions?'':'disabled'}>${ic('redo')}Получить следующий IP</button><output data-node-rotation-result aria-live="polite"></output><small>Тест изменяет счётчик ротации этого пользователя. Выдача подписок будет подключена отдельно.</small></div>`
     :'';
   const fields=k==='nodes'
-    ?'<div class="node-form-layout"><section class="node-main-section"><div class="node-form-section-title">Основные параметры</div><div class="node-form-grid">'+e.fs.slice(0,-2).map(f=>field(f,o[f.k])).join('')+'</div></section>'+`<section class="node-ip-section"><div class="node-form-section-title">IP-пул и ротация</div><div class="node-ip-hint">Адреса должны принадлежать этому VPS и быть доступны извне.</div><div class="node-rotation-editor-body">${rotationFields}<div class="node-pool-toolbar"><span data-node-pool-count>Адресов: ${nodeRotationIPs(o).length} / 64</span><button type="button" class="gh sm" data-node-pool-normalize>Убрать повторы</button><button type="button" class="gh sm" data-node-pool-clear>Очистить</button></div><output data-node-pool-feedback aria-live="polite"></output>${rotationProbe}</div></section></div>`
+    ?'<div class="node-form-layout"><section class="node-main-section"><div class="node-form-section-title">Основные параметры</div><div class="node-form-grid">'+e.fs.filter(f=>!f.k.startsWith('billing')&&!['rotationEnabled','rotationIps'].includes(f.k)).map(f=>field(f,o[f.k])).join('')+'</div></section>'+`<section class="node-ip-section"><div class="node-form-section-title">IP-пул и ротация</div><div class="node-ip-hint">Адреса должны принадлежать этому VPS и быть доступны извне.</div><div class="node-rotation-editor-body">${rotationFields}<div class="node-pool-toolbar"><span data-node-pool-count>Адресов: ${nodeRotationIPs(o).length} / 64</span><button type="button" class="gh sm" data-node-pool-normalize>Убрать повторы</button><button type="button" class="gh sm" data-node-pool-clear>Очистить</button></div><output data-node-pool-feedback aria-live="polite"></output>${rotationProbe}</div></section><section class="node-billing-section"><div class="node-form-section-title">Инфрабиллинг</div><p class="node-ip-hint">Стоимость, аренда и напоминания</p><div class="node-billing-fields">${billingFields}</div></section></div>`
     :standardFields;
   modal(`<form class="box" data-k="ent" data-ent="${k}" data-id="${id||''}" method="dialog"><h2>${id?'Изменить':'Новый'}: ${e.nw.toLowerCase()}</h2>${fields}<p class="er" id="fe"></p><div class="act">${id?`<button type="button" class="dg" data-del="${k}:${id}" style="margin-right:auto">${ic('trash')}Удалить</button>`:''}<button type="button" class="gh" data-x>Отмена</button><button class="btn">Сохранить</button></div></form>`,k==='nodes'?'node-wide':k=='profiles'||k=='subs'?'wide':'')
 }
@@ -2438,6 +2452,10 @@ const nodeNotificationTitle=node=>flagView(node.flag,'notification-country-flag'
   '<span class="notification-node-label">'+esc(node.name)+(node.hosting?.trim()?'<small>'+esc(node.hosting.trim())+'</small>':'')+'</span>';
 $('#bell').onclick=()=>{
  const notifications=[
+  ...DB.nodes.filter(n=>n.billingDueDate&&/^\d{4}-\d{2}-\d{2}$/.test(n.billingDueDate)).filter(n=>{
+    const due=Date.parse(n.billingDueDate+'T23:59:59Z'),days=Math.max(0,Number(n.billingRemindDays)||0);
+    return Number.isFinite(due)&&due-Date.now()<=(days+1)*DAY;
+  }).map(n=>({title:esc(n.name)+' · аренда VPS',message:'Оплачено до '+esc(n.billingDueDate)+' · '+esc(String(n.billingPrice||0))+' '+esc(n.billingCurrency||'EUR')})),
   ...DB.nodes.filter(node=>nstat(node)==='OFFLINE').map(node=>({
    title:nodeNotificationTitle(node),message:'Узел не отвечает'
   })),
