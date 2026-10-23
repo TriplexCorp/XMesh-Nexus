@@ -195,6 +195,7 @@ const ENT={
     {k:'profileId',l:'Профиль XRAY STUDIO',t:'sel',o:()=>DB.profiles.map(p=>[p.id,p.name])},
     {k:'tag',l:'Inbound',t:'sel',o:tags},
     {k:'nodes',l:'Назначенные ноды',t:'multi',o:()=>DB.nodes.map(n=>[n.id,n.name])},
+    {k:'disabled',l:'Отключить выдачу хоста в подписках',t:'bool'},
     {k:'remark',l:'Название в подписке',req:1},
     {k:'address',l:'Публичный адрес',req:1},
     {k:'port',l:'Публичный порт',t:'num'},
@@ -211,6 +212,7 @@ const ENT={
   ],
     def:()=>({port:443,fp:'',order:DB.hosts.length+1,nodes:[],profileId:DB.profiles[0]?.id||0}),
     chk:d=>{
+      if(d.disabled)return '';
       if(!d.remark.trim()||!d.address.trim())return 'Укажите название и публичный адрес.';
       if(!Number.isInteger(d.port)||d.port<1||d.port>65535)return 'Публичный порт должен быть от 1 до 65535.';
       const profile=DB.profiles.find(p=>String(p.id)===String(d.profileId));
@@ -1863,7 +1865,7 @@ function hostEditorMarkup(o,e){
   const inboundOptions=selectedProfile?inbs(selectedProfile).map(i=>[i.tag,i.tag+' · '+i.protocol]):[];
   const tag=field({...f('tag'),o:inboundOptions},o.tag||inboundOptions[0]?.[0]||'');
   const basic=['remark','address','port'].map(k=>field(f(k),o[k])).join('');
-  const nodes=field(f('nodes'),o.nodes||[]);
+  const nodes=field(f('nodes'),o.nodes||[])+field(f('disabled'),!!o.disabled);
   const advanced=['sni','host','path','fp','publicKey','shortId','spiderX','alpn','serviceName','clientEncryption'].map(k=>field(f(k),o[k]??'')).join('');
   return '<div class="host-editor-layout"><section class="host-editor-main"><div class="node-form-section-title">01 · Подключение</div>'+
     '<p class="node-ip-hint">Выберите ноду и inbound — остальное берётся из XRAY STUDIO.</p>'+preset+p+tag+
