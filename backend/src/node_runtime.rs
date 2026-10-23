@@ -355,13 +355,17 @@ pub async fn acknowledge_restart(
     Ok(Json(json!({"accepted":true})))
 }
 
-// Populate Xray VLESS inbound users from the authoritative panel users and squads.
+// Populate Xray proxy inbound accounts from authoritative panel users and squads.
 // XRAY STUDIO owns transports/security; panel users own runtime UUID authorization.
-fn provision_vless_users(config:&mut Value,users:&[Value],squads:&[Value],now_ms:i64) -> Result<(),ApiError> {
+fn provision_proxy_users(config:&mut Value,users:&[Value],squads:&[Value],now_ms:i64) -> Result<(),ApiError> {
     let inbounds=config.get_mut("inbounds").and_then(Value::as_array_mut)
         .ok_or_else(||ApiError::new(StatusCode::CONFLICT,"Profile has no inbounds."))?;
     for inbound in inbounds {
-        if inbound.get("protocol").and_then(Value::as_str)!=Some("vless"){continue}
+        let protocol=inbound.get("protocol").and_then(Value::as_str).unwrap_or("");
+        if !["vless","vmess","trojan","shadowsocks","hysteria"].contains(&protocol){continue}
+        let ss_method=inbound.get("settings").and_then(|v|v.get("method"))
+            .and_then(Value::as_str).unwrap_or("").to_owned();
+        if protocol=="shadowsocks" && ss_method.is_empty(){continue}
         let tag=inbound.get("tag").and_then(Value::as_str).unwrap_or("");
         if tag.is_empty(){return Err(ApiError::new(StatusCode::CONFLICT,"VLESS inbound has no tag."))}
         let mut allowed=std::collections::HashSet::new();
@@ -386,20 +390,38 @@ fn provision_vless_users(config:&mut Value,users:&[Value],squads:&[Value],now_ms
                     (b as char).to_string()
                 }else{format!("%{b:02X}")}
             }).collect::<String>();
-            entries.push(json!({"id":uuid.to_string(),"level":0,
-                "email":format!("xmesh-u{record_id}--{encoded_tag}")}));
+            let email=format!("xmesh-u{record_id}--{encoded_tag}");
+            let entry=match protocol {
+                "vless"|"vmess"=>json!({"id":uuid.to_string(),"level":0,"email":email}),
+                "trojan"=>json!({"password":uuid.to_string(),"level":0,"email":email}),
+                "hysteria"=>json!({"auth":uuid.to_string(),"level":0,"email":email}),
+                "shadowsocks"=>{
+                    // SS2022 passwords must be valid PSKs; never use a plain UUID
+                    // as a 2022 cipher key. Require an explicit per-user key.
+                    let password=if ss_method.starts_with("2022-"){
+                        user.get("ssPassword").and_then(Value::as_str).unwrap_or("")
+                    }else{id};
+                    if password.is_empty(){continue}
+                    json!({"password":password,"method":ss_method,"level":0,"email":email})
+                },
+                _=>continue
+            };
+            entries.push(entry);
         }
         let settings=inbound.get_mut("settings").and_then(Value::as_object_mut)
             .ok_or_else(||ApiError::new(StatusCode::CONFLICT,"VLESS inbound settings missing."))?;
-        // Current Xray requires explicit decryption: "none" for plain VLESS.
-        // Preserve configured post-quantum decryption values verbatim.
-        if settings.get("decryption").and_then(Value::as_str).is_none_or(|s|s.trim().is_empty()) {
-            settings.insert("decryption".to_owned(),json!("none"));
+        if protocol=="vless"{
+            // Server VLESS uses clients; never insert outbound vnext users.
+            if settings.get("decryption").and_then(Value::as_str)
+                .is_none_or(|s|s.trim().is_empty()){
+                settings.insert("decryption".to_owned(),json!("none"));
+            }
+            settings.remove("users");
+            settings.insert("clients".to_owned(),Value::Array(entries));
+        }else{
+            settings.remove("clients");
+            settings.insert("users".to_owned(),Value::Array(entries));
         }
-        // Inbound VLESS uses settings.clients, unlike outbound VLESS which uses
-        // settings.vnext[].users. Never confuse the two schemas.
-        settings.remove("users");
-        settings.insert("clients".to_owned(),Value::Array(entries));
     }
     // Keep Xray StatsService private to the node: no public API listeners.
     if config.get("api").is_some_and(|api|!api.is_null()){
@@ -532,7 +554,7 @@ pub async fn desired_config(
     let squads=crate::load_records(&state.pool,"squads").await?;
     let now=std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default().as_millis() as i64;
-    provision_vless_users(&mut config,&users,&squads,now)?;
+    provision_proxy_users(&mut config,&users,&squads,now)?;
     let digest=hex::encode(sha2::Sha256::digest(serde_json::to_vec(&config).unwrap_or_default()));
     // Conserve offline allowances across all currently enabled nodes. Large
     // deployments should replace this bound with server-side reserved leases.
@@ -579,7 +601,7 @@ mod provision_tests {
             json!({"id":4,"xrayId":"550e8400-e29b-41d4-a716-446655440003","squads":[4],"expireAt":now-1})
         ];
         let squads=vec![json!({"id":4,"inb":["NL"]}),json!({"id":5,"inb":["SE"]})];
-        provision_vless_users(&mut config,&users,&squads,now).unwrap();
+        provision_proxy_users(&mut config,&users,&squads,now).unwrap();
         let settings=&config["inbounds"][0]["settings"];
         assert!(settings.get("users").is_none());
         assert_eq!(settings["clients"].as_array().unwrap().len(),1);
@@ -597,7 +619,7 @@ mod provision_tests {
         let mut config=json!({"inbounds":[{"protocol":"vless","tag":"CDN NL","settings":{}}]});
         let users=vec![json!({"id":7,"xrayId":"550e8400-e29b-41d4-a716-446655440000","squads":[4]})];
         let squads=vec![json!({"id":4,"inb":["CDN NL"]})];
-        provision_vless_users(&mut config,&users,&squads,1_800_000_000_000).unwrap();
+        provision_proxy_users(&mut config,&users,&squads,1_800_000_000_000).unwrap();
         assert_eq!(config["inbounds"][0]["settings"]["clients"][0]["email"],"xmesh-u7--CDN%20NL");
     }
     #[test]
@@ -605,7 +627,7 @@ mod provision_tests {
         let mut config=json!({"inbounds":[{"protocol":"vless","tag":"NL","settings":{"users":[]}}]});
         let users=vec![json!({"id":1,"xrayId":"550e8400-e29b-41d4-a716-446655440000","squads":[4,5]})];
         let squads=vec![json!({"id":4,"inb":["NL"]}),json!({"id":5,"inb":["NL"]})];
-        provision_vless_users(&mut config,&users,&squads,1_800_000_000_000).unwrap();
+        provision_proxy_users(&mut config,&users,&squads,1_800_000_000_000).unwrap();
         assert_eq!(config["inbounds"][0]["settings"]["clients"].as_array().unwrap().len(),1);
     }
 }
