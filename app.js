@@ -2090,7 +2090,12 @@ function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id
   const nodeCoreFields=e.fs.filter(f=>!f.k.startsWith('billing')&&!['rotationEnabled','rotationIps'].includes(f.k));
   const nodeMainFields=nodeCoreFields.map(f=>f.k==='addr'
     ?'<div class="node-address-port">'+field(f,o[f.k])+field(nodeCoreFields.find(x=>x.k==='port'),o.port)+'</div>'
-    :f.k==='port'?'':field(f,o[f.k])).join('');
+    :f.k==='port'?'':f.k==='limit'?
+      '<div class="node-traffic-limit-control">'+field(f,o[f.k])+
+      (id?'<button type="button" class="gh sm node-traffic-reset-button" data-node-reset-traffic="'+esc(String(id))+'">'+ic('redo')+'Сбросить трафик</button>'+
+      '<small class="node-traffic-reset-help">Обнуляет накопленный расход этой ноды. Отключённый Xray автоматически не запустится.</small>'+
+      '<output class="node-traffic-reset-status" data-node-reset-feedback aria-live="polite"></output>':'')+
+      '</div>':field(f,o[f.k])).join('');
   const userOptions=DB.users.filter(u=>st(u)==='ACTIVE').map(u=>`<option value="${u.id}">${esc(u.username)}</option>`).join('');
   const rotationProbe=id&&o.rotationEnabled
     ?`<div class="node-rotation-probe"><label class="f"><span>Проверка на пользователе</span><select data-node-rotation-user>${userOptions||'<option value="">Нет активных пользователей</option>'}</select></label><button type="button" class="gh sm" data-node-rotation-probe="${id}" ${userOptions?'':'disabled'}>${ic('redo')}Получить следующий IP</button><output data-node-rotation-result aria-live="polite"></output><small>Тест изменяет счётчик ротации этого пользователя. Выдача подписок будет подключена отдельно.</small></div>`
@@ -2432,6 +2437,33 @@ document.addEventListener('click',async e=>{
     const id=Number(b.dataset.rowDelete),user=DB.users.find(u=>u.id===id);
     if(!user)return;
     confirmBox('Удалить пользователя «'+user.username+'»? Подписка будет отозвана, а действие необратимо.','Удалить',()=>delUsers(new Set([id])));
+    return;
+  }
+  if(b=g('[data-node-reset-traffic]')){
+    e.preventDefault();
+    const id=Number(b.dataset.nodeResetTraffic);
+    const node=DB.nodes.find(n=>Number(n.id)===id);
+    if(!Number.isSafeInteger(id)||id<=0||!node)return;
+    const approved=await panelConfirm(
+      'Сбросить накопленный RX + TX узла «'+node.name+'»? Текущие счётчики интерфейса сохранятся как новая точка отсчёта. История графиков и пользовательский трафик не затрагиваются. Отключённая нода останется отключённой.',
+      {title:'Сбросить трафик узла?',confirmLabel:'Сбросить трафик',danger:true}
+    );
+    if(!approved)return;
+    b.disabled=true;
+    const feedback=b.closest('form')?.querySelector('[data-node-reset-feedback]');
+    try{
+      const result=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/traffic/reset',{method:'POST'});
+      const latest=await backendRequest('/api/v1/collections/nodes');
+      if(Array.isArray(latest?.items))DB.nodes=latest.items;
+      if(!LV[id])LV[id]={cpu:null,ram:null,mbps:null};
+      LV[id].networkTotalBytes=0;
+      if(cur==='nodes')updateNodeGauges();
+      if(feedback)feedback.textContent='Счётчик сброшен. Новые байты считаются с момента сброса.';
+      toast(result.disabled?'Трафик обнулён. Нода остаётся отключённой.':'Трафик ноды сброшен');
+    }catch(error){
+      if(feedback)feedback.textContent='Ошибка сброса: '+(error.message||'backend API');
+      toast('Не удалось сбросить трафик: '+(error.message||'ошибка'));
+    }finally{b.disabled=false}
     return;
   }
   if(b=g('[data-node-pool-normalize]')){
