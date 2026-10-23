@@ -2054,6 +2054,9 @@ document.addEventListener('input',e=>{
   if(dirty)dirty.textContent='Есть несохранённые изменения';
 });
 document.addEventListener('input',e=>{
+  if(e.target.closest('form[data-ent="hosts"]')&&['remark','address','port','sni','host','path','fp','publicKey','shortId','alpn','serviceName','clientEncryption'].includes(e.target.name)){
+    hostEditorRefresh(e.target.closest('form'));return;
+  }
   if(!e.target.matches('form[data-ent="nodes"] [name="rotationIps"]'))return;
   const form=e.target.closest('form'),count=form?.querySelector('[data-node-pool-count]'),feedback=form?.querySelector('[data-node-pool-feedback]');
   const ips=String(e.target.value).split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
@@ -2216,6 +2219,10 @@ document.addEventListener('click',async e=>{
   else if(b=g('[data-dd]')){const [ui,di]=b.dataset.dd.split(':').map(Number),u=DB.users.find(x=>x.id==ui);await api.update('users',ui,{devices:u.devices.filter(d=>d.id!=di)});toast('Устройство удалено');if(cur=='tools')drawTools();else userDrawer(ui,'dev')}
   else if(b=g('[data-qx]')){const u=DB.users.find(x=>x.id==b.dataset.qx);if(u)userDrawer(u.id,'ov')}
   else if(b=g('[data-qr]')){await api.update('users',+b.dataset.qr,{used:0});toast('Трафик сброшен');render(1)}
+  else if(b=g('[data-host-clear-overrides]')){
+    const form=b.closest('form');
+    if(form){['sni','host','path','publicKey','shortId','spiderX','alpn','serviceName','clientEncryption','fp'].forEach(key=>{const input=form.elements.namedItem(key);if(input)input.value='';});hostEditorRefresh(form);toast('Переопределения сброшены — применятся настройки XRAY STUDIO после сохранения');}
+  }
   else if(b=g('[data-host-duplicate]')){const host=DB.hosts.find(h=>String(h.id)===b.dataset.hostDuplicate);if(host){const {id,...copy}=host;entForm('hosts',null,{...copy,remark:(copy.remark||'Хост')+' · копия',order:DB.hosts.length+1});}}
   else if(b=g('[data-ne]')){const [k,id]=b.dataset.ne.split(':');entForm(k,id)}
   else if(b=g('tr[data-e]')){const [k,id]=b.dataset.e.split(':');entForm(k,id)}
@@ -2441,15 +2448,29 @@ document.addEventListener('change',async e=>{const t=e.target;
   if(t.matches('[data-host-node-preset]')){
     const node=DB.nodes.find(n=>String(n.id)===t.value),form=t.closest('form');
     if(node&&form){
-      const address=form.elements.namedItem('address'),port=form.elements.namedItem('port');
+      const address=form.elements.namedItem('address'),port=form.elements.namedItem('port'),
+        remark=form.elements.namedItem('remark'),profile=form.elements.namedItem('profileId');
       if(address)address.value=node.addr||'';
       if(port)port.value=node.port||443;
-      const checkbox=[...form.querySelectorAll('input[type=checkbox]')].find(x=>x.value===String(node.id));
-      if(checkbox){form.querySelectorAll('input[type=checkbox]').forEach(x=>{if(DB.nodes.some(n=>String(n.id)===x.value))x.checked=x===checkbox;});}
-      toast('Адрес и порт подставлены из узла');
+      if(remark&&!remark.value.trim())remark.value=node.name||'';
+      if(profile&&hostProfile(node.profileId))profile.value=String(node.profileId);
+      form.querySelectorAll('[name="nodes"]').forEach(input=>{input.checked=String(input.value)===String(node.id)});
+      hostEditorRefresh(form,true);
+      const warning=form.querySelector('[data-host-warnings]');
+      if(!hostProfile(node.profileId) && warning){
+        warning.hidden=false;
+        warning.textContent='Нода «'+node.name+'» ссылается на отсутствующий XRAY-профиль ID '+node.profileId+'. Назначьте ей существующий профиль в разделе «Узлы».';
+      }
     }
     return;
   }
+  if(t.closest('form[data-ent="hosts"]')){
+    const form=t.closest('form');
+    if(t.name==='profileId')hostEditorRefresh(form,true);
+    else hostEditorRefresh(form);
+    return;
+  }
+
   syncRangeProgress(t);
   if(t.id==='range-precision'){
     C.rangePrecision=t.value==='10'?10:1;
