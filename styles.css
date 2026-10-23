@@ -2869,3 +2869,70 @@ dialog.node-wide .node-date-field .user-date-calendar{position:absolute;top:calc
 dialog.node-wide .node-date-field .user-date-calendar[hidden]{display:none!important}
 dialog.node-wide .node-billing-section{overflow:visible}
 @media(max-width:490px){dialog.node-wide .node-address-port{grid-template-columns:minmax(0,1fr) 110px;gap:.5rem}}
+
+/* Reuse the existing user calendar design in node billing (no separate widget styles). */
+dialog.node-wide .user-date-field{position:relative;min-width:0}
+dialog.node-wide .user-date-trigger{
+  display:flex;align-items:center;gap:.36rem;justify-content:flex-start;
+  width:100%;height:2.36rem;min-height:2.36rem;padding:.3rem .53rem;
+  border:1px solid var(--ln);border-radius:var(--ui-control-radius);background:var(--s2);
+  color:var(--tx);font-size:.76rem;font-weight:570;cursor:pointer;
+}
+dialog.node-wide .user-date-trigger:hover,
+dialog.node-wide .user-date-trigger[aria-expanded="true"]{border-color:color-mix(in srgb,var(--a) 45%,var(--ln))}
+dialog.node-wide .user-date-trigger>.ic{width:.85rem;height:.85rem;flex:0 0 .85rem;color:var(--a)}
+dialog.node-wide .user-date-trigger>.ic:last-child{width:.72rem;height:.72rem;flex-basis:.72rem;margin-left:auto;transform:rotate(90deg);color:var(--mu)}
+dialog.node-wide [data-user-date-label]{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+dialog.node-wide .user-date-calendar{
+  position:absolute;top:calc(100% + .37rem);left:0;z-index:30;
+  display:grid;gap:.48rem;width:min(20rem,max(100%,20rem));max-width:min(22rem,90vw);
+  padding:.65rem;border:1px solid var(--border-strong);
+  border-radius:.67rem;background:var(--s1);
+  box-shadow:0 13px 36px rgba(0,0,0,.38);
+}
+dialog.node-wide .user-date-calendar[hidden],
+dialog.node-wide .user-renew-error[hidden]{display:none!important}
+dialog.node-wide .user-cal-header{display:flex;align-items:center;justify-content:space-between;gap:.4rem}
+dialog.node-wide .user-cal-header strong{color:var(--tx);font-size:.79rem;font-weight:730;text-transform:capitalize}
+dialog.node-wide .user-cal-nav{display:flex;gap:.17rem}
+dialog.node-wide .user-cal-nav button{
+  display:grid;place-items:center;width:1.87rem;height:1.87rem;
+  border:1px solid var(--ln);border-radius:var(--ui-control-radius);background:var(--s2);
+  color:var(--mu);cursor:pointer;
+}
+dialog.node-wide .user-cal-nav button .ic{width:.86rem;height:.86rem}
+dialog.node-wide .user-cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:.13rem}
+dialog.node-wide .user-cal-weekday{
+  display:grid;place-items:center;min-height:1.35rem;color:var(--mu);font-size:.64rem;font-weight:690;
+}
+dialog.node-wide .user-cal-empty{min-height:1.82rem}
+dialog.node-wide .user-cal-day{
+  display:grid;place-items:center;min-height:1.83rem;min-width:0;padding:0;
+  border:1px solid transparent;border-radius:var(--ui-control-radius);
+  background:transparent;color:var(--tx);font-size:.73rem;cursor:pointer;
+}
+dialog.node-wide .user-cal-day:hover{background:color-mix(in srgb,var(--a) 12%,var(--s2))}
+dialog.node-wide .user-cal-day.is-today{color:var(--a);border-color:color-mix(in srgb,var(--a) 32%,var(--ln))}
+dialog.node-wide .user-cal-day.selected{background:var(--a);border-color:var(--a);color:var(--btn-text);font-weight:765}
+dialog.node-wide .user-cal-footer{display:flex;justify-content:space-between;gap:.3rem;padding-top:.4rem;border-top:1px solid var(--ln)}
+dialog.node-wide .user-cal-footer button{
+  min-height:1.83rem;padding:.25rem .58rem;
+  border:1px solid var(--ln);border-radius:var(--ui-control-radius);background:var(--s2);
+  color:var(--mu);font-size:.7rem;font-weight:685;cursor:pointer;
+}
+dialog.node-wide .user-cal-renew{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.36rem;
+  padding-top:.42rem;border-top:1px solid var(--ln);
+}
+dialog.node-wide .user-cal-renew input{
+  width:100%;min-width:0;min-height:2.18rem;height:2.18rem;
+  padding:.4rem .53rem;border:1px solid var(--ln);border-radius:.45rem;
+  background:var(--s2);color:var(--tx);font-size:.77rem;
+}
+dialog.node-wide .user-cal-renew button{min-height:2.18rem;height:2.18rem;padding:0 .68rem;font-size:.72rem}
+dialog.node-wide .user-renew-error{margin:0;color:var(--er);font-size:.69rem;line-height:1.4}
+dialog.node-wide :is(.user-date-trigger,.user-cal-day,.user-cal-nav button,.user-cal-footer button,.user-id-copy):focus-visible{outline:2px solid var(--a);outline-offset:2px}
+dialog.node-wide .node-date-field .user-date-calendar{width:min(320px,calc(100vw - 36px));max-width:calc(100vw - 36px);padding:.65rem;display:grid;gap:.48rem;box-sizing:border-box;overflow:visible}
+dialog.node-wide .node-date-field .user-cal-renew{display:none}
+dialog.node-wide .node-date-field .user-cal-grid{grid-template-columns:repeat(7,minmax(0,1fr))}
+dialog.node-wide .node-date-field .user-date-trigger{min-height:2.45rem}
