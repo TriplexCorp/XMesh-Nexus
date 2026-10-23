@@ -402,7 +402,16 @@ fn provision_proxy_users(config:&mut Value,users:&[Value],squads:&[Value],now_ms
                         user.get("ssPassword").and_then(Value::as_str).unwrap_or("")
                     }else{id};
                     if password.is_empty(){continue}
-                    json!({"password":password,"method":ss_method,"level":0,"email":email})
+                    if ss_method.starts_with("2022-"){
+                        // Xray forbids method in SS2022 per-user entries.
+                        use base64::Engine as _;
+                        let decoded=base64::engine::general_purpose::STANDARD.decode(password).ok();
+                        let length=if ss_method=="2022-blake3-aes-128-gcm"{16}else{32};
+                        if decoded.as_ref().is_none_or(|v|v.len()!=length){continue}
+                        json!({"password":password,"level":0,"email":email})
+                    }else{
+                        json!({"password":password,"method":ss_method,"level":0,"email":email})
+                    }
                 },
                 _=>continue
             };
