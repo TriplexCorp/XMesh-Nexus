@@ -124,6 +124,8 @@ jobs:
         run: node scripts/check-agent-update.js
       - name: Check live node Xray version and status feedback
         run: node scripts/check-node-live-status.js
+      - name: Check wide horizontal Node editor field alignment
+        run: node scripts/check-node-editor-layout.js
       - name: Check responsive Nodes grid and density buttons
         run: node scripts/check-node-grid-layout.js
       - name: Check Nodes IP rotation and Rust resolver integration
