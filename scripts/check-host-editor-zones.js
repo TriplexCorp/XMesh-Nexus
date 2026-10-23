@@ -6,7 +6,7 @@ const app=fs.readFileSync('app.js','utf8');
 const css=fs.readFileSync('styles.css','utf8');
 new Function(app); // Catch invalid JavaScript before shipping any layout changes.
 const start=app.indexOf('function hostEditorMarkup(o,e){');
-const end=app.indexOf('\nfunction entForm(',start);
+const end=app.indexOf('\nfunction squadEditorMarkup(',start);
 assert(start>=0&&end>start,'Missing host editing template');
 const source=app.slice(start,end);
 const DB={
