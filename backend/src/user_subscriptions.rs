@@ -63,7 +63,7 @@ fn encode_component(s:&str)->String{
  for c in s.bytes(){if c.is_ascii_alphanumeric()||b"-._~".contains(&c){result.push(c as char)}else{result.push_str(&format!("%{c:02X}"))}}
  result
 }
-fn vless_link(user:&Value, inbound:&Value, host:&Value)->Option<String>{
+fn vless_link(user:&Value, inbound:&Value, host:&Value, device:&str)->Option<String>{
  if nonempty(inbound,"protocol")?!="vless"{return None}
  let uuid=nonempty(user,"xrayId")?;
  if uuid::Uuid::parse_str(uuid).is_err(){return None}
@@ -94,7 +94,15 @@ fn vless_link(user:&Value, inbound:&Value, host:&Value)->Option<String>{
   if let Some(path)=nonempty(host,"path").or_else(||nonempty(config,"path")){opts.push(format!("path={}",encode_component(path)))}
   if let Some(h)=nonempty(host,"host").or_else(||nonempty(host,"externalHost")){opts.push(format!("host={}",encode_component(h)))}
   if network=="grpc" && let Some(service)=nonempty(config,"serviceName"){opts.push(format!("serviceName={}",encode_component(service)))}
-  if network=="xhttp" && let Some(mode)=nonempty(config,"mode"){opts.push(format!("mode={}",encode_component(mode)))}
+  if network=="xhttp" {
+   let platform=match device{"ios"=>Some("iOS"),"windows"=>Some("Windows"),_=>None};
+   let profile=platform.and_then(|key|{
+    inbound.get("xmesh").and_then(|v|v.get("xhttpDeviceProfiles"))
+     .or_else(||inbound.get("xhttpDeviceProfiles")).and_then(|v|v.get(key))
+   });
+   let mode=profile.and_then(|v|nonempty(v,"mode")).or_else(||nonempty(config,"mode"));
+   if let Some(mode)=mode{opts.push(format!("mode={}",encode_component(mode)))}
+  }
  }
  if security!="none"{
   let sni=nonempty(host,"sni").or_else(||nonempty(host,"externalSNI"))
@@ -118,7 +126,7 @@ fn vless_link(user:&Value, inbound:&Value, host:&Value)->Option<String>{
 // Client-native Xray outbound: build from explicitly allowed public values,
 // not from server-side streamSettings containing Reality private keys.
 fn vless_outbound(user:&Value,inbound:&Value,host:&Value,device:&str)->Option<Value>{
- vless_link(user,inbound,host)?;
+ vless_link(user,inbound,host,device)?;
  let address=endpoint(host)?;
  let port=["externalPort","port"].into_iter().find_map(|key|host.get(key).and_then(self::port))
    .or_else(||inbound.get("port").and_then(self::port))?;
@@ -302,14 +310,14 @@ async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str)->Result
    let matched:Vec<&Value>=hosts.iter().filter(|h|h.get("disabled")!=Some(&Value::Bool(true))&&nonempty(h,"tag")==Some(tag)).collect();
    if !matched.is_empty(){
     for host in matched{
-     if let Some(link)=vless_link(user,inbound,host) && let Some(outbound)=vless_outbound(user,inbound,host,device){
+     if let Some(link)=vless_link(user,inbound,host,device) && let Some(outbound)=vless_outbound(user,inbound,host,device){
       outbounds.push(outbound);links.push(link)
      }
     }
    }else{
     for node in nodes.iter().filter(|n|n.get("profileId")==profile.get("id")&&n.get("disabled")!=Some(&Value::Bool(true))){
      let host=json!({"address":node.get("publicAddress").or_else(||node.get("externalAddress")).or_else(||node.get("addr")),"port":inbound.get("port"),"remark":node.get("name"),"country":node.get("country")});
-     if let Some(link)=vless_link(user,inbound,&host) && let Some(outbound)=vless_outbound(user,inbound,&host,device){
+     if let Some(link)=vless_link(user,inbound,&host,device) && let Some(outbound)=vless_outbound(user,inbound,&host,device){
       outbounds.push(outbound);links.push(link)
      }
     }
@@ -663,11 +671,15 @@ mod tests{
   assert_eq!(windows["streamSettings"]["xhttpSettings"]["mode"],"stream-up");
   assert_eq!(automatic["streamSettings"]["xhttpSettings"]["mode"],"auto");
   assert_eq!(windows["streamSettings"]["xhttpSettings"]["xmux"]["cMaxReuseTimes"],64);
+  let ios_uri=vless_link(&user,&inbound,&host,"ios").unwrap();
+  let windows_uri=vless_link(&user,&inbound,&host,"windows").unwrap();
+  assert!(ios_uri.contains("mode=packet-up"));
+  assert!(windows_uri.contains("mode=stream-up"));
  }
  #[test] fn invalid_reality_not_exported(){
  let user=json!({"xrayId":"550e8400-e29b-41d4-a716-446655440000"});
  let inbound=json!({"protocol":"vless","port":443,"streamSettings":{"network":"xhttp","security":"reality","realitySettings":{"serverNames":["example.org"]}}});
  let host=json!({"address":"vpn.example.org"});
- assert!(vless_link(&user,&inbound,&host).is_none());
+ assert!(vless_link(&user,&inbound,&host,"auto").is_none());
  }
 }
