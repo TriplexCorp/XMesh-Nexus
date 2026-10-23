@@ -2120,7 +2120,7 @@ const getNodeGridMode=()=>{try{const mode=localStorage.getItem(NODE_GRID_KEY);re
 // Render independent runtime and Xray health badges. Only fresh, authenticated
 // agent heartbeats can mark a node as active; a configured node is not online.
 const nodeRuntimeState=(node,runtime)=>{
-  if(node.disabled)return {label:node.disabledReason==='traffic_limit'?'Лимит исчерпан':'Отключена',kind:node.disabledReason==='traffic_limit'?'offline':'disabled'};
+  if(node.disabled)return node.disabledReason==='traffic_limit' ? {label:runtime?.connected&&runtime?.xrayRunning===true?'Остановка ожидается':'Лимит исчерпан',kind:'offline'} : {label:'Отключена',kind:'disabled'};
   if(!runtime?.connected)return {label:runtime?.lastSeenAt?'Нет связи':'Не подключена',kind:'offline'};
   if(runtime.xrayRunning===true&&runtime.routerRunning===true)return {label:'Активна',kind:'online'};
   if(runtime.xrayRunning===false)return {label:'Xray остановлен',kind:'offline'};
@@ -3120,7 +3120,7 @@ $('#bell').onclick=()=>{
   const nodes=[...freshNodes],users=[...DB.users],today=Date.now();
   // A missing heartbeat means "unknown", not that Xray is definitely offline.
   // Failed API requests are reported as unavailable, never a fake disconnected state.
-  const statuses=new Map(await Promise.all(nodes.filter(n=>!n.disabled).map(async n=>{
+  const statuses=new Map(await Promise.all(nodes.filter(n=>!n.disabled||n.disabledReason==='traffic_limit').map(async n=>{
    try{
     return [String(n.id),{data:await backendRequest('/api/v1/nodes/'+encodeURIComponent(n.id)+'/runtime')}];
    }catch(error){
@@ -3142,11 +3142,13 @@ $('#bell').onclick=()=>{
   const quotas=nodes.flatMap(n=>{
    if(n.disabledReason!=='traffic_limit')return [];
    const limit=Number(n.limit)||0;
+   const runtime=statuses.get(String(n.id))?.data;
+   const confirmed=runtime?.connected&&runtime?.xrayRunning===false;
    return [{group:'Лимиты трафика',severity:'critical',node:n,
     message:'Лимит '+(limit?fmt(limit,2)+' ГБ':'исчерпан')+
-      ' · нода автоматически отключена'+
-      (n.trafficLimitReachedAt?' · '+new Date(n.trafficLimitReachedAt).toLocaleString('ru-RU'):'')+
-      '. Остановка Xray проверяется управляющим агентом.'}];
+      (confirmed?' · Xray остановлен':' · ОСТАНОВКА XRAY НЕ ПОДТВЕРЖДЕНА')+
+      (n.trafficLimitReachedAt?' · '+new Date(n.trafficLimitReachedAt.replace(' ','T')).toLocaleString('ru-RU'):'')+
+      '. Нода заблокирована до увеличения лимита и ручного включения.'}];
   });
   const infrastructure=nodes.flatMap(n=>{
    if(n.disabled)return [];
@@ -3179,7 +3181,7 @@ $('#bell').onclick=()=>{
      '<p>'+esc(item.message)+'</p></div></div>').join('')+'</section>';
   }).join('');
   output.innerHTML=body||'<p class="note notification-empty">Новых уведомлений нет. Доступные ноды не сообщают об ошибках.</p>';
-  $('#bell .pip')?.remove();
+  showNodeQuotaBell();
   busy=false;refresh.disabled=false;
  }
  refresh.addEventListener('click',()=>{void updateNotifications()});
