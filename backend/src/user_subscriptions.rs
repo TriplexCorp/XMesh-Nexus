@@ -229,7 +229,7 @@ pub async fn create(State(state):State<AppState>,Extension(actor):Extension<Auth
  let settings=crate::read_settings(&state.pool).await?;
  // A link can exist before nodes are fully configured. Report that distinction
  // explicitly instead of presenting an unusable subscription as ready.
- let readiness=match collect_user_outbounds(&state,&_user,"generic").await {
+ let readiness=match collect_user_outbounds(&state,&_user,"generic",false).await {
   Ok(outbounds)=>json!({"ready":true,"connections":outbounds.len()}),
   Err(error)=>{
    tracing::warn!(user_id=id, reason=%error.message,"Subscription link created without usable endpoints");
@@ -284,7 +284,37 @@ fn host_for_profile(host:&Value,tag:&str,profile:&Value,nodes:&[Value])->bool {
  }
  true
 }
-async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str)->Result<Vec<Value>,ApiError>{
+// Never rewrite a CDN/host alias to an arbitrary node IP. Rotation applies
+// only to an unambiguous directly addressed node that owns the host address.
+fn direct_host_node<'a>(host: &Value, profile: &Value, nodes: &'a [Value]) -> Option<&'a Value> {
+ let address=endpoint(host)?.parse::<std::net::IpAddr>().ok()?;
+ let pins=host.get("nodes").and_then(Value::as_array).filter(|v|!v.is_empty());
+ let eligible:Vec<&Value>=nodes.iter().filter(|node|{
+  if node.get("disabled").and_then(Value::as_bool)==Some(true)
+    || node.get("profileId")!=profile.get("id"){return false}
+  if let Some(ids)=pins {
+   if !ids.iter().any(|id|id.as_i64()==node.get("id").and_then(Value::as_i64)){return false}
+  }
+  ["addr","externalAddress","publicAddress"].iter()
+   .any(|key|nonempty(node,key).and_then(|s|s.parse::<std::net::IpAddr>().ok())==Some(address))
+ }).collect();
+ if eligible.len()==1 {Some(eligible[0])} else {None}
+}
+
+async fn apply_ip_rotation(
+ state:&AppState, user:&Value, node:&Value, outbound:&mut Value, enabled:bool
+)->Result<(),ApiError>{
+ if !enabled || node.get("rotationEnabled").and_then(Value::as_bool)!=Some(true){return Ok(())}
+ let node_id=node.get("id").and_then(Value::as_i64).filter(|id|*id>0)
+   .ok_or_else(||ApiError::new(StatusCode::SERVICE_UNAVAILABLE,"Invalid rotation node identity"))?;
+ let user_id=user.get("id").and_then(Value::as_i64).filter(|id|*id>0)
+   .ok_or_else(||ApiError::new(StatusCode::SERVICE_UNAVAILABLE,"Invalid subscription user identity"))?;
+ let address=crate::node_rotation::resolve_subscription_address(state,node_id,user_id).await?;
+ outbound["settings"]["vnext"][0]["address"]=json!(address);
+ Ok(())
+}
+
+async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str,rotate:bool)->Result<Vec<Value>,ApiError>{
  let squads=crate::load_records(&state.pool,"squads").await?;
  let profiles=crate::load_records(&state.pool,"profiles").await?;
  let hosts=crate::load_records(&state.pool,"hosts").await?;
@@ -330,6 +360,9 @@ async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str)->Result
       if let Some(id)=host.get("id").and_then(Value::as_i64){
        outbound["xmeshSourceKey"]=json!(format!("host:{id}"));
       }
+      if let Some(node)=direct_host_node(host,profile,&nodes){
+       apply_ip_rotation(state,user,node,&mut outbound,rotate).await?;
+      }
       outbounds.push(outbound)
      }else{
       let reality=inbound.get("streamSettings").and_then(|s|s.get("realitySettings")).unwrap_or(&Value::Null);
@@ -348,6 +381,7 @@ async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str)->Result
       if let Some(id)=node.get("id").and_then(Value::as_i64){
        outbound["xmeshSourceKey"]=json!(format!("node:{id}:{tag}"));
       }
+      apply_ip_rotation(state,user,node,&mut outbound,rotate).await?;
       outbounds.push(outbound)
      }
     }
@@ -380,7 +414,7 @@ pub async fn admin_client_json(
  let user=record(&state,id).await?;
  let device=crate::subscription_user_agent::negotiate(&headers,&options)
   .map_err(bad)?.device.as_str();
- let proxies=collect_user_outbounds(&state,&user,device).await?;
+ let proxies=collect_user_outbounds(&state,&user,device,false).await?;
  let setting=crate::read_settings(&state.pool).await?;
  let profile=crate::subscription_json::build_feed(proxies,&setting)
   .map_err(|detail|ApiError::new(StatusCode::BAD_REQUEST,detail))?;
@@ -399,7 +433,7 @@ pub async fn serve(State(state):State<AppState>,Path(token):Path<String>,
  // actual User-Agent. Explicit query parameters remain optional overrides.
  let client=crate::subscription_user_agent::negotiate(&headers,&options)
   .map_err(bad)?;
- let outbounds=collect_user_outbounds(&state,&user,client.device.as_str()).await?;
+ let outbounds=collect_user_outbounds(&state,&user,client.device.as_str(),true).await?;
  let settings=crate::read_settings(&state.pool).await?;
  // Native Xray JSON is the only supported subscription format.
  // A disabled SMART selector changes routing, never the wire representation.
@@ -690,6 +724,15 @@ mod tests{
   assert!(data["routing"]["rules"][2]["outboundTag"].as_str().unwrap().starts_with("xmesh-SE-0001"));
   assert_eq!(data["remarks"],"Sweden");
   assert_eq!(data["inbounds"][0]["protocol"],"socks");
+ }
+ #[test] fn host_rotation_requires_unambiguous_direct_ip_not_cdn(){
+  let profile=json!({"id":7});
+  let nodes=vec![json!({"id":10,"profileId":7,"addr":"13.143.175.131"}),
+    json!({"id":11,"profileId":7,"addr":"13.143.175.132"})];
+  let host=json!({"address":"13.143.175.131","nodes":[10]});
+  assert_eq!(direct_host_node(&host,&profile,&nodes).unwrap()["id"],10);
+  assert!(direct_host_node(&json!({"address":"cdn.example.org","nodes":[10]}),&profile,&nodes).is_none());
+  assert!(direct_host_node(&json!({"address":"13.143.175.130","nodes":[10]}),&profile,&nodes).is_none());
  }
  #[test] fn hosts_respect_profile_and_node_assignment(){
   let profile=json!({"id":7});
