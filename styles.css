@@ -2738,3 +2738,17 @@ dialog.user-modal .user-subscription-url{min-width:0}
 .users-panel .user-row-actions .user-row-delete:hover{border-color:var(--er)}
 @media(max-width:1200px){dialog.user-modal .user-canvas-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:800px){dialog.user-modal{width:calc(100vw - 1rem)!important}dialog.user-modal .user-canvas-grid{grid-template-columns:minmax(0,1fr)}dialog.user-modal .user-pane{padding-inline:.85rem}}
+
+/* Unified in-app confirmation dialog, above all existing editor dialogs. */
+dialog.xm-action-confirm{position:fixed;inset:0;margin:auto;width:min(440px,calc(100vw - 2rem));max-width:none;max-height:calc(100dvh - 2rem);padding:0;border:1px solid var(--ln);border-radius:var(--ui-radius);background:var(--s1);color:var(--tx);box-shadow:0 32px 90px #0009;z-index:2200}
+dialog.xm-action-confirm::backdrop{background:rgba(3,7,13,.68);backdrop-filter:blur(5px)}
+.xm-action-confirm-box{padding:1.5rem;display:grid;gap:.85rem}
+.xm-action-confirm-icon{width:2.5rem;height:2.5rem;border-radius:.9rem;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--a) 13%,transparent);color:var(--a)}
+.xm-action-confirm-box h2{font-size:1.1rem;font-weight:750;margin:0}
+.xm-action-confirm-box p{line-height:1.55;color:var(--mu);margin:0;overflow-wrap:anywhere;font-size:.86rem}
+.xm-action-confirm-actions{display:flex;justify-content:flex-end;gap:.6rem;margin-top:.45rem}
+.xm-action-confirm-actions button{min-height:2.35rem}
+dialog.node-wide .node-ip-section{background:color-mix(in srgb,var(--s2) 65%,var(--s1));box-shadow:inset 0 1px color-mix(in srgb,var(--a) 9%,transparent)}
+dialog.node-wide .node-form-section-title{display:flex;align-items:center;gap:.45rem;font-size:.95rem}
+dialog.node-wide .node-ip-section textarea{font-family:ui-monospace,Consolas,monospace;line-height:1.6}
+dialog.node-wide .node-ip-section textarea:focus{outline:2px solid var(--a);outline-offset:1px}
