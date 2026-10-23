@@ -835,3 +835,10 @@
 .xm-studio-modal[open]{animation:xm-studio-dialog-enter .22s cubic-bezier(.2,.8,.2,1) both}
 .xm-studio-modal[open]::backdrop{animation:xm-studio-backdrop-enter .2s ease both}
 @media(prefers-reduced-motion:reduce){.xm-studio-modal[open],.xm-studio-modal[open]::backdrop{animation:none}}
+
+/* Directly editable and discoverable XRAY profile name. */
+.sv-studio .sv-codebar .sv-profile-name{display:flex;flex:0 1 320px;min-width:170px;align-items:center;gap:.55rem;color:var(--vmute);font-size:.72rem}
+.sv-studio .sv-codebar .sv-profile-name span{white-space:nowrap}
+.sv-studio .sv-codebar .sv-profile-name input{min-width:0;width:100%;height:2rem;padding:.35rem .6rem;border:1px solid var(--vline);border-radius:var(--vround);background:var(--vfield);color:var(--vtext);font:inherit}
+.sv-studio .sv-codebar .sv-profile-name input:focus{outline:2px solid var(--vaccent);outline-offset:1px}
+@media(max-width:720px){.sv-studio .sv-codebar{flex-wrap:wrap}.sv-studio .sv-codebar .sv-profile-name{flex:1 1 100%}}
