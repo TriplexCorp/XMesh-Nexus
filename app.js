@@ -1093,10 +1093,6 @@ function userDrawer(id,tab){
         <div class="user-host-list">${hostMarkup}</div>
         <div class="user-dev-limit"><label class="f"><span>Лимит устройств</span><input type="number" min="0" value="${u.hwid}" data-hw="${u.id}" aria-label="Лимит устройств"></label></div>
         <div class="user-section-divider"></div>
-        <div class="user-pane-heading user-sub-heading"><div><h3>Подключения</h3></div></div>
-        <p class="user-sub-note">Готовый Client JSON собирается из UUID этого пользователя, доступных inbound и публичных хостов.</p>
-        <button type="button" class="btn sm" data-user-client-json="${u.id}">${ic('file-code')} Готовые Client JSON</button>
-        <div class="user-section-divider"></div>
         <div class="user-pane-heading user-sub-heading"><div><h3>Подписка</h3></div></div>
         <p class="user-sub-note">Постоянная ссылка на подписку. Домен, путь, оформление и приложения управляются в SUBSCRIPTION STUDIO.</p>
         <div class="user-subscription-state" data-user-sub-state="${u.id}" role="status" aria-live="polite"><span class="user-canvas-muted">Загружаем ссылку…</span></div>
