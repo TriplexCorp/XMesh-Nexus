@@ -4,7 +4,7 @@
 window.XMeshSubscriptionStudio = (() => {
   const defaults = {
     subscriptionDomain:'', subscriptionPath:'/s',
-    subscriptionBrand:'', subscriptionDescription:'Настройки подключения и информация о подписке.',
+    subscriptionBrand:'', subscriptionAnnouncement:'', subscriptionUpdateInterval:24, subscriptionDescription:'Настройки подключения и информация о подписке.',
     subscriptionDescriptionEn:'', subscriptionFooter:'',subscriptionFooterEn:'', subscriptionAccent:'#e8bb78',subscriptionSecondaryAccent:'#c6e985', subscriptionSyncPanelTheme:true, subscriptionLanguage:'ru', subscriptionTheme:'dark',
     subscriptionShowTraffic:true, subscriptionShowExpiry:true,
     subscriptionPlacement:'a', nodePlacement:'a', deploymentServerB:'', deploymentServerC:'',
@@ -144,6 +144,8 @@ window.XMeshSubscriptionStudio = (() => {
       '<section class="card subscription-studio-section">',
       '<div class="subscription-studio-heading"><span>03</span><div><h3>Клиентский портал</h3><p>Синхронизация с темой панели или отдельная палитра.</p></div></div>',
       field('subscriptionBrand','Название подписки',data.subscriptionBrand,'Пустое значение — использовать бренд панели.',{placeholder:'Название вашего сервиса',max:80}),
+      field('subscriptionAnnouncement','Анонс для VPN-клиентов',data.subscriptionAnnouncement,'Короткое сообщение, передаваемое в заголовке подписки (если клиент поддерживает).',{area:true,max:240}),
+      field('subscriptionUpdateInterval','Интервал обновления подписки (ч)',data.subscriptionUpdateInterval,'Подсказка для поддерживающих клиентов: от 1 до 168 часов.',{type:'number',min:1,max:168}),
       field('subscriptionDescription','Описание (RU)',data.subscriptionDescription,'Текст на русском.',{area:true,max:240}),
       field('subscriptionDescriptionEn','Описание (EN)',data.subscriptionDescriptionEn,'Английский текст; пустое поле — стандартное описание на английском.',{area:true,max:240}),
       '<label class="subscription-theme-sync"><input type="checkbox" name="subscriptionSyncPanelTheme"'+(data.subscriptionSyncPanelTheme!==false?' checked':'')+'> <span><b>Синхронизировать с темой панели</b><small>Акцент, светлый/тёмный режим, фон, карточки и цвет текста. Выключите для своего оформления.</small></span></label>',
@@ -290,6 +292,8 @@ window.XMeshSubscriptionStudio = (() => {
         subscriptionDomain:input(form,'subscriptionDomain').value.trim().toLowerCase(),
         subscriptionPath:input(form,'subscriptionPath').value.trim(),
         subscriptionBrand:input(form,'subscriptionBrand').value.trim(),
+        subscriptionAnnouncement:input(form,'subscriptionAnnouncement').value.trim(),
+        subscriptionUpdateInterval:Number(input(form,'subscriptionUpdateInterval').value),
         subscriptionDescription:input(form,'subscriptionDescription').value.trim(),
         subscriptionDescriptionEn:input(form,'subscriptionDescriptionEn').value.trim(),
         subscriptionFooter:input(form,'subscriptionFooter').value.trim(),
@@ -473,6 +477,7 @@ window.XMeshSubscriptionStudio = (() => {
         if(![draft.subscriptionJson.socksPort,draft.subscriptionJson.httpPort].every(p=>Number.isInteger(p)&&p>=1024&&p<=65535)||draft.subscriptionJson.socksPort===draft.subscriptionJson.httpPort){notify('Укажите разные локальные порты в диапазоне 1024–65535');return;}
         for(const key of ['deploymentServerB','deploymentServerC'])
           if(draft[key] && (draft[key].length>253 || /[\u0000-\u001f\u007f]/.test(draft[key]))) {notify('Некорректное описание сервера');return;}
+        if(!Number.isInteger(draft.subscriptionUpdateInterval)||draft.subscriptionUpdateInterval<1||draft.subscriptionUpdateInterval>168){notify('Интервал обновления должен быть от 1 до 168 часов.');return;}
         for(const key of ['subscriptionLogoUrl','subscriptionSupportUrl']){
           if(!validHttps(draft[key])){notify('Укажите корректную HTTPS-ссылку без логина и порта.');return;}
         }
