@@ -3284,7 +3284,7 @@ $('#bell').onclick=()=>{
      '<p>'+esc(item.message)+'</p></div></div>').join('')+'</section>';
   }).join('');
   output.innerHTML=body||'<p class="note notification-empty">Новых уведомлений нет. Доступные ноды не сообщают об ошибках.</p>';
-  showNodeQuotaBell();
+  if(typeof showNodeQuotaBell==='function')showNodeQuotaBell();
   busy=false;refresh.disabled=false;
  }
  refresh.addEventListener('click',()=>{void updateNotifications()});
