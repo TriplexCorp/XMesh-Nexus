@@ -327,7 +327,8 @@ mod tests{
   a["settings"]["vnext"][0]["address"]=json!("203.0.113.8");
   b["settings"]["vnext"][0]["address"]=json!("203.0.113.8");
   let c=build(vec![a,b],&json!({})).unwrap();
-  assert_eq!(c["outbounds"].as_array().unwrap().len(),5);
+  // Two independent proxy connections plus direct/block; DNS-out is opt-in.
+  assert_eq!(c["outbounds"].as_array().unwrap().len(),4);
  }
  #[test] fn reject_unsafe_settings(){
   assert!(validate_settings(&json!({"route":[{"outboundTag":"direct"}]})).is_err());
