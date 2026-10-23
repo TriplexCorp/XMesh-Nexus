@@ -256,10 +256,36 @@ const ENT={
     {k:'billingNote',l:'Примечание по оплате'},
     {k:'rotationEnabled',l:'Ротация IP-адресов',t:'bool',h:'Пул IP-адресов для подключений узла. Используйте только назначенные серверу адреса.'},
     {k:'rotationIntervalHours',l:'Смена адреса каждые, ч',t:'num',h:'1–720 часов. По умолчанию 24. Адрес закреплён за пользователем между обновлениями подписки.'},
-    {k:'rotationIps',l:'Пул внешних IP-адресов',t:'area',rows:7,h:'Один IPv4 или IPv6 на строку. Добавляйте только IP, реально назначенные VPS и доступные клиентам. До 256 адресов. Основной адрес узла остаётся прежним.'}],
-    def:()=>({flag:'',mult:1,limit:0,resetDay:1,rotationEnabled:false,rotationIntervalHours:24,rotationIps:'',billingCurrency:'EUR',billingPeriod:'monthly',billingRemindDays:7,billingPrice:0}),
+    {k:'rotationIps',l:'Пул внешних IP-адресов',t:'area',rows:7,h:'Один IPv4 или IPv6 на строку. Добавляйте только IP, реально назначенные VPS и доступные клиентам. До 256 адресов. Основной адрес узла остаётся прежним.'},
+    {k:'geoEnabled',l:'Включить GeoData и маршрутизацию',t:'bool',h:'Нода самостоятельно скачивает файлы и применяет правила после проверки Xray.'},
+    {k:'geoBlockAds',l:'Блокировать рекламу (category-ads-all)',t:'bool',h:'Добавляет geosite:category-ads-all → blackhole перед обычными маршрутами.'},
+    {k:'geoUpdateHours',l:'Проверять обновления каждые, ч',t:'num',h:'От 6 до 168 часов. Нода обновляется независимо от доступности панели.'},
+    {k:'geoSiteUrl',l:'Источник geosite.dat',ph:'https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat',h:'HTTPS-адрес. Пустое значение — стандартный источник.'},
+    {k:'geoIpUrl',l:'Источник geoip.dat',ph:'https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat',h:'HTTPS-адрес. Пустое значение — стандартный источник.'},
+    {k:'geoExtraSources',l:'Дополнительные .dat',t:'area',rows:4,h:'Каждая строка: filename.dat https://example.com/file.dat [SHA-256]. До 8 файлов.'},
+    {k:'geoCustomRules',l:'Свои правила routing',t:'area',rows:5,h:'По одному на строку: geosite:category-ads-all => block, geoip:private => direct или ext:custom.dat:list => block.'}],
+    def:()=>({flag:'',mult:1,limit:0,resetDay:1,rotationEnabled:false,rotationIntervalHours:24,rotationIps:'',billingCurrency:'EUR',billingPeriod:'monthly',billingRemindDays:7,billingPrice:0,geoEnabled:false,geoBlockAds:true,geoUpdateHours:24,geoSiteUrl:'',geoIpUrl:'',geoExtraSources:'',geoCustomRules:''}),
     chk:data=>{
       const issue=nodeRotationValidate(data);if(issue)return issue;
+      if(data.geoEnabled){
+        if(!Number.isInteger(Number(data.geoUpdateHours))||Number(data.geoUpdateHours)<6||Number(data.geoUpdateHours)>168)return 'GeoData: интервал должен быть от 6 до 168 часов.';
+        for(const url of [data.geoSiteUrl,data.geoIpUrl].filter(Boolean)){
+          try{const u=new URL(url);if(u.protocol!=='https:'||u.username||u.password||(u.port&&u.port!=='443')||!u.hostname.includes('.')||u.hash)throw Error()}
+          catch(_){return 'GeoData: источники должны быть HTTPS-ссылками без логина, пароля и фрагмента.'}
+        }
+        const sources=String(data.geoExtraSources||'').split(/\r?\n/).map(x=>x.trim()).filter(x=>x&&!x.startsWith('#'));
+        if(sources.length>8)return 'GeoData: допускается до 8 дополнительных файлов.';
+        const seen=new Set(['geosite.dat','geoip.dat']);
+        for(const src of sources){
+          const parts=src.split(/\s+/);
+          if(!/^[A-Za-z0-9_-]{1,48}\.dat$/.test(parts[0]||'')||seen.has(parts[0])||parts.length<2||parts.length>3)return 'GeoData: строка должна иметь вид filename.dat HTTPS_URL [SHA256], без повторов.';
+          seen.add(parts[0]);
+          try{const u=new URL(parts[1]);if(u.protocol!=='https:'||!u.hostname.includes('.')||u.username||u.password||u.hash||(u.port&&u.port!=='443'))throw Error()}catch(_){return 'GeoData: дополнительные источники должны использовать HTTPS.'}
+          if(parts[2]&&!/^[a-fA-F0-9]{64}$/.test(parts[2]))return 'GeoData: неверная контрольная сумма SHA-256.';
+        }
+        const rules=String(data.geoCustomRules||'').split(/\r?\n/).map(x=>x.trim()).filter(x=>x&&!x.startsWith('#'));
+        if(rules.length>64||rules.some(x=>!/^(?:geosite|geoip|ext):[A-Za-z0-9_:.-]+\s*=>\s*(?:block|direct)$/.test(x)))return 'GeoData: правило должно иметь вид geosite:категория => block (или direct).';
+      }
       const interval=Number(data.rotationIntervalHours||24);
       if(data.rotationEnabled&&(!Number.isInteger(interval)||interval<1||interval>720))return 'Интервал IP-ротации должен быть от 1 до 720 часов.';
       const port=Number(data.xrayLocalPort||0),nodePort=Number(data.port||0);
@@ -2395,7 +2421,8 @@ function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id
   const billingFields=e.fs.filter(f=>f.k.startsWith('billing')).map(f=>f.k==='billingDueDate'
     ?'<div class="f node-date-field"><span>Оплачено до</span><button type="button" class="user-date-trigger" data-node-date-open aria-expanded="false">'+ic('calendar')+'<span data-node-date-label>'+esc(o.billingDueDate?userDateLabel(o.billingDueDate):'Выберите дату')+'</span>'+ic('chevronRight')+'</button><input type="hidden" name="billingDueDate" value="'+esc(o.billingDueDate||'')+'"><div class="user-date-calendar" data-node-date-calendar hidden></div></div>'
     :field(f,o[f.k])).join('');
-  const nodeCoreFields=e.fs.filter(f=>!f.k.startsWith('billing')&&!['rotationEnabled','rotationIntervalHours','rotationIps'].includes(f.k));
+  const nodeCoreFields=e.fs.filter(f=>!f.k.startsWith('billing')&&!f.k.startsWith('geo')&&!['rotationEnabled','rotationIntervalHours','rotationIps'].includes(f.k));
+  const nodeGeoFields=e.fs.filter(f=>f.k.startsWith('geo')).map(f=>field(f,f.k==='geoUpdateHours'?(o[f.k]??24):f.k==='geoBlockAds'?(o[f.k]??true):o[f.k]??'')).join('');
   // Keep tab / screen-reader order in sync with the wide four-column layout.
   // New fields remain supported and follow the explicitly grouped core fields.
   const nodeCoreOrder=['name','hosting','flag','profileId','addr','port','xrayLocalPort','mult','limit','resetDay'];
@@ -2414,7 +2441,7 @@ function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id
     :'';
   const hostWizard=k==='hosts'?'<div class="host-quick"><label class="f"><span>Быстро заполнить из узла</span><select data-host-node-preset><option value="">Выберите сервер…</option>'+DB.nodes.map(n=>'<option value="'+esc(String(n.id))+'">'+esc(n.name)+' · '+esc(n.addr||'')+'</option>').join('')+'</select></label><p class="note">Подставит адрес, порт и привязку. Остальные поля сохранятся.</p></div>':'';
   const fields=k==='squads'?squadEditorMarkup(o,e):k==='hosts'?hostEditorMarkup(o,e):k==='nodes'
-    ?'<div class="node-form-layout"><section class="node-main-section"><div class="node-form-section-title">Основные параметры</div><p class="node-section-intro">Подключение, профиль Xray и ограничения узла</p><div class="node-form-grid">'+nodeMainFields+'</div>'+nodeResetAction+'</section>'+`<section class="node-ip-section"><div class="node-form-section-title">IP-пул и ротация</div><div class="node-ip-hint">Адреса должны принадлежать этому VPS и быть доступны извне.</div><div class="node-rotation-editor-body">${rotationFields}<div class="node-pool-toolbar"><span data-node-pool-count>Адресов: ${nodeRotationIPs(o).length} / 256</span><button type="button" class="gh sm" data-node-pool-normalize>Убрать повторы</button><button type="button" class="gh sm" data-node-pool-clear>Очистить</button></div><output data-node-pool-feedback aria-live="polite"></output>${rotationProbe}</div></section><section class="node-billing-section"><div class="node-form-section-title">Инфрабиллинг</div><p class="node-ip-hint">Стоимость, аренда и напоминания</p><div class="node-billing-fields">${billingFields}</div></section></div>`
+    ?'<div class="node-form-layout"><section class="node-main-section"><div class="node-form-section-title">Основные параметры</div><p class="node-section-intro">Подключение, профиль Xray и ограничения узла</p><div class="node-form-grid">'+nodeMainFields+'</div>'+nodeResetAction+'</section>'+`<section class="node-ip-section"><div class="node-form-section-title">IP-пул и ротация</div><div class="node-ip-hint">Адреса должны принадлежать этому VPS и быть доступны извне.</div><div class="node-rotation-editor-body">${rotationFields}<div class="node-pool-toolbar"><span data-node-pool-count>Адресов: ${nodeRotationIPs(o).length} / 256</span><button type="button" class="gh sm" data-node-pool-normalize>Убрать повторы</button><button type="button" class="gh sm" data-node-pool-clear>Очистить</button></div><output data-node-pool-feedback aria-live="polite"></output>${rotationProbe}</div></section><section class="node-geo-section"><div class="node-form-section-title">GeoData и маршрутизация</div><p class="node-ip-hint">GeoSite/GeoIP скачивает сама нода. Правила применяются раньше общих правил профиля, но после StatsService.</p><div class="node-geo-fields">${nodeGeoFields}</div><p class="node-ip-hint">После сохранения обновите Agent; применение подтверждается на ноде.</p></section><section class="node-billing-section"><div class="node-form-section-title">Инфрабиллинг</div><p class="node-ip-hint">Стоимость, аренда и напоминания</p><div class="node-billing-fields">${billingFields}</div></section></div>`
     :standardFields;
   modal(`<form class="box" data-k="ent" data-ent="${k}" data-id="${id||''}" method="dialog"><h2>${id?'Изменить':'Новый'}: ${e.nw.toLowerCase()}</h2>${fields}<p class="er" id="fe"></p><div class="act">${id?`<button type="button" class="dg" data-del="${k}:${id}" style="margin-right:auto">${ic('trash')}Удалить</button>`:''}${k==='hosts'&&id?`<button type="button" class="gh" data-host-duplicate="${id}">${ic('copy')}Дублировать</button>`:''}<button type="button" class="gh" data-x>Отмена</button><button class="btn">Сохранить</button></div></form>`,k==='nodes'?'node-wide':k==='hosts'?'host-wide':k==='squads'?'squad-wide':k=='profiles'||k=='subs'?'wide':'');
   if(k==='squads')squadEditorRefresh(dlg.querySelector('form[data-ent="squads"]'));
@@ -2496,6 +2523,7 @@ async function nodesP(){
     const k=n.limit&&trafficGb!==null?cl(trafficGb/n.limit,0,1):0,tc=k>.9?'--er':k>.75?'--wr':'--c3';
     return `<div class="card nc${n.disabled?' off':''}" data-node-card-id="${n.id}"><div class="h"><span class="fg">${flagView(n.flag)}</span><div class="node-identity"><b>${esc(n.name)}</b><br><small class="mu">${esc(n.addr)}${n.port?':'+esc(n.port):''}</small>${n.hosting?.trim()?`<span class="node-hosting" title="Хостинг">${ic('building-2')}${esc(n.hosting.trim())}</span>`:''}<span class="node-agent-version" data-node-agent-version title="Версия управляющего агента">${runtime.get(n.id)?.version?"Agent "+esc(runtime.get(n.id).version.replace(/^control-v/,"v")):"Agent —"}</span></div><div class="node-live-badges"><span class="node-xray-version" data-node-xray-version title="Версия по последнему heartbeat">${runtime.get(n.id)?.xrayVersion?'Xray '+esc(runtime.get(n.id).xrayVersion):'Xray —'}</span><span data-node-runtime-state class="node-runtime-pill node-runtime-${nodeRuntimeState(n,runtime.get(n.id)).kind}"><span class="node-runtime-dot" aria-hidden="true"></span>${esc(nodeRuntimeState(n,runtime.get(n.id)).label)}</span></div></div>
       <div class="kvg"><div><span>Активные пользователи</span><b>${s.nodeOn[n.id]??0}</b></div><div><span>XRAY STUDIO</span>${p?esc(p.name)+'<br><small class="mu">Применение профиля не подтверждено</small>':n.profileId?'<span class="er">Профиль ID '+esc(n.profileId)+' не найден</span>':'—'}</div></div>
+      ${n.geoEnabled?`<div class="node-ip-rotation active" title="GeoData задана; применение зависит от синхронизации агента"><span class="node-ip-indicator" aria-hidden="true"></span><span>GeoData · ${n.geoBlockAds?'блокировка рекламы':'свои правила'}</span></div>`:''}
       ${n.rotationEnabled?`<div class="node-ip-rotation active" aria-label="Пул IP-ротации"><span class="node-ip-indicator" aria-hidden="true"></span><span>IP-пул · ${nodeRotationIPs(n).length} адресов</span></div>`:''}
       <div class="node-gauges">
         ${nodeGauge(n,'cpu-'+n.id,'CPU',Number.isFinite(l.cpu)?l.cpu:0,Number.isFinite(l.cpu)?Math.round(l.cpu)+'%':'—',Number.isFinite(l.cpu)?'загрузка':'нет данных','--a')}
