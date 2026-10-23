@@ -30,7 +30,7 @@ assert.match(update,/\.bind\(&actor\.username\)\.bind\(target\)/);
 assert.match(runtime,/RETURNING id,action,target_version/);
 assert.match(runtime,/"targetVersion":row\.try_get/);
 assert.match(migration,/ADD COLUMN target_version TEXT/);
-assert.match(agent,/control-v3\.0/);
+assert.match(agent,/control-v4\\.0\\.0/);
 assert.match(agent,/update_managed_xray "\$target_version"/);
 assert.match(agent,/local image_tag="\$\{version#v\}"/);
 assert.match(agent,/ghcr\.io\/xtls\/xray-core:\$image_tag/);
