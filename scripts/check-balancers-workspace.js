@@ -28,4 +28,6 @@ assert.doesNotMatch(subscriptions,/Format::|options\.get\("format"\)|options\.co
  'Feed generation must not support a format selector');
 assert.match(negotiation,/options\.get\("device"\)/,
  'Keep device-specific XHTTP configuration');
+assert.match(engine,/fn disabled_smart_never_emits_balancer_or_observatory\(\)/);
+assert.match(engine,/В JSON обнаружена балансировка, хотя SMART отключён/);
 console.log('Dedicated opt-in balancer workspace: OK');
