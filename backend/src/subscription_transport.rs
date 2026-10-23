@@ -48,6 +48,7 @@ const GRPC_FIELDS:&[&str]=&["serviceName","authority","multiMode","user_agent",
     "idle_timeout","health_check_timeout","permit_without_stream","initial_windows_size"];
 const HTTPUPGRADE_FIELDS:&[&str]=&["path","host"];
 const RAW_FIELDS:&[&str]=&["header"];
+const HYSTERIA_FIELDS:&[&str]=&["version","udpIdleTimeout"];
 const KCP_FIELDS:&[&str]=&[
     "mtu","tti","uplinkCapacity","downlinkCapacity","cwndMultiplier","maxSendingWindow"
 ];
@@ -85,10 +86,11 @@ fn client_transport(stream:&Value,inbound:&Value,host:&Value,device:&str,network
         "httpupgrade"=>("httpupgradeSettings",HTTPUPGRADE_FIELDS),
         "raw"|"tcp"=>("rawSettings",RAW_FIELDS),
         "mkcp"|"kcp"=>("kcpSettings",KCP_FIELDS),
+        "hysteria"=>("hysteriaSettings",HYSTERIA_FIELDS),
         _=>return json!({})
     };
     let mut config=stream.get(settings_key).cloned().unwrap_or_else(||json!({}));
-    if network=="tcp" && config.is_null(){
+    if network=="tcp" && config.as_object().is_some_and(|m|m.is_empty()){
         config=stream.get("tcpSettings").cloned().unwrap_or_else(||json!({}));
     }
     if network=="xhttp"{config=effective_xhttp(&config)}
@@ -136,9 +138,10 @@ pub(crate) fn client_stream(inbound:&Value,host:&Value,device:&str)->Option<Valu
     let security=field(stream,"security").unwrap_or("none");
     let network=field(stream,"method").or_else(||field(stream,"network")).unwrap_or("raw");
     if !["none","tls","reality"].contains(&security){return None}
-    if !["raw","tcp","xhttp","ws","websocket","grpc","httpupgrade","mkcp","kcp"].contains(&network){return None}
+    if !["raw","tcp","xhttp","ws","websocket","grpc","httpupgrade","mkcp","kcp","hysteria"].contains(&network){return None}
     if security=="reality" && !["raw","tcp","xhttp","grpc"].contains(&network){return None}
-    let mut out=json!({"security":security,"network":network});
+    let mut out=if field(stream,"method").is_some(){json!({"security":security,"method":network})}
+        else{json!({"security":security,"network":network})};
     if security=="reality"{
         let reality=stream.get("realitySettings").unwrap_or(&Value::Null);
         // 'password' is the current client name; 'publicKey' is its old alias.
@@ -196,7 +199,7 @@ pub(crate) fn client_stream(inbound:&Value,host:&Value,device:&str)->Option<Valu
         let field=match network{
             "raw"|"tcp"=>"rawSettings","xhttp"=>"xhttpSettings","ws"|"websocket"=>"wsSettings",
             "grpc"=>"grpcSettings","httpupgrade"=>"httpupgradeSettings",
-            "mkcp"|"kcp"=>"kcpSettings",_=>return None
+            "mkcp"|"kcp"=>"kcpSettings","hysteria"=>"hysteriaSettings",_=>return None
         };
         out[field]=transport;
     }
