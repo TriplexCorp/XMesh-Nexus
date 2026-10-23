@@ -1365,6 +1365,21 @@ async function loadUserTrafficStats(userId){
     const payload=await backendRequest('/api/v1/users/'+encodeURIComponent(userId)+'/traffic');
     if(dlg.open&&container.isConnected&&dlg.contains(container)){
       container.innerHTML=userTrafficDonutsMarkup(payload)+userInboundTrafficMarkup(payload);
+      // The header must reflect the same signed meter as the graphs, without
+      // waiting for another full panel bootstrap (and without double counting).
+      const used=Number(payload?.effectiveUsedGb);
+      const u=DB.users.find(item=>item.id===userId);
+      if(u&&Number.isFinite(used)&&used>=0&&payload?.effectiveUsedGb!=null){
+        u.used=used;
+        const value=dlg.querySelector('.user-usage-line>strong');
+        if(value)value.textContent=gb(used);
+        const track=dlg.querySelector('.user-usage-track');
+        if(track&&u.limit>0){
+          const percent=Math.min(100,Math.max(0,used/u.limit*100));
+          track.style.setProperty('--usage',percent+'%');
+          track.setAttribute('aria-valuenow',String(Math.round(percent)));
+        }
+      }
     }
   }catch(error){
     if(dlg.open&&container.isConnected&&dlg.contains(container)){
