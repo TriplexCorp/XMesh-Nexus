@@ -496,6 +496,22 @@ async fn create_record(
         object.insert("xrayId".into(),Value::String(Uuid::new_v4().to_string()));
     }
     validate_record(&collection, &data)?;
+    if collection=="nodes" && data.get("disabled").and_then(Value::as_bool)==Some(false) {
+        // Do not let a button click reactivate an exhausted node. Raise the
+        // cap first or explicitly reset its accounting baseline.
+        let consumed=sqlx::query_scalar::<_,Option<i64>>(
+            "SELECT rx_bytes+tx_bytes FROM node_network_traffic_totals WHERE node_id=$1"
+        ).bind(id).fetch_optional(&mut *tx).await?.flatten().unwrap_or(0);
+        let cap=data.get("limit").and_then(Value::as_f64).unwrap_or(0.0);
+        if cap>0.0 && (consumed as f64)>=cap*1073741824.0 {
+            return Err(ApiError::new(StatusCode::CONFLICT,
+                "Лимит трафика узла исчерпан. Увеличьте лимит перед включением."));
+        }
+        if let Some(obj)=data.as_object_mut(){
+            obj.remove("disabledReason");
+            obj.remove("trafficLimitReachedAt");
+        }
+    }
     if collection == "hosts" { validate_host_binding(&state.pool, &data).await?; }
 
     // User and initial subscription must be one atomic operation: never create
@@ -1121,6 +1137,37 @@ async fn ingest_node_metrics(
                updated_at=NOW()"
         ).bind(body.node_id).bind(interface).bind(rx).bind(tx)
          .execute(&state.pool).await?;
+    }
+
+    // Enforce an exhausted node bandwidth quota in the control plane.
+    // This is independent of per-user Xray statistics and is decided on the
+    // authenticated, cumulative RX+TX counters persisted above.
+    // The conditional UPDATE makes the critical event idempotent.
+    let cutoff=sqlx::query(
+        "UPDATE panel_records AS node SET
+           data=jsonb_set(
+             jsonb_set(
+               jsonb_set(data,'{disabled}','true'::jsonb,true),
+               '{disabledReason}',to_jsonb('traffic_limit'::text),true),
+             '{trafficLimitReachedAt}',to_jsonb(NOW()::text),true),
+           updated_at=NOW()
+         WHERE collection='nodes' AND id=$1
+           AND COALESCE((data->>'disabled')::boolean,false)=false
+           AND jsonb_typeof(data->'limit')='number'
+           AND (data->>'limit')::numeric>0
+           AND EXISTS (
+             SELECT 1 FROM node_network_traffic_totals t
+             WHERE t.node_id=$1
+               AND (t.rx_bytes::numeric+t.tx_bytes::numeric)
+                   >= (data->>'limit')::numeric*1073741824
+           )
+         RETURNING data->>'name' AS node_name,
+           (data->>'limit')::numeric AS limit_gb"
+    ).bind(body.node_id).fetch_optional(&state.pool).await?;
+    if let Some(row)=cutoff{
+        tracing::error!(node_id=body.node_id,
+          name=?row.try_get::<Option<String>,_>("node_name")?,
+          "NODE TRAFFIC LIMIT EXHAUSTED: automatic Xray shutdown required");
     }
 
     if !user_traffic.is_empty() {
