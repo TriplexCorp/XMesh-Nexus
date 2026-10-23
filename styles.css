@@ -3878,3 +3878,15 @@ dialog.user-modal .user-server-donut{
 dialog.user-modal .user-server-details>b::before{
   background:var(--server-gradient,var(--server-color,var(--a)));
 }
+
+/* Avatar paint containment: prevent a second inherited background layer or
+   oversized pseudo-element from peeking through the circular gradient. */
+.av{
+  position:relative;
+  isolation:isolate;
+  overflow:hidden;
+  background-clip:padding-box;
+  background-origin:padding-box;
+  box-shadow:none;
+}
+.av::before,.av::after{content:none!important}
