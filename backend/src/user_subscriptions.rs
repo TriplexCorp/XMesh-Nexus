@@ -487,7 +487,7 @@ pub async fn serve(State(state):State<AppState>,Path(token):Path<String>,
    use base64::Engine as _;
    let encoded=base64::engine::general_purpose::STANDARD.encode(announcement.as_bytes());
    if let Ok(value)=header::HeaderValue::from_str(&format!("base64:{encoded}")) {
-    response.headers_mut().insert("subscription-announcement",value);
+    response.headers_mut().insert("announce",value);
    }
   }
  }
