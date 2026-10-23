@@ -17,10 +17,12 @@ assert.match(engine,/let smart=enabled\(opts,"smart",false\)/);
 assert.match(engine,/if smart && tags\.len\(\)>1 && balance!="off"/);
 assert.match(engine,/fn balancers_are_opt_in_and_servers_remain_distinct/);
 const subscriptions=fs.readFileSync('backend/src/user_subscriptions.rs','utf8');
-assert.match(subscriptions,/fn use_vless_feed\(/,
- 'Subscription delivery must choose between independent servers and native JSON');
-assert.match(subscriptions,/!options\.contains_key\("format"\) && !crate::subscription_json::smart_enabled\(settings\)/,
- 'Disabled SMART must return separate links unless JSON is explicitly requested');
-assert.match(subscriptions,/fn no_smart_shows_standalone_servers_for_happ\(/,
- 'Keep a Rust regression test for Happ with SMART off');
+assert.match(subscriptions,/let mut response=Json\(json\)\.into_response\(\)/,
+ 'Every subscription returns native JSON regardless of SMART');
+assert.doesNotMatch(subscriptions,/vless_link\(|links\.join\(|use_vless_feed\(/,
+ 'Legacy URI generation and fallback must remain removed');
+const negotiation=fs.readFileSync('backend/src/subscription_user_agent.rs','utf8');
+assert.match(negotiation,/let format=Format::Json/);
+assert.doesNotMatch(negotiation,/Format::Vless|enum Format \{Json, Vless\}/);
+assert.match(negotiation,/"json"=>Format::Json/);
 console.log('Dedicated opt-in balancer workspace: OK');
