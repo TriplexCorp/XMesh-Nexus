@@ -1308,15 +1308,15 @@ async fn get_user_traffic(
     if user_id <= 0 {
         return Err(ApiError::new(StatusCode::BAD_REQUEST, "Некорректный ID пользователя."));
     }
-    let user_exists: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM panel_records WHERE collection = 'users' AND id = $1)"
+    let user_data: Value = sqlx::query_scalar(
+        "SELECT data FROM panel_records WHERE collection='users' AND id=$1"
     )
     .bind(user_id)
-    .fetch_one(&state.pool)
-    .await?;
-    if !user_exists {
-        return Err(ApiError::new(StatusCode::NOT_FOUND, "Пользователь не найден."));
-    }
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(||ApiError::new(StatusCode::NOT_FOUND,"Пользователь не найден."))?;
+    let base_usage = user_data.get("used").and_then(Value::as_f64)
+        .filter(|value|value.is_finite()&&*value>=0.0).unwrap_or(0.0);
     let rows = sqlx::query(
         "SELECT totals.node_id,
                 COALESCE(
@@ -1407,6 +1407,8 @@ async fn get_user_traffic(
         "sampleCount": servers.len(),
         "totalUplinkBytes": uplink,
         "totalDownlinkBytes": downlink,
+        "effectiveUsedGb": base_usage+(uplink.saturating_add(downlink) as f64 / 1_073_741_824.0),
+        "meteredUsedGb": uplink.saturating_add(downlink) as f64 / 1_073_741_824.0,
         "servers": servers,
         "inbounds": inbound_totals,
         "inboundAccounting": "independent_signed_user_inbound_counters"
