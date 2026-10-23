@@ -2795,8 +2795,8 @@ const nodeNotificationTitle=node=>flagView(node.flag,'notification-country-flag'
 $('#bell').onclick=()=>{
  const button=$('#bell');
  modal('<div class="box notification-workspace">'+
-  '<div class="bar2"><h2>Уведомления</h2>'+
-  '<button type="button" class="gh sm" data-notifications-refresh aria-label="Обновить уведомления">'+ic('redo')+'Обновить</button>'+
+  '<div class="bar2 notification-header"><div class="notification-heading"><h2>Уведомления</h2><small>События инфраструктуры</small></div>'+
+  '<button type="button" class="gh sm" data-notifications-refresh aria-label="Обновить уведомления" title="Обновить">'+ic('redo')+'</button>'+
   '<button type="button" class="ia" data-x aria-label="Закрыть">'+ic('x')+'</button></div>'+
   '<div class="notification-sections" data-notifications-content role="status" aria-live="polite">'+
   '<p class="note">Загружаем события и проверяем состояние нод…</p></div></div>','pop');
@@ -2852,7 +2852,7 @@ $('#bell').onclick=()=>{
    return [];
   });
   const items=[...rent,...infrastructure,...expiringUsers];
-  const groups=['Аренда серверов','Состояние инфраструктуры','Пользователи'];
+  const groups=['Состояние инфраструктуры','Аренда серверов','Пользователи'];
   const body=groups.map(group=>{
    const entries=items.filter(item=>item.group===group);
    if(!entries.length)return '';
@@ -2862,7 +2862,7 @@ $('#bell').onclick=()=>{
      (item.node?'<div class="notification-title">'+nodeNotificationTitle(item.node)+'</div>':'<b>'+esc(item.title||'Уведомление')+'</b>')+
      '<p>'+esc(item.message)+'</p></div></div>').join('')+'</section>';
   }).join('');
-  output.innerHTML=body||'<p class="note">Новых уведомлений нет. Доступные ноды не сообщают об ошибках.</p>';
+  output.innerHTML=body||'<p class="note notification-empty">Новых уведомлений нет. Доступные ноды не сообщают об ошибках.</p>';
   $('#bell .pip')?.remove();
   busy=false;refresh.disabled=false;
  }
