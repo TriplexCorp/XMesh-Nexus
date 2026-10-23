@@ -311,7 +311,7 @@ function field(f,v){
     const existing=COUNTRIES.find(c=>c.flag===v);
     const current=existing?existing.flag:(v||'');
     i=`<div class="country-picker">
-      <div class="country-search-wrap"><input class="country-search" type="search" data-country-search placeholder="Поиск по названию или коду…" aria-label="Поиск страны" autocomplete="off" aria-controls="country-options-${f.k}" aria-expanded="false"><div class="country-options" id="country-options-${f.k}" role="listbox" aria-label="Результаты поиска стран" hidden></div></div>
+      <div class="country-search-wrap"><input class="country-search" type="search" data-country-search placeholder="${existing?esc(existing.name):'Найти страну…'}" aria-label="Поиск страны" autocomplete="off" aria-controls="country-options-${f.k}" aria-expanded="false"><div class="country-options" id="country-options-${f.k}" role="listbox" aria-label="Результаты поиска стран" hidden></div></div>
       <div class="country-selected">${flagView(current,'country-flag-preview')}<span data-country-label>${existing?esc(existing.name):current?esc(current+' Сохранённый флаг'):'Выберите страну…'}</span></div>
       <input type="hidden" name="${f.k}" class="country-value" value="${esc(current)}">
       <small class="country-hint">Поиск по названию страны или ISO-коду. ${COUNTRIES.length} стран и территорий.</small>
