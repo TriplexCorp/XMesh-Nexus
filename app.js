@@ -221,6 +221,13 @@ const ENT={
       if(!d.nodes.length)return 'Назначьте хотя бы одну ноду с выбранным профилем.';
       const bad=d.nodes.map(id=>DB.nodes.find(n=>String(n.id)===String(id))).find(n=>!n||n.disabled||String(n.profileId)!==String(profile.id));
       if(bad)return 'Одна из нод не использует выбранный XRAY-профиль или отключена. Исправьте привязку ноды.';
+      const reality=inbound.streamSettings?.realitySettings||{};
+      if(inbound.streamSettings?.security==='reality' &&
+         !(d.publicKey||inbound.publicKey||reality.publicKey))
+        return 'REALITY publicKey отсутствует. Укажите публичную часть ключа в расширенных настройках хоста (не privateKey).';
+      if(inbound.streamSettings?.security==='reality' &&
+         !(d.sni||reality.serverNames?.[0]))
+        return 'REALITY требует SNI: укажите его в профиле или в хосте.';
       if(d.publicKey&&!/^[A-Za-z0-9_-]{43,44}$/.test(d.publicKey))return 'REALITY publicKey должен быть в формате X25519 base64url (43–44 символа).';
       if(d.shortId&&(!/^[\da-fA-F]*$/.test(d.shortId)||d.shortId.length>16||d.shortId.length%2!==0))return 'REALITY shortId должен быть чётной длины, hex до 16 символов.';
       return '';
@@ -1878,7 +1885,7 @@ async function nodesP(){
         ${nodeGauge(n,'traffic-'+n.id,'Трафик',n.limit?k*100:0,n.limit?Math.round(k*100)+'%':'∞',n.limit?`${gb(n.used)} / ${gb(n.limit)}`:`${gb(n.used)} · без лимита`,tc)}
       </div>
       <div class="mb node-speed"><div><span>Текущая скорость</span><b id="nm${n.id}">${Number.isFinite(l.mbps)?fmt(l.mbps)+' Мбит/с':'—'}</b></div><div class="pb f" style="--w:${Number.isFinite(l.mbps)?cl(l.mbps/240*100,0,100):0}%" id="npm${n.id}"><i></i></div></div>
-      <div class="acts"><button class="gh sm" data-node-bootstrap="${n.id}">${ic('link')}Подключить ноду и метрики</button><button class="gh sm" data-nr="${n.id}">${ic('redo')}Перезапуск</button><button class="gh sm" data-nt="${n.id}">${ic(n.disabled?'play':'pause')}${n.disabled?'Включить':'Отключить'}</button><button class="gh sm" data-ne="nodes:${n.id}">${ic('pen')}Изменить</button></div></div>`;
+      <div class="acts"><button class="gh sm" data-node-bootstrap="${n.id}">${ic('link')}Подключить ноду и метрики</button><button class="gh sm" data-nr="${n.id}">${ic('redo')}Перезапуск</button><button class="gh sm" data-nt="${n.id}">${ic(n.disabled?'play':'pause')}${n.disabled?'Включить':'Отключить'}</button><button class="gh sm" data-ne="nodes:${n.id}">${ic('pen')}Изменить</button><button class="gh sm" data-node-create-host="${n.id}">${ic('globe')}Создать хост</button></div></div>`;
   }).join('');
   const empty=`<div class="card empty"><b>Узлов пока нет</b><span>Список начнёт заполняться после добавления ваших серверов.</span><button class="btn sm" data-ne="nodes">${ic('plus')}Добавить узел</button></div>`;
   const gridMode=getNodeGridMode();
@@ -2222,6 +2229,14 @@ document.addEventListener('click',async e=>{
   else if(b=g('[data-host-clear-overrides]')){
     const form=b.closest('form');
     if(form){['sni','host','path','publicKey','shortId','spiderX','alpn','serviceName','clientEncryption','fp'].forEach(key=>{const input=form.elements.namedItem(key);if(input)input.value='';});hostEditorRefresh(form);toast('Переопределения сброшены — применятся настройки XRAY STUDIO после сохранения');}
+  }
+  else if(b=g('[data-node-create-host]')){
+    const node=DB.nodes.find(n=>String(n.id)===b.dataset.nodeCreateHost);
+    if(node){
+      const profile=hostProfile(node.profileId),inbound=profile?inbs(profile).find(i=>i.protocol==='vless'):null;
+      entForm('hosts',null,{remark:node.name||'Новый хост',address:node.addr||'',port:node.port||443,
+        profileId:profile?.id||DB.profiles[0]?.id||0,tag:inbound?.tag||'',nodes:[node.id],fp:'',order:DB.hosts.length+1});
+    }
   }
   else if(b=g('[data-host-duplicate]')){const host=DB.hosts.find(h=>String(h.id)===b.dataset.hostDuplicate);if(host){const {id,...copy}=host;entForm('hosts',null,{...copy,remark:(copy.remark||'Хост')+' · копия',order:DB.hosts.length+1});}}
   else if(b=g('[data-ne]')){const [k,id]=b.dataset.ne.split(':');entForm(k,id)}
