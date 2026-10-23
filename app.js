@@ -2428,7 +2428,7 @@ const nodeRuntimeState=(node,runtime)=>{
   if(node.disabled){
     if(!runtime?.connected)return {label:'Остановка не подтверждена',kind:'offline'};
     if(runtime.xrayRunning!==false)return {label:'Остановка ожидается',kind:'offline'};
-    return {label:node.disabledReason==='traffic_limit'?'Лимит исчерпан · Xray остановлен':'Отключена · Xray остановлен',kind:'disabled'};
+    return {label:(node.disabled&&node.disabledReason==='traffic_limit')?'Лимит исчерпан · Xray остановлен':'Отключена · Xray остановлен',kind:'disabled'};
   }
   if(!runtime?.connected)return {label:runtime?.lastSeenAt?'Нет связи':'Не подключена',kind:'offline'};
   if(runtime.xrayRunning===true&&runtime.routerRunning===true)return {label:'Активна',kind:'online'};
@@ -3530,7 +3530,7 @@ $('#bell').onclick=()=>{
   const nodes=[...freshNodes],users=[...DB.users],today=Date.now();
   // A missing heartbeat means "unknown", not that Xray is definitely offline.
   // Failed API requests are reported as unavailable, never a fake disconnected state.
-  const statuses=new Map(await Promise.all(nodes.filter(n=>!n.disabled||n.disabledReason==='traffic_limit').map(async n=>{
+  const statuses=new Map(await Promise.all(nodes.filter(n=>!n.disabled||(n.disabled&&n.disabledReason==='traffic_limit')).map(async n=>{
    try{
     return [String(n.id),{data:await backendRequest('/api/v1/nodes/'+encodeURIComponent(n.id)+'/runtime')}];
    }catch(error){
@@ -3550,7 +3550,7 @@ $('#bell').onclick=()=>{
     message:(due<today?'Аренда просрочена':'До окончания аренды '+days+' дн.')+' · '+date+' · '+(Number(n.billingPrice)||0)+' '+(n.billingCurrency||'EUR')}];
   });
   const quotas=nodes.flatMap(n=>{
-   if(n.disabledReason!=='traffic_limit')return [];
+   if((!n.disabled||n.disabledReason!=='traffic_limit'))return [];
    const limit=Number(n.limit)||0;
    const runtime=statuses.get(String(n.id))?.data;
    const confirmed=runtime?.connected&&runtime?.xrayRunning===false;
@@ -3663,7 +3663,7 @@ function showNodeQuotaBell(){
  const bell=$('#bell');
  if(!bell)return;
  const pending=DB.nodes.some(n=>{
-  if(n.disabledReason!=='traffic_limit')return false;
+  if((!n.disabled||n.disabledReason!=='traffic_limit'))return false;
   const key=notificationId({group:'Лимиты трафика',node:n});
   return !notificationState[key]?.hidden;
  });
@@ -3678,7 +3678,7 @@ function showNodeQuotaBell(){
 }
 function startNodeQuotaNotifications(){
  if(nodeQuotaPoller!==null)clearInterval(nodeQuotaPoller);
- acknowledgedQuotaEvents=new Set(DB.nodes.filter(n=>n.disabledReason==='traffic_limit')
+ acknowledgedQuotaEvents=new Set(DB.nodes.filter(n=>(n.disabled&&n.disabledReason==='traffic_limit'))
   .map(n=>String(n.id)+':'+String(n.trafficLimitReachedAt||'')));
  showNodeQuotaBell();
  nodeQuotaPoller=setInterval(async()=>{
@@ -3688,7 +3688,7 @@ function startNodeQuotaNotifications(){
    const result=await backendRequest('/api/v1/collections/nodes');
    if(!Array.isArray(result?.items))return;
    for(const node of result.items){
-    if(node.disabledReason!=='traffic_limit')continue;
+    if((!node.disabled||node.disabledReason!=='traffic_limit'))continue;
     const key=String(node.id)+':'+String(node.trafficLimitReachedAt||'');
     if(!acknowledgedQuotaEvents.has(key)){
      acknowledgedQuotaEvents.add(key);
@@ -3702,7 +3702,7 @@ function startNodeQuotaNotifications(){
     // Update the disabled state without erasing live gauge data.
     for(const node of result.items){
      const status=$('[data-node-card-id="'+node.id+'"] [data-node-runtime-state]');
-     if(status&&node.disabledReason==='traffic_limit'){
+     if(status&&(node.disabled&&node.disabledReason==='traffic_limit')){
       status.className='node-runtime-pill node-runtime-offline';
       status.textContent='Лимит исчерпан';
      }
