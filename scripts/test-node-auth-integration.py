@@ -164,6 +164,60 @@ def main():
         import uuid
         uuid.UUID(new_user["xrayId"])
 
+        # End-to-end authenticated desired-config: policy binds live UUIDs,
+        # expiry, conservative offline quota and exact Xray JSON digest.
+        profile_config={
+            "inbounds":[{"tag":"DE_VLESS","listen":"127.0.0.1","port":28351,
+                         "protocol":"vless","settings":{"decryption":"none","clients":[]},
+                         "streamSettings":{"network":"tcp","security":"none"}}],
+            "outbounds":[{"tag":"direct","protocol":"freedom"}],
+            "routing":{"rules":[]}
+        }
+        code,profile,_=request("POST","/collections/profiles",
+            {"name":"CI signed autonomous profile","config":json.dumps(profile_config)},
+            cookie=cookie,origin=BASE)
+        assert_status(code,201,"create XRAY STUDIO profile for node policy test")
+        profile_id=profile["id"]
+        code,squad,_=request("POST","/collections/squads",
+            {"name":"CI autonomous squad","inb":["DE_VLESS"]},
+            cookie=cookie,origin=BASE)
+        assert_status(code,201,"create inbound assignment for policy test")
+        squad_id=squad["id"]
+        code,_,_=request("PATCH",f"/collections/users/{user_id}",
+            {"squads":[squad_id],"limit":1.0,
+             "expireAt":int(time.time()*1000)+86400000},
+            cookie=cookie,origin=BASE)
+        assert_status(code,200,"assign user and expiration")
+        code,_,_=request("PATCH",f"/collections/nodes/{node}",
+            {"profileId":profile_id,"xrayLocalPort":28351},
+            cookie=cookie,origin=BASE)
+        assert_status(code,200,"bind signed profile to node")
+        code,desired,_=signed_post("/node/desired-config",{"node_id":node})
+        assert_status(code,200,"node pulls signed, versioned desired policy")
+        policy=desired["policy"]
+        assert policy["nodeId"]==node and policy["version"]==1
+        assert policy["validUntilMs"]>policy["issuedAtMs"]
+        assert any(u["xrayId"]==new_user["xrayId"] and
+                   u["offlineBudgetBytes"]>0 for u in policy["users"])
+        serialized=json.dumps(desired["config"],sort_keys=True,
+                              separators=(",",":"),ensure_ascii=False).encode()
+        assert policy["configSha256"]==hashlib.sha256(serialized).hexdigest()
+        assert desired["config"]["inbounds"][1]["tag"]=="xmesh_stats_in"
+        der=(bytes.fromhex("302a300506032b6570032100")+
+             bytes.fromhex(desired["policyPublicKey"]))
+        policy_file=Path(directory)/"policy.json"
+        pub_file=Path(directory)/"policy-public.der"
+        sig_file=Path(directory)/"policy.sig"
+        policy_file.write_bytes(json.dumps(policy,sort_keys=True,
+                                ensure_ascii=False,separators=(",",":")).encode())
+        pub_file.write_bytes(der)
+        sig_file.write_bytes(bytes.fromhex(desired["policySignature"]))
+        subprocess.run(["openssl","pkeyutl","-verify","-pubin",
+            "-keyform","DER","-inkey",str(pub_file),"-rawin",
+            "-in",str(policy_file),"-sigfile",str(sig_file)],
+            check=True,capture_output=True)
+        print("PASS: panel Ed25519 policy signature matches Xray JSON and live user assignment")
+
         def report_signed(inbound_a, inbound_b):
             sample={
                 "node_id":node,
@@ -219,6 +273,10 @@ def main():
         code,_,_=request("DELETE",f"/collections/users/{user_id}",
                          cookie=cookie,origin=BASE)
         assert_status(code,200,"clean up inbound stats user")
+        for collection, ident in (("squads",squad_id),("profiles",profile_id)):
+            code,_,_=request("DELETE",f"/collections/{collection}/{ident}",
+                             cookie=cookie,origin=BASE)
+            assert_status(code,200,f"clean up autonomous {collection}")
 
         code, _, _ = request("DELETE", f"/nodes/{node}/metrics-key",
                              cookie=cookie, origin=BASE)
