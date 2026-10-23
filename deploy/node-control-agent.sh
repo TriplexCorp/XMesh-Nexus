@@ -11,7 +11,7 @@ export LC_ALL=C
 [[ "$XMESH_API_URL" == https://* ]] || exit 2
 XMESH_API_URL="${XMESH_API_URL%/}"
 KEY="${XMESH_METRICS_PRIVATE_KEY:-/etc/xmesh-node-metrics/node.key}"
-AGENT_VERSION="control-v4.0.0"
+AGENT_VERSION="control-v4.1.0"
 UNIT="${XMESH_XRAY_UNIT:-xray.service}"
 # Only root-owned local configuration can choose a unit. Remote responses never do.
 [[ "$UNIT" =~ ^[A-Za-z0-9_.@-]+\.service$ ]] || { echo "Invalid systemd unit" >&2; exit 2; }
@@ -52,7 +52,21 @@ heartbeat(){
  fi
  version="$(printf '%s\n' "$raw" | awk 'NR==1 && $1=="Xray" {print $2}')"
  [[ "$version" =~ ^[A-Za-z0-9._+-]{1,40}$ ]] || version=''
- signed_post '/api/v1/node/heartbeat' "{\"node_id\":$XMESH_NODE_ID,\"version\":\"$AGENT_VERSION\",\"xray_version\":\"$version\",\"xray_running\":$xr,\"router_running\":$xr}" >/dev/null
+ local geo_data='null'
+ if [[ -r /var/lib/xmesh-xray-sync/geo-status.json ]];then
+  geo_data="$(python3 - /var/lib/xmesh-xray-sync/geo-status.json <<'PY'
+import json,sys
+try:
+ with open(sys.argv[1],encoding="utf-8") as stream: data=json.load(stream)
+ if not isinstance(data,dict):raise ValueError("Not an object")
+ result={key:data.get(key) for key in ("state","checkedAt","files","lastError")}
+ print(json.dumps(result,separators=(",",":")))
+except (OSError,ValueError,TypeError):
+ print("null")
+PY
+)"
+ fi
+ signed_post '/api/v1/node/heartbeat' "{\"node_id\":$XMESH_NODE_ID,\"version\":\"$AGENT_VERSION\",\"xray_version\":\"$version\",\"xray_running\":$xr,\"router_running\":$xr,\"geoData\":$geo_data}" >/dev/null
 }
 restart_xray(){
  if docker inspect xmesh-managed-xray >/dev/null 2>&1;then
