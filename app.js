@@ -2787,44 +2787,89 @@ document.addEventListener('submit',async e=>{const f=e.target,k=f.dataset.k;if(!
   else if(k=='brand'){e.preventDefault();const d=read([{k:'brand'},{k:'domain'},{k:'subscriptionBrand'},{k:'subscriptionDomain'}],f);try{await api.saveSettings(d);brand();toast('Названия и домены сохранены')}catch(err){return er(err.message)}}});
 const acts2=ok=>`<div class="act"><button type="button" class="gh" data-x>Отмена</button><button class="btn">${ok}</button></div>`;
 $('#theme').onclick=()=>{C.theme=document.documentElement.dataset.theme=='dark'?'light':'dark';apply();syncSubscriptionTheme();if(cur=='set')render(1)};
-// Notification labels use the same first-party SVG flags as the node cards.
+// Notifications must not depend on the local "runtime" variable inside nodesP().
+// Fetch live statuses on demand and render an immediately responsive dialog.
 const nodeNotificationTitle=node=>flagView(node.flag,'notification-country-flag')+
-  '<span class="notification-node-label">'+esc(node.name)+(node.hosting?.trim()?'<small>'+esc(node.hosting.trim())+'</small>':'')+'</span>';
+  '<span class="notification-node-label">'+esc(node.name||'Узел')+
+  (node.hosting?.trim()?'<small>'+esc(node.hosting.trim())+'</small>':'')+'</span>';
 $('#bell').onclick=()=>{
- const today=Date.now();
- const rent=DB.nodes.flatMap(n=>{
+ const button=$('#bell');
+ modal('<div class="box notification-workspace">'+
+  '<div class="bar2"><h2>Уведомления</h2>'+
+  '<button type="button" class="gh sm" data-notifications-refresh aria-label="Обновить уведомления">'+ic('redo')+'Обновить</button>'+
+  '<button type="button" class="ia" data-x aria-label="Закрыть">'+ic('x')+'</button></div>'+
+  '<div class="notification-sections" data-notifications-content role="status" aria-live="polite">'+
+  '<p class="note">Загружаем события и проверяем состояние нод…</p></div></div>','pop');
+ button.setAttribute('aria-expanded','true');
+ const workspace=dlg.querySelector('.notification-workspace');
+ const output=workspace?.querySelector('[data-notifications-content]');
+ const refresh=workspace?.querySelector('[data-notifications-refresh]');
+ if(!workspace||!output||!refresh)return;
+ let busy=false;
+ async function updateNotifications(){
+  if(busy)return;
+  busy=true;refresh.disabled=true;
+  output.innerHTML='<p class="note">Проверяем состояние нод и уведомления…</p>';
+  const nodes=[...DB.nodes],users=[...DB.users],today=Date.now();
+  // A missing heartbeat means "unknown", not that Xray is definitely offline.
+  // Failed API requests are reported as unavailable, never a fake disconnected state.
+  const statuses=new Map(await Promise.all(nodes.filter(n=>!n.disabled).map(async n=>{
+   try{
+    return [String(n.id),{data:await backendRequest('/api/v1/nodes/'+encodeURIComponent(n.id)+'/runtime')}];
+   }catch(error){
+    return [String(n.id),{error:true}];
+   }
+  })));
+  if(!workspace.isConnected||!dlg.open||!dlg.contains(workspace))return;
+  const rent=nodes.flatMap(n=>{
    if(!n.billingDueDate||!/^\d{4}-\d{2}-\d{2}$/.test(n.billingDueDate))return [];
-   const due=Date.parse(n.billingDueDate+'T23:59:59Z'),remind=Math.max(0,Number(n.billingRemindDays)||0);
+   const due=Date.parse(n.billingDueDate+'T23:59:59Z');
+   const remind=Math.max(0,Number(n.billingRemindDays)||0);
    if(!Number.isFinite(due))return [];
    const days=Math.max(0,Math.ceil((due-today)/DAY));
    if(due>today&&days>remind)return [];
    const date=new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(due));
-   return [{group:'Аренда серверов',severity:due<today?'critical':'warning',title:n.name,message:(due<today?'Аренда просрочена':'До окончания аренды '+days+' дн.')+' · '+date+' · '+(Number(n.billingPrice)||0)+' '+(n.billingCurrency||'EUR')}];
- });
- const infrastructure=DB.nodes.flatMap(n=>{
-   const observed=runtime.get(n.id);
+   return [{group:'Аренда серверов',severity:due<today?'critical':'warning',node:n,
+    message:(due<today?'Аренда просрочена':'До окончания аренды '+days+' дн.')+' · '+date+' · '+(Number(n.billingPrice)||0)+' '+(n.billingCurrency||'EUR')}];
+  });
+  const infrastructure=nodes.flatMap(n=>{
    if(n.disabled)return [];
-   if(observed?.connected)return [];
-   if(observed?.lastSeenAt)return [{group:'Состояние инфраструктуры',severity:'critical',title:n.name,message:'Узел не отвечает · последнее соединение '+new Date(observed.lastSeenAt).toLocaleString('ru-RU')}];
-   return [{group:'Состояние инфраструктуры',severity:'neutral',title:n.name,message:'Агент узла ещё не подключён · статус неизвестен'}];
- });
- const users=DB.users.flatMap(u=>{
+   const status=statuses.get(String(n.id));
+   if(status?.error||!status)return [{group:'Состояние инфраструктуры',severity:'neutral',node:n,message:'Не удалось получить состояние агента. Проверьте соединение с API.'}];
+   const observed=status.data;
+   if(!observed?.connected){
+    if(observed?.lastSeenAt)return [{group:'Состояние инфраструктуры',severity:'critical',node:n,message:'Агент не отвечает · последнее соединение '+new Date(observed.lastSeenAt).toLocaleString('ru-RU')}];
+    return [{group:'Состояние инфраструктуры',severity:'neutral',node:n,message:'Агент ещё не подключён · состояние Xray неизвестно'}];
+   }
+   if(observed.xrayRunning===false)return [{group:'Состояние инфраструктуры',severity:'critical',node:n,message:'Агент онлайн, но Xray остановлен'}];
+   if(observed.routerRunning===false)return [{group:'Состояние инфраструктуры',severity:'critical',node:n,message:'Агент онлайн, но маршрутизатор остановлен'}];
+   return [];
+  });
+  const expiringUsers=users.flatMap(u=>{
    if(st(u)!=='ACTIVE')return [];
    if(u.limit&&u.used/u.limit>.9)return [{group:'Пользователи',severity:'warning',title:u.username,message:'Использовано '+Math.round(u.used/u.limit*100)+'% трафика'}];
    if(u.expireAt&&u.expireAt>today&&u.expireAt-today<2*DAY)return [{group:'Пользователи',severity:'warning',title:u.username,message:'Подписка скоро истечёт · '+left(u.expireAt)}];
    return [];
- });
- const groups=['Аренда серверов','Состояние инфраструктуры','Пользователи'];
- const items=[...rent,...infrastructure,...users];
- const body=groups.map(group=>{
+  });
+  const items=[...rent,...infrastructure,...expiringUsers];
+  const groups=['Аренда серверов','Состояние инфраструктуры','Пользователи'];
+  const body=groups.map(group=>{
    const entries=items.filter(item=>item.group===group);
    if(!entries.length)return '';
    return '<section class="notification-group"><h3>'+esc(group)+' <span>'+entries.length+'</span></h3>'+
-     entries.map(item=>'<div class="notification-item notification-'+item.severity+'"><span class="notification-status-dot" aria-hidden="true"></span><div><b>'+esc(item.title)+'</b><p>'+esc(item.message)+'</p></div></div>').join('')+'</section>';
- }).join('');
- $('#bell .pip')?.remove();
- modal('<div class="box notification-workspace"><div class="bar2"><h2>Уведомления</h2><button class="ia" data-x style="margin-left:auto" aria-label="Закрыть">'+ic('x')+'</button></div><div class="notification-sections">'+(body||'<p class="note">Новых уведомлений нет.</p>')+'</div></div>','pop');
+    entries.map(item=>'<div class="notification-item notification-'+item.severity+'">'+
+     '<span class="notification-status-dot" aria-hidden="true"></span><div>'+
+     (item.node?'<div class="notification-title">'+nodeNotificationTitle(item.node)+'</div>':'<b>'+esc(item.title||'Уведомление')+'</b>')+
+     '<p>'+esc(item.message)+'</p></div></div>').join('')+'</section>';
+  }).join('');
+  output.innerHTML=body||'<p class="note">Новых уведомлений нет. Доступные ноды не сообщают об ошибках.</p>';
+  $('#bell .pip')?.remove();
+  busy=false;refresh.disabled=false;
+ }
+ refresh.addEventListener('click',()=>{void updateNotifications()});
+ void updateNotifications();
 };
+dlg.addEventListener('close',()=>{$('#bell')?.setAttribute('aria-expanded','false')});
 $('#restart').onclick=()=>{location.hash='set';setTimeout(()=>document.querySelector('#core-panel')?.scrollIntoView({behavior:'smooth',block:'start'}),100)};
 
 document.addEventListener('click',e=>{
