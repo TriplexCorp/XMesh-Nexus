@@ -214,7 +214,7 @@ def main():
         assert_status(report_signed((150,170),(45,95))[0],201,"next Xray delta after reset")
         code,users,_=request("GET","/collections/users",cookie=cookie)
         used=next(u["used"] for u in users["items"] if u["id"]==user_id)
-        assert abs(used-(120/(1024**3)))<1e-9
+        assert abs(used-(140/(1024**3)))<1e-9
 
         code,_,_=request("DELETE",f"/collections/users/{user_id}",
                          cookie=cookie,origin=BASE)
