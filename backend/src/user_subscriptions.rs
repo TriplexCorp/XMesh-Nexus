@@ -65,9 +65,9 @@ fn vless_outbound(user:&Value,inbound:&Value,host:&Value,device:&str)->Option<Va
  if uuid::Uuid::parse_str(nonempty(user,"xrayId")?).is_err(){return None}
  let stream_check=inbound.get("streamSettings")?;
  let security_check=nonempty(stream_check,"security").unwrap_or("none");
- let network_check=nonempty(stream_check,"network").unwrap_or("tcp");
+ let network_check=nonempty(stream_check,"method").or_else(||nonempty(stream_check,"network")).unwrap_or("tcp");
  if !["tls","reality","none"].contains(&security_check)
-   || !["tcp","raw","xhttp","ws","grpc"].contains(&network_check){return None}
+   || !["tcp","raw","xhttp","ws","websocket","grpc","httpupgrade","mkcp","kcp"].contains(&network_check){return None}
  if security_check=="none"{
   let enc=nonempty(host,"clientEncryption")
    .or_else(||nonempty(host,"externalClientEncryption"))
@@ -79,9 +79,6 @@ fn vless_outbound(user:&Value,inbound:&Value,host:&Value,device:&str)->Option<Va
  let address=endpoint(host)?;
  let port=["externalPort","port"].into_iter().find_map(|key|host.get(key).and_then(self::port))
    .or_else(||inbound.get("port").and_then(self::port))?;
- let stream=inbound.get("streamSettings")?;
- let security=nonempty(stream,"security").unwrap_or("none");
- let network=nonempty(stream,"network").unwrap_or("tcp");
  let uuid=nonempty(user,"xrayId")?;
  let tag=nonempty(host,"remark").or_else(||nonempty(inbound,"tag")).unwrap_or(address);
  let country=nonempty(host,"countryCode").or_else(||nonempty(host,"country"))
@@ -113,91 +110,8 @@ fn vless_outbound(user:&Value,inbound:&Value,host:&Value,device:&str)->Option<Va
   .or_else(||inbound.get("settings").and_then(|v|nonempty(v,"flow")));
  if let Some(flow)=flow.filter(|v|*v!="none"){client["flow"]=json!(flow);}
 
- let mut outbound_stream=json!({"network":network,"security":security});
- if security=="reality"{
-  let server=stream.get("realitySettings").unwrap_or(&Value::Null);
-  let sni=nonempty(host,"sni").or_else(||nonempty(host,"externalSNI"))
-   .or_else(||server.get("serverNames").and_then(Value::as_array).and_then(|v|v.first()).and_then(Value::as_str))?;
-  let key=nonempty(host,"publicKey").or_else(||nonempty(host,"realityPublicKey"))
-   .or_else(||nonempty(inbound,"publicKey")).or_else(||nonempty(server,"publicKey"))?;
-  let sid=nonempty(host,"shortId").or_else(||nonempty(host,"externalShortId"))
-   .or_else(||server.get("shortIds").and_then(Value::as_array).and_then(|v|v.first()).and_then(Value::as_str))?;
-  outbound_stream["realitySettings"]=json!({
-   "serverName":sni,"publicKey":key,"shortId":sid,
-   "fingerprint":nonempty(host,"fp").or_else(||nonempty(host,"fingerprint")).unwrap_or("chrome"),
-   "spiderX":nonempty(host,"spiderX").unwrap_or("/")
-  });
- }else if security=="tls"{
-  let sni=nonempty(host,"sni").or_else(||nonempty(host,"externalSNI"))
-   .or_else(||stream.get("tlsSettings").and_then(|v|nonempty(v,"serverName")))?;
-  let mut tls=json!({"serverName":sni});
-  if let Some(value)=nonempty(host,"alpn"){
-   let values:Vec<&str>=value.split(',').map(str::trim).filter(|s|!s.is_empty()&&s.len()<=32&&s.bytes().all(|b|b.is_ascii_alphanumeric()||b"/.-_".contains(&b))).collect();
-   if !values.is_empty(){tls["alpn"]=json!(values)}
-  }else if let Some(values)=stream.get("tlsSettings").and_then(|v|v.get("alpn")).and_then(Value::as_array){
-   tls["alpn"]=json!(values);
-  }
-  if let Some(fp)=nonempty(host,"fp").or_else(||nonempty(host,"fingerprint")){tls["fingerprint"]=json!(fp)}
-  outbound_stream["tlsSettings"]=tls;
- }
- let config=match network{
-  "xhttp"=>stream.get("xhttpSettings"),
-  "ws"=>stream.get("wsSettings"),
-  "grpc"=>stream.get("grpcSettings"),
-  "raw"=>stream.get("rawSettings"),
-  "tcp"=>stream.get("tcpSettings"),
-  _=>None
- };
- let mut transport=json!({});
- if let Some(config)=config{
-  let fields=match network{
-   "xhttp"=>&["path","host","mode","xPaddingBytes","xPaddingObfsMode","xPaddingKey","xPaddingHeader","xPaddingPlacement","xPaddingMethod","seqPlacement","seqKey","sessionIDPlacement","sessionIDKey","sessionIDTable","sessionIDLength","sessionPlacement","sessionKey","uplinkHTTPMethod","uplinkDataPlacement","uplinkDataKey","scMaxEachPostBytes","scMinPostsIntervalMs"][..],
-   "ws"=>&["path"][..],
-   "grpc"=>&["serviceName","multiMode"][..],
-   _=>&[][..]
-  };
-  for key in fields {
-   if let Some(v)=config.get(*key).filter(|v|v.is_string()||v.is_boolean()||v.is_number()){
-    transport[*key]=v.clone()
-   }
-  }
-  if network=="xhttp"{
-   for key in ["xmux","headers"]{
-    if let Some(value)=config.get(key).filter(|v|v.is_object()){transport[key]=value.clone()}
-   }
-  }
- }
- if let Some(path)=nonempty(host,"path") && network!="grpc"{
-  transport["path"]=json!(path);
- }
- if let Some(hostname)=nonempty(host,"host").or_else(||nonempty(host,"externalHost")){
-  if network=="ws"{transport["headers"]=json!({"Host":hostname})}
-  else if network=="xhttp"{transport["host"]=json!(hostname)}
- }
- if network=="grpc" && let Some(service)=nonempty(host,"serviceName"){transport["serviceName"]=json!(service)}
- // Device profiles are client-side transport overrides only; never copy
- // the entire server inbound or any Reality private material.
- if network=="xhttp" && (device=="ios"||device=="windows"){
-  let profile_key=if device=="ios"{"iOS"}else{"Windows"};
-  let profile=inbound.get("xmesh").and_then(|v|v.get("xhttpDeviceProfiles"))
-    .or_else(||inbound.get("xhttpDeviceProfiles"))
-    .and_then(|v|v.get(profile_key));
-  if let Some(profile)=profile {
-   for key in ["mode","uplinkHTTPMethod","scMaxEachPostBytes","scMinPostsIntervalMs"]{
-    if let Some(value)=profile.get(key).filter(|v|v.is_string()||v.is_number()){
-     transport[key]=value.clone();
-    }
-   }
-   if let Some(xmux)=profile.get("xmux").filter(|v|v.is_object()){
-    transport["xmux"]=xmux.clone();
-   }
-  }
- }
- if transport.as_object().is_some_and(|o|!o.is_empty()){
-  if network=="xhttp"{outbound_stream["xhttpSettings"]=transport}
-  else if network=="ws"{outbound_stream["wsSettings"]=transport}
-  else if network=="grpc"{outbound_stream["grpcSettings"]=transport}
- }
+ // Protocol credentials and transport are independently projected.
+ let outbound_stream=crate::subscription_transport::client_stream(inbound,host,device)?;
  Some(json!({
   "tag":tag,"xmeshCountry":country,"protocol":"vless",
   "settings":{"vnext":[{"address":address,"port":port,"users":[client]}]},
