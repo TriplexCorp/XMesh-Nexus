@@ -876,15 +876,29 @@ async function homeP(){
   }];
 }
 /* ================= ПОЛЬЗОВАТЕЛИ ================= */
-const UQ={q:'',st:'all',sq:'',page:1,size:15,sort:'created',dir:'desc',sel:new Set()};let UIDS=[];
+const UQ={q:'',st:'all',sq:'',inbound:'',tag:'',fp:'',node:'',expiry:'',page:1,size:15,sort:'created',dir:'desc',sel:new Set()};let UIDS=[];
 async function usersP(){
   return [`<div class="card users-panel"><div class="bar2 users-statusbar"><div class="fl" id="uf"></div></div><div class="users-toolbar">
     <div class="users-search-wrap"><label class="search users-search-field" style="cursor:text">${ic('search')}<input id="uq" placeholder="Поиск пользователей" value="${esc(UQ.q)}" aria-label="Поиск по имени, тегу, email, ссылке или Telegram ID"></label><span class="users-search-hint">Поиск по имени · тегу · email · ссылке · Telegram ID</span></div>
     <select id="usq" aria-label="Сквад"><option value="">Все сквады</option>${DB.squads.map(s=>`<option value="${s.id}"${UQ.sq==s.id?' selected':''}>${esc(s.name)}</option>`).join('')}</select>
     <div class="users-toolbar-actions"><button class="gh" data-exp>${ic('dl')}Экспорт CSV</button><button class="btn" data-nu>${ic('plus')}Пользователь</button></div>
-  </div><div class="bulk" id="bulk" role="toolbar" aria-label="Массовые действия"></div><div id="ut"></div></div>`,()=>{drawUsers();let h;$('#uq').oninput=e=>{clearTimeout(h);h=setTimeout(()=>{UQ.q=e.target.value.trim().toLowerCase();UQ.page=1;drawUsers()},200)};$('#usq').onchange=e=>{UQ.sq=e.target.value;UQ.page=1;drawUsers()}}];
+  </div><div class="users-advanced-filters" aria-label="Дополнительные фильтры пользователей">
+    <label>Тег <select data-user-filter="tag"><option value="">Все теги</option>${[...new Set(DB.users.map(u=>u.tag).filter(Boolean))].sort().map(tag=>`<option value="${esc(tag)}"${UQ.tag===tag?' selected':''}>${esc(tag)}</option>`).join('')}</select></label>
+    <label>Inbound <select data-user-filter="inbound"><option value="">Все inbound</option>${[...new Set(DB.squads.flatMap(s=>s.inb||[]))].sort().map(tag=>`<option value="${esc(tag)}"${UQ.inbound===tag?' selected':''}>${esc(tag)}</option>`).join('')}</select></label>
+    <label>Узел <select data-user-filter="node"><option value="">Все узлы</option>${DB.nodes.map(n=>`<option value="${n.id}"${UQ.node===String(n.id)?' selected':''}>${esc(n.name)}</option>`).join('')}</select></label>
+    <label>Fingerprint <select data-user-filter="fp"><option value="">Любой fingerprint</option>${[...new Set(DB.users.map(u=>u.fingerprint).filter(Boolean))].sort().map(fp=>`<option value="${esc(fp)}"${UQ.fp===fp?' selected':''}>${esc(fp)}</option>`).join('')}</select></label>
+    <label>Срок <select data-user-filter="expiry"><option value="">Любой срок</option><option value="eternal"${UQ.expiry==='eternal'?' selected':''}>Бессрочно</option><option value="3"${UQ.expiry==='3'?' selected':''}>До 3 дней</option><option value="7"${UQ.expiry==='7'?' selected':''}>До 7 дней</option><option value="30"${UQ.expiry==='30'?' selected':''}>До 30 дней</option></select></label>
+    <button type="button" class="gh sm" data-user-filter-reset>Сбросить фильтры</button>
+  </div><div class="bulk" id="bulk" role="toolbar" aria-label="Массовые действия"></div><div id="ut"></div></div>`,()=>{drawUsers();let h;$('#uq').oninput=e=>{clearTimeout(h);h=setTimeout(()=>{UQ.q=e.target.value.trim().toLowerCase();UQ.page=1;drawUsers()},200)};$('#usq').onchange=e=>{UQ.sq=e.target.value;UQ.page=1;drawUsers()};
+    $('[data-user-filter]').forEach(el=>el.onchange=()=>{UQ[el.dataset.userFilter]=el.value;UQ.page=1;drawUsers()});
+    $('[data-user-filter-reset]').onclick=()=>{for(const key of ['sq','inbound','tag','fp','node','expiry'])UQ[key]='';UQ.page=1;render(1)};
+  }];
 }
-const uf=u=>(UQ.st=='all'||(UQ.st=='ONLINE'?isOn(u):st(u)==UQ.st))&&(!UQ.sq||u.squads.includes(+UQ.sq))&&(!UQ.q||[u.username,u.tag,u.email,u.desc,u.tg,u.short].join(' ').toLowerCase().includes(UQ.q));
+const uf=u=>(UQ.st=='all'||(UQ.st=='ONLINE'?isOn(u):st(u)==UQ.st))&&(!UQ.sq||u.squads.includes(+UQ.sq))&&(!UQ.tag||u.tag===UQ.tag)&&(!UQ.fp||u.fingerprint===UQ.fp)
+&&(!UQ.expiry||(UQ.expiry==='eternal'?!u.expireAt:!!u.expireAt&&u.expireAt>=Date.now()&&u.expireAt-Date.now()<=Number(UQ.expiry)*DAY))
+&&(!UQ.inbound||DB.squads.some(s=>u.squads.includes(s.id)&&(s.inb||[]).includes(UQ.inbound)))
+&&(!UQ.node||DB.nodes.some(n=>String(n.id)===UQ.node&&DB.squads.some(s=>u.squads.includes(s.id)&&(s.inb||[]).some(tag=>DB.profiles.some(p=>String(p.id)===String(n.profileId)&&inbs(p).some(ib=>ib.tag===tag))))))
+&&(!UQ.q||[u.username,u.tag,u.email,u.desc,u.tg,u.short,...u.squads.map(id=>DB.squads.find(s=>s.id===id)?.name||'')].join(' ').toLowerCase().includes(UQ.q));
 async function drawUsers(){
   const [r,s]=await Promise.all([api.list('users',{f:uf,sort:UQ.sort,dir:UQ.dir,page:UQ.page,size:UQ.size}),api.stats()]);if(!$('#ut'))return;
   const pages=Math.max(1,Math.ceil(r.total/UQ.size));if(UQ.page>pages){UQ.page=pages;return drawUsers()}UIDS=r.ids;
