@@ -254,10 +254,13 @@ const ENT={
     {k:'billingProviderUrl',l:'Сайт провайдера',ph:'https://provider.example'},
     {k:'billingNote',l:'Примечание по оплате'},
     {k:'rotationEnabled',l:'Ротация IP-адресов',t:'bool',h:'Пул IP-адресов для подключений узла. Используйте только назначенные серверу адреса.'},
+    {k:'rotationIntervalHours',l:'Смена адреса каждые, ч',t:'num',h:'1–720 часов. По умолчанию 24. Адрес закреплён за пользователем между обновлениями подписки.'},
     {k:'rotationIps',l:'Пул внешних IP-адресов',t:'area',rows:7,h:'Один IPv4 или IPv6 на строку. Добавляйте только IP, реально назначенные VPS и доступные клиентам. До 256 адресов. Основной адрес узла остаётся прежним.'}],
-    def:()=>({flag:'',mult:1,limit:0,resetDay:1,rotationEnabled:false,rotationIps:'',billingCurrency:'EUR',billingPeriod:'monthly',billingRemindDays:7,billingPrice:0}),
+    def:()=>({flag:'',mult:1,limit:0,resetDay:1,rotationEnabled:false,rotationIntervalHours:24,rotationIps:'',billingCurrency:'EUR',billingPeriod:'monthly',billingRemindDays:7,billingPrice:0}),
     chk:data=>{
       const issue=nodeRotationValidate(data);if(issue)return issue;
+      const interval=Number(data.rotationIntervalHours||24);
+      if(!Number.isInteger(interval)||interval<1||interval>720)return 'Интервал IP-ротации должен быть от 1 до 720 часов.';
       const port=Number(data.xrayLocalPort||0),nodePort=Number(data.port||0);
       if(port&&(!Number.isInteger(port)||port<1||port>65535))return 'Локальный порт Xray должен быть от 1 до 65535.';
       if(port&&port===nodePort)return 'Порт Xray должен отличаться от порта XMesh Node на том же сетевом интерфейсе.';
@@ -2379,11 +2382,11 @@ document.addEventListener('click',event=>{
 
 function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id)===String(id)):e.def?e.def():{});
   const standardFields=e.fs.map(f=>field(f,k==='admins'&&f.k==='password'?'':o[f.k])).join('');
-  const rotationFields=e.fs.filter(f=>['rotationEnabled','rotationIps'].includes(f.k)).map(f=>field(f,o[f.k])).join('');
+  const rotationFields=e.fs.filter(f=>['rotationEnabled','rotationIntervalHours','rotationIps'].includes(f.k)).map(f=>field(f,o[f.k])).join('');
   const billingFields=e.fs.filter(f=>f.k.startsWith('billing')).map(f=>f.k==='billingDueDate'
     ?'<div class="f node-date-field"><span>Оплачено до</span><button type="button" class="user-date-trigger" data-node-date-open aria-expanded="false">'+ic('calendar')+'<span data-node-date-label>'+esc(o.billingDueDate?userDateLabel(o.billingDueDate):'Выберите дату')+'</span>'+ic('chevronRight')+'</button><input type="hidden" name="billingDueDate" value="'+esc(o.billingDueDate||'')+'"><div class="user-date-calendar" data-node-date-calendar hidden></div></div>'
     :field(f,o[f.k])).join('');
-  const nodeCoreFields=e.fs.filter(f=>!f.k.startsWith('billing')&&!['rotationEnabled','rotationIps'].includes(f.k));
+  const nodeCoreFields=e.fs.filter(f=>!f.k.startsWith('billing')&&!['rotationEnabled','rotationIntervalHours','rotationIps'].includes(f.k));
   // Keep tab / screen-reader order in sync with the wide four-column layout.
   // New fields remain supported and follow the explicitly grouped core fields.
   const nodeCoreOrder=['name','hosting','flag','profileId','addr','port','xrayLocalPort','mult','limit','resetDay'];
