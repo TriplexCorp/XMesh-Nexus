@@ -115,8 +115,66 @@ update_managed_xray(){
  fi
  return 1
 }
+# Persistent quota/manual shutdown marker. Prevent systemd reboot activation and
+# docker restart after a denied node is stopped.
+STATE_DIR=/var/lib/xmesh-node-control
+MARKER="$STATE_DIR/forced-stop"
+stop_xray(){
+ mkdir -p "$STATE_DIR"
+ chmod 700 "$STATE_DIR"
+ if docker inspect xmesh-managed-xray >/dev/null 2>&1;then
+  # Prevent Docker from automatically starting the container after reboot.
+  timeout 15 docker update --restart=no xmesh-managed-xray >/dev/null || return 1
+  timeout 30 docker stop xmesh-managed-xray >/dev/null || return 1
+  printf 'docker\n' > "$MARKER"
+ else
+  # systemd units must stay disabled across reboots until the panel allows
+  # traffic again. Never stop arbitrary remote-specified services.
+  timeout 30 systemctl disable --now "$UNIT" >/dev/null || return 1
+  printf 'systemd\n' > "$MARKER"
+ fi
+ chmod 600 "$MARKER"
+ return 0
+}
+resume_xray(){
+ [[ -f "$MARKER" ]] || return 0
+ local mode
+ mode="$(cat "$MARKER")"
+ if [[ "$mode" == docker ]];then
+  timeout 15 docker update --restart=unless-stopped xmesh-managed-xray >/dev/null || return 1
+  timeout 35 docker start xmesh-managed-xray >/dev/null || return 1
+  docker inspect -f '{{.State.Running}}' xmesh-managed-xray | grep -qx true || return 1
+ elif [[ "$mode" == systemd ]];then
+  timeout 35 systemctl enable --now "$UNIT" >/dev/null || return 1
+  systemctl is-active --quiet "$UNIT" || return 1
+ else
+  echo "Invalid local Xray shutdown marker" >&2
+  return 1
+ fi
+ rm -f "$MARKER"
+}
 heartbeat
 reply="$(signed_post '/api/v1/node/restart/poll' "{\"node_id\":$XMESH_NODE_ID}")"
+# A stop directive is evaluated before any queued action. The agent never
+# invents a shutdown from a failed HTTP request or malformed JSON response.
+enforce_stop="$(printf '%s' "$reply" | python3 -c '
+import json,sys
+data=json.load(sys.stdin)
+flag=data.get("enforceStop")
+if not isinstance(flag,bool):sys.exit(2)
+print("true" if flag else "false")
+')"
+if [[ "$enforce_stop" == true ]];then
+ if ! stop_xray;then echo "CRITICAL: Xray shutdown failed" >&2;exit 1;fi
+ heartbeat
+ exit 0
+fi
+if [[ -f "$MARKER" ]];then
+ # Only an authenticated control-plane response with enforceStop=false
+ # authorizes restoring a locally quota-stopped Xray.
+ resume_xray || { echo "Xray reactivation failed" >&2;exit 1; }
+ heartbeat
+fi
 command_info="$(printf '%s' "$reply" | python3 -c '
 import json,sys
 obj=json.load(sys.stdin)
