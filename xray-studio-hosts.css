@@ -1,0 +1,31 @@
+/* Public endpoints are a native section of XRAY STUDIO, not a second
+   transport/security editor. Values are stored in the existing hosts records. */
+.sv-public-endpoints{display:grid;gap:14px;margin-top:20px;padding-top:18px;border-top:1px solid var(--border,#ffffff20)}
+.sv-endpoints-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.sv-endpoints-head h4{margin:0 0 5px;font-size:16px}
+.sv-endpoints-head p{margin:0;font-size:12px;line-height:1.5;opacity:.75}
+.sv-endpoints-head>button,.sv-endpoint-actions button,.sv-endpoint-editor button{border:1px solid color-mix(in srgb,currentColor 22%,transparent);border-radius:10px;padding:9px 13px;cursor:pointer;color:inherit;background:transparent;font:inherit}
+.sv-endpoints-head>button{white-space:nowrap;font-weight:650}
+.sv-endpoint-list{display:grid;gap:10px}
+.sv-endpoint-list>.sv-muted{margin:0;padding:18px;border-radius:12px;border:1px dashed color-mix(in srgb,currentColor 22%,transparent)}
+.sv-endpoint-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px 16px;align-items:center;padding:14px;border-radius:14px;background:color-mix(in srgb,var(--s1,#15212b) 76%,transparent);border:1px solid color-mix(in srgb,currentColor 13%,transparent)}
+.sv-endpoint-card.is-disabled{opacity:.72}
+.sv-endpoint-info{min-width:0;display:grid;gap:4px}
+.sv-endpoint-info strong{font-size:14px;overflow-wrap:anywhere}
+.sv-endpoint-info span{font-size:13px;overflow-wrap:anywhere}
+.sv-endpoint-info small{font-size:11px;opacity:.7;overflow-wrap:anywhere}
+.sv-endpoint-status{font-size:11px;font-weight:700;color:var(--a,#74ddb1)}
+.sv-endpoint-card.is-disabled .sv-endpoint-status{color:inherit;opacity:.65}
+.sv-endpoint-actions{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:7px}
+.sv-endpoint-actions button{font-size:12px;padding:7px 10px;min-height:32px}
+.sv-endpoint-editor{display:grid;gap:14px;padding:18px;border-radius:16px;border:1px solid color-mix(in srgb,var(--a,#74ddb1) 35%,transparent);background:var(--s1,#15212b)}
+.sv-endpoint-editor[hidden]{display:none}
+.sv-endpoint-editor>header,.sv-endpoint-editor>footer{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.sv-endpoint-editor .sv-field{min-width:0}
+.sv-endpoint-editor [data-endpoint]{width:100%;max-width:100%;min-height:38px}
+.sv-endpoint-nodes{display:grid;gap:5px;font-size:13px}
+.sv-endpoint-nodes>b{font-size:13px}
+.sv-endpoint-nodes>p{font-size:12px;margin:0;opacity:.7}
+.sv-endpoint-node{display:flex;align-items:center;gap:8px;font-size:12px;padding:6px 0}
+.sv-endpoint-editor .sv-primary{background:var(--a,#74ddb1);color:#0d1517;font-weight:700}
+@media(max-width:680px){.sv-endpoints-head{flex-wrap:wrap}.sv-endpoint-card{grid-template-columns:1fr}.sv-endpoint-status{justify-self:start}}
