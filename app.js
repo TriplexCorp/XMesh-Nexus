@@ -945,7 +945,7 @@ const statsSpark=(points,key)=> {
 const statsRing=(label,percent,accent)=> {
  const valid=percent!==null&&percent!==undefined&&Number.isFinite(Number(percent));
  const pct=valid?Math.max(0,Math.min(100,Number(percent))):0;
- return '<div class="stats-ring-card" style="--ring-color:'+accent+';--ring-value:'+pct+'%"><div class="stats-ring"><strong>'+(valid?esc(fmt(pct,1))+'%':'—')+'</strong></div><span>'+esc(label)+'</span></div>';
+ return '<div class="stats-ring-card" style="--ring-color:'+accent+';--ring-value:'+pct+'%"><div class="stats-ring"><div class="stats-ring-center"><strong>'+(valid?esc(fmt(pct,1))+'%':'—')+'</strong></div></div><span>'+esc(label)+'</span></div>';
 };
 function statisticsP(){
  const markup=`<div class="stats-dashboard" id="stats-dashboard">
@@ -1000,7 +1000,7 @@ function statisticsP(){
       ['Процессы',statsValue(sys.processCount)],['PostgreSQL',sys.database==='online'?'Онлайн':'Не отвечает'],
       ['Uptime',sys.uptimeSeconds==null?'Нет данных':Math.floor(sys.uptimeSeconds/3600)+(panelIsEnglish()?' h':' ч')]
     ];
-    $('#stats-control').innerHTML='<div class="stats-kvs">'+control.map(x=>statsRow(...x)).join('')+'</div>';
+    $('#stats-control').innerHTML='<div class="stats-control-rings">'+statsRing('CPU',sys.cpu?.percent,'#6f9bff')+statsRing('RAM',sys.ram?.percent,'#c294e8')+statsRing('Диск',sys.disk?.percent,'#44c9b6')+'</div><div class="stats-kvs">'+control.map(x=>statsRow(...x)).join('')+'</div>';
     const points=traffic.points||[];
     const latest=points[points.length-1]||{};
     $('#stats-trend').innerHTML='<div class="stats-trend-grid"><div><b>RX</b><strong>'+ (points.length?statsBytes(latest.rxBytesPerSec)+'/с':'Нет данных')+'</strong>'+statsSpark(points,'rxBytesPerSec')+'</div><div><b>TX</b><strong>'+(points.length?statsBytes(latest.txBytesPerSec)+'/с':'Нет данных')+'</strong>'+statsSpark(points,'txBytesPerSec')+'</div></div><small class="note">'+(panelIsEnglish()?'Samples: ':'Измерений: ')+esc(String(traffic.sampleCount??0))+(panelIsEnglish()?' · Source: TimescaleDB</small>':' · Источник: TimescaleDB</small>');
