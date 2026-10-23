@@ -3916,235 +3916,233 @@ dialog.user-modal .user-server-details>b::before{
 .stats-layout .stats-spark{height:clamp(9rem,13vw,13rem)}
 @media(max-width:900px){.stats-layout{grid-template-columns:1fr}}
 
-/* Hosts: wider, landscape-oriented editor on desktop. */
-dialog#dlg.host-wide{width:min(1480px,calc(100vw - 40px))!important;max-width:calc(100vw - 40px)}
-dialog#dlg.host-wide .host-editor-layout{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:1.25rem}
-@media(max-width:820px){dialog#dlg.host-wide{width:calc(100vw - 20px)!important;max-width:calc(100vw - 20px)}dialog#dlg.host-wide .host-editor-layout{grid-template-columns:minmax(0,1fr)}}
 
-/* Host editor: landscape workspace, with a short scrollable form. */
-@media(min-width:1100px){
- dialog#dlg.host-wide{width:min(1840px,calc(100vw - 48px))!important;max-width:calc(100vw - 48px)!important}
- dialog#dlg.host-wide .host-editor-layout{grid-template-columns:minmax(0,1.55fr) minmax(360px,1fr);gap:1.5rem}
- dialog#dlg.host-wide .host-editor-main{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-content:start;column-gap:1.1rem}
- dialog#dlg.host-wide .host-editor-main>.node-form-section-title,
- dialog#dlg.host-wide .host-editor-main>.node-ip-hint,
- dialog#dlg.host-wide .host-editor-main>[data-host-count]{grid-column:1/-1}
- dialog#dlg.host-wide>form.box{max-height:calc(100dvh - 48px)}
-}
-
-/* Host editor v3: balanced horizontal workspace.
-   Separate the preview from the overrides so neither becomes a tall sidebar. */
+/* Host editor v5. One horizontal rectangle, THREE permanent vertical zones:
+   [Connection / Public / Assignment] [Advanced] [Client preview].
+   All controls stay in the DOM; the form does not acquire a second scroll area. */
 dialog#dlg.host-wide{
-  width:min(1840px,calc(100vw - 40px))!important;
-  max-width:calc(100vw - 40px)!important;
-  max-height:calc(100dvh - 28px)!important;
+  width:min(2080px,calc(100vw - 36px))!important;
+  max-width:calc(100vw - 36px)!important;
+  max-height:calc(100dvh - 24px);
+  margin:auto;
+  overflow:hidden;
 }
 dialog#dlg.host-wide>form.box{
   box-sizing:border-box;
-  max-height:calc(100dvh - 28px)!important;
+  width:100%;
+  max-width:100%;
+  height:auto;
   min-height:0;
-  overflow-y:auto;
+  max-height:calc(100dvh - 24px)!important;
+  padding:clamp(14px,1.05vw,22px)!important;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
   overflow-x:hidden;
-  padding:clamp(18px,1.5vw,28px)!important;
+  overflow-y:auto; /* Only a fallback for extreme browser zoom / short screens. */
   scrollbar-width:thin;
 }
+dialog#dlg.host-wide>form.box>h2{
+  margin:0;
+  font-size:1.18rem;
+  line-height:1.3;
+}
+dialog#dlg.host-wide>form.box>#fe:empty{display:none}
 dialog#dlg.host-wide .host-editor-layout{
   display:grid;
-  grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);
-  grid-template-areas:"configuration preview" "overrides overrides";
-  align-items:start;
-  gap:clamp(14px,1.2vw,24px);
+  grid-template-columns:minmax(0,1.08fr) minmax(0,1fr) minmax(0,1.08fr);
+  grid-template-areas:"primary overrides preview";
+  align-items:stretch;
   min-width:0;
+  gap:clamp(10px,.75vw,16px);
 }
-dialog#dlg.host-wide .host-editor-layout>.host-editor-main{
-  grid-area:configuration;
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:12px 18px;
-  align-items:start;
-  align-content:start;
-  padding:clamp(18px,1.2vw,24px);
-}
-dialog#dlg.host-wide .host-editor-main>.node-form-section-title,
-dialog#dlg.host-wide .host-editor-main>.node-ip-hint,
-dialog#dlg.host-wide .host-editor-main>[data-host-count]{
-  grid-column:1/-1;
-}
-dialog#dlg.host-wide .host-editor-main .node-form-section-title:not(:first-child){
-  margin-top:6px;
-}
-dialog#dlg.host-wide .host-editor-layout>.host-editor-side{
-  grid-area:preview;
-  padding:clamp(18px,1.2vw,24px);
-}
-dialog#dlg.host-wide .host-editor-layout>.host-advanced-panel{
-  grid-area:overrides;
-  display:block;
-  padding:clamp(18px,1.2vw,24px);
+dialog#dlg.host-wide .host-editor-layout>section{
+  box-sizing:border-box;
+  min-width:0;
+  margin:0;
+  padding:clamp(12px,.9vw,18px);
   border:1px solid var(--ln);
   border-radius:var(--ui-radius);
   background:var(--s1);
-  min-width:0;
 }
-dialog#dlg.host-wide .host-advanced-heading{
-  margin-bottom:16px;
+dialog#dlg.host-wide .host-editor-layout>.host-primary-panel{
+  grid-area:primary;
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  gap:9px;
 }
-dialog#dlg.host-wide .host-advanced-heading .node-form-section-title{
-  margin:0 0 6px;
+dialog#dlg.host-wide .host-editor-layout>.host-advanced-panel{
+  grid-area:overrides;
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  gap:10px;
+  border:1px solid var(--ln);
+}
+dialog#dlg.host-wide .host-editor-layout>.host-editor-side{
+  grid-area:preview;
+  display:flex;
+  flex-direction:column;
+  gap:9px;
+}
+dialog#dlg.host-wide .node-form-section-title{
+  font-size:.87rem;
+  line-height:1.35;
+  font-weight:720;
+  margin:0;
   padding:0;
   border:0;
 }
+dialog#dlg.host-wide .host-primary-panel>.node-form-section-title:not(:first-child){
+  margin-top:6px;
+  padding-top:10px;
+  border-top:1px solid var(--ln);
+}
+dialog#dlg.host-wide .host-connect-fields,
+dialog#dlg.host-wide .host-public-fields,
+dialog#dlg.host-wide .host-assignment-fields,
 dialog#dlg.host-wide .host-advanced-fields{
   display:grid;
-  grid-template-columns:repeat(4,minmax(0,1fr));
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px 12px;
+  align-content:start;
   align-items:start;
-  gap:16px 18px;
+  min-width:0;
+  width:100%;
+}
+dialog#dlg.host-wide .host-connect-fields>.f:first-child{
+  grid-column:1/-1;
+}
+dialog#dlg.host-wide .host-advanced-fields{
   margin:0;
 }
 dialog#dlg.host-wide .host-advanced-fields .f:has([name="publicKey"]),
 dialog#dlg.host-wide .host-advanced-fields .f:has([name="clientEncryption"]){
-  grid-column:span 2;
+  grid-column:1/-1;
+}
+dialog#dlg.host-wide :is(.host-connect-fields,.host-public-fields,.host-assignment-fields,.host-advanced-fields)>.f{
+  min-width:0;
+  margin:0;
+}
+dialog#dlg.host-wide .host-editor-layout .f>span:first-child{
+  font-size:.76rem;
+  line-height:1.32;
+  font-weight:630;
+}
+dialog#dlg.host-wide .host-editor-layout .f :is(input:not([type="checkbox"]),select,textarea){
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  box-sizing:border-box;
+  min-height:2.45rem;
+  font-size:.9rem;
+}
+dialog#dlg.host-wide .host-editor-layout .f small{
+  font-size:.7rem;
+  line-height:1.3;
+  color:var(--mu);
+  overflow-wrap:anywhere;
+}
+dialog#dlg.host-wide .host-editor-layout .node-ip-hint{
+  font-size:.73rem;
+  line-height:1.35;
+  margin:0;
+  color:var(--mu);
+}
+dialog#dlg.host-wide .host-advanced-heading{
+  display:grid;
+  gap:4px;
+  margin:0;
+}
+dialog#dlg.host-wide .host-advanced-heading>.node-form-section-title{
+  margin:0;
+  padding:0;
+  border:0;
 }
 dialog#dlg.host-wide .host-advanced-actions{
   display:flex;
-  justify-content:flex-end;
-  padding-top:18px;
+  margin-top:auto;
+  justify-content:flex-start;
+  padding:6px 0 0;
 }
-dialog#dlg.host-wide .host-editor-layout :is(input,select,textarea){
-  box-sizing:border-box;
-  min-width:0;
-  max-width:100%;
+dialog#dlg.host-wide .host-resolved{
+  padding:0 .7rem;
+}
+dialog#dlg.host-wide .host-resolved-line{
+  padding:.42rem 0;
+  gap:.5rem;
+  font-size:.75rem;
+}
+dialog#dlg.host-wide .host-resolved-line>b{
+  font-size:.76rem;
+  line-height:1.3;
+  overflow-wrap:anywhere;
+}
+dialog#dlg.host-wide .host-editor-layout .ms{
+  flex-wrap:wrap;
+  gap:.35rem;
+}
+dialog#dlg.host-wide .host-editor-layout .ms label{
+  font-size:.8rem;
+}
+dialog#dlg.host-wide .host-editor-layout [data-host-count]{
+  font-size:.73rem;
+  line-height:1.35;
 }
 dialog#dlg.host-wide>form.box>.act{
-  position:sticky;
-  bottom:0;
-  z-index:10;
-  flex-shrink:0;
+  position:static!important; /* Never cover the last row of overrides. */
+  flex:0 0 auto;
   margin:0;
-  padding:14px 0 0;
+  padding:11px 0 0;
   border-top:1px solid var(--ln);
   background:var(--s1);
+  z-index:auto;
 }
-@media(max-width:1250px){
-  dialog#dlg.host-wide .host-advanced-fields{
-    grid-template-columns:repeat(2,minmax(0,1fr));
-  }
-}
-@media(max-width:900px){
+/* Narrow displays and high zoom cannot fit 3 legible columns; allow fallback. */
+@media(max-width:1260px){
   dialog#dlg.host-wide .host-editor-layout{
-    grid-template-columns:minmax(0,1fr);
-    grid-template-areas:"configuration" "preview" "overrides";
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    grid-template-areas:"primary preview" "overrides overrides";
+  }
+  dialog#dlg.host-wide .host-advanced-fields{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+  dialog#dlg.host-wide .host-advanced-fields .f:has([name="publicKey"]),
+  dialog#dlg.host-wide .host-advanced-fields .f:has([name="clientEncryption"]){
+    grid-column:span 2;
   }
 }
-@media(max-width:620px){
+@media(max-width:760px){
   dialog#dlg.host-wide{
     width:calc(100vw - 12px)!important;
     max-width:calc(100vw - 12px)!important;
+    max-height:calc(100dvh - 12px);
   }
-  dialog#dlg.host-wide>form.box{padding:16px!important}
-  dialog#dlg.host-wide .host-editor-main{
+  dialog#dlg.host-wide>form.box{
+    max-height:calc(100dvh - 12px)!important;
+    padding:14px!important;
+  }
+  dialog#dlg.host-wide .host-editor-layout{
     grid-template-columns:minmax(0,1fr);
+    grid-template-areas:"primary" "overrides" "preview";
   }
-  dialog#dlg.host-wide .host-editor-main>*,dialog#dlg.host-wide .host-advanced-fields>*{
-    grid-column:1/-1!important;
+  dialog#dlg.host-wide .host-advanced-fields{
+    grid-template-columns:repeat(2,minmax(0,1fr));
   }
+  dialog#dlg.host-wide .host-advanced-fields .f:has([name="publicKey"]),
+  dialog#dlg.host-wide .host-advanced-fields .f:has([name="clientEncryption"]){
+    grid-column:1/-1;
+  }
+}
+@media(max-width:440px){
+  dialog#dlg.host-wide .host-connect-fields,
+  dialog#dlg.host-wide .host-public-fields,
+  dialog#dlg.host-wide .host-assignment-fields,
   dialog#dlg.host-wide .host-advanced-fields{
     grid-template-columns:minmax(0,1fr);
   }
-}
-
-/* Host editor v4: truly horizontal three-column top + one compact bottom row. */
-@media(min-width:1180px){
- dialog#dlg.host-wide{
-   width:min(1960px,calc(100vw - 32px))!important;
-   max-width:calc(100vw - 32px)!important;
- }
- dialog#dlg.host-wide .host-editor-layout{
-   grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.08fr);
-   grid-template-areas:"connect public preview" "overrides overrides overrides";
-   gap:14px;
- }
- dialog#dlg.host-wide .host-editor-layout>.host-connect-panel{
-   grid-area:connect;
- }
- dialog#dlg.host-wide .host-editor-layout>.host-public-panel{
-   grid-area:public;
- }
- dialog#dlg.host-wide .host-editor-layout>.host-editor-side{grid-area:preview}
- dialog#dlg.host-wide .host-editor-layout>.host-editor-main{
-   display:flex;
-   flex-direction:column;
-   gap:11px;
-   padding:18px;
-   min-width:0;
- }
- dialog#dlg.host-wide .host-connect-fields,
- dialog#dlg.host-wide .host-public-fields,
- dialog#dlg.host-wide .host-assignment-fields{
-   display:grid;
-   grid-template-columns:repeat(2,minmax(0,1fr));
-   align-items:start;
-   gap:12px;
-   width:100%;
- }
- dialog#dlg.host-wide .host-connect-fields>[data-host-node-preset],
- dialog#dlg.host-wide .host-connect-fields>.f:first-child,
- dialog#dlg.host-wide .host-assignment-fields>.f:has([name="nodes"]){
-   grid-column:1/-1;
- }
- dialog#dlg.host-wide .host-editor-main .node-form-section-title:not(:first-child){
-   width:100%;
-   padding-top:12px;
-   border-top:1px solid var(--ln);
- }
- dialog#dlg.host-wide .host-editor-layout>.host-advanced-panel{grid-area:overrides;padding:18px}
- dialog#dlg.host-wide .host-advanced-fields{
-   grid-template-columns:repeat(5,minmax(0,1fr));
-   gap:12px 14px;
- }
- dialog#dlg.host-wide .host-advanced-fields .f:has([name="publicKey"]),
- dialog#dlg.host-wide .host-advanced-fields .f:has([name="clientEncryption"]){grid-column:span 2}
- dialog#dlg.host-wide .host-advanced-actions{padding-top:10px}
- dialog#dlg.host-wide .host-editor-layout .node-ip-hint{font-size:.76rem}
-}
-@media(min-width:901px) and (max-width:1179px){
- dialog#dlg.host-wide .host-editor-layout{
-   grid-template-columns:repeat(2,minmax(0,1fr));
-   grid-template-areas:"connect public" "preview preview" "overrides overrides";
- }
- dialog#dlg.host-wide .host-connect-panel{grid-area:connect}
- dialog#dlg.host-wide .host-public-panel{grid-area:public}
- dialog#dlg.host-wide .host-editor-layout>.host-editor-side{grid-area:preview}
- dialog#dlg.host-wide .host-connect-fields,
- dialog#dlg.host-wide .host-public-fields,
- dialog#dlg.host-wide .host-assignment-fields{
-   display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px
- }
-}
-@media(max-width:900px){
- dialog#dlg.host-wide .host-editor-layout{
-   grid-template-columns:minmax(0,1fr);
-   grid-template-areas:"connect" "public" "preview" "overrides";
- }
- dialog#dlg.host-wide .host-connect-panel{grid-area:connect}
- dialog#dlg.host-wide .host-public-panel{grid-area:public}
- dialog#dlg.host-wide .host-editor-layout>.host-editor-side{grid-area:preview}
-}
-
-@media(max-width:1179px){
- dialog#dlg.host-wide .host-editor-layout>.host-editor-main{
-   display:flex;flex-direction:column;align-items:stretch;gap:12px;min-width:0;
- }
- dialog#dlg.host-wide .host-editor-main .host-connect-fields,
- dialog#dlg.host-wide .host-editor-main .host-public-fields,
- dialog#dlg.host-wide .host-editor-main .host-assignment-fields{
-   width:100%;min-width:0;
- }
-}
-@media(max-width:620px){
- dialog#dlg.host-wide .host-connect-fields,
- dialog#dlg.host-wide .host-public-fields,
- dialog#dlg.host-wide .host-assignment-fields{
-   display:grid;grid-template-columns:minmax(0,1fr);gap:12px
- }
+  dialog#dlg.host-wide .host-connect-fields>*,dialog#dlg.host-wide .host-advanced-fields>*{
+    grid-column:1/-1;
+  }
 }
