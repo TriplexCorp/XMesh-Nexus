@@ -72,6 +72,15 @@ Unit=xmesh-node-control.service
 WantedBy=timers.target
 EOF
 systemctl daemon-reload
+# The autonomous policy guard only takes effect while the reconciliation timer
+# runs. Upgrading an existing node must reactivate an inactive sync timer.
+if [[ -f /etc/systemd/system/xmesh-xray-sync.timer &&
+      -f /etc/systemd/system/xmesh-xray-sync.service ]];then
+ systemctl enable xmesh-xray-sync.timer
+ systemctl restart xmesh-xray-sync.timer
+else
+ echo "WARNING: Xray sync timer is absent; offline policy enforcement is not active." >&2
+fi
 systemctl enable xmesh-node-control.timer
 systemctl restart xmesh-node-control.timer
 systemctl restart xmesh-node-metrics.timer
