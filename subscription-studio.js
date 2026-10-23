@@ -4,7 +4,7 @@
 window.XMeshSubscriptionStudio = (() => {
   const defaults = {
     subscriptionDomain:'', subscriptionPath:'/s',
-    subscriptionBrand:'', subscriptionAnnouncement:'', subscriptionUpdateInterval:24, subscriptionDescription:'Настройки подключения и информация о подписке.',
+    subscriptionBrand:'', subscriptionAnnouncement:'', subscriptionAnnouncementRotationHours:24, subscriptionUpdateInterval:24, subscriptionDescription:'Настройки подключения и информация о подписке.',
     subscriptionDescriptionEn:'', subscriptionFooter:'',subscriptionFooterEn:'', subscriptionAccent:'#e8bb78',subscriptionSecondaryAccent:'#c6e985', subscriptionSyncPanelTheme:true, subscriptionLanguage:'ru', subscriptionTheme:'dark',
     subscriptionShowTraffic:true, subscriptionShowExpiry:true,
     subscriptionPlacement:'a', nodePlacement:'a', deploymentServerB:'', deploymentServerC:'',
@@ -144,7 +144,8 @@ window.XMeshSubscriptionStudio = (() => {
       '<section class="card subscription-studio-section">',
       '<div class="subscription-studio-heading"><span>03</span><div><h3>Клиентский портал</h3><p>Синхронизация с темой панели или отдельная палитра.</p></div></div>',
       field('subscriptionBrand','Название подписки',data.subscriptionBrand,'Пустое значение — использовать бренд панели.',{placeholder:'Название вашего сервиса',max:80}),
-      field('subscriptionAnnouncement','Анонсы для VPN-клиентов',data.subscriptionAnnouncement,'Разделяйте объявления отдельной строкой --- . Показывается одно объявление в сутки (UTC), по очереди. Если объявление одно — оно постоянно.',{area:true,max:4000}),
+      field('subscriptionAnnouncement','Анонсы для VPN-клиентов',data.subscriptionAnnouncement,'Разделяйте объявления отдельной строкой --- . Сообщения чередуются с заданной ниже периодичностью.',{area:true,max:4000}),
+      field('subscriptionAnnouncementRotationHours','Ротация анонсов (ч)',data.subscriptionAnnouncementRotationHours,'От 1 до 720 часов. По умолчанию 24 часа. Период отсчитывается по UTC.',{type:'number',min:1,max:720}),
       field('subscriptionUpdateInterval','Интервал обновления подписки (ч)',data.subscriptionUpdateInterval,'Подсказка для поддерживающих клиентов: от 1 до 168 часов.',{type:'number',min:1,max:168}),
       field('subscriptionDescription','Описание (RU)',data.subscriptionDescription,'Текст на русском.',{area:true,max:240}),
       field('subscriptionDescriptionEn','Описание (EN)',data.subscriptionDescriptionEn,'Английский текст; пустое поле — стандартное описание на английском.',{area:true,max:240}),
@@ -293,6 +294,7 @@ window.XMeshSubscriptionStudio = (() => {
         subscriptionPath:input(form,'subscriptionPath').value.trim(),
         subscriptionBrand:input(form,'subscriptionBrand').value.trim(),
         subscriptionAnnouncement:input(form,'subscriptionAnnouncement').value.trim(),
+        subscriptionAnnouncementRotationHours:Number(input(form,'subscriptionAnnouncementRotationHours').value),
         subscriptionUpdateInterval:Number(input(form,'subscriptionUpdateInterval').value),
         subscriptionDescription:input(form,'subscriptionDescription').value.trim(),
         subscriptionDescriptionEn:input(form,'subscriptionDescriptionEn').value.trim(),
