@@ -30,4 +30,11 @@ assert.match(negotiation,/options\.get\("device"\)/,
  'Keep device-specific XHTTP configuration');
 assert.match(engine,/fn disabled_smart_never_emits_balancer_or_observatory\(\)/);
 assert.match(engine,/В JSON обнаружена балансировка, хотя SMART отключён/);
+assert.match(engine,/pub\(crate\) fn build_feed\(proxies:Vec<Value>,settings:&Value\)/,
+ 'Feed must return a JSON array of independent Xray configs');
+assert.match(engine,/Ok\(Value::Array\(entries\)\)/);
+assert.match(engine,/fn feed_exposes_one_full_json_profile_per_server\(\)/);
+assert.match(engine,/fn smart_is_an_optional_additional_profile\(\)/);
+assert.match(subscriptions,/subscription_json::build_feed\(outbounds,&settings\)/);
+assert.match(subscriptions,/subscription_json::build_feed\(proxies,&setting\)/);
 console.log('Dedicated opt-in balancer workspace: OK');
