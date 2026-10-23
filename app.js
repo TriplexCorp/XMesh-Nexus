@@ -1754,6 +1754,34 @@ async function simple(ks){const h=await Promise.all(ks.map(crudCard));return [h.
    Resolve inherited values for preview only; never expose server privateKey. */
 function hostProfile(profileId){return DB.profiles.find(p=>String(p.id)===String(profileId))}
 function hostInbound(profileId,tag){return inbs(hostProfile(profileId)||{}).find(i=>i.tag===tag)}
+// Client-only X25519 public-key derivation: never export a REALITY private key
+// from the host record or send it to a remote key-generation endpoint.
+async function hostDeriveRealityPublic(form){
+  if(!form?.isConnected||!globalThis.crypto?.subtle)return;
+  const profileId=form.elements.namedItem('profileId')?.value,tag=form.elements.namedItem('tag')?.value;
+  const inbound=hostInbound(profileId,tag),reality=inbound?.streamSettings?.realitySettings;
+  const field=form.elements.namedItem('publicKey');
+  if(!field||String(field.value||'').trim()||!reality?.privateKey)return;
+  try{
+    const encoded=String(reality.privateKey).replace(/-/g,'+').replace(/_/g,'/');
+    const raw=Uint8Array.from(atob(encoded+'='.repeat((4-encoded.length%4)%4)),c=>c.charCodeAt(0));
+    if(raw.length!==32)return;
+    // RFC 8410 PKCS#8 X25519 private seed (32 bytes).
+    const prefix=Uint8Array.from([0x30,0x2e,0x02,0x01,0x00,0x30,0x05,0x06,0x03,0x2b,0x65,0x6e,0x04,0x22,0x04,0x20]);
+    const der=new Uint8Array(prefix.length+raw.length);
+    der.set(prefix);der.set(raw,prefix.length);
+    const key=await crypto.subtle.importKey('pkcs8',der,{name:'X25519'},true,['deriveBits']);
+    const exported=await crypto.subtle.exportKey('jwk',key);
+    if(!exported.x||!form.isConnected||form.elements.namedItem('profileId')?.value!==String(profileId)
+       ||form.elements.namedItem('tag')?.value!==tag||String(field.value||'').trim())return;
+    field.value=exported.x;
+    field.dataset.hostAutoPublic='1';
+    hostEditorRefresh(form);
+  }catch(_){
+    // Not all browsers support X25519 WebCrypto. Keep the explicit validation
+    // warning rather than silently publishing an unusable subscription.
+  }
+}
 function hostEditorRefresh(form,changedProfile=false){
   if(!form||form.dataset.ent!=='hosts')return;
   const get=k=>form.elements.namedItem(k);
@@ -1863,7 +1891,11 @@ function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id
     ?'<div class="node-form-layout"><section class="node-main-section"><div class="node-form-section-title">Основные параметры</div><div class="node-form-grid">'+nodeMainFields+'</div></section>'+`<section class="node-ip-section"><div class="node-form-section-title">IP-пул и ротация</div><div class="node-ip-hint">Адреса должны принадлежать этому VPS и быть доступны извне.</div><div class="node-rotation-editor-body">${rotationFields}<div class="node-pool-toolbar"><span data-node-pool-count>Адресов: ${nodeRotationIPs(o).length} / 64</span><button type="button" class="gh sm" data-node-pool-normalize>Убрать повторы</button><button type="button" class="gh sm" data-node-pool-clear>Очистить</button></div><output data-node-pool-feedback aria-live="polite"></output>${rotationProbe}</div></section><section class="node-billing-section"><div class="node-form-section-title">Инфрабиллинг</div><p class="node-ip-hint">Стоимость, аренда и напоминания</p><div class="node-billing-fields">${billingFields}</div></section></div>`
     :standardFields;
   modal(`<form class="box" data-k="ent" data-ent="${k}" data-id="${id||''}" method="dialog"><h2>${id?'Изменить':'Новый'}: ${e.nw.toLowerCase()}</h2>${fields}<p class="er" id="fe"></p><div class="act">${id?`<button type="button" class="dg" data-del="${k}:${id}" style="margin-right:auto">${ic('trash')}Удалить</button>`:''}${k==='hosts'&&id?`<button type="button" class="gh" data-host-duplicate="${id}">${ic('copy')}Дублировать</button>`:''}<button type="button" class="gh" data-x>Отмена</button><button class="btn">Сохранить</button></div></form>`,k==='nodes'?'node-wide':k==='hosts'?'host-wide':k=='profiles'||k=='subs'?'wide':'');
-  if(k==='hosts')hostEditorRefresh(dlg.querySelector('form[data-ent="hosts"]'));
+  if(k==='hosts'){
+    const form=dlg.querySelector('form[data-ent="hosts"]');
+    hostEditorRefresh(form);
+    void hostDeriveRealityPublic(form);
+  }
 }
 
 /* ================= УЗЛЫ ================= */
@@ -2481,9 +2513,12 @@ document.addEventListener('change',async e=>{const t=e.target;
       if(address)address.value=node.addr||'';
       if(port)port.value=node.port||443;
       if(remark&&!remark.value.trim())remark.value=node.name||'';
-      if(profile&&hostProfile(node.profileId))profile.value=String(node.profileId);
+      if(profile&&hostProfile(node.profileId)&&String(profile.value)!==String(node.profileId)){
+        profile.value=String(node.profileId);
+        const key=form.elements.namedItem('publicKey');if(key){key.value='';delete key.dataset.hostAutoPublic}
+      }
       form.querySelectorAll('[name="nodes"]').forEach(input=>{input.checked=String(input.value)===String(node.id)});
-      hostEditorRefresh(form,true);
+      hostEditorRefresh(form,true);void hostDeriveRealityPublic(form);
       const warning=form.querySelector('[data-host-warnings]');
       if(!hostProfile(node.profileId) && warning){
         warning.hidden=false;
@@ -2494,7 +2529,11 @@ document.addEventListener('change',async e=>{const t=e.target;
   }
   if(t.closest('form[data-ent="hosts"]')){
     const form=t.closest('form');
-    if(t.name==='profileId')hostEditorRefresh(form,true);
+    if(t.name==='profileId'){
+      const key=form.elements.namedItem('publicKey');
+      if(key){key.value='';delete key.dataset.hostAutoPublic}
+      hostEditorRefresh(form,true);void hostDeriveRealityPublic(form);
+    }
     else hostEditorRefresh(form);
     return;
   }
