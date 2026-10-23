@@ -100,23 +100,37 @@ fi
 payload="$(printf '{"node_id":%s,"cpu_percent":%s,"cpu_steal_percent":%s,"ram_used_bytes":%s,"ram_total_bytes":%s,"disk_used_bytes":%s,"disk_total_bytes":%s,"rx_bytes_per_sec":%s,"tx_bytes_per_sec":%s,"active_connections":%s,"metrics":{"interface":"%s","rateIntervalSeconds":%s}}' \
   "$XMESH_NODE_ID" "$cpu_pct" "$steal_pct" "$mem_used_bytes" "$mem_total_bytes" "${disk_used_bytes:-0}" "${disk_total_bytes:-0}" "$rx_rate" "$tx_rate" "$active_connections" "$XMESH_INTERFACE" "$elapsed")"
 
-# Optional Xray StatsService counters, joined accurately using the unique
-# per-user/per-inbound Xray email assigned by XRAY STUDIO.
-# A stock Xray user counter shared across inbounds cannot be split accurately.
+# Optional Xray StatsService counters. Missing Xray CLI or inaccessible API
+# must never be reported as successful per-user traffic collection.
 XRAY_API_ADDRESS="${XMESH_XRAY_API_ADDRESS:-127.0.0.1:10085}"
-if [[ "$XRAY_API_ADDRESS" =~ ^127\.0\.0\.1:[0-9]{1,5}$ ]] &&
-   command -v xray >/dev/null 2>&1 &&
+if [[ "$XRAY_API_ADDRESS" =~ ^127\\.0\\.0\\.1:[0-9]{1,5}$ ]] &&
    command -v python3 >/dev/null 2>&1 &&
    [[ -r /usr/local/libexec/xmesh-xray-stats-collector.py ]]; then
-  # No -reset: PostgreSQL stores monotonic deltas. The Xray stats API must be
-  # configured on loopback; if absent, do not invent user traffic.
-  if stats_json="$(timeout 6 xray api statsquery --server="$XRAY_API_ADDRESS" -pattern 'user>>>xmesh-u' 2>/dev/null)"; then
-    if stats_fragment="$(printf '%s' "$stats_json" | python3 /usr/local/libexec/xmesh-xray-stats-collector.py 2>/dev/null)"; then
-      if [[ "$stats_fragment" == ,* ]]; then
-        payload="${payload%\}}$stats_fragment}"
-      fi
-    fi
+  XRAY_CLI="$(command -v xray || true)"
+  if [[ -z "$XRAY_CLI" ]]; then
+    for candidate in /usr/local/bin/xray /usr/bin/xray /usr/local/xray/xray /opt/xray/xray /usr/local/bin/xray-core; do
+      if [[ -x "$candidate" ]]; then XRAY_CLI="$candidate"; break; fi
+    done
   fi
+  if [[ -z "$XRAY_CLI" ]]; then
+    echo "XMesh: per-user traffic unavailable: Xray CLI not installed on host (possibly containerized)." >&2
+  else
+    stats_error="$(mktemp)"
+    if stats_json="$(timeout 6 "$XRAY_CLI" api statsquery --server="$XRAY_API_ADDRESS" -pattern 'user>>>xmesh-u' 2>"$stats_error")"; then
+      if stats_fragment="$(printf '%s' "$stats_json" | python3 /usr/local/libexec/xmesh-xray-stats-collector.py)"; then
+        if [[ "$stats_fragment" == ,* ]]; then
+          payload="${payload%\\}}$stats_fragment}"
+        fi
+      else
+        echo "XMesh: Xray user stats response could not be parsed." >&2
+      fi
+    else
+      echo "XMesh: Xray Stats API unavailable at $XRAY_API_ADDRESS (check API listener and service)." >&2
+    fi
+    rm -f "$stats_error"
+  fi
+else
+  echo "XMesh: Xray StatsService collection is not configured." >&2
 fi
 
 [[ -r "$XMESH_METRICS_PRIVATE_KEY" ]] || { echo "Missing readable Ed25519 private key." >&2; exit 1; }
