@@ -4625,10 +4625,51 @@ dialog#dlg.squad-wide > form.box > .act{
   dialog#dlg.squad-wide .squad-editor-toolbar .gh{flex:1 1 auto}
 }
 
-/* Squad editor: three always-visible horizontal workspaces. */
-dialog#dlg.squad-wide .box{width:min(1280px,calc(100vw - 40px));max-width:none}
-dialog#dlg.squad-wide .squad-editor-layout{grid-template-columns:minmax(0,.88fr) minmax(0,1.22fr) minmax(0,1fr);align-items:stretch}
-dialog#dlg.squad-wide .squad-editor-layout>section{min-width:0}
-dialog#dlg.squad-wide .squad-inbound-list{max-height:min(39dvh,360px)}
-@media(max-width:1050px){dialog#dlg.squad-wide .squad-editor-layout{grid-template-columns:repeat(2,minmax(0,1fr))}dialog#dlg.squad-wide .squad-editor-side{grid-column:1/-1}}
-@media(max-width:680px){dialog#dlg.squad-wide .box{width:calc(100vw - 20px)}dialog#dlg.squad-wide .squad-editor-layout{grid-template-columns:minmax(0,1fr)}dialog#dlg.squad-wide .squad-editor-side{grid-column:auto}}
+
+/* Compact squad workspace: no stretched empty columns. */
+dialog#dlg.squad-wide{
+  width:min(1120px,calc(100vw - 40px))!important;
+  inline-size:min(1120px,calc(100vw - 40px))!important;
+}
+dialog#dlg.squad-wide > form.box{
+  padding:20px 22px 16px;
+  gap:12px;
+}
+dialog#dlg.squad-wide > form.box > h2{font-size:1.1rem;letter-spacing:-.025em}
+dialog#dlg.squad-wide .squad-editor-layout{
+  grid-template-columns:minmax(0,.95fr) minmax(0,1.35fr) minmax(0,1.15fr);
+  align-items:start;
+  gap:10px;
+}
+dialog#dlg.squad-wide .squad-editor-layout > section{
+  padding:16px;
+  gap:10px;
+  align-content:start;
+  min-height:0;
+  border-radius:14px;
+}
+dialog#dlg.squad-wide .squad-editor-fields{gap:12px}
+dialog#dlg.squad-wide .squad-editor-fields .f{gap:6px}
+dialog#dlg.squad-wide .squad-editor-fields input{height:2.65rem;min-height:2.65rem}
+dialog#dlg.squad-wide .squad-section-heading{padding:0;border:0}
+dialog#dlg.squad-wide .squad-editor-toolbar{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px}
+dialog#dlg.squad-wide .squad-inbound-search{min-width:0;flex:auto}
+dialog#dlg.squad-wide .squad-editor-toolbar .gh{white-space:nowrap}
+dialog#dlg.squad-wide .squad-inbound-list{max-height:min(33dvh,290px);gap:6px}
+dialog#dlg.squad-wide .squad-inbound-row{padding:9px 10px}
+dialog#dlg.squad-wide [data-squad-preview]{gap:10px}
+dialog#dlg.squad-wide .squad-preview-stats{gap:7px}
+dialog#dlg.squad-wide .squad-preview-section{padding-top:9px}
+dialog#dlg.squad-wide > form.box > .act{padding-top:12px}
+@media(max-width:980px){
+ dialog#dlg.squad-wide .squad-editor-layout{grid-template-columns:repeat(2,minmax(0,1fr))}
+ dialog#dlg.squad-wide .squad-editor-side{grid-column:1/-1}
+}
+@media(max-width:680px){
+ dialog#dlg.squad-wide{width:calc(100vw - 16px)!important;inline-size:calc(100vw - 16px)!important}
+ dialog#dlg.squad-wide > form.box{padding:14px}
+ dialog#dlg.squad-wide .squad-editor-layout{grid-template-columns:minmax(0,1fr)}
+ dialog#dlg.squad-wide .squad-editor-side{grid-column:auto}
+ dialog#dlg.squad-wide .squad-editor-toolbar{grid-template-columns:1fr 1fr}
+ dialog#dlg.squad-wide .squad-inbound-search{grid-column:1/-1}
+}
