@@ -95,6 +95,9 @@ fn vless_outbound(user:&Value,inbound:&Value,host:&Value,device:&str)->Option<Va
   .or_else(||nonempty(user,"vlessEncryption"))
   .or_else(||inbound.get("xmesh").and_then(|v|nonempty(v,"clientEncryption")))
   .unwrap_or("none");
+ // Fail closed: a server-side decryption value must never be used as client material,
+ // even if accidentally pasted into a host or user encryption override.
+ if client_encryption==server_decryption && server_decryption!="none"{return None}
  if server_decryption!="none" && client_encryption=="none"{return None}
  let mut client=json!({"id":uuid,"encryption":client_encryption});
  // Flow must only be included when the inbound actually supports it.
