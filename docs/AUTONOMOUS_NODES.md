@@ -103,3 +103,37 @@ stat -c '%a %U:%G %n' /var/lib/xmesh-xray-sync/policy-public-key /var/lib/xmesh-
 
 Do not disable signature verification, grant the metrics user access to the
 Docker socket, or remove the `forced-stop` file to "fix" an outage.
+
+## Обновление Agent без SSH · control-v4.0.0
+
+В карточке каждого узла отображается версия управляющего агента из
+**подписанного heartbeat**, например `Agent v4.0.0`, и кнопка **«Обновить Agent»**.
+
+Обновление проходит по тому же подписанному каналу команд, что и перезапуск
+Xray. Администратор подтверждает действие, API ставит фиксированную команду
+`update_agent` в очередь, нода самостоятельно запускает заранее установленную
+`xmesh-node-agent-upgrade.service`. Панель не может передавать shell-команды,
+пути файлов или URL. Отдельная служба скачивает компоненты из фиксированных
+репозиториев, проверяет синтаксис, сохраняет существующий Ed25519-ключ и
+применяет обновление. Подтверждение `succeeded` отправляется **только после
+успешной установки**, при ошибке — `failed`.
+
+Команды `restart_xray`, `update_xray` и `update_agent` эксклюзивны
+для одной ноды и журналируются. Если узел отключён или heartbeat устарел,
+обновление не запускается.
+
+**Переход с control-v3:** старый агент не умеет выполнять новую команду.
+Потребуется один раз вручную обновить его на VPS (без повторной регистрации
+или смены ключа):
+
+```bash
+curl --proto '=https' --tlsv1.2 -fsSLo /tmp/xmesh-agent-upgrade.sh \
+  https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy/update-node-control-agent.sh
+sudo bash /tmp/xmesh-agent-upgrade.sh
+```
+
+После появления `Agent v4.0.0` последующие обновления доступны в панели.
+При **чистой установке новой управляемой ноды** upgrade-service и v4
+устанавливаются автоматически. Сервис Xray-профиля при штатном обновлении
+агента не перезапускается; доступность сети и персонального учёта нужно
+контролировать отдельно.
