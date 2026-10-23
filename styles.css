@@ -2686,3 +2686,23 @@ dialog.node-wide{width:min(920px,calc(100vw - 2rem))!important;max-width:none}
 dialog.node-wide .node-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem 1.25rem;align-items:start}
 dialog.node-wide .node-rotation-editor{min-width:0}
 @media(max-width:680px){dialog.node-wide{width:calc(100vw - 1rem)!important}dialog.node-wide .node-form-grid{grid-template-columns:minmax(0,1fr)}}
+
+/* User details: wider balanced layout and compact subscription controls. */
+dialog.user-modal{width:min(1120px,calc(100vw - 2rem));max-width:1120px}
+dialog.user-modal .user-canvas-grid{grid-template-columns:minmax(0,1.2fr) minmax(290px,1fr) minmax(0,1fr)}
+dialog.user-modal .user-pane{min-width:0}
+dialog.user-modal .user-subscription-state{min-width:0;width:100%}
+dialog.user-modal .user-sub-link-card{display:grid;gap:.72rem;min-width:0}
+dialog.user-modal .user-sub-link-head{display:flex;justify-content:space-between;align-items:center;gap:.5rem}
+dialog.user-modal .user-sub-link-label{color:var(--mu);font-size:.73rem;font-weight:650}
+dialog.user-modal .user-sub-link-status{display:inline-flex;align-items:center;gap:.35rem;color:var(--a);font-size:.68rem;font-weight:700;white-space:nowrap}
+dialog.user-modal .user-sub-status-dot{height:6px;width:6px;border-radius:50%;background:currentColor}
+dialog.user-modal .user-sub-link-row{display:flex;gap:.45rem;align-items:stretch;min-width:0}
+dialog.user-modal .user-subscription-url{display:block;flex:1 1 auto;min-width:0;width:100%;height:2.5rem;padding:.55rem .7rem;border-radius:var(--ui-control-radius);border:1px solid var(--ln);background:var(--s2);color:var(--tx);font-size:.77rem;font-family:ui-monospace,Consolas,monospace;text-overflow:ellipsis;overflow:hidden;box-sizing:border-box}
+dialog.user-modal .user-sub-link-row .user-sub-copy-main{flex:0 0 auto;min-height:2.5rem;white-space:nowrap}
+dialog.user-modal .user-sub-actions{display:flex;flex-wrap:wrap;gap:.45rem}
+dialog.user-modal .user-sub-actions button{flex:1 1 auto;justify-content:center;min-width:0;white-space:nowrap;font-size:.71rem}
+dialog.user-modal .user-sub-actions .user-sub-revoke{color:var(--er)}
+@media(max-width:1060px){dialog.user-modal .user-canvas-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+@media(max-width:760px){dialog.user-modal{width:calc(100vw - 1rem)}dialog.user-modal .user-canvas-grid{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:420px){dialog.user-modal .user-sub-link-row{flex-wrap:wrap}dialog.user-modal .user-sub-link-row .user-sub-copy-main{width:100%}}
