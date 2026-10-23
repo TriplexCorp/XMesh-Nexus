@@ -2479,23 +2479,39 @@ $('#theme').onclick=()=>{C.theme=document.documentElement.dataset.theme=='dark'?
 const nodeNotificationTitle=node=>flagView(node.flag,'notification-country-flag')+
   '<span class="notification-node-label">'+esc(node.name)+(node.hosting?.trim()?'<small>'+esc(node.hosting.trim())+'</small>':'')+'</span>';
 $('#bell').onclick=()=>{
- const notifications=[
-  ...DB.nodes.filter(n=>n.billingDueDate&&/^\d{4}-\d{2}-\d{2}$/.test(n.billingDueDate)).filter(n=>{
-    const due=Date.parse(n.billingDueDate+'T23:59:59Z'),days=Math.max(0,Number(n.billingRemindDays)||0);
-    return Number.isFinite(due)&&due-Date.now()<=(days+1)*DAY;
-  }).map(n=>({title:esc(n.name)+' · аренда VPS',message:'Оплачено до '+esc(n.billingDueDate)+' · '+esc(String(n.billingPrice||0))+' '+esc(n.billingCurrency||'EUR')})),
-  ...DB.nodes.filter(node=>nstat(node)==='OFFLINE').map(node=>({
-   title:nodeNotificationTitle(node),message:'Узел не отвечает'
-  })),
-  ...DB.users.flatMap(user=>
-   st(user)==='ACTIVE'&&user.limit&&user.used/user.limit>.9
-    ?[{title:esc(user.username),message:'Использовал '+Math.round(user.used/user.limit*100)+'% трафика'}]
-    :st(user)==='ACTIVE'&&user.expireAt&&user.expireAt-Date.now()<2*DAY
-     ?[{title:esc(user.username),message:'Подписка истекает: '+esc(left(user.expireAt))}]:[]
-  ).slice(0,8)
- ];
+ const today=Date.now();
+ const rent=DB.nodes.flatMap(n=>{
+   if(!n.billingDueDate||!/^\d{4}-\d{2}-\d{2}$/.test(n.billingDueDate))return [];
+   const due=Date.parse(n.billingDueDate+'T23:59:59Z'),remind=Math.max(0,Number(n.billingRemindDays)||0);
+   if(!Number.isFinite(due))return [];
+   const days=Math.max(0,Math.ceil((due-today)/DAY));
+   if(due>today&&days>remind)return [];
+   const date=new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(due));
+   return [{group:'Аренда серверов',severity:due<today?'critical':'warning',title:n.name,message:(due<today?'Аренда просрочена':'До окончания аренды '+days+' дн.')+' · '+date+' · '+(Number(n.billingPrice)||0)+' '+(n.billingCurrency||'EUR')}];
+ });
+ const infrastructure=DB.nodes.flatMap(n=>{
+   const observed=runtime.get(n.id);
+   if(n.disabled)return [];
+   if(observed?.connected)return [];
+   if(observed?.lastSeenAt)return [{group:'Состояние инфраструктуры',severity:'critical',title:n.name,message:'Узел не отвечает · последнее соединение '+new Date(observed.lastSeenAt).toLocaleString('ru-RU')}];
+   return [{group:'Состояние инфраструктуры',severity:'neutral',title:n.name,message:'Агент узла ещё не подключён · статус неизвестен'}];
+ });
+ const users=DB.users.flatMap(u=>{
+   if(st(u)!=='ACTIVE')return [];
+   if(u.limit&&u.used/u.limit>.9)return [{group:'Пользователи',severity:'warning',title:u.username,message:'Использовано '+Math.round(u.used/u.limit*100)+'% трафика'}];
+   if(u.expireAt&&u.expireAt>today&&u.expireAt-today<2*DAY)return [{group:'Пользователи',severity:'warning',title:u.username,message:'Подписка скоро истечёт · '+left(u.expireAt)}];
+   return [];
+ });
+ const groups=['Аренда серверов','Состояние инфраструктуры','Пользователи'];
+ const items=[...rent,...infrastructure,...users];
+ const body=groups.map(group=>{
+   const entries=items.filter(item=>item.group===group);
+   if(!entries.length)return '';
+   return '<section class="notification-group"><h3>'+esc(group)+' <span>'+entries.length+'</span></h3>'+
+     entries.map(item=>'<div class="notification-item notification-'+item.severity+'"><span class="notification-status-dot" aria-hidden="true"></span><div><b>'+esc(item.title)+'</b><p>'+esc(item.message)+'</p></div></div>').join('')+'</section>';
+ }).join('');
  $('#bell .pip')?.remove();
- modal(`<div class="box"><div class="bar2"><h2>Уведомления</h2><button class="ia" data-x style="margin-left:auto" aria-label="Закрыть">${ic('x')}</button></div><div>${notifications.map(item=>`<div class="nt"><b class="notification-title">${item.title}</b><span class="mu">${esc(item.message)}</span></div>`).join('')||'<p class="note">Новых уведомлений нет.</p>'}</div></div>`,'pop');
+ modal('<div class="box notification-workspace"><div class="bar2"><h2>Уведомления</h2><button class="ia" data-x style="margin-left:auto" aria-label="Закрыть">'+ic('x')+'</button></div><div class="notification-sections">'+(body||'<p class="note">Новых уведомлений нет.</p>')+'</div></div>','pop');
 };
 $('#restart').onclick=()=>{location.hash='set';setTimeout(()=>document.querySelector('#core-panel')?.scrollIntoView({behavior:'smooth',block:'start'}),100)};
 
