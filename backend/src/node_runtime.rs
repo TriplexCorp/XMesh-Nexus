@@ -83,6 +83,60 @@ pub async fn status(
     }
 }
 
+/// Ask the autonomous node reconciler to bypass the GeoData refresh interval.
+///
+/// No remote shell actions, arbitrary URLs or Xray restarts are enqueued.
+/// The per-node signed manifest carries a monotonic revision. The node
+/// verifies it via the existing policy guard, downloads and tests the assets
+/// during its next scheduled desired-config reconciliation.
+pub async fn request_geodata_refresh(
+    State(state): State<AppState>,
+    axum::extract::Extension(actor): axum::extract::Extension<crate::auth::AuthUser>,
+    Path(node_id): Path<i64>,
+) -> Result<(StatusCode, Json<Value>), ApiError> {
+    crate::require_mutation(&actor)?;
+    if node_id <= 0 {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid node ID."));
+    }
+    let node=sqlx::query_scalar::<_,Value>(
+        "SELECT data FROM panel_records WHERE collection='nodes' AND id=$1"
+    ).bind(node_id).fetch_optional(&state.pool).await?
+     .ok_or_else(||ApiError::new(StatusCode::NOT_FOUND,"Node not found."))?;
+    if node.get("disabled").and_then(Value::as_bool)==Some(true) {
+        return Err(ApiError::new(StatusCode::CONFLICT,
+            "Отключённый узел не принимает новые команды GeoData."));
+    }
+    if node.get("geoEnabled").and_then(Value::as_bool)!=Some(true) {
+        return Err(ApiError::new(StatusCode::CONFLICT,
+            "Сначала включите GeoData в настройках узла."));
+    }
+    let previous=node.get("geoRefreshRevision").and_then(Value::as_i64).unwrap_or(0);
+    let next=sqlx::query_scalar::<_,i64>(
+        "UPDATE panel_records SET
+           data=jsonb_set(data,'{geoRefreshRevision}',
+             to_jsonb(GREATEST($2::BIGINT,
+               COALESCE((data->>'geoRefreshRevision')::BIGINT,0)+1)),true),
+           updated_at=NOW()
+         WHERE collection='nodes' AND id=$1
+           AND data->>'geoEnabled'='true'
+           AND COALESCE((data->>'disabled')::boolean,false)=false
+           AND COALESCE((data->>'geoRefreshRevision')::BIGINT,0) <= $3
+         RETURNING (data->>'geoRefreshRevision')::BIGINT"
+    ).bind(node_id)
+     .bind(std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+         .unwrap_or_default().as_millis().min(i64::MAX as u128) as i64)
+     .bind(previous)
+     .fetch_optional(&state.pool).await?
+     .ok_or_else(||ApiError::new(StatusCode::CONFLICT,
+         "Настройки узла изменились. Обновите данные и повторите."))?;
+    crate::audit(&state.pool,&actor.username,"node.geodata.refresh.requested",
+        Some("nodes"),Some(node_id),json!({"revision":next})).await;
+    Ok((StatusCode::ACCEPTED,Json(json!({
+        "nodeId":node_id, "refreshRevision":next, "state":"requested",
+        "message":"Нода получит запрос на обновление GeoData при следующей синхронизации."
+    }))))
+}
+
 // A metrics agent is read-only; restarts need a separate, signed control agent.
 // Requests are queued, claimed by exactly one authenticated node, and acknowledged
 // only after systemd reports a confirmed result. No shell commands are accepted.
