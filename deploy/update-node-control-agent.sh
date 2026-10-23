@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Upgrade existing signed control agent without changing node enrollment keys.
 set -Eeuo pipefail
+MODE="${1:-manual}"
+[[ "$MODE" == manual || "$MODE" == --remote ]] || { echo "Unknown update mode" >&2; exit 2; }
 [[ "$EUID" -eq 0 ]] || { echo "Run as root" >&2;exit 1; }
 [[ -r /etc/xmesh-node-metrics/node.key && -f /etc/xmesh-node-metrics.env ]] || {
  echo "Node enrollment missing" >&2;exit 1;
@@ -45,11 +47,15 @@ if [[ -f /usr/local/sbin/xmesh-node-control ]];then
 fi
 cp -p /usr/local/sbin/xmesh-xray-sync /usr/local/sbin/xmesh-xray-sync.bak
 install -d -o root -g root -m 0755 /usr/local/libexec
-install -o root -g root -m 0700 "$policy_tmp" /usr/local/libexec/xmesh-policy-guard.py
-install -o root -g root -m 0700 "$sync_tmp" /usr/local/sbin/xmesh-xray-sync
+install -o root -g root -m 0700 "$policy_tmp" /usr/local/libexec/.xmesh-policy-guard.new
+mv -f /usr/local/libexec/.xmesh-policy-guard.new /usr/local/libexec/xmesh-policy-guard.py
+install -o root -g root -m 0700 "$sync_tmp" /usr/local/sbin/.xmesh-xray-sync.new
+mv -f /usr/local/sbin/.xmesh-xray-sync.new /usr/local/sbin/xmesh-xray-sync
 install -d -o root -g root -m 0700 /var/lib/xmesh-xray-sync
-install -o root -g root -m 0700 "$tmp" /usr/local/sbin/xmesh-node-control
-install -o root -g root -m 0755 "$metrics_tmp" /usr/local/sbin/xmesh-node-metrics
+install -o root -g root -m 0700 "$tmp" /usr/local/sbin/.xmesh-node-control.new
+mv -f /usr/local/sbin/.xmesh-node-control.new /usr/local/sbin/xmesh-node-control
+install -o root -g root -m 0755 "$metrics_tmp" /usr/local/sbin/.xmesh-node-metrics.new
+mv -f /usr/local/sbin/.xmesh-node-metrics.new /usr/local/sbin/xmesh-node-metrics
 install -d -o root -g root -m 0700 /var/lib/xmesh-node-control
 # Existing hardened systemd service must be allowed to persist the shutdown
 # marker; no relaxation of ProtectSystem for any other directory.
@@ -110,6 +116,32 @@ Unit=xmesh-node-user-meter.service
 [Install]
 WantedBy=timers.target
 EOF
+# Install an isolated, fixed updater service. A signed control action invokes
+# this unit; the control worker never runs a URL or script from the API.
+cat >/etc/systemd/system/xmesh-node-agent-upgrade.service <<'EOF'
+[Unit]
+Description=XMesh node agent verified self-update
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/xmesh-update-agent --remote
+User=root
+Group=root
+UMask=0077
+TimeoutStartSec=150s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ReadWritePaths=/usr/local/sbin /usr/local/libexec /etc/systemd/system /var/lib/xmesh-node-control /var/lib/xmesh-xray-sync /run
+EOF
 systemctl daemon-reload
 # The autonomous policy guard only takes effect while the reconciliation timer
 # runs. Upgrading an existing node must reactivate an inactive sync timer.
@@ -128,6 +160,18 @@ systemctl restart xmesh-node-user-meter.timer
 if ! systemctl start xmesh-node-user-meter.service; then
   echo "WARNING: Xray user sampler is not ready. Check: journalctl -u xmesh-node-user-meter.service -n 50 --no-pager" >&2
 fi
-systemctl start xmesh-node-control.service
+# Keep the fixed updater script current for the next panel-driven upgrade.
+# Replace atomically because this script can itself be executing.
+self_tmp="$(mktemp)"
+trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$metrics_tmp" "$self_tmp"' EXIT
+curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 \
+ https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy/update-node-control-agent.sh -o "$self_tmp"
+bash -n "$self_tmp"
+grep -q 'xmesh-node-agent-upgrade.service' "$self_tmp" || { echo "Invalid agent updater" >&2; exit 1; }
+install -o root -g root -m 0700 "$self_tmp" /usr/local/sbin/.xmesh-update-agent.new
+mv -f /usr/local/sbin/.xmesh-update-agent.new /usr/local/sbin/xmesh-update-agent
+if [[ "$MODE" != --remote ]]; then
+ systemctl start xmesh-node-control.service
+fi
 echo "Signed node control, offline policy verifier and pinned Xray synchronizer installed."
 echo "Check reconciliation: systemctl start xmesh-xray-sync.service && journalctl -u xmesh-xray-sync.service -n 30 --no-pager"
