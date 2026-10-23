@@ -104,6 +104,8 @@ payload="$(printf '{"node_id":%s,"cpu_percent":%s,"cpu_steal_percent":%s,"ram_us
 # The unprivileged metrics collector never receives Docker socket access.
 SNAPSHOT=/run/xmesh-node-user-metrics.json
 SNAPSHOT_LOADED=false
+USER_STATS_STATUS=unavailable
+USER_STATS_AT_MS=null
 if [[ -r "$SNAPSHOT" ]];then
   if snapshot_fragment="$(python3 - "$SNAPSHOT" "$XMESH_NODE_ID" <<'PY'
 import json,sys,time
@@ -132,6 +134,8 @@ PY
 )";then
     payload="${payload%\}}$snapshot_fragment}"
     SNAPSHOT_LOADED=true
+    USER_STATS_STATUS=verified
+    USER_STATS_AT_MS="$(date +%s%3N)"
   fi
 fi
 if [[ "$SNAPSHOT_LOADED" != true ]];then
@@ -155,6 +159,8 @@ if [[ "$XRAY_API_ADDRESS" =~ ^127\.0\.0\.1:[0-9]{1,5}$ ]] &&
       if stats_fragment="$(printf '%s' "$stats_json" | python3 /usr/local/libexec/xmesh-xray-stats-collector.py)"; then
         if [[ "$stats_fragment" == ,* ]]; then
           payload="${payload%\}}$stats_fragment}"
+          USER_STATS_STATUS=direct
+          USER_STATS_AT_MS="$(date +%s%3N)"
         fi
       else
         echo "XMesh: Xray user stats response could not be parsed." >&2
@@ -168,6 +174,8 @@ else
   echo "XMesh: Xray StatsService collection is not configured." >&2
 fi
 fi # End fallback for missing root-owned metrics snapshot.
+
+payload="${payload%\}},\"userStatsStatus\":\"$USER_STATS_STATUS\",\"userStatsAtMs\":$USER_STATS_AT_MS}"
 
 [[ -r "$XMESH_METRICS_PRIVATE_KEY" ]] || { echo "Missing readable Ed25519 private key." >&2; exit 1; }
 command -v openssl >/dev/null || { echo "OpenSSL is required for signed metrics" >&2; exit 1; }
