@@ -292,9 +292,8 @@ fn direct_host_node<'a>(host: &Value, profile: &Value, nodes: &'a [Value]) -> Op
  let eligible:Vec<&Value>=nodes.iter().filter(|node|{
   if node.get("disabled").and_then(Value::as_bool)==Some(true)
     || node.get("profileId")!=profile.get("id"){return false}
-  if let Some(ids)=pins {
-   if !ids.iter().any(|id|id.as_i64()==node.get("id").and_then(Value::as_i64)){return false}
-  }
+  if let Some(ids)=pins
+    && !ids.iter().any(|id|id.as_i64()==node.get("id").and_then(Value::as_i64)){return false}
   ["addr","externalAddress","publicAddress"].iter()
    .any(|key|nonempty(node,key).and_then(|s|s.parse::<std::net::IpAddr>().ok())==Some(address))
  }).collect();
@@ -309,8 +308,14 @@ async fn apply_ip_rotation(
    .ok_or_else(||ApiError::new(StatusCode::SERVICE_UNAVAILABLE,"Invalid rotation node identity"))?;
  let user_id=user.get("id").and_then(Value::as_i64).filter(|id|*id>0)
    .ok_or_else(||ApiError::new(StatusCode::SERVICE_UNAVAILABLE,"Invalid subscription user identity"))?;
- let address=crate::node_rotation::resolve_subscription_address(state,node_id,user_id).await?;
- outbound["settings"]["vnext"][0]["address"]=json!(address);
+ // Rotation is an optional delivery enhancement. A stale cursor table or a
+ // transient database failure must not take the entire public subscription
+ // offline. Preserve the already validated host address on failure.
+ match crate::node_rotation::resolve_subscription_address(state,node_id,user_id).await {
+  Ok(address) => outbound["settings"]["vnext"][0]["address"]=json!(address),
+  Err(error) => tracing::error!(node_id,user_id,error=?error,
+    "IP rotation failed; serving the original subscription endpoint"),
+ }
  Ok(())
 }
 
