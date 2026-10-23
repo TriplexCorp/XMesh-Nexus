@@ -58,6 +58,7 @@ XMESH_NODE_ID=$NODE_ID
 XMESH_METRICS_PRIVATE_KEY=/etc/xmesh-node-metrics/node.key
 XMESH_INTERFACE=$INTERFACE
 XMESH_XRAY_API_ADDRESS=127.0.0.1:10085
+XMESH_XRAY_UNIT=xray.service
 EOF
 chmod 0600 /etc/xmesh-node-metrics.env
 
@@ -122,6 +123,60 @@ Unit=xmesh-node-metrics.service
 WantedBy=timers.target
 EOF
 
+# The privileged control worker is separate from unprivileged metrics.
+# It accepts only one hard-coded action (restart_xray) from a signed polling API;
+# no arbitrary command strings or SSH keys are delivered by the panel.
+CONTROL_TMP="$(mktemp)"
+trap 'rm -f "$AGENT_TMP" "$COLLECTOR_TMP" "$CONTROL_TMP"' EXIT
+curl --fail --silent --show-error --location "$RAW_BASE/node-control-agent.sh" -o "$CONTROL_TMP"
+bash -n "$CONTROL_TMP"
+install -o root -g root -m 0700 "$CONTROL_TMP" /usr/local/sbin/xmesh-node-control
+
+cat > /etc/systemd/system/xmesh-node-control.service <<'EOF'
+[Unit]
+Description=XMesh Nexus signed Xray service controller
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/xmesh-node-metrics.env
+ExecStart=/usr/local/sbin/xmesh-node-control
+User=root
+Group=root
+UMask=0077
+TimeoutStartSec=65s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectHostname=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ReadWritePaths=/run
+EOF
+
+cat > /etc/systemd/system/xmesh-node-control.timer <<'EOF'
+[Unit]
+Description=Poll XMesh restart commands with signed node identity
+
+[Timer]
+OnBootSec=25s
+OnUnitActiveSec=20s
+AccuracySec=5s
+Persistent=true
+Unit=xmesh-node-control.service
+
+[Install]
+WantedBy=timers.target
+EOF
+
+systemctl daemon-reload
+systemctl enable --now xmesh-node-control.timer
+
 systemctl daemon-reload
 systemctl enable --now xmesh-node-metrics.timer
 
@@ -129,8 +184,10 @@ echo "XMesh node metrics agent installed."
 echo "Node ID: $NODE_ID"
 echo "Network interface: $INTERFACE (auto detects the default-route interface)"
 echo "The first run saves a baseline. The first real rate sample arrives after the next timer interval."
-echo "Check with: systemctl status xmesh-node-metrics.timer"
-echo "Logs: journalctl -u xmesh-node-metrics.service -n 20 --no-pager"
+echo "Check with: systemctl status xmesh-node-metrics.timer xmesh-node-control.timer"
+echo "Logs: journalctl -u xmesh-node-metrics.service -u xmesh-node-control.service -n 30 --no-pager"
+echo "Control: this agent can restart only the root-configured Xray systemd unit."
+echo "If your Xray uses another unit, set XMESH_XRAY_UNIT in /etc/xmesh-node-metrics.env and restart the control timer."
 echo "Ed25519 public key (for troubleshooting only):"
 echo "$public_key"
 echo "With one-time-token bootstrap, the public key is registered automatically during enrollment."
