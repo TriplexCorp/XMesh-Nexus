@@ -741,7 +741,7 @@ async fn patch_settings(
         .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Настройки должны быть JSON-объектом."))?;
     for key in object.keys() {
         if !matches!(key.as_str(), "brand" | "domain" | "hooks"
-                | "subscriptionDomain" | "subscriptionPath" | "subscriptionBrand"
+                | "subscriptionDomain" | "subscriptionPath" | "subscriptionBrand" | "subscriptionAnnouncement" | "subscriptionUpdateInterval"
                 | "subscriptionDescription" | "subscriptionDescriptionEn" | "subscriptionFooter" | "subscriptionFooterEn" | "subscriptionAccent" | "subscriptionSecondaryAccent"
                 | "subscriptionLanguage" | "subscriptionTheme" | "subscriptionSyncPanelTheme" | "subscriptionPlacement" | "nodePlacement"
                 | "deploymentServerB" | "deploymentServerC" | "subscriptionShowTraffic"
@@ -789,7 +789,7 @@ async fn patch_settings(
             return Err(ApiError::new(StatusCode::BAD_REQUEST, "Путь конфликтует со служебными маршрутами панели."));
         }
     }
-    for (key, max_len) in [("subscriptionBrand", 80), ("subscriptionDescription", 240), ("subscriptionDescriptionEn", 240), ("subscriptionFooter", 160), ("subscriptionFooterEn", 160), ("deploymentServerB", 253), ("deploymentServerC", 253)] {
+    for (key, max_len) in [("subscriptionBrand", 80), ("subscriptionAnnouncement", 240), ("subscriptionDescription", 240), ("subscriptionDescriptionEn", 240), ("subscriptionFooter", 160), ("subscriptionFooterEn", 160), ("deploymentServerB", 253), ("deploymentServerC", 253)] {
         if let Some(value) = object.get(key) {
             let text = value.as_str().ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, format!("Поле {key} должно быть текстом.")))?;
             if text.chars().count() > max_len || text.chars().any(char::is_control) {
@@ -821,6 +821,12 @@ async fn patch_settings(
             && !value.is_boolean()
         {
             return Err(ApiError::new(StatusCode::BAD_REQUEST, format!("Поле {key} должно быть переключателем.")));
+        }
+    }
+    if let Some(value) = object.get("subscriptionUpdateInterval") {
+        let hours = value.as_u64().ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Интервал обновления должен быть целым числом."))?;
+        if !(1..=168).contains(&hours) {
+            return Err(ApiError::new(StatusCode::BAD_REQUEST, "Интервал обновления должен быть от 1 до 168 часов."));
         }
     }
     subscription_settings::validate(object)?;
