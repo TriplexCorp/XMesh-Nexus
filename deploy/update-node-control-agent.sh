@@ -71,6 +71,45 @@ Unit=xmesh-node-control.service
 [Install]
 WantedBy=timers.target
 EOF
+# The signed Xray counters are sampled independently of slow configuration
+# reconciliation. This service does not need the node signing key or API access;
+# it only reads the running managed Xray and publishes a root-owned snapshot.
+cat >/etc/systemd/system/xmesh-node-user-meter.service <<'EOF'
+[Unit]
+Description=XMesh verified per-user Xray traffic sampler
+After=docker.service
+Wants=docker.service
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/xmesh-node-metrics.env
+ExecStart=/usr/bin/python3 /usr/local/libexec/xmesh-policy-guard.py sample --state /var/lib/xmesh-xray-sync --node-id ${XMESH_NODE_ID}
+User=root
+Group=root
+UMask=0077
+TimeoutStartSec=20s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectHostname=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ReadWritePaths=/run /var/lib/xmesh-xray-sync
+EOF
+cat >/etc/systemd/system/xmesh-node-user-meter.timer <<'EOF'
+[Unit]
+Description=Sample Xray per-user traffic every ten seconds
+[Timer]
+OnBootSec=10s
+OnUnitInactiveSec=10s
+AccuracySec=1s
+Unit=xmesh-node-user-meter.service
+[Install]
+WantedBy=timers.target
+EOF
 systemctl daemon-reload
 # The autonomous policy guard only takes effect while the reconciliation timer
 # runs. Upgrading an existing node must reactivate an inactive sync timer.
@@ -84,6 +123,9 @@ fi
 systemctl enable xmesh-node-control.timer
 systemctl restart xmesh-node-control.timer
 systemctl restart xmesh-node-metrics.timer
+systemctl enable xmesh-node-user-meter.timer
+systemctl restart xmesh-node-user-meter.timer
+systemctl start xmesh-node-user-meter.service || true
 systemctl start xmesh-node-control.service
 echo "Signed node control, offline policy verifier and pinned Xray synchronizer installed."
 echo "Check reconciliation: systemctl start xmesh-xray-sync.service && journalctl -u xmesh-xray-sync.service -n 30 --no-pager"
