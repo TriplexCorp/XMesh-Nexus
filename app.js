@@ -962,7 +962,11 @@ function statisticsP(){
  </div>`;
  const init=()=>{
   let generation=0;
+  let refreshing=false;
+  let lastRefresh=0;
   const refresh=async()=>{
+   if(refreshing||cur!=='statistics'||document.hidden)return;
+   refreshing=true;
    const generationAtStart=++generation,status=$('#stats-status');
    const button=$('#stats-refresh');if(button)button.disabled=true;
    if(status)status.textContent='Обновление измерений…';
@@ -1022,12 +1026,12 @@ function statisticsP(){
     }).join(''):'<p class="note">Узлы пока не созданы.</p>';
     if(status)status.textContent=(panelIsEnglish()?'Data updated · ':'Данные обновлены · ')+new Date().toLocaleTimeString(panelIsEnglish()?'en-US':'ru-RU');
    }catch(error){if(status)status.textContent=(panelIsEnglish()?'Unable to refresh statistics: ':'Не удалось обновить статистику: ')+(error.message||(panelIsEnglish()?'API error':'Ошибка API'))}
-   finally{if(button?.isConnected)button.disabled=false}
+   finally{refreshing=false;lastRefresh=Date.now();if(button?.isConnected)button.disabled=false}
   };
   $('#stats-refresh')?.addEventListener('click',()=>{void refresh()});
   $('#stats-period')?.addEventListener('change',()=>{void refresh()});
   void refresh();
-  T.push(setInterval(()=>{if(cur==='statistics')void refresh()},30000));
+  T.push(setInterval(()=>{if(cur==='statistics'&&!document.hidden&&Date.now()-lastRefresh>=30000)void refresh()},5000));
  };
  return Promise.resolve([markup,init]);
 }
