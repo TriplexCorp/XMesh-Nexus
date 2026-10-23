@@ -1845,7 +1845,7 @@ const delUsers=async ids=>{const gone=DB.users.filter(u=>[...ids].some(id=>Strin
 document.addEventListener('input',e=>{
   if(!e.target.matches('form[data-ent="nodes"] [name="rotationIps"]'))return;
   const form=e.target.closest('form'),count=form?.querySelector('[data-node-pool-count]'),feedback=form?.querySelector('[data-node-pool-feedback]');
-  const ips=String(e.target.value).split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean);
+  const ips=String(e.target.value).split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
   if(count)count.textContent='Адресов: '+ips.length+' / 64';
   if(feedback)feedback.textContent=ips.length>64?'Превышен лимит 64 адресов.':new Set(ips).size!==ips.length?'В пуле есть повторяющиеся адреса.':'';
 });
@@ -1854,7 +1854,7 @@ document.addEventListener('click',async e=>{
   if(b=g('[data-node-pool-normalize]')){
     e.preventDefault();
     const form=b.closest('form'),field=form?.querySelector('[name="rotationIps"]');
-    if(field){field.value=[...new Set(String(field.value).split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean))].join('\\n');field.dispatchEvent(new Event('input',{bubbles:true}));toast('Повторы удалены');}
+    if(field){field.value=[...new Set(String(field.value).split(/\r?\n/).map(x=>x.trim()).filter(Boolean))].join('\n');field.dispatchEvent(new Event('input',{bubbles:true}));toast('Повторы удалены');}
     return;
   }
   if(b=g('[data-node-pool-clear]')){
