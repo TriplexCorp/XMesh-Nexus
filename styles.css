@@ -3002,3 +3002,53 @@ dialog.pop:has(.notification-workspace){width:min(480px,calc(100vw - 24px))!impo
 .notification-warning .notification-status-dot{background:var(--wr)}
 .notification-critical .notification-status-dot{background:var(--er)}
 .notification-neutral .notification-status-dot{background:var(--mu)}
+
+/* Compact node editor: content-driven height, no empty 690px spacer.
+   User cards retain their own sizing; node fields and the shared calendar stay intact. */
+dialog#dlg.node-wide{
+  width:min(1460px,calc(100vw - 48px))!important;
+  inline-size:min(1460px,calc(100vw - 48px))!important;
+  max-width:calc(100vw - 48px)!important;
+  max-inline-size:calc(100vw - 48px)!important;
+  min-height:0!important;
+  height:auto!important;
+  max-height:calc(100dvh - 32px)!important;
+  overflow:visible;
+}
+dialog#dlg.node-wide > form.box{
+  min-height:0!important;
+  height:auto!important;
+  max-height:calc(100dvh - 32px)!important;
+  overflow-x:hidden;
+  overflow-y:auto;
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+  padding:clamp(16px,1.25vw,24px)!important;
+}
+dialog#dlg.node-wide > form.box > .node-form-layout{
+  flex:0 0 auto!important;
+  align-content:start;
+  grid-template-columns:minmax(0,1.34fr) minmax(0,1fr) minmax(0,1.08fr);
+  gap:clamp(12px,1vw,20px);
+}
+dialog#dlg.node-wide > form.box > .act{
+  margin-top:0!important;
+  padding-top:10px;
+  border-top:1px solid var(--ln);
+}
+dialog#dlg.node-wide #fe:empty{display:none}
+dialog#dlg.node-wide .node-ip-section,
+dialog#dlg.node-wide .node-billing-section{align-self:start}
+dialog#dlg.node-wide .node-main-section .node-form-grid{row-gap:.75rem}
+dialog#dlg.node-wide .node-billing-fields{row-gap:.7rem}
+dialog#dlg.node-wide .node-ip-section .node-rotation-editor-body textarea{min-height:105px}
+dialog#dlg.node-wide .node-ip-section .node-ip-hint,
+dialog#dlg.node-wide .node-billing-section .node-ip-hint{margin-bottom:.5rem}
+@media(max-width:1150px){
+  dialog#dlg.node-wide > form.box > .node-form-layout{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:750px){
+  dialog#dlg.node-wide{width:calc(100vw - 12px)!important;inline-size:calc(100vw - 12px)!important;max-width:calc(100vw - 12px)!important}
+  dialog#dlg.node-wide > form.box > .node-form-layout{grid-template-columns:minmax(0,1fr)}
+}
