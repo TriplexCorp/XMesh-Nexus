@@ -62,6 +62,13 @@ fn secure_vless(outbound:&Value)->bool {
         _=>false
     }
 }
+/// The actual routing mode saved in SUBSCRIPTION STUDIO / Balancers.
+/// An absent setting does not implicitly turn SMART on when more nodes appear.
+pub(crate) fn smart_enabled(settings:&Value)->bool{
+ let opts=settings.get("subscriptionJson").unwrap_or(&Value::Null);
+ enabled(opts,"smart",false) && option(opts,"balance",&["leastPing","roundRobin","random","off"],"leastPing")!="off"
+}
+
 /// Every proxy passed into this engine must be fully public-side serialized.
 pub(crate) fn build(mut proxies:Vec<Value>,setting:&Value)->Result<Value,String>{
     if proxies.is_empty(){return Err("Нет доступных клиентских подключений".into())}
@@ -81,7 +88,7 @@ pub(crate) fn build(mut proxies:Vec<Value>,setting:&Value)->Result<Value,String>
     let query_strategy=option(opts,"queryStrategy",&["UseIPv4","UseIPv6","UseIP"],"UseIPv4");
     let routing_strategy=option(opts,"routingStrategy",&["AsIs","IPIfNonMatch","IPOnDemand"],"IPIfNonMatch");
     let balance=option(opts,"balance",&["leastPing","roundRobin","random","off"],"leastPing");
-    let smart=enabled(opts,"smart",false);
+    let smart=smart_enabled(setting);
     let sniffing=enabled(opts,"sniffing",true);
     let dns_out=enabled(opts,"dnsRouting",false);
     let socks_port=port(opts,"socksPort",10808);
@@ -221,6 +228,12 @@ mod tests{
    "streamSettings":{"security":"reality","network":"xhttp",
    "realitySettings":{"serverName":"example.com","publicKey":"public","shortId":"aa"},
    "xhttpSettings":{"path":"/test","mode":"stream-up"}}})
+ }
+ #[test] fn explicit_smart_state_controls_feed_delivery(){
+  assert!(!smart_enabled(&json!({})));
+  assert!(!smart_enabled(&json!({"subscriptionJson":{"smart":false,"balance":"leastPing"}})));
+  assert!(!smart_enabled(&json!({"subscriptionJson":{"smart":true,"balance":"off"}})));
+  assert!(smart_enabled(&json!({"subscriptionJson":{"smart":true,"balance":"leastPing"}})));
  }
  #[test] fn balancers_are_opt_in_and_servers_remain_distinct(){
   let config=build(vec![outbound("NL"),outbound("PL")],&json!({})).unwrap();
