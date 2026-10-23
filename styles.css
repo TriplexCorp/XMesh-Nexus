@@ -3359,3 +3359,27 @@ dialog#dlg > .node-setup{
 @media(max-width:600px){
   .nodes-page .nc .node-live-badges{width:100%;justify-content:flex-start;margin-left:0}
 }
+
+/* Dedicated subscription-balancer workspace: separate from XRAY STUDIO. */
+.balancer-workspace{display:grid;gap:1.15rem;max-width:980px;margin:0 auto}
+.balancer-intro{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap}
+.balancer-intro h2{font-size:1.5rem;margin:0}
+.balancer-intro p{color:var(--mu);margin:.4rem 0 0;line-height:1.5}
+.balancer-state{border:1px solid var(--ln);background:var(--s2);color:var(--mu);padding:.45rem .75rem;border-radius:999px;font-weight:650;font-size:.85rem}
+.balancer-state.is-on{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 32%,var(--ln))}
+.balancer-settings{padding:clamp(18px,2.5vw,30px)!important;display:grid;gap:1.5rem}
+.balancer-primary{display:flex;align-items:center;justify-content:space-between;gap:1.2rem}
+.balancer-primary h3{margin:0;font-size:1.12rem}
+.balancer-primary p{margin:.5rem 0 0;max-width:62ch;color:var(--mu);line-height:1.6}
+.balancer-switch{flex:none;cursor:pointer;position:relative;display:inline-flex;align-items:center}
+.balancer-switch input{position:absolute;opacity:0;width:1px;height:1px}
+.balancer-switch-track{position:relative;width:3.25rem;height:1.85rem;background:var(--s2);border:1px solid var(--ln);border-radius:999px;transition:background .2s ease}
+.balancer-switch-track::after{content:"";position:absolute;top:.19rem;left:.19rem;width:1.35rem;height:1.35rem;background:var(--mu);border-radius:50%;transition:transform .2s ease,background .2s ease}
+.balancer-switch input:checked+.balancer-switch-track{background:color-mix(in srgb,var(--a) 28%,var(--s2))}
+.balancer-switch input:checked+.balancer-switch-track::after{transform:translateX(1.4rem);background:var(--a)}
+.balancer-switch input:focus-visible+.balancer-switch-track{outline:2px solid var(--a);outline-offset:3px}
+.balancer-strategy{max-width:420px}
+.balancer-strategy select:disabled{opacity:.5;cursor:not-allowed}
+.balancer-actions{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;border-top:1px solid var(--ln);padding-top:1.15rem}
+.balancer-actions p{margin:0;flex:1;color:var(--mu);font-size:.9rem;line-height:1.5}
+@media(max-width:600px){.balancer-primary{align-items:flex-start}.balancer-actions .btn{width:100%}}
