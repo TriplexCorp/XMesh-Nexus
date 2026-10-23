@@ -14,6 +14,8 @@ struct Heartbeat {
     xray_running: bool,
     #[serde(default)]
     xray_version: Option<String>,
+    #[serde(default, rename="geoData")]
+    geo_data: Option<Value>,
 }
 
 pub async fn heartbeat(
@@ -30,16 +32,23 @@ pub async fn heartbeat(
         v.len()>40 || !v.bytes().all(|b| b.is_ascii_alphanumeric() || b".-+_".contains(&b))) {
         return Err(ApiError::new(StatusCode::BAD_REQUEST,"Invalid Xray version."));
     }
+    if report.geo_data.as_ref().is_some_and(|data|
+        serde_json::to_vec(data).is_ok_and(|bytes|bytes.len()>5000)
+        || !data.is_object()) {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST,"Invalid GeoData telemetry."));
+    }
     node_auth::authenticate_for(
         &state, &headers, report.node_id, &body, "/api/v1/node/heartbeat"
     ).await?;
     sqlx::query(
-        "INSERT INTO node_runtime_heartbeats(node_id,version,router_running,xray_running,xray_version,received_at)
-         VALUES($1,$2,$3,$4,$5,NOW()) ON CONFLICT(node_id) DO UPDATE
+        "INSERT INTO node_runtime_heartbeats(node_id,version,router_running,xray_running,xray_version,geo_data,received_at)
+         VALUES($1,$2,$3,$4,$5,$6,NOW()) ON CONFLICT(node_id) DO UPDATE
          SET version=EXCLUDED.version,router_running=EXCLUDED.router_running,
-         xray_running=EXCLUDED.xray_running,xray_version=EXCLUDED.xray_version,received_at=NOW()"
+         xray_running=EXCLUDED.xray_running,xray_version=EXCLUDED.xray_version,
+         geo_data=EXCLUDED.geo_data,received_at=NOW()"
     ).bind(report.node_id).bind(&report.version).bind(report.router_running)
-    .bind(report.xray_running).bind(&report.xray_version).execute(&state.pool).await?;
+    .bind(report.xray_running).bind(&report.xray_version)
+    .bind(&report.geo_data).execute(&state.pool).await?;
     Ok(Json(json!({"accepted":true})))
 }
 
@@ -51,7 +60,7 @@ pub async fn status(
     ).bind(node_id).fetch_optional(&state.pool).await?;
     if exists.is_none() {return Err(ApiError::new(StatusCode::NOT_FOUND,"Node not found."))}
     let record = sqlx::query(
-        "SELECT version,router_running,xray_running,xray_version,
+        "SELECT version,router_running,xray_running,xray_version,geo_data,
                 (EXTRACT(EPOCH FROM received_at)*1000)::BIGINT AS received_ms,
                 received_at > NOW() - INTERVAL '65 seconds' AS fresh
          FROM node_runtime_heartbeats WHERE node_id=$1"
@@ -66,6 +75,7 @@ pub async fn status(
                 "routerRunning":row.try_get::<bool,_>("router_running")?,
                 "xrayRunning":row.try_get::<bool,_>("xray_running")?,
                 "xrayVersion":row.try_get::<Option<String>,_>("xray_version")?,
+                "geoData":row.try_get::<Option<Value>,_>("geo_data")?,
                 "lastSeenAt":row.try_get::<i64,_>("received_ms")?
             })))
         }
