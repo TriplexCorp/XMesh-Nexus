@@ -110,6 +110,50 @@ pub async fn request_restart(
     Ok((StatusCode::ACCEPTED,Json(json!({"id":row,"nodeId":node_id,"state":"pending"}))))
 }
 
+// Only an authenticated administrator can queue a fixed managed-container update.
+// The node never receives an arbitrary command, image URL, or shell snippet.
+pub async fn request_xray_update(
+    State(state): State<AppState>,
+    axum::extract::Extension(actor): axum::extract::Extension<crate::auth::AuthUser>,
+    Path(node_id): Path<i64>,
+) -> Result<(StatusCode,Json<Value>),ApiError> {
+    crate::require_mutation(&actor)?;
+    if node_id<=0 {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST,"Invalid node ID"));
+    }
+    let node=sqlx::query_scalar::<_,Value>(
+        "SELECT data FROM panel_records WHERE collection='nodes' AND id=$1"
+    ).bind(node_id).fetch_optional(&state.pool).await?
+        .ok_or_else(||ApiError::new(StatusCode::NOT_FOUND,"Node not found"))?;
+    if node.get("disabled").and_then(Value::as_bool)==Some(true) {
+        return Err(ApiError::new(StatusCode::CONFLICT,"Node is disabled."));
+    }
+    let active=sqlx::query_scalar::<_,bool>(
+        "SELECT EXISTS(SELECT 1 FROM node_runtime_heartbeats
+         WHERE node_id=$1 AND received_at>NOW()-INTERVAL '90 seconds'
+           AND version LIKE 'control-v2%')"
+    ).bind(node_id).fetch_one(&state.pool).await?;
+    if !active {
+        return Err(ApiError::new(StatusCode::CONFLICT,
+            "Обновление требует управляющий агент control-v2 на узле."));
+    }
+    // Claiming an update is exclusive with a pending restart.
+    sqlx::query(
+        "UPDATE node_restart_commands SET state='failed',
+         result='Command expired before delivery',finished_at=NOW()
+         WHERE node_id=$1 AND state IN ('pending','claimed')
+           AND requested_at<NOW()-INTERVAL '180 seconds'"
+    ).bind(node_id).execute(&state.pool).await?;
+    let id=sqlx::query_scalar::<_,i64>(
+        "INSERT INTO node_restart_commands(node_id,action,requested_by)
+         VALUES($1,'update_xray',$2) RETURNING id"
+    ).bind(node_id).bind(&actor.username).fetch_one(&state.pool).await?;
+    crate::audit(&state.pool,&actor.username,"node.xray.update.requested",
+        Some("nodes"),Some(node_id),json!({"commandId":id})).await;
+    Ok((StatusCode::ACCEPTED,Json(json!({"id":id,"nodeId":node_id,
+        "action":"update_xray","state":"pending"}))))
+}
+
 pub async fn restart_status(
     State(state): State<AppState>,Path(node_id):Path<i64>,
 )->Result<Json<Value>,ApiError>{
@@ -124,7 +168,7 @@ pub async fn restart_status(
            AND requested_at<NOW()-INTERVAL '180 seconds'"
     ).bind(node_id).execute(&state.pool).await?;
     let item=sqlx::query(
-        "SELECT id,state,result,requested_by,
+        "SELECT id,action,state,result,requested_by,
           (EXTRACT(EPOCH FROM requested_at)*1000)::BIGINT AS requested_ms,
           (EXTRACT(EPOCH FROM finished_at)*1000)::BIGINT AS finished_ms
          FROM node_restart_commands WHERE node_id=$1 ORDER BY id DESC LIMIT 1"
@@ -132,6 +176,7 @@ pub async fn restart_status(
     Ok(Json(match item {
         Some(row)=>json!({
             "id":row.try_get::<i64,_>("id")?,
+            "action":row.try_get::<String,_>("action")?,
             "nodeId":node_id,
             "state":row.try_get::<String,_>("state")?,
             "result":row.try_get::<String,_>("result")?,
@@ -162,13 +207,18 @@ pub async fn poll_restart(
          WHERE node_id=$1 AND state='pending'
            AND requested_at<NOW()-INTERVAL '180 seconds'"
     ).bind(request.node_id).execute(&state.pool).await?;
-    let row=sqlx::query_scalar::<_,i64>(
+    let row=sqlx::query(
         "UPDATE node_restart_commands SET state='claimed',claimed_at=NOW()
          WHERE id=(SELECT id FROM node_restart_commands WHERE node_id=$1
            AND state='pending' ORDER BY id FOR UPDATE SKIP LOCKED LIMIT 1)
-         RETURNING id"
+         RETURNING id,action"
     ).bind(request.node_id).fetch_optional(&state.pool).await?;
-    Ok(Json(json!({"command":row.map(|id|json!({"id":id,"action":"restart_xray"}))})))
+    let command=match row {
+        Some(row)=>Some(json!({"id":row.try_get::<i64,_>("id")?,
+            "action":row.try_get::<String,_>("action")?})),
+        None=>None
+    };
+    Ok(Json(json!({"command":command})))
 }
 
 #[derive(Deserialize)]
