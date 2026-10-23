@@ -2987,3 +2987,18 @@ dialog#dlg.node-wide .node-form-layout{
   dialog#dlg.node-wide .node-form-layout{grid-template-columns:minmax(0,1fr)}
   dialog#dlg.node-wide > form.box,dialog#dlg.user-modal > .box.user-canvas{min-height:0}
 }
+
+/* Unified, grouped infrastructure and subscription notifications. */
+dialog.pop:has(.notification-workspace){width:min(480px,calc(100vw - 24px))!important;max-width:480px}
+.notification-workspace{min-width:0;max-height:min(75dvh,680px);overflow-y:auto}
+.notification-sections{display:grid;gap:1rem}
+.notification-group{min-width:0;display:grid;gap:.5rem}
+.notification-group h3{display:flex;align-items:center;justify-content:space-between;margin:.35rem 0 0;font-size:.8rem;font-weight:760;color:var(--mu)}
+.notification-group h3 span{font-variant-numeric:tabular-nums;color:var(--tx);background:var(--s2);border:1px solid var(--ln);padding:.1rem .4rem;border-radius:999px}
+.notification-item{display:grid;grid-template-columns:8px minmax(0,1fr);gap:.75rem;align-items:start;padding:.8rem;border:1px solid var(--ln);border-radius:var(--ui-radius);background:var(--s2);min-width:0}
+.notification-item b{display:block;font-size:.82rem;overflow-wrap:anywhere}
+.notification-item p{margin:.28rem 0 0;color:var(--mu);font-size:.74rem;line-height:1.5;overflow-wrap:anywhere}
+.notification-status-dot{height:8px;width:8px;margin-top:.35rem;border-radius:50%;background:var(--mu)}
+.notification-warning .notification-status-dot{background:var(--wr)}
+.notification-critical .notification-status-dot{background:var(--er)}
+.notification-neutral .notification-status-dot{background:var(--mu)}
