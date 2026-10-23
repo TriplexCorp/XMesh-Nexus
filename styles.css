@@ -4772,3 +4772,15 @@ dialog#dlg.node-wide .node-main-section .country-search{padding-right:48%;height
 dialog#dlg.node-wide .node-main-section .country-selected{grid-area:1/1;justify-self:end;align-self:center;z-index:1;max-width:47%;padding:0 12px 0 10px;pointer-events:none;border-left:1px solid var(--ln);min-height:1.5rem;white-space:nowrap}
 dialog#dlg.node-wide .node-main-section .country-selected [data-country-label]{font-size:.8rem}
 dialog#dlg.node-wide .node-main-section .country-options{left:0;right:auto;width:min(360px,100%);max-height:260px}
+
+/* Country picker: selected value is a button, search lives inside the dropdown. */
+dialog#dlg.node-wide .node-main-section .country-picker-dropdown{display:block;position:relative}
+dialog#dlg.node-wide .node-main-section .country-trigger{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:2.65rem;padding:0 12px;background:var(--s2);color:var(--tx);border:1px solid var(--ln);border-radius:.72rem;cursor:pointer;font:inherit;text-align:left}
+dialog#dlg.node-wide .node-main-section .country-trigger:hover{border-color:var(--a)}
+dialog#dlg.node-wide .node-main-section .country-trigger-value{display:flex;align-items:center;gap:9px;min-width:0}
+dialog#dlg.node-wide .node-main-section .country-trigger-value [data-country-label]{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+dialog#dlg.node-wide .node-main-section .country-trigger-chevron{font-size:1.25rem;color:var(--mu)}
+dialog#dlg.node-wide .node-main-section .country-dropdown{position:absolute;z-index:120;top:calc(100% + 6px);left:0;width:max(100%,300px);max-width:min(380px,calc(100vw - 40px));padding:8px;background:var(--s1);border:1px solid var(--ln);border-radius:12px;box-shadow:0 16px 40px #0007}
+dialog#dlg.node-wide .node-main-section .country-dropdown[hidden]{display:none!important}
+dialog#dlg.node-wide .node-main-section .country-dropdown .country-search{padding:10px 12px;width:100%;min-height:40px;height:40px}
+dialog#dlg.node-wide .node-main-section .country-dropdown .country-options{position:static;width:100%;max-width:none;max-height:260px;overflow-y:auto;margin-top:6px;box-shadow:none;border:0}
