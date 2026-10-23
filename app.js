@@ -438,6 +438,49 @@ const panelConfirm=(message,{danger=false,title='Подтверждение',con
  dialog.addEventListener('click',ev=>{if(ev.target===dialog)finish(false)});
  dialog.showModal();cancel.focus();
 });
+// Explicit release picker, preserving the existing page and its scroll state.
+const selectNodeXrayRelease=(node,releases,installed)=>new Promise(resolve=>{
+ const dialog=document.createElement('dialog');dialog.className='xm-action-confirm xray-release-dialog';
+ const box=document.createElement('div');box.className='xm-action-confirm-box';
+ const title=document.createElement('h2');title.textContent='Версия Xray · '+(node.name||'Узел');
+ const description=document.createElement('p');
+ description.textContent='Выберите официальный релиз, включая предварительные версии. Установка может прервать соединения. Текущая версия: '+(installed||'неизвестно');
+ const label=document.createElement('label');label.className='f';label.textContent='Версия для установки';
+ const select=document.createElement('select');select.className='xray-release-select';
+ select.setAttribute('aria-label','Выбрать версию Xray');
+ for(const r of releases){
+  if(!/^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/.test(r.version))continue;
+  const opt=document.createElement('option');opt.value=r.version;
+  opt.textContent=r.version+(r.prerelease?' · Pre-release':' · Stable')+
+    (r.version===installed?' · Установлена':'');
+  select.append(opt);
+ }
+ const info=document.createElement('p');info.className='xray-release-info';
+ const actions=document.createElement('div');actions.className='xm-action-confirm-actions';
+ const cancel=document.createElement('button');cancel.type='button';cancel.className='gh';cancel.textContent='Отмена';
+ const accept=document.createElement('button');accept.type='button';accept.className='btn';accept.textContent='Установить версию';
+ const link=document.createElement('a');link.target='_blank';link.rel='noopener noreferrer';link.textContent='Релиз на GitHub ↗';
+ const update=()=>{
+  const item=releases.find(x=>x.version===select.value);
+  info.textContent=item?(item.prerelease?'Предварительный релиз · ':'Стабильный релиз · ')+
+    (item.published_at||'Дата не указана'):'Выберите версию';
+  const safe=String(item?.url||'');
+  if(/^https:\/\/github\.com\/XTLS\/Xray-core\/releases\/tag\/[A-Za-z0-9._+%-]+$/i.test(safe)){
+   link.href=safe;link.hidden=false;
+  }else{link.removeAttribute('href');link.hidden=true}
+  accept.disabled=!item||item.version===installed;
+ };
+ select.addEventListener('change',update);update();
+ label.append(select);box.append(title,description,label,info,link,actions);
+ actions.append(cancel,accept);dialog.append(box);document.body.append(dialog);
+ let finished=false;
+ const finish=v=>{if(finished)return;finished=true;resolve(v);dialog.close();dialog.remove()};
+ cancel.addEventListener('click',()=>finish(null));
+ accept.addEventListener('click',()=>finish(select.value));
+ dialog.addEventListener('cancel',e=>{e.preventDefault();finish(null)});
+ dialog.addEventListener('click',e=>{if(e.target===dialog)finish(null)});
+ dialog.showModal();select.focus();
+});
 const confirmBox=(h,ok,fn)=>{CF=fn;modal(`<div class="box"><h2>${h}</h2><div class="act"><button class="gh" data-x>Отмена</button><button class="btn" data-cf>${ok}</button></div></div>`)};
 let tt;const toast=(m,al,fn)=>{
  // A manual popover participates in the browser top layer above modal dialogs.
@@ -2710,13 +2753,18 @@ document.addEventListener('click',async e=>{
       if(!runtime.connected||!String(runtime.version||'').startsWith('control-v2')){
         throw new Error('Нужен управляющий агент control-v2. Переустановите агент узла.');
       }
+      const catalog=await backendRequest('/api/v1/nodes/xray-releases');
+      const releases=Array.isArray(catalog.items)?catalog.items:[];
+      if(!releases.length)throw new Error('Не удалось получить официальные релизы Xray.');
+      const version=await selectNodeXrayRelease(node,releases,runtime.xrayVersion);
+      if(!version)return;
       const confirmed=await panelConfirm(
-        'Установить актуальный образ Xray на «'+node.name+'»? Обновление доступно только для xmesh-managed-xray. Перед запуском агент проверит конфигурацию, а при неудаче восстановит предыдущий образ. Активные подключения могут прерваться.',
-        {title:'Обновление Xray на узле',confirmLabel:'Обновить Xray'}
+        'Установить Xray '+version+' на «'+node.name+'»? Управляемый Docker-агент проверит конфигурацию и при ошибке попытается восстановить предыдущий образ. Активные подключения могут прерваться.',
+        {title:'Подтвердить установку Xray '+version,confirmLabel:'Установить '+version}
       );
       if(!confirmed)return;
       const request=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/xray-update',{
-        method:'POST',body:JSON.stringify({})
+        method:'POST',body:JSON.stringify({version})
       });
       toast('Обновление поставлено в очередь. Ожидаем результат узла.');
       const deadline=Date.now()+180000;
