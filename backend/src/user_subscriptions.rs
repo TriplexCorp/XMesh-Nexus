@@ -232,7 +232,7 @@ pub async fn create(State(state):State<AppState>,Extension(actor):Extension<Auth
  // A link can exist before nodes are fully configured. Report that distinction
  // explicitly instead of presenting an unusable subscription as ready.
  let readiness=match collect_user_outbounds(&state,&_user,"generic").await {
-  Ok((links,_))=>json!({"ready":true,"connections":links.len()}),
+  Ok(outbounds)=>json!({"ready":true,"connections":outbounds.len()}),
   Err(error)=>{
    tracing::warn!(user_id=id, reason=%error.message,"Subscription link created without usable endpoints");
    json!({"ready":false,"connections":0,"warning":error.message})
