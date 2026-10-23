@@ -1774,7 +1774,7 @@ function hostEditorRefresh(form,changedProfile=false){
       form.querySelectorAll('[name="nodes"]').forEach(input=>{input.checked=String(input.value)===String(node.id)});
       for(const [key,value] of [['address',node.addr||''],['port',node.port||443],['remark',node.name||'']]){
         const input=form.elements.namedItem(key);
-        if(input&&!String(input.value||'').trim())input.value=String(value);
+        if(input&&(key==='port'||!String(input.value||'').trim()))input.value=String(value);
       }
     }
   }
