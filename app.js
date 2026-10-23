@@ -1819,6 +1819,20 @@ function hostEditorRefresh(form,changedProfile=false){
   const security=stream.security||'none';
   const reality=stream.realitySettings||{};
   const tls=stream.tlsSettings||{};
+  // Show only client overrides relevant to the selected transport/security.
+  for(const [name,show] of Object.entries({
+    sni:security==='reality'||security==='tls',
+    host:['ws','xhttp'].includes(stream.network),
+    path:['ws','xhttp'].includes(stream.network),
+    fp:['reality','tls'].includes(security),
+    publicKey:security==='reality',shortId:security==='reality',spiderX:security==='reality',
+    alpn:security==='tls',serviceName:stream.network==='grpc',
+    clientEncryption:inbound?.protocol==='vless'
+  })){
+    const input=form.elements.namedItem(name);
+    const wrapper=input?.closest('.f');
+    if(wrapper)wrapper.hidden=!show;
+  }
   const xhttp=stream.xhttpSettings||{};
   const val=k=>String(get(k)?.value||'').trim();
   const securityName=security==='reality'?'REALITY':security==='tls'?'TLS':security;
