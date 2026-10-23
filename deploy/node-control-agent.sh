@@ -63,6 +63,16 @@ restart_xray(){
 }
 # Only the specifically managed container may be upgraded. A non-managed
 # Xray, arbitrary Docker container or remote-selected image is never modified.
+persist_pinned_xray_image(){
+ local image="$1"
+ [[ "$image" =~ ^ghcr[.]io/xtls/xray-core:[0-9]+[.][0-9]+[.][0-9]+([._+-][A-Za-z0-9._+-]+)?$ ]] || return 1
+ local state=/var/lib/xmesh-xray-sync
+ local tmp
+ tmp="$(mktemp "$state/pin.XXXXXXXX")" || return 1
+ printf '%s\n' "$image" > "$tmp"
+ chmod 600 "$tmp"
+ mv -f "$tmp" "$state/pinned-image"
+}
 update_managed_xray(){
  local version="${1:?Pinned Xray version required}"
  [[ "$version" =~ ^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$ ]] || {
@@ -94,6 +104,7 @@ update_managed_xray(){
  new_image="$(docker image inspect -f '{{.Id}}' "$image")" || return 1
  [[ "$new_image" =~ ^sha256:[0-9a-f]{64}$ ]] || { detail='Invalid new image identity';return 1; }
  if [[ "$old_image" == "$new_image" ]];then
+  persist_pinned_xray_image "$image" || { detail='Failed to persist image pin';return 1; }
   detail="Xray $version already installed";return 0
  fi
  if ! timeout 25 docker run --rm --network none --user 0:0 --cap-drop ALL \
@@ -109,6 +120,9 @@ update_managed_xray(){
   run -config /etc/xray/config.json >/dev/null;then
    sleep 3
    if docker inspect -f '{{.State.Running}}' "$name" 2>/dev/null | grep -qx true;then
+    if ! persist_pinned_xray_image "$image";then
+     detail='Xray installed but image pin could not be persisted';return 1
+    fi
     detail="Xray $version installed and running";return 0
    fi
  fi
