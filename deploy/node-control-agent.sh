@@ -51,7 +51,7 @@ heartbeat(){
  fi
  version="$(printf '%s\n' "$raw" | awk 'NR==1 && $1=="Xray" {print $2}')"
  [[ "$version" =~ ^[A-Za-z0-9._+-]{1,40}$ ]] || version=''
- signed_post '/api/v1/node/heartbeat' "{\"node_id\":$XMESH_NODE_ID,\"version\":\"control-v2.0\",\"xray_version\":\"$version\",\"xray_running\":$xr,\"router_running\":$xr}" >/dev/null
+ signed_post '/api/v1/node/heartbeat' "{\"node_id\":$XMESH_NODE_ID,\"version\":\"control-v3.0\",\"xray_version\":\"$version\",\"xray_running\":$xr,\"router_running\":$xr}" >/dev/null
 }
 restart_xray(){
  if docker inspect xmesh-managed-xray >/dev/null 2>&1;then
