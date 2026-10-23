@@ -1,7 +1,7 @@
 /* Context-aware non-destructive JSON editing tools. */
 window.XMeshJsonTools=(()=>{
 'use strict';
-function setup(root,{toast,realityKeys}){
+function setup(root,{toast,realityKeys,apiRequest}){
 const area=root.querySelector('[data-xm="manual"]');
 const host=root.querySelector('[data-xm-tools]');
 if(!area||!host)return;
@@ -371,28 +371,30 @@ const operations={
    ensureDialogs();
    const selected=await chooseInbound();if(!selected)return;
    const inbound=getInbound(parse(),selected.index);
-   if(inbound.protocol!=='vless')throw Error('VLESS Encryption доступен только для VLESS');
-   const response=await dialog.request({
-    title:'VLESS Encryption — сервер и клиент',
-    description:'Вставьте парные значения из xray vlessenc. Серверный decryption никогда не отправляется в подписку. Клиентский encryption передаётся в VLESS outbound.',
-    confirmLabel:'Применить',
-    fields:[
-     {name:'decryption',label:'Серверный decryption',wide:true,value:inbound.settings?.decryption||'none',required:true},
-     {name:'encryption',label:'Клиентский encryption',wide:true,value:inbound.xmesh?.clientEncryption||'none',required:true}
-    ]
-   });
-   if(!response)return;
-   const server=response.decryption.trim(),client=response.encryption.trim();
-   if((server==='none')!==(client==='none'))throw Error('Для VLESS Encryption укажите оба парных значения или none в обоих полях.');
-   if(!server||!client)throw Error('Оба значения обязательны.');
-   if(server!=='none'&&(!server.startsWith('mlkem768x25519plus.')||!client.startsWith('mlkem768x25519plus.')))throw Error('Ожидается парная конфигурация ML-KEM-768 из xray vlessenc.');
-   if(area.value!==selected.source){notify('JSON изменился; повторите действие.');return}
+   if(inbound.protocol!=='vless')throw Error('VLESS Encryption доступен только для VLESS.');
+   if(typeof apiRequest!=='function')throw Error('API генерации ключей недоступен.');
+   if(inbound.settings?.decryption&&inbound.settings.decryption!=='none'){
+    const proceed=await dialog.confirm({
+     title:'Заменить VLESS Encryption?',
+     description:'Новая пара ключей отключит существующих клиентов до обновления подписки.',
+     confirmLabel:'Сгенерировать новые ключи',cancelLabel:'Отмена',danger:true
+    });
+    if(!proceed)return;
+   }
+   if(area.value!==selected.source){notify('JSON изменился. Повторите действие.');return}
+   status('Генерация ML-KEM-768 через установленный Xray-core…');
+   const result=await apiRequest('/api/v1/core/vlessenc',{method:'POST'});
+   const server=result?.mlkem768?.decryption,client=result?.mlkem768?.encryption;
+   if(typeof server!=='string'||typeof client!=='string'||!server.startsWith('mlkem768x25519plus.')||!client.startsWith('mlkem768x25519plus.'))
+    throw Error('Xray-core не вернул корректную пару ML-KEM-768.');
+   if(area.value!==selected.source)throw Error('JSON изменился во время генерации. Ключи не применены.');
    mutate(doc=>{
-    const ib=getInbound(doc,selected.index);if(ib.tag!==selected.tag||ib.protocol!=='vless')throw Error('Inbound изменился');
+    const ib=getInbound(doc,selected.index);
+    if(ib.tag!==selected.tag||ib.protocol!=='vless')throw Error('Выбранный inbound изменился.');
     (ib.settings??={users:[]}).decryption=server;
-    ib.xmesh??={};ib.xmesh.clientEncryption=client;
-   },'VLESS Encryption: сервер и клиент настроены');
-  }catch(e){notify(e.message)}
+    (ib.xmesh??={}).clientEncryption=client;
+   },'ML-KEM-768 сгенерирован: серверный и клиентский ключи записаны в JSON');
+  }catch(e){status('Ошибка генерации: '+e.message);notify(e.message)}
  },
  async finalmask(){
   try{
