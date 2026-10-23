@@ -272,9 +272,8 @@ pub(crate) fn validate_client_balancers(value:&Value)->Result<(),String>{
     let secs=value.strip_suffix('s').and_then(|v|v.parse::<u64>().ok()).unwrap_or(0);
     if secs<min||secs>max {return Err(format!("Некорректное значение {field}"))}
    }
-   if let Some(n)=obj.get("sampling"){
-    if !n.as_u64().is_some_and(|v|(1..=50).contains(&v)){return Err("sampling должен быть от 1 до 50".into())}
-   }
+   if let Some(n)=obj.get("sampling")
+    && !n.as_u64().is_some_and(|v|(1..=50).contains(&v)){return Err("sampling должен быть от 1 до 50".into())}
    for field in ["probeURL","connectivity"]{
     if let Some(value)=obj.get(field){
      let url=value.as_str().ok_or("Адрес проверки должен быть строкой")?;
