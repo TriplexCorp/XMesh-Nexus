@@ -3506,10 +3506,16 @@ $('#theme').onclick=()=>{C.theme=document.documentElement.dataset.theme=='dark'?
 const nodeNotificationTitle=node=>flagView(node.flag,'notification-country-flag')+
   '<span class="notification-node-label">'+esc(node.name||'Узел')+
   (node.hosting?.trim()?'<small>'+esc(node.hosting.trim())+'</small>':'')+'</span>';
+const notificationKey='xmesh-notifications-v1';
+const notificationState=(()=>{try{return JSON.parse(localStorage.getItem(notificationKey)||'{}')}catch{return {}}})();
+const saveNotifications=()=>{try{localStorage.setItem(notificationKey,JSON.stringify(notificationState))}catch{}};
+const notificationId=item=>[item.group,item.node?.id??item.title??'',item.group==='Аренда серверов'?'rent':item.group==='Лимиты трафика'?'quota':item.message?.split(' · ')[0]].join('|');
+const notificationDate=ms=>new Date(ms).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 $('#bell').onclick=()=>{
  const button=$('#bell');
  modal('<div class="box notification-workspace">'+
   '<div class="bar2 notification-header"><div class="notification-heading"><h2>Уведомления</h2><small>События инфраструктуры</small></div>'+
+  '<button type="button" class="gh sm" data-notifications-clear title="Очистить все уведомления">'+ic('trash')+' Очистить все</button>'+ 
   '<button type="button" class="gh sm" data-notifications-refresh aria-label="Обновить уведомления" title="Обновить">'+ic('redo')+'</button>'+
   '<button type="button" class="ia" data-x aria-label="Закрыть">'+ic('x')+'</button></div>'+
   '<div class="notification-sections" data-notifications-content role="status" aria-live="polite">'+
@@ -3581,7 +3587,15 @@ $('#bell').onclick=()=>{
    if(u.expireAt&&u.expireAt>today&&u.expireAt-today<2*DAY)return [{group:'Пользователи',severity:'warning',title:u.username,message:'Подписка скоро истечёт · '+left(u.expireAt)}];
    return [];
   });
-  const items=[...quotas,...rent,...infrastructure,...expiringUsers];
+  const current=[...quotas,...rent,...infrastructure,...expiringUsers];
+  const active=new Set(current.map(notificationId));
+  for(const key of Object.keys(notificationState))if(!active.has(key))delete notificationState[key];
+  for(const item of current){
+   const key=notificationId(item);
+   if(!notificationState[key])notificationState[key]={at:today,hidden:false};
+  }
+  saveNotifications();
+  const items=current.filter(item=>!notificationState[notificationId(item)]?.hidden);
   const groups=['Лимиты трафика','Состояние инфраструктуры','Аренда серверов','Пользователи'];
   const body=groups.map(group=>{
    const entries=items.filter(item=>item.group===group);
@@ -3590,12 +3604,35 @@ $('#bell').onclick=()=>{
     entries.map(item=>'<div class="notification-item notification-'+item.severity+'">'+
      '<span class="notification-status-dot" aria-hidden="true"></span><div>'+
      (item.node?'<div class="notification-title">'+nodeNotificationTitle(item.node)+'</div>':'<b>'+esc(item.title||'Уведомление')+'</b>')+
-     '<p>'+esc(item.message)+'</p></div></div>').join('')+'</section>';
+     '<p>'+esc(item.message)+'</p><small class="notification-when">Когда: '+esc(notificationDate(notificationState[notificationId(item)].at))+'</small></div>'+
+     '<button type="button" class="ia notification-dismiss" data-notification-dismiss="'+esc(notificationId(item))+'" aria-label="Удалить уведомление" title="Удалить">'+ic('x')+'</button></div>').join('')+'</section>';
   }).join('');
   output.innerHTML=body||'<p class="note notification-empty">Новых уведомлений нет. Доступные ноды не сообщают об ошибках.</p>';
   if(typeof showNodeQuotaBell==='function')showNodeQuotaBell();
   busy=false;refresh.disabled=false;
  }
+ output.addEventListener('click',event=>{
+  const button=event.target.closest('[data-notification-dismiss]');
+  if(!button)return;
+  const key=button.dataset.notificationDismiss;
+  if(notificationState[key])notificationState[key].hidden=true;
+  saveNotifications();
+  button.closest('.notification-item')?.remove();
+  for(const group of output.querySelectorAll('.notification-group')){
+   const count=group.querySelectorAll('.notification-item').length;
+   if(!count)group.remove();
+   else {const label=group.querySelector('h3 span');if(label)label.textContent=String(count)}
+  }
+  if(!output.querySelector('.notification-item'))output.innerHTML='<p class="note notification-empty">Уведомления очищены.</p>';
+ });
+ workspace.querySelector('[data-notifications-clear]')?.addEventListener('click',()=>{
+  for(const item of output.querySelectorAll('[data-notification-dismiss]')){
+   const key=item.dataset.notificationDismiss;
+   if(notificationState[key])notificationState[key].hidden=true;
+  }
+  saveNotifications();
+  output.innerHTML='<p class="note notification-empty">Уведомления очищены.</p>';
+ });
  refresh.addEventListener('click',()=>{void updateNotifications()});
  void updateNotifications();
 };
