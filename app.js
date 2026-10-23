@@ -324,7 +324,7 @@ function field(f,v){
   else i=`<input name="${f.k}" type="${t=='num'?'number':t=='date'?'date':t=='password'?'password':'text'}"${t=='num'?' min="0" step="any"':''}${f.req?' required':''}${f.pat?` pattern="${f.pat}"`:''} value="${esc(t=='date'&&v?new Date(v).toLocaleDateString('sv'):v)}" placeholder="${esc(f.ph||'')}" autocomplete="off">`;
   const g=t=='multi'?'div':'label';return `<${g} class="f"><span>${f.l}</span>${i}${f.h?`<small>${f.h}</small>`:''}</${g}>`;
 }
-function read(fs,form){const d={};fs.forEach(f=>{const e=$$(`[name="${f.k}"]`,form);if(f.t=='multi')d[f.k]=e.filter(x=>x.checked).map(x=>isNaN(+x.value)?x.value:+x.value);else if(f.t=='bool')d[f.k]=e[0].checked;else if(f.t=='num')d[f.k]=+e[0].value||0;else if(f.t=='date')d[f.k]=e[0].value?new Date(e[0].value+'T23:59:59').getTime():null;else if(f.t=='sel')d[f.k]=isNaN(+e[0].value)?e[0].value:+e[0].value;else d[f.k]=e[0].value.trim()});return d}
+function read(fs,form){const d={};fs.forEach(f=>{const e=$$(`[name="${f.k}"]`,form);if(f.t=='multi')d[f.k]=e.filter(x=>x.checked).map(x=>isNaN(+x.value)?x.value:+x.value);else if(f.t=='bool')d[f.k]=e[0].checked;else if(f.t=='num')d[f.k]=+e[0].value||0;else if(f.t=='date')d[f.k]=e[0].value?new Date(e[0].value+'T23:59:59').getTime():null;else if(f.t=='sel')d[f.k]=f.k==='fp'?e[0].value:(isNaN(+e[0].value)?e[0].value:+e[0].value);else d[f.k]=e[0].value.trim()});return d}
 
 /* ================= ОБОЛОЧКА ================= */
 const dlg=$('#dlg');let CF;
