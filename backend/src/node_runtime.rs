@@ -361,13 +361,13 @@ fn provision_proxy_users(config:&mut Value,users:&[Value],squads:&[Value],now_ms
     let inbounds=config.get_mut("inbounds").and_then(Value::as_array_mut)
         .ok_or_else(||ApiError::new(StatusCode::CONFLICT,"Profile has no inbounds."))?;
     for inbound in inbounds {
-        let protocol=inbound.get("protocol").and_then(Value::as_str).unwrap_or("");
-        if !["vless","vmess","trojan","shadowsocks","hysteria"].contains(&protocol){continue}
+        let protocol=inbound.get("protocol").and_then(Value::as_str).unwrap_or("").to_owned();
+        if !["vless","vmess","trojan","shadowsocks","hysteria"].contains(&protocol.as_str()){continue}
         let ss_method=inbound.get("settings").and_then(|v|v.get("method"))
             .and_then(Value::as_str).unwrap_or("").to_owned();
         if protocol=="shadowsocks" && ss_method.is_empty(){continue}
         let tag=inbound.get("tag").and_then(Value::as_str).unwrap_or("");
-        if tag.is_empty(){return Err(ApiError::new(StatusCode::CONFLICT,"VLESS inbound has no tag."))}
+        if tag.is_empty(){return Err(ApiError::new(StatusCode::CONFLICT,"Proxy inbound has no tag."))}
         let mut allowed=std::collections::HashSet::new();
         for squad in squads {
             let selected=squad.get("inb").and_then(Value::as_array)
@@ -391,7 +391,7 @@ fn provision_proxy_users(config:&mut Value,users:&[Value],squads:&[Value],now_ms
                 }else{format!("%{b:02X}")}
             }).collect::<String>();
             let email=format!("xmesh-u{record_id}--{encoded_tag}");
-            let entry=match protocol {
+            let entry=match protocol.as_str() {
                 "vless"|"vmess"=>json!({"id":uuid.to_string(),"level":0,"email":email}),
                 "trojan"=>json!({"password":uuid.to_string(),"level":0,"email":email}),
                 "hysteria"=>json!({"auth":uuid.to_string(),"level":0,"email":email}),
@@ -409,7 +409,7 @@ fn provision_proxy_users(config:&mut Value,users:&[Value],squads:&[Value],now_ms
             entries.push(entry);
         }
         let settings=inbound.get_mut("settings").and_then(Value::as_object_mut)
-            .ok_or_else(||ApiError::new(StatusCode::CONFLICT,"VLESS inbound settings missing."))?;
+            .ok_or_else(||ApiError::new(StatusCode::CONFLICT,"Proxy inbound settings missing."))?;
         if protocol=="vless"{
             // Server VLESS uses clients; never insert outbound vnext users.
             if settings.get("decryption").and_then(Value::as_str)
