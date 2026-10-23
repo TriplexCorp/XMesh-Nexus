@@ -345,8 +345,6 @@ pub(crate) fn build_feed(proxies:Vec<Value>,settings:&Value)->Result<Value,Strin
     // probeTimeout / sampling / connectivity are stored in panel metadata.
     // Xray core does not support them as top-level observatory settings.
    }
-   config["xmeshBalancer"]=json!({"tag":row["tag"],"selector":row["selector"],
-     "hideSelectedInbounds":row["hideSelectedInbounds"]});
    if row["hideSelectedInbounds"]==true {
     hidden.extend(source_ids.iter().map(|s|s.to_string()));
    }
