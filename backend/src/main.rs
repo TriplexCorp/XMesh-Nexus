@@ -569,23 +569,42 @@ async fn delete_record(
 ) -> Result<Json<Value>, ApiError> {
     validate_collection(&collection)?;
     enforce_collection(&actor, &collection, true)?;
+    let mut tx = state.pool.begin().await?;
+    // When deleting a node, detach it from public hosts in the same transaction.
+    // Preserve host records and their other node associations.
+    if collection == "nodes" {
+        let hosts = sqlx::query("SELECT id, data FROM panel_records WHERE collection = 'hosts' FOR UPDATE")
+            .fetch_all(&mut *tx).await?;
+        for host in hosts {
+            let host_id: i64 = host.try_get("id")?;
+            let mut data: Value = host.try_get("data")?;
+            if let Some(nodes) = data.get_mut("nodes").and_then(Value::as_array_mut) {
+                let count = nodes.len();
+                nodes.retain(|v| v.as_i64() != Some(id) && v.as_str() != Some(&id.to_string()));
+                if nodes.len() != count {
+                    sqlx::query("UPDATE panel_records SET data = $1 WHERE collection = 'hosts' AND id = $2")
+                        .bind(&data).bind(host_id).execute(&mut *tx).await?;
+                }
+            }
+        }
+    }
     let row = sqlx::query(
         "DELETE FROM panel_records WHERE collection = $1 AND id = $2 RETURNING id, data",
     )
     .bind(&collection)
     .bind(id)
-    .fetch_optional(&state.pool)
+    .fetch_optional(&mut *tx)
     .await?
     .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Запись не найдена."))?;
     let result = row_to_record(&row)?;
     if collection == "nodes" {
         sqlx::query("DELETE FROM node_metric_keys WHERE node_id = $1")
-            .bind(id).execute(&state.pool).await?;
+            .bind(id).execute(&mut *tx).await?;
         sqlx::query("DELETE FROM node_metric_nonces WHERE node_id = $1")
             .bind(id).execute(&state.pool).await?;
         sqlx::query("DELETE FROM node_ip_rotation_cursors WHERE node_id = $1")
             .bind(id)
-            .execute(&state.pool)
+            .execute(&mut *tx)
             .await?;
     } else if collection == "users" {
         sqlx::query("DELETE FROM node_ip_rotation_cursors WHERE user_id = $1")
@@ -593,6 +612,7 @@ async fn delete_record(
             .execute(&state.pool)
             .await?;
     }
+    tx.commit().await?;
     audit(&state.pool, &actor.username, "delete", Some(&collection), Some(id), json!({})).await;
     Ok(Json(result))
 }
