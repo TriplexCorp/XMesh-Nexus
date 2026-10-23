@@ -1121,11 +1121,13 @@ async function loadUserSubscription(id){
     if(!target.isConnected)return;
     if(result.token&&result.url){
       const url=new URL(result.url,location.origin).href;
-      target.innerHTML='<label class="f"><span>'+(panelIsEnglish()?'Subscription URL':'Ссылка подписки')+'</span><input type="text" class="user-subscription-url" value="'+esc(url)+'" readonly spellcheck="false" autocomplete="off"></label>'+
-        '<div class="act"><button type="button" class="btn sm" data-user-sub-copy="'+id+'">'+ic('copy')+(panelIsEnglish()?'Copy':'Скопировать')+'</button>'+
-        '<button type="button" class="gh sm" data-user-sub-open="'+id+'">'+ic('external-link')+(panelIsEnglish()?'Open portal':'Открыть страницу')+'</button>'+
-        '<button type="button" class="gh sm" data-user-sub-create="'+id+'">'+ic('refresh-cw')+(panelIsEnglish()?'Rotate link':'Перевыпустить')+'</button>'+
-        '<button type="button" class="gh sm" data-user-sub-revoke="'+id+'">'+ic('shield-off')+(panelIsEnglish()?'Revoke':'Отозвать')+'</button></div>';
+      const label=panelIsEnglish()?'Subscription link':'Ссылка подписки';
+      target.innerHTML='<div class="user-sub-link-card"><div class="user-sub-link-head"><span class="user-sub-link-label">'+label+'</span><span class="user-sub-link-status"><span class="user-sub-status-dot"></span>'+(panelIsEnglish()?'Issued':'Выпущена')+'</span></div>'+
+        '<div class="user-sub-link-row"><input type="text" class="user-subscription-url" aria-label="'+label+'" value="'+esc(url)+'" readonly spellcheck="false" autocomplete="off" title="'+esc(url)+'">'+
+        '<button type="button" class="btn sm user-sub-copy-main" data-user-sub-copy="'+id+'" title="'+(panelIsEnglish()?'Copy subscription link':'Скопировать ссылку')+'">'+ic('copy')+(panelIsEnglish()?'Copy':'Копировать')+'</button></div>'+
+        '<div class="user-sub-actions"><button type="button" class="gh sm" data-user-sub-open="'+id+'">'+ic('external-link')+(panelIsEnglish()?'Open subscription':'Открыть')+'</button>'+
+        '<button type="button" class="gh sm" data-user-sub-create="'+id+'">'+ic('refresh-cw')+(panelIsEnglish()?'Rotate':'Перевыпустить')+'</button>'+
+        '<button type="button" class="gh sm user-sub-revoke" data-user-sub-revoke="'+id+'">'+ic('shield-off')+(panelIsEnglish()?'Revoke':'Отозвать')+'</button></div></div>';
     }else{
       const message=result.legacy?(panelIsEnglish()?'Old link remains active, but its secret cannot be recovered. Rotate it once to enable persistent display.':'Старая ссылка продолжает действовать, но её секрет нельзя восстановить из хеша. Один раз перевыпустите её для постоянного отображения.'):(panelIsEnglish()?'No subscription has been issued yet.':'Подписка ещё не создана.');
       target.innerHTML='<p class="user-sub-note">'+esc(message)+'</p><div class="act"><button type="button" class="btn sm" data-user-sub-create="'+id+'">'+ic('link')+(result.legacy?(panelIsEnglish()?'Rotate legacy link':'Перевыпустить старую ссылку'):(panelIsEnglish()?'Create subscription':'Создать подписку'))+'</button>'+
