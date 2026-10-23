@@ -2253,6 +2253,127 @@ function hostEditorMarkup(o,e){
     '<button type="button" class="gh sm" data-host-link-profile hidden></button>'+
     '<p class="node-ip-hint host-preview-disclaimer">Предпросмотр не подтверждает применение профиля, добавление UUID или доступность порта.</p></section></div>';
 }
+
+/* Squad editor: expose the actual access graph, without introducing fake
+   per-squad limits or changing the existing persisted {name,desc,inb} model. */
+function squadEditorMarkup(o,e){
+  const saved=Array.isArray(o.inb)?o.inb.map(String):[];
+  const byTag=new Map();
+  for(const profile of DB.profiles){
+    for(const inbound of inbs(profile)){
+      const tag=String(inbound?.tag||'').trim();
+      if(!tag)continue;
+      if(!byTag.has(tag))byTag.set(tag,{tag,meta:[]});
+      byTag.get(tag).meta.push({
+        profile:String(profile.name||'XRAY STUDIO'),
+        protocol:String(inbound.protocol||'—'),
+        network:String(inbound.streamSettings?.network||'tcp')
+      });
+    }
+  }
+  for(const tag of saved){
+    if(!byTag.has(tag))byTag.set(tag,{tag,meta:[]});
+  }
+  const rows=[...byTag.values()].sort((a,b)=>a.tag.localeCompare(b.tag,'ru')).map(item=>{
+    const missing=!item.meta.length;
+    const profileNames=[...new Set(item.meta.map(m=>m.profile))];
+    const details=missing?'Отсутствует в XRAY STUDIO — сохранённая привязка':
+      [...new Set(item.meta.map(m=>m.protocol+' / '+m.network))].join(', ')+
+      ' · '+profileNames.join(', ');
+    const count=DB.hosts.filter(h=>!h.disabled&&String(h.tag)===item.tag).length;
+    return '<label class="squad-inbound-row'+(missing?' is-missing':'')+'" data-squad-option data-squad-filter="'+esc(item.tag+' '+details)+'">'+
+      '<input type="checkbox" name="inb" value="'+esc(item.tag)+'"'+(saved.includes(item.tag)?' checked':'')+(missing?' data-squad-missing':'')+'>'+
+      '<span class="squad-inbound-copy"><b>'+esc(item.tag)+'</b><small>'+esc(details)+'</small></span>'+
+      '<span class="squad-inbound-hosts">'+(missing?'Нет профиля':count+' хост.')+'</span></label>';
+  }).join('');
+  return '<div class="squad-editor-layout">'+
+    '<section class="squad-editor-main" aria-label="Параметры сквада">'+
+      '<div class="node-form-section-title">Основные параметры</div>'+
+      '<p class="squad-help">Название и описание видны администраторам. Сквад объединяет inbound для пользователей.</p>'+
+      '<div class="squad-editor-fields">'+field(e.fs.find(x=>x.k==='name'),o.name||'')+field(e.fs.find(x=>x.k==='desc'),o.desc||'')+'</div>'+
+      '<div class="squad-section-heading"><div><b>Доступные inbound</b><small>Теги из XRAY STUDIO, без изменения серверной конфигурации</small></div><span class="squad-selected-count" data-squad-selected>0 выбрано</span></div>'+
+      '<div class="squad-editor-toolbar">'+
+        '<label class="search squad-inbound-search">'+ic('search')+'<input type="search" data-squad-search placeholder="Найти inbound или профиль…" autocomplete="off" aria-label="Поиск inbound"></label>'+
+        '<button type="button" class="gh sm" data-squad-select="all">Выбрать все</button>'+
+        '<button type="button" class="gh sm" data-squad-select="clear">Очистить</button>'+
+      '</div>'+
+      '<div class="squad-inbound-list">'+(rows||'<div class="squad-inbound-empty">В XRAY STUDIO пока нет inbound. Создайте профиль, чтобы назначить доступ.</div>')+'</div>'+
+      '<p class="squad-inbound-empty" data-squad-no-results hidden>Ничего не найдено</p>'+
+      '<p class="squad-help">Одинаковый тег в нескольких профилях отображается один раз: сквад хранит именно тег, а не отдельную привязку к профилю.</p>'+
+    '</section>'+
+    '<section class="squad-editor-side" aria-label="Предпросмотр и влияние">'+
+      '<div class="node-form-section-title">Предпросмотр доступа</div>'+
+      '<p class="squad-help">Показывает связи в панели. Не подтверждает применение конфигурации на нодах.</p>'+
+      '<div data-squad-preview role="status" aria-live="polite"></div>'+
+    '</section>'+
+  '</div>';
+}
+function squadEditorRefresh(form){
+  if(!form||form.dataset.ent!=='squads')return;
+  const checked=[...form.querySelectorAll('input[name="inb"]:checked')].map(input=>input.value);
+  const selected=[...new Set(checked)];
+  const known=new Set(DB.profiles.flatMap(p=>inbs(p).map(i=>String(i.tag||''))).filter(Boolean));
+  const missing=selected.filter(tag=>!known.has(tag));
+  const hosts=DB.hosts.filter(h=>!h.disabled&&selected.includes(String(h.tag)));
+  const hostTags=new Set(hosts.map(h=>String(h.tag)));
+  const uncovered=selected.filter(tag=>!hostTags.has(tag)&&known.has(tag));
+  const nodeIds=new Set(hosts.flatMap(h=>Array.isArray(h.nodes)?h.nodes:[]).map(String));
+  const users=DB.users.filter(u=>Array.isArray(u.squads)&&u.squads.some(id=>String(id)===form.dataset.id));
+  const count=form.querySelector('[data-squad-selected]');
+  if(count)count.textContent=selected.length+' выбрано';
+  const preview=form.querySelector('[data-squad-preview]');
+  if(!preview)return;
+  const stats=[
+    ['Inbound',selected.length],
+    ['Хосты',hosts.length],
+    ['Назначенные ноды',nodeIds.size],
+    ['Пользователи',users.length]
+  ].map(([label,value])=>'<div class="squad-preview-stat"><b>'+value+'</b><small>'+label+'</small></div>').join('');
+  const hostList=hosts.length?hosts.slice(0,6).map(h=>
+    '<div class="squad-preview-line"><b>'+esc(h.remark||h.tag||'Хост')+'</b><small>'+esc(h.address||'Адрес не задан')+'</small></div>'
+  ).join('')+(hosts.length>6?'<small class="squad-help">И ещё '+(hosts.length-6)+' хост.</small>':''):
+    '<p class="squad-help">Для выбранных inbound нет включённых хостов.</p>';
+  const userList=users.length?users.slice(0,5).map(u=>'<span class="squad-user-chip">'+esc(u.username)+'</span>').join('')+
+    (users.length>5?'<span class="squad-user-chip">+'+(users.length-5)+'</span>':''):
+    '<span class="squad-help">Пользователи ещё не назначены.</span>';
+  const warnings=[];
+  if(!selected.length)warnings.push('Не выбраны inbound: сквад не предоставит подключения.');
+  if(missing.length)warnings.push('Отсутствуют в XRAY STUDIO: '+missing.join(', '));
+  if(uncovered.length)warnings.push('Нет включённых хостов для: '+uncovered.join(', '));
+  if(hosts.some(h=>!Array.isArray(h.nodes)||!h.nodes.length))warnings.push('У некоторых хостов не назначены ноды.');
+  preview.innerHTML='<div class="squad-preview-stats">'+stats+'</div>'+
+    '<div class="squad-preview-section"><b>Хосты, соответствующие выбору</b><div class="squad-preview-list">'+hostList+'</div></div>'+
+    '<div class="squad-preview-section"><b>Затронутые пользователи</b><div class="squad-user-list">'+userList+'</div></div>'+
+    (warnings.length?'<div class="squad-preview-warnings" role="note">'+warnings.map(w=>'<p>'+ic('alert-triangle')+esc(w)+'</p>').join('')+'</div>':'<p class="squad-preview-ready">'+ic('check')+'Связи в панели найдены. Доступность серверов проверяется отдельно.</p>');
+}
+document.addEventListener('input',event=>{
+  const input=event.target;
+  if(!input.matches?.('form[data-ent="squads"] [data-squad-search]'))return;
+  const form=input.closest('form');
+  const term=input.value.trim().toLocaleLowerCase('ru');
+  let visible=0;
+  for(const row of form.querySelectorAll('[data-squad-option]')){
+    row.hidden=!String(row.dataset.squadFilter||'').toLocaleLowerCase('ru').includes(term);
+    if(!row.hidden)visible++;
+  }
+  const empty=form.querySelector('[data-squad-no-results]');
+  if(empty)empty.hidden=visible>0;
+});
+document.addEventListener('change',event=>{
+  if(event.target.matches?.('form[data-ent="squads"] input[name="inb"]'))squadEditorRefresh(event.target.closest('form'));
+});
+document.addEventListener('click',event=>{
+  const button=event.target.closest?.('form[data-ent="squads"] [data-squad-select]');
+  if(!button)return;
+  event.preventDefault();
+  const form=button.closest('form');
+  for(const input of form.querySelectorAll('input[name="inb"]')){
+    if(button.dataset.squadSelect==='clear')input.checked=false;
+    else if(!input.hasAttribute('data-squad-missing')&&!input.closest('[data-squad-option]').hidden)input.checked=true;
+  }
+  squadEditorRefresh(form);
+});
+
 function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id)===String(id)):e.def?e.def():{});
   const standardFields=e.fs.map(f=>field(f,k==='admins'&&f.k==='password'?'':o[f.k])).join('');
   const rotationFields=e.fs.filter(f=>['rotationEnabled','rotationIps'].includes(f.k)).map(f=>field(f,o[f.k])).join('');
@@ -2281,10 +2402,11 @@ function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id
     ?`<div class="node-rotation-probe"><label class="f"><span>Проверка на пользователе</span><select data-node-rotation-user>${userOptions||'<option value="">Нет активных пользователей</option>'}</select></label><button type="button" class="gh sm" data-node-rotation-probe="${id}" ${userOptions?'':'disabled'}>${ic('redo')}Получить следующий IP</button><output data-node-rotation-result aria-live="polite"></output><small>Тест изменяет счётчик ротации этого пользователя. Выдача подписок будет подключена отдельно.</small></div>`
     :'';
   const hostWizard=k==='hosts'?'<div class="host-quick"><label class="f"><span>Быстро заполнить из узла</span><select data-host-node-preset><option value="">Выберите сервер…</option>'+DB.nodes.map(n=>'<option value="'+esc(String(n.id))+'">'+esc(n.name)+' · '+esc(n.addr||'')+'</option>').join('')+'</select></label><p class="note">Подставит адрес, порт и привязку. Остальные поля сохранятся.</p></div>':'';
-  const fields=k==='hosts'?hostEditorMarkup(o,e):k==='nodes'
+  const fields=k==='squads'?squadEditorMarkup(o,e):k==='hosts'?hostEditorMarkup(o,e):k==='nodes'
     ?'<div class="node-form-layout"><section class="node-main-section"><div class="node-form-section-title">Основные параметры</div><p class="node-section-intro">Подключение, профиль Xray и ограничения узла</p><div class="node-form-grid">'+nodeMainFields+'</div></section>'+`<section class="node-ip-section"><div class="node-form-section-title">IP-пул и ротация</div><div class="node-ip-hint">Адреса должны принадлежать этому VPS и быть доступны извне.</div><div class="node-rotation-editor-body">${rotationFields}<div class="node-pool-toolbar"><span data-node-pool-count>Адресов: ${nodeRotationIPs(o).length} / 64</span><button type="button" class="gh sm" data-node-pool-normalize>Убрать повторы</button><button type="button" class="gh sm" data-node-pool-clear>Очистить</button></div><output data-node-pool-feedback aria-live="polite"></output>${rotationProbe}</div></section><section class="node-billing-section"><div class="node-form-section-title">Инфрабиллинг</div><p class="node-ip-hint">Стоимость, аренда и напоминания</p><div class="node-billing-fields">${billingFields}</div></section></div>`
     :standardFields;
-  modal(`<form class="box" data-k="ent" data-ent="${k}" data-id="${id||''}" method="dialog"><h2>${id?'Изменить':'Новый'}: ${e.nw.toLowerCase()}</h2>${fields}<p class="er" id="fe"></p><div class="act">${id?`<button type="button" class="dg" data-del="${k}:${id}" style="margin-right:auto">${ic('trash')}Удалить</button>`:''}${k==='hosts'&&id?`<button type="button" class="gh" data-host-duplicate="${id}">${ic('copy')}Дублировать</button>`:''}<button type="button" class="gh" data-x>Отмена</button><button class="btn">Сохранить</button></div></form>`,k==='nodes'?'node-wide':k==='hosts'?'host-wide':k=='profiles'||k=='subs'?'wide':'');
+  modal(`<form class="box" data-k="ent" data-ent="${k}" data-id="${id||''}" method="dialog"><h2>${id?'Изменить':'Новый'}: ${e.nw.toLowerCase()}</h2>${fields}<p class="er" id="fe"></p><div class="act">${id?`<button type="button" class="dg" data-del="${k}:${id}" style="margin-right:auto">${ic('trash')}Удалить</button>`:''}${k==='hosts'&&id?`<button type="button" class="gh" data-host-duplicate="${id}">${ic('copy')}Дублировать</button>`:''}<button type="button" class="gh" data-x>Отмена</button><button class="btn">Сохранить</button></div></form>`,k==='nodes'?'node-wide':k==='hosts'?'host-wide':k==='squads'?'squad-wide':k=='profiles'||k=='subs'?'wide':'');
+  if(k==='squads')squadEditorRefresh(dlg.querySelector('form[data-ent="squads"]'));
   if(k==='hosts'){
     const form=dlg.querySelector('form[data-ent="hosts"]');
     hostEditorRefresh(form);
