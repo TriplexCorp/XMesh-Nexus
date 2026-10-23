@@ -68,6 +68,10 @@ update_managed_xray(){
  local name=xmesh-managed-xray
  local image=ghcr.io/xtls/xray-core:latest
  local config=/var/lib/xmesh-xray-sync/config.json
+ # The reconciliation worker uses this same lock. Never race deployments.
+ [[ -d /var/lib/xmesh-xray-sync ]] || { detail='Managed Xray state missing';return 1; }
+ exec 8>/var/lib/xmesh-xray-sync/lock
+ flock -w 10 8 || { detail='Xray configuration sync currently busy';return 1; }
  if ! docker inspect "$name" >/dev/null 2>&1;then
   detail='Managed Xray container not found';return 1
  fi
