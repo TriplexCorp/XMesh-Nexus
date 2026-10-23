@@ -691,46 +691,125 @@ const subscriptionStudioP=()=>window.XMeshSubscriptionStudio.create(DB.set,patch
 // Balancers are an explicit subscription feature, never inferred from node count.
 // Keeping this as a separate workspace prevents accidental SMART activation.
 const balancersP=async()=>{
- const setting=DB.set.subscriptionJson||{};
- const active=setting.smart===true && setting.balance!=='off';
- const strategy=['leastPing','roundRobin','random'].includes(setting.balance)?setting.balance:'leastPing';
- const markup=`<section class="balancer-workspace">
-   <div class="balancer-intro"><div><h2>Балансировщики</h2><p>Узлы и хосты работают независимо. SMART подключается только по вашему решению.</p></div>
-   <span class="balancer-state ${active?'is-on':''}" id="balancer-current-state">${active?'SMART включён':'Отключено'}</span></div>
-   <div class="card balancer-settings"><div class="balancer-primary">
-    <div><h3>SMART · автоматический выбор</h3><p>Объединяет доступные подключения в один виртуальный маршрут. Подписка всегда отдаёт JSON. При выключенном SMART все серверы остаются отдельными outbound без автоматического выбора; при включённом появляется маршрутизация через балансировщик.</p></div>
-    <label class="balancer-switch"><input type="checkbox" id="balancer-enabled" ${active?'checked':''} aria-label="Включить SMART балансировщик"><span class="balancer-switch-track"></span></label>
-   </div>
-   <label class="f balancer-strategy"><span>Стратегия выбора</span>
-     <select id="balancer-strategy" ${active?'':'disabled'}>
-       <option value="leastPing" ${strategy==='leastPing'?'selected':''}>Наименьшая задержка</option>
-       <option value="roundRobin" ${strategy==='roundRobin'?'selected':''}>По очереди</option>
-       <option value="random" ${strategy==='random'?'selected':''}>Случайный сервер</option>
-     </select>
-   </label>
-   <div class="balancer-actions"><p id="balancer-description">Изменение вступит в силу после сохранения. Это не перезапускает Xray на узлах.</p>
-     <button class="btn" type="button" id="balancer-save">${ic('save')}Сохранить настройки</button>
-   </div></div>
-   <p class="note">Создание нового узла не активирует балансировку. Доступность серверов и привязки хостов настраиваются в разделах «Узлы» и «Хосты».</p>
- </section>`;
+ // Balancer selectors are stable record identities, never positional Xray tags.
+ const choices=[];
+ const enabledHosts=DB.hosts.filter(h=>!h.disabled);
+ for(const h of enabledHosts){
+  if(!Number.isSafeInteger(Number(h.id))||Number(h.id)<=0)continue;
+  choices.push({key:'host:'+h.id,label:h.remark||h.name||h.address||h.tag||('Хост #'+h.id),
+   meta:'Хост · '+(h.tag||'без тега')});
+ }
+ // Node fallback entries exist only when no explicit public host is assigned
+ // to that inbound. The backend is the final authority for availability.
+ for(const n of DB.nodes.filter(n=>!n.disabled)){
+  const p=DB.profiles.find(p=>String(p.id)===String(n.profileId));
+  if(!p)continue;
+  for(const inbound of inbs(p)){
+   const tag=inbound.tag;
+   if(!tag||enabledHosts.some(h=>h.tag===tag && (!h.profileId||String(h.profileId)===String(p.id))))continue;
+   const key='node:'+n.id+':'+tag;
+   if(choices.some(c=>c.key===key))continue;
+   choices.push({key,label:(n.name||'Узел #'+n.id)+' · '+tag,meta:'Узел · резервный адрес'});
+  }
+ }
+ const stored=Array.isArray(DB.set.clientBalancers)?DB.set.clientBalancers:[];
+ let draft=stored.map(row=>({...row,selector:[...(row.selector||[])],
+   observatory:{...(row.observatory||{})}}));
+ const options=[['leastPing','Наименьшая задержка'],['roundRobin','По очереди'],['random','Случайный сервер']];
+ const field=(label,name,value,placeholder='',max=160)=>
+  '<label class="f"><span>'+label+'</span><input data-balancer-field="'+name+'" maxlength="'+max+'" value="'+esc(value||'')+'" placeholder="'+esc(placeholder)+'"></label>';
+ const view=()=>{
+  const root=$('#balancers-list');
+  if(!root)return;
+  root.innerHTML=draft.length?draft.map((item,index)=>{
+   const selected=new Set(item.selector||[]);
+   const obs=item.observatory||{};
+   const visible=(choices.length?choices.map(c=>
+      '<label class="balancer-source"><input type="checkbox" data-balancer-source="'+esc(c.key)+'"'+(selected.has(c.key)?' checked':'')+'>'+
+      '<span><strong>'+esc(c.label)+'</strong><small>'+esc(c.meta)+'</small></span></label>').join(''):
+      '<p class="note">Добавьте хосты или узлы и назначьте им профиль XRAY STUDIO.</p>');
+   return '<section class="card balancer-editor" data-balancer-index="'+index+'">'+
+    '<div class="balancer-editor-head"><div><span class="balancer-seq">#'+(index+1)+'</span><strong>'+esc(item.remark||'Новый балансировщик')+'</strong></div>'+
+    '<button type="button" class="gh sm" data-balancer-delete="'+index+'">'+ic('trash')+'Удалить</button></div>'+
+    '<div class="balancer-edit-grid">'+field('Remark','remark',item.remark,'🇩🇪 Лучший — Германия {STATUS_EMOJI}',120)+
+       field('Tag (уникальный)','tag',item.tag,'DE_BEST',64)+
+       field('Описание','serverDescription',item.serverDescription,'Самый быстрый сервер',240)+
+       '<label class="f"><span>Стратегия</span><select data-balancer-field="strategy">'+
+       options.map(([k,label])=>'<option value="'+k+'"'+(item.strategy===k?' selected':'')+'>'+label+'</option>').join('')+
+       '</select></label></div>'+
+    '<div class="balancer-source-heading"><strong>Серверы для выбора</strong><span>Отметьте нужные галочками</span></div>'+
+    '<div class="balancer-source-grid">'+visible+'</div>'+
+    '<div class="balancer-checks"><label><input type="checkbox" data-balancer-field="enabled"'+(item.enabled!==false?' checked':'')+'> Включён</label>'+
+    '<label><input type="checkbox" data-balancer-field="hideSelectedInbounds"'+(item.hideSelectedInbounds?' checked':'')+'> Скрыть выбранные одиночные профили</label></div>'+
+    '<details class="balancer-advanced"><summary>Проверка доступности · дополнительные параметры</summary>'+
+      '<div class="balancer-edit-grid">'+field('Интервал','probeInterval',obs.probeInterval||'20s','20s',5)+
+      field('Таймаут','probeTimeout',obs.probeTimeout||'2s','2s',5)+
+      field('Выборка','sampling',String(obs.sampling||5),'5',2)+
+      field('Проверочный HTTPS URL','probeURL',obs.probeURL||'https://www.gstatic.com/generate_204','https://...',256)+
+      field('Проверка связности','connectivity',obs.connectivity||'https://cp.cloudflare.com/generate_204','https://...',256)+
+      '</div><p class="note">Xray поддерживает probeInterval и probeUrl. Таймаут, выборка и связность сохраняются как настройки группы, но не передаются в неподдерживаемые поля Xray.</p></details>'+
+   '</section>';
+  }).join(''):'<div class="balancer-empty"><strong>Балансировщиков пока нет</strong><p>Добавьте любую комбинацию серверов. Одиночные подключения работают независимо.</p></div>';
+  $('#balancers-count').textContent=draft.length+' групп';
+ };
+ const read=()=>[...$$('.balancer-editor')].map((row,i)=>{
+  const get=name=>row.querySelector('[data-balancer-field="'+name+'"]');
+  const source=[...row.querySelectorAll('[data-balancer-source]:checked')].map(el=>el.dataset.balancerSource);
+  const obs={probeInterval:get('probeInterval').value.trim(),probeTimeout:get('probeTimeout').value.trim(),
+   sampling:Number(get('sampling').value),probeURL:get('probeURL').value.trim(),connectivity:get('connectivity').value.trim()};
+  return {tag:get('tag').value.trim(),remark:get('remark').value.trim(),serverDescription:get('serverDescription').value.trim(),
+   strategy:get('strategy').value,enabled:get('enabled').checked,hideSelectedInbounds:get('hideSelectedInbounds').checked,
+   selector:source,observatory:obs};
+ });
+ const markup='<section class="balancer-workspace"><div class="balancer-intro"><div>'+
+  '<h2>Балансировщики</h2><p>Создавайте собственные группы с любыми комбинациями серверов. Только JSON; без автоматических групп.</p>'+
+  '</div><div class="balancer-toolbar"><span id="balancers-count"></span><button class="btn" type="button" id="balancer-add">'+ic('plus')+'Новый балансировщик</button></div></div>'+
+  '<div id="balancers-list" class="balancer-list"></div>'+
+  '<div class="balancer-savebar"><p>Серверы выбираются по стабильным ID. Изменения применятся после сохранения.</p>'+
+  '<button type="button" class="btn" id="balancer-save">'+ic('save')+'Сохранить изменения</button></div></section>';
  return [markup,()=>{
-   const enabled=$('#balancer-enabled'),select=$('#balancer-strategy'),button=$('#balancer-save');
-   if(!enabled||!select||!button)return;
-   enabled.addEventListener('change',()=>{select.disabled=!enabled.checked});
-   button.addEventListener('click',async()=>{
-     button.disabled=true;
-     try{
-       // PATCH replaces subscriptionJson, so preserve every unrelated DNS field.
-       const current=DB.set.subscriptionJson||{};
-       const smart=enabled.checked;
-       const balance=smart?select.value:'off';
-       await api.saveSettings({subscriptionJson:{...current,smart,balance}});
-       const state=$('#balancer-current-state');
-       if(state){state.textContent=smart?'SMART включён':'Отключено';state.classList.toggle('is-on',smart)}
-       toast(smart?'SMART балансировщик включён':'SMART балансировщик отключён');
-     }catch(error){toast('Не удалось сохранить балансировщик: '+(error.message||'ошибка'))}
-     finally{button.disabled=false}
-   });
+  const list=$('#balancers-list');
+  if(!list)return;
+  view();
+  $('#balancer-add').addEventListener('click',()=>{
+   draft=read();
+   let next=1;
+   while(draft.some(item=>item.tag==='AUTO_'+next))next++;
+   draft.push({tag:'AUTO_'+next,remark:'Новый балансировщик',serverDescription:'',
+    enabled:true,strategy:'leastPing',selector:[],hideSelectedInbounds:false,
+    observatory:{probeInterval:'20s',probeTimeout:'2s',sampling:5,
+    probeURL:'https://www.gstatic.com/generate_204',connectivity:'https://cp.cloudflare.com/generate_204'}});
+   view();
+   list.lastElementChild?.scrollIntoView({behavior:'smooth',block:'nearest'});
+  });
+  list.addEventListener('click',event=>{
+   const button=event.target.closest('[data-balancer-delete]');
+   if(!button)return;
+   const index=Number(button.dataset.balancerDelete);
+   draft=read().filter((_,i)=>i!==index);
+   view();
+  });
+  const save=$('#balancer-save');
+  save.addEventListener('click',async()=>{
+   const rows=read();
+   for(const row of rows){
+    if(!row.tag||!row.remark||!row.selector.length){
+     toast('Укажите tag, название и хотя бы один сервер для каждого балансировщика');return;
+    }
+    if(!/^[A-Za-z0-9_-]{1,64}$/.test(row.tag)){toast('Tag допускает только латиницу, цифры, _ и -');return}
+   }
+   if(new Set(rows.map(r=>r.tag)).size!==rows.length){toast('Теги балансировщиков должны быть уникальными');return}
+   save.disabled=true;
+   try{
+    // An explicit array disables legacy automatic SMART once and for all.
+    await api.saveSettings({clientBalancers:rows,
+      subscriptionJson:{...(DB.set.subscriptionJson||{}),smart:false,balance:'off'}});
+    draft=rows;
+    toast('Настройки балансировщиков сохранены');
+    view();
+   }catch(error){toast('Не удалось сохранить балансировщики: '+(error.message||'API'))}
+   finally{save.disabled=false}
+  });
  }];
 };
 const pages={home:['Дашборд',homeP],statistics:['Статистика',statisticsP],users:['Пользователи',usersP],squads:['Сквады',()=>simple(['squads'])],hosts:['Хосты',()=>simple(['hosts'])],nodes:['Узлы',nodesP],templates:['Шаблоны',()=>simple(['tpls','subs'])],profiles:['XRAY STUDIO',profilesP],subscription:['SUBSCRIPTION STUDIO',subscriptionStudioP],balancers:['Балансировщики',balancersP],tools:['Диагностика',toolsP],admins:['Администраторы',()=>simple(['admins'])],security:['Безопасность',securityP],set:['Настройки',setP]};
