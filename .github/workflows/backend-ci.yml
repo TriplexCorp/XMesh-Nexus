@@ -120,6 +120,8 @@ jobs:
         run: node scripts/check-node-network-traffic.js
       - name: Check exact Xray release choice and pinned node agent
         run: node scripts/check-node-xray-releases.js
+      - name: Check secure remote Agent upgrades and version display
+        run: node scripts/check-agent-update.js
       - name: Check live node Xray version and status feedback
         run: node scripts/check-node-live-status.js
       - name: Check responsive Nodes grid and density buttons
