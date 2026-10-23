@@ -17,5 +17,5 @@ assert.match(app,/version\.textContent=text/,'Remote version must be inserted as
 assert.match(css,/\.node-runtime-online/);
 assert.match(css,/\.node-runtime-offline/);
 assert.match(runtime,/"xrayVersion":row\.try_get/);
-assert.match(runtime,/received_at > NOW\(\) - INTERVAL '150 seconds'/);
+assert.match(runtime,/received_at > NOW\(\) - INTERVAL '65 seconds'/);
 console.log('Live Xray and node state contract: OK');
