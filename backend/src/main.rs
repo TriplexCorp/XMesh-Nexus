@@ -270,6 +270,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/nodes/{id}/metrics-key", post(node_auth::enroll).delete(node_auth::revoke))
         .route("/nodes/{id}/runtime", get(node_runtime::status))
         .route("/nodes/{id}/restart", post(node_runtime::request_restart).get(node_runtime::restart_status))
+        .route("/nodes/{id}/xray-update", post(node_runtime::request_xray_update))
         .route("/users/{id}/subscription", get(user_subscriptions::status).post(user_subscriptions::create).delete(user_subscriptions::revoke))
         .route("/users/{id}/client-json", get(user_subscriptions::admin_client_json))
         .route("/nodes/{id}/enrollment", post(node_enrollment::issue))
