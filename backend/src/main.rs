@@ -277,6 +277,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/admins", get(admin_accounts::list).post(admin_accounts::create))
         .route("/admins/{id}", patch(admin_accounts::update).delete(admin_accounts::delete))
         .route("/nodes/{id}/rotation/next", post(node_rotation::rotate_next))
+        .route("/nodes/{id}/traffic/reset", post(reset_node_network_traffic))
         .route("/collections/{collection}", get(list_records).post(create_record))
         .route("/collections/{collection}/{id}", patch(update_record).delete(delete_record))
         .route("/core", get(get_core_status))
@@ -534,6 +535,58 @@ async fn create_record(
     let record_id = result.get("id").and_then(Value::as_i64);
     audit(&state.pool, &actor.username, "create", Some(&collection), record_id, json!({})).await;
     Ok((StatusCode::CREATED, Json(result)))
+}
+
+/// Manually reset only the node-wide network accounting period. The last
+/// physical interface counters remain the current baseline, preventing all
+/// traffic before the reset from being counted again at the next sample.
+async fn reset_node_network_traffic(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+    Path(node_id): Path<i64>,
+) -> Result<Json<Value>, ApiError> {
+    require_mutation(&actor)?;
+    enforce_collection(&actor, "nodes", true)?;
+    if node_id <= 0 {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Некорректный ID узла."));
+    }
+    let mut tx=state.pool.begin().await?;
+    // Serialize against the quota-cutoff transition and concurrent resets.
+    let record=sqlx::query(
+        "SELECT data FROM panel_records
+         WHERE collection='nodes' AND id=$1 FOR UPDATE"
+    ).bind(node_id).fetch_optional(&mut *tx).await?
+        .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Узел не найден."))?;
+    let old:Value=record.try_get("data")?;
+    let previous=sqlx::query(
+        "UPDATE node_network_traffic_totals
+         SET rx_bytes=0,tx_bytes=0,updated_at=NOW()
+         WHERE node_id=$1
+         RETURNING rx_bytes,tx_bytes,last_rx_bytes,last_tx_bytes"
+    ).bind(node_id).fetch_optional(&mut *tx).await?;
+    // A quota-stopped node stays disabled. A reset never starts its Xray.
+    let was_quota_stopped=old.get("disabledReason").and_then(Value::as_str)==Some("traffic_limit");
+    let row=sqlx::query(
+        "UPDATE panel_records
+         SET data=(data - 'disabledReason' - 'trafficLimitReachedAt')
+                   || jsonb_build_object('trafficLastResetAt',
+                                        to_char(NOW() AT TIME ZONE 'UTC',
+                                                'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"')),
+             updated_at=NOW()
+         WHERE collection='nodes' AND id=$1 RETURNING data"
+    ).bind(node_id).fetch_one(&mut *tx).await?;
+    tx.commit().await?;
+    audit(&state.pool,&actor.username,"node_traffic_reset",Some("nodes"),Some(node_id),
+        json!({"nodePreviouslyQuotaStopped":was_quota_stopped})).await;
+    Ok(Json(json!({
+        "nodeId":node_id,
+        "networkRxBytes":0,
+        "networkTxBytes":0,
+        "resetAt":row.try_get::<Value,_>("data")?["trafficLastResetAt"],
+        "disabled":old.get("disabled").and_then(Value::as_bool)==Some(true),
+        "counterPresent":previous.is_some(),
+        "xrayStarted":false
+    })))
 }
 
 async fn update_record(
