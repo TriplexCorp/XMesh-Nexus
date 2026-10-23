@@ -118,6 +118,7 @@ pub(crate) fn build(mut proxies:Vec<Value>,setting:&Value)->Result<Value,String>
         let tag=format!("xmesh-{code}-{:04}",i+1);
         if !used.insert(tag.clone()){return Err("Дублирующийся тег Xray".into())}
         outbound.as_object_mut().ok_or("Неверная структура outbound")?.remove("xmeshCountry");
+        outbound.as_object_mut().unwrap().remove("xmeshSourceKey");
         outbound["tag"]=json!(tag);
         tags.push(tag.clone());
         countries.entry(code).or_default().push(tag);
@@ -214,30 +215,151 @@ pub(crate) fn build(mut proxies:Vec<Value>,setting:&Value)->Result<Value,String>
 /// config with multiple outbounds appears as just one item in Happ.
 /// SMART, when explicitly enabled, is offered as an *additional* item, never
 /// a replacement for the individual country/server choices.
+/// Custom named balancers use stable source identities; never select by IP,
+/// host remark or positional Xray tag. Duplicated IPs remain independent.
+pub(crate) fn validate_client_balancers(value:&Value)->Result<(),String>{
+ let rows=value.as_array().ok_or("Балансировщики должны быть массивом")?;
+ let mut tags=HashSet::new();
+ for row in rows {
+  let obj=row.as_object().ok_or("Балансировщик должен быть объектом")?;
+  for key in obj.keys(){
+   if !["tag","remark","serverDescription","selector","strategy",
+       "hideSelectedInbounds","enabled","observatory"].contains(&key.as_str()){
+    return Err(format!("Неизвестное поле балансировщика: {key}"))
+   }
+  }
+  let tag=row["tag"].as_str().unwrap_or("");
+  if tag.is_empty() || tag.len()>64 || !tag.bytes().all(|c|c.is_ascii_alphanumeric()||b"_-".contains(&c))
+     || ["direct","block","dns-out"].contains(&tag) || !tags.insert(tag.to_owned()) {
+   return Err("Тег балансировщика должен быть уникальным (латиница, цифры, _ и -)".into())
+  }
+  for (field,max) in [("remark",120),("serverDescription",240)]{
+   let text=row[field].as_str().ok_or(format!("Укажите {field}"))?;
+   if text.is_empty() && field=="remark" || text.chars().count()>max
+     || text.chars().any(char::is_control){return Err(format!("Некорректное поле {field}"))}
+  }
+  if !["leastPing","roundRobin","random"].contains(&row["strategy"].as_str().unwrap_or("")){
+   return Err("Неизвестная стратегия балансировщика".into())
+  }
+  if row.get("enabled").is_some_and(|v|!v.is_boolean())
+   || row.get("hideSelectedInbounds").is_some_and(|v|!v.is_boolean()){
+   return Err("Некорректные переключатели балансировщика".into())
+  }
+  let selected=row["selector"].as_array().ok_or("Укажите серверы для балансировщика")?;
+  if selected.is_empty(){return Err(format!("Выберите минимум один сервер для {tag}"))}
+  let mut sources=HashSet::new();
+  for key in selected{
+   let key=key.as_str().ok_or("Неверный ID сервера")?;
+   if key.len()>160 || !(key.starts_with("host:")||key.starts_with("node:"))
+    || !key.bytes().all(|c|c.is_ascii_alphanumeric()||b"_:-".contains(&c))
+    || !sources.insert(key){return Err("Некорректный или повторяющийся сервер".into())}
+  }
+  if let Some(o)=row.get("observatory"){
+   let obj=o.as_object().ok_or("Настройки проверки должны быть объектом")?;
+   for key in obj.keys(){
+    if !["probeInterval","probeTimeout","sampling","probeURL","connectivity"].contains(&key.as_str()){
+     return Err(format!("Неизвестный параметр проверки: {key}"))
+    }
+   }
+   for (field,min,max) in [("probeInterval",5,300),("probeTimeout",1,30)] {
+    let value=obj.get(field).and_then(Value::as_str).unwrap_or(if field=="probeInterval"{"20s"}else{"2s"});
+    let secs=value.strip_suffix('s').and_then(|v|v.parse::<u64>().ok()).unwrap_or(0);
+    if secs<min||secs>max {return Err(format!("Некорректное значение {field}"))}
+   }
+   if let Some(n)=obj.get("sampling"){
+    if !n.as_u64().is_some_and(|v|(1..=50).contains(&v)){return Err("sampling должен быть от 1 до 50".into())}
+   }
+   for field in ["probeURL","connectivity"]{
+    if let Some(value)=obj.get(field){
+     let url=value.as_str().ok_or("Адрес проверки должен быть строкой")?;
+     if url.len()>256 || !url.starts_with("https://") ||
+       !url.is_ascii() || url.bytes().any(|c|c<=32||c==127||c==b'\\'||c==b'@')
+       || url.contains('#'){return Err("Требуется безопасный HTTPS URL проверки".into())}
+    }
+   }
+  }
+ }
+ Ok(())
+}
+
+/// A public feed contains an independent full Xray JSON profile for each
+/// available server plus only the explicitly enabled custom selections.
 pub(crate) fn build_feed(proxies:Vec<Value>,settings:&Value)->Result<Value,String>{
  if proxies.is_empty(){return Err("Нет доступных клиентских подключений".into())}
  if proxies.len()>256{return Err("Превышен лимит подключений в одной подписке".into())}
- let smart=smart_enabled(settings);
- let mut entries=Vec::with_capacity(proxies.len()+usize::from(smart && proxies.len()>1));
- if smart && proxies.len()>1 {
-  entries.push(build(proxies.clone(),settings)?);
- }
- // The same DNS/XHTTP/Reality settings are included in each standalone item.
- // Stable source order and the original host remark are preserved.
+ let custom=settings.get("clientBalancers").and_then(Value::as_array);
+ if let Some(rows)=custom{validate_client_balancers(&Value::Array(rows.clone()))?}
+ let mut entries=Vec::new();
+ let mut hidden=HashSet::new();
  let mut standalone_settings=settings.clone();
  if let Some(opts)=standalone_settings.get_mut("subscriptionJson").and_then(Value::as_object_mut){
   opts.insert("smart".to_owned(),Value::Bool(false));
   opts.insert("balance".to_owned(),Value::String("off".to_owned()));
  }
- for proxy in proxies {
-  let cfg=build(vec![proxy],&standalone_settings)?;
-  if cfg["routing"].get("balancers").is_some()
-    || cfg.get("observatory").is_some()
-    || cfg["routing"]["rules"].as_array().is_some_and(|rules|
-      rules.iter().any(|rule|rule.get("balancerTag").is_some())) {
-   return Err("Одиночный сервер содержит запрещённый балансировщик".into());
+ if let Some(rows)=custom{
+  for row in rows{
+   if row.get("enabled").and_then(Value::as_bool)==Some(false){continue}
+   let selected=row["selector"].as_array().ok_or("Неверный список серверов")?;
+   let source_ids:HashSet<&str>=selected.iter().filter_map(Value::as_str).collect();
+   let matched:Vec<Value>=proxies.iter().filter(|p|
+    p.get("xmeshSourceKey").and_then(Value::as_str)
+     .is_some_and(|id|source_ids.contains(id))
+   ).cloned().collect();
+   // If some nodes are unavailable, do not silently reassign a group to an
+   // unrelated endpoint; skip only the missing node and preserve the others.
+   if matched.is_empty(){continue}
+   let mut group_settings=standalone_settings.clone();
+   if let Some(opts)=group_settings.get_mut("subscriptionJson").and_then(Value::as_object_mut){
+    opts.insert("smart".into(),Value::Bool(matched.len()>1));
+    opts.insert("balance".into(),row["strategy"].clone());
+   }else{
+    group_settings["subscriptionJson"]=json!({
+      "smart":matched.len()>1,"balance":row["strategy"]
+    });
+   }
+   let mut config=build(matched,&group_settings)?;
+   config["remarks"]=row["remark"].clone();
+   config["serverDescription"]=row["serverDescription"].clone();
+   if config["routing"]["balancers"].is_array(){
+    // One requested balancer per independent profile. Country auto-groups
+    // must not leak into a manually selected combination.
+    let first=config["outbounds"][0]["tag"].clone();
+    let tags:Vec<Value>=config["outbounds"].as_array().unwrap().iter()
+     .filter(|p|p["protocol"]=="vless").map(|p|p["tag"].clone()).collect();
+    config["routing"]["balancers"]=json!([{
+     "tag":row["tag"],"selector":tags,"fallbackTag":first,
+     "strategy":{"type":row["strategy"]}
+    }]);
+    if let Some(rules)=config["routing"]["rules"].as_array_mut(){
+     for rule in rules{
+      if rule.get("balancerTag").is_some(){rule["balancerTag"]=row["tag"].clone()}
+     }
+    }
+   }
+   // Single-source groups are aliases to that source, not fake balancers.
+   if row["strategy"]!="leastPing"{config.as_object_mut().unwrap().remove("observatory");}
+   if row["strategy"]=="leastPing" && config.get("observatory").is_some(){
+    let obs=&row["observatory"];
+    if let Some(v)=obs.get("probeInterval"){config["observatory"]["probeInterval"]=v.clone()}
+    if let Some(v)=obs.get("probeURL"){config["observatory"]["probeUrl"]=v.clone()}
+    // probeTimeout / sampling / connectivity are stored in panel metadata.
+    // Xray core does not support them as top-level observatory settings.
+   }
+   config["xmeshBalancer"]=json!({"tag":row["tag"],"selector":row["selector"],
+     "hideSelectedInbounds":row["hideSelectedInbounds"]});
+   if row["hideSelectedInbounds"]==true {
+    hidden.extend(source_ids.iter().map(|s|s.to_string()));
+   }
+   entries.push(config);
   }
-  entries.push(cfg);
+ }else if smart_enabled(settings)&&proxies.len()>1{
+  // Legacy SMART remains compatible until the new editor is first saved.
+  entries.push(build(proxies.clone(),settings)?);
+ }
+ for proxy in proxies{
+  if proxy.get("xmeshSourceKey").and_then(Value::as_str)
+    .is_some_and(|source|hidden.contains(source)){continue}
+  entries.push(build(vec![proxy],&standalone_settings)?);
  }
  Ok(Value::Array(entries))
 }
