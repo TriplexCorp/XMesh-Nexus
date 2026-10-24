@@ -911,7 +911,12 @@ const balancersP=async()=>{
   });
  }];
 };
-const pages={home:['Дашборд',homeP],statistics:['Статистика',statisticsP],users:['Пользователи',usersP],squads:['Сквады',()=>simple(['squads'])],hosts:['Хосты',()=>simple(['hosts'])],nodes:['Узлы',nodesP],templates:['Шаблоны',()=>simple(['tpls','subs'])],profiles:['XRAY STUDIO',profilesP],subscription:['SUBSCRIPTION STUDIO',subscriptionStudioP],balancers:['Балансировщики',balancersP],clientrouting:['Маршрутизация клиентов',()=>window.XMeshClientRouting.create(DB,patch=>api.saveSettings(patch),toast)],tools:['Диагностика',toolsP],admins:['Администраторы',()=>simple(['admins'])],security:['Безопасность',securityP],set:['Настройки',setP]};
+const pages={home:['Дашборд',homeP],statistics:['Статистика',statisticsP],users:['Пользователи',usersP],squads:['Сквады',()=>simple(['squads'])],hosts:['Хосты',()=>simple(['hosts'])],nodes:['Узлы',nodesP],templates:['Шаблоны',()=>simple(['tpls','subs'])],profiles:['XRAY STUDIO',profilesP],subscription:['SUBSCRIPTION STUDIO',subscriptionStudioP],balancers:['Балансировщики',balancersP],clientrouting:['Маршрутизация клиентов',()=>window.XMeshClientRouting.create(DB,async patch=>{
+    const result=await backendRequest('/api/v1/client-routing',{
+      method:'PATCH',body:JSON.stringify({profiles:patch.clientRoutingProfiles})});
+    DB.set.clientRoutingProfiles=result.profiles;
+    return result;
+  },toast)],tools:['Диагностика',toolsP],admins:['Администраторы',()=>simple(['admins'])],security:['Безопасность',securityP],set:['Настройки',setP]};
 const skel=()=>`<div class="sk" style="height:7rem"></div><div class="sk" style="height:18rem"></div><div class="sk" style="height:12rem"></div>`;
 const NAV_SHORT={home:'Главная',users:'Клиенты',nodes:'Узлы',subscription:'Подписка'};
 $('#nav').innerHTML=NAV.map(([g,a])=>`<div class="g">${g}</div>`+a.map(([k,i,l,p])=>`<a href="#${k}" class="${p?'':'sec'}" aria-label="${l}" data-rail-tip="${l}">${ic(i)}<span class="lbl"><span class="nav-label-full">${l}</span><span class="nav-label-short" aria-hidden="true">${NAV_SHORT[k]||l}</span></span>${k=='users'?'<em id="unb"></em>':''}</a>`).join('')).join('')+`<button class="more" id="more" aria-label="Ещё разделы" data-rail-tip="Ещё разделы">${ic('more')}<span class="lbl">Ещё</span></button>`;
