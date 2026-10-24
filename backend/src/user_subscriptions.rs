@@ -13,6 +13,7 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use sqlx::Row;
 use std::collections::HashMap;
+use base64::Engine as _;
 
 // Encrypt recoverable bearer secrets at rest with a separately derived key.
 // TOTP_ENCRYPTION_KEY must stay stable across upgrades; raw token never enters
@@ -254,7 +255,7 @@ fn vless_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> 
         .and_then(Value::as_array)
         .and_then(|users| {
             users.iter().find(|entry| {
-                (nonempty(entry, "id") == Some(uuid))
+                (Some(uuid) == nonempty(entry, "id"))
                     || (nonempty(entry, "email") == nonempty(user, "username"))
             })
         })
@@ -313,7 +314,6 @@ fn proxy_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> 
                     .get("settings")
                     .and_then(|v| nonempty(v, "password"))?;
                 let client = nonempty(user, "ssPassword")?;
-                use base64::Engine as _;
                 let decode =
                     |value: &str| base64::engine::general_purpose::STANDARD.decode(value).ok();
                 let len = if method == "2022-blake3-aes-128-gcm" {
@@ -842,7 +842,9 @@ pub async fn serve(
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
-        .as_millis() as i64;
+        .as_millis()
+        .try_into()
+        .unwrap_or(i64::MAX);
     if crate::user_status(&user, now) != "ACTIVE" {
         return Err(ApiError::new(
             StatusCode::FORBIDDEN,
@@ -918,8 +920,9 @@ pub async fn serve(
                 .unwrap_or_default()
                 .as_secs()
                 / (rotation_hours * 3_600);
-            let selected = messages[(slot % messages.len() as u64) as usize];
-            use base64::Engine as _;
+            let selected_index = usize::try_from(slot % u64::try_from(messages.len()).unwrap_or(u64::MAX))
+                .expect("message index fits in usize");
+            let selected = messages[selected_index];
             let encoded = base64::engine::general_purpose::STANDARD.encode(selected.as_bytes());
             if let Ok(value) = header::HeaderValue::from_str(&format!("base64:{encoded}")) {
                 response.headers_mut().insert("announce", value);
@@ -952,7 +955,7 @@ pub async fn serve(
     let expiry = user.get("expireAt").and_then(Value::as_i64).unwrap_or(0);
     let to_bytes = |gib: f64| -> u64 {
         if gib.is_finite() {
-            (gib * 1073741824.0).min(u64::MAX as f64) as u64
+            (gib * 1_073_741_824.0).min(u64::MAX as f64) as u64
         } else {
             0
         }
@@ -1171,7 +1174,9 @@ pub async fn portal(
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
-        .as_millis() as i64;
+        .as_millis()
+        .try_into()
+        .unwrap_or(i64::MAX);
     let active = crate::user_status(&user, now) == "ACTIVE";
     let settings = crate::read_settings(&state.pool).await?;
     let lang = if options.get("lang").is_some_and(|s| s == "en") {
