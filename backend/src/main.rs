@@ -462,6 +462,22 @@ async fn health_ready(State(state): State<AppState>) -> impl IntoResponse {
     }
 }
 
+// Viewer responses must never include credentials or connection material.
+fn redact_viewer_value(value: &mut Value) {
+    match value {
+        Value::Object(object) => {
+            object.retain(|key, _| {
+                let k = key.to_ascii_lowercase();
+                !["xrayid", "uuid", "password", "passwd", "secret", "token", "privatekey", "publickey", "shortid", "subscription", "suburl", "sub_link", "subscriptionurl", "subscriptionlink", "link", "uri", "api_key", "apikey", "clientconfig", "clientjson", "configjson", "realitysettings", "key", "auth"].contains(&k.as_str())
+                    && !k.contains("credential") && !k.contains("private_key") && !k.contains("subscription_url")
+            });
+            for child in object.values_mut() { redact_viewer_value(child); }
+        }
+        Value::Array(items) => for child in items { redact_viewer_value(child); },
+        _ => {}
+    }
+}
+
 async fn bootstrap(State(state): State<AppState>, Extension(actor): Extension<auth::AuthUser>) -> Result<Json<Value>, ApiError> {
     let mut collections = Map::new();
     for collection in COLLECTIONS {
@@ -473,9 +489,12 @@ async fn bootstrap(State(state): State<AppState>, Extension(actor): Extension<au
         } else {
             load_records(&state.pool, collection).await?
         };
-        collections.insert((*collection).to_owned(), Value::Array(records));
+        let mut records = Value::Array(records);
+        if actor.role == "viewer" { redact_viewer_value(&mut records); }
+        collections.insert((*collection).to_owned(), records);
     }
-    let settings = read_settings(&state.pool).await?;
+    let mut settings = read_settings(&state.pool).await?;
+    if actor.role == "viewer" { redact_viewer_value(&mut settings); }
     Ok(Json(json!({
         "collections": collections,
         "settings": settings,
@@ -490,7 +509,10 @@ async fn list_records(
 ) -> Result<Json<Value>, ApiError> {
     validate_collection(&collection)?;
     enforce_collection(&actor, &collection, false)?;
-    let items = load_records(&state.pool, &collection).await?;
+    let mut items = load_records(&state.pool, &collection).await?;
+    if actor.role == "viewer" {
+        for item in &mut items { redact_viewer_value(item); }
+    }
     let ids = items.iter().filter_map(|item| item.get("id").cloned()).collect::<Vec<_>>();
     let total = items.len();
     Ok(Json(json!({"items": items, "ids": ids, "total": total})))
