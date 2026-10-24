@@ -129,7 +129,98 @@ fn cycle_reaches(start:i64, goal:i64,nodes:&[Value])->bool{
 
 /// Validate persistent routing input before storing a node record. The
 /// dynamic cross-node graph and endpoint identity checks happen in apply().
+
+fn json_routing(node:&Value)->Result<Option<&serde_json::Map<String,Value>>,ApiError>{
+    let Some(raw)=node.get("routingJson") else{return Ok(None)};
+    let obj=raw.as_object().ok_or_else(||bad("Routing JSON must be an object."))?;
+    if serde_json::to_vec(raw).unwrap_or_default().len()>262144 {
+        return Err(bad("Routing JSON exceeds 256 KiB."));
+    }
+    if obj.keys().any(|key|!matches!(key.as_str(),"dns"|"routing"|"outbounds")){
+        return Err(bad("Routing JSON may contain only dns, routing and outbounds."));
+    }
+    if obj.get("dns").is_some_and(|v|!v.is_object()) ||
+       obj.get("routing").is_some_and(|v|!v.is_object()) ||
+       obj.get("outbounds").is_some_and(|v|!v.is_array()) {
+        return Err(bad("Routing JSON: invalid dns/routing/outbounds structure."));
+    }
+    if let Some(routing)=obj.get("routing"){
+        let rules=routing.get("rules").and_then(Value::as_array)
+            .ok_or_else(||bad("Routing JSON requires routing.rules array."))?;
+        if rules.len()>512{return Err(bad("Routing JSON: too many rules."))}
+        for rule in rules {
+            if rule.get("type").and_then(Value::as_str)!=Some("field"){
+                return Err(bad("Routing JSON: only field rules are supported."));
+            }
+            if !rule.get("outboundTag").and_then(Value::as_str)
+                .is_some_and(|s|!s.is_empty()) {
+                return Err(bad("Routing JSON: every rule needs outboundTag."));
+            }
+        }
+    }
+    if let Some(outbounds)=obj.get("outbounds").and_then(Value::as_array){
+        if outbounds.len()>64{return Err(bad("Routing JSON: too many outbounds."))}
+        let mut tags=HashSet::new();
+        for out in outbounds {
+            let tag=out.get("tag").and_then(Value::as_str)
+                .ok_or_else(||bad("Routing JSON: each outbound needs tag."))?;
+            if !small_name(tag) || !tags.insert(tag) ||
+               tag.starts_with("xmesh_") {
+                return Err(bad("Routing JSON: invalid, duplicate or reserved outbound tag."));
+            }
+            if out.get("protocol").and_then(Value::as_str).is_none(){
+                return Err(bad("Routing JSON: outbound requires protocol."));
+            }
+        }
+    }
+    Ok(Some(obj))
+}
+
+/// Overlay node-local DNS, routing and outbound definitions without changing
+/// XRAY STUDIO or mandatory StatsService routes.
+fn apply_json(node:&Value,config:&mut Value)->Result<(),ApiError>{
+    let Some(raw)=json_routing(node)? else{return Ok(())};
+    let obj=config.as_object_mut().ok_or_else(||bad("Xray configuration is not an object."))?;
+    if let Some(dns)=raw.get("dns"){obj.insert("dns".into(),dns.clone());}
+    if let Some(extra)=raw.get("outbounds").and_then(Value::as_array){
+        let outbounds=obj.entry("outbounds").or_insert_with(||json!([]));
+        let outbounds=outbounds.as_array_mut()
+            .ok_or_else(||bad("Xray outbounds must be an array."))?;
+        let mut tags:HashSet<String>=outbounds.iter().filter_map(|o|
+            o.get("tag").and_then(Value::as_str).map(str::to_owned)).collect();
+        for outbound in extra {
+            let tag=outbound.get("tag").and_then(Value::as_str).unwrap_or("");
+            if !tags.insert(tag.to_owned()){
+                return Err(bad("Routing JSON: outbound tag already exists in XRAY STUDIO."));
+            }
+            outbounds.push(outbound.clone());
+        }
+    }
+    if let Some(custom)=raw.get("routing"){
+        let routing=obj.entry("routing").or_insert_with(||json!({}));
+        let routing=routing.as_object_mut()
+            .ok_or_else(||bad("Xray routing must be an object."))?;
+        let custom=custom.as_object().unwrap();
+        for (key,value) in custom {
+            if key!="rules"{routing.insert(key.clone(),value.clone());}
+        }
+        if let Some(rules)=custom.get("rules").and_then(Value::as_array){
+            let current=routing.entry("rules").or_insert_with(||json!([]));
+            let current=current.as_array_mut()
+                .ok_or_else(||bad("Xray routing.rules must be an array."))?;
+            // Keep StatsService reachable even if the user replaces all routes.
+            let protected:Vec<Value>=current.iter().filter(|r|
+                r.get("inboundTag").and_then(Value::as_array).is_some_and(|tags|
+                    tags.iter().any(|tag|tag.as_str()==Some("xmesh_stats_in")))).cloned().collect();
+            *current=protected;
+            current.extend(rules.iter().cloned());
+        }
+    }
+    Ok(())
+}
+
 pub fn validate_saved(node:&Value)->Result<(),ApiError>{
+    if json_routing(node)?.is_some(){return Ok(())}
     for name in ["routingEnabled","routingSniffing"]{
         if node.get(name).is_some_and(|v|!v.is_boolean()){
             return Err(bad("Routing: enable/sniffing switches must be boolean."));
@@ -191,6 +282,7 @@ pub fn validate_saved(node:&Value)->Result<(),ApiError>{
 }
 
 pub fn apply(node:&Value,config:&mut Value,nodes:&[Value],hosts:&[Value])->Result<(),ApiError>{
+    if node.get("routingEnabled").and_then(Value::as_bool)==Some(true) && json_routing(node)?.is_some(){return apply_json(node,config)}
     if node.get("routingEnabled").and_then(Value::as_bool)!=Some(true){return Ok(())}
     let rules=node.get("routingRules").and_then(Value::as_array)
         .ok_or_else(||bad("Routing: rules must be a JSON array."))?;
@@ -403,6 +495,21 @@ mod tests{
             {"nodeId":10,"outbound":{}},{"nodeId":10,"outbound":{}}]})).is_err());
         assert!(validate_saved(&json!({"routingEnabled":false,"routingRules":[
             {"matcher":"geosite","value":"","target":"node","nodeId":0}],"routingRelays":[]})).is_ok());
+    }
+    #[test]
+    fn json_mode_keeps_stats_and_full_field_rules(){
+        let node=json!({"routingEnabled":true,"routingJson":{
+            "dns":{"servers":["1.1.1.1"]},
+            "routing":{"domainStrategy":"AsIs","rules":[
+                {"type":"field","inboundTag":["Russia"],"domain":["geosite:category-ru"],
+                 "outboundTag":"DIRECT"}]},
+            "outbounds":[{"tag":"DIRECT","protocol":"freedom"}]}});
+        let mut config=sample();
+        validate_saved(&node).unwrap();
+        apply(&node,&mut config,&[],&[]).unwrap();
+        assert_eq!(config["routing"]["rules"][0]["outboundTag"],"xmesh_stats_api");
+        assert_eq!(config["routing"]["rules"][1]["inboundTag"][0],"Russia");
+        assert_eq!(config["dns"]["servers"][0],"1.1.1.1");
     }
     #[test]
     fn direct_block_and_existing_proxy_are_first_match(){
