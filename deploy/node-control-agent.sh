@@ -66,12 +66,31 @@ except (OSError,ValueError,TypeError):
 PY
 )"
  fi
- local applied='' revision_json='null'
- if [[ "$xr" == true && -r /usr/local/libexec/xmesh-profile-attest.py ]];then
-  applied="$(timeout 8 python3 /usr/local/libexec/xmesh-profile-attest.py 2>/dev/null || true)"
-  if [[ "$applied" =~ ^[a-f0-9]{64}$ ]];then revision_json="\"$applied\"";fi
+ local revision_json='null' profile_check='helper_missing' report=''
+ if [[ "$xr" == false ]];then
+  profile_check='xray_stopped'
+ elif [[ -r /usr/local/libexec/xmesh-profile-attest.py ]];then
+  report="$(timeout 8 python3 /usr/local/libexec/xmesh-profile-attest.py --json 2>/dev/null || true)"
+  local parsed
+  parsed="$(printf '%s' "$report" | python3 -c '
+import json,sys,re
+try:
+ d=json.load(sys.stdin)
+ status=d.get("status")
+ allowed={"verified","policy_missing","active_config_missing","guard_unavailable","policy_invalid","revision_invalid","policy_hash_mismatch","active_config_invalid","active_config_mismatch","xray_stopped","mount_mismatch","container_unavailable"}
+ if status not in allowed:raise ValueError()
+ rev=d.get("revision")
+ if status=="verified" and isinstance(rev,str) and re.fullmatch(r"[a-f0-9]{64}",rev):
+  print(status+" "+rev)
+ else:
+  print(status+" -")
+except (ValueError,TypeError,KeyError):
+ print("helper_error -")
+')" 
+  read -r profile_check parsed_revision <<< "$parsed"
+  if [[ "$parsed_revision" =~ ^[a-f0-9]{64}$ ]];then revision_json="\"$parsed_revision\"";fi
  fi
- signed_post '/api/v1/node/heartbeat' "{\"node_id\":$XMESH_NODE_ID,\"version\":\"$AGENT_VERSION\",\"xray_version\":\"$version\",\"xray_running\":$xr,\"router_running\":$xr,\"geoData\":$geo_data,\"appliedRevision\":$revision_json}" >/dev/null
+ signed_post '/api/v1/node/heartbeat' "{\"node_id\":$XMESH_NODE_ID,\"version\":\"$AGENT_VERSION\",\"xray_version\":\"$version\",\"xray_running\":$xr,\"router_running\":$xr,\"geoData\":$geo_data,\"appliedRevision\":$revision_json,\"profileCheck\":\"$profile_check\"}" >/dev/null
 }
 restart_xray(){
  if docker inspect xmesh-managed-xray >/dev/null 2>&1;then
