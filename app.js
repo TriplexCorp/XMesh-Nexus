@@ -154,7 +154,8 @@ async function backendRequest(path,options={}){
 }
 const lat=()=>Promise.resolve();
 const st=u=>u.disabled?'DISABLED':u.hold?'ON_HOLD':(u.limit&&u.used>=u.limit)?'LIMITED':(u.expireAt&&u.expireAt<Date.now())?'EXPIRED':'ACTIVE';
-const isOn=u=>st(u)=='ACTIVE'&&u.onlineAt>Date.now()-3e5;
+const USER_PRESENCE_WINDOW_MS=45_000;
+const isOn=u=>st(u)==='ACTIVE'&&Number(u.onlineAt)>Date.now()-USER_PRESENCE_WINDOW_MS;
 const inbs=p=>{try{return JSON.parse(p.config).inbounds||[]}catch(e){return[]}};
 const tags=()=>DB.profiles.flatMap(p=>inbs(p).map(i=>i.tag));
 const tcol=t=>({vless:'--a',trojan:'--c3',shadowsocks:'--c4'}[DB.profiles.flatMap(inbs).find(x=>x.tag==t)?.protocol]||'--b');
@@ -1256,25 +1257,40 @@ async function usersP(){
   </div><div class="bulk" id="bulk" role="toolbar" aria-label="Массовые действия"></div><div id="ut"></div></div>`,()=>{drawUsers();let h;$('#uq').oninput=e=>{clearTimeout(h);h=setTimeout(()=>{UQ.q=e.target.value.trim().toLowerCase();UQ.page=1;drawUsers()},200)};$('#usq').onchange=e=>{UQ.sq=e.target.value;UQ.page=1;drawUsers()};
     $$('[data-user-filter]').forEach(el=>el.onchange=()=>{UQ[el.dataset.userFilter]=el.value;UQ.page=1;drawUsers()});
     $('[data-user-filter-reset]').onclick=()=>{for(const key of ['sq','inbound','tag','node','expiry'])UQ[key]='';UQ.page=1;render(1)};
-    // Refresh presence from the backend; an old bootstrap snapshot must not
-    // keep a user online indefinitely while this page stays open.
-    let presenceRefreshBusy=false;
+    // Poll only user presence, not the entire bootstrap with profiles and secrets.
+    // Xray confirms recent traffic, not a persistent TCP connection state.
+    let presenceRefreshBusy=false,presenceErrorLogged=false;
     const refreshPresence=async()=>{
       if(cur!=='users'||document.hidden||presenceRefreshBusy)return;
       presenceRefreshBusy=true;
       try{
-        const response=await fetch('/api/v1/bootstrap',{credentials:'same-origin',cache:'no-store'});
-        if(!response.ok)throw Error('Presence refresh failed');
+        const response=await fetch('/api/v1/users/presence',{credentials:'same-origin',cache:'no-store'});
+        if(!response.ok)throw Error('HTTP '+response.status);
         const payload=await response.json();
-        if(Array.isArray(payload?.collections?.users))DB.users=payload.collections.users;
-      }catch(_){
-        // On a failed request the local five-minute activity TTL still expires.
+        if(!Array.isArray(payload?.items))throw Error('Invalid presence response');
+        const activity=new Map(payload.items.map(item=>[String(item.id),Number(item.onlineAt)]));
+        for(const u of DB.users){
+          const at=activity.get(String(u.id));
+          if(Number.isSafeInteger(at)&&at>=0)u.onlineAt=at;
+        }
+        presenceErrorLogged=false;
+      }catch(error){
+        // The local activity TTL still expires even if telemetry is unreachable.
+        if(!presenceErrorLogged)console.warn('XMesh user presence refresh failed:',error);
+        presenceErrorLogged=true;
       }finally{
         presenceRefreshBusy=false;
-        if(cur==='users'&&$('#ut'))void drawUsers();
+        if(cur==='users'){
+          document.querySelectorAll('[data-user-presence-id]').forEach(dot=>{
+            const user=DB.users.find(u=>String(u.id)===dot.dataset.userPresenceId);
+            dot.style.display=user&&isOn(user)?'':'none';
+          });
+          if($('#ut'))void drawUsers();
+        }
       }
     };
-    T.push(setInterval(()=>{void refreshPresence()},30000));
+    void refreshPresence();
+    T.push(setInterval(()=>{void refreshPresence()},10000));
   }];
 }
 const uf=u=>(UQ.st=='all'||(UQ.st=='ONLINE'?isOn(u):st(u)==UQ.st))&&(!UQ.sq||u.squads.includes(+UQ.sq))&&(!UQ.tag||u.tag===UQ.tag)
@@ -1579,7 +1595,7 @@ function userDrawer(id,tab){
     :'<span class="user-canvas-muted">Подключённых устройств пока нет</span>';
   modal(`<div class="box user-drawer user-canvas">
     <header class="user-head">
-      <div class="who"><span class="av" style="${userAvatarStyle(u)}">${esc((u.username||'?')[0].toUpperCase())}</span><div><h2>${esc(u.username)}</h2>${chip(label,statusColor)} ${isOn(u)?'<span class="dot"></span>':''}</div></div>
+      <div class="who"><span class="av" style="${userAvatarStyle(u)}">${esc((u.username||'?')[0].toUpperCase())}</span><div><h2>${esc(u.username)}</h2>${chip(label,statusColor)} <span class="dot" data-user-presence-id="${u.id}" style="${isOn(u)?'':'display:none'}"></span></div></div>
       <div class="user-head-actions"><button type="button" class="gh sm" data-a="tog" data-u="${u.id}">${ic(u.disabled?'play':'pause')}${u.disabled?'Включить':'Отключить'}</button><button type="button" class="ia user-remove" data-a="del" data-u="${u.id}" aria-label="Удалить пользователя" title="Удалить пользователя">${ic('trash')}</button><button type="button" class="ia" data-x aria-label="Закрыть">${ic('x')}</button></div>
     </header>
     <div class="user-overview-band">
