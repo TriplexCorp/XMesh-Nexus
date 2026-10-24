@@ -379,14 +379,19 @@ impl CoreManager {
         Ok(())
     }
 
-    async fn activate_staged_version(&self, versions_dir: &Path, staging_dir: &Path, version: &str) -> Result<(), String> {
+    async fn activate_staged_version(
+        &self,
+        versions_dir: &Path,
+        staging_dir: &Path,
+        version: &str,
+    ) -> Result<(), String> {
         let target_dir = versions_dir.join(version);
         if fs::try_exists(&target_dir).await.unwrap_or(false) {
             fs::remove_dir_all(&target_dir)
                 .await
                 .map_err(|e| e.to_string())?;
         }
-        fs::rename(&staging_dir, &target_dir)
+        fs::rename(staging_dir, &target_dir)
             .await
             .map_err(|e| format!("Could not finalize release directory: {e}"))?;
 
