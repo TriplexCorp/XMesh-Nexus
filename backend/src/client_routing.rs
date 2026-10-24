@@ -1,5 +1,5 @@
 //! Reusable client-side Xray routing policies assigned to nodes and public hosts.
-//! This is deliberately separate from server-side node_routing. Public client
+//! This is deliberately separate from server-side `node_routing`. Public client
 //! outbounds are assembled only from the authenticated subscriber's endpoints.
 use serde_json::{Value, json};
 use std::collections::{HashMap, HashSet};
@@ -85,7 +85,7 @@ fn valid_match(kind: &str, value: &str) -> bool {
 fn err(text: &str) -> Result<(), String> {
     Err(text.into())
 }
-pub(crate) fn validate(value: &Value) -> Result<(), String> {
+pub fn validate(value: &Value) -> Result<(), String> {
     let policies = value
         .as_array()
         .ok_or("Маршрутизация клиентов должна быть массивом")?;
@@ -219,14 +219,14 @@ fn make_rule(spec: &Value, target: &str) -> Value {
         _ => {}
     }
     if let Some(network) = spec.get("network").and_then(Value::as_str) {
-        rule["network"] = json!(network)
+        rule["network"] = json!(network);
     }
     rule
 }
 /// Build a standalone client entry. Extra outbound destinations come only from
 /// the subscriber's already authorized endpoints. Missing targets resolve to
 /// 'block', never to direct or another accidental server.
-pub(crate) fn build_server(
+pub fn build_server(
     source: Value,
     all: &[Value],
     settings: &Value,
@@ -290,8 +290,7 @@ pub(crate) fn build_server(
                 .as_str()
                 .and_then(|key| targets.get(key))
                 .and_then(|index| outbound_tags.get(*index))
-                .map(String::as_str)
-                .unwrap_or("block"),
+                .map_or("block", String::as_str),
             _ => return Err("Неизвестное действие маршрутизации".into()),
         };
         mapped.push(make_rule(rule, tag));
