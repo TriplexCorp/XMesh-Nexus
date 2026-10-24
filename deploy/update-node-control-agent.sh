@@ -56,7 +56,7 @@ python3 -m py_compile "$profile_tmp"
 grep -q 'xmesh-managed-xray' "$profile_tmp" || { echo "Invalid profile attestation helper" >&2;exit 1; }
 # Validate the updater itself before changing any installed components.
 self_tmp="$(mktemp)"
-trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp" "$self_tmp"' EXIT
+trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp" "$profile_tmp" "$self_tmp"' EXIT
 curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 \
  https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy/update-node-control-agent.sh -o "$self_tmp"
 bash -n "$self_tmp"
