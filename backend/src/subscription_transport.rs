@@ -284,6 +284,68 @@ fn client_reality_settings(inbound: &Value, host: &Value, stream: &Value) -> Opt
     Some(out["realitySettings"].clone())
 }
 
+fn client_tls_settings(inbound: &Value, host: &Value, stream: &Value) -> Option<Value> {
+    let server = stream.get("tlsSettings").unwrap_or(&Value::Null);
+    let sni = field(host, "sni")
+        .or_else(|| field(host, "externalSNI"))
+        .or_else(|| field(server, "serverName"))
+        .or_else(|| field(host, "address"))?;
+    let mut tls = pick(
+        server,
+        &[
+            "alpn",
+            "minVersion",
+            "maxVersion",
+            "cipherSuites",
+            "curvePreferences",
+        ],
+    );
+    tls["serverName"] = json!(sni);
+    if let Some(override_alpn) = field(host, "alpn") {
+        let alpn: Vec<&str> = override_alpn
+            .split(',')
+            .map(str::trim)
+            .filter(|s| {
+                !s.is_empty()
+                    && s.len() <= 32
+                    && s.bytes()
+                        .all(|b| b.is_ascii_alphanumeric() || b"/.-_".contains(&b))
+            })
+            .collect();
+        if !alpn.is_empty() {
+            tls["alpn"] = json!(alpn);
+        }
+    }
+    if let Some(fp) = field(host, "fp").or_else(|| field(host, "fingerprint")) {
+        tls["fingerprint"] = json!(fp);
+    }
+    // Certificate chains, private keys, server ECH keys, OCSP stapling,
+    // rejectUnknownSni, and all inbound trust material never leave the server.
+    if let Some(client) = client_metadata(inbound, host, "clientTlsSettings") {
+        merge_allowed(
+            &mut tls,
+            client,
+            &[
+                "verifyPeerCertByName",
+                "allowInsecure",
+                "alpn",
+                "fingerprint",
+                "pinnedPeerCertSha256",
+                "useSystemCA",
+                "disableSystemRoot",
+                "enableSessionResumption",
+                "echConfigList",
+                "echSockopt",
+                "minVersion",
+                "maxVersion",
+                "cipherSuites",
+                "curvePreferences",
+            ],
+        );
+    }
+    Some(tls)
+}
+
 pub fn client_stream(inbound: &Value, host: &Value, device: &str) -> Option<Value> {
     let stream = inbound.get("streamSettings")?;
     let security = field(stream, "security").unwrap_or("none");
@@ -325,65 +387,7 @@ pub fn client_stream(inbound: &Value, host: &Value, device: &str) -> Option<Valu
     if security == "reality" {
         out["realitySettings"] = client_reality_settings(inbound, host, stream)?;
     } else if security == "tls" {
-        let server = stream.get("tlsSettings").unwrap_or(&Value::Null);
-        let sni = field(host, "sni")
-            .or_else(|| field(host, "externalSNI"))
-            .or_else(|| field(server, "serverName"))
-            .or_else(|| field(host, "address"))?;
-        let mut tls = pick(
-            server,
-            &[
-                "alpn",
-                "minVersion",
-                "maxVersion",
-                "cipherSuites",
-                "curvePreferences",
-            ],
-        );
-        tls["serverName"] = json!(sni);
-        if let Some(override_alpn) = field(host, "alpn") {
-            let alpn: Vec<&str> = override_alpn
-                .split(',')
-                .map(str::trim)
-                .filter(|s| {
-                    !s.is_empty()
-                        && s.len() <= 32
-                        && s.bytes()
-                            .all(|b| b.is_ascii_alphanumeric() || b"/.-_".contains(&b))
-                })
-                .collect();
-            if !alpn.is_empty() {
-                tls["alpn"] = json!(alpn);
-            }
-        }
-        if let Some(fp) = field(host, "fp").or_else(|| field(host, "fingerprint")) {
-            tls["fingerprint"] = json!(fp);
-        }
-        // Certificate chains, private keys, server ECH keys, OCSP stapling,
-        // rejectUnknownSni, and all inbound trust material never leave the server.
-        if let Some(client) = client_metadata(inbound, host, "clientTlsSettings") {
-            merge_allowed(
-                &mut tls,
-                client,
-                &[
-                    "verifyPeerCertByName",
-                    "allowInsecure",
-                    "alpn",
-                    "fingerprint",
-                    "pinnedPeerCertSha256",
-                    "useSystemCA",
-                    "disableSystemRoot",
-                    "enableSessionResumption",
-                    "echConfigList",
-                    "echSockopt",
-                    "minVersion",
-                    "maxVersion",
-                    "cipherSuites",
-                    "curvePreferences",
-                ],
-            );
-        }
-        out["tlsSettings"] = tls;
+        out["tlsSettings"] = client_tls_settings(inbound, host, stream)?;
     }
     let transport = client_transport(stream, inbound, host, device, network);
     if !transport.as_object().is_some_and(serde_json::Map::is_empty) {
