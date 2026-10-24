@@ -398,31 +398,21 @@ const operations={
  },
  async vision(){
   try{
-   ensureDialogs();
    const selected=await chooseInbound();if(!selected)return;
+   if(area.value!==selected.source){notify('JSON изменился; повторите настройку Vision.');return}
    const inbound=getInbound(parse(),selected.index);
    if(inbound.protocol!=='vless')throw Error('XTLS Vision доступен только для VLESS.');
-   const active=inbound.settings?.flow==='xtls-rprx-vision';
-   const response=await dialog.request({
-    title:'XTLS Vision — сервер и подписка',
-    description:'Записывает flow в settings.flow выбранного VLESS inbound. Генератор подписок наследует его для клиентского outbound.',
-    confirmLabel:'Применить',
-    fields:[{name:'flow',label:'Flow (xtls-rprx-vision или none)',value:active?'xtls-rprx-vision':'xtls-rprx-vision',wide:true,required:true,validate:v=>['xtls-rprx-vision','none'].includes(v)?'':'Допустимо xtls-rprx-vision или none'}]
-   });
-   if(!response)return;
-   if(area.value!==selected.source){notify('JSON изменился; повторите настройку Vision.');return}
-   mutate(doc=>{
+   const changed=mutate(doc=>{
     const ib=getInbound(doc,selected.index);
     if(ib.tag!==selected.tag||ib.protocol!=='vless')throw Error('Выбранный inbound изменился');
     const settings=ib.settings??={clients:[]};
-    if(response.flow==='none')delete settings.flow;
-    else settings.flow='xtls-rprx-vision';
-    // Remove the obsolete studio-only default so settings.flow is the single source of truth.
+    settings.flow='xtls-rprx-vision';
+    // The inbound is the authoritative source for subscription flow.
     if(ib.xmesh)delete ib.xmesh.clientFlow;
-    // Existing per-user overrides must not conflict with the inbound default.
     for(const user of [...(Array.isArray(settings.users)?settings.users:[]),...(Array.isArray(settings.clients)?settings.clients:[])])delete user.flow;
-   },'XTLS Vision записан в settings.flow и будет передан в подписку');
-  }catch(e){notify(e.message)}
+   },'XTLS Vision добавлен в JSON. Сохраните профиль после проверки Xray-core.');
+   if(changed)focusJsonSection('flow','XTLS Vision');
+  }catch(e){status('Ошибка Vision: '+e.message);notify(e.message)}
  },
  async vlessens(){
   try{
