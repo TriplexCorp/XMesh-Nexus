@@ -5,7 +5,7 @@ dialog#dlg.node-routing-modal{
   padding:0;border:1px solid var(--ln);border-radius:24px;
   overflow:hidden;color:var(--tx);background:var(--s1)
 }
-dialog#dlg.node-routing-modal::backdrop{background:rgba(2,9,14,.72);backdrop-filter:blur(11px)}
+dialog#dlg.node-routing-modal::backdrop{background:var(--xm-modal-dim);-webkit-backdrop-filter:blur(var(--xm-modal-blur));backdrop-filter:blur(var(--xm-modal-blur))}
 dialog#dlg.node-routing-modal .route-workspace{
   display:flex;flex-direction:column;gap:0;min-height:0;max-height:min(94dvh,1020px);
   overflow:hidden;padding:0;background:var(--s1)
@@ -211,6 +211,3 @@ dialog#dlg.node-routing-modal .route-json-workspace{
  width:34px;height:34px;min-width:34px;min-height:34px;padding:0;font-size:18px;line-height:1;
  border-radius:50%;aspect-ratio:1;box-sizing:border-box;
 }
-
-/* Shared modal backdrop. */
-dialog#dlg.node-routing-modal::backdrop{background:var(--xm-modal-dim,rgba(2,7,12,.72));backdrop-filter:blur(var(--xm-modal-blur,11px));-webkit-backdrop-filter:blur(var(--xm-modal-blur,11px))}
