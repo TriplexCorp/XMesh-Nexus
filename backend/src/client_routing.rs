@@ -226,11 +226,7 @@ fn make_rule(spec: &Value, target: &str) -> Value {
 /// Build a standalone client entry. Extra outbound destinations come only from
 /// the subscriber's already authorized endpoints. Missing targets resolve to
 /// 'block', never to direct or another accidental server.
-pub fn build_server(
-    source: Value,
-    all: &[Value],
-    settings: &Value,
-) -> Result<Value, String> {
+pub fn build_server(source: Value, all: &[Value], settings: &Value) -> Result<Value, String> {
     let Some(profile) = assigned(&source, settings) else {
         return crate::subscription_json::build(vec![source], settings);
     };
