@@ -2536,7 +2536,7 @@ async function nodesP(){
         ${nodeGauge(n,'traffic-'+n.id,'Трафик сети',n.limit?k*100:0,trafficGb===null?'—':n.limit?Math.round(k*100)+'%':'∞',trafficGb===null?'нет данных':(n.limit?`${gb(trafficGb)} / ${gb(n.limit)}`:`${gb(trafficGb)} · без лимита`)+(nodeTrafficFactor(n)!==1?` · ×${nodeTrafficFactor(n)} (учётный)`:''),tc)}
       </div>
       <div class="mb node-speed"><div><span>Текущая скорость</span><b id="nm${n.id}">${Number.isFinite(l.mbps)?fmt(l.mbps)+' Мбит/с':'—'}</b></div><div class="pb f" style="--w:${Number.isFinite(l.mbps)?cl(l.mbps/240*100,0,100):0}%" id="npm${n.id}"><i></i></div></div>
-      <div class="acts"><button class="gh sm" data-node-bootstrap="${n.id}">${ic('link')}Подключить ноду и метрики</button><button class="gh sm" data-nr="${n.id}" ${n.disabled?'disabled title="Сначала включите узел после восстановления лимита"':''}>${ic('redo')}Перезапуск</button><button class="gh sm" data-xray-update="${n.id}">${ic('upload')}Обновить Xray</button><button class="gh sm" data-agent-update="${n.id}" title="Обновить управляющий Agent через подтверждённую команду ноде">${ic("refresh-cw")}Обновить Agent</button><button type="button" class="gh sm node-geodata-open" data-node-geodata="${n.id}" title="Настройки GeoData и ручное обновление файлов на этом узле">${ic("globe")}Обновить GeoData</button><button class="gh sm" data-nt="${n.id}">${ic(n.disabled?'play':'pause')}${n.disabled?'Включить':'Отключить'}</button><button class="gh sm" data-ne="nodes:${n.id}">${ic('pen')}Изменить</button><button class="gh sm" data-node-create-host="${n.id}">${ic('globe')}Создать хост</button></div></div>`;
+      <div class="acts"><button class="gh sm" data-node-bootstrap="${n.id}">${ic('link')}Подключить ноду и метрики</button><button class="gh sm" data-nr="${n.id}" ${n.disabled?'disabled title="Сначала включите узел после восстановления лимита"':''}>${ic('redo')}Перезапуск</button><button class="gh sm" data-xray-update="${n.id}">${ic('upload')}Обновить Xray</button><button class="gh sm" data-agent-update="${n.id}" title="Обновить управляющий Agent через подтверждённую команду ноде">${ic("refresh-cw")}Обновить Agent</button><button type="button" class="gh sm node-geodata-open" data-node-geodata="${n.id}" title="Настройки GeoData и ручное обновление файлов на этом узле">${ic("globe")}Обновить GeoData</button><button type="button" class="gh sm node-routing-open" data-node-routing="${n.id}" title="Направление трафика по GeoSite, GeoIP и через другие ноды">${ic("git-branch")}Маршрутизация</button><button class="gh sm" data-nt="${n.id}">${ic(n.disabled?'play':'pause')}${n.disabled?'Включить':'Отключить'}</button><button class="gh sm" data-ne="nodes:${n.id}">${ic('pen')}Изменить</button><button class="gh sm" data-node-create-host="${n.id}">${ic('globe')}Создать хост</button></div></div>`;
   }).join('');
   const empty=`<div class="card empty"><b>Узлов пока нет</b><span>Список начнёт заполняться после добавления ваших серверов.</span><button class="btn sm" data-ne="nodes">${ic('plus')}Добавить узел</button></div>`;
   const gridMode=getNodeGridMode();
@@ -2775,6 +2775,23 @@ document.addEventListener('input',e=>{
 });
 document.addEventListener('click',async e=>{
   const g=s=>e.target.closest(s);let b;
+  if(b=g('[data-node-routing]')){
+    e.preventDefault();
+    const node=DB.nodes.find(item=>Number(item.id)===Number(b.dataset.nodeRouting));
+    if(!node){toast('Узел не найден.');return}
+    if(!window.XMeshNodeRouting?.open){
+      toast('Окно маршрутизации не загружено. Проверьте сборку панели.');
+      return;
+    }
+    window.XMeshNodeRouting.open({
+      node,nodes:DB.nodes,hosts:DB.hosts,profiles:DB.profiles,
+      modal,apiRequest:backendRequest,
+      updateNode:(patch)=>api.update('nodes',node.id,patch),
+      notify:toast,
+      afterSave:()=>{if(cur==='nodes')void render(1);}
+    });
+    return;
+  }
   if(b=g('[data-node-geodata]')){
     e.preventDefault();
     const node=DB.nodes.find(item=>Number(item.id)===Number(b.dataset.nodeGeodata));
