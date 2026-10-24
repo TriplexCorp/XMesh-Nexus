@@ -29,7 +29,7 @@ const nodeFormStart=app.indexOf('chk:data=>{',app.indexOf("const ENT="));
 assert(nodeFormStart>=0,'Node editor must declare a validation callback');
 const nodeFormEnd=app.indexOf('const issue=nodeRotationValidate(data)',nodeFormStart);
 assert(nodeFormEnd>nodeFormStart&&nodeFormEnd-nodeFormStart<3500,'Node form must validate before submitting');
-assert.match(app.slice(nodeFormEnd,nodeFormEnd+100),/if\\s*\\(issue\\)\\s*return\\s+issue/,'Node form must reject invalid rotation pool');
+assert.match(app.slice(nodeFormEnd,nodeFormEnd+100),/if\s*\(issue\)\s*return\s+issue/,'Node form must reject invalid rotation pool');
 assert.match(app,/class="node-rotation-editor-body"/,'Node rotation fields must remain grouped in the redesigned editor');
 assert.match(app,/data-node-rotation-probe/,'Node editor must provide an authenticated test');
 assert.match(app,/nodeRotationIPs\(n\)\.length/,'Node card must show real pool size');
