@@ -166,7 +166,14 @@ const api={
   async remove(c,id){await lat();const i=DB[c].findIndex(x=>x.id==id);const old=i>=0?DB[c][i]:null;if(backendReady){const path=c==='admins'?'/api/v1/admins/'+encodeURIComponent(id):'/api/v1/collections/'+encodeURIComponent(c)+'/'+encodeURIComponent(id);await backendRequest(path,{method:'DELETE'});}else if(i<0){throw new Error('Запись не найдена в локальном кеше.');}if(i>=0)DB[c].splice(i,1);save();return old},
   async bulk(c,ids,fn){await lat();for(const x of [...(DB[c]||[])].filter(item=>ids.has(item.id))){fn(x);await this.update(c,x.id,{...x})}save()},
   async saveSettings(patch){const saved=await backendRequest('/api/v1/settings',{method:'PATCH',body:JSON.stringify(patch)});DB.set={...DB.set,...saved,hooks:{...DB.set.hooks,...(saved.hooks||{})}};return DB.set},
-  async stats(){await lat();const U=DB.users,by={};U.forEach(u=>{const status=st(u);by[status]=(by[status]||0)+1});const on=U.filter(isOn),live=DB.nodes.filter(n=>n.state==='ONLINE'&&!n.disabled),nodeOn={};live.forEach(n=>nodeOn[n.id]=0);return{by,total:U.length,online:on.length,conn:null,nodeOn,nOn:live.length,nAll:DB.nodes.length};},
+  async stats(){await lat();const U=DB.users,by={};U.forEach(u=>{const status=st(u);by[status]=(by[status]||0)+1});const on=U.filter(isOn),live=DB.nodes.filter(n=>n.state==='ONLINE'&&!n.disabled),nodeOn={};
+    // Count eligible users assigned to each node via its XRAY STUDIO profile and squad inbound tags.
+    // This is an access count, not a per-node live connection count.
+    DB.nodes.forEach(n=>{
+      const profile=DB.profiles.find(p=>String(p.id)===String(n.profileId));
+      const inboundTags=new Set(profile?inbs(profile).map(ib=>ib.tag).filter(Boolean):[]);
+      nodeOn[n.id]=n.disabled||!inboundTags.size?0:U.filter(u=>st(u)==='ACTIVE'&&uin(u).some(tag=>inboundTags.has(tag))).length;
+    });return{by,total:U.length,online:on.length,conn:null,nodeOn,nOn:live.length,nAll:DB.nodes.length};},
   async systemStats(){if(!backendReady)return null;return backendRequest('/api/v1/system/stats')}
 };
 
@@ -2539,7 +2546,7 @@ async function nodesP(){
     const trafficGb=l.networkTotalBytes===null?null:l.networkTotalBytes*nodeTrafficFactor(n)/1073741824;
     const k=n.limit&&trafficGb!==null?cl(trafficGb/n.limit,0,1):0,tc=k>.9?'--er':k>.75?'--wr':'--c3';
     return `<div class="card nc${n.disabled?' off':''}" data-node-card-id="${n.id}"><div class="h"><span class="fg">${flagView(n.flag)}</span><div class="node-identity"><b>${esc(n.name)}</b><br><small class="mu">${viewerMode()?'Адрес скрыт':esc(n.addr||'—')+(n.port?':'+esc(n.port):'')}</small>${n.hosting?.trim()?`<span class="node-hosting" title="Хостинг">${ic('building-2')}${esc(n.hosting.trim())}</span>`:''}</div><div class="node-live-badges"><span class="node-xray-version" data-node-xray-version title="Версия по последнему heartbeat">${runtime.get(n.id)?.xrayVersion?'Xray '+esc(runtime.get(n.id).xrayVersion):'Xray —'}</span><span class="node-agent-version" data-node-agent-version title="Версия управляющего агента">${runtime.get(n.id)?.version?"Agent "+esc(runtime.get(n.id).version.replace(/^control-v/,"v")):"Agent —"}</span><span data-node-runtime-state class="node-runtime-pill node-runtime-${nodeRuntimeState(n,runtime.get(n.id)).kind}"><span class="node-runtime-dot" aria-hidden="true"></span>${esc(nodeRuntimeState(n,runtime.get(n.id)).label)}</span></div></div>
-      <div class="kvg"><div><span>Активные пользователи</span><b>${s.nodeOn[n.id]??0}</b></div><div><span>XRAY STUDIO</span>${p?esc(p.name)+'<br><small class="mu">Применение профиля не подтверждено</small>':n.profileId?'<span class="er">Профиль ID '+esc(n.profileId)+' не найден</span>':'—'}</div></div>
+      <div class="kvg"><div><span title="Пользователи с активным доступом через inbound этой ноды, не число текущих подключений">Активные пользователи</span><b>${s.nodeOn[n.id]??0}</b></div><div><span>XRAY STUDIO</span>${p?esc(p.name)+'<br><small class="mu">Применение профиля не подтверждено</small>':n.profileId?'<span class="er">Профиль ID '+esc(n.profileId)+' не найден</span>':'—'}</div></div>
       ${n.geoEnabled?`<div class="node-ip-rotation active" title="${esc(geoStatus?.lastError||'Подтверждение от управляющего агента, не проверка фактической блокировки рекламы')}"><span class="node-ip-indicator" aria-hidden="true"></span><span>GeoData · ${esc(geoLabel)}${geoFileCount?' · '+geoFileCount+' файла(ов)':''}</span></div>`:''}
       ${n.rotationEnabled?`<div class="node-ip-rotation active" aria-label="Пул IP-ротации"><span class="node-ip-indicator" aria-hidden="true"></span><span>IP-пул · ${nodeRotationIPs(n).length} адресов</span></div>`:''}
       <div class="node-gauges">
