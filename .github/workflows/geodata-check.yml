@@ -43,6 +43,15 @@ jobs:
             if(!docker.includes(name)||!html.includes(name)||!rebasing.includes(name))
               throw new Error('Missing packaged or custom-path asset: '+name);
           }
+          // The general node form reads ENT.nodes.fs in full. Hidden GeoData
+          // fields in that schema previously caused a null-input crash.
+          const app=fs.readFileSync('app.js','utf8');
+          const start=app.indexOf("nodes:{t:'Узлы'");
+          const end=app.indexOf("  tpls:{",start);
+          if(start<0||end<0)throw new Error('Cannot identify node schema');
+          const fields=app.slice(start,app.indexOf('def:()=>',start));
+          if(/\\{k:'geo(?:Enabled|BlockAds|UpdateHours|SiteUrl|IpUrl|ExtraSources|CustomRules)'/.test(fields))
+            throw new Error('GeoData input leaked into the general node editor form schema');
           JS
       - name: Check installed agents
         run: |
