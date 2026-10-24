@@ -200,10 +200,10 @@ pub async fn dashboard_entry(State(state):State<AppState>,Path(slug):Path<String
     // The canonical root HTML and links remain untouched.
     let mut html=content;
     for asset in [
-        "styles.css","global-hover.css","subscription-studio.css","xray-studio-v4.css",
+        "styles.css","global-hover.css","subscription-studio.css","xray-studio-v4.css","node-geodata.css",
         "xray-json-intelligence.js","xray-json-diagnostics.js","i18n.js",
         "subscription-studio.js","qr-code.js","mfa-ui.js","security-ui.js",
-        "app.js","xray-studio-v4.js","xray-studio-dialog.js"
+        "app.js","node-geodata.js","xray-studio-v4.js","xray-studio-dialog.js"
     ] {
         html=html.replace(&format!("href=\"{asset}"),&format!("href=\"/{asset}"));
         html=html.replace(&format!("src=\"{asset}"),&format!("src=\"/{asset}"));
