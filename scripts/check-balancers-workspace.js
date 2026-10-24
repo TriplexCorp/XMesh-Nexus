@@ -13,12 +13,12 @@ assert.match(app,/subscriptionJson:\{\.\.\.\(DB\.set\.subscriptionJson\|\|\{\}\)
 assert.match(studio,/balance:'leastPing',smart:false/);
 assert.doesNotMatch(studio,/name="json_smart"/,'Balancer switch belongs in its own workspace');
 assert.doesNotMatch(studio,/name="json_balance"/,'Strategy belongs in its own workspace');
-assert.match(engine,/let smart=smart_enabled\(setting\)/);
-assert.match(engine,/enabled\(opts,"smart",false\)/);
-assert.match(engine,/if smart && tags\.len\(\)>1 && balance!="off"/);
+assert.match(engine,/let\s+smart\s*=\s*smart_enabled\(\s*setting\s*\)/);
+assert.match(engine,/enabled\(\s*opts\s*,\s*"smart"\s*,\s*false\s*\)/);
+assert.match(engine,/if\s+smart\s*&&\s*tags\.len\(\)\s*>\s*1\s*&&\s*balance\s*!=\s*"off"/);
 assert.match(engine,/fn balancers_are_opt_in_and_servers_remain_distinct/);
 const subscriptions=fs.readFileSync('backend/src/user_subscriptions.rs','utf8');
-assert.match(subscriptions,/let mut response=Json\(json\)\.into_response\(\)/,
+assert.match(subscriptions,/let\s+mut\s+response\s*=\s*Json\(\s*json\s*\)\.into_response\(\)/,
  'Every subscription returns native JSON regardless of SMART');
 assert.doesNotMatch(subscriptions,/vless_link\(|links\.join\(|use_vless_feed\(/,
  'Legacy URI generation and fallback must remain removed');
@@ -31,13 +31,13 @@ assert.match(negotiation,/options\.get\("device"\)/,
  'Keep device-specific XHTTP configuration');
 assert.match(engine,/fn disabled_smart_never_emits_balancer_or_observatory\(\)/);
 assert.match(engine,/В JSON обнаружена балансировка, хотя SMART отключён/);
-assert.match(engine,/pub\(crate\) fn build_feed\(proxies:Vec<Value>,settings:&Value\)/,
+assert.match(engine,/pub\(crate\)\s+fn\s+build_feed\(\s*proxies:\s*Vec<Value>\s*,\s*settings:\s*&Value\s*\)/,
  'Feed must return a JSON array of independent Xray configs');
 assert.match(engine,/Ok\(Value::Array\(entries\)\)/);
 assert.match(engine,/fn feed_exposes_one_full_json_profile_per_server\(\)/);
 assert.match(engine,/fn smart_is_an_optional_additional_profile\(\)/);
-assert.match(subscriptions,/subscription_json::build_feed\(outbounds,&settings\)/);
-assert.match(subscriptions,/subscription_json::build_feed\(proxies,&setting\)/);
+assert.match(subscriptions,/subscription_json::build_feed\(\s*outbounds\s*,\s*&settings\s*\)/);
+assert.match(subscriptions,/subscription_json::build_feed\(\s*proxies\s*,\s*&setting\s*\)/);
 assert.match(engine,/fn validate_client_balancers\(/);
 assert.match(engine,/settings\.get\("clientBalancers"\)/);
 assert.match(engine,/xmeshSourceKey/);
