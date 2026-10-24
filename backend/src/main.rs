@@ -1740,7 +1740,8 @@ async fn get_statistics_overview(
                 "onlineClients":row.try_get::<Option<i32>,_>("online_clients")?,
                 "sampledAt":sampled_at,
                 "stale":std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default().as_millis() as i64 - sampled_at > 300_000
+                    .unwrap_or_default().as_millis().try_into().unwrap_or(i64::MAX)
+                    > sampled_at.saturating_add(300_000)
             }))
         } else {
             None
