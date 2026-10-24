@@ -38,7 +38,7 @@ COPY --from=builder /build/output/xmesh-api /usr/local/bin/xmesh-api
 COPY --from=flag-assets /flags/package/flags/4x3/ /app/static/flags/
 # MIT license for bundled flag-icons assets.
 COPY --from=flag-assets /flags/package/LICENSE /app/static/flags/LICENSE
-COPY index.html styles.css global-hover.css i18n.js subscription-studio.css subscription-public.css subscription-studio.js subscription-portal.js qr-code.js mfa-ui.js security-ui.js xray-studio-v4.css xray-studio-hosts.css xray-studio-hosts.js xray-studio-dialogs.js xray-studio-tools.js xray-studio-v4.js xray-json-intelligence.js xray-json-diagnostics.js client-config.js app.js login.html login.css login.js /app/static/
+COPY index.html styles.css global-hover.css i18n.js subscription-studio.css subscription-public.css subscription-studio.js subscription-portal.js qr-code.js mfa-ui.js security-ui.js xray-studio-v4.css xray-studio-hosts.css xray-studio-hosts.js xray-studio-dialogs.js xray-studio-tools.js xray-studio-v4.js xray-json-intelligence.js xray-json-diagnostics.js client-config.js node-geodata.js node-geodata.css app.js login.html login.css login.js /app/static/
 RUN chown -R xmesh:xmesh /app/static
 USER 10001:10001
 WORKDIR /app
