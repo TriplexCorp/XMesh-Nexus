@@ -379,6 +379,34 @@ impl CoreManager {
         Ok(())
     }
 
+    async fn activate_staged_version(&self, versions_dir: &Path, staging_dir: &Path, version: &str) -> Result<(), String> {
+        let target_dir = versions_dir.join(version);
+        if fs::try_exists(&target_dir).await.unwrap_or(false) {
+            fs::remove_dir_all(&target_dir)
+                .await
+                .map_err(|e| e.to_string())?;
+        }
+        fs::rename(&staging_dir, &target_dir)
+            .await
+            .map_err(|e| format!("Could not finalize release directory: {e}"))?;
+
+        let temporary_link = self
+            .root
+            .join(format!(".current-{}", Uuid::new_v4().simple()));
+        let relative_target = PathBuf::from("versions").join(version);
+        symlink(&relative_target, &temporary_link)
+            .map_err(|e| format!("Could not create atomic Xray-core version link: {e}"))?;
+        let current = self.root.join("current");
+        if let Err(error) = fs::rename(&temporary_link, &current).await {
+            let _ = fs::remove_file(&temporary_link).await;
+            return Err(format!(
+                "Could not switch installed Xray-core version atomically: {error}"
+            ));
+        }
+
+        Ok(())
+    }
+
     async fn install_inner(&self, target: &str) -> Result<(String, String), String> {
         let releases = self.fetch_releases().await?;
         let latest = releases
@@ -496,29 +524,7 @@ impl CoreManager {
 
         self.verify_staged_binary(&staging_dir, &release.tag_name).await?;
 
-        let target_dir = versions_dir.join(&release.tag_name);
-        if fs::try_exists(&target_dir).await.unwrap_or(false) {
-            fs::remove_dir_all(&target_dir)
-                .await
-                .map_err(|e| e.to_string())?;
-        }
-        fs::rename(&staging_dir, &target_dir)
-            .await
-            .map_err(|e| format!("Could not finalize release directory: {e}"))?;
-
-        let temporary_link = self
-            .root
-            .join(format!(".current-{}", Uuid::new_v4().simple()));
-        let relative_target = PathBuf::from("versions").join(&release.tag_name);
-        symlink(&relative_target, &temporary_link)
-            .map_err(|e| format!("Could not create atomic Xray-core version link: {e}"))?;
-        let current = self.root.join("current");
-        if let Err(error) = fs::rename(&temporary_link, &current).await {
-            let _ = fs::remove_file(&temporary_link).await;
-            return Err(format!(
-                "Could not switch installed Xray-core version atomically: {error}"
-            ));
-        }
+        self.activate_staged_version(&versions_dir, &staging_dir, &release.tag_name).await?;
 
         Ok((release.tag_name, latest))
     }
