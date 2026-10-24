@@ -5023,3 +5023,14 @@ dialog.user-modal .user-head-actions button.ia[data-x][aria-label^="Закрыт
 .balancer-list>.balancer-editor{min-width:0;height:100%;align-content:start}
 .balancer-list>.balancer-empty{grid-column:1/-1}
 @media(max-width:960px){.balancer-list{grid-template-columns:1fr}}
+
+/* Keep the user save action at the bottom of the Settings column,
+   aligned with the other two panes instead of directly below Notes. */
+dialog.user-modal .user-canvas-grid{align-items:stretch}
+dialog.user-modal .user-pane-settings{grid-template-rows:auto minmax(0,1fr)}
+dialog.user-modal .user-pane-settings .user-inline-editor{
+  display:flex;flex-direction:column;min-height:0;
+}
+dialog.user-modal .user-pane-settings .user-editor-actions{
+  margin-top:auto;padding-top:.85rem;
+}
