@@ -14,6 +14,7 @@ mod subscription_settings;
 mod user_subscriptions;
 mod subscription_user_agent;
 mod subscription_json;
+mod client_routing;
 mod subscription_transport;
 
 use axum::{
@@ -846,7 +847,7 @@ async fn patch_settings(
                 | "subscriptionLogoUrl" | "subscriptionSupportUrl" | "subscriptionShowStatus"
                 | "subscriptionShowApps" | "subscriptionShowQr" | "subscriptionShowCopy"
                 | "subscriptionShowSupport" | "subscriptionShowDevices"
-                | "subscriptionJson" | "clientBalancers" | "subscriptionClients" | "subscriptionClientLinks"
+                | "subscriptionJson" | "clientBalancers" | "clientRoutingProfiles" | "subscriptionClients" | "subscriptionClientLinks"
                 | "subscriptionAppsTitle" | "subscriptionAppsTitleEn" | "subscriptionCustomClients") {
             return Err(ApiError::new(StatusCode::BAD_REQUEST, format!("Неизвестное поле настроек: {key}")));
         }
