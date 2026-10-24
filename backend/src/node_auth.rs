@@ -27,13 +27,7 @@ fn error(message: &'static str) -> ApiError {
     ApiError::new(StatusCode::UNAUTHORIZED, message)
 }
 
-pub fn canonical_for(
-    path: &str,
-    node_id: i64,
-    timestamp: i64,
-    nonce: &str,
-    body: &[u8],
-) -> String {
+pub fn canonical_for(path: &str, node_id: i64, timestamp: i64, nonce: &str, body: &[u8]) -> String {
     let digest = hex::encode(Sha256::digest(body));
     format!("XMESH1\nPOST\n{path}\n{node_id}\n{timestamp}\n{nonce}\n{digest}\n")
 }
