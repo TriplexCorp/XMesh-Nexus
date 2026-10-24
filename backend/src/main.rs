@@ -291,7 +291,7 @@ async fn main() -> anyhow::Result<()> {
         .min_connections(1)
         .acquire_timeout(Duration::from_secs(10))
         .idle_timeout(Duration::from_secs(600))
-        .max_lifetime(Duration::from_secs(1800))
+        .max_lifetime(Duration::from_mins(30))
         .connect(&database_url)
         .await?;
 
@@ -336,13 +336,12 @@ async fn main() -> anyhow::Result<()> {
     auth::seed_bootstrap_admin(&pool, &admin_username, &admin_password).await?;
 
     let cookie_secure = env::var("COOKIE_SECURE")
-        .map(|value| {
+        .map_or(true, |value| {
             matches!(
                 value.trim().to_ascii_lowercase().as_str(),
                 "1" | "true" | "yes"
             )
-        })
-        .unwrap_or(true);
+        });
     let core_dir = PathBuf::from(
         env::var("CORE_DATA_DIR").unwrap_or_else(|_| "/var/lib/xmesh/core".to_owned()),
     );
@@ -636,8 +635,8 @@ async fn shutdown_signal() {
     #[cfg(not(unix))]
     let terminate = std::future::pending::<()>();
     tokio::select! {
-        _ = ctrl_c => {},
-        _ = terminate => {},
+        () = ctrl_c => {},
+        () = terminate => {},
     }
     tracing::info!("Graceful shutdown requested");
 }
