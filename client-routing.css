@@ -58,3 +58,33 @@
 #client-route-root .client-route-savebar .btn{min-height:43px;padding:0 20px}
 @media(max-width:1250px){#client-route-root .client-route-rule{grid-template-columns:26px repeat(2,minmax(0,1fr))}#client-route-root .client-route-rule-actions{grid-column:2/-1;justify-content:flex-end}}
 @media(max-width:720px){#client-route-root .client-route-toolbar,#client-route-root .client-route-profile-head{padding:17px}#client-route-root .client-route-toolbar>.btn{width:100%;justify-content:center}#client-route-root .client-route-block{padding:17px}#client-route-root .client-route-rule{grid-template-columns:1fr}#client-route-root .client-route-rule-actions{grid-column:1}#client-route-root .client-route-savebar .btn{width:100%}}
+
+/* Integrated client routing workspace — same surfaces as Hosts and Balancers */
+#client-route-root.client-routing-workspace{max-width:none;margin:0;display:block;padding:0 0 42px}
+#client-route-root .client-route-main-card{background:var(--s1,#121923);border:1px solid var(--ln,#2a3846);border-radius:var(--ui-control-radius,15px);overflow:clip}
+#client-route-root .client-route-main-head{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;padding:18px 20px;border-bottom:1px solid var(--ln,#2a3846)}
+#client-route-root .client-route-main-head h2{font-size:16px;font-weight:780;margin:0 0 6px;color:var(--tx,#eef1f7)}
+#client-route-root .client-route-main-head p{font-size:12px;color:var(--mu,#95a5b5);line-height:1.5;margin:0}
+#client-route-root .client-route-head-actions{display:flex;align-items:center;gap:12px}
+#client-route-root .client-route-counter{font-size:12px;color:var(--mu,#95a5b5);font-weight:650;white-space:nowrap}
+#client-route-root .client-route-main-body{padding:20px}
+#client-route-root .client-route-list{display:grid;gap:16px}
+#client-route-root .client-route-empty{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;text-align:center;min-height:330px;padding:40px 20px;background:var(--s1,#121923);border:1px dashed var(--ln,#2a3846);border-radius:13px}
+#client-route-root .client-route-empty-icon{display:grid;place-items:center;width:62px;height:62px;background:color-mix(in srgb,var(--a,#70d9b0) 12%,var(--s2,#1b2633));border-radius:17px;color:var(--a,#70d9b0);font-size:26px}
+#client-route-root .client-route-empty h3{font-size:17px;font-weight:760;margin:6px 0 0;color:var(--tx,#eef1f7)}
+#client-route-root .client-route-empty p{max-width:495px;color:var(--mu,#95a5b5);font-size:13px;line-height:1.6;margin:0}
+#client-route-root .client-route-empty-hint{font-size:11px;color:var(--mu,#95a5b5);margin-top:12px}
+#client-route-root .client-route-profile{background:var(--s2,#18222e);border:1px solid var(--ln,#2a3846);border-radius:13px;overflow:hidden}
+#client-route-root .client-route-profile-head{background:var(--s1,#121923);border-bottom:1px solid var(--ln,#2a3846);padding:18px 20px}
+#client-route-root .client-route-block{padding:20px}
+#client-route-root .client-route-block+.client-route-block{border-top:1px solid var(--ln,#2a3846)}
+#client-route-root .client-route-section-heading{margin-bottom:15px}
+#client-route-root .client-route-rules-empty{border:1px dashed var(--ln,#2a3846);border-radius:11px;text-align:center;color:var(--mu,#95a5b5);font-size:12px;padding:24px}
+#client-route-root .client-route-savebar{position:sticky;bottom:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap;margin:0;border:0;border-top:1px solid var(--ln,#2a3846);border-radius:0;background:var(--s1,#121923);box-shadow:none;padding:14px 20px}
+#client-route-root .client-route-summary{display:grid;gap:5px}
+#client-route-root .client-route-summary strong{font-size:13px;color:var(--tx,#eef1f7)}
+#client-route-root .client-route-summary span{font-size:11px;color:var(--mu,#95a5b5)}
+#client-route-root .client-route-saveactions{display:flex;align-items:center;gap:10px}
+#client-route-root button:disabled{opacity:.45;cursor:not-allowed}
+#client-route-root [hidden]{display:none!important}
+@media(max-width:720px){#client-route-root .client-route-main-head,#client-route-root .client-route-main-body,#client-route-root .client-route-savebar{padding:14px}#client-route-root .client-route-head-actions,#client-route-root .client-route-saveactions{width:100%}#client-route-root .client-route-head-actions .btn,#client-route-root .client-route-saveactions .btn{flex:1}}
