@@ -88,3 +88,17 @@
 #client-route-root button:disabled{opacity:.45;cursor:not-allowed}
 #client-route-root [hidden]{display:none!important}
 @media(max-width:720px){#client-route-root .client-route-main-head,#client-route-root .client-route-main-body,#client-route-root .client-route-savebar{padding:14px}#client-route-root .client-route-head-actions,#client-route-root .client-route-saveactions{width:100%}#client-route-root .client-route-head-actions .btn,#client-route-root .client-route-saveactions .btn{flex:1}}
+
+
+/* JSON-first authoring for reusable client routing templates */
+#client-route-root .client-route-json-block{padding:20px;display:grid;gap:14px}
+#client-route-root .client-route-json-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+#client-route-root .client-route-json-head h3{font-size:15px;margin:0 0 5px}
+#client-route-root .client-route-json-head p{font-size:12px;color:var(--mu,#95a5b5);margin:0;line-height:1.5}
+#client-route-root .client-route-json-actions{display:flex;align-items:center;gap:9px}
+#client-route-root .client-route-json-actions button{min-height:38px;padding:8px 14px;border-radius:10px}
+#client-route-root .client-route-json-block textarea{display:block;width:100%;min-height:350px;max-height:72vh;resize:vertical;padding:19px 21px;border:1px solid var(--ln,#2a3846);border-radius:12px;background:var(--s1,#0c121a);color:var(--tx,#eef1f7);font:13px/1.7 ui-monospace,SFMono-Regular,Consolas,monospace;tab-size:2;outline:none}
+#client-route-root .client-route-json-block textarea:focus{border-color:var(--a,#70d9b0);box-shadow:0 0 0 2px color-mix(in srgb,var(--a,#70d9b0) 17%,transparent)}
+#client-route-root .client-route-json-error{margin:0;color:#ff8f98;font-size:12px;line-height:1.5}
+#client-route-root .client-route-form-blocks[hidden]{display:none!important}
+@media(max-width:720px){#client-route-root .client-route-json-block{padding:14px}#client-route-root .client-route-json-block textarea{min-height:300px;font-size:12px}}
