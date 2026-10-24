@@ -22,6 +22,8 @@ assert.deepEqual(violations, [], 'Unexpected provider-specific branding in track
 const studio = fs.readFileSync('subscription-studio.js', 'utf8');
 assert.match(studio, /placeholder:'Название вашего сервиса'/,
   'Portal must ship with a vendor-neutral name placeholder');
-assert.match(studio, /subscriptionBrand:'', subscriptionDescription:'Настройки подключения и информация о подписке\.'/,
+assert.match(studio, /subscriptionBrand:''/,
+  'Portal must ship without a hard-coded provider name');
+assert.match(studio, /subscriptionDescription:'Настройки подключения и информация о подписке\.'/,
   'Portal must ship with a vendor-neutral description');
 console.log('Public repository white-label and generic subscription portal defaults: OK');
