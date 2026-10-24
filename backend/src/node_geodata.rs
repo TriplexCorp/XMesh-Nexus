@@ -128,7 +128,11 @@ fn geo_sources(node: &Value) -> Result<(u64, Vec<Value>), ApiError> {
 
 fn inject_geo_rules(config: &mut Value, rules: Vec<Value>) -> Result<(), ApiError> {
     if !rules.is_empty() {
-        outbounds.push(json!({"tag":"xmesh_geo_block","protocol":"blackhole"}));
+        config
+            .get_mut("outbounds")
+            .and_then(Value::as_array_mut)
+            .ok_or_else(|| invalid("GeoData: Xray profile needs an outbounds array."))?
+            .push(json!({"tag":"xmesh_geo_block","protocol":"blackhole"}));
         let routing = config
             .as_object_mut()
             .ok_or_else(|| invalid("GeoData: Xray config must be an object."))?
