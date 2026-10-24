@@ -246,7 +246,7 @@
           '<p class="crx-json-error" data-cr-json-error'+(jsonError?'':' hidden')+'>'+escapeHTML(jsonError)+'</p>')+
         '</main><footer class="crx-dialog-footer"><div class="crx-dialog-summary">'+
         '<span>'+(p.servers||[]).length+' назначений · '+(p.rules||[]).length+' правил</span><small>Настройки применяются к следующим JSON-подпискам</small></div>'+
-        '<div class="crx-dialog-footer-actions"><button type="button" class="crx-btn crx-btn-ghost" data-cr-close>Закрыть</button>'+
+        '<div class="crx-dialog-footer-actions">'+
         '<button type="button" class="crx-btn crx-btn-primary" data-cr-save'+(saveBusy?' disabled':'')+'>'+icon('save')+' Сохранить изменения</button></div></footer>'+
         '<div class="crx-settings"><div class="crx-settings-fields"><label>Название шаблона<input data-cr-name maxlength="100" value="'+escapeHTML(p.name||'')+'"></label>'+
         '<label class="crx-toggle"><input type="checkbox" data-cr-enabled'+(p.enabled!==false?' checked':'')+'><span>Шаблон включён</span></label></div>'+
