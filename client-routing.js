@@ -36,6 +36,7 @@ function create(db,saveSettings,toast){
   })
  ];
  let draft=clone(Array.isArray(db.set?.clientRoutingProfiles)?db.set.clientRoutingProfiles:[]);
+ const jsonEditors=new Set();
  const route=(match='geosite',value='',action='proxy',server='')=>({match,value,action,...(server?{server}:{})});
  const root='<section class="client-routing-workspace" id="client-route-root">'+
   '<div class="client-route-main-card">'+
@@ -86,8 +87,11 @@ function create(db,saveSettings,toast){
     '<header class="client-route-profile-head"><div class="client-route-heading"><span class="client-route-count">'+(index+1)+'</span>'+
     '<label><span>Название шаблона</span><input data-cr-name value="'+esc(p.name||'')+'" maxlength="100" placeholder="Например: RU через Польшу"></label></div>'+
     '<div class="client-route-actions"><label class="client-route-toggle"><input type="checkbox" data-cr-enabled'+(p.enabled!==false?' checked':'')+'> Включён</label>'+
+    '<button type="button" class="gh sm" data-cr-json="'+index+'" aria-pressed="'+jsonEditors.has(p.id)+'">'+(jsonEditors.has(p.id)?'Конструктор':'{ } JSON')+'</button>'+ 
     '<button type="button" class="gh sm" data-cr-duplicate="'+index+'">Копировать</button>'+
     '<button type="button" class="gh sm" data-cr-delete="'+index+'">Удалить</button></div></header>'+
+    (jsonEditors.has(p.id)?'<section class="client-route-json-block"><div class="client-route-json-head"><div><h3>JSON шаблона</h3><p>Редактируйте правила и назначения. Применение не сохраняет изменения на сервере.</p></div><div class="client-route-json-actions"><button type="button" class="gh sm" data-cr-json-format>Форматировать</button><button type="button" class="btn" data-cr-json-apply>Применить JSON</button></div></div><textarea data-cr-json-text spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="JSON шаблона">'+esc(JSON.stringify(p,null,2))+'</textarea><p class="client-route-json-error" data-cr-json-error role="alert" hidden></p></section>':'')+
+    '<div'+(jsonEditors.has(p.id)?' hidden':'')+' class="client-route-form-blocks">'+
     '<section class="client-route-block"><div class="client-route-section-heading"><div><h3>Назначения</h3>'+
     '<p>Выберите серверы, на которых будет действовать этот шаблон.</p></div>'+
     '<span>'+keys.size+' выбрано</span></div>'+
@@ -96,7 +100,7 @@ function create(db,saveSettings,toast){
     '<p>Правила применяются по порядку сверху вниз.</p></div>'+
     '<button type="button" class="gh sm" data-cr-rule-add="'+index+'">Добавить правило</button></div>'+
     '<div class="client-route-rules">'+(rules||'<div class="client-route-rules-empty">Дополнительных правил пока нет. Используется стандартная маршрутизация.</div>')+'</div></section>'+
-    '</article>';
+    '</div></article>';
   }).join(''):'<div class="client-route-empty">'+
    '<div class="client-route-empty-icon" aria-hidden="true">⇄</div>'+
    '<h3>Шаблонов маршрутизации пока нет</h3>'+
@@ -123,6 +127,7 @@ function create(db,saveSettings,toast){
   if(!root)return clone(draft);
   return [...root.querySelectorAll('[data-cr-profile]')].map((element,index)=>{
    const saved=draft[index];
+   if(jsonEditors.has(saved.id))return clone(saved);
    const rules=[...element.querySelectorAll('[data-cr-rule]')].map(row=>{
     const get=k=>row.querySelector('[data-cr-field="'+k+'"]').value.trim();
     return route(get('match'),get('value'),get('action'),get('action')==='server'?get('server'):'');
@@ -143,7 +148,8 @@ function create(db,saveSettings,toast){
     seen.add(source);
    }
    for(const rule of profile.rules){
-    if(!rule.value)return 'Укажите значение каждого правила.';
+    if(!rule||typeof rule!=='object'||!['geosite','geoip','domain','ip','port'].includes(rule.match)||typeof rule.value!=='string'||!rule.value.trim())return 'Укажите корректный тип и значение каждого правила.';
+    if(!['proxy','direct','block','server'].includes(rule.action))return 'Некорректное действие правила.';
     if(rule.action==='server'&&!rule.server)return 'Выберите целевой сервер для правила.';
    }
   }
@@ -177,6 +183,7 @@ function create(db,saveSettings,toast){
     return;
    }
    if(button.hasAttribute('data-cr-reset')){
+    jsonEditors.clear();
     draft=JSON.parse(saved);render();syncDirty();return;
    }
    if(button.hasAttribute('data-cr-add')){
@@ -192,6 +199,33 @@ function create(db,saveSettings,toast){
    const card=button.closest('[data-cr-profile]');if(!card)return;
    const index=Number(card.dataset.crProfile);
    draft=read();
+   if(button.hasAttribute('data-cr-json')){
+    const id=draft[index].id;
+    if(jsonEditors.has(id))jsonEditors.delete(id);else jsonEditors.add(id);
+    render();syncDirty();return;
+   }
+   if(button.hasAttribute('data-cr-json-format')||button.hasAttribute('data-cr-json-apply')){
+    const editor=card.querySelector('[data-cr-json-text]');
+    const errorBox=card.querySelector('[data-cr-json-error]');
+    try{
+     const parsed=JSON.parse(editor.value);
+     if(!parsed||Array.isArray(parsed)||typeof parsed!=='object')throw Error('Ожидается JSON-объект шаблона');
+     if(parsed.id!==draft[index].id)throw Error('ID шаблона менять нельзя');
+     if(typeof parsed.name!=='string'||!parsed.name.trim())throw Error('Укажите название шаблона');
+     if(parsed.enabled!==undefined&&typeof parsed.enabled!=='boolean')throw Error('enabled должен быть true или false');
+     if(!Array.isArray(parsed.servers)||!parsed.servers.every(v=>typeof v==='string'))throw Error('servers должен быть массивом ID серверов');
+     if(!Array.isArray(parsed.rules))throw Error('rules должен быть массивом правил');
+     if(Object.keys(parsed).some(k=>!['id','name','enabled','servers','rules'].includes(k)))throw Error('В шаблоне есть неизвестные поля');
+     const issue=validate([...draft.slice(0,index),parsed,...draft.slice(index+1)]);
+     if(issue)throw Error(issue);
+     if(button.hasAttribute('data-cr-json-format')){
+      editor.value=JSON.stringify(parsed,null,2);errorBox.hidden=true;return;
+     }
+     draft[index]=parsed;
+     errorBox.hidden=true;render();syncDirty();toast('JSON применён. Сохраните изменения.');
+    }catch(e){errorBox.textContent='Ошибка JSON: '+e.message;errorBox.hidden=false;}
+    return;
+   }
    if(button.hasAttribute('data-cr-duplicate')){
     const copy=clone(draft[index]);
     copy.id='route_'+Array.from(crypto.getRandomValues(new Uint8Array(6)),
@@ -203,6 +237,7 @@ function create(db,saveSettings,toast){
      button.dataset.confirm='yes';button.textContent='Подтвердить удаление';
      return;
     }
+    jsonEditors.delete(draft[index].id);
     draft.splice(index,1);
    }else if(button.hasAttribute('data-cr-rule-add')){
     draft[index].rules.push(route());
@@ -220,7 +255,7 @@ function create(db,saveSettings,toast){
    }else return;
    render();syncDirty();
   });
-  root.addEventListener('input',syncDirty);
+  root.addEventListener('input',event=>{if(!event.target.matches('[data-cr-json-text]'))syncDirty()});
   root.addEventListener('change',syncDirty);
   syncDirty();
  }
