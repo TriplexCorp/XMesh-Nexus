@@ -1,6 +1,6 @@
 //! Client-side Xray stream settings. Never serialize an inbound streamSettings verbatim.
-//! Source of truth: https://xtls.github.io/en/config/transport.html
-//! XHTTP fields: Xray-core infra/conf/transport_method.go (SplitHTTPConfig).
+//! Source of truth: <https://xtls.github.io/en/config/transport.html>
+//! XHTTP fields: `Xray-core` `infra/conf/transport_method.go` (`SplitHTTPConfig`).
 use serde_json::{Value, json};
 
 fn field<'a>(obj: &'a Value, key: &str) -> Option<&'a str> {
@@ -163,7 +163,7 @@ fn client_transport(
         .get(settings_key)
         .cloned()
         .unwrap_or_else(|| json!({}));
-    if network == "tcp" && config.as_object().is_some_and(|m| m.is_empty()) {
+    if network == "tcp" && config.as_object().is_some_and(serde_json::Map::is_empty) {
         config = stream
             .get("tcpSettings")
             .cloned()
@@ -243,7 +243,7 @@ fn client_transport(
     transport
 }
 
-pub(crate) fn client_stream(inbound: &Value, host: &Value, device: &str) -> Option<Value> {
+pub fn client_stream(inbound: &Value, host: &Value, device: &str) -> Option<Value> {
     let stream = inbound.get("streamSettings")?;
     let security = field(stream, "security").unwrap_or("none");
     let network = field(stream, "method")
@@ -347,7 +347,7 @@ pub(crate) fn client_stream(inbound: &Value, host: &Value, device: &str) -> Opti
                 })
                 .collect();
             if !alpn.is_empty() {
-                tls["alpn"] = json!(alpn)
+                tls["alpn"] = json!(alpn);
             }
         }
         if let Some(fp) = field(host, "fp").or_else(|| field(host, "fingerprint")) {
@@ -380,7 +380,7 @@ pub(crate) fn client_stream(inbound: &Value, host: &Value, device: &str) -> Opti
         out["tlsSettings"] = tls;
     }
     let transport = client_transport(stream, inbound, host, device, network);
-    if !transport.as_object().is_some_and(|o| o.is_empty()) {
+    if !transport.as_object().is_some_and(serde_json::Map::is_empty) {
         let field = match network {
             "raw" | "tcp" => "rawSettings",
             "xhttp" => "xhttpSettings",
