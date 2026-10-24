@@ -301,6 +301,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/security/sessions/others", post(security::revoke_other_sessions))
         .route("/security/sessions/{id}", axum::routing::delete(security::revoke_session))
         .route("/settings", get(get_settings).patch(patch_settings))
+        .route("/client-routing", patch(patch_client_routing))
         .route("/stats", get(get_stats))
         .route("/system/stats", get(get_system_stats))
         .route("/statistics/overview", get(get_statistics_overview))
@@ -969,6 +970,35 @@ async fn patch_settings(
     let settings: Value = row.try_get("value")?;
     audit(&state.pool, &actor.username, "settings.update", None, None, json!({})).await;
     Ok(Json(settings))
+}
+
+// Narrow-scoped settings endpoint: administrators may edit client routing
+// without gaining control of unrelated owner-only security, branding or hooks.
+async fn patch_client_routing(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+    Json(body): Json<Value>,
+) -> Result<Json<Value>,ApiError>{
+    require_mutation(&actor)?;
+    let object=body.as_object().ok_or_else(||ApiError::new(
+        StatusCode::BAD_REQUEST,"Ожидается объект настроек маршрутизации."))?;
+    if object.len()!=1 || !object.contains_key("profiles"){
+        return Err(ApiError::new(StatusCode::BAD_REQUEST,
+            "Разрешено изменять только массив profiles."));
+    }
+    let profiles=object.get("profiles").unwrap();
+    client_routing::validate(profiles).map_err(|reason|
+        ApiError::new(StatusCode::BAD_REQUEST,reason))?;
+    let settings:Value=sqlx::query_scalar(
+        "INSERT INTO app_settings(key,value) VALUES('panel',$1)
+         ON CONFLICT(key) DO UPDATE
+         SET value=app_settings.value || EXCLUDED.value,updated_at=NOW()
+         RETURNING value"
+    ).bind(json!({"clientRoutingProfiles":profiles})).fetch_one(&state.pool).await?;
+    audit(&state.pool,&actor.username,"client-routing.update",None,None,json!({
+        "templates":profiles.as_array().map_or(0,Vec::len)
+    })).await;
+    Ok(Json(json!({"profiles":settings["clientRoutingProfiles"]})))
 }
 
 async fn get_stats(State(state): State<AppState>) -> Result<Json<Value>, ApiError> {
