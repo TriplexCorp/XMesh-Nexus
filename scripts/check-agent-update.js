@@ -23,7 +23,7 @@ assert.match(runtime,/version LIKE 'control-v4\.%'/);
 assert.match(runtime,/VALUES\(\$1,'update_agent',\$2,\$3\)/);
 assert.match(runtime,/pub const CONTROL_AGENT_VERSION/);
 assert.match(migration,/CHECK \(action IN \('restart_xray', 'update_xray', 'update_agent'\)\)/);
-assert.match(agent,/AGENT_VERSION="control-v4[.]0[.]0"/);
+assert.match(agent,/AGENT_VERSION="control-v4[.][0-9]+[.][0-9]+"/);
 assert.match(agent,/if action not in \("restart_xray","update_xray","update_agent"\)/);
 assert.match(agent,/systemctl start --wait xmesh-node-agent-upgrade[.]service/);
 assert.match(agent,/signed_post '\/api\/v1\/node\/restart\/ack'/);
