@@ -40,6 +40,9 @@ use tower_http::{
     trace::TraceLayer,
 };
 
+// Recent verified Xray traffic, not a live TCP-session count.
+const USER_ONLINE_WINDOW_MS: i64 = 45_000;
+
 const COLLECTIONS: &[&str] = &[
     "users", "nodes", "profiles", "hosts", "squads", "tpls", "subs", "admins", "tokens", "srh",
 ];
@@ -306,6 +309,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/system/stats", get(get_system_stats))
         .route("/statistics/overview", get(get_statistics_overview))
         .route("/metrics/traffic", get(get_traffic_metrics))
+        .route("/users/presence", get(get_user_presence))
         .route("/users/{id}/traffic", get(get_user_traffic))
         .route("/nodes/{id}/metrics-key", post(node_auth::enroll).delete(node_auth::revoke))
         .route("/nodes/{id}/runtime", get(node_runtime::status))
@@ -1014,7 +1018,7 @@ async fn get_stats(State(state): State<AppState>) -> Result<Json<Value>, ApiErro
     }
     let online = users.iter().filter(|user| {
         user_status(user, now_ms) == "ACTIVE" &&
-            number(user, "onlineAt").is_some_and(|last| last > now_ms - 300_000)
+            number(user, "onlineAt").is_some_and(|last| last > now_ms - USER_ONLINE_WINDOW_MS)
     }).count();
     let mut node_on = Map::new();
     let mut n_on = 0usize;
@@ -1427,7 +1431,10 @@ async fn ingest_node_metrics(
         // Preserve the last activity timestamp across node restarts and resets.
         sqlx::query(
             "UPDATE panel_records AS u
-             SET data=jsonb_set(u.data,'{onlineAt}',to_jsonb(LEAST($3::BIGINT,$4::BIGINT)),true),
+             SET data=jsonb_set(
+                   u.data,'{onlineAt}',
+                   to_jsonb(GREATEST(
+                       CASE WHEN (u.data->>'onlineAt') ~ '^[0-9]{1,16}
                  updated_at=NOW()
              FROM jsonb_to_recordset($2::jsonb)
                   AS sample(user_id BIGINT,uplink_bytes BIGINT,downlink_bytes BIGINT)
@@ -1690,6 +1697,2574 @@ async fn ingest_node_metrics(
         "userTrafficSamples": user_traffic.len(),
         "userInboundTrafficSamples": inbound_samples.len()
     }))))
+}
+
+/// Lightweight, authenticated presence refresh for the Users page.
+/// Return only IDs and last activity timestamps; never send subscription keys.
+async fn get_user_presence(
+    State(state): State<AppState>,
+) -> Result<Json<Value>, ApiError> {
+    let rows = sqlx::query(
+        "SELECT id,
+           CASE WHEN (data->>'onlineAt') ~ '^[0-9]{1,16}
+/// Without actual per-user counter reports this returns an empty server list.
+async fn get_user_traffic(
+    State(state): State<AppState>,
+    Path(user_id): Path<i64>,
+) -> Result<Json<Value>, ApiError> {
+    if user_id <= 0 {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Некорректный ID пользователя."));
+    }
+    let user_data: Value = sqlx::query_scalar(
+        "SELECT data FROM panel_records WHERE collection='users' AND id=$1"
+    )
+    .bind(user_id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(||ApiError::new(StatusCode::NOT_FOUND,"Пользователь не найден."))?;
+    let base_usage = user_data.get("used").and_then(Value::as_f64)
+        .filter(|value|value.is_finite()&&*value>=0.0).unwrap_or(0.0);
+    let rows = sqlx::query(
+        "SELECT totals.node_id,
+                COALESCE(
+                  NULLIF(node.data->>'remark', ''),
+                  NULLIF(node.data->>'name', ''),
+                  NULLIF(node.data->>'tag', ''),
+                  'Узел #' || totals.node_id::text
+                ) AS node_name,
+                totals.uplink_bytes,
+                totals.downlink_bytes,
+                totals.observations,
+                (EXTRACT(EPOCH FROM totals.updated_at) * 1000)::BIGINT AS updated_at_ms
+         FROM user_node_traffic_totals totals
+         LEFT JOIN panel_records node
+           ON node.collection = 'nodes' AND node.id = totals.node_id
+         WHERE totals.user_id = $1
+         ORDER BY (totals.uplink_bytes + totals.downlink_bytes) DESC, totals.node_id"
+    )
+    .bind(user_id)
+    .fetch_all(&state.pool)
+    .await?;
+    let mut servers = Vec::with_capacity(rows.len());
+    let mut uplink = 0_i64;
+    let mut downlink = 0_i64;
+    for row in rows {
+        let up: i64 = row.try_get("uplink_bytes")?;
+        let down: i64 = row.try_get("downlink_bytes")?;
+        uplink = uplink.saturating_add(up);
+        downlink = downlink.saturating_add(down);
+        servers.push(json!({
+            "nodeId": row.try_get::<i64, _>("node_id")?,
+            "name": row.try_get::<String, _>("node_name")?,
+            "uplinkBytes": up,
+            "downlinkBytes": down,
+            "observations": row.try_get::<i64, _>("observations")?,
+            "updatedAtMs": row.try_get::<i64, _>("updated_at_ms")?
+        }));
+    }
+    let inbound_rows = sqlx::query(
+        "SELECT t.node_id,t.inbound_tag,t.uplink_bytes,t.downlink_bytes,t.observations,
+                COALESCE(NULLIF(n.data->>'name',''),'Узел #'||t.node_id::text) AS node_name
+         FROM user_inbound_traffic_totals t
+         LEFT JOIN panel_records n ON n.collection='nodes' AND n.id=t.node_id
+         WHERE t.user_id=$1 ORDER BY (t.uplink_bytes+t.downlink_bytes) DESC,t.inbound_tag"
+    ).bind(user_id).fetch_all(&state.pool).await?;
+    let mut inbound_totals=Vec::with_capacity(inbound_rows.len());
+    for r in inbound_rows {
+        inbound_totals.push(json!({
+            "nodeId":r.try_get::<i64,_>("node_id")?,
+            "nodeName":r.try_get::<String,_>("node_name")?,
+            "inboundTag":r.try_get::<String,_>("inbound_tag")?,
+            "uplinkBytes":r.try_get::<i64,_>("uplink_bytes")?,
+            "downlinkBytes":r.try_get::<i64,_>("downlink_bytes")?,
+            "observations":r.try_get::<i64,_>("observations")?
+        }));
+    }
+    // Distinguish a truly idle user from an unreachable Xray StatsService.
+    // The last signed sample on each node is advisory; it is never counted as usage.
+    let collector_rows = sqlx::query(
+        "SELECT n.id AS node_id,
+                COALESCE(NULLIF(n.data->>'name',''),'Узел #'||n.id::text) AS node_name,
+                last_sample.status,
+                last_sample.sampled_at_ms
+         FROM panel_records n
+         LEFT JOIN LATERAL (
+             SELECT sm.metrics->>'userStatsStatus' AS status,
+                    (EXTRACT(EPOCH FROM sm.sampled_at)*1000)::BIGINT AS sampled_at_ms
+             FROM server_metric_samples sm
+             WHERE sm.node_id=n.id::text
+             ORDER BY sm.sampled_at DESC LIMIT 1
+         ) last_sample ON TRUE
+         WHERE n.collection='nodes' ORDER BY n.id"
+    ).fetch_all(&state.pool).await?;
+    let mut collectors=Vec::with_capacity(collector_rows.len());
+    for row in collector_rows {
+        collectors.push(json!({
+            "nodeId":row.try_get::<i64,_>("node_id")?,
+            "name":row.try_get::<String,_>("node_name")?,
+            "status":row.try_get::<Option<String>,_>("status")?,
+            "sampledAtMs":row.try_get::<Option<i64>,_>("sampled_at_ms")?
+        }));
+    }
+    Ok(Json(json!({
+        "collectors":collectors,
+        "userId": user_id,
+        "dataSource": "user_node_traffic_totals",
+        "accounting": "monotonic_counter_deltas",
+        "sampleCount": servers.len(),
+        "totalUplinkBytes": uplink,
+        "totalDownlinkBytes": downlink,
+        "effectiveUsedGb": base_usage+(uplink.saturating_add(downlink) as f64 / 1_073_741_824.0),
+        "meteredUsedGb": uplink.saturating_add(downlink) as f64 / 1_073_741_824.0,
+        "servers": servers,
+        "inbounds": inbound_totals,
+        "inboundAccounting": "independent_signed_user_inbound_counters"
+    })))
+}
+
+async fn get_traffic_metrics(
+    State(state): State<AppState>,
+    Query(query): Query<TrafficMetricsQuery>,
+) -> Result<Json<Value>, ApiError> {
+    let (range, interval_seconds) =
+        match query.range.as_deref().unwrap_or("1h") {
+            "1h" => ("1h", 60_i64),
+            "24h" => ("24h", 900_i64),
+            _ => return Err(ApiError::new(StatusCode::BAD_REQUEST, "Период должен быть 1h или 24h.")),
+        };
+
+    if query.node_id.is_some_and(|id| id <= 0) || query.squad_id.is_some_and(|id| id <= 0) {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "ID узла и сквада должны быть положительными числами."));
+    }
+
+    // Node identifiers in the hypertable are text versions of panel_records.id.
+    // A squad includes nodes whose assigned Xray profile has at least one inbound
+    // tag in common with that squad's inbound list.
+    let rows = sqlx::query(
+        "WITH selected_nodes AS (
+            SELECT n.id::text AS node_id
+            FROM panel_records n
+            LEFT JOIN panel_records p
+              ON p.collection = 'profiles'
+             AND p.id::text = n.data->>'profileId'
+            WHERE n.collection = 'nodes'
+              AND ($1::BIGINT IS NULL OR n.id = $1)
+              AND (
+                $2::BIGINT IS NULL
+                OR EXISTS (
+                    SELECT 1
+                    FROM panel_records sq
+                    WHERE sq.collection = 'squads'
+                      AND sq.id = $2
+                      AND EXISTS (
+                          SELECT 1
+                          FROM jsonb_array_elements_text(
+                              CASE
+                                WHEN jsonb_typeof(sq.data->'inb') = 'array' THEN sq.data->'inb'
+                                ELSE '[]'::jsonb
+                              END
+                          ) AS squad_tag(tag)
+                          WHERE EXISTS (
+                              SELECT 1
+                              FROM jsonb_array_elements(
+                                  CASE
+                                    WHEN p.data->>'config' IS NOT NULL
+                                      THEN COALESCE((p.data->>'config')::jsonb->'inbounds', '[]'::jsonb)
+                                    ELSE '[]'::jsonb
+                                  END
+                              ) AS profile_inbound(item)
+                              WHERE profile_inbound.item->>'tag' = squad_tag.tag
+                          )
+                      )
+                )
+              )
+        ),
+        per_node_bucket AS (
+            SELECT
+                time_bucket(CASE WHEN $3::text = '1h' THEN INTERVAL '1 minute' ELSE INTERVAL '15 minutes' END, s.sampled_at) AS bucket,
+                s.node_id,
+                AVG(s.rx_bytes_per_sec) AS rx_bytes_per_sec,
+                AVG(s.tx_bytes_per_sec) AS tx_bytes_per_sec,
+                COUNT(*)::BIGINT AS sample_count
+            FROM server_metric_samples s
+            WHERE s.sampled_at >= NOW() - CASE WHEN $3::text = '1h' THEN INTERVAL '1 hour' ELSE INTERVAL '24 hours' END
+              AND s.node_id IN (SELECT node_id FROM selected_nodes)
+            GROUP BY 1, 2
+        )
+        SELECT
+            (EXTRACT(EPOCH FROM bucket) * 1000)::BIGINT AS bucket_ms,
+            COALESCE(SUM(rx_bytes_per_sec), 0)::DOUBLE PRECISION AS rx_bytes_per_sec,
+            COALESCE(SUM(tx_bytes_per_sec), 0)::DOUBLE PRECISION AS tx_bytes_per_sec,
+            COUNT(DISTINCT node_id)::BIGINT AS node_count,
+            COALESCE(SUM(sample_count), 0)::BIGINT AS sample_count
+        FROM per_node_bucket
+        GROUP BY bucket
+        ORDER BY bucket ASC"
+    )
+    .bind(query.node_id)
+    .bind(query.squad_id)
+    .bind(range)
+    .fetch_all(&state.pool)
+    .await?;
+
+    let mut points = Vec::with_capacity(rows.len());
+    let mut total_samples = 0_i64;
+    let mut latest_node_count = 0_i64;
+
+    for row in &rows {
+        let bucket_ms: i64 = row.try_get("bucket_ms")?;
+        let rx: f64 = row.try_get("rx_bytes_per_sec")?;
+        let tx: f64 = row.try_get("tx_bytes_per_sec")?;
+        let node_count: i64 = row.try_get("node_count")?;
+        let sample_count: i64 = row.try_get("sample_count")?;
+        total_samples = total_samples.saturating_add(sample_count);
+        latest_node_count = node_count;
+        points.push(json!({
+            "bucketMs": bucket_ms,
+            "rxBytesPerSec": rx,
+            "txBytesPerSec": tx,
+            "nodeCount": node_count,
+            "sampleCount": sample_count
+        }));
+    }
+
+    Ok(Json(json!({
+        "range": range,
+        "intervalSeconds": interval_seconds,
+        "nodeId": query.node_id,
+        "squadId": query.squad_id,
+        "dataSource": "server_metric_samples",
+        "sampleCount": total_samples,
+        "latestNodeCount": latest_node_count,
+        "points": points
+    })))
+}
+
+async fn read_cpu_ticks() -> Option<(u64, u64)> {
+    let stat = tokio::fs::read_to_string("/proc/stat").await.ok()?;
+    let line = stat.lines().find(|line| line.starts_with("cpu "))?;
+    let values = line.split_whitespace().skip(1).take(8).filter_map(|value| value.parse::<u64>().ok()).collect::<Vec<_>>();
+    if values.len() < 4 { return None; }
+    let total = values.iter().copied().fold(0u64, u64::saturating_add);
+    let idle = values[3].saturating_add(*values.get(4).unwrap_or(&0));
+    Some((total, idle))
+}
+
+async fn get_core_status(State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>) -> Json<Value> {
+    let status=state.core.status().await;
+    if viewer_read_only(&actor) {
+        Json(json!({"status":status.status,"installed_version":status.installed_version,
+          "latest_version":status.latest_version,"runtime":status.runtime}))
+    } else {Json(serde_json::to_value(status).unwrap_or_else(|_|json!({})))}
+}
+
+async fn get_core_releases(State(state): State<AppState>) -> Result<Json<Value>, ApiError> {
+    let releases = state.core.available_releases().await
+        .map_err(|error| ApiError::new(StatusCode::BAD_GATEWAY, error))?;
+    Ok(Json(json!({"items": releases})))
+}
+
+#[derive(Debug, Deserialize)]
+struct CoreValidationRequest { config: String }
+
+async fn validate_xray_configuration(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+    Json(body): Json<CoreValidationRequest>,
+) -> Result<Json<Value>, ApiError> {
+    require_mutation(&actor)?;
+    if body.config.len() > 512 * 1024 {
+        return Err(ApiError::new(StatusCode::PAYLOAD_TOO_LARGE, "Конфигурация слишком большая."));
+    }
+    // Syntax errors are mapped precisely by the browser JSON parser; never claim
+    // that Xray reports a line when it only reports a semantic error.
+    let _: Value = serde_json::from_str(&body.config)
+        .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Некорректный JSON. Исправьте синтаксис в редакторе."))?;
+    let (valid, stdout, stderr) = state.core.validate_json(&body.config).await
+        .map_err(|msg| ApiError::new(StatusCode::SERVICE_UNAVAILABLE, msg))?;
+    Ok(Json(json!({
+        "valid": valid, "engine": "xray-core",
+        "stdout": stdout, "stderr": stderr,
+        "message": if valid { "Конфигурация принята установленным Xray-core." } else { "Xray-core отклонил конфигурацию." }
+    })))
+}
+
+async fn generate_vless_encryption(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+) -> Result<Json<Value>, ApiError> {
+    require_mutation(&actor)?;
+    let generated = state.core.generate_vless_encryption().await
+        .map_err(|error| ApiError::new(StatusCode::SERVICE_UNAVAILABLE, error))?;
+
+    // Audit the action but never persist or log the secret encryption/decryption values.
+    audit(
+        &state.pool,
+        &actor.username,
+        "xray_core.vlessenc_generated",
+        None,
+        None,
+        json!({"methods": ["x25519", "mlkem768"]}),
+    ).await;
+
+    Ok(Json(generated))
+}
+
+async fn update_core(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+    Json(body): Json<CoreUpdateRequest>,
+) -> Result<(StatusCode, Json<Value>), ApiError> {
+    require_owner(&actor)?;
+    let target = state.core.set_desired_version(&body.version).await
+        .map_err(|error| ApiError::new(StatusCode::BAD_REQUEST, error))?;
+    audit(&state.pool, &actor.username, "xray_core.update_requested", None, None, json!({"version": target})).await;
+
+    let manager = state.core.clone();
+    tokio::spawn(async move {
+        if let Err(error) = manager.install_or_update(target).await {
+            tracing::warn!(error = %error, "Requested Xray-core update failed");
+        }
+    });
+    Ok((StatusCode::ACCEPTED, Json(json!({
+        "status": "updating",
+        "message": "Обновление Xray-core запущено."
+    }))))
+}
+
+/// Only an authenticated owner may request an upgrade. The application never
+/// executes shell commands or receives the Docker socket: a root-owned systemd
+/// worker watches one fixed-value request file and performs a DB backup first.
+async fn request_panel_update(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+) -> Result<(StatusCode, Json<Value>), ApiError> {
+    require_owner(&actor)?;
+    let request_file=env::var("PANEL_UPDATE_REQUEST").map_err(|_|ApiError::new(
+        StatusCode::SERVICE_UNAVAILABLE,"Web-обновления недоступны: настройте host systemd worker через install.sh."
+    ))?;
+    let status_file=env::var("PANEL_UPDATE_STATUS").map_err(|_|ApiError::new(
+        StatusCode::SERVICE_UNAVAILABLE,"Web-обновления недоступны: нет файла состояния."
+    ))?;
+    let status=tokio::fs::read_to_string(&status_file).await.map_err(|_|ApiError::new(
+        StatusCode::SERVICE_UNAVAILABLE,"Хостовый updater не инициализирован."
+    ))?;
+    if status.trim()=="running" {
+        return Err(ApiError::new(StatusCode::CONFLICT,"Обновление уже выполняется."));
+    }
+    tokio::fs::write(&request_file,b"update\n").await.map_err(|error|{
+        tracing::error!(%error,"Panel update request could not be written");
+        ApiError::new(StatusCode::SERVICE_UNAVAILABLE,"Не удалось передать запрос хостовому updater.")
+    })?;
+    audit(&state.pool,&actor.username,"panel.update_requested",None,None,json!({"source":"owner_web"})).await;
+    Ok((StatusCode::ACCEPTED,Json(json!({
+        "status":"queued",
+        "message":"Запрос передан в системный updater. БД будет скопирована до обновления."
+    }))))
+}
+
+async fn get_panel_update_status(
+    Extension(actor): Extension<auth::AuthUser>,
+) -> Result<Json<Value>, ApiError> {
+    require_owner(&actor)?;
+    let state=match env::var("PANEL_UPDATE_STATUS") {
+        Ok(path)=>tokio::fs::read_to_string(path).await.unwrap_or_else(|_|"unavailable".into()),
+        Err(_)=>"unavailable".into(),
+    };
+    let status=match state.trim() {
+        "running"=>"running",
+        "success"=>"success",
+        "failed"=>"failed",
+        "idle"=>"idle",
+        _=>"unavailable",
+    };
+    Ok(Json(json!({"status":status})))
+}
+
+async fn read_settings(pool: &PgPool) -> Result<Value, ApiError> {
+    Ok(sqlx::query_scalar::<_, Value>("SELECT value FROM app_settings WHERE key = 'panel'")
+        .fetch_optional(pool)
+        .await?
+        .unwrap_or_else(|| json!({
+            "brand":"XMesh Nexus",
+            "domain":"",
+            "hooks": {
+                "user.created":0,
+                "user.limited":0,
+                "user.expired":0,
+                "user.expires_in_24_hours":0,
+                "user.first_connected":0,
+                "user.bandwidth_usage_threshold_reached":0
+            }
+        })))
+}
+
+// Panel quotas are expressed in GiB; signed node counters are bytes.
+// Keep the manually configured baseline in panel_records and overlay actual,
+// monotonic signed user counters on reads. Never use node-wide RX/TX here.
+pub(crate) fn add_metered_usage(user: &mut Value, bytes: i64) {
+    let base=user.get("used").and_then(Value::as_f64).unwrap_or(0.0).max(0.0);
+    let measured=(bytes.max(0) as f64)/1_073_741_824.0;
+    if let Some(object)=user.as_object_mut(){
+        object.insert("used".into(),json!(base+measured));
+        object.insert("meteredUsedGb".into(),json!(measured));
+    }
+}
+
+pub(crate) async fn user_metered_bytes(pool: &PgPool, user_id: i64) -> Result<i64,ApiError> {
+    let bytes: i64=sqlx::query_scalar(
+        "SELECT COALESCE(SUM(uplink_bytes + downlink_bytes),0)::BIGINT
+         FROM user_node_traffic_totals WHERE user_id=$1"
+    ).bind(user_id).fetch_one(pool).await?;
+    Ok(bytes.max(0))
+}
+
+async fn load_records(pool: &PgPool, collection: &str) -> Result<Vec<Value>, ApiError> {
+    validate_collection(collection)?;
+    let rows = sqlx::query("SELECT id, data FROM panel_records WHERE collection = $1 ORDER BY id")
+        .bind(collection)
+        .fetch_all(pool)
+        .await?;
+    let mut records=rows.iter().map(row_to_record).collect::<Result<Vec<_>,_>>()?;
+    if collection=="users" && !records.is_empty(){
+        // One grouped query, not one SQL request per user.
+        let totals=sqlx::query(
+            "SELECT user_id, COALESCE(SUM(uplink_bytes+downlink_bytes),0)::BIGINT AS bytes
+             FROM user_node_traffic_totals GROUP BY user_id"
+        ).fetch_all(pool).await?;
+        let traffic=totals.into_iter().filter_map(|row|{
+            Some((row.try_get::<i64,_>("user_id").ok()?,
+                  row.try_get::<i64,_>("bytes").ok()?))
+        }).collect::<std::collections::HashMap<_,_>>();
+        for user in &mut records {
+            if let Some(id)=user.get("id").and_then(Value::as_i64){
+                add_metered_usage(user,*traffic.get(&id).unwrap_or(&0));
+            }
+        }
+    }
+    Ok(records)
+}
+
+fn row_to_record(row: &sqlx::postgres::PgRow) -> Result<Value, ApiError> {
+    let id: i64 = row.try_get("id")?;
+    let mut data: Value = row.try_get("data")?;
+    let object = data.as_object_mut()
+        .ok_or_else(|| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Повреждён формат записи."))?;
+    object.insert("id".to_owned(), json!(id));
+    Ok(data)
+}
+
+fn validate_collection(collection: &str) -> Result<(), ApiError> {
+    if COLLECTIONS.contains(&collection) {
+        Ok(())
+    } else {
+        Err(ApiError::new(StatusCode::NOT_FOUND, "Неизвестная коллекция."))
+    }
+}
+
+// A public Host is not a standalone Xray profile. Its inbound must come from
+// the selected profile, and each assigned node must actually run that profile.
+async fn validate_host_binding(pool: &PgPool, host: &Value) -> Result<(), ApiError> {
+    // Disabled hosts are allowed to remain drafts and can always be switched off.
+    // Re-enabling them validates the full runtime profile/node relationship.
+    if host.get("disabled").and_then(Value::as_bool) == Some(true) { return Ok(()); }
+    let bad = |message: &'static str| ApiError::new(StatusCode::BAD_REQUEST, message);
+    let profile_id = host.get("profileId").and_then(Value::as_i64)
+        .filter(|id| *id > 0)
+        .ok_or_else(|| bad("Хосту необходимо назначить XRAY STUDIO профиль."))?;
+    let tag = host.get("tag").and_then(Value::as_str)
+        .filter(|tag| !tag.is_empty() && tag.len() <= 150)
+        .ok_or_else(|| bad("Выберите inbound из XRAY STUDIO."))?;
+    let address = host.get("address").and_then(Value::as_str)
+        .filter(|value| !value.is_empty() && value.len() <= 253
+            && !value.chars().any(|ch| ch.is_control() || ch.is_whitespace() || "/@?#\\".contains(ch)))
+        .ok_or_else(|| bad("Некорректный публичный адрес хоста."))?;
+    if address == "localhost" || address == "0.0.0.0" || address.starts_with("127.") {
+        return Err(bad("Для подписки нужен публичный адрес ноды."));
+    }
+    let port = host.get("port").and_then(Value::as_u64).unwrap_or(0);
+    if !(1..=65535).contains(&port) { return Err(bad("Укажите публичный порт 1–65535.")); }
+    let nodes = host.get("nodes").and_then(Value::as_array)
+        .filter(|nodes| !nodes.is_empty() && nodes.len() <= 64)
+        .ok_or_else(|| bad("Привяжите хост к одной или нескольким нодам."))?;
+    let profiles = load_records(pool, "profiles").await?;
+    let profile = profiles.iter().find(|profile| profile.get("id").and_then(Value::as_i64) == Some(profile_id))
+        .ok_or_else(|| bad("Выбранный XRAY STUDIO профиль отсутствует."))?;
+    let config = profile.get("config").and_then(Value::as_str)
+        .and_then(|raw| serde_json::from_str::<Value>(raw).ok())
+        .ok_or_else(|| bad("Сохранённая конфигурация XRAY STUDIO недействительна."))?;
+    let inbound = config.get("inbounds").and_then(Value::as_array)
+        .and_then(|items| items.iter().find(|inbound| inbound.get("tag").and_then(Value::as_str) == Some(tag)))
+        .ok_or_else(|| bad("Выбранный inbound отсутствует в XRAY STUDIO профиле."))?;
+    if inbound.get("protocol").and_then(Value::as_str) != Some("vless") {
+        return Err(bad("Генератор подписок пока поддерживает VLESS inbound."));
+    }
+    let all_nodes = load_records(pool, "nodes").await?;
+    for node_id in nodes {
+        let id = node_id.as_i64().ok_or_else(|| bad("Некорректная привязка ноды."))?;
+        let node = all_nodes.iter().find(|node| node.get("id").and_then(Value::as_i64) == Some(id))
+            .ok_or_else(|| bad("Одна из привязанных нод не найдена."))?;
+        if node.get("disabled").and_then(Value::as_bool) == Some(true)
+            || node.get("profileId").and_then(Value::as_i64) != Some(profile_id)
+        {
+            return Err(bad("Профиль привязанной ноды не совпадает с XRAY-профилем хоста. Обновите профиль в разделе «Узлы»."));
+        }
+    }
+    let reality = inbound.get("streamSettings").and_then(|v| v.get("realitySettings"));
+    if inbound.get("streamSettings").and_then(|v| v.get("security")).and_then(Value::as_str) == Some("reality") {
+        let key = host.get("publicKey").and_then(Value::as_str).filter(|s| !s.is_empty())
+            .or_else(|| inbound.get("publicKey").and_then(Value::as_str))
+            .or_else(|| reality.and_then(|v|v.get("publicKey")).and_then(Value::as_str));
+        if key.is_none() { return Err(bad("Отсутствует REALITY publicKey. Добавьте публичный ключ в расширенных настройках хоста.")); }
+    }
+    Ok(())
+}
+
+fn validate_node_address(data: &Value) -> Result<(), ApiError> {
+    use std::net::IpAddr;
+    let addr = data.get("addr").and_then(Value::as_str)
+        .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Укажите адрес ноды: IPv4, IPv6 или домен."))?;
+    if addr.is_empty() || addr != addr.trim() || addr.chars().any(char::is_whitespace) {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Адрес ноды не должен содержать пробелы."));
+    }
+    if addr.parse::<IpAddr>().is_ok() { return Ok(()); }
+    // ASCII DNS hostnames only; internationalized domains must use IDNA A-labels.
+    // Reject numeric dotted strings that look like invalid IPv4 addresses.
+    if addr.len() > 253 || !addr.is_ascii() || addr.contains(':') ||
+       addr.contains('/') || addr.contains('@') || addr.contains('[') ||
+       addr.contains(']') || addr.contains("..") ||
+       addr.chars().all(|c| c.is_ascii_digit() || c == '.') {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Некорректный адрес ноды. Используйте IPv4, IPv6 без скобок или DNS-домен без порта."));
+    }
+    let valid = addr.split('.').all(|label| {
+        !label.is_empty() && label.len() <= 63 &&
+        !label.starts_with('-') && !label.ends_with('-') &&
+        label.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
+    });
+    if !valid {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Некорректное доменное имя ноды."));
+    }
+    Ok(())
+}
+
+fn validate_record(collection: &str, data: &Value) -> Result<(), ApiError> {
+    let object = data.as_object()
+        .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Запись должна быть JSON-объектом."))?;
+    if collection == "nodes" {
+        validate_node_address(data)?;
+        node_rotation::validate_node(data)?;
+        node_routing::validate_saved(data)?;
+        if let Some(hosting) = object.get("hosting") {
+            let value = hosting.as_str().ok_or_else(|| ApiError::new(
+                StatusCode::BAD_REQUEST, "Название хостинга должно быть строкой."
+            ))?;
+            if value.chars().count() > 100 || value.chars().any(char::is_control) {
+                return Err(ApiError::new(
+                    StatusCode::BAD_REQUEST, "Название хостинга не должно превышать 100 символов или содержать управляющие символы."
+                ));
+            }
+        }
+    }
+    if collection == "users" {
+        let username = object.get("username").and_then(Value::as_str)
+            .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Имя пользователя обязательно."))?;
+        if username.trim().is_empty() || username.chars().count() > 128 || username.chars().any(char::is_control) {
+            return Err(ApiError::new(StatusCode::BAD_REQUEST, "Некорректное имя пользователя."));
+        }
+    }
+    if collection == "profiles" {
+        let config = object.get("config").and_then(Value::as_str)
+            .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Конфигурация Xray обязательна."))?;
+        let parsed: Value = serde_json::from_str(config)
+            .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Конфигурация Xray содержит некорректный JSON."))?;
+        let inbounds = parsed.get("inbounds").and_then(Value::as_array)
+            .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "В конфигурации Xray должен быть массив inbounds."))?;
+        if inbounds.is_empty() {
+            return Err(ApiError::new(StatusCode::BAD_REQUEST, "В конфигурации Xray должен быть хотя бы один inbound."));
+        }
+        let mut tags = std::collections::HashSet::new();
+        for inbound in inbounds {
+            let tag = inbound.get("tag").and_then(Value::as_str)
+                .filter(|tag| !tag.trim().is_empty())
+                .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "У каждого inbound должен быть tag."))?;
+            if !tags.insert(tag) {
+                return Err(ApiError::new(StatusCode::BAD_REQUEST, "Теги inbounds должны быть уникальными."));
+            }
+            // Defense in depth: browser credential managers may have filled
+            // unrelated Studio password/username inputs into REALITY secrets.
+            // Validate even dormant realitySettings with security="none".
+            if let Some(reality) = inbound.get("streamSettings")
+                .and_then(|stream| stream.get("realitySettings"))
+            {
+                if !reality.is_object() {
+                    return Err(ApiError::new(StatusCode::BAD_REQUEST,
+                        "REALITY: realitySettings должен быть объектом."));
+                }
+                if let Some(private_key) = reality.get("privateKey") {
+                    let valid = private_key.as_str().is_some_and(|key| {
+                        key.is_empty() || (key.len() == 43 && key.bytes().all(|b|
+                            b.is_ascii_alphanumeric() || b == b'-' || b == b'_'))
+                    });
+                    if !valid {
+                        return Err(ApiError::new(StatusCode::BAD_REQUEST,
+                            "REALITY: privateKey должен быть X25519 base64url (43 символа). Проверьте автозаполнение браузера."));
+                    }
+                }
+                if let Some(ids) = reality.get("shortIds") {
+                    let ids = ids.as_array().ok_or_else(|| ApiError::new(
+                        StatusCode::BAD_REQUEST, "REALITY: shortIds должен быть массивом."))?;
+                    let mut seen = std::collections::HashSet::new();
+                    for short_id in ids {
+                        let valid = short_id.as_str().is_some_and(|id| {
+                            id.len() <= 16 && id.len() % 2 == 0
+                                && id.bytes().all(|b| b.is_ascii_hexdigit())
+                                && seen.insert(id.to_ascii_lowercase())
+                        });
+                        if !valid {
+                            return Err(ApiError::new(StatusCode::BAD_REQUEST,
+                                "REALITY: Short ID должен быть уникальной HEX-строкой чётной длины, максимум 16 символов."));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod reality_profile_autofill_validation_tests {
+    use super::*;
+
+    fn profile(key: &str, short_id: &str, security: &str) -> Value {
+        let config = json!({"inbounds":[{"tag":"main","protocol":"vless","port":443,
+            "streamSettings":{"network":"xhttp","security":security,
+                "realitySettings":{"privateKey":key,"shortIds":[short_id]}}}]});
+        json!({"name":"test","config":config.to_string()})
+    }
+
+    #[test]
+    fn rejects_autofilled_login_and_credential_even_while_inactive() {
+        let contaminated = profile(&"a".repeat(256), "Triplex", "none");
+        assert!(validate_record("profiles", &contaminated).is_err());
+        assert!(validate_record("profiles", &profile(&"a".repeat(256), "abcdef12", "none")).is_err());
+        assert!(validate_record("profiles", &profile(&"A".repeat(43), "Triplex", "none")).is_err());
+    }
+
+    #[test]
+    fn accepts_canonical_x25519_and_hex_short_id() {
+        let valid = profile(&"A".repeat(43), "0123456789abcdef", "reality");
+        assert!(validate_record("profiles", &valid).is_ok());
+    }
+}
+
+fn user_status(user: &Value, now_ms: i64) -> &'static str {
+    if user.get("disabled").and_then(Value::as_bool) == Some(true) {
+        return "DISABLED";
+    }
+    if user.get("hold").and_then(Value::as_bool) == Some(true) {
+        return "ON_HOLD";
+    }
+    let limit = user.get("limit").and_then(Value::as_f64).unwrap_or(0.0);
+    let used = user.get("used").and_then(Value::as_f64).unwrap_or(0.0);
+    if limit > 0.0 && used >= limit {
+        return "LIMITED";
+    }
+    let expire_at = number(user, "expireAt").unwrap_or(0);
+    if expire_at > 0 && expire_at < now_ms {
+        return "EXPIRED";
+    }
+    "ACTIVE"
+}
+
+fn number(value: &Value, key: &str) -> Option<i64> {
+    value.get(key).and_then(Value::as_i64)
+        .or_else(|| value.get(key).and_then(Value::as_f64).map(|number| number as i64))
+}
+
+async fn audit(
+    pool: &PgPool,
+    actor: &str,
+    action: &str,
+    collection: Option<&str>,
+    record_id: Option<i64>,
+    detail: Value,
+) {
+    if let Err(error) = sqlx::query(
+        "INSERT INTO panel_audit_log (actor, action, collection, record_id, detail) VALUES ($1,$2,$3,$4,$5)",
+    )
+    .bind(actor)
+    .bind(action)
+    .bind(collection)
+    .bind(record_id)
+    .bind(detail)
+    .execute(pool)
+    .await
+    {
+        tracing::warn!(error = %error, "Could not append audit event");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{number, user_status};
+    use serde_json::json;
+
+    #[test]
+    fn user_status_rules_match_panel_contract() {
+        let now = 1_800_000_000_000_i64;
+        assert_eq!(user_status(&json!({"disabled":true}), now), "DISABLED");
+        assert_eq!(user_status(&json!({"hold":true}), now), "ON_HOLD");
+        assert_eq!(user_status(&json!({"limit":10,"used":10}), now), "LIMITED");
+        assert_eq!(user_status(&json!({"expireAt":now-1}), now), "EXPIRED");
+        assert_eq!(user_status(&json!({"limit":0,"used":500}), now), "ACTIVE");
+    }
+
+    #[test]
+    fn studio_subscription_routes_do_not_conflict_with_dashboard_or_flag_assets() {
+        use super::AppState;
+        use axum::{http::StatusCode, routing::get, Router};
+        use tower_http::services::ServeDir;
+        let mut app = Router::<AppState>::new()
+            .route("/dashboard/{slug}", get(|| async { StatusCode::OK }))
+            .nest_service("/flags", ServeDir::new("/app/static/flags"));
+        for count in 1..=8 {
+            let mut path = String::new();
+            for index in 1..=count {
+                path.push_str(&format!("/{{part{index}}}"));
+            }
+            path.push_str("/{token}");
+            app = app.route(&path, get(|| async { StatusCode::OK }));
+        }
+        // Building this router must not panic at runtime due to path conflicts.
+        drop(app);
+    }
+
+    #[test]
+    fn metered_usage_is_added_in_gib_not_raw_bytes() {
+        let mut user=json!({"id":21,"used":0.0,"limit":2});
+        super::add_metered_usage(&mut user,1_073_741_824);
+        assert_eq!(user["used"],1.0);
+        assert_eq!(user["meteredUsedGb"],1.0);
+        assert_eq!(super::user_status(&user,1_800_000_000_000),"ACTIVE");
+        super::add_metered_usage(&mut user,1_073_741_824);
+        assert_eq!(user["used"],2.0);
+        assert_eq!(super::user_status(&user,1_800_000_000_000),"LIMITED");
+    }
+    #[test]
+    fn numeric_json_fields_are_read_safely() {
+        assert_eq!(number(&json!({"used":12}), "used"), Some(12));
+        assert_eq!(number(&json!({"used":12.5}), "used"), Some(12));
+        assert_eq!(number(&json!({}), "used"), None);
+    }
+}
+
+             THEN (data->>'onlineAt')::BIGINT ELSE 0 END AS online_at
+         FROM panel_records WHERE collection='users'"
+    ).fetch_all(&state.pool).await?;
+    let mut items = Vec::with_capacity(rows.len());
+    for row in rows {
+        items.push(json!({
+            "id": row.try_get::<i64, _>("id")?,
+            "onlineAt": row.try_get::<i64, _>("online_at")?
+        }));
+    }
+    Ok(Json(json!({"items": items, "onlineWindowMs": USER_ONLINE_WINDOW_MS})))
+}
+
+/// Real per-user, per-node traffic collected from authenticated Xray node counters.
+/// Without actual per-user counter reports this returns an empty server list.
+async fn get_user_traffic(
+    State(state): State<AppState>,
+    Path(user_id): Path<i64>,
+) -> Result<Json<Value>, ApiError> {
+    if user_id <= 0 {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Некорректный ID пользователя."));
+    }
+    let user_data: Value = sqlx::query_scalar(
+        "SELECT data FROM panel_records WHERE collection='users' AND id=$1"
+    )
+    .bind(user_id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(||ApiError::new(StatusCode::NOT_FOUND,"Пользователь не найден."))?;
+    let base_usage = user_data.get("used").and_then(Value::as_f64)
+        .filter(|value|value.is_finite()&&*value>=0.0).unwrap_or(0.0);
+    let rows = sqlx::query(
+        "SELECT totals.node_id,
+                COALESCE(
+                  NULLIF(node.data->>'remark', ''),
+                  NULLIF(node.data->>'name', ''),
+                  NULLIF(node.data->>'tag', ''),
+                  'Узел #' || totals.node_id::text
+                ) AS node_name,
+                totals.uplink_bytes,
+                totals.downlink_bytes,
+                totals.observations,
+                (EXTRACT(EPOCH FROM totals.updated_at) * 1000)::BIGINT AS updated_at_ms
+         FROM user_node_traffic_totals totals
+         LEFT JOIN panel_records node
+           ON node.collection = 'nodes' AND node.id = totals.node_id
+         WHERE totals.user_id = $1
+         ORDER BY (totals.uplink_bytes + totals.downlink_bytes) DESC, totals.node_id"
+    )
+    .bind(user_id)
+    .fetch_all(&state.pool)
+    .await?;
+    let mut servers = Vec::with_capacity(rows.len());
+    let mut uplink = 0_i64;
+    let mut downlink = 0_i64;
+    for row in rows {
+        let up: i64 = row.try_get("uplink_bytes")?;
+        let down: i64 = row.try_get("downlink_bytes")?;
+        uplink = uplink.saturating_add(up);
+        downlink = downlink.saturating_add(down);
+        servers.push(json!({
+            "nodeId": row.try_get::<i64, _>("node_id")?,
+            "name": row.try_get::<String, _>("node_name")?,
+            "uplinkBytes": up,
+            "downlinkBytes": down,
+            "observations": row.try_get::<i64, _>("observations")?,
+            "updatedAtMs": row.try_get::<i64, _>("updated_at_ms")?
+        }));
+    }
+    let inbound_rows = sqlx::query(
+        "SELECT t.node_id,t.inbound_tag,t.uplink_bytes,t.downlink_bytes,t.observations,
+                COALESCE(NULLIF(n.data->>'name',''),'Узел #'||t.node_id::text) AS node_name
+         FROM user_inbound_traffic_totals t
+         LEFT JOIN panel_records n ON n.collection='nodes' AND n.id=t.node_id
+         WHERE t.user_id=$1 ORDER BY (t.uplink_bytes+t.downlink_bytes) DESC,t.inbound_tag"
+    ).bind(user_id).fetch_all(&state.pool).await?;
+    let mut inbound_totals=Vec::with_capacity(inbound_rows.len());
+    for r in inbound_rows {
+        inbound_totals.push(json!({
+            "nodeId":r.try_get::<i64,_>("node_id")?,
+            "nodeName":r.try_get::<String,_>("node_name")?,
+            "inboundTag":r.try_get::<String,_>("inbound_tag")?,
+            "uplinkBytes":r.try_get::<i64,_>("uplink_bytes")?,
+            "downlinkBytes":r.try_get::<i64,_>("downlink_bytes")?,
+            "observations":r.try_get::<i64,_>("observations")?
+        }));
+    }
+    // Distinguish a truly idle user from an unreachable Xray StatsService.
+    // The last signed sample on each node is advisory; it is never counted as usage.
+    let collector_rows = sqlx::query(
+        "SELECT n.id AS node_id,
+                COALESCE(NULLIF(n.data->>'name',''),'Узел #'||n.id::text) AS node_name,
+                last_sample.status,
+                last_sample.sampled_at_ms
+         FROM panel_records n
+         LEFT JOIN LATERAL (
+             SELECT sm.metrics->>'userStatsStatus' AS status,
+                    (EXTRACT(EPOCH FROM sm.sampled_at)*1000)::BIGINT AS sampled_at_ms
+             FROM server_metric_samples sm
+             WHERE sm.node_id=n.id::text
+             ORDER BY sm.sampled_at DESC LIMIT 1
+         ) last_sample ON TRUE
+         WHERE n.collection='nodes' ORDER BY n.id"
+    ).fetch_all(&state.pool).await?;
+    let mut collectors=Vec::with_capacity(collector_rows.len());
+    for row in collector_rows {
+        collectors.push(json!({
+            "nodeId":row.try_get::<i64,_>("node_id")?,
+            "name":row.try_get::<String,_>("node_name")?,
+            "status":row.try_get::<Option<String>,_>("status")?,
+            "sampledAtMs":row.try_get::<Option<i64>,_>("sampled_at_ms")?
+        }));
+    }
+    Ok(Json(json!({
+        "collectors":collectors,
+        "userId": user_id,
+        "dataSource": "user_node_traffic_totals",
+        "accounting": "monotonic_counter_deltas",
+        "sampleCount": servers.len(),
+        "totalUplinkBytes": uplink,
+        "totalDownlinkBytes": downlink,
+        "effectiveUsedGb": base_usage+(uplink.saturating_add(downlink) as f64 / 1_073_741_824.0),
+        "meteredUsedGb": uplink.saturating_add(downlink) as f64 / 1_073_741_824.0,
+        "servers": servers,
+        "inbounds": inbound_totals,
+        "inboundAccounting": "independent_signed_user_inbound_counters"
+    })))
+}
+
+async fn get_traffic_metrics(
+    State(state): State<AppState>,
+    Query(query): Query<TrafficMetricsQuery>,
+) -> Result<Json<Value>, ApiError> {
+    let (range, interval_seconds) =
+        match query.range.as_deref().unwrap_or("1h") {
+            "1h" => ("1h", 60_i64),
+            "24h" => ("24h", 900_i64),
+            _ => return Err(ApiError::new(StatusCode::BAD_REQUEST, "Период должен быть 1h или 24h.")),
+        };
+
+    if query.node_id.is_some_and(|id| id <= 0) || query.squad_id.is_some_and(|id| id <= 0) {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "ID узла и сквада должны быть положительными числами."));
+    }
+
+    // Node identifiers in the hypertable are text versions of panel_records.id.
+    // A squad includes nodes whose assigned Xray profile has at least one inbound
+    // tag in common with that squad's inbound list.
+    let rows = sqlx::query(
+        "WITH selected_nodes AS (
+            SELECT n.id::text AS node_id
+            FROM panel_records n
+            LEFT JOIN panel_records p
+              ON p.collection = 'profiles'
+             AND p.id::text = n.data->>'profileId'
+            WHERE n.collection = 'nodes'
+              AND ($1::BIGINT IS NULL OR n.id = $1)
+              AND (
+                $2::BIGINT IS NULL
+                OR EXISTS (
+                    SELECT 1
+                    FROM panel_records sq
+                    WHERE sq.collection = 'squads'
+                      AND sq.id = $2
+                      AND EXISTS (
+                          SELECT 1
+                          FROM jsonb_array_elements_text(
+                              CASE
+                                WHEN jsonb_typeof(sq.data->'inb') = 'array' THEN sq.data->'inb'
+                                ELSE '[]'::jsonb
+                              END
+                          ) AS squad_tag(tag)
+                          WHERE EXISTS (
+                              SELECT 1
+                              FROM jsonb_array_elements(
+                                  CASE
+                                    WHEN p.data->>'config' IS NOT NULL
+                                      THEN COALESCE((p.data->>'config')::jsonb->'inbounds', '[]'::jsonb)
+                                    ELSE '[]'::jsonb
+                                  END
+                              ) AS profile_inbound(item)
+                              WHERE profile_inbound.item->>'tag' = squad_tag.tag
+                          )
+                      )
+                )
+              )
+        ),
+        per_node_bucket AS (
+            SELECT
+                time_bucket(CASE WHEN $3::text = '1h' THEN INTERVAL '1 minute' ELSE INTERVAL '15 minutes' END, s.sampled_at) AS bucket,
+                s.node_id,
+                AVG(s.rx_bytes_per_sec) AS rx_bytes_per_sec,
+                AVG(s.tx_bytes_per_sec) AS tx_bytes_per_sec,
+                COUNT(*)::BIGINT AS sample_count
+            FROM server_metric_samples s
+            WHERE s.sampled_at >= NOW() - CASE WHEN $3::text = '1h' THEN INTERVAL '1 hour' ELSE INTERVAL '24 hours' END
+              AND s.node_id IN (SELECT node_id FROM selected_nodes)
+            GROUP BY 1, 2
+        )
+        SELECT
+            (EXTRACT(EPOCH FROM bucket) * 1000)::BIGINT AS bucket_ms,
+            COALESCE(SUM(rx_bytes_per_sec), 0)::DOUBLE PRECISION AS rx_bytes_per_sec,
+            COALESCE(SUM(tx_bytes_per_sec), 0)::DOUBLE PRECISION AS tx_bytes_per_sec,
+            COUNT(DISTINCT node_id)::BIGINT AS node_count,
+            COALESCE(SUM(sample_count), 0)::BIGINT AS sample_count
+        FROM per_node_bucket
+        GROUP BY bucket
+        ORDER BY bucket ASC"
+    )
+    .bind(query.node_id)
+    .bind(query.squad_id)
+    .bind(range)
+    .fetch_all(&state.pool)
+    .await?;
+
+    let mut points = Vec::with_capacity(rows.len());
+    let mut total_samples = 0_i64;
+    let mut latest_node_count = 0_i64;
+
+    for row in &rows {
+        let bucket_ms: i64 = row.try_get("bucket_ms")?;
+        let rx: f64 = row.try_get("rx_bytes_per_sec")?;
+        let tx: f64 = row.try_get("tx_bytes_per_sec")?;
+        let node_count: i64 = row.try_get("node_count")?;
+        let sample_count: i64 = row.try_get("sample_count")?;
+        total_samples = total_samples.saturating_add(sample_count);
+        latest_node_count = node_count;
+        points.push(json!({
+            "bucketMs": bucket_ms,
+            "rxBytesPerSec": rx,
+            "txBytesPerSec": tx,
+            "nodeCount": node_count,
+            "sampleCount": sample_count
+        }));
+    }
+
+    Ok(Json(json!({
+        "range": range,
+        "intervalSeconds": interval_seconds,
+        "nodeId": query.node_id,
+        "squadId": query.squad_id,
+        "dataSource": "server_metric_samples",
+        "sampleCount": total_samples,
+        "latestNodeCount": latest_node_count,
+        "points": points
+    })))
+}
+
+async fn read_cpu_ticks() -> Option<(u64, u64)> {
+    let stat = tokio::fs::read_to_string("/proc/stat").await.ok()?;
+    let line = stat.lines().find(|line| line.starts_with("cpu "))?;
+    let values = line.split_whitespace().skip(1).take(8).filter_map(|value| value.parse::<u64>().ok()).collect::<Vec<_>>();
+    if values.len() < 4 { return None; }
+    let total = values.iter().copied().fold(0u64, u64::saturating_add);
+    let idle = values[3].saturating_add(*values.get(4).unwrap_or(&0));
+    Some((total, idle))
+}
+
+async fn get_core_status(State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>) -> Json<Value> {
+    let status=state.core.status().await;
+    if viewer_read_only(&actor) {
+        Json(json!({"status":status.status,"installed_version":status.installed_version,
+          "latest_version":status.latest_version,"runtime":status.runtime}))
+    } else {Json(serde_json::to_value(status).unwrap_or_else(|_|json!({})))}
+}
+
+async fn get_core_releases(State(state): State<AppState>) -> Result<Json<Value>, ApiError> {
+    let releases = state.core.available_releases().await
+        .map_err(|error| ApiError::new(StatusCode::BAD_GATEWAY, error))?;
+    Ok(Json(json!({"items": releases})))
+}
+
+#[derive(Debug, Deserialize)]
+struct CoreValidationRequest { config: String }
+
+async fn validate_xray_configuration(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+    Json(body): Json<CoreValidationRequest>,
+) -> Result<Json<Value>, ApiError> {
+    require_mutation(&actor)?;
+    if body.config.len() > 512 * 1024 {
+        return Err(ApiError::new(StatusCode::PAYLOAD_TOO_LARGE, "Конфигурация слишком большая."));
+    }
+    // Syntax errors are mapped precisely by the browser JSON parser; never claim
+    // that Xray reports a line when it only reports a semantic error.
+    let _: Value = serde_json::from_str(&body.config)
+        .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Некорректный JSON. Исправьте синтаксис в редакторе."))?;
+    let (valid, stdout, stderr) = state.core.validate_json(&body.config).await
+        .map_err(|msg| ApiError::new(StatusCode::SERVICE_UNAVAILABLE, msg))?;
+    Ok(Json(json!({
+        "valid": valid, "engine": "xray-core",
+        "stdout": stdout, "stderr": stderr,
+        "message": if valid { "Конфигурация принята установленным Xray-core." } else { "Xray-core отклонил конфигурацию." }
+    })))
+}
+
+async fn generate_vless_encryption(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+) -> Result<Json<Value>, ApiError> {
+    require_mutation(&actor)?;
+    let generated = state.core.generate_vless_encryption().await
+        .map_err(|error| ApiError::new(StatusCode::SERVICE_UNAVAILABLE, error))?;
+
+    // Audit the action but never persist or log the secret encryption/decryption values.
+    audit(
+        &state.pool,
+        &actor.username,
+        "xray_core.vlessenc_generated",
+        None,
+        None,
+        json!({"methods": ["x25519", "mlkem768"]}),
+    ).await;
+
+    Ok(Json(generated))
+}
+
+async fn update_core(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+    Json(body): Json<CoreUpdateRequest>,
+) -> Result<(StatusCode, Json<Value>), ApiError> {
+    require_owner(&actor)?;
+    let target = state.core.set_desired_version(&body.version).await
+        .map_err(|error| ApiError::new(StatusCode::BAD_REQUEST, error))?;
+    audit(&state.pool, &actor.username, "xray_core.update_requested", None, None, json!({"version": target})).await;
+
+    let manager = state.core.clone();
+    tokio::spawn(async move {
+        if let Err(error) = manager.install_or_update(target).await {
+            tracing::warn!(error = %error, "Requested Xray-core update failed");
+        }
+    });
+    Ok((StatusCode::ACCEPTED, Json(json!({
+        "status": "updating",
+        "message": "Обновление Xray-core запущено."
+    }))))
+}
+
+/// Only an authenticated owner may request an upgrade. The application never
+/// executes shell commands or receives the Docker socket: a root-owned systemd
+/// worker watches one fixed-value request file and performs a DB backup first.
+async fn request_panel_update(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+) -> Result<(StatusCode, Json<Value>), ApiError> {
+    require_owner(&actor)?;
+    let request_file=env::var("PANEL_UPDATE_REQUEST").map_err(|_|ApiError::new(
+        StatusCode::SERVICE_UNAVAILABLE,"Web-обновления недоступны: настройте host systemd worker через install.sh."
+    ))?;
+    let status_file=env::var("PANEL_UPDATE_STATUS").map_err(|_|ApiError::new(
+        StatusCode::SERVICE_UNAVAILABLE,"Web-обновления недоступны: нет файла состояния."
+    ))?;
+    let status=tokio::fs::read_to_string(&status_file).await.map_err(|_|ApiError::new(
+        StatusCode::SERVICE_UNAVAILABLE,"Хостовый updater не инициализирован."
+    ))?;
+    if status.trim()=="running" {
+        return Err(ApiError::new(StatusCode::CONFLICT,"Обновление уже выполняется."));
+    }
+    tokio::fs::write(&request_file,b"update\n").await.map_err(|error|{
+        tracing::error!(%error,"Panel update request could not be written");
+        ApiError::new(StatusCode::SERVICE_UNAVAILABLE,"Не удалось передать запрос хостовому updater.")
+    })?;
+    audit(&state.pool,&actor.username,"panel.update_requested",None,None,json!({"source":"owner_web"})).await;
+    Ok((StatusCode::ACCEPTED,Json(json!({
+        "status":"queued",
+        "message":"Запрос передан в системный updater. БД будет скопирована до обновления."
+    }))))
+}
+
+async fn get_panel_update_status(
+    Extension(actor): Extension<auth::AuthUser>,
+) -> Result<Json<Value>, ApiError> {
+    require_owner(&actor)?;
+    let state=match env::var("PANEL_UPDATE_STATUS") {
+        Ok(path)=>tokio::fs::read_to_string(path).await.unwrap_or_else(|_|"unavailable".into()),
+        Err(_)=>"unavailable".into(),
+    };
+    let status=match state.trim() {
+        "running"=>"running",
+        "success"=>"success",
+        "failed"=>"failed",
+        "idle"=>"idle",
+        _=>"unavailable",
+    };
+    Ok(Json(json!({"status":status})))
+}
+
+async fn read_settings(pool: &PgPool) -> Result<Value, ApiError> {
+    Ok(sqlx::query_scalar::<_, Value>("SELECT value FROM app_settings WHERE key = 'panel'")
+        .fetch_optional(pool)
+        .await?
+        .unwrap_or_else(|| json!({
+            "brand":"XMesh Nexus",
+            "domain":"",
+            "hooks": {
+                "user.created":0,
+                "user.limited":0,
+                "user.expired":0,
+                "user.expires_in_24_hours":0,
+                "user.first_connected":0,
+                "user.bandwidth_usage_threshold_reached":0
+            }
+        })))
+}
+
+// Panel quotas are expressed in GiB; signed node counters are bytes.
+// Keep the manually configured baseline in panel_records and overlay actual,
+// monotonic signed user counters on reads. Never use node-wide RX/TX here.
+pub(crate) fn add_metered_usage(user: &mut Value, bytes: i64) {
+    let base=user.get("used").and_then(Value::as_f64).unwrap_or(0.0).max(0.0);
+    let measured=(bytes.max(0) as f64)/1_073_741_824.0;
+    if let Some(object)=user.as_object_mut(){
+        object.insert("used".into(),json!(base+measured));
+        object.insert("meteredUsedGb".into(),json!(measured));
+    }
+}
+
+pub(crate) async fn user_metered_bytes(pool: &PgPool, user_id: i64) -> Result<i64,ApiError> {
+    let bytes: i64=sqlx::query_scalar(
+        "SELECT COALESCE(SUM(uplink_bytes + downlink_bytes),0)::BIGINT
+         FROM user_node_traffic_totals WHERE user_id=$1"
+    ).bind(user_id).fetch_one(pool).await?;
+    Ok(bytes.max(0))
+}
+
+async fn load_records(pool: &PgPool, collection: &str) -> Result<Vec<Value>, ApiError> {
+    validate_collection(collection)?;
+    let rows = sqlx::query("SELECT id, data FROM panel_records WHERE collection = $1 ORDER BY id")
+        .bind(collection)
+        .fetch_all(pool)
+        .await?;
+    let mut records=rows.iter().map(row_to_record).collect::<Result<Vec<_>,_>>()?;
+    if collection=="users" && !records.is_empty(){
+        // One grouped query, not one SQL request per user.
+        let totals=sqlx::query(
+            "SELECT user_id, COALESCE(SUM(uplink_bytes+downlink_bytes),0)::BIGINT AS bytes
+             FROM user_node_traffic_totals GROUP BY user_id"
+        ).fetch_all(pool).await?;
+        let traffic=totals.into_iter().filter_map(|row|{
+            Some((row.try_get::<i64,_>("user_id").ok()?,
+                  row.try_get::<i64,_>("bytes").ok()?))
+        }).collect::<std::collections::HashMap<_,_>>();
+        for user in &mut records {
+            if let Some(id)=user.get("id").and_then(Value::as_i64){
+                add_metered_usage(user,*traffic.get(&id).unwrap_or(&0));
+            }
+        }
+    }
+    Ok(records)
+}
+
+fn row_to_record(row: &sqlx::postgres::PgRow) -> Result<Value, ApiError> {
+    let id: i64 = row.try_get("id")?;
+    let mut data: Value = row.try_get("data")?;
+    let object = data.as_object_mut()
+        .ok_or_else(|| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Повреждён формат записи."))?;
+    object.insert("id".to_owned(), json!(id));
+    Ok(data)
+}
+
+fn validate_collection(collection: &str) -> Result<(), ApiError> {
+    if COLLECTIONS.contains(&collection) {
+        Ok(())
+    } else {
+        Err(ApiError::new(StatusCode::NOT_FOUND, "Неизвестная коллекция."))
+    }
+}
+
+// A public Host is not a standalone Xray profile. Its inbound must come from
+// the selected profile, and each assigned node must actually run that profile.
+async fn validate_host_binding(pool: &PgPool, host: &Value) -> Result<(), ApiError> {
+    // Disabled hosts are allowed to remain drafts and can always be switched off.
+    // Re-enabling them validates the full runtime profile/node relationship.
+    if host.get("disabled").and_then(Value::as_bool) == Some(true) { return Ok(()); }
+    let bad = |message: &'static str| ApiError::new(StatusCode::BAD_REQUEST, message);
+    let profile_id = host.get("profileId").and_then(Value::as_i64)
+        .filter(|id| *id > 0)
+        .ok_or_else(|| bad("Хосту необходимо назначить XRAY STUDIO профиль."))?;
+    let tag = host.get("tag").and_then(Value::as_str)
+        .filter(|tag| !tag.is_empty() && tag.len() <= 150)
+        .ok_or_else(|| bad("Выберите inbound из XRAY STUDIO."))?;
+    let address = host.get("address").and_then(Value::as_str)
+        .filter(|value| !value.is_empty() && value.len() <= 253
+            && !value.chars().any(|ch| ch.is_control() || ch.is_whitespace() || "/@?#\\".contains(ch)))
+        .ok_or_else(|| bad("Некорректный публичный адрес хоста."))?;
+    if address == "localhost" || address == "0.0.0.0" || address.starts_with("127.") {
+        return Err(bad("Для подписки нужен публичный адрес ноды."));
+    }
+    let port = host.get("port").and_then(Value::as_u64).unwrap_or(0);
+    if !(1..=65535).contains(&port) { return Err(bad("Укажите публичный порт 1–65535.")); }
+    let nodes = host.get("nodes").and_then(Value::as_array)
+        .filter(|nodes| !nodes.is_empty() && nodes.len() <= 64)
+        .ok_or_else(|| bad("Привяжите хост к одной или нескольким нодам."))?;
+    let profiles = load_records(pool, "profiles").await?;
+    let profile = profiles.iter().find(|profile| profile.get("id").and_then(Value::as_i64) == Some(profile_id))
+        .ok_or_else(|| bad("Выбранный XRAY STUDIO профиль отсутствует."))?;
+    let config = profile.get("config").and_then(Value::as_str)
+        .and_then(|raw| serde_json::from_str::<Value>(raw).ok())
+        .ok_or_else(|| bad("Сохранённая конфигурация XRAY STUDIO недействительна."))?;
+    let inbound = config.get("inbounds").and_then(Value::as_array)
+        .and_then(|items| items.iter().find(|inbound| inbound.get("tag").and_then(Value::as_str) == Some(tag)))
+        .ok_or_else(|| bad("Выбранный inbound отсутствует в XRAY STUDIO профиле."))?;
+    if inbound.get("protocol").and_then(Value::as_str) != Some("vless") {
+        return Err(bad("Генератор подписок пока поддерживает VLESS inbound."));
+    }
+    let all_nodes = load_records(pool, "nodes").await?;
+    for node_id in nodes {
+        let id = node_id.as_i64().ok_or_else(|| bad("Некорректная привязка ноды."))?;
+        let node = all_nodes.iter().find(|node| node.get("id").and_then(Value::as_i64) == Some(id))
+            .ok_or_else(|| bad("Одна из привязанных нод не найдена."))?;
+        if node.get("disabled").and_then(Value::as_bool) == Some(true)
+            || node.get("profileId").and_then(Value::as_i64) != Some(profile_id)
+        {
+            return Err(bad("Профиль привязанной ноды не совпадает с XRAY-профилем хоста. Обновите профиль в разделе «Узлы»."));
+        }
+    }
+    let reality = inbound.get("streamSettings").and_then(|v| v.get("realitySettings"));
+    if inbound.get("streamSettings").and_then(|v| v.get("security")).and_then(Value::as_str) == Some("reality") {
+        let key = host.get("publicKey").and_then(Value::as_str).filter(|s| !s.is_empty())
+            .or_else(|| inbound.get("publicKey").and_then(Value::as_str))
+            .or_else(|| reality.and_then(|v|v.get("publicKey")).and_then(Value::as_str));
+        if key.is_none() { return Err(bad("Отсутствует REALITY publicKey. Добавьте публичный ключ в расширенных настройках хоста.")); }
+    }
+    Ok(())
+}
+
+fn validate_node_address(data: &Value) -> Result<(), ApiError> {
+    use std::net::IpAddr;
+    let addr = data.get("addr").and_then(Value::as_str)
+        .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Укажите адрес ноды: IPv4, IPv6 или домен."))?;
+    if addr.is_empty() || addr != addr.trim() || addr.chars().any(char::is_whitespace) {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Адрес ноды не должен содержать пробелы."));
+    }
+    if addr.parse::<IpAddr>().is_ok() { return Ok(()); }
+    // ASCII DNS hostnames only; internationalized domains must use IDNA A-labels.
+    // Reject numeric dotted strings that look like invalid IPv4 addresses.
+    if addr.len() > 253 || !addr.is_ascii() || addr.contains(':') ||
+       addr.contains('/') || addr.contains('@') || addr.contains('[') ||
+       addr.contains(']') || addr.contains("..") ||
+       addr.chars().all(|c| c.is_ascii_digit() || c == '.') {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Некорректный адрес ноды. Используйте IPv4, IPv6 без скобок или DNS-домен без порта."));
+    }
+    let valid = addr.split('.').all(|label| {
+        !label.is_empty() && label.len() <= 63 &&
+        !label.starts_with('-') && !label.ends_with('-') &&
+        label.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
+    });
+    if !valid {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Некорректное доменное имя ноды."));
+    }
+    Ok(())
+}
+
+fn validate_record(collection: &str, data: &Value) -> Result<(), ApiError> {
+    let object = data.as_object()
+        .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Запись должна быть JSON-объектом."))?;
+    if collection == "nodes" {
+        validate_node_address(data)?;
+        node_rotation::validate_node(data)?;
+        node_routing::validate_saved(data)?;
+        if let Some(hosting) = object.get("hosting") {
+            let value = hosting.as_str().ok_or_else(|| ApiError::new(
+                StatusCode::BAD_REQUEST, "Название хостинга должно быть строкой."
+            ))?;
+            if value.chars().count() > 100 || value.chars().any(char::is_control) {
+                return Err(ApiError::new(
+                    StatusCode::BAD_REQUEST, "Название хостинга не должно превышать 100 символов или содержать управляющие символы."
+                ));
+            }
+        }
+    }
+    if collection == "users" {
+        let username = object.get("username").and_then(Value::as_str)
+            .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Имя пользователя обязательно."))?;
+        if username.trim().is_empty() || username.chars().count() > 128 || username.chars().any(char::is_control) {
+            return Err(ApiError::new(StatusCode::BAD_REQUEST, "Некорректное имя пользователя."));
+        }
+    }
+    if collection == "profiles" {
+        let config = object.get("config").and_then(Value::as_str)
+            .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Конфигурация Xray обязательна."))?;
+        let parsed: Value = serde_json::from_str(config)
+            .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Конфигурация Xray содержит некорректный JSON."))?;
+        let inbounds = parsed.get("inbounds").and_then(Value::as_array)
+            .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "В конфигурации Xray должен быть массив inbounds."))?;
+        if inbounds.is_empty() {
+            return Err(ApiError::new(StatusCode::BAD_REQUEST, "В конфигурации Xray должен быть хотя бы один inbound."));
+        }
+        let mut tags = std::collections::HashSet::new();
+        for inbound in inbounds {
+            let tag = inbound.get("tag").and_then(Value::as_str)
+                .filter(|tag| !tag.trim().is_empty())
+                .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "У каждого inbound должен быть tag."))?;
+            if !tags.insert(tag) {
+                return Err(ApiError::new(StatusCode::BAD_REQUEST, "Теги inbounds должны быть уникальными."));
+            }
+            // Defense in depth: browser credential managers may have filled
+            // unrelated Studio password/username inputs into REALITY secrets.
+            // Validate even dormant realitySettings with security="none".
+            if let Some(reality) = inbound.get("streamSettings")
+                .and_then(|stream| stream.get("realitySettings"))
+            {
+                if !reality.is_object() {
+                    return Err(ApiError::new(StatusCode::BAD_REQUEST,
+                        "REALITY: realitySettings должен быть объектом."));
+                }
+                if let Some(private_key) = reality.get("privateKey") {
+                    let valid = private_key.as_str().is_some_and(|key| {
+                        key.is_empty() || (key.len() == 43 && key.bytes().all(|b|
+                            b.is_ascii_alphanumeric() || b == b'-' || b == b'_'))
+                    });
+                    if !valid {
+                        return Err(ApiError::new(StatusCode::BAD_REQUEST,
+                            "REALITY: privateKey должен быть X25519 base64url (43 символа). Проверьте автозаполнение браузера."));
+                    }
+                }
+                if let Some(ids) = reality.get("shortIds") {
+                    let ids = ids.as_array().ok_or_else(|| ApiError::new(
+                        StatusCode::BAD_REQUEST, "REALITY: shortIds должен быть массивом."))?;
+                    let mut seen = std::collections::HashSet::new();
+                    for short_id in ids {
+                        let valid = short_id.as_str().is_some_and(|id| {
+                            id.len() <= 16 && id.len() % 2 == 0
+                                && id.bytes().all(|b| b.is_ascii_hexdigit())
+                                && seen.insert(id.to_ascii_lowercase())
+                        });
+                        if !valid {
+                            return Err(ApiError::new(StatusCode::BAD_REQUEST,
+                                "REALITY: Short ID должен быть уникальной HEX-строкой чётной длины, максимум 16 символов."));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod reality_profile_autofill_validation_tests {
+    use super::*;
+
+    fn profile(key: &str, short_id: &str, security: &str) -> Value {
+        let config = json!({"inbounds":[{"tag":"main","protocol":"vless","port":443,
+            "streamSettings":{"network":"xhttp","security":security,
+                "realitySettings":{"privateKey":key,"shortIds":[short_id]}}}]});
+        json!({"name":"test","config":config.to_string()})
+    }
+
+    #[test]
+    fn rejects_autofilled_login_and_credential_even_while_inactive() {
+        let contaminated = profile(&"a".repeat(256), "Triplex", "none");
+        assert!(validate_record("profiles", &contaminated).is_err());
+        assert!(validate_record("profiles", &profile(&"a".repeat(256), "abcdef12", "none")).is_err());
+        assert!(validate_record("profiles", &profile(&"A".repeat(43), "Triplex", "none")).is_err());
+    }
+
+    #[test]
+    fn accepts_canonical_x25519_and_hex_short_id() {
+        let valid = profile(&"A".repeat(43), "0123456789abcdef", "reality");
+        assert!(validate_record("profiles", &valid).is_ok());
+    }
+}
+
+fn user_status(user: &Value, now_ms: i64) -> &'static str {
+    if user.get("disabled").and_then(Value::as_bool) == Some(true) {
+        return "DISABLED";
+    }
+    if user.get("hold").and_then(Value::as_bool) == Some(true) {
+        return "ON_HOLD";
+    }
+    let limit = user.get("limit").and_then(Value::as_f64).unwrap_or(0.0);
+    let used = user.get("used").and_then(Value::as_f64).unwrap_or(0.0);
+    if limit > 0.0 && used >= limit {
+        return "LIMITED";
+    }
+    let expire_at = number(user, "expireAt").unwrap_or(0);
+    if expire_at > 0 && expire_at < now_ms {
+        return "EXPIRED";
+    }
+    "ACTIVE"
+}
+
+fn number(value: &Value, key: &str) -> Option<i64> {
+    value.get(key).and_then(Value::as_i64)
+        .or_else(|| value.get(key).and_then(Value::as_f64).map(|number| number as i64))
+}
+
+async fn audit(
+    pool: &PgPool,
+    actor: &str,
+    action: &str,
+    collection: Option<&str>,
+    record_id: Option<i64>,
+    detail: Value,
+) {
+    if let Err(error) = sqlx::query(
+        "INSERT INTO panel_audit_log (actor, action, collection, record_id, detail) VALUES ($1,$2,$3,$4,$5)",
+    )
+    .bind(actor)
+    .bind(action)
+    .bind(collection)
+    .bind(record_id)
+    .bind(detail)
+    .execute(pool)
+    .await
+    {
+        tracing::warn!(error = %error, "Could not append audit event");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{number, user_status};
+    use serde_json::json;
+
+    #[test]
+    fn user_status_rules_match_panel_contract() {
+        let now = 1_800_000_000_000_i64;
+        assert_eq!(user_status(&json!({"disabled":true}), now), "DISABLED");
+        assert_eq!(user_status(&json!({"hold":true}), now), "ON_HOLD");
+        assert_eq!(user_status(&json!({"limit":10,"used":10}), now), "LIMITED");
+        assert_eq!(user_status(&json!({"expireAt":now-1}), now), "EXPIRED");
+        assert_eq!(user_status(&json!({"limit":0,"used":500}), now), "ACTIVE");
+    }
+
+    #[test]
+    fn studio_subscription_routes_do_not_conflict_with_dashboard_or_flag_assets() {
+        use super::AppState;
+        use axum::{http::StatusCode, routing::get, Router};
+        use tower_http::services::ServeDir;
+        let mut app = Router::<AppState>::new()
+            .route("/dashboard/{slug}", get(|| async { StatusCode::OK }))
+            .nest_service("/flags", ServeDir::new("/app/static/flags"));
+        for count in 1..=8 {
+            let mut path = String::new();
+            for index in 1..=count {
+                path.push_str(&format!("/{{part{index}}}"));
+            }
+            path.push_str("/{token}");
+            app = app.route(&path, get(|| async { StatusCode::OK }));
+        }
+        // Building this router must not panic at runtime due to path conflicts.
+        drop(app);
+    }
+
+    #[test]
+    fn metered_usage_is_added_in_gib_not_raw_bytes() {
+        let mut user=json!({"id":21,"used":0.0,"limit":2});
+        super::add_metered_usage(&mut user,1_073_741_824);
+        assert_eq!(user["used"],1.0);
+        assert_eq!(user["meteredUsedGb"],1.0);
+        assert_eq!(super::user_status(&user,1_800_000_000_000),"ACTIVE");
+        super::add_metered_usage(&mut user,1_073_741_824);
+        assert_eq!(user["used"],2.0);
+        assert_eq!(super::user_status(&user,1_800_000_000_000),"LIMITED");
+    }
+    #[test]
+    fn numeric_json_fields_are_read_safely() {
+        assert_eq!(number(&json!({"used":12}), "used"), Some(12));
+        assert_eq!(number(&json!({"used":12.5}), "used"), Some(12));
+        assert_eq!(number(&json!({}), "used"), None);
+    }
+}
+
+                            THEN (u.data->>'onlineAt')::BIGINT ELSE 0 END,
+                       LEAST($3::BIGINT,$4::BIGINT))),true),
+                 updated_at=NOW()
+             FROM jsonb_to_recordset($2::jsonb)
+                  AS sample(user_id BIGINT,uplink_bytes BIGINT,downlink_bytes BIGINT)
+             LEFT JOIN user_node_traffic_totals AS previous
+                  ON previous.node_id=$1 AND previous.user_id=sample.user_id
+             WHERE u.collection='users' AND u.id=sample.user_id
+               AND previous.user_id IS NOT NULL
+               AND sample.uplink_bytes >= previous.last_uplink_bytes
+               AND sample.downlink_bytes >= previous.last_downlink_bytes
+               AND (sample.uplink_bytes>previous.last_uplink_bytes
+                    OR sample.downlink_bytes>previous.last_downlink_bytes)"
+        ).bind(body.node_id).bind(&serialized).bind(sampled_at).bind(source_ms)
+         .execute(&mut *telemetry_tx).await?;
+        sqlx::query(
+            "INSERT INTO user_node_traffic_totals AS totals (
+                node_id, user_id, last_uplink_bytes, last_downlink_bytes,
+                uplink_bytes, downlink_bytes, observations, updated_at
+            )
+            SELECT $1, metrics.user_id, metrics.uplink_bytes, metrics.downlink_bytes,
+                   0, 0, 1, NOW()
+            FROM jsonb_to_recordset($2::jsonb)
+                 AS metrics(user_id BIGINT, uplink_bytes BIGINT, downlink_bytes BIGINT)
+            JOIN panel_records u ON u.collection = 'users' AND u.id = metrics.user_id
+            ON CONFLICT (node_id, user_id) DO UPDATE SET
+                uplink_bytes = totals.uplink_bytes +
+                    GREATEST(EXCLUDED.last_uplink_bytes - totals.last_uplink_bytes, 0),
+                downlink_bytes = totals.downlink_bytes +
+                    GREATEST(EXCLUDED.last_downlink_bytes - totals.last_downlink_bytes, 0),
+                last_uplink_bytes = EXCLUDED.last_uplink_bytes,
+                last_downlink_bytes = EXCLUDED.last_downlink_bytes,
+                observations = totals.observations + 1,
+                updated_at = NOW()"
+        )
+        .bind(body.node_id)
+        .bind(serialized)
+        .execute(&mut *telemetry_tx)
+        .await?;
+    }
+
+
+    if !inbound_samples.is_empty() {
+        // An inbound's aggregate traffic MUST NEVER be interpreted as per-user traffic.
+        // Signed node agents report cumulative counters scoped to a real user+inbound.
+        let serialized = serde_json::to_value(&inbound_samples)
+            .map_err(|_|ApiError::new(StatusCode::BAD_REQUEST,"Некорректный userInboundTraffic."))?;
+        sqlx::query(
+            "INSERT INTO user_inbound_traffic_totals AS totals (
+                node_id,user_id,inbound_tag,last_uplink_bytes,last_downlink_bytes,
+                uplink_bytes,downlink_bytes,observations,updated_at
+            )
+            SELECT $1,s.user_id,s.inbound_tag,s.uplink_bytes,s.downlink_bytes,0,0,1,NOW()
+            FROM jsonb_to_recordset($2::jsonb)
+                AS s(user_id BIGINT,inbound_tag TEXT,uplink_bytes BIGINT,downlink_bytes BIGINT)
+            JOIN panel_records u ON u.collection='users' AND u.id=s.user_id
+            ON CONFLICT(node_id,user_id,inbound_tag) DO UPDATE SET
+                uplink_bytes=totals.uplink_bytes+
+                    GREATEST(EXCLUDED.last_uplink_bytes-totals.last_uplink_bytes,0),
+                downlink_bytes=totals.downlink_bytes+
+                    GREATEST(EXCLUDED.last_downlink_bytes-totals.last_downlink_bytes,0),
+                last_uplink_bytes=EXCLUDED.last_uplink_bytes,
+                last_downlink_bytes=EXCLUDED.last_downlink_bytes,
+                observations=totals.observations+1,
+                updated_at=NOW()"
+        ).bind(body.node_id).bind(serialized).execute(&mut *telemetry_tx).await?;
+    }
+
+    telemetry_tx.commit().await?;
+
+    Ok((StatusCode::CREATED, Json(json!({
+        "status": "accepted",
+        "nodeId": body.node_id,
+        "sampledAt": sampled_at,
+        "userTrafficSamples": user_traffic.len(),
+        "userInboundTrafficSamples": inbound_samples.len()
+    }))))
+}
+
+"
+        ).bind(body.node_id.to_string()).fetch_one(&mut *telemetry_tx).await?
+    } else { None };
+    let accept_user_stats = source_valid
+        && latest_source_ms.is_none_or(|last| source_ms > last);
+    if !accept_user_stats {
+        // Do not modify traffic baselines or onlineAt on stale/replayed data.
+        user_traffic.clear();
+        inbound_samples.clear();
+    }
+    metrics.as_object_mut().expect("validated metrics object")
+        .insert("userStatsAccepted".into(), json!(accept_user_stats));
+
+    let node_id = body.node_id.to_string();
+    let sampled_at: i64 = sqlx::query_scalar(
+        "INSERT INTO server_metric_samples (
+            sampled_at, node_id, cpu_percent,
+            ram_used_bytes, ram_total_bytes, disk_used_bytes, disk_total_bytes,
+            rx_bytes_per_sec, tx_bytes_per_sec, active_connections, online_clients, metrics
+         ) VALUES (
+            NOW(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+         )
+         RETURNING (EXTRACT(EPOCH FROM sampled_at) * 1000)::BIGINT"
+    )
+    .bind(&node_id)
+    .bind(body.cpu_percent)
+    .bind(body.ram_used_bytes)
+    .bind(body.ram_total_bytes)
+    .bind(body.disk_used_bytes)
+    .bind(body.disk_total_bytes)
+    .bind(body.rx_bytes_per_sec)
+    .bind(body.tx_bytes_per_sec)
+    .bind(body.active_connections)
+    .bind(body.online_clients)
+    .bind(metrics)
+    .fetch_one(&mut *telemetry_tx)
+    .await?;
+
+    if let Some((rx,tx,interface))=network_sample{
+        // The first sample is a baseline, not historical traffic. A reboot or
+        // switch to another NIC resets the baseline without a negative delta.
+        sqlx::query(
+            "INSERT INTO node_network_traffic_totals AS totals (
+                 node_id,interface_name,last_rx_bytes,last_tx_bytes,
+                 rx_bytes,tx_bytes,observations,updated_at
+             ) VALUES ($1,$2,$3,$4,0,0,1,NOW())
+             ON CONFLICT (node_id) DO UPDATE SET
+               rx_bytes=totals.rx_bytes+
+                 CASE WHEN totals.interface_name=EXCLUDED.interface_name
+                   THEN GREATEST(EXCLUDED.last_rx_bytes-totals.last_rx_bytes,0)
+                   ELSE 0 END,
+               tx_bytes=totals.tx_bytes+
+                 CASE WHEN totals.interface_name=EXCLUDED.interface_name
+                   THEN GREATEST(EXCLUDED.last_tx_bytes-totals.last_tx_bytes,0)
+                   ELSE 0 END,
+               interface_name=EXCLUDED.interface_name,
+               last_rx_bytes=EXCLUDED.last_rx_bytes,
+               last_tx_bytes=EXCLUDED.last_tx_bytes,
+               observations=totals.observations+1,
+               updated_at=NOW()"
+        ).bind(body.node_id).bind(interface).bind(rx).bind(tx)
+         .execute(&mut *telemetry_tx).await?;
+    }
+
+    // Enforce an exhausted node bandwidth quota in the control plane.
+    // This is independent of per-user Xray statistics and is decided on the
+    // authenticated, cumulative RX+TX counters persisted above.
+    // The conditional UPDATE makes the critical event idempotent.
+    let cutoff=sqlx::query(
+        "UPDATE panel_records AS node SET
+           data=jsonb_set(
+             jsonb_set(
+               jsonb_set(data,'{disabled}','true'::jsonb,true),
+               '{disabledReason}',to_jsonb('traffic_limit'::text),true),
+             '{trafficLimitReachedAt}',to_jsonb(NOW()::text),true),
+           updated_at=NOW()
+         WHERE collection='nodes' AND id=$1
+           AND COALESCE((data->>'disabled')::boolean,false)=false
+           AND jsonb_typeof(data->'limit')='number'
+           AND (data->>'limit')::numeric>0
+           AND EXISTS (
+             SELECT 1 FROM node_network_traffic_totals t
+             WHERE t.node_id=$1
+               AND (t.rx_bytes::numeric+t.tx_bytes::numeric)
+                   * CASE
+                       WHEN jsonb_typeof(data->'mult')='number'
+                         AND (data->>'mult')::numeric > 0
+                         AND (data->>'mult')::numeric <= 1000
+                       THEN (data->>'mult')::numeric
+                       ELSE 1
+                     END
+                   >= (data->>'limit')::numeric*1073741824
+           )
+         RETURNING data->>'name' AS node_name,
+           (data->>'limit')::numeric AS limit_gb"
+    ).bind(body.node_id).fetch_optional(&mut *telemetry_tx).await?;
+    if let Some(row)=cutoff{
+        tracing::error!(node_id=body.node_id,
+          name=?row.try_get::<Option<String>,_>("node_name")?,
+          "NODE TRAFFIC LIMIT EXHAUSTED: automatic Xray shutdown required");
+    }
+
+    if !user_traffic.is_empty() {
+        // One atomic UPSERT for the full node batch. Initial samples establish a
+        // baseline instead of spuriously counting traffic from before collection.
+        // Counter resets start a new baseline, never subtract or fabricate usage.
+        let serialized = serde_json::to_value(&user_traffic)
+            .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Некорректный userTraffic."))?;
+        // Only a positive delta from an authenticated per-user Xray counter
+        // constitutes activity. Repeated idle samples must NOT refresh onlineAt.
+        // Preserve the last activity timestamp across node restarts and resets.
+        sqlx::query(
+            "UPDATE panel_records AS u
+             SET data=jsonb_set(u.data,'{onlineAt}',to_jsonb($3::BIGINT),true),
+                 updated_at=NOW()
+             FROM jsonb_to_recordset($2::jsonb)
+                  AS sample(user_id BIGINT,uplink_bytes BIGINT,downlink_bytes BIGINT)
+             LEFT JOIN user_node_traffic_totals AS previous
+                  ON previous.node_id=$1 AND previous.user_id=sample.user_id
+             WHERE u.collection='users' AND u.id=sample.user_id
+               AND previous.user_id IS NOT NULL
+               AND (sample.uplink_bytes>previous.last_uplink_bytes
+                    OR sample.downlink_bytes>previous.last_downlink_bytes)"
+        ).bind(body.node_id).bind(&serialized).bind(sampled_at)
+         .execute(&mut *telemetry_tx).await?;
+        sqlx::query(
+            "INSERT INTO user_node_traffic_totals AS totals (
+                node_id, user_id, last_uplink_bytes, last_downlink_bytes,
+                uplink_bytes, downlink_bytes, observations, updated_at
+            )
+            SELECT $1, metrics.user_id, metrics.uplink_bytes, metrics.downlink_bytes,
+                   0, 0, 1, NOW()
+            FROM jsonb_to_recordset($2::jsonb)
+                 AS metrics(user_id BIGINT, uplink_bytes BIGINT, downlink_bytes BIGINT)
+            JOIN panel_records u ON u.collection = 'users' AND u.id = metrics.user_id
+            ON CONFLICT (node_id, user_id) DO UPDATE SET
+                uplink_bytes = totals.uplink_bytes +
+                    GREATEST(EXCLUDED.last_uplink_bytes - totals.last_uplink_bytes, 0),
+                downlink_bytes = totals.downlink_bytes +
+                    GREATEST(EXCLUDED.last_downlink_bytes - totals.last_downlink_bytes, 0),
+                last_uplink_bytes = EXCLUDED.last_uplink_bytes,
+                last_downlink_bytes = EXCLUDED.last_downlink_bytes,
+                observations = totals.observations + 1,
+                updated_at = NOW()"
+        )
+        .bind(body.node_id)
+        .bind(serialized)
+        .execute(&mut *telemetry_tx)
+        .await?;
+    }
+
+
+    if !inbound_samples.is_empty() {
+        // An inbound's aggregate traffic MUST NEVER be interpreted as per-user traffic.
+        // Signed node agents report cumulative counters scoped to a real user+inbound.
+        let serialized = serde_json::to_value(&inbound_samples)
+            .map_err(|_|ApiError::new(StatusCode::BAD_REQUEST,"Некорректный userInboundTraffic."))?;
+        sqlx::query(
+            "INSERT INTO user_inbound_traffic_totals AS totals (
+                node_id,user_id,inbound_tag,last_uplink_bytes,last_downlink_bytes,
+                uplink_bytes,downlink_bytes,observations,updated_at
+            )
+            SELECT $1,s.user_id,s.inbound_tag,s.uplink_bytes,s.downlink_bytes,0,0,1,NOW()
+            FROM jsonb_to_recordset($2::jsonb)
+                AS s(user_id BIGINT,inbound_tag TEXT,uplink_bytes BIGINT,downlink_bytes BIGINT)
+            JOIN panel_records u ON u.collection='users' AND u.id=s.user_id
+            ON CONFLICT(node_id,user_id,inbound_tag) DO UPDATE SET
+                uplink_bytes=totals.uplink_bytes+
+                    GREATEST(EXCLUDED.last_uplink_bytes-totals.last_uplink_bytes,0),
+                downlink_bytes=totals.downlink_bytes+
+                    GREATEST(EXCLUDED.last_downlink_bytes-totals.last_downlink_bytes,0),
+                last_uplink_bytes=EXCLUDED.last_uplink_bytes,
+                last_downlink_bytes=EXCLUDED.last_downlink_bytes,
+                observations=totals.observations+1,
+                updated_at=NOW()"
+        ).bind(body.node_id).bind(serialized).execute(&mut *telemetry_tx).await?;
+    }
+
+    Ok((StatusCode::CREATED, Json(json!({
+        "status": "accepted",
+        "nodeId": body.node_id,
+        "sampledAt": sampled_at,
+        "userTrafficSamples": user_traffic.len(),
+        "userInboundTrafficSamples": inbound_samples.len()
+    }))))
+}
+
+/// Lightweight, authenticated presence refresh for the Users page.
+/// Return only IDs and last activity timestamps; never send subscription keys.
+async fn get_user_presence(
+    State(state): State<AppState>,
+) -> Result<Json<Value>, ApiError> {
+    let rows = sqlx::query(
+        "SELECT id,
+           CASE WHEN (data->>'onlineAt') ~ '^[0-9]{1,16}
+/// Without actual per-user counter reports this returns an empty server list.
+async fn get_user_traffic(
+    State(state): State<AppState>,
+    Path(user_id): Path<i64>,
+) -> Result<Json<Value>, ApiError> {
+    if user_id <= 0 {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Некорректный ID пользователя."));
+    }
+    let user_data: Value = sqlx::query_scalar(
+        "SELECT data FROM panel_records WHERE collection='users' AND id=$1"
+    )
+    .bind(user_id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(||ApiError::new(StatusCode::NOT_FOUND,"Пользователь не найден."))?;
+    let base_usage = user_data.get("used").and_then(Value::as_f64)
+        .filter(|value|value.is_finite()&&*value>=0.0).unwrap_or(0.0);
+    let rows = sqlx::query(
+        "SELECT totals.node_id,
+                COALESCE(
+                  NULLIF(node.data->>'remark', ''),
+                  NULLIF(node.data->>'name', ''),
+                  NULLIF(node.data->>'tag', ''),
+                  'Узел #' || totals.node_id::text
+                ) AS node_name,
+                totals.uplink_bytes,
+                totals.downlink_bytes,
+                totals.observations,
+                (EXTRACT(EPOCH FROM totals.updated_at) * 1000)::BIGINT AS updated_at_ms
+         FROM user_node_traffic_totals totals
+         LEFT JOIN panel_records node
+           ON node.collection = 'nodes' AND node.id = totals.node_id
+         WHERE totals.user_id = $1
+         ORDER BY (totals.uplink_bytes + totals.downlink_bytes) DESC, totals.node_id"
+    )
+    .bind(user_id)
+    .fetch_all(&state.pool)
+    .await?;
+    let mut servers = Vec::with_capacity(rows.len());
+    let mut uplink = 0_i64;
+    let mut downlink = 0_i64;
+    for row in rows {
+        let up: i64 = row.try_get("uplink_bytes")?;
+        let down: i64 = row.try_get("downlink_bytes")?;
+        uplink = uplink.saturating_add(up);
+        downlink = downlink.saturating_add(down);
+        servers.push(json!({
+            "nodeId": row.try_get::<i64, _>("node_id")?,
+            "name": row.try_get::<String, _>("node_name")?,
+            "uplinkBytes": up,
+            "downlinkBytes": down,
+            "observations": row.try_get::<i64, _>("observations")?,
+            "updatedAtMs": row.try_get::<i64, _>("updated_at_ms")?
+        }));
+    }
+    let inbound_rows = sqlx::query(
+        "SELECT t.node_id,t.inbound_tag,t.uplink_bytes,t.downlink_bytes,t.observations,
+                COALESCE(NULLIF(n.data->>'name',''),'Узел #'||t.node_id::text) AS node_name
+         FROM user_inbound_traffic_totals t
+         LEFT JOIN panel_records n ON n.collection='nodes' AND n.id=t.node_id
+         WHERE t.user_id=$1 ORDER BY (t.uplink_bytes+t.downlink_bytes) DESC,t.inbound_tag"
+    ).bind(user_id).fetch_all(&state.pool).await?;
+    let mut inbound_totals=Vec::with_capacity(inbound_rows.len());
+    for r in inbound_rows {
+        inbound_totals.push(json!({
+            "nodeId":r.try_get::<i64,_>("node_id")?,
+            "nodeName":r.try_get::<String,_>("node_name")?,
+            "inboundTag":r.try_get::<String,_>("inbound_tag")?,
+            "uplinkBytes":r.try_get::<i64,_>("uplink_bytes")?,
+            "downlinkBytes":r.try_get::<i64,_>("downlink_bytes")?,
+            "observations":r.try_get::<i64,_>("observations")?
+        }));
+    }
+    // Distinguish a truly idle user from an unreachable Xray StatsService.
+    // The last signed sample on each node is advisory; it is never counted as usage.
+    let collector_rows = sqlx::query(
+        "SELECT n.id AS node_id,
+                COALESCE(NULLIF(n.data->>'name',''),'Узел #'||n.id::text) AS node_name,
+                last_sample.status,
+                last_sample.sampled_at_ms
+         FROM panel_records n
+         LEFT JOIN LATERAL (
+             SELECT sm.metrics->>'userStatsStatus' AS status,
+                    (EXTRACT(EPOCH FROM sm.sampled_at)*1000)::BIGINT AS sampled_at_ms
+             FROM server_metric_samples sm
+             WHERE sm.node_id=n.id::text
+             ORDER BY sm.sampled_at DESC LIMIT 1
+         ) last_sample ON TRUE
+         WHERE n.collection='nodes' ORDER BY n.id"
+    ).fetch_all(&state.pool).await?;
+    let mut collectors=Vec::with_capacity(collector_rows.len());
+    for row in collector_rows {
+        collectors.push(json!({
+            "nodeId":row.try_get::<i64,_>("node_id")?,
+            "name":row.try_get::<String,_>("node_name")?,
+            "status":row.try_get::<Option<String>,_>("status")?,
+            "sampledAtMs":row.try_get::<Option<i64>,_>("sampled_at_ms")?
+        }));
+    }
+    Ok(Json(json!({
+        "collectors":collectors,
+        "userId": user_id,
+        "dataSource": "user_node_traffic_totals",
+        "accounting": "monotonic_counter_deltas",
+        "sampleCount": servers.len(),
+        "totalUplinkBytes": uplink,
+        "totalDownlinkBytes": downlink,
+        "effectiveUsedGb": base_usage+(uplink.saturating_add(downlink) as f64 / 1_073_741_824.0),
+        "meteredUsedGb": uplink.saturating_add(downlink) as f64 / 1_073_741_824.0,
+        "servers": servers,
+        "inbounds": inbound_totals,
+        "inboundAccounting": "independent_signed_user_inbound_counters"
+    })))
+}
+
+async fn get_traffic_metrics(
+    State(state): State<AppState>,
+    Query(query): Query<TrafficMetricsQuery>,
+) -> Result<Json<Value>, ApiError> {
+    let (range, interval_seconds) =
+        match query.range.as_deref().unwrap_or("1h") {
+            "1h" => ("1h", 60_i64),
+            "24h" => ("24h", 900_i64),
+            _ => return Err(ApiError::new(StatusCode::BAD_REQUEST, "Период должен быть 1h или 24h.")),
+        };
+
+    if query.node_id.is_some_and(|id| id <= 0) || query.squad_id.is_some_and(|id| id <= 0) {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "ID узла и сквада должны быть положительными числами."));
+    }
+
+    // Node identifiers in the hypertable are text versions of panel_records.id.
+    // A squad includes nodes whose assigned Xray profile has at least one inbound
+    // tag in common with that squad's inbound list.
+    let rows = sqlx::query(
+        "WITH selected_nodes AS (
+            SELECT n.id::text AS node_id
+            FROM panel_records n
+            LEFT JOIN panel_records p
+              ON p.collection = 'profiles'
+             AND p.id::text = n.data->>'profileId'
+            WHERE n.collection = 'nodes'
+              AND ($1::BIGINT IS NULL OR n.id = $1)
+              AND (
+                $2::BIGINT IS NULL
+                OR EXISTS (
+                    SELECT 1
+                    FROM panel_records sq
+                    WHERE sq.collection = 'squads'
+                      AND sq.id = $2
+                      AND EXISTS (
+                          SELECT 1
+                          FROM jsonb_array_elements_text(
+                              CASE
+                                WHEN jsonb_typeof(sq.data->'inb') = 'array' THEN sq.data->'inb'
+                                ELSE '[]'::jsonb
+                              END
+                          ) AS squad_tag(tag)
+                          WHERE EXISTS (
+                              SELECT 1
+                              FROM jsonb_array_elements(
+                                  CASE
+                                    WHEN p.data->>'config' IS NOT NULL
+                                      THEN COALESCE((p.data->>'config')::jsonb->'inbounds', '[]'::jsonb)
+                                    ELSE '[]'::jsonb
+                                  END
+                              ) AS profile_inbound(item)
+                              WHERE profile_inbound.item->>'tag' = squad_tag.tag
+                          )
+                      )
+                )
+              )
+        ),
+        per_node_bucket AS (
+            SELECT
+                time_bucket(CASE WHEN $3::text = '1h' THEN INTERVAL '1 minute' ELSE INTERVAL '15 minutes' END, s.sampled_at) AS bucket,
+                s.node_id,
+                AVG(s.rx_bytes_per_sec) AS rx_bytes_per_sec,
+                AVG(s.tx_bytes_per_sec) AS tx_bytes_per_sec,
+                COUNT(*)::BIGINT AS sample_count
+            FROM server_metric_samples s
+            WHERE s.sampled_at >= NOW() - CASE WHEN $3::text = '1h' THEN INTERVAL '1 hour' ELSE INTERVAL '24 hours' END
+              AND s.node_id IN (SELECT node_id FROM selected_nodes)
+            GROUP BY 1, 2
+        )
+        SELECT
+            (EXTRACT(EPOCH FROM bucket) * 1000)::BIGINT AS bucket_ms,
+            COALESCE(SUM(rx_bytes_per_sec), 0)::DOUBLE PRECISION AS rx_bytes_per_sec,
+            COALESCE(SUM(tx_bytes_per_sec), 0)::DOUBLE PRECISION AS tx_bytes_per_sec,
+            COUNT(DISTINCT node_id)::BIGINT AS node_count,
+            COALESCE(SUM(sample_count), 0)::BIGINT AS sample_count
+        FROM per_node_bucket
+        GROUP BY bucket
+        ORDER BY bucket ASC"
+    )
+    .bind(query.node_id)
+    .bind(query.squad_id)
+    .bind(range)
+    .fetch_all(&state.pool)
+    .await?;
+
+    let mut points = Vec::with_capacity(rows.len());
+    let mut total_samples = 0_i64;
+    let mut latest_node_count = 0_i64;
+
+    for row in &rows {
+        let bucket_ms: i64 = row.try_get("bucket_ms")?;
+        let rx: f64 = row.try_get("rx_bytes_per_sec")?;
+        let tx: f64 = row.try_get("tx_bytes_per_sec")?;
+        let node_count: i64 = row.try_get("node_count")?;
+        let sample_count: i64 = row.try_get("sample_count")?;
+        total_samples = total_samples.saturating_add(sample_count);
+        latest_node_count = node_count;
+        points.push(json!({
+            "bucketMs": bucket_ms,
+            "rxBytesPerSec": rx,
+            "txBytesPerSec": tx,
+            "nodeCount": node_count,
+            "sampleCount": sample_count
+        }));
+    }
+
+    Ok(Json(json!({
+        "range": range,
+        "intervalSeconds": interval_seconds,
+        "nodeId": query.node_id,
+        "squadId": query.squad_id,
+        "dataSource": "server_metric_samples",
+        "sampleCount": total_samples,
+        "latestNodeCount": latest_node_count,
+        "points": points
+    })))
+}
+
+async fn read_cpu_ticks() -> Option<(u64, u64)> {
+    let stat = tokio::fs::read_to_string("/proc/stat").await.ok()?;
+    let line = stat.lines().find(|line| line.starts_with("cpu "))?;
+    let values = line.split_whitespace().skip(1).take(8).filter_map(|value| value.parse::<u64>().ok()).collect::<Vec<_>>();
+    if values.len() < 4 { return None; }
+    let total = values.iter().copied().fold(0u64, u64::saturating_add);
+    let idle = values[3].saturating_add(*values.get(4).unwrap_or(&0));
+    Some((total, idle))
+}
+
+async fn get_core_status(State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>) -> Json<Value> {
+    let status=state.core.status().await;
+    if viewer_read_only(&actor) {
+        Json(json!({"status":status.status,"installed_version":status.installed_version,
+          "latest_version":status.latest_version,"runtime":status.runtime}))
+    } else {Json(serde_json::to_value(status).unwrap_or_else(|_|json!({})))}
+}
+
+async fn get_core_releases(State(state): State<AppState>) -> Result<Json<Value>, ApiError> {
+    let releases = state.core.available_releases().await
+        .map_err(|error| ApiError::new(StatusCode::BAD_GATEWAY, error))?;
+    Ok(Json(json!({"items": releases})))
+}
+
+#[derive(Debug, Deserialize)]
+struct CoreValidationRequest { config: String }
+
+async fn validate_xray_configuration(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+    Json(body): Json<CoreValidationRequest>,
+) -> Result<Json<Value>, ApiError> {
+    require_mutation(&actor)?;
+    if body.config.len() > 512 * 1024 {
+        return Err(ApiError::new(StatusCode::PAYLOAD_TOO_LARGE, "Конфигурация слишком большая."));
+    }
+    // Syntax errors are mapped precisely by the browser JSON parser; never claim
+    // that Xray reports a line when it only reports a semantic error.
+    let _: Value = serde_json::from_str(&body.config)
+        .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Некорректный JSON. Исправьте синтаксис в редакторе."))?;
+    let (valid, stdout, stderr) = state.core.validate_json(&body.config).await
+        .map_err(|msg| ApiError::new(StatusCode::SERVICE_UNAVAILABLE, msg))?;
+    Ok(Json(json!({
+        "valid": valid, "engine": "xray-core",
+        "stdout": stdout, "stderr": stderr,
+        "message": if valid { "Конфигурация принята установленным Xray-core." } else { "Xray-core отклонил конфигурацию." }
+    })))
+}
+
+async fn generate_vless_encryption(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+) -> Result<Json<Value>, ApiError> {
+    require_mutation(&actor)?;
+    let generated = state.core.generate_vless_encryption().await
+        .map_err(|error| ApiError::new(StatusCode::SERVICE_UNAVAILABLE, error))?;
+
+    // Audit the action but never persist or log the secret encryption/decryption values.
+    audit(
+        &state.pool,
+        &actor.username,
+        "xray_core.vlessenc_generated",
+        None,
+        None,
+        json!({"methods": ["x25519", "mlkem768"]}),
+    ).await;
+
+    Ok(Json(generated))
+}
+
+async fn update_core(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+    Json(body): Json<CoreUpdateRequest>,
+) -> Result<(StatusCode, Json<Value>), ApiError> {
+    require_owner(&actor)?;
+    let target = state.core.set_desired_version(&body.version).await
+        .map_err(|error| ApiError::new(StatusCode::BAD_REQUEST, error))?;
+    audit(&state.pool, &actor.username, "xray_core.update_requested", None, None, json!({"version": target})).await;
+
+    let manager = state.core.clone();
+    tokio::spawn(async move {
+        if let Err(error) = manager.install_or_update(target).await {
+            tracing::warn!(error = %error, "Requested Xray-core update failed");
+        }
+    });
+    Ok((StatusCode::ACCEPTED, Json(json!({
+        "status": "updating",
+        "message": "Обновление Xray-core запущено."
+    }))))
+}
+
+/// Only an authenticated owner may request an upgrade. The application never
+/// executes shell commands or receives the Docker socket: a root-owned systemd
+/// worker watches one fixed-value request file and performs a DB backup first.
+async fn request_panel_update(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+) -> Result<(StatusCode, Json<Value>), ApiError> {
+    require_owner(&actor)?;
+    let request_file=env::var("PANEL_UPDATE_REQUEST").map_err(|_|ApiError::new(
+        StatusCode::SERVICE_UNAVAILABLE,"Web-обновления недоступны: настройте host systemd worker через install.sh."
+    ))?;
+    let status_file=env::var("PANEL_UPDATE_STATUS").map_err(|_|ApiError::new(
+        StatusCode::SERVICE_UNAVAILABLE,"Web-обновления недоступны: нет файла состояния."
+    ))?;
+    let status=tokio::fs::read_to_string(&status_file).await.map_err(|_|ApiError::new(
+        StatusCode::SERVICE_UNAVAILABLE,"Хостовый updater не инициализирован."
+    ))?;
+    if status.trim()=="running" {
+        return Err(ApiError::new(StatusCode::CONFLICT,"Обновление уже выполняется."));
+    }
+    tokio::fs::write(&request_file,b"update\n").await.map_err(|error|{
+        tracing::error!(%error,"Panel update request could not be written");
+        ApiError::new(StatusCode::SERVICE_UNAVAILABLE,"Не удалось передать запрос хостовому updater.")
+    })?;
+    audit(&state.pool,&actor.username,"panel.update_requested",None,None,json!({"source":"owner_web"})).await;
+    Ok((StatusCode::ACCEPTED,Json(json!({
+        "status":"queued",
+        "message":"Запрос передан в системный updater. БД будет скопирована до обновления."
+    }))))
+}
+
+async fn get_panel_update_status(
+    Extension(actor): Extension<auth::AuthUser>,
+) -> Result<Json<Value>, ApiError> {
+    require_owner(&actor)?;
+    let state=match env::var("PANEL_UPDATE_STATUS") {
+        Ok(path)=>tokio::fs::read_to_string(path).await.unwrap_or_else(|_|"unavailable".into()),
+        Err(_)=>"unavailable".into(),
+    };
+    let status=match state.trim() {
+        "running"=>"running",
+        "success"=>"success",
+        "failed"=>"failed",
+        "idle"=>"idle",
+        _=>"unavailable",
+    };
+    Ok(Json(json!({"status":status})))
+}
+
+async fn read_settings(pool: &PgPool) -> Result<Value, ApiError> {
+    Ok(sqlx::query_scalar::<_, Value>("SELECT value FROM app_settings WHERE key = 'panel'")
+        .fetch_optional(pool)
+        .await?
+        .unwrap_or_else(|| json!({
+            "brand":"XMesh Nexus",
+            "domain":"",
+            "hooks": {
+                "user.created":0,
+                "user.limited":0,
+                "user.expired":0,
+                "user.expires_in_24_hours":0,
+                "user.first_connected":0,
+                "user.bandwidth_usage_threshold_reached":0
+            }
+        })))
+}
+
+// Panel quotas are expressed in GiB; signed node counters are bytes.
+// Keep the manually configured baseline in panel_records and overlay actual,
+// monotonic signed user counters on reads. Never use node-wide RX/TX here.
+pub(crate) fn add_metered_usage(user: &mut Value, bytes: i64) {
+    let base=user.get("used").and_then(Value::as_f64).unwrap_or(0.0).max(0.0);
+    let measured=(bytes.max(0) as f64)/1_073_741_824.0;
+    if let Some(object)=user.as_object_mut(){
+        object.insert("used".into(),json!(base+measured));
+        object.insert("meteredUsedGb".into(),json!(measured));
+    }
+}
+
+pub(crate) async fn user_metered_bytes(pool: &PgPool, user_id: i64) -> Result<i64,ApiError> {
+    let bytes: i64=sqlx::query_scalar(
+        "SELECT COALESCE(SUM(uplink_bytes + downlink_bytes),0)::BIGINT
+         FROM user_node_traffic_totals WHERE user_id=$1"
+    ).bind(user_id).fetch_one(pool).await?;
+    Ok(bytes.max(0))
+}
+
+async fn load_records(pool: &PgPool, collection: &str) -> Result<Vec<Value>, ApiError> {
+    validate_collection(collection)?;
+    let rows = sqlx::query("SELECT id, data FROM panel_records WHERE collection = $1 ORDER BY id")
+        .bind(collection)
+        .fetch_all(pool)
+        .await?;
+    let mut records=rows.iter().map(row_to_record).collect::<Result<Vec<_>,_>>()?;
+    if collection=="users" && !records.is_empty(){
+        // One grouped query, not one SQL request per user.
+        let totals=sqlx::query(
+            "SELECT user_id, COALESCE(SUM(uplink_bytes+downlink_bytes),0)::BIGINT AS bytes
+             FROM user_node_traffic_totals GROUP BY user_id"
+        ).fetch_all(pool).await?;
+        let traffic=totals.into_iter().filter_map(|row|{
+            Some((row.try_get::<i64,_>("user_id").ok()?,
+                  row.try_get::<i64,_>("bytes").ok()?))
+        }).collect::<std::collections::HashMap<_,_>>();
+        for user in &mut records {
+            if let Some(id)=user.get("id").and_then(Value::as_i64){
+                add_metered_usage(user,*traffic.get(&id).unwrap_or(&0));
+            }
+        }
+    }
+    Ok(records)
+}
+
+fn row_to_record(row: &sqlx::postgres::PgRow) -> Result<Value, ApiError> {
+    let id: i64 = row.try_get("id")?;
+    let mut data: Value = row.try_get("data")?;
+    let object = data.as_object_mut()
+        .ok_or_else(|| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Повреждён формат записи."))?;
+    object.insert("id".to_owned(), json!(id));
+    Ok(data)
+}
+
+fn validate_collection(collection: &str) -> Result<(), ApiError> {
+    if COLLECTIONS.contains(&collection) {
+        Ok(())
+    } else {
+        Err(ApiError::new(StatusCode::NOT_FOUND, "Неизвестная коллекция."))
+    }
+}
+
+// A public Host is not a standalone Xray profile. Its inbound must come from
+// the selected profile, and each assigned node must actually run that profile.
+async fn validate_host_binding(pool: &PgPool, host: &Value) -> Result<(), ApiError> {
+    // Disabled hosts are allowed to remain drafts and can always be switched off.
+    // Re-enabling them validates the full runtime profile/node relationship.
+    if host.get("disabled").and_then(Value::as_bool) == Some(true) { return Ok(()); }
+    let bad = |message: &'static str| ApiError::new(StatusCode::BAD_REQUEST, message);
+    let profile_id = host.get("profileId").and_then(Value::as_i64)
+        .filter(|id| *id > 0)
+        .ok_or_else(|| bad("Хосту необходимо назначить XRAY STUDIO профиль."))?;
+    let tag = host.get("tag").and_then(Value::as_str)
+        .filter(|tag| !tag.is_empty() && tag.len() <= 150)
+        .ok_or_else(|| bad("Выберите inbound из XRAY STUDIO."))?;
+    let address = host.get("address").and_then(Value::as_str)
+        .filter(|value| !value.is_empty() && value.len() <= 253
+            && !value.chars().any(|ch| ch.is_control() || ch.is_whitespace() || "/@?#\\".contains(ch)))
+        .ok_or_else(|| bad("Некорректный публичный адрес хоста."))?;
+    if address == "localhost" || address == "0.0.0.0" || address.starts_with("127.") {
+        return Err(bad("Для подписки нужен публичный адрес ноды."));
+    }
+    let port = host.get("port").and_then(Value::as_u64).unwrap_or(0);
+    if !(1..=65535).contains(&port) { return Err(bad("Укажите публичный порт 1–65535.")); }
+    let nodes = host.get("nodes").and_then(Value::as_array)
+        .filter(|nodes| !nodes.is_empty() && nodes.len() <= 64)
+        .ok_or_else(|| bad("Привяжите хост к одной или нескольким нодам."))?;
+    let profiles = load_records(pool, "profiles").await?;
+    let profile = profiles.iter().find(|profile| profile.get("id").and_then(Value::as_i64) == Some(profile_id))
+        .ok_or_else(|| bad("Выбранный XRAY STUDIO профиль отсутствует."))?;
+    let config = profile.get("config").and_then(Value::as_str)
+        .and_then(|raw| serde_json::from_str::<Value>(raw).ok())
+        .ok_or_else(|| bad("Сохранённая конфигурация XRAY STUDIO недействительна."))?;
+    let inbound = config.get("inbounds").and_then(Value::as_array)
+        .and_then(|items| items.iter().find(|inbound| inbound.get("tag").and_then(Value::as_str) == Some(tag)))
+        .ok_or_else(|| bad("Выбранный inbound отсутствует в XRAY STUDIO профиле."))?;
+    if inbound.get("protocol").and_then(Value::as_str) != Some("vless") {
+        return Err(bad("Генератор подписок пока поддерживает VLESS inbound."));
+    }
+    let all_nodes = load_records(pool, "nodes").await?;
+    for node_id in nodes {
+        let id = node_id.as_i64().ok_or_else(|| bad("Некорректная привязка ноды."))?;
+        let node = all_nodes.iter().find(|node| node.get("id").and_then(Value::as_i64) == Some(id))
+            .ok_or_else(|| bad("Одна из привязанных нод не найдена."))?;
+        if node.get("disabled").and_then(Value::as_bool) == Some(true)
+            || node.get("profileId").and_then(Value::as_i64) != Some(profile_id)
+        {
+            return Err(bad("Профиль привязанной ноды не совпадает с XRAY-профилем хоста. Обновите профиль в разделе «Узлы»."));
+        }
+    }
+    let reality = inbound.get("streamSettings").and_then(|v| v.get("realitySettings"));
+    if inbound.get("streamSettings").and_then(|v| v.get("security")).and_then(Value::as_str) == Some("reality") {
+        let key = host.get("publicKey").and_then(Value::as_str).filter(|s| !s.is_empty())
+            .or_else(|| inbound.get("publicKey").and_then(Value::as_str))
+            .or_else(|| reality.and_then(|v|v.get("publicKey")).and_then(Value::as_str));
+        if key.is_none() { return Err(bad("Отсутствует REALITY publicKey. Добавьте публичный ключ в расширенных настройках хоста.")); }
+    }
+    Ok(())
+}
+
+fn validate_node_address(data: &Value) -> Result<(), ApiError> {
+    use std::net::IpAddr;
+    let addr = data.get("addr").and_then(Value::as_str)
+        .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Укажите адрес ноды: IPv4, IPv6 или домен."))?;
+    if addr.is_empty() || addr != addr.trim() || addr.chars().any(char::is_whitespace) {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Адрес ноды не должен содержать пробелы."));
+    }
+    if addr.parse::<IpAddr>().is_ok() { return Ok(()); }
+    // ASCII DNS hostnames only; internationalized domains must use IDNA A-labels.
+    // Reject numeric dotted strings that look like invalid IPv4 addresses.
+    if addr.len() > 253 || !addr.is_ascii() || addr.contains(':') ||
+       addr.contains('/') || addr.contains('@') || addr.contains('[') ||
+       addr.contains(']') || addr.contains("..") ||
+       addr.chars().all(|c| c.is_ascii_digit() || c == '.') {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Некорректный адрес ноды. Используйте IPv4, IPv6 без скобок или DNS-домен без порта."));
+    }
+    let valid = addr.split('.').all(|label| {
+        !label.is_empty() && label.len() <= 63 &&
+        !label.starts_with('-') && !label.ends_with('-') &&
+        label.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
+    });
+    if !valid {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Некорректное доменное имя ноды."));
+    }
+    Ok(())
+}
+
+fn validate_record(collection: &str, data: &Value) -> Result<(), ApiError> {
+    let object = data.as_object()
+        .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Запись должна быть JSON-объектом."))?;
+    if collection == "nodes" {
+        validate_node_address(data)?;
+        node_rotation::validate_node(data)?;
+        node_routing::validate_saved(data)?;
+        if let Some(hosting) = object.get("hosting") {
+            let value = hosting.as_str().ok_or_else(|| ApiError::new(
+                StatusCode::BAD_REQUEST, "Название хостинга должно быть строкой."
+            ))?;
+            if value.chars().count() > 100 || value.chars().any(char::is_control) {
+                return Err(ApiError::new(
+                    StatusCode::BAD_REQUEST, "Название хостинга не должно превышать 100 символов или содержать управляющие символы."
+                ));
+            }
+        }
+    }
+    if collection == "users" {
+        let username = object.get("username").and_then(Value::as_str)
+            .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Имя пользователя обязательно."))?;
+        if username.trim().is_empty() || username.chars().count() > 128 || username.chars().any(char::is_control) {
+            return Err(ApiError::new(StatusCode::BAD_REQUEST, "Некорректное имя пользователя."));
+        }
+    }
+    if collection == "profiles" {
+        let config = object.get("config").and_then(Value::as_str)
+            .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Конфигурация Xray обязательна."))?;
+        let parsed: Value = serde_json::from_str(config)
+            .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Конфигурация Xray содержит некорректный JSON."))?;
+        let inbounds = parsed.get("inbounds").and_then(Value::as_array)
+            .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "В конфигурации Xray должен быть массив inbounds."))?;
+        if inbounds.is_empty() {
+            return Err(ApiError::new(StatusCode::BAD_REQUEST, "В конфигурации Xray должен быть хотя бы один inbound."));
+        }
+        let mut tags = std::collections::HashSet::new();
+        for inbound in inbounds {
+            let tag = inbound.get("tag").and_then(Value::as_str)
+                .filter(|tag| !tag.trim().is_empty())
+                .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "У каждого inbound должен быть tag."))?;
+            if !tags.insert(tag) {
+                return Err(ApiError::new(StatusCode::BAD_REQUEST, "Теги inbounds должны быть уникальными."));
+            }
+            // Defense in depth: browser credential managers may have filled
+            // unrelated Studio password/username inputs into REALITY secrets.
+            // Validate even dormant realitySettings with security="none".
+            if let Some(reality) = inbound.get("streamSettings")
+                .and_then(|stream| stream.get("realitySettings"))
+            {
+                if !reality.is_object() {
+                    return Err(ApiError::new(StatusCode::BAD_REQUEST,
+                        "REALITY: realitySettings должен быть объектом."));
+                }
+                if let Some(private_key) = reality.get("privateKey") {
+                    let valid = private_key.as_str().is_some_and(|key| {
+                        key.is_empty() || (key.len() == 43 && key.bytes().all(|b|
+                            b.is_ascii_alphanumeric() || b == b'-' || b == b'_'))
+                    });
+                    if !valid {
+                        return Err(ApiError::new(StatusCode::BAD_REQUEST,
+                            "REALITY: privateKey должен быть X25519 base64url (43 символа). Проверьте автозаполнение браузера."));
+                    }
+                }
+                if let Some(ids) = reality.get("shortIds") {
+                    let ids = ids.as_array().ok_or_else(|| ApiError::new(
+                        StatusCode::BAD_REQUEST, "REALITY: shortIds должен быть массивом."))?;
+                    let mut seen = std::collections::HashSet::new();
+                    for short_id in ids {
+                        let valid = short_id.as_str().is_some_and(|id| {
+                            id.len() <= 16 && id.len() % 2 == 0
+                                && id.bytes().all(|b| b.is_ascii_hexdigit())
+                                && seen.insert(id.to_ascii_lowercase())
+                        });
+                        if !valid {
+                            return Err(ApiError::new(StatusCode::BAD_REQUEST,
+                                "REALITY: Short ID должен быть уникальной HEX-строкой чётной длины, максимум 16 символов."));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod reality_profile_autofill_validation_tests {
+    use super::*;
+
+    fn profile(key: &str, short_id: &str, security: &str) -> Value {
+        let config = json!({"inbounds":[{"tag":"main","protocol":"vless","port":443,
+            "streamSettings":{"network":"xhttp","security":security,
+                "realitySettings":{"privateKey":key,"shortIds":[short_id]}}}]});
+        json!({"name":"test","config":config.to_string()})
+    }
+
+    #[test]
+    fn rejects_autofilled_login_and_credential_even_while_inactive() {
+        let contaminated = profile(&"a".repeat(256), "Triplex", "none");
+        assert!(validate_record("profiles", &contaminated).is_err());
+        assert!(validate_record("profiles", &profile(&"a".repeat(256), "abcdef12", "none")).is_err());
+        assert!(validate_record("profiles", &profile(&"A".repeat(43), "Triplex", "none")).is_err());
+    }
+
+    #[test]
+    fn accepts_canonical_x25519_and_hex_short_id() {
+        let valid = profile(&"A".repeat(43), "0123456789abcdef", "reality");
+        assert!(validate_record("profiles", &valid).is_ok());
+    }
+}
+
+fn user_status(user: &Value, now_ms: i64) -> &'static str {
+    if user.get("disabled").and_then(Value::as_bool) == Some(true) {
+        return "DISABLED";
+    }
+    if user.get("hold").and_then(Value::as_bool) == Some(true) {
+        return "ON_HOLD";
+    }
+    let limit = user.get("limit").and_then(Value::as_f64).unwrap_or(0.0);
+    let used = user.get("used").and_then(Value::as_f64).unwrap_or(0.0);
+    if limit > 0.0 && used >= limit {
+        return "LIMITED";
+    }
+    let expire_at = number(user, "expireAt").unwrap_or(0);
+    if expire_at > 0 && expire_at < now_ms {
+        return "EXPIRED";
+    }
+    "ACTIVE"
+}
+
+fn number(value: &Value, key: &str) -> Option<i64> {
+    value.get(key).and_then(Value::as_i64)
+        .or_else(|| value.get(key).and_then(Value::as_f64).map(|number| number as i64))
+}
+
+async fn audit(
+    pool: &PgPool,
+    actor: &str,
+    action: &str,
+    collection: Option<&str>,
+    record_id: Option<i64>,
+    detail: Value,
+) {
+    if let Err(error) = sqlx::query(
+        "INSERT INTO panel_audit_log (actor, action, collection, record_id, detail) VALUES ($1,$2,$3,$4,$5)",
+    )
+    .bind(actor)
+    .bind(action)
+    .bind(collection)
+    .bind(record_id)
+    .bind(detail)
+    .execute(pool)
+    .await
+    {
+        tracing::warn!(error = %error, "Could not append audit event");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{number, user_status};
+    use serde_json::json;
+
+    #[test]
+    fn user_status_rules_match_panel_contract() {
+        let now = 1_800_000_000_000_i64;
+        assert_eq!(user_status(&json!({"disabled":true}), now), "DISABLED");
+        assert_eq!(user_status(&json!({"hold":true}), now), "ON_HOLD");
+        assert_eq!(user_status(&json!({"limit":10,"used":10}), now), "LIMITED");
+        assert_eq!(user_status(&json!({"expireAt":now-1}), now), "EXPIRED");
+        assert_eq!(user_status(&json!({"limit":0,"used":500}), now), "ACTIVE");
+    }
+
+    #[test]
+    fn studio_subscription_routes_do_not_conflict_with_dashboard_or_flag_assets() {
+        use super::AppState;
+        use axum::{http::StatusCode, routing::get, Router};
+        use tower_http::services::ServeDir;
+        let mut app = Router::<AppState>::new()
+            .route("/dashboard/{slug}", get(|| async { StatusCode::OK }))
+            .nest_service("/flags", ServeDir::new("/app/static/flags"));
+        for count in 1..=8 {
+            let mut path = String::new();
+            for index in 1..=count {
+                path.push_str(&format!("/{{part{index}}}"));
+            }
+            path.push_str("/{token}");
+            app = app.route(&path, get(|| async { StatusCode::OK }));
+        }
+        // Building this router must not panic at runtime due to path conflicts.
+        drop(app);
+    }
+
+    #[test]
+    fn metered_usage_is_added_in_gib_not_raw_bytes() {
+        let mut user=json!({"id":21,"used":0.0,"limit":2});
+        super::add_metered_usage(&mut user,1_073_741_824);
+        assert_eq!(user["used"],1.0);
+        assert_eq!(user["meteredUsedGb"],1.0);
+        assert_eq!(super::user_status(&user,1_800_000_000_000),"ACTIVE");
+        super::add_metered_usage(&mut user,1_073_741_824);
+        assert_eq!(user["used"],2.0);
+        assert_eq!(super::user_status(&user,1_800_000_000_000),"LIMITED");
+    }
+    #[test]
+    fn numeric_json_fields_are_read_safely() {
+        assert_eq!(number(&json!({"used":12}), "used"), Some(12));
+        assert_eq!(number(&json!({"used":12.5}), "used"), Some(12));
+        assert_eq!(number(&json!({}), "used"), None);
+    }
+}
+
+             THEN (data->>'onlineAt')::BIGINT ELSE 0 END AS online_at
+         FROM panel_records WHERE collection='users'"
+    ).fetch_all(&state.pool).await?;
+    let mut items = Vec::with_capacity(rows.len());
+    for row in rows {
+        items.push(json!({
+            "id": row.try_get::<i64, _>("id")?,
+            "onlineAt": row.try_get::<i64, _>("online_at")?
+        }));
+    }
+    Ok(Json(json!({"items": items, "onlineWindowMs": USER_ONLINE_WINDOW_MS})))
 }
 
 /// Real per-user, per-node traffic collected from authenticated Xray node counters.
