@@ -272,11 +272,11 @@ pub async fn issue_session_in_transaction(
         .await?;
     sqlx::query(
         "INSERT INTO panel_sessions (token_hash, admin_id, expires_at, last_seen_at) \
-         VALUES ($1, $2, NOW() + make_interval(secs=>$3::double precision), NOW())",
+         VALUES ($1, $2, NOW() + ($3::bigint * INTERVAL '1 second'), NOW())",
     )
     .bind(&token_hash)
     .bind(admin_id)
-    .bind((policy.session_hours * 3600) as f64)
+    .bind(policy.session_hours.saturating_mul(3_600))
     .execute(&mut **tx)
     .await?;
     // Successful logins are serialized with the locked account row.
@@ -359,16 +359,16 @@ pub async fn record_failed_login(state: &AppState, username_key: &str) -> Result
         "INSERT INTO auth_login_limits (username_key, attempts, window_started_at, locked_until) \
          VALUES ($1, 1, NOW(), NULL) \
          ON CONFLICT (username_key) DO UPDATE SET \
-           attempts = CASE WHEN auth_login_limits.window_started_at < NOW() - make_interval(secs=>$2::double precision) \
+           attempts = CASE WHEN auth_login_limits.window_started_at < NOW() - ($2::bigint * INTERVAL '1 second') \
                            THEN 1 ELSE auth_login_limits.attempts + 1 END, \
-           window_started_at = CASE WHEN auth_login_limits.window_started_at < NOW() - make_interval(secs=>$2::double precision) \
+           window_started_at = CASE WHEN auth_login_limits.window_started_at < NOW() - ($2::bigint * INTERVAL '1 second') \
                                      THEN NOW() ELSE auth_login_limits.window_started_at END, \
-           locked_until = CASE WHEN (CASE WHEN auth_login_limits.window_started_at < NOW() - make_interval(secs=>$2::double precision) \
+           locked_until = CASE WHEN (CASE WHEN auth_login_limits.window_started_at < NOW() - ($2::bigint * INTERVAL '1 second') \
                                           THEN 1 ELSE auth_login_limits.attempts + 1 END) >= $3 \
-                               THEN NOW() + make_interval(secs=>$2::double precision) ELSE NULL END",
+                               THEN NOW() + ($2::bigint * INTERVAL '1 second') ELSE NULL END",
     )
     .bind(username_key)
-    .bind((policy.lockout_minutes*60) as f64)
+    .bind(policy.lockout_minutes.saturating_mul(60))
     .bind(policy.login_attempts)
     .execute(&state.pool)
     .await?;
@@ -447,12 +447,12 @@ async fn user_from_headers(state: &AppState, headers: &HeaderMap) -> Option<Auth
          FROM panel_sessions s \
          JOIN panel_auth_users a ON a.id = s.admin_id \
          WHERE s.token_hash = $1 AND s.expires_at > NOW() AND a.is_active = TRUE \
-         AND s.created_at > NOW() - make_interval(secs=>$2::double precision) \
-         AND ($3::double precision=0 OR COALESCE(s.last_seen_at,s.created_at) > NOW() - make_interval(secs=>$3::double precision))",
+         AND s.created_at > NOW() - ($2::bigint * INTERVAL '1 second') \
+         AND ($3::bigint=0 OR COALESCE(s.last_seen_at,s.created_at) > NOW() - ($3::bigint * INTERVAL '1 second'))",
     )
     .bind(hash_token(&token))
-    .bind((policy.session_hours*3600) as f64)
-    .bind((policy.idle_minutes*60) as f64)
+    .bind(policy.session_hours.saturating_mul(3_600))
+    .bind(policy.idle_minutes.saturating_mul(60))
     .fetch_optional(&state.pool)
     .await
     .ok()??;
