@@ -12,7 +12,24 @@ const css=fs.readFileSync('styles.css','utf8');
 
 assert.match(app,/k:'rotationEnabled'.*t:'bool'/,'Node editor must expose an enable switch');
 assert.match(app,/k:'rotationIps'.*t:'area'/,'Node editor must expose IP address pool');
-assert.match(app,/chk:data=>\{[\s\S]*?const issue=nodeRotationValidate\(data\);if\(issue\)return issue;/,'Node form must validate before submitting');
+// Exercise the actual browser validation helpers, not their whitespace or order.
+const vm=require('node:vm');
+const validationStart=app.indexOf('const nodeRotationIPs =');
+const validationEnd=app.indexOf('const ENT=',validationStart);
+assert(validationStart>=0&&validationEnd>validationStart,'Node rotation validation helpers must exist');
+const validate=vm.runInNewContext(app.slice(validationStart,validationEnd)+';nodeRotationValidate',{URL});
+assert.equal(validate({rotationEnabled:false,rotationIps:''}),'');
+assert.equal(validate({rotationEnabled:true,rotationIps:'198.51.100.10\\n203.0.113.20'}),'');
+assert.match(validate({rotationEnabled:true,rotationIps:'198.51.100.10'}),/минимум два/);
+assert.match(validate({rotationEnabled:true,rotationIps:'198.51.100.10\\n198.51.100.10'}),/одинаковые/);
+assert.match(validate({rotationEnabled:true,rotationIps:'999.999.999.999\\n198.51.100.10'}),/корректные/);
+assert.match(validate({rotationEnabled:true,rotationIps:'198.51.100.10\\n203.0.113.20\\n'.repeat(129)}),/не более 256/);
+// The node form must surface validation failures before accepting its data.
+const nodeFormStart=app.indexOf('chk:data=>{',app.indexOf("const ENT="));
+assert(nodeFormStart>=0,'Node editor must declare a validation callback');
+const nodeFormEnd=app.indexOf('const issue=nodeRotationValidate(data)',nodeFormStart);
+assert(nodeFormEnd>nodeFormStart&&nodeFormEnd-nodeFormStart<3500,'Node form must validate before submitting');
+assert.match(app.slice(nodeFormEnd,nodeFormEnd+100),/if\\s*\\(issue\\)\\s*return\\s+issue/,'Node form must reject invalid rotation pool');
 assert.match(app,/class="node-rotation-editor-body"/,'Node rotation fields must remain grouped in the redesigned editor');
 assert.match(app,/data-node-rotation-probe/,'Node editor must provide an authenticated test');
 assert.match(app,/nodeRotationIPs\(n\)\.length/,'Node card must show real pool size');
