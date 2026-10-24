@@ -1173,3 +1173,7 @@
   flex:1 1 100%;justify-content:flex-end;
  }
 }
+
+/* Reverse navigation order without changing editor logic. */
+.sv-studio .sv-topbar>.sv-page-tabs>button[data-action="profiles"]{order:-1}
+.sv-studio .sv-topbar>.sv-page-tabs>button[data-action="studio-editor"]{order:0}
