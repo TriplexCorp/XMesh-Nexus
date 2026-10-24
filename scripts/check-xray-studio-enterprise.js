@@ -36,7 +36,7 @@ assert.match(css,/--vcode:/,'Same font token for JSON and overlay');
 assert.match(html,/xray-studio-v4\.css\?v=20261024-composer-v2/,'CSS cache key must change');
 assert.match(html,/xray-studio-v4\.js\?v=20261024-composer-v3/,'JS cache key must change');
 assert.match(html,/xray-studio-composer\.js\?v=20261024-composer-v2/,'Composer script asset is versioned');
-assert.match(html,/xray-studio-tools\.js\?v=20261024-adaptive-tools-v4/,'Tool cache key must change');
+assert.match(html,/xray-studio-tools\.js\?v=20261024-composer-tools-v5/,'Tool cache key must change');
 class Element {
  constructor(tag='div'){this.tag=tag;this.children=[];this.dataset={};this.attrs={};this.textContent='';this.hidden=false}
  append(...items){this.children.push(...items)}
