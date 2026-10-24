@@ -175,7 +175,7 @@ else
 fi
 fi # End fallback for missing root-owned metrics snapshot.
 
-# Approximate distinct users with Xray traffic in the last 120 seconds.
+# Approximate distinct users with confirmed Xray traffic in the last 45 seconds.
 # No counters / first baseline / reset -> unknown or zero only after a valid baseline.
 online_count=""
 if [[ "$USER_STATS_STATUS" == verified || "$USER_STATS_STATUS" == direct ]]; then
@@ -211,7 +211,7 @@ for uid,counters in current.items():
             last=now
         elif any(a<b for a,b in zip(counters,previous_counters)):
             last=None
-    if type(last)!=int or last>now or now-last>120:last=None
+    if type(last)!=int or last>now or now-last>45:last=None
     seen[key]={"bytes":counters,"last":last}
 # First sample only establishes baselines; no online count is asserted.
 count=sum(v["last"] is not None for v in seen.values())
