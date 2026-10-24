@@ -88,7 +88,7 @@
 #client-route-root.crx .crx-bottom-actions{display:flex;gap:9px;flex-wrap:wrap}
 
 /* Layer 2 — independent editor window */
-body.crx-modal-active{overflow:hidden}
+body:has(#client-route-root .crx-overlay){overflow:hidden}
 #client-route-root.crx .crx-overlay{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;padding:clamp(12px,3vw,36px);background:rgba(2,7,12,.76);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 #client-route-root.crx .crx-dialog{display:flex;flex-direction:column;width:min(1160px,100%);max-height:min(90vh,970px);min-height:0;overflow:hidden;border:1px solid var(--crx-border);border-radius:22px;background:var(--crx-bg);box-shadow:0 30px 95px rgba(0,0,0,.48);animation:crx-enter .2s ease-out}
 @keyframes crx-enter{from{opacity:.65;transform:translateY(9px) scale(.992)}to{opacity:1;transform:none}}
@@ -157,3 +157,7 @@ body.crx-modal-active{overflow:hidden}
 @media(max-width:740px){#client-route-root.crx .crx-page-head{padding-top:6px}#client-route-root.crx .crx-page-actions{width:100%;justify-content:space-between}#client-route-root.crx .crx-overlay{padding:0}#client-route-root.crx .crx-dialog{border:0;border-radius:0;width:100%;height:100%;max-height:100vh}#client-route-root.crx .crx-dialog-body{padding:17px}#client-route-root.crx .crx-dialog-header,#client-route-root.crx .crx-dialog-footer,#client-route-root.crx .crx-settings{padding:15px 17px}#client-route-root.crx .crx-tabs{padding:0 10px}#client-route-root.crx .crx-rule{flex-wrap:wrap;align-items:flex-start}#client-route-root.crx .crx-rule-fields{min-width:calc(100% - 52px)}#client-route-root.crx .crx-rule-actions{margin-left:auto}#client-route-root.crx .crx-settings-fields{width:100%}#client-route-root.crx .crx-settings-fields>label:not(.crx-toggle){flex:1}#client-route-root.crx .crx-settings-fields input:not([type=checkbox]){width:100%}}
 @media(max-width:480px){#client-route-root.crx .crx-bottom-actions,#client-route-root.crx .crx-bottom-actions .crx-btn{width:100%}#client-route-root.crx .crx-list{grid-template-columns:1fr}#client-route-root.crx .crx-card{padding:17px}#client-route-root.crx .crx-dialog-mark{display:none}#client-route-root.crx .crx-settings-actions{width:100%}#client-route-root.crx .crx-settings-actions .crx-btn{flex:1}#client-route-root.crx .crx-dialog-footer-actions{width:100%}#client-route-root.crx .crx-dialog-footer-actions .crx-btn{flex:1}}
 @media(prefers-reduced-motion:reduce){#client-route-root.crx *,#client-route-root.crx *::before{animation:none!important;transition:none!important}}
+
+/* Keep the save action at the bottom of the layered editor. */
+#client-route-root.crx .crx-settings{order:4}
+#client-route-root.crx .crx-dialog-footer{order:5}
