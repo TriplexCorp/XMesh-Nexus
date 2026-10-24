@@ -603,7 +603,7 @@ pub async fn preview_routing(
     let patch=patch.as_object().ok_or_else(||ApiError::new(
         StatusCode::BAD_REQUEST,"Routing preview expects a JSON object."))?;
     let valid_keys=["routingEnabled","routingRules","routingRelays",
-        "routingDomainStrategy","geoEnabled","geoBlockAds","geoCustomRules"];
+        "routingDomainStrategy","routingSniffing","geoEnabled","geoBlockAds","geoCustomRules"];
     if patch.keys().any(|key|!valid_keys.contains(&key.as_str())){
         return Err(ApiError::new(StatusCode::BAD_REQUEST,
             "Routing preview received an unrelated node field."));
