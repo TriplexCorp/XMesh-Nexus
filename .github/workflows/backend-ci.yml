@@ -65,6 +65,8 @@ jobs:
         run: node scripts/check-xray-intelligence.js
       - name: Test XRAY STUDIO editor tools and Reality Short ID recovery
         run: node scripts/check-xray-tool-actions.js
+      - name: Verify enterprise XRAY STUDIO inspector and layout
+        run: node scripts/check-xray-studio-enterprise.js
       - name: Verify XRAY STUDIO public endpoint integration
         run: node scripts/check-xray-studio-hosts.js
       - name: Enforce active XRAY STUDIO entrypoint and remove stale assets
