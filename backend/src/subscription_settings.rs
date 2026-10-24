@@ -303,64 +303,64 @@ mod tests {
             "subscriptionLayout":"centered","subscriptionRadius":24,
             "subscriptionClientLinks":{"happ":"https://example.com/download"}})
         ));
-        assert!(!accepts(json!({"subscriptionClients":{"unknown":true}})));
-        assert!(!accepts(json!({"subscriptionClients":{"happ":"yes"}})));
+        assert!(!accepts(&json!({"subscriptionClients":{"unknown":true}})));
+        assert!(!accepts(&json!({"subscriptionClients":{"happ":"yes"}})));
         assert!(!accepts(
-            json!({"subscriptionClientLinks":{"happ":"javascript:alert(1)"}})
+            &json!({"subscriptionClientLinks":{"happ":"javascript:alert(1)"}})
         ));
         assert!(!accepts(
-            json!({"subscriptionLogoUrl":"https://user:pass@example.com/logo.png"})
+            &json!({"subscriptionLogoUrl":"https://user:pass@example.com/logo.png"})
         ));
         assert!(!accepts(
-            json!({"subscriptionSupportUrl":"http://example.com"})
+            &json!({"subscriptionSupportUrl":"http://example.com"})
         ));
-        assert!(accepts(json!({"subscriptionRadius":29})));
-        assert!(accepts(json!({"subscriptionRadius":36})));
-        assert!(!accepts(json!({"subscriptionRadius":0})));
-        assert!(!accepts(json!({"subscriptionRadius":37})));
-        assert!(accepts(json!({"subscriptionSyncPanelTheme":true})));
+        assert!(accepts(&json!({"subscriptionRadius":29})));
+        assert!(accepts(&json!({"subscriptionRadius":36})));
+        assert!(!accepts(&json!({"subscriptionRadius":0})));
+        assert!(!accepts(&json!({"subscriptionRadius":37})));
+        assert!(accepts(&json!({"subscriptionSyncPanelTheme":true})));
         assert!(accepts(
             &json!({"subscriptionAppsTitleEn":"Connection apps","subscriptionHeroEn":"Active"})
         ));
         assert!(!accepts(
-            json!({"subscriptionAppsTitleEn":"<script>\u{0000}</script>"})
+            &json!({"subscriptionAppsTitleEn":"<script>\u{0000}</script>"})
         ));
-        assert!(!accepts(json!({"subscriptionHeroEn":false})));
-        assert!(!accepts(json!({"subscriptionSyncPanelTheme":"yes"})));
-        assert!(!accepts(json!({"subscriptionBackground":"red"})));
-        assert!(!accepts(json!({"subscriptionShowApps":"yes"})));
+        assert!(!accepts(&json!({"subscriptionHeroEn":false})));
+        assert!(!accepts(&json!({"subscriptionSyncPanelTheme":"yes"})));
+        assert!(!accepts(&json!({"subscriptionBackground":"red"})));
+        assert!(!accepts(&json!({"subscriptionShowApps":"yes"})));
         assert!(accepts(
             &json!({"subscriptionAppsTitle":"Поддерживаемые клиенты",
             "subscriptionCustomClients":[{"id":"custom-1","name":"My Client",
             "platforms":"Android · iOS","url":"https://example.com/install",
             "enabled":true}]})
         ));
-        assert!(accepts(json!({"subscriptionCustomClients":[]})));
-        assert!(!accepts(json!({"subscriptionAppsTitle":true})));
-        assert!(!accepts(json!({"subscriptionAppsTitle":"x".repeat(81)})));
+        assert!(accepts(&json!({"subscriptionCustomClients":[]})));
+        assert!(!accepts(&json!({"subscriptionAppsTitle":true})));
+        assert!(!accepts(&json!({"subscriptionAppsTitle":"x".repeat(81)})));
         assert!(!accepts(
-            json!({"subscriptionCustomClients":[{"id":"custom-1",
+            &json!({"subscriptionCustomClients":[{"id":"custom-1",
             "name":"", "platforms":"iOS","url":"","enabled":true}]})
         ));
         assert!(!accepts(
-            json!({"subscriptionCustomClients":[{"id":"custom-1",
+            &json!({"subscriptionCustomClients":[{"id":"custom-1",
             "name":"Custom","platforms":"","url":"javascript:alert(1)","enabled":true}]})
         ));
         assert!(!accepts(
-            json!({"subscriptionCustomClients":[{"id":"custom-1",
+            &json!({"subscriptionCustomClients":[{"id":"custom-1",
             "name":"Client A","platforms":"","url":"","enabled":true},
             {"id":"custom-1","name":"Client B","platforms":"","url":"","enabled":false}]})
         ));
         assert!(!accepts(
-            json!({"subscriptionCustomClients":[{"id":"custom-2",
+            &json!({"subscriptionCustomClients":[{"id":"custom-2",
             "name":"Client","platforms":"","url":"","enabled":"yes"}]})
         ));
         assert!(!accepts(
-            json!({"subscriptionCustomClients":[{"id":"custom-2",
+            &json!({"subscriptionCustomClients":[{"id":"custom-2",
             "name":"Client","platforms":"","url":"","enabled":true,
             "html":"<script>alert(1)</script>"}]})
         ));
-        assert!(!accepts(json!({"subscriptionCustomClients":vec![json!({
+        assert!(!accepts(&json!({"subscriptionCustomClients":vec![json!({
             "id":"custom-1","name":"Client","platforms":"","url":"","enabled":true
         }); 33]})));
     }
