@@ -156,7 +156,7 @@ pub async fn heartbeat(
     // config again; never trust its reported revision as desired state.
     let needs_reconcile=report.xray_running && report.applied_revision.is_some()
         && sqlx::query_scalar::<_,i64>(
-            "SELECT 1 FROM node_desired_revisions WHERE node_id=$1"
+            "SELECT 1::BIGINT FROM node_desired_revisions WHERE node_id=$1"
         ).bind(report.node_id).fetch_optional(&state.pool).await?.is_none();
     Ok(Json(json!({"accepted":true,"reconcileDesired":needs_reconcile})))
 }
