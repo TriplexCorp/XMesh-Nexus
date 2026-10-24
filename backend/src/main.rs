@@ -2854,23 +2854,8 @@ fn validate_collection(collection: &str) -> Result<(), ApiError> {
 
 // A public Host is not a standalone Xray profile. Its inbound must come from
 // the selected profile, and each assigned node must actually run that profile.
-async fn validate_host_binding(pool: &PgPool, host: &Value) -> Result<(), ApiError> {
-    // Disabled hosts are allowed to remain drafts and can always be switched off.
-    // Re-enabling them validates the full runtime profile/node relationship.
-    if host.get("disabled").and_then(Value::as_bool) == Some(true) {
-        return Ok(());
-    }
+fn validate_public_host_endpoint(host: &Value) -> Result<(), ApiError> {
     let bad = |message: &'static str| ApiError::new(StatusCode::BAD_REQUEST, message);
-    let profile_id = host
-        .get("profileId")
-        .and_then(Value::as_i64)
-        .filter(|id| *id > 0)
-        .ok_or_else(|| bad("Хосту необходимо назначить XRAY STUDIO профиль."))?;
-    let tag = host
-        .get("tag")
-        .and_then(Value::as_str)
-        .filter(|tag| !tag.is_empty() && tag.len() <= 150)
-        .ok_or_else(|| bad("Выберите inbound из XRAY STUDIO."))?;
     let address = host
         .get("address")
         .and_then(Value::as_str)
@@ -2889,6 +2874,27 @@ async fn validate_host_binding(pool: &PgPool, host: &Value) -> Result<(), ApiErr
     if !(1..=65535).contains(&port) {
         return Err(bad("Укажите публичный порт 1–65535."));
     }
+    Ok(())
+}
+
+async fn validate_host_binding(pool: &PgPool, host: &Value) -> Result<(), ApiError> {
+    // Disabled hosts are allowed to remain drafts and can always be switched off.
+    // Re-enabling them validates the full runtime profile/node relationship.
+    if host.get("disabled").and_then(Value::as_bool) == Some(true) {
+        return Ok(());
+    }
+    let bad = |message: &'static str| ApiError::new(StatusCode::BAD_REQUEST, message);
+    let profile_id = host
+        .get("profileId")
+        .and_then(Value::as_i64)
+        .filter(|id| *id > 0)
+        .ok_or_else(|| bad("Хосту необходимо назначить XRAY STUDIO профиль."))?;
+    let tag = host
+        .get("tag")
+        .and_then(Value::as_str)
+        .filter(|tag| !tag.is_empty() && tag.len() <= 150)
+        .ok_or_else(|| bad("Выберите inbound из XRAY STUDIO."))?;
+    validate_public_host_endpoint(host)?;
     let nodes = host
         .get("nodes")
         .and_then(Value::as_array)
