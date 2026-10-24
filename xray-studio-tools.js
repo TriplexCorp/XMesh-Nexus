@@ -360,6 +360,42 @@ const refreshIssues=()=>{
   if(message)message.textContent='Найдено '+problems.length+' неверных или повторяющихся Short ID в REALITY. Исправить автоматически?';
  }
 };
+// Section editing is scoped to the selected inbound; other server fields stay intact.
+async function editInboundJsonSection({name,label,parent='streamSettings',guard,initial={}}){
+ ensureDialogs();
+ const selection=await chooseInbound();if(!selection)return;
+ if(area.value!==selection.source){notify('JSON изменился; повторите действие.');return}
+ const inbound=getInbound(parse(),selection.index);
+ if(guard)guard(inbound);
+ const holder=parent==='streamSettings'?inbound.streamSettings:inbound;
+ const existing=holder?.[name];
+ if(existing!=null&&(!existing||typeof existing!=='object'||Array.isArray(existing)))throw Error(label+': ожидается JSON-объект.');
+ const response=await dialog.request({
+  eyebrow:'XRAY STUDIO / '+label.toUpperCase(),title:label,
+  description:'Inbound: '+String(inbound.tag||selection.index+1)+'. Изменяется только '+(parent==='streamSettings'?'streamSettings.':'')+name+'. Остальные параметры сохраняются.',
+  confirmLabel:'Применить к JSON',
+  notice:'После изменения проверьте конфигурацию через установленный Xray-core.',
+  fields:[{name:'json',label:'Параметры '+name,type:'textarea',rows:12,wide:true,required:true,value:JSON.stringify(existing??initial,null,2),
+   validate:text=>{try{if(text.length>96*1024)return 'Максимум 96 КБ.';const obj=JSON.parse(text);return obj&&typeof obj==='object'&&!Array.isArray(obj)?'':'Требуется JSON-объект'}catch{return 'Некорректный JSON'}}}]
+ });
+ if(!response)return;
+ if(area.value!==selection.source){notify('JSON изменился во время редактирования — операция отменена.');return}
+ if(String(response.json).length>96*1024)throw Error('Раздел слишком большой (максимум 96 КБ).');
+ let parsed;try{parsed=JSON.parse(response.json)}catch{throw Error('Параметры '+name+': синтаксическая ошибка JSON.')}
+ if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))throw Error(label+': требуется JSON-объект');
+ const changed=mutate(doc=>{
+  const ib=getInbound(doc,selection.index);
+  if(ib.tag!==selection.tag)throw Error('Выбранный inbound изменился.');
+  if(guard)guard(ib);
+  const target=parent==='streamSettings'?(ib.streamSettings??={}):ib;
+  target[name]=parsed;
+  if(name==='hysteriaSettings'&&parsed.version!=null){
+   if(parsed.version!==2)throw Error('Для Hysteria2 требуется version: 2.');
+   if(ib.settings&&typeof ib.settings==='object')ib.settings.version=2;
+  }
+ },label+' обновлён в JSON');
+ if(changed)focusJsonSection(name,label);
+}
 const operations={
  undo(){if(!undo.length)return;redo.push(area.value);const value=undo.pop();area.value=value;last=value;area.dispatchEvent(new Event('input',{bubbles:true}));update()},
  redo(){if(!redo.length)return;undo.push(area.value);area.value=redo.pop();last=area.value;area.dispatchEvent(new Event('input',{bubbles:true}));update()},
@@ -501,6 +537,31 @@ const operations={
    },'XTLS Vision добавлен в JSON. Сохраните профиль после проверки Xray-core.');
    if(changed)focusJsonSection('flow','XTLS Vision');
   }catch(e){status('Ошибка Vision: '+e.message);notify(e.message)}
+ },
+ async 'hysteria-config'(){
+  try{await editInboundJsonSection({name:'hysteriaSettings',label:'Hysteria2',initial:{version:2},
+   guard:ib=>{const p=String(ib.protocol||'').toLowerCase(),n=String(ib.streamSettings?.network||'').toLowerCase();if(!['hysteria','hysteria2'].includes(p)&&n!=='hysteria')throw Error('Выбранный inbound не использует Hysteria2.')}
+  })}catch(e){status('Ошибка Hysteria2: '+e.message);notify(e.message)}
+ },
+ async tls(){
+  try{await editInboundJsonSection({name:'tlsSettings',label:'TLS',initial:{certificates:[]},
+   guard:ib=>{if(ib.streamSettings?.security!=='tls')throw Error('У выбранного inbound не включён TLS.')}
+  })}catch(e){status('Ошибка TLS: '+e.message);notify(e.message)}
+ },
+ async 'protocol-config'(){
+  try{await editInboundJsonSection({name:'settings',label:'Параметры протокола',parent:'inbound',initial:{}})}
+  catch(e){status('Ошибка протокола: '+e.message);notify(e.message)}
+ },
+ async 'transport-config'(){
+  try{
+   const doc=parse(),inbounds=safeInbounds(doc),index=inbounds.length?resolveToolInbound(inbounds):0;
+   const network=String(inbounds[index]?.streamSettings?.network||'').toLowerCase();
+   const fields={ws:'wsSettings',grpc:'grpcSettings',httpupgrade:'httpupgradeSettings',quic:'quicSettings'};
+   const key=fields[network];if(!key)throw Error('Для этого транспорта нет специализированных параметров.');
+   await editInboundJsonSection({name:key,label:'Настройки '+network.toUpperCase(),initial:{},
+    guard:ib=>{if(String(ib.streamSettings?.network||'').toLowerCase()!==network)throw Error('Транспорт inbound изменился.')}
+   });
+  }catch(e){status('Ошибка транспорта: '+e.message);notify(e.message)}
  },
  async vlessens(){
   try{
