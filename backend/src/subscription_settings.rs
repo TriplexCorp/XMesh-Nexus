@@ -37,6 +37,9 @@ pub(crate) fn validate(object: &Map<String, Value>) -> Result<(), ApiError> {
     if let Some(json)=object.get("subscriptionJson") {
         crate::subscription_json::validate_settings(json).map_err(|message|bad(&message))?;
     }
+    if let Some(routes)=object.get("clientRoutingProfiles") {
+        crate::client_routing::validate(routes).map_err(|detail|bad(&detail))?;
+    }
 
     for key in [
         "subscriptionBackground", "subscriptionCardColor", "subscriptionTextColor", "subscriptionSecondaryAccent",
