@@ -3595,6 +3595,25 @@ dialog.user-modal .user-canvas-foot{padding-top:14px;font-size:.79rem}
   white-space:nowrap;
   font-variant-numeric:tabular-nums;
 }
+.nodes-page .nc .node-agent-updating{
+  color:var(--a);
+  background:color-mix(in srgb,var(--a) 12%,var(--s2));
+  border-color:color-mix(in srgb,var(--a) 38%,var(--ln));
+}
+.nodes-page .nc .node-agent-spinner{
+  display:inline-block;
+  flex:none;
+  width:.88rem;
+  height:.88rem;
+  border:2px solid color-mix(in srgb,var(--a) 25%,transparent);
+  border-top-color:var(--a);
+  border-radius:50%;
+  animation:xmesh-agent-spinning .8s linear infinite;
+}
+@keyframes xmesh-agent-spinning{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){
+  .nodes-page .nc .node-agent-spinner{animation-duration:2s}
+}
 .nodes-page .nc [data-agent-update]{
   color:var(--a);
   border-color:color-mix(in srgb,var(--a) 25%,var(--ln));
