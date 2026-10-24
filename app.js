@@ -98,7 +98,7 @@ function decorateButtonIcons(root){
  if(root.nodeType===1&&root.matches('button'))buttons.push(root);
  buttons.push(...root.querySelectorAll('button'));
  buttons.forEach(button=>{
-  if(button.querySelector('svg,.ic,.xray-tab-icon')||button.dataset.actionIcon==='done')return;
+  if(button.matches('[data-x]')||button.querySelector('svg,.ic,.xray-tab-icon')||button.dataset.actionIcon==='done')return;
   // These controls are selectors/tabs rather than actions; they have their own layout.
   if(button.closest('.seg,.fl,.swt,.choice,.palette-swatch,.country-picker,.color-bubbles,[role="tablist"],.xray-presets,.xray-preset-row'))return;
   if(button.matches('.palette-swatch,.country-option,[role="switch"],[data-ui],[data-th],[data-ac],[data-uf],[data-s],[data-dt],[data-tt],[data-lv],[data-traffic-range],[data-node-grid-mode],[data-xray-mode],[data-xray-config-tab],[data-xray-output]'))return;
