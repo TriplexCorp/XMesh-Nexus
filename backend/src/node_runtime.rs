@@ -591,6 +591,70 @@ fn build_offline_policy(config:&Value, users:&[Value], node_id:i64, now_ms:i64,
     })
 }
 
+/// Validate an *unsaved* routing edit using the same GeoData and outbound
+/// compiler used for signed desired-config. Never return Xray secrets.
+pub async fn preview_routing(
+    State(state): State<AppState>,
+    Path(node_id): Path<i64>,
+    axum::extract::Extension(actor): axum::extract::Extension<crate::auth::AuthUser>,
+    Json(patch): Json<Value>,
+) -> Result<Json<Value>,ApiError> {
+    crate::require_mutation(&actor)?;
+    let patch=patch.as_object().ok_or_else(||ApiError::new(
+        StatusCode::BAD_REQUEST,"Routing preview expects a JSON object."))?;
+    let valid_keys=["routingEnabled","routingRules","routingRelays",
+        "routingDomainStrategy","geoEnabled","geoBlockAds","geoCustomRules"];
+    if patch.keys().any(|key|!valid_keys.contains(&key.as_str())){
+        return Err(ApiError::new(StatusCode::BAD_REQUEST,
+            "Routing preview received an unrelated node field."));
+    }
+    let mut node=sqlx::query_scalar::<_,Value>(
+        "SELECT data FROM panel_records WHERE collection='nodes' AND id=$1"
+    ).bind(node_id).fetch_optional(&state.pool).await?
+        .ok_or_else(||ApiError::new(StatusCode::NOT_FOUND,"Node not found."))?;
+    let obj=node.as_object_mut().ok_or_else(||ApiError::new(
+        StatusCode::CONFLICT,"Invalid node record."))?;
+    for (key,value) in patch {obj.insert(key.clone(),value.clone());}
+    let profile_id=node.get("profileId").and_then(Value::as_i64)
+        .or_else(||node.get("profileId").and_then(Value::as_str)
+            .and_then(|s|s.parse::<i64>().ok()))
+        .ok_or_else(||ApiError::new(StatusCode::CONFLICT,
+            "Assign XRAY STUDIO profile to the source node first."))?;
+    let profile=sqlx::query_scalar::<_,Value>(
+        "SELECT data FROM panel_records WHERE collection='profiles' AND id=$1"
+    ).bind(profile_id).fetch_optional(&state.pool).await?
+        .ok_or_else(||ApiError::new(StatusCode::CONFLICT,
+            "Source XRAY STUDIO profile was not found."))?;
+    let source=profile.get("config").and_then(Value::as_str).ok_or_else(||ApiError::new(
+        StatusCode::CONFLICT,"Source profile has no Xray JSON."))?;
+    let mut config:Value=serde_json::from_str(source).map_err(|_|ApiError::new(
+        StatusCode::CONFLICT,"Source profile contains invalid Xray JSON."))?;
+    // Identical stats-first ordering to live signed policy provisioning.
+    let users=crate::load_records(&state.pool,"users").await?;
+    let squads=crate::load_records(&state.pool,"squads").await?;
+    let now=std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default().as_millis() as i64;
+    provision_proxy_users(&mut config,&users,&squads,now)?;
+    let geo=crate::node_geodata::apply(&node,&mut config)?;
+    let nodes=crate::load_records(&state.pool,"nodes").await?;
+    let hosts=crate::load_records(&state.pool,"hosts").await?;
+    crate::node_routing::apply(&node,&mut config,&nodes,&hosts)?;
+    let rule_count=node.get("routingRules").and_then(Value::as_array).into_iter()
+        .flatten().filter(|r|r.get("enabled").and_then(Value::as_bool)!=Some(false)).count();
+    let exit_count=node.get("routingRules").and_then(Value::as_array).into_iter()
+        .flatten().filter(|r|r.get("enabled").and_then(Value::as_bool)!=Some(false)
+            && r.get("target").and_then(Value::as_str)==Some("node"))
+        .filter_map(|r|r.get("nodeId").and_then(Value::as_i64))
+        .collect::<std::collections::HashSet<_>>().len();
+    Ok(Json(json!({
+        "valid":true,
+        "rules":if node.get("routingEnabled").and_then(Value::as_bool)==Some(true){rule_count}else{0},
+        "exitNodes":exit_count,
+        "usesGeoData":geo.is_some(),
+        "previewOnly":true
+    })))
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct DesiredConfigRequest { node_id: i64 }
