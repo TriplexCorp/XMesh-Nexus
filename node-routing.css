@@ -166,3 +166,10 @@ dialog#dlg.node-routing-modal .route-workspace{
   .route-rule-heading{flex-wrap:wrap}
   .route-rule-actions{width:100%;justify-content:flex-end;margin-top:4px}
 }
+
+/* Transparent hostname extraction for domain/GeoSite matching. */
+.route-sniffing{display:flex;align-items:flex-start;gap:12px;padding:13px;border:1px solid var(--ln);border-radius:11px;background:var(--s1);cursor:pointer}
+.route-sniffing input{width:18px;height:18px;flex:none;accent-color:var(--a);margin:2px 0 0;cursor:pointer}
+.route-sniffing>span{display:grid;gap:5px}
+.route-sniffing strong{font-size:.76rem;font-weight:760}
+.route-sniffing small{font-size:.69rem;line-height:1.5;color:var(--mu)}
