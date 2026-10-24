@@ -5,14 +5,14 @@ use axum::http::{HeaderMap, header};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Device {
+pub enum Device {
     Auto,
     Ios,
     Windows,
 }
 
 impl Device {
-    pub(crate) fn as_str(self) -> &'static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
             Self::Auto => "auto",
             Self::Ios => "ios",
@@ -22,9 +22,9 @@ impl Device {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct Client {
-    pub(crate) device: Device,
-    pub(crate) known_app: bool,
+pub struct Client {
+    pub device: Device,
+    pub known_app: bool,
 }
 
 fn has_agent_token(agent: &str, token: &str) -> bool {
@@ -35,7 +35,7 @@ fn has_agent_token(agent: &str, token: &str) -> bool {
             && after.is_none_or(|c| !c.is_ascii_alphanumeric())
     })
 }
-pub(crate) fn detect(headers: &HeaderMap) -> Client {
+pub fn detect(headers: &HeaderMap) -> Client {
     let ua = headers
         .get(header::USER_AGENT)
         .and_then(|v| v.to_str().ok())
@@ -95,7 +95,7 @@ pub(crate) fn detect(headers: &HeaderMap) -> Client {
 }
 /// The canonical subscription URL serves a portal to ordinary browsers,
 /// and a client configuration to VPN applications, with no query required.
-pub(crate) fn wants_feed(
+pub fn wants_feed(
     headers: &HeaderMap,
     options: &HashMap<String, String>,
 ) -> Result<bool, &'static str> {
@@ -111,7 +111,7 @@ pub(crate) fn wants_feed(
         || options.get("raw").is_some_and(|v| v == "1")
         || options.contains_key("device"))
 }
-pub(crate) fn negotiate(
+pub fn negotiate(
     headers: &HeaderMap,
     options: &HashMap<String, String>,
 ) -> Result<Client, &'static str> {
