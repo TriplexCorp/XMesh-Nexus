@@ -60,7 +60,8 @@ const engine=fs.readFileSync('backend/src/subscription_json.rs','utf8');
 const backend=fs.readFileSync('backend/src/client_routing.rs','utf8');
 const api=fs.readFileSync('backend/src/main.rs','utf8');
 const publicFeed=fs.readFileSync('backend/src/user_subscriptions.rs','utf8');
-assert.match(engine,/client_routing::build_server\(proxy,&all_proxies/);
+assert.match(engine,/client_routing::build_server\(\s*proxy,\s*&all_proxies\s*,\s*&standalone_settings\s*,?\s*\)/,
+ 'Each standalone feed must use subscriber-authorized client routing');
 assert.match(backend,/fn same_template_is_shared_and_server_route_keeps_default_source/);
 assert.match(backend,/fn unknown_or_unauthorized_destination_blocks_instead_of_falling_back/);
 assert.match(backend,/unwrap_or\("block"\)/);
