@@ -255,7 +255,7 @@ fn vless_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> 
         .and_then(Value::as_array)
         .and_then(|users| {
             users.iter().find(|entry| {
-                (Some(uuid) == nonempty(entry, "id"))
+                (nonempty(entry, "id").is_some_and(|client_id| client_id == uuid))
                     || (nonempty(entry, "email") == nonempty(user, "username"))
             })
         })
@@ -941,7 +941,7 @@ pub async fn serve(
     );
     // User limits are expressed in GiB in panel records; the conventional subscription-userinfo
     // header expects bytes and Unix seconds.
-    let used = user
+    let consumed_gib = user
         .get("used")
         .and_then(Value::as_f64)
         .or_else(|| user.get("used").and_then(Value::as_i64).map(|v| v as f64))
@@ -963,7 +963,7 @@ pub async fn serve(
     };
     let info = format!(
         "upload=0; download={}; total={}; expire={}",
-        to_bytes(used),
+        to_bytes(consumed_gib),
         to_bytes(limit),
         if expiry > 1_000_000_000_000 {
             expiry / 1000
@@ -1188,7 +1188,7 @@ pub async fn portal(
         studio_string(&settings, "subscriptionLanguage", "ru")
     };
     let en = lang == "en";
-    let used = user
+    let consumed_gib = user
         .get("used")
         .and_then(Value::as_f64)
         .or_else(|| user.get("used").and_then(Value::as_i64).map(|v| v as f64))
@@ -1205,7 +1205,7 @@ pub async fn portal(
         let remaining = if limit > 0.0 {
             format!(
                 "{:.2} / {:.2} {}",
-                used,
+                consumed_gib,
                 limit,
                 if en { "GB" } else { "ГБ" }
             )
@@ -1222,7 +1222,7 @@ pub async fn portal(
             )
         };
         let pct = if limit > 0.0 {
-            (used / limit * 100.0).clamp(0.0, 100.0)
+            (consumed_gib / limit * 100.0).clamp(0.0, 100.0)
         } else {
             0.0
         };
@@ -1305,7 +1305,7 @@ pub async fn portal(
         if studio_enabled(&settings, "subscriptionShowDevices", false) {
             quick.push_str(&format!("<button type=\"button\" id=\"toggle-devices\" aria-controls=\"subscription-devices\" aria-expanded=\"false\">{}</button>",if en{"Devices"}else{"Устройства"}));
             let maximum = user.get("hwid").and_then(Value::as_i64).unwrap_or(0);
-            let used = user
+            let consumed_gib = user
                 .get("devices")
                 .and_then(Value::as_array)
                 .map_or(0, Vec::len);
@@ -1316,7 +1316,7 @@ pub async fn portal(
                 } else {
                     "Подключённые устройства"
                 },
-                used,
+                connected_devices,
                 if en { "Limit" } else { "Лимит" },
                 if maximum > 0 {
                     maximum.to_string()
