@@ -279,7 +279,7 @@ mod tests {
             let (selected, address) = choose(&pool, index, &previous);
             assert_ne!(address, previous);
             previous = address;
-            index = selected as i64 + 1;
+            index = i64::try_from(selected).expect("bounded pool index") + 1;
         }
         // Even after a pool edit, a stale cursor cannot immediately repeat.
         let reduced = &pool[..2];
