@@ -160,7 +160,7 @@ jobs:
       # Keep source-contract checks above this step so they inspect the committed code.
       - name: Verify committed Rust formatting
         run: cargo fmt --manifest-path backend/Cargo.toml --all -- --check
-      - name: Test and lint (strict Clippy: all targets, pedantic, nursery)
+      - name: "Test and lint (strict Clippy: all targets, pedantic, nursery)"
         run: |
           cargo test --manifest-path backend/Cargo.toml --all-targets
           # Correctness, security-sensitive patterns and code-quality warnings
