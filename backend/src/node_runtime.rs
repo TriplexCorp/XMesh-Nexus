@@ -54,6 +54,7 @@ pub async fn heartbeat(
 
 pub async fn status(
     State(state): State<AppState>, Path(node_id): Path<i64>,
+    Extension(actor): Extension<crate::auth::AuthUser>,
 ) -> Result<Json<Value>, ApiError> {
     let exists = sqlx::query_scalar::<_,i64>(
         "SELECT id FROM panel_records WHERE collection='nodes' AND id=$1"
@@ -75,7 +76,11 @@ pub async fn status(
                 "routerRunning":row.try_get::<bool,_>("router_running")?,
                 "xrayRunning":row.try_get::<bool,_>("xray_running")?,
                 "xrayVersion":row.try_get::<Option<String>,_>("xray_version")?,
-                "geoData":row.try_get::<Option<Value>,_>("geo_data")?,
+                // GeoData reports may include custom source URLs. Observers
+                // only receive operational status, never source metadata.
+                "geoData":if crate::viewer_read_only(&actor){Value::Null}
+                    else{row.try_get::<Option<Value>,_>("geo_data")?
+                        .unwrap_or(Value::Null)},
                 "lastSeenAt":row.try_get::<i64,_>("received_ms")?
             })))
         }
@@ -307,7 +312,11 @@ pub async fn request_agent_update(
 
 pub async fn restart_status(
     State(state): State<AppState>,Path(node_id):Path<i64>,
+    Extension(actor): Extension<crate::auth::AuthUser>,
 )->Result<Json<Value>,ApiError>{
+    // This GET also expires pending commands in the database; observers must
+    // not cause any state changes or inspect command history.
+    crate::require_mutation(&actor)?;
     let exists=sqlx::query_scalar::<_,i64>(
         "SELECT id FROM panel_records WHERE collection='nodes' AND id=$1"
     ).bind(node_id).fetch_optional(&state.pool).await?;
