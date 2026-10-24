@@ -257,6 +257,25 @@ fn smart_routes(countries: &HashMap<String, Vec<String>>, tags: &[String], first
     SmartRoutes { balancers, rules, observation }
 }
 
+fn subscription_display_name(display_names: &[String], setting: &Value, smart: bool, tag_count: usize, balance: &str) -> String {
+    if display_names.len() == 1 && !display_names[0].is_empty() {
+        display_names[0].clone()
+    } else {
+        setting
+            .get("subscriptionName")
+            .and_then(Value::as_str)
+            .filter(|s| !s.is_empty() && s.chars().count() <= 100)
+            .unwrap_or_else(|| {
+                if smart && tag_count > 1 && balance != "off" {
+                    "XMesh SMART"
+                } else {
+                    "XMesh Servers"
+                }
+            })
+            .to_owned()
+    }
+}
+
 pub fn build(mut proxies: Vec<Value>, setting: &Value) -> Result<Value, String> {
     if proxies.is_empty() {
         return Err("Нет доступных клиентских подключений".into());
@@ -333,22 +352,7 @@ pub fn build(mut proxies: Vec<Value>, setting: &Value) -> Result<Value, String> 
     if !balancers.is_empty() {
         routing["balancers"] = json!(balancers);
     }
-    let display_name = if display_names.len() == 1 && !display_names[0].is_empty() {
-        display_names[0].clone()
-    } else {
-        setting
-            .get("subscriptionName")
-            .and_then(Value::as_str)
-            .filter(|s| !s.is_empty() && s.chars().count() <= 100)
-            .unwrap_or_else(|| {
-                if smart && tags.len() > 1 && balance != "off" {
-                    "XMesh SMART"
-                } else {
-                    "XMesh Servers"
-                }
-            })
-            .to_owned()
-    };
+    let display_name = subscription_display_name(&display_names, setting, smart, tags.len(), balance);
     let mut config = json!({
         "remarks":display_name,
         "log":{"loglevel":"warning"},
