@@ -70,6 +70,20 @@ assert.match(index,/client-routing\.css\?v=20261024-client-cards-v3/,'New CSS sh
 assert.match(index,/href="\/client-routing\.css\?v=/,'Routing CSS must be absolute under the nested dashboard URL');
 assert.match(index,/src="\/client-routing\.js\?v=/,'Routing JS must be absolute under the nested dashboard URL');
 
+// The secured dashboard lives under /dashboard/<slug>. Every remaining
+// relative local asset must be in the Rust rebasing allowlist.
+const dashboardServer=fs.readFileSync('backend/src/security.rs','utf8');
+for (const item of index.matchAll(/(?:href|src)="([^"]+)"/g)) {
+ const uri=item[1];
+ if(uri.startsWith('/')||/^[a-z][a-z0-9+.-]*:/i.test(uri))continue;
+ const asset=uri.split('?')[0];
+ if(!/\.(css|js)$/.test(asset))continue;
+ assert(dashboardServer.includes('"'+asset+'"'),
+  'Hidden dashboard route does not rebase '+asset);
+}
+assert.match(dashboardServer,/fn dashboard_client_routing_assets_are_absolute/);
+
+
 assert.match(index,/client-routing\.js\?v=20261024-client-cards-v3/,'New JS should be cache busted');
 
 const docker=fs.readFileSync('backend/Dockerfile','utf8');
