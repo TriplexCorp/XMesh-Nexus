@@ -64,7 +64,8 @@ assert.match(engine,/client_routing::build_server\(\s*proxy,\s*&all_proxies\s*,\
  'Each standalone feed must use subscriber-authorized client routing');
 assert.match(backend,/fn same_template_is_shared_and_server_route_keeps_default_source/);
 assert.match(backend,/fn unknown_or_unauthorized_destination_blocks_instead_of_falling_back/);
-assert.match(backend,/unwrap_or\("block"\)/);
+assert.match(backend,/(?:\.map_or\(\s*"block"\s*,\s*String::as_str\s*\)|\.map\(\s*String::as_str\s*\)\s*\.unwrap_or\(\s*"block"\s*\))/,
+ 'Unknown or unauthorized routing destinations must fall back to block');
 assert.match(publicFeed,/xmeshOwnerNodeKey/);
 assert.match(api,/\.route\("\/client-routing", patch\(patch_client_routing\)\)/);
 assert.match(api,/require_mutation\(&actor\)\?/);
