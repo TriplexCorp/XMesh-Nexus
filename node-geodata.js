@@ -44,7 +44,7 @@ function open({node,modal,updateNode,notify,afterSave}){
  field('geoIpUrl','GeoIP',n.geoIpUrl||'',{placeholder:'Стандартный geoip.dat',hint:'Пустое поле — источник по умолчанию'})+
  field('geoExtraSources','Дополнительные .dat',n.geoExtraSources||'',{area:true,rows:4,placeholder:'custom.dat https://example.org/custom.dat',hint:'Имя файла · HTTPS-ссылка · необязательный SHA-256'})+
  '</section></div>'+ 
- '<div class="geo-foot"><output class="geo-feedback" aria-live="polite"></output><div class="geo-buttons"><button type="button" class="gh geo-refresh" data-geo-refresh>↻ Обновить сейчас</button><button type="submit" class="btn geo-save">Сохранить настройки</button></div></div></form>';
+ '<div class="geo-foot"><output class="geo-feedback" aria-live="polite"></output><div class="geo-buttons"><button type="button" class="gh geo-refresh" data-geo-refresh>Обновить сейчас</button><button type="submit" class="btn geo-save">Сохранить настройки</button></div></div></form>';
  modal(html,'geo-modal');
  const dialog=document.querySelector('dialog#dlg');
  const form=dialog?.querySelector('[data-geodata-form]');
