@@ -86,7 +86,7 @@ for (const item of index.matchAll(/(?:href|src)="([^"]+)"/g)) {
 assert.match(dashboardServer,/fn dashboard_client_routing_assets_are_absolute/);
 
 
-assert.match(index,/client-routing\\.js\\?v=[A-Za-z0-9-]+/,'Routing JS must carry a cache-busting version');
+assert.match(index,/client-routing\.js\?v=[A-Za-z0-9-]+/,'Routing JS must carry a cache-busting version');
 
 const docker=fs.readFileSync('backend/Dockerfile','utf8');
 for(const item of ['client-routing.js','client-routing.css']){
