@@ -11,7 +11,7 @@ export LC_ALL=C
 [[ "$XMESH_API_URL" == https://* ]] || exit 2
 XMESH_API_URL="${XMESH_API_URL%/}"
 KEY="${XMESH_METRICS_PRIVATE_KEY:-/etc/xmesh-node-metrics/node.key}"
-AGENT_VERSION="control-v4.3.1"
+AGENT_VERSION="control-v4.3.2"
 UNIT="${XMESH_XRAY_UNIT:-xray.service}"
 # Only root-owned local configuration can choose a unit. Remote responses never do.
 [[ "$UNIT" =~ ^[A-Za-z0-9_.@-]+\.service$ ]] || { echo "Invalid systemd unit" >&2; exit 2; }
@@ -90,7 +90,23 @@ except (ValueError,TypeError,KeyError):
   read -r profile_check parsed_revision <<< "$parsed"
   if [[ "$parsed_revision" =~ ^[a-f0-9]{64}$ ]];then revision_json="\"$parsed_revision\"";fi
  fi
- signed_post '/api/v1/node/heartbeat' "{\"node_id\":$XMESH_NODE_ID,\"version\":\"$AGENT_VERSION\",\"xray_version\":\"$version\",\"xray_running\":$xr,\"router_running\":$xr,\"geoData\":$geo_data,\"appliedRevision\":$revision_json,\"profileCheck\":\"$profile_check\"}" >/dev/null
+ local ack=''
+ ack="$(signed_post '/api/v1/node/heartbeat' "{\"node_id\":$XMESH_NODE_ID,\"version\":\"$AGENT_VERSION\",\"xray_version\":\"$version\",\"xray_running\":$xr,\"router_running\":$xr,\"geoData\":$geo_data,\"appliedRevision\":$revision_json,\"profileCheck\":\"$profile_check\"}")"
+ # Reconcile missing desired-state records without treating a node-supplied
+ # digest as authoritative. Rate-limit even when the panel requests repeatedly.
+ if [[ "$xr" == true && -f /etc/systemd/system/xmesh-xray-sync.service ]] &&
+    printf '%s' "$ack" | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get("accepted") is True and d.get("reconcileDesired") is True else 1)' ;then
+  local stamp=/var/lib/xmesh-node-control/desired-reconcile-at now last=0
+  now="$(date +%s)"
+  if [[ -r "$stamp" ]];then read -r last < "$stamp" || last=0;fi
+  [[ "$last" =~ ^[0-9]+$ ]] || last=0
+  if (( now-last >= 300 ));then
+   install -d -m 0700 /var/lib/xmesh-node-control
+   printf '%s\n' "$now" > "$stamp"
+   chmod 600 "$stamp"
+   systemctl start --no-block xmesh-xray-sync.service || true
+  fi
+ fi
 }
 restart_xray(){
  if docker inspect xmesh-managed-xray >/dev/null 2>&1;then
