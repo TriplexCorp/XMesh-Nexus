@@ -129,6 +129,18 @@ async fn check_login_limits(
     Ok((username_key, locked))
 }
 
+fn verify_login_password(password: &str, password_hash: &str) -> Result<bool, ApiError> {
+    let parsed_hash = PasswordHash::new(password_hash).map_err(|_| {
+        ApiError::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Не удалось проверить пароль.",
+        )
+    })?;
+    Ok(Argon2::default()
+        .verify_password(password.as_bytes(), &parsed_hash)
+        .is_ok())
+}
+
 pub async fn login(
     State(state): State<AppState>,
     Json(body): Json<LoginRequest>,
@@ -177,15 +189,7 @@ pub async fn login(
     let password_hash: String = row.try_get("password_hash")?;
     let is_active: bool = row.try_get("is_active")?;
 
-    let parsed_hash = PasswordHash::new(&password_hash).map_err(|_| {
-        ApiError::new(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Не удалось проверить пароль.",
-        )
-    })?;
-    let verified = Argon2::default()
-        .verify_password(body.password.as_bytes(), &parsed_hash)
-        .is_ok();
+    let verified = verify_login_password(&body.password, &password_hash)?;
     if !is_active || !verified {
         if locked {
             return Err(ApiError::new(
