@@ -62,7 +62,7 @@ const f=new Function('window','document','root','get','input','getComputedStyle'
  'const hasValidJSON=()=>JSON.parse(input.value);'+outlineJs+
  '\nreturn {renderInspector,jumpToSection,setInspectorVisible};');
 const inspector=f({localStorage:{setItem(){}}},{createElement:tag=>new Element(tag),activeElement:null},root,
- k=>ids[k],()=>({lineHeight:'22px'}),class Event{constructor(type){this.type=type}},null);
+ k=>ids[k],input,()=>({lineHeight:'22px'}),class Event{constructor(type){this.type=type}},null);
 inspector.renderInspector(config,[],input.value);
 assert.equal(ids.insInbounds.textContent,'1');
 assert.equal(ids.insOutbounds.textContent,'1');
