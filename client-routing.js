@@ -37,6 +37,8 @@ function create(db,saveSettings,toast){
  ];
  let draft=clone(Array.isArray(db.set?.clientRoutingProfiles)?db.set.clientRoutingProfiles:[]);
  const jsonEditors=new Set();
+ const activeTabs=new Map();
+ const sourceSearch=new Map();
  const route=(match='geosite',value='',action='proxy',server='')=>({match,value,action,...(server?{server}:{})});
  const root='<section class="client-routing-workspace" id="client-route-root">'+
   '<div class="client-route-main-card">'+
@@ -84,19 +86,23 @@ function create(db,saveSettings,toast){
      '</div>';
    }).join('');
    return '<article class="client-route-profile" data-cr-profile="'+index+'">'+
-    '<header class="client-route-profile-head"><div class="client-route-heading"><span class="client-route-count">'+(index+1)+'</span>'+
-    '<label><span>Название шаблона</span><input data-cr-name value="'+esc(p.name||'')+'" maxlength="100" placeholder="Например: RU через Польшу"></label></div>'+
-    '<div class="client-route-actions"><label class="client-route-toggle"><input type="checkbox" data-cr-enabled'+(p.enabled!==false?' checked':'')+'> Включён</label>'+
+    '<header class="client-route-profile-head"><div class="client-route-heading"><span class="client-route-count">⇄</span>'+
+    '<label><span>Название шаблона</span><input data-cr-name value="'+esc(p.name||'')+'" maxlength="100" placeholder="Например: RU через Польшу"></label><span class="client-route-profile-subtitle">Правила для выбранных серверов и хостов</span></div>'+
+    '<div class="client-route-actions"><span class="client-route-assigned-count">Назначения <b>'+keys.size+'</b></span><label class="client-route-toggle"><input type="checkbox" data-cr-enabled'+(p.enabled!==false?' checked':'')+'> Включён</label>'+
     '<button type="button" class="gh sm" data-cr-json="'+index+'" aria-pressed="'+jsonEditors.has(p.id)+'">'+(jsonEditors.has(p.id)?'Конструктор':'{ } JSON')+'</button>'+ 
     '<button type="button" class="gh sm" data-cr-duplicate="'+index+'">Копировать</button>'+
     '<button type="button" class="gh sm" data-cr-delete="'+index+'">Удалить</button></div></header>'+
     (jsonEditors.has(p.id)?'<section class="client-route-json-block"><div class="client-route-json-head"><div><h3>JSON шаблона</h3><p>Редактируйте правила и назначения. Применение не сохраняет изменения на сервере.</p></div><div class="client-route-json-actions"><button type="button" class="gh sm" data-cr-json-format>Форматировать</button><button type="button" class="btn" data-cr-json-apply>Применить JSON</button></div></div><textarea data-cr-json-text spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="JSON шаблона">'+esc(JSON.stringify(p,null,2))+'</textarea><p class="client-route-json-error" data-cr-json-error role="alert" hidden></p></section>':'')+
     '<div'+(jsonEditors.has(p.id)?' hidden':'')+' class="client-route-form-blocks">'+
-    '<section class="client-route-block"><div class="client-route-section-heading"><div><h3>Назначения</h3>'+
+    '<nav class="client-route-tabs" aria-label="Разделы шаблона">'+
+    '<button type="button" data-cr-tab="sources" class="'+((activeTabs.get(p.id)||'sources')==='sources'?'is-active':'')+'">Назначения <span>'+keys.size+'</span></button>'+
+    '<button type="button" data-cr-tab="rules" class="'+(activeTabs.get(p.id)==='rules'?'is-active':'')+'">Правила маршрутизации <span>'+(p.rules||[]).length+'</span></button>'+
+    '</nav>'+
+    '<section class="client-route-block client-route-sources-block"'+((activeTabs.get(p.id)||'sources')==='sources'?'':' hidden')+'><div class="client-route-section-heading"><div><h3>Назначения</h3>'+
     '<p>Выберите серверы, на которых будет действовать этот шаблон.</p></div>'+
-    '<span>'+keys.size+' выбрано</span></div>'+
+    '<div class="client-route-source-tools"><input type="search" data-cr-search placeholder="Поиск серверов…" value="'+esc(sourceSearch.get(p.id)||'')+'" aria-label="Поиск серверов"><button type="button" class="gh sm" data-cr-select-all>Выбрать все</button><button type="button" class="gh sm" data-cr-select-none>Снять выбор</button></div></div>'+
     '<div class="client-route-sources">'+(assigned||'<p class="note">Сначала добавьте ноды или хосты.</p>')+'</div></section>'+
-    '<section class="client-route-block"><div class="client-route-section-heading"><div><h3>Правила маршрутизации</h3>'+
+    '<section class="client-route-block client-route-rules-block"'+(activeTabs.get(p.id)==='rules'?'':' hidden')+'><div class="client-route-section-heading"><div><h3>Правила маршрутизации <span class="client-route-rule-count">'+(p.rules||[]).length+'</span></h3>'+
     '<p>Правила применяются по порядку сверху вниз.</p></div>'+
     '<button type="button" class="gh sm" data-cr-rule-add="'+index+'">Добавить правило</button></div>'+
     '<div class="client-route-rules">'+(rules||'<div class="client-route-rules-empty">Дополнительных правил пока нет. Используется стандартная маршрутизация.</div>')+'</div></section>'+
@@ -205,6 +211,18 @@ function create(db,saveSettings,toast){
    const card=button.closest('[data-cr-profile]');if(!card)return;
    const index=Number(card.dataset.crProfile);
    draft=read();
+   if(button.hasAttribute('data-cr-tab')){
+    activeTabs.set(draft[index].id,button.dataset.crTab);
+    render();syncDirty();return;
+   }
+   if(button.hasAttribute('data-cr-select-all')||button.hasAttribute('data-cr-select-none')){
+    const checked=button.hasAttribute('data-cr-select-all');
+    const query=(sourceSearch.get(draft[index].id)||'').toLocaleLowerCase();
+    const available=assignments.filter(a=>!query||(a.title+' '+a.detail).toLocaleLowerCase().includes(query)).map(a=>a.key);
+    const selected=new Set(draft[index].servers||[]);
+    for(const key of available){if(checked)selected.add(key);else selected.delete(key)}
+    draft[index].servers=[...selected];render();syncDirty();return;
+   }
    if(button.hasAttribute('data-cr-json')){
     const id=draft[index].id;
     if(jsonEditors.has(id))jsonEditors.delete(id);else jsonEditors.add(id);
@@ -247,6 +265,7 @@ function create(db,saveSettings,toast){
     draft.splice(index,1);
    }else if(button.hasAttribute('data-cr-rule-add')){
     draft[index].rules.push(route());
+    activeTabs.set(draft[index].id,'rules');
    }else if(button.hasAttribute('data-cr-rule-delete')){
     draft[index].rules.splice(Number(button.dataset.crRuleDelete),1);
    }else if(button.hasAttribute('data-cr-up')){
@@ -261,7 +280,16 @@ function create(db,saveSettings,toast){
    }else return;
    render();syncDirty();
   });
-  root.addEventListener('input',event=>{if(!event.target.matches('[data-cr-json-text]'))syncDirty()});
+  root.addEventListener('input',event=>{
+   if(event.target.matches('[data-cr-search]')){
+    const card=event.target.closest('[data-cr-profile]');
+    sourceSearch.set(draft[Number(card.dataset.crProfile)].id,event.target.value);
+    const query=event.target.value.toLocaleLowerCase();
+    card.querySelectorAll('.client-route-source').forEach(label=>{label.hidden=!label.textContent.toLocaleLowerCase().includes(query)});
+    return;
+   }
+   if(!event.target.matches('[data-cr-json-text]'))syncDirty();
+  });
   root.addEventListener('change',syncDirty);
   syncDirty();
  }
