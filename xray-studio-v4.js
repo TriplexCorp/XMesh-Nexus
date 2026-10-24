@@ -37,14 +37,14 @@ function view(){return [
 
 
 '<div class="sv-topbar"><nav class="sv-page-tabs" aria-label="Рабочие разделы XRAY STUDIO">',
-'<button class="active" type="button" data-action="profiles" aria-current="page"><span class="sv-page-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m8 7-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></svg></span><span class="sv-page-tab-text"><strong>Профили</strong><small>Библиотека Xray</small></span></button>',
-'<button type="button" data-action="studio-editor"><span class="sv-page-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="5" rx="1.5"/><rect x="4" y="11" width="16" height="5" rx="1.5"/><rect x="4" y="18" width="16" height="3" rx="1.5"/></svg></span><span class="sv-page-tab-text"><strong>JSON-редактор</strong><small>Рабочая область</small></span><span class="sv-page-count" data-v="profilesCount">0</span></button>',
+'<button class="active" type="button" data-action="studio-editor" aria-current="page"><span class="sv-page-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m8 7-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></svg></span><span class="sv-page-tab-text"><strong>JSON-редактор</strong><small>Конфигурация Xray</small></span></button>',
+'<button type="button" data-action="profiles"><span class="sv-page-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="5" rx="1.5"/><rect x="4" y="11" width="16" height="5" rx="1.5"/><rect x="4" y="18" width="16" height="3" rx="1.5"/></svg></span><span class="sv-page-tab-text"><strong>Профили</strong><small>Библиотека Xray</small></span><span class="sv-page-count" data-v="profilesCount">0</span></button>',
 '</nav><div class="sv-actions"><button type="button" data-action="check" title="Проверить Xray-core"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5L20 7"/><path d="M12 2a10 10 0 1 0 10 10"/></svg> Проверить</button><button type="button" data-action="templates"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z"/></svg> Конструктор</button><span class="sv-action-divider" aria-hidden="true"></span><button type="button" data-action="import" title="Импортировать JSON"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V3m-5 5 5-5 5 5"/><path d="M4 16v4h16v-4"/></svg> Импорт</button><button type="button" data-action="export" title="Экспортировать JSON"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v13m-5-5 5 5 5-5"/><path d="M4 17v4h16v-4"/></svg> Экспорт</button><button class="sv-primary" type="button" data-action="save" title="Сохранить профиль · Ctrl+S"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><path d="M7 3v6h10M7 21v-8h10v8"/></svg> Сохранить</button></div></div>',
 '<section class="sv-profiles-page" data-v="profilesPage" hidden>',
 '<header class="sv-library-hero"><div class="sv-library-heading"><span class="sv-library-eyebrow"><span class="sv-library-beacon"></span> XRAY STUDIO / LIBRARY</span><h2>Библиотека профилей</h2><p>Все серверные конфигурации Xray в одном месте. Выберите профиль, чтобы продолжить редактирование.</p><div class="sv-library-summary"><span><strong data-v="profilesTotal">0</strong> сохранённых профилей</span><span data-v="profilesActive">Нет открытого профиля</span></div></div><button class="sv-primary sv-library-create" type="button" data-action="new-profile"><span aria-hidden="true">＋</span> Новый профиль</button></header>',
 '<div class="sv-library-toolbar"><label class="sv-library-search"><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.7" cy="10.7" r="6.7"/><path d="m16 16 5 5"/></svg></span><input class="sv-profiles-search" data-v="profilesSearch" type="search" placeholder="Поиск по профилям и inbound..." aria-label="Поиск профилей"></label><span class="sv-library-found" data-v="profilesFound" role="status" aria-live="polite">0 профилей</span></div>',
 '<div class="sv-profiles-list" data-v="profilesList"></div></section>',
-'<div class="sv-workspace"><div class="sv-editor-tabs" data-v="editorTabs" role="tablist" aria-label="Открытые JSON-конфигурации"></div><div class="sv-columns"><section class="sv-codepanel"><header class="sv-codebar"><div class="sv-codebar-start"><label class="sv-profile-name"><span>Профиль</span><input data-field="name" type="text" maxlength="120" placeholder="Название профиля" autocomplete="off"></label><span class="sv-codebar-file"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg> config.json</span><small class="sv-file-state" data-v="dirty">Черновик</small></div><div class="sv-codebar-actions"><button type="button" data-action="undo" aria-label="Отменить" title="Отменить · Ctrl+Z">↶</button><button type="button" data-action="redo" aria-label="Повторить" title="Повторить · Ctrl+Y">↷</button><button type="button" data-action="outline" aria-controls="sv-studio-outline" aria-expanded="true" title="Показать или скрыть структуру"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18M7 8h4M7 12h4M7 16h3"/></svg> <span>Структура</span></button></div></header>',
+'<div class="sv-workspace"><div class="sv-columns"><section class="sv-codepanel"><header class="sv-codebar"><div class="sv-codebar-start"><label class="sv-profile-name"><span>Профиль</span><input data-field="name" type="text" maxlength="120" placeholder="Название профиля" autocomplete="off"></label><span class="sv-codebar-file"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg> config.json</span><small class="sv-file-state" data-v="dirty">Черновик</small></div><div class="sv-codebar-actions"><button type="button" data-action="undo" aria-label="Отменить" title="Отменить · Ctrl+Z">↶</button><button type="button" data-action="redo" aria-label="Повторить" title="Повторить · Ctrl+Y">↷</button><button type="button" data-action="outline" aria-controls="sv-studio-outline" aria-expanded="true" title="Показать или скрыть структуру"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18M7 8h4M7 12h4M7 16h3"/></svg> <span>Структура</span></button></div></header>',
 '<div class="sv-inline-tools" aria-label="Инструменты JSON"><div data-xm-tools class="sv-legacy"></div></div>',
 '<div class="sv-editor-context"><span><i class="sv-context-marker" aria-hidden="true"></i> JSON / SERVER CONFIG</span><span>Сохраните профиль, чтобы применить изменения</span></div><div class="sv-codesurface"><pre class="sv-gutter" data-v="gutter" aria-hidden="true"></pre><div class="sv-codeholder"><pre class="sv-highlight" data-v="highlight" aria-hidden="true"></pre><textarea data-v="source" data-xm="manual" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Серверный JSON"></textarea></div><pre class="sv-minimap" data-v="minimap" aria-hidden="true"></pre></div><div class="sv-core-diagnostics" data-v="coreIssues" role="status" aria-live="polite" hidden></div><footer class="sv-codestatus"><span data-v="position">Строка 1, столбец 1</span><span class="sv-codestatus-lines" data-v="lines">0 строк</span><span class="sv-codestatus-valid" data-v="valid" role="status">Проверка...</span><label><input type="checkbox" data-v="wrap"> Перенос строк</label></footer></section>',
 '<section class="sv-constructor"><header><h3>Конструктор конфигурации</h3><p>Изменения параметров синхронизируются с JSON.</p></header><nav class="sv-tabs"><button type="button" data-tab="basic" class="active">Основные</button><button type="button" data-tab="inbound">Входящие</button><button type="button" data-tab="outbound">Исходящие</button><button type="button" data-tab="routing">Маршрутизация</button><button type="button" data-tab="extra">Дополнительно</button></nav>',
@@ -75,81 +75,30 @@ const unsavedApproval=async description=>input.value===saved||await approve({tit
    inboundTag:()=>{try{return JSON.parse(input.value)?.inbounds?.[inboundIndex]?.tag||''}catch{return ''}}
  });
 
-// Multiple independent editor buffers: never discard an unsaved document when opening another.
-const openDocuments=new Map();
-let activeDocumentKey='draft:initial',draftSequence=0;
-const snapshot=()=>({id,name,source:input.value,saved,inboundIndex,outIndex});
-function stash(){openDocuments.set(activeDocumentKey,snapshot())}
-function renderDocumentTabs(){
- const bar=get('editorTabs');bar.replaceChildren();
- for(const [key,doc] of openDocuments){
-  const item=document.createElement('div');item.className='sv-document-tab'+(key===activeDocumentKey?' is-active':'');
-  const select=document.createElement('button');select.type='button';select.dataset.documentOpen=key;
-  select.setAttribute('role','tab');select.setAttribute('aria-selected',String(key===activeDocumentKey));
-  select.textContent=(doc.name||'Без названия')+(doc.source!==doc.saved?' •':'');
-  const closeButton=document.createElement('button');closeButton.type='button';closeButton.dataset.documentClose=key;
-  closeButton.setAttribute('aria-label','Закрыть вкладку '+(doc.name||'JSON'));closeButton.textContent='×';
-  item.append(select,closeButton);bar.append(item);
- }
- const add=document.createElement('button');add.type='button';add.className='sv-document-new';add.dataset.documentNew='true';
- add.textContent='+ JSON';add.title='Открыть новый JSON-документ';bar.append(add);
-}
-function activateDocument(key){
- if(key===activeDocumentKey)return;
- if(activeDocumentKey!=='__switching__')stash();
- const doc=openDocuments.get(key);if(!doc)return;
- activeDocumentKey=key;id=doc.id;name=doc.name;saved=doc.saved;
- inboundIndex=doc.inboundIndex;outIndex=doc.outIndex;
- hostManager.close();input.value=doc.source;input.dispatchEvent(new Event('xmesh:reset-history'));paint();
- renderDocumentTabs();renderProfiles();setPage('editor');
-}
-function addDocument(doc){
- stash();
- const key=doc.id!=null?'profile:'+String(doc.id):'draft:'+ ++draftSequence;
- if(openDocuments.has(key)){activateDocument(key);return}
- openDocuments.set(key,doc);activateDocument(key);
-}
-async function closeDocument(key){
- const doc=key===activeDocumentKey?snapshot():openDocuments.get(key);if(!doc)return;
- if(doc.source!==doc.saved&&!(await approve({title:'Закрыть вкладку?',description:'В этой JSON-конфигурации есть несохранённые изменения.',notice:'Несохранённый черновик будет потерян.',danger:true,confirmLabel:'Закрыть без сохранения'})))return;
- const wasActive=key===activeDocumentKey;
- openDocuments.delete(key);
- if(wasActive){
-  const next=openDocuments.keys().next().value;
-  if(next){activeDocumentKey='__switching__';activateDocument(next);openDocuments.delete('__switching__')}
-  else{
-   activeDocumentKey='draft:'+ ++draftSequence;
-   id=null;name='Новый профиль';saved='';inboundIndex=outIndex=0;
-   input.value=pretty(defaultDoc());input.dispatchEvent(new Event('xmesh:reset-history'));paint();
-   openDocuments.set(activeDocumentKey,snapshot());
-  }
- }
- renderDocumentTabs();renderProfiles();
-}
 let activePage='editor';
 function setPage(page){
- activePage='editor';
- get('profilesPage').hidden=false;
- root.querySelector('.sv-workspace').hidden=false;
- root.querySelector('.sv-bottom').hidden=false;
- root.classList.add('sv-profiles-active','sv-multi-document');
- for(const b of root.querySelectorAll('.sv-page-tabs button')){
-  const selected=b.dataset.action==='profiles';
-  b.classList.toggle('active',selected);
-  if(selected)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');
- }
- renderProfiles();renderDocumentTabs();
+ activePage=page;
+ const editor=page==='editor';
+ get('profilesPage').hidden=editor;
+ root.querySelector('.sv-workspace').hidden=!editor;
+ root.classList.toggle('sv-profiles-active',!editor);
+ root.querySelector('.sv-bottom').hidden=!editor;
+ for(const b of root.querySelectorAll('.sv-page-tabs button')){const selected=b.dataset.action===(editor?'studio-editor':'profiles');b.classList.toggle('active',selected);if(selected)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')}
+ if(!editor)renderProfiles();
 }
 async function openProfile(p){
+ if(!await unsavedApproval('Открыть «'+(p.name||'профиль')+'» вместо текущего черновика?'))return;
  try{
   const d=typeof p.config==='string'?JSON.parse(p.config):p.config;
-  const key='profile:'+String(p.id);
-  if(openDocuments.has(key)){activateDocument(key);return}
-  addDocument({id:p.id,name:p.name||'Без названия',source:pretty(d),saved:pretty(d),inboundIndex:0,outIndex:0});
+  id=p.id;name=p.name;inboundIndex=outIndex=0;hostManager.close();
+  input.value=pretty(d);saved=input.value;paint();input.dispatchEvent(new Event('xmesh:reset-history'));
+  setPage('editor');
  }catch(err){notify('Не удалось открыть профиль: '+err.message)}
 }
 async function newProfile(){
- addDocument({id:null,name:'Новый профиль',source:pretty(defaultDoc()),saved:'',inboundIndex:0,outIndex:0});
+ if(!await unsavedApproval('Создать новый профиль вместо текущего черновика?'))return;
+ id=null;name='Новый профиль';inboundIndex=outIndex=0;hostManager.close();
+ input.value=pretty(defaultDoc());saved=input.value;paint();input.dispatchEvent(new Event('xmesh:reset-history'));setPage('editor');
 }
 function describeProfile(p){
  try{
@@ -797,7 +746,7 @@ async function checkWithCore(){
   get('valid').dataset.status=valid?'ok':'bad';
  }catch(err){if(source!==input.value)return;reportCore('Проверка ядром недоступна: '+err.message)}
 }
-async function save(){try{const d=json();validate(d);if(!name.trim())throw Error('Укажите название профиля');const body={name:name.trim(),config:pretty(d)};if(id!=null)await ctx.api.update('profiles',id,body);else {const created=await ctx.api.create('profiles',body);id=created.id}saved=input.value;stash();renderDocumentTabs();paint();hostManager.render();renderProfiles();notify('Профиль сохранён')}catch(err){notify('Не удалось сохранить: '+err.message)}}
+async function save(){try{const d=json();validate(d);if(!name.trim())throw Error('Укажите название профиля');const body={name:name.trim(),config:pretty(d)};if(id!=null)await ctx.api.update('profiles',id,body);else {const created=await ctx.api.create('profiles',body);id=created.id}saved=input.value;paint();hostManager.render();renderProfiles();notify('Профиль сохранён')}catch(err){notify('Не удалось сохранить: '+err.message)}}
 const bytes=n=>{const b=new Uint8Array(n);crypto.getRandomValues(b);return Array.from(b,v=>v.toString(16).padStart(2,'0')).join('')};
 async function action(a){
  switch(a){
@@ -825,24 +774,16 @@ async function action(a){
  case 'reality':root.querySelector('[data-tool="reality"]')?.click();return;
  }
 }
-root.addEventListener('click',ev=>{
- const open=ev.target.closest('[data-document-open]');
- const closeTab=ev.target.closest('[data-document-close]');
- const create=ev.target.closest('[data-document-new]');
- if(open){ev.preventDefault();activateDocument(open.dataset.documentOpen);return}
- if(closeTab){ev.preventDefault();closeDocument(closeTab.dataset.documentClose).catch(e=>notify(e.message));return}
- if(create){ev.preventDefault();newProfile();return}
-});
 root.addEventListener('click',ev=>{const jump=ev.target.closest('[data-sv-jump]');if(jump){ev.preventDefault();jumpToSection(jump.dataset.svJump);return}const quick=ev.target.closest('[data-quick-outbound]');if(quick){outIndex=Number(quick.dataset.quickOutbound);root.querySelector('[data-tab="outbound"]')?.click();const d=hasValidJSON();if(d)sync(d);return}const b=ev.target.closest('[data-action]');if(b){ev.preventDefault();Promise.resolve(action(b.dataset.action)).catch(x=>notify(x.message))}const tab=ev.target.closest('[data-tab]');if(tab){root.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x===tab));root.querySelectorAll('[data-section]').forEach(x=>x.hidden=x.dataset.section!==tab.dataset.tab)}});
 root.addEventListener('change',ev=>{if(ev.target.matches('[data-field]'))Promise.resolve(formChanged(ev.target)).catch(err=>notify(err.message))});
-input.addEventListener('input',()=>{paint();const current=openDocuments.get(activeDocumentKey);if(current){current.source=input.value;current.name=name;renderDocumentTabs()}});
+input.addEventListener('input',paint);
 input.addEventListener('scroll',()=>{highlight.scrollTop=input.scrollTop;highlight.scrollLeft=input.scrollLeft;gutter.scrollTop=input.scrollTop});
 input.addEventListener('click',paint);input.addEventListener('keyup',paint);
 input.addEventListener('keydown',ev=>{if(ev.key==='Tab'){ev.preventDefault();const i=input.selectionStart;input.setRangeText('  ',i,input.selectionEnd,'end');input.dispatchEvent(new Event('input',{bubbles:true}))}if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='s'){ev.preventDefault();save()}});
 get('wrap').addEventListener('change',ev=>root.classList.toggle('sv-wrap',ev.target.checked));
 get('upload').addEventListener('change',async ev=>{const f=ev.target.files?.[0];if(!f)return;try{if(f.size>2e6)throw Error('Файл больше 2 МБ');const raw=await f.text();JSON.parse(raw);if(!await unsavedApproval('Импортировать JSON вместо текущего черновика?'))return;input.value=raw;paint();input.dispatchEvent(new Event('xmesh:reset-history'));notify('JSON импортирован')}catch(err){notify(err.message)}finally{ev.target.value=''}});
 try{setInspectorVisible(window.localStorage?.getItem('xmesh-studio-inspector')!=='hidden',false)}catch(_){setInspectorVisible(true,false)}
-input.value=pretty(defaultDoc());saved='';paint();openDocuments.set(activeDocumentKey,snapshot());setPage('editor');root.querySelector('[data-tab="inbound"]')?.click();renderProfiles();
+input.value=pretty(defaultDoc());saved='';paint();root.querySelector('[data-tab="inbound"]')?.click();renderProfiles();
 toolPaletteHandle=window.XMeshJsonTools?.setup(root,{toast:notify,realityKeys:ctx.realityKeys,apiRequest:ctx.apiRequest})||null;
 }
 return {view,mount};
