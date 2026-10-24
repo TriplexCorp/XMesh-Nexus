@@ -122,10 +122,10 @@ fn studio_url(settings: &Value, token: &str) -> String {
         .filter(|p| p.starts_with('/'))
         .unwrap_or("/s")
         .trim_end_matches('/');
-    match domain {
-        Some(host) => format!("https://{host}{path}/{token}"),
-        None => format!("{path}/{token}"),
-    }
+    domain.map_or_else(
+        || format!("{path}/{token}"),
+        |host| format!("https://{host}{path}/{token}"),
+    )
 }
 fn token_hash(token: &str) -> String {
     hex::encode(Sha256::digest(token.as_bytes()))
@@ -254,8 +254,8 @@ fn vless_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> 
         .and_then(Value::as_array)
         .and_then(|users| {
             users.iter().find(|entry| {
-                nonempty(entry, "id") == Some(uuid)
-                    || nonempty(entry, "email") == nonempty(user, "username")
+                (nonempty(entry, "id") == Some(uuid))
+                    || (nonempty(entry, "email") == nonempty(user, "username"))
             })
         })
         .and_then(|entry| nonempty(entry, "flow"))
@@ -441,7 +441,7 @@ pub async fn create(
     if id <= 0 {
         return Err(bad("Invalid user ID"));
     }
-    let _user = record(&state, id).await?;
+    let subscription_user = record(&state, id).await?;
     let mut secret = [0u8; 32];
     OsRng.fill_bytes(&mut secret);
     let token = hex::encode(secret);
@@ -468,7 +468,7 @@ pub async fn create(
     let settings = crate::read_settings(&state.pool).await?;
     // A link can exist before nodes are fully configured. Report that distinction
     // explicitly instead of presenting an unusable subscription as ready.
-    let readiness = match collect_user_outbounds(&state, &_user, "generic", false).await {
+    let readiness = match collect_user_outbounds(&state, &subscription_user, "generic", false).await {
         Ok(outbounds) => json!({"ready":true,"connections":outbounds.len()}),
         Err(error) => {
             tracing::warn!(user_id=id, reason=%error.message,"Subscription link created without usable endpoints");
@@ -1018,7 +1018,7 @@ fn app_item(label: &str, platform: &str, url: &str) -> String {
             content
         )
     } else {
-        format!("<div class=\"subscription-preview-app\">{}</div>", content)
+        format!("<div class=\"subscription-preview-app\">{content}</div>")
     }
 }
 fn app_catalog(settings: &Value, language: &str) -> String {
@@ -1301,8 +1301,7 @@ pub async fn portal(
             let used = user
                 .get("devices")
                 .and_then(Value::as_array)
-                .map(|d| d.len())
-                .unwrap_or(0);
+                .map_or(0, Vec::len);
             devices = format!(
                 "<div id=\"subscription-devices\" class=\"subscription-public-devices\" hidden>{}: {} · {}: {}</div>",
                 if en {
@@ -1325,10 +1324,10 @@ pub async fn portal(
             );
         }
         if !quick.is_empty() {
-            quick = format!("<div class=\"subscription-preview-quick\">{quick}</div>")
+            quick = format!("<div class=\"subscription-preview-quick\">{quick}</div>");
         }
         if studio_enabled(&settings, "subscriptionShowApps", true) {
-            apps = app_catalog(&settings, lang)
+            apps = app_catalog(&settings, lang);
         }
     } else {
         cta = format!(
@@ -1812,7 +1811,7 @@ mod tests {
             proxy["settings"]["password"],
             json!(format!("{server}:{client}"))
         );
-        let mut broken = inbound.clone();
+        let mut broken = inbound;
         broken["settings"]["password"] = json!("invalid-base64");
         assert!(proxy_outbound(&user, &broken, &host, "auto").is_none());
     }
