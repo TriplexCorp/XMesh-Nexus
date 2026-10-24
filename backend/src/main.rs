@@ -1858,9 +1858,7 @@ async fn ingest_node_metrics(
         }
     }
     if !metrics.is_object()
-        || serde_json::to_vec(&metrics)
-            .map_or(usize::MAX, |v| v.len())
-            > 32 * 1024
+        || serde_json::to_vec(&metrics).map_or(usize::MAX, |v| v.len()) > 32 * 1024
     {
         return Err(ApiError::new(
             StatusCode::BAD_REQUEST,
