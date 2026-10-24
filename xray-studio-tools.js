@@ -18,11 +18,18 @@ const getInbound=(data,index=0)=>{
  if(!Array.isArray(data.inbounds)||!data.inbounds.length)throw Error('В конфигурации нет inbound');
  const item=data.inbounds[index];if(!item)throw Error('Выбранный inbound отсутствует');return item;
 };
+let selectedToolInboundIndex=0,selectedToolInboundTag=null;
 async function chooseInbound(){
- ensureDialogs();
  const source=area.value,data=parse();
  if(!Array.isArray(data.inbounds)||!data.inbounds.length)throw Error('В конфигурации нет inbound');
  if(data.inbounds.length===1)return {index:0,source,tag:data.inbounds[0].tag};
+ // The visible inbound selector controls both the palette and the action target.
+ // Preserve the legacy picker only for older embedded callers without a selector.
+ if(host.querySelector('[data-tool-inbound]')){
+  const index=resolveToolInbound(data.inbounds);
+  return {index,source,tag:data.inbounds[index].tag};
+ }
+ ensureDialogs();
  const result=await dialog.request({
   title:'Выберите inbound',
   description:'Укажите соединение, к которому нужно применить инструмент. Другие inbound не изменятся.',
@@ -58,33 +65,114 @@ const snippets={
  'log':{loglevel:'warning'}
 };
 const tools=[
- ['undo','↶ Отменить'],['redo','↷ Повторить'],['find','⌕ Поиск'],['validate','✓ Проверить'],
- ['reality','✦ REALITY'],['shortid','♯ Short ID'],['vision','XTLS Vision'],
- ['dns','◉ DNS'],['routing','⇄ Routing'],['policy','▥ Policy / Stats'],['outbounds','⬡ Outbounds'],['log','Log'],
- ['inbound','Новый inbound'],['xhttp','XHTTP настройки'],['vlessens','VLESS Encryption'],['finalmask','FinalMask'],['hysteria','Hysteria2 inbound'],['uuid','UUID (скопировать)'],['backup','Скачать JSON'],['format','Форматировать']
+ ['reality','REALITY'],['shortid','Short ID'],['vlessens','VLESS Encryption'],['vision','XTLS Vision'],
+ ['tls','TLS'],['hysteria-config','Hysteria2'],['protocol-config','Параметры протокола'],['transport-config','Параметры транспорта'],
+ ['dns','DNS'],['routing','Routing'],['outbounds','Outbounds'],['inbound','Новый inbound'],
+ ['xhttp','XHTTP'],['finalmask','FinalMask']
 ];
-const details={reality:['Настроить REALITY: target, SNI, Short ID и X25519','key-round'],shortid:['Генерация Short ID','hash'],vision:['XTLS rprx Vision','shield-check'],dns:['Настройка DNS-серверов','globe'],routing:['Правила маршрутизации','route'],policy:['Политики и статистика','chart-no-axes-column'],outbounds:['Исходящие соединения','network'],validate:['Проверка через Xray-core','shield-check'],xhttp:['Транспорт XHTTP','network'],vlessens:['Серверный VLESS Encryption','shield'],finalmask:['Маскировка потоков','layers'],hysteria:['Шаблон Hysteria2','radio'],uuid:['Скопировать UUID','fingerprint'],backup:['Экспорт текущего JSON','download'],inbound:['Добавить серверный inbound','plus']};
-const featured=['reality','shortid','vlessens','vision','xhttp','dns','routing','inbound'];
+const details={
+ reality:'REALITY: target, SNI, Short ID и X25519',shortid:'Сгенерировать Short ID для REALITY',
+ vlessens:'Сгенерировать VLESS Encryption',vision:'Добавить XTLS Vision',
+ tls:'Редактировать серверные TLS settings', 'hysteria-config':'Настройки транспорта Hysteria2',
+ 'protocol-config':'Редактировать параметры текущего inbound', 'transport-config':'Настройки транспорта',
+ dns:'Открыть или добавить DNS',routing:'Открыть или добавить Routing',
+ outbounds:'Добавить базовые outbounds',inbound:'Создать inbound',xhttp:'Открыть или добавить настройки XHTTP',
+ finalmask:'Настроить FinalMask'
+};
 const icons={
  reality:'<path d="M12 2 4 6v6c0 5 3.5 8 8 10 4.5-2 8-5 8-10V6l-8-4Z"/><path d="m9 12 2 2 4-4"/>',
  shortid:'<path d="M5 9h14M4 15h14M11 3 7 21M17 3l-4 18"/>',
  vlessens:'<path d="M12 2 4 6v6c0 5 3.5 8 8 10 4.5-2 8-5 8-10V6l-8-4Z"/><path d="M8 12h8M12 8v8"/>',
  vision:'<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
+ tls:'<path d="M12 2 4 6v6c0 5 3 8 8 10 5-2 8-5 8-10V6l-8-4Z"/><path d="M8 12h8M12 8v8"/>',
+ 'hysteria-config':'<path d="M3 12a9 9 0 0 1 18 0"/><path d="M6 12a6 6 0 0 1 12 0"/><path d="M9 12a3 3 0 0 1 6 0"/><path d="M12 12v9"/>',
+ 'protocol-config':'<path d="M4 4h16v16H4zM8 9h8M8 13h8M8 17h4"/>',
+ 'transport-config':'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/>',
  xhttp:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/>',
  dns:'<rect x="3" y="3" width="18" height="8" rx="2"/><rect x="3" y="13" width="18" height="8" rx="2"/><path d="M7 7h.01M7 17h.01M11 7h6M11 17h6"/>',
  routing:'<path d="M4 7h14l-3-3m3 3-3 3M20 17H6l3-3m-3 3 3 3"/>',
- inbound:'<path d="M12 3v13m-5-5 5 5 5-5M4 19h16"/>'
+ outbounds:'<path d="M4 12h13m-4-4 4 4-4 4"/><rect x="2" y="3" width="20" height="18" rx="2"/>',
+ inbound:'<path d="M12 3v13m-5-5 5 5 5-5M4 19h16"/>',
+ finalmask:'<path d="M3 7h18M3 12h18M3 17h18"/>'
 };
+const displayProtocol={hysteria:'Hysteria2',hysteria2:'Hysteria2',vless:'VLESS',vmess:'VMess',trojan:'Trojan',shadowsocks:'Shadowsocks',socks:'SOCKS',http:'HTTP'};
+const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+const safeInbounds=data=>Array.isArray(data?.inbounds)?data.inbounds.filter(x=>x&&typeof x==='object'&&!Array.isArray(x)):[];
+function resolveToolInbound(inbounds){
+ if(selectedToolInboundTag!==null){
+  const match=inbounds.findIndex(x=>x.tag===selectedToolInboundTag);
+  if(match>=0){selectedToolInboundIndex=match;return match}
+ }
+ selectedToolInboundIndex=Math.min(Math.max(0,selectedToolInboundIndex),inbounds.length-1);
+ selectedToolInboundTag=inbounds[selectedToolInboundIndex]?.tag??null;
+ return selectedToolInboundIndex;
+}
+function contextualToolGroups(inbound,hasInbound){
+ const common=['dns','routing','outbounds','inbound'];
+ if(!hasInbound)return [['Конфигурация',common]];
+ const protocol=String(inbound.protocol||'').toLowerCase();
+ const network=String(inbound.streamSettings?.network||'raw').toLowerCase();
+ const security=String(inbound.streamSettings?.security||'none').toLowerCase();
+ const hysteria=protocol==='hysteria'||protocol==='hysteria2'||network==='hysteria';
+ const specialized=[];
+ const networkTools=[];
+ if(hysteria){
+  specialized.push('hysteria-config','tls','protocol-config');
+ }else if(protocol==='vless'){
+  if(security==='reality'||security==='none'&&['raw','xhttp','grpc'].includes(network))specialized.push('reality');
+  if(security==='reality')specialized.push('shortid');
+  if(security==='tls')specialized.push('tls');
+  specialized.push('vlessens');
+  if(['reality','tls'].includes(security))specialized.push('vision');
+ }else{
+  if(security==='tls')specialized.push('tls');
+  specialized.push('protocol-config');
+ }
+ if(!hysteria){
+  if(network==='xhttp'||network==='raw')networkTools.push('xhttp');
+  else if(['ws','grpc','httpupgrade','quic'].includes(network))networkTools.push('transport-config');
+ }
+ if(inbound.streamSettings?.finalmask)networkTools.push('finalmask');
+ const result=[];
+ if(specialized.length)result.push([hysteria?'Hysteria2':displayProtocol[protocol]||'Протокол',specialized]);
+ if(networkTools.length)result.push(['Транспорт',networkTools]);
+ result.push(['Конфигурация',common]);
+ return result;
+}
 const toolButton=id=>{
- const item=tools.find(x=>x[0]===id),meta=details[id];
- return '<button type="button" class="sv-toolitem sv-tool-'+id+'" data-tool="'+id+'" title="'+meta[0]+'" aria-label="'+meta[0]+'"><span class="sv-tool-glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+icons[id]+'</svg></span><span class="sv-tool-label">'+item[1].replace(/^[^A-Za-zА-Яа-яЁё0-9]+/,'')+'</span></button>';
+ const label=tools.find(x=>x[0]===id)?.[1]||id;
+ return '<button type="button" class="sv-toolitem sv-tool-'+id+'" data-tool="'+id+'" title="'+escapeHtml(details[id]||label)+'" aria-label="'+escapeHtml(details[id]||label)+'"><span class="sv-tool-glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+icons[id]+'</svg></span><span class="sv-tool-label">'+escapeHtml(label)+'</span></button>';
 };
-const toolCluster=(label,ids)=>'<div class="xm-tool-cluster"><span class="xm-tool-cluster-label">'+label+'</span><div class="xm-tools-grid">'+ids.map(toolButton).join('')+'</div></div>';
-host.innerHTML='<div class="xm-tools-groups" role="toolbar" aria-label="Инструменты JSON">'+
-  toolCluster('Защита',['reality','shortid','vlessens','vision'])+
-  toolCluster('Сеть и конфигурация',['xhttp','dns','routing','inbound'])+
- '</div><div class="sv-tool-issue" data-tool-issue hidden><span data-tool-issue-message></span><button type="button" data-tool="repair-shortids">Исправить Short ID</button></div><span data-tool-status class="xm-tools-status" role="status" aria-live="polite"></span>';
-const status=msg=>{const e=host.querySelector('[data-tool-status]');if(e)e.textContent=msg};
+const toolCluster=(label,ids)=>'<div class="xm-tool-cluster"><span class="xm-tool-cluster-label">'+escapeHtml(label)+'</span><div class="xm-tools-grid">'+ids.map(toolButton).join('')+'</div></div>';
+let toolPaletteSignature='',lastToolStatus='';
+function renderToolPalette(){
+ let data=null,valid=true;
+ try{if(area.value.length>1024*1024)throw Error('size limit');data=parse()}catch{valid=false}
+ const inbounds=valid?safeInbounds(data):[];
+ const index=inbounds.length?resolveToolInbound(inbounds):0;
+ const inbound=inbounds[index];
+ const protocol=String(inbound?.protocol||'').toLowerCase();
+ const network=String(inbound?.streamSettings?.network||'raw').toLowerCase();
+ const security=String(inbound?.streamSettings?.security||'none').toLowerCase();
+ const groups=valid?contextualToolGroups(inbound,!!inbound):[];
+ const selection=valid&&inbounds.length>1?inbounds.map((ib,i)=>[i,String(ib.tag||'Inbound '+(i+1)),String(ib.protocol||'').toUpperCase()]):[];
+ const signature=JSON.stringify([valid,selection,selectedToolInboundIndex,protocol,network,security,groups,inbound?.streamSettings?.finalmask?true:false]);
+ if(signature===toolPaletteSignature)return;
+ toolPaletteSignature=signature;
+ const context=valid?(inbound?
+  (displayProtocol[protocol]||String(inbound.protocol||'Протокол').toUpperCase())+' · '+network.toUpperCase()+' · '+security.toUpperCase():
+  'Нет inbound — создайте входящее соединение'):'Исправьте JSON для работы с инструментами';
+ const selector=selection.length?'<label class="xm-tool-inbound"><span>Входящее соединение</span><select data-tool-inbound aria-label="Выберите inbound для инструментов">'+selection.map(([i,tag,proto])=>'<option value="'+i+'"'+(i===index?' selected':'')+'>'+escapeHtml(tag+' · '+proto)+'</option>').join('')+'</select></label>':'';
+ const currentTag=valid&&inbound&&!selection.length?'<span class="xm-tools-current-tag" title="Текущий inbound">'+escapeHtml(inbound.tag||'Inbound')+'</span>':'';
+ host.innerHTML='<div class="xm-tools-header"><div class="xm-tools-identity"><span class="xm-tools-eyebrow">КОНТЕКСТНЫЕ ИНСТРУМЕНТЫ</span><strong class="xm-tools-summary">'+escapeHtml(context)+'</strong></div>'+selector+currentTag+'</div>'+
+ (valid?'<div class="xm-tools-groups" role="toolbar" aria-label="Инструменты текущего профиля">'+groups.map(([label,ids])=>toolCluster(label,ids)).join('')+'</div>':'<p class="xm-tools-invalid">Инструменты временно недоступны: исправьте JSON, затем они появятся автоматически.</p>')+
+ '<div class="sv-tool-issue" data-tool-issue hidden><span data-tool-issue-message></span><button type="button" data-tool="repair-shortids">Исправить Short ID</button></div><span data-tool-status class="xm-tools-status" role="status" aria-live="polite"></span>';
+ const node=host.querySelector('[data-tool-status]');
+ if(node)node.textContent=lastToolStatus;
+ renderToolPalette();update();refreshIssues();
+}
+
+const status=msg=>{lastToolStatus=String(msg||'');const e=host.querySelector('[data-tool-status]');if(e)e.textContent=lastToolStatus};
 const focusJsonSection=(key,title=key)=>{
  const find='"'+key+'"',pos=area.value.indexOf(find);
  if(pos<0)return false;
@@ -470,7 +558,15 @@ const operations={
   format(){try{commit(JSON.stringify(parse(),null,2),'JSON отформатирован')}catch(e){notify(e.message)}}
 };
 host.addEventListener('click',e=>{const b=e.target.closest('[data-tool]');if(b&&operations[b.dataset.tool])return Promise.resolve(operations[b.dataset.tool]()).catch(x=>notify(x.message))});
-area.addEventListener('input',()=>{snapshot();refreshIssues()});
+host.addEventListener('change',e=>{
+ if(!e.target.matches('[data-tool-inbound]'))return;
+ const index=Number(e.target.value);
+ const data=parse(),inbounds=safeInbounds(data);
+ if(!Number.isInteger(index)||!inbounds[index])return;
+ selectedToolInboundIndex=index;selectedToolInboundTag=inbounds[index].tag??null;
+ toolPaletteSignature='';renderToolPalette();
+});
+area.addEventListener('input',()=>{snapshot();renderToolPalette();refreshIssues()});
 area.addEventListener('xmesh:reset-history',()=>{undo=[];redo=[];last=area.value;update()});
 area.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key.toLowerCase()==='z'){e.preventDefault();operations.undo()}if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==='y'||e.shiftKey&&e.key.toLowerCase()==='z')){e.preventDefault();operations.redo() }});
 update();refreshIssues();
