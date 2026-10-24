@@ -144,6 +144,7 @@ pub(crate) fn build(mut proxies:Vec<Value>,setting:&Value)->Result<Value,String>
         if !used.insert(tag.clone()){return Err("Дублирующийся тег Xray".into())}
         outbound.as_object_mut().ok_or("Неверная структура outbound")?.remove("xmeshCountry");
         outbound.as_object_mut().unwrap().remove("xmeshSourceKey");
+        outbound.as_object_mut().unwrap().remove("xmeshOwnerNodeKey");
         outbound["tag"]=json!(tag);
         tags.push(tag.clone());
         countries.entry(code).or_default().push(tag);
@@ -319,6 +320,7 @@ pub(crate) fn validate_client_balancers(value:&Value)->Result<(),String>{
 pub(crate) fn build_feed(proxies:Vec<Value>,settings:&Value)->Result<Value,String>{
  if proxies.is_empty(){return Err("Нет доступных клиентских подключений".into())}
  if proxies.len()>256{return Err("Превышен лимит подключений в одной подписке".into())}
+ let all_proxies=proxies.clone();
  let custom=settings.get("clientBalancers").and_then(Value::as_array);
  if let Some(rows)=custom{validate_client_balancers(&Value::Array(rows.clone()))?}
  let mut entries=Vec::new();
@@ -393,7 +395,7 @@ pub(crate) fn build_feed(proxies:Vec<Value>,settings:&Value)->Result<Value,Strin
  for proxy in proxies{
   if proxy.get("xmeshSourceKey").and_then(Value::as_str)
     .is_some_and(|source|hidden.contains(source)){continue}
-  entries.push(build(vec![proxy],&standalone_settings)?);
+  entries.push(crate::client_routing::build_server(proxy,&all_proxies,&standalone_settings)?);
  }
  Ok(Value::Array(entries))
 }
