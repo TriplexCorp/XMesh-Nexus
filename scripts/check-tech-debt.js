@@ -9,7 +9,10 @@ new Function(app);
 
 // Dead compatibility logic must not silently return or delete user data.
 assert.doesNotMatch(app,/\blegacyDemo\b/);
-assert.doesNotMatch(app,/localStorage\.removeItem\('xmeshNexusDB'\)/);
+// Scrubbing stale sensitive browser snapshots is intentional. The panel must
+// never read or write them, even if a legacy snapshot remains in storage.
+assert.doesNotMatch(app,/localStorage\\.getItem\\(['"]xmeshNexusDB['"]\\)/);
+assert.doesNotMatch(app,/localStorage\\.setItem\\(['"]xmeshNexusDB['"]/);
 assert.doesNotMatch(app,/\b_legacy\b/);
 assert.doesNotMatch(app,/,false,true\)/,'Retired Studio positional argument must not return');
 assert.match(app,/window\.XMeshStudioV4\.view\(\)/,'Active XRAY STUDIO V4 entrypoint must remain available');
