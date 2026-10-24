@@ -162,7 +162,7 @@ mod tests {
         let secret = SigningKey::from_bytes(&[11u8; 32]);
         let pubhex = hex::encode(secret.verifying_key().to_bytes());
         let token = "a".repeat(64);
-        let message = format!("XMESH-ENROLL-V1\n{}\n{}\n", token, pubhex);
+        let message = format!("XMESH-ENROLL-V1\n{token}\n{pubhex}\n");
         let signature = secret.sign(message.as_bytes());
         assert!(
             secret
