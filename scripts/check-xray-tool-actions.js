@@ -29,7 +29,7 @@ const sample=()=>({
  outbounds:[{tag:'direct',protocol:'freedom'}],routing:{domainStrategy:'AsIs',rules:[]}
 });
 
-function harness(documentValue,{confirmValue=true,confirmHandler,requestValues,realityKeys}={}){
+function harness(documentValue,{confirmValue=true,confirmHandler,requestValues,realityKeys,selectorUI=false}={}){
  const calls=[],listeners={},confirmCalls=[],clipboard=[];
  const area={
    value:JSON.stringify(documentValue,null,2),selectionStart:0,selectionEnd:0,
@@ -38,10 +38,14 @@ function harness(documentValue,{confirmValue=true,confirmHandler,requestValues,r
    dispatchEvent(e){for(const fn of listeners[e.type]||[])fn(e)}
  };
  const status={textContent:''},issue={hidden:true},issueMessage={textContent:''};
+ const inboundSelector={value:'0'};
  const host={
-   innerHTML:'',click:null,
-   querySelector(q){return ({'[data-tool-status]':status,'[data-tool-issue]':issue,'[data-tool-issue-message]':issueMessage})[q]||null},
-   addEventListener(type,fn){if(type==='click')this.click=fn}
+   innerHTML:'',click:null,change:null,
+   querySelector(q){
+    if(q==='[data-tool-inbound]')return selectorUI&&this.innerHTML.includes('data-tool-inbound')?inboundSelector:null;
+    return ({'[data-tool-status]':status,'[data-tool-issue]':issue,'[data-tool-issue-message]':issueMessage})[q]||null;
+   },
+   addEventListener(type,fn){if(type==='click')this.click=fn;if(type==='change')this.change=fn}
  };
  const root={querySelector(q){
    if(q==='[data-xm="manual"]')return area;
@@ -69,6 +73,10 @@ function harness(documentValue,{confirmValue=true,confirmHandler,requestValues,r
  });
  return {
    area,host,status,issue,issueMessage,calls,confirmCalls,clipboard,
+   selectInbound(index){
+    inboundSelector.value=String(index);
+    host.change({target:{value:String(index),matches:q=>q==='[data-tool-inbound]'}});
+   },
    run(tool){return host.click({target:{closest:()=>({dataset:{tool}})}})},
    doc(){return JSON.parse(area.value)}
  };
@@ -112,6 +120,23 @@ async function run(){
  assert.ok(changed.host.innerHTML.includes('Инструменты временно недоступны'),'Malformed JSON hides stale actions');
  changed.area.value=JSON.stringify(hysteria,null,2);changed.area.dispatchEvent({type:'input'});
  assert.ok(changed.host.innerHTML.includes('data-tool="hysteria-config"'),'Fixing JSON restores Hysteria tools');
+
+ // Multi-inbound profiles expose a real selector; action target must follow its choice.
+ const mixed=JSON.parse(JSON.stringify(hysteria));
+ const vless=sample().inbounds[0];
+ vless.streamSettings.realitySettings.shortIds=['aabbccdd'];
+ mixed.inbounds.push(vless);
+ const multiPalette=harness(mixed,{selectorUI:true});
+ assert.ok(multiPalette.host.innerHTML.includes('data-tool-inbound'),'Multiple inbounds must expose a selector');
+ assert.ok(multiPalette.host.innerHTML.includes('data-tool="hysteria-config"'),'First inbound controls visible');
+ multiPalette.selectInbound(1);
+ assert.ok(multiPalette.host.innerHTML.includes('data-tool="vision"'),'Selected VLESS controls visible');
+ assert.ok(!multiPalette.host.innerHTML.includes('data-tool="hysteria-config"'),'Mixed profile does not mix protocol tool groups');
+ await multiPalette.run('vision');
+ assert.equal(multiPalette.doc().inbounds[1].settings.flow,'xtls-rprx-vision','Vision applied only to selected VLESS inbound');
+ assert.deepEqual(multiPalette.doc().inbounds[0],hysteria.inbounds[0],'Other inbound is untouched');
+ const escaped=harness({...hysteria,inbounds:[{...hysteria.inbounds[0],tag:'"><img src=x onerror=alert(1)>'}]});
+ assert.ok(!escaped.host.innerHTML.includes('<img'),'Inbound tags are escaped before display in toolbar');
 
  const repair=harness(sample());
  await repair.run('shortid');
