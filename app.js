@@ -2495,6 +2495,30 @@ const nodeRuntimeState=(node,runtime)=>{
   if(runtime.routerRunning===false)return {label:'Маршрутизатор остановлен',kind:'offline'};
   return {label:'Состояние неизвестно',kind:'unknown'};
 };
+const nodeAgentUpdating=new Set();
+function renderNodeAgentVersion(nodeId,runtime){
+  if(nodeAgentUpdating.has(Number(nodeId))){
+    return '<span class="node-agent-spinner" aria-hidden="true"></span><span>Agent обновляется</span>';
+  }
+  const version=String(runtime?.version||'');
+  return /^control-v[0-9]+\.[0-9]+\.[0-9]+$/.test(version)
+    ?'Agent '+esc(version.replace(/^control-v/,'v')):'Agent —';
+}
+function paintNodeAgentUpdate(nodeId,updating){
+  const card=document.querySelector('[data-node-card-id="'+nodeId+'"]');
+  const badge=card?.querySelector('[data-node-agent-version]');
+  if(!badge)return;
+  badge.classList.toggle('node-agent-updating',updating);
+  if(updating){
+    badge.setAttribute('role','status');
+    badge.setAttribute('aria-label','Agent обновляется');
+    badge.title='Ожидается подтверждение установки новой версии';
+    badge.innerHTML=renderNodeAgentVersion(nodeId,null);
+  }else{
+    badge.removeAttribute('role');
+    badge.removeAttribute('aria-label');
+  }
+}
 const updateNodeRuntimeBadges=(node,runtime)=>{
   const card=$('[data-node-card-id="'+node.id+'"]');
   if(!card)return;
@@ -2512,9 +2536,16 @@ const updateNodeRuntimeBadges=(node,runtime)=>{
   }
   const agent=card.querySelector('[data-node-agent-version]');
   if(agent){
-    agent.textContent=runtime?.version?'Agent '+runtime.version.replace(/^control-v/,'v'):'Agent —';
-    agent.title=runtime?.connected?'Версия управляющего агента по подтверждённому heartbeat':
-      'Нет свежего подтверждения подключения управляющего агента';
+    if(nodeAgentUpdating.has(Number(node.id))){
+      paintNodeAgentUpdate(node.id,true);
+    }else{
+      agent.classList.remove('node-agent-updating');
+      agent.removeAttribute('role');
+      agent.removeAttribute('aria-label');
+      agent.textContent=renderNodeAgentVersion(node.id,runtime);
+      agent.title=runtime?.connected?'Версия управляющего агента по подтверждённому heartbeat':
+        'Нет свежего подтверждения подключения управляющего агента';
+    }
   }
 };
 async function nodesP(){
@@ -2545,7 +2576,7 @@ async function nodesP(){
     LV[n.id]=l;
     const trafficGb=l.networkTotalBytes===null?null:l.networkTotalBytes*nodeTrafficFactor(n)/1073741824;
     const k=n.limit&&trafficGb!==null?cl(trafficGb/n.limit,0,1):0,tc=k>.9?'--er':k>.75?'--wr':'--c3';
-    return `<div class="card nc${n.disabled?' off':''}" data-node-card-id="${n.id}"><div class="h"><span class="fg">${flagView(n.flag)}</span><div class="node-identity"><b>${esc(n.name)}</b><br><small class="mu">${viewerMode()?'Адрес скрыт':esc(n.addr||'—')+(n.port?':'+esc(n.port):'')}</small>${n.hosting?.trim()?`<span class="node-hosting" title="Хостинг">${ic('building-2')}${esc(n.hosting.trim())}</span>`:''}</div><div class="node-live-badges"><span class="node-xray-version" data-node-xray-version title="Версия по последнему heartbeat">${runtime.get(n.id)?.xrayVersion?'Xray '+esc(runtime.get(n.id).xrayVersion):'Xray —'}</span><span class="node-agent-version" data-node-agent-version title="Версия управляющего агента">${runtime.get(n.id)?.version?"Agent "+esc(runtime.get(n.id).version.replace(/^control-v/,"v")):"Agent —"}</span><span data-node-runtime-state class="node-runtime-pill node-runtime-${nodeRuntimeState(n,runtime.get(n.id)).kind}"><span class="node-runtime-dot" aria-hidden="true"></span>${esc(nodeRuntimeState(n,runtime.get(n.id)).label)}</span></div></div>
+    return `<div class="card nc${n.disabled?' off':''}" data-node-card-id="${n.id}"><div class="h"><span class="fg">${flagView(n.flag)}</span><div class="node-identity"><b>${esc(n.name)}</b><br><small class="mu">${viewerMode()?'Адрес скрыт':esc(n.addr||'—')+(n.port?':'+esc(n.port):'')}</small>${n.hosting?.trim()?`<span class="node-hosting" title="Хостинг">${ic('building-2')}${esc(n.hosting.trim())}</span>`:''}</div><div class="node-live-badges"><span class="node-xray-version" data-node-xray-version title="Версия по последнему heartbeat">${runtime.get(n.id)?.xrayVersion?'Xray '+esc(runtime.get(n.id).xrayVersion):'Xray —'}</span><span class="node-agent-version" data-node-agent-version title="Версия управляющего агента">${renderNodeAgentVersion(n.id,runtime.get(n.id))}</span><span data-node-runtime-state class="node-runtime-pill node-runtime-${nodeRuntimeState(n,runtime.get(n.id)).kind}"><span class="node-runtime-dot" aria-hidden="true"></span>${esc(nodeRuntimeState(n,runtime.get(n.id)).label)}</span></div></div>
       <div class="kvg"><div><span title="Пользователи с активным доступом через inbound этой ноды, не число текущих подключений">Активные пользователи</span><b>${s.nodeOn[n.id]??0}</b><div class="node-online-clients" title="Онлайн-клиенты по свежей телеметрии агента ноды"><span>Пользователи онлайн</span><b>${m?.onlineClients!=null&&Number.isFinite(Number(m.onlineClients))?Math.max(0,Math.trunc(Number(m.onlineClients))):"—"}</b></div></div><div><span>XRAY STUDIO</span>${p?esc(p.name)+'<br><small class="mu" title="Сравнение ожидаемой конфигурации с подписанным подтверждением агента">'+({applied:'Профиль применён',pending:'Ожидает применения',stopped:'Xray не запущен',unknown:'Нет подтверждения от агента'})[runtime.get(n.id)?.profileApplicationStatus||'unknown']+'</small>':n.profileId?'<span class="er">Профиль ID '+esc(n.profileId)+' не найден</span>':'—'}</div></div>
       ${n.geoEnabled?`<div class="node-ip-rotation active" title="${esc(geoStatus?.lastError||'Подтверждение от управляющего агента, не проверка фактической блокировки рекламы')}"><span class="node-ip-indicator" aria-hidden="true"></span><span>GeoData · ${esc(geoLabel)}${geoFileCount?' · '+geoFileCount+' файла(ов)':''}</span></div>`:''}
       ${n.rotationEnabled?`<div class="node-ip-rotation active" aria-label="Пул IP-ротации"><span class="node-ip-indicator" aria-hidden="true"></span><span>IP-пул · ${nodeRotationIPs(n).length} адресов</span></div>`:''}
@@ -3148,7 +3179,9 @@ document.addEventListener('click',async e=>{
         {title:'Обновить Agent · '+node.name,confirmLabel:'Обновить Agent'}
       );
       if(!confirmed)return;
-      b.textContent='Обновление Agent…';
+      nodeAgentUpdating.add(id);
+      paintNodeAgentUpdate(id,true);
+      b.innerHTML=ic('refresh-cw')+'Agent обновляется…';
       const request=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/agent-update',{
         method:'POST',body:JSON.stringify({})
       });
@@ -3174,6 +3207,17 @@ document.addEventListener('click',async e=>{
       if(cur==='nodes')updateNodeRuntimeBadges(node,observed);
     }catch(error){toast('Обновление Agent: '+(error.message||'ошибка API'))}
     finally{
+      nodeAgentUpdating.delete(id);
+      if(cur==='nodes'){
+        try{
+          const fresh=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/runtime');
+          updateNodeRuntimeBadges(node,fresh);
+        }catch(_){
+          paintNodeAgentUpdate(id,false);
+          const badge=document.querySelector('[data-node-card-id="'+id+'"] [data-node-agent-version]');
+          if(badge)badge.textContent='Agent —';
+        }
+      }
       delete b.dataset.loading;
       if(b.isConnected){b.disabled=false;b.innerHTML=original}
     }
