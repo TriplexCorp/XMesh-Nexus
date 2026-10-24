@@ -71,17 +71,12 @@ pub async fn seed_bootstrap_admin(
     Ok(())
 }
 
-pub async fn login(
-    State(state): State<AppState>,
-    Json(body): Json<LoginRequest>,
-) -> Result<(StatusCode, HeaderMap, Json<Value>), ApiError> {
-    if body.username.len() > 128 || body.password.len() > 1024 {
-        return Err(ApiError::new(
-            StatusCode::UNAUTHORIZED,
-            "Неверный логин или пароль.",
-        ));
-    }
-    let policy = crate::security::get_policy(&state.pool).await?;
+async fn check_login_limits(
+    state: &AppState,
+    username: &str,
+    login_attempts: i64,
+    lockout_minutes: i64,
+) -> Result<(String, bool), ApiError> {
     // Password-spray guard: per-username counters cannot bound random-username
     // abuse. This DB-backed minute budget survives Redis outages.
     // Under sustained attack it deliberately rejects new logins to protect
@@ -100,7 +95,7 @@ pub async fn login(
     }
     // Rate-limit case variants together, but authenticate the exact account name.
     // The submitted username must match its stored casing byte-for-byte.
-    let username_key = body.username.trim().to_lowercase();
+    let username_key = username.trim().to_lowercase();
     if username_key.is_empty() {
         record_failed_login(&state, &username_key).await?;
         return Err(ApiError::new(
@@ -121,16 +116,37 @@ pub async fn login(
     .bind(&username_key)
     .fetch_one(&state.pool)
     .await?;
-    let locked = redis_attempts >= policy.login_attempts || db_locked;
+    let locked = redis_attempts >= login_attempts || db_locked;
     if locked {
         return Err(ApiError::new(
             StatusCode::TOO_MANY_REQUESTS,
             format!(
                 "Слишком много попыток. Повторите вход через {} минут.",
-                policy.lockout_minutes
+                lockout_minutes
             ),
         ));
     }
+    Ok((username_key, locked))
+}
+
+pub async fn login(
+    State(state): State<AppState>,
+    Json(body): Json<LoginRequest>,
+) -> Result<(StatusCode, HeaderMap, Json<Value>), ApiError> {
+    if body.username.len() > 128 || body.password.len() > 1024 {
+        return Err(ApiError::new(
+            StatusCode::UNAUTHORIZED,
+            "Неверный логин или пароль.",
+        ));
+    }
+    let policy = crate::security::get_policy(&state.pool).await?;
+    let (username_key, locked) = check_login_limits(
+        &state,
+        &body.username,
+        policy.login_attempts,
+        policy.lockout_minutes,
+    )
+    .await?;
     let row = sqlx::query(
         "SELECT id, username, role, password_hash, is_active \
          FROM panel_auth_users WHERE username = $1 LIMIT 1",
