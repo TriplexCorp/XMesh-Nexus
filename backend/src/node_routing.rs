@@ -129,7 +129,6 @@ fn cycle_reaches(start:i64, goal:i64,nodes:&[Value])->bool{
 
 /// Validate persistent routing input before storing a node record. The
 /// dynamic cross-node graph and endpoint identity checks happen in apply().
-
 fn json_routing(node:&Value)->Result<Option<&serde_json::Map<String,Value>>,ApiError>{
     let Some(raw)=node.get("routingJson") else{return Ok(None)};
     let obj=raw.as_object().ok_or_else(||bad("Routing JSON must be an object."))?;
