@@ -73,7 +73,7 @@
     return values.map(([value,label])=>'<option value="'+escapeHTML(value)+'"'+(value===selected?' selected':'')+'>'+escapeHTML(label)+'</option>').join('');
   }
 
-  const CSS_VERSION = '20261024-client-cards-v5';
+  const CSS_VERSION = '20261024-client-cards-v6';
   function ensureStylesheet() {
     const file = 'client-routing.css';
     const existing = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
@@ -206,7 +206,7 @@
         '<label><span>Действие</span><select data-cr-field="action">'+optionList(Object.entries(actions),r.action)+'</select></label>'+
         '<label class="crx-rule-target"'+(r.action==='server'?'':' hidden')+'><span>Целевой сервер</span><select data-cr-field="server">'+
           '<option value="">Выберите сервер</option>'+options.map(t=>'<option value="'+escapeHTML(t.key)+'"'+(t.key===selected?' selected':'')+'>'+escapeHTML(t.label)+'</option>').join('')+'</select></label>'+
-        '<label class="crx-rule-network"><span>Сеть</span><select data-cr-field="network">'+optionList([['','Обе сети'],['tcp','TCP'],['udp','UDP'],['tcp,udp','TCP + UDP']],r.network||'')+'</select></label>'+
+        '<label class="crx-rule-network"><span>Сеть</span><select data-cr-field="network">'+optionList([['','TCP + UDP'],['tcp','TCP'],['udp','UDP']],r.network==='tcp,udp'?'':(r.network||''))+'</select></label>'+
         '</div><div class="crx-rule-actions">'+
         '<button type="button" class="crx-icon-btn" data-cr-up="'+i+'" title="Поднять правило" aria-label="Поднять правило"'+(i===0?' disabled':'')+'>'+icon('arrowup')+'</button>'+
         '<button type="button" class="crx-icon-btn" data-cr-down="'+i+'" title="Опустить правило" aria-label="Опустить правило">'+icon('arrowdown')+'</button>'+
@@ -227,8 +227,8 @@
         '<button type="button" class="crx-icon-btn crx-close" data-cr-close title="Закрыть" aria-label="Закрыть">'+icon('close')+'</button></header>'+
         '<nav class="crx-tabs" aria-label="Разделы маршрутизации">'+
           [['sources','Назначения','server'],['rules','Правила','settings'],['json','JSON','code']].map(([id,label,symbol])=>
-          '<button type="button" data-cr-tab="'+id+'" class="'+(activeTab===id?'is-current':'')+'" aria-current="'+(activeTab===id?'page':'false')+'">'+
-          icon(symbol)+label+(id==='sources'?'<span>'+(p.servers||[]).length+'</span>':id==='rules'?'<span>'+(p.rules||[]).length+'</span>':'')+'</button>').join('')+
+          '<button type="button" data-cr-tab="'+id+'" class="'+(activeTab===id?'is-current':'')+'" aria-current="'+(activeTab===id?'page':'false')+'" aria-pressed="'+(activeTab===id?'true':'false')+'">'+
+          icon(symbol)+'<span class="crx-tab-label">'+label+'</span>'+(id==='sources'?'<span class="crx-tab-count">'+(p.servers||[]).length+'</span>':id==='rules'?'<span class="crx-tab-count">'+(p.rules||[]).length+'</span>':'')+'</button>').join('')+
         '</nav><main class="crx-dialog-body">'+
         (activeTab==='sources'?
           '<div class="crx-section-head"><div><h3>Назначить серверам</h3><p>Выберите ноды и публичные хосты. Привязки хостов имеют приоритет над нодами.</p></div>'+
