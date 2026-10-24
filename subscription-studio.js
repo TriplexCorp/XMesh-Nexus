@@ -243,7 +243,7 @@ window.XMeshSubscriptionStudio = (() => {
       '<div class="subscription-preview-brand"><span data-subscription-logo-symbol>✦</span><img data-subscription-logo alt="" hidden><b data-subscription-brand></b><div class="subscription-preview-languages" role="group" aria-label="Language / Язык"><button type="button" data-portal-language="ru" aria-pressed="true" lang="ru">RU</button><button type="button" data-portal-language="en" aria-pressed="false" lang="en">EN</button></div></div>',
       '<div class="subscription-preview-hero"><span class="subscription-preview-ok" data-subscription-ok>●</span><h3 data-subscription-active></h3><p data-subscription-description></p></div>',
       '<div class="subscription-preview-meta" data-subscription-metrics>',
-      '<div data-subscription-traffic><small data-subscription-traffic-label></small><b>12,4 / 100 ГБ</b><div class="subscription-preview-progress"><i></i></div></div>',
+      '<div data-subscription-traffic><small data-subscription-traffic-label></small><b>12.4 / 100 ГБ</b><div class="subscription-preview-progress"><i></i></div></div>',
       '<div data-subscription-expiry><small data-subscription-expiry-label></small><b>31.12.2026</b></div>',
       '</div>',
       '<div class="subscription-preview-cta" data-subscription-connect></div>',
@@ -381,7 +381,7 @@ window.XMeshSubscriptionStudio = (() => {
         $('[data-subscription-expiry-label]').textContent=copy[2];
         const sampleUsage=$('[data-subscription-traffic] b');
         const sampleDate=$('[data-subscription-expiry] b');
-        if(sampleUsage)sampleUsage.textContent=english?'12.4 / 100 GB':'12,4 / 100 ГБ';
+        if(sampleUsage)sampleUsage.textContent=english?'12.4 / 100 GB':'12.4 / 100 ГБ';
         if(sampleDate)sampleDate.textContent=english?'Dec 31, 2026':'31.12.2026';
         $('[data-subscription-connect]').textContent=(english?d.subscriptionCtaEn:d.subscriptionCta)||copy[3];
         $('[data-subscription-footer]').textContent=english?d.subscriptionFooterEn:d.subscriptionFooter;
