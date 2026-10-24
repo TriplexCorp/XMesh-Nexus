@@ -2407,7 +2407,7 @@ fn aggregate_traffic_metric_rows(
     let mut total_samples = 0_i64;
     let mut latest_node_count = 0_i64;
 
-    for row in &rows {
+    for row in rows {
         let bucket_ms: i64 = row.try_get("bucket_ms")?;
         let rx: f64 = row.try_get("rx_bytes_per_sec")?;
         let tx: f64 = row.try_get("tx_bytes_per_sec")?;
