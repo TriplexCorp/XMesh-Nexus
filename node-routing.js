@@ -49,10 +49,18 @@ function open({node,nodes,hosts,profiles,modal,updateNode,apiRequest,notify,afte
  const otherNodes=(nodes||[]).filter(n=>Number(n.id)!==Number(node.id)&&!n.disabled).sort((a,b)=>nameFor(a).localeCompare(nameFor(b),'ru'));
  const knownOutbounds=profileOutbounds(node,profiles);
  const hasSaved=Array.isArray(node.routingRules);
- const initialRules=hasSaved?clone(node.routingRules):legacyRules(node);
- const legacy=!hasSaved&&initialRules.length>0;
+ const initialRules=hasSaved?clone(node.routingRules):[];
+ const legacyItems=legacyRules(node);
+ for(const item of legacyItems){
+  // When migrating, keep node-specific routing first, exactly as in Xray:
+  // signed custom rules currently precede old GeoData catch-alls.
+  if(!initialRules.some(r=>r.matcher===item.matcher&&r.value===item.value&&r.target===item.target)){
+   initialRules.push(item);
+  }
+ }
+ const legacy=legacyItems.length>0||node.geoBlockAds===true||!!String(node.geoCustomRules||'').trim();
  const draft={
-  enabled:typeof node.routingEnabled==='boolean'?node.routingEnabled:(legacy&&!!node.geoEnabled),
+  enabled:node.routingEnabled===true||(legacyItems.length>0&&!!node.geoEnabled),
   strategy:node.routingDomainStrategy||'AsIs',
   sniffing:node.routingSniffing!==false,
   rules:initialRules,
@@ -267,7 +275,9 @@ function open({node,nodes,hosts,profiles,modal,updateNode,apiRequest,notify,afte
    routingRelays:relays
   };
   if(geoNeeded&&!node.geoEnabled)patch.geoEnabled=true;
-  if(legacy){patch.geoBlockAds=false;patch.geoCustomRules='';}
+  // Prevent invisible legacy GeoData ad/routing rules from persisting behind this workspace.
+  patch.geoBlockAds=false;
+  patch.geoCustomRules='';
   return patch;
  }
  async function persist(preview=false){
