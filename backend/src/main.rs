@@ -1549,7 +1549,9 @@ async fn get_stats(State(state): State<AppState>) -> Result<Json<Value>, ApiErro
     let now_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
-        .as_millis() as i64;
+        .as_millis()
+        .try_into()
+        .unwrap_or(i64::MAX);
     let mut by = BTreeMap::<String, usize>::new();
     for user in &users {
         *by.entry(user_status(user, now_ms).to_owned()).or_default() += 1;
@@ -1566,7 +1568,7 @@ async fn get_stats(State(state): State<AppState>) -> Result<Json<Value>, ApiErro
         {
             n_on += 1;
             node_on.insert(
-                node.get("id").map(|id| id.to_string()).unwrap_or_default(),
+                node.get("id").map(ToString::to_string).unwrap_or_default(),
                 json!(0),
             );
         }
@@ -1686,7 +1688,9 @@ async fn get_system_stats(State(state): State<AppState>) -> Json<Value> {
     let sampled_at = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
-        .as_millis() as u64;
+        .as_millis()
+        .try_into()
+        .unwrap_or(u64::MAX);
 
     Json(json!({
         "cpu": {"percent": cpu},
@@ -1701,7 +1705,7 @@ async fn get_system_stats(State(state): State<AppState>) -> Json<Value> {
     }))
 }
 
-/// Read-only dashboard overview from actual TimescaleDB measurements.
+/// Read-only dashboard overview from actual `TimescaleDB` measurements.
 /// Samples older than 5 minutes are reported stale, never as live zeroes.
 async fn get_statistics_overview(
     State(state): State<AppState>,
@@ -1982,7 +1986,9 @@ async fn ingest_node_metrics(
     let server_now_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
-        .as_millis() as i64;
+        .as_millis()
+        .try_into()
+        .unwrap_or(i64::MAX);
     let source_ms = body.user_stats_at_ms.unwrap_or(0);
     let source_valid = matches!(
         body.user_stats_status.as_deref(),
@@ -2250,7 +2256,9 @@ async fn get_user_presence(
     let server_now_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
-        .as_millis() as i64;
+        .as_millis()
+        .try_into()
+        .unwrap_or(i64::MAX);
     // Presence is operationally sensitive and must not be cached by browsers
     // or intermediaries: an old response could resurrect an offline badge.
     let mut headers = HeaderMap::new();
