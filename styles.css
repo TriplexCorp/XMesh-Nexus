@@ -5058,3 +5058,8 @@ html[data-access-role="viewer"] dialog.user-modal .user-inline-editor
 html[data-access-role="viewer"] dialog.user-modal .user-head-actions button[data-x]{
   pointer-events:auto;
 }
+
+/* Remaining user subscription time, with the actual expiry date underneath. */
+.user-expiry-primary{display:block;font-weight:650;font-variant-numeric:tabular-nums}
+.user-expiry-date{display:block;margin-top:4px;font-size:.76rem;color:var(--muted,#92a1b5);font-variant-numeric:tabular-nums}
+td.er .user-expiry-primary{color:var(--danger,#f08080)}
