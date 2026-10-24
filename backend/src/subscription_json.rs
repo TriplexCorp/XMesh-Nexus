@@ -138,7 +138,7 @@ fn proxy_address(outbound: &Value) -> &str {
 }
 /// The actual routing mode saved in SUBSCRIPTION STUDIO / Balancers.
 /// An absent setting does not implicitly turn SMART on when more nodes appear.
-pub(crate) fn smart_enabled(settings: &Value) -> bool {
+pub fn smart_enabled(settings: &Value) -> bool {
     let opts = settings.get("subscriptionJson").unwrap_or(&Value::Null);
     enabled(opts, "smart", false)
         && option(
@@ -150,7 +150,7 @@ pub(crate) fn smart_enabled(settings: &Value) -> bool {
 }
 
 /// Every proxy passed into this engine must be fully public-side serialized.
-pub(crate) fn build(mut proxies: Vec<Value>, setting: &Value) -> Result<Value, String> {
+pub fn build(mut proxies: Vec<Value>, setting: &Value) -> Result<Value, String> {
     if proxies.is_empty() {
         return Err("Нет доступных клиентских подключений".into());
     }
@@ -322,7 +322,7 @@ pub(crate) fn build(mut proxies: Vec<Value>, setting: &Value) -> Result<Value, S
             .get("subscriptionName")
             .and_then(Value::as_str)
             .filter(|s| !s.is_empty() && s.chars().count() <= 100)
-            .unwrap_or(if smart && tags.len() > 1 && balance != "off" {
+            .unwrap_or_else(|| if smart && tags.len() > 1 && balance != "off" {
                 "XMesh SMART"
             } else {
                 "XMesh Servers"
@@ -369,7 +369,7 @@ pub(crate) fn build(mut proxies: Vec<Value>, setting: &Value) -> Result<Value, S
 /// a replacement for the individual country/server choices.
 /// Custom named balancers use stable source identities; never select by IP,
 /// host remark or positional Xray tag. Duplicated IPs remain independent.
-pub(crate) fn validate_client_balancers(value: &Value) -> Result<(), String> {
+pub fn validate_client_balancers(value: &Value) -> Result<(), String> {
     let rows = value
         .as_array()
         .ok_or("Балансировщики должны быть массивом")?;
@@ -408,7 +408,7 @@ pub(crate) fn validate_client_balancers(value: &Value) -> Result<(), String> {
             );
         }
         for (field, max) in [("remark", 120), ("serverDescription", 240)] {
-            let text = row[field].as_str().ok_or(format!("Укажите {field}"))?;
+            let text = row[field].as_str().ok_or_else(|| format!("Укажите {field}"))?;
             if text.is_empty() && field == "remark"
                 || text.chars().count() > max
                 || text.chars().any(char::is_control)
@@ -507,7 +507,7 @@ pub(crate) fn validate_client_balancers(value: &Value) -> Result<(), String> {
 
 /// A public feed contains an independent full Xray JSON profile for each
 /// available server plus only the explicitly enabled custom selections.
-pub(crate) fn build_feed(proxies: Vec<Value>, settings: &Value) -> Result<Value, String> {
+pub fn build_feed(proxies: Vec<Value>, settings: &Value) -> Result<Value, String> {
     if proxies.is_empty() {
         return Err("Нет доступных клиентских подключений".into());
     }
@@ -622,7 +622,7 @@ pub(crate) fn build_feed(proxies: Vec<Value>, settings: &Value) -> Result<Value,
                 // Xray core does not support them as top-level observatory settings.
             }
             if row["hideSelectedInbounds"] == true {
-                hidden.extend(source_ids.iter().map(|s| s.to_string()));
+                hidden.extend(source_ids.iter().map(ToString::to_string));
             }
             entries.push(config);
         }
@@ -649,7 +649,7 @@ pub(crate) fn build_feed(proxies: Vec<Value>, settings: &Value) -> Result<Value,
 
 /// Reject unknown or unsafe JSON Engine configuration instead of silently
 /// accepting privileged raw Xray fields from the appearance settings API.
-pub(crate) fn validate_settings(settings: &Value) -> Result<(), String> {
+pub fn validate_settings(settings: &Value) -> Result<(), String> {
     let object = settings
         .as_object()
         .ok_or("JSON Engine settings must be an object")?;
