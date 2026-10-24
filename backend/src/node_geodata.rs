@@ -69,10 +69,7 @@ fn source(name: &str, url: &str, checksum: Option<&str>) -> Result<Value, ApiErr
 
 /// Validate and inject node-level routes before the first user profile catch-all.
 /// Returns the asset manifest that is included in the signed offline policy.
-pub fn apply(node: &Value, config: &mut Value) -> Result<Option<Value>, ApiError> {
-    if node.get("geoEnabled").and_then(Value::as_bool) != Some(true) {
-        return Ok(None);
-    }
+fn geo_sources(node: &Value) -> Result<(u64, Vec<Value>), ApiError> {
     let hours = node
         .get("geoUpdateHours")
         .and_then(Value::as_u64)
@@ -126,6 +123,14 @@ pub fn apply(node: &Value, config: &mut Value) -> Result<Option<Value>, ApiError
         }
         sources.push(source(name, parts[1], parts.get(2).copied())?);
     }
+    Ok((hours, sources))
+}
+
+pub fn apply(node: &Value, config: &mut Value) -> Result<Option<Value>, ApiError> {
+    if node.get("geoEnabled").and_then(Value::as_bool) != Some(true) {
+        return Ok(None);
+    }
+    let (hours, sources) = geo_sources(node)?;
     let mut rules = Vec::<Value>::new();
     if node.get("geoBlockAds").and_then(Value::as_bool) == Some(true) {
         rules.push(json!({"type":"field","domain":["geosite:category-ads-all"],"outboundTag":"xmesh_geo_block"}));
