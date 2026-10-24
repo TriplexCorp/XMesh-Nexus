@@ -10,7 +10,7 @@ const clone=o=>JSON.parse(JSON.stringify(o));
 const notify=(m)=>toast?.(m);
 const snapshot=()=>{if(area.value!==last){undo.push(last);if(undo.length>80)undo.shift();last=area.value;redo=[]}update()};
 const update=()=>{const undoButton=host.querySelector('[data-tool="undo"]'),redoButton=host.querySelector('[data-tool="redo"]');if(undoButton)undoButton.disabled=undo.length===0;if(redoButton)redoButton.disabled=redo.length===0};
-const commit=(value,msg)=>{snapshot();const from=area.value;if(value===from)return;undo.push(from);if(undo.length>80)undo.shift();redo=[];area.value=value;last=value;area.dispatchEvent(new Event('input',{bubbles:true}));area.focus();update();notify(msg||'JSON обновлён')};
+const commit=(value,msg)=>{snapshot();const from=area.value;if(value===from)return;const start=area.selectionStart,end=area.selectionEnd,scrollTop=area.scrollTop,scrollLeft=area.scrollLeft;undo.push(from);if(undo.length>80)undo.shift();redo=[];area.value=value;last=value;area.dispatchEvent(new Event('input',{bubbles:true}));if(Number.isInteger(start)&&Number.isInteger(end))area.setSelectionRange(Math.min(start,value.length),Math.min(end,value.length));if(scrollTop!=null)area.scrollTop=scrollTop;if(scrollLeft!=null)area.scrollLeft=scrollLeft;update();notify(msg||'JSON обновлён')};
 const parse=()=>{try{const x=JSON.parse(area.value);if(!x||typeof x!=='object'||Array.isArray(x))throw Error('Корень должен быть объектом');return x}catch(e){throw Error('Исправьте синтаксис JSON перед применением: '+e.message)}};
 const dialog=window.XMeshStudioDialogs;
 const ensureDialogs=()=>{if(!dialog?.request||!dialog?.confirm)throw Error('Диалоговый модуль XRAY STUDIO не загрузился. Обновите страницу без кеша.')};
@@ -59,11 +59,11 @@ const snippets={
 };
 const tools=[
  ['undo','↶ Отменить'],['redo','↷ Повторить'],['find','⌕ Поиск'],['validate','✓ Проверить'],
- ['reality','✦ Reality X25519'],['shortid','♯ Short ID'],['vision','XTLS Vision'],
+ ['reality','✦ REALITY'],['shortid','♯ Short ID'],['vision','XTLS Vision'],
  ['dns','◉ DNS'],['routing','⇄ Routing'],['policy','▥ Policy / Stats'],['outbounds','⬡ Outbounds'],['log','Log'],
  ['inbound','Новый inbound'],['xhttp','XHTTP настройки'],['vlessens','VLESS Encryption'],['finalmask','FinalMask'],['hysteria','Hysteria2 inbound'],['uuid','UUID (скопировать)'],['backup','Скачать JSON'],['format','Форматировать']
 ];
-const details={reality:['Ключи X25519 для Reality','key-round'],shortid:['Генерация Short ID','hash'],vision:['XTLS rprx Vision','shield-check'],dns:['Настройка DNS-серверов','globe'],routing:['Правила маршрутизации','route'],policy:['Политики и статистика','chart-no-axes-column'],outbounds:['Исходящие соединения','network'],validate:['Проверка через Xray-core','shield-check'],xhttp:['Транспорт XHTTP','network'],vlessens:['Серверный VLESS Encryption','shield'],finalmask:['Маскировка потоков','layers'],hysteria:['Шаблон Hysteria2','radio'],uuid:['Скопировать UUID','fingerprint'],backup:['Экспорт текущего JSON','download'],inbound:['Добавить серверный inbound','plus']};
+const details={reality:['Настроить REALITY: target, SNI, Short ID и X25519','key-round'],shortid:['Генерация Short ID','hash'],vision:['XTLS rprx Vision','shield-check'],dns:['Настройка DNS-серверов','globe'],routing:['Правила маршрутизации','route'],policy:['Политики и статистика','chart-no-axes-column'],outbounds:['Исходящие соединения','network'],validate:['Проверка через Xray-core','shield-check'],xhttp:['Транспорт XHTTP','network'],vlessens:['Серверный VLESS Encryption','shield'],finalmask:['Маскировка потоков','layers'],hysteria:['Шаблон Hysteria2','radio'],uuid:['Скопировать UUID','fingerprint'],backup:['Экспорт текущего JSON','download'],inbound:['Добавить серверный inbound','plus']};
 const featured=['reality','shortid','vlessens','vision','xhttp','dns','routing','inbound'];
 const icons={
  reality:'<path d="M12 2 4 6v6c0 5 3.5 8 8 10 4.5-2 8-5 8-10V6l-8-4Z"/><path d="m9 12 2 2 4-4"/>',
@@ -191,13 +191,14 @@ async function setReality(){
    if(updated.tag!==selected.tag)throw Error('Выбранный inbound изменился.');
    const ss=updated.streamSettings??={};
    if(!['raw','xhttp','grpc'].includes(ss.network||'raw'))throw Error('Транспорт inbound изменился.');
+   const created=ss.realitySettings==null;
    const rs=ss.realitySettings??={};
    if(!rs||typeof rs!=='object'||Array.isArray(rs))throw Error('realitySettings должен быть объектом.');
    ss.security='reality';
    // target and dest are server aliases; do not leave conflicting values.
    if(Object.hasOwn(rs,'dest')&&!Object.hasOwn(rs,'target'))rs.dest=response.target.trim();
    else {rs.target=response.target.trim();if(Object.hasOwn(rs,'dest'))delete rs.dest;}
-   if(rs.show===undefined)rs.show=false;
+   if(created&&rs.show===undefined)rs.show=false;
    rs.serverNames=sni;
    rs.shortIds=shortIds;
    if(generate)rs.privateKey=keys.privateKey;
