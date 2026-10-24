@@ -473,22 +473,19 @@ pub async fn disable(
     .await;
     Ok(Json(json!({"enabled":false})))
 }
-pub async fn verify_challenge(
-    State(state): State<AppState>,
-    Json(body): Json<ChallengeRequest>,
-) -> Result<(StatusCode, HeaderMap, Json<Value>), ApiError> {
-    if body.challenge.len() != 64 || !body.challenge.bytes().all(|x| x.is_ascii_hexdigit()) {
-        return Err(err(StatusCode::UNAUTHORIZED, INVALID_CODE));
-    }
-    let token_hash = hash(&body.challenge);
-    let mut tx = state.pool.begin().await?;
+// Preserve the administrator-first locking order to avoid deadlocks with
+// concurrent credential changes.
+async fn lock_challenge_account(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    token_hash: &str,
+) -> Result<(i64, sqlx::postgres::PgRow), ApiError> {
     // Find the administrator without locking the challenge yet: locking the
     // challenge before the administrator can deadlock with credential updates.
     let id = sqlx::query_scalar::<_, i64>(
         "SELECT admin_id FROM panel_mfa_challenges WHERE token_hash=$1 AND expires_at>NOW()",
     )
     .bind(&token_hash)
-    .fetch_optional(&mut *tx)
+    .fetch_optional(&mut **tx)
     .await?
     .ok_or_else(|| {
         err(
@@ -499,12 +496,25 @@ pub async fn verify_challenge(
     let account =
         sqlx::query("SELECT username,role,is_active FROM panel_auth_users WHERE id=$1 FOR UPDATE")
             .bind(id)
-            .fetch_optional(&mut *tx)
+            .fetch_optional(&mut **tx)
             .await?
             .ok_or_else(|| err(StatusCode::UNAUTHORIZED, "Войдите снова."))?;
     if !account.try_get::<bool, _>("is_active")? {
         return Err(err(StatusCode::UNAUTHORIZED, "Войдите снова."));
     }
+    Ok((id, account))
+}
+
+pub async fn verify_challenge(
+    State(state): State<AppState>,
+    Json(body): Json<ChallengeRequest>,
+) -> Result<(StatusCode, HeaderMap, Json<Value>), ApiError> {
+    if body.challenge.len() != 64 || !body.challenge.bytes().all(|x| x.is_ascii_hexdigit()) {
+        return Err(err(StatusCode::UNAUTHORIZED, INVALID_CODE));
+    }
+    let token_hash = hash(&body.challenge);
+    let mut tx = state.pool.begin().await?;
+    let (id, account) = lock_challenge_account(&mut tx, &token_hash).await?;
     // Another transaction could have revoked this challenge while we waited
     // for the administrator lock; therefore re-check it under its own lock.
     let challenge = sqlx::query(
