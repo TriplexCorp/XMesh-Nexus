@@ -394,7 +394,8 @@ pub async fn request_geodata_refresh(
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_millis()
-            .min(i64::MAX as u128) as i64,
+            .try_into()
+            .unwrap_or(i64::MAX),
     )
     .bind(previous)
     .fetch_optional(&state.pool)
@@ -1274,7 +1275,9 @@ pub async fn preview_routing(
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
-        .as_millis() as i64;
+        .as_millis()
+        .try_into()
+        .unwrap_or(i64::MAX);
     provision_proxy_users(&mut config, &users, &squads, now)?;
     let geo = crate::node_geodata::apply(&node, &mut config)?;
     let nodes = crate::load_records(&state.pool, "nodes").await?;
@@ -1407,7 +1410,9 @@ async fn compile_node_profile(
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
-        .as_millis() as i64;
+        .as_millis()
+        .try_into()
+        .unwrap_or(i64::MAX);
     provision_proxy_users(&mut config, &users, &squads, now)?;
     // Keep the source XRAY STUDIO profile immutable: every source node gets
     // its own GeoData assets and its own validated routing/exit graph.
@@ -1430,7 +1435,9 @@ async fn compile_node_profile(
         .iter()
         .filter(|node| node.get("disabled").and_then(Value::as_bool) != Some(true))
         .count()
-        .max(1) as i64;
+        .max(1)
+        .try_into()
+        .unwrap_or(i64::MAX);
     Ok(CompiledNodeProfile {
         profile_id,
         port,
