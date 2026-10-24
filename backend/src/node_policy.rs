@@ -28,7 +28,7 @@ impl PolicySigner {
                     "Invalid policy key file type"
                 );
                 anyhow::ensure!(
-                    fs::metadata(path)?.permissions().mode() & 0o077 == 0,
+                    fs::metadata(path)?.permissions().mode().trailing_zeros() >= 6,
                     "Policy signing key must not be readable by group/others"
                 );
                 value
@@ -82,7 +82,7 @@ mod tests {
         let secret = [7u8; 32];
         let signer = PolicySigner(SigningKey::from_bytes(&secret));
         let policy = json!({"version":1,"nodeId":42,"configSha256":"a".repeat(64),
-            "users":[{"userId":1,"expireAtMs":1800000000000_i64}]});
+            "users":[{"userId":1,"expireAtMs":1_800_000_000_000_i64}]});
         let signature = Signature::from_bytes(
             &hex::decode(signer.sign(&policy).unwrap())
                 .unwrap()
