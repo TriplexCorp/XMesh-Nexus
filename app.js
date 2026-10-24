@@ -257,36 +257,11 @@ const ENT={
     {k:'billingNote',l:'Примечание по оплате'},
     {k:'rotationEnabled',l:'Ротация IP-адресов',t:'bool',h:'Пул IP-адресов для подключений узла. Используйте только назначенные серверу адреса.'},
     {k:'rotationIntervalHours',l:'Смена адреса каждые, ч',t:'num',h:'1–720 часов. По умолчанию 24. Адрес закреплён за пользователем между обновлениями подписки.'},
-    {k:'rotationIps',l:'Пул внешних IP-адресов',t:'area',rows:7,h:'Один IPv4 или IPv6 на строку. Добавляйте только IP, реально назначенные VPS и доступные клиентам. До 256 адресов. Основной адрес узла остаётся прежним.'},
-    {k:'geoEnabled',l:'Включить GeoData и маршрутизацию',t:'bool',h:'Нода самостоятельно скачивает файлы и применяет правила после проверки Xray.'},
-    {k:'geoBlockAds',l:'Блокировать рекламу (category-ads-all)',t:'bool',h:'Добавляет geosite:category-ads-all → blackhole перед обычными маршрутами.'},
-    {k:'geoUpdateHours',l:'Проверять обновления каждые, ч',t:'num',h:'От 6 до 168 часов. Нода обновляется независимо от доступности панели.'},
-    {k:'geoSiteUrl',l:'Источник geosite.dat',ph:'https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat',h:'HTTPS-адрес. Пустое значение — стандартный источник.'},
-    {k:'geoIpUrl',l:'Источник geoip.dat',ph:'https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat',h:'HTTPS-адрес. Пустое значение — стандартный источник.'},
-    {k:'geoExtraSources',l:'Дополнительные .dat',t:'area',rows:4,h:'Каждая строка: filename.dat https://example.com/file.dat [SHA-256]. До 8 файлов.'},
-    {k:'geoCustomRules',l:'Свои правила routing',t:'area',rows:5,h:'По одному на строку: geosite:category-ads-all => block, geoip:private => direct или ext:custom.dat:list => block.'}],
-    def:()=>({flag:'',mult:1,limit:0,resetDay:1,rotationEnabled:false,rotationIntervalHours:24,rotationIps:'',billingCurrency:'EUR',billingPeriod:'monthly',billingRemindDays:7,billingPrice:0,geoEnabled:false,geoBlockAds:true,geoUpdateHours:24,geoSiteUrl:'',geoIpUrl:'',geoExtraSources:'',geoCustomRules:''}),
+    {k:'rotationIps',l:'Пул внешних IP-адресов',t:'area',rows:7,h:'Один IPv4 или IPv6 на строку. Добавляйте только IP, реально назначенные VPS и доступные клиентам. До 256 адресов. Основной адрес узла остаётся прежним.'}],
+
+    def:()=>({flag:'',mult:1,limit:0,resetDay:1,rotationEnabled:false,rotationIntervalHours:24,rotationIps:'',billingCurrency:'EUR',billingPeriod:'monthly',billingRemindDays:7,billingPrice:0}),
     chk:data=>{
       const issue=nodeRotationValidate(data);if(issue)return issue;
-      if(data.geoEnabled){
-        if(!Number.isInteger(Number(data.geoUpdateHours))||Number(data.geoUpdateHours)<6||Number(data.geoUpdateHours)>168)return 'GeoData: интервал должен быть от 6 до 168 часов.';
-        for(const url of [data.geoSiteUrl,data.geoIpUrl].filter(Boolean)){
-          try{const u=new URL(url);if(u.protocol!=='https:'||u.username||u.password||(u.port&&u.port!=='443')||!u.hostname.includes('.')||u.hash)throw Error()}
-          catch(_){return 'GeoData: источники должны быть HTTPS-ссылками без логина, пароля и фрагмента.'}
-        }
-        const sources=String(data.geoExtraSources||'').split(/\r?\n/).map(x=>x.trim()).filter(x=>x&&!x.startsWith('#'));
-        if(sources.length>8)return 'GeoData: допускается до 8 дополнительных файлов.';
-        const seen=new Set(['geosite.dat','geoip.dat']);
-        for(const src of sources){
-          const parts=src.split(/\s+/);
-          if(!/^[A-Za-z0-9_-]{1,48}\.dat$/.test(parts[0]||'')||seen.has(parts[0])||parts.length<2||parts.length>3)return 'GeoData: строка должна иметь вид filename.dat HTTPS_URL [SHA256], без повторов.';
-          seen.add(parts[0]);
-          try{const u=new URL(parts[1]);if(u.protocol!=='https:'||!u.hostname.includes('.')||u.username||u.password||u.hash||(u.port&&u.port!=='443'))throw Error()}catch(_){return 'GeoData: дополнительные источники должны использовать HTTPS.'}
-          if(parts[2]&&!/^[a-fA-F0-9]{64}$/.test(parts[2]))return 'GeoData: неверная контрольная сумма SHA-256.';
-        }
-        const rules=String(data.geoCustomRules||'').split(/\r?\n/).map(x=>x.trim()).filter(x=>x&&!x.startsWith('#'));
-        if(rules.length>64||rules.some(x=>!/^(?:geosite|geoip|ext):[A-Za-z0-9_:.-]+\s*=>\s*(?:block|direct)$/.test(x)))return 'GeoData: правило должно иметь вид geosite:категория => block (или direct).';
-      }
       const interval=Number(data.rotationIntervalHours||24);
       if(data.rotationEnabled&&(!Number.isInteger(interval)||interval<1||interval>720))return 'Интервал IP-ротации должен быть от 1 до 720 часов.';
       const port=Number(data.xrayLocalPort||0),nodePort=Number(data.port||0);
