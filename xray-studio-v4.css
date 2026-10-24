@@ -1137,3 +1137,104 @@
  .sv-studio .sv-compose-footer button{flex:1 1 auto}
  .sv-compose-examples{grid-template-columns:1fr}
 }
+
+
+/* Browser-like JSON document workspace: profile library left, editors right. */
+.sv-studio.sv-multi-document{
+ display:grid;grid-template-columns:minmax(15rem,18rem) minmax(0,1fr);
+ column-gap:.85rem;align-items:start;
+}
+.sv-studio.sv-multi-document>.sv-title,
+.sv-studio.sv-multi-document>.sv-topbar{
+ grid-column:1/-1;
+}
+.sv-studio.sv-multi-document>.sv-topbar .sv-page-tabs{display:none}
+.sv-studio.sv-multi-document>.sv-topbar{justify-content:flex-end}
+.sv-studio.sv-multi-document>.sv-profiles-page{
+ display:flex!important;flex-direction:column;grid-column:1;grid-row:3;
+ min-width:0;min-height:34rem;height:clamp(35rem,75dvh,72rem);
+ overflow:hidden;border:1px solid var(--vline);border-radius:var(--vpanelround);
+ background:var(--vpanel);
+}
+.sv-studio.sv-multi-document>.sv-workspace{
+ grid-column:2;grid-row:3;min-width:0;min-height:34rem;
+ height:clamp(35rem,75dvh,72rem);
+ display:flex!important;flex-direction:column;
+ overflow:hidden;
+}
+.sv-studio.sv-multi-document>.sv-bottom{grid-column:2}
+.sv-studio.sv-multi-document .sv-library-hero{
+ padding:1rem;display:flex;flex-direction:column;align-items:stretch;gap:.7rem;
+ border:0;border-bottom:1px solid var(--vline);border-radius:0;
+}
+.sv-studio.sv-multi-document .sv-library-eyebrow,
+.sv-studio.sv-multi-document .sv-library-hero p,
+.sv-studio.sv-multi-document .sv-library-summary{display:none}
+.sv-studio.sv-multi-document .sv-library-hero h2{font-size:1rem;margin:0}
+.sv-studio.sv-multi-document .sv-library-create{
+ width:100%;min-height:2.4rem;justify-content:center;font-size:.75rem;
+}
+.sv-studio.sv-multi-document .sv-library-toolbar{
+ margin:0;padding:.75rem;display:block;border-bottom:1px solid var(--vline);
+}
+.sv-studio.sv-multi-document .sv-library-search{
+ max-width:none;width:100%;height:2.5rem;
+}
+.sv-studio.sv-multi-document .sv-library-found{display:none}
+.sv-studio.sv-multi-document .sv-profiles-list{
+ overflow:auto;min-height:0;flex:1;
+ display:flex;flex-direction:column;gap:.4rem;padding:.6rem;
+}
+.sv-studio.sv-multi-document .sv-profile-card{
+ width:100%;min-width:0;padding:.65rem;flex:none;
+}
+.sv-studio.sv-multi-document .sv-profile-stats,
+.sv-studio.sv-multi-document .sv-profile-chips{display:none}
+.sv-studio.sv-multi-document .sv-profile-top{gap:.45rem}
+.sv-studio.sv-multi-document .sv-profile-titles{min-width:0}
+.sv-studio.sv-multi-document .sv-profile-titles h3{font-size:.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sv-studio.sv-multi-document .sv-profile-titles p{font-size:.65rem}
+.sv-studio.sv-multi-document .sv-profile-footer{margin-top:.45rem}
+.sv-studio.sv-multi-document .sv-document-tab,
+.sv-studio.sv-multi-document .sv-document-new{flex:none}
+.sv-studio .sv-editor-tabs{
+ display:flex;align-items:center;gap:.25rem;min-height:3rem;
+ padding:.4rem .6rem;overflow-x:auto;overflow-y:hidden;
+ scrollbar-width:thin;background:var(--vpanel);
+ border:1px solid var(--vline);border-bottom:0;
+ border-radius:var(--vpanelround) var(--vpanelround) 0 0;
+}
+.sv-studio .sv-document-tab{
+ display:flex;align-items:center;gap:.15rem;max-width:16rem;
+ border:1px solid var(--vline);border-radius:var(--vround);
+ background:var(--vfield);color:var(--vmute);
+}
+.sv-studio .sv-document-tab.is-active{
+ border-color:color-mix(in srgb,var(--vaccent) 55%,var(--vline));
+ background:color-mix(in srgb,var(--vaccent) 9%,var(--vpanel));
+ color:var(--vtext);
+}
+.sv-studio .sv-document-tab button{
+ background:transparent;border:0;color:inherit;
+ min-height:2rem;padding:.4rem .65rem;font-size:.75rem;
+}
+.sv-studio .sv-document-tab button:first-child{
+ max-width:12rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.sv-studio .sv-document-tab button:last-child{padding:.35rem .55rem;font-size:1.1rem}
+.sv-studio .sv-document-new{
+ min-height:2rem;padding:.4rem .7rem;font-size:.75rem;white-space:nowrap;
+}
+.sv-studio.sv-multi-document .sv-columns{flex:1;min-height:0}
+@media(max-width:950px){
+ .sv-studio.sv-multi-document{grid-template-columns:minmax(0,1fr)}
+ .sv-studio.sv-multi-document>.sv-profiles-page{
+  grid-column:1;grid-row:3;height:15rem;min-height:0;
+ }
+ .sv-studio.sv-multi-document>.sv-workspace{
+  grid-column:1;grid-row:4;height:65dvh;min-height:30rem;
+ }
+ .sv-studio.sv-multi-document>.sv-bottom{grid-column:1}
+ .sv-studio.sv-multi-document .sv-profiles-list{flex-direction:row;overflow-x:auto}
+ .sv-studio.sv-multi-document .sv-profile-card{width:14rem}
+}
