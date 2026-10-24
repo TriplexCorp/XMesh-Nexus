@@ -38,13 +38,15 @@ function create(db,saveSettings,toast){
  let draft=clone(Array.isArray(db.set?.clientRoutingProfiles)?db.set.clientRoutingProfiles:[]);
  const route=(match='geosite',value='',action='proxy',server='')=>({match,value,action,...(server?{server}:{})});
  const root='<section class="client-routing-workspace" id="client-route-root">'+
-  '<header class="client-route-intro"><div><span class="client-route-eyebrow">CLIENT ROUTING / XRAY JSON</span>'+
-  '<h2>Маршрутизация клиентов</h2><p>Создавайте общие шаблоны правил и назначайте их нескольким нодам или отдельным хостам. Каждая подписка получает собственную маршрутизацию.</p>'+
-  '</div><button type="button" class="btn" data-cr-add>Новый шаблон</button></header>'+
-  '<div class="client-route-help"><b>Приоритет:</b> индивидуальный хост → назначенная нода → стандартный маршрут. Правила обрабатываются сверху вниз. Балансировщики остаются самостоятельными профилями.</div>'+
+  '<div class="client-route-toolbar"><div><span class="client-route-eyebrow">XRAY / CLIENT ROUTING</span>'+
+  '<p>Общие правила для нескольких нод и хостов. Без дублирования конфигураций.</p></div>'+
+  '<button type="button" class="btn client-route-create" data-cr-add><span aria-hidden="true">＋</span> Создать шаблон</button></div>'+
+  '<div class="client-route-context"><span class="client-route-context-icon" aria-hidden="true">↗</span><div>'+
+  '<strong>Гибкие назначения</strong><p>Правила хоста имеют приоритет над правилами ноды. Остальной трафик идёт через выбранный клиентом сервер.</p></div></div>'+
   '<div data-cr-list class="client-route-list"></div>'+
-  '<footer class="client-route-savebar"><span data-cr-status>Ничего не изменено</span>'+
-  '<button type="button" class="btn" data-cr-save>Сохранить маршрутизацию</button></footer></section>';
+  '<footer class="client-route-savebar"><div class="client-route-summary"><strong data-cr-status>Настроек пока нет</strong>'+
+  '<span>Изменения применяются к новым клиентским конфигурациям подписки</span></div>'+
+  '<button type="button" class="btn" data-cr-save>Сохранить изменения</button></footer></section>';
  const valueOptions=(entries,value)=>entries.map(([v,label])=>
   '<option value="'+esc(v)+'"'+(v===value?' selected':'')+'>'+esc(label)+'</option>').join('');
  const selectedSources=items=>new Set(items||[]);
@@ -85,15 +87,15 @@ function create(db,saveSettings,toast){
     '<button type="button" class="gh sm" data-cr-duplicate="'+index+'">Копировать</button>'+
     '<button type="button" class="gh sm" data-cr-delete="'+index+'">Удалить шаблон</button></div></div>'+
     '<div class="client-route-block"><div class="client-route-section-heading"><div><h3>Назначить серверам</h3>'+
-    '<p>Один шаблон можно назначить сразу нескольким узлам и хостам. Не нужно копировать правила.</p></div>'+
-    '<span>'+keys.size+' назначений</span></div>'+
+    '<p>Отметьте нужные ноды и хосты: все они используют одни правила.</p></div>'+
+    '<span>'+keys.size+' выбрано</span></div>'+
     '<div class="client-route-sources">'+(assigned||'<p class="note">Сначала добавьте ноды или хосты.</p>')+'</div></div>'+
     '<div class="client-route-block"><div class="client-route-section-heading"><div><h3>Правила</h3>'+
-    '<p>Приоритет сверху вниз. Если целевой сервер недоступен пользователю, правило блокирует совпадающий трафик.</p></div>'+
+    '<p>Верхние правила имеют больший приоритет. Недоступные направления блокируются.</p></div>'+
     '<button type="button" class="gh sm" data-cr-rule-add="'+index+'">Добавить правило</button></div>'+
     '<div class="client-route-rules">'+(rules||'<p class="note">Нет дополнительных правил — используется стандартная маршрутизация.</p>')+'</div></div>'+
     '</article>';
-  }).join(''):'<div class="card client-route-empty"><h3>Пока нет шаблонов маршрутизации</h3><p>Создайте один шаблон, добавьте правила и отметьте все серверы, которым он нужен.</p></div>';
+  }).join(''):'<div class="client-route-empty"><span class="client-route-empty-icon" aria-hidden="true">⇄</span><h3>Маршрутизация ещё не настроена</h3><p>Создайте шаблон, добавьте правила и назначьте его нескольким серверам. При необходимости правила конкретного хоста переопределят правила всей ноды.</p><button type="button" class="btn" data-cr-add>＋ Создать первый шаблон</button></div>';
   const status=document.querySelector('#client-route-root [data-cr-status]');
   if(status)status.textContent=draft.length+' шаблон(ов) · '+draft.reduce((n,p)=>n+(p.servers||[]).length,0)+' назначений';
  };
@@ -151,7 +153,7 @@ function create(db,saveSettings,toast){
      toast('Клиентская маршрутизация сохранена');
      render();
     }catch(err){toast('Не удалось сохранить: '+(err.message||'API'))}
-    finally{button.disabled=false;button.textContent='Сохранить маршрутизацию'}
+    finally{button.disabled=false;button.textContent='Сохранить изменения'}
     return;
    }
    if(button.hasAttribute('data-cr-add')){
