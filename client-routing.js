@@ -73,7 +73,7 @@
     return values.map(([value,label])=>'<option value="'+escapeHTML(value)+'"'+(value===selected?' selected':'')+'>'+escapeHTML(label)+'</option>').join('');
   }
 
-  const CSS_VERSION = '20261024-unified-route-v12';
+  const CSS_VERSION = '20261024-unified-route-v13';
   function ensureStylesheet() {
     const file = 'client-routing.css';
     const existing = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
@@ -415,7 +415,23 @@
           const id=el.dataset.crDelete;
           if(confirmDelete!==id){confirmDelete=id;editorRefresh();return;}
           if(checkPending())return;
-          draft=draft.filter(p=>p.id!==id);activeId=null;confirmDelete='';render();return;
+          if(saveBusy)return;
+          const previous=draft;
+          const remaining=draft.filter(p=>p.id!==id);
+          if(remaining.length===draft.length){notify('Шаблон не найден.');return;}
+          const error=validate(remaining);
+          if(error){notify(error);return;}
+          saveBusy=true;status();
+          try{
+            await saveSettings({clientRoutingProfiles:clone(remaining)});
+            draft=remaining;saved=JSON.stringify(remaining);
+            activeId=null;confirmDelete='';render();
+            notify('Шаблон удалён');
+          }catch(e){
+            draft=previous;confirmDelete='';render();
+            notify('Не удалось удалить шаблон: '+(e?.message||'API'));
+          }finally{saveBusy=false;status();}
+          return;
         }
         if(el.hasAttribute('data-cr-tab')){
           if(checkPending())return;
