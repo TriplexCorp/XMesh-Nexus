@@ -33,7 +33,7 @@ function profileOutbounds(node,profiles){
 }
 function legacyRules(node){
  const migrated=[];
- if(node.geoEnabled&&node.geoBlockAds!==false){
+ if(node.geoEnabled&&node.geoBlockAds===true){
   migrated.push({...ident('geosite','category-ads-all'),target:'block'});
  }
  for(const line of String(node.geoCustomRules||'').split(/\r?\n/)){
@@ -87,7 +87,7 @@ function open({node,nodes,hosts,profiles,modal,updateNode,apiRequest,notify,afte
  const selectedNode=id=>otherNodes.find(n=>String(n.id)===String(id));
  const usedExits=()=>[...new Set(draft.rules.filter(r=>r.enabled!==false&&r.target==='node'&&validId(r.nodeId)).map(r=>String(r.nodeId)))];
  const ruleDestination=r=>{
-  if(r.target==='node')return nameFor(selectedNode(r.nodeId))||'Не выбрана нода';
+  if(r.target==='node')return selectedNode(r.nodeId)?nameFor(selectedNode(r.nodeId)):'Нода не выбрана';
   if(r.target==='outbound')return r.outboundTag||'Выберите outbound';
   return r.target==='block'?'Блокировка':'Прямое подключение';
  };
@@ -210,10 +210,6 @@ function open({node,nodes,hosts,profiles,modal,updateNode,apiRequest,notify,afte
   const key=element.dataset.ruleField;
   if(!key)return false;
   rule[key]=key==='enabled'?element.checked:key==='nodeId'?(Number(element.value)||0):element.value;
-  if(key==='matcher'){
-   const previous=types.find(t=>t[0]===rule.matcher);
-   if(!rule.value&&previous)rule.value=previous[2];
-  }
   markDirty();
   return true;
  }
@@ -245,7 +241,10 @@ function open({node,nodes,hosts,profiles,modal,updateNode,apiRequest,notify,afte
   const relays=[];
   for(const id of exits){
    const raw=String(draft.relays.get(id)||'').trim();
-   if(!raw)throw Error('У ноды «'+nameFor(selectedNode(id))+'» не заполнена конфигурация выхода. Откройте вкладку «Выходные соединения».');
+   if(!raw){
+    if(!draft.enabled)continue;
+    throw Error('У ноды «'+nameFor(selectedNode(id))+'» не заполнена конфигурация выхода. Откройте вкладку «Выходные соединения».');
+   }
    let outbound;
    try{outbound=JSON.parse(raw)}catch(e){throw Error('Неверный JSON для '+nameFor(selectedNode(id))+': '+e.message)}
    if(!outbound||Array.isArray(outbound)||typeof outbound!=='object'||!outbound.protocol||!outbound.settings)
