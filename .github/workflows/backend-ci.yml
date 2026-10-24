@@ -116,6 +116,8 @@ jobs:
         run: node scripts/check-crud-dialog-lifecycle.js
       - name: Verify Xray per-user per-inbound metrics collector
         run: python3 scripts/test-xray-stats-collector.py
+      - name: Ensure online status expires and signed telemetry cannot replay
+        run: node scripts/check-user-presence.js
       - name: Check managed Xray update safety and SQLx migration uniqueness
         run: node scripts/check-managed-xray-update.js
       - name: Ensure client fingerprint is configured at hosts, not users
