@@ -6,6 +6,12 @@ const vm=require('node:vm');
 const {webcrypto}=require('node:crypto');
 
 const source=fs.readFileSync('xray-studio-tools.js','utf8');
+const studio=fs.readFileSync('xray-studio-v4.js','utf8');
+// Credential managers mistook constructor password + Short ID fields for panel login.
+assert.ok(!studio.includes("field('private'"),'Never render a Reality privateKey password input in the constructor');
+assert.ok(!studio.includes("field('shortid'"),'Never expose a Short ID text field beside password inputs');
+assert.ok(studio.includes('validRealityX25519Key'),'Studio must reject non-X25519 secrets before saving');
+assert.ok(studio.includes('const reality=x.streamSettings?.realitySettings;'),'Dormant Reality payloads must be checked as well');
 const PREVIOUS_KEY='A'.repeat(43),NEW_PRIVATE='B'.repeat(43),NEW_PUBLIC='C'.repeat(43);
 const sample=()=>({
  log:{loglevel:'warning'},
