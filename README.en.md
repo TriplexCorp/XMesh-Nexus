@@ -4,7 +4,7 @@
 
 **XMesh Nexus** is a self-hosted Xray-core infrastructure management panel for users, nodes, hosts, squads, XRAY STUDIO, subscriptions, monitoring and administration. The API is built with **Rust (Tokio/Axum)**, persistent data uses **PostgreSQL 18 + TimescaleDB**, ephemeral state uses **Redis 7**, and the panel is deployed with Docker Compose.
 
-> **Source-code status as of October 23, 2026:** this is an actively developed project. The repository **does** include public subscription endpoints, native Xray client JSON generation, managed-node integration and Xray-derived user traffic accounting. Running VPN traffic still requires a separately installed [XMesh-Node](https://github.com/TriplexCorp/XMesh-Node) runtime on each VPS, working Xray configuration and correct networking. A feature existing in the code or UI does not prove that a particular node has applied it successfully.
+> **Source-code status as of October 24, 2026:** this is an actively developed project. The repository **does** include public subscription endpoints, native Xray client JSON generation, managed-node integration and Xray-derived user traffic accounting. Running VPN traffic still requires a separately installed [XMesh-Node](https://github.com/TriplexCorp/XMesh-Node) runtime on each VPS, working Xray configuration and correct networking. A feature existing in the code or UI does not prove that a particular node has applied it successfully.
 
 ## Implementation status
 
@@ -13,7 +13,7 @@
 | **Control plane** | Web panel, Rust API, server-side storage of users, nodes, hosts, squads and settings | A saved panel state is not proof of applied node state |
 | **XRAY STUDIO** | Editable and validated Xray JSON, profile tools, inbound/host/node associations | The public subscription generator does not support every protocol offered by the editor |
 | **Managed nodes** | Ed25519 enrollment, signed requests, heartbeats, desired configuration, restart/update commands | Node-side execution is provided by [XMesh-Node](https://github.com/TriplexCorp/XMesh-Node) |
-| **Subscriptions** | Token issuing/revocation, public URL, HTML portal, native Xray JSON, RU/EN, User-Agent device negotiation | Public outbound generation is currently **VLESS-oriented** and needs valid user, squad, profile and endpoint data |
+| **Subscriptions** | Token issuing/revocation, public URL, HTML portal, native Xray JSON, RU/EN, User-Agent device negotiation | Rust outbound generation supports VLESS, VMess, Trojan, Shadowsocks (including SS2022), Hysteria2 and MASQUE, subject to valid protocol/transport settings and client support |
 | **SUBSCRIPTION STUDIO** | Domain/name, portal appearance, client-app catalog, JSON and balancer settings | DNS, HTTPS and reverse-proxy routing are operator responsibilities |
 | **Statistics** | Node RX/TX and system metrics; per-user/per-inbound traffic counters and diagnostic pages | Xray StatsService and up-to-date agents must report real samples |
 | **Security** | Server-enforced owner/admin/viewer roles, Argon2, sessions, rate limiting, TOTP, audit log | This is not a claim of a complete penetration test or guaranteed vulnerability-free deployment |
@@ -87,7 +87,7 @@ Implemented Rust APIs include:
 - Outbound assembly from **user → squads → XRAY STUDIO inbound → host/node**, including optional native Xray JSON balancers.
 - A user whose subscription is not active cannot retrieve an active client JSON feed.
 
-**Current protocol scope:** the public outbound assembler in `user_subscriptions.rs` builds **VLESS** client connections. VMess, Trojan, Shadowsocks and other protocol editors existing in XRAY STUDIO **do not imply those protocols are supported by the public subscription endpoint**. This endpoint outputs native Xray JSON; it is not a general URI/base64/Clash/Sing-box subscription-format service.
+**Current implementation:** the public outbound assembler in `user_subscriptions.rs` handles **VLESS, VMess, Trojan, Shadowsocks (including SS2022), Hysteria2 and MASQUE**, provided that the inbound, host, user credentials and transport satisfy the corresponding checks. `subscription_transport.rs` separately projects allowed client-side settings instead of copying server secrets. **A supported code path or passing unit test is not proof that every protocol/transport combination works in a particular Xray release or client app.** The feed only serves native Xray JSON, not URI/base64/Clash/Sing-box subscription formats.
 
 A newly issued token may exist before any usable endpoint is configured: the API reports readiness separately. Publishing the URL requires working DNS, a trusted TLS certificate and reverse-proxy routes. A link being present does **not** prove VPN connectivity.
 
@@ -137,14 +137,29 @@ node scripts/check-node-editor-layout.js
 node scripts/check-subscription-studio.js
 node scripts/check-static-assets.js
 cargo test --manifest-path backend/Cargo.toml
+cargo clippy --manifest-path backend/Cargo.toml --all-targets -- -D warnings
 ```
 
 Principal directories/files: `app.js`, `styles.css`, `xray-studio-v4.js`, `subscription-studio.js`, `backend/src/`, `deploy/`, `scripts/`. CI and unit checks cover only part of the product; they do **not** replace testing real node deployments and VPN clients.
 
+## Release maturity and verification
+
+XMesh Nexus is under **active development**. Unit tests, cryptographic signatures, and administration features **are not a claim of certified enterprise or high-availability readiness**. `compose.yaml` deploys one API, one PostgreSQL/TimescaleDB instance and one Redis instance, without automatic database failover. Redis disk persistence is disabled (`appendonly no`, `save ""`): treat it as ephemeral and verify that temporary-state loss cannot undermine policy enforcement.
+
+Before production use and after every update:
+
+1. Review [GitHub Actions](https://github.com/TriplexCorp/XMesh-Nexus/actions) for frontend checks, Rust unit tests, Clippy (`-D warnings`), Docker build and API integration. **Passing individual test suites does not establish an entirely green CI run.**
+2. On a disposable node, verify that disabling a user actually stops VPN traffic at Xray, not merely in the dashboard.
+3. Verify local expiration and traffic enforcement during control-plane disconnection and reconciliation after reconnection.
+4. Test off-host recovery of PostgreSQL **together with** node-policy signing keys and subscription/TOTP encryption secrets.
+5. Exercise generated JSON in real client applications for each enabled protocol, security and transport combination.
+
+Some static assertions under `scripts/` depend on source text and can fail after harmless refactors. Prefer behavioral validation and do not weaken runtime checks simply to make CI green.
+
 ## Known limitations at a glance
 
 1. **Managed VPN nodes require XMesh-Node, real Xray and correctly configured VPS networking.** Panel settings alone are not applied-state confirmation.
-2. **Public subscriptions exist, but client assembly is currently VLESS-focused and native-Xray-JSON-only.**
+2. **Public subscriptions produce native Xray JSON only.** Several protocols are implemented, but not every editor, transport and client-app combination has end-to-end verification.
 3. **IP rotation is integrated into the public native JSON feed for unambiguous direct-node endpoints only.** CDN and external proxy hostnames are intentionally excluded.
 4. **Per-user offline enforcement is bounded, not a strict global quota guarantee across disconnected nodes.**
 5. **Operators must configure DNS, HTTPS reverse proxy, VPS addresses and agent updates.**
