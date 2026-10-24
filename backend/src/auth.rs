@@ -298,14 +298,17 @@ pub async fn issue_session_in_transaction(
     let mut headers = HeaderMap::new();
     headers.insert(
         header::SET_COOKIE,
-        make_session_cookie(&token, state.cookie_secure, policy.session_hours.saturating_mul(3_600)).map_err(
-            |_| {
-                ApiError::new(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Не удалось создать сессию.",
-                )
-            },
-        )?,
+        make_session_cookie(
+            &token,
+            state.cookie_secure,
+            policy.session_hours.saturating_mul(3_600),
+        )
+        .map_err(|_| {
+            ApiError::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Не удалось создать сессию.",
+            )
+        })?,
     );
     Ok((
         StatusCode::OK,
