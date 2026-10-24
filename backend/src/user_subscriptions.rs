@@ -277,6 +277,37 @@ fn vless_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> 
 // Native outbound credentials follow the protocol schema, never the inbound
 // settings shape. The node provisions these per-user credentials from xrayId.
 // Shadowsocks-2022 requires a separately provisioned per-user key.
+fn configure_masque_credentials(
+    stream: &mut Value,
+    user: &Value,
+    inbound: &Value,
+    uuid: &str,
+) -> Option<()> {
+    // MASQUE uses HTTP Basic username/password in transport settings, not UUID
+    // in its outbound settings. The server uses the same stat email as username.
+    let record_id = user.get("id").and_then(Value::as_i64)?;
+    if record_id <= 0 {
+        return None;
+    }
+    let tag = nonempty(inbound, "tag")?;
+    let encoded = tag
+        .bytes()
+        .map(|b| {
+            if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b'~') {
+                (b as char).to_string()
+            } else {
+                format!("%{b:02X}")
+            }
+        })
+        .collect::<String>();
+    if !stream["masqueSettings"].is_object() {
+        stream["masqueSettings"] = json!({});
+    }
+    stream["masqueSettings"]["user"] = json!(format!("xmesh-u{record_id}--{encoded}"));
+    stream["masqueSettings"]["pass"] = json!(uuid);
+    Some(())
+}
+
 fn proxy_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> Option<Value> {
     if nonempty(inbound, "protocol") == Some("vless") {
         return vless_outbound(user, inbound, host, device);
@@ -356,28 +387,7 @@ fn proxy_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> 
     };
     let mut stream = stream;
     if protocol == "masque" {
-        // MASQUE uses HTTP Basic username/password in transport settings, not UUID
-        // in its outbound settings. The server uses the same stat email as username.
-        let record_id = user.get("id").and_then(Value::as_i64)?;
-        if record_id <= 0 {
-            return None;
-        }
-        let tag = nonempty(inbound, "tag")?;
-        let encoded = tag
-            .bytes()
-            .map(|b| {
-                if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b'~') {
-                    (b as char).to_string()
-                } else {
-                    format!("%{b:02X}")
-                }
-            })
-            .collect::<String>();
-        if !stream["masqueSettings"].is_object() {
-            stream["masqueSettings"] = json!({});
-        }
-        stream["masqueSettings"]["user"] = json!(format!("xmesh-u{record_id}--{encoded}"));
-        stream["masqueSettings"]["pass"] = json!(uuid);
+        configure_masque_credentials(&mut stream, user, inbound, uuid)?;
     }
     if protocol == "hysteria" {
         if !stream["hysteriaSettings"].is_object() {
