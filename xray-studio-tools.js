@@ -123,10 +123,9 @@ function contextualToolGroups(inbound,hasInbound){
   if(security==='reality')specialized.push('shortid');
   if(security==='tls')specialized.push('tls');
   specialized.push('vlessens');
-  // Xray-core supports Vision over VLESS Encryption even without outer TLS/REALITY.
-  const decryption=String(inbound.settings?.decryption||'').trim();
-  const hasVlessEncryption=decryption.startsWith('mlkem768x25519plus.');
-  if(['reality','tls'].includes(security)||hasVlessEncryption)specialized.push('vision');
+  // Keep Vision discoverable for every VLESS inbound. Validate compatibility
+  // against the actual core when applying/checking the configuration.
+  specialized.push('vision');
  }else{
   // REALITY config is transport-level, not exclusive to VLESS.
   // Shadowsocks + XHTTP + REALITY must remain editable after composition.
