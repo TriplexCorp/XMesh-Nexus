@@ -17,11 +17,11 @@ for(const secret of ['xrayId','subscriptionUrl','privateKey','password','config'
 }
 const boot=section(main,'async fn bootstrap(','async fn list_records(');
 assert.match(boot,/viewer_read_only\(&actor\) && !viewer_can_read_collection\(collection\)/);
-assert.match(boot,/viewer_record\(collection,r\)/);
+assert.match(boot,/viewer_record\(\s*collection\s*,\s*r\s*\)/);
 assert.match(boot,/viewer_settings\(&settings\)/);
 const listing=section(main,'async fn list_records(','async fn create_record(');
 assert.match(listing,/enforce_collection\(&actor, &collection, false\)/);
-assert.match(listing,/viewer_record\(&collection,item\)/);
+assert.match(listing,/viewer_record\(\s*&collection\s*,\s*item\s*\)/);
 const settings=section(main,'async fn get_settings(','async fn patch_settings(');
 assert.match(settings,/viewer_settings\(&settings\)/);
 const status=section(runtime,'pub async fn status(','pub async fn request_geodata_refresh(');
