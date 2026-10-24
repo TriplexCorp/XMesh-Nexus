@@ -5,6 +5,36 @@ use serde_json::{json, Value};
 use sqlx::Row;
 use sha2::Digest;
 
+// Only a fresh node attestation matching the panel's own expected digest
+// proves that the assigned Xray configuration has been applied.
+fn profile_application_status(
+    fresh:bool, running:bool, applied:Option<&str>, desired:Option<&str>,
+)->&'static str{
+    if !fresh {return "unknown"}
+    if !running {return "stopped"}
+    match (applied,desired){
+        (Some(actual),Some(expected)) if actual==expected => "applied",
+        (Some(_),Some(_)) => "pending",
+        _ => "unknown",
+    }
+}
+
+#[cfg(test)]
+mod profile_application_tests {
+    use super::profile_application_status as status;
+    #[test]
+    fn never_claims_application_without_current_matching_digest(){
+        let digest="a".repeat(64);
+        let old="b".repeat(64);
+        assert_eq!(status(false,true,Some(&digest),Some(&digest)),"unknown");
+        assert_eq!(status(true,false,Some(&digest),Some(&digest)),"stopped");
+        assert_eq!(status(true,true,Some(&digest),None),"unknown");
+        assert_eq!(status(true,true,None,Some(&digest)),"unknown");
+        assert_eq!(status(true,true,Some(&old),Some(&digest)),"pending");
+        assert_eq!(status(true,true,Some(&digest),Some(&digest)),"applied");
+    }
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Heartbeat {
@@ -129,10 +159,9 @@ pub async fn status(
             }else{
                 (None,"missing")
             };
-            let application_status=if !fresh {"unknown"}
-                else if !row.try_get::<bool,_>("xray_running")? {"stopped"}
-                else if applied.is_none() || expected.is_none() {"unknown"}
-                else if applied==expected {"applied"} else {"pending"};
+            let application_status=profile_application_status(
+                fresh,row.try_get::<bool,_>("xray_running")?,
+                applied.as_deref(),expected.as_deref());
             Ok(Json(json!({
                 "profileApplicationStatus":application_status,
                 "desiredRevisionSource":desired_source,
