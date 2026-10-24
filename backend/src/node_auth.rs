@@ -33,7 +33,7 @@ pub fn canonical_for(path: &str, node_id: i64, timestamp: i64, nonce: &str, body
 }
 
 #[cfg(test)]
-pub(crate) fn canonical(node_id: i64, timestamp: i64, nonce: &str, body: &[u8]) -> String {
+pub fn canonical(node_id: i64, timestamp: i64, nonce: &str, body: &[u8]) -> String {
     canonical_for("/api/v1/metrics/ingest", node_id, timestamp, nonce, body)
 }
 
