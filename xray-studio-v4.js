@@ -85,22 +85,44 @@ function captureDocument(){
 function stashDocument(){if(!switchingDocument)documents.set(activeDocument,captureDocument())}
 function renderDocumentTabs(){
  const nav=root.querySelector('.sv-page-tabs');
- nav.querySelectorAll('.sv-json-document-tab,.sv-json-document-add').forEach(el=>el.remove());
  const editorButton=nav.querySelector('[data-action="studio-editor"]');
  editorButton.hidden=true;
+ const tabs=[...documents];
+ const counts=new Map();
+ for(const [,doc] of tabs){const title=(doc.name||'Новый профиль').trim();counts.set(title,(counts.get(title)||0)+1)}
+ const positions=new Map();
+ // Reuse existing elements to avoid losing keyboard focus on every keystroke.
+ const old=new Map([...nav.querySelectorAll('.sv-json-document-tab')].map(el=>[el.dataset.documentKey,el]));
  let anchor=editorButton;
- for(const [key,doc] of documents){
-  const wrap=document.createElement('span');wrap.className='sv-json-document-tab'+(key===activeDocument?' active':'');
-  const button=document.createElement('button');button.type='button';button.dataset.docOpen=key;
-  button.title=doc.name||'JSON';button.textContent=(doc.name||'Новый профиль')+(doc.source!==doc.saved?' ●':'');
-  button.setAttribute('aria-label','Открыть JSON: '+(doc.name||'Новый профиль'));
-  const close=document.createElement('button');close.type='button';close.dataset.docClose=key;
-  close.textContent='×';close.title='Закрыть вкладку';close.setAttribute('aria-label','Закрыть JSON: '+(doc.name||'Новый профиль'));
-  wrap.append(button,close);anchor.after(wrap);anchor=wrap;
+ for(const [key,doc] of tabs){
+  let wrap=old.get(key);
+  if(!wrap){
+   wrap=document.createElement('span');wrap.className='sv-json-document-tab';wrap.dataset.documentKey=key;
+   const button=document.createElement('button');button.type='button';button.className='sv-document-open';button.dataset.docOpen=key;
+   const label=document.createElement('span');label.className='sv-document-label';
+   const indicator=document.createElement('span');indicator.className='sv-document-indicator';
+   indicator.setAttribute('aria-hidden','true');button.append(label,indicator);
+   const close=document.createElement('button');close.type='button';close.className='sv-document-close';close.dataset.docClose=key;
+   close.textContent='×';wrap.append(button,close);
+  }
+  const title=(doc.name||'Новый профиль').trim();
+  const position=(positions.get(title)||0)+1;positions.set(title,position);
+  const display=counts.get(title)>1?title+' · '+position:title;
+  const dirty=doc.source!==doc.saved;
+  wrap.classList.toggle('active',key===activeDocument);
+  wrap.classList.toggle('is-dirty',dirty);
+  const button=wrap.querySelector('.sv-document-open'),close=wrap.querySelector('.sv-document-close');
+  button.querySelector('.sv-document-label').textContent=display;
+  button.title=display+(dirty?' — не сохранено':' — сохранено');
+  button.setAttribute('aria-label','Открыть JSON: '+display);
+  button.setAttribute('aria-selected',String(key===activeDocument));
+  close.title='Закрыть '+display;close.setAttribute('aria-label','Закрыть JSON: '+display);
+  anchor.after(wrap);anchor=wrap;old.delete(key);
  }
- const plus=document.createElement('button');plus.type='button';plus.className='sv-json-document-add';
- plus.dataset.docNew='true';plus.textContent='+';plus.title='Новый JSON';
- plus.setAttribute('aria-label','Открыть новый JSON-редактор');nav.append(plus);
+ for(const el of old.values())el.remove();
+ let plus=nav.querySelector('.sv-json-document-add');
+ if(!plus){plus=document.createElement('button');plus.type='button';plus.className='sv-json-document-add';plus.dataset.docNew='true';plus.title='Новый JSON';plus.setAttribute('aria-label','Открыть новый JSON-редактор');plus.textContent='+'}
+ anchor.after(plus);
 }
 function switchDocument(key){
  if(key===activeDocument){setPage('editor');return}
