@@ -1,4 +1,4 @@
-//! Real panel login accounts. The legacy panel_records('admins') collection
+//! Real panel login accounts. The legacy `panel_records`('admins') collection
 //! is not an authentication store and must not be used for access control.
 use crate::{ApiError, AppState, auth::AuthUser};
 use argon2::{
@@ -14,7 +14,7 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 use sqlx::{PgPool, Row};
 
-pub(crate) fn require_owner(actor: &AuthUser) -> Result<(), ApiError> {
+pub fn require_owner(actor: &AuthUser) -> Result<(), ApiError> {
     if actor.role == "owner" {
         Ok(())
     } else {
@@ -27,7 +27,7 @@ pub(crate) fn require_owner(actor: &AuthUser) -> Result<(), ApiError> {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(crate) struct CreateAccount {
+pub struct CreateAccount {
     username: String,
     password: String,
     role: String,
@@ -35,13 +35,13 @@ pub(crate) struct CreateAccount {
     is_active: bool,
 }
 
-fn default_active() -> bool {
+const fn default_active() -> bool {
     true
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(crate) struct UpdateAccount {
+pub struct UpdateAccount {
     username: Option<String>,
     password: Option<String>,
     role: Option<String>,
@@ -92,7 +92,7 @@ fn password_hash(password: &str) -> Result<String, ApiError> {
         })
 }
 
-pub(crate) async fn accounts(pool: &PgPool) -> Result<Vec<Value>, ApiError> {
+pub async fn accounts(pool: &PgPool) -> Result<Vec<Value>, ApiError> {
     let rows = sqlx::query(
         "SELECT id, username, role, is_active, \
            (EXTRACT(EPOCH FROM created_at)*1000)::BIGINT AS created_ms, \
@@ -116,7 +116,7 @@ pub(crate) async fn accounts(pool: &PgPool) -> Result<Vec<Value>, ApiError> {
         .collect()
 }
 
-pub(crate) async fn list(
+pub async fn list(
     State(state): State<AppState>,
     Extension(actor): Extension<AuthUser>,
 ) -> Result<Json<Value>, ApiError> {
@@ -124,7 +124,7 @@ pub(crate) async fn list(
     Ok(Json(json!({"items":accounts(&state.pool).await?})))
 }
 
-pub(crate) async fn create(
+pub async fn create(
     State(state): State<AppState>,
     Extension(actor): Extension<AuthUser>,
     Json(body): Json<CreateAccount>,
@@ -161,7 +161,7 @@ pub(crate) async fn create(
     Ok((StatusCode::CREATED, Json(record)))
 }
 
-pub(crate) async fn update(
+pub async fn update(
     State(state): State<AppState>,
     Extension(actor): Extension<AuthUser>,
     Path(id): Path<i64>,
@@ -259,7 +259,7 @@ pub(crate) async fn update(
     Ok(Json(record))
 }
 
-pub(crate) async fn delete(
+pub async fn delete(
     State(state): State<AppState>,
     Extension(actor): Extension<AuthUser>,
     Path(id): Path<i64>,
