@@ -489,9 +489,9 @@ function openComposer(){
  const comboCount=engine.countKnownCombinations();
  body.innerHTML=
  '<div class="sv-compose" data-compose-root>'+
-   '<div class="sv-compose-intro"><div><span class="sv-compose-kicker">XRAY CONFIGURATION ENGINE</span>'+
-      '<p>Собирайте конфигурации из независимых компонентов. Сценарии — только отправная точка, а не ограничение.</p></div>'+
-      '<div class="sv-compose-count"><strong>'+comboCount+'</strong><span>документированных сочетаний<br>+ свободный JSON</span></div></div>'+
+   '<div class="sv-compose-intro"><div><span class="sv-compose-kicker">КОНСТРУКТОР XRAY</span>'+
+      '<p>Протокол, транспорт и защита — любые доступные сочетания.</p></div>'+
+      '<div class="sv-compose-count"><strong>'+comboCount+'</strong><span>сочетания<br>+ ручной JSON</span></div></div>'+
    '<div class="sv-compose-tabs" role="tablist" aria-label="Режим конструктора">'+
       '<button type="button" data-compose-tab="builder" aria-selected="true">Собрать своё</button>'+
       '<button type="button" data-compose-tab="examples" aria-selected="false">Быстрый старт</button></div>'+
@@ -512,10 +512,7 @@ function openComposer(){
            '<label data-compose-when="customTransport" class="sv-compose-field-wide"><span>Название своего транспорта в Xray-core</span><input data-compose-field="customTransport" placeholder="my-transport" spellcheck="false"></label>'+
          '</div>'+
        '</div>'+
-       '<div class="sv-compose-apply-mode"><strong>Куда добавить результат</strong>'+
-        '<label><input type="radio" name="sv-compose-mode" value="new" checked> Создать новый профиль</label>'+
-        '<label><input type="radio" name="sv-compose-mode" value="add"> Добавить inbound в текущий JSON</label>'+
-       '</div>'+
+       ''+
       '</div>'+
       '<aside class="sv-compose-preview"><div class="sv-compose-preview-head"><span>LIVE JSON / INBOUND</span><strong data-compose-summary>—</strong></div>'+
        '<div class="sv-compose-diagnostics"><strong data-compose-state>Черновик</strong><div data-compose-messages></div></div>'+
@@ -523,16 +520,21 @@ function openComposer(){
        '<p class="sv-compose-preview-note">Это предварительный JSON. Секреты добавляются только при создании; окончательная проверка — через Xray-core.</p></aside>'+
    '</div>'+
    '<div class="sv-compose-examples" data-compose-examples hidden></div>'+
-   '<div class="sv-compose-footer"><label class="sv-compose-override" data-compose-override hidden>'+
+   '<div class="sv-compose-footer">'+
+    '<fieldset class="sv-compose-apply-mode"><legend>Результат</legend>'+
+     '<label><input type="radio" name="sv-compose-mode" value="new" checked><span>Новый профиль</span></label>'+
+     '<label><input type="radio" name="sv-compose-mode" value="add"><span>Добавить inbound</span></label>'+
+    '</fieldset>'+
+    '<label class="sv-compose-override" data-compose-override hidden>'+
       '<input type="checkbox" data-compose-field="allowExperimental"> Всё равно создать экспериментальный JSON с предупреждениями</label>'+
-    '<span class="sv-compose-footer-note" data-compose-footer-note>Результат сохраняется как редактируемый черновик, без перезапуска нод.</span>'+
+    '<span class="sv-compose-footer-note" data-compose-footer-note>Черновик · без перезапуска нод</span>'+
     '<button type="button" data-compose-close>Отмена</button>'+
     '<button type="button" class="sv-primary" data-compose-apply>Создать JSON</button></div>'+
  '</div>';
  const scope=body.querySelector('[data-compose-root]'),by=name=>scope.querySelector('[data-compose-field="'+name+'"]');
  const list=scope.querySelector('[data-compose-choices]'),examples=scope.querySelector('[data-compose-examples]');
  const choose=scope.querySelector('[data-compose-apply]'),messages=scope.querySelector('[data-compose-messages]'),preview=scope.querySelector('[data-compose-json]');
- const groups=[['protocol','01 · Протокол',engine.protocols],['transport','02 · Транспорт',engine.transports],['security','03 · Защита',engine.securities]];
+ const groups=[['protocol','Протокол',engine.protocols],['transport','Транспорт',engine.transports],['security','Защита',engine.securities]];
  const htmlSafe=escapeHtml;
  for(const method of engine.shadowsocksMethods){
   const opt=document.createElement('option');opt.value=method.id;opt.textContent=method.id;by('method').append(opt);
