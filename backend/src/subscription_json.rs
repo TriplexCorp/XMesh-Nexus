@@ -516,6 +516,48 @@ pub fn validate_client_balancers(value: &Value) -> Result<(), String> {
 
 /// A public feed contains an independent full Xray JSON profile for each
 /// available server plus only the explicitly enabled custom selections.
+fn configure_feed_balancer(config: &mut Value, row: &Value) {
+    if config["routing"]["balancers"].is_array() {
+        // One requested balancer per independent profile. Country auto-groups
+        // must not leak into a manually selected combination.
+        let first = config["outbounds"][0]["tag"].clone();
+        let tags: Vec<Value> = config["outbounds"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|p| {
+                [
+                    "vless",
+                    "vmess",
+                    "trojan",
+                    "shadowsocks",
+                    "hysteria",
+                    "masque",
+                ]
+                .contains(&p["protocol"].as_str().unwrap_or(""))
+            })
+            .map(|p| p["tag"].clone())
+            .collect();
+        let strategy = row["strategy"].as_str().unwrap_or("random");
+        let mut balancer = json!({
+         "tag":row["tag"],"selector":tags,
+         "strategy":{"type":strategy}
+        });
+        // Prevent "core: not all dependencies are resolved" on roundRobin/random.
+        if strategy == "leastPing" {
+            balancer["fallbackTag"] = first;
+        }
+        config["routing"]["balancers"] = json!([balancer]);
+        if let Some(rules) = config["routing"]["rules"].as_array_mut() {
+            for rule in rules {
+                if rule.get("balancerTag").is_some() {
+                    rule["balancerTag"] = row["tag"].clone();
+                }
+            }
+        }
+    }
+}
+
 pub fn build_feed(proxies: Vec<Value>, settings: &Value) -> Result<Value, String> {
     if proxies.is_empty() {
         return Err("Нет доступных клиентских подключений".into());
@@ -576,45 +618,7 @@ pub fn build_feed(proxies: Vec<Value>, settings: &Value) -> Result<Value, String
             let mut config = build(matched, &group_settings)?;
             config["remarks"] = row["remark"].clone();
             config["serverDescription"] = row["serverDescription"].clone();
-            if config["routing"]["balancers"].is_array() {
-                // One requested balancer per independent profile. Country auto-groups
-                // must not leak into a manually selected combination.
-                let first = config["outbounds"][0]["tag"].clone();
-                let tags: Vec<Value> = config["outbounds"]
-                    .as_array()
-                    .unwrap()
-                    .iter()
-                    .filter(|p| {
-                        [
-                            "vless",
-                            "vmess",
-                            "trojan",
-                            "shadowsocks",
-                            "hysteria",
-                            "masque",
-                        ]
-                        .contains(&p["protocol"].as_str().unwrap_or(""))
-                    })
-                    .map(|p| p["tag"].clone())
-                    .collect();
-                let strategy = row["strategy"].as_str().unwrap_or("random");
-                let mut balancer = json!({
-                 "tag":row["tag"],"selector":tags,
-                 "strategy":{"type":strategy}
-                });
-                // Prevent "core: not all dependencies are resolved" on roundRobin/random.
-                if strategy == "leastPing" {
-                    balancer["fallbackTag"] = first;
-                }
-                config["routing"]["balancers"] = json!([balancer]);
-                if let Some(rules) = config["routing"]["rules"].as_array_mut() {
-                    for rule in rules {
-                        if rule.get("balancerTag").is_some() {
-                            rule["balancerTag"] = row["tag"].clone();
-                        }
-                    }
-                }
-            }
+            configure_feed_balancer(&mut config, row);
             // Single-source groups are aliases to that source, not fake balancers.
             if row["strategy"] != "leastPing" {
                 config.as_object_mut().unwrap().remove("observatory");
