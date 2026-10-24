@@ -911,12 +911,28 @@ const balancersP=async()=>{
   });
  }];
 };
-const pages={home:['Дашборд',homeP],statistics:['Статистика',statisticsP],users:['Пользователи',usersP],squads:['Сквады',()=>simple(['squads'])],hosts:['Хосты',()=>simple(['hosts'])],nodes:['Узлы',nodesP],templates:['Шаблоны',()=>simple(['tpls','subs'])],profiles:['XRAY STUDIO',profilesP],subscription:['SUBSCRIPTION STUDIO',subscriptionStudioP],balancers:['Балансировщики',balancersP],clientrouting:['Маршрутизация клиентов',()=>window.XMeshClientRouting.create(DB,async patch=>{
-    const result=await backendRequest('/api/v1/client-routing',{
-      method:'PATCH',body:JSON.stringify({profiles:patch.clientRoutingProfiles})});
-    DB.set.clientRoutingProfiles=result.profiles;
-    return result;
-  },toast)],tools:['Диагностика',toolsP],admins:['Администраторы',()=>simple(['admins'])],security:['Безопасность',securityP],set:['Настройки',setP]};
+const pages={home:['Дашборд',homeP],statistics:['Статистика',statisticsP],users:['Пользователи',usersP],squads:['Сквады',()=>simple(['squads'])],hosts:['Хосты',()=>simple(['hosts'])],nodes:['Узлы',nodesP],templates:['Шаблоны',()=>simple(['tpls','subs'])],profiles:['XRAY STUDIO',profilesP],subscription:['SUBSCRIPTION STUDIO',subscriptionStudioP],balancers:['Балансировщики',balancersP],clientrouting:['Маршрутизация клиентов',async()=>{
+    // Do not assume the editor asset was loaded by an older cached index.html.
+    // A failed optional script must not crash the whole workspace.
+    if(typeof window.XMeshClientRouting?.create!=='function'){
+      await new Promise((resolve,reject)=>{
+        const script=document.createElement('script');
+        script.src='/client-routing.js?v=20261024-client-routes-recovery-2';
+        script.async=true;
+        script.onload=resolve;
+        script.onerror=()=>reject(new Error('Не удалось загрузить редактор маршрутизации. Проверьте обновление Docker-образа панели и наличие client-routing.js.'));
+        document.head.append(script);
+      });
+    }
+    if(typeof window.XMeshClientRouting?.create!=='function')
+      throw new Error('Редактор маршрутизации не инициализирован. Проверьте ошибки client-routing.js в консоли браузера.');
+    return window.XMeshClientRouting.create(DB,async patch=>{
+      const result=await backendRequest('/api/v1/client-routing',{
+        method:'PATCH',body:JSON.stringify({profiles:patch.clientRoutingProfiles})});
+      DB.set.clientRoutingProfiles=result.profiles;
+      return result;
+    },toast);
+  }],tools:['Диагностика',toolsP],admins:['Администраторы',()=>simple(['admins'])],security:['Безопасность',securityP],set:['Настройки',setP]};
 const skel=()=>`<div class="sk" style="height:7rem"></div><div class="sk" style="height:18rem"></div><div class="sk" style="height:12rem"></div>`;
 const NAV_SHORT={home:'Главная',users:'Клиенты',nodes:'Узлы',subscription:'Подписка'};
 $('#nav').innerHTML=NAV.map(([g,a])=>`<div class="g">${g}</div>`+a.map(([k,i,l,p])=>`<a href="#${k}" class="${p?'':'sec'}" aria-label="${l}" data-rail-tip="${l}">${ic(i)}<span class="lbl"><span class="nav-label-full">${l}</span><span class="nav-label-short" aria-hidden="true">${NAV_SHORT[k]||l}</span></span>${k=='users'?'<em id="unb"></em>':''}</a>`).join('')).join('')+`<button class="more" id="more" aria-label="Ещё разделы" data-rail-tip="Ещё разделы">${ic('more')}<span class="lbl">Ещё</span></button>`;
