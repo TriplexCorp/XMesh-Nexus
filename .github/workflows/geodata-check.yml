@@ -1,18 +1,27 @@
-name: GeoData backend and UI checks
+name: Node GeoData and Routing checks
 on:
   push:
     paths:
       - 'backend/src/node_geodata.rs'
+      - 'backend/src/node_routing.rs'
       - 'backend/src/node_runtime.rs'
       - 'backend/src/main.rs'
       - 'backend/migrations/0025_node_geodata_status.sql'
       - 'app.js'
+      - 'node-geodata.js'
+      - 'node-geodata.css'
+      - 'node-routing.js'
+      - 'node-routing.css'
+      - 'backend/Dockerfile'
+      - 'backend/src/security.rs'
+      - 'index.html'
       - 'styles.css'
       - '.github/workflows/geodata-check.yml'
   pull_request:
     paths:
       - 'backend/src/node_geodata.rs'
       - 'backend/src/node_runtime.rs'
+      - 'backend/src/node_routing.rs'
       - 'app.js'
   workflow_dispatch:
 jobs:
@@ -21,7 +30,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Check dashboard JavaScript
-        run: node --check app.js
+        run: |
+          node --check app.js
+          node --check node-geodata.js
+          node --check node-routing.js
+          node - <<'JS'
+          const fs=require('fs');
+          const docker=fs.readFileSync('backend/Dockerfile','utf8');
+          const html=fs.readFileSync('index.html','utf8');
+          const rebasing=fs.readFileSync('backend/src/security.rs','utf8');
+          for(const name of ['node-geodata.js','node-geodata.css','node-routing.js','node-routing.css']){
+            if(!docker.includes(name)||!html.includes(name)||!rebasing.includes(name))
+              throw new Error('Missing packaged or custom-path asset: '+name);
+          }
+          JS
       - name: Check installed agents
         run: |
           bash -n deploy/node-control-agent.sh
@@ -31,6 +53,8 @@ jobs:
     container: rust:1.99.1-bookworm
     steps:
       - uses: actions/checkout@v4
-      - name: Compile and test GeoData policy
+      - name: Compile and test GeoData and routing policies
         working-directory: backend
-        run: cargo test node_geodata
+        run: |
+          cargo test node_geodata
+          cargo test node_routing
