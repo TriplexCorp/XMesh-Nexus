@@ -124,17 +124,13 @@ const emptyDB=()=>({
   users:[],nodes:[],profiles:[],hosts:[],squads:[],tpls:[],subs:[],admins:[],tokens:[],srh:[],
   set:{brand:'XMesh Nexus',domain:'',hooks:{...defaultHooks}}
 });
-let DB;
-try{DB=JSON.parse(localStorage.getItem('xmeshNexusDB')||'null')}catch(e){DB=null}
-// Never delete user data based on example-looking addresses or email fields.
-// The authenticated PostgreSQL backend remains the authoritative data source.
-if(!DB||!Array.isArray(DB.users)) DB=emptyDB();
-else {
-  for(const k of ['users','nodes','profiles','hosts','squads','tpls','subs','admins','tokens','srh']) if(!Array.isArray(DB[k])) DB[k]=[];
-  DB.set={brand:'XMesh Nexus',domain:'',hooks:{...defaultHooks,...(DB.set?.hooks||{})},...(DB.set||{})};
-  DB.set.hooks={...defaultHooks,...(DB.set?.hooks||{})};
-}
-let sv,backendReady=false,sessionUser=null;const save=()=>{if(backendReady)return;clearTimeout(sv);sv=setTimeout(()=>{try{localStorage.setItem('xmeshNexusDB',JSON.stringify(DB))}catch(e){}},120)};
+// Never restore another administrator's control-plane records from persistent
+// browser storage. The API is the only source of privileged information.
+try{localStorage.removeItem('xmeshNexusDB')}catch(_){}
+let DB=emptyDB();
+let sv,backendReady=false,sessionUser=null;
+const save=()=>{}; // PostgreSQL is authoritative; no cross-role local snapshots.
+const viewerMode=()=>Boolean(sessionUser&&!['owner','admin'].includes(sessionUser.role));
 async function backendRequest(path,options={}){
   const headers={...(options.headers||{})};
   if(options.body&&!headers['Content-Type']&&!headers['content-type'])headers['Content-Type']='application/json';
@@ -425,6 +421,13 @@ window.addEventListener('resize',hideRailTip);
 const modal=(h,c='')=>{
  const replacing=dlg.open;
  dlg.className=c;dlg.innerHTML=h;decorateButtonIcons(dlg);
+ if(viewerMode()&&c==='user-modal'){
+   dlg.querySelectorAll('input,textarea,select').forEach(el=>{el.disabled=true});
+   dlg.querySelectorAll('button').forEach(el=>{
+     if(!el.matches('[data-x],[data-user-traffic-refresh]'))el.disabled=true;
+   });
+   dlg.classList.add('viewer-readonly');
+ }
  if(!replacing)dlg.showModal();
  else if(C.motion&&typeof dlg.firstElementChild?.animate==='function'&&!matchMedia('(prefers-reduced-motion: reduce)').matches){
   dlg.firstElementChild.animate([
@@ -900,7 +903,7 @@ function scrollToSettingsTarget(id){
   return true;
 }
 async function render(soft){
-  T.forEach(clearInterval);T=[];cur=location.hash.slice(1);if(!pages[cur])cur='home';const rt=++RT,[t,f]=pages[cur],v=$('#view');
+  T.forEach(clearInterval);T=[];cur=location.hash.slice(1);if(!pages[cur]||(viewerMode()&&!['home','statistics','users','nodes'].includes(cur)))cur='home';const rt=++RT,[t,f]=pages[cur],v=$('#view');
   $('#title').textContent=t;document.title=(window.XMeshI18n?.translate(t)||t)+' — '+DB.set.brand;$$('#nav a').forEach(a=>a.classList.toggle('on',a.getAttribute('href')=='#'+cur));
   if(!soft){v.classList.remove('still');v.innerHTML=skel();scrollTo(0,0)}
   try{
@@ -1559,7 +1562,7 @@ function userDrawer(id,tab){
   </div>`,'user-modal');
   void loadUserTrafficStats(u.id);
   startUserTrafficAutoRefresh(u.id);
-  void loadUserSubscription(u.id);
+  if(!viewerMode())void loadUserSubscription(u.id);
 }
 async function loadUserSubscription(id){
   const target=$('[data-user-sub-state="'+id+'"]');
@@ -3826,7 +3829,23 @@ async function bootPanel(){
     const session=await response.json();
     if(!session.authenticated){location.replace(location.pathname);return}
     sessionUser=session.user||null;
-    document.documentElement.dataset.accessRole=sessionUser?.role||'viewer';
+    document.documentElement.dataset.accessRole=viewerMode()?'viewer':sessionUser.role;
+    if(viewerMode()){
+      const allowed=new Set(['#home','#statistics','#users','#nodes']);
+      document.querySelectorAll('#nav a[href^="#"]').forEach(a=>{
+        if(!allowed.has(a.getAttribute('href')))a.remove();
+      });
+      document.querySelectorAll('#nav .g').forEach(group=>{
+        let next=group.nextElementSibling,hasLink=false;
+        while(next&&!next.classList.contains('g')){
+          if(next.matches('a'))hasLink=true;
+          next=next.nextElementSibling;
+        }
+        if(!hasLink)group.remove();
+      });
+      document.querySelector('#more')?.remove();
+      if(!allowed.has(location.hash))location.hash='#home';
+    }
     if(sessionUser?.role!=='owner'){
       document.querySelector('a[href="#admins"]')?.remove();
       if(location.hash==='#admins')location.hash='#home';
