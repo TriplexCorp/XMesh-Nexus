@@ -173,3 +173,35 @@ dialog#dlg.node-routing-modal .route-workspace{
 .route-sniffing>span{display:grid;gap:5px}
 .route-sniffing strong{font-size:.76rem;font-weight:760}
 .route-sniffing small{font-size:.69rem;line-height:1.5;color:var(--mu)}
+
+/* JSON-first routing workspace overrides the retired visual rule builder. */
+dialog#dlg.node-routing-modal .route-json-workspace{
+ display:flex;flex-direction:column;gap:0;min-height:0;height:min(88dvh,950px);
+ max-height:94dvh;overflow:hidden;padding:0;background:var(--s1)
+}
+.route-json-head{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:22px 26px 17px;flex:none}
+.route-json-head h2{font-size:1.35rem;line-height:1.25;margin:4px 0 5px}
+.route-json-head p{margin:0;color:var(--mu);font-size:.79rem}
+.route-json-kicker{font-size:.67rem;font-weight:800;letter-spacing:.09em;color:var(--a)}
+.route-json-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 26px;border-top:1px solid var(--ln);border-bottom:1px solid var(--ln);flex:none}
+.route-json-bar label{display:flex;align-items:center;gap:9px;font-size:.79rem;font-weight:700;cursor:pointer}
+.route-json-bar input{accent-color:var(--a);width:17px;height:17px}
+.route-json-bar>div,.route-json-foot>div{display:flex;gap:8px;align-items:center}
+.route-json-editor{display:flex;flex-direction:column;min-height:0;flex:1;margin:17px 25px;border:1px solid var(--ln);border-radius:14px;overflow:hidden;background:color-mix(in srgb,var(--s1) 80%,#05080d)}
+.route-json-editor-head{display:flex;align-items:center;justify-content:space-between;padding:10px 15px;border-bottom:1px solid var(--ln);font-size:.68rem;color:var(--mu);letter-spacing:.06em}
+.route-json-editor-head strong{font-size:.67rem;font-weight:800}
+.route-json-editor-head span{color:var(--ok)}
+.route-json-editor-head span.is-invalid{color:var(--er)}
+.route-json-editor textarea{display:block;box-sizing:border-box;resize:none;width:100%;height:100%;min-height:0;flex:1;border:0;outline:0;background:transparent;color:var(--tx);padding:16px 19px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.84rem;line-height:1.65;tab-size:2;white-space:pre;overflow:auto}
+.route-json-editor textarea:focus{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--a) 35%,transparent)}
+.route-json-foot{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:15px 25px;border-top:1px solid var(--ln);flex:none}
+.route-json-foot>span{color:var(--mu);font-size:.74rem;line-height:1.5;min-width:0}
+.route-json-foot button{white-space:nowrap}
+@media(max-width:680px){
+ .route-json-head{padding:16px}
+ .route-json-bar{padding:12px 16px;flex-wrap:wrap}
+ .route-json-editor{margin:12px}
+ .route-json-foot{padding:12px;flex-wrap:wrap}
+ .route-json-foot>div{width:100%}
+ .route-json-foot button{flex:1}
+}
