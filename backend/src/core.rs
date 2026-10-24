@@ -143,10 +143,11 @@ impl CoreManager {
         .await
         .map_err(|e| format!("Could not persist Xray-core version setting: {e}"))?;
         let mut state = self.state.write().await;
-        state.desired_version = target.clone();
-        state.status = "updating".to_owned();
+        state.desired_version.clone_from(&target);
+        "updating".clone_into(&mut state.status);
         state.progress = Some("Обновление поставлено в очередь".to_owned());
         state.last_error = None;
+        drop(state);
         Ok(target)
     }
 
@@ -155,8 +156,8 @@ impl CoreManager {
         let _guard = self.update_lock.lock().await;
         {
             let mut state = self.state.write().await;
-            state.desired_version = target.clone();
-            state.status = "updating".to_owned();
+            state.desired_version.clone_from(&target);
+            "updating".clone_into(&mut state.status);
             state.progress = Some("Resolving official GitHub release".to_owned());
             state.last_error = None;
         }
@@ -167,7 +168,7 @@ impl CoreManager {
                 let mut state = self.state.write().await;
                 state.installed_version = Some(version.clone());
                 state.latest_version = Some(latest);
-                state.status = "ready".to_owned();
+                "ready".clone_into(&mut state.status);
                 state.progress = None;
                 state.last_error = None;
                 state.updated_at = Some(chrono_free_timestamp());
@@ -176,9 +177,10 @@ impl CoreManager {
             }
             Err(error) => {
                 let mut state = self.state.write().await;
-                state.status = "error".to_owned();
+                "error".clone_into(&mut state.status);
                 state.progress = None;
                 state.last_error = Some(error.clone());
+                drop(state);
                 tracing::error!(error = %error, target = %target, "Xray-core installation failed");
                 Err(error)
             }
@@ -353,6 +355,7 @@ impl CoreManager {
         if read_installed_version(&self.root).await.as_deref() == Some(release.tag_name.as_str()) {
             let mut state = self.state.write().await;
             state.progress = Some("Requested version is already installed".to_owned());
+            drop(state);
             return Ok((release.tag_name, latest));
         }
 
