@@ -45,8 +45,8 @@ assert.match(publicFeed,/xmeshOwnerNodeKey/);
 assert.match(api,/\.route\("\/client-routing", patch\(patch_client_routing\)\)/);
 assert.match(api,/require_mutation\(&actor\)\?/);
 const index=fs.readFileSync('index.html','utf8');
-assert.match(index,/client-routing\.css\?v=20261024-client-cards-v2/,'New CSS should be cache busted');
-assert.match(index,/client-routing\.js\?v=20261024-client-cards-v2/,'New JS should be cache busted');
+assert.match(index,/client-routing\.css\?v=20261024-client-cards-v3/,'New CSS should be cache busted');
+assert.match(index,/client-routing\.js\?v=20261024-client-cards-v3/,'New JS should be cache busted');
 
 const docker=fs.readFileSync('backend/Dockerfile','utf8');
 for(const item of ['client-routing.js','client-routing.css']){
@@ -54,3 +54,7 @@ for(const item of ['client-routing.js','client-routing.css']){
  assert(docker.includes(item),'Runtime image must package '+item);
 }
 console.log('Shared client routing: template editor, source assignment, subscriber authorization, admin API, and packaged assets OK.');
+
+assert.match(source,/ensureStylesheet\(\)/,'Routing view must load its own CSS');
+assert.match(source,/width=\\"19\\" height=\\"19\\"/,'SVG icons must have explicit dimensions');
+assert.match(source,/ensureCriticalStyles\(\)/,'Routing view needs safe layout when CSS fails');
