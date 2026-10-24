@@ -876,7 +876,7 @@ mod tests{
    let proxy=proxy_outbound(&user,&inbound,&host,"auto").unwrap();
    let auth=if protocol=="hysteria"{&proxy["streamSettings"]["hysteriaSettings"][field]}
      else{&proxy["settings"][field]};
-   assert_eq!(auth,user["xrayId"],"{protocol}");
+   assert_eq!(auth,&user["xrayId"],"{protocol}");
    assert!(crate::subscription_json::build_feed(vec![proxy],&json!({})).is_ok());
   }
  }
