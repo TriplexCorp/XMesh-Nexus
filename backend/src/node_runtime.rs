@@ -1,5 +1,5 @@
 use crate::{node_auth, ApiError, AppState};
-use axum::{body::Bytes, extract::{Path, State}, http::{HeaderMap, StatusCode}, Json};
+use axum::{body::Bytes, extract::{Path, State}, http::{HeaderMap, StatusCode}, Extension, Json};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use sqlx::Row;
