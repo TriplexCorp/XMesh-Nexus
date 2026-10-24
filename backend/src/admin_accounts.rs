@@ -16,7 +16,7 @@ use sqlx::{PgPool, Row};
 
 pub(crate) fn require_owner(actor: &AuthUser) -> Result<(), ApiError> {
     if actor.role == "owner" { Ok(()) }
-    else { Err(ApiError::new(StatusCode::FORBIDDEN, "Только владелец может управлять администраторами.")) }
+    else { Err(ApiError::new(StatusCode::FORBIDDEN, "Недостаточно прав для выполнения этого действия.")) }
 }
 
 #[derive(Deserialize)]
