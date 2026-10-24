@@ -1226,13 +1226,17 @@ pub async fn portal(
         } else {
             0.0
         };
-        let _ = write!(metrics,
-   "<div data-subscription-traffic><small>{}</small><b>{}</b><div class=\"subscription-preview-progress\"><i style=\"width:{pct:.1}%\"></i></div></div>",
-   if en{"Traffic"}else{"Трафик"},escape_html(&remaining));
+        let _ = write!(
+            metrics,
+            "<div data-subscription-traffic><small>{}</small><b>{}</b><div class=\"subscription-preview-progress\"><i style=\"width:{pct:.1}%\"></i></div></div>",
+            if en { "Traffic" } else { "Трафик" },
+            escape_html(&remaining)
+        );
     }
     if studio_enabled(&settings, "subscriptionShowExpiry", true) {
         let expiry = user.get("expireAt").and_then(Value::as_i64).unwrap_or(0);
-        let _ = write!(metrics,
+        let _ = write!(
+            metrics,
             "<div data-subscription-expiry><small>{}</small><b data-expiry=\"{}\">{}</b></div>",
             if en {
                 "Expires"
@@ -1287,7 +1291,8 @@ pub async fn portal(
             escape_html(&raw_link)
         );
         if studio_enabled(&settings, "subscriptionShowCopy", true) {
-            let _ = write!(quick,
+            let _ = write!(
+                quick,
                 "<button type=\"button\" id=\"copy-link\">{}</button>",
                 if en {
                     "Copy link"
@@ -1301,7 +1306,15 @@ pub async fn portal(
             "<div id=\"subscription-qr\" class=\"subscription-preview-qr\" hidden aria-label=\"QR-код подписки\"></div>".clone_into(&mut qr);
         }
         if studio_enabled(&settings, "subscriptionShowDevices", false) {
-            let _ = write!(quick,"<button type=\"button\" id=\"toggle-devices\" aria-controls=\"subscription-devices\" aria-expanded=\"false\">{}</button>",if en{"Devices"}else{"Устройства"});
+            let _ = write!(
+                quick,
+                "<button type=\"button\" id=\"toggle-devices\" aria-controls=\"subscription-devices\" aria-expanded=\"false\">{}</button>",
+                if en {
+                    "Devices"
+                } else {
+                    "Устройства"
+                }
+            );
             let maximum = user.get("hwid").and_then(Value::as_i64).unwrap_or(0);
             let connected_devices = user
                 .get("devices")
