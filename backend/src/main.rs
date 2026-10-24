@@ -506,7 +506,7 @@ fn viewer_record(collection: &str, record: &Value) -> Value {
     let fields: &[&str] = match collection {
         "users" => &["id","username","limit","used","expireAt","onlineAt",
                     "disabled","created","status","hwid","squads"],
-        "nodes" => &["id","name","remark","flag","country","hosting","state",
+        "nodes" => &["id","name","remark","flag","country","state",
                     "disabled","used","limit","traffic","maxTraffic",
                     "xrayVersion","agentVersion","onlineAt","lastSeenAt"],
         "squads" => &["id","name","remark","tag"],
@@ -1090,7 +1090,8 @@ async fn get_system_stats(State(state): State<AppState>) -> Json<Value> {
 
 /// Read-only dashboard overview from actual TimescaleDB measurements.
 /// Samples older than 5 minutes are reported stale, never as live zeroes.
-async fn get_statistics_overview(State(state): State<AppState>) -> Result<Json<Value>, ApiError> {
+async fn get_statistics_overview(State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>) -> Result<Json<Value>, ApiError> {
     let records = load_records(&state.pool, "nodes").await?;
     let mut nodes = Vec::with_capacity(records.len());
     for node in records {
@@ -1140,7 +1141,8 @@ async fn get_statistics_overview(State(state): State<AppState>) -> Result<Json<V
             "networkTrafficSource":"interface_counters_since_first_sample",
             "id":id,
             "name":node.get("name").and_then(Value::as_str).unwrap_or("Узел"),
-            "hosting":node.get("hosting"),
+            "hosting":if viewer_read_only(&actor){Value::Null}
+                else{node.get("hosting").cloned().unwrap_or(Value::Null)},
             "flag":node.get("flag"),
             "disabled":node.get("disabled"),
             "latest":current
