@@ -326,6 +326,59 @@ impl CoreManager {
         Ok(all)
     }
 
+    async fn verify_staged_binary(&self, staging_dir: &Path, version: &str) -> Result<(), String> {
+        let binary = staging_dir.join("xray");
+        {
+            let mut permissions = fs::metadata(&binary)
+                .await
+                .map_err(|e| e.to_string())?
+                .permissions();
+            permissions.set_mode(0o755);
+            fs::set_permissions(&binary, permissions)
+                .await
+                .map_err(|e| e.to_string())?;
+        }
+        {
+            let mut state = self.state.write().await;
+            state.progress = Some("Verifying downloaded binary".to_owned());
+        }
+        let output = timeout(
+            Duration::from_secs(15),
+            Command::new(&binary)
+                .arg("version")
+                .stdin(Stdio::null())
+                .output(),
+        )
+        .await
+        .map_err(|_| {
+            "Downloaded Xray-core binary did not respond to the version command".to_owned()
+        })?
+        .map_err(|e| format!("Could not execute downloaded Xray-core binary: {e}"))?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let _ = fs::remove_dir_all(&staging_dir).await;
+            return Err(format!(
+                "Downloaded Xray-core binary verification failed: {}",
+                stderr.trim()
+            ));
+        }
+        let version_output = format!(
+            "{} {}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let reported = version_output.trim();
+        if !reported.contains(version.trim_start_matches('v')) {
+            let _ = fs::remove_dir_all(&staging_dir).await;
+            return Err(format!(
+                "Downloaded binary reports an unexpected version; expected {}, received {}",
+                version, reported
+            ));
+        }
+
+        Ok(())
+    }
+
     async fn install_inner(&self, target: &str) -> Result<(String, String), String> {
         let releases = self.fetch_releases().await?;
         let latest = releases
@@ -441,54 +494,7 @@ impl CoreManager {
             return Err(error);
         }
 
-        let binary = staging_dir.join("xray");
-        {
-            let mut permissions = fs::metadata(&binary)
-                .await
-                .map_err(|e| e.to_string())?
-                .permissions();
-            permissions.set_mode(0o755);
-            fs::set_permissions(&binary, permissions)
-                .await
-                .map_err(|e| e.to_string())?;
-        }
-        {
-            let mut state = self.state.write().await;
-            state.progress = Some("Verifying downloaded binary".to_owned());
-        }
-        let output = timeout(
-            Duration::from_secs(15),
-            Command::new(&binary)
-                .arg("version")
-                .stdin(Stdio::null())
-                .output(),
-        )
-        .await
-        .map_err(|_| {
-            "Downloaded Xray-core binary did not respond to the version command".to_owned()
-        })?
-        .map_err(|e| format!("Could not execute downloaded Xray-core binary: {e}"))?;
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            let _ = fs::remove_dir_all(&staging_dir).await;
-            return Err(format!(
-                "Downloaded Xray-core binary verification failed: {}",
-                stderr.trim()
-            ));
-        }
-        let version_output = format!(
-            "{} {}",
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        );
-        let reported = version_output.trim();
-        if !reported.contains(release.tag_name.trim_start_matches('v')) {
-            let _ = fs::remove_dir_all(&staging_dir).await;
-            return Err(format!(
-                "Downloaded binary reports an unexpected version; expected {}, received {}",
-                release.tag_name, reported
-            ));
-        }
+        self.verify_staged_binary(&staging_dir, &release.tag_name).await?;
 
         let target_dir = versions_dir.join(&release.tag_name);
         if fs::try_exists(&target_dir).await.unwrap_or(false) {
