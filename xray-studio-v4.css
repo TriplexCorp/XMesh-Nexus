@@ -1299,3 +1299,28 @@
 @media(prefers-reduced-motion:reduce){
  .sv-studio .sv-json-document-tab,.sv-studio .sv-json-document-add{transition:none}
 }
+
+/* Quiet browser tabs: no bottom underline or hover fill on the main tab. */
+.sv-studio .sv-json-document-tab.active::after{display:none!important;content:none!important}
+.sv-studio .sv-json-document-tab:not(.active):hover,
+.sv-studio .sv-json-document-tab.active:hover{
+ background:transparent;
+ color:inherit;
+}
+.sv-studio .sv-json-document-tab.active,
+.sv-studio .sv-json-document-tab.active:hover{
+ background:color-mix(in srgb,var(--vaccent) 9%,var(--vfield));
+ color:var(--vtext);
+}
+.sv-studio .sv-json-document-tab>button.sv-document-open:hover{
+ background:transparent!important;color:inherit!important;
+}
+.sv-studio .sv-json-document-tab>button.sv-document-close{
+ width:1.85rem;height:1.85rem;flex:0 0 1.85rem;
+ border-radius:50%!important;
+ background:transparent!important;
+}
+.sv-studio .sv-json-document-tab .sv-document-close:hover{
+ background:color-mix(in srgb,var(--vaccent) 16%,transparent)!important;
+ color:var(--vaccent);
+}
