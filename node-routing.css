@@ -211,3 +211,6 @@ dialog#dlg.node-routing-modal .route-json-workspace{
  width:34px;height:34px;min-width:34px;min-height:34px;padding:0;font-size:18px;line-height:1;
  border-radius:50%;aspect-ratio:1;box-sizing:border-box;
 }
+
+/* Shared modal backdrop. */
+dialog#dlg.node-routing-modal::backdrop{background:var(--xm-modal-dim,rgba(2,7,12,.72));backdrop-filter:blur(var(--xm-modal-blur,11px));-webkit-backdrop-filter:blur(var(--xm-modal-blur,11px))}
