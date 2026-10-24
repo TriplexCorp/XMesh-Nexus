@@ -25,6 +25,7 @@ assert(page.indexOf('sv-codepanel')<page.indexOf('sv-outline'),'Editor remains p
 assert.match(tools,/toolCluster\('Защита'/,'Security tool cluster visible');
 assert.match(tools,/toolCluster\('Сеть и конфигурация'/,'Network tool cluster visible');
 assert.match(css,/--vround:var\(--ui-control-radius/,'Global corner radius inherited');
+assert(!page.includes('data-action="format"')&&!page.includes('data-action="expand"'),'No redundant editor toolbar actions');
 assert.match(css,/height:clamp\(36rem,calc\(100dvh - 16rem\)/,'Editor responds to viewport height');
 assert.match(css,/\.sv-studio\.sv-outline-hidden \.sv-workspace\{grid-template-columns:minmax\(0,1fr\)\}/,'Hidden inspector restores full editor width');
 assert.match(css,/container:sv-studio-workspace \/ inline-size/,'Workspace must react to the user-selected content width');
