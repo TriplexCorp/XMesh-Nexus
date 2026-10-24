@@ -81,7 +81,13 @@
         try { return new URL(link.href, location.href).pathname.endsWith('/' + file); }
         catch (_) { return false; }
       });
-    if (existing && existing.href.includes('v=' + CSS_VERSION)) return;
+    // /dashboard/<secret-path> is not the static asset root. A matching
+    // filename/version at that location may be a 404 HTML response.
+    if (existing) {
+      const url = new URL(existing.href, location.href);
+      if (url.origin === location.origin && url.pathname === '/' + file &&
+          url.searchParams.get('v') === CSS_VERSION) return;
+    }
     const link = document.createElement('link');
     link.rel = 'stylesheet';
     link.href = '/' + file + '?v=' + CSS_VERSION;
