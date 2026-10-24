@@ -18,11 +18,20 @@ const profile={inbounds:[{
  settings:{users:[],decryption:'none'},
  streamSettings:{
   network:'xhttp',security:'reality',
-  realitySettings:{target:'example.com:443',privateKey:'real-looking-key',shortIds:['1234abcd']},
+  realitySettings:{target:'example.com:443',privateKey:'A'.repeat(43),shortIds:['1234abcd']},
   xhttpSettings:{path:'/vpn',mode:'packet-up',extra:{xPaddingBytes:'100-1000'}}
  }
 }],outbounds:[{protocol:'freedom',tag:'direct'},{protocol:'blackhole',tag:'blocked'}]};
 assert.deepEqual(verify(profile),[],'Normal VLESS XHTTP/Reality server profile must not trigger false positives');
+const browserAutofill=JSON.parse(JSON.stringify(profile));
+browserAutofill.inbounds[0].streamSettings.security='none';
+browserAutofill.inbounds[0].streamSettings.realitySettings.privateKey='a'.repeat(256);
+browserAutofill.inbounds[0].streamSettings.realitySettings.shortIds=['Triplex'];
+const autofillIssues=verify(browserAutofill);
+for(const code of ['REALITY_PRIVATEKEY_FORMAT','REALITY_INACTIVE','SHORTID_FORMAT'])
+ assert(autofillIssues.some(x=>x.code===code),'Browser-autofill contamination must be detected: '+code);
+assert(autofillIssues.every(x=>!x.message.includes('a'.repeat(64))),'Never echo suspected secrets in diagnostics');
+
 assert.deepEqual(verify({outbounds:[{protocol:'freedom',tag:'direct'}]}),[],'Outbound-only configs can be valid');
 const tls=JSON.parse(JSON.stringify(profile));
 tls.inbounds[0].streamSettings={network:'ws',security:'tls',tlsSettings:{certificates:[]},wsSettings:{path:'/websocket'}};
