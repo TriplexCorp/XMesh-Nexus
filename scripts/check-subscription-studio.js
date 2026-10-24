@@ -174,7 +174,7 @@ assert.match(src,/enabled=clientCatalog\.filter/);
 assert.match(src,/data-client-preset/);
 assert.match(rust,/mod subscription_settings;/);
 const validation=fs.readFileSync('backend/src/subscription_settings.rs','utf8');
-assert.match(validation,/pub\(crate\) fn validate/);
+assert.match(validation,/pub(?:\(crate\))?\s+fn\s+validate\s*\(/);
 assert.match(validation,/"subscriptionClients"/);
 assert.match(validation,/"subscriptionClientLinks"/);
 assert.match(validation,/"subscriptionCustomClients"/);
