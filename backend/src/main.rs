@@ -135,6 +135,7 @@ impl ApiError {
     pub fn new(status: StatusCode, message: impl Into<String>) -> Self {
         Self { status, message: message.into() }
     }
+    pub(crate) fn safe_message(&self) -> &str { &self.message }
 }
 
 impl From<sqlx::Error> for ApiError {
