@@ -335,13 +335,12 @@ async fn main() -> anyhow::Result<()> {
         .map_err(|_| anyhow::anyhow!("ADMIN_PASSWORD is required; run ./install.sh"))?;
     auth::seed_bootstrap_admin(&pool, &admin_username, &admin_password).await?;
 
-    let cookie_secure = env::var("COOKIE_SECURE")
-        .map_or(true, |value| {
-            matches!(
-                value.trim().to_ascii_lowercase().as_str(),
-                "1" | "true" | "yes"
-            )
-        });
+    let cookie_secure = env::var("COOKIE_SECURE").map_or(true, |value| {
+        matches!(
+            value.trim().to_ascii_lowercase().as_str(),
+            "1" | "true" | "yes"
+        )
+    });
     let core_dir = PathBuf::from(
         env::var("CORE_DATA_DIR").unwrap_or_else(|_| "/var/lib/xmesh/core".to_owned()),
     );
