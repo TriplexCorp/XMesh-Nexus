@@ -49,6 +49,22 @@ pub async fn heartbeat(
     ).bind(report.node_id).bind(&report.version).bind(report.router_running)
     .bind(report.xray_running).bind(&report.xray_version)
     .bind(&report.geo_data).execute(&state.pool).await?;
+    // A self-upgrade can replace its own running worker before its ACK is sent.
+    // A fresh, authenticated heartbeat with the exact requested version is
+    // stronger evidence of success than the lost acknowledgement.
+    sqlx::query(
+        "UPDATE node_restart_commands AS c SET state='succeeded',
+         result='Версия агента подтверждена подписанным heartbeat',
+         finished_at=NOW()
+         WHERE c.node_id=$1 AND c.action='update_agent'
+           AND c.state IN ('pending','claimed','failed')
+           AND c.target_version=$2
+           AND c.requested_at <= NOW()
+           AND c.requested_at > NOW()-INTERVAL '15 minutes'
+           AND EXISTS (SELECT 1 FROM node_runtime_heartbeats h
+                       WHERE h.node_id=c.node_id AND h.version=c.target_version
+                         AND h.received_at >= c.requested_at)"
+    ).bind(report.node_id).bind(&report.version).execute(&state.pool).await?;
     Ok(Json(json!({"accepted":true})))
 }
 
