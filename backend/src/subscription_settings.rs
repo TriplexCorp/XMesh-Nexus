@@ -68,7 +68,7 @@ fn safe_https_url(value: &str) -> bool {
     })
 }
 
-pub(crate) fn validate(object: &Map<String, Value>) -> Result<(), ApiError> {
+pub fn validate(object: &Map<String, Value>) -> Result<(), ApiError> {
     if let Some(json) = object.get("subscriptionJson") {
         crate::subscription_json::validate_settings(json).map_err(|message| bad(&message))?;
     }
