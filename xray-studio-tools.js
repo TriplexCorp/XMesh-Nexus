@@ -75,7 +75,15 @@ const icons={
  routing:'<path d="M4 7h14l-3-3m3 3-3 3M20 17H6l3-3m-3 3 3 3"/>',
  inbound:'<path d="M12 3v13m-5-5 5 5 5-5M4 19h16"/>'
 };
-host.innerHTML='<div class="xm-tools-grid">'+featured.map(id=>{const item=tools.find(x=>x[0]===id),meta=details[id];return '<button type="button" class="sv-toolitem sv-tool-'+id+'" data-tool="'+id+'" title="'+meta[0]+'" aria-label="'+meta[0]+'"><span class="sv-tool-glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+icons[id]+'</svg></span><span class="sv-tool-label">'+item[1].replace(/^[^A-Za-zА-Яа-яЁё0-9]+/,'')+'</span></button>'}).join('')+'</div><div class="sv-tool-issue" data-tool-issue hidden><span data-tool-issue-message></span><button type="button" data-tool="repair-shortids">Исправить Short ID</button></div><span data-tool-status class="xm-tools-status" role="status" aria-live="polite"></span>';
+const toolButton=id=>{
+ const item=tools.find(x=>x[0]===id),meta=details[id];
+ return '<button type="button" class="sv-toolitem sv-tool-'+id+'" data-tool="'+id+'" title="'+meta[0]+'" aria-label="'+meta[0]+'"><span class="sv-tool-glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+icons[id]+'</svg></span><span class="sv-tool-label">'+item[1].replace(/^[^A-Za-zА-Яа-яЁё0-9]+/,'')+'</span></button>';
+};
+const toolCluster=(label,ids)=>'<div class="xm-tool-cluster"><span class="xm-tool-cluster-label">'+label+'</span><div class="xm-tools-grid">'+ids.map(toolButton).join('')+'</div></div>';
+host.innerHTML='<div class="xm-tools-groups" role="toolbar" aria-label="Инструменты JSON">'+
+  toolCluster('Защита',['reality','shortid','vlessens','vision'])+
+  toolCluster('Сеть и конфигурация',['xhttp','dns','routing','inbound'])+
+ '</div><div class="sv-tool-issue" data-tool-issue hidden><span data-tool-issue-message></span><button type="button" data-tool="repair-shortids">Исправить Short ID</button></div><span data-tool-status class="xm-tools-status" role="status" aria-live="polite"></span>';
 const status=msg=>{const e=host.querySelector('[data-tool-status]');if(e)e.textContent=msg};
 const focusJsonSection=(key,title=key)=>{
  const find='"'+key+'"',pos=area.value.indexOf(find);
