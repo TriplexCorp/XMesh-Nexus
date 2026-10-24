@@ -695,21 +695,21 @@ fn permitted_inbound_tags(
 }
 
 fn log_unavailable_subscription_host(user: &Value, inbound: &Value, host: &Value, tag: &str) {
-        let reality = inbound
-            .get("streamSettings")
-            .and_then(|s| s.get("realitySettings"))
-            .unwrap_or(&Value::Null);
-        let missing_key = nonempty(host, "publicKey")
-            .or_else(|| nonempty(host, "realityPublicKey"))
-            .or_else(|| nonempty(inbound, "publicKey"))
-            .or_else(|| nonempty(reality, "publicKey"))
-            .is_none();
-        let no_uuid = nonempty(user, "xrayId")
-            .and_then(|id| uuid::Uuid::parse_str(id).ok())
-            .is_none();
-        tracing::warn!(inbound_tag=%tag, missing_reality_public_key=missing_key,
-        invalid_user_uuid=no_uuid, host_has_address=endpoint(host).is_some(),
-        "Subscription public host could not produce an authorized client outbound");
+    let reality = inbound
+        .get("streamSettings")
+        .and_then(|s| s.get("realitySettings"))
+        .unwrap_or(&Value::Null);
+    let missing_key = nonempty(host, "publicKey")
+        .or_else(|| nonempty(host, "realityPublicKey"))
+        .or_else(|| nonempty(inbound, "publicKey"))
+        .or_else(|| nonempty(reality, "publicKey"))
+        .is_none();
+    let no_uuid = nonempty(user, "xrayId")
+        .and_then(|id| uuid::Uuid::parse_str(id).ok())
+        .is_none();
+    tracing::warn!(inbound_tag=%tag, missing_reality_public_key=missing_key,
+    invalid_user_uuid=no_uuid, host_has_address=endpoint(host).is_some(),
+    "Subscription public host could not produce an authorized client outbound");
 }
 
 async fn collect_user_outbounds(
