@@ -18,6 +18,8 @@ This roadmap tracks verified improvements, not feature claims. A stage is comple
 - [x] Replace mutating `cargo fmt` CI step with `cargo fmt --all -- --check`. Commit: `f2add5a`.
 - [ ] Establish a passing baseline on `main` for Node.js checks, Rust formatting, all-target tests, strict Clippy, Docker build and API integration.
 - [ ] Replace brittle source-regex checks where possible with observable, behavior-based tests; retain security-contract checks that express real invariants.
+  - [x] IP rotation UI validation: execute the real validation helpers against valid, duplicate, invalid, insufficient and oversized pools instead of requiring an exact source layout (`a676ac7`).
+  - [ ] Extend this approach to other UI source-contract tests and integration behaviors.
 - [ ] Ensure required branch protection prevents merging when those checks fail.
 - [ ] Document reproducible release / rollback and evidence from a clean checkout.
 
