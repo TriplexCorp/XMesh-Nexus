@@ -205,3 +205,8 @@ dialog#dlg.node-routing-modal .route-json-workspace{
  .route-json-foot>div{width:100%}
  .route-json-foot button{flex:1}
 }
+
+.route-json-head>.route-json-close{
+ flex:none;align-self:flex-start;display:inline-flex;align-items:center;justify-content:center;
+ width:34px;height:34px;min-width:34px;padding:0;font-size:18px;line-height:1;
+}
