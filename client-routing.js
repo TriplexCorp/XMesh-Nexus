@@ -39,6 +39,7 @@ function create(db,saveSettings,toast){
  const jsonEditors=new Set();
  const activeTabs=new Map();
  const sourceSearch=new Map();
+ let openedId=null;
  const route=(match='geosite',value='',action='proxy',server='')=>({match,value,action,...(server?{server}:{})});
  const root='<section class="client-routing-workspace" id="client-route-root">'+
   '<div class="client-route-main-card">'+
@@ -85,7 +86,10 @@ function create(db,saveSettings,toast){
      '<button type="button" class="gh sm" data-cr-rule-delete="'+n+'" aria-label="Удалить правило" title="Удалить правило">×</button></div>'+
      '</div>';
    }).join('');
+   const open=openedId===p.id;
    return '<article class="client-route-profile" data-cr-profile="'+index+'">'+
+    '<div class="client-route-card-overview"><div class="client-route-card-icon">⇄</div><div class="client-route-card-description"><strong>'+esc(p.name||'Без названия')+'</strong><span>'+(p.enabled===false?'Выключен':'Активен')+' · '+keys.size+' назначений · '+(p.rules||[]).length+' правил</span></div><button type="button" class="gh" data-cr-open aria-expanded="'+open+'">'+(open?'Свернуть ↑':'Настроить →')+'</button></div>'+
+    '<div class="client-route-card-details"'+(open?'':' hidden')+'>'+
     '<header class="client-route-profile-head"><div class="client-route-heading"><span class="client-route-count">⇄</span>'+
     '<label><span>Название шаблона</span><input data-cr-name value="'+esc(p.name||'')+'" maxlength="100" placeholder="Например: RU через Польшу"></label><span class="client-route-profile-subtitle">Правила для выбранных серверов и хостов</span></div>'+
     '<div class="client-route-actions"><span class="client-route-assigned-count">Назначения <b>'+keys.size+'</b></span><label class="client-route-toggle"><input type="checkbox" data-cr-enabled'+(p.enabled!==false?' checked':'')+'> Включён</label>'+
@@ -106,7 +110,7 @@ function create(db,saveSettings,toast){
     '<p>Правила применяются по порядку сверху вниз.</p></div>'+
     '<button type="button" class="gh sm" data-cr-rule-add="'+index+'">Добавить правило</button></div>'+
     '<div class="client-route-rules">'+(rules||'<div class="client-route-rules-empty">Дополнительных правил пока нет. Используется стандартная маршрутизация.</div>')+'</div></section>'+
-    '</div></article>';
+    '</div></div></article>';
   }).join(''):'<div class="client-route-empty">'+
    '<div class="client-route-empty-icon" aria-hidden="true">⇄</div>'+
    '<h3>Шаблонов маршрутизации пока нет</h3>'+
@@ -133,7 +137,7 @@ function create(db,saveSettings,toast){
   if(!root)return clone(draft);
   return [...root.querySelectorAll('[data-cr-profile]')].map((element,index)=>{
    const saved=draft[index];
-   if(jsonEditors.has(saved.id))return clone(saved);
+   if(jsonEditors.has(saved.id)||openedId!==saved.id)return clone(saved);
    const rules=[...element.querySelectorAll('[data-cr-rule]')].map(row=>{
     const get=k=>row.querySelector('[data-cr-field="'+k+'"]').value.trim();
     return route(get('match'),get('value'),get('action'),get('action')==='server'?get('server'):'');
@@ -203,6 +207,7 @@ function create(db,saveSettings,toast){
     const id='route_'+Array.from(crypto.getRandomValues(new Uint8Array(6)),
       n=>n.toString(16).padStart(2,'0')).join('');
     draft.push({id,name:'Новый шаблон',enabled:true,servers:[],rules:[]});
+    openedId=id;
     render();
     syncDirty();
     root.querySelector('[data-cr-profile]:last-child [data-cr-name]')?.focus();
@@ -211,6 +216,15 @@ function create(db,saveSettings,toast){
    const card=button.closest('[data-cr-profile]');if(!card)return;
    const index=Number(card.dataset.crProfile);
    draft=read();
+   if(button.hasAttribute('data-cr-open')){
+    const editor=card.querySelector('[data-cr-json-text]');
+    if(openedId===draft[index].id&&editor){
+     let changed=true;try{changed=JSON.stringify(JSON.parse(editor.value))!==JSON.stringify(draft[index])}catch(_){}
+     if(changed){toast('Сначала примените изменения JSON.');return}
+    }
+    openedId=openedId===draft[index].id?null:draft[index].id;
+    render();syncDirty();return;
+   }
    if(button.hasAttribute('data-cr-tab')){
     activeTabs.set(draft[index].id,button.dataset.crTab);
     render();syncDirty();return;
