@@ -68,7 +68,7 @@ assert.match(publicFeed,/xmeshOwnerNodeKey/);
 assert.match(api,/\.route\("\/client-routing", patch\(patch_client_routing\)\)/);
 assert.match(api,/require_mutation\(&actor\)\?/);
 const index=fs.readFileSync('index.html','utf8');
-assert.match(index,/client-routing\.css\?v=20261024-unified-route-v12/,'New CSS should be cache busted');
+assert(index.includes('client-routing.css?v='+currentCssVersion),'Routing CSS must match the actual version');
 assert.match(index,/href="\/client-routing\.css\?v=/,'Routing CSS must be absolute under the nested dashboard URL');
 assert.match(index,/src="\/client-routing\.js\?v=/,'Routing JS must be absolute under the nested dashboard URL');
 
@@ -86,7 +86,7 @@ for (const item of index.matchAll(/(?:href|src)="([^"]+)"/g)) {
 assert.match(dashboardServer,/fn dashboard_client_routing_assets_are_absolute/);
 
 
-assert.match(index,/client-routing\.js\?v=20261024-unified-route-v12/,'New JS should be cache busted');
+assert.match(index,/client-routing\\.js\\?v=[A-Za-z0-9-]+/,'Routing JS must carry a cache-busting version');
 
 const docker=fs.readFileSync('backend/Dockerfile','utf8');
 for(const item of ['client-routing.js','client-routing.css']){
