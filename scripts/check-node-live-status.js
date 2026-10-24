@@ -25,8 +25,8 @@ assert.equal(state({disabled:false},{...healthy,routerRunning:false}).kind,'offl
 assert.equal(state({disabled:true},healthy).kind,'offline','A disabled node must not be reported online while Xray is running');
 assert.equal(state({disabled:true},{...healthy,xrayRunning:false}).kind,'disabled','Only confirmed shutdown marks disabled state');
 assert.equal(state({disabled:false},{connected:true}).kind,'unknown','Missing service state must not imply online');
-assert.match(app,/version\\.textContent\\s*=\\s*runtime\\?\\.xrayVersion\\s*\\?/,'Remote Xray version must be rendered using textContent');
-assert.doesNotMatch(app,/version\\.innerHTML\\s*=\\s*runtime/,'Untrusted node version must never be parsed as HTML');
+assert.match(app,/version\.textContent\s*=\s*runtime\?\.xrayVersion\s*\?/,'Remote Xray version must be rendered using textContent');
+assert.doesNotMatch(app,/version\.innerHTML\s*=\s*runtime/,'Untrusted node version must never be parsed as HTML');
 assert.match(css,/\.node-runtime-online/);
 assert.match(css,/\.node-runtime-offline/);
 assert.match(runtime,/"xrayVersion":row\.try_get/);
