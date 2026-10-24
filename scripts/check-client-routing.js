@@ -17,6 +17,27 @@ const [markup,mount]=sandbox.window.XMeshClientRouting.create({
    rules:[{match:'geosite',value:'category-ru',action:'server',server:'host:7'}]}]}
 },()=>{},()=>{});
 assert.equal(typeof mount,'function');
+// Regression: the panel is served on /dashboard/<secret>, not on /.
+// A dashboard-relative stylesheet with the right version is STILL a 404.
+const oldLink={
+ href:'https://panel.example/dashboard/client-routing.css?v=20261024-client-cards-v3',
+ remove(){this.removed=true;}
+};
+const appended=[];
+sandbox.URL=URL;
+sandbox.location=new URL('https://panel.example/dashboard/private');
+sandbox.document={
+ querySelectorAll(selector){return selector==='link[rel="stylesheet"]'?[oldLink]:[];},
+ getElementById(){return null;},
+ createElement(tag){return {tagName:tag,dataset:{},id:'',textContent:'',href:'',rel:''};},
+ head:{appendChild(node){appended.push(node);}}
+};
+mount();
+const replacementLink=appended.find(el=>el.tagName==='link');
+assert(replacementLink,'Routing must load a missing or misdirected CSS asset');
+assert.equal(replacementLink.href,'/client-routing.css?v=20261024-client-cards-v3');
+assert.equal(oldLink.removed,true);
+
 for(const key of ['data-cr-save','data-cr-add','data-cr-list','Клиентская маршрутизация'])
  assert(markup.includes(key),'Missing client routing workspace control: '+key);
 assert.match(source,/clientRoutingProfiles/);
@@ -46,6 +67,9 @@ assert.match(api,/\.route\("\/client-routing", patch\(patch_client_routing\)\)/)
 assert.match(api,/require_mutation\(&actor\)\?/);
 const index=fs.readFileSync('index.html','utf8');
 assert.match(index,/client-routing\.css\?v=20261024-client-cards-v3/,'New CSS should be cache busted');
+assert.match(index,/href="\/client-routing\.css\?v=/,'Routing CSS must be absolute under the nested dashboard URL');
+assert.match(index,/src="\/client-routing\.js\?v=/,'Routing JS must be absolute under the nested dashboard URL');
+
 assert.match(index,/client-routing\.js\?v=20261024-client-cards-v3/,'New JS should be cache busted');
 
 const docker=fs.readFileSync('backend/Dockerfile','utf8');
