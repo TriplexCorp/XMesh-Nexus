@@ -76,6 +76,8 @@ jobs:
         run: node scripts/check-subscription-studio.js
       - name: Verify real admin RBAC, authentication boundaries and CSP
         run: node scripts/check-admin-security.js
+      - name: Enforce observer least-privilege API and UI security contracts
+        run: node scripts/check-viewer-security.js
       - name: Verify advanced server-enforced security policies and sessions
         run: node scripts/check-security-policy.js
       - name: Verify user creation and dialog motion
