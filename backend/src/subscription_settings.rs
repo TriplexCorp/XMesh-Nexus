@@ -293,13 +293,13 @@ pub fn validate(object: &Map<String, Value>) -> Result<(), ApiError> {
 mod tests {
     use super::*;
     use serde_json::json;
-    fn accepts(input: Value) -> bool {
+    fn accepts(input: &Value) -> bool {
         validate(input.as_object().unwrap()).is_ok()
     }
     #[test]
     fn validates_clients_and_presentation() {
         assert!(accepts(
-            json!({"subscriptionClients":{"happ":true,"incy":false},
+            &json!({"subscriptionClients":{"happ":true,"incy":false},
             "subscriptionLayout":"centered","subscriptionRadius":24,
             "subscriptionClientLinks":{"happ":"https://example.com/download"}})
         ));
@@ -320,7 +320,7 @@ mod tests {
         assert!(!accepts(json!({"subscriptionRadius":37})));
         assert!(accepts(json!({"subscriptionSyncPanelTheme":true})));
         assert!(accepts(
-            json!({"subscriptionAppsTitleEn":"Connection apps","subscriptionHeroEn":"Active"})
+            &json!({"subscriptionAppsTitleEn":"Connection apps","subscriptionHeroEn":"Active"})
         ));
         assert!(!accepts(
             json!({"subscriptionAppsTitleEn":"<script>\u{0000}</script>"})
@@ -330,7 +330,7 @@ mod tests {
         assert!(!accepts(json!({"subscriptionBackground":"red"})));
         assert!(!accepts(json!({"subscriptionShowApps":"yes"})));
         assert!(accepts(
-            json!({"subscriptionAppsTitle":"Поддерживаемые клиенты",
+            &json!({"subscriptionAppsTitle":"Поддерживаемые клиенты",
             "subscriptionCustomClients":[{"id":"custom-1","name":"My Client",
             "platforms":"Android · iOS","url":"https://example.com/install",
             "enabled":true}]})
