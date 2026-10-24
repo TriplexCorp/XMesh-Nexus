@@ -64,7 +64,7 @@ function mount(root,ctx){
 const get=k=>$(root,k),control=k=>root.querySelector('[data-field="'+k+'"]'),value=k=>control(k)?.value||'',set=(k,v)=>{if(control(k))control(k).value=v??''};
 const input=get('source'),gutter=get('gutter'),highlight=get('highlight'),minimap=get('minimap');
 let name='Новый профиль',id=null,inboundIndex=0,outIndex=0,saved='',locked=false,tools=true;
-let diagnosticsLine=null,validatedSource=null;
+let diagnosticsLine=null,validatedSource=null,toolPaletteHandle=null;
 const notify=msg=>ctx.toast?.(msg);
 const studioDialog=window.XMeshStudioDialogs;
 const approve=async spec=>{if(!studioDialog?.confirm)throw Error('Диалоги XRAY STUDIO не загружены');return studioDialog.confirm(spec)};
@@ -345,6 +345,7 @@ function paint(){
   get('valid').dataset.status='bad';
   get('sync').textContent='Исправьте JSON, чтобы изменить параметры конструктором';
  }
+ toolPaletteHandle?.refresh();
 }
 function selected(arr,k){return Array.isArray(arr)?arr[k]||null:null}
 function setOptions(k,labels,index){const el=control(k);el.replaceChildren();labels.forEach((v,i)=>{const opt=document.createElement('option');opt.value=String(i);opt.textContent=v;el.append(opt)});if(labels.length)el.value=String(Math.min(index,labels.length-1))}
@@ -574,7 +575,7 @@ get('wrap').addEventListener('change',ev=>root.classList.toggle('sv-wrap',ev.tar
 get('upload').addEventListener('change',async ev=>{const f=ev.target.files?.[0];if(!f)return;try{if(f.size>2e6)throw Error('Файл больше 2 МБ');const raw=await f.text();JSON.parse(raw);if(!await unsavedApproval('Импортировать JSON вместо текущего черновика?'))return;input.value=raw;paint();input.dispatchEvent(new Event('xmesh:reset-history'));notify('JSON импортирован')}catch(err){notify(err.message)}finally{ev.target.value=''}});
 try{setInspectorVisible(window.localStorage?.getItem('xmesh-studio-inspector')!=='hidden',false)}catch(_){setInspectorVisible(true,false)}
 input.value=pretty(defaultDoc());saved='';paint();root.querySelector('[data-tab="inbound"]')?.click();renderProfiles();
-window.XMeshJsonTools?.setup(root,{toast:notify,realityKeys:ctx.realityKeys,apiRequest:ctx.apiRequest});
+toolPaletteHandle=window.XMeshJsonTools?.setup(root,{toast:notify,realityKeys:ctx.realityKeys,apiRequest:ctx.apiRequest})||null;
 }
 return {view,mount};
 })();
