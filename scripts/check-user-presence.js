@@ -12,7 +12,8 @@ assert.match(backend,/now_ms - USER_ONLINE_WINDOW_MS/);
 assert.match(app,/const USER_PRESENCE_WINDOW_MS=45_000;/);
 assert.match(app,/data-user-presence-id/);
 assert.match(backend,/\.route\("\/users\/presence", get\(get_user_presence\)\)/);
-assert.match(backend,/\.route_layer\(middleware::from_fn_with_state\(state\.clone\(\), auth::require_session\)\)/);
+assert.match(backend,/\.route_layer\(\s*middleware::from_fn_with_state\(\s*state\.clone\(\)\s*,\s*auth::require_session\s*,?\s*\)\s*\)/,
+ 'Authenticated routes must retain the session middleware layer');
 assert.match(app,/fetch\('\/api\/v1\/users\/presence'/);
 assert.doesNotMatch(app.match(/const refreshPresence=async\(\)=>\{[\s\S]*?\n    \};/)?.[0]||'',/\/api\/v1\/bootstrap/);
 assert.match(agent,/USER_STATS_AT_MS="\$snapshot_timestamp"/);
