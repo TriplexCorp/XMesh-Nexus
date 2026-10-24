@@ -2566,7 +2566,24 @@ function nodeProfileStatus(runtime){
   if(detail)return detail;
   if(runtime.profileCheck==='verified'){
     if(runtime.desiredRevisionSource==='invalid_configuration')
-      return 'Проверен на ноде · ошибка сборки профиля панели';
+      return 'Проверен на ноде · '+({
+        invalid_local_port:'Укажите локальный порт Xray',
+        missing_profile_assignment:'Не назначен XRAY STUDIO профиль',
+        profile_not_found:'Не найден назначенный профиль',
+        missing_profile_json:'В профиле отсутствует JSON',
+        invalid_profile_json:'Ошибка формата JSON профиля',
+        missing_inbounds:'Нет inbound в профиле',
+        unsupported_inbound_count:'Нужен один управляемый inbound',
+        invalid_inbound:'Ошибка inbound в профиле',
+        missing_inbound_tag:'Отсутствует тег inbound',
+        invalid_inbound_settings:'Нет настроек inbound',
+        conflicting_stats_api:'Конфликт StatsService API',
+        node_disabled:'Нода отключена',
+        geodata_validation:'Проверьте GeoData',
+        routing_validation:'Проверьте маршрутизацию',
+        serialization:'Не удалось сформировать JSON',
+        compile_failed:'Ошибка подготовки профиля'
+      }[runtime.profileCompileError]||'Не удалось подготовить профиль панели');
     if(runtime.desiredRevisionSource==='missing')
       return 'Проверен на ноде · панель ещё не получила ревизию';
     return 'Проверен на ноде · нет совпадающей ревизии панели';
