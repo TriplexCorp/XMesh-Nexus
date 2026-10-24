@@ -20,7 +20,7 @@ assert.equal(typeof mount,'function');
 // Regression: the panel is served on /dashboard/<secret>, not on /.
 // A dashboard-relative stylesheet with the right version is STILL a 404.
 const oldLink={
- href:'https://panel.example/dashboard/client-routing.css?v=20261024-client-cards-v9',
+ href:'https://panel.example/dashboard/client-routing.css?v=20261024-client-cards-v11',
  remove(){this.removed=true;}
 };
 const appended=[];
@@ -35,7 +35,7 @@ sandbox.document={
 mount();
 const replacementLink=appended.find(el=>el.tagName==='link');
 assert(replacementLink,'Routing must load a missing or misdirected CSS asset');
-assert.equal(replacementLink.href,'/client-routing.css?v=20261024-client-cards-v9');
+assert.equal(replacementLink.href,'/client-routing.css?v=20261024-client-cards-v11');
 assert.equal(oldLink.removed,true);
 
 for(const key of ['data-cr-save','data-cr-add','data-cr-list','Клиентская маршрутизация'])
@@ -66,7 +66,7 @@ assert.match(publicFeed,/xmeshOwnerNodeKey/);
 assert.match(api,/\.route\("\/client-routing", patch\(patch_client_routing\)\)/);
 assert.match(api,/require_mutation\(&actor\)\?/);
 const index=fs.readFileSync('index.html','utf8');
-assert.match(index,/client-routing\.css\?v=20261024-client-cards-v9/,'New CSS should be cache busted');
+assert.match(index,/client-routing\.css\?v=20261024-client-cards-v11/,'New CSS should be cache busted');
 assert.match(index,/href="\/client-routing\.css\?v=/,'Routing CSS must be absolute under the nested dashboard URL');
 assert.match(index,/src="\/client-routing\.js\?v=/,'Routing JS must be absolute under the nested dashboard URL');
 
@@ -84,7 +84,7 @@ for (const item of index.matchAll(/(?:href|src)="([^"]+)"/g)) {
 assert.match(dashboardServer,/fn dashboard_client_routing_assets_are_absolute/);
 
 
-assert.match(index,/client-routing\.js\?v=20261024-client-cards-v9/,'New JS should be cache busted');
+assert.match(index,/client-routing\.js\?v=20261024-client-cards-v11/,'New JS should be cache busted');
 
 const docker=fs.readFileSync('backend/Dockerfile','utf8');
 for(const item of ['client-routing.js','client-routing.css']){
@@ -106,3 +106,17 @@ assert.match(source,/modal\.showModal\(\)/,'Editor must enter browser top layer'
 const routingCSS=fs.readFileSync('client-routing.css','utf8');
 assert.match(routingCSS,/dialog\.crx-overlay::backdrop/,'Native dialog must blur the full page backdrop');
 assert.equal((routingCSS.match(/\.crx-overlay\{/g)||[]).length,1,'Only one modal overlay style should exist');
+
+assert.match(source,/const reuse=live\\?\\.open&&live\\.dataset\\.crProfileId===p\\.id/,
+ 'Changing routing tabs must reuse the same native dialog');
+assert.match(source,/body\\.replaceChildren\\(\\.\\.\\.replacement\\.childNodes\\)/,
+ 'Routing tabs should replace only panel content and preserve the modal shell');
+assert.match(source,/modal\\.addEventListener\\('cancel'/,
+ 'Browser Escape must synchronize dialog state');
+assert.match(clientCss,/width:min\\(var\\(--panel-content-max,120rem\\),100%\\)/,
+ 'Editor width must follow the panel width slider');
+assert.match(clientCss,/dialog\\.crx-overlay::backdrop\\{background:var\\(--xm-modal-dim/,
+ 'Editor must use shared backdrop tokens');
+assert.doesNotMatch(clientCss,/\\.crx-overlay\\{[^}]*backdrop-filter/,
+ 'Never apply page blur to the dialog content');
+
