@@ -160,10 +160,16 @@ jobs:
       # Runtime Rust tests and Clippy still run before the Docker build.
       - name: Format Rust sources
         run: cargo fmt --manifest-path backend/Cargo.toml
-      - name: Test and lint
+      - name: Test and lint (strict Clippy: all targets, pedantic, nursery)
         run: |
-          cargo test --manifest-path backend/Cargo.toml
-          cargo clippy --manifest-path backend/Cargo.toml --all-targets -- -D warnings
+          cargo test --manifest-path backend/Cargo.toml --all-targets
+          # Correctness, security-sensitive patterns and code-quality warnings
+          # are fatal; do not suppress individual lint families globally.
+          cargo clippy --manifest-path backend/Cargo.toml --all-targets --all-features -- \
+            -D warnings \
+            -D clippy::pedantic \
+            -D clippy::nursery \
+            -F unsafe-code
       - name: Validate installer and Docker Compose
         env:
           POSTGRES_PASSWORD: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
