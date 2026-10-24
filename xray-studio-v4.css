@@ -1179,38 +1179,6 @@
 .sv-studio .sv-topbar>.sv-page-tabs>button[data-action="studio-editor"]{order:0}
 
 
-/* Multiple JSON drafts in the existing navigation row; no layout redesign. */
-.sv-studio .sv-topbar>.sv-page-tabs{overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;flex:1 1 auto}
-.sv-studio .sv-topbar>.sv-actions{flex:0 0 auto}
-.sv-studio .sv-topbar>.sv-page-tabs>[hidden]{display:none!important}
-.sv-studio .sv-json-document-tab{
- display:inline-flex;align-items:center;flex:0 0 auto;min-width:0;
- border:1px solid var(--vline);border-radius:var(--vround);
- background:var(--vfield);color:var(--vmute);
-}
-.sv-studio .sv-json-document-tab.active{
- border-color:color-mix(in srgb,var(--vaccent) 55%,var(--vline));
- background:color-mix(in srgb,var(--vaccent) 11%,var(--vpanel));
- color:var(--vtext);
-}
-.sv-studio .sv-json-document-tab>button{
- min-height:2.7rem;background:transparent;border:0;color:inherit;
- font-size:.76rem;font-weight:750;cursor:pointer;
-}
-.sv-studio .sv-json-document-tab>button:first-child{
- max-width:12rem;min-width:5rem;overflow:hidden;text-overflow:ellipsis;
- white-space:nowrap;text-align:left;padding:.55rem .65rem;
-}
-.sv-studio .sv-json-document-tab>button:last-child{
- padding:.45rem .65rem;font-size:1rem;opacity:.8;
-}
-.sv-studio .sv-json-document-tab>button:hover{color:var(--vaccent)}
-.sv-studio .sv-json-document-add{
- flex:0 0 auto;min-width:2.6rem;min-height:2.7rem;
- border:1px dashed var(--vline);border-radius:var(--vround);
- color:var(--vmute);background:transparent;font-size:1.1rem;
-}
-.sv-studio .sv-json-document-add:hover{color:var(--vaccent);border-color:var(--vaccent)}
 @media(max-width:950px){
  .sv-studio .sv-topbar{flex-wrap:wrap}
  .sv-studio .sv-topbar>.sv-page-tabs{flex:1 1 100%;width:100%;justify-content:flex-start}
@@ -1300,6 +1268,38 @@
  .sv-studio .sv-json-document-tab,.sv-studio .sv-json-document-add{transition:none}
 }
 
+/* Document tabs: one consistent surface, no nested hover outlines. */
+.sv-studio .sv-json-document-tab,
+.sv-studio .sv-json-document-tab:hover,
+.sv-studio .sv-json-document-tab.active,
+.sv-studio .sv-json-document-tab.active:hover{
+ box-shadow:none!important;
+ outline:none!important;
+}
+.sv-studio .sv-json-document-tab>button.sv-document-open,
+.sv-studio .sv-json-document-tab>button.sv-document-open:hover,
+.sv-studio .sv-json-document-tab>button.sv-document-open:focus,
+.sv-studio .sv-json-document-tab>button.sv-document-open:active{
+ border:0!important;
+ outline:0!important;
+ box-shadow:none!important;
+ background:transparent!important;
+ border-radius:0!important;
+ color:inherit!important;
+ transform:none!important;
+}
+.sv-studio .sv-json-document-tab>button.sv-document-open:focus-visible{
+ outline:2px solid var(--vaccent)!important;
+ outline-offset:-3px!important;
+ border-radius:8px!important;
+}
+.sv-studio .sv-json-document-tab>button.sv-document-close{
+ border:0!important;outline:0!important;box-shadow:none!important;
+ border-radius:50%!important;
+}
+.sv-studio .sv-json-document-tab>button.sv-document-close:focus-visible{
+ outline:2px solid var(--vaccent)!important;
+}
 /* Quiet browser tabs: no bottom underline or hover fill on the main tab. */
 .sv-studio .sv-json-document-tab.active::after{display:none!important;content:none!important}
 .sv-studio .sv-json-document-tab:not(.active):hover,
