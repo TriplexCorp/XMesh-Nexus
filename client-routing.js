@@ -30,7 +30,7 @@
     return flagPatterns.find(([pattern]) => pattern.test(name))?.[1] || '';
   }
   function flag(code) {
-    const start = '<svg class="crx-flag" viewBox="0 0 32 24" aria-hidden="true" focusable="false"><defs><clipPath id="crx-flag-clip"><rect x="1" y="1" width="30" height="22" rx="4"/></clipPath></defs><g clip-path="url(#crx-flag-clip)">';
+    const start = '<svg class="crx-flag" width="29" height="22" viewBox="0 0 32 24" aria-hidden="true" focusable="false"><defs><clipPath id="crx-flag-clip"><rect x="1" y="1" width="30" height="22" rx="4"/></clipPath></defs><g clip-path="url(#crx-flag-clip)">';
     const end = '</g><rect x="1" y="1" width="30" height="22" rx="4" fill="none" stroke="currentColor" stroke-opacity=".14"/></svg>';
     const rect = (color,x,y,w,h) => '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" fill="'+color+'"/>';
     const stripes = colors => colors.map((c,i) => rect(c,1,1+i*22/colors.length,30,22/colors.length+0.3)).join('');
@@ -67,12 +67,44 @@
       shield:'<path d="m12 22 7-4V5l-7-3-7 3v13l7 4z"/><path d="m9 12 2 2 4-4"/>',
       globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/>'
     };
-    return '<svg class="crx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(paths[name]||paths.route)+'</svg>';
+    return '<svg class="crx-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(paths[name]||paths.route)+'</svg>';
   }
   function optionList(values, selected) {
     return values.map(([value,label])=>'<option value="'+escapeHTML(value)+'"'+(value===selected?' selected':'')+'>'+escapeHTML(label)+'</option>').join('');
   }
 
+  const CSS_VERSION = '20261024-client-cards-v3';
+  function ensureStylesheet() {
+    const file = 'client-routing.css';
+    const existing = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
+      .find(link => {
+        try { return new URL(link.href, location.href).pathname.endsWith('/' + file); }
+        catch (_) { return false; }
+      });
+    if (existing && existing.href.includes('v=' + CSS_VERSION)) return;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = '/' + file + '?v=' + CSS_VERSION;
+    link.dataset.clientRoutingStyles = CSS_VERSION;
+    document.head.appendChild(link);
+    if (existing) existing.remove();
+  }
+  // Fail-safe: SVGs must never occupy the viewport if the optional CSS asset fails.
+  function ensureCriticalStyles() {
+    if (document.getElementById('crx-critical-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'crx-critical-styles';
+    style.textContent = '#client-route-root.crx .crx-icon{display:inline-block;width:19px;height:19px;max-width:19px;max-height:19px;flex-shrink:0}' +
+      '#client-route-root.crx .crx-flag{display:block;width:29px;height:22px;max-width:29px;max-height:22px;flex-shrink:0}' +
+      '#client-route-root.crx .crx-card-symbol .crx-icon{width:23px;height:23px;max-width:23px;max-height:23px}' +
+      '#client-route-root.crx .crx-page-head{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}' +
+      '#client-route-root.crx .crx-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr));gap:16px}' +
+      '#client-route-root.crx .crx-card{min-width:0;padding:20px;border:1px solid var(--ln,#293846);border-radius:16px;background:var(--s2,#19232f)}' +
+      '#client-route-root.crx .crx-overlay{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;padding:20px;background:rgba(0,0,0,.78)}' +
+      '#client-route-root.crx .crx-dialog{display:flex;flex-direction:column;width:min(1160px,100%);max-height:90vh;overflow:hidden;background:var(--s1,#111923);border:1px solid var(--ln,#293846);border-radius:18px}' +
+      '#client-route-root.crx .crx-dialog-body{overflow:auto;flex:1}';
+    document.head.appendChild(style);
+  }
   function create(db, saveSettings, toast) {
     const nodes = (db.nodes||[]).filter(n=>!n.disabled);
     const hosts = (db.hosts||[]).filter(h=>!h.disabled);
@@ -323,6 +355,8 @@
       draft.push(copy);open(copy.id);
     }
     function wire(){
+      ensureCriticalStyles();
+      ensureStylesheet();
       const root=document.getElementById('client-route-root');if(!root)return;
       render();
       root.addEventListener('click',async event=>{
