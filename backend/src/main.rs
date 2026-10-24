@@ -1,44 +1,42 @@
 mod admin_accounts;
 mod auth;
-mod mfa;
-mod security;
+mod client_routing;
 mod core;
-mod node_rotation;
+mod mfa;
 mod node_auth;
-mod node_runtime;
-mod node_routing;
+mod node_enrollment;
 mod node_geodata;
 mod node_policy;
-mod node_enrollment;
-mod subscription_settings;
-mod user_subscriptions;
-mod subscription_user_agent;
+mod node_rotation;
+mod node_routing;
+mod node_runtime;
+mod security;
 mod subscription_json;
-mod client_routing;
+mod subscription_settings;
 mod subscription_transport;
+mod subscription_user_agent;
+mod user_subscriptions;
 
 use axum::{
-    extract::{Extension, Path, Query, Request, State},
+    Json, Router,
     body::Bytes,
-    http::{header, HeaderMap, HeaderName, HeaderValue, Method, StatusCode, Uri},
+    extract::{Extension, Path, Query, Request, State},
+    http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode, Uri, header},
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::{get, patch, post},
-    Json, Router,
 };
 use core::CoreManager;
 use redis::aio::ConnectionManager;
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-use serde_json::{json, Map, Value};
-use sqlx::{postgres::PgPoolOptions, PgPool, Row};
+use serde_json::{Map, Value, json};
+use sqlx::{PgPool, Row, postgres::PgPoolOptions};
 use std::{collections::BTreeMap, env, path::PathBuf, time::Duration};
 use tower_http::{
-    compression::CompressionLayer,
-    limit::RequestBodyLimitLayer,
-    services::ServeDir,
+    compression::CompressionLayer, limit::RequestBodyLimitLayer, services::ServeDir,
     trace::TraceLayer,
 };
+use uuid::Uuid;
 
 // Recent verified Xray traffic, not a live TCP-session count.
 const USER_ONLINE_WINDOW_MS: i64 = 45_000;
@@ -50,38 +48,63 @@ const COLLECTIONS: &[&str] = &[
 /// Roles are re-read from SQL for each request; changing or disabling an admin
 /// invalidates their sessions. Never trust role fields from the browser.
 fn require_mutation(actor: &auth::AuthUser) -> Result<(), ApiError> {
-    if matches!(actor.role.as_str(), "owner" | "admin") { Ok(()) }
-    else { Err(ApiError::new(StatusCode::FORBIDDEN, "Недостаточно прав: доступ только для чтения.")) }
+    if matches!(actor.role.as_str(), "owner" | "admin") {
+        Ok(())
+    } else {
+        Err(ApiError::new(
+            StatusCode::FORBIDDEN,
+            "Недостаточно прав: доступ только для чтения.",
+        ))
+    }
 }
 
 fn require_owner(actor: &auth::AuthUser) -> Result<(), ApiError> {
     admin_accounts::require_owner(actor)
 }
 
-fn enforce_collection(actor: &auth::AuthUser, collection: &str, write: bool) -> Result<(), ApiError> {
+fn enforce_collection(
+    actor: &auth::AuthUser,
+    collection: &str,
+    write: bool,
+) -> Result<(), ApiError> {
     if matches!(collection, "admins" | "tokens") {
         return Err(ApiError::new(
             StatusCode::FORBIDDEN,
             "Используйте защищённый раздел администраторов. API-токены пока не реализованы.",
         ));
     }
-    if write { return require_mutation(actor); }
+    if write {
+        return require_mutation(actor);
+    }
     if viewer_read_only(actor) && !viewer_can_read_collection(collection) {
-        return Err(ApiError::new(StatusCode::FORBIDDEN, "Недостаточно прав для просмотра раздела."));
+        return Err(ApiError::new(
+            StatusCode::FORBIDDEN,
+            "Недостаточно прав для просмотра раздела.",
+        ));
     }
     Ok(())
 }
-
-
 
 #[cfg(test)]
 mod authorization_tests {
     use super::*;
     #[test]
     fn viewers_cannot_mutate_collections_or_sensitive_operations() {
-        let viewer = auth::AuthUser { id: 3, username: "viewer".into(), role: "viewer".into() };
-        let admin = auth::AuthUser { id: 2, username: "admin".into(), role: "admin".into() };
-        let owner = auth::AuthUser { id: 1, username: "owner".into(), role: "owner".into() };
+        let viewer = auth::AuthUser {
+            id: 3,
+            username: "viewer".into(),
+            role: "viewer".into(),
+        };
+        let admin = auth::AuthUser {
+            id: 2,
+            username: "admin".into(),
+            role: "admin".into(),
+        };
+        let owner = auth::AuthUser {
+            id: 1,
+            username: "owner".into(),
+            role: "owner".into(),
+        };
         assert!(require_mutation(&viewer).is_err());
         assert!(require_mutation(&admin).is_ok());
         assert!(require_mutation(&owner).is_ok());
@@ -90,29 +113,46 @@ mod authorization_tests {
         assert!(require_owner(&owner).is_ok());
         assert!(enforce_collection(&viewer, "users", false).is_ok());
         assert!(enforce_collection(&viewer, "users", true).is_err());
-        for forbidden in ["profiles","hosts","tpls","subs","srh","admins","tokens"] {
-            assert!(enforce_collection(&viewer,forbidden,false).is_err());
+        for forbidden in [
+            "profiles", "hosts", "tpls", "subs", "srh", "admins", "tokens",
+        ] {
+            assert!(enforce_collection(&viewer, forbidden, false).is_err());
         }
         assert!(enforce_collection(&viewer, "nodes", false).is_ok());
         assert!(enforce_collection(&viewer, "squads", false).is_ok());
-        let sample=json!({"id":5,"username":"alice","used":42.0,"xrayId":"SECRET-UUID",
+        let sample = json!({"id":5,"username":"alice","used":42.0,"xrayId":"SECRET-UUID",
           "subscriptionUrl":"https://secret.example.com","profileId":9,
           "devices":[{"fingerprint":"sensitive"}],
           "squads":[2,3],"config":"{\\\"privateKey\\\":\\\"SECRET\\\"}",
           "role":"admin","extra":{"token":"secret"}});
-        let safe=viewer_record("users",&sample);
-        assert_eq!(safe["username"],"alice");
-        assert_eq!(safe["squads"][0],2);
-        for secret in ["SECRET-UUID","secret.example.com","sensitive","privateKey","admin"] {
-            assert!(!safe.to_string().contains(secret),"viewer leak: {secret}");
+        let safe = viewer_record("users", &sample);
+        assert_eq!(safe["username"], "alice");
+        assert_eq!(safe["squads"][0], 2);
+        for secret in [
+            "SECRET-UUID",
+            "secret.example.com",
+            "sensitive",
+            "privateKey",
+            "admin",
+        ] {
+            assert!(!safe.to_string().contains(secret), "viewer leak: {secret}");
         }
-        assert!(viewer_record("profiles",&sample).as_object().is_some_and(|v|v.is_empty()));
-        let restricted=viewer_settings(&json!({"brand":"Test","subscriptionJson":{"secret":"leak"},
+        assert!(
+            viewer_record("profiles", &sample)
+                .as_object()
+                .is_some_and(|v| v.is_empty())
+        );
+        let restricted =
+            viewer_settings(&json!({"brand":"Test","subscriptionJson":{"secret":"leak"},
             "hooks":{"user.created":{"url":"https://secret.example"}}}));
-        assert_eq!(restricted,json!({"brand":"Test"}));
-        let unknown=auth::AuthUser{id:4,username:"unknown".into(),role:"custom".into()};
+        assert_eq!(restricted, json!({"brand":"Test"}));
+        let unknown = auth::AuthUser {
+            id: 4,
+            username: "unknown".into(),
+            role: "custom".into(),
+        };
         assert!(viewer_read_only(&unknown));
-        assert!(enforce_collection(&unknown,"profiles",false).is_err());
+        assert!(enforce_collection(&unknown, "profiles", false).is_err());
         assert!(enforce_collection(&admin, "users", true).is_ok());
         assert!(enforce_collection(&owner, "tokens", true).is_err());
         assert!(enforce_collection(&owner, "admins", false).is_err());
@@ -125,7 +165,7 @@ pub struct AppState {
     pub redis: ConnectionManager,
     pub core: CoreManager,
     pub cookie_secure: bool,
-    pub totp_key: Option<[u8;32]>,
+    pub totp_key: Option<[u8; 32]>,
     pub node_policy_signer: std::sync::Arc<node_policy::PolicySigner>,
 }
 
@@ -137,9 +177,14 @@ pub struct ApiError {
 
 impl ApiError {
     pub fn new(status: StatusCode, message: impl Into<String>) -> Self {
-        Self { status, message: message.into() }
+        Self {
+            status,
+            message: message.into(),
+        }
     }
-    pub(crate) fn safe_message(&self) -> &str { &self.message }
+    pub(crate) fn safe_message(&self) -> &str {
+        &self.message
+    }
 }
 
 impl From<sqlx::Error> for ApiError {
@@ -148,7 +193,10 @@ impl From<sqlx::Error> for ApiError {
         if let sqlx::Error::Database(db_error) = &error
             && db_error.code().as_deref() == Some("23505")
         {
-            return Self::new(StatusCode::CONFLICT, "Запись с такими данными уже существует.");
+            return Self::new(
+                StatusCode::CONFLICT,
+                "Запись с такими данными уже существует.",
+            );
         }
         Self::new(StatusCode::INTERNAL_SERVER_ERROR, "Внутренняя ошибка API.")
     }
@@ -210,13 +258,13 @@ struct UserTrafficSample {
 
 #[derive(Debug, Deserialize, Serialize)]
 struct UserInboundTrafficSample {
-    #[serde(alias="userId")]
+    #[serde(alias = "userId")]
     user_id: i64,
-    #[serde(alias="inboundTag")]
+    #[serde(alias = "inboundTag")]
     inbound_tag: String,
-    #[serde(alias="uplinkBytes")]
+    #[serde(alias = "uplinkBytes")]
     uplink_bytes: i64,
-    #[serde(alias="downlinkBytes")]
+    #[serde(alias = "downlinkBytes")]
     downlink_bytes: i64,
 }
 
@@ -224,15 +272,22 @@ struct UserInboundTrafficSample {
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info,tower_http=info,sqlx=warn")),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                tracing_subscriber::EnvFilter::new("info,tower_http=info,sqlx=warn")
+            }),
         )
         .json()
         .init();
 
-    let database_url = env::var("DATABASE_URL").map_err(|_| anyhow::anyhow!("DATABASE_URL is required"))?;
+    let database_url =
+        env::var("DATABASE_URL").map_err(|_| anyhow::anyhow!("DATABASE_URL is required"))?;
     let pool = PgPoolOptions::new()
-        .max_connections(env::var("DB_MAX_CONNECTIONS").ok().and_then(|v| v.parse().ok()).unwrap_or(20))
+        .max_connections(
+            env::var("DB_MAX_CONNECTIONS")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(20),
+        )
         .min_connections(1)
         .acquire_timeout(Duration::from_secs(10))
         .idle_timeout(Duration::from_secs(600))
@@ -250,26 +305,30 @@ async fn main() -> anyhow::Result<()> {
     sqlx::migrate!("./migrations").run(&pool).await?;
     // Preserve an existing custom dashboard path on upgrades. Migrate only the
     // former hardcoded default; the database remains authoritative thereafter.
-    if let Ok(from_env)=env::var("DASHBOARD_PATH") {
-        let current:Option<Value>=sqlx::query_scalar(
-            "SELECT value FROM app_settings WHERE key='security'"
-        ).fetch_optional(&pool).await?;
-        if let Some(mut policy_json)=current
-            && policy_json.get("dashboardPath").and_then(Value::as_str)==Some("/dashboard/nexus") {
-                policy_json["dashboardPath"]=Value::String(from_env);
-                sqlx::query("UPDATE app_settings SET value=$1,updated_at=NOW() WHERE key='security'")
-                    .bind(policy_json).execute(&pool).await?;
+    if let Ok(from_env) = env::var("DASHBOARD_PATH") {
+        let current: Option<Value> =
+            sqlx::query_scalar("SELECT value FROM app_settings WHERE key='security'")
+                .fetch_optional(&pool)
+                .await?;
+        if let Some(mut policy_json) = current
+            && policy_json.get("dashboardPath").and_then(Value::as_str) == Some("/dashboard/nexus")
+        {
+            policy_json["dashboardPath"] = Value::String(from_env);
+            sqlx::query("UPDATE app_settings SET value=$1,updated_at=NOW() WHERE key='security'")
+                .bind(policy_json)
+                .execute(&pool)
+                .await?;
         }
     }
     // Sync the effective database path to a dedicated host-visible mirror.
     // The panel never gets write access to the host's .env or other secrets.
-    let active_path=security::get_policy(&pool).await
-        .map_err(|e|anyhow::anyhow!("Invalid dashboard policy: {}",e.message))?
+    let active_path = security::get_policy(&pool)
+        .await
+        .map_err(|e| anyhow::anyhow!("Invalid dashboard policy: {}", e.message))?
         .dashboard_path;
-    if let Ok(mirror)=env::var("DASHBOARD_PATH_MIRROR") {
-        tokio::fs::write(mirror,format!("{active_path}\n")).await?;
+    if let Ok(mirror) = env::var("DASHBOARD_PATH_MIRROR") {
+        tokio::fs::write(mirror, format!("{active_path}\n")).await?;
     }
-
 
     let admin_username = env::var("ADMIN_USERNAME").unwrap_or_else(|_| "admin".to_owned());
     let admin_password = env::var("ADMIN_PASSWORD")
@@ -277,19 +336,36 @@ async fn main() -> anyhow::Result<()> {
     auth::seed_bootstrap_admin(&pool, &admin_username, &admin_password).await?;
 
     let cookie_secure = env::var("COOKIE_SECURE")
-        .map(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes"))
+        .map(|value| {
+            matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes"
+            )
+        })
         .unwrap_or(true);
     let core_dir = PathBuf::from(
         env::var("CORE_DATA_DIR").unwrap_or_else(|_| "/var/lib/xmesh/core".to_owned()),
     );
-    let node_policy_signer = std::sync::Arc::new(node_policy::PolicySigner::load(&core_dir.join("node-policy-ed25519.key"))?);
+    let node_policy_signer = std::sync::Arc::new(node_policy::PolicySigner::load(
+        &core_dir.join("node-policy-ed25519.key"),
+    )?);
     let core = CoreManager::new(pool.clone(), core_dir).await?;
-    let totp_key=env::var("TOTP_ENCRYPTION_KEY").ok().filter(|s|!s.trim().is_empty())
-        .map(|raw|mfa::decode_key(&raw)).transpose()?;
+    let totp_key = env::var("TOTP_ENCRYPTION_KEY")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .map(|raw| mfa::decode_key(&raw))
+        .transpose()?;
     if totp_key.is_none() {
         tracing::warn!("TOTP_ENCRYPTION_KEY is not configured: MFA enrollment is unavailable");
     }
-    let state = AppState { pool, redis, core, cookie_secure, totp_key, node_policy_signer };
+    let state = AppState {
+        pool,
+        redis,
+        core,
+        cookie_secure,
+        totp_key,
+        node_policy_signer,
+    };
     state.core.launch_startup_update().await;
 
     let protected = Router::new()
@@ -298,11 +374,20 @@ async fn main() -> anyhow::Result<()> {
         .route("/auth/mfa/setup", post(mfa::setup))
         .route("/auth/mfa/confirm", post(mfa::confirm))
         .route("/auth/mfa/disable", post(mfa::disable))
-        .route("/security/policy", get(security::get_settings).patch(security::update_settings))
+        .route(
+            "/security/policy",
+            get(security::get_settings).patch(security::update_settings),
+        )
         .route("/security/audit", get(security::audit_events))
         .route("/security/sessions", get(security::sessions))
-        .route("/security/sessions/others", post(security::revoke_other_sessions))
-        .route("/security/sessions/{id}", axum::routing::delete(security::revoke_session))
+        .route(
+            "/security/sessions/others",
+            post(security::revoke_other_sessions),
+        )
+        .route(
+            "/security/sessions/{id}",
+            axum::routing::delete(security::revoke_session),
+        )
         .route("/settings", get(get_settings).patch(patch_settings))
         .route("/client-routing", patch(patch_client_routing))
         .route("/stats", get(get_stats))
@@ -311,30 +396,83 @@ async fn main() -> anyhow::Result<()> {
         .route("/metrics/traffic", get(get_traffic_metrics))
         .route("/users/presence", get(get_user_presence))
         .route("/users/{id}/traffic", get(get_user_traffic))
-        .route("/nodes/{id}/metrics-key", post(node_auth::enroll).delete(node_auth::revoke))
+        .route(
+            "/nodes/{id}/metrics-key",
+            post(node_auth::enroll).delete(node_auth::revoke),
+        )
         .route("/nodes/{id}/runtime", get(node_runtime::status))
-        .route("/nodes/{id}/geodata/refresh", post(node_runtime::request_geodata_refresh))
-        .route("/nodes/{id}/routing/preview", post(node_runtime::preview_routing))
-        .route("/nodes/{id}/restart", post(node_runtime::request_restart).get(node_runtime::restart_status))
-        .route("/nodes/{id}/xray-update", post(node_runtime::request_xray_update))
-        .route("/nodes/{id}/agent-update", post(node_runtime::request_agent_update))
-        .route("/nodes/xray-releases", get(node_runtime::available_xray_releases))
-        .route("/users/{id}/subscription", get(user_subscriptions::status).post(user_subscriptions::create).delete(user_subscriptions::revoke))
-        .route("/users/{id}/client-json", get(user_subscriptions::admin_client_json))
+        .route(
+            "/nodes/{id}/geodata/refresh",
+            post(node_runtime::request_geodata_refresh),
+        )
+        .route(
+            "/nodes/{id}/routing/preview",
+            post(node_runtime::preview_routing),
+        )
+        .route(
+            "/nodes/{id}/restart",
+            post(node_runtime::request_restart).get(node_runtime::restart_status),
+        )
+        .route(
+            "/nodes/{id}/xray-update",
+            post(node_runtime::request_xray_update),
+        )
+        .route(
+            "/nodes/{id}/agent-update",
+            post(node_runtime::request_agent_update),
+        )
+        .route(
+            "/nodes/xray-releases",
+            get(node_runtime::available_xray_releases),
+        )
+        .route(
+            "/users/{id}/subscription",
+            get(user_subscriptions::status)
+                .post(user_subscriptions::create)
+                .delete(user_subscriptions::revoke),
+        )
+        .route(
+            "/users/{id}/client-json",
+            get(user_subscriptions::admin_client_json),
+        )
         .route("/nodes/{id}/enrollment", post(node_enrollment::issue))
-        .route("/admins", get(admin_accounts::list).post(admin_accounts::create))
-        .route("/admins/{id}", patch(admin_accounts::update).delete(admin_accounts::delete))
-        .route("/nodes/{id}/rotation/next", post(node_rotation::rotate_next))
-        .route("/nodes/{id}/traffic/reset", post(reset_node_network_traffic))
-        .route("/collections/{collection}", get(list_records).post(create_record))
-        .route("/collections/{collection}/{id}", patch(update_record).delete(delete_record))
+        .route(
+            "/admins",
+            get(admin_accounts::list).post(admin_accounts::create),
+        )
+        .route(
+            "/admins/{id}",
+            patch(admin_accounts::update).delete(admin_accounts::delete),
+        )
+        .route(
+            "/nodes/{id}/rotation/next",
+            post(node_rotation::rotate_next),
+        )
+        .route(
+            "/nodes/{id}/traffic/reset",
+            post(reset_node_network_traffic),
+        )
+        .route(
+            "/collections/{collection}",
+            get(list_records).post(create_record),
+        )
+        .route(
+            "/collections/{collection}/{id}",
+            patch(update_record).delete(delete_record),
+        )
         .route("/core", get(get_core_status))
         .route("/core/releases", get(get_core_releases))
         .route("/core/update", post(update_core))
-        .route("/panel/update", post(request_panel_update).get(get_panel_update_status))
+        .route(
+            "/panel/update",
+            post(request_panel_update).get(get_panel_update_status),
+        )
         .route("/core/vlessenc", post(generate_vless_encryption))
         .route("/core/validate", post(validate_xray_configuration))
-        .route_layer(middleware::from_fn_with_state(state.clone(), auth::require_session));
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth::require_session,
+        ));
 
     let public = Router::new()
         .route("/health/live", get(health_live))
@@ -360,14 +498,40 @@ async fn main() -> anyhow::Result<()> {
         .route("/login.html", get(|| async { StatusCode::NOT_FOUND }))
         .route("/dashboard/{slug}", get(security::dashboard_entry))
         .route("/{part1}/{token}", get(user_subscriptions::portal_route))
-        .route("/{part1}/{part2}/{token}", get(user_subscriptions::portal_route))
-        .route("/{part1}/{part2}/{part3}/{token}", get(user_subscriptions::portal_route))
-        .route("/{part1}/{part2}/{part3}/{part4}/{token}", get(user_subscriptions::portal_route))
-        .route("/{part1}/{part2}/{part3}/{part4}/{part5}/{token}", get(user_subscriptions::portal_route))
-        .route("/{part1}/{part2}/{part3}/{part4}/{part5}/{part6}/{token}", get(user_subscriptions::portal_route))
-        .route("/{part1}/{part2}/{part3}/{part4}/{part5}/{part6}/{part7}/{token}", get(user_subscriptions::portal_route))
-        .route("/{part1}/{part2}/{part3}/{part4}/{part5}/{part6}/{part7}/{part8}/{token}", get(user_subscriptions::portal_route))
-        .nest("/api/v1", public.merge(protected).fallback(|| async { StatusCode::NOT_FOUND }))
+        .route(
+            "/{part1}/{part2}/{token}",
+            get(user_subscriptions::portal_route),
+        )
+        .route(
+            "/{part1}/{part2}/{part3}/{token}",
+            get(user_subscriptions::portal_route),
+        )
+        .route(
+            "/{part1}/{part2}/{part3}/{part4}/{token}",
+            get(user_subscriptions::portal_route),
+        )
+        .route(
+            "/{part1}/{part2}/{part3}/{part4}/{part5}/{token}",
+            get(user_subscriptions::portal_route),
+        )
+        .route(
+            "/{part1}/{part2}/{part3}/{part4}/{part5}/{part6}/{token}",
+            get(user_subscriptions::portal_route),
+        )
+        .route(
+            "/{part1}/{part2}/{part3}/{part4}/{part5}/{part6}/{part7}/{token}",
+            get(user_subscriptions::portal_route),
+        )
+        .route(
+            "/{part1}/{part2}/{part3}/{part4}/{part5}/{part6}/{part7}/{part8}/{token}",
+            get(user_subscriptions::portal_route),
+        )
+        .nest(
+            "/api/v1",
+            public
+                .merge(protected)
+                .fallback(|| async { StatusCode::NOT_FOUND }),
+        )
         .nest_service("/flags", ServeDir::new(format!("{static_dir}/flags")))
         .fallback_service(ServeDir::new(static_dir).append_index_html_on_directories(false))
         .layer(RequestBodyLimitLayer::new(2 * 1024 * 1024))
@@ -380,12 +544,17 @@ async fn main() -> anyhow::Result<()> {
     let address = env::var("APP_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".to_owned());
     let listener = tokio::net::TcpListener::bind(&address).await?;
     tracing::info!(address = %address, "XMesh Nexus API ready");
-    axum::serve(listener, app).with_graceful_shutdown(shutdown_signal()).await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
     Ok(())
 }
 
 async fn csrf_guard(request: Request, next: Next) -> Response {
-    let is_mutation = matches!(*request.method(), Method::POST | Method::PUT | Method::PATCH | Method::DELETE);
+    let is_mutation = matches!(
+        *request.method(),
+        Method::POST | Method::PUT | Method::PATCH | Method::DELETE
+    );
     // Only cookie-less machine-to-machine endpoints bypass browser Origin validation.
     // Each endpoint enforces its own strong authentication (signed Ed25519 or
     // single-use short-lived enrollment token) before performing any mutation.
@@ -395,37 +564,60 @@ async fn csrf_guard(request: Request, next: Next) -> Response {
         && request.headers().get(header::COOKIE).is_none()
         && request.headers().get("sec-fetch-site").is_none()
         && match path {
-            "/api/v1/metrics/ingest" | "/api/v1/node/heartbeat" | "/api/v1/node/desired-config"
-            | "/api/v1/node/restart/poll" | "/api/v1/node/restart/ack" =>
-                request.headers().contains_key("x-xmesh-signature"),
-            "/api/v1/node/enroll" =>
-                request.headers().get(header::CONTENT_TYPE)
-                    .and_then(|value| value.to_str().ok())
-                    .is_some_and(|value| value.eq_ignore_ascii_case("application/json")),
+            "/api/v1/metrics/ingest"
+            | "/api/v1/node/heartbeat"
+            | "/api/v1/node/desired-config"
+            | "/api/v1/node/restart/poll"
+            | "/api/v1/node/restart/ack" => request.headers().contains_key("x-xmesh-signature"),
+            "/api/v1/node/enroll" => request
+                .headers()
+                .get(header::CONTENT_TYPE)
+                .and_then(|value| value.to_str().ok())
+                .is_some_and(|value| value.eq_ignore_ascii_case("application/json")),
             _ => false,
         };
     if is_mutation && request.uri().path().starts_with("/api/v1/") && !machine_request {
         // Sec-Fetch-Site stops same-site but cross-origin form and fetch attacks.
         // Older clients still have to supply a matching Origin.
-        if request.headers().get("sec-fetch-site").and_then(|v| v.to_str().ok())
+        if request
+            .headers()
+            .get("sec-fetch-site")
+            .and_then(|v| v.to_str().ok())
             .is_some_and(|site| !matches!(site, "same-origin" | "none"))
         {
-            return (StatusCode::FORBIDDEN, Json(json!({"error": "Запрос из другого источника запрещён."}))).into_response();
+            return (
+                StatusCode::FORBIDDEN,
+                Json(json!({"error": "Запрос из другого источника запрещён."})),
+            )
+                .into_response();
         }
-        let origin = request.headers().get(header::ORIGIN).and_then(|value| value.to_str().ok());
-        let host = request.headers().get(header::HOST).and_then(|value| value.to_str().ok());
+        let origin = request
+            .headers()
+            .get(header::ORIGIN)
+            .and_then(|value| value.to_str().ok());
+        let host = request
+            .headers()
+            .get(header::HOST)
+            .and_then(|value| value.to_str().ok());
         let valid = origin
             .and_then(|value| value.parse::<Uri>().ok())
             .and_then(|uri| {
-                if !matches!(uri.scheme_str(), Some("https") | Some("http")) || uri.query().is_some() {
+                if !matches!(uri.scheme_str(), Some("https") | Some("http"))
+                    || uri.query().is_some()
+                {
                     return None;
                 }
-                uri.authority().map(|authority| authority.as_str().to_ascii_lowercase())
+                uri.authority()
+                    .map(|authority| authority.as_str().to_ascii_lowercase())
             })
             .zip(host.map(str::to_ascii_lowercase))
             .is_some_and(|(origin_authority, request_host)| origin_authority == request_host);
         if !valid {
-            return (StatusCode::FORBIDDEN, Json(json!({"error": "Запрос отклонён проверкой источника."}))).into_response();
+            return (
+                StatusCode::FORBIDDEN,
+                Json(json!({"error": "Запрос отклонён проверкой источника."})),
+            )
+                .into_response();
         }
     }
     next.run(request).await
@@ -437,7 +629,9 @@ async fn shutdown_signal() {
     };
     #[cfg(unix)]
     let terminate = async {
-        if let Ok(mut signal) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+        if let Ok(mut signal) =
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+        {
             signal.recv().await;
         }
     };
@@ -453,10 +647,22 @@ async fn shutdown_signal() {
 async fn security_headers(request: Request, next: Next) -> Response {
     let mut response = next.run(request).await;
     let headers = response.headers_mut();
-    headers.insert(HeaderName::from_static("x-content-type-options"), HeaderValue::from_static("nosniff"));
-    headers.insert(HeaderName::from_static("cache-control"), HeaderValue::from_static("no-store"));
-    headers.insert(HeaderName::from_static("x-frame-options"), HeaderValue::from_static("DENY"));
-    headers.insert(HeaderName::from_static("referrer-policy"), HeaderValue::from_static("same-origin"));
+    headers.insert(
+        HeaderName::from_static("x-content-type-options"),
+        HeaderValue::from_static("nosniff"),
+    );
+    headers.insert(
+        HeaderName::from_static("cache-control"),
+        HeaderValue::from_static("no-store"),
+    );
+    headers.insert(
+        HeaderName::from_static("x-frame-options"),
+        HeaderValue::from_static("DENY"),
+    );
+    headers.insert(
+        HeaderName::from_static("referrer-policy"),
+        HeaderValue::from_static("same-origin"),
+    );
     headers.insert(
         HeaderName::from_static("content-security-policy"),
         HeaderValue::from_static("default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' https: data:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self'; form-action 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'"),
@@ -475,13 +681,18 @@ async fn health_live() -> Json<Value> {
 async fn health_ready(State(state): State<AppState>) -> impl IntoResponse {
     let database_ok = sqlx::query("SELECT 1").execute(&state.pool).await.is_ok();
     let mut redis = state.redis.clone();
-    let redis_ok = redis::cmd("PING").query_async::<String>(&mut redis).await
+    let redis_ok = redis::cmd("PING")
+        .query_async::<String>(&mut redis)
+        .await
         .is_ok_and(|reply| reply == "PONG");
     if database_ok && redis_ok {
-        (StatusCode::OK, Json(json!({
-            "status": "ready",
-            "dependencies": {"postgresql": "online", "redis": "online"}
-        })))
+        (
+            StatusCode::OK,
+            Json(json!({
+                "status": "ready",
+                "dependencies": {"postgresql": "online", "redis": "online"}
+            })),
+        )
     } else {
         (
             StatusCode::SERVICE_UNAVAILABLE,
@@ -511,26 +722,58 @@ fn viewer_can_read_collection(collection: &str) -> bool {
 /// viewer response: new schema fields must be invisible by default.
 fn viewer_record(collection: &str, record: &Value) -> Value {
     let fields: &[&str] = match collection {
-        "users" => &["id","username","limit","used","expireAt","onlineAt",
-                    "disabled","created","status","hwid","squads"],
-        "nodes" => &["id","name","remark","flag","country","state",
-                    "disabled","used","limit","traffic","maxTraffic",
-                    "xrayVersion","agentVersion","onlineAt","lastSeenAt"],
-        "squads" => &["id","name","remark","tag"],
+        "users" => &[
+            "id", "username", "limit", "used", "expireAt", "onlineAt", "disabled", "created",
+            "status", "hwid", "squads",
+        ],
+        "nodes" => &[
+            "id",
+            "name",
+            "remark",
+            "flag",
+            "country",
+            "state",
+            "disabled",
+            "used",
+            "limit",
+            "traffic",
+            "maxTraffic",
+            "xrayVersion",
+            "agentVersion",
+            "onlineAt",
+            "lastSeenAt",
+        ],
+        "squads" => &["id", "name", "remark", "tag"],
         _ => return json!({}),
     };
-    let mut result=Map::new();
+    let mut result = Map::new();
     for field in fields {
-        if let Some(value)=record.get(*field) {
+        if let Some(value) = record.get(*field) {
             // Reject arbitrary nested JSON: squad association IDs are the
             // only arrays allowed through the restricted projection.
-            let safe=if *field=="squads" && collection=="users" {
-                value.as_array().map(|items|Value::Array(items.iter().filter(|id|
-                    id.is_u64()||id.is_i64()).take(100).cloned().collect()))
-            } else if value.is_string() || value.is_boolean() || value.is_number() || value.is_null() {
+            let safe = if *field == "squads" && collection == "users" {
+                value.as_array().map(|items| {
+                    Value::Array(
+                        items
+                            .iter()
+                            .filter(|id| id.is_u64() || id.is_i64())
+                            .take(100)
+                            .cloned()
+                            .collect(),
+                    )
+                })
+            } else if value.is_string()
+                || value.is_boolean()
+                || value.is_number()
+                || value.is_null()
+            {
                 Some(value.clone())
-            } else { None };
-            if let Some(safe)=safe {result.insert((*field).into(),safe);}
+            } else {
+                None
+            };
+            if let Some(safe) = safe {
+                result.insert((*field).into(), safe);
+            }
         }
     }
     Value::Object(result)
@@ -542,30 +785,45 @@ fn viewer_settings(settings: &Value) -> Value {
     json!({"brand":settings.get("brand").and_then(Value::as_str).unwrap_or("XMesh Nexus")})
 }
 
-
-async fn bootstrap(State(state): State<AppState>, Extension(actor): Extension<auth::AuthUser>) -> Result<Json<Value>, ApiError> {
+async fn bootstrap(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+) -> Result<Json<Value>, ApiError> {
     let mut collections = Map::new();
     for collection in COLLECTIONS {
         // No loading or serialization of privileged collections for observers.
         if viewer_read_only(&actor) && !viewer_can_read_collection(collection) {
-            collections.insert((*collection).to_owned(),Value::Array(vec![]));
+            collections.insert((*collection).to_owned(), Value::Array(vec![]));
             continue;
         }
         let records = if *collection == "admins" {
-            if actor.role == "owner" { admin_accounts::accounts(&state.pool).await? } else { Vec::new() }
+            if actor.role == "owner" {
+                admin_accounts::accounts(&state.pool).await?
+            } else {
+                Vec::new()
+            }
         } else if *collection == "tokens" {
             // API tokens remain unimplemented, not credentials. Never surface legacy placeholders.
             Vec::new()
         } else {
             load_records(&state.pool, collection).await?
         };
-        let records=if viewer_read_only(&actor) {
-            Value::Array(records.iter().map(|r|viewer_record(collection,r)).collect())
-        } else {Value::Array(records)};
+        let records = if viewer_read_only(&actor) {
+            Value::Array(
+                records
+                    .iter()
+                    .map(|r| viewer_record(collection, r))
+                    .collect(),
+            )
+        } else {
+            Value::Array(records)
+        };
         collections.insert((*collection).to_owned(), records);
     }
     let mut settings = read_settings(&state.pool).await?;
-    if viewer_read_only(&actor) {settings=viewer_settings(&settings);}
+    if viewer_read_only(&actor) {
+        settings = viewer_settings(&settings);
+    }
     Ok(Json(json!({
         "collections": collections,
         "settings": settings,
@@ -582,9 +840,15 @@ async fn list_records(
     enforce_collection(&actor, &collection, false)?;
     let mut items = load_records(&state.pool, &collection).await?;
     if viewer_read_only(&actor) {
-        items=items.iter().map(|item|viewer_record(&collection,item)).collect();
+        items = items
+            .iter()
+            .map(|item| viewer_record(&collection, item))
+            .collect();
     }
-    let ids = items.iter().filter_map(|item| item.get("id").cloned()).collect::<Vec<_>>();
+    let ids = items
+        .iter()
+        .filter_map(|item| item.get("id").cloned())
+        .collect::<Vec<_>>();
     let total = items.len();
     Ok(Json(json!({"items": items, "ids": ids, "total": total})))
 }
@@ -597,12 +861,14 @@ async fn create_record(
 ) -> Result<(StatusCode, Json<Value>), ApiError> {
     validate_collection(&collection)?;
     enforce_collection(&actor, &collection, true)?;
-    let object=data.as_object_mut().ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Запись должна быть JSON-объектом."))?;
+    let object = data.as_object_mut().ok_or_else(|| {
+        ApiError::new(StatusCode::BAD_REQUEST, "Запись должна быть JSON-объектом.")
+    })?;
     object.remove("id");
     // Authoritative, unpredictable, immutable per-user Xray identity. Never trust
     // a client-provided UUID for a newly created account.
-    if collection=="users" {
-        object.insert("xrayId".into(),Value::String(Uuid::new_v4().to_string()));
+    if collection == "users" {
+        object.insert("xrayId".into(), Value::String(Uuid::new_v4().to_string()));
     }
     // A quota reason is only valid for an actually disabled node. Updating
     // a node must not carry a stale reason into its next saved revision.
@@ -616,7 +882,9 @@ async fn create_record(
         obj.remove("trafficLimitReachedAt");
     }
     validate_record(&collection, &data)?;
-    if collection == "hosts" { validate_host_binding(&state.pool, &data).await?; }
+    if collection == "hosts" {
+        validate_host_binding(&state.pool, &data).await?;
+    }
 
     // User and initial subscription must be one atomic operation: never create
     // an account whose subscription secret could not be persisted.
@@ -630,13 +898,22 @@ async fn create_record(
     .await?;
     let result = row_to_record(&row)?;
     if collection == "users" {
-        let id = result.get("id").and_then(Value::as_i64)
-            .ok_or_else(|| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Created user has no ID"))?;
+        let id = result.get("id").and_then(Value::as_i64).ok_or_else(|| {
+            ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Created user has no ID")
+        })?;
         user_subscriptions::provision_new_user(&state, id, &mut tx).await?;
     }
     tx.commit().await?;
     let record_id = result.get("id").and_then(Value::as_i64);
-    audit(&state.pool, &actor.username, "create", Some(&collection), record_id, json!({})).await;
+    audit(
+        &state.pool,
+        &actor.username,
+        "create",
+        Some(&collection),
+        record_id,
+        json!({}),
+    )
+    .await;
     Ok((StatusCode::CREATED, Json(result)))
 }
 
@@ -651,37 +928,57 @@ async fn reset_node_network_traffic(
     require_mutation(&actor)?;
     enforce_collection(&actor, "nodes", true)?;
     if node_id <= 0 {
-        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Некорректный ID узла."));
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Некорректный ID узла.",
+        ));
     }
-    let mut tx=state.pool.begin().await?;
+    let mut tx = state.pool.begin().await?;
     // Serialize against the quota-cutoff transition and concurrent resets.
-    let record=sqlx::query(
+    let record = sqlx::query(
         "SELECT data FROM panel_records
-         WHERE collection='nodes' AND id=$1 FOR UPDATE"
-    ).bind(node_id).fetch_optional(&mut *tx).await?
-        .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Узел не найден."))?;
-    let old:Value=record.try_get("data")?;
-    let previous=sqlx::query(
+         WHERE collection='nodes' AND id=$1 FOR UPDATE",
+    )
+    .bind(node_id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Узел не найден."))?;
+    let old: Value = record.try_get("data")?;
+    let previous = sqlx::query(
         "UPDATE node_network_traffic_totals
          SET rx_bytes=0,tx_bytes=0,updated_at=NOW()
          WHERE node_id=$1
-         RETURNING rx_bytes,tx_bytes,last_rx_bytes,last_tx_bytes"
-    ).bind(node_id).fetch_optional(&mut *tx).await?;
+         RETURNING rx_bytes,tx_bytes,last_rx_bytes,last_tx_bytes",
+    )
+    .bind(node_id)
+    .fetch_optional(&mut *tx)
+    .await?;
     // A quota-stopped node stays disabled. A reset never starts its Xray.
-    let was_quota_stopped=old.get("disabledReason").and_then(Value::as_str)==Some("traffic_limit");
-    let row=sqlx::query(
+    let was_quota_stopped =
+        old.get("disabledReason").and_then(Value::as_str) == Some("traffic_limit");
+    let row = sqlx::query(
         "UPDATE panel_records
          SET data=(data - 'disabledReason' - 'trafficLimitReachedAt')
                    || jsonb_build_object('trafficLastResetAt',
                                         to_char(NOW() AT TIME ZONE 'UTC',
                                                 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"')),
              updated_at=NOW()
-         WHERE collection='nodes' AND id=$1 RETURNING data"
-    ).bind(node_id).fetch_one(&mut *tx).await?;
+         WHERE collection='nodes' AND id=$1 RETURNING data",
+    )
+    .bind(node_id)
+    .fetch_one(&mut *tx)
+    .await?;
     tx.commit().await?;
-    audit(&state.pool,&actor.username,"node_traffic_reset",Some("nodes"),Some(node_id),
-        json!({"nodePreviouslyQuotaStopped":was_quota_stopped})).await;
-    let updated:Value=row.try_get("data")?;
+    audit(
+        &state.pool,
+        &actor.username,
+        "node_traffic_reset",
+        Some("nodes"),
+        Some(node_id),
+        json!({"nodePreviouslyQuotaStopped":was_quota_stopped}),
+    )
+    .await;
+    let updated: Value = row.try_get("data")?;
     Ok(Json(json!({
         "nodeId":node_id,
         "networkRxBytes":0,
@@ -701,40 +998,58 @@ async fn update_record(
 ) -> Result<Json<Value>, ApiError> {
     validate_collection(&collection)?;
     enforce_collection(&actor, &collection, true)?;
-    let patch_object = patch.as_object_mut()
-        .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Обновление должно быть JSON-объектом."))?;
+    let patch_object = patch.as_object_mut().ok_or_else(|| {
+        ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Обновление должно быть JSON-объектом.",
+        )
+    })?;
     patch_object.remove("id");
 
-    let mut tx=state.pool.begin().await?;
-    let existing = sqlx::query("SELECT data FROM panel_records WHERE collection = $1 AND id = $2 FOR UPDATE")
-        .bind(&collection)
-        .bind(id)
-        .fetch_optional(&mut *tx)
-        .await?
-        .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Запись не найдена."))?;
+    let mut tx = state.pool.begin().await?;
+    let existing =
+        sqlx::query("SELECT data FROM panel_records WHERE collection = $1 AND id = $2 FOR UPDATE")
+            .bind(&collection)
+            .bind(id)
+            .fetch_optional(&mut *tx)
+            .await?
+            .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Запись не найдена."))?;
     let mut data: Value = existing.try_get("data")?;
-    let object = data.as_object_mut()
-        .ok_or_else(|| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Повреждён формат записи."))?;
+    let object = data.as_object_mut().ok_or_else(|| {
+        ApiError::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Повреждён формат записи.",
+        )
+    })?;
     if collection == "users"
         && let Some(existing_id) = object.get("xrayId").and_then(Value::as_str)
         && !existing_id.is_empty()
-        && patch_object.get("xrayId").is_some_and(|v| v.as_str() != Some(existing_id))
+        && patch_object
+            .get("xrayId")
+            .is_some_and(|v| v.as_str() != Some(existing_id))
     {
-        return Err(ApiError::new(StatusCode::FORBIDDEN,
-            "Xray UUID пользователя нельзя менять через общий API."));
+        return Err(ApiError::new(
+            StatusCode::FORBIDDEN,
+            "Xray UUID пользователя нельзя менять через общий API.",
+        ));
     }
     for (key, value) in patch_object.clone() {
         object.insert(key, value);
     }
     validate_record(&collection, &data)?;
-    if collection == "hosts" { validate_host_binding(&state.pool, &data).await?; }
+    if collection == "hosts" {
+        validate_host_binding(&state.pool, &data).await?;
+    }
 
     // Admin traffic reset sets the new baseline without corrupting the
     // last-seen Xray monotonic counters. The next delta still counts correctly.
-    if collection=="users" && patch_object.contains_key("used") {
+    if collection == "users" && patch_object.contains_key("used") {
         sqlx::query(
-            "UPDATE user_node_traffic_totals SET uplink_bytes=0,downlink_bytes=0 WHERE user_id=$1"
-        ).bind(id).execute(&mut *tx).await?;
+            "UPDATE user_node_traffic_totals SET uplink_bytes=0,downlink_bytes=0 WHERE user_id=$1",
+        )
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
         sqlx::query(
             "UPDATE user_inbound_traffic_totals SET uplink_bytes=0,downlink_bytes=0 WHERE user_id=$1"
         ).bind(id).execute(&mut *tx).await?;
@@ -750,7 +1065,15 @@ async fn update_record(
     .await?;
     tx.commit().await?;
     let result = row_to_record(&row)?;
-    audit(&state.pool, &actor.username, "update", Some(&collection), Some(id), json!({})).await;
+    audit(
+        &state.pool,
+        &actor.username,
+        "update",
+        Some(&collection),
+        Some(id),
+        json!({}),
+    )
+    .await;
     Ok(Json(result))
 }
 
@@ -765,8 +1088,10 @@ async fn delete_record(
     // When deleting a node, detach it from public hosts in the same transaction.
     // Preserve host records and their other node associations.
     if collection == "nodes" {
-        let hosts = sqlx::query("SELECT id, data FROM panel_records WHERE collection = 'hosts' FOR UPDATE")
-            .fetch_all(&mut *tx).await?;
+        let hosts =
+            sqlx::query("SELECT id, data FROM panel_records WHERE collection = 'hosts' FOR UPDATE")
+                .fetch_all(&mut *tx)
+                .await?;
         for host in hosts {
             let host_id: i64 = host.try_get("id")?;
             let mut data: Value = host.try_get("data")?;
@@ -776,9 +1101,16 @@ async fn delete_record(
                 if nodes.len() != count {
                     // Empty host node lists mean "all nodes": disable the host instead
                     // of accidentally exposing it on every remaining node.
-                    if nodes.is_empty() { data["disabled"] = Value::Bool(true); }
-                    sqlx::query("UPDATE panel_records SET data = $1 WHERE collection = 'hosts' AND id = $2")
-                        .bind(&data).bind(host_id).execute(&mut *tx).await?;
+                    if nodes.is_empty() {
+                        data["disabled"] = Value::Bool(true);
+                    }
+                    sqlx::query(
+                        "UPDATE panel_records SET data = $1 WHERE collection = 'hosts' AND id = $2",
+                    )
+                    .bind(&data)
+                    .bind(host_id)
+                    .execute(&mut *tx)
+                    .await?;
                 }
             }
         }
@@ -794,9 +1126,13 @@ async fn delete_record(
     let result = row_to_record(&row)?;
     if collection == "nodes" {
         sqlx::query("DELETE FROM node_metric_keys WHERE node_id = $1")
-            .bind(id).execute(&mut *tx).await?;
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
         sqlx::query("DELETE FROM node_metric_nonces WHERE node_id = $1")
-            .bind(id).execute(&mut *tx).await?;
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
         sqlx::query("DELETE FROM node_ip_rotation_cursors WHERE node_id = $1")
             .bind(id)
             .execute(&mut *tx)
@@ -808,7 +1144,15 @@ async fn delete_record(
             .await?;
     }
     tx.commit().await?;
-    audit(&state.pool, &actor.username, "delete", Some(&collection), Some(id), json!({})).await;
+    audit(
+        &state.pool,
+        &actor.username,
+        "delete",
+        Some(&collection),
+        Some(id),
+        json!({}),
+    )
+    .await;
     Ok(Json(result))
 }
 
@@ -817,17 +1161,30 @@ fn valid_public_hostname(value: &str) -> bool {
         return false;
     }
     value.split('.').all(|part| {
-        !part.is_empty() && part.len() <= 63
-            && part.bytes().next().is_some_and(|c| c.is_ascii_alphanumeric())
-            && part.bytes().last().is_some_and(|c| c.is_ascii_alphanumeric())
+        !part.is_empty()
+            && part.len() <= 63
+            && part
+                .bytes()
+                .next()
+                .is_some_and(|c| c.is_ascii_alphanumeric())
+            && part
+                .bytes()
+                .last()
+                .is_some_and(|c| c.is_ascii_alphanumeric())
             && part.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-')
     })
 }
 
-async fn get_settings(State(state): State<AppState>,
-    Extension(actor): Extension<auth::AuthUser>) -> Result<Json<Value>, ApiError> {
-    let settings=read_settings(&state.pool).await?;
-    Ok(Json(if viewer_read_only(&actor){viewer_settings(&settings)}else{settings}))
+async fn get_settings(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+) -> Result<Json<Value>, ApiError> {
+    let settings = read_settings(&state.pool).await?;
+    Ok(Json(if viewer_read_only(&actor) {
+        viewer_settings(&settings)
+    } else {
+        settings
+    }))
 }
 
 async fn patch_settings(
@@ -836,70 +1193,190 @@ async fn patch_settings(
     Json(patch): Json<Value>,
 ) -> Result<Json<Value>, ApiError> {
     require_owner(&actor)?;
-    let object = patch.as_object()
-        .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Настройки должны быть JSON-объектом."))?;
+    let object = patch.as_object().ok_or_else(|| {
+        ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Настройки должны быть JSON-объектом.",
+        )
+    })?;
     for key in object.keys() {
-        if !matches!(key.as_str(), "brand" | "domain" | "hooks"
-                | "subscriptionDomain" | "subscriptionPath" | "subscriptionBrand" | "subscriptionAnnouncement" | "subscriptionUpdateInterval" | "subscriptionAnnouncementRotationHours"
-                | "subscriptionDescription" | "subscriptionDescriptionEn" | "subscriptionFooter" | "subscriptionFooterEn" | "subscriptionAccent" | "subscriptionSecondaryAccent"
-                | "subscriptionLanguage" | "subscriptionTheme" | "subscriptionSyncPanelTheme" | "subscriptionPlacement" | "nodePlacement"
-                | "deploymentServerB" | "deploymentServerC" | "subscriptionShowTraffic"
-                | "subscriptionShowExpiry" | "subscriptionBackground" | "subscriptionCardColor"
-                | "subscriptionTextColor" | "subscriptionLayout" | "subscriptionCardStyle"
-                | "subscriptionFont" | "subscriptionRadius" | "subscriptionClientLayout"
-                | "subscriptionHero" | "subscriptionHeroEn" | "subscriptionCta" | "subscriptionCtaEn" | "subscriptionSupportLabel" | "subscriptionSupportLabelEn"
-                | "subscriptionLogoUrl" | "subscriptionSupportUrl" | "subscriptionShowStatus"
-                | "subscriptionShowApps" | "subscriptionShowQr" | "subscriptionShowCopy"
-                | "subscriptionShowSupport" | "subscriptionShowDevices"
-                | "subscriptionJson" | "clientBalancers" | "clientRoutingProfiles" | "subscriptionClients" | "subscriptionClientLinks"
-                | "subscriptionAppsTitle" | "subscriptionAppsTitleEn" | "subscriptionCustomClients") {
-            return Err(ApiError::new(StatusCode::BAD_REQUEST, format!("Неизвестное поле настроек: {key}")));
+        if !matches!(
+            key.as_str(),
+            "brand"
+                | "domain"
+                | "hooks"
+                | "subscriptionDomain"
+                | "subscriptionPath"
+                | "subscriptionBrand"
+                | "subscriptionAnnouncement"
+                | "subscriptionUpdateInterval"
+                | "subscriptionAnnouncementRotationHours"
+                | "subscriptionDescription"
+                | "subscriptionDescriptionEn"
+                | "subscriptionFooter"
+                | "subscriptionFooterEn"
+                | "subscriptionAccent"
+                | "subscriptionSecondaryAccent"
+                | "subscriptionLanguage"
+                | "subscriptionTheme"
+                | "subscriptionSyncPanelTheme"
+                | "subscriptionPlacement"
+                | "nodePlacement"
+                | "deploymentServerB"
+                | "deploymentServerC"
+                | "subscriptionShowTraffic"
+                | "subscriptionShowExpiry"
+                | "subscriptionBackground"
+                | "subscriptionCardColor"
+                | "subscriptionTextColor"
+                | "subscriptionLayout"
+                | "subscriptionCardStyle"
+                | "subscriptionFont"
+                | "subscriptionRadius"
+                | "subscriptionClientLayout"
+                | "subscriptionHero"
+                | "subscriptionHeroEn"
+                | "subscriptionCta"
+                | "subscriptionCtaEn"
+                | "subscriptionSupportLabel"
+                | "subscriptionSupportLabelEn"
+                | "subscriptionLogoUrl"
+                | "subscriptionSupportUrl"
+                | "subscriptionShowStatus"
+                | "subscriptionShowApps"
+                | "subscriptionShowQr"
+                | "subscriptionShowCopy"
+                | "subscriptionShowSupport"
+                | "subscriptionShowDevices"
+                | "subscriptionJson"
+                | "clientBalancers"
+                | "clientRoutingProfiles"
+                | "subscriptionClients"
+                | "subscriptionClientLinks"
+                | "subscriptionAppsTitle"
+                | "subscriptionAppsTitleEn"
+                | "subscriptionCustomClients"
+        ) {
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                format!("Неизвестное поле настроек: {key}"),
+            ));
         }
     }
     if let Some(brand) = object.get("brand") {
-        let value = brand.as_str().ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Название панели должно быть строкой."))?;
+        let value = brand.as_str().ok_or_else(|| {
+            ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Название панели должно быть строкой.",
+            )
+        })?;
         if value.trim().is_empty() || value.chars().count() > 80 {
-            return Err(ApiError::new(StatusCode::BAD_REQUEST, "Название панели должно содержать от 1 до 80 символов."));
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Название панели должно содержать от 1 до 80 символов.",
+            ));
         }
     }
     if let Some(domain) = object.get("domain") {
-        let value = domain.as_str().ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Домен должен быть строкой."))?;
+        let value = domain
+            .as_str()
+            .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Домен должен быть строкой."))?;
         if value.chars().count() > 253 || value.chars().any(char::is_whitespace) {
-            return Err(ApiError::new(StatusCode::BAD_REQUEST, "Указан некорректный домен."));
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Указан некорректный домен.",
+            ));
         }
     }
     if let Some(domain) = object.get("subscriptionDomain") {
-        let value = domain.as_str().ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Домен подписки должен быть строкой."))?;
+        let value = domain.as_str().ok_or_else(|| {
+            ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Домен подписки должен быть строкой.",
+            )
+        })?;
         if !value.is_empty() && !valid_public_hostname(value) {
-            return Err(ApiError::new(StatusCode::BAD_REQUEST, "Некорректный домен подписки. Укажите только hostname без схемы, пути и порта."));
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Некорректный домен подписки. Укажите только hostname без схемы, пути и порта.",
+            ));
         }
     }
     if let Some(path) = object.get("subscriptionPath") {
-        let value = path.as_str().ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Путь подписки должен быть строкой."))?;
-        if value.len() < 2 || value.len() > 64 || !value.starts_with('/')
-            || value.ends_with('/') || value.contains("//")
-            || value.split('/').skip(1).count()>8
-            || value.split('/').skip(1).any(|segment| segment.is_empty() || segment == "." || segment == "..")
-            || !value.bytes().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'/' | b'-' | b'_'))
+        let value = path.as_str().ok_or_else(|| {
+            ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Путь подписки должен быть строкой.",
+            )
+        })?;
+        if value.len() < 2
+            || value.len() > 64
+            || !value.starts_with('/')
+            || value.ends_with('/')
+            || value.contains("//")
+            || value.split('/').skip(1).count() > 8
+            || value
+                .split('/')
+                .skip(1)
+                .any(|segment| segment.is_empty() || segment == "." || segment == "..")
+            || !value
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'/' | b'-' | b'_'))
         {
-            return Err(ApiError::new(StatusCode::BAD_REQUEST, "Путь должен начинаться с / и состоять из латиницы, цифр, - и _."));
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Путь должен начинаться с / и состоять из латиницы, цифр, - и _.",
+            ));
         }
-        if value.starts_with("/api") || value.starts_with("/login") || value.starts_with("/dashboard") {
-            return Err(ApiError::new(StatusCode::BAD_REQUEST, "Путь конфликтует со служебными маршрутами панели."));
+        if value.starts_with("/api")
+            || value.starts_with("/login")
+            || value.starts_with("/dashboard")
+        {
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Путь конфликтует со служебными маршрутами панели.",
+            ));
         }
     }
-    for (key, max_len) in [("subscriptionBrand", 80), ("subscriptionDescription", 240), ("subscriptionDescriptionEn", 240), ("subscriptionFooter", 160), ("subscriptionFooterEn", 160), ("deploymentServerB", 253), ("deploymentServerC", 253)] {
+    for (key, max_len) in [
+        ("subscriptionBrand", 80),
+        ("subscriptionDescription", 240),
+        ("subscriptionDescriptionEn", 240),
+        ("subscriptionFooter", 160),
+        ("subscriptionFooterEn", 160),
+        ("deploymentServerB", 253),
+        ("deploymentServerC", 253),
+    ] {
         if let Some(value) = object.get(key) {
-            let text = value.as_str().ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, format!("Поле {key} должно быть текстом.")))?;
+            let text = value.as_str().ok_or_else(|| {
+                ApiError::new(
+                    StatusCode::BAD_REQUEST,
+                    format!("Поле {key} должно быть текстом."),
+                )
+            })?;
             if text.chars().count() > max_len || text.chars().any(char::is_control) {
-                return Err(ApiError::new(StatusCode::BAD_REQUEST, format!("Некорректное значение поля {key}.")));
+                return Err(ApiError::new(
+                    StatusCode::BAD_REQUEST,
+                    format!("Некорректное значение поля {key}."),
+                ));
             }
         }
     }
     if let Some(color) = object.get("subscriptionAccent") {
-        let text = color.as_str().ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Цвет подписки должен быть строкой."))?;
-        if text.len() != 7 || !text.starts_with('#') || !text[1..].bytes().all(|c| c.is_ascii_hexdigit()) {
-            return Err(ApiError::new(StatusCode::BAD_REQUEST, "Цвет подписки должен быть в формате #RRGGBB."));
+        let text = color.as_str().ok_or_else(|| {
+            ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Цвет подписки должен быть строкой.",
+            )
+        })?;
+        if text.len() != 7
+            || !text.starts_with('#')
+            || !text[1..].bytes().all(|c| c.is_ascii_hexdigit())
+        {
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Цвет подписки должен быть в формате #RRGGBB.",
+            ));
         }
     }
     for (key, choices) in [
@@ -909,9 +1386,14 @@ async fn patch_settings(
         ("nodePlacement", &["a", "b", "c"][..]),
     ] {
         if let Some(value) = object.get(key) {
-            let text = value.as_str().ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, format!("Некорректное поле {key}.")))?;
+            let text = value.as_str().ok_or_else(|| {
+                ApiError::new(StatusCode::BAD_REQUEST, format!("Некорректное поле {key}."))
+            })?;
             if !choices.contains(&text) {
-                return Err(ApiError::new(StatusCode::BAD_REQUEST, format!("Недопустимое значение {key}.")));
+                return Err(ApiError::new(
+                    StatusCode::BAD_REQUEST,
+                    format!("Недопустимое значение {key}."),
+                ));
             }
         }
     }
@@ -919,44 +1401,80 @@ async fn patch_settings(
         if let Some(value) = object.get(key)
             && !value.is_boolean()
         {
-            return Err(ApiError::new(StatusCode::BAD_REQUEST, format!("Поле {key} должно быть переключателем.")));
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                format!("Поле {key} должно быть переключателем."),
+            ));
         }
     }
     if let Some(value) = object.get("subscriptionAnnouncement") {
-        let message = value.as_str().ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Анонсы должны быть текстом."))?;
-        if message.chars().count() > 4000 || message.chars().any(|c| c.is_control() && c != '\n' && c != '\r') {
-            return Err(ApiError::new(StatusCode::BAD_REQUEST, "Анонсы: максимум 4000 символов, разделитель — отдельная строка ---." ));
+        let message = value
+            .as_str()
+            .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Анонсы должны быть текстом."))?;
+        if message.chars().count() > 4000
+            || message
+                .chars()
+                .any(|c| c.is_control() && c != '\n' && c != '\r')
+        {
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Анонсы: максимум 4000 символов, разделитель — отдельная строка ---.",
+            ));
         }
     }
     if let Some(value) = object.get("subscriptionAnnouncementRotationHours") {
-        let hours = value.as_u64().ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Период ротации анонсов должен быть целым числом часов."))?;
+        let hours = value.as_u64().ok_or_else(|| {
+            ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Период ротации анонсов должен быть целым числом часов.",
+            )
+        })?;
         if !(1..=720).contains(&hours) {
-            return Err(ApiError::new(StatusCode::BAD_REQUEST, "Период ротации анонсов должен быть от 1 до 720 часов."));
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Период ротации анонсов должен быть от 1 до 720 часов.",
+            ));
         }
     }
     if let Some(value) = object.get("subscriptionUpdateInterval") {
-        let hours = value.as_u64().ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Интервал обновления должен быть целым числом."))?;
+        let hours = value.as_u64().ok_or_else(|| {
+            ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Интервал обновления должен быть целым числом.",
+            )
+        })?;
         if !(1..=168).contains(&hours) {
-            return Err(ApiError::new(StatusCode::BAD_REQUEST, "Интервал обновления должен быть от 1 до 168 часов."));
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Интервал обновления должен быть от 1 до 168 часов.",
+            ));
         }
     }
     subscription_settings::validate(object)?;
-    if let Some(groups)=object.get("clientBalancers"){
+    if let Some(groups) = object.get("clientBalancers") {
         subscription_json::validate_client_balancers(groups)
-            .map_err(|error|ApiError::new(StatusCode::BAD_REQUEST,error))?;
+            .map_err(|error| ApiError::new(StatusCode::BAD_REQUEST, error))?;
     }
     if let Some(hooks) = object.get("hooks") {
-        let hooks = hooks.as_object().ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Вебхуки должны быть объектом."))?;
+        let hooks = hooks.as_object().ok_or_else(|| {
+            ApiError::new(StatusCode::BAD_REQUEST, "Вебхуки должны быть объектом.")
+        })?;
         let allowed = [
-            "user.created", "user.limited", "user.expired",
-            "user.expires_in_24_hours", "user.first_connected",
+            "user.created",
+            "user.limited",
+            "user.expired",
+            "user.expires_in_24_hours",
+            "user.first_connected",
             "user.bandwidth_usage_threshold_reached",
         ];
         for (key, value) in hooks {
             if !allowed.contains(&key.as_str())
                 || !(value.is_boolean() || value.as_i64().is_some_and(|n| n == 0 || n == 1))
             {
-                return Err(ApiError::new(StatusCode::BAD_REQUEST, "Недопустимый параметр вебхука."));
+                return Err(ApiError::new(
+                    StatusCode::BAD_REQUEST,
+                    "Недопустимый параметр вебхука.",
+                ));
             }
         }
     }
@@ -971,7 +1489,15 @@ async fn patch_settings(
     .fetch_one(&state.pool)
     .await?;
     let settings: Value = row.try_get("value")?;
-    audit(&state.pool, &actor.username, "settings.update", None, None, json!({})).await;
+    audit(
+        &state.pool,
+        &actor.username,
+        "settings.update",
+        None,
+        None,
+        json!({}),
+    )
+    .await;
     Ok(Json(settings))
 }
 
@@ -981,26 +1507,43 @@ async fn patch_client_routing(
     State(state): State<AppState>,
     Extension(actor): Extension<auth::AuthUser>,
     Json(body): Json<Value>,
-) -> Result<Json<Value>,ApiError>{
+) -> Result<Json<Value>, ApiError> {
     require_mutation(&actor)?;
-    let object=body.as_object().ok_or_else(||ApiError::new(
-        StatusCode::BAD_REQUEST,"Ожидается объект настроек маршрутизации."))?;
-    if object.len()!=1 || !object.contains_key("profiles"){
-        return Err(ApiError::new(StatusCode::BAD_REQUEST,
-            "Разрешено изменять только массив profiles."));
+    let object = body.as_object().ok_or_else(|| {
+        ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Ожидается объект настроек маршрутизации.",
+        )
+    })?;
+    if object.len() != 1 || !object.contains_key("profiles") {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Разрешено изменять только массив profiles.",
+        ));
     }
-    let profiles=object.get("profiles").unwrap();
-    client_routing::validate(profiles).map_err(|reason|
-        ApiError::new(StatusCode::BAD_REQUEST,reason))?;
-    let settings:Value=sqlx::query_scalar(
+    let profiles = object.get("profiles").unwrap();
+    client_routing::validate(profiles)
+        .map_err(|reason| ApiError::new(StatusCode::BAD_REQUEST, reason))?;
+    let settings: Value = sqlx::query_scalar(
         "INSERT INTO app_settings(key,value) VALUES('panel',$1)
          ON CONFLICT(key) DO UPDATE
          SET value=app_settings.value || EXCLUDED.value,updated_at=NOW()
-         RETURNING value"
-    ).bind(json!({"clientRoutingProfiles":profiles})).fetch_one(&state.pool).await?;
-    audit(&state.pool,&actor.username,"client-routing.update",None,None,json!({
-        "templates":profiles.as_array().map_or(0,Vec::len)
-    })).await;
+         RETURNING value",
+    )
+    .bind(json!({"clientRoutingProfiles":profiles}))
+    .fetch_one(&state.pool)
+    .await?;
+    audit(
+        &state.pool,
+        &actor.username,
+        "client-routing.update",
+        None,
+        None,
+        json!({
+            "templates":profiles.as_array().map_or(0,Vec::len)
+        }),
+    )
+    .await;
     Ok(Json(json!({"profiles":settings["clientRoutingProfiles"]})))
 }
 
@@ -1015,7 +1558,10 @@ async fn get_stats(State(state): State<AppState>) -> Result<Json<Value>, ApiErro
     for user in &users {
         *by.entry(user_status(user, now_ms).to_owned()).or_default() += 1;
     }
-    let online = users.iter().filter(|user| user_is_online(user, now_ms)).count();
+    let online = users
+        .iter()
+        .filter(|user| user_is_online(user, now_ms))
+        .count();
     let mut node_on = Map::new();
     let mut n_on = 0usize;
     for node in &nodes {
@@ -1040,7 +1586,6 @@ async fn get_stats(State(state): State<AppState>) -> Result<Json<Value>, ApiErro
     })))
 }
 
-
 async fn get_system_stats(State(state): State<AppState>) -> Json<Value> {
     let cpu_before = read_cpu_ticks().await;
     tokio::time::sleep(Duration::from_millis(220)).await;
@@ -1050,34 +1595,58 @@ async fn get_system_stats(State(state): State<AppState>) -> Json<Value> {
             let total_delta = after.0.saturating_sub(before.0);
             let idle_delta = after.1.saturating_sub(before.1);
             if total_delta > 0 {
-                Some(((total_delta.saturating_sub(idle_delta)) as f64 * 100.0 / total_delta as f64).clamp(0.0, 100.0))
-            } else { None }
+                Some(
+                    ((total_delta.saturating_sub(idle_delta)) as f64 * 100.0 / total_delta as f64)
+                        .clamp(0.0, 100.0),
+                )
+            } else {
+                None
+            }
         }
         _ => None,
     };
 
-    let meminfo = tokio::fs::read_to_string("/proc/meminfo").await.unwrap_or_default();
+    let meminfo = tokio::fs::read_to_string("/proc/meminfo")
+        .await
+        .unwrap_or_default();
     let mem_value = |key: &str| -> u64 {
-        meminfo.lines().find_map(|line| {
-            let mut parts = line.split_whitespace();
-            if parts.next()? != key { return None; }
-            parts.next()?.parse::<u64>().ok().map(|kb| kb.saturating_mul(1024))
-        }).unwrap_or(0)
+        meminfo
+            .lines()
+            .find_map(|line| {
+                let mut parts = line.split_whitespace();
+                if parts.next()? != key {
+                    return None;
+                }
+                parts
+                    .next()?
+                    .parse::<u64>()
+                    .ok()
+                    .map(|kb| kb.saturating_mul(1024))
+            })
+            .unwrap_or(0)
     };
     let ram_total = mem_value("MemTotal:");
     let ram_available = mem_value("MemAvailable:").min(ram_total);
     let ram_used = ram_total.saturating_sub(ram_available);
-    let ram_percent = if ram_total > 0 { Some(ram_used as f64 * 100.0 / ram_total as f64) } else { None };
+    let ram_percent = if ram_total > 0 {
+        Some(ram_used as f64 * 100.0 / ram_total as f64)
+    } else {
+        None
+    };
 
     let disk = tokio::process::Command::new("df")
         .args(["-B1", "-P", "/"])
-        .output().await.ok()
+        .output()
+        .await
+        .ok()
         .filter(|output| output.status.success())
         .and_then(|output| String::from_utf8(output.stdout).ok())
         .and_then(|output| output.lines().nth(1).map(str::to_owned))
         .and_then(|line| {
             let cols = line.split_whitespace().collect::<Vec<_>>();
-            if cols.len() < 6 { return None; }
+            if cols.len() < 6 {
+                return None;
+            }
             let total = cols[1].parse::<u64>().ok()?;
             let used = cols[2].parse::<u64>().ok()?;
             let available = cols[3].parse::<u64>().ok()?;
@@ -1088,24 +1657,40 @@ async fn get_system_stats(State(state): State<AppState>) -> Json<Value> {
             }))
         });
 
-    let uptime_seconds = tokio::fs::read_to_string("/proc/uptime").await.ok()
+    let uptime_seconds = tokio::fs::read_to_string("/proc/uptime")
+        .await
+        .ok()
         .and_then(|s| s.split_whitespace().next()?.parse::<f64>().ok())
         .map(|seconds| seconds as u64);
-    let load = tokio::fs::read_to_string("/proc/loadavg").await.unwrap_or_default();
-    let loads = load.split_whitespace().take(3).filter_map(|v| v.parse::<f64>().ok()).collect::<Vec<_>>();
+    let load = tokio::fs::read_to_string("/proc/loadavg")
+        .await
+        .unwrap_or_default();
+    let loads = load
+        .split_whitespace()
+        .take(3)
+        .filter_map(|v| v.parse::<f64>().ok())
+        .collect::<Vec<_>>();
     let process_count = match tokio::fs::read_dir("/proc").await {
         Ok(mut entries) => {
             let mut count = 0u64;
             while let Ok(Some(entry)) = entries.next_entry().await {
-                if entry.file_name().to_string_lossy().parse::<u32>().is_ok() { count += 1; }
+                if entry.file_name().to_string_lossy().parse::<u32>().is_ok() {
+                    count += 1;
+                }
             }
             Some(count)
         }
         Err(_) => None,
     };
-    let db_status = if sqlx::query("SELECT 1").execute(&state.pool).await.is_ok() { "online" } else { "offline" };
-    let sampled_at = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default().as_millis() as u64;
+    let db_status = if sqlx::query("SELECT 1").execute(&state.pool).await.is_ok() {
+        "online"
+    } else {
+        "offline"
+    };
+    let sampled_at = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
 
     Json(json!({
         "cpu": {"percent": cpu},
@@ -1122,13 +1707,17 @@ async fn get_system_stats(State(state): State<AppState>) -> Json<Value> {
 
 /// Read-only dashboard overview from actual TimescaleDB measurements.
 /// Samples older than 5 minutes are reported stale, never as live zeroes.
-async fn get_statistics_overview(State(state): State<AppState>,
-    Extension(actor): Extension<auth::AuthUser>) -> Result<Json<Value>, ApiError> {
+async fn get_statistics_overview(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+) -> Result<Json<Value>, ApiError> {
     let records = load_records(&state.pool, "nodes").await?;
     let mut nodes = Vec::with_capacity(records.len());
     for node in records {
         let id = node.get("id").and_then(Value::as_i64).unwrap_or(0);
-        if id <= 0 { continue; }
+        if id <= 0 {
+            continue;
+        }
         let sample = sqlx::query(
             "SELECT cpu_percent, ram_used_bytes, ram_total_bytes, disk_used_bytes, disk_total_bytes,
                     rx_bytes_per_sec,tx_bytes_per_sec,active_connections,online_clients,metrics,
@@ -1153,18 +1742,27 @@ async fn get_statistics_overview(State(state): State<AppState>,
                 "stale":std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
                     .unwrap_or_default().as_millis() as i64 - sampled_at > 300_000
             }))
-        } else { None };
-        let traffic=sqlx::query(
+        } else {
+            None
+        };
+        let traffic = sqlx::query(
             "SELECT rx_bytes, tx_bytes, observations,
                     (EXTRACT(EPOCH FROM updated_at)*1000)::BIGINT AS updated_at_ms
-             FROM node_network_traffic_totals WHERE node_id=$1"
-        ).bind(id).fetch_optional(&state.pool).await?;
-        let (network_rx,network_tx,network_samples,network_updated)=if let Some(t)=traffic{
-            (Some(t.try_get::<i64,_>("rx_bytes")?),
-             Some(t.try_get::<i64,_>("tx_bytes")?),
-             Some(t.try_get::<i64,_>("observations")?),
-             Some(t.try_get::<i64,_>("updated_at_ms")?))
-        }else{(None,None,None,None)};
+             FROM node_network_traffic_totals WHERE node_id=$1",
+        )
+        .bind(id)
+        .fetch_optional(&state.pool)
+        .await?;
+        let (network_rx, network_tx, network_samples, network_updated) = if let Some(t) = traffic {
+            (
+                Some(t.try_get::<i64, _>("rx_bytes")?),
+                Some(t.try_get::<i64, _>("tx_bytes")?),
+                Some(t.try_get::<i64, _>("observations")?),
+                Some(t.try_get::<i64, _>("updated_at_ms")?),
+            )
+        } else {
+            (None, None, None, None)
+        };
         nodes.push(json!({
             "networkRxBytes":network_rx,
             "networkTxBytes":network_tx,
@@ -1180,18 +1778,26 @@ async fn get_statistics_overview(State(state): State<AppState>,
             "latest":current
         }));
     }
-    let users: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM panel_records WHERE collection='users'")
-        .fetch_one(&state.pool).await?;
-    let inbound: (i64,i64,i64) = {
-        let row=sqlx::query(
+    let users: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM panel_records WHERE collection='users'")
+            .fetch_one(&state.pool)
+            .await?;
+    let inbound: (i64, i64, i64) = {
+        let row = sqlx::query(
             "SELECT COUNT(*)::BIGINT AS entries,
                     COALESCE(SUM(uplink_bytes),0)::BIGINT AS up,
                     COALESCE(SUM(downlink_bytes),0)::BIGINT AS down
-             FROM user_inbound_traffic_totals"
-        ).fetch_one(&state.pool).await?;
-        (row.try_get("entries")?,row.try_get("up")?,row.try_get("down")?)
+             FROM user_inbound_traffic_totals",
+        )
+        .fetch_one(&state.pool)
+        .await?;
+        (
+            row.try_get("entries")?,
+            row.try_get("up")?,
+            row.try_get("down")?,
+        )
     };
-    let total_nodes=nodes.len();
+    let total_nodes = nodes.len();
     Ok(Json(json!({
         "nodes":nodes,
         "totalNodes":total_nodes,
@@ -1208,9 +1814,12 @@ async fn ingest_node_metrics(
     raw_body: Bytes,
 ) -> Result<(StatusCode, Json<Value>), ApiError> {
     let body: NodeMetricsIngestRequest = serde_json::from_slice(&raw_body)
-        .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST,"Некорректный JSON метрик."))?;
+        .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Некорректный JSON метрик."))?;
     if body.node_id <= 0 {
-        return Err(ApiError::new(StatusCode::BAD_REQUEST, "node_id должен быть положительным числом."));
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "node_id должен быть положительным числом.",
+        ));
     }
     // The node must authenticate before untrusted samples are recorded.
     // Telemetry requires a registered Ed25519 identity.
@@ -1219,106 +1828,170 @@ async fn ingest_node_metrics(
     let mut metrics = body.metrics.unwrap_or_else(|| json!({}));
     if let Some(status) = body.user_stats_status.as_deref() {
         if !matches!(status, "verified" | "direct" | "unavailable") {
-            return Err(ApiError::new(StatusCode::BAD_REQUEST,"Некорректный статус персонального учёта."));
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Некорректный статус персонального учёта.",
+            ));
         }
         if let Some(map) = metrics.as_object_mut() {
-            map.insert("userStatsStatus".into(),json!(status));
+            map.insert("userStatsStatus".into(), json!(status));
             if let Some(at) = body.user_stats_at_ms {
                 if at < 0 {
-                    return Err(ApiError::new(StatusCode::BAD_REQUEST,"Некорректное время пользовательских счётчиков."));
+                    return Err(ApiError::new(
+                        StatusCode::BAD_REQUEST,
+                        "Некорректное время пользовательских счётчиков.",
+                    ));
                 }
-                map.insert("userStatsAtMs".into(),json!(at));
+                map.insert("userStatsAtMs".into(), json!(at));
             }
         }
     }
     if let Some(steal) = body.cpu_steal_percent {
         if !steal.is_finite() || !(0.0..=100.0).contains(&steal) {
-            return Err(ApiError::new(StatusCode::BAD_REQUEST,"Некорректное значение CPU steal time."));
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Некорректное значение CPU steal time.",
+            ));
         }
         if let Some(map) = metrics.as_object_mut() {
-            map.insert("cpuStealPercent".into(),json!(steal));
+            map.insert("cpuStealPercent".into(), json!(steal));
         }
     }
-    if !metrics.is_object() || serde_json::to_vec(&metrics).map(|v| v.len()).unwrap_or(usize::MAX) > 32 * 1024 {
-        return Err(ApiError::new(StatusCode::BAD_REQUEST, "metrics должен быть JSON-объектом не больше 32 КиБ."));
+    if !metrics.is_object()
+        || serde_json::to_vec(&metrics)
+            .map(|v| v.len())
+            .unwrap_or(usize::MAX)
+            > 32 * 1024
+    {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "metrics должен быть JSON-объектом не больше 32 КиБ.",
+        ));
     }
-    if body.cpu_percent.is_some_and(|value| !value.is_finite() || !(0.0..=100.0).contains(&value))
-        || body.cpu_steal_percent.is_some_and(|value| !value.is_finite() || !(0.0..=100.0).contains(&value))
+    if body
+        .cpu_percent
+        .is_some_and(|value| !value.is_finite() || !(0.0..=100.0).contains(&value))
+        || body
+            .cpu_steal_percent
+            .is_some_and(|value| !value.is_finite() || !(0.0..=100.0).contains(&value))
         || body.ram_used_bytes.is_some_and(|value| value < 0)
         || body.ram_total_bytes.is_some_and(|value| value < 0)
         || body.disk_used_bytes.is_some_and(|value| value < 0)
         || body.disk_total_bytes.is_some_and(|value| value < 0)
-        || body.rx_bytes_per_sec.is_some_and(|value| !value.is_finite() || value < 0.0)
-        || body.tx_bytes_per_sec.is_some_and(|value| !value.is_finite() || value < 0.0)
+        || body
+            .rx_bytes_per_sec
+            .is_some_and(|value| !value.is_finite() || value < 0.0)
+        || body
+            .tx_bytes_per_sec
+            .is_some_and(|value| !value.is_finite() || value < 0.0)
         || body.active_connections.is_some_and(|value| value < 0)
         || body.online_clients.is_some_and(|value| value < 0)
     {
-        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Одно или несколько значений метрик выходят за допустимые пределы."));
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Одно или несколько значений метрик выходят за допустимые пределы.",
+        ));
     }
-
 
     let mut user_traffic = body.user_traffic.unwrap_or_default();
     if user_traffic.len() > 2048 {
-        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Не более 2048 пользователей за один пакет метрик."));
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Не более 2048 пользователей за один пакет метрик.",
+        ));
     }
     let mut seen_users = std::collections::HashSet::new();
     for sample in &user_traffic {
-        if sample.user_id <= 0 || sample.uplink_bytes < 0 || sample.downlink_bytes < 0
+        if sample.user_id <= 0
+            || sample.uplink_bytes < 0
+            || sample.downlink_bytes < 0
             || !seen_users.insert(sample.user_id)
         {
-            return Err(ApiError::new(StatusCode::BAD_REQUEST, "Некорректная или дублирующаяся запись userTraffic."));
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Некорректная или дублирующаяся запись userTraffic.",
+            ));
         }
     }
 
     let mut inbound_samples = body.user_inbound_traffic.unwrap_or_default();
     if inbound_samples.len() > 4096 {
-        return Err(ApiError::new(StatusCode::BAD_REQUEST,"Не более 4096 inbound-счётчиков за один пакет."));
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Не более 4096 inbound-счётчиков за один пакет.",
+        ));
     }
     let mut inbound_seen = std::collections::HashSet::new();
     for sample in &inbound_samples {
-        if sample.user_id <= 0 || sample.uplink_bytes < 0 || sample.downlink_bytes < 0
-            || sample.inbound_tag.is_empty() || sample.inbound_tag.len() > 128
+        if sample.user_id <= 0
+            || sample.uplink_bytes < 0
+            || sample.downlink_bytes < 0
+            || sample.inbound_tag.is_empty()
+            || sample.inbound_tag.len() > 128
             || sample.inbound_tag.chars().any(char::is_control)
             || !inbound_seen.insert((sample.user_id, sample.inbound_tag.as_str()))
         {
-            return Err(ApiError::new(StatusCode::BAD_REQUEST,
-                "Некорректная или дублирующаяся запись userInboundTraffic."));
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Некорректная или дублирующаяся запись userInboundTraffic.",
+            ));
         }
     }
 
     // Node-wide traffic accounting is separate from authenticated per-user
     // Xray counters. Require both monotonic NIC counters and an interface ID.
     // Older metrics agents simply omit these fields until upgraded.
-    let network_sample=match (
-        metrics.get("rxTotalBytes"),metrics.get("txTotalBytes"),metrics.get("interface")
-    ){
-        (None,None,_)=>None,
-        (Some(rx),Some(tx),Some(interface))=>{
-            let rx=rx.as_i64().filter(|n|*n>=0)
-                .ok_or_else(||ApiError::new(StatusCode::BAD_REQUEST,"Недопустимый rxTotalBytes"))?;
-            let tx=tx.as_i64().filter(|n|*n>=0)
-                .ok_or_else(||ApiError::new(StatusCode::BAD_REQUEST,"Недопустимый txTotalBytes"))?;
-            let interface=interface.as_str().filter(|name|!name.is_empty()
-                && name.len()<=64 && name.bytes().all(|c|
-                    c.is_ascii_alphanumeric() || b"_.:-".contains(&c)))
-                .ok_or_else(||ApiError::new(StatusCode::BAD_REQUEST,"Недопустимый сетевой интерфейс"))?;
-            Some((rx,tx,interface.to_owned()))
+    let network_sample = match (
+        metrics.get("rxTotalBytes"),
+        metrics.get("txTotalBytes"),
+        metrics.get("interface"),
+    ) {
+        (None, None, _) => None,
+        (Some(rx), Some(tx), Some(interface)) => {
+            let rx = rx.as_i64().filter(|n| *n >= 0).ok_or_else(|| {
+                ApiError::new(StatusCode::BAD_REQUEST, "Недопустимый rxTotalBytes")
+            })?;
+            let tx = tx.as_i64().filter(|n| *n >= 0).ok_or_else(|| {
+                ApiError::new(StatusCode::BAD_REQUEST, "Недопустимый txTotalBytes")
+            })?;
+            let interface = interface
+                .as_str()
+                .filter(|name| {
+                    !name.is_empty()
+                        && name.len() <= 64
+                        && name
+                            .bytes()
+                            .all(|c| c.is_ascii_alphanumeric() || b"_.:-".contains(&c))
+                })
+                .ok_or_else(|| {
+                    ApiError::new(StatusCode::BAD_REQUEST, "Недопустимый сетевой интерфейс")
+                })?;
+            Some((rx, tx, interface.to_owned()))
         }
-        _=>return Err(ApiError::new(StatusCode::BAD_REQUEST,
-            "Счётчики RX/TX ноды должны передаваться вместе с интерфейсом"))
+        _ => {
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Счётчики RX/TX ноды должны передаваться вместе с интерфейсом",
+            ));
+        }
     };
     // Serialize telemetry for this node. A delayed/duplicated Xray snapshot
     // must never roll back the baseline and turn the next idle poll into activity.
     // Keep the server sample, counters and onlineAt update in one transaction.
     let mut telemetry_tx = state.pool.begin().await?;
     sqlx::query("SELECT pg_advisory_xact_lock($1)")
-        .bind(body.node_id).execute(&mut *telemetry_tx).await?;
+        .bind(body.node_id)
+        .execute(&mut *telemetry_tx)
+        .await?;
     let server_now_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default().as_millis() as i64;
+        .unwrap_or_default()
+        .as_millis() as i64;
     let source_ms = body.user_stats_at_ms.unwrap_or(0);
-    let source_valid = matches!(body.user_stats_status.as_deref(), Some("verified" | "direct"))
-        && source_ms > 0
+    let source_valid = matches!(
+        body.user_stats_status.as_deref(),
+        Some("verified" | "direct")
+    ) && source_ms > 0
         && source_ms >= server_now_ms.saturating_sub(45_000)
         && source_ms <= server_now_ms.saturating_add(15_000);
     // Reject duplicate or out-of-order producer timestamps under the node lock.
@@ -1328,17 +2001,23 @@ async fn ingest_node_metrics(
              FROM server_metric_samples
              WHERE node_id=$1 AND sampled_at > NOW()-INTERVAL '2 minutes'
                AND metrics->>'userStatsAccepted'='true'
-               AND (metrics->>'userStatsAtMs') ~ '^[0-9]{1,16}$'"
-        ).bind(body.node_id.to_string()).fetch_one(&mut *telemetry_tx).await?
-    } else { None };
-    let accept_user_stats = source_valid
-        && latest_source_ms.is_none_or(|last| source_ms > last);
+               AND (metrics->>'userStatsAtMs') ~ '^[0-9]{1,16}$'",
+        )
+        .bind(body.node_id.to_string())
+        .fetch_one(&mut *telemetry_tx)
+        .await?
+    } else {
+        None
+    };
+    let accept_user_stats = source_valid && latest_source_ms.is_none_or(|last| source_ms > last);
     if !accept_user_stats {
         // Do not modify traffic baselines or onlineAt on stale/replayed data.
         user_traffic.clear();
         inbound_samples.clear();
     }
-    metrics.as_object_mut().expect("validated metrics object")
+    metrics
+        .as_object_mut()
+        .expect("validated metrics object")
         .insert("userStatsAccepted".into(), json!(accept_user_stats));
 
     let node_id = body.node_id.to_string();
@@ -1350,7 +2029,7 @@ async fn ingest_node_metrics(
          ) VALUES (
             NOW(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
          )
-         RETURNING (EXTRACT(EPOCH FROM sampled_at) * 1000)::BIGINT"
+         RETURNING (EXTRACT(EPOCH FROM sampled_at) * 1000)::BIGINT",
     )
     .bind(&node_id)
     .bind(body.cpu_percent)
@@ -1366,7 +2045,7 @@ async fn ingest_node_metrics(
     .fetch_one(&mut *telemetry_tx)
     .await?;
 
-    if let Some((rx,tx,interface))=network_sample{
+    if let Some((rx, tx, interface)) = network_sample {
         // The first sample is a baseline, not historical traffic. A reboot or
         // switch to another NIC resets the baseline without a negative delta.
         sqlx::query(
@@ -1387,16 +2066,21 @@ async fn ingest_node_metrics(
                last_rx_bytes=EXCLUDED.last_rx_bytes,
                last_tx_bytes=EXCLUDED.last_tx_bytes,
                observations=totals.observations+1,
-               updated_at=NOW()"
-        ).bind(body.node_id).bind(interface).bind(rx).bind(tx)
-         .execute(&mut *telemetry_tx).await?;
+               updated_at=NOW()",
+        )
+        .bind(body.node_id)
+        .bind(interface)
+        .bind(rx)
+        .bind(tx)
+        .execute(&mut *telemetry_tx)
+        .await?;
     }
 
     // Enforce an exhausted node bandwidth quota in the control plane.
     // This is independent of per-user Xray statistics and is decided on the
     // authenticated, cumulative RX+TX counters persisted above.
     // The conditional UPDATE makes the critical event idempotent.
-    let cutoff=sqlx::query(
+    let cutoff = sqlx::query(
         "UPDATE panel_records AS node SET
            data=jsonb_set(
              jsonb_set(
@@ -1422,9 +2106,12 @@ async fn ingest_node_metrics(
                    >= (data->>'limit')::numeric*1073741824
            )
          RETURNING data->>'name' AS node_name,
-           (data->>'limit')::numeric AS limit_gb"
-    ).bind(body.node_id).fetch_optional(&mut *telemetry_tx).await?;
-    if let Some(row)=cutoff{
+           (data->>'limit')::numeric AS limit_gb",
+    )
+    .bind(body.node_id)
+    .fetch_optional(&mut *telemetry_tx)
+    .await?;
+    if let Some(row) = cutoff {
         tracing::error!(node_id=body.node_id,
           name=?row.try_get::<Option<String>,_>("node_name")?,
           "NODE TRAFFIC LIMIT EXHAUSTED: automatic Xray shutdown required");
@@ -1457,9 +2144,14 @@ async fn ingest_node_metrics(
                AND sample.uplink_bytes >= previous.last_uplink_bytes
                AND sample.downlink_bytes >= previous.last_downlink_bytes
                AND (sample.uplink_bytes>previous.last_uplink_bytes
-                    OR sample.downlink_bytes>previous.last_downlink_bytes)"
-        ).bind(body.node_id).bind(&serialized).bind(sampled_at).bind(source_ms)
-         .execute(&mut *telemetry_tx).await?;
+                    OR sample.downlink_bytes>previous.last_downlink_bytes)",
+        )
+        .bind(body.node_id)
+        .bind(&serialized)
+        .bind(sampled_at)
+        .bind(source_ms)
+        .execute(&mut *telemetry_tx)
+        .await?;
         sqlx::query(
             "INSERT INTO user_node_traffic_totals AS totals (
                 node_id, user_id, last_uplink_bytes, last_downlink_bytes,
@@ -1482,7 +2174,7 @@ async fn ingest_node_metrics(
                 last_uplink_bytes = EXCLUDED.last_uplink_bytes,
                 last_downlink_bytes = EXCLUDED.last_downlink_bytes,
                 observations = totals.observations + 1,
-                updated_at = NOW()"
+                updated_at = NOW()",
         )
         .bind(body.node_id)
         .bind(serialized)
@@ -1490,12 +2182,12 @@ async fn ingest_node_metrics(
         .await?;
     }
 
-
     if !inbound_samples.is_empty() {
         // An inbound's aggregate traffic MUST NEVER be interpreted as per-user traffic.
         // Signed node agents report cumulative counters scoped to a real user+inbound.
-        let serialized = serde_json::to_value(&inbound_samples)
-            .map_err(|_|ApiError::new(StatusCode::BAD_REQUEST,"Некорректный userInboundTraffic."))?;
+        let serialized = serde_json::to_value(&inbound_samples).map_err(|_| {
+            ApiError::new(StatusCode::BAD_REQUEST, "Некорректный userInboundTraffic.")
+        })?;
         sqlx::query(
             "INSERT INTO user_inbound_traffic_totals AS totals (
                 node_id,user_id,inbound_tag,last_uplink_bytes,last_downlink_bytes,
@@ -1517,51 +2209,67 @@ async fn ingest_node_metrics(
                 last_uplink_bytes=EXCLUDED.last_uplink_bytes,
                 last_downlink_bytes=EXCLUDED.last_downlink_bytes,
                 observations=totals.observations+1,
-                updated_at=NOW()"
-        ).bind(body.node_id).bind(serialized).execute(&mut *telemetry_tx).await?;
+                updated_at=NOW()",
+        )
+        .bind(body.node_id)
+        .bind(serialized)
+        .execute(&mut *telemetry_tx)
+        .await?;
     }
 
     // Commit source watermark, traffic accounting, and presence in one transaction.
     telemetry_tx.commit().await?;
 
-    Ok((StatusCode::CREATED, Json(json!({
-        "status": "accepted",
-        "nodeId": body.node_id,
-        "sampledAt": sampled_at,
-        "userTrafficSamples": user_traffic.len(),
-        "userInboundTrafficSamples": inbound_samples.len()
-    }))))
+    Ok((
+        StatusCode::CREATED,
+        Json(json!({
+            "status": "accepted",
+            "nodeId": body.node_id,
+            "sampledAt": sampled_at,
+            "userTrafficSamples": user_traffic.len(),
+            "userInboundTrafficSamples": inbound_samples.len()
+        })),
+    ))
 }
 
 /// Authenticated, read-only user presence. No secrets or subscription tokens.
 async fn get_user_presence(
     State(state): State<AppState>,
 ) -> Result<(HeaderMap, Json<Value>), ApiError> {
-    let rows=sqlx::query(
+    let rows = sqlx::query(
         "SELECT id,
             CASE WHEN (data->>'onlineAt') ~ '^[0-9]{1,16}$'
                  THEN (data->>'onlineAt')::BIGINT ELSE 0 END AS online_at
-         FROM panel_records WHERE collection='users'"
-    ).fetch_all(&state.pool).await?;
-    let mut items=Vec::with_capacity(rows.len());
+         FROM panel_records WHERE collection='users'",
+    )
+    .fetch_all(&state.pool)
+    .await?;
+    let mut items = Vec::with_capacity(rows.len());
     for row in rows {
         items.push(json!({
             "id":row.try_get::<i64,_>("id")?,
             "onlineAt":row.try_get::<i64,_>("online_at")?
         }));
     }
-    let server_now_ms=std::time::SystemTime::now()
+    let server_now_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default().as_millis() as i64;
+        .unwrap_or_default()
+        .as_millis() as i64;
     // Presence is operationally sensitive and must not be cached by browsers
     // or intermediaries: an old response could resurrect an offline badge.
-    let mut headers=HeaderMap::new();
-    headers.insert(header::CACHE_CONTROL,HeaderValue::from_static("private, no-store"));
-    headers.insert(header::VARY,HeaderValue::from_static("Cookie"));
-    Ok((headers,Json(json!({
-        "items":items,"serverNowMs":server_now_ms,
-        "onlineWindowMs":USER_ONLINE_WINDOW_MS
-    }))))
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("private, no-store"),
+    );
+    headers.insert(header::VARY, HeaderValue::from_static("Cookie"));
+    Ok((
+        headers,
+        Json(json!({
+            "items":items,"serverNowMs":server_now_ms,
+            "onlineWindowMs":USER_ONLINE_WINDOW_MS
+        })),
+    ))
 }
 
 /// Real per-user, per-node traffic collected from authenticated Xray node counters.
@@ -1571,17 +2279,22 @@ async fn get_user_traffic(
     Path(user_id): Path<i64>,
 ) -> Result<Json<Value>, ApiError> {
     if user_id <= 0 {
-        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Некорректный ID пользователя."));
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Некорректный ID пользователя.",
+        ));
     }
-    let user_data: Value = sqlx::query_scalar(
-        "SELECT data FROM panel_records WHERE collection='users' AND id=$1"
-    )
-    .bind(user_id)
-    .fetch_optional(&state.pool)
-    .await?
-    .ok_or_else(||ApiError::new(StatusCode::NOT_FOUND,"Пользователь не найден."))?;
-    let base_usage = user_data.get("used").and_then(Value::as_f64)
-        .filter(|value|value.is_finite()&&*value>=0.0).unwrap_or(0.0);
+    let user_data: Value =
+        sqlx::query_scalar("SELECT data FROM panel_records WHERE collection='users' AND id=$1")
+            .bind(user_id)
+            .fetch_optional(&state.pool)
+            .await?
+            .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Пользователь не найден."))?;
+    let base_usage = user_data
+        .get("used")
+        .and_then(Value::as_f64)
+        .filter(|value| value.is_finite() && *value >= 0.0)
+        .unwrap_or(0.0);
     let rows = sqlx::query(
         "SELECT totals.node_id,
                 COALESCE(
@@ -1598,7 +2311,7 @@ async fn get_user_traffic(
          LEFT JOIN panel_records node
            ON node.collection = 'nodes' AND node.id = totals.node_id
          WHERE totals.user_id = $1
-         ORDER BY (totals.uplink_bytes + totals.downlink_bytes) DESC, totals.node_id"
+         ORDER BY (totals.uplink_bytes + totals.downlink_bytes) DESC, totals.node_id",
     )
     .bind(user_id)
     .fetch_all(&state.pool)
@@ -1625,9 +2338,12 @@ async fn get_user_traffic(
                 COALESCE(NULLIF(n.data->>'name',''),'Узел #'||t.node_id::text) AS node_name
          FROM user_inbound_traffic_totals t
          LEFT JOIN panel_records n ON n.collection='nodes' AND n.id=t.node_id
-         WHERE t.user_id=$1 ORDER BY (t.uplink_bytes+t.downlink_bytes) DESC,t.inbound_tag"
-    ).bind(user_id).fetch_all(&state.pool).await?;
-    let mut inbound_totals=Vec::with_capacity(inbound_rows.len());
+         WHERE t.user_id=$1 ORDER BY (t.uplink_bytes+t.downlink_bytes) DESC,t.inbound_tag",
+    )
+    .bind(user_id)
+    .fetch_all(&state.pool)
+    .await?;
+    let mut inbound_totals = Vec::with_capacity(inbound_rows.len());
     for r in inbound_rows {
         inbound_totals.push(json!({
             "nodeId":r.try_get::<i64,_>("node_id")?,
@@ -1653,9 +2369,11 @@ async fn get_user_traffic(
              WHERE sm.node_id=n.id::text
              ORDER BY sm.sampled_at DESC LIMIT 1
          ) last_sample ON TRUE
-         WHERE n.collection='nodes' ORDER BY n.id"
-    ).fetch_all(&state.pool).await?;
-    let mut collectors=Vec::with_capacity(collector_rows.len());
+         WHERE n.collection='nodes' ORDER BY n.id",
+    )
+    .fetch_all(&state.pool)
+    .await?;
+    let mut collectors = Vec::with_capacity(collector_rows.len());
     for row in collector_rows {
         collectors.push(json!({
             "nodeId":row.try_get::<i64,_>("node_id")?,
@@ -1684,15 +2402,22 @@ async fn get_traffic_metrics(
     State(state): State<AppState>,
     Query(query): Query<TrafficMetricsQuery>,
 ) -> Result<Json<Value>, ApiError> {
-    let (range, interval_seconds) =
-        match query.range.as_deref().unwrap_or("1h") {
-            "1h" => ("1h", 60_i64),
-            "24h" => ("24h", 900_i64),
-            _ => return Err(ApiError::new(StatusCode::BAD_REQUEST, "Период должен быть 1h или 24h.")),
-        };
+    let (range, interval_seconds) = match query.range.as_deref().unwrap_or("1h") {
+        "1h" => ("1h", 60_i64),
+        "24h" => ("24h", 900_i64),
+        _ => {
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Период должен быть 1h или 24h.",
+            ));
+        }
+    };
 
     if query.node_id.is_some_and(|id| id <= 0) || query.squad_id.is_some_and(|id| id <= 0) {
-        return Err(ApiError::new(StatusCode::BAD_REQUEST, "ID узла и сквада должны быть положительными числами."));
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "ID узла и сквада должны быть положительными числами.",
+        ));
     }
 
     // Node identifiers in the hypertable are text versions of panel_records.id.
@@ -1801,30 +2526,48 @@ async fn get_traffic_metrics(
 async fn read_cpu_ticks() -> Option<(u64, u64)> {
     let stat = tokio::fs::read_to_string("/proc/stat").await.ok()?;
     let line = stat.lines().find(|line| line.starts_with("cpu "))?;
-    let values = line.split_whitespace().skip(1).take(8).filter_map(|value| value.parse::<u64>().ok()).collect::<Vec<_>>();
-    if values.len() < 4 { return None; }
+    let values = line
+        .split_whitespace()
+        .skip(1)
+        .take(8)
+        .filter_map(|value| value.parse::<u64>().ok())
+        .collect::<Vec<_>>();
+    if values.len() < 4 {
+        return None;
+    }
     let total = values.iter().copied().fold(0u64, u64::saturating_add);
     let idle = values[3].saturating_add(*values.get(4).unwrap_or(&0));
     Some((total, idle))
 }
 
-async fn get_core_status(State(state): State<AppState>,
-    Extension(actor): Extension<auth::AuthUser>) -> Json<Value> {
-    let status=state.core.status().await;
+async fn get_core_status(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+) -> Json<Value> {
+    let status = state.core.status().await;
     if viewer_read_only(&actor) {
-        Json(json!({"status":status.status,"installed_version":status.installed_version,
-          "latest_version":status.latest_version,"runtime":status.runtime}))
-    } else {Json(serde_json::to_value(status).unwrap_or_else(|_|json!({})))}
+        Json(
+            json!({"status":status.status,"installed_version":status.installed_version,
+          "latest_version":status.latest_version,"runtime":status.runtime}),
+        )
+    } else {
+        Json(serde_json::to_value(status).unwrap_or_else(|_| json!({})))
+    }
 }
 
 async fn get_core_releases(State(state): State<AppState>) -> Result<Json<Value>, ApiError> {
-    let releases = state.core.available_releases().await
+    let releases = state
+        .core
+        .available_releases()
+        .await
         .map_err(|error| ApiError::new(StatusCode::BAD_GATEWAY, error))?;
     Ok(Json(json!({"items": releases})))
 }
 
 #[derive(Debug, Deserialize)]
-struct CoreValidationRequest { config: String }
+struct CoreValidationRequest {
+    config: String,
+}
 
 async fn validate_xray_configuration(
     State(state): State<AppState>,
@@ -1833,13 +2576,23 @@ async fn validate_xray_configuration(
 ) -> Result<Json<Value>, ApiError> {
     require_mutation(&actor)?;
     if body.config.len() > 512 * 1024 {
-        return Err(ApiError::new(StatusCode::PAYLOAD_TOO_LARGE, "Конфигурация слишком большая."));
+        return Err(ApiError::new(
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "Конфигурация слишком большая.",
+        ));
     }
     // Syntax errors are mapped precisely by the browser JSON parser; never claim
     // that Xray reports a line when it only reports a semantic error.
-    let _: Value = serde_json::from_str(&body.config)
-        .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Некорректный JSON. Исправьте синтаксис в редакторе."))?;
-    let (valid, stdout, stderr) = state.core.validate_json(&body.config).await
+    let _: Value = serde_json::from_str(&body.config).map_err(|_| {
+        ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Некорректный JSON. Исправьте синтаксис в редакторе.",
+        )
+    })?;
+    let (valid, stdout, stderr) = state
+        .core
+        .validate_json(&body.config)
+        .await
         .map_err(|msg| ApiError::new(StatusCode::SERVICE_UNAVAILABLE, msg))?;
     Ok(Json(json!({
         "valid": valid, "engine": "xray-core",
@@ -1853,7 +2606,10 @@ async fn generate_vless_encryption(
     Extension(actor): Extension<auth::AuthUser>,
 ) -> Result<Json<Value>, ApiError> {
     require_mutation(&actor)?;
-    let generated = state.core.generate_vless_encryption().await
+    let generated = state
+        .core
+        .generate_vless_encryption()
+        .await
         .map_err(|error| ApiError::new(StatusCode::SERVICE_UNAVAILABLE, error))?;
 
     // Audit the action but never persist or log the secret encryption/decryption values.
@@ -1864,7 +2620,8 @@ async fn generate_vless_encryption(
         None,
         None,
         json!({"methods": ["x25519", "mlkem768"]}),
-    ).await;
+    )
+    .await;
 
     Ok(Json(generated))
 }
@@ -1875,9 +2632,20 @@ async fn update_core(
     Json(body): Json<CoreUpdateRequest>,
 ) -> Result<(StatusCode, Json<Value>), ApiError> {
     require_owner(&actor)?;
-    let target = state.core.set_desired_version(&body.version).await
+    let target = state
+        .core
+        .set_desired_version(&body.version)
+        .await
         .map_err(|error| ApiError::new(StatusCode::BAD_REQUEST, error))?;
-    audit(&state.pool, &actor.username, "xray_core.update_requested", None, None, json!({"version": target})).await;
+    audit(
+        &state.pool,
+        &actor.username,
+        "xray_core.update_requested",
+        None,
+        None,
+        json!({"version": target}),
+    )
+    .await;
 
     let manager = state.core.clone();
     tokio::spawn(async move {
@@ -1885,10 +2653,13 @@ async fn update_core(
             tracing::warn!(error = %error, "Requested Xray-core update failed");
         }
     });
-    Ok((StatusCode::ACCEPTED, Json(json!({
-        "status": "updating",
-        "message": "Обновление Xray-core запущено."
-    }))))
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(json!({
+            "status": "updating",
+            "message": "Обновление Xray-core запущено."
+        })),
+    ))
 }
 
 /// Only an authenticated owner may request an upgrade. The application never
@@ -1899,82 +2670,123 @@ async fn request_panel_update(
     Extension(actor): Extension<auth::AuthUser>,
 ) -> Result<(StatusCode, Json<Value>), ApiError> {
     require_owner(&actor)?;
-    let request_file=env::var("PANEL_UPDATE_REQUEST").map_err(|_|ApiError::new(
-        StatusCode::SERVICE_UNAVAILABLE,"Web-обновления недоступны: настройте host systemd worker через install.sh."
-    ))?;
-    let status_file=env::var("PANEL_UPDATE_STATUS").map_err(|_|ApiError::new(
-        StatusCode::SERVICE_UNAVAILABLE,"Web-обновления недоступны: нет файла состояния."
-    ))?;
-    let status=tokio::fs::read_to_string(&status_file).await.map_err(|_|ApiError::new(
-        StatusCode::SERVICE_UNAVAILABLE,"Хостовый updater не инициализирован."
-    ))?;
-    if status.trim()=="running" {
-        return Err(ApiError::new(StatusCode::CONFLICT,"Обновление уже выполняется."));
-    }
-    tokio::fs::write(&request_file,b"update\n").await.map_err(|error|{
-        tracing::error!(%error,"Panel update request could not be written");
-        ApiError::new(StatusCode::SERVICE_UNAVAILABLE,"Не удалось передать запрос хостовому updater.")
+    let request_file = env::var("PANEL_UPDATE_REQUEST").map_err(|_| {
+        ApiError::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Web-обновления недоступны: настройте host systemd worker через install.sh.",
+        )
     })?;
-    audit(&state.pool,&actor.username,"panel.update_requested",None,None,json!({"source":"owner_web"})).await;
-    Ok((StatusCode::ACCEPTED,Json(json!({
-        "status":"queued",
-        "message":"Запрос передан в системный updater. БД будет скопирована до обновления."
-    }))))
+    let status_file = env::var("PANEL_UPDATE_STATUS").map_err(|_| {
+        ApiError::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Web-обновления недоступны: нет файла состояния.",
+        )
+    })?;
+    let status = tokio::fs::read_to_string(&status_file).await.map_err(|_| {
+        ApiError::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Хостовый updater не инициализирован.",
+        )
+    })?;
+    if status.trim() == "running" {
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "Обновление уже выполняется.",
+        ));
+    }
+    tokio::fs::write(&request_file, b"update\n")
+        .await
+        .map_err(|error| {
+            tracing::error!(%error,"Panel update request could not be written");
+            ApiError::new(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Не удалось передать запрос хостовому updater.",
+            )
+        })?;
+    audit(
+        &state.pool,
+        &actor.username,
+        "panel.update_requested",
+        None,
+        None,
+        json!({"source":"owner_web"}),
+    )
+    .await;
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(json!({
+            "status":"queued",
+            "message":"Запрос передан в системный updater. БД будет скопирована до обновления."
+        })),
+    ))
 }
 
 async fn get_panel_update_status(
     Extension(actor): Extension<auth::AuthUser>,
 ) -> Result<Json<Value>, ApiError> {
     require_owner(&actor)?;
-    let state=match env::var("PANEL_UPDATE_STATUS") {
-        Ok(path)=>tokio::fs::read_to_string(path).await.unwrap_or_else(|_|"unavailable".into()),
-        Err(_)=>"unavailable".into(),
+    let state = match env::var("PANEL_UPDATE_STATUS") {
+        Ok(path) => tokio::fs::read_to_string(path)
+            .await
+            .unwrap_or_else(|_| "unavailable".into()),
+        Err(_) => "unavailable".into(),
     };
-    let status=match state.trim() {
-        "running"=>"running",
-        "success"=>"success",
-        "failed"=>"failed",
-        "idle"=>"idle",
-        _=>"unavailable",
+    let status = match state.trim() {
+        "running" => "running",
+        "success" => "success",
+        "failed" => "failed",
+        "idle" => "idle",
+        _ => "unavailable",
     };
     Ok(Json(json!({"status":status})))
 }
 
 async fn read_settings(pool: &PgPool) -> Result<Value, ApiError> {
-    Ok(sqlx::query_scalar::<_, Value>("SELECT value FROM app_settings WHERE key = 'panel'")
-        .fetch_optional(pool)
-        .await?
-        .unwrap_or_else(|| json!({
-            "brand":"XMesh Nexus",
-            "domain":"",
-            "hooks": {
-                "user.created":0,
-                "user.limited":0,
-                "user.expired":0,
-                "user.expires_in_24_hours":0,
-                "user.first_connected":0,
-                "user.bandwidth_usage_threshold_reached":0
-            }
-        })))
+    Ok(
+        sqlx::query_scalar::<_, Value>("SELECT value FROM app_settings WHERE key = 'panel'")
+            .fetch_optional(pool)
+            .await?
+            .unwrap_or_else(|| {
+                json!({
+                    "brand":"XMesh Nexus",
+                    "domain":"",
+                    "hooks": {
+                        "user.created":0,
+                        "user.limited":0,
+                        "user.expired":0,
+                        "user.expires_in_24_hours":0,
+                        "user.first_connected":0,
+                        "user.bandwidth_usage_threshold_reached":0
+                    }
+                })
+            }),
+    )
 }
 
 // Panel quotas are expressed in GiB; signed node counters are bytes.
 // Keep the manually configured baseline in panel_records and overlay actual,
 // monotonic signed user counters on reads. Never use node-wide RX/TX here.
 pub(crate) fn add_metered_usage(user: &mut Value, bytes: i64) {
-    let base=user.get("used").and_then(Value::as_f64).unwrap_or(0.0).max(0.0);
-    let measured=(bytes.max(0) as f64)/1_073_741_824.0;
-    if let Some(object)=user.as_object_mut(){
-        object.insert("used".into(),json!(base+measured));
-        object.insert("meteredUsedGb".into(),json!(measured));
+    let base = user
+        .get("used")
+        .and_then(Value::as_f64)
+        .unwrap_or(0.0)
+        .max(0.0);
+    let measured = (bytes.max(0) as f64) / 1_073_741_824.0;
+    if let Some(object) = user.as_object_mut() {
+        object.insert("used".into(), json!(base + measured));
+        object.insert("meteredUsedGb".into(), json!(measured));
     }
 }
 
-pub(crate) async fn user_metered_bytes(pool: &PgPool, user_id: i64) -> Result<i64,ApiError> {
-    let bytes: i64=sqlx::query_scalar(
+pub(crate) async fn user_metered_bytes(pool: &PgPool, user_id: i64) -> Result<i64, ApiError> {
+    let bytes: i64 = sqlx::query_scalar(
         "SELECT COALESCE(SUM(uplink_bytes + downlink_bytes),0)::BIGINT
-         FROM user_node_traffic_totals WHERE user_id=$1"
-    ).bind(user_id).fetch_one(pool).await?;
+         FROM user_node_traffic_totals WHERE user_id=$1",
+    )
+    .bind(user_id)
+    .fetch_one(pool)
+    .await?;
     Ok(bytes.max(0))
 }
 
@@ -1984,20 +2796,30 @@ async fn load_records(pool: &PgPool, collection: &str) -> Result<Vec<Value>, Api
         .bind(collection)
         .fetch_all(pool)
         .await?;
-    let mut records=rows.iter().map(row_to_record).collect::<Result<Vec<_>,_>>()?;
-    if collection=="users" && !records.is_empty(){
+    let mut records = rows
+        .iter()
+        .map(row_to_record)
+        .collect::<Result<Vec<_>, _>>()?;
+    if collection == "users" && !records.is_empty() {
         // One grouped query, not one SQL request per user.
-        let totals=sqlx::query(
+        let totals = sqlx::query(
             "SELECT user_id, COALESCE(SUM(uplink_bytes+downlink_bytes),0)::BIGINT AS bytes
-             FROM user_node_traffic_totals GROUP BY user_id"
-        ).fetch_all(pool).await?;
-        let traffic=totals.into_iter().filter_map(|row|{
-            Some((row.try_get::<i64,_>("user_id").ok()?,
-                  row.try_get::<i64,_>("bytes").ok()?))
-        }).collect::<std::collections::HashMap<_,_>>();
+             FROM user_node_traffic_totals GROUP BY user_id",
+        )
+        .fetch_all(pool)
+        .await?;
+        let traffic = totals
+            .into_iter()
+            .filter_map(|row| {
+                Some((
+                    row.try_get::<i64, _>("user_id").ok()?,
+                    row.try_get::<i64, _>("bytes").ok()?,
+                ))
+            })
+            .collect::<std::collections::HashMap<_, _>>();
         for user in &mut records {
-            if let Some(id)=user.get("id").and_then(Value::as_i64){
-                add_metered_usage(user,*traffic.get(&id).unwrap_or(&0));
+            if let Some(id) = user.get("id").and_then(Value::as_i64) {
+                add_metered_usage(user, *traffic.get(&id).unwrap_or(&0));
             }
         }
     }
@@ -2007,8 +2829,12 @@ async fn load_records(pool: &PgPool, collection: &str) -> Result<Vec<Value>, Api
 fn row_to_record(row: &sqlx::postgres::PgRow) -> Result<Value, ApiError> {
     let id: i64 = row.try_get("id")?;
     let mut data: Value = row.try_get("data")?;
-    let object = data.as_object_mut()
-        .ok_or_else(|| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Повреждён формат записи."))?;
+    let object = data.as_object_mut().ok_or_else(|| {
+        ApiError::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Повреждён формат записи.",
+        )
+    })?;
     object.insert("id".to_owned(), json!(id));
     Ok(data)
 }
@@ -2017,7 +2843,10 @@ fn validate_collection(collection: &str) -> Result<(), ApiError> {
     if COLLECTIONS.contains(&collection) {
         Ok(())
     } else {
-        Err(ApiError::new(StatusCode::NOT_FOUND, "Неизвестная коллекция."))
+        Err(ApiError::new(
+            StatusCode::NOT_FOUND,
+            "Неизвестная коллекция.",
+        ))
     }
 }
 
@@ -2026,162 +2855,296 @@ fn validate_collection(collection: &str) -> Result<(), ApiError> {
 async fn validate_host_binding(pool: &PgPool, host: &Value) -> Result<(), ApiError> {
     // Disabled hosts are allowed to remain drafts and can always be switched off.
     // Re-enabling them validates the full runtime profile/node relationship.
-    if host.get("disabled").and_then(Value::as_bool) == Some(true) { return Ok(()); }
+    if host.get("disabled").and_then(Value::as_bool) == Some(true) {
+        return Ok(());
+    }
     let bad = |message: &'static str| ApiError::new(StatusCode::BAD_REQUEST, message);
-    let profile_id = host.get("profileId").and_then(Value::as_i64)
+    let profile_id = host
+        .get("profileId")
+        .and_then(Value::as_i64)
         .filter(|id| *id > 0)
         .ok_or_else(|| bad("Хосту необходимо назначить XRAY STUDIO профиль."))?;
-    let tag = host.get("tag").and_then(Value::as_str)
+    let tag = host
+        .get("tag")
+        .and_then(Value::as_str)
         .filter(|tag| !tag.is_empty() && tag.len() <= 150)
         .ok_or_else(|| bad("Выберите inbound из XRAY STUDIO."))?;
-    let address = host.get("address").and_then(Value::as_str)
-        .filter(|value| !value.is_empty() && value.len() <= 253
-            && !value.chars().any(|ch| ch.is_control() || ch.is_whitespace() || "/@?#\\".contains(ch)))
+    let address = host
+        .get("address")
+        .and_then(Value::as_str)
+        .filter(|value| {
+            !value.is_empty()
+                && value.len() <= 253
+                && !value
+                    .chars()
+                    .any(|ch| ch.is_control() || ch.is_whitespace() || "/@?#\\".contains(ch))
+        })
         .ok_or_else(|| bad("Некорректный публичный адрес хоста."))?;
     if address == "localhost" || address == "0.0.0.0" || address.starts_with("127.") {
         return Err(bad("Для подписки нужен публичный адрес ноды."));
     }
     let port = host.get("port").and_then(Value::as_u64).unwrap_or(0);
-    if !(1..=65535).contains(&port) { return Err(bad("Укажите публичный порт 1–65535.")); }
-    let nodes = host.get("nodes").and_then(Value::as_array)
+    if !(1..=65535).contains(&port) {
+        return Err(bad("Укажите публичный порт 1–65535."));
+    }
+    let nodes = host
+        .get("nodes")
+        .and_then(Value::as_array)
         .filter(|nodes| !nodes.is_empty() && nodes.len() <= 64)
         .ok_or_else(|| bad("Привяжите хост к одной или нескольким нодам."))?;
     let profiles = load_records(pool, "profiles").await?;
-    let profile = profiles.iter().find(|profile| profile.get("id").and_then(Value::as_i64) == Some(profile_id))
+    let profile = profiles
+        .iter()
+        .find(|profile| profile.get("id").and_then(Value::as_i64) == Some(profile_id))
         .ok_or_else(|| bad("Выбранный XRAY STUDIO профиль отсутствует."))?;
-    let config = profile.get("config").and_then(Value::as_str)
+    let config = profile
+        .get("config")
+        .and_then(Value::as_str)
         .and_then(|raw| serde_json::from_str::<Value>(raw).ok())
         .ok_or_else(|| bad("Сохранённая конфигурация XRAY STUDIO недействительна."))?;
-    let inbound = config.get("inbounds").and_then(Value::as_array)
-        .and_then(|items| items.iter().find(|inbound| inbound.get("tag").and_then(Value::as_str) == Some(tag)))
+    let inbound = config
+        .get("inbounds")
+        .and_then(Value::as_array)
+        .and_then(|items| {
+            items
+                .iter()
+                .find(|inbound| inbound.get("tag").and_then(Value::as_str) == Some(tag))
+        })
         .ok_or_else(|| bad("Выбранный inbound отсутствует в XRAY STUDIO профиле."))?;
     if inbound.get("protocol").and_then(Value::as_str) != Some("vless") {
         return Err(bad("Генератор подписок пока поддерживает VLESS inbound."));
     }
     let all_nodes = load_records(pool, "nodes").await?;
     for node_id in nodes {
-        let id = node_id.as_i64().ok_or_else(|| bad("Некорректная привязка ноды."))?;
-        let node = all_nodes.iter().find(|node| node.get("id").and_then(Value::as_i64) == Some(id))
+        let id = node_id
+            .as_i64()
+            .ok_or_else(|| bad("Некорректная привязка ноды."))?;
+        let node = all_nodes
+            .iter()
+            .find(|node| node.get("id").and_then(Value::as_i64) == Some(id))
             .ok_or_else(|| bad("Одна из привязанных нод не найдена."))?;
         if node.get("disabled").and_then(Value::as_bool) == Some(true)
             || node.get("profileId").and_then(Value::as_i64) != Some(profile_id)
         {
-            return Err(bad("Профиль привязанной ноды не совпадает с XRAY-профилем хоста. Обновите профиль в разделе «Узлы»."));
+            return Err(bad(
+                "Профиль привязанной ноды не совпадает с XRAY-профилем хоста. Обновите профиль в разделе «Узлы».",
+            ));
         }
     }
-    let reality = inbound.get("streamSettings").and_then(|v| v.get("realitySettings"));
-    if inbound.get("streamSettings").and_then(|v| v.get("security")).and_then(Value::as_str) == Some("reality") {
-        let key = host.get("publicKey").and_then(Value::as_str).filter(|s| !s.is_empty())
+    let reality = inbound
+        .get("streamSettings")
+        .and_then(|v| v.get("realitySettings"));
+    if inbound
+        .get("streamSettings")
+        .and_then(|v| v.get("security"))
+        .and_then(Value::as_str)
+        == Some("reality")
+    {
+        let key = host
+            .get("publicKey")
+            .and_then(Value::as_str)
+            .filter(|s| !s.is_empty())
             .or_else(|| inbound.get("publicKey").and_then(Value::as_str))
-            .or_else(|| reality.and_then(|v|v.get("publicKey")).and_then(Value::as_str));
-        if key.is_none() { return Err(bad("Отсутствует REALITY publicKey. Добавьте публичный ключ в расширенных настройках хоста.")); }
+            .or_else(|| {
+                reality
+                    .and_then(|v| v.get("publicKey"))
+                    .and_then(Value::as_str)
+            });
+        if key.is_none() {
+            return Err(bad(
+                "Отсутствует REALITY publicKey. Добавьте публичный ключ в расширенных настройках хоста.",
+            ));
+        }
     }
     Ok(())
 }
 
 fn validate_node_address(data: &Value) -> Result<(), ApiError> {
     use std::net::IpAddr;
-    let addr = data.get("addr").and_then(Value::as_str)
-        .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Укажите адрес ноды: IPv4, IPv6 или домен."))?;
+    let addr = data.get("addr").and_then(Value::as_str).ok_or_else(|| {
+        ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Укажите адрес ноды: IPv4, IPv6 или домен.",
+        )
+    })?;
     if addr.is_empty() || addr != addr.trim() || addr.chars().any(char::is_whitespace) {
-        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Адрес ноды не должен содержать пробелы."));
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Адрес ноды не должен содержать пробелы.",
+        ));
     }
-    if addr.parse::<IpAddr>().is_ok() { return Ok(()); }
+    if addr.parse::<IpAddr>().is_ok() {
+        return Ok(());
+    }
     // ASCII DNS hostnames only; internationalized domains must use IDNA A-labels.
     // Reject numeric dotted strings that look like invalid IPv4 addresses.
-    if addr.len() > 253 || !addr.is_ascii() || addr.contains(':') ||
-       addr.contains('/') || addr.contains('@') || addr.contains('[') ||
-       addr.contains(']') || addr.contains("..") ||
-       addr.chars().all(|c| c.is_ascii_digit() || c == '.') {
-        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Некорректный адрес ноды. Используйте IPv4, IPv6 без скобок или DNS-домен без порта."));
+    if addr.len() > 253
+        || !addr.is_ascii()
+        || addr.contains(':')
+        || addr.contains('/')
+        || addr.contains('@')
+        || addr.contains('[')
+        || addr.contains(']')
+        || addr.contains("..")
+        || addr.chars().all(|c| c.is_ascii_digit() || c == '.')
+    {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Некорректный адрес ноды. Используйте IPv4, IPv6 без скобок или DNS-домен без порта.",
+        ));
     }
     let valid = addr.split('.').all(|label| {
-        !label.is_empty() && label.len() <= 63 &&
-        !label.starts_with('-') && !label.ends_with('-') &&
-        label.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
+        !label.is_empty()
+            && label.len() <= 63
+            && !label.starts_with('-')
+            && !label.ends_with('-')
+            && label
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'-')
     });
     if !valid {
-        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Некорректное доменное имя ноды."));
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Некорректное доменное имя ноды.",
+        ));
     }
     Ok(())
 }
 
 fn validate_record(collection: &str, data: &Value) -> Result<(), ApiError> {
-    let object = data.as_object()
-        .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Запись должна быть JSON-объектом."))?;
+    let object = data.as_object().ok_or_else(|| {
+        ApiError::new(StatusCode::BAD_REQUEST, "Запись должна быть JSON-объектом.")
+    })?;
     if collection == "nodes" {
         validate_node_address(data)?;
         node_rotation::validate_node(data)?;
         node_routing::validate_saved(data)?;
         if let Some(hosting) = object.get("hosting") {
-            let value = hosting.as_str().ok_or_else(|| ApiError::new(
-                StatusCode::BAD_REQUEST, "Название хостинга должно быть строкой."
-            ))?;
+            let value = hosting.as_str().ok_or_else(|| {
+                ApiError::new(
+                    StatusCode::BAD_REQUEST,
+                    "Название хостинга должно быть строкой.",
+                )
+            })?;
             if value.chars().count() > 100 || value.chars().any(char::is_control) {
                 return Err(ApiError::new(
-                    StatusCode::BAD_REQUEST, "Название хостинга не должно превышать 100 символов или содержать управляющие символы."
+                    StatusCode::BAD_REQUEST,
+                    "Название хостинга не должно превышать 100 символов или содержать управляющие символы.",
                 ));
             }
         }
     }
     if collection == "users" {
-        let username = object.get("username").and_then(Value::as_str)
-            .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Имя пользователя обязательно."))?;
-        if username.trim().is_empty() || username.chars().count() > 128 || username.chars().any(char::is_control) {
-            return Err(ApiError::new(StatusCode::BAD_REQUEST, "Некорректное имя пользователя."));
+        let username = object
+            .get("username")
+            .and_then(Value::as_str)
+            .ok_or_else(|| {
+                ApiError::new(StatusCode::BAD_REQUEST, "Имя пользователя обязательно.")
+            })?;
+        if username.trim().is_empty()
+            || username.chars().count() > 128
+            || username.chars().any(char::is_control)
+        {
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Некорректное имя пользователя.",
+            ));
         }
     }
     if collection == "profiles" {
-        let config = object.get("config").and_then(Value::as_str)
-            .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Конфигурация Xray обязательна."))?;
-        let parsed: Value = serde_json::from_str(config)
-            .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Конфигурация Xray содержит некорректный JSON."))?;
-        let inbounds = parsed.get("inbounds").and_then(Value::as_array)
-            .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "В конфигурации Xray должен быть массив inbounds."))?;
+        let config = object
+            .get("config")
+            .and_then(Value::as_str)
+            .ok_or_else(|| {
+                ApiError::new(StatusCode::BAD_REQUEST, "Конфигурация Xray обязательна.")
+            })?;
+        let parsed: Value = serde_json::from_str(config).map_err(|_| {
+            ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Конфигурация Xray содержит некорректный JSON.",
+            )
+        })?;
+        let inbounds = parsed
+            .get("inbounds")
+            .and_then(Value::as_array)
+            .ok_or_else(|| {
+                ApiError::new(
+                    StatusCode::BAD_REQUEST,
+                    "В конфигурации Xray должен быть массив inbounds.",
+                )
+            })?;
         if inbounds.is_empty() {
-            return Err(ApiError::new(StatusCode::BAD_REQUEST, "В конфигурации Xray должен быть хотя бы один inbound."));
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "В конфигурации Xray должен быть хотя бы один inbound.",
+            ));
         }
         let mut tags = std::collections::HashSet::new();
         for inbound in inbounds {
-            let tag = inbound.get("tag").and_then(Value::as_str)
+            let tag = inbound
+                .get("tag")
+                .and_then(Value::as_str)
                 .filter(|tag| !tag.trim().is_empty())
-                .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "У каждого inbound должен быть tag."))?;
+                .ok_or_else(|| {
+                    ApiError::new(
+                        StatusCode::BAD_REQUEST,
+                        "У каждого inbound должен быть tag.",
+                    )
+                })?;
             if !tags.insert(tag) {
-                return Err(ApiError::new(StatusCode::BAD_REQUEST, "Теги inbounds должны быть уникальными."));
+                return Err(ApiError::new(
+                    StatusCode::BAD_REQUEST,
+                    "Теги inbounds должны быть уникальными.",
+                ));
             }
             // Defense in depth: browser credential managers may have filled
             // unrelated Studio password/username inputs into REALITY secrets.
             // Validate even dormant realitySettings with security="none".
-            if let Some(reality) = inbound.get("streamSettings")
+            if let Some(reality) = inbound
+                .get("streamSettings")
                 .and_then(|stream| stream.get("realitySettings"))
             {
                 if !reality.is_object() {
-                    return Err(ApiError::new(StatusCode::BAD_REQUEST,
-                        "REALITY: realitySettings должен быть объектом."));
+                    return Err(ApiError::new(
+                        StatusCode::BAD_REQUEST,
+                        "REALITY: realitySettings должен быть объектом.",
+                    ));
                 }
                 if let Some(private_key) = reality.get("privateKey") {
                     let valid = private_key.as_str().is_some_and(|key| {
-                        key.is_empty() || (key.len() == 43 && key.bytes().all(|b|
-                            b.is_ascii_alphanumeric() || b == b'-' || b == b'_'))
+                        key.is_empty()
+                            || (key.len() == 43
+                                && key
+                                    .bytes()
+                                    .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_'))
                     });
                     if !valid {
-                        return Err(ApiError::new(StatusCode::BAD_REQUEST,
-                            "REALITY: privateKey должен быть X25519 base64url (43 символа). Проверьте автозаполнение браузера."));
+                        return Err(ApiError::new(
+                            StatusCode::BAD_REQUEST,
+                            "REALITY: privateKey должен быть X25519 base64url (43 символа). Проверьте автозаполнение браузера.",
+                        ));
                     }
                 }
                 if let Some(ids) = reality.get("shortIds") {
-                    let ids = ids.as_array().ok_or_else(|| ApiError::new(
-                        StatusCode::BAD_REQUEST, "REALITY: shortIds должен быть массивом."))?;
+                    let ids = ids.as_array().ok_or_else(|| {
+                        ApiError::new(
+                            StatusCode::BAD_REQUEST,
+                            "REALITY: shortIds должен быть массивом.",
+                        )
+                    })?;
                     let mut seen = std::collections::HashSet::new();
                     for short_id in ids {
                         let valid = short_id.as_str().is_some_and(|id| {
-                            id.len() <= 16 && id.len() % 2 == 0
+                            id.len() <= 16
+                                && id.len() % 2 == 0
                                 && id.bytes().all(|b| b.is_ascii_hexdigit())
                                 && seen.insert(id.to_ascii_lowercase())
                         });
                         if !valid {
-                            return Err(ApiError::new(StatusCode::BAD_REQUEST,
-                                "REALITY: Short ID должен быть уникальной HEX-строкой чётной длины, максимум 16 символов."));
+                            return Err(ApiError::new(
+                                StatusCode::BAD_REQUEST,
+                                "REALITY: Short ID должен быть уникальной HEX-строкой чётной длины, максимум 16 символов.",
+                            ));
                         }
                     }
                 }
@@ -2206,7 +3169,9 @@ mod reality_profile_autofill_validation_tests {
     fn rejects_autofilled_login_and_credential_even_while_inactive() {
         let contaminated = profile(&"a".repeat(256), "Triplex", "none");
         assert!(validate_record("profiles", &contaminated).is_err());
-        assert!(validate_record("profiles", &profile(&"a".repeat(256), "abcdef12", "none")).is_err());
+        assert!(
+            validate_record("profiles", &profile(&"a".repeat(256), "abcdef12", "none")).is_err()
+        );
         assert!(validate_record("profiles", &profile(&"A".repeat(43), "Triplex", "none")).is_err());
     }
 
@@ -2220,9 +3185,8 @@ mod reality_profile_autofill_validation_tests {
 /// An online badge means verified traffic within the recent activity window.
 fn user_is_online(user: &Value, now_ms: i64) -> bool {
     user_status(user, now_ms) == "ACTIVE"
-        && number(user, "onlineAt").is_some_and(|last| {
-            last > 0 && last <= now_ms && last > now_ms - USER_ONLINE_WINDOW_MS
-        })
+        && number(user, "onlineAt")
+            .is_some_and(|last| last > 0 && last <= now_ms && last > now_ms - USER_ONLINE_WINDOW_MS)
 }
 
 fn user_status(user: &Value, now_ms: i64) -> &'static str {
@@ -2245,8 +3209,12 @@ fn user_status(user: &Value, now_ms: i64) -> &'static str {
 }
 
 fn number(value: &Value, key: &str) -> Option<i64> {
-    value.get(key).and_then(Value::as_i64)
-        .or_else(|| value.get(key).and_then(Value::as_f64).map(|number| number as i64))
+    value.get(key).and_then(Value::as_i64).or_else(|| {
+        value
+            .get(key)
+            .and_then(Value::as_f64)
+            .map(|number| number as i64)
+    })
 }
 
 async fn audit(
@@ -2274,7 +3242,7 @@ async fn audit(
 
 #[cfg(test)]
 mod tests {
-    use super::{number, user_status, user_is_online, USER_ONLINE_WINDOW_MS};
+    use super::{USER_ONLINE_WINDOW_MS, number, user_is_online, user_status};
     use serde_json::json;
 
     #[test]
@@ -2291,12 +3259,24 @@ mod tests {
     fn online_requires_recent_nonfuture_verified_activity() {
         let now = 1_800_000_000_000_i64;
         assert!(user_is_online(&json!({"onlineAt":now-1}), now));
-        assert!(user_is_online(&json!({"onlineAt":now-USER_ONLINE_WINDOW_MS+1}), now));
-        assert!(!user_is_online(&json!({"onlineAt":now-USER_ONLINE_WINDOW_MS}), now));
+        assert!(user_is_online(
+            &json!({"onlineAt":now-USER_ONLINE_WINDOW_MS+1}),
+            now
+        ));
+        assert!(!user_is_online(
+            &json!({"onlineAt":now-USER_ONLINE_WINDOW_MS}),
+            now
+        ));
         assert!(!user_is_online(&json!({"onlineAt":now+1}), now));
-        assert!(!user_is_online(&json!({"onlineAt":now-1,"disabled":true}), now));
+        assert!(!user_is_online(
+            &json!({"onlineAt":now-1,"disabled":true}),
+            now
+        ));
         assert!(!user_is_online(&json!({"onlineAt":now-1,"hold":true}), now));
-        assert!(!user_is_online(&json!({"onlineAt":now-1,"limit":1,"used":1}), now));
+        assert!(!user_is_online(
+            &json!({"onlineAt":now-1,"limit":1,"used":1}),
+            now
+        ));
         assert!(!user_is_online(&json!({"onlineAt":0}), now));
         assert!(!user_is_online(&json!({}), now));
     }
@@ -2304,7 +3284,7 @@ mod tests {
     #[test]
     fn studio_subscription_routes_do_not_conflict_with_dashboard_or_flag_assets() {
         use super::AppState;
-        use axum::{http::StatusCode, routing::get, Router};
+        use axum::{Router, http::StatusCode, routing::get};
         use tower_http::services::ServeDir;
         let mut app = Router::<AppState>::new()
             .route("/dashboard/{slug}", get(|| async { StatusCode::OK }))
@@ -2323,14 +3303,14 @@ mod tests {
 
     #[test]
     fn metered_usage_is_added_in_gib_not_raw_bytes() {
-        let mut user=json!({"id":21,"used":0.0,"limit":2});
-        super::add_metered_usage(&mut user,1_073_741_824);
-        assert_eq!(user["used"],1.0);
-        assert_eq!(user["meteredUsedGb"],1.0);
-        assert_eq!(super::user_status(&user,1_800_000_000_000),"ACTIVE");
-        super::add_metered_usage(&mut user,1_073_741_824);
-        assert_eq!(user["used"],2.0);
-        assert_eq!(super::user_status(&user,1_800_000_000_000),"LIMITED");
+        let mut user = json!({"id":21,"used":0.0,"limit":2});
+        super::add_metered_usage(&mut user, 1_073_741_824);
+        assert_eq!(user["used"], 1.0);
+        assert_eq!(user["meteredUsedGb"], 1.0);
+        assert_eq!(super::user_status(&user, 1_800_000_000_000), "ACTIVE");
+        super::add_metered_usage(&mut user, 1_073_741_824);
+        assert_eq!(user["used"], 2.0);
+        assert_eq!(super::user_status(&user, 1_800_000_000_000), "LIMITED");
     }
     #[test]
     fn numeric_json_fields_are_read_safely() {

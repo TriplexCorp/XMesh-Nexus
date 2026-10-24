@@ -2,16 +2,16 @@
 //! The selection is transactional so simultaneous subscription refreshes cannot
 //! accidentally reuse the same cursor. This module does not change server IPs.
 use axum::{
-    extract::{Extension, Path, State},
-    http::{header, StatusCode},
     Json,
+    extract::{Extension, Path, State},
+    http::{StatusCode, header},
 };
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sqlx::Row;
 use std::{collections::HashSet, net::IpAddr};
 
-use crate::{auth, user_status, ApiError, AppState};
+use crate::{ApiError, AppState, auth, user_status};
 
 const MAX_POOL: usize = 256;
 
@@ -20,8 +20,12 @@ fn invalid(message: &str) -> ApiError {
 }
 
 pub(crate) fn parse_pool(value: &Value) -> Result<Vec<IpAddr>, ApiError> {
-    let Some(raw) = value.get("rotationIps") else { return Ok(Vec::new()) };
-    let source = raw.as_str().ok_or_else(|| invalid("Пул ротации должен быть текстом: один IP в каждой строке."))?;
+    let Some(raw) = value.get("rotationIps") else {
+        return Ok(Vec::new());
+    };
+    let source = raw
+        .as_str()
+        .ok_or_else(|| invalid("Пул ротации должен быть текстом: один IP в каждой строке."))?;
     if source.len() > 16384 {
         return Err(invalid("Слишком большой список IP-адресов (максимум 256)."));
     }
@@ -29,17 +33,25 @@ pub(crate) fn parse_pool(value: &Value) -> Result<Vec<IpAddr>, ApiError> {
     let mut addresses = Vec::new();
     for line in source.lines() {
         let entry = line.trim();
-        if entry.is_empty() { continue; }
-        let ip: IpAddr = entry.parse().map_err(|_| invalid("Пул ротации принимает только IP-адреса, по одному на строку, без портов."))?;
+        if entry.is_empty() {
+            continue;
+        }
+        let ip: IpAddr = entry.parse().map_err(|_| {
+            invalid("Пул ротации принимает только IP-адреса, по одному на строку, без портов.")
+        })?;
         if ip.is_unspecified() || ip.is_loopback() || ip.is_multicast() {
-            return Err(invalid("В пуле запрещены локальные, групповые и неопределённые IP-адреса."));
+            return Err(invalid(
+                "В пуле запрещены локальные, групповые и неопределённые IP-адреса.",
+            ));
         }
         if !seen.insert(ip) {
             return Err(invalid("В пуле ротации есть повторяющиеся IP-адреса."));
         }
         addresses.push(ip);
         if addresses.len() > MAX_POOL {
-            return Err(invalid("В пуле ротации допускается не более 256 IP-адресов."));
+            return Err(invalid(
+                "В пуле ротации допускается не более 256 IP-адресов.",
+            ));
         }
     }
     Ok(addresses)
@@ -52,14 +64,20 @@ pub(crate) fn validate_node(value: &Value) -> Result<(), ApiError> {
         _ => return Err(invalid("Ротация IP должна быть включена или выключена.")),
     };
     if let Some(value) = value.get("rotationIntervalHours") {
-        let hours = value.as_i64().ok_or_else(|| invalid("Интервал IP-ротации должен быть целым числом часов."))?;
+        let hours = value
+            .as_i64()
+            .ok_or_else(|| invalid("Интервал IP-ротации должен быть целым числом часов."))?;
         if !(1..=720).contains(&hours) {
-            return Err(invalid("Интервал IP-ротации должен быть от 1 до 720 часов."));
+            return Err(invalid(
+                "Интервал IP-ротации должен быть от 1 до 720 часов.",
+            ));
         }
     }
     let pool = parse_pool(value)?;
     if enabled && pool.len() < 2 {
-        return Err(invalid("Для включения ротации укажите хотя бы два различных IP-адреса."));
+        return Err(invalid(
+            "Для включения ротации укажите хотя бы два различных IP-адреса.",
+        ));
     }
     Ok(())
 }
@@ -90,16 +108,21 @@ pub(crate) async fn resolve_subscription_address(
     node_id: i64,
     user_id: i64,
 ) -> Result<String, ApiError> {
-    Ok(resolve_address_inner(state, node_id, user_id, true).await?.0)
+    Ok(resolve_address_inner(state, node_id, user_id, true)
+        .await?
+        .0)
 }
 
 fn interval_hours(node: &Value) -> i64 {
-    node.get("rotationIntervalHours").and_then(Value::as_i64)
-        .filter(|hours| (1..=720).contains(hours)).unwrap_or(24)
+    node.get("rotationIntervalHours")
+        .and_then(Value::as_i64)
+        .filter(|hours| (1..=720).contains(hours))
+        .unwrap_or(24)
 }
 
 fn reusable_address(pool: &[IpAddr], previous: &str, elapsed_seconds: i64, hours: i64) -> bool {
-    elapsed_seconds >= 0 && elapsed_seconds < hours * 3600
+    elapsed_seconds >= 0
+        && elapsed_seconds < hours * 3600
         && pool.iter().any(|ip| ip.to_string() == previous)
 }
 
@@ -126,12 +149,18 @@ async fn resolve_address_inner(
     let user: Value = user_row.try_get("data")?;
     let now_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default().as_millis() as i64;
+        .unwrap_or_default()
+        .as_millis() as i64;
     if user_status(&user, now_ms) != "ACTIVE" {
-        return Err(ApiError::new(StatusCode::FORBIDDEN, "Подписка пользователя неактивна."));
+        return Err(ApiError::new(
+            StatusCode::FORBIDDEN,
+            "Подписка пользователя неактивна.",
+        ));
     }
 
-    let primary = node.get("addr").and_then(Value::as_str)
+    let primary = node
+        .get("addr")
+        .and_then(Value::as_str)
         .filter(|address| !address.trim().is_empty())
         .ok_or_else(|| invalid("У узла отсутствует основной адрес."))?;
     let pool = parse_pool(&node)?;
@@ -195,8 +224,7 @@ pub(crate) async fn rotate_next(
     Json(request): Json<RotateRequest>,
 ) -> Result<impl axum::response::IntoResponse, ApiError> {
     super::require_mutation(&actor)?;
-    let (address, enabled, pool_size) =
-        resolve_address(&state, node_id, request.user_id).await?;
+    let (address, enabled, pool_size) = resolve_address(&state, node_id, request.user_id).await?;
     Ok((
         [(header::CACHE_CONTROL, "no-store")],
         Json(json!({
@@ -218,7 +246,10 @@ mod tests {
         assert!(parse_pool(&json!({"rotationIps":"example.com"})).is_err());
         assert!(parse_pool(&json!({"rotationIps":"127.0.0.1"})).is_err());
         assert!(validate_node(&json!({"rotationEnabled":true,"rotationIps":"1.1.1.1"})).is_err());
-        assert!(validate_node(&json!({"rotationEnabled":true,"rotationIps":"1.1.1.1\n9.9.9.9"})).is_ok());
+        assert!(
+            validate_node(&json!({"rotationEnabled":true,"rotationIps":"1.1.1.1\n9.9.9.9"}))
+                .is_ok()
+        );
         assert!(validate_node(&json!({"rotationIntervalHours":0})).is_err());
         assert!(validate_node(&json!({"rotationIntervalHours":721})).is_err());
         assert!(validate_node(&json!({"rotationIntervalHours":24})).is_ok());
@@ -236,7 +267,8 @@ mod tests {
     }
     #[test]
     fn rotates_without_repeating_last_address() {
-        let pool = parse_pool(&json!({"rotationIps":"1.1.1.1\n9.9.9.9\n2606:4700:4700::1111"})).unwrap();
+        let pool =
+            parse_pool(&json!({"rotationIps":"1.1.1.1\n9.9.9.9\n2606:4700:4700::1111"})).unwrap();
         let mut index = 0;
         let mut previous = String::new();
         for _ in 0..20 {

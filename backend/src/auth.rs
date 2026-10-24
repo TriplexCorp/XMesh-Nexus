@@ -1,17 +1,17 @@
 use crate::{ApiError, AppState};
 use argon2::{
-    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
+    password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString, rand_core::OsRng},
 };
 use axum::{
+    Json,
     extract::{Request, State},
-    http::{header, HeaderMap, HeaderValue, StatusCode},
+    http::{HeaderMap, HeaderValue, StatusCode, header},
     middleware::Next,
     response::{IntoResponse, Response},
-    Json,
 };
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use sqlx::{PgPool, Row};
 use uuid::Uuid;
@@ -31,12 +31,18 @@ pub struct LoginRequest {
     pub password: String,
 }
 
-pub async fn seed_bootstrap_admin(pool: &PgPool, username: &str, password: &str) -> anyhow::Result<()> {
+pub async fn seed_bootstrap_admin(
+    pool: &PgPool,
+    username: &str,
+    password: &str,
+) -> anyhow::Result<()> {
     if username.trim().is_empty() || username.len() > 128 {
         anyhow::bail!("ADMIN_USERNAME must contain 1 to 128 characters");
     }
     if password.len() < 16 {
-        anyhow::bail!("ADMIN_PASSWORD must be at least 16 characters; run ./install.sh to generate a secure one");
+        anyhow::bail!(
+            "ADMIN_PASSWORD must be at least 16 characters; run ./install.sh to generate a secure one"
+        );
     }
 
     let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM panel_auth_users")
@@ -49,7 +55,9 @@ pub async fn seed_bootstrap_admin(pool: &PgPool, username: &str, password: &str)
     let salt = SaltString::generate(&mut OsRng);
     let password_hash = Argon2::default()
         .hash_password(password.as_bytes(), &salt)
-        .map_err(|error| anyhow::anyhow!("Could not hash bootstrap administrator password: {error}"))?
+        .map_err(|error| {
+            anyhow::anyhow!("Could not hash bootstrap administrator password: {error}")
+        })?
         .to_string();
     sqlx::query(
         "INSERT INTO panel_auth_users (username, password_hash) VALUES ($1, $2) \
@@ -68,27 +76,37 @@ pub async fn login(
     Json(body): Json<LoginRequest>,
 ) -> Result<(StatusCode, HeaderMap, Json<Value>), ApiError> {
     if body.username.len() > 128 || body.password.len() > 1024 {
-        return Err(ApiError::new(StatusCode::UNAUTHORIZED, "Неверный логин или пароль."));
+        return Err(ApiError::new(
+            StatusCode::UNAUTHORIZED,
+            "Неверный логин или пароль.",
+        ));
     }
-    let policy=crate::security::get_policy(&state.pool).await?;
+    let policy = crate::security::get_policy(&state.pool).await?;
     // Password-spray guard: per-username counters cannot bound random-username
     // abuse. This DB-backed minute budget survives Redis outages.
     // Under sustained attack it deliberately rejects new logins to protect
     // the control plane's API and Argon2 capacity.
-    let global_attempts:i64=sqlx::query_scalar(
+    let global_attempts: i64 = sqlx::query_scalar(
         "SELECT COALESCE((SELECT attempts FROM auth_global_limits \
-         WHERE minute_start=date_trunc('minute',NOW())),0)"
-    ).fetch_one(&state.pool).await?;
-    if global_attempts>=240 {
-        return Err(ApiError::new(StatusCode::TOO_MANY_REQUESTS,
-            "Слишком много попыток входа в панель. Повторите позже."));
+         WHERE minute_start=date_trunc('minute',NOW())),0)",
+    )
+    .fetch_one(&state.pool)
+    .await?;
+    if global_attempts >= 240 {
+        return Err(ApiError::new(
+            StatusCode::TOO_MANY_REQUESTS,
+            "Слишком много попыток входа в панель. Повторите позже.",
+        ));
     }
     // Rate-limit case variants together, but authenticate the exact account name.
     // The submitted username must match its stored casing byte-for-byte.
     let username_key = body.username.trim().to_lowercase();
     if username_key.is_empty() {
         record_failed_login(&state, &username_key).await?;
-        return Err(ApiError::new(StatusCode::UNAUTHORIZED, "Неверный логин или пароль."));
+        return Err(ApiError::new(
+            StatusCode::UNAUTHORIZED,
+            "Неверный логин или пароль.",
+        ));
     }
     let mut redis_conn = state.redis.clone();
     let redis_attempts = redis::cmd("GET")
@@ -105,7 +123,13 @@ pub async fn login(
     .await?;
     let locked = redis_attempts >= policy.login_attempts || db_locked;
     if locked {
-        return Err(ApiError::new(StatusCode::TOO_MANY_REQUESTS, format!("Слишком много попыток. Повторите вход через {} минут.",policy.lockout_minutes)));
+        return Err(ApiError::new(
+            StatusCode::TOO_MANY_REQUESTS,
+            format!(
+                "Слишком много попыток. Повторите вход через {} минут.",
+                policy.lockout_minutes
+            ),
+        ));
     }
     let row = sqlx::query(
         "SELECT id, username, role, password_hash, is_active \
@@ -117,10 +141,19 @@ pub async fn login(
 
     let Some(row) = row else {
         if locked {
-            return Err(ApiError::new(StatusCode::TOO_MANY_REQUESTS, format!("Слишком много попыток. Повторите вход через {} минут.",policy.lockout_minutes)));
+            return Err(ApiError::new(
+                StatusCode::TOO_MANY_REQUESTS,
+                format!(
+                    "Слишком много попыток. Повторите вход через {} минут.",
+                    policy.lockout_minutes
+                ),
+            ));
         }
         record_failed_login(&state, &username_key).await?;
-        return Err(ApiError::new(StatusCode::UNAUTHORIZED, "Неверный логин или пароль."));
+        return Err(ApiError::new(
+            StatusCode::UNAUTHORIZED,
+            "Неверный логин или пароль.",
+        ));
     };
     let admin_id: i64 = row.try_get("id")?;
     let username: String = row.try_get("username")?;
@@ -128,55 +161,95 @@ pub async fn login(
     let password_hash: String = row.try_get("password_hash")?;
     let is_active: bool = row.try_get("is_active")?;
 
-    let parsed_hash = PasswordHash::new(&password_hash)
-        .map_err(|_| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Не удалось проверить пароль."))?;
-    let verified = Argon2::default().verify_password(body.password.as_bytes(), &parsed_hash).is_ok();
+    let parsed_hash = PasswordHash::new(&password_hash).map_err(|_| {
+        ApiError::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Не удалось проверить пароль.",
+        )
+    })?;
+    let verified = Argon2::default()
+        .verify_password(body.password.as_bytes(), &parsed_hash)
+        .is_ok();
     if !is_active || !verified {
         if locked {
-            return Err(ApiError::new(StatusCode::TOO_MANY_REQUESTS, format!("Слишком много попыток. Повторите вход через {} минут.",policy.lockout_minutes)));
+            return Err(ApiError::new(
+                StatusCode::TOO_MANY_REQUESTS,
+                format!(
+                    "Слишком много попыток. Повторите вход через {} минут.",
+                    policy.lockout_minutes
+                ),
+            ));
         }
         record_failed_login(&state, &username_key).await?;
-        return Err(ApiError::new(StatusCode::UNAUTHORIZED, "Неверный логин или пароль."));
+        return Err(ApiError::new(
+            StatusCode::UNAUTHORIZED,
+            "Неверный логин или пароль.",
+        ));
     }
     // Serialize successful password authentication with account mutations.
     // Revoking a password or role must never be followed by a stale login.
-    let mut tx=state.pool.begin().await?;
-    let current=sqlx::query(
-        "SELECT username,role,password_hash,is_active FROM panel_auth_users WHERE id=$1 FOR UPDATE"
-    ).bind(admin_id).fetch_optional(&mut *tx).await?
-        .ok_or_else(||ApiError::new(StatusCode::UNAUTHORIZED,"Войдите снова."))?;
-    let current_username:String=current.try_get("username")?;
-    let current_role:String=current.try_get("role")?;
-    let current_hash:String=current.try_get("password_hash")?;
-    let active:bool=current.try_get("is_active")?;
-    if !active || current_hash!=password_hash || current_username!=username || current_role!=role {
-        return Err(ApiError::new(StatusCode::UNAUTHORIZED,"Учётная запись изменилась. Войдите снова."));
+    let mut tx = state.pool.begin().await?;
+    let current = sqlx::query(
+        "SELECT username,role,password_hash,is_active FROM panel_auth_users WHERE id=$1 FOR UPDATE",
+    )
+    .bind(admin_id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(|| ApiError::new(StatusCode::UNAUTHORIZED, "Войдите снова."))?;
+    let current_username: String = current.try_get("username")?;
+    let current_role: String = current.try_get("role")?;
+    let current_hash: String = current.try_get("password_hash")?;
+    let active: bool = current.try_get("is_active")?;
+    if !active
+        || current_hash != password_hash
+        || current_username != username
+        || current_role != role
+    {
+        return Err(ApiError::new(
+            StatusCode::UNAUTHORIZED,
+            "Учётная запись изменилась. Войдите снова.",
+        ));
     }
-    if crate::mfa::enabled(&state,admin_id).await? {
-        let challenge=crate::mfa::new_challenge_in_transaction(&state,&mut tx,admin_id).await?;
+    if crate::mfa::enabled(&state, admin_id).await? {
+        let challenge = crate::mfa::new_challenge_in_transaction(&state, &mut tx, admin_id).await?;
         tx.commit().await?;
-        return Ok((StatusCode::OK,HeaderMap::new(),Json(json!({
-            "mfaRequired":true,"challenge":challenge
-        }))));
+        return Ok((
+            StatusCode::OK,
+            HeaderMap::new(),
+            Json(json!({
+                "mfaRequired":true,"challenge":challenge
+            })),
+        ));
     }
-    let response=issue_session_in_transaction(&state,&mut tx,admin_id,&username,&role).await?;
+    let response =
+        issue_session_in_transaction(&state, &mut tx, admin_id, &username, &role).await?;
     tx.commit().await?;
-    clear_failed_login(&state,&username_key).await?;
+    clear_failed_login(&state, &username_key).await?;
     Ok(response)
 }
 
-pub(crate) async fn is_rate_limited(state:&AppState,username_key:&str)->Result<bool,ApiError>{
-    let mut conn=state.redis.clone();
-    let count=redis::cmd("GET").arg(format!("xmesh:auth:login:{username_key}"))
-        .query_async::<Option<i64>>(&mut conn).await.unwrap_or(None).unwrap_or(0);
+pub(crate) async fn is_rate_limited(
+    state: &AppState,
+    username_key: &str,
+) -> Result<bool, ApiError> {
+    let mut conn = state.redis.clone();
+    let count = redis::cmd("GET")
+        .arg(format!("xmesh:auth:login:{username_key}"))
+        .query_async::<Option<i64>>(&mut conn)
+        .await
+        .unwrap_or(None)
+        .unwrap_or(0);
     let locked:bool=sqlx::query_scalar(
         "SELECT COALESCE((SELECT locked_until>NOW() FROM auth_login_limits WHERE username_key=$1),FALSE)"
     ).bind(username_key).fetch_one(&state.pool).await?;
-    let policy=crate::security::get_policy(&state.pool).await?;
-    Ok(count>=policy.login_attempts || locked)
+    let policy = crate::security::get_policy(&state.pool).await?;
+    Ok(count >= policy.login_attempts || locked)
 }
 
-pub(crate) async fn clear_failed_login(state:&AppState,username_key:&str)->Result<(),ApiError>{
+pub(crate) async fn clear_failed_login(
+    state: &AppState,
+    username_key: &str,
+) -> Result<(), ApiError> {
     sqlx::query("DELETE FROM auth_login_limits WHERE username_key = $1")
         .bind(username_key)
         .execute(&state.pool)
@@ -191,11 +264,13 @@ pub(crate) async fn clear_failed_login(state:&AppState,username_key:&str)->Resul
 }
 
 pub(crate) async fn issue_session_in_transaction(
-    state:&AppState,
-    tx:&mut sqlx::Transaction<'_,sqlx::Postgres>,
-    admin_id:i64,username:&str,role:&str,
-)->Result<(StatusCode,HeaderMap,Json<Value>),ApiError>{
-    let policy=crate::security::get_policy(&state.pool).await?;
+    state: &AppState,
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    admin_id: i64,
+    username: &str,
+    role: &str,
+) -> Result<(StatusCode, HeaderMap, Json<Value>), ApiError> {
+    let policy = crate::security::get_policy(&state.pool).await?;
     let token = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
     let token_hash = hash_token(&token);
     sqlx::query("DELETE FROM panel_sessions WHERE expires_at < NOW()")
@@ -207,15 +282,20 @@ pub(crate) async fn issue_session_in_transaction(
     )
     .bind(&token_hash)
     .bind(admin_id)
-    .bind((policy.session_hours*3600) as f64)
+    .bind((policy.session_hours * 3600) as f64)
     .execute(&mut **tx)
     .await?;
     // Successful logins are serialized with the locked account row.
     // Drop oldest sessions to enforce the administrator-configured cap.
-    sqlx::query("DELETE FROM panel_sessions WHERE token_hash IN (\
+    sqlx::query(
+        "DELETE FROM panel_sessions WHERE token_hash IN (\
         SELECT token_hash FROM panel_sessions WHERE admin_id=$1 \
-        ORDER BY created_at DESC,token_hash DESC OFFSET $2)")
-        .bind(admin_id).bind(policy.max_sessions).execute(&mut **tx).await?;
+        ORDER BY created_at DESC,token_hash DESC OFFSET $2)",
+    )
+    .bind(admin_id)
+    .bind(policy.max_sessions)
+    .execute(&mut **tx)
+    .await?;
     sqlx::query("UPDATE panel_auth_users SET last_login_at = NOW() WHERE id = $1")
         .bind(admin_id)
         .execute(&mut **tx)
@@ -224,34 +304,51 @@ pub(crate) async fn issue_session_in_transaction(
     let mut headers = HeaderMap::new();
     headers.insert(
         header::SET_COOKIE,
-        make_session_cookie(&token, state.cookie_secure, policy.session_hours*3600)
-            .map_err(|_| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Не удалось создать сессию."))?,
+        make_session_cookie(&token, state.cookie_secure, policy.session_hours * 3600).map_err(
+            |_| {
+                ApiError::new(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Не удалось создать сессию.",
+                )
+            },
+        )?,
     );
     Ok((
         StatusCode::OK,
         headers,
-        Json(json!({"authenticated": true, "user": {"id": admin_id, "username": username, "role": role}})),
+        Json(
+            json!({"authenticated": true, "user": {"id": admin_id, "username": username, "role": role}}),
+        ),
     ))
 }
 
-pub(crate) async fn record_failed_login(state: &AppState, username_key: &str) -> Result<(), ApiError> {
+pub(crate) async fn record_failed_login(
+    state: &AppState,
+    username_key: &str,
+) -> Result<(), ApiError> {
     // Redis provides cross-instance throttling; PostgreSQL remains the durable fallback.
-    let global_count:i64=sqlx::query_scalar(
+    let global_count: i64 = sqlx::query_scalar(
         "INSERT INTO auth_global_limits(minute_start,attempts) \
          VALUES(date_trunc('minute',NOW()),1) \
          ON CONFLICT(minute_start) DO UPDATE \
-         SET attempts=auth_global_limits.attempts+1 RETURNING attempts"
-    ).fetch_one(&state.pool).await?;
-    if global_count==1 {
+         SET attempts=auth_global_limits.attempts+1 RETURNING attempts",
+    )
+    .fetch_one(&state.pool)
+    .await?;
+    if global_count == 1 {
         // Bound accumulated counters from random, nonexistent usernames.
         sqlx::query("DELETE FROM auth_global_limits WHERE minute_start<NOW()-INTERVAL '3 hours'")
-            .execute(&state.pool).await?;
-        sqlx::query("DELETE FROM auth_login_limits \
+            .execute(&state.pool)
+            .await?;
+        sqlx::query(
+            "DELETE FROM auth_login_limits \
             WHERE window_started_at<NOW()-INTERVAL '48 hours' \
-            AND (locked_until IS NULL OR locked_until<NOW())")
-            .execute(&state.pool).await?;
+            AND (locked_until IS NULL OR locked_until<NOW())",
+        )
+        .execute(&state.pool)
+        .await?;
     }
-    let policy=crate::security::get_policy(&state.pool).await?;
+    let policy = crate::security::get_policy(&state.pool).await?;
     let mut redis_conn = state.redis.clone();
     let redis_key = format!("xmesh:auth:login:{username_key}");
     if let Ok(attempts) = redis::cmd("INCR")
@@ -262,7 +359,7 @@ pub(crate) async fn record_failed_login(state: &AppState, username_key: &str) ->
     {
         let _ = redis::cmd("EXPIRE")
             .arg(&redis_key)
-            .arg(policy.lockout_minutes*60)
+            .arg(policy.lockout_minutes * 60)
             .query_async::<i64>(&mut redis_conn)
             .await;
     }
@@ -319,9 +416,18 @@ pub async fn logout(
             "{SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0{}",
             if state.cookie_secure { "; Secure" } else { "" }
         ))
-        .map_err(|_| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Не удалось завершить сессию."))?,
+        .map_err(|_| {
+            ApiError::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Не удалось завершить сессию.",
+            )
+        })?,
     );
-    Ok((StatusCode::OK, headers_out, Json(json!({"authenticated": false}))))
+    Ok((
+        StatusCode::OK,
+        headers_out,
+        Json(json!({"authenticated": false})),
+    ))
 }
 
 pub async fn require_session(
@@ -345,7 +451,7 @@ pub async fn require_session(
 
 async fn user_from_headers(state: &AppState, headers: &HeaderMap) -> Option<AuthUser> {
     let token = cookie_token(headers)?;
-    let policy=crate::security::get_policy(&state.pool).await.ok()?;
+    let policy = crate::security::get_policy(&state.pool).await.ok()?;
     let row = sqlx::query(
         "SELECT a.id, a.username, a.role \
          FROM panel_sessions s \
@@ -360,9 +466,13 @@ async fn user_from_headers(state: &AppState, headers: &HeaderMap) -> Option<Auth
     .fetch_optional(&state.pool)
     .await
     .ok()??;
-    let _=sqlx::query("UPDATE panel_sessions SET last_seen_at=NOW() \
-        WHERE token_hash=$1")
-        .bind(hash_token(&token)).execute(&state.pool).await;
+    let _ = sqlx::query(
+        "UPDATE panel_sessions SET last_seen_at=NOW() \
+        WHERE token_hash=$1",
+    )
+    .bind(hash_token(&token))
+    .execute(&state.pool)
+    .await;
     Some(AuthUser {
         id: row.try_get("id").ok()?,
         username: row.try_get("username").ok()?,
@@ -370,7 +480,7 @@ async fn user_from_headers(state: &AppState, headers: &HeaderMap) -> Option<Auth
     })
 }
 
-pub(crate) fn session_token_hash(headers:&HeaderMap)->Option<String>{
+pub(crate) fn session_token_hash(headers: &HeaderMap) -> Option<String> {
     cookie_token(headers).map(|token| hash_token(&token))
 }
 fn cookie_token(headers: &HeaderMap) -> Option<String> {
@@ -389,7 +499,11 @@ fn hash_token(token: &str) -> String {
     hex::encode(Sha256::digest(token.as_bytes()))
 }
 
-fn make_session_cookie(token: &str, secure: bool, session_seconds:i64) -> Result<HeaderValue, axum::http::header::InvalidHeaderValue> {
+fn make_session_cookie(
+    token: &str,
+    secure: bool,
+    session_seconds: i64,
+) -> Result<HeaderValue, axum::http::header::InvalidHeaderValue> {
     HeaderValue::from_str(&format!(
         "{SESSION_COOKIE}={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={session_seconds}{}",
         if secure { "; Secure" } else { "" }

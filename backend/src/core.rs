@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 use std::{
     io::{Cursor, Read},
-    os::unix::fs::{symlink, PermissionsExt},
+    os::unix::fs::{PermissionsExt, symlink},
     path::{Path, PathBuf},
     process::Stdio,
     sync::Arc,
@@ -100,7 +100,12 @@ impl CoreManager {
                 desired_version: desired,
                 installed_version: installed.clone(),
                 latest_version: None,
-                status: if installed.is_some() { "ready" } else { "not_installed" }.to_owned(),
+                status: if installed.is_some() {
+                    "ready"
+                } else {
+                    "not_installed"
+                }
+                .to_owned(),
                 progress: None,
                 last_error: None,
                 updated_at: None,
@@ -180,7 +185,6 @@ impl CoreManager {
         }
     }
 
-
     /// Validate configuration with the same locally installed Xray binary used by the control plane.
     /// Uses standard input: no config files, shell, server sockets or executable user input.
     pub async fn validate_json(&self, source: &str) -> Result<(bool, String, String), String> {
@@ -194,19 +198,29 @@ impl CoreManager {
         }
         let mut child = Command::new(&binary)
             .args(["run", "-test", "-format=json", "-config=stdin:"])
-            .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped())
-            .kill_on_drop(true).spawn()
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .kill_on_drop(true)
+            .spawn()
             .map_err(|_| "Не удалось запустить валидатор Xray-core.".to_owned())?;
         let mut stdin = child.stdin.take().ok_or("Нет stdin у валидатора Xray.")?;
         let input = source.as_bytes().to_vec();
         let writer = tokio::spawn(async move { stdin.write_all(&input).await });
-        let output = timeout(Duration::from_secs(8), child.wait_with_output()).await
+        let output = timeout(Duration::from_secs(8), child.wait_with_output())
+            .await
             .map_err(|_| "Проверка Xray-core превысила 8 секунд.".to_owned())?
             .map_err(|_| "Ошибка запуска валидатора Xray-core.".to_owned())?;
         let _ = writer.await;
         let ok = output.status.success();
-        let stdout = String::from_utf8_lossy(&output.stdout).chars().take(3000).collect();
-        let stderr = String::from_utf8_lossy(&output.stderr).chars().take(5000).collect();
+        let stdout = String::from_utf8_lossy(&output.stdout)
+            .chars()
+            .take(3000)
+            .collect();
+        let stderr = String::from_utf8_lossy(&output.stderr)
+            .chars()
+            .take(5000)
+            .collect();
         Ok((ok, stdout, stderr))
     }
 
@@ -269,28 +283,44 @@ impl CoreManager {
         // One release dropdown + one install request must not consume the
         // unauthenticated GitHub API rate limit twice. Cache the official
         // catalog for ten minutes across admin sessions.
-        if let Some((read_at,releases))=self.node_release_cache.read().await.as_ref()
-            && read_at.elapsed()<Duration::from_secs(600){return Ok(releases.clone())}
-        let mut all=Vec::new();
-        for page in 1..=20u32 {
-            let url=format!("https://api.github.com/repos/XTLS/Xray-core/releases?per_page=100&page={page}");
-            let batch=self.client.get(&url)
-                .header(reqwest::header::ACCEPT,"application/vnd.github+json")
-                .timeout(Duration::from_secs(20))
-                .send().await.map_err(|e|format!("GitHub releases unavailable: {e}"))?
-                .error_for_status().map_err(|e|format!("GitHub releases returned an error: {e}"))?
-                .json::<Vec<GithubRelease>>().await
-                .map_err(|e|format!("Invalid GitHub release response: {e}"))?;
-            let count=batch.len();
-            all.extend(batch.into_iter().filter(|r|!r.draft).map(|r|ReleaseInfo{
-                version:r.tag_name,published_at:r.published_at,
-                prerelease:r.prerelease,url:r.html_url,
-            }));
-            if count<100{break}
-            if page==20{return Err("Too many releases to enumerate safely".into())}
+        if let Some((read_at, releases)) = self.node_release_cache.read().await.as_ref()
+            && read_at.elapsed() < Duration::from_secs(600)
+        {
+            return Ok(releases.clone());
         }
-        *self.node_release_cache.write().await=
-            Some((std::time::Instant::now(),all.clone()));
+        let mut all = Vec::new();
+        for page in 1..=20u32 {
+            let url = format!(
+                "https://api.github.com/repos/XTLS/Xray-core/releases?per_page=100&page={page}"
+            );
+            let batch = self
+                .client
+                .get(&url)
+                .header(reqwest::header::ACCEPT, "application/vnd.github+json")
+                .timeout(Duration::from_secs(20))
+                .send()
+                .await
+                .map_err(|e| format!("GitHub releases unavailable: {e}"))?
+                .error_for_status()
+                .map_err(|e| format!("GitHub releases returned an error: {e}"))?
+                .json::<Vec<GithubRelease>>()
+                .await
+                .map_err(|e| format!("Invalid GitHub release response: {e}"))?;
+            let count = batch.len();
+            all.extend(batch.into_iter().filter(|r| !r.draft).map(|r| ReleaseInfo {
+                version: r.tag_name,
+                published_at: r.published_at,
+                prerelease: r.prerelease,
+                url: r.html_url,
+            }));
+            if count < 100 {
+                break;
+            }
+            if page == 20 {
+                return Err("Too many releases to enumerate safely".into());
+            }
+        }
+        *self.node_release_cache.write().await = Some((std::time::Instant::now(), all.clone()));
         Ok(all)
     }
 
@@ -330,10 +360,22 @@ impl CoreManager {
             "x86_64" => "Xray-linux-64.zip",
             "aarch64" => "Xray-linux-arm64-v8a.zip",
             "arm" => "Xray-linux-arm32-v7a.zip",
-            arch => return Err(format!("Automatic Xray-core installation is not supported for architecture {arch}")),
+            arch => {
+                return Err(format!(
+                    "Automatic Xray-core installation is not supported for architecture {arch}"
+                ));
+            }
         };
-        let asset = release.assets.iter().find(|asset| asset.name == asset_name)
-            .ok_or_else(|| format!("Release {} does not publish expected asset {asset_name}", release.tag_name))?;
+        let asset = release
+            .assets
+            .iter()
+            .find(|asset| asset.name == asset_name)
+            .ok_or_else(|| {
+                format!(
+                    "Release {} does not publish expected asset {asset_name}",
+                    release.tag_name
+                )
+            })?;
         if asset.size as usize > MAX_RELEASE_BYTES {
             return Err("Release asset exceeds the 120 MiB safety limit".to_owned());
         }
@@ -341,9 +383,13 @@ impl CoreManager {
             .map_err(|e| format!("Invalid GitHub asset URL: {e}"))?;
         if parsed_url.scheme() != "https"
             || parsed_url.host_str() != Some("github.com")
-            || !parsed_url.path().starts_with("/XTLS/Xray-core/releases/download/")
+            || !parsed_url
+                .path()
+                .starts_with("/XTLS/Xray-core/releases/download/")
         {
-            return Err("Refusing to download an asset from a non-official Xray-core URL".to_owned());
+            return Err(
+                "Refusing to download an asset from a non-official Xray-core URL".to_owned(),
+            );
         }
 
         {
@@ -360,7 +406,10 @@ impl CoreManager {
         .map_err(|e| format!("GitHub download request failed: {e}"))?
         .error_for_status()
         .map_err(|e| format!("GitHub refused the release download: {e}"))?;
-        let bytes = response.bytes().await.map_err(|e| format!("Could not read release archive: {e}"))?;
+        let bytes = response
+            .bytes()
+            .await
+            .map_err(|e| format!("Could not read release archive: {e}"))?;
         if bytes.is_empty() || bytes.len() > MAX_RELEASE_BYTES {
             return Err("Downloaded release archive is empty or exceeds 120 MiB".to_owned());
         }
@@ -376,9 +425,13 @@ impl CoreManager {
         }
 
         let versions_dir = self.root.join("versions");
-        fs::create_dir_all(&versions_dir).await.map_err(|e| e.to_string())?;
+        fs::create_dir_all(&versions_dir)
+            .await
+            .map_err(|e| e.to_string())?;
         let stage = versions_dir.join(format!(".staging-{}", Uuid::new_v4().simple()));
-        fs::create_dir_all(&stage).await.map_err(|e| e.to_string())?;
+        fs::create_dir_all(&stage)
+            .await
+            .map_err(|e| e.to_string())?;
 
         if let Err(error) = unpack_release(&bytes, &stage).await {
             let _ = fs::remove_dir_all(&stage).await;
@@ -387,9 +440,14 @@ impl CoreManager {
 
         let binary = stage.join("xray");
         {
-            let mut permissions = fs::metadata(&binary).await.map_err(|e| e.to_string())?.permissions();
+            let mut permissions = fs::metadata(&binary)
+                .await
+                .map_err(|e| e.to_string())?
+                .permissions();
             permissions.set_mode(0o755);
-            fs::set_permissions(&binary, permissions).await.map_err(|e| e.to_string())?;
+            fs::set_permissions(&binary, permissions)
+                .await
+                .map_err(|e| e.to_string())?;
         }
         {
             let mut state = self.state.write().await;
@@ -403,12 +461,17 @@ impl CoreManager {
                 .output(),
         )
         .await
-        .map_err(|_| "Downloaded Xray-core binary did not respond to the version command".to_owned())?
+        .map_err(|_| {
+            "Downloaded Xray-core binary did not respond to the version command".to_owned()
+        })?
         .map_err(|e| format!("Could not execute downloaded Xray-core binary: {e}"))?;
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             let _ = fs::remove_dir_all(&stage).await;
-            return Err(format!("Downloaded Xray-core binary verification failed: {}", stderr.trim()));
+            return Err(format!(
+                "Downloaded Xray-core binary verification failed: {}",
+                stderr.trim()
+            ));
         }
         let version_output = format!(
             "{} {}",
@@ -426,18 +489,26 @@ impl CoreManager {
 
         let target_dir = versions_dir.join(&release.tag_name);
         if fs::try_exists(&target_dir).await.unwrap_or(false) {
-            fs::remove_dir_all(&target_dir).await.map_err(|e| e.to_string())?;
+            fs::remove_dir_all(&target_dir)
+                .await
+                .map_err(|e| e.to_string())?;
         }
-        fs::rename(&stage, &target_dir).await.map_err(|e| format!("Could not finalize release directory: {e}"))?;
+        fs::rename(&stage, &target_dir)
+            .await
+            .map_err(|e| format!("Could not finalize release directory: {e}"))?;
 
-        let temporary_link = self.root.join(format!(".current-{}", Uuid::new_v4().simple()));
+        let temporary_link = self
+            .root
+            .join(format!(".current-{}", Uuid::new_v4().simple()));
         let relative_target = PathBuf::from("versions").join(&release.tag_name);
         symlink(&relative_target, &temporary_link)
             .map_err(|e| format!("Could not create atomic Xray-core version link: {e}"))?;
         let current = self.root.join("current");
         if let Err(error) = fs::rename(&temporary_link, &current).await {
             let _ = fs::remove_file(&temporary_link).await;
-            return Err(format!("Could not switch installed Xray-core version atomically: {error}"));
+            return Err(format!(
+                "Could not switch installed Xray-core version atomically: {error}"
+            ));
         }
 
         Ok((release.tag_name, latest))
@@ -496,7 +567,11 @@ fn parse_vless_encryption_output(output: &str) -> Result<Value, String> {
 
     for (mode, pair) in [("x25519", &x25519), ("mlkem768", &mlkem768)] {
         for field in ["decryption", "encryption"] {
-            if pair.get(field).and_then(Value::as_str).is_none_or(str::is_empty) {
+            if pair
+                .get(field)
+                .and_then(Value::as_str)
+                .is_none_or(str::is_empty)
+            {
                 return Err(format!(
                     "xray vlessenc: не удалось прочитать {field} для {mode}. Проверьте версию Xray-core и формат его вывода."
                 ));
@@ -517,12 +592,20 @@ fn normalize_version(value: &str) -> Result<String, String> {
     }
     if value.is_empty()
         || value.len() > 64
-        || !value.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
+        || !value
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
         || value.contains("..")
     {
-        return Err("Version must be latest or a valid Xray-core release tag such as v26.10.10".to_owned());
+        return Err(
+            "Version must be latest or a valid Xray-core release tag such as v26.10.10".to_owned(),
+        );
     }
-    let normalized = if value.starts_with('v') { value.to_owned() } else { format!("v{value}") };
+    let normalized = if value.starts_with('v') {
+        value.to_owned()
+    } else {
+        format!("v{value}")
+    };
     Ok(normalized)
 }
 
@@ -539,13 +622,17 @@ async fn unpack_release(bytes: &[u8], destination: &Path) -> Result<(), String> 
             .map_err(|e| format!("Downloaded Xray-core archive is not a valid ZIP: {e}"))?;
         let mut found_binary = false;
         for index in 0..archive.len() {
-            let mut entry = archive.by_index(index)
+            let mut entry = archive
+                .by_index(index)
                 .map_err(|e| format!("Could not read ZIP entry: {e}"))?;
             let name = entry.name().to_owned();
             if !entry.is_file() || name.contains('/') || name.contains('\\') {
                 continue;
             }
-            if !matches!(name.as_str(), "xray" | "geoip.dat" | "geosite.dat" | "LICENSE" | "README.md") {
+            if !matches!(
+                name.as_str(),
+                "xray" | "geoip.dat" | "geosite.dat" | "LICENSE" | "README.md"
+            ) {
                 continue;
             }
             if let Some(mode) = entry.unix_mode()
@@ -554,7 +641,8 @@ async fn unpack_release(bytes: &[u8], destination: &Path) -> Result<(), String> 
                 continue;
             }
             let mut contents = Vec::new();
-            entry.read_to_end(&mut contents)
+            entry
+                .read_to_end(&mut contents)
                 .map_err(|e| format!("Could not extract {name}: {e}"))?;
             if name == "xray" {
                 if contents.is_empty() || contents.len() > 100 * 1024 * 1024 {
@@ -618,15 +706,29 @@ Authentication: ML-KEM-768, Post-Quantum
 "encryption": "mlkem768x25519plus.native.0rtt.client-mlkem"
 "#;
         let parsed = parse_vless_encryption_output(output).unwrap();
-        assert_eq!(parsed["x25519"]["decryption"], "mlkem768x25519plus.native.600s.server-x25519");
-        assert_eq!(parsed["x25519"]["encryption"], "mlkem768x25519plus.native.0rtt.client-x25519");
-        assert_eq!(parsed["mlkem768"]["decryption"], "mlkem768x25519plus.native.600s.server-mlkem");
-        assert_eq!(parsed["mlkem768"]["encryption"], "mlkem768x25519plus.native.0rtt.client-mlkem");
+        assert_eq!(
+            parsed["x25519"]["decryption"],
+            "mlkem768x25519plus.native.600s.server-x25519"
+        );
+        assert_eq!(
+            parsed["x25519"]["encryption"],
+            "mlkem768x25519plus.native.0rtt.client-x25519"
+        );
+        assert_eq!(
+            parsed["mlkem768"]["decryption"],
+            "mlkem768x25519plus.native.600s.server-mlkem"
+        );
+        assert_eq!(
+            parsed["mlkem768"]["encryption"],
+            "mlkem768x25519plus.native.0rtt.client-mlkem"
+        );
     }
 
     #[test]
     fn rejects_partial_vlessenc_output() {
-        assert!(parse_vless_encryption_output("Authentication: X25519\n\"decryption\": \"server\"").is_err());
+        assert!(
+            parse_vless_encryption_output("Authentication: X25519\n\"decryption\": \"server\"")
+                .is_err()
+        );
     }
-
 }
