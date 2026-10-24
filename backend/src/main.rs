@@ -602,9 +602,7 @@ async fn csrf_guard(request: Request, next: Next) -> Response {
         let valid = origin
             .and_then(|value| value.parse::<Uri>().ok())
             .and_then(|uri| {
-                if !matches!(uri.scheme_str(), Some("https" | "http"))
-                    || uri.query().is_some()
-                {
+                if !matches!(uri.scheme_str(), Some("https" | "http")) || uri.query().is_some() {
                     return None;
                 }
                 uri.authority()
