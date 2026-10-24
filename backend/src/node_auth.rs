@@ -131,7 +131,7 @@ pub async fn authenticate_for(
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(|_| error("Ошибка времени сервера."))?
-        .as_secs() as i64;
+        .as_secs().try_into().map_err(|_| error("Ошибка времени сервера."))?;
     let nonce = verified_signature(&key, headers, node_id, raw_body, now, path)?;
     let inserted = sqlx::query(
         "INSERT INTO node_metric_nonces(node_id, nonce) VALUES($1, $2) ON CONFLICT DO NOTHING",
