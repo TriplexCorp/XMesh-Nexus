@@ -133,7 +133,9 @@ fn current_seconds() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
-        .as_secs().try_into().unwrap_or(i64::MAX)
+        .as_secs()
+        .try_into()
+        .unwrap_or(i64::MAX)
 }
 fn recovery_hash(code: &str) -> Option<String> {
     let cleaned = code.trim().replace('-', "").to_ascii_uppercase();
