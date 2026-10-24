@@ -198,6 +198,19 @@ fn apply_json(node:&Value,config:&mut Value)->Result<(),ApiError>{
             outbounds.push(outbound.clone());
         }
     }
+    // Fail early on references to non-existent outbounds. This does not
+    // replace Xray-core validation on the actual node.
+    let known:HashSet<String>=obj.get("outbounds").and_then(Value::as_array)
+        .into_iter().flatten().filter_map(|out|out.get("tag")
+        .and_then(Value::as_str).map(str::to_owned)).collect();
+    if let Some(rules)=raw.get("routing").and_then(|r|r.get("rules")).and_then(Value::as_array){
+        for rule in rules {
+            let tag=rule.get("outboundTag").and_then(Value::as_str).unwrap_or("");
+            if !known.contains(tag){
+                return Err(bad(&format!("Routing JSON: outboundTag '{}' is not defined in XRAY STUDIO or node outbounds.",tag)));
+            }
+        }
+    }
     if let Some(custom)=raw.get("routing"){
         let routing=obj.entry("routing").or_insert_with(||json!({}));
         let routing=routing.as_object_mut()
