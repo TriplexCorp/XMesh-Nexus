@@ -1325,7 +1325,7 @@ async fn ingest_node_metrics(
         && source_ms > 0
         && source_ms >= server_now_ms.saturating_sub(45_000)
         && source_ms <= server_now_ms.saturating_add(15_000);
-    // Reject duplicate/out-of-order signed Xray snapshots under a per-node lock.
+    // Reject duplicate or out-of-order producer timestamps under the node lock.
     let latest_source_ms: Option<i64> = if source_valid {
         sqlx::query_scalar(
             "SELECT MAX((metrics->>'userStatsAtMs')::BIGINT)
@@ -1448,7 +1448,10 @@ async fn ingest_node_metrics(
              SET data=jsonb_set(
                    u.data,'{onlineAt}',
                    to_jsonb(GREATEST(
-                     CASE WHEN (u.data->>'onlineAt') ~ '^[0-9]{1,16}
+                     CASE WHEN (u.data->>'onlineAt') ~ '^[0-9]{1,16}$'
+                       THEN (u.data->>'onlineAt')::BIGINT ELSE 0 END,
+                     LEAST($3::BIGINT,$4::BIGINT))),true),
+                 updated_at=NOW()
              FROM jsonb_to_recordset($2::jsonb)
                   AS sample(user_id BIGINT,uplink_bytes BIGINT,downlink_bytes BIGINT)
              LEFT JOIN user_node_traffic_totals AS previous
@@ -1522,7 +1525,7 @@ async fn ingest_node_metrics(
         ).bind(body.node_id).bind(serialized).execute(&mut *telemetry_tx).await?;
     }
 
-    // Commit the accepted-source watermark, counters and presence atomically.
+    // Commit source watermark, traffic accounting, and presence in one transaction.
     telemetry_tx.commit().await?;
 
     Ok((StatusCode::CREATED, Json(json!({
@@ -1534,87 +1537,11 @@ async fn ingest_node_metrics(
     }))))
 }
 
-
-                       THEN (u.data->>'onlineAt')::BIGINT ELSE 0 END,
-                     LEAST($3::BIGINT,$4::BIGINT))),true),
-                 updated_at=NOW()
-             FROM jsonb_to_recordset($2::jsonb)
-                  AS sample(user_id BIGINT,uplink_bytes BIGINT,downlink_bytes BIGINT)
-             LEFT JOIN user_node_traffic_totals AS previous
-                  ON previous.node_id=$1 AND previous.user_id=sample.user_id
-             WHERE u.collection='users' AND u.id=sample.user_id
-               AND previous.user_id IS NOT NULL
-               AND (sample.uplink_bytes>previous.last_uplink_bytes
-                    OR sample.downlink_bytes>previous.last_downlink_bytes)"
-        ).bind(body.node_id).bind(&serialized).bind(sampled_at)
-         .execute(&mut *telemetry_tx).await?;
-        sqlx::query(
-            "INSERT INTO user_node_traffic_totals AS totals (
-                node_id, user_id, last_uplink_bytes, last_downlink_bytes,
-                uplink_bytes, downlink_bytes, observations, updated_at
-            )
-            SELECT $1, metrics.user_id, metrics.uplink_bytes, metrics.downlink_bytes,
-                   0, 0, 1, NOW()
-            FROM jsonb_to_recordset($2::jsonb)
-                 AS metrics(user_id BIGINT, uplink_bytes BIGINT, downlink_bytes BIGINT)
-            JOIN panel_records u ON u.collection = 'users' AND u.id = metrics.user_id
-            ON CONFLICT (node_id, user_id) DO UPDATE SET
-                uplink_bytes = totals.uplink_bytes +
-                    GREATEST(EXCLUDED.last_uplink_bytes - totals.last_uplink_bytes, 0),
-                downlink_bytes = totals.downlink_bytes +
-                    GREATEST(EXCLUDED.last_downlink_bytes - totals.last_downlink_bytes, 0),
-                last_uplink_bytes = EXCLUDED.last_uplink_bytes,
-                last_downlink_bytes = EXCLUDED.last_downlink_bytes,
-                observations = totals.observations + 1,
-                updated_at = NOW()"
-        )
-        .bind(body.node_id)
-        .bind(serialized)
-        .execute(&mut *telemetry_tx)
-        .await?;
-    }
-
-
-    if !inbound_samples.is_empty() {
-        // An inbound's aggregate traffic MUST NEVER be interpreted as per-user traffic.
-        // Signed node agents report cumulative counters scoped to a real user+inbound.
-        let serialized = serde_json::to_value(&inbound_samples)
-            .map_err(|_|ApiError::new(StatusCode::BAD_REQUEST,"Некорректный userInboundTraffic."))?;
-        sqlx::query(
-            "INSERT INTO user_inbound_traffic_totals AS totals (
-                node_id,user_id,inbound_tag,last_uplink_bytes,last_downlink_bytes,
-                uplink_bytes,downlink_bytes,observations,updated_at
-            )
-            SELECT $1,s.user_id,s.inbound_tag,s.uplink_bytes,s.downlink_bytes,0,0,1,NOW()
-            FROM jsonb_to_recordset($2::jsonb)
-                AS s(user_id BIGINT,inbound_tag TEXT,uplink_bytes BIGINT,downlink_bytes BIGINT)
-            JOIN panel_records u ON u.collection='users' AND u.id=s.user_id
-            ON CONFLICT(node_id,user_id,inbound_tag) DO UPDATE SET
-                uplink_bytes=totals.uplink_bytes+
-                    GREATEST(EXCLUDED.last_uplink_bytes-totals.last_uplink_bytes,0),
-                downlink_bytes=totals.downlink_bytes+
-                    GREATEST(EXCLUDED.last_downlink_bytes-totals.last_downlink_bytes,0),
-                last_uplink_bytes=EXCLUDED.last_uplink_bytes,
-                last_downlink_bytes=EXCLUDED.last_downlink_bytes,
-                observations=totals.observations+1,
-                updated_at=NOW()"
-        ).bind(body.node_id).bind(serialized).execute(&mut *telemetry_tx).await?;
-    }
-
-    Ok((StatusCode::CREATED, Json(json!({
-        "status": "accepted",
-        "nodeId": body.node_id,
-        "sampledAt": sampled_at,
-        "userTrafficSamples": user_traffic.len(),
-        "userInboundTrafficSamples": inbound_samples.len()
-    }))))
-}
-
-/// Authenticated presence: no credentials, subscriptions or user secrets.
+/// Authenticated, read-only user presence. No secrets or subscription tokens.
 async fn get_user_presence(
     State(state): State<AppState>,
 ) -> Result<Json<Value>, ApiError> {
-    let rows = sqlx::query(
+    let rows=sqlx::query(
         "SELECT id,
             CASE WHEN (data->>'onlineAt') ~ '^[0-9]{1,16}$'
                  THEN (data->>'onlineAt')::BIGINT ELSE 0 END AS online_at
