@@ -6,6 +6,7 @@ mod core;
 mod node_rotation;
 mod node_auth;
 mod node_runtime;
+mod node_routing;
 mod node_geodata;
 mod node_policy;
 mod node_enrollment;
