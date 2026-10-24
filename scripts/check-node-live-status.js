@@ -13,7 +13,7 @@ assert.match(app,/Promise\.all\(\[refreshNodeMetrics\(\),refreshNodeRuntime\(\)\
 assert.match(app,/setInterval\(\(\)=>\{void poll\(\)\},5000\)/);
 assert.match(app,/if\(!runtime\?\.connected\)/,'Stale heartbeats must never mark a node active');
 assert.match(app,/runtime\.xrayRunning===true&&runtime\.routerRunning===true/,'Both Xray and router must be running');
-assert.match(app,/version\.textContent=text/,'Remote version must be inserted as text');
+assert.match(app,/version\.textContent=runtime\?\.xrayVersion\?'Xray '\+runtime\.xrayVersion:'Xray —'/,'Remote version must be inserted as text');
 assert.match(css,/\.node-runtime-online/);
 assert.match(css,/\.node-runtime-offline/);
 assert.match(runtime,/"xrayVersion":row\.try_get/);
