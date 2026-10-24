@@ -27,7 +27,8 @@ assert.match(tools,/toolCluster\('Сеть и конфигурация'/,'Networ
 assert.match(css,/--vround:var\(--ui-control-radius/,'Global corner radius inherited');
 assert.match(css,/height:clamp\(36rem,calc\(100dvh - 16rem\)/,'Editor responds to viewport height');
 assert.match(css,/\.sv-studio\.sv-outline-hidden \.sv-workspace\{grid-template-columns:minmax\(0,1fr\)\}/,'Hidden inspector restores full editor width');
-assert.match(css,/@media\(max-width:940px\)/,'Narrow viewports stack inspector');
+assert.match(css,/container:sv-studio-workspace \/ inline-size/,'Workspace must react to the user-selected content width');
+assert.match(css,/@container sv-studio-workspace \(max-width:940px\)/,'Narrow content width stacks inspector');
 assert.match(css,/--vcode:/,'Same font token for JSON and overlay');
 assert.match(html,/xray-studio-v4\.css\?v=20261024-enterprise-v1/,'CSS cache key must change');
 assert.match(html,/xray-studio-v4\.js\?v=20261024-enterprise-v1/,'JS cache key must change');
