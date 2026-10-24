@@ -73,7 +73,7 @@
     return values.map(([value,label])=>'<option value="'+escapeHTML(value)+'"'+(value===selected?' selected':'')+'>'+escapeHTML(label)+'</option>').join('');
   }
 
-  const CSS_VERSION = '20261024-client-cards-v7';
+  const CSS_VERSION = '20261024-routing-clean-v1';
   function ensureStylesheet() {
     const file = 'client-routing.css';
     const existing = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
@@ -96,16 +96,9 @@
     if (existing) existing.remove();
   }
   // Fail-safe: SVGs must never occupy the viewport if the optional CSS asset fails.
-  function ensureCriticalStyles() {
-    if (document.getElementById('crx-critical-styles')) return;
-    const style = document.createElement('style');
-    style.id = 'crx-critical-styles';
-    // Only emergency icon bounds. Layout is exclusively owned by client-routing.css
-    // so it follows the global html font scale without conflicting overrides.
-    style.textContent = '#client-route-root.crx .crx-icon{display:inline-block;width:1.1875rem;height:1.1875rem;max-width:1.1875rem;max-height:1.1875rem;flex-shrink:0}' +
-      '#client-route-root.crx .crx-flag{display:block;width:1.8125rem;height:1.375rem;max-width:1.8125rem;max-height:1.375rem;flex-shrink:0}';
-    document.head.appendChild(style);
-  }
+  // One CSS owner: client-routing.css. No competing inline fallback rules.
+  function ensureCriticalStyles() {}
+
   function create(db, saveSettings, toast) {
     const nodes = (db.nodes||[]).filter(n=>!n.disabled);
     const hosts = (db.hosts||[]).filter(h=>!h.disabled);
