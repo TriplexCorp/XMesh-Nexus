@@ -18,7 +18,7 @@ function open({node,profiles,modal,updateNode,apiRequest,notify,afterSave}){
  modal('<form class="box route-json-workspace" data-route-json-form method="dialog">'+
  '<header class="route-json-head"><div><span class="route-json-kicker">УЗЛЫ / '+esc(node.name||node.id)+'</span>'+
  '<h2>Маршрутизация</h2><p>Нативный Xray JSON. Настройки применяются только к этой ноде.</p></div>'+
- '<button type="button" class="gh sm" data-x aria-label="Закрыть">✕</button></header>'+
+ '</header>'+
  '<div class="route-json-bar"><label><input type="checkbox" data-route-json-enabled '+(node.routingEnabled?'checked':'')+'> Включить маршрутизацию</label>'+
  '<div><button type="button" class="gh sm" data-route-format>Форматировать</button>'+
  '<button type="button" class="gh sm" data-route-copy>Копировать JSON</button></div></div>'+
