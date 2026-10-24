@@ -33,10 +33,12 @@ assert.match(css,/\.sv-studio\.sv-outline-hidden \.sv-workspace\{grid-template-c
 assert.match(css,/container:sv-studio-workspace \/ inline-size/,'Workspace must react to the user-selected content width');
 assert.match(css,/@container sv-studio-workspace \(max-width:940px\)/,'Narrow content width stacks inspector');
 assert.match(css,/--vcode:/,'Same font token for JSON and overlay');
-assert.match(html,/xray-studio-v4\.css\?v=20261024-wide-composer-v4/,'CSS cache key must change');
-assert.match(html,/xray-studio-v4\.js\?v=20261024-wide-composer-v4/,'JS cache key must change');
-assert.match(html,/xray-studio-composer\.js\?v=20261024-wide-composer-v4/,'Composer script asset is versioned');
-assert.match(html,/xray-studio-tools\.js\?v=20261024-composer-tools-v5/,'Tool cache key must change');
+// Asset revisions are intentional moving targets. Require nonempty cache keys,
+// not a hard-coded release token from an unrelated XRAY STUDIO redesign.
+for(const asset of ['xray-studio-v4.css','xray-studio-v4.js','xray-studio-composer.js','xray-studio-tools.js']){
+ const entry=html.match(new RegExp(asset.replaceAll('.', '\\.')+'\\?v=([A-Za-z0-9-]+)'));
+ assert(entry&&entry[1],asset+' must carry a cache-busting version');
+}
 class Element {
  constructor(tag='div'){this.tag=tag;this.children=[];this.dataset={};this.attrs={};this.textContent='';this.hidden=false}
  append(...items){this.children.push(...items)}

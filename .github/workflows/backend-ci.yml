@@ -116,6 +116,10 @@ jobs:
         run: node scripts/check-crud-dialog-lifecycle.js
       - name: Verify Xray per-user per-inbound metrics collector
         run: python3 scripts/test-xray-stats-collector.py
+      - name: Test node metrics collector syntax and real presence state transitions
+        run: |
+          bash -n deploy/node-metrics-agent.sh
+          python3 scripts/test-node-presence.py
       - name: Ensure online status expires and signed telemetry cannot replay
         run: node scripts/check-user-presence.js
       - name: Check managed Xray update safety and SQLx migration uniqueness

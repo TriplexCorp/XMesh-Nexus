@@ -155,7 +155,13 @@ async function backendRequest(path,options={}){
 const lat=()=>Promise.resolve();
 const st=u=>u.disabled?'DISABLED':u.hold?'ON_HOLD':(u.limit&&u.used>=u.limit)?'LIMITED':(u.expireAt&&u.expireAt<Date.now())?'EXPIRED':'ACTIVE';
 const USER_PRESENCE_WINDOW_MS=45_000;
-const isOn=u=>st(u)==='ACTIVE'&&Number(u.onlineAt)>Date.now()-USER_PRESENCE_WINDOW_MS;
+let presenceClockOffsetMs=0,presenceFeedHealthy=true;
+const presenceNow=()=>Date.now()+presenceClockOffsetMs;
+const isOn=u=>{
+  const at=Number(u.onlineAt),now=presenceNow();
+  return presenceFeedHealthy&&st(u)==='ACTIVE'&&Number.isSafeInteger(at)&&at>0
+    &&at<=now&&at>now-USER_PRESENCE_WINDOW_MS;
+};
 const inbs=p=>{try{return JSON.parse(p.config).inbounds||[]}catch(e){return[]}};
 const tags=()=>DB.profiles.flatMap(p=>inbs(p).map(i=>i.tag));
 const tcol=t=>({vless:'--a',trojan:'--c3',shadowsocks:'--c4'}[DB.profiles.flatMap(inbs).find(x=>x.tag==t)?.protocol]||'--b');
@@ -1264,18 +1270,29 @@ async function usersP(){
       if(cur!=='users'||document.hidden||presenceRefreshBusy)return;
       presenceRefreshBusy=true;
       try{
-        const response=await fetch('/api/v1/users/presence',{credentials:'same-origin',cache:'no-store'});
+        const startedAt=Date.now();
+        const signal=typeof AbortSignal!=='undefined'&&typeof AbortSignal.timeout==='function'
+          ?AbortSignal.timeout(8000):undefined;
+        const response=await fetch('/api/v1/users/presence',{
+          credentials:'same-origin',cache:'no-store',signal
+        });
         if(!response.ok)throw Error('HTTP '+response.status);
         const payload=await response.json();
-        if(!Array.isArray(payload?.items))throw Error('Invalid presence response');
+        if(!Array.isArray(payload?.items)||payload.items.length>100000)throw Error('Invalid presence response');
+        const serverNow=Number(payload.serverNowMs);
+        if(!Number.isSafeInteger(serverNow)||serverNow<=0)throw Error('Invalid presence clock');
+        // Use server time for TTL decisions even when the operator PC clock drifts.
+        presenceClockOffsetMs=serverNow-Math.round((startedAt+Date.now())/2);
         const activity=new Map(payload.items.map(item=>[String(item.id),Number(item.onlineAt)]));
         for(const u of DB.users){
           const at=activity.get(String(u.id));
           if(Number.isSafeInteger(at)&&at>=0)u.onlineAt=at;
         }
+        presenceFeedHealthy=true;
         presenceErrorLogged=false;
       }catch(error){
-        // The local activity TTL still expires even if telemetry is unreachable.
+        // Unknown telemetry is not a proof of presence. Fail closed.
+        presenceFeedHealthy=false;
         if(!presenceErrorLogged)console.warn('XMesh user presence refresh failed:',error);
         presenceErrorLogged=true;
       }finally{

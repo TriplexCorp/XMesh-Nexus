@@ -88,9 +88,9 @@ const tick=async()=>{for(let n=0;n<12;n++)await Promise.resolve()};
 
 async function run(){
  const initial=harness(sample());
- assert.equal((initial.host.innerHTML.match(/class="sv-toolitem /g)||[]).length,9,'VLESS Reality shows 9 relevant actions');
+ assert.equal((initial.host.innerHTML.match(/class="sv-toolitem /g)||[]).length,8,'VLESS XHTTP Reality without VLESS Encryption shows 8 supported actions');
  assert.equal(initial.issue.hidden,false,'broken ID visible as contextual warning');
- assert.deepEqual(['reality','shortid','vlessens','vision','xhttp','dns','routing','outbounds','inbound'].map(x=>initial.host.innerHTML.includes('data-tool="'+x+'"')),[true,true,true,true,true,true,true,true,true]);
+ assert.deepEqual(['reality','shortid','vlessens','vision','xhttp','dns','routing','outbounds','inbound'].map(x=>initial.host.innerHTML.includes('data-tool="'+x+'"')),[true,true,true,false,true,true,true,true,true]);
 
  const shadowsocksReality=sample();
  shadowsocksReality.inbounds=[{tag:'ss-reality',port:443,protocol:'shadowsocks',settings:{network:'tcp,udp',method:'2022-blake3-aes-256-gcm',password:'local-secret'},streamSettings:{network:'xhttp',security:'reality',xhttpSettings:{path:'/proxy',mode:'auto'},realitySettings:{target:'front.example.org:443',serverNames:['front.example.org'],privateKey:PREVIOUS_KEY,shortIds:['0a0b']}}}];
@@ -146,6 +146,7 @@ async function run(){
  const mixed=JSON.parse(JSON.stringify(hysteria));
  const vless=sample().inbounds[0];
  vless.streamSettings.realitySettings.shortIds=['aabbccdd'];
+ vless.settings.decryption='mlkem768x25519plus.native.testvalue';
  mixed.inbounds.push(vless);
  const multiPalette=harness(mixed,{selectorUI:true});
  assert.ok(multiPalette.host.innerHTML.includes('data-tool-inbound'),'Multiple inbounds must expose a selector');

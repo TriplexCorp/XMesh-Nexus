@@ -1,0 +1,45 @@
+name: User Presence Integrity
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/src/main.rs"
+      - "deploy/node-metrics-agent.sh"
+      - "app.js"
+      - "scripts/test-node-presence.py"
+      - "scripts/check-user-presence.js"
+      - ".github/workflows/user-presence-integrity.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/src/main.rs"
+      - "deploy/node-metrics-agent.sh"
+      - "app.js"
+      - "scripts/test-node-presence.py"
+      - "scripts/check-user-presence.js"
+      - ".github/workflows/user-presence-integrity.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  integrity:
+    name: Source verification + behavioral tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Reject malformed or duplicated telemetry source
+        run: |
+          bash -n deploy/node-metrics-agent.sh
+          node --check app.js
+          node scripts/check-user-presence.js
+      - name: Exercise actual Python collector and producer-time verification
+        run: python3 scripts/test-node-presence.py
+      - name: Compile and test Rust API with signed telemetry gate
+        run: cargo test --manifest-path backend/Cargo.toml --bin xmesh-api
