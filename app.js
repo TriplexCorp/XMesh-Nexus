@@ -1191,7 +1191,7 @@ async function usersP(){
   return [`<div class="card users-panel"><div class="bar2 users-statusbar"><div class="fl" id="uf"></div></div><div class="users-toolbar">
     <div class="users-search-wrap"><label class="search users-search-field" style="cursor:text">${ic('search')}<input id="uq" placeholder="Поиск пользователей" value="${esc(UQ.q)}" aria-label="Поиск по имени, тегу, email, ссылке или Telegram ID"></label><span class="users-search-hint">Поиск по имени · тегу · email · ссылке · Telegram ID</span></div>
     <select id="usq" aria-label="Сквад"><option value="">Все сквады</option>${DB.squads.map(s=>`<option value="${s.id}"${UQ.sq==s.id?' selected':''}>${esc(s.name)}</option>`).join('')}</select>
-    <div class="users-toolbar-actions"><button class="gh" data-exp>${ic('dl')}Экспорт CSV</button><button class="btn" data-nu>${ic('plus')}Пользователь</button></div>
+    <div class="users-toolbar-actions"><button type="button" class="gh" data-users-refresh title="Заново загрузить пользователей и их статусы с сервера">${ic('refresh-cw')}Обновить</button><button class="gh" data-exp>${ic('dl')}Экспорт CSV</button><button class="btn" data-nu>${ic('plus')}Пользователь</button></div>
   </div><div class="users-advanced-filters" aria-label="Дополнительные фильтры пользователей">
     <label>Тег <select data-user-filter="tag"><option value="">Все теги</option>${[...new Set(DB.users.map(u=>u.tag).filter(Boolean))].sort().map(tag=>`<option value="${esc(tag)}"${UQ.tag===tag?' selected':''}>${esc(tag)}</option>`).join('')}</select></label>
     <label>Inbound <select data-user-filter="inbound"><option value="">Все inbound</option>${[...new Set(DB.squads.flatMap(s=>s.inb||[]))].sort().map(tag=>`<option value="${esc(tag)}"${UQ.inbound===tag?' selected':''}>${esc(tag)}</option>`).join('')}</select></label>
@@ -2850,6 +2850,30 @@ document.addEventListener('click',async e=>{
       pendingScrollTarget=null;
       requestAnimationFrame(()=>scrollToSettingsTarget(target));
     }else location.hash='set';
+    return;
+  }
+  if(b=g('[data-users-refresh]')){
+    if(b.disabled)return;
+    b.disabled=true;
+    b.setAttribute('aria-busy','true');
+    const original=b.innerHTML;
+    b.innerHTML=ic('refresh-cw')+'Обновление…';
+    try{
+      const response=await fetch('/api/v1/bootstrap',{credentials:'same-origin',cache:'no-store'});
+      const payload=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(payload.error||'Не удалось обновить пользователей.');
+      const collections=payload.collections||{};
+      for(const key of ['users','nodes','profiles','hosts','squads','tpls','subs','admins','tokens','srh']){
+        if(Array.isArray(collections[key]))DB[key]=collections[key];
+      }
+      UQ.sel.clear();
+      if(cur==='users')await render(1);
+      toast('Список пользователей обновлён');
+    }catch(error){
+      toast(error?.message||'Ошибка обновления пользователей');
+    }finally{
+      if(b.isConnected){b.disabled=false;b.removeAttribute('aria-busy');b.innerHTML=original;}
+    }
     return;
   }
   if(g('[data-nu]'))userNew();
