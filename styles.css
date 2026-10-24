@@ -4955,9 +4955,9 @@ dialog#dlg.node-wide .node-geo-fields small{overflow-wrap:anywhere}
   }
 }
 
-/* Consistent circular close control across all XMesh Nexus dialogs.
-   Specificity intentionally exceeds legacy per-dialog radius rules. */
-dialog button[data-x],
+/* Only icon-only close controls are circular. Text actions such as
+   'Отмена' also use data-x and MUST retain their normal button layout. */
+dialog button[data-x][aria-label^="Закрыть"],
 dialog .geo-close[data-x],
 dialog .route-json-close[data-x]{
   width:34px;
