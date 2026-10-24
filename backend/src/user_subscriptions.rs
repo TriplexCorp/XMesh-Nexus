@@ -374,14 +374,14 @@ fn proxy_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> 
             })
             .collect::<String>();
         if !stream["masqueSettings"].is_object() {
-            stream["masqueSettings"] = json!({})
+            stream["masqueSettings"] = json!({});
         }
         stream["masqueSettings"]["user"] = json!(format!("xmesh-u{record_id}--{encoded}"));
         stream["masqueSettings"]["pass"] = json!(uuid);
     }
     if protocol == "hysteria" {
         if !stream["hysteriaSettings"].is_object() {
-            stream["hysteriaSettings"] = json!({})
+            stream["hysteriaSettings"] = json!({});
         }
         stream["hysteriaSettings"]["version"] = json!(2);
         stream["hysteriaSettings"]["auth"] = json!(uuid);
@@ -418,7 +418,7 @@ async fn record(state: &AppState, id: i64) -> Result<Value, ApiError> {
 }
 // Provision a new user's subscription atomically with their account creation.
 // Never expose the bearer secret in the user record or logs.
-pub(crate) async fn provision_new_user(
+pub async fn provision_new_user(
     state: &AppState,
     id: i64,
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
@@ -746,7 +746,7 @@ async fn collect_user_outbounds(
                         if let Some(node) = direct_host_node(host, profile, &nodes) {
                             apply_ip_rotation(state, user, node, &mut outbound, rotate).await?;
                         }
-                        outbounds.push(outbound)
+                        outbounds.push(outbound);
                     } else {
                         let reality = inbound
                             .get("streamSettings")
@@ -776,7 +776,7 @@ async fn collect_user_outbounds(
                             outbound["xmeshSourceKey"] = json!(format!("node:{id}:{tag}"));
                         }
                         apply_ip_rotation(state, user, node, &mut outbound, rotate).await?;
-                        outbounds.push(outbound)
+                        outbounds.push(outbound);
                     }
                 }
             } else if any_explicit_host {
