@@ -11,8 +11,8 @@ new Function(app);
 assert.doesNotMatch(app,/\blegacyDemo\b/);
 // Scrubbing stale sensitive browser snapshots is intentional. The panel must
 // never read or write them, even if a legacy snapshot remains in storage.
-assert.doesNotMatch(app,/localStorage\\.getItem\\(['"]xmeshNexusDB['"]\\)/);
-assert.doesNotMatch(app,/localStorage\\.setItem\\(['"]xmeshNexusDB['"]/);
+assert.doesNotMatch(app,/localStorage\.getItem\(['"]xmeshNexusDB['"]\)/);
+assert.doesNotMatch(app,/localStorage\.setItem\(['"]xmeshNexusDB['"]\s*,/);
 assert.doesNotMatch(app,/\b_legacy\b/);
 assert.doesNotMatch(app,/,false,true\)/,'Retired Studio positional argument must not return');
 assert.match(app,/window\.XMeshStudioV4\.view\(\)/,'Active XRAY STUDIO V4 entrypoint must remain available');
