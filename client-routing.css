@@ -130,3 +130,24 @@
 #client-route-root .client-route-json-block{border:1px solid var(--ln);border-radius:16px;background:var(--s1);margin-bottom:16px}
 #client-route-root .client-route-savebar{border:1px solid var(--ln);border-radius:13px;margin-top:16px}
 @media(max-width:720px){#client-route-root .client-route-source-tools input{width:100%}#client-route-root .client-route-tabs button{padding:11px;font-size:12px}}
+
+/* Layered routing cards: overview first, editor only when expanded */
+#client-route-root .client-route-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(420px,100%),1fr));align-items:start;gap:16px}
+#client-route-root .client-route-profile{border:1px solid var(--ln,#2a3846);border-radius:17px;background:var(--s1,#121923);overflow:hidden}
+#client-route-root .client-route-profile:has(.client-route-card-details:not([hidden])){grid-column:1/-1}
+#client-route-root .client-route-card-overview{display:flex;align-items:center;gap:16px;padding:22px;min-height:112px}
+#client-route-root .client-route-card-icon{display:grid;place-items:center;flex:none;width:52px;height:52px;border-radius:14px;background:color-mix(in srgb,var(--a,#70d9b0) 15%,var(--s2,#1b2633));color:var(--a,#70d9b0);font-size:25px}
+#client-route-root .client-route-card-description{display:grid;gap:6px;min-width:0;flex:1}
+#client-route-root .client-route-card-description strong{font-size:17px;overflow-wrap:anywhere}
+#client-route-root .client-route-card-description>span{font-size:12px;color:var(--mu,#95a5b5)}
+#client-route-root .client-route-card-flags{display:flex;align-items:center;gap:5px;font-size:19px}
+#client-route-root .client-route-card-flags span{display:inline-flex;line-height:1.2}
+#client-route-root .client-route-card-overview button{padding:11px 15px;min-height:42px;border-radius:11px}
+#client-route-root .client-route-card-details{padding:18px;background:var(--s2,#18222e);border-top:1px solid var(--ln,#2a3846)}
+#client-route-root .client-route-card-details[hidden]{display:none!important}
+#client-route-root .client-route-card-details .client-route-profile-head{margin:0 0 16px}
+#client-route-root .client-route-source{gap:11px;align-items:center}
+#client-route-root .client-route-source-flag{font-size:25px;line-height:1.1;flex:none}
+#client-route-root .client-route-source>span:last-child{min-width:0}
+#client-route-root .client-route-profile:has(.client-route-card-details:not([hidden])){box-shadow:0 10px 36px rgba(0,0,0,.13)}
+@media(max-width:650px){#client-route-root .client-route-list{grid-template-columns:1fr}#client-route-root .client-route-card-overview{padding:15px;gap:10px}#client-route-root .client-route-card-icon{width:42px;height:42px}#client-route-root .client-route-card-description strong{font-size:15px}#client-route-root .client-route-card-overview button{padding:9px}#client-route-root .client-route-card-details{padding:12px}}
