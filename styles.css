@@ -5005,3 +5005,14 @@ button.xm-studio-modal-close:hover,
 button[data-endpoint-action="cancel"][aria-label^="Закрыть"]:hover{
   border-color:var(--a);background:color-mix(in srgb,var(--a) 12%,var(--s2));
 }
+
+/* User editor has a higher-specificity legacy .ia rule; keep close circular. */
+dialog.user-modal .user-head-actions button.ia[data-x][aria-label^="Закрыть"]{
+  width:34px;height:34px;min-width:34px;min-height:34px;
+  flex:0 0 34px;padding:0;border-radius:50%;
+  border:1px solid var(--ln);background:var(--s2);color:var(--tx);
+  display:inline-flex;align-items:center;justify-content:center;
+}
+dialog.user-modal .user-head-actions button.ia[data-x][aria-label^="Закрыть"]:hover{
+  border-color:var(--a);background:color-mix(in srgb,var(--a) 12%,var(--s2));
+}
