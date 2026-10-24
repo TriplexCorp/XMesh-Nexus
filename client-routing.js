@@ -73,7 +73,7 @@
     return values.map(([value,label])=>'<option value="'+escapeHTML(value)+'"'+(value===selected?' selected':'')+'>'+escapeHTML(label)+'</option>').join('');
   }
 
-  const CSS_VERSION = '20261024-unified-route-v13';
+  const CSS_VERSION = '20261024-route-json-v14';
   function ensureStylesheet() {
     const file = 'client-routing.css';
     const existing = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
