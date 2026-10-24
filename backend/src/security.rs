@@ -183,7 +183,7 @@ fn rebase_dashboard_asset_paths(content:&str)->String{
         "styles.css","global-hover.css","subscription-studio.css","xray-studio-v4.css",
         "node-geodata.css","node-routing.css","client-routing.css",
         "xray-json-intelligence.js","xray-json-diagnostics.js","i18n.js",
-        "subscription-studio.js","qr-code.js","mfa-ui.js","security-ui.js",
+        "subscription-studio.js","qr-code.js","mfa-ui.js","security-ui.js","client-config.js",
         "app.js","node-geodata.js","node-routing.js","client-routing.js",
         "xray-studio-v4.js","xray-studio-dialog.js"
     ] {
