@@ -27,5 +27,13 @@ assert(html.indexOf('/xray-studio-hosts.js')<html.indexOf('/xray-studio-v4.js'))
 assert(html.includes('/xray-studio-hosts.css'));
 assert(docker.includes('xray-studio-hosts.js')&&docker.includes('xray-studio-hosts.css'));
 assert(server.includes('fn host_for_profile('),'Generator must filter by profile and nodes');
-assert(server.includes('let any_explicit_host='),'Disabled hosts must not fall back to raw IPs');
+// The fallback guard must survive rustfmt's whitespace changes.
+const guard=server.match(/let\s+any_explicit_host\s*=\s*hosts\.iter\(\)\.any\([\s\S]*?\);/);
+assert(guard,'Explicit hosts must be detected before considering raw node IPs');
+assert.match(guard[0],/nonempty\(h,\s*"tag"\)\s*==\s*Some\(tag\)/,
+ 'Fallback guard must match the inbound tag');
+assert.match(server,/else\s+if\s*!any_explicit_host\s*\{/,
+ 'Raw node IP fallback must only run when no explicit host exists');
+assert.match(server,/\.filter\(\|h\|\s*host_for_profile\(h,\s*tag,\s*profile,\s*&nodes\)\)/,
+ 'Disabled and nonmatching hosts must not be served');
 console.log('XRAY STUDIO endpoints integration, backwards-compatible storage and routing: PASS');
