@@ -61,7 +61,11 @@ fn enforce_collection(actor: &auth::AuthUser, collection: &str, write: bool) -> 
             "Используйте защищённый раздел администраторов. API-токены пока не реализованы.",
         ));
     }
-    if write { require_mutation(actor) } else { Ok(()) }
+    if write { return require_mutation(actor); }
+    if viewer_read_only(actor) && !viewer_can_read_collection(collection) {
+        return Err(ApiError::new(StatusCode::FORBIDDEN, "Недостаточно прав для просмотра раздела."));
+    }
+    Ok(())
 }
 
 
@@ -82,6 +86,29 @@ mod authorization_tests {
         assert!(require_owner(&owner).is_ok());
         assert!(enforce_collection(&viewer, "users", false).is_ok());
         assert!(enforce_collection(&viewer, "users", true).is_err());
+        for forbidden in ["profiles","hosts","tpls","subs","srh","admins","tokens"] {
+            assert!(enforce_collection(&viewer,forbidden,false).is_err());
+        }
+        assert!(enforce_collection(&viewer, "nodes", false).is_ok());
+        assert!(enforce_collection(&viewer, "squads", false).is_ok());
+        let sample=json!({"id":5,"username":"alice","used":42.0,"xrayId":"SECRET-UUID",
+          "subscriptionUrl":"https://secret.example.com","profileId":9,
+          "devices":[{"fingerprint":"sensitive"}],
+          "squads":[2,3],"config":"{\\\"privateKey\\\":\\\"SECRET\\\"}",
+          "role":"admin","extra":{"token":"secret"}});
+        let safe=viewer_record("users",&sample);
+        assert_eq!(safe["username"],"alice");
+        assert_eq!(safe["squads"][0],2);
+        for secret in ["SECRET-UUID","secret.example.com","sensitive","privateKey","admin"] {
+            assert!(!safe.to_string().contains(secret),"viewer leak: {secret}");
+        }
+        assert!(viewer_record("profiles",&sample).as_object().is_some_and(|v|v.is_empty()));
+        let restricted=viewer_settings(&json!({"brand":"Test","subscriptionJson":{"secret":"leak"},
+            "hooks":{"user.created":{"url":"https://secret.example"}}}));
+        assert_eq!(restricted,json!({"brand":"Test"}));
+        let unknown=auth::AuthUser{id:4,username:"unknown".into(),role:"custom".into()};
+        assert!(viewer_read_only(&unknown));
+        assert!(enforce_collection(&unknown,"profiles",false).is_err());
         assert!(enforce_collection(&admin, "users", true).is_ok());
         assert!(enforce_collection(&owner, "tokens", true).is_err());
         assert!(enforce_collection(&owner, "admins", false).is_err());
@@ -463,24 +490,60 @@ async fn health_ready(State(state): State<AppState>) -> impl IntoResponse {
 }
 
 // Viewer responses must never include credentials or connection material.
-fn redact_viewer_value(value: &mut Value) {
-    match value {
-        Value::Object(object) => {
-            object.retain(|key, _| {
-                let k = key.to_ascii_lowercase();
-                !["xrayid", "uuid", "password", "passwd", "secret", "token", "privatekey", "publickey", "shortid", "subscription", "suburl", "sub_link", "subscriptionurl", "subscriptionlink", "link", "uri", "api_key", "apikey", "clientconfig", "clientjson", "configjson", "realitysettings", "key", "auth"].contains(&k.as_str())
-                    && !k.contains("credential") && !k.contains("private_key") && !k.contains("subscription_url")
-            });
-            for child in object.values_mut() { redact_viewer_value(child); }
-        }
-        Value::Array(items) => for child in items { redact_viewer_value(child); },
-        _ => {}
-    }
+/// Fail closed for any role which is not explicitly owner or admin.
+fn viewer_read_only(actor: &auth::AuthUser) -> bool {
+    !matches!(actor.role.as_str(), "owner" | "admin")
 }
+
+/// Observer is a monitoring role, not an XRAY configuration reader.
+fn viewer_can_read_collection(collection: &str) -> bool {
+    matches!(collection, "users" | "nodes" | "squads")
+}
+
+/// Whitelist-only public projection. Never serialize the source record into a
+/// viewer response: new schema fields must be invisible by default.
+fn viewer_record(collection: &str, record: &Value) -> Value {
+    let fields: &[&str] = match collection {
+        "users" => &["id","username","limit","used","expireAt","onlineAt",
+                    "disabled","created","status","hwid","squads"],
+        "nodes" => &["id","name","remark","flag","country","hosting","state",
+                    "disabled","used","limit","traffic","maxTraffic",
+                    "xrayVersion","agentVersion","onlineAt","lastSeenAt"],
+        "squads" => &["id","name","remark","tag"],
+        _ => return json!({}),
+    };
+    let mut result=Map::new();
+    for field in fields {
+        if let Some(value)=record.get(*field) {
+            // Reject arbitrary nested JSON: squad association IDs are the
+            // only arrays allowed through the restricted projection.
+            let safe=if *field=="squads" && collection=="users" {
+                value.as_array().map(|items|Value::Array(items.iter().filter(|id|
+                    id.is_u64()||id.is_i64()).take(100).cloned().collect()))
+            } else if value.is_string() || value.is_boolean() || value.is_number() || value.is_null() {
+                Some(value.clone())
+            } else { None };
+            if let Some(safe)=safe {result.insert((*field).into(),safe);}
+        }
+    }
+    Value::Object(result)
+}
+
+/// Only cosmetic information is necessary for an observer. In particular,
+/// never include hooks, subscription config, client JSON or URLs in settings.
+fn viewer_settings(settings: &Value) -> Value {
+    json!({"brand":settings.get("brand").and_then(Value::as_str).unwrap_or("XMesh Nexus")})
+}
+
 
 async fn bootstrap(State(state): State<AppState>, Extension(actor): Extension<auth::AuthUser>) -> Result<Json<Value>, ApiError> {
     let mut collections = Map::new();
     for collection in COLLECTIONS {
+        // No loading or serialization of privileged collections for observers.
+        if viewer_read_only(&actor) && !viewer_can_read_collection(collection) {
+            collections.insert((*collection).to_owned(),Value::Array(vec![]));
+            continue;
+        }
         let records = if *collection == "admins" {
             if actor.role == "owner" { admin_accounts::accounts(&state.pool).await? } else { Vec::new() }
         } else if *collection == "tokens" {
@@ -489,12 +552,13 @@ async fn bootstrap(State(state): State<AppState>, Extension(actor): Extension<au
         } else {
             load_records(&state.pool, collection).await?
         };
-        let mut records = Value::Array(records);
-        if actor.role == "viewer" { redact_viewer_value(&mut records); }
+        let records=if viewer_read_only(&actor) {
+            Value::Array(records.iter().map(|r|viewer_record(collection,r)).collect())
+        } else {Value::Array(records)};
         collections.insert((*collection).to_owned(), records);
     }
     let mut settings = read_settings(&state.pool).await?;
-    if actor.role == "viewer" { redact_viewer_value(&mut settings); }
+    if viewer_read_only(&actor) {settings=viewer_settings(&settings);}
     Ok(Json(json!({
         "collections": collections,
         "settings": settings,
@@ -510,8 +574,8 @@ async fn list_records(
     validate_collection(&collection)?;
     enforce_collection(&actor, &collection, false)?;
     let mut items = load_records(&state.pool, &collection).await?;
-    if actor.role == "viewer" {
-        for item in &mut items { redact_viewer_value(item); }
+    if viewer_read_only(&actor) {
+        items=items.iter().map(|item|viewer_record(&collection,item)).collect();
     }
     let ids = items.iter().filter_map(|item| item.get("id").cloned()).collect::<Vec<_>>();
     let total = items.len();
@@ -754,8 +818,10 @@ fn valid_public_hostname(value: &str) -> bool {
     })
 }
 
-async fn get_settings(State(state): State<AppState>) -> Result<Json<Value>, ApiError> {
-    Ok(Json(read_settings(&state.pool).await?))
+async fn get_settings(State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>) -> Result<Json<Value>, ApiError> {
+    let settings=read_settings(&state.pool).await?;
+    Ok(Json(if viewer_read_only(&actor){viewer_settings(&settings)}else{settings}))
 }
 
 async fn patch_settings(
@@ -1625,8 +1691,13 @@ async fn read_cpu_ticks() -> Option<(u64, u64)> {
     Some((total, idle))
 }
 
-async fn get_core_status(State(state): State<AppState>) -> Json<core::CoreStatus> {
-    Json(state.core.status().await)
+async fn get_core_status(State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>) -> Json<Value> {
+    let status=state.core.status().await;
+    if viewer_read_only(&actor) {
+        Json(json!({"status":status.status,"installed_version":status.installed_version,
+          "latest_version":status.latest_version,"runtime":status.runtime}))
+    } else {Json(serde_json::to_value(status).unwrap_or_else(|_|json!({})))}
 }
 
 async fn get_core_releases(State(state): State<AppState>) -> Result<Json<Value>, ApiError> {
