@@ -17,7 +17,7 @@ const [markup,mount]=sandbox.window.XMeshClientRouting.create({
    rules:[{match:'geosite',value:'category-ru',action:'server',server:'host:7'}]}]}
 },()=>{},()=>{});
 assert.equal(typeof mount,'function');
-for(const key of ['data-cr-save','data-cr-add','data-cr-list','Маршрутизация клиентов'])
+for(const key of ['data-cr-save','data-cr-add','data-cr-list','Клиентская маршрутизация'])
  assert(markup.includes(key),'Missing client routing workspace control: '+key);
 assert.match(source,/clientRoutingProfiles/);
 assert.match(source,/data-cr-source/);
