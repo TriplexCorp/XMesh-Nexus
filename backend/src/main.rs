@@ -1869,10 +1869,38 @@ async fn validate_host_binding(pool: &PgPool, host: &Value) -> Result<(), ApiErr
     Ok(())
 }
 
+fn validate_node_address(data: &Value) -> Result<(), ApiError> {
+    use std::net::IpAddr;
+    let addr = data.get("addr").and_then(Value::as_str)
+        .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Укажите адрес ноды: IPv4, IPv6 или домен."))?;
+    if addr.is_empty() || addr != addr.trim() || addr.chars().any(char::is_whitespace) {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Адрес ноды не должен содержать пробелы."));
+    }
+    if addr.parse::<IpAddr>().is_ok() { return Ok(()); }
+    // ASCII DNS hostnames only; internationalized domains must use IDNA A-labels.
+    // Reject numeric dotted strings that look like invalid IPv4 addresses.
+    if addr.len() > 253 || !addr.is_ascii() || addr.contains(':') ||
+       addr.contains('/') || addr.contains('@') || addr.contains('[') ||
+       addr.contains(']') || addr.contains("..") ||
+       addr.chars().all(|c| c.is_ascii_digit() || c == '.') {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Некорректный адрес ноды. Используйте IPv4, IPv6 без скобок или DNS-домен без порта."));
+    }
+    let valid = addr.split('.').all(|label| {
+        !label.is_empty() && label.len() <= 63 &&
+        !label.starts_with('-') && !label.ends_with('-') &&
+        label.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
+    });
+    if !valid {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Некорректное доменное имя ноды."));
+    }
+    Ok(())
+}
+
 fn validate_record(collection: &str, data: &Value) -> Result<(), ApiError> {
     let object = data.as_object()
         .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Запись должна быть JSON-объектом."))?;
     if collection == "nodes" {
+        validate_node_address(data)?;
         node_rotation::validate_node(data)?;
         node_routing::validate_saved(data)?;
         if let Some(hosting) = object.get("hosting") {
