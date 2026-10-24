@@ -311,15 +311,12 @@ pub async fn dashboard_entry(
     Path(slug): Path<String>,
     headers: HeaderMap,
 ) -> Response {
-    let policy = match get_policy(&state.pool).await {
-        Ok(p) => p,
-        Err(_) => {
-            return (
-                StatusCode::SERVICE_UNAVAILABLE,
-                "Security policy unavailable",
-            )
-                .into_response();
-        }
+    let Ok(policy) = get_policy(&state.pool).await else {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Security policy unavailable",
+        )
+            .into_response();
     };
     if format!("/dashboard/{slug}") != policy.dashboard_path {
         return StatusCode::NOT_FOUND.into_response();
