@@ -97,7 +97,7 @@ const icons={
 };
 const displayProtocol={hysteria:'Hysteria2',hysteria2:'Hysteria2',vless:'VLESS',vmess:'VMess',trojan:'Trojan',shadowsocks:'Shadowsocks',socks:'SOCKS',http:'HTTP'};
 const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
-const safeInbounds=data=>Array.isArray(data?.inbounds)?data.inbounds.filter(x=>x&&typeof x==='object'&&!Array.isArray(x)):[];
+const safeInbounds=data=>Array.isArray(data?.inbounds)?data.inbounds.map(x=>x&&typeof x==='object'&&!Array.isArray(x)?x:{tag:'',protocol:'invalid',streamSettings:{}}):[];
 function resolveToolInbound(inbounds){
  if(selectedToolInboundTag!==null){
   const match=inbounds.findIndex(x=>x.tag===selectedToolInboundTag);
@@ -156,7 +156,7 @@ function renderToolPalette(){
  const security=String(inbound?.streamSettings?.security||'none').toLowerCase();
  const groups=valid?contextualToolGroups(inbound,!!inbound):[];
  const selection=valid&&inbounds.length>1?inbounds.map((ib,i)=>[i,String(ib.tag||'Inbound '+(i+1)),String(ib.protocol||'').toUpperCase()]):[];
- const signature=JSON.stringify([valid,selection,selectedToolInboundIndex,protocol,network,security,groups,inbound?.streamSettings?.finalmask?true:false]);
+ const signature=JSON.stringify([valid,selection,selectedToolInboundIndex,inbound?.tag,protocol,network,security,groups,inbound?.streamSettings?.finalmask?true:false]);
  if(signature===toolPaletteSignature)return;
  toolPaletteSignature=signature;
  const context=valid?(inbound?
@@ -630,7 +630,8 @@ host.addEventListener('change',e=>{
 area.addEventListener('input',()=>{snapshot();renderToolPalette();refreshIssues()});
 area.addEventListener('xmesh:reset-history',()=>{undo=[];redo=[];last=area.value;update()});
 area.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key.toLowerCase()==='z'){e.preventDefault();operations.undo()}if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==='y'||e.shiftKey&&e.key.toLowerCase()==='z')){e.preventDefault();operations.redo() }});
-update();refreshIssues();
+renderToolPalette();update();refreshIssues();
+return {refresh:renderToolPalette};
 }
 return {setup};
 })();
