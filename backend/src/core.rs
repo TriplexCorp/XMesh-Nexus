@@ -122,7 +122,7 @@ impl CoreManager {
         self.state.read().await.clone()
     }
 
-    pub async fn launch_startup_update(&self) {
+    pub fn launch_startup_update(&self) {
         let manager = self.clone();
         tokio::spawn(async move {
             let target = manager.status().await.desired_version;
