@@ -1670,7 +1670,7 @@ dialog.user-modal .user-overview-band{
   border-bottom:1px solid var(--ln);
 }
 dialog.user-modal .user-usage-line{
-  display:flex;align-items:baseline;flex:0 1 auto;flex-wrap:wrap;
+  display:flex;align-items:center;flex:0 1 auto;flex-wrap:wrap;
   gap:.25rem .46rem;min-width:0;
 }
 dialog.user-modal .user-usage-line>span,
@@ -1680,6 +1680,9 @@ dialog.user-modal .user-usage-line>strong{
   line-height:1.25;color:var(--tx);font-variant-numeric:tabular-nums;
 }
 dialog.user-modal .user-usage-line>small{color:var(--mu);font-size:.72rem}
+dialog.user-modal .user-expiry-summary{display:inline-flex;align-items:center;gap:.38rem;margin-left:.65rem;white-space:nowrap;color:var(--mu);font-size:.72rem;font-weight:655;line-height:1.3}
+dialog.user-modal .user-expiry-summary .ic{width:.95rem;height:.95rem;flex:none}
+dialog.user-modal .user-expiry-summary strong{font-size:.78rem;font-weight:725;color:var(--tx);letter-spacing:0}
 dialog.user-modal .user-action-text{
   display:inline-flex;align-items:center;gap:.25rem;
   width:auto;min-height:1.67rem;margin-left:.25rem;padding:.16rem .34rem;
