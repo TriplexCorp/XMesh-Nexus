@@ -140,7 +140,7 @@ mod authorization_tests {
         assert!(
             viewer_record("profiles", &sample)
                 .as_object()
-                .is_some_and(|v| v.is_empty())
+                .is_some_and(serde_json::Map::is_empty)
         );
         let restricted =
             viewer_settings(&json!({"brand":"Test","subscriptionJson":{"secret":"leak"},
@@ -602,7 +602,7 @@ async fn csrf_guard(request: Request, next: Next) -> Response {
         let valid = origin
             .and_then(|value| value.parse::<Uri>().ok())
             .and_then(|uri| {
-                if !matches!(uri.scheme_str(), Some("https") | Some("http"))
+                if !matches!(uri.scheme_str(), Some("https" | "http"))
                     || uri.query().is_some()
                 {
                     return None;
@@ -3197,8 +3197,8 @@ fn user_status(user: &Value, now_ms: i64) -> &'static str {
         return "ON_HOLD";
     }
     let limit = user.get("limit").and_then(Value::as_f64).unwrap_or(0.0);
-    let used = user.get("used").and_then(Value::as_f64).unwrap_or(0.0);
-    if limit > 0.0 && used >= limit {
+    let consumed = user.get("used").and_then(Value::as_f64).unwrap_or(0.0);
+    if limit > 0.0 && consumed >= limit {
         return "LIMITED";
     }
     let expire_at = number(user, "expireAt").unwrap_or(0);
