@@ -1,0 +1,168 @@
+/* Dedicated node routing workspace. Scoped: never change the node editor. */
+dialog#dlg.node-routing-modal{
+  box-sizing:border-box;width:min(1210px,calc(100vw - 28px))!important;
+  max-width:1210px!important;max-height:min(94dvh,1020px);
+  padding:0;border:1px solid var(--ln);border-radius:24px;
+  overflow:hidden;color:var(--tx);background:var(--s1)
+}
+dialog#dlg.node-routing-modal::backdrop{background:rgba(2,9,14,.72);backdrop-filter:blur(11px)}
+dialog#dlg.node-routing-modal .route-workspace{
+  display:flex;flex-direction:column;gap:0;min-height:0;max-height:min(94dvh,1020px);
+  overflow:hidden;padding:0;background:var(--s1)
+}
+.route-header{display:flex;align-items:center;gap:17px;padding:24px 29px 20px;flex:none}
+.route-header-icon{
+  display:grid;place-items:center;flex:none;width:53px;height:53px;border-radius:17px;
+  color:var(--a);background:color-mix(in srgb,var(--a) 12%,var(--s2));
+  border:1px solid color-mix(in srgb,var(--a) 20%,var(--ln));font-size:2rem;font-weight:500
+}
+.route-heading{flex:1;min-width:0}
+.route-kicker{color:var(--a);font-size:.66rem;letter-spacing:.105em;font-weight:830;text-transform:uppercase}
+.route-heading h2{margin:3px 0 4px;font-size:1.52rem;font-weight:780;line-height:1.24}
+.route-heading p{margin:0;color:var(--mu);font-size:.83rem}
+.route-close{width:38px;height:38px;padding:0;display:grid;place-items:center;border-radius:12px}
+.route-toolbar{
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:13px 29px;background:color-mix(in srgb,var(--s2) 57%,var(--s1));
+  border-top:1px solid var(--ln);border-bottom:1px solid var(--ln);flex:none
+}
+.route-status{display:flex;align-items:center;gap:9px;flex-wrap:wrap;min-width:0}
+.route-dot{height:9px;width:9px;border-radius:50%;background:var(--mu);flex:none}
+.route-dot.is-on{background:var(--ok);box-shadow:0 0 0 4px color-mix(in srgb,var(--ok) 11%,transparent)}
+.route-status>strong{font-size:.78rem}
+.route-status-caption{font-size:.71rem;color:var(--mu);margin-left:5px}
+.route-power{display:flex;align-items:center;gap:10px;flex:none;font-size:.79rem;font-weight:750;cursor:pointer}
+.route-power input,.route-mini-check input{accent-color:var(--a);cursor:pointer;width:18px;height:18px}
+.route-tabs{display:flex;gap:6px;padding:9px 26px 0;border-bottom:1px solid var(--ln);flex:none}
+.route-tabs button{
+  appearance:none;border:0;border-bottom:2px solid transparent;
+  background:transparent;color:var(--mu);font:inherit;font-size:.82rem;font-weight:700;
+  padding:12px 15px;cursor:pointer;border-radius:10px 10px 0 0
+}
+.route-tabs button span{margin-left:5px;opacity:.65}
+.route-tabs button:hover{background:color-mix(in srgb,var(--a) 6%,transparent);color:var(--tx)}
+.route-tabs button.is-selected{color:var(--a);border-bottom-color:var(--a)}
+.route-body{min-height:0;flex:1;overflow:auto;overscroll-behavior:contain}
+.route-rules-layout,.route-exits-layout{display:grid;grid-template-columns:minmax(0,1fr) 285px;min-height:100%}
+.route-rules-pane,.route-exits-pane{padding:23px 27px 28px;min-width:0}
+.route-aside{
+  padding:25px 22px;min-width:0;border-left:1px solid var(--ln);
+  background:color-mix(in srgb,var(--s2) 45%,var(--s1));
+  display:flex;flex-direction:column;align-items:stretch;gap:12px
+}
+.route-aside-title,.route-section-intro>div>span{
+  font-weight:800;font-size:.63rem;letter-spacing:.11em;color:var(--a)
+}
+.route-aside h3{margin:0;font-size:1rem;font-weight:780;line-height:1.3}
+.route-aside-text{color:var(--mu);font-size:.78rem;line-height:1.65;margin:0}
+.route-aside .route-manage-geo{margin-top:7px;align-self:stretch}
+.route-section-intro{display:flex;justify-content:space-between;gap:20px;align-items:center}
+.route-section-intro h3{margin:6px 0 5px;font-size:1.05rem;font-weight:780}
+.route-section-intro p{margin:0;color:var(--mu);font-size:.77rem;line-height:1.5}
+.route-add{white-space:nowrap;align-self:center}
+.route-presets{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:19px 0 17px}
+.route-presets>span{font-size:.64rem;font-weight:800;letter-spacing:.06em;color:var(--mu);margin-right:5px}
+.route-presets button{
+  appearance:none;border:1px solid var(--ln);border-radius:11px;
+  background:var(--s2);color:var(--tx);font:inherit;font-size:.73rem;font-weight:650;
+  padding:8px 11px;cursor:pointer;white-space:normal
+}
+.route-presets button:hover{border-color:color-mix(in srgb,var(--a) 45%,var(--ln));background:color-mix(in srgb,var(--a) 7%,var(--s2))}
+.route-rule-list{display:grid;gap:11px}
+.route-rule{
+  padding:15px 17px 17px;border:1px solid var(--ln);border-radius:16px;
+  background:color-mix(in srgb,var(--s2) 56%,var(--s1));min-width:0
+}
+.route-rule-muted{opacity:.62}
+.route-rule-heading{display:flex;align-items:center;gap:9px;margin-bottom:15px;min-width:0}
+.route-rule-counter{display:grid;place-items:center;flex:none;width:28px;height:28px;background:var(--s1);color:var(--a);border-radius:9px;font-size:.69rem;font-weight:790}
+.route-rule-heading strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;font-weight:760}
+.route-rule-heading .route-arrow{color:var(--mu);font-weight:500;margin:0 4px}
+.route-rule-actions{display:flex;align-items:center;gap:3px;margin-left:auto;flex:none}
+.route-tag-warning{color:var(--wr);font-size:.68rem;font-weight:740;white-space:nowrap}
+.route-icon-btn{display:grid;place-items:center;flex:none;width:28px;height:28px;background:transparent;border:1px solid transparent;border-radius:8px;color:var(--mu);font-size:1rem;cursor:pointer}
+.route-icon-btn:hover{background:var(--s1);color:var(--tx);border-color:var(--ln)}
+.route-icon-btn:disabled{opacity:.23;cursor:default}
+.route-remove:hover{color:var(--er)}
+.route-mini-check{display:grid;place-items:center;margin:0 3px;cursor:pointer}
+.route-mini-check input{width:16px;height:16px}
+.route-rule-grid{display:grid;grid-template-columns:minmax(125px,.8fr) minmax(130px,1.5fr) minmax(140px,1fr);gap:10px;align-items:start;min-width:0}
+.route-input,.route-inline-parameter{display:grid;gap:6px;min-width:0}
+.route-input>span,.route-inline-parameter>span{font-size:.68rem;font-weight:720;color:var(--mu)}
+.route-input :is(select,input,textarea),.route-inline-parameter select{
+  box-sizing:border-box;width:100%;min-width:0;min-height:40px;border:1px solid var(--ln);
+  border-radius:10px;background:var(--s1);padding:8px 11px;
+  color:var(--tx);font:inherit;font-size:.78rem
+}
+.route-input :is(select,input,textarea):focus,.route-inline-parameter select:focus{outline:2px solid color-mix(in srgb,var(--a) 50%,transparent);outline-offset:1px}
+.route-prefixed{display:flex;align-items:center;min-width:0;background:var(--s1);border:1px solid var(--ln);border-radius:10px;overflow:hidden}
+.route-prefixed>span{padding-left:9px;color:var(--a);font-family:ui-monospace,Consolas,monospace;font-size:.73rem;white-space:nowrap}
+.route-prefixed input{border:0!important;background:transparent!important;min-width:40px;padding-left:3px!important}
+.route-prefixed:focus-within{outline:2px solid color-mix(in srgb,var(--a) 50%,transparent)}
+.route-rule-extra{display:flex;align-items:end;gap:12px;margin-top:13px;padding:12px 0 0;border-top:1px solid var(--ln);min-width:0}
+.route-rule-extra .route-inline-parameter{flex:1;min-width:0}
+.route-rule-extra button{white-space:nowrap}
+.route-empty{padding:45px 22px;text-align:center;border:1px dashed var(--ln);border-radius:15px;color:var(--mu)}
+.route-empty strong{display:block;color:var(--tx);font-size:.91rem;margin-bottom:6px}
+.route-empty p{margin:0 auto;max-width:370px;font-size:.77rem;line-height:1.6}
+.route-path{display:grid;gap:0}
+.route-path>div{display:grid;grid-template-columns:29px minmax(0,1fr);column-gap:9px;align-items:center}
+.route-path-dot{grid-row:span 2;border-radius:9px;width:28px;height:28px;background:var(--s1);border:1px solid var(--ln);display:grid;place-items:center;color:var(--a);font-size:.7rem;font-weight:800}
+.route-path strong{font-size:.76rem;line-height:1.4;overflow-wrap:anywhere}
+.route-path small{font-size:.68rem;color:var(--mu);line-height:1.5}
+.route-path-line{margin:3px 0 3px 13px;width:1px;height:22px;background:var(--ln)}
+.route-separator{margin:4px 0;height:1px;background:var(--ln)}
+.route-advice{padding:12px 14px;font-size:.73rem;line-height:1.55;color:var(--mu);border:1px solid var(--ln);border-radius:11px;background:var(--s1)}
+.route-footer{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:15px 27px;border-top:1px solid var(--ln);background:var(--s1);flex:none}
+.route-footnote{min-width:0;flex:1;color:var(--mu);font-size:.74rem;line-height:1.45}
+.route-footer-actions{display:flex;align-items:center;gap:9px;flex:none}
+.route-footer-actions button{min-height:42px;padding:0 17px;border-radius:11px;font-weight:740}
+.route-footer-actions button:disabled{opacity:.5;cursor:wait}
+.route-exit-list{margin-top:19px;display:grid;gap:12px}
+.route-exit-card{border:1px solid var(--ln);border-radius:15px;background:color-mix(in srgb,var(--s2) 55%,var(--s1));overflow:hidden}
+.route-exit-card.is-active{border-color:color-mix(in srgb,var(--a) 35%,var(--ln))}
+.route-exit-header{width:100%;display:flex;align-items:center;gap:12px;padding:16px 18px;appearance:none;background:transparent;color:var(--tx);font:inherit;cursor:pointer;border:0;text-align:left}
+.route-exit-avatar{width:39px;height:39px;border-radius:12px;display:grid;place-items:center;background:var(--s1);color:var(--a);font-size:1.4rem;flex:none}
+.route-exit-identity{flex:1;display:grid;gap:4px;min-width:0}
+.route-exit-identity strong{font-size:.84rem}
+.route-exit-identity small{font-size:.72rem;color:var(--mu);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.route-exit-status{font-size:.7rem;font-weight:760;color:var(--wr);white-space:nowrap}
+.route-exit-status.is-ready{color:var(--ok)}
+.route-exit-chevron{font-size:1.25rem;color:var(--mu);width:20px;text-align:center}
+.route-exit-details{border-top:1px solid var(--ln);padding:18px;display:grid;gap:13px}
+.route-endpoints{padding:12px;background:var(--s1);border:1px solid var(--ln);border-radius:10px}
+.route-endpoints span{font-size:.62rem;letter-spacing:.08em;font-weight:790;color:var(--a)}
+.route-endpoints p{font-family:ui-monospace,Consolas,monospace;font-size:.72rem;line-height:1.6;margin:5px 0 0;overflow-wrap:anywhere}
+.route-input textarea[data-route-relay]{min-height:200px;resize:vertical;font:inherit;font-family:ui-monospace,Consolas,monospace;font-size:.76rem;line-height:1.6;tab-size:2}
+.route-exit-help{font-size:.73rem;line-height:1.6;color:var(--mu);margin:0}
+.route-exit-help code{font-size:.73rem}
+.route-exit-warning{padding:14px;color:var(--wr);font-size:.8rem;background:var(--s2);border:1px solid var(--ln);border-radius:12px}
+@media(max-width:950px){
+  .route-rules-layout,.route-exits-layout{grid-template-columns:minmax(0,1fr) 245px}
+  .route-rules-pane,.route-exits-pane{padding:18px}
+  .route-aside{padding:19px 15px}
+  .route-rule-grid{grid-template-columns:minmax(110px,.8fr) minmax(130px,1.2fr) minmax(115px,1fr)}
+}
+@media(max-width:760px){
+  dialog#dlg.node-routing-modal{width:calc(100vw - 12px)!important;max-height:96dvh;border-radius:16px}
+  dialog#dlg.node-routing-modal .route-workspace{max-height:96dvh}
+  .route-header{padding:17px}.route-header-icon{width:44px;height:44px}
+  .route-toolbar{padding:12px 17px;align-items:flex-start;flex-wrap:wrap}
+  .route-status-caption{margin-left:0}
+  .route-tabs{padding:8px 12px 0}
+  .route-rules-layout,.route-exits-layout{grid-template-columns:minmax(0,1fr)}
+  .route-rules-pane,.route-exits-pane{padding:17px}
+  .route-aside{border-left:0;border-top:1px solid var(--ln)}
+  .route-section-intro{flex-wrap:wrap}
+  .route-rule-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .route-rule-grid>.route-input:last-child{grid-column:1/-1}
+  .route-rule-extra{flex-wrap:wrap}
+  .route-footer{padding:13px 15px;flex-wrap:wrap}
+  .route-footer-actions{width:100%}.route-footer-actions button{flex:1;padding:0 10px}
+}
+@media(max-width:430px){
+  .route-rule-grid{grid-template-columns:minmax(0,1fr)}
+  .route-rule-grid>.route-input:last-child{grid-column:auto}
+  .route-rule-heading{flex-wrap:wrap}
+  .route-rule-actions{width:100%;justify-content:flex-end;margin-top:4px}
+}
