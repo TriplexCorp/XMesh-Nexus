@@ -92,6 +92,18 @@ async function run(){
  assert.equal(initial.issue.hidden,false,'broken ID visible as contextual warning');
  assert.deepEqual(['reality','shortid','vlessens','vision','xhttp','dns','routing','outbounds','inbound'].map(x=>initial.host.innerHTML.includes('data-tool="'+x+'"')),[true,true,true,true,true,true,true,true,true]);
 
+ const shadowsocksReality=sample();
+ shadowsocksReality.inbounds=[{tag:'ss-reality',port:443,protocol:'shadowsocks',settings:{network:'tcp,udp',method:'2022-blake3-aes-256-gcm',password:'local-secret'},streamSettings:{network:'xhttp',security:'reality',xhttpSettings:{path:'/proxy',mode:'auto'},realitySettings:{target:'front.example.org:443',serverNames:['front.example.org'],privateKey:PREVIOUS_KEY,shortIds:['0a0b']}}}];
+ const ssUI=harness(shadowsocksReality);
+ for(const tool of ['reality','shortid','xhttp','protocol-config'])
+  assert.ok(ssUI.host.innerHTML.includes('data-tool="'+tool+'"'),'Shadowsocks XHTTP REALITY exposes '+tool);
+ for(const tool of ['vision','vlessens','hysteria-config'])
+  assert.ok(!ssUI.host.innerHTML.includes('data-tool="'+tool+'"'),'Shadowsocks cannot show VLESS/Hysteria tool '+tool);
+ const ssEdited=harness(shadowsocksReality,{requestValues:{target:'alternate.example.org:443',serverNames:'alternate.example.org'}});
+ await ssEdited.run('reality');
+ assert.equal(ssEdited.doc().inbounds[0].streamSettings.realitySettings.target,'alternate.example.org:443','REALITY dialog also works on Shadowsocks');
+ assert.equal(ssEdited.doc().inbounds[0].settings.password,'local-secret','REALITY edit preserves Shadowsocks credentials');
+
  const hysteria=sample();
  hysteria.inbounds=[{tag:'hysteria-main',port:443,protocol:'hysteria',
   settings:{version:2,users:[]},
