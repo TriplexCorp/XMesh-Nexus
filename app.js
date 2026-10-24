@@ -3253,6 +3253,7 @@ document.addEventListener('click',async e=>{
     if(!node){toast('Узел не найден.');return}
     if(b.dataset.loading==='1')return;
     b.dataset.loading='1';b.disabled=true;
+    const original=b.innerHTML;
     try{
       const version=await selectNodeXrayRelease(node,async()=>{
         const runtime=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/runtime');
@@ -3270,6 +3271,8 @@ document.addEventListener('click',async e=>{
       if(!confirmed)return;
       nodeXrayUpdating.add(id);
       paintNodeXrayUpdate(id);
+      b.innerHTML='<span class="node-agent-spinner" aria-hidden="true"></span><span>Xray обновляется…</span>';
+      b.setAttribute('aria-label','Xray обновляется');
       const request=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/xray-update',{
         method:'POST',body:JSON.stringify({version})
       });
@@ -3299,7 +3302,9 @@ document.addEventListener('click',async e=>{
           if(badge)badge.textContent='Xray —';
         }
       }
-      delete b.dataset.loading;b.disabled=false;
+      b.removeAttribute('aria-label');
+      if(b.isConnected){b.innerHTML=original;b.disabled=false}
+      delete b.dataset.loading;
     }
   }
   else if(b=g('[data-nr]')){
