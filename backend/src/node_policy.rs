@@ -92,7 +92,7 @@ mod tests {
         let key = signer.0.verifying_key();
         key.verify(&serde_json::to_vec(&policy).unwrap(), &signature)
             .unwrap();
-        let mut altered = policy.clone();
+        let mut altered = policy;
         altered["nodeId"] = json!(43);
         assert!(
             key.verify(&serde_json::to_vec(&altered).unwrap(), &signature)
