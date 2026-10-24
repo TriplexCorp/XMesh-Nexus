@@ -100,6 +100,8 @@ const repairIds=(list,append)=>{
  if(append||!list.length)return [...list,newShortId(used)];
  return [...list];
 };
+// Require canonical 32-byte X25519 base64url, never a browser password or arbitrary hex token.
+const validRealityX25519Key=key=>typeof key==='string'&&/^[A-Za-z0-9_-]{43}$/.test(key);
 // Reality is a configuration action, never an implicit key-rotation button.
 // Server-only fields are changed only after the user reviews the full form.
 const realityTarget=value=>{
@@ -136,7 +138,11 @@ async function setReality(){
   const existing=stream.realitySettings??{};
   if(!existing||typeof existing!=='object'||Array.isArray(existing))throw Error('realitySettings должен быть объектом.');
   const privateKey=typeof existing.privateKey==='string'?existing.privateKey.trim():'';
-  const hasKey=Boolean(privateKey&&!/REPLACE|YOUR[_-]?KEY|example/i.test(privateKey));
+  const hasKey=validRealityX25519Key(privateKey);
+  const invalidExistingKey=Boolean(privateKey&&!hasKey);
+  const originalIds=existing.shortIds??[];
+  const previewIds=repairIds(originalIds,false);
+  const repairedIds=JSON.stringify(originalIds)!==JSON.stringify(previewIds);
   const currentTarget=typeof existing.target==='string'?existing.target:typeof existing.dest==='string'?existing.dest:'';
   const options=hasKey?
    [{value:'keep',label:'Сохранить действующий privateKey (рекомендуется)'},{value:'rotate',label:'Сгенерировать новый privateKey (ротация)'}]:
@@ -146,15 +152,16 @@ async function setReality(){
    title:'Настройка REALITY',
    description:'Inbound: '+(inbound.tag||'#'+(selected.index+1))+' · '+String(transport).toUpperCase()+'. Заполните серверные параметры; до подтверждения JSON не изменится.',
    confirmLabel:'Применить к JSON',
-   notice:hasKey?'Существующий privateKey будет сохранён, если вы явно не выберете ротацию. Смена ключа потребует обновления клиентских подключений.':'Новая пара X25519 генерируется только после нажатия «Применить к JSON».',
+   notice:invalidExistingKey?'Обнаружен некорректный privateKey — не X25519 base64url (43 символа). Возможно, в JSON попал пароль или токен администратора из автозаполнения браузера. Нужна новая пара ключей. Перед заменой будет отдельное подтверждение.':hasKey?'Действующий X25519 privateKey останется без изменений, если вы явно не выберете ротацию.':(repairedIds?'Некорректные Short ID заменены на HEX в предпросмотре. JSON изменится только после подтверждения.':'Новая пара X25519 будет создана после нажатия «Применить к JSON».'),
+
    fields:[
     {name:'target',label:'Reality target · домен:порт',wide:true,required:true,value:currentTarget,
      placeholder:'example.com:443',help:'Сервер назначения для маскировки. Используйте проверенный HTTPS-хост, не пример из подсказки.',
      validate:value=>realityTarget(value)?'':'Введите корректный адрес и порт 1–65535.'},
     {name:'serverNames',label:'Допустимые SNI (через запятую)',wide:true,value:realityListText(existing.serverNames),
      placeholder:'example.com, www.example.com',help:'Если поле пустое, будет использован домен из target. Сохраняются все указанные имена.'},
-    {name:'shortIds',label:'Short ID (через запятую)',wide:true,value:realityListText(existing.shortIds),
-     placeholder:'Пусто — создать случайный Short ID',help:'Существующие ID сохраняются. Для пустого ID укажите "". Некорректные ID исправьте здесь.'},
+    {name:'shortIds',label:'Short ID (через запятую)',wide:true,value:realityListText(previewIds),
+     placeholder:'Пусто — создать случайный Short ID',help:repairedIds?'Предпросмотр: неверные или повторяющиеся Short ID заменены на случайные HEX. Изменения ещё не применены.':'Существующие корректные ID сохраняются. Для пустого ID укажите "".'},
     {name:'keyMode',label:'Ключ X25519',type:'select',wide:true,value:hasKey?'keep':'generate',options}
    ],
    validate:checkRealityForm
@@ -171,10 +178,12 @@ async function setReality(){
   const shortIds=enteredIds.length?enteredIds:[hex(8)];
   const rekey=response.keyMode==='rotate';
   const generate=response.keyMode==='generate'||rekey;
-  if(rekey){
+  if(hasKey&&!generate&&!validRealityX25519Key(privateKey))throw Error('Недопустимый privateKey.');
+  if(invalidExistingKey&&!generate)throw Error('Некорректный ключ можно только заменить новым X25519.');
+  if(rekey||invalidExistingKey){
    const approved=await dialog.confirm({
-    title:'Заменить ключ REALITY?',
-    description:'Клиенты с действующим public key потеряют подключение до обновления подписки.',
+    title:invalidExistingKey?'Заменить некорректный ключ REALITY?':'Заменить ключ REALITY?',
+    description:invalidExistingKey?'В JSON найден не-X25519 privateKey. Он будет заменён корректной парой в base64url. Если это был пароль панели, смените его отдельно.':'Клиенты с действующим public key потеряют подключение до обновления подписки.',
     notice:'Существующий privateKey будет заменён только после подтверждения. Отмена оставит JSON без изменений.',
     confirmLabel:'Сгенерировать и заменить',cancelLabel:'Не менять ключ',danger:true
    });
@@ -184,7 +193,7 @@ async function setReality(){
   if(area.value!==selected.source){notify('JSON был изменён. Настройка Reality не применена.');return}
   if(generate)status('Генерация X25519…');
   const keys=generate?await realityKeys():null;
-  if(generate&&(typeof keys?.privateKey!=='string'||!keys.privateKey||typeof keys?.publicKey!=='string'||!keys.publicKey))throw Error('Генератор X25519 не вернул корректную пару ключей.');
+  if(generate&&(!validRealityX25519Key(keys?.privateKey)||!validRealityX25519Key(keys?.publicKey)))throw Error('Генератор X25519 не вернул пару base64url длиной 43 символа. Ничего не записано.');
   if(area.value!==selected.source){notify('JSON изменился во время генерации ключей Reality. Повторите действие.');return}
   const applied=mutate(doc=>{
    const updated=getInbound(doc,selected.index);
@@ -202,12 +211,13 @@ async function setReality(){
    rs.serverNames=sni;
    rs.shortIds=shortIds;
    if(generate)rs.privateKey=keys.privateKey;
+   if(!validRealityX25519Key(rs.privateKey))throw Error('Некорректный privateKey. Сгенерируйте новый X25519.');
   },generate?'Новая пара Reality X25519 добавлена в черновик':'Параметры Reality применены к черновику');
   if(!applied)return;
   if(generate){
    try{
     await navigator.clipboard.writeText(keys.publicKey);
-    notify('Новый Reality public key скопирован. Сохраните профиль и проверьте JSON через Xray-core.');
+    notify('X25519 privateKey (base64url, 43 символа) записан в серверный JSON. Public key скопирован. Проверьте конфигурацию через Xray-core.');
    }catch{
     await dialog.request({
      title:'Public key для клиентов',description:'Скопируйте ключ вручную. Он соответствует новому серверному privateKey.',
