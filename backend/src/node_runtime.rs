@@ -1194,6 +1194,29 @@ fn build_offline_policy(
 
 /// Validate an *unsaved* routing edit using the same `GeoData` and outbound
 /// compiler used for signed desired-config. Never return Xray secrets.
+fn preview_routing_counts(node: &Value) -> (usize, usize) {
+    let rule_count = node
+        .get("routingRules")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter(|r| r.get("enabled").and_then(Value::as_bool) != Some(false))
+        .count();
+    let exit_count = node
+        .get("routingRules")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter(|r| {
+            r.get("enabled").and_then(Value::as_bool) != Some(false)
+                && r.get("target").and_then(Value::as_str) == Some("node")
+        })
+        .filter_map(|r| r.get("nodeId").and_then(Value::as_i64))
+        .collect::<std::collections::HashSet<_>>()
+        .len();
+    (rule_count, exit_count)
+}
+
 pub async fn preview_routing(
     State(state): State<AppState>,
     Path(node_id): Path<i64>,
@@ -1288,25 +1311,7 @@ pub async fn preview_routing(
     let nodes = crate::load_records(&state.pool, "nodes").await?;
     let hosts = crate::load_records(&state.pool, "hosts").await?;
     crate::node_routing::apply(&node, &mut config, &nodes, &hosts)?;
-    let rule_count = node
-        .get("routingRules")
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-        .filter(|r| r.get("enabled").and_then(Value::as_bool) != Some(false))
-        .count();
-    let exit_count = node
-        .get("routingRules")
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-        .filter(|r| {
-            r.get("enabled").and_then(Value::as_bool) != Some(false)
-                && r.get("target").and_then(Value::as_str) == Some("node")
-        })
-        .filter_map(|r| r.get("nodeId").and_then(Value::as_i64))
-        .collect::<std::collections::HashSet<_>>()
-        .len();
+    let (rule_count, exit_count) = preview_routing_counts(&node);
     Ok(Json(json!({
         "valid":true,
         "rules":if node.get("routingEnabled").and_then(Value::as_bool)==Some(true){rule_count}else{0},
