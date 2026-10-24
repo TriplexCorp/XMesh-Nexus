@@ -134,16 +134,15 @@ fn client_transport(stream:&Value,inbound:&Value,host:&Value,device:&str,network
             transport["headers"]=Value::Object(headers.clone());
         }
     }
-    if network!="grpc" {
-        if let Some(path)=field(host,"path"){transport["path"]=json!(path)}
+    if network!="grpc" && let Some(path)=field(host,"path") {
+        transport["path"]=json!(path);
     }
-    if let Some(hostname)=field(host,"host").or_else(||field(host,"externalHost")){
-        if ["xhttp","ws","websocket","httpupgrade"].contains(&network){
-            transport["host"]=json!(hostname);
-        }
+    if let Some(hostname)=field(host,"host").or_else(||field(host,"externalHost"))
+        && ["xhttp","ws","websocket","httpupgrade"].contains(&network) {
+        transport["host"]=json!(hostname);
     }
-    if network=="grpc" {
-        if let Some(service)=field(host,"serviceName"){transport["serviceName"]=json!(service)}
+    if network=="grpc" && let Some(service)=field(host,"serviceName") {
+        transport["serviceName"]=json!(service);
     }
     if network=="masque" {
         if let Some(extra)=client_metadata(inbound,host,"clientMasqueSettings"){
