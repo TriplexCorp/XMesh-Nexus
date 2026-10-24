@@ -60,6 +60,11 @@ function open({node,modal,updateNode,notify,afterSave}){
  async function persist(force){
   try{
    const values=read();
+   if(!values.geoEnabled&&n.routingEnabled&&Array.isArray(n.routingRules)
+      &&n.routingRules.some(rule=>rule.enabled!==false
+        &&['geosite','geoip','extDomain','extIp'].includes(rule.matcher))){
+     throw Error('GeoData используются в активных правилах маршрутизации. Сначала отключите эти правила в отдельном окне.');
+   }
    const patch={...values};
    if(force){
     if(!values.geoEnabled)throw Error('Сначала включите GeoData.');
