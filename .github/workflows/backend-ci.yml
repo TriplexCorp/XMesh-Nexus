@@ -56,6 +56,7 @@ jobs:
           node --check xray-studio-hosts.js
           node --check xray-studio-v4.js
           node --check xray-studio-tools.js
+          node --check xray-studio-composer.js
           node --check client-routing.js
           node --check xray-json-diagnostics.js
           node --check xray-json-intelligence.js
@@ -67,6 +68,8 @@ jobs:
         run: node scripts/check-xray-tool-actions.js
       - name: Verify enterprise XRAY STUDIO inspector and layout
         run: node scripts/check-xray-studio-enterprise.js
+      - name: Verify combinatorial Xray composer and Shadowsocks XHTTP Reality
+        run: node scripts/check-xray-studio-composer.js
       - name: Verify XRAY STUDIO public endpoint integration
         run: node scripts/check-xray-studio-hosts.js
       - name: Enforce active XRAY STUDIO entrypoint and remove stale assets
