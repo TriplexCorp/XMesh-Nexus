@@ -668,16 +668,10 @@ async fn apply_ip_rotation(
     Ok(())
 }
 
-async fn collect_user_outbounds(
-    state: &AppState,
+fn permitted_inbound_tags(
     user: &Value,
-    device: &str,
-    rotate: bool,
-) -> Result<Vec<Value>, ApiError> {
-    let squads = crate::load_records(&state.pool, "squads").await?;
-    let profiles = crate::load_records(&state.pool, "profiles").await?;
-    let hosts = crate::load_records(&state.pool, "hosts").await?;
-    let nodes = crate::load_records(&state.pool, "nodes").await?;
+    squads: &[Value],
+) -> (Vec<Value>, std::collections::HashSet<String>) {
     let ids = user
         .get("squads")
         .and_then(Value::as_array)
@@ -697,6 +691,20 @@ async fn collect_user_outbounds(
             }
         }
     }
+    (ids, tags)
+}
+
+async fn collect_user_outbounds(
+    state: &AppState,
+    user: &Value,
+    device: &str,
+    rotate: bool,
+) -> Result<Vec<Value>, ApiError> {
+    let squads = crate::load_records(&state.pool, "squads").await?;
+    let profiles = crate::load_records(&state.pool, "profiles").await?;
+    let hosts = crate::load_records(&state.pool, "hosts").await?;
+    let nodes = crate::load_records(&state.pool, "nodes").await?;
+    let (ids, tags) = permitted_inbound_tags(user, &squads);
     let mut outbounds = Vec::<Value>::new();
     for profile in &profiles {
         let cfg = match profile.get("config") {
