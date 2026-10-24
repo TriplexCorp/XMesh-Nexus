@@ -391,16 +391,6 @@
 .sv-dialog>header{display:flex;align-items:center;justify-content:space-between;gap:1rem}
 .sv-dialog h3{margin:0;font-size:1.05rem}
 .sv-dialogitem{display:flex!important;width:100%;text-align:left!important;justify-content:flex-start!important;margin-top:.4rem}
-.sv-studio .sv-dialog:has(.sv-template-choice){width:min(42rem,96vw)}
-.sv-studio .sv-dialog:has(.sv-template-choice) [data-v=overlayBody]{
- display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.55rem;margin-top:1rem
-}
-.sv-studio .sv-template-choice{
- display:flex;flex-direction:column;align-items:flex-start;gap:.3rem;
- min-height:4rem;margin:0;padding:.75rem;text-align:left;white-space:normal
-}
-.sv-template-choice strong{font-size:.83rem}
-.sv-template-choice small{font-size:.7rem;font-weight:450;color:var(--vmute)}
 .sv-studio.sv-expand::before{
  content:"";position:fixed;inset:0;z-index:1199;pointer-events:auto;
  background:var(--xm-modal-dim,rgba(2,7,12,.72));
@@ -411,6 +401,188 @@
  border:1px solid var(--vline);border-radius:var(--vpanelround);
  background:var(--vpanel);box-shadow:0 1.5rem 5rem #0008
 }
+/* COMPOSABLE CONFIGURATION ENGINE
+   The curated examples never constrain the independently selectable dimensions. */
+.sv-studio .sv-overlay-composer{
+ align-items:center;justify-content:center;padding:clamp(.5rem,2vw,1.6rem);
+}
+.sv-studio .sv-overlay-composer .sv-dialog{
+ display:flex;flex-direction:column;overflow:hidden;
+ width:min(76rem,calc(100vw - 2rem),var(--panel-content-max,3000px));
+ max-width:100%;height:min(90dvh,58rem);max-height:calc(100dvh - 1rem);
+ padding:0;min-height:0;border-radius:var(--vpanelround);background:var(--vpanel);
+ box-shadow:0 1.5rem 5rem rgba(0,0,0,.55)
+}
+.sv-studio .sv-overlay-composer .sv-dialog>header{
+ flex:none;min-height:4.3rem;padding:1rem 1.3rem;
+ border-bottom:1px solid var(--vline)
+}
+.sv-studio .sv-overlay-composer .sv-dialog>header h3{font-size:1.15rem;font-weight:800}
+.sv-studio .sv-overlay-composer .sv-dialog>header button{
+ min-width:2rem;height:2rem;padding:0;border-radius:var(--vround)
+}
+.sv-studio .sv-overlay-composer [data-v=overlayBody]{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0}
+.sv-compose{display:flex;flex-direction:column;flex:1;min-height:0;min-width:0}
+.sv-compose-intro{
+ display:flex;justify-content:space-between;align-items:center;gap:1rem;
+ padding:1.1rem 1.4rem .9rem;flex:none;
+}
+.sv-compose-intro>div:first-child{max-width:40rem;min-width:0}
+.sv-compose-kicker{
+ color:var(--vaccent);font-size:.64rem;font-weight:800;letter-spacing:.11em
+}
+.sv-compose-intro p{
+ margin:.35rem 0 0;color:var(--vmute);font-size:.78rem;line-height:1.6
+}
+.sv-compose-count{
+ display:flex;align-items:center;gap:.65rem;min-width:max-content;
+ padding:.5rem .9rem;border:1px solid var(--vline);border-radius:var(--vround);
+ background:var(--vfield)
+}
+.sv-compose-count strong{font-size:1.4rem;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.04em}
+.sv-compose-count span{color:var(--vmute);font-size:.64rem;line-height:1.4}
+.sv-compose-tabs{
+ display:flex;gap:.3rem;padding:0 1.4rem .8rem;
+ border-bottom:1px solid var(--vline)
+}
+.sv-studio .sv-compose-tabs button{
+ border:1px solid transparent;background:transparent;min-height:2.2rem;color:var(--vmute);
+ padding:.5rem .85rem;font-size:.77rem
+}
+.sv-studio .sv-compose-tabs button[aria-selected=true]{
+ color:var(--vaccent);
+ border-color:color-mix(in srgb,var(--vaccent) 42%,var(--vline));
+ background:color-mix(in srgb,var(--vaccent) 8%,var(--vpanel))
+}
+.sv-compose-workspace{
+ display:grid;grid-template-columns:minmax(0,1.7fr) minmax(18rem,1fr);
+ flex:1;min-height:0;overflow:hidden
+}
+.sv-compose-form{display:flex;flex-direction:column;gap:1rem;min-width:0;min-height:0;overflow:auto;padding:1rem 1.35rem 1.35rem;scrollbar-width:thin}
+.sv-compose-choices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.6rem}
+.sv-compose-choice-group{display:grid;grid-auto-rows:max-content;align-content:start;gap:.3rem;min-width:0}
+.sv-compose-choice-group h4{
+ margin:0 0 .25rem;font-size:.7rem;color:var(--vmute);
+ font-weight:800;letter-spacing:.03em
+}
+.sv-studio .sv-compose-choice{
+ display:flex;flex-direction:column;align-items:flex-start;justify-content:center;
+ text-align:left;gap:.1rem;width:100%;min-height:3.2rem;padding:.55rem .65rem;
+ border-radius:var(--vround);border:1px solid var(--vline);
+ background:color-mix(in srgb,var(--vfield) 70%,var(--vpanel));
+ white-space:normal
+}
+.sv-compose-choice strong{font-size:.78rem;font-weight:780;line-height:1.35}
+.sv-compose-choice small{
+ color:var(--vmute);font-size:.66rem;line-height:1.32;font-weight:450;
+}
+.sv-studio .sv-compose-choice.active{
+ border-color:color-mix(in srgb,var(--vaccent) 68%,var(--vline));
+ background:color-mix(in srgb,var(--vaccent) 12%,var(--vpanel))
+}
+.sv-compose-choice.active strong{color:var(--vaccent)}
+.sv-compose-panel-heading{display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:.65rem}
+.sv-compose-panel-heading h4{font-size:.8rem;letter-spacing:-.01em;margin:0;font-weight:800}
+.sv-compose-panel-heading>span{color:var(--vmute);font-size:.67rem}
+.sv-compose-parameters{border-top:1px solid var(--vline);padding-top:.9rem}
+.sv-compose-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.67rem .85rem}
+.sv-compose-fields label{display:flex;flex-direction:column;gap:.33rem;min-width:0}
+.sv-compose-fields label>span{color:var(--vmute);font-size:.68rem;font-weight:740}
+.sv-compose-fields label.sv-compose-field-wide{grid-column:span 2}
+.sv-studio .sv-compose-fields :is(input,select){
+ width:100%;min-width:0;min-height:2.35rem;
+ padding:.42rem .65rem;background:var(--vfield);
+ border:1px solid var(--vline);border-radius:var(--vround);
+ color:var(--vtext);font-size:.78rem;font-weight:650
+}
+.sv-studio .sv-compose-fields :is(input,select):hover{border-color:color-mix(in srgb,var(--vaccent) 48%,var(--vline))}
+.sv-compose-apply-mode{
+ display:flex;align-items:center;flex-wrap:wrap;gap:.7rem 1.1rem;
+ padding:.8rem 0 .15rem;border-top:1px solid var(--vline)
+}
+.sv-compose-apply-mode strong{font-size:.73rem;flex:1 1 100%;font-weight:800}
+.sv-compose-apply-mode label{display:flex;align-items:center;gap:.4rem;font-size:.74rem;cursor:pointer}
+.sv-compose-apply-mode input,.sv-compose-override input{accent-color:var(--vaccent)}
+.sv-compose-preview{
+ display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;
+ background:color-mix(in srgb,var(--vbg) 74%,var(--vpanel));
+ border-left:1px solid var(--vline)
+}
+.sv-compose-preview-head{
+ display:flex;flex-direction:column;flex:none;gap:.3rem;padding:.9rem 1rem .7rem;
+ border-bottom:1px solid var(--vline)
+}
+.sv-compose-preview-head>span{font:760 .62rem/1.3 var(--vcode);letter-spacing:.09em;color:var(--vaccent)}
+.sv-compose-preview-head>strong{font-size:.81rem;line-height:1.3;overflow-wrap:anywhere}
+.sv-compose-diagnostics{
+ flex:none;max-height:13rem;overflow-y:auto;
+ padding:.85rem 1rem;border-bottom:1px solid var(--vline)
+}
+.sv-compose-diagnostics>strong{display:block;font-size:.76rem;margin-bottom:.45rem}
+.sv-compose-diagnostics>strong[data-severity=ok]{color:var(--ok,#50dca8)}
+.sv-compose-diagnostics>strong[data-severity=warning]{color:var(--vmute)}
+.sv-compose-diagnostics>strong[data-severity=error]{color:var(--er,#ef8194)}
+.sv-compose-message{margin:.25rem 0;color:var(--vmute);font-size:.69rem;line-height:1.45}
+.sv-compose-message::before{content:"•";margin-right:.35rem}
+.sv-compose-message.error{color:var(--er,#ef8194)}
+.sv-compose-message.ok{color:var(--ok,#50dca8)}
+.sv-studio .sv-compose-preview pre{
+ margin:0;padding:1rem;flex:1;min-height:5rem;
+ overflow:auto;white-space:pre;tab-size:2;
+ color:var(--vtext);font:500 .74rem/1.65 var(--vcode);
+}
+.sv-compose-preview-note{margin:0;padding:.65rem 1rem;color:var(--vmute);font-size:.68rem;line-height:1.5;border-top:1px solid var(--vline)}
+.sv-compose-examples{
+ display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.62rem;
+ align-content:start;overflow-y:auto;flex:1;min-height:0;padding:1rem 1.35rem 1.25rem
+}
+.sv-compose-examples-title{grid-column:1/-1;font-size:.77rem;line-height:1.5;color:var(--vmute);margin-bottom:.25rem}
+.sv-studio .sv-compose-example{
+ width:100%;min-width:0;min-height:5.15rem;display:grid;
+ grid-template-columns:1fr auto;grid-template-rows:auto auto;
+ justify-items:start;align-content:center;text-align:left;
+ gap:.3rem;padding:.75rem .85rem;white-space:normal
+}
+.sv-compose-example strong{grid-column:1/-1;font-size:.8rem;line-height:1.3}
+.sv-compose-example small{grid-column:1;max-width:100%;color:var(--vmute);font-weight:450;font-size:.69rem;line-height:1.45}
+.sv-compose-example>span{grid-column:2;grid-row:2;color:var(--vaccent);font-size:.67rem}
+.sv-compose-footer{
+ display:flex;align-items:center;gap:.55rem;flex:none;flex-wrap:wrap;
+ padding:.85rem 1.4rem;border-top:1px solid var(--vline);
+ background:var(--vpanel)
+}
+.sv-compose-override{display:flex;align-items:center;gap:.5rem;flex:1 1 100%;font-size:.73rem;color:var(--er,#ef8194)}
+.sv-compose-footer-note{flex:1 1 15rem;font-size:.7rem;line-height:1.4;color:var(--vmute)}
+.sv-studio .sv-compose-footer button{min-height:2.4rem}
+.sv-studio .sv-compose-footer .sv-primary{min-width:9.5rem}
+@media(max-width:1080px){
+ .sv-studio .sv-overlay-composer .sv-dialog{width:min(96vw,72rem)}
+ .sv-compose-workspace{grid-template-columns:minmax(0,1fr)}
+ .sv-compose-preview{max-height:22rem;border-left:0;border-top:1px solid var(--vline)}
+ .sv-compose-form{min-height:17rem}
+ .sv-compose-workspace{overflow-y:auto;display:flex;flex-direction:column}
+ .sv-compose-choices{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .sv-compose-examples{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:660px){
+ .sv-studio .sv-overlay-composer{padding:.3rem}
+ .sv-studio .sv-overlay-composer .sv-dialog{width:100%;height:calc(100dvh - .6rem);max-height:none}
+ .sv-compose-intro{flex-wrap:wrap;padding:.8rem}
+ .sv-compose-count{min-width:0}
+ .sv-compose-tabs{padding:0 .7rem .6rem}
+ .sv-compose-form{padding:.8rem}
+ .sv-compose-choices{grid-template-columns:1fr;gap:.75rem}
+ .sv-compose-choice-group{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .sv-compose-choice-group h4{grid-column:1/-1}
+ .sv-compose-fields{grid-template-columns:1fr}
+ .sv-compose-fields label.sv-compose-field-wide{grid-column:1}
+ .sv-compose-preview{max-height:19rem}
+ .sv-compose-footer{padding:.7rem;gap:.4rem}
+ .sv-compose-footer-note{flex:1 1 100%}
+ .sv-studio .sv-compose-footer button{flex:1 1 auto}
+ .sv-compose-examples{grid-template-columns:1fr}
+}
+
 /* Hidden constructor is still mounted for existing sync / hosts integration. */
 .sv-formbody{flex:1;min-height:0;overflow:auto;padding:1rem}
 .sv-field{display:grid;gap:.4rem;min-width:0;margin-bottom:.65rem;font-size:.73rem}
