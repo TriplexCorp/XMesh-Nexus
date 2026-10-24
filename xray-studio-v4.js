@@ -88,7 +88,7 @@ function renderDocumentTabs(){
  nav.querySelectorAll('.sv-json-document-tab,.sv-json-document-add').forEach(el=>el.remove());
  const editorButton=nav.querySelector('[data-action="studio-editor"]');
  editorButton.hidden=true;
- const anchor=editorButton;
+ let anchor=editorButton;
  for(const [key,doc] of documents){
   const wrap=document.createElement('span');wrap.className='sv-json-document-tab'+(key===activeDocument?' active':'');
   const button=document.createElement('button');button.type='button';button.dataset.docOpen=key;
@@ -96,7 +96,7 @@ function renderDocumentTabs(){
   button.setAttribute('aria-label','Открыть JSON: '+(doc.name||'Новый профиль'));
   const close=document.createElement('button');close.type='button';close.dataset.docClose=key;
   close.textContent='×';close.title='Закрыть вкладку';close.setAttribute('aria-label','Закрыть JSON: '+(doc.name||'Новый профиль'));
-  wrap.append(button,close);anchor.after(wrap);
+  wrap.append(button,close);anchor.after(wrap);anchor=wrap;
  }
  const plus=document.createElement('button');plus.type='button';plus.className='sv-json-document-add';
  plus.dataset.docNew='true';plus.textContent='+';plus.title='Новый JSON';
@@ -105,7 +105,7 @@ function renderDocumentTabs(){
 function switchDocument(key){
  if(key===activeDocument){setPage('editor');return}
  const next=documents.get(key);if(!next)return;
- stashDocument();switchingDocument=true;
+ if(!switchingDocument)stashDocument();switchingDocument=true;
  try{
   activeDocument=key;id=next.id;name=next.name;saved=next.saved;
   inboundIndex=next.inboundIndex;outIndex=next.outIndex;
