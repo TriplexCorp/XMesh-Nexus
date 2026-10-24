@@ -89,7 +89,7 @@ async function main(){
  const emptyButton=getChildren(list()[0],'sv-library-empty-action')[0];
  emptyButton.onclick();assert.equal(createCount,1,'empty library offers new profile');
  assert.ok(source.includes('id=created.id'),'saving a newly-created profile retains its ID');
- assert.ok(source.includes('saved=input.value;paint();renderProfiles();'),'save refreshes library without destroying editor state');
+ assert.ok(source.includes('saved=input.value;paint();hostManager.render();renderProfiles();'),'save refreshes library without destroying editor state');
  console.log('XRAY STUDIO profiles: search, empty state, counters, invalid JSON, open/delete and selection tests passed.');
 }
 main().catch(err=>{console.error(err);process.exitCode=1});
