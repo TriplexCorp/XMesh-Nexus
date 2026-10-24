@@ -148,6 +148,10 @@ pub fn validate_saved(node:&Value)->Result<(),ApiError>{
             let raw=rule.get("value").and_then(Value::as_str)
                 .ok_or_else(||bad("Routing: rule value is missing."))?;
             matcher(kind,raw)?;
+            if matches!(kind,"geosite"|"geoip"|"extDomain"|"extIp")
+                && node.get("geoEnabled").and_then(Value::as_bool)!=Some(true) {
+                return Err(bad("Routing: GeoData must remain enabled while GeoSite/GeoIP rules are active."));
+            }
             match rule.get("target").and_then(Value::as_str) {
                 Some("direct"|"block")=>{},
                 Some("outbound") if rule.get("outboundTag").and_then(Value::as_str)
@@ -379,6 +383,12 @@ mod tests{
         let linked=json!({"id":10,"addr":"wrong.example.com","port":443,
             "routingEnabled":true,"routingRules":[{"enabled":true,"target":"node","nodeId":4}]});
         assert!(apply(&node,&mut config,&[node.clone(),linked],&[]).is_err());
+    }
+    #[test]
+    fn cannot_disable_geodata_under_an_active_geo_rule(){
+        assert!(validate_saved(&json!({"geoEnabled":false,"routingEnabled":true,
+            "routingRules":[{"matcher":"geosite","value":"category-ru","target":"block"}],
+            "routingRelays":[]})).is_err());
     }
     #[test]
     fn saved_policy_rejects_nonboolean_toggle_and_duplicate_exit(){
