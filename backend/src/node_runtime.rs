@@ -59,7 +59,7 @@ pub async fn heartbeat(
         &state, &headers, report.node_id, &body, "/api/v1/node/heartbeat"
     ).await?;
     sqlx::query(
-        "INSERT INTO node_runtime_heartbeats(node_id,version,router_running,xray_running,xray_version,geo_data,applied_revision,profile_check,profile_check,received_at)
+        "INSERT INTO node_runtime_heartbeats(node_id,version,router_running,xray_running,xray_version,geo_data,applied_revision,profile_check,received_at)
          VALUES($1,$2,$3,$4,$5,$6,$7,$8,NOW()) ON CONFLICT(node_id) DO UPDATE
          SET version=EXCLUDED.version,router_running=EXCLUDED.router_running,
          xray_running=EXCLUDED.xray_running,xray_version=EXCLUDED.xray_version,
@@ -96,7 +96,7 @@ pub async fn status(
     ).bind(node_id).fetch_optional(&state.pool).await?;
     if exists.is_none() {return Err(ApiError::new(StatusCode::NOT_FOUND,"Node not found."))}
     let record = sqlx::query(
-        "SELECT version,router_running,xray_running,xray_version,geo_data,applied_revision,
+        "SELECT version,router_running,xray_running,xray_version,geo_data,applied_revision,profile_check,
                 (EXTRACT(EPOCH FROM received_at)*1000)::BIGINT AS received_ms,
                 received_at > NOW() - INTERVAL '65 seconds' AS fresh
          FROM node_runtime_heartbeats WHERE node_id=$1"
