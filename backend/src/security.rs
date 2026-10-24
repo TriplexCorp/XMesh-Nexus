@@ -187,8 +187,8 @@ fn rebase_dashboard_asset_paths(content:&str)->String{
         "app.js","node-geodata.js","node-routing.js","client-routing.js",
         "xray-studio-v4.js","xray-studio-dialog.js"
     ] {
-        html=html.replace(&format!("href=\\\"{asset}"),&format!("href=\\\"/{asset}"));
-        html=html.replace(&format!("src=\\\"{asset}"),&format!("src=\\\"/{asset}"));
+        html=html.replace(&format!("href=\"{asset}"),&format!("href=\"/{asset}"));
+        html=html.replace(&format!("src=\"{asset}"),&format!("src=\"/{asset}"));
     }
     html
 }
