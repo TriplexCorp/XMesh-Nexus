@@ -1,4 +1,4 @@
-//! Per-node server-side routing, separate from GeoData asset management.
+//! Per-node server-side routing, separate from `GeoData` asset management.
 //! Nodes are only labels/authoritative destinations; a real Xray outbound
 //! with working authentication and transport is mandatory for remote egress.
 use crate::ApiError;
@@ -226,7 +226,7 @@ fn cycle_reaches(start: i64, goal: i64, nodes: &[Value]) -> bool {
 }
 
 /// Validate persistent routing input before storing a node record. The
-/// dynamic cross-node graph and endpoint identity checks happen in apply().
+/// dynamic cross-node graph and endpoint identity checks happen in `apply()`.
 fn json_routing(node: &Value) -> Result<Option<&serde_json::Map<String, Value>>, ApiError> {
     let Some(raw) = node.get("routingJson") else {
         return Ok(None);
@@ -234,7 +234,7 @@ fn json_routing(node: &Value) -> Result<Option<&serde_json::Map<String, Value>>,
     let obj = raw
         .as_object()
         .ok_or_else(|| bad("Routing JSON must be an object."))?;
-    if serde_json::to_vec(raw).unwrap_or_default().len() > 262144 {
+    if serde_json::to_vec(raw).unwrap_or_default().len() > 262_144 {
         return Err(bad("Routing JSON exceeds 256 KiB."));
     }
     if obj
@@ -299,7 +299,7 @@ fn json_routing(node: &Value) -> Result<Option<&serde_json::Map<String, Value>>,
 }
 
 /// Overlay node-local DNS, routing and outbound definitions without changing
-/// XRAY STUDIO or mandatory StatsService routes.
+/// XRAY STUDIO or mandatory `StatsService` routes.
 fn apply_json(node: &Value, config: &mut Value) -> Result<(), ApiError> {
     let Some(raw) = json_routing(node)? else {
         return Ok(());
