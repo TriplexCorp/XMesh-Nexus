@@ -96,7 +96,9 @@ for(const method of C.shadowsocksMethods){
 assert.throws(()=>C.generateShadowsocksPassword('2022-blake3-aes-256-gcm',null),/генератор/);
 assert(studio.includes('function openComposer()'),'Studio must mount composer');
 assert(!studio.includes('const templates=['),'Fixed list must not be the only mode');
-assert(studio.includes('engine.buildDocument(opts,activeJson'),'Studio must use the reusable document generator');
+assert(studio.includes('engine.buildDocument(chosen,activeJson'),'Studio must use the reusable document generator');
+assert(studio.includes("if(overlay.hidden||!scope.isConnected)"),'Closed modal must not commit an async generated key');
+assert(studio.includes('selectionSignature=JSON.stringify(opts)'),'Composer must detect async option changes');
 assert(studio.includes("unsavedApproval('Создать новую конфигурацию"),'Destructive replacement needs permission');
 assert(studio.includes("get('overlay').classList.remove('sv-overlay-composer')"),'Dialog can return to normal layout');
 assert(html.includes('/xray-studio-composer.js?v='),'Composer must load before Studio');
