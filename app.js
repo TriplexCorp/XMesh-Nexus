@@ -1513,7 +1513,7 @@ function userDrawer(id,tab){
     <div class="user-overview-band">
       <div class="user-usage-line"><span>Трафик</span><strong>${gb(u.used)}</strong><small>${u.limit?'из '+u.limit+' ГБ':'без лимита'}</small><button type="button" class="user-action-text" data-a="rst" data-u="${u.id}" title="Обнулить использованный трафик">${ic('redo')} Сбросить</button></div>
       ${u.limit?`<div class="user-usage-track" style="--usage:${Math.min(100,Math.max(0,usageRatio*100))}%" role="progressbar" aria-label="Использование трафика" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(Math.min(100,Math.max(0,usageRatio*100)))}"><i></i></div>`:''}
-      <div class="user-identity-row"><span>Xray ID</span><code class="user-id-masked" aria-label="Xray ID скрыт" title="UUID скрыт. Нажмите кнопку копирования">••••••••-••••-••••-••••-••••••••••••</code><button type="button" class="user-id-copy" data-copy-xray-id="${u.id}" aria-label="Копировать Xray ID" title="Копировать Xray ID">${ic('copy')}</button></div>
+      <div class="user-identity-row"><span>Xray ID</span>${sessionUser?.role === "viewer" ? '<code class="user-id-masked" aria-label="Xray ID скрыт">••••••••-••••-••••-••••-••••••••••••</code>' : `<code class="user-id-value">${esc(u.xrayId || "—")}</code><button type="button" class="user-id-copy" data-copy-xray-id="${u.id}" aria-label="Копировать Xray ID" title="Копировать Xray ID">${ic("copy")}</button>`}</div>
     </div>
     <div class="user-canvas-grid">
       <section class="user-pane user-pane-settings" aria-label="Настройки пользователя">
