@@ -18,6 +18,8 @@ struct Heartbeat {
     geo_data: Option<Value>,
     #[serde(default, rename="appliedRevision")]
     applied_revision: Option<String>,
+    #[serde(default, rename="profileCheck")]
+    profile_check: Option<String>,
 }
 
 pub async fn heartbeat(
@@ -44,18 +46,28 @@ pub async fn heartbeat(
     ) {
         return Err(ApiError::new(StatusCode::BAD_REQUEST,"Invalid applied profile revision."));
     }
+    if report.profile_check.as_ref().is_some_and(|status|
+        !matches!(status.as_str(),
+            "verified"|"policy_missing"|"active_config_missing"|"guard_unavailable"|
+            "policy_invalid"|"revision_invalid"|"policy_hash_mismatch"|
+            "active_config_invalid"|"active_config_mismatch"|"xray_stopped"|
+            "mount_mismatch"|"container_unavailable"|"helper_missing"|"helper_error")
+    ){
+        return Err(ApiError::new(StatusCode::BAD_REQUEST,"Invalid profile check status."));
+    }
     node_auth::authenticate_for(
         &state, &headers, report.node_id, &body, "/api/v1/node/heartbeat"
     ).await?;
     sqlx::query(
-        "INSERT INTO node_runtime_heartbeats(node_id,version,router_running,xray_running,xray_version,geo_data,applied_revision,received_at)
-         VALUES($1,$2,$3,$4,$5,$6,$7,NOW()) ON CONFLICT(node_id) DO UPDATE
+        "INSERT INTO node_runtime_heartbeats(node_id,version,router_running,xray_running,xray_version,geo_data,applied_revision,profile_check,profile_check,received_at)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8,NOW()) ON CONFLICT(node_id) DO UPDATE
          SET version=EXCLUDED.version,router_running=EXCLUDED.router_running,
          xray_running=EXCLUDED.xray_running,xray_version=EXCLUDED.xray_version,
-         geo_data=EXCLUDED.geo_data,applied_revision=EXCLUDED.applied_revision,received_at=NOW()"
+         geo_data=EXCLUDED.geo_data,applied_revision=EXCLUDED.applied_revision,profile_check=EXCLUDED.profile_check,received_at=NOW()"
     ).bind(report.node_id).bind(&report.version).bind(report.router_running)
     .bind(report.xray_running).bind(&report.xray_version)
-    .bind(&report.geo_data).bind(if report.xray_running {report.applied_revision.as_deref()} else {None}).execute(&state.pool).await?;
+    .bind(&report.geo_data).bind(if report.xray_running {report.applied_revision.as_deref()} else {None})
+    .bind(report.profile_check.as_deref()).execute(&state.pool).await?;
     // A self-upgrade can replace its own running worker before its ACK is sent.
     // A fresh, authenticated heartbeat with the exact requested version is
     // stronger evidence of success than the lost acknowledgement.
@@ -104,6 +116,7 @@ pub async fn status(
                 else if applied==expected {"applied"} else {"pending"};
             Ok(Json(json!({
                 "profileApplicationStatus":application_status,
+                "profileCheck":row.try_get::<Option<String>,_>("profile_check")?,
                 "appliedRevision":applied,
                 "desiredRevision":expected,
                 "nodeId":node_id,
@@ -294,7 +307,7 @@ pub async fn request_xray_update(
 
 // Remote agent upgrades are a fixed local action, never a command string or URL.
 // Only v4+ nodes understand this action. Older nodes need one bootstrap upgrade.
-pub const CONTROL_AGENT_VERSION: &str = "control-v4.3.0";
+pub const CONTROL_AGENT_VERSION: &str = "control-v4.3.1";
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
