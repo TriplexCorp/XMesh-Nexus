@@ -74,7 +74,9 @@ def main():
     check(status, 201, "owner creates viewer")
     viewer_id = viewer["id"]
     _, viewer_cookie = login("ci_viewer", VIEWER_PASSWORD)
-    check(api("GET", "/collections/hosts", cookie=viewer_cookie)[0], 200, "viewer can read")
+    check(api("GET", "/collections/hosts", cookie=viewer_cookie)[0], 403, "viewer denied host configuration")
+    check(api("GET", "/collections/users", cookie=viewer_cookie)[0], 200, "viewer can read user overview")
+    check(api("GET", "/security/policy", cookie=viewer_cookie)[0], 403, "viewer denied security policy")
     check(api("POST", "/collections/hosts", {"name": "smoke"}, viewer_cookie)[0], 403,
           "viewer cannot write")
     check(api("GET", "/admins", cookie=viewer_cookie)[0], 403, "viewer cannot see administrators")
