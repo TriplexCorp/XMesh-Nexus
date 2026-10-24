@@ -1212,7 +1212,7 @@ pub async fn portal(
         } else {
             format!(
                 "{:.2} {} / {}",
-                used,
+                consumed_gib,
                 if en { "GB" } else { "ГБ" },
                 if en {
                     "Unlimited"
@@ -1305,7 +1305,7 @@ pub async fn portal(
         if studio_enabled(&settings, "subscriptionShowDevices", false) {
             quick.push_str(&format!("<button type=\"button\" id=\"toggle-devices\" aria-controls=\"subscription-devices\" aria-expanded=\"false\">{}</button>",if en{"Devices"}else{"Устройства"}));
             let maximum = user.get("hwid").and_then(Value::as_i64).unwrap_or(0);
-            let consumed_gib = user
+            let connected_devices = user
                 .get("devices")
                 .and_then(Value::as_array)
                 .map_or(0, Vec::len);
