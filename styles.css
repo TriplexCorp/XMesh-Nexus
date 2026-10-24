@@ -4906,26 +4906,44 @@ dialog#dlg.node-wide .node-geo-fields small{overflow-wrap:anywhere}
   dialog#dlg.node-wide .node-geo-fields{grid-template-columns:minmax(0,1fr)}
 }
 
-/* Users: quiet icon-only refresh, aligned with the action buttons. */
+/* Users: compact, but recognizable primary utility control. */
 .users-toolbar-actions>.users-refresh-icon{
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  flex:0 0 36px;
-  width:36px;
-  min-width:36px;
-  height:36px;
-  min-height:36px;
+  flex:0 0 42px;
+  width:42px;
+  min-width:42px;
+  height:42px;
+  min-height:42px;
   padding:0;
-  border-radius:10px;
+  border:1px solid color-mix(in srgb,var(--a) 42%,var(--ln));
+  border-radius:12px;
+  background:color-mix(in srgb,var(--a) 12%,var(--s2));
+  color:var(--a);
+  box-shadow:inset 0 1px 0 color-mix(in srgb,var(--a) 8%,transparent);
+  transition:background .18s ease,border-color .18s ease,box-shadow .18s ease,transform .18s ease;
 }
-.users-refresh-icon .ic{width:17px;height:17px;flex:none}
+.users-toolbar-actions>.users-refresh-icon:hover:not(:disabled){
+  color:var(--a);
+  border-color:color-mix(in srgb,var(--a) 75%,var(--ln));
+  background:color-mix(in srgb,var(--a) 20%,var(--s2));
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--a) 10%,transparent);
+}
+.users-toolbar-actions>.users-refresh-icon:active:not(:disabled){transform:scale(.96)}
+.users-toolbar-actions>.users-refresh-icon:focus-visible{
+  outline:2px solid var(--a);outline-offset:3px;
+}
+.users-refresh-icon .ic{width:20px;height:20px;flex:none;stroke-width:2}
 .users-refresh-icon.is-refreshing .ic{animation:users-refresh-spin .85s linear infinite}
 @keyframes users-refresh-spin{to{transform:rotate(360deg)}}
-@media(prefers-reduced-motion:reduce){.users-refresh-icon.is-refreshing .ic{animation:none}}
+@media(prefers-reduced-motion:reduce){
+  .users-refresh-icon.is-refreshing .ic{animation:none}
+  .users-toolbar-actions>.users-refresh-icon{transition:none}
+}
 @media(max-width:760px){
   .users-toolbar-actions>.users-refresh-icon{
-    width:36px;min-width:36px;min-height:36px;
+    width:42px;min-width:42px;min-height:42px;
     justify-self:end;
   }
 }
