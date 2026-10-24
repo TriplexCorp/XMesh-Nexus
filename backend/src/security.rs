@@ -175,6 +175,24 @@ pub async fn revoke_other_sessions(State(state):State<AppState>,
     Ok(Json(json!({"revokedCount":result.rows_affected()})))
 }
 
+/// Convert root-owned dashboard assets to absolute URLs for the nested
+/// authenticated dashboard route. Avoid rewriting already-absolute URLs.
+fn rebase_dashboard_asset_paths(content:&str)->String{
+    let mut html=content.to_owned();
+    for asset in [
+        "styles.css","global-hover.css","subscription-studio.css","xray-studio-v4.css",
+        "node-geodata.css","node-routing.css","client-routing.css",
+        "xray-json-intelligence.js","xray-json-diagnostics.js","i18n.js",
+        "subscription-studio.js","qr-code.js","mfa-ui.js","security-ui.js",
+        "app.js","node-geodata.js","node-routing.js","client-routing.js",
+        "xray-studio-v4.js","xray-studio-dialog.js"
+    ] {
+        html=html.replace(&format!("href=\\\"{asset}"),&format!("href=\\\"/{asset}"));
+        html=html.replace(&format!("src=\\\"{asset}"),&format!("src=\\\"/{asset}"));
+    }
+    html
+}
+
 pub async fn dashboard_entry(State(state):State<AppState>,Path(slug):Path<String>,
     headers:HeaderMap)->Response {
     let policy=match get_policy(&state.pool).await{
@@ -198,25 +216,29 @@ pub async fn dashboard_entry(State(state):State<AppState>,Path(slug):Path<String
             return (StatusCode::INTERNAL_SERVER_ERROR,"Panel assets unavailable").into_response();
         }
     };
-    // The dashboard alias is a nested URL. Asset URLs in the regular /
-    // entry page are relative; rebase only the HTML copy served at the alias.
-    // The canonical root HTML and links remain untouched.
-    let mut html=content;
-    for asset in [
-        "styles.css","global-hover.css","subscription-studio.css","xray-studio-v4.css","node-geodata.css","node-routing.css",
-        "xray-json-intelligence.js","xray-json-diagnostics.js","i18n.js",
-        "subscription-studio.js","qr-code.js","mfa-ui.js","security-ui.js",
-        "app.js","node-geodata.js","node-routing.js","xray-studio-v4.js","xray-studio-dialog.js"
-    ] {
-        html=html.replace(&format!("href=\"{asset}"),&format!("href=\"/{asset}"));
-        html=html.replace(&format!("src=\"{asset}"),&format!("src=\"/{asset}"));
-    }
+    // The dashboard is served under /dashboard/{slug}. Relative static paths
+    // otherwise resolve below /dashboard/ and return 404, leaving the
+    // dynamic client-routing workspace without its stylesheet.
+    let html=rebase_dashboard_asset_paths(content.as_str());
     axum::response::Html(html).into_response()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn dashboard_client_routing_assets_are_absolute() {
+        let entry=r#"<link rel="stylesheet" href="client-routing.css?v=3">
+<script src="client-routing.js?v=3"></script>
+<link href="styles.css?v=4"><script src="/already-absolute.js"></script>"#;
+        let html=rebase_dashboard_asset_paths(entry);
+        assert!(html.contains(r#"href="/client-routing.css?v=3""#));
+        assert!(html.contains(r#"src="/client-routing.js?v=3""#));
+        assert!(html.contains(r#"href="/styles.css?v=4""#));
+        assert!(html.contains(r#"src="/already-absolute.js""#));
+        assert!(!html.contains("/dashboard/client-routing"));
+        assert_eq!(rebase_dashboard_asset_paths(&html),html);
+    }
     #[test]
     fn validates_ranges_and_dashboard_slug() {
         let mut p=SecurityPolicy::default();assert!(p.validate().is_ok());
