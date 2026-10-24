@@ -27,7 +27,7 @@ fn error(message: &'static str) -> ApiError {
     ApiError::new(StatusCode::UNAUTHORIZED, message)
 }
 
-pub(crate) fn canonical_for(
+pub fn canonical_for(
     path: &str,
     node_id: i64,
     timestamp: i64,
@@ -50,7 +50,7 @@ fn valid_nonce(nonce: &str) -> bool {
             .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
 }
 
-fn check_timestamp(timestamp: i64, now: i64) -> bool {
+const fn check_timestamp(timestamp: i64, now: i64) -> bool {
     timestamp.abs_diff(now) <= MAX_CLOCK_SKEW_SECONDS as u64
 }
 
