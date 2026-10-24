@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const KEYS=['geoEnabled','geoBlockAds','geoUpdateHours','geoSiteUrl','geoIpUrl','geoExtraSources','geoCustomRules'];
+const KEYS=['geoEnabled','geoUpdateHours','geoSiteUrl','geoIpUrl','geoExtraSources'];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const field=(name,label,value,opts={})=>{
  const id='ng-'+name;
@@ -28,27 +28,22 @@ function validate(v){
   if(u.protocol!=='https:'||u.username||u.password||u.hash||(u.port&&u.port!=='443'))throw Error('Дополнительные файлы должны скачиваться по HTTPS.');
   if(parts[2]&&!/^[0-9a-f]{64}$/i.test(parts[2]))throw Error('Неверная SHA-256 контрольная сумма.');
  }
- const rules=v.geoCustomRules.split(/\r?\n/).map(x=>x.trim()).filter(x=>x&&!x.startsWith('#'));
- if(rules.length>64||rules.some(x=>!/^(?:geosite|geoip|ext):[A-Za-z0-9_:.-]+\s*=>\s*(?:block|direct)$/.test(x)))throw Error('Правило: geosite:категория => block или geoip:код => direct.');
 }
 function open({node,modal,updateNode,notify,afterSave}){
  const n=node;
  const status=n.geoEnabled?'Настроено':'Выключено';
  const html='<form class="box geo-console" data-geodata-form method="dialog">'+
- '<header class="geo-head"><span class="geo-symbol">◎</span><div><span class="geo-eyebrow">XMesh Nexus / Node services</span><h2>GeoData</h2><p>Файлы и маршрутизация · '+esc(n.name)+'</p></div><button type="button" class="gh sm geo-close" data-x aria-label="Закрыть">✕</button></header>'+
+ '<header class="geo-head"><span class="geo-symbol">◎</span><div><span class="geo-eyebrow">XMesh Nexus / Node services</span><h2>GeoData</h2><p>Скачивание и обновление файлов · '+esc(n.name)+'</p></div><button type="button" class="gh sm geo-close" data-x aria-label="Закрыть">✕</button></header>'+
  '<div class="geo-summary"><div><span>СОСТОЯНИЕ</span><b>'+status+'</b></div><div><span>УЗЕЛ</span><b>'+esc(n.name)+'</b></div><div><span>ОБНОВЛЕНИЕ</span><b>Каждые '+esc(n.geoUpdateHours??24)+' ч</b></div></div>'+
  '<div class="geo-content"><section class="geo-primary"><div class="geo-section-title"><span>01</span><div><h3>Управление</h3><p>Нода обновляет файлы самостоятельно</p></div></div>'+
  field('geoEnabled','Использовать GeoData',!!n.geoEnabled,{check:true,hint:'Подключать GeoSite/GeoIP к Xray на этой ноде'})+
- field('geoBlockAds','Блокировать рекламу',n.geoBlockAds!==false,{check:true,hint:'Категория geosite:category-ads-all → blackhole'})+
  '<div class="geo-divider"></div>'+field('geoUpdateHours','Интервал проверки, часов',n.geoUpdateHours??24,{number:true,hint:'Автоматически, от 6 до 168 часов'})+
- '<div class="geo-hint">Изменения применяются после синхронизации ноды. Для немедленной проверки используйте «Обновить сейчас».</div></section>'+
+ '<div class="geo-hint">Изменения применяются после синхронизации ноды. Маршруты настраиваются отдельно — кнопка «Маршрутизация» в карточке узла.</div></section>'+
  '<section class="geo-secondary"><div class="geo-section-title"><span>02</span><div><h3>Источники</h3><p>HTTPS-адреса и дополнительные файлы</p></div></div>'+
  field('geoSiteUrl','GeoSite',n.geoSiteUrl||'',{placeholder:'Стандартный geosite.dat',hint:'Пустое поле — источник по умолчанию'})+
  field('geoIpUrl','GeoIP',n.geoIpUrl||'',{placeholder:'Стандартный geoip.dat',hint:'Пустое поле — источник по умолчанию'})+
  field('geoExtraSources','Дополнительные .dat',n.geoExtraSources||'',{area:true,rows:4,placeholder:'custom.dat https://example.org/custom.dat',hint:'Имя файла · HTTPS-ссылка · необязательный SHA-256'})+
- '</section><section class="geo-rules"><div class="geo-section-title"><span>03</span><div><h3>Правила маршрутизации</h3><p>Приоритет выше общих правил профиля Xray</p></div></div>'+
- field('geoCustomRules','Свои правила',n.geoCustomRules||'',{area:true,rows:7,placeholder:'geosite:category-ads-all => block\ngeoip:private => direct\next:custom.dat:list => block',hint:'Одно правило на строку. block — блокировать, direct — напрямую.'})+
- '<div class="geo-rule-note">Маршрутизация применяется на сервере. Правило direct требует outbound с тегом direct в XRAY STUDIO.</div></section></div>'+
+ '</section></div>'+ 
  '<div class="geo-foot"><output class="geo-feedback" aria-live="polite"></output><div class="geo-buttons"><button type="button" class="gh geo-refresh" data-geo-refresh>↻ Обновить сейчас</button><button type="submit" class="btn geo-save">Сохранить настройки</button></div></div></form>';
  modal(html,'geo-modal');
  const dialog=document.querySelector('dialog#dlg');
