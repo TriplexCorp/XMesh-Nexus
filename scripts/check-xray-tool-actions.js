@@ -67,12 +67,13 @@ function harness(documentValue,{confirmValue=true,confirmHandler,requestValues,r
   }
  };
  vm.runInNewContext(source,environment,{filename:'xray-studio-tools.js'});
- win.XMeshJsonTools.setup(root,{
+ const toolHandle=win.XMeshJsonTools.setup(root,{
    toast:text=>calls.push(text),
    realityKeys:realityKeys||(async()=>({privateKey:NEW_PRIVATE,publicKey:NEW_PUBLIC}))
  });
  return {
    area,host,status,issue,issueMessage,calls,confirmCalls,clipboard,
+   refresh(){toolHandle.refresh()},
    selectInbound(index){
     inboundSelector.value=String(index);
     host.change({target:{value:String(index),matches:q=>q==='[data-tool-inbound]'}});
@@ -112,6 +113,14 @@ async function run(){
  const protocolEdit=harness(hysteria,{requestValues:{json:'{"version":2,"users":[],"customProtocolSetting":42}'}});
  await protocolEdit.run('protocol-config');
  assert.equal(protocolEdit.doc().inbounds[0].settings.customProtocolSetting,42);
+ const newTLS=JSON.parse(JSON.stringify(hysteria));newTLS.inbounds[0].streamSettings.security='none';
+ const enableTLS=harness(newTLS,{requestValues:{json:'{"certificates":[]}'}});
+ await enableTLS.run('tls');
+ assert.equal(enableTLS.doc().inbounds[0].streamSettings.security,'tls','Hysteria TLS setup enables security without changing protocol');
+ const importedTemplate=harness(sample());importedTemplate.area.value=JSON.stringify(hysteria,null,2);
+ importedTemplate.refresh();
+ assert.ok(importedTemplate.host.innerHTML.includes('data-tool="hysteria-config"'),'Programmatic template loading refreshes tools without synthetic typing');
+
  const changed=harness(hysteria);
  changed.area.value=JSON.stringify(sample(),null,2);changed.area.dispatchEvent({type:'input'});
  assert.ok(changed.host.innerHTML.includes('data-tool="reality"'),'VLESS tools appear on template switch');
