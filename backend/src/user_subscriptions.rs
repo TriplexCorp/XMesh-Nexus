@@ -678,7 +678,7 @@ fn permitted_inbound_tags(
         .cloned()
         .unwrap_or_default();
     let mut tags = std::collections::HashSet::new();
-    for squad in &squads {
+    for squad in squads {
         if !ids
             .iter()
             .any(|id| id.as_i64() == squad.get("id").and_then(Value::as_i64))
