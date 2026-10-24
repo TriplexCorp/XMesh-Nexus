@@ -35,7 +35,9 @@ sandbox.document={
 mount();
 const replacementLink=appended.find(el=>el.tagName==='link');
 assert(replacementLink,'Routing must load a missing or misdirected CSS asset');
-assert.equal(replacementLink.href,'/client-routing.css?v=20261024-unified-route-v12');
+const currentCssVersion=source.match(/const CSS_VERSION = '([^']+)'/)?.[1];
+assert(currentCssVersion,'Client routing stylesheet version must be explicit');
+assert.equal(replacementLink.href,'/client-routing.css?v='+currentCssVersion);
 assert.equal(oldLink.removed,true);
 
 for(const key of ['data-cr-save','data-cr-add','data-cr-list','Клиентская маршрутизация'])
