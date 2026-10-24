@@ -156,10 +156,10 @@ jobs:
         run: node scripts/check-xray-endpoint-autofill.js
       - name: Test real per-user client JSON generation and Reality X25519 derivation
         run: node scripts/test-client-config.js
-      # Run source-contract assertions before rustfmt mutates the CI checkout.
-      # Runtime Rust tests and Clippy still run before the Docker build.
-      - name: Format Rust sources
-        run: cargo fmt --manifest-path backend/Cargo.toml
+      # Formatting is a verification gate: CI must not silently rewrite the checkout.
+      # Keep source-contract checks above this step so they inspect the committed code.
+      - name: Verify committed Rust formatting
+        run: cargo fmt --manifest-path backend/Cargo.toml --all -- --check
       - name: Test and lint (strict Clippy: all targets, pedantic, nursery)
         run: |
           cargo test --manifest-path backend/Cargo.toml --all-targets
