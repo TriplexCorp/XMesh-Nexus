@@ -1859,8 +1859,7 @@ async fn ingest_node_metrics(
     }
     if !metrics.is_object()
         || serde_json::to_vec(&metrics)
-            .map(|v| v.len())
-            .unwrap_or(usize::MAX)
+            .map_or(usize::MAX, |v| v.len())
             > 32 * 1024
     {
         return Err(ApiError::new(
@@ -3296,7 +3295,7 @@ mod tests {
         for count in 1..=8 {
             let mut path = String::new();
             for index in 1..=count {
-                path.push_str(&format!("/{{part{index}}}"));
+                let _ = std::fmt::Write::write_fmt(&mut path, format_args!("/{{part{index}}}"));
             }
             path.push_str("/{token}");
             app = app.route(&path, get(|| async { StatusCode::OK }));
