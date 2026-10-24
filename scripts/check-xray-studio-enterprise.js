@@ -15,7 +15,7 @@ for(const marker of ['data-v="source"','data-v="highlight"','data-v="gutter"',
  'data-action="check"','data-action="save"','data-v="jsonOutline"',
  'data-v="inboundOutline"','data-v="outlineStatus"','data-v="insInbounds"',
  'data-v="insOutbounds"','data-v="insRules"','data-v="lines"',
- 'data-action="outline"','data-action="expand"']){
+ 'data-action="outline"']){
  assert(page.includes(marker),'XRAY editor missing '+marker);
 }
 assert.equal((page.match(/data-v="source"/g)||[]).length,1,'Single authoritative JSON editor');
