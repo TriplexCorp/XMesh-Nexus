@@ -685,6 +685,7 @@ function openComposer(){
     keys={privateKey:pair.privateKey,shortId:Array.from(random,b=>b.toString(16).padStart(2,'0')).join('')};
     publicKey=pair.publicKey;
    }
+   if(overlay.hidden||!scope.isConnected)throw Error('Конструктор был закрыт. JSON оставлен без изменений.');
    if(input.value!==originalSource||JSON.stringify(opts)!==selectionSignature)throw Error('JSON или параметры изменились во время генерации. Черновик не заменён.');
    const activeJson=chosen.mode==='add'?JSON.parse(originalSource):null;
    const documentValue=engine.buildDocument(chosen,activeJson,{shadowsocksPassword,realityKeys:keys});
