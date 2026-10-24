@@ -305,7 +305,7 @@ fn direct_host_node<'a>(host: &Value, profile: &Value, nodes: &'a [Value]) -> Op
  let pins=host.get("nodes").and_then(Value::as_array).filter(|v|!v.is_empty());
  let eligible:Vec<&Value>=nodes.iter().filter(|node|{
   if node.get("disabled").and_then(Value::as_bool)==Some(true)
-    || node.get("profileId")!=profile.get("id"){return false}
+    || !same_record_id(node.get("profileId"),profile.get("id")){return false}
   if let Some(ids)=pins
     && !ids.iter().any(|id|same_record_id(Some(id),node.get("id"))){return false}
   ["addr","externalAddress","publicAddress"].iter()
