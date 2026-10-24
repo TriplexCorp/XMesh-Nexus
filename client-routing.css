@@ -102,3 +102,31 @@
 #client-route-root .client-route-json-error{margin:0;color:#ff8f98;font-size:12px;line-height:1.5}
 #client-route-root .client-route-form-blocks[hidden]{display:none!important}
 @media(max-width:720px){#client-route-root .client-route-json-block{padding:14px}#client-route-root .client-route-json-block textarea{min-height:300px;font-size:12px}}
+
+/* Client routing cards */
+#client-route-root .client-route-main-card{border:0;background:transparent;overflow:visible}
+#client-route-root .client-route-main-head{padding:8px 0 20px;margin-bottom:20px;background:transparent}
+#client-route-root .client-route-main-body{padding:0}
+#client-route-root .client-route-list{gap:24px}
+#client-route-root .client-route-profile{background:transparent;border:0;overflow:visible}
+#client-route-root .client-route-profile-head{border:1px solid var(--ln);border-radius:16px;background:var(--s1);padding:20px;margin-bottom:15px}
+#client-route-root .client-route-count{width:48px;height:48px;border-radius:13px;font-size:23px;background:color-mix(in srgb,var(--a) 14%,var(--s2))}
+#client-route-root .client-route-heading input{font-size:18px;font-weight:800;background:transparent;border-color:transparent}
+#client-route-root .client-route-profile-subtitle{font-size:11px;color:var(--mu);font-weight:400}
+#client-route-root .client-route-assigned-count{border:1px solid var(--ln);padding:9px 12px;border-radius:10px;font-size:12px}
+#client-route-root .client-route-assigned-count b{margin-left:6px;color:var(--a)}
+#client-route-root .client-route-tabs{display:flex;gap:6px;border-bottom:1px solid var(--ln);margin-bottom:16px}
+#client-route-root .client-route-tabs button{padding:14px 20px;background:transparent;border:1px solid transparent;border-bottom:2px solid transparent;color:var(--mu);font-weight:700;border-radius:11px 11px 0 0}
+#client-route-root .client-route-tabs button.is-active{background:color-mix(in srgb,var(--a) 10%,var(--s1));color:var(--tx);border-color:var(--ln);border-bottom-color:var(--a)}
+#client-route-root .client-route-tabs button span{padding:3px 7px;border-radius:99px;background:var(--s2);margin-left:7px}
+#client-route-root .client-route-block{border:1px solid var(--ln)!important;border-radius:16px;background:var(--s1);padding:22px;margin-bottom:16px}
+#client-route-root .client-route-section-heading h3{font-size:16px}
+#client-route-root .client-route-source-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#client-route-root .client-route-source-tools input{width:230px}
+#client-route-root .client-route-sources{grid-template-columns:repeat(auto-fill,minmax(min(240px,100%),1fr));gap:12px}
+#client-route-root .client-route-source{min-height:92px;align-items:flex-start;padding:16px}
+#client-route-root .client-route-rule{min-height:88px}
+#client-route-root .client-route-rule-count{color:var(--a);font-size:12px}
+#client-route-root .client-route-json-block{border:1px solid var(--ln);border-radius:16px;background:var(--s1);margin-bottom:16px}
+#client-route-root .client-route-savebar{border:1px solid var(--ln);border-radius:13px;margin-top:16px}
+@media(max-width:720px){#client-route-root .client-route-source-tools input{width:100%}#client-route-root .client-route-tabs button{padding:11px;font-size:12px}}
