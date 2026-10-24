@@ -144,6 +144,8 @@ Principal directories/files: `app.js`, `styles.css`, `xray-studio-v4.js`, `subsc
 
 ## Release maturity and verification
 
+Tracked improvement plan: **[Enterprise hardening roadmap](docs/ENTERPRISE_ROADMAP.md)** — six stages with acceptance criteria and current status.
+
 XMesh Nexus is under **active development**. Unit tests, cryptographic signatures, and administration features **are not a claim of certified enterprise or high-availability readiness**. `compose.yaml` deploys one API, one PostgreSQL/TimescaleDB instance and one Redis instance, without automatic database failover. Redis disk persistence is disabled (`appendonly no`, `save ""`): treat it as ephemeral and verify that temporary-state loss cannot undermine policy enforcement.
 
 Before production use and after every update:
