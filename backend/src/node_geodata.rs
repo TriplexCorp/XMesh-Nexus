@@ -1,4 +1,4 @@
-//! Per-node GeoData policy. Only source metadata enters the signed node policy;
+//! Per-node `GeoData` policy. Only source metadata enters the signed node policy;
 //! the node downloads assets itself and validates the complete Xray configuration.
 use crate::ApiError;
 use axum::http::StatusCode;
@@ -28,7 +28,9 @@ fn source_url(url: &str) -> Result<String, ApiError> {
     let host = parsed.host_str().unwrap();
     if host.parse::<std::net::IpAddr>().is_ok()
         || host.eq_ignore_ascii_case("localhost")
-        || host.ends_with(".local")
+        || std::path::Path::new(host)
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("local"))
         || host.ends_with(".internal")
         || !host.contains('.')
     {
