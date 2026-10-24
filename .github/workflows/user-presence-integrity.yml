@@ -42,4 +42,4 @@ jobs:
       - name: Exercise actual Python collector and producer-time verification
         run: python3 scripts/test-node-presence.py
       - name: Compile and test Rust API with signed telemetry gate
-        run: cargo test --manifest-path backend/Cargo.toml --bin xmesh-api --locked
+        run: cargo test --manifest-path backend/Cargo.toml --bin xmesh-api
