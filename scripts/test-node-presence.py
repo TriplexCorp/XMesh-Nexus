@@ -13,7 +13,7 @@ import tempfile
 import time
 
 agent = pathlib.Path("deploy/node-metrics-agent.sh").read_text(encoding="utf-8")
-assert agent.count("# Distinct users with verified Xray byte increases") == 1
+assert agent.count('online_count="$(printf \\'%s\\' "$payload" | python3 -c \\'') == 1
 assert agent.count("curl --fail --silent --show-error --max-time 12") == 1
 
 snapshot_start = 'snapshot_fragment="$(python3 - "$SNAPSHOT" "$XMESH_NODE_ID" <<\'PY\'\n'
