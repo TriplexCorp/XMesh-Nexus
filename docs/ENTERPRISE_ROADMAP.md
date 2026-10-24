@@ -19,6 +19,8 @@ This roadmap tracks verified improvements, not feature claims. A stage is comple
 - [ ] Establish a passing baseline on `main` for Node.js checks, Rust formatting, all-target tests, strict Clippy, Docker build and API integration.
 - [ ] Replace brittle source-regex checks where possible with observable, behavior-based tests; retain security-contract checks that express real invariants.
   - [x] IP rotation UI validation: execute the real validation helpers against valid, duplicate, invalid, insufficient and oversized pools instead of requiring an exact source layout (`a676ac7`).
+  - [x] Live-node status contract: execute the actual state function for healthy, stale, disabled, stopped Xray/router and unknown states (`db52057`).
+  - [x] Xray version rendering contract: assert `textContent` sink and guard against directly inserting untrusted version via `innerHTML` (`f66bdd3`).
   - [ ] Extend this approach to other UI source-contract tests and integration behaviors.
 - [ ] Ensure required branch protection prevents merging when those checks fail.
 - [ ] Document reproducible release / rollback and evidence from a clean checkout.
