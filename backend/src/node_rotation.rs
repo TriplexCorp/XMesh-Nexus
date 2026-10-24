@@ -19,7 +19,7 @@ fn invalid(message: &str) -> ApiError {
     ApiError::new(StatusCode::BAD_REQUEST, message)
 }
 
-pub(crate) fn parse_pool(value: &Value) -> Result<Vec<IpAddr>, ApiError> {
+pub fn parse_pool(value: &Value) -> Result<Vec<IpAddr>, ApiError> {
     let Some(raw) = value.get("rotationIps") else {
         return Ok(Vec::new());
     };
@@ -57,7 +57,7 @@ pub(crate) fn parse_pool(value: &Value) -> Result<Vec<IpAddr>, ApiError> {
     Ok(addresses)
 }
 
-pub(crate) fn validate_node(value: &Value) -> Result<(), ApiError> {
+pub fn validate_node(value: &Value) -> Result<(), ApiError> {
     let enabled = match value.get("rotationEnabled") {
         None => false,
         Some(Value::Bool(value)) => *value,
@@ -83,7 +83,9 @@ pub(crate) fn validate_node(value: &Value) -> Result<(), ApiError> {
 }
 
 fn choose(pool: &[IpAddr], cursor: i64, last_ip: &str) -> (usize, String) {
-    let mut index = cursor.rem_euclid(pool.len() as i64) as usize;
+    let pool_len = i64::try_from(pool.len()).expect("IP rotation pool is bounded to 256 addresses");
+    let mut index = usize::try_from(cursor.rem_euclid(pool_len))
+        .expect("nonnegative rotation index fits in usize");
     if pool.len() > 1 && pool[index].to_string() == last_ip {
         index = (index + 1) % pool.len();
     }
@@ -92,7 +94,7 @@ fn choose(pool: &[IpAddr], cursor: i64, last_ip: &str) -> (usize, String) {
 
 /// Called exactly once per *actual subscription refresh* by a subscription
 /// generator. Safe across panel replicas; do not call it for UI previews.
-pub(crate) async fn resolve_address(
+pub async fn resolve_address(
     state: &AppState,
     node_id: i64,
     user_id: i64,
@@ -103,7 +105,7 @@ pub(crate) async fn resolve_address(
 /// Public subscriptions are sticky for a bounded interval, while the
 /// administrator's explicit /rotation/next endpoint advances immediately.
 /// The same row lock serializes all selections across replicas.
-pub(crate) async fn resolve_subscription_address(
+pub async fn resolve_subscription_address(
     state: &AppState,
     node_id: i64,
     user_id: i64,
@@ -150,7 +152,9 @@ async fn resolve_address_inner(
     let now_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
-        .as_millis() as i64;
+        .as_millis()
+        .try_into()
+        .unwrap_or(i64::MAX);
     if user_status(&user, now_ms) != "ACTIVE" {
         return Err(ApiError::new(
             StatusCode::FORBIDDEN,
@@ -201,7 +205,7 @@ async fn resolve_address_inner(
     )
     .bind(node_id)
     .bind(user_id)
-    .bind((chosen_index as i64) + 1)
+    .bind(i64::try_from(chosen_index).expect("bounded IP pool index") + 1)
     .bind(&address)
     .execute(&mut *tx)
     .await?;
@@ -211,13 +215,13 @@ async fn resolve_address_inner(
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct RotateRequest {
+pub struct RotateRequest {
     user_id: i64,
 }
 
 /// Session-protected integration endpoint; never publicly expose IDs as access tokens.
 /// The subscription server must call the resolver on an authenticated code path.
-pub(crate) async fn rotate_next(
+pub async fn rotate_next(
     State(state): State<AppState>,
     Extension(actor): Extension<auth::AuthUser>,
     Path(node_id): Path<i64>,
