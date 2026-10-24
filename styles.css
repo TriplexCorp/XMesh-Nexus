@@ -5034,3 +5034,27 @@ dialog.user-modal .user-pane-settings .user-inline-editor{
 dialog.user-modal .user-pane-settings .user-editor-actions{
   margin-top:auto;padding-top:.85rem;
 }
+
+/* Observers: monitoring-only UI. Backend enforces every permission; these
+   rules prevent presenting commands that can never succeed. */
+html[data-access-role="viewer"] :is(
+  #addb,#restart,#pal,#bell,#bulk,
+  [data-nu],[data-exp],[data-ne],[data-core-update],[data-core-refresh],
+  [data-node-bootstrap],[data-nr],[data-xray-update],[data-agent-update],
+  [data-node-geodata],[data-node-routing],[data-node-traffic-reset],
+  [data-node-rotate],[data-rotate],[data-node-create-host],
+  [data-a="del"],[data-a="tog"],[data-a="rst"],
+  [data-user-sub-copy],[data-user-sub-revoke],[data-user-sub-new],
+  .user-save-button,.user-editor-actions,
+  .user-id-copy,.node-actions,.nodes-page .acts,
+  .bulk-actions,.users-selection-toolbar
+){display:none!important}
+html[data-access-role="viewer"] dialog.user-modal .user-pane-access
+  :is(button,input,select,textarea){pointer-events:none}
+html[data-access-role="viewer"] dialog.user-modal .user-inline-editor
+  :is(input,textarea,select){opacity:1;cursor:default}
+html[data-access-role="viewer"] dialog.user-modal .user-inline-editor
+  :is(input,textarea,select):focus{outline:none}
+html[data-access-role="viewer"] dialog.user-modal .user-head-actions button[data-x]{
+  pointer-events:auto;
+}
