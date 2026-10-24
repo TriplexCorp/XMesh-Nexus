@@ -355,8 +355,16 @@ function open({node,nodes,hosts,profiles,modal,updateNode,apiRequest,notify,afte
   if(button.hasAttribute('data-route-check')){void persist(true);return}
   if(button.hasAttribute('data-route-open-geodata')){
    // Do not silently discard draft changes when opening another service editor.
-   if(draft.dirty){status('Сначала сохраните маршруты, затем откройте GeoData из карточки узла.');return}
-   status('Файлы GeoData управляются отдельной кнопкой на карточке узла.');
+   if(draft.dirty){
+    status('Сначала сохраните маршруты, прежде чем открывать GeoData.');
+    return;
+   }
+   if(window.XMeshNodeGeoData?.open){
+    window.XMeshNodeGeoData.open({node,modal,apiRequest,updateNode,notify,afterSave});
+   }else{
+    status('Окно GeoData не загружено. Проверьте сборку панели.');
+   }
+   return;
   }
  });
  render();
