@@ -73,7 +73,7 @@
     return values.map(([value,label])=>'<option value="'+escapeHTML(value)+'"'+(value===selected?' selected':'')+'>'+escapeHTML(label)+'</option>').join('');
   }
 
-  const CSS_VERSION = '20261024-client-cards-v9';
+  const CSS_VERSION = '20261024-client-cards-v10';
   function ensureStylesheet() {
     const file = 'client-routing.css';
     const existing = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
@@ -218,9 +218,9 @@
         '<header class="crx-dialog-header"><div class="crx-dialog-identity"><div class="crx-dialog-mark">'+icon('route')+'</div>'+
         '<div><span class="crx-dialog-kicker">РЕДАКТОР МАРШРУТИЗАЦИИ</span><h2 id="crx-dialog-title">'+escapeHTML(p.name||'Новый шаблон')+'</h2></div></div>'+
         '<button type="button" class="crx-icon-btn crx-close" data-cr-close title="Закрыть" aria-label="Закрыть">'+icon('close')+'</button></header>'+
-        '<nav class="crx-tabs" aria-label="Разделы маршрутизации">'+
+        '<nav class="crx-tabs" role="tablist" aria-label="Разделы маршрутизации">'+
           [['sources','Назначения','server'],['rules','Правила','settings'],['json','JSON','code']].map(([id,label,symbol])=>
-          '<button type="button" data-cr-tab="'+id+'" class="'+(activeTab===id?'is-current':'')+'" aria-current="'+(activeTab===id?'page':'false')+'" aria-pressed="'+(activeTab===id?'true':'false')+'">'+
+          '<button type="button" data-cr-tab="'+id+'" role="tab" aria-selected="'+(activeTab===id?'true':'false')+'" class="'+(activeTab===id?'is-current':'')+'" aria-current="'+(activeTab===id?'page':'false')+'" aria-pressed="'+(activeTab===id?'true':'false')+'">'+
           icon(symbol)+'<span class="crx-tab-label">'+label+'</span>'+(id==='sources'?'<span class="crx-tab-count">'+(p.servers||[]).length+'</span>':id==='rules'?'<span class="crx-tab-count">'+(p.rules||[]).length+'</span>':'')+'</button>').join('')+
         '</nav><main class="crx-dialog-body">'+
         (activeTab==='sources'?
@@ -379,7 +379,7 @@
           if(checkPending())return;
           activeTab=el.dataset.crTab;
           if(activeTab==='json')jsonValue=JSON.stringify(current(),null,2);
-          jsonError='';editorRefresh(false);return;
+          jsonError='';editorRefresh(false);root.querySelector('[data-cr-tab="'+activeTab+'"]')?.focus();return;
         }
         if(el.hasAttribute('data-cr-select-all')||el.hasAttribute('data-cr-select-none')){
           const p=current();if(!p)return;
