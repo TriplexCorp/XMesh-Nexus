@@ -100,76 +100,121 @@ const repairIds=(list,append)=>{
  if(append||!list.length)return [...list,newShortId(used)];
  return [...list];
 };
+// Reality is a configuration action, never an implicit key-rotation button.
+// Server-only fields are changed only after the user reviews the full form.
+const realityTarget=value=>{
+ const match=String(value||'').trim().match(/^(\[[0-9a-f:.]+\]|[a-z0-9.-]+):(\d{1,5})$/i);
+ if(!match||Number(match[2])<1||Number(match[2])>65535||match[1].includes('..')||match[1].startsWith('.')||match[1].endsWith('.'))return null;
+ return {host:match[1],port:Number(match[2])};
+};
+const realityList=value=>String(value||'').split(/[,;\n]+/).map(x=>x.trim()).filter(Boolean).map(x=>x==='""'?'':x);
+const realityListText=values=>Array.isArray(values)?values.map(x=>x===''?'""':String(x)).join(', '):'';
+const checkRealityForm=values=>{
+ const parsed=realityTarget(values.target);
+ if(!parsed)return 'Укажите Reality target в формате домен:порт (например, example.com:443).';
+ const sni=realityList(values.serverNames);
+ const defaultSni=parsed.host.startsWith('[')||/^\d+\.\d+\.\d+\.\d+$/.test(parsed.host)?'':parsed.host;
+ const names=sni.length?sni:(defaultSni?[defaultSni]:[]);
+ if(!names.length)return 'Для IP-адреса target укажите допустимые SNI вручную.';
+ if(names.length>32||names.some(n=>n!==''&&(!/^[a-z0-9.-]+$/i.test(n)||n.includes('..')||n.startsWith('.')||n.endsWith('.'))))return 'SNI должны быть доменами без * и пробелов, максимум 32.';
+ if(new Set(names.map(n=>n.toLowerCase())).size!==names.length)return 'Уберите повторяющиеся SNI.';
+ const ids=realityList(values.shortIds);
+ if(ids.length>64)return 'Допускается не более 64 Short ID.';
+ if(ids.some(id=>!shortIdValid(id)))return 'Short ID: от 0 до 16 шестнадцатеричных символов, чётная длина. Для пустого используйте "".';
+ if(new Set(ids.map(id=>id.toLowerCase())).size!==ids.length)return 'Уберите повторяющиеся Short ID.';
+ return '';
+};
 async function setReality(){
  try{
   ensureDialogs();
   const selected=await chooseInbound();
   if(!selected)return;
   if(area.value!==selected.source){notify('JSON изменился, повторите настройку Reality.');return}
-  const doc=parse(),inbound=getInbound(doc,selected.index);
+  const inbound=getInbound(parse(),selected.index);
   const stream=inbound.streamSettings||{},transport=stream.network||'raw';
-  if(!['raw','xhttp','grpc'].includes(transport))throw Error('Для этого транспорта Reality здесь не поддерживается. Используйте RAW, XHTTP или gRPC.');
-  const existing=stream.realitySettings||{};
-  let target=existing.target||existing.dest||'';
-  if(!target){
-   const result=await dialog.request({
-    title:'Настройка Reality X25519',
-    description:'Укажите адрес назначения Reality. Создание ключей не изменяет сервер, пока конфигурация не будет сохранена.',
-    confirmLabel:'Продолжить',
-    fields:[{name:'target',label:'Reality target',wide:true,required:true,value:'www.microsoft.com:443',placeholder:'example.com:443',help:'HTTPS-домен и порт назначения. Проверьте его доступность.',validate:v=>!/^([a-zA-Z0-9.-]+):(\d{1,5})$/.test(v)?'Введите домен:порт':''}]
-   });if(!result)return;target=result.target;
-  }
-  target=target.trim();
-  const match=target.match(/^([a-zA-Z0-9.-]+):(\d{1,5})$/);
-  if(!match||Number(match[2])<1||Number(match[2])>65535||!match[1].includes('.')||match[1].includes('..'))throw Error('Reality target должен иметь формат домен:порт');
-  const savedSni=Array.isArray(existing.serverNames)?existing.serverNames.filter(x=>typeof x==='string'&&x.trim()):[];
-  const sni=savedSni.length?savedSni:[match[1]];
-  const oldPrivate=typeof existing.privateKey==='string'?existing.privateKey.trim():'';
-  const usablePrivate=oldPrivate.length>0&&!/REPLACE|YOUR[_-]?KEY|example/i.test(oldPrivate);
-  let generate=!usablePrivate;
-  if(usablePrivate){
-   generate=await dialog.confirm({
-    title:'Ротация ключей Reality',
-    description:'В этом inbound уже есть privateKey. Смена ключа приведёт к отключению клиентов, которые используют старый publicKey.',
-    notice:'Без необходимости рекомендуем сохранить существующую пару ключей.',
-    confirmLabel:'Создать новые ключи',
-    cancelLabel:'Сохранить текущий ключ',
-    danger:true
+  if(!['raw','xhttp','grpc'].includes(transport))throw Error('Reality поддерживает RAW, XHTTP и gRPC. Текущий транспорт: '+transport+'.');
+  const existing=stream.realitySettings??{};
+  if(!existing||typeof existing!=='object'||Array.isArray(existing))throw Error('realitySettings должен быть объектом.');
+  const privateKey=typeof existing.privateKey==='string'?existing.privateKey.trim():'';
+  const hasKey=Boolean(privateKey&&!/REPLACE|YOUR[_-]?KEY|example/i.test(privateKey));
+  const currentTarget=typeof existing.target==='string'?existing.target:typeof existing.dest==='string'?existing.dest:'';
+  const options=hasKey?
+   [{value:'keep',label:'Сохранить действующий privateKey (рекомендуется)'},{value:'rotate',label:'Сгенерировать новый privateKey (ротация)'}]:
+   [{value:'generate',label:'Сгенерировать новую пару X25519'}];
+  const response=await dialog.request({
+   eyebrow:'XRAY STUDIO / REALITY',
+   title:'Настройка REALITY',
+   description:'Inbound: '+(inbound.tag||'#'+(selected.index+1))+' · '+String(transport).toUpperCase()+'. Заполните серверные параметры; до подтверждения JSON не изменится.',
+   confirmLabel:'Применить к JSON',
+   notice:hasKey?'Существующий privateKey будет сохранён, если вы явно не выберете ротацию. Смена ключа потребует обновления клиентских подключений.':'Новая пара X25519 генерируется только после нажатия «Применить к JSON».',
+   fields:[
+    {name:'target',label:'Reality target · домен:порт',wide:true,required:true,value:currentTarget,
+     placeholder:'example.com:443',help:'Сервер назначения для маскировки. Используйте проверенный HTTPS-хост, не пример из подсказки.',
+     validate:value=>realityTarget(value)?'':'Введите корректный адрес и порт 1–65535.'},
+    {name:'serverNames',label:'Допустимые SNI (через запятую)',wide:true,value:realityListText(existing.serverNames),
+     placeholder:'example.com, www.example.com',help:'Если поле пустое, будет использован домен из target. Сохраняются все указанные имена.'},
+    {name:'shortIds',label:'Short ID (через запятую)',wide:true,value:realityListText(existing.shortIds),
+     placeholder:'Пусто — создать случайный Short ID',help:'Существующие ID сохраняются. Для пустого ID укажите "". Некорректные ID исправьте здесь.'},
+    {name:'keyMode',label:'Ключ X25519',type:'select',wide:true,value:hasKey?'keep':'generate',options}
+   ],
+   validate:checkRealityForm
+  });
+  if(!response)return;
+  const formError=checkRealityForm(response);
+  if(formError)throw Error(formError);
+  if(area.value!==selected.source){notify('JSON изменился, пока открывалось окно Reality. Повторите действие.');return}
+  const parsedTarget=realityTarget(response.target);
+  const enteredNames=realityList(response.serverNames);
+  const defaultSni=parsedTarget.host.startsWith('[')||/^\d+\.\d+\.\d+\.\d+$/.test(parsedTarget.host)?'':parsedTarget.host;
+  const sni=enteredNames.length?enteredNames:[defaultSni];
+  const enteredIds=realityList(response.shortIds);
+  const shortIds=enteredIds.length?enteredIds:[hex(8)];
+  const rekey=response.keyMode==='rotate';
+  const generate=response.keyMode==='generate'||rekey;
+  if(rekey){
+   const approved=await dialog.confirm({
+    title:'Заменить ключ REALITY?',
+    description:'Клиенты с действующим public key потеряют подключение до обновления подписки.',
+    notice:'Существующий privateKey будет заменён только после подтверждения. Отмена оставит JSON без изменений.',
+    confirmLabel:'Сгенерировать и заменить',cancelLabel:'Не менять ключ',danger:true
    });
+   if(!approved)return;
   }
-  const list=existing.shortIds??[];
-  let ids=repairIds(list,false);
-  if(JSON.stringify(list)!==JSON.stringify(ids)){
-   const allowed=await dialog.confirm({
-    title:'Исправить Short ID?',
-    description:'В выбранном Reality есть неверные или повторяющиеся Short ID. Можно заменить только повреждённые значения.',
-    notice:'Для клиентов, использующих заменённые ID, потребуется обновление подключения.',
-    confirmLabel:'Исправить значения',
-    cancelLabel:'Отмена'
-   });
-   if(!allowed)return;
-  }
-  if(area.value!==selected.source){notify('JSON изменился, пока окно было открыто. Никакие ключи не заменены.');return}
+  if(generate&&typeof realityKeys!=='function')throw Error('Генератор ключей X25519 недоступен.');
+  if(area.value!==selected.source){notify('JSON был изменён. Настройка Reality не применена.');return}
+  if(generate)status('Генерация X25519…');
   const keys=generate?await realityKeys():null;
-  if(area.value!==selected.source){notify('JSON изменился при генерации Reality. Повторите действие.');return}
-  if(generate&&(!keys?.privateKey||!keys?.publicKey))throw Error('Генератор X25519 не вернул пару ключей.');
-  const ok=mutate(d=>{
-   const updated=getInbound(d,selected.index);
-   if(updated.tag!==selected.tag)throw Error('Выбранный inbound изменился');
-   const ss=updated.streamSettings??={};ss.security='reality';
+  if(generate&&(typeof keys?.privateKey!=='string'||!keys.privateKey||typeof keys?.publicKey!=='string'||!keys.publicKey))throw Error('Генератор X25519 не вернул корректную пару ключей.');
+  if(area.value!==selected.source){notify('JSON изменился во время генерации ключей Reality. Повторите действие.');return}
+  const applied=mutate(doc=>{
+   const updated=getInbound(doc,selected.index);
+   if(updated.tag!==selected.tag)throw Error('Выбранный inbound изменился.');
+   const ss=updated.streamSettings??={};
+   if(!['raw','xhttp','grpc'].includes(ss.network||'raw'))throw Error('Транспорт inbound изменился.');
    const rs=ss.realitySettings??={};
-   if(!rs.target&&!rs.dest)rs.target=target;
-   rs.show=rs.show??false;
-   if(!Array.isArray(rs.serverNames)||!rs.serverNames.length)rs.serverNames=sni;
-   rs.shortIds=ids;
+   if(!rs||typeof rs!=='object'||Array.isArray(rs))throw Error('realitySettings должен быть объектом.');
+   ss.security='reality';
+   // target and dest are server aliases; do not leave conflicting values.
+   if(Object.hasOwn(rs,'dest')&&!Object.hasOwn(rs,'target'))rs.dest=response.target.trim();
+   else {rs.target=response.target.trim();if(Object.hasOwn(rs,'dest'))delete rs.dest;}
+   if(rs.show===undefined)rs.show=false;
+   rs.serverNames=sni;
+   rs.shortIds=shortIds;
    if(generate)rs.privateKey=keys.privateKey;
-  },'Reality параметры обновлены');
-  if(!ok)return;
+  },generate?'Новая пара Reality X25519 добавлена в черновик':'Параметры Reality применены к черновику');
+  if(!applied)return;
   if(generate){
-   try{await navigator.clipboard.writeText(keys.publicKey);notify('Reality настроен. Public key скопирован; проверьте конфигурацию ядром.')}
-   catch{await dialog.request({title:'Public Key Reality',description:'Скопируйте публичный ключ для клиентов.',confirmLabel:'Готово',fields:[{name:'publicKey',label:'Public key',value:keys.publicKey,readonly:true,wide:true,trim:false}]})}
-  }else notify('Действующий privateKey сохранён, проверьте конфигурацию ядром.');
- }catch(e){status('Ошибка: '+e.message);notify(e.message)}
+   try{
+    await navigator.clipboard.writeText(keys.publicKey);
+    notify('Новый Reality public key скопирован. Сохраните профиль и проверьте JSON через Xray-core.');
+   }catch{
+    await dialog.request({
+     title:'Public key для клиентов',description:'Скопируйте ключ вручную. Он соответствует новому серверному privateKey.',
+     confirmLabel:'Готово',fields:[{name:'publicKey',label:'Public key',value:keys.publicKey,readonly:true,wide:true,trim:false}]
+    });
+   }
+  }else notify('Reality обновлён без изменения privateKey. Сохраните профиль после проверки Xray-core.');
+ }catch(e){status('Ошибка Reality: '+e.message);notify(e.message)}
 }
 
 const invalidRealityIds=data=>{
