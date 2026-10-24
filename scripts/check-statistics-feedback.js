@@ -29,4 +29,18 @@ assert.match(sec,/announce\('Настройки безопасности усп�
 assert.match(sec,/announce\(error\.textContent,'error'\)/);
 assert.match(app,/toast-state-icon/);
 assert.match(sec,/if\(location\.pathname!==patch\.dashboardPath\)/);
+// Presence requires fresh authenticated counter deltas; guard against duplicated handlers.
+assert.match(backend,/const USER_ONLINE_WINDOW_MS:\s*i64\s*=\s*45_000/);
+assert.match(backend,/async fn get_user_presence\(/);
+assert.match(backend,/userStatsAccepted/);
+assert.match(backend,/latest_source_ms\.is_none_or/);
+assert.match(backend,/sample\.uplink_bytes>previous\.last_uplink_bytes/);
+assert.match(backend,/sample\.downlink_bytes>previous\.last_downlink_bytes/);
+assert.equal((backend.match(/async fn ingest_node_metrics\(/g)||[]).length,1);
+assert.equal((backend.match(/async fn get_user_presence\(/g)||[]).length,1);
+assert.equal((backend.match(/async fn get_user_traffic\(/g)||[]).length,1);
+assert.equal((agent.match(/# Distinct users with a verified Xray byte delta/g)||[]).length,1);
+assert.equal((agent.match(/signed_file=/g)||[]).length,1);
+assert.match(app,/\/api\/v1\/users\/presence/);
+assert.match(app,/presenceFeedHealthy&&st\(u\)==='ACTIVE'/);
 console.log('Statistics view, real signed steal-time and save-confirmation contracts: PASS');
