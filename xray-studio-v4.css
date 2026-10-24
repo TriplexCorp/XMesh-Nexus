@@ -6,6 +6,7 @@
  --vround:var(--ui-control-radius,10px);--vpanelround:var(--ui-radius,18px);
  --vcode:ui-monospace,"IBM Plex Mono",SFMono-Regular,Consolas,"Liberation Mono",monospace;
  display:flex;flex-direction:column;gap:.85rem;width:100%;min-width:0;
+ container:sv-studio-workspace / inline-size;
  color:var(--vtext);font-size:.875rem;line-height:1.5;
 }
 .sv-studio *,.sv-studio *::before,.sv-studio *::after{box-sizing:border-box}
@@ -340,9 +341,8 @@
 }
 .sv-template-choice strong{font-size:.83rem}
 .sv-template-choice small{font-size:.7rem;font-weight:450;color:var(--vmute)}
-.sv-studio .sv-outline-hidden .sv-workspace{grid-template-columns:1fr}
 .sv-studio.sv-expand::before{
- content:"";position:fixed;inset:0;z-index:1199;pointer-events:none;
+ content:"";position:fixed;inset:0;z-index:1199;pointer-events:auto;
  background:var(--xm-modal-dim,rgba(2,7,12,.72));
  backdrop-filter:blur(var(--xm-modal-blur,11px));-webkit-backdrop-filter:blur(var(--xm-modal-blur,11px))
 }
@@ -367,12 +367,12 @@
 .sv-studio .sv-constructor nav.sv-tabs{display:flex;gap:.3rem;overflow-x:auto}
 .sv-studio .sv-constructor nav.sv-tabs>button{flex:none}
 /* Responsive: inspector stacks below, controls wrap, editor remains usable. */
-@media(max-width:1250px){
+@container sv-studio-workspace (max-width:1250px){
  .sv-studio .sv-topbar{flex-wrap:wrap}
  .sv-studio .sv-topbar>.sv-actions{flex:1 1 100%;justify-content:flex-start}
  .sv-studio .sv-workspace{grid-template-columns:minmax(0,1fr) minmax(14rem,16rem)}
 }
-@media(max-width:940px){
+@container sv-studio-workspace (max-width:940px){
  .sv-studio .sv-workspace{
   display:flex;flex-direction:column;overflow:visible;height:auto;min-height:0
  }
@@ -381,7 +381,7 @@
  .sv-studio .sv-outline-content{overflow-y:auto;max-height:20rem}
  .sv-studio .sv-topbar>.sv-actions{flex-wrap:wrap}
 }
-@media(max-width:650px){
+@container sv-studio-workspace (max-width:650px){
  .sv-studio .sv-title-mode{display:none}
  .sv-studio .sv-topbar>.sv-page-tabs{width:100%}
  .sv-studio .sv-topbar>.sv-page-tabs>button{flex:1;min-width:0}
