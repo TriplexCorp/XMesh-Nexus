@@ -115,7 +115,7 @@ assert.match(source,/body\.replaceChildren\(\.\.\.replacement\.childNodes\)/,
  'Routing tabs should replace only panel content and preserve the modal shell');
 assert.match(source,/modal\.addEventListener\('cancel'/,
  'Browser Escape must synchronize dialog state');
-assert.match(clientCss,/width:min\(100%,var\(--panel-content-max,1920px\)\)/,
+assert.match(clientCss,/\.crx-dialog\{[^}]*width:min\(100%,var\(--panel-content-max,1920px\)/,
  'Editor width must follow the panel width slider');
 assert.match(clientCss,/dialog\.crx-overlay::backdrop\{background:var\(--xm-modal-dim/,
  'Editor must use shared backdrop tokens');
