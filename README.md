@@ -137,7 +137,7 @@ node scripts/check-node-editor-layout.js
 node scripts/check-subscription-studio.js
 node scripts/check-static-assets.js
 cargo test --manifest-path backend/Cargo.toml
-cargo clippy --manifest-path backend/Cargo.toml --all-targets -- -D warnings
+cargo clippy --manifest-path backend/Cargo.toml --all-targets --all-features -- -D warnings -D clippy::pedantic -D clippy::nursery -F unsafe-code
 ```
 
 Основные файлы: `app.js`, `styles.css`, `xray-studio-v4.js`, `subscription-studio.js`, `backend/src/`, `deploy/`, `scripts/`. Тестовые скрипты и CI проверяют часть сценариев, **но не заменяют проверку настоящего Xray на VPS и приложения клиента**.
