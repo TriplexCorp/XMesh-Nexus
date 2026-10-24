@@ -208,7 +208,14 @@ struct SmartRoutes {
     observation: bool,
 }
 
-fn smart_routes(countries: &HashMap<String, Vec<String>>, tags: &[String], first: &str, balance: &str, smart: bool, dns_out: bool) -> SmartRoutes {
+fn smart_routes(
+    countries: &HashMap<String, Vec<String>>,
+    tags: &[String],
+    first: &str,
+    balance: &str,
+    smart: bool,
+    dns_out: bool,
+) -> SmartRoutes {
     let mut balancers: Vec<Value> = Vec::new();
     let mut rules = vec![
         json!({"type":"field","ip":["geoip:private"],"outboundTag":"direct"}),
@@ -254,10 +261,20 @@ fn smart_routes(countries: &HashMap<String, Vec<String>>, tags: &[String], first
     } else {
         rules.push(json!({"type":"field","inboundTag":["socks","http"],"outboundTag":first}));
     }
-    SmartRoutes { balancers, rules, observation }
+    SmartRoutes {
+        balancers,
+        rules,
+        observation,
+    }
 }
 
-fn subscription_display_name(display_names: &[String], setting: &Value, smart: bool, tag_count: usize, balance: &str) -> String {
+fn subscription_display_name(
+    display_names: &[String],
+    setting: &Value,
+    smart: bool,
+    tag_count: usize,
+    balance: &str,
+) -> String {
     if display_names.len() == 1 && !display_names[0].is_empty() {
         display_names[0].clone()
     } else {
@@ -331,7 +348,11 @@ pub fn build(mut proxies: Vec<Value>, setting: &Value) -> Result<Value, String> 
         .first()
         .ok_or("Отсутствует маршрут по умолчанию")?
         .clone();
-    let SmartRoutes { balancers, rules, observation } = smart_routes(&countries, &tags, &first, balance, smart, dns_out);
+    let SmartRoutes {
+        balancers,
+        rules,
+        observation,
+    } = smart_routes(&countries, &tags, &first, balance, smart, dns_out);
     let mut inbounds = vec![
         json!({"tag":"socks","listen":"127.0.0.1","port":socks_port,"protocol":"socks",
          "settings":{"auth":"noauth","udp":true}}),
@@ -352,7 +373,8 @@ pub fn build(mut proxies: Vec<Value>, setting: &Value) -> Result<Value, String> 
     if !balancers.is_empty() {
         routing["balancers"] = json!(balancers);
     }
-    let display_name = subscription_display_name(&display_names, setting, smart, tags.len(), balance);
+    let display_name =
+        subscription_display_name(&display_names, setting, smart, tags.len(), balance);
     let mut config = json!({
         "remarks":display_name,
         "log":{"loglevel":"warning"},
