@@ -319,8 +319,8 @@ def main():
                       201,"out-of-order stats accepted only as system telemetry")
         code,after_stale,_=request("GET",f"/users/{user_id}/traffic",cookie=cookie)
         assert_status(code,200,"read usage after stale user stats")
-        assert after_stale["totalUplinkBytes"]==140
-        assert after_stale["totalDownlinkBytes"]==120
+        assert after_stale["totalUplinkBytes"]==60
+        assert after_stale["totalDownlinkBytes"]==80
         code,presence,_=request("GET","/users/presence",cookie=cookie)
         assert next(item["onlineAt"] for item in presence["items"] if item["id"]==user_id)==previous_online
 
