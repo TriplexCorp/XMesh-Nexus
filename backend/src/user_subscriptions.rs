@@ -712,6 +712,25 @@ fn log_unavailable_subscription_host(user: &Value, inbound: &Value, host: &Value
     "Subscription public host could not produce an authorized client outbound");
 }
 
+fn log_subscription_candidate(profile: &Value, inbound: &Value, nodes: &[Value], tag: &str) {
+let stream = inbound.get("streamSettings").unwrap_or(&Value::Null);
+let security = nonempty(stream, "security").unwrap_or("none");
+let reality = stream.get("realitySettings").unwrap_or(&Value::Null);
+let has_public_key = nonempty(reality, "publicKey").is_some()
+    || nonempty(inbound, "publicKey").is_some();
+let assigned_nodes = nodes
+    .iter()
+    .filter(|n| {
+        same_record_id(n.get("profileId"), profile.get("id"))
+            && n.get("disabled") != Some(&Value::Bool(true))
+    })
+    .count();
+tracing::info!(profile_id=?(profile.get("id").and_then(serde_json::Value::as_i64)),
+     inbound_tag=%tag, security=%security, assigned_nodes,
+     reality_public_key_in_profile=has_public_key,
+     "Subscription endpoint candidate");
+}
+
 async fn collect_user_outbounds(
     state: &AppState,
     user: &Value,
@@ -741,22 +760,7 @@ async fn collect_user_outbounds(
             if !tags.contains(tag) {
                 continue;
             }
-            let stream = inbound.get("streamSettings").unwrap_or(&Value::Null);
-            let security = nonempty(stream, "security").unwrap_or("none");
-            let reality = stream.get("realitySettings").unwrap_or(&Value::Null);
-            let has_public_key = nonempty(reality, "publicKey").is_some()
-                || nonempty(inbound, "publicKey").is_some();
-            let assigned_nodes = nodes
-                .iter()
-                .filter(|n| {
-                    same_record_id(n.get("profileId"), profile.get("id"))
-                        && n.get("disabled") != Some(&Value::Bool(true))
-                })
-                .count();
-            tracing::info!(profile_id=?(profile.get("id").and_then(serde_json::Value::as_i64)),
-     inbound_tag=%tag, security=%security, assigned_nodes,
-     reality_public_key_in_profile=has_public_key,
-     "Subscription endpoint candidate");
+            log_subscription_candidate(profile, inbound, &nodes, tag);
             // Do not silently fall back to a node's raw address when an explicitly
             // configured public host is disabled or pinned to a different node.
             let any_explicit_host = hosts.iter().any(|h| {
