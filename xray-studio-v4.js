@@ -96,7 +96,7 @@ function renderDocumentTabs(){
 }
 function activateDocument(key){
  if(key===activeDocumentKey)return;
- stash();
+ if(activeDocumentKey!=='__switching__')stash();
  const doc=openDocuments.get(key);if(!doc)return;
  activeDocumentKey=key;id=doc.id;name=doc.name;saved=doc.saved;
  inboundIndex=doc.inboundIndex;outIndex=doc.outIndex;
@@ -116,7 +116,7 @@ async function closeDocument(key){
  openDocuments.delete(key);
  if(wasActive){
   const next=openDocuments.keys().next().value;
-  if(next){activeDocumentKey='__switching__';activateDocument(next)}
+  if(next){activeDocumentKey='__switching__';activateDocument(next);openDocuments.delete('__switching__')}
   else{
    activeDocumentKey='draft:'+ ++draftSequence;
    id=null;name='Новый профиль';saved='';inboundIndex=outIndex=0;
