@@ -183,8 +183,8 @@
     function renderEditor(){
       const host=document.querySelector('#client-route-root [data-cr-modal-host]');if(!host)return;
       const p=current();
-      if(!p){host.innerHTML='';document.body.classList.remove('crx-modal-active');return;}
-      document.body.classList.add('crx-modal-active');
+      if(!p){host.innerHTML='';return;}
+      
       const missing=(p.servers||[]).filter(key=>!sourceByKey.has(key));
       const all=[...sources,...missing.map(key=>({key,title:key,kind:'Недоступный сервер',detail:'Сохранённая привязка',code:''}))];
       const matching=all.filter(s=>(s.title+' '+s.kind+' '+s.detail).toLocaleLowerCase().includes(search.toLocaleLowerCase()));
