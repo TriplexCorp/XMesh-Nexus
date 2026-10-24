@@ -300,6 +300,18 @@ fn host_for_profile(host:&Value,tag:&str,profile:&Value,nodes:&[Value])->bool {
 }
 // Never rewrite a CDN/host alias to an arbitrary node IP. Rotation applies
 // only to an unambiguous directly addressed node that owns the host address.
+// A public host may inherit per-node client routing only when its placement
+// resolves to exactly one enabled node. Multi-node/CDN hosts require an
+// explicit host assignment; guessing a node's policy would misroute traffic.
+fn host_owner_node<'a>(host:&Value,profile:&Value,nodes:&'a [Value])->Option<&'a Value>{
+ let pins=host.get("nodes").and_then(Value::as_array).filter(|v|!v.is_empty());
+ let mut options=nodes.iter().filter(|node|
+    node.get("disabled")!=Some(&Value::Bool(true))
+    && same_record_id(node.get("profileId"),profile.get("id"))
+    && pins.is_none_or(|items|items.iter().any(|id|same_record_id(Some(id),node.get("id")))));
+ let owner=options.next()?;
+ if options.next().is_none(){Some(owner)}else{None}
+}
 fn direct_host_node<'a>(host: &Value, profile: &Value, nodes: &'a [Value]) -> Option<&'a Value> {
  let address=endpoint(host)?.parse::<std::net::IpAddr>().ok()?;
  let pins=host.get("nodes").and_then(Value::as_array).filter(|v|!v.is_empty());
@@ -382,6 +394,11 @@ async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str,rotate:b
       // Persist a stable selector identity independent of display name/order.
       if let Some(id)=host.get("id").and_then(Value::as_i64){
        outbound["xmeshSourceKey"]=json!(format!("host:{id}"));
+      }
+      if let Some(node)=host_owner_node(host,profile,&nodes){
+       if let Some(id)=node.get("id").and_then(Value::as_i64){
+        outbound["xmeshOwnerNodeKey"]=json!(format!("node:{id}"));
+       }
       }
       if let Some(node)=direct_host_node(host,profile,&nodes){
        apply_ip_rotation(state,user,node,&mut outbound,rotate).await?;
