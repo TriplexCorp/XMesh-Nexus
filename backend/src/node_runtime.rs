@@ -84,7 +84,14 @@ pub async fn heartbeat(
                        WHERE h.node_id=c.node_id AND h.version=c.target_version
                          AND h.received_at >= c.requested_at)"
     ).bind(report.node_id).bind(&report.version).execute(&state.pool).await?;
-    Ok(Json(json!({"accepted":true})))
+    // The desired-revision table may be empty after a migration even when a
+    // node already has a valid signed policy. Ask the node to fetch desired
+    // config again; never trust its reported revision as desired state.
+    let needs_reconcile=report.xray_running && report.applied_revision.is_some()
+        && sqlx::query_scalar::<_,i64>(
+            "SELECT 1 FROM node_desired_revisions WHERE node_id=$1"
+        ).bind(report.node_id).fetch_optional(&state.pool).await?.is_none();
+    Ok(Json(json!({"accepted":true,"reconcileDesired":needs_reconcile})))
 }
 
 pub async fn status(
