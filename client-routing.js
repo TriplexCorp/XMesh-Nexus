@@ -73,7 +73,7 @@
     return values.map(([value,label])=>'<option value="'+escapeHTML(value)+'"'+(value===selected?' selected':'')+'>'+escapeHTML(label)+'</option>').join('');
   }
 
-  const CSS_VERSION = '20261024-routing-clean-v1';
+  const CSS_VERSION = '20261024-client-cards-v9';
   function ensureStylesheet() {
     const file = 'client-routing.css';
     const existing = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
@@ -214,7 +214,7 @@
       const missing=(p.servers||[]).filter(key=>!sourceByKey.has(key));
       const all=[...sources,...missing.map(key=>({key,title:key,kind:'Недоступный сервер',detail:'Сохранённая привязка',code:''}))];
       const matching=all.filter(s=>(s.title+' '+s.kind+' '+s.detail).toLocaleLowerCase().includes(search.toLocaleLowerCase()));
-      host.innerHTML='<div class="crx-overlay" data-cr-overlay><div class="crx-dialog" role="dialog" aria-modal="true" aria-labelledby="crx-dialog-title">'+
+      host.innerHTML='<dialog class="crx-overlay" data-cr-overlay aria-labelledby="crx-dialog-title"><div class="crx-dialog">'+
         '<header class="crx-dialog-header"><div class="crx-dialog-identity"><div class="crx-dialog-mark">'+icon('route')+'</div>'+
         '<div><span class="crx-dialog-kicker">РЕДАКТОР МАРШРУТИЗАЦИИ</span><h2 id="crx-dialog-title">'+escapeHTML(p.name||'Новый шаблон')+'</h2></div></div>'+
         '<button type="button" class="crx-icon-btn crx-close" data-cr-close title="Закрыть" aria-label="Закрыть">'+icon('close')+'</button></header>'+
@@ -248,7 +248,9 @@
         '<label class="crx-toggle"><input type="checkbox" data-cr-enabled'+(p.enabled!==false?' checked':'')+'><span>Шаблон включён</span></label></div>'+
         '<div class="crx-settings-actions"><button type="button" class="crx-btn crx-btn-ghost" data-cr-duplicate="'+escapeHTML(p.id)+'">'+icon('copy')+' Копировать</button>'+
         '<button type="button" class="crx-btn crx-btn-danger" data-cr-delete="'+escapeHTML(p.id)+'">'+icon('trash')+' '+(confirmDelete===p.id?'Подтвердить удаление':'Удалить')+'</button></div></div>'+
-        '</div></div>';
+        '</div></dialog>';
+      const modal=host.querySelector('dialog.crx-overlay');
+      if(modal && typeof modal.showModal==='function') modal.showModal();
     }
     function render(){
       const list=document.querySelector('#client-route-root [data-cr-list]');if(!list)return;
