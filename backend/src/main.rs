@@ -1537,7 +1537,7 @@ async fn ingest_node_metrics(
 /// Authenticated, read-only user presence. No secrets or subscription tokens.
 async fn get_user_presence(
     State(state): State<AppState>,
-) -> Result<Json<Value>, ApiError> {
+) -> Result<(HeaderMap, Json<Value>), ApiError> {
     let rows=sqlx::query(
         "SELECT id,
             CASE WHEN (data->>'onlineAt') ~ '^[0-9]{1,16}$'
@@ -1554,10 +1554,15 @@ async fn get_user_presence(
     let server_now_ms=std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default().as_millis() as i64;
-    Ok(Json(json!({
+    // Presence is operationally sensitive and must not be cached by browsers
+    // or intermediaries: an old response could resurrect an offline badge.
+    let mut headers=HeaderMap::new();
+    headers.insert(header::CACHE_CONTROL,HeaderValue::from_static("private, no-store"));
+    headers.insert(header::VARY,HeaderValue::from_static("Cookie"));
+    Ok((headers,Json(json!({
         "items":items,"serverNowMs":server_now_ms,
         "onlineWindowMs":USER_ONLINE_WINDOW_MS
-    })))
+    }))))
 }
 
 /// Real per-user, per-node traffic collected from authenticated Xray node counters.
