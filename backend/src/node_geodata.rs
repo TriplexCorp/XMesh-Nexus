@@ -126,6 +126,36 @@ fn geo_sources(node: &Value) -> Result<(u64, Vec<Value>), ApiError> {
     Ok((hours, sources))
 }
 
+fn inject_geo_rules(config: &mut Value, rules: Vec<Value>) -> Result<(), ApiError> {
+    if !rules.is_empty() {
+        outbounds.push(json!({"tag":"xmesh_geo_block","protocol":"blackhole"}));
+        let routing = config
+            .as_object_mut()
+            .ok_or_else(|| invalid("GeoData: Xray config must be an object."))?
+            .entry("routing")
+            .or_insert_with(|| json!({}));
+        let routing = routing
+            .as_object_mut()
+            .ok_or_else(|| invalid("GeoData: routing must be an object."))?;
+        let existing = routing.entry("rules").or_insert_with(|| json!([]));
+        let existing = existing
+            .as_array_mut()
+            .ok_or_else(|| invalid("GeoData: routing.rules must be an array."))?;
+        // StatsService inbound must remain the first rule. Other node rules win
+        // over broad profile catch-all rules.
+        let offset = existing
+            .iter()
+            .take_while(|r| {
+                r.get("inboundTag")
+                    .and_then(Value::as_array)
+                    .is_some_and(|tags| tags.iter().any(|t| t.as_str() == Some("xmesh_stats_in")))
+            })
+            .count();
+        existing.splice(offset..offset, rules);
+    }
+    Ok(())
+}
+
 pub fn apply(node: &Value, config: &mut Value) -> Result<Option<Value>, ApiError> {
     if node.get("geoEnabled").and_then(Value::as_bool) != Some(true) {
         return Ok(None);
@@ -203,32 +233,7 @@ pub fn apply(node: &Value, config: &mut Value) -> Result<Option<Value>, ApiError
         rule[key] = json!([value]);
         rules.push(rule);
     }
-    if !rules.is_empty() {
-        outbounds.push(json!({"tag":"xmesh_geo_block","protocol":"blackhole"}));
-        let routing = config
-            .as_object_mut()
-            .ok_or_else(|| invalid("GeoData: Xray config must be an object."))?
-            .entry("routing")
-            .or_insert_with(|| json!({}));
-        let routing = routing
-            .as_object_mut()
-            .ok_or_else(|| invalid("GeoData: routing must be an object."))?;
-        let existing = routing.entry("rules").or_insert_with(|| json!([]));
-        let existing = existing
-            .as_array_mut()
-            .ok_or_else(|| invalid("GeoData: routing.rules must be an array."))?;
-        // StatsService inbound must remain the first rule. Other node rules win
-        // over broad profile catch-all rules.
-        let offset = existing
-            .iter()
-            .take_while(|r| {
-                r.get("inboundTag")
-                    .and_then(Value::as_array)
-                    .is_some_and(|tags| tags.iter().any(|t| t.as_str() == Some("xmesh_stats_in")))
-            })
-            .count();
-        existing.splice(offset..offset, rules);
-    }
+    inject_geo_rules(config, rules)?;
     let refresh_revision = node
         .get("geoRefreshRevision")
         .and_then(Value::as_u64)
