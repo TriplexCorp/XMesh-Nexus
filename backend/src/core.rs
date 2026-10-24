@@ -431,17 +431,17 @@ impl CoreManager {
         fs::create_dir_all(&versions_dir)
             .await
             .map_err(|e| e.to_string())?;
-        let stage = versions_dir.join(format!(".staging-{}", Uuid::new_v4().simple()));
-        fs::create_dir_all(&stage)
+        let staging_dir = versions_dir.join(format!(".staging-{}", Uuid::new_v4().simple()));
+        fs::create_dir_all(&staging_dir)
             .await
             .map_err(|e| e.to_string())?;
 
-        if let Err(error) = unpack_release(&bytes, &stage).await {
-            let _ = fs::remove_dir_all(&stage).await;
+        if let Err(error) = unpack_release(&bytes, &staging_dir).await {
+            let _ = fs::remove_dir_all(&staging_dir).await;
             return Err(error);
         }
 
-        let binary = stage.join("xray");
+        let binary = staging_dir.join("xray");
         {
             let mut permissions = fs::metadata(&binary)
                 .await
@@ -470,7 +470,7 @@ impl CoreManager {
         .map_err(|e| format!("Could not execute downloaded Xray-core binary: {e}"))?;
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            let _ = fs::remove_dir_all(&stage).await;
+            let _ = fs::remove_dir_all(&staging_dir).await;
             return Err(format!(
                 "Downloaded Xray-core binary verification failed: {}",
                 stderr.trim()
@@ -483,7 +483,7 @@ impl CoreManager {
         );
         let reported = version_output.trim();
         if !reported.contains(release.tag_name.trim_start_matches('v')) {
-            let _ = fs::remove_dir_all(&stage).await;
+            let _ = fs::remove_dir_all(&staging_dir).await;
             return Err(format!(
                 "Downloaded binary reports an unexpected version; expected {}, received {}",
                 release.tag_name, reported
@@ -496,7 +496,7 @@ impl CoreManager {
                 .await
                 .map_err(|e| e.to_string())?;
         }
-        fs::rename(&stage, &target_dir)
+        fs::rename(&staging_dir, &target_dir)
             .await
             .map_err(|e| format!("Could not finalize release directory: {e}"))?;
 
