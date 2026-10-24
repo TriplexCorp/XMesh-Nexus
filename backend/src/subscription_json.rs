@@ -371,6 +371,67 @@ pub fn build(mut proxies: Vec<Value>, setting: &Value) -> Result<Value, String> 
 /// a replacement for the individual country/server choices.
 /// Custom named balancers use stable source identities; never select by IP,
 /// host remark or positional Xray tag. Duplicated IPs remain independent.
+fn validate_balancer_observatory(row: &Value) -> Result<(), String> {
+    if let Some(o) = row.get("observatory") {
+        let obj = o
+            .as_object()
+            .ok_or("Настройки проверки должны быть объектом")?;
+        for key in obj.keys() {
+            if ![
+                "probeInterval",
+                "probeTimeout",
+                "sampling",
+                "probeURL",
+                "connectivity",
+            ]
+            .contains(&key.as_str())
+            {
+                return Err(format!("Неизвестный параметр проверки: {key}"));
+            }
+        }
+        for (field, min, max) in [("probeInterval", 5, 300), ("probeTimeout", 1, 30)] {
+            let value =
+                obj.get(field)
+                    .and_then(Value::as_str)
+                    .unwrap_or(if field == "probeInterval" {
+                        "20s"
+                    } else {
+                        "2s"
+                    });
+            let secs = value
+                .strip_suffix('s')
+                .and_then(|v| v.parse::<u64>().ok())
+                .unwrap_or(0);
+            if secs < min || secs > max {
+                return Err(format!("Некорректное значение {field}"));
+            }
+        }
+        if let Some(n) = obj.get("sampling")
+            && !n.as_u64().is_some_and(|v| (1..=50).contains(&v))
+        {
+            return Err("sampling должен быть от 1 до 50".into());
+        }
+        for field in ["probeURL", "connectivity"] {
+            if let Some(value) = obj.get(field) {
+                let url = value.as_str().ok_or("Адрес проверки должен быть строкой")?;
+                let allowed_scheme = url.starts_with("https://")
+                    || (field == "connectivity" && url.starts_with("http://"));
+                if url.len() > 256
+                    || !allowed_scheme
+                    || !url.is_ascii()
+                    || url
+                        .bytes()
+                        .any(|c| c <= 32 || c == 127 || c == b'\\' || c == b'@')
+                    || url.contains('#')
+                {
+                    return Err("Некорректный URL проверки".into());
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 pub fn validate_client_balancers(value: &Value) -> Result<(), String> {
     let rows = value
         .as_array()
@@ -448,63 +509,7 @@ pub fn validate_client_balancers(value: &Value) -> Result<(), String> {
                 return Err("Некорректный или повторяющийся сервер".into());
             }
         }
-        if let Some(o) = row.get("observatory") {
-            let obj = o
-                .as_object()
-                .ok_or("Настройки проверки должны быть объектом")?;
-            for key in obj.keys() {
-                if ![
-                    "probeInterval",
-                    "probeTimeout",
-                    "sampling",
-                    "probeURL",
-                    "connectivity",
-                ]
-                .contains(&key.as_str())
-                {
-                    return Err(format!("Неизвестный параметр проверки: {key}"));
-                }
-            }
-            for (field, min, max) in [("probeInterval", 5, 300), ("probeTimeout", 1, 30)] {
-                let value =
-                    obj.get(field)
-                        .and_then(Value::as_str)
-                        .unwrap_or(if field == "probeInterval" {
-                            "20s"
-                        } else {
-                            "2s"
-                        });
-                let secs = value
-                    .strip_suffix('s')
-                    .and_then(|v| v.parse::<u64>().ok())
-                    .unwrap_or(0);
-                if secs < min || secs > max {
-                    return Err(format!("Некорректное значение {field}"));
-                }
-            }
-            if let Some(n) = obj.get("sampling")
-                && !n.as_u64().is_some_and(|v| (1..=50).contains(&v))
-            {
-                return Err("sampling должен быть от 1 до 50".into());
-            }
-            for field in ["probeURL", "connectivity"] {
-                if let Some(value) = obj.get(field) {
-                    let url = value.as_str().ok_or("Адрес проверки должен быть строкой")?;
-                    let allowed_scheme = url.starts_with("https://")
-                        || (field == "connectivity" && url.starts_with("http://"));
-                    if url.len() > 256
-                        || !allowed_scheme
-                        || !url.is_ascii()
-                        || url
-                            .bytes()
-                            .any(|c| c <= 32 || c == 127 || c == b'\\' || c == b'@')
-                        || url.contains('#')
-                    {
-                        return Err("Некорректный URL проверки".into());
-                    }
-                }
-            }
-        }
+        validate_balancer_observatory(row)?;
     }
     Ok(())
 }
