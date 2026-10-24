@@ -4905,3 +4905,27 @@ dialog#dlg.node-wide .node-geo-fields small{overflow-wrap:anywhere}
   }
   dialog#dlg.node-wide .node-geo-fields{grid-template-columns:minmax(0,1fr)}
 }
+
+/* Users: quiet icon-only refresh, aligned with the action buttons. */
+.users-toolbar-actions>.users-refresh-icon{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 36px;
+  width:36px;
+  min-width:36px;
+  height:36px;
+  min-height:36px;
+  padding:0;
+  border-radius:10px;
+}
+.users-refresh-icon .ic{width:17px;height:17px;flex:none}
+.users-refresh-icon.is-refreshing .ic{animation:users-refresh-spin .85s linear infinite}
+@keyframes users-refresh-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.users-refresh-icon.is-refreshing .ic{animation:none}}
+@media(max-width:760px){
+  .users-toolbar-actions>.users-refresh-icon{
+    width:36px;min-width:36px;min-height:36px;
+    justify-self:end;
+  }
+}
