@@ -403,7 +403,9 @@ pub(crate) fn validate_client_balancers(value: &Value) -> Result<(), String> {
             || ["direct", "block", "dns-out"].contains(&tag)
             || !tags.insert(tag.to_owned())
         {
-            return Err("Тег балансировщика должен быть уникальным (латиница, цифры, _ и -)".into());
+            return Err(
+                "Тег балансировщика должен быть уникальным (латиница, цифры, _ и -)".into(),
+            );
         }
         for (field, max) in [("remark", 120), ("serverDescription", 240)] {
             let text = row[field].as_str().ok_or(format!("Укажите {field}"))?;
