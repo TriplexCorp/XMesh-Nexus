@@ -68,6 +68,71 @@ fn safe_https_url(value: &str) -> bool {
     })
 }
 
+fn validate_custom_clients(object: &Map<String, Value>) -> Result<(), ApiError> {
+    if let Some(value) = object.get("subscriptionCustomClients") {
+        let clients = value
+            .as_array()
+            .ok_or_else(|| bad("Свои приложения должны быть массивом."))?;
+        if clients.len() > 32 {
+            return Err(bad("Можно добавить не более 32 своих приложений."));
+        }
+        let mut ids = std::collections::HashSet::new();
+        for client in clients {
+            let record = client
+                .as_object()
+                .ok_or_else(|| bad("Приложение должно быть объектом."))?;
+            if record.len() != 5
+                || record.keys().any(|key| {
+                    !["id", "name", "platforms", "url", "enabled"].contains(&key.as_str())
+                })
+            {
+                return Err(bad("Неизвестное или отсутствующее поле приложения."));
+            }
+            let id = record
+                .get("id")
+                .and_then(Value::as_str)
+                .ok_or_else(|| bad("Некорректный ID приложения."))?;
+            if !id.starts_with("custom-")
+                || id.len() > 32
+                || id.len() < 8
+                || !id["custom-".len()..].bytes().all(|b| b.is_ascii_digit())
+                || !ids.insert(id)
+            {
+                return Err(bad("Некорректный или повторяющийся ID приложения."));
+            }
+            let name = record
+                .get("name")
+                .and_then(Value::as_str)
+                .ok_or_else(|| bad("Некорректное название приложения."))?;
+            let platforms = record
+                .get("platforms")
+                .and_then(Value::as_str)
+                .ok_or_else(|| bad("Некорректное описание платформ."))?;
+            if name.trim().is_empty()
+                || name.chars().count() > 80
+                || name.chars().any(char::is_control)
+                || platforms.chars().count() > 120
+                || platforms.chars().any(char::is_control)
+            {
+                return Err(bad(
+                    "Название или платформы приложения содержат недопустимые символы.",
+                ));
+            }
+            let url = record
+                .get("url")
+                .and_then(Value::as_str)
+                .ok_or_else(|| bad("Ссылка приложения должна быть строкой."))?;
+            if !safe_https_url(url) {
+                return Err(bad("Укажите корректную HTTPS-ссылку своего приложения."));
+            }
+            if !record.get("enabled").is_some_and(Value::is_boolean) {
+                return Err(bad("Состояние приложения должно быть переключателем."));
+            }
+        }
+    }
+    Ok(())
+}
+
 pub fn validate(object: &Map<String, Value>) -> Result<(), ApiError> {
     if let Some(json) = object.get("subscriptionJson") {
         crate::subscription_json::validate_settings(json).map_err(|message| bad(&message))?;
@@ -225,67 +290,7 @@ pub fn validate(object: &Map<String, Value>) -> Result<(), ApiError> {
             }
         }
     }
-    if let Some(value) = object.get("subscriptionCustomClients") {
-        let clients = value
-            .as_array()
-            .ok_or_else(|| bad("Свои приложения должны быть массивом."))?;
-        if clients.len() > 32 {
-            return Err(bad("Можно добавить не более 32 своих приложений."));
-        }
-        let mut ids = std::collections::HashSet::new();
-        for client in clients {
-            let record = client
-                .as_object()
-                .ok_or_else(|| bad("Приложение должно быть объектом."))?;
-            if record.len() != 5
-                || record.keys().any(|key| {
-                    !["id", "name", "platforms", "url", "enabled"].contains(&key.as_str())
-                })
-            {
-                return Err(bad("Неизвестное или отсутствующее поле приложения."));
-            }
-            let id = record
-                .get("id")
-                .and_then(Value::as_str)
-                .ok_or_else(|| bad("Некорректный ID приложения."))?;
-            if !id.starts_with("custom-")
-                || id.len() > 32
-                || id.len() < 8
-                || !id["custom-".len()..].bytes().all(|b| b.is_ascii_digit())
-                || !ids.insert(id)
-            {
-                return Err(bad("Некорректный или повторяющийся ID приложения."));
-            }
-            let name = record
-                .get("name")
-                .and_then(Value::as_str)
-                .ok_or_else(|| bad("Некорректное название приложения."))?;
-            let platforms = record
-                .get("platforms")
-                .and_then(Value::as_str)
-                .ok_or_else(|| bad("Некорректное описание платформ."))?;
-            if name.trim().is_empty()
-                || name.chars().count() > 80
-                || name.chars().any(char::is_control)
-                || platforms.chars().count() > 120
-                || platforms.chars().any(char::is_control)
-            {
-                return Err(bad(
-                    "Название или платформы приложения содержат недопустимые символы.",
-                ));
-            }
-            let url = record
-                .get("url")
-                .and_then(Value::as_str)
-                .ok_or_else(|| bad("Ссылка приложения должна быть строкой."))?;
-            if !safe_https_url(url) {
-                return Err(bad("Укажите корректную HTTPS-ссылку своего приложения."));
-            }
-            if !record.get("enabled").is_some_and(Value::is_boolean) {
-                return Err(bad("Состояние приложения должно быть переключателем."));
-            }
-        }
-    }
+    validate_custom_clients(object)?;
     Ok(())
 }
 
