@@ -108,10 +108,10 @@ fn code_at(secret: &[u8], step: u64) -> String {
     mac.update(&step.to_be_bytes());
     let digest = mac.finalize().into_bytes();
     let index = (digest[19] & 15) as usize;
-    let v = (((digest[index] & 127) as u32) << 24)
-        | ((digest[index + 1] as u32) << 16)
-        | ((digest[index + 2] as u32) << 8)
-        | (digest[index + 3] as u32);
+    let v = (u32::from(digest[index] & 127) << 24)
+        | (u32::from(digest[index + 1]) << 16)
+        | (u32::from(digest[index + 2]) << 8)
+        | u32::from(digest[index + 3]);
     format!("{:06}", v % 1_000_000)
 }
 fn matching_step(secret: &[u8], input: &str, last: i64, now: i64) -> Option<i64> {
@@ -123,7 +123,7 @@ fn matching_step(secret: &[u8], input: &str, last: i64, now: i64) -> Option<i64>
         candidate > last
             && candidate >= 0
             && bool::from(
-                code_at(secret, candidate as u64)
+                code_at(secret, candidate.cast_unsigned())
                     .as_bytes()
                     .ct_eq(input.as_bytes()),
             )
@@ -133,7 +133,7 @@ fn current_seconds() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
-        .as_secs() as i64
+        .as_secs().try_into().unwrap_or(i64::MAX)
 }
 fn recovery_hash(code: &str) -> Option<String> {
     let cleaned = code.trim().replace('-', "").to_ascii_uppercase();
