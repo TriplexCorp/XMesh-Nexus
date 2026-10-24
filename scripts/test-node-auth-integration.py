@@ -248,11 +248,16 @@ def main():
             check=True,capture_output=True)
         print("PASS: panel Ed25519 policy signature matches Xray JSON and live user assignment")
 
-        def report_signed(inbound_a, inbound_b):
+        # Distinct actual source snapshots must have strictly increasing sample times,
+        # even when the test sends multiple requests within one millisecond.
+        source_clock_ms = int(time.time() * 1000)
+        def report_signed(inbound_a, inbound_b, sampled_at_ms=None):
+            nonlocal source_clock_ms
+            source_clock_ms = max(source_clock_ms + 1, int(time.time() * 1000))
             sample={
                 "node_id":node,
                 "userStatsStatus":"verified",
-                "userStatsAtMs":int(time.time()*1000),
+                "userStatsAtMs":source_clock_ms if sampled_at_ms is None else sampled_at_ms,
                 "userInboundTraffic":[
                     {"userId":user_id,"inboundTag":"DE_VLESS",
                      "uplinkBytes":inbound_a[0],"downlinkBytes":inbound_a[1]},
@@ -303,6 +308,21 @@ def main():
         code,users,_=request("GET","/collections/users",cookie=cookie)
         used=next(u["used"] for u in users["items"] if u["id"]==user_id)
         assert abs(used-(140/(1024**3)))<1e-9
+
+        # Old snapshots must not replay traffic or extend the user's presence.
+        code,presence,_=request("GET","/users/presence",cookie=cookie)
+        assert_status(code,200,"read restricted user presence")
+        assert all(set(item.keys())=={"id","onlineAt"} for item in presence["items"])
+        previous_online=next(item["onlineAt"] for item in presence["items"] if item["id"]==user_id)
+        old_sample_ms=source_clock_ms-2
+        assert_status(report_signed((9000,9000),(9000,9000),sampled_at_ms=old_sample_ms)[0],
+                      201,"out-of-order stats accepted only as system telemetry")
+        code,after_stale,_=request("GET",f"/users/{user_id}/traffic",cookie=cookie)
+        assert_status(code,200,"read usage after stale user stats")
+        assert after_stale["totalUplinkBytes"]==140
+        assert after_stale["totalDownlinkBytes"]==120
+        code,presence,_=request("GET","/users/presence",cookie=cookie)
+        assert next(item["onlineAt"] for item in presence["items"] if item["id"]==user_id)==previous_online
 
         code,_,_=request("DELETE",f"/collections/users/{user_id}",
                          cookie=cookie,origin=BASE)
