@@ -1874,6 +1874,7 @@ fn validate_record(collection: &str, data: &Value) -> Result<(), ApiError> {
         .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Запись должна быть JSON-объектом."))?;
     if collection == "nodes" {
         node_rotation::validate_node(data)?;
+        node_routing::validate_saved(data)?;
         if let Some(hosting) = object.get("hosting") {
             let value = hosting.as_str().ok_or_else(|| ApiError::new(
                 StatusCode::BAD_REQUEST, "Название хостинга должно быть строкой."
