@@ -16,6 +16,8 @@ struct Heartbeat {
     xray_version: Option<String>,
     #[serde(default, rename="geoData")]
     geo_data: Option<Value>,
+    #[serde(default, rename="appliedRevision")]
+    applied_revision: Option<String>,
 }
 
 pub async fn heartbeat(
@@ -37,18 +39,23 @@ pub async fn heartbeat(
         || !data.is_object()) {
         return Err(ApiError::new(StatusCode::BAD_REQUEST,"Invalid GeoData telemetry."));
     }
+    if report.applied_revision.as_ref().is_some_and(|r|
+        r.len()!=64 || !r.bytes().all(|b|b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+    ) {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST,"Invalid applied profile revision."));
+    }
     node_auth::authenticate_for(
         &state, &headers, report.node_id, &body, "/api/v1/node/heartbeat"
     ).await?;
     sqlx::query(
-        "INSERT INTO node_runtime_heartbeats(node_id,version,router_running,xray_running,xray_version,geo_data,received_at)
-         VALUES($1,$2,$3,$4,$5,$6,NOW()) ON CONFLICT(node_id) DO UPDATE
+        "INSERT INTO node_runtime_heartbeats(node_id,version,router_running,xray_running,xray_version,geo_data,applied_revision,received_at)
+         VALUES($1,$2,$3,$4,$5,$6,$7,NOW()) ON CONFLICT(node_id) DO UPDATE
          SET version=EXCLUDED.version,router_running=EXCLUDED.router_running,
          xray_running=EXCLUDED.xray_running,xray_version=EXCLUDED.xray_version,
-         geo_data=EXCLUDED.geo_data,received_at=NOW()"
+         geo_data=EXCLUDED.geo_data,applied_revision=EXCLUDED.applied_revision,received_at=NOW()"
     ).bind(report.node_id).bind(&report.version).bind(report.router_running)
     .bind(report.xray_running).bind(&report.xray_version)
-    .bind(&report.geo_data).execute(&state.pool).await?;
+    .bind(&report.geo_data).bind(if report.xray_running {report.applied_revision.as_deref()} else {None}).execute(&state.pool).await?;
     // A self-upgrade can replace its own running worker before its ACK is sent.
     // A fresh, authenticated heartbeat with the exact requested version is
     // stronger evidence of success than the lost acknowledgement.
@@ -77,15 +84,28 @@ pub async fn status(
     ).bind(node_id).fetch_optional(&state.pool).await?;
     if exists.is_none() {return Err(ApiError::new(StatusCode::NOT_FOUND,"Node not found."))}
     let record = sqlx::query(
-        "SELECT version,router_running,xray_running,xray_version,geo_data,
+        "SELECT version,router_running,xray_running,xray_version,geo_data,applied_revision,
                 (EXTRACT(EPOCH FROM received_at)*1000)::BIGINT AS received_ms,
                 received_at > NOW() - INTERVAL '65 seconds' AS fresh
          FROM node_runtime_heartbeats WHERE node_id=$1"
     ).bind(node_id).fetch_optional(&state.pool).await?;
+    let desired=sqlx::query(
+        "SELECT revision,profile_id FROM node_desired_revisions WHERE node_id=$1"
+    ).bind(node_id).fetch_optional(&state.pool).await?;
     match record {
         Some(row) => {
             let fresh: bool = row.try_get("fresh")?;
+            let applied:Option<String>=row.try_get("applied_revision")?;
+            let expected:Option<String>=desired.as_ref()
+                .map(|r|r.try_get::<String,_>("revision")).transpose()?;
+            let application_status=if !fresh {"unknown"}
+                else if !row.try_get::<bool,_>("xray_running")? {"stopped"}
+                else if applied.is_none() || expected.is_none() {"unknown"}
+                else if applied==expected {"applied"} else {"pending"};
             Ok(Json(json!({
+                "profileApplicationStatus":application_status,
+                "appliedRevision":applied,
+                "desiredRevision":expected,
                 "nodeId":node_id,
                 "connected":fresh,
                 "version":row.try_get::<String,_>("version")?,
@@ -274,7 +294,7 @@ pub async fn request_xray_update(
 
 // Remote agent upgrades are a fixed local action, never a command string or URL.
 // Only v4+ nodes understand this action. Older nodes need one bootstrap upgrade.
-pub const CONTROL_AGENT_VERSION: &str = "control-v4.2.0";
+pub const CONTROL_AGENT_VERSION: &str = "control-v4.3.0";
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -751,6 +771,11 @@ pub async fn desired_config(
     if let Some(manifest)=geo_data { policy["geoData"]=manifest; }
     let signature=state.node_policy_signer.sign(&policy)
         .map_err(|_|ApiError::new(StatusCode::INTERNAL_SERVER_ERROR,"Node policy signing failed."))?;
+    sqlx::query(
+        "INSERT INTO node_desired_revisions(node_id,profile_id,revision,served_at)
+         VALUES($1,$2,$3,NOW()) ON CONFLICT(node_id) DO UPDATE
+         SET profile_id=EXCLUDED.profile_id,revision=EXCLUDED.revision,served_at=NOW()"
+    ).bind(request.node_id).bind(profile_id).bind(&digest).execute(&state.pool).await?;
     Ok(Json(json!({
         "nodeId":request.node_id,"profileId":profile_id,
         "listen":"127.0.0.1","port":port,"revision":digest,"config":config,
