@@ -1,495 +1,414 @@
-/* XRAY STUDIO — unified layout. No incremental overrides. */
-.sv-studio{--vbg:var(--bg);--vpanel:var(--s1);--vfield:var(--s2);--vline:var(--ln);--vtext:var(--tx);--vmute:var(--mu);--vaccent:var(--a);--vround:var(--ui-control-radius,10px);color:var(--vtext);font-size:0.8125rem;line-height:1.5;width:100%;min-width:0;display:flex;flex-direction:column;gap:12px}
-.sv-studio *, .sv-studio *::before,.sv-studio *::after{box-sizing:border-box}
+/* XRAY STUDIO / ENTERPRISE WORKSPACE
+   One author-owned layout, theme-aware tokens, JSON-first. No legacy layout overrides. */
+.sv-studio{
+ --vbg:var(--bg);--vpanel:var(--s1);--vfield:var(--s2);--vline:var(--ln);
+ --vtext:var(--tx);--vmute:var(--mu);--vaccent:var(--a);
+ --vround:var(--ui-control-radius,10px);--vpanelround:var(--ui-radius,18px);
+ --vcode:ui-monospace,"IBM Plex Mono",SFMono-Regular,Consolas,"Liberation Mono",monospace;
+ display:flex;flex-direction:column;gap:.85rem;width:100%;min-width:0;
+ color:var(--vtext);font-size:.875rem;line-height:1.5;
+}
+.sv-studio *,.sv-studio *::before,.sv-studio *::after{box-sizing:border-box}
 .sv-studio [hidden]{display:none!important}
-.sv-studio button,.sv-studio input,.sv-studio select{font:inherit}
-.sv-studio button{cursor:pointer;color:var(--vtext);background:var(--vpanel);border:1px solid var(--vline);border-radius:var(--vround);padding:0.5rem 0.75rem;min-height:2.25rem;font-weight:600;font-size:0.75rem;transition:background-color .15s,border-color .15s}
-.sv-studio button:hover{background:var(--vfield);border-color:var(--vaccent)}
-.sv-studio button:focus-visible,.sv-studio :is(input,select,textarea):focus-visible{outline:2px solid var(--vaccent);outline-offset:2px}
-.sv-studio button.sv-primary{background:var(--vaccent);color:var(--btn-text);border-color:var(--vaccent);padding-inline:1.375rem;font-weight:750}
-.sv-title{display:flex;min-height:1.625rem;align-items:center;padding:0 0 .1rem}.sv-subtitle{letter-spacing:.005em}
-.sv-subtitle{font-size:0.75rem;color:var(--vmute);margin:0}
-.sv-mainnav{grid-area:modes;display:flex;align-items:center;min-width:0;background:var(--vpanel);border:1px solid var(--vline);border-radius:var(--vround);padding:.25rem .4rem;overflow-x:auto;scrollbar-width:thin}.sv-navtags{display:flex;align-items:center;gap:.35rem;min-width:max-content}.sv-navtags button{flex:none;background:transparent;border:0;border-bottom:2px solid transparent;border-radius:.35rem .35rem 0 0;min-height:2.3rem;padding:.46rem .95rem;white-space:nowrap;transition:background .15s,color .15s,border-color .15s}.sv-navtags button.active{border-bottom-color:var(--vaccent);color:var(--vaccent);background:color-mix(in srgb,var(--vaccent) 9%,var(--vpanel))}
-.sv-workspace{display:grid;grid-template-columns:minmax(0,1.44fr) minmax(380px,1.06fr) minmax(205px,.44fr);grid-template-rows:auto minmax(590px,calc(100dvh - 255px));grid-template-areas:"modes actions tools" "editor constructor tools";gap:12px;align-items:stretch;min-width:0}
-.sv-studio .sv-workspace>.sv-actions{grid-area:actions;display:flex;align-items:center;justify-content:flex-end;gap:7px;padding:0.25rem 0;min-width:0;flex-wrap:wrap}
-.sv-studio .sv-workspace>.sv-actions button{min-height:2.3125rem;padding:0.4375rem 0.625rem}
-/* Grid has two explicit columns plus sidebar; maintain existing DOM children */
-.sv-columns{display:contents}
-.sv-codepanel,.sv-constructor,.sv-tools{min-width:0;min-height:0;border:1px solid color-mix(in srgb,var(--vline) 84%,transparent);border-radius:var(--ui-radius,14px);background:var(--vpanel);overflow:hidden}
-.sv-codepanel{grid-area:editor;display:flex;flex-direction:column}
-.sv-constructor{grid-area:constructor;display:flex;flex-direction:column}
-.sv-tools{grid-area:tools;display:flex;flex-direction:column;gap:10px;padding:0.875rem;overflow-y:auto;scrollbar-width:thin}
-.sv-codebar{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:3.0625rem;padding:0.4375rem 0.625rem;border-bottom:1px solid var(--vline)}
-.sv-codebar>span{display:flex;align-items:center;gap:8px;font-weight:750;font-size:0.75rem}
-.sv-codebar small{font-size:0.625rem;color:var(--vmute);border-radius:7px;background:var(--vfield);padding:0.25rem 0.4375rem}
-.sv-codebar>div{display:flex;align-items:center;gap:5px}
-.sv-codebar button{min-height:1.875rem;padding:0.3125rem 0.5rem;font-size:0.6875rem}
-.sv-dot,.sv-statusmark{flex:none;display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--ok,#47d8a4)}
-.sv-codesurface{display:flex;flex:1;min-height:0;overflow:hidden;background:color-mix(in srgb,var(--vbg) 92%,var(--vpanel));font:0.8125rem/1.65 ui-monospace,SFMono-Regular,Consolas,monospace}
-.sv-gutter{flex:0 0 48px;text-align:right;padding:0.875rem 0.625rem 0.875rem 0;margin:0;border-right:1px solid var(--vline);overflow:hidden;white-space:pre;color:var(--vmute);font:inherit;user-select:none}
-.sv-codeholder{flex:1;min-width:0;position:relative;overflow:hidden}
-.sv-highlight,.sv-codeholder textarea{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0.875rem 1.125rem;border:0;background:transparent;font:inherit;line-height:inherit;white-space:pre;tab-size:2;overflow:auto;overflow-wrap:normal}
-.sv-highlight{pointer-events:none;z-index:1;color:var(--vtext);scrollbar-width:none}
-.sv-highlight::-webkit-scrollbar{display:none}
-.sv-codeholder textarea{z-index:2;resize:none;outline:0;color:transparent!important;-webkit-text-fill-color:transparent;caret-color:var(--vtext);box-shadow:none!important}
-.sv-codeholder textarea::selection{background:color-mix(in srgb,var(--vaccent) 35%,transparent)}
-
-/* Keep the transparent input layer pixel-aligned with the syntax overlay.
-   Global form typography and font themes must never affect only one layer. */
-.sv-studio .sv-codesurface{
-  --sv-code-font:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;
+.sv-studio :is(button,input,select,textarea){font:inherit}
+.sv-studio button{
+ display:inline-flex;align-items:center;justify-content:center;gap:.48rem;
+ flex:none;min-height:2.375rem;padding:.55rem .85rem;
+ border:1px solid var(--vline);border-radius:var(--vround);
+ color:var(--vtext);background:var(--vpanel);font-size:.78rem;font-weight:700;line-height:1.2;
+ cursor:pointer;white-space:nowrap;
+ transition:background-color .16s ease,color .16s ease,border-color .16s ease,box-shadow .16s ease;
 }
-.sv-studio .sv-codeholder > :is(.sv-highlight,textarea){
-  box-sizing:border-box;
-  font-family:var(--sv-code-font)!important;
-  font-size:inherit!important;
-  font-weight:400!important;
-  font-style:normal!important;
-  line-height:inherit!important;
-  letter-spacing:normal!important;
-  word-spacing:normal!important;
-  font-variant-ligatures:none!important;
-  font-feature-settings:"liga" 0,"calt" 0!important;
-  text-transform:none!important;
-  text-indent:0!important;
-  text-shadow:none!important;
-  text-rendering:auto!important;
+.sv-studio button:hover{background:var(--vfield);border-color:color-mix(in srgb,var(--vaccent) 45%,var(--vline))}
+.sv-studio button:focus-visible,.sv-studio :is(input,textarea,select):focus-visible{
+ outline:2px solid var(--vaccent);outline-offset:2px
 }
-.sv-studio .sv-codeholder > textarea::selection{
-  color:transparent!important;
-  -webkit-text-fill-color:transparent!important;
+.sv-studio button:disabled{opacity:.45;cursor:not-allowed}
+.sv-studio button svg{width:1rem;height:1rem;display:block;flex:none}
+.sv-studio button.sv-primary{
+ color:var(--btn-text);background:var(--vaccent);border-color:var(--vaccent);
+ font-weight:800;padding-inline:1.1rem
 }
-
-.sv-key{color:#79d1f5}.sv-string{color:#ef939b}.sv-number{color:#a5df99}.sv-boolean{color:#cfafff}
-.sv-minimap{flex:0 0 55px;overflow:hidden;margin:0;padding:0.625rem 0.1875rem;border-left:1px solid var(--vline);font:0.125rem/0.23125rem ui-monospace,monospace;white-space:pre;opacity:.8;pointer-events:none}
-.sv-codestatus{display:flex;align-items:center;gap:12px;padding:0.5rem 0.6875rem;border-top:1px solid var(--vline);min-height:2.3125rem;font-size:0.6875rem;color:var(--vmute);flex-wrap:wrap}
-.sv-codestatus [data-status=ok]{color:var(--ok,#50dca8)}.sv-codestatus [data-status=bad]{color:var(--er,#ef8194)}
-.sv-codestatus label{display:flex;align-items:center;gap:4px;margin-left:auto}
-.sv-codestatus input{accent-color:var(--vaccent)}
-.sv-wrap .sv-highlight,.sv-wrap .sv-codeholder textarea{white-space:pre-wrap;overflow-wrap:anywhere}
-.sv-constructor>header{padding:1rem 1.1rem .55rem}
-.sv-constructor h3{margin:0 0 4px;font-weight:750;font-size:0.9375rem}
-.sv-constructor>header p,.sv-tools>p{color:var(--vmute);font-size:0.6875rem;margin:0}
-/* Scoped tabs: global nav styles must not turn them into a vertical menu. */
-.sv-studio .sv-constructor nav.sv-tabs{
- display:flex;flex-direction:row;align-items:center;justify-content:flex-start;
- flex-wrap:nowrap;gap:.25rem;width:100%;min-width:0;
- padding:.35rem .7rem .65rem;margin:0;
- overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;flex:0 0 auto;
- border:0;background:transparent;
+.sv-studio button.sv-primary:hover{background:color-mix(in srgb,var(--vaccent) 83%,white)}
+/* Product header */
+.sv-studio .sv-title{
+ display:flex;align-items:center;gap:.85rem;min-height:4.2rem;
+ padding:.25rem 0 .55rem;border-bottom:1px solid color-mix(in srgb,var(--vline) 70%,transparent)
 }
-.sv-studio .sv-constructor nav.sv-tabs>button{
- display:inline-flex;align-items:center;justify-content:center;
- position:static;flex:0 0 auto;width:auto;max-width:none;min-width:0;
- margin:0;min-height:2.25rem;padding:.48rem .7rem;
- border:1px solid transparent;border-radius:var(--vround);
- background:transparent;color:var(--vmute);
- font-size:.78rem;font-weight:690;line-height:1.2;white-space:nowrap;
- transition:color .16s,background-color .16s,border-color .16s;
+.sv-title-symbol{
+ display:grid;place-items:center;flex:none;width:2.75rem;height:2.75rem;
+ border:1px solid color-mix(in srgb,var(--vaccent) 28%,var(--vline));border-radius:var(--vpanelround);
+ background:color-mix(in srgb,var(--vaccent) 10%,var(--vpanel));color:var(--vaccent)
 }
-.sv-studio .sv-constructor nav.sv-tabs>button:hover{
- color:var(--vtext);background:var(--vfield);
+.sv-title-symbol svg{height:1.3rem;width:1.3rem}
+.sv-title-copy{display:grid;min-width:0;gap:.07rem}
+.sv-studio .sv-eyebrow{
+ color:var(--vaccent);font-size:.63rem;letter-spacing:.12em;font-weight:800
 }
-.sv-studio .sv-constructor nav.sv-tabs>button.active{
- color:var(--vaccent);border-color:var(--vaccent);
- background:color-mix(in srgb,var(--vaccent) 12%,var(--vpanel));
+.sv-title-copy h2{font-size:1.3rem;line-height:1.2;margin:0;letter-spacing:-.035em;font-weight:830}
+.sv-studio .sv-subtitle{color:var(--vmute);font-size:.77rem;line-height:1.45;margin:.08rem 0 0}
+.sv-title-mode{
+ display:inline-flex;align-items:center;gap:.5rem;margin-left:auto;flex:none;
+ padding:.4rem .65rem;border:1px solid var(--vline);border-radius:var(--vround);
+ color:var(--vmute);font:750 .65rem/1.2 var(--vcode);letter-spacing:.04em
 }
-.sv-studio .sv-constructor nav.sv-tabs>button:focus-visible{
- outline:2px solid var(--vaccent);outline-offset:2px;
-}
-
-.sv-formbody{flex:1;min-height:0;overflow:auto;padding:1.05rem 1.1rem;border-top:1px solid var(--vline);scrollbar-width:thin}
-.sv-formbody h4{font-size:0.8125rem;margin:7px 0 10px}
-.sv-sectionhead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
-.sv-sectionhead h4{margin:0;font-size:0.75rem}
-.sv-sectionhead button{min-height:1.875rem;font-size:0.6875rem;padding:0.3125rem 0.5625rem}
-.sv-field{display:grid;gap:5px;min-width:0;font-size:0.6875rem;font-weight:650;margin-bottom:11px}
-.sv-field input,.sv-field select{background:var(--vfield);border:1px solid var(--vline);border-radius:var(--vround);width:100%;min-width:0;max-width:100%;padding:0.5625rem 0.625rem;min-height:2.375rem;color:var(--vtext);outline:0;font-size:0.75rem}
-.sv-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.sv-inbound-summary{display:flex;align-items:center;gap:9px;padding:0.625rem 0.6875rem 0.5rem;background:var(--vfield);border:1px solid var(--vline);border-bottom:0;border-radius:var(--vround) var(--vround) 0 0}
-.sv-inbound-summary strong{font-size:0.75rem;overflow-wrap:anywhere}
-.sv-protobadge{font-size:0.625rem;font-weight:750;border-radius:99px;background:color-mix(in srgb,var(--vaccent) 17%,var(--vpanel));padding:0.25rem 0.5rem;color:var(--vaccent)}
-.sv-inbound-summary button{margin-left:auto;padding:0.1875rem 0.4375rem;min-height:1.6875rem;color:var(--er,#f18492);background:transparent;border:0}
-.sv-inbound-summary~.sv-two,.sv-inbound-summary~[data-when],.sv-inbound-summary~.sv-note{background:var(--vfield);border-inline:1px solid var(--vline);padding:0.5rem 0.625rem 0;margin:0}
-.sv-inbound-summary~[data-when]{padding-top:0.625rem;border-top:1px solid var(--vline)}
-.sv-inbound-summary~.sv-note{padding-bottom:0.75rem;border-bottom:1px solid var(--vline);border-radius:0 0 var(--vround) var(--vround)}
-.sv-note{color:var(--vmute);font-size:0.6875rem;line-height:1.5;padding:0.625rem;background:var(--vfield);border-radius:var(--vround);margin:12px 0}
-.sv-muted{font-size:0.75rem;color:var(--vmute)}
-.sv-inline{display:flex;gap:6px;flex-wrap:wrap}
-.sv-inline button{font-size:0.6875rem;min-height:1.875rem}
-.sv-outbound-preview{margin-top:12px;padding:0.625rem;border:1px solid var(--vline);border-radius:var(--vround)}
-.sv-outbound-list{display:grid;gap:6px}
-.sv-outbound-row{display:flex;align-items:center;gap:8px;width:100%;min-height:2.625rem;text-align:left;background:var(--vfield)!important}
-.sv-outbound-row strong{font-size:0.75rem}.sv-outbound-chevron{margin-left:auto;font-size:1.25rem;color:var(--vmute)}
-.sv-constructor>footer{padding:0.5625rem 0.75rem;border-top:1px solid var(--vline);font-size:0.6875rem;color:var(--ok,#4ddda9)}
-.sv-danger{color:var(--er,#f27787)!important}
-.sv-toolhead{display:flex;align-items:center;justify-content:space-between}
-.sv-toolhead h3{font-size:0.8125rem;letter-spacing:.05em;margin:0}
-.sv-toolhead button{font-size:1.0625rem;min-height:1.75rem;padding:0.1875rem 0.5rem}
-.sv-legacy .xm-tools-heading,.sv-legacy .sv-secondary-tools{display:none}
-.sv-legacy .xm-tools-grid{display:flex;flex-direction:column;gap:8px}
-.sv-legacy .xm-tools-grid .sv-toolitem{display:flex;align-items:center;gap:9px;min-height:3.625rem;width:100%;text-align:left;padding:0.5625rem;background:var(--vfield);border:1px solid var(--vline);border-radius:var(--vround)}
-.sv-toolicon{display:grid;place-items:center;flex:0 0 38px;height:38px;border-radius:9px;font-size:1.25rem;color:var(--vaccent);background:color-mix(in srgb,var(--vaccent) 20%,var(--vpanel))}
-.sv-tool-shortid .sv-toolicon{color:#d7a8fa;background:#513767}.sv-tool-dns .sv-toolicon{color:#a3ccff;background:#284669}
-.sv-tool-routing .sv-toolicon{color:#80e3c7;background:#245147}.sv-tool-policy .sv-toolicon{color:#ffabda;background:#61374f}
-.sv-tool-outbounds .sv-toolicon{color:#f7c88b;background:#60482b}.sv-tool-validate .sv-toolicon{color:#d3b6ff;background:#493a66}
-.sv-toolcopy{display:grid;gap:3px;min-width:0;flex:1}
-.sv-toolcopy strong{font-size:0.75rem}.sv-toolcopy small{color:var(--vmute);font-size:0.65625rem;line-height:1.4}
-.sv-toolarrow{font-size:1.25rem;color:var(--vmute)}
-.sv-legacy .xm-tools-grid .sv-toolitem:hover{border-color:var(--vaccent)}
-.sv-legacy .xm-tools-status{color:var(--vmute);font-size:0.6875rem;overflow-wrap:anywhere}
-.sv-template{margin-top:auto;padding:0.6875rem;border:1px solid var(--vline);border-radius:var(--vround);background:var(--vfield)}
-.sv-template h4{margin:0 0 8px;font-size:0.75rem}.sv-template button{width:100%;text-align:left;font-size:0.6875rem}
-.sv-bottom{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0.4375rem 0;border-top:1px solid var(--vline)}
-.sv-bottom>span{color:var(--vmute);font-size:0.6875rem}.sv-bottom>div{display:flex;align-items:center;gap:8px}
-.sv-studio button:disabled{opacity:.4;cursor:default}
-.sv-overlay{position:fixed;inset:0;z-index:1100;display:flex;align-items:center;justify-content:center;padding:1.25rem;background:#000a}
-.sv-dialog{background:var(--vpanel);border:1px solid var(--vline);border-radius:var(--ui-radius,14px);width:min(520px,100%);max-height:75vh;overflow:auto;padding:1.125rem}
-.sv-dialog>header{display:flex;align-items:center;justify-content:space-between}.sv-dialog h3{margin:0;font-size:1.0625rem}
-.sv-dialogitem{width:100%;display:block;text-align:left;margin-top:7px;min-height:2.625rem}
-.sv-expand .sv-codepanel{position:fixed;inset:2vh 2vw;z-index:1200;box-shadow:0 20px 75px #000a}
-.sv-hide-tools .sv-workspace{grid-template-columns:minmax(0,1.55fr) minmax(350px,1fr);grid-template-areas:"modes actions" "editor constructor"}
-@media(max-width:1420px){.sv-workspace{grid-template-columns:minmax(0,1.25fr) minmax(330px,1fr) 230px}.sv-toolcopy small{font-size:0.625rem}}
-@media(max-width:1120px){.sv-workspace,.sv-hide-tools .sv-workspace{grid-template-columns:minmax(0,1.25fr) minmax(290px,1fr);grid-template-rows:auto 620px auto;grid-template-areas:"modes actions" "editor constructor" "tools tools"}.sv-tools{height:auto}.sv-legacy .xm-tools-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.sv-template{margin-top:0}.sv-studio .sv-workspace>.sv-actions{justify-content:flex-end}}
-@media(max-width:760px){.sv-workspace,.sv-hide-tools .sv-workspace{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto 520px 540px auto;grid-template-areas:"modes" "actions" "editor" "constructor" "tools"}.sv-navtags button{font-size:0.625rem;padding:0.375rem 0.5rem}.sv-studio .sv-workspace>.sv-actions{justify-content:flex-start}.sv-tools{grid-area:tools}.sv-two{grid-template-columns:minmax(0,1fr)}.sv-legacy .xm-tools-grid{grid-template-columns:minmax(0,1fr)}.sv-minimap{display:none}.sv-bottom{flex-wrap:wrap}}
-
-/* Minimal workspace: thin navigation, low-contrast surfaces, readable form hierarchy. */
-.sv-studio .sv-constructor nav.sv-tabs{border-bottom:1px solid var(--vline);padding:.15rem .8rem 0;gap:.2rem}
-.sv-studio .sv-constructor nav.sv-tabs>button{border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;min-height:2.65rem;padding:.55rem .75rem;font-size:.78rem;font-weight:650;letter-spacing:0}
-.sv-studio .sv-constructor nav.sv-tabs>button:hover{background:transparent;color:var(--vtext)}
-.sv-studio .sv-constructor nav.sv-tabs>button.active{border:0;border-bottom:2px solid var(--vaccent);background:transparent;color:var(--vaccent)}
-.sv-studio .sv-formbody .sv-sectionhead{margin-bottom:.85rem;padding-bottom:.55rem;border-bottom:1px solid color-mix(in srgb,var(--vline) 60%,transparent)}
-.sv-studio .sv-inbound-summary{background:var(--vpanel);border-color:var(--vline);padding:.85rem 1rem}
-.sv-studio .sv-inbound-summary~.sv-two,.sv-studio .sv-inbound-summary~[data-when],.sv-studio .sv-inbound-summary~.sv-note{background:var(--vpanel);padding-inline:1rem}
-.sv-studio .sv-inbound-summary~.sv-two input,.sv-studio .sv-inbound-summary~.sv-two select,.sv-studio .sv-inbound-summary~[data-when] input{background:var(--vfield)}
-.sv-studio .sv-field{gap:.38rem;margin-bottom:.85rem;font-size:.77rem}
-.sv-studio .sv-field input,.sv-studio .sv-field select{min-height:2.4rem}
-.sv-studio .sv-outbound-preview{margin-top:1.15rem}
-.sv-studio .sv-outbound-row{background:color-mix(in srgb,var(--vfield) 78%,var(--vpanel))!important}
-.sv-studio .sv-legacy .xm-tools-grid{gap:.48rem}
-.sv-studio .sv-legacy .xm-tools-grid .sv-toolitem{border-color:color-mix(in srgb,var(--vline) 72%,transparent);min-height:3.4rem}
-.sv-studio .sv-tools{padding:.95rem;gap:.85rem}
-.sv-studio .sv-toolicon{flex-basis:2.25rem;height:2.25rem;font-size:1.15rem}
-.sv-studio .sv-codebar{min-height:3rem}
-.sv-studio .sv-codesurface{font-size:.9rem}
-.sv-studio .sv-codebar small{background:transparent;color:var(--vmute)}
-.sv-studio .sv-workspace>.sv-actions{align-content:center}
-.sv-studio .sv-workspace>.sv-actions button{font-weight:570}
-@media(max-width:1420px){.sv-workspace{grid-template-columns:minmax(0,1.25fr) minmax(340px,1fr) minmax(190px,.55fr)}}
-@media(prefers-reduced-motion:reduce){.sv-studio *{animation:none!important;transition:none!important}}
-
-
-/* Diagnostics reported by installed Xray-core. Never fabricate source locations. */
-.sv-core-diagnostics{flex:none;max-height:8rem;overflow:auto;padding:.7rem 1rem;font-size:.8rem;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere;border-top:1px solid var(--vline)}
-.sv-core-diagnostics[data-status=bad]{color:var(--er,#f28a9b);background:color-mix(in srgb,var(--er,#f28a9b) 6%,var(--vpanel))}
-.sv-core-diagnostics[data-status=ok]{color:var(--ok,#57d6a4)}
-.sv-gutter{color:var(--vmute)}
-
-.sv-highlight .sv-invalid-line{display:inline;background:color-mix(in srgb,var(--er,#f28a9b) 10%,transparent);text-decoration:underline wavy var(--er,#f28a9b);text-underline-offset:.17em;text-decoration-thickness:1px}
-
-/* Compact Studio header — one toolbar, no repeated editor actions. */
-.sv-studio .sv-topbar{display:flex;align-items:center;gap:.65rem;min-width:0;padding:.32rem .45rem;border:1px solid var(--vline);border-radius:var(--vround);background:var(--vpanel)}
-.sv-studio .sv-topbar>.sv-page-tabs{display:flex;flex:0 0 auto;align-items:center;gap:.15rem;padding:0 .65rem 0 0;margin:0;border:0;border-right:1px solid var(--vline)}
-.sv-studio .sv-topbar>.sv-page-tabs button{min-height:2.15rem;padding:.42rem .75rem;font-size:.77rem;white-space:nowrap}
-.sv-studio .sv-topbar>.sv-mainnav{display:flex;align-items:center;flex:1 1 auto;min-width:0;max-width:unset;overflow-x:auto;border:0;background:transparent;padding:0;margin:0}
-.sv-studio .sv-topbar .sv-navtags{gap:.1rem}
-.sv-studio .sv-topbar .sv-navtags button{font-size:.76rem;min-height:2.15rem;padding:.42rem .75rem}
-.sv-studio .sv-topbar>.sv-actions{display:flex;align-items:center;justify-content:flex-end;gap:.3rem;flex:0 0 auto;margin:0 0 0 auto;padding:0;flex-wrap:nowrap}
-.sv-studio .sv-topbar>.sv-actions button{padding:.43rem .65rem;min-height:2.15rem;font-size:.75rem}
-.sv-studio .sv-topbar>.sv-actions .sv-primary{padding-inline:1rem}
-.sv-studio .sv-workspace,.sv-studio.sv-hide-tools .sv-workspace{grid-template-rows:minmax(560px,calc(100dvh - 218px));grid-template-areas:"editor constructor tools";gap:.7rem}
-.sv-studio .sv-bottom{padding:.45rem .1rem}
-.sv-studio .sv-profiles-active .sv-mainnav{display:none}
-.sv-studio.sv-profiles-active .sv-topbar>.sv-mainnav,.sv-studio.sv-profiles-active .sv-topbar>.sv-actions{display:none}
-.sv-studio.sv-hide-tools .sv-workspace{grid-template-columns:minmax(0,1.5fr) minmax(340px,1fr);grid-template-areas:"editor constructor"}
-@media(max-width:1120px){
-.sv-studio .sv-topbar{flex-wrap:wrap}
-.sv-studio .sv-topbar>.sv-mainnav{order:3;flex-basis:100%}
-.sv-studio .sv-workspace,.sv-studio.sv-hide-tools .sv-workspace{grid-template-rows:minmax(520px,1fr) auto;grid-template-areas:"editor constructor" "tools tools"}
-.sv-studio.sv-hide-tools .sv-workspace{grid-template-areas:"editor constructor"}
-}
-@media(max-width:760px){
-.sv-studio .sv-topbar>.sv-page-tabs{border-right:0}
-.sv-studio .sv-topbar>.sv-actions{margin-left:0;flex-wrap:wrap}
-.sv-studio .sv-workspace,.sv-studio.sv-hide-tools .sv-workspace{grid-template-columns:minmax(0,1fr);grid-template-rows:520px minmax(420px,auto) auto;grid-template-areas:"editor" "constructor" "tools"}
-.sv-studio.sv-hide-tools .sv-workspace{grid-template-areas:"editor" "constructor"}
-}
-
-
-/* Progressive disclosure for protocol-specific advanced configuration. */
-.sv-studio .sv-advanced{margin:1rem 0 .25rem;border-top:1px solid var(--vline);padding-top:.85rem}
-.sv-studio .sv-advanced summary{cursor:pointer;list-style:none;color:var(--vmute);font-size:.8rem;font-weight:650;padding:.3rem 0}
-.sv-studio .sv-advanced summary::-webkit-details-marker{display:none}
-.sv-studio .sv-advanced summary::before{content:"›";display:inline-block;margin-right:.5rem;transition:transform .15s}
-.sv-studio .sv-advanced[open] summary::before{transform:rotate(90deg)}
-.sv-studio .sv-advanced textarea{width:100%;min-height:8rem;resize:vertical;border:1px solid var(--vline);border-radius:var(--vround);background:var(--vfield);color:var(--vtext);padding:.7rem;font:500 .78rem/1.55 ui-monospace,SFMono-Regular,Consolas,monospace;tab-size:2}
-.sv-studio .sv-advanced .sv-field{margin:.8rem 0}
-
-
-/* Density pass: scale-aware compact controls, without shrinking user typography. */
-.sv-studio .sv-constructor>header{padding:.7rem .85rem .35rem}
-.sv-studio .sv-constructor>header h3{margin:0 0 .12rem}
-.sv-studio .sv-constructor>header p{margin:0}
-.sv-studio .sv-constructor nav.sv-tabs{padding:0 .65rem;gap:.12rem}
-.sv-studio .sv-constructor nav.sv-tabs>button{min-height:2.25rem;padding:.4rem .65rem}
-.sv-studio .sv-formbody{padding:.65rem .8rem}
-.sv-studio .sv-formbody h4{margin:.35rem 0 .55rem;font-size:.85rem}
-.sv-studio .sv-formbody .sv-sectionhead{margin-bottom:.6rem;padding-bottom:.4rem}
-.sv-studio .sv-formbody .sv-field{margin-bottom:.55rem;gap:.22rem}
-.sv-studio .sv-formbody .sv-field input,.sv-studio .sv-formbody .sv-field select{min-height:2.12rem;padding:.38rem .65rem}
-.sv-studio .sv-formbody .sv-two{gap:.35rem .65rem}
-.sv-studio .sv-formbody .sv-inbound-summary{padding:.48rem .7rem}
-.sv-studio .sv-inbound-summary~.sv-two,.sv-studio .sv-inbound-summary~[data-when],.sv-studio .sv-inbound-summary~.sv-note{padding-inline:.7rem}
-.sv-studio .sv-formbody [data-when]>h4{margin:.5rem 0 .4rem}
-.sv-studio .sv-formbody .sv-note{padding:.5rem .65rem;margin:.55rem 0}
-.sv-studio .sv-outbound-preview{margin-top:.65rem;padding:.55rem .65rem}
-.sv-studio .sv-outbound-preview .sv-sectionhead{margin-bottom:.35rem}
-.sv-studio .sv-outbound-row{min-height:2.25rem;padding:.4rem .65rem}
-.sv-studio .sv-advanced{margin:.5rem 0 0;padding-top:.45rem}
-.sv-studio .sv-advanced summary{padding:.25rem 0}
-.sv-studio .sv-tools{padding:.7rem;gap:.55rem}
-.sv-studio .sv-legacy .xm-tools-grid{gap:.3rem}
-.sv-studio .sv-legacy .xm-tools-grid .sv-toolitem{min-height:2.95rem;padding:.4rem .55rem;gap:.5rem}
-.sv-studio .sv-toolicon{flex-basis:2rem;height:2rem}
-.sv-studio .sv-template{padding:.6rem;margin-top:auto}
-.sv-studio .sv-codebar{min-height:2.65rem}
-.sv-studio .sv-codestatus{min-height:2rem;padding:.35rem .55rem}
-
-
-/* Dense but readable studio; controls honor the global root-scale. */
-.sv-studio .sv-profile-card{display:flex;align-items:stretch;gap:.4rem;min-width:0}
-.sv-studio .sv-profile-card .sv-profile-row{flex:1;min-width:0}
-.sv-studio .sv-profile-delete{align-self:stretch;padding:.45rem .8rem;border:1px solid var(--vline);background:var(--vpanel);color:var(--er,#f58ba1);font-size:.75rem}
-.sv-studio .sv-profile-delete:hover{border-color:var(--er,#f58ba1)}
-.sv-studio .sv-constructor>header{padding:.55rem .75rem .25rem}
-.sv-studio .sv-constructor nav.sv-tabs>button{min-height:2rem;padding:.32rem .55rem}
-.sv-studio .sv-formbody{padding:.55rem .7rem}
-.sv-studio .sv-formbody .sv-field{margin-bottom:.45rem}
-.sv-studio .sv-formbody .sv-field input,.sv-studio .sv-formbody .sv-field select{min-height:2rem}
-.sv-studio .sv-formbody [data-when]>h4{margin:.4rem 0 .25rem}
-.sv-studio .sv-formbody .sv-two{gap:.25rem .5rem}
-.sv-studio .sv-inbound-summary{padding:.4rem .65rem}
-.sv-studio .sv-outbound-preview{margin-top:.45rem}
-.sv-studio .sv-tools{padding:.55rem}
-.sv-studio .sv-legacy .xm-tools-grid{gap:.25rem}
-.sv-studio .sv-legacy .xm-tools-grid .sv-toolitem{min-height:2.65rem}
-
-
-/* JSON-first workspace: single editor surface and integrated utility dock.
-   The old constructor stays mounted, but is visually hidden to preserve sync,
-   profile loading and existing programmatic field integrations. */
-.sv-studio .sv-topbar{gap:.5rem;padding:.28rem .45rem}
-.sv-studio .sv-topbar>.sv-page-tabs{border-right:0;padding-right:0}
-.sv-studio .sv-topbar>.sv-actions{margin-left:auto}
-.sv-studio .sv-workspace,
-.sv-studio.sv-hide-tools .sv-workspace{
-  display:grid;
-  grid-template-columns:minmax(0,1fr) minmax(215px,245px);
-  grid-template-rows:minmax(560px,calc(100dvh - 208px));
-  grid-template-areas:"editor tools";
-  gap:0;
-  padding:0;
-  overflow:hidden;
-  border:1px solid var(--vline);
-  border-radius:var(--ui-radius,14px);
-  background:var(--vpanel);
-}
-.sv-studio .sv-columns{display:contents}
-.sv-studio .sv-codepanel{grid-area:editor;border:0;border-radius:0;min-width:0}
-.sv-studio .sv-constructor{display:none!important}
-.sv-studio .sv-tools{
-  grid-area:tools;min-width:0;min-height:0;
-  border:0;border-left:1px solid var(--vline);border-radius:0;
-  background:var(--vpanel);padding:.75rem;
-}
-.sv-studio .sv-codebar{padding-inline:.85rem}
-.sv-studio .sv-toolhead{padding:.1rem 0}
-.sv-studio .sv-legacy .xm-tools-grid{gap:.25rem}
-.sv-studio .sv-legacy .xm-tools-grid .sv-toolitem{border-radius:var(--vround)}
-.sv-studio.sv-hide-tools .sv-workspace{grid-template-columns:minmax(0,1fr);grid-template-areas:"editor"}
-.sv-studio.sv-hide-tools .sv-tools{display:none}
-.sv-studio .sv-topbar button{white-space:nowrap}
-@media(max-width:900px){
- .sv-studio .sv-workspace,.sv-studio.sv-hide-tools .sv-workspace{
-   grid-template-columns:minmax(0,1fr);
-   grid-template-rows:minmax(440px,67dvh) auto;
-   grid-template-areas:"editor" "tools";
- }
- .sv-studio .sv-tools{border-left:0;border-top:1px solid var(--vline);max-height:22rem}
- .sv-studio .sv-legacy .xm-tools-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
- .sv-studio.sv-hide-tools .sv-workspace{grid-template-rows:minmax(440px,67dvh);grid-template-areas:"editor"}
-}
-@media(max-width:550px){
- .sv-studio .sv-topbar{flex-wrap:wrap}
- .sv-studio .sv-topbar>.sv-actions{flex-wrap:wrap}
- .sv-studio .sv-legacy .xm-tools-grid{grid-template-columns:minmax(0,1fr)}
-}
-
-/* Compact template library & expanded utilities. */
-.sv-studio .sv-dialog:has(.sv-template-choice){width:min(660px,96vw)}
-.sv-studio .sv-dialog:has(.sv-template-choice) [data-v="overlayBody"]{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.55rem;margin-top:1rem}
-.sv-studio .sv-template-choice{display:flex;flex-direction:column;gap:.25rem;align-items:flex-start;min-height:3.5rem;text-align:left;margin:0;padding:.75rem}
-.sv-studio .sv-template-choice strong{font-size:.85rem}
-.sv-studio .sv-template-choice small{font-size:.72rem;color:var(--vmute);font-weight:450}
-.sv-studio .sv-tools{scrollbar-width:thin}
-.sv-studio .sv-legacy .xm-tools-grid .sv-toolitem{min-height:2.8rem}
-@media(max-width:580px){.sv-studio .sv-dialog:has(.sv-template-choice) [data-v="overlayBody"]{grid-template-columns:1fr}}
-
-
-/* JSON workspace: one editor with native inline utilities, no blank right rail. */
-.sv-studio .sv-workspace,.sv-studio.sv-hide-tools .sv-workspace{
- display:block;min-height:0;overflow:hidden;border:1px solid var(--vline);
- border-radius:var(--ui-radius,14px);background:var(--vpanel)
-}
-.sv-studio .sv-codepanel{display:flex;flex-direction:column;height:max(36rem,calc(100dvh - 215px));border:0;border-radius:0}
-.sv-studio .sv-inline-tools{flex:none;padding:.48rem .75rem;border-bottom:1px solid var(--vline);background:var(--vpanel)}
-.sv-studio .sv-inline-tools .xm-tools-grid{display:flex;flex-direction:row;align-items:center;gap:.35rem;flex-wrap:wrap}
-.sv-studio .sv-inline-tools .sv-toolitem{width:auto;min-height:2.15rem;padding:.35rem .75rem;display:inline-flex;align-items:center;justify-content:center;background:var(--vfield);border:1px solid var(--vline);border-radius:var(--vround);font-size:.75rem;font-weight:650;white-space:nowrap}
-.sv-studio .sv-inline-tools .sv-toolitem:hover{border-color:var(--vaccent);color:var(--vaccent)}
-.sv-studio .sv-inline-tools .xm-tools-status{display:block;font-size:.72rem;color:var(--vmute)}
-.sv-studio .sv-inline-tools .xm-tools-status:empty{display:none}
-.sv-studio .sv-codepanel .sv-codesurface{min-height:0;flex:1}
-.sv-studio .sv-tools{display:none!important}
-@media(max-width:760px){.sv-studio .sv-codepanel{height:max(30rem,calc(100dvh - 240px))}}
-
-
-/* Distinct, scale-aware JSON tool buttons with restrained semantic accents. */
-.sv-studio .sv-inline-tools .xm-tools-grid{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
-.sv-studio .sv-inline-tools .sv-toolitem{--tool-color:var(--vaccent);--tool-tint:color-mix(in srgb,var(--tool-color) 9%,var(--vpanel));display:inline-flex;gap:.52rem;align-items:center;justify-content:flex-start;min-height:2.55rem;padding:.36rem .78rem .36rem .38rem;border:1px solid color-mix(in srgb,var(--tool-color) 28%,var(--vline));border-radius:var(--vround);background:var(--tool-tint);color:var(--vtext);font-weight:650;font-size:.76rem;transition:background .18s,border-color .18s,transform .18s}
-.sv-studio .sv-inline-tools .sv-toolitem:hover{background:color-mix(in srgb,var(--tool-color) 15%,var(--vpanel));border-color:var(--tool-color);transform:translateY(-1px);color:var(--vtext)}
-.sv-studio .sv-inline-tools .sv-toolitem:focus-visible{outline:2px solid var(--tool-color);outline-offset:2px}
-.sv-studio .sv-inline-tools .sv-tool-glyph{display:grid;place-items:center;flex:none;width:1.85rem;height:1.85rem;border-radius:calc(var(--vround) - 3px);background:color-mix(in srgb,var(--tool-color) 17%,var(--vpanel));color:var(--tool-color)}
-.sv-studio .sv-inline-tools .sv-tool-glyph svg{width:1rem;height:1rem;display:block}
-.sv-studio .sv-inline-tools .sv-tool-label{white-space:nowrap}
-.sv-studio .sv-inline-tools .sv-tool-reality{--tool-color:#69d6ae}
-.sv-studio .sv-inline-tools .sv-tool-shortid{--tool-color:#ba94f2}
-.sv-studio .sv-inline-tools .sv-tool-xhttp{--tool-color:#72b5f6}
-.sv-studio .sv-inline-tools .sv-tool-dns{--tool-color:#e4ae69}
-.sv-studio .sv-inline-tools .sv-tool-routing{--tool-color:#69c7c8}
-.sv-studio .sv-inline-tools .sv-tool-inbound{--tool-color:var(--vaccent)}
-@media(prefers-reduced-motion:reduce){.sv-studio .sv-inline-tools .sv-toolitem{transform:none!important}}
-
-
-/* Inline Reality diagnostics with a single explicit repair action. */
-.sv-studio .sv-inline-tools .sv-tool-issue[hidden]{display:none!important}
-.sv-studio .sv-inline-tools .sv-tool-issue{
- display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;
- gap:.45rem .9rem;margin-top:.45rem;padding:.45rem .65rem;
- border:1px solid color-mix(in srgb,var(--er,#f28a9b) 35%,var(--vline));
- border-radius:var(--vround);background:color-mix(in srgb,var(--er,#f28a9b) 7%,var(--vpanel));
- color:var(--vtext);font-size:.76rem;line-height:1.45;
-}
-.sv-studio .sv-inline-tools .sv-tool-issue>span{flex:1;min-width:min(19rem,100%)}
-.sv-studio .sv-inline-tools .sv-tool-issue button{
- flex:none;min-height:2rem;padding:.35rem .65rem;
- border:1px solid color-mix(in srgb,var(--er,#f28a9b) 38%,var(--vline));
- border-radius:var(--vround);background:var(--vfield);
- color:var(--vtext);font-size:.76rem;font-weight:700;
-}
-.sv-studio .sv-inline-tools .sv-tool-issue button:hover{border-color:var(--er,#f28a9b)}
-.sv-studio .sv-inline-tools .sv-tool-issue button:focus-visible{outline:2px solid var(--vaccent);outline-offset:2px}
-.sv-studio .sv-inline-tools .xm-tools-status:not(:empty){padding-top:.3rem}
-@media(max-width:640px){.sv-studio .sv-inline-tools .sv-tool-issue{align-items:stretch}.sv-studio .sv-inline-tools .sv-tool-issue button{width:100%}}
-
-
-/* XRAY LIBRARY 2026: two unmistakable primary destinations; quiet premium cards.
-   All accents inherit the user's chosen theme. */
+.sv-live-dot{width:.45rem;height:.45rem;border-radius:50%;background:var(--vaccent)}
+/* Product navigation + commands */
 .sv-studio .sv-topbar{
-  min-height:4.2rem;
-  padding:.45rem .6rem;
-  gap:1rem;
-  border:1px solid var(--vline);
-  background:var(--vpanel);
-  border-radius:var(--ui-radius,16px);
+ display:flex;align-items:center;gap:1rem;min-width:0;min-height:4.25rem;
+ padding:.45rem .6rem;border:1px solid var(--vline);border-radius:var(--vpanelround);
+ background:var(--vpanel)
 }
 .sv-studio .sv-topbar>.sv-page-tabs{
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  align-items:stretch;
-  gap:.35rem;
-  width:min(100%,25.5rem);
-  min-width:min(100%,19rem);
-  flex:0 1 25.5rem;
-  border:0;
-  padding:0;
-  margin:0;
-  border-radius:var(--vround);
+ display:flex;align-items:stretch;gap:.35rem;flex:none;width:auto;margin:0;padding:0;
+ border:0;background:transparent
 }
 .sv-studio .sv-topbar>.sv-page-tabs>button{
-  display:flex;
-  align-items:center;
-  gap:.7rem;
-  text-align:left;
-  min-width:0;
-  min-height:3.25rem;
-  padding:.5rem .75rem;
-  border:1px solid transparent;
-  border-radius:var(--vround);
-  background:transparent;
-  color:var(--vmute);
-  transition:background .18s,border-color .18s,color .18s,transform .18s;
+ display:flex;align-items:center;gap:.65rem;min-height:3.15rem;max-width:14rem;
+ text-align:left;padding:.45rem .8rem;border:1px solid transparent;
+ border-radius:var(--vround);background:transparent;color:var(--vmute);font-size:.8rem
 }
-.sv-studio .sv-topbar>.sv-page-tabs>button:hover{
-  border-color:var(--vline);
-  background:var(--vfield);
-  color:var(--vtext);
-}
+.sv-studio .sv-topbar>.sv-page-tabs>button:hover{background:var(--vfield);color:var(--vtext)}
 .sv-studio .sv-topbar>.sv-page-tabs>button.active{
-  background:color-mix(in srgb,var(--vaccent) 11%,var(--vpanel));
-  color:var(--vtext);
-  border-color:color-mix(in srgb,var(--vaccent) 48%,var(--vline));
-  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--vaccent) 9%,transparent);
+ border-color:color-mix(in srgb,var(--vaccent) 45%,var(--vline));
+ background:color-mix(in srgb,var(--vaccent) 11%,var(--vpanel));color:var(--vtext)
 }
-.sv-studio .sv-page-tab-icon{
-  display:grid;place-items:center;flex:none;
-  width:2.2rem;height:2.2rem;border-radius:calc(var(--vround) - 2px);
-  background:var(--vfield);color:var(--vmute);
+.sv-page-tab-icon{
+ display:grid;place-items:center;flex:none;width:2.05rem;height:2.05rem;
+ color:var(--vmute);border-radius:var(--vround);background:var(--vfield)
 }
-.sv-studio .sv-page-tab-icon svg{display:block;width:1.15rem;height:1.15rem}
-.sv-studio .sv-page-tabs button.active .sv-page-tab-icon{
-  color:var(--vaccent);
-  background:color-mix(in srgb,var(--vaccent) 19%,var(--vpanel));
+.sv-page-tab-icon svg{width:1.05rem;height:1.05rem}
+.sv-page-tabs button.active .sv-page-tab-icon{
+ color:var(--vaccent);background:color-mix(in srgb,var(--vaccent) 17%,var(--vpanel))
 }
-.sv-studio .sv-page-tab-text{display:flex;flex-direction:column;align-items:flex-start;gap:0;min-width:0}
-.sv-studio .sv-page-tab-text strong{
-  font-weight:750;
-  font-size:.85rem;
-  letter-spacing:-.012em;
-  line-height:1.3;
-  white-space:nowrap;
+.sv-page-tab-text{display:flex;flex-direction:column;align-items:flex-start;min-width:0}
+.sv-page-tab-text strong{font-weight:800;font-size:.83rem;letter-spacing:-.012em}
+.sv-page-tab-text small{font-size:.68rem;font-weight:450;color:var(--vmute)}
+.sv-page-count{
+ display:grid;place-items:center;flex:none;min-width:1.4rem;height:1.4rem;
+ padding:0 .25rem;margin-left:.2rem;border:1px solid var(--vline);
+ border-radius:var(--vround);background:var(--vfield);font-size:.68rem;font-variant-numeric:tabular-nums
 }
-.sv-studio .sv-page-tab-text small{
-  font-weight:450;
-  font-size:.68rem;
-  line-height:1.35;
-  color:var(--vmute);
-  white-space:nowrap;
+.sv-studio .sv-topbar>.sv-actions{
+ display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;
+ gap:.45rem;min-width:0;margin-left:auto
 }
-.sv-studio .sv-page-count{
-  margin-left:auto;
-  flex:none;
-  min-width:1.55rem;
-  height:1.55rem;
-  display:grid;place-items:center;
-  padding:0 .28rem;
-  background:var(--vfield);
-  border:1px solid var(--vline);
-  border-radius:100px;
-  font-size:.7rem;
-  font-weight:750;
-  font-variant-numeric:tabular-nums;
-  color:var(--vtext);
-}
-.sv-studio .sv-page-tabs button.active .sv-page-count{
-  border-color:color-mix(in srgb,var(--vaccent) 38%,var(--vline));
-  background:color-mix(in srgb,var(--vaccent) 14%,var(--vpanel));
-  color:var(--vaccent);
-}
-.sv-studio .sv-topbar>.sv-actions{margin-left:auto;gap:.35rem}
-.sv-studio .sv-topbar>.sv-actions button{min-height:2.35rem;font-size:.75rem;padding:.45rem .7rem}
-.sv-studio .sv-topbar>.sv-actions .sv-primary{padding-inline:1.1rem}
+.sv-studio .sv-topbar>.sv-actions button{min-height:2.55rem;padding:.5rem .75rem}
+.sv-studio .sv-topbar>.sv-actions .sv-primary{min-width:7.2rem}
+.sv-action-divider{height:1.45rem;align-self:center;border-left:1px solid var(--vline);margin:0 .1rem}
 .sv-studio.sv-profiles-active .sv-topbar>.sv-actions{display:none}
+.sv-studio .sv-profiles-page{min-width:0}
+.sv-studio.sv-profiles-active .sv-workspace,.sv-studio.sv-profiles-active .sv-bottom{display:none!important}
+/* Editor + optional document structure. Width inherits the panel user setting. */
+.sv-studio .sv-workspace{
+ display:grid;grid-template-columns:minmax(0,1fr) minmax(15.75rem,17.5rem);
+ grid-template-rows:minmax(0,1fr);min-width:0;width:100%;
+ height:clamp(36rem,calc(100dvh - 16rem),74rem);
+ border:1px solid var(--vline);border-radius:var(--vpanelround);
+ background:var(--vpanel);overflow:hidden;
+}
+.sv-studio .sv-columns{display:contents}
+.sv-studio .sv-constructor{display:none!important}
+.sv-studio .sv-codepanel{
+ display:flex;flex-direction:column;min-width:0;min-height:0;
+ border:0;border-radius:0;overflow:hidden;background:var(--vpanel)
+}
+.sv-studio.sv-outline-hidden .sv-workspace{grid-template-columns:minmax(0,1fr)}
+.sv-studio.sv-outline-hidden .sv-outline{display:none}
+/* File header */
+.sv-studio .sv-codebar{
+ display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.55rem 1rem;
+ flex:none;min-height:3.65rem;padding:.6rem .95rem;
+ border-bottom:1px solid var(--vline);background:var(--vpanel)
+}
+.sv-codebar-start,.sv-codebar-actions{display:flex;align-items:center;gap:.55rem;min-width:0}
+.sv-codebar-start{flex:1 1 24rem;flex-wrap:wrap}
+.sv-studio .sv-codebar .sv-profile-name{
+ display:flex;align-items:center;gap:.55rem;flex:0 1 18.5rem;min-width:11rem;
+ font-weight:700;font-size:.73rem;color:var(--vmute)
+}
+.sv-studio .sv-codebar .sv-profile-name span{white-space:nowrap}
+.sv-studio .sv-codebar .sv-profile-name input{
+ flex:1;min-width:0;max-width:16rem;height:2.25rem;
+ padding:.45rem .7rem;border:1px solid var(--vline);
+ border-radius:var(--vround);background:var(--vfield);color:var(--vtext);
+ font-size:.78rem;font-weight:700
+}
+.sv-codebar-file{
+ display:inline-flex;align-items:center;gap:.45rem;white-space:nowrap;
+ color:var(--vtext);font:600 .76rem/1.2 var(--vcode)
+}
+.sv-codebar-file svg{width:.96rem;height:.96rem;color:var(--vmute)}
+.sv-file-state{
+ display:inline-flex;align-items:center;gap:.3rem;
+ padding:.33rem .55rem;border-radius:var(--vround);
+ color:var(--vmute);background:var(--vfield);font-size:.68rem;font-weight:750;white-space:nowrap
+}
+.sv-file-state[data-state=pending]{color:var(--vaccent);background:color-mix(in srgb,var(--vaccent) 10%,var(--vpanel))}
+.sv-codebar-actions{margin-left:auto;flex:none;gap:.32rem}
+.sv-studio .sv-codebar-actions button{
+ min-width:2.15rem;min-height:2.15rem;padding:.42rem .6rem;
+ background:transparent;border-color:transparent;font-size:.77rem
+}
+.sv-studio .sv-codebar-actions button:hover{background:var(--vfield);border-color:var(--vline)}
+.sv-codebar-actions button[aria-expanded=true]{color:var(--vaccent)}
+.sv-codebar-divider{height:1.25rem;border-left:1px solid var(--vline);margin:0 .18rem}
+/* Commands — two quiet, readable groups, instead of a rainbow toolbar. */
+.sv-studio .sv-inline-tools{
+ display:block;flex:none;padding:.67rem .95rem .5rem;
+ border-bottom:1px solid var(--vline);background:var(--vpanel)
+}
+.sv-studio .xm-tools-groups{display:flex;flex-wrap:wrap;align-items:center;gap:.8rem 1.35rem;min-width:0}
+.sv-studio .xm-tool-cluster{display:flex;flex-wrap:wrap;align-items:center;gap:.45rem;min-width:0}
+.sv-studio .xm-tool-cluster-label{
+ display:inline-block;flex:none;min-width:max-content;margin-right:.15rem;
+ font-size:.64rem;letter-spacing:.045em;font-weight:800;color:var(--vmute)
+}
+.sv-studio .xm-tools-grid{display:flex;align-items:center;flex-wrap:wrap;gap:.35rem}
+.sv-studio .sv-inline-tools .sv-toolitem{
+ display:inline-flex;align-items:center;justify-content:flex-start;gap:.5rem;
+ width:auto;min-height:2.35rem;padding:.3rem .72rem .3rem .38rem;
+ background:var(--vfield);border:1px solid var(--vline);border-radius:var(--vround);
+ color:var(--vtext);font-weight:710;font-size:.75rem
+}
+.sv-studio .sv-inline-tools .sv-toolitem:hover{
+ background:color-mix(in srgb,var(--vaccent) 8%,var(--vfield));
+ border-color:color-mix(in srgb,var(--vaccent) 45%,var(--vline))
+}
+.sv-studio .sv-tool-glyph{
+ display:grid;place-items:center;flex:none;width:1.55rem;height:1.55rem;
+ border-radius:var(--vround);background:color-mix(in srgb,var(--vaccent) 10%,var(--vpanel));color:var(--vaccent)
+}
+.sv-studio .sv-tool-glyph svg{display:block;width:.94rem;height:.94rem}
+.sv-studio .sv-tool-label{white-space:nowrap}
+.sv-studio .sv-inline-tools .sv-tool-issue[hidden],.sv-studio .sv-inline-tools .xm-tools-status:empty{display:none!important}
+.sv-studio .sv-tool-issue{
+ display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;margin:.65rem 0 .15rem;padding:.65rem .8rem;
+ border:1px solid color-mix(in srgb,var(--er,#ef8194) 36%,var(--vline));
+ border-radius:var(--vround);background:color-mix(in srgb,var(--er,#ef8194) 7%,var(--vpanel));
+ font-size:.77rem
+}
+.sv-studio .sv-tool-issue>span{flex:1 1 18rem}
+.sv-studio .sv-tool-issue button{min-height:2rem;font-size:.72rem}
+.sv-studio .xm-tools-status:not(:empty){display:block;padding:.5rem 0 0;color:var(--vmute);font-size:.73rem}
+/* Editor context, identical scroll and font metrics for text + highlighter. */
+.sv-editor-context{
+ display:flex;flex:none;align-items:center;justify-content:space-between;gap:1rem;
+ min-height:2.35rem;padding:.38rem 1rem;
+ border-bottom:1px solid var(--vline);
+ color:var(--vmute);font-size:.66rem
+}
+.sv-editor-context>span:first-child{font:750 .65rem/1.2 var(--vcode);letter-spacing:.045em}
+.sv-context-marker{display:inline-block;width:.4rem;height:.4rem;border-radius:50%;background:var(--vaccent);margin-right:.36rem}
+.sv-studio .sv-codesurface{
+ --sv-code-size:.875rem;--sv-code-leading:1.65;
+ display:flex;flex:1 1 0;min-width:0;min-height:0;overflow:hidden;
+ background:color-mix(in srgb,var(--vbg) 95%,var(--vpanel));
+ font-family:var(--vcode);font-size:var(--sv-code-size);line-height:var(--sv-code-leading)
+}
+.sv-studio .sv-gutter{
+ display:block;flex:0 0 3.1rem;min-width:0;margin:0;overflow:hidden;
+ padding:.95rem .65rem .95rem .15rem;text-align:right;white-space:pre;
+ background:color-mix(in srgb,var(--vbg) 85%,var(--vpanel));
+ border-right:1px solid color-mix(in srgb,var(--vline) 75%,transparent);
+ font:inherit;line-height:inherit;font-variant-numeric:tabular-nums;color:var(--vmute);user-select:none
+}
+.sv-codeholder{position:relative;flex:1;min-width:0;min-height:0;overflow:hidden}
+.sv-studio .sv-highlight,.sv-studio .sv-codeholder textarea{
+ position:absolute;inset:0;display:block;width:100%;height:100%;margin:0;
+ padding:.95rem 1rem;border:0;background:transparent;white-space:pre;overflow:auto;
+ overflow-wrap:normal;tab-size:2;box-shadow:none;
+ font-family:var(--vcode)!important;font-size:inherit!important;
+ font-weight:450!important;font-style:normal!important;line-height:inherit!important;
+ letter-spacing:normal!important;word-spacing:normal!important;
+ font-variant-ligatures:none!important;font-feature-settings:"liga" 0,"calt" 0!important;
+ text-transform:none!important;text-indent:0!important;text-shadow:none!important;
+ scrollbar-gutter:stable
+}
+.sv-studio .sv-highlight{
+ z-index:1;pointer-events:none;overflow:hidden;scrollbar-width:none;color:var(--vtext)
+}
+.sv-studio .sv-codeholder textarea{
+ z-index:2;resize:none;outline:none;color:transparent!important;-webkit-text-fill-color:transparent;
+ caret-color:var(--vtext);background:transparent!important
+}
+.sv-studio .sv-codeholder textarea::selection{color:transparent!important;-webkit-text-fill-color:transparent!important;background:color-mix(in srgb,var(--vaccent) 31%,transparent)}
+.sv-studio .sv-codeholder textarea:focus{outline:0;box-shadow:none}
+.sv-key{color:#79d1f5}.sv-string{color:#ef939b}.sv-number{color:#a5df99}.sv-boolean{color:#cfafff}
+.sv-invalid-line{background:color-mix(in srgb,var(--er,#ef8194) 12%,transparent);text-decoration:underline wavy var(--er,#ef8194);text-decoration-thickness:1px}
+.sv-minimap{
+ flex:0 0 2.7rem;margin:0;padding:.5rem .18rem;overflow:hidden;
+ border-left:1px solid color-mix(in srgb,var(--vline) 70%,transparent);
+ font:.12rem/.25rem var(--vcode);white-space:pre;opacity:.55;pointer-events:none
+}
+.sv-wrap .sv-highlight,.sv-wrap .sv-codeholder textarea{white-space:pre-wrap;overflow-wrap:anywhere}
+.sv-studio .sv-core-diagnostics:not([hidden]){
+ flex:none;padding:.62rem .85rem;border-top:1px solid var(--vline);
+ font-size:.76rem;line-height:1.5;max-height:7rem;overflow-y:auto;overflow-wrap:anywhere
+}
+.sv-studio .sv-core-diagnostics[data-status=ok]{color:var(--ok,#50dca8)}
+.sv-studio .sv-core-diagnostics[data-status=bad]{color:var(--er,#ef8194)}
+.sv-studio .sv-codestatus{
+ display:flex;flex:0 0 auto;align-items:center;flex-wrap:wrap;gap:.6rem .9rem;
+ min-height:2.6rem;padding:.46rem .85rem;border-top:1px solid var(--vline);
+ background:var(--vpanel);color:var(--vmute);font-size:.7rem;font-variant-numeric:tabular-nums
+}
+.sv-codestatus-lines{padding-left:.7rem;border-left:1px solid var(--vline)}
+.sv-codestatus-valid{margin-left:auto}
+.sv-codestatus-valid[data-status=ok]{color:var(--ok,#50dca8)}
+.sv-codestatus-valid[data-status=bad]{color:var(--er,#ef8194)}
+.sv-studio .sv-codestatus label{display:inline-flex;align-items:center;gap:.3rem;cursor:pointer;white-space:nowrap}
+.sv-codestatus input{accent-color:var(--vaccent)}
+/* Live inspector. No secret values are ever rendered in this panel. */
+.sv-studio .sv-outline{
+ display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;
+ border-left:1px solid var(--vline);background:var(--vpanel)
+}
+.sv-outline-head{
+ display:flex;align-items:center;justify-content:space-between;flex:none;gap:.75rem;
+ min-height:4.15rem;padding:1rem 1rem .8rem;border-bottom:1px solid var(--vline)
+}
+.sv-outline-eyebrow{font-size:.59rem;font-weight:800;letter-spacing:.08em;color:var(--vaccent)}
+.sv-outline-head h3{font-size:1rem;margin:.17rem 0 0;letter-spacing:-.02em}
+.sv-studio .sv-outline-head button{width:2rem;height:2rem;min-height:2rem;padding:0;font-size:1.15rem}
+.sv-outline-content{
+ display:flex;flex-direction:column;flex:1;min-height:0;gap:1rem;
+ padding:1rem;overflow-y:auto;scrollbar-width:thin
+}
+.sv-overview-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.3rem}
+.sv-overview-metrics>div{
+ display:flex;flex-direction:column;gap:.22rem;align-items:center;
+ padding:.72rem .15rem;border:1px solid var(--vline);
+ border-radius:var(--vround);background:var(--vfield)
+}
+.sv-overview-metrics strong{font-size:1.12rem;line-height:1.1;letter-spacing:-.035em;font-variant-numeric:tabular-nums}
+.sv-overview-metrics span{font-size:.62rem;color:var(--vmute)}
+.sv-outline-section{display:flex;flex-direction:column;gap:.5rem;min-width:0}
+.sv-outline-section h4{
+ margin:.3rem 0 0;color:var(--vmute);font-size:.68rem;
+ letter-spacing:.025em;font-weight:800
+}
+.sv-outline-nav,.sv-inbound-outline{display:grid;gap:.36rem;min-width:0}
+.sv-studio .sv-outline-item{
+ display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto;
+ align-items:center;text-align:left;column-gap:.35rem;row-gap:.1rem;
+ width:100%;min-width:0;min-height:2.95rem;padding:.54rem .67rem;
+ border:1px solid var(--vline);border-radius:var(--vround);
+ background:color-mix(in srgb,var(--vfield) 65%,var(--vpanel));color:var(--vtext)
+}
+.sv-studio .sv-outline-item:hover{border-color:var(--vaccent);background:var(--vfield)}
+.sv-outline-item-label{grid-column:1;grid-row:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:750;font-size:.74rem}
+.sv-outline-item small{grid-column:1;grid-row:2;min-width:0;color:var(--vmute);font-size:.65rem;font-weight:450;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sv-outline-item-arrow{grid-column:2;grid-row:1/3;color:var(--vmute)}
+.sv-outline-empty,.sv-outline-more{color:var(--vmute);font-size:.72rem;line-height:1.5;margin:0}
+.sv-outline-footer{
+ display:flex;align-items:center;gap:.47rem;flex:none;flex-wrap:wrap;
+ padding:.8rem .95rem;border-top:1px solid var(--vline);font-size:.67rem;color:var(--vmute)
+}
+.sv-outline-footer [data-v=outlineStatus]{flex:1 1 7rem;min-width:0}
+.sv-outline-status-dot{flex:none;width:.43rem;height:.43rem;border-radius:50%;background:var(--vmute)}
+.sv-outline-status-dot[data-status=ok]{background:var(--ok,#50dca8)}
+.sv-outline-status-dot[data-status=bad]{background:var(--er,#ef8194)}
+.sv-studio .sv-outline-footer button{min-height:2rem;padding:.35rem .55rem;font-size:.67rem}
+/* Footer, templates and focus mode */
+.sv-studio .sv-bottom{
+ display:flex;align-items:center;justify-content:space-between;gap:1rem;
+ min-height:2.7rem;padding:.35rem .15rem;border-top:1px solid var(--vline)
+}
+.sv-bottom>span{color:var(--vmute);font-size:.72rem}
+.sv-studio[data-dirty=true] .sv-bottom>span{color:var(--vaccent)}
+.sv-overlay{
+ position:fixed;inset:0;z-index:1100;display:flex;align-items:center;justify-content:center;
+ padding:1.25rem;background:var(--xm-modal-dim,rgba(2,7,12,.72));
+ backdrop-filter:blur(var(--xm-modal-blur,11px));-webkit-backdrop-filter:blur(var(--xm-modal-blur,11px))
+}
+.sv-dialog{
+ width:min(36rem,100%);max-height:82dvh;overflow-y:auto;padding:1.15rem;
+ border:1px solid var(--vline);border-radius:var(--vpanelround);
+ background:var(--vpanel);box-shadow:0 1.5rem 4.5rem #0007
+}
+.sv-dialog>header{display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.sv-dialog h3{margin:0;font-size:1.05rem}
+.sv-dialogitem{display:flex!important;width:100%;text-align:left!important;justify-content:flex-start!important;margin-top:.4rem}
+.sv-studio .sv-dialog:has(.sv-template-choice){width:min(42rem,96vw)}
+.sv-studio .sv-dialog:has(.sv-template-choice) [data-v=overlayBody]{
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.55rem;margin-top:1rem
+}
+.sv-studio .sv-template-choice{
+ display:flex;flex-direction:column;align-items:flex-start;gap:.3rem;
+ min-height:4rem;margin:0;padding:.75rem;text-align:left;white-space:normal
+}
+.sv-template-choice strong{font-size:.83rem}
+.sv-template-choice small{font-size:.7rem;font-weight:450;color:var(--vmute)}
+.sv-studio .sv-outline-hidden .sv-workspace{grid-template-columns:1fr}
+.sv-studio.sv-expand::before{
+ content:"";position:fixed;inset:0;z-index:1199;pointer-events:none;
+ background:var(--xm-modal-dim,rgba(2,7,12,.72));
+ backdrop-filter:blur(var(--xm-modal-blur,11px));-webkit-backdrop-filter:blur(var(--xm-modal-blur,11px))
+}
+.sv-studio.sv-expand .sv-codepanel{
+ position:fixed;inset:clamp(.5rem,2vw,1.5rem);z-index:1200;
+ border:1px solid var(--vline);border-radius:var(--vpanelround);
+ background:var(--vpanel);box-shadow:0 1.5rem 5rem #0008
+}
+/* Hidden constructor is still mounted for existing sync / hosts integration. */
+.sv-formbody{flex:1;min-height:0;overflow:auto;padding:1rem}
+.sv-field{display:grid;gap:.4rem;min-width:0;margin-bottom:.65rem;font-size:.73rem}
+.sv-field :is(input,select,textarea){width:100%;min-height:2.25rem;background:var(--vfield);border:1px solid var(--vline);border-radius:var(--vround);padding:.5rem .6rem;color:var(--vtext)}
+.sv-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem}
+.sv-protobadge{padding:.3rem .5rem;border-radius:var(--vround);background:var(--vfield);font-size:.67rem}
+.sv-sectionhead{display:flex;align-items:center;justify-content:space-between;gap:.5rem}
+.sv-sectionhead h4{margin:0}
+.sv-muted,.sv-note{font-size:.75rem;color:var(--vmute)}
+.sv-inline{display:flex;gap:.5rem;flex-wrap:wrap}
+.sv-outbound-preview{display:grid;gap:.5rem}
+.sv-outbound-row{display:flex;align-items:center;gap:.5rem}
+.sv-outbound-chevron{margin-left:auto}
+.sv-studio .sv-constructor nav.sv-tabs{display:flex;gap:.3rem;overflow-x:auto}
+.sv-studio .sv-constructor nav.sv-tabs>button{flex:none}
+/* Responsive: inspector stacks below, controls wrap, editor remains usable. */
+@media(max-width:1250px){
+ .sv-studio .sv-topbar{flex-wrap:wrap}
+ .sv-studio .sv-topbar>.sv-actions{flex:1 1 100%;justify-content:flex-start}
+ .sv-studio .sv-workspace{grid-template-columns:minmax(0,1fr) minmax(14rem,16rem)}
+}
+@media(max-width:940px){
+ .sv-studio .sv-workspace{
+  display:flex;flex-direction:column;overflow:visible;height:auto;min-height:0
+ }
+ .sv-studio .sv-codepanel{height:clamp(32rem,72dvh,58rem);flex:none}
+ .sv-studio .sv-outline{border-left:0;border-top:1px solid var(--vline);max-height:28rem}
+ .sv-studio .sv-outline-content{overflow-y:auto;max-height:20rem}
+ .sv-studio .sv-topbar>.sv-actions{flex-wrap:wrap}
+}
+@media(max-width:650px){
+ .sv-studio .sv-title-mode{display:none}
+ .sv-studio .sv-topbar>.sv-page-tabs{width:100%}
+ .sv-studio .sv-topbar>.sv-page-tabs>button{flex:1;min-width:0}
+ .sv-studio .sv-topbar>.sv-actions{gap:.35rem}
+ .sv-studio .sv-topbar>.sv-actions button{flex:1 1 auto}
+ .sv-studio .sv-action-divider{display:none}
+ .sv-studio .sv-codebar{padding:.55rem}
+ .sv-studio .sv-codebar-start{flex-basis:100%}
+ .sv-studio .sv-codebar .sv-profile-name{flex:1 1 100%}
+ .sv-studio .sv-codebar .sv-profile-name input{max-width:none}
+ .sv-studio .sv-codebar-actions{margin-left:0;flex-wrap:wrap}
+ .sv-editor-context>span:last-child{display:none}
+ .sv-studio .sv-inline-tools{padding:.65rem}
+ .sv-studio .xm-tools-groups{gap:.65rem}
+ .sv-studio .xm-tool-cluster-label{flex:0 0 100%}
+ .sv-studio .sv-codesurface{--sv-code-size:.79rem}
+ .sv-studio .sv-gutter{flex-basis:2.45rem;padding-right:.35rem}
+ .sv-studio .sv-minimap{display:none}
+ .sv-studio .sv-codestatus{gap:.45rem}
+ .sv-codestatus-valid{flex:1 1 100%;margin-left:0;order:3}
+ .sv-studio .sv-dialog:has(.sv-template-choice) [data-v=overlayBody]{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){
+ .sv-studio button,.sv-studio *{transition:none!important;animation:none!important}
+}
 
+/* Profile library — preserved component rules */
 /* Library header and discovery controls */
 .sv-studio .sv-profiles-page{
   min-height:30rem;
@@ -715,24 +634,7 @@
  border-color:color-mix(in srgb,var(--vaccent) 39%,var(--vline));
  color:var(--vtext);font-weight:750;
 }
-@media(max-width:1020px){
- .sv-studio .sv-topbar{flex-wrap:wrap}
- .sv-studio .sv-topbar>.sv-page-tabs{width:min(100%,28rem);flex:1 1 20rem}
- .sv-studio .sv-topbar>.sv-actions{flex:1 1 auto;justify-content:flex-end;flex-wrap:wrap}
-}
-@media(max-width:680px){
- .sv-studio .sv-topbar{padding:.4rem}
- .sv-studio .sv-topbar>.sv-page-tabs{flex:1 1 100%;width:100%;min-width:0}
- .sv-studio .sv-topbar>.sv-page-tabs>button{padding:.42rem;gap:.4rem}
- .sv-studio .sv-page-tab-icon{width:1.9rem;height:1.9rem}
- .sv-studio .sv-page-tab-text small{display:none}
- .sv-studio .sv-page-tab-text strong{font-size:.79rem}
- .sv-studio .sv-profiles-page>.sv-library-hero{padding:1.1rem;align-items:stretch;flex-direction:column}
- .sv-studio .sv-library-create{align-self:flex-start}
- .sv-studio .sv-library-toolbar{flex-wrap:wrap}
- .sv-studio .sv-library-search{flex:1 1 100%;max-width:none}
- .sv-studio .sv-profiles-list{grid-template-columns:1fr}
-}
+/* Shared Studio dialogs — preserved component rules */
 @media(prefers-reduced-motion:reduce){
  .sv-studio .sv-profile-card{transform:none!important;transition:none}
  .sv-studio .sv-page-tabs button{transition:none}
@@ -835,10 +737,3 @@
 .xm-studio-modal[open]{animation:xm-studio-dialog-enter .22s cubic-bezier(.2,.8,.2,1) both}
 .xm-studio-modal[open]::backdrop{animation:xm-studio-backdrop-enter .2s ease both}
 @media(prefers-reduced-motion:reduce){.xm-studio-modal[open],.xm-studio-modal[open]::backdrop{animation:none}}
-
-/* Directly editable and discoverable XRAY profile name. */
-.sv-studio .sv-codebar .sv-profile-name{display:flex;flex:0 1 320px;min-width:170px;align-items:center;gap:.55rem;color:var(--vmute);font-size:.72rem}
-.sv-studio .sv-codebar .sv-profile-name span{white-space:nowrap}
-.sv-studio .sv-codebar .sv-profile-name input{min-width:0;width:100%;height:2rem;padding:.35rem .6rem;border:1px solid var(--vline);border-radius:var(--vround);background:var(--vfield);color:var(--vtext);font:inherit}
-.sv-studio .sv-codebar .sv-profile-name input:focus{outline:2px solid var(--vaccent);outline-offset:1px}
-@media(max-width:720px){.sv-studio .sv-codebar{flex-wrap:wrap}.sv-studio .sv-codebar .sv-profile-name{flex:1 1 100%}}
