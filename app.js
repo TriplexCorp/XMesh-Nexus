@@ -2612,7 +2612,7 @@ const updateNodeRuntimeBadges=(node,runtime)=>{
   const profileStatus=card.querySelector('[data-node-profile-status]');
   if(profileStatus){
     profileStatus.textContent=nodeProfileStatus(runtime);
-    profileStatus.title=runtime?.desiredRevisionSource==='computed'
+    profileStatus.title=runtime?.desiredRevisionSource==='current'
       ?'Ожидаемая ревизия вычислена из актуальных настроек панели; совпадение проверено по подписанному heartbeat'
       :'Сравнение актуальной конфигурации панели с подписанным подтверждением агента';
   }
