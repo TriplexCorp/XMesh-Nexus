@@ -120,10 +120,7 @@ async fn check_login_limits(
     if locked {
         return Err(ApiError::new(
             StatusCode::TOO_MANY_REQUESTS,
-            format!(
-                "Слишком много попыток. Повторите вход через {} минут.",
-                lockout_minutes
-            ),
+            format!("Слишком много попыток. Повторите вход через {lockout_minutes} минут."),
         ));
     }
     Ok((username_key, locked))
