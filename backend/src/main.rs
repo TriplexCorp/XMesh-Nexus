@@ -1016,10 +1016,7 @@ async fn get_stats(State(state): State<AppState>) -> Result<Json<Value>, ApiErro
     for user in &users {
         *by.entry(user_status(user, now_ms).to_owned()).or_default() += 1;
     }
-    let online = users.iter().filter(|user| {
-        user_status(user, now_ms) == "ACTIVE" &&
-            number(user, "onlineAt").is_some_and(|last| last > now_ms - USER_ONLINE_WINDOW_MS)
-    }).count();
+    let online = users.iter().filter(|user| user_is_online(user, now_ms)).count();
     let mut node_on = Map::new();
     let mut n_on = 0usize;
     for node in &nodes {
@@ -1540,7 +1537,7 @@ async fn ingest_node_metrics(
 /// Authenticated, read-only user presence. No secrets or subscription tokens.
 async fn get_user_presence(
     State(state): State<AppState>,
-) -> Result<Json<Value>, ApiError> {
+) -> Result<(HeaderMap, Json<Value>), ApiError> {
     let rows=sqlx::query(
         "SELECT id,
             CASE WHEN (data->>'onlineAt') ~ '^[0-9]{1,16}$'
@@ -1557,10 +1554,15 @@ async fn get_user_presence(
     let server_now_ms=std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default().as_millis() as i64;
-    Ok(Json(json!({
+    // Presence is operationally sensitive and must not be cached by browsers
+    // or intermediaries: an old response could resurrect an offline badge.
+    let mut headers=HeaderMap::new();
+    headers.insert(header::CACHE_CONTROL,HeaderValue::from_static("private, no-store"));
+    headers.insert(header::VARY,HeaderValue::from_static("Cookie"));
+    Ok((headers,Json(json!({
         "items":items,"serverNowMs":server_now_ms,
         "onlineWindowMs":USER_ONLINE_WINDOW_MS
-    })))
+    }))))
 }
 
 /// Real per-user, per-node traffic collected from authenticated Xray node counters.
@@ -2216,6 +2218,14 @@ mod reality_profile_autofill_validation_tests {
     }
 }
 
+/// An online badge means verified traffic within the recent activity window.
+fn user_is_online(user: &Value, now_ms: i64) -> bool {
+    user_status(user, now_ms) == "ACTIVE"
+        && number(user, "onlineAt").is_some_and(|last| {
+            last > 0 && last <= now_ms && last > now_ms - USER_ONLINE_WINDOW_MS
+        })
+}
+
 fn user_status(user: &Value, now_ms: i64) -> &'static str {
     if user.get("disabled").and_then(Value::as_bool) == Some(true) {
         return "DISABLED";
@@ -2265,7 +2275,7 @@ async fn audit(
 
 #[cfg(test)]
 mod tests {
-    use super::{number, user_status};
+    use super::{number, user_status, user_is_online, USER_ONLINE_WINDOW_MS};
     use serde_json::json;
 
     #[test]
@@ -2276,6 +2286,20 @@ mod tests {
         assert_eq!(user_status(&json!({"limit":10,"used":10}), now), "LIMITED");
         assert_eq!(user_status(&json!({"expireAt":now-1}), now), "EXPIRED");
         assert_eq!(user_status(&json!({"limit":0,"used":500}), now), "ACTIVE");
+    }
+
+    #[test]
+    fn online_requires_recent_nonfuture_verified_activity() {
+        let now = 1_800_000_000_000_i64;
+        assert!(user_is_online(&json!({"onlineAt":now-1}), now));
+        assert!(user_is_online(&json!({"onlineAt":now-USER_ONLINE_WINDOW_MS+1}), now));
+        assert!(!user_is_online(&json!({"onlineAt":now-USER_ONLINE_WINDOW_MS}), now));
+        assert!(!user_is_online(&json!({"onlineAt":now+1}), now));
+        assert!(!user_is_online(&json!({"onlineAt":now-1,"disabled":true}), now));
+        assert!(!user_is_online(&json!({"onlineAt":now-1,"hold":true}), now));
+        assert!(!user_is_online(&json!({"onlineAt":now-1,"limit":1,"used":1}), now));
+        assert!(!user_is_online(&json!({"onlineAt":0}), now));
+        assert!(!user_is_online(&json!({}), now));
     }
 
     #[test]
