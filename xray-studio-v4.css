@@ -1324,3 +1324,23 @@
  background:color-mix(in srgb,var(--vaccent) 16%,transparent)!important;
  color:var(--vaccent);
 }
+
+/* Composer: compact, round close control without square hover artifacts. */
+.sv-studio .sv-overlay-composer .sv-dialog>header>button[data-action="close"]{
+ display:grid!important;place-items:center!important;
+ flex:0 0 2rem!important;width:2rem!important;min-width:2rem!important;
+ height:2rem!important;min-height:2rem!important;padding:0!important;
+ border-radius:50%!important;
+ background:transparent!important;
+ border:1px solid var(--vline)!important;
+ box-shadow:none!important;transform:none!important;
+ line-height:1!important;
+}
+.sv-studio .sv-overlay-composer .sv-dialog>header>button[data-action="close"]:hover{
+ background:color-mix(in srgb,var(--vaccent) 10%,transparent)!important;
+ border-color:var(--vline)!important;
+ box-shadow:none!important;transform:none!important;
+}
+.sv-studio .sv-overlay-composer .sv-dialog>header>button[data-action="close"]:focus-visible{
+ outline:2px solid var(--vaccent)!important;outline-offset:2px!important;
+}
