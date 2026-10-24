@@ -107,16 +107,16 @@ const routingCSS=fs.readFileSync('client-routing.css','utf8');
 assert.match(routingCSS,/dialog\.crx-overlay::backdrop/,'Native dialog must blur the full page backdrop');
 assert.equal((routingCSS.match(/\.crx-overlay\{/g)||[]).length,1,'Only one modal overlay style should exist');
 
-assert.match(source,/const reuse=live\\?\\.open&&live\\.dataset\\.crProfileId===p\\.id/,
+assert.match(source,/const reuse=live\?\.open&&live\.dataset\.crProfileId===p\.id/,
  'Changing routing tabs must reuse the same native dialog');
-assert.match(source,/body\\.replaceChildren\\(\\.\\.\\.replacement\\.childNodes\\)/,
+assert.match(source,/body\.replaceChildren\(\.\.\.replacement\.childNodes\)/,
  'Routing tabs should replace only panel content and preserve the modal shell');
-assert.match(source,/modal\\.addEventListener\\('cancel'/,
+assert.match(source,/modal\.addEventListener\('cancel'/,
  'Browser Escape must synchronize dialog state');
-assert.match(clientCss,/width:min\\(var\\(--panel-content-max,120rem\\),100%\\)/,
+assert.match(clientCss,/width:min\(var\(--panel-content-max,120rem\),100%\)/,
  'Editor width must follow the panel width slider');
-assert.match(clientCss,/dialog\\.crx-overlay::backdrop\\{background:var\\(--xm-modal-dim/,
+assert.match(clientCss,/dialog\.crx-overlay::backdrop\{background:var\(--xm-modal-dim/,
  'Editor must use shared backdrop tokens');
-assert.doesNotMatch(clientCss,/\\.crx-overlay\\{[^}]*backdrop-filter/,
+assert.doesNotMatch(clientCss,/\.crx-overlay\{[^}]*backdrop-filter/,
  'Never apply page blur to the dialog content');
 
