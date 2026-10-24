@@ -484,7 +484,7 @@ async fn lock_challenge_account(
     let id = sqlx::query_scalar::<_, i64>(
         "SELECT admin_id FROM panel_mfa_challenges WHERE token_hash=$1 AND expires_at>NOW()",
     )
-    .bind(&token_hash)
+    .bind(token_hash)
     .fetch_optional(&mut **tx)
     .await?
     .ok_or_else(|| {
