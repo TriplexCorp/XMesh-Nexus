@@ -5,6 +5,28 @@ use serde_json::{json, Value};
 use sqlx::Row;
 use sha2::Digest;
 
+// Stable error codes only: never send profile JSON, secrets or raw database
+// errors to the UI. The real root cause is recorded as a bounded stage.
+fn profile_compile_error_code(error:&ApiError)->&'static str{
+    let message=error.safe_message();
+    if message.starts_with("Set a valid local Xray port") {"invalid_local_port"}
+    else if message.starts_with("Assign an XRAY STUDIO profile") {"missing_profile_assignment"}
+    else if message.starts_with("Assigned XRAY STUDIO profile was not found") {"profile_not_found"}
+    else if message.starts_with("Profile has no Xray JSON") {"missing_profile_json"}
+    else if message.starts_with("Invalid profile JSON") {"invalid_profile_json"}
+    else if message.starts_with("Profile has no inbounds") {"missing_inbounds"}
+    else if message.starts_with("Automatic local-port mapping") {"unsupported_inbound_count"}
+    else if message.starts_with("Invalid inbound") {"invalid_inbound"}
+    else if message.starts_with("Proxy inbound has no tag") {"missing_inbound_tag"}
+    else if message.starts_with("Proxy inbound settings missing") {"invalid_inbound_settings"}
+    else if message.starts_with("XRAY STUDIO profile already defines an API") {"conflicting_stats_api"}
+    else if message.starts_with("Node disabled") {"node_disabled"}
+    else if message.starts_with("GeoData") {"geodata_validation"}
+    else if message.starts_with("Routing") {"routing_validation"}
+    else if message.starts_with("Failed to encode node profile") {"serialization"}
+    else {"compile_failed"}
+}
+
 // Only a fresh node attestation matching the panel's own expected digest
 // proves that the assigned Xray configuration has been applied.
 fn profile_application_status(
@@ -22,6 +44,21 @@ fn profile_application_status(
 #[cfg(test)]
 mod profile_application_tests {
     use super::profile_application_status as status;
+    #[test]
+    fn known_profile_compilation_errors_have_safe_codes(){
+        let invalid=super::ApiError::new(
+            axum::http::StatusCode::CONFLICT,
+            "Set a valid local Xray port on the node.");
+        assert_eq!(super::profile_compile_error_code(&invalid),"invalid_local_port");
+        let config=super::ApiError::new(
+            axum::http::StatusCode::CONFLICT,
+            "XRAY STUDIO profile already defines an API. Remove it.");
+        assert_eq!(super::profile_compile_error_code(&config),"conflicting_stats_api");
+        let unknown=super::ApiError::new(
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "database secret is redacted");
+        assert_eq!(super::profile_compile_error_code(&unknown),"compile_failed");
+    }
     #[test]
     fn never_claims_application_without_current_matching_digest(){
         let digest="a".repeat(64);
@@ -138,26 +175,27 @@ pub async fn status(
                 received_at > NOW() - INTERVAL '65 seconds' AS fresh
          FROM node_runtime_heartbeats WHERE node_id=$1"
     ).bind(node_id).fetch_optional(&state.pool).await?;
-    let desired=sqlx::query(
-        "SELECT revision,profile_id FROM node_desired_revisions WHERE node_id=$1"
-    ).bind(node_id).fetch_optional(&state.pool).await?;
+    // The last-issued table is useful for delivery bookkeeping, but it can
+    // be absent after a migration or stale after editing a profile. Only the
+    // current authoritative compiler may decide whether a node is up to date.
     match record {
         Some(row) => {
             let fresh: bool = row.try_get("fresh")?;
             let applied:Option<String>=row.try_get("applied_revision")?;
-            // A node may have a correctly signed, already running profile that
-            // predates migration 0026. Rebuild the CURRENT desired digest instead
-            // of waiting forever for a row that an old agent never created.
-            // This is read-only and uses the same compiler as desired-config.
-            let (expected,desired_source):(Option<String>,&str)=if let Some(d)=desired.as_ref(){
-                (Some(d.try_get::<String,_>("revision")?),"issued")
-            }else if fresh && applied.is_some(){
+            // Recompile read-only using the exact same compiler as the
+            // authenticated desired-config endpoint. A stale issued record
+            // must never make an outdated node look current.
+            let (expected,desired_source,compile_error)=if fresh {
                 match compile_node_profile(&state,node_id).await {
-                    Ok(compiled)=>(Some(compiled.revision),"computed"),
-                    Err(_)=>(None,"invalid_configuration"),
+                    Ok(compiled)=>(Some(compiled.revision),"current",None),
+                    Err(error)=>{
+                        let reason=profile_compile_error_code(&error);
+                        tracing::warn!(node_id,stage=reason,"Cannot compile current desired node profile");
+                        (None,"invalid_configuration",Some(reason))
+                    }
                 }
             }else{
-                (None,"missing")
+                (None,"unavailable",None)
             };
             let application_status=profile_application_status(
                 fresh,row.try_get::<bool,_>("xray_running")?,
@@ -165,6 +203,7 @@ pub async fn status(
             Ok(Json(json!({
                 "profileApplicationStatus":application_status,
                 "desiredRevisionSource":desired_source,
+                "profileCompileError":if crate::viewer_read_only(&actor) {None} else {compile_error},
                 "profileCheck":row.try_get::<Option<String>,_>("profile_check")?,
                 "appliedRevision":applied,
                 "desiredRevision":expected,
