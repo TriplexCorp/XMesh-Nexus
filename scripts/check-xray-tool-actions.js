@@ -79,9 +79,39 @@ const tick=async()=>{for(let n=0;n<12;n++)await Promise.resolve()};
 
 async function run(){
  const initial=harness(sample());
- assert.equal((initial.host.innerHTML.match(/class="sv-toolitem /g)||[]).length,8,'eight supported main actions are visible');
+ assert.equal((initial.host.innerHTML.match(/class="sv-toolitem /g)||[]).length,9,'VLESS Reality shows 9 relevant actions');
  assert.equal(initial.issue.hidden,false,'broken ID visible as contextual warning');
- assert.deepEqual(['reality','shortid','vlessens','vision','xhttp','dns','routing','inbound'].map(x=>initial.host.innerHTML.includes('data-tool="'+x+'"')),[true,true,true,true,true,true,true,true]);
+ assert.deepEqual(['reality','shortid','vlessens','vision','xhttp','dns','routing','outbounds','inbound'].map(x=>initial.host.innerHTML.includes('data-tool="'+x+'"')),[true,true,true,true,true,true,true,true,true]);
+
+ const hysteria=sample();
+ hysteria.inbounds=[{tag:'hysteria-main',port:443,protocol:'hysteria',
+  settings:{version:2,users:[]},
+  streamSettings:{network:'hysteria',security:'tls',hysteriaSettings:{version:2},tlsSettings:{certificates:[]}}}];
+ const hysteriaUI=harness(hysteria);
+ for(const id of ['hysteria-config','tls','protocol-config','dns','routing','outbounds','inbound'])
+  assert.ok(hysteriaUI.host.innerHTML.includes('data-tool="'+id+'"'),'Hysteria tools need '+id);
+ for(const id of ['reality','shortid','vision','vlessens','xhttp'])
+  assert.ok(!hysteriaUI.host.innerHTML.includes('data-tool="'+id+'"'),'No irrelevant tool '+id+' for Hysteria');
+ assert.ok(hysteriaUI.host.innerHTML.includes('Hysteria2 · HYSTERIA · TLS'),'Active protocol context displayed');
+ const hEdit=harness(hysteria,{requestValues:{json:'{"version":2,"customOption":"test"}'}});
+ await hEdit.run('hysteria-config');
+ assert.equal(hEdit.doc().inbounds[0].streamSettings.hysteriaSettings.customOption,'test');
+ assert.deepEqual(hEdit.doc().inbounds[0].streamSettings.tlsSettings,{certificates:[]},'Hysteria editor must preserve TLS');
+ const tlsEdit=harness(hysteria,{requestValues:{json:'{"certificates":[],"minVersion":"1.3"}'}});
+ await tlsEdit.run('tls');
+ assert.equal(tlsEdit.doc().inbounds[0].streamSettings.tlsSettings.minVersion,'1.3');
+ assert.deepEqual(tlsEdit.doc().inbounds[0].streamSettings.hysteriaSettings,{version:2});
+ const protocolEdit=harness(hysteria,{requestValues:{json:'{"version":2,"users":[],"customProtocolSetting":42}'}});
+ await protocolEdit.run('protocol-config');
+ assert.equal(protocolEdit.doc().inbounds[0].settings.customProtocolSetting,42);
+ const changed=harness(hysteria);
+ changed.area.value=JSON.stringify(sample(),null,2);changed.area.dispatchEvent({type:'input'});
+ assert.ok(changed.host.innerHTML.includes('data-tool="reality"'),'VLESS tools appear on template switch');
+ assert.ok(!changed.host.innerHTML.includes('data-tool="hysteria-config"'),'Hysteria tools disappear');
+ changed.area.value='{broken-json';changed.area.dispatchEvent({type:'input'});
+ assert.ok(changed.host.innerHTML.includes('Инструменты временно недоступны'),'Malformed JSON hides stale actions');
+ changed.area.value=JSON.stringify(hysteria,null,2);changed.area.dispatchEvent({type:'input'});
+ assert.ok(changed.host.innerHTML.includes('data-tool="hysteria-config"'),'Fixing JSON restores Hysteria tools');
 
  const repair=harness(sample());
  await repair.run('shortid');
