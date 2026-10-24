@@ -19,11 +19,11 @@ const validationEnd=app.indexOf('const ENT=',validationStart);
 assert(validationStart>=0&&validationEnd>validationStart,'Node rotation validation helpers must exist');
 const validate=vm.runInNewContext(app.slice(validationStart,validationEnd)+';nodeRotationValidate',{URL});
 assert.equal(validate({rotationEnabled:false,rotationIps:''}),'');
-assert.equal(validate({rotationEnabled:true,rotationIps:'198.51.100.10\\n203.0.113.20'}),'');
+assert.equal(validate({rotationEnabled:true,rotationIps:'198.51.100.10\n203.0.113.20'}),'');
 assert.match(validate({rotationEnabled:true,rotationIps:'198.51.100.10'}),/минимум два/);
-assert.match(validate({rotationEnabled:true,rotationIps:'198.51.100.10\\n198.51.100.10'}),/одинаковые/);
-assert.match(validate({rotationEnabled:true,rotationIps:'999.999.999.999\\n198.51.100.10'}),/корректные/);
-assert.match(validate({rotationEnabled:true,rotationIps:'198.51.100.10\\n203.0.113.20\\n'.repeat(129)}),/не более 256/);
+assert.match(validate({rotationEnabled:true,rotationIps:'198.51.100.10\n198.51.100.10'}),/одинаковые/);
+assert.match(validate({rotationEnabled:true,rotationIps:'999.999.999.999\n198.51.100.10'}),/корректные/);
+assert.match(validate({rotationEnabled:true,rotationIps:'198.51.100.10\n203.0.113.20\n'.repeat(129)}),/не более 256/);
 // The node form must surface validation failures before accepting its data.
 const nodeFormStart=app.indexOf('chk:data=>{',app.indexOf("const ENT="));
 assert(nodeFormStart>=0,'Node editor must declare a validation callback');
