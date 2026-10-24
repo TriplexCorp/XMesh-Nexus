@@ -1216,3 +1216,86 @@
  .sv-studio .sv-topbar>.sv-page-tabs{flex:1 1 100%;width:100%;justify-content:flex-start}
  .sv-studio .sv-topbar>.sv-actions{flex:1 1 100%;justify-content:flex-end}
 }
+
+
+/* XRAY STUDIO — refined native document tab strip. */
+.sv-studio .sv-topbar{gap:clamp(.55rem,1vw,1rem);align-items:center}
+.sv-studio .sv-topbar>.sv-page-tabs{
+ display:flex;align-items:center;gap:3px;min-height:2.8rem;
+ padding:3px;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;
+ scrollbar-color:var(--vline) transparent;
+}
+.sv-studio .sv-topbar>.sv-page-tabs>button[data-action="profiles"]{
+ align-self:center;flex:0 0 auto;margin-right:.55rem;
+ border-radius:var(--vround);
+}
+.sv-studio .sv-json-document-tab{
+ position:relative;display:inline-flex;align-items:center;gap:0;
+ flex:0 1 auto;min-width:7.6rem;max-width:13.75rem;
+ height:2.65rem;border:1px solid transparent;
+ border-radius:calc(var(--vround) - 1px);
+ background:transparent;color:var(--vmute);
+ transition:background .18s ease,border-color .18s ease,color .18s ease;
+}
+.sv-studio .sv-json-document-tab:not(.active):hover{
+ background:var(--vfield);color:var(--vtext);
+}
+.sv-studio .sv-json-document-tab.active{
+ background:color-mix(in srgb,var(--vaccent) 9%,var(--vfield));
+ border-color:color-mix(in srgb,var(--vaccent) 45%,var(--vline));
+ color:var(--vtext);
+}
+.sv-studio .sv-json-document-tab.active::after{
+ content:"";position:absolute;left:.75rem;right:.75rem;bottom:-4px;height:2px;
+ border-radius:2px;background:var(--vaccent);
+}
+.sv-studio .sv-json-document-tab>button{
+ display:inline-flex;align-items:center;justify-content:center;
+ height:100%;min-height:0;background:transparent;border:0;
+ border-radius:inherit;color:inherit;cursor:pointer;
+}
+.sv-studio .sv-json-document-tab>button.sv-document-open{
+ flex:1 1 auto;min-width:0;max-width:none;padding:.45rem .25rem .45rem .75rem;
+ gap:.45rem;font-size:.78rem;font-weight:650;text-align:left;
+}
+.sv-studio .sv-document-label{
+ display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.sv-studio .sv-document-indicator{
+ display:block;flex:0 0 auto;width:6px;height:6px;border-radius:50%;
+ background:transparent;
+}
+.sv-studio .sv-json-document-tab.is-dirty .sv-document-indicator{background:var(--vaccent)}
+.sv-studio .sv-json-document-tab>button.sv-document-close{
+ flex:0 0 1.9rem;width:1.9rem;height:1.9rem;margin-right:.32rem;
+ padding:0;border-radius:calc(var(--vround) - 3px);
+ font-size:1rem;font-weight:500;opacity:.55;
+}
+.sv-studio .sv-json-document-tab:hover .sv-document-close,
+.sv-studio .sv-json-document-tab.active .sv-document-close{opacity:.8}
+.sv-studio .sv-json-document-tab .sv-document-close:hover{
+ background:color-mix(in srgb,var(--vaccent) 15%,transparent);
+ color:var(--vaccent);opacity:1;
+}
+.sv-studio .sv-json-document-add{
+ display:inline-grid;place-items:center;flex:0 0 2.4rem;
+ width:2.4rem;min-width:2.4rem;height:2.4rem;min-height:0;
+ margin-left:.3rem;border:1px solid transparent;
+ border-radius:var(--vround);background:transparent;
+ color:var(--vmute);font-size:1.3rem;font-weight:400;
+ transition:background .18s ease,color .18s ease,border-color .18s ease;
+}
+.sv-studio .sv-json-document-add:hover{
+ background:color-mix(in srgb,var(--vaccent) 10%,var(--vfield));
+ color:var(--vaccent);border-color:var(--vline);
+}
+.sv-studio .sv-json-document-tab button:focus-visible,
+.sv-studio .sv-json-document-add:focus-visible{
+ outline:2px solid var(--vaccent);outline-offset:-2px;
+}
+@media(max-width:950px){
+ .sv-studio .sv-json-document-tab{min-width:6rem;max-width:11rem}
+}
+@media(prefers-reduced-motion:reduce){
+ .sv-studio .sv-json-document-tab,.sv-studio .sv-json-document-add{transition:none}
+}
