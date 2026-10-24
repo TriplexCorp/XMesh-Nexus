@@ -3027,6 +3027,62 @@ fn validate_node_address(data: &Value) -> Result<(), ApiError> {
     Ok(())
 }
 
+fn validate_reality_settings(inbound: &Value) -> Result<(), ApiError> {
+    // Defense in depth: browser credential managers may have filled
+    // unrelated Studio password/username inputs into REALITY secrets.
+    // Validate even dormant realitySettings with security="none".
+    if let Some(reality) = inbound
+        .get("streamSettings")
+        .and_then(|stream| stream.get("realitySettings"))
+    {
+        if !reality.is_object() {
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "REALITY: realitySettings должен быть объектом.",
+            ));
+        }
+        if let Some(private_key) = reality.get("privateKey") {
+            let valid = private_key.as_str().is_some_and(|key| {
+                key.is_empty()
+                    || (key.len() == 43
+                        && key
+                            .bytes()
+                            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_'))
+            });
+            if !valid {
+                return Err(ApiError::new(
+                    StatusCode::BAD_REQUEST,
+                    "REALITY: privateKey должен быть X25519 base64url (43 символа). Проверьте автозаполнение браузера.",
+                ));
+            }
+        }
+        if let Some(ids) = reality.get("shortIds") {
+            let ids = ids.as_array().ok_or_else(|| {
+                ApiError::new(
+                    StatusCode::BAD_REQUEST,
+                    "REALITY: shortIds должен быть массивом.",
+                )
+            })?;
+            let mut seen = std::collections::HashSet::new();
+            for short_id in ids {
+                let valid = short_id.as_str().is_some_and(|id| {
+                    id.len() <= 16
+                        && id.len() % 2 == 0
+                        && id.bytes().all(|b| b.is_ascii_hexdigit())
+                        && seen.insert(id.to_ascii_lowercase())
+                });
+                if !valid {
+                    return Err(ApiError::new(
+                        StatusCode::BAD_REQUEST,
+                        "REALITY: Short ID должен быть уникальной HEX-строкой чётной длины, максимум 16 символов.",
+                    ));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 fn validate_record(collection: &str, data: &Value) -> Result<(), ApiError> {
     let object = data.as_object().ok_or_else(|| {
         ApiError::new(StatusCode::BAD_REQUEST, "Запись должна быть JSON-объектом.")
@@ -3113,58 +3169,7 @@ fn validate_record(collection: &str, data: &Value) -> Result<(), ApiError> {
                     "Теги inbounds должны быть уникальными.",
                 ));
             }
-            // Defense in depth: browser credential managers may have filled
-            // unrelated Studio password/username inputs into REALITY secrets.
-            // Validate even dormant realitySettings with security="none".
-            if let Some(reality) = inbound
-                .get("streamSettings")
-                .and_then(|stream| stream.get("realitySettings"))
-            {
-                if !reality.is_object() {
-                    return Err(ApiError::new(
-                        StatusCode::BAD_REQUEST,
-                        "REALITY: realitySettings должен быть объектом.",
-                    ));
-                }
-                if let Some(private_key) = reality.get("privateKey") {
-                    let valid = private_key.as_str().is_some_and(|key| {
-                        key.is_empty()
-                            || (key.len() == 43
-                                && key
-                                    .bytes()
-                                    .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_'))
-                    });
-                    if !valid {
-                        return Err(ApiError::new(
-                            StatusCode::BAD_REQUEST,
-                            "REALITY: privateKey должен быть X25519 base64url (43 символа). Проверьте автозаполнение браузера.",
-                        ));
-                    }
-                }
-                if let Some(ids) = reality.get("shortIds") {
-                    let ids = ids.as_array().ok_or_else(|| {
-                        ApiError::new(
-                            StatusCode::BAD_REQUEST,
-                            "REALITY: shortIds должен быть массивом.",
-                        )
-                    })?;
-                    let mut seen = std::collections::HashSet::new();
-                    for short_id in ids {
-                        let valid = short_id.as_str().is_some_and(|id| {
-                            id.len() <= 16
-                                && id.len() % 2 == 0
-                                && id.bytes().all(|b| b.is_ascii_hexdigit())
-                                && seen.insert(id.to_ascii_lowercase())
-                        });
-                        if !valid {
-                            return Err(ApiError::new(
-                                StatusCode::BAD_REQUEST,
-                                "REALITY: Short ID должен быть уникальной HEX-строкой чётной длины, максимум 16 символов.",
-                            ));
-                        }
-                    }
-                }
-            }
+            validate_reality_settings(inbound)?;
         }
     }
     Ok(())
