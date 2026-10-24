@@ -115,14 +115,27 @@ pub async fn status(
         Some(row) => {
             let fresh: bool = row.try_get("fresh")?;
             let applied:Option<String>=row.try_get("applied_revision")?;
-            let expected:Option<String>=desired.as_ref()
-                .map(|r|r.try_get::<String,_>("revision")).transpose()?;
+            // A node may have a correctly signed, already running profile that
+            // predates migration 0026. Rebuild the CURRENT desired digest instead
+            // of waiting forever for a row that an old agent never created.
+            // This is read-only and uses the same compiler as desired-config.
+            let (expected,desired_source):(Option<String>,&str)=if let Some(d)=desired.as_ref(){
+                (Some(d.try_get::<String,_>("revision")?),"issued")
+            }else if fresh && applied.is_some(){
+                match compile_node_profile(&state,node_id).await {
+                    Ok(compiled)=>(Some(compiled.revision),"computed"),
+                    Err(_)=>(None,"invalid_configuration"),
+                }
+            }else{
+                (None,"missing")
+            };
             let application_status=if !fresh {"unknown"}
                 else if !row.try_get::<bool,_>("xray_running")? {"stopped"}
                 else if applied.is_none() || expected.is_none() {"unknown"}
                 else if applied==expected {"applied"} else {"pending"};
             Ok(Json(json!({
                 "profileApplicationStatus":application_status,
+                "desiredRevisionSource":desired_source,
                 "profileCheck":row.try_get::<Option<String>,_>("profile_check")?,
                 "appliedRevision":applied,
                 "desiredRevision":expected,
@@ -721,27 +734,24 @@ pub async fn preview_routing(
     })))
 }
 
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct DesiredConfigRequest { node_id: i64 }
-
-/// Authenticated, outbound-only desired Xray configuration retrieval.
-/// The node signs the request with its registered Ed25519 identity.
-/// Inbounds are bound to loopback so the edge router alone owns public TCP ports.
-pub async fn desired_config(
-    State(state): State<AppState>, headers: HeaderMap, body: Bytes,
-) -> Result<Json<Value>, ApiError> {
-    let request: DesiredConfigRequest = serde_json::from_slice(&body)
-        .map_err(|_|ApiError::new(StatusCode::BAD_REQUEST,"Invalid node configuration request."))?;
-    if request.node_id <= 0 {
-        return Err(ApiError::new(StatusCode::BAD_REQUEST,"Invalid node ID."));
-    }
-    node_auth::authenticate_for(
-        &state,&headers,request.node_id,&body,"/api/v1/node/desired-config"
-    ).await?;
+// Compile the exact node configuration from current Control Plane state.
+// This is shared by desired-config and the read-only runtime reconciliation
+// fallback. The fallback never trusts a revision claimed by the node as
+// the desired revision and never mutates Xray or authorization state.
+struct CompiledNodeProfile {
+    profile_id:i64,
+    port:u64,
+    config:Value,
+    geo_data:Option<Value>,
+    users:Vec<Value>,
+    now_ms:i64,
+    active_nodes:i64,
+    revision:String,
+}
+async fn compile_node_profile(state:&AppState,node_id:i64)->Result<CompiledNodeProfile,ApiError>{
     let node = sqlx::query_scalar::<_,Value>(
         "SELECT data FROM panel_records WHERE collection='nodes' AND id=$1"
-    ).bind(request.node_id).fetch_optional(&state.pool).await?
+    ).bind(node_id).fetch_optional(&state.pool).await?
       .ok_or_else(||ApiError::new(StatusCode::NOT_FOUND,"Node not found."))?;
     if node.get("disabled").and_then(Value::as_bool)==Some(true){
         return Err(ApiError::new(StatusCode::FORBIDDEN,
@@ -781,11 +791,37 @@ pub async fn desired_config(
     let hosts=crate::load_records(&state.pool,"hosts").await?;
     let geo_data=crate::node_geodata::apply(&node,&mut config)?;
     crate::node_routing::apply(&node,&mut config,&nodes,&hosts)?;
-    let digest=hex::encode(sha2::Sha256::digest(serde_json::to_vec(&config).unwrap_or_default()));
+    let digest=hex::encode(sha2::Sha256::digest(
+        serde_json::to_vec(&config).map_err(|_|ApiError::new(
+            StatusCode::INTERNAL_SERVER_ERROR,"Failed to encode node profile."))?));
+
     // Conserve offline allowances across all currently enabled nodes. Large
     // deployments should replace this bound with server-side reserved leases.
     let active_nodes=nodes.iter().filter(|node|
         node.get("disabled").and_then(Value::as_bool)!=Some(true)).count().max(1) as i64;
+    Ok(CompiledNodeProfile{profile_id,port,config,geo_data,users,now_ms:now,active_nodes,revision:digest})
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DesiredConfigRequest { node_id: i64 }
+
+/// Authenticated, outbound-only desired Xray configuration retrieval.
+/// The node signs the request with its registered Ed25519 identity.
+/// Inbounds are bound to loopback so the edge router alone owns public TCP ports.
+pub async fn desired_config(
+    State(state): State<AppState>, headers: HeaderMap, body: Bytes,
+) -> Result<Json<Value>, ApiError> {
+    let request: DesiredConfigRequest = serde_json::from_slice(&body)
+        .map_err(|_|ApiError::new(StatusCode::BAD_REQUEST,"Invalid node configuration request."))?;
+    if request.node_id <= 0 {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST,"Invalid node ID."));
+    }
+    node_auth::authenticate_for(
+        &state,&headers,request.node_id,&body,"/api/v1/node/desired-config"
+    ).await?;
+    let CompiledNodeProfile{profile_id,port,config,geo_data,users,now_ms:now,
+        active_nodes,revision:digest}=compile_node_profile(&state,request.node_id).await?;
     let mut policy=build_offline_policy(&config,&users,request.node_id,now,&digest,active_nodes);
     // Metadata is covered by the existing Ed25519 node-policy signature.
     if let Some(manifest)=geo_data { policy["geoData"]=manifest; }
