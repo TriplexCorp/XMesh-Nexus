@@ -786,7 +786,10 @@ async fn compile_node_profile(state:&AppState,node_id:i64)->Result<CompiledNodeP
         return Err(ApiError::new(StatusCode::FORBIDDEN,
             "Node disabled: Xray configuration updates blocked."));
     }
-    let port = node.get("xrayLocalPort").and_then(|v|v.as_u64())
+    // Legacy form submissions may persist positive numeric ports as strings.
+    // Never silently fall back to the public node port: it is not Xray's port.
+    let port = node.get("xrayLocalPort")
+        .and_then(|v|v.as_u64().or_else(||v.as_str().and_then(|s|s.parse::<u64>().ok())))
         .filter(|p| *p>0 && *p<=65535)
         .ok_or_else(||ApiError::new(StatusCode::CONFLICT,"Set a valid local Xray port on the node."))?;
     let profile_id = node.get("profileId").and_then(|v|v.as_i64())
@@ -796,10 +799,12 @@ async fn compile_node_profile(state:&AppState,node_id:i64)->Result<CompiledNodeP
         "SELECT data FROM panel_records WHERE collection='profiles' AND id=$1"
     ).bind(profile_id).fetch_optional(&state.pool).await?
       .ok_or_else(||ApiError::new(StatusCode::CONFLICT,"Assigned XRAY STUDIO profile was not found."))?;
-    let source = profile.get("config").and_then(Value::as_str)
-        .ok_or_else(||ApiError::new(StatusCode::CONFLICT,"Profile has no Xray JSON."))?;
-    let mut config:Value=serde_json::from_str(source)
-        .map_err(|_|ApiError::new(StatusCode::CONFLICT,"Invalid profile JSON."))?;
+    let mut config:Value=match profile.get("config"){
+        Some(Value::String(source))=>serde_json::from_str(source)
+            .map_err(|_|ApiError::new(StatusCode::CONFLICT,"Invalid profile JSON."))?,
+        Some(value @ Value::Object(_))=>value.clone(),
+        _=>return Err(ApiError::new(StatusCode::CONFLICT,"Profile has no Xray JSON.")),
+    };
     let inbounds = config.get_mut("inbounds").and_then(Value::as_array_mut)
         .ok_or_else(||ApiError::new(StatusCode::CONFLICT,"Profile has no inbounds."))?;
     if inbounds.len()!=1 {
