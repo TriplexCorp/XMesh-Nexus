@@ -123,9 +123,11 @@ function contextualToolGroups(inbound,hasInbound){
   if(security==='reality')specialized.push('shortid');
   if(security==='tls')specialized.push('tls');
   specialized.push('vlessens');
-  // Keep Vision discoverable for every VLESS inbound. Validate compatibility
-  // against the actual core when applying/checking the configuration.
-  specialized.push('vision');
+  // Minimal compatibility gate: TLS/REALITY, or native VLESS Encryption.
+  // VLESS Encryption works without an outer TLS layer (e.g. XHTTP + NONE).
+  const encryption=String(inbound.settings?.decryption||'').trim();
+  const hasVlessEncryption=/^mlkem768x25519plus\.(?:native\.)?\S+$/i.test(encryption);
+  if(['reality','tls'].includes(security)||hasVlessEncryption)specialized.push('vision');
  }else{
   // REALITY config is transport-level, not exclusive to VLESS.
   // Shadowsocks + XHTTP + REALITY must remain editable after composition.
@@ -641,7 +643,7 @@ host.addEventListener('change',e=>{
  toolPaletteSignature='';renderToolPalette();
 });
 area.addEventListener('input',()=>{snapshot();renderToolPalette();refreshIssues()});
-area.addEventListener('xmesh:reset-history',()=>{undo=[];redo=[];last=area.value;update()});
+area.addEventListener('xmesh:reset-history',()=>{undo=[];redo=[];last=area.value;update();renderToolPalette();refreshIssues()});
 area.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key.toLowerCase()==='z'){e.preventDefault();operations.undo()}if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==='y'||e.shiftKey&&e.key.toLowerCase()==='z')){e.preventDefault();operations.redo() }});
 renderToolPalette();update();refreshIssues();
 return {refresh:renderToolPalette};
