@@ -75,6 +75,80 @@ const unsavedApproval=async description=>input.value===saved||await approve({tit
    inboundTag:()=>{try{return JSON.parse(input.value)?.inbounds?.[inboundIndex]?.tag||''}catch{return ''}}
  });
 
+// Each JSON tab owns its draft, profile identity and editor selection.
+const documents=new Map();
+let documentSequence=0,activeDocument='draft:0',switchingDocument=false;
+function captureDocument(){
+ return {id,name,source:input.value,saved,inboundIndex,outIndex,
+  start:input.selectionStart,end:input.selectionEnd,scroll:input.scrollTop};
+}
+function stashDocument(){if(!switchingDocument)documents.set(activeDocument,captureDocument())}
+function renderDocumentTabs(){
+ const nav=root.querySelector('.sv-page-tabs');
+ nav.querySelectorAll('.sv-json-document-tab,.sv-json-document-add').forEach(el=>el.remove());
+ const editorButton=nav.querySelector('[data-action="studio-editor"]');
+ editorButton.hidden=true;
+ const anchor=editorButton;
+ for(const [key,doc] of documents){
+  const wrap=document.createElement('span');wrap.className='sv-json-document-tab'+(key===activeDocument?' active':'');
+  const button=document.createElement('button');button.type='button';button.dataset.docOpen=key;
+  button.title=doc.name||'JSON';button.textContent=(doc.name||'Новый профиль')+(doc.source!==doc.saved?' ●':'');
+  button.setAttribute('aria-label','Открыть JSON: '+(doc.name||'Новый профиль'));
+  const close=document.createElement('button');close.type='button';close.dataset.docClose=key;
+  close.textContent='×';close.title='Закрыть вкладку';close.setAttribute('aria-label','Закрыть JSON: '+(doc.name||'Новый профиль'));
+  wrap.append(button,close);anchor.after(wrap);
+ }
+ const plus=document.createElement('button');plus.type='button';plus.className='sv-json-document-add';
+ plus.dataset.docNew='true';plus.textContent='+';plus.title='Новый JSON';
+ plus.setAttribute('aria-label','Открыть новый JSON-редактор');nav.append(plus);
+}
+function switchDocument(key){
+ if(key===activeDocument){setPage('editor');return}
+ const next=documents.get(key);if(!next)return;
+ stashDocument();switchingDocument=true;
+ try{
+  activeDocument=key;id=next.id;name=next.name;saved=next.saved;
+  inboundIndex=next.inboundIndex;outIndex=next.outIndex;
+  hostManager.close();input.value=next.source;
+  input.dispatchEvent(new Event('xmesh:reset-history'));
+  input.setSelectionRange(Math.min(next.start||0,input.value.length),Math.min(next.end||0,input.value.length));
+  input.scrollTop=next.scroll||0;paint();setPage('editor');
+ }finally{switchingDocument=false}
+ renderDocumentTabs();
+}
+function openDocument(doc){
+ stashDocument();
+ const existing=doc.id!=null?[...documents].find(([,d])=>d.id===doc.id&&d.id!=null)?.[0]:null;
+ if(existing){switchDocument(existing);return}
+ const key='draft:'+ ++documentSequence;
+ documents.set(key,{...doc,start:0,end:0,scroll:0});
+ switchDocument(key);
+}
+async function closeDocument(key){
+ const doc=key===activeDocument?captureDocument():documents.get(key);
+ if(!doc)return;
+ if(doc.source!==doc.saved){
+  const ok=await approve({title:'Закрыть JSON?',description:'В этом документе есть несохранённые изменения.',notice:'Изменения будут потеряны.',danger:true,confirmLabel:'Закрыть без сохранения'});
+  if(!ok)return;
+ }
+ const isCurrent=key===activeDocument;
+ documents.delete(key);
+ if(isCurrent){
+  const next=documents.keys().next().value;
+  if(next){
+   // Avoid restoring the just-closed document while switching.
+   switchingDocument=true;
+   try{activeDocument='__closed__';switchDocument(next)}finally{switchingDocument=false}
+  }else{
+   const fresh='draft:'+ ++documentSequence;
+   activeDocument=fresh;id=null;name='Новый профиль';inboundIndex=outIndex=0;
+   saved='';input.value=pretty(defaultDoc());
+   input.dispatchEvent(new Event('xmesh:reset-history'));paint();
+   documents.set(fresh,captureDocument());
+  }
+ }
+ renderDocumentTabs();
+}
 let activePage='editor';
 function setPage(page){
  activePage=page;
@@ -83,22 +157,21 @@ function setPage(page){
  root.querySelector('.sv-workspace').hidden=!editor;
  root.classList.toggle('sv-profiles-active',!editor);
  root.querySelector('.sv-bottom').hidden=!editor;
- for(const b of root.querySelectorAll('.sv-page-tabs button')){const selected=b.dataset.action===(editor?'studio-editor':'profiles');b.classList.toggle('active',selected);if(selected)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')}
+ for(const b of root.querySelectorAll('.sv-page-tabs>button[data-action]')){
+  const selected=b.dataset.action===(editor?'studio-editor':'profiles');
+  b.classList.toggle('active',selected);
+  if(selected)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');
+ }
  if(!editor)renderProfiles();
 }
 async function openProfile(p){
- if(!await unsavedApproval('Открыть «'+(p.name||'профиль')+'» вместо текущего черновика?'))return;
  try{
   const d=typeof p.config==='string'?JSON.parse(p.config):p.config;
-  id=p.id;name=p.name;inboundIndex=outIndex=0;hostManager.close();
-  input.value=pretty(d);saved=input.value;paint();input.dispatchEvent(new Event('xmesh:reset-history'));
-  setPage('editor');
+  openDocument({id:p.id,name:p.name||'Без названия',source:pretty(d),saved:pretty(d),inboundIndex:0,outIndex:0});
  }catch(err){notify('Не удалось открыть профиль: '+err.message)}
 }
 async function newProfile(){
- if(!await unsavedApproval('Создать новый профиль вместо текущего черновика?'))return;
- id=null;name='Новый профиль';inboundIndex=outIndex=0;hostManager.close();
- input.value=pretty(defaultDoc());saved=input.value;paint();input.dispatchEvent(new Event('xmesh:reset-history'));setPage('editor');
+ openDocument({id:null,name:'Новый профиль',source:pretty(defaultDoc()),saved:'',inboundIndex:0,outIndex:0});
 }
 function describeProfile(p){
  try{
@@ -383,7 +456,7 @@ function currentInbound(d){const ib=selected(d.inbounds,inboundIndex);if(!ib)thr
 function currentOut(d){const ob=selected(d.outbounds,outIndex);if(!ob)throw Error('Выберите outbound');return ob}
 async function formChanged(el){
  if(locked||!el.dataset.field)return;const k=el.dataset.field;
- if(k==='name'){name=el.value;get('saveState').textContent='Имя профиля будет сохранено при сохранении';return}
+ if(k==='name'){name=el.value;stashDocument();renderDocumentTabs();get('saveState').textContent='Имя профиля будет сохранено при сохранении';return}
  if(k==='inboundSelect'){inboundIndex=Number(el.value);sync(json());return}
  if(k==='outSelect'){outIndex=Number(el.value);sync(json());return}
  if(k==='protocol'){
@@ -746,7 +819,7 @@ async function checkWithCore(){
   get('valid').dataset.status=valid?'ok':'bad';
  }catch(err){if(source!==input.value)return;reportCore('Проверка ядром недоступна: '+err.message)}
 }
-async function save(){try{const d=json();validate(d);if(!name.trim())throw Error('Укажите название профиля');const body={name:name.trim(),config:pretty(d)};if(id!=null)await ctx.api.update('profiles',id,body);else {const created=await ctx.api.create('profiles',body);id=created.id}saved=input.value;paint();hostManager.render();renderProfiles();notify('Профиль сохранён')}catch(err){notify('Не удалось сохранить: '+err.message)}}
+async function save(){try{const d=json();validate(d);if(!name.trim())throw Error('Укажите название профиля');const body={name:name.trim(),config:pretty(d)};if(id!=null)await ctx.api.update('profiles',id,body);else {const created=await ctx.api.create('profiles',body);id=created.id}saved=input.value;stashDocument();renderDocumentTabs();paint();hostManager.render();renderProfiles();notify('Профиль сохранён')}catch(err){notify('Не удалось сохранить: '+err.message)}}
 const bytes=n=>{const b=new Uint8Array(n);crypto.getRandomValues(b);return Array.from(b,v=>v.toString(16).padStart(2,'0')).join('')};
 async function action(a){
  switch(a){
@@ -774,16 +847,16 @@ async function action(a){
  case 'reality':root.querySelector('[data-tool="reality"]')?.click();return;
  }
 }
-root.addEventListener('click',ev=>{const jump=ev.target.closest('[data-sv-jump]');if(jump){ev.preventDefault();jumpToSection(jump.dataset.svJump);return}const quick=ev.target.closest('[data-quick-outbound]');if(quick){outIndex=Number(quick.dataset.quickOutbound);root.querySelector('[data-tab="outbound"]')?.click();const d=hasValidJSON();if(d)sync(d);return}const b=ev.target.closest('[data-action]');if(b){ev.preventDefault();Promise.resolve(action(b.dataset.action)).catch(x=>notify(x.message))}const tab=ev.target.closest('[data-tab]');if(tab){root.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x===tab));root.querySelectorAll('[data-section]').forEach(x=>x.hidden=x.dataset.section!==tab.dataset.tab)}});
+root.addEventListener('click',ev=>{const tabOpen=ev.target.closest('[data-doc-open]'),tabClose=ev.target.closest('[data-doc-close]'),tabNew=ev.target.closest('[data-doc-new]');if(tabOpen){ev.preventDefault();switchDocument(tabOpen.dataset.docOpen);return}if(tabClose){ev.preventDefault();closeDocument(tabClose.dataset.docClose).catch(err=>notify(err.message));return}if(tabNew){ev.preventDefault();newProfile();return}const jump=ev.target.closest('[data-sv-jump]');if(jump){ev.preventDefault();jumpToSection(jump.dataset.svJump);return}const quick=ev.target.closest('[data-quick-outbound]');if(quick){outIndex=Number(quick.dataset.quickOutbound);root.querySelector('[data-tab="outbound"]')?.click();const d=hasValidJSON();if(d)sync(d);return}const b=ev.target.closest('[data-action]');if(b){ev.preventDefault();Promise.resolve(action(b.dataset.action)).catch(x=>notify(x.message))}const tab=ev.target.closest('[data-tab]');if(tab){root.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x===tab));root.querySelectorAll('[data-section]').forEach(x=>x.hidden=x.dataset.section!==tab.dataset.tab)}});
 root.addEventListener('change',ev=>{if(ev.target.matches('[data-field]'))Promise.resolve(formChanged(ev.target)).catch(err=>notify(err.message))});
-input.addEventListener('input',paint);
+input.addEventListener('input',()=>{paint();stashDocument();renderDocumentTabs()});
 input.addEventListener('scroll',()=>{highlight.scrollTop=input.scrollTop;highlight.scrollLeft=input.scrollLeft;gutter.scrollTop=input.scrollTop});
 input.addEventListener('click',paint);input.addEventListener('keyup',paint);
 input.addEventListener('keydown',ev=>{if(ev.key==='Tab'){ev.preventDefault();const i=input.selectionStart;input.setRangeText('  ',i,input.selectionEnd,'end');input.dispatchEvent(new Event('input',{bubbles:true}))}if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='s'){ev.preventDefault();save()}});
 get('wrap').addEventListener('change',ev=>root.classList.toggle('sv-wrap',ev.target.checked));
 get('upload').addEventListener('change',async ev=>{const f=ev.target.files?.[0];if(!f)return;try{if(f.size>2e6)throw Error('Файл больше 2 МБ');const raw=await f.text();JSON.parse(raw);if(!await unsavedApproval('Импортировать JSON вместо текущего черновика?'))return;input.value=raw;paint();input.dispatchEvent(new Event('xmesh:reset-history'));notify('JSON импортирован')}catch(err){notify(err.message)}finally{ev.target.value=''}});
 try{setInspectorVisible(window.localStorage?.getItem('xmesh-studio-inspector')!=='hidden',false)}catch(_){setInspectorVisible(true,false)}
-input.value=pretty(defaultDoc());saved='';paint();root.querySelector('[data-tab="inbound"]')?.click();renderProfiles();
+input.value=pretty(defaultDoc());saved='';paint();documents.set(activeDocument,captureDocument());renderDocumentTabs();root.querySelector('[data-tab="inbound"]')?.click();renderProfiles();
 toolPaletteHandle=window.XMeshJsonTools?.setup(root,{toast:notify,realityKeys:ctx.realityKeys,apiRequest:ctx.apiRequest})||null;
 }
 return {view,mount};
