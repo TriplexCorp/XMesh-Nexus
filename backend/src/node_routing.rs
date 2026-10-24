@@ -69,8 +69,14 @@ fn endpoint(outbound:&Value)->Result<(String,u64),ApiError>{
         return Err(bad("Routing: invalid remote proxy address."));
     }
     let users=server.get("users").and_then(Value::as_array);
-    if matches!(proto,"vless"|"vmess") && !users.is_some_and(|u|!u.is_empty()) {
-        return Err(bad("Routing: VLESS/VMess remote outbound requires authorized users."));
+    if matches!(proto,"vless"|"vmess") {
+        let Some(users)=users.filter(|u|!u.is_empty()) else {
+            return Err(bad("Routing: VLESS/VMess remote outbound requires authorized users."));
+        };
+        if users.iter().any(|user|!user.get("id").and_then(Value::as_str)
+            .is_some_and(|id|uuid::Uuid::parse_str(id).is_ok())) {
+            return Err(bad("Routing: remote outbound needs a valid VLESS/VMess UUID."));
+        }
     }
     if matches!(proto,"trojan"|"shadowsocks") && server.get("password").and_then(Value::as_str).unwrap_or("").is_empty() {
         return Err(bad("Routing: remote outbound requires the server password."));
