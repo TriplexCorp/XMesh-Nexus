@@ -13,7 +13,7 @@ use base64::Engine as _;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use sqlx::Row;
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Write as _};
 
 // Encrypt recoverable bearer secrets at rest with a separately derived key.
 // TOTP_ENCRYPTION_KEY must stay stable across upgrades; raw token never enters
@@ -1226,13 +1226,13 @@ pub async fn portal(
         } else {
             0.0
         };
-        metrics.push_str(&format!(
+        let _ = write!(metrics,
    "<div data-subscription-traffic><small>{}</small><b>{}</b><div class=\"subscription-preview-progress\"><i style=\"width:{pct:.1}%\"></i></div></div>",
-   if en{"Traffic"}else{"Трафик"},escape_html(&remaining)));
+   if en{"Traffic"}else{"Трафик"},escape_html(&remaining));
     }
     if studio_enabled(&settings, "subscriptionShowExpiry", true) {
         let expiry = user.get("expireAt").and_then(Value::as_i64).unwrap_or(0);
-        metrics.push_str(&format!(
+        let _ = write!(metrics,
             "<div data-subscription-expiry><small>{}</small><b data-expiry=\"{}\">{}</b></div>",
             if en {
                 "Expires"
@@ -1242,14 +1242,12 @@ pub async fn portal(
             expiry,
             if expiry > 0 {
                 "—"
+            } else if en {
+                "Unlimited"
             } else {
-                if en {
-                    "Unlimited"
-                } else {
-                    "Бессрочно"
-                }
+                "Бессрочно"
             }
-        ));
+        );
     }
     if !metrics.is_empty() {
         metrics = format!(
@@ -1289,21 +1287,21 @@ pub async fn portal(
             escape_html(&raw_link)
         );
         if studio_enabled(&settings, "subscriptionShowCopy", true) {
-            quick.push_str(&format!(
+            let _ = write!(quick,
                 "<button type=\"button\" id=\"copy-link\">{}</button>",
                 if en {
                     "Copy link"
                 } else {
                     "Скопировать ссылку"
                 }
-            ));
+            );
         }
         if studio_enabled(&settings, "subscriptionShowQr", true) {
             quick.push_str("<button type=\"button\" id=\"toggle-qr\" aria-controls=\"subscription-qr\" aria-expanded=\"false\">QR</button>");
-            qr="<div id=\"subscription-qr\" class=\"subscription-preview-qr\" hidden aria-label=\"QR-код подписки\"></div>".to_owned();
+            "<div id=\"subscription-qr\" class=\"subscription-preview-qr\" hidden aria-label=\"QR-код подписки\"></div>".clone_into(&mut qr);
         }
         if studio_enabled(&settings, "subscriptionShowDevices", false) {
-            quick.push_str(&format!("<button type=\"button\" id=\"toggle-devices\" aria-controls=\"subscription-devices\" aria-expanded=\"false\">{}</button>",if en{"Devices"}else{"Устройства"}));
+            let _ = write!(quick,"<button type=\"button\" id=\"toggle-devices\" aria-controls=\"subscription-devices\" aria-expanded=\"false\">{}</button>",if en{"Devices"}else{"Устройства"});
             let maximum = user.get("hwid").and_then(Value::as_i64).unwrap_or(0);
             let connected_devices = user
                 .get("devices")
