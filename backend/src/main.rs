@@ -2276,6 +2276,38 @@ async fn get_user_presence(
 
 /// Real per-user, per-node traffic collected from authenticated Xray node counters.
 /// Without actual per-user counter reports this returns an empty server list.
+async fn user_traffic_collectors(pool: &PgPool) -> Result<Vec<Value>, ApiError> {
+    // Distinguish a truly idle user from an unreachable Xray StatsService.
+    // The last signed sample on each node is advisory; it is never counted as usage.
+    let collector_rows = sqlx::query(
+        "SELECT n.id AS node_id,
+                COALESCE(NULLIF(n.data->>'name',''),'Узел #'||n.id::text) AS node_name,
+                last_sample.status,
+                last_sample.sampled_at_ms
+         FROM panel_records n
+         LEFT JOIN LATERAL (
+             SELECT sm.metrics->>'userStatsStatus' AS status,
+                    (EXTRACT(EPOCH FROM sm.sampled_at)*1000)::BIGINT AS sampled_at_ms
+             FROM server_metric_samples sm
+             WHERE sm.node_id=n.id::text
+             ORDER BY sm.sampled_at DESC LIMIT 1
+         ) last_sample ON TRUE
+         WHERE n.collection='nodes' ORDER BY n.id",
+    )
+    .fetch_all(&state.pool)
+    .await?;
+    let mut collectors = Vec::with_capacity(collector_rows.len());
+    for row in collector_rows {
+        collectors.push(json!({
+            "nodeId":row.try_get::<i64,_>("node_id")?,
+            "name":row.try_get::<String,_>("node_name")?,
+            "status":row.try_get::<Option<String>,_>("status")?,
+            "sampledAtMs":row.try_get::<Option<i64>,_>("sampled_at_ms")?
+        }));
+    }
+    Ok(collectors)
+}
+
 async fn get_user_traffic(
     State(state): State<AppState>,
     Path(user_id): Path<i64>,
@@ -2356,34 +2388,7 @@ async fn get_user_traffic(
             "observations":r.try_get::<i64,_>("observations")?
         }));
     }
-    // Distinguish a truly idle user from an unreachable Xray StatsService.
-    // The last signed sample on each node is advisory; it is never counted as usage.
-    let collector_rows = sqlx::query(
-        "SELECT n.id AS node_id,
-                COALESCE(NULLIF(n.data->>'name',''),'Узел #'||n.id::text) AS node_name,
-                last_sample.status,
-                last_sample.sampled_at_ms
-         FROM panel_records n
-         LEFT JOIN LATERAL (
-             SELECT sm.metrics->>'userStatsStatus' AS status,
-                    (EXTRACT(EPOCH FROM sm.sampled_at)*1000)::BIGINT AS sampled_at_ms
-             FROM server_metric_samples sm
-             WHERE sm.node_id=n.id::text
-             ORDER BY sm.sampled_at DESC LIMIT 1
-         ) last_sample ON TRUE
-         WHERE n.collection='nodes' ORDER BY n.id",
-    )
-    .fetch_all(&state.pool)
-    .await?;
-    let mut collectors = Vec::with_capacity(collector_rows.len());
-    for row in collector_rows {
-        collectors.push(json!({
-            "nodeId":row.try_get::<i64,_>("node_id")?,
-            "name":row.try_get::<String,_>("node_name")?,
-            "status":row.try_get::<Option<String>,_>("status")?,
-            "sampledAtMs":row.try_get::<Option<i64>,_>("sampled_at_ms")?
-        }));
-    }
+    let collectors = user_traffic_collectors(&state.pool).await?;
     Ok(Json(json!({
         "collectors":collectors,
         "userId": user_id,
