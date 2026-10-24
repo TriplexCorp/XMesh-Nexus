@@ -197,6 +197,99 @@ get('profilesSearch').addEventListener('input',renderProfiles);
 const json=()=>{const d=JSON.parse(input.value);if(!d||typeof d!=='object'||Array.isArray(d))throw Error('JSON должен быть объектом');return d};
 const hasValidJSON=()=>{try{return json()}catch{return null}};
 const pretty=d=>JSON.stringify(d,null,2);
+// Read-only document inspector. Never copies secrets from the Xray configuration.
+let outlineSignature='';
+const outlineSections=[
+ ['log','Логирование'],['dns','DNS'],['inbounds','Inbounds'],
+ ['outbounds','Outbounds'],['routing','Маршрутизация'],['policy','Политики'],['stats','Статистика']
+];
+function inspectorButton(label,description,jump){
+ const btn=document.createElement('button');btn.type='button';btn.className='sv-outline-item';
+ btn.dataset.svJump=jump;btn.title='Найти в JSON: '+label;
+ const left=document.createElement('span');left.className='sv-outline-item-label';left.textContent=label;
+ const note=document.createElement('small');note.textContent=description||'';
+ const arrow=document.createElement('span');arrow.className='sv-outline-item-arrow';arrow.textContent='↗';arrow.setAttribute('aria-hidden','true');
+ btn.append(left,note,arrow);return btn;
+}
+function renderInspector(doc,issues=[],source=''){
+ const inbounds=Array.isArray(doc?.inbounds)?doc.inbounds:[];
+ const outbounds=Array.isArray(doc?.outbounds)?doc.outbounds:[];
+ const rules=Array.isArray(doc?.routing?.rules)?doc.routing.rules:[];
+ const errors=issues.filter(issue=>issue.severity==='error').length;
+ const sourceIsValid=Boolean(doc);
+ const coreVerified=sourceIsValid&&validatedSource===source&&!get('coreIssues').hidden;
+ const key=JSON.stringify({properties:doc?Object.keys(doc):[],inbounds:inbounds.map(x=>[x?.tag,x?.protocol,x?.streamSettings?.network,x?.streamSettings?.security]),outbounds:outbounds.length,rules:rules.length,errors,coreVerified,coreStatus:get('coreIssues').dataset.status||''});
+ if(key===outlineSignature)return;
+ outlineSignature=key;
+ get('insInbounds').textContent=sourceIsValid?String(inbounds.length):'—';
+ get('insOutbounds').textContent=sourceIsValid?String(outbounds.length):'—';
+ get('insRules').textContent=sourceIsValid?String(rules.length):'—';
+ const nav=get('jsonOutline');nav.replaceChildren();
+ const inboundList=get('inboundOutline');inboundList.replaceChildren();
+ if(sourceIsValid){
+  for(const [key,label] of outlineSections){
+   if(!Object.prototype.hasOwnProperty.call(doc,key))continue;
+   const value=doc[key];
+   const description=Array.isArray(value)?value.length+' элементов':typeof value==='object'&&value!==null?Object.keys(value).length+' полей':'Значение';
+   nav.append(inspectorButton(label,description,key));
+  }
+  for(const [index,ib] of inbounds.slice(0,12).entries()){
+   const name=typeof ib?.tag==='string'&&ib.tag?ib.tag:'Inbound '+(index+1);
+   const protocol=String(ib?.protocol||'unknown').toUpperCase();
+   const network=String(ib?.streamSettings?.network||'raw').toUpperCase();
+   const security=String(ib?.streamSettings?.security||'none').toUpperCase();
+   inboundList.append(inspectorButton(name,protocol+' · '+network+' · '+security,'inbound:'+index));
+  }
+  if(inbounds.length>12){const more=document.createElement('p');more.className='sv-outline-more';more.textContent='Ещё '+(inbounds.length-12)+' inbound — в JSON';inboundList.append(more)}
+ }else{
+  const msg=document.createElement('p');msg.className='sv-outline-empty';msg.textContent='Исправьте синтаксис JSON — структура появится автоматически.';nav.append(msg);
+ }
+ if(sourceIsValid&&!inbounds.length){
+  const empty=document.createElement('p');empty.className='sv-outline-empty';empty.textContent='Входящих соединений пока нет';inboundList.append(empty);
+ }
+ const status=get('outlineStatus');
+ const dot=root.querySelector('.sv-outline-status-dot');
+ let state='neutral';
+ if(!sourceIsValid){status.textContent='Ошибка синтаксиса JSON';state='bad'}
+ else if(errors){status.textContent='Ошибки анализа: '+errors;state='bad'}
+ else if(coreVerified){
+  state=get('coreIssues').dataset.status==='ok'?'ok':'bad';
+  status.textContent=state==='ok'?'Проверено Xray-core':'Xray-core: ошибка проверки';
+ }else{status.textContent='JSON разобран · ядро не проверено';state='neutral'}
+ dot.dataset.status=state;
+}
+function jumpToSection(jump){
+ const source=input.value;
+ let offset=-1;
+ if(jump.startsWith('inbound:')){
+  const index=Number(jump.slice(8)),data=hasValidJSON();
+  const inbound=Array.isArray(data?.inbounds)?data.inbounds[index]:null;
+  const base=source.indexOf('"inbounds"');
+  if(inbound?.tag&&base>=0)offset=source.indexOf(JSON.stringify(inbound.tag),base);
+  if(offset<0)offset=base;
+ }else if(outlineSections.some(([key])=>key===jump)){
+  offset=source.indexOf('"'+jump+'"');
+ }
+ if(offset<0)return;
+ input.focus({preventScroll:true});input.setSelectionRange(offset,offset);
+ // The browser scrolls selection into view while preserving the code/editor overlay.
+ const line=source.slice(0,offset).split('\n').length;
+ const styles=getComputedStyle(input);
+ const lineHeight=parseFloat(styles.lineHeight)||22;
+ input.scrollTop=Math.max(0,(line-5)*lineHeight);
+ input.dispatchEvent(new Event('scroll'));
+ const parts=source.slice(0,offset).split('\n');
+ get('position').textContent='Строка '+parts.length+', столбец '+(parts.at(-1).length+1);
+}
+function setInspectorVisible(show,persist=true){
+ root.classList.toggle('sv-outline-hidden',!show);
+ const panel=get('jsonOutline')?.closest('.sv-outline');
+ if(panel)panel.setAttribute('aria-hidden',String(!show));
+ root.querySelectorAll('[data-action="outline"]').forEach(button=>{
+  if(button.hasAttribute('aria-expanded'))button.setAttribute('aria-expanded',String(show));
+ });
+ if(persist){try{window.localStorage?.setItem('xmesh-studio-inspector',show?'visible':'hidden')}catch(_){}}
+}
 const codeColor=source=>{const rx=/"(?:\\.|[^"\\])*"(?=\s*:)|"(?:\\.|[^"\\])*"|\b(?:true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g;let result='',i=0,m;while((m=rx.exec(source))){result+=escapeHtml(source.slice(i,m.index));const token=m[0];const next=source.slice(m.index+token.length);const c=token[0]==='"'?( /^\s*:/.test(next)?'key':'string'):/^(?:true|false|null)$/.test(token)?'boolean':'number';result+='<span class="sv-'+c+'">'+escapeHtml(token)+'</span>';i=m.index+token.length}return result+escapeHtml(source.slice(i))+'\n'};
 function paint(){
  const source=input.value;
@@ -211,6 +304,7 @@ function paint(){
   }
  }
  const issues=obj?(window.XrayJsonIntelligence?.analyze?.(source,obj)||[]):[];
+ renderInspector(obj,issues,source);
  const structuralErrors=issues.filter(x=>x.severity==='error');
  const byLine=new Map();
  for(const issue of structuralErrors){
@@ -226,6 +320,7 @@ function paint(){
   return '<span class="sv-invalid-line" title="'+escapeHtml(message)+'">'+part+'</span>';
  }).join('\n');
  minimap.innerHTML=codeColor(source.split('\n').slice(0,180).join('\n'));
+ get('lines').textContent=source.split('\n').length+' строк';
  const count=Math.min(source.split('\n').length,10000);
  gutter.textContent=Array.from({length:count},(_,i)=>{
   const n=i+1;return (diagnosticsLine===n?'✕ ':byLine.has(n)?'! ':'')+n;
@@ -234,6 +329,8 @@ function paint(){
  get('position').textContent='Строка '+parts.length+', столбец '+(parts.at(-1).length+1);
  const dirty=input.value!==saved;
  get('dirty').textContent=dirty?'● Не сохранено':'✓ Сохранено';
+ get('dirty').dataset.state=dirty?'pending':'saved';
+ root.dataset.dirty=dirty?'true':'false';
  get('saveState').textContent=dirty?'Есть несохранённые изменения':'Конфигурация сохранена';
  if(obj){
   get('valid').textContent=structuralErrors.length?structuralErrors.length+' ошибок предварительного анализа':'✓ JSON корректен (ядро не проверяло)';
@@ -452,6 +549,7 @@ async function action(a){
  case 'format':try{update(json())}catch(err){notify(err.message)}return;
  case 'check':return checkWithCore();
  
+ case 'outline':setInspectorVisible(root.classList.contains('sv-outline-hidden'));return;
  case 'expand':root.classList.toggle('sv-expand');return;
  case 'reset':if(await approve({title:'Сбросить изменения?',description:'Вернуться к последней сохранённой версии JSON?',notice:'Все изменения после сохранения будут потеряны.',danger:true,confirmLabel:'Сбросить изменения'})){input.value=saved||pretty(defaultDoc());paint();input.dispatchEvent(new Event('xmesh:reset-history'))}return;
  case 'undo':root.querySelector('[data-tool="undo"]')?.click();return;
@@ -464,7 +562,7 @@ async function action(a){
  case 'reality':root.querySelector('[data-tool="reality"]')?.click();return;
  }
 }
-root.addEventListener('click',ev=>{const quick=ev.target.closest('[data-quick-outbound]');if(quick){outIndex=Number(quick.dataset.quickOutbound);root.querySelector('[data-tab="outbound"]')?.click();const d=hasValidJSON();if(d)sync(d);return}const b=ev.target.closest('[data-action]');if(b){ev.preventDefault();Promise.resolve(action(b.dataset.action)).catch(x=>notify(x.message))}const tab=ev.target.closest('[data-tab]');if(tab){root.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x===tab));root.querySelectorAll('[data-section]').forEach(x=>x.hidden=x.dataset.section!==tab.dataset.tab)}});
+root.addEventListener('click',ev=>{const jump=ev.target.closest('[data-sv-jump]');if(jump){ev.preventDefault();jumpToSection(jump.dataset.svJump);return}const quick=ev.target.closest('[data-quick-outbound]');if(quick){outIndex=Number(quick.dataset.quickOutbound);root.querySelector('[data-tab="outbound"]')?.click();const d=hasValidJSON();if(d)sync(d);return}const b=ev.target.closest('[data-action]');if(b){ev.preventDefault();Promise.resolve(action(b.dataset.action)).catch(x=>notify(x.message))}const tab=ev.target.closest('[data-tab]');if(tab){root.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x===tab));root.querySelectorAll('[data-section]').forEach(x=>x.hidden=x.dataset.section!==tab.dataset.tab)}});
 root.addEventListener('change',ev=>{if(ev.target.matches('[data-field]'))Promise.resolve(formChanged(ev.target)).catch(err=>notify(err.message))});
 input.addEventListener('input',paint);
 input.addEventListener('scroll',()=>{highlight.scrollTop=input.scrollTop;highlight.scrollLeft=input.scrollLeft;gutter.scrollTop=input.scrollTop});
@@ -472,6 +570,7 @@ input.addEventListener('click',paint);input.addEventListener('keyup',paint);
 input.addEventListener('keydown',ev=>{if(ev.key==='Tab'){ev.preventDefault();const i=input.selectionStart;input.setRangeText('  ',i,input.selectionEnd,'end');input.dispatchEvent(new Event('input',{bubbles:true}))}if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='s'){ev.preventDefault();save()}});
 get('wrap').addEventListener('change',ev=>root.classList.toggle('sv-wrap',ev.target.checked));
 get('upload').addEventListener('change',async ev=>{const f=ev.target.files?.[0];if(!f)return;try{if(f.size>2e6)throw Error('Файл больше 2 МБ');const raw=await f.text();JSON.parse(raw);if(!await unsavedApproval('Импортировать JSON вместо текущего черновика?'))return;input.value=raw;paint();input.dispatchEvent(new Event('xmesh:reset-history'));notify('JSON импортирован')}catch(err){notify(err.message)}finally{ev.target.value=''}});
+try{setInspectorVisible(window.localStorage?.getItem('xmesh-studio-inspector')!=='hidden',false)}catch(_){setInspectorVisible(true,false)}
 input.value=pretty(defaultDoc());saved='';paint();root.querySelector('[data-tab="inbound"]')?.click();renderProfiles();
 window.XMeshJsonTools?.setup(root,{toast:notify,realityKeys:ctx.realityKeys,apiRequest:ctx.apiRequest});
 }
