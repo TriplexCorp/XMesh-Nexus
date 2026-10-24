@@ -13,6 +13,11 @@ assert(!app.includes("fingerprint:d.fingerprint"),'User creation must not store 
 assert.match(app,/FE\.find\(f=>f\.k==='limit'\)/,'User traffic limit is still editable');
 assert.match(app,/FE\.find\(f=>f\.k==='strategy'\)/,'User reset strategy is still editable');
 assert.match(hostEditor,/data-endpoint="fp"/,'Host fingerprint editor remains available');
-assert.match(subscription,/nonempty\(host,"fp"\)\.or_else\(\|\|nonempty\(host,"fingerprint"\)\)/,
-  'Subscription fingerprint must be resolved from the host');
+const transport=fs.readFileSync('backend/src/subscription_transport.rs','utf8');
+assert.match(subscription,/crate::subscription_transport::client_stream\(inbound,host,device\)/,
+  'Subscription must delegate stream generation to the transport projector');
+assert.match(transport,/field\(host,"fp"\)\.or_else\(\|\|field\(host,"fingerprint"\)\)/,
+  'Client TLS/REALITY fingerprint must be resolved from the host, never the user');
+assert.doesNotMatch(transport,/field\(user,"(?:fp|fingerprint)"\)/,
+  'Transport projector must not read a user fingerprint');
 console.log('Fingerprint ownership: hosts only; user forms unchanged otherwise.');
