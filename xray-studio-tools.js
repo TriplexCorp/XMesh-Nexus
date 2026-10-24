@@ -389,6 +389,7 @@ async function editInboundJsonSection({name,label,parent='streamSettings',guard,
   if(guard)guard(ib);
   const target=parent==='streamSettings'?(ib.streamSettings??={}):ib;
   target[name]=parsed;
+  if(name==='tlsSettings'&&['hysteria','hysteria2'].includes(String(ib.protocol||'').toLowerCase())&&target===ib.streamSettings&&ib.streamSettings.security!=='tls')ib.streamSettings.security='tls';
   if(name==='hysteriaSettings'&&parsed.version!=null){
    if(parsed.version!==2)throw Error('Для Hysteria2 требуется version: 2.');
    if(ib.settings&&typeof ib.settings==='object')ib.settings.version=2;
@@ -545,7 +546,11 @@ const operations={
  },
  async tls(){
   try{await editInboundJsonSection({name:'tlsSettings',label:'TLS',initial:{certificates:[]},
-   guard:ib=>{if(ib.streamSettings?.security!=='tls')throw Error('У выбранного inbound не включён TLS.')}
+   guard:ib=>{
+    const p=String(ib.protocol||'').toLowerCase();
+    if(ib.streamSettings?.security!=='tls'&&!['hysteria','hysteria2'].includes(p))
+     throw Error('У выбранного inbound не включён TLS.');
+   }
   })}catch(e){status('Ошибка TLS: '+e.message);notify(e.message)}
  },
  async 'protocol-config'(){
