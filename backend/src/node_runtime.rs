@@ -645,12 +645,15 @@ pub async fn desired_config(
     let now=std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default().as_millis() as i64;
     provision_proxy_users(&mut config,&users,&squads,now)?;
-    // GeoData is node-scoped, not persisted into a shared XRAY STUDIO profile.
+    // Keep the source XRAY STUDIO profile immutable: every source node gets
+    // its own GeoData assets and its own validated routing/exit graph.
+    let nodes=crate::load_records(&state.pool,"nodes").await?;
+    let hosts=crate::load_records(&state.pool,"hosts").await?;
     let geo_data=crate::node_geodata::apply(&node,&mut config)?;
+    crate::node_routing::apply(&node,&mut config,&nodes,&hosts)?;
     let digest=hex::encode(sha2::Sha256::digest(serde_json::to_vec(&config).unwrap_or_default()));
     // Conserve offline allowances across all currently enabled nodes. Large
     // deployments should replace this bound with server-side reserved leases.
-    let nodes=crate::load_records(&state.pool,"nodes").await?;
     let active_nodes=nodes.iter().filter(|node|
         node.get("disabled").and_then(Value::as_bool)!=Some(true)).count().max(1) as i64;
     let mut policy=build_offline_policy(&config,&users,request.node_id,now,&digest,active_nodes);
