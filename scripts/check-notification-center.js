@@ -13,7 +13,7 @@ const source=app.slice(start,end);
 assert(!source.includes('runtime.get('),'Bell handler cannot access nodesP-local runtime');
 async function settle(){await new Promise(resolve=>setImmediate(resolve));}
 function fixture({nodes=[],users=[],getStatus=async()=>({connected:true,xrayRunning:true,routerRunning:true})}={}){
- const content={innerHTML:''};
+ const content={innerHTML:'',addEventListener(){},scrollTop:0,scrollHeight:0,clientHeight:0};
  const refresh={disabled:false,handler:null,addEventListener(event,handler){if(event==='click')this.handler=handler}};
  const workspace={isConnected:true,querySelector(selector){
    if(selector==='[data-notifications-content]')return content;
