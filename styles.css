@@ -5182,3 +5182,7 @@ td.er .user-expiry-primary{color:var(--danger,#f08080)}
 #client-route-root [hidden]{display:none!important}
 @media(max-width:720px){#client-route-root .client-route-main-head,#client-route-root .client-route-main-body,#client-route-root .client-route-savebar{padding:14px}#client-route-root .client-route-head-actions,#client-route-root .client-route-saveactions{width:100%}#client-route-root .client-route-head-actions .btn,#client-route-root .client-route-saveactions .btn{flex:1}}
 
+
+/* Shared modal appearance */
+:root{--xm-modal-dim:rgba(2,7,12,.72);--xm-modal-blur:11px}
+dialog::backdrop,dialog#dlg.node-routing-modal::backdrop,.xm-studio-modal::backdrop{background:var(--xm-modal-dim);backdrop-filter:blur(var(--xm-modal-blur));-webkit-backdrop-filter:blur(var(--xm-modal-blur))}
