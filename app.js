@@ -247,7 +247,7 @@ const ENT={
         if(i.streamSettings?.security==='reality'&&!(r.publicKey||i.publicKey||i.streamSettings?.realitySettings?.publicKey))return chip('Нет REALITY publicKey','--wr');
         return chip(r.disabled?'Выключен':'Настроен',r.disabled?'--mu':'--ok');
       }],['Вкл.',swc('hosts')]]},
-  nodes:{t:'Узлы',nw:'Узел',s:'id',fs:[{k:'name',l:'Название',req:1},{k:'hosting',l:'Хостинг (необязательно)',h:'Например: Cloudrix, Hetzner, OVH. Отображается в карточке узла.'},{k:'flag',l:'Страна и флаг',t:'country'},{k:'addr',l:'Адрес',req:1},{k:'port',l:'Порт ноды',t:'num',req:1},{k:'profileId',l:'XRAY STUDIO',t:'sel',o:()=>DB.profiles.map(p=>[p.id,p.name])},{k:'xrayLocalPort',l:'Локальный порт Xray',t:'num',h:'Планируемый порт Xray на 127.0.0.1; не является публичным портом ноды. Настройка пока не применяется автоматически.'},{k:'mult',l:'Коэффициент трафика',t:'num',h:'1 — без изменений, 2 — считать вдвое'},{k:'limit',l:'Лимит трафика, ГБ',t:'num',h:'0 — без лимита'},{k:'resetDay',l:'День сброса счётчика',t:'num'},
+  nodes:{t:'Узлы',nw:'Узел',s:'id',fs:[{k:'name',l:'Название',req:1},{k:'hosting',l:'Хостинг (необязательно)',h:'Например: Cloudrix, Hetzner, OVH. Отображается в карточке узла.'},{k:'flag',l:'Страна и флаг',t:'country'},{k:'addr',l:'Адрес ноды',req:1,ph:'1.2.3.4, 2001:db8::1 или nl1.example.com',h:'IPv4, IPv6 без скобок или домен. Порт указывается отдельно.'},{k:'port',l:'Порт ноды',t:'num',req:1},{k:'profileId',l:'XRAY STUDIO',t:'sel',o:()=>DB.profiles.map(p=>[p.id,p.name])},{k:'xrayLocalPort',l:'Локальный порт Xray',t:'num',h:'Планируемый порт Xray на 127.0.0.1; не является публичным портом ноды. Настройка пока не применяется автоматически.'},{k:'mult',l:'Коэффициент трафика',t:'num',h:'1 — без изменений, 2 — считать вдвое'},{k:'limit',l:'Лимит трафика, ГБ',t:'num',h:'0 — без лимита'},{k:'resetDay',l:'День сброса счётчика',t:'num'},
     {k:'billingPrice',l:'Стоимость аренды',t:'num'},
     {k:'billingCurrency',l:'Валюта',t:'sel',o:[['EUR','EUR · €'],['USD','USD · $'],['RUB','RUB · ₽'],['PLN','PLN · zł'],['GBP','GBP · £']]},
     {k:'billingDueDate',l:'Оплачено до',ph:'ГГГГ-ММ-ДД'},
@@ -261,6 +261,18 @@ const ENT={
 
     def:()=>({flag:'',mult:1,limit:0,resetDay:1,rotationEnabled:false,rotationIntervalHours:24,rotationIps:'',billingCurrency:'EUR',billingPeriod:'monthly',billingRemindDays:7,billingPrice:0}),
     chk:data=>{
+      const address=String(data.addr??'');
+      const ipv4=address.split('.');
+      const isIPv4=ipv4.length===4&&ipv4.every(part=>/^\\d{1,3}$/.test(part)&&Number(part)<=255);
+      const isIPv6=address.includes(':')&&/^[0-9a-fA-F:.]+$/.test(address)
+        &&address.split(':').length>=3&&address.split(':').length<=9
+        &&address.split(':').filter(Boolean).every(part=>part.length<=4)
+        &&(!address.includes('::')||address.indexOf('::')===address.lastIndexOf('::'));
+      const isDomain=address.length<=253&&/^[a-zA-Z0-9-]+(?:\\.[a-zA-Z0-9-]+)*$/.test(address)
+        &&address.split('.').every(label=>label.length<=63&&!label.startsWith('-')&&!label.endsWith('-'))
+        &&!/^[0-9.]+$/.test(address);
+      if(!address||address!==address.trim()||!(isIPv4||isIPv6||isDomain))
+        return 'Укажите корректный IPv4, IPv6 без скобок или домен без порта.';
       const issue=nodeRotationValidate(data);if(issue)return issue;
       const interval=Number(data.rotationIntervalHours||24);
       if(data.rotationEnabled&&(!Number.isInteger(interval)||interval<1||interval>720))return 'Интервал IP-ротации должен быть от 1 до 720 часов.';
