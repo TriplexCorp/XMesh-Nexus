@@ -666,13 +666,14 @@ function openComposer(){
    notify('Нельзя добавить inbound: текущий JSON повреждён или тег уже занят.');return;
   }
   if(opts.mode==='new'&&!await unsavedApproval('Создать новую конфигурацию вместо текущего черновика?'))return;
+  const chosen={...opts},originalSource=input.value,selectionSignature=JSON.stringify(opts);
   busy=true;renderPreview();
   try{
    let shadowsocksPassword,keys,publicKey;
-   if(opts.protocol==='shadowsocks'){
-    shadowsocksPassword=engine.generateShadowsocksPassword(opts.method,window.crypto);
+   if(chosen.protocol==='shadowsocks'){
+    shadowsocksPassword=engine.generateShadowsocksPassword(chosen.method,window.crypto);
    }
-   if(opts.security==='reality'&&opts.target&&opts.sni&&typeof ctx.realityKeys==='function'){
+   if(chosen.security==='reality'&&chosen.target&&chosen.sni&&typeof ctx.realityKeys==='function'){
     const pair=await ctx.realityKeys();
     if(!/^[A-Za-z0-9_-]{43}$/.test(pair?.privateKey||'')||!/^[A-Za-z0-9_-]{43}$/.test(pair?.publicKey||''))
       throw Error('Генератор X25519 не вернул корректную пару. JSON не изменён.');
@@ -682,16 +683,17 @@ function openComposer(){
     keys={privateKey:pair.privateKey,shortId:Array.from(random,b=>b.toString(16).padStart(2,'0')).join('')};
     publicKey=pair.publicKey;
    }
-   const activeJson=opts.mode==='add'?hasValidJSON():null;
-   const documentValue=engine.buildDocument(opts,activeJson,{shadowsocksPassword,realityKeys:keys});
-   if(opts.mode==='new'){id=null;name=String(opts.name||'Новая конфигурация').trim().slice(0,100)||'Новая конфигурация';inboundIndex=outIndex=0;saved=''}
+   if(input.value!==originalSource||JSON.stringify(opts)!==selectionSignature)throw Error('JSON или параметры изменились во время генерации. Черновик не заменён.');
+   const activeJson=chosen.mode==='add'?JSON.parse(originalSource):null;
+   const documentValue=engine.buildDocument(chosen,activeJson,{shadowsocksPassword,realityKeys:keys});
+   if(chosen.mode==='new'){id=null;name=String(chosen.name||'Новая конфигурация').trim().slice(0,100)||'Новая конфигурация';inboundIndex=outIndex=0;saved=''}
    update(documentValue);
-   if(opts.mode==='new')input.dispatchEvent(new Event('xmesh:reset-history'));
+   if(chosen.mode==='new')input.dispatchEvent(new Event('xmesh:reset-history'));
    setPage('editor');close();
    if(publicKey){
     try{await navigator.clipboard.writeText(publicKey);notify('JSON создан. Public key REALITY скопирован; сохраните его для клиентов.')}catch{notify('JSON создан. Откройте REALITY и скопируйте public key для клиентов.')}
    }else{
-    const suffix=opts.security==='reality'?' Для REALITY завершите настройку target/SNI и ключей.':'';
+    const suffix=chosen.security==='reality'?' Для REALITY завершите настройку target/SNI и ключей.':'';
     notify('JSON-черновик создан. Проверьте конфигурацию через Xray-core перед сохранением.'+suffix);
    }
   }catch(error){notify('Не удалось собрать JSON: '+error.message)}
