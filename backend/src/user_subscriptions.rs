@@ -846,68 +846,13 @@ pub async fn admin_client_json(
         .map_err(|detail| ApiError::new(StatusCode::BAD_REQUEST, detail))?;
     Ok(Json(profile))
 }
-pub async fn serve(
-    State(state): State<AppState>,
-    Path(token): Path<String>,
-    headers: HeaderMap,
-    Query(options): Query<HashMap<String, String>>,
-) -> Result<Response, ApiError> {
-    if !valid_token(&token) {
-        return Err(ApiError::new(
-            StatusCode::NOT_FOUND,
-            "Subscription not found",
-        ));
-    }
-    let row = sqlx::query("SELECT user_id FROM user_subscription_tokens WHERE token_hash=$1")
-        .bind(token_hash(&token))
-        .fetch_optional(&state.pool)
-        .await?
-        .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Subscription not found"))?;
-    let id: i64 = row.try_get("user_id")?;
-    let user = record(&state, id).await?;
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis()
-        .try_into()
-        .unwrap_or(i64::MAX);
-    if crate::user_status(&user, now) != "ACTIVE" {
-        return Err(ApiError::new(
-            StatusCode::FORBIDDEN,
-            "Subscription inactive",
-        ));
-    }
-    // Resolve content and XHTTP transport profile from the VPN client's
-    // actual User-Agent. Explicit query parameters remain optional overrides.
-    let client = crate::subscription_user_agent::negotiate(&headers, &options).map_err(bad)?;
-    let outbounds = collect_user_outbounds(&state, &user, client.device.as_str(), true).await?;
-    let settings = crate::read_settings(&state.pool).await?;
-    // Native Xray JSON is the only supported subscription format.
-    // A disabled SMART selector changes routing, never the wire representation.
-    let json = crate::subscription_json::build_feed(outbounds, &settings).map_err(|message| {
-        tracing::warn!(user_id=id, error=%message,"Subscription JSON could not be generated");
-        ApiError::new(StatusCode::SERVICE_UNAVAILABLE, message)
-    })?;
-    let mut response = Json(json).into_response();
-    response.headers_mut().insert(
-        header::CONTENT_TYPE,
-        "application/json; charset=utf-8".parse().unwrap(),
-    );
-    response
-        .headers_mut()
-        .insert(header::CACHE_CONTROL, "no-store, private".parse().unwrap());
-    response
-        .headers_mut()
-        .insert(header::REFERRER_POLICY, "no-referrer".parse().unwrap());
-    response
-        .headers_mut()
-        .insert(header::VARY, "User-Agent, Accept".parse().unwrap());
+fn add_subscription_profile_headers(response: &mut Response, settings: &Value) {
     // Client metadata: these are advisory headers and never change the native Xray JSON body.
     // Never reflect untrusted settings into HTTP headers without HeaderValue validation.
     let title = studio_string(
-        &settings,
+        settings,
         "subscriptionBrand",
-        studio_string(&settings, "brand", "XMesh Nexus"),
+        studio_string(settings, "brand", "XMesh Nexus"),
     );
     if let Ok(encoded) = header::HeaderValue::from_str(&format!("base64:{}", {
         use base64::Engine as _;
@@ -965,6 +910,65 @@ pub async fn serve(
         "profile-update-interval",
         header::HeaderValue::from_str(&interval.to_string()).unwrap(),
     );
+}
+
+pub async fn serve(
+    State(state): State<AppState>,
+    Path(token): Path<String>,
+    headers: HeaderMap,
+    Query(options): Query<HashMap<String, String>>,
+) -> Result<Response, ApiError> {
+    if !valid_token(&token) {
+        return Err(ApiError::new(
+            StatusCode::NOT_FOUND,
+            "Subscription not found",
+        ));
+    }
+    let row = sqlx::query("SELECT user_id FROM user_subscription_tokens WHERE token_hash=$1")
+        .bind(token_hash(&token))
+        .fetch_optional(&state.pool)
+        .await?
+        .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Subscription not found"))?;
+    let id: i64 = row.try_get("user_id")?;
+    let user = record(&state, id).await?;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+        .try_into()
+        .unwrap_or(i64::MAX);
+    if crate::user_status(&user, now) != "ACTIVE" {
+        return Err(ApiError::new(
+            StatusCode::FORBIDDEN,
+            "Subscription inactive",
+        ));
+    }
+    // Resolve content and XHTTP transport profile from the VPN client's
+    // actual User-Agent. Explicit query parameters remain optional overrides.
+    let client = crate::subscription_user_agent::negotiate(&headers, &options).map_err(bad)?;
+    let outbounds = collect_user_outbounds(&state, &user, client.device.as_str(), true).await?;
+    let settings = crate::read_settings(&state.pool).await?;
+    // Native Xray JSON is the only supported subscription format.
+    // A disabled SMART selector changes routing, never the wire representation.
+    let json = crate::subscription_json::build_feed(outbounds, &settings).map_err(|message| {
+        tracing::warn!(user_id=id, error=%message,"Subscription JSON could not be generated");
+        ApiError::new(StatusCode::SERVICE_UNAVAILABLE, message)
+    })?;
+    let mut response = Json(json).into_response();
+    response.headers_mut().insert(
+        header::CONTENT_TYPE,
+        "application/json; charset=utf-8".parse().unwrap(),
+    );
+    response
+        .headers_mut()
+        .insert(header::CACHE_CONTROL, "no-store, private".parse().unwrap());
+    response
+        .headers_mut()
+        .insert(header::REFERRER_POLICY, "no-referrer".parse().unwrap());
+    response
+        .headers_mut()
+        .insert(header::VARY, "User-Agent, Accept".parse().unwrap());
+    add_subscription_profile_headers(&mut response, &settings);
     // User limits are expressed in GiB in panel records; the conventional subscription-userinfo
     // header expects bytes and Unix seconds.
     let consumed_gib = user
