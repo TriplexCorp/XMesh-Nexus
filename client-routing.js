@@ -73,7 +73,7 @@
     return values.map(([value,label])=>'<option value="'+escapeHTML(value)+'"'+(value===selected?' selected':'')+'>'+escapeHTML(label)+'</option>').join('');
   }
 
-  const CSS_VERSION = '20261024-client-cards-v11';
+  const CSS_VERSION = '20261024-unified-route-v12';
   function ensureStylesheet() {
     const file = 'client-routing.css';
     const existing = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
@@ -217,7 +217,7 @@
       // The modal and its backdrop are persistent. Only the active tab's content
       // changes, so switching tabs never opens another browser dialog.
       const live=host.querySelector('dialog.crx-overlay');
-      const reuse=live?.open&&live.dataset.crProfileId===p.id;
+      const reuse=Boolean(live?.open&&live.dataset.crProfileId===p.id);
       const markup='<dialog class="crx-overlay" data-cr-overlay aria-labelledby="crx-dialog-title"><div class="crx-dialog">'+
         '<header class="crx-dialog-header"><div class="crx-dialog-identity"><div class="crx-dialog-mark">'+icon('route')+'</div>'+
         '<div><span class="crx-dialog-kicker">РЕДАКТОР МАРШРУТИЗАЦИИ</span><h2 id="crx-dialog-title">'+escapeHTML(p.name||'Новый шаблон')+'</h2></div></div>'+
@@ -259,6 +259,7 @@
         const next=template.content.querySelector('dialog.crx-overlay');
         const body=live.querySelector('.crx-dialog-body');
         const replacement=next.querySelector('.crx-dialog-body');
+        // Keep a single native dialog; only the active panel is reconciled.
         body.replaceChildren(...replacement.childNodes);
         body.setAttribute('aria-labelledby','crx-tab-'+activeTab);
         for(const tab of live.querySelectorAll('[data-cr-tab]')){
@@ -420,7 +421,7 @@
           if(checkPending())return;
           activeTab=el.dataset.crTab;
           if(activeTab==='json')jsonValue=JSON.stringify(current(),null,2);
-          jsonError='';editorRefresh(false);root.querySelector('[data-cr-tab="'+activeTab+'"]')?.focus();return;
+          jsonError='';editorRefresh(false);root.querySelector('[data-cr-tab="'+activeTab+'"]')?.focus({preventScroll:true});return;
         }
         if(el.hasAttribute('data-cr-select-all')||el.hasAttribute('data-cr-select-none')){
           const p=current();if(!p)return;
