@@ -293,6 +293,21 @@ fn subscription_display_name(
     }
 }
 
+fn local_client_inbounds(socks_port: u16, http_port: u16, sniffing: bool) -> Vec<Value> {
+    let mut inbounds = vec![
+        json!({"tag":"socks","listen":"127.0.0.1","port":socks_port,"protocol":"socks",
+         "settings":{"auth":"noauth","udp":true}}),
+        json!({"tag":"http","listen":"127.0.0.1","port":http_port,"protocol":"http"}),
+    ];
+    if sniffing {
+        for inbound in &mut inbounds {
+            inbound["sniffing"] =
+                json!({"enabled":true,"destOverride":["http","tls","quic"],"routeOnly":true});
+        }
+    }
+    inbounds
+}
+
 pub fn build(mut proxies: Vec<Value>, setting: &Value) -> Result<Value, String> {
     if proxies.is_empty() {
         return Err("Нет доступных клиентских подключений".into());
@@ -353,17 +368,7 @@ pub fn build(mut proxies: Vec<Value>, setting: &Value) -> Result<Value, String> 
         rules,
         observation,
     } = smart_routes(&countries, &tags, &first, balance, smart, dns_out);
-    let mut inbounds = vec![
-        json!({"tag":"socks","listen":"127.0.0.1","port":socks_port,"protocol":"socks",
-         "settings":{"auth":"noauth","udp":true}}),
-        json!({"tag":"http","listen":"127.0.0.1","port":http_port,"protocol":"http"}),
-    ];
-    if sniffing {
-        for inbound in &mut inbounds {
-            inbound["sniffing"] =
-                json!({"enabled":true,"destOverride":["http","tls","quic"],"routeOnly":true});
-        }
-    }
+    let inbounds = local_client_inbounds(socks_port, http_port, sniffing);
     proxies.push(json!({"tag":"direct","protocol":"freedom","settings":{"domainStrategy":"AsIs"}}));
     proxies.push(json!({"tag":"block","protocol":"blackhole"}));
     if dns_out {
