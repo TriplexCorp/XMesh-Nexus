@@ -8,6 +8,7 @@ function open({node,profiles,modal,updateNode,apiRequest,notify,afterSave}){
  let base={};
  try{base=typeof profile?.config==='string'?JSON.parse(profile.config):profile?.config||{}}catch(_){}
  const fallback={
+  log:base.log||{loglevel:'warning'},
   dns:base.dns||{servers:['1.1.1.1']},
   routing:base.routing||{domainStrategy:'AsIs',rules:[]},
   outbounds:[]
@@ -23,7 +24,7 @@ function open({node,profiles,modal,updateNode,apiRequest,notify,afterSave}){
  '<button type="button" class="gh sm" data-route-copy>Копировать JSON</button></div></div>'+
  '<div class="route-json-editor"><div class="route-json-editor-head"><strong>NODE ROUTING · JSON</strong><span data-route-json-valid>JSON</span></div>'+
  '<textarea data-route-json-text spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="JSON конфигурация маршрутизации"></textarea></div>'+
- '<footer class="route-json-foot"><span data-route-json-status>DNS, routing и outbounds. Системный маршрут статистики сохраняется автоматически.</span>'+
+ '<footer class="route-json-foot"><span data-route-json-status>Log, DNS, routing и outbounds. Системный маршрут статистики сохраняется автоматически.</span>'+
  '<div><button type="button" class="gh" data-route-json-preview>Проверить</button><button type="submit" class="btn" data-route-json-save>Сохранить</button></div></footer>'+
  '</form>','node-routing-modal');
  const form=document.querySelector('#dlg [data-route-json-form]');if(!form)return;
@@ -35,7 +36,7 @@ function open({node,profiles,modal,updateNode,apiRequest,notify,afterSave}){
   try{obj=JSON.parse(editor.value)}catch(e){throw Error('Ошибка JSON: '+e.message)}
   if(!obj||Array.isArray(obj)||typeof obj!=='object')throw Error('Ожидается JSON-объект.');
   const keys=Object.keys(obj);
-  if(keys.some(k=>!['dns','routing','outbounds'].includes(k)))throw Error('Разрешены только dns, routing и outbounds. Другие разделы остаются в XRAY STUDIO.');
+  if(keys.some(k=>!['log','dns','routing','outbounds'].includes(k)))throw Error('Разрешены только log, dns, routing и outbounds. Другие разделы остаются в XRAY STUDIO.');
   if(obj.routing&&(!Array.isArray(obj.routing.rules)))throw Error('routing.rules должен быть массивом.');
   if(obj.outbounds&&!Array.isArray(obj.outbounds))throw Error('outbounds должен быть массивом.');
   return obj;
