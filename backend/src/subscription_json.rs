@@ -202,6 +202,61 @@ fn prepare_proxy_outbounds(proxies: &mut [Value]) -> Result<PreparedProxyOutboun
     Ok((tags, countries, display_names))
 }
 
+struct SmartRoutes {
+    balancers: Vec<Value>,
+    rules: Vec<Value>,
+    observation: bool,
+}
+
+fn smart_routes(countries: &HashMap<String, Vec<String>>, tags: &[String], first: &str, balance: &str, smart: bool, dns_out: bool) -> SmartRoutes {
+    let mut balancers: Vec<Value> = Vec::new();
+    let mut rules = vec![
+        json!({"type":"field","ip":["geoip:private"],"outboundTag":"direct"}),
+        json!({"type":"field","domain":["geosite:private"],"outboundTag":"direct"}),
+    ];
+    if dns_out {
+        rules.push(
+            json!({"type":"field","inboundTag":["socks","http"],"port":53,
+            "network":"tcp,udp","outboundTag":"dns-out"}),
+        );
+    }
+    let mut observation = false;
+    if smart && tags.len() > 1 && balance != "off" {
+        let mut group_names: Vec<String> = countries.keys().cloned().collect();
+        group_names.sort();
+        for code in group_names {
+            let members = &countries[&code];
+            if members.len() < 2 || code == "ZZ" {
+                continue;
+            }
+            let tag = format!("{code}_AUTO");
+            let mut balancer = json!({
+                "tag":tag,"selector":[format!("xmesh-{code}-")],
+                "strategy":{"type":balance}
+            });
+            // Xray requires an Observatory when fallbackTag is present,
+            // even for roundRobin/random. Only leastPing configures one.
+            if balance == "leastPing" {
+                balancer["fallbackTag"] = json!(members[0]);
+            }
+            balancers.push(balancer);
+        }
+        let mut balancer = json!({
+            "tag":"SMART","selector":["xmesh-"],
+            "strategy":{"type":balance}
+        });
+        if balance == "leastPing" {
+            balancer["fallbackTag"] = json!(first);
+        }
+        balancers.push(balancer);
+        observation = balance == "leastPing";
+        rules.push(json!({"type":"field","inboundTag":["socks","http"],"balancerTag":"SMART"}));
+    } else {
+        rules.push(json!({"type":"field","inboundTag":["socks","http"],"outboundTag":first}));
+    }
+    SmartRoutes { balancers, rules, observation }
+}
+
 pub fn build(mut proxies: Vec<Value>, setting: &Value) -> Result<Value, String> {
     if proxies.is_empty() {
         return Err("Нет доступных клиентских подключений".into());
@@ -257,51 +312,7 @@ pub fn build(mut proxies: Vec<Value>, setting: &Value) -> Result<Value, String> 
         .first()
         .ok_or("Отсутствует маршрут по умолчанию")?
         .clone();
-    let mut balancers: Vec<Value> = Vec::new();
-    let mut rules = vec![
-        json!({"type":"field","ip":["geoip:private"],"outboundTag":"direct"}),
-        json!({"type":"field","domain":["geosite:private"],"outboundTag":"direct"}),
-    ];
-    if dns_out {
-        rules.push(
-            json!({"type":"field","inboundTag":["socks","http"],"port":53,
-            "network":"tcp,udp","outboundTag":"dns-out"}),
-        );
-    }
-    let mut observation = false;
-    if smart && tags.len() > 1 && balance != "off" {
-        let mut group_names: Vec<String> = countries.keys().cloned().collect();
-        group_names.sort();
-        for code in group_names {
-            let members = &countries[&code];
-            if members.len() < 2 || code == "ZZ" {
-                continue;
-            }
-            let tag = format!("{code}_AUTO");
-            let mut balancer = json!({
-                "tag":tag,"selector":[format!("xmesh-{code}-")],
-                "strategy":{"type":balance}
-            });
-            // Xray requires an Observatory when fallbackTag is present,
-            // even for roundRobin/random. Only leastPing configures one.
-            if balance == "leastPing" {
-                balancer["fallbackTag"] = json!(members[0]);
-            }
-            balancers.push(balancer);
-        }
-        let mut balancer = json!({
-            "tag":"SMART","selector":["xmesh-"],
-            "strategy":{"type":balance}
-        });
-        if balance == "leastPing" {
-            balancer["fallbackTag"] = json!(first);
-        }
-        balancers.push(balancer);
-        observation = balance == "leastPing";
-        rules.push(json!({"type":"field","inboundTag":["socks","http"],"balancerTag":"SMART"}));
-    } else {
-        rules.push(json!({"type":"field","inboundTag":["socks","http"],"outboundTag":first}));
-    }
+    let SmartRoutes { balancers, rules, observation } = smart_routes(&countries, &tags, &first, balance, smart, dns_out);
     let mut inbounds = vec![
         json!({"tag":"socks","listen":"127.0.0.1","port":socks_port,"protocol":"socks",
          "settings":{"auth":"noauth","udp":true}}),
