@@ -83,6 +83,8 @@ pub async fn login(
         return Err(ApiError::new(StatusCode::TOO_MANY_REQUESTS,
             "Слишком много попыток входа в панель. Повторите позже."));
     }
+    // Rate-limit case variants together, but authenticate the exact account name.
+    // The submitted username must match its stored casing byte-for-byte.
     let username_key = body.username.trim().to_lowercase();
     if username_key.is_empty() {
         record_failed_login(&state, &username_key).await?;
@@ -107,7 +109,7 @@ pub async fn login(
     }
     let row = sqlx::query(
         "SELECT id, username, role, password_hash, is_active \
-         FROM panel_auth_users WHERE LOWER(username) = LOWER($1) LIMIT 1",
+         FROM panel_auth_users WHERE username = $1 LIMIT 1",
     )
     .bind(body.username.trim())
     .fetch_optional(&state.pool)
