@@ -133,14 +133,7 @@ fn validate_custom_clients(object: &Map<String, Value>) -> Result<(), ApiError> 
     Ok(())
 }
 
-pub fn validate(object: &Map<String, Value>) -> Result<(), ApiError> {
-    if let Some(json) = object.get("subscriptionJson") {
-        crate::subscription_json::validate_settings(json).map_err(|message| bad(&message))?;
-    }
-    if let Some(routes) = object.get("clientRoutingProfiles") {
-        crate::client_routing::validate(routes).map_err(|detail| bad(&detail))?;
-    }
-
+fn validate_portal_appearance(object: &Map<String, Value>) -> Result<(), ApiError> {
     for key in [
         "subscriptionBackground",
         "subscriptionCardColor",
@@ -206,6 +199,18 @@ pub fn validate(object: &Map<String, Value>) -> Result<(), ApiError> {
             return Err(bad("Скругление должно быть от 1 до 36 пикселей."));
         }
     }
+    Ok(())
+}
+
+pub fn validate(object: &Map<String, Value>) -> Result<(), ApiError> {
+    if let Some(json) = object.get("subscriptionJson") {
+        crate::subscription_json::validate_settings(json).map_err(|message| bad(&message))?;
+    }
+    if let Some(routes) = object.get("clientRoutingProfiles") {
+        crate::client_routing::validate(routes).map_err(|detail| bad(&detail))?;
+    }
+
+    validate_portal_appearance(object)?;
     for (key, max) in [
         ("subscriptionHero", 100),
         ("subscriptionHeroEn", 100),
