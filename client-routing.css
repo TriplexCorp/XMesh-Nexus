@@ -104,3 +104,6 @@
 @media(max-width:60rem){#client-route-root.crx .crx-rule{align-items:start;flex-wrap:wrap}#client-route-root.crx .crx-rule-fields{grid-template-columns:repeat(2,minmax(0,1fr));flex-basis:calc(100% - 3rem)}#client-route-root.crx .crx-rule-actions{margin-left:auto}}
 @media(max-width:40rem){#client-route-root.crx .crx-page-head,#client-route-root.crx .crx-bottom{align-items:stretch}#client-route-root.crx .crx-dialog{max-height:96vh}#client-route-root.crx .crx-dialog-header,#client-route-root.crx .crx-dialog-body,#client-route-root.crx .crx-settings,#client-route-root.crx .crx-dialog-footer{padding:.875rem}#client-route-root.crx nav.crx-tabs{padding:.625rem .875rem}#client-route-root.crx .crx-rule-fields{grid-template-columns:1fr;flex-basis:100%}#client-route-root.crx .crx-rule-n{display:none}#client-route-root.crx .crx-settings-fields,#client-route-root.crx .crx-settings-actions{width:100%}#client-route-root.crx .crx-settings-fields>label:not(.crx-toggle){flex:1}}
 @media(prefers-reduced-motion:reduce){#client-route-root.crx *{transition:none}}
+
+/* Match the shared panel modal backdrop. */
+#client-route-root.crx .crx-overlay{background:var(--xm-modal-dim,rgba(2,7,12,.72));backdrop-filter:blur(var(--xm-modal-blur,11px));-webkit-backdrop-filter:blur(var(--xm-modal-blur,11px))}
