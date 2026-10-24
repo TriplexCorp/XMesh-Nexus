@@ -52,7 +52,9 @@ fn matcher(kind: &str, raw: &str) -> Result<(&'static str, String), ApiError> {
             let Some((filename, category)) = value.split_once(':') else {
                 return Err(bad("Routing: custom GeoData needs filename.dat:category."));
             };
-            if !filename.ends_with(".dat")
+            if !std::path::Path::new(filename)
+                    .extension()
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("dat"))
                 || filename.len() > 52
                 || !filename[..filename.len() - 4]
                     .bytes()
@@ -113,10 +115,10 @@ fn endpoint(outbound: &Value) -> Result<(String, u64), ApiError> {
             ));
         };
         if users.iter().any(|user| {
-            !user
+            user
                 .get("id")
                 .and_then(Value::as_str)
-                .is_some_and(|id| uuid::Uuid::parse_str(id).is_ok())
+                .is_none_or(|id| uuid::Uuid::parse_str(id).is_err())
         }) {
             return Err(bad(
                 "Routing: remote outbound needs a valid VLESS/VMess UUID.",
@@ -266,10 +268,10 @@ fn json_routing(node: &Value) -> Result<Option<&serde_json::Map<String, Value>>,
             if rule.get("type").and_then(Value::as_str) != Some("field") {
                 return Err(bad("Routing JSON: only field rules are supported."));
             }
-            if !rule
+            if rule
                 .get("outboundTag")
                 .and_then(Value::as_str)
-                .is_some_and(|s| !s.is_empty())
+                .is_none_or(str::is_empty)
             {
                 return Err(bad("Routing JSON: every rule needs outboundTag."));
             }
