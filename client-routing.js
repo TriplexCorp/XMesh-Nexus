@@ -6,6 +6,15 @@
 'use strict';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','"':'&quot;'}[c]));
 const clone=v=>JSON.parse(JSON.stringify(v));
+const flagFor=name=>{
+ const n=String(name||'').toLowerCase();
+ const countries=[['нидерланд','🇳🇱'],['netherland','🇳🇱'],['голланд','🇳🇱'],['польш','🇵🇱'],['poland','🇵🇱'],['герман','🇩🇪'],['germany','🇩🇪'],['росси','🇷🇺'],['russia','🇷🇺'],['швеци','🇸🇪'],['sweden','🇸🇪'],['эстони','🇪🇪'],['estonia','🇪🇪'],['финлян','🇫🇮'],['finland','🇫🇮'],['франци','🇫🇷'],['france','🇫🇷']];
+ const found=countries.find(([word])=>n.includes(word));
+ if(found)return found[1];
+ const code=n.match(/(?:^|[^a-z])(ru|nl|pl|de|se|swe|ee|fi|fr|us)(?:$|[^a-z])/);
+ const flags={ru:'🇷🇺',nl:'🇳🇱',pl:'🇵🇱',de:'🇩🇪',se:'🇸🇪',swe:'🇸🇪',ee:'🇪🇪',fi:'🇫🇮',fr:'🇫🇷',us:'🇺🇸'};
+ return code?flags[code[1]]:'🌐';
+};
 const labels={
  geosite:'GeoSite',geoip:'GeoIP',domain:'Домен',ip:'IP / CIDR',port:'Порт',
  proxy:'Через выбранный сервер',direct:'Напрямую',block:'Блокировать',
@@ -65,7 +74,7 @@ function create(db,saveSettings,toast){
    const candidateList=[...assignments,...missing.map(key=>({key,title:key,detail:'Недоступный сервер · сохранённая привязка'}))];
    const assigned=candidateList.map(c=>
     '<label class="client-route-source"><input type="checkbox" data-cr-source="'+esc(c.key)+'"'+(keys.has(c.key)?' checked':'')+'>'+
-    '<span><strong>'+esc(c.title)+'</strong><small>'+esc(c.detail)+'</small></span></label>').join('');
+    '<span class="client-route-source-flag" aria-hidden="true">'+flagFor(c.title)+'</span><span><strong>'+esc(c.title)+'</strong><small>'+esc(c.detail)+'</small></span></label>').join('');
    const rules=(p.rules||[]).map((rule,n)=>{
     const target=rule.server||'';
     const available=[...targets,...(target&&!targets.some(t=>t.key===target)?[{key:target,label:'Недоступный · '+target}]:[])];
@@ -88,7 +97,7 @@ function create(db,saveSettings,toast){
    }).join('');
    const open=openedId===p.id;
    return '<article class="client-route-profile" data-cr-profile="'+index+'">'+
-    '<div class="client-route-card-overview"><div class="client-route-card-icon">⇄</div><div class="client-route-card-description"><strong>'+esc(p.name||'Без названия')+'</strong><span>'+(p.enabled===false?'Выключен':'Активен')+' · '+keys.size+' назначений · '+(p.rules||[]).length+' правил</span></div><button type="button" class="gh" data-cr-open aria-expanded="'+open+'">'+(open?'Свернуть ↑':'Настроить →')+'</button></div>'+
+    '<div class="client-route-card-overview"><div class="client-route-card-icon">⇄</div><div class="client-route-card-description"><strong>'+esc(p.name||'Без названия')+'</strong><span>'+(p.enabled===false?'Выключен':'Активен')+' · '+keys.size+' назначений · '+(p.rules||[]).length+' правил</span><div class="client-route-card-flags">'+[...keys].slice(0,6).map(key=>{const item=candidateList.find(c=>c.key===key);return '<span title="'+esc(item?.title||key)+'">'+flagFor(item?.title||key)+'</span>'}).join('')+'</div></div><button type="button" class="gh" data-cr-open aria-expanded="'+open+'">'+(open?'Свернуть ↑':'Настроить →')+'</button></div>'+
     '<div class="client-route-card-details"'+(open?'':' hidden')+'>'+
     '<header class="client-route-profile-head"><div class="client-route-heading"><span class="client-route-count">⇄</span>'+
     '<label><span>Название шаблона</span><input data-cr-name value="'+esc(p.name||'')+'" maxlength="100" placeholder="Например: RU через Польшу"></label><span class="client-route-profile-subtitle">Правила для выбранных серверов и хостов</span></div>'+
