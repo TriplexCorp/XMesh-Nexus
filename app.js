@@ -1494,6 +1494,15 @@ async function loadUserTrafficStats(userId){
     }
   }
 }
+function userRemainingLabel(expireAt){
+  if(expireAt==null||expireAt===''||Number(expireAt)===0)return 'Бессрочно';
+  const expiry=Number(expireAt);
+  if(!Number.isFinite(expiry))return '—';
+  const remaining=expiry-Date.now();
+  if(remaining<=0)return 'Срок истёк';
+  const days=Math.ceil(remaining/86400000);
+  return days+' '+(days%10===1&&days%100!==11?'день':days%10>=2&&days%10<=4&&(days%100<12||days%100>14)?'дня':'дней');
+}
 function userDrawer(id,tab){
   const u=DB.users.find(x=>x.id==id);
   if(!u)return dlg.close();
@@ -1527,7 +1536,7 @@ function userDrawer(id,tab){
       <div class="user-head-actions"><button type="button" class="gh sm" data-a="tog" data-u="${u.id}">${ic(u.disabled?'play':'pause')}${u.disabled?'Включить':'Отключить'}</button><button type="button" class="ia user-remove" data-a="del" data-u="${u.id}" aria-label="Удалить пользователя" title="Удалить пользователя">${ic('trash')}</button><button type="button" class="ia" data-x aria-label="Закрыть">${ic('x')}</button></div>
     </header>
     <div class="user-overview-band">
-      <div class="user-usage-line"><span>Трафик</span><strong>${gb(u.used)}</strong><small>${u.limit?'из '+u.limit+' ГБ':'без лимита'}</small><button type="button" class="user-action-text" data-a="rst" data-u="${u.id}" title="Обнулить использованный трафик">${ic('redo')} Сбросить</button></div>
+      <div class="user-usage-line"><span>Трафик</span><strong>${gb(u.used)}</strong><small>${u.limit?'из '+u.limit+' ГБ':'без лимита'}</small><button type="button" class="user-action-text" data-a="rst" data-u="${u.id}" title="Обнулить использованный трафик">${ic('redo')} Сбросить</button><span class="user-expiry-summary" data-user-expiry-summary style="margin-left:auto;display:inline-flex;align-items:center;gap:6px;white-space:nowrap">${ic('calendar')} <span>Осталось</span> <strong>${userRemainingLabel(u.expireAt)}</strong></span></div>
       ${u.limit?`<div class="user-usage-track" style="--usage:${Math.min(100,Math.max(0,usageRatio*100))}%" role="progressbar" aria-label="Использование трафика" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(Math.min(100,Math.max(0,usageRatio*100)))}"><i></i></div>`:''}
       <div class="user-identity-row"><span>Xray ID</span>${viewerMode() ? '<code class="user-id-masked" aria-label="Xray ID скрыт">••••••••-••••-••••-••••-••••••••••••</code>' : `<code class="user-id-value">${esc(u.xrayId || "—")}</code><button type="button" class="user-id-copy" data-copy-xray-id="${u.id}" aria-label="Копировать Xray ID" title="Копировать Xray ID">${ic("copy")}</button>`}</div>
     </div>
