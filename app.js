@@ -264,10 +264,9 @@ const ENT={
       const address=String(data.addr??'');
       const ipv4=address.split('.');
       const isIPv4=ipv4.length===4&&ipv4.every(part=>/^\\d{1,3}$/.test(part)&&Number(part)<=255);
-      const isIPv6=address.includes(':')&&/^[0-9a-fA-F:.]+$/.test(address)
-        &&address.split(':').length>=3&&address.split(':').length<=9
-        &&address.split(':').filter(Boolean).every(part=>part.length<=4)
-        &&(!address.includes('::')||address.indexOf('::')===address.lastIndexOf('::'));
+      const isIPv6=(()=>{if(!address.includes(':')||!/^[0-9a-fA-F:]+$/.test(address))return false;
+        try{return new URL('http://['+address+']/').hostname.startsWith('[')}catch{return false}
+      })();
       const isDomain=address.length<=253&&/^[a-zA-Z0-9-]+(?:\\.[a-zA-Z0-9-]+)*$/.test(address)
         &&address.split('.').every(label=>label.length<=63&&!label.startsWith('-')&&!label.endsWith('-'))
         &&!/^[0-9.]+$/.test(address);
