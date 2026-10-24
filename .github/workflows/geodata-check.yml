@@ -50,7 +50,8 @@ jobs:
           const end=app.indexOf("  tpls:{",start);
           if(start<0||end<0)throw new Error('Cannot identify node schema');
           const fields=app.slice(start,app.indexOf('def:()=>',start));
-          if(/\\{k:'geo(?:Enabled|BlockAds|UpdateHours|SiteUrl|IpUrl|ExtraSources|CustomRules)'/.test(fields))
+          if(['geoEnabled','geoBlockAds','geoUpdateHours','geoSiteUrl','geoIpUrl','geoExtraSources','geoCustomRules']
+            .some(key=>fields.includes("{k:'"+key+"'")))
             throw new Error('GeoData input leaked into the general node editor form schema');
           JS
       - name: Check installed agents
