@@ -125,6 +125,11 @@ function contextualToolGroups(inbound,hasInbound){
   specialized.push('vlessens');
   if(['reality','tls'].includes(security))specialized.push('vision');
  }else{
+  // REALITY config is transport-level, not exclusive to VLESS.
+  // Shadowsocks + XHTTP + REALITY must remain editable after composition.
+  if(security==='reality')specialized.push('reality','shortid');
+  else if(['vmess','trojan','shadowsocks'].includes(protocol)&&security==='none'&&['raw','xhttp','grpc'].includes(network))
+   specialized.push('reality');
   if(security==='tls')specialized.push('tls');
   specialized.push('protocol-config');
  }
