@@ -39,7 +39,7 @@ function view(){return [
 '<div class="sv-topbar"><nav class="sv-page-tabs" aria-label="Рабочие разделы XRAY STUDIO">',
 '<button class="active" type="button" data-action="studio-editor" aria-current="page"><span class="sv-page-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m8 7-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></svg></span><span class="sv-page-tab-text"><strong>JSON-редактор</strong><small>Конфигурация Xray</small></span></button>',
 '<button type="button" data-action="profiles"><span class="sv-page-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="5" rx="1.5"/><rect x="4" y="11" width="16" height="5" rx="1.5"/><rect x="4" y="18" width="16" height="3" rx="1.5"/></svg></span><span class="sv-page-tab-text"><strong>Профили</strong><small>Библиотека Xray</small></span><span class="sv-page-count" data-v="profilesCount">0</span></button>',
-'</nav><div class="sv-actions"><button type="button" data-action="check" title="Проверить Xray-core"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5L20 7"/><path d="M12 2a10 10 0 1 0 10 10"/></svg> Проверить</button><button type="button" data-action="templates"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z"/></svg> Шаблоны</button><span class="sv-action-divider" aria-hidden="true"></span><button type="button" data-action="import" title="Импортировать JSON"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V3m-5 5 5-5 5 5"/><path d="M4 16v4h16v-4"/></svg> Импорт</button><button type="button" data-action="export" title="Экспортировать JSON"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v13m-5-5 5 5 5-5"/><path d="M4 17v4h16v-4"/></svg> Экспорт</button><button class="sv-primary" type="button" data-action="save" title="Сохранить профиль · Ctrl+S"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><path d="M7 3v6h10M7 21v-8h10v8"/></svg> Сохранить</button></div></div>',
+'</nav><div class="sv-actions"><button type="button" data-action="check" title="Проверить Xray-core"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5L20 7"/><path d="M12 2a10 10 0 1 0 10 10"/></svg> Проверить</button><button type="button" data-action="templates"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z"/></svg> Конструктор</button><span class="sv-action-divider" aria-hidden="true"></span><button type="button" data-action="import" title="Импортировать JSON"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V3m-5 5 5-5 5 5"/><path d="M4 16v4h16v-4"/></svg> Импорт</button><button type="button" data-action="export" title="Экспортировать JSON"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v13m-5-5 5 5 5-5"/><path d="M4 17v4h16v-4"/></svg> Экспорт</button><button class="sv-primary" type="button" data-action="save" title="Сохранить профиль · Ctrl+S"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><path d="M7 3v6h10M7 21v-8h10v8"/></svg> Сохранить</button></div></div>',
 '<section class="sv-profiles-page" data-v="profilesPage" hidden>',
 '<header class="sv-library-hero"><div class="sv-library-heading"><span class="sv-library-eyebrow"><span class="sv-library-beacon"></span> XRAY STUDIO / LIBRARY</span><h2>Библиотека профилей</h2><p>Все серверные конфигурации Xray в одном месте. Выберите профиль, чтобы продолжить редактирование.</p><div class="sv-library-summary"><span><strong data-v="profilesTotal">0</strong> сохранённых профилей</span><span data-v="profilesActive">Нет открытого профиля</span></div></div><button class="sv-primary sv-library-create" type="button" data-action="new-profile"><span aria-hidden="true">＋</span> Новый профиль</button></header>',
 '<div class="sv-library-toolbar"><label class="sv-library-search"><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.7" cy="10.7" r="6.7"/><path d="m16 16 5 5"/></svg></span><input class="sv-profiles-search" data-v="profilesSearch" type="search" placeholder="Поиск по профилям и inbound..." aria-label="Поиск профилей"></label><span class="sv-library-found" data-v="profilesFound" role="status" aria-live="polite">0 профилей</span></div>',
@@ -462,49 +462,251 @@ if(!x.tag||tags.has(x.tag))throw Error('Пустой или повторяющи
  }
  }
 }}
+function openComposer(){
+ const engine=window.XMeshStudioComposer;
+ if(!engine){notify('Конструктор не загружен. Обновите страницу без кеша.');return}
+ const overlay=get('overlay'),body=get('overlayBody');
+ overlay.classList.add('sv-overlay-composer');
+ get('overlayTitle').textContent='Конструктор конфигураций';
+ const original=hasValidJSON();
+ const primary=Array.isArray(original?.inbounds)?original.inbounds[0]:null;
+ const opts={...engine.defaults};
+ if(primary){
+  const proto=String(primary.protocol||''),net=String(primary.streamSettings?.network||'raw');
+  opts.protocol=engine.protocols.some(x=>x.id===proto)?proto:'custom';
+  opts.customProtocol=opts.protocol==='custom'?proto:'';
+  opts.transport=engine.transports.some(x=>x.id===net)?net:'custom';
+  opts.customTransport=opts.transport==='custom'?net:'';
+  opts.security=primary.streamSettings?.security||'none';
+  opts.port=primary.port||443;
+  opts.path=primary.streamSettings?.xhttpSettings?.path||primary.streamSettings?.wsSettings?.path||primary.streamSettings?.grpcSettings?.serviceName||'/xhttp';
+  opts.target=primary.streamSettings?.realitySettings?.target||'';
+  opts.sni=primary.streamSettings?.realitySettings?.serverNames?.[0]||'';
+ }
+ opts.tag=(opts.protocol==='custom'?(opts.customProtocol||'server'):opts.protocol)+'-main';
+ opts.name='Новая конфигурация';
+ let autoTag=true,tab='builder',busy=false;
+ const comboCount=engine.countKnownCombinations();
+ body.innerHTML=
+ '<div class="sv-compose" data-compose-root>'+
+   '<div class="sv-compose-intro"><div><span class="sv-compose-kicker">XRAY CONFIGURATION ENGINE</span>'+
+      '<p>Собирайте конфигурации из независимых компонентов. Сценарии — только отправная точка, а не ограничение.</p></div>'+
+      '<div class="sv-compose-count"><strong>'+comboCount+'</strong><span>документированных сочетаний<br>+ свободный JSON</span></div></div>'+
+   '<div class="sv-compose-tabs" role="tablist" aria-label="Режим конструктора">'+
+      '<button type="button" data-compose-tab="builder" aria-selected="true">Собрать своё</button>'+
+      '<button type="button" data-compose-tab="examples" aria-selected="false">Быстрый старт</button></div>'+
+   '<div class="sv-compose-workspace" data-compose-workspace>'+
+      '<div class="sv-compose-form">'+
+       '<div class="sv-compose-choices" data-compose-choices></div>'+
+       '<div class="sv-compose-parameters"><div class="sv-compose-panel-heading"><h4>Параметры нового inbound</h4><span>Будут записаны в JSON</span></div>'+
+         '<div class="sv-compose-fields">'+
+           '<label><span>Название профиля</span><input data-compose-field="name" maxlength="100" autocomplete="off"></label>'+
+           '<label><span>Тег inbound</span><input data-compose-field="tag" maxlength="64" autocomplete="off" spellcheck="false"></label>'+
+           '<label><span>Порт</span><input data-compose-field="port" type="number" min="1" max="65535"></label>'+
+           '<label><span>Listen</span><input data-compose-field="listen" placeholder="127.0.0.1" spellcheck="false"></label>'+
+           '<label data-compose-when="path" class="sv-compose-field-wide"><span>Путь / serviceName</span><input data-compose-field="path" spellcheck="false"></label>'+
+           '<label data-compose-when="target" class="sv-compose-field-wide"><span>REALITY target (домен:порт)</span><input data-compose-field="target" placeholder="your-domain.example:443" autocomplete="off" spellcheck="false"></label>'+
+           '<label data-compose-when="sni" class="sv-compose-field-wide"><span>REALITY SNI</span><input data-compose-field="sni" placeholder="your-domain.example" autocomplete="off" spellcheck="false"></label>'+
+           '<label data-compose-when="method" class="sv-compose-field-wide"><span>Метод Shadowsocks</span><select data-compose-field="method"></select></label>'+
+           '<label data-compose-when="customProtocol" class="sv-compose-field-wide"><span>Название своего протокола в Xray-core</span><input data-compose-field="customProtocol" placeholder="my-protocol" spellcheck="false"></label>'+
+           '<label data-compose-when="customTransport" class="sv-compose-field-wide"><span>Название своего транспорта в Xray-core</span><input data-compose-field="customTransport" placeholder="my-transport" spellcheck="false"></label>'+
+         '</div>'+
+       '</div>'+
+       '<div class="sv-compose-apply-mode"><strong>Куда добавить результат</strong>'+
+        '<label><input type="radio" name="sv-compose-mode" value="new" checked> Создать новый профиль</label>'+
+        '<label><input type="radio" name="sv-compose-mode" value="add"> Добавить inbound в текущий JSON</label>'+
+       '</div>'+
+      '</div>'+
+      '<aside class="sv-compose-preview"><div class="sv-compose-preview-head"><span>LIVE JSON / INBOUND</span><strong data-compose-summary>—</strong></div>'+
+       '<div class="sv-compose-diagnostics"><strong data-compose-state>Черновик</strong><div data-compose-messages></div></div>'+
+       '<pre data-compose-json aria-label="Предпросмотр создаваемого inbound"></pre>'+
+       '<p class="sv-compose-preview-note">Это предварительный JSON. Секреты добавляются только при создании; окончательная проверка — через Xray-core.</p></aside>'+
+   '</div>'+
+   '<div class="sv-compose-examples" data-compose-examples hidden></div>'+
+   '<div class="sv-compose-footer"><label class="sv-compose-override" data-compose-override hidden>'+
+      '<input type="checkbox" data-compose-field="allowExperimental"> Всё равно создать экспериментальный JSON с предупреждениями</label>'+
+    '<span class="sv-compose-footer-note" data-compose-footer-note>Результат сохраняется как редактируемый черновик, без перезапуска нод.</span>'+
+    '<button type="button" data-compose-close>Отмена</button>'+
+    '<button type="button" class="sv-primary" data-compose-apply>Создать JSON</button></div>'+
+ '</div>';
+ const scope=body.querySelector('[data-compose-root]'),by=name=>scope.querySelector('[data-compose-field="'+name+'"]');
+ const list=scope.querySelector('[data-compose-choices]'),examples=scope.querySelector('[data-compose-examples]');
+ const choose=scope.querySelector('[data-compose-apply]'),messages=scope.querySelector('[data-compose-messages]'),preview=scope.querySelector('[data-compose-json]');
+ const groups=[['protocol','01 · Протокол',engine.protocols],['transport','02 · Транспорт',engine.transports],['security','03 · Защита',engine.securities]];
+ const htmlSafe=escapeHtml;
+ for(const method of engine.shadowsocksMethods){
+  const opt=document.createElement('option');opt.value=method.id;opt.textContent=method.id;by('method').append(opt);
+ }
+ const allInputs=scope.querySelectorAll('[data-compose-field]');
+ const renderFields=()=>{
+  for(const el of allInputs){
+   if(el.type==='checkbox')el.checked=Boolean(opts[el.dataset.composeField]);
+   else el.value=String(opts[el.dataset.composeField]??'');
+  }
+  const protocol=opts.protocol,network=opts.transport,security=opts.security;
+  const flags={
+   path:['xhttp','ws','grpc','httpupgrade'].includes(network),
+   target:security==='reality',sni:security==='reality',
+   method:protocol==='shadowsocks',customProtocol:protocol==='custom',
+   customTransport:network==='custom'
+  };
+  for(const el of scope.querySelectorAll('[data-compose-when]'))el.hidden=!flags[el.dataset.composeWhen];
+  for(const radio of scope.querySelectorAll('[name="sv-compose-mode"]'))radio.checked=radio.value===opts.mode;
+ };
+ const renderChoices=()=>{
+  list.replaceChildren();
+  for(const [key,title,choices] of groups){
+   const group=document.createElement('section');group.className='sv-compose-choice-group';
+   const heading=document.createElement('h4');heading.textContent=title;group.append(heading);
+   for(const choice of choices){
+    const button=document.createElement('button');button.type='button';
+    button.className='sv-compose-choice'+(opts[key]===choice.id?' active':'');
+    button.dataset.composeChoice=key;button.dataset.composeValue=choice.id;
+    button.setAttribute('aria-pressed',String(opts[key]===choice.id));
+    const top=document.createElement('strong');top.textContent=choice.label;
+    const hint=document.createElement('small');hint.textContent=choice.hint;
+    button.append(top,hint);group.append(button);
+   }
+   list.append(group);
+  }
+ };
+ const renderExamples=()=>{
+  examples.replaceChildren();
+  const lead=document.createElement('div');lead.className='sv-compose-examples-title';lead.textContent='Примеры можно использовать как отправную точку — любую часть затем можно поменять.';
+  examples.append(lead);
+  for(const preset of engine.presets){
+   const button=document.createElement('button');button.type='button';button.className='sv-compose-example';button.dataset.composePreset=preset.id;
+   const label=document.createElement('strong');label.textContent=preset.label;
+   const note=document.createElement('small');note.textContent=preset.description;
+   const mark=document.createElement('span');mark.textContent='Настроить ↗';
+   button.append(label,note,mark);examples.append(button);
+  }
+ };
+ const validation=()=>{
+  const quality=engine.analyze(opts);
+  const issues=[...quality.errors.map(message=>['error',message]),...quality.warnings.map(message=>['warning',message]),...quality.info.map(message=>['info',message])];
+  if(opts.mode==='add'&&(!original||!Array.isArray(original.inbounds)))issues.unshift(['error','Текущий JSON нельзя разобрать: сначала исправьте его или создайте новый профиль.']);
+  if(opts.mode==='add'&&original?.inbounds?.some(ib=>ib.tag===opts.tag))issues.unshift(['error','Этот тег inbound уже существует. Укажите уникальный тег.']);
+  if(opts.security==='reality'&&(!opts.target||!opts.sni))issues.push(['warning','Укажите реальный target и SNI. Без них REALITY не готов к запуску.']);
+  if(opts.protocol==='shadowsocks')issues.push(['info','Ключ Shadowsocks будет сгенерирован локально криптографическим генератором браузера.']);
+  return {quality,issues};
+ };
+ const renderPreview=()=>{
+  const {quality,issues}=validation();
+  const experimental=quality.errors.length>0;
+  const override=scope.querySelector('[data-compose-override]');
+  override.hidden=!experimental;
+  scope.querySelector('[data-compose-state]').textContent=quality.status==='unsupported'?'Комбинация не поддерживается':quality.status==='unknown'?'Неизвестно ядру':quality.status==='review'?'Требуются дополнительные настройки':'По таблице Xray допустимо';
+  scope.querySelector('[data-compose-state]').dataset.severity=experimental?'error':quality.status==='supported'?'ok':'warning';
+  scope.querySelector('[data-compose-summary]').textContent=[quality.protocol||'?',quality.transport||'?',quality.security||'?'].join(' / ');
+  messages.replaceChildren();
+  for(const [kind,text] of issues.slice(0,7)){
+   const row=document.createElement('p');row.className='sv-compose-message '+kind;row.textContent=text;messages.append(row);
+  }
+  if(!issues.length){const row=document.createElement('p');row.className='sv-compose-message ok';row.textContent='Предварительно допустимо по таблице транспорта. Запустите проверку ядром перед применением.';messages.append(row)}
+  try{
+   const draft=engine.buildInbound({...opts,allowExperimental:true});
+   preview.textContent=JSON.stringify(draft,null,2);
+   choose.disabled=busy||(experimental&&!opts.allowExperimental)||(opts.mode==='add'&&issues.some(([level,msg])=>level==='error'&&msg.includes('тег inbound')));
+   if(opts.mode==='add'&&(!original||!Array.isArray(original.inbounds)))choose.disabled=true;
+  }catch(e){preview.textContent='// '+e.message;choose.disabled=true}
+  choose.textContent=opts.mode==='add'?'Добавить inbound':'Создать JSON';
+  if(busy){choose.disabled=true;choose.textContent='Создание…'}
+ };
+ const refresh=()=>{renderChoices();renderFields();renderPreview()};
+ renderExamples();refresh();
+ const tabs=()=>{for(const button of scope.querySelectorAll('[data-compose-tab]'))button.setAttribute('aria-selected',String(button.dataset.composeTab===tab));scope.querySelector('[data-compose-workspace]').hidden=tab!=='builder';examples.hidden=tab!=='examples'};
+ tabs();
+ function close(){overlay.hidden=true;overlay.classList.remove('sv-overlay-composer')}
+ scope.addEventListener('click',event=>{
+  const button=event.target.closest('button');
+  if(!button||busy)return;
+  if(button.hasAttribute('data-compose-close')){close();return}
+  if(button.hasAttribute('data-compose-tab')){tab=button.dataset.composeTab;tabs();return}
+  if(button.hasAttribute('data-compose-choice')){
+   const key=button.dataset.composeChoice,newValue=button.dataset.composeValue;
+   if(opts[key]===newValue)return;
+   opts[key]=newValue;
+   if(key==='protocol'&&autoTag){opts.tag=(newValue==='custom'?(opts.customProtocol||'custom'):newValue)+'-main';if(newValue==='socks')opts.port=10808;if(newValue==='http')opts.port=10809;}
+   if(key==='transport'){if(newValue==='xhttp')opts.path='/xhttp';if(newValue==='ws')opts.path='/ws';if(newValue==='grpc')opts.path='grpc';}
+   refresh();return;
+  }
+  if(button.hasAttribute('data-compose-preset')){
+   const preset=engine.presets.find(x=>x.id===button.dataset.composePreset);if(!preset)return;
+   opts.protocol=preset.protocol;opts.transport=preset.transport;opts.security=preset.security;
+   opts.tag=preset.protocol+'-main';autoTag=true;
+   opts.path=opts.transport==='ws'?'/ws':opts.transport==='grpc'?'grpc':'/xhttp';
+   opts.name=preset.label;opts.allowExperimental=false;
+   tab='builder';tabs();refresh();
+  }
+ });
+ scope.addEventListener('input',event=>{
+  const field=event.target.dataset.composeField;
+  if(!field)return;
+  opts[field]=event.target.type==='checkbox'?event.target.checked:event.target.value;
+  if(field==='tag')autoTag=false;
+  renderPreview();
+ });
+ scope.addEventListener('change',event=>{
+  if(event.target.name==='sv-compose-mode'){
+   opts.mode=event.target.value;
+   if(opts.mode==='add'&&original?.inbounds?.some(ib=>ib.tag===opts.tag)){
+    let i=2;const base=String(opts.tag||'new-inbound');
+    while(original.inbounds.some(ib=>ib.tag===base+'-'+i))i++;
+    opts.tag=base+'-'+i;
+   }
+   refresh();
+  }
+ });
+ const apply=async()=>{
+  if(busy)return;
+  const {quality,issues}=validation();
+  if(quality.errors.length&&!opts.allowExperimental){notify('Исправьте несовместимую комбинацию или подтвердите экспериментальный режим.');return}
+  if(opts.mode==='add'&&(!original||!Array.isArray(original.inbounds)||original.inbounds.some(ib=>ib.tag===opts.tag))){
+   notify('Нельзя добавить inbound: текущий JSON повреждён или тег уже занят.');return;
+  }
+  if(opts.mode==='new'&&!await unsavedApproval('Создать новую конфигурацию вместо текущего черновика?'))return;
+  busy=true;renderPreview();
+  try{
+   let shadowsocksPassword,keys,publicKey;
+   if(opts.protocol==='shadowsocks'){
+    shadowsocksPassword=engine.generateShadowsocksPassword(opts.method,window.crypto);
+   }
+   if(opts.security==='reality'&&opts.target&&opts.sni&&typeof ctx.realityKeys==='function'){
+    const pair=await ctx.realityKeys();
+    if(!/^[A-Za-z0-9_-]{43}$/.test(pair?.privateKey||'')||!/^[A-Za-z0-9_-]{43}$/.test(pair?.publicKey||''))
+      throw Error('Генератор X25519 не вернул корректную пару. JSON не изменён.');
+    const random=new Uint8Array(8);
+    if(!window.crypto?.getRandomValues)throw Error('Безопасный генератор Short ID недоступен.');
+    window.crypto.getRandomValues(random);
+    keys={privateKey:pair.privateKey,shortId:Array.from(random,b=>b.toString(16).padStart(2,'0')).join('')};
+    publicKey=pair.publicKey;
+   }
+   const activeJson=opts.mode==='add'?hasValidJSON():null;
+   const documentValue=engine.buildDocument(opts,activeJson,{shadowsocksPassword,realityKeys:keys});
+   if(opts.mode==='new'){id=null;name=String(opts.name||'Новая конфигурация').trim().slice(0,100)||'Новая конфигурация';inboundIndex=outIndex=0;saved=''}
+   update(documentValue);
+   if(opts.mode==='new')input.dispatchEvent(new Event('xmesh:reset-history'));
+   setPage('editor');close();
+   if(publicKey){
+    try{await navigator.clipboard.writeText(publicKey);notify('JSON создан. Public key REALITY скопирован; сохраните его для клиентов.')}catch{notify('JSON создан. Откройте REALITY и скопируйте public key для клиентов.')}
+   }else{
+    const suffix=opts.security==='reality'?' Для REALITY завершите настройку target/SNI и ключей.':'';
+    notify('JSON-черновик создан. Проверьте конфигурацию через Xray-core перед сохранением.'+suffix);
+   }
+  }catch(error){notify('Не удалось собрать JSON: '+error.message)}
+  finally{busy=false;if(!overlay.hidden)renderPreview()}
+ };
+ scope.querySelector('[data-compose-apply]').addEventListener('click',apply);
+ overlay.hidden=false;
+}
 function showPopup(title,kind){
- const body=get('overlayBody');body.replaceChildren();get('overlayTitle').textContent=title;
+ const body=get('overlayBody');body.replaceChildren();get('overlay').classList.remove('sv-overlay-composer');get('overlayTitle').textContent=title;
  if(kind==='profiles'){
  const create=document.createElement('button');create.className='sv-dialogitem';create.textContent='+ Новый профиль';create.onclick=async()=>{if(!await unsavedApproval('Открыть новый профиль без сохранения изменений?'))return;id=null;name='Новый профиль';inboundIndex=outIndex=0;saved='';update(defaultDoc());input.dispatchEvent(new Event('xmesh:reset-history'));get('overlay').hidden=true};body.append(create);
  for(const p of ctx.DB.profiles||[]){const b=document.createElement('button');b.className='sv-dialogitem';b.textContent=p.name;b.onclick=async()=>{if(!await unsavedApproval('Открыть другой профиль без сохранения изменений?'))return;try{const d=typeof p.config==='string'?JSON.parse(p.config):p.config;id=p.id;name=p.name;inboundIndex=outIndex=0;input.value=pretty(d);saved=input.value;paint();input.dispatchEvent(new Event('xmesh:reset-history'));get('overlay').hidden=true}catch(err){notify(err.message)}};body.append(b)}
  }else{
- const templates=[
-  ['base','VLESS · XHTTP','Черновик VLESS с XHTTP'],
-  ['reality','VLESS · Reality + XHTTP','Шаблон Reality с пустым приватным ключом'],
-  ['raw','VLESS · RAW/TCP','Только для доверенной сети без TLS'],
-  ['tls','VLESS · TLS + XHTTP','Требует сертификаты'],
-  ['ws','VLESS · WebSocket + TLS','Для HTTP reverse proxy'],
-  ['grpc','VLESS · gRPC + TLS','gRPC serviceName'],
-  ['vmess','VMess · WebSocket + TLS','Клиентов добавляет панель'],
-  ['trojan','Trojan · TLS','Клиентов добавляет панель'],
-  ['ss','Shadowsocks 2022','Заполните метод и ключ'],
-  ['hysteria','Hysteria2','Требует TLS и параметры пользователей'],
-  ['socks','SOCKS inbound','Локальный вход'],
-  ['http','HTTP inbound','Локальный HTTP proxy']
- ];
- for(const [kind,label,description] of templates){
-  const b=document.createElement('button');b.className='sv-dialogitem sv-template-choice';
-  const strong=document.createElement('strong');strong.textContent=label;
-  const small=document.createElement('small');small.textContent=description;
-  b.append(strong,small);
-  b.onclick=async()=>{
-   if(!await unsavedApproval('Применить шаблон поверх текущего черновика?'))return;
-   const d=defaultDoc(),ib=d.inbounds[0],ss=ib.streamSettings;
-   if(kind==='reality'){ss.security='reality';ss.realitySettings={target:'example.com:443',serverNames:['example.com'],privateKey:'',shortIds:[generateRealityShortId()]}}
-   if(kind==='raw')ib.streamSettings={network:'raw',security:'none'};
-   if(kind==='tls'){ss.security='tls';ss.tlsSettings={certificates:[]}}
-   if(kind==='ws'){ib.streamSettings={network:'ws',security:'tls',wsSettings:{path:'/ws'},tlsSettings:{certificates:[]}}}
-   if(kind==='grpc'){ib.streamSettings={network:'grpc',security:'tls',grpcSettings:{serviceName:'xray'},tlsSettings:{certificates:[]}}}
-   if(kind==='vmess'||kind==='trojan'){ib.protocol=kind;ib.settings={users:[]};ib.streamSettings={network:kind==='vmess'?'ws':'raw',security:'tls',tlsSettings:{certificates:[]}};if(kind==='vmess')ib.streamSettings.wsSettings={path:'/ws'}}
-   if(kind==='ss'){ib.protocol='shadowsocks';ib.settings={network:'tcp,udp',method:'2022-blake3-aes-128-gcm',password:''};ib.streamSettings={network:'raw',security:'none'}}
-   if(kind==='hysteria'){ib.protocol='hysteria';ib.settings={version:2,users:[]};ib.streamSettings={network:'hysteria',security:'tls',hysteriaSettings:{version:2},tlsSettings:{certificates:[]}}}
-   if(kind==='socks'){ib.protocol='socks';ib.listen='127.0.0.1';ib.port=10808;ib.settings={auth:'noauth',accounts:[],udp:true};ib.streamSettings={network:'raw',security:'none'}}
-   if(kind==='http'){ib.protocol='http';ib.listen='127.0.0.1';ib.port=10809;ib.settings={accounts:[]};ib.streamSettings={network:'raw',security:'none'}}
-   ib.tag=kind+'-main';
-   inboundIndex=0;name=label;id=null;update(d);input.dispatchEvent(new Event('xmesh:reset-history'));get('overlay').hidden=true;
-   notify('Шаблон открыт. Заполните обязательные параметры и проверьте ядром Xray-core.');
-  };body.append(b);
- }
+  openComposer();return;
  }
  get('overlay').hidden=false;
 }
@@ -546,7 +748,7 @@ async function action(a){
  case 'profiles':setPage('profiles');return;
  case 'studio-editor':setPage('editor');return;
  case 'new-profile':return newProfile();
- case 'templates':return showPopup('Шаблоны','templates');
+ case 'templates':return showPopup('Конструктор конфигураций','templates');
  case 'close':get('overlay').hidden=true;return;
  case 'save':return save();
  case 'import':get('upload').click();return;
