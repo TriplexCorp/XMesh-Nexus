@@ -38,7 +38,7 @@ assert.match(agent,/persist_pinned_xray_image/);
 assert.match(updater,/xmesh-xray-sync\.sh/);
 assert.match(updater,/pinned-image/);
 assert.match(ui,/const selectNodeXrayRelease=/);
-assert.match(ui,/Pre-release/);
+assert.match(ui,/item\.prerelease\?'Предварительная':'Стабильная'/);
 assert.match(ui,/xray-release-search/);
 assert.match(ui,/\/api\/v1\/nodes\/xray-releases/);
 assert.match(ui,/body:JSON\.stringify\(\{version\}\)/);
