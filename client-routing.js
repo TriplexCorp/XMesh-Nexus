@@ -169,6 +169,12 @@ function create(db,saveSettings,toast){
   root.addEventListener('click',async event=>{
    const button=event.target.closest('button');if(!button)return;
    if(button.hasAttribute('data-cr-save')){
+    const pending=[...root.querySelectorAll('[data-cr-json-text]')].some(editor=>{
+     const card=editor.closest('[data-cr-profile]');
+     const profile=draft[Number(card.dataset.crProfile)];
+     try{return JSON.stringify(JSON.parse(editor.value))!==JSON.stringify(profile)}catch(_){return true}
+    });
+    if(pending){toast('Сначала нажмите «Применить JSON» в редакторе шаблона.');return}
     const data=read(),error=validate(data);
     if(error){toast(error);return}
     button.disabled=true;button.textContent='Сохраняем…';
