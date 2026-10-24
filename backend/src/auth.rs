@@ -228,10 +228,7 @@ pub async fn login(
     Ok(response)
 }
 
-pub async fn is_rate_limited(
-    state: &AppState,
-    username_key: &str,
-) -> Result<bool, ApiError> {
+pub async fn is_rate_limited(state: &AppState, username_key: &str) -> Result<bool, ApiError> {
     let mut conn = state.redis.clone();
     let count = redis::cmd("GET")
         .arg(format!("xmesh:auth:login:{username_key}"))
@@ -246,10 +243,7 @@ pub async fn is_rate_limited(
     Ok(count >= policy.login_attempts || locked)
 }
 
-pub async fn clear_failed_login(
-    state: &AppState,
-    username_key: &str,
-) -> Result<(), ApiError> {
+pub async fn clear_failed_login(state: &AppState, username_key: &str) -> Result<(), ApiError> {
     sqlx::query("DELETE FROM auth_login_limits WHERE username_key = $1")
         .bind(username_key)
         .execute(&state.pool)
@@ -322,10 +316,7 @@ pub async fn issue_session_in_transaction(
     ))
 }
 
-pub async fn record_failed_login(
-    state: &AppState,
-    username_key: &str,
-) -> Result<(), ApiError> {
+pub async fn record_failed_login(state: &AppState, username_key: &str) -> Result<(), ApiError> {
     // Redis provides cross-instance throttling; PostgreSQL remains the durable fallback.
     let global_count: i64 = sqlx::query_scalar(
         "INSERT INTO auth_global_limits(minute_start,attempts) \
