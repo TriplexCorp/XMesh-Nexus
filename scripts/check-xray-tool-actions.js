@@ -101,7 +101,7 @@ async function run(){
  await stable.run('reality');await tick();
  assert.equal(stable.area.value,JSON.stringify(clean,null,2),'existing valid Reality is idempotent');
  assert.ok(!stable.calls.some(v=>v.includes('Reality настроен')),'no false success on an idempotent action');
- assert.equal(stable.confirmCalls.length,1,'rotation requires explicit choice');
+ assert.equal(stable.confirmCalls.length,0,'opening Reality never requests key rotation automatically');
 
  const keyRecovery=sample();keyRecovery.inbounds[0].streamSettings.realitySettings.shortIds=['admin'];
  const preserved=harness(keyRecovery,{confirmValue:false});
@@ -137,15 +137,15 @@ async function run(){
 
  const noReality=sample();noReality.inbounds[0].streamSettings.security='none';delete noReality.inbounds[0].streamSettings.realitySettings;
  const preserveAndRepair=sample();
- const noRotation=harness(preserveAndRepair,{confirmHandler:question=>!question.includes('Ротация ключей')});
+ const noRotation=harness(preserveAndRepair,{requestValues:{shortIds:'aabbccdd, 0123456789abcdef'}});
  await noRotation.run('reality');await tick();
  assert.equal(noRotation.doc().inbounds[0].streamSettings.realitySettings.privateKey,'existing-valid-key','existing private key survives routine repairs');
- assert.ok(ids(noRotation.doc()).every(validShortId),'invalid Short ID repaired without key rotation');
- assert.ok(noRotation.calls.some(m=>m.includes('privateKey сохранён')),'visible confirmation of key preservation');
+ assert.ok(ids(noRotation.doc()).every(validShortId),'explicitly corrected Short IDs applied without key rotation');
+ assert.ok(noRotation.calls.some(m=>m.includes('без изменения privateKey')),'visible confirmation of key preservation');
 
  let resolveDelayed;
  const delayedKeys=new Promise(resolve=>{resolveDelayed=resolve});
- const delayed=harness(noReality,{realityKeys:()=>delayedKeys});
+ const delayed=harness(noReality,{requestValues:{target:'cdn.example.org:443'},realityKeys:()=>delayedKeys});
  const pendingReality=delayed.run('reality');
  await tick();
  delayed.area.value=JSON.stringify({...noReality,log:{loglevel:'debug'}},null,2);
@@ -198,18 +198,79 @@ async function run(){
  await duplicateTag.run('inbound');
  assert.equal(duplicateTag.area.value,priorTag,'duplicate inbound tag is rejected without mutation');
 
- const generated=harness(noReality);
+ const generated=harness(noReality,{requestValues:{target:'cdn.example.org:443'}});
  await generated.run('reality');await tick();
  const reality=generated.doc().inbounds[0].streamSettings;
  assert.equal(reality.security,'reality');
- assert.equal(reality.realitySettings.target,'www.microsoft.com:443');
- assert.deepEqual(reality.realitySettings.serverNames,['www.microsoft.com']);
+ assert.equal(reality.realitySettings.target,'cdn.example.org:443','target must come from the user, never a hardcoded default');
+ assert.deepEqual(reality.realitySettings.serverNames,['cdn.example.org'],'empty SNI field derives from selected target');
  assert.equal(reality.realitySettings.privateKey,'generated-private');
  assert.equal(reality.realitySettings.shortIds.length,1);
  assert.ok(validShortId(reality.realitySettings.shortIds[0]),'reality setup generates valid Short ID');
  assert.ok(generated.clipboard.includes('generated-public'),'public key copied');
 
- const failed=harness(noReality,{realityKeys:async()=>{throw Error('generation failed')}});
+
+ // A normal Reality click must never rekey or silently rewrite a healthy config.
+ const unchanged=sample();
+ unchanged.inbounds[0].streamSettings.realitySettings.shortIds=['aabbccdd'];
+ const unchangedHarness=harness(unchanged,{realityKeys:async()=>{throw Error('unexpected key rotation')}});
+ await unchangedHarness.run('reality');
+ assert.equal(unchangedHarness.area.value,JSON.stringify(unchanged,null,2),'reviewing Reality without edits is a no-op');
+ assert.equal(unchangedHarness.confirmCalls.length,0,'no extra confirmation dialog for routine settings');
+ assert.equal(unchangedHarness.clipboard.length,0,'do not copy keys on a routine click');
+
+ // Changing target and SNI must preserve a pre-existing key and advanced server fields.
+ const custom=sample();
+ const config=custom.inbounds[0].streamSettings.realitySettings;
+ config.shortIds=['aabbccdd'];
+ config.maxTimeDiff=60000;
+ config.mldsa65Seed='untouched-secret';
+ const edited=harness(custom,{requestValues:{target:'front.example.net:8443',serverNames:'front.example.net, alt.example.net',shortIds:'aabbccdd'}});
+ await edited.run('reality');
+ const changedReality=edited.doc().inbounds[0].streamSettings.realitySettings;
+ assert.equal(changedReality.target,'front.example.net:8443');
+ assert.deepEqual(changedReality.serverNames,['front.example.net','alt.example.net']);
+ assert.equal(changedReality.privateKey,config.privateKey,'existing private key retained');
+ assert.equal(changedReality.maxTimeDiff,60000,'advanced Reality settings preserved');
+ assert.equal(changedReality.mldsa65Seed,'untouched-secret','PQ signature seed preserved');
+
+ const deniedRotation=harness(custom,{
+  requestValues:{keyMode:'rotate'},
+  confirmHandler:title=>!title.includes('Заменить ключ REALITY'),
+  realityKeys:async()=>{throw Error('rotation was not approved')}
+ });
+ const beforeDenied=deniedRotation.area.value;
+ await deniedRotation.run('reality');
+ assert.equal(deniedRotation.area.value,beforeDenied,'rejected key rotation never changes the config');
+ assert.equal(deniedRotation.confirmCalls.length,1,'explicit rotation gets a second warning');
+
+ const rotated=harness(custom,{requestValues:{keyMode:'rotate'}});
+ await rotated.run('reality');
+ assert.equal(rotated.doc().inbounds[0].streamSettings.realitySettings.privateKey,'generated-private','explicitly approved rotation generates new private key');
+ assert.ok(rotated.clipboard.includes('generated-public'),'new public key can be transferred to clients');
+
+ const invalidShortIds=harness(sample());
+ const beforeInvalid=invalidShortIds.area.value;
+ await invalidShortIds.run('reality');
+ assert.equal(invalidShortIds.area.value,beforeInvalid,'invalid existing IDs are not silently repaired by Reality setup');
+ assert.ok(invalidShortIds.calls.some(x=>x.includes('Short ID')),'invalid IDs must be explained');
+
+ const invalidTarget=harness(noReality,{requestValues:{target:'not a domain'}});
+ const beforeTarget=invalidTarget.area.value;
+ await invalidTarget.run('reality');
+ assert.equal(invalidTarget.area.value,beforeTarget,'invalid Reality target must not enter server JSON');
+ assert.ok(invalidTarget.calls.some(x=>x.includes('Reality target')),'invalid target gets a clear error');
+
+ const untouchedOther=sample();
+ untouchedOther.inbounds[0].streamSettings.realitySettings.shortIds=['aabbccdd'];
+ const second=JSON.parse(JSON.stringify(untouchedOther.inbounds[0]));
+ second.tag='other-inbound';untouchedOther.inbounds.push(second);
+ const multi=harness(untouchedOther,{requestValues:{index:'1',target:'second.example.org:443',serverNames:'second.example.org'}});
+ await multi.run('reality');
+ assert.equal(multi.doc().inbounds[0].streamSettings.realitySettings.target,'www.microsoft.com:443','unselected inbound must be unchanged');
+ assert.equal(multi.doc().inbounds[1].streamSettings.realitySettings.target,'second.example.org:443');
+
+ const failed=harness(noReality,{requestValues:{target:'cdn.example.org:443'},realityKeys:async()=>{throw Error('generation failed')}});
  await failed.run('reality');await tick();
  assert.equal(failed.doc().inbounds[0].streamSettings.security,'none','failed key generation does not mutate document');
  assert.ok(!failed.calls.some(v=>/Reality настроен/.test(v)),'failed action cannot report success');
