@@ -73,7 +73,7 @@
     return values.map(([value,label])=>'<option value="'+escapeHTML(value)+'"'+(value===selected?' selected':'')+'>'+escapeHTML(label)+'</option>').join('');
   }
 
-  const CSS_VERSION = '20261024-client-cards-v10';
+  const CSS_VERSION = '20261024-client-cards-v11';
   function ensureStylesheet() {
     const file = 'client-routing.css';
     const existing = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
@@ -209,20 +209,24 @@
     function renderEditor(){
       const host=document.querySelector('#client-route-root [data-cr-modal-host]');if(!host)return;
       const p=current();
-      if(!p){host.innerHTML='';return;}
+      if(!p){const old=host.querySelector('dialog.crx-overlay');if(old?.open)old.close();host.replaceChildren();return;}
       
       const missing=(p.servers||[]).filter(key=>!sourceByKey.has(key));
       const all=[...sources,...missing.map(key=>({key,title:key,kind:'Недоступный сервер',detail:'Сохранённая привязка',code:''}))];
       const matching=all.filter(s=>(s.title+' '+s.kind+' '+s.detail).toLocaleLowerCase().includes(search.toLocaleLowerCase()));
-      host.innerHTML='<dialog class="crx-overlay" data-cr-overlay aria-labelledby="crx-dialog-title"><div class="crx-dialog">'+
+      // The modal and its backdrop are persistent. Only the active tab's content
+      // changes, so switching tabs never opens another browser dialog.
+      const live=host.querySelector('dialog.crx-overlay');
+      const reuse=live?.open&&live.dataset.crProfileId===p.id;
+      const markup='<dialog class="crx-overlay" data-cr-overlay aria-labelledby="crx-dialog-title"><div class="crx-dialog">'+
         '<header class="crx-dialog-header"><div class="crx-dialog-identity"><div class="crx-dialog-mark">'+icon('route')+'</div>'+
         '<div><span class="crx-dialog-kicker">РЕДАКТОР МАРШРУТИЗАЦИИ</span><h2 id="crx-dialog-title">'+escapeHTML(p.name||'Новый шаблон')+'</h2></div></div>'+
         '<button type="button" class="crx-icon-btn crx-close" data-cr-close title="Закрыть" aria-label="Закрыть">'+icon('close')+'</button></header>'+
         '<nav class="crx-tabs" role="tablist" aria-label="Разделы маршрутизации">'+
           [['sources','Назначения','server'],['rules','Правила','settings'],['json','JSON','code']].map(([id,label,symbol])=>
-          '<button type="button" data-cr-tab="'+id+'" role="tab" aria-selected="'+(activeTab===id?'true':'false')+'" class="'+(activeTab===id?'is-current':'')+'" aria-current="'+(activeTab===id?'page':'false')+'" aria-pressed="'+(activeTab===id?'true':'false')+'">'+
+          '<button type="button" id="crx-tab-'+id+'" data-cr-tab="'+id+'" role="tab" aria-controls="crx-tab-panel" aria-selected="'+(activeTab===id?'true':'false')+'" tabindex="'+(activeTab===id?'0':'-1')+'" class="'+(activeTab===id?'is-current':'')+'">'+
           icon(symbol)+'<span class="crx-tab-label">'+label+'</span>'+(id==='sources'?'<span class="crx-tab-count">'+(p.servers||[]).length+'</span>':id==='rules'?'<span class="crx-tab-count">'+(p.rules||[]).length+'</span>':'')+'</button>').join('')+
-        '</nav><main class="crx-dialog-body">'+
+        '</nav><main id="crx-tab-panel" class="crx-dialog-body" role="tabpanel" aria-labelledby="crx-tab-'+activeTab+'">'+
         (activeTab==='sources'?
           '<div class="crx-section-head"><div><h3>Назначить серверам</h3><p>Выберите ноды и публичные хосты. Привязки хостов имеют приоритет над нодами.</p></div>'+
           '<div class="crx-source-tools"><button type="button" class="crx-btn crx-btn-ghost" data-cr-select-all>Выбрать все</button>'+
@@ -249,8 +253,45 @@
         '<div class="crx-settings-actions"><button type="button" class="crx-btn crx-btn-ghost" data-cr-duplicate="'+escapeHTML(p.id)+'">'+icon('copy')+' Копировать</button>'+
         '<button type="button" class="crx-btn crx-btn-danger" data-cr-delete="'+escapeHTML(p.id)+'">'+icon('trash')+' '+(confirmDelete===p.id?'Подтвердить удаление':'Удалить')+'</button></div></div>'+
         '</div></dialog>';
+      if(reuse){
+        const template=document.createElement('template');
+        template.innerHTML=markup;
+        const next=template.content.querySelector('dialog.crx-overlay');
+        const body=live.querySelector('.crx-dialog-body');
+        const replacement=next.querySelector('.crx-dialog-body');
+        body.replaceChildren(...replacement.childNodes);
+        body.setAttribute('aria-labelledby','crx-tab-'+activeTab);
+        for(const tab of live.querySelectorAll('[data-cr-tab]')){
+          const nextTab=next.querySelector('[data-cr-tab="'+tab.dataset.crTab+'"]');
+          const selected=tab.dataset.crTab===activeTab;
+          tab.classList.toggle('is-current',selected);
+          tab.setAttribute('aria-selected',String(selected));
+          tab.tabIndex=selected?0:-1;
+          const count=tab.querySelector('.crx-tab-count');
+          const nextCount=nextTab.querySelector('.crx-tab-count');
+          if(count&&nextCount)count.textContent=nextCount.textContent;
+        }
+        live.querySelector('#crx-dialog-title').textContent=p.name||'Новый шаблон';
+        live.querySelector('.crx-dialog-summary').innerHTML=next.querySelector('.crx-dialog-summary').innerHTML;
+        const saveButton=live.querySelector('.crx-dialog-footer-actions [data-cr-save]');
+        saveButton.disabled=saveBusy;
+        const name=live.querySelector('[data-cr-name]');
+        if(document.activeElement!==name)name.value=p.name||'';
+        live.querySelector('[data-cr-enabled]').checked=p.enabled!==false;
+        live.querySelector('[data-cr-delete]').innerHTML=next.querySelector('[data-cr-delete]').innerHTML;
+        live.dataset.crActiveTab=activeTab;
+        return;
+      }
+      if(live?.open)live.close();
+      host.innerHTML=markup;
       const modal=host.querySelector('dialog.crx-overlay');
-      if(modal && typeof modal.showModal==='function') modal.showModal();
+      if(modal&&typeof modal.showModal==='function'){
+        modal.dataset.crProfileId=p.id;
+        modal.dataset.crActiveTab=activeTab;
+        modal.addEventListener('cancel',event=>{event.preventDefault();close();});
+        modal.addEventListener('click',event=>{if(event.target===modal)close();});
+        modal.showModal();
+      }
     }
     function render(){
       const list=document.querySelector('#client-route-root [data-cr-list]');if(!list)return;
@@ -446,6 +487,16 @@
         }
       });
       root.addEventListener('keydown',event=>{
+        const tab=event.target.closest('[data-cr-tab]');
+        if(tab&&['ArrowRight','ArrowLeft','Home','End'].includes(event.key)){
+          event.preventDefault();
+          const tabs=[...root.querySelectorAll('dialog.crx-overlay [data-cr-tab]')];
+          const index=tabs.indexOf(tab);
+          const target=event.key==='Home'?tabs[0]:event.key==='End'?tabs[tabs.length-1]:
+            tabs[(index+(event.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length];
+          target?.click();
+          return;
+        }
         if(event.key==='Escape'&&activeId){event.preventDefault();close();}
         if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='s'){
           event.preventDefault();save();
