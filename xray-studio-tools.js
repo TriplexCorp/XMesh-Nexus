@@ -129,7 +129,8 @@ function contextualToolGroups(inbound,hasInbound){
   specialized.push('protocol-config');
  }
  if(!hysteria){
-  if(network==='xhttp'||network==='raw')networkTools.push('xhttp');
+  const canUseXhttp=['vless','vmess','trojan','shadowsocks'].includes(protocol);
+  if(canUseXhttp&&(network==='xhttp'||network==='raw'))networkTools.push('xhttp');
   else if(['ws','grpc','httpupgrade','quic'].includes(network))networkTools.push('transport-config');
  }
  if(inbound.streamSettings?.finalmask)networkTools.push('finalmask');
