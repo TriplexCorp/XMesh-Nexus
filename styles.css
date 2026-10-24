@@ -24,6 +24,8 @@
   color-scheme: dark;
   --ui-radius: 15px;
   --ui-control-radius: 10px;
+  --xm-modal-dim: rgba(2,7,12,.72);
+  --xm-modal-blur: 11px;
   --card-pad: 1.3rem;
   --view-gap: 1.1rem;
   --glow-alpha: 5%;
@@ -311,7 +313,7 @@ input[type=range]{accent-color:var(--a);width:min(14rem,100%);height:auto;paddin
 .color-bubbles{display:flex;align-items:center;gap:1rem;flex-wrap:wrap}.color-bubble-wrap{display:grid;justify-items:center;gap:.4rem;color:var(--mu);font-size:.85rem}.color-bubble{width:3.1rem;height:3.1rem;padding:0;border:3px solid var(--s1);outline:1px solid var(--ln);border-radius:50%;overflow:hidden;cursor:pointer;background:transparent}.color-bubble input[type=color]{width:150%;height:150%;margin:-25%;padding:0;border:0;background:transparent;cursor:pointer}.color-slider-grid{display:grid;grid-template-columns:minmax(7rem,1fr) minmax(8rem,2fr) 3.5rem;align-items:center;gap:.65rem}.color-slider-grid label{font-size:.9rem;color:var(--mu)}.color-slider-grid input[type=range]{width:100%}.color-slider-grid output{font-size:.85rem;color:var(--tx);text-align:right;font-variant-numeric:tabular-nums}@media(max-width:850px){.color-slider-grid{grid-template-columns:6rem minmax(5rem,1fr) 3rem}}@media(max-width:520px){.color-slider-grid{grid-template-columns:5.5rem minmax(4rem,1fr) 2.7rem}}
 
 dialog{border:0;padding:0;background:none;color:var(--tx);max-width:none;max-height:none;overflow:visible}
-dialog::backdrop{background:rgba(6,10,14,.55);backdrop-filter:blur(6px);animation:fade .3s}
+dialog::backdrop{background:var(--xm-modal-dim);-webkit-backdrop-filter:blur(var(--xm-modal-blur));backdrop-filter:blur(var(--xm-modal-blur));animation:fade .3s}
 dialog[open]{animation:pop .35s cubic-bezier(.2,.9,.3,1.1)}
 dialog:not(.side):not(.pop):not(.pal):not(.user-modal){margin:auto;width:min(30rem,calc(100vw - 2rem))}dialog.wide{width:min(44rem,calc(100vw - 2rem))!important}
 dialog.side{margin:0 0 0 auto;width:min(33rem,100vw);height:100dvh;animation:slide .4s cubic-bezier(.2,.9,.3,1)}dialog.side .box{height:100%;border-radius:1.2rem 0 0 1.2rem;max-height:none}
@@ -842,7 +844,7 @@ html[data-surface=glass] .app>aside{
 html[data-surface=raised] .card{background:linear-gradient(145deg,color-mix(in srgb,var(--s1) 94%,var(--a) 6%),var(--s1));box-shadow:0 18px 42px -34px rgba(0,0,0,.5),inset 0 1px rgba(255,255,255,.035)}
 html[data-borders=off] .card::before{opacity:0}
 .box{background:var(--s1);box-shadow:0 28px 85px -30px rgba(0,0,0,.67);border-color:var(--border-strong)}
-dialog::backdrop{background:rgba(3,4,5,.62);backdrop-filter:blur(10px)}
+
 .card>.hd{align-items:center}.card>.hd>div{min-width:0}
 .card .hd .note{letter-spacing:.105em;font-size:.67rem;font-weight:760;color:color-mix(in srgb,var(--a) 78%,var(--tx))}
 .chip{border:1px solid color-mix(in srgb,var(--c) 24%,var(--ln));font-size:.72rem;letter-spacing:0;padding:.19rem .58rem;border-radius:.46rem;font-weight:650;line-height:1.45;background:color-mix(in srgb,var(--c) 8%,transparent)}
@@ -2744,7 +2746,7 @@ dialog.user-modal .user-subscription-url{min-width:0}
 
 /* Unified in-app confirmation dialog, above all existing editor dialogs. */
 dialog.xm-action-confirm{position:fixed;inset:0;margin:auto;width:min(440px,calc(100vw - 2rem));max-width:none;max-height:calc(100dvh - 2rem);padding:0;border:1px solid var(--ln);border-radius:var(--ui-radius);background:var(--s1);color:var(--tx);box-shadow:0 32px 90px #0009;z-index:2200}
-dialog.xm-action-confirm::backdrop{background:rgba(3,7,13,.68);backdrop-filter:blur(5px)}
+dialog.xm-action-confirm::backdrop{background:var(--xm-modal-dim);-webkit-backdrop-filter:blur(var(--xm-modal-blur));backdrop-filter:blur(var(--xm-modal-blur))}
 .xm-action-confirm-box{padding:1.5rem;display:grid;gap:.85rem}
 .xm-action-confirm-icon{width:2.5rem;height:2.5rem;border-radius:.9rem;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--a) 13%,transparent);color:var(--a)}
 .xm-action-confirm-box h2{font-size:1.1rem;font-weight:750;margin:0}
@@ -5181,8 +5183,3 @@ td.er .user-expiry-primary{color:var(--danger,#f08080)}
 #client-route-root button:disabled{opacity:.45;cursor:not-allowed}
 #client-route-root [hidden]{display:none!important}
 @media(max-width:720px){#client-route-root .client-route-main-head,#client-route-root .client-route-main-body,#client-route-root .client-route-savebar{padding:14px}#client-route-root .client-route-head-actions,#client-route-root .client-route-saveactions{width:100%}#client-route-root .client-route-head-actions .btn,#client-route-root .client-route-saveactions .btn{flex:1}}
-
-
-/* Shared modal appearance */
-:root{--xm-modal-dim:rgba(2,7,12,.72);--xm-modal-blur:11px}
-dialog::backdrop,dialog#dlg.node-routing-modal::backdrop,.xm-studio-modal::backdrop{background:var(--xm-modal-dim);backdrop-filter:blur(var(--xm-modal-blur));-webkit-backdrop-filter:blur(var(--xm-modal-blur))}
