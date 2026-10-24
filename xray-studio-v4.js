@@ -284,7 +284,11 @@ function jumpToSection(jump){
 function setInspectorVisible(show,persist=true){
  root.classList.toggle('sv-outline-hidden',!show);
  const panel=get('jsonOutline')?.closest('.sv-outline');
- if(panel)panel.setAttribute('aria-hidden',String(!show));
+ if(panel){
+  if(!show&&panel.contains(document.activeElement))
+   root.querySelector('.sv-codebar [data-action="outline"]')?.focus({preventScroll:true});
+  panel.setAttribute('aria-hidden',String(!show));
+ }
  root.querySelectorAll('[data-action="outline"]').forEach(button=>{
   if(button.hasAttribute('aria-expanded'))button.setAttribute('aria-expanded',String(show));
  });
@@ -550,7 +554,13 @@ async function action(a){
  case 'check':return checkWithCore();
  
  case 'outline':setInspectorVisible(root.classList.contains('sv-outline-hidden'));return;
- case 'expand':root.classList.toggle('sv-expand');return;
+ case 'expand':{
+  const expanded=root.classList.toggle('sv-expand');
+  const button=root.querySelector('[data-action="expand"]');
+  button?.setAttribute('aria-pressed',String(expanded));
+  button?.setAttribute('aria-label',expanded?'Выйти из режима фокуса':'Режим фокуса');
+  return;
+ }
  case 'reset':if(await approve({title:'Сбросить изменения?',description:'Вернуться к последней сохранённой версии JSON?',notice:'Все изменения после сохранения будут потеряны.',danger:true,confirmLabel:'Сбросить изменения'})){input.value=saved||pretty(defaultDoc());paint();input.dispatchEvent(new Event('xmesh:reset-history'))}return;
  case 'undo':root.querySelector('[data-tool="undo"]')?.click();return;
  case 'redo':root.querySelector('[data-tool="redo"]')?.click();return;
@@ -567,7 +577,7 @@ root.addEventListener('change',ev=>{if(ev.target.matches('[data-field]'))Promise
 input.addEventListener('input',paint);
 input.addEventListener('scroll',()=>{highlight.scrollTop=input.scrollTop;highlight.scrollLeft=input.scrollLeft;gutter.scrollTop=input.scrollTop});
 input.addEventListener('click',paint);input.addEventListener('keyup',paint);
-input.addEventListener('keydown',ev=>{if(ev.key==='Tab'){ev.preventDefault();const i=input.selectionStart;input.setRangeText('  ',i,input.selectionEnd,'end');input.dispatchEvent(new Event('input',{bubbles:true}))}if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='s'){ev.preventDefault();save()}});
+input.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&root.classList.contains('sv-expand')){ev.preventDefault();root.classList.remove('sv-expand');root.querySelector('[data-action="expand"]')?.setAttribute('aria-pressed','false');root.querySelector('[data-action="expand"]')?.setAttribute('aria-label','Режим фокуса');return}if(ev.key==='Tab'){ev.preventDefault();const i=input.selectionStart;input.setRangeText('  ',i,input.selectionEnd,'end');input.dispatchEvent(new Event('input',{bubbles:true}))}if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='s'){ev.preventDefault();save()}});
 get('wrap').addEventListener('change',ev=>root.classList.toggle('sv-wrap',ev.target.checked));
 get('upload').addEventListener('change',async ev=>{const f=ev.target.files?.[0];if(!f)return;try{if(f.size>2e6)throw Error('Файл больше 2 МБ');const raw=await f.text();JSON.parse(raw);if(!await unsavedApproval('Импортировать JSON вместо текущего черновика?'))return;input.value=raw;paint();input.dispatchEvent(new Event('xmesh:reset-history'));notify('JSON импортирован')}catch(err){notify(err.message)}finally{ev.target.value=''}});
 try{setInspectorVisible(window.localStorage?.getItem('xmesh-studio-inspector')!=='hidden',false)}catch(_){setInspectorVisible(true,false)}
