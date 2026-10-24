@@ -73,6 +73,9 @@ pub async fn get_policy(pool:&PgPool) -> Result<SecurityPolicy,ApiError> {
 
 pub async fn get_settings(State(state):State<AppState>,Extension(actor):Extension<AuthUser>)
     -> Result<Json<Value>,ApiError> {
+    // The dashboard URL and authentication policy are private administrative
+    // settings, not data a monitoring-only observer needs.
+    crate::require_mutation(&actor)?;
     let policy=get_policy(&state.pool).await?;
     Ok(Json(json!({"policy":policy,"canEdit":actor.role=="owner"})))
 }
