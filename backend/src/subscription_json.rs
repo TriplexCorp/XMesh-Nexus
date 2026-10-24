@@ -1,5 +1,5 @@
-//! XMesh JSON Engine: one fail-closed assembler for public native Xray subscriptions.
-//! Outbounds are produced from allowlisted client fields by user_subscriptions,
+//! `XMesh` JSON Engine: one fail-closed assembler for public native Xray subscriptions.
+//! Outbounds are produced from allowlisted client fields by `user_subscriptions`,
 //! never by copying a server inbound/Reality private key into a client profile.
 use serde_json::{Value, json};
 use std::collections::{HashMap, HashSet};
@@ -278,7 +278,7 @@ pub(crate) fn build(mut proxies: Vec<Value>, setting: &Value) -> Result<Value, S
             // Xray requires an Observatory when fallbackTag is present,
             // even for roundRobin/random. Only leastPing configures one.
             if balance == "leastPing" {
-                balancer["fallbackTag"] = json!(members[0])
+                balancer["fallbackTag"] = json!(members[0]);
             }
             balancers.push(balancer);
         }
@@ -287,7 +287,7 @@ pub(crate) fn build(mut proxies: Vec<Value>, setting: &Value) -> Result<Value, S
             "strategy":{"type":balance}
         });
         if balance == "leastPing" {
-            balancer["fallbackTag"] = json!(first)
+            balancer["fallbackTag"] = json!(first);
         }
         balancers.push(balancer);
         observation = balance == "leastPing";
@@ -313,7 +313,7 @@ pub(crate) fn build(mut proxies: Vec<Value>, setting: &Value) -> Result<Value, S
     }
     let mut routing = json!({"domainStrategy":routing_strategy,"rules":rules});
     if !balancers.is_empty() {
-        routing["balancers"] = json!(balancers)
+        routing["balancers"] = json!(balancers);
     }
     let display_name = if display_names.len() == 1 && !display_names[0].is_empty() {
         display_names[0].clone()
@@ -517,7 +517,7 @@ pub(crate) fn build_feed(proxies: Vec<Value>, settings: &Value) -> Result<Value,
     let all_proxies = proxies.clone();
     let custom = settings.get("clientBalancers").and_then(Value::as_array);
     if let Some(rows) = custom {
-        validate_client_balancers(&Value::Array(rows.clone()))?
+        validate_client_balancers(&Value::Array(rows.clone()))?;
     }
     let mut entries = Vec::new();
     let mut hidden = HashSet::new();
@@ -595,13 +595,13 @@ pub(crate) fn build_feed(proxies: Vec<Value>, settings: &Value) -> Result<Value,
                 });
                 // Prevent "core: not all dependencies are resolved" on roundRobin/random.
                 if strategy == "leastPing" {
-                    balancer["fallbackTag"] = first
+                    balancer["fallbackTag"] = first;
                 }
                 config["routing"]["balancers"] = json!([balancer]);
                 if let Some(rules) = config["routing"]["rules"].as_array_mut() {
                     for rule in rules {
                         if rule.get("balancerTag").is_some() {
-                            rule["balancerTag"] = row["tag"].clone()
+                            rule["balancerTag"] = row["tag"].clone();
                         }
                     }
                 }
@@ -613,10 +613,10 @@ pub(crate) fn build_feed(proxies: Vec<Value>, settings: &Value) -> Result<Value,
             if row["strategy"] == "leastPing" && config.get("observatory").is_some() {
                 let obs = &row["observatory"];
                 if let Some(v) = obs.get("probeInterval") {
-                    config["observatory"]["probeInterval"] = v.clone()
+                    config["observatory"]["probeInterval"] = v.clone();
                 }
                 if let Some(v) = obs.get("probeURL") {
-                    config["observatory"]["probeUrl"] = v.clone()
+                    config["observatory"]["probeUrl"] = v.clone();
                 }
                 // probeTimeout / sampling / connectivity are stored in panel metadata.
                 // Xray core does not support them as top-level observatory settings.
