@@ -11,7 +11,7 @@ export LC_ALL=C
 [[ "$XMESH_API_URL" == https://* ]] || exit 2
 XMESH_API_URL="${XMESH_API_URL%/}"
 KEY="${XMESH_METRICS_PRIVATE_KEY:-/etc/xmesh-node-metrics/node.key}"
-AGENT_VERSION="control-v4.2.0"
+AGENT_VERSION="control-v4.3.0"
 UNIT="${XMESH_XRAY_UNIT:-xray.service}"
 # Only root-owned local configuration can choose a unit. Remote responses never do.
 [[ "$UNIT" =~ ^[A-Za-z0-9_.@-]+\.service$ ]] || { echo "Invalid systemd unit" >&2; exit 2; }
@@ -66,7 +66,12 @@ except (OSError,ValueError,TypeError):
 PY
 )"
  fi
- signed_post '/api/v1/node/heartbeat' "{\"node_id\":$XMESH_NODE_ID,\"version\":\"$AGENT_VERSION\",\"xray_version\":\"$version\",\"xray_running\":$xr,\"router_running\":$xr,\"geoData\":$geo_data}" >/dev/null
+ local applied='' revision_json='null'
+ if [[ "$xr" == true && -r /usr/local/libexec/xmesh-profile-attest.py ]];then
+  applied="$(timeout 8 python3 /usr/local/libexec/xmesh-profile-attest.py 2>/dev/null || true)"
+  if [[ "$applied" =~ ^[a-f0-9]{64}$ ]];then revision_json="\"$applied\"";fi
+ fi
+ signed_post '/api/v1/node/heartbeat' "{\"node_id\":$XMESH_NODE_ID,\"version\":\"$AGENT_VERSION\",\"xray_version\":\"$version\",\"xray_running\":$xr,\"router_running\":$xr,\"geoData\":$geo_data,\"appliedRevision\":$revision_json}" >/dev/null
 }
 restart_xray(){
  if docker inspect xmesh-managed-xray >/dev/null 2>&1;then
