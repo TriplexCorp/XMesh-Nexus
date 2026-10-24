@@ -1137,3 +1137,39 @@
  .sv-studio .sv-compose-footer button{flex:1 1 auto}
  .sv-compose-examples{grid-template-columns:1fr}
 }
+
+
+/* Single-row XRAY STUDIO navigation — layout-only change. */
+.sv-studio .sv-topbar{
+ flex-wrap:nowrap;
+}
+.sv-studio .sv-topbar>.sv-page-tabs{
+ display:flex;flex-direction:row;flex-wrap:nowrap;
+ align-items:center;gap:.4rem;
+ flex:0 0 auto;width:auto;min-width:0;
+}
+.sv-studio .sv-topbar>.sv-page-tabs>button{
+ flex:0 0 auto;width:auto;max-width:none;
+ white-space:nowrap;
+}
+.sv-studio .sv-topbar>.sv-actions{
+ flex:1 1 auto;min-width:0;
+ justify-content:flex-end;margin-left:auto;
+}
+@media(min-width:661px){
+ .sv-studio .sv-topbar>.sv-actions{flex-basis:auto}
+ .sv-studio .sv-topbar>.sv-page-tabs{width:auto}
+ .sv-studio .sv-topbar>.sv-page-tabs>button{flex:0 0 auto}
+}
+@media(max-width:660px){
+ .sv-studio .sv-topbar{flex-wrap:wrap}
+ .sv-studio .sv-topbar>.sv-page-tabs{
+  flex:1 1 100%;width:100%;justify-content:space-between;
+ }
+ .sv-studio .sv-topbar>.sv-page-tabs>button{
+  flex:1 1 0;min-width:0;justify-content:center;
+ }
+ .sv-studio .sv-topbar>.sv-actions{
+  flex:1 1 100%;justify-content:flex-end;
+ }
+}
