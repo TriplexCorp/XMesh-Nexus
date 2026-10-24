@@ -109,7 +109,8 @@ fn cycle_reaches(start:i64, goal:i64,nodes:&[Value])->bool{
     let mut visited=HashSet::new();
     while let Some(id)=pending.pop(){
         if id==goal{return true}
-        if !visited.insert(id) || visited.len()>1000 {continue}
+        if !visited.insert(id) {continue}
+        if visited.len()>1000{return true} // fail closed on abnormal graphs
         let Some(node)=by_id.get(&id) else{continue};
         if node.get("routingEnabled").and_then(Value::as_bool)!=Some(true){continue}
         for rule in node.get("routingRules").and_then(Value::as_array).into_iter().flatten(){
@@ -118,6 +119,65 @@ fn cycle_reaches(start:i64, goal:i64,nodes:&[Value])->bool{
         }
     }
     false
+}
+
+/// Validate persistent routing input before storing a node record. The
+/// dynamic cross-node graph and endpoint identity checks happen in apply().
+pub fn validate_saved(node:&Value)->Result<(),ApiError>{
+    for name in ["routingEnabled","routingSniffing"]{
+        if node.get(name).is_some_and(|v|!v.is_boolean()){
+            return Err(bad("Routing: enable/sniffing switches must be boolean."));
+        }
+    }
+    if node.get("routingDomainStrategy").is_some_and(|v|
+        !matches!(v.as_str(),Some("AsIs"|"IPIfNonMatch"|"IPOnDemand"))){
+        return Err(bad("Routing: invalid domain strategy."));
+    }
+    if let Some(rules)=node.get("routingRules"){
+        let rules=rules.as_array().ok_or_else(||bad("Routing: rules must be an array."))?;
+        if rules.len()>64{return Err(bad("Routing: too many rules."))}
+        for rule in rules {
+            if !rule.is_object(){return Err(bad("Routing: every rule must be an object."))}
+            if rule.get("enabled").is_some_and(|x|!x.is_boolean()){
+                return Err(bad("Routing: rule activation must be boolean."));
+            }
+            if rule.get("enabled").and_then(Value::as_bool)==Some(false)
+                || node.get("routingEnabled").and_then(Value::as_bool)!=Some(true){continue}
+            let kind=rule.get("matcher").and_then(Value::as_str)
+                .ok_or_else(||bad("Routing: rule type is missing."))?;
+            let raw=rule.get("value").and_then(Value::as_str)
+                .ok_or_else(||bad("Routing: rule value is missing."))?;
+            matcher(kind,raw)?;
+            match rule.get("target").and_then(Value::as_str) {
+                Some("direct"|"block")=>{},
+                Some("outbound") if rule.get("outboundTag").and_then(Value::as_str)
+                    .is_some_and(|tag|!tag.is_empty() && tag.len()<=128)=>{},
+                Some("node") if rule.get("nodeId").and_then(Value::as_i64)
+                    .is_some_and(|id|id>0)=>{},
+                _=>return Err(bad("Routing: invalid destination for an enabled rule."))
+            }
+        }
+    } else if node.get("routingEnabled").and_then(Value::as_bool)==Some(true){
+        return Err(bad("Routing: enable requires a rules array."));
+    }
+    if let Some(relays)=node.get("routingRelays"){
+        let relays=relays.as_array().ok_or_else(||bad("Routing: exit definitions must be an array."))?;
+        if relays.len()>16{return Err(bad("Routing: too many exit definitions."))}
+        let mut seen=HashSet::new();
+        for relay in relays {
+            let id=relay.get("nodeId").and_then(Value::as_i64)
+                .filter(|id|*id>0).ok_or_else(||bad("Routing: exit node ID is invalid."))?;
+            if !seen.insert(id){return Err(bad("Routing: duplicate exit node definition."))}
+            let config=relay.get("outbound")
+                .filter(|v|v.is_object()).ok_or_else(||bad("Routing: invalid exit outbound JSON."))?;
+            if serde_json::to_vec(config).unwrap_or_default().len()>24576 {
+                return Err(bad("Routing: exit configuration is too large."));
+            }
+        }
+    } else if node.get("routingEnabled").and_then(Value::as_bool)==Some(true){
+        return Err(bad("Routing: enable requires an exit definitions array."));
+    }
+    Ok(())
 }
 
 pub fn apply(node:&Value,config:&mut Value,nodes:&[Value],hosts:&[Value])->Result<(),ApiError>{
@@ -138,8 +198,10 @@ pub fn apply(node:&Value,config:&mut Value,nodes:&[Value],hosts:&[Value])->Resul
     let mut known_tags=HashSet::<String>::new();
     let mut freedom:Option<String>=None;
     for outbound in config_outbounds {
-        let tag=outbound.get("tag").and_then(Value::as_str)
-            .ok_or_else(||bad("Routing: profile outbound lacks a tag."))?;
+        // Xray allows unnamed default outbounds. They cannot be selected by
+        // outboundTag; skip them instead of rejecting unrelated routing rules.
+        let Some(tag)=outbound.get("tag").and_then(Value::as_str)
+            .filter(|tag|!tag.is_empty()) else{continue};
         if !known_tags.insert(tag.into()){return Err(bad("Routing: duplicate outbound tag in profile."))}
         if freedom.is_none() && outbound.get("protocol").and_then(Value::as_str)==Some("freedom"){
             freedom=Some(tag.into());
@@ -317,6 +379,14 @@ mod tests{
         let linked=json!({"id":10,"addr":"wrong.example.com","port":443,
             "routingEnabled":true,"routingRules":[{"enabled":true,"target":"node","nodeId":4}]});
         assert!(apply(&node,&mut config,&[node.clone(),linked],&[]).is_err());
+    }
+    #[test]
+    fn saved_policy_rejects_nonboolean_toggle_and_duplicate_exit(){
+        assert!(validate_saved(&json!({"routingEnabled":"yes"})).is_err());
+        assert!(validate_saved(&json!({"routingEnabled":true,"routingRules":[],"routingRelays":[
+            {"nodeId":10,"outbound":{}},{"nodeId":10,"outbound":{}}]})).is_err());
+        assert!(validate_saved(&json!({"routingEnabled":false,"routingRules":[
+            {"matcher":"geosite","value":"","target":"node","nodeId":0}],"routingRelays":[]})).is_ok());
     }
     #[test]
     fn direct_block_and_existing_proxy_are_first_match(){
