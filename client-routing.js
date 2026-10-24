@@ -73,7 +73,7 @@
     return values.map(([value,label])=>'<option value="'+escapeHTML(value)+'"'+(value===selected?' selected':'')+'>'+escapeHTML(label)+'</option>').join('');
   }
 
-  const CSS_VERSION = '20261024-client-cards-v4';
+  const CSS_VERSION = '20261024-client-cards-v5';
   function ensureStylesheet() {
     const file = 'client-routing.css';
     const existing = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
@@ -100,15 +100,10 @@
     if (document.getElementById('crx-critical-styles')) return;
     const style = document.createElement('style');
     style.id = 'crx-critical-styles';
-    style.textContent = '#client-route-root.crx .crx-icon{display:inline-block;width:19px;height:19px;max-width:19px;max-height:19px;flex-shrink:0}' +
-      '#client-route-root.crx .crx-flag{display:block;width:29px;height:22px;max-width:29px;max-height:22px;flex-shrink:0}' +
-      '#client-route-root.crx .crx-card-symbol .crx-icon{width:23px;height:23px;max-width:23px;max-height:23px}' +
-      '#client-route-root.crx .crx-page-head{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}' +
-      '#client-route-root.crx .crx-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr));gap:16px}' +
-      '#client-route-root.crx .crx-card{min-width:0;padding:20px;border:1px solid var(--ln,#293846);border-radius:16px;background:var(--s2,#19232f)}' +
-      '#client-route-root.crx .crx-overlay{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;padding:20px;background:rgba(0,0,0,.78)}' +
-      '#client-route-root.crx .crx-dialog{display:flex;flex-direction:column;width:min(1160px,100%);max-height:90vh;overflow:hidden;background:var(--s1,#111923);border:1px solid var(--ln,#293846);border-radius:18px}' +
-      '#client-route-root.crx .crx-dialog-body{overflow:auto;flex:1}';
+    // Only emergency icon bounds. Layout is exclusively owned by client-routing.css
+    // so it follows the global html font scale without conflicting overrides.
+    style.textContent = '#client-route-root.crx .crx-icon{display:inline-block;width:1.1875rem;height:1.1875rem;max-width:1.1875rem;max-height:1.1875rem;flex-shrink:0}' +
+      '#client-route-root.crx .crx-flag{display:block;width:1.8125rem;height:1.375rem;max-width:1.8125rem;max-height:1.375rem;flex-shrink:0}';
     document.head.appendChild(style);
   }
   function create(db, saveSettings, toast) {
