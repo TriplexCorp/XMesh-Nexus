@@ -33,9 +33,9 @@ assert.match(css,/\.sv-studio\.sv-outline-hidden \.sv-workspace\{grid-template-c
 assert.match(css,/container:sv-studio-workspace \/ inline-size/,'Workspace must react to the user-selected content width');
 assert.match(css,/@container sv-studio-workspace \(max-width:940px\)/,'Narrow content width stacks inspector');
 assert.match(css,/--vcode:/,'Same font token for JSON and overlay');
-assert.match(html,/xray-studio-v4\.css\?v=20261024-adaptive-tools-v3/,'CSS cache key must change');
-assert.match(html,/xray-studio-v4\.js\?v=20261024-adaptive-tools-v3/,'JS cache key must change');
-assert.match(html,/xray-studio-tools\.js\?v=20261024-adaptive-tools-v3/,'Tool cache key must change');
+assert.match(html,/xray-studio-v4\.css\?v=20261024-adaptive-tools-v4/,'CSS cache key must change');
+assert.match(html,/xray-studio-v4\.js\?v=20261024-adaptive-tools-v4/,'JS cache key must change');
+assert.match(html,/xray-studio-tools\.js\?v=20261024-adaptive-tools-v4/,'Tool cache key must change');
 class Element {
  constructor(tag='div'){this.tag=tag;this.children=[];this.dataset={};this.attrs={};this.textContent='';this.hidden=false}
  append(...items){this.children.push(...items)}
