@@ -30,12 +30,29 @@ signed_post(){
  signature="$(openssl pkeyutl -sign -rawin -inkey "$KEY" -in "$signfile" | od -An -tx1 -v | tr -d ' \n')"
  rm -f "$signfile"
  [[ "${#signature}" == 128 ]] || return 1
- curl --proto '=https' --tlsv1.2 --fail --silent --show-error --max-time 12 \
+ # Report the failed endpoint and status, never credentials or payload.
+ # A failed signed control request MUST remain a failure: do not silently
+ # treat HTTP 500 as a successful heartbeat or an allow-to-run directive.
+ local response status
+ response="$(mktemp)"
+ status="$(curl --proto '=https' --tlsv1.2 --silent --show-error --max-time 12 \
+   --output "$response" --write-out '%{http_code}' \
    -X POST "$XMESH_API_URL$path" \
    -H "X-XMesh-Timestamp: $timestamp" \
    -H "X-XMesh-Nonce: $nonce" \
    -H "X-XMesh-Signature: $signature" \
-   -H "Content-Type: application/json" --data-binary "$payload"
+   -H "Content-Type: application/json" --data-binary "$payload")" || {
+     rm -f "$response"
+     echo "XMesh control request failed: POST $path (transport error)" >&2
+     return 1
+   }
+ if [[ ! "$status" =~ ^2[0-9][0-9]$ ]];then
+   rm -f "$response"
+   echo "XMesh control request failed: POST $path (HTTP $status)" >&2
+   return 1
+ fi
+ cat "$response"
+ rm -f "$response"
 }
 # Report the actual runtime, whether native systemd or the XMesh-managed container.
 xray_running(){
