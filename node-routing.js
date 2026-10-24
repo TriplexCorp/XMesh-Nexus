@@ -54,6 +54,7 @@ function open({node,nodes,hosts,profiles,modal,updateNode,apiRequest,notify,afte
  const draft={
   enabled:typeof node.routingEnabled==='boolean'?node.routingEnabled:(legacy&&!!node.geoEnabled),
   strategy:node.routingDomainStrategy||'AsIs',
+  sniffing:node.routingSniffing!==false,
   rules:initialRules,
   relays:new Map((Array.isArray(node.routingRelays)?node.routingRelays:[])
    .filter(x=>validId(x.nodeId)).map(x=>[String(x.nodeId),JSON.stringify(x.outbound||{},null,2)])),
@@ -147,6 +148,8 @@ function open({node,nodes,hosts,profiles,modal,updateNode,apiRequest,notify,afte
    '<div class="route-separator"></div>'+
    '<label class="route-input"><span>Стратегия DNS для IP-правил</span><select data-route-strategy>'+
    [['AsIs','AsIs · без резолвинга'],['IPIfNonMatch','IPIfNonMatch · если нет совпадения'],['IPOnDemand','IPOnDemand · по необходимости']].map(x=>opt(x[0],x[1],draft.strategy)).join('')+'</select></label>'+
+   '<label class="route-sniffing"><input type="checkbox" data-route-sniffing '+(draft.sniffing?'checked':'')+'>'+
+   '<span><strong>Определять домены</strong><small>HTTP Host / TLS SNI / QUIC — только для правил, не изменяя адрес назначения</small></span></label>'+
    '<div class="route-advice">'+(requiresGeo&&!node.geoEnabled?
     'GeoData на этой ноде выключена. При сохранении будет включена автоматически, иначе категории не смогут работать.':
     requiresGeo?'Используются GeoData-файлы, которые нода скачивает в отдельном разделе «GeoData».':
@@ -256,6 +259,7 @@ function open({node,nodes,hosts,profiles,modal,updateNode,apiRequest,notify,afte
   const patch={
    routingEnabled:!!draft.enabled,
    routingDomainStrategy:draft.strategy,
+   routingSniffing:!!draft.sniffing,
    routingRules:draft.rules.map(r=>({
     enabled:r.enabled!==false,matcher:r.matcher,value:String(r.value||'').trim(),
     target:r.target,outboundTag:String(r.outboundTag||''),nodeId:Number(r.nodeId)||0
@@ -299,6 +303,7 @@ function open({node,nodes,hosts,profiles,modal,updateNode,apiRequest,notify,afte
   const el=e.target;
   if(el.matches('[data-route-enabled]')){draft.enabled=el.checked;markDirty();render();return}
   if(el.matches('[data-route-strategy]')){draft.strategy=el.value;markDirty();return}
+  if(el.matches('[data-route-sniffing]')){draft.sniffing=el.checked;markDirty();return}
   if(el.matches('[data-rule-field]')&&saveRuleChange(el)){render();return}
  });
  form.addEventListener('input',e=>{
