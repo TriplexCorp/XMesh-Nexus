@@ -107,6 +107,14 @@ function resolveToolInbound(inbounds){
  selectedToolInboundTag=inbounds[selectedToolInboundIndex]?.tag??null;
  return selectedToolInboundIndex;
 }
+function supportsVision(inbound){
+ if(String(inbound?.protocol||'').toLowerCase()!=='vless')return false;
+ const network=String(inbound.streamSettings?.network||'tcp').toLowerCase();
+ const security=String(inbound.streamSettings?.security||'none').toLowerCase();
+ const encryption=String(inbound.settings?.decryption||'').trim();
+ const hasEncryption=/^mlkem768x25519plus\.(?:native|xorpub|random)\./i.test(encryption);
+ return hasEncryption||(['tcp','raw'].includes(network)&&['tls','reality'].includes(security));
+}
 function contextualToolGroups(inbound,hasInbound){
  const common=['dns','routing','outbounds','inbound'];
  if(!hasInbound)return [['Конфигурация',common]];
@@ -123,11 +131,7 @@ function contextualToolGroups(inbound,hasInbound){
   if(security==='reality')specialized.push('shortid');
   if(security==='tls')specialized.push('tls');
   specialized.push('vlessens');
-  // Minimal compatibility gate: TLS/REALITY, or native VLESS Encryption.
-  // VLESS Encryption works without an outer TLS layer (e.g. XHTTP + NONE).
-  const encryption=String(inbound.settings?.decryption||'').trim();
-  const hasVlessEncryption=/^mlkem768x25519plus\.(?:native\.)?\S+$/i.test(encryption);
-  if(['reality','tls'].includes(security)||hasVlessEncryption)specialized.push('vision');
+  if(supportsVision(inbound))specialized.push('vision');
  }else{
   // REALITY config is transport-level, not exclusive to VLESS.
   // Shadowsocks + XHTTP + REALITY must remain editable after composition.
@@ -536,10 +540,10 @@ const operations={
    const selected=await chooseInbound();if(!selected)return;
    if(area.value!==selected.source){notify('JSON изменился; повторите настройку Vision.');return}
    const inbound=getInbound(parse(),selected.index);
-   if(inbound.protocol!=='vless')throw Error('XTLS Vision доступен только для VLESS.');
+   if(!supportsVision(inbound))throw Error('XTLS Vision требует VLESS Encryption либо TCP + TLS/REALITY.');
    const changed=mutate(doc=>{
     const ib=getInbound(doc,selected.index);
-    if(ib.tag!==selected.tag||ib.protocol!=='vless')throw Error('Выбранный inbound изменился');
+    if(ib.tag!==selected.tag||!supportsVision(ib))throw Error('Inbound изменился или не поддерживает XTLS Vision');
     const settings=ib.settings??={clients:[]};
     settings.flow='xtls-rprx-vision';
     // The inbound is the authoritative source for subscription flow.
