@@ -150,7 +150,9 @@ pub fn smart_enabled(settings: &Value) -> bool {
 }
 
 /// Every proxy passed into this engine must be fully public-side serialized.
-fn prepare_proxy_outbounds(proxies: &mut [Value]) -> Result<(Vec<String>, HashMap<String, Vec<String>>, Vec<String>), String> {
+fn prepare_proxy_outbounds(
+    proxies: &mut [Value],
+) -> Result<(Vec<String>, HashMap<String, Vec<String>>, Vec<String>), String> {
     let mut used = HashSet::new();
     let mut countries: HashMap<String, Vec<String>> = HashMap::new();
     let mut tags = Vec::new();
