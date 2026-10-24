@@ -207,7 +207,7 @@ fn apply_json(node:&Value,config:&mut Value)->Result<(),ApiError>{
         for rule in rules {
             let tag=rule.get("outboundTag").and_then(Value::as_str).unwrap_or("");
             if !known.contains(tag){
-                return Err(bad(&format!("Routing JSON: outboundTag '{}' is not defined in XRAY STUDIO or node outbounds.",tag)));
+                return Err(bad("Routing JSON: outboundTag is not defined in XRAY STUDIO or node outbounds."));
             }
         }
     }
