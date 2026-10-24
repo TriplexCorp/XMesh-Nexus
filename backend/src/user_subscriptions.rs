@@ -9,11 +9,11 @@ use axum::{
     http::{HeaderMap, StatusCode, header},
     response::{Html, IntoResponse, Response},
 };
+use base64::Engine as _;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use sqlx::Row;
 use std::collections::HashMap;
-use base64::Engine as _;
 
 // Encrypt recoverable bearer secrets at rest with a separately derived key.
 // TOTP_ENCRYPTION_KEY must stay stable across upgrades; raw token never enters
@@ -920,8 +920,9 @@ pub async fn serve(
                 .unwrap_or_default()
                 .as_secs()
                 / (rotation_hours * 3_600);
-            let selected_index = usize::try_from(slot % u64::try_from(messages.len()).unwrap_or(u64::MAX))
-                .expect("message index fits in usize");
+            let selected_index =
+                usize::try_from(slot % u64::try_from(messages.len()).unwrap_or(u64::MAX))
+                    .expect("message index fits in usize");
             let selected = messages[selected_index];
             let encoded = base64::engine::general_purpose::STANDARD.encode(selected.as_bytes());
             if let Ok(value) = header::HeaderValue::from_str(&format!("base64:{encoded}")) {
