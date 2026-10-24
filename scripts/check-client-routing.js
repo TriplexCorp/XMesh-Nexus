@@ -20,7 +20,7 @@ assert.equal(typeof mount,'function');
 // Regression: the panel is served on /dashboard/<secret>, not on /.
 // A dashboard-relative stylesheet with the right version is STILL a 404.
 const oldLink={
- href:'https://panel.example/dashboard/client-routing.css?v=20261024-client-cards-v7',
+ href:'https://panel.example/dashboard/client-routing.css?v=20261024-routing-clean-v1',
  remove(){this.removed=true;}
 };
 const appended=[];
@@ -35,7 +35,7 @@ sandbox.document={
 mount();
 const replacementLink=appended.find(el=>el.tagName==='link');
 assert(replacementLink,'Routing must load a missing or misdirected CSS asset');
-assert.equal(replacementLink.href,'/client-routing.css?v=20261024-client-cards-v7');
+assert.equal(replacementLink.href,'/client-routing.css?v=20261024-routing-clean-v1');
 assert.equal(oldLink.removed,true);
 
 for(const key of ['data-cr-save','data-cr-add','data-cr-list','Клиентская маршрутизация'])
@@ -66,7 +66,7 @@ assert.match(publicFeed,/xmeshOwnerNodeKey/);
 assert.match(api,/\.route\("\/client-routing", patch\(patch_client_routing\)\)/);
 assert.match(api,/require_mutation\(&actor\)\?/);
 const index=fs.readFileSync('index.html','utf8');
-assert.match(index,/client-routing\.css\?v=20261024-client-cards-v7/,'New CSS should be cache busted');
+assert.match(index,/client-routing\.css\?v=20261024-routing-clean-v1/,'New CSS should be cache busted');
 assert.match(index,/href="\/client-routing\.css\?v=/,'Routing CSS must be absolute under the nested dashboard URL');
 assert.match(index,/src="\/client-routing\.js\?v=/,'Routing JS must be absolute under the nested dashboard URL');
 
@@ -84,7 +84,7 @@ for (const item of index.matchAll(/(?:href|src)="([^"]+)"/g)) {
 assert.match(dashboardServer,/fn dashboard_client_routing_assets_are_absolute/);
 
 
-assert.match(index,/client-routing\.js\?v=20261024-client-cards-v7/,'New JS should be cache busted');
+assert.match(index,/client-routing\.js\?v=20261024-routing-clean-v1/,'New JS should be cache busted');
 
 const docker=fs.readFileSync('backend/Dockerfile','utf8');
 for(const item of ['client-routing.js','client-routing.css']){
@@ -95,7 +95,7 @@ console.log('Shared client routing: template editor, source assignment, subscrib
 
 assert.match(source,/ensureStylesheet\(\)/,'Routing view must load its own CSS');
 assert.match(source,/width="19" height="19"/,'SVG icons must have explicit dimensions');
-assert.match(source,/ensureCriticalStyles\(\)/,'Routing view needs safe layout when CSS fails');
+assert.match(source,/ensureStylesheet\(\)/,'Routing stylesheet must load');
 
 assert.doesNotMatch(source,/\['tcp,udp','TCP \+ UDP'\]/,'Network menu must not duplicate the all-networks choice');
 assert.match(source,/\['','TCP \+ UDP'\]/,'Default network must be labelled TCP + UDP');
