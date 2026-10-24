@@ -2400,6 +2400,33 @@ async fn get_user_traffic(
     })))
 }
 
+fn aggregate_traffic_metric_rows(
+    rows: &[sqlx::postgres::PgRow],
+) -> Result<(Vec<Value>, i64, i64), ApiError> {
+    let mut points = Vec::with_capacity(rows.len());
+    let mut total_samples = 0_i64;
+    let mut latest_node_count = 0_i64;
+
+    for row in &rows {
+        let bucket_ms: i64 = row.try_get("bucket_ms")?;
+        let rx: f64 = row.try_get("rx_bytes_per_sec")?;
+        let tx: f64 = row.try_get("tx_bytes_per_sec")?;
+        let node_count: i64 = row.try_get("node_count")?;
+        let sample_count: i64 = row.try_get("sample_count")?;
+        total_samples = total_samples.saturating_add(sample_count);
+        latest_node_count = node_count;
+        points.push(json!({
+            "bucketMs": bucket_ms,
+            "rxBytesPerSec": rx,
+            "txBytesPerSec": tx,
+            "nodeCount": node_count,
+            "sampleCount": sample_count
+        }));
+    }
+
+    Ok((points, total_samples, latest_node_count))
+}
+
 async fn get_traffic_metrics(
     State(state): State<AppState>,
     Query(query): Query<TrafficMetricsQuery>,
@@ -2492,26 +2519,7 @@ async fn get_traffic_metrics(
     .fetch_all(&state.pool)
     .await?;
 
-    let mut points = Vec::with_capacity(rows.len());
-    let mut total_samples = 0_i64;
-    let mut latest_node_count = 0_i64;
-
-    for row in &rows {
-        let bucket_ms: i64 = row.try_get("bucket_ms")?;
-        let rx: f64 = row.try_get("rx_bytes_per_sec")?;
-        let tx: f64 = row.try_get("tx_bytes_per_sec")?;
-        let node_count: i64 = row.try_get("node_count")?;
-        let sample_count: i64 = row.try_get("sample_count")?;
-        total_samples = total_samples.saturating_add(sample_count);
-        latest_node_count = node_count;
-        points.push(json!({
-            "bucketMs": bucket_ms,
-            "rxBytesPerSec": rx,
-            "txBytesPerSec": tx,
-            "nodeCount": node_count,
-            "sampleCount": sample_count
-        }));
-    }
+    let (points, total_samples, latest_node_count) = aggregate_traffic_metric_rows(&rows)?;
 
     Ok(Json(json!({
         "range": range,
