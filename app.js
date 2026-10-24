@@ -2564,7 +2564,13 @@ function nodeProfileStatus(runtime){
   if(status==='pending')return 'Ожидает применения новой конфигурации';
   const detail=PROFILE_CHECK_LABELS[runtime.profileCheck];
   if(detail)return detail;
-  if(runtime.profileCheck==='verified')return 'Проверен на ноде · ожидается ревизия панели';
+  if(runtime.profileCheck==='verified'){
+    if(runtime.desiredRevisionSource==='invalid_configuration')
+      return 'Проверен на ноде · ошибка сборки профиля панели';
+    if(runtime.desiredRevisionSource==='missing')
+      return 'Проверен на ноде · панель ещё не получила ревизию';
+    return 'Проверен на ноде · нет совпадающей ревизии панели';
+  }
   return 'Нет подтверждения от агента';
 }
 const updateNodeRuntimeBadges=(node,runtime)=>{
@@ -2589,6 +2595,9 @@ const updateNodeRuntimeBadges=(node,runtime)=>{
   const profileStatus=card.querySelector('[data-node-profile-status]');
   if(profileStatus){
     profileStatus.textContent=nodeProfileStatus(runtime);
+    profileStatus.title=runtime?.desiredRevisionSource==='computed'
+      ?'Ожидаемая ревизия вычислена из актуальных настроек панели; совпадение проверено по подписанному heartbeat'
+      :'Сравнение актуальной конфигурации панели с подписанным подтверждением агента';
   }
   const agent=card.querySelector('[data-node-agent-version]');
   if(agent){
