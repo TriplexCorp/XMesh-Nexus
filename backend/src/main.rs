@@ -610,11 +610,10 @@ async fn create_record(
     if collection == "nodes"
         && data.get("disabled").and_then(Value::as_bool) == Some(false)
         && data.get("disabledReason").and_then(Value::as_str) == Some("traffic_limit")
+        && let Some(obj) = data.as_object_mut()
     {
-        if let Some(obj) = data.as_object_mut() {
-            obj.remove("disabledReason");
-            obj.remove("trafficLimitReachedAt");
-        }
+        obj.remove("disabledReason");
+        obj.remove("trafficLimitReachedAt");
     }
     validate_record(&collection, &data)?;
     if collection == "hosts" { validate_host_binding(&state.pool, &data).await?; }
