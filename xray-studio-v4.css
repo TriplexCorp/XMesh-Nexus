@@ -192,6 +192,66 @@
 .sv-studio .sv-tool-issue>span{flex:1 1 18rem}
 .sv-studio .sv-tool-issue button{min-height:2rem;font-size:.72rem}
 .sv-studio .xm-tools-status:not(:empty){display:block;padding:.5rem 0 0;color:var(--vmute);font-size:.73rem}
+/* Context-driven commands for the actual inbound, not a static template toolbar. */
+.sv-studio .xm-tools-header{
+ display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;
+ gap:.65rem 1rem;padding:0 0 .6rem;margin-bottom:.6rem;
+ border-bottom:1px solid color-mix(in srgb,var(--vline) 66%,transparent)
+}
+.sv-studio .xm-tools-identity{
+ display:flex;align-items:center;flex-wrap:wrap;gap:.35rem .7rem;min-width:0;
+}
+.sv-studio .xm-tools-eyebrow{
+ color:var(--vmute);font-size:.625rem;line-height:1.35;
+ letter-spacing:.07em;font-weight:800;white-space:nowrap
+}
+.sv-studio .xm-tools-summary{
+ display:inline-flex;align-items:center;gap:.4rem;min-width:0;
+ color:var(--vaccent);font-size:.72rem;font-weight:760;letter-spacing:.008em
+}
+.sv-studio .xm-tools-summary::before{
+ content:"";flex:none;width:.34rem;height:.34rem;border-radius:50%;background:var(--vaccent)
+}
+.sv-studio .xm-tools-current-tag{
+ display:inline-flex;align-items:center;max-width:20rem;
+ padding:.28rem .57rem;border:1px solid var(--vline);border-radius:var(--vround);
+ color:var(--vmute);font:600 .69rem/1.35 var(--vcode);
+ overflow:hidden;text-overflow:ellipsis;white-space:nowrap
+}
+.sv-studio .xm-tool-inbound{
+ display:flex;align-items:center;gap:.5rem;min-width:0;
+ color:var(--vmute);font-size:.71rem;font-weight:650
+}
+.sv-studio .xm-tool-inbound span{white-space:nowrap}
+.sv-studio .xm-tool-inbound select{
+ width:min(18rem,100%);min-width:9rem;min-height:2.2rem;
+ padding:.37rem .65rem;border:1px solid var(--vline);
+ border-radius:var(--vround);background:var(--vfield);color:var(--vtext);
+ font-size:.74rem;font-weight:700
+}
+.sv-studio .xm-tool-inbound select:hover{border-color:var(--vaccent)}
+.sv-studio .xm-tools-invalid{margin:.35rem 0;color:var(--er,#ef8194);font-size:.76rem}
+.sv-studio .xm-tool-cluster{
+ padding-right:.7rem;
+ border-right:1px solid color-mix(in srgb,var(--vline) 65%,transparent)
+}
+.sv-studio .xm-tool-cluster:last-child{padding-right:0;border-right:0}
+.sv-studio .xm-tools-grid{gap:.35rem}
+.sv-studio .xm-tools-groups{gap:.55rem .9rem}
+@container sv-studio-workspace (max-width:940px){
+ .sv-studio .xm-tools-header{align-items:flex-start;flex-direction:column}
+ .sv-studio .xm-tools-current-tag{max-width:100%}
+ .sv-studio .xm-tool-cluster{flex:1 1 auto}
+}
+@container sv-studio-workspace (max-width:650px){
+ .sv-studio .xm-tool-inbound{width:100%;flex-wrap:wrap}
+ .sv-studio .xm-tool-inbound select{width:100%}
+ .sv-studio .xm-tools-groups{align-items:stretch}
+ .sv-studio .xm-tool-cluster{width:100%;border-right:0;border-bottom:1px solid var(--vline);padding:0 0 .55rem}
+ .sv-studio .xm-tool-cluster:last-child{border-bottom:0;padding-bottom:0}
+ .sv-studio .xm-tools-grid{width:100%}
+}
+
 /* Editor context, identical scroll and font metrics for text + highlighter. */
 .sv-editor-context{
  display:flex;flex:none;align-items:center;justify-content:space-between;gap:1rem;
