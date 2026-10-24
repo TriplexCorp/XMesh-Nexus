@@ -14,9 +14,9 @@ assert.match(app,/FE\.find\(f=>f\.k==='limit'\)/,'User traffic limit is still ed
 assert.match(app,/FE\.find\(f=>f\.k==='strategy'\)/,'User reset strategy is still editable');
 assert.match(hostEditor,/data-endpoint="fp"/,'Host fingerprint editor remains available');
 const transport=fs.readFileSync('backend/src/subscription_transport.rs','utf8');
-assert.match(subscription,/crate::subscription_transport::client_stream\(inbound,host,device\)/,
+assert.match(subscription,/crate::subscription_transport::client_stream\(\s*inbound\s*,\s*host\s*,\s*device\s*,?\s*\)/,
   'Subscription must delegate stream generation to the transport projector');
-assert.match(transport,/field\(host,"fp"\)\.or_else\(\|\|field\(host,"fingerprint"\)\)/,
+assert.match(transport,/field\(\s*host\s*,\s*"fp"\s*\)\s*\.or_else\(\s*\|\|\s*field\(\s*host\s*,\s*"fingerprint"\s*\)\s*\)/,
   'Client TLS/REALITY fingerprint must be resolved from the host, never the user');
 assert.doesNotMatch(transport,/field\(user,"(?:fp|fingerprint)"\)/,
   'Transport projector must not read a user fingerprint');
