@@ -201,3 +201,17 @@ body:has(#client-route-root .crx-overlay){overflow:hidden}
   #client-route-root.crx .crx-tabs{padding:.625rem .75rem;gap:.375rem}
   #client-route-root.crx .crx-tabs button{padding:.625rem .75rem}
 }
+
+/* The panel's generic nav layout sets column direction; routing tabs must stay in one row. */
+#client-route-root.crx nav.crx-tabs{
+  flex-direction:row!important;
+  flex-wrap:nowrap!important;
+  justify-content:flex-start!important;
+  align-items:center!important;
+  width:100%;
+  min-width:0;
+}
+#client-route-root.crx nav.crx-tabs>button{
+  width:auto!important;
+  flex:0 0 auto!important;
+}
