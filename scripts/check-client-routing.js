@@ -101,7 +101,7 @@ assert.doesNotMatch(source,/\['tcp,udp','TCP \+ UDP'\]/,'Network menu must not d
 assert.match(source,/\['','TCP \+ UDP'\]/,'Default network must be labelled TCP + UDP');
 assert.match(source,/crx-tab-label/,'Editor navigation must have dedicated tab labels');
 
-assert.match(source,/<dialog class=\\"crx-overlay\\"/,'Editor must use a native top-layer dialog');
+assert.match(source,/<dialog class="crx-overlay"/,'Editor must use a native top-layer dialog');
 assert.match(source,/modal\.showModal\(\)/,'Editor must enter browser top layer');
 const routingCSS=fs.readFileSync('client-routing.css','utf8');
 assert.match(routingCSS,/dialog\.crx-overlay::backdrop/,'Native dialog must blur the full page backdrop');
