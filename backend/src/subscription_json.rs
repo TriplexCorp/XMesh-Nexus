@@ -322,10 +322,12 @@ pub fn build(mut proxies: Vec<Value>, setting: &Value) -> Result<Value, String> 
             .get("subscriptionName")
             .and_then(Value::as_str)
             .filter(|s| !s.is_empty() && s.chars().count() <= 100)
-            .unwrap_or_else(|| if smart && tags.len() > 1 && balance != "off" {
-                "XMesh SMART"
-            } else {
-                "XMesh Servers"
+            .unwrap_or_else(|| {
+                if smart && tags.len() > 1 && balance != "off" {
+                    "XMesh SMART"
+                } else {
+                    "XMesh Servers"
+                }
             })
             .to_owned()
     };
@@ -408,7 +410,9 @@ pub fn validate_client_balancers(value: &Value) -> Result<(), String> {
             );
         }
         for (field, max) in [("remark", 120), ("serverDescription", 240)] {
-            let text = row[field].as_str().ok_or_else(|| format!("Укажите {field}"))?;
+            let text = row[field]
+                .as_str()
+                .ok_or_else(|| format!("Укажите {field}"))?;
             if text.is_empty() && field == "remark"
                 || text.chars().count() > max
                 || text.chars().any(char::is_control)
