@@ -43,6 +43,10 @@ state_dir="/var/lib/xmesh-node-metrics"
 state_file="$state_dir/state"
 mkdir -p "$state_dir"
 chmod 700 "$state_dir"
+# Avoid racing on cumulative baselines or the local online snapshot.
+command -v flock >/dev/null || { echo "flock is required" >&2; exit 2; }
+exec 9>"$state_dir/collector.lock"
+flock -n 9 || { echo "Metrics collector already running"; exit 0; }
 
 if [[ ! -r "$state_file" ]]; then
   tmp_state="$state_file.$$"
@@ -117,15 +121,26 @@ try:
  assert type(stamp) is int and 0<=now-stamp<=30000
  users=data.get("userTraffic")
  inbounds=data.get("userInboundTraffic")
- assert isinstance(users,list) and len(users)<=4096
+ assert isinstance(users,list) and len(users)<=2048
  assert isinstance(inbounds,list) and len(inbounds)<=4096
+ seen_users=set()
  for item in users:
-  assert type(item.get("userId")) is int and item["userId"]>0
+  assert isinstance(item,dict)
+  uid=item.get("userId")
+  assert type(uid) is int and uid>0 and uid not in seen_users
+  seen_users.add(uid)
   assert all(type(item.get(k)) is int and 0<=item[k]<2**63 for k in ("uplinkBytes","downlinkBytes"))
+ seen_inbounds=set()
  for item in inbounds:
-  assert type(item.get("userId")) is int and item["userId"]>0
-  assert isinstance(item.get("inboundTag"),str) and 0<len(item["inboundTag"])<=128
+  assert isinstance(item,dict)
+  uid=item.get("userId")
+  tag=item.get("inboundTag")
+  assert type(uid) is int and uid>0
+  assert isinstance(tag,str) and 0<len(tag.encode("utf-8"))<=128 and not any(ord(c)<32 for c in tag)
+  assert (uid,tag) not in seen_inbounds
+  seen_inbounds.add((uid,tag))
   assert all(type(item.get(k)) is int and 0<=item[k]<2**63 for k in ("uplinkBytes","downlinkBytes"))
+ # The authoritative sample time is set by the producer, not the uploader.
  print(str(stamp))
  print(',"userTraffic":'+json.dumps(users,separators=(",",":"))+
        ',"userInboundTraffic":'+json.dumps(inbounds,separators=(",",":")))
@@ -133,252 +148,8 @@ except (AssertionError,ValueError,TypeError,KeyError,OSError):
  sys.exit(1)
 PY
 )";then
-    # Propagate the producer's verified sample time, not the later upload time.
-    # The backend uses it to reject duplicates and out-of-order snapshots.
-    snapshot_timestamp="${snapshot_fragment%%
-  fi
-fi
-if [[ "$SNAPSHOT_LOADED" != true ]];then
-# Optional Xray StatsService counters. Missing Xray CLI or inaccessible API
-# must never be reported as successful per-user traffic collection.
-XRAY_API_ADDRESS="${XMESH_XRAY_API_ADDRESS:-127.0.0.1:10085}"
-if [[ "$XRAY_API_ADDRESS" =~ ^127\.0\.0\.1:[0-9]{1,5}$ ]] &&
-   command -v python3 >/dev/null 2>&1 &&
-   [[ -r /usr/local/libexec/xmesh-xray-stats-collector.py ]]; then
-  XRAY_CLI="$(command -v xray || true)"
-  if [[ -z "$XRAY_CLI" ]]; then
-    for candidate in /usr/local/bin/xray /usr/bin/xray /usr/local/xray/xray /opt/xray/xray /usr/local/bin/xray-core; do
-      if [[ -x "$candidate" ]]; then XRAY_CLI="$candidate"; break; fi
-    done
-  fi
-  if [[ -z "$XRAY_CLI" ]]; then
-    echo "XMesh: per-user traffic unavailable: Xray CLI not installed on host (possibly containerized)." >&2
-  else
-    stats_error="$(mktemp)"
-    if stats_json="$(timeout 6 "$XRAY_CLI" api statsquery --server="$XRAY_API_ADDRESS" -pattern 'user>>>xmesh-u' 2>"$stats_error")"; then
-      if stats_fragment="$(printf '%s' "$stats_json" | python3 /usr/local/libexec/xmesh-xray-stats-collector.py)"; then
-        if [[ "$stats_fragment" == ,* ]]; then
-          payload="${payload%\}}$stats_fragment}"
-          USER_STATS_STATUS=direct
-          USER_STATS_AT_MS="$(date +%s%3N)"
-        fi
-      else
-        echo "XMesh: Xray user stats response could not be parsed." >&2
-      fi
-    else
-      echo "XMesh: Xray Stats API unavailable at $XRAY_API_ADDRESS (check API listener and service)." >&2
-    fi
-    rm -f "$stats_error"
-  fi
-else
-  echo "XMesh: Xray StatsService collection is not configured." >&2
-fi
-fi # End fallback for missing root-owned metrics snapshot.
-
-# Approximate distinct users with confirmed Xray traffic in the last 45 seconds.
-# No counters / first baseline / reset -> unknown or zero only after a valid baseline.
-online_count=""
-if [[ "$USER_STATS_STATUS" == verified || "$USER_STATS_STATUS" == direct ]]; then
-  online_count="$(printf '%s' "$payload" | python3 -c '
-import json,sys,time,os,tempfile
-path=sys.argv[1]
-now=int(time.time())
-data=json.load(sys.stdin)
-rows=data.get("userTraffic")
-if not isinstance(rows,list) or len(rows)>4096:sys.exit(1)
-current={}
-for row in rows:
-    uid=row.get("userId")
-    up=row.get("uplinkBytes")
-    down=row.get("downlinkBytes")
-    if type(uid)!=int or uid<=0 or type(up)!=int or type(down)!=int or min(up,down)<0:sys.exit(1)
-    if uid in current:sys.exit(1)
-    current[uid]=[up,down]
-try:
-    with open(path,encoding="utf-8") as f:previous=json.load(f)
-except (OSError,ValueError):
-    previous={}
-old=previous.get("users",{})
-if not isinstance(old,dict):old={}
-seen={}
-for uid,counters in current.items():
-    key=str(uid)
-    prior=old.get(key,{})
-    previous_counters=prior.get("bytes") if isinstance(prior,dict) else None
-    last=prior.get("last") if isinstance(prior,dict) else None
-    if isinstance(previous_counters,list) and len(previous_counters)==2 and all(type(v)==int for v in previous_counters):
-        if all(a>=b for a,b in zip(counters,previous_counters)) and any(a>b for a,b in zip(counters,previous_counters)):
-            last=now
-        elif any(a<b for a,b in zip(counters,previous_counters)):
-            last=None
-    if type(last)!=int or last>now or now-last>45:last=None
-    seen[key]={"bytes":counters,"last":last}
-# First sample only establishes baselines; no online count is asserted.
-count=sum(v["last"] is not None for v in seen.values())
-fd,tmp=tempfile.mkstemp(prefix=".online-",dir=os.path.dirname(path))
-try:
-    with os.fdopen(fd,"w",encoding="utf-8") as f:
-        json.dump({"users":seen},f,separators=(",",":"))
-        f.flush()
-        os.fchmod(f.fileno(),0o600)
-    os.replace(tmp,path)
-finally:
-    if os.path.exists(tmp):os.unlink(tmp)
-print(count if isinstance(previous.get("users"),dict) else "null")
-' "$state_dir/online-users.json")" || online_count=""
-fi
-if [[ "$online_count" =~ ^[0-9]+$ ]]; then
-  payload="${payload%\}},\"online_clients\":$online_count}"
-fi
-
-payload="${payload%\}},\"userStatsStatus\":\"$USER_STATS_STATUS\",\"userStatsAtMs\":$USER_STATS_AT_MS}"
-
-[[ -r "$XMESH_METRICS_PRIVATE_KEY" ]] || { echo "Missing readable Ed25519 private key." >&2; exit 1; }
-command -v openssl >/dev/null || { echo "OpenSSL is required for signed metrics" >&2; exit 1; }
-timestamp="$(date +%s)"
-nonce="$(openssl rand -hex 16)"
-payload_hash="$(printf '%s' "$payload" | openssl dgst -sha256 -r | awk '{print $1}')"
-signed_file="$(mktemp "$state_dir/sign.XXXXXXXX")"
-trap 'rm -f "$signed_file"' EXIT
-printf 'XMESH1\nPOST\n/api/v1/metrics/ingest\n%s\n%s\n%s\n%s\n' \
-  "$XMESH_NODE_ID" "$timestamp" "$nonce" "$payload_hash" > "$signed_file"
-signature="$(openssl pkeyutl -sign -rawin -inkey "$XMESH_METRICS_PRIVATE_KEY" \
-  -in "$signed_file" | od -An -tx1 -v | tr -d ' \n')"
-[[ "${#signature}" -eq 128 ]] || { echo "Ed25519 signing failed" >&2; exit 1; }
-curl --fail --silent --show-error --max-time 12 \
-  -X POST "$XMESH_API_URL/api/v1/metrics/ingest" \
-  -H "X-XMesh-Timestamp: $timestamp" \
-  -H "X-XMesh-Nonce: $nonce" \
-  -H "X-XMesh-Signature: $signature" \
-  -H "Content-Type: application/json" \
-  --data-binary "$payload" >/dev/null
-tmp_state="$state_file.$$"
-printf '%s %s %s %s %s %s\n' "$now" "$rx_now" "$tx_now" "$cpu_total_now" "$cpu_idle_now" "$cpu_steal" > "$tmp_state"
-chmod 600 "$tmp_state"
-mv "$tmp_state" "$state_file"
-\n'*}"
-    snapshot_json="${snapshot_fragment#*
-  fi
-fi
-if [[ "$SNAPSHOT_LOADED" != true ]];then
-# Optional Xray StatsService counters. Missing Xray CLI or inaccessible API
-# must never be reported as successful per-user traffic collection.
-XRAY_API_ADDRESS="${XMESH_XRAY_API_ADDRESS:-127.0.0.1:10085}"
-if [[ "$XRAY_API_ADDRESS" =~ ^127\.0\.0\.1:[0-9]{1,5}$ ]] &&
-   command -v python3 >/dev/null 2>&1 &&
-   [[ -r /usr/local/libexec/xmesh-xray-stats-collector.py ]]; then
-  XRAY_CLI="$(command -v xray || true)"
-  if [[ -z "$XRAY_CLI" ]]; then
-    for candidate in /usr/local/bin/xray /usr/bin/xray /usr/local/xray/xray /opt/xray/xray /usr/local/bin/xray-core; do
-      if [[ -x "$candidate" ]]; then XRAY_CLI="$candidate"; break; fi
-    done
-  fi
-  if [[ -z "$XRAY_CLI" ]]; then
-    echo "XMesh: per-user traffic unavailable: Xray CLI not installed on host (possibly containerized)." >&2
-  else
-    stats_error="$(mktemp)"
-    if stats_json="$(timeout 6 "$XRAY_CLI" api statsquery --server="$XRAY_API_ADDRESS" -pattern 'user>>>xmesh-u' 2>"$stats_error")"; then
-      if stats_fragment="$(printf '%s' "$stats_json" | python3 /usr/local/libexec/xmesh-xray-stats-collector.py)"; then
-        if [[ "$stats_fragment" == ,* ]]; then
-          payload="${payload%\}}$stats_fragment}"
-          USER_STATS_STATUS=direct
-          USER_STATS_AT_MS="$(date +%s%3N)"
-        fi
-      else
-        echo "XMesh: Xray user stats response could not be parsed." >&2
-      fi
-    else
-      echo "XMesh: Xray Stats API unavailable at $XRAY_API_ADDRESS (check API listener and service)." >&2
-    fi
-    rm -f "$stats_error"
-  fi
-else
-  echo "XMesh: Xray StatsService collection is not configured." >&2
-fi
-fi # End fallback for missing root-owned metrics snapshot.
-
-# Approximate distinct users with Xray traffic in the last 120 seconds.
-# No counters / first baseline / reset -> unknown or zero only after a valid baseline.
-online_count=""
-if [[ "$USER_STATS_STATUS" == verified || "$USER_STATS_STATUS" == direct ]]; then
-  online_count="$(printf '%s' "$payload" | python3 -c '
-import json,sys,time,os,tempfile
-path=sys.argv[1]
-now=int(time.time())
-data=json.load(sys.stdin)
-rows=data.get("userTraffic")
-if not isinstance(rows,list) or len(rows)>4096:sys.exit(1)
-current={}
-for row in rows:
-    uid=row.get("userId")
-    up=row.get("uplinkBytes")
-    down=row.get("downlinkBytes")
-    if type(uid)!=int or uid<=0 or type(up)!=int or type(down)!=int or min(up,down)<0:sys.exit(1)
-    if uid in current:sys.exit(1)
-    current[uid]=[up,down]
-try:
-    with open(path,encoding="utf-8") as f:previous=json.load(f)
-except (OSError,ValueError):
-    previous={}
-old=previous.get("users",{})
-if not isinstance(old,dict):old={}
-seen={}
-for uid,counters in current.items():
-    key=str(uid)
-    prior=old.get(key,{})
-    previous_counters=prior.get("bytes") if isinstance(prior,dict) else None
-    last=prior.get("last") if isinstance(prior,dict) else None
-    if isinstance(previous_counters,list) and len(previous_counters)==2 and all(type(v)==int for v in previous_counters):
-        if all(a>=b for a,b in zip(counters,previous_counters)) and any(a>b for a,b in zip(counters,previous_counters)):
-            last=now
-        elif any(a<b for a,b in zip(counters,previous_counters)):
-            last=None
-    if type(last)!=int or last>now or now-last>120:last=None
-    seen[key]={"bytes":counters,"last":last}
-# First sample only establishes baselines; no online count is asserted.
-count=sum(v["last"] is not None for v in seen.values())
-fd,tmp=tempfile.mkstemp(prefix=".online-",dir=os.path.dirname(path))
-try:
-    with os.fdopen(fd,"w",encoding="utf-8") as f:
-        json.dump({"users":seen},f,separators=(",",":"))
-        f.flush()
-        os.fchmod(f.fileno(),0o600)
-    os.replace(tmp,path)
-finally:
-    if os.path.exists(tmp):os.unlink(tmp)
-print(count if isinstance(previous.get("users"),dict) else "null")
-' "$state_dir/online-users.json")" || online_count=""
-fi
-if [[ "$online_count" =~ ^[0-9]+$ ]]; then
-  payload="${payload%\}},\"online_clients\":$online_count}"
-fi
-
-payload="${payload%\}},\"userStatsStatus\":\"$USER_STATS_STATUS\",\"userStatsAtMs\":$USER_STATS_AT_MS}"
-
-[[ -r "$XMESH_METRICS_PRIVATE_KEY" ]] || { echo "Missing readable Ed25519 private key." >&2; exit 1; }
-command -v openssl >/dev/null || { echo "OpenSSL is required for signed metrics" >&2; exit 1; }
-timestamp="$(date +%s)"
-nonce="$(openssl rand -hex 16)"
-payload_hash="$(printf '%s' "$payload" | openssl dgst -sha256 -r | awk '{print $1}')"
-signed_file="$(mktemp "$state_dir/sign.XXXXXXXX")"
-trap 'rm -f "$signed_file"' EXIT
-printf 'XMESH1\nPOST\n/api/v1/metrics/ingest\n%s\n%s\n%s\n%s\n' \
-  "$XMESH_NODE_ID" "$timestamp" "$nonce" "$payload_hash" > "$signed_file"
-signature="$(openssl pkeyutl -sign -rawin -inkey "$XMESH_METRICS_PRIVATE_KEY" \
-  -in "$signed_file" | od -An -tx1 -v | tr -d ' \n')"
-[[ "${#signature}" -eq 128 ]] || { echo "Ed25519 signing failed" >&2; exit 1; }
-curl --fail --silent --show-error --max-time 12 \
-  -X POST "$XMESH_API_URL/api/v1/metrics/ingest" \
-  -H "X-XMesh-Timestamp: $timestamp" \
-  -H "X-XMesh-Nonce: $nonce" \
-  -H "X-XMesh-Signature: $signature" \
-  -H "Content-Type: application/json" \
-  --data-binary "$payload" >/dev/null
-tmp_state="$state_file.$$"
-printf '%s %s %s %s %s %s\n' "$now" "$rx_now" "$tx_now" "$cpu_total_now" "$cpu_idle_now" "$cpu_steal" > "$tmp_state"
-chmod 600 "$tmp_state"
-mv "$tmp_state" "$state_file"
-\n'}"
+    snapshot_timestamp="${snapshot_fragment%%$'\n'*}"
+    snapshot_json="${snapshot_fragment#*$'\n'}"
     if [[ "$snapshot_timestamp" =~ ^[0-9]{13}$ && "$snapshot_json" == ,* ]]; then
       payload="${payload%\}}$snapshot_json}"
       SNAPSHOT_LOADED=true
@@ -424,7 +195,7 @@ else
 fi
 fi # End fallback for missing root-owned metrics snapshot.
 
-# Approximate distinct users with Xray traffic in the last 120 seconds.
+# Distinct users with a verified Xray byte delta in the previous 45 seconds.
 # No counters / first baseline / reset -> unknown or zero only after a valid baseline.
 online_count=""
 if [[ "$USER_STATS_STATUS" == verified || "$USER_STATS_STATUS" == direct ]]; then
@@ -434,7 +205,7 @@ path=sys.argv[1]
 now=int(time.time())
 data=json.load(sys.stdin)
 rows=data.get("userTraffic")
-if not isinstance(rows,list) or len(rows)>4096:sys.exit(1)
+if not isinstance(rows,list) or len(rows)>2048:sys.exit(1)
 current={}
 for row in rows:
     uid=row.get("userId")
@@ -460,7 +231,7 @@ for uid,counters in current.items():
             last=now
         elif any(a<b for a,b in zip(counters,previous_counters)):
             last=None
-    if type(last)!=int or last>now or now-last>120:last=None
+    if type(last)!=int or last>now or now-last>45:last=None
     seen[key]={"bytes":counters,"last":last}
 # First sample only establishes baselines; no online count is asserted.
 count=sum(v["last"] is not None for v in seen.values())
