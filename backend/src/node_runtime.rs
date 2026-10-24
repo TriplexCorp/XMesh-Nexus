@@ -1354,6 +1354,26 @@ fn node_xray_local_port(node: &Value) -> Result<u64, ApiError> {
     Ok(port)
 }
 
+fn configure_local_xray_inbound(config: &mut Value, port: u64) -> Result<(), ApiError> {
+    let inbounds = config
+        .get_mut("inbounds")
+        .and_then(Value::as_array_mut)
+        .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Profile has no inbounds."))?;
+    if inbounds.len() != 1 {
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "Automatic local-port mapping currently requires exactly one inbound per profile.",
+        ));
+    }
+    let inbound = inbounds.get_mut(0).unwrap();
+    let object = inbound
+        .as_object_mut()
+        .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Invalid inbound."))?;
+    object.insert("listen".to_owned(), json!("127.0.0.1"));
+    object.insert("port".to_owned(), json!(port));
+    Ok(())
+}
+
 async fn compile_node_profile(
     state: &AppState,
     node_id: i64,
@@ -1404,22 +1424,7 @@ async fn compile_node_profile(
             ));
         }
     };
-    let inbounds = config
-        .get_mut("inbounds")
-        .and_then(Value::as_array_mut)
-        .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Profile has no inbounds."))?;
-    if inbounds.len() != 1 {
-        return Err(ApiError::new(
-            StatusCode::CONFLICT,
-            "Automatic local-port mapping currently requires exactly one inbound per profile.",
-        ));
-    }
-    let inbound = inbounds.get_mut(0).unwrap();
-    let object = inbound
-        .as_object_mut()
-        .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Invalid inbound."))?;
-    object.insert("listen".to_owned(), json!("127.0.0.1"));
-    object.insert("port".to_owned(), json!(port));
+    configure_local_xray_inbound(&mut config, port)?;
     let users = crate::load_records(&state.pool, "users").await?;
     let squads = crate::load_records(&state.pool, "squads").await?;
     let now = std::time::SystemTime::now()
