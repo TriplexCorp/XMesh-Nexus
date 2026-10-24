@@ -615,6 +615,7 @@ pub async fn preview_routing(
     let obj=node.as_object_mut().ok_or_else(||ApiError::new(
         StatusCode::CONFLICT,"Invalid node record."))?;
     for (key,value) in patch {obj.insert(key.clone(),value.clone());}
+    crate::node_routing::validate_saved(&node)?;
     let profile_id=node.get("profileId").and_then(Value::as_i64)
         .or_else(||node.get("profileId").and_then(Value::as_str)
             .and_then(|s|s.parse::<i64>().ok()))
