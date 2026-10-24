@@ -136,10 +136,11 @@ fn json_routing(node:&Value)->Result<Option<&serde_json::Map<String,Value>>,ApiE
     if serde_json::to_vec(raw).unwrap_or_default().len()>262144 {
         return Err(bad("Routing JSON exceeds 256 KiB."));
     }
-    if obj.keys().any(|key|!matches!(key.as_str(),"dns"|"routing"|"outbounds")){
+    if obj.keys().any(|key|!matches!(key.as_str(),"log"|"dns"|"routing"|"outbounds")){
         return Err(bad("Routing JSON may contain only dns, routing and outbounds."));
     }
-    if obj.get("dns").is_some_and(|v|!v.is_object()) ||
+    if obj.get("log").is_some_and(|v|!v.is_object()) ||
+       obj.get("dns").is_some_and(|v|!v.is_object()) ||
        obj.get("routing").is_some_and(|v|!v.is_object()) ||
        obj.get("outbounds").is_some_and(|v|!v.is_array()) {
         return Err(bad("Routing JSON: invalid dns/routing/outbounds structure."));
@@ -181,6 +182,7 @@ fn json_routing(node:&Value)->Result<Option<&serde_json::Map<String,Value>>,ApiE
 fn apply_json(node:&Value,config:&mut Value)->Result<(),ApiError>{
     let Some(raw)=json_routing(node)? else{return Ok(())};
     let obj=config.as_object_mut().ok_or_else(||bad("Xray configuration is not an object."))?;
+    if let Some(log)=raw.get("log"){obj.insert("log".into(),log.clone());}
     if let Some(dns)=raw.get("dns"){obj.insert("dns".into(),dns.clone());}
     if let Some(extra)=raw.get("outbounds").and_then(Value::as_array){
         let outbounds=obj.entry("outbounds").or_insert_with(||json!([]));
