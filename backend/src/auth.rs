@@ -97,7 +97,7 @@ async fn check_login_limits(
     // The submitted username must match its stored casing byte-for-byte.
     let username_key = username.trim().to_lowercase();
     if username_key.is_empty() {
-        record_failed_login(&state, &username_key).await?;
+        record_failed_login(state, &username_key).await?;
         return Err(ApiError::new(
             StatusCode::UNAUTHORIZED,
             "Неверный логин или пароль.",
