@@ -29,7 +29,7 @@ fn matcher(kind:&str, raw:&str)->Result<(&'static str,String),ApiError>{
         "ip" if value.parse::<IpAddr>().is_ok()
             || value.split_once('/').is_some_and(|(ip,mask)|
                 ip.parse::<IpAddr>().is_ok() && mask.parse::<u16>().is_ok_and(|prefix|
-                    prefix <= if ip.contains(':'){128}else{32})) => Ok(("ip",value.into())),
+                    prefix <= (if ip.contains(':'){128}else{32}))) => Ok(("ip",value.into())),
         "extDomain" | "extIp" => {
             let Some((filename,category))=value.split_once(':') else {
                 return Err(bad("Routing: custom GeoData needs filename.dat:category."));
@@ -148,6 +148,7 @@ pub fn apply(node:&Value,config:&mut Value,nodes:&[Value],hosts:&[Value])->Resul
     let mut generated=Vec::<Value>::new();
     let mut added=Vec::<Value>::new();
     let mut need_block=false;
+    let mut needs_domain_sniffing=false;
     let mut visited_exits=HashSet::<i64>::new();
     for (index,entry) in rules.iter().enumerate(){
         if entry.get("enabled").and_then(Value::as_bool)==Some(false){continue}
@@ -156,6 +157,7 @@ pub fn apply(node:&Value,config:&mut Value,nodes:&[Value],hosts:&[Value])->Resul
         let raw=entry.get("value").and_then(Value::as_str)
             .ok_or_else(||bad("Routing: rule value is missing."))?;
         let (key,value)=matcher(kind,raw)?;
+        if key=="domain" {needs_domain_sniffing=true;}
         if matches!(kind,"geosite"|"geoip"|"extDomain"|"extIp")
             && node.get("geoEnabled").and_then(Value::as_bool)!=Some(true){
             return Err(bad("Routing: enable GeoData downloads on the source node first."));
@@ -245,6 +247,25 @@ pub fn apply(node:&Value,config:&mut Value,nodes:&[Value],hosts:&[Value])->Resul
         rule.get("inboundTag").and_then(Value::as_array).is_some_and(|tags|
             tags.iter().any(|v|v.as_str()==Some("xmesh_stats_in")))).count();
     configured.splice(protected..protected,generated);
+    // Domain route matching requires the destination domain. IP-only VLESS
+    // requests often hide it; sniff TLS SNI / HTTP Host for ROUTING ONLY.
+    // Never rewrite the actual network destination in this control plane.
+    if needs_domain_sniffing && node.get("routingSniffing").and_then(Value::as_bool)!=Some(false) {
+        let inbound=obj.get_mut("inbounds").and_then(Value::as_array_mut)
+            .and_then(|list|list.first_mut())
+            .ok_or_else(||bad("Routing: source profile must have a proxy inbound."))?;
+        let sniff=inbound.as_object_mut().ok_or_else(||bad("Routing: invalid inbound."))?
+            .entry("sniffing").or_insert_with(||json!({}));
+        let sniff=sniff.as_object_mut().ok_or_else(||bad("Routing: invalid sniffing settings."))?;
+        sniff.insert("enabled".into(),json!(true));
+        sniff.insert("routeOnly".into(),json!(true));
+        let overrides=sniff.entry("destOverride").or_insert_with(||json!([]));
+        let overrides=overrides.as_array_mut()
+            .ok_or_else(||bad("Routing: sniffing.destOverride must be an array."))?;
+        for proto in ["http","tls","quic"] {
+            if !overrides.iter().any(|x|x.as_str()==Some(proto)) { overrides.push(json!(proto)); }
+        }
+    }
     Ok(())
 }
 
@@ -252,7 +273,8 @@ pub fn apply(node:&Value,config:&mut Value,nodes:&[Value],hosts:&[Value])->Resul
 mod tests{
     use super::*;
     fn sample()->Value{
-        json!({"routing":{"rules":[
+        json!({"inbounds":[{"protocol":"vless","tag":"NL","settings":{}}],
+            "routing":{"rules":[
             {"type":"field","inboundTag":["xmesh_stats_in"],"outboundTag":"xmesh_stats_api"},
             {"type":"field","inboundTag":["NL"],"outboundTag":"direct"}]},
             "outbounds":[{"protocol":"freedom","tag":"direct"}]})
@@ -272,6 +294,8 @@ mod tests{
         assert_eq!(config["routing"]["rules"][1]["domain"][0],"geosite:category-ru");
         assert_eq!(config["routing"]["rules"][2]["outboundTag"],"direct");
         assert_eq!(config["outbounds"][1]["protocol"],"vless");
+        assert_eq!(config["inbounds"][0]["sniffing"]["enabled"],true);
+        assert_eq!(config["inbounds"][0]["sniffing"]["routeOnly"],true);
     }
     #[test]
     fn reject_phantom_node_with_no_transport(){
