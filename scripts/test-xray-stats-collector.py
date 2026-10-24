@@ -26,4 +26,30 @@ assert users[11]["uplinkBytes"]==120
 assert users[11]["downlinkBytes"]==245
 assert users[22]["uplinkBytes"]==80
 assert sum(x["downlinkBytes"] for x in parsed["userInboundTraffic"])==245
-print("Xray per-user/per-inbound stats and aggregate isolation: OK")
+# The parser is the trust boundary between local Xray StatsService and the
+# signed agent payload: malformed/ambiguous counters must never be submitted.
+def rejects(payload, reason):
+    try:
+        mod.collect(payload)
+    except ValueError:
+        return
+    raise AssertionError(f"Unsafe Xray counters accepted: {reason}")
+
+rejects({}, "missing stat array")
+rejects({"stat": "wrong-type"}, "invalid stat array")
+rejects({"stat": [stat(11, "DE", "uplink", 1), stat(11, "DE", "uplink", 2)]},
+        "duplicate counter")
+rejects({"stat": [stat(11, "DE", "uplink", -1)]}, "negative counter")
+rejects({"stat": [stat(11, "DE", "uplink", 2**63)]}, "out-of-range counter")
+rejects({"stat": [{"name": stat(11, "DE", "uplink", 1)["name"], "value": True}]},
+        "boolean counter")
+rejects({"stat": [{"name": stat(11, "DE", "uplink", 1)["name"], "value": 1.5}]},
+        "fractional counter")
+rejects({"stat": [stat(11, "DE", "uplink", 2**63-1),
+                    stat(11, "PL", "uplink", 1)]}, "aggregate overflow")
+rejects({"stat": [stat(i, "DE", "uplink", 1) for i in range(1, 2050)]},
+        "too many users for the backend telemetry envelope")
+# Partial directions are legal during a new counter's first observation.
+partial = mod.collect({"stat": [stat(1, "DE", "downlink", 9)]})
+assert partial["userTraffic"] == [{"userId": 1, "uplinkBytes": 0, "downlinkBytes": 9}]
+print("Xray per-user/per-inbound stats, overflow and malformed-input isolation: OK")
