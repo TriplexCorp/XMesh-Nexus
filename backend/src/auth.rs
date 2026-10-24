@@ -228,7 +228,7 @@ pub async fn login(
     Ok(response)
 }
 
-pub(crate) async fn is_rate_limited(
+pub async fn is_rate_limited(
     state: &AppState,
     username_key: &str,
 ) -> Result<bool, ApiError> {
@@ -246,7 +246,7 @@ pub(crate) async fn is_rate_limited(
     Ok(count >= policy.login_attempts || locked)
 }
 
-pub(crate) async fn clear_failed_login(
+pub async fn clear_failed_login(
     state: &AppState,
     username_key: &str,
 ) -> Result<(), ApiError> {
@@ -263,7 +263,7 @@ pub(crate) async fn clear_failed_login(
     Ok(())
 }
 
-pub(crate) async fn issue_session_in_transaction(
+pub async fn issue_session_in_transaction(
     state: &AppState,
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     admin_id: i64,
@@ -322,7 +322,7 @@ pub(crate) async fn issue_session_in_transaction(
     ))
 }
 
-pub(crate) async fn record_failed_login(
+pub async fn record_failed_login(
     state: &AppState,
     username_key: &str,
 ) -> Result<(), ApiError> {
@@ -392,11 +392,10 @@ pub async fn session(
     State(state): State<AppState>,
     headers: HeaderMap,
 ) -> Result<Json<Value>, ApiError> {
-    if let Some(user) = user_from_headers(&state, &headers).await {
-        Ok(Json(json!({"authenticated": true, "user": user})))
-    } else {
-        Ok(Json(json!({"authenticated": false})))
-    }
+    user_from_headers(&state, &headers).await.map_or_else(
+        || Ok(Json(json!({"authenticated": false}))),
+        |user| Ok(Json(json!({"authenticated": true, "user": user}))),
+    )
 }
 
 pub async fn logout(
@@ -480,7 +479,7 @@ async fn user_from_headers(state: &AppState, headers: &HeaderMap) -> Option<Auth
     })
 }
 
-pub(crate) fn session_token_hash(headers: &HeaderMap) -> Option<String> {
+pub fn session_token_hash(headers: &HeaderMap) -> Option<String> {
     cookie_token(headers).map(|token| hash_token(&token))
 }
 fn cookie_token(headers: &HeaderMap) -> Option<String> {
