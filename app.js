@@ -1256,6 +1256,25 @@ async function usersP(){
   </div><div class="bulk" id="bulk" role="toolbar" aria-label="Массовые действия"></div><div id="ut"></div></div>`,()=>{drawUsers();let h;$('#uq').oninput=e=>{clearTimeout(h);h=setTimeout(()=>{UQ.q=e.target.value.trim().toLowerCase();UQ.page=1;drawUsers()},200)};$('#usq').onchange=e=>{UQ.sq=e.target.value;UQ.page=1;drawUsers()};
     $$('[data-user-filter]').forEach(el=>el.onchange=()=>{UQ[el.dataset.userFilter]=el.value;UQ.page=1;drawUsers()});
     $('[data-user-filter-reset]').onclick=()=>{for(const key of ['sq','inbound','tag','node','expiry'])UQ[key]='';UQ.page=1;render(1)};
+    // Refresh presence from the backend; an old bootstrap snapshot must not
+    // keep a user online indefinitely while this page stays open.
+    let presenceRefreshBusy=false;
+    const refreshPresence=async()=>{
+      if(cur!=='users'||document.hidden||presenceRefreshBusy)return;
+      presenceRefreshBusy=true;
+      try{
+        const response=await fetch('/api/v1/bootstrap',{credentials:'same-origin',cache:'no-store'});
+        if(!response.ok)throw Error('Presence refresh failed');
+        const payload=await response.json();
+        if(Array.isArray(payload?.collections?.users))DB.users=payload.collections.users;
+      }catch(_){
+        // On a failed request the local five-minute activity TTL still expires.
+      }finally{
+        presenceRefreshBusy=false;
+        if(cur==='users'&&$('#ut'))void drawUsers();
+      }
+    };
+    T.push(setInterval(()=>{void refreshPresence()},30000));
   }];
 }
 const uf=u=>(UQ.st=='all'||(UQ.st=='ONLINE'?isOn(u):st(u)==UQ.st))&&(!UQ.sq||u.squads.includes(+UQ.sq))&&(!UQ.tag||u.tag===UQ.tag)
