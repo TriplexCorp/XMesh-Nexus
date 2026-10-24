@@ -328,7 +328,7 @@ mod tests {
         let mut de = proxy("host:21", "DE");
         de["xmeshOwnerNodeKey"] = json!("node:1");
         let pl = proxy("host:30", "PL");
-        let all = vec![nl.clone(), de.clone(), pl.clone()];
+        let all = vec![nl.clone(), de.clone(), pl];
         let config = build_server(nl, &all, &settings()).unwrap();
         let rules = config["routing"]["rules"].as_array().unwrap();
         assert_eq!(rules[2]["domain"], json!(["geosite:category-ru"]));
@@ -336,8 +336,8 @@ mod tests {
         assert_eq!(rules[3]["outboundTag"], "direct");
         assert_eq!(rules[4]["outboundTag"], "block");
         assert_eq!(rules[5]["outboundTag"], config["outbounds"][0]["tag"]);
-        assert!(config.to_string().find("xmeshSourceKey").is_none());
-        assert!(config.to_string().find("xmeshOwnerNodeKey").is_none());
+        assert!(!config.to_string().contains("xmeshSourceKey"));
+        assert!(!config.to_string().contains("xmeshOwnerNodeKey"));
         let inherited = build_server(de, &all, &settings()).unwrap();
         assert_eq!(
             inherited["routing"]["rules"][2]["outboundTag"],
