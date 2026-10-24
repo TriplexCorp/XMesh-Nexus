@@ -38,15 +38,17 @@ function create(db,saveSettings,toast){
  let draft=clone(Array.isArray(db.set?.clientRoutingProfiles)?db.set.clientRoutingProfiles:[]);
  const route=(match='geosite',value='',action='proxy',server='')=>({match,value,action,...(server?{server}:{})});
  const root='<section class="client-routing-workspace" id="client-route-root">'+
-  '<div class="client-route-toolbar"><div><span class="client-route-eyebrow">XRAY / CLIENT ROUTING</span>'+
-  '<p>Общие правила для нескольких нод и хостов. Без дублирования конфигураций.</p></div>'+
-  '<button type="button" class="btn client-route-create" data-cr-add><span aria-hidden="true">＋</span> Создать шаблон</button></div>'+
-  '<div class="client-route-context"><span class="client-route-context-icon" aria-hidden="true">↗</span><div>'+
-  '<strong>Гибкие назначения</strong><p>Правила хоста имеют приоритет над правилами ноды. Остальной трафик идёт через выбранный клиентом сервер.</p></div></div>'+
-  '<div data-cr-list class="client-route-list"></div>'+
-  '<footer class="client-route-savebar"><div class="client-route-summary"><strong data-cr-status>Настроек пока нет</strong>'+
-  '<span>Изменения применяются к новым клиентским конфигурациям подписки</span></div>'+
-  '<button type="button" class="btn" data-cr-save>Сохранить изменения</button></footer></section>';
+  '<div class="client-route-main-card">'+
+  '<header class="client-route-main-head">'+
+   '<div><h2>Клиентская маршрутизация</h2><p>Шаблоны правил для серверов Xray JSON. Один шаблон — несколько нод и хостов.</p></div>'+
+   '<div class="client-route-head-actions"><span data-cr-counter class="client-route-counter">0 шаблонов</span>'+
+   '<button type="button" class="btn client-route-create" data-cr-add>Новый шаблон</button></div>'+
+  '</header>'+
+  '<div class="client-route-main-body"><div data-cr-list class="client-route-list"></div></div>'+
+  '<footer class="client-route-savebar"><div class="client-route-summary"><strong data-cr-status>0 шаблонов · 0 назначений</strong>'+
+  '<span>Изменения вступят в силу при получении клиентами новой конфигурации</span></div>'+
+  '<div class="client-route-saveactions"><button type="button" class="gh" data-cr-reset hidden>Отменить изменения</button>'+
+  '<button type="button" class="btn" data-cr-save disabled>Сохранить изменения</button></div></footer></div></section>';
  const valueOptions=(entries,value)=>entries.map(([v,label])=>
   '<option value="'+esc(v)+'"'+(v===value?' selected':'')+'>'+esc(label)+'</option>').join('');
  const selectedSources=items=>new Set(items||[]);
@@ -80,24 +82,41 @@ function create(db,saveSettings,toast){
      '<button type="button" class="gh sm" data-cr-rule-delete="'+n+'" aria-label="Удалить правило" title="Удалить правило">×</button></div>'+
      '</div>';
    }).join('');
-   return '<article class="card client-route-profile" data-cr-profile="'+index+'">'+
-    '<div class="client-route-profile-head"><div class="client-route-heading"><span class="client-route-count">'+(index+1)+'</span>'+
-    '<label><span>Название шаблона</span><input data-cr-name value="'+esc(p.name||'')+'" maxlength="100" placeholder="Например: RU через Варшаву"></label></div>'+
+   return '<article class="client-route-profile" data-cr-profile="'+index+'">'+
+    '<header class="client-route-profile-head"><div class="client-route-heading"><span class="client-route-count">'+(index+1)+'</span>'+
+    '<label><span>Название шаблона</span><input data-cr-name value="'+esc(p.name||'')+'" maxlength="100" placeholder="Например: RU через Польшу"></label></div>'+
     '<div class="client-route-actions"><label class="client-route-toggle"><input type="checkbox" data-cr-enabled'+(p.enabled!==false?' checked':'')+'> Включён</label>'+
     '<button type="button" class="gh sm" data-cr-duplicate="'+index+'">Копировать</button>'+
-    '<button type="button" class="gh sm" data-cr-delete="'+index+'">Удалить шаблон</button></div></div>'+
-    '<div class="client-route-block"><div class="client-route-section-heading"><div><h3>Назначить серверам</h3>'+
-    '<p>Отметьте нужные ноды и хосты: все они используют одни правила.</p></div>'+
+    '<button type="button" class="gh sm" data-cr-delete="'+index+'">Удалить</button></div></header>'+
+    '<section class="client-route-block"><div class="client-route-section-heading"><div><h3>Назначения</h3>'+
+    '<p>Выберите серверы, на которых будет действовать этот шаблон.</p></div>'+
     '<span>'+keys.size+' выбрано</span></div>'+
-    '<div class="client-route-sources">'+(assigned||'<p class="note">Сначала добавьте ноды или хосты.</p>')+'</div></div>'+
-    '<div class="client-route-block"><div class="client-route-section-heading"><div><h3>Правила</h3>'+
-    '<p>Верхние правила имеют больший приоритет. Недоступные направления блокируются.</p></div>'+
+    '<div class="client-route-sources">'+(assigned||'<p class="note">Сначала добавьте ноды или хосты.</p>')+'</div></section>'+
+    '<section class="client-route-block"><div class="client-route-section-heading"><div><h3>Правила маршрутизации</h3>'+
+    '<p>Правила применяются по порядку сверху вниз.</p></div>'+
     '<button type="button" class="gh sm" data-cr-rule-add="'+index+'">Добавить правило</button></div>'+
-    '<div class="client-route-rules">'+(rules||'<p class="note">Нет дополнительных правил — используется стандартная маршрутизация.</p>')+'</div></div>'+
+    '<div class="client-route-rules">'+(rules||'<div class="client-route-rules-empty">Дополнительных правил пока нет. Используется стандартная маршрутизация.</div>')+'</div></section>'+
     '</article>';
-  }).join(''):'<div class="client-route-empty"><span class="client-route-empty-icon" aria-hidden="true">⇄</span><h3>Маршрутизация ещё не настроена</h3><p>Создайте шаблон, добавьте правила и назначьте его нескольким серверам. При необходимости правила конкретного хоста переопределят правила всей ноды.</p><button type="button" class="btn" data-cr-add>＋ Создать первый шаблон</button></div>';
+  }).join(''):'<div class="client-route-empty">'+
+   '<div class="client-route-empty-icon" aria-hidden="true">⇄</div>'+
+   '<h3>Шаблонов маршрутизации пока нет</h3>'+
+   '<p>Создайте набор правил и назначьте его нодам или хостам. Настройки не придётся дублировать для каждого сервера.</p>'+
+   '<button type="button" class="btn" data-cr-add>Создать первый шаблон</button>'+
+   '<div class="client-route-empty-hint">Правила хоста имеют приоритет над правилами ноды</div></div>';
   const status=document.querySelector('#client-route-root [data-cr-status]');
   if(status)status.textContent=draft.length+' шаблон(ов) · '+draft.reduce((n,p)=>n+(p.servers||[]).length,0)+' назначений';
+  const counter=document.querySelector('#client-route-root [data-cr-counter]');
+  if(counter)counter.textContent=draft.length+' шаблон(ов)';
+ };
+ let saved=JSON.stringify(draft);
+ const syncDirty=()=>{
+  const root=document.querySelector('#client-route-root');
+  if(!root)return;
+  const dirty=JSON.stringify(read())!==saved;
+  const save=root.querySelector('[data-cr-save]');
+  const reset=root.querySelector('[data-cr-reset]');
+  if(save)save.disabled=!dirty;
+  if(reset)reset.hidden=!dirty;
  };
  const read=()=>{
   const root=document.querySelector('#client-route-root');
@@ -150,11 +169,15 @@ function create(db,saveSettings,toast){
     try{
      await saveSettings({clientRoutingProfiles:data});
      draft=clone(data);
+     saved=JSON.stringify(draft);
      toast('Клиентская маршрутизация сохранена');
-     render();
+     render();syncDirty();
     }catch(err){toast('Не удалось сохранить: '+(err.message||'API'))}
     finally{button.disabled=false;button.textContent='Сохранить изменения'}
     return;
+   }
+   if(button.hasAttribute('data-cr-reset')){
+    draft=JSON.parse(saved);render();syncDirty();return;
    }
    if(button.hasAttribute('data-cr-add')){
     draft=read();
@@ -162,6 +185,7 @@ function create(db,saveSettings,toast){
       n=>n.toString(16).padStart(2,'0')).join('');
     draft.push({id,name:'Новый шаблон',enabled:true,servers:[],rules:[]});
     render();
+    syncDirty();
     root.querySelector('[data-cr-profile]:last-child [data-cr-name]')?.focus();
     return;
    }
@@ -194,8 +218,11 @@ function create(db,saveSettings,toast){
      [draft[index].rules[n+1],draft[index].rules[n]]=
       [draft[index].rules[n],draft[index].rules[n+1]];
    }else return;
-   render();
+   render();syncDirty();
   });
+  root.addEventListener('input',syncDirty);
+  root.addEventListener('change',syncDirty);
+  syncDirty();
  }
  return [root,mount];
 }
