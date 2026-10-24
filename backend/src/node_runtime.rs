@@ -338,7 +338,7 @@ pub async fn status(
     }
 }
 
-/// Ask the autonomous node reconciler to bypass the GeoData refresh interval.
+/// Ask the autonomous node reconciler to bypass the `GeoData` refresh interval.
 ///
 /// No remote shell actions, arbitrary URLs or Xray restarts are enqueued.
 /// The per-node signed manifest carries a monotonic revision. The node
@@ -1186,7 +1186,7 @@ fn build_offline_policy(
     })
 }
 
-/// Validate an *unsaved* routing edit using the same GeoData and outbound
+/// Validate an *unsaved* routing edit using the same `GeoData` and outbound
 /// compiler used for signed desired-config. Never return Xray secrets.
 pub async fn preview_routing(
     State(state): State<AppState>,
@@ -1356,7 +1356,7 @@ async fn compile_node_profile(
         })?;
     let profile_id = node
         .get("profileId")
-        .and_then(|v| v.as_i64())
+        .and_then(Value::as_i64)
         .or_else(|| {
             node.get("profileId")
                 .and_then(|v| v.as_str())
