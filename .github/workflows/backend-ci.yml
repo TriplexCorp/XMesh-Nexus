@@ -56,6 +56,7 @@ jobs:
           node --check xray-studio-hosts.js
           node --check xray-studio-v4.js
           node --check xray-studio-tools.js
+          node --check client-routing.js
           node --check xray-json-diagnostics.js
           node --check xray-json-intelligence.js
       - name: Test manual JSON line diagnostics and Hot Fix
@@ -70,6 +71,8 @@ jobs:
         run: node scripts/check-xray-active-entrypoint.js
       - name: Verify packaged frontend assets
         run: node scripts/check-static-assets.js
+      - name: Verify per-server client routing templates and assignments
+        run: node scripts/check-client-routing.js
       - name: Validate RU/EN panel and portal localization
         run: node scripts/check-i18n.js
       - name: Check subscription studio and independent deployment blueprint
