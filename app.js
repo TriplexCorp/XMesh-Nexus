@@ -2496,6 +2496,7 @@ const nodeRuntimeState=(node,runtime)=>{
   return {label:'Состояние неизвестно',kind:'unknown'};
 };
 const nodeAgentUpdating=new Set();
+const nodeXrayUpdating=new Set();
 function renderNodeAgentVersion(nodeId,runtime){
   if(nodeAgentUpdating.has(Number(nodeId))){
     return '<span class="node-agent-spinner" aria-hidden="true"></span><span>Agent обновляется</span>';
@@ -2519,6 +2520,27 @@ function paintNodeAgentUpdate(nodeId,updating){
     badge.removeAttribute('aria-label');
   }
 }
+function renderNodeXrayVersion(nodeId,runtime){
+  if(nodeXrayUpdating.has(Number(nodeId))){
+    return '<span class="node-agent-spinner" aria-hidden="true"></span><span>Xray обновляется</span>';
+  }
+  return runtime?.xrayVersion?'Xray '+esc(runtime.xrayVersion):'Xray —';
+}
+function paintNodeXrayUpdate(nodeId){
+  const badge=document.querySelector('[data-node-card-id="'+nodeId+'"] [data-node-xray-version]');
+  if(!badge)return;
+  const updating=nodeXrayUpdating.has(Number(nodeId));
+  badge.classList.toggle('node-agent-updating',updating);
+  if(updating){
+    badge.setAttribute('role','status');
+    badge.setAttribute('aria-label','Xray обновляется');
+    badge.title='Ожидается подтверждение обновления Xray';
+    badge.innerHTML=renderNodeXrayVersion(nodeId,null);
+  }else{
+    badge.removeAttribute('role');
+    badge.removeAttribute('aria-label');
+  }
+}
 const updateNodeRuntimeBadges=(node,runtime)=>{
   const card=$('[data-node-card-id="'+node.id+'"]');
   if(!card)return;
@@ -2530,9 +2552,13 @@ const updateNodeRuntimeBadges=(node,runtime)=>{
     pill.append(dot,document.createTextNode(status.label));
   }
   if(version){
-    const text=runtime?.xrayVersion?('Xray '+runtime.xrayVersion):'Xray —';
-    version.textContent=text;
-    version.title=runtime?.xrayVersion?'Версия Xray по последнему heartbeat':'Версия Xray пока не получена';
+    if(nodeXrayUpdating.has(Number(node.id))){
+      paintNodeXrayUpdate(node.id);
+    }else{
+      paintNodeXrayUpdate(node.id);
+      version.textContent=runtime?.xrayVersion?'Xray '+runtime.xrayVersion:'Xray —';
+      version.title=runtime?.xrayVersion?'Версия Xray по последнему heartbeat':'Версия Xray пока не получена';
+    }
   }
   const agent=card.querySelector('[data-node-agent-version]');
   if(agent){
@@ -2576,7 +2602,7 @@ async function nodesP(){
     LV[n.id]=l;
     const trafficGb=l.networkTotalBytes===null?null:l.networkTotalBytes*nodeTrafficFactor(n)/1073741824;
     const k=n.limit&&trafficGb!==null?cl(trafficGb/n.limit,0,1):0,tc=k>.9?'--er':k>.75?'--wr':'--c3';
-    return `<div class="card nc${n.disabled?' off':''}" data-node-card-id="${n.id}"><div class="h"><span class="fg">${flagView(n.flag)}</span><div class="node-identity"><b>${esc(n.name)}</b><br><small class="mu">${viewerMode()?'Адрес скрыт':esc(n.addr||'—')+(n.port?':'+esc(n.port):'')}</small>${n.hosting?.trim()?`<span class="node-hosting" title="Хостинг">${ic('building-2')}${esc(n.hosting.trim())}</span>`:''}</div><div class="node-live-badges"><span class="node-xray-version" data-node-xray-version title="Версия по последнему heartbeat">${runtime.get(n.id)?.xrayVersion?'Xray '+esc(runtime.get(n.id).xrayVersion):'Xray —'}</span><span class="node-agent-version" data-node-agent-version title="Версия управляющего агента">${renderNodeAgentVersion(n.id,runtime.get(n.id))}</span><span data-node-runtime-state class="node-runtime-pill node-runtime-${nodeRuntimeState(n,runtime.get(n.id)).kind}"><span class="node-runtime-dot" aria-hidden="true"></span>${esc(nodeRuntimeState(n,runtime.get(n.id)).label)}</span></div></div>
+    return `<div class="card nc${n.disabled?' off':''}" data-node-card-id="${n.id}"><div class="h"><span class="fg">${flagView(n.flag)}</span><div class="node-identity"><b>${esc(n.name)}</b><br><small class="mu">${viewerMode()?'Адрес скрыт':esc(n.addr||'—')+(n.port?':'+esc(n.port):'')}</small>${n.hosting?.trim()?`<span class="node-hosting" title="Хостинг">${ic('building-2')}${esc(n.hosting.trim())}</span>`:''}</div><div class="node-live-badges"><span class="node-xray-version" data-node-xray-version title="Версия по последнему heartbeat">${renderNodeXrayVersion(n.id,runtime.get(n.id))}</span><span class="node-agent-version" data-node-agent-version title="Версия управляющего агента">${renderNodeAgentVersion(n.id,runtime.get(n.id))}</span><span data-node-runtime-state class="node-runtime-pill node-runtime-${nodeRuntimeState(n,runtime.get(n.id)).kind}"><span class="node-runtime-dot" aria-hidden="true"></span>${esc(nodeRuntimeState(n,runtime.get(n.id)).label)}</span></div></div>
       <div class="kvg"><div><span title="Пользователи с активным доступом через inbound этой ноды, не число текущих подключений">Активные пользователи</span><b>${s.nodeOn[n.id]??0}</b><div class="node-online-clients" title="Онлайн-клиенты по свежей телеметрии агента ноды"><span>Пользователи онлайн</span><b>${m?.onlineClients!=null&&Number.isFinite(Number(m.onlineClients))?Math.max(0,Math.trunc(Number(m.onlineClients))):"—"}</b></div></div><div><span>XRAY STUDIO</span>${p?esc(p.name)+'<br><small class="mu" title="Сравнение ожидаемой конфигурации с подписанным подтверждением агента">'+({applied:'Профиль применён',pending:'Ожидает применения',stopped:'Xray не запущен',unknown:'Нет подтверждения от агента'})[runtime.get(n.id)?.profileApplicationStatus||'unknown']+'</small>':n.profileId?'<span class="er">Профиль ID '+esc(n.profileId)+' не найден</span>':'—'}</div></div>
       ${n.geoEnabled?`<div class="node-ip-rotation active" title="${esc(geoStatus?.lastError||'Подтверждение от управляющего агента, не проверка фактической блокировки рекламы')}"><span class="node-ip-indicator" aria-hidden="true"></span><span>GeoData · ${esc(geoLabel)}${geoFileCount?' · '+geoFileCount+' файла(ов)':''}</span></div>`:''}
       ${n.rotationEnabled?`<div class="node-ip-rotation active" aria-label="Пул IP-ротации"><span class="node-ip-indicator" aria-hidden="true"></span><span>IP-пул · ${nodeRotationIPs(n).length} адресов</span></div>`:''}
@@ -3242,6 +3268,8 @@ document.addEventListener('click',async e=>{
         {title:'Подтвердить установку Xray '+version,confirmLabel:'Установить '+version}
       );
       if(!confirmed)return;
+      nodeXrayUpdating.add(id);
+      paintNodeXrayUpdate(id);
       const request=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/xray-update',{
         method:'POST',body:JSON.stringify({version})
       });
@@ -3259,7 +3287,20 @@ document.addEventListener('click',async e=>{
       toast(node.name+': '+(status.result||'обновление успешно'));
       if(cur==='nodes')render(1);
     }catch(error){toast('Обновление Xray: '+(error.message||'ошибка API'))}
-    finally{delete b.dataset.loading;b.disabled=false}
+    finally{
+      nodeXrayUpdating.delete(id);
+      if(cur==='nodes'){
+        try{
+          const fresh=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/runtime');
+          updateNodeRuntimeBadges(node,fresh);
+        }catch(_){
+          paintNodeXrayUpdate(id);
+          const badge=document.querySelector('[data-node-card-id="'+id+'"] [data-node-xray-version]');
+          if(badge)badge.textContent='Xray —';
+        }
+      }
+      delete b.dataset.loading;b.disabled=false;
+    }
   }
   else if(b=g('[data-nr]')){
      const id=Number(b.dataset.nr),node=DB.nodes.find(n=>Number(n.id)===id);
