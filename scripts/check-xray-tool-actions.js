@@ -6,6 +6,7 @@ const vm=require('node:vm');
 const {webcrypto}=require('node:crypto');
 
 const source=fs.readFileSync('xray-studio-tools.js','utf8');
+const PREVIOUS_KEY='A'.repeat(43),NEW_PRIVATE='B'.repeat(43),NEW_PUBLIC='C'.repeat(43);
 const sample=()=>({
  log:{loglevel:'warning'},
  inbounds:[{
@@ -15,7 +16,7 @@ const sample=()=>({
      network:'xhttp',security:'reality',xhttpSettings:{path:'/xhttp',mode:'auto'},
      realitySettings:{
        show:false,target:'www.microsoft.com:443',serverNames:['www.microsoft.com'],
-       privateKey:'existing-valid-key',shortIds:['admin','0123456789abcdef']
+       privateKey:PREVIOUS_KEY,shortIds:['admin','0123456789abcdef']
      }
    }
  }],
@@ -58,7 +59,7 @@ function harness(documentValue,{confirmValue=true,confirmHandler,requestValues,r
  vm.runInNewContext(source,environment,{filename:'xray-studio-tools.js'});
  win.XMeshJsonTools.setup(root,{
    toast:text=>calls.push(text),
-   realityKeys:realityKeys||(async()=>({privateKey:'generated-private',publicKey:'generated-public'}))
+   realityKeys:realityKeys||(async()=>({privateKey:NEW_PRIVATE,publicKey:NEW_PUBLIC}))
  });
  return {
    area,host,status,issue,issueMessage,calls,confirmCalls,clipboard,
@@ -139,7 +140,7 @@ async function run(){
  const preserveAndRepair=sample();
  const noRotation=harness(preserveAndRepair,{requestValues:{shortIds:'aabbccdd, 0123456789abcdef'}});
  await noRotation.run('reality');await tick();
- assert.equal(noRotation.doc().inbounds[0].streamSettings.realitySettings.privateKey,'existing-valid-key','existing private key survives routine repairs');
+ assert.equal(noRotation.doc().inbounds[0].streamSettings.realitySettings.privateKey,PREVIOUS_KEY,'existing private key survives routine repairs');
  assert.ok(ids(noRotation.doc()).every(validShortId),'explicitly corrected Short IDs applied without key rotation');
  assert.ok(noRotation.calls.some(m=>m.includes('без изменения privateKey')),'visible confirmation of key preservation');
 
@@ -204,10 +205,10 @@ async function run(){
  assert.equal(reality.security,'reality');
  assert.equal(reality.realitySettings.target,'cdn.example.org:443','target must come from the user, never a hardcoded default');
  assert.deepEqual(reality.realitySettings.serverNames,['cdn.example.org'],'empty SNI field derives from selected target');
- assert.equal(reality.realitySettings.privateKey,'generated-private');
+ assert.equal(reality.realitySettings.privateKey,NEW_PRIVATE);
  assert.equal(reality.realitySettings.shortIds.length,1);
  assert.ok(validShortId(reality.realitySettings.shortIds[0]),'reality setup generates valid Short ID');
- assert.ok(generated.clipboard.includes('generated-public'),'public key copied');
+ assert.ok(generated.clipboard.includes(NEW_PUBLIC),'public key copied');
 
 
  // A normal Reality click must never rekey or silently rewrite a healthy config.
@@ -246,14 +247,13 @@ async function run(){
 
  const rotated=harness(custom,{requestValues:{keyMode:'rotate'}});
  await rotated.run('reality');
- assert.equal(rotated.doc().inbounds[0].streamSettings.realitySettings.privateKey,'generated-private','explicitly approved rotation generates new private key');
- assert.ok(rotated.clipboard.includes('generated-public'),'new public key can be transferred to clients');
+ assert.equal(rotated.doc().inbounds[0].streamSettings.realitySettings.privateKey,NEW_PRIVATE,'explicitly approved rotation generates new private key');
+ assert.ok(rotated.clipboard.includes(NEW_PUBLIC),'new public key can be transferred to clients');
 
  const invalidShortIds=harness(sample());
- const beforeInvalid=invalidShortIds.area.value;
  await invalidShortIds.run('reality');
- assert.equal(invalidShortIds.area.value,beforeInvalid,'invalid existing IDs are not silently repaired by Reality setup');
- assert.ok(invalidShortIds.calls.some(x=>x.includes('Short ID')),'invalid IDs must be explained');
+ assert.ok(ids(invalidShortIds.doc()).every(validShortId),'invalid Short IDs are replaced only after explicit form submission');
+ assert.ok(!ids(invalidShortIds.doc()).includes('admin'),'a username must never become a Reality Short ID');
 
  const invalidTarget=harness(noReality,{requestValues:{target:'not a domain'}});
  const beforeTarget=invalidTarget.area.value;
@@ -269,6 +269,29 @@ async function run(){
  await multi.run('reality');
  assert.equal(multi.doc().inbounds[0].streamSettings.realitySettings.target,'www.microsoft.com:443','unselected inbound must be unchanged');
  assert.equal(multi.doc().inbounds[1].streamSettings.realitySettings.target,'second.example.org:443');
+
+ // Regression: browser login and password-manager token inserted into a dormant REALITY block.
+ const poisoned=sample();const poison=poisoned.inbounds[0].streamSettings;
+ poison.security='none';poison.realitySettings.shortIds=['Triplex'];
+ poison.realitySettings.privateKey='a'.repeat(256);
+ const poisonCancel=harness(poisoned,{confirmValue:false});
+ const beforePoison=poisonCancel.area.value;
+ await poisonCancel.run('reality');
+ assert.equal(poisonCancel.area.value,beforePoison,'cancel never overwrites a suspected credential');
+ const poisonFix=harness(poisoned);
+ await poisonFix.run('reality');
+ const recovered=poisonFix.doc().inbounds[0].streamSettings;
+ assert.equal(recovered.security,'reality','confirmed recovery enables REALITY');
+ assert.equal(recovered.realitySettings.privateKey,NEW_PRIVATE,'credential-like token is replaced with canonical X25519 key');
+ assert.ok(recovered.realitySettings.shortIds.every(validShortId),'admin login is replaced by hex Short ID');
+ assert.ok(!recovered.realitySettings.shortIds.includes('Triplex'),'admin login must not survive a repair');
+ assert.equal(poisonFix.confirmCalls.length,1,'replacing an invalid existing secret needs confirmation');
+ assert.ok(poisonFix.clipboard.includes(NEW_PUBLIC),'public key is exported after new generation');
+ const brokenGenerator=harness(noReality,{requestValues:{target:'cdn.example.org:443'},realityKeys:async()=>({privateKey:'deadbeef',publicKey:'0'.repeat(43)})});
+ const beforeGenerator=brokenGenerator.area.value;
+ await brokenGenerator.run('reality');
+ assert.equal(brokenGenerator.area.value,beforeGenerator,'generator output with wrong length is rejected');
+ assert.ok(brokenGenerator.calls.some(v=>/base64url/.test(v)),'the user is told X25519 key requirements');
 
  const failed=harness(noReality,{requestValues:{target:'cdn.example.org:443'},realityKeys:async()=>{throw Error('generation failed')}});
  await failed.run('reality');await tick();
