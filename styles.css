@@ -4954,3 +4954,23 @@ dialog#dlg.node-wide .node-geo-fields small{overflow-wrap:anywhere}
     width:100%;
   }
 }
+
+/* Consistent circular close control across all XMesh Nexus dialogs.
+   Specificity intentionally exceeds legacy per-dialog radius rules. */
+dialog button[data-x],
+dialog .geo-close[data-x],
+dialog .route-json-close[data-x]{
+  width:34px;
+  height:34px;
+  min-width:34px;
+  min-height:34px;
+  padding:0;
+  border-radius:50%;
+  aspect-ratio:1;
+  box-sizing:border-box;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  flex:none;
+  line-height:1;
+}
