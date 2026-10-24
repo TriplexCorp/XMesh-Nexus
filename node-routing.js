@@ -18,6 +18,7 @@ function open({node,profiles,modal,updateNode,apiRequest,notify,afterSave}){
  modal('<form class="box route-json-workspace" data-route-json-form method="dialog">'+
  '<header class="route-json-head"><div><span class="route-json-kicker">УЗЛЫ / '+esc(node.name||node.id)+'</span>'+
  '<h2>Маршрутизация</h2><p>Нативный Xray JSON. Настройки применяются только к этой ноде.</p></div>'+
+ '<button type="button" class="gh sm route-json-close" data-x aria-label="Закрыть окно" title="Закрыть">✕</button>'+
  '</header>'+
  '<div class="route-json-bar"><label><input type="checkbox" data-route-json-enabled '+(node.routingEnabled?'checked':'')+'> Включить маршрутизацию</label>'+
  '<div><button type="button" class="gh sm" data-route-format>Форматировать</button>'+
@@ -73,7 +74,15 @@ function open({node,profiles,modal,updateNode,apiRequest,notify,afterSave}){
   const b=e.target.closest('button');if(!b)return;
   if(b.hasAttribute('data-route-json-preview')){void save(true);return}
   if(b.hasAttribute('data-route-format')){
-   try{editor.value=format(parse());state();changed=true;status.textContent='JSON отформатирован.'}
+   try{
+    const original=editor.value;
+    const parsed=parse();
+    const formatted=format(parsed);
+    editor.value=formatted;
+    editor.dispatchEvent(new Event('input',{bubbles:true}));
+    editor.focus();
+    status.textContent=original===formatted?'JSON уже отформатирован.':'JSON отформатирован.';
+   }
    catch(e){status.textContent=e.message}return
   }
   if(b.hasAttribute('data-route-copy')){
