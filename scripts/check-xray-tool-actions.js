@@ -72,9 +72,9 @@ const tick=async()=>{for(let n=0;n<12;n++)await Promise.resolve()};
 
 async function run(){
  const initial=harness(sample());
- assert.equal((initial.host.innerHTML.match(/class="sv-toolitem /g)||[]).length,6,'only six main actions are visible');
+ assert.equal((initial.host.innerHTML.match(/class="sv-toolitem /g)||[]).length,8,'eight supported main actions are visible');
  assert.equal(initial.issue.hidden,false,'broken ID visible as contextual warning');
- assert.deepEqual(['reality','shortid','xhttp','dns','routing','inbound'].map(x=>initial.host.innerHTML.includes('data-tool="'+x+'"')),[true,true,true,true,true,true]);
+ assert.deepEqual(['reality','shortid','vlessens','vision','xhttp','dns','routing','inbound'].map(x=>initial.host.innerHTML.includes('data-tool="'+x+'"')),[true,true,true,true,true,true,true,true]);
 
  const repair=harness(sample());
  await repair.run('shortid');
