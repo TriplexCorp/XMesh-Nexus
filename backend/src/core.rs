@@ -376,7 +376,7 @@ impl CoreManager {
                     release.tag_name
                 )
             })?;
-        if asset.size as usize > MAX_RELEASE_BYTES {
+        if asset.size > MAX_RELEASE_BYTES as u64 {
             return Err("Release asset exceeds the 120 MiB safety limit".to_owned());
         }
         let parsed_url = reqwest::Url::parse(&asset.browser_download_url)
@@ -636,7 +636,7 @@ async fn unpack_release(bytes: &[u8], destination: &Path) -> Result<(), String> 
                 continue;
             }
             if let Some(mode) = entry.unix_mode()
-                && mode & 0o170000 == 0o120000
+                && mode & 0o170_000 == 0o120_000
             {
                 continue;
             }
@@ -666,8 +666,7 @@ fn chrono_free_timestamp() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_secs().to_string())
-        .unwrap_or_else(|_| "0".to_owned())
+        .map_or_else(|_| "0".to_owned(), |duration| duration.as_secs().to_string())
 }
 
 #[cfg(test)]
