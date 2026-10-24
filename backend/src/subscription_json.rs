@@ -150,6 +150,56 @@ pub fn smart_enabled(settings: &Value) -> bool {
 }
 
 /// Every proxy passed into this engine must be fully public-side serialized.
+fn prepare_proxy_outbounds(proxies: &mut [Value]) -> Result<(Vec<String>, HashMap<String, Vec<String>>, Vec<String>), String> {
+    let mut used = HashSet::new();
+    let mut countries: HashMap<String, Vec<String>> = HashMap::new();
+    let mut tags = Vec::new();
+    // An Xray routing tag is not a human-readable server name. Preserve
+    // the host's real subscription remark separately for GUI clients.
+    let display_names: Vec<String> = proxies
+        .iter()
+        .map(|p| {
+            p.get("tag")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .trim()
+                .chars()
+                .filter(|c| !c.is_control())
+                .take(100)
+                .collect()
+        })
+        .collect();
+    for (i, outbound) in proxies.iter_mut().enumerate() {
+        if !secure_proxy(outbound) {
+            return Err("Некорректные или недостаточно защищённые учётные данные прокси".into());
+        }
+        let address = proxy_address(outbound);
+        if address.is_empty() {
+            return Err("Не указан публичный адрес сервера".into());
+        }
+        let code = country(outbound);
+        // Xray routing tags are internal identifiers, never display labels.
+        // Keep them stable, unique and ASCII-only regardless of host names.
+        let tag = format!("xmesh-{code}-{:04}", i + 1);
+        if !used.insert(tag.clone()) {
+            return Err("Дублирующийся тег Xray".into());
+        }
+        outbound
+            .as_object_mut()
+            .ok_or("Неверная структура outbound")?
+            .remove("xmeshCountry");
+        outbound.as_object_mut().unwrap().remove("xmeshSourceKey");
+        outbound
+            .as_object_mut()
+            .unwrap()
+            .remove("xmeshOwnerNodeKey");
+        outbound["tag"] = json!(tag);
+        tags.push(tag.clone());
+        countries.entry(code).or_default().push(tag);
+    }
+    Ok((tags, countries, display_names))
+}
+
 pub fn build(mut proxies: Vec<Value>, setting: &Value) -> Result<Value, String> {
     if proxies.is_empty() {
         return Err("Нет доступных клиентских подключений".into());
@@ -200,52 +250,7 @@ pub fn build(mut proxies: Vec<Value>, setting: &Value) -> Result<Value, String> 
     if socks_port == http_port {
         return Err("Локальные SOCKS и HTTP порты совпадают".into());
     }
-    let mut used = HashSet::new();
-    let mut countries: HashMap<String, Vec<String>> = HashMap::new();
-    let mut tags = Vec::new();
-    // An Xray routing tag is not a human-readable server name. Preserve
-    // the host's real subscription remark separately for GUI clients.
-    let display_names: Vec<String> = proxies
-        .iter()
-        .map(|p| {
-            p.get("tag")
-                .and_then(Value::as_str)
-                .unwrap_or("")
-                .trim()
-                .chars()
-                .filter(|c| !c.is_control())
-                .take(100)
-                .collect()
-        })
-        .collect();
-    for (i, outbound) in proxies.iter_mut().enumerate() {
-        if !secure_proxy(outbound) {
-            return Err("Некорректные или недостаточно защищённые учётные данные прокси".into());
-        }
-        let address = proxy_address(outbound);
-        if address.is_empty() {
-            return Err("Не указан публичный адрес сервера".into());
-        }
-        let code = country(outbound);
-        // Xray routing tags are internal identifiers, never display labels.
-        // Keep them stable, unique and ASCII-only regardless of host names.
-        let tag = format!("xmesh-{code}-{:04}", i + 1);
-        if !used.insert(tag.clone()) {
-            return Err("Дублирующийся тег Xray".into());
-        }
-        outbound
-            .as_object_mut()
-            .ok_or("Неверная структура outbound")?
-            .remove("xmeshCountry");
-        outbound.as_object_mut().unwrap().remove("xmeshSourceKey");
-        outbound
-            .as_object_mut()
-            .unwrap()
-            .remove("xmeshOwnerNodeKey");
-        outbound["tag"] = json!(tag);
-        tags.push(tag.clone());
-        countries.entry(code).or_default().push(tag);
-    }
+    let (tags, countries, display_names) = prepare_proxy_outbounds(&mut proxies)?;
     let first = tags
         .first()
         .ok_or("Отсутствует маршрут по умолчанию")?
