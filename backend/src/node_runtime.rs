@@ -1335,6 +1335,25 @@ struct CompiledNodeProfile {
     active_nodes: i64,
     revision: String,
 }
+fn node_xray_local_port(node: &Value) -> Result<u64, ApiError> {
+    // Legacy form submissions may persist positive numeric ports as strings.
+    // Never silently fall back to the public node port: it is not Xray's port.
+    let port = node
+        .get("xrayLocalPort")
+        .and_then(|v| {
+            v.as_u64()
+                .or_else(|| v.as_str().and_then(|s| s.parse::<u64>().ok()))
+        })
+        .filter(|p| *p > 0 && *p <= 65535)
+        .ok_or_else(|| {
+            ApiError::new(
+                StatusCode::CONFLICT,
+                "Set a valid local Xray port on the node.",
+            )
+        })?;
+    Ok(port)
+}
+
 async fn compile_node_profile(
     state: &AppState,
     node_id: i64,
@@ -1352,21 +1371,7 @@ async fn compile_node_profile(
             "Node disabled: Xray configuration updates blocked.",
         ));
     }
-    // Legacy form submissions may persist positive numeric ports as strings.
-    // Never silently fall back to the public node port: it is not Xray's port.
-    let port = node
-        .get("xrayLocalPort")
-        .and_then(|v| {
-            v.as_u64()
-                .or_else(|| v.as_str().and_then(|s| s.parse::<u64>().ok()))
-        })
-        .filter(|p| *p > 0 && *p <= 65535)
-        .ok_or_else(|| {
-            ApiError::new(
-                StatusCode::CONFLICT,
-                "Set a valid local Xray port on the node.",
-            )
-        })?;
+    let port = node_xray_local_port(&node)?;
     let profile_id = node
         .get("profileId")
         .and_then(Value::as_i64)
