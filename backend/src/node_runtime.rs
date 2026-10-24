@@ -130,13 +130,7 @@ struct Heartbeat {
     profile_check: Option<String>,
 }
 
-pub async fn heartbeat(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-    body: Bytes,
-) -> Result<Json<Value>, ApiError> {
-    let report: Heartbeat = serde_json::from_slice(&body)
-        .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Invalid node heartbeat JSON."))?;
+fn validate_heartbeat_report(report: &Heartbeat) -> Result<(), ApiError> {
     if report.node_id <= 0
         || report.version.is_empty()
         || report.version.len() > 80
@@ -204,6 +198,17 @@ pub async fn heartbeat(
             "Invalid profile check status.",
         ));
     }
+    Ok(())
+}
+
+pub async fn heartbeat(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Json<Value>, ApiError> {
+    let report: Heartbeat = serde_json::from_slice(&body)
+        .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Invalid node heartbeat JSON."))?;
+    validate_heartbeat_report(&report)?;
     node_auth::authenticate_for(
         &state,
         &headers,
