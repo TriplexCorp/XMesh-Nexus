@@ -407,39 +407,7 @@ impl CoreManager {
         Ok(())
     }
 
-    async fn install_inner(&self, target: &str) -> Result<(String, String), String> {
-        let releases = self.fetch_releases().await?;
-        let latest = releases
-            .iter()
-            .find(|release| !release.draft && !release.prerelease)
-            .ok_or_else(|| "GitHub did not return a usable Xray-core release".to_owned())?
-            .tag_name
-            .clone();
-
-        let release = if target == "latest" {
-            releases
-                .iter()
-                .find(|release| !release.draft && !release.prerelease)
-                .cloned()
-                .ok_or_else(|| "No public Xray-core release was found".to_owned())?
-        } else {
-            let exact = normalize_version(target)?;
-            releases
-                .iter()
-                .find(|release| !release.draft && release.tag_name == exact)
-                .cloned()
-                .ok_or_else(|| format!(
-                    "Release {exact} is not present in the latest 30 releases returned by GitHub"
-                ))?
-        };
-
-        if read_installed_version(&self.root).await.as_deref() == Some(release.tag_name.as_str()) {
-            let mut state = self.state.write().await;
-            state.progress = Some("Requested version is already installed".to_owned());
-            drop(state);
-            return Ok((release.tag_name, latest));
-        }
-
+    fn select_official_release_asset(release: &GithubRelease) -> Result<&GithubAsset, String> {
         let asset_name = match std::env::consts::ARCH {
             "x86_64" => "Xray-linux-64.zip",
             "aarch64" => "Xray-linux-arm64-v8a.zip",
@@ -475,6 +443,44 @@ impl CoreManager {
                 "Refusing to download an asset from a non-official Xray-core URL".to_owned(),
             );
         }
+
+        Ok(asset)
+    }
+
+    async fn install_inner(&self, target: &str) -> Result<(String, String), String> {
+        let releases = self.fetch_releases().await?;
+        let latest = releases
+            .iter()
+            .find(|release| !release.draft && !release.prerelease)
+            .ok_or_else(|| "GitHub did not return a usable Xray-core release".to_owned())?
+            .tag_name
+            .clone();
+
+        let release = if target == "latest" {
+            releases
+                .iter()
+                .find(|release| !release.draft && !release.prerelease)
+                .cloned()
+                .ok_or_else(|| "No public Xray-core release was found".to_owned())?
+        } else {
+            let exact = normalize_version(target)?;
+            releases
+                .iter()
+                .find(|release| !release.draft && release.tag_name == exact)
+                .cloned()
+                .ok_or_else(|| format!(
+                    "Release {exact} is not present in the latest 30 releases returned by GitHub"
+                ))?
+        };
+
+        if read_installed_version(&self.root).await.as_deref() == Some(release.tag_name.as_str()) {
+            let mut state = self.state.write().await;
+            state.progress = Some("Requested version is already installed".to_owned());
+            drop(state);
+            return Ok((release.tag_name, latest));
+        }
+
+        let asset = Self::select_official_release_asset(&release)?;
 
         {
             let mut state = self.state.write().await;
