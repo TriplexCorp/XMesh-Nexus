@@ -103,13 +103,13 @@ fn root_source_key(source:&Value)->Option<String>{
 }
 fn assigned<'a>(source:&Value,settings:&'a Value)->Option<&'a Value>{
  let src=root_source_key(source)?;
- let candidates=[Some(src.as_str()),source.get("xmeshOwnerNodeKey").and_then(Value::as_str),
-   src.strip_prefix("node:").and_then(|rest|rest.split_once(':').map(|(id,_)|id))
-      .and_then(|_|None::<&str>)];
- let node_parent=src.strip_prefix("node:").and_then(|v|v.split_once(':')
-  .map(|(id,_)|format!("node:{id}")));
+ let parent=src.strip_prefix("node:").and_then(|value|
+  value.split_once(':').map(|(id,_)|format!("node:{id}")));
+ let candidates=[Some(src.as_str()),
+   source.get("xmeshOwnerNodeKey").and_then(Value::as_str),
+   parent.as_deref()];
  let profiles=settings.get("clientRoutingProfiles")?.as_array()?;
- for key in candidates.into_iter().take(2).flatten().chain(node_parent.as_deref()){
+ for key in candidates.into_iter().flatten(){
   if let Some(profile)=profiles.iter().find(|p|p["enabled"]!=false
     &&p["servers"].as_array().is_some_and(|keys|keys.iter().any(|s|s.as_str()==Some(key)))){
    return Some(profile)
