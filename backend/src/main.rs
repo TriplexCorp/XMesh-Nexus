@@ -364,7 +364,7 @@ async fn main() -> anyhow::Result<()> {
         totp_key,
         node_policy_signer,
     };
-    state.core.launch_startup_update().await;
+    state.core.launch_startup_update();
 
     let protected = Router::new()
         .route("/bootstrap", get(bootstrap))
