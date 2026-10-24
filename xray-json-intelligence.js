@@ -153,6 +153,8 @@ function analyze(source,data){
   }
   if(security==='tls'&&!prop(n,'tlsSettings'))add('warning','TLS_SETTINGS','Для TLS проверьте tlsSettings и наличие сертификата или другого поддерживаемого источника ключей.',secNode||n,path.concat('tlsSettings'));
   const reality=prop(n,'realitySettings');
+  if(reality&&security!=='reality')
+   add('warning','REALITY_INACTIVE','realitySettings присутствует, но security не равен reality — Xray игнорирует эти настройки. Выберите REALITY или удалите неиспользуемые настройки.',reality,path.concat('realitySettings'));
   if(reality&&reality.type==='object'){
    wrongKeys(reality,sets.reality,path.concat('realitySettings'));
    const ids=prop(reality,'shortIds');
@@ -165,8 +167,11 @@ function analyze(source,data){
     });
    }
    const key=prop(reality,role==='inbound'?'privateKey':'publicKey');
-   if(role==='inbound'&&!key)add('warning','REALITY_KEY','Для серверного REALITY обычно нужен privateKey; пустой ключ не будет создан автоматически.',reality,path.concat('realitySettings','privateKey'));
-   if(key&&typeof primitive(key)==='string'&&/REPLACE|YOUR[_-]?KEY|example/i.test(primitive(key)))add('warning','PLACEHOLDER_KEY','Похоже, здесь пример ключа, а не реальный ключ REALITY.',key,path.concat('realitySettings',role==='inbound'?'privateKey':'publicKey'));
+   if(role==='inbound'&&!key&&security==='reality')add('warning','REALITY_KEY','Для серверного REALITY нужен privateKey X25519. Создайте его через «Настроить REALITY».',reality,path.concat('realitySettings','privateKey'));
+   if(role==='inbound'&&key&&typeof primitive(key)==='string'&&primitive(key)&&!/^[A-Za-z0-9_-]{43}$/.test(primitive(key)))
+    add('error','REALITY_PRIVATEKEY_FORMAT','Некорректный X25519 privateKey: ожидается base64url из 43 символов. Возможно, браузер подставил пароль администратора. Не сохраняйте такой JSON; используйте «Настроить REALITY».',key,path.concat('realitySettings','privateKey'));
+   else if(key&&typeof primitive(key)==='string'&&/REPLACE|YOUR[_-]?KEY|example/i.test(primitive(key)))
+    add('warning','PLACEHOLDER_KEY','Похоже, здесь пример ключа, а не реальный ключ REALITY.',key,path.concat('realitySettings',role==='inbound'?'privateKey':'publicKey'));
   }
   const xhttp=prop(n,'xhttpSettings')||prop(n,'splithttpSettings');
   if(canonical==='xhttp'&&!xhttp)add('warning','XHTTP_MISSING','Для XHTTP рекомендуется явно задать xhttpSettings (например, path и mode).',networkNode||n,path.concat('xhttpSettings'));
