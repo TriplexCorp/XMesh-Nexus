@@ -2294,7 +2294,7 @@ async fn user_traffic_collectors(pool: &PgPool) -> Result<Vec<Value>, ApiError> 
          ) last_sample ON TRUE
          WHERE n.collection='nodes' ORDER BY n.id",
     )
-    .fetch_all(&state.pool)
+    .fetch_all(pool)
     .await?;
     let mut collectors = Vec::with_capacity(collector_rows.len());
     for row in collector_rows {
