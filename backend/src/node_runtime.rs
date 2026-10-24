@@ -1521,14 +1521,14 @@ mod provision_tests {
     fn offline_budget_is_conservative_and_scoped_to_authorized_users() {
         let cfg = json!({"inbounds":[{"settings":{"clients":[{"id":"550e8400-e29b-41d4-a716-446655440000"}]}}]});
         let u = vec![
-            json!({"id":1,"xrayId":"550e8400-e29b-41d4-a716-446655440000","limit":1.0,"used":0.5,"expireAt":1800000010000_i64}),
+            json!({"id":1,"xrayId":"550e8400-e29b-41d4-a716-446655440000","limit":1.0,"used":0.5,"expireAt":1_800_000_010_000_i64}),
             json!({"id":2,"xrayId":"550e8400-e29b-41d4-a716-446655440001","limit":1.0,"used":0.0}),
         ];
-        let policy = build_offline_policy(&cfg, &u, 12, 1800000000000_i64, &"a".repeat(64), 2);
+        let policy = build_offline_policy(&cfg, &u, 12, 1_800_000_000_000_i64, &"a".repeat(64), 2);
         assert_eq!(policy["users"].as_array().unwrap().len(), 1);
         assert_eq!(policy["users"][0]["offlineBudgetBytes"], 64 * 1024 * 1024);
-        assert_eq!(policy["users"][0]["expireAtMs"], 1800000010000_i64);
-        assert_eq!(policy["users"][0]["panelUsedBytes"], 536870912);
+        assert_eq!(policy["users"][0]["expireAtMs"], 1_800_000_010_000_i64);
+        assert_eq!(policy["users"][0]["panelUsedBytes"], 536_870_912);
         assert_eq!(policy["nodeId"], 12);
     }
     #[test]
