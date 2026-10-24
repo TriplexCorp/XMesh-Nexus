@@ -243,6 +243,47 @@ fn client_transport(
     transport
 }
 
+fn client_reality_settings(inbound: &Value, host: &Value, stream: &Value) -> Option<Value> {
+    let mut out = json!({});
+    let reality = stream.get("realitySettings").unwrap_or(&Value::Null);
+    // 'password' is the current client name; 'publicKey' is its old alias.
+    let key = field(host, "realityPassword")
+        .or_else(|| field(host, "publicKey"))
+        .or_else(|| field(host, "realityPublicKey"))
+        .or_else(|| field(inbound, "publicKey"))
+        .or_else(|| field(reality, "password"))
+        .or_else(|| field(reality, "publicKey"))?;
+    let sni = field(host, "sni")
+        .or_else(|| field(host, "externalSNI"))
+        .or_else(|| {
+            reality
+                .get("serverNames")
+                .and_then(Value::as_array)
+                .and_then(|a| a.first())
+                .and_then(Value::as_str)
+        })?;
+    let sid = field(host, "shortId")
+        .or_else(|| field(host, "externalShortId"))
+        .or_else(|| {
+            reality
+                .get("shortIds")
+                .and_then(Value::as_array)
+                .and_then(|a| a.first())
+                .and_then(Value::as_str)
+        })?;
+    out["realitySettings"] = json!({
+        "serverName":sni,"password":key,"shortId":sid,
+        "fingerprint":field(host,"fp").or_else(||field(host,"fingerprint")).unwrap_or("chrome"),
+        "spiderX":field(host,"spiderX").unwrap_or("/")
+    });
+    if let Some(verify) = field(host, "mldsa65Verify")
+        .or_else(|| inbound.get("xmesh").and_then(|m| field(m, "mldsa65Verify")))
+    {
+        out["realitySettings"]["mldsa65Verify"] = json!(verify);
+    }
+    Some(out["realitySettings"].clone())
+}
+
 pub fn client_stream(inbound: &Value, host: &Value, device: &str) -> Option<Value> {
     let stream = inbound.get("streamSettings")?;
     let security = field(stream, "security").unwrap_or("none");
@@ -282,42 +323,7 @@ pub fn client_stream(inbound: &Value, host: &Value, device: &str) -> Option<Valu
         json!({"security":security,"network":network})
     };
     if security == "reality" {
-        let reality = stream.get("realitySettings").unwrap_or(&Value::Null);
-        // 'password' is the current client name; 'publicKey' is its old alias.
-        let key = field(host, "realityPassword")
-            .or_else(|| field(host, "publicKey"))
-            .or_else(|| field(host, "realityPublicKey"))
-            .or_else(|| field(inbound, "publicKey"))
-            .or_else(|| field(reality, "password"))
-            .or_else(|| field(reality, "publicKey"))?;
-        let sni = field(host, "sni")
-            .or_else(|| field(host, "externalSNI"))
-            .or_else(|| {
-                reality
-                    .get("serverNames")
-                    .and_then(Value::as_array)
-                    .and_then(|a| a.first())
-                    .and_then(Value::as_str)
-            })?;
-        let sid = field(host, "shortId")
-            .or_else(|| field(host, "externalShortId"))
-            .or_else(|| {
-                reality
-                    .get("shortIds")
-                    .and_then(Value::as_array)
-                    .and_then(|a| a.first())
-                    .and_then(Value::as_str)
-            })?;
-        out["realitySettings"] = json!({
-            "serverName":sni,"password":key,"shortId":sid,
-            "fingerprint":field(host,"fp").or_else(||field(host,"fingerprint")).unwrap_or("chrome"),
-            "spiderX":field(host,"spiderX").unwrap_or("/")
-        });
-        if let Some(verify) = field(host, "mldsa65Verify")
-            .or_else(|| inbound.get("xmesh").and_then(|m| field(m, "mldsa65Verify")))
-        {
-            out["realitySettings"]["mldsa65Verify"] = json!(verify);
-        }
+        out["realitySettings"] = client_reality_settings(inbound, host, stream)?;
     } else if security == "tls" {
         let server = stream.get("tlsSettings").unwrap_or(&Value::Null);
         let sni = field(host, "sni")
