@@ -56,5 +56,5 @@ for(const item of ['client-routing.js','client-routing.css']){
 console.log('Shared client routing: template editor, source assignment, subscriber authorization, admin API, and packaged assets OK.');
 
 assert.match(source,/ensureStylesheet\(\)/,'Routing view must load its own CSS');
-assert.match(source,/width=\\"19\\" height=\\"19\\"/,'SVG icons must have explicit dimensions');
+assert.match(source,/width="19" height="19"/,'SVG icons must have explicit dimensions');
 assert.match(source,/ensureCriticalStyles\(\)/,'Routing view needs safe layout when CSS fails');
