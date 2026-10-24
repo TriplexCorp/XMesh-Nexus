@@ -22,8 +22,10 @@ assert.equal((page.match(/data-v="source"/g)||[]).length,1,'Single authoritative
 assert.equal((page.match(/data-action="outline"/g)||[]).length,2,'Inspector has toolbar toggle and close');
 assert(page.indexOf('sv-inline-tools')<page.indexOf('sv-codesurface'),'Tools precede editor');
 assert(page.indexOf('sv-codepanel')<page.indexOf('sv-outline'),'Editor remains primary');
-assert.match(tools,/toolCluster\('Защита'/,'Security tool cluster visible');
-assert.match(tools,/toolCluster\('Сеть и конфигурация'/,'Network tool cluster visible');
+assert.match(tools,/function contextualToolGroups\(/,'Commands must derive from inbound configuration');
+assert.match(tools,/specialized.push\('hysteria-config','tls','protocol-config'\)/,'Hysteria2 must have protocol-specific commands');
+assert.match(tools,/host.addEventListener\('change'/,'Inbound selection must update tools');
+assert.match(js,/toolPaletteHandle\?\.refresh\(\)/,'Template changes must refresh tools');
 assert.match(css,/--vround:var\(--ui-control-radius/,'Global corner radius inherited');
 assert(!page.includes('data-action="format"')&&!page.includes('data-action="expand"'),'No redundant editor toolbar actions');
 assert.match(css,/height:clamp\(36rem,calc\(100dvh - 16rem\)/,'Editor responds to viewport height');
@@ -31,9 +33,9 @@ assert.match(css,/\.sv-studio\.sv-outline-hidden \.sv-workspace\{grid-template-c
 assert.match(css,/container:sv-studio-workspace \/ inline-size/,'Workspace must react to the user-selected content width');
 assert.match(css,/@container sv-studio-workspace \(max-width:940px\)/,'Narrow content width stacks inspector');
 assert.match(css,/--vcode:/,'Same font token for JSON and overlay');
-assert.match(html,/xray-studio-v4\.css\?v=20261024-enterprise-v1/,'CSS cache key must change');
-assert.match(html,/xray-studio-v4\.js\?v=20261024-enterprise-v1/,'JS cache key must change');
-assert.match(html,/xray-studio-tools\.js\?v=20261024-vision-direct-v2/,'Tool cache key must change');
+assert.match(html,/xray-studio-v4\.css\?v=20261024-adaptive-tools-v3/,'CSS cache key must change');
+assert.match(html,/xray-studio-v4\.js\?v=20261024-adaptive-tools-v3/,'JS cache key must change');
+assert.match(html,/xray-studio-tools\.js\?v=20261024-adaptive-tools-v3/,'Tool cache key must change');
 class Element {
  constructor(tag='div'){this.tag=tag;this.children=[];this.dataset={};this.attrs={};this.textContent='';this.hidden=false}
  append(...items){this.children.push(...items)}
