@@ -175,6 +175,62 @@ else
 fi
 fi # End fallback for missing root-owned metrics snapshot.
 
+# Approximate distinct users with Xray traffic in the last 120 seconds.
+# No counters / first baseline / reset -> unknown or zero only after a valid baseline.
+online_count=""
+if [[ "$USER_STATS_STATUS" == verified || "$USER_STATS_STATUS" == direct ]]; then
+  online_count="$(printf '%s' "$payload" | python3 -c '
+import json,sys,time,os,tempfile
+path=sys.argv[1]
+now=int(time.time())
+data=json.load(sys.stdin)
+rows=data.get("userTraffic")
+if not isinstance(rows,list) or len(rows)>4096:sys.exit(1)
+current={}
+for row in rows:
+    uid=row.get("userId")
+    up=row.get("uplinkBytes")
+    down=row.get("downlinkBytes")
+    if type(uid)!=int or uid<=0 or type(up)!=int or type(down)!=int or min(up,down)<0:sys.exit(1)
+    if uid in current:sys.exit(1)
+    current[uid]=[up,down]
+try:
+    with open(path,encoding="utf-8") as f:previous=json.load(f)
+except (OSError,ValueError):
+    previous={}
+old=previous.get("users",{})
+if not isinstance(old,dict):old={}
+seen={}
+for uid,counters in current.items():
+    key=str(uid)
+    prior=old.get(key,{})
+    previous_counters=prior.get("bytes") if isinstance(prior,dict) else None
+    last=prior.get("last") if isinstance(prior,dict) else None
+    if isinstance(previous_counters,list) and len(previous_counters)==2 and all(type(v)==int for v in previous_counters):
+        if all(a>=b for a,b in zip(counters,previous_counters)) and any(a>b for a,b in zip(counters,previous_counters)):
+            last=now
+        elif any(a<b for a,b in zip(counters,previous_counters)):
+            last=None
+    if type(last)!=int or last>now or now-last>120:last=None
+    seen[key]={"bytes":counters,"last":last}
+# First sample only establishes baselines; no online count is asserted.
+count=sum(v["last"] is not None for v in seen.values())
+fd,tmp=tempfile.mkstemp(prefix=".online-",dir=os.path.dirname(path))
+try:
+    with os.fdopen(fd,"w",encoding="utf-8") as f:
+        json.dump({"users":seen},f,separators=(",",":"))
+        f.flush()
+        os.fchmod(f.fileno(),0o600)
+    os.replace(tmp,path)
+finally:
+    if os.path.exists(tmp):os.unlink(tmp)
+print(count if isinstance(previous.get("users"),dict) else "null")
+' "$state_dir/online-users.json")" || online_count=""
+fi
+if [[ "$online_count" =~ ^[0-9]+$ ]]; then
+  payload="${payload%\}},\"online_clients\":$online_count}"
+fi
+
 payload="${payload%\}},\"userStatsStatus\":\"$USER_STATS_STATUS\",\"userStatsAtMs\":$USER_STATS_AT_MS}"
 
 [[ -r "$XMESH_METRICS_PRIVATE_KEY" ]] || { echo "Missing readable Ed25519 private key." >&2; exit 1; }
