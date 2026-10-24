@@ -100,6 +100,15 @@ def main():
     status, settings, _ = api("GET", "/settings", cookie=viewer_cookie)
     check(status, 200, "viewer settings are restricted")
     assert settings.keys() == {"brand"}
+    check(api("GET", f"/users/{user_id}/subscription", cookie=viewer_cookie)[0], 403,
+          "viewer denied subscription retrieval")
+    check(api("GET", f"/users/{user_id}/client-json", cookie=viewer_cookie)[0], 403,
+          "viewer denied client configuration retrieval")
+    check(api("GET", "/collections/profiles", cookie=viewer_cookie)[0], 403,
+          "viewer denied XRAY STUDIO profiles")
+    check(api("GET", "/nodes/1/restart", cookie=viewer_cookie)[0], 403,
+          "viewer denied node command history")
+
 
 
     check(api("PATCH", f"/admins/{viewer_id}", {"role": "admin"}, owner_cookie)[0], 200,
