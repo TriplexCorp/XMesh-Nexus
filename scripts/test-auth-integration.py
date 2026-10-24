@@ -80,6 +80,27 @@ def main():
     check(api("POST", "/collections/hosts", {"name": "smoke"}, viewer_cookie)[0], 403,
           "viewer cannot write")
     check(api("GET", "/admins", cookie=viewer_cookie)[0], 403, "viewer cannot see administrators")
+    status, user, _ = api("POST", "/collections/users",
+                          {"username": "ci_viewer_audit", "limit": 10}, owner_cookie)
+    check(status, 201, "owner creates viewer protection test user")
+    user_id = user["id"]
+    assert user.get("xrayId"), "owner must receive original Xray UUID"
+    status, listing, _ = api("GET", "/collections/users", cookie=viewer_cookie)
+    check(status, 200, "viewer reads redacted users")
+    exposed = next(entry for entry in listing["items"] if entry["id"] == user_id)
+    assert exposed["username"] == "ci_viewer_audit"
+    assert "xrayId" not in exposed
+    assert user["xrayId"] not in json.dumps(listing)
+    status, data, _ = api("GET", "/bootstrap", cookie=viewer_cookie)
+    check(status, 200, "viewer bootstrap is redacted")
+    assert data["collections"]["hosts"] == []
+    assert data["collections"]["profiles"] == []
+    assert data["settings"].keys() == {"brand"}
+    assert user["xrayId"] not in json.dumps(data)
+    status, settings, _ = api("GET", "/settings", cookie=viewer_cookie)
+    check(status, 200, "viewer settings are restricted")
+    assert settings.keys() == {"brand"}
+
 
     check(api("PATCH", f"/admins/{viewer_id}", {"role": "admin"}, owner_cookie)[0], 200,
           "owner changes role")
