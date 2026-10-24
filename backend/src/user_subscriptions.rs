@@ -395,10 +395,9 @@ async fn collect_user_outbounds(state:&AppState,user:&Value,device:&str,rotate:b
       if let Some(id)=host.get("id").and_then(Value::as_i64){
        outbound["xmeshSourceKey"]=json!(format!("host:{id}"));
       }
-      if let Some(node)=host_owner_node(host,profile,&nodes){
-       if let Some(id)=node.get("id").and_then(Value::as_i64){
+      if let Some(node)=host_owner_node(host,profile,&nodes)
+       && let Some(id)=node.get("id").and_then(Value::as_i64) {
         outbound["xmeshOwnerNodeKey"]=json!(format!("node:{id}"));
-       }
       }
       if let Some(node)=direct_host_node(host,profile,&nodes){
        apply_ip_rotation(state,user,node,&mut outbound,rotate).await?;
@@ -496,10 +495,10 @@ pub async fn serve(State(state):State<AppState>,Path(token):Path<String>,
  })) {
   response.headers_mut().insert("profile-title",encoded);
  }
- if let Some(url)=settings.get("subscriptionSupportUrl").and_then(Value::as_str) {
-  if url.starts_with("https://") && !url.contains(['\r','\n']) {
-   if let Ok(value)=header::HeaderValue::from_str(url){response.headers_mut().insert("support-url",value);}
-  }
+ if let Some(url)=settings.get("subscriptionSupportUrl").and_then(Value::as_str)
+  && url.starts_with("https://") && !url.contains(['\r','\n'])
+  && let Ok(value)=header::HeaderValue::from_str(url) {
+   response.headers_mut().insert("support-url",value);
  }
  // Rotate announcements at a configurable UTC epoch-aligned interval.
  // A line containing only "---" separates announcements. Plain text stays compatible.
