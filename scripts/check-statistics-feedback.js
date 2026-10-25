@@ -73,7 +73,7 @@ assert.match(backend,/source_type=\$3/);
 
 assert.match(backend,/viewer_read_only\(&actor\)/);
 
-assert.match(app,/const statsDetailedChart=\(points\)=>/);
+assert.match(app,/const statsDetailedChart=\(points,chartWidth=1000\)=>/);
 assert.match(app,/statsDetailedChart\(points\)/);
 assert.match(app,/data-bucket-ms/);
 assert.match(app,/metrics\/traffic\/bucket-detail/);
@@ -279,7 +279,9 @@ assert.match(css,/scrollbar-color:var\(--scrollbar-thumb\) var\(--scrollbar-trac
 assert.match(css,/--scrollbar-end-gap:7px/);
 assert.match(css,/::-webkit-scrollbar-button:single-button:vertical:start:decrement/);
 
-// SVG chart footprint follows rem-based global UI zoom rather than unlimited viewport width.
-assert.match(css,/Scale infrastructure and user traffic charts with Appearance/);
-assert.match(css,/width:min\(100%,72rem\)/);
-assert.match(css,/aspect-ratio:1000 \/ 340/);
+// Chart geometry is independently height-bounded and width-aware.
+assert.match(app,/const syncResponsiveTrafficChart=\(kind,selector,renderSvg,logicalHeight\)=>/);
+assert.match(css,/\.stats-detail-chart\{[\s\S]*?height:21\.25rem/);
+assert.match(css,/\.traffic-chart-svg\{[\s\S]*?height:18\.25rem/);
+assert.doesNotMatch(css,/width:min\(100%,(?:72|100)rem\)/);
+
