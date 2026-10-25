@@ -169,3 +169,8 @@ assert.equal((agent.match(/signed_file=/g)||[]).length,1);
 assert.match(app,/\/api\/v1\/users\/presence/);
 assert.match(app,/presenceFeedHealthy&&st\(u\)==='ACTIVE'/);
 console.log('Statistics view, real signed steal-time and save-confirmation contracts: PASS');
+
+// Stats overlay must escape transformed/scoped workspace containers to blur the entire app.
+assert.match(app,/document\.body\.append\(statsPortal\)/);
+assert.match(app,/document\.querySelector\('body > #stats-user-modal'\)\?\.remove\(\)/);
+assert.match(css,/body > \.stats-user-overlay\{position:fixed;inset:0;width:100vw;height:100dvh/);
