@@ -1069,6 +1069,32 @@ const statsXrayHistoryChart=points=>{
  const ticks=[0,Math.floor((buckets.length-1)/2),buckets.length-1].filter((v,i,a)=>a.indexOf(v)===i).map(i=>'<text class="stats-detail-label" x="'+x(i)+'" y="'+(h-12)+'" text-anchor="'+(i===0?'start':i===buckets.length-1?'end':'middle')+'">'+esc(new Date(buckets[i]).toLocaleString(panelIsEnglish()?'en-US':'ru-RU',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}))+'</text>').join('');
  return '<div class="stats-detail-wrap"><svg class="stats-detail-chart" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="Подтверждённые дельты Upload и Download по интервалам; промежуточные значения отсутствуют">'+grid+series('up','rx')+series('down','tx')+ticks+'</svg></div><div class="stats-detail-legend"><span><i class="rx"></i> Upload</span><span><i class="tx"></i> Download</span><small>Каждая точка — сумма подтверждённых дельт в интервале; пропущенные интервалы не означают нулевой трафик. Линии лишь соединяют наблюдаемые точки.</small></div>';
 };
+function enhanceStatsPeriodSelect(select){
+ if(!select||select.dataset.xmEnhanced)return;
+ select.dataset.xmEnhanced='true';
+ const shell=document.createElement('span');shell.className='xm-period-select';
+ const trigger=document.createElement('button');trigger.type='button';trigger.className='xm-period-trigger';trigger.setAttribute('aria-haspopup','listbox');trigger.setAttribute('aria-expanded','false');
+ const arrow=document.createElement('span');arrow.className='xm-period-chevron';arrow.setAttribute('aria-hidden','true');arrow.textContent='⌄';
+ const menu=document.createElement('span');menu.className='xm-period-menu';menu.setAttribute('role','listbox');menu.hidden=true;
+ const sync=()=>{
+  trigger.textContent=select.selectedOptions[0]?.textContent||'Выберите период';trigger.append(arrow);
+  menu.replaceChildren();
+  for(const option of select.options){
+   const item=document.createElement('button');item.type='button';item.className='xm-period-option';item.textContent=option.textContent;item.dataset.value=option.value;item.setAttribute('role','option');item.setAttribute('aria-selected',String(option.selected));
+   item.addEventListener('click',()=>{select.value=option.value;select.dispatchEvent(new Event('change',{bubbles:true}));close();trigger.focus()});
+   menu.append(item);
+  }
+ };
+ const close=()=>{menu.hidden=true;trigger.setAttribute('aria-expanded','false')};
+ const open=()=>{document.querySelectorAll('.xm-period-menu:not([hidden])').forEach(el=>{el.hidden=true;el.parentElement?.querySelector('.xm-period-trigger')?.setAttribute('aria-expanded','false')});sync();menu.hidden=false;trigger.setAttribute('aria-expanded','true')};
+ select.parentNode.insertBefore(shell,select);shell.append(select,trigger,menu);
+ trigger.addEventListener('click',()=>menu.hidden?open():close());
+ trigger.addEventListener('keydown',event=>{if(event.key==='Escape'){close();return}if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();open();const selected=menu.querySelector('[aria-selected="true"]');(selected||menu.querySelector('button'))?.focus()}});
+ menu.addEventListener('keydown',event=>{const items=[...menu.querySelectorAll('button')],at=items.indexOf(document.activeElement);if(event.key==='Escape'){close();trigger.focus()}else if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();items[(at+items.length+(event.key==='ArrowDown'?1:-1))%items.length]?.focus()}});
+ document.addEventListener('pointerdown',event=>{if(!shell.contains(event.target))close()});
+ select.addEventListener('change',sync);
+ sync();
+}
 function statisticsP(){
  const markup=`<div class="stats-dashboard" id="stats-dashboard">
   <div class="stats-heading"><div><h2>Статистика инфраструктуры</h2><p class="note">Реальные измерения. CPU steal показывает долю времени, которую виртуальная машина ожидала процессор гипервизора.</p></div>
@@ -1096,6 +1122,8 @@ function statisticsP(){
   <p class="note">Новые показатели появляются только после установки обновлённого агента. Отсутствующие измерения и устаревшие показания не заменяются нулями.</p>
  </div>`;
  const init=()=>{
+  enhanceStatsPeriodSelect($('#stats-leaders-range'));
+  enhanceStatsPeriodSelect($('#stats-history-range'));
   let generation=0;
   let refreshing=false;
   let lastRefresh=0;
