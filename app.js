@@ -1057,6 +1057,9 @@ function statisticsP(){
    <section class="card"><div class="hd"><div><h3>Скорость сети нод</h3><p>RX/TX сетевых интерфейсов (включая сторонние сервисы), отдельно от персональных Xray-счётчиков.</p></div></div><div id="stats-trend"></div><section id="stats-bucket-detail" class="stats-bucket-detail" hidden aria-live="polite"></section></section>
   </div>
   <section class="card"><div class="hd"><div><h3>Top-10: подтверждённый трафик</h3><p>Накопленные байты с первого достоверного измерения. Не расход за выбранный период; счётчики пользователей и inbound независимы.</p></div></div><div id="stats-leaders" class="stats-leaders"><p class="note">Загрузка рейтингов…</p></div></section>
+  <section class="card"><div class="hd"><div><h3>История Xray · пользователь / inbound / нода</h3><p>Только подтверждённые дельты после запуска исторического журнала. Пропуски не считаются нулевым трафиком.</p></div></div>
+   <div class="stats-history-filters"><label>Пользователь ID<input id="stats-history-user" type="number" min="1" step="1" placeholder="ID пользователя"></label><label>Inbound<select id="stats-history-inbound"><option value="">Все (пользовательские счётчики)</option></select></label><label>Нода<select id="stats-history-node"><option value="">Все ноды</option></select></label><label>Период<select id="stats-history-range"><option value="1h">1 час</option><option value="24h" selected>24 часа</option><option value="7d">7 дней</option><option value="30d">30 дней</option></select></label><button class="gh" id="stats-history-load" type="button">Показать историю</button></div>
+   <div id="stats-history-results" class="stats-history-results" role="status" aria-live="polite">Укажите ID пользователя или выберите его в Top-10.</div></section>
   <section class="card"><div class="hd"><div><h3>Control Plane</h3><p>Метрики контейнера панели, не всей физической машины.</p></div></div><div id="stats-control"></div></section>
   <section class="card"><div class="hd"><div><h3>Узлы и виртуализация</h3><p>CPU, steal time, RAM, диски, сеть, активные соединения и свежесть данных.</p></div></div><div id="stats-nodes" class="stats-node-grid"></div></section>
   <p class="note">Новые показатели появляются только после установки обновлённого агента. Отсутствующие измерения и устаревшие показания не заменяются нулями.</p>
@@ -1216,13 +1219,48 @@ function statisticsP(){
         '<div><h4>'+label+'</h4><div class="stats-bucket-table-wrap"><table><thead><tr><th>Название</th><th>Uplink</th><th>Downlink</th><th>Всего</th></tr></thead><tbody>'+
         (items.length?items.map(item=>{
           const up=Number(item.uplinkBytes)||0,down=Number(item.downlinkBytes)||0;
-          return '<tr><td>'+esc(item.name||item.inboundTag||'—')+'</td><td>'+statsBytes(up)+'</td><td>'+statsBytes(down)+'</td><td>'+statsBytes(up+down)+'</td></tr>';
+          return '<tr><td>'+(item.userId?'<button class="gh sm" type="button" data-stats-history-user="'+esc(item.userId)+'">'+esc(item.name||'Пользователь #'+item.userId)+'</button>':esc(item.inboundTag||'—'))+'</td><td>'+statsBytes(up)+'</td><td>'+statsBytes(down)+'</td><td>'+statsBytes(up+down)+'</td></tr>';
         }).join(''):'<tr><td colspan="4">Пока нет подтверждённых счётчиков</td></tr>')+
         '</tbody></table></div></div>';
       root.innerHTML=table(result.topUsers||[],'Пользователи')+table(result.topInbounds||[],'Inbound');
     }catch(e){if(root.isConnected)root.textContent='Рейтинги недоступны: '+(e.message||'API error')}
   };
   void loadLeaders();
+  const historyUser=$('#stats-history-user'),historyInbound=$('#stats-history-inbound'),historyNode=$('#stats-history-node'),historyRoot=$('#stats-history-results');
+  let historyRequest=0;
+  const historyOption=(value,label)=>'<option value="'+esc(String(value))+'">'+esc(label)+'</option>';
+  const loadHistory=async(reloadDimensions=false)=>{
+    const id=Number(historyUser?.value),request=++historyRequest;
+    if(!Number.isSafeInteger(id)||id<=0){historyRoot.textContent='Укажите действительный ID пользователя.';return}
+    historyRoot.textContent='Запрашиваем подтверждённую историю…';
+    try{
+      if(reloadDimensions){
+        const totals=await backendRequest('/api/v1/users/'+encodeURIComponent(id)+'/traffic');
+        if(request!==historyRequest||cur!=='statistics')return;
+        const inboundTags=[...new Set((totals.inbounds||[]).map(v=>v.inboundTag).filter(Boolean))].sort();
+        const nodes=[...new Map((totals.servers||[]).map(v=>[Number(v.nodeId),v])).values()].filter(v=>Number(v.nodeId)>0);
+        historyInbound.innerHTML=historyOption('','Все (пользовательские счётчики)')+inboundTags.map(v=>historyOption(v,v)).join('');
+        historyNode.innerHTML=historyOption('','Все ноды')+nodes.map(v=>historyOption(v.nodeId,v.name||'Нода #'+v.nodeId)).join('');
+      }
+      const params=new URLSearchParams({range:$('#stats-history-range').value});
+      if(historyInbound.value)params.set('inboundTag',historyInbound.value);
+      if(historyNode.value)params.set('nodeId',historyNode.value);
+      const result=await backendRequest('/api/v1/users/'+encodeURIComponent(id)+'/traffic/history?'+params);
+      if(request!==historyRequest||cur!=='statistics'||!historyRoot.isConnected)return;
+      const points=Array.isArray(result.points)?result.points:[];
+      const rows=points.map(p=>'<tr><td>'+esc(new Date(p.bucketMs).toLocaleString(panelIsEnglish()?'en-US':'ru-RU'))+'</td><td>'+esc(p.inboundTag||'Пользователь')+'</td><td>'+esc(p.nodeId)+'</td><td>'+statsBytes(p.uplinkBytes)+'</td><td>'+statsBytes(p.downlinkBytes)+'</td><td>'+esc(p.sampleCount)+'</td></tr>').join('');
+      historyRoot.innerHTML='<p class="note">Источник: подтверждённые дельты Xray · '+(result.sourceType==='inbound'?'пользователь × inbound':'счётчик пользователя')+' · '+esc(result.range)+(result.truncated?' · Результат ограничен 5000 строками':'')+'. Счётчики разных источников не суммируются.</p>'+
+       (rows?'<div class="stats-bucket-table-wrap"><table><thead><tr><th>Интервал</th><th>Источник</th><th>Нода</th><th>Upload</th><th>Download</th><th>Измерений</th></tr></thead><tbody>'+rows+'</tbody></table></div>':'<p class="note">За период нет подтверждённых изменений. Это не доказательство нулевого трафика.</p>');
+    }catch(error){if(request===historyRequest&&historyRoot.isConnected)historyRoot.textContent='История недоступна: '+(error.message||'Ошибка API')}
+  };
+  $('#stats-history-load')?.addEventListener('click',()=>void loadHistory());
+  historyUser?.addEventListener('change',()=>void loadHistory(true));
+  for(const control of [historyInbound,historyNode,$('#stats-history-range')])control?.addEventListener('change',()=>void loadHistory());
+  $('#stats-leaders')?.addEventListener('click',event=>{
+    const user=event.target.closest?.('[data-stats-history-user]');
+    if(user){historyUser.value=user.dataset.statsHistoryUser;void loadHistory(true);historyRoot.scrollIntoView({block:'nearest',behavior:'smooth'})}
+  });
+
   // One-second UI heartbeat, but no invented network samples: the sparkline
   // changes only when actual signed telemetry reaches TimescaleDB.
   T.push(setInterval(()=>{
