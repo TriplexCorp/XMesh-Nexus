@@ -11,6 +11,7 @@ mod node_rotation;
 mod node_routing;
 mod node_runtime;
 mod security;
+mod subscription_finalmask;
 mod subscription_json;
 mod subscription_settings;
 mod subscription_transport;
