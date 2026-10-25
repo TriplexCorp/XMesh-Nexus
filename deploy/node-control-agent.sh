@@ -11,7 +11,7 @@ export LC_ALL=C
 [[ "$XMESH_API_URL" == https://* ]] || exit 2
 XMESH_API_URL="${XMESH_API_URL%/}"
 KEY="${XMESH_METRICS_PRIVATE_KEY:-/etc/xmesh-node-metrics/node.key}"
-AGENT_VERSION="control-v4.3.4"
+AGENT_VERSION="control-v4.3.5"
 UNIT="${XMESH_XRAY_UNIT:-xray.service}"
 # Only root-owned local configuration can choose a unit. Remote responses never do.
 [[ "$UNIT" =~ ^[A-Za-z0-9_.@-]+\.service$ ]] || { echo "Invalid systemd unit" >&2; exit 2; }
@@ -310,7 +310,7 @@ elif [[ "$action" == update_agent ]];then
  # provide executable commands, paths or URLs.
  if ! systemctl cat xmesh-node-agent-upgrade.service >/dev/null 2>&1;then
   detail='Agent updater service missing; reinstall control-v4 first'
- elif timeout 150 systemctl start --wait xmesh-node-agent-upgrade.service &&
+ elif timeout 650 systemctl start --wait xmesh-node-agent-upgrade.service &&
       grep -Fxq "AGENT_VERSION=\"$target_version\"" /usr/local/sbin/xmesh-node-control;then
   success=true
   detail='Agent installed and version verified'
