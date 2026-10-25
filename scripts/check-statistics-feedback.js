@@ -201,3 +201,7 @@ assert.match(app,/data-open-user-traffic="\$\{u\.id\}"/);
 assert.match(app,/ID пользователя: \$\{esc\(u\.id\)\}/);
 assert.match(app,/pendingUserTrafficDetail=\{id,name:/);
 assert.match(app,/openStatsUser\(requested\.id,requested\.name\)/);
+
+assert.match(app,/userTrafficReturn=\{hash:location\.hash\|\|'#users',userId:id\}/);
+assert.match(app,/const origin=userTrafficReturn/);
+assert.match(app,/location\.hash=origin\.hash/);
