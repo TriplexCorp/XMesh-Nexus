@@ -3214,6 +3214,28 @@ function nodeExplorerSort(entries,mode){
  if(mode==='id-asc')return entries.sort((a,b)=>Number(a.id)-Number(b.id));
  return entries.sort(cmp);
 }
+function nodeExplorerPump(explorer){
+ // Bound the number of simultaneous runtime queries regardless of fleet size.
+ while(explorer.runtimeActive<8&&explorer.runtimeQueue.length&&nodeExplorer===explorer&&cur==='nodes'){
+  const entry=explorer.runtimeQueue.shift();
+  if(!explorer.runtimePending.has(entry.id))continue;
+  explorer.runtimeActive++;
+  backendRequest('/api/v1/nodes/'+encodeURIComponent(entry.id)+'/runtime')
+   .then(rt=>{
+    if(nodeExplorer!==explorer)return;
+    explorer.runtimeCache.set(entry.id,rt);
+    updateNodeRuntimeBadges(entry.node,rt);
+   }).catch(()=>{
+    if(nodeExplorer!==explorer)return;
+    explorer.runtimeCache.set(entry.id,null);
+    updateNodeRuntimeBadges(entry.node,null);
+   }).finally(()=>{
+    explorer.runtimePending.delete(entry.id);
+    explorer.runtimeActive--;
+    nodeExplorerPump(explorer);
+   });
+ }
+}
 function nodeExplorerUpdate(){
  const explorer=nodeExplorer,root=document.querySelector('.nodes-page');
  if(!explorer||!root||cur!=='nodes')return;
@@ -3240,20 +3262,20 @@ function nodeExplorerUpdate(){
  }
  const empty=root.querySelector('[data-node-search-empty]');
  if(empty)empty.hidden=filtered.length!==0;
- // Only the currently rendered cards need live runtime lookups. Max 48 requests,
- // and the cache avoids repeated calls while browsing/searching.
+ // Queued requests for off-screen cards are discarded when the page changes.
+ // In-flight queries may finish, but only eight execute simultaneously.
+ const visibleIds=new Set(visible.map(e=>e.id));
+ explorer.runtimeQueue=explorer.runtimeQueue.filter(e=>{
+  if(visibleIds.has(e.id))return true;
+  explorer.runtimePending.delete(e.id);
+  return false;
+ });
  for(const entry of visible){
-  if(explorer.runtimeLoaded.has(entry.id))continue;
-  explorer.runtimeLoaded.add(entry.id);
-  backendRequest('/api/v1/nodes/'+encodeURIComponent(entry.id)+'/runtime')
-   .then(rt=>{
-    if(nodeExplorer!==explorer)return;
-    explorer.runtimeCache.set(entry.id,rt);
-    updateNodeRuntimeBadges(entry.node,rt);
-    // Connection data belongs to the runtime badge; fleet filters use complete
-    // collection / bulk telemetry state rather than only the current page.
-   }).catch(()=>{if(nodeExplorer===explorer)updateNodeRuntimeBadges(entry.node,null)});
+  if(explorer.runtimeCache.has(entry.id)||explorer.runtimePending.has(entry.id))continue;
+  explorer.runtimePending.add(entry.id);
+  explorer.runtimeQueue.push(entry);
  }
+ nodeExplorerPump(explorer);
 }
 function mountNodeExplorer(){
  const root=document.querySelector('.nodes-page');if(!root||!nodeExplorer)return;
@@ -3327,7 +3349,7 @@ async function nodesP(){
     }
   }
   const profilesById=new Map(DB.profiles.map(p=>[String(p.id),p]));
-  nodeExplorer={entries:r.items.map(n=>nodeSearchEntry(n,profilesById.get(String(n.profileId)),null,hostsByNode.get(String(n.id))||[],!!latestMetrics.get(Number(n.id)))),cards:cardById,page:1,runtimeLoaded:new Set(),runtimeCache:new Map()};
+  nodeExplorer={entries:r.items.map(n=>nodeSearchEntry(n,profilesById.get(String(n.profileId)),null,hostsByNode.get(String(n.id))||[],!!latestMetrics.get(Number(n.id)))),cards:cardById,page:1,runtimeQueue:[],runtimePending:new Set(),runtimeActive:0,runtimeCache:new Map()};
   const empty=`<div class="card empty"><b>Узлов пока нет</b><span>Список начнёт заполняться после добавления ваших серверов.</span><button class="btn sm" data-ne="nodes">${ic('plus')}Добавить узел</button></div>`;
   const gridMode=getNodeGridMode();
   return [`<section class="nodes-page"><div class="bar2 nodes-toolbar"><p class="note">${s.nAll} узлов настроено. CPU, RAM и скорость требуют подключённого мониторинга.</p><div class="node-grid-controls"><span class="note">Сетка</span><div class="seg" role="group" aria-label="Плотность сетки"><button type="button" data-node-grid-mode="compact" aria-pressed="${gridMode==='compact'?'true':'false'}" class="${gridMode==='compact'?'on':''}">Плотно</button><button type="button" data-node-grid-mode="standard" aria-pressed="${gridMode==='standard'?'true':'false'}" class="${gridMode==='standard'?'on':''}">Стандарт</button><button type="button" data-node-grid-mode="spacious" aria-pressed="${gridMode==='spacious'?'true':'false'}" class="${gridMode==='spacious'?'on':''}">Крупно</button></div></div><button type="button" class="node-create-action" data-ne="nodes" aria-label="Добавить новый узел"><span class="node-create-icon" aria-hidden="true">${ic('plus')}</span><span class="node-create-label">Новый узел</span></button></div>
