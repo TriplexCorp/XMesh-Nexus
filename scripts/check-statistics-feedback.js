@@ -16,6 +16,14 @@ assert.match(app,/CPU steal/);
 assert.match(app,/stats-quality/);
 assert.match(app,/\/api\/v1\/statistics\/leaders/);
 assert.match(app,/id="stats-leaders"/);
+assert.match(app,/id="stats-history-results"/);
+assert.match(app,/id="stats-history-user"/);
+assert.match(app,/id="stats-history-inbound"/);
+assert.match(app,/id="stats-history-node"/);
+assert.match(app,/data-stats-history-user/);
+assert.match(app,/traffic\\/history\\?/);
+assert.match(app,/Это не доказательство нулевого трафика/);
+
 assert.match(backend,/async fn get_statistics_leaders/);
 assert.match(backend,/lifetime_since_first_verified_sample/);
 assert.match(backend,/async fn persist_verified_traffic_deltas/);
