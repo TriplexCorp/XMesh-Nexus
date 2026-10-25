@@ -8,6 +8,7 @@ const fmt=(v,d=0)=>(+v).toLocaleString(panelIsEnglish()?'en-US':'ru-RU',{minimum
 const gb=v=>{const en=panelIsEnglish(),unit=en?[' TB',' GB',' MB']:[' ТБ',' ГБ',' МБ'];return v>=1024?fmt(v/1024,2)+unit[0]:v>=10?fmt(v,1)+unit[1]:v>=1?fmt(v,2)+unit[1]:fmt(v*1024)+unit[2]};
 const ago=t=>{if(!t)return panelIsEnglish()?'never':'никогда';const s=(Date.now()-t)/1e3;return panelIsEnglish()?(s<60?'just now':s<3600?(s/60|0)+' min ago':s<86400?(s/3600|0)+' h ago':(s/86400|0)+' days ago'):(s<60?'только что':s<3600?(s/60|0)+' мин назад':s<86400?(s/3600|0)+' ч назад':(s/86400|0)+' дн назад')};
 let pendingUserTrafficDetail=null;
+let userTrafficReturn=null;
 const DAY=864e5,left=t=>{if(!t)return panelIsEnglish()?'never':'бессрочно';const d=Math.ceil((t-Date.now())/DAY);return panelIsEnglish()?(d>0?d+' days':d===0?'expires today':'expired '+(-d)+' days ago'):(d>0?d+' дн':d===0?'истёк сегодня':'истёк '+(-d)+' дн назад')};
 const userExpiryCell=u=>{
   if(u.hold)return `<span class="user-expiry-primary">${esc(String(u.holdDays||0))} ${panelIsEnglish()?'days after connection':'дн после подключения'}</span>`;
@@ -1325,7 +1326,18 @@ function statisticsP(){
   // Portal above the app shell: backdrop must blur the navigation rail as well.
   const statsPortal=$('#stats-user-modal');
   if(statsPortal&&statsPortal.parentElement!==document.body)document.body.append(statsPortal);
-  const closeStatsUser=()=>{++historyRequest;$('#stats-user-modal').hidden=true;$('#stats-leaders-range')?.focus()};
+  const closeStatsUser=()=>{
+    ++historyRequest;
+    $('#stats-user-modal').hidden=true;
+    const origin=userTrafficReturn;
+    userTrafficReturn=null;
+    if(origin){
+      // Return to the originating workspace instead of leaving the user in Statistics.
+      location.hash=origin.hash;
+      return;
+    }
+    $('#stats-leaders-range')?.focus();
+  };
   $('#stats-user-close')?.addEventListener('click',closeStatsUser);
   $('#stats-user-refresh')?.addEventListener('click',()=>void loadHistory(true));
   $('#stats-user-modal')?.addEventListener('click',e=>{if(e.target.id==='stats-user-modal')closeStatsUser()});
@@ -1993,6 +2005,7 @@ document.addEventListener('click',event=>{
   event.preventDefault();
   const id=Number(trigger.dataset.openUserTraffic);
   if(!Number.isSafeInteger(id)||id<=0)return;
+  userTrafficReturn={hash:location.hash||'#users',userId:id};
   pendingUserTrafficDetail={id,name:trigger.dataset.trafficUsername||'Пользователь #'+id};
   if(dlg.open)dlg.close();
   if(location.hash==='#statistics')void render(false);
