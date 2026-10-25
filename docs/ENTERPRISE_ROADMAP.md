@@ -19,9 +19,19 @@ This roadmap tracks verified improvements, not feature claims. A stage is comple
 - [x] Move the XRAY STUDIO configuration constructor overlay above the app shell so blur covers the entire screen.
 - [x] Update source-level regression checks (`scripts/check-statistics-feedback.js`, `scripts/check-xray-studio-selectors.js`).
 
+### Subsequent UI refinements — delivered in source
+
+- [x] Automatically refresh raw observations when node, inbound, user or time range changes; remove the redundant manual observations button.
+- [x] Filter the Inbound/Nodes breakdown tables using the selected node and inbound, without adding independent counters together.
+- [x] Replace the short fixed node palette with a session-stable, maximin OKLab candidate selection of **pastel** colours; use a consistent node colour across per-node rings, aggregate node distribution and analytics bars.
+- [x] Distinguish semantic traffic-direction colours from node colours: Upload (teal) and Download (violet); correct the aggregate ring legend to identify nodes.
+- [x] Introduce application-wide branded scrollbar styling in the main stylesheet and XRAY STUDIO stylesheet, including 8 px rails and attempted 7 px end insets on supported engines; preserve existing overflow containers.
+
 ### Verification and follow-up (open)
 
 - [ ] Execute browser-level smoke/e2e tests at multiple screen sizes and global UI scale settings: modal bounds, stable tabs, scrollbars, table overflow, dropdown positioning and accessibility/focus.
+- [ ] Compare node colours across user editor and detailed analytics after repeated refreshes, node additions and full reloads; check pastel contrast and perceptual collisions as node counts increase.
+- [ ] Verify scrollbar insets (including top/bottom corners), thumb styling and lack of duplicate scroll regions in Chromium and Firefox, as well as all major dialogs and XRAY STUDIO.
 - [ ] Verify **User card → Detailed statistics → close** returns to Users reliably for close button, Escape and backdrop, without losing the original context.
 - [ ] Validate confirmation cancellation, exactly one successful traffic reset, API failure reporting and current displayed counters on a disposable environment.
 - [ ] Validate XRAY STUDIO constructor full-viewport backdrop, close/escape behaviors and cleanup when navigating away.
