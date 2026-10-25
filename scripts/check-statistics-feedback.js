@@ -175,7 +175,7 @@ assert.match(app,/document\.body\.append\(statsPortal\)/);
 assert.match(app,/document\.querySelector\('body > #stats-user-modal'\)\?\.remove\(\)/);
 assert.match(css,/body > \.stats-user-overlay\{position:fixed;inset:0;width:100vw;height:100dvh/);
 
-assert.match(app,/data-stats-plain-icon="refresh">Обновить<\/button>/);
+assert.match(app,/id="stats-user-refresh" class="gh stats-user-refresh"/);
 assert.match(app,/data-stats-plain-icon="close">Закрыть<\/button>/);
 assert.match(css,/\.stats-user-tabs\{display:flex;flex-direction:row/);
 assert.match(css,/\.stats-user-actions\{margin-left:auto;display:flex;flex-direction:row/);
@@ -188,3 +188,9 @@ assert.doesNotMatch(app,/for\(const button of \$\('\.stats-user-actions button'\
 assert.match(css,/Stable modal geometry independent from selected statistics tab/);
 assert.match(css,/height:calc\(100dvh - 3rem\);max-height:calc\(100dvh - 3rem\)/);
 assert.match(css,/\.stats-user-pane:not\(\[hidden\]\)\{/);
+
+assert.doesNotMatch(app,/id="stats-history-load"/);
+assert.match(app,/refreshButton\.classList\.add\('is-refreshing'\)/);
+assert.match(app,/finally\{if\(request===historyRequest&&refreshButton\)/);
+assert.match(css,/@keyframes stats-user-refresh-spin/);
+assert.match(css,/\.stats-refresh-icon\{display:block!important/);
