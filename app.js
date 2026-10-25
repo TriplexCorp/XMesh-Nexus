@@ -1074,7 +1074,7 @@ function statisticsP(){
   <div class="stats-layout">
    <section class="card"><div class="hd"><div><h3>Скорость сети нод</h3><p>RX/TX сетевых интерфейсов (включая сторонние сервисы), отдельно от персональных Xray-счётчиков.</p></div></div><div id="stats-trend"></div><section id="stats-bucket-detail" class="stats-bucket-detail" hidden aria-live="polite"></section></section>
   </div>
-  <section class="card"><div class="hd"><div><h3>Top-10: подтверждённый трафик за период</h3><p>Только подтверждённые изменения Xray за выбранный период. Пользовательские и inbound-счётчики независимы и не складываются.</p></div></div><div class="stats-history-filters"><label>Период рейтинга<select id="stats-leaders-range"><option value="1h">1 час</option><option value="24h" selected>24 часа</option><option value="7d">7 дней</option><option value="30d">30 дней</option></select></label></div><div id="stats-leaders" class="stats-leaders"><p class="note">Загрузка рейтингов…</p></div></section>
+  <section class="card"><div class="hd"><div><h3>Top-10: подтверждённый трафик за период</h3><p>Только подтверждённые изменения Xray за выбранный период. Пользовательские и inbound-счётчики независимы и не складываются.</p></div></div><div class="stats-history-filters"><label>Период рейтинга<select id="stats-leaders-range"><option value="1h">1 час</option><option value="24h" selected>24 часа</option><option value="7d">7 дней</option><option value="30d">30 дней</option></select></label><label>Открыть любого пользователя по ID<input id="stats-user-lookup" type="number" min="1" step="1" placeholder="ID"></label><button class="gh" id="stats-user-lookup-open" type="button">Открыть карточку</button></div><div id="stats-leaders" class="stats-leaders"><p class="note">Загрузка рейтингов…</p></div></section>
   <div id="stats-user-modal" class="stats-user-overlay" hidden>
    <section class="stats-user-dialog" role="dialog" aria-modal="true" aria-labelledby="stats-user-title" tabindex="-1">
     <header class="stats-user-head"><div class="stats-user-avatar" aria-hidden="true">X</div><div><small>XMESH · USER INTELLIGENCE</small><h2 id="stats-user-title">Аналитика пользователя</h2><p id="stats-user-subtitle" class="note">Подтверждённая телеметрия Xray</p></div><button id="stats-user-close" class="gh" type="button" aria-label="Закрыть аналитику">Закрыть ✕</button></header>
@@ -1316,21 +1316,25 @@ function statisticsP(){
   $('#stats-user-modal')?.addEventListener('click',e=>{if(e.target.id==='stats-user-modal')closeStatsUser()});
   $('#stats-user-modal')?.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();closeStatsUser()}});
   $('.stats-user-tabs button').forEach(el=>el.addEventListener('click',()=>showStatsUserTab(el.dataset.statsUserTab)));
+  const openStatsUser=(id,name)=>{
+    const modal=$('#stats-user-modal'),n=Number(id);
+    if(!modal||!Number.isSafeInteger(n)||n<=0)return;
+    historyUser.value=String(n);
+    $('#stats-user-title').textContent=name||'Пользователь #'+n;
+    $('#stats-user-subtitle').textContent='Пользователь #'+n+' · подтверждённый трафик Xray';
+    $('#stats-user-overview').textContent='Загрузка сводки…';
+    $('#stats-user-breakdown').textContent='Загрузка…';
+    modal.hidden=false;
+    showStatsUserTab('history');
+    void loadHistory(true);
+    $('#stats-user-close')?.focus();
+  };
   $('#stats-leaders')?.addEventListener('click',event=>{
     const user=event.target.closest?.('[data-stats-history-user]');
-    if(user){
-      const modal=$('#stats-user-modal');
-      historyUser.value=user.dataset.statsHistoryUser;
-      $('#stats-user-title').textContent=user.textContent.trim();
-      $('#stats-user-subtitle').textContent='Пользователь #'+historyUser.value+' · проверенный трафик Xray';
-      $('#stats-user-overview').textContent='Загрузка сводки…';
-      $('#stats-user-breakdown').textContent='Загрузка…';
-      modal.hidden=false;
-      showStatsUserTab('history');
-      void loadHistory(true);
-      $('#stats-user-close')?.focus();
-    }
+    if(user)openStatsUser(user.dataset.statsHistoryUser,user.textContent.trim());
   });
+  $('#stats-user-lookup-open')?.addEventListener('click',()=>openStatsUser($('#stats-user-lookup')?.value));
+  $('#stats-user-lookup')?.addEventListener('keydown',e=>{if(e.key==='Enter')openStatsUser(e.target.value)});
 
   // One-second UI heartbeat, but no invented network samples: the sparkline
   // changes only when actual signed telemetry reaches TimescaleDB.
