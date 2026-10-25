@@ -1412,7 +1412,9 @@ fn validate_settings_presentation(object: &serde_json::Map<String, Value>) -> Re
     Ok(())
 }
 
-fn validate_settings_announcements(object: &serde_json::Map<String, Value>) -> Result<(), ApiError> {
+fn validate_settings_announcements(
+    object: &serde_json::Map<String, Value>,
+) -> Result<(), ApiError> {
     if let Some(value) = object.get("subscriptionAnnouncement") {
         let message = value
             .as_str()
@@ -1660,13 +1662,17 @@ fn saturating_float_to_i64(value: f64) -> i64 {
     if value.is_nan() {
         return 0;
     }
-    value.trunc().to_string().parse::<i64>().unwrap_or_else(|_| {
-        if value.is_sign_negative() {
-            i64::MIN
-        } else {
-            i64::MAX
-        }
-    })
+    value
+        .trunc()
+        .to_string()
+        .parse::<i64>()
+        .unwrap_or_else(|_| {
+            if value.is_sign_negative() {
+                i64::MIN
+            } else {
+                i64::MAX
+            }
+        })
 }
 
 async fn get_system_stats(State(state): State<AppState>) -> Json<Value> {
@@ -1681,7 +1687,7 @@ async fn get_system_stats(State(state): State<AppState>) -> Json<Value> {
                 Some(
                     (numeric_u64_to_f64(total_delta.saturating_sub(idle_delta)) * 100.0
                         / numeric_u64_to_f64(total_delta))
-                        .clamp(0.0, 100.0),
+                    .clamp(0.0, 100.0),
                 )
             } else {
                 None
