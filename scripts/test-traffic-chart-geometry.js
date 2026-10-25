@@ -26,15 +26,9 @@ const dashboard=new Function(...Object.keys(helpers),
  '\nreturn trafficChartMarkup;')(...Object.values(helpers));
 
 function viewBox(html){
- const match=html.match(/viewBox="0 0 (\\d+) (\\d+)"/);
+ const match=html.match(/viewBox="0 0 (\d+) (\d+)"/);
  assert(match,'SVG viewBox must be emitted');
  return match.slice(1).map(Number);
-}
-function coord(html,klass,axis){
- const pattern=new RegExp('class="'+klass+'"[^>]*\\b'+axis+'="([0-9.]+)"');
- const match=html.match(pattern);
- assert(match,'Missing '+klass+' '+axis);
- return Number(match[1]);
 }
 const points=[
  {bucketMs:1792900000000,rxBytesPerSec:20000,txBytesPerSec:12000},
@@ -49,15 +43,15 @@ for(const [renderer,height] of [[w=>stats(points,w),340],[w=>dashboard({points,s
  const line=(html)=>html.match(/class="(?:stats-detail-line rx|traffic-line rx)" d="([^"]+)"/)?.[1];
  assert(line(small)&&line(large),'RX path must exist');
  assert.notEqual(line(small),line(large),'X coordinates must expand');
- const endpoints=html=>Array.from(line(html).matchAll(/[ML]\\s*([0-9.]+)\\s+([0-9.]+)/g),m=>[+m[1],+m[2]]);
+ const endpoints=html=>Array.from(line(html).matchAll(/[ML]\s*([0-9.]+)\s+([0-9.]+)/g),m=>[+m[1],+m[2]]);
  const a=endpoints(small),b=endpoints(large);
  assert.equal(a.length,b.length);
  for(let i=0;i<a.length;i++)assert(Math.abs(a[i][1]-b[i][1])<0.01,'Y must not scale with width');
  assert(b.at(-1)[0]>a.at(-1)[0],'Plot must expand horizontally');
 }
-assert.match(css,/\\.stats-detail-chart\\{[^}]*height:21\\.25rem/);
-assert.match(css,/\\.traffic-chart-svg\\{[^}]*height:18\\.25rem/);
-assert.doesNotMatch(css,/width:min\\(100%,(?:72|100)rem\\)/);
-assert.match(app,/new ResizeObserver\\(update\\)/);
-assert.match(app,/observer\\.observe\\(wrapper\\)/);
+assert.match(css,/\.stats-detail-chart\{[^}]*height:21\.25rem/);
+assert.match(css,/\.traffic-chart-svg\{[^}]*height:18\.25rem/);
+assert.doesNotMatch(css,/width:min\(100%,(?:72|100)rem\)/);
+assert.match(app,/new ResizeObserver\(update\)/);
+assert.match(app,/observer\.observe\(wrapper\)/);
 console.log('Statistics/Dashboard SVG horizontal reflow and independent heights: PASS');
