@@ -1876,24 +1876,7 @@ async fn get_statistics_overview(
     })))
 }
 
-async fn ingest_node_metrics(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-    raw_body: Bytes,
-) -> Result<(StatusCode, Json<Value>), ApiError> {
-    let body: NodeMetricsIngestRequest = serde_json::from_slice(&raw_body)
-        .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Некорректный JSON метрик."))?;
-    if body.node_id <= 0 {
-        return Err(ApiError::new(
-            StatusCode::BAD_REQUEST,
-            "node_id должен быть положительным числом.",
-        ));
-    }
-    // The node must authenticate before untrusted samples are recorded.
-    // Telemetry requires a registered Ed25519 identity.
-    node_auth::authenticate(&state, &headers, body.node_id, &raw_body).await?;
-
-    let mut metrics = body.metrics.unwrap_or_else(|| json!({}));
+fn prepare_node_metrics(body: &NodeMetricsIngestRequest, mut metrics: Value) -> Result<Value, ApiError> {
     if let Some(status) = body.user_stats_status.as_deref() {
         if !matches!(status, "verified" | "direct" | "unavailable") {
             return Err(ApiError::new(
@@ -1958,6 +1941,27 @@ async fn ingest_node_metrics(
         ));
     }
 
+    Ok(metrics)
+}
+
+async fn ingest_node_metrics(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    raw_body: Bytes,
+) -> Result<(StatusCode, Json<Value>), ApiError> {
+    let body: NodeMetricsIngestRequest = serde_json::from_slice(&raw_body)
+        .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Некорректный JSON метрик."))?;
+    if body.node_id <= 0 {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "node_id должен быть положительным числом.",
+        ));
+    }
+    // The node must authenticate before untrusted samples are recorded.
+    // Telemetry requires a registered Ed25519 identity.
+    node_auth::authenticate(&state, &headers, body.node_id, &raw_body).await?;
+
+    let mut metrics = prepare_node_metrics(&body, body.metrics.clone().unwrap_or_else(|| json!({})))?;
     let mut user_traffic = body.user_traffic.unwrap_or_default();
     if user_traffic.len() > 2048 {
         return Err(ApiError::new(
