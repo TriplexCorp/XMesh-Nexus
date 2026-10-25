@@ -1349,3 +1349,14 @@
 body > .sv-studio-portal{position:fixed;inset:0;z-index:100000;pointer-events:none;background:transparent}
 body > .sv-studio-portal > .sv-overlay{position:fixed;inset:0;width:100vw;height:100dvh;z-index:1;pointer-events:auto;background:var(--xm-modal-dim,rgba(2,7,12,.72));-webkit-backdrop-filter:blur(var(--xm-modal-blur,11px));backdrop-filter:blur(var(--xm-modal-blur,11px))}
 body > .sv-studio-portal > .sv-overlay[hidden]{display:none!important}
+
+
+/* XRAY STUDIO uses the same application-wide themed scrollbar tokens. */
+.sv-studio :where(*),body>.sv-studio-portal :where(*){
+ scrollbar-width:thin;
+ scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track);
+}
+.sv-studio ::-webkit-scrollbar,body>.sv-studio-portal ::-webkit-scrollbar{width:var(--scrollbar-size,9px);height:var(--scrollbar-size,9px)}
+.sv-studio ::-webkit-scrollbar-track,body>.sv-studio-portal ::-webkit-scrollbar-track{background:var(--scrollbar-track);border-radius:999px}
+.sv-studio ::-webkit-scrollbar-thumb,body>.sv-studio-portal ::-webkit-scrollbar-thumb{background:var(--scrollbar-thumb);border:2px solid transparent;border-radius:999px;background-clip:padding-box}
+.sv-studio ::-webkit-scrollbar-thumb:hover,body>.sv-studio-portal ::-webkit-scrollbar-thumb:hover{background-color:var(--scrollbar-thumb-hover)}
