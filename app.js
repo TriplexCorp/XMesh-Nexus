@@ -3176,7 +3176,7 @@ function nodeSearchTerms(query){
   return {field,value:nodeFold((match?match[2]:part).replace(/^"|"$/g,'')).trim()};
  }).filter(x=>x.value);
 }
-function nodeSearchEntry(n,profile,runtime,hosts=[]){
+function nodeSearchEntry(n,profile,runtime,hosts=[],monitored=false){
  const address=String(n.addr||''),name=String(n.name||'');
  const hosting=String(n.hosting||''),pname=String(profile?.name||'');
  const country=String(n.flag||''),domain=address;
@@ -3190,11 +3190,13 @@ function nodeSearchEntry(n,profile,runtime,hosts=[]){
  fields.provider=fields.hosting;fields.host=fields.ip+' '+fields.domain;
  const all=Object.values(fields).join(' ');
  return {id:n.id,node:n,profile,fields,all,
-  state:n.disabled?'disabled':runtime?.connected?'online':'unknown',
+  state:n.disabled?'disabled':'enabled',monitored,
   hasHosting:!!hosting.trim()};
 }
 function nodeExplorerMatch(entry,terms,status,hostingOnly){
- if(status!=='all'&&entry.state!==status)return false;
+ if(status==='monitored'&&!entry.monitored)return false;
+ if(status==='unmonitored'&&entry.monitored)return false;
+ if(!['all','monitored','unmonitored'].includes(status)&&entry.state!==status)return false;
  if(hostingOnly&&!entry.hasHosting)return false;
  return terms.every(t=>(t.field?entry.fields[t.field]||'':entry.all).includes(t.value));
 }
@@ -3244,7 +3246,8 @@ function nodeExplorerUpdate(){
     if(nodeExplorer!==explorer)return;
     explorer.runtimeCache.set(entry.id,rt);
     updateNodeRuntimeBadges(entry.node,rt);
-    entry.state=entry.node.disabled?'disabled':rt?.connected?'online':'unknown';
+    // Connection data belongs to the runtime badge; fleet filters use complete
+    // collection / bulk telemetry state rather than only the current page.
    }).catch(()=>{if(nodeExplorer===explorer)updateNodeRuntimeBadges(entry.node,null)});
  }
 }
@@ -3320,13 +3323,13 @@ async function nodesP(){
     }
   }
   const profilesById=new Map(DB.profiles.map(p=>[String(p.id),p]));
-  nodeExplorer={entries:r.items.map(n=>nodeSearchEntry(n,profilesById.get(String(n.profileId)),null,hostsByNode.get(String(n.id))||[])),cards:cardById,page:1,runtimeLoaded:new Set(),runtimeCache:new Map()};
+  nodeExplorer={entries:r.items.map(n=>nodeSearchEntry(n,profilesById.get(String(n.profileId)),null,hostsByNode.get(String(n.id))||[],!!latestMetrics.get(Number(n.id)))),cards:cardById,page:1,runtimeLoaded:new Set(),runtimeCache:new Map()};
   const empty=`<div class="card empty"><b>Узлов пока нет</b><span>Список начнёт заполняться после добавления ваших серверов.</span><button class="btn sm" data-ne="nodes">${ic('plus')}Добавить узел</button></div>`;
   const gridMode=getNodeGridMode();
   return [`<section class="nodes-page"><div class="bar2 nodes-toolbar"><p class="note">${s.nAll} узлов настроено. CPU, RAM и скорость требуют подключённого мониторинга.</p><div class="node-grid-controls"><span class="note">Сетка</span><div class="seg" role="group" aria-label="Плотность сетки"><button type="button" data-node-grid-mode="compact" aria-pressed="${gridMode==='compact'?'true':'false'}" class="${gridMode==='compact'?'on':''}">Плотно</button><button type="button" data-node-grid-mode="standard" aria-pressed="${gridMode==='standard'?'true':'false'}" class="${gridMode==='standard'?'on':''}">Стандарт</button><button type="button" data-node-grid-mode="spacious" aria-pressed="${gridMode==='spacious'?'true':'false'}" class="${gridMode==='spacious'?'on':''}">Крупно</button></div></div><button type="button" class="node-create-action" data-ne="nodes" aria-label="Добавить новый узел"><span class="node-create-icon" aria-hidden="true">${ic('plus')}</span><span class="node-create-label">Новый узел</span></button></div>
   ${r.items.length?`<div class="node-explorer" role="search" aria-label="Поиск и фильтры узлов">
    <label class="node-explorer-search"><span>Поиск по нодам</span><input type="search" data-node-search autocomplete="off" placeholder="Название, IP, домен, хостинг, профиль, ID…" aria-label="Поиск по названию, IP, домену, хостингу и профилю"></label>
-   <label><span>Состояние</span><select data-node-state><option value="all">Все</option><option value="online">На связи</option><option value="disabled">Отключены</option><option value="unknown">Нет подтверждения</option></select></label>
+   <label><span>Состояние</span><select data-node-state><option value="all">Все</option><option value="enabled">Активные</option><option value="disabled">Отключены</option><option value="monitored">Есть телеметрия</option><option value="unmonitored">Нет свежей телеметрии</option></select></label>
    <label><span>Сортировка</span><select data-node-sort><option value="name">Название А–Я</option><option value="name-desc">Название Я–А</option><option value="ip">IP / адрес</option><option value="hosting">Хостинг</option><option value="status">Состояние</option><option value="id-desc">Новые сначала</option><option value="id-asc">Старые сначала</option></select></label>
    <label class="node-explorer-hosting"><input type="checkbox" data-node-hosting-only> Только с хостингом</label>
    <button type="button" class="gh" data-node-search-clear>Сбросить</button>
