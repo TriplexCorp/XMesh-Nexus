@@ -665,6 +665,26 @@ fn routing_inputs(node: &Value) -> Result<(&[Value], &[Value], &str), ApiError> 
     Ok((rules, relays, strategy))
 }
 
+fn validated_route_matcher(entry: &Value, node: &Value) -> Result<(&'static str, String), ApiError> {
+        let kind = entry
+            .get("matcher")
+            .and_then(Value::as_str)
+            .ok_or_else(|| bad("Routing: rule matcher is missing."))?;
+        let raw = entry
+            .get("value")
+            .and_then(Value::as_str)
+            .ok_or_else(|| bad("Routing: rule value is missing."))?;
+        let (key, value) = matcher(kind, raw)?;
+        if matches!(kind, "geosite" | "geoip" | "extDomain" | "extIp")
+            && node.get("geoEnabled").and_then(Value::as_bool) != Some(true)
+        {
+            return Err(bad(
+                "Routing: enable GeoData downloads on the source node first.",
+            ));
+        }
+        Ok((key, value))
+}
+
 pub fn apply(
     node: &Value,
     config: &mut Value,
@@ -691,24 +711,9 @@ pub fn apply(
         if entry.get("enabled").and_then(Value::as_bool) == Some(false) {
             continue;
         }
-        let kind = entry
-            .get("matcher")
-            .and_then(Value::as_str)
-            .ok_or_else(|| bad("Routing: rule matcher is missing."))?;
-        let raw = entry
-            .get("value")
-            .and_then(Value::as_str)
-            .ok_or_else(|| bad("Routing: rule value is missing."))?;
-        let (key, value) = matcher(kind, raw)?;
+        let (key, value) = validated_route_matcher(entry, node)?;
         if key == "domain" {
             needs_domain_sniffing = true;
-        }
-        if matches!(kind, "geosite" | "geoip" | "extDomain" | "extIp")
-            && node.get("geoEnabled").and_then(Value::as_bool) != Some(true)
-        {
-            return Err(bad(
-                "Routing: enable GeoData downloads on the source node first.",
-            ));
         }
         let outbound = match entry.get("target").and_then(Value::as_str).unwrap_or("") {
             "direct" => freedom
