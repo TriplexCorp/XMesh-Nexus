@@ -943,56 +943,56 @@ fn proxy_user_client_entry(
     protocol: &str,
     ss_method: &str,
 ) -> Option<Value> {
-        let record_id = user.get("id").and_then(Value::as_i64).unwrap_or(0);
-        let encoded_tag = tag
-            .bytes()
-            .map(|b| {
-                if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b'~') {
-                    (b as char).to_string()
+    let record_id = user.get("id").and_then(Value::as_i64).unwrap_or(0);
+    let encoded_tag = tag
+        .bytes()
+        .map(|b| {
+            if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b'~') {
+                (b as char).to_string()
+            } else {
+                format!("%{b:02X}")
+            }
+        })
+        .collect::<String>();
+    let email = format!("xmesh-u{record_id}--{encoded_tag}");
+    let entry = match protocol {
+        "vless" | "vmess" => json!({"id":uuid.to_string(),"level":0,"email":email}),
+        "trojan" => json!({"password":uuid.to_string(),"level":0,"email":email}),
+        "hysteria" => json!({"auth":uuid.to_string(),"level":0,"email":email}),
+        "masque" => json!({"pass":uuid.to_string(),"level":0,"email":email}),
+        "shadowsocks" => {
+            // SS2022 passwords must be valid PSKs; never use a plain UUID
+            // as a 2022 cipher key. Require an explicit per-user key.
+            let password = if ss_method.starts_with("2022-") {
+                user.get("ssPassword").and_then(Value::as_str).unwrap_or("")
+            } else {
+                id
+            };
+            if password.is_empty() {
+                return None;
+            }
+            if ss_method.starts_with("2022-") {
+                // Xray forbids method in SS2022 per-user entries.
+                use base64::Engine as _;
+                let decoded = base64::engine::general_purpose::STANDARD
+                    .decode(password)
+                    .ok();
+                let length = if ss_method == "2022-blake3-aes-128-gcm" {
+                    16
                 } else {
-                    format!("%{b:02X}")
-                }
-            })
-            .collect::<String>();
-        let email = format!("xmesh-u{record_id}--{encoded_tag}");
-        let entry = match protocol.as_str() {
-            "vless" | "vmess" => json!({"id":uuid.to_string(),"level":0,"email":email}),
-            "trojan" => json!({"password":uuid.to_string(),"level":0,"email":email}),
-            "hysteria" => json!({"auth":uuid.to_string(),"level":0,"email":email}),
-            "masque" => json!({"pass":uuid.to_string(),"level":0,"email":email}),
-            "shadowsocks" => {
-                // SS2022 passwords must be valid PSKs; never use a plain UUID
-                // as a 2022 cipher key. Require an explicit per-user key.
-                let password = if ss_method.starts_with("2022-") {
-                    user.get("ssPassword").and_then(Value::as_str).unwrap_or("")
-                } else {
-                    id
+                    32
                 };
-                if password.is_empty() {
+                if decoded.as_ref().is_none_or(|v| v.len() != length) {
                     return None;
                 }
-                if ss_method.starts_with("2022-") {
-                    // Xray forbids method in SS2022 per-user entries.
-                    use base64::Engine as _;
-                    let decoded = base64::engine::general_purpose::STANDARD
-                        .decode(password)
-                        .ok();
-                    let length = if ss_method == "2022-blake3-aes-128-gcm" {
-                        16
-                    } else {
-                        32
-                    };
-                    if decoded.as_ref().is_none_or(|v| v.len() != length) {
-                        return None;
-                    }
-                    json!({"password":password,"level":0,"email":email})
-                } else {
-                    json!({"password":password,"method":ss_method,"level":0,"email":email})
-                }
+                json!({"password":password,"level":0,"email":email})
+            } else {
+                json!({"password":password,"method":ss_method,"level":0,"email":email})
             }
-            _ => return None,
-        };
-        Some(entry)
+        }
+        _ => return None,
+    };
+    Some(entry)
 }
 
 fn provision_proxy_users(
@@ -1074,7 +1074,9 @@ fn provision_proxy_users(
             if !seen.insert(uuid) {
                 continue;
             }
-            if let Some(entry) = proxy_user_client_entry(user, id, &uuid, tag, &protocol, &ss_method) {
+            if let Some(entry) =
+                proxy_user_client_entry(user, id, &uuid, tag, &protocol, &ss_method)
+            {
                 entries.push(entry);
             }
         }
