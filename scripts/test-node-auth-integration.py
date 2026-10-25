@@ -33,7 +33,10 @@ def request(method, path, payload=None, *, headers=None, cookie=None, origin=Non
         response = exc
     with response:
         raw = response.read()
-        result = json.loads(raw) if raw else None
+        # Axum extractor rejections (e.g. unknown JSON fields) may be plain text.
+        # Decode JSON only when the response advertises a JSON media type.
+        content_type = response.headers.get_content_type()
+        result = json.loads(raw) if raw and (content_type == "application/json" or content_type.endswith("+json")) else (raw.decode("utf-8", errors="replace") if raw else None)
         cookies = response.headers.get_all("Set-Cookie", [])
         auth = next((x.split(";", 1)[0] for x in cookies if x.startswith("xmesh_session=")), None)
         return response.status, result, auth
