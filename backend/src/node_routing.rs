@@ -612,6 +612,34 @@ fn safe_exit_outbound(
     Ok(Value::Object(outbound))
 }
 
+fn known_routing_outbounds(config: &Value) -> Result<(HashSet<String>, Option<String>), ApiError> {
+    let config_outbounds = config
+        .get("outbounds")
+        .and_then(Value::as_array)
+        .ok_or_else(|| bad("Routing: XRAY STUDIO profile requires outbounds."))?;
+    let mut known_tags = HashSet::<String>::new();
+    let mut freedom: Option<String> = None;
+    for outbound in config_outbounds {
+        // Xray allows unnamed default outbounds. They cannot be selected by
+        // outboundTag; skip them instead of rejecting unrelated routing rules.
+        let Some(tag) = outbound
+            .get("tag")
+            .and_then(Value::as_str)
+            .filter(|tag| !tag.is_empty())
+        else {
+            continue;
+        };
+        if !known_tags.insert(tag.into()) {
+            return Err(bad("Routing: duplicate outbound tag in profile."));
+        }
+        if freedom.is_none() && outbound.get("protocol").and_then(Value::as_str) == Some("freedom")
+        {
+            freedom = Some(tag.into());
+        }
+    }
+    Ok((known_tags, freedom))
+}
+
 pub fn apply(
     node: &Value,
     config: &mut Value,
@@ -648,30 +676,7 @@ pub fn apply(
         return Err(bad("Routing: unsupported domainStrategy."));
     }
     let node_id = node.get("id").and_then(Value::as_i64).unwrap_or(0);
-    let config_outbounds = config
-        .get("outbounds")
-        .and_then(Value::as_array)
-        .ok_or_else(|| bad("Routing: XRAY STUDIO profile requires outbounds."))?;
-    let mut known_tags = HashSet::<String>::new();
-    let mut freedom: Option<String> = None;
-    for outbound in config_outbounds {
-        // Xray allows unnamed default outbounds. They cannot be selected by
-        // outboundTag; skip them instead of rejecting unrelated routing rules.
-        let Some(tag) = outbound
-            .get("tag")
-            .and_then(Value::as_str)
-            .filter(|tag| !tag.is_empty())
-        else {
-            continue;
-        };
-        if !known_tags.insert(tag.into()) {
-            return Err(bad("Routing: duplicate outbound tag in profile."));
-        }
-        if freedom.is_none() && outbound.get("protocol").and_then(Value::as_str) == Some("freedom")
-        {
-            freedom = Some(tag.into());
-        }
-    }
+    let (known_tags, freedom) = known_routing_outbounds(config)?;
     let mut generated = Vec::<Value>::new();
     let mut added = Vec::<Value>::new();
     let mut need_block = false;
