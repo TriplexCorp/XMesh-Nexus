@@ -954,6 +954,7 @@ function scrollToSettingsTarget(id){
   return true;
 }
 async function render(soft){
+  document.querySelectorAll('body > .xm-period-portal').forEach(menu=>menu.remove());
   document.querySelector('body > .sv-studio-portal')?.remove();
   document.querySelector('body > #stats-user-modal')?.remove();
   T.forEach(clearInterval);T=[];cur=location.hash.slice(1);if(!pages[cur]||(viewerMode()&&!['home','statistics','users','nodes'].includes(cur)))cur='home';const rt=++RT,[t,f]=pages[cur],v=$('#view');
@@ -1075,7 +1076,16 @@ function enhanceStatsPeriodSelect(select){
  const shell=document.createElement('span');shell.className='xm-period-select';
  const trigger=document.createElement('button');trigger.type='button';trigger.className='xm-period-trigger';trigger.setAttribute('aria-haspopup','listbox');trigger.setAttribute('aria-expanded','false');
  const arrow=document.createElement('span');arrow.className='xm-period-chevron';arrow.setAttribute('aria-hidden','true');arrow.textContent='⌄';
- const menu=document.createElement('span');menu.className='xm-period-menu';menu.setAttribute('role','listbox');menu.hidden=true;
+ // Mount dropdown under body so cards, tables and overflow containers cannot cover it.
+ const menu=document.createElement('span');menu.className='xm-period-menu xm-period-portal';menu.setAttribute('role','listbox');menu.hidden=true;
+ document.body.append(menu);
+ const close=()=>{menu.hidden=true;trigger.setAttribute('aria-expanded','false')};
+ const position=()=>{
+  const rect=trigger.getBoundingClientRect(),roomBelow=innerHeight-rect.bottom,menuHeight=Math.min(menu.scrollHeight,Math.min(256,innerHeight*.4));
+  const below=roomBelow>=menuHeight||roomBelow>=rect.top;
+  menu.style.left=rect.left+'px';menu.style.width=rect.width+'px';
+  menu.style.top=(below?rect.bottom+5:Math.max(6,rect.top-menuHeight-5))+'px';
+ };
  const sync=()=>{
   trigger.textContent=select.selectedOptions[0]?.textContent||'Выберите период';trigger.append(arrow);
   menu.replaceChildren();
@@ -1085,15 +1095,19 @@ function enhanceStatsPeriodSelect(select){
    menu.append(item);
   }
  };
- const close=()=>{menu.hidden=true;trigger.setAttribute('aria-expanded','false')};
- const open=()=>{document.querySelectorAll('.xm-period-menu:not([hidden])').forEach(el=>{el.hidden=true;el.parentElement?.querySelector('.xm-period-trigger')?.setAttribute('aria-expanded','false')});sync();menu.hidden=false;trigger.setAttribute('aria-expanded','true')};
- select.parentNode.insertBefore(shell,select);shell.append(select,trigger,menu);
+ const open=()=>{
+  document.querySelectorAll('.xm-period-menu:not([hidden])').forEach(el=>{el.hidden=true;el._xmTrigger?.setAttribute('aria-expanded','false')});
+  sync();menu.hidden=false;trigger.setAttribute('aria-expanded','true');position();
+ };
+ menu._xmTrigger=trigger;
+ select.parentNode.insertBefore(shell,select);shell.append(select,trigger);
  trigger.addEventListener('click',()=>menu.hidden?open():close());
- trigger.addEventListener('keydown',event=>{if(event.key==='Escape'){close();return}if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();open();const selected=menu.querySelector('[aria-selected="true"]');(selected||menu.querySelector('button'))?.focus()}});
+ trigger.addEventListener('keydown',event=>{if(event.key==='Escape'){close();return}if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();open();(menu.querySelector('[aria-selected="true"]')||menu.querySelector('button'))?.focus()}});
  menu.addEventListener('keydown',event=>{const items=[...menu.querySelectorAll('button')],at=items.indexOf(document.activeElement);if(event.key==='Escape'){close();trigger.focus()}else if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();items[(at+items.length+(event.key==='ArrowDown'?1:-1))%items.length]?.focus()}});
- document.addEventListener('pointerdown',event=>{if(!shell.contains(event.target))close()});
- select.addEventListener('change',sync);
- sync();
+ document.addEventListener('pointerdown',event=>{if(!shell.contains(event.target)&&!menu.contains(event.target))close()});
+ document.addEventListener('scroll',()=>{if(!menu.hidden)position()},{capture:true,passive:true});
+ window.addEventListener('resize',()=>{if(!menu.hidden)position()});
+ select.addEventListener('change',sync);sync();
 }
 function statisticsP(){
  const markup=`<div class="stats-dashboard" id="stats-dashboard">
