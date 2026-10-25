@@ -26,4 +26,11 @@ assert.match(css,/\.xm-select-trigger:focus-visible/,'visible keyboard focus');
 assert.match(app,/function hostEditorRefresh\(form/,'host editor dynamically updates inbound options');
 assert.match(app,/inboundSelect\.innerHTML=candidates\.map/,'host editor options rebuilt from profile');
 assert.match(ui,/instance\.observer\.observe\(select/,'host options rebuild triggers sync');
+
+const docker=fs.readFileSync('backend/Dockerfile','utf8');
+assert.match(docker,/COPY [^\n]*\bunified-selects\.js\b[^\n]*\/app\/static\//,'shared select script must be shipped in Docker');
+assert.match(css,/#stats-dashboard \.stats-history-filters:has\(#stats-leaders-range\)/,'Top-10 toolbar has scoped layout');
+assert.match(css,/--stats-leaders-control-height:2\.8rem/,'all Top-10 controls use the same height');
+assert.match(css,/\.xm-period-trigger,\s*#stats-user-lookup,\s*#stats-user-lookup-open/s,'period, ID input and action are sized together');
+
 console.log('Unified select source contracts: PASS (browser interaction/e2e still required).');
