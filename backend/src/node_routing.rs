@@ -699,9 +699,14 @@ fn existing_route_tag(entry: &Value, known_tags: &HashSet<String>) -> Result<Str
     Ok(tag.into())
 }
 
-fn append_route_block(known_tags: &HashSet<String>, added: &mut Vec<Value>) -> Result<(), ApiError> {
+fn append_route_block(
+    known_tags: &HashSet<String>,
+    added: &mut Vec<Value>,
+) -> Result<(), ApiError> {
     if known_tags.contains("xmesh_route_block") {
-        return Err(bad("Routing: profile outbound conflicts with reserved block tag."));
+        return Err(bad(
+            "Routing: profile outbound conflicts with reserved block tag.",
+        ));
     }
     added.push(json!({"tag":"xmesh_route_block","protocol":"blackhole"}));
     Ok(())
