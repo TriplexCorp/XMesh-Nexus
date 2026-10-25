@@ -183,3 +183,8 @@ assert.match(css,/\.stats-user-actions\{margin-left:auto;display:flex;flex-direc
 // Regression: a single DOM element cannot be iterated with for...of.
 assert.match(app,/for\(const button of \$\$\('\.stats-user-actions button'\)\)/);
 assert.doesNotMatch(app,/for\(const button of \$\('\.stats-user-actions button'\)\)/);
+
+// Tab switching must not affect the outer modal dimensions.
+assert.match(css,/Stable modal geometry independent from selected statistics tab/);
+assert.match(css,/height:calc\(100dvh - 3rem\);max-height:calc\(100dvh - 3rem\)/);
+assert.match(css,/\.stats-user-pane:not\(\[hidden\]\)\{/);
