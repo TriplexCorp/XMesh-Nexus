@@ -227,10 +227,29 @@ systemctl restart xmesh-node-user-meter.timer
 if ! systemctl start xmesh-node-user-meter.service; then
   echo "WARNING: Xray user sampler is not ready. Check: journalctl -u xmesh-node-user-meter.service -n 50 --no-pager" >&2
 fi
-if ! update_router;then
- echo "Router update failed; full node upgrade is NOT successful." >&2
+# Router sources are not writable from the hardened control-agent upgrade unit
+# (ProtectSystem=strict). Run the narrowly scoped router step as a separate
+# transient systemd unit with writable access only to the installation tree.
+# This also works on nodes still running the previous upgrade unit definition.
+router_helper="$(mktemp)"
+trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp" "$profile_tmp" "$self_tmp" "$router_helper"' EXIT
+{
+ printf '%s\\n' '#!/usr/bin/env bash' 'set -Eeuo pipefail'
+ declare -f update_router
+ printf '%s\\n' 'update_router'
+} > "$router_helper"
+bash -n "$router_helper"
+install -o root -g root -m 0700 "$router_helper" /usr/local/sbin/.xmesh-router-upgrade.new
+if ! systemd-run --quiet --wait --collect --pipe --unit=xmesh-node-router-upgrade \\
+ --property=Type=exec --property=TimeoutStartSec=450s \\
+ --property=ProtectSystem=strict --property=ProtectHome=true \\
+ --property=ReadWritePaths=/opt/xmesh-node \\
+ /usr/local/sbin/.xmesh-router-upgrade.new;then
+ echo "Router update failed; full node upgrade is NOT successful. Check journalctl -u xmesh-node-router-upgrade." >&2
+ rm -f /usr/local/sbin/.xmesh-router-upgrade.new
  exit 1
 fi
+rm -f /usr/local/sbin/.xmesh-router-upgrade.new
 # Keep the fixed updater script current for the next panel-driven upgrade.
 # Replace atomically because this script can itself be executing.
 install -o root -g root -m 0700 "$self_tmp" /usr/local/sbin/.xmesh-update-agent.new
