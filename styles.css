@@ -2447,6 +2447,18 @@ aside #logout .ic{width:1.12rem;height:1.12rem;flex-shrink:0}
 .nt .notification-node-label{display:flex;flex-direction:column;min-width:0;overflow-wrap:anywhere}
 .nt .notification-node-label small{font-weight:500;color:var(--mu);font-size:.73rem;margin-top:.13rem}
 
+/* Live displays transport health separately from actual observed metrics. */
+.stats-live-bar{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem 1rem;min-width:0}
+.stats-live-badge{display:inline-flex;align-items:center;gap:.45rem;padding:.3rem .65rem;border:1px solid color-mix(in srgb,var(--ok,#43cda6) 42%,transparent);border-radius:999px;color:var(--ok,#43cda6);font-size:.75rem;letter-spacing:.08em}
+.stats-live-badge i{display:block;width:.5rem;height:.5rem;background:currentColor;border-radius:50%;box-shadow:0 0 0 0 currentColor;animation:stats-live-pulse 2s ease-out infinite}
+.stats-live-badge.is-paused{color:var(--mu);border-color:var(--ln)}
+.stats-live-badge.is-paused i{animation:none}
+#stats-sample-age{font-variant-numeric:tabular-nums}
+#stats-trend .stats-spark{animation:stats-live-reveal .38s ease-out both}
+@keyframes stats-live-pulse{0%{box-shadow:0 0 0 0 currentColor}65%{box-shadow:0 0 0 5px transparent}100%{box-shadow:0 0 0 0 transparent}}
+@keyframes stats-live-reveal{from{opacity:.35;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.stats-live-badge i,#stats-trend .stats-spark{animation:none!important}}
+
 /* Dedicated infrastructure statistics: compact scalable cards, true stale states. */
 .stats-dashboard{display:grid;gap:var(--view-gap,1rem);min-width:0}
 .stats-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap}
