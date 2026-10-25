@@ -17,6 +17,11 @@ assert.match(app,/stats-quality/);
 assert.match(app,/\/api\/v1\/statistics\/leaders/);
 assert.match(app,/id="stats-leaders"/);
 assert.match(app,/id="stats-history-results"/);
+assert.match(app,/const statsXrayHistoryChart=points=>/);
+assert.match(app,/statsXrayHistoryChart\(points\)/);
+assert.match(app,/Подтверждённые дельты Upload и Download/);
+assert.match(css,/\.stats-xray-line/);
+
 assert.match(app,/id="stats-history-user"/);
 assert.match(app,/id="stats-history-inbound"/);
 assert.match(app,/id="stats-history-node"/);
