@@ -21,7 +21,7 @@ assert.match(app,/id="stats-history-user"/);
 assert.match(app,/id="stats-history-inbound"/);
 assert.match(app,/id="stats-history-node"/);
 assert.match(app,/data-stats-history-user/);
-assert.match(app,/traffic\\/history\\?/);
+assert.match(app,/traffic\/history\?/);
 assert.match(app,/Это не доказательство нулевого трафика/);
 
 assert.match(backend,/async fn get_statistics_leaders/);
