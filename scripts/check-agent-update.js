@@ -45,8 +45,8 @@ assert.match(updater,/docker compose run --rm --no-deps xmesh-node -check/,'Rebu
 assert.match(updater,/docker compose up -d --no-deps --force-recreate xmesh-node/,'Router must actually be restarted');
 assert.doesNotMatch(updater,/then\\n echo/,'Do not embed literal backslash-n in Bash');
 assert.match(runtime,/INTERVAL '15 minutes'/,'Long full-node upgrades must not expire after 180 seconds');
-assert.match(runtime,/control-v4\.3\.7/,'Panel must advertise the current full node runtime release');
-assert.match(agent,/AGENT_VERSION="control-v4\.3\.7"/,'Downloaded control agent must report same version');
+assert.match(runtime,/control-v4\.3\.8/,'Panel must advertise the current full node runtime release');
+assert.match(agent,/AGENT_VERSION="control-v4\.3\.8"/,'Downloaded control agent must report same version');
 assert.match(updater,/xmesh-policy-guard[.]py -o "\$policy_tmp"/,'Agent update must fetch updated signed policy guard');
 
 assert.match(installer,/xmesh-node-agent-upgrade[.]service/);
