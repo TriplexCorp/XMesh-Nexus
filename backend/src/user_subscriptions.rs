@@ -1282,7 +1282,7 @@ fn portal_device_summary(user: &Value, en: bool) -> String {
             }
             .to_owned()
         }
-    );
+    )
 }
 
 fn portal_controls(
