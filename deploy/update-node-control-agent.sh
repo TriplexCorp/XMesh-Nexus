@@ -234,16 +234,16 @@ fi
 router_helper="$(mktemp)"
 trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp" "$profile_tmp" "$self_tmp" "$router_helper"' EXIT
 {
- printf '%s\\n' '#!/usr/bin/env bash' 'set -Eeuo pipefail'
+ printf '%s\n' '#!/usr/bin/env bash' 'set -Eeuo pipefail'
  declare -f update_router
- printf '%s\\n' 'update_router'
+ printf '%s\n' 'update_router'
 } > "$router_helper"
 bash -n "$router_helper"
 install -o root -g root -m 0700 "$router_helper" /usr/local/sbin/.xmesh-router-upgrade.new
-if ! systemd-run --quiet --wait --collect --pipe --unit=xmesh-node-router-upgrade \\
- --property=Type=exec --property=TimeoutStartSec=450s \\
- --property=ProtectSystem=strict --property=ProtectHome=true \\
- --property=ReadWritePaths=/opt/xmesh-node \\
+if ! systemd-run --quiet --wait --collect --pipe --unit=xmesh-node-router-upgrade \
+ --property=Type=exec --property=TimeoutStartSec=450s \
+ --property=ProtectSystem=strict --property=ProtectHome=true \
+ --property=ReadWritePaths=/opt/xmesh-node \
  /usr/local/sbin/.xmesh-router-upgrade.new;then
  echo "Router update failed; full node upgrade is NOT successful. Check journalctl -u xmesh-node-router-upgrade." >&2
  rm -f /usr/local/sbin/.xmesh-router-upgrade.new
