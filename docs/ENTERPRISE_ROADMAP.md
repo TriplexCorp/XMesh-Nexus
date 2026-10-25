@@ -128,6 +128,8 @@ This roadmap tracks verified improvements, not feature claims. A stage is comple
 - [ ] Add sortable/filterable node health diagnostics (CPU/steal, RAM, disk, RX/TX, sessions, signed heartbeat, agent/Xray version, policy desired/delivered/applied status where verifiable) with explanations for missing or degraded data.
 - [ ] Keep UI refresh and API polling efficient, cancellable and non-duplicative; preserve security boundaries and regression tests.
 
+**Deep Analytics implementation note (2026-10-25):** `GET /api/v1/statistics/leaders` and the Statistics Top-10 tables are now present in `main`, using `user_node_traffic_totals` and independently `user_inbound_traffic_totals`. They show **verified cumulative totals since the first accepted baseline**, not traffic over the selected graph period. Viewer access is denied; owner/admin can inspect ranks. **Historical per-period Xray charts and Top-10 for 24h/7d still require an append-only accepted-delta journal and must not be inferred from `updated_at` or cumulative totals.** Await strict CI and live API verification before claiming the slice accepted.
+
 ### Phase C — P1: Deep TimescaleDB, user and inbound analytics
 
 - [ ] Build genuine **time-bucketed Xray user-traffic** history (not merely lifetime totals), with safe filters for user, node, inbound, squad, time range and source reliability; preserve accounting direction/units.
