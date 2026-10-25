@@ -2083,7 +2083,6 @@ fn validate_user_traffic_samples(user_traffic: &[UserTrafficSample]) -> Result<(
 
 fn validate_inbound_traffic_samples(
     inbound_samples: &[UserInboundTrafficSample],
-    sampled_at: i64,
 ) -> Result<(), ApiError> {
     if inbound_samples.len() > 4096 {
         return Err(ApiError::new(
@@ -2356,6 +2355,7 @@ async fn persist_inbound_traffic(
     conn: &mut sqlx::PgConnection,
     node_id: i64,
     inbound_samples: &[UserInboundTrafficSample],
+    sampled_at: i64,
 ) -> Result<(), ApiError> {
     if !inbound_samples.is_empty() {
         // An inbound's aggregate traffic MUST NEVER be interpreted as per-user traffic.
