@@ -1,0 +1,321 @@
+//! Safe inbound → outbound FinalMask projection for Xray JSON subscriptions.
+//! Contract: transport compatibility is checked for every layer. Only masks
+//! with truly shared wire settings are inherited; directional configurations
+//! must be authored explicitly in xmesh.clientFinalmask / host.clientFinalmask.
+//! Source: https://xtls.github.io/en/config/transports/finalmask.html
+use serde_json::{json, Value};
+
+#[derive(Clone, Copy)]
+struct Transport {
+    tcp: bool,
+    udp: bool,
+    quic: bool,
+    kcp: bool,
+    xhttp_h3: bool,
+    hysteria: bool,
+}
+
+fn transport(network: &str, client_stream: &Value) -> Transport {
+    let alpn = client_stream.get("tlsSettings")
+        .and_then(|v| v.get("alpn"))
+        .and_then(Value::as_array);
+    let has_alpn = alpn.is_some_and(|v| !v.is_empty());
+    let h3 = alpn.is_some_and(|v| v.iter().any(|s| s.as_str() == Some("h3")));
+    let h2 = alpn.is_some_and(|v| v.iter().any(|s| s.as_str() == Some("h2")));
+    let is_xhttp = network == "xhttp";
+    let is_masque = network == "masque";
+    let hysteria = network == "hysteria";
+    let kcp = matches!(network, "mkcp" | "kcp");
+    let tcp = matches!(network, "raw" | "tcp" | "ws" | "websocket"
+        | "grpc" | "httpupgrade")
+        || ((is_xhttp || is_masque) && (!has_alpn || h2));
+    let udp = hysteria || kcp || ((is_xhttp || is_masque) && (!has_alpn && is_masque || h3));
+    Transport { tcp, udp, quic: hysteria || ((is_xhttp || is_masque) && udp),
+        kcp, xhttp_h3: is_xhttp && h3, hysteria }
+}
+
+fn settings<'a>(layer: &'a Value) -> Result<(&'a str, &'a Value), &'static str> {
+    let kind = layer.get("type").and_then(Value::as_str)
+        .ok_or("FinalMask layer needs a type")?;
+    let config = layer.get("settings").ok_or("FinalMask layer needs settings")?;
+    if !config.is_object() {
+        return Err("FinalMask settings must be an object");
+    }
+    Ok((kind, config))
+}
+
+fn copy_keys(value: &Value, keys: &[&str]) -> Value {
+    let mut out = json!({});
+    for key in keys {
+        if let Some(v) = value.get(*key) {
+            out[*key] = v.clone();
+        }
+    }
+    out
+}
+
+fn compatible(
+    kind: &str, direction: &str, caps: Transport, explicit: bool
+) -> Result<bool, &'static str> {
+    if kind == "filter" {
+        // Server-only firewall layer; it never belongs in an outbound.
+        return if explicit { Err("filter is inbound-only") } else { Ok(false) };
+    }
+    match (direction, kind) {
+        ("tcp", "sudoku" | "header-custom") => Ok(true),
+        ("tcp", "fragment" | "xmc") if explicit => Ok(true),
+        ("udp", "sudoku" | "header-custom" | "mkcp-legacy" | "salamander") => Ok(true),
+        ("udp", "noise" | "xicmp" | "realm") if explicit => Ok(true),
+        ("udp", "xdns") if explicit && caps.kcp => Ok(true),
+        ("udp", "udphop") if explicit => Ok(true),
+        ("tcp", "fragment" | "xmc") | ("udp", "noise" | "xdns" | "xicmp" | "realm" | "udphop")
+            => Err("directional FinalMask needs explicit clientFinalmask"),
+        _ => Err("unsupported FinalMask layer or direction"),
+    }
+}
+
+fn validate_layer(
+    layer: &Value, direction: &str, caps: Transport, explicit: bool
+) -> Result<Option<Value>, &'static str> {
+    let (kind, src) = settings(layer)?;
+    if !compatible(kind, direction, caps, explicit)? {
+        return Ok(None);
+    }
+    let safe = match kind {
+        "salamander" => {
+            let password = src.get("password").and_then(Value::as_str)
+                .filter(|v| !v.is_empty()).ok_or("Salamander requires password")?;
+            let mut out = json!({"password":password});
+            if let Some(size) = src.get("packetSize") {
+                let range = size.as_str().ok_or("invalid Gecko packetSize")?;
+                let parse = |v: &str| v.parse::<u16>().ok().filter(|n| *n > 0);
+                let values = range.split_once('-')
+                    .and_then(|(lo, hi)| Some((parse(lo)?, parse(hi)?)))
+                    .or_else(|| parse(range).map(|v| (v, v)))
+                    .ok_or("invalid Gecko packetSize")?;
+                if values.0 > values.1 || values.1 > 2048 || !caps.quic {
+                    return Err("Gecko packetSize requires QUIC and a maximum of 2048");
+                }
+                out["packetSize"] = size.clone();
+            }
+            out
+        },
+        "sudoku" => copy_keys(src, &["password", "ascii", "customTable", "customTables",
+            "paddingMin", "paddingMax"]),
+        "mkcp-legacy" => {
+            let header = src.get("header").and_then(Value::as_str).unwrap_or("");
+            if !["", "dns", "dtls", "srtp", "utp", "wechat", "wireguard"].contains(&header) {
+                return Err("unknown mkcp-legacy header");
+            }
+            if src.get("value").is_some_and(|v| !v.is_string()) {
+                return Err("mkcp-legacy value must be a string");
+            }
+            copy_keys(src, &["header", "value"])
+        },
+        "header-custom" => {
+            let keys: &[&str] = if direction == "tcp" {
+                &["clients", "servers"]
+            } else {
+                &["client", "server"]
+            };
+            if !keys.iter().any(|k| src.get(*k).is_some()) {
+                return Err("header-custom requires directional sequences");
+            }
+            for key in keys {
+                if src.get(*key).is_some_and(|v| !v.is_array()) {
+                    return Err("header-custom sequences must be arrays");
+                }
+            }
+            // Inbound 'errors' is intentionally not disclosed to subscribers.
+            copy_keys(src, keys)
+        },
+        "xdns" => {
+            if !caps.kcp { return Err("xdns requires mKCP, not QUIC"); }
+            src.clone()
+        },
+        "udphop" => {
+            let mode = src.get("mode").and_then(Value::as_str).unwrap_or("");
+            if mode.split(',').any(|m| {
+                let m = m.trim();
+                !m.is_empty() && !["intervallocal", "intervalremote", "perconnremote"].contains(&m)
+            }) {
+                return Err("unknown UDP hop mode");
+            }
+            if mode.split(',').any(|m| m.trim() == "intervallocal")
+                && !caps.hysteria && !caps.xhttp_h3 {
+                return Err("intervallocal UDP hop supports Hysteria or XHTTP H3 only");
+            }
+            src.clone()
+        },
+        // The following are intentionally CLIENT-ONLY. Their objects cannot
+        // be reliably inferred from inbound configuration.
+        "fragment" | "xmc" | "noise" | "xicmp" | "realm" => src.clone(),
+        _ => return Err("unsupported FinalMask layer"),
+    };
+    Ok(Some(json!({"type":kind,"settings":safe})))
+}
+
+fn validate_quic_params(value: &Value) -> Result<Value, &'static str> {
+    let obj = value.as_object().ok_or("quicParams must be an object")?;
+    const CLIENT_KEYS: &[&str] = &[
+        "congestion", "bbrProfile", "debug", "brutalUp", "brutalDown",
+        "udpHop", "initStreamReceiveWindow", "maxStreamReceiveWindow",
+        "initConnectionReceiveWindow", "maxConnectionReceiveWindow",
+        "maxIdleTimeout", "keepAlivePeriod", "disablePathMTUDiscovery",
+    ];
+    for key in obj.keys() {
+        if !CLIENT_KEYS.contains(&key.as_str()) {
+            return Err("unsupported or server-only QUIC parameter");
+        }
+    }
+    if let Some(mode) = value.get("congestion") {
+        if !["reno", "bbr", "brutal", "force-brutal"].contains(
+            &mode.as_str().ok_or("congestion must be a string")?) {
+            return Err("unknown QUIC congestion control");
+        }
+    }
+    if value.get("udpHop").is_some_and(|v| !v.is_object()) {
+        return Err("quicParams.udpHop must be an object");
+    }
+    Ok(value.clone())
+}
+
+/// Returns None when no client mask is required, or an error when emitting an
+/// incomplete/mismatched mask would break the connection.
+pub(crate) fn project(
+    network: &str, outbound_stream: &Value, server_finalmask: Option<&Value>,
+    explicit_client_finalmask: Option<&Value>
+) -> Result<Option<Value>, &'static str> {
+    let caps = transport(network, outbound_stream);
+    let explicit = explicit_client_finalmask.is_some();
+    let Some(source) = explicit_client_finalmask.or(server_finalmask) else {
+        return Ok(None);
+    };
+    let obj = source.as_object().ok_or("finalmask must be an object")?;
+    for key in obj.keys() {
+        if !["tcp", "udp", "quicParams"].contains(&key.as_str()) {
+            return Err("unsupported FinalMask top-level field");
+        }
+    }
+    let mut out = json!({});
+    for (direction, allowed) in [("tcp", caps.tcp), ("udp", caps.udp)] {
+        let Some(value) = source.get(direction) else { continue };
+        if !allowed {
+            if explicit && value.as_array().is_some_and(|v| !v.is_empty()) {
+                return Err("FinalMask direction incompatible with transport");
+            }
+            continue;
+        }
+        let entries = value.as_array().ok_or("FinalMask layers must be an array")?;
+        if entries.len() > 16 { return Err("too many FinalMask layers"); }
+        let mut layers = Vec::new();
+        for layer in entries {
+            if let Some(projected) = validate_layer(layer, direction, caps, explicit)? {
+                layers.push(projected);
+            }
+        }
+        if !layers.is_empty() {
+            out[direction] = json!(layers);
+        }
+    }
+    if let Some(quic) = source.get("quicParams") {
+        if explicit {
+            if !caps.quic { return Err("QUIC params require a QUIC transport"); }
+            out["quicParams"] = validate_quic_params(quic)?;
+        }
+        // QUIC parameters are per-endpoint and must never be inferred from
+        // the server: congestion caps, receive windows, hop ports differ.
+    }
+    Ok(out.as_object().filter(|v| !v.is_empty()).map(|_| out))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn outbound(network: &str, alpn: &[&str]) -> Value {
+        json!({"method":network,"security":"tls","tlsSettings":{"alpn":alpn}})
+    }
+    fn layer(kind: &str, settings: Value) -> Value {
+        json!({"type":kind,"settings":settings})
+    }
+    #[test]
+    fn shared_masks_cover_all_compatible_transports() {
+        for network in ["raw", "tcp", "xhttp", "ws", "grpc", "httpupgrade"] {
+            let server = json!({"tcp":[layer("sudoku",json!({"password":"key","serverOnly":"secret"})),
+                layer("header-custom",json!({"clients":[],"servers":[[]],
+                    "errors":[[{"packet":"confidential"}]]}))]});
+            let client = project(network, &outbound(network,&[]),Some(&server),None)
+                .unwrap().unwrap();
+            assert_eq!(client["tcp"][0]["settings"]["password"], "key");
+            assert!(client.to_string().contains("servers"));
+            assert!(!client.to_string().contains("confidential"));
+            assert!(!client.to_string().contains("serverOnly"));
+        }
+        for network in ["hysteria","mkcp","masque"] {
+            let server = json!({"udp":[layer("salamander",json!({"password":"secret"})),
+                layer("mkcp-legacy",json!({"header":"dtls"})),
+                layer("header-custom",json!({"client":[],"server":[]}))]});
+            let client = project(network,&outbound(network,&[]),Some(&server),None)
+                .unwrap().unwrap();
+            assert_eq!(client["udp"].as_array().unwrap().len(),3);
+        }
+    }
+    #[test]
+    fn directional_only_layers_need_explicit_client_config() {
+        for (network,direction,kind) in [
+            ("raw","tcp","fragment"),("raw","tcp","xmc"),
+            ("hysteria","udp","noise"),("mkcp","udp","xdns"),
+            ("hysteria","udp","xicmp"),("hysteria","udp","realm"),
+            ("hysteria","udp","udphop")
+        ] {
+            let server = json!({direction:[layer(kind,json!({}))]});
+            assert!(project(network,&outbound(network,&[]),Some(&server),None).is_err());
+            assert!(project(network,&outbound(network,&[]),None,Some(&server)).is_ok());
+        }
+    }
+    #[test]
+    fn tcp_udp_and_h3_are_not_interchangeable() {
+        let udp = json!({"udp":[layer("salamander",json!({"password":"secret"}))]});
+        assert!(project("raw",&outbound("raw",&[]),None,Some(&udp)).is_err());
+        assert!(project("xhttp",&outbound("xhttp",&["h3"]),Some(&udp),None)
+            .unwrap().is_some());
+        assert!(project("xhttp",&outbound("xhttp",&["h2"]),Some(&udp),None)
+            .unwrap().is_none());
+        assert!(project("masque",&outbound("masque",&["h3"]),Some(&udp),None)
+            .unwrap().is_some());
+        assert!(project("hysteria",&outbound("hysteria",&["h3"]),None,
+            Some(&json!({"tcp":[layer("sudoku",json!({}))]}))).is_err());
+    }
+    #[test]
+    fn server_filter_does_not_leak_or_break_wire_layers() {
+        let source=json!({"tcp":[layer("sudoku",json!({"password":"p"})),
+            layer("filter",json!({"allowedSourceIPs":["10.0.0.0/8"]}))]});
+        let result=project("raw",&outbound("raw",&[]),Some(&source),None)
+            .unwrap().unwrap();
+        assert_eq!(result["tcp"].as_array().unwrap().len(),1);
+        assert!(!result.to_string().contains("allowedSourceIPs"));
+        assert!(project("raw",&outbound("raw",&[]),None,Some(&source)).is_err());
+    }
+    #[test]
+    fn quic_params_are_client_specific() {
+        let config=json!({"quicParams":{"congestion":"bbr","maxIdleTimeout":30}});
+        assert!(project("hysteria",&outbound("hysteria",&["h3"]),Some(&config),None)
+            .unwrap().is_none());
+        assert_eq!(project("hysteria",&outbound("hysteria",&["h3"]),None,Some(&config))
+            .unwrap().unwrap()["quicParams"],config["quicParams"]);
+        assert!(project("raw",&outbound("raw",&[]),None,Some(&config)).is_err());
+        assert!(project("hysteria",&outbound("hysteria",&["h3"]),None,
+            Some(&json!({"quicParams":{"maxIncomingStreams":1024}}))).is_err());
+    }
+    #[test]
+    fn xdns_only_kcp_and_gecko_only_quic() {
+        let xdns=json!({"udp":[layer("xdns",json!({"domains":[]}))]});
+        assert!(project("mkcp",&outbound("mkcp",&[]),None,Some(&xdns)).is_ok());
+        assert!(project("hysteria",&outbound("hysteria",&["h3"]),None,Some(&xdns)).is_err());
+        let gecko=json!({"udp":[layer("salamander",json!({
+            "password":"shared","packetSize":"512-1200"}))]});
+        assert!(project("hysteria",&outbound("hysteria",&["h3"]),Some(&gecko),None)
+            .unwrap().is_some());
+        assert!(project("mkcp",&outbound("mkcp",&[]),Some(&gecko),None).is_err());
+    }
+}
