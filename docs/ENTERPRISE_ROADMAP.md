@@ -8,6 +8,8 @@ This roadmap tracks verified improvements, not feature claims. A stage is comple
 
 **Status:** [ ] NOT IMPLEMENTED / NOT VERIFIED. **Priority:** highest; start this work before new features. **Scope:** XMesh Nexus control plane and XMesh Node agents; coordinate changes in **both repositories**. This is a planned security upgrade, not a claim that existing Ed25519 traffic is already post-quantum secure.
 
+**Full engineering blueprint:** [Hybrid Post-Quantum Security — XSP-v2 complete implementation plan](HYBRID_POST_QUANTUM_SECURITY_IMPLEMENTATION_PLAN.md) (20 sections: architecture, source-file map, wire format, identity, TLS, migration, PRs, tests, acceptance gates). Follow the detailed plan as the implementation source of truth; the checklist below is a short milestone overview.
+
 **Goal:** protect authenticity/integrity of node policies, commands and telemetry against future quantum-capable forgery, and protect confidentiality of node↔panel control traffic against *harvest now, decrypt later* attacks. These are **separate** security properties; embedding a PQ key inside an Ed25519 key is not a valid design.
 
 ### Required architecture
