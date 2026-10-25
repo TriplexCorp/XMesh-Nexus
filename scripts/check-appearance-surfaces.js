@@ -17,6 +17,18 @@ for(const [input,expected] of [['flat','solid'],['bogus','solid'],[null,'solid']
 }
 assert.match(app,/prop!=='surface'\|\|\['solid','glass','raised'\]\.includes\(value\)/,'Event handler must reject removed Flat style');
 assert.match(html,/styles\.css\?v=[a-z0-9-]+/,'Styles must retain a cache-busting version');
+
+// Ambient background must span the viewport rather than rendering only at a corner.
+// No pseudo-element below an opaque body canvas, and all four UI levels persist.
+assert.match(css,/background-image:\s*radial-gradient\(ellipse 65vw 65vh at 12% 19%/,'Glow must reach the upper-left workspace');
+assert.match(css,/radial-gradient\(ellipse 62vw 68vh at 85% 19%/,'Glow must reach the upper-right workspace');
+assert.match(css,/radial-gradient\(ellipse 74vw 70vh at 48% 83%/,'Glow must reach the lower workspace');
+assert.match(css,/background-attachment:fixed/,'Glow must be stable during page scrolling');
+assert.match(css,/body::before,body::after\{content:none\}/,'Legacy clipped pseudo-element glow must be disabled');
+for(const [level,alpha] of [['off','0'],['subtle','12'],['normal','25'],['rich','43']]){
+ assert(css.includes('html[data-glow='+level+']{--glow-alpha:'+alpha+'%}'),'Missing ambient glow level '+level);
+}
+
 assert.match(html,/app\.js\?v=[a-z0-9-]+/,'Application script must retain a cache-busting version');
 
 const wrapLimits=[...css.matchAll(/\.wrap\s*\{[^}]*max-width:[^;}]+/g)].map(match=>match[0]);
