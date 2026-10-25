@@ -1627,7 +1627,11 @@ fn saturating_float_to_i64(value: f64) -> i64 {
         return 0;
     }
     value.trunc().to_string().parse::<i64>().unwrap_or_else(|_| {
-        if value.is_sign_negative() { i64::MIN } else { i64::MAX }
+        if value.is_sign_negative() {
+            i64::MIN
+        } else {
+            i64::MAX
+        }
     })
 }
 
