@@ -1257,7 +1257,34 @@ struct PortalControls {
     apps: String,
 }
 
-#[allow(clippy::too_many_lines)]
+fn portal_device_summary(user: &Value, en: bool) -> String {
+    let maximum = user.get("hwid").and_then(Value::as_i64).unwrap_or(0);
+    let connected_devices = user
+        .get("devices")
+        .and_then(Value::as_array)
+        .map_or(0, Vec::len);
+    format!(
+        "<div id=\"subscription-devices\" class=\"subscription-public-devices\" hidden>{}: {} · {}: {}</div>",
+        if en {
+            "Connected devices"
+        } else {
+            "Подключённые устройства"
+        },
+        connected_devices,
+        if en { "Limit" } else { "Лимит" },
+        if maximum > 0 {
+            maximum.to_string()
+        } else {
+            if en {
+                "Unlimited"
+            } else {
+                "Без лимита"
+            }
+            .to_owned()
+        }
+    );
+}
+
 fn portal_controls(
     user: &Value,
     settings: &Value,
@@ -1320,31 +1347,7 @@ fn portal_controls(
                     "Устройства"
                 }
             );
-            let maximum = user.get("hwid").and_then(Value::as_i64).unwrap_or(0);
-            let connected_devices = user
-                .get("devices")
-                .and_then(Value::as_array)
-                .map_or(0, Vec::len);
-            devices = format!(
-                "<div id=\"subscription-devices\" class=\"subscription-public-devices\" hidden>{}: {} · {}: {}</div>",
-                if en {
-                    "Connected devices"
-                } else {
-                    "Подключённые устройства"
-                },
-                connected_devices,
-                if en { "Limit" } else { "Лимит" },
-                if maximum > 0 {
-                    maximum.to_string()
-                } else {
-                    if en {
-                        "Unlimited"
-                    } else {
-                        "Без лимита"
-                    }
-                    .to_owned()
-                }
-            );
+            devices = portal_device_summary(user, en);
         }
         if !quick.is_empty() {
             quick = format!("<div class=\"subscription-preview-quick\">{quick}</div>");
