@@ -533,9 +533,11 @@ impl CoreManager {
             return Err(error);
         }
 
-        self.verify_staged_binary(&staging_dir, &release.tag_name).await?;
+        self.verify_staged_binary(&staging_dir, &release.tag_name)
+            .await?;
 
-        self.activate_staged_version(&versions_dir, &staging_dir, &release.tag_name).await?;
+        self.activate_staged_version(&versions_dir, &staging_dir, &release.tag_name)
+            .await?;
 
         Ok((release.tag_name, latest))
     }
