@@ -3577,7 +3577,10 @@ mod subscription_host_protocol_tests {
             assert!(subscription_host_protocol_supported(&inbound), "{protocol}");
         }
         for protocol in ["socks", "http", "wireguard", "unknown"] {
-            assert!(!subscription_host_protocol_supported(&json!({"protocol":protocol})), "{protocol}");
+            assert!(
+                !subscription_host_protocol_supported(&json!({"protocol":protocol})),
+                "{protocol}"
+            );
         }
         assert!(!subscription_host_protocol_supported(&json!({})));
     }
