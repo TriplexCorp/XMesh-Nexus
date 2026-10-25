@@ -13,7 +13,7 @@ const logic=app.slice(start,stop);
 const funcs=new Function('viewerMode',logic+';return {size:NODE_EXPLORER_PAGE_SIZE,nodeSearchTerms,nodeSearchEntry,nodeExplorerMatch,nodeExplorerSort};')(()=>false);
 assert.equal(funcs.size,48,'Do not mount every node in the DOM');
 const first={id:7,name:'Нидерланды',addr:'203.0.113.7',hosting:'Hetzner',flag:'NL',disabled:false};
-const second={id:11,name:'Польша',addr:'198.51.100.8',hosting:'OVH',flag:'PL',disabled:true};
+const second={id:11,name:'Польша',addr:'198.51.100.8',hosting:'',flag:'PL',disabled:true};
 const host=[{address:'edge.example.net',sni:'secure.example.net',remark:'EU endpoint'}];
 const entries=[funcs.nodeSearchEntry(first,{name:'VLESS Main'},null,host,true),funcs.nodeSearchEntry(second,{name:'Backup'},null,[],false)];
 const select=(text,status='all',hosting=false)=>entries.filter(e=>funcs.nodeExplorerMatch(e,funcs.nodeSearchTerms(text),status,hosting)).map(e=>e.id);
