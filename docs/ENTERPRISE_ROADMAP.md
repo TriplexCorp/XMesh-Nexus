@@ -36,6 +36,9 @@ This roadmap tracks verified improvements, not feature claims. A stage is comple
 - [x] Adjust SVG **horizontal** coordinates and `viewBox` width with `ResizeObserver` against the actual rendered aspect ratio; do not uniformly enlarge axis text or plot markers when card width changes.
 - [x] Preserve existing Statistics point selection across SVG replacement where the selected node remains present. Leave the modal user-history chart's independent bounded geometry intact.
 - [x] Bust frontend CSS/JS cache versions in `index.html`; document behavior and verification requirements in README.
+- [x] Update the stale `scripts/check-statistics-feedback.js` source contract to the new parameterized SVG width and remove the old `72rem` expectation.
+- [x] Add `scripts/test-traffic-chart-geometry.js`, executing the Statistics/Dashboard renderers at 720/1920 logical widths and a stubbed `ResizeObserver` reflow, then make it a required Backend CI step.
+- [x] Execute isolated JavaScript checks of both real SVG renderers and the observer callback: matching viewBoxes, stable Y coordinates, expanding X coordinates, and a single redraw for a width change. These are not full-browser tests.
 - [ ] Run committed-source syntax, frontend regression, and strict CI checks; record exact commit and run results. A source change is **not** a tested feature.
 - [ ] Browser-test content width at 720, 1280, 1920 and 3000 px and UI scale at 90%, 100%, 150% and 200% (including combinations), without reload and after page navigation.
 - [ ] Verify desktop, ultrawide, laptop and mobile layout: legible axes, stable plot height, no clipping or horizontal overflow, no oversized points or hit regions.
