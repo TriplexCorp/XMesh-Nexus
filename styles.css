@@ -5603,3 +5603,34 @@ body>.sv-studio-portal,body>.sv-studio-portal *{
  background:transparent!important;border:0!important;box-shadow:none!important;
 }
 :where(html,body,*)::-webkit-scrollbar-track{margin-block:var(--scrollbar-end-gap);margin-inline:var(--scrollbar-end-gap)}
+
+
+/* Scale infrastructure and user traffic charts with Appearance > UI scale.
+   Keep the 1000×340 viewBox proportions without allowing full-width SVGs to
+   grow unbounded on ultrawide screens or ignore the root --ts font scale. */
+.stats-detail-wrap{
+ width:min(100%,72rem);
+ max-width:100%;
+ margin-inline:auto;
+ box-sizing:border-box;
+}
+.stats-detail-chart{
+ display:block;
+ width:100%;
+ height:auto;
+ min-height:0;
+ max-height:none;
+ aspect-ratio:1000 / 340;
+}
+@media(max-width:700px){
+ .stats-detail-wrap{width:100%}
+ .stats-detail-chart{min-height:0}
+}
+/* History inside a modal must fit its fixed workspace, independent of tab. */
+body>.stats-user-overlay .stats-user-pane .stats-detail-wrap{width:100%;max-height:none}
+body>.stats-user-overlay .stats-user-pane .stats-detail-chart{
+ width:100%;
+ min-height:0;
+ height:auto;
+ max-height:min(18rem,30dvh);
+}
