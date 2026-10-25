@@ -123,6 +123,40 @@ def main():
           "admin cannot create unbound active host")
     check(api("POST", "/collections/hosts", {"name": "ci smoke", "disabled": True}, admin_cookie)[0], 201,
           "admin can create disabled host draft")
+    # Positive authorization path: create a real active VLESS host using a
+    # valid profile and a node explicitly bound to that same profile.
+    profile_config = {
+        "inbounds": [{
+            "tag": "CI_AUTH_VLESS", "listen": "127.0.0.1", "port": 28352,
+            "protocol": "vless", "settings": {"decryption": "none", "clients": []},
+            "streamSettings": {"network": "tcp", "security": "none"}
+        }],
+        "outbounds": [{"tag": "direct", "protocol": "freedom"}],
+        "routing": {"rules": []}
+    }
+    status, profile, _ = api("POST", "/collections/profiles",
+                             {"name": "CI auth host profile", "config": json.dumps(profile_config)},
+                             admin_cookie)
+    check(status, 201, "admin creates valid XRAY profile")
+    profile_id = profile["id"]
+    status, node, _ = api("POST", "/collections/nodes",
+                          {"name": "CI auth host node", "addr": "127.0.0.1",
+                           "profileId": profile_id}, admin_cookie)
+    check(status, 201, "admin creates profile-bound node")
+    node_id = node["id"]
+    status, host, _ = api("POST", "/collections/hosts",
+                          {"name": "ci active host", "profileId": profile_id,
+                           "tag": "CI_AUTH_VLESS", "address": "ci-host.example.com",
+                           "port": 443, "nodes": [node_id]}, admin_cookie)
+    check(status, 201, "admin creates fully bound active host")
+    assert host["id"] > 0 and host["profileId"] == profile_id
+    assert host["nodes"] == [node_id] and host["tag"] == "CI_AUTH_VLESS"
+    check(api("DELETE", f"/collections/hosts/{host['id']}", cookie=admin_cookie)[0], 200,
+          "clean up active host")
+    check(api("DELETE", f"/collections/nodes/{node_id}", cookie=admin_cookie)[0], 200,
+          "clean up active host node")
+    check(api("DELETE", f"/collections/profiles/{profile_id}", cookie=admin_cookie)[0], 200,
+          "clean up active host profile")
     check(api("GET", "/admins", cookie=admin_cookie)[0], 403, "admin cannot manage administrators")
     check(api("PATCH", f"/admins/{viewer_id}", {"isActive": False}, owner_cookie)[0], 200,
           "owner disables admin")
