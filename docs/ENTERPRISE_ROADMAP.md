@@ -152,7 +152,7 @@ For **any selected user**, an authorized operator must be able to inspect **each
 - [x] Source code: Timescale hypertable migration for accepted user/inbound deltas, transactional ingestion under the signed node's serialized lock, and authenticated user/node/inbound history API.
 - [ ] Confirm the migration runs correctly on PostgreSQL 18 + TimescaleDB and strict CI passes on the committed source.
 - [ ] Integration-test monotonic increases, baseline-only snapshots, reset/restart, duplicate/replayed signed samples, two inbounds on one user, and absence of independent-counter double counting.
-- [ ] Add usable user → inbound → node → bucket history UI with explicit missing-data and partial-coverage states.
+- [ ] Verify the new user → inbound → node → bucket history UI in a real browser (filters and missing-data messaging are implemented in source; partial coverage and accessibility remain to be validated).
 - [ ] Add time-bounded period Top-10 (not lifetime counts), paging/retention policy, representative-volume query plans and permission tests.
 
 ### Phase C — P1: Deep TimescaleDB, user and inbound analytics
