@@ -5654,3 +5654,67 @@ body>.stats-user-overlay .stats-user-pane .stats-detail-chart{
 @media(max-width:700px){
  .traffic-chart-wrap{width:100%}
 }
+
+
+/* One close-action contract across Nexus dialogs and overlay workspaces.
+   Excludes Cancel, destructive dismiss buttons, and JSON document-tab controls. */
+:root{--xm-close-size:34px;--xm-close-glyph-size:16px}
+:is(dialog button[data-x][aria-label^="Закрыть"],
+    dialog .geo-close[data-x],
+    dialog .route-json-close[data-x],
+    button.xm-studio-modal-close,
+    button[data-endpoint-action="cancel"][aria-label^="Закрыть"],
+    body>.stats-user-overlay #stats-user-close,
+    .notification-workspace .notification-header button[data-x][aria-label^="Закрыть"]){
+  width:var(--xm-close-size)!important;
+  height:var(--xm-close-size)!important;
+  min-width:var(--xm-close-size)!important;
+  min-height:var(--xm-close-size)!important;
+  max-width:var(--xm-close-size);
+  max-height:var(--xm-close-size);
+  flex:0 0 var(--xm-close-size)!important;
+  box-sizing:border-box;
+  aspect-ratio:1;
+  padding:0!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  border:1px solid var(--ln)!important;
+  border-radius:50%!important;
+  background:var(--s2)!important;
+  color:var(--tx);
+  font-size:20px;
+  line-height:1;
+  cursor:pointer;
+}
+:is(dialog button[data-x][aria-label^="Закрыть"],
+    dialog .geo-close[data-x],
+    dialog .route-json-close[data-x],
+    button.xm-studio-modal-close,
+    button[data-endpoint-action="cancel"][aria-label^="Закрыть"],
+    body>.stats-user-overlay #stats-user-close,
+    .notification-workspace .notification-header button[data-x][aria-label^="Закрыть"]) :is(svg,.ic){
+  width:var(--xm-close-glyph-size)!important;
+  height:var(--xm-close-glyph-size)!important;
+  flex:0 0 var(--xm-close-glyph-size);
+  display:block;
+}
+:is(dialog button[data-x][aria-label^="Закрыть"],
+    dialog .geo-close[data-x],
+    dialog .route-json-close[data-x],
+    button.xm-studio-modal-close,
+    button[data-endpoint-action="cancel"][aria-label^="Закрыть"],
+    body>.stats-user-overlay #stats-user-close,
+    .notification-workspace .notification-header button[data-x][aria-label^="Закрыть"]):hover{
+  border-color:var(--a)!important;
+  background:color-mix(in srgb,var(--a) 12%,var(--s2))!important;
+}
+:is(dialog button[data-x][aria-label^="Закрыть"],
+    dialog .geo-close[data-x],
+    dialog .route-json-close[data-x],
+    button.xm-studio-modal-close,
+    button[data-endpoint-action="cancel"][aria-label^="Закрыть"],
+    body>.stats-user-overlay #stats-user-close,
+    .notification-workspace .notification-header button[data-x][aria-label^="Закрыть"]):focus-visible{
+  outline:2px solid var(--a);outline-offset:2px;
+}
