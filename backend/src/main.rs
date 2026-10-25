@@ -1192,18 +1192,7 @@ async fn get_settings(
     }))
 }
 
-async fn patch_settings(
-    State(state): State<AppState>,
-    Extension(actor): Extension<auth::AuthUser>,
-    Json(patch): Json<Value>,
-) -> Result<Json<Value>, ApiError> {
-    require_owner(&actor)?;
-    let object = patch.as_object().ok_or_else(|| {
-        ApiError::new(
-            StatusCode::BAD_REQUEST,
-            "Настройки должны быть JSON-объектом.",
-        )
-    })?;
+fn validate_settings_keys(object: &serde_json::Map<String, Value>) -> Result<(), ApiError> {
     for key in object.keys() {
         if !matches!(
             key.as_str(),
@@ -1268,6 +1257,10 @@ async fn patch_settings(
             ));
         }
     }
+    Ok(())
+}
+
+fn validate_settings_identifiers(object: &serde_json::Map<String, Value>) -> Result<(), ApiError> {
     if let Some(brand) = object.get("brand") {
         let value = brand.as_str().ok_or_else(|| {
             ApiError::new(
@@ -1343,6 +1336,10 @@ async fn patch_settings(
             ));
         }
     }
+    Ok(())
+}
+
+fn validate_settings_presentation(object: &serde_json::Map<String, Value>) -> Result<(), ApiError> {
     for (key, max_len) in [
         ("subscriptionBrand", 80),
         ("subscriptionDescription", 240),
@@ -1412,6 +1409,10 @@ async fn patch_settings(
             ));
         }
     }
+    Ok(())
+}
+
+fn validate_settings_announcements(object: &serde_json::Map<String, Value>) -> Result<(), ApiError> {
     if let Some(value) = object.get("subscriptionAnnouncement") {
         let message = value
             .as_str()
@@ -1455,6 +1456,10 @@ async fn patch_settings(
             ));
         }
     }
+    Ok(())
+}
+
+fn validate_settings_integrations(object: &serde_json::Map<String, Value>) -> Result<(), ApiError> {
     subscription_settings::validate(object)?;
     if let Some(groups) = object.get("clientBalancers") {
         subscription_json::validate_client_balancers(groups)
@@ -1483,6 +1488,26 @@ async fn patch_settings(
             }
         }
     }
+    Ok(())
+}
+
+async fn patch_settings(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+    Json(patch): Json<Value>,
+) -> Result<Json<Value>, ApiError> {
+    require_owner(&actor)?;
+    let object = patch.as_object().ok_or_else(|| {
+        ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Настройки должны быть JSON-объектом.",
+        )
+    })?;
+    validate_settings_keys(object)?;
+    validate_settings_identifiers(object)?;
+    validate_settings_presentation(object)?;
+    validate_settings_announcements(object)?;
+    validate_settings_integrations(object)?;
 
     let row = sqlx::query(
         "INSERT INTO app_settings (key, value) VALUES ('panel', $1) \
