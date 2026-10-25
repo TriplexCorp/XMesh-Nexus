@@ -31,6 +31,14 @@ for (const [label, fragment] of requiredFragments) {
   if (!studioSource.includes(fragment)) issues.push('xray-studio-v4.js: required ' + label + ' marker is missing');
 }
 
+
+// XRAY STUDIO constructor must blur the entire application, including the rail.
+const studio = fs.readFileSync(path.join(__dirname, '..', 'xray-studio-v4.js'), 'utf8');
+const studioCss = fs.readFileSync(path.join(__dirname, '..', 'xray-studio-v4.css'), 'utf8');
+if (!studio.includes("portal.className='sv-studio sv-studio-portal'")) issues.push('XRAY STUDIO composer portal missing');
+if (!studio.includes('document.body.append(portal)')) issues.push('XRAY STUDIO composer not mounted on body');
+if (!studio.includes('overlayWatch.observe(overlayElement')) issues.push('XRAY STUDIO portal close cleanup missing');
+if (!studioCss.includes('body > .sv-studio-portal > .sv-overlay')) issues.push('XRAY STUDIO full-viewport backdrop missing');
 if (issues.length) {
   console.error('XRAY Studio selector audit failed:');
   for (const issue of issues) console.error(' - ' + issue);
