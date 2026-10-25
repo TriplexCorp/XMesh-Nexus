@@ -3176,12 +3176,13 @@ function nodeSearchTerms(query){
   return {field,value:nodeFold((match?match[2]:part).replace(/^"|"$/g,'')).trim()};
  }).filter(x=>x.value);
 }
-function nodeSearchEntry(n,profile,runtime){
+function nodeSearchEntry(n,profile,runtime,hosts=[]){
  const address=String(n.addr||''),name=String(n.name||'');
  const hosting=String(n.hosting||''),pname=String(profile?.name||'');
- const country=String(n.flag||''),domain=address.includes(':')&&!address.includes(']')?address.split(':')[0]:address;
+ const country=String(n.flag||''),domain=address;
+ const hostDomains=hosts.flatMap(h=>[h.address,h.sni,h.host,h.remark]).filter(Boolean).map(String).join(' ');
  const fields={
-  name:nodeFold(name),ip:nodeFold(address),domain:nodeFold(domain),
+  name:nodeFold(name),ip:nodeFold(address),domain:nodeFold(domain+' '+hostDomains),
   hosting:nodeFold(hosting),profile:nodeFold(pname),country:nodeFold(country),
   id:String(n.id)
  };
@@ -3311,7 +3312,15 @@ async function nodesP(){
       <div class="acts"><button class="gh sm" data-node-bootstrap="${n.id}">${ic('link')}Подключить агент ноды</button><button class="gh sm" data-nr="${n.id}" ${n.disabled?'disabled title="Сначала включите узел после восстановления лимита"':''}>${ic('redo')}Перезапуск</button><button class="gh sm" data-xray-update="${n.id}">${ic('upload')}Обновить Xray</button><button class="gh sm" data-agent-update="${n.id}" title="Обновить управляющий Agent через подтверждённую команду ноде">${ic("refresh-cw")}Обновить Agent</button><button type="button" class="gh sm node-geodata-open" data-node-geodata="${n.id}" title="Настройки GeoData и ручное обновление файлов на этом узле">${ic("globe")}Обновить GeoData</button><button type="button" class="gh sm node-routing-open" data-node-routing="${n.id}" title="Направление трафика по GeoSite, GeoIP и через другие ноды">${ic("git-branch")}Маршрутизация</button><button class="gh sm" data-nt="${n.id}">${ic(n.disabled?'play':'pause')}${n.disabled?'Включить':'Отключить'}</button><button class="gh sm" data-ne="nodes:${n.id}">${ic('pen')}Изменить</button><button class="gh sm" data-node-create-host="${n.id}">${ic('globe')}Создать хост</button></div></div>`;
   });
   const cardById=new Map(r.items.map((n,i)=>[n.id,cards[i]]));
-  nodeExplorer={entries:r.items.map(n=>nodeSearchEntry(n,DB.profiles.find(p=>p.id===n.profileId),null)),cards:cardById,page:1,runtimeLoaded:new Set(),runtimeCache:new Map()};
+  const hostsByNode=new Map();
+  for(const h of DB.hosts){
+    for(const id of Array.isArray(h.nodes)?h.nodes:[]){
+      const key=String(id);if(!hostsByNode.has(key))hostsByNode.set(key,[]);
+      hostsByNode.get(key).push(h);
+    }
+  }
+  const profilesById=new Map(DB.profiles.map(p=>[String(p.id),p]));
+  nodeExplorer={entries:r.items.map(n=>nodeSearchEntry(n,profilesById.get(String(n.profileId)),null,hostsByNode.get(String(n.id))||[])),cards:cardById,page:1,runtimeLoaded:new Set(),runtimeCache:new Map()};
   const empty=`<div class="card empty"><b>Узлов пока нет</b><span>Список начнёт заполняться после добавления ваших серверов.</span><button class="btn sm" data-ne="nodes">${ic('plus')}Добавить узел</button></div>`;
   const gridMode=getNodeGridMode();
   return [`<section class="nodes-page"><div class="bar2 nodes-toolbar"><p class="note">${s.nAll} узлов настроено. CPU, RAM и скорость требуют подключённого мониторинга.</p><div class="node-grid-controls"><span class="note">Сетка</span><div class="seg" role="group" aria-label="Плотность сетки"><button type="button" data-node-grid-mode="compact" aria-pressed="${gridMode==='compact'?'true':'false'}" class="${gridMode==='compact'?'on':''}">Плотно</button><button type="button" data-node-grid-mode="standard" aria-pressed="${gridMode==='standard'?'true':'false'}" class="${gridMode==='standard'?'on':''}">Стандарт</button><button type="button" data-node-grid-mode="spacious" aria-pressed="${gridMode==='spacious'?'true':'false'}" class="${gridMode==='spacious'?'on':''}">Крупно</button></div></div><button type="button" class="node-create-action" data-ne="nodes" aria-label="Добавить новый узел"><span class="node-create-icon" aria-hidden="true">${ic('plus')}</span><span class="node-create-label">Новый узел</span></button></div>
