@@ -259,3 +259,7 @@ assert.match(app,/userNodeDistance/);
 assert.match(app,/const userNodeColors=new Map\(\)/);
 assert.match(app,/--server-color:'\+userServerColor\(r\.nodeId\)/);
 assert.match(css,/conic-gradient\(var\(--server-color,var\(--a\)\)/);
+
+assert.match(app,/for\(const saturation of \[42,55\]\)/);
+assert.match(app,/for\(const lightness of \[68,76\]\)/);
+assert.match(app,/const feather=Math\.min\(\.22,\(end-cursor\)\/6\)/);
