@@ -5502,3 +5502,19 @@ body > .xm-period-portal .xm-period-option{width:100%}
   min-height:0;
  }
 }
+
+/* Statistics history: a single branded vertical scrollbar for the whole pane.
+   Nested data tables scroll horizontally only; no second vertical track. */
+body > .stats-user-overlay .stats-user-pane:not([hidden]){
+ overflow-y:auto;overflow-x:hidden;
+ scrollbar-width:thin;scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track);
+}
+body > .stats-user-overlay .stats-user-pane .stats-bucket-table-wrap{
+ max-height:none;overflow-y:visible;overflow-x:auto;
+ scrollbar-width:thin;scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track);
+}
+body > .stats-user-overlay .stats-user-pane::-webkit-scrollbar,
+body > .stats-user-overlay .stats-user-pane .stats-bucket-table-wrap::-webkit-scrollbar{width:var(--scrollbar-size,10px);height:var(--scrollbar-size,10px)}
+body > .stats-user-overlay .stats-user-pane::-webkit-scrollbar-thumb,
+body > .stats-user-overlay .stats-user-pane .stats-bucket-table-wrap::-webkit-scrollbar-thumb{background:var(--scrollbar-thumb);border:2px solid var(--scrollbar-track);border-radius:999px}
+body > .stats-user-overlay .stats-user-pane::-webkit-scrollbar-thumb:hover{background:var(--scrollbar-thumb-hover)}
