@@ -1876,11 +1876,19 @@ function userServerSegments(servers){
   const sum=servers.reduce((n,r)=>n+Math.max(0,+r.uplinkBytes + +r.downlinkBytes),0);
   if(!sum)return 'conic-gradient(var(--ln) 0% 100%)';
   let cursor=0;
-  return 'conic-gradient('+servers.map(r=>{
+  const stops=[];
+  servers.forEach((r,index)=>{
     const end=cursor+Math.max(0,+r.uplinkBytes + +r.downlinkBytes)/sum*100;
-    const piece=userServerColor(r.nodeId)+' '+cursor.toFixed(4)+'% '+end.toFixed(4)+'%';
-    cursor=end;return piece;
-  }).join(',')+')';
+    const colour=userServerColor(r.nodeId);
+    const next=userServerColor(servers[(index+1)%servers.length].nodeId);
+    // A short interpolated edge reduces harsh seams without changing node shares.
+    const feather=Math.min(.22,(end-cursor)/6);
+    stops.push(colour+' '+cursor.toFixed(4)+'% '+Math.max(cursor,end-feather).toFixed(4)+'%');
+    if(index<servers.length-1)stops.push(next+' '+end.toFixed(4)+'%');
+    else stops.push(colour+' '+end.toFixed(4)+'%');
+    cursor=end;
+  });
+  return 'conic-gradient('+stops.join(',')+')';
 }
 function userTrafficDonutsMarkup(payload){
   const servers=Array.isArray(payload?.servers)?payload.servers.filter(r=>
