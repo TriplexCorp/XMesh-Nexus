@@ -1952,7 +1952,7 @@ fn validate_user_traffic_samples(user_traffic: &[UserTrafficSample]) -> Result<(
         ));
     }
     let mut seen_users = std::collections::HashSet::new();
-    for sample in &user_traffic {
+    for sample in user_traffic {
         if sample.user_id <= 0
             || sample.uplink_bytes < 0
             || sample.downlink_bytes < 0
@@ -1976,7 +1976,7 @@ fn validate_inbound_traffic_samples(inbound_samples: &[UserInboundTrafficSample]
         ));
     }
     let mut inbound_seen = std::collections::HashSet::new();
-    for sample in &inbound_samples {
+    for sample in inbound_samples {
         if sample.user_id <= 0
             || sample.uplink_bytes < 0
             || sample.downlink_bytes < 0
