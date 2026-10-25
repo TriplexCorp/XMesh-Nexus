@@ -1584,6 +1584,29 @@ async fn get_stats(State(state): State<AppState>) -> Result<Json<Value>, ApiErro
     })))
 }
 
+async fn system_meminfo() -> (u64, u64) {
+    let meminfo = tokio::fs::read_to_string("/proc/meminfo")
+        .await
+        .unwrap_or_default();
+    let mem_value = |key: &str| -> u64 {
+        meminfo
+            .lines()
+            .find_map(|line| {
+                let mut parts = line.split_whitespace();
+                if parts.next()? != key {
+                    return None;
+                }
+                parts
+                    .next()?
+                    .parse::<u64>()
+                    .ok()
+                    .map(|kb| kb.saturating_mul(1024))
+            })
+            .unwrap_or(0)
+    };
+    (mem_value("MemTotal:"), mem_value("MemAvailable:"))
+}
+
 async fn get_system_stats(State(state): State<AppState>) -> Json<Value> {
     let cpu_before = read_cpu_ticks().await;
     tokio::time::sleep(Duration::from_millis(220)).await;
@@ -1604,27 +1627,8 @@ async fn get_system_stats(State(state): State<AppState>) -> Json<Value> {
         _ => None,
     };
 
-    let meminfo = tokio::fs::read_to_string("/proc/meminfo")
-        .await
-        .unwrap_or_default();
-    let mem_value = |key: &str| -> u64 {
-        meminfo
-            .lines()
-            .find_map(|line| {
-                let mut parts = line.split_whitespace();
-                if parts.next()? != key {
-                    return None;
-                }
-                parts
-                    .next()?
-                    .parse::<u64>()
-                    .ok()
-                    .map(|kb| kb.saturating_mul(1024))
-            })
-            .unwrap_or(0)
-    };
-    let ram_total = mem_value("MemTotal:");
-    let ram_available = mem_value("MemAvailable:").min(ram_total);
+    let (ram_total, mem_available) = system_meminfo().await;
+    let ram_available = mem_available.min(ram_total);
     let ram_used = ram_total.saturating_sub(ram_available);
     let ram_percent = if ram_total > 0 {
         Some(ram_used as f64 * 100.0 / ram_total as f64)
