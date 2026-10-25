@@ -32,6 +32,10 @@ This roadmap tracks verified improvements, not feature claims. A stage is comple
 
 **Status:** [ ] OPEN / operator screenshots reproduced conceptually, **browser verification not complete**. This is a UI refinement backlog, **not** a replacement for the top P0 post-quantum security priority. See [README — UI: фильтры нод и согласованность кнопок](../README.md#ui-фильтры-нод-и-согласованность-кнопок--открытые-замечания-25-октября-2026).
 
+### Implementation checkpoint (2026-10-25)
+
+Source-level changes now present in `main`: the fleet Reset control uses a single explicit SVG and suppresses the global icon decorator; pagination buttons also suppress decoration and are hidden for `1 / 1`; Reset's SVG receives click-triggered rotation via Web Animations API; the Users refresh button has an explicit global `--ui-control-radius` override. Source assertions exist in `scripts/check-node-explorer.js`. **Do not mark the checklist done yet:** the operator reported that the Reset animation still does not behave as expected, and no actual browser/e2e acceptance has been recorded. Next: compare the real Users Refresh interaction against Reset, choose a single shared animation primitive, test hover/click/disabled/reduced-motion at multiple scales, and save real screenshots and CI evidence.
+
 ### Outstanding work
 
 - [ ] **Node pagination icons:** eliminate duplicate arrow/SVG caused by overlapping explicit markup and shared `decorateButtonIcons()`; guarantee exactly one icon per arrow button and no extra decorator on pagination controls.
