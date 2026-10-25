@@ -4,6 +4,28 @@
 
 This roadmap tracks verified improvements, not feature claims. A stage is complete only after the listed acceptance criteria pass in CI and, where required, on a disposable real Xray node. A green source-level assertion alone does not count as production evidence.
 
+## PRIORITY #1 — P0: Hybrid post-quantum security for Nexus ↔ Node (NEXT TASK)
+
+**Status:** [ ] NOT IMPLEMENTED / NOT VERIFIED. **Priority:** highest; start this work before new features. **Scope:** XMesh Nexus control plane and XMesh Node agents; coordinate changes in **both repositories**. This is a planned security upgrade, not a claim that existing Ed25519 traffic is already post-quantum secure.
+
+**Goal:** protect authenticity/integrity of node policies, commands and telemetry against future quantum-capable forgery, and protect confidentiality of node↔panel control traffic against *harvest now, decrypt later* attacks. These are **separate** security properties; embedding a PQ key inside an Ed25519 key is not a valid design.
+
+### Required architecture
+
+- [ ] Inventory the entire existing trust boundary: node enrollment/bootstrap, Ed25519 identity, signed desired-config/policy, telemetry, restart/update commands and ACKs, local offline-policy cache, HTTPS client/server, key rotation and recovery. Write a threat model and compatibility matrix before changing the wire format.
+- [ ] Design a **versioned, domain-separated hybrid signature envelope**: existing Ed25519 **AND** standardized **ML-DSA-65** (FIPS 204), each signing the same deterministic/canonical message bytes with explicit protocol version, message type, node identity, issuer/key IDs, revision/nonce, issuance/expiry and payload digest. Both signatures must verify; neither is an optional fallback after migration. Never concatenate keys and call it a hybrid signature.
+- [ ] Cover **all security-sensitive signed message directions** (panel→node policies/commands and node→panel authenticated telemetry/ACKs) or document explicit exceptions. Preserve anti-replay, authorization, freshness and revision checks. Keep signing and verification semantics identical across Rust and Go implementations with shared golden test vectors.
+- [ ] Design **downgrade-resistant enrollment and migration**: versioned capabilities, authenticated trust anchors, pinned minimum accepted security suite per node, dual-key enrollment, controlled rollout and explicit operator-mediated recovery. After a node is upgraded, missing/invalid PQ signatures or old-only messages must be rejected; do not silently downgrade to Ed25519-only. Keep existing nodes working during a deliberately bounded, audited migration.
+- [ ] Add **hybrid TLS 1.3 key agreement** using **X25519MLKEM768** (ML-KEM-768 + X25519) in a well-maintained TLS stack supporting the negotiated group; verify actual negotiated group and certificate/hostname authentication, with explicit compatibility/fallback policy. **PQ signatures do not encrypt the HTTPS channel.** Do not confuse this control-plane TLS with user-facing Xray Reality/VLESS encryption.
+- [ ] Secure lifecycle for Ed25519 and ML-DSA keys: independent generation and storage, least-privilege permissions, key IDs, rotation, backup/restore, revocation, compromise response and disaster recovery. Never log/export private keys; no home-grown cryptographic primitives or unaudited bespoke TLS.
+- [ ] Test malformed/missing/altered signatures, cross-protocol replay, duplicate/reordered messages, expired policies, key substitution, protocol downgrade, revision rollback, loss of connectivity, agent/Xray restart, stale offline cache, mixed-version deployments and TLS group negotiation; fuzz parsers and run Rust/Go cross-implementation vectors.
+- [ ] Measure CPU, memory, message size, TLS handshake cost, node bootstrap latency and impact on policy/command application at realistic node counts; ensure secure limits on payload size and resource consumption.
+- [ ] Deliver operator documentation, explicit rollout/rollback boundaries, updated README/security docs, CI checks in **both** repositories and live-node verification with recorded commit/build/observed outcomes.
+
+**Acceptance / exit:** real Nexus↔Node traffic demonstrably negotiates hybrid TLS; every upgraded security-critical message requires **both** valid signatures and cannot be downgraded; verified rotation/recovery and mixed-version migration; automated negative/fault tests pass in both repositories; live-node deployment proves policy enforcement and telemetry still work. Do **not** mark complete based on design notes or library installation alone.
+
+---
+
 ## 2026-10-25 — Statistics and user-workspace UX delivery
 
 ### Implemented in source (not yet production-accepted)
