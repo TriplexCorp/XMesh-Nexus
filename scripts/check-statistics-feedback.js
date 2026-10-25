@@ -17,6 +17,14 @@ assert.match(app,/stats-quality/);
 assert.match(app,/\/api\/v1\/statistics\/leaders/);
 assert.match(app,/id="stats-leaders"/);
 assert.match(app,/id="stats-history-results"/);
+assert.match(app,/id="stats-user-modal"/);
+assert.match(app,/data-stats-user-tab="history"/);
+assert.match(app,/data-stats-user-tab="inbounds"/);
+assert.match(app,/data-stats-user-tab="observations"/);
+assert.match(app,/const showStatsUserTab=name=>/);
+assert.match(app,/const closeStatsUser=\(\)=>/);
+assert.match(css,/\.stats-user-overlay\[hidden\]/);
+
 assert.match(app,/const statsXrayHistoryChart=points=>/);
 assert.match(app,/statsXrayHistoryChart\(points\)/);
 assert.match(app,/Подтверждённые дельты Upload и Download/);
