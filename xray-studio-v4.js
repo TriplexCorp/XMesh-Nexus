@@ -61,12 +61,25 @@ function view(){return [
 '<div class="sv-overlay" data-v="overlay" hidden><div class="sv-dialog"><header><h3 data-v="overlayTitle">Профили</h3><button type="button" data-action="close">×</button></header><div data-v="overlayBody"></div></div></div><input data-v="upload" type="file" accept=".json,application/json" hidden></section>'
 ].join('')}
 function mount(root,ctx){
-const get=k=>$(root,k),control=k=>root.querySelector('[data-field="'+k+'"]'),value=k=>control(k)?.value||'',set=(k,v)=>{if(control(k))control(k).value=v??''};
+const overlayElement=$(root,'overlay');
+const get=k=>$(root,k)||(k==='overlay'?overlayElement:overlayElement.querySelector('[data-v="'+k+'"]'));
+const control=k=>root.querySelector('[data-field="'+k+'"]'),value=k=>control(k)?.value||'',set=(k,v)=>{if(control(k))control(k).value=v??''};
 const input=get('source'),gutter=get('gutter'),highlight=get('highlight'),minimap=get('minimap');
 let name='Новый профиль',id=null,inboundIndex=0,outIndex=0,saved='',locked=false,tools=true;
 let diagnosticsLine=null,validatedSource=null,toolPaletteHandle=null;
 const notify=msg=>ctx.toast?.(msg);
 const studioDialog=window.XMeshStudioDialogs;
+ // The composer handles its own buttons; the dialog header close is delegated here.
+ overlayElement.addEventListener('click',event=>{
+  if(event.target.closest('[data-action="close"]')){event.preventDefault();overlayElement.hidden=true;}
+ });
+ const overlayWatch=new MutationObserver(()=>{
+  if(overlayElement.hidden&&overlayElement.parentElement?.classList.contains('sv-studio-portal')){
+   root.append(overlayElement);
+   document.querySelector('body > .sv-studio-portal:empty')?.remove();
+  }
+ });
+ overlayWatch.observe(overlayElement,{attributes:true,attributeFilter:['hidden']});
 const approve=async spec=>{if(!studioDialog?.confirm)throw Error('Диалоги XRAY STUDIO не загружены');return studioDialog.confirm(spec)};
 const unsavedApproval=async description=>input.value===saved||await approve({title:'Несохранённые изменения',description,notice:'Изменения в текущем JSON будут потеряны. При необходимости сначала сохраните профиль.',danger:true,confirmLabel:'Продолжить без сохранения',cancelLabel:'Вернуться'});
  const hostManager=window.XMeshStudioHosts.mount(root,{
@@ -558,6 +571,14 @@ if(!x.tag||tags.has(x.tag))throw Error('Пустой или повторяющи
  }
 }}
 function openComposer(){
+ // Move the constructor into a body-level portal to blur the whole app shell.
+ // Preserve the original overlay and its event handlers; restore it on close.
+ if(overlayElement.parentElement===root){
+  const portal=document.createElement('div');
+  portal.className='sv-studio sv-studio-portal';
+  portal.append(overlayElement);
+  document.body.append(portal);
+ }
  const engine=window.XMeshStudioComposer;
  if(!engine){notify('Конструктор не загружен. Обновите страницу без кеша.');return}
  const overlay=get('overlay'),body=get('overlayBody');
