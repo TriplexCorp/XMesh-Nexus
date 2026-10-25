@@ -2267,6 +2267,39 @@ async fn accept_node_user_stats(
     Ok((source_ms, accept_user_stats))
 }
 
+async fn persist_node_metric_sample(
+    conn: &mut sqlx::PgConnection,
+    body: &NodeMetricsIngestRequest,
+    metrics: Value,
+) -> Result<i64, ApiError> {
+    let node_id = body.node_id.to_string();
+    let sampled_at: i64 = sqlx::query_scalar(
+        "INSERT INTO server_metric_samples (
+            sampled_at, node_id, cpu_percent,
+            ram_used_bytes, ram_total_bytes, disk_used_bytes, disk_total_bytes,
+            rx_bytes_per_sec, tx_bytes_per_sec, active_connections, online_clients, metrics
+         ) VALUES (
+            NOW(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+         )
+         RETURNING (EXTRACT(EPOCH FROM sampled_at) * 1000)::BIGINT",
+    )
+    .bind(&node_id)
+    .bind(body.cpu_percent)
+    .bind(body.ram_used_bytes)
+    .bind(body.ram_total_bytes)
+    .bind(body.disk_used_bytes)
+    .bind(body.disk_total_bytes)
+    .bind(body.rx_bytes_per_sec)
+    .bind(body.tx_bytes_per_sec)
+    .bind(body.active_connections)
+    .bind(body.online_clients)
+    .bind(metrics)
+    .fetch_one(&mut *conn)
+    .await?;
+
+    Ok(sampled_at)
+}
+
 async fn ingest_node_metrics(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -2312,30 +2345,7 @@ async fn ingest_node_metrics(
         .expect("validated metrics object")
         .insert("userStatsAccepted".into(), json!(accept_user_stats));
 
-    let node_id = body.node_id.to_string();
-    let sampled_at: i64 = sqlx::query_scalar(
-        "INSERT INTO server_metric_samples (
-            sampled_at, node_id, cpu_percent,
-            ram_used_bytes, ram_total_bytes, disk_used_bytes, disk_total_bytes,
-            rx_bytes_per_sec, tx_bytes_per_sec, active_connections, online_clients, metrics
-         ) VALUES (
-            NOW(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
-         )
-         RETURNING (EXTRACT(EPOCH FROM sampled_at) * 1000)::BIGINT",
-    )
-    .bind(&node_id)
-    .bind(body.cpu_percent)
-    .bind(body.ram_used_bytes)
-    .bind(body.ram_total_bytes)
-    .bind(body.disk_used_bytes)
-    .bind(body.disk_total_bytes)
-    .bind(body.rx_bytes_per_sec)
-    .bind(body.tx_bytes_per_sec)
-    .bind(body.active_connections)
-    .bind(body.online_clients)
-    .bind(metrics)
-    .fetch_one(&mut *telemetry_tx)
-    .await?;
+    let sampled_at = persist_node_metric_sample(&mut *telemetry_tx, &body, metrics).await?;
 
     persist_node_network_counters(&mut *telemetry_tx, body.node_id, network_sample).await?;
     // Enforce an exhausted node bandwidth quota in the control plane.
