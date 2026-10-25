@@ -201,7 +201,7 @@ pub(crate) fn project(
     for (direction, allowed) in [("tcp", caps.tcp), ("udp", caps.udp)] {
         let Some(value) = source.get(direction) else { continue };
         if !allowed {
-            if explicit && value.as_array().is_some_and(|v| !v.is_empty()) {
+            if explicit {
                 return Err("FinalMask direction incompatible with transport");
             }
             continue;
@@ -268,7 +268,8 @@ mod tests {
             ("hysteria","udp","xicmp"),("hysteria","udp","realm"),
             ("hysteria","udp","udphop")
         ] {
-            let server = json!({direction:[layer(kind,json!({}))]});
+            let mut server = json!({});
+            server[direction] = json!([layer(kind,json!({}))]);
             assert!(project(network,&outbound(network,&[]),Some(&server),None).is_err());
             assert!(project(network,&outbound(network,&[]),None,Some(&server)).is_ok());
         }
