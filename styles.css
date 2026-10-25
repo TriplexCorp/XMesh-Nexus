@@ -5491,3 +5491,14 @@ body > .xm-period-portal .xm-period-option{width:100%}
   grid-template-columns:minmax(0,2.25fr) minmax(14rem,.9fr);
  }
 }
+
+/* Use the real dimensions of the source user card, never a guessed rem preset. */
+@media (min-width:1000px) and (min-height:650px){
+ body > .stats-user-overlay .stats-user-dialog{
+  width:min(var(--stats-source-width,108rem),calc(100vw - 2rem));
+  max-width:calc(100vw - 2rem);
+  height:min(var(--stats-source-height,calc(100dvh - 3rem)),calc(100dvh - 2rem));
+  max-height:calc(100dvh - 2rem);
+  min-height:0;
+ }
+}
