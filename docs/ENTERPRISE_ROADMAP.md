@@ -28,6 +28,24 @@ This roadmap tracks verified improvements, not feature claims. A stage is comple
 
 ---
 
+## 2026-10-25 — Node fleet toolbar and button polish (OPEN UI defects)
+
+**Status:** [ ] OPEN / operator screenshots reproduced conceptually, **browser verification not complete**. This is a UI refinement backlog, **not** a replacement for the top P0 post-quantum security priority. See [README — UI: фильтры нод и согласованность кнопок](../README.md#ui-фильтры-нод-и-согласованность-кнопок--открытые-замечания-25-октября-2026).
+
+### Outstanding work
+
+- [ ] **Node pagination icons:** eliminate duplicate arrow/SVG caused by overlapping explicit markup and shared `decorateButtonIcons()`; guarantee exactly one icon per arrow button and no extra decorator on pagination controls.
+- [ ] **Single-page pagination states:** redesign disabled/empty pagination at 1/1 so it clearly communicates “only one page” rather than appearing broken or barely visible; retain accessible labels, adequate contrast, visible keyboard focus and non-clickable disabled buttons. Verify both ends and multiple pages.
+- [ ] **Reset button icons:** remove duplicate refresh icon in fleet filter `data-node-search-clear`; reuse the established user-section Refresh action visual language, SVG component and behavior rather than inventing a competing animation.
+- [ ] **Reset animation and alignment:** fix the current unexpected hover animation (rotate only the intended SVG when appropriate; reliable busy/confirmation behavior); match height/baseline with filter fields and dropdowns at responsive breakpoints. Respect `prefers-reduced-motion`.
+- [ ] **User Refresh button radius:** eliminate fixed corner-radius overrides; use global `--ui-control-radius` from Appearance settings consistently in the user view and any relevant modal.
+- [ ] **Design-system regression checks:** add behavior-focused tests for exactly one SVG, disabled pagination UX, shared radius under changed UI appearance settings and genuine reset/refresh interactions, not solely substring assertions.
+- [ ] **Browser acceptance:** validate Chromium/Firefox, light/dark accents, 90–200% UI scale, compact/standard/spacious grid, mobile/desktop widths, filter clearing and a test list of 1, 2, 48, 49 and 1000+ nodes. Record screenshots, CI run, exact revision and outcome before marking done.
+
+**Exit:** no duplicate icons; pagination is intentional and legible at 1/1; reset has one consistent SVG and matches existing Refresh animation; buttons align and inherit global corner radius; browser/e2e evidence confirms changes.
+
+---
+
 ## 2026-10-25 — Statistics and user-workspace UX delivery
 
 ### Implemented in source (not yet production-accepted)
