@@ -1,6 +1,6 @@
 # XMesh Nexus — Enterprise hardening roadmap
 
-**Baseline:** 2026-10-24 · **Target branch:** `main` · **Status:** active, not enterprise-production certified.
+**Baseline:** 2026-10-24 · **Progress reviewed:** 2026-10-25 · **Target branch:** `main` · **Status:** active, not enterprise-production certified.
 
 This roadmap tracks verified improvements, not feature claims. A stage is complete only after the listed acceptance criteria pass in CI and, where required, on a disposable real Xray node. A green source-level assertion alone does not count as production evidence.
 
@@ -13,16 +13,33 @@ This roadmap tracks verified improvements, not feature claims. A stage is comple
 - Record the commit, CI run, reproducible failure scenario and verification result for every milestone.
 - Do not call a stage complete solely because README says it is implemented.
 
+## Progress snapshot — 2026-10-25
+
+**Evidence level:** PR-level CI, not production-node certification. [PR #8](https://github.com/TriplexCorp/XMesh-Nexus/pull/8) at commit `43c8693` passed [Backend CI run #2414](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40151051399) and [User Presence Integrity run #55](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40151051415). PR #8 was **open and unmerged** when this snapshot was prepared. These results do **not** establish a green `main` run or completed P0 exit criteria.
+
+| Workstream | Implemented / verified so far | Still required for stage exit |
+| --- | --- | --- |
+| **P0 CI / releases** | Non-mutating rustfmt gate, all-target Rust tests, strict pedantic/nursery Clippy, Node.js checks, Docker build and disposable API integration pass in PR CI | Green baseline after merge on `main`, branch protection evidence, release / rollback drill |
+| **P0 node enforcement** | Signed Ed25519 node policy/telemetry, signed command delivery, replay rejection and offline enforcement logic documented; API integration exercises signatures and command acknowledgement | Actual Xray traffic-denial tests, disconnect/reconnect and revision-conflict fault injection, independently verified applied revision |
+| **P0 telemetry** | Per-user/per-inbound cumulative counters and signed ingestion implemented; CI includes replay, presence and accounting checks | Full delayed/out-of-order/reset/restart matrix and verified 45-second expiration under faults; stale-data alerts |
+| **P1 compatibility** | Server/client JSON generation and endpoint selection logic with test coverage for supported paths | Real client/Xray compatibility matrix, transport/security fixtures and verified exports |
+| **P1 security / operations** | Owner/admin/viewer isolation, MFA/session revocation and Ed25519 enrollment covered by API integration; active-host creation exercised with valid profile+node binding | Exhaustive endpoint × role matrix, threat model, scans, off-host restore of database and cryptographic keys |
+| **P2 scale / HA** | Single-instance Compose architecture and existing operator UI | Benchmarks, failover tests, incremental UI modularization and UX measurements |
+
+**Recent CI regression corrections (PR #8):** Clippy failures fixed without relaxing lint flags; oversized Rust functions refactored rather than suppressed; node integration fixtures updated to supply required `addr`, assert the complete restart-command schema, handle non-JSON extractor rejections, and expect the current fixed agent-update target `control-v4.3.2`. Authentication integration now checks both invalid active-host rejection and creation of a *valid, fully bound active host*, preserving positive authorization coverage (`43c8693`). These are CI test results, **not** real-node enforcement evidence.
+
+**Verification gaps:** GitHub branch-protection settings could not be inspected via the available integration (403). Production-node outcomes, off-host restore and HA have not been demonstrated in this roadmap. Leave their acceptance checkboxes unchecked until evidence exists.
+
 ## 1 — P0: CI and release reliability
 
 - [x] Replace mutating `cargo fmt` CI step with `cargo fmt --all -- --check`. Commit: `f2add5a`.
-- [ ] Establish a passing baseline on `main` for Node.js checks, Rust formatting, all-target tests, strict Clippy, Docker build and API integration.
+- [ ] Establish a passing baseline on `main` for Node.js checks, Rust formatting, all-target tests, strict Clippy, Docker build and API integration. **PR-level prerequisite passed** at `43c8693` (Backend CI #2414); a post-merge `main` run is still required.
 - [ ] Replace brittle source-regex checks where possible with observable, behavior-based tests; retain security-contract checks that express real invariants.
   - [x] IP rotation UI validation: execute the real validation helpers against valid, duplicate, invalid, insufficient and oversized pools instead of requiring an exact source layout (`a676ac7`).
   - [x] Live-node status contract: execute the actual state function for healthy, stale, disabled, stopped Xray/router and unknown states (`db52057`).
   - [x] Xray version rendering contract: assert `textContent` sink and guard against directly inserting untrusted version via `innerHTML` (`f66bdd3`).
   - [ ] Extend this approach to other UI source-contract tests and integration behaviors.
-- [ ] Ensure required branch protection prevents merging when those checks fail.
+- [ ] Ensure required branch protection prevents merging when those checks fail. **Not verified:** protection API returned 403; inspect settings with authorized access.
 - [ ] Document reproducible release / rollback and evidence from a clean checkout.
 
 **Exit:** a documented green main-branch CI run, reproducible local checks, no test stage mutating tracked source files, and enforced required checks.
