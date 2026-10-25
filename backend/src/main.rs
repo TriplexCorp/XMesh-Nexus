@@ -2231,40 +2231,10 @@ async fn persist_inbound_traffic(
     Ok(())
 }
 
-async fn ingest_node_metrics(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-    raw_body: Bytes,
-) -> Result<(StatusCode, Json<Value>), ApiError> {
-    let body: NodeMetricsIngestRequest = serde_json::from_slice(&raw_body)
-        .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Некорректный JSON метрик."))?;
-    if body.node_id <= 0 {
-        return Err(ApiError::new(
-            StatusCode::BAD_REQUEST,
-            "node_id должен быть положительным числом.",
-        ));
-    }
-    // The node must authenticate before untrusted samples are recorded.
-    // Telemetry requires a registered Ed25519 identity.
-    node_auth::authenticate(&state, &headers, body.node_id, &raw_body).await?;
-
-    let mut metrics = prepare_node_metrics(&body, body.metrics.clone().unwrap_or_else(|| json!({})))?;
-    let mut user_traffic = body.user_traffic.unwrap_or_default();
-    validate_user_traffic_samples(&user_traffic)?;
-    let mut inbound_samples = body.user_inbound_traffic.unwrap_or_default();
-    validate_inbound_traffic_samples(&inbound_samples)?;
-    // Node-wide traffic accounting is separate from authenticated per-user
-    // Xray counters. Require both monotonic NIC counters and an interface ID.
-    // Older metrics agents simply omit these fields until upgraded.
-    let network_sample = parse_node_network_sample(&metrics)?;
-    // Serialize telemetry for this node. A delayed/duplicated Xray snapshot
-    // must never roll back the baseline and turn the next idle poll into activity.
-    // Keep the server sample, counters and onlineAt update in one transaction.
-    let mut telemetry_tx = state.pool.begin().await?;
-    sqlx::query("SELECT pg_advisory_xact_lock($1)")
-        .bind(body.node_id)
-        .execute(&mut *telemetry_tx)
-        .await?;
+async fn accept_node_user_stats(
+    conn: &mut sqlx::PgConnection,
+    body: &NodeMetricsIngestRequest,
+) -> Result<(i64, bool), ApiError> {
     let server_now_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
@@ -2288,12 +2258,50 @@ async fn ingest_node_metrics(
                AND (metrics->>'userStatsAtMs') ~ '^[0-9]{1,16}$'",
         )
         .bind(body.node_id.to_string())
-        .fetch_one(&mut *telemetry_tx)
+        .fetch_one(&mut *conn)
         .await?
     } else {
         None
     };
     let accept_user_stats = source_valid && latest_source_ms.is_none_or(|last| source_ms > last);
+    Ok((source_ms, accept_user_stats))
+}
+
+async fn ingest_node_metrics(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    raw_body: Bytes,
+) -> Result<(StatusCode, Json<Value>), ApiError> {
+    let mut body: NodeMetricsIngestRequest = serde_json::from_slice(&raw_body)
+        .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Некорректный JSON метрик."))?;
+    if body.node_id <= 0 {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "node_id должен быть положительным числом.",
+        ));
+    }
+    // The node must authenticate before untrusted samples are recorded.
+    // Telemetry requires a registered Ed25519 identity.
+    node_auth::authenticate(&state, &headers, body.node_id, &raw_body).await?;
+
+    let mut metrics = prepare_node_metrics(&body, body.metrics.clone().unwrap_or_else(|| json!({})))?;
+    let mut user_traffic = body.user_traffic.take().unwrap_or_default();
+    validate_user_traffic_samples(&user_traffic)?;
+    let mut inbound_samples = body.user_inbound_traffic.take().unwrap_or_default();
+    validate_inbound_traffic_samples(&inbound_samples)?;
+    // Node-wide traffic accounting is separate from authenticated per-user
+    // Xray counters. Require both monotonic NIC counters and an interface ID.
+    // Older metrics agents simply omit these fields until upgraded.
+    let network_sample = parse_node_network_sample(&metrics)?;
+    // Serialize telemetry for this node. A delayed/duplicated Xray snapshot
+    // must never roll back the baseline and turn the next idle poll into activity.
+    // Keep the server sample, counters and onlineAt update in one transaction.
+    let mut telemetry_tx = state.pool.begin().await?;
+    sqlx::query("SELECT pg_advisory_xact_lock($1)")
+        .bind(body.node_id)
+        .execute(&mut *telemetry_tx)
+        .await?;
+    let (source_ms, accept_user_stats) = accept_node_user_stats(&mut *telemetry_tx, &body).await?;
     if !accept_user_stats {
         // Do not modify traffic baselines or onlineAt on stale/replayed data.
         user_traffic.clear();
