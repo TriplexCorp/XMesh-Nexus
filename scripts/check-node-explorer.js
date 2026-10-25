@@ -44,5 +44,11 @@ assert.match(app,/while\(explorer\.runtimeActive<8&&explorer\.runtimeQueue\.leng
 assert.match(app,/explorer\.runtimeQueue=explorer\.runtimeQueue\.filter/,'Drop queued requests that are no longer visible');
 assert.match(app,/setTimeout\(\(\)=>\{if\(!root\.isConnected\)return;nodeExplorer\.page=1;nodeExplorerUpdate\(\)\},140\)/,'Debounced input');
 assert.match(css,/\.nodes-page \.node-explorer\{/,'Dedicated themed filter bar');
-assert.match(html,/app\.js\?v=20261025-node-explorer-v2/,'Cache-busted explorer script');
+assert.match(html,/app\.js\?v=[a-z0-9-]+/,'Cache-busted explorer script');
+assert.match(app,/data-action-icon="done"[^>]*>\\$\\{ic\\("redo"\\)\\}/,'Reset button supplies exactly one SVG and opt-outs of icon decoration');
+assert.match(app,/data-node-prev data-action-icon="done"/,'Previous page must not duplicate icons');
+assert.match(app,/data-node-next data-action-icon="done"/,'Next page must not duplicate icons');
+assert.match(app,/pager\\.dataset\\.singlePage=pages===1/,'One-page pagination is visually simplified');
+assert.match(css,/\.users-toolbar-actions>\.users-refresh-action\\{[\\s\\S]*?border-radius:var\\(--ui-control-radius\\)/,'Users refresh obeys global radius');
+assert.match(css,/\.node-explorer-pages\\[data-single-page="true"\\]/,'Single page hides misleading disabled arrows');
 console.log('Fleet explorer search/filter/sort and 1,200-node pagination: PASS.');
