@@ -1447,66 +1447,28 @@ fn portal_decoration<'a>(settings: &'a Value, en: bool, active: bool) -> PortalD
     PortalDecoration { support, logo_markup, status_dot, title, footer, logo_brand }
 }
 
-pub async fn portal(
-    State(state): State<AppState>,
-    Path(token): Path<String>,
-    headers: HeaderMap,
-    Query(options): Query<HashMap<String, String>>,
-) -> Result<Response, ApiError> {
-    if !valid_token(&token) {
-        return Err(ApiError::new(
-            StatusCode::NOT_FOUND,
-            "Subscription not found",
-        ));
-    }
-    // A single permanent HTTPS URL is a portal for browsers and a
-    // negotiated JSON/VLESS subscription for the VPN client's User-Agent.
-    if crate::subscription_user_agent::wants_feed(&headers, &options).map_err(bad)? {
-        return serve(State(state), Path(token), headers, Query(options)).await;
-    }
-    let hash = token_hash(&token);
-    let row = sqlx::query("SELECT user_id FROM user_subscription_tokens WHERE token_hash=$1")
-        .bind(hash)
-        .fetch_optional(&state.pool)
-        .await?
-        .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Subscription not found"))?;
-    let user_id: i64 = row.try_get("user_id")?;
-    let user = record(&state, user_id).await?;
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis()
-        .try_into()
-        .unwrap_or(i64::MAX);
-    let active = crate::user_status(&user, now) == "ACTIVE";
-    let settings = crate::read_settings(&state.pool).await?;
-    let lang = if options.get("lang").is_some_and(|s| s == "en") {
-        "en"
-    } else if options.get("lang").is_some_and(|s| s == "ru") {
-        "ru"
-    } else {
-        studio_string(&settings, "subscriptionLanguage", "ru")
-    };
-    let en = lang == "en";
-    let metrics = portal_metrics(&user, &settings, en);
-    // Show/copy one canonical HTTPS subscription URL. The requesting app's
-    // User-Agent decides the JSON/link format and device profile.
-    let raw_link = studio_url(&settings, &token);
-    let PortalControls { quick, qr, devices, cta, apps } =
-        portal_controls(&user, &settings, lang, en, active, &raw_link);
-    let PortalDecoration { support, logo_markup, status_dot, title, footer, logo_brand } = portal_decoration(&settings, en, active);
-    let background = studio_color(&settings, "subscriptionBackground", "#0c131b");
-    let card_color = studio_color(&settings, "subscriptionCardColor", "#15212b");
-    let text_color = studio_color(&settings, "subscriptionTextColor", "#ecf3f6");
-    let accent = studio_color(&settings, "subscriptionAccent", "#7be5b4");
-    let secondary = studio_color(&settings, "subscriptionSecondaryAccent", "#c6e985");
+fn portal_html(
+    settings: &Value,
+    lang: &str,
+    en: bool,
+    metrics: String,
+    controls: PortalControls,
+    decoration: PortalDecoration<'_>,
+) -> String {
+    let PortalControls { quick, qr, devices, cta, apps } = controls;
+    let PortalDecoration { support, logo_markup, status_dot, title, footer, logo_brand } = decoration;
+    let background = studio_color(settings, "subscriptionBackground", "#0c131b");
+    let card_color = studio_color(settings, "subscriptionCardColor", "#15212b");
+    let text_color = studio_color(settings, "subscriptionTextColor", "#ecf3f6");
+    let accent = studio_color(settings, "subscriptionAccent", "#7be5b4");
+    let secondary = studio_color(settings, "subscriptionSecondaryAccent", "#c6e985");
     let radius = settings
         .get("subscriptionRadius")
         .and_then(Value::as_u64)
         .unwrap_or(16)
         .clamp(1, 36);
     let allowed = |key: &str, valid: &[&str], default: &str| -> String {
-        let value = studio_string(&settings, key, default);
+        let value = studio_string(settings, key, default);
         if valid.contains(&value) {
             value.to_owned()
         } else {
@@ -1591,7 +1553,7 @@ pub async fn portal(
         (
             "{{DESCRIPTION}}",
             escape_html(studio_string(
-                &settings,
+                settings,
                 if en {
                     "subscriptionDescriptionEn"
                 } else {
@@ -1616,6 +1578,57 @@ pub async fn portal(
     for (marker, value) in changes {
         html = html.replace(marker, &value);
     }
+    html
+}
+
+pub async fn portal(
+    State(state): State<AppState>,
+    Path(token): Path<String>,
+    headers: HeaderMap,
+    Query(options): Query<HashMap<String, String>>,
+) -> Result<Response, ApiError> {
+    if !valid_token(&token) {
+        return Err(ApiError::new(
+            StatusCode::NOT_FOUND,
+            "Subscription not found",
+        ));
+    }
+    // A single permanent HTTPS URL is a portal for browsers and a
+    // negotiated JSON/VLESS subscription for the VPN client's User-Agent.
+    if crate::subscription_user_agent::wants_feed(&headers, &options).map_err(bad)? {
+        return serve(State(state), Path(token), headers, Query(options)).await;
+    }
+    let hash = token_hash(&token);
+    let row = sqlx::query("SELECT user_id FROM user_subscription_tokens WHERE token_hash=$1")
+        .bind(hash)
+        .fetch_optional(&state.pool)
+        .await?
+        .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Subscription not found"))?;
+    let user_id: i64 = row.try_get("user_id")?;
+    let user = record(&state, user_id).await?;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+        .try_into()
+        .unwrap_or(i64::MAX);
+    let active = crate::user_status(&user, now) == "ACTIVE";
+    let settings = crate::read_settings(&state.pool).await?;
+    let lang = if options.get("lang").is_some_and(|s| s == "en") {
+        "en"
+    } else if options.get("lang").is_some_and(|s| s == "ru") {
+        "ru"
+    } else {
+        studio_string(&settings, "subscriptionLanguage", "ru")
+    };
+    let en = lang == "en";
+    let metrics = portal_metrics(&user, &settings, en);
+    // Show/copy one canonical HTTPS subscription URL. The requesting app's
+    // User-Agent decides the JSON/link format and device profile.
+    let raw_link = studio_url(&settings, &token);
+    let controls = portal_controls(&user, &settings, lang, en, active, &raw_link);
+    let decoration = portal_decoration(&settings, en, active);
+    let html = portal_html(&settings, lang, en, metrics, controls, decoration);
     let mut response = Html(html).into_response();
     response
         .headers_mut()
