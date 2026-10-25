@@ -249,7 +249,7 @@ const ENT={
       if(!inbound)return 'Выберите inbound из назначенного XRAY-профиля.';
       if(!SUBSCRIPTION_PROTOCOLS.has(inbound.protocol))return 'Выбранный inbound не поддерживается генератором JSON-подписок.';
       if(!d.nodes.length)return 'Назначьте хотя бы одну ноду с выбранным профилем.';
-      const bad=d.nodes.map(id=>DB.nodes.find(n=>String(n.id)===String(id))).find(n=>!n||n.disabled||String(n.profileId)!==String(profile.id));
+      const bad=d.nodes.some(id=>{const node=DB.nodes.find(n=>String(n.id)===String(id));return !node||node.disabled||String(node.profileId)!==String(profile.id)});
       if(bad)return 'Одна из нод не использует выбранный XRAY-профиль или отключена. Исправьте привязку ноды.';
       const reality=inbound.streamSettings?.realitySettings||{};
       if(inbound.streamSettings?.security==='reality' &&
