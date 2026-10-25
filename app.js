@@ -3292,6 +3292,12 @@ function mountNodeExplorer(){
  });
  root.addEventListener('click',event=>{
   if(event.target.closest('[data-node-search-clear]')){
+   const reset=event.target.closest('[data-node-search-clear]');
+   const glyph=reset?.querySelector('.ic');
+   if(glyph&&typeof glyph.animate==='function'&&!matchMedia('(prefers-reduced-motion: reduce)').matches){
+    glyph.getAnimations().forEach(animation=>animation.cancel());
+    glyph.animate([{transform:'rotate(0deg)'},{transform:'rotate(360deg)'}],{duration:620,easing:'cubic-bezier(.2,.75,.2,1)'});
+   }
    const input=root.querySelector('[data-node-search]');if(input){input.value='';input.focus()}
    const status=root.querySelector('[data-node-state]');if(status)status.value='all';
    const only=root.querySelector('[data-node-hosting-only]');if(only)only.checked=false;
