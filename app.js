@@ -1075,9 +1075,18 @@ function statisticsP(){
    <section class="card"><div class="hd"><div><h3>Скорость сети нод</h3><p>RX/TX сетевых интерфейсов (включая сторонние сервисы), отдельно от персональных Xray-счётчиков.</p></div></div><div id="stats-trend"></div><section id="stats-bucket-detail" class="stats-bucket-detail" hidden aria-live="polite"></section></section>
   </div>
   <section class="card"><div class="hd"><div><h3>Top-10: подтверждённый трафик за период</h3><p>Только подтверждённые изменения Xray за выбранный период. Пользовательские и inbound-счётчики независимы и не складываются.</p></div></div><div class="stats-history-filters"><label>Период рейтинга<select id="stats-leaders-range"><option value="1h">1 час</option><option value="24h" selected>24 часа</option><option value="7d">7 дней</option><option value="30d">30 дней</option></select></label></div><div id="stats-leaders" class="stats-leaders"><p class="note">Загрузка рейтингов…</p></div></section>
-  <section class="card"><div class="hd"><div><h3>История Xray · пользователь / inbound / нода</h3><p>Только подтверждённые дельты после запуска исторического журнала. Пропуски не считаются нулевым трафиком.</p></div></div>
-   <div class="stats-history-filters"><label>Пользователь ID<input id="stats-history-user" type="number" min="1" step="1" placeholder="ID пользователя"></label><label>Inbound<select id="stats-history-inbound"><option value="">Все (пользовательские счётчики)</option></select></label><label>Нода<select id="stats-history-node"><option value="">Все ноды</option></select></label><label>Период<select id="stats-history-range"><option value="1h">1 час</option><option value="24h" selected>24 часа</option><option value="7d">7 дней</option><option value="30d">30 дней</option></select></label><button class="gh" id="stats-history-load" type="button">Показать историю</button></div>
-   <div id="stats-history-results" class="stats-history-results" role="status" aria-live="polite">Укажите ID пользователя или выберите его в Top-10.</div><div class="stats-history-raw"><button class="gh" id="stats-history-observations-load" type="button">Показать отдельные измерения</button><div id="stats-history-observations" class="stats-history-results" aria-live="polite"></div></div></section>
+  <div id="stats-user-modal" class="stats-user-overlay" hidden>
+   <section class="stats-user-dialog" role="dialog" aria-modal="true" aria-labelledby="stats-user-title" tabindex="-1">
+    <header class="stats-user-head"><div class="stats-user-avatar" aria-hidden="true">X</div><div><small>XMESH · USER INTELLIGENCE</small><h2 id="stats-user-title">Аналитика пользователя</h2><p id="stats-user-subtitle" class="note">Подтверждённая телеметрия Xray</p></div><button id="stats-user-close" class="gh" type="button" aria-label="Закрыть аналитику">Закрыть ✕</button></header>
+    <div id="stats-user-overview" class="stats-user-overview" aria-live="polite">Загрузка сводки…</div>
+    <nav class="stats-user-tabs" aria-label="Аналитика пользователя"><button type="button" class="is-active" data-stats-user-tab="history">История трафика</button><button type="button" data-stats-user-tab="inbounds">Inbound и ноды</button><button type="button" data-stats-user-tab="observations">Измерения</button></nav>
+    <div class="stats-history-filters"><label>ID пользователя<input id="stats-history-user" type="number" min="1" step="1" placeholder="ID"></label><label>Inbound<select id="stats-history-inbound"><option value="">Все (пользовательские счётчики)</option></select></label><label>Нода<select id="stats-history-node"><option value="">Все ноды</option></select></label><label>Период<select id="stats-history-range"><option value="1h">1 час</option><option value="24h" selected>24 часа</option><option value="7d">7 дней</option><option value="30d">30 дней</option></select></label><button class="gh" id="stats-history-load" type="button">Обновить</button></div>
+    <div class="stats-user-pane" data-stats-user-pane="history"><div id="stats-history-results" class="stats-history-results" role="status" aria-live="polite">Укажите ID пользователя или выберите его в Top-10.</div></div>
+    <div class="stats-user-pane" data-stats-user-pane="inbounds" hidden><div id="stats-user-breakdown" class="stats-user-breakdown">Загрузка…</div></div>
+    <div class="stats-user-pane" data-stats-user-pane="observations" hidden><div class="stats-history-raw"><button class="gh" id="stats-history-observations-load" type="button">Показать отдельные измерения</button><div id="stats-history-observations" class="stats-history-results" aria-live="polite"></div></div></div>
+    <p class="note">Источник: подписанные Xray-счётчики. Значения пользовательского и inbound-учёта не суммируются. Нет измерений ≠ нулевой расход.</p>
+   </section>
+  </div>
   <section class="card"><div class="hd"><div><h3>Control Plane</h3><p>Метрики контейнера панели, не всей физической машины.</p></div></div><div id="stats-control"></div></section>
   <section class="card"><div class="hd"><div><h3>Узлы и виртуализация</h3><p>CPU, steal time, RAM, диски, сеть, активные соединения и свежесть данных.</p></div></div><div id="stats-nodes" class="stats-node-grid"></div></section>
   <p class="note">Новые показатели появляются только после установки обновлённого агента. Отсутствующие измерения и устаревшие показания не заменяются нулями.</p>
@@ -1260,6 +1269,12 @@ function statisticsP(){
         const nodes=[...new Map((totals.servers||[]).map(v=>[Number(v.nodeId),v])).values()].filter(v=>Number(v.nodeId)>0);
         historyInbound.innerHTML=historyOption('','Все (пользовательские счётчики)')+inboundTags.map(v=>historyOption(v,v)).join('');
         historyNode.innerHTML=historyOption('','Все ноды')+nodes.map(v=>historyOption(v.nodeId,v.name||'Нода #'+v.nodeId)).join('');
+        const overview=$('#stats-user-overview'),breakdown=$('#stats-user-breakdown');
+        const totalUp=Number(totals.totalUplinkBytes)||0,totalDown=Number(totals.totalDownlinkBytes)||0;
+        overview.innerHTML='<div><small>Подтверждённый Upload · накопленный</small><strong>'+statsBytes(totalUp)+'</strong></div><div><small>Подтверждённый Download · накопленный</small><strong>'+statsBytes(totalDown)+'</strong></div><div><small>Всего · накоплено</small><strong>'+statsBytes(totalUp+totalDown)+'</strong></div><div><small>Ноды с учётом</small><strong>'+nodes.length+'</strong></div>';
+        const detailTable=(entries,title)=>'<article><h3>'+title+'</h3><div class="stats-bucket-table-wrap"><table><thead><tr><th>Источник</th><th>Upload</th><th>Download</th><th>Измерений</th></tr></thead><tbody>'+((entries||[]).length?entries.map(v=>'<tr><td>'+esc(v.inboundTag?(v.inboundTag+' · '+(v.nodeName||'Нода #'+v.nodeId)):(v.name||'Нода #'+v.nodeId))+'</td><td>'+statsBytes(v.uplinkBytes)+'</td><td>'+statsBytes(v.downlinkBytes)+'</td><td>'+esc(v.observations??'—')+'</td></tr>').join(''):'<tr><td colspan="4">Нет подтверждённых записей</td></tr>')+'</tbody></table></div></article>';
+        breakdown.innerHTML=detailTable(totals.inbounds,'Inbound по нодам · независимый счётчик')+detailTable(totals.servers,'Ноды · пользовательский счётчик');
+
       }
       const params=new URLSearchParams({range:$('#stats-history-range').value});
       if(historyInbound.value)params.set('inboundTag',historyInbound.value);
@@ -1291,9 +1306,30 @@ function statisticsP(){
   $('#stats-history-load')?.addEventListener('click',()=>void loadHistory());
   historyUser?.addEventListener('change',()=>void loadHistory(true));
   for(const control of [historyInbound,historyNode,$('#stats-history-range')])control?.addEventListener('change',()=>void loadHistory());
+  const showStatsUserTab=name=>{
+    $('.stats-user-pane').forEach(el=>{el.hidden=el.dataset.statsUserPane!==name});
+    $('.stats-user-tabs button').forEach(el=>el.classList.toggle('is-active',el.dataset.statsUserTab===name));
+    if(name==='observations')void loadObservations();
+  };
+  const closeStatsUser=()=>{++historyRequest;$('#stats-user-modal').hidden=true;$('#stats-leaders-range')?.focus()};
+  $('#stats-user-close')?.addEventListener('click',closeStatsUser);
+  $('#stats-user-modal')?.addEventListener('click',e=>{if(e.target.id==='stats-user-modal')closeStatsUser()});
+  $('#stats-user-modal')?.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();closeStatsUser()}});
+  $('.stats-user-tabs button').forEach(el=>el.addEventListener('click',()=>showStatsUserTab(el.dataset.statsUserTab)));
   $('#stats-leaders')?.addEventListener('click',event=>{
     const user=event.target.closest?.('[data-stats-history-user]');
-    if(user){historyUser.value=user.dataset.statsHistoryUser;void loadHistory(true);historyRoot.scrollIntoView({block:'nearest',behavior:'smooth'})}
+    if(user){
+      const modal=$('#stats-user-modal');
+      historyUser.value=user.dataset.statsHistoryUser;
+      $('#stats-user-title').textContent=user.textContent.trim();
+      $('#stats-user-subtitle').textContent='Пользователь #'+historyUser.value+' · проверенный трафик Xray';
+      $('#stats-user-overview').textContent='Загрузка сводки…';
+      $('#stats-user-breakdown').textContent='Загрузка…';
+      modal.hidden=false;
+      showStatsUserTab('history');
+      void loadHistory(true);
+      $('#stats-user-close')?.focus();
+    }
   });
 
   // One-second UI heartbeat, but no invented network samples: the sparkline
