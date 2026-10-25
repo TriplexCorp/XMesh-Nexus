@@ -1063,7 +1063,7 @@ const syncResponsiveTrafficChart=(kind,selector,renderSvg,logicalHeight)=>{
   const bounds=current.getBoundingClientRect();
   if(bounds.width<1||bounds.height<1)return;
   const logicalWidth=Math.max(300,Math.round(logicalHeight*bounds.width/bounds.height));
-  const previous=Number(current.getAttribute('viewBox')?.split(/\\s+/)[2])||0;
+  const previous=Number(current.getAttribute('viewBox')?.split(/\s+/)[2])||0;
   if(Math.abs(logicalWidth-previous)<=2)return;
   const template=document.createElement('template');
   template.innerHTML=renderSvg(logicalWidth);
