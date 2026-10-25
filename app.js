@@ -1047,6 +1047,24 @@ const statsRing=(label,percent,accent)=> {
  const pct=valid?Math.max(0,Math.min(100,Number(percent))):0;
  return '<div class="stats-ring-card" style="--ring-color:'+accent+';--ring-value:'+pct+'%"><div class="stats-ring"><div class="stats-ring-center"><strong>'+(valid?esc(fmt(pct,1))+'%':'—')+'</strong></div></div><span>'+esc(label)+'</span></div>';
 };
+// Plot only observed Xray delta buckets; missing intervals are deliberately not invented.
+const statsXrayHistoryChart=points=>{
+ const buckets=[...new Map(points.map(p=>[Number(p.bucketMs),null])).keys()].filter(Number.isFinite).sort((a,b)=>a-b);
+ if(!buckets.length)return '';
+ const byTime=new Map(buckets.map(t=>[t,{up:0,down:0}]));
+ for(const p of points){
+  const slot=byTime.get(Number(p.bucketMs));if(!slot)continue;
+  slot.up+=Math.max(0,Number(p.uplinkBytes)||0);
+  slot.down+=Math.max(0,Number(p.downlinkBytes)||0);
+ }
+ const w=960,h=260,l=74,r=20,t=20,b=45,max=Math.max(1,...[...byTime.values()].flatMap(v=>[v.up,v.down]));
+ const x=i=>l+(buckets.length===1?.5:i/(buckets.length-1))*(w-l-r);
+ const y=v=>t+(h-t-b)*(1-v/max);
+ const series=(key,cls)=>'<polyline class="stats-xray-line '+cls+'" points="'+buckets.map((time,i)=>x(i).toFixed(1)+','+y(byTime.get(time)[key]).toFixed(1)).join(' ')+'" fill="none"/>'+buckets.map((time,i)=>'<circle class="stats-xray-dot '+cls+'" cx="'+x(i).toFixed(1)+'" cy="'+y(byTime.get(time)[key]).toFixed(1)+'" r="4"><title>'+esc(new Date(time).toLocaleString()+' · '+key+' · '+statsBytes(byTime.get(time)[key]))+'</title></circle>').join('');
+ const grid=[0,.5,1].map(f=>'<line class="stats-detail-grid" x1="'+l+'" x2="'+(w-r)+'" y1="'+y(max*f)+'" y2="'+y(max*f)+'"/><text class="stats-detail-label" x="'+(l-8)+'" y="'+(y(max*f)+4)+'" text-anchor="end">'+esc(statsBytes(max*f))+'</text>').join('');
+ const ticks=[0,Math.floor((buckets.length-1)/2),buckets.length-1].filter((v,i,a)=>a.indexOf(v)===i).map(i=>'<text class="stats-detail-label" x="'+x(i)+'" y="'+(h-12)+'" text-anchor="'+(i===0?'start':i===buckets.length-1?'end':'middle')+'">'+esc(new Date(buckets[i]).toLocaleString(panelIsEnglish()?'en-US':'ru-RU',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}))+'</text>').join('');
+ return '<div class="stats-detail-wrap"><svg class="stats-detail-chart" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="Подтверждённые дельты Upload и Download по интервалам; промежуточные значения отсутствуют">'+grid+series('up','rx')+series('down','tx')+ticks+'</svg></div><div class="stats-detail-legend"><span><i class="rx"></i> Upload</span><span><i class="tx"></i> Download</span><small>Каждая точка — сумма подтверждённых дельт в интервале; пропущенные интервалы не означают нулевой трафик. Линии лишь соединяют наблюдаемые точки.</small></div>';
+};
 function statisticsP(){
  const markup=`<div class="stats-dashboard" id="stats-dashboard">
   <div class="stats-heading"><div><h2>Статистика инфраструктуры</h2><p class="note">Реальные измерения. CPU steal показывает долю времени, которую виртуальная машина ожидала процессор гипервизора.</p></div>
@@ -1249,7 +1267,7 @@ function statisticsP(){
       if(request!==historyRequest||cur!=='statistics'||!historyRoot.isConnected)return;
       const points=Array.isArray(result.points)?result.points:[];
       const rows=points.map(p=>'<tr><td>'+esc(new Date(p.bucketMs).toLocaleString(panelIsEnglish()?'en-US':'ru-RU'))+'</td><td>'+esc(p.inboundTag||'Пользователь')+'</td><td>'+esc(p.nodeId)+'</td><td>'+statsBytes(p.uplinkBytes)+'</td><td>'+statsBytes(p.downlinkBytes)+'</td><td>'+esc(p.sampleCount)+'</td></tr>').join('');
-      historyRoot.innerHTML='<p class="note">Источник: подтверждённые дельты Xray · '+(result.sourceType==='inbound'?'пользователь × inbound':'счётчик пользователя')+' · '+esc(result.range)+(result.truncated?' · Результат ограничен 5000 строками':'')+'. Счётчики разных источников не суммируются.</p>'+
+      historyRoot.innerHTML=statsXrayHistoryChart(points)+'<p class="note">Источник: подтверждённые дельты Xray · '+(result.sourceType==='inbound'?'пользователь × inbound':'счётчик пользователя')+' · '+esc(result.range)+(result.truncated?' · Результат ограничен 5000 строками':'')+'. Счётчики разных источников не суммируются.</p>'+
        (rows?'<div class="stats-bucket-table-wrap"><table><thead><tr><th>Интервал</th><th>Источник</th><th>Нода</th><th>Upload</th><th>Download</th><th>Измерений</th></tr></thead><tbody>'+rows+'</tbody></table></div>':'<p class="note">За период нет подтверждённых изменений. Это не доказательство нулевого трафика.</p>');
     }catch(error){if(request===historyRequest&&historyRoot.isConnected)historyRoot.textContent='История недоступна: '+(error.message||'Ошибка API')}
   };
