@@ -1857,6 +1857,10 @@ async fn get_statistics_overview(
         } else {
             (None, None, None, None)
         };
+        let telemetry_state = current.as_ref()
+            .and_then(|value| value.get("freshness"))
+            .and_then(Value::as_str)
+            .unwrap_or("never_received");
         nodes.push(json!({
             "networkRxBytes":network_rx,
             "networkTxBytes":network_tx,
@@ -1870,7 +1874,7 @@ async fn get_statistics_overview(
             "flag":node.get("flag"),
             "disabled":node.get("disabled"),
             "latest":current,
-            "telemetryState":current.as_ref().and_then(|value| value.get("freshness")).and_then(Value::as_str).unwrap_or("never_received")
+            "telemetryState":telemetry_state
         }));
     }
     let users: i64 =
