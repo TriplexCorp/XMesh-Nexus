@@ -14,7 +14,7 @@ assert.match(app,/\/api\/v1\/statistics\/overview/);
 assert.match(app,/\/api\/v1\/metrics\/traffic\?range=/);
 assert.match(app,/CPU steal/);
 assert.match(app,/stats-quality/);
-assert.match(app,/\/api\/v1\/statistics\/leaders/);
+assert.match(app,/\/api\/v1\/statistics\/period-leaders/);
 assert.match(app,/id="stats-leaders"/);
 assert.match(app,/id="stats-history-results"/);
 assert.match(app,/id="stats-user-modal"/);
@@ -181,7 +181,7 @@ assert.match(css,/\.stats-user-tabs\{display:flex;flex-direction:row/);
 assert.match(css,/\.stats-user-actions\{margin-left:auto;display:flex;flex-direction:row/);
 
 // Regression: a single DOM element cannot be iterated with for...of.
-assert.match(app,/for\(const button of \$\$\('\.stats-user-actions button'\)\)/);
+assert.match(app,/\$\$\('\.stats-user-tabs button'\)\.forEach/);
 assert.doesNotMatch(app,/for\(const button of \$\('\.stats-user-actions button'\)\)/);
 
 // Tab switching must not affect the outer modal dimensions.
@@ -202,7 +202,7 @@ assert.match(app,/ID пользователя: \$\{esc\(u\.id\)\}/);
 assert.match(app,/pendingUserTrafficDetail=\{id,name:/);
 assert.match(app,/openStatsUser\(requested\.id,requested\.name\)/);
 
-assert.match(app,/userTrafficReturn=\{hash:location\.hash\|\|'#users',userId:id\}/);
+assert.match(app,/userTrafficReturn=\{hash:location\.hash\|\|'#users',userId:id,dialogSize:/);
 assert.match(app,/const origin=userTrafficReturn/);
 assert.match(app,/location\.hash=origin\.hash/);
 
