@@ -37,6 +37,7 @@ const P={
   search:'<circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>',
   sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M6.35 17.65l-1.42 1.42M19.07 4.93l-1.42 1.42"/>',
   moon:'<path d="M20.985 12.486A9 9 0 0 1 11.514 3.015 9 9 0 1 0 20.985 12.486Z"/>',
+  'refresh-cw':'<path d="M20 11a8 8 0 0 0-14.3-5L3 9m0-6v6h6"/><path d="M4 13a8 8 0 0 0 14.3 5L21 15m0 6v-6h-6"/>',
   redo:'<path d="M3 12a9 9 0 0 1 15.36-6.36L21 8M21 3v5h-5M21 12a9 9 0 0 1-15.36 6.36L3 16M3 21v-5h5"/>',
   plus:'<path d="M12 5v14M5 12h14"/>',
   x:'<path d="M18 6 6 18M6 6l12 12"/>',
@@ -1009,7 +1010,7 @@ const statsRing=(label,percent,accent)=> {
 function statisticsP(){
  const markup=`<div class="stats-dashboard" id="stats-dashboard">
   <div class="stats-heading"><div><h2>Статистика инфраструктуры</h2><p class="note">Реальные измерения. CPU steal показывает долю времени, которую виртуальная машина ожидала процессор гипервизора.</p></div>
-   <div class="act"><select id="stats-period" aria-label="Период графиков"><option value="1h">1 час</option><option value="24h">24 часа</option><option value="7d">7 дней</option><option value="30d">30 дней</option></select><button class="gh" id="stats-refresh" type="button">${ic('refresh-cw')} Обновить</button></div></div>
+   <div class="act"><button class="gh" id="stats-refresh" type="button" aria-label="Обновить статистику">${ic('refresh-cw')} Обновить</button><select id="stats-period" aria-label="Период графиков"><option value="live">В реальном времени</option><option value="5m">5 минут</option><option value="15m">15 минут</option><option value="30m">30 минут</option><option value="1h">1 час</option><option value="3h">3 часа</option><option value="6h">6 часов</option><option value="12h">12 часов</option><option value="24h">24 часа</option><option value="7d">7 дней</option><option value="30d">30 дней</option></select></div></div>
   <div id="stats-status" class="note" role="status" aria-live="polite">Получение измерений…</div><div id="stats-quality" class="note" role="status" aria-live="polite"></div>
   <div id="stats-summary" class="stats-overview-grid"></div>
   <div class="stats-layout">
@@ -1030,7 +1031,7 @@ function statisticsP(){
    const button=$('#stats-refresh');if(button)button.disabled=true;
    if(status)status.textContent='Обновление измерений…';
    try{
-    const period=$('#stats-period')?.value||'1h';
+    const period=$('#stats-period')?.value||'live';
     const [overview,sys,traffic]=await Promise.all([
       backendRequest('/api/v1/statistics/overview'),
       api.systemStats(),
@@ -1099,7 +1100,7 @@ function statisticsP(){
   $('#stats-refresh')?.addEventListener('click',()=>{void refresh()});
   $('#stats-period')?.addEventListener('change',()=>{void refresh()});
   void refresh();
-  T.push(setInterval(()=>{if(cur==='statistics'&&!document.hidden&&Date.now()-lastRefresh>=30000)void refresh()},5000));
+  T.push(setInterval(()=>{if(cur==='statistics'&&!document.hidden&&Date.now()-lastRefresh>=($('#stats-period')?.value==='live'?5000:30000))void refresh()},1000));
  };
  return Promise.resolve([markup,init]);
 }
