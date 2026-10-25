@@ -65,7 +65,10 @@ update_router() {
  export DOCKER_CONFIG="$HOME/.docker"
  export XDG_CONFIG_HOME="$HOME/.config"
  export XDG_CACHE_HOME="$HOME/.cache"
- install -d -m 0700 "$HOME" "$DOCKER_CONFIG" "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME" || return 1
+ # Compose's Buildx metadata uses os.CreateTemp and defaults to /tmp.
+ # PrivateTmp + ProtectSystem=strict makes that path read-only.
+ export TMPDIR="$HOME/tmp"
+ install -d -m 0700 "$HOME" "$DOCKER_CONFIG" "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME" "$TMPDIR" || return 1
  docker compose version >/dev/null 2>&1 || { echo "Docker Compose missing" >&2; return 1; }
  local mounted dir previous
  mounted="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/etc/xmesh-node/config.json"}}{{.Source}}{{end}}{{end}}' xmesh-node 2>/dev/null)" || return 1
