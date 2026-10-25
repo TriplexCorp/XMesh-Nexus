@@ -974,12 +974,12 @@ pub async fn serve(
     let consumed_gib = user
         .get("used")
         .and_then(Value::as_f64)
-                .unwrap_or(0.0)
+        .unwrap_or(0.0)
         .max(0.0);
     let limit = user
         .get("limit")
         .and_then(Value::as_f64)
-                .unwrap_or(0.0)
+        .unwrap_or(0.0)
         .max(0.0);
     let expiry = user.get("expireAt").and_then(Value::as_i64).unwrap_or(0);
     let to_bytes = |gib: f64| -> u64 {
@@ -1219,12 +1219,12 @@ pub async fn portal(
     let consumed_gib = user
         .get("used")
         .and_then(Value::as_f64)
-                .unwrap_or(0.0)
+        .unwrap_or(0.0)
         .max(0.0);
     let limit = user
         .get("limit")
         .and_then(Value::as_f64)
-                .unwrap_or(0.0)
+        .unwrap_or(0.0)
         .max(0.0);
     let mut metrics = String::new();
     if studio_enabled(&settings, "subscriptionShowTraffic", true) {
