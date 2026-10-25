@@ -1447,16 +1447,7 @@ fn portal_decoration<'a>(settings: &'a Value, en: bool, active: bool) -> PortalD
     PortalDecoration { support, logo_markup, status_dot, title, footer, logo_brand }
 }
 
-fn portal_html(
-    settings: &Value,
-    lang: &str,
-    en: bool,
-    metrics: String,
-    controls: PortalControls,
-    decoration: PortalDecoration<'_>,
-) -> String {
-    let PortalControls { quick, qr, devices, cta, apps } = controls;
-    let PortalDecoration { support, logo_markup, status_dot, title, footer, logo_brand } = decoration;
+fn portal_theme_changes(settings: &Value) -> Vec<(&'static str, String)> {
     let background = studio_color(settings, "subscriptionBackground", "#0c131b");
     let card_color = studio_color(settings, "subscriptionCardColor", "#15212b");
     let text_color = studio_color(settings, "subscriptionTextColor", "#ecf3f6");
@@ -1475,10 +1466,7 @@ fn portal_html(
             default.to_owned()
         }
     };
-    let mut html = include_str!("subscription_template.html").to_owned();
-    let changes = [
-        ("{{LANG}}", lang.to_owned()),
-        ("{{BRAND}}", escape_html(logo_brand)),
+    vec![
         ("{{ACCENT}}", accent),
         ("{{SECONDARY_ACCENT}}", secondary),
         ("{{BACKGROUND}}", background),
@@ -1531,6 +1519,24 @@ fn portal_html(
                 "system",
             ),
         ),
+    ]
+}
+
+fn portal_html(
+    settings: &Value,
+    lang: &str,
+    en: bool,
+    metrics: String,
+    controls: PortalControls,
+    decoration: PortalDecoration<'_>,
+) -> String {
+    let PortalControls { quick, qr, devices, cta, apps } = controls;
+    let PortalDecoration { support, logo_markup, status_dot, title, footer, logo_brand } = decoration;
+    let theme_changes = portal_theme_changes(settings);
+    let mut html = include_str!("subscription_template.html").to_owned();
+    let changes = [
+        ("{{LANG}}", lang.to_owned()),
+        ("{{BRAND}}", escape_html(logo_brand)),
         ("{{LOGO}}", logo_markup),
         (
             "{{RU_SELECTED}}",
@@ -1575,6 +1581,9 @@ fn portal_html(
         ("{{SUPPORT}}", support),
         ("{{FOOTER}}", escape_html(footer)),
     ];
+    for (marker, value) in theme_changes {
+        html = html.replace(marker, &value);
+    }
     for (marker, value) in changes {
         html = html.replace(marker, &value);
     }
