@@ -1399,3 +1399,36 @@ body>.sv-studio-portal ::-webkit-scrollbar-button:single-button:vertical:end:inc
 .sv-studio .sv-overlay .sv-dialog>header>button[data-action="close"]:focus-visible{
   outline:2px solid var(--vaccent);outline-offset:2px;
 }
+
+
+/* Document add tab: reserve a true square button even when the responsive
+   page-tabs rule makes all direct buttons flex:1 / min-width:0. */
+.sv-studio .sv-topbar>.sv-page-tabs>button.sv-json-document-add{
+ flex:0 0 2.75rem;
+ inline-size:2.75rem;
+ min-inline-size:2.75rem;
+ max-inline-size:2.75rem;
+ block-size:2.75rem;
+ min-block-size:2.75rem;
+ max-block-size:2.75rem;
+ padding:0;
+ margin-inline-start:.45rem;
+ align-self:center;
+ aspect-ratio:1;
+ box-sizing:border-box;
+ display:grid;
+ place-items:center;
+ border:1px solid var(--vline);
+ border-radius:var(--vround);
+ background:var(--vfield);
+ color:var(--vtext);
+ line-height:1;
+ font-size:1.32rem;
+ font-weight:600;
+ flex-shrink:0;
+}
+.sv-studio .sv-topbar>.sv-page-tabs>button.sv-json-document-add:hover{
+ background:color-mix(in srgb,var(--vaccent) 11%,var(--vfield));
+ border-color:var(--vaccent);
+ color:var(--vaccent);
+}
