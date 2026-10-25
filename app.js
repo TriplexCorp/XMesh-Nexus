@@ -952,6 +952,7 @@ function scrollToSettingsTarget(id){
   return true;
 }
 async function render(soft){
+  document.querySelector('body > .sv-studio-portal')?.remove();
   document.querySelector('body > #stats-user-modal')?.remove();
   T.forEach(clearInterval);T=[];cur=location.hash.slice(1);if(!pages[cur]||(viewerMode()&&!['home','statistics','users','nodes'].includes(cur)))cur='home';const rt=++RT,[t,f]=pages[cur],v=$('#view');
   $('#title').textContent=t;document.title=(window.XMeshI18n?.translate(t)||t)+' — '+DB.set.brand;$$('#nav a').forEach(a=>a.classList.toggle('on',a.getAttribute('href')=='#'+cur));
