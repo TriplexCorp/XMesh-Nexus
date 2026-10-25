@@ -2650,14 +2650,21 @@ async fn get_traffic_metrics(
     Query(query): Query<TrafficMetricsQuery>,
 ) -> Result<Json<Value>, ApiError> {
     let (range, interval_seconds) = match query.range.as_deref().unwrap_or("1h") {
+        "live" => ("live", 5_i64),
+        "5m" => ("5m", 10_i64),
+        "15m" => ("15m", 30_i64),
+        "30m" => ("30m", 30_i64),
         "1h" => ("1h", 60_i64),
+        "3h" => ("3h", 180_i64),
+        "6h" => ("6h", 300_i64),
+        "12h" => ("12h", 600_i64),
         "24h" => ("24h", 900_i64),
         "7d" => ("7d", 3600_i64),
         "30d" => ("30d", 21_600_i64),
         _ => {
             return Err(ApiError::new(
                 StatusCode::BAD_REQUEST,
-                "Период должен быть 1h, 24h, 7d или 30d.",
+                "Недопустимый период статистики.",
             ));
         }
     };
@@ -2713,13 +2720,13 @@ async fn get_traffic_metrics(
         ),
         per_node_bucket AS (
             SELECT
-                time_bucket(CASE $3::text WHEN '1h' THEN INTERVAL '1 minute' WHEN '24h' THEN INTERVAL '15 minutes' WHEN '7d' THEN INTERVAL '1 hour' ELSE INTERVAL '6 hours' END, s.sampled_at) AS bucket,
+                time_bucket(CASE $3::text WHEN 'live' THEN INTERVAL '5 seconds' WHEN '5m' THEN INTERVAL '10 seconds' WHEN '15m' THEN INTERVAL '30 seconds' WHEN '30m' THEN INTERVAL '30 seconds' WHEN '1h' THEN INTERVAL '1 minute' WHEN '3h' THEN INTERVAL '3 minutes' WHEN '6h' THEN INTERVAL '5 minutes' WHEN '12h' THEN INTERVAL '10 minutes' WHEN '24h' THEN INTERVAL '15 minutes' WHEN '7d' THEN INTERVAL '1 hour' ELSE INTERVAL '6 hours' END, s.sampled_at) AS bucket,
                 s.node_id,
                 AVG(s.rx_bytes_per_sec) AS rx_bytes_per_sec,
                 AVG(s.tx_bytes_per_sec) AS tx_bytes_per_sec,
                 COUNT(*)::BIGINT AS sample_count
             FROM server_metric_samples s
-            WHERE s.sampled_at >= NOW() - CASE $3::text WHEN '1h' THEN INTERVAL '1 hour' WHEN '24h' THEN INTERVAL '24 hours' WHEN '7d' THEN INTERVAL '7 days' ELSE INTERVAL '30 days' END
+            WHERE s.sampled_at >= NOW() - CASE $3::text WHEN 'live' THEN INTERVAL '1 minute' WHEN '5m' THEN INTERVAL '5 minutes' WHEN '15m' THEN INTERVAL '15 minutes' WHEN '30m' THEN INTERVAL '30 minutes' WHEN '1h' THEN INTERVAL '1 hour' WHEN '3h' THEN INTERVAL '3 hours' WHEN '6h' THEN INTERVAL '6 hours' WHEN '12h' THEN INTERVAL '12 hours' WHEN '24h' THEN INTERVAL '24 hours' WHEN '7d' THEN INTERVAL '7 days' ELSE INTERVAL '30 days' END
               AND s.node_id IN (SELECT node_id FROM selected_nodes)
             GROUP BY 1, 2
         )
