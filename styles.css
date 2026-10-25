@@ -5609,7 +5609,7 @@ body>.sv-studio-portal,body>.sv-studio-portal *{
    Keep the 1000×340 viewBox proportions without allowing full-width SVGs to
    grow unbounded on ultrawide screens or ignore the root --ts font scale. */
 .stats-detail-wrap{
- width:min(100%,72rem);
+ width:min(100%,100rem);
  max-width:100%;
  margin-inline:auto;
  box-sizing:border-box;
@@ -5639,7 +5639,7 @@ body>.stats-user-overlay .stats-user-pane .stats-detail-chart{
    Use an intrinsic viewBox, constrain the drawing area on wide monitors, and
    keep its width responsive instead of enlarging indefinitely with viewport. */
 .traffic-chart-wrap{
- width:min(100%,72rem);
+ width:min(100%,100rem);
  max-width:100%;
  margin-inline:auto;
  box-sizing:border-box;
