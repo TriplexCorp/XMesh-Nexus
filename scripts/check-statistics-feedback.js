@@ -22,6 +22,9 @@ assert.match(app,/data-stats-user-tab="history"/);
 assert.match(app,/data-stats-user-tab="inbounds"/);
 assert.match(app,/data-stats-user-tab="observations"/);
 assert.match(app,/const showStatsUserTab=name=>/);
+assert.match(app,/\$\$\('\.stats-user-pane'\)\.forEach/);
+assert.equal((app.match(/\$\$\('\.stats-user-tabs button'\)\.forEach/g)||[]).length,2);
+assert.doesNotMatch(app,/(?<!\$)\$\([^\n;]*\)\.forEach\s*\(/, 'querySelector returns an element, not a collection; use $ for forEach');
 assert.match(app,/const closeStatsUser=\(\)=>/);
 assert.match(css,/\.stats-user-overlay\[hidden\]/);
 
