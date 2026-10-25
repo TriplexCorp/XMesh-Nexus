@@ -77,7 +77,7 @@ This roadmap tracks verified improvements, not feature claims. A stage is comple
 | Workstream | Implemented / verified so far | Still required for stage exit |
 | --- | --- | --- |
 | **P0 CI / releases** | Non-mutating rustfmt gate, all-target Rust tests, strict pedantic/nursery Clippy, Node.js checks, Docker build and disposable API integration pass in PR CI | Green baseline after merge on `main`, branch protection evidence, release / rollback drill |
-| **P0 node enforcement** | Signed Ed25519 node policy/telemetry, signed command delivery, replay rejection and offline enforcement logic documented; API integration exercises signatures and command acknowledgement | Actual Xray traffic-denial tests, disconnect/reconnect and revision-conflict fault injection, independently verified applied revision |
+| **P0 node enforcement** | Signed Ed25519 node policy/telemetry, signed command delivery, replay rejection and offline enforcement logic documented; API integration exercises signatures and command acknowledgement. **Operator reports a live manual test:** disabling a user stopped real Xray traffic after ~10 s (2026-10-25) | Independently reproducible/automated traffic-denial tests (new and existing flows), timing measurements, disconnect/reconnect and revision-conflict fault injection, independently verified applied revision |
 | **P0 telemetry** | Per-user/per-inbound cumulative counters and signed ingestion implemented; CI includes replay, presence and accounting checks | Full delayed/out-of-order/reset/restart matrix and verified 45-second expiration under faults; stale-data alerts |
 | **P1 compatibility** | Server/client JSON generation and endpoint selection logic with test coverage for supported paths | Real client/Xray compatibility matrix, transport/security fixtures and verified exports |
 | **P1 security / operations** | Owner/admin/viewer isolation, MFA/session revocation and Ed25519 enrollment covered by API integration; active-host creation exercised with valid profile+node binding | Exhaustive endpoint × role matrix, threat model, scans, off-host restore of database and cryptographic keys |
@@ -103,7 +103,8 @@ This roadmap tracks verified improvements, not feature claims. A stage is comple
 
 ## 2 — P0: Verified enforcement on nodes
 
-- [ ] Test disabling an active user end-to-end: panel write → desired policy → node apply → Xray rejects further traffic.
+- [x] **User-confirmed live-node manual test (2026-10-25):** disabling an active user in Nexus causes actual VPN traffic through Xray to stop after approximately **10 seconds**. The operator personally tested traffic cessation, not just the UI status. This is **user-reported operational evidence**, not an independently reproduced or automated test; the precise internal stage timings were not measured.
+- [ ] **Automate and reproduce** active-user disablement end-to-end: panel write → desired policy → node apply → Xray denies new connections **and** terminates/blocks existing traffic; capture before/after traffic evidence, revision/ACK and timing distribution across repeated runs.
 - [ ] Verify expiry and exhausted quotas on real node(s), not just UI or generated JSON.
 - [ ] Simulate control-plane disconnection, node reconnect, revision conflicts, retries and replay attempts.
 - [ ] Capture and report desired vs actually applied revision; do not claim success from an accepted command.
