@@ -1306,6 +1306,20 @@ function statisticsP(){
   const historyUser=$('#stats-history-user'),historyInbound=$('#stats-history-inbound'),historyNode=$('#stats-history-node'),historyRoot=$('#stats-history-results');
   let historyRequest=0;
   const historyOption=(value,label)=>'<option value="'+esc(String(value))+'">'+esc(label)+'</option>';
+  let statsBreakdownTotals=null;
+  const renderStatsBreakdown=()=>{
+    const root=$('#stats-user-breakdown');
+    if(!root||!statsBreakdownTotals)return;
+    const inbound=historyInbound.value,node=historyNode.value;
+    const rows=entries=>(Array.isArray(entries)?entries:[]).filter(entry=>
+      (!node||String(entry.nodeId)===node)&&(!inbound||String(entry.inboundTag||'')===inbound));
+    const table=(entries,title)=>'<article><h3>'+title+'</h3><div class="stats-bucket-table-wrap"><table><thead><tr><th>Источник</th><th>Upload</th><th>Download</th><th>Измерений</th></tr></thead><tbody>'+
+      (entries.length?entries.map(v=>'<tr><td>'+esc(v.inboundTag?(v.inboundTag+' · '+(v.nodeName||'Нода #'+v.nodeId)):(v.name||'Нода #'+v.nodeId))+'</td><td>'+statsBytes(v.uplinkBytes)+'</td><td>'+statsBytes(v.downlinkBytes)+'</td><td>'+esc(v.observations??'—')+'</td></tr>').join(''):'<tr><td colspan="4">Нет данных для выбранных фильтров</td></tr>')+'</tbody></table></div></article>';
+    // Node totals are user counters, independent of inbound counters. Do not claim
+    // that filtering by an inbound produces a node-level inbound breakdown.
+    root.innerHTML=table(rows(statsBreakdownTotals.inbounds),'Inbound по нодам · независимый счётчик')+
+      table(inbound?[]:rows(statsBreakdownTotals.servers),'Ноды · пользовательский счётчик');
+  };
   const loadHistory=async(reloadDimensions=false)=>{
     const id=Number(historyUser?.value),request=++historyRequest;
     const refreshButton=$('#stats-user-refresh');
@@ -1330,8 +1344,8 @@ function statisticsP(){
         if(sourceInsight)sourceInsight.innerHTML='<div class="stats-insight-donut" style="--stats-download-share:'+(totalTraffic?100*totalDown/totalTraffic:0)+'%"><span><small>Всего</small><strong>'+statsBytes(totalTraffic)+'</strong></span></div><div class="stats-insight-legend"><div><i class="stats-insight-dot is-download"></i><span>Download</span><strong>'+statsBytes(totalDown)+' · '+pct(totalDown)+'</strong></div><div><i class="stats-insight-dot is-upload"></i><span>Upload</span><strong>'+statsBytes(totalUp)+' · '+pct(totalUp)+'</strong></div></div>';
         const nodeInsight=$('#stats-user-node-insight');
         if(nodeInsight){const servers=(Array.isArray(totals.servers)?totals.servers:[]).map(node=>({...node,bytes:(Number(node.uplinkBytes)||0)+(Number(node.downlinkBytes)||0)})).sort((a,b)=>b.bytes-a.bytes);const nodeTotal=servers.reduce((sum,node)=>sum+node.bytes,0);nodeInsight.innerHTML=servers.length?servers.slice(0,5).map(node=>'<div class="stats-insight-node"><div><span>'+esc(node.name||'Нода #'+node.nodeId)+'</span><strong>'+statsBytes(node.bytes)+'</strong></div><div class="stats-insight-track"><span style="width:'+(nodeTotal?Math.min(100,100*node.bytes/nodeTotal):0)+'%"></span></div></div>').join(''):'<p class="note">Нет подтверждённых измерений по нодам</p>';}
-        const detailTable=(entries,title)=>'<article><h3>'+title+'</h3><div class="stats-bucket-table-wrap"><table><thead><tr><th>Источник</th><th>Upload</th><th>Download</th><th>Измерений</th></tr></thead><tbody>'+((entries||[]).length?entries.map(v=>'<tr><td>'+esc(v.inboundTag?(v.inboundTag+' · '+(v.nodeName||'Нода #'+v.nodeId)):(v.name||'Нода #'+v.nodeId))+'</td><td>'+statsBytes(v.uplinkBytes)+'</td><td>'+statsBytes(v.downlinkBytes)+'</td><td>'+esc(v.observations??'—')+'</td></tr>').join(''):'<tr><td colspan="4">Нет подтверждённых записей</td></tr>')+'</tbody></table></div></article>';
-        breakdown.innerHTML=detailTable(totals.inbounds,'Inbound по нодам · независимый счётчик')+detailTable(totals.servers,'Ноды · пользовательский счётчик');
+        statsBreakdownTotals=totals;
+        renderStatsBreakdown();
 
       }
       const params=new URLSearchParams({range:$('#stats-history-range').value});
@@ -1364,7 +1378,7 @@ function statisticsP(){
     }catch(error){if(request===observationsRequest&&root.isConnected)root.textContent='Не удалось загрузить измерения: '+(error.message||'Ошибка API')}
   };
   historyUser?.addEventListener('change',()=>void loadHistory(true));
-  for(const control of [historyInbound,historyNode,$('#stats-history-range')])control?.addEventListener('change',()=>{void loadHistory();if($('.stats-user-pane[data-stats-user-pane="observations"]')?.hidden===false)void loadObservations()});
+  for(const control of [historyInbound,historyNode,$('#stats-history-range')])control?.addEventListener('change',()=>{renderStatsBreakdown();void loadHistory();if($('.stats-user-pane[data-stats-user-pane="observations"]')?.hidden===false)void loadObservations()});
   historyUser?.addEventListener('change',()=>{if($('.stats-user-pane[data-stats-user-pane="observations"]')?.hidden===false)void loadObservations()});
   const showStatsUserTab=name=>{
     $$('.stats-user-pane').forEach(el=>{el.hidden=el.dataset.statsUserPane!==name});
