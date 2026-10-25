@@ -2646,7 +2646,7 @@ fn aggregate_traffic_metric_rows(
 }
 
 fn traffic_metrics_range(range: Option<&str>) -> Result<(&'static str, i64), ApiError> {
-    match range.unwrap_or("1h") {
+    Ok(match range.unwrap_or("1h") {
         "live" => ("live", 5_i64),
         "5m" => ("5m", 10_i64),
         "15m" => ("15m", 30_i64),
@@ -2664,7 +2664,7 @@ fn traffic_metrics_range(range: Option<&str>) -> Result<(&'static str, i64), Api
                 "Недопустимый период статистики.",
             ));
         }
-    }
+    })
 }
 
 async fn get_traffic_metrics(
