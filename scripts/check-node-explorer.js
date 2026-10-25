@@ -45,7 +45,7 @@ assert.match(app,/explorer\.runtimeQueue=explorer\.runtimeQueue\.filter/,'Drop q
 assert.match(app,/setTimeout\(\(\)=>\{if\(!root\.isConnected\)return;nodeExplorer\.page=1;nodeExplorerUpdate\(\)\},140\)/,'Debounced input');
 assert.match(css,/\.nodes-page \.node-explorer\{/,'Dedicated themed filter bar');
 assert.match(html,/app\.js\?v=[a-z0-9-]+/,'Cache-busted explorer script');
-assert.match(app,/data-action-icon="done"[^>]*>\\$\\{ic\\("redo"\\)\\}/,'Reset button supplies exactly one SVG and opt-outs of icon decoration');
+assert(app.includes('data-node-search-clear data-action-icon="done"')&&app.includes('${ic("redo")}<span>Сбросить</span>'),'Reset button supplies exactly one SVG and opts out of icon decoration');
 assert.match(app,/data-node-prev data-action-icon="done"/,'Previous page must not duplicate icons');
 assert.match(app,/data-node-next data-action-icon="done"/,'Next page must not duplicate icons');
 assert.match(app,/pager\\.dataset\\.singlePage=pages===1/,'One-page pagination is visually simplified');
