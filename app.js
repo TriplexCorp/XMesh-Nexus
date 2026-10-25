@@ -3257,6 +3257,8 @@ function nodeExplorerUpdate(){
  if(total)total.textContent=filtered.length+' / '+explorer.entries.length+(panelIsEnglish()?' nodes':' узлов');
  const page=root.querySelector('[data-node-search-page]');
  if(page)page.textContent=explorer.page+' / '+pages;
+ const pager=root.querySelector('.node-explorer-pages');
+ if(pager)pager.dataset.singlePage=pages===1?'true':'false';
  for(const [button,disabled] of [['[data-node-prev]',explorer.page===1],['[data-node-next]',explorer.page===pages]]){
   const el=root.querySelector(button);if(el)el.disabled=disabled;
  }
@@ -3358,8 +3360,8 @@ async function nodesP(){
    <label><span>Состояние</span><select data-node-state><option value="all">Все</option><option value="enabled">Активные</option><option value="disabled">Отключены</option><option value="monitored">Есть телеметрия</option><option value="unmonitored">Нет свежей телеметрии</option></select></label>
    <label><span>Сортировка</span><select data-node-sort><option value="name">Название А–Я</option><option value="name-desc">Название Я–А</option><option value="ip">IP / адрес</option><option value="hosting">Хостинг</option><option value="status">Состояние</option><option value="id-desc">Новые сначала</option><option value="id-asc">Старые сначала</option></select></label>
    <label class="node-explorer-hosting"><input type="checkbox" data-node-hosting-only> Только с хостингом</label>
-   <button type="button" class="gh node-explorer-reset" data-node-search-clear><span class="node-explorer-reset-icon" aria-hidden="true">⟳</span><span>Сбросить</span></button>
-  </div><div class="node-explorer-meta"><span data-node-search-count></span><div class="node-explorer-pages"><button type="button" class="gh sm" data-node-prev aria-label="Предыдущая страница">←</button><span data-node-search-page></span><button type="button" class="gh sm" data-node-next aria-label="Следующая страница">→</button></div></div><div class="node-explorer-empty" data-node-search-empty hidden>Ничего не найдено. Измените запрос или сбросьте фильтры.</div>
+   <button type="button" class="gh node-explorer-reset" data-node-search-clear data-action-icon="done">${ic("redo")}<span>Сбросить</span></button>
+  </div><div class="node-explorer-meta"><span data-node-search-count></span><div class="node-explorer-pages" aria-label="Навигация по страницам"><button type="button" class="gh sm node-explorer-page-button" data-node-prev data-action-icon="done" aria-label="Предыдущая страница" title="Предыдущая страница">${ic("arrowLeft")}</button><span data-node-search-page aria-live="polite"></span><button type="button" class="gh sm node-explorer-page-button" data-node-next data-action-icon="done" aria-label="Следующая страница" title="Следующая страница">${ic("arrowRight")}</button></div></div><div class="node-explorer-empty" data-node-search-empty hidden>Ничего не найдено. Измените запрос или сбросьте фильтры.</div>
   <div class="nodes" data-grid-mode="${gridMode}" data-node-count="${r.items.length}"></div>`:empty}</section>`,()=>{mountNodeExplorer();drawNodeLive()}]
 }
 function setNodeGauge(key,pct,center,detail){
