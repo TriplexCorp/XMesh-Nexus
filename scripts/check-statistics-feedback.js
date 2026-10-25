@@ -35,6 +35,10 @@ assert.match(app,/stats-insight-donut/);
 assert.match(css,/backdrop-filter:blur\(13px\)/);
 assert.match(css,/\.stats-user-workspace\{display:grid/);
 assert.match(css,/@media\(max-width:1050px\)/);
+assert.match(css,/Statistics intelligence: viewport-first landscape layout/);
+assert.match(css,/var\(--panel-content-max, 1920px\)/);
+assert.match(css,/max-height:calc\(100dvh - 2rem\)/);
+assert.match(css,/\.stats-user-main\{display:flex;flex-direction:column;min-height:0;overflow:hidden\}/);
 
 
 assert.match(app,/const statsXrayHistoryChart=points=>/);
