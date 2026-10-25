@@ -315,7 +315,9 @@ elif [[ "$action" == update_agent ]];then
   success=true
   detail='Agent installed and version verified'
  else
-  detail='Agent update failed; inspect xmesh-node-agent-upgrade.service'
+  unit_result="$(systemctl show --property=Result --value xmesh-node-agent-upgrade.service 2>/dev/null || true)"
+  [[ "$unit_result" =~ ^[a-zA-Z0-9_-]{1,40}$ ]] || unit_result=unknown
+  detail="Agent update failed (systemd: $unit_result); journalctl -u xmesh-node-agent-upgrade.service"
  fi
 elif [[ "$action" == restart_xray ]];then
  if restart_xray;then
