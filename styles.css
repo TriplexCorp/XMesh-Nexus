@@ -5445,3 +5445,8 @@ body > .stats-user-overlay #stats-user-refresh.is-refreshing .stats-refresh-icon
 body > .stats-user-overlay #stats-user-refresh.is-refreshing{cursor:progress;opacity:.8}
 @keyframes stats-user-refresh-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){body > .stats-user-overlay #stats-user-refresh.is-refreshing .stats-refresh-icon{animation-duration:2s}}
+
+/* Match the standard circular close control used by user dialogs. */
+body > .stats-user-overlay .stats-user-actions #stats-user-close{flex:0 0 2.15rem;width:2.15rem;min-width:2.15rem;height:2.15rem;min-height:2.15rem;padding:0!important;border-radius:50%;display:inline-flex;align-items:center;justify-content:center}
+body > .stats-user-overlay .stats-user-actions #stats-user-close svg{display:block!important;width:1rem;height:1rem}
+body > .stats-user-overlay .stats-user-actions #stats-user-close:hover{border-color:var(--a);color:var(--a)}
