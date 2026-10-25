@@ -3558,6 +3558,31 @@ fn validate_public_host_endpoint(host: &Value) -> Result<(), ApiError> {
     Ok(())
 }
 
+// Keep the host save gate consistent with user_subscriptions::proxy_outbound.
+fn subscription_host_protocol_supported(inbound: &Value) -> bool {
+    matches!(
+        inbound.get("protocol").and_then(Value::as_str),
+        Some("vless" | "vmess" | "trojan" | "shadowsocks" | "hysteria" | "masque")
+    )
+}
+
+#[cfg(test)]
+mod subscription_host_protocol_tests {
+    use super::*;
+
+    #[test]
+    fn all_exportable_inbounds_can_be_used_by_hosts() {
+        for protocol in ["vless", "vmess", "trojan", "shadowsocks", "hysteria", "masque"] {
+            let inbound = json!({"tag":"test","protocol":protocol});
+            assert!(subscription_host_protocol_supported(&inbound), "{protocol}");
+        }
+        for protocol in ["socks", "http", "wireguard", "unknown"] {
+            assert!(!subscription_host_protocol_supported(&json!({"protocol":protocol})), "{protocol}");
+        }
+        assert!(!subscription_host_protocol_supported(&json!({})));
+    }
+}
+
 async fn validate_host_binding(pool: &PgPool, host: &Value) -> Result<(), ApiError> {
     // Disabled hosts are allowed to remain drafts and can always be switched off.
     // Re-enabling them validates the full runtime profile/node relationship.
@@ -3600,8 +3625,7 @@ async fn validate_host_binding(pool: &PgPool, host: &Value) -> Result<(), ApiErr
                 .find(|inbound| inbound.get("tag").and_then(Value::as_str) == Some(tag))
         })
         .ok_or_else(|| bad("Выбранный inbound отсутствует в XRAY STUDIO профиле."))?;
-    let protocol = inbound.get("protocol").and_then(Value::as_str).unwrap_or("");
-    if !["vless", "vmess", "trojan", "shadowsocks", "hysteria", "masque"].contains(&protocol) {
+    if !subscription_host_protocol_supported(inbound) {
         return Err(bad("Выбранный inbound не поддерживается генератором JSON-подписок."));
     }
     let all_nodes = load_records(pool, "nodes").await?;
