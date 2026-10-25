@@ -1163,7 +1163,7 @@ function statisticsP(){
     if(!panel)return;
     panel.hidden=false;
     panel.innerHTML='<p class="note">Загрузка показаний узлов…</p>';
-    $('.stats-detail-point').forEach(el=>el.classList.toggle('is-selected',Number(el.dataset.bucketMs)===bucketMs));
+    $$('.stats-detail-point').forEach(el=>el.classList.toggle('is-selected',Number(el.dataset.bucketMs)===bucketMs));
     try{
       const range=$('#stats-period')?.value||'live';
       const detail=await backendRequest('/api/v1/metrics/traffic/bucket-detail?'+new URLSearchParams({range,bucketMs:String(bucketMs)}));
@@ -1191,7 +1191,7 @@ function statisticsP(){
   $('#stats-bucket-detail')?.addEventListener('click',e=>{
     if(e.target.closest?.('[data-stats-detail-close]')){
       selectedBucketMs=null;++detailRequest;$('#stats-bucket-detail').hidden=true;
-      $('.stats-detail-point').forEach(el=>el.classList.remove('is-selected'));
+      $$('.stats-detail-point').forEach(el=>el.classList.remove('is-selected'));
     }
   });
   $('#stats-refresh')?.addEventListener('click',()=>{void refresh(true)});
