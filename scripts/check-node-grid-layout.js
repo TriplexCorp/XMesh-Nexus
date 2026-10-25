@@ -7,7 +7,7 @@ const css=fs.readFileSync('styles.css','utf8');
 const html=fs.readFileSync('index.html','utf8');
 
 assert.match(app,/<section class="nodes-page"><div class="bar2 nodes-toolbar">/,'Page needs a dedicated grid container');
-assert.match(app,/<div class="nodes" data-grid-mode="\$\{gridMode\}" data-node-count="\$\{r\.items\.length\}">/,'Nodes grid must expose current mode and node count');
+assert.match(app,/<div class="nodes" data-grid-mode="\$\{gridMode\}" data-node-count="\$\{r\.items\.length\}"><\/div>/,'Nodes grid must expose density mode and count for lazy rendering');
 assert.match(app,/localStorage\.getItem\(NODE_GRID_KEY\)/,'Current mode must persist across navigation');
 assert.match(css,/\.nodes-page\{[^}]*container:nodes-grid \/ inline-size;/s,'Layout must use its available container width');
 for(const width of ['32rem','52rem','70rem']){
