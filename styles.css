@@ -5617,14 +5617,14 @@ body>.sv-studio-portal,body>.sv-studio-portal *{
 .stats-detail-chart{
  display:block;
  width:100%;
- height:auto;
+ height:21.25rem;
  min-height:0;
  max-height:none;
- aspect-ratio:1000 / 340;
+ aspect-ratio:auto;
 }
 @media(max-width:700px){
  .stats-detail-wrap{width:100%}
- .stats-detail-chart{min-height:0}
+ .stats-detail-chart{min-height:0;height:17rem}
 }
 /* History inside a modal must fit its fixed workspace, independent of tab. */
 body>.stats-user-overlay .stats-user-pane .stats-detail-wrap{width:100%;max-height:none}
@@ -5645,12 +5645,14 @@ body>.stats-user-overlay .stats-user-pane .stats-detail-chart{
 .traffic-chart-svg{
  display:block;
  width:100%;
- height:auto;
+ height:18.25rem;
  min-height:0;
  max-height:none;
+ aspect-ratio:auto;
 }
 @media(max-width:700px){
  .traffic-chart-wrap{width:100%}
+ .traffic-chart-svg{height:16rem}
 }
 
 
