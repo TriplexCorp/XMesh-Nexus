@@ -5270,3 +5270,24 @@ td.er .user-expiry-primary{color:var(--danger,#f08080)}
 .stats-xray-line.rx{stroke:var(--a)}.stats-xray-line.tx{stroke:var(--b)}
 .stats-xray-dot{stroke:var(--s1);stroke-width:1.5;vector-effect:non-scaling-stroke}
 .stats-xray-dot.rx{fill:var(--a)}.stats-xray-dot.tx{fill:var(--b)}
+
+/* Statistics-only user intelligence detail: no changes to user editor. */
+.stats-user-overlay{position:fixed;inset:0;z-index:1200;background:rgba(4,9,16,.77);backdrop-filter:blur(5px);display:grid;place-items:center;padding:20px}
+.stats-user-overlay[hidden],.stats-user-pane[hidden]{display:none!important}
+.stats-user-dialog{width:min(1180px,100%);max-height:calc(100dvh - 40px);overflow:auto;background:var(--s1);border:1px solid var(--ln);border-radius:18px;padding:22px;box-shadow:0 24px 85px rgba(0,0,0,.45)}
+.stats-user-head{display:flex;align-items:center;gap:16px;border-bottom:1px solid var(--ln);padding-bottom:16px}
+.stats-user-head h2{margin:.15rem 0;font-size:1.45rem}
+.stats-user-head small{color:var(--a);letter-spacing:.09em;font-weight:700}
+.stats-user-head #stats-user-close{margin-left:auto}
+.stats-user-avatar{height:54px;width:54px;border-radius:15px;background:linear-gradient(135deg,var(--a),var(--b));color:var(--s1);display:grid;place-items:center;font-weight:800;font-size:1.5rem}
+.stats-user-overview{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:18px 0}
+.stats-user-overview>div{border:1px solid var(--ln);border-radius:12px;padding:14px;min-width:0;background:var(--s2)}
+.stats-user-overview small{display:block;color:var(--mu);font-size:.78rem;margin-bottom:9px}
+.stats-user-overview strong{font-size:1.3rem}
+.stats-user-tabs{display:flex;gap:6px;flex-wrap:wrap;border-bottom:1px solid var(--ln);margin:10px 0 12px}
+.stats-user-tabs button{background:none;border:0;border-bottom:2px solid transparent;color:var(--mu);padding:12px 16px;cursor:pointer}
+.stats-user-tabs button.is-active,.stats-user-tabs button:focus-visible{color:var(--a);border-bottom-color:var(--a)}
+.stats-user-breakdown{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.stats-user-breakdown article{min-width:0}
+@media(max-width:850px){.stats-user-overview{grid-template-columns:repeat(2,minmax(0,1fr))}.stats-user-breakdown{grid-template-columns:1fr}.stats-user-dialog{padding:14px}}
+@media(max-width:600px){.stats-user-overlay{padding:0}.stats-user-dialog{width:100%;height:100dvh;max-height:100dvh;border-radius:0}.stats-user-head{gap:9px}.stats-user-head h2{font-size:1.05rem}.stats-user-avatar{width:42px;height:42px;flex-shrink:0}}
