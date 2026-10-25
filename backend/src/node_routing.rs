@@ -347,14 +347,25 @@ fn apply_json(node: &Value, config: &mut Value) -> Result<(), ApiError> {
         .and_then(|r| r.get("rules"))
         .and_then(Value::as_array)
     {
-        for rule in rules {
+        for (index, rule) in rules.iter().enumerate() {
             let tag = rule
                 .get("outboundTag")
                 .and_then(Value::as_str)
                 .unwrap_or("");
             if !known.contains(tag) {
-                return Err(bad(
-                    "Routing JSON: outboundTag is not defined in XRAY STUDIO or node outbounds.",
+                let mut available: Vec<&str> = known.iter().map(String::as_str).collect();
+                available.sort_unstable();
+                let available = if available.is_empty() {
+                    "(none)".to_owned()
+                } else {
+                    available.join(", ")
+                };
+                return Err(ApiError::new(
+                    StatusCode::CONFLICT,
+                    format!(
+                        "Routing JSON: rule #{} references missing outboundTag '{tag}'. Available outbounds: {available}.",
+                        index + 1
+                    ),
                 ));
             }
         }
