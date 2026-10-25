@@ -404,11 +404,30 @@ pub fn client_stream(inbound: &Value, host: &Value, device: &str) -> Option<Valu
         };
         out[field] = transport;
     }
-    // FinalMask is directional: copy ONLY an intentionally authored client
-    // configuration. The inbound's finalmask can contain server-side payloads.
+    // Explicit client overrides take precedence. Only Salamander's symmetric
+    // UDP password may be inherited from a server inbound: other FinalMask
+    // entries can contain directional or server-only payloads.
     if let Some(mask) = client_metadata(inbound, host, "clientFinalmask").filter(|v| v.is_object())
     {
         out["finalmask"] = mask.clone();
+    } else if network == "hysteria" {
+        if let Some(entries) = stream
+            .get("finalmask")
+            .and_then(|v| v.get("udp"))
+            .and_then(Value::as_array)
+        {
+            let salamander: Vec<Value> = entries
+                .iter()
+                .filter(|entry| entry.get("type").and_then(Value::as_str) == Some("salamander"))
+                .filter_map(|entry| {
+                    let password = entry.get("settings").and_then(|v| field(v, "password"))?;
+                    Some(json!({"type":"salamander","settings":{"password":password}}))
+                })
+                .collect();
+            if !salamander.is_empty() {
+                out["finalmask"] = json!({"udp":salamander});
+            }
+        }
     }
     if let Some(sockopt) = client_metadata(inbound, host, "clientSockopt").filter(|v| v.is_object())
     {
@@ -472,6 +491,33 @@ mod tests {
             !body.contains("SECRET") && !body.contains("secret:443") && !body.contains("PRIVATE")
         );
         assert!(c.get("finalmask").is_none());
+    }
+    #[test]
+    fn hysteria_salamander_finalmask_reaches_client_without_server_only_fields() {
+        let inbound = json!({"protocol":"hysteria","streamSettings":{
+            "network":"hysteria","security":"tls",
+            "tlsSettings":{"serverName":"pl.example.org"},
+            "finalmask":{"udp":[
+                {"type":"salamander","settings":{"password":"shared-obfs","serverOnly":"do-not-copy"}},
+                {"type":"noise","settings":{"server":"private"}}]}}});
+        let host = json!({"address":"198.51.100.1"});
+        let client = client_stream(&inbound, &host, "auto").unwrap();
+        assert_eq!(client["finalmask"], json!({"udp":[
+            {"type":"salamander","settings":{"password":"shared-obfs"}}]}));
+        assert!(!client.to_string().contains("do-not-copy"));
+        assert!(!client.to_string().contains("private"));
+        let explicit = json!({"address":"198.51.100.1","clientFinalmask":{"udp":[
+            {"type":"salamander","settings":{"password":"override"}}]}});
+        assert_eq!(client_stream(&inbound, &explicit, "auto").unwrap()["finalmask"],
+            explicit["clientFinalmask"]);
+    }
+    #[test]
+    fn non_hysteria_does_not_inherit_salamander() {
+        let inbound = json!({"streamSettings":{"network":"raw","security":"tls",
+            "tlsSettings":{"serverName":"example.org"},
+            "finalmask":{"udp":[{"type":"salamander","settings":{"password":"secret"}}]}}});
+        assert!(client_stream(&inbound, &json!({"address":"example.org"}), "auto")
+            .unwrap().get("finalmask").is_none());
     }
     #[test]
     fn kcp_seed_and_header_are_shared_but_proxy_protocol_is_server_only() {
