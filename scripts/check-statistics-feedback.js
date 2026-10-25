@@ -263,3 +263,10 @@ assert.match(css,/conic-gradient\(var\(--server-color,var\(--a\)\)/);
 assert.match(app,/for\(const saturation of \[42,55\]\)/);
 assert.match(app,/for\(const lightness of \[68,76\]\)/);
 assert.match(app,/const feather=Math\.min\(\.22,\(end-cursor\)\/6\)/);
+
+// Node colours are shared across user card and analytics; traffic direction has separate tokens.
+assert.match(app,/registerUserNodeColors\(servers\);const nodeTotal/);
+assert.match(app,/class="stats-insight-node" style="--node-color:'\+userServerColor\(node\.nodeId\)/);
+assert.match(app,/const nodeLegend=servers\.map/);
+assert.match(css,/--traffic-upload:#72dbc4;--traffic-download:#b5a0f4/);
+assert.match(css,/\.stats-insight-track span\{background:var\(--node-color,var\(--a\)\)\}/);
