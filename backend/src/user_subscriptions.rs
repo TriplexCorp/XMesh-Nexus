@@ -798,7 +798,7 @@ async fn collect_user_outbounds(
                         && n.get("disabled") != Some(&Value::Bool(true))
                 }) {
                     let host = json!({"address":node.get("publicAddress").or_else(||node.get("externalAddress")).or_else(||node.get("addr")),"port":node.get("port").or_else(||inbound.get("port")),"remark":node.get("name"),"country":node.get("country")});
-                    if let Some(mut outbound) = vless_outbound(user, inbound, &host, device) {
+                    if let Some(mut outbound) = proxy_outbound(user, inbound, &host, device) {
                         if let Some(id) = node.get("id").and_then(Value::as_i64) {
                             outbound["xmeshSourceKey"] = json!(format!("node:{id}:{tag}"));
                         }
