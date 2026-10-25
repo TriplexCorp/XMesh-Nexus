@@ -29,8 +29,8 @@ This roadmap tracks verified improvements, not feature claims. A stage is comple
 
 ### Chart scaling — implemented in stylesheet, pending acceptance
 
-- [x] Constrain the infrastructure Statistics SVG chart to a `72rem` rem-based responsive container, preserving the intrinsic `1000 × 340` plot proportions.
-- [x] Apply the same rem-based responsive chart-width approach to the Dashboard RX/TX graphic (`.traffic-chart-wrap`, `.traffic-chart-svg`).
+- [x] Size the infrastructure Statistics SVG chart to its parent card under the Appearance content-width setting (`--panel-content-max`), preserving the intrinsic `1000 × 340` plot proportions.
+- [x] Apply the same card-filling, content-width-driven chart layout to the Dashboard RX/TX graphic (`.traffic-chart-wrap`, `.traffic-chart-svg`).
 - [x] Keep user history charts bounded within their modal workspace without changing tab-dependent dialog geometry.
 - [ ] Confirm graph sizing, SVG axis-label legibility, hover targets and alignment at UI scales 90–200%, across common laptop, desktop and ultrawide viewport sizes.
 - [ ] Test switching global UI scale while Statistics and Dashboard are already mounted; ensure plots respond without stale measurements, clipping or overflow.
