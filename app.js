@@ -952,6 +952,7 @@ function scrollToSettingsTarget(id){
   return true;
 }
 async function render(soft){
+  document.querySelector('body > #stats-user-modal')?.remove();
   T.forEach(clearInterval);T=[];cur=location.hash.slice(1);if(!pages[cur]||(viewerMode()&&!['home','statistics','users','nodes'].includes(cur)))cur='home';const rt=++RT,[t,f]=pages[cur],v=$('#view');
   $('#title').textContent=t;document.title=(window.XMeshI18n?.translate(t)||t)+' — '+DB.set.brand;$$('#nav a').forEach(a=>a.classList.toggle('on',a.getAttribute('href')=='#'+cur));
   if(!soft){v.classList.remove('still');v.innerHTML=skel();scrollTo(0,0)}
@@ -1317,6 +1318,9 @@ function statisticsP(){
     $$('.stats-user-tabs button').forEach(el=>el.classList.toggle('is-active',el.dataset.statsUserTab===name));
     if(name==='observations')void loadObservations();
   };
+  // Portal above the app shell: backdrop must blur the navigation rail as well.
+  const statsPortal=$('#stats-user-modal');
+  if(statsPortal&&statsPortal.parentElement!==document.body)document.body.append(statsPortal);
   const closeStatsUser=()=>{++historyRequest;$('#stats-user-modal').hidden=true;$('#stats-leaders-range')?.focus()};
   $('#stats-user-close')?.addEventListener('click',closeStatsUser);
   $('#stats-user-refresh')?.addEventListener('click',()=>void loadHistory(true));
