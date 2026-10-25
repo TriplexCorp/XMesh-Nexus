@@ -1009,6 +1009,17 @@ fn allowed_inbound_squads(squads: &[Value], tag: &str) -> std::collections::Hash
     allowed
 }
 
+fn quota_gib_to_bytes(gib: f64) -> i64 {
+    let bytes = (gib * 1_073_741_824.0).floor();
+    if bytes.is_nan() || bytes <= 0.0 {
+        return 0;
+    }
+    if bytes.is_infinite() {
+        return i64::MAX;
+    }
+    bytes.to_string().parse::<i64>().unwrap_or(i64::MAX)
+}
+
 fn provision_proxy_users(
     config: &mut Value,
     users: &[Value],
@@ -1184,20 +1195,12 @@ fn build_offline_policy(
             .and_then(Value::as_f64)
             .unwrap_or(0.0)
             .max(0.0);
-        // Use floor for both limits and remaining capacity: never round quota up.
-        let used_bytes = (used_gb * 1_073_741_824.0)
-            .floor()
-            .clamp(0.0, i64::MAX as f64) as i64;
-        let limit_bytes = (limit_gb.max(0.0) * 1_073_741_824.0)
-            .floor()
-            .clamp(0.0, i64::MAX as f64) as i64;
+        // Floor each quota to bytes without a lossy float/integer cast.
+        let used_bytes = quota_gib_to_bytes(used_gb);
+        let limit_bytes = quota_gib_to_bytes(limit_gb.max(0.0));
         let remaining = if limit_gb.is_finite() && limit_gb > 0.0 {
             let remaining_gb = (limit_gb - used_gb).max(0.0);
-            Some(
-                (remaining_gb * 1_073_741_824.0)
-                    .floor()
-                    .clamp(0.0, i64::MAX as f64) as i64,
-            )
+            Some(quota_gib_to_bytes(remaining_gb))
         } else {
             None
         };
