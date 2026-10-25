@@ -278,3 +278,8 @@ assert.match(css,/scrollbar-color:var\(--scrollbar-thumb\) var\(--scrollbar-trac
 
 assert.match(css,/--scrollbar-end-gap:7px/);
 assert.match(css,/::-webkit-scrollbar-button:single-button:vertical:start:decrement/);
+
+// SVG chart footprint follows rem-based global UI zoom rather than unlimited viewport width.
+assert.match(css,/Scale infrastructure and user traffic charts with Appearance/);
+assert.match(css,/width:min\(100%,72rem\)/);
+assert.match(css,/aspect-ratio:1000 \/ 340/);
