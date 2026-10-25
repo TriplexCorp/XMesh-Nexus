@@ -5634,3 +5634,23 @@ body>.stats-user-overlay .stats-user-pane .stats-detail-chart{
  height:auto;
  max-height:min(18rem,30dvh);
 }
+
+/* Dashboard RX/TX chart: same rem-based Appearance scaling as full Statistics.
+   Use an intrinsic viewBox, constrain the drawing area on wide monitors, and
+   keep its width responsive instead of enlarging indefinitely with viewport. */
+.traffic-chart-wrap{
+ width:min(100%,72rem);
+ max-width:100%;
+ margin-inline:auto;
+ box-sizing:border-box;
+}
+.traffic-chart-svg{
+ display:block;
+ width:100%;
+ height:auto;
+ min-height:0;
+ max-height:none;
+}
+@media(max-width:700px){
+ .traffic-chart-wrap{width:100%}
+}
