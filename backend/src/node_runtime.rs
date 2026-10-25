@@ -882,6 +882,59 @@ pub async fn acknowledge_restart(
 
 // Populate Xray proxy inbound accounts from authoritative panel users and squads.
 // XRAY STUDIO owns transports/security; panel users own runtime UUID authorization.
+fn configure_private_xray_stats(config: &mut Value) -> Result<(), ApiError> {
+    // Keep Xray StatsService private to the node: no public API listeners.
+    if config.get("api").is_some_and(|api| !api.is_null()) {
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "XRAY STUDIO profile already defines an API. Remove the conflicting API or use the dedicated node telemetry configuration.",
+        ));
+    }
+    // Xray StatsService does not accept api.listen. It must be routed via
+    // a private dokodemo-door inbound to an API-tagged outbound.
+    config["api"] = json!({"tag":"xmesh_stats_api","services":["StatsService"]});
+    config["stats"] = json!({});
+    let inbounds = config
+        .get_mut("inbounds")
+        .and_then(Value::as_array_mut)
+        .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Missing inbound array"))?;
+    inbounds.push(json!({
+        "tag":"xmesh_stats_in","listen":"127.0.0.1","port":10085,
+        "protocol":"dokodemo-door",
+        "settings":{"address":"127.0.0.1","port":10085,"network":"tcp"}
+    }));
+    let object = config
+        .as_object_mut()
+        .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Invalid Xray profile JSON"))?;
+    let routing = object.entry("routing").or_insert_with(|| json!({}));
+    let ro = routing
+        .as_object_mut()
+        .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Invalid routing field"))?;
+    let rules = ro.entry("rules").or_insert_with(|| json!([]));
+    let rules = rules
+        .as_array_mut()
+        .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Invalid routing.rules"))?;
+    rules.insert(
+        0,
+        json!({"type":"field","inboundTag":["xmesh_stats_in"],"outboundTag":"xmesh_stats_api"}),
+    );
+    let policy = object.entry("policy").or_insert_with(|| json!({}));
+    let po = policy
+        .as_object_mut()
+        .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Invalid policy field"))?;
+    let levels = po.entry("levels").or_insert_with(|| json!({}));
+    let lo = levels
+        .as_object_mut()
+        .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Invalid policy.levels"))?;
+    let level = lo.entry("0").or_insert_with(|| json!({}));
+    let lvl = level
+        .as_object_mut()
+        .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Invalid policy level 0"))?;
+    lvl.insert("statsUserUplink".into(), json!(true));
+    lvl.insert("statsUserDownlink".into(), json!(true));
+    Ok(())
+}
+
 fn provision_proxy_users(
     config: &mut Value,
     users: &[Value],
@@ -1034,55 +1087,7 @@ fn provision_proxy_users(
             settings.insert("users".to_owned(), Value::Array(entries));
         }
     }
-    // Keep Xray StatsService private to the node: no public API listeners.
-    if config.get("api").is_some_and(|api| !api.is_null()) {
-        return Err(ApiError::new(
-            StatusCode::CONFLICT,
-            "XRAY STUDIO profile already defines an API. Remove the conflicting API or use the dedicated node telemetry configuration.",
-        ));
-    }
-    // Xray StatsService does not accept api.listen. It must be routed via
-    // a private dokodemo-door inbound to an API-tagged outbound.
-    config["api"] = json!({"tag":"xmesh_stats_api","services":["StatsService"]});
-    config["stats"] = json!({});
-    let inbounds = config
-        .get_mut("inbounds")
-        .and_then(Value::as_array_mut)
-        .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Missing inbound array"))?;
-    inbounds.push(json!({
-        "tag":"xmesh_stats_in","listen":"127.0.0.1","port":10085,
-        "protocol":"dokodemo-door",
-        "settings":{"address":"127.0.0.1","port":10085,"network":"tcp"}
-    }));
-    let object = config
-        .as_object_mut()
-        .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Invalid Xray profile JSON"))?;
-    let routing = object.entry("routing").or_insert_with(|| json!({}));
-    let ro = routing
-        .as_object_mut()
-        .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Invalid routing field"))?;
-    let rules = ro.entry("rules").or_insert_with(|| json!([]));
-    let rules = rules
-        .as_array_mut()
-        .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Invalid routing.rules"))?;
-    rules.insert(
-        0,
-        json!({"type":"field","inboundTag":["xmesh_stats_in"],"outboundTag":"xmesh_stats_api"}),
-    );
-    let policy = object.entry("policy").or_insert_with(|| json!({}));
-    let po = policy
-        .as_object_mut()
-        .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Invalid policy field"))?;
-    let levels = po.entry("levels").or_insert_with(|| json!({}));
-    let lo = levels
-        .as_object_mut()
-        .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Invalid policy.levels"))?;
-    let level = lo.entry("0").or_insert_with(|| json!({}));
-    let lvl = level
-        .as_object_mut()
-        .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Invalid policy level 0"))?;
-    lvl.insert("statsUserUplink".into(), json!(true));
-    lvl.insert("statsUserDownlink".into(), json!(true));
+    configure_private_xray_stats(config)?;
     Ok(())
 }
 
