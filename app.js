@@ -1324,7 +1324,7 @@ function statisticsP(){
   const closeStatsUser=()=>{++historyRequest;$('#stats-user-modal').hidden=true;$('#stats-leaders-range')?.focus()};
   // Other panel buttons receive icons from decorateButtonIcons; keep these
   // header actions text-only to avoid duplicate refresh/close glyphs.
-  for(const button of $('.stats-user-actions button')){
+  for(const button of $$('.stats-user-actions button')){
     button.querySelectorAll('svg').forEach(svg=>svg.remove());
   }
   $('#stats-user-close')?.addEventListener('click',closeStatsUser);
