@@ -5829,3 +5829,32 @@ body>.stats-user-overlay .stats-user-pane .stats-detail-chart{
 @media(max-width:1450px){.nodes-page .node-explorer{grid-template-columns:minmax(16rem,2fr) minmax(10rem,1fr) minmax(10rem,1fr)}.nodes-page .node-explorer-hosting{padding:0}.nodes-page .node-explorer>[data-node-search-clear]{justify-self:start}}
 @media(max-width:900px){.nodes-page .node-explorer{grid-template-columns:repeat(2,minmax(0,1fr))}.nodes-page .node-explorer-search{grid-column:1/-1}}
 @media(max-width:550px){.nodes-page .node-explorer{grid-template-columns:minmax(0,1fr)}.nodes-page .node-explorer-search{grid-column:auto}}
+
+
+/* Align the reset action with the inputs instead of the checkbox baseline. */
+.nodes-page .node-explorer{align-items:end}
+.nodes-page .node-explorer>.node-explorer-reset{
+ align-self:end;display:inline-flex;align-items:center;justify-content:center;gap:.5rem;
+ height:2.7rem;min-height:2.7rem;min-width:8.5rem;padding:0 .9rem;
+ border:1px solid var(--ln);border-radius:var(--ui-control-radius);
+ background:var(--s2);color:var(--tx);font-weight:700;
+ transition:background-color .22s ease,border-color .22s ease,box-shadow .22s ease,transform .22s cubic-bezier(.2,.8,.2,1);
+}
+.nodes-page .node-explorer>.node-explorer-reset:hover{
+ background:color-mix(in srgb,var(--a) 10%,var(--s2));
+ border-color:color-mix(in srgb,var(--a) 42%,var(--ln));
+ box-shadow:0 4px 16px -10px color-mix(in srgb,var(--a) 45%,transparent);
+ transform:translateY(-1px);
+}
+.nodes-page .node-explorer>.node-explorer-reset:active{transform:translateY(0) scale(.97)}
+.nodes-page .node-explorer-reset-icon{display:inline-block;font-size:1.2rem;line-height:1;transition:transform .55s cubic-bezier(.2,.8,.2,1)}
+.nodes-page .node-explorer-reset:hover .node-explorer-reset-icon{transform:rotate(-180deg)}
+.nodes-page .node-explorer-hosting{align-self:end;min-height:2.7rem;padding:0;display:inline-flex;align-items:center}
+.nodes-page .node-explorer-meta{justify-content:space-between}
+.nodes-page .node-explorer-pages{margin-left:auto}
+@media(max-width:1450px){.nodes-page .node-explorer>.node-explorer-reset{justify-self:stretch}}
+@media(prefers-reduced-motion:reduce){
+ .nodes-page .node-explorer>.node-explorer-reset,.nodes-page .node-explorer-reset-icon{transition:none}
+ .nodes-page .node-explorer>.node-explorer-reset:hover,.nodes-page .node-explorer>.node-explorer-reset:active{transform:none}
+ .nodes-page .node-explorer-reset:hover .node-explorer-reset-icon{transform:none}
+}
