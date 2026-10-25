@@ -912,6 +912,14 @@ fn add_subscription_profile_headers(response: &mut Response, settings: &Value) {
     );
 }
 
+fn subscription_gib_to_bytes(gib: f64) -> u64 {
+    if !gib.is_finite() || gib <= 0.0 {
+        return 0;
+    }
+    let bytes = (gib * 1_073_741_824.0).floor();
+    bytes.to_string().parse::<u64>().unwrap_or(u64::MAX)
+}
+
 pub async fn serve(
     State(state): State<AppState>,
     Path(token): Path<String>,
@@ -982,13 +990,7 @@ pub async fn serve(
         .unwrap_or(0.0)
         .max(0.0);
     let expiry = user.get("expireAt").and_then(Value::as_i64).unwrap_or(0);
-    let to_bytes = |gib: f64| -> u64 {
-        if gib.is_finite() {
-            (gib * 1_073_741_824.0).min(u64::MAX as f64) as u64
-        } else {
-            0
-        }
-    };
+    let to_bytes = subscription_gib_to_bytes;
     let info = format!(
         "upload=0; download={}; total={}; expire={}",
         to_bytes(consumed_gib),
