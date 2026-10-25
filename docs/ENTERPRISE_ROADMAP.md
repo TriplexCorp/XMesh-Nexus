@@ -159,6 +159,8 @@ For **any selected user**, an authorized operator must be able to inspect **each
 - [ ] Verify the new user → inbound → node → bucket history UI in a real browser (filters and missing-data messaging are implemented in source; partial coverage and accessibility remain to be validated).
 - [ ] Add time-bounded period Top-10 (not lifetime counts), paging/retention policy, representative-volume query plans and permission tests.
 
+**Period rankings and raw drill-down increment (2026-10-25, implementation in `main`):** `GET /api/v1/statistics/period-leaders?range=1h|24h|7d|30d` ranks users, inbounds, and nodes by accepted Xray deltas from `verified_traffic_deltas`. User/node rankings use the `user` counter family; inbound rankings use independent `inbound` counters (never summed across families). The Statistics page can switch ranking periods and open a user's filtered history. `GET /api/v1/users/{id}/traffic/observations` returns the latest **up to 500** individually accepted delta entries under user/inbound/node/range filters, with truncation status; the UI exposes the evidence table. These are signed-ingest accepted increments, not packet captures, IP destinations, or route-level attribution. **Source changes are not accepted as complete** without green strict CI, live migration and signed-node integration tests, browser verification, and pagination/coverage work. A Top-10 derived from the new journal covers only telemetry ingested after its deployment.
+
 ### Phase C — P1: Deep TimescaleDB, user and inbound analytics
 
 - [ ] Build genuine **time-bucketed Xray user-traffic** history (not merely lifetime totals), with safe filters for user, node, inbound, squad, time range and source reliability; preserve accounting direction/units.
