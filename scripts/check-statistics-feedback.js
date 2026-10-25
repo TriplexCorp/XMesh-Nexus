@@ -27,6 +27,15 @@ assert.equal((app.match(/\$\$\('\.stats-user-tabs button'\)\.forEach/g)||[]).len
 assert.doesNotMatch(app,/(?<!\$)\$\([^\n;]*\)\.forEach\s*\(/, 'querySelector returns an element, not a collection; use $ for forEach');
 assert.match(app,/const closeStatsUser=\(\)=>/);
 assert.match(css,/\.stats-user-overlay\[hidden\]/);
+assert.match(app,/class="stats-user-workspace"/);
+assert.match(app,/id="stats-user-source-insight"/);
+assert.match(app,/id="stats-user-node-insight"/);
+assert.match(app,/id="stats-user-refresh"/);
+assert.match(app,/stats-insight-donut/);
+assert.match(css,/backdrop-filter:blur\(13px\)/);
+assert.match(css,/\.stats-user-workspace\{display:grid/);
+assert.match(css,/@media\(max-width:1050px\)/);
+
 
 assert.match(app,/const statsXrayHistoryChart=points=>/);
 assert.match(app,/statsXrayHistoryChart\(points\)/);
