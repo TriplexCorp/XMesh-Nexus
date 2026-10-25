@@ -767,18 +767,30 @@ dialog.user-modal .sg{gap:.9rem}
 html[data-density=compact]{--card-pad:.9rem;--view-gap:.75rem}
 html[data-density=comfortable]{--card-pad:1.3rem;--view-gap:1.1rem}
 html[data-density=spacious]{--card-pad:1.7rem;--view-gap:1.45rem}
+/* Ambient light must cover the entire viewport, not only two clipped corners.
+   A fixed body background sits ABOVE the solid canvas, BELOW all interface
+   surfaces, and follows the active accent palette in both light/dark themes. */
 html[data-glow=off]{--glow-alpha:0%}
-html[data-glow=subtle]{--glow-alpha:2%}
-html[data-glow=normal]{--glow-alpha:5%}
-html[data-glow=rich]{--glow-alpha:12%}
+html[data-glow=subtle]{--glow-alpha:12%}
+html[data-glow=normal]{--glow-alpha:25%}
+html[data-glow=rich]{--glow-alpha:43%}
 html[data-font=onest] body{font-family:Manrope,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 html[data-font=system] body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 html[data-font=mono] body{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:-.025em}
 html[data-font=mono] h1,html[data-font=mono] h3,html[data-font=mono] .val{letter-spacing:-.06em}
-body{background:var(--bg);letter-spacing:-.012em}
-body::before,body::after{filter:blur(95px);width:40vmax;height:40vmax;opacity:.44;animation:none}
-body::before{background:radial-gradient(circle,color-mix(in srgb,var(--a) var(--glow-alpha),transparent),transparent 68%);top:-25vmax;left:-18vmax}
-body::after{background:radial-gradient(circle,color-mix(in srgb,var(--b) var(--glow-alpha),transparent),transparent 68%);bottom:-27vmax;right:-18vmax}
+body{
+ background-color:var(--bg);
+ background-image:
+  radial-gradient(ellipse 65vw 65vh at 12% 19%,color-mix(in srgb,var(--a) var(--glow-alpha),transparent),transparent 78%),
+  radial-gradient(ellipse 62vw 68vh at 85% 19%,color-mix(in srgb,var(--b) var(--glow-alpha),transparent),transparent 80%),
+  radial-gradient(ellipse 74vw 70vh at 48% 83%,color-mix(in srgb,var(--a) var(--glow-alpha),transparent),transparent 83%);
+ background-attachment:fixed;
+ background-repeat:no-repeat;
+ letter-spacing:-.012em;
+}
+/* Previous pseudo-elements had z-index:-1 under an opaque body background:
+   they were invisible across most of the viewport. */
+body::before,body::after{content:none}
 ::selection{background:color-mix(in srgb,var(--a) 30%,transparent);color:var(--tx)}
 :focus-visible{outline-color:var(--a);outline-offset:3px}
 .app{grid-template-columns:15.4rem minmax(0,1fr)}
