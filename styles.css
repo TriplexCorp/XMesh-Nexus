@@ -5605,11 +5605,11 @@ body>.sv-studio-portal,body>.sv-studio-portal *{
 :where(html,body,*)::-webkit-scrollbar-track{margin-block:var(--scrollbar-end-gap);margin-inline:var(--scrollbar-end-gap)}
 
 
-/* Scale infrastructure and user traffic charts with Appearance > UI scale.
-   Keep the 1000×340 viewBox proportions without allowing full-width SVGs to
-   grow unbounded on ultrawide screens or ignore the root --ts font scale. */
+/* Infrastructure charts fill their parent cards. The outer .wrap already follows
+   Appearance > Content width via --panel-content-max (720–3000px).
+   Do not impose a second rem cap that makes plots undersized on wide layouts. */
 .stats-detail-wrap{
- width:min(100%,100rem);
+ width:100%;
  max-width:100%;
  margin-inline:auto;
  box-sizing:border-box;
@@ -5635,11 +5635,9 @@ body>.stats-user-overlay .stats-user-pane .stats-detail-chart{
  max-height:min(18rem,30dvh);
 }
 
-/* Dashboard RX/TX chart: same rem-based Appearance scaling as full Statistics.
-   Use an intrinsic viewBox, constrain the drawing area on wide monitors, and
-   keep its width responsive instead of enlarging indefinitely with viewport. */
+/* Dashboard uses the same available card width and native SVG viewBox ratio. */
 .traffic-chart-wrap{
- width:min(100%,100rem);
+ width:100%;
  max-width:100%;
  margin-inline:auto;
  box-sizing:border-box;
