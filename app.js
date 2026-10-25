@@ -1031,7 +1031,9 @@ const statsDetailedChart=(points)=>{
    if(!valid(p[key]))return '';
    const v=Number(p[key])*8/1e6;
    const when=new Date(Number(p.bucketMs)).toLocaleString(panelIsEnglish()?'en-US':'ru-RU');
-   return '<circle class="stats-detail-point '+cls+'" cx="'+x(i).toFixed(2)+'" cy="'+y(v).toFixed(2)+'" r="5" tabindex="0" role="button" data-bucket-ms="'+Number(p.bucketMs)+'" data-series="'+cls+'"><title>'+esc(when+' · '+cls.toUpperCase()+' · '+fmt(v,3)+' Мбит/с')+'</title></circle>';
+   return '<g class="stats-detail-point-wrap '+cls+'" tabindex="0" role="button" data-bucket-ms="'+Number(p.bucketMs)+'" data-series="'+cls+'">'+
+    '<circle class="stats-detail-point-ring" cx="'+x(i).toFixed(2)+'" cy="'+y(v).toFixed(2)+'" r="10"/>'+
+    '<circle class="stats-detail-point-core" cx="'+x(i).toFixed(2)+'" cy="'+y(v).toFixed(2)+'" r="5"><title>'+esc(when+' · '+cls.toUpperCase()+' · '+fmt(v,3)+' Мбит/с')+'</title></circle></g>';
   }).join('');
   return '<path class="stats-detail-area '+cls+'" d="'+area+'"/><path class="stats-detail-line '+cls+'" d="'+d+'"/>'+dots;
  };
@@ -1169,7 +1171,7 @@ function statisticsP(){
     if(!panel)return;
     panel.hidden=false;
     panel.innerHTML='<p class="note">Загрузка показаний узлов…</p>';
-    $$('.stats-detail-point').forEach(el=>el.classList.toggle('is-selected',Number(el.dataset.bucketMs)===bucketMs));
+    $$('.stats-detail-point-wrap').forEach(el=>el.classList.toggle('is-selected',Number(el.dataset.bucketMs)===bucketMs));
     try{
       const range=$('#stats-period')?.value||'live';
       const detail=await backendRequest('/api/v1/metrics/traffic/bucket-detail?'+new URLSearchParams({range,bucketMs:String(bucketMs)}));
@@ -1187,17 +1189,17 @@ function statisticsP(){
     }catch(e){if(requestId===detailRequest&&panel)panel.textContent='Ошибка детализации: '+(e.message||'API error')}
   };
   $('#stats-trend')?.addEventListener('click',e=>{
-    const point=e.target.closest?.('.stats-detail-point');
+    const point=e.target.closest?.('.stats-detail-point-wrap');
     if(point)void openBucket(Number(point.dataset.bucketMs));
   });
   $('#stats-trend')?.addEventListener('keydown',e=>{
-    const point=e.target.closest?.('.stats-detail-point');
+    const point=e.target.closest?.('.stats-detail-point-wrap');
     if(point&&(e.key==='Enter'||e.key===' ')){e.preventDefault();void openBucket(Number(point.dataset.bucketMs))}
   });
   $('#stats-bucket-detail')?.addEventListener('click',e=>{
     if(e.target.closest?.('[data-stats-detail-close]')){
       selectedBucketMs=null;++detailRequest;$('#stats-bucket-detail').hidden=true;
-      $$('.stats-detail-point').forEach(el=>el.classList.remove('is-selected'));
+      $$('.stats-detail-point-wrap').forEach(el=>el.classList.remove('is-selected'));
     }
   });
   $('#stats-refresh')?.addEventListener('click',()=>{void refresh(true)});
