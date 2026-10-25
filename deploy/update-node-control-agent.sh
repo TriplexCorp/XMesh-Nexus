@@ -54,6 +54,50 @@ curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 \
  https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/main/deploy/xmesh-profile-attest.py -o "$profile_tmp"
 python3 -m py_compile "$profile_tmp"
 grep -q 'xmesh-managed-xray' "$profile_tmp" || { echo "Invalid profile attestation helper" >&2;exit 1; }
+# Update the Docker router as part of the same node release. Resolve the
+# installation from the container's config bind rather than guessing /root.
+update_router() {
+ command -v docker >/dev/null && command -v git >/dev/null || { echo "Docker/git missing for router upgrade" >&2; return 1; }
+ docker compose version >/dev/null 2>&1 || { echo "Docker Compose missing" >&2; return 1; }
+ local mounted dir previous
+ mounted="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/etc/xmesh-node/config.json"}}{{.Source}}{{end}}{{end}}' xmesh-node 2>/dev/null)" || return 1
+ [[ -f "$mounted" ]] || { echo "Router config mount missing" >&2; return 1; }
+ dir="$(dirname "$mounted")"
+ [[ -f "$dir/compose.yaml" || -f "$dir/docker-compose.yml" || -f "$dir/docker-compose.yaml" ]] || {
+  echo "Router compose file missing in $dir" >&2; return 1;
+ }
+ [[ "$(git -C "$dir" remote get-url origin)" == "https://github.com/TriplexCorp/XMesh-Node.git" ||
+    "$(git -C "$dir" remote get-url origin)" == "git@github.com:TriplexCorp/XMesh-Node.git" ]] || {
+  echo "Router source origin is not XMesh-Node; refusing automatic upgrade" >&2; return 1;
+ }
+ [[ -z "$(git -C "$dir" status --porcelain --untracked-files=no)" ]] || {
+  echo "Router source has local changes; refusing automatic upgrade" >&2; return 1;
+ }
+ previous="$(git -C "$dir" rev-parse HEAD)" || return 1
+ git -C "$dir" fetch --depth=1 origin main || return 1
+ if [[ "$previous" == "$(git -C "$dir" rev-parse FETCH_HEAD)" ]];then
+  echo "Router source already current."
+  return 0
+ fi
+ # Refuse rewritten history; never silently discard administrator changes.
+ git -C "$dir" merge-base --is-ancestor "$previous" FETCH_HEAD || {
+  echo "Router repository cannot fast-forward safely" >&2; return 1;
+ }
+ git -C "$dir" merge --ff-only FETCH_HEAD || return 1
+ if (cd "$dir" && docker compose build xmesh-node &&
+     docker compose run --rm --no-deps xmesh-node -check -config /etc/xmesh-node/config.json &&
+     docker compose up -d --no-deps --force-recreate xmesh-node &&
+     [[ "$(docker inspect -f '{{.State.Running}}' xmesh-node)" == true ]]);then
+  echo "Router upgraded and running."
+  return 0
+ fi
+ echo "Router upgrade failed; restoring previous source and container." >&2
+ git -C "$dir" reset --hard "$previous" || return 1
+ (cd "$dir" && docker compose build xmesh-node &&
+  docker compose up -d --no-deps --force-recreate xmesh-node) || return 1
+ [[ "$(docker inspect -f '{{.State.Running}}' xmesh-node)" == true ]]
+ return 1
+}
 # Validate the updater itself before changing any installed components.
 self_tmp="$(mktemp)"
 trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp" "$profile_tmp" "$self_tmp"' EXIT
@@ -153,7 +197,7 @@ ExecStart=/usr/local/sbin/xmesh-update-agent --remote
 User=root
 Group=root
 UMask=0077
-TimeoutStartSec=150s
+TimeoutStartSec=650s
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
@@ -163,7 +207,7 @@ ProtectKernelTunables=true
 ProtectControlGroups=true
 RestrictSUIDSGID=true
 LockPersonality=true
-ReadWritePaths=/usr/local/sbin /usr/local/libexec /etc/systemd/system /var/lib/xmesh-node-control /var/lib/xmesh-xray-sync /run
+ReadWritePaths=/usr/local/sbin /usr/local/libexec /etc/systemd/system /var/lib/xmesh-node-control /var/lib/xmesh-xray-sync /opt/xmesh-node /root/XMesh-Node /run
 EOF
 systemctl daemon-reload
 # The autonomous policy guard only takes effect while the reconciliation timer
@@ -183,7 +227,7 @@ systemctl restart xmesh-node-user-meter.timer
 if ! systemctl start xmesh-node-user-meter.service; then
   echo "WARNING: Xray user sampler is not ready. Check: journalctl -u xmesh-node-user-meter.service -n 50 --no-pager" >&2
 fi
-# Keep the fixed updater script current for the next panel-driven upgrade.
+if ! update_router;then\n echo "Router update failed; full node upgrade is NOT successful." >&2\n exit 1\nfi\n# Keep the fixed updater script current for the next panel-driven upgrade.
 # Replace atomically because this script can itself be executing.
 install -o root -g root -m 0700 "$self_tmp" /usr/local/sbin/.xmesh-update-agent.new
 mv -f /usr/local/sbin/.xmesh-update-agent.new /usr/local/sbin/xmesh-update-agent
