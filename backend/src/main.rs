@@ -304,6 +304,7 @@ fn protected_routes(state: &AppState) -> Router<AppState> {
         .route("/metrics/traffic/bucket-detail", get(get_traffic_bucket_detail))
         .route("/users/presence", get(get_user_presence))
         .route("/users/{id}/traffic", get(get_user_traffic))
+        .route("/users/{id}/traffic/history", get(get_user_traffic_history))
         .route(
             "/nodes/{id}/metrics-key",
             post(node_auth::enroll).delete(node_auth::revoke),
@@ -2619,6 +2620,79 @@ async fn user_traffic_collectors(pool: &PgPool) -> Result<Vec<Value>, ApiError> 
         }));
     }
     Ok(collectors)
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct UserTrafficHistoryQuery {
+    range: Option<String>,
+    inbound_tag: Option<String>,
+    node_id: Option<i64>,
+}
+
+async fn get_user_traffic_history(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+    Path(user_id): Path<i64>,
+    Query(query): Query<UserTrafficHistoryQuery>,
+) -> Result<Json<Value>, ApiError> {
+    if viewer_read_only(&actor) {
+        return Err(ApiError::new(StatusCode::FORBIDDEN, "Недостаточно прав."));
+    }
+    if user_id <= 0 || query.node_id.is_some_and(|id| id <= 0)
+        || query.inbound_tag.as_ref().is_some_and(|tag| tag.is_empty() || tag.len() > 128)
+    {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Некорректный фильтр истории."));
+    }
+    let (period, bucket, duration) = match query.range.as_deref().unwrap_or("24h") {
+        "1h" => ("1h", "1 minute", "1 hour"),
+        "24h" => ("24h", "15 minutes", "24 hours"),
+        "7d" => ("7d", "1 hour", "7 days"),
+        "30d" => ("30d", "6 hours", "30 days"),
+        _ => return Err(ApiError::new(StatusCode::BAD_REQUEST, "Неверный период.")),
+    };
+    let exists: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM panel_records WHERE collection='users' AND id=$1)"
+    ).bind(user_id).fetch_one(&state.pool).await?;
+    if !exists {
+        return Err(ApiError::new(StatusCode::NOT_FOUND, "Пользователь не найден."));
+    }
+    let source = if query.inbound_tag.is_some() { "inbound" } else { "user" };
+    let rows = sqlx::query(
+        "SELECT (EXTRACT(EPOCH FROM time_bucket($1::INTERVAL,sampled_at))*1000)::BIGINT AS bucket_ms,
+                node_id,inbound_tag,
+                SUM(uplink_bytes)::BIGINT AS up,SUM(downlink_bytes)::BIGINT AS down,
+                COUNT(*)::BIGINT AS samples
+         FROM verified_traffic_deltas
+         WHERE user_id=$2 AND source_type=$3
+           AND sampled_at>=NOW()-$4::INTERVAL
+           AND ($5::BIGINT IS NULL OR node_id=$5)
+           AND ($6::TEXT IS NULL OR inbound_tag=$6)
+         GROUP BY time_bucket($1::INTERVAL,sampled_at),node_id,inbound_tag
+         ORDER BY bucket_ms ASC,node_id ASC,inbound_tag ASC LIMIT 5000"
+    )
+    .bind(bucket)
+    .bind(user_id)
+    .bind(source)
+    .bind(duration)
+    .bind(query.node_id)
+    .bind(&query.inbound_tag)
+    .fetch_all(&state.pool).await?;
+    let mut points = Vec::with_capacity(rows.len());
+    for row in rows {
+        points.push(json!({
+            "bucketMs":row.try_get::<i64,_>("bucket_ms")?,
+            "nodeId":row.try_get::<i64,_>("node_id")?,
+            "inboundTag":row.try_get::<String,_>("inbound_tag")?,
+            "uplinkBytes":row.try_get::<i64,_>("up")?,
+            "downlinkBytes":row.try_get::<i64,_>("down")?,
+            "sampleCount":row.try_get::<i64,_>("samples")?
+        }));
+    }
+    let truncated = points.len() == 5000;
+    Ok(Json(json!({"userId":user_id,"range":period,"sourceType":source,
+        "source":"verified_traffic_deltas","inboundFilter":query.inbound_tag,
+        "nodeFilter":query.node_id,"points":points,"truncated":truncated})))
 }
 
 async fn get_user_traffic(
