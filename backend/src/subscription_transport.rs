@@ -404,29 +404,67 @@ pub fn client_stream(inbound: &Value, host: &Value, device: &str) -> Option<Valu
         };
         out[field] = transport;
     }
-    // Explicit client overrides take precedence. Only Salamander's symmetric
-    // UDP password may be inherited from a server inbound: other FinalMask
-    // entries can contain directional or server-only payloads.
+    // Preserve explicit direction-specific client configuration. For automatic
+    // inheritance, only symmetric reversible masks are safe to share.
+    // Directional header/noise/filter/fragment/xdns/udphop settings must be
+    // authored independently as clientFinalmask.
     if let Some(mask) = client_metadata(inbound, host, "clientFinalmask").filter(|v| v.is_object())
     {
         out["finalmask"] = mask.clone();
-    } else if network == "hysteria" {
-        if let Some(entries) = stream
-            .get("finalmask")
-            .and_then(|v| v.get("udp"))
-            .and_then(Value::as_array)
-        {
-            let salamander: Vec<Value> = entries
-                .iter()
-                .filter(|entry| entry.get("type").and_then(Value::as_str) == Some("salamander"))
-                .filter_map(|entry| {
-                    let password = entry.get("settings").and_then(|v| field(v, "password"))?;
-                    Some(json!({"type":"salamander","settings":{"password":password}}))
-                })
-                .collect();
-            if !salamander.is_empty() {
-                out["finalmask"] = json!({"udp":salamander});
+    } else if let Some(mask) = stream.get("finalmask") {
+        let udp_transport = matches!(network, "hysteria" | "masque" | "mkcp" | "kcp");
+        let tcp_transport = matches!(
+            network,
+            "raw" | "tcp" | "xhttp" | "ws" | "websocket" | "grpc" | "httpupgrade"
+        );
+        let mut inherited = json!({});
+        for (direction, enabled) in [("tcp", tcp_transport), ("udp", udp_transport)] {
+            if !enabled {
+                continue;
             }
+            let Some(entries) = mask.get(direction).and_then(Value::as_array) else {
+                continue;
+            };
+            // Do not silently omit an unknown layer from a multi-layer mask:
+            // that would yield an invalid client/server pairing.
+            let mut layers = Vec::new();
+            let mut safe = true;
+            for entry in entries {
+                let kind = entry.get("type").and_then(Value::as_str);
+                let settings = entry.get("settings").unwrap_or(&Value::Null);
+                let layer = match kind {
+                    Some("salamander") if direction == "udp" => {
+                        field(settings, "password").map(|password| {
+                            let mut safe_settings = json!({"password":password});
+                            if let Some(size) = settings.get("packetSize").filter(|v| v.is_string()) {
+                                safe_settings["packetSize"] = size.clone();
+                            }
+                            json!({"type":"salamander","settings":safe_settings})
+                        })
+                    }
+                    Some("sudoku") => {
+                        let keys = ["password", "ascii", "customTable", "customTables", "paddingMin", "paddingMax"];
+                        if !settings.is_object() {
+                            None
+                        } else {
+                            Some(json!({"type":"sudoku","settings":pick(settings, &keys)}))
+                        }
+                    }
+                    _ => None,
+                };
+                if let Some(layer) = layer {
+                    layers.push(layer);
+                } else {
+                    safe = false;
+                    break;
+                }
+            }
+            if safe && !layers.is_empty() {
+                inherited[direction] = json!(layers);
+            }
+        }
+        if inherited.as_object().is_some_and(|v| !v.is_empty()) {
+            out["finalmask"] = inherited;
         }
     }
     if let Some(sockopt) = client_metadata(inbound, host, "clientSockopt").filter(|v| v.is_object())
@@ -518,6 +556,29 @@ mod tests {
             "finalmask":{"udp":[{"type":"salamander","settings":{"password":"secret"}}]}}});
         assert!(client_stream(&inbound, &json!({"address":"example.org"}), "auto")
             .unwrap().get("finalmask").is_none());
+    }
+    #[test]
+    fn symmetric_sudoku_is_exported_for_tcp_and_udp_transports() {
+        for (network, direction) in [("raw", "tcp"), ("xhttp", "tcp"), ("grpc", "tcp"),
+            ("hysteria", "udp"), ("masque", "udp"), ("mkcp", "udp")] {
+            let mut inbound = json!({"streamSettings":{"network":network,"security":"tls",
+                "tlsSettings":{"serverName":"example.org"}}});
+            inbound["streamSettings"]["finalmask"][direction] = json!([
+                {"type":"sudoku","settings":{"password":"shared","paddingMin":2,"serverOnly":"hidden"}}]);
+            let client = client_stream(&inbound, &json!({"address":"example.org"}), "auto").unwrap();
+            assert_eq!(client["finalmask"][direction][0]["settings"]["password"], "shared");
+            assert!(client["finalmask"][direction][0]["settings"].get("serverOnly").is_none());
+        }
+    }
+    #[test]
+    fn unsupported_mask_layer_is_not_partially_exported() {
+        let inbound = json!({"streamSettings":{"network":"hysteria","security":"tls",
+            "tlsSettings":{"serverName":"example.org"},
+            "finalmask":{"udp":[
+                {"type":"salamander","settings":{"password":"shared"}},
+                {"type":"header-custom","settings":{"server":[{"rand":20}]}}]}}});
+        let client = client_stream(&inbound, &json!({"address":"example.org"}), "auto").unwrap();
+        assert!(client.get("finalmask").is_none());
     }
     #[test]
     fn kcp_seed_and_header_are_shared_but_proxy_protocol_is_server_only() {
