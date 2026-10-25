@@ -1032,6 +1032,7 @@ const statsDetailedChart=(points)=>{
    const v=Number(p[key])*8/1e6;
    const when=new Date(Number(p.bucketMs)).toLocaleString(panelIsEnglish()?'en-US':'ru-RU');
    return '<g class="stats-detail-point-wrap '+cls+'" tabindex="0" role="button" data-bucket-ms="'+Number(p.bucketMs)+'" data-series="'+cls+'">'+
+    '<circle class="stats-detail-point-hit" cx="'+x(i).toFixed(2)+'" cy="'+y(v).toFixed(2)+'" r="13"/>'+ 
     '<circle class="stats-detail-point-ring" cx="'+x(i).toFixed(2)+'" cy="'+y(v).toFixed(2)+'" r="10"/>'+
     '<circle class="stats-detail-point-core" cx="'+x(i).toFixed(2)+'" cy="'+y(v).toFixed(2)+'" r="5"><title>'+esc(when+' · '+cls.toUpperCase()+' · '+fmt(v,3)+' Мбит/с')+'</title></circle></g>';
   }).join('');
