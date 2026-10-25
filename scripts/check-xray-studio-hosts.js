@@ -73,7 +73,7 @@ assert(!app.includes('Для подписок сейчас поддержива�
  'Remove the obsolete VLESS-only editor warning');
 assert.match(app,/inbs\(profile\)\.find\(i=>SUBSCRIPTION_PROTOCOLS\.has\(i\.protocol\)\)/,
  'Creating a host from a node must not require a VLESS inbound');
-assert.equal((server.match(/if let Some\(mut outbound\) = proxy_outbound\(user, inbound, &host, device\)/g)||[]).length,2,
+assert.equal((server.match(/if let Some\(mut outbound\) = proxy_outbound\(user, inbound, &?host, device\)/g)||[]).length,2,
  'Both explicit hosts and direct node fallback must use the multi-protocol exporter');
 
 console.log('XRAY STUDIO endpoints integration, backwards-compatible storage and routing: PASS');
