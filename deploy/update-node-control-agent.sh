@@ -74,7 +74,7 @@ update_router() {
   echo "Router source has local changes; refusing automatic upgrade" >&2; return 1;
  }
  previous="$(git -C "$dir" rev-parse HEAD)" || return 1
- git -C "$dir" fetch --depth=1 origin main || return 1
+ git -C "$dir" fetch origin main || return 1
  if [[ "$previous" == "$(git -C "$dir" rev-parse FETCH_HEAD)" ]];then
   echo "Router source already current."
   return 0
@@ -207,7 +207,7 @@ ProtectKernelTunables=true
 ProtectControlGroups=true
 RestrictSUIDSGID=true
 LockPersonality=true
-ReadWritePaths=/usr/local/sbin /usr/local/libexec /etc/systemd/system /var/lib/xmesh-node-control /var/lib/xmesh-xray-sync /opt/xmesh-node /root/XMesh-Node /run
+ReadWritePaths=/usr/local/sbin /usr/local/libexec /etc/systemd/system /var/lib/xmesh-node-control /var/lib/xmesh-xray-sync -/opt/xmesh-node -/root/XMesh-Node /run
 EOF
 systemctl daemon-reload
 # The autonomous policy guard only takes effect while the reconciliation timer
