@@ -1388,6 +1388,13 @@ function statisticsP(){
   const openStatsUser=(id,name)=>{
     const modal=$('#stats-user-modal'),n=Number(id);
     if(!modal||!Number.isSafeInteger(n)||n<=0)return;
+    const panel=modal.querySelector('.stats-user-dialog');
+    if(panel){
+      // Match the *actual* user editor dimensions at the current global UI scale.
+      const size=userTrafficReturn?.dialogSize;
+      panel.style.setProperty('--stats-source-width',size?.width?size.width+'px':'min(108rem,calc(100vw - 2rem))');
+      panel.style.setProperty('--stats-source-height',size?.height?size.height+'px':'calc(100dvh - 3rem)');
+    }
     historyUser.value=String(n);
     $('#stats-user-title').textContent=name||'Пользователь #'+n;
     $('#stats-user-subtitle').textContent='Пользователь #'+n+' · подтверждённый трафик Xray';
@@ -2047,7 +2054,8 @@ document.addEventListener('click',event=>{
   event.preventDefault();
   const id=Number(trigger.dataset.openUserTraffic);
   if(!Number.isSafeInteger(id)||id<=0)return;
-  userTrafficReturn={hash:location.hash||'#users',userId:id};
+  const sourceRect=dlg.getBoundingClientRect();
+  userTrafficReturn={hash:location.hash||'#users',userId:id,dialogSize:{width:sourceRect.width,height:sourceRect.height}};
   pendingUserTrafficDetail={id,name:trigger.dataset.trafficUsername||'Пользователь #'+id};
   if(dlg.open)dlg.close();
   if(location.hash==='#statistics')void render(false);
