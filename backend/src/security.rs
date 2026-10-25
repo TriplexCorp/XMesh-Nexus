@@ -294,6 +294,7 @@ fn rebase_dashboard_asset_paths(content: &str) -> String {
         "security-ui.js",
         "client-config.js",
         "app.js",
+        "unified-selects.js",
         "node-geodata.js",
         "node-routing.js",
         "client-routing.js",
