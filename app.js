@@ -1024,7 +1024,9 @@ function statisticsP(){
   let generation=0;
   let refreshing=false;
   let lastRefresh=0;
-  const refresh=async()=>{
+  let lastOverview=0,lastSystem=0,overviewCache=null,systemCache=null;
+  let requestFailed=false;
+  const refresh=async(force=false)=>{
    if(refreshing||cur!=='statistics'||document.hidden)return;
    refreshing=true;
    const generationAtStart=++generation,status=$('#stats-status');
@@ -1032,11 +1034,19 @@ function statisticsP(){
    if(status)status.textContent='Обновление измерений…';
    try{
     const period=$('#stats-period')?.value||'live';
+    // Fast network history remains live; expensive per-node overview and
+    // container CPU sampling are cached independently to avoid DB overload.
+    const now=Date.now();
+    const needOverview=force||!overviewCache||now-lastOverview>=15000;
+    const needSystem=force||!systemCache||now-lastSystem>=15000;
     const [overview,sys,traffic]=await Promise.all([
-      backendRequest('/api/v1/statistics/overview'),
-      api.systemStats(),
-      backendRequest('/api/v1/metrics/traffic?range='+period)
+      needOverview?backendRequest('/api/v1/statistics/overview'):Promise.resolve(overviewCache),
+      needSystem?api.systemStats():Promise.resolve(systemCache),
+      backendRequest('/api/v1/metrics/traffic?range='+encodeURIComponent(period))
     ]);
+    if(needOverview){overviewCache=overview;lastOverview=Date.now()}
+    if(needSystem){systemCache=sys;lastSystem=Date.now()}
+    requestFailed=false;
     if(generationAtStart!==generation||cur!=='statistics')return;
     const nodes=Array.isArray(overview.nodes)?overview.nodes:[];
     const fresh=nodes.filter(n=>n.telemetryState==='fresh'||(!n.telemetryState&&n.latest&&!n.latest.stale));
@@ -1094,13 +1104,25 @@ function statisticsP(){
       return '<article class="stats-node"><div class="stats-node-head">'+head+'</div><span class="stats-node-status">'+(quality==='fresh'?'Свежие данные':quality==='delayed'?'Данные задерживаются':quality==='stale'?'Данные устарели':quality==='invalid'?'Недостоверная метка времени':'Нет телеметрии')+' · '+esc(last)+'</span><div class="stats-node-rings">'+statsRing('CPU',ok?v.cpuPercent:null,'#6f9bff')+statsRing('Steal time',ok?v.cpuStealPercent:null,'#f3ae63')+statsRing('RAM',ok&&v.ramTotalBytes>0?v.ramUsedBytes/v.ramTotalBytes*100:null,'#c294e8')+statsRing('Диск',ok&&v.diskTotalBytes>0?v.diskUsedBytes/v.diskTotalBytes*100:null,'#44c9b6')+'</div><div class="stats-kvs">'+values.map(x=>statsRow(...x)).join('')+'</div></article>';
     }).join(''):'<p class="note">Узлы пока не созданы.</p>';
     if(status)status.textContent=(panelIsEnglish()?'Data updated · ':'Данные обновлены · ')+new Date().toLocaleTimeString(panelIsEnglish()?'en-US':'ru-RU');
-   }catch(error){if(status)status.textContent=(panelIsEnglish()?'Unable to refresh statistics: ':'Не удалось обновить статистику: ')+(error.message||(panelIsEnglish()?'API error':'Ошибка API'))}
+   }catch(error){requestFailed=true;if(status)status.textContent=(panelIsEnglish()?'Unable to refresh statistics: ':'Не удалось обновить статистику: ')+(error.message||(panelIsEnglish()?'API error':'Ошибка API'))}
    finally{refreshing=false;lastRefresh=Date.now();if(button?.isConnected)button.disabled=false}
   };
-  $('#stats-refresh')?.addEventListener('click',()=>{void refresh()});
-  $('#stats-period')?.addEventListener('change',()=>{void refresh()});
+  $('#stats-refresh')?.addEventListener('click',()=>{void refresh(true)});
+  $('#stats-period')?.addEventListener('change',()=>{lastRefresh=0;void refresh()});
   void refresh();
-  T.push(setInterval(()=>{if(cur==='statistics'&&!document.hidden&&Date.now()-lastRefresh>=($('#stats-period')?.value==='live'?5000:30000))void refresh()},1000));
+  // One-second UI heartbeat, but no invented network samples: the sparkline
+  // changes only when actual signed telemetry reaches TimescaleDB.
+  T.push(setInterval(()=>{
+    if(cur!=='statistics'||document.hidden)return;
+    const live=$('#stats-period')?.value==='live';
+    const cadence=live?5000:30000;
+    if(!refreshing&&Date.now()-lastRefresh>=cadence){void refresh();return}
+    const status=$('#stats-status');
+    if(status&&!requestFailed&&lastRefresh&&live){
+      const age=Math.max(0,Math.floor((Date.now()-lastRefresh)/1000));
+      status.textContent=(panelIsEnglish()?'Last API refresh ':'Последнее обновление API ')+age+(panelIsEnglish()?'s ago':' с назад')+' · '+(panelIsEnglish()?'live view':'живой режим');
+    }
+  },1000));
  };
  return Promise.resolve([markup,init]);
 }
