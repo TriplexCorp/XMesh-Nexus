@@ -1585,6 +1585,22 @@ mod provision_tests {
         assert_eq!(config["inbounds"][0]["port"], 5000);
     }
     #[test]
+    fn hysteria_desired_config_uses_edited_local_port_without_tcp_hardcode() {
+        let node = json!({"xrayLocalPort": 13456, "port": 443});
+        let port = node_xray_local_port(&node).unwrap();
+        let mut config = json!({
+            "inbounds": [{
+                "tag": "hysteria-main", "protocol": "hysteria", "listen": "127.0.0.1",
+                "port": 5000, "settings": {"version": 2, "users": []},
+                "streamSettings": {"network": "hysteria", "security": "tls"}
+            }]
+        });
+        configure_local_xray_inbound(&mut config, port).unwrap();
+        assert_eq!(config["inbounds"][0]["port"], 13456);
+        assert_eq!(config["inbounds"][0]["listen"], "127.0.0.1");
+        assert_eq!(config["inbounds"][0]["streamSettings"]["network"], "hysteria");
+    }
+    #[test]
     fn offline_budget_is_conservative_and_scoped_to_authorized_users() {
         let cfg = json!({"inbounds":[{"settings":{"clients":[{"id":"550e8400-e29b-41d4-a716-446655440000"}]}}]});
         let u = vec![
