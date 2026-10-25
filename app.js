@@ -1078,7 +1078,7 @@ function statisticsP(){
   <section class="card"><div class="hd"><div><h3>Top-10: подтверждённый трафик за период</h3><p>Только подтверждённые изменения Xray за выбранный период. Пользовательские и inbound-счётчики независимы и не складываются.</p></div></div><div class="stats-history-filters"><label>Период рейтинга<select id="stats-leaders-range"><option value="1h">1 час</option><option value="24h" selected>24 часа</option><option value="7d">7 дней</option><option value="30d">30 дней</option></select></label><label>Открыть любого пользователя по ID<input id="stats-user-lookup" type="number" min="1" step="1" placeholder="ID"></label><button class="gh" id="stats-user-lookup-open" type="button">Открыть карточку</button></div><div id="stats-leaders" class="stats-leaders"><p class="note">Загрузка рейтингов…</p></div></section>
   <div id="stats-user-modal" class="stats-user-overlay" hidden>
    <section class="stats-user-dialog" role="dialog" aria-modal="true" aria-labelledby="stats-user-title" tabindex="-1">
-    <header class="stats-user-head"><div class="stats-user-avatar" aria-hidden="true">X</div><div><small>XMESH · USER INTELLIGENCE</small><h2 id="stats-user-title">Аналитика пользователя</h2><p id="stats-user-subtitle" class="note">Подтверждённая телеметрия Xray</p></div><div class="stats-user-actions"><button id="stats-user-refresh" class="gh" type="button">↻ Обновить</button><button id="stats-user-close" class="gh" type="button" aria-label="Закрыть аналитику">✕ Закрыть</button></div></header>
+    <header class="stats-user-head"><div class="stats-user-avatar" aria-hidden="true">X</div><div><small>XMESH · USER INTELLIGENCE</small><h2 id="stats-user-title">Аналитика пользователя</h2><p id="stats-user-subtitle" class="note">Подтверждённая телеметрия Xray</p></div><div class="stats-user-actions"><button id="stats-user-refresh" class="gh" type="button" data-stats-plain-icon="refresh">Обновить</button><button id="stats-user-close" class="gh" type="button" aria-label="Закрыть аналитику" data-stats-plain-icon="close">Закрыть</button></div></header>
     <div id="stats-user-overview" class="stats-user-overview" aria-live="polite">Загрузка сводки…</div>
     <nav class="stats-user-tabs" aria-label="Аналитика пользователя"><button type="button" class="is-active" data-stats-user-tab="history">История трафика</button><button type="button" data-stats-user-tab="inbounds">Inbound и ноды</button><button type="button" data-stats-user-tab="observations">Измерения</button></nav>
     <div class="stats-user-workspace"><div class="stats-user-main"><div class="stats-history-filters"><label>ID пользователя<input id="stats-history-user" type="number" min="1" step="1" placeholder="ID"></label><label>Inbound<select id="stats-history-inbound"><option value="">Все (пользовательские счётчики)</option></select></label><label>Нода<select id="stats-history-node"><option value="">Все ноды</option></select></label><label>Период<select id="stats-history-range"><option value="1h">1 час</option><option value="24h" selected>24 часа</option><option value="7d">7 дней</option><option value="30d">30 дней</option></select></label><button class="gh" id="stats-history-load" type="button">Обновить</button></div>
@@ -1322,6 +1322,11 @@ function statisticsP(){
   const statsPortal=$('#stats-user-modal');
   if(statsPortal&&statsPortal.parentElement!==document.body)document.body.append(statsPortal);
   const closeStatsUser=()=>{++historyRequest;$('#stats-user-modal').hidden=true;$('#stats-leaders-range')?.focus()};
+  // Other panel buttons receive icons from decorateButtonIcons; keep these
+  // header actions text-only to avoid duplicate refresh/close glyphs.
+  for(const button of $('.stats-user-actions button')){
+    button.querySelectorAll('svg').forEach(svg=>svg.remove());
+  }
   $('#stats-user-close')?.addEventListener('click',closeStatsUser);
   $('#stats-user-refresh')?.addEventListener('click',()=>void loadHistory(true));
   $('#stats-user-modal')?.addEventListener('click',e=>{if(e.target.id==='stats-user-modal')closeStatsUser()});
