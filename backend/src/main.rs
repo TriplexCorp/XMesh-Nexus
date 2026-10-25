@@ -2082,6 +2082,7 @@ fn validate_user_traffic_samples(user_traffic: &[UserTrafficSample]) -> Result<(
 
 fn validate_inbound_traffic_samples(
     inbound_samples: &[UserInboundTrafficSample],
+    sampled_at: i64,
 ) -> Result<(), ApiError> {
     if inbound_samples.len() > 4096 {
         return Err(ApiError::new(
@@ -2230,6 +2231,50 @@ async fn enforce_node_traffic_limit(
     Ok(())
 }
 
+// Called before cumulative UPSERTs in the same signed-telemetry transaction.
+// Capture only forward movement of both counters; a reset establishes a new baseline.
+async fn persist_verified_traffic_deltas(
+    conn: &mut sqlx::PgConnection,
+    node_id: i64,
+    samples: &Value,
+    sampled_at: i64,
+    inbound: bool,
+) -> Result<(), ApiError> {
+    let sql = if inbound {
+        "INSERT INTO verified_traffic_deltas
+             (sampled_at,node_id,user_id,source_type,inbound_tag,uplink_bytes,downlink_bytes)
+         SELECT to_timestamp($3::DOUBLE PRECISION/1000),$1,s.user_id,'inbound',s.inbound_tag,
+                s.uplink_bytes-t.last_uplink_bytes,
+                s.downlink_bytes-t.last_downlink_bytes
+         FROM jsonb_to_recordset($2::jsonb)
+              AS s(user_id BIGINT,inbound_tag TEXT,uplink_bytes BIGINT,downlink_bytes BIGINT)
+         JOIN user_inbound_traffic_totals t
+           ON t.node_id=$1 AND t.user_id=s.user_id AND t.inbound_tag=s.inbound_tag
+         WHERE s.uplink_bytes>=t.last_uplink_bytes
+           AND s.downlink_bytes>=t.last_downlink_bytes
+           AND (s.uplink_bytes>t.last_uplink_bytes OR s.downlink_bytes>t.last_downlink_bytes)"
+    } else {
+        "INSERT INTO verified_traffic_deltas
+             (sampled_at,node_id,user_id,source_type,inbound_tag,uplink_bytes,downlink_bytes)
+         SELECT to_timestamp($3::DOUBLE PRECISION/1000),$1,s.user_id,'user','',
+                s.uplink_bytes-t.last_uplink_bytes,
+                s.downlink_bytes-t.last_downlink_bytes
+         FROM jsonb_to_recordset($2::jsonb)
+              AS s(user_id BIGINT,uplink_bytes BIGINT,downlink_bytes BIGINT)
+         JOIN user_node_traffic_totals t ON t.node_id=$1 AND t.user_id=s.user_id
+         WHERE s.uplink_bytes>=t.last_uplink_bytes
+           AND s.downlink_bytes>=t.last_downlink_bytes
+           AND (s.uplink_bytes>t.last_uplink_bytes OR s.downlink_bytes>t.last_downlink_bytes)"
+    };
+    sqlx::query(sql)
+        .bind(node_id)
+        .bind(samples)
+        .bind(sampled_at)
+        .execute(&mut *conn)
+        .await?;
+    Ok(())
+}
+
 async fn persist_user_traffic(
     conn: &mut sqlx::PgConnection,
     node_id: i64,
@@ -2272,6 +2317,7 @@ async fn persist_user_traffic(
         .bind(source_ms)
         .execute(&mut *conn)
         .await?;
+        persist_verified_traffic_deltas(conn, node_id, &serialized, sampled_at, false).await?;
         sqlx::query(
             "INSERT INTO user_node_traffic_totals AS totals (
                 node_id, user_id, last_uplink_bytes, last_downlink_bytes,
@@ -2316,6 +2362,7 @@ async fn persist_inbound_traffic(
         let serialized = serde_json::to_value(inbound_samples).map_err(|_| {
             ApiError::new(StatusCode::BAD_REQUEST, "Некорректный userInboundTraffic.")
         })?;
+        persist_verified_traffic_deltas(conn, node_id, &serialized, sampled_at, true).await?;
         sqlx::query(
             "INSERT INTO user_inbound_traffic_totals AS totals (
                 node_id,user_id,inbound_tag,last_uplink_bytes,last_downlink_bytes,
@@ -2481,7 +2528,7 @@ async fn ingest_node_metrics(
     )
     .await?;
 
-    persist_inbound_traffic(&mut telemetry_tx, body.node_id, &inbound_samples).await?;
+    persist_inbound_traffic(&mut telemetry_tx, body.node_id, &inbound_samples, sampled_at).await?;
 
     // Commit source watermark, traffic accounting, and presence in one transaction.
     telemetry_tx.commit().await?;
