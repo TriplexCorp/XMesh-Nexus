@@ -218,3 +218,10 @@ assert.match(app,/document\.body\.append\(menu\)/);
 assert.match(app,/menu\.style\.left=rect\.left/);
 assert.match(app,/body > \.xm-period-portal/);
 assert.match(css,/body > \.xm-period-portal\{position:fixed;z-index:200000/);
+
+// Traffic reset is destructive and must be confirmed in the standard modal.
+assert.match(app,/Сбросить трафик<\/button>/);
+assert.match(app,/if\(a==='rst'\)\{/);
+assert.match(app,/confirmBox\('Сбросить трафик пользователя/);
+assert.match(app,/await api\.update\('users',id,\{used:0\}\)/);
+assert.doesNotMatch(app,/a=='rst'\?\{used:0\}/);
