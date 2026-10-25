@@ -1009,7 +1009,7 @@ const statsRing=(label,percent,accent)=> {
 function statisticsP(){
  const markup=`<div class="stats-dashboard" id="stats-dashboard">
   <div class="stats-heading"><div><h2>Статистика инфраструктуры</h2><p class="note">Реальные измерения. CPU steal показывает долю времени, которую виртуальная машина ожидала процессор гипервизора.</p></div>
-   <div class="act"><select id="stats-period" aria-label="Период графиков"><option value="1h">1 час</option><option value="24h">24 часа</option></select><button class="gh" id="stats-refresh" type="button">${ic('refresh-cw')} Обновить</button></div></div>
+   <div class="act"><select id="stats-period" aria-label="Период графиков"><option value="1h">1 час</option><option value="24h">24 часа</option><option value="7d">7 дней</option><option value="30d">30 дней</option></select><button class="gh" id="stats-refresh" type="button">${ic('refresh-cw')} Обновить</button></div></div>
   <div id="stats-status" class="note" role="status" aria-live="polite">Получение измерений…</div><div id="stats-quality" class="note" role="status" aria-live="polite"></div>
   <div id="stats-summary" class="stats-overview-grid"></div>
   <div class="stats-layout">
