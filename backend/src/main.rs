@@ -1876,7 +1876,10 @@ async fn get_statistics_overview(
     })))
 }
 
-fn prepare_node_metrics(body: &NodeMetricsIngestRequest, mut metrics: Value) -> Result<Value, ApiError> {
+fn prepare_node_metrics(
+    body: &NodeMetricsIngestRequest,
+    mut metrics: Value,
+) -> Result<Value, ApiError> {
     if let Some(status) = body.user_stats_status.as_deref() {
         if !matches!(status, "verified" | "direct" | "unavailable") {
             return Err(ApiError::new(
@@ -1968,7 +1971,9 @@ fn validate_user_traffic_samples(user_traffic: &[UserTrafficSample]) -> Result<(
     Ok(())
 }
 
-fn validate_inbound_traffic_samples(inbound_samples: &[UserInboundTrafficSample]) -> Result<(), ApiError> {
+fn validate_inbound_traffic_samples(
+    inbound_samples: &[UserInboundTrafficSample],
+) -> Result<(), ApiError> {
     if inbound_samples.len() > 4096 {
         return Err(ApiError::new(
             StatusCode::BAD_REQUEST,
@@ -2072,7 +2077,10 @@ async fn persist_node_network_counters(
     Ok(())
 }
 
-async fn enforce_node_traffic_limit(conn: &mut sqlx::PgConnection, node_id: i64) -> Result<(), ApiError> {
+async fn enforce_node_traffic_limit(
+    conn: &mut sqlx::PgConnection,
+    node_id: i64,
+) -> Result<(), ApiError> {
     let cutoff = sqlx::query(
         "UPDATE panel_records AS node SET
            data=jsonb_set(
@@ -2317,7 +2325,8 @@ async fn ingest_node_metrics(
     // Telemetry requires a registered Ed25519 identity.
     node_auth::authenticate(&state, &headers, body.node_id, &raw_body).await?;
 
-    let mut metrics = prepare_node_metrics(&body, body.metrics.clone().unwrap_or_else(|| json!({})))?;
+    let mut metrics =
+        prepare_node_metrics(&body, body.metrics.clone().unwrap_or_else(|| json!({})))?;
     let mut user_traffic = body.user_traffic.take().unwrap_or_default();
     validate_user_traffic_samples(&user_traffic)?;
     let mut inbound_samples = body.user_inbound_traffic.take().unwrap_or_default();
@@ -2354,7 +2363,14 @@ async fn ingest_node_metrics(
     // The conditional UPDATE makes the critical event idempotent.
     enforce_node_traffic_limit(&mut *telemetry_tx, body.node_id).await?;
 
-    persist_user_traffic(&mut *telemetry_tx, body.node_id, &user_traffic, sampled_at, source_ms).await?;
+    persist_user_traffic(
+        &mut *telemetry_tx,
+        body.node_id,
+        &user_traffic,
+        sampled_at,
+        source_ms,
+    )
+    .await?;
 
     persist_inbound_traffic(&mut *telemetry_tx, body.node_id, &inbound_samples).await?;
 
