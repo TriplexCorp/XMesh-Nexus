@@ -1803,7 +1803,7 @@ async fn inbound_traffic_summary(pool: &PgPool) -> Result<(i64, i64, i64), ApiEr
 }
 
 // Distinguish delayed or missing telemetry from genuine zero usage.
-fn metric_freshness(sampled_at_ms: i64, now_ms: i64) -> &'static str {
+const fn metric_freshness(sampled_at_ms: i64, now_ms: i64) -> &'static str {
     if sampled_at_ms > now_ms.saturating_add(30_000) {
         "invalid"
     } else if sampled_at_ms >= now_ms.saturating_sub(65_000) {
