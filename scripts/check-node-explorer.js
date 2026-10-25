@@ -44,5 +44,5 @@ assert.match(app,/while\(explorer\.runtimeActive<8&&explorer\.runtimeQueue\.leng
 assert.match(app,/explorer\.runtimeQueue=explorer\.runtimeQueue\.filter/,'Drop queued requests that are no longer visible');
 assert.match(app,/setTimeout\(\(\)=>\{if\(!root\.isConnected\)return;nodeExplorer\.page=1;nodeExplorerUpdate\(\)\},140\)/,'Debounced input');
 assert.match(css,/\.nodes-page \.node-explorer\{/,'Dedicated themed filter bar');
-assert.match(html,/app\.js\?v=20261025-node-explorer-v1/,'Cache-busted explorer script');
+assert.match(html,/app\.js\?v=20261025-node-explorer-v2/,'Cache-busted explorer script');
 console.log('Fleet explorer search/filter/sort and 1,200-node pagination: PASS.');
