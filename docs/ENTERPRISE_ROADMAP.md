@@ -90,6 +90,50 @@ This roadmap tracks verified improvements, not feature claims. A stage is comple
 
 **Exit:** reproducible capacity limits, verified failure handling and measurable UX improvements.
 
+## 7 — P1: Statistics 2.0 — full observability and operator analytics (committed scope)
+
+**User mandate (2026-10-25):** Deliver the **entire** statistics upgrade, not just a telemetry-freshness patch or a visual mockup. This is an end-to-end product requirement across Rust APIs, TimescaleDB/PostgreSQL, authenticated UI and real signed Xray node telemetry. **Overall status: IN PROGRESS — NOT COMPLETE.** A green CI run for one increment must never be described as completion of this section.
+
+**Already merged into `main`:** [PR #10](https://github.com/TriplexCorp/XMesh-Nexus/pull/10), commit [`a9138eb`](https://github.com/TriplexCorp/XMesh-Nexus/commit/a9138ebcd6eb897e4cef28a8f20f9626da875b79). Existing Statistics UI now distinguishes fresh/delayed/stale/invalid/never-received telemetry, exposes Xray user-counter status, identifies nodes needing attention, separates node interface RX/TX from cumulative per-user usage, and offers 1h/24h/7d/30d network-traffic views. This is **partial delivery**, not Statistics 2.0 completion. It does not prove end-to-end accounting correctness or provide all historical analytics.
+
+### Phase A — P0: Data integrity and trustworthy measurements
+
+- [ ] Define and test one documented freshness/quality contract across node, user, inbound and aggregate endpoints: timestamps, provenance, availability, expected coverage, clock skew, and `fresh`/`delayed`/`stale`/`unavailable`/`never_received` states.
+- [ ] Never show missing counters, absent samples, failed StatsService polling, or disconnected nodes as **zero usage**. Genuine zero values require a verified observation; missing time buckets remain gaps (`null`).
+- [ ] Display network-interface RX/TX, verified Xray per-user/per-inbound traffic, and panel-container performance **as separate metric families**; do not add unrelated or overlapping counters.
+- [ ] Exercise duplicate, out-of-order, delayed and replayed signed telemetry, counter resets, agent/Xray restarts, partial coverage and disconnect/reconnect. Prove cumulative totals are monotonic without double-counting or fabricated consumption.
+- [ ] Enforce owner/admin/viewer data-access restrictions, avoid disclosing secrets/internal host details, and test authorization for every new endpoint and export.
+- [ ] Add behavior-based Rust/API/frontend regression tests for missing/stale/partial data, time-boundary behavior, realistic observations and incorrect client-side assumptions.
+
+### Phase B — P1: Redesigned Statistics Overview (real implementation, not mockup)
+
+- [ ] Deliver a coherent, responsive, accessible Statistics UI (desktop/mobile) with **Overview, Traffic, Nodes and Users** views, honoring existing theme and RU/EN localization.
+- [ ] Display actionable KPI cards: online/total users, healthy/total nodes, data coverage/freshness and **verified** user traffic for a clearly labelled period; never substitute network-interface traffic for user traffic.
+- [ ] Implement complete, readable historical visualizations with explicit units, date/time range, sampling resolution, gaps, legends, last verified sample time, loading/error/empty states and bounded refresh.
+- [ ] Support 1h, 24h, 7d, 30d and appropriate bounded custom date ranges; allow period-over-period comparisons with matching windows.
+- [ ] Add sortable/filterable node health diagnostics (CPU/steal, RAM, disk, RX/TX, sessions, signed heartbeat, agent/Xray version, policy desired/delivered/applied status where verifiable) with explanations for missing or degraded data.
+- [ ] Keep UI refresh and API polling efficient, cancellable and non-duplicative; preserve security boundaries and regression tests.
+
+### Phase C — P1: Deep TimescaleDB, user and inbound analytics
+
+- [ ] Build genuine **time-bucketed Xray user-traffic** history (not merely lifetime totals), with safe filters for user, node, inbound, squad, time range and source reliability; preserve accounting direction/units.
+- [ ] Provide Top-10 users/nodes/inbounds by **verified consumption**, trends and historical comparisons, plus usage against limits, impending expiry and quota-risk indicators.
+- [ ] Implement drill-down from overview to node → inbound → user, including clearly identified partial/stale data and count of contributing nodes/samples.
+- [ ] Replace per-node N+1 statistics queries with bounded set-based queries; add safe SQL paging, indexes and query-plan/performance evidence.
+- [ ] Evaluate continuous aggregates, retention/compression policy and backfill rules for TimescaleDB with production-safe migrations, realistic-volume tests, and a documented capacity envelope.
+- [ ] Add secure, permission-aware **CSV and JSON export** of selected measurements with time bounds, provenance, sample quality and controlled result sizes.
+
+### Phase D — P1: Monitoring, anomaly detection and incident response
+
+- [ ] Detect and signal stale/offline nodes, missing Xray StatsService, collection failures, anomalous traffic changes, CPU steal/pressure, disk/memory saturation and impending limits using explicit, configurable thresholds.
+- [ ] Provide an incident/alert history: onset, last observation, duration, impacted nodes/users where authorized, status, resolution, and traceable evidence; avoid duplicate notification storms.
+- [ ] Add in-panel alerts and actionable diagnosis; document supported external notification channels rather than assuming unimplemented integrations.
+- [ ] Test notification deduplication, recovery, noisy telemetry, missing-data failure modes, restricted access and operational runbooks.
+
+**Acceptance / definition of done:** Every checkbox in Phases A–D is implemented with production code and behavioral tests, verified in strict CI on committed sources and, for traffic enforcement/accounting/failure behavior, on disposable real Xray nodes. Report verified data coverage and performance under representative node/user loads; document data retention, permissions, deployment/rollback, and known limitations. **Do not mark Statistics 2.0 complete merely because PR #10 passed or 7d/30d periods became available.**
+
+**Delivery workflow:** Per user instruction, do **not create additional branches** unless explicitly authorized. Changes should target `main` while preserving formatting, all-target Rust tests, strict Clippy, security checks and integration gates. Record each delivered slice and its CI evidence here; check off only verified acceptance criteria.
+
 ## Current architecture and limitations
 
 XMesh Nexus is a Rust/Axum control plane with PostgreSQL/TimescaleDB and Redis, using separate XMesh-Node runtime on VPN nodes. Signed Ed25519 node telemetry and policies are implemented. Native Xray JSON generation contains code paths for VLESS, VMess, Trojan, Shadowsocks/SS2022, Hysteria2 and MASQUE, but end-to-end client compatibility is not assumed. The default Compose topology is a single panel, database and Redis; HA is **not** verified. Offline quota enforcement is conservative, not a globally exact quota across disconnected nodes.
