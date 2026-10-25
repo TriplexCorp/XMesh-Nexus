@@ -39,13 +39,13 @@ assert.match(server,/\.filter\(\|h\|\s*host_for_profile\(h,\s*tag,\s*profile,\s*
 // Regression: the Hosts form previously rejected Hysteria2 (and every non-VLESS
 // protocol) before sending any request, even though backend subscriptions worked.
 const hostStart=app.indexOf("hosts:{t:'Хосты'");
-const hostEnd=app.indexOf("\n   nodes:{",hostStart);
+const hostEnd=app.indexOf("nodes:{t:'Узлы'",hostStart);
 assert(hostStart>=0&&hostEnd>hostStart,'Hosts form source not found');
 const hostCode=app.slice(hostStart,hostEnd);
 const validatorStart=hostCode.indexOf('chk:d=>{');
-const validatorEnd=hostCode.indexOf('\n     },\n     cols:',validatorStart);
+const validatorEnd=hostCode.indexOf('\n    },\n    cols:',validatorStart);
 assert(validatorStart>=0&&validatorEnd>validatorStart,'Hosts validation function not found');
-const validator=hostCode.slice(validatorStart+4,validatorEnd+7);
+const validator=hostCode.slice(validatorStart+4,validatorEnd+6);
 const protocols=['vless','vmess','trojan','shadowsocks','hysteria','masque'];
 const whitelist=app.match(/const SUBSCRIPTION_PROTOCOLS=new Set\(\[([^\]]+)\]\);/);
 assert(whitelist,'Subscription protocol whitelist missing');
