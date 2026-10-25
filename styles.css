@@ -805,6 +805,11 @@ body::before,body::after{content:none}
 .app{grid-template-columns:15.4rem minmax(0,1fr)}
 .app>aside{padding:1.45rem .9rem;background:var(--nav-bg);border-right-color:var(--ln);box-shadow:12px 0 32px -32px rgba(0,0,0,.65);-webkit-backdrop-filter:none;backdrop-filter:none}
 .brand{display:flex;align-items:center;gap:.72rem;min-width:0;padding:.2rem .6rem 1.05rem;font-size:1rem;letter-spacing:-.035em}
+/* Subtle divider beneath the sidebar identity, aligned with navigation gutters. */
+.app>aside .brand{position:relative;margin-bottom:.85rem;padding-bottom:1.25rem}
+.app>aside .brand::after{content:"";position:absolute;left:.6rem;right:.6rem;bottom:0;height:1px;background:color-mix(in srgb,var(--ln) 85%,var(--tx) 15%);pointer-events:none}
+html[data-sidebar=compact] .app>aside .brand::after{left:.3rem;right:.3rem}
+@media(max-width:700px){.app>aside .brand::after{display:none}}
 .logo{flex:0 0 2.65rem;width:2.65rem;height:2.65rem;border-radius:.82rem;background:linear-gradient(145deg,color-mix(in srgb,var(--b) 28%,var(--a)),var(--a));color:var(--btn-text);box-shadow:0 5px 14px -8px color-mix(in srgb,var(--a) 45%,transparent),inset 0 1px 0 rgba(255,255,255,.3);border:1px solid color-mix(in srgb,var(--a) 65%,var(--tx));font-weight:850;font-size:1.12rem}
 nav{gap:.16rem}
 nav .g{padding:1.12rem .7rem .43rem;color:color-mix(in srgb,var(--mu) 82%,var(--bg));font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;font-weight:760}
