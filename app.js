@@ -3167,7 +3167,7 @@ const updateNodeRuntimeBadges=(node,runtime)=>{
  * Never index secret tokens, UUIDs, API credentials or other private properties. */
 const NODE_EXPLORER_PAGE_SIZE=48;
 let nodeExplorer=null;
-const nodeFold=value=>String(value??'').normalize('NFKD').replace(/[\\u0300-\\u036f]/g,'').toLocaleLowerCase().replace(/ё/g,'е');
+const nodeFold=value=>String(value??'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase().replace(/ё/g,'е');
 function nodeSearchTerms(query){
  const parts=String(query||'').match(/(?:[^\s"]+:"[^"]*"|"[^"]*"|\S+)/g)||[];
  return parts.slice(0,16).map(part=>{
@@ -3223,6 +3223,7 @@ function nodeExplorerUpdate(){
  if(!grid)return;
  grid.dataset.nodeCount=String(filtered.length);
  grid.innerHTML=visible.map(e=>explorer.cards.get(e.id)||'').join('');
+ for(const entry of visible)if(explorer.runtimeCache.has(entry.id))updateNodeRuntimeBadges(entry.node,explorer.runtimeCache.get(entry.id));
  const total=root.querySelector('[data-node-search-count]');
  if(total)total.textContent=filtered.length+' / '+explorer.entries.length+' узлов';
  const page=root.querySelector('[data-node-search-page]');
@@ -3240,6 +3241,7 @@ function nodeExplorerUpdate(){
   backendRequest('/api/v1/nodes/'+encodeURIComponent(entry.id)+'/runtime')
    .then(rt=>{
     if(nodeExplorer!==explorer)return;
+    explorer.runtimeCache.set(entry.id,rt);
     updateNodeRuntimeBadges(entry.node,rt);
     entry.state=entry.node.disabled?'disabled':rt?.connected?'online':'unknown';
    }).catch(()=>{if(nodeExplorer===explorer)updateNodeRuntimeBadges(entry.node,null)});
@@ -3309,7 +3311,7 @@ async function nodesP(){
       <div class="acts"><button class="gh sm" data-node-bootstrap="${n.id}">${ic('link')}Подключить агент ноды</button><button class="gh sm" data-nr="${n.id}" ${n.disabled?'disabled title="Сначала включите узел после восстановления лимита"':''}>${ic('redo')}Перезапуск</button><button class="gh sm" data-xray-update="${n.id}">${ic('upload')}Обновить Xray</button><button class="gh sm" data-agent-update="${n.id}" title="Обновить управляющий Agent через подтверждённую команду ноде">${ic("refresh-cw")}Обновить Agent</button><button type="button" class="gh sm node-geodata-open" data-node-geodata="${n.id}" title="Настройки GeoData и ручное обновление файлов на этом узле">${ic("globe")}Обновить GeoData</button><button type="button" class="gh sm node-routing-open" data-node-routing="${n.id}" title="Направление трафика по GeoSite, GeoIP и через другие ноды">${ic("git-branch")}Маршрутизация</button><button class="gh sm" data-nt="${n.id}">${ic(n.disabled?'play':'pause')}${n.disabled?'Включить':'Отключить'}</button><button class="gh sm" data-ne="nodes:${n.id}">${ic('pen')}Изменить</button><button class="gh sm" data-node-create-host="${n.id}">${ic('globe')}Создать хост</button></div></div>`;
   });
   const cardById=new Map(r.items.map((n,i)=>[n.id,cards[i]]));
-  nodeExplorer={entries:r.items.map(n=>nodeSearchEntry(n,DB.profiles.find(p=>p.id===n.profileId),null)),cards:cardById,page:1,runtimeLoaded:new Set()};
+  nodeExplorer={entries:r.items.map(n=>nodeSearchEntry(n,DB.profiles.find(p=>p.id===n.profileId),null)),cards:cardById,page:1,runtimeLoaded:new Set(),runtimeCache:new Map()};
   const empty=`<div class="card empty"><b>Узлов пока нет</b><span>Список начнёт заполняться после добавления ваших серверов.</span><button class="btn sm" data-ne="nodes">${ic('plus')}Добавить узел</button></div>`;
   const gridMode=getNodeGridMode();
   return [`<section class="nodes-page"><div class="bar2 nodes-toolbar"><p class="note">${s.nAll} узлов настроено. CPU, RAM и скорость требуют подключённого мониторинга.</p><div class="node-grid-controls"><span class="note">Сетка</span><div class="seg" role="group" aria-label="Плотность сетки"><button type="button" data-node-grid-mode="compact" aria-pressed="${gridMode==='compact'?'true':'false'}" class="${gridMode==='compact'?'on':''}">Плотно</button><button type="button" data-node-grid-mode="standard" aria-pressed="${gridMode==='standard'?'true':'false'}" class="${gridMode==='standard'?'on':''}">Стандарт</button><button type="button" data-node-grid-mode="spacious" aria-pressed="${gridMode==='spacious'?'true':'false'}" class="${gridMode==='spacious'?'on':''}">Крупно</button></div></div><button type="button" class="node-create-action" data-ne="nodes" aria-label="Добавить новый узел"><span class="node-create-icon" aria-hidden="true">${ic('plus')}</span><span class="node-create-label">Новый узел</span></button></div>
