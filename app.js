@@ -1307,15 +1307,15 @@ function statisticsP(){
   historyUser?.addEventListener('change',()=>void loadHistory(true));
   for(const control of [historyInbound,historyNode,$('#stats-history-range')])control?.addEventListener('change',()=>void loadHistory());
   const showStatsUserTab=name=>{
-    $('.stats-user-pane').forEach(el=>{el.hidden=el.dataset.statsUserPane!==name});
-    $('.stats-user-tabs button').forEach(el=>el.classList.toggle('is-active',el.dataset.statsUserTab===name));
+    $$('.stats-user-pane').forEach(el=>{el.hidden=el.dataset.statsUserPane!==name});
+    $$('.stats-user-tabs button').forEach(el=>el.classList.toggle('is-active',el.dataset.statsUserTab===name));
     if(name==='observations')void loadObservations();
   };
   const closeStatsUser=()=>{++historyRequest;$('#stats-user-modal').hidden=true;$('#stats-leaders-range')?.focus()};
   $('#stats-user-close')?.addEventListener('click',closeStatsUser);
   $('#stats-user-modal')?.addEventListener('click',e=>{if(e.target.id==='stats-user-modal')closeStatsUser()});
   $('#stats-user-modal')?.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();closeStatsUser()}});
-  $('.stats-user-tabs button').forEach(el=>el.addEventListener('click',()=>showStatsUserTab(el.dataset.statsUserTab)));
+  $$('.stats-user-tabs button').forEach(el=>el.addEventListener('click',()=>showStatsUserTab(el.dataset.statsUserTab)));
   const openStatsUser=(id,name)=>{
     const modal=$('#stats-user-modal'),n=Number(id);
     if(!modal||!Number.isSafeInteger(n)||n<=0)return;
