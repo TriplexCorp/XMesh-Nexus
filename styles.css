@@ -2451,7 +2451,18 @@ aside #logout .ic{width:1.12rem;height:1.12rem;flex-shrink:0}
 .stats-dashboard{display:grid;gap:var(--view-gap,1rem);min-width:0}
 .stats-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap}
 .stats-heading h2{margin:0 0 .3rem;font-size:1.22rem}
-.stats-heading .act{display:flex;align-items:center;gap:.55rem;flex-wrap:wrap}
+/* Keep refresh on the LEFT of the period selector, even when the select is wide. */
+#stats-dashboard .stats-heading .act{
+  display:grid;
+  grid-template-columns:max-content minmax(12rem,19rem);
+  align-items:center;
+  gap:.55rem;
+  justify-content:end;
+  width:auto;
+  max-width:100%;
+}
+#stats-dashboard #stats-refresh{grid-column:1;grid-row:1;white-space:nowrap;width:auto;min-width:0}
+#stats-dashboard #stats-period{grid-column:2;grid-row:1;width:100%;min-width:0;max-width:100%}
 .stats-overview-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.7rem}
 .stats-tile{display:flex;flex-direction:column;gap:.32rem;padding:1.15rem;min-width:0;background:var(--s1);border:1px solid var(--ln);border-radius:var(--ui-radius,16px)}
 .stats-tile small,.stats-tile span{font-size:.78rem;color:var(--mu)}
