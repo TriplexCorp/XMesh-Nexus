@@ -1025,7 +1025,7 @@ const statsDetailedChart=(points)=>{
    if(!valid(p[key]))return '';
    const v=Number(p[key])*8/1e6;
    const when=new Date(Number(p.bucketMs)).toLocaleString(panelIsEnglish()?'en-US':'ru-RU');
-   return '<circle class="stats-detail-point '+cls+'" cx="'+x(i).toFixed(2)+'" cy="'+y(v).toFixed(2)+'" r="5" tabindex="0"><title>'+esc(when+' · '+cls.toUpperCase()+' · '+fmt(v,3)+' Мбит/с')+'</title></circle>';
+   return '<circle class="stats-detail-point '+cls+'" cx="'+x(i).toFixed(2)+'" cy="'+y(v).toFixed(2)+'" r="5" tabindex="0" role="button" data-bucket-ms="'+Number(p.bucketMs)+'" data-series="'+cls+'"><title>'+esc(when+' · '+cls.toUpperCase()+' · '+fmt(v,3)+' Мбит/с')+'</title></circle>';
   }).join('');
   return '<path class="stats-detail-area '+cls+'" d="'+area+'"/><path class="stats-detail-line '+cls+'" d="'+d+'"/>'+dots;
  };
@@ -1045,7 +1045,7 @@ function statisticsP(){
   <div class="stats-live-bar"><span id="stats-live-badge" class="stats-live-badge" aria-label="Режим наблюдения"><i aria-hidden="true"></i><b>LIVE</b></span><span id="stats-status" class="note" role="status" aria-live="polite">Получение измерений…</span><span id="stats-sample-age" class="note">Ожидание измерений</span></div><div id="stats-quality" class="note" role="status" aria-live="polite"></div>
   <div id="stats-summary" class="stats-overview-grid"></div>
   <div class="stats-layout">
-   <section class="card"><div class="hd"><div><h3>Скорость сети нод</h3><p>RX/TX сетевых интерфейсов (включая сторонние сервисы), отдельно от персональных Xray-счётчиков.</p></div></div><div id="stats-trend"></div></section>
+   <section class="card"><div class="hd"><div><h3>Скорость сети нод</h3><p>RX/TX сетевых интерфейсов (включая сторонние сервисы), отдельно от персональных Xray-счётчиков.</p></div></div><div id="stats-trend"></div><section id="stats-bucket-detail" class="stats-bucket-detail" hidden aria-live="polite"></section></section>
    <section class="card"><div class="hd"><div><h3>Control Plane</h3><p>Метрики контейнера панели, не всей физической машины.</p></div></div><div id="stats-control"></div></section>
   </div>
   <section class="card"><div class="hd"><div><h3>Узлы и виртуализация</h3><p>CPU, steal time, RAM, диски, сеть, активные соединения и свежесть данных.</p></div></div><div id="stats-nodes" class="stats-node-grid"></div></section>
@@ -1057,6 +1057,7 @@ function statisticsP(){
   let lastRefresh=0;
   let lastOverview=0,lastSystem=0,overviewCache=null,systemCache=null;
   let requestFailed=false,lastSampleAt=0,lastTrafficSignature='',lastTrafficPeriod='';
+  let selectedBucketMs=null,detailRequest=0,chartPoints=[];
   const updateLiveStatus=()=>{
     const live=$('#stats-period')?.value==='live',badge=$('#stats-live-badge'),age=$('#stats-sample-age');
     if(badge)badge.classList.toggle('is-paused',!live||document.hidden||requestFailed);
@@ -1123,6 +1124,7 @@ function statisticsP(){
     ];
     $('#stats-control').innerHTML='<div class="stats-control-rings">'+statsRing('CPU',sys.cpu?.percent,'#6f9bff')+statsRing('RAM',sys.ram?.percent,'#c294e8')+statsRing('Диск',sys.disk?.percent,'#44c9b6')+'</div><div class="stats-kvs">'+control.map(x=>statsRow(...x)).join('')+'</div>';
     const points=traffic.points||[];
+    chartPoints=points;
     const latest=points[points.length-1]||{};
     const sampled=Number(latest.bucketMs);
     lastSampleAt=Number.isFinite(sampled)&&sampled>0?sampled:0;
@@ -1154,6 +1156,44 @@ function statisticsP(){
    }catch(error){requestFailed=true;updateLiveStatus();if(status)status.textContent=(panelIsEnglish()?'Unable to refresh statistics: ':'Не удалось обновить статистику: ')+(error.message||(panelIsEnglish()?'API error':'Ошибка API'))}
    finally{refreshing=false;lastRefresh=Date.now();if(button?.isConnected)button.disabled=false}
   };
+  const openBucket=async(bucketMs)=>{
+    if(!Number.isFinite(bucketMs)||!chartPoints.some(p=>Number(p.bucketMs)===bucketMs))return;
+    selectedBucketMs=bucketMs;
+    const panel=$('#stats-bucket-detail'),requestId=++detailRequest;
+    if(!panel)return;
+    panel.hidden=false;
+    panel.innerHTML='<p class="note">Загрузка показаний узлов…</p>';
+    $('.stats-detail-point').forEach(el=>el.classList.toggle('is-selected',Number(el.dataset.bucketMs)===bucketMs));
+    try{
+      const range=$('#stats-period')?.value||'live';
+      const detail=await backendRequest('/api/v1/metrics/traffic/bucket-detail?'+new URLSearchParams({range,bucketMs:String(bucketMs)}));
+      if(requestId!==detailRequest||selectedBucketMs!==bucketMs||cur!=='statistics')return;
+      const nodes=Array.isArray(detail.nodes)?detail.nodes:[];
+      const totals=(key)=>nodes.reduce((sum,n)=>sum+(Number.isFinite(Number(n[key]))&&n[key]!=null?Number(n[key]):0),0);
+      const rx=totals('rxBytesPerSec'),tx=totals('txBytesPerSec');
+      const peak=nodes.filter(n=>n.rxBytesPerSec!=null).sort((a,b)=>Number(b.rxBytesPerSec)-Number(a.rxBytesPerSec))[0];
+      const rows=nodes.map(n=>'<tr><td>'+esc(n.name||'Нода #'+n.id)+'</td><td>'+statsBytes(n.rxBytesPerSec)+'/с</td><td>'+statsBytes(n.txBytesPerSec)+'/с</td><td>'+esc(String(n.sampleCount??'—'))+'</td><td>'+(n.lastSampleMs?esc(new Date(n.lastSampleMs).toLocaleTimeString(panelIsEnglish()?'en-US':'ru-RU')):'—')+'</td></tr>').join('');
+      panel.innerHTML='<div class="stats-detail-header"><div><h4>Детали интервала · '+esc(new Date(bucketMs).toLocaleString(panelIsEnglish()?'en-US':'ru-RU'))+'</h4><p class="note">RX — принято сетевыми интерфейсами; TX — отправлено. Другие сервисы хоста тоже учитываются. Это не персональный трафик Xray.</p></div><button class="gh sm" type="button" data-stats-detail-close>Закрыть</button></div>'+
+        '<div class="stats-detail-kpis"><div><b>RX всех учтённых нод</b><strong>'+statsBytes(rx)+'/с</strong></div><div><b>TX всех учтённых нод</b><strong>'+statsBytes(tx)+'/с</strong></div><div><b>Нод с измерениями</b><strong>'+nodes.length+'</strong></div></div>'+
+        (peak?'<p class="note">Наибольший вклад RX: '+esc(peak.name||'Нода #'+peak.id)+' · '+statsBytes(peak.rxBytesPerSec)+'/с'+(rx>0?' ('+fmt(Number(peak.rxBytesPerSec)/rx*100,1)+'%)':'')+'</p>':'')+
+        '<div class="stats-bucket-table-wrap"><table><thead><tr><th>Нода</th><th>RX</th><th>TX</th><th>Измерений</th><th>Последняя точка</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+        '<p class="note">Источник: TimescaleDB · server_metric_samples'+(detail.truncated?' · Показаны первые 500 нод':'')+'. Отсутствующие измерения не заменены нулями.</p>';
+    }catch(e){if(requestId===detailRequest&&panel)panel.textContent='Ошибка детализации: '+(e.message||'API error')}
+  };
+  $('#stats-trend')?.addEventListener('click',e=>{
+    const point=e.target.closest?.('.stats-detail-point');
+    if(point)void openBucket(Number(point.dataset.bucketMs));
+  });
+  $('#stats-trend')?.addEventListener('keydown',e=>{
+    const point=e.target.closest?.('.stats-detail-point');
+    if(point&&(e.key==='Enter'||e.key===' ')){e.preventDefault();void openBucket(Number(point.dataset.bucketMs))}
+  });
+  $('#stats-bucket-detail')?.addEventListener('click',e=>{
+    if(e.target.closest?.('[data-stats-detail-close]')){
+      selectedBucketMs=null;++detailRequest;$('#stats-bucket-detail').hidden=true;
+      $('.stats-detail-point').forEach(el=>el.classList.remove('is-selected'));
+    }
+  });
   $('#stats-refresh')?.addEventListener('click',()=>{void refresh(true)});
   $('#stats-period')?.addEventListener('change',()=>{lastRefresh=0;void refresh()});
   void refresh();
