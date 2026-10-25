@@ -118,6 +118,20 @@ async function run(){
  await hEdit.run('hysteria-config');
  assert.equal(hEdit.doc().inbounds[0].streamSettings.hysteriaSettings.customOption,'test');
  assert.deepEqual(hEdit.doc().inbounds[0].streamSettings.tlsSettings,{certificates:[]},'Hysteria editor must preserve TLS');
+ // FinalMask editor must persist server and client projections separately.
+ const withMask=JSON.parse(JSON.stringify(hysteria));
+ withMask.inbounds[0].streamSettings.finalmask={udp:[{type:'salamander',settings:{password:'shared'}}]};
+ const paired=harness(withMask,{requestValues:{
+  json:JSON.stringify({udp:[{type:'salamander',settings:{password:'shared-2'}}]}),
+  client:JSON.stringify({udp:[{type:'noise',settings:{noise:[{rand:'10-20'}]}}]})
+ }});
+ assert.ok(paired.host.innerHTML.includes('data-tool="finalmask"'),'FinalMask tool must appear');
+ await paired.run('finalmask');
+ const pairedInbound=paired.doc().inbounds[0];
+ assert.equal(pairedInbound.streamSettings.finalmask.udp[0].settings.password,'shared-2');
+ assert.equal(pairedInbound.xmesh.clientFinalmask.udp[0].type,'noise');
+ assert.equal(pairedInbound.streamSettings.finalmask.udp[0].type,'salamander',
+  'client mask must not overwrite server mask');
  const tlsEdit=harness(hysteria,{requestValues:{json:'{"certificates":[],"minVersion":"1.3"}'}});
  await tlsEdit.run('tls');
  assert.equal(tlsEdit.doc().inbounds[0].streamSettings.tlsSettings.minVersion,'1.3');
