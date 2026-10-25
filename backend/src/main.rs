@@ -2645,11 +2645,8 @@ fn aggregate_traffic_metric_rows(
     Ok((points, total_samples, latest_node_count))
 }
 
-async fn get_traffic_metrics(
-    State(state): State<AppState>,
-    Query(query): Query<TrafficMetricsQuery>,
-) -> Result<Json<Value>, ApiError> {
-    let (range, interval_seconds) = match query.range.as_deref().unwrap_or("1h") {
+fn traffic_metrics_range(range: Option<&str>) -> Result<(&'static str, i64), ApiError> {
+    match range.unwrap_or("1h") {
         "live" => ("live", 5_i64),
         "5m" => ("5m", 10_i64),
         "15m" => ("15m", 30_i64),
@@ -2667,7 +2664,14 @@ async fn get_traffic_metrics(
                 "Недопустимый период статистики.",
             ));
         }
-    };
+    }
+}
+
+async fn get_traffic_metrics(
+    State(state): State<AppState>,
+    Query(query): Query<TrafficMetricsQuery>,
+) -> Result<Json<Value>, ApiError> {
+    let (range, interval_seconds) = traffic_metrics_range(query.range.as_deref())?;
 
     if query.node_id.is_some_and(|id| id <= 0) || query.squad_id.is_some_and(|id| id <= 0) {
         return Err(ApiError::new(
