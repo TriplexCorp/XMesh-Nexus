@@ -5252,3 +5252,7 @@ td.er .user-expiry-primary{color:var(--danger,#f08080)}
 .stats-detail-point-wrap:is(:hover,:focus-visible,.is-selected) .stats-detail-point-core{r:6}
 .stats-detail-point-wrap:focus{outline:none}
 @media(prefers-reduced-motion:reduce){.stats-detail-point-ring,.stats-detail-point-core{transition:none}}
+
+.stats-leaders{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}
+.stats-leaders>div{min-width:0}.stats-leaders h4{margin:.25rem 0 .7rem}
+@media(max-width:1000px){.stats-leaders{grid-template-columns:1fr}}
