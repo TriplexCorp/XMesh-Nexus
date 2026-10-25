@@ -2681,8 +2681,13 @@ async fn get_traffic_bucket_detail(
 ) -> Result<Json<Value>, ApiError> {
     let (range, interval_seconds) = traffic_metrics_range(Some(&query.range))?;
     let step_ms = interval_seconds.saturating_mul(1000);
-    let now_ms = chrono::Utc::now().timestamp_millis();
-    let window_ms = match range {
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+        .try_into()
+        .unwrap_or(i64::MAX);
+    let window_ms: i64 = match range {
         "live" => 60_000,
         "5m" => 300_000,
         "15m" => 900_000,
