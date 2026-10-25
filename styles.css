@@ -5221,22 +5221,14 @@ td.er .user-expiry-primary{color:var(--danger,#f08080)}
 .stats-detail-area.rx{fill:var(--a)}.stats-detail-area.tx{fill:var(--b)}
 .stats-detail-line{fill:none;stroke-width:2.8;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
 .stats-detail-line.rx{stroke:var(--a)}.stats-detail-line.tx{stroke:var(--b)}
-.stats-detail-point{cursor:crosshair;stroke:var(--s1);stroke-width:2;vector-effect:non-scaling-stroke;transition:r .15s ease,stroke-width .15s ease}
-.stats-detail-point.rx{fill:var(--a)}.stats-detail-point.tx{fill:var(--b)}
-.stats-detail-point:hover,.stats-detail-point:focus-visible{r:7;stroke-width:2;outline:none;filter:drop-shadow(0 0 4px currentColor)}
-.stats-detail-point:focus{outline:none}
 .stats-detail-legend{display:flex;align-items:center;flex-wrap:wrap;gap:.6rem 1.2rem;padding:.7rem .2rem;font-size:.8rem}
 .stats-detail-legend span{display:inline-flex;align-items:center;gap:.4rem}
 .stats-detail-legend i{display:inline-block;width:.7rem;height:.7rem;border-radius:50%}
 .stats-detail-legend i.rx{background:var(--a)}.stats-detail-legend i.tx{background:var(--b)}
 .stats-detail-legend small{color:var(--mu)}
 @media(max-width:700px){.stats-detail-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.stats-detail-label{font-size:15px}}
-@media(prefers-reduced-motion:reduce){.stats-detail-point{transition:none}}
 
 /* Timescale traffic drill-down: the selected point reveals actual per-node evidence. */
-.stats-detail-point.is-selected{r:7;stroke-width:2;filter:drop-shadow(0 0 5px currentColor)}
-.stats-detail-point.is-selected.rx{color:var(--a)}
-.stats-detail-point.is-selected.tx{color:var(--b)}
 .stats-bucket-detail{display:grid;gap:.85rem;margin-top:1rem;padding:1rem;background:var(--s1);border:1px solid var(--ln);border-radius:var(--ui-radius,16px)}
 .stats-bucket-detail[hidden]{display:none!important}
 .stats-detail-header{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem}
@@ -5246,3 +5238,16 @@ td.er .user-expiry-primary{color:var(--danger,#f08080)}
 .stats-bucket-table-wrap th,.stats-bucket-table-wrap td{padding:.7rem;border-bottom:1px solid var(--ln);font-size:.85rem}
 .stats-bucket-table-wrap th{color:var(--mu);font-weight:600;position:sticky;top:0;background:var(--s1)}
 @media(max-width:700px){.stats-detail-header{flex-direction:column}.stats-bucket-detail{padding:.75rem}}
+
+/* Sharp selection ring, not glow or browser SVG focus rectangle. */
+.stats-detail-point-wrap{cursor:pointer;outline:none}
+.stats-detail-point-ring{fill:none;stroke:transparent;stroke-width:2;opacity:0;pointer-events:none;vector-effect:non-scaling-stroke;transition:opacity .16s ease}
+.stats-detail-point-core{stroke:var(--s1);stroke-width:2;pointer-events:none;vector-effect:non-scaling-stroke;transition:r .16s ease}
+.stats-detail-point-wrap.rx .stats-detail-point-core{fill:var(--a)}
+.stats-detail-point-wrap.tx .stats-detail-point-core{fill:var(--b)}
+.stats-detail-point-wrap.rx .stats-detail-point-ring{stroke:var(--a)}
+.stats-detail-point-wrap.tx .stats-detail-point-ring{stroke:var(--b)}
+.stats-detail-point-wrap:is(:hover,:focus-visible,.is-selected) .stats-detail-point-ring{opacity:1}
+.stats-detail-point-wrap:is(:hover,:focus-visible,.is-selected) .stats-detail-point-core{r:6}
+.stats-detail-point-wrap:focus{outline:none}
+@media(prefers-reduced-motion:reduce){.stats-detail-point-ring,.stats-detail-point-core{transition:none}}
