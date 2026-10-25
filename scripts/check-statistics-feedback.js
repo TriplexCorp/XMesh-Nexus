@@ -270,3 +270,8 @@ assert.match(app,/class="stats-insight-node" style="--node-color:'\+userServerCo
 assert.match(app,/const nodeLegend=servers\.map/);
 assert.match(css,/--traffic-upload:#72dbc4;--traffic-download:#b5a0f4/);
 assert.match(css,/\.stats-insight-track span\{background:var\(--node-color,var\(--a\)\)\}/);
+
+assert.match(css,/Global XMesh scrollbar contract/);
+assert.match(css,/dialog\.user-modal,dialog\.user-modal \*/);
+assert.match(css,/--scrollbar-size:9px/);
+assert.match(css,/scrollbar-color:var\(--scrollbar-thumb\) var\(--scrollbar-track\)/);
