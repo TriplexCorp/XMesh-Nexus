@@ -2072,6 +2072,47 @@ async fn persist_node_network_counters(
     Ok(())
 }
 
+async fn enforce_node_traffic_limit(conn: &mut sqlx::PgConnection, node_id: i64) -> Result<(), ApiError> {
+    let cutoff = sqlx::query(
+        "UPDATE panel_records AS node SET
+           data=jsonb_set(
+             jsonb_set(
+               jsonb_set(data,'{disabled}','true'::jsonb,true),
+               '{disabledReason}',to_jsonb('traffic_limit'::text),true),
+             '{trafficLimitReachedAt}',to_jsonb(NOW()::text),true),
+           updated_at=NOW()
+         WHERE collection='nodes' AND id=$1
+           AND COALESCE((data->>'disabled')::boolean,false)=false
+           AND jsonb_typeof(data->'limit')='number'
+           AND (data->>'limit')::numeric>0
+           AND EXISTS (
+             SELECT 1 FROM node_network_traffic_totals t
+             WHERE t.node_id=$1
+               AND (t.rx_bytes::numeric+t.tx_bytes::numeric)
+                   * CASE
+                       WHEN jsonb_typeof(data->'mult')='number'
+                         AND (data->>'mult')::numeric > 0
+                         AND (data->>'mult')::numeric <= 1000
+                       THEN (data->>'mult')::numeric
+                       ELSE 1
+                     END
+                   >= (data->>'limit')::numeric*1073741824
+           )
+         RETURNING data->>'name' AS node_name,
+           (data->>'limit')::numeric AS limit_gb",
+    )
+    .bind(node_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    if let Some(row) = cutoff {
+        tracing::error!(node_id=node_id,
+          name=?row.try_get::<Option<String>,_>("node_name")?,
+          "NODE TRAFFIC LIMIT EXHAUSTED: automatic Xray shutdown required");
+    }
+
+    Ok(())
+}
+
 async fn ingest_node_metrics(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -2175,42 +2216,7 @@ async fn ingest_node_metrics(
     // This is independent of per-user Xray statistics and is decided on the
     // authenticated, cumulative RX+TX counters persisted above.
     // The conditional UPDATE makes the critical event idempotent.
-    let cutoff = sqlx::query(
-        "UPDATE panel_records AS node SET
-           data=jsonb_set(
-             jsonb_set(
-               jsonb_set(data,'{disabled}','true'::jsonb,true),
-               '{disabledReason}',to_jsonb('traffic_limit'::text),true),
-             '{trafficLimitReachedAt}',to_jsonb(NOW()::text),true),
-           updated_at=NOW()
-         WHERE collection='nodes' AND id=$1
-           AND COALESCE((data->>'disabled')::boolean,false)=false
-           AND jsonb_typeof(data->'limit')='number'
-           AND (data->>'limit')::numeric>0
-           AND EXISTS (
-             SELECT 1 FROM node_network_traffic_totals t
-             WHERE t.node_id=$1
-               AND (t.rx_bytes::numeric+t.tx_bytes::numeric)
-                   * CASE
-                       WHEN jsonb_typeof(data->'mult')='number'
-                         AND (data->>'mult')::numeric > 0
-                         AND (data->>'mult')::numeric <= 1000
-                       THEN (data->>'mult')::numeric
-                       ELSE 1
-                     END
-                   >= (data->>'limit')::numeric*1073741824
-           )
-         RETURNING data->>'name' AS node_name,
-           (data->>'limit')::numeric AS limit_gb",
-    )
-    .bind(body.node_id)
-    .fetch_optional(&mut *telemetry_tx)
-    .await?;
-    if let Some(row) = cutoff {
-        tracing::error!(node_id=body.node_id,
-          name=?row.try_get::<Option<String>,_>("node_name")?,
-          "NODE TRAFFIC LIMIT EXHAUSTED: automatic Xray shutdown required");
-    }
+    enforce_node_traffic_limit(&mut *telemetry_tx, body.node_id).await?;
 
     if !user_traffic.is_empty() {
         // One atomic UPSERT for the full node batch. Initial samples establish a
