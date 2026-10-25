@@ -1791,7 +1791,7 @@ async fn inbound_traffic_summary(pool: &PgPool) -> Result<(i64, i64, i64), ApiEr
                     COALESCE(SUM(downlink_bytes),0)::BIGINT AS down
              FROM user_inbound_traffic_totals",
         )
-        .fetch_one(&state.pool)
+        .fetch_one(pool)
         .await?;
         (
             row.try_get("entries")?,
