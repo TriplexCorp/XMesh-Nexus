@@ -23,7 +23,7 @@ assert.match(backend,/fn metric_freshness\(/);
 assert.match(backend,/mod metric_freshness_tests/);
 assert.match(backend,/"7d" => \("7d", 3600_i64\)/);
 assert.match(backend,/"30d" => \("30d", 21_600_i64\)/);
-assert.match(app,/v\?\.stale/);
+assert.match(app,/quality==='stale'/);
 assert.match(app,/statsValue\(ok\?v\.cpuStealPercent:null,'%'/);
 assert.match(app,/Нет данных/);
 assert.match(backend,/route\("\/statistics\/overview", get\(get_statistics_overview\)\)/);
