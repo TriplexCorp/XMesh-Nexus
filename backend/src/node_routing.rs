@@ -640,20 +640,7 @@ fn known_routing_outbounds(config: &Value) -> Result<(HashSet<String>, Option<St
     Ok((known_tags, freedom))
 }
 
-pub fn apply(
-    node: &Value,
-    config: &mut Value,
-    nodes: &[Value],
-    hosts: &[Value],
-) -> Result<(), ApiError> {
-    if node.get("routingEnabled").and_then(Value::as_bool) == Some(true)
-        && json_routing(node)?.is_some()
-    {
-        return apply_json(node, config);
-    }
-    if node.get("routingEnabled").and_then(Value::as_bool) != Some(true) {
-        return Ok(());
-    }
+fn routing_inputs(node: &Value) -> Result<(&[Value], &[Value], &str), ApiError> {
     let rules = node
         .get("routingRules")
         .and_then(Value::as_array)
@@ -675,6 +662,24 @@ pub fn apply(
     if !matches!(strategy, "AsIs" | "IPIfNonMatch" | "IPOnDemand") {
         return Err(bad("Routing: unsupported domainStrategy."));
     }
+    Ok((rules, relays, strategy))
+}
+
+pub fn apply(
+    node: &Value,
+    config: &mut Value,
+    nodes: &[Value],
+    hosts: &[Value],
+) -> Result<(), ApiError> {
+    if node.get("routingEnabled").and_then(Value::as_bool) == Some(true)
+        && json_routing(node)?.is_some()
+    {
+        return apply_json(node, config);
+    }
+    if node.get("routingEnabled").and_then(Value::as_bool) != Some(true) {
+        return Ok(());
+    }
+    let (rules, relays, strategy) = routing_inputs(node)?;
     let node_id = node.get("id").and_then(Value::as_i64).unwrap_or(0);
     let (known_tags, freedom) = known_routing_outbounds(config)?;
     let mut generated = Vec::<Value>::new();
