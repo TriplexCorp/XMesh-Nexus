@@ -253,6 +253,7 @@ assert.match(app,/statsBreakdownTotals=totals/);
 assert.match(app,/renderStatsBreakdown\(\);void loadHistory\(\)/);
 
 // Node donuts use the same distinct stable palette as the aggregate node ring.
-assert.match(app,/const USER_NODE_COLORS=\[/);
+assert.match(app,/function userServerColor\(id\)/);
+assert.match(app,/137\.50776405003785/);
 assert.match(app,/--server-color:'\+userServerColor\(r\.nodeId\)/);
 assert.match(css,/conic-gradient\(var\(--server-color,var\(--a\)\)/);
