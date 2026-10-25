@@ -309,6 +309,7 @@ fn protected_routes(state: &AppState) -> Router<AppState> {
         .route("/users/presence", get(get_user_presence))
         .route("/users/{id}/traffic", get(get_user_traffic))
         .route("/users/{id}/traffic/history", get(get_user_traffic_history))
+        .route("/users/{id}/traffic/observations", get(get_user_traffic_observations))
         .route(
             "/nodes/{id}/metrics-key",
             post(node_auth::enroll).delete(node_auth::revoke),
@@ -2739,6 +2740,67 @@ struct UserTrafficHistoryQuery {
     range: Option<String>,
     inbound_tag: Option<String>,
     node_id: Option<i64>,
+}
+
+async fn get_user_traffic_observations(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+    Path(user_id): Path<i64>,
+    Query(query): Query<UserTrafficHistoryQuery>,
+) -> Result<Json<Value>, ApiError> {
+    if viewer_read_only(&actor) {
+        return Err(ApiError::new(StatusCode::FORBIDDEN, "Недостаточно прав."));
+    }
+    if user_id <= 0
+        || query.node_id.is_some_and(|id| id <= 0)
+        || query
+            .inbound_tag
+            .as_ref()
+            .is_some_and(|tag| tag.is_empty() || tag.len() > 128)
+    {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Некорректный фильтр истории.",
+        ));
+    }
+    let (range, duration) = statistics_period(query.range.as_deref())?;
+    let source_type = if query.inbound_tag.is_some() {
+        "inbound"
+    } else {
+        "user"
+    };
+    let rows = sqlx::query(
+        "SELECT (EXTRACT(EPOCH FROM sampled_at)*1000)::BIGINT AS sampled_at_ms,
+                node_id,inbound_tag,uplink_bytes,downlink_bytes
+         FROM verified_traffic_deltas
+         WHERE user_id=$1 AND source_type=$2 AND sampled_at>=NOW()-$3::INTERVAL
+           AND ($4::BIGINT IS NULL OR node_id=$4)
+           AND ($5::TEXT IS NULL OR inbound_tag=$5)
+         ORDER BY sampled_at DESC,node_id ASC,inbound_tag ASC LIMIT 501",
+    )
+    .bind(user_id)
+    .bind(source_type)
+    .bind(duration)
+    .bind(query.node_id)
+    .bind(&query.inbound_tag)
+    .fetch_all(&state.pool)
+    .await?;
+    let truncated = rows.len() > 500;
+    let mut observations = Vec::with_capacity(rows.len().min(500));
+    for row in rows.into_iter().take(500) {
+        observations.push(json!({
+            "sampledAtMs":row.try_get::<i64,_>("sampled_at_ms")?,
+            "nodeId":row.try_get::<i64,_>("node_id")?,
+            "inboundTag":row.try_get::<String,_>("inbound_tag")?,
+            "uplinkBytes":row.try_get::<i64,_>("uplink_bytes")?,
+            "downlinkBytes":row.try_get::<i64,_>("downlink_bytes")?
+        }));
+    }
+    Ok(Json(json!({
+        "userId":user_id,"range":range,"sourceType":source_type,
+        "source":"verified_traffic_deltas",
+        "observations":observations,"truncated":truncated
+    })))
 }
 
 async fn get_user_traffic_history(
