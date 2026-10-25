@@ -1357,6 +1357,96 @@ fn portal_controls(user: &Value, settings: &Value, lang: &str, en: bool, active:
     PortalControls { quick, qr, devices, cta, apps }
 }
 
+struct PortalDecoration<'a> {
+    support: String,
+    logo_markup: String,
+    status_dot: String,
+    title: &'a str,
+    footer: &'a str,
+    logo_brand: &'a str,
+}
+
+fn portal_decoration<'a>(settings: &'a Value, en: bool, active: bool) -> PortalDecoration<'a> {
+    let support = if studio_enabled(settings, "subscriptionShowSupport", false) {
+        let url = studio_string(settings, "subscriptionSupportUrl", "");
+        let label = escape_html(studio_string(
+            settings,
+            if en {
+                "subscriptionSupportLabelEn"
+            } else {
+                "subscriptionSupportLabel"
+            },
+            if en { "Support" } else { "Поддержка" },
+        ));
+        if url.starts_with("https://") {
+            format!(
+                "<a class=\"subscription-preview-support\" href=\"{}\" rel=\"noopener noreferrer\" target=\"_blank\">{label}</a>",
+                escape_html(url)
+            )
+        } else {
+            format!("<div class=\"subscription-preview-support\">{label}</div>")
+        }
+    } else {
+        String::new()
+    };
+    let logo = studio_string(settings, "subscriptionLogoUrl", "");
+    let logo_markup = if logo.starts_with("https://") {
+        format!(
+            "<img src=\"{}\" alt=\"\" class=\"subscription-preview-logo\">",
+            escape_html(logo)
+        )
+    } else {
+        "<span aria-hidden=\"true\">✦</span>".to_owned()
+    };
+    let visible_status = studio_enabled(settings, "subscriptionShowStatus", true);
+    let status_dot = if visible_status {
+        format!(
+            "<span class=\"subscription-preview-ok\" style=\"color:{}\">●</span>",
+            if active {
+                "var(--portal-accent)"
+            } else {
+                "#ef8888"
+            }
+        )
+    } else {
+        String::new()
+    };
+    let title = if active {
+        studio_string(
+            settings,
+            if en {
+                "subscriptionHeroEn"
+            } else {
+                "subscriptionHero"
+            },
+            if en {
+                "Subscription active"
+            } else {
+                "Подписка активна"
+            },
+        )
+    } else if en {
+        "Subscription inactive"
+    } else {
+        "Подписка неактивна"
+    };
+    let footer = studio_string(
+        settings,
+        if en {
+            "subscriptionFooterEn"
+        } else {
+            "subscriptionFooter"
+        },
+        "",
+    );
+    let logo_brand = studio_string(
+        settings,
+        "subscriptionBrand",
+        studio_string(settings, "brand", "XMesh Nexus"),
+    );
+    PortalDecoration { support, logo_markup, status_dot, title, footer, logo_brand }
+}
+
 pub async fn portal(
     State(state): State<AppState>,
     Path(token): Path<String>,
@@ -1404,83 +1494,7 @@ pub async fn portal(
     let raw_link = studio_url(&settings, &token);
     let PortalControls { quick, qr, devices, cta, apps } =
         portal_controls(&user, &settings, lang, en, active, &raw_link);
-    let support = if studio_enabled(&settings, "subscriptionShowSupport", false) {
-        let url = studio_string(&settings, "subscriptionSupportUrl", "");
-        let label = escape_html(studio_string(
-            &settings,
-            if en {
-                "subscriptionSupportLabelEn"
-            } else {
-                "subscriptionSupportLabel"
-            },
-            if en { "Support" } else { "Поддержка" },
-        ));
-        if url.starts_with("https://") {
-            format!(
-                "<a class=\"subscription-preview-support\" href=\"{}\" rel=\"noopener noreferrer\" target=\"_blank\">{label}</a>",
-                escape_html(url)
-            )
-        } else {
-            format!("<div class=\"subscription-preview-support\">{label}</div>")
-        }
-    } else {
-        String::new()
-    };
-    let logo = studio_string(&settings, "subscriptionLogoUrl", "");
-    let logo_markup = if logo.starts_with("https://") {
-        format!(
-            "<img src=\"{}\" alt=\"\" class=\"subscription-preview-logo\">",
-            escape_html(logo)
-        )
-    } else {
-        "<span aria-hidden=\"true\">✦</span>".to_owned()
-    };
-    let visible_status = studio_enabled(&settings, "subscriptionShowStatus", true);
-    let status_dot = if visible_status {
-        format!(
-            "<span class=\"subscription-preview-ok\" style=\"color:{}\">●</span>",
-            if active {
-                "var(--portal-accent)"
-            } else {
-                "#ef8888"
-            }
-        )
-    } else {
-        String::new()
-    };
-    let title = if active {
-        studio_string(
-            &settings,
-            if en {
-                "subscriptionHeroEn"
-            } else {
-                "subscriptionHero"
-            },
-            if en {
-                "Subscription active"
-            } else {
-                "Подписка активна"
-            },
-        )
-    } else if en {
-        "Subscription inactive"
-    } else {
-        "Подписка неактивна"
-    };
-    let footer = studio_string(
-        &settings,
-        if en {
-            "subscriptionFooterEn"
-        } else {
-            "subscriptionFooter"
-        },
-        "",
-    );
-    let logo_brand = studio_string(
-        &settings,
-        "subscriptionBrand",
-        studio_string(&settings, "brand", "XMesh Nexus"),
-    );
+    let PortalDecoration { support, logo_markup, status_dot, title, footer, logo_brand } = portal_decoration(&settings, en, active);
     let background = studio_color(&settings, "subscriptionBackground", "#0c131b");
     let card_color = studio_color(&settings, "subscriptionCardColor", "#15212b");
     let text_color = studio_color(&settings, "subscriptionTextColor", "#ecf3f6");
