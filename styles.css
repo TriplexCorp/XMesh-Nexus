@@ -5543,3 +5543,12 @@ dialog.user-modal .user-server-donut{
 dialog.user-modal .user-server-donut{
  transition:background .2s ease,box-shadow .2s ease;
 }
+
+/* Consistent traffic semantics: node palette differs from direction palette. */
+:root{--traffic-upload:#72dbc4;--traffic-download:#b5a0f4}
+dialog.user-modal .user-legend-dot.is-up,.stats-insight-dot.is-upload{background:var(--traffic-upload)}
+dialog.user-modal .user-legend-dot.is-down,.stats-insight-dot.is-download{background:var(--traffic-download)}
+.stats-insight-donut{background:conic-gradient(var(--traffic-download) var(--stats-download-share),var(--traffic-upload) 0)}
+.stats-insight-track span{background:var(--node-color,var(--a))}
+.stats-insight-node>div:first-child span{display:inline-flex;align-items:center;gap:.45rem}
+.stats-insight-node>div:first-child span::before{content:"";width:.5rem;height:.5rem;border-radius:50%;background:var(--node-color,var(--a));flex:none}
