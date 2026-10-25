@@ -557,6 +557,57 @@ fn insert_routing_rules(
     Ok(())
 }
 
+fn safe_exit_outbound(
+    target_id: i64,
+    tag: &str,
+    remote: &Value,
+    relays: &[Value],
+    hosts: &[Value],
+) -> Result<Value, ApiError> {
+            let spec=relays.iter().find(|v|v.get("nodeId").and_then(Value::as_i64)==Some(target_id))
+                .ok_or_else(||bad("Routing: select a working proxy connection for the exit node first."))?;
+            let mut outbound = spec
+                .get("outbound")
+                .and_then(Value::as_object)
+                .cloned()
+                .ok_or_else(|| bad("Routing: exit node requires outbound JSON."))?;
+            let json_bytes = serde_json::to_vec(&outbound).unwrap_or_default();
+            if json_bytes.len() > 24576 {
+                return Err(bad("Routing: exit outbound JSON exceeds 24 KiB."));
+            }
+            // Refuse local filesystem transports and administrator overrides
+            // that can cause unexpected bind/proxy routing or file access.
+            if outbound.contains_key("sendThrough")
+                || outbound.contains_key("tag")
+                || outbound
+                    .get("streamSettings")
+                    .and_then(|s| s.get("xdriveSettings"))
+                    .is_some()
+                || outbound
+                    .get("streamSettings")
+                    .and_then(|s| s.get("tlsSettings"))
+                    .and_then(|s| s.get("certificates"))
+                    .is_some()
+                || outbound
+                    .get("streamSettings")
+                    .and_then(|s| s.get("realitySettings"))
+                    .and_then(|s| s.get("privateKey"))
+                    .is_some()
+            {
+                return Err(bad(
+                    "Routing: remote outbound includes unsafe or reserved fields.",
+                ));
+            }
+            let (address, port) = endpoint(&Value::Object(outbound.clone()))?;
+            if !permitted_endpoint(remote, hosts, &address, port) {
+                return Err(bad(
+                    "Routing: exit outbound address:port must match the exit node or a Host explicitly linked to it.",
+                ));
+            }
+            outbound.insert("tag".into(), json!(tag));
+            Ok(Value::Object(outbound))
+}
+
 pub fn apply(
     node: &Value,
     config: &mut Value,
@@ -687,48 +738,7 @@ pub fn apply(
                             "Routing: a profile outbound conflicts with a reserved exit tag.",
                         ));
                     }
-                    let spec=relays.iter().find(|v|v.get("nodeId").and_then(Value::as_i64)==Some(target_id))
-                        .ok_or_else(||bad("Routing: select a working proxy connection for the exit node first."))?;
-                    let mut outbound = spec
-                        .get("outbound")
-                        .and_then(Value::as_object)
-                        .cloned()
-                        .ok_or_else(|| bad("Routing: exit node requires outbound JSON."))?;
-                    let json_bytes = serde_json::to_vec(&outbound).unwrap_or_default();
-                    if json_bytes.len() > 24576 {
-                        return Err(bad("Routing: exit outbound JSON exceeds 24 KiB."));
-                    }
-                    // Refuse local filesystem transports and administrator overrides
-                    // that can cause unexpected bind/proxy routing or file access.
-                    if outbound.contains_key("sendThrough")
-                        || outbound.contains_key("tag")
-                        || outbound
-                            .get("streamSettings")
-                            .and_then(|s| s.get("xdriveSettings"))
-                            .is_some()
-                        || outbound
-                            .get("streamSettings")
-                            .and_then(|s| s.get("tlsSettings"))
-                            .and_then(|s| s.get("certificates"))
-                            .is_some()
-                        || outbound
-                            .get("streamSettings")
-                            .and_then(|s| s.get("realitySettings"))
-                            .and_then(|s| s.get("privateKey"))
-                            .is_some()
-                    {
-                        return Err(bad(
-                            "Routing: remote outbound includes unsafe or reserved fields.",
-                        ));
-                    }
-                    let (address, port) = endpoint(&Value::Object(outbound.clone()))?;
-                    if !permitted_endpoint(remote, hosts, &address, port) {
-                        return Err(bad(
-                            "Routing: exit outbound address:port must match the exit node or a Host explicitly linked to it.",
-                        ));
-                    }
-                    outbound.insert("tag".into(), json!(tag));
-                    added.push(Value::Object(outbound));
+                    added.push(safe_exit_outbound(target_id, &tag, remote, relays, hosts)?);
                 }
                 tag
             }
