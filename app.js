@@ -3162,13 +3162,119 @@ const updateNodeRuntimeBadges=(node,runtime)=>{
     }
   }
 };
+/* Nodes explorer: bounded DOM (48 cards per page) even with 1000+ nodes.
+ * Search is accent/case insensitive and supports field prefixes + quoted phrases.
+ * Never index secret tokens, UUIDs, API credentials or other private properties. */
+const NODE_EXPLORER_PAGE_SIZE=48;
+let nodeExplorer=null;
+const nodeFold=value=>String(value??'').normalize('NFKD').replace(/[\\u0300-\\u036f]/g,'').toLocaleLowerCase().replace(/ё/g,'е');
+function nodeSearchTerms(query){
+ const parts=String(query||'').match(/(?:[^\\s"]+:"[^"]*"|"[^"]*"|\\S+)/g)||[];
+ return parts.slice(0,16).map(part=>{
+  const match=/^(name|ip|domain|host|hosting|provider|profile|country|id):(.+)$/i.exec(part);
+  const field=match?match[1].toLowerCase():null;
+  return {field,value:nodeFold((match?match[2]:part).replace(/^"|"$/g,'')).trim()};
+ }).filter(x=>x.value);
+}
+function nodeSearchEntry(n,profile,runtime){
+ const address=String(n.addr||''),name=String(n.name||'');
+ const hosting=String(n.hosting||''),pname=String(profile?.name||'');
+ const country=String(n.flag||''),domain=address.includes(':')&&!address.includes(']')?address.split(':')[0]:address;
+ const fields={
+  name:nodeFold(name),ip:nodeFold(address),domain:nodeFold(domain),
+  hosting:nodeFold(hosting),profile:nodeFold(pname),country:nodeFold(country),
+  id:String(n.id)
+ };
+ // Hosting and provider are aliases; host also searches the address.
+ fields.provider=fields.hosting;fields.host=fields.ip+' '+fields.domain;
+ const all=Object.values(fields).join(' ');
+ return {id:n.id,node:n,profile,fields,all,
+  state:n.disabled?'disabled':runtime?.connected?'online':'unknown',
+  hasHosting:!!hosting.trim()};
+}
+function nodeExplorerMatch(entry,terms,status,hostingOnly){
+ if(status!=='all'&&entry.state!==status)return false;
+ if(hostingOnly&&!entry.hasHosting)return false;
+ return terms.every(t=>(t.field?entry.fields[t.field]||'':entry.all).includes(t.value));
+}
+function nodeExplorerSort(entries,mode){
+ const cmp=(a,b)=>nodeFold(a.node.name).localeCompare(nodeFold(b.node.name),'ru');
+ if(mode==='name-desc')return entries.sort((a,b)=>-cmp(a,b));
+ if(mode==='ip')return entries.sort((a,b)=>nodeFold(a.node.addr).localeCompare(nodeFold(b.node.addr)));
+ if(mode==='hosting')return entries.sort((a,b)=>nodeFold(a.node.hosting).localeCompare(nodeFold(b.node.hosting))||cmp(a,b));
+ if(mode==='status')return entries.sort((a,b)=>String(a.state).localeCompare(String(b.state))||cmp(a,b));
+ if(mode==='id-desc')return entries.sort((a,b)=>Number(b.id)-Number(a.id));
+ if(mode==='id-asc')return entries.sort((a,b)=>Number(a.id)-Number(b.id));
+ return entries.sort(cmp);
+}
+function nodeExplorerUpdate(){
+ const explorer=nodeExplorer,root=document.querySelector('.nodes-page');
+ if(!explorer||!root||cur!=='nodes')return;
+ const input=root.querySelector('[data-node-search]');
+ const terms=nodeSearchTerms(input?.value||'');
+ const state=root.querySelector('[data-node-state]')?.value||'all';
+ const hostingOnly=!!root.querySelector('[data-node-hosting-only]')?.checked;
+ const order=root.querySelector('[data-node-sort]')?.value||'name';
+ const filtered=nodeExplorerSort(explorer.entries.filter(e=>nodeExplorerMatch(e,terms,state,hostingOnly)),order);
+ const pages=Math.max(1,Math.ceil(filtered.length/NODE_EXPLORER_PAGE_SIZE));
+ explorer.page=Math.min(Math.max(1,explorer.page),pages);
+ const start=(explorer.page-1)*NODE_EXPLORER_PAGE_SIZE,visible=filtered.slice(start,start+NODE_EXPLORER_PAGE_SIZE);
+ const grid=root.querySelector('.nodes');
+ if(!grid)return;
+ grid.dataset.nodeCount=String(filtered.length);
+ grid.innerHTML=visible.map(e=>explorer.cards.get(e.id)||'').join('');
+ const total=root.querySelector('[data-node-search-count]');
+ if(total)total.textContent=filtered.length+' / '+explorer.entries.length+' узлов';
+ const page=root.querySelector('[data-node-search-page]');
+ if(page)page.textContent=explorer.page+' / '+pages;
+ for(const [button,disabled] of [['[data-node-prev]',explorer.page===1],['[data-node-next]',explorer.page===pages]]){
+  const el=root.querySelector(button);if(el)el.disabled=disabled;
+ }
+ const empty=root.querySelector('[data-node-search-empty]');
+ if(empty)empty.hidden=filtered.length!==0;
+ // Only the currently rendered cards need live runtime lookups. Max 48 requests,
+ // and the cache avoids repeated calls while browsing/searching.
+ for(const entry of visible){
+  if(explorer.runtimeLoaded.has(entry.id))continue;
+  explorer.runtimeLoaded.add(entry.id);
+  backendRequest('/api/v1/nodes/'+encodeURIComponent(entry.id)+'/runtime')
+   .then(rt=>{
+    if(nodeExplorer!==explorer)return;
+    updateNodeRuntimeBadges(entry.node,rt);
+    entry.state=entry.node.disabled?'disabled':rt?.connected?'online':'unknown';
+   }).catch(()=>{if(nodeExplorer===explorer)updateNodeRuntimeBadges(entry.node,null)});
+ }
+}
+function mountNodeExplorer(){
+ const root=document.querySelector('.nodes-page');if(!root||!nodeExplorer)return;
+ let searchTimer=0;
+ root.addEventListener('input',event=>{
+  if(!event.target.matches('[data-node-search]'))return;
+  clearTimeout(searchTimer);searchTimer=setTimeout(()=>{if(!root.isConnected)return;nodeExplorer.page=1;nodeExplorerUpdate()},140);
+ });
+ root.addEventListener('change',event=>{
+  if(!event.target.matches('[data-node-state],[data-node-sort],[data-node-hosting-only]'))return;
+  nodeExplorer.page=1;nodeExplorerUpdate();
+ });
+ root.addEventListener('click',event=>{
+  if(event.target.closest('[data-node-search-clear]')){
+   const input=root.querySelector('[data-node-search]');if(input){input.value='';input.focus()}
+   const status=root.querySelector('[data-node-state]');if(status)status.value='all';
+   const only=root.querySelector('[data-node-hosting-only]');if(only)only.checked=false;
+   nodeExplorer.page=1;nodeExplorerUpdate();
+  }
+  if(event.target.closest('[data-node-prev]')){nodeExplorer.page--;nodeExplorerUpdate()}
+  if(event.target.closest('[data-node-next]')){nodeExplorer.page++;nodeExplorerUpdate()}
+ });
+ nodeExplorerUpdate();
+}
 async function nodesP(){
   const [r,s,overview]=await Promise.all([api.list('nodes',{sort:'id'}),api.stats(),backendRequest('/api/v1/statistics/overview').catch(()=>null)]);ST=s;
   const latestMetrics=new Map((overview?.nodes||[]).map(n=>[Number(n.id),n.latest&&!n.latest.stale?n.latest:null]));
   const networkTotals=new Map((overview?.nodes||[]).map(n=>[Number(n.id),n]));
-  const runtime=new Map(await Promise.all(r.items.map(async n=>{
-    try{return [n.id,await backendRequest('/api/v1/nodes/'+encodeURIComponent(n.id)+'/runtime')]}catch(_){return [n.id,null]}
-  })));
+  // Rendering all runtime requests on a 1000-node page would overwhelm the API.
+  // Runtime is loaded lazily for the current visible page by mountNodeExplorer().
+  const runtime=new Map();
   const cards=r.items.map(n=>{
     const ss=nstat(n),p=DB.profiles.find(x=>x.id==n.profileId),m=latestMetrics.get(Number(n.id));
     const geoRuntime=runtime.get(n.id);
@@ -3201,10 +3307,20 @@ async function nodesP(){
       </div>
       <div class="mb node-speed"><div><span>Текущая скорость</span><b id="nm${n.id}">${Number.isFinite(l.mbps)?fmt(l.mbps)+' Мбит/с':'—'}</b></div><div class="pb f" style="--w:${Number.isFinite(l.mbps)?cl(l.mbps/240*100,0,100):0}%" id="npm${n.id}"><i></i></div></div>
       <div class="acts"><button class="gh sm" data-node-bootstrap="${n.id}">${ic('link')}Подключить агент ноды</button><button class="gh sm" data-nr="${n.id}" ${n.disabled?'disabled title="Сначала включите узел после восстановления лимита"':''}>${ic('redo')}Перезапуск</button><button class="gh sm" data-xray-update="${n.id}">${ic('upload')}Обновить Xray</button><button class="gh sm" data-agent-update="${n.id}" title="Обновить управляющий Agent через подтверждённую команду ноде">${ic("refresh-cw")}Обновить Agent</button><button type="button" class="gh sm node-geodata-open" data-node-geodata="${n.id}" title="Настройки GeoData и ручное обновление файлов на этом узле">${ic("globe")}Обновить GeoData</button><button type="button" class="gh sm node-routing-open" data-node-routing="${n.id}" title="Направление трафика по GeoSite, GeoIP и через другие ноды">${ic("git-branch")}Маршрутизация</button><button class="gh sm" data-nt="${n.id}">${ic(n.disabled?'play':'pause')}${n.disabled?'Включить':'Отключить'}</button><button class="gh sm" data-ne="nodes:${n.id}">${ic('pen')}Изменить</button><button class="gh sm" data-node-create-host="${n.id}">${ic('globe')}Создать хост</button></div></div>`;
-  }).join('');
+  });
+  const cardById=new Map(r.items.map((n,i)=>[n.id,cards[i]]));
+  nodeExplorer={entries:r.items.map(n=>nodeSearchEntry(n,DB.profiles.find(p=>p.id===n.profileId),null)),cards:cardById,page:1,runtimeLoaded:new Set()};
   const empty=`<div class="card empty"><b>Узлов пока нет</b><span>Список начнёт заполняться после добавления ваших серверов.</span><button class="btn sm" data-ne="nodes">${ic('plus')}Добавить узел</button></div>`;
   const gridMode=getNodeGridMode();
-  return [`<section class="nodes-page"><div class="bar2 nodes-toolbar"><p class="note">${s.nAll} узлов настроено. CPU, RAM и скорость требуют подключённого мониторинга.</p><div class="node-grid-controls"><span class="note">Сетка</span><div class="seg" role="group" aria-label="Плотность сетки"><button type="button" data-node-grid-mode="compact" aria-pressed="${gridMode==='compact'?'true':'false'}" class="${gridMode==='compact'?'on':''}">Плотно</button><button type="button" data-node-grid-mode="standard" aria-pressed="${gridMode==='standard'?'true':'false'}" class="${gridMode==='standard'?'on':''}">Стандарт</button><button type="button" data-node-grid-mode="spacious" aria-pressed="${gridMode==='spacious'?'true':'false'}" class="${gridMode==='spacious'?'on':''}">Крупно</button></div></div><button type="button" class="node-create-action" data-ne="nodes" aria-label="Добавить новый узел"><span class="node-create-icon" aria-hidden="true">${ic('plus')}</span><span class="node-create-label">Новый узел</span></button></div>${r.items.length?`<div class="nodes" data-grid-mode="${gridMode}" data-node-count="${r.items.length}">${cards}</div>`:empty}</section>`,drawNodeLive]
+  return [`<section class="nodes-page"><div class="bar2 nodes-toolbar"><p class="note">${s.nAll} узлов настроено. CPU, RAM и скорость требуют подключённого мониторинга.</p><div class="node-grid-controls"><span class="note">Сетка</span><div class="seg" role="group" aria-label="Плотность сетки"><button type="button" data-node-grid-mode="compact" aria-pressed="${gridMode==='compact'?'true':'false'}" class="${gridMode==='compact'?'on':''}">Плотно</button><button type="button" data-node-grid-mode="standard" aria-pressed="${gridMode==='standard'?'true':'false'}" class="${gridMode==='standard'?'on':''}">Стандарт</button><button type="button" data-node-grid-mode="spacious" aria-pressed="${gridMode==='spacious'?'true':'false'}" class="${gridMode==='spacious'?'on':''}">Крупно</button></div></div><button type="button" class="node-create-action" data-ne="nodes" aria-label="Добавить новый узел"><span class="node-create-icon" aria-hidden="true">${ic('plus')}</span><span class="node-create-label">Новый узел</span></button></div>
+  ${r.items.length?`<div class="node-explorer" role="search" aria-label="Поиск и фильтры узлов">
+   <label class="node-explorer-search"><span>Поиск по нодам</span><input type="search" data-node-search autocomplete="off" placeholder="Название, IP, домен, хостинг, профиль, ID…" aria-label="Поиск по названию, IP, домену, хостингу и профилю"></label>
+   <label><span>Состояние</span><select data-node-state><option value="all">Все</option><option value="online">На связи</option><option value="disabled">Отключены</option><option value="unknown">Нет подтверждения</option></select></label>
+   <label><span>Сортировка</span><select data-node-sort><option value="name">Название А–Я</option><option value="name-desc">Название Я–А</option><option value="ip">IP / адрес</option><option value="hosting">Хостинг</option><option value="status">Состояние</option><option value="id-desc">Новые сначала</option><option value="id-asc">Старые сначала</option></select></label>
+   <label class="node-explorer-hosting"><input type="checkbox" data-node-hosting-only> Только с хостингом</label>
+   <button type="button" class="gh" data-node-search-clear>Сбросить</button>
+  </div><div class="node-explorer-meta"><span data-node-search-count></span><span class="note">Подсказка: ip:1.2.3.4 · hosting:hetzner · profile:vless</span><div class="node-explorer-pages"><button type="button" class="gh sm" data-node-prev aria-label="Предыдущая страница">←</button><span data-node-search-page></span><button type="button" class="gh sm" data-node-next aria-label="Следующая страница">→</button></div></div><div class="node-explorer-empty" data-node-search-empty hidden>Ничего не найдено. Измените запрос или сбросьте фильтры.</div>
+  <div class="nodes" data-grid-mode="${gridMode}" data-node-count="${r.items.length}"></div>`:empty}</section>`,()=>{mountNodeExplorer();drawNodeLive()}]
 }
 function setNodeGauge(key,pct,center,detail){
   const value=cl(Number(pct)||0,0,100),arc=$('#ngarc-'+key),val=$('#ngval-'+key),sub=$('#ngsub-'+key);
