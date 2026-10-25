@@ -2033,6 +2033,45 @@ fn parse_node_network_sample(metrics: &Value) -> Result<Option<(i64, i64, String
     Ok(network_sample)
 }
 
+async fn persist_node_network_counters(
+    conn: &mut sqlx::PgConnection,
+    node_id: i64,
+    network_sample: Option<(i64, i64, String)>,
+) -> Result<(), ApiError> {
+    if let Some((rx, tx, interface)) = network_sample {
+        // The first sample is a baseline, not historical traffic. A reboot or
+        // switch to another NIC resets the baseline without a negative delta.
+        sqlx::query(
+            "INSERT INTO node_network_traffic_totals AS totals (
+                 node_id,interface_name,last_rx_bytes,last_tx_bytes,
+                 rx_bytes,tx_bytes,observations,updated_at
+             ) VALUES ($1,$2,$3,$4,0,0,1,NOW())
+             ON CONFLICT (node_id) DO UPDATE SET
+               rx_bytes=totals.rx_bytes+
+                 CASE WHEN totals.interface_name=EXCLUDED.interface_name
+                   THEN GREATEST(EXCLUDED.last_rx_bytes-totals.last_rx_bytes,0)
+                   ELSE 0 END,
+               tx_bytes=totals.tx_bytes+
+                 CASE WHEN totals.interface_name=EXCLUDED.interface_name
+                   THEN GREATEST(EXCLUDED.last_tx_bytes-totals.last_tx_bytes,0)
+                   ELSE 0 END,
+               interface_name=EXCLUDED.interface_name,
+               last_rx_bytes=EXCLUDED.last_rx_bytes,
+               last_tx_bytes=EXCLUDED.last_tx_bytes,
+               observations=totals.observations+1,
+               updated_at=NOW()",
+        )
+        .bind(node_id)
+        .bind(interface)
+        .bind(rx)
+        .bind(tx)
+        .execute(&mut *conn)
+        .await?;
+    }
+
+    Ok(())
+}
+
 async fn ingest_node_metrics(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -2131,37 +2170,7 @@ async fn ingest_node_metrics(
     .fetch_one(&mut *telemetry_tx)
     .await?;
 
-    if let Some((rx, tx, interface)) = network_sample {
-        // The first sample is a baseline, not historical traffic. A reboot or
-        // switch to another NIC resets the baseline without a negative delta.
-        sqlx::query(
-            "INSERT INTO node_network_traffic_totals AS totals (
-                 node_id,interface_name,last_rx_bytes,last_tx_bytes,
-                 rx_bytes,tx_bytes,observations,updated_at
-             ) VALUES ($1,$2,$3,$4,0,0,1,NOW())
-             ON CONFLICT (node_id) DO UPDATE SET
-               rx_bytes=totals.rx_bytes+
-                 CASE WHEN totals.interface_name=EXCLUDED.interface_name
-                   THEN GREATEST(EXCLUDED.last_rx_bytes-totals.last_rx_bytes,0)
-                   ELSE 0 END,
-               tx_bytes=totals.tx_bytes+
-                 CASE WHEN totals.interface_name=EXCLUDED.interface_name
-                   THEN GREATEST(EXCLUDED.last_tx_bytes-totals.last_tx_bytes,0)
-                   ELSE 0 END,
-               interface_name=EXCLUDED.interface_name,
-               last_rx_bytes=EXCLUDED.last_rx_bytes,
-               last_tx_bytes=EXCLUDED.last_tx_bytes,
-               observations=totals.observations+1,
-               updated_at=NOW()",
-        )
-        .bind(body.node_id)
-        .bind(interface)
-        .bind(rx)
-        .bind(tx)
-        .execute(&mut *telemetry_tx)
-        .await?;
-    }
-
+    persist_node_network_counters(&mut *telemetry_tx, body.node_id, network_sample).await?;
     // Enforce an exhausted node bandwidth quota in the control plane.
     // This is independent of per-user Xray statistics and is decided on the
     // authenticated, cumulative RX+TX counters persisted above.
