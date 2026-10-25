@@ -1044,7 +1044,7 @@ function statisticsP(){
      const missing=nodes.filter(n=>n.telemetryState==='never_received'||(!n.telemetryState&&!n.latest));
      const verified=fresh.filter(n=>['verified','direct'].includes(n.latest?.userStatsStatus));
      const quality=$('#stats-quality');
-     if(quality)quality.textContent='Телеметрия: '+fresh.length+' свежих · '+delayed.length+' задержанных · '+staleNodes.length+' устаревших/недостоверных · '+missing.length+' без измерений. Персональные Xray-счётчики подтверждены на '+verified.length+' нодах.';
+     if(quality)quality.textContent='Телеметрия: '+fresh.length+' свежих · '+delayed.length+' задержанных · '+staleNodes.length+' устаревших/недостоверных · '+missing.length+' без измерений. Персональные Xray-счётчики подтверждены на '+verified.length+' нодах.'+(delayed.length||staleNodes.length||missing.length?' Требуют внимания: '+[...delayed,...staleNodes,...missing].slice(0,5).map(n=>n.name).join(', ')+(delayed.length+staleNodes.length+missing.length>5?' и другие':'')+'.':'');
     const validNumbers=(key)=>fresh.map(n=>Number(n.latest[key])).filter(n=>Number.isFinite(n));
     const steals=fresh.map(n=>n.latest.cpuStealPercent).filter(v=>v!==null&&v!==undefined&&Number.isFinite(Number(v))).map(Number);
     const stealAvg=steals.length?steals.reduce((a,b)=>a+b,0)/steals.length:null;
@@ -1059,8 +1059,8 @@ function statisticsP(){
       ['RX',rxReporting?statsBytes(rx)+'/с':'Нет данных','Сетевая скорость · '+rxReporting+'/'+nodes.length+' нод'],
       ['TX',txReporting?statsBytes(tx)+'/с':'Нет данных','Сетевая скорость · '+txReporting+'/'+nodes.length+' нод'],
       ['User × inbound',String(overview.inboundTraffic?.counters??0),'Записей фактического учета'],
-      ['Uplink',statsBytes(overview.inboundTraffic?.uplinkBytes),'Накопленный персональный трафик, не за выбранный период'],
-      ['Downlink',statsBytes(overview.inboundTraffic?.downlinkBytes),'Накопленный персональный трафик, не за выбранный период']
+      ['Uplink',Number(overview.inboundTraffic?.counters)>0?statsBytes(overview.inboundTraffic?.uplinkBytes):'Нет данных','Накопленный персональный трафик, не за выбранный период'],
+      ['Downlink',Number(overview.inboundTraffic?.counters)>0?statsBytes(overview.inboundTraffic?.downlinkBytes):'Нет данных','Накопленный персональный трафик, не за выбранный период']
     ];
     $('#stats-summary').innerHTML=tiles.map(x=>statsMetric(...x)).join('');
     const control=[
