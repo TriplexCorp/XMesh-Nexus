@@ -3600,8 +3600,9 @@ async fn validate_host_binding(pool: &PgPool, host: &Value) -> Result<(), ApiErr
                 .find(|inbound| inbound.get("tag").and_then(Value::as_str) == Some(tag))
         })
         .ok_or_else(|| bad("Выбранный inbound отсутствует в XRAY STUDIO профиле."))?;
-    if inbound.get("protocol").and_then(Value::as_str) != Some("vless") {
-        return Err(bad("Генератор подписок пока поддерживает VLESS inbound."));
+    let protocol = inbound.get("protocol").and_then(Value::as_str).unwrap_or("");
+    if !["vless", "vmess", "trojan", "shadowsocks", "hysteria", "masque"].contains(&protocol) {
+        return Err(bad("Выбранный inbound не поддерживается генератором JSON-подписок."));
     }
     let all_nodes = load_records(pool, "nodes").await?;
     for node_id in nodes {
