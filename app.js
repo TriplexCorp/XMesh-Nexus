@@ -1107,6 +1107,7 @@ function enhanceStatsPeriodSelect(select){
  document.addEventListener('pointerdown',event=>{if(!shell.contains(event.target)&&!menu.contains(event.target))close()});
  document.addEventListener('scroll',()=>{if(!menu.hidden)position()},{capture:true,passive:true});
  window.addEventListener('resize',()=>{if(!menu.hidden)position()});
+ select._xmRefresh=sync;
  select.addEventListener('change',sync);sync();
 }
 function statisticsP(){
@@ -1124,10 +1125,10 @@ function statisticsP(){
     <header class="stats-user-head"><div class="stats-user-avatar" aria-hidden="true">X</div><div><small>XMESH · USER INTELLIGENCE</small><h2 id="stats-user-title">Аналитика пользователя</h2><p id="stats-user-subtitle" class="note">Подтверждённая телеметрия Xray</p></div><div class="stats-user-actions"><button id="stats-user-refresh" class="gh stats-user-refresh" type="button" aria-label="Обновить аналитику"><svg class="stats-refresh-icon" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.3-5L3 9m0-6v6h6"/><path d="M4 13a8 8 0 0 0 14.3 5L21 15m0 6v-6h-6"/></svg><span>Обновить</span></button><button id="stats-user-close" class="gh stats-user-close" type="button" aria-label="Закрыть аналитику" title="Закрыть"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div></header>
     <div id="stats-user-overview" class="stats-user-overview" aria-live="polite">Загрузка сводки…</div>
     <nav class="stats-user-tabs" aria-label="Аналитика пользователя"><button type="button" class="is-active" data-stats-user-tab="history">История трафика</button><button type="button" data-stats-user-tab="inbounds">Inbound и ноды</button><button type="button" data-stats-user-tab="observations">Измерения</button></nav>
-    <div class="stats-user-workspace"><div class="stats-user-main"><div class="stats-history-filters"><label>ID пользователя<input id="stats-history-user" type="number" min="1" step="1" placeholder="ID"></label><label>Inbound<select id="stats-history-inbound"><option value="">Все (пользовательские счётчики)</option></select></label><label>Нода<select id="stats-history-node"><option value="">Все ноды</option></select></label><label>Период<select id="stats-history-range"><option value="1h">1 час</option><option value="24h" selected>24 часа</option><option value="7d">7 дней</option><option value="30d">30 дней</option></select></label></div>
+    <div class="stats-user-workspace"><div class="stats-user-main"><div class="stats-history-filters"><label>ID пользователя<input id="stats-history-user" type="number" min="1" step="1" inputmode="numeric" placeholder="ID"></label><label>Inbound<select id="stats-history-inbound"><option value="">Все (пользовательские счётчики)</option></select></label><label>Нода<select id="stats-history-node"><option value="">Все ноды</option></select></label><label>Период<select id="stats-history-range"><option value="1h">1 час</option><option value="24h" selected>24 часа</option><option value="7d">7 дней</option><option value="30d">30 дней</option></select></label></div>
     <div class="stats-user-pane" data-stats-user-pane="history"><div id="stats-history-results" class="stats-history-results" role="status" aria-live="polite">Укажите ID пользователя или выберите его в Top-10.</div></div>
     <div class="stats-user-pane" data-stats-user-pane="inbounds" hidden><div id="stats-user-breakdown" class="stats-user-breakdown">Загрузка…</div></div>
-    <div class="stats-user-pane" data-stats-user-pane="observations" hidden><div class="stats-history-raw"><button class="gh" id="stats-history-observations-load" type="button">Показать отдельные измерения</button><div id="stats-history-observations" class="stats-history-results" aria-live="polite"></div></div></div>
+    <div class="stats-user-pane" data-stats-user-pane="observations" hidden><div class="stats-history-raw"><div id="stats-history-observations" class="stats-history-results" aria-live="polite"></div></div></div>
     <p class="note stats-user-footnote">Источник: подписанные Xray-счётчики. Значения пользовательского и inbound-учёта не суммируются. Нет измерений ≠ нулевой расход.</p></div><aside class="stats-user-aside" aria-label="Сводка по трафику"><section class="stats-insight-card"><h3>Источники трафика</h3><div id="stats-user-source-insight" class="stats-insight-content">Загрузка подтверждённых измерений…</div></section><section class="stats-insight-card"><h3>Ноды с трафиком</h3><div id="stats-user-node-insight" class="stats-insight-content">Загрузка…</div></section><section class="stats-insight-card"><h3>Качество данных</h3><p class="note">Только подтверждённые дельты Xray. Отсутствие показаний не означает нулевой трафик.</p></section></aside></div>
    </section>
   </div>
@@ -1138,6 +1139,8 @@ function statisticsP(){
  const init=()=>{
   enhanceStatsPeriodSelect($('#stats-leaders-range'));
   enhanceStatsPeriodSelect($('#stats-history-range'));
+  enhanceStatsPeriodSelect($('#stats-history-inbound'));
+  enhanceStatsPeriodSelect($('#stats-history-node'));
   let generation=0;
   let refreshing=false;
   let lastRefresh=0;
@@ -1317,6 +1320,7 @@ function statisticsP(){
         const nodes=[...new Map((totals.servers||[]).map(v=>[Number(v.nodeId),v])).values()].filter(v=>Number(v.nodeId)>0);
         historyInbound.innerHTML=historyOption('','Все (пользовательские счётчики)')+inboundTags.map(v=>historyOption(v,v)).join('');
         historyNode.innerHTML=historyOption('','Все ноды')+nodes.map(v=>historyOption(v.nodeId,v.name||'Нода #'+v.nodeId)).join('');
+        historyInbound._xmRefresh?.();historyNode._xmRefresh?.();
         const overview=$('#stats-user-overview'),breakdown=$('#stats-user-breakdown');
         const totalUp=Number(totals.totalUplinkBytes)||0,totalDown=Number(totals.totalDownlinkBytes)||0;
         overview.innerHTML='<div><small>Подтверждённый Upload · накопленный</small><strong>'+statsBytes(totalUp)+'</strong></div><div><small>Подтверждённый Download · накопленный</small><strong>'+statsBytes(totalDown)+'</strong></div><div><small>Всего · накоплено</small><strong>'+statsBytes(totalUp+totalDown)+'</strong></div><div><small>Ноды с учётом</small><strong>'+nodes.length+'</strong></div>';
@@ -1342,7 +1346,9 @@ function statisticsP(){
     }catch(error){if(request===historyRequest&&historyRoot.isConnected)historyRoot.textContent='История недоступна: '+(error.message||'Ошибка API')}
     finally{if(request===historyRequest&&refreshButton){refreshButton.classList.remove('is-refreshing');refreshButton.disabled=false;refreshButton.removeAttribute('aria-busy')}}
   };
+  let observationsRequest=0;
   const loadObservations=async()=>{
+    const request=++observationsRequest;
     const root=$('#stats-history-observations'),id=Number(historyUser?.value);
     if(!root||!Number.isSafeInteger(id)||id<=0)return;
     root.textContent='Загрузка отдельных подтверждённых измерений…';
@@ -1351,15 +1357,15 @@ function statisticsP(){
       if(historyInbound.value)params.set('inboundTag',historyInbound.value);
       if(historyNode.value)params.set('nodeId',historyNode.value);
       const data=await backendRequest('/api/v1/users/'+encodeURIComponent(id)+'/traffic/observations?'+params);
-      if(cur!=='statistics'||!root.isConnected)return;
+      if(request!==observationsRequest||cur!=='statistics'||!root.isConnected)return;
       const records=Array.isArray(data.observations)?data.observations:[];
       root.innerHTML='<p class="note">Первичные принятые дельты Xray · '+records.length+' записей'+(data.truncated?' · Показаны последние 500, результат неполный':'')+'. Отдельные пользовательские и inbound-счётчики не складываются.</p>'+
         (records.length?'<div class="stats-bucket-table-wrap"><table><thead><tr><th>Получено</th><th>Inbound</th><th>Нода</th><th>Upload</th><th>Download</th></tr></thead><tbody>'+records.map(p=>'<tr><td>'+esc(new Date(p.sampledAtMs).toLocaleString(panelIsEnglish()?'en-US':'ru-RU'))+'</td><td>'+esc(p.inboundTag||'Пользователь')+'</td><td>'+esc(p.nodeId)+'</td><td>'+statsBytes(p.uplinkBytes)+'</td><td>'+statsBytes(p.downlinkBytes)+'</td></tr>').join('')+'</tbody></table></div>':'<p class="note">Нет подтверждённых записей для фильтра. Это не доказательство отсутствия трафика.</p>');
-    }catch(error){if(root.isConnected)root.textContent='Не удалось загрузить измерения: '+(error.message||'Ошибка API')}
+    }catch(error){if(request===observationsRequest&&root.isConnected)root.textContent='Не удалось загрузить измерения: '+(error.message||'Ошибка API')}
   };
-  $('#stats-history-observations-load')?.addEventListener('click',()=>void loadObservations());
   historyUser?.addEventListener('change',()=>void loadHistory(true));
-  for(const control of [historyInbound,historyNode,$('#stats-history-range')])control?.addEventListener('change',()=>void loadHistory());
+  for(const control of [historyInbound,historyNode,$('#stats-history-range')])control?.addEventListener('change',()=>{void loadHistory();if($('.stats-user-pane[data-stats-user-pane="observations"]')?.hidden===false)void loadObservations()});
+  historyUser?.addEventListener('change',()=>{if($('.stats-user-pane[data-stats-user-pane="observations"]')?.hidden===false)void loadObservations()});
   const showStatsUserTab=name=>{
     $$('.stats-user-pane').forEach(el=>{el.hidden=el.dataset.statsUserPane!==name});
     $$('.stats-user-tabs button').forEach(el=>el.classList.toggle('is-active',el.dataset.statsUserTab===name));
@@ -1369,7 +1375,7 @@ function statisticsP(){
   const statsPortal=$('#stats-user-modal');
   if(statsPortal&&statsPortal.parentElement!==document.body)document.body.append(statsPortal);
   const closeStatsUser=()=>{
-    ++historyRequest;
+    ++historyRequest;++observationsRequest;
     $('#stats-user-modal').hidden=true;
     const origin=userTrafficReturn;
     userTrafficReturn=null;
