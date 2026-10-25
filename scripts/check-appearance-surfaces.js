@@ -18,16 +18,17 @@ for(const [input,expected] of [['flat','solid'],['bogus','solid'],[null,'solid']
 assert.match(app,/prop!=='surface'\|\|\['solid','glass','raised'\]\.includes\(value\)/,'Event handler must reject removed Flat style');
 assert.match(html,/styles\.css\?v=[a-z0-9-]+/,'Styles must retain a cache-busting version');
 
-// Ambient background must span the viewport rather than rendering only at a corner.
-// No pseudo-element below an opaque body canvas, and all four UI levels persist.
-assert.match(css,/background-image:\s*radial-gradient\(ellipse 65vw 65vh at 12% 19%/,'Glow must reach the upper-left workspace');
-assert.match(css,/radial-gradient\(ellipse 62vw 68vh at 85% 19%/,'Glow must reach the upper-right workspace');
-assert.match(css,/radial-gradient\(ellipse 74vw 70vh at 48% 83%/,'Glow must reach the lower workspace');
-assert.match(css,/background-attachment:fixed/,'Glow must be stable during page scrolling');
-assert.match(css,/body::before,body::after\{content:none\}/,'Legacy clipped pseudo-element glow must be disabled');
-for(const [level,alpha] of [['off','0'],['subtle','12'],['normal','25'],['rich','43']]){
- assert(css.includes('html[data-glow='+level+']{--glow-alpha:'+alpha+'%}'),'Missing ambient glow level '+level);
+// Full-screen ambient lighting must use broad fields, never small isolated circles.
+assert.match(css,/background-image:\s*radial-gradient\(ellipse 150vw 142vh at 7% 4%/,'Ambient glow spans upper-left viewport');
+assert.match(css,/radial-gradient\(ellipse 160vw 150vh at 96% 12%/,'Ambient glow spans upper-right viewport');
+assert.match(css,/linear-gradient\(180deg,/,'Diffuse light blends across the center and lower viewport');
+assert.match(css,/transparent 100%/,'All glow fields fade smoothly across their full radius');
+assert.match(css,/background-attachment:fixed/,'Glow remains stable while scrolling');
+assert.match(css,/body::before,body::after\{content:none\}/,'Clipped pseudo-element spots stay disabled');
+for(const [level,alpha] of [['off','0'],['subtle','8'],['normal','15'],['rich','26']]){
+ assert(css.includes('html[data-glow='+level+']{--glow-alpha:'+alpha+'%}'),'Wrong glow intensity for '+level);
 }
+assert.doesNotMatch(css,/radial-gradient\(ellipse (?:65vw 65vh|62vw 68vh|74vw 70vh)/,'Small circular glow islands must not return');
 
 assert.match(html,/app\.js\?v=[a-z0-9-]+/,'Application script must retain a cache-busting version');
 
