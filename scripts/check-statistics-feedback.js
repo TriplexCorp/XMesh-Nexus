@@ -14,6 +14,12 @@ assert.match(app,/\/api\/v1\/statistics\/overview/);
 assert.match(app,/\/api\/v1\/metrics\/traffic\?range=/);
 assert.match(app,/CPU steal/);
 assert.match(app,/stats-quality/);
+assert.match(app,/\/api\/v1\/statistics\/leaders/);
+assert.match(app,/id="stats-leaders"/);
+assert.match(backend,/async fn get_statistics_leaders/);
+assert.match(backend,/lifetime_since_first_verified_sample/);
+assert.match(backend,/viewer_read_only\(&actor\)/);
+
 assert.match(app,/const statsDetailedChart=\(points\)=>/);
 assert.match(app,/statsDetailedChart\(points\)/);
 assert.match(app,/data-bucket-ms/);
