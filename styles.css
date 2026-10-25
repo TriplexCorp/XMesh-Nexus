@@ -5384,3 +5384,8 @@ td.er .user-expiry-primary{color:var(--danger,#f08080)}
 @media (max-width: 999px), (max-height: 649px){
  .stats-user-dialog{width:calc(100vw - 1rem);max-height:calc(100dvh - 1rem);overflow:auto}
 }
+
+/* Modal portal lives directly under body, above the entire application including the sidebar. */
+body > .stats-user-overlay{position:fixed;inset:0;width:100vw;height:100dvh;z-index:99999;-webkit-backdrop-filter:blur(16px) saturate(.65);backdrop-filter:blur(16px) saturate(.65);background:rgba(3,8,16,.7);place-items:center}
+body > .stats-user-overlay[hidden]{display:none!important}
+body:has(> .stats-user-overlay:not([hidden])){overflow:hidden}
