@@ -3254,7 +3254,7 @@ function nodeExplorerUpdate(){
  grid.innerHTML=visible.map(e=>explorer.cards.get(e.id)||'').join('');
  for(const entry of visible)if(explorer.runtimeCache.has(entry.id))updateNodeRuntimeBadges(entry.node,explorer.runtimeCache.get(entry.id));
  const total=root.querySelector('[data-node-search-count]');
- if(total)total.textContent=filtered.length+' / '+explorer.entries.length+' узлов';
+ if(total)total.textContent=filtered.length+' / '+explorer.entries.length+(panelIsEnglish()?' nodes':' узлов');
  const page=root.querySelector('[data-node-search-page]');
  if(page)page.textContent=explorer.page+' / '+pages;
  for(const [button,disabled] of [['[data-node-prev]',explorer.page===1],['[data-node-next]',explorer.page===pages]]){
