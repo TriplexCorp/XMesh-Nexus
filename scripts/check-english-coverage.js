@@ -23,6 +23,8 @@ const take=source=>{
  for(const m of source.matchAll(/(['"])([^'"\\\r\n]{2,240})\1/g)){
   const value=m[2].trim();
   if(!/[А-Яа-яЁё]/.test(value)||/[<>{}\\]/.test(value))continue;
+  // Never treat a fragment of a JavaScript expression as user-visible copy.
+  if(value.includes(').toLocaleLowerCase()')||value.includes('.replace('))continue;
   if(/^(?:https?:|\/|#|\.|[a-z][-a-z0-9_]*:)/i.test(value))continue;
   found.add(value);
  }
