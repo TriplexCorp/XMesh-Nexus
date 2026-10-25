@@ -1573,6 +1573,18 @@ pub async fn desired_config(
 mod provision_tests {
     use super::*;
     #[test]
+    fn node_desired_config_uses_local_xray_port_not_public_port() {
+        let node = json!({"xrayLocalPort": "5000", "port": 443});
+        let local_port = node_xray_local_port(&node).unwrap();
+        assert_eq!(local_port, 5000);
+        let mut config = json!({
+            "inbounds": [{"protocol": "vless", "listen": "0.0.0.0", "port": 443}]
+        });
+        configure_local_xray_inbound(&mut config, local_port).unwrap();
+        assert_eq!(config["inbounds"][0]["listen"], "127.0.0.1");
+        assert_eq!(config["inbounds"][0]["port"], 5000);
+    }
+    #[test]
     fn offline_budget_is_conservative_and_scoped_to_authorized_users() {
         let cfg = json!({"inbounds":[{"settings":{"clients":[{"id":"550e8400-e29b-41d4-a716-446655440000"}]}}]});
         let u = vec![
