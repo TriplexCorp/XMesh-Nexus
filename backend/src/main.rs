@@ -268,6 +268,7 @@ struct UserInboundTrafficSample {
     downlink_bytes: i64,
 }
 
+#[allow(clippy::too_many_lines)]
 fn protected_routes(state: &AppState) -> Router<AppState> {
     Router::new()
         .route("/bootstrap", get(bootstrap))
@@ -395,7 +396,7 @@ fn application_router(state: AppState) -> Router {
         .route("/auth/logout", post(auth::logout));
 
     let static_dir = env::var("STATIC_DIR").unwrap_or_else(|_| "/app/static".to_owned());
-    let app = Router::new()
+    Router::new()
         .route("/", get(|| async { StatusCode::NOT_FOUND }))
         .route("/index.html", get(|| async { StatusCode::NOT_FOUND }))
         .route("/login", get(|| async { StatusCode::NOT_FOUND }))
@@ -443,9 +444,7 @@ fn application_router(state: AppState) -> Router {
         .layer(TraceLayer::new_for_http())
         .layer(middleware::from_fn(security_headers))
         .layer(middleware::from_fn(csrf_guard))
-        .with_state(state);
-
-    app
+        .with_state(state)
 }
 
 #[tokio::main]
@@ -2138,7 +2137,7 @@ async fn persist_user_traffic(
         // One atomic UPSERT for the full node batch. Initial samples establish a
         // baseline instead of spuriously counting traffic from before collection.
         // Counter resets start a new baseline, never subtract or fabricate usage.
-        let serialized = serde_json::to_value(&user_traffic)
+        let serialized = serde_json::to_value(user_traffic)
             .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Некорректный userTraffic."))?;
         // Only a positive delta from an authenticated per-user Xray counter
         // constitutes activity. Repeated idle samples must NOT refresh onlineAt.
@@ -2210,7 +2209,7 @@ async fn persist_inbound_traffic(
     if !inbound_samples.is_empty() {
         // An inbound's aggregate traffic MUST NEVER be interpreted as per-user traffic.
         // Signed node agents report cumulative counters scoped to a real user+inbound.
-        let serialized = serde_json::to_value(&inbound_samples).map_err(|_| {
+        let serialized = serde_json::to_value(inbound_samples).map_err(|_| {
             ApiError::new(StatusCode::BAD_REQUEST, "Некорректный userInboundTraffic.")
         })?;
         sqlx::query(
@@ -2349,7 +2348,7 @@ async fn ingest_node_metrics(
         .bind(body.node_id)
         .execute(&mut *telemetry_tx)
         .await?;
-    let (source_ms, accept_user_stats) = accept_node_user_stats(&mut *telemetry_tx, &body).await?;
+    let (source_ms, accept_user_stats) = accept_node_user_stats(&mut telemetry_tx, &body).await?;
     if !accept_user_stats {
         // Do not modify traffic baselines or onlineAt on stale/replayed data.
         user_traffic.clear();
@@ -2360,17 +2359,17 @@ async fn ingest_node_metrics(
         .expect("validated metrics object")
         .insert("userStatsAccepted".into(), json!(accept_user_stats));
 
-    let sampled_at = persist_node_metric_sample(&mut *telemetry_tx, &body, metrics).await?;
+    let sampled_at = persist_node_metric_sample(&mut telemetry_tx, &body, metrics).await?;
 
-    persist_node_network_counters(&mut *telemetry_tx, body.node_id, network_sample).await?;
+    persist_node_network_counters(&mut telemetry_tx, body.node_id, network_sample).await?;
     // Enforce an exhausted node bandwidth quota in the control plane.
     // This is independent of per-user Xray statistics and is decided on the
     // authenticated, cumulative RX+TX counters persisted above.
     // The conditional UPDATE makes the critical event idempotent.
-    enforce_node_traffic_limit(&mut *telemetry_tx, body.node_id).await?;
+    enforce_node_traffic_limit(&mut telemetry_tx, body.node_id).await?;
 
     persist_user_traffic(
-        &mut *telemetry_tx,
+        &mut telemetry_tx,
         body.node_id,
         &user_traffic,
         sampled_at,
@@ -2378,7 +2377,7 @@ async fn ingest_node_metrics(
     )
     .await?;
 
-    persist_inbound_traffic(&mut *telemetry_tx, body.node_id, &inbound_samples).await?;
+    persist_inbound_traffic(&mut telemetry_tx, body.node_id, &inbound_samples).await?;
 
     // Commit source watermark, traffic accounting, and presence in one transaction.
     telemetry_tx.commit().await?;
