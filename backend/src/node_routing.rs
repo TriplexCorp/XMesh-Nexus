@@ -494,6 +494,34 @@ pub fn validate_saved(node: &Value) -> Result<(), ApiError> {
     Ok(())
 }
 
+fn enable_route_sniffing(obj: &mut serde_json::Map<String, Value>) -> Result<(), ApiError> {
+    let inbound = obj
+        .get_mut("inbounds")
+        .and_then(Value::as_array_mut)
+        .and_then(|list| list.first_mut())
+        .ok_or_else(|| bad("Routing: source profile must have a proxy inbound."))?;
+    let sniff = inbound
+        .as_object_mut()
+        .ok_or_else(|| bad("Routing: invalid inbound."))?
+        .entry("sniffing")
+        .or_insert_with(|| json!({}));
+    let sniff = sniff
+        .as_object_mut()
+        .ok_or_else(|| bad("Routing: invalid sniffing settings."))?;
+    sniff.insert("enabled".into(), json!(true));
+    sniff.insert("routeOnly".into(), json!(true));
+    let overrides = sniff.entry("destOverride").or_insert_with(|| json!([]));
+    let overrides = overrides
+        .as_array_mut()
+        .ok_or_else(|| bad("Routing: sniffing.destOverride must be an array."))?;
+    for proto in ["http", "tls", "quic"] {
+        if !overrides.iter().any(|x| x.as_str() == Some(proto)) {
+            overrides.push(json!(proto));
+        }
+    }
+    Ok(())
+}
+
 pub fn apply(
     node: &Value,
     config: &mut Value,
@@ -717,35 +745,10 @@ pub fn apply(
         })
         .count();
     configured.splice(protected..protected, generated);
-    // Domain route matching requires the destination domain. IP-only VLESS
-    // requests often hide it; sniff TLS SNI / HTTP Host for ROUTING ONLY.
-    // Never rewrite the actual network destination in this control plane.
+    // Enable routing-only destination sniffing without rewriting the real destination.
     if needs_domain_sniffing && node.get("routingSniffing").and_then(Value::as_bool) != Some(false)
     {
-        let inbound = obj
-            .get_mut("inbounds")
-            .and_then(Value::as_array_mut)
-            .and_then(|list| list.first_mut())
-            .ok_or_else(|| bad("Routing: source profile must have a proxy inbound."))?;
-        let sniff = inbound
-            .as_object_mut()
-            .ok_or_else(|| bad("Routing: invalid inbound."))?
-            .entry("sniffing")
-            .or_insert_with(|| json!({}));
-        let sniff = sniff
-            .as_object_mut()
-            .ok_or_else(|| bad("Routing: invalid sniffing settings."))?;
-        sniff.insert("enabled".into(), json!(true));
-        sniff.insert("routeOnly".into(), json!(true));
-        let overrides = sniff.entry("destOverride").or_insert_with(|| json!([]));
-        let overrides = overrides
-            .as_array_mut()
-            .ok_or_else(|| bad("Routing: sniffing.destOverride must be an array."))?;
-        for proto in ["http", "tls", "quic"] {
-            if !overrides.iter().any(|x| x.as_str() == Some(proto)) {
-                overrides.push(json!(proto));
-            }
-        }
+        enable_route_sniffing(obj)?;
     }
     Ok(())
 }
