@@ -155,6 +155,8 @@ jobs:
         run: node scripts/check-node-editor-layout.js
       - name: Check responsive Nodes grid and density buttons
         run: node scripts/check-node-grid-layout.js
+      - name: Verify large-fleet node search and pagination
+        run: node scripts/check-node-explorer.js
       - name: Check Nodes IP rotation and Rust resolver integration
         run: node scripts/check-node-ip-rotation.js
       - name: Check XHTTP serialization and themed dropdowns
