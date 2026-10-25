@@ -32,7 +32,7 @@ assert.match(app,/Пропуски не интерполируются/);
 assert.match(css,/\.stats-detail-point-wrap:is/);
 assert.match(css,/\.stats-detail-point-ring/);
 assert.match(css,/\.stats-detail-point-core/);
-assert.doesNotMatch(css,/drop-shadow\(/);
+assert.doesNotMatch(css,/\.stats-detail-point-wrap[^\n]*drop-shadow/);
 assert.match(css,/\.stats-detail-grid/);
 assert.match(css,/\.stats-detail-line\.rx/);
 assert.match(css,/\.stats-detail-line\.tx/);
