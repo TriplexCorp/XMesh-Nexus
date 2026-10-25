@@ -128,7 +128,7 @@ This roadmap tracks verified improvements, not feature claims. A stage is comple
 - [ ] Add sortable/filterable node health diagnostics (CPU/steal, RAM, disk, RX/TX, sessions, signed heartbeat, agent/Xray version, policy desired/delivered/applied status where verifiable) with explanations for missing or degraded data.
 - [ ] Keep UI refresh and API polling efficient, cancellable and non-duplicative; preserve security boundaries and regression tests.
 
-**Deep Analytics implementation note (2026-10-25):** `GET /api/v1/statistics/leaders` and the Statistics Top-10 tables are now present in `main`, using `user_node_traffic_totals` and independently `user_inbound_traffic_totals`. They show **verified cumulative totals since the first accepted baseline**, not traffic over the selected graph period. Viewer access is denied; owner/admin can inspect ranks. **Historical per-period Xray charts and Top-10 for 24h/7d still require an append-only accepted-delta journal and must not be inferred from `updated_at` or cumulative totals.** Await strict CI and live API verification before claiming the slice accepted.
+**Deep Analytics implementation note (2026-10-25):** `GET /api/v1/statistics/leaders` and the Statistics Top-10 tables are now present in `main`, using `user_node_traffic_totals` and independently `user_inbound_traffic_totals`. They show **verified cumulative totals since the first accepted baseline**, not traffic over the selected graph period. Viewer access is denied; owner/admin can inspect ranks. **An accepted-delta TimescaleDB journal has since been added in source (see below); historical charts and period-specific Top-10 still require UI/API implementation, strict tests, and deployment verification.** Await strict CI and live API verification before claiming the slice accepted.
 
 ### Mandatory requirement — per-user × inbound forensic drill-down (2026-10-25)
 
@@ -147,6 +147,13 @@ For **any selected user**, an authorized operator must be able to inspect **each
 **Done means:** an operator can pick user U, inbound I and node N for a real interval and see reproducible, independently supported Uplink/Downlink values with evidence and freshness, not a mockup or totals backfilled into fake history. **Status: NOT YET IMPLEMENTED.** Present `user_inbound_traffic_totals` and the per-user traffic endpoint expose cumulative snapshots only.
 
 **Historical ledger increment (2026-10-25, code pushed to `main`; deployment and CI not yet verified):** Migration `0017_verified_traffic_deltas.sql` adds a Timescale hypertable for independently sourced `user` and `inbound` positive deltas. Accepted signed telemetry writes those deltas **before** cumulative-counter UPSERTs in the same per-node advisory-locked transaction. Baselines, replayed/stale source timestamps and reset counters contribute no new historical usage. `GET /api/v1/users/{id}/traffic/history?range=24h&inboundTag=...&nodeId=...` provides filtered rows bucketed over 1h/24h/7d/30d, bounded at 5000 rows. It returns source type, provenance, samples and truncation; viewing detailed personal traffic is denied to `viewer`. Existing totals cannot be backfilled faithfully: history begins only after deploying this migration and ingestion code. **Remaining:** live migration/integration evidence, browser drill-down, period Top-10, missing-data quality display, and load tests. Do not tick the phase complete yet.
+
+**Delivery checklist for the next slice (status 2026-10-25):**
+- [x] Source code: Timescale hypertable migration for accepted user/inbound deltas, transactional ingestion under the signed node's serialized lock, and authenticated user/node/inbound history API.
+- [ ] Confirm the migration runs correctly on PostgreSQL 18 + TimescaleDB and strict CI passes on the committed source.
+- [ ] Integration-test monotonic increases, baseline-only snapshots, reset/restart, duplicate/replayed signed samples, two inbounds on one user, and absence of independent-counter double counting.
+- [ ] Add usable user → inbound → node → bucket history UI with explicit missing-data and partial-coverage states.
+- [ ] Add time-bounded period Top-10 (not lifetime counts), paging/retention policy, representative-volume query plans and permission tests.
 
 ### Phase C — P1: Deep TimescaleDB, user and inbound analytics
 
