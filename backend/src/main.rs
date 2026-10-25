@@ -1873,7 +1873,8 @@ async fn get_statistics_overview(
         } else {
             (None, None, None, None)
         };
-        let telemetry_state = current.as_ref()
+        let telemetry_state = current
+            .as_ref()
             .and_then(|value| value.get("freshness"))
             .and_then(Value::as_str)
             .unwrap_or("never_received");
