@@ -96,6 +96,20 @@ This roadmap tracks verified improvements, not feature claims. A stage is comple
 
 **Already merged into `main`:** [PR #10](https://github.com/TriplexCorp/XMesh-Nexus/pull/10), commit [`a9138eb`](https://github.com/TriplexCorp/XMesh-Nexus/commit/a9138ebcd6eb897e4cef28a8f20f9626da875b79). Existing Statistics UI now distinguishes fresh/delayed/stale/invalid/never-received telemetry, exposes Xray user-counter status, identifies nodes needing attention, separates node interface RX/TX from cumulative per-user usage, and offers 1h/24h/7d/30d network-traffic views. This is **partial delivery**, not Statistics 2.0 completion. It does not prove end-to-end accounting correctness or provide all historical analytics.
 
+### Implementation update — 2026-10-25 (after PR #10)
+
+**Delivered in `main` (code present; not a Statistics 2.0 stage-exit certification):**
+
+- Network traffic selection supports **Live, 5m, 15m, 30m, 1h, 3h, 6h, 12h, 24h, 7d, 30d** via the authenticated Rust/TimescaleDB API.
+- Statistics UI refresh is decoupled from expensive reads: 1-second visual heartbeat, 5-second Live traffic polling, 15-second overview/system cache, 30-second historical polling; refresh pauses for hidden tabs and user-initiated reload bypasses the cache. **These are configured cadences, not proven production throughput or true 1-second telemetry sampling.**
+- Graph RX/TX uses a combined, accessible SVG with visible colored dots, selected-point ring, axes, grid, timestamps, units in **bits per second**, hover titles and no invented intermediate samples. Readouts distinguish interface speeds from accumulated Xray usage.
+- Clicking a real point opens an interval drill-down using `GET /api/v1/metrics/traffic/bucket-detail`, backed by bounded per-node TimescaleDB sample aggregation. It reports participating nodes, RX/TX, sample counts, last sample and the leading RX contributor. Detail access is interactive (mouse/keyboard); missing samples remain unavailable rather than fabricated zeros. UI selection and click-target regressions have been corrected.
+- Existing UI shows freshness categories, last actual TimescaleDB bucket age, signed user-counter status and affected nodes. UI source-contract tests cover the new interaction and presentation.
+
+**Outstanding before acceptance:** CI/production runtime evidence for the latest direct-to-`main` changes, real browser keyboard/screen-reader test, complete timeout/error and large-node behavior for bucket detail, aggregate-versus-detail parity, correct SQL/query-plan performance under load, actual per-user/per-inbound time series, alerting, incident history, export and full Statistics 2.0 navigation. The drill-down is **per-node interface network traffic**, not external destination attribution or individual-user Xray usage. Do not infer destinations from RX/TX alone.
+
+**Repository workflow:** Following the owner's instruction, update `main` directly; do not create extra branches without explicit authorization. Preserve security gates and strict CI.
+
 ### Phase A — P0: Data integrity and trustworthy measurements
 
 - [ ] Define and test one documented freshness/quality contract across node, user, inbound and aggregate endpoints: timestamps, provenance, availability, expected coverage, clock skew, and `fresh`/`delayed`/`stale`/`unavailable`/`never_received` states.
