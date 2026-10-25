@@ -5518,3 +5518,18 @@ body > .stats-user-overlay .stats-user-pane .stats-bucket-table-wrap::-webkit-sc
 body > .stats-user-overlay .stats-user-pane::-webkit-scrollbar-thumb,
 body > .stats-user-overlay .stats-user-pane .stats-bucket-table-wrap::-webkit-scrollbar-thumb{background:var(--scrollbar-thumb);border:2px solid var(--scrollbar-track);border-radius:999px}
 body > .stats-user-overlay .stats-user-pane::-webkit-scrollbar-thumb:hover{background:var(--scrollbar-thumb-hover)}
+
+/* Consistent analytics filter controls: branded dropdowns, no native popup clipping. */
+body > .stats-user-overlay .stats-history-filters{min-width:0}
+body > .stats-user-overlay .stats-history-filters label{min-width:0;overflow:visible}
+body > .stats-user-overlay .stats-history-filters .xm-period-select{min-width:0;width:100%}
+body > .stats-user-overlay .stats-history-filters .xm-period-trigger{
+ box-sizing:border-box;width:100%;min-width:0;max-width:100%;overflow:hidden;
+ text-overflow:ellipsis;white-space:nowrap;text-align:left;
+}
+body > .stats-user-overlay .stats-history-filters .xm-period-chevron{margin-left:auto;flex-shrink:0}
+body > .xm-period-portal{overflow-x:hidden;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track)}
+body > .xm-period-portal .xm-period-option{white-space:normal;overflow-wrap:anywhere}
+body > .stats-user-overlay #stats-history-user{-moz-appearance:textfield;appearance:textfield}
+body > .stats-user-overlay #stats-history-user::-webkit-inner-spin-button,
+body > .stats-user-overlay #stats-history-user::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
