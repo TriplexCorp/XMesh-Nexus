@@ -993,6 +993,12 @@ const statsValue=(v,unit='')=>v===null||v===undefined||!Number.isFinite(Number(v
   ?'Нет данных':fmt(Number(v),1)+unit;
 const statsBytes=v=>v===null||v===undefined||!Number.isFinite(Number(v))
  ?'Нет данных':sysBytes(Number(v));
+// Display network speeds in bits/s; lifetime data usage stays in bytes.
+const statsRate=v=>{
+ if(v===null||v===undefined||!Number.isFinite(Number(v)))return 'Нет данных';
+ const bps=Number(v)*8,abs=Math.abs(bps);
+ return abs>=1e9?fmt(bps/1e9,2)+' Гбит/с':abs>=1e6?fmt(bps/1e6,2)+' Мбит/с':abs>=1e3?fmt(bps/1e3,1)+' Кбит/с':fmt(bps,0)+' бит/с';
+};
 const statsMetric=(label,value,hint='')=>`<div class="stats-tile"><small>${esc(label)}</small><strong>${esc(String(value))}</strong>${hint?`<span>${esc(hint)}</span>`:''}</div>`;
 const statsRow=(label,value)=>`<div class="stats-kv"><span>${esc(label)}</span><b>${esc(String(value))}</b></div>`;
 // Detailed chart uses the same RX/TX color vocabulary as the dashboard.
@@ -1107,8 +1113,8 @@ function statisticsP(){
       ['Узлы',String(overview.totalNodes??nodes.length),(panelIsEnglish()?fresh.length+' reporting fresh data':fresh.length+' передают свежие данные')],
       ['Пользователи',String(overview.totalUsers??'—'),'Учетные записи панели'],
       ['CPU steal',statsValue(stealAvg,'%'),steals.length?(panelIsEnglish()?steals.length+' nodes reporting':steals.length+' узлов с показаниями'):'Данные агента отсутствуют'],
-      ['RX',rxReporting?statsBytes(rx)+'/с':'Нет данных','Сетевая скорость · '+rxReporting+'/'+nodes.length+' нод'],
-      ['TX',txReporting?statsBytes(tx)+'/с':'Нет данных','Сетевая скорость · '+txReporting+'/'+nodes.length+' нод'],
+      ['RX',rxReporting?statsRate(rx):'Нет данных','Сетевая скорость · '+rxReporting+'/'+nodes.length+' нод'],
+      ['TX',txReporting?statsRate(tx):'Нет данных','Сетевая скорость · '+txReporting+'/'+nodes.length+' нод'],
       ['User × inbound',String(overview.inboundTraffic?.counters??0),'Записей фактического учета'],
       ['Uplink',Number(overview.inboundTraffic?.counters)>0?statsBytes(overview.inboundTraffic?.uplinkBytes):'Нет данных','Накопленный персональный трафик, не за выбранный период'],
       ['Downlink',Number(overview.inboundTraffic?.counters)>0?statsBytes(overview.inboundTraffic?.downlinkBytes):'Нет данных','Накопленный персональный трафик, не за выбранный период']
@@ -1132,7 +1138,7 @@ function statisticsP(){
     if(trafficSignature!==lastTrafficSignature||period!==lastTrafficPeriod){
      lastTrafficSignature=trafficSignature;
      lastTrafficPeriod=period;
-     $('#stats-trend').innerHTML='<div class="stats-detail-kpis"><div><b>RX</b><strong>'+(latest.rxBytesPerSec!=null?statsBytes(latest.rxBytesPerSec)+'/с':'Нет данных')+'</strong></div><div><b>TX</b><strong>'+(latest.txBytesPerSec!=null?statsBytes(latest.txBytesPerSec)+'/с':'Нет данных')+'</strong></div><div><b>Временных интервалов</b><strong>'+esc(String(points.length))+'</strong></div></div>'+statsDetailedChart(points)+'<small class="note">'+(panelIsEnglish()?'Samples: ':'Измерений: ')+esc(String(traffic.sampleCount??0))+(panelIsEnglish()?' · Source: TimescaleDB':' · Источник: TimescaleDB')+'</small>';
+     $('#stats-trend').innerHTML='<div class="stats-detail-kpis"><div><b>RX</b><strong>'+(latest.rxBytesPerSec!=null?statsRate(latest.rxBytesPerSec):'Нет данных')+'</strong></div><div><b>TX</b><strong>'+(latest.txBytesPerSec!=null?statsRate(latest.txBytesPerSec):'Нет данных')+'</strong></div><div><b>Временных интервалов</b><strong>'+esc(String(points.length))+'</strong></div></div>'+statsDetailedChart(points)+'<small class="note">'+(panelIsEnglish()?'Samples: ':'Измерений: ')+esc(String(traffic.sampleCount??0))+(panelIsEnglish()?' · Source: TimescaleDB':' · Источник: TimescaleDB')+'</small>';
     }
     updateLiveStatus();
     $('#stats-nodes').innerHTML=nodes.length?nodes.map(n=>{
@@ -1143,8 +1149,8 @@ function statisticsP(){
         ['Steal time',statsValue(ok?v.cpuStealPercent:null,'%')],
         ['RAM',statsBytes(ok?v.ramUsedBytes:null)+' / '+statsBytes(ok?v.ramTotalBytes:null)],
         ['Диск',statsBytes(ok?v.diskUsedBytes:null)+' / '+statsBytes(ok?v.diskTotalBytes:null)],
-        ['RX',ok?statsBytes(v.rxBytesPerSec)+'/с':'Нет данных'],
-        ['TX',ok?statsBytes(v.txBytesPerSec)+'/с':'Нет данных'],
+        ['RX',ok?statsRate(v.rxBytesPerSec):'Нет данных'],
+        ['TX',ok?statsRate(v.txBytesPerSec):'Нет данных'],
         ['TCP соединения',statsValue(ok?v.activeConnections:null)],
         ['Онлайн клиенты',statsValue(ok?v.onlineClients:null)],
          ['Учёт Xray',ok?(['verified','direct'].includes(v.userStatsStatus)?'Подтверждён':v.userStatsStatus==='unavailable'?'Недоступен':'Статус не получен'):'Нет свежего подтверждения']
@@ -1172,10 +1178,10 @@ function statisticsP(){
       const totals=(key)=>nodes.reduce((sum,n)=>sum+(Number.isFinite(Number(n[key]))&&n[key]!=null?Number(n[key]):0),0);
       const rx=totals('rxBytesPerSec'),tx=totals('txBytesPerSec');
       const peak=nodes.filter(n=>n.rxBytesPerSec!=null).sort((a,b)=>Number(b.rxBytesPerSec)-Number(a.rxBytesPerSec))[0];
-      const rows=nodes.map(n=>'<tr><td>'+esc(n.name||'Нода #'+n.id)+'</td><td>'+statsBytes(n.rxBytesPerSec)+'/с</td><td>'+statsBytes(n.txBytesPerSec)+'/с</td><td>'+esc(String(n.sampleCount??'—'))+'</td><td>'+(n.lastSampleMs?esc(new Date(n.lastSampleMs).toLocaleTimeString(panelIsEnglish()?'en-US':'ru-RU')):'—')+'</td></tr>').join('');
+      const rows=nodes.map(n=>'<tr><td>'+esc(n.name||'Нода #'+n.id)+'</td><td>'+statsRate(n.rxBytesPerSec)+'</td><td>'+statsRate(n.txBytesPerSec)+'</td><td>'+esc(String(n.sampleCount??'—'))+'</td><td>'+(n.lastSampleMs?esc(new Date(n.lastSampleMs).toLocaleTimeString(panelIsEnglish()?'en-US':'ru-RU')):'—')+'</td></tr>').join('');
       panel.innerHTML='<div class="stats-detail-header"><div><h4>Детали интервала · '+esc(new Date(bucketMs).toLocaleString(panelIsEnglish()?'en-US':'ru-RU'))+'</h4><p class="note">RX — принято сетевыми интерфейсами; TX — отправлено. Другие сервисы хоста тоже учитываются. Это не персональный трафик Xray.</p></div><button class="gh sm" type="button" data-stats-detail-close>Закрыть</button></div>'+
-        '<div class="stats-detail-kpis"><div><b>RX всех учтённых нод</b><strong>'+statsBytes(rx)+'/с</strong></div><div><b>TX всех учтённых нод</b><strong>'+statsBytes(tx)+'/с</strong></div><div><b>Нод с измерениями</b><strong>'+nodes.length+'</strong></div></div>'+
-        (peak?'<p class="note">Наибольший вклад RX: '+esc(peak.name||'Нода #'+peak.id)+' · '+statsBytes(peak.rxBytesPerSec)+'/с'+(rx>0?' ('+fmt(Number(peak.rxBytesPerSec)/rx*100,1)+'%)':'')+'</p>':'')+
+        '<div class="stats-detail-kpis"><div><b>RX всех учтённых нод</b><strong>'+statsRate(rx)+'/с</strong></div><div><b>TX всех учтённых нод</b><strong>'+statsRate(tx)+'/с</strong></div><div><b>Нод с измерениями</b><strong>'+nodes.length+'</strong></div></div>'+
+        (peak?'<p class="note">Наибольший вклад RX: '+esc(peak.name||'Нода #'+peak.id)+' · '+statsRate(peak.rxBytesPerSec)+(rx>0?' ('+fmt(Number(peak.rxBytesPerSec)/rx*100,1)+'%)':'')+'</p>':'')+
         '<div class="stats-bucket-table-wrap"><table><thead><tr><th>Нода</th><th>RX</th><th>TX</th><th>Измерений</th><th>Последняя точка</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
         '<p class="note">Источник: TimescaleDB · server_metric_samples'+(detail.truncated?' · Показаны первые 500 нод':'')+'. Отсутствующие измерения не заменены нулями.</p>';
     }catch(e){if(requestId===detailRequest&&panel)panel.textContent='Ошибка детализации: '+(e.message||'API error')}
