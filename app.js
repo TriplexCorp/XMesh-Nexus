@@ -167,6 +167,8 @@ const isOn=u=>{
 };
 const inbs=p=>{try{return JSON.parse(p.config).inbounds||[]}catch(e){return[]}};
 const tags=()=>DB.profiles.flatMap(p=>inbs(p).map(i=>i.tag));
+// Must match the public JSON subscription assembler and the backend Hosts validator.
+const SUBSCRIPTION_PROTOCOLS=new Set(['vless','vmess','trojan','shadowsocks','hysteria','masque']);
 const tcol=t=>({vless:'--a',trojan:'--c3',shadowsocks:'--c4'}[DB.profiles.flatMap(inbs).find(x=>x.tag==t)?.protocol]||'--b');
 const uin=u=>[...new Set(DB.squads.filter(s=>u.squads.includes(s.id)).flatMap(s=>s.inb))];
 const api={
@@ -245,7 +247,7 @@ const ENT={
       if(!profile)return 'Выберите существующий профиль XRAY STUDIO.';
       const inbound=inbs(profile).find(i=>i.tag===d.tag);
       if(!inbound)return 'Выберите inbound из назначенного XRAY-профиля.';
-      if(inbound.protocol!=='vless')return 'Генератор подписок пока поддерживает только VLESS. Выберите VLESS inbound.';
+      if(!SUBSCRIPTION_PROTOCOLS.has(inbound.protocol))return 'Выбранный inbound не поддерживается генератором JSON-подписок.';
       if(!d.nodes.length)return 'Назначьте хотя бы одну ноду с выбранным профилем.';
       const bad=d.nodes.map(id=>DB.nodes.find(n=>String(n.id)===String(id))).find(n=>!n||n.disabled||String(n.profileId)!==String(profile.id));
       if(bad)return 'Одна из нод не использует выбранный XRAY-профиль или отключена. Исправьте привязку ноды.';
@@ -2759,7 +2761,7 @@ function hostEditorRefresh(form,changedProfile=false){
   const warnings=[];
   if(!profile)warnings.push('Выберите XRAY-профиль.');
   else if(!inbound)warnings.push('У профиля нет выбранного inbound.');
-  else if(inbound.protocol!=='vless')warnings.push('Для подписок сейчас поддерживается только VLESS.');
+  else if(!SUBSCRIPTION_PROTOCOLS.has(inbound.protocol))warnings.push('Выбранный протокол не поддерживается генератором JSON-подписок.');
   if(requiredNodes.length===0)warnings.push('Выберите ноду с действующим профилем XRAY STUDIO, иначе хост не будет выдан в подписке.');
   if(val('countryCode')&&!/^[A-Za-z]{2}$/.test(val('countryCode')))warnings.push('Код страны должен состоять из двух латинских букв, например NL.');
   if(mismatched.length)warnings.push('Несовместимые ноды: '+mismatched.map(n=>!n?'нода удалена':n.name+' (ID '+n.id+': '+(n.disabled?'отключена':hostProfile(n.profileId)?'назначен профиль «'+hostProfile(n.profileId).name+'»':'профиль ID '+(n.profileId||'не назначен')+' отсутствует')+')').join(', ')+'. Назначьте нодам существующий XRAY-профиль и только затем сохраняйте хост.');
@@ -3856,7 +3858,7 @@ document.addEventListener('click',async e=>{
   else if(b=g('[data-node-create-host]')){
     const node=DB.nodes.find(n=>String(n.id)===b.dataset.nodeCreateHost);
     if(node){
-      const profile=hostProfile(node.profileId),inbound=profile?inbs(profile).find(i=>i.protocol==='vless'):null;
+      const profile=hostProfile(node.profileId),inbound=profile?inbs(profile).find(i=>SUBSCRIPTION_PROTOCOLS.has(i.protocol)):null;
       entForm('hosts',null,{remark:node.name||'Новый хост',address:node.addr||'',port:node.port||443,
         profileId:profile?.id||DB.profiles[0]?.id||0,tag:inbound?.tag||'',nodes:[node.id],fp:'',order:DB.hosts.length+1});
     }
