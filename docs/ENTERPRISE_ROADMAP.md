@@ -27,13 +27,22 @@ This roadmap tracks verified improvements, not feature claims. A stage is comple
 - [x] Distinguish semantic traffic-direction colours from node colours: Upload (teal) and Download (violet); correct the aggregate ring legend to identify nodes.
 - [x] Introduce application-wide branded scrollbar styling in the main stylesheet and XRAY STUDIO stylesheet, including 8 px rails and attempted 7 px end insets on supported engines; preserve existing overflow containers.
 
-### Chart scaling — implemented in stylesheet, pending acceptance
+### Chart scaling — root-cause fix implemented, browser acceptance pending (2026-10-25)
 
-- [x] Size the infrastructure Statistics chart to its parent card under Appearance content width (`--panel-content-max`) while keeping an independent fixed-height SVG viewport and recalculating horizontal `viewBox` coordinates via `ResizeObserver`; no uniform upscaling of the original `1000 × 340` drawing.
-- [x] Apply the same width-aware, independently height-bounded SVG geometry to the Dashboard RX/TX chart (`.traffic-chart-wrap`, `.traffic-chart-svg`).
-- [x] Keep user history charts bounded within their modal workspace without changing tab-dependent dialog geometry.
-- [ ] Confirm graph sizing, SVG axis-label legibility, hover targets and alignment at UI scales 90–200%, across common laptop, desktop and ultrawide viewport sizes.
-- [ ] Test switching global UI scale while Statistics and Dashboard are already mounted; ensure plots respond without stale measurements, clipping or overflow.
+**Root cause:** a fixed `1000 × 340` Statistics or `960 × 292` Dashboard SVG `viewBox` with CSS `width:100%; height:auto` caused uniform scaling of plot height, text, markers and hit areas as card width grew. Earlier `72rem`/ `100rem` width caps hid this at the cost of excessive unused card width; removing caps alone exposed the same underlying defect.
+
+- [x] Remove chart-specific rem-based width caps; both charts fill their parent cards, whose outer workspace is constrained by the Appearance setting `--panel-content-max` (720–3000 px).
+- [x] Decouple CSS height from width: Statistics `21.25rem`, Dashboard `18.25rem`; mobile <=700 px: `17rem` and `16rem`. The global UI font scale still affects rem-based height.
+- [x] Adjust SVG **horizontal** coordinates and `viewBox` width with `ResizeObserver` against the actual rendered aspect ratio; do not uniformly enlarge axis text or plot markers when card width changes.
+- [x] Preserve existing Statistics point selection across SVG replacement where the selected node remains present. Leave the modal user-history chart's independent bounded geometry intact.
+- [x] Bust frontend CSS/JS cache versions in `index.html`; document behavior and verification requirements in README.
+- [ ] Run committed-source syntax, frontend regression, and strict CI checks; record exact commit and run results. A source change is **not** a tested feature.
+- [ ] Browser-test content width at 720, 1280, 1920 and 3000 px and UI scale at 90%, 100%, 150% and 200% (including combinations), without reload and after page navigation.
+- [ ] Verify desktop, ultrawide, laptop and mobile layout: legible axes, stable plot height, no clipping or horizontal overflow, no oversized points or hit regions.
+- [ ] Verify click, keyboard selection, interval drill-down, selected-point preservation, 1h/24h and other available Statistics periods, live refresh, empty/error state and data fidelity on a disposable deployment.
+- [ ] Verify switching settings while mounted produces no stale SVG coordinates or repeated ResizeObserver loops; inspect for layout/performance regressions.
+
+**Acceptance criterion:** at the same UI scale, the graph may grow horizontally as allowed content width grows, but must **not** grow proportionally in height or uniformly magnify text/markers. Production/browser verification is still outstanding; do not mark the chart scaling task accepted based on source alone.
 
 ### Verification and follow-up (open)
 
