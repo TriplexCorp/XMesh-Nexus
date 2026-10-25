@@ -1369,3 +1369,33 @@ body>.sv-studio-portal ::-webkit-scrollbar-button:single-button:vertical:start:d
 body>.sv-studio-portal ::-webkit-scrollbar-button:single-button:vertical:end:increment{
  display:block!important;height:var(--scrollbar-end-gap,7px);background:transparent!important;border:0!important;
 }
+
+
+/* Unified 34px close action; JSON document tab × remains a separate small control. */
+.sv-studio .sv-overlay .sv-dialog>header>button[data-action="close"],
+.sv-studio .sv-overlay-composer .sv-dialog>header>button[data-action="close"]{
+  width:var(--xm-close-size,34px)!important;
+  height:var(--xm-close-size,34px)!important;
+  min-width:var(--xm-close-size,34px)!important;
+  min-height:var(--xm-close-size,34px)!important;
+  flex:0 0 var(--xm-close-size,34px)!important;
+  aspect-ratio:1;
+  box-sizing:border-box;
+  padding:0!important;
+  display:inline-grid!important;
+  place-items:center!important;
+  border-radius:50%!important;
+  border:1px solid var(--vline)!important;
+  background:var(--vfield,var(--s2))!important;
+  color:var(--vtext,var(--tx))!important;
+  font-size:20px;
+  line-height:1;
+}
+.sv-studio .sv-overlay .sv-dialog>header>button[data-action="close"]:hover,
+.sv-studio .sv-overlay-composer .sv-dialog>header>button[data-action="close"]:hover{
+  background:color-mix(in srgb,var(--vaccent) 12%,var(--vfield,var(--s2)))!important;
+  border-color:var(--vaccent)!important;
+}
+.sv-studio .sv-overlay .sv-dialog>header>button[data-action="close"]:focus-visible{
+  outline:2px solid var(--vaccent);outline-offset:2px;
+}
