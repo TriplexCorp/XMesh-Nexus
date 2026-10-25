@@ -18,6 +18,8 @@ window.XMeshI18n=(()=>{
     'Дашборд':'Dashboard','Главная':'Home','Пользователи':'Users',
     'Клиенты':'Clients','Сквады':'Squads','Хосты':'Hosts','Узлы':'Nodes',
     'Маршрутизация клиентов':'Client routing',
+    'Выбранный inbound не поддерживается генератором JSON-подписок.':'The selected inbound is not supported by the JSON subscription generator.',
+    'Выбранный протокол не поддерживается генератором JSON-подписок.':'The selected protocol is not supported by the JSON subscription generator.',
     'Новый шаблон':'New template',
     'Сохранить маршрутизацию':'Save routing',
     'Название шаблона':'Template name',
