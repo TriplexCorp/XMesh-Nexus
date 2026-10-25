@@ -1868,7 +1868,7 @@ dialog.user-modal .user-server-donut{
   display:grid;place-items:center;position:relative;
   flex:0 0 3.15rem;width:3.15rem;height:3.15rem;
   border-radius:50%;
-  background:conic-gradient(var(--a) 0 var(--traffic-share),color-mix(in srgb,var(--tx) 9%,var(--s2)) var(--traffic-share) 100%);
+  background:conic-gradient(var(--server-color,var(--a)) 0 var(--traffic-share),color-mix(in srgb,var(--tx) 9%,var(--s2)) var(--traffic-share) 100%);
 }
 dialog.user-modal .user-server-donut::after{
   content:"";position:absolute;inset:.49rem;background:var(--s2);border-radius:50%;
