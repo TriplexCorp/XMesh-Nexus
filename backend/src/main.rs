@@ -1783,10 +1783,64 @@ async fn get_system_stats(State(state): State<AppState>) -> Json<Value> {
 
 /// Read-only dashboard overview from actual `TimescaleDB` measurements.
 /// Samples older than 5 minutes are reported stale, never as live zeroes.
+async fn inbound_traffic_summary(pool: &PgPool) -> Result<(i64, i64, i64), ApiError> {
+    let inbound: (i64, i64, i64) = {
+        let row = sqlx::query(
+            "SELECT COUNT(*)::BIGINT AS entries,
+                    COALESCE(SUM(uplink_bytes),0)::BIGINT AS up,
+                    COALESCE(SUM(downlink_bytes),0)::BIGINT AS down
+             FROM user_inbound_traffic_totals",
+        )
+        .fetch_one(&state.pool)
+        .await?;
+        (
+            row.try_get("entries")?,
+            row.try_get("up")?,
+            row.try_get("down")?,
+        )
+    };
+    Ok(inbound)
+}
+
+// Distinguish delayed or missing telemetry from genuine zero usage.
+fn metric_freshness(sampled_at_ms: i64, now_ms: i64) -> &'static str {
+    if sampled_at_ms > now_ms.saturating_add(30_000) {
+        "invalid"
+    } else if sampled_at_ms >= now_ms.saturating_sub(65_000) {
+        "fresh"
+    } else if sampled_at_ms >= now_ms.saturating_sub(300_000) {
+        "delayed"
+    } else {
+        "stale"
+    }
+}
+
+#[cfg(test)]
+mod metric_freshness_tests {
+    use super::metric_freshness;
+
+    #[test]
+    fn distinguishes_fresh_delayed_stale_and_future_samples() {
+        let now = 1_800_000_000_000_i64;
+        assert_eq!(metric_freshness(now, now), "fresh");
+        assert_eq!(metric_freshness(now - 65_000, now), "fresh");
+        assert_eq!(metric_freshness(now - 65_001, now), "delayed");
+        assert_eq!(metric_freshness(now - 300_000, now), "delayed");
+        assert_eq!(metric_freshness(now - 300_001, now), "stale");
+        assert_eq!(metric_freshness(now + 30_001, now), "invalid");
+    }
+}
+
 async fn get_statistics_overview(
     State(state): State<AppState>,
     Extension(actor): Extension<auth::AuthUser>,
 ) -> Result<Json<Value>, ApiError> {
+    let now_ms: i64 = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+        .try_into()
+        .unwrap_or(i64::MAX);
     let records = load_records(&state.pool, "nodes").await?;
     let mut nodes = Vec::with_capacity(records.len());
     for node in records {
@@ -1814,10 +1868,11 @@ async fn get_statistics_overview(
                 "txBytesPerSec":row.try_get::<Option<f64>,_>("tx_bytes_per_sec")?,
                 "activeConnections":row.try_get::<Option<i32>,_>("active_connections")?,
                 "onlineClients":row.try_get::<Option<i32>,_>("online_clients")?,
+                "userStatsStatus":metric.get("userStatsStatus"),
+                "userStatsAtMs":metric.get("userStatsAtMs"),
                 "sampledAt":sampled_at,
-                "stale":std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default().as_millis().try_into().unwrap_or(i64::MAX)
-                    > sampled_at.saturating_add(300_000)
+                "freshness":metric_freshness(sampled_at, now_ms),
+                "stale":now_ms > sampled_at.saturating_add(300_000)
             }))
         } else {
             None
@@ -1840,6 +1895,11 @@ async fn get_statistics_overview(
         } else {
             (None, None, None, None)
         };
+        let telemetry_state = current
+            .as_ref()
+            .and_then(|value| value.get("freshness"))
+            .and_then(Value::as_str)
+            .unwrap_or("never_received");
         nodes.push(json!({
             "networkRxBytes":network_rx,
             "networkTxBytes":network_tx,
@@ -1852,28 +1912,15 @@ async fn get_statistics_overview(
                 else{node.get("hosting").cloned().unwrap_or(Value::Null)},
             "flag":node.get("flag"),
             "disabled":node.get("disabled"),
-            "latest":current
+            "latest":current,
+            "telemetryState":telemetry_state
         }));
     }
     let users: i64 =
         sqlx::query_scalar("SELECT COUNT(*) FROM panel_records WHERE collection='users'")
             .fetch_one(&state.pool)
             .await?;
-    let inbound: (i64, i64, i64) = {
-        let row = sqlx::query(
-            "SELECT COUNT(*)::BIGINT AS entries,
-                    COALESCE(SUM(uplink_bytes),0)::BIGINT AS up,
-                    COALESCE(SUM(downlink_bytes),0)::BIGINT AS down
-             FROM user_inbound_traffic_totals",
-        )
-        .fetch_one(&state.pool)
-        .await?;
-        (
-            row.try_get("entries")?,
-            row.try_get("up")?,
-            row.try_get("down")?,
-        )
-    };
+    let inbound = inbound_traffic_summary(&state.pool).await?;
     let total_nodes = nodes.len();
     Ok(Json(json!({
         "nodes":nodes,
@@ -2605,10 +2652,12 @@ async fn get_traffic_metrics(
     let (range, interval_seconds) = match query.range.as_deref().unwrap_or("1h") {
         "1h" => ("1h", 60_i64),
         "24h" => ("24h", 900_i64),
+        "7d" => ("7d", 3600_i64),
+        "30d" => ("30d", 21_600_i64),
         _ => {
             return Err(ApiError::new(
                 StatusCode::BAD_REQUEST,
-                "Период должен быть 1h или 24h.",
+                "Период должен быть 1h, 24h, 7d или 30d.",
             ));
         }
     };
@@ -2664,13 +2713,13 @@ async fn get_traffic_metrics(
         ),
         per_node_bucket AS (
             SELECT
-                time_bucket(CASE WHEN $3::text = '1h' THEN INTERVAL '1 minute' ELSE INTERVAL '15 minutes' END, s.sampled_at) AS bucket,
+                time_bucket(CASE $3::text WHEN '1h' THEN INTERVAL '1 minute' WHEN '24h' THEN INTERVAL '15 minutes' WHEN '7d' THEN INTERVAL '1 hour' ELSE INTERVAL '6 hours' END, s.sampled_at) AS bucket,
                 s.node_id,
                 AVG(s.rx_bytes_per_sec) AS rx_bytes_per_sec,
                 AVG(s.tx_bytes_per_sec) AS tx_bytes_per_sec,
                 COUNT(*)::BIGINT AS sample_count
             FROM server_metric_samples s
-            WHERE s.sampled_at >= NOW() - CASE WHEN $3::text = '1h' THEN INTERVAL '1 hour' ELSE INTERVAL '24 hours' END
+            WHERE s.sampled_at >= NOW() - CASE $3::text WHEN '1h' THEN INTERVAL '1 hour' WHEN '24h' THEN INTERVAL '24 hours' WHEN '7d' THEN INTERVAL '7 days' ELSE INTERVAL '30 days' END
               AND s.node_id IN (SELECT node_id FROM selected_nodes)
             GROUP BY 1, 2
         )
