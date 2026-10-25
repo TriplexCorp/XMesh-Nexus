@@ -1177,47 +1177,7 @@ pub async fn portal_route(
     )
     .await
 }
-pub async fn portal(
-    State(state): State<AppState>,
-    Path(token): Path<String>,
-    headers: HeaderMap,
-    Query(options): Query<HashMap<String, String>>,
-) -> Result<Response, ApiError> {
-    if !valid_token(&token) {
-        return Err(ApiError::new(
-            StatusCode::NOT_FOUND,
-            "Subscription not found",
-        ));
-    }
-    // A single permanent HTTPS URL is a portal for browsers and a
-    // negotiated JSON/VLESS subscription for the VPN client's User-Agent.
-    if crate::subscription_user_agent::wants_feed(&headers, &options).map_err(bad)? {
-        return serve(State(state), Path(token), headers, Query(options)).await;
-    }
-    let hash = token_hash(&token);
-    let row = sqlx::query("SELECT user_id FROM user_subscription_tokens WHERE token_hash=$1")
-        .bind(hash)
-        .fetch_optional(&state.pool)
-        .await?
-        .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Subscription not found"))?;
-    let user_id: i64 = row.try_get("user_id")?;
-    let user = record(&state, user_id).await?;
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis()
-        .try_into()
-        .unwrap_or(i64::MAX);
-    let active = crate::user_status(&user, now) == "ACTIVE";
-    let settings = crate::read_settings(&state.pool).await?;
-    let lang = if options.get("lang").is_some_and(|s| s == "en") {
-        "en"
-    } else if options.get("lang").is_some_and(|s| s == "ru") {
-        "ru"
-    } else {
-        studio_string(&settings, "subscriptionLanguage", "ru")
-    };
-    let en = lang == "en";
+fn portal_metrics(user: &Value, settings: &Value, en: bool) -> String {
     let consumed_gib = user
         .get("used")
         .and_then(Value::as_f64)
@@ -1286,6 +1246,51 @@ pub async fn portal(
             "<div class=\"subscription-preview-meta\" data-subscription-metrics>{metrics}</div>"
         );
     }
+    metrics
+}
+
+pub async fn portal(
+    State(state): State<AppState>,
+    Path(token): Path<String>,
+    headers: HeaderMap,
+    Query(options): Query<HashMap<String, String>>,
+) -> Result<Response, ApiError> {
+    if !valid_token(&token) {
+        return Err(ApiError::new(
+            StatusCode::NOT_FOUND,
+            "Subscription not found",
+        ));
+    }
+    // A single permanent HTTPS URL is a portal for browsers and a
+    // negotiated JSON/VLESS subscription for the VPN client's User-Agent.
+    if crate::subscription_user_agent::wants_feed(&headers, &options).map_err(bad)? {
+        return serve(State(state), Path(token), headers, Query(options)).await;
+    }
+    let hash = token_hash(&token);
+    let row = sqlx::query("SELECT user_id FROM user_subscription_tokens WHERE token_hash=$1")
+        .bind(hash)
+        .fetch_optional(&state.pool)
+        .await?
+        .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Subscription not found"))?;
+    let user_id: i64 = row.try_get("user_id")?;
+    let user = record(&state, user_id).await?;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+        .try_into()
+        .unwrap_or(i64::MAX);
+    let active = crate::user_status(&user, now) == "ACTIVE";
+    let settings = crate::read_settings(&state.pool).await?;
+    let lang = if options.get("lang").is_some_and(|s| s == "en") {
+        "en"
+    } else if options.get("lang").is_some_and(|s| s == "ru") {
+        "ru"
+    } else {
+        studio_string(&settings, "subscriptionLanguage", "ru")
+    };
+    let en = lang == "en";
+    let metrics = portal_metrics(&user, &settings, en);
     // Show/copy one canonical HTTPS subscription URL. The requesting app's
     // User-Agent decides the JSON/link format and device profile.
     let raw_link = studio_url(&settings, &token);
