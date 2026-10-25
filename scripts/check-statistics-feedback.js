@@ -229,3 +229,8 @@ assert.doesNotMatch(app,/a=='rst'\?\{used:0\}/);
 assert.match(css,/Shared desktop geometry for user editor and detailed user analytics/);
 assert.match(css,/width:min\(82rem,calc\(100vw - 2\.5rem\)\)/);
 assert.match(css,/height:min\(44\.5rem,calc\(100dvh - 2rem\)\)/);
+
+assert.match(app,/const sourceRect=dlg\.getBoundingClientRect\(\)/);
+assert.match(app,/dialogSize:\{width:sourceRect\.width,height:sourceRect\.height\}/);
+assert.match(app,/--stats-source-width/);
+assert.match(css,/var\(--stats-source-width,108rem\)/);
