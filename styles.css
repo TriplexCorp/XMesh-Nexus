@@ -5740,3 +5740,36 @@ body>.stats-user-overlay .stats-user-pane .stats-detail-chart{
 .xm-select-option.in-group{padding-left:1.15rem}
 @media(max-width:640px){.xm-select-popover:popover-open{max-width:calc(100vw - 16px)}.xm-select-trigger{font-size:.82rem}}
 @media(prefers-reduced-motion:reduce){.xm-select-trigger,.xm-select-chevron{transition:none}}
+
+
+/* Top-10 toolbar: a single control-height contract across custom period select,
+   native user-ID field and action button, including responsive wrapping. */
+#stats-dashboard .stats-history-filters:has(#stats-leaders-range){
+ --stats-leaders-control-height:2.8rem;
+ grid-template-columns:repeat(3,minmax(0,1fr));
+ align-items:end;
+}
+#stats-dashboard .stats-history-filters:has(#stats-leaders-range) :is(
+ .xm-period-trigger,
+ #stats-user-lookup,
+ #stats-user-lookup-open
+){
+ box-sizing:border-box;
+ height:var(--stats-leaders-control-height);
+ min-height:var(--stats-leaders-control-height);
+ max-height:var(--stats-leaders-control-height);
+ margin:0;
+}
+#stats-dashboard .stats-history-filters:has(#stats-leaders-range) #stats-user-lookup-open{
+ width:100%;
+ align-self:end;
+ justify-content:center;
+}
+@media(max-width:900px){
+ #stats-dashboard .stats-history-filters:has(#stats-leaders-range){grid-template-columns:repeat(2,minmax(0,1fr))}
+ #stats-dashboard .stats-history-filters:has(#stats-leaders-range) #stats-user-lookup-open{grid-column:1/-1}
+}
+@media(max-width:600px){
+ #stats-dashboard .stats-history-filters:has(#stats-leaders-range){grid-template-columns:minmax(0,1fr)}
+ #stats-dashboard .stats-history-filters:has(#stats-leaders-range) #stats-user-lookup-open{grid-column:1}
+}
