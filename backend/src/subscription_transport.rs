@@ -412,11 +412,18 @@ pub fn client_stream(inbound: &Value, host: &Value, device: &str) -> Option<Valu
     {
         out["finalmask"] = mask.clone();
     } else if let Some(mask) = stream.get("finalmask") {
-        let udp_transport = matches!(network, "hysteria" | "masque" | "mkcp" | "kcp");
+        // MASQUE may negotiate H2 (TCP), H3 (UDP), or both. Only
+        // inherit a mask for a transport explicitly selected by ALPN.
+        let alpn = out["tlsSettings"]["alpn"].as_array();
+        let masque_h2 = network == "masque"
+            && alpn.is_some_and(|v| v.iter().any(|x| x.as_str() == Some("h2")));
+        let masque_h3 = network == "masque"
+            && alpn.is_none_or(|v| v.iter().any(|x| x.as_str() == Some("h3")));
+        let udp_transport = matches!(network, "hysteria" | "mkcp" | "kcp") || masque_h3;
         let tcp_transport = matches!(
             network,
-            "raw" | "tcp" | "xhttp" | "ws" | "websocket" | "grpc" | "httpupgrade"
-        );
+            "raw" | "tcp" | "ws" | "websocket" | "grpc" | "httpupgrade"
+        ) || masque_h2 || network == "xhttp";
         let mut inherited = json!({});
         for (direction, enabled) in [("tcp", tcp_transport), ("udp", udp_transport)] {
             if !enabled {
@@ -540,14 +547,24 @@ mod tests {
                 {"type":"noise","settings":{"server":"private"}}]}}});
         let host = json!({"address":"198.51.100.1"});
         let client = client_stream(&inbound, &host, "auto").unwrap();
-        assert_eq!(client["finalmask"], json!({"udp":[
-            {"type":"salamander","settings":{"password":"shared-obfs"}}]}));
+        // Mixed layers must never be partially exported.
+        assert!(client.get("finalmask").is_none());
         assert!(!client.to_string().contains("do-not-copy"));
         assert!(!client.to_string().contains("private"));
         let explicit = json!({"address":"198.51.100.1","clientFinalmask":{"udp":[
             {"type":"salamander","settings":{"password":"override"}}]}});
         assert_eq!(client_stream(&inbound, &explicit, "auto").unwrap()["finalmask"],
             explicit["clientFinalmask"]);
+    }
+    #[test]
+    fn hysteria_salamander_and_gecko_export_when_symmetric() {
+        let inbound = json!({"streamSettings":{"network":"hysteria","security":"tls",
+            "tlsSettings":{"serverName":"pl.example.org"},
+            "finalmask":{"udp":[{"type":"salamander","settings":{
+                "password":"shared","packetSize":"512-1200"}}]}}});
+        let client = client_stream(&inbound, &json!({"address":"198.51.100.1"}), "auto").unwrap();
+        assert_eq!(client["finalmask"]["udp"][0]["settings"]["password"], "shared");
+        assert_eq!(client["finalmask"]["udp"][0]["settings"]["packetSize"], "512-1200");
     }
     #[test]
     fn non_hysteria_does_not_inherit_salamander() {
