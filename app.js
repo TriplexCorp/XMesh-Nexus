@@ -1832,7 +1832,7 @@ const userTrafficBytes=v=>sysBytes(Number.isFinite(+v)&&+v>=0?+v:0);
 const userNodeColors=new Map();
 const userNodeCandidates=(()=>{
   const list=[];
-  for(let hue=0;hue<360;hue+=5)for(const saturation of [75,95])for(const lightness of [48,65]){
+  for(let hue=0;hue<360;hue+=5)for(const saturation of [42,55])for(const lightness of [68,76]){
     const h=hue/60,c=(1-Math.abs(2*lightness/100-1))*saturation/100,x=c*(1-Math.abs(h%2-1)),m=lightness/100-c/2;
     const rgb=h<1?[c,x,0]:h<2?[x,c,0]:h<3?[0,c,x]:h<4?[0,x,c]:h<5?[x,0,c]:[c,0,x];
     const [r,g,b]=rgb.map(v=>{const q=v+m;return q<=.04045?q/12.92:((q+.055)/1.055)**2.4});
