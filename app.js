@@ -1057,6 +1057,7 @@ function statisticsP(){
    <section class="card"><div class="hd"><div><h3>Скорость сети нод</h3><p>RX/TX сетевых интерфейсов (включая сторонние сервисы), отдельно от персональных Xray-счётчиков.</p></div></div><div id="stats-trend"></div><section id="stats-bucket-detail" class="stats-bucket-detail" hidden aria-live="polite"></section></section>
    <section class="card"><div class="hd"><div><h3>Control Plane</h3><p>Метрики контейнера панели, не всей физической машины.</p></div></div><div id="stats-control"></div></section>
   </div>
+  <section class="card"><div class="hd"><div><h3>Top-10: подтверждённый трафик</h3><p>Накопленные байты с первого достоверного измерения. Не расход за выбранный период; счётчики пользователей и inbound независимы.</p></div></div><div id="stats-leaders" class="stats-leaders"><p class="note">Загрузка рейтингов…</p></div></section>
   <section class="card"><div class="hd"><div><h3>Узлы и виртуализация</h3><p>CPU, steal time, RAM, диски, сеть, активные соединения и свежесть данных.</p></div></div><div id="stats-nodes" class="stats-node-grid"></div></section>
   <p class="note">Новые показатели появляются только после установки обновлённого агента. Отсутствующие измерения и устаревшие показания не заменяются нулями.</p>
  </div>`;
@@ -1206,6 +1207,22 @@ function statisticsP(){
   $('#stats-refresh')?.addEventListener('click',()=>{void refresh(true)});
   $('#stats-period')?.addEventListener('change',()=>{lastRefresh=0;void refresh()});
   void refresh();
+  const loadLeaders=async()=>{
+    const root=$('#stats-leaders');if(!root)return;
+    try{
+      const result=await backendRequest('/api/v1/statistics/leaders');
+      if(cur!=='statistics'||!root.isConnected)return;
+      const table=(items,label)=>
+        '<div><h4>'+label+'</h4><div class="stats-bucket-table-wrap"><table><thead><tr><th>Название</th><th>Uplink</th><th>Downlink</th><th>Всего</th></tr></thead><tbody>'+
+        (items.length?items.map(item=>{
+          const up=Number(item.uplinkBytes)||0,down=Number(item.downlinkBytes)||0;
+          return '<tr><td>'+esc(item.name||item.inboundTag||'—')+'</td><td>'+statsBytes(up)+'</td><td>'+statsBytes(down)+'</td><td>'+statsBytes(up+down)+'</td></tr>';
+        }).join(''):'<tr><td colspan="4">Пока нет подтверждённых счётчиков</td></tr>')+
+        '</tbody></table></div></div>';
+      root.innerHTML=table(result.topUsers||[],'Пользователи')+table(result.topInbounds||[],'Inbound');
+    }catch(e){if(root.isConnected)root.textContent='Рейтинги недоступны: '+(e.message||'API error')}
+  };
+  void loadLeaders();
   // One-second UI heartbeat, but no invented network samples: the sparkline
   // changes only when actual signed telemetry reaches TimescaleDB.
   T.push(setInterval(()=>{
