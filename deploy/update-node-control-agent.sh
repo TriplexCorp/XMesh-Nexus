@@ -74,11 +74,15 @@ update_router() {
   echo "Router source has local changes; refusing automatic upgrade" >&2; return 1;
  }
  previous="$(git -C "$dir" rev-parse HEAD)" || return 1
- git -C "$dir" fetch origin main || return 1
- if [[ "$previous" == "$(git -C "$dir" rev-parse FETCH_HEAD)" ]];then
-  echo "Router source already current."
-  return 0
+ # Bootstrap initially shallow-clones XMesh-Node. A shallow boundary must
+ # not make legitimate later updates look like rewritten history.
+ if [[ "$(git -C "$dir" rev-parse --is-shallow-repository)" == true ]];then
+  git -C "$dir" fetch --unshallow origin main || return 1
+ else
+  git -C "$dir" fetch origin main || return 1
  fi
+ # Even if HEAD is current, rebuild/validate the managed Docker image: the
+ # source checkout may have updated while the container is still outdated.
  # Refuse rewritten history; never silently discard administrator changes.
  git -C "$dir" merge-base --is-ancestor "$previous" FETCH_HEAD || {
   echo "Router repository cannot fast-forward safely" >&2; return 1;
