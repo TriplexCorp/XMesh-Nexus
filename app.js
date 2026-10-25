@@ -1162,7 +1162,7 @@ function statisticsP(){
       const last=v?.sampledAt?new Date(v.sampledAt).toLocaleString(panelIsEnglish()?'en-US':'ru-RU'):'Нет измерений';
       return '<article class="stats-node"><div class="stats-node-head">'+head+'</div><span class="stats-node-status">'+(quality==='fresh'?'Свежие данные':quality==='delayed'?'Данные задерживаются':quality==='stale'?'Данные устарели':quality==='invalid'?'Недостоверная метка времени':'Нет телеметрии')+' · '+esc(last)+'</span><div class="stats-node-rings">'+statsRing('CPU',ok?v.cpuPercent:null,'#6f9bff')+statsRing('Steal time',ok?v.cpuStealPercent:null,'#f3ae63')+statsRing('RAM',ok&&v.ramTotalBytes>0?v.ramUsedBytes/v.ramTotalBytes*100:null,'#c294e8')+statsRing('Диск',ok&&v.diskTotalBytes>0?v.diskUsedBytes/v.diskTotalBytes*100:null,'#44c9b6')+'</div><div class="stats-kvs">'+values.map(x=>statsRow(...x)).join('')+'</div></article>';
     }).join(''):'<p class="note">Узлы пока не созданы.</p>';
-    if(status)status.textContent=(panelIsEnglish()?'API checked · ':'API проверен · ')+new Date().toLocaleTimeString(panelIsEnglish()?'en-US':'ru-RU');
+    if(status)status.textContent=(panelIsEnglish()?'Data updated · API checked at ':'Данные обновлены · API проверен в ')+new Date().toLocaleTimeString(panelIsEnglish()?'en-US':'ru-RU');
    }catch(error){requestFailed=true;updateLiveStatus();if(status)status.textContent=(panelIsEnglish()?'Unable to refresh statistics: ':'Не удалось обновить статистику: ')+(error.message||(panelIsEnglish()?'API error':'Ошибка API'))}
    finally{refreshing=false;lastRefresh=Date.now();if(button?.isConnected)button.disabled=false}
   };
