@@ -5241,6 +5241,7 @@ td.er .user-expiry-primary{color:var(--danger,#f08080)}
 
 /* Sharp selection ring, not glow or browser SVG focus rectangle. */
 .stats-detail-point-wrap{cursor:pointer;outline:none}
+.stats-detail-point-hit{fill:transparent;stroke:none;pointer-events:all;cursor:pointer}
 .stats-detail-point-ring{fill:none;stroke:transparent;stroke-width:2;opacity:0;pointer-events:none;vector-effect:non-scaling-stroke;transition:opacity .16s ease}
 .stats-detail-point-core{stroke:var(--s1);stroke-width:2;pointer-events:none;vector-effect:non-scaling-stroke;transition:r .16s ease}
 .stats-detail-point-wrap.rx .stats-detail-point-core{fill:var(--a)}
