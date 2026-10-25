@@ -176,7 +176,7 @@ assert.match(app,/document\.querySelector\('body > #stats-user-modal'\)\?\.remov
 assert.match(css,/body > \.stats-user-overlay\{position:fixed;inset:0;width:100vw;height:100dvh/);
 
 assert.match(app,/id="stats-user-refresh" class="gh stats-user-refresh"/);
-assert.match(app,/data-stats-plain-icon="close">Закрыть<\/button>/);
+assert.match(app,/id="stats-user-close" class="gh stats-user-close"/);
 assert.match(css,/\.stats-user-tabs\{display:flex;flex-direction:row/);
 assert.match(css,/\.stats-user-actions\{margin-left:auto;display:flex;flex-direction:row/);
 
@@ -194,3 +194,5 @@ assert.match(app,/refreshButton\.classList\.add\('is-refreshing'\)/);
 assert.match(app,/finally\{if\(request===historyRequest&&refreshButton\)/);
 assert.match(css,/@keyframes stats-user-refresh-spin/);
 assert.match(css,/\.stats-refresh-icon\{display:block!important/);
+
+assert.match(css,/#stats-user-close\{flex:0 0 2\.15rem/);
