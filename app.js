@@ -1823,11 +1823,14 @@ function handleUserRenewalAction(button){
    Never derive a user's consumption from node-wide RX/TX interface speeds. */
 const userTrafficBytes=v=>sysBytes(Number.isFinite(+v)&&+v>=0?+v:0);
 // Stable, varied server accents; neighboring nodes are not restricted to a short palette.
+// Distinct, stable node colours used by both overview ring and per-node donuts.
+const USER_NODE_COLORS=['#26d7b2','#6387ff','#f59b3b','#b379ff','#f0648d','#27c8e3','#e8bd3e','#79ce51','#ed7651','#a9a5ff','#df6ac9','#57b8fb'];
 function userServerColor(id){
-  const key=String(id??'unknown');let h=2166136261;
-  for(const c of key)h=Math.imul(h^c.codePointAt(0),16777619)>>>0;
-  const hue=h%360,sat=68+((h>>>12)%20),light=53+((h>>>20)%11);
-  return 'hsl('+hue+' '+sat+'% '+light+'%)';
+  const numeric=Number(id);
+  if(Number.isSafeInteger(numeric)&&numeric>=0)return USER_NODE_COLORS[numeric%USER_NODE_COLORS.length];
+  const key=String(id??'unknown');let hash=2166136261;
+  for(const c of key)hash=Math.imul(hash^c.codePointAt(0),16777619)>>>0;
+  return USER_NODE_COLORS[hash%USER_NODE_COLORS.length];
 }
 function userServerGradient(id){
   const key=String(id??'unknown');let h=2166136261;
