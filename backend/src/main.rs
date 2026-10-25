@@ -2188,6 +2188,49 @@ async fn persist_user_traffic(
     Ok(())
 }
 
+async fn persist_inbound_traffic(
+    conn: &mut sqlx::PgConnection,
+    node_id: i64,
+    inbound_samples: &[UserInboundTrafficSample],
+) -> Result<(), ApiError> {
+    if !inbound_samples.is_empty() {
+        // An inbound's aggregate traffic MUST NEVER be interpreted as per-user traffic.
+        // Signed node agents report cumulative counters scoped to a real user+inbound.
+        let serialized = serde_json::to_value(&inbound_samples).map_err(|_| {
+            ApiError::new(StatusCode::BAD_REQUEST, "Некорректный userInboundTraffic.")
+        })?;
+        sqlx::query(
+            "INSERT INTO user_inbound_traffic_totals AS totals (
+                node_id,user_id,inbound_tag,last_uplink_bytes,last_downlink_bytes,
+                uplink_bytes,downlink_bytes,observations,updated_at
+            )
+            SELECT $1,s.user_id,s.inbound_tag,s.uplink_bytes,s.downlink_bytes,0,0,1,NOW()
+            FROM jsonb_to_recordset($2::jsonb)
+                AS s(user_id BIGINT,inbound_tag TEXT,uplink_bytes BIGINT,downlink_bytes BIGINT)
+            JOIN panel_records u ON u.collection='users' AND u.id=s.user_id
+            ON CONFLICT(node_id,user_id,inbound_tag) DO UPDATE SET
+                uplink_bytes=totals.uplink_bytes+
+                    CASE WHEN EXCLUDED.last_uplink_bytes >= totals.last_uplink_bytes
+                           AND EXCLUDED.last_downlink_bytes >= totals.last_downlink_bytes
+                      THEN EXCLUDED.last_uplink_bytes-totals.last_uplink_bytes ELSE 0 END,
+                downlink_bytes=totals.downlink_bytes+
+                    CASE WHEN EXCLUDED.last_uplink_bytes >= totals.last_uplink_bytes
+                           AND EXCLUDED.last_downlink_bytes >= totals.last_downlink_bytes
+                      THEN EXCLUDED.last_downlink_bytes-totals.last_downlink_bytes ELSE 0 END,
+                last_uplink_bytes=EXCLUDED.last_uplink_bytes,
+                last_downlink_bytes=EXCLUDED.last_downlink_bytes,
+                observations=totals.observations+1,
+                updated_at=NOW()",
+        )
+        .bind(node_id)
+        .bind(serialized)
+        .execute(&mut *conn)
+        .await?;
+    }
+
+    Ok(())
+}
+
 async fn ingest_node_metrics(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -2295,40 +2338,7 @@ async fn ingest_node_metrics(
 
     persist_user_traffic(&mut *telemetry_tx, body.node_id, &user_traffic, sampled_at, source_ms).await?;
 
-    if !inbound_samples.is_empty() {
-        // An inbound's aggregate traffic MUST NEVER be interpreted as per-user traffic.
-        // Signed node agents report cumulative counters scoped to a real user+inbound.
-        let serialized = serde_json::to_value(&inbound_samples).map_err(|_| {
-            ApiError::new(StatusCode::BAD_REQUEST, "Некорректный userInboundTraffic.")
-        })?;
-        sqlx::query(
-            "INSERT INTO user_inbound_traffic_totals AS totals (
-                node_id,user_id,inbound_tag,last_uplink_bytes,last_downlink_bytes,
-                uplink_bytes,downlink_bytes,observations,updated_at
-            )
-            SELECT $1,s.user_id,s.inbound_tag,s.uplink_bytes,s.downlink_bytes,0,0,1,NOW()
-            FROM jsonb_to_recordset($2::jsonb)
-                AS s(user_id BIGINT,inbound_tag TEXT,uplink_bytes BIGINT,downlink_bytes BIGINT)
-            JOIN panel_records u ON u.collection='users' AND u.id=s.user_id
-            ON CONFLICT(node_id,user_id,inbound_tag) DO UPDATE SET
-                uplink_bytes=totals.uplink_bytes+
-                    CASE WHEN EXCLUDED.last_uplink_bytes >= totals.last_uplink_bytes
-                           AND EXCLUDED.last_downlink_bytes >= totals.last_downlink_bytes
-                      THEN EXCLUDED.last_uplink_bytes-totals.last_uplink_bytes ELSE 0 END,
-                downlink_bytes=totals.downlink_bytes+
-                    CASE WHEN EXCLUDED.last_uplink_bytes >= totals.last_uplink_bytes
-                           AND EXCLUDED.last_downlink_bytes >= totals.last_downlink_bytes
-                      THEN EXCLUDED.last_downlink_bytes-totals.last_downlink_bytes ELSE 0 END,
-                last_uplink_bytes=EXCLUDED.last_uplink_bytes,
-                last_downlink_bytes=EXCLUDED.last_downlink_bytes,
-                observations=totals.observations+1,
-                updated_at=NOW()",
-        )
-        .bind(body.node_id)
-        .bind(serialized)
-        .execute(&mut *telemetry_tx)
-        .await?;
-    }
+    persist_inbound_traffic(&mut *telemetry_tx, body.node_id, &inbound_samples).await?;
 
     // Commit source watermark, traffic accounting, and presence in one transaction.
     telemetry_tx.commit().await?;
