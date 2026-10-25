@@ -2113,6 +2113,81 @@ async fn enforce_node_traffic_limit(conn: &mut sqlx::PgConnection, node_id: i64)
     Ok(())
 }
 
+async fn persist_user_traffic(
+    conn: &mut sqlx::PgConnection,
+    node_id: i64,
+    user_traffic: &[UserTrafficSample],
+    sampled_at: i64,
+    source_ms: i64,
+) -> Result<(), ApiError> {
+    if !user_traffic.is_empty() {
+        // One atomic UPSERT for the full node batch. Initial samples establish a
+        // baseline instead of spuriously counting traffic from before collection.
+        // Counter resets start a new baseline, never subtract or fabricate usage.
+        let serialized = serde_json::to_value(&user_traffic)
+            .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Некорректный userTraffic."))?;
+        // Only a positive delta from an authenticated per-user Xray counter
+        // constitutes activity. Repeated idle samples must NOT refresh onlineAt.
+        // Preserve the last activity timestamp across node restarts and resets.
+        sqlx::query(
+            "UPDATE panel_records AS u
+             SET data=jsonb_set(
+                   u.data,'{onlineAt}',
+                   to_jsonb(GREATEST(
+                     CASE WHEN (u.data->>'onlineAt') ~ '^[0-9]{1,16}$'
+                       THEN (u.data->>'onlineAt')::BIGINT ELSE 0 END,
+                     LEAST($3::BIGINT,$4::BIGINT))),true),
+                 updated_at=NOW()
+             FROM jsonb_to_recordset($2::jsonb)
+                  AS sample(user_id BIGINT,uplink_bytes BIGINT,downlink_bytes BIGINT)
+             LEFT JOIN user_node_traffic_totals AS previous
+                  ON previous.node_id=$1 AND previous.user_id=sample.user_id
+             WHERE u.collection='users' AND u.id=sample.user_id
+               AND previous.user_id IS NOT NULL
+               AND sample.uplink_bytes >= previous.last_uplink_bytes
+               AND sample.downlink_bytes >= previous.last_downlink_bytes
+               AND (sample.uplink_bytes>previous.last_uplink_bytes
+                    OR sample.downlink_bytes>previous.last_downlink_bytes)",
+        )
+        .bind(node_id)
+        .bind(&serialized)
+        .bind(sampled_at)
+        .bind(source_ms)
+        .execute(&mut *conn)
+        .await?;
+        sqlx::query(
+            "INSERT INTO user_node_traffic_totals AS totals (
+                node_id, user_id, last_uplink_bytes, last_downlink_bytes,
+                uplink_bytes, downlink_bytes, observations, updated_at
+            )
+            SELECT $1, metrics.user_id, metrics.uplink_bytes, metrics.downlink_bytes,
+                   0, 0, 1, NOW()
+            FROM jsonb_to_recordset($2::jsonb)
+                 AS metrics(user_id BIGINT, uplink_bytes BIGINT, downlink_bytes BIGINT)
+            JOIN panel_records u ON u.collection = 'users' AND u.id = metrics.user_id
+            ON CONFLICT (node_id, user_id) DO UPDATE SET
+                uplink_bytes = totals.uplink_bytes +
+                    CASE WHEN EXCLUDED.last_uplink_bytes >= totals.last_uplink_bytes
+                           AND EXCLUDED.last_downlink_bytes >= totals.last_downlink_bytes
+                      THEN EXCLUDED.last_uplink_bytes - totals.last_uplink_bytes ELSE 0 END,
+                downlink_bytes = totals.downlink_bytes +
+                    CASE WHEN EXCLUDED.last_uplink_bytes >= totals.last_uplink_bytes
+                           AND EXCLUDED.last_downlink_bytes >= totals.last_downlink_bytes
+                      THEN EXCLUDED.last_downlink_bytes - totals.last_downlink_bytes ELSE 0 END,
+                last_uplink_bytes = EXCLUDED.last_uplink_bytes,
+                last_downlink_bytes = EXCLUDED.last_downlink_bytes,
+                observations = totals.observations + 1,
+                updated_at = NOW()",
+        )
+        .bind(node_id)
+        .bind(serialized)
+        .execute(&mut *conn)
+        .await?;
+    }
+
+    Ok(())
+}
+
 async fn ingest_node_metrics(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -2218,70 +2293,7 @@ async fn ingest_node_metrics(
     // The conditional UPDATE makes the critical event idempotent.
     enforce_node_traffic_limit(&mut *telemetry_tx, body.node_id).await?;
 
-    if !user_traffic.is_empty() {
-        // One atomic UPSERT for the full node batch. Initial samples establish a
-        // baseline instead of spuriously counting traffic from before collection.
-        // Counter resets start a new baseline, never subtract or fabricate usage.
-        let serialized = serde_json::to_value(&user_traffic)
-            .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Некорректный userTraffic."))?;
-        // Only a positive delta from an authenticated per-user Xray counter
-        // constitutes activity. Repeated idle samples must NOT refresh onlineAt.
-        // Preserve the last activity timestamp across node restarts and resets.
-        sqlx::query(
-            "UPDATE panel_records AS u
-             SET data=jsonb_set(
-                   u.data,'{onlineAt}',
-                   to_jsonb(GREATEST(
-                     CASE WHEN (u.data->>'onlineAt') ~ '^[0-9]{1,16}$'
-                       THEN (u.data->>'onlineAt')::BIGINT ELSE 0 END,
-                     LEAST($3::BIGINT,$4::BIGINT))),true),
-                 updated_at=NOW()
-             FROM jsonb_to_recordset($2::jsonb)
-                  AS sample(user_id BIGINT,uplink_bytes BIGINT,downlink_bytes BIGINT)
-             LEFT JOIN user_node_traffic_totals AS previous
-                  ON previous.node_id=$1 AND previous.user_id=sample.user_id
-             WHERE u.collection='users' AND u.id=sample.user_id
-               AND previous.user_id IS NOT NULL
-               AND sample.uplink_bytes >= previous.last_uplink_bytes
-               AND sample.downlink_bytes >= previous.last_downlink_bytes
-               AND (sample.uplink_bytes>previous.last_uplink_bytes
-                    OR sample.downlink_bytes>previous.last_downlink_bytes)",
-        )
-        .bind(body.node_id)
-        .bind(&serialized)
-        .bind(sampled_at)
-        .bind(source_ms)
-        .execute(&mut *telemetry_tx)
-        .await?;
-        sqlx::query(
-            "INSERT INTO user_node_traffic_totals AS totals (
-                node_id, user_id, last_uplink_bytes, last_downlink_bytes,
-                uplink_bytes, downlink_bytes, observations, updated_at
-            )
-            SELECT $1, metrics.user_id, metrics.uplink_bytes, metrics.downlink_bytes,
-                   0, 0, 1, NOW()
-            FROM jsonb_to_recordset($2::jsonb)
-                 AS metrics(user_id BIGINT, uplink_bytes BIGINT, downlink_bytes BIGINT)
-            JOIN panel_records u ON u.collection = 'users' AND u.id = metrics.user_id
-            ON CONFLICT (node_id, user_id) DO UPDATE SET
-                uplink_bytes = totals.uplink_bytes +
-                    CASE WHEN EXCLUDED.last_uplink_bytes >= totals.last_uplink_bytes
-                           AND EXCLUDED.last_downlink_bytes >= totals.last_downlink_bytes
-                      THEN EXCLUDED.last_uplink_bytes - totals.last_uplink_bytes ELSE 0 END,
-                downlink_bytes = totals.downlink_bytes +
-                    CASE WHEN EXCLUDED.last_uplink_bytes >= totals.last_uplink_bytes
-                           AND EXCLUDED.last_downlink_bytes >= totals.last_downlink_bytes
-                      THEN EXCLUDED.last_downlink_bytes - totals.last_downlink_bytes ELSE 0 END,
-                last_uplink_bytes = EXCLUDED.last_uplink_bytes,
-                last_downlink_bytes = EXCLUDED.last_downlink_bytes,
-                observations = totals.observations + 1,
-                updated_at = NOW()",
-        )
-        .bind(body.node_id)
-        .bind(serialized)
-        .execute(&mut *telemetry_tx)
-        .await?;
-    }
+    persist_user_traffic(&mut *telemetry_tx, body.node_id, &user_traffic, sampled_at, source_ms).await?;
 
     if !inbound_samples.is_empty() {
         // An inbound's aggregate traffic MUST NEVER be interpreted as per-user traffic.
