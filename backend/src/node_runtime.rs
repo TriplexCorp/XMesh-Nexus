@@ -620,7 +620,7 @@ pub async fn request_xray_update(
 
 // Remote agent upgrades are a fixed local action, never a command string or URL.
 // Only v4+ nodes understand this action. Older nodes need one bootstrap upgrade.
-pub const CONTROL_AGENT_VERSION: &str = "control-v4.3.4";
+pub const CONTROL_AGENT_VERSION: &str = "control-v4.3.5";
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
