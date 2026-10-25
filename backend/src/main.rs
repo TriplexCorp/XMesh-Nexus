@@ -268,10 +268,8 @@ struct UserInboundTrafficSample {
     downlink_bytes: i64,
 }
 
-#[allow(clippy::too_many_lines)]
-fn protected_routes(state: &AppState) -> Router<AppState> {
+fn protected_management_routes() -> Router<AppState> {
     Router::new()
-        .route("/bootstrap", get(bootstrap))
         .route("/auth/mfa/status", get(mfa::status))
         .route("/auth/mfa/setup", post(mfa::setup))
         .route("/auth/mfa/confirm", post(mfa::confirm))
@@ -290,6 +288,12 @@ fn protected_routes(state: &AppState) -> Router<AppState> {
             "/security/sessions/{id}",
             axum::routing::delete(security::revoke_session),
         )
+}
+
+fn protected_routes(state: &AppState) -> Router<AppState> {
+    Router::new()
+        .route("/bootstrap", get(bootstrap))
+        .merge(protected_management_routes())
         .route("/settings", get(get_settings).patch(patch_settings))
         .route("/client-routing", patch(patch_client_routing))
         .route("/stats", get(get_stats))
