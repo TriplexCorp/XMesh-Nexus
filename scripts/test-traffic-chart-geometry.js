@@ -54,4 +54,49 @@ assert.match(css,/\.traffic-chart-svg\{[^}]*height:18\.25rem/);
 assert.doesNotMatch(css,/width:min\(100%,(?:72|100)rem\)/);
 assert.match(app,/new ResizeObserver\(update\)/);
 assert.match(app,/observer\.observe\(wrapper\)/);
+
+// Exercise the actual ResizeObserver callback with a controlled DOM stub.
+let renderedWidth=1000,replacements=0,observer;
+const wrapper={
+ isConnected:true,
+ current:null,
+ querySelector:selector=>selector==='svg'?wrapper.current:null
+};
+function svg(width){
+ return {
+  getBoundingClientRect:()=>({width:renderedWidth,height:340}),
+  getAttribute:key=>key==='viewBox'?'0 0 '+width+' 340':null,
+  querySelector:()=>null,
+  querySelectorAll:()=>[],
+  replaceWith(next){wrapper.current=next;replacements++}
+ };
+}
+wrapper.current=svg(1000);
+const fakeDocument={
+ querySelector:()=>({querySelector:()=>wrapper}),
+ createElement:()=>({
+  content:{querySelector:()=>null},
+  set innerHTML(html){
+   const match=html.match(/viewBox="0 0 (\d+) 340"/);
+   this.content.querySelector=()=>match?svg(Number(match[1])):null;
+  }
+ })
+};
+class FakeResizeObserver{
+ constructor(callback){this.callback=callback;observer=this}
+ observe(target){assert.equal(target,wrapper)}
+ disconnect(){}
+}
+const resize=new Function('document','ResizeObserver',
+ extract('const trafficChartResizeObservers=', 'const statsRing=')+
+ '\nreturn syncResponsiveTrafficChart;')(fakeDocument,FakeResizeObserver);
+resize('statistics','#stats-trend',w=>'<svg viewBox="0 0 '+w+' 340"></svg>',340);
+assert.equal(replacements,0,'unchanged size must not rerender');
+renderedWidth=1700;
+observer.callback();
+assert.equal(replacements,1,'changed width must reflow once');
+assert.equal(wrapper.current.getAttribute('viewBox'),'0 0 1700 340');
+observer.callback();
+assert.equal(replacements,1,'stable dimensions must not cause a reflow loop');
+
 console.log('Statistics/Dashboard SVG horizontal reflow and independent heights: PASS');
