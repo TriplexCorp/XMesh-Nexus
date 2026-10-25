@@ -616,13 +616,46 @@ const operations={
   try{
    ensureDialogs();
    const selected=await chooseInbound();if(!selected)return;
-   const current=getInbound(parse(),selected.index).streamSettings?.finalmask||{};
-   const response=await dialog.request({title:'FinalMask',description:'Редактируйте отдельный объект streamSettings.finalmask. Перед применением проверьте поддержку параметров ядром Xray.',
-    confirmLabel:'Применить',fields:[{name:'json',label:'FinalMask JSON',type:'textarea',wide:true,rows:8,value:JSON.stringify(current,null,2),required:true,validate:v=>{try{const parsed=JSON.parse(v);return !parsed||typeof parsed!=='object'||Array.isArray(parsed)?'Требуется JSON-объект':''}catch{return 'Некорректный JSON'}}}]});
+   const inbound=getInbound(parse(),selected.index);
+   const current=inbound.streamSettings?.finalmask||{};
+   const client=inbound.xmesh?.clientFinalmask||{};
+   const check=value=>{
+    try{
+     const data=JSON.parse(value);
+     if(!data||typeof data!=='object'||Array.isArray(data))return 'Требуется JSON-объект';
+     if(Object.keys(data).some(k=>!['tcp','udp','quicParams'].includes(k)))return 'Разрешены tcp, udp, quicParams';
+     for(const dir of ['tcp','udp']){
+      if(data[dir]!==undefined&&(!Array.isArray(data[dir])||data[dir].length>16))return dir+': нужен массив не более 16 слоёв';
+      if(data[dir]?.some(v=>!v||typeof v.type!=='string'||!v.settings||typeof v.settings!=='object'||Array.isArray(v.settings)))return dir+': нужны type и settings';
+     }
+     return '';
+    }catch{return 'Некорректный JSON'}
+   };
+   const response=await dialog.request({
+    title:'FinalMask · сервер и клиент',
+    description:'Автоэкспорт: TCP Sudoku/header-custom; UDP Salamander/Gecko, Sudoku, mkcp-legacy, header-custom. Для направленных масок задайте clientFinalmask отдельно. QUIC-параметры задаются индивидуально.',
+    confirmLabel:'Применить',
+    fields:[
+     {name:'json',label:'Сервер · streamSettings.finalmask',type:'textarea',wide:true,rows:8,
+      value:JSON.stringify(current,null,2),required:true,validate:check},
+     {name:'client',label:'Клиент · xmesh.clientFinalmask (JSON подписки)',type:'textarea',wide:true,rows:8,
+      value:JSON.stringify(client,null,2),required:true,validate:check}
+    ]
+   });
    if(!response)return;
    if(area.value!==selected.source){notify('Конфигурация изменилась. Повторите действие.');return}
-   const value=JSON.parse(response.json);
-   mutate(doc=>{const ib=getInbound(doc,selected.index);if(ib.tag!==selected.tag)throw Error('Inbound изменился');ib.streamSettings??={};if(Object.keys(value).length)ib.streamSettings.finalmask=value;else delete ib.streamSettings.finalmask},'FinalMask обновлён');
+   const server=JSON.parse(response.json),outbound=JSON.parse(response.client);
+   if(['tcp','udp'].some(dir=>outbound[dir]?.some(layer=>layer.type==='filter')))
+    throw Error('filter допустим только на серверном inbound');
+   mutate(doc=>{
+    const ib=getInbound(doc,selected.index);
+    if(ib.tag!==selected.tag)throw Error('Inbound изменился');
+    ib.streamSettings??={};
+    if(Object.keys(server).length)ib.streamSettings.finalmask=server;
+    else delete ib.streamSettings.finalmask;
+    if(Object.keys(outbound).length)(ib.xmesh??={}).clientFinalmask=outbound;
+    else if(ib.xmesh){delete ib.xmesh.clientFinalmask;if(!Object.keys(ib.xmesh).length)delete ib.xmesh}
+   },'Серверная и клиентская FinalMask обновлены');
   }catch(e){notify(e.message)}
  },
  hysteria(){mutate(d=>{d.inbounds??=[];const tag='hysteria-'+(d.inbounds.length+1);if(d.inbounds.some(x=>x.tag===tag))throw Error('Тег уже занят');d.inbounds.push({tag,listen:'127.0.0.1',port:4433,protocol:'hysteria',settings:{version:2,users:[]},streamSettings:{network:'hysteria',security:'tls',hysteriaSettings:{version:2},tlsSettings:{certificates:[]}}});notify('Заполните TLS-сертификаты и пользователей, затем проверьте ядром Xray-core.')},'Черновик Hysteria2 создан')},
