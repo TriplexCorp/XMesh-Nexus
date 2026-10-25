@@ -171,17 +171,17 @@ def main():
         code,agent_command,_=request("POST",f"/nodes/{node}/agent-update",{},
                                     cookie=cookie,origin=BASE)
         assert_status(code,202,"admin queued a fixed agent self-update")
-        assert agent_command["targetVersion"]=="control-v4.0.0"
+        assert agent_command["targetVersion"]=="control-v4.3.2"
         code,_,_=request("POST",f"/nodes/{node}/restart",{},
                          cookie=cookie,origin=BASE)
         assert_status(code,409,"agent update prevents overlapping restart commands")
         code,polled,_=signed_post("/node/restart/poll",{"node_id":node})
         assert_status(code,200,"signed v4 node receives agent update")
         assert polled["command"]=={
-            "id":agent_command["id"],"action":"update_agent","targetVersion":"control-v4.0.0"}
+            "id":agent_command["id"],"action":"update_agent","targetVersion":"control-v4.3.2"}
         code,_,_=signed_post("/node/restart/ack",{
             "node_id":node,"command_id":agent_command["id"],
-            "success":True,"detail":"Agent control-v4.0.0 installed and verified"})
+            "success":True,"detail":"Agent control-v4.3.2 installed and verified"})
         assert_status(code,200,"signed node confirms agent update")
         code,last_command,_=request("GET",f"/nodes/{node}/restart",cookie=cookie)
         assert_status(code,200,"admin reads confirmed agent-update status")
