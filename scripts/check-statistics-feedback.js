@@ -275,3 +275,6 @@ assert.match(css,/Global XMesh scrollbar contract/);
 assert.match(css,/dialog\.user-modal,dialog\.user-modal \*/);
 assert.match(css,/--scrollbar-size:9px/);
 assert.match(css,/scrollbar-color:var\(--scrollbar-thumb\) var\(--scrollbar-track\)/);
+
+assert.match(css,/--scrollbar-end-gap:7px/);
+assert.match(css,/::-webkit-scrollbar-button:single-button:vertical:start:decrement/);
