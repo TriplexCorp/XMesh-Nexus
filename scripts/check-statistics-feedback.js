@@ -174,3 +174,8 @@ console.log('Statistics view, real signed steal-time and save-confirmation contr
 assert.match(app,/document\.body\.append\(statsPortal\)/);
 assert.match(app,/document\.querySelector\('body > #stats-user-modal'\)\?\.remove\(\)/);
 assert.match(css,/body > \.stats-user-overlay\{position:fixed;inset:0;width:100vw;height:100dvh/);
+
+assert.match(app,/data-stats-plain-icon="refresh">Обновить<\/button>/);
+assert.match(app,/data-stats-plain-icon="close">Закрыть<\/button>/);
+assert.match(css,/\.stats-user-tabs\{display:flex;flex-direction:row/);
+assert.match(css,/\.stats-user-actions\{margin-left:auto;display:flex;flex-direction:row/);
