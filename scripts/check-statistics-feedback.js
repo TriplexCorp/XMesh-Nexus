@@ -179,3 +179,7 @@ assert.match(app,/data-stats-plain-icon="refresh">Обновить<\/button>/);
 assert.match(app,/data-stats-plain-icon="close">Закрыть<\/button>/);
 assert.match(css,/\.stats-user-tabs\{display:flex;flex-direction:row/);
 assert.match(css,/\.stats-user-actions\{margin-left:auto;display:flex;flex-direction:row/);
+
+// Regression: a single DOM element cannot be iterated with for...of.
+assert.match(app,/for\(const button of \$\$\('\.stats-user-actions button'\)\)/);
+assert.doesNotMatch(app,/for\(const button of \$\('\.stats-user-actions button'\)\)/);
