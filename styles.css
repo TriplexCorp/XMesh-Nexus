@@ -5587,3 +5587,19 @@ body>.stats-user-overlay,body>.stats-user-overlay *,
 body>.sv-studio-portal,body>.sv-studio-portal *{
  scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track);
 }
+
+/* Inset scrollbar rails: avoid thumb/track touching modal or panel corners. */
+:root{--scrollbar-size:8px;--scrollbar-end-gap:7px}
+:where(html,body,*)::-webkit-scrollbar{width:var(--scrollbar-size);height:var(--scrollbar-size)}
+:where(html,body,*)::-webkit-scrollbar-button{display:none!important}
+:where(html,body,*)::-webkit-scrollbar-button:single-button:vertical:start:decrement,
+:where(html,body,*)::-webkit-scrollbar-button:single-button:vertical:end:increment{
+ display:block!important;height:var(--scrollbar-end-gap);min-height:var(--scrollbar-end-gap);
+ background:transparent!important;border:0!important;box-shadow:none!important;
+}
+:where(html,body,*)::-webkit-scrollbar-button:single-button:horizontal:start:decrement,
+:where(html,body,*)::-webkit-scrollbar-button:single-button:horizontal:end:increment{
+ display:block!important;width:var(--scrollbar-end-gap);min-width:var(--scrollbar-end-gap);
+ background:transparent!important;border:0!important;box-shadow:none!important;
+}
+:where(html,body,*)::-webkit-scrollbar-track{margin-block:var(--scrollbar-end-gap);margin-inline:var(--scrollbar-end-gap)}
