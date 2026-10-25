@@ -205,3 +205,11 @@ assert.match(app,/openStatsUser\(requested\.id,requested\.name\)/);
 assert.match(app,/userTrafficReturn=\{hash:location\.hash\|\|'#users',userId:id\}/);
 assert.match(app,/const origin=userTrafficReturn/);
 assert.match(app,/location\.hash=origin\.hash/);
+
+// Period controls retain native select state/API but render a branded listbox.
+assert.match(app,/function enhanceStatsPeriodSelect\(select\)/);
+assert.match(app,/enhanceStatsPeriodSelect\(\$\('#stats-leaders-range'\)\)/);
+assert.match(app,/enhanceStatsPeriodSelect\(\$\('#stats-history-range'\)\)/);
+assert.match(app,/select\.dispatchEvent\(new Event\('change',\{bubbles:true\}\)\)/);
+assert.match(css,/\.xm-period-menu\{position:absolute/);
+assert.match(css,/scrollbar-color:var\(--scrollbar-thumb\) var\(--scrollbar-track\)/);
