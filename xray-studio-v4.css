@@ -1360,3 +1360,12 @@ body > .sv-studio-portal > .sv-overlay[hidden]{display:none!important}
 .sv-studio ::-webkit-scrollbar-track,body>.sv-studio-portal ::-webkit-scrollbar-track{background:var(--scrollbar-track);border-radius:999px}
 .sv-studio ::-webkit-scrollbar-thumb,body>.sv-studio-portal ::-webkit-scrollbar-thumb{background:var(--scrollbar-thumb);border:2px solid transparent;border-radius:999px;background-clip:padding-box}
 .sv-studio ::-webkit-scrollbar-thumb:hover,body>.sv-studio-portal ::-webkit-scrollbar-thumb:hover{background-color:var(--scrollbar-thumb-hover)}
+
+/* Match inset global scrollbar rails in standalone XRAY STUDIO surfaces. */
+.sv-studio ::-webkit-scrollbar-button,body>.sv-studio-portal ::-webkit-scrollbar-button{display:none!important}
+.sv-studio ::-webkit-scrollbar-button:single-button:vertical:start:decrement,
+.sv-studio ::-webkit-scrollbar-button:single-button:vertical:end:increment,
+body>.sv-studio-portal ::-webkit-scrollbar-button:single-button:vertical:start:decrement,
+body>.sv-studio-portal ::-webkit-scrollbar-button:single-button:vertical:end:increment{
+ display:block!important;height:var(--scrollbar-end-gap,7px);background:transparent!important;border:0!important;
+}
