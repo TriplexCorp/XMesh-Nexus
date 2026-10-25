@@ -5471,3 +5471,7 @@ dialog.user-modal .user-head-actions{display:flex;align-items:center;justify-con
 .xm-period-option[aria-selected=true]{background:color-mix(in srgb,var(--a) 16%,var(--s2));color:var(--a);font-weight:750}
 .stats-history-filters label:has(.xm-period-select){min-width:0}
 body>.stats-user-overlay .stats-user-main>.stats-history-filters .xm-period-trigger{height:2rem;min-height:2rem}
+
+/* Dropdown portal escapes table/card stacking contexts and clipped parents. */
+body > .xm-period-portal{position:fixed;z-index:200000;right:auto;bottom:auto;max-width:calc(100vw - 12px);box-sizing:border-box}
+body > .xm-period-portal .xm-period-option{width:100%}
