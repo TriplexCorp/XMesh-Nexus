@@ -234,3 +234,7 @@ assert.match(app,/const sourceRect=dlg\.getBoundingClientRect\(\)/);
 assert.match(app,/dialogSize:\{width:sourceRect\.width,height:sourceRect\.height\}/);
 assert.match(app,/--stats-source-width/);
 assert.match(css,/var\(--stats-source-width,108rem\)/);
+
+assert.match(css,/Statistics history: a single branded vertical scrollbar/);
+assert.match(css,/max-height:none;overflow-y:visible;overflow-x:auto/);
+assert.match(css,/scrollbar-color:var\(--scrollbar-thumb\) var\(--scrollbar-track\)/);
