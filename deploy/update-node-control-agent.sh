@@ -227,7 +227,11 @@ systemctl restart xmesh-node-user-meter.timer
 if ! systemctl start xmesh-node-user-meter.service; then
   echo "WARNING: Xray user sampler is not ready. Check: journalctl -u xmesh-node-user-meter.service -n 50 --no-pager" >&2
 fi
-if ! update_router;then\n echo "Router update failed; full node upgrade is NOT successful." >&2\n exit 1\nfi\n# Keep the fixed updater script current for the next panel-driven upgrade.
+if ! update_router;then
+ echo "Router update failed; full node upgrade is NOT successful." >&2
+ exit 1
+fi
+# Keep the fixed updater script current for the next panel-driven upgrade.
 # Replace atomically because this script can itself be executing.
 install -o root -g root -m 0700 "$self_tmp" /usr/local/sbin/.xmesh-update-agent.new
 mv -f /usr/local/sbin/.xmesh-update-agent.new /usr/local/sbin/xmesh-update-agent
