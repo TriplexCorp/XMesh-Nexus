@@ -50,6 +50,7 @@ jobs:
           node --version
           test "$(node -p 'process.versions.node.split(".")[0]')" = "24"
           node --check app.js
+          node --check unified-selects.js
           node --check subscription-studio.js
           node --check subscription-portal.js
           node --check login.js
@@ -60,6 +61,8 @@ jobs:
           node --check client-routing.js
           node --check xray-json-diagnostics.js
           node --check xray-json-intelligence.js
+      - name: Check shared themed selectors across all sections
+        run: node scripts/check-unified-selects.js
       - name: Test manual JSON line diagnostics and Hot Fix
         run: node scripts/check-json-diagnostics.js
       - name: Test Xray semantic intelligence
