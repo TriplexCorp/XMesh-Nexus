@@ -5475,3 +5475,19 @@ body>.stats-user-overlay .stats-user-main>.stats-history-filters .xm-period-trig
 /* Dropdown portal escapes table/card stacking contexts and clipped parents. */
 body > .xm-period-portal{position:fixed;z-index:200000;right:auto;bottom:auto;max-width:calc(100vw - 12px);box-sizing:border-box}
 body > .xm-period-portal .xm-period-option{width:100%}
+
+/* Shared desktop geometry for user editor and detailed user analytics.
+   Stable across all analytics tabs; both respect the global rem scale. */
+@media(min-width:1000px) and (min-height:650px){
+ body > .stats-user-overlay .stats-user-dialog{
+  width:min(82rem,calc(100vw - 2.5rem));
+  max-width:calc(100vw - 2.5rem);
+  height:min(44.5rem,calc(100dvh - 2rem));
+  max-height:calc(100dvh - 2rem);
+  margin:auto;
+  padding:.9rem;
+ }
+ body > .stats-user-overlay .stats-user-workspace{
+  grid-template-columns:minmax(0,2.25fr) minmax(14rem,.9fr);
+ }
+}
