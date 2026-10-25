@@ -300,6 +300,7 @@ fn protected_routes(state: &AppState) -> Router<AppState> {
         .route("/system/stats", get(get_system_stats))
         .route("/statistics/overview", get(get_statistics_overview))
         .route("/statistics/leaders", get(get_statistics_leaders))
+        .route("/statistics/period-leaders", get(get_statistics_period_leaders))
         .route("/metrics/traffic", get(get_traffic_metrics))
         .route(
             "/metrics/traffic/bucket-detail",
@@ -1838,6 +1839,105 @@ mod metric_freshness_tests {
 }
 
 // Lifetime counters are not a time series: never label them as usage in a selected period.
+#[derive(Debug, Deserialize)]
+struct StatisticsPeriodQuery {
+    range: Option<String>,
+}
+
+fn statistics_period(range: Option<&str>) -> Result<(&'static str, &'static str), ApiError> {
+    match range.unwrap_or("24h") {
+        "1h" => Ok(("1h", "1 hour")),
+        "24h" => Ok(("24h", "24 hours")),
+        "7d" => Ok(("7d", "7 days")),
+        "30d" => Ok(("30d", "30 days")),
+        _ => Err(ApiError::new(StatusCode::BAD_REQUEST, "Неверный период.")),
+    }
+}
+
+async fn get_statistics_period_leaders(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+    Query(query): Query<StatisticsPeriodQuery>,
+) -> Result<Json<Value>, ApiError> {
+    if viewer_read_only(&actor) {
+        return Err(ApiError::new(StatusCode::FORBIDDEN, "Недостаточно прав."));
+    }
+    let (range, duration) = statistics_period(query.range.as_deref())?;
+    // Independent signed counter families: user totals and inbound totals MUST NOT be added.
+    let users = sqlx::query(
+        "SELECT d.user_id,
+                COALESCE(NULLIF(u.data->>'username',''),NULLIF(u.data->>'name',''),
+                    'Пользователь #'||d.user_id::TEXT) AS name,
+                SUM(d.uplink_bytes)::BIGINT AS up, SUM(d.downlink_bytes)::BIGINT AS down
+         FROM verified_traffic_deltas d
+         JOIN panel_records u ON u.collection='users' AND u.id=d.user_id
+         WHERE d.source_type='user' AND d.sampled_at>=NOW()-$1::INTERVAL
+         GROUP BY d.user_id,u.data
+         ORDER BY SUM(d.uplink_bytes+d.downlink_bytes) DESC,d.user_id
+         LIMIT 10",
+    )
+    .bind(duration)
+    .fetch_all(&state.pool)
+    .await?;
+    let inbounds = sqlx::query(
+        "SELECT inbound_tag,SUM(uplink_bytes)::BIGINT AS up,
+                SUM(downlink_bytes)::BIGINT AS down,
+                COUNT(DISTINCT user_id)::BIGINT AS users
+         FROM verified_traffic_deltas
+         WHERE source_type='inbound' AND sampled_at>=NOW()-$1::INTERVAL
+         GROUP BY inbound_tag
+         ORDER BY SUM(uplink_bytes+downlink_bytes) DESC,inbound_tag LIMIT 10",
+    )
+    .bind(duration)
+    .fetch_all(&state.pool)
+    .await?;
+    let nodes = sqlx::query(
+        "SELECT d.node_id,
+                COALESCE(NULLIF(n.data->>'name',''),'Узел #'||d.node_id::TEXT) AS name,
+                SUM(d.uplink_bytes)::BIGINT AS up,SUM(d.downlink_bytes)::BIGINT AS down
+         FROM verified_traffic_deltas d
+         LEFT JOIN panel_records n ON n.collection='nodes' AND n.id=d.node_id
+         WHERE d.source_type='user' AND d.sampled_at>=NOW()-$1::INTERVAL
+         GROUP BY d.node_id,n.data
+         ORDER BY SUM(d.uplink_bytes+d.downlink_bytes) DESC,d.node_id LIMIT 10",
+    )
+    .bind(duration)
+    .fetch_all(&state.pool)
+    .await?;
+    let mut top_users = Vec::with_capacity(users.len());
+    for row in users {
+        top_users.push(json!({
+            "userId":row.try_get::<i64,_>("user_id")?,
+            "name":row.try_get::<String,_>("name")?,
+            "uplinkBytes":row.try_get::<i64,_>("up")?,
+            "downlinkBytes":row.try_get::<i64,_>("down")?
+        }));
+    }
+    let mut top_inbounds = Vec::with_capacity(inbounds.len());
+    for row in inbounds {
+        top_inbounds.push(json!({
+            "inboundTag":row.try_get::<String,_>("inbound_tag")?,
+            "uplinkBytes":row.try_get::<i64,_>("up")?,
+            "downlinkBytes":row.try_get::<i64,_>("down")?,
+            "userCount":row.try_get::<i64,_>("users")?
+        }));
+    }
+    let mut top_nodes = Vec::with_capacity(nodes.len());
+    for row in nodes {
+        top_nodes.push(json!({
+            "nodeId":row.try_get::<i64,_>("node_id")?,
+            "name":row.try_get::<String,_>("name")?,
+            "uplinkBytes":row.try_get::<i64,_>("up")?,
+            "downlinkBytes":row.try_get::<i64,_>("down")?
+        }));
+    }
+    Ok(Json(json!({
+        "range":range,"source":"verified_traffic_deltas",
+        "countersAreIndependent":true,
+        "topUsers":top_users,"topInbounds":top_inbounds,"topNodes":top_nodes
+    })))
+}
+
 async fn get_statistics_leaders(
     State(state): State<AppState>,
     Extension(actor): Extension<auth::AuthUser>,
