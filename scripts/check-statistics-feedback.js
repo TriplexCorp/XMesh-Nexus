@@ -244,3 +244,10 @@ assert.match(app,/enhanceStatsPeriodSelect\(\$\('#stats-history-node'\)\)/);
 assert.match(app,/historyInbound\._xmRefresh\?\.\(\);historyNode\._xmRefresh\?\.\(\)/);
 assert.match(app,/if\(\$\('\.stats-user-pane\[data-stats-user-pane="observations"\]'\)\?\.hidden===false\)void loadObservations\(\)/);
 assert.match(css,/#stats-history-user::-webkit-inner-spin-button/);
+
+// Inbound / Nodes breakdown must respond to selected node and inbound filters.
+assert.match(app,/const renderStatsBreakdown=\(\)=>/);
+assert.match(app,/String\(entry\.nodeId\)===node/);
+assert.match(app,/String\(entry\.inboundTag\|\|''\)===inbound/);
+assert.match(app,/statsBreakdownTotals=totals/);
+assert.match(app,/renderStatsBreakdown\(\);void loadHistory\(\)/);
