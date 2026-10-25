@@ -3169,7 +3169,7 @@ const NODE_EXPLORER_PAGE_SIZE=48;
 let nodeExplorer=null;
 const nodeFold=value=>String(value??'').normalize('NFKD').replace(/[\\u0300-\\u036f]/g,'').toLocaleLowerCase().replace(/ё/g,'е');
 function nodeSearchTerms(query){
- const parts=String(query||'').match(/(?:[^\\s"]+:"[^"]*"|"[^"]*"|\\S+)/g)||[];
+ const parts=String(query||'').match(/(?:[^\s"]+:"[^"]*"|"[^"]*"|\S+)/g)||[];
  return parts.slice(0,16).map(part=>{
   const match=/^(name|ip|domain|host|hosting|provider|profile|country|id):(.+)$/i.exec(part);
   const field=match?match[1].toLowerCase():null;
