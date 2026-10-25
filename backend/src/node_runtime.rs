@@ -467,7 +467,7 @@ pub async fn request_restart(
         "UPDATE node_restart_commands SET state='failed',
          result='Управляющий агент не подтвердил выполнение вовремя',finished_at=NOW()
          WHERE node_id=$1 AND state IN ('pending','claimed')
-           AND requested_at<NOW()-INTERVAL '180 seconds'",
+           AND ((action='update_agent' AND requested_at<NOW()-INTERVAL '15 minutes') OR (action<>'update_agent' AND requested_at<NOW()-INTERVAL '180 seconds'))",
     )
     .bind(node_id)
     .execute(&state.pool)
@@ -582,7 +582,7 @@ pub async fn request_xray_update(
         "UPDATE node_restart_commands SET state='failed',
          result='Command expired before delivery',finished_at=NOW()
          WHERE node_id=$1 AND state IN ('pending','claimed')
-           AND requested_at<NOW()-INTERVAL '180 seconds'",
+           AND ((action='update_agent' AND requested_at<NOW()-INTERVAL '15 minutes') OR (action<>'update_agent' AND requested_at<NOW()-INTERVAL '180 seconds'))",
     )
     .bind(node_id)
     .execute(&state.pool)
@@ -620,7 +620,7 @@ pub async fn request_xray_update(
 
 // Remote agent upgrades are a fixed local action, never a command string or URL.
 // Only v4+ nodes understand this action. Older nodes need one bootstrap upgrade.
-pub const CONTROL_AGENT_VERSION: &str = "control-v4.3.5";
+pub const CONTROL_AGENT_VERSION: &str = "control-v4.3.6";
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -667,7 +667,7 @@ pub async fn request_agent_update(
         "UPDATE node_restart_commands SET state='failed',
          result='Command expired before delivery',finished_at=NOW()
          WHERE node_id=$1 AND state IN ('pending','claimed')
-           AND requested_at<NOW()-INTERVAL '180 seconds'",
+           AND ((action='update_agent' AND requested_at<NOW()-INTERVAL '15 minutes') OR (action<>'update_agent' AND requested_at<NOW()-INTERVAL '180 seconds'))",
     )
     .bind(node_id)
     .execute(&state.pool)
@@ -726,7 +726,7 @@ pub async fn restart_status(
         "UPDATE node_restart_commands SET state='failed',
          result='Управляющий агент не подтвердил выполнение вовремя',finished_at=NOW()
          WHERE node_id=$1 AND state IN ('pending','claimed')
-           AND requested_at<NOW()-INTERVAL '180 seconds'",
+           AND ((action='update_agent' AND requested_at<NOW()-INTERVAL '15 minutes') OR (action<>'update_agent' AND requested_at<NOW()-INTERVAL '180 seconds'))",
     )
     .bind(node_id)
     .execute(&state.pool)
@@ -799,7 +799,7 @@ pub async fn poll_restart(
         "UPDATE node_restart_commands SET state='failed',
          result='Command expired before delivery',finished_at=NOW()
          WHERE node_id=$1 AND state='pending'
-           AND requested_at<NOW()-INTERVAL '180 seconds'",
+           AND ((action='update_agent' AND requested_at<NOW()-INTERVAL '15 minutes') OR (action<>'update_agent' AND requested_at<NOW()-INTERVAL '180 seconds'))",
     )
     .bind(request.node_id)
     .execute(&state.pool)
