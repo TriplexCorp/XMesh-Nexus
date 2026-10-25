@@ -5231,3 +5231,15 @@ td.er .user-expiry-primary{color:var(--danger,#f08080)}
 .stats-detail-legend small{color:var(--mu)}
 @media(max-width:700px){.stats-detail-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.stats-detail-label{font-size:15px}}
 @media(prefers-reduced-motion:reduce){.stats-detail-point{transition:none}}
+
+/* Timescale traffic drill-down: the selected point reveals actual per-node evidence. */
+.stats-detail-point.is-selected{r:9;stroke-width:3}
+.stats-bucket-detail{display:grid;gap:.85rem;margin-top:1rem;padding:1rem;background:var(--s1);border:1px solid var(--ln);border-radius:var(--ui-radius,16px)}
+.stats-bucket-detail[hidden]{display:none!important}
+.stats-detail-header{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem}
+.stats-detail-header h4{margin:0 0 .35rem}
+.stats-bucket-table-wrap{overflow-x:auto;max-height:27rem;overflow-y:auto}
+.stats-bucket-table-wrap table{width:100%;border-collapse:collapse;min-width:620px;text-align:left}
+.stats-bucket-table-wrap th,.stats-bucket-table-wrap td{padding:.7rem;border-bottom:1px solid var(--ln);font-size:.85rem}
+.stats-bucket-table-wrap th{color:var(--mu);font-weight:600;position:sticky;top:0;background:var(--s1)}
+@media(max-width:700px){.stats-detail-header{flex-direction:column}.stats-bucket-detail{padding:.75rem}}
