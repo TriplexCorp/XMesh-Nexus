@@ -1078,10 +1078,10 @@ function statisticsP(){
   <section class="card"><div class="hd"><div><h3>Top-10: подтверждённый трафик за период</h3><p>Только подтверждённые изменения Xray за выбранный период. Пользовательские и inbound-счётчики независимы и не складываются.</p></div></div><div class="stats-history-filters"><label>Период рейтинга<select id="stats-leaders-range"><option value="1h">1 час</option><option value="24h" selected>24 часа</option><option value="7d">7 дней</option><option value="30d">30 дней</option></select></label><label>Открыть любого пользователя по ID<input id="stats-user-lookup" type="number" min="1" step="1" placeholder="ID"></label><button class="gh" id="stats-user-lookup-open" type="button">Открыть карточку</button></div><div id="stats-leaders" class="stats-leaders"><p class="note">Загрузка рейтингов…</p></div></section>
   <div id="stats-user-modal" class="stats-user-overlay" hidden>
    <section class="stats-user-dialog" role="dialog" aria-modal="true" aria-labelledby="stats-user-title" tabindex="-1">
-    <header class="stats-user-head"><div class="stats-user-avatar" aria-hidden="true">X</div><div><small>XMESH · USER INTELLIGENCE</small><h2 id="stats-user-title">Аналитика пользователя</h2><p id="stats-user-subtitle" class="note">Подтверждённая телеметрия Xray</p></div><div class="stats-user-actions"><button id="stats-user-refresh" class="gh" type="button" data-stats-plain-icon="refresh">Обновить</button><button id="stats-user-close" class="gh" type="button" aria-label="Закрыть аналитику" data-stats-plain-icon="close">Закрыть</button></div></header>
+    <header class="stats-user-head"><div class="stats-user-avatar" aria-hidden="true">X</div><div><small>XMESH · USER INTELLIGENCE</small><h2 id="stats-user-title">Аналитика пользователя</h2><p id="stats-user-subtitle" class="note">Подтверждённая телеметрия Xray</p></div><div class="stats-user-actions"><button id="stats-user-refresh" class="gh stats-user-refresh" type="button" aria-label="Обновить аналитику"><svg class="stats-refresh-icon" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.3-5L3 9m0-6v6h6"/><path d="M4 13a8 8 0 0 0 14.3 5L21 15m0 6v-6h-6"/></svg><span>Обновить</span></button><button id="stats-user-close" class="gh" type="button" aria-label="Закрыть аналитику" data-stats-plain-icon="close">Закрыть</button></div></header>
     <div id="stats-user-overview" class="stats-user-overview" aria-live="polite">Загрузка сводки…</div>
     <nav class="stats-user-tabs" aria-label="Аналитика пользователя"><button type="button" class="is-active" data-stats-user-tab="history">История трафика</button><button type="button" data-stats-user-tab="inbounds">Inbound и ноды</button><button type="button" data-stats-user-tab="observations">Измерения</button></nav>
-    <div class="stats-user-workspace"><div class="stats-user-main"><div class="stats-history-filters"><label>ID пользователя<input id="stats-history-user" type="number" min="1" step="1" placeholder="ID"></label><label>Inbound<select id="stats-history-inbound"><option value="">Все (пользовательские счётчики)</option></select></label><label>Нода<select id="stats-history-node"><option value="">Все ноды</option></select></label><label>Период<select id="stats-history-range"><option value="1h">1 час</option><option value="24h" selected>24 часа</option><option value="7d">7 дней</option><option value="30d">30 дней</option></select></label><button class="gh" id="stats-history-load" type="button">Обновить</button></div>
+    <div class="stats-user-workspace"><div class="stats-user-main"><div class="stats-history-filters"><label>ID пользователя<input id="stats-history-user" type="number" min="1" step="1" placeholder="ID"></label><label>Inbound<select id="stats-history-inbound"><option value="">Все (пользовательские счётчики)</option></select></label><label>Нода<select id="stats-history-node"><option value="">Все ноды</option></select></label><label>Период<select id="stats-history-range"><option value="1h">1 час</option><option value="24h" selected>24 часа</option><option value="7d">7 дней</option><option value="30d">30 дней</option></select></label></div>
     <div class="stats-user-pane" data-stats-user-pane="history"><div id="stats-history-results" class="stats-history-results" role="status" aria-live="polite">Укажите ID пользователя или выберите его в Top-10.</div></div>
     <div class="stats-user-pane" data-stats-user-pane="inbounds" hidden><div id="stats-user-breakdown" class="stats-user-breakdown">Загрузка…</div></div>
     <div class="stats-user-pane" data-stats-user-pane="observations" hidden><div class="stats-history-raw"><button class="gh" id="stats-history-observations-load" type="button">Показать отдельные измерения</button><div id="stats-history-observations" class="stats-history-results" aria-live="polite"></div></div></div>
@@ -1260,7 +1260,9 @@ function statisticsP(){
   const historyOption=(value,label)=>'<option value="'+esc(String(value))+'">'+esc(label)+'</option>';
   const loadHistory=async(reloadDimensions=false)=>{
     const id=Number(historyUser?.value),request=++historyRequest;
-    if(!Number.isSafeInteger(id)||id<=0){historyRoot.textContent='Укажите действительный ID пользователя.';return}
+    const refreshButton=$('#stats-user-refresh');
+    if(refreshButton){refreshButton.classList.add('is-refreshing');refreshButton.disabled=true;refreshButton.setAttribute('aria-busy','true')}
+    if(!Number.isSafeInteger(id)||id<=0){historyRoot.textContent='Укажите действительный ID пользователя.';if(refreshButton){refreshButton.classList.remove('is-refreshing');refreshButton.disabled=false;refreshButton.removeAttribute('aria-busy')}return}
     historyRoot.textContent='Запрашиваем подтверждённую историю…';
     try{
       if(reloadDimensions){
@@ -1293,6 +1295,7 @@ function statisticsP(){
       historyRoot.innerHTML=statsXrayHistoryChart(points)+'<p class="note">Источник: подтверждённые дельты Xray · '+(result.sourceType==='inbound'?'пользователь × inbound':'счётчик пользователя')+' · '+esc(result.range)+(result.truncated?' · Результат ограничен 5000 строками':'')+'. Счётчики разных источников не суммируются.</p>'+
        (rows?'<div class="stats-bucket-table-wrap"><table><thead><tr><th>Интервал</th><th>Источник</th><th>Нода</th><th>Upload</th><th>Download</th><th>Измерений</th></tr></thead><tbody>'+rows+'</tbody></table></div>':'<p class="note">За период нет подтверждённых изменений. Это не доказательство нулевого трафика.</p>');
     }catch(error){if(request===historyRequest&&historyRoot.isConnected)historyRoot.textContent='История недоступна: '+(error.message||'Ошибка API')}
+    finally{if(request===historyRequest&&refreshButton){refreshButton.classList.remove('is-refreshing');refreshButton.disabled=false;refreshButton.removeAttribute('aria-busy')}}
   };
   const loadObservations=async()=>{
     const root=$('#stats-history-observations'),id=Number(historyUser?.value);
@@ -1310,7 +1313,6 @@ function statisticsP(){
     }catch(error){if(root.isConnected)root.textContent='Не удалось загрузить измерения: '+(error.message||'Ошибка API')}
   };
   $('#stats-history-observations-load')?.addEventListener('click',()=>void loadObservations());
-  $('#stats-history-load')?.addEventListener('click',()=>void loadHistory());
   historyUser?.addEventListener('change',()=>void loadHistory(true));
   for(const control of [historyInbound,historyNode,$('#stats-history-range')])control?.addEventListener('change',()=>void loadHistory());
   const showStatsUserTab=name=>{
@@ -1322,11 +1324,6 @@ function statisticsP(){
   const statsPortal=$('#stats-user-modal');
   if(statsPortal&&statsPortal.parentElement!==document.body)document.body.append(statsPortal);
   const closeStatsUser=()=>{++historyRequest;$('#stats-user-modal').hidden=true;$('#stats-leaders-range')?.focus()};
-  // Other panel buttons receive icons from decorateButtonIcons; keep these
-  // header actions text-only to avoid duplicate refresh/close glyphs.
-  for(const button of $$('.stats-user-actions button')){
-    button.querySelectorAll('svg').forEach(svg=>svg.remove());
-  }
   $('#stats-user-close')?.addEventListener('click',closeStatsUser);
   $('#stats-user-refresh')?.addEventListener('click',()=>void loadHistory(true));
   $('#stats-user-modal')?.addEventListener('click',e=>{if(e.target.id==='stats-user-modal')closeStatsUser()});
