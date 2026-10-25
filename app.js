@@ -1824,13 +1824,16 @@ function handleUserRenewalAction(button){
 const userTrafficBytes=v=>sysBytes(Number.isFinite(+v)&&+v>=0?+v:0);
 // Stable, varied server accents; neighboring nodes are not restricted to a short palette.
 // Distinct, stable node colours used by both overview ring and per-node donuts.
-const USER_NODE_COLORS=['#26d7b2','#6387ff','#f59b3b','#b379ff','#f0648d','#27c8e3','#e8bd3e','#79ce51','#ed7651','#a9a5ff','#df6ac9','#57b8fb'];
+// Deterministic, effectively unbounded node colours: golden-angle hue rotation
+// avoids repeating a short fixed palette as installations grow.
 function userServerColor(id){
-  const numeric=Number(id);
-  if(Number.isSafeInteger(numeric)&&numeric>=0)return USER_NODE_COLORS[numeric%USER_NODE_COLORS.length];
-  const key=String(id??'unknown');let hash=2166136261;
-  for(const c of key)hash=Math.imul(hash^c.codePointAt(0),16777619)>>>0;
-  return USER_NODE_COLORS[hash%USER_NODE_COLORS.length];
+  const key=String(id??'unknown');
+  let hash=2166136261;
+  for(const char of key)hash=Math.imul(hash^char.codePointAt(0),16777619)>>>0;
+  const hue=(hash*137.50776405003785)%360;
+  const saturation=68+((hash>>>12)%18);
+  const lightness=55+((hash>>>20)%10);
+  return 'hsl('+hue.toFixed(2)+' '+saturation+'% '+lightness+'%)';
 }
 function userServerGradient(id){
   const key=String(id??'unknown');let h=2166136261;
