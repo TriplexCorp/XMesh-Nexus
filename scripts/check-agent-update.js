@@ -30,6 +30,17 @@ assert.match(agent,/signed_post '\/api\/v1\/node\/restart\/ack'/);
 assert.match(updater,/MODE="\$\{1:-manual\}"/);
 assert.match(updater,/xmesh-node-agent-upgrade[.]service/);
 assert.match(updater,/if \[\[ "\$MODE" != --remote \]\]/);
+
+assert.match(updater,/declare -f update_router/,'Router upgrade must execute in the scoped worker');
+assert.match(updater,/systemd-run --quiet --wait --collect --pipe/,'Router upgrade must be checked synchronously');
+assert.match(updater,/--property=ReadWritePaths=\/opt\/xmesh-node/,'Router worker needs write access to the installed source');
+assert.match(updater,/git -C "\$dir" fetch --unshallow origin main/,'Router source clone is shallow after bootstrap');
+assert.match(updater,/docker compose run --rm --no-deps xmesh-node -check/,'Rebuilt router must be validated');
+assert.match(updater,/docker compose up -d --no-deps --force-recreate xmesh-node/,'Router must actually be restarted');
+assert.doesNotMatch(updater,/then\\n echo/,'Do not embed literal backslash-n in Bash');
+assert.match(runtime,/INTERVAL '15 minutes'/,'Long full-node upgrades must not expire after 180 seconds');
+assert.match(runtime,/control-v4\.3\.6/);
+
 assert.match(installer,/xmesh-node-agent-upgrade[.]service/);
 assert.match(installer,/\/usr\/local\/sbin\/xmesh-update-agent/);
 assert.match(app,/data-node-agent-version/);
