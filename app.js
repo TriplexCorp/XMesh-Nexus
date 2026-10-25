@@ -459,7 +459,10 @@ const modal=(h,c='')=>{
 
  }
  if(!replacing)dlg.showModal();
- else if(C.motion&&typeof dlg.firstElementChild?.animate==='function'&&!matchMedia('(prefers-reduced-motion: reduce)').matches){
+ // The dialog is populated through innerHTML: enhance selects immediately after
+ // showModal, not just when the document-wide mutation observer eventually runs.
+ window.XMeshSelects?.refresh(dlg);
+ if(replacing&&C.motion&&typeof dlg.firstElementChild?.animate==='function'&&!matchMedia('(prefers-reduced-motion: reduce)').matches){
   dlg.firstElementChild.animate([
    {opacity:.6,transform:'translateY(7px) scale(.988)'},
    {opacity:1,transform:'translateY(0) scale(1)'}
