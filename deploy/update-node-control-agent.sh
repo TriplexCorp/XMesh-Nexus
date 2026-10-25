@@ -58,6 +58,14 @@ grep -q 'xmesh-managed-xray' "$profile_tmp" || { echo "Invalid profile attestati
 # installation from the container's config bind rather than guessing /root.
 update_router() {
  command -v docker >/dev/null && command -v git >/dev/null || { echo "Docker/git missing for router upgrade" >&2; return 1; }
+ # The upgrade worker uses ProtectSystem=strict and ProtectHome=true.
+ # Docker Compose/Buildx otherwise attempts to create /root/.docker and fails.
+ # Keep its state in a private writable runtime directory; do not weaken /root.
+ export HOME=/run/xmesh-node-router-upgrade
+ export DOCKER_CONFIG="$HOME/.docker"
+ export XDG_CONFIG_HOME="$HOME/.config"
+ export XDG_CACHE_HOME="$HOME/.cache"
+ install -d -m 0700 "$HOME" "$DOCKER_CONFIG" "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME" || return 1
  docker compose version >/dev/null 2>&1 || { echo "Docker Compose missing" >&2; return 1; }
  local mounted dir previous
  mounted="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/etc/xmesh-node/config.json"}}{{.Source}}{{end}}{{end}}' xmesh-node 2>/dev/null)" || return 1
@@ -125,7 +133,7 @@ install -o root -g root -m 0700 "$router_helper" /usr/local/sbin/.xmesh-router-u
 if ! systemd-run --quiet --wait --collect --pipe --unit=xmesh-node-router-upgrade \
  --property=Type=oneshot --property=TimeoutStartSec=450s \
  --property=ProtectSystem=strict --property=ProtectHome=true \
- --property=ReadWritePaths=/opt/xmesh-node \
+ --property=ReadWritePaths=/opt/xmesh-node --property=ReadWritePaths=/run \
  /usr/local/sbin/.xmesh-router-upgrade.new;then
  echo "Router update failed; full node upgrade is NOT successful. Check journalctl -u xmesh-node-router-upgrade." >&2
  rm -f /usr/local/sbin/.xmesh-router-upgrade.new
