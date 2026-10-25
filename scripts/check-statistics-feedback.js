@@ -19,6 +19,10 @@ assert.match(app,/statsDetailedChart\(points\)/);
 assert.match(app,/data-bucket-ms/);
 assert.match(app,/metrics\/traffic\/bucket-detail/);
 assert.match(app,/const openBucket=async\(bucketMs\)=>/);
+assert.equal((app.match(/\$\$\('\.stats-detail-point'\)\.forEach/g)||[]).length,2,
+  'selected SVG points must use querySelectorAll for both open and close');
+assert.doesNotMatch(app,/(?<!\$)\$\('\.stats-detail-point'\)\.forEach/,
+  'querySelector yields only one element and has no forEach');
 assert.match(app,/stats-bucket-detail/);
 assert.match(backend,/async fn get_traffic_bucket_detail\(/);
 assert.match(backend,/LIMIT 500/);
