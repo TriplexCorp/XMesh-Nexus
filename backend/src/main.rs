@@ -1780,10 +1780,29 @@ async fn get_system_stats(State(state): State<AppState>) -> Json<Value> {
 
 /// Read-only dashboard overview from actual `TimescaleDB` measurements.
 /// Samples older than 5 minutes are reported stale, never as live zeroes.
+// Distinguish delayed or missing telemetry from genuine zero usage.
+fn metric_freshness(sampled_at_ms: i64, now_ms: i64) -> &'static str {
+    if sampled_at_ms > now_ms.saturating_add(30_000) {
+        "invalid"
+    } else if sampled_at_ms >= now_ms.saturating_sub(65_000) {
+        "fresh"
+    } else if sampled_at_ms >= now_ms.saturating_sub(300_000) {
+        "delayed"
+    } else {
+        "stale"
+    }
+}
+
 async fn get_statistics_overview(
     State(state): State<AppState>,
     Extension(actor): Extension<auth::AuthUser>,
 ) -> Result<Json<Value>, ApiError> {
+    let now_ms: i64 = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+        .try_into()
+        .unwrap_or(i64::MAX);
     let records = load_records(&state.pool, "nodes").await?;
     let mut nodes = Vec::with_capacity(records.len());
     for node in records {
@@ -1811,10 +1830,11 @@ async fn get_statistics_overview(
                 "txBytesPerSec":row.try_get::<Option<f64>,_>("tx_bytes_per_sec")?,
                 "activeConnections":row.try_get::<Option<i32>,_>("active_connections")?,
                 "onlineClients":row.try_get::<Option<i32>,_>("online_clients")?,
+                "userStatsStatus":metric.get("userStatsStatus"),
+                "userStatsAtMs":metric.get("userStatsAtMs"),
                 "sampledAt":sampled_at,
-                "stale":std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default().as_millis().try_into().unwrap_or(i64::MAX)
-                    > sampled_at.saturating_add(300_000)
+                "freshness":metric_freshness(sampled_at, now_ms),
+                "stale":now_ms > sampled_at.saturating_add(300_000)
             }))
         } else {
             None
@@ -1849,7 +1869,8 @@ async fn get_statistics_overview(
                 else{node.get("hosting").cloned().unwrap_or(Value::Null)},
             "flag":node.get("flag"),
             "disabled":node.get("disabled"),
-            "latest":current
+            "latest":current,
+            "telemetryState":current.as_ref().and_then(|value| value.get("freshness")).and_then(Value::as_str).unwrap_or("never_received")
         }));
     }
     let users: i64 =
