@@ -301,7 +301,10 @@ fn protected_routes(state: &AppState) -> Router<AppState> {
         .route("/statistics/overview", get(get_statistics_overview))
         .route("/statistics/leaders", get(get_statistics_leaders))
         .route("/metrics/traffic", get(get_traffic_metrics))
-        .route("/metrics/traffic/bucket-detail", get(get_traffic_bucket_detail))
+        .route(
+            "/metrics/traffic/bucket-detail",
+            get(get_traffic_bucket_detail),
+        )
         .route("/users/presence", get(get_user_presence))
         .route("/users/{id}/traffic", get(get_user_traffic))
         .route("/users/{id}/traffic/history", get(get_user_traffic_history))
@@ -1855,8 +1858,10 @@ async fn get_statistics_leaders(
                 COUNT(DISTINCT user_id)::BIGINT AS users
          FROM user_inbound_traffic_totals
          GROUP BY inbound_tag
-         ORDER BY SUM(uplink_bytes+downlink_bytes) DESC,inbound_tag LIMIT 10"
-    ).fetch_all(&state.pool).await?;
+         ORDER BY SUM(uplink_bytes+downlink_bytes) DESC,inbound_tag LIMIT 10",
+    )
+    .fetch_all(&state.pool)
+    .await?;
     let mut top_users = Vec::with_capacity(users.len());
     for row in users {
         top_users.push(json!({
@@ -2529,7 +2534,13 @@ async fn ingest_node_metrics(
     )
     .await?;
 
-    persist_inbound_traffic(&mut telemetry_tx, body.node_id, &inbound_samples, sampled_at).await?;
+    persist_inbound_traffic(
+        &mut telemetry_tx,
+        body.node_id,
+        &inbound_samples,
+        sampled_at,
+    )
+    .await?;
 
     // Commit source watermark, traffic accounting, and presence in one transaction.
     telemetry_tx.commit().await?;
@@ -2639,10 +2650,17 @@ async fn get_user_traffic_history(
     if viewer_read_only(&actor) {
         return Err(ApiError::new(StatusCode::FORBIDDEN, "Недостаточно прав."));
     }
-    if user_id <= 0 || query.node_id.is_some_and(|id| id <= 0)
-        || query.inbound_tag.as_ref().is_some_and(|tag| tag.is_empty() || tag.len() > 128)
+    if user_id <= 0
+        || query.node_id.is_some_and(|id| id <= 0)
+        || query
+            .inbound_tag
+            .as_ref()
+            .is_some_and(|tag| tag.is_empty() || tag.len() > 128)
     {
-        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Некорректный фильтр истории."));
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Некорректный фильтр истории.",
+        ));
     }
     let (period, bucket, duration) = match query.range.as_deref().unwrap_or("24h") {
         "1h" => ("1h", "1 minute", "1 hour"),
@@ -2652,12 +2670,22 @@ async fn get_user_traffic_history(
         _ => return Err(ApiError::new(StatusCode::BAD_REQUEST, "Неверный период.")),
     };
     let exists: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM panel_records WHERE collection='users' AND id=$1)"
-    ).bind(user_id).fetch_one(&state.pool).await?;
+        "SELECT EXISTS(SELECT 1 FROM panel_records WHERE collection='users' AND id=$1)",
+    )
+    .bind(user_id)
+    .fetch_one(&state.pool)
+    .await?;
     if !exists {
-        return Err(ApiError::new(StatusCode::NOT_FOUND, "Пользователь не найден."));
+        return Err(ApiError::new(
+            StatusCode::NOT_FOUND,
+            "Пользователь не найден.",
+        ));
     }
-    let source = if query.inbound_tag.is_some() { "inbound" } else { "user" };
+    let source = if query.inbound_tag.is_some() {
+        "inbound"
+    } else {
+        "user"
+    };
     let rows = sqlx::query(
         "SELECT (EXTRACT(EPOCH FROM time_bucket($1::INTERVAL,sampled_at))*1000)::BIGINT AS bucket_ms,
                 node_id,inbound_tag,
@@ -2690,9 +2718,11 @@ async fn get_user_traffic_history(
         }));
     }
     let truncated = points.len() == 5000;
-    Ok(Json(json!({"userId":user_id,"range":period,"sourceType":source,
+    Ok(Json(
+        json!({"userId":user_id,"range":period,"sourceType":source,
         "source":"verified_traffic_deltas","inboundFilter":query.inbound_tag,
-        "nodeFilter":query.node_id,"points":points,"truncated":truncated})))
+        "nodeFilter":query.node_id,"points":points,"truncated":truncated}),
+    ))
 }
 
 async fn get_user_traffic(
@@ -2877,7 +2907,10 @@ async fn get_traffic_bucket_detail(
         || query.bucket_ms > now_ms.saturating_add(step_ms)
         || query.bucket_ms < now_ms.saturating_sub(window_ms.saturating_add(step_ms))
     {
-        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Интервал вне выбранного периода."));
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Интервал вне выбранного периода.",
+        ));
     }
     let rows = sqlx::query(
         "SELECT n.id, n.data->>'name' AS name,
@@ -2891,7 +2924,7 @@ async fn get_traffic_bucket_detail(
            AND s.sampled_at < to_timestamp(($1::DOUBLE PRECISION + $2::DOUBLE PRECISION) / 1000.0)
          GROUP BY n.id, n.data->>'name'
          ORDER BY rx DESC NULLS LAST, n.id ASC
-         LIMIT 500"
+         LIMIT 500",
     )
     .bind(query.bucket_ms)
     .bind(step_ms)
@@ -2908,8 +2941,10 @@ async fn get_traffic_bucket_detail(
             "lastSampleMs": row.try_get::<Option<i64>, _>("last_ms")?
         }));
     }
-    Ok(Json(json!({"range":range,"bucketMs":query.bucket_ms,"intervalSeconds":interval_seconds,
-        "source":"server_metric_samples","nodes":nodes,"truncated":nodes.len()==500})))
+    Ok(Json(
+        json!({"range":range,"bucketMs":query.bucket_ms,"intervalSeconds":interval_seconds,
+        "source":"server_metric_samples","nodes":nodes,"truncated":nodes.len()==500}),
+    ))
 }
 
 async fn get_traffic_metrics(
