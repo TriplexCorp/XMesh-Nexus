@@ -196,3 +196,8 @@ assert.match(css,/@keyframes stats-user-refresh-spin/);
 assert.match(css,/\.stats-refresh-icon\{display:block!important/);
 
 assert.match(css,/#stats-user-close\{flex:0 0 2\.15rem/);
+
+assert.match(app,/data-open-user-traffic="\$\{u\.id\}"/);
+assert.match(app,/ID пользователя: \$\{esc\(u\.id\)\}/);
+assert.match(app,/pendingUserTrafficDetail=\{id,name:/);
+assert.match(app,/openStatsUser\(requested\.id,requested\.name\)/);
