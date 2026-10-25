@@ -213,3 +213,8 @@ assert.match(app,/enhanceStatsPeriodSelect\(\$\('#stats-history-range'\)\)/);
 assert.match(app,/select\.dispatchEvent\(new Event\('change',\{bubbles:true\}\)\)/);
 assert.match(css,/\.xm-period-menu\{position:absolute/);
 assert.match(css,/scrollbar-color:var\(--scrollbar-thumb\) var\(--scrollbar-track\)/);
+
+assert.match(app,/document\.body\.append\(menu\)/);
+assert.match(app,/menu\.style\.left=rect\.left/);
+assert.match(app,/body > \.xm-period-portal/);
+assert.match(css,/body > \.xm-period-portal\{position:fixed;z-index:200000/);
