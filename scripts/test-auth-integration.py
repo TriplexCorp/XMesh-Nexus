@@ -118,8 +118,11 @@ def main():
     assert old["authenticated"] is False, "Role update did not revoke session"
     admin, admin_cookie = login("ci_viewer", VIEWER_PASSWORD)
     assert admin["user"]["role"] == "admin"
-    check(api("POST", "/collections/hosts", {"name": "ci smoke"}, admin_cookie)[0], 201,
-          "admin can write")
+    # Active hosts require a valid XRAY profile, inbound and node bindings.
+    check(api("POST", "/collections/hosts", {"name": "ci smoke"}, admin_cookie)[0], 400,
+          "admin cannot create unbound active host")
+    check(api("POST", "/collections/hosts", {"name": "ci smoke", "disabled": True}, admin_cookie)[0], 201,
+          "admin can create disabled host draft")
     check(api("GET", "/admins", cookie=admin_cookie)[0], 403, "admin cannot manage administrators")
     check(api("PATCH", f"/admins/{viewer_id}", {"isActive": False}, owner_cookie)[0], 200,
           "owner disables admin")
