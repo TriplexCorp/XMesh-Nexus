@@ -15,6 +15,9 @@ assert.match(ui,/MutationObserver/,'dynamically created selectors are enhanced')
 assert.match(ui,/select\.dispatchEvent\(new Event\('change',\{bubbles:true\}\)\)/,'existing change handlers still run');
 assert.match(ui,/select\.selectedIndex=i/,'form source stays native select');
 assert.match(ui,/popup\.showPopover\(\)/,'dropdown appears above dialogs and clipping');
+assert.match(ui,/select\.closest\('dialog'\)/,'popup belongs to active dialog rather than inert document body');
+assert.match(ui,/\(ownerDialog\|\|document\.body\)\.append\(popup\)/,'modal options stay inside the non-inert dialog subtree');
+assert.doesNotMatch(ui,/document\.body\.append\(popup\)/,'a body portal makes popover options inert inside modal dialogs');
 assert.match(ui,/instance\.observer\.disconnect\(\)/,'observers cleaned on navigation');
 assert.match(ui,/if\(active&&active!==instance\)dismiss\(active\)/,'only one popover at a time');
 assert.match(ui,/select\.disabled/,'disabled state preserved');
