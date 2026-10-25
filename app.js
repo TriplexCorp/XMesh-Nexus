@@ -1008,10 +1008,10 @@ const statsMetric=(label,value,hint='')=>`<div class="stats-tile"><small>${esc(l
 const statsRow=(label,value)=>`<div class="stats-kv"><span>${esc(label)}</span><b>${esc(String(value))}</b></div>`;
 // Detailed chart uses the same RX/TX color vocabulary as the dashboard.
 // Each plotted point must be an actual TimescaleDB observation; nulls break paths.
-const statsDetailedChart=(points)=>{
+const statsDetailedChart=(points,chartWidth=1000)=>{
  const samples=(Array.isArray(points)?points:[]).filter(p=>Number.isFinite(Number(p.bucketMs))&&Number(p.bucketMs)>0);
  if(!samples.length)return '<p class="note">Нет подтверждённых измерений за выбранный период.</p>';
- const w=1000,h=340,left=72,right=22,top=20,bottom=48,pw=w-left-right,ph=h-top-bottom;
+ const w=chartWidth,h=340,left=72,right=22,top=20,bottom=48,pw=w-left-right,ph=h-top-bottom;
  const metrics=['rxBytesPerSec','txBytesPerSec'];
  const valid=(v)=>v!==null&&v!==undefined&&Number.isFinite(Number(v))&&Number(v)>=0;
  const max=Math.max(1,...samples.flatMap(p=>metrics.map(k=>valid(p[k])?Number(p[k])*8/1e6:0)))*1.1;
@@ -1047,6 +1047,44 @@ const statsDetailedChart=(points)=>{
  const ticks=[0,Math.floor((samples.length-1)/2),samples.length-1].filter((v,i,a)=>a.indexOf(v)===i).map(i=>'<text class="stats-detail-label" x="'+x(i)+'" y="'+(h-15)+'" text-anchor="'+(i===0?'start':i===samples.length-1?'end':'middle')+'">'+esc(new Date(Number(samples[i].bucketMs)).toLocaleString(panelIsEnglish()?'en-US':'ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}))+'</text>').join('');
  return '<div class="stats-detail-wrap"><svg class="stats-detail-chart" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="История RX и TX, Мбит/с. Наведите на точки для значений"><text class="stats-detail-axis" x="17" y="'+(top+ph/2)+'" transform="rotate(-90 17 '+(top+ph/2)+')" text-anchor="middle">Мбит/с</text>'+grid+line('rxBytesPerSec')+line('txBytesPerSec')+ticks+'</svg></div><div class="stats-detail-legend"><span><i class="rx"></i> RX · принято нодами</span><span><i class="tx"></i> TX · отправлено нодами</span><small>Наведите на точку для времени и скорости. Пропуски не интерполируются.</small></div>';
 };
+// SVG coordinates are resized horizontally, not scaled as a whole.
+// Match the viewBox width to the *actual* CSS viewport ratio so labels and
+// click targets keep their size when Appearance > Content width changes.
+const trafficChartResizeObservers={statistics:null,dashboard:null};
+const syncResponsiveTrafficChart=(kind,selector,renderSvg,logicalHeight)=>{
+ const parent=document.querySelector(selector);
+ const wrapper=parent?.querySelector(kind==='statistics'?'.stats-detail-wrap':'.traffic-chart-wrap');
+ const svg=wrapper?.querySelector('svg');
+ if(!wrapper||!svg)return;
+ trafficChartResizeObservers[kind]?.disconnect();
+ const update=()=>{
+  const current=wrapper.querySelector('svg');
+  if(!current||!wrapper.isConnected)return;
+  const bounds=current.getBoundingClientRect();
+  if(bounds.width<1||bounds.height<1)return;
+  const logicalWidth=Math.max(300,Math.round(logicalHeight*bounds.width/bounds.height));
+  const previous=Number(current.getAttribute('viewBox')?.split(/\\s+/)[2])||0;
+  if(Math.abs(logicalWidth-previous)<=2)return;
+  const template=document.createElement('template');
+  template.innerHTML=renderSvg(logicalWidth);
+  const replacement=template.content.querySelector('svg');
+  if(!replacement)return;
+  // Restore the selected bucket when reflowing the Statistics SVG.
+  const selected=current.querySelector('.stats-detail-point-wrap.is-selected');
+  if(selected){
+   const candidate=[...replacement.querySelectorAll('.stats-detail-point-wrap')].find(
+    point=>point.dataset.bucketMs===selected.dataset.bucketMs&&point.dataset.series===selected.dataset.series
+   );
+   candidate?.classList.add('is-selected');
+  }
+  current.replaceWith(replacement);
+ };
+ const observer=new ResizeObserver(update);
+ trafficChartResizeObservers[kind]=observer;
+ observer.observe(wrapper);
+ update();
+};
+
 const statsRing=(label,percent,accent)=> {
  const valid=percent!==null&&percent!==undefined&&Number.isFinite(Number(percent));
  const pct=valid?Math.max(0,Math.min(100,Number(percent))):0;
@@ -1222,6 +1260,7 @@ function statisticsP(){
      lastTrafficSignature=trafficSignature;
      lastTrafficPeriod=period;
      $('#stats-trend').innerHTML='<div class="stats-detail-kpis"><div><b>RX</b><strong>'+(latest.rxBytesPerSec!=null?statsRate(latest.rxBytesPerSec):'Нет данных')+'</strong></div><div><b>TX</b><strong>'+(latest.txBytesPerSec!=null?statsRate(latest.txBytesPerSec):'Нет данных')+'</strong></div><div><b>Временных интервалов</b><strong>'+esc(String(points.length))+'</strong></div></div>'+statsDetailedChart(points)+'<small class="note">'+(panelIsEnglish()?'Samples: ':'Измерений: ')+esc(String(traffic.sampleCount??0))+(panelIsEnglish()?' · Source: TimescaleDB':' · Источник: TimescaleDB')+'</small>';
+     syncResponsiveTrafficChart('statistics','#stats-trend',width=>statsDetailedChart(points,width),340);
     }
     updateLiveStatus();
     $('#stats-nodes').innerHTML=nodes.length?nodes.map(n=>{
@@ -1498,12 +1537,12 @@ function trafficSummaryMarkup(payload){
   const detail=latest?('Последний бакет · '+when):'Ожидание телеметрии';
   return `<div class="traffic-kpi"><span><i class="traffic-dot rx"></i> RX · принято узлами</span><b>${rx}</b><small>${detail}</small></div><div class="traffic-kpi"><span><i class="traffic-dot tx"></i> TX · отправлено узлами</span><b>${tx}</b><small>${detail}</small></div>`;
 }
-function trafficChartMarkup(payload,range){
+function trafficChartMarkup(payload,range,chartWidth=960){
   const points=Array.isArray(payload?.points)?payload.points:[];
   if(!payload||!payload.sampleCount||!points.length){
     return `<div class="traffic-empty"><span class="traffic-empty-icon">${ic('activity')}</span><b>Пока нет данных RX/TX</b><span>TimescaleDB готова хранить телеметрию, но отправитель метрик от узлов ещё не подключён. График появится после поступления реальных измерений — фиктивные значения не отображаются.</span>${DB.nodes.length?'<small>Выбранный период: '+(range==='1h'?'последний час':'последние 24 часа')+'. Проверьте выбранный узел или сквад.</small>':'<small>Сначала добавьте узлы в раздел «Узлы».</small>'}</div>`;
   }
-  const width=960,height=292,left=66,right=22,top=18,bottom=44,plotW=width-left-right,plotH=height-top-bottom;
+  const width=chartWidth,height=292,left=66,right=22,top=18,bottom=44,plotW=width-left-right,plotH=height-top-bottom;
   const rx=points.map(p=>trafficMbit(p.rxBytesPerSec)),tx=points.map(p=>trafficMbit(p.txBytesPerSec));
   const peak=Math.max(0,...rx,...tx);
   const max=peak>0?peak*1.12:1;
@@ -1586,6 +1625,7 @@ async function homeP(){
         if(requestId!==trafficRequest||!$('#traffic-chart'))return;
         kpis.innerHTML=trafficSummaryMarkup(data);
         chart.innerHTML=trafficChartMarkup(data,trafficRange);
+        syncResponsiveTrafficChart('dashboard','#traffic-chart',width=>trafficChartMarkup(data,trafficRange,width),292);
       }catch(error){
         if(requestId!==trafficRequest||!$('#traffic-chart'))return;
         kpis.innerHTML=trafficSummaryMarkup(null);
