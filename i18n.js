@@ -782,6 +782,33 @@ window.XMeshI18n=(()=>{
   ];
   for(const [ru,en] of studioEnglishTranslations)dict.set(ru,en);
 
+  // Fleet explorer search, filters and accessible controls.
+  for(const [ru,en] of [
+    ["узлов","nodes"],
+    ["Поиск и фильтры узлов","Node search and filters"],
+    ["Название, IP, домен, хостинг, профиль, ID…","Name, IP, domain, hosting, profile, ID…"],
+    ["Поиск по названию, IP, домену, хостингу и профилю","Search by name, IP, domain, hosting and profile"],
+    ["Поиск по нодам","Search nodes"],
+    ["Состояние","Status"],
+    ["Сортировка","Sort by"],
+    ["Все","All"],
+    ["Активные","Enabled"],
+    ["Отключены","Disabled"],
+    ["Есть телеметрия","Telemetry available"],
+    ["Нет свежей телеметрии","No recent telemetry"],
+    ["Название А–Я","Name A–Z"],
+    ["Название Я–А","Name Z–A"],
+    ["IP / адрес","IP / address"],
+    ["Хостинг","Hosting"],
+    ["Новые сначала","Newest first"],
+    ["Старые сначала","Oldest first"],
+    ["Только с хостингом","Hosting specified only"],
+    ["Сбросить","Reset"],
+    ["Предыдущая страница","Previous page"],
+    ["Следующая страница","Next page"],
+    ["Ничего не найдено. Измените запрос или сбросьте фильтры.","No matching nodes. Change your query or reset filters."],
+    ["Подсказка: ip:1.2.3.4 · hosting:hetzner · profile:vless","Tip: ip:1.2.3.4 · hosting:hetzner · profile:vless"]
+  ])dict.set(ru,en);
   const dynamic=[
     [/^(\d+)\s+узлов настроено\. CPU, RAM и скорость требуют подключённого мониторинга\.$/i,
       (_,n)=>n+' nodes configured. CPU, RAM, and speed require connected monitoring.'],
