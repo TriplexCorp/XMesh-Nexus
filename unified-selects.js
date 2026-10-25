@@ -93,8 +93,11 @@
   const popup=document.createElement('div');popup.className='xm-select-popover';
   if(supportsPopover)popup.setAttribute('popover','manual');else popup.hidden=true;
   popup.setAttribute('role','listbox');
-  // popover lives in the top layer, even when opened from a <dialog>.
-  document.body.append(popup);
+  // A modal <dialog> makes elements outside it inert, EVEN when a popover
+  // visually appears above it. Keep the popover inside its owning dialog
+  // so option buttons can receive pointer and keyboard events.
+  const ownerDialog=select.closest('dialog');
+  (ownerDialog||document.body).append(popup);
   select.before(shell);shell.append(select,trigger);
   select.classList.add('xm-select-source');
   const instance={select,wrapper:shell,trigger,popup,observer:null,disposed:false};
