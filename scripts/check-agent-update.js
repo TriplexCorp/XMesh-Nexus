@@ -45,6 +45,7 @@ assert.match(installer,/xmesh-node-agent-upgrade[.]service/);
 assert.match(installer,/\/usr\/local\/sbin\/xmesh-update-agent/);
 assert.match(app,/data-node-agent-version/);
 assert.match(app,/data-agent-update/);
+assert.match(app,/Date\.now\(\)\+900000/,'Full node update UI must wait 15 minutes');
 assert.match(app,/\/api\/v1\/nodes\/'\+encodeURIComponent\(id\)\+'\/agent-update/);
 assert.match(css,/\[data-agent-update\]/);
 assert.match(tests,/admin queued a fixed agent self-update/);
