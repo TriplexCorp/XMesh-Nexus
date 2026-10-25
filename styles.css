@@ -5718,3 +5718,25 @@ body>.stats-user-overlay .stats-user-pane .stats-detail-chart{
     .notification-workspace .notification-header button[data-x][aria-label^="Закрыть"]):focus-visible{
   outline:2px solid var(--a);outline-offset:2px;
 }
+
+
+/* Unified select controls throughout Nexus; <select> remains canonical form state.
+   Native controls are retained as a graceful fallback where Popover API is unavailable. */
+.xm-select-shell{position:relative;display:block;width:100%;min-width:0;box-sizing:border-box}
+.xm-select-shell>.xm-select-source{position:absolute!important;width:1px!important;height:1px!important;min-height:0!important;padding:0!important;margin:0!important;border:0!important;opacity:0!important;pointer-events:none!important;clip-path:inset(50%);overflow:hidden}
+.xm-select-trigger{display:flex;align-items:center;justify-content:space-between;gap:.6rem;width:100%;max-width:100%;min-width:0;height:2.8rem;min-height:2.4rem;padding:0 .85rem;box-sizing:border-box;text-align:left;background:var(--s2);border:1px solid var(--ln);border-radius:var(--ui-control-radius,.7rem);color:var(--tx);font:inherit;font-size:.85rem;line-height:1.25;cursor:pointer;transition:border-color .15s,background-color .15s,box-shadow .15s}
+.xm-select-trigger:hover:not(:disabled){border-color:color-mix(in srgb,var(--a) 45%,var(--ln))}
+.xm-select-trigger:focus-visible,.xm-select-shell.is-open>.xm-select-trigger{outline:2px solid var(--a);outline-offset:1px}
+.xm-select-trigger:disabled{opacity:.55;cursor:not-allowed}
+.xm-select-caption{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;min-width:0}
+.xm-select-chevron{flex:none;font-size:1.05rem;color:var(--mu);line-height:1;transition:transform .15s}
+.xm-select-shell.is-open .xm-select-chevron{transform:rotate(180deg)}
+.xm-select-popover:popover-open{position:fixed!important;inset:auto;margin:0;padding:.3rem;z-index:2147483647;box-sizing:border-box;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;background:var(--s1);color:var(--tx);border:1px solid color-mix(in srgb,var(--a) 32%,var(--ln));border-radius:var(--ui-control-radius,.75rem);box-shadow:0 12px 36px #0007;font:inherit;color-scheme:normal}
+.xm-select-option{display:block;width:100%;border:1px solid transparent;border-radius:calc(var(--ui-control-radius,.7rem) - .2rem);background:transparent;color:var(--tx);padding:.6rem .7rem;text-align:left;font:inherit;font-size:.82rem;white-space:normal;overflow-wrap:anywhere;cursor:pointer}
+.xm-select-option:hover:not(:disabled),.xm-select-option:focus-visible{background:color-mix(in srgb,var(--a) 11%,var(--s2));outline:none;border-color:color-mix(in srgb,var(--a) 28%,transparent)}
+.xm-select-option[aria-selected="true"]{background:color-mix(in srgb,var(--a) 17%,var(--s2));color:var(--tx)}
+.xm-select-option[aria-selected="true"]::after{content:"✓";float:right;color:var(--a);margin-left:.65rem}
+.xm-select-option:disabled{opacity:.48;cursor:not-allowed}
+.xm-select-option.in-group{padding-left:1.15rem}
+@media(max-width:640px){.xm-select-popover:popover-open{max-width:calc(100vw - 16px)}.xm-select-trigger{font-size:.82rem}}
+@media(prefers-reduced-motion:reduce){.xm-select-trigger,.xm-select-chevron{transition:none}}
