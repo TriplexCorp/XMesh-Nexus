@@ -137,3 +137,45 @@ sudo bash /tmp/xmesh-agent-upgrade.sh
 устанавливаются автоматически. Сервис Xray-профиля при штатном обновлении
 агента не перезапускается; доступность сети и персонального учёта нужно
 контролировать отдельно.
+
+## Local Xray port changes and TCP router reconciliation (2026-10-26)
+
+The panel's node `xrayLocalPort` is the **loopback** port for managed Xray;
+it is distinct from the public node TCP port (normally 443). The signed
+`/api/v1/node/desired-config` response carries the chosen local port and a
+compiled Xray inbound bound to `127.0.0.1`.
+
+The updated XMesh-Node `deploy/xmesh-xray-sync.sh` reconciles the actively
+mounted `/etc/xmesh-node/config.json` router default to the verified Xray
+port, including when the Xray JSON itself has not changed. The previously
+managed Xray port is eligible for automatic migration (for example
+`10443 -> 5000`). Customized SNI routes or unrelated manually selected
+defaults are **never** silently overwritten: reconciliation reports an error.
+The router container must be **recreated** after atomic `config.json`
+replacement; a simple `docker compose restart` retains the old file bind
+mount inode.
+
+IMPORTANT: A signed **offline** policy does not carry new node settings
+from the panel. If desired-config returns a non-200 HTTP status, the worker
+now records that status and continues conservative offline enforcement.
+Do not change the router to a new port until Xray is verified to be
+listening on that port. Also do not disable the policy guard, re-enroll the
+node, or replace its Ed25519 identity as part of troubleshooting.
+
+On an already enrolled node, update the agent using the documented
+`deploy/update-node-control-agent.sh` procedure above, then inspect:
+
+```bash
+systemctl start xmesh-xray-sync.service
+journalctl -u xmesh-xray-sync.service -n 80 --no-pager
+sudo ss -lntp | grep -E ':443|:5000|:10443'
+docker inspect xmesh-node \
+  --format '{{range .Mounts}}{{println .Source "->" .Destination}}{{end}}'
+```
+
+A green script exit and a running container do not independently prove a
+successful traffic handshake. Confirm the signed policy revision, Xray
+loopback listener, actual router backend, and client connection on a
+disposable test account. Port changes can briefly interrupt active TCP
+connections. CI tests for the migration live in the XMesh-Node repository;
+live VPS acceptance is still required.
