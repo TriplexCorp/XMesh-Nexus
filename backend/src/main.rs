@@ -1944,25 +1944,7 @@ fn prepare_node_metrics(body: &NodeMetricsIngestRequest, mut metrics: Value) -> 
     Ok(metrics)
 }
 
-async fn ingest_node_metrics(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-    raw_body: Bytes,
-) -> Result<(StatusCode, Json<Value>), ApiError> {
-    let body: NodeMetricsIngestRequest = serde_json::from_slice(&raw_body)
-        .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Некорректный JSON метрик."))?;
-    if body.node_id <= 0 {
-        return Err(ApiError::new(
-            StatusCode::BAD_REQUEST,
-            "node_id должен быть положительным числом.",
-        ));
-    }
-    // The node must authenticate before untrusted samples are recorded.
-    // Telemetry requires a registered Ed25519 identity.
-    node_auth::authenticate(&state, &headers, body.node_id, &raw_body).await?;
-
-    let mut metrics = prepare_node_metrics(&body, body.metrics.clone().unwrap_or_else(|| json!({})))?;
-    let mut user_traffic = body.user_traffic.unwrap_or_default();
+fn validate_user_traffic_samples(user_traffic: &[UserTrafficSample]) -> Result<(), ApiError> {
     if user_traffic.len() > 2048 {
         return Err(ApiError::new(
             StatusCode::BAD_REQUEST,
@@ -1983,7 +1965,10 @@ async fn ingest_node_metrics(
         }
     }
 
-    let mut inbound_samples = body.user_inbound_traffic.unwrap_or_default();
+    Ok(())
+}
+
+fn validate_inbound_traffic_samples(inbound_samples: &[UserInboundTrafficSample]) -> Result<(), ApiError> {
     if inbound_samples.len() > 4096 {
         return Err(ApiError::new(
             StatusCode::BAD_REQUEST,
@@ -2007,6 +1992,31 @@ async fn ingest_node_metrics(
         }
     }
 
+    Ok(())
+}
+
+async fn ingest_node_metrics(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    raw_body: Bytes,
+) -> Result<(StatusCode, Json<Value>), ApiError> {
+    let body: NodeMetricsIngestRequest = serde_json::from_slice(&raw_body)
+        .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Некорректный JSON метрик."))?;
+    if body.node_id <= 0 {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "node_id должен быть положительным числом.",
+        ));
+    }
+    // The node must authenticate before untrusted samples are recorded.
+    // Telemetry requires a registered Ed25519 identity.
+    node_auth::authenticate(&state, &headers, body.node_id, &raw_body).await?;
+
+    let mut metrics = prepare_node_metrics(&body, body.metrics.clone().unwrap_or_else(|| json!({})))?;
+    let mut user_traffic = body.user_traffic.unwrap_or_default();
+    validate_user_traffic_samples(&user_traffic)?;
+    let mut inbound_samples = body.user_inbound_traffic.unwrap_or_default();
+    validate_inbound_traffic_samples(&inbound_samples)?;
     // Node-wide traffic accounting is separate from authenticated per-user
     // Xray counters. Require both monotonic NIC counters and an interface ID.
     // Older metrics agents simply omit these fields until upgraded.
