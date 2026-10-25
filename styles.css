@@ -5455,3 +5455,19 @@ body > .stats-user-overlay .stats-user-actions #stats-user-close:hover{border-co
 dialog.user-modal .user-numeric-id{display:inline-block;margin:.1rem .45rem .2rem 0;color:var(--mu);font-size:.72rem;white-space:nowrap}
 dialog.user-modal .user-head-actions{display:flex;align-items:center;justify-content:flex-end;gap:.45rem;flex-wrap:wrap}
 @media(max-width:720px){dialog.user-modal .user-head-actions{gap:.3rem}dialog.user-modal [data-open-user-traffic]{max-width:100%;white-space:normal}}
+
+/* XMesh period picker: render our own option list, not the OS-native menu. */
+.xm-period-select{position:relative;display:block;min-width:0;width:100%;isolation:isolate}
+.xm-period-select>select{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none!important;inset:auto!important}
+.xm-period-trigger{display:flex;align-items:center;justify-content:space-between;gap:.55rem;width:100%;height:2.45rem;min-height:2.45rem;padding:.45rem .8rem;color:var(--tx);background:var(--s2);border:1px solid var(--ln);border-radius:var(--ui-control-radius);font:inherit;font-size:.84rem;font-weight:600;cursor:pointer;text-align:left;white-space:nowrap}
+.xm-period-trigger:hover,.xm-period-trigger[aria-expanded=true]{border-color:var(--a);background:color-mix(in srgb,var(--a) 5%,var(--s2))}
+.xm-period-trigger:focus-visible,.xm-period-option:focus-visible{outline:2px solid var(--a);outline-offset:2px}
+.xm-period-chevron{color:var(--mu);font-size:1.3em;line-height:1;transition:transform .16s}
+.xm-period-trigger[aria-expanded=true] .xm-period-chevron{transform:rotate(180deg)}
+.xm-period-menu{position:absolute;z-index:500;top:calc(100% + .35rem);left:0;right:0;display:grid;gap:.2rem;padding:.35rem;background:var(--elevated,var(--s1));border:1px solid var(--border-strong,var(--ln));border-radius:var(--ui-control-radius);box-shadow:0 1.2rem 2.5rem rgba(0,0,0,.55);max-height:min(16rem,40vh);overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track)}
+.xm-period-menu[hidden]{display:none!important}
+.xm-period-option{display:block;width:100%;padding:.58rem .75rem;border-radius:calc(var(--ui-control-radius) * .7);border:0;background:transparent;color:var(--tx);text-align:left;font:inherit;font-size:.84rem;cursor:pointer}
+.xm-period-option:hover,.xm-period-option:focus-visible{background:color-mix(in srgb,var(--a) 13%,var(--s2))}
+.xm-period-option[aria-selected=true]{background:color-mix(in srgb,var(--a) 16%,var(--s2));color:var(--a);font-weight:750}
+.stats-history-filters label:has(.xm-period-select){min-width:0}
+body>.stats-user-overlay .stats-user-main>.stats-history-filters .xm-period-trigger{height:2rem;min-height:2rem}
