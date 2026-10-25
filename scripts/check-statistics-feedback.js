@@ -19,17 +19,20 @@ assert.match(app,/statsDetailedChart\(points\)/);
 assert.match(app,/data-bucket-ms/);
 assert.match(app,/metrics\/traffic\/bucket-detail/);
 assert.match(app,/const openBucket=async\(bucketMs\)=>/);
-assert.equal((app.match(/\$\$\('\.stats-detail-point'\)\.forEach/g)||[]).length,2,
+assert.equal((app.match(/\$\$\('\.stats-detail-point-wrap'\)\.forEach/g)||[]).length,2,
   'selected SVG points must use querySelectorAll for both open and close');
-assert.doesNotMatch(app,/(?<!\$)\$\('\.stats-detail-point'\)\.forEach/,
+assert.doesNotMatch(app,/(?<!\$)\$\('\.stats-detail-point-wrap'\)\.forEach/,
   'querySelector yields only one element and has no forEach');
 assert.match(app,/stats-bucket-detail/);
 assert.match(backend,/async fn get_traffic_bucket_detail\(/);
 assert.match(backend,/LIMIT 500/);
 assert.match(css,/\.stats-bucket-detail\[hidden\]/);
-assert.match(app,/class="stats-detail-point /);
+assert.match(app,/class="stats-detail-point-wrap /);
 assert.match(app,/Пропуски не интерполируются/);
-assert.match(css,/\.stats-detail-point:hover/);
+assert.match(css,/\.stats-detail-point-wrap:is/);
+assert.match(css,/\.stats-detail-point-ring/);
+assert.match(css,/\.stats-detail-point-core/);
+assert.doesNotMatch(css,/drop-shadow\(/);
 assert.match(css,/\.stats-detail-grid/);
 assert.match(css,/\.stats-detail-line\.rx/);
 assert.match(css,/\.stats-detail-line\.tx/);
