@@ -5223,7 +5223,8 @@ td.er .user-expiry-primary{color:var(--danger,#f08080)}
 .stats-detail-line.rx{stroke:var(--a)}.stats-detail-line.tx{stroke:var(--b)}
 .stats-detail-point{cursor:crosshair;stroke:var(--s1);stroke-width:2;vector-effect:non-scaling-stroke;transition:r .15s ease,stroke-width .15s ease}
 .stats-detail-point.rx{fill:var(--a)}.stats-detail-point.tx{fill:var(--b)}
-.stats-detail-point:hover,.stats-detail-point:focus-visible{r:8;stroke-width:3;outline:none}
+.stats-detail-point:hover,.stats-detail-point:focus-visible{r:7;stroke-width:2;outline:none;filter:drop-shadow(0 0 4px currentColor)}
+.stats-detail-point:focus{outline:none}
 .stats-detail-legend{display:flex;align-items:center;flex-wrap:wrap;gap:.6rem 1.2rem;padding:.7rem .2rem;font-size:.8rem}
 .stats-detail-legend span{display:inline-flex;align-items:center;gap:.4rem}
 .stats-detail-legend i{display:inline-block;width:.7rem;height:.7rem;border-radius:50%}
@@ -5233,7 +5234,9 @@ td.er .user-expiry-primary{color:var(--danger,#f08080)}
 @media(prefers-reduced-motion:reduce){.stats-detail-point{transition:none}}
 
 /* Timescale traffic drill-down: the selected point reveals actual per-node evidence. */
-.stats-detail-point.is-selected{r:9;stroke-width:3}
+.stats-detail-point.is-selected{r:7;stroke-width:2;filter:drop-shadow(0 0 5px currentColor)}
+.stats-detail-point.is-selected.rx{color:var(--a)}
+.stats-detail-point.is-selected.tx{color:var(--b)}
 .stats-bucket-detail{display:grid;gap:.85rem;margin-top:1rem;padding:1rem;background:var(--s1);border:1px solid var(--ln);border-radius:var(--ui-radius,16px)}
 .stats-bucket-detail[hidden]{display:none!important}
 .stats-detail-header{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem}
