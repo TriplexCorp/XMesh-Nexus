@@ -4995,7 +4995,7 @@ dialog#dlg.node-wide .node-geo-fields small{overflow-wrap:anywhere}
   min-height:2.55rem;
   padding:0 .85rem;
   border:1px solid color-mix(in srgb,var(--a) 32%,var(--ln));
-  border-radius:11px;
+  border-radius:var(--ui-control-radius);
   background:color-mix(in srgb,var(--a) 7%,var(--s2));
   color:var(--tx);
   font-size:.79rem;
@@ -5857,4 +5857,47 @@ body>.stats-user-overlay .stats-user-pane .stats-detail-chart{
  .nodes-page .node-explorer>.node-explorer-reset,.nodes-page .node-explorer-reset-icon{transition:none}
  .nodes-page .node-explorer>.node-explorer-reset:hover,.nodes-page .node-explorer>.node-explorer-reset:active{transform:none}
  .nodes-page .node-explorer-reset:hover .node-explorer-reset-icon{transform:none}
+}
+
+
+/* Fleet buttons use a SINGLE Lucide SVG and the same interaction language
+   as the Users refresh action. No duplicated glyphs from global decorators. */
+.nodes-page .node-explorer>.node-explorer-reset .ic{
+ width:1.1rem;height:1.1rem;flex:none;color:var(--a);
+ transform-origin:center;transition:transform .5s cubic-bezier(.2,.8,.2,1);
+}
+.nodes-page .node-explorer>.node-explorer-reset:hover:not(:disabled) .ic{transform:rotate(-90deg)}
+.nodes-page .node-explorer>.node-explorer-reset:active:not(:disabled) .ic{transform:rotate(-150deg)}
+.nodes-page .node-explorer>.node-explorer-reset:focus-visible,
+.nodes-page .node-explorer-page-button:focus-visible{outline:2px solid var(--a);outline-offset:2px}
+.nodes-page .node-explorer-pages{
+ display:flex;align-items:center;gap:.6rem;min-height:2.7rem;
+}
+.nodes-page .node-explorer-pages [data-node-search-page]{
+ min-width:3.4rem;text-align:center;color:var(--tx);font-weight:750;
+ font-variant-numeric:tabular-nums;
+}
+.nodes-page .node-explorer-pages .node-explorer-page-button{
+ display:inline-flex;align-items:center;justify-content:center;
+ flex:0 0 2.5rem;width:2.5rem;height:2.5rem;min-height:2.5rem;
+ padding:0;border:1px solid var(--ln);border-radius:var(--ui-control-radius);
+ background:var(--s2);color:var(--tx);
+ transition:background-color .18s ease,border-color .18s ease,transform .18s ease;
+}
+.nodes-page .node-explorer-pages .node-explorer-page-button .ic{width:1.05rem;height:1.05rem;flex:none}
+.nodes-page .node-explorer-pages .node-explorer-page-button:hover:not(:disabled){
+ background:color-mix(in srgb,var(--a) 12%,var(--s2));
+ border-color:color-mix(in srgb,var(--a) 48%,var(--ln));transform:translateY(-1px);
+}
+.nodes-page .node-explorer-pages .node-explorer-page-button:active:not(:disabled){transform:scale(.96)}
+/* On one-page lists, no misleading disabled navigation controls. */
+.nodes-page .node-explorer-pages[data-single-page="true"] .node-explorer-page-button{display:none}
+.nodes-page .node-explorer-pages .node-explorer-page-button:disabled{
+ opacity:.5;cursor:default;transform:none;
+}
+@media(prefers-reduced-motion:reduce){
+ .nodes-page .node-explorer>.node-explorer-reset .ic,
+ .nodes-page .node-explorer-pages .node-explorer-page-button{transition:none!important}
+ .nodes-page .node-explorer>.node-explorer-reset:hover .ic,
+ .nodes-page .node-explorer>.node-explorer-reset:active .ic{transform:none!important}
 }
