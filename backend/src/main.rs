@@ -299,6 +299,7 @@ fn protected_routes(state: &AppState) -> Router<AppState> {
         .route("/stats", get(get_stats))
         .route("/system/stats", get(get_system_stats))
         .route("/statistics/overview", get(get_statistics_overview))
+        .route("/statistics/leaders", get(get_statistics_leaders))
         .route("/metrics/traffic", get(get_traffic_metrics))
         .route("/metrics/traffic/bucket-detail", get(get_traffic_bucket_detail))
         .route("/users/presence", get(get_user_presence))
@@ -1830,6 +1831,57 @@ mod metric_freshness_tests {
         assert_eq!(metric_freshness(now - 300_001, now), "stale");
         assert_eq!(metric_freshness(now + 30_001, now), "invalid");
     }
+}
+
+// Lifetime counters are not a time series: never label them as usage in a selected period.
+async fn get_statistics_leaders(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+) -> Result<Json<Value>, ApiError> {
+    if viewer_read_only(&actor) {
+        return Err(ApiError::new(StatusCode::FORBIDDEN, "Недостаточно прав."));
+    }
+    let users = sqlx::query(
+        "SELECT t.user_id, COALESCE(NULLIF(u.data->>'username',''),NULLIF(u.data->>'name',''),'Пользователь #'||t.user_id::text) AS name,
+                SUM(t.uplink_bytes)::BIGINT AS up, SUM(t.downlink_bytes)::BIGINT AS down
+         FROM user_node_traffic_totals t
+         JOIN panel_records u ON u.collection='users' AND u.id=t.user_id
+         GROUP BY t.user_id,u.data
+         ORDER BY SUM(t.uplink_bytes+t.downlink_bytes) DESC,t.user_id LIMIT 10"
+    ).fetch_all(&state.pool).await?;
+    let inbounds = sqlx::query(
+        "SELECT inbound_tag, SUM(uplink_bytes)::BIGINT AS up, SUM(downlink_bytes)::BIGINT AS down,
+                COUNT(DISTINCT user_id)::BIGINT AS users
+         FROM user_inbound_traffic_totals
+         GROUP BY inbound_tag
+         ORDER BY SUM(uplink_bytes+downlink_bytes) DESC,inbound_tag LIMIT 10"
+    ).fetch_all(&state.pool).await?;
+    let mut top_users = Vec::with_capacity(users.len());
+    for row in users {
+        top_users.push(json!({
+            "userId":row.try_get::<i64,_>("user_id")?,
+            "name":row.try_get::<String,_>("name")?,
+            "uplinkBytes":row.try_get::<i64,_>("up")?,
+            "downlinkBytes":row.try_get::<i64,_>("down")?
+        }));
+    }
+    let mut top_inbounds = Vec::with_capacity(inbounds.len());
+    for row in inbounds {
+        top_inbounds.push(json!({
+            "inboundTag":row.try_get::<String,_>("inbound_tag")?,
+            "uplinkBytes":row.try_get::<i64,_>("up")?,
+            "downlinkBytes":row.try_get::<i64,_>("down")?,
+            "userCount":row.try_get::<i64,_>("users")?
+        }));
+    }
+    Ok(Json(json!({
+        "period":"lifetime_since_first_verified_sample",
+        "usersSource":"user_node_traffic_totals",
+        "inboundsSource":"user_inbound_traffic_totals",
+        "countersAreIndependent":true,
+        "topUsers":top_users,
+        "topInbounds":top_inbounds
+    })))
 }
 
 async fn get_statistics_overview(
