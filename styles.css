@@ -5437,3 +5437,11 @@ body > .stats-user-overlay .stats-user-footnote{flex:0 0 auto}
  body > .stats-user-overlay .stats-user-aside{height:auto;overflow:visible;grid-template-columns:repeat(3,minmax(0,1fr))}
 }
 @media(max-width:700px){body > .stats-user-overlay .stats-user-aside{grid-template-columns:1fr}}
+
+/* One functional refresh action. Only the SVG rotates while its request is pending. */
+body > .stats-user-overlay .stats-user-actions #stats-user-refresh{gap:.45rem}
+body > .stats-user-overlay .stats-user-actions #stats-user-refresh .stats-refresh-icon{display:block!important;flex:none;transform-origin:center}
+body > .stats-user-overlay #stats-user-refresh.is-refreshing .stats-refresh-icon{animation:stats-user-refresh-spin .8s linear infinite}
+body > .stats-user-overlay #stats-user-refresh.is-refreshing{cursor:progress;opacity:.8}
+@keyframes stats-user-refresh-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){body > .stats-user-overlay #stats-user-refresh.is-refreshing .stats-refresh-icon{animation-duration:2s}}
