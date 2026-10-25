@@ -909,6 +909,19 @@ mod tests {
         );
     }
     #[test]
+    fn json_mode_reports_missing_outbound_and_rule_number() {
+        let node = json!({"routingEnabled":true,"routingJson":{
+            "routing":{"rules":[
+                {"type":"field","outboundTag":"direct"},
+                {"type":"field","outboundTag":"BLOCK"}]}}});
+        let mut config = sample();
+        let error = apply(&node, &mut config, &[], &[]).unwrap_err();
+        let message = error.safe_message();
+        assert!(message.contains("rule #2"), "{message}");
+        assert!(message.contains("missing outboundTag 'BLOCK'"), "{message}");
+        assert!(message.contains("Available outbounds: direct"), "{message}");
+    }
+    #[test]
     fn json_mode_keeps_stats_and_full_field_rules() {
         let node = json!({"routingEnabled":true,"routingJson":{
             "dns":{"servers":["1.1.1.1"]},
