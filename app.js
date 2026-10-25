@@ -3976,7 +3976,7 @@ document.addEventListener('click',async e=>{
         method:'POST',body:JSON.stringify({})
       });
       toast('Команда обновления Agent отправлена ноде.');
-      const deadline=Date.now()+180000;
+      const deadline=Date.now()+900000;
       let status=null;
       while(Date.now()<deadline){
         await new Promise(resolve=>setTimeout(resolve,3000));
@@ -3985,7 +3985,7 @@ document.addEventListener('click',async e=>{
         if(status.state==='succeeded')break;
         if(status.state==='failed')throw new Error(status.result||'Agent не смог завершить обновление.');
       }
-      if(status?.state!=='succeeded')throw new Error('Agent не подтвердил установку в течение трёх минут.');
+      if(status?.state!=='succeeded')throw new Error('Agent не подтвердил установку в течение 15 минут.');
       let observed=null;
       for(let attempt=0;attempt<8;attempt++){
         observed=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/runtime');
