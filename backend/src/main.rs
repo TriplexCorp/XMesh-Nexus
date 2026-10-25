@@ -268,105 +268,8 @@ struct UserInboundTrafficSample {
     downlink_bytes: i64,
 }
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-                tracing_subscriber::EnvFilter::new("info,tower_http=info,sqlx=warn")
-            }),
-        )
-        .json()
-        .init();
-
-    let database_url =
-        env::var("DATABASE_URL").map_err(|_| anyhow::anyhow!("DATABASE_URL is required"))?;
-    let pool = PgPoolOptions::new()
-        .max_connections(
-            env::var("DB_MAX_CONNECTIONS")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(20),
-        )
-        .min_connections(1)
-        .acquire_timeout(Duration::from_secs(10))
-        .idle_timeout(Duration::from_secs(600))
-        .max_lifetime(Duration::from_mins(30))
-        .connect(&database_url)
-        .await?;
-
-    let redis_url = env::var("REDIS_URL").map_err(|_| anyhow::anyhow!("REDIS_URL is required"))?;
-    let redis_client = redis::Client::open(redis_url)?;
-    let redis: ConnectionManager = redis_client.get_connection_manager().await?;
-    let mut redis_probe = redis.clone();
-    let redis_ping: String = redis::cmd("PING").query_async(&mut redis_probe).await?;
-    anyhow::ensure!(redis_ping == "PONG", "Redis readiness probe failed");
-
-    sqlx::migrate!("./migrations").run(&pool).await?;
-    // Preserve an existing custom dashboard path on upgrades. Migrate only the
-    // former hardcoded default; the database remains authoritative thereafter.
-    if let Ok(from_env) = env::var("DASHBOARD_PATH") {
-        let current: Option<Value> =
-            sqlx::query_scalar("SELECT value FROM app_settings WHERE key='security'")
-                .fetch_optional(&pool)
-                .await?;
-        if let Some(mut policy_json) = current
-            && policy_json.get("dashboardPath").and_then(Value::as_str) == Some("/dashboard/nexus")
-        {
-            policy_json["dashboardPath"] = Value::String(from_env);
-            sqlx::query("UPDATE app_settings SET value=$1,updated_at=NOW() WHERE key='security'")
-                .bind(policy_json)
-                .execute(&pool)
-                .await?;
-        }
-    }
-    // Sync the effective database path to a dedicated host-visible mirror.
-    // The panel never gets write access to the host's .env or other secrets.
-    let active_path = security::get_policy(&pool)
-        .await
-        .map_err(|e| anyhow::anyhow!("Invalid dashboard policy: {}", e.message))?
-        .dashboard_path;
-    if let Ok(mirror) = env::var("DASHBOARD_PATH_MIRROR") {
-        tokio::fs::write(mirror, format!("{active_path}\n")).await?;
-    }
-
-    let admin_username = env::var("ADMIN_USERNAME").unwrap_or_else(|_| "admin".to_owned());
-    let admin_password = env::var("ADMIN_PASSWORD")
-        .map_err(|_| anyhow::anyhow!("ADMIN_PASSWORD is required; run ./install.sh"))?;
-    auth::seed_bootstrap_admin(&pool, &admin_username, &admin_password).await?;
-
-    let cookie_secure = env::var("COOKIE_SECURE").map_or(true, |value| {
-        matches!(
-            value.trim().to_ascii_lowercase().as_str(),
-            "1" | "true" | "yes"
-        )
-    });
-    let core_dir = PathBuf::from(
-        env::var("CORE_DATA_DIR").unwrap_or_else(|_| "/var/lib/xmesh/core".to_owned()),
-    );
-    let node_policy_signer = std::sync::Arc::new(node_policy::PolicySigner::load(
-        &core_dir.join("node-policy-ed25519.key"),
-    )?);
-    let core = CoreManager::new(pool.clone(), core_dir).await?;
-    let totp_key = env::var("TOTP_ENCRYPTION_KEY")
-        .ok()
-        .filter(|s| !s.trim().is_empty())
-        .map(|raw| mfa::decode_key(&raw))
-        .transpose()?;
-    if totp_key.is_none() {
-        tracing::warn!("TOTP_ENCRYPTION_KEY is not configured: MFA enrollment is unavailable");
-    }
-    let state = AppState {
-        pool,
-        redis,
-        core,
-        cookie_secure,
-        totp_key,
-        node_policy_signer,
-    };
-    state.core.launch_startup_update();
-
-    let protected = Router::new()
+fn protected_routes(state: &AppState) -> Router<AppState> {
+    Router::new()
         .route("/bootstrap", get(bootstrap))
         .route("/auth/mfa/status", get(mfa::status))
         .route("/auth/mfa/setup", post(mfa::setup))
@@ -470,8 +373,11 @@ async fn main() -> anyhow::Result<()> {
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             auth::require_session,
-        ));
+        ))
+}
 
+fn application_router(state: AppState) -> Router {
+    let protected = protected_routes(&state);
     let public = Router::new()
         .route("/health/live", get(health_live))
         .route("/health/ready", get(health_ready))
@@ -538,6 +444,109 @@ async fn main() -> anyhow::Result<()> {
         .layer(middleware::from_fn(security_headers))
         .layer(middleware::from_fn(csrf_guard))
         .with_state(state);
+
+    app
+}
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                tracing_subscriber::EnvFilter::new("info,tower_http=info,sqlx=warn")
+            }),
+        )
+        .json()
+        .init();
+
+    let database_url =
+        env::var("DATABASE_URL").map_err(|_| anyhow::anyhow!("DATABASE_URL is required"))?;
+    let pool = PgPoolOptions::new()
+        .max_connections(
+            env::var("DB_MAX_CONNECTIONS")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(20),
+        )
+        .min_connections(1)
+        .acquire_timeout(Duration::from_secs(10))
+        .idle_timeout(Duration::from_secs(600))
+        .max_lifetime(Duration::from_mins(30))
+        .connect(&database_url)
+        .await?;
+
+    let redis_url = env::var("REDIS_URL").map_err(|_| anyhow::anyhow!("REDIS_URL is required"))?;
+    let redis_client = redis::Client::open(redis_url)?;
+    let redis: ConnectionManager = redis_client.get_connection_manager().await?;
+    let mut redis_probe = redis.clone();
+    let redis_ping: String = redis::cmd("PING").query_async(&mut redis_probe).await?;
+    anyhow::ensure!(redis_ping == "PONG", "Redis readiness probe failed");
+
+    sqlx::migrate!("./migrations").run(&pool).await?;
+    // Preserve an existing custom dashboard path on upgrades. Migrate only the
+    // former hardcoded default; the database remains authoritative thereafter.
+    if let Ok(from_env) = env::var("DASHBOARD_PATH") {
+        let current: Option<Value> =
+            sqlx::query_scalar("SELECT value FROM app_settings WHERE key='security'")
+                .fetch_optional(&pool)
+                .await?;
+        if let Some(mut policy_json) = current
+            && policy_json.get("dashboardPath").and_then(Value::as_str) == Some("/dashboard/nexus")
+        {
+            policy_json["dashboardPath"] = Value::String(from_env);
+            sqlx::query("UPDATE app_settings SET value=$1,updated_at=NOW() WHERE key='security'")
+                .bind(policy_json)
+                .execute(&pool)
+                .await?;
+        }
+    }
+    // Sync the effective database path to a dedicated host-visible mirror.
+    // The panel never gets write access to the host's .env or other secrets.
+    let active_path = security::get_policy(&pool)
+        .await
+        .map_err(|e| anyhow::anyhow!("Invalid dashboard policy: {}", e.message))?
+        .dashboard_path;
+    if let Ok(mirror) = env::var("DASHBOARD_PATH_MIRROR") {
+        tokio::fs::write(mirror, format!("{active_path}\n")).await?;
+    }
+
+    let admin_username = env::var("ADMIN_USERNAME").unwrap_or_else(|_| "admin".to_owned());
+    let admin_password = env::var("ADMIN_PASSWORD")
+        .map_err(|_| anyhow::anyhow!("ADMIN_PASSWORD is required; run ./install.sh"))?;
+    auth::seed_bootstrap_admin(&pool, &admin_username, &admin_password).await?;
+
+    let cookie_secure = env::var("COOKIE_SECURE").map_or(true, |value| {
+        matches!(
+            value.trim().to_ascii_lowercase().as_str(),
+            "1" | "true" | "yes"
+        )
+    });
+    let core_dir = PathBuf::from(
+        env::var("CORE_DATA_DIR").unwrap_or_else(|_| "/var/lib/xmesh/core".to_owned()),
+    );
+    let node_policy_signer = std::sync::Arc::new(node_policy::PolicySigner::load(
+        &core_dir.join("node-policy-ed25519.key"),
+    )?);
+    let core = CoreManager::new(pool.clone(), core_dir).await?;
+    let totp_key = env::var("TOTP_ENCRYPTION_KEY")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .map(|raw| mfa::decode_key(&raw))
+        .transpose()?;
+    if totp_key.is_none() {
+        tracing::warn!("TOTP_ENCRYPTION_KEY is not configured: MFA enrollment is unavailable");
+    }
+    let state = AppState {
+        pool,
+        redis,
+        core,
+        cookie_secure,
+        totp_key,
+        node_policy_signer,
+    };
+    state.core.launch_startup_update();
+
+    let app = application_router(state);
 
     let address = env::var("APP_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".to_owned());
     let listener = tokio::net::TcpListener::bind(&address).await?;
