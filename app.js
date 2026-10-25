@@ -1011,7 +1011,7 @@ function statisticsP(){
  const markup=`<div class="stats-dashboard" id="stats-dashboard">
   <div class="stats-heading"><div><h2>Статистика инфраструктуры</h2><p class="note">Реальные измерения. CPU steal показывает долю времени, которую виртуальная машина ожидала процессор гипервизора.</p></div>
    <div class="act"><button class="gh" id="stats-refresh" type="button" aria-label="Обновить статистику">${ic('refresh-cw')} Обновить</button><select id="stats-period" aria-label="Период графиков"><option value="live">В реальном времени</option><option value="5m">5 минут</option><option value="15m">15 минут</option><option value="30m">30 минут</option><option value="1h">1 час</option><option value="3h">3 часа</option><option value="6h">6 часов</option><option value="12h">12 часов</option><option value="24h">24 часа</option><option value="7d">7 дней</option><option value="30d">30 дней</option></select></div></div>
-  <div id="stats-status" class="note" role="status" aria-live="polite">Получение измерений…</div><div id="stats-quality" class="note" role="status" aria-live="polite"></div>
+  <div class="stats-live-bar"><span id="stats-live-badge" class="stats-live-badge" aria-label="Режим наблюдения"><i aria-hidden="true"></i><b>LIVE</b></span><span id="stats-status" class="note" role="status" aria-live="polite">Получение измерений…</span><span id="stats-sample-age" class="note">Ожидание измерений</span></div><div id="stats-quality" class="note" role="status" aria-live="polite"></div>
   <div id="stats-summary" class="stats-overview-grid"></div>
   <div class="stats-layout">
    <section class="card"><div class="hd"><div><h3>Скорость сети нод</h3><p>RX/TX сетевых интерфейсов (включая сторонние сервисы), отдельно от персональных Xray-счётчиков.</p></div></div><div id="stats-trend"></div></section>
@@ -1025,7 +1025,15 @@ function statisticsP(){
   let refreshing=false;
   let lastRefresh=0;
   let lastOverview=0,lastSystem=0,overviewCache=null,systemCache=null;
-  let requestFailed=false;
+  let requestFailed=false,lastSampleAt=0,lastTrafficSignature='',lastTrafficPeriod='';
+  const updateLiveStatus=()=>{
+    const live=$('#stats-period')?.value==='live',badge=$('#stats-live-badge'),age=$('#stats-sample-age');
+    if(badge)badge.classList.toggle('is-paused',!live||document.hidden||requestFailed);
+    if(!age)return;
+    if(!lastSampleAt){age.textContent='Нет подтверждённых измерений сети';return}
+    const seconds=Math.max(0,Math.floor((Date.now()-lastSampleAt)/1000));
+    age.textContent='Последняя точка TimescaleDB: '+seconds+' с назад'+(seconds>65?' · данные задерживаются':'');
+  };
   const refresh=async(force=false)=>{
    if(refreshing||cur!=='statistics'||document.hidden)return;
    refreshing=true;
@@ -1085,7 +1093,15 @@ function statisticsP(){
     $('#stats-control').innerHTML='<div class="stats-control-rings">'+statsRing('CPU',sys.cpu?.percent,'#6f9bff')+statsRing('RAM',sys.ram?.percent,'#c294e8')+statsRing('Диск',sys.disk?.percent,'#44c9b6')+'</div><div class="stats-kvs">'+control.map(x=>statsRow(...x)).join('')+'</div>';
     const points=traffic.points||[];
     const latest=points[points.length-1]||{};
-    $('#stats-trend').innerHTML='<div class="stats-trend-grid"><div><b>RX</b><strong>'+ (points.length?statsBytes(latest.rxBytesPerSec)+'/с':'Нет данных')+'</strong>'+statsSpark(points,'rxBytesPerSec')+'</div><div><b>TX</b><strong>'+(points.length?statsBytes(latest.txBytesPerSec)+'/с':'Нет данных')+'</strong>'+statsSpark(points,'txBytesPerSec')+'</div></div><small class="note">'+(panelIsEnglish()?'Samples: ':'Измерений: ')+esc(String(traffic.sampleCount??0))+(panelIsEnglish()?' · Source: TimescaleDB</small>':' · Источник: TimescaleDB</small>');
+    const sampled=Number(latest.bucketMs);
+    lastSampleAt=Number.isFinite(sampled)&&sampled>0?sampled:0;
+    const trafficSignature=JSON.stringify(points);
+    if(trafficSignature!==lastTrafficSignature||period!==lastTrafficPeriod){
+     lastTrafficSignature=trafficSignature;
+     lastTrafficPeriod=period;
+     $('#stats-trend').innerHTML='<div class="stats-trend-grid"><div><b>RX</b><strong>'+ (points.length?statsBytes(latest.rxBytesPerSec)+'/с':'Нет данных')+'</strong>'+statsSpark(points,'rxBytesPerSec')+'</div><div><b>TX</b><strong>'+(points.length?statsBytes(latest.txBytesPerSec)+'/с':'Нет данных')+'</strong>'+statsSpark(points,'txBytesPerSec')+'</div></div><small class="note">'+(panelIsEnglish()?'Samples: ':'Измерений: ')+esc(String(traffic.sampleCount??0))+(panelIsEnglish()?' · Source: TimescaleDB</small>':' · Источник: TimescaleDB</small>');
+    }
+    updateLiveStatus();
     $('#stats-nodes').innerHTML=nodes.length?nodes.map(n=>{
       const v=n.latest,quality=n.telemetryState||(v?(v.stale?'stale':'fresh'):'never_received'),ok=v&&quality==='fresh';
       const head=flagView(n.flag)+' <b>'+esc(n.name)+'</b>'+(n.hosting?'<small>'+esc(n.hosting)+'</small>':'');
@@ -1103,8 +1119,8 @@ function statisticsP(){
       const last=v?.sampledAt?new Date(v.sampledAt).toLocaleString(panelIsEnglish()?'en-US':'ru-RU'):'Нет измерений';
       return '<article class="stats-node"><div class="stats-node-head">'+head+'</div><span class="stats-node-status">'+(quality==='fresh'?'Свежие данные':quality==='delayed'?'Данные задерживаются':quality==='stale'?'Данные устарели':quality==='invalid'?'Недостоверная метка времени':'Нет телеметрии')+' · '+esc(last)+'</span><div class="stats-node-rings">'+statsRing('CPU',ok?v.cpuPercent:null,'#6f9bff')+statsRing('Steal time',ok?v.cpuStealPercent:null,'#f3ae63')+statsRing('RAM',ok&&v.ramTotalBytes>0?v.ramUsedBytes/v.ramTotalBytes*100:null,'#c294e8')+statsRing('Диск',ok&&v.diskTotalBytes>0?v.diskUsedBytes/v.diskTotalBytes*100:null,'#44c9b6')+'</div><div class="stats-kvs">'+values.map(x=>statsRow(...x)).join('')+'</div></article>';
     }).join(''):'<p class="note">Узлы пока не созданы.</p>';
-    if(status)status.textContent=(panelIsEnglish()?'Data updated · ':'Данные обновлены · ')+new Date().toLocaleTimeString(panelIsEnglish()?'en-US':'ru-RU');
-   }catch(error){requestFailed=true;if(status)status.textContent=(panelIsEnglish()?'Unable to refresh statistics: ':'Не удалось обновить статистику: ')+(error.message||(panelIsEnglish()?'API error':'Ошибка API'))}
+    if(status)status.textContent=(panelIsEnglish()?'API checked · ':'API проверен · ')+new Date().toLocaleTimeString(panelIsEnglish()?'en-US':'ru-RU');
+   }catch(error){requestFailed=true;updateLiveStatus();if(status)status.textContent=(panelIsEnglish()?'Unable to refresh statistics: ':'Не удалось обновить статистику: ')+(error.message||(panelIsEnglish()?'API error':'Ошибка API'))}
    finally{refreshing=false;lastRefresh=Date.now();if(button?.isConnected)button.disabled=false}
   };
   $('#stats-refresh')?.addEventListener('click',()=>{void refresh(true)});
@@ -1114,13 +1130,14 @@ function statisticsP(){
   // changes only when actual signed telemetry reaches TimescaleDB.
   T.push(setInterval(()=>{
     if(cur!=='statistics'||document.hidden)return;
+    updateLiveStatus();
     const live=$('#stats-period')?.value==='live';
     const cadence=live?5000:30000;
     if(!refreshing&&Date.now()-lastRefresh>=cadence){void refresh();return}
     const status=$('#stats-status');
     if(status&&!requestFailed&&lastRefresh&&live){
       const age=Math.max(0,Math.floor((Date.now()-lastRefresh)/1000));
-      status.textContent=(panelIsEnglish()?'Last API refresh ':'Последнее обновление API ')+age+(panelIsEnglish()?'s ago':' с назад')+' · '+(panelIsEnglish()?'live view':'живой режим');
+      status.textContent=(panelIsEnglish()?'API checked ':'API проверен ')+age+(panelIsEnglish()?'s ago':' с назад');
     }
   },1000));
  };
