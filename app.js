@@ -995,12 +995,43 @@ const statsBytes=v=>v===null||v===undefined||!Number.isFinite(Number(v))
  ?'Нет данных':sysBytes(Number(v));
 const statsMetric=(label,value,hint='')=>`<div class="stats-tile"><small>${esc(label)}</small><strong>${esc(String(value))}</strong>${hint?`<span>${esc(hint)}</span>`:''}</div>`;
 const statsRow=(label,value)=>`<div class="stats-kv"><span>${esc(label)}</span><b>${esc(String(value))}</b></div>`;
-const statsSpark=(points,key)=> {
- const values=(Array.isArray(points)?points:[]).map(p=>Number(p[key])).filter(Number.isFinite);
- if(values.length<2)return '<p class="note">История появится после первых измерений.</p>';
- const top=Math.max(1,...values),n=values.length-1;
- const coords=values.map((v,i)=>(i/n*100).toFixed(2)+','+(100-v/top*95).toFixed(2)).join(' ');
- return `<svg class="stats-spark" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="История скорости за выбранный период"><polyline points="${coords}" fill="none" stroke="currentColor" stroke-width="1.7" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+// Detailed chart uses the same RX/TX color vocabulary as the dashboard.
+// Each plotted point must be an actual TimescaleDB observation; nulls break paths.
+const statsDetailedChart=(points)=>{
+ const samples=(Array.isArray(points)?points:[]).filter(p=>Number.isFinite(Number(p.bucketMs))&&Number(p.bucketMs)>0);
+ if(!samples.length)return '<p class="note">Нет подтверждённых измерений за выбранный период.</p>';
+ const w=1000,h=340,left=72,right=22,top=20,bottom=48,pw=w-left-right,ph=h-top-bottom;
+ const metrics=['rxBytesPerSec','txBytesPerSec'];
+ const valid=(v)=>v!==null&&v!==undefined&&Number.isFinite(Number(v))&&Number(v)>=0;
+ const max=Math.max(1,...samples.flatMap(p=>metrics.map(k=>valid(p[k])?Number(p[k])*8/1e6:0)))*1.1;
+ const x=i=>left+(samples.length===1?.5:i/(samples.length-1))*pw;
+ const y=v=>top+ph-v/max*ph;
+ const line=(key)=>{
+  let d='',area='',segment=[];
+  const flush=()=>{
+   if(!segment.length)return;
+   const path=segment.map(([i,v],j)=>(j?'L':'M')+x(i).toFixed(2)+' '+y(v).toFixed(2)).join(' ');
+   d+=path+' ';
+   area+=path+' L'+x(segment[segment.length-1][0]).toFixed(2)+' '+(top+ph)+' L'+x(segment[0][0]).toFixed(2)+' '+(top+ph)+' Z ';
+   segment=[];
+  };
+  samples.forEach((p,i)=>{
+   if(!valid(p[key])){flush();return}
+   segment.push([i,Number(p[key])*8/1e6]);
+  });
+  flush();
+  const cls=key==='rxBytesPerSec'?'rx':'tx';
+  const dots=samples.map((p,i)=>{
+   if(!valid(p[key]))return '';
+   const v=Number(p[key])*8/1e6;
+   const when=new Date(Number(p.bucketMs)).toLocaleString(panelIsEnglish()?'en-US':'ru-RU');
+   return '<circle class="stats-detail-point '+cls+'" cx="'+x(i).toFixed(2)+'" cy="'+y(v).toFixed(2)+'" r="5" tabindex="0"><title>'+esc(when+' · '+cls.toUpperCase()+' · '+fmt(v,3)+' Мбит/с')+'</title></circle>';
+  }).join('');
+  return '<path class="stats-detail-area '+cls+'" d="'+area+'"/><path class="stats-detail-line '+cls+'" d="'+d+'"/>'+dots;
+ };
+ const grid=[0,.25,.5,.75,1].map(f=>'<line class="stats-detail-grid" x1="'+left+'" x2="'+(w-right)+'" y1="'+y(max*f)+'" y2="'+y(max*f)+'"/><text class="stats-detail-label" x="'+(left-12)+'" y="'+(y(max*f)+4)+'" text-anchor="end">'+esc(fmt(max*f,2))+'</text>').join('');
+ const ticks=[0,Math.floor((samples.length-1)/2),samples.length-1].filter((v,i,a)=>a.indexOf(v)===i).map(i=>'<text class="stats-detail-label" x="'+x(i)+'" y="'+(h-15)+'" text-anchor="'+(i===0?'start':i===samples.length-1?'end':'middle')+'">'+esc(new Date(Number(samples[i].bucketMs)).toLocaleString(panelIsEnglish()?'en-US':'ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}))+'</text>').join('');
+ return '<div class="stats-detail-wrap"><svg class="stats-detail-chart" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="История RX и TX, Мбит/с. Наведите на точки для значений"><text class="stats-detail-axis" x="17" y="'+(top+ph/2)+'" transform="rotate(-90 17 '+(top+ph/2)+')" text-anchor="middle">Мбит/с</text>'+grid+line('rxBytesPerSec')+line('txBytesPerSec')+ticks+'</svg></div><div class="stats-detail-legend"><span><i class="rx"></i> RX · принято нодами</span><span><i class="tx"></i> TX · отправлено нодами</span><small>Наведите на точку для времени и скорости. Пропуски не интерполируются.</small></div>';
 };
 const statsRing=(label,percent,accent)=> {
  const valid=percent!==null&&percent!==undefined&&Number.isFinite(Number(percent));
@@ -1099,7 +1130,7 @@ function statisticsP(){
     if(trafficSignature!==lastTrafficSignature||period!==lastTrafficPeriod){
      lastTrafficSignature=trafficSignature;
      lastTrafficPeriod=period;
-     $('#stats-trend').innerHTML='<div class="stats-trend-grid"><div><b>RX</b><strong>'+ (points.length?statsBytes(latest.rxBytesPerSec)+'/с':'Нет данных')+'</strong>'+statsSpark(points,'rxBytesPerSec')+'</div><div><b>TX</b><strong>'+(points.length?statsBytes(latest.txBytesPerSec)+'/с':'Нет данных')+'</strong>'+statsSpark(points,'txBytesPerSec')+'</div></div><small class="note">'+(panelIsEnglish()?'Samples: ':'Измерений: ')+esc(String(traffic.sampleCount??0))+(panelIsEnglish()?' · Source: TimescaleDB</small>':' · Источник: TimescaleDB</small>');
+     $('#stats-trend').innerHTML='<div class="stats-detail-kpis"><div><b>RX</b><strong>'+(latest.rxBytesPerSec!=null?statsBytes(latest.rxBytesPerSec)+'/с':'Нет данных')+'</strong></div><div><b>TX</b><strong>'+(latest.txBytesPerSec!=null?statsBytes(latest.txBytesPerSec)+'/с':'Нет данных')+'</strong></div><div><b>Временных интервалов</b><strong>'+esc(String(points.length))+'</strong></div></div>'+statsDetailedChart(points)+'<small class="note">'+(panelIsEnglish()?'Samples: ':'Измерений: ')+esc(String(traffic.sampleCount??0))+(panelIsEnglish()?' · Source: TimescaleDB':' · Источник: TimescaleDB')+'</small>';
     }
     updateLiveStatus();
     $('#stats-nodes').innerHTML=nodes.length?nodes.map(n=>{
