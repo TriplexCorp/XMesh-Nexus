@@ -7,6 +7,7 @@ const panelIsEnglish=()=>window.XMeshI18n?.getLanguage()==='en';
 const fmt=(v,d=0)=>(+v).toLocaleString(panelIsEnglish()?'en-US':'ru-RU',{minimumFractionDigits:d,maximumFractionDigits:d});
 const gb=v=>{const en=panelIsEnglish(),unit=en?[' TB',' GB',' MB']:[' ТБ',' ГБ',' МБ'];return v>=1024?fmt(v/1024,2)+unit[0]:v>=10?fmt(v,1)+unit[1]:v>=1?fmt(v,2)+unit[1]:fmt(v*1024)+unit[2]};
 const ago=t=>{if(!t)return panelIsEnglish()?'never':'никогда';const s=(Date.now()-t)/1e3;return panelIsEnglish()?(s<60?'just now':s<3600?(s/60|0)+' min ago':s<86400?(s/3600|0)+' h ago':(s/86400|0)+' days ago'):(s<60?'только что':s<3600?(s/60|0)+' мин назад':s<86400?(s/3600|0)+' ч назад':(s/86400|0)+' дн назад')};
+let pendingUserTrafficDetail=null;
 const DAY=864e5,left=t=>{if(!t)return panelIsEnglish()?'never':'бессрочно';const d=Math.ceil((t-Date.now())/DAY);return panelIsEnglish()?(d>0?d+' days':d===0?'expires today':'expired '+(-d)+' days ago'):(d>0?d+' дн':d===0?'истёк сегодня':'истёк '+(-d)+' дн назад')};
 const userExpiryCell=u=>{
   if(u.hold)return `<span class="user-expiry-primary">${esc(String(u.holdDays||0))} ${panelIsEnglish()?'days after connection':'дн после подключения'}</span>`;
@@ -1348,6 +1349,7 @@ function statisticsP(){
     if(user)openStatsUser(user.dataset.statsHistoryUser,user.textContent.trim());
   });
   $('#stats-user-lookup-open')?.addEventListener('click',()=>openStatsUser($('#stats-user-lookup')?.value));
+  if(pendingUserTrafficDetail){const requested=pendingUserTrafficDetail;pendingUserTrafficDetail=null;openStatsUser(requested.id,requested.name)}
   $('#stats-user-lookup')?.addEventListener('keydown',e=>{if(e.key==='Enter')openStatsUser(e.target.value)});
 
   // One-second UI heartbeat, but no invented network samples: the sparkline
@@ -1885,8 +1887,8 @@ function userDrawer(id,tab){
     :'<span class="user-canvas-muted">Подключённых устройств пока нет</span>';
   modal(`<div class="box user-drawer user-canvas">
     <header class="user-head">
-      <div class="who"><span class="av" style="${userAvatarStyle(u)}">${esc((u.username||'?')[0].toUpperCase())}</span><div><h2>${esc(u.username)}</h2>${chip(label,statusColor)} <span class="dot" data-user-presence-id="${u.id}" style="${isOn(u)?'':'display:none'}"></span></div></div>
-      <div class="user-head-actions"><button type="button" class="gh sm" data-a="tog" data-u="${u.id}">${ic(u.disabled?'play':'pause')}${u.disabled?'Включить':'Отключить'}</button><button type="button" class="ia user-remove" data-a="del" data-u="${u.id}" aria-label="Удалить пользователя" title="Удалить пользователя">${ic('trash')}</button><button type="button" class="ia" data-x aria-label="Закрыть">${ic('x')}</button></div>
+      <div class="who"><span class="av" style="${userAvatarStyle(u)}">${esc((u.username||'?')[0].toUpperCase())}</span><div><h2>${esc(u.username)}</h2><small class="user-numeric-id">ID пользователя: ${esc(u.id)}</small>${chip(label,statusColor)} <span class="dot" data-user-presence-id="${u.id}" style="${isOn(u)?'':'display:none'}"></span></div></div>
+      <div class="user-head-actions"><button type="button" class="gh sm" data-open-user-traffic="${u.id}" data-traffic-username="${esc(u.username)}">${ic("activity")} Подробная статистика</button><button type="button" class="gh sm" data-a="tog" data-u="${u.id}">${ic(u.disabled?'play':'pause')}${u.disabled?'Включить':'Отключить'}</button><button type="button" class="ia user-remove" data-a="del" data-u="${u.id}" aria-label="Удалить пользователя" title="Удалить пользователя">${ic('trash')}</button><button type="button" class="ia" data-x aria-label="Закрыть">${ic('x')}</button></div>
     </header>
     <div class="user-overview-band">
       <div class="user-usage-line"><span>Трафик</span><strong>${gb(u.used)}</strong><small>${u.limit?'из '+u.limit+' ГБ':'без лимита'}</small><button type="button" class="user-action-text" data-a="rst" data-u="${u.id}" title="Обнулить использованный трафик">${ic('redo')} Сбросить</button><span class="user-expiry-summary" data-user-expiry-summary >${ic('calendar')} <span>Осталось</span> <strong>${userRemainingLabel(u.expireAt)}</strong></span></div>
@@ -1985,6 +1987,17 @@ function generateAvailableUsername(current=''){
   }
   throw new Error('Не удалось подобрать уникальное имя. Повторите попытку.');
 }
+document.addEventListener('click',event=>{
+  const trigger=event.target.closest('[data-open-user-traffic]');
+  if(!trigger)return;
+  event.preventDefault();
+  const id=Number(trigger.dataset.openUserTraffic);
+  if(!Number.isSafeInteger(id)||id<=0)return;
+  pendingUserTrafficDetail={id,name:trigger.dataset.trafficUsername||'Пользователь #'+id};
+  if(dlg.open)dlg.close();
+  if(location.hash==='#statistics')void render(false);
+  else location.hash='statistics';
+});
 document.addEventListener('click',event=>{
   const button=event.target.closest('[data-generate-username]');
   if(!button)return;
