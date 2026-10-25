@@ -1009,11 +1009,11 @@ const statsRing=(label,percent,accent)=> {
 function statisticsP(){
  const markup=`<div class="stats-dashboard" id="stats-dashboard">
   <div class="stats-heading"><div><h2>Статистика инфраструктуры</h2><p class="note">Реальные измерения. CPU steal показывает долю времени, которую виртуальная машина ожидала процессор гипервизора.</p></div>
-   <div class="act"><select id="stats-period" aria-label="Период графиков"><option value="1h">1 час</option><option value="24h">24 часа</option></select><button class="gh" id="stats-refresh" type="button">${ic('refresh-cw')} Обновить</button></div></div>
-  <div id="stats-status" class="note" role="status" aria-live="polite">Получение измерений…</div>
+   <div class="act"><select id="stats-period" aria-label="Период графиков"><option value="1h">1 час</option><option value="24h">24 часа</option><option value="7d">7 дней</option><option value="30d">30 дней</option></select><button class="gh" id="stats-refresh" type="button">${ic('refresh-cw')} Обновить</button></div></div>
+  <div id="stats-status" class="note" role="status" aria-live="polite">Получение измерений…</div><div id="stats-quality" class="note" role="status" aria-live="polite"></div>
   <div id="stats-summary" class="stats-overview-grid"></div>
   <div class="stats-layout">
-   <section class="card"><div class="hd"><div><h3>Скорость сети</h3><p>Сумма показаний подключённых узлов, RX и TX. История TimescaleDB.</p></div></div><div id="stats-trend"></div></section>
+   <section class="card"><div class="hd"><div><h3>Скорость сети нод</h3><p>RX/TX сетевых интерфейсов (включая сторонние сервисы), отдельно от персональных Xray-счётчиков.</p></div></div><div id="stats-trend"></div></section>
    <section class="card"><div class="hd"><div><h3>Control Plane</h3><p>Метрики контейнера панели, не всей физической машины.</p></div></div><div id="stats-control"></div></section>
   </div>
   <section class="card"><div class="hd"><div><h3>Узлы и виртуализация</h3><p>CPU, steal time, RAM, диски, сеть, активные соединения и свежесть данных.</p></div></div><div id="stats-nodes" class="stats-node-grid"></div></section>
@@ -1038,21 +1038,29 @@ function statisticsP(){
     ]);
     if(generationAtStart!==generation||cur!=='statistics')return;
     const nodes=Array.isArray(overview.nodes)?overview.nodes:[];
-    const fresh=nodes.filter(n=>n.latest&&!n.latest.stale);
+    const fresh=nodes.filter(n=>n.telemetryState==='fresh'||(!n.telemetryState&&n.latest&&!n.latest.stale));
+     const delayed=nodes.filter(n=>n.telemetryState==='delayed');
+     const staleNodes=nodes.filter(n=>n.telemetryState==='stale'||n.telemetryState==='invalid');
+     const missing=nodes.filter(n=>n.telemetryState==='never_received'||(!n.telemetryState&&!n.latest));
+     const verified=fresh.filter(n=>['verified','direct'].includes(n.latest?.userStatsStatus));
+     const quality=$('#stats-quality');
+     if(quality)quality.textContent='Телеметрия: '+fresh.length+' свежих · '+delayed.length+' задержанных · '+staleNodes.length+' устаревших/недостоверных · '+missing.length+' без измерений. Персональные Xray-счётчики подтверждены на '+verified.length+' нодах.'+(delayed.length||staleNodes.length||missing.length?' Требуют внимания: '+[...delayed,...staleNodes,...missing].slice(0,5).map(n=>n.name).join(', ')+(delayed.length+staleNodes.length+missing.length>5?' и другие':'')+'.':'');
     const validNumbers=(key)=>fresh.map(n=>Number(n.latest[key])).filter(n=>Number.isFinite(n));
     const steals=fresh.map(n=>n.latest.cpuStealPercent).filter(v=>v!==null&&v!==undefined&&Number.isFinite(Number(v))).map(Number);
     const stealAvg=steals.length?steals.reduce((a,b)=>a+b,0)/steals.length:null;
     const rx=fresh.reduce((sum,n)=>sum+(Number(n.latest.rxBytesPerSec)||0),0);
+     const rxReporting=fresh.filter(n=>n.latest.rxBytesPerSec!=null&&Number.isFinite(Number(n.latest.rxBytesPerSec))).length;
     const tx=fresh.reduce((sum,n)=>sum+(Number(n.latest.txBytesPerSec)||0),0);
+     const txReporting=fresh.filter(n=>n.latest.txBytesPerSec!=null&&Number.isFinite(Number(n.latest.txBytesPerSec))).length;
     const tiles=[
       ['Узлы',String(overview.totalNodes??nodes.length),(panelIsEnglish()?fresh.length+' reporting fresh data':fresh.length+' передают свежие данные')],
       ['Пользователи',String(overview.totalUsers??'—'),'Учетные записи панели'],
       ['CPU steal',statsValue(stealAvg,'%'),steals.length?(panelIsEnglish()?steals.length+' nodes reporting':steals.length+' узлов с показаниями'):'Данные агента отсутствуют'],
-      ['RX',fresh.length?statsBytes(rx)+'/с':'Нет данных','Скорость получения'],
-      ['TX',fresh.length?statsBytes(tx)+'/с':'Нет данных','Скорость отправки'],
+      ['RX',rxReporting?statsBytes(rx)+'/с':'Нет данных','Сетевая скорость · '+rxReporting+'/'+nodes.length+' нод'],
+      ['TX',txReporting?statsBytes(tx)+'/с':'Нет данных','Сетевая скорость · '+txReporting+'/'+nodes.length+' нод'],
       ['User × inbound',String(overview.inboundTraffic?.counters??0),'Записей фактического учета'],
-      ['Uplink',statsBytes(overview.inboundTraffic?.uplinkBytes),'Трафик, подтвержденный узлами'],
-      ['Downlink',statsBytes(overview.inboundTraffic?.downlinkBytes),'Трафик, подтвержденный узлами']
+      ['Uplink',Number(overview.inboundTraffic?.counters)>0?statsBytes(overview.inboundTraffic?.uplinkBytes):'Нет данных','Накопленный персональный трафик, не за выбранный период'],
+      ['Downlink',Number(overview.inboundTraffic?.counters)>0?statsBytes(overview.inboundTraffic?.downlinkBytes):'Нет данных','Накопленный персональный трафик, не за выбранный период']
     ];
     $('#stats-summary').innerHTML=tiles.map(x=>statsMetric(...x)).join('');
     const control=[
@@ -1068,7 +1076,7 @@ function statisticsP(){
     const latest=points[points.length-1]||{};
     $('#stats-trend').innerHTML='<div class="stats-trend-grid"><div><b>RX</b><strong>'+ (points.length?statsBytes(latest.rxBytesPerSec)+'/с':'Нет данных')+'</strong>'+statsSpark(points,'rxBytesPerSec')+'</div><div><b>TX</b><strong>'+(points.length?statsBytes(latest.txBytesPerSec)+'/с':'Нет данных')+'</strong>'+statsSpark(points,'txBytesPerSec')+'</div></div><small class="note">'+(panelIsEnglish()?'Samples: ':'Измерений: ')+esc(String(traffic.sampleCount??0))+(panelIsEnglish()?' · Source: TimescaleDB</small>':' · Источник: TimescaleDB</small>');
     $('#stats-nodes').innerHTML=nodes.length?nodes.map(n=>{
-      const v=n.latest,stale=v?.stale,ok=v&&!stale;
+      const v=n.latest,quality=n.telemetryState||(v?(v.stale?'stale':'fresh'):'never_received'),ok=v&&quality==='fresh';
       const head=flagView(n.flag)+' <b>'+esc(n.name)+'</b>'+(n.hosting?'<small>'+esc(n.hosting)+'</small>':'');
       const values=[
         ['CPU',statsValue(ok?v.cpuPercent:null,'%')],
@@ -1078,10 +1086,11 @@ function statisticsP(){
         ['RX',ok?statsBytes(v.rxBytesPerSec)+'/с':'Нет данных'],
         ['TX',ok?statsBytes(v.txBytesPerSec)+'/с':'Нет данных'],
         ['TCP соединения',statsValue(ok?v.activeConnections:null)],
-        ['Онлайн клиенты',statsValue(ok?v.onlineClients:null)]
+        ['Онлайн клиенты',statsValue(ok?v.onlineClients:null)],
+         ['Учёт Xray',ok?(['verified','direct'].includes(v.userStatsStatus)?'Подтверждён':v.userStatsStatus==='unavailable'?'Недоступен':'Статус не получен'):'Нет свежего подтверждения']
       ];
       const last=v?.sampledAt?new Date(v.sampledAt).toLocaleString(panelIsEnglish()?'en-US':'ru-RU'):'Нет измерений';
-      return '<article class="stats-node"><div class="stats-node-head">'+head+'</div><span class="stats-node-status">'+(ok?'Свежие данные':stale?'Данные устарели':'Нет телеметрии')+' · '+esc(last)+'</span><div class="stats-node-rings">'+statsRing('CPU',ok?v.cpuPercent:null,'#6f9bff')+statsRing('Steal time',ok?v.cpuStealPercent:null,'#f3ae63')+statsRing('RAM',ok&&v.ramTotalBytes>0?v.ramUsedBytes/v.ramTotalBytes*100:null,'#c294e8')+statsRing('Диск',ok&&v.diskTotalBytes>0?v.diskUsedBytes/v.diskTotalBytes*100:null,'#44c9b6')+'</div><div class="stats-kvs">'+values.map(x=>statsRow(...x)).join('')+'</div></article>';
+      return '<article class="stats-node"><div class="stats-node-head">'+head+'</div><span class="stats-node-status">'+(quality==='fresh'?'Свежие данные':quality==='delayed'?'Данные задерживаются':quality==='stale'?'Данные устарели':quality==='invalid'?'Недостоверная метка времени':'Нет телеметрии')+' · '+esc(last)+'</span><div class="stats-node-rings">'+statsRing('CPU',ok?v.cpuPercent:null,'#6f9bff')+statsRing('Steal time',ok?v.cpuStealPercent:null,'#f3ae63')+statsRing('RAM',ok&&v.ramTotalBytes>0?v.ramUsedBytes/v.ramTotalBytes*100:null,'#c294e8')+statsRing('Диск',ok&&v.diskTotalBytes>0?v.diskUsedBytes/v.diskTotalBytes*100:null,'#44c9b6')+'</div><div class="stats-kvs">'+values.map(x=>statsRow(...x)).join('')+'</div></article>';
     }).join(''):'<p class="note">Узлы пока не созданы.</p>';
     if(status)status.textContent=(panelIsEnglish()?'Data updated · ':'Данные обновлены · ')+new Date().toLocaleTimeString(panelIsEnglish()?'en-US':'ru-RU');
    }catch(error){if(status)status.textContent=(panelIsEnglish()?'Unable to refresh statistics: ':'Не удалось обновить статистику: ')+(error.message||(panelIsEnglish()?'API error':'Ошибка API'))}
