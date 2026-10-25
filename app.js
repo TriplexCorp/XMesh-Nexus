@@ -3180,10 +3180,10 @@ function nodeSearchEntry(n,profile,runtime,hosts=[],monitored=false){
  // The viewer role must not use search as an oracle for masked IP/domain
  // data; index only the fields a viewer is already permitted to see.
  const restricted=viewerMode();
- const address=restricted?'':String(n.addr||'')+' '+String(n.publicAddress||'')+' '+String(n.externalAddress||'');
+ const address=restricted?'':[n.addr,n.publicAddress,n.externalAddress,...nodeRotationIPs(n)].filter(Boolean).join(' ');
  const name=String(n.name||'');
  const hosting=String(n.hosting||''),pname=String(profile?.name||'');
- const country=String(n.flag||''),domain=address;
+ const country=[n.flag,...hosts.map(h=>h.countryCode)].filter(Boolean).join(' '),domain=address;
  const hostDomains=restricted?'':hosts.flatMap(h=>[h.address,h.sni,h.host,h.remark]).filter(Boolean).map(String).join(' ');
  const fields={
   name:nodeFold(name),ip:nodeFold(address),domain:nodeFold(domain+' '+hostDomains),
