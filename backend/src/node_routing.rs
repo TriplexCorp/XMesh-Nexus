@@ -564,8 +564,12 @@ fn safe_exit_outbound(
     relays: &[Value],
     hosts: &[Value],
 ) -> Result<Value, ApiError> {
-    let spec=relays.iter().find(|v|v.get("nodeId").and_then(Value::as_i64)==Some(target_id))
-        .ok_or_else(||bad("Routing: select a working proxy connection for the exit node first."))?;
+    let spec = relays
+        .iter()
+        .find(|v| v.get("nodeId").and_then(Value::as_i64) == Some(target_id))
+        .ok_or_else(|| {
+            bad("Routing: select a working proxy connection for the exit node first.")
+        })?;
     let mut outbound = spec
         .get("outbound")
         .and_then(Value::as_object)
