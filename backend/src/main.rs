@@ -2627,10 +2627,12 @@ async fn get_traffic_metrics(
     let (range, interval_seconds) = match query.range.as_deref().unwrap_or("1h") {
         "1h" => ("1h", 60_i64),
         "24h" => ("24h", 900_i64),
+        "7d" => ("7d", 3600_i64),
+        "30d" => ("30d", 21_600_i64),
         _ => {
             return Err(ApiError::new(
                 StatusCode::BAD_REQUEST,
-                "Период должен быть 1h или 24h.",
+                "Период должен быть 1h, 24h, 7d или 30d.",
             ));
         }
     };
@@ -2686,13 +2688,13 @@ async fn get_traffic_metrics(
         ),
         per_node_bucket AS (
             SELECT
-                time_bucket(CASE WHEN $3::text = '1h' THEN INTERVAL '1 minute' ELSE INTERVAL '15 minutes' END, s.sampled_at) AS bucket,
+                time_bucket(CASE $3::text WHEN '1h' THEN INTERVAL '1 minute' WHEN '24h' THEN INTERVAL '15 minutes' WHEN '7d' THEN INTERVAL '1 hour' ELSE INTERVAL '6 hours' END, s.sampled_at) AS bucket,
                 s.node_id,
                 AVG(s.rx_bytes_per_sec) AS rx_bytes_per_sec,
                 AVG(s.tx_bytes_per_sec) AS tx_bytes_per_sec,
                 COUNT(*)::BIGINT AS sample_count
             FROM server_metric_samples s
-            WHERE s.sampled_at >= NOW() - CASE WHEN $3::text = '1h' THEN INTERVAL '1 hour' ELSE INTERVAL '24 hours' END
+            WHERE s.sampled_at >= NOW() - CASE $3::text WHEN '1h' THEN INTERVAL '1 hour' WHEN '24h' THEN INTERVAL '24 hours' WHEN '7d' THEN INTERVAL '7 days' ELSE INTERVAL '30 days' END
               AND s.node_id IN (SELECT node_id FROM selected_nodes)
             GROUP BY 1, 2
         )
