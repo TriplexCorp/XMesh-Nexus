@@ -143,7 +143,7 @@ def main():
         assert_status(code,409,"duplicate in-flight restart refused")
         code,pending,_=signed_post("/node/restart/poll",{"node_id":node})
         assert_status(code,200,"signed node claims restart")
-        assert pending["command"]=={"id":restart_id,"action":"restart_xray"}
+        assert pending["command"]=={"id":restart_id,"action":"restart_xray","targetVersion":None}
         code,again,_=signed_post("/node/restart/poll",{"node_id":node})
         assert_status(code,200,"claimed command cannot execute twice")
         assert again["command"] is None
