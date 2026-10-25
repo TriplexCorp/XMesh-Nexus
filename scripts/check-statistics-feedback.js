@@ -225,3 +225,7 @@ assert.match(app,/if\(a==='rst'\)\{/);
 assert.match(app,/confirmBox\('Сбросить трафик пользователя/);
 assert.match(app,/await api\.update\('users',id,\{used:0\}\)/);
 assert.doesNotMatch(app,/a=='rst'\?\{used:0\}/);
+
+assert.match(css,/Shared desktop geometry for user editor and detailed user analytics/);
+assert.match(css,/width:min\(82rem,calc\(100vw - 2\.5rem\)\)/);
+assert.match(css,/height:min\(44\.5rem,calc\(100dvh - 2rem\)\)/);
