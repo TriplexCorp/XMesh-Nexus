@@ -3177,10 +3177,14 @@ function nodeSearchTerms(query){
  }).filter(x=>x.value);
 }
 function nodeSearchEntry(n,profile,runtime,hosts=[],monitored=false){
- const address=String(n.addr||''),name=String(n.name||'');
+ // The viewer role must not use search as an oracle for masked IP/domain
+ // data; index only the fields a viewer is already permitted to see.
+ const restricted=viewerMode();
+ const address=restricted?'':String(n.addr||'')+' '+String(n.publicAddress||'')+' '+String(n.externalAddress||'');
+ const name=String(n.name||'');
  const hosting=String(n.hosting||''),pname=String(profile?.name||'');
  const country=String(n.flag||''),domain=address;
- const hostDomains=hosts.flatMap(h=>[h.address,h.sni,h.host,h.remark]).filter(Boolean).map(String).join(' ');
+ const hostDomains=restricted?'':hosts.flatMap(h=>[h.address,h.sni,h.host,h.remark]).filter(Boolean).map(String).join(' ');
  const fields={
   name:nodeFold(name),ip:nodeFold(address),domain:nodeFold(domain+' '+hostDomains),
   hosting:nodeFold(hosting),profile:nodeFold(pname),country:nodeFold(country),
