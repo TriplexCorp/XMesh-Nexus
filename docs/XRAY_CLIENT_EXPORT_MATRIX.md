@@ -1,6 +1,6 @@
 # Xray inbound → client outbound projection (XMesh Nexus)
 
-Updated 2026-10-24. Backend implementation: `subscription_transport.rs`,
+Updated 2026-10-26. Backend implementation: `subscription_transport.rs`,
 `user_subscriptions.rs`, `subscription_json.rs`; node identities:
 `node_runtime.rs`.
 
@@ -57,9 +57,23 @@ TLS client: `serverName`, `alpn`, `fingerprint`, optional explicit
 client certificate verification options. NEVER copy server
 `certificates` private keys or server-only TLS material.
 
-FinalMask and sockopt may differ directionally; never infer a client
-configuration from the server version. Optional explicitly configured
-`clientFinalmask` and `clientSockopt` are exported.
+FinalMask is projected through `subscription_finalmask.rs` using the
+actual transport and TLS ALPN. Symmetric masks are inherited only where the
+client and server use the same wire-format settings: TCP `sudoku` and
+`header-custom`; UDP `sudoku`, `header-custom`, `mkcp-legacy`, and
+`salamander` (Gecko `packetSize` requires QUIC). Server-only `filter`
+is never copied. A mixed mask chain with a layer that cannot be safely
+projected is **rejected rather than partially copied**.
+
+For directional/client-only features (`fragment`, `xmc`, `noise`,
+`udphop`, `xdns`, `xicmp`, `realm`) or per-endpoint
+`quicParams`, set `inbound.xmesh.clientFinalmask` in XRAY STUDIO, or
+`host.clientFinalmask` for host-specific overrides. Explicit masks are
+transport-checked, replace automatic inheritance, and reject
+client-side `filter` and mismatched TCP/UDP. `xdns` is mKCP-only;
+QUIC params require Hysteria, MASQUE H3 or XHTTP H3. `clientSockopt`
+remains explicit. See [complete FinalMask compatibility and deployment
+guide](FINALMASK_COMPATIBILITY.md).
 
 ### Protocol credentials and per-user authorization
 
