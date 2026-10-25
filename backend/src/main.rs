@@ -300,6 +300,7 @@ fn protected_routes(state: &AppState) -> Router<AppState> {
         .route("/system/stats", get(get_system_stats))
         .route("/statistics/overview", get(get_statistics_overview))
         .route("/metrics/traffic", get(get_traffic_metrics))
+        .route("/metrics/traffic/bucket-detail", get(get_traffic_bucket_detail))
         .route("/users/presence", get(get_user_presence))
         .route("/users/{id}/traffic", get(get_user_traffic))
         .route(
@@ -2665,6 +2666,72 @@ fn traffic_metrics_range(range: Option<&str>) -> Result<(&'static str, i64), Api
             ));
         }
     })
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TrafficBucketDetailQuery {
+    range: String,
+    bucket_ms: i64,
+}
+
+async fn get_traffic_bucket_detail(
+    State(state): State<AppState>,
+    Query(query): Query<TrafficBucketDetailQuery>,
+) -> Result<Json<Value>, ApiError> {
+    let (range, interval_seconds) = traffic_metrics_range(Some(&query.range))?;
+    let step_ms = interval_seconds.saturating_mul(1000);
+    let now_ms = chrono::Utc::now().timestamp_millis();
+    let window_ms = match range {
+        "live" => 60_000,
+        "5m" => 300_000,
+        "15m" => 900_000,
+        "30m" => 1_800_000,
+        "1h" => 3_600_000,
+        "3h" => 10_800_000,
+        "6h" => 21_600_000,
+        "12h" => 43_200_000,
+        "24h" => 86_400_000,
+        "7d" => 604_800_000,
+        _ => 2_592_000_000,
+    };
+    if query.bucket_ms <= 0
+        || query.bucket_ms > now_ms.saturating_add(step_ms)
+        || query.bucket_ms < now_ms.saturating_sub(window_ms.saturating_add(step_ms))
+    {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Интервал вне выбранного периода."));
+    }
+    let rows = sqlx::query(
+        "SELECT n.id, n.data->>'name' AS name,
+                AVG(s.rx_bytes_per_sec) AS rx,
+                AVG(s.tx_bytes_per_sec) AS tx,
+                COUNT(s.node_id)::BIGINT AS samples,
+                (EXTRACT(EPOCH FROM MAX(s.sampled_at))*1000)::BIGINT AS last_ms
+         FROM server_metric_samples s
+         JOIN panel_records n ON n.collection = 'nodes' AND n.id::text = s.node_id
+         WHERE s.sampled_at >= to_timestamp($1::DOUBLE PRECISION / 1000.0)
+           AND s.sampled_at < to_timestamp(($1::DOUBLE PRECISION + $2::DOUBLE PRECISION) / 1000.0)
+         GROUP BY n.id, n.data->>'name'
+         ORDER BY rx DESC NULLS LAST, n.id ASC
+         LIMIT 500"
+    )
+    .bind(query.bucket_ms)
+    .bind(step_ms)
+    .fetch_all(&state.pool)
+    .await?;
+    let mut nodes = Vec::with_capacity(rows.len());
+    for row in rows {
+        nodes.push(json!({
+            "id": row.try_get::<i64, _>("id")?,
+            "name": row.try_get::<Option<String>, _>("name")?,
+            "rxBytesPerSec": row.try_get::<Option<f64>, _>("rx")?,
+            "txBytesPerSec": row.try_get::<Option<f64>, _>("tx")?,
+            "sampleCount": row.try_get::<i64, _>("samples")?,
+            "lastSampleMs": row.try_get::<Option<i64>, _>("last_ms")?
+        }));
+    }
+    Ok(Json(json!({"range":range,"bucketMs":query.bucket_ms,"intervalSeconds":interval_seconds,
+        "source":"server_metric_samples","nodes":nodes,"truncated":nodes.len()==500})))
 }
 
 async fn get_traffic_metrics(
