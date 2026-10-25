@@ -1826,14 +1826,45 @@ const userTrafficBytes=v=>sysBytes(Number.isFinite(+v)&&+v>=0?+v:0);
 // Distinct, stable node colours used by both overview ring and per-node donuts.
 // Deterministic, effectively unbounded node colours: golden-angle hue rotation
 // avoids repeating a short fixed palette as installations grow.
+// Distinguishable node colours: choose the candidate farthest from already
+// assigned colours in perceptually uniform OKLab (maximin / farthest-point).
+// Assignments persist for the session and do not shift when telemetry changes.
+const userNodeColors=new Map();
+const userNodeCandidates=(()=>{
+  const list=[];
+  for(let hue=0;hue<360;hue+=5)for(const saturation of [75,95])for(const lightness of [48,65]){
+    const h=hue/60,c=(1-Math.abs(2*lightness/100-1))*saturation/100,x=c*(1-Math.abs(h%2-1)),m=lightness/100-c/2;
+    const rgb=h<1?[c,x,0]:h<2?[x,c,0]:h<3?[0,c,x]:h<4?[0,x,c]:h<5?[x,0,c]:[c,0,x];
+    const [r,g,b]=rgb.map(v=>{const q=v+m;return q<=.04045?q/12.92:((q+.055)/1.055)**2.4});
+    const l=Math.cbrt(.4122214708*r+.5363325363*g+.0514459929*b);
+    const mm=Math.cbrt(.2119034982*r+.6806995451*g+.1073969566*b);
+    const ss=Math.cbrt(.0883024619*r+.2817188376*g+.6299787005*b);
+    list.push({css:'hsl('+hue+' '+saturation+'% '+lightness+'%)',lab:[
+      .2104542553*l+.793617785*mm-.0040720468*ss,
+      1.9779984951*l-2.428592205*mm+.4505937099*ss,
+      .0259040371*l+.7827717662*mm-.808675766*ss]});
+  }
+  return list;
+})();
+const userNodeDistance=(a,b)=>a.reduce((sum,v,i)=>sum+(v-b[i])**2,0);
+function registerUserNodeColors(servers){
+  const keys=[...new Set(servers.map(v=>String(v.nodeId)))].filter(v=>v!=='undefined'&&v!=='null').sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
+  for(const key of keys){
+    if(userNodeColors.has(key))continue;
+    let best=null,bestDistance=-1;
+    for(const candidate of userNodeCandidates){
+      const distance=userNodeColors.size
+        ?Math.min(...[...userNodeColors.values()].map(v=>userNodeDistance(candidate.lab,v.lab)))
+        :userNodeDistance(candidate.lab,[.65,0,0]);
+      if(distance>bestDistance){best=candidate;bestDistance=distance;}
+    }
+    if(best)userNodeColors.set(key,best);
+  }
+}
 function userServerColor(id){
   const key=String(id??'unknown');
-  let hash=2166136261;
-  for(const char of key)hash=Math.imul(hash^char.codePointAt(0),16777619)>>>0;
-  const hue=(hash*137.50776405003785)%360;
-  const saturation=68+((hash>>>12)%18);
-  const lightness=55+((hash>>>20)%10);
-  return 'hsl('+hue.toFixed(2)+' '+saturation+'% '+lightness+'%)';
+  if(!userNodeColors.has(key))registerUserNodeColors([{nodeId:key}]);
+  return userNodeColors.get(key)?.css||'var(--a)';
 }
 function userServerGradient(id){
   const key=String(id??'unknown');let h=2166136261;
@@ -1870,6 +1901,7 @@ function userTrafficDonutsMarkup(payload){
       'Ноды не прислали свежую подтверждённую статистику Xray. Проверьте таймер xmesh-node-user-meter и службу xmesh-node-metrics на подключённых нодах.';
     return '<div class="user-chart-empty"><div class="user-chart-empty-ring" aria-hidden="true"><span>—</span></div><div class="user-chart-empty-copy"><b>'+title+'</b><p>'+help+'</p><small>Статус подтверждён подписанными метриками. Общий трафик VPS не считается трафиком пользователя.</small></div></div>';
   }
+  registerUserNodeColors(servers);
   const up=servers.reduce((sum,r)=>sum+Number(r.uplinkBytes),0);
   const down=servers.reduce((sum,r)=>sum+Number(r.downlinkBytes),0);
   const total=up+down;
