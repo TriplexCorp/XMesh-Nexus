@@ -35,6 +35,7 @@ assert.match(updater,/declare -f update_router/,'Router upgrade must execute in 
 assert.match(updater,/export HOME=\/run\/xmesh-node-router-upgrade/,'Systemd-constrained Docker builds need a writable HOME');
 assert.match(updater,/export DOCKER_CONFIG="\$HOME\/\.docker"/,'Buildx must not write to inaccessible /root/.docker');
 assert.match(updater,/export XDG_CACHE_HOME="\$HOME\/\.cache"/,'Buildx cache needs writable runtime path');
+assert.match(updater,/export TMPDIR="\$HOME\/tmp"/,'Compose metadata must not use read-only /tmp');
 assert.match(updater,/ReadWritePaths=\/run/,'The isolated router upgrade worker must be able to write Docker state');
 
 assert.match(updater,/systemd-run --quiet --wait --collect --pipe/,'Router upgrade must be checked synchronously');
