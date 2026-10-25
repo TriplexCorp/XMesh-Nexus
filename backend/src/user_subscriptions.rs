@@ -1189,7 +1189,7 @@ fn portal_metrics(user: &Value, settings: &Value, en: bool) -> String {
         .unwrap_or(0.0)
         .max(0.0);
     let mut metrics = String::new();
-    if studio_enabled(&settings, "subscriptionShowTraffic", true) {
+    if studio_enabled(settings, "subscriptionShowTraffic", true) {
         let remaining = if limit > 0.0 {
             format!(
                 "{:.2} / {:.2} {}",
@@ -1221,7 +1221,7 @@ fn portal_metrics(user: &Value, settings: &Value, en: bool) -> String {
             escape_html(&remaining)
         );
     }
-    if studio_enabled(&settings, "subscriptionShowExpiry", true) {
+    if studio_enabled(settings, "subscriptionShowExpiry", true) {
         let expiry = user.get("expireAt").and_then(Value::as_i64).unwrap_or(0);
         let _ = write!(
             metrics,
@@ -1257,6 +1257,34 @@ struct PortalControls {
     apps: String,
 }
 
+fn portal_device_summary(user: &Value, en: bool) -> String {
+    let maximum = user.get("hwid").and_then(Value::as_i64).unwrap_or(0);
+    let connected_devices = user
+        .get("devices")
+        .and_then(Value::as_array)
+        .map_or(0, Vec::len);
+    format!(
+        "<div id=\"subscription-devices\" class=\"subscription-public-devices\" hidden>{}: {} · {}: {}</div>",
+        if en {
+            "Connected devices"
+        } else {
+            "Подключённые устройства"
+        },
+        connected_devices,
+        if en { "Limit" } else { "Лимит" },
+        if maximum > 0 {
+            maximum.to_string()
+        } else {
+            if en {
+                "Unlimited"
+            } else {
+                "Без лимита"
+            }
+            .to_owned()
+        }
+    )
+}
+
 fn portal_controls(
     user: &Value,
     settings: &Value,
@@ -1272,7 +1300,7 @@ fn portal_controls(
     let mut apps = String::new();
     if active {
         let button = studio_string(
-            &settings,
+            settings,
             if en {
                 "subscriptionCtaEn"
             } else {
@@ -1292,9 +1320,9 @@ fn portal_controls(
                 "Скопировать HTTPS-ссылку подписки"
             },
             escape_html(button),
-            escape_html(&raw_link)
+            escape_html(raw_link)
         );
-        if studio_enabled(&settings, "subscriptionShowCopy", true) {
+        if studio_enabled(settings, "subscriptionShowCopy", true) {
             let _ = write!(
                 quick,
                 "<button type=\"button\" id=\"copy-link\">{}</button>",
@@ -1305,11 +1333,11 @@ fn portal_controls(
                 }
             );
         }
-        if studio_enabled(&settings, "subscriptionShowQr", true) {
+        if studio_enabled(settings, "subscriptionShowQr", true) {
             quick.push_str("<button type=\"button\" id=\"toggle-qr\" aria-controls=\"subscription-qr\" aria-expanded=\"false\">QR</button>");
             "<div id=\"subscription-qr\" class=\"subscription-preview-qr\" hidden aria-label=\"QR-код подписки\"></div>".clone_into(&mut qr);
         }
-        if studio_enabled(&settings, "subscriptionShowDevices", false) {
+        if studio_enabled(settings, "subscriptionShowDevices", false) {
             let _ = write!(
                 quick,
                 "<button type=\"button\" id=\"toggle-devices\" aria-controls=\"subscription-devices\" aria-expanded=\"false\">{}</button>",
@@ -1319,37 +1347,13 @@ fn portal_controls(
                     "Устройства"
                 }
             );
-            let maximum = user.get("hwid").and_then(Value::as_i64).unwrap_or(0);
-            let connected_devices = user
-                .get("devices")
-                .and_then(Value::as_array)
-                .map_or(0, Vec::len);
-            devices = format!(
-                "<div id=\"subscription-devices\" class=\"subscription-public-devices\" hidden>{}: {} · {}: {}</div>",
-                if en {
-                    "Connected devices"
-                } else {
-                    "Подключённые устройства"
-                },
-                connected_devices,
-                if en { "Limit" } else { "Лимит" },
-                if maximum > 0 {
-                    maximum.to_string()
-                } else {
-                    if en {
-                        "Unlimited"
-                    } else {
-                        "Без лимита"
-                    }
-                    .to_owned()
-                }
-            );
+            devices = portal_device_summary(user, en);
         }
         if !quick.is_empty() {
             quick = format!("<div class=\"subscription-preview-quick\">{quick}</div>");
         }
-        if studio_enabled(&settings, "subscriptionShowApps", true) {
-            apps = app_catalog(&settings, lang);
+        if studio_enabled(settings, "subscriptionShowApps", true) {
+            apps = app_catalog(settings, lang);
         }
     } else {
         cta = format!(

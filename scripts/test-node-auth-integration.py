@@ -33,7 +33,10 @@ def request(method, path, payload=None, *, headers=None, cookie=None, origin=Non
         response = exc
     with response:
         raw = response.read()
-        result = json.loads(raw) if raw else None
+        # Axum extractor rejections (e.g. unknown JSON fields) may be plain text.
+        # Decode JSON only when the response advertises a JSON media type.
+        content_type = response.headers.get_content_type()
+        result = json.loads(raw) if raw and (content_type == "application/json" or content_type.endswith("+json")) else (raw.decode("utf-8", errors="replace") if raw else None)
         cookies = response.headers.get_all("Set-Cookie", [])
         auth = next((x.split(";", 1)[0] for x in cookies if x.startswith("xmesh_session=")), None)
         return response.status, result, auth
@@ -50,7 +53,7 @@ def main():
     assert_status(code, 200, "bootstrap login")
     assert cookie and login["authenticated"]
 
-    code, created, _ = request("POST", "/collections/nodes", {"name": "CI signed telemetry"},
+    code, created, _ = request("POST", "/collections/nodes", {"name": "CI signed telemetry", "addr": "127.0.0.1"},
                                cookie=cookie, origin=BASE)
     assert_status(code, 201, "create CI node")
     node = created["id"]
@@ -143,7 +146,7 @@ def main():
         assert_status(code,409,"duplicate in-flight restart refused")
         code,pending,_=signed_post("/node/restart/poll",{"node_id":node})
         assert_status(code,200,"signed node claims restart")
-        assert pending["command"]=={"id":restart_id,"action":"restart_xray"}
+        assert pending["command"]=={"id":restart_id,"action":"restart_xray","targetVersion":None}
         code,again,_=signed_post("/node/restart/poll",{"node_id":node})
         assert_status(code,200,"claimed command cannot execute twice")
         assert again["command"] is None
@@ -168,17 +171,17 @@ def main():
         code,agent_command,_=request("POST",f"/nodes/{node}/agent-update",{},
                                     cookie=cookie,origin=BASE)
         assert_status(code,202,"admin queued a fixed agent self-update")
-        assert agent_command["targetVersion"]=="control-v4.0.0"
+        assert agent_command["targetVersion"]=="control-v4.3.2"
         code,_,_=request("POST",f"/nodes/{node}/restart",{},
                          cookie=cookie,origin=BASE)
         assert_status(code,409,"agent update prevents overlapping restart commands")
         code,polled,_=signed_post("/node/restart/poll",{"node_id":node})
         assert_status(code,200,"signed v4 node receives agent update")
         assert polled["command"]=={
-            "id":agent_command["id"],"action":"update_agent","targetVersion":"control-v4.0.0"}
+            "id":agent_command["id"],"action":"update_agent","targetVersion":"control-v4.3.2"}
         code,_,_=signed_post("/node/restart/ack",{
             "node_id":node,"command_id":agent_command["id"],
-            "success":True,"detail":"Agent control-v4.0.0 installed and verified"})
+            "success":True,"detail":"Agent control-v4.3.2 installed and verified"})
         assert_status(code,200,"signed node confirms agent update")
         code,last_command,_=request("GET",f"/nodes/{node}/restart",cookie=cookie)
         assert_status(code,200,"admin reads confirmed agent-update status")
