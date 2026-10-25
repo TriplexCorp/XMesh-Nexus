@@ -1257,7 +1257,14 @@ struct PortalControls {
     apps: String,
 }
 
-fn portal_controls(user: &Value, settings: &Value, lang: &str, en: bool, active: bool, raw_link: &str) -> PortalControls {
+fn portal_controls(
+    user: &Value,
+    settings: &Value,
+    lang: &str,
+    en: bool,
+    active: bool,
+    raw_link: &str,
+) -> PortalControls {
     let mut quick = String::new();
     let mut qr = String::new();
     let mut devices = String::new();
@@ -1354,7 +1361,13 @@ fn portal_controls(user: &Value, settings: &Value, lang: &str, en: bool, active:
             }
         );
     }
-    PortalControls { quick, qr, devices, cta, apps }
+    PortalControls {
+        quick,
+        qr,
+        devices,
+        cta,
+        apps,
+    }
 }
 
 struct PortalDecoration<'a> {
@@ -1366,7 +1379,7 @@ struct PortalDecoration<'a> {
     logo_brand: &'a str,
 }
 
-fn portal_decoration<'a>(settings: &'a Value, en: bool, active: bool) -> PortalDecoration<'a> {
+fn portal_decoration(settings: &Value, en: bool, active: bool) -> PortalDecoration<'_> {
     let support = if studio_enabled(settings, "subscriptionShowSupport", false) {
         let url = studio_string(settings, "subscriptionSupportUrl", "");
         let label = escape_html(studio_string(
@@ -1444,7 +1457,14 @@ fn portal_decoration<'a>(settings: &'a Value, en: bool, active: bool) -> PortalD
         "subscriptionBrand",
         studio_string(settings, "brand", "XMesh Nexus"),
     );
-    PortalDecoration { support, logo_markup, status_dot, title, footer, logo_brand }
+    PortalDecoration {
+        support,
+        logo_markup,
+        status_dot,
+        title,
+        footer,
+        logo_brand,
+    }
 }
 
 fn portal_theme_changes(settings: &Value) -> Vec<(&'static str, String)> {
@@ -1530,8 +1550,21 @@ fn portal_html(
     controls: PortalControls,
     decoration: PortalDecoration<'_>,
 ) -> String {
-    let PortalControls { quick, qr, devices, cta, apps } = controls;
-    let PortalDecoration { support, logo_markup, status_dot, title, footer, logo_brand } = decoration;
+    let PortalControls {
+        quick,
+        qr,
+        devices,
+        cta,
+        apps,
+    } = controls;
+    let PortalDecoration {
+        support,
+        logo_markup,
+        status_dot,
+        title,
+        footer,
+        logo_brand,
+    } = decoration;
     let theme_changes = portal_theme_changes(settings);
     let mut html = include_str!("subscription_template.html").to_owned();
     let changes = [
