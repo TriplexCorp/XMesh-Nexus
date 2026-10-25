@@ -130,6 +130,22 @@ This roadmap tracks verified improvements, not feature claims. A stage is comple
 
 **Deep Analytics implementation note (2026-10-25):** `GET /api/v1/statistics/leaders` and the Statistics Top-10 tables are now present in `main`, using `user_node_traffic_totals` and independently `user_inbound_traffic_totals`. They show **verified cumulative totals since the first accepted baseline**, not traffic over the selected graph period. Viewer access is denied; owner/admin can inspect ranks. **Historical per-period Xray charts and Top-10 for 24h/7d still require an append-only accepted-delta journal and must not be inferred from `updated_at` or cumulative totals.** Await strict CI and live API verification before claiming the slice accepted.
 
+### Mandatory requirement — per-user × inbound forensic drill-down (2026-10-25)
+
+**User requirement, verbatim:** «ты сможешь контрить буквально по инбаунду статистику конкретного юзера». This is **required product scope**, not an optional chart.
+
+For **any selected user**, an authorized operator must be able to inspect **each inbound individually**, with further breakdown by **node and time bucket**:
+
+- Verified **uplink, downlink and total bytes** for the exact `user_id × inbound_tag × node_id` combination, including the contributing sample count, latest valid observation time, collection freshness and source.
+- Historic breakdown by selectable intervals (1h, 24h, 7d, 30d and bounded custom period), with correct time buckets and explicit missing-data gaps. Provide separate time-series lines for each inbound and the ability to expand **user → inbound → node → interval → supporting observations**.
+- Inbound Top-10 can be filtered to the **selected user's traffic**, not just a global inbound ranking; filtering by node and direction must not change accounting semantics.
+- A click-through UI from a user or inbound entry should show a clear ledger-like explanation of what was measured, when, which node reported it, whether the Xray StatsService counter was verified, and what is unknown.
+- Ingestion must persist accepted monotonic **counter deltas** in a durable, idempotent, append-only historical ledger. Deduplicate signed retries; handle out-of-order samples, counter resets and agent/Xray restarts without double-counting. Existing cumulative tables are **not** sufficient to reconstruct past intervals.
+- **Never add user-global and user-inbound counters together** (two independent views can overlap); never infer destination IP, domain, application, VPN protocol or actual routing solely from the inbound tag or host network-interface RX/TX. Show unavailable dimensions as unknown.
+- Tests must cover two users sharing one inbound, one user across multiple inbounds and nodes, absent Xray StatsService data, resets/replays, conservation against accepted cumulative deltas, RBAC, time boundaries and high-cardinality query performance.
+
+**Done means:** an operator can pick user U, inbound I and node N for a real interval and see reproducible, independently supported Uplink/Downlink values with evidence and freshness, not a mockup or totals backfilled into fake history. **Status: NOT YET IMPLEMENTED.** Present `user_inbound_traffic_totals` and the per-user traffic endpoint expose cumulative snapshots only.
+
 ### Phase C — P1: Deep TimescaleDB, user and inbound analytics
 
 - [ ] Build genuine **time-bucketed Xray user-traffic** history (not merely lifetime totals), with safe filters for user, node, inbound, squad, time range and source reliability; preserve accounting direction/units.
