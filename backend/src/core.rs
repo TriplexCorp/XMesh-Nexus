@@ -371,8 +371,7 @@ impl CoreManager {
         if !reported.contains(version.trim_start_matches('v')) {
             let _ = fs::remove_dir_all(&staging_dir).await;
             return Err(format!(
-                "Downloaded binary reports an unexpected version; expected {}, received {}",
-                version, reported
+                "Downloaded binary reports an unexpected version; expected {version}, received {reported}"
             ));
         }
 
