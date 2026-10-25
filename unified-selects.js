@@ -4,15 +4,17 @@
  */
 (()=>{
  'use strict';
- if(typeof document==='undefined'||!HTMLElement.prototype.showPopover)return;
+ if(typeof document==='undefined')return;
+ const supportsPopover=typeof HTMLElement.prototype.showPopover==='function';
  const instances=new Map();
  const SKIP='select[multiple],select[size]:not([size="1"]),select.country-select,select[data-xm-native],.xm-period-select select,.country-picker select,select[hidden]';
- const eligible=el=>el instanceof HTMLSelectElement&&!el.matches(SKIP)&&!el.closest('[hidden],[inert]')&&el.options.length>0;
+ const eligible=el=>el instanceof HTMLSelectElement&&!el.matches(SKIP)&&!el.closest('[inert]')&&el.options.length>0;
  let active=null;
  const textFor=option=>option?.textContent?.trim()||'—';
  function dismiss(instance,restoreFocus=false){
   if(!instance||instance.disposed)return;
-  if(instance.popup.matches(':popover-open'))instance.popup.hidePopover();
+  if(supportsPopover){if(instance.popup.matches(':popover-open'))instance.popup.hidePopover();}
+  else instance.popup.hidden=true;
   instance.trigger.setAttribute('aria-expanded','false');
   instance.wrapper.classList.remove('is-open');
   if(active===instance)active=null;
@@ -73,7 +75,7 @@
   if(instance.select.disabled||instance.disposed)return;
   if(active&&active!==instance)dismiss(active);
   buildOptions(instance);
-  instance.popup.showPopover();
+  if(supportsPopover)instance.popup.showPopover();else instance.popup.hidden=false;
   active=instance;
   instance.wrapper.classList.add('is-open');
   instance.trigger.setAttribute('aria-expanded','true');
@@ -89,7 +91,8 @@
   const chevron=document.createElement('span');chevron.className='xm-select-chevron';chevron.setAttribute('aria-hidden','true');chevron.textContent='⌄';
   trigger.append(caption,chevron);
   const popup=document.createElement('div');popup.className='xm-select-popover';
-  popup.setAttribute('popover','manual');popup.setAttribute('role','listbox');
+  if(supportsPopover)popup.setAttribute('popover','manual');else popup.hidden=true;
+  popup.setAttribute('role','listbox');
   // popover lives in the top layer, even when opened from a <dialog>.
   document.body.append(popup);
   select.before(shell);shell.append(select,trigger);
@@ -137,7 +140,7 @@
     next?.focus();
    }
   });
-  popup.addEventListener('toggle',e=>{if(e.newState==='closed')dismiss(instance)});
+  if(supportsPopover)popup.addEventListener('toggle',e=>{if(e.newState==='closed')dismiss(instance)});
   sync(instance);
  }
  function scan(root){
@@ -151,8 +154,16 @@
   // When a rerender replaces a view/dialog, dispose orphaned portals.
   for(const instance of instances.values())if(!instance.select.isConnected)release(instance);
  });
+ function refresh(root=document){
+  scan(root);
+  if(root instanceof Element && root.matches('dialog'))root.querySelectorAll('select').forEach(enhance);
+  for(const instance of instances.values())if(instance.select.isConnected)sync(instance);
+ }
+ // Dynamic dialogs can be populated while not open. Allow explicit post-render
+ // enhancement without waiting for MutationObserver scheduling.
+ window.XMeshSelects={refresh};
  function boot(){
-  scan(document);
+  refresh(document);
   observer.observe(document.body,{childList:true,subtree:true});
   document.addEventListener('pointerdown',e=>{
    if(active&&!active.wrapper.contains(e.target)&&!active.popup.contains(e.target))dismiss(active);
