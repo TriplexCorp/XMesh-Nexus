@@ -685,6 +685,17 @@ fn validated_route_matcher(entry: &Value, node: &Value) -> Result<(&'static str,
         Ok((key, value))
 }
 
+fn existing_route_tag(entry: &Value, known_tags: &HashSet<String>) -> Result<String, ApiError> {
+    let tag = entry
+        .get("outboundTag")
+        .and_then(Value::as_str)
+        .ok_or_else(|| bad("Routing: specify an outbound tag."))?;
+    if tag == "xmesh_stats_api" || !known_tags.contains(tag) {
+        return Err(bad("Routing: chosen outbound tag is missing or reserved."));
+    }
+    Ok(tag.into())
+}
+
 pub fn apply(
     node: &Value,
     config: &mut Value,
@@ -723,16 +734,7 @@ pub fn apply(
                 need_block = true;
                 "xmesh_route_block".into()
             }
-            "outbound" => {
-                let tag = entry
-                    .get("outboundTag")
-                    .and_then(Value::as_str)
-                    .ok_or_else(|| bad("Routing: specify an outbound tag."))?;
-                if tag == "xmesh_stats_api" || !known_tags.contains(tag) {
-                    return Err(bad("Routing: chosen outbound tag is missing or reserved."));
-                }
-                tag.into()
-            }
+            "outbound" => existing_route_tag(entry, &known_tags)?,
             "node" => {
                 let target_id = entry.get("nodeId").and_then(Value::as_i64).unwrap_or(0);
                 if target_id <= 0 || target_id == node_id {
