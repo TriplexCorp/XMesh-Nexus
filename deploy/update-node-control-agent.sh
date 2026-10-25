@@ -123,7 +123,7 @@ trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp" "$profile
 bash -n "$router_helper"
 install -o root -g root -m 0700 "$router_helper" /usr/local/sbin/.xmesh-router-upgrade.new
 if ! systemd-run --quiet --wait --collect --pipe --unit=xmesh-node-router-upgrade \
- --property=Type=exec --property=TimeoutStartSec=450s \
+ --property=Type=oneshot --property=TimeoutStartSec=450s \
  --property=ProtectSystem=strict --property=ProtectHome=true \
  --property=ReadWritePaths=/opt/xmesh-node \
  /usr/local/sbin/.xmesh-router-upgrade.new;then
