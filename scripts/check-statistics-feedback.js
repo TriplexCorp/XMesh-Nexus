@@ -30,6 +30,16 @@ assert.match(app,/traffic\/history\?/);
 assert.match(app,/Это не доказательство нулевого трафика/);
 
 assert.match(backend,/async fn get_statistics_leaders/);
+assert.match(backend,/async fn get_statistics_period_leaders/);
+assert.match(backend,/async fn get_user_traffic_observations/);
+assert.match(backend,/source_type='user'/);
+assert.match(backend,/source_type='inbound'/);
+assert.match(backend,/LIMIT 501/);
+assert.match(app,/id="stats-leaders-range"/);
+assert.match(app,/statistics\/period-leaders/);
+assert.match(app,/id="stats-history-observations-load"/);
+assert.match(app,/traffic\/observations/);
+
 assert.match(backend,/lifetime_since_first_verified_sample/);
 assert.match(backend,/async fn persist_verified_traffic_deltas/);
 assert.match(backend,/async fn get_user_traffic_history/);
