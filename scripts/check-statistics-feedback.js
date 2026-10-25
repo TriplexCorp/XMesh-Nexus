@@ -61,7 +61,7 @@ assert.match(backend,/source_type='inbound'/);
 assert.match(backend,/LIMIT 501/);
 assert.match(app,/id="stats-leaders-range"/);
 assert.match(app,/statistics\/period-leaders/);
-assert.match(app,/id="stats-history-observations-load"/);
+assert.doesNotMatch(app,/id="stats-history-observations-load"/);
 assert.match(app,/traffic\/observations/);
 
 assert.match(backend,/lifetime_since_first_verified_sample/);
@@ -238,3 +238,9 @@ assert.match(css,/var\(--stats-source-width,108rem\)/);
 assert.match(css,/Statistics history: a single branded vertical scrollbar/);
 assert.match(css,/max-height:none;overflow-y:visible;overflow-x:auto/);
 assert.match(css,/scrollbar-color:var\(--scrollbar-thumb\) var\(--scrollbar-track\)/);
+
+assert.match(app,/enhanceStatsPeriodSelect\(\$\('#stats-history-inbound'\)\)/);
+assert.match(app,/enhanceStatsPeriodSelect\(\$\('#stats-history-node'\)\)/);
+assert.match(app,/historyInbound\._xmRefresh\?\.\(\);historyNode\._xmRefresh\?\.\(\)/);
+assert.match(app,/if\(\$\('\.stats-user-pane\[data-stats-user-pane="observations"\]'\)\?\.hidden===false\)void loadObservations\(\)/);
+assert.match(css,/#stats-history-user::-webkit-inner-spin-button/);
