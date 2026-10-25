@@ -522,6 +522,41 @@ fn enable_route_sniffing(obj: &mut serde_json::Map<String, Value>) -> Result<(),
     Ok(())
 }
 
+fn insert_routing_rules(
+    config: &mut Value,
+    added: Vec<Value>,
+    generated: Vec<Value>,
+    strategy: &str,
+) -> Result<(), ApiError> {
+    let obj = config
+        .as_object_mut()
+        .ok_or_else(|| bad("Routing: Xray config is not an object."))?;
+    obj.get_mut("outbounds")
+        .and_then(Value::as_array_mut)
+        .unwrap()
+        .extend(added);
+    let routing = obj.entry("routing").or_insert_with(|| json!({}));
+    let routing = routing
+        .as_object_mut()
+        .ok_or_else(|| bad("Routing: profile routing is not an object."))?;
+    routing.insert("domainStrategy".into(), json!(strategy));
+    let configured = routing.entry("rules").or_insert_with(|| json!([]));
+    let configured = configured
+        .as_array_mut()
+        .ok_or_else(|| bad("Routing: profile routing.rules is not an array."))?;
+    // Never displace the mandatory StatsService route.
+    let protected = configured
+        .iter()
+        .take_while(|rule| {
+            rule.get("inboundTag")
+                .and_then(Value::as_array)
+                .is_some_and(|tags| tags.iter().any(|v| v.as_str() == Some("xmesh_stats_in")))
+        })
+        .count();
+    configured.splice(protected..protected, generated);
+    Ok(())
+}
+
 pub fn apply(
     node: &Value,
     config: &mut Value,
@@ -719,35 +754,13 @@ pub fn apply(
         }
         added.push(json!({"tag":"xmesh_route_block","protocol":"blackhole"}));
     }
-    let obj = config
-        .as_object_mut()
-        .ok_or_else(|| bad("Routing: Xray config is not an object."))?;
-    obj.get_mut("outbounds")
-        .and_then(Value::as_array_mut)
-        .unwrap()
-        .extend(added);
-    let routing = obj.entry("routing").or_insert_with(|| json!({}));
-    let routing = routing
-        .as_object_mut()
-        .ok_or_else(|| bad("Routing: profile routing is not an object."))?;
-    routing.insert("domainStrategy".into(), json!(strategy));
-    let configured = routing.entry("rules").or_insert_with(|| json!([]));
-    let configured = configured
-        .as_array_mut()
-        .ok_or_else(|| bad("Routing: profile routing.rules is not an array."))?;
-    // Never displace the mandatory StatsService route.
-    let protected = configured
-        .iter()
-        .take_while(|rule| {
-            rule.get("inboundTag")
-                .and_then(Value::as_array)
-                .is_some_and(|tags| tags.iter().any(|v| v.as_str() == Some("xmesh_stats_in")))
-        })
-        .count();
-    configured.splice(protected..protected, generated);
+    insert_routing_rules(config, added, generated, strategy)?;
     // Enable routing-only destination sniffing without rewriting the real destination.
     if needs_domain_sniffing && node.get("routingSniffing").and_then(Value::as_bool) != Some(false)
     {
+        let obj = config
+            .as_object_mut()
+            .ok_or_else(|| bad("Routing: Xray config is not an object."))?;
         enable_route_sniffing(obj)?;
     }
     Ok(())
