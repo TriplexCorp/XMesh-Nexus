@@ -69,6 +69,8 @@ jobs:
         run: node scripts/check-xray-intelligence.js
       - name: Test XRAY STUDIO editor tools and Reality Short ID recovery
         run: node scripts/check-xray-tool-actions.js
+      - name: Verify XRAY STUDIO wrap default and Add JSON tab dimensions
+        run: node scripts/check-xray-studio-wrap-tabs.js
       - name: Verify enterprise XRAY STUDIO inspector and layout
         run: node scripts/check-xray-studio-enterprise.js
       - name: Verify combinatorial Xray composer and Shadowsocks XHTTP Reality
