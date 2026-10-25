@@ -1793,6 +1793,22 @@ fn metric_freshness(sampled_at_ms: i64, now_ms: i64) -> &'static str {
     }
 }
 
+#[cfg(test)]
+mod metric_freshness_tests {
+    use super::metric_freshness;
+
+    #[test]
+    fn distinguishes_fresh_delayed_stale_and_future_samples() {
+        let now = 1_800_000_000_000_i64;
+        assert_eq!(metric_freshness(now, now), "fresh");
+        assert_eq!(metric_freshness(now - 65_000, now), "fresh");
+        assert_eq!(metric_freshness(now - 65_001, now), "delayed");
+        assert_eq!(metric_freshness(now - 300_000, now), "delayed");
+        assert_eq!(metric_freshness(now - 300_001, now), "stale");
+        assert_eq!(metric_freshness(now + 30_001, now), "invalid");
+    }
+}
+
 async fn get_statistics_overview(
     State(state): State<AppState>,
     Extension(actor): Extension<auth::AuthUser>,
