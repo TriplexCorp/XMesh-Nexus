@@ -4,6 +4,16 @@
 
 This roadmap tracks verified improvements, not feature claims. A stage is complete only after the listed acceptance criteria pass in CI and, where required, on a disposable real Xray node. A green source-level assertion alone does not count as production evidence.
 
+## 2026-10-25 — Statistics UI crash hotfix
+
+- [x] Replace single-element `$().forEach()` calls in user-statistics pane and tab handling with multi-element `$().forEach()` in `app.js`.
+- [x] Add source regression assertions in `scripts/check-statistics-feedback.js` to reject the same class of selector error.
+- [x] Change the `app.js` version query in `index.html` to invalidate older cached frontend assets.
+- [ ] Verify the Statistics page, user detail modal and all its tabs in a deployed environment with browser-level smoke tests; source assertions are not a substitute for runtime checks.
+- [ ] Confirm panel deployment serves the updated `app.js`, then repeat hard reload / cache validation against the production reverse proxy.
+
+This hotfix does **not** complete the broader Statistics 2.0 implementation or its real-node acceptance criteria.
+
 ## Working rules
 
 - Prefer correctness and reproducibility over adding UI features.
