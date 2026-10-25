@@ -1055,9 +1055,9 @@ function statisticsP(){
   <div id="stats-summary" class="stats-overview-grid"></div>
   <div class="stats-layout">
    <section class="card"><div class="hd"><div><h3>Скорость сети нод</h3><p>RX/TX сетевых интерфейсов (включая сторонние сервисы), отдельно от персональных Xray-счётчиков.</p></div></div><div id="stats-trend"></div><section id="stats-bucket-detail" class="stats-bucket-detail" hidden aria-live="polite"></section></section>
-   <section class="card"><div class="hd"><div><h3>Control Plane</h3><p>Метрики контейнера панели, не всей физической машины.</p></div></div><div id="stats-control"></div></section>
   </div>
   <section class="card"><div class="hd"><div><h3>Top-10: подтверждённый трафик</h3><p>Накопленные байты с первого достоверного измерения. Не расход за выбранный период; счётчики пользователей и inbound независимы.</p></div></div><div id="stats-leaders" class="stats-leaders"><p class="note">Загрузка рейтингов…</p></div></section>
+  <section class="card"><div class="hd"><div><h3>Control Plane</h3><p>Метрики контейнера панели, не всей физической машины.</p></div></div><div id="stats-control"></div></section>
   <section class="card"><div class="hd"><div><h3>Узлы и виртуализация</h3><p>CPU, steal time, RAM, диски, сеть, активные соединения и свежесть данных.</p></div></div><div id="stats-nodes" class="stats-node-grid"></div></section>
   <p class="note">Новые показатели появляются только после установки обновлённого агента. Отсутствующие измерения и устаревшие показания не заменяются нулями.</p>
  </div>`;
