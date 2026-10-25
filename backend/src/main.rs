@@ -1607,6 +1607,30 @@ async fn system_meminfo() -> (u64, u64) {
     (mem_value("MemTotal:"), mem_value("MemAvailable:"))
 }
 
+fn numeric_u64_to_f64(value: u64) -> f64 {
+    json!(value).as_f64().unwrap_or(0.0)
+}
+
+fn numeric_i64_to_f64(value: i64) -> f64 {
+    json!(value).as_f64().unwrap_or(0.0)
+}
+
+fn nonnegative_float_to_u64(value: f64) -> u64 {
+    if value.is_nan() || value <= 0.0 {
+        return 0;
+    }
+    value.trunc().to_string().parse::<u64>().unwrap_or(u64::MAX)
+}
+
+fn saturating_float_to_i64(value: f64) -> i64 {
+    if value.is_nan() {
+        return 0;
+    }
+    value.trunc().to_string().parse::<i64>().unwrap_or_else(|_| {
+        if value.is_sign_negative() { i64::MIN } else { i64::MAX }
+    })
+}
+
 async fn get_system_stats(State(state): State<AppState>) -> Json<Value> {
     let cpu_before = read_cpu_ticks().await;
     tokio::time::sleep(Duration::from_millis(220)).await;
@@ -1617,7 +1641,8 @@ async fn get_system_stats(State(state): State<AppState>) -> Json<Value> {
             let idle_delta = after.1.saturating_sub(before.1);
             if total_delta > 0 {
                 Some(
-                    ((total_delta.saturating_sub(idle_delta)) as f64 * 100.0 / total_delta as f64)
+                    (numeric_u64_to_f64(total_delta.saturating_sub(idle_delta)) * 100.0
+                        / numeric_u64_to_f64(total_delta))
                         .clamp(0.0, 100.0),
                 )
             } else {
@@ -1631,7 +1656,7 @@ async fn get_system_stats(State(state): State<AppState>) -> Json<Value> {
     let ram_available = mem_available.min(ram_total);
     let ram_used = ram_total.saturating_sub(ram_available);
     let ram_percent = if ram_total > 0 {
-        Some(ram_used as f64 * 100.0 / ram_total as f64)
+        Some(numeric_u64_to_f64(ram_used) * 100.0 / numeric_u64_to_f64(ram_total))
     } else {
         None
     };
@@ -1654,7 +1679,7 @@ async fn get_system_stats(State(state): State<AppState>) -> Json<Value> {
             let available = cols[3].parse::<u64>().ok()?;
             Some(json!({
                 "totalBytes": total, "usedBytes": used, "availableBytes": available,
-                "percent": if total > 0 { Some(used as f64 * 100.0 / total as f64) } else { None },
+                "percent": if total > 0 { Some(numeric_u64_to_f64(used) * 100.0 / numeric_u64_to_f64(total)) } else { None },
                 "mount": cols[5]
             }))
         });
@@ -1663,7 +1688,7 @@ async fn get_system_stats(State(state): State<AppState>) -> Json<Value> {
         .await
         .ok()
         .and_then(|s| s.split_whitespace().next()?.parse::<f64>().ok())
-        .map(|seconds| seconds as u64);
+        .map(nonnegative_float_to_u64);
     let load = tokio::fs::read_to_string("/proc/loadavg")
         .await
         .unwrap_or_default();
@@ -2401,8 +2426,8 @@ async fn get_user_traffic(
         "sampleCount": servers.len(),
         "totalUplinkBytes": uplink,
         "totalDownlinkBytes": downlink,
-        "effectiveUsedGb": base_usage+(uplink.saturating_add(downlink) as f64 / 1_073_741_824.0),
-        "meteredUsedGb": uplink.saturating_add(downlink) as f64 / 1_073_741_824.0,
+        "effectiveUsedGb": base_usage+(numeric_i64_to_f64(uplink.saturating_add(downlink)) / 1_073_741_824.0),
+        "meteredUsedGb": numeric_i64_to_f64(uplink.saturating_add(downlink)) / 1_073_741_824.0,
         "servers": servers,
         "inbounds": inbound_totals,
         "inboundAccounting": "independent_signed_user_inbound_counters"
@@ -2791,7 +2816,7 @@ pub(crate) fn add_metered_usage(user: &mut Value, bytes: i64) {
         .and_then(Value::as_f64)
         .unwrap_or(0.0)
         .max(0.0);
-    let measured = (bytes.max(0) as f64) / 1_073_741_824.0;
+    let measured = numeric_i64_to_f64(bytes.max(0)) / 1_073_741_824.0;
     if let Some(object) = user.as_object_mut() {
         object.insert("used".into(), json!(base + measured));
         object.insert("meteredUsedGb".into(), json!(measured));
@@ -3243,7 +3268,7 @@ fn number(value: &Value, key: &str) -> Option<i64> {
         value
             .get(key)
             .and_then(Value::as_f64)
-            .map(|number| number as i64)
+            .map(saturating_float_to_i64)
     })
 }
 
