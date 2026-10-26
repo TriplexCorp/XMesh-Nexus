@@ -2127,12 +2127,14 @@ mod provision_tests {
           {"tag":"HY","protocol":"hysteria","settings":{"version":2}},
           {"tag":"MQ","protocol":"masque","settings":{"address":["10.0.0.1/24"]}}
         ]});
-        let active = json!({"id":7,"xrayId":"550e8400-e29b-41d4-a716-446655440000",
-            "squads":[4],"ssPassword":psk});
+        let mut active = Value::Object(crate::user_credentials::generate());
+        active["id"] = json!(7);
+        active["squads"] = json!([4]);
+        active["ssPassword"] = json!(psk);
         let blocked = json!({"id":8,"xrayId":"550e8400-e29b-41d4-a716-446655440001",
             "squads":[4],"disabled":true});
         let squads = vec![json!({"id":4,"inb":["VM","TR","SS","SS22","HY","MQ"]})];
-        provision_proxy_users(&mut config, &[active, blocked], &squads, 1_800_000_000_000).unwrap();
+        provision_proxy_users(&mut config, &[active.clone(), blocked], &squads, 1_800_000_000_000).unwrap();
         for (i, expected) in ["id", "password", "password", "password", "auth", "pass"]
             .iter()
             .enumerate()
@@ -2154,6 +2156,30 @@ mod provision_tests {
             config["inbounds"][5]["settings"]["users"][0]["email"],
             "xmesh-u7--MQ"
         );
+        // Every non-VLESS protocol uses its own credential from the same
+        // stored user; no password silently reuses the VLESS UUID.
+        let expected = [
+            ("VM", "vmess", "id"),
+            ("TR", "trojan", "password"),
+            ("SS", "shadowsocks", "password"),
+            ("HY", "hysteria", "auth"),
+            ("MQ", "masque", "pass"),
+        ];
+        for (tag, protocol, key) in expected {
+            let inbound = config["inbounds"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|entry| entry["tag"] == tag)
+                .unwrap();
+            let actual = inbound["settings"]["users"][0][key].as_str().unwrap();
+            assert_eq!(
+                Some(actual),
+                crate::user_credentials::for_protocol(&active, protocol),
+                "{protocol}"
+            );
+            assert_ne!(actual, active["xrayId"].as_str().unwrap(), "{protocol}");
+        }
     }
     #[test]
     fn same_user_in_multiple_matching_squads_is_not_duplicated() {
