@@ -891,7 +891,22 @@ async fn create_record(
     // Authoritative, unpredictable, immutable per-user Xray identity. Never trust
     // a client-provided UUID for a newly created account.
     if collection == "users" {
+        use base64::Engine as _;
         object.insert("xrayId".into(), Value::String(Uuid::new_v4().to_string()));
+        // SS2022 multi-user keys must be cryptographically random, persistent,
+        // and shared by the node policy and the generated client subscription.
+        let mut key256 = [0u8; 32];
+        let mut key128 = [0u8; 16];
+        aes_gcm::aead::OsRng.fill_bytes(&mut key256);
+        aes_gcm::aead::OsRng.fill_bytes(&mut key128);
+        object.insert(
+            "ssPassword".into(),
+            json!(base64::engine::general_purpose::STANDARD.encode(key256)),
+        );
+        object.insert(
+            "ssPassword128".into(),
+            json!(base64::engine::general_purpose::STANDARD.encode(key128)),
+        );
     }
     // A quota reason is only valid for an actually disabled node. Updating
     // a node must not carry a stale reason into its next saved revision.
@@ -1028,6 +1043,11 @@ async fn update_record(
         )
     })?;
     patch_object.remove("id");
+    // Managed SS2022 keys are immutable through the generic record API.
+    if collection == "users" {
+        patch_object.remove("ssPassword");
+        patch_object.remove("ssPassword128");
+    }
 
     let mut tx = state.pool.begin().await?;
     let existing =
