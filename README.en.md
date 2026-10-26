@@ -1,5 +1,10 @@
 # XMesh Nexus
 
+## Shadowsocks 2022 JSON subscription delivery (October 26, 2026)
+
+Fixed a missing Shadowsocks 2022 outbound cause: node policies and subscription generation required a per-user `ssPassword` that regular user creation did not provision. New users now receive persistent cryptographically random PSKs; older accounts are conditionally backfilled in PostgreSQL before subscription or node-policy reads, without rotating existing keys. `2022-blake3-aes-128-gcm` uses a separate 16-byte `ssPassword128`, while 256-bit methods use the 32-byte `ssPassword`. Client JSON contains `ServerPSK:UserPSK`; the corresponding key must also reach the Xray node. Invalid or missing credentials still fail closed. **Verify the new node policy and actual client connectivity after upgrading.**
+
+
 ## FinalMask without manual JSON (October 26, 2026)
 
 XRAY STUDIO's **FinalMask** action now opens a card-based wizard for **TCP Sudoku**, **UDP Salamander / Gecko**, **client-only TCP Fragment**, **client-only UDP Noise**, **Advanced JSON** and **Reset**. Sudoku/Salamander secrets are generated with the browser's cryptographic RNG (32 random bytes, hex-encoded); compatible server-side symmetric masks are inherited by native client JSON subscriptions. Fragment and Noise are emitted only through `xmesh.clientFinalmask` and depend on client support. Incompatible directions are hidden; Gecko `packetSize` is offered only for QUIC. Advanced JSON remains available for complex layers; the wizard never silently replaces an explicit client override when generating a server secret. **Generating a configuration does not prove successful node deployment**; validate with the installed Xray-core and target clients.
