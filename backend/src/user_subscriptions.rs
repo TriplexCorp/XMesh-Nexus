@@ -347,6 +347,10 @@ fn configure_masque_credentials(stream: &mut Value, user: &Value, inbound: &Valu
     Some(())
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "Protocol-specific JSON generation is kept in a single auditable schema switch"
+)]
 fn proxy_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> Option<Value> {
     if nonempty(inbound, "protocol") == Some("vless") {
         return vless_outbound(user, inbound, host, device);
