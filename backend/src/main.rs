@@ -3501,9 +3501,12 @@ pub(crate) async fn user_metered_bytes(pool: &PgPool, user_id: i64) -> Result<i6
     Ok(bytes.max(0))
 }
 
-async fn load_records(pool: &PgPool, collection: &str) -> Result<Vec<Value>, ApiError> {
-    validate_collection(collection)?;
-    if collection == "users" {
+// Stable SS2022 keys are provisioned before both public subscriptions and
+// managed node policies; never regenerate them on each client download.
+pub(crate) async fn ensure_ss2022_user_keys(
+    pool: &PgPool,
+    user_id: Option<i64>,
+) -> Result<(), ApiError> {
         // Backfill older accounts before either the Xray node policy or JSON
         // subscription reads them. INSERT-time provisioning handles new users.
         // Updates are conditional so concurrent readers never rotate a key.
@@ -3511,8 +3514,10 @@ async fn load_records(pool: &PgPool, collection: &str) -> Result<Vec<Value>, Api
         use base64::Engine as _;
         let legacy = sqlx::query(
             "SELECT id, data FROM panel_records WHERE collection='users'
+             AND ($1::BIGINT IS NULL OR id=$1)
              AND (NOT (data ? 'ssPassword') OR NOT (data ? 'ssPassword128'))",
         )
+        .bind(user_id)
         .fetch_all(pool)
         .await?;
         for row in legacy {
@@ -3554,6 +3559,13 @@ async fn load_records(pool: &PgPool, collection: &str) -> Result<Vec<Value>, Api
                 .await?;
             }
         }
+    Ok(())
+}
+
+async fn load_records(pool: &PgPool, collection: &str) -> Result<Vec<Value>, ApiError> {
+    validate_collection(collection)?;
+    if collection == "users" {
+        ensure_ss2022_user_keys(pool, None).await?;
     }
     let rows = sqlx::query("SELECT id, data FROM panel_records WHERE collection = $1 ORDER BY id")
         .bind(collection)
