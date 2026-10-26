@@ -16,8 +16,8 @@ mod subscription_json;
 mod subscription_settings;
 mod subscription_transport;
 mod subscription_user_agent;
-mod user_subscriptions;
 mod user_credentials;
+mod user_subscriptions;
 
 use axum::{
     Json, Router,
