@@ -1440,7 +1440,7 @@ fn node_xray_local_port(node: &Value) -> Result<u64, ApiError> {
 }
 
 /// A managed node has one public TCP backend and one public UDP backend.
-/// The second inbound uses the next loopback port; StatsService reserves 10085.
+/// The second inbound uses the next loopback port; `StatsService` reserves 10085.
 fn managed_tcp_hysteria_pair(inbounds: &[Value]) -> bool {
     if inbounds.len() != 2 {
         return false;
@@ -1529,15 +1529,14 @@ fn ensure_masque_address(config: &mut Value) -> Result<(), ApiError> {
             .and_then(|v| v.get("tlsSettings"))
             .and_then(|v| v.get("alpn"))
             .and_then(Value::as_array);
-        if matches!(network, "masque" | "xhttp") {
-            if network == "masque"
-                && alpn.is_none_or(|a| a.len() != 1 || !matches!(a[0].as_str(), Some("h3" | "h2")))
-            {
-                return Err(ApiError::new(
-                    StatusCode::CONFLICT,
-                    "Node-managed MASQUE requires ALPN h3 or h2 explicitly.",
-                ));
-            }
+        if matches!(network, "masque" | "xhttp")
+            && network == "masque"
+            && alpn.is_none_or(|a| a.len() != 1 || !matches!(a[0].as_str(), Some("h3" | "h2")))
+        {
+            return Err(ApiError::new(
+                StatusCode::CONFLICT,
+                "Node-managed MASQUE requires ALPN h3 or h2 explicitly.",
+            ));
         }
         if inbound.get("protocol").and_then(Value::as_str) != Some("masque") {
             continue;
@@ -1582,6 +1581,7 @@ fn ensure_masque_address(config: &mut Value) -> Result<(), ApiError> {
     Ok(())
 }
 
+#[expect(clippy::too_many_lines, reason = "TLS mode validation and certificate injection are one atomic operation")]
 fn configure_node_managed_tls(node: &Value, config: &mut Value) -> Result<Option<Value>, ApiError> {
     if node.get("tlsAutoProvision").and_then(Value::as_bool) == Some(true)
         && node.get("tlsManualProvision").and_then(Value::as_bool) == Some(true)
