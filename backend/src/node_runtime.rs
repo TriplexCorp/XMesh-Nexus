@@ -1015,10 +1015,12 @@ fn proxy_user_client_entry(
         .collect::<String>();
     let email = format!("xmesh-u{record_id}--{encoded_tag}");
     let entry = match protocol {
-        "vless" | "vmess" => json!({"id":uuid.to_string(),"level":0,"email":email}),
-        "trojan" => json!({"password":uuid.to_string(),"level":0,"email":email}),
-        "hysteria" => json!({"auth":uuid.to_string(),"level":0,"email":email}),
-        "masque" => json!({"pass":uuid.to_string(),"level":0,"email":email}),
+        "vless" | "vmess" => json!({"id":if protocol == "vmess" {
+            user.get("vmessId").and_then(Value::as_str).unwrap_or(id)
+        } else { id },"level":0,"email":email}),
+        "trojan" => json!({"password":user.get("trojanPassword").and_then(Value::as_str).unwrap_or(id),"level":0,"email":email}),
+        "hysteria" => json!({"auth":user.get("hysteriaPassword").and_then(Value::as_str).unwrap_or(id),"level":0,"email":email}),
+        "masque" => json!({"pass":user.get("masquePassword").and_then(Value::as_str).unwrap_or(id),"level":0,"email":email}),
         "shadowsocks" => {
             // SS2022 passwords must be valid PSKs; never use a plain UUID
             // as a 2022 cipher key. Require an explicit per-user key.
@@ -1030,7 +1032,7 @@ fn proxy_user_client_entry(
                 };
                 user.get(field).and_then(Value::as_str).unwrap_or("")
             } else {
-                id
+                user.get("ssLegacyPassword").and_then(Value::as_str).unwrap_or(id)
             };
             if password.is_empty() {
                 return None;
