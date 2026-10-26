@@ -1330,6 +1330,9 @@ pub async fn preview_routing(
             "Source profile contains invalid Xray JSON.",
         )
     })?;
+    // Preview uses the same MASQUE and per-node TLS compilation guards.
+    ensure_masque_address(&mut config)?;
+    configure_node_managed_tls(&node, &mut config)?;
     // Identical stats-first ordering to live signed policy provisioning.
     let users = crate::load_records(&state.pool, "users").await?;
     let squads = crate::load_records(&state.pool, "squads").await?;
