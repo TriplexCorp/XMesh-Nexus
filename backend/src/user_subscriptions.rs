@@ -346,7 +346,7 @@ fn configure_masque_credentials(
         stream["masqueSettings"] = json!({});
     }
     stream["masqueSettings"]["user"] = json!(format!("xmesh-u{record_id}--{encoded}"));
-    stream["masqueSettings"]["pass"] = json!(uuid);
+    stream["masqueSettings"]["pass"] = json!(crate::protocol_credentials::for_protocol(user, "masque", "")?);
     Some(())
 }
 
@@ -370,12 +370,12 @@ fn proxy_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> 
         return None;
     }
     let settings = match protocol {
-        "vmess" => json!({"address":address,"port":port,"id":uuid,"security":"auto"}),
+        "vmess" => json!({"address":address,"port":port,"id":crate::protocol_credentials::for_protocol(user, "vmess", "")?,"security":"auto"}),
         "trojan" => {
             if security == "none" {
                 return None;
             }
-            json!({"address":address,"port":port,"password":uuid})
+            json!({"address":address,"port":port,"password":crate::protocol_credentials::for_protocol(user, "trojan", "")?})
         }
         "shadowsocks" => {
             let method = inbound
@@ -406,7 +406,7 @@ fn proxy_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> 
                 }
                 format!("{server}:{client}")
             } else {
-                uuid.to_owned()
+                crate::protocol_credentials::for_protocol(user, "shadowsocks", method)?.to_owned()
             };
             json!({"address":address,"port":port,"method":method,"password":password})
         }
@@ -441,7 +441,7 @@ fn proxy_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> 
             stream["hysteriaSettings"] = json!({});
         }
         stream["hysteriaSettings"]["version"] = json!(2);
-        stream["hysteriaSettings"]["auth"] = json!(uuid);
+        stream["hysteriaSettings"]["auth"] = json!(crate::protocol_credentials::for_protocol(user, "hysteria", "")?);
     }
     let tag = nonempty(host, "remark")
         .or_else(|| nonempty(inbound, "tag"))
@@ -561,29 +561,15 @@ pub async fn rotate_credentials(
             .await?
             .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "User not found"))?;
     let mut user: Value = row.try_get("data")?;
-    let old_uuid = user.get("xrayId").and_then(Value::as_str).unwrap_or("");
-    let new_uuid = loop {
-        let proposed = uuid::Uuid::new_v4().to_string();
-        if proposed != old_uuid {
-            break proposed;
-        }
-    };
     let object = user
         .as_object_mut()
         .ok_or_else(|| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Invalid user record"))?;
-    let mut ss256 = [0u8; 32];
-    let mut ss128 = [0u8; 16];
-    OsRng.fill_bytes(&mut ss256);
-    OsRng.fill_bytes(&mut ss128);
-    object.insert("xrayId".to_owned(), json!(new_uuid));
-    object.insert(
-        "ssPassword".to_owned(),
-        json!(base64::engine::general_purpose::STANDARD.encode(ss256)),
-    );
-    object.insert(
-        "ssPassword128".to_owned(),
-        json!(base64::engine::general_purpose::STANDARD.encode(ss128)),
-    );
+    crate::protocol_credentials::provision(object);
+    let new_uuid = object
+        .get("xrayId")
+        .and_then(Value::as_str)
+        .ok_or_else(|| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Missing new Xray UUID"))?
+        .to_owned();
     sqlx::query(
         "UPDATE panel_records SET data=$1,updated_at=NOW()
          WHERE collection='users' AND id=$2",
