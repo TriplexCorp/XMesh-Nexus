@@ -346,7 +346,7 @@ fn configure_masque_credentials(
         stream["masqueSettings"] = json!({});
     }
     stream["masqueSettings"]["user"] = json!(format!("xmesh-u{record_id}--{encoded}"));
-    stream["masqueSettings"]["pass"] = json!(uuid);
+    stream["masqueSettings"]["pass"] = json!(nonempty(user, "masquePassword").unwrap_or(uuid));
     Some(())
 }
 
@@ -370,12 +370,12 @@ fn proxy_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> 
         return None;
     }
     let settings = match protocol {
-        "vmess" => json!({"address":address,"port":port,"id":uuid,"security":"auto"}),
+        "vmess" => json!({"address":address,"port":port,"id":nonempty(user, "vmessId").unwrap_or(uuid),"security":"auto"}),
         "trojan" => {
             if security == "none" {
                 return None;
             }
-            json!({"address":address,"port":port,"password":uuid})
+            json!({"address":address,"port":port,"password":nonempty(user, "trojanPassword").unwrap_or(uuid)})
         }
         "shadowsocks" => {
             let method = inbound
@@ -406,7 +406,7 @@ fn proxy_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> 
                 }
                 format!("{server}:{client}")
             } else {
-                uuid.to_owned()
+                nonempty(user, "ssLegacyPassword").unwrap_or(uuid).to_owned()
             };
             json!({"address":address,"port":port,"method":method,"password":password})
         }
@@ -441,7 +441,7 @@ fn proxy_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> 
             stream["hysteriaSettings"] = json!({});
         }
         stream["hysteriaSettings"]["version"] = json!(2);
-        stream["hysteriaSettings"]["auth"] = json!(uuid);
+        stream["hysteriaSettings"]["auth"] = json!(nonempty(user, "hysteriaPassword").unwrap_or(uuid));
     }
     let tag = nonempty(host, "remark")
         .or_else(|| nonempty(inbound, "tag"))
@@ -576,6 +576,12 @@ pub async fn rotate_credentials(
     OsRng.fill_bytes(&mut ss256);
     OsRng.fill_bytes(&mut ss128);
     object.insert("xrayId".to_owned(), json!(new_uuid));
+    object.insert("vmessId".to_owned(), json!(uuid::Uuid::new_v4().to_string()));
+    for key in ["trojanPassword", "hysteriaPassword", "masquePassword", "ssLegacyPassword"] {
+        let mut secret = [0u8; 32];
+        OsRng.fill_bytes(&mut secret);
+        object.insert(key.to_owned(), json!(hex::encode(secret)));
+    }
     object.insert(
         "ssPassword".to_owned(),
         json!(base64::engine::general_purpose::STANDARD.encode(ss256)),
