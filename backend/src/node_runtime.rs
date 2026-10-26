@@ -2146,6 +2146,37 @@ mod provision_tests {
         );
     }
     #[test]
+    fn managed_node_matches_distinct_client_secrets_and_preserves_legacy() {
+        let user = json!({"id":7,"xrayId":"550e8400-e29b-41d4-a716-446655440000",
+            "vmessId":"550e8400-e29b-41d4-a716-446655440123",
+            "trojanPassword":"11".repeat(32),"hysteriaPassword":"22".repeat(32),
+            "masquePassword":"33".repeat(32),"ssLegacyPassword":"44".repeat(32),
+            "squads":[4]});
+        let mut config = json!({"inbounds":[
+            {"tag":"VL","protocol":"vless","settings":{}},
+            {"tag":"VM","protocol":"vmess","settings":{}},
+            {"tag":"TR","protocol":"trojan","settings":{}},
+            {"tag":"HY","protocol":"hysteria","settings":{}},
+            {"tag":"MQ","protocol":"masque","settings":{}},
+            {"tag":"SS","protocol":"shadowsocks","settings":{"method":"aes-256-gcm"}}
+        ]});
+        let squads = vec![json!({"id":4,"inb":["VL","VM","TR","HY","MQ","SS"]})];
+        provision_proxy_users(&mut config, &[user.clone()], &squads, 1_800_000_000_000).unwrap();
+        let credentials = [
+            ("id", "xrayId"), ("id", "vmessId"),
+            ("password", "trojanPassword"), ("auth", "hysteriaPassword"),
+            ("pass", "masquePassword"), ("password", "ssLegacyPassword"),
+        ];
+        for (idx, (field, source)) in credentials.iter().enumerate() {
+            assert_eq!(config["inbounds"][idx]["settings"]
+                [if idx == 0 {"clients"} else {"users"}][0][*field], user[*source]);
+        }
+        let legacy = json!({"id":7,"xrayId":"550e8400-e29b-41d4-a716-446655440000","squads":[4]});
+        let mut old = json!({"inbounds":[{"tag":"HY","protocol":"hysteria","settings":{}}]});
+        provision_proxy_users(&mut old, &[legacy.clone()], &squads, 1_800_000_000_000).unwrap();
+        assert_eq!(old["inbounds"][0]["settings"]["users"][0]["auth"], legacy["xrayId"]);
+    }
+    #[test]
     fn same_user_in_multiple_matching_squads_is_not_duplicated() {
         let mut config =
             json!({"inbounds":[{"protocol":"vless","tag":"NL","settings":{"users":[]}}]});
