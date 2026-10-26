@@ -5,10 +5,23 @@
 Fixed a missing Shadowsocks 2022 outbound cause: node policies and subscription generation required a per-user `ssPassword` that regular user creation did not provision. New users now receive persistent cryptographically random PSKs; older accounts are conditionally backfilled in PostgreSQL before subscription or node-policy reads, without rotating existing keys. `2022-blake3-aes-128-gcm` uses a separate 16-byte `ssPassword128`, while 256-bit methods use the 32-byte `ssPassword`. Client JSON contains `ServerPSK:UserPSK`; the corresponding key must also reach the Xray node. Invalid or missing credentials still fail closed. **Verify the new node policy and actual client connectivity after upgrading.**
 
 
-## FinalMask without manual JSON (October 26, 2026)
+## FinalMask: complete catalog and wide dialog (October 26, 2026)
 
-XRAY STUDIO's **FinalMask** action now opens a card-based wizard for **TCP Sudoku**, **UDP Salamander / Gecko**, **client-only TCP Fragment**, **client-only UDP Noise**, **Advanced JSON** and **Reset**. Sudoku/Salamander secrets are generated with the browser's cryptographic RNG (32 random bytes, hex-encoded); compatible server-side symmetric masks are inherited by native client JSON subscriptions. Fragment and Noise are emitted only through `xmesh.clientFinalmask` and depend on client support. Incompatible directions are hidden; Gecko `packetSize` is offered only for QUIC. Advanced JSON remains available for complex layers; the wizard never silently replaces an explicit client override when generating a server secret. **Generating a configuration does not prove successful node deployment**; validate with the installed Xray-core and target clients.
+**XRAY STUDIO → FinalMask** now offers the **complete 16-entry TCP/UDP/QUIC catalog**, alongside **Advanced JSON** and **Reset**, rather than the original four guided presets:
 
+| Direction | Available catalog entries |
+| --- | --- |
+| **TCP** | Sudoku, Header Custom, Fragment, XMC (Minecraft), Filter |
+| **UDP** | Salamander / Gecko, Sudoku, Header Custom, mKCP Legacy, Noise, Port Hopping (`udphop`), XDNS, XICMP, Realm, Filter |
+| **QUIC** | Client Params (`quicParams`: congestion control, windows, timeouts and UDP hopping) |
+
+**All choices remain visible.** Choices incompatible with the selected inbound transport are **disabled with a reason**: XDNS requires mKCP; client QUIC params require QUIC/H3. Gecko is enabled through `salamander.packetSize` on QUIC, **not** a separate `gecko` layer. `filter` is inbound-only; `fragment`, `xmc`, `noise`, `xdns`, `xicmp`, `realm`, `udphop` and client `quicParams` use an explicit `xmesh.clientFinalmask` override. Required symmetric server layers must remain present and ordered in client configuration.
+
+The guided Sudoku and Salamander recipes generate 256-bit shared secrets with the browser cryptographic RNG. More specialized recipes edit the **individual layer settings JSON**; Advanced JSON remains available for full custom server/client chains. Client-side `udphop` must come last. Consult the [FinalMask compatibility matrix](docs/FINALMASK_COMPATIBILITY.md).
+
+**Dialog width fix:** the app-wide `dialog:not(...)` rule in `styles.css` was more specific than the original `.xm-studio-modal--cards` width declaration and constrained the three-column catalog to a narrow dialog. The `main` branch now uses `dialog.xm-studio-modal.xm-studio-modal--cards` with a maximum **84rem width**, responsive **4/3/2/1 columns**, bounded vertical scrolling and a cache-busted stylesheet. `scripts/check-xray-tool-actions.js` includes a regression assertion. See [PR #21](https://github.com/TriplexCorp/XMesh-Nexus/pull/21), [CSS fix](https://github.com/TriplexCorp/XMesh-Nexus/commit/c918fecb334679bcf6050ef66077795d9f1b4d9f) and [regression guard](https://github.com/TriplexCorp/XMesh-Nexus/commit/150978cc203b0d6b463c1c0031151b6f89349a80).
+
+**Verification boundary:** a visible preset, saved JSON or passing source-level test does not prove that the node applied the mask or that a given Xray-core/client version supports it. Validate real transports, permissions, DNS/NAT/firewall dependencies and browser responsiveness before production use.
 
 ## XRAY STUDIO: transport-aware TLS templates (October 26, 2026)
 
@@ -20,17 +33,17 @@ The generator does not invent DNS names, certificate files, private keys, users 
 ## Build and CI stabilization — October 26, 2026
 
 - Fixed Rust `E0505` in client FinalMask projection without cloning the JSON value.
-- Added translations for page navigation and the agent installation timeout; refreshed the English coverage baseline. **997 previously known untranslated strings remain**.
+- Added translations for page navigation, the agent installation timeout and the expanded FinalMask catalog. Existing English translation debt is still tracked in `scripts/english-coverage-baseline.json`; this is not complete localization.
 - Updated the user-presence regression guard to check a versioned `app.js` entry point without pinning an obsolete cache-busting revision; corrected a follow-up regex escaping error.
 - Applied **61 Rustfmt changes from the CI diff** across `main.rs`, `node_runtime.rs`, `subscription_finalmask.rs`, `subscription_transport.rs`, and `user_subscriptions.rs`.
-- **Verification status:** commits are on `main`, but a passing full GitHub Actions run, `cargo fmt --check`, Rust tests, Clippy and Docker build have **not yet been confirmed**.
+- **Verification (October 26):** [Backend CI #40304117546](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40304117546) for code commit `150978cc` has completed the `cli`, `rust` (including frontend checks) and `subscription-build` jobs successfully. API integration was still running when these notes were updated. **Do not infer a green end-to-end pipeline or browser validation.**
 
 
 **Documentation:** [Русский](README.md) · **English**
 
 **XMesh Nexus** is a self-hosted Xray-core infrastructure management panel for users, nodes, hosts, squads, XRAY STUDIO, subscriptions, monitoring and administration. The API is built with **Rust (Tokio/Axum)**, persistent data uses **PostgreSQL 18 + TimescaleDB**, ephemeral state uses **Redis 7**, and the panel is deployed with Docker Compose.
 
-> **Source-code status as of October 24, 2026:** this is an actively developed project. The repository **does** include public subscription endpoints, native Xray client JSON generation, managed-node integration and Xray-derived user traffic accounting. Running VPN traffic still requires a separately installed [XMesh-Node](https://github.com/TriplexCorp/XMesh-Node) runtime on each VPS, working Xray configuration and correct networking. A feature existing in the code or UI does not prove that a particular node has applied it successfully.
+> **Source-code status as of October 26, 2026:** this is an actively developed project. The repository **does** include public subscription endpoints, native Xray client JSON generation, managed-node integration and Xray-derived user traffic accounting. Running VPN traffic still requires a separately installed [XMesh-Node](https://github.com/TriplexCorp/XMesh-Node) runtime on each VPS, working Xray configuration and correct networking. A feature existing in the code or UI does not prove that a particular node has applied it successfully.
 
 ## FinalMask: TCP, UDP and QUIC (October 26, 2026)
 
@@ -41,7 +54,7 @@ XRAY STUDIO now separates server FinalMask from xmesh.clientFinalmask metadata. 
 | Area | Implemented | Prerequisites / limits |
 | --- | --- | --- |
 | **Control plane** | Web panel, Rust API, server-side storage of users, nodes, hosts, squads and settings | A saved panel state is not proof of applied node state |
-| **XRAY STUDIO** | Editable and validated Xray JSON, profile tools, inbound/host/node associations | The public subscription generator does not support every protocol offered by the editor |
+| **XRAY STUDIO** | Editable Xray JSON, full transport-aware FinalMask preset catalog, profile tools and inbound/host/node associations | The public subscription generator does not support every protocol offered by the editor |
 | **Managed nodes** | Ed25519 enrollment, signed requests, heartbeats, desired configuration, restart/update commands | Node-side execution is provided by [XMesh-Node](https://github.com/TriplexCorp/XMesh-Node) |
 | **Subscriptions** | Token issuing/revocation, public URL, HTML portal, native Xray JSON, RU/EN, User-Agent device negotiation | Rust outbound generation supports VLESS, VMess, Trojan, Shadowsocks (including SS2022), Hysteria2 and MASQUE, subject to valid protocol/transport settings and client support |
 | **SUBSCRIPTION STUDIO** | Domain/name, portal appearance, client-app catalog, JSON and balancer settings | DNS, HTTPS and reverse-proxy routing are operator responsibilities |
@@ -166,6 +179,8 @@ node scripts/check-node-ip-rotation.js
 node scripts/check-node-editor-layout.js
 node scripts/check-subscription-studio.js
 node scripts/check-static-assets.js
+node scripts/check-xray-tool-actions.js
+node scripts/check-english-coverage.js
 cargo test --manifest-path backend/Cargo.toml
 cargo clippy --manifest-path backend/Cargo.toml --all-targets --all-features -- -D warnings -D clippy::pedantic -D clippy::nursery -F unsafe-code
 ```
