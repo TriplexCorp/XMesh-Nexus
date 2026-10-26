@@ -130,6 +130,8 @@ struct Heartbeat {
     xray_version: Option<String>,
     #[serde(default, rename = "geoData")]
     geo_data: Option<Value>,
+    #[serde(default, rename = "tlsStatus")]
+    tls_status: Option<Value>,
     #[serde(default, rename = "appliedRevision")]
     applied_revision: Option<String>,
     #[serde(default, rename = "profileCheck")]
@@ -160,6 +162,13 @@ fn validate_heartbeat_report(report: &Heartbeat) -> Result<(), ApiError> {
             StatusCode::BAD_REQUEST,
             "Invalid Xray version.",
         ));
+    }
+    if report.tls_status.as_ref().is_some_and(|data| {
+        serde_json::to_vec(data).is_ok_and(|bytes| bytes.len() > 2048)
+            || !data.is_object()
+            || data.as_object().is_some_and(|obj| obj.keys().any(|k| !matches!(k.as_str(), "state" | "domain" | "issuer" | "notBefore" | "notAfter" | "daysRemaining" | "autoRenew" | "lastError")))
+    }) {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid TLS telemetry."));
     }
     if report.geo_data.as_ref().is_some_and(|data| {
         serde_json::to_vec(data).is_ok_and(|bytes| bytes.len() > 5000) || !data.is_object()
@@ -224,15 +233,15 @@ pub async fn heartbeat(
     )
     .await?;
     sqlx::query(
-        "INSERT INTO node_runtime_heartbeats(node_id,version,router_running,xray_running,xray_version,geo_data,applied_revision,profile_check,received_at)
-         VALUES($1,$2,$3,$4,$5,$6,$7,$8,NOW()) ON CONFLICT(node_id) DO UPDATE
+        "INSERT INTO node_runtime_heartbeats(node_id,version,router_running,xray_running,xray_version,geo_data,applied_revision,profile_check,tls_status,received_at)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW()) ON CONFLICT(node_id) DO UPDATE
          SET version=EXCLUDED.version,router_running=EXCLUDED.router_running,
          xray_running=EXCLUDED.xray_running,xray_version=EXCLUDED.xray_version,
-         geo_data=EXCLUDED.geo_data,applied_revision=EXCLUDED.applied_revision,profile_check=EXCLUDED.profile_check,received_at=NOW()"
+         geo_data=EXCLUDED.geo_data,applied_revision=EXCLUDED.applied_revision,profile_check=EXCLUDED.profile_check,tls_status=EXCLUDED.tls_status,received_at=NOW()"
     ).bind(report.node_id).bind(&report.version).bind(report.router_running)
     .bind(report.xray_running).bind(&report.xray_version)
     .bind(&report.geo_data).bind(if report.xray_running {report.applied_revision.as_deref()} else {None})
-    .bind(report.profile_check.as_deref()).execute(&state.pool).await?;
+    .bind(report.profile_check.as_deref()).bind(&report.tls_status).execute(&state.pool).await?;
     // A self-upgrade can replace its own running worker before its ACK is sent.
     // A fresh, authenticated heartbeat with the exact requested version is
     // stronger evidence of success than the lost acknowledgement.
@@ -285,7 +294,7 @@ pub async fn status(
         return Err(ApiError::new(StatusCode::NOT_FOUND, "Node not found."));
     }
     let record = sqlx::query(
-        "SELECT version,router_running,xray_running,xray_version,geo_data,applied_revision,profile_check,
+        "SELECT version,router_running,xray_running,xray_version,geo_data,tls_status,applied_revision,profile_check,
                 (EXTRACT(EPOCH FROM received_at)*1000)::BIGINT AS received_ms,
                 received_at > NOW() - INTERVAL '65 seconds' AS fresh
          FROM node_runtime_heartbeats WHERE node_id=$1"
@@ -341,6 +350,7 @@ pub async fn status(
                 "xrayVersion":row.try_get::<Option<String>,_>("xray_version")?,
                 // GeoData reports may include custom source URLs. Observers
                 // only receive operational status, never source metadata.
+                "tlsStatus":row.try_get::<Option<Value>,_>("tls_status")?.unwrap_or(Value::Null),
                 "geoData":if crate::viewer_read_only(&actor){Value::Null}
                     else{row.try_get::<Option<Value>,_>("geo_data")?
                         .unwrap_or(Value::Null)},
