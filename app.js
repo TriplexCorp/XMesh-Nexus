@@ -3858,7 +3858,12 @@ document.addEventListener('click',async e=>{
     try{
       const result=await backendRequest('/api/v1/users/'+encodeURIComponent(id)+'/credentials/rotate',{method:'POST'});
       const current=DB.users.find(u=>u.id===id);
-      if(current)current.xrayId=result.xrayId;
+      if(current){
+        current.xrayId=result.xrayId;
+        // Refresh every credential in memory as the owner may immediately
+        // sync a custom Xray profile without reloading the dashboard.
+        try{Object.assign(current,await backendRequest('/api/v1/collections/users/'+encodeURIComponent(id)))}catch(_){}
+      }
       // The open user drawer must not continue displaying the old VPN UUID.
       const idValue=b.closest('.user-canvas')?.querySelector('.user-id-value');
       if(idValue)idValue.textContent=result.xrayId;
