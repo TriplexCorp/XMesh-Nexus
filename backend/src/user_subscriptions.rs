@@ -412,6 +412,9 @@ fn proxy_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> 
    "settings":settings,"streamSettings":stream}))
 }
 async fn record(state: &AppState, id: i64) -> Result<Value, ApiError> {
+    // Existing users created before SS2022 support need the same persistent
+    // keys that node policies will use. Never mint ephemeral feed-only secrets.
+    crate::ensure_ss2022_user_keys(&state.pool, Some(id)).await?;
     let row = sqlx::query("SELECT data FROM panel_records WHERE collection='users' AND id=$1")
         .bind(id)
         .fetch_optional(&state.pool)
