@@ -1581,7 +1581,10 @@ fn ensure_masque_address(config: &mut Value) -> Result<(), ApiError> {
     Ok(())
 }
 
-#[expect(clippy::too_many_lines, reason = "TLS mode validation and certificate injection are one atomic operation")]
+#[expect(
+    clippy::too_many_lines,
+    reason = "TLS mode validation and certificate injection are one atomic operation"
+)]
 fn configure_node_managed_tls(node: &Value, config: &mut Value) -> Result<Option<Value>, ApiError> {
     if node.get("tlsAutoProvision").and_then(Value::as_bool) == Some(true)
         && node.get("tlsManualProvision").and_then(Value::as_bool) == Some(true)

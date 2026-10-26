@@ -6,7 +6,10 @@
 use serde_json::{Value, json};
 
 #[derive(Clone, Copy)]
-#[expect(clippy::struct_excessive_bools, reason = "Independent flags model each transport capability without mutating protocol identity")]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "Independent flags model each transport capability without mutating protocol identity"
+)]
 struct Transport {
     tcp: bool,
     udp: bool,
@@ -84,8 +87,11 @@ fn compatible(
     match (direction, kind) {
         ("tcp", "sudoku" | "header-custom")
         | ("udp", "sudoku" | "header-custom" | "mkcp-legacy" | "salamander") => Ok(true),
-        ("tcp", "fragment" | "xmc")
-        | ("udp", "noise" | "xicmp" | "realm" | "udphop") if explicit => Ok(true),
+        ("tcp", "fragment" | "xmc") | ("udp", "noise" | "xicmp" | "realm" | "udphop")
+            if explicit =>
+        {
+            Ok(true)
+        }
         ("udp", "xdns") if explicit && caps.kcp => Ok(true),
         ("tcp", "fragment" | "xmc") | ("udp", "noise" | "xdns" | "xicmp" | "realm" | "udphop") => {
             Err("directional FinalMask needs explicit clientFinalmask")
@@ -94,7 +100,10 @@ fn compatible(
     }
 }
 
-#[expect(clippy::too_many_lines, reason = "The explicit mask-type validation matrix is intentionally exhaustive and fail-closed")]
+#[expect(
+    clippy::too_many_lines,
+    reason = "The explicit mask-type validation matrix is intentionally exhaustive and fail-closed"
+)]
 fn validate_layer(
     layer: &Value,
     direction: &str,
@@ -269,7 +278,6 @@ const QUIC_CLIENT_KEYS: &[&str] = &[
     "disablePathMTUDiscovery",
 ];
 
-
 fn validate_quic_params(value: &Value) -> Result<Value, &'static str> {
     let obj = value.as_object().ok_or("quicParams must be an object")?;
     for key in obj.keys() {
@@ -397,53 +405,52 @@ pub fn project(
     // configuration. Without this check an explicit noise-only mask would
     // produce a plausible-looking, permanently broken subscription.
     if explicit && let Some(server) = server_finalmask {
-            for (direction, allowed) in [("tcp", caps.tcp), ("udp", caps.udp)] {
-                if !allowed {
-                    continue;
-                }
-                let Some(server_layers) = server.get(direction).and_then(Value::as_array) else {
-                    continue;
+        for (direction, allowed) in [("tcp", caps.tcp), ("udp", caps.udp)] {
+            if !allowed {
+                continue;
+            }
+            let Some(server_layers) = server.get(direction).and_then(Value::as_array) else {
+                continue;
+            };
+            let mut required = Vec::new();
+            for layer in server_layers {
+                let Some(kind) = layer.get("type").and_then(Value::as_str) else {
+                    return Err("invalid server FinalMask layer");
                 };
-                let mut required = Vec::new();
-                for layer in server_layers {
-                    let Some(kind) = layer.get("type").and_then(Value::as_str) else {
-                        return Err("invalid server FinalMask layer");
-                    };
-                    // These are deliberately directional or inbound-only,
-                    // not symmetric encoding requirements for subscribers.
-                    if [
-                        "filter", "fragment", "xmc", "noise", "xdns", "xicmp", "realm", "udphop",
-                    ]
-                    .contains(&kind)
-                    {
-                        continue;
-                    }
-                    if let Some(shared) = validate_layer(layer, direction, caps, false)? {
-                        required.push(shared);
-                    }
-                }
-                if required.is_empty() {
+                // These are deliberately directional or inbound-only,
+                // not symmetric encoding requirements for subscribers.
+                if [
+                    "filter", "fragment", "xmc", "noise", "xdns", "xicmp", "realm", "udphop",
+                ]
+                .contains(&kind)
+                {
                     continue;
                 }
-                let mut supplied = Vec::new();
-                if let Some(client_layers) = out.get(direction).and_then(Value::as_array) {
-                    for layer in client_layers {
-                        if layer
-                            .get("type")
-                            .and_then(Value::as_str)
-                            .is_some_and(|kind| {
-                                ["salamander", "sudoku", "mkcp-legacy", "header-custom"]
-                                    .contains(&kind)
-                            })
-                        {
-                            supplied.push(layer.clone());
-                        }
-                    }
-                }
-                if supplied != required {
-                    return Err("clientFinalmask must preserve server shared mask layers");
+                if let Some(shared) = validate_layer(layer, direction, caps, false)? {
+                    required.push(shared);
                 }
             }
+            if required.is_empty() {
+                continue;
+            }
+            let mut supplied = Vec::new();
+            if let Some(client_layers) = out.get(direction).and_then(Value::as_array) {
+                for layer in client_layers {
+                    if layer
+                        .get("type")
+                        .and_then(Value::as_str)
+                        .is_some_and(|kind| {
+                            ["salamander", "sudoku", "mkcp-legacy", "header-custom"].contains(&kind)
+                        })
+                    {
+                        supplied.push(layer.clone());
+                    }
+                }
+            }
+            if supplied != required {
+                return Err("clientFinalmask must preserve server shared mask layers");
+            }
+        }
     }
     // QUIC parameters are per-endpoint and must never be inferred from
     // the server: congestion caps, receive windows, hop ports differ.
