@@ -1166,9 +1166,7 @@ fn provision_proxy_users(
             if !seen.insert(uuid) {
                 continue;
             }
-            if let Some(entry) =
-                proxy_user_client_entry(user, &uuid, tag, &protocol, &ss_method)
-            {
+            if let Some(entry) = proxy_user_client_entry(user, &uuid, tag, &protocol, &ss_method) {
                 entries.push(entry);
             }
         }
@@ -2134,7 +2132,13 @@ mod provision_tests {
         let blocked = json!({"id":8,"xrayId":"550e8400-e29b-41d4-a716-446655440001",
             "squads":[4],"disabled":true});
         let squads = vec![json!({"id":4,"inb":["VM","TR","SS","SS22","HY","MQ"]})];
-        provision_proxy_users(&mut config, &[active.clone(), blocked], &squads, 1_800_000_000_000).unwrap();
+        provision_proxy_users(
+            &mut config,
+            &[active.clone(), blocked],
+            &squads,
+            1_800_000_000_000,
+        )
+        .unwrap();
         for (i, expected) in ["id", "password", "password", "password", "auth", "pass"]
             .iter()
             .enumerate()
