@@ -1,4 +1,5 @@
 name: Temporary JS regression diagnosis
+# Recheck node-agent and profile-state contracts after fixes
 on:
   push:
     branches:
