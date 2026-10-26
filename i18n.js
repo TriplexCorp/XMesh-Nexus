@@ -809,6 +809,16 @@ window.XMeshI18n=(()=>{
     "Server-side. Shared TCP Sudoku/header-custom and UDP Salamander/Gecko, Sudoku, mkcp-legacy, header-custom are exported automatically. Other masks require separate client-side JSON."
   ]
 ])dict.set(ru,en);
+  // Guided XRAY STUDIO TLS composer diagnostics.
+  dict.set("ALPN: используйте auto, h2, h3 или http/1.1 через запятую без повторов.","ALPN: use auto, h2, h3 or http/1.1 separated by commas without duplicates.");
+  dict.set("gRPC через TLS требует ALPN h2.","gRPC over TLS requires ALPN h2.");
+  dict.set("Для WebSocket/HTTPUpgrade предпочтителен ALPN http/1.1; h2 требует проверенного reverse proxy.","WebSocket/HTTPUpgrade should use ALPN http/1.1; h2 requires a verified reverse proxy.");
+  dict.set("Проверьте QUIC/HTTP3: без h3 выбранный транспорт может не работать как ожидается.","Check QUIC/HTTP3: the selected transport may not work as expected without h3.");
+  dict.set("Для TLS укажите оба пути: certificateFile и keyFile.","For TLS, provide both certificateFile and keyFile paths.");
+  dict.set("TLS-сертификат не настроен: добавьте реальные certificateFile/keyFile, доступные процессу Xray.","TLS certificate is not configured: provide real certificateFile/keyFile paths accessible to Xray.");
+  dict.set("Inbound доступен только локально: для внешних клиентов нужен reverse proxy или явная смена Listen.","This inbound listens on loopback only: external clients require a reverse proxy or a changed listen address.");
+  dict.set("В шаблоне users пустой: клиентов требуется добавить через панель или Xray до подключения.","The template has an empty users list: add clients in the panel or Xray before connecting.");
+  dict.set("TLS требует одновременно certificateFile и keyFile.","TLS requires both certificateFile and keyFile.");
   // Node explorer and control-agent installation status.
   dict.set('Навигация по страницам','Page navigation');
   dict.set('Agent не подтвердил установку в течение 15 минут.','The agent did not confirm installation within 15 minutes.');
