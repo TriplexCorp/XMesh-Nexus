@@ -1422,27 +1422,64 @@ fn node_xray_local_port(node: &Value) -> Result<u64, ApiError> {
     Ok(port)
 }
 
+/// A managed node has one public TCP backend and one public UDP backend.
+/// The second inbound uses the next loopback port; StatsService reserves 10085.
+fn managed_tcp_hysteria_pair(inbounds: &[Value]) -> bool {
+    if inbounds.len() != 2 {
+        return false;
+    }
+    let is_hysteria = |inbound: &Value| {
+        inbound.get("protocol").and_then(Value::as_str) == Some("hysteria")
+            && inbound.pointer("/streamSettings/network").and_then(Value::as_str)
+                == Some("hysteria")
+            && inbound.pointer("/streamSettings/security").and_then(Value::as_str)
+                == Some("tls")
+    };
+    let is_tcp = |inbound: &Value| {
+        let protocol = inbound.get("protocol").and_then(Value::as_str).unwrap_or("");
+        let network = inbound.pointer("/streamSettings/network")
+            .and_then(Value::as_str).unwrap_or("raw");
+        let h3 = inbound.pointer("/streamSettings/tlsSettings/alpn")
+            .and_then(Value::as_array)
+            .is_some_and(|alpn| alpn.iter().any(|value| value.as_str() == Some("h3")));
+        matches!(protocol, "vless" | "vmess" | "trojan" | "shadowsocks")
+            && matches!(network, "raw" | "tcp" | "xhttp" | "grpc" | "ws" | "httpupgrade")
+            && !(network == "xhttp" && h3)
+    };
+    (is_hysteria(&inbounds[0]) && is_tcp(&inbounds[1]))
+        || (is_tcp(&inbounds[0]) && is_hysteria(&inbounds[1]))
+}
+
 fn configure_local_xray_inbound(config: &mut Value, port: u64) -> Result<(), ApiError> {
     let inbounds = config
         .get_mut("inbounds")
         .and_then(Value::as_array_mut)
         .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Profile has no inbounds."))?;
-    if inbounds.len() != 1 {
+    if inbounds.is_empty() || inbounds.len() > 2
+        || (inbounds.len() == 2 && !managed_tcp_hysteria_pair(inbounds))
+    {
         return Err(ApiError::new(
             StatusCode::CONFLICT,
-            "Automatic local-port mapping currently requires exactly one inbound per profile.",
+            "Managed profiles support one inbound or a TCP proxy + Hysteria2 pair without competing UDP/QUIC transports.",
         ));
     }
-    let inbound = inbounds.get_mut(0).unwrap();
-    let object = inbound
-        .as_object_mut()
-        .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Invalid inbound."))?;
-    object.insert("listen".to_owned(), json!("127.0.0.1"));
-    object.insert("port".to_owned(), json!(port));
+    if port == 10085 || (inbounds.len() == 2 && (port >= 65535 || port + 1 == 10085)) {
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "Managed Xray local ports must not collide with StatsService or exceed 65535.",
+        ));
+    }
+    for (index, inbound) in inbounds.iter_mut().enumerate() {
+        let object = inbound.as_object_mut().ok_or_else(|| {
+            ApiError::new(StatusCode::CONFLICT, "Invalid inbound.")
+        })?;
+        // The first listener preserves xrayLocalPort for existing deployments.
+        // The second uses xrayLocalPort + 1; both remain private to the edge.
+        object.insert("listen".to_owned(), json!("127.0.0.1"));
+        object.insert("port".to_owned(), json!(port + index as u64));
+    }
     Ok(())
 }
-
-
 
 fn ensure_masque_address(config: &mut Value) -> Result<(), ApiError> {
     let inbounds = config.get_mut("inbounds").and_then(Value::as_array_mut)
@@ -1773,6 +1810,46 @@ mod provision_tests {
         configure_local_xray_inbound(&mut config, local_port).unwrap();
         assert_eq!(config["inbounds"][0]["listen"], "127.0.0.1");
         assert_eq!(config["inbounds"][0]["port"], 5000);
+    }
+    #[test]
+    fn managed_tcp_hysteria_pair_receives_distinct_private_ports() {
+        for swap in [false, true] {
+            let vless = json!({
+                "tag":"vless-main","protocol":"vless","listen":"0.0.0.0","port":443,
+                "streamSettings":{"network":"xhttp","security":"tls",
+                    "tlsSettings":{"alpn":["h2","http/1.1"]}}
+            });
+            let hysteria = json!({
+                "tag":"hysteria-main","protocol":"hysteria","listen":"0.0.0.0","port":443,
+                "streamSettings":{"network":"hysteria","security":"tls",
+                    "tlsSettings":{"alpn":["h3"]}}
+            });
+            let mut config = if swap {
+                json!({"inbounds":[hysteria,vless]})
+            } else {
+                json!({"inbounds":[vless,hysteria]})
+            };
+            configure_local_xray_inbound(&mut config, 5000).unwrap();
+            assert_eq!(config["inbounds"][0]["port"], 5000);
+            assert_eq!(config["inbounds"][1]["port"], 5001);
+            for entry in config["inbounds"].as_array().unwrap() {
+                assert_eq!(entry["listen"], "127.0.0.1");
+            }
+        }
+    }
+    #[test]
+    fn managed_pair_rejects_competing_quic_and_reserved_ports() {
+        let tcp = json!({"protocol":"vless","streamSettings":{"network":"xhttp",
+            "tlsSettings":{"alpn":["h2","h3"]}}});
+        let udp = json!({"protocol":"hysteria","streamSettings":{
+            "network":"hysteria","security":"tls"}});
+        let mut config = json!({"inbounds":[tcp,udp]});
+        assert!(configure_local_xray_inbound(&mut config, 5000).is_err());
+        config["inbounds"][0]["streamSettings"]["tlsSettings"]["alpn"] = json!(["h2"]);
+        for port in [10084, 10085, 65535] {
+            assert!(configure_local_xray_inbound(&mut config, port).is_err());
+        }
+        configure_local_xray_inbound(&mut config, 10086).unwrap();
     }
     #[test]
     fn hysteria_desired_config_uses_edited_local_port_without_tcp_hardcode() {
