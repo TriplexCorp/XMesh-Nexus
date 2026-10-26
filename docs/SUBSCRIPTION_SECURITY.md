@@ -61,6 +61,22 @@ VMess, Trojan, Hysteria2, MASQUE and classic Shadowsocks, and both per-user
 Shadowsocks 2022 keys. Clients must reimport the new configuration.
 The change is audited without recording raw credentials.
 
+## Independent protocol credentials
+
+New users receive a distinct VLESS UUID, a different VMess UUID, and
+independent 256-bit random hex passwords for Trojan, Hysteria2, MASQUE,
+classic Shadowsocks AEAD, and manual HTTP/SOCKS profile accounts. SS2022
+continues to receive independently generated 128/256-bit PSKs. A credential
+exposed from one protocol is not a password for any other protocol.
+
+Historical users are deliberately **not** rekeyed automatically: accounts
+that lack these new fields keep using their original `xrayId` for older
+protocols until the owner explicitly chooses **Rotate VPN access**. The
+owner-only rotation regenerates all separate credentials atomically along
+with the subscription URL. Clients must reimport the updated feed and all
+managed nodes must reconcile; offline authorization remains subject to
+its previously signed policy lifetime.
+
 The panel database changes immediately. **Revocation on remote nodes is
 not instantaneous or globally atomic.** Connected managed nodes apply the
 new signed desired configuration during their next reconciliation.
