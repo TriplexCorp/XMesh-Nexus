@@ -2,6 +2,18 @@
 set -Eeuo pipefail
 cd "$(dirname "$0")"
 
+prepare_only=0
+if [[ "${1:-}" == "--prepare-only" ]]; then prepare_only=1; fi
+if [[ "$prepare_only" == 0 ]]; then
+  if [[ "$EUID" -ne 0 ]]; then
+    echo "Full panel installation needs root privileges. Run: sudo ./install.sh" >&2
+    exit 1
+  fi
+  # Ubuntu host bootstrap: Docker, Nginx mainline, Certbot. No tenant domain
+  # is embedded in the installer or the public repository.
+  bash deploy/install-panel-host.sh deps
+fi
+
 if ! command -v docker >/dev/null 2>&1; then
   echo "Docker is required. Install Docker Engine and the Compose plugin first." >&2
   exit 1
@@ -15,8 +27,6 @@ if ! command -v openssl >/dev/null 2>&1; then
   exit 1
 fi
 
-prepare_only=0
-if [[ "${1:-}" == "--prepare-only" ]]; then prepare_only=1; fi
 created_env=0
 # The URL slug is 192 random bits, generated once and preserved on reinstall.
 new_dashboard_path="/dashboard/$(openssl rand -hex 24)"
@@ -88,6 +98,12 @@ done
 # Existing installations may contain an empty TOTP_ENCRYPTION_KEY.
 # Verify without replacing a nonempty key (which is required to decrypt existing TOTP secrets).
 bash deploy/ensure-totp-key.sh .env
+
+# Persist the operator's HTTPS FQDN and ACME email once, never rewriting
+# an existing installation's DNS identity or secret material.
+if [[ "$prepare_only" == 0 ]]; then
+  bash deploy/install-panel-host.sh domain "$PWD/.env"
+fi
 
 # Configure a root-owned host-only watcher to atomically synchronize the path into .env.
 if [[ "$(id -u)" == 0 ]] && command -v systemctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]]; then
@@ -181,11 +197,15 @@ if ! docker compose up -d --build --wait --wait-timeout 180; then
   exit 1
 fi
 
+# HTTPS is configured only after the API is healthy. Failure leaves database
+# volumes intact and never publishes the app beyond 127.0.0.1.
+bash deploy/install-panel-host.sh activate "$PWD/.env"
+
 echo
 echo "XMesh Nexus panel is healthy and ready."
 echo "PostgreSQL stores persistent panel data; Redis provides shared login throttling."
 echo "Redis is private to the Compose network and is not published on a host port."
-echo "Panel is bound to 127.0.0.1:8080 by default; put it behind your HTTPS reverse proxy."
+echo "Panel stays on loopback; Nginx terminates TLS for PANEL_DOMAIN."
 printf 'Dashboard entrypoint: %s\n' "$dashboard_path"
 echo 'This path is stored in .env (mode 600). Save your full HTTPS URL.'
 if [[ "$created_env" == "1" ]]; then
