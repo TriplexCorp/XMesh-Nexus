@@ -305,12 +305,16 @@ pub async fn status(
                     Ok(compiled) => (Some(compiled.revision), "current", None),
                     Err(error) => {
                         let reason = profile_compile_error_code(&error);
-                        tracing::warn!(
-                            node_id,
-                            stage = reason,
-                            "Cannot compile current desired node profile"
-                        );
-                        (None, "invalid_configuration", Some(reason))
+                        if reason == "missing_profile_assignment" {
+                            (None, "awaiting_profile", None)
+                        } else {
+                            tracing::warn!(
+                                node_id,
+                                stage = reason,
+                                "Cannot compile current desired node profile"
+                            );
+                            (None, "invalid_configuration", Some(reason))
+                        }
                     }
                 }
             } else {
@@ -1378,6 +1382,17 @@ struct CompiledNodeProfile {
     active_nodes: i64,
     revision: String,
 }
+// A newly enrolled node is allowed to exist without a profile. Treat this
+// as a provisioning state, not a broken managed Xray configuration.
+fn node_awaits_profile(node: &Value) -> bool {
+    match node.get("profileId") {
+        None | Some(Value::Null) => true,
+        Some(Value::String(value)) => value.trim().is_empty(),
+        Some(Value::Number(value)) => value.as_i64() == Some(0),
+        _ => false,
+    }
+}
+
 fn node_xray_local_port(node: &Value) -> Result<u64, ApiError> {
     // Legacy form submissions may persist positive numeric ports as strings.
     // Never silently fall back to the public node port: it is not Xray's port.
@@ -1628,7 +1643,7 @@ pub async fn desired_config(
     State(state): State<AppState>,
     headers: HeaderMap,
     body: Bytes,
-) -> Result<Json<Value>, ApiError> {
+) -> Result<(StatusCode, Json<Value>), ApiError> {
     let request: DesiredConfigRequest = serde_json::from_slice(&body).map_err(|_| {
         ApiError::new(
             StatusCode::BAD_REQUEST,
@@ -1646,6 +1661,32 @@ pub async fn desired_config(
         "/api/v1/node/desired-config",
     )
     .await?;
+    // Enrollment precedes profile authoring. Authenticated nodes without a
+    // profile receive a non-successful-to-apply but healthy pending response.
+    // Never sign or issue a policy while no Xray configuration exists.
+    let node = sqlx::query_scalar::<_, Value>(
+        "SELECT data FROM panel_records WHERE collection='nodes' AND id=$1",
+    )
+    .bind(request.node_id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Node not found."))?;
+    if node.get("disabled").and_then(Value::as_bool) == Some(true) {
+        return Err(ApiError::new(
+            StatusCode::FORBIDDEN,
+            "Node disabled: Xray configuration updates blocked.",
+        ));
+    }
+    if node_awaits_profile(&node) {
+        return Ok((
+            StatusCode::ACCEPTED,
+            Json(json!({
+                "status":"awaiting_profile",
+                "nodeId":request.node_id,
+                "message":"Node enrolled. Assign an XRAY STUDIO profile to provision Xray."
+            })),
+        ));
+    }
     let CompiledNodeProfile {
         profile_id,
         port,
@@ -1680,17 +1721,32 @@ pub async fn desired_config(
     .bind(&digest)
     .execute(&state.pool)
     .await?;
-    Ok(Json(json!({
+    Ok((StatusCode::OK, Json(json!({
         "nodeId":request.node_id,"profileId":profile_id,
         "listen":"127.0.0.1","port":port,"revision":digest,"config":config,
         "policy":policy,"policySignature":signature,
         "policyPublicKey":state.node_policy_signer.public_key()
-    })))
+    }))))
 }
 
 #[cfg(test)]
 mod provision_tests {
     use super::*;
+    #[test]
+    fn profile_assignment_is_optional_until_provisioning() {
+        for node in [
+            json!({}), json!({"profileId":null}), json!({"profileId":""}),
+            json!({"profileId":"  "}), json!({"profileId":0})
+        ] {
+            assert!(node_awaits_profile(&node), "{node:?}");
+        }
+        for node in [
+            json!({"profileId":1}), json!({"profileId":"1"}),
+            json!({"profileId":-1}), json!({"profileId":"invalid"})
+        ] {
+            assert!(!node_awaits_profile(&node), "{node:?}");
+        }
+    }
     #[test]
     fn managed_tls_rejects_conflicting_provisioning_modes() {
         let node = json!({"tlsAutoProvision": true, "tlsManualProvision": true});
