@@ -3891,6 +3891,22 @@ fn validate_record(collection: &str, data: &Value) -> Result<(), ApiError> {
     })?;
     if collection == "nodes" {
         validate_node_address(data)?;
+        if object.get("tlsAutoProvision").and_then(Value::as_bool) == Some(true) {
+            let domain = object.get("tlsDomain").and_then(Value::as_str).unwrap_or("").trim().to_ascii_lowercase();
+            let email = object.get("tlsAcmeEmail").and_then(Value::as_str).unwrap_or("").trim();
+            let valid_domain = domain.len() <= 253 && domain.contains('.')
+                && domain.split('.').all(|part| !part.is_empty() && part.len() <= 63
+                    && !part.starts_with('-') && !part.ends_with('-')
+                    && part.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-'));
+            let valid_email = email.len() <= 254 && !email.contains(char::is_whitespace)
+                && email.split_once('@').is_some_and(|(user,host)| !user.is_empty()
+                    && host.contains('.') && host.len() <= 253
+                    && host.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-')));
+            if !valid_domain || !valid_email {
+                return Err(ApiError::new(StatusCode::BAD_REQUEST,
+                    "Managed TLS requires a valid node domain and ACME email."));
+            }
+        }
         node_rotation::validate_node(data)?;
         node_routing::validate_saved(data)?;
         if let Some(hosting) = object.get("hosting") {
