@@ -1364,6 +1364,7 @@ struct CompiledNodeProfile {
     config: Value,
     geo_data: Option<Value>,
     users: Vec<Value>,
+    tls_provision: Option<Value>,
     now_ms: i64,
     active_nodes: i64,
     revision: String,
@@ -1405,6 +1406,39 @@ fn configure_local_xray_inbound(config: &mut Value, port: u64) -> Result<(), Api
     object.insert("listen".to_owned(), json!("127.0.0.1"));
     object.insert("port".to_owned(), json!(port));
     Ok(())
+}
+
+
+fn configure_node_managed_tls(node: &Value, config: &mut Value) -> Result<Option<Value>, ApiError> {
+    if node.get("tlsAutoProvision").and_then(Value::as_bool) != Some(true) { return Ok(None); }
+    let domain = node.get("tlsDomain").and_then(Value::as_str).unwrap_or("").trim().to_ascii_lowercase();
+    let email = node.get("tlsAcmeEmail").and_then(Value::as_str).unwrap_or("").trim();
+    let valid_domain = domain.len() <= 253 && domain.contains('.')
+        && domain.split('.').all(|part| !part.is_empty() && part.len() <= 63
+            && !part.starts_with('-') && !part.ends_with('-')
+            && part.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-'));
+    let valid_email = email.len() <= 254 && !email.contains(char::is_whitespace)
+        && email.split_once('@').is_some_and(|(user, host)| !user.is_empty() && host.contains('.')
+            && host.len() <= 253 && host.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-')));
+    if !valid_domain || !valid_email {
+        return Err(ApiError::new(StatusCode::CONFLICT, "Managed TLS requires a valid node TLS domain and ACME email."));
+    }
+    let inbounds = config.get_mut("inbounds").and_then(Value::as_array_mut)
+        .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Profile has no inbounds."))?;
+    let mut updated = false;
+    for inbound in inbounds {
+        let Some(stream) = inbound.get_mut("streamSettings").and_then(Value::as_object_mut) else { continue };
+        if stream.get("security").and_then(Value::as_str) != Some("tls") { continue; }
+        let tls = stream.entry("tlsSettings").or_insert_with(|| json!({}));
+        let tls = tls.as_object_mut().ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Invalid TLS settings."))?;
+        tls.insert("certificates".to_owned(), json!([{
+            "certificateFile":format!("/etc/letsencrypt/live/{domain}/fullchain.pem"),
+            "keyFile":format!("/etc/letsencrypt/live/{domain}/privkey.pem")
+        }]));
+        updated = true;
+    }
+    if !updated { return Err(ApiError::new(StatusCode::CONFLICT, "Managed TLS requires an assigned TLS inbound.")); }
+    Ok(Some(json!({"domain":domain,"email":email,"provider":"letsencrypt-http01"})))
 }
 
 async fn compile_node_profile(
@@ -1458,6 +1492,7 @@ async fn compile_node_profile(
         }
     };
     configure_local_xray_inbound(&mut config, port)?;
+    let tls_provision = configure_node_managed_tls(&node, &mut config)?;
     let users = crate::load_records(&state.pool, "users").await?;
     let squads = crate::load_records(&state.pool, "squads").await?;
     let now = std::time::SystemTime::now()
@@ -1497,6 +1532,7 @@ async fn compile_node_profile(
         config,
         geo_data,
         users,
+        tls_provision,
         now_ms: now,
         active_nodes,
         revision: digest,
@@ -1540,12 +1576,14 @@ pub async fn desired_config(
         config,
         geo_data,
         users,
+        tls_provision,
         now_ms: now,
         active_nodes,
         revision: digest,
     } = compile_node_profile(&state, request.node_id).await?;
     let mut policy =
         build_offline_policy(&config, &users, request.node_id, now, &digest, active_nodes);
+    if let Some(tls) = tls_provision { policy["tlsProvision"] = tls; }
     // Metadata is covered by the existing Ed25519 node-policy signature.
     if let Some(manifest) = geo_data {
         policy["geoData"] = manifest;
