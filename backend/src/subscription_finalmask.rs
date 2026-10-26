@@ -1,11 +1,12 @@
-//! Safe inbound → outbound FinalMask projection for Xray JSON subscriptions.
+//! Safe inbound → outbound `FinalMask` projection for Xray JSON subscriptions.
 //! Contract: transport compatibility is checked for every layer. Only masks
 //! with truly shared wire settings are inherited; directional configurations
 //! must be authored explicitly in xmesh.clientFinalmask / host.clientFinalmask.
-//! Source: https://xtls.github.io/en/config/transports/finalmask.html
+//! Source: <https://xtls.github.io/en/config/transports/finalmask.html>
 use serde_json::{Value, json};
 
 #[derive(Clone, Copy)]
+#[expect(clippy::struct_excessive_bools, reason = "Independent flags model each transport capability without mutating protocol identity")]
 struct Transport {
     tcp: bool,
     udp: bool,
@@ -42,7 +43,7 @@ fn transport(network: &str, client_stream: &Value) -> Transport {
     }
 }
 
-fn settings<'a>(layer: &'a Value) -> Result<(&'a str, &'a Value), &'static str> {
+fn settings(layer: &Value) -> Result<(&str, &Value), &'static str> {
     let kind = layer
         .get("type")
         .and_then(Value::as_str)
@@ -81,12 +82,11 @@ fn compatible(
         };
     }
     match (direction, kind) {
-        ("tcp", "sudoku" | "header-custom") => Ok(true),
-        ("tcp", "fragment" | "xmc") if explicit => Ok(true),
-        ("udp", "sudoku" | "header-custom" | "mkcp-legacy" | "salamander") => Ok(true),
-        ("udp", "noise" | "xicmp" | "realm") if explicit => Ok(true),
+        ("tcp", "sudoku" | "header-custom")
+        | ("udp", "sudoku" | "header-custom" | "mkcp-legacy" | "salamander") => Ok(true),
+        ("tcp", "fragment" | "xmc")
+        | ("udp", "noise" | "xicmp" | "realm" | "udphop") if explicit => Ok(true),
         ("udp", "xdns") if explicit && caps.kcp => Ok(true),
-        ("udp", "udphop") if explicit => Ok(true),
         ("tcp", "fragment" | "xmc") | ("udp", "noise" | "xdns" | "xicmp" | "realm" | "udphop") => {
             Err("directional FinalMask needs explicit clientFinalmask")
         }
@@ -94,6 +94,7 @@ fn compatible(
     }
 }
 
+#[expect(clippy::too_many_lines, reason = "The explicit mask-type validation matrix is intentionally exhaustive and fail-closed")]
 fn validate_layer(
     layer: &Value,
     direction: &str,
@@ -169,10 +170,10 @@ fn validate_layer(
             if !caps.kcp {
                 return Err("xdns requires mKCP, not QUIC");
             }
-            if !src
+            if src
                 .get("domains")
                 .and_then(Value::as_array)
-                .is_some_and(|v| !v.is_empty())
+                .is_none_or(|v| v.is_empty())
             {
                 return Err("xdns requires a non-empty domains array");
             }
@@ -220,10 +221,10 @@ fn validate_layer(
             src.clone()
         }
         "noise" => {
-            if !src
+            if src
                 .get("noise")
                 .and_then(Value::as_array)
-                .is_some_and(|v| !v.is_empty())
+                .is_none_or(|v| v.is_empty())
             {
                 return Err("UDP noise requires a non-empty noise array");
             }
