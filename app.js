@@ -3190,6 +3190,18 @@ const updateNodeRuntimeBadges=(node,runtime)=>{
     tlsBadge.title=tls.detail;
     tlsBadge.dataset.state=tls.kind;
   }
+  const geoBadge=card.querySelector('[data-node-geodata-status]');
+  if(geoBadge){
+    const geo=runtime?.connected?runtime.geoData:null;
+    const labels={current:'файлы актуальны',pending:'применяется',error:'ошибка обновления',rolled_back:'откат'};
+    const count=geo?.files&&typeof geo.files==='object'?Object.keys(geo.files).length:0;
+    const label=geo?.state?(labels[geo.state]||'статус неизвестен'):(runtime?.connected?'нет отчёта':'ожидает агента');
+    geoBadge.textContent='GeoData · '+label+(count?' · '+count+' файла(ов)':'');
+    geoBadge.title=geo?.lastError?String(geo.lastError).slice(0,240):
+      geo?.checkedAt?'Последняя проверка: '+String(geo.checkedAt):
+      'Агент не сообщил состояние GeoData; проверьте синхронизацию файлов';
+    geoBadge.dataset.state=geo?.state||'unknown';
+  }
   const profileStatus=card.querySelector('[data-node-profile-status]');
   if(profileStatus){
     profileStatus.textContent=nodeProfileStatus(runtime);
@@ -3388,7 +3400,7 @@ async function nodesP(){
     return `<div class="card nc${n.disabled?' off':''}" data-node-card-id="${n.id}"><div class="h"><span class="fg">${flagView(n.flag)}</span><div class="node-identity"><b>${esc(n.name)}</b><br><small class="mu">${viewerMode()?'Адрес скрыт':esc(n.addr||'—')+(n.port?':'+esc(n.port):'')}</small>${n.hosting?.trim()?`<span class="node-hosting" title="Хостинг">${ic('building-2')}${esc(n.hosting.trim())}</span>`:''}</div><div class="node-live-badges"><span class="node-xray-version" data-node-xray-version title="Версия по последнему heartbeat">${renderNodeXrayVersion(n.id,runtime.get(n.id))}</span><span class="node-agent-version" data-node-agent-version title="Версия управляющего агента">${renderNodeAgentVersion(n.id,runtime.get(n.id))}</span><span data-node-runtime-state class="node-runtime-pill node-runtime-${nodeRuntimeState(n,runtime.get(n.id)).kind}"><span class="node-runtime-dot" aria-hidden="true"></span>${esc(nodeRuntimeState(n,runtime.get(n.id)).label)}</span></div></div>
       <div class="kvg"><div><span title="Пользователи с активным доступом через inbound этой ноды, не число текущих подключений">Активные пользователи</span><b>${s.nodeOn[n.id]??0}</b><div class="node-online-clients" title="Онлайн-клиенты по свежей телеметрии агента ноды"><span>Пользователи онлайн</span><b>${m?.onlineClients!=null&&Number.isFinite(Number(m.onlineClients))?Math.max(0,Math.trunc(Number(m.onlineClients))):"—"}</b></div></div><div><span>XRAY STUDIO</span>${p?esc(p.name)+'<br><small class="mu" data-node-profile-status="'+esc(n.id)+'" title="Проверка подписанной политики и реально используемой конфигурации Xray">'+esc(nodeProfileStatus(runtime.get(n.id)))+'</small>':n.profileId?'<span class="er">Профиль ID '+esc(n.profileId)+' не найден</span>':'<span class="mu" data-node-profile-status="'+esc(n.id)+'">Профиль пока не назначен</span>'}</div></div>
       ${n.tlsAutoProvision||n.tlsManualProvision?'<div class="node-tls-health" data-node-tls-status title="Ожидается подписанный отчёт агента">TLS · нет данных</div>':''}
-      ${n.geoEnabled?`<div class="node-ip-rotation active" title="${esc(geoStatus?.lastError||'Подтверждение от управляющего агента, не проверка фактической блокировки рекламы')}"><span class="node-ip-indicator" aria-hidden="true"></span><span>GeoData · ${esc(geoLabel)}${geoFileCount?' · '+geoFileCount+' файла(ов)':''}</span></div>`:''}
+      ${n.geoEnabled?`<div class="node-ip-rotation active" title="${esc(geoStatus?.lastError||'Подтверждение от управляющего агента, не проверка фактической блокировки рекламы')}"><span class="node-ip-indicator" aria-hidden="true"></span><span data-node-geodata-status>GeoData · ${esc(geoLabel)}${geoFileCount?' · '+geoFileCount+' файла(ов)':''}</span></div>`:''}
       ${n.rotationEnabled?`<div class="node-ip-rotation active" aria-label="Пул IP-ротации"><span class="node-ip-indicator" aria-hidden="true"></span><span>IP-пул · ${nodeRotationIPs(n).length} адресов</span></div>`:''}
       <div class="node-gauges">
         ${nodeGauge(n,'cpu-'+n.id,'CPU',Number.isFinite(l.cpu)?l.cpu:0,Number.isFinite(l.cpu)?Math.round(l.cpu)+'%':'—',Number.isFinite(l.cpu)?'загрузка':'нет данных','--a')}
