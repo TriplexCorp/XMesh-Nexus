@@ -566,12 +566,17 @@ pub async fn rotate_credentials(
             .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "User not found"))?;
     let mut user: Value = row.try_get("data")?;
     let old_uuid = user.get("xrayId").and_then(Value::as_str).unwrap_or("");
-    let new_uuid = loop {
-        let proposed = uuid::Uuid::new_v4().to_string();
-        if proposed != old_uuid {
+    let new_credentials = loop {
+        let proposed = crate::user_credentials::generate();
+        if proposed.get("xrayId").and_then(Value::as_str) != Some(old_uuid) {
             break proposed;
         }
     };
+    let new_uuid = new_credentials
+        .get("xrayId")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_owned();
     let object = user
         .as_object_mut()
         .ok_or_else(|| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Invalid user record"))?;
@@ -579,7 +584,9 @@ pub async fn rotate_credentials(
     let mut ss128 = [0u8; 16];
     OsRng.fill_bytes(&mut ss256);
     OsRng.fill_bytes(&mut ss128);
-    object.insert("xrayId".to_owned(), json!(new_uuid));
+    // Refresh every credential in a single DB transaction, including the
+    // independent passwords for all managed and local-auth protocols.
+    object.extend(new_credentials);
     object.insert(
         "ssPassword".to_owned(),
         json!(base64::engine::general_purpose::STANDARD.encode(ss256)),
@@ -639,11 +646,12 @@ pub async fn status(
     if id <= 0 {
         return Err(bad("Invalid user ID"));
     }
-    let _ = record(&state, id).await?;
+    let subscription_user = record(&state, id).await?;
+    let separated = crate::user_credentials::is_isolated(&subscription_user);
     let row=sqlx::query("SELECT token_hash,token_ciphertext,created_at FROM user_subscription_tokens WHERE user_id=$1")
   .bind(id).fetch_optional(&state.pool).await?;
     let Some(row) = row else {
-        return Ok(Json(json!({"enabled":false,"token":null,"legacy":false})));
+        return Ok(Json(json!({"enabled":false,"token":null,"legacy":false,"credentialsSeparated":separated})));
     };
     let encrypted: Option<String> = row.try_get("token_ciphertext")?;
     let hash: String = row.try_get("token_hash")?;
@@ -654,7 +662,7 @@ pub async fn status(
     let settings = crate::read_settings(&state.pool).await?;
     let url = token.as_deref().map(|value| studio_url(&settings, value));
     Ok(Json(
-        json!({"enabled":true,"legacy":token.is_none(),"token":token,"url":url}),
+        json!({"enabled":true,"legacy":token.is_none(),"token":token,"url":url,"credentialsSeparated":separated}),
     ))
 }
 pub async fn revoke(
