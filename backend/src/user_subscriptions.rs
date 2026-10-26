@@ -350,6 +350,14 @@ fn configure_masque_credentials(
     Some(())
 }
 
+fn apply_hysteria_auth(stream: &mut Value, user: &Value, uuid: &str) {
+    if !stream["hysteriaSettings"].is_object() {
+        stream["hysteriaSettings"] = json!({});
+    }
+    stream["hysteriaSettings"]["version"] = json!(2);
+    stream["hysteriaSettings"]["auth"] =
+        json!(nonempty(user, "hysteriaPassword").unwrap_or(uuid));
+}
 fn proxy_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> Option<Value> {
     if nonempty(inbound, "protocol") == Some("vless") {
         return vless_outbound(user, inbound, host, device);
@@ -441,12 +449,7 @@ fn proxy_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> 
         configure_masque_credentials(&mut stream, user, inbound, uuid)?;
     }
     if protocol == "hysteria" {
-        if !stream["hysteriaSettings"].is_object() {
-            stream["hysteriaSettings"] = json!({});
-        }
-        stream["hysteriaSettings"]["version"] = json!(2);
-        stream["hysteriaSettings"]["auth"] =
-            json!(nonempty(user, "hysteriaPassword").unwrap_or(uuid));
+        apply_hysteria_auth(&mut stream, user, uuid);
     }
     let tag = nonempty(host, "remark")
         .or_else(|| nonempty(inbound, "tag"))
