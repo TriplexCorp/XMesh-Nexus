@@ -969,6 +969,15 @@ async fn create_record(
         use aes_gcm::aead::rand_core::RngCore as _;
         use base64::Engine as _;
         object.insert("xrayId".into(), Value::String(Uuid::new_v4().to_string()));
+        // Independent secrets per protocol: compromise of one outbound must not
+        // disclose another. Existing users without these fields keep legacy
+        // xrayId credentials until an explicit owner-initiated rekey.
+        object.insert("vmessId".into(), json!(Uuid::new_v4().to_string()));
+        for key in ["trojanPassword", "hysteriaPassword", "masquePassword", "ssLegacyPassword"] {
+            let mut secret = [0u8; 32];
+            aes_gcm::aead::OsRng.fill_bytes(&mut secret);
+            object.insert(key.into(), json!(hex::encode(secret)));
+        }
         // SS2022 multi-user keys must be cryptographically random, persistent,
         // and shared by the node policy and the generated client subscription.
         let mut key256 = [0u8; 32];
@@ -1121,8 +1130,12 @@ async fn update_record(
     patch_object.remove("id");
     // Managed SS2022 keys are immutable through the generic record API.
     if collection == "users" {
-        patch_object.remove("ssPassword");
-        patch_object.remove("ssPassword128");
+        // Credential material is immutable via generic CRUD. Only the
+        // dedicated owner-only rotation endpoint can replace these secrets.
+        for key in ["ssPassword", "ssPassword128", "vmessId", "trojanPassword",
+                    "hysteriaPassword", "masquePassword", "ssLegacyPassword"] {
+            patch_object.remove(key);
+        }
     }
 
     let mut tx = state.pool.begin().await?;
