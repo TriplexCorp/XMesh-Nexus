@@ -2450,7 +2450,9 @@ async function syncXrayUserToProfile(user){
   // into the Xray stats identity, so each inbound gets an independent user counter.
   // Do not guess this intersection from separate aggregate counters.
   const email='xmesh-u'+Number(user.id)+'--'+encodeURIComponent(String(inbound.tag||''));
-  const login=String(user.username||'xmesh').toLowerCase().replace(/[^a-z0-9_.-]/g,'-').slice(0,32)||'xmesh';
+  // Match backend protocol_credentials::for_protocol. Older users keep their
+  // original UUID passwords until the owner explicitly rotates VPN access.
+  const credential=(field)=>user[field]||user.xrayId;
   if(inbound.protocol==='vless'){
    const list=inbound.settings.users||(inbound.settings.users=[]);
    if(Array.isArray(inbound.settings.clients)){for(const legacy of inbound.settings.clients){if(legacy.id&&!list.some(x=>x.id===legacy.id))list.push({...legacy})}delete inbound.settings.clients}
@@ -2460,35 +2462,28 @@ async function syncXrayUserToProfile(user){
   }else if(inbound.protocol==='vmess'){
    const list=inbound.settings.users||(inbound.settings.users=[]);
    if(Array.isArray(inbound.settings.clients)){for(const legacy of inbound.settings.clients){if(legacy.id&&!list.some(x=>x.id===legacy.id))list.push({...legacy})}delete inbound.settings.clients}
-   if(!list.some(x=>x.id===user.xrayId))list.push({id:user.xrayId,level:0,email,alterId:0});
+   if(!list.some(x=>x.id===credential('vmessId')))list.push({id:credential('vmessId'),level:0,email,alterId:0});
    changed++;
   }else if(inbound.protocol==='trojan'){
    const list=inbound.settings.clients||(inbound.settings.clients=[]);
-   if(!list.some(x=>x.password===user.xrayId))list.push({password:user.xrayId,email,level:0});
+   if(!list.some(x=>x.password===credential('trojanPassword')))list.push({password:credential('trojanPassword'),email,level:0});
    changed++;
-  }else if(inbound.protocol==='http'){
-   const list=inbound.settings.users||(inbound.settings.users=[]);
-   if(!list.some(x=>x.pass===user.xrayId||x.user===login))list.push({user:login,pass:user.xrayId});
-   changed++;
-  }else if(inbound.protocol==='socks'||inbound.protocol==='mixed'){
-   inbound.settings.auth='password';
-   const list=inbound.settings.users||(inbound.settings.users=[]);
-   if(!list.some(x=>x.pass===user.xrayId||x.user===login))list.push({user:login,pass:user.xrayId});
-   changed++;
+  }else if(inbound.protocol==='http'||inbound.protocol==='socks'||inbound.protocol==='mixed'){
+   skipped.push(inbound.tag||inbound.protocol);
   }else if(inbound.protocol==='hysteria'){
    inbound.settings.version=2;
    const list=inbound.settings.users||(inbound.settings.users=[]);
-   if(!list.some(x=>x.auth===user.xrayId||x.email===email))list.push({auth:user.xrayId,level:0,email});
+   if(!list.some(x=>x.auth===credential('hysteriaPassword')||x.email===email))list.push({auth:credential('hysteriaPassword'),level:0,email});
    changed++;
   }else if(inbound.protocol==='masque'){
    const list=inbound.settings.users||(inbound.settings.users=[]);
-   if(!list.some(x=>x.pass===user.xrayId||x.email===email))list.push({pass:user.xrayId,level:0,email});
+   if(!list.some(x=>x.pass===credential('masquePassword')||x.email===email))list.push({pass:credential('masquePassword'),level:0,email});
    changed++;
   }else if(inbound.protocol==='shadowsocks'){
    const method=String(inbound.settings.method||'chacha20-ietf-poly1305');
    if(method.startsWith('2022-')){skipped.push(inbound.tag||'Shadowsocks 2022');continue}
    const list=inbound.settings.users||(inbound.settings.users=[]);
-   if(!list.some(x=>x.password===user.xrayId||x.email===email))list.push({password:user.xrayId,method,level:0,email});
+   if(!list.some(x=>x.password===credential('ssLegacyPassword')||x.email===email))list.push({password:credential('ssLegacyPassword'),method,level:0,email});
    changed++;
   }
  }
