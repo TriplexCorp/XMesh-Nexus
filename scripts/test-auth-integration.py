@@ -85,6 +85,9 @@ def main():
     check(status, 201, "owner creates viewer protection test user")
     user_id = user["id"]
     assert user.get("xrayId"), "owner must receive original Xray UUID"
+    assert user["vmessId"] != user["xrayId"]
+    passwords = [user[k] for k in ["trojanPassword", "hysteriaPassword", "masquePassword", "ssLegacyPassword"]]
+    assert len(set(passwords)) == 4 and all(len(p) == 64 for p in passwords)
     status, listing, _ = api("GET", "/collections/users", cookie=viewer_cookie)
     check(status, 200, "viewer reads redacted users")
     exposed = next(entry for entry in listing["items"] if entry["id"] == user_id)
