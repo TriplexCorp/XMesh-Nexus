@@ -59,6 +59,7 @@ const defaults={protocol:'vless',transport:'xhttp',security:'reality',name:'Но
  tag:'vless-main',port:443,listen:'127.0.0.1',path:'/xhttp',target:'',sni:'',
  alpn:'auto',certificateFile:'',keyFile:'',vlessDecryption:'none',
  xdriveService:'local',xdriveRemoteFolder:'',xdriveSecrets:'',xdriveTemplate:'',
+ sniFallbackRoutes:'',
  method:'2022-blake3-aes-256-gcm',mode:'new',customProtocol:'',customTransport:'',allowExperimental:false};
 const selected=(options,field)=>String(field==='protocol'&&options.protocol==='custom'?options.customProtocol:
  field==='transport'&&options.transport==='custom'?options.customTransport:options[field]||'').trim().toLowerCase();
@@ -80,6 +81,24 @@ function parsedAlpn(input,transport){
     values.some(v=>!['h2','h3','http/1.1'].includes(v)))throw Error('ALPN: используйте auto, h2, h3 или http/1.1 через запятую без повторов.');
  return values;
 }
+// Each line: hostname local-port. Xray fallbacks work after the TLS handshake
+// for non-VLESS traffic; this is not a general raw ClientHello multiplexer.
+function parseSniFallbackRoutes(value){
+ const lines=String(value||'').split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean);
+ if(lines.length>64)throw Error('SNI Fallback: максимум 64 маршрута.');
+ const seen=new Set();
+ return lines.map((line,index)=>{
+  const parts=line.split(/\\s+/);
+  if(parts.length!==2)throw Error('SNI Fallback, строка '+(index+1)+': формат domain.example 10443.');
+  const [name,portText]=parts;
+  if(name.length>253||!name.includes('.')||!name.split('.').every(x=>/^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/.test(x)))throw Error('SNI Fallback: некорректный домен '+name);
+  const port=Number(portText);
+  if(!/^[0-9]+$/.test(portText)||!Number.isInteger(port)||port<1||port>65535)throw Error('SNI Fallback: некорректный локальный порт '+portText);
+  if(seen.has(name.toLowerCase()))throw Error('SNI Fallback: повторяющийся SNI '+name);
+  seen.add(name.toLowerCase());
+  return {name:name.toLowerCase(),dest:'127.0.0.1:'+port};
+ });
+}
 function analyze(input){
  const o=normalize(input),p=selected(o,'protocol'),t=selected(o,'transport'),s=selected(o,'security');
  const errors=[],warnings=[],info=[];
@@ -90,6 +109,12 @@ function analyze(input){
  if(!isNetworkAllowed(t,s))errors.push('REALITY поддерживается только с RAW, XHTTP и gRPC (по текущей документации Xray).');
  if(specialProtocol(p)&&(t!==p||s!=='tls'))errors.push((p==='hysteria'?'Hysteria2':'MASQUE')+' требует свой QUIC-транспорт и TLS.');
  if(['hysteria','masque'].includes(t)&&p!==t)errors.push('Транспорт '+t.toUpperCase()+' не поддерживается выбранным протоколом.');
+ if(String(o.sniFallbackRoutes||'').trim()){
+  if(!['vless','trojan'].includes(p)||t!=='raw'||s!=='tls')errors.push('SNI Fallback доступен только для VLESS/Trojan + RAW/TCP + TLS.');
+  try{const routes=parseSniFallbackRoutes(o.sniFallbackRoutes);if(routes.some(x=>Number(x.dest.split(':').pop())===Number(o.port)))errors.push('SNI Fallback: локальный порт назначения не должен совпадать с входным портом.');}
+  catch(e){errors.push(e.message)}
+  warnings.push('SNI Fallback перенаправляет только fallback-трафик после TLS. Для полного SNI-мультиплексирования TLS-соединений нужен отдельный L4-прокси.');
+ }
  if(t==='xdrive'){
   if(p!=='vless')errors.push('XDRIVE работает только с VLESS.');
   if(s!=='none')errors.push('XDRIVE не использует отдельный TLS/REALITY stream security.');
@@ -195,7 +220,9 @@ function buildInbound(input,{shadowsocksPassword,realityKeys}={}){
    privateKey:realityKeys?.privateKey||''
   };
  }
- return {tag,listen,port,protocol:p,settings:makeSettings(p,o,shadowsocksPassword),streamSettings};
+ const settings=makeSettings(p,o,shadowsocksPassword);
+ if(String(o.sniFallbackRoutes||'').trim())settings.fallbacks=parseSniFallbackRoutes(o.sniFallbackRoutes);
+ return {tag,listen,port,protocol:p,settings,streamSettings};
 }
 function buildDocument(input,oldDoc,options={}){
  const o=normalize(input),inbound=buildInbound(o,options);
@@ -225,5 +252,5 @@ function generateShadowsocksPassword(method,random){
  }
  return buf.join('');
 }
-return {protocols,transports,securities,shadowsocksMethods,presets,defaults,analyze,countKnownCombinations,buildInbound,buildDocument,generateShadowsocksPassword};
+return {protocols,transports,securities,shadowsocksMethods,presets,defaults,parseSniFallbackRoutes,analyze,countKnownCombinations,buildInbound,buildDocument,generateShadowsocksPassword};
 })();
