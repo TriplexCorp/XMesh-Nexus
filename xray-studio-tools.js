@@ -146,7 +146,8 @@ function contextualToolGroups(inbound,hasInbound){
   if(canUseXhttp&&(network==='xhttp'||network==='raw'))networkTools.push('xhttp');
   else if(['ws','grpc','httpupgrade','quic'].includes(network))networkTools.push('transport-config');
  }
- if(inbound.streamSettings?.finalmask)networkTools.push('finalmask');
+ // Expose FinalMask even when the first layer has not been created yet.
+ if(['vless','vmess','trojan','shadowsocks','hysteria','hysteria2','masque'].includes(protocol))networkTools.push('finalmask');
  const result=[];
  if(specialized.length)result.push([hysteria?'Hysteria2':displayProtocol[protocol]||'Протокол',specialized]);
  if(networkTools.length)result.push(['Транспорт',networkTools]);
