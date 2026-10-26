@@ -39,8 +39,8 @@ assert.match(test,/viewer forbidden from rotating VPN credentials/);
 assert.ok(!/token_expire_at|token_ttl|expires_at.*user_subscription_tokens/.test(backend),
   'Subscription bearer URLs must not be assigned a rolling TTL');
 for(const protocol of ['vmess','trojan','hysteria','masque','shadowsocks']){
-  assert.match(backend,new RegExp('for_protocol\\(user, "'+protocol+'"'),'Subscription feed must issue dedicated '+protocol+' secret');
-  assert.match(node,new RegExp('for_protocol\\(user, "'+protocol+'"'),'Node authorization must use matching '+protocol+' secret');
+  assert.match(backend,new RegExp('for_protocol\\(\\s*user,\\s*"'+protocol+'"'),'Subscription feed must issue dedicated '+protocol+' secret');
+  assert.match(node,new RegExp('for_protocol\\(\\s*user,\\s*"'+protocol+'"'),'Node authorization must use matching '+protocol+' secret');
 }
 assert.match(protocols,/fn secret256\(\) -> String/);
 assert.match(protocols,/OsRng\.fill_bytes\(&mut bytes\)/);
