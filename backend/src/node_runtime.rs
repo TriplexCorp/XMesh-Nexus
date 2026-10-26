@@ -964,7 +964,12 @@ fn proxy_user_client_entry(
             // SS2022 passwords must be valid PSKs; never use a plain UUID
             // as a 2022 cipher key. Require an explicit per-user key.
             let password = if ss_method.starts_with("2022-") {
-                user.get("ssPassword").and_then(Value::as_str).unwrap_or("")
+                let field = if ss_method == "2022-blake3-aes-128-gcm" {
+                    "ssPassword128"
+                } else {
+                    "ssPassword"
+                };
+                user.get(field).and_then(Value::as_str).unwrap_or("")
             } else {
                 id
             };
