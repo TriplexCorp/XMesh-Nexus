@@ -1438,8 +1438,8 @@ fn ensure_masque_address(config: &mut Value) -> Result<(), ApiError> {
     let inbounds = config.get_mut("inbounds").and_then(Value::as_array_mut)
         .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Profile has no inbounds."))?;
     for inbound in inbounds {
-        // One managed edge router can expose one transport family per inbound.
-        // Mixed h3+TCP ALPN cannot be silently routed through only one port.
+        // The managed edge router can forward TCP and UDP concurrently for
+        // mixed XHTTP ALPN; MASQUE still has its own transport constraints.
         let stream = inbound.get("streamSettings");
         let network = stream.and_then(|v| v.get("network")).and_then(Value::as_str).unwrap_or("");
         let alpn = stream.and_then(|v| v.get("tlsSettings")).and_then(|v| v.get("alpn"))
