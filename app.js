@@ -314,8 +314,8 @@ const ENT={
         return 'Выберите только один способ управления сертификатом.';
       if(data.tlsAutoProvision){
         const domain=String(data.tlsDomain||'').trim().toLowerCase(),email=String(data.tlsAcmeEmail||'').trim();
-        if(!/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(domain))return 'Управляемый TLS: укажите корректный DNS-домен ноды.';
-        if(!/^[^\\s@]+@[a-z0-9.-]+\\.[a-z]{2,}$/i.test(email))return 'Управляемый TLS: укажите контактный email ACME.';
+        if(!/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(domain))return 'Управляемый TLS: укажите корректный DNS-домен ноды.';
+        if(!/^[^\s@]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(email))return 'Управляемый TLS: укажите контактный email ACME.';
       }
       const port=Number(data.xrayLocalPort||0),nodePort=Number(data.port||0);
       if(port&&(!Number.isInteger(port)||port<1||port>65535))return 'Локальный порт Xray должен быть от 1 до 65535.';
