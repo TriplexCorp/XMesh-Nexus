@@ -115,14 +115,28 @@
    if(flow)userEntry.flow=flow;
    settings={vnext:[{address:endpoint,port:actualPort,users:[userEntry]}]};
   }else if(protocol==='vmess'){
-   settings={vnext:[{address:endpoint,port:actualPort,users:[{id:user.xrayId,alterId:0,security:'auto'}]}]};
+   const id=nonempty(user.vmessId)||user.xrayId;
+   if(!validUUID(id))throw new Error('VMess: некорректный отдельный UUID.');
+   settings={vnext:[{address:endpoint,port:actualPort,users:[{id,alterId:0,security:'auto'}]}]};
   }else if(protocol==='trojan'){
-   settings={servers:[{address:endpoint,port:actualPort,password:user.xrayId}]};
+   const password=nonempty(user.trojanPassword)||user.xrayId;
+   settings={servers:[{address:endpoint,port:actualPort,password}]};
   }else if(protocol==='shadowsocks'){
    const ss=obj(inbound.settings);
    const method=nonempty(ss.method);
-   const password=nonempty(host.password)||nonempty(ss.password);
-   if(!method||!password)throw new Error('Shadowsocks: для клиента нужны действительный method и password.');
+   if(!method)throw new Error('Shadowsocks: необходимо указать метод шифрования.');
+   let password;
+   if(method.startsWith('2022-')){
+    const b64=value=>{try{return Uint8Array.from(atob(value),c=>c.charCodeAt(0))}catch{return null}};
+    const len=method==='2022-blake3-aes-128-gcm'?16:32;
+    const server=nonempty(ss.password);
+    const client=nonempty(len===16?user.ssPassword128:user.ssPassword);
+    if(b64(server)?.length!==len||b64(client)?.length!==len)
+     throw new Error('Shadowsocks 2022: требуется валидная серверная и пользовательская PSK.');
+    password=server+':'+client;
+   }else{
+    password=nonempty(user.ssLegacyPassword)||user.xrayId;
+   }
    settings={servers:[{address:endpoint,port:actualPort,method,password}]};
   }else{
    throw new Error('Протокол '+protocol+' требует отдельного сериализатора. Некорректный Client JSON не выдаётся.');
