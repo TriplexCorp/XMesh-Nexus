@@ -161,7 +161,7 @@ if command -v ss >/dev/null 2>&1 && ss -H -ltn "( sport = :$panel_port )" | grep
   if [[ -n "$existing_panel" ]]; then
     existing_mapping="$(docker port "$existing_panel" 8080/tcp 2>/dev/null || true)"
   fi
-  if ! printf '%s\\n' "$existing_mapping" | grep -Fq ":${panel_port}"; then
+  if ! printf '%s\n' "$existing_mapping" | grep -Eq "(^|:)${panel_port}$"; then
     echo "ERROR: Host TCP/$panel_port is already occupied; panel cannot bind to $panel_bind:$panel_port." >&2
     echo "Inspect: ss -ltnp '( sport = :$panel_port )'" >&2
     echo "Use a free loopback APP_PORT in .env, or adjust the reverse proxy to listen on 80/443 and proxy to APP_BIND:APP_PORT." >&2
@@ -190,8 +190,7 @@ printf 'Dashboard entrypoint: %s\n' "$dashboard_path"
 echo 'This path is stored in .env (mode 600). Save your full HTTPS URL.'
 if [[ "$created_env" == "1" ]]; then
   printf 'Initial administrator: %s\n' "admin"
-  printf 'Initial password: %s\n' "$admin_password"
-  echo "Credentials are stored in .env (permissions 600). Save the password now."
+  echo "Initial password is stored securely in .env (mode 600); do not paste credentials into logs or support chats."
 else
   echo "Existing .env was preserved; missing service settings were repaired safely."
   echo "Administrator credentials were not reset."
