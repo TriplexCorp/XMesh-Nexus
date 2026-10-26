@@ -4213,8 +4213,8 @@ document.addEventListener('change',e=>{
  if(!select)return;
  const picker=select.closest('.country-picker');
  const country=COUNTRIES.find(c=>c.flag===select.value);
- const preview=picker.querySelector('.country-selected');
- preview.innerHTML=flagView(select.value,'country-flag-preview')+`<span data-country-label>${country?esc(country.name):select.value?esc(select.value+' Сохранённый флаг'):'Выберите страну…'}</span>`;
+ const preview=picker.querySelector('.country-trigger-value');
+ if(preview)preview.innerHTML=flagView(select.value,'country-flag-preview')+`<span data-country-label>${country?esc(country.name):select.value?esc(select.value+' Сохранённый флаг'):'Выберите страну…'}</span>`;
 });
 function syncTopLanguage(){
   const selected=window.XMeshI18n?.getLanguage()==='en'?'en':'ru';
