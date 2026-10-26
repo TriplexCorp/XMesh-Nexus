@@ -63,13 +63,16 @@ update_router() {
  # Keep its state in a private writable runtime directory; do not weaken /root.
  export HOME=/run/xmesh-node-router-upgrade
  export DOCKER_CONFIG="$HOME/.docker"
+ # Buildx can derive its home from the root passwd entry rather than HOME.
+ # Explicitly configure BOTH Docker CLI and Buildx to use writable /run.
+ export BUILDX_CONFIG="$HOME/.buildx"
  export XDG_CONFIG_HOME="$HOME/.config"
  export XDG_CACHE_HOME="$HOME/.cache"
  # Compose's Buildx metadata uses os.CreateTemp and defaults to /tmp.
  # PrivateTmp + ProtectSystem=strict makes that path read-only.
  export TMPDIR="$HOME/tmp"
- install -d -m 0700 "$HOME" "$DOCKER_CONFIG" "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME" "$TMPDIR" || return 1
- docker compose version >/dev/null 2>&1 || { echo "Docker Compose missing" >&2; return 1; }
+ install -d -m 0700 "$HOME" "$DOCKER_CONFIG" "$BUILDX_CONFIG" "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME" "$TMPDIR" || return 1
+ docker --config "$DOCKER_CONFIG" compose version >/dev/null 2>&1 || { echo "Docker Compose missing" >&2; return 1; }
  local mounted dir previous
  mounted="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/etc/xmesh-node/config.json"}}{{.Source}}{{end}}{{end}}' xmesh-node 2>/dev/null)" || return 1
  [[ -f "$mounted" ]] || { echo "Router config mount missing" >&2; return 1; }
@@ -99,17 +102,17 @@ update_router() {
   echo "Router repository cannot fast-forward safely" >&2; return 1;
  }
  git -C "$dir" merge --ff-only FETCH_HEAD || return 1
- if (cd "$dir" && docker compose build xmesh-node &&
-     docker compose run --rm --no-deps xmesh-node -check -config /etc/xmesh-node/config.json &&
-     docker compose up -d --no-deps --force-recreate xmesh-node &&
+ if (cd "$dir" && docker --config "$DOCKER_CONFIG" compose build xmesh-node &&
+     docker --config "$DOCKER_CONFIG" compose run --rm --no-deps xmesh-node -check -config /etc/xmesh-node/config.json &&
+     docker --config "$DOCKER_CONFIG" compose up -d --no-deps --force-recreate xmesh-node &&
      [[ "$(docker inspect -f '{{.State.Running}}' xmesh-node)" == true ]]);then
   echo "Router upgraded and running."
   return 0
  fi
  echo "Router upgrade failed; restoring previous source and container." >&2
  git -C "$dir" reset --hard "$previous" || return 1
- (cd "$dir" && docker compose build xmesh-node &&
-  docker compose up -d --no-deps --force-recreate xmesh-node) || return 1
+ (cd "$dir" && docker --config "$DOCKER_CONFIG" compose build xmesh-node &&
+  docker --config "$DOCKER_CONFIG" compose up -d --no-deps --force-recreate xmesh-node) || return 1
  [[ "$(docker inspect -f '{{.State.Running}}' xmesh-node)" == true ]]
  return 1
 }
