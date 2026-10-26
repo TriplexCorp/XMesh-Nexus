@@ -316,14 +316,13 @@ fn vless_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> 
      "streamSettings":outbound_stream
     }))
 }
-// Native outbound credentials follow the protocol schema, never the inbound
-// settings shape. The node provisions these per-user credentials from xrayId.
-// Shadowsocks-2022 requires a separately provisioned per-user key.
+// Native outbound credentials follow each protocol's schema, never the
+// inbound settings or a shared user UUID. Pre-upgrade users retain their
+// original credentials until an explicit owner-only rekey.
 fn configure_masque_credentials(
     stream: &mut Value,
     user: &Value,
     inbound: &Value,
-    uuid: &str,
 ) -> Option<()> {
     // MASQUE uses HTTP Basic username/password in transport settings, not UUID
     // in its outbound settings. The server uses the same stat email as username.
@@ -346,7 +345,8 @@ fn configure_masque_credentials(
         stream["masqueSettings"] = json!({});
     }
     stream["masqueSettings"]["user"] = json!(format!("xmesh-u{record_id}--{encoded}"));
-    stream["masqueSettings"]["pass"] = json!(uuid);
+    stream["masqueSettings"]["pass"] =
+        json!(crate::user_credentials::for_protocol(user, "masque")?);
     Some(())
 }
 
@@ -370,12 +370,15 @@ fn proxy_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> 
         return None;
     }
     let settings = match protocol {
-        "vmess" => json!({"address":address,"port":port,"id":uuid,"security":"auto"}),
+        "vmess" => json!({"address":address,"port":port,
+            "id":crate::user_credentials::for_protocol(user, "vmess")?,
+            "security":"auto"}),
         "trojan" => {
             if security == "none" {
                 return None;
             }
-            json!({"address":address,"port":port,"password":uuid})
+            json!({"address":address,"port":port,
+                "password":crate::user_credentials::for_protocol(user, "trojan")?})
         }
         "shadowsocks" => {
             let method = inbound
@@ -406,7 +409,7 @@ fn proxy_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> 
                 }
                 format!("{server}:{client}")
             } else {
-                uuid.to_owned()
+                crate::user_credentials::for_protocol(user, "shadowsocks")?.to_owned()
             };
             json!({"address":address,"port":port,"method":method,"password":password})
         }
@@ -434,14 +437,15 @@ fn proxy_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> 
     };
     let mut stream = stream;
     if protocol == "masque" {
-        configure_masque_credentials(&mut stream, user, inbound, uuid)?;
+        configure_masque_credentials(&mut stream, user, inbound)?;
     }
     if protocol == "hysteria" {
         if !stream["hysteriaSettings"].is_object() {
             stream["hysteriaSettings"] = json!({});
         }
         stream["hysteriaSettings"]["version"] = json!(2);
-        stream["hysteriaSettings"]["auth"] = json!(uuid);
+        stream["hysteriaSettings"]["auth"] =
+            json!(crate::user_credentials::for_protocol(user, "hysteria")?);
     }
     let tag = nonempty(host, "remark")
         .or_else(|| nonempty(inbound, "tag"))
