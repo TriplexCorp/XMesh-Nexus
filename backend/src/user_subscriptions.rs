@@ -355,8 +355,7 @@ fn apply_hysteria_auth(stream: &mut Value, user: &Value, uuid: &str) {
         stream["hysteriaSettings"] = json!({});
     }
     stream["hysteriaSettings"]["version"] = json!(2);
-    stream["hysteriaSettings"]["auth"] =
-        json!(nonempty(user, "hysteriaPassword").unwrap_or(uuid));
+    stream["hysteriaSettings"]["auth"] = json!(nonempty(user, "hysteriaPassword").unwrap_or(uuid));
 }
 fn proxy_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> Option<Value> {
     if nonempty(inbound, "protocol") == Some("vless") {
