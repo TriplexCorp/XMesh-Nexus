@@ -3045,6 +3045,8 @@ const nodeRuntimeState=(node,runtime)=>{
     return {label:(node.disabled&&node.disabledReason==='traffic_limit')?'Лимит исчерпан · Xray остановлен':'Отключена · Xray остановлен',kind:'disabled'};
   }
   if(!runtime?.connected)return {label:runtime?.lastSeenAt?'Нет связи':'Не подключена',kind:'offline'};
+  if(runtime.desiredRevisionSource==='awaiting_profile')
+    return {label:'Подключена · ждёт профиль',kind:'unknown'};
   if(runtime.xrayRunning===true&&runtime.routerRunning===true)return {label:'Активна',kind:'online'};
   if(runtime.xrayRunning===false)return {label:'Xray остановлен',kind:'offline'};
   if(runtime.routerRunning===false)return {label:'Маршрутизатор остановлен',kind:'offline'};
@@ -3113,6 +3115,8 @@ const PROFILE_CHECK_LABELS={
 };
 function nodeProfileStatus(runtime){
   if(!runtime?.connected)return 'Нет свежего подтверждения от агента';
+  if(runtime.desiredRevisionSource==='awaiting_profile')
+    return 'Нода подключена · назначьте профиль XRAY STUDIO, чтобы запустить Xray';
   const status=runtime.profileApplicationStatus;
   if(status==='applied')return 'Профиль применён';
   if(status==='stopped')return 'Xray не запущен';
