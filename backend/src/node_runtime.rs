@@ -1598,7 +1598,10 @@ mod provision_tests {
         configure_local_xray_inbound(&mut config, port).unwrap();
         assert_eq!(config["inbounds"][0]["port"], 13456);
         assert_eq!(config["inbounds"][0]["listen"], "127.0.0.1");
-        assert_eq!(config["inbounds"][0]["streamSettings"]["network"], "hysteria");
+        assert_eq!(
+            config["inbounds"][0]["streamSettings"]["network"],
+            "hysteria"
+        );
     }
     #[test]
     fn offline_budget_is_conservative_and_scoped_to_authorized_users() {
