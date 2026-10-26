@@ -3900,7 +3900,14 @@ document.addEventListener('click',async e=>{
     try{
       const result=await backendRequest('/api/v1/users/'+encodeURIComponent(id)+'/credentials/rotate',{method:'POST'});
       const current=DB.users.find(u=>u.id===id);
-      if(current)current.xrayId=result.xrayId;
+      if(current){
+        // Update ALL cached protocol keys, not only the VLESS UUID: otherwise
+        // a subsequent admin client export could reuse stale credentials.
+        try{
+          const refreshed=await backendRequest('/api/v1/collections/users/'+encodeURIComponent(id));
+          Object.assign(current,refreshed);
+        }catch(_){current.xrayId=result.xrayId}
+      }
       // The open user drawer must not continue displaying the old VPN UUID.
       const idValue=b.closest('.user-canvas')?.querySelector('.user-id-value');
       if(idValue)idValue.textContent=result.xrayId;
