@@ -18,6 +18,7 @@ const protocols=[
 const transports=[
  {id:'raw',label:'RAW / TCP',hint:'Прямой поток'},
  {id:'xhttp',label:'XHTTP',hint:'HTTP transport'},
+ {id:'xdrive',label:'XDRIVE',hint:'Файловый транспорт · VLESS Encryption'},
  {id:'grpc',label:'gRPC',hint:'HTTP/2'},
  {id:'ws',label:'WebSocket',hint:'WebSocket / reverse proxy'},
  {id:'httpupgrade',label:'HTTPUpgrade',hint:'HTTP/1.1 upgrade'},
@@ -43,6 +44,7 @@ const presets=[
  {id:'vless-xhttp-reality',label:'VLESS · XHTTP · REALITY',description:'VLESS c REALITY и XHTTP',protocol:'vless',transport:'xhttp',security:'reality'},
  {id:'shadowsocks-xhttp-reality',label:'Shadowsocks · XHTTP · REALITY',description:'Допустимая связка; UDP требует отдельного внимания',protocol:'shadowsocks',transport:'xhttp',security:'reality'},
  {id:'vless-raw-reality',label:'VLESS · RAW · REALITY',description:'Прямое TLS-подобное соединение',protocol:'vless',transport:'raw',security:'reality'},
+ {id:'vless-xdrive',label:'VLESS · XDRIVE',description:'Файловый транспорт с VLESS Encryption (Xray 26.10.17+)',protocol:'vless',transport:'xdrive',security:'none'},
  {id:'vless-xhttp-tls',label:'VLESS · XHTTP · TLS',description:'TLS и XHTTP за доверенной схемой',protocol:'vless',transport:'xhttp',security:'tls'},
  {id:'vless-ws-tls',label:'VLESS · WebSocket · TLS',description:'HTTP reverse proxy',protocol:'vless',transport:'ws',security:'tls'},
  {id:'vmess-ws-tls',label:'VMess · WebSocket · TLS',description:'VMess поверх защищённого WebSocket',protocol:'vmess',transport:'ws',security:'tls'},
@@ -55,7 +57,8 @@ const presets=[
 ];
 const defaults={protocol:'vless',transport:'xhttp',security:'reality',name:'Новая конфигурация',
  tag:'vless-main',port:443,listen:'127.0.0.1',path:'/xhttp',target:'',sni:'',
- alpn:'auto',certificateFile:'',keyFile:'',
+ alpn:'auto',certificateFile:'',keyFile:'',vlessDecryption:'none',
+ xdriveService:'local',xdriveRemoteFolder:'',xdriveSecrets:'',xdriveTemplate:'',
  method:'2022-blake3-aes-256-gcm',mode:'new',customProtocol:'',customTransport:'',allowExperimental:false};
 const selected=(options,field)=>String(field==='protocol'&&options.protocol==='custom'?options.customProtocol:
  field==='transport'&&options.transport==='custom'?options.customTransport:options[field]||'').trim().toLowerCase();
@@ -87,6 +90,19 @@ function analyze(input){
  if(!isNetworkAllowed(t,s))errors.push('REALITY поддерживается только с RAW, XHTTP и gRPC (по текущей документации Xray).');
  if(specialProtocol(p)&&(t!==p||s!=='tls'))errors.push((p==='hysteria'?'Hysteria2':'MASQUE')+' требует свой QUIC-транспорт и TLS.');
  if(['hysteria','masque'].includes(t)&&p!==t)errors.push('Транспорт '+t.toUpperCase()+' не поддерживается выбранным протоколом.');
+ if(t==='xdrive'){
+  if(p!=='vless')errors.push('XDRIVE работает только с VLESS.');
+  if(s!=='none')errors.push('XDRIVE не использует отдельный TLS/REALITY stream security.');
+  if(!String(o.vlessDecryption||'').trim()||o.vlessDecryption==='none')errors.push('XDRIVE требует VLESS Encryption: укажите серверный decryption из xray vlessenc.');
+  if(!['local','google-drive','template'].includes(o.xdriveService))errors.push('XDRIVE: неизвестный service.');
+  if(!String(o.xdriveRemoteFolder||'').trim())errors.push('XDRIVE: укажите remoteFolder.');
+  if(o.xdriveService==='google-drive'&&String(o.xdriveSecrets||'').split('\n').filter(Boolean).length!==3)errors.push('Google Drive требует 3 секрета: ClientID, ClientSecret, RefreshToken (по одному на строку).');
+  if(o.xdriveService==='template'){
+   try{const v=JSON.parse(String(o.xdriveTemplate||''));if(!v||typeof v!=='object'||Array.isArray(v))throw Error('bad');}
+   catch{errors.push('XDRIVE template должен быть JSON-объектом.');}
+  }
+  info.push('XDRIVE: клиенту нужны соответствующие encryption, xdriveSettings и включённый Mux; обычные ссылки подписки не подходят.');
+ }
  if((p==='vless'||p==='trojan')&&s==='none')warnings.push('Для публичного соединения нужна транспортная защита или предусмотренные Xray исключения (доверенная сеть / VLESS Encryption).');
  if(['shadowsocks','socks'].includes(p)&&(t!=='raw'||s!=='none'))warnings.push('Для '+p.toUpperCase()+' обычный UDP может обходить выбранный транспорт и TLS/REALITY. Для UDP изучите XUDP.');
  if(s==='reality')warnings.push('REALITY требует корректные target/SNI и действующий X25519 privateKey. Нажмите REALITY после создания либо используйте генератор.');
@@ -122,7 +138,7 @@ function countKnownCombinations(){
 }
 function makeSettings(p,o,secret){
  switch(p){
-  case 'vless':return {users:[],decryption:'none'};
+  case 'vless':return {users:[],decryption:o.vlessDecryption||'none'};
   case 'vmess':case 'trojan':return {users:[]};
   case 'shadowsocks':return {network:'tcp,udp',method:o.method,password:secret||'<КЛЮЧ_ПРИ_СОЗДАНИИ>'};
   case 'socks':return {auth:'noauth',users:[],udp:true};
@@ -144,6 +160,17 @@ function buildInbound(input,{shadowsocksPassword,realityKeys}={}){
  switch(t){
   case 'raw':break;
   case 'xhttp':streamSettings.xhttpSettings={path:String(o.path||'/xhttp'),mode:'auto'};break;
+  case 'xdrive':{
+   const service=String(o.xdriveService||'local');
+   const x={service,remoteFolder:String(o.xdriveRemoteFolder||'').trim()};
+   if(service==='google-drive')x.secrets=String(o.xdriveSecrets||'').split('\n').map(v=>v.trim()).filter(Boolean);
+   if(service==='template'){
+    x.template=JSON.parse(String(o.xdriveTemplate||'{}'));
+    const secrets=String(o.xdriveSecrets||'').split('\n').map(v=>v.trim()).filter(Boolean);
+    if(secrets.length)x.secrets=secrets;
+   }
+   streamSettings.xdriveSettings=x;break;
+  }
   case 'grpc':streamSettings.grpcSettings={serviceName:String(o.path||'grpc').replace(/^\//,'')||'grpc'};break;
   case 'ws':streamSettings.wsSettings={path:String(o.path||'/ws')};break;
   case 'httpupgrade':streamSettings.httpupgradeSettings={path:String(o.path||'/')};break;
