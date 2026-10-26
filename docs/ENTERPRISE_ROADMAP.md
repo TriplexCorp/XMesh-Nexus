@@ -10,7 +10,7 @@
 | Управление инфраструктурой | Ноды, профили, подписанные политики, команды, обновление агента из UI | Проверка обновления и восстановления на реальной VPS |
 | TLS / ACME | HTTP-01 provisioning, TLS-статус сертификата в карточке ноды, телеметрия `control-v5.1.0` | Реальное продление, диагностика ошибок ACME и подтверждение успешного обновления сертификата |
 | GeoData | Подписанный manifest, HTTPS-загрузка и обновление, дефолтные GeoSite/GeoIP Loyalsoldier | Проверка актуальности, отказов источника и применения данных на тестовой ноде |
-| XRAY STUDIO / JSON | Конструктор, шаблоны, клиентская JSON-подписка, SS2022 и FinalMask | Матрица живых тестов по транспорту, защите и клиенту |
+| XRAY STUDIO / JSON | Конструктор, SS2022, JSON-подписки, полный каталог FinalMask и адаптивное окно до 84rem | Проверка реального Xray, клиентов и диалога на разных экранах |
 | Статистика и доступ | Исторические метрики, карточки, RBAC и автономные политики | Нагрузочные, отказоустойчивые и security regression тесты |
 | Криптография control plane | Ed25519-подписи политик и команд | **P0:** проектирование и реализация гибридной PQ-защиты без downgrade |
 | Качество релиза | Статические и интеграционные проверки в репозитории | Полный подтверждённый зелёный CI, e2e и процедуры rollback |
@@ -74,15 +74,23 @@
 - [ ] Confirm Xray node policy deployment and that the client receives a working `ServerPSK:UserPSK` with an actual SS2022 client.
 
 
-## FinalMask guided configuration — 2026-10-26
+## FinalMask guided configuration and dialog layout — 2026-10-26
 
-- [x] Replace the default dual-JSON modal with responsive selectable cards and guided steps; keep advanced JSON available.
-- [x] Generate 256-bit random shared secrets locally for TCP Sudoku and UDP Salamander; let JSON subscription projection inherit symmetric server layers.
-- [x] Add client-only TCP Fragment and UDP Noise presets with conservative defaults, reset action, transport filtering and preservation of existing complex chains.
-- [x] Add JavaScript regression assertions for generation, inheritance and client-only semantics; update RU/EN UI and refresh asset cache versions.
-- [ ] Confirm the full CI suite on `main` and actual Xray-core configuration validation.
-- [ ] Validate client compatibility with live Xray nodes and extend the guided interface for remaining layer types, directional chain ordering and QUIC advanced settings.
+**Source status: implemented in `main`. Production/client/browser acceptance: open.** [PR #21](https://github.com/TriplexCorp/XMesh-Nexus/pull/21) was squash-merged; subsequent width and regression fixes were committed directly to `main`.
 
+- [x] Replace the original narrow dual-JSON-first dialog with a selectable catalog while preserving Advanced JSON and Reset.
+- [x] Expose the **complete 16-option catalog**: TCP Sudoku, Header Custom, Fragment, XMC, Filter; UDP Salamander/Gecko, Sudoku, Header Custom, mKCP Legacy, Noise, Port Hopping, XDNS, XICMP, Realm, Filter; QUIC Client Params.
+- [x] Keep every mask visible and mark transport-incompatible choices disabled with a reason. Restrict XDNS to mKCP, Gecko packetSize to QUIC and client QUIC params to QUIC/H3; distinguish inbound-only filter from client-only directional layers.
+- [x] Generate 256-bit Sudoku/Salamander shared secrets using browser CSPRNG, retain Advanced JSON for complex chains, and offer per-layer settings JSON for less common types.
+- [x] Preserve required server symmetric layers when creating an explicit client override; maintain client UDP hop as the last layer and preserve guardrails around incompatible overrides.
+- [x] **Fix the narrow-dialog regression:** root cause was the global `styles.css` `dialog:not(...)` width selector taking precedence over the original `.xm-studio-modal--cards` declaration. Add `dialog.xm-studio-modal.xm-studio-modal--cards` with `width:min(84rem,calc(100vw - 2rem))!important`, viewport-bounded scrolling and a 4/3/2/1 responsive grid. Cache-bust the stylesheet. [CSS change `c918fecb`](https://github.com/TriplexCorp/XMesh-Nexus/commit/c918fecb334679bcf6050ef66077795d9f1b4d9f).
+- [x] Add `scripts/check-xray-tool-actions.js` regression assertions for catalog options, inherited layers, masks and explicit dialog width. [Regression commit `150978cc`](https://github.com/TriplexCorp/XMesh-Nexus/commit/150978cc203b0d6b463c1c0031151b6f89349a80). Add RU/EN copy and cache refresh.
+- [ ] **Browser acceptance:** open the actual modal in Chromium and Firefox at 375/580/760/1100/1440/1920 px, verify 4/3/2/1 columns, readable cards, proper scrollbar and header/footer, focus and Escape, RU/EN text, 90–200% scaling, light/dark themes and no inherited app-wide width cap.
+- [ ] **Behavioral acceptance:** exercise each enabled card, rejected inputs, complex pre-existing server/client chains and the final emitted subscription. Confirm validation against the installed Xray-core, not only JS source contracts.
+- [ ] **Network/client acceptance:** validate compatible Xray releases and clients for TCP, UDP and QUIC; specifically confirm XDNS/mKCP, XICMP permissions, Realm infrastructure, Gecko, UDP Hop NAT/firewall and filter behavior on a disposable node.
+- [ ] **Release gate:** record an entirely successful `main` CI run and browser/network evidence before calling FinalMask production-verified.
+
+**Safety note:** a `filter` mask is inbound-only and must never be exported to an outbound; `quicParams` are endpoint-specific; enabled UI options are not a promise of universal client compatibility. Detailed semantics: [FinalMask matrix](FINALMASK_COMPATIBILITY.md).
 
 ## XRAY STUDIO template completeness — 2026-10-26
 
@@ -97,7 +105,7 @@
 
 ## CI stabilization checkpoint — 2026-10-26
 
-**Scope:** recent FinalMask implementation, English copy audit and presence regression checks. All changes are committed directly to `main`; the following items distinguish source changes from verified gates.
+**Scope:** FinalMask catalog and layout regression, English copy audit, presence checks and backend release gates. PR #21 was merged, then the dialog-specific fix and tests were committed directly to `main`; source changes and verified gates remain distinct.
 
 - [x] Resolve Rust `E0505` borrow/move failure in `subscription_finalmask.rs` (source fix committed).
 - [x] Translate newly introduced English UI copy for page navigation and agent installation timeout; refresh the static translation-debt baseline (997 known outstanding).
@@ -106,7 +114,8 @@
 - [ ] Confirm fresh `cargo fmt --manifest-path backend/Cargo.toml --all -- --check` passes.
 - [ ] Confirm `cargo test --manifest-path backend/Cargo.toml`, strict Clippy and release Docker build pass.
 - [ ] Confirm `node scripts/check-user-presence.js` and `node scripts/check-english-coverage.js` pass in a fresh CI run.
-- [ ] Confirm the complete GitHub Actions pipeline is green and validate FinalMask client JSON against real Xray clients.
+- [x] Confirm the `cli`, `rust` (including Frontend/FinalMask checks) and `subscription-build` jobs completed successfully in [Backend CI #40304117546](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40304117546) for `150978cc`. This is **partial CI evidence**, not full-pipeline acceptance.
+- [ ] Confirm API integration and the **entire** GitHub Actions pipeline end green on the same code revision (or later), then validate FinalMask client JSON against actual Xray clients.
 
 **Acceptance gate:** do not mark enterprise readiness or full CI stabilization complete until the above checks have actual passing evidence.
 
@@ -280,6 +289,7 @@ Source-level changes now present in `main`: the fleet Reset control uses a singl
 ## 4 — P1: Subscription/client compatibility
 
 - [ ] Build a matrix for VLESS, VMess, Trojan, Shadowsocks/SS2022, Hysteria2 and MASQUE across supported transports and security.
+- [ ] Extend the matrix to each compatible TCP/UDP/QUIC FinalMask layer, server/client symmetry, layer ordering, unsupported combinations and exact installed Xray/client versions.
 - [ ] Validate outbound JSON against real Xray-core and supported client versions; reject unsafe server-only fields.
 - [ ] Test host, node, direct IP, CDN and ambiguous endpoint handling plus IP rotation.
 - [ ] Decide on URI/base64/Clash/Sing-box formats based on verified user need; do not advertise formats not implemented.
@@ -302,6 +312,7 @@ Source-level changes now present in `main`: the fleet Reset control uses a singl
 - [ ] Design and test panel/database/Redis failover and recovery before claiming HA support.
 - [ ] Modularize high-risk regions of `app.js` incrementally with behavioral regression tests.
 - [ ] Measure and reduce steps to accomplish core administration tasks.
+- [ ] Validate the FinalMask 84rem modal and disabled-card UX at desktop/mobile sizes, zoom, keyboard focus, overflow and language variants in a real browser; keep a screenshot-based regression record.
 
 **Exit:** reproducible capacity limits, verified failure handling and measurable UX improvements.
 
