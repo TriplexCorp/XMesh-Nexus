@@ -2656,7 +2656,7 @@ function xrayClientSample(){
  if(network==='httpupgrade')streamSettings.httpupgradeSettings={path,host};
  if(network==='mkcp')streamSettings.kcpSettings={seed:v('kcp-seed')||''};
  if(network==='hysteria')streamSettings.hysteriaSettings={version:2,auth:previewPassword('hysteria',v('hy-auth')),udpIdleTimeout:cl(+v('hy-idle')||60,2,600)};
- if(network==='masque')streamSettings.masqueSettings={host:v('masque-host')||sni,path:v('masque-path')||'/masque',...(v('masque-user')?{user:v('masque-user')}:{}),{pass:previewPassword('masque',v('masque-pass'))}};
+ if(network==='masque')streamSettings.masqueSettings={host:v('masque-host')||sni,path:v('masque-path')||'/masque',...(v('masque-user')?{user:v('masque-user')}:{}),pass:previewPassword('masque',v('masque-pass'))};
  if(network==='xdrive'){
   const service=v('xdrive-service')||'local',secrets=String(v('xdrive-secrets')||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
   let template;if(service==='template'){try{template=JSON.parse(v('xdrive-template')||'{}')}catch(e){template={}}}
