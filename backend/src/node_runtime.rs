@@ -1018,9 +1018,15 @@ fn proxy_user_client_entry(
         "vless" | "vmess" => json!({"id":if protocol == "vmess" {
             user.get("vmessId").and_then(Value::as_str).unwrap_or(id)
         } else { id },"level":0,"email":email}),
-        "trojan" => json!({"password":user.get("trojanPassword").and_then(Value::as_str).unwrap_or(id),"level":0,"email":email}),
-        "hysteria" => json!({"auth":user.get("hysteriaPassword").and_then(Value::as_str).unwrap_or(id),"level":0,"email":email}),
-        "masque" => json!({"pass":user.get("masquePassword").and_then(Value::as_str).unwrap_or(id),"level":0,"email":email}),
+        "trojan" => {
+            json!({"password":user.get("trojanPassword").and_then(Value::as_str).unwrap_or(id),"level":0,"email":email})
+        }
+        "hysteria" => {
+            json!({"auth":user.get("hysteriaPassword").and_then(Value::as_str).unwrap_or(id),"level":0,"email":email})
+        }
+        "masque" => {
+            json!({"pass":user.get("masquePassword").and_then(Value::as_str).unwrap_or(id),"level":0,"email":email})
+        }
         "shadowsocks" => {
             // SS2022 passwords must be valid PSKs; never use a plain UUID
             // as a 2022 cipher key. Require an explicit per-user key.
@@ -1032,7 +1038,9 @@ fn proxy_user_client_entry(
                 };
                 user.get(field).and_then(Value::as_str).unwrap_or("")
             } else {
-                user.get("ssLegacyPassword").and_then(Value::as_str).unwrap_or(id)
+                user.get("ssLegacyPassword")
+                    .and_then(Value::as_str)
+                    .unwrap_or(id)
             };
             if password.is_empty() {
                 return None;
@@ -2163,18 +2171,27 @@ mod provision_tests {
         let squads = vec![json!({"id":4,"inb":["VL","VM","TR","HY","MQ","SS"]})];
         provision_proxy_users(&mut config, &[user.clone()], &squads, 1_800_000_000_000).unwrap();
         let credentials = [
-            ("id", "xrayId"), ("id", "vmessId"),
-            ("password", "trojanPassword"), ("auth", "hysteriaPassword"),
-            ("pass", "masquePassword"), ("password", "ssLegacyPassword"),
+            ("id", "xrayId"),
+            ("id", "vmessId"),
+            ("password", "trojanPassword"),
+            ("auth", "hysteriaPassword"),
+            ("pass", "masquePassword"),
+            ("password", "ssLegacyPassword"),
         ];
         for (idx, (field, source)) in credentials.iter().enumerate() {
-            assert_eq!(config["inbounds"][idx]["settings"]
-                [if idx == 0 {"clients"} else {"users"}][0][*field], user[*source]);
+            assert_eq!(
+                config["inbounds"][idx]["settings"][if idx == 0 { "clients" } else { "users" }][0]
+                    [*field],
+                user[*source]
+            );
         }
         let legacy = json!({"id":7,"xrayId":"550e8400-e29b-41d4-a716-446655440000","squads":[4]});
         let mut old = json!({"inbounds":[{"tag":"HY","protocol":"hysteria","settings":{}}]});
         provision_proxy_users(&mut old, &[legacy.clone()], &squads, 1_800_000_000_000).unwrap();
-        assert_eq!(old["inbounds"][0]["settings"]["users"][0]["auth"], legacy["xrayId"]);
+        assert_eq!(
+            old["inbounds"][0]["settings"]["users"][0]["auth"],
+            legacy["xrayId"]
+        );
     }
     #[test]
     fn same_user_in_multiple_matching_squads_is_not_duplicated() {
