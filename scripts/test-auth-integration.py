@@ -86,11 +86,11 @@ def main():
     user_id = user["id"]
     assert user.get("xrayId"), "owner must receive original Xray UUID"
     credential_fields = ("vmessId", "trojanPassword", "hysteriaPassword",
-                         "masquePassword", "ssLegacyPassword")
+                         "masquePassword", "ssLegacyPassword", "httpPassword", "socksPassword")
     assert len(user["vmessId"]) == 36 and user["vmessId"] != user["xrayId"]
     isolated_passwords = [user[key] for key in credential_fields[1:]]
     assert all(len(password) == 64 for password in isolated_passwords)
-    assert len(set(isolated_passwords + [user["xrayId"], user["vmessId"]])) == 6
+    assert len(set(isolated_passwords + [user["xrayId"], user["vmessId"]])) == 8
     status, listing, _ = api("GET", "/collections/users", cookie=viewer_cookie)
     check(status, 200, "viewer reads redacted users")
     exposed = next(entry for entry in listing["items"] if entry["id"] == user_id)
@@ -131,7 +131,7 @@ def main():
     check(status, 200, "read rotated independent protocol credentials")
     for key in credential_fields:
         assert new_user[key] != user[key], f"{key} not rotated"
-    assert len({new_user[key] for key in credential_fields}) == 5
+    assert len({new_user[key] for key in credential_fields}) == 7
 
 
 
