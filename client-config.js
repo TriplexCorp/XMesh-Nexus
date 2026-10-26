@@ -8,6 +8,16 @@
  const copy=value=>JSON.parse(JSON.stringify(value));
  const nonempty=value=>typeof value==='string'&&value.trim()?value.trim():'';
  const validUUID=value=>/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value||''));
+ // Absent keys identify legacy accounts; present-but-invalid keys must not
+ // silently downgrade to the shared VLESS UUID.
+ function userCredential(user,field,uuid=false){
+  if(!Object.prototype.hasOwnProperty.call(user,field))return user.xrayId;
+  const value=nonempty(user[field]);
+  const valid=uuid?validUUID(value):/^[0-9a-f]{64}$/i.test(value);
+  if(!valid)throw new Error('Повреждён секрет '+field+': замените VPN-реквизиты.');
+  return value;
+ }
+
  function address(value){
   const v=nonempty(value);
   if(!v||/[\s/?#@\\]/.test(v)||v.includes('://')||v==='0.0.0.0'||v==='::'||/^(localhost|127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)/i.test(v)||/^(fc|fd|fe80|\[fc|\[fd|\[fe80)/i.test(v))return '';
@@ -115,11 +125,11 @@
    if(flow)userEntry.flow=flow;
    settings={vnext:[{address:endpoint,port:actualPort,users:[userEntry]}]};
   }else if(protocol==='vmess'){
-   const id=nonempty(user.vmessId)||user.xrayId;
+   const id=userCredential(user,'vmessId',true);
    if(!validUUID(id))throw new Error('VMess: некорректный отдельный UUID.');
    settings={vnext:[{address:endpoint,port:actualPort,users:[{id,alterId:0,security:'auto'}]}]};
   }else if(protocol==='trojan'){
-   const password=nonempty(user.trojanPassword)||user.xrayId;
+   const password=userCredential(user,'trojanPassword');
    settings={servers:[{address:endpoint,port:actualPort,password}]};
   }else if(protocol==='shadowsocks'){
    const ss=obj(inbound.settings);
@@ -135,7 +145,7 @@
      throw new Error('Shadowsocks 2022: требуется валидная серверная и пользовательская PSK.');
     password=server+':'+client;
    }else{
-    password=nonempty(user.ssLegacyPassword)||user.xrayId;
+    password=userCredential(user,'ssLegacyPassword');
    }
    settings={servers:[{address:endpoint,port:actualPort,method,password}]};
   }else{
