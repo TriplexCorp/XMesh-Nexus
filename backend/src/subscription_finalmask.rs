@@ -291,6 +291,50 @@ pub(crate) fn project(
             out[direction] = json!(layers);
         }
     }
+    // A client override must not silently drop or change reversible layers
+    // required by the server (e.g. Salamander password). Directional additions
+    // are allowed, but the ordered shared subset must match the server wire
+    // configuration. Without this check an explicit noise-only mask would
+    // produce a plausible-looking, permanently broken subscription.
+    if explicit {
+        if let Some(server) = server_finalmask {
+            for (direction, allowed) in [("tcp", caps.tcp), ("udp", caps.udp)] {
+                if !allowed { continue; }
+                let Some(server_layers) = server.get(direction).and_then(Value::as_array) else {
+                    continue;
+                };
+                let mut required = Vec::new();
+                for layer in server_layers {
+                    let Some(kind) = layer.get("type").and_then(Value::as_str) else {
+                        return Err("invalid server FinalMask layer");
+                    };
+                    // These are deliberately directional or inbound-only,
+                    // not symmetric encoding requirements for subscribers.
+                    if ["filter", "fragment", "xmc", "noise", "xdns",
+                        "xicmp", "realm", "udphop"].contains(&kind) {
+                        continue;
+                    }
+                    if let Some(shared) = validate_layer(layer, direction, caps, false)? {
+                        required.push(shared);
+                    }
+                }
+                if required.is_empty() { continue; }
+                let mut supplied = Vec::new();
+                if let Some(client_layers) = out.get(direction).and_then(Value::as_array) {
+                    for layer in client_layers {
+                        if layer.get("type").and_then(Value::as_str).is_some_and(|kind| {
+                            ["salamander", "sudoku", "mkcp-legacy", "header-custom"].contains(&kind)
+                        }) {
+                            supplied.push(layer.clone());
+                        }
+                    }
+                }
+                if supplied != required {
+                    return Err("clientFinalmask must preserve server shared mask layers");
+                }
+            }
+        }
+    }
     if let Some(quic) = source.get("quicParams") {
         if explicit {
             if !caps.quic { return Err("QUIC params require a QUIC transport"); }
@@ -389,6 +433,22 @@ mod tests {
         assert!(project("raw",&outbound("raw",&[]),None,Some(&config)).is_err());
         assert!(project("hysteria",&outbound("hysteria",&["h3"]),None,
             Some(&json!({"quicParams":{"maxIncomingStreams":1024}}))).is_err());
+    }
+    #[test]
+    fn explicit_client_masks_must_preserve_server_symmetric_wire_layers() {
+        let server=json!({"udp":[layer("salamander",json!({"password":"server-secret"})),
+            layer("filter",json!({"blockedSourceIPs":["10.0.0.0/8"]}))]});
+        let client=json!({"udp":[layer("noise",json!({"noise":[{"rand":"10-20"}]}))]});
+        assert!(project("hysteria",&outbound("hysteria",&["h3"]),
+            Some(&server),Some(&client)).is_err());
+        let wrong=json!({"udp":[layer("salamander",json!({"password":"wrong"}))]});
+        assert!(project("hysteria",&outbound("hysteria",&["h3"]),
+            Some(&server),Some(&wrong)).is_err());
+        let correct=json!({"udp":[layer("salamander",json!({"password":"server-secret"})),
+            layer("noise",json!({"noise":[{"rand":"10-20"}]}))]});
+        let result=project("hysteria",&outbound("hysteria",&["h3"]),
+            Some(&server),Some(&correct)).unwrap().unwrap();
+        assert_eq!(result["udp"].as_array().unwrap().len(),2);
     }
     #[test]
     fn xdns_only_kcp_and_gecko_only_quic() {
