@@ -1,5 +1,5 @@
 name: Temporary JS regression diagnosis
-# Recheck node-agent and profile-state contracts after fixes
+# Recheck node-editor layout semantics after managed TLS grouping
 on:
   push:
     branches:
