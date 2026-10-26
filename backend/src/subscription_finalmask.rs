@@ -343,7 +343,11 @@ pub(crate) fn project(
         // QUIC parameters are per-endpoint and must never be inferred from
         // the server: congestion caps, receive windows, hop ports differ.
     }
-    Ok(out.as_object().filter(|v| !v.is_empty()).map(|_| out))
+    if out.as_object().is_some_and(|fields| !fields.is_empty()) {
+        Ok(Some(out))
+    } else {
+        Ok(None)
+    }
 }
 
 #[cfg(test)]
