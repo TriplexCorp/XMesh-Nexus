@@ -62,6 +62,8 @@ function request(spec={}){
     for(const option of field.options||[]){
      const button=make('button','xm-studio-modal-choice');button.type='button';
      button.dataset.choice=String(option.value);
+     button.disabled=Boolean(option.disabled);
+     if(option.disabled){button.setAttribute('aria-disabled','true');button.title=option.disabledReason||'Несовместимо с выбранным транспортом'}
      button.setAttribute('aria-pressed',String(button.dataset.choice===control.value));
      button.append(make('strong','',option.label));
      if(option.description)button.append(make('small','',option.description));
