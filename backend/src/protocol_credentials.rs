@@ -25,7 +25,12 @@ fn secret256() -> String {
 pub fn provision(object: &mut Map<String, Value>) {
     object.insert("xrayId".into(), json!(Uuid::new_v4().to_string()));
     object.insert("vmessId".into(), json!(Uuid::new_v4().to_string()));
-    for field in ["trojanPassword", "hysteriaPassword", "masquePassword", "ssLegacyPassword"] {
+    for field in [
+        "trojanPassword",
+        "hysteriaPassword",
+        "masquePassword",
+        "ssLegacyPassword",
+    ] {
         object.insert(field.into(), json!(secret256()));
     }
     let mut key256 = [0u8; 32];
@@ -40,7 +45,10 @@ pub fn provision(object: &mut Map<String, Value>) {
 /// xrayId so client imports do not break until explicit VPN access rotation.
 /// Never use this fallback for new accounts: provision() creates all fields.
 pub fn for_protocol<'a>(user: &'a Value, protocol: &str, ss_method: &str) -> Option<&'a str> {
-    let legacy = user.get("xrayId")?.as_str().filter(|v| Uuid::parse_str(v).is_ok())?;
+    let legacy = user
+        .get("xrayId")?
+        .as_str()
+        .filter(|v| Uuid::parse_str(v).is_ok())?;
     let name = match protocol {
         "vless" => return Some(legacy),
         "vmess" => "vmessId",
@@ -57,14 +65,25 @@ pub fn for_protocol<'a>(user: &'a Value, protocol: &str, ss_method: &str) -> Opt
         "shadowsocks" => "ssLegacyPassword",
         _ => return None,
     };
-    let value = user.get(name).and_then(Value::as_str).filter(|v| !v.is_empty());
+    let value = user
+        .get(name)
+        .and_then(Value::as_str)
+        .filter(|v| !v.is_empty());
     if protocol == "shadowsocks" && ss_method.starts_with("2022-") {
         return value;
     }
     if protocol == "vmess" {
-        return Some(value.filter(|v| Uuid::parse_str(v).is_ok()).unwrap_or(legacy));
+        return Some(
+            value
+                .filter(|v| Uuid::parse_str(v).is_ok())
+                .unwrap_or(legacy),
+        );
     }
-    Some(value.filter(|v| v.len() == 64 && v.bytes().all(|b| b.is_ascii_hexdigit())).unwrap_or(legacy))
+    Some(
+        value
+            .filter(|v| v.len() == 64 && v.bytes().all(|b| b.is_ascii_hexdigit()))
+            .unwrap_or(legacy),
+    )
 }
 
 #[cfg(test)]
@@ -87,14 +106,36 @@ mod tests {
             assert_ne!(secret, vmess);
         }
         assert_eq!(secrets.len(), 4);
-        assert_eq!(STANDARD.decode(for_protocol(&user, "shadowsocks", "2022-blake3-aes-256-gcm").unwrap()).unwrap().len(), 32);
-        assert_eq!(STANDARD.decode(for_protocol(&user, "shadowsocks", "2022-blake3-aes-128-gcm").unwrap()).unwrap().len(), 16);
+        assert_eq!(
+            STANDARD
+                .decode(for_protocol(&user, "shadowsocks", "2022-blake3-aes-256-gcm").unwrap())
+                .unwrap()
+                .len(),
+            32
+        );
+        assert_eq!(
+            STANDARD
+                .decode(for_protocol(&user, "shadowsocks", "2022-blake3-aes-128-gcm").unwrap())
+                .unwrap()
+                .len(),
+            16
+        );
     }
     #[test]
     fn existing_records_keep_legacy_passwords_until_explicit_rekey() {
         let old = json!({"xrayId":"f47ac10b-58cc-4372-a567-0e02b2c3d479"});
-        for protocol in ["vless", "vmess", "trojan", "hysteria", "masque", "shadowsocks"] {
-            assert_eq!(for_protocol(&old, protocol, "aes-256-gcm"),old["xrayId"].as_str());
+        for protocol in [
+            "vless",
+            "vmess",
+            "trojan",
+            "hysteria",
+            "masque",
+            "shadowsocks",
+        ] {
+            assert_eq!(
+                for_protocol(&old, protocol, "aes-256-gcm"),
+                old["xrayId"].as_str()
+            );
         }
         assert!(for_protocol(&old, "shadowsocks", "2022-blake3-aes-256-gcm").is_none());
     }
@@ -105,10 +146,20 @@ mod tests {
         let before = Value::Object(obj.clone());
         provision(&mut obj);
         let after = Value::Object(obj);
-        for method in ["vless", "vmess", "trojan", "hysteria", "masque", "shadowsocks"] {
-            assert_ne!(for_protocol(&before, method, "aes-256-gcm"),for_protocol(&after, method, "aes-256-gcm"));
+        for method in [
+            "vless",
+            "vmess",
+            "trojan",
+            "hysteria",
+            "masque",
+            "shadowsocks",
+        ] {
+            assert_ne!(
+                for_protocol(&before, method, "aes-256-gcm"),
+                for_protocol(&after, method, "aes-256-gcm")
+            );
         }
-        assert_ne!(before["ssPassword"],after["ssPassword"]);
-        assert_ne!(before["ssPassword128"],after["ssPassword128"]);
+        assert_ne!(before["ssPassword"], after["ssPassword"]);
+        assert_ne!(before["ssPassword128"], after["ssPassword128"]);
     }
 }
