@@ -809,6 +809,15 @@ window.XMeshI18n=(()=>{
     "Server-side. Shared TCP Sudoku/header-custom and UDP Salamander/Gecko, Sudoku, mkcp-legacy, header-custom are exported automatically. Other masks require separate client-side JSON."
   ]
 ])dict.set(ru,en);
+  dict.set("Клиентская фрагментация TLS ClientHello; готовые безопасные параметры, пароль не нужен.","Client-side TLS ClientHello fragmentation with ready-made parameters; no password needed.");
+  dict.set("Клиентский случайный UDP-шум перед данными; пароль не нужен.","Client-side random UDP noise before application data; no password needed.");
+  dict.set("Маска несовместима с транспортом","Mask is incompatible with this transport");
+  dict.set("На сервере уже есть маски этого направления. Настройте совместную цепочку клиента в расширенном JSON.","Server masks already exist for this direction. Configure the full matching client chain in Advanced JSON.");
+  dict.set("Будет добавлена только клиентская фрагментация TLS ClientHello с параметрами lengths 3-5 / 6-8 / 10-20, delays 10-20. Поддержка зависит от клиента.","Client-only TLS ClientHello fragmentation will be added with lengths 3-5 / 6-8 / 10-20 and delays 10-20. Requires client support.");
+  dict.set("Будет добавлен только клиентский UDP-шум (8–32 случайных байта, задержка 10–20 мс). Это может увеличить расход трафика.","Client-only UDP noise will be added (8–32 random bytes, 10–20 ms delay). This may increase traffic usage.");
+  dict.set("Добавить клиентскую маску","Add client mask");
+  dict.set("Клиентская FinalMask ","Client FinalMask ");
+  dict.set(" добавлена"," added");
 // FinalMask guided builder UI.
   dict.set("Симметричная TCP-маска, общий секрет генерируется автоматически.","Symmetric TCP mask with an automatically generated shared secret.");
   dict.set("Маска QUIC/UDP, автоматический общий пароль и необязательный packetSize.","QUIC/UDP mask with an auto-generated shared secret and optional packetSize.");
