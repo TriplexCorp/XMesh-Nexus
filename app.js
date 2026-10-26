@@ -3150,6 +3150,20 @@ function nodeProfileStatus(runtime){
   }
   return 'Нет подтверждения от агента';
 }
+function nodeTlsHealth(runtime){
+  if(!runtime?.connected)return {label:'TLS · нет данных',detail:'Нет свежего подписанного отчёта ноды',kind:'unknown'};
+  const t=runtime.tlsStatus;
+  if(!t||typeof t!=='object')return {label:'TLS · ожидается агент',detail:'Обновите агент для получения состояния сертификата',kind:'unknown'};
+  const days=Number(t.daysRemaining);
+  const date=typeof t.notAfter==='string'&&!Number.isNaN(Date.parse(t.notAfter))
+    ?new Date(t.notAfter).toLocaleDateString('ru-RU'):'—';
+  const label={valid:'действует',expiring:'скоро истекает',expired:'истёк',missing:'не найден',error:'ошибка',not_configured:'не используется',multiple:'несколько сертификатов',unknown:'неизвестно'}[t.state]||'неизвестно';
+  const remaining=Number.isFinite(days)?' · '+days+' дн.':'';
+  const detail=['Домен: '+(t.domain||'—'),'Удостоверяющий центр: '+(t.issuer||'—'),
+    'Действует до: '+date,'Автопродление: '+(t.autoRenew?'обнаружено':'не подтверждено'),
+    ...(t.lastError?['Ошибка ACME/TLS: '+t.lastError]:[])].join('\\n');
+  return {label:'TLS · '+label+remaining,detail,kind:t.state==='valid'?'valid':t.state==='expiring'?'warning':t.state==='not_configured'?'unknown':'error'};
+}
 const updateNodeRuntimeBadges=(node,runtime)=>{
   const card=$('[data-node-card-id="'+node.id+'"]');
   if(!card)return;
@@ -3168,6 +3182,13 @@ const updateNodeRuntimeBadges=(node,runtime)=>{
       version.textContent=runtime?.xrayVersion?'Xray '+runtime.xrayVersion:'Xray —';
       version.title=runtime?.xrayVersion?'Версия Xray по последнему heartbeat':'Версия Xray пока не получена';
     }
+  }
+  const tlsBadge=card.querySelector('[data-node-tls-status]');
+  if(tlsBadge){
+    const tls=nodeTlsHealth(runtime);
+    tlsBadge.textContent=tls.label;
+    tlsBadge.title=tls.detail;
+    tlsBadge.dataset.state=tls.kind;
   }
   const profileStatus=card.querySelector('[data-node-profile-status]');
   if(profileStatus){
@@ -3366,6 +3387,7 @@ async function nodesP(){
     const k=n.limit&&trafficGb!==null?cl(trafficGb/n.limit,0,1):0,tc=k>.9?'--er':k>.75?'--wr':'--c3';
     return `<div class="card nc${n.disabled?' off':''}" data-node-card-id="${n.id}"><div class="h"><span class="fg">${flagView(n.flag)}</span><div class="node-identity"><b>${esc(n.name)}</b><br><small class="mu">${viewerMode()?'Адрес скрыт':esc(n.addr||'—')+(n.port?':'+esc(n.port):'')}</small>${n.hosting?.trim()?`<span class="node-hosting" title="Хостинг">${ic('building-2')}${esc(n.hosting.trim())}</span>`:''}</div><div class="node-live-badges"><span class="node-xray-version" data-node-xray-version title="Версия по последнему heartbeat">${renderNodeXrayVersion(n.id,runtime.get(n.id))}</span><span class="node-agent-version" data-node-agent-version title="Версия управляющего агента">${renderNodeAgentVersion(n.id,runtime.get(n.id))}</span><span data-node-runtime-state class="node-runtime-pill node-runtime-${nodeRuntimeState(n,runtime.get(n.id)).kind}"><span class="node-runtime-dot" aria-hidden="true"></span>${esc(nodeRuntimeState(n,runtime.get(n.id)).label)}</span></div></div>
       <div class="kvg"><div><span title="Пользователи с активным доступом через inbound этой ноды, не число текущих подключений">Активные пользователи</span><b>${s.nodeOn[n.id]??0}</b><div class="node-online-clients" title="Онлайн-клиенты по свежей телеметрии агента ноды"><span>Пользователи онлайн</span><b>${m?.onlineClients!=null&&Number.isFinite(Number(m.onlineClients))?Math.max(0,Math.trunc(Number(m.onlineClients))):"—"}</b></div></div><div><span>XRAY STUDIO</span>${p?esc(p.name)+'<br><small class="mu" data-node-profile-status="'+esc(n.id)+'" title="Проверка подписанной политики и реально используемой конфигурации Xray">'+esc(nodeProfileStatus(runtime.get(n.id)))+'</small>':n.profileId?'<span class="er">Профиль ID '+esc(n.profileId)+' не найден</span>':'<span class="mu" data-node-profile-status="'+esc(n.id)+'">Профиль пока не назначен</span>'}</div></div>
+      ${n.tlsAutoProvision||n.tlsManualProvision?'<div class="node-tls-health" data-node-tls-status title="Ожидается подписанный отчёт агента">TLS · нет данных</div>':''}
       ${n.geoEnabled?`<div class="node-ip-rotation active" title="${esc(geoStatus?.lastError||'Подтверждение от управляющего агента, не проверка фактической блокировки рекламы')}"><span class="node-ip-indicator" aria-hidden="true"></span><span>GeoData · ${esc(geoLabel)}${geoFileCount?' · '+geoFileCount+' файла(ов)':''}</span></div>`:''}
       ${n.rotationEnabled?`<div class="node-ip-rotation active" aria-label="Пул IP-ротации"><span class="node-ip-indicator" aria-hidden="true"></span><span>IP-пул · ${nodeRotationIPs(n).length} адресов</span></div>`:''}
       <div class="node-gauges">
