@@ -181,6 +181,8 @@ jobs:
             -D clippy::pedantic \
             -D clippy::nursery \
             -F unsafe-code
+      - name: Verify automated Ubuntu host installation and nginx TLS template
+        run: bash scripts/check-install-host.sh
       - name: Validate installer and Docker Compose
         env:
           POSTGRES_PASSWORD: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
