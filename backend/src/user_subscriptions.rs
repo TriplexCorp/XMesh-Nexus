@@ -539,6 +539,93 @@ pub async fn create(
         json!({"token":token,"userId":id,"url":studio_url(&settings,&token),"readiness":readiness}),
     ))
 }
+/// Destructive, owner-only response to a compromised subscription URL.
+/// Replace the URL and every managed Xray per-user credential in ONE database
+/// transaction. Remote node revocation is eventual: cached signed offline
+/// policy remains enforceable until the node reconciles with the panel.
+pub async fn rotate_credentials(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Path(id): Path<i64>,
+) -> Result<Json<Value>, ApiError> {
+    crate::require_owner(&actor)?;
+    if id <= 0 {
+        return Err(bad("Invalid user ID"));
+    }
+    let mut tx = state.pool.begin().await?;
+    let row = sqlx::query(
+        "SELECT data FROM panel_records WHERE collection='users' AND id=$1 FOR UPDATE",
+    )
+    .bind(id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "User not found"))?;
+    let mut user: Value = row.try_get("data")?;
+    let old_uuid = user.get("xrayId").and_then(Value::as_str).unwrap_or("");
+    let new_uuid = loop {
+        let proposed = uuid::Uuid::new_v4().to_string();
+        if proposed != old_uuid {
+            break proposed;
+        }
+    };
+    let object = user.as_object_mut().ok_or_else(|| {
+        ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Invalid user record")
+    })?;
+    let mut ss256 = [0u8; 32];
+    let mut ss128 = [0u8; 16];
+    OsRng.fill_bytes(&mut ss256);
+    OsRng.fill_bytes(&mut ss128);
+    object.insert("xrayId".to_owned(), json!(new_uuid));
+    object.insert(
+        "ssPassword".to_owned(),
+        json!(base64::engine::general_purpose::STANDARD.encode(ss256)),
+    );
+    object.insert(
+        "ssPassword128".to_owned(),
+        json!(base64::engine::general_purpose::STANDARD.encode(ss128)),
+    );
+    sqlx::query(
+        "UPDATE panel_records SET data=$1,updated_at=NOW()
+         WHERE collection='users' AND id=$2",
+    )
+    .bind(user)
+    .bind(id)
+    .execute(&mut *tx)
+    .await?;
+    let mut secret = [0u8; 32];
+    OsRng.fill_bytes(&mut secret);
+    let token = hex::encode(secret);
+    let encrypted = encrypt_token(&state, id, &token)?;
+    sqlx::query(
+        "INSERT INTO user_subscription_tokens(user_id,token_hash,token_ciphertext)
+         VALUES($1,$2,$3)
+         ON CONFLICT(user_id) DO UPDATE SET
+         token_hash=EXCLUDED.token_hash,token_ciphertext=EXCLUDED.token_ciphertext,
+         created_at=NOW()",
+    )
+    .bind(id)
+    .bind(token_hash(&token))
+    .bind(encrypted)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    crate::audit(
+        &state.pool,
+        &actor.username,
+        "subscription.credentials_rotated",
+        Some("users"),
+        Some(id),
+        json!({}),
+    )
+    .await;
+    // Do not claim global revocation until every managed node has confirmed
+    // applying the new signed desired configuration.
+    Ok(Json(json!({
+        "rotated":true,"userId":id,"xrayId":new_uuid,
+        "requiresNodeSync":true,
+        "warning":"Old VPN credentials may remain usable on disconnected nodes until their signed offline policies expire."
+    })))
+}
 pub async fn status(
     State(state): State<AppState>,
     Extension(actor): Extension<AuthUser>,
