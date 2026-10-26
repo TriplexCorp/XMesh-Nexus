@@ -494,9 +494,12 @@ mod tests {
         // Mixed layers must never be partially exported: refuse the outbound.
         assert!(client_stream(&inbound, &host, "auto").is_none());
         let explicit = json!({"address":"198.51.100.1","clientFinalmask":{"udp":[
-            {"type":"salamander","settings":{"password":"override"}}]}});
+            {"type":"salamander","settings":{"password":"shared-obfs"}}]}});
         assert_eq!(client_stream(&inbound, &explicit, "auto").unwrap()["finalmask"],
             explicit["clientFinalmask"]);
+        let mismatched = json!({"address":"198.51.100.1","clientFinalmask":{"udp":[
+            {"type":"salamander","settings":{"password":"wrong-password"}}]}});
+        assert!(client_stream(&inbound, &mismatched, "auto").is_none());
     }
     #[test]
     fn hysteria_salamander_and_gecko_export_when_symmetric() {
