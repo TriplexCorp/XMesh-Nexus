@@ -3554,8 +3554,11 @@ async fn get_panel_update_status(
     // The root-owned watcher clears the request before it sets "running".
     // Until then report queued, never stale "success" or "idle".
     let pending = match env::var("PANEL_UPDATE_REQUEST") {
-        Ok(path) => tokio::fs::read_to_string(path).await.unwrap_or_default(),
-        Err(_) => String::new(),
+        Ok(path) => match tokio::fs::read_to_string(path).await {
+            Ok(pending) => pending,
+            Err(_) => return Ok(Json(json!({"status":"unavailable"}))),
+        },
+        Err(_) => return Ok(Json(json!({"status":"unavailable"}))),
     };
     let status = if pending.trim() == "update" && status != "running" {
         "queued"
