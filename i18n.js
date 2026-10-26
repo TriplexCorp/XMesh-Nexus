@@ -809,7 +809,30 @@ window.XMeshI18n=(()=>{
     "Server-side. Shared TCP Sudoku/header-custom and UDP Salamander/Gecko, Sudoku, mkcp-legacy, header-custom are exported automatically. Other masks require separate client-side JSON."
   ]
 ])dict.set(ru,en);
-  // Guided XRAY STUDIO TLS composer diagnostics.
+// FinalMask guided builder UI.
+  dict.set("Симметричная TCP-маска, общий секрет генерируется автоматически.","Symmetric TCP mask with an automatically generated shared secret.");
+  dict.set("Маска QUIC/UDP, автоматический общий пароль и необязательный packetSize.","QUIC/UDP mask with an auto-generated shared secret and optional packetSize.");
+  dict.set("Расширенный JSON","Advanced JSON");
+  dict.set("Направленные слои, QUIC-параметры и нестандартные настройки.","Directional layers, QUIC parameters, and custom settings.");
+  dict.set("Сбросить FinalMask","Reset FinalMask");
+  dict.set("Удалить серверную и клиентскую маски этого inbound.","Remove server and client masks from this inbound.");
+  dict.set("FinalMask · конструктор","FinalMask · Builder");
+  dict.set("Выберите готовую маску. Секрет генерируется криптографически в браузере, совместимые серверные слои автоматически попадают в JSON-подписку.","Choose a ready-made mask. The secret is generated securely in the browser; compatible server layers are inherited by JSON subscriptions.");
+  dict.set("Выберите тип маски","Choose a mask");
+  dict.set("Удалить FinalMask?","Delete FinalMask?");
+  dict.set("Будут удалены серверная и клиентская маски выбранного inbound.","The selected inbound's server and client masks will be removed.");
+  dict.set("FinalMask удалён","FinalMask removed");
+  dict.set("FinalMask несовместим с выбранным транспортом","FinalMask is incompatible with the selected transport");
+  dict.set("У inbound есть явная клиентская маска. Сначала согласуйте её в расширенном JSON.","This inbound has an explicit client mask. Reconcile it in Advanced JSON first.");
+  dict.set("Криптографический генератор недоступен","Secure random generator is unavailable");
+  dict.set("Секрет сгенерирован безопасным генератором браузера. Слой будет добавлен в серверный JSON и унаследован клиентской JSON-подпиской.","The browser securely generated the secret. The server layer will be added to JSON and inherited by client subscriptions.");
+  dict.set("Создать маску","Create mask");
+  dict.set("Общий секрет","Shared secret");
+  dict.set("Gecko packetSize (необязательно)","Gecko packetSize (optional)");
+  dict.set("Нужен размер 1–2048 или диапазон min-max","Enter a size from 1–2048 or a min-max range");
+  dict.set("создан; клиентская подписка наследует симметричную маску","created; client subscription inherits the symmetric mask");
+  dict.set("Неизвестный тип маски","Unknown mask type");
+    // Guided XRAY STUDIO TLS composer diagnostics.
   dict.set("ALPN: используйте auto, h2, h3 или http/1.1 через запятую без повторов.","ALPN: use auto, h2, h3 or http/1.1 separated by commas without duplicates.");
   dict.set("gRPC через TLS требует ALPN h2.","gRPC over TLS requires ALPN h2.");
   dict.set("Для WebSocket/HTTPUpgrade предпочтителен ALPN http/1.1; h2 требует проверенного reverse proxy.","WebSocket/HTTPUpgrade should use ALPN http/1.1; h2 requires a verified reverse proxy.");
