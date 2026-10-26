@@ -291,6 +291,7 @@ fn protected_management_routes() -> Router<AppState> {
         )
 }
 
+#[expect(clippy::too_many_lines, reason = "The declarative protected route table is kept together for endpoint auditing")]
 fn protected_routes(state: &AppState) -> Router<AppState> {
     Router::new()
         .route("/bootstrap", get(bootstrap))
@@ -467,7 +468,10 @@ fn application_router(state: AppState) -> Router {
 }
 
 #[tokio::main]
+#[expect(clippy::too_many_lines, reason = "Ordered startup performs database, Redis and HTTP bootstrap checks")]
 async fn main() -> anyhow::Result<()> {
+    const STARTUP_CONNECT_ATTEMPTS: usize = 24;
+
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
@@ -482,7 +486,6 @@ async fn main() -> anyhow::Result<()> {
     // Docker's embedded service-name DNS can briefly lag network creation
     // even after Compose marks the database container healthy. Retry readiness
     // without disclosing connection strings (which contain DB credentials).
-    const STARTUP_CONNECT_ATTEMPTS: usize = 24;
     let pool_options = PgPoolOptions::new()
         .max_connections(
             env::var("DB_MAX_CONNECTIONS")
@@ -3925,6 +3928,7 @@ fn validate_reality_settings(inbound: &Value) -> Result<(), ApiError> {
     Ok(())
 }
 
+#[expect(clippy::too_many_lines, reason = "Centralized collection validation rejects incomplete node and TLS settings")]
 fn validate_record(collection: &str, data: &Value) -> Result<(), ApiError> {
     let object = data.as_object().ok_or_else(|| {
         ApiError::new(StatusCode::BAD_REQUEST, "Запись должна быть JSON-объектом.")
