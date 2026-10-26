@@ -1,5 +1,21 @@
 # XMesh Nexus — Enterprise hardening roadmap
 
+## CI stabilization checkpoint — 2026-10-26
+
+**Scope:** recent FinalMask implementation, English copy audit and presence regression checks. All changes are committed directly to `main`; the following items distinguish source changes from verified gates.
+
+- [x] Resolve Rust `E0505` borrow/move failure in `subscription_finalmask.rs` (source fix committed).
+- [x] Translate newly introduced English UI copy for page navigation and agent installation timeout; refresh the static translation-debt baseline (997 known outstanding).
+- [x] Remove brittle exact cache-version pinning from the user-presence test and correct the follow-up JavaScript regular-expression syntax error.
+- [x] Apply all **61** formatting hunks reported by Rustfmt across five backend Rust files.
+- [ ] Confirm fresh `cargo fmt --manifest-path backend/Cargo.toml --all -- --check` passes.
+- [ ] Confirm `cargo test --manifest-path backend/Cargo.toml`, strict Clippy and release Docker build pass.
+- [ ] Confirm `node scripts/check-user-presence.js` and `node scripts/check-english-coverage.js` pass in a fresh CI run.
+- [ ] Confirm the complete GitHub Actions pipeline is green and validate FinalMask client JSON against real Xray clients.
+
+**Acceptance gate:** do not mark enterprise readiness or full CI stabilization complete until the above checks have actual passing evidence.
+
+
 **Baseline:** 2026-10-24 · **Progress reviewed:** 2026-10-25 · **Target branch:** `main` · **Status:** active, not enterprise-production certified.
 
 This roadmap tracks verified improvements, not feature claims. A stage is complete only after the listed acceptance criteria pass in CI and, where required, on a disposable real Xray node. A green source-level assertion alone does not count as production evidence.
