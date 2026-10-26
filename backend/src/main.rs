@@ -496,7 +496,7 @@ async fn main() -> anyhow::Result<()> {
         .max_lifetime(Duration::from_mins(30));
     let mut db_attempt = 0;
     let pool = loop {
-        match pool_options.connect(&database_url).await {
+        match pool_options.clone().connect(&database_url).await {
             Ok(pool) => break pool,
             Err(error) => {
                 db_attempt += 1;
