@@ -1,5 +1,10 @@
 # XMesh Nexus
 
+## FinalMask without manual JSON (October 26, 2026)
+
+XRAY STUDIO's **FinalMask** action now opens a card-based wizard for **TCP Sudoku**, **UDP Salamander / Gecko**, **client-only TCP Fragment**, **client-only UDP Noise**, **Advanced JSON** and **Reset**. Sudoku/Salamander secrets are generated with the browser's cryptographic RNG (32 random bytes, hex-encoded); compatible server-side symmetric masks are inherited by native client JSON subscriptions. Fragment and Noise are emitted only through `xmesh.clientFinalmask` and depend on client support. Incompatible directions are hidden; Gecko `packetSize` is offered only for QUIC. Advanced JSON remains available for complex layers; the wizard never silently replaces an explicit client override when generating a server secret. **Generating a configuration does not prove successful node deployment**; validate with the installed Xray-core and target clients.
+
+
 ## XRAY STUDIO: transport-aware TLS templates (October 26, 2026)
 
 The configuration composer now populates `tlsSettings.alpn` by transport: XHTTP/RAW → `h2,http/1.1`, gRPC → `h2`, WebSocket/HTTPUpgrade → `http/1.1`, and Hysteria/MASQUE → `h3`. ALPN can be edited manually; `certificateFile` and `keyFile` fields refer to paths **visible to the Xray process**. The composer warns about missing certificate files, empty user lists and loopback-only listeners, and rejects mismatched TLS file pairs or gRPC ALPN without `h2`.
