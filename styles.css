@@ -5944,3 +5944,34 @@ body>.stats-user-overlay .stats-user-pane .stats-detail-chart{
     grid-template-columns:minmax(0,1fr);
   }
 }
+
+/* Compact and Standard need the same usable card anatomy as Spacious.
+   Preserve their relative density through padding, not a 22/30rem squeeze. */
+@container nodes-grid (min-width:32rem){
+  .nodes-page>.nodes[data-node-count="1"][data-grid-mode=compact]{
+    grid-template-columns:minmax(0,35rem);
+  }
+  .nodes-page>.nodes[data-node-count="1"][data-grid-mode=standard]{
+    grid-template-columns:minmax(0,38rem);
+  }
+}
+.nodes-page>.nodes[data-grid-mode=standard] .acts{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:.55rem;
+  width:100%;
+}
+.nodes-page>.nodes[data-grid-mode=standard] .acts>*{
+  min-width:0;
+  width:100%;
+  justify-content:center;
+  overflow-wrap:anywhere;
+}
+.nodes-page>.nodes[data-grid-mode=standard]>.nc{
+  min-width:0;
+}
+@media(max-width:420px){
+  .nodes-page>.nodes[data-grid-mode=standard] .acts{
+    grid-template-columns:minmax(0,1fr);
+  }
+}
