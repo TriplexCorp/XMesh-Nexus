@@ -3858,6 +3858,9 @@ document.addEventListener('click',async e=>{
       const result=await backendRequest('/api/v1/users/'+encodeURIComponent(id)+'/credentials/rotate',{method:'POST'});
       const current=DB.users.find(u=>u.id===id);
       if(current)current.xrayId=result.xrayId;
+      // The open user drawer must not continue displaying the old VPN UUID.
+      const idValue=b.closest('.user-canvas')?.querySelector('.user-id-value');
+      if(idValue)idValue.textContent=result.xrayId;
       await loadUserSubscription(id);
       toast(panelIsEnglish()?'New VPN credentials issued. Update client imports and verify each node has synced.':'Новые VPN-ключи выпущены. Обновите импорты клиентов и проверьте синхронизацию каждой ноды.');
     }catch(error){toast('Ошибка перевыпуска: '+(error.message||'API'))}
