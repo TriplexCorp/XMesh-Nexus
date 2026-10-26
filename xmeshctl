@@ -239,6 +239,17 @@ update_panel() {
   # never performed by this updater.
   compose up -d --build
 
+  # An earlier managed Nginx vhost may still contain default access logs
+  # even after upgrading the container. Refresh the host-owned config only
+  # when this operator is root and the managed public TLS domain exists.
+  if [[ "$EUID" -eq 0 ]] && [[ -f /etc/nginx/conf.d/xmesh-nexus.conf ]] &&
+     [[ -n "$(sed -n 's/^PANEL_DOMAIN=//p' "$ROOT/.env" | tail -n 1)" ]];then
+    say "Обновление конфигурации Nginx без записи токенов подписки в access log"
+    if ! bash "$ROOT/deploy/install-panel-host.sh" activate "$ROOT/.env";then
+      warn "Не удалось обновить Nginx; проверь панельный vhost и access_log вручную."
+    fi
+  fi
+
   say "Текущее состояние"
   compose ps
   ok "Команда обновления завершена. Проверь логи, если панель не стала healthy."
