@@ -1849,7 +1849,7 @@ mod node_tls_masque_contract_tests {
     fn managed_tls_is_opt_in_and_node_scoped() {
         let mut config = json!({"inbounds":[{"protocol":"masque","settings":{},
             "streamSettings":{"network":"masque","security":"tls","tlsSettings":{
-                "certificates":[{"certificateFile":"/etc/letsencrypt/live/old.example/fullchain.pem",
+                "alpn":["h3"],"certificates":[{"certificateFile":"/etc/letsencrypt/live/old.example/fullchain.pem",
                 "keyFile":"/etc/letsencrypt/live/old.example/privkey.pem"}]}}}]});
         ensure_masque_address(&mut config).unwrap();
         assert_eq!(config["inbounds"][0]["settings"]["address"][0], "10.129.0.1/24");
