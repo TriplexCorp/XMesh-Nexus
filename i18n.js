@@ -809,6 +809,9 @@ window.XMeshI18n=(()=>{
     "Server-side. Shared TCP Sudoku/header-custom and UDP Salamander/Gecko, Sudoku, mkcp-legacy, header-custom are exported automatically. Other masks require separate client-side JSON."
   ]
 ])dict.set(ru,en);
+  // Node explorer and control-agent installation status.
+  dict.set('Навигация по страницам','Page navigation');
+  dict.set('Agent не подтвердил установку в течение 15 минут.','The agent did not confirm installation within 15 minutes.');
   // Dual-ended FinalMask editor and transport compatibility diagnostics.
   for(const [ru,en] of [
   [
