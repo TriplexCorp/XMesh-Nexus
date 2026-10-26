@@ -21,7 +21,7 @@ fn secret256() -> String {
 }
 
 /// Generate all managed credentials on user creation or explicit full rekey.
-/// VLESS remains a protocol-required UUID v4; VMess gets an independent UUID.
+/// VLESS remains a protocol-required UUID v4; `VMess` gets an independent UUID.
 pub fn provision(object: &mut Map<String, Value>) {
     object.insert("xrayId".into(), json!(Uuid::new_v4().to_string()));
     object.insert("vmessId".into(), json!(Uuid::new_v4().to_string()));
@@ -43,7 +43,7 @@ pub fn provision(object: &mut Map<String, Value>) {
 
 /// For existing records missing independent fields, retain the old per-user
 /// xrayId so client imports do not break until explicit VPN access rotation.
-/// Never use this fallback for new accounts: provision() creates all fields.
+/// Never use this fallback for new accounts: `provision()` creates all fields.
 pub fn for_protocol<'a>(user: &'a Value, protocol: &str, ss_method: &str) -> Option<&'a str> {
     let legacy = user
         .get("xrayId")?
@@ -94,16 +94,16 @@ mod tests {
         let mut obj = Map::new();
         provision(&mut obj);
         let user = Value::Object(obj);
-        let vless = for_protocol(&user, "vless", "").unwrap();
-        let vmess = for_protocol(&user, "vmess", "").unwrap();
-        assert_ne!(vless, vmess);
+        let vless_uuid = for_protocol(&user, "vless", "").unwrap();
+        let vmess_uuid = for_protocol(&user, "vmess", "").unwrap();
+        assert_ne!(vless_uuid, vmess_uuid);
         let mut secrets = std::collections::HashSet::new();
         for protocol in ["trojan", "hysteria", "masque", "shadowsocks"] {
             let secret = for_protocol(&user, protocol, "aes-256-gcm").unwrap();
             assert_eq!(secret.len(), 64);
             assert!(secrets.insert(secret));
-            assert_ne!(secret, vless);
-            assert_ne!(secret, vmess);
+            assert_ne!(secret, vless_uuid);
+            assert_ne!(secret, vmess_uuid);
         }
         assert_eq!(secrets.len(), 4);
         assert_eq!(
