@@ -176,7 +176,21 @@ const api={
   async create(c,o){await lat();let row;if(backendReady){const path=c==='admins'?'/api/v1/admins':'/api/v1/collections/'+encodeURIComponent(c);const body=c==='admins'?{username:o.username,password:o.password,role:o.role,isActive:o.isActive}:o;row=await backendRequest(path,{method:'POST',body:JSON.stringify(body)})}else{if(c==='admins')throw new Error('Для создания администратора требуется доступ к Rust API.');o.id=DB[c].reduce((m,x)=>Math.max(m,x.id),0)+1;row=o}DB[c].push(row);save();return row},
   async update(c,id,p){await lat();const x=DB[c].find(y=>y.id==id);if(!x)throw new Error('Запись не найдена в локальном кеше.');const path=c==='admins'?'/api/v1/admins/'+encodeURIComponent(id):'/api/v1/collections/'+encodeURIComponent(c)+'/'+encodeURIComponent(id);const row=backendReady?await backendRequest(path,{method:'PATCH',body:JSON.stringify(p)}):{...x,...p};Object.assign(x,row);save();return x},
   async remove(c,id){await lat();const i=DB[c].findIndex(x=>x.id==id);const old=i>=0?DB[c][i]:null;if(backendReady){const path=c==='admins'?'/api/v1/admins/'+encodeURIComponent(id):'/api/v1/collections/'+encodeURIComponent(c)+'/'+encodeURIComponent(id);await backendRequest(path,{method:'DELETE'});}else if(i<0){throw new Error('Запись не найдена в локальном кеше.');}if(i>=0)DB[c].splice(i,1);save();return old},
-  async bulk(c,ids,fn){await lat();for(const x of [...(DB[c]||[])].filter(item=>ids.has(item.id))){fn(x);await this.update(c,x.id,{...x})}save()},
+  async bulk(c,ids,fn){
+    await lat();
+    for(const record of [...(DB[c]||[])].filter(item=>ids.has(item.id))){
+      // All API user reads expose effective usage, including signed node deltas.
+      // Never resend that derived "used" on unrelated bulk edits: doing so
+      // would turn squad changes/renewals into an unintended traffic reset.
+      const next=structuredClone(record);
+      fn(next);
+      const patch=Object.fromEntries(Object.keys(next)
+        .filter(key=>JSON.stringify(next[key])!==JSON.stringify(record[key]))
+        .map(key=>[key,next[key]]));
+      if(Object.keys(patch).length)await this.update(c,record.id,patch);
+    }
+    save();
+  },
   async saveSettings(patch){const saved=await backendRequest('/api/v1/settings',{method:'PATCH',body:JSON.stringify(patch)});DB.set={...DB.set,...saved,hooks:{...DB.set.hooks,...(saved.hooks||{})}};return DB.set},
   async stats(){await lat();const U=DB.users,by={};U.forEach(u=>{const status=st(u);by[status]=(by[status]||0)+1});const on=U.filter(isOn),live=DB.nodes.filter(n=>n.state==='ONLINE'&&!n.disabled),nodeOn={};
     // Count eligible users assigned to each node via its XRAY STUDIO profile and squad inbound tags.

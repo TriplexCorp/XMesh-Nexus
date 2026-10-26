@@ -1110,6 +1110,17 @@ async fn update_record(
         )
     })?;
     patch_object.remove("id");
+    // User usage is a separate accounting operation, not part of editing
+    // quotas, renewal or other account fields. A full-record PATCH may contain
+    // the read-only effective usage (base + signed metered counters): treating
+    // it as a reset would erase signed counters and double count the baseline.
+    // Preserve the legacy explicit one-field usage adjustment/reset endpoint.
+    if collection == "users" && patch_object.contains_key("used") && patch_object.len() != 1 {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Трафик пользователя можно изменять только отдельным запросом.",
+        ));
+    }
     // Secrets are issued only server-side and changed via the owner-only rekey.
     if collection == "users" {
         for field in protocol_credentials::PROTOCOL_FIELDS {
@@ -1177,7 +1188,13 @@ async fn update_record(
     .fetch_one(&mut *tx)
     .await?;
     tx.commit().await?;
-    let result = row_to_record(&row)?;
+    let mut result = row_to_record(&row)?;
+    if collection == "users" {
+        // Exactly like bootstrap/collection reads: return the true effective
+        // usage after an edit so a quota-only PATCH cannot appear to reset
+        // the user's already accumulated authenticated traffic in the UI.
+        add_metered_usage(&mut result, user_metered_bytes(&state.pool, id).await?);
+    }
     audit(
         &state.pool,
         &actor.username,

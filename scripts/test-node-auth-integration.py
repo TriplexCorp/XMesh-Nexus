@@ -317,6 +317,34 @@ def main():
         assert_status(code,200,"panel exposes metered user GiB")
         metered=next(u for u in users["items"] if u["id"]==user_id)
         assert abs(metered["used"]-(120/(1024**3)))<1e-9
+
+        # Quota editing must preserve existing signed per-user usage, including
+        # transitions from unlimited back to limited and their PATCH response.
+        expected_usage = 120 / (1024**3)
+        code, unlimited, _ = request("PATCH",f"/collections/users/{user_id}",
+                                    {"limit":0},cookie=cookie,origin=BASE)
+        assert_status(code,200,"make metered user unlimited without resetting usage")
+        assert unlimited["limit"] == 0
+        assert abs(unlimited["used"]-expected_usage)<1e-9
+        code, limited, _ = request("PATCH",f"/collections/users/{user_id}",
+                                  {"limit":0.5},cookie=cookie,origin=BASE)
+        assert_status(code,200,"set quota for previously unlimited user")
+        assert limited["limit"] == 0.5
+        assert abs(limited["used"]-expected_usage)<1e-9
+        code, after_limit, _ = request("GET",f"/users/{user_id}/traffic",cookie=cookie)
+        assert_status(code,200,"verify signed traffic survives new quota")
+        assert after_limit["totalUplinkBytes"] == 60
+        assert after_limit["totalDownlinkBytes"] == 60
+        assert abs(after_limit["effectiveUsedGb"]-expected_usage)<1e-9
+        code, _, _ = request("PATCH",f"/collections/users/{user_id}",
+                             {"limit":1.0,"used":expected_usage},
+                             cookie=cookie,origin=BASE)
+        assert_status(code,400,"reject accidental accounting reset in mixed user PATCH")
+        code, after_reject, _ = request("GET",f"/users/{user_id}/traffic",cookie=cookie)
+        assert_status(code,200,"verify rejected mixed PATCH preserved signed counters")
+        assert after_reject["totalUplinkBytes"] == 60
+        assert after_reject["totalDownlinkBytes"] == 60
+
         code,_,_=request("PATCH",f"/collections/users/{user_id}",{"used":0},
                          cookie=cookie,origin=BASE)
         assert_status(code,200,"traffic reset clears meter totals but keeps Xray baselines")

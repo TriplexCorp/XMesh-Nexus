@@ -137,6 +137,8 @@ jobs:
         run: node scripts/check-user-fingerprint-ownership.js
       - name: Verify opt-in balancers and separate settings workspace
         run: node scripts/check-balancers-workspace.js
+      - name: Verify user quota changes preserve signed traffic and bulk edits do not reset it
+        run: node scripts/check-user-quota-preserves-traffic.js
       - name: Verify manual node traffic reset and safety guards
         run: node scripts/check-node-traffic-reset.js
       - name: Verify automatic node quota cutoff and signed shutdown
