@@ -7,7 +7,17 @@
 значение update в выделенный файл, но не запускает shell и не имеет Docker socket.
 Отдельная root-owned systemd служба xmesh-panel-update.service вызывает
 xmeshctl --web-update с flock и полным PostgreSQL backup перед pull/rebuild.
-GET /api/v1/panel/update показывает idle/running/success/failed.
+GET /api/v1/panel/update показывает `idle`, `queued`, `running`, `success`, `failed` либо `unavailable`.
+`POST` с кодом 202 означает **только постановку запроса в очередь**, не завершение
+обновления. Пока request-marker содержит `update`, статус остаётся `queued`
+даже при старом `success` в status-marker; повторный запрос получает HTTP 409.
+Кнопка «Проверить состояние» показывает настоящий статус systemd-updater; после
+«Обновить панель» интерфейс проверяет очередь/выполнение каждые пять секунд
+(при активной вкладке). Если `queued` не сменяется на `running`, проверьте
+`sudo systemctl status xmesh-panel-update.path xmesh-panel-update.service`.
+Если marker отсутствует, интерфейс показывает `unavailable`, а не фиктивный успех.
+Кнопки обновления Xray-core и панели доступны только роли owner; обе проверяют
+права на сервере. Кнопки проверки статуса не запускают обновление.
 Установка host helper: sudo bash install.sh в каталоге проекта.
 Лог: sudo journalctl -u xmesh-panel-update.service -n 80 --no-pager
 Или: sudo tail -n 80 /var/log/xmesh-nexus/update.log
