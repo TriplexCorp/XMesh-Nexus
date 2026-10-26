@@ -63,6 +63,28 @@ for(const [i,entry] of versions.entries()){
 }
 assert.equal(C.buildInbound({protocol:'hysteria',transport:'hysteria',security:'tls',tag:'hy',port:443}).settings.version,2);
 assert.equal(C.buildInbound({protocol:'hysteria',transport:'hysteria',security:'tls',tag:'hy',port:443}).streamSettings.hysteriaSettings.version,2);
+// Transport-specific TLS ALPN must be generated and editable in the UI.
+for(const [transport,expected] of [
+ ['xhttp',['h2','http/1.1']],['grpc',['h2']],
+ ['ws',['http/1.1']],['httpupgrade',['http/1.1']],
+ ['hysteria',['h3']],['masque',['h3']]
+]){
+ const protocol=transport==='hysteria'||transport==='masque'?transport:'vless';
+ const generated=C.buildInbound({protocol,transport,security:'tls',tag:'tls-'+transport});
+ assert.deepEqual(Array.from(generated.streamSettings.tlsSettings.alpn),expected,'Auto ALPN for '+transport);
+}
+const withCert=C.buildInbound({protocol:'vless',transport:'xhttp',security:'tls',tag:'tls-files',
+ alpn:'h2',certificateFile:'/etc/xray/fullchain.pem',keyFile:'/etc/xray/privkey.pem'});
+assert.deepEqual(Array.from(withCert.streamSettings.tlsSettings.alpn),['h2']);
+assert.equal(withCert.streamSettings.tlsSettings.certificates[0].certificateFile,'/etc/xray/fullchain.pem');
+assert.equal(withCert.streamSettings.tlsSettings.certificates[0].keyFile,'/etc/xray/privkey.pem');
+assert(C.analyze({protocol:'vless',transport:'xhttp',security:'tls',certificateFile:'only-cert'}).errors.length);
+assert(C.analyze({protocol:'vless',transport:'grpc',security:'tls',alpn:'http/1.1'}).errors.length);
+assert(C.analyze({protocol:'vless',transport:'xhttp',security:'tls',alpn:'bad'}).errors.length);
+assert(C.analyze({protocol:'vless',transport:'xhttp',security:'tls'}).warnings.some(x=>x.includes('certificateFile')));
+for(const name of ['alpn','certificateFile','keyFile'])
+ assert(studio.includes('data-compose-field="'+name+'"'),'Builder exposes '+name);
+
 const invalid=C.analyze({protocol:'vless',transport:'ws',security:'reality'});
 assert(invalid.errors.length,'WebSocket REALITY is not supported by Xray docs');
 assert.throws(()=>C.buildInbound({protocol:'vless',transport:'ws',security:'reality',tag:'bad',port:443}),/REALITY/);
