@@ -131,6 +131,8 @@ jobs:
           python3 scripts/test-node-presence.py
       - name: Ensure online status expires and signed telemetry cannot replay
         run: node scripts/check-user-presence.js
+      - name: Test Xray-core and panel update buttons, queue and responsive layout
+        run: node scripts/check-settings-update-actions.js
       - name: Check managed Xray update safety and SQLx migration uniqueness
         run: node scripts/check-managed-xray-update.js
       - name: Ensure client fingerprint is configured at hosts, not users
