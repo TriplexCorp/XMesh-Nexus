@@ -996,7 +996,6 @@ fn configure_private_xray_stats(config: &mut Value) -> Result<(), ApiError> {
 
 fn proxy_user_client_entry(
     user: &Value,
-    id: &str,
     uuid: &uuid::Uuid,
     tag: &str,
     protocol: &str,
@@ -1156,7 +1155,7 @@ fn provision_proxy_users(
                 continue;
             }
             if let Some(entry) =
-                proxy_user_client_entry(user, id, &uuid, tag, &protocol, &ss_method)
+                proxy_user_client_entry(user, &uuid, tag, &protocol, &ss_method)
             {
                 entries.push(entry);
             }
