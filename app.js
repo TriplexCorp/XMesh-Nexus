@@ -2438,6 +2438,20 @@ function xrayBuilderConfig(){
  }
  return {log:{loglevel:v('loglevel')||'warning'},stats:{},policy:{levels:{'0':{statsUserUplink:true,statsUserDownlink:true}}},inbounds:[inbound],outbounds:[{protocol:'freedom',tag:'direct'},{protocol:'blackhole',tag:'blocked'}],routing:{rules:[{type:'field',outboundTag:'direct',inboundTag:[tag]}]}};
 }
+// The server issues independent per-protocol secrets. Missing fields indicate
+// an existing account that has NOT yet been explicitly rekeyed.
+function managedUserCredential(user,protocol){
+ const field={vmess:'vmessId',trojan:'trojanPassword',shadowsocks:'ssLegacyPassword',
+  hysteria:'hysteriaPassword',masque:'masquePassword',
+  socks:'socksPassword',mixed:'socksPassword',http:'httpPassword'}[protocol];
+ if(!field)return user.xrayId;
+ if(!Object.prototype.hasOwnProperty.call(user,field))return user.xrayId;
+ const key=user[field];
+ const valid=field==='vmessId'?/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(key):
+  typeof key==='string'&&/^[0-9a-f]{64}$/i.test(key);
+ if(!valid)throw new Error('Некорректный реквизит '+protocol+': перевыпустите VPN-доступ.');
+ return key;
+}
 async function syncXrayUserToProfile(user){
  const profile=DB.profiles.find(p=>String(p.id)===String(user.xrayProfileId));
  if(!profile)throw new Error('Выбранный Xray-профиль не найден.');
@@ -2460,35 +2474,35 @@ async function syncXrayUserToProfile(user){
   }else if(inbound.protocol==='vmess'){
    const list=inbound.settings.users||(inbound.settings.users=[]);
    if(Array.isArray(inbound.settings.clients)){for(const legacy of inbound.settings.clients){if(legacy.id&&!list.some(x=>x.id===legacy.id))list.push({...legacy})}delete inbound.settings.clients}
-   if(!list.some(x=>x.id===user.xrayId))list.push({id:user.xrayId,level:0,email,alterId:0});
+   if(!list.some(x=>x.id===managedUserCredential(user,'vmess')))list.push({id:managedUserCredential(user,'vmess'),level:0,email,alterId:0});
    changed++;
   }else if(inbound.protocol==='trojan'){
    const list=inbound.settings.clients||(inbound.settings.clients=[]);
-   if(!list.some(x=>x.password===user.xrayId))list.push({password:user.xrayId,email,level:0});
+   if(!list.some(x=>x.password===managedUserCredential(user,'trojan')))list.push({password:managedUserCredential(user,'trojan'),email,level:0});
    changed++;
   }else if(inbound.protocol==='http'){
    const list=inbound.settings.users||(inbound.settings.users=[]);
-   if(!list.some(x=>x.pass===user.xrayId||x.user===login))list.push({user:login,pass:user.xrayId});
+   if(!list.some(x=>x.pass===managedUserCredential(user,'http')||x.user===login))list.push({user:login,pass:managedUserCredential(user,'http')});
    changed++;
   }else if(inbound.protocol==='socks'||inbound.protocol==='mixed'){
    inbound.settings.auth='password';
    const list=inbound.settings.users||(inbound.settings.users=[]);
-   if(!list.some(x=>x.pass===user.xrayId||x.user===login))list.push({user:login,pass:user.xrayId});
+   if(!list.some(x=>x.pass===managedUserCredential(user,'socks')||x.user===login))list.push({user:login,pass:managedUserCredential(user,'socks')});
    changed++;
   }else if(inbound.protocol==='hysteria'){
    inbound.settings.version=2;
    const list=inbound.settings.users||(inbound.settings.users=[]);
-   if(!list.some(x=>x.auth===user.xrayId||x.email===email))list.push({auth:user.xrayId,level:0,email});
+   if(!list.some(x=>x.auth===managedUserCredential(user,'hysteria')||x.email===email))list.push({auth:managedUserCredential(user,'hysteria'),level:0,email});
    changed++;
   }else if(inbound.protocol==='masque'){
    const list=inbound.settings.users||(inbound.settings.users=[]);
-   if(!list.some(x=>x.pass===user.xrayId||x.email===email))list.push({pass:user.xrayId,level:0,email});
+   if(!list.some(x=>x.pass===managedUserCredential(user,'masque')||x.email===email))list.push({pass:managedUserCredential(user,'masque'),level:0,email});
    changed++;
   }else if(inbound.protocol==='shadowsocks'){
    const method=String(inbound.settings.method||'chacha20-ietf-poly1305');
    if(method.startsWith('2022-')){skipped.push(inbound.tag||'Shadowsocks 2022');continue}
    const list=inbound.settings.users||(inbound.settings.users=[]);
-   if(!list.some(x=>x.password===user.xrayId||x.email===email))list.push({password:user.xrayId,method,level:0,email});
+   if(!list.some(x=>x.password===managedUserCredential(user,'shadowsocks')||x.email===email))list.push({password:managedUserCredential(user,'shadowsocks'),method,level:0,email});
    changed++;
   }
  }
