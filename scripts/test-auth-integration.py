@@ -131,8 +131,9 @@ def main():
     status, changed, _ = api("POST", f"/users/{user_id}/credentials/rotate", cookie=owner_cookie)
     check(status, 200, "owner rotates VPN and subscription credentials")
     assert changed["xrayId"] != user["xrayId"] and changed["requiresNodeSync"]
-    status, changed_user, _ = api("GET", f"/collections/users/{user_id}", cookie=owner_cookie)
+    status, changed_users, _ = api("GET", "/collections/users", cookie=owner_cookie)
     check(status, 200, "full rekey persists separate credentials")
+    changed_user = next(item for item in changed_users["items"] if item["id"] == user_id)
     for field in protocol_secrets:
         assert changed_user[field] != old_secrets[field], field
     assert len({changed_user["xrayId"], *(changed_user[field] for field in protocol_secrets)}) == 8
