@@ -1,5 +1,12 @@
 # XMesh Nexus
 
+## XRAY STUDIO: transport-aware TLS templates (October 26, 2026)
+
+The configuration composer now populates `tlsSettings.alpn` by transport: XHTTP/RAW → `h2,http/1.1`, gRPC → `h2`, WebSocket/HTTPUpgrade → `http/1.1`, and Hysteria/MASQUE → `h3`. ALPN can be edited manually; `certificateFile` and `keyFile` fields refer to paths **visible to the Xray process**. The composer warns about missing certificate files, empty user lists and loopback-only listeners, and rejects mismatched TLS file pairs or gRPC ALPN without `h2`.
+
+The generator does not invent DNS names, certificate files, private keys, users or reverse-proxy topology. Verify the resulting JSON with the installed Xray-core. [Official TLS/ALPN reference](https://xtls.github.io/en/config/transports/tls.html).
+
+
 ## Build and CI stabilization — October 26, 2026
 
 - Fixed Rust `E0505` in client FinalMask projection without cloning the JSON value.
