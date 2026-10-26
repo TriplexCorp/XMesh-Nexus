@@ -344,7 +344,12 @@ fn proxy_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> 
                 let server = inbound
                     .get("settings")
                     .and_then(|v| nonempty(v, "password"))?;
-                let client = nonempty(user, "ssPassword")?;
+                let key_field = if method == "2022-blake3-aes-128-gcm" {
+                    "ssPassword128"
+                } else {
+                    "ssPassword"
+                };
+                let client = nonempty(user, key_field)?;
                 let decode =
                     |value: &str| base64::engine::general_purpose::STANDARD.decode(value).ok();
                 let len = if method == "2022-blake3-aes-128-gcm" {
