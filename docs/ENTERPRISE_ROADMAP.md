@@ -13,7 +13,7 @@
 | XRAY STUDIO / JSON | Конструктор, SS2022, JSON-подписки, полный каталог FinalMask и адаптивное окно до 84rem | Проверка реального Xray, клиентов и диалога на разных экранах |
 | Статистика и доступ | Исторические метрики, карточки, RBAC и автономные политики | Нагрузочные, отказоустойчивые и security regression тесты |
 | Криптография control plane | Ed25519-подписи политик и команд | **P0:** проектирование и реализация гибридной PQ-защиты без downgrade |
-| Качество релиза | Статические и интеграционные проверки в репозитории | Полный подтверждённый зелёный CI, e2e и процедуры rollback |
+| Качество релиза | Зелёный Backend CI на `main` (коммит `150978cc`, запуск #40304117546); статические и API-интеграционные проверки | Browser/live-node e2e, проверка rollback и обязательные release gates |
 
 ## Обновления 26 октября 2026
 
@@ -88,7 +88,8 @@
 - [ ] **Browser acceptance:** open the actual modal in Chromium and Firefox at 375/580/760/1100/1440/1920 px, verify 4/3/2/1 columns, readable cards, proper scrollbar and header/footer, focus and Escape, RU/EN text, 90–200% scaling, light/dark themes and no inherited app-wide width cap.
 - [ ] **Behavioral acceptance:** exercise each enabled card, rejected inputs, complex pre-existing server/client chains and the final emitted subscription. Confirm validation against the installed Xray-core, not only JS source contracts.
 - [ ] **Network/client acceptance:** validate compatible Xray releases and clients for TCP, UDP and QUIC; specifically confirm XDNS/mKCP, XICMP permissions, Realm infrastructure, Gecko, UDP Hop NAT/firewall and filter behavior on a disposable node.
-- [ ] **Release gate:** record an entirely successful `main` CI run and browser/network evidence before calling FinalMask production-verified.
+- [x] **CI gate (code revision):** [Backend CI #40304117546](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40304117546) succeeded on `main` at `150978cc`, including the FinalMask JavaScript checks.
+- [ ] **Production gate:** complete browser and real Xray/client/network testing before calling FinalMask production-verified.
 
 **Safety note:** a `filter` mask is inbound-only and must never be exported to an outbound; `quicParams` are endpoint-specific; enabled UI options are not a promise of universal client compatibility. Detailed semantics: [FinalMask matrix](FINALMASK_COMPATIBILITY.md).
 
@@ -108,19 +109,16 @@
 **Scope:** FinalMask catalog and layout regression, English copy audit, presence checks and backend release gates. PR #21 was merged, then the dialog-specific fix and tests were committed directly to `main`; source changes and verified gates remain distinct.
 
 - [x] Resolve Rust `E0505` borrow/move failure in `subscription_finalmask.rs` (source fix committed).
-- [x] Translate newly introduced English UI copy for page navigation and agent installation timeout; refresh the static translation-debt baseline (997 known outstanding).
+- [x] Translate new navigation, agent installation and FinalMask catalog copy; pass the English-coverage CI audit. The documented translation-debt baseline remains tracked and non-zero.
 - [x] Remove brittle exact cache-version pinning from the user-presence test and correct the follow-up JavaScript regular-expression syntax error.
 - [x] Apply all **61** formatting hunks reported by Rustfmt across five backend Rust files.
-- [ ] Confirm fresh `cargo fmt --manifest-path backend/Cargo.toml --all -- --check` passes.
-- [ ] Confirm `cargo test --manifest-path backend/Cargo.toml`, strict Clippy and release Docker build pass.
-- [ ] Confirm `node scripts/check-user-presence.js` and `node scripts/check-english-coverage.js` pass in a fresh CI run.
-- [x] Confirm the `cli`, `rust` (including Frontend/FinalMask checks) and `subscription-build` jobs completed successfully in [Backend CI #40304117546](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40304117546) for `150978cc`. This is **partial CI evidence**, not full-pipeline acceptance.
-- [ ] Confirm API integration and the **entire** GitHub Actions pipeline end green on the same code revision (or later), then validate FinalMask client JSON against actual Xray clients.
+- [x] Confirm Rustfmt and Rust tests, strict Clippy, frontend/FinalMask and English-coverage checks, Docker build, `cli`, `subscription-build` and API authentication integration all pass in [Backend CI #40304117546](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40304117546) on `main` at `150978cc` (**conclusion: success**).
+- [ ] Confirm the generated FinalMask/client JSON on real deployed Xray nodes and clients, including browser-modal interaction and permissions/network dependencies. CI success alone is insufficient.
 
 **Acceptance gate:** do not mark enterprise readiness or full CI stabilization complete until the above checks have actual passing evidence.
 
 
-**Baseline:** 2026-10-24 · **Progress reviewed:** 2026-10-25 · **Target branch:** `main` · **Status:** active, not enterprise-production certified.
+**Baseline:** 2026-10-24 · **Progress reviewed:** 2026-10-26 · **Target branch:** `main` · **Status:** source CI green at `150978cc`, not enterprise-production certified.
 
 This roadmap tracks verified improvements, not feature claims. A stage is complete only after the listed acceptance criteria pass in CI and, where required, on a disposable real Xray node. A green source-level assertion alone does not count as production evidence.
 
@@ -256,7 +254,7 @@ Source-level changes now present in `main`: the fleet Reset control uses a singl
 ## 1 — P0: CI and release reliability
 
 - [x] Replace mutating `cargo fmt` CI step with `cargo fmt --all -- --check`. Commit: `f2add5a`.
-- [ ] Establish a passing baseline on `main` for Node.js checks, Rust formatting, all-target tests, strict Clippy, Docker build and API integration. **PR-level prerequisite passed** at `43c8693` (Backend CI #2414); a post-merge `main` run is still required.
+- [x] Establish a passing baseline on `main` for Node.js checks, Rust formatting, all-target tests, strict Clippy, Docker build and API integration: [Backend CI #40304117546](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40304117546), `150978cc`, completed successfully on 2026-10-26. Required-check branch protection and release/rollback evidence remain separate open tasks.
 - [ ] Replace brittle source-regex checks where possible with observable, behavior-based tests; retain security-contract checks that express real invariants.
   - [x] IP rotation UI validation: execute the real validation helpers against valid, duplicate, invalid, insufficient and oversized pools instead of requiring an exact source layout (`a676ac7`).
   - [x] Live-node status contract: execute the actual state function for healthy, stale, disabled, stopped Xray/router and unknown states (`db52057`).
@@ -265,7 +263,7 @@ Source-level changes now present in `main`: the fleet Reset control uses a singl
 - [ ] Ensure required branch protection prevents merging when those checks fail. **Not verified:** protection API returned 403; inspect settings with authorized access.
 - [ ] Document reproducible release / rollback and evidence from a clean checkout.
 
-**Exit:** a documented green main-branch CI run, reproducible local checks, no test stage mutating tracked source files, and enforced required checks.
+**Exit:** green main-branch CI now documented; still require reproducible release/rollback drill and enforced branch protection. No stage should mutate tracked source files.
 
 ## 2 — P0: Verified enforcement on nodes
 
