@@ -3891,6 +3891,11 @@ fn validate_record(collection: &str, data: &Value) -> Result<(), ApiError> {
     })?;
     if collection == "nodes" {
         validate_node_address(data)?;
+        if object.get("tlsAutoProvision").and_then(Value::as_bool) == Some(true)
+            && object.get("tlsManualProvision").and_then(Value::as_bool) == Some(true) {
+            return Err(ApiError::new(StatusCode::BAD_REQUEST,
+                "Choose either managed TLS or externally provisioned certificates."));
+        }
         if object.get("tlsAutoProvision").and_then(Value::as_bool) == Some(true) {
             let domain = object.get("tlsDomain").and_then(Value::as_str).unwrap_or("").trim().to_ascii_lowercase();
             let email = object.get("tlsAcmeEmail").and_then(Value::as_str).unwrap_or("").trim();
