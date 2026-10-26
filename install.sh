@@ -143,10 +143,46 @@ if [[ "$prepare_only" == "1" ]]; then
 fi
 
 docker compose config --quiet
-docker compose up -d --build
+
+# Fail before a costly container rebuild if the configured host port belongs
+# to another process (frequently an incorrectly configured reverse proxy).
+# Re-running install against its own Compose panel remains supported.
+panel_bind="${APP_BIND:-$(sed -n 's/^APP_BIND=//p' .env | tail -n 1)}"
+panel_port="${APP_PORT:-$(sed -n 's/^APP_PORT=//p' .env | tail -n 1)}"
+panel_bind="${panel_bind:-127.0.0.1}"
+panel_port="${panel_port:-8080}"
+if [[ ! "$panel_port" =~ ^[0-9]{1,5}$ ]] || (( 10#$panel_port < 1 || 10#$panel_port > 65535 )); then
+  echo "Invalid APP_PORT: expected 1-65535." >&2
+  exit 1
+fi
+if command -v ss >/dev/null 2>&1 && ss -H -ltn "( sport = :$panel_port )" | grep -q .; then
+  existing_panel="$(docker compose ps -a -q panel 2>/dev/null || true)"
+  existing_mapping=""
+  if [[ -n "$existing_panel" ]]; then
+    existing_mapping="$(docker port "$existing_panel" 8080/tcp 2>/dev/null || true)"
+  fi
+  if ! printf '%s\\n' "$existing_mapping" | grep -Fq ":${panel_port}"; then
+    echo "ERROR: Host TCP/$panel_port is already occupied; panel cannot bind to $panel_bind:$panel_port." >&2
+    echo "Inspect: ss -ltnp '( sport = :$panel_port )'" >&2
+    echo "Use a free loopback APP_PORT in .env, or adjust the reverse proxy to listen on 80/443 and proxy to APP_BIND:APP_PORT." >&2
+    echo "No database volumes or existing panel credentials were changed." >&2
+    exit 1
+  fi
+fi
+
+# 'Started' is not 'ready': wait for backend migrations and actual PostgreSQL
+# and Redis health checks, failing the installer on persistent DNS/DB errors.
+if ! docker compose up -d --build --wait --wait-timeout 180; then
+  echo "ERROR: Panel was not healthy after Compose startup." >&2
+  docker compose ps >&2 || true
+  echo "Inspect: docker compose logs --tail=80 panel" >&2
+  echo "Check Docker DNS/network: docker network inspect xmesh-nexus_default" >&2
+  echo "Existing PostgreSQL and Redis volumes have been preserved." >&2
+  exit 1
+fi
 
 echo
-echo "XMesh Nexus panel containers are starting."
+echo "XMesh Nexus panel is healthy and ready."
 echo "PostgreSQL stores persistent panel data; Redis provides shared login throttling."
 echo "Redis is private to the Compose network and is not published on a host port."
 echo "Panel is bound to 127.0.0.1:8080 by default; put it behind your HTTPS reverse proxy."
