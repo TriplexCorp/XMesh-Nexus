@@ -11,7 +11,7 @@ if [[ "$prepare_only" == 0 ]]; then
       exit 1
     fi
     # Preserve only the documented non-interactive installer inputs.
-    exec sudo --preserve-env=PANEL_DOMAIN,PANEL_ACME_EMAIL bash "$0" "$@"
+    exec sudo --preserve-env=PANEL_DOMAIN,PANEL_ACME_EMAIL bash "$PWD/install.sh" "$@"
   fi
   # Ubuntu host bootstrap: Docker, Nginx mainline, Certbot. No tenant domain
   # is embedded in the installer or the public repository.
