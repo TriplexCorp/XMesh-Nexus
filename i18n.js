@@ -11,6 +11,12 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    // Owner-only credential compromise response
+    'Новые VPN-ключи выпущены. Обновите импорты клиентов и проверьте синхронизацию каждой ноды.':'New VPN credentials issued. Refresh client imports and verify every node has synchronized.',
+    'Ошибка перевыпуска:':'Credential rotation failed:',
+    'Перевыпуск VPN-реквизитов':'Rotate VPN credentials',
+    'Перевыпустить ссылку и ВСЕ VPN-реквизиты':'Replace subscription URL and ALL VPN credentials',
+    'Перевыпустить VPN-доступ':'Rotate VPN access',
     // Navigation and global shell
     'ОБЗОР':'OVERVIEW','Обзор':'Overview','УПРАВЛЕНИЕ':'MANAGEMENT',
     'Управление':'Management','ИНСТРУМЕНТЫ':'TOOLS','Инструменты':'Tools',
