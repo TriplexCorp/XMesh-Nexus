@@ -3988,6 +3988,21 @@ fn validate_record(collection: &str, data: &Value) -> Result<(), ApiError> {
                 ));
             }
             validate_reality_settings(inbound)?;
+            // Syntax-only validation at save time. Physical certificate readiness
+            // is evaluated by the assigned node, not by the panel host.
+            if inbound.get("streamSettings").and_then(|v| v.get("security")).and_then(Value::as_str) == Some("tls") {
+                let tls = inbound.get("streamSettings").and_then(|v| v.get("tlsSettings"));
+                if let Some(certs) = tls.and_then(|v| v.get("certificates")).and_then(Value::as_array) {
+                    for cert in certs {
+                        let file = cert.get("certificateFile").and_then(Value::as_str).unwrap_or("").trim();
+                        let key = cert.get("keyFile").and_then(Value::as_str).unwrap_or("").trim();
+                        if file.is_empty() != key.is_empty() {
+                            return Err(ApiError::new(StatusCode::BAD_REQUEST,
+                                "TLS certificateFile и keyFile должны быть указаны вместе."));
+                        }
+                    }
+                }
+            }
         }
     }
     Ok(())
