@@ -3862,7 +3862,11 @@ document.addEventListener('click',async e=>{
         current.xrayId=result.xrayId;
         // Refresh every credential in memory as the owner may immediately
         // sync a custom Xray profile without reloading the dashboard.
-        try{Object.assign(current,await backendRequest('/api/v1/collections/users/'+encodeURIComponent(id)))}catch(_){}
+        try{
+          const records=await backendRequest('/api/v1/collections/users');
+          const refreshed=records.items?.find(u=>u.id===id);
+          if(refreshed)Object.assign(current,refreshed);
+        }catch(_){}
       }
       // The open user drawer must not continue displaying the old VPN UUID.
       const idValue=b.closest('.user-canvas')?.querySelector('.user-id-value');
