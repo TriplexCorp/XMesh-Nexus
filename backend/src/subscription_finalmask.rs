@@ -466,14 +466,14 @@ mod tests {
     fn outbound(network: &str, alpn: &[&str]) -> Value {
         json!({"method":network,"security":"tls","tlsSettings":{"alpn":alpn}})
     }
-    fn layer(kind: &str, settings: Value) -> Value {
+    fn layer(kind: &str, settings: &Value) -> Value {
         json!({"type":kind,"settings":settings})
     }
     #[test]
     fn shared_masks_cover_all_compatible_transports() {
         for network in ["raw", "tcp", "xhttp", "ws", "grpc", "httpupgrade"] {
-            let server = json!({"tcp":[layer("sudoku",json!({"password":"key","serverOnly":"secret"})),
-                layer("header-custom",json!({"clients":[],"servers":[[]],
+            let server = json!({"tcp":[layer("sudoku",&json!({"password":"key","serverOnly":"secret"})),
+                layer("header-custom",&json!({"clients":[],"servers":[[]],
                     "errors":[[{"packet":"confidential"}]]}))]});
             let client = project(network, &outbound(network, &[]), Some(&server), None)
                 .unwrap()
@@ -484,9 +484,9 @@ mod tests {
             assert!(!client.to_string().contains("serverOnly"));
         }
         for network in ["hysteria", "mkcp", "masque"] {
-            let server = json!({"udp":[layer("salamander",json!({"password":"secret"})),
-                layer("mkcp-legacy",json!({"header":"dtls"})),
-                layer("header-custom",json!({"client":[],"server":[]}))]});
+            let server = json!({"udp":[layer("salamander",&json!({"password":"secret"})),
+                layer("mkcp-legacy",&json!({"header":"dtls"})),
+                layer("header-custom",&json!({"client":[],"server":[]}))]});
             let client = project(network, &outbound(network, &[]), Some(&server), None)
                 .unwrap()
                 .unwrap();
@@ -514,14 +514,14 @@ mod tests {
                 _ => json!({}),
             };
             let mut server = json!({});
-            server[direction] = json!([layer(kind, settings)]);
+            server[direction] = json!([layer(kind, &settings)]);
             assert!(project(network, &outbound(network, &[]), Some(&server), None).is_err());
             assert!(project(network, &outbound(network, &[]), None, Some(&server)).is_ok());
         }
     }
     #[test]
     fn tcp_udp_and_h3_are_not_interchangeable() {
-        let udp = json!({"udp":[layer("salamander",json!({"password":"secret"}))]});
+        let udp = json!({"udp":[layer("salamander",&json!({"password":"secret"}))]});
         assert!(project("raw", &outbound("raw", &[]), None, Some(&udp)).is_err());
         assert!(
             project("xhttp", &outbound("xhttp", &["h3"]), Some(&udp), None)
@@ -543,15 +543,15 @@ mod tests {
                 "hysteria",
                 &outbound("hysteria", &["h3"]),
                 None,
-                Some(&json!({"tcp":[layer("sudoku",json!({}))]}))
+                Some(&json!({"tcp":[layer("sudoku",&json!({}))]}))
             )
             .is_err()
         );
     }
     #[test]
     fn server_filter_does_not_leak_or_break_wire_layers() {
-        let source = json!({"tcp":[layer("sudoku",json!({"password":"p"})),
-            layer("filter",json!({"allowedSourceIPs":["10.0.0.0/8"]}))]});
+        let source = json!({"tcp":[layer("sudoku",&json!({"password":"p"})),
+            layer("filter",&json!({"allowedSourceIPs":["10.0.0.0/8"]}))]});
         let result = project("raw", &outbound("raw", &[]), Some(&source), None)
             .unwrap()
             .unwrap();
@@ -596,9 +596,9 @@ mod tests {
     }
     #[test]
     fn explicit_client_masks_must_preserve_server_symmetric_wire_layers() {
-        let server = json!({"udp":[layer("salamander",json!({"password":"server-secret"})),
-            layer("filter",json!({"blockedSourceIPs":["10.0.0.0/8"]}))]});
-        let client = json!({"udp":[layer("noise",json!({"noise":[{"rand":"10-20"}]}))]});
+        let server = json!({"udp":[layer("salamander",&json!({"password":"server-secret"})),
+            layer("filter",&json!({"blockedSourceIPs":["10.0.0.0/8"]}))]});
+        let client = json!({"udp":[layer("noise",&json!({"noise":[{"rand":"10-20"}]}))]});
         assert!(
             project(
                 "hysteria",
@@ -608,7 +608,7 @@ mod tests {
             )
             .is_err()
         );
-        let wrong = json!({"udp":[layer("salamander",json!({"password":"wrong"}))]});
+        let wrong = json!({"udp":[layer("salamander",&json!({"password":"wrong"}))]});
         assert!(
             project(
                 "hysteria",
@@ -618,8 +618,8 @@ mod tests {
             )
             .is_err()
         );
-        let correct = json!({"udp":[layer("salamander",json!({"password":"server-secret"})),
-            layer("noise",json!({"noise":[{"rand":"10-20"}]}))]});
+        let correct = json!({"udp":[layer("salamander",&json!({"password":"server-secret"})),
+            layer("noise",&json!({"noise":[{"rand":"10-20"}]}))]});
         let result = project(
             "hysteria",
             &outbound("hysteria", &["h3"]),
@@ -632,7 +632,7 @@ mod tests {
     }
     #[test]
     fn xdns_only_kcp_and_gecko_only_quic() {
-        let xdns = json!({"udp":[layer("xdns",json!({"domains":[{"names":["t.example.org"]}]}))]});
+        let xdns = json!({"udp":[layer("xdns",&json!({"domains":[{"names":["t.example.org"]}]}))]});
         assert!(project("mkcp", &outbound("mkcp", &[]), None, Some(&xdns)).is_ok());
         assert!(
             project(
@@ -643,7 +643,7 @@ mod tests {
             )
             .is_err()
         );
-        let gecko = json!({"udp":[layer("salamander",json!({
+        let gecko = json!({"udp":[layer("salamander",&json!({
             "password":"shared","packetSize":"512-1200"}))]});
         assert!(
             project(
