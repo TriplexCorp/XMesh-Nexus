@@ -22,6 +22,10 @@ assert.match(runtime,/crate::require_mutation\(&actor\)/);
 assert.match(runtime,/version LIKE 'control-v4\.%'/);
 assert.match(runtime,/VALUES\(\$1,'update_agent',\$2,\$3\)/);
 assert.match(runtime,/pub const CONTROL_AGENT_VERSION/);
+const target=runtime.match(/pub const CONTROL_AGENT_VERSION: &str = "(control-v[4-9]\.[0-9]+\.[0-9]+)";/);
+assert.ok(target,'Panel must advertise a numbered control runtime');
+assert.ok(agent.includes('AGENT_VERSION="'+target[1]+'"'),'Installer must report the same runtime version as the panel');
+assert.match(runtime,/version LIKE 'control-v5[.]%'/,'Agent updates must accept control-v5');
 assert.match(migration,/CHECK \(action IN \('restart_xray', 'update_xray', 'update_agent'\)\)/);
 assert.match(agent,/AGENT_VERSION="control-v[45][.][0-9]+[.][0-9]+"/);
 assert.match(agent,/if action not in \("restart_xray","update_xray","update_agent"\)/);
@@ -47,8 +51,6 @@ assert.match(updater,/docker --config "\$DOCKER_CONFIG" compose run --rm --no-de
 assert.match(updater,/docker --config "\$DOCKER_CONFIG" compose up -d --no-deps --force-recreate xmesh-node/,'Router must actually be restarted');
 assert.doesNotMatch(updater,/then\\n echo/,'Do not embed literal backslash-n in Bash');
 assert.match(runtime,/INTERVAL '15 minutes'/,'Long full-node upgrades must not expire after 180 seconds');
-assert.match(runtime,/control-v4\.3\.8/,'Panel must advertise the current full node runtime release');
-assert.match(agent,/AGENT_VERSION="control-v4\.3\.8"/,'Downloaded control agent must report same version');
 assert.match(updater,/xmesh-policy-guard[.]py -o "\$policy_tmp"/,'Agent update must fetch updated signed policy guard');
 
 assert.match(installer,/xmesh-node-agent-upgrade[.]service/);

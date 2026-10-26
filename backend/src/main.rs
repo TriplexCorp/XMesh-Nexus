@@ -291,6 +291,10 @@ fn protected_management_routes() -> Router<AppState> {
         )
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "The declarative protected route table is kept together for endpoint auditing"
+)]
 fn protected_routes(state: &AppState) -> Router<AppState> {
     Router::new()
         .route("/bootstrap", get(bootstrap))
@@ -467,7 +471,13 @@ fn application_router(state: AppState) -> Router {
 }
 
 #[tokio::main]
+#[expect(
+    clippy::too_many_lines,
+    reason = "Ordered startup performs database, Redis and HTTP bootstrap checks"
+)]
 async fn main() -> anyhow::Result<()> {
+    const STARTUP_CONNECT_ATTEMPTS: usize = 24;
+
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
@@ -482,7 +492,6 @@ async fn main() -> anyhow::Result<()> {
     // Docker's embedded service-name DNS can briefly lag network creation
     // even after Compose marks the database container healthy. Retry readiness
     // without disclosing connection strings (which contain DB credentials).
-    const STARTUP_CONNECT_ATTEMPTS: usize = 24;
     let pool_options = PgPoolOptions::new()
         .max_connections(
             env::var("DB_MAX_CONNECTIONS")
@@ -507,7 +516,10 @@ async fn main() -> anyhow::Result<()> {
                 }
                 // Do not log `error`: driver diagnostics can include the URL.
                 let _ = error;
-                tracing::warn!(attempt = db_attempt, "Waiting for PostgreSQL DNS/connectivity");
+                tracing::warn!(
+                    attempt = db_attempt,
+                    "Waiting for PostgreSQL DNS/connectivity"
+                );
                 tokio::time::sleep(Duration::from_secs(2)).await;
             }
         }
@@ -530,7 +542,10 @@ async fn main() -> anyhow::Result<()> {
         if redis_attempt >= STARTUP_CONNECT_ATTEMPTS {
             anyhow::bail!("Redis unavailable after {redis_attempt} startup attempts");
         }
-        tracing::warn!(attempt = redis_attempt, "Waiting for Redis DNS/connectivity");
+        tracing::warn!(
+            attempt = redis_attempt,
+            "Waiting for Redis DNS/connectivity"
+        );
         tokio::time::sleep(Duration::from_secs(2)).await;
     };
 
@@ -3919,6 +3934,10 @@ fn validate_reality_settings(inbound: &Value) -> Result<(), ApiError> {
     Ok(())
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "Centralized collection validation rejects incomplete node and TLS settings"
+)]
 fn validate_record(collection: &str, data: &Value) -> Result<(), ApiError> {
     let object = data.as_object().ok_or_else(|| {
         ApiError::new(StatusCode::BAD_REQUEST, "Запись должна быть JSON-объектом.")
@@ -3926,24 +3945,51 @@ fn validate_record(collection: &str, data: &Value) -> Result<(), ApiError> {
     if collection == "nodes" {
         validate_node_address(data)?;
         if object.get("tlsAutoProvision").and_then(Value::as_bool) == Some(true)
-            && object.get("tlsManualProvision").and_then(Value::as_bool) == Some(true) {
-            return Err(ApiError::new(StatusCode::BAD_REQUEST,
-                "Choose either managed TLS or externally provisioned certificates."));
+            && object.get("tlsManualProvision").and_then(Value::as_bool) == Some(true)
+        {
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Choose either managed TLS or externally provisioned certificates.",
+            ));
         }
         if object.get("tlsAutoProvision").and_then(Value::as_bool) == Some(true) {
-            let domain = object.get("tlsDomain").and_then(Value::as_str).unwrap_or("").trim().to_ascii_lowercase();
-            let email = object.get("tlsAcmeEmail").and_then(Value::as_str).unwrap_or("").trim();
-            let valid_domain = domain.len() <= 253 && domain.contains('.')
-                && domain.split('.').all(|part| !part.is_empty() && part.len() <= 63
-                    && !part.starts_with('-') && !part.ends_with('-')
-                    && part.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-'));
-            let valid_email = email.len() <= 254 && !email.contains(char::is_whitespace)
-                && email.split_once('@').is_some_and(|(user,host)| !user.is_empty()
-                    && host.contains('.') && host.len() <= 253
-                    && host.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-')));
+            let domain = object
+                .get("tlsDomain")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .trim()
+                .to_ascii_lowercase();
+            let email = object
+                .get("tlsAcmeEmail")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .trim();
+            let valid_domain = domain.len() <= 253
+                && domain.contains('.')
+                && domain.split('.').all(|part| {
+                    !part.is_empty()
+                        && part.len() <= 63
+                        && !part.starts_with('-')
+                        && !part.ends_with('-')
+                        && part
+                            .bytes()
+                            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+                });
+            let valid_email = email.len() <= 254
+                && !email.contains(char::is_whitespace)
+                && email.split_once('@').is_some_and(|(user, host)| {
+                    !user.is_empty()
+                        && host.contains('.')
+                        && host.len() <= 253
+                        && host
+                            .bytes()
+                            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-'))
+                });
             if !valid_domain || !valid_email {
-                return Err(ApiError::new(StatusCode::BAD_REQUEST,
-                    "Managed TLS requires a valid node domain and ACME email."));
+                return Err(ApiError::new(
+                    StatusCode::BAD_REQUEST,
+                    "Managed TLS requires a valid node domain and ACME email.",
+                ));
             }
         }
         node_rotation::validate_node(data)?;
@@ -4029,15 +4075,35 @@ fn validate_record(collection: &str, data: &Value) -> Result<(), ApiError> {
             validate_reality_settings(inbound)?;
             // Syntax-only validation at save time. Physical certificate readiness
             // is evaluated by the assigned node, not by the panel host.
-            if inbound.get("streamSettings").and_then(|v| v.get("security")).and_then(Value::as_str) == Some("tls") {
-                let tls = inbound.get("streamSettings").and_then(|v| v.get("tlsSettings"));
-                if let Some(certs) = tls.and_then(|v| v.get("certificates")).and_then(Value::as_array) {
+            if inbound
+                .get("streamSettings")
+                .and_then(|v| v.get("security"))
+                .and_then(Value::as_str)
+                == Some("tls")
+            {
+                let tls = inbound
+                    .get("streamSettings")
+                    .and_then(|v| v.get("tlsSettings"));
+                if let Some(certs) = tls
+                    .and_then(|v| v.get("certificates"))
+                    .and_then(Value::as_array)
+                {
                     for cert in certs {
-                        let file = cert.get("certificateFile").and_then(Value::as_str).unwrap_or("").trim();
-                        let key = cert.get("keyFile").and_then(Value::as_str).unwrap_or("").trim();
+                        let file = cert
+                            .get("certificateFile")
+                            .and_then(Value::as_str)
+                            .unwrap_or("")
+                            .trim();
+                        let key = cert
+                            .get("keyFile")
+                            .and_then(Value::as_str)
+                            .unwrap_or("")
+                            .trim();
                         if file.is_empty() != key.is_empty() {
-                            return Err(ApiError::new(StatusCode::BAD_REQUEST,
-                                "TLS certificateFile и keyFile должны быть указаны вместе."));
+                            return Err(ApiError::new(
+                                StatusCode::BAD_REQUEST,
+                                "TLS certificateFile и keyFile должны быть указаны вместе.",
+                            ));
                         }
                     }
                 }

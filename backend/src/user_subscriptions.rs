@@ -2037,7 +2037,7 @@ mod tests {
             json!(format!("{server}:{client128}"))
         );
         assert!(crate::subscription_json::build_feed(vec![proxy], &json!({})).is_ok());
-        let mut legacy = user.clone();
+        let mut legacy = user;
         legacy.as_object_mut().unwrap().remove("ssPassword128");
         assert!(proxy_outbound(&legacy, &inbound, &host, "auto").is_none());
     }

@@ -24,13 +24,15 @@ assert.match(restart,/control-v3/,'The new agent must still be able to restart X
 const update=runtime.slice(runtime.indexOf('pub async fn request_xray_update('),runtime.indexOf('pub async fn restart_status('));
 assert.match(update,/Json\(body\): Json<XrayVersionRequest>/);
 assert.match(update,/releases\.iter\(\)\.any\(\s*\|r\|\s*r\.version\s*==\s*target\s*\)/);
-assert.match(update,/version LIKE 'control-v3%'/);
+assert.ok(update.includes("version LIKE 'control-v3.%'"),'Xray release updates must support control-v3');
+assert.ok(update.includes("version LIKE 'control-v4.%'"),'Xray release updates must support control-v4');
+assert.ok(update.includes("version LIKE 'control-v5.%'"),'Xray release updates must support control-v5');
 assert.match(update,/target_version/);
 assert.match(update,/\.bind\(\s*&actor\.username\s*\)\s*\.bind\(\s*target\s*\)/);
 assert.match(runtime,/RETURNING id,action,target_version/);
 assert.match(runtime,/"targetVersion":row\.try_get/);
 assert.match(migration,/ADD COLUMN target_version TEXT/);
-assert.match(agent,/AGENT_VERSION="control-v4[.][0-9]+[.][0-9]+"/);
+assert.match(agent,/AGENT_VERSION="control-v[4-9][.][0-9]+[.][0-9]+"/,'managed runtime must advertise a supported v4+ agent');
 assert.match(agent,/update_managed_xray "\$target_version"/);
 assert.match(agent,/local image_tag="\$\{version#v\}"/);
 assert.match(agent,/ghcr\.io\/xtls\/xray-core:\$image_tag/);

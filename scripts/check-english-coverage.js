@@ -41,6 +41,13 @@ for(const file of files){
  });
  if(outstanding.length)missing[file]=outstanding;
 }
+// Rebuild the explicit debt ledger only on deliberate maintainer request.
+// Ordinary CI still fails whenever current source introduces untracked copy.
+if(process.argv.includes('--update-baseline')){
+ fs.writeFileSync('scripts/english-coverage-baseline.json',JSON.stringify(missing,null,2)+'\n');
+ console.log('Updated English translation debt baseline from current extracted UI copy.');
+ process.exit(0);
+}
 const baseline=JSON.parse(fs.readFileSync('scripts/english-coverage-baseline.json','utf8'));
 const newMissing=[];
 for(const [file,items] of Object.entries(missing)){

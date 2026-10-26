@@ -166,9 +166,26 @@ fn validate_heartbeat_report(report: &Heartbeat) -> Result<(), ApiError> {
     if report.tls_status.as_ref().is_some_and(|data| {
         serde_json::to_vec(data).is_ok_and(|bytes| bytes.len() > 2048)
             || !data.is_object()
-            || data.as_object().is_some_and(|obj| obj.keys().any(|k| !matches!(k.as_str(), "state" | "domain" | "issuer" | "notBefore" | "notAfter" | "daysRemaining" | "autoRenew" | "lastError")))
+            || data.as_object().is_some_and(|obj| {
+                obj.keys().any(|k| {
+                    !matches!(
+                        k.as_str(),
+                        "state"
+                            | "domain"
+                            | "issuer"
+                            | "notBefore"
+                            | "notAfter"
+                            | "daysRemaining"
+                            | "autoRenew"
+                            | "lastError"
+                    )
+                })
+            })
     }) {
-        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid TLS telemetry."));
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Invalid TLS telemetry.",
+        ));
     }
     if report.geo_data.as_ref().is_some_and(|data| {
         serde_json::to_vec(data).is_ok_and(|bytes| bytes.len() > 5000) || !data.is_object()
@@ -586,7 +603,7 @@ pub async fn request_xray_update(
     let active = sqlx::query_scalar::<_, bool>(
         "SELECT EXISTS(SELECT 1 FROM node_runtime_heartbeats
          WHERE node_id=$1 AND received_at>NOW()-INTERVAL '90 seconds'
-           AND (version LIKE 'control-v3%' OR version LIKE 'control-v4%'))",
+           AND (version LIKE 'control-v3.%' OR version LIKE 'control-v4.%' OR version LIKE 'control-v5.%'))",
     )
     .bind(node_id)
     .fetch_one(&state.pool)
@@ -594,7 +611,7 @@ pub async fn request_xray_update(
     if !active {
         return Err(ApiError::new(
             StatusCode::CONFLICT,
-            "Для выбора версии требуется управляющий агент control-v3 на узле.",
+            "Для выбора версии требуется активный управляющий агент control-v3/v4/v5 на узле.",
         ));
     }
     // Claiming an update is exclusive with a pending restart.
@@ -1423,27 +1440,40 @@ fn node_xray_local_port(node: &Value) -> Result<u64, ApiError> {
 }
 
 /// A managed node has one public TCP backend and one public UDP backend.
-/// The second inbound uses the next loopback port; StatsService reserves 10085.
+/// The second inbound uses the next loopback port; `StatsService` reserves 10085.
 fn managed_tcp_hysteria_pair(inbounds: &[Value]) -> bool {
     if inbounds.len() != 2 {
         return false;
     }
     let is_hysteria = |inbound: &Value| {
         inbound.get("protocol").and_then(Value::as_str) == Some("hysteria")
-            && inbound.pointer("/streamSettings/network").and_then(Value::as_str)
+            && inbound
+                .pointer("/streamSettings/network")
+                .and_then(Value::as_str)
                 == Some("hysteria")
-            && inbound.pointer("/streamSettings/security").and_then(Value::as_str)
+            && inbound
+                .pointer("/streamSettings/security")
+                .and_then(Value::as_str)
                 == Some("tls")
     };
     let is_tcp = |inbound: &Value| {
-        let protocol = inbound.get("protocol").and_then(Value::as_str).unwrap_or("");
-        let network = inbound.pointer("/streamSettings/network")
-            .and_then(Value::as_str).unwrap_or("raw");
-        let h3 = inbound.pointer("/streamSettings/tlsSettings/alpn")
+        let protocol = inbound
+            .get("protocol")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        let network = inbound
+            .pointer("/streamSettings/network")
+            .and_then(Value::as_str)
+            .unwrap_or("raw");
+        let h3 = inbound
+            .pointer("/streamSettings/tlsSettings/alpn")
             .and_then(Value::as_array)
             .is_some_and(|alpn| alpn.iter().any(|value| value.as_str() == Some("h3")));
         matches!(protocol, "vless" | "vmess" | "trojan" | "shadowsocks")
-            && matches!(network, "raw" | "tcp" | "xhttp" | "grpc" | "ws" | "httpupgrade")
+            && matches!(
+                network,
+                "raw" | "tcp" | "xhttp" | "grpc" | "ws" | "httpupgrade"
+            )
             && !(network == "xhttp" && h3)
     };
     (is_hysteria(&inbounds[0]) && is_tcp(&inbounds[1]))
@@ -1455,7 +1485,8 @@ fn configure_local_xray_inbound(config: &mut Value, port: u64) -> Result<(), Api
         .get_mut("inbounds")
         .and_then(Value::as_array_mut)
         .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Profile has no inbounds."))?;
-    if inbounds.is_empty() || inbounds.len() > 2
+    if inbounds.is_empty()
+        || inbounds.len() > 2
         || (inbounds.len() == 2 && !managed_tcp_hysteria_pair(inbounds))
     {
         return Err(ApiError::new(
@@ -1470,9 +1501,9 @@ fn configure_local_xray_inbound(config: &mut Value, port: u64) -> Result<(), Api
         ));
     }
     for (index, inbound) in inbounds.iter_mut().enumerate() {
-        let object = inbound.as_object_mut().ok_or_else(|| {
-            ApiError::new(StatusCode::CONFLICT, "Invalid inbound.")
-        })?;
+        let object = inbound
+            .as_object_mut()
+            .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Invalid inbound."))?;
         // The first listener preserves xrayLocalPort for existing deployments.
         // The second uses xrayLocalPort + 1; both remain private to the edge.
         object.insert("listen".to_owned(), json!("127.0.0.1"));
@@ -1482,43 +1513,78 @@ fn configure_local_xray_inbound(config: &mut Value, port: u64) -> Result<(), Api
 }
 
 fn ensure_masque_address(config: &mut Value) -> Result<(), ApiError> {
-    let inbounds = config.get_mut("inbounds").and_then(Value::as_array_mut)
+    let inbounds = config
+        .get_mut("inbounds")
+        .and_then(Value::as_array_mut)
         .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Profile has no inbounds."))?;
     for inbound in inbounds {
         // The managed edge router can forward TCP and UDP concurrently for
         // mixed XHTTP ALPN; MASQUE still has its own transport constraints.
         let stream = inbound.get("streamSettings");
-        let network = stream.and_then(|v| v.get("network")).and_then(Value::as_str).unwrap_or("");
-        let alpn = stream.and_then(|v| v.get("tlsSettings")).and_then(|v| v.get("alpn"))
+        let network = stream
+            .and_then(|v| v.get("network"))
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        let alpn = stream
+            .and_then(|v| v.get("tlsSettings"))
+            .and_then(|v| v.get("alpn"))
             .and_then(Value::as_array);
-        if matches!(network, "masque" | "xhttp") {
-            if network == "masque" && alpn.is_none_or(|a| a.len() != 1 ||
-                !matches!(a[0].as_str(), Some("h3" | "h2"))) {
-                return Err(ApiError::new(StatusCode::CONFLICT,
-                    "Node-managed MASQUE requires ALPN h3 or h2 explicitly."));
-            }
+        if matches!(network, "masque" | "xhttp")
+            && network == "masque"
+            && alpn.is_none_or(|a| a.len() != 1 || !matches!(a[0].as_str(), Some("h3" | "h2")))
+        {
+            return Err(ApiError::new(
+                StatusCode::CONFLICT,
+                "Node-managed MASQUE requires ALPN h3 or h2 explicitly.",
+            ));
         }
-        if inbound.get("protocol").and_then(Value::as_str) != Some("masque") { continue; }
+        if inbound.get("protocol").and_then(Value::as_str) != Some("masque") {
+            continue;
+        }
         let stream = inbound.get("streamSettings");
-        if stream.and_then(|v| v.get("network")).and_then(Value::as_str) != Some("masque")
-            || stream.and_then(|v| v.get("security")).and_then(Value::as_str) != Some("tls") {
-            return Err(ApiError::new(StatusCode::CONFLICT, "MASQUE requires masque transport and TLS."));
+        if stream
+            .and_then(|v| v.get("network"))
+            .and_then(Value::as_str)
+            != Some("masque")
+            || stream
+                .and_then(|v| v.get("security"))
+                .and_then(Value::as_str)
+                != Some("tls")
+        {
+            return Err(ApiError::new(
+                StatusCode::CONFLICT,
+                "MASQUE requires masque transport and TLS.",
+            ));
         }
-        let settings = inbound.get_mut("settings").and_then(Value::as_object_mut)
-            .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "MASQUE settings must be an object."))?;
+        let settings = inbound
+            .get_mut("settings")
+            .and_then(Value::as_object_mut)
+            .ok_or_else(|| {
+                ApiError::new(StatusCode::CONFLICT, "MASQUE settings must be an object.")
+            })?;
         // Backward compatibility for saved composer profiles created before
         // the required tunnel address was generated. Individual overrides win.
         if !settings.contains_key("address") {
             settings.insert("address".to_owned(), json!(["10.129.0.1/24"]));
         }
-        if settings.get("address").and_then(Value::as_array)
-            .is_none_or(|a| a.is_empty() || a.iter().any(|v| v.as_str().is_none_or(str::is_empty))) {
-            return Err(ApiError::new(StatusCode::CONFLICT, "MASQUE requires non-empty address ranges."));
+        if settings
+            .get("address")
+            .and_then(Value::as_array)
+            .is_none_or(|a| a.is_empty() || a.iter().any(|v| v.as_str().is_none_or(str::is_empty)))
+        {
+            return Err(ApiError::new(
+                StatusCode::CONFLICT,
+                "MASQUE requires non-empty address ranges.",
+            ));
         }
     }
     Ok(())
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "TLS mode validation and certificate injection are one atomic operation"
+)]
 fn configure_node_managed_tls(node: &Value, config: &mut Value) -> Result<Option<Value>, ApiError> {
     if node.get("tlsAutoProvision").and_then(Value::as_bool) == Some(true)
         && node.get("tlsManualProvision").and_then(Value::as_bool) == Some(true)
@@ -1533,42 +1599,100 @@ fn configure_node_managed_tls(node: &Value, config: &mut Value) -> Result<Option
         // provisioning contract. New records must choose explicitly.
         if node.get("tlsAutoProvision").and_then(Value::as_bool) == Some(false)
             && node.get("tlsManualProvision").and_then(Value::as_bool) != Some(true)
-            && config.get("inbounds").and_then(Value::as_array).is_some_and(|items|
-                items.iter().any(|ib| ib.get("streamSettings")
-                    .and_then(|s| s.get("security")).and_then(Value::as_str) == Some("tls"))) {
-            return Err(ApiError::new(StatusCode::CONFLICT,
-                "TLS node needs managed ACME settings or explicit externally provisioned certificates."));
+            && config
+                .get("inbounds")
+                .and_then(Value::as_array)
+                .is_some_and(|items| {
+                    items.iter().any(|ib| {
+                        ib.get("streamSettings")
+                            .and_then(|s| s.get("security"))
+                            .and_then(Value::as_str)
+                            == Some("tls")
+                    })
+                })
+        {
+            return Err(ApiError::new(
+                StatusCode::CONFLICT,
+                "TLS node needs managed ACME settings or explicit externally provisioned certificates.",
+            ));
         }
         return Ok(None);
     }
-    let domain = node.get("tlsDomain").and_then(Value::as_str).unwrap_or("").trim().to_ascii_lowercase();
-    let email = node.get("tlsAcmeEmail").and_then(Value::as_str).unwrap_or("").trim();
-    let valid_domain = domain.len() <= 253 && domain.contains('.')
-        && domain.split('.').all(|part| !part.is_empty() && part.len() <= 63
-            && !part.starts_with('-') && !part.ends_with('-')
-            && part.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-'));
-    let valid_email = email.len() <= 254 && !email.contains(char::is_whitespace)
-        && email.split_once('@').is_some_and(|(user, host)| !user.is_empty() && host.contains('.')
-            && host.len() <= 253 && host.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-')));
+    let domain = node
+        .get("tlsDomain")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .trim()
+        .to_ascii_lowercase();
+    let email = node
+        .get("tlsAcmeEmail")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .trim();
+    let valid_domain = domain.len() <= 253
+        && domain.contains('.')
+        && domain.split('.').all(|part| {
+            !part.is_empty()
+                && part.len() <= 63
+                && !part.starts_with('-')
+                && !part.ends_with('-')
+                && part
+                    .bytes()
+                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+        });
+    let valid_email = email.len() <= 254
+        && !email.contains(char::is_whitespace)
+        && email.split_once('@').is_some_and(|(user, host)| {
+            !user.is_empty()
+                && host.contains('.')
+                && host.len() <= 253
+                && host
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-'))
+        });
     if !valid_domain || !valid_email {
-        return Err(ApiError::new(StatusCode::CONFLICT, "Managed TLS requires a valid node TLS domain and ACME email."));
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "Managed TLS requires a valid node TLS domain and ACME email.",
+        ));
     }
-    let inbounds = config.get_mut("inbounds").and_then(Value::as_array_mut)
+    let inbounds = config
+        .get_mut("inbounds")
+        .and_then(Value::as_array_mut)
         .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Profile has no inbounds."))?;
     let mut updated = false;
     for inbound in inbounds {
-        let Some(stream) = inbound.get_mut("streamSettings").and_then(Value::as_object_mut) else { continue };
-        if stream.get("security").and_then(Value::as_str) != Some("tls") { continue; }
+        let Some(stream) = inbound
+            .get_mut("streamSettings")
+            .and_then(Value::as_object_mut)
+        else {
+            continue;
+        };
+        if stream.get("security").and_then(Value::as_str) != Some("tls") {
+            continue;
+        }
         let tls = stream.entry("tlsSettings").or_insert_with(|| json!({}));
-        let tls = tls.as_object_mut().ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Invalid TLS settings."))?;
-        tls.insert("certificates".to_owned(), json!([{
-            "certificateFile":format!("/etc/letsencrypt/live/{domain}/fullchain.pem"),
-            "keyFile":format!("/etc/letsencrypt/live/{domain}/privkey.pem")
-        }]));
+        let tls = tls
+            .as_object_mut()
+            .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Invalid TLS settings."))?;
+        tls.insert(
+            "certificates".to_owned(),
+            json!([{
+                "certificateFile":format!("/etc/letsencrypt/live/{domain}/fullchain.pem"),
+                "keyFile":format!("/etc/letsencrypt/live/{domain}/privkey.pem")
+            }]),
+        );
         updated = true;
     }
-    if !updated { return Err(ApiError::new(StatusCode::CONFLICT, "Managed TLS requires an assigned TLS inbound.")); }
-    Ok(Some(json!({"domain":domain,"email":email,"provider":"letsencrypt-http01"})))
+    if !updated {
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "Managed TLS requires an assigned TLS inbound.",
+        ));
+    }
+    Ok(Some(
+        json!({"domain":domain,"email":email,"provider":"letsencrypt-http01"}),
+    ))
 }
 
 async fn compile_node_profile(
@@ -1740,7 +1864,9 @@ pub async fn desired_config(
     } = compile_node_profile(&state, request.node_id).await?;
     let mut policy =
         build_offline_policy(&config, &users, request.node_id, now, &digest, active_nodes);
-    if let Some(tls) = tls_provision { policy["tlsProvision"] = tls; }
+    if let Some(tls) = tls_provision {
+        policy["tlsProvision"] = tls;
+    }
     // Metadata is covered by the existing Ed25519 node-policy signature.
     if let Some(manifest) = geo_data {
         policy["geoData"] = manifest;
@@ -1761,12 +1887,15 @@ pub async fn desired_config(
     .bind(&digest)
     .execute(&state.pool)
     .await?;
-    Ok((StatusCode::OK, Json(json!({
-        "nodeId":request.node_id,"profileId":profile_id,
-        "listen":"127.0.0.1","port":port,"revision":digest,"config":config,
-        "policy":policy,"policySignature":signature,
-        "policyPublicKey":state.node_policy_signer.public_key()
-    }))))
+    Ok((
+        StatusCode::OK,
+        Json(json!({
+            "nodeId":request.node_id,"profileId":profile_id,
+            "listen":"127.0.0.1","port":port,"revision":digest,"config":config,
+            "policy":policy,"policySignature":signature,
+            "policyPublicKey":state.node_policy_signer.public_key()
+        })),
+    ))
 }
 
 #[cfg(test)]
@@ -1775,14 +1904,20 @@ mod provision_tests {
     #[test]
     fn profile_assignment_is_optional_until_provisioning() {
         for node in [
-            json!({}), json!({"profileId":null}), json!({"profileId":""}),
-            json!({"profileId":"  "}), json!({"profileId":0}), json!({"profileId":"0"})
+            json!({}),
+            json!({"profileId":null}),
+            json!({"profileId":""}),
+            json!({"profileId":"  "}),
+            json!({"profileId":0}),
+            json!({"profileId":"0"}),
         ] {
             assert!(node_awaits_profile(&node), "{node:?}");
         }
         for node in [
-            json!({"profileId":1}), json!({"profileId":"1"}),
-            json!({"profileId":-1}), json!({"profileId":"invalid"})
+            json!({"profileId":1}),
+            json!({"profileId":"1"}),
+            json!({"profileId":-1}),
+            json!({"profileId":"invalid"}),
         ] {
             assert!(!node_awaits_profile(&node), "{node:?}");
         }
@@ -2014,20 +2149,37 @@ mod node_tls_masque_contract_tests {
                 "alpn":["h3"],"certificates":[{"certificateFile":"/etc/letsencrypt/live/old.example/fullchain.pem",
                 "keyFile":"/etc/letsencrypt/live/old.example/privkey.pem"}]}}}]});
         ensure_masque_address(&mut config).unwrap();
-        assert_eq!(config["inbounds"][0]["settings"]["address"][0], "10.129.0.1/24");
+        assert_eq!(
+            config["inbounds"][0]["settings"]["address"][0],
+            "10.129.0.1/24"
+        );
         let node = json!({"tlsAutoProvision":true,"tlsDomain":"new.example.org",
             "tlsAcmeEmail":"ops@example.org"});
-        let signed = configure_node_managed_tls(&node, &mut config).unwrap().unwrap();
+        let signed = configure_node_managed_tls(&node, &mut config)
+            .unwrap()
+            .unwrap();
         assert_eq!(signed["domain"], "new.example.org");
-        assert_eq!(config["inbounds"][0]["streamSettings"]["tlsSettings"]["certificates"][0]["certificateFile"],
-            "/etc/letsencrypt/live/new.example.org/fullchain.pem");
+        assert_eq!(
+            config["inbounds"][0]["streamSettings"]["tlsSettings"]["certificates"][0]["certificateFile"],
+            "/etc/letsencrypt/live/new.example.org/fullchain.pem"
+        );
         let mut manual = json!({"inbounds":[]});
-        assert!(configure_node_managed_tls(&json!({}), &mut manual).unwrap().is_none());
+        assert!(
+            configure_node_managed_tls(&json!({}), &mut manual)
+                .unwrap()
+                .is_none()
+        );
     }
     #[test]
     fn managed_tls_rejects_missing_acme_identity() {
         let mut config = json!({"inbounds":[{"streamSettings":{"security":"tls"}}]});
-        assert!(configure_node_managed_tls(&json!({"tlsAutoProvision":true,
-            "tlsDomain":"example.org"}), &mut config).is_err());
+        assert!(
+            configure_node_managed_tls(
+                &json!({"tlsAutoProvision":true,
+            "tlsDomain":"example.org"}),
+                &mut config
+            )
+            .is_err()
+        );
     }
 }

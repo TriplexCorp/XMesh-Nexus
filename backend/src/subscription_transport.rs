@@ -544,10 +544,14 @@ mod tests {
         ] {
             let mut inbound = json!({"streamSettings":{"network":network,"security":"tls",
                 "tlsSettings":{"serverName":"example.org"}}});
+            if network == "masque" {
+                // MASQUE is only exported for a MASQUE protocol inbound.
+                inbound["protocol"] = json!("masque");
+            }
             inbound["streamSettings"]["finalmask"][direction] = json!([
                 {"type":"sudoku","settings":{"password":"shared","paddingMin":2,"serverOnly":"hidden"}}]);
-            let client =
-                client_stream(&inbound, &json!({"address":"example.org"}), "auto").unwrap();
+            let client = client_stream(&inbound, &json!({"address":"example.org"}), "auto")
+                .unwrap_or_else(|| panic!("symmetric Sudoku projection failed for {network}"));
             assert_eq!(
                 client["finalmask"][direction][0]["settings"]["password"],
                 "shared"
