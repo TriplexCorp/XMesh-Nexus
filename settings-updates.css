@@ -1,0 +1,42 @@
+/* Settings → software updates. Shared action grid for Xray-core and Nexus updater.
+   Scoped selectors override older #core-panel .act and generic .act rules. */
+#core-panel .update-action-row,
+#panel-update-card .update-action-row{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,12.5rem));
+  align-items:stretch;
+  justify-content:end;
+  gap:.65rem;
+  width:100%;
+  margin-top:.85rem;
+}
+#core-panel .update-action-row > button,
+#panel-update-card .update-action-row > button{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:100%;
+  min-width:0;
+  min-height:2.65rem;
+  padding:.65rem .75rem;
+  gap:.45rem;
+  white-space:normal;
+  line-height:1.2;
+  text-align:center;
+}
+#core-panel .update-action-row > button:disabled,
+#panel-update-card .update-action-row > button:disabled{
+  cursor:wait;
+}
+@media(max-width:650px){
+  #core-panel .update-action-row,
+  #panel-update-card .update-action-row{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+@media(max-width:420px){
+  #core-panel .update-action-row,
+  #panel-update-card .update-action-row{
+    grid-template-columns:minmax(0,1fr);
+  }
+}
