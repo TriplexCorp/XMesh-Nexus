@@ -3503,6 +3503,58 @@ pub(crate) async fn user_metered_bytes(pool: &PgPool, user_id: i64) -> Result<i6
 
 async fn load_records(pool: &PgPool, collection: &str) -> Result<Vec<Value>, ApiError> {
     validate_collection(collection)?;
+    if collection == "users" {
+        // Backfill older accounts before either the Xray node policy or JSON
+        // subscription reads them. INSERT-time provisioning handles new users.
+        // Updates are conditional so concurrent readers never rotate a key.
+        use aes_gcm::aead::rand_core::RngCore as _;
+        use base64::Engine as _;
+        let legacy = sqlx::query(
+            "SELECT id, data FROM panel_records WHERE collection='users'
+             AND (NOT (data ? 'ssPassword') OR NOT (data ? 'ssPassword128'))",
+        )
+        .fetch_all(pool)
+        .await?;
+        for row in legacy {
+            let id: i64 = row.try_get("id")?;
+            let data: Value = row.try_get("data")?;
+            let mut patch = serde_json::Map::new();
+            if data.get("ssPassword").is_none() {
+                let mut key = [0u8; 32];
+                aes_gcm::aead::OsRng.fill_bytes(&mut key);
+                patch.insert(
+                    "ssPassword".into(),
+                    json!(base64::engine::general_purpose::STANDARD.encode(key)),
+                );
+            }
+            if data.get("ssPassword128").is_none() {
+                let mut key = [0u8; 16];
+                aes_gcm::aead::OsRng.fill_bytes(&mut key);
+                patch.insert(
+                    "ssPassword128".into(),
+                    json!(base64::engine::general_purpose::STANDARD.encode(key)),
+                );
+            }
+            if !patch.is_empty() {
+                // Conditional JSONB update preserves existing keys if another
+                // process supplied them first. Never replace an issued key.
+                sqlx::query(
+                    "UPDATE panel_records SET
+                       data = data || (
+                         SELECT COALESCE(jsonb_object_agg(k.key, k.value), '{}'::jsonb)
+                         FROM jsonb_each($2::jsonb) AS k(key, value)
+                         WHERE NOT (panel_records.data ? k.key)
+                       ),
+                       updated_at = NOW()
+                     WHERE collection='users' AND id=$1",
+                )
+                .bind(id)
+                .bind(Value::Object(patch))
+                .execute(pool)
+                .await?;
+            }
+        }
+    }
     let rows = sqlx::query("SELECT id, data FROM panel_records WHERE collection = $1 ORDER BY id")
         .bind(collection)
         .fetch_all(pool)
