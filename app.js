@@ -2999,17 +2999,9 @@ function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id
       const ia=nodeCoreOrder.indexOf(a.k),ib=nodeCoreOrder.indexOf(b.k);
       return (ia<0?nodeCoreOrder.length:ia)-(ib<0?nodeCoreOrder.length:ib);
     }):nodeCoreFields;
-  // Keep field names and validation unchanged; group by the operator's task.
-  const nodeFieldMarkup=f=>f.k==='addr'
+  const nodeMainFields=arrangedNodeCoreFields.map(f=>f.k==='addr'
     ?'<div class="node-address-port">'+field(f,o[f.k])+field(nodeCoreFields.find(x=>x.k==='port'),o.port)+'</div>'
-    :field(f,o[f.k]);
-  const nodeGroup=(keys)=>arrangedNodeCoreFields.filter(f=>keys.includes(f.k)&&f.k!=='port').map(nodeFieldMarkup).join('');
-  const nodeIdentityFields=nodeGroup(['name','hosting','flag','profileId']);
-  const nodeConnectionFields=nodeGroup(['addr','port','xrayLocalPort']);
-  const nodeTlsFields=nodeGroup(['tlsAutoProvision','tlsManualProvision','tlsDomain','tlsAcmeEmail']);
-  const nodeLimitsFields=nodeGroup(['mult','limit','resetDay']);
-  const nodeKnownKeys=new Set(['name','hosting','flag','profileId','addr','port','xrayLocalPort','tlsAutoProvision','tlsManualProvision','tlsDomain','tlsAcmeEmail','mult','limit','resetDay']);
-  const nodeOtherFields=arrangedNodeCoreFields.filter(f=>!nodeKnownKeys.has(f.k)).map(nodeFieldMarkup).join('');
+    :f.k==='port'?'':field(f,o[f.k])).join('');
   const nodeResetAction=id?'<div class="node-reset-action"><div class="node-reset-copy"><strong>Счётчик трафика</strong><span>Обнулить расход ноды. Xray не перезапускается.</span></div><button type="button" class="gh sm node-traffic-reset-button" data-node-reset-traffic="'+esc(String(id))+'" title="">'+ic('redo')+'Обнулить</button><output class="node-traffic-reset-status" data-node-reset-feedback aria-live="polite"></output></div>':'';
   const userOptions=DB.users.filter(u=>st(u)==='ACTIVE').map(u=>`<option value="${u.id}">${esc(u.username)}</option>`).join('');
   const rotationProbe=id&&o.rotationEnabled
@@ -3017,40 +3009,7 @@ function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id
     :'';
   const hostWizard=k==='hosts'?'<div class="host-quick"><label class="f"><span>Быстро заполнить из узла</span><select data-host-node-preset><option value="">Выберите сервер…</option>'+DB.nodes.map(n=>'<option value="'+esc(String(n.id))+'">'+esc(n.name)+' · '+esc(n.addr||'')+'</option>').join('')+'</select></label><p class="note">Подставит адрес, порт и привязку. Остальные поля сохранятся.</p></div>':'';
   const fields=k==='squads'?squadEditorMarkup(o,e):k==='hosts'?hostEditorMarkup(o,e):k==='nodes'
-    ?`<div class="node-form-layout node-editor-v2">
-      <section class="node-main-section node-identity-section">
-        <div class="node-form-section-title">01 · Узел и профиль</div>
-        <p class="node-section-intro">Название, расположение и профиль XRAY STUDIO.</p>
-        <div class="node-form-grid">${nodeIdentityFields}</div>
-      </section>
-      <section class="node-connect-section">
-        <div class="node-form-section-title">02 · Подключение и TLS</div>
-        <p class="node-section-intro">Адрес и порты ноды. TLS включайте только если его требует транспорт.</p>
-        <div class="node-form-grid">${nodeConnectionFields}</div>
-        <div class="node-editor-subtitle">Сертификат ноды</div>
-        <p class="node-ip-hint">Управляемый Let's Encrypt и внешний сертификат — альтернативные режимы. Для Reality отдельный сертификат обычно не нужен.</p>
-        <div class="node-form-grid node-tls-fields">${nodeTlsFields}</div>
-      </section>
-      <section class="node-limits-section">
-        <div class="node-form-section-title">03 · Трафик и ограничения</div>
-        <p class="node-section-intro">Коэффициент, лимит и период сброса.</p>
-        <div class="node-form-grid">${nodeLimitsFields}${nodeOtherFields}</div>
-        ${nodeResetAction}
-      </section>
-      <section class="node-ip-section">
-        <div class="node-form-section-title">04 · IP-пул и ротация</div>
-        <p class="node-ip-hint">Необязательно. Адреса должны принадлежать VPS и быть доступны извне.</p>
-        <div class="node-rotation-editor-body">${rotationFields}
-          <div class="node-pool-toolbar"><span data-node-pool-count>Адресов: ${nodeRotationIPs(o).length} / 256</span><button type="button" class="gh sm" data-node-pool-normalize>Убрать повторы</button><button type="button" class="gh sm" data-node-pool-clear>Очистить</button></div>
-          <output data-node-pool-feedback aria-live="polite"></output>${rotationProbe}
-        </div>
-      </section>
-      <section class="node-billing-section">
-        <div class="node-form-section-title">05 · Инфрабиллинг</div>
-        <p class="node-ip-hint">Не влияет на работу Xray. Только учёт расходов и напоминания.</p>
-        <div class="node-billing-fields">${billingFields}</div>
-      </section>
-    </div>`
+    ?'<div class="node-form-layout"><section class="node-main-section"><div class="node-form-section-title">Основные параметры</div><p class="node-section-intro">Подключение, профиль Xray и ограничения узла</p><div class="node-form-grid">'+nodeMainFields+'</div>'+nodeResetAction+'</section>'+`<section class="node-ip-section"><div class="node-form-section-title">IP-пул и ротация</div><div class="node-ip-hint">Адреса должны принадлежать этому VPS и быть доступны извне.</div><div class="node-rotation-editor-body">${rotationFields}<div class="node-pool-toolbar"><span data-node-pool-count>Адресов: ${nodeRotationIPs(o).length} / 256</span><button type="button" class="gh sm" data-node-pool-normalize>Убрать повторы</button><button type="button" class="gh sm" data-node-pool-clear>Очистить</button></div><output data-node-pool-feedback aria-live="polite"></output>${rotationProbe}</div></section><section class="node-billing-section"><div class="node-form-section-title">Инфрабиллинг</div><p class="node-ip-hint">Стоимость, аренда и напоминания</p><div class="node-billing-fields">${billingFields}</div></section></div>`
     :standardFields;
   modal(`<form class="box" data-k="ent" data-ent="${k}" data-id="${id||''}" method="dialog"><h2>${id?'Изменить':'Новый'}: ${e.nw.toLowerCase()}</h2>${fields}<p class="er" id="fe"></p><div class="act">${id?`<button type="button" class="dg" data-del="${k}:${id}" style="margin-right:auto">${ic('trash')}Удалить</button>`:''}${k==='hosts'&&id?`<button type="button" class="gh" data-host-duplicate="${id}">${ic('copy')}Дублировать</button>`:''}<button type="button" class="gh" data-x>Отмена</button><button class="btn">Сохранить</button></div></form>`,k==='nodes'?'node-wide':k==='hosts'?'host-wide':k==='squads'?'squad-wide':k=='profiles'||k=='subs'?'wide':'');
   if(k==='squads')squadEditorRefresh(dlg.querySelector('form[data-ent="squads"]'));
