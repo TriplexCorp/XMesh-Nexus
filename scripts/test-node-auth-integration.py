@@ -171,6 +171,17 @@ def main():
             "node_id":node,"version":"control-v4.0.0",
             "xray_running":True,"router_running":True})
         assert_status(code,200,"new control-v4 heartbeat accepted")
+        # The legacy Go router posts version 0.1.0 with xray_running=false.
+        # That reporter must never overwrite the authoritative control agent.
+        code,_,_=signed_post("/node/heartbeat",{
+            "node_id":node,"version":"0.1.0",
+            "xray_running":False,"router_running":True})
+        assert_status(code,200,"signed standalone router heartbeat accepted without overwriting control")
+        code,runtime,_=request("GET",f"/nodes/{node}/runtime",cookie=cookie)
+        assert_status(code,200,"read authoritative node status after router heartbeat")
+        assert runtime["version"]=="control-v4.0.0" and runtime["xrayRunning"] is True, (
+            "legacy router heartbeat must not erase the control agent version or Xray state",runtime)
+        print("PASS: legacy router heartbeats cannot downgrade active node-control health")
         code,_,_=request("POST",f"/nodes/{node}/agent-update",
             {"command":"rm -rf /"},cookie=cookie,origin=BASE)
         assert code in (400,422), f"arbitrary updater commands must be rejected: HTTP {code}"
