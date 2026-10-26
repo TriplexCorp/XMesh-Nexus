@@ -23,7 +23,7 @@ fn random_password() -> String {
     hex::encode(secret)
 }
 
-/// Generate fresh unrelated credentials. Only VLESS gets xrayId; VMess gets
+/// Generate fresh unrelated credentials. Only VLESS gets `xrayId`; `VMess` gets
 /// its own v4 UUID, while all password-based protocols get 256-bit secrets.
 pub fn generate() -> Map<String, Value> {
     let mut fields = Map::new();
