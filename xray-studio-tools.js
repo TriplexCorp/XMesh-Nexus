@@ -628,17 +628,32 @@ const operations={
      (network==='xhttp'&&alpn.includes('h3'));
    const tcp=!['hysteria','masque','mkcp','kcp'].includes(network);
    const choices=[
-    ...(tcp?[{value:'sudoku',label:'TCP · Sudoku',description:'Симметричная TCP-маска, общий секрет генерируется автоматически.'}]:[]),
-    ...(tcp?[{value:'fragment',label:'TCP · Fragment',description:'Клиентская фрагментация TLS ClientHello; готовые безопасные параметры, пароль не нужен.'}]:[]),
-    ...(udp?[{value:'salamander',label:'UDP · Salamander / Gecko',description:'Маска QUIC/UDP, автоматический общий пароль и необязательный packetSize.'}]:[]),
-    ...(udp?[{value:'noise',label:'UDP · Noise',description:'Клиентский случайный UDP-шум перед данными; пароль не нужен.'}]:[]),
-    {value:'advanced',label:'Расширенный JSON',description:'Направленные слои, QUIC-параметры и нестандартные настройки.'},
-    {value:'clear',label:'Сбросить FinalMask',description:'Удалить серверную и клиентскую маски этого inbound.'}
+    ...(tcp?[
+     {value:'sudoku',label:'TCP · Sudoku',description:'Симметричная маска с безопасным общим секретом.'},
+     {value:'fragment',label:'TCP · Fragment',description:'Клиентская фрагментация TLS ClientHello.'},
+     {value:'tcp-header-custom',label:'TCP · Header Custom',description:'Произвольные заголовки клиента и сервера; редактор JSON.'},
+     {value:'xmc',label:'TCP · XMC',description:'Маскировка Minecraft; клиент и версия Xray должны поддерживать.'}
+    ]:[]),
+    ...(udp?[
+     {value:'salamander',label:'UDP · Salamander / Gecko',description:'Симметричная UDP/QUIC маска, общий пароль.'},
+     {value:'udp-sudoku',label:'UDP · Sudoku',description:'Симметричная UDP-маска с общим секретом.'},
+     {value:'udp-header-custom',label:'UDP · Header Custom',description:'Настраиваемые UDP-заголовки; редактор JSON.'},
+     {value:'mkcp-legacy',label:'UDP · mKCP Legacy',description:'Заголовки DNS/DTLS/SRTP/UTP/WeChat/WireGuard.'},
+     {value:'noise',label:'UDP · Noise',description:'Клиентский UDP-шум.'},
+     {value:'udphop',label:'UDP · UDP Hop',description:'Смена портов; нужны firewall/NAT настройки.'},
+     ...(network==='mkcp'||network==='kcp'?[{value:'xdns',label:'UDP · XDNS',description:'Только mKCP, требуется настроенный DNS.'}]:[]),
+     {value:'xicmp',label:'UDP · XICMP',description:'ICMP-маскировка; нужны права системы.'},
+     {value:'realm',label:'UDP · Realm',description:'Использует настроенную Realm/STUN-инфраструктуру.'}
+    ]:[]),
+    ...((tcp||udp)?[{value:'filter',label:'Server · Filter',description:'Только серверный фильтр, не экспортируется клиенту.'}]:[]),
+    ...(quic?[{value:'quic-params',label:'QUIC · Параметры',description:'Конфигурация QUIC клиента в JSON.'}]:[]),
+    {value:'advanced',label:'Расширенный JSON',description:'Все направления, цепочки и нестандартные параметры.'},
+    {value:'clear',label:'Сбросить FinalMask',description:'Удалить серверную и клиентскую маски inbound.'}
    ];
    const action=await dialog.request({
     title:'FinalMask · конструктор',description:'Выберите готовую маску. Секрет генерируется криптографически в браузере, совместимые серверные слои автоматически попадают в JSON-подписку.',
     confirmLabel:'Продолжить',selectFirst:false,
-    fields:[{name:'action',label:'Выберите тип маски',type:'cards',wide:true,value:udp?'salamander':tcp?'sudoku':'advanced',options:choices}]
+    fields:[{name:'action',label:'Выберите тип маски',type:'cards',wide:true,value:tcp?'sudoku':udp?'salamander':'advanced',options:choices}]
    });
    if(!action)return;
    if(area.value!==selected.source){notify('JSON изменился. Повторите действие.');return}
@@ -686,16 +701,16 @@ const operations={
     },'Клиентская FinalMask '+action.action+' добавлена');
     return;
    }
-   if(['sudoku','salamander'].includes(action.action)){
+   if(['sudoku','udp-sudoku','salamander'].includes(action.action)){
     const salamander=action.action==='salamander';
-    if(salamander&&!udp||!salamander&&!tcp)throw Error('FinalMask несовместим с выбранным транспортом');
+    if(salamander&&!udp||action.action==='udp-sudoku'&&!udp||action.action==='sudoku'&&!tcp)throw Error('FinalMask несовместим с выбранным транспортом');
     if(inbound.xmesh?.clientFinalmask&&Object.keys(inbound.xmesh.clientFinalmask).length)
      throw Error('У inbound есть явная клиентская маска. Сначала согласуйте её в расширенном JSON.');
     if(!crypto?.getRandomValues)throw Error('Криптографический генератор недоступен');
     const bytes=new Uint8Array(32);crypto.getRandomValues(bytes);
     const secret=Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
     const result=await dialog.request({
-     title:salamander?'UDP · Salamander / Gecko':'TCP · Sudoku',
+     title:salamander?'UDP · Salamander / Gecko':action.action==='udp-sudoku'?'UDP · Sudoku':'TCP · Sudoku',
      description:'Секрет сгенерирован безопасным генератором браузера. Слой будет добавлен в серверный JSON и унаследован клиентской JSON-подпиской.',
      confirmLabel:'Создать маску',
      fields:[
@@ -708,7 +723,7 @@ const operations={
     });
     if(!result)return;
     if(area.value!==selected.source){notify('JSON изменился. Повторите действие.');return}
-    const direction=salamander?'udp':'tcp';
+    const direction=salamander||action.action==='udp-sudoku'?'udp':'tcp';
     mutate(doc=>{
      const ib=getInbound(doc,selected.index);
      if(ib.tag!==selected.tag)throw Error('Inbound изменился');
@@ -716,7 +731,8 @@ const operations={
      const layers=ib.streamSettings.finalmask[direction]??=[];
      const settings={password:result.password};
      if(salamander&&result.packetSize)settings.packetSize=result.packetSize;
-     const layer={type:action.action,settings},index=layers.findIndex(v=>v?.type===action.action);
+     const kind=action.action==='udp-sudoku'?'sudoku':action.action;
+      const layer={type:kind,settings},index=layers.findIndex(v=>v?.type===kind);
      if(index>=0)layers[index]=layer;else layers.push(layer);
      if(layers.length>16)throw Error('FinalMask: максимум 16 слоёв');
      ib.streamSettings.finalmask[direction]=layers;
@@ -738,13 +754,13 @@ const operations={
    };
    const response=await dialog.request({
     title:'FinalMask · сервер и клиент',
-    description:'Автоэкспорт: TCP Sudoku/header-custom; UDP Salamander/Gecko, Sudoku, mkcp-legacy, header-custom. Для направленных масок задайте clientFinalmask отдельно. QUIC-параметры задаются индивидуально.',
+    description:recipeHelp||'Автоэкспорт: TCP Sudoku/header-custom; UDP Salamander/Gecko, Sudoku, mkcp-legacy, header-custom. Для направленных масок задайте clientFinalmask отдельно. QUIC-параметры задаются индивидуально.',
     confirmLabel:'Применить',
     fields:[
      {name:'json',label:'Сервер · streamSettings.finalmask',type:'textarea',wide:true,rows:8,
-      value:JSON.stringify(current,null,2),required:true,validate:check},
+      value:JSON.stringify(advancedServer,null,2),required:true,validate:check},
      {name:'client',label:'Клиент · xmesh.clientFinalmask (JSON подписки)',type:'textarea',wide:true,rows:8,
-      value:JSON.stringify(client,null,2),required:true,validate:check}
+      value:JSON.stringify(advancedClient,null,2),required:true,validate:check}
     ]
    });
    if(!response)return;
