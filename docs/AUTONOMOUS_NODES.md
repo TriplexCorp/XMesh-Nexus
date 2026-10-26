@@ -145,6 +145,8 @@ it is distinct from the public node TCP port (normally 443). The signed
 `/api/v1/node/desired-config` response carries the chosen local port and a
 compiled Xray inbound bound to `127.0.0.1`.
 
+For a dual inbound **TCP + Hysteria2** XRAY STUDIO profile, the panel binds the first proxy to `127.0.0.1:xrayLocalPort` and the second to `127.0.0.1:(xrayLocalPort+1)`. Both protocols may be added in either order. The node agent independently routes TCP and UDP on the public node port; this requires both the updated Nexus backend and updated XMesh-Node runtime. `10085` is reserved for StatsService; `65535` cannot be the base port for a pair. A TCP XHTTP inbound offering `h3` cannot share UDP with Hysteria2; use `h2` / `http/1.1` for that TCP inbound. Arbitrary multiple QUIC services are not supported. Verify both protocol subscriptions and actual handshakes before production rollout.
+
 The updated XMesh-Node `deploy/xmesh-xray-sync.sh` reconciles the actively
 mounted `/etc/xmesh-node/config.json` router default to the verified Xray
 port, including when the Xray JSON itself has not changed. The previously

@@ -1,0 +1,29 @@
+name: Managed dual inbound regression
+on:
+  push:
+    paths:
+      - backend/src/node_runtime.rs
+      - .github/workflows/dual-inbound-regression.yml
+  pull_request:
+    paths:
+      - backend/src/node_runtime.rs
+      - .github/workflows/dual-inbound-regression.yml
+
+jobs:
+  dual-inbound:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      # The repository currently has unrelated rustfmt diffs in main.rs and other modules.
+      # Surface the debt without masking the focused compiler/regression result.
+      - name: Check repository formatting (existing debt tolerated)
+        continue-on-error: true
+        run: cargo fmt --manifest-path backend/Cargo.toml --all -- --check
+      - name: Verify dual-inbound compilation and regression tests
+        run: |
+          cargo test --manifest-path backend/Cargo.toml managed_tcp_hysteria_pair_receives_distinct_private_ports
+          cargo test --manifest-path backend/Cargo.toml managed_pair_rejects_competing_quic_and_reserved_ports
+          cargo test --manifest-path backend/Cargo.toml hysteria_desired_config_uses_edited_local_port_without_tcp_hardcode

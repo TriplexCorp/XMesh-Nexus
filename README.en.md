@@ -59,7 +59,7 @@ XRAY STUDIO now separates server FinalMask from xmesh.clientFinalmask metadata. 
 
 ### Saved settings are not the same as applied changes
 
-The panel provides `POST /api/v1/node/desired-config` with a desired Xray configuration, revision and signed policy. A separate node worker validates, tests and applies this data. **Automatic local-port mapping currently requires exactly one inbound in the assigned XRAY STUDIO profile**; do not assume arbitrary multi-inbound profiles work through that path.
+The panel provides `POST /api/v1/node/desired-config` with a desired Xray configuration, revision and signed policy. A separate node worker validates, tests and applies this data. **Managed profiles accept either one proxy inbound or a TCP proxy + Hysteria2 pair.** For two inbounds, Nexus assigns loopback ports `xrayLocalPort` and `xrayLocalPort + 1` in JSON order; port 10085 is reserved for StatsService. The TCP profile must not also request QUIC/H3. XMesh-Node forwards the public TCP port and public UDP port independently. This is not generic multi-inbound/QUIC multiplexing: update the node agent and verify both backends before production rollout.
 
 Restart and update requests are asynchronous. A successfully queued request is not a verified restart: inspect agent heartbeat, operation status and the actual Xray process. See [autonomous nodes and signed policies](docs/AUTONOMOUS_NODES.md).
 
