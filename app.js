@@ -2468,12 +2468,12 @@ async function syncXrayUserToProfile(user){
    changed++;
   }else if(inbound.protocol==='http'){
    const list=inbound.settings.users||(inbound.settings.users=[]);
-   if(!list.some(x=>x.pass===user.xrayId||x.user===login))list.push({user:login,pass:user.xrayId});
+   if(!list.some(x=>x.pass===(user.httpPassword||user.xrayId)||x.user===login))list.push({user:login,pass:user.httpPassword||user.xrayId});
    changed++;
   }else if(inbound.protocol==='socks'||inbound.protocol==='mixed'){
    inbound.settings.auth='password';
    const list=inbound.settings.users||(inbound.settings.users=[]);
-   if(!list.some(x=>x.pass===user.xrayId||x.user===login))list.push({user:login,pass:user.xrayId});
+   if(!list.some(x=>x.pass===(user.socksPassword||user.xrayId)||x.user===login))list.push({user:login,pass:user.socksPassword||user.xrayId});
    changed++;
   }else if(inbound.protocol==='hysteria'){
    inbound.settings.version=2;
@@ -2512,7 +2512,7 @@ async function removeXrayUserFromProfiles(user){
     const settings=inbound.settings||{};
     for(const key of ['users','clients']){
      if(Array.isArray(settings[key])){
-      const secrets=[user.xrayId,user.vmessId,user.trojanPassword,user.hysteriaPassword,user.masquePassword,user.ssLegacyPassword].filter(Boolean);
+      const secrets=[user.xrayId,user.vmessId,user.trojanPassword,user.hysteriaPassword,user.masquePassword,user.ssLegacyPassword,user.httpPassword,user.socksPassword].filter(Boolean);
       const filtered=settings[key].filter(c=>!secrets.includes(c.id)&&!secrets.includes(c.password)&&!secrets.includes(c.pass)&&!secrets.includes(c.auth)&&(!email||c.email!==email));
       if(filtered.length!==settings[key].length){settings[key]=filtered;changed=true}
      }
