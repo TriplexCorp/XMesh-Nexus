@@ -471,9 +471,9 @@ fn application_router(state: AppState) -> Router {
         .layer(CompressionLayer::new())
         // Never put request URIs into telemetry: public subscription routes
         // contain bearer secrets in the path, including custom Studio paths.
-        .layer(TraceLayer::new_for_http().make_span_with(|request: &Request| {
-            tracing::info_span!("http_request", method = %request.method())
-        }))
+        .layer(TraceLayer::new_for_http().make_span_with(
+            |request: &Request| tracing::info_span!("http_request", method = %request.method()),
+        ))
         .layer(middleware::from_fn(security_headers))
         .layer(middleware::from_fn(csrf_guard))
         .with_state(state)
@@ -614,14 +614,16 @@ async fn main() -> anyhow::Result<()> {
     }
     // A separate long-lived 256-bit secret must be provisioned by install.sh.
     // Never silently derive new subscription encryption from the TOTP key.
-    let subscription_hex = env::var("SUBSCRIPTION_ENCRYPTION_KEY")
-        .map_err(|_| anyhow::anyhow!("SUBSCRIPTION_ENCRYPTION_KEY is missing; run ./install.sh --prepare-only"))?;
+    let subscription_hex = env::var("SUBSCRIPTION_ENCRYPTION_KEY").map_err(|_| {
+        anyhow::anyhow!("SUBSCRIPTION_ENCRYPTION_KEY is missing; run ./install.sh --prepare-only")
+    })?;
     if subscription_hex.len() != 64 {
         anyhow::bail!("SUBSCRIPTION_ENCRYPTION_KEY must be 64 hexadecimal characters");
     }
     let subscription_bytes = hex::decode(&subscription_hex)
         .map_err(|_| anyhow::anyhow!("SUBSCRIPTION_ENCRYPTION_KEY must be hexadecimal"))?;
-    let subscription_key: [u8; 32] = subscription_bytes.try_into()
+    let subscription_key: [u8; 32] = subscription_bytes
+        .try_into()
         .map_err(|_| anyhow::anyhow!("SUBSCRIPTION_ENCRYPTION_KEY length is invalid"))?;
     let state = AppState {
         pool,
