@@ -997,7 +997,7 @@ fn configure_private_xray_stats(config: &mut Value) -> Result<(), ApiError> {
 fn proxy_user_client_entry(
     user: &Value,
     id: &str,
-    uuid: &uuid::Uuid,
+    _uuid: &uuid::Uuid,
     tag: &str,
     protocol: &str,
     ss_method: &str,
