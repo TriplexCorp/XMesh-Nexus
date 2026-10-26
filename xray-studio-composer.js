@@ -169,7 +169,7 @@ function makeSettings(p,o,secret){
   case 'socks':return {auth:'noauth',users:[],udp:true};
   case 'http':return {users:[]};
   case 'hysteria':return {version:2,users:[]};
-  case 'masque':return {};
+  case 'masque':return {users:[],address:['10.129.0.1/24'],mtu:1280};
   default:return {};
  }
 }
