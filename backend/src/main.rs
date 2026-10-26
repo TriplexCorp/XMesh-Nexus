@@ -757,7 +757,7 @@ async fn security_headers(request: Request, next: Next) -> Response {
     );
     headers.insert(
         HeaderName::from_static("referrer-policy"),
-        HeaderValue::from_static("same-origin"),
+        HeaderValue::from_static("no-referrer"),
     );
     headers.insert(
         HeaderName::from_static("content-security-policy"),
