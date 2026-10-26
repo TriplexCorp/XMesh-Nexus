@@ -7,6 +7,16 @@ const {webcrypto}=require('node:crypto');
 
 const source=fs.readFileSync('xray-studio-tools.js','utf8');
 const studio=fs.readFileSync('xray-studio-v4.js','utf8');
+// Regression: the more-specific global dialog selector used to squeeze
+// FinalMask's multi-column catalog into a 30rem popup.
+const studioCss=fs.readFileSync('xray-studio-v4.css','utf8');
+assert.ok(studioCss.includes('dialog.xm-studio-modal.xm-studio-modal--cards{'),
+ 'FinalMask must scope its width rule to the native dialog');
+assert.ok(studioCss.includes('width:min(84rem,calc(100vw - 2rem))!important'),
+ 'FinalMask width must win against the global dialog constraint');
+assert.ok(studioCss.includes('grid-template-columns:repeat(4,minmax(0,1fr))'),
+ 'Wide FinalMask catalog must use four columns');
+
 // Credential managers mistook constructor password + Short ID fields for panel login.
 assert.ok(!studio.includes("field('private'"),'Never render a Reality privateKey password input in the constructor');
 assert.ok(!studio.includes("field('shortid'"),'Never expose a Short ID text field beside password inputs');
