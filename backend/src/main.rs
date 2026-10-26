@@ -479,7 +479,11 @@ async fn main() -> anyhow::Result<()> {
 
     let database_url =
         env::var("DATABASE_URL").map_err(|_| anyhow::anyhow!("DATABASE_URL is required"))?;
-    let pool = PgPoolOptions::new()
+    // Docker's embedded service-name DNS can briefly lag network creation
+    // even after Compose marks the database container healthy. Retry readiness
+    // without disclosing connection strings (which contain DB credentials).
+    const STARTUP_CONNECT_ATTEMPTS: usize = 24;
+    let pool_options = PgPoolOptions::new()
         .max_connections(
             env::var("DB_MAX_CONNECTIONS")
                 .ok()
@@ -489,16 +493,46 @@ async fn main() -> anyhow::Result<()> {
         .min_connections(1)
         .acquire_timeout(Duration::from_secs(10))
         .idle_timeout(Duration::from_secs(600))
-        .max_lifetime(Duration::from_mins(30))
-        .connect(&database_url)
-        .await?;
+        .max_lifetime(Duration::from_mins(30));
+    let mut db_attempt = 0;
+    let pool = loop {
+        match pool_options.connect(&database_url).await {
+            Ok(pool) => break pool,
+            Err(error) => {
+                db_attempt += 1;
+                if db_attempt >= STARTUP_CONNECT_ATTEMPTS {
+                    return Err(anyhow::anyhow!(
+                        "PostgreSQL unavailable after {db_attempt} startup attempts"
+                    ));
+                }
+                // Do not log `error`: driver diagnostics can include the URL.
+                let _ = error;
+                tracing::warn!(attempt = db_attempt, "Waiting for PostgreSQL DNS/connectivity");
+                tokio::time::sleep(Duration::from_secs(2)).await;
+            }
+        }
+    };
 
     let redis_url = env::var("REDIS_URL").map_err(|_| anyhow::anyhow!("REDIS_URL is required"))?;
     let redis_client = redis::Client::open(redis_url)?;
-    let redis: ConnectionManager = redis_client.get_connection_manager().await?;
-    let mut redis_probe = redis.clone();
-    let redis_ping: String = redis::cmd("PING").query_async(&mut redis_probe).await?;
-    anyhow::ensure!(redis_ping == "PONG", "Redis readiness probe failed");
+    let mut redis_attempt = 0;
+    let redis: ConnectionManager = loop {
+        let maybe_connection = redis_client.get_connection_manager().await;
+        if let Ok(mut connection) = maybe_connection {
+            let ping = redis::cmd("PING")
+                .query_async::<String>(&mut connection)
+                .await;
+            if matches!(ping.as_deref(), Ok("PONG")) {
+                break connection;
+            }
+        }
+        redis_attempt += 1;
+        if redis_attempt >= STARTUP_CONNECT_ATTEMPTS {
+            anyhow::bail!("Redis unavailable after {redis_attempt} startup attempts");
+        }
+        tracing::warn!(attempt = redis_attempt, "Waiting for Redis DNS/connectivity");
+        tokio::time::sleep(Duration::from_secs(2)).await;
+    };
 
     sqlx::migrate!("./migrations").run(&pool).await?;
     // Preserve an existing custom dashboard path on upgrades. Migrate only the
