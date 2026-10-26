@@ -131,10 +131,16 @@ fn validate_layer(
         },
         "xdns" => {
             if !caps.kcp { return Err("xdns requires mKCP, not QUIC"); }
+            if !src.get("domains").and_then(Value::as_array).is_some_and(|v| !v.is_empty()) {
+                return Err("xdns requires a non-empty domains array");
+            }
             src.clone()
         },
         "udphop" => {
             let mode = src.get("mode").and_then(Value::as_str).unwrap_or("");
+            if mode.trim().is_empty() {
+                return Err("udphop requires an explicit mode");
+            }
             if mode.split(',').any(|m| {
                 let m = m.trim();
                 !m.is_empty() && !["intervallocal", "intervalremote", "perconnremote"].contains(&m)
@@ -147,9 +153,41 @@ fn validate_layer(
             }
             src.clone()
         },
-        // The following are intentionally CLIENT-ONLY. Their objects cannot
-        // be reliably inferred from inbound configuration.
-        "fragment" | "xmc" | "noise" | "xicmp" | "realm" => src.clone(),
+        "fragment" => {
+            if src.get("packets").and_then(Value::as_str).is_none_or(str::is_empty)
+                || !src.get("lengths").is_some_and(Value::is_array)
+                || !src.get("delays").is_some_and(Value::is_array) {
+                return Err("fragment needs packets, lengths and delays");
+            }
+            src.clone()
+        },
+        "xmc" => {
+            if src.get("password").and_then(Value::as_str).is_none_or(str::is_empty) {
+                return Err("xmc needs an explicit password and compatible Xray version");
+            }
+            src.clone()
+        },
+        "noise" => {
+            if !src.get("noise").and_then(Value::as_array).is_some_and(|v| !v.is_empty()) {
+                return Err("UDP noise requires a non-empty noise array");
+            }
+            src.clone()
+        },
+        "xicmp" => {
+            if src.get("dgram").is_some_and(|v| !v.is_boolean())
+                || src.get("ips").is_some_and(|v| !v.is_array()) {
+                return Err("xicmp dgram must be boolean and ips an array");
+            }
+            src.clone()
+        },
+        "realm" => {
+            if !src.get("url").and_then(Value::as_str).is_some_and(|v| {
+                v.starts_with("realm://") || v.starts_with("realm+http://")
+            }) {
+                return Err("realm needs realm:// or realm+http:// URL");
+            }
+            src.clone()
+        },
         _ => return Err("unsupported FinalMask layer"),
     };
     Ok(Some(json!({"type":kind,"settings":safe})))
@@ -174,8 +212,43 @@ fn validate_quic_params(value: &Value) -> Result<Value, &'static str> {
             return Err("unknown QUIC congestion control");
         }
     }
-    if value.get("udpHop").is_some_and(|v| !v.is_object()) {
-        return Err("quicParams.udpHop must be an object");
+    for name in ["debug", "disablePathMTUDiscovery"] {
+        if value.get(name).is_some_and(|v| !v.is_boolean()) {
+            return Err("QUIC flag must be boolean");
+        }
+    }
+    if value.get("bbrProfile").is_some_and(|v| !v.is_string()) {
+        return Err("bbrProfile must be a string");
+    }
+    for name in ["brutalUp", "brutalDown"] {
+        if value.get(name).is_some_and(|v| !v.is_string() && !v.is_number()) {
+            return Err("QUIC bandwidth must be a number or string");
+        }
+    }
+    for name in ["initStreamReceiveWindow", "maxStreamReceiveWindow",
+        "initConnectionReceiveWindow", "maxConnectionReceiveWindow"] {
+        if value.get(name).is_some_and(|v| v.as_u64().is_none_or(|n| n == 0)) {
+            return Err("QUIC receive window must be positive");
+        }
+    }
+    if value.get("maxIdleTimeout").is_some_and(|v| {
+        v.as_u64().is_none_or(|n| !(4..=120).contains(&n))
+    }) {
+        return Err("QUIC maxIdleTimeout must be in 4-120 seconds");
+    }
+    if value.get("keepAlivePeriod").is_some_and(|v| {
+        v.as_u64().is_none_or(|n| n != 0 && !(2..=60).contains(&n))
+    }) {
+        return Err("QUIC keepAlivePeriod must be 0 or 2-60 seconds");
+    }
+    if let Some(hop) = value.get("udpHop") {
+        if !hop.is_object() { return Err("quicParams.udpHop must be an object"); }
+        if hop.get("ports").and_then(Value::as_str).is_none_or(str::is_empty) {
+            return Err("quicParams.udpHop requires ports");
+        }
+        if hop.get("interval").is_some_and(|v| v.as_u64().is_none_or(|n| n < 5)) {
+            return Err("quicParams.udpHop interval must be >= 5 seconds");
+        }
     }
     Ok(value.clone())
 }
@@ -268,8 +341,17 @@ mod tests {
             ("hysteria","udp","xicmp"),("hysteria","udp","realm"),
             ("hysteria","udp","udphop")
         ] {
+            let settings = match kind {
+                "fragment" => json!({"packets":"tlshello","lengths":["10-20"],"delays":["1-2"]}),
+                "xmc" => json!({"password":"minecraft-secret"}),
+                "noise" => json!({"noise":[{"rand":"10-20"}]}),
+                "xdns" => json!({"domains":[{"names":["t.example.org"]}]}),
+                "realm" => json!({"url":"realm://token@example.org/name"}),
+                "udphop" => json!({"mode":"intervalremote","remotePorts":"20000-20010"}),
+                _ => json!({}),
+            };
             let mut server = json!({});
-            server[direction] = json!([layer(kind,json!({}))]);
+            server[direction] = json!([layer(kind,settings)]);
             assert!(project(network,&outbound(network,&[]),Some(&server),None).is_err());
             assert!(project(network,&outbound(network,&[]),None,Some(&server)).is_ok());
         }
@@ -310,7 +392,7 @@ mod tests {
     }
     #[test]
     fn xdns_only_kcp_and_gecko_only_quic() {
-        let xdns=json!({"udp":[layer("xdns",json!({"domains":[]}))]});
+        let xdns=json!({"udp":[layer("xdns",json!({"domains":[{"names":["t.example.org"]}]}))]});
         assert!(project("mkcp",&outbound("mkcp",&[]),None,Some(&xdns)).is_ok());
         assert!(project("hysteria",&outbound("hysteria",&["h3"]),None,Some(&xdns)).is_err());
         let gecko=json!({"udp":[layer("salamander",json!({
