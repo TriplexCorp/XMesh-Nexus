@@ -88,7 +88,7 @@ const tick=async()=>{for(let n=0;n<12;n++)await Promise.resolve()};
 
 async function run(){
  const initial=harness(sample());
- assert.equal((initial.host.innerHTML.match(/class="sv-toolitem /g)||[]).length,8,'VLESS XHTTP Reality without VLESS Encryption shows 8 supported actions');
+ assert.equal((initial.host.innerHTML.match(/class="sv-toolitem /g)||[]).length,9,'VLESS XHTTP Reality now includes FinalMask creation');
  assert.equal(initial.issue.hidden,false,'broken ID visible as contextual warning');
  assert.deepEqual(['reality','shortid','vlessens','vision','xhttp','dns','routing','outbounds','inbound'].map(x=>initial.host.innerHTML.includes('data-tool="'+x+'"')),[true,true,true,false,true,true,true,true,true]);
 
