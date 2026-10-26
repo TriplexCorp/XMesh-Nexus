@@ -2455,7 +2455,7 @@ function managedUserCredential(user,protocol){
  const key=user[field];
  const valid=field==='vmessId'?/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(key):
   typeof key==='string'&&/^[0-9a-f]{64}$/i.test(key);
- if(!valid)throw new Error('Некорректный реквизит '+protocol+': перевыпустите VPN-доступ.');
+ if(!valid)throw new Error('Некорректные VPN-реквизиты. Выполните перевыпуск доступа.');
  return key;
 }
 async function syncXrayUserToProfile(user){
