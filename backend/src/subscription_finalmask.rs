@@ -253,34 +253,35 @@ fn validate_layer(
     Ok(Some(json!({"type":kind,"settings":safe})))
 }
 
+const QUIC_CLIENT_KEYS: &[&str] = &[
+    "congestion",
+    "bbrProfile",
+    "debug",
+    "brutalUp",
+    "brutalDown",
+    "udpHop",
+    "initStreamReceiveWindow",
+    "maxStreamReceiveWindow",
+    "initConnectionReceiveWindow",
+    "maxConnectionReceiveWindow",
+    "maxIdleTimeout",
+    "keepAlivePeriod",
+    "disablePathMTUDiscovery",
+];
+
+
 fn validate_quic_params(value: &Value) -> Result<Value, &'static str> {
     let obj = value.as_object().ok_or("quicParams must be an object")?;
-    const CLIENT_KEYS: &[&str] = &[
-        "congestion",
-        "bbrProfile",
-        "debug",
-        "brutalUp",
-        "brutalDown",
-        "udpHop",
-        "initStreamReceiveWindow",
-        "maxStreamReceiveWindow",
-        "initConnectionReceiveWindow",
-        "maxConnectionReceiveWindow",
-        "maxIdleTimeout",
-        "keepAlivePeriod",
-        "disablePathMTUDiscovery",
-    ];
     for key in obj.keys() {
-        if !CLIENT_KEYS.contains(&key.as_str()) {
+        if !QUIC_CLIENT_KEYS.contains(&key.as_str()) {
             return Err("unsupported or server-only QUIC parameter");
         }
     }
-    if let Some(mode) = value.get("congestion") {
-        if !["reno", "bbr", "brutal", "force-brutal"]
+    if let Some(mode) = value.get("congestion")
+        && !["reno", "bbr", "brutal", "force-brutal"]
             .contains(&mode.as_str().ok_or("congestion must be a string")?)
-        {
-            return Err("unknown QUIC congestion control");
-        }
+    {
+        return Err("unknown QUIC congestion control");
     }
     for name in ["debug", "disablePathMTUDiscovery"] {
         if value.get(name).is_some_and(|v| !v.is_boolean()) {
@@ -346,7 +347,7 @@ fn validate_quic_params(value: &Value) -> Result<Value, &'static str> {
 
 /// Returns None when no client mask is required, or an error when emitting an
 /// incomplete/mismatched mask would break the connection.
-pub(crate) fn project(
+pub fn project(
     network: &str,
     outbound_stream: &Value,
     server_finalmask: Option<&Value>,
@@ -395,8 +396,7 @@ pub(crate) fn project(
     // are allowed, but the ordered shared subset must match the server wire
     // configuration. Without this check an explicit noise-only mask would
     // produce a plausible-looking, permanently broken subscription.
-    if explicit {
-        if let Some(server) = server_finalmask {
+    if explicit && let Some(server) = server_finalmask {
             for (direction, allowed) in [("tcp", caps.tcp), ("udp", caps.udp)] {
                 if !allowed {
                     continue;
@@ -444,17 +444,14 @@ pub(crate) fn project(
                     return Err("clientFinalmask must preserve server shared mask layers");
                 }
             }
-        }
     }
-    if let Some(quic) = source.get("quicParams") {
-        if explicit {
-            if !caps.quic {
-                return Err("QUIC params require a QUIC transport");
-            }
-            out["quicParams"] = validate_quic_params(quic)?;
+    // QUIC parameters are per-endpoint and must never be inferred from
+    // the server: congestion caps, receive windows, hop ports differ.
+    if explicit && let Some(quic) = source.get("quicParams") {
+        if !caps.quic {
+            return Err("QUIC params require a QUIC transport");
         }
-        // QUIC parameters are per-endpoint and must never be inferred from
-        // the server: congestion caps, receive windows, hop ports differ.
+        out["quicParams"] = validate_quic_params(quic)?;
     }
     if out.as_object().is_some_and(|fields| !fields.is_empty()) {
         Ok(Some(out))
