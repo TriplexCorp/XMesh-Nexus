@@ -370,7 +370,9 @@ fn proxy_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> 
         return None;
     }
     let settings = match protocol {
-        "vmess" => json!({"address":address,"port":port,"id":nonempty(user, "vmessId").unwrap_or(uuid),"security":"auto"}),
+        "vmess" => {
+            json!({"address":address,"port":port,"id":nonempty(user, "vmessId").unwrap_or(uuid),"security":"auto"})
+        }
         "trojan" => {
             if security == "none" {
                 return None;
@@ -406,7 +408,9 @@ fn proxy_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> 
                 }
                 format!("{server}:{client}")
             } else {
-                nonempty(user, "ssLegacyPassword").unwrap_or(uuid).to_owned()
+                nonempty(user, "ssLegacyPassword")
+                    .unwrap_or(uuid)
+                    .to_owned()
             };
             json!({"address":address,"port":port,"method":method,"password":password})
         }
@@ -441,7 +445,8 @@ fn proxy_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> 
             stream["hysteriaSettings"] = json!({});
         }
         stream["hysteriaSettings"]["version"] = json!(2);
-        stream["hysteriaSettings"]["auth"] = json!(nonempty(user, "hysteriaPassword").unwrap_or(uuid));
+        stream["hysteriaSettings"]["auth"] =
+            json!(nonempty(user, "hysteriaPassword").unwrap_or(uuid));
     }
     let tag = nonempty(host, "remark")
         .or_else(|| nonempty(inbound, "tag"))
@@ -576,8 +581,18 @@ pub async fn rotate_credentials(
     OsRng.fill_bytes(&mut ss256);
     OsRng.fill_bytes(&mut ss128);
     object.insert("xrayId".to_owned(), json!(new_uuid));
-    object.insert("vmessId".to_owned(), json!(uuid::Uuid::new_v4().to_string()));
-    for key in ["trojanPassword", "hysteriaPassword", "masquePassword", "ssLegacyPassword", "httpPassword", "socksPassword"] {
+    object.insert(
+        "vmessId".to_owned(),
+        json!(uuid::Uuid::new_v4().to_string()),
+    );
+    for key in [
+        "trojanPassword",
+        "hysteriaPassword",
+        "masquePassword",
+        "ssLegacyPassword",
+        "httpPassword",
+        "socksPassword",
+    ] {
         let mut secret = [0u8; 32];
         OsRng.fill_bytes(&mut secret);
         object.insert(key.to_owned(), json!(hex::encode(secret)));
@@ -2091,7 +2106,10 @@ mod tests {
         let inbound = json!({"protocol":"hysteria","tag":"HY","settings":{},
             "streamSettings":{"network":"hysteria","security":"tls"}});
         let proxy = proxy_outbound(&legacy, &inbound, &host, "auto").unwrap();
-        assert_eq!(proxy["streamSettings"]["hysteriaSettings"]["auth"], legacy["xrayId"]);
+        assert_eq!(
+            proxy["streamSettings"]["hysteriaSettings"]["auth"],
+            legacy["xrayId"]
+        );
     }
     #[test]
     fn finalmask_survives_full_json_subscription_for_every_proxy_protocol() {
