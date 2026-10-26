@@ -49,17 +49,22 @@ curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 \
 bash -n "$metrics_tmp"
 grep -q 'xmesh-node-user-metrics.json' "$metrics_tmp" || { echo "Metrics agent cannot read autonomous counters" >&2;exit 1; }
 profile_tmp="$(mktemp)"
-trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp" "$profile_tmp" "${tls_tmp:-}"' EXIT
+trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp" "$profile_tmp" "${tls_tmp:-}" "${renew_tmp:-}"' EXIT
 curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 \
  https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/main/deploy/xmesh-profile-attest.py -o "$profile_tmp"
 python3 -m py_compile "$profile_tmp"
 grep -q 'xmesh-managed-xray' "$profile_tmp" || { echo "Invalid profile attestation helper" >&2;exit 1; }
 tls_tmp="$(mktemp)"
-trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp" "$profile_tmp" "${tls_tmp:-}"' EXIT
+trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp" "$profile_tmp" "${tls_tmp:-}" "${renew_tmp:-}"' EXIT
 curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 \
  https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/main/deploy/xmesh-tls-provision.py -o "$tls_tmp"
 python3 -m py_compile "$tls_tmp"
 grep -q 'letsencrypt-http01' "$tls_tmp" || { echo "TLS worker missing signed ACME contract support" >&2;exit 1; }
+renew_tmp="$(mktemp)"
+trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp" "$profile_tmp" "$tls_tmp" "$renew_tmp"' EXIT
+curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 \
+ https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/main/deploy/xmesh-tls-renew-hook.sh -o "$renew_tmp"
+bash -n "$renew_tmp"
 # Update the Docker router as part of the same node release. Resolve the
 # installation from the container's config bind rather than guessing /root.
 update_router() {
@@ -124,7 +129,7 @@ update_router() {
 }
 # Validate the updater itself before changing any installed components.
 self_tmp="$(mktemp)"
-trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp" "$profile_tmp" "$self_tmp" "${tls_tmp:-}"' EXIT
+trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp" "$profile_tmp" "$self_tmp" "${tls_tmp:-}" "${renew_tmp:-}"' EXIT
 curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 \
  https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy/update-node-control-agent.sh -o "$self_tmp"
 bash -n "$self_tmp"
@@ -134,7 +139,7 @@ grep -q 'xmesh-node-agent-upgrade.service' "$self_tmp" || { echo "Invalid agent 
 # transient systemd unit with writable access only to the installation tree.
 # This also works on nodes still running the previous upgrade unit definition.
 router_helper="$(mktemp)"
-trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp" "$profile_tmp" "$self_tmp" "$router_helper" "${tls_tmp:-}"' EXIT
+trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp" "$profile_tmp" "$self_tmp" "$router_helper" "${tls_tmp:-}" "${renew_tmp:-}"' EXIT
 {
  printf '%s\n' '#!/usr/bin/env bash' 'set -Eeuo pipefail'
  declare -f update_router
@@ -165,6 +170,8 @@ install -o root -g root -m 0700 "$geo_tmp" /usr/local/libexec/.xmesh-geodata-syn
 mv -f /usr/local/libexec/.xmesh-geodata-sync.new /usr/local/libexec/xmesh-geodata-sync.py
 install -o root -g root -m 0700 "$tls_tmp" /usr/local/libexec/.xmesh-tls-provision.new
 mv -f /usr/local/libexec/.xmesh-tls-provision.new /usr/local/libexec/xmesh-tls-provision.py
+install -o root -g root -m 0700 "$renew_tmp" /usr/local/sbin/.xmesh-tls-renew-hook.new
+mv -f /usr/local/sbin/.xmesh-tls-renew-hook.new /usr/local/sbin/xmesh-tls-renew-hook
 install -o root -g root -m 0700 "$sync_tmp" /usr/local/sbin/.xmesh-xray-sync.new
 mv -f /usr/local/sbin/.xmesh-xray-sync.new /usr/local/sbin/xmesh-xray-sync
 install -d -o root -g root -m 0700 /var/lib/xmesh-xray-sync
