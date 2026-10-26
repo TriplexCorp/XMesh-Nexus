@@ -36,7 +36,7 @@ function request(spec={}){
     const control=cards?document.createElement('input'):field.type==='textarea'?document.createElement('textarea'):field.type==='select'?document.createElement('select'):document.createElement('input');
     if(cards){control.type='hidden';}
    control.name=field.name;
-   if(field.type!=='select'&&field.type!=='textarea')control.type=field.type||'text';
+   if(!cards&&field.type!=='select'&&field.type!=='textarea')control.type=field.type||'text';
    control.autocomplete='off';
    if(field.placeholder)control.placeholder=field.placeholder;
    if(field.min!=null)control.min=String(field.min);
@@ -56,6 +56,24 @@ function request(spec={}){
    const err=make('small','xm-studio-modal-error');err.setAttribute('role','alert');err.hidden=true;
    control.addEventListener('input',()=>{err.hidden=true;control.removeAttribute('aria-invalid');globalErr.hidden=true});
    wrap.append(label,control);
+   if(cards){
+    const buttons=[];
+    const choices=make('div','xm-studio-modal-cardchoices');choices.setAttribute('role','group');choices.setAttribute('aria-label',field.label||field.name);
+    for(const option of field.options||[]){
+     const button=make('button','xm-studio-modal-choice');button.type='button';
+     button.dataset.choice=String(option.value);
+     button.setAttribute('aria-pressed',String(button.dataset.choice===control.value));
+     button.append(make('strong','',option.label));
+     if(option.description)button.append(make('small','',option.description));
+     button.addEventListener('click',()=>{
+      control.value=button.dataset.choice;
+      for(const item of buttons)item.setAttribute('aria-pressed',String(item===button));
+      err.hidden=true;globalErr.hidden=true;
+     });
+     buttons.push(button);choices.append(button);
+    }
+    wrap.append(choices);
+   }
    if(field.help)wrap.append(help);
    wrap.append(err);grid.append(wrap);controls.set(field.name,{control,err,field});
   });
@@ -96,7 +114,8 @@ function request(spec={}){
   document.body.append(dlg);
   try{dlg.showModal()}catch(e){dlg.remove();resolve(null);return}
   const preferred=fields.length?controls.get(fields[0].name)?.control:primary;
-  preferred?.focus();
+  if(fields[0]?.type==='cards')grid.querySelector('.xm-studio-modal-choice[aria-pressed="true"]')?.focus();
+  else preferred?.focus();
   if(fields.length&&spec.selectFirst!==false&&preferred.select)preferred.select();
  });
  const next=queue.then(run,run);
