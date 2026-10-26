@@ -8,7 +8,7 @@ const ui=fs.readFileSync('app.js','utf8');
 const css=fs.readFileSync('styles.css','utf8');
 assert.match(ui,/const nodeCoreOrder=\['name','hosting','flag','profileId','addr','port','xrayLocalPort','tlsAutoProvision','tlsManualProvision','tlsDomain','tlsAcmeEmail','mult','limit','resetDay'\]/);
 assert.match(ui,/node-tls-settings/,'Node editor must keep the managed TLS certificate controls');
-assert.match(ui,/arrangedNodeCoreFields\.map/);
+assert.match(ui,/arrangedNodeCoreFields\.filter/,'Editor must exclude certificate-only fields from the main grid');
 assert.match(ui,/node-section-intro/);
 assert.match(ui,/node-form-layout/);
 assert.match(ui,/node-main-section/);
