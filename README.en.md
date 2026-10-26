@@ -1,5 +1,14 @@
 # XMesh Nexus
 
+## Build and CI stabilization — October 26, 2026
+
+- Fixed Rust `E0505` in client FinalMask projection without cloning the JSON value.
+- Added translations for page navigation and the agent installation timeout; refreshed the English coverage baseline. **997 previously known untranslated strings remain**.
+- Updated the user-presence regression guard to check a versioned `app.js` entry point without pinning an obsolete cache-busting revision; corrected a follow-up regex escaping error.
+- Applied **61 Rustfmt changes from the CI diff** across `main.rs`, `node_runtime.rs`, `subscription_finalmask.rs`, `subscription_transport.rs`, and `user_subscriptions.rs`.
+- **Verification status:** commits are on `main`, but a passing full GitHub Actions run, `cargo fmt --check`, Rust tests, Clippy and Docker build have **not yet been confirmed**.
+
+
 **Documentation:** [Русский](README.md) · **English**
 
 **XMesh Nexus** is a self-hosted Xray-core infrastructure management panel for users, nodes, hosts, squads, XRAY STUDIO, subscriptions, monitoring and administration. The API is built with **Rust (Tokio/Axum)**, persistent data uses **PostgreSQL 18 + TimescaleDB**, ephemeral state uses **Redis 7**, and the panel is deployed with Docker Compose.
