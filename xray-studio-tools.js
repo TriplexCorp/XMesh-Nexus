@@ -623,6 +623,7 @@ const operations={
    // Guided mode: the JSON editor below remains available for expert layers.
    const network=String(inbound.streamSettings?.network||'raw').toLowerCase();
    const alpn=inbound.streamSettings?.tlsSettings?.alpn||[];
+   const quic=network==='hysteria'||network==='masque'||(network==='xhttp'&&alpn.includes('h3'));
    const udp=['hysteria','masque','mkcp','kcp'].includes(network)||
      (network==='xhttp'&&alpn.includes('h3'));
    const tcp=!['hysteria','masque','mkcp','kcp'].includes(network);
@@ -699,7 +700,7 @@ const operations={
      confirmLabel:'Создать маску',
      fields:[
       {name:'password',label:'Общий секрет',value:secret,wide:true,required:true},
-      ...(salamander?[{name:'packetSize',label:'Gecko packetSize (необязательно)',value:'',wide:true,placeholder:'512-1200',
+      ...(salamander&&quic?[{name:'packetSize',label:'Gecko packetSize (необязательно)',value:'',wide:true,placeholder:'512-1200',
        validate:value=>!value||(/^[0-9]{1,5}(?:-[0-9]{1,5})?$/.test(value)&&
         value.split('-').every(v=>Number(v)>0&&Number(v)<=2048)&&
         (!value.includes('-')||Number(value.split('-')[0])<=Number(value.split('-')[1])))?'':'Нужен размер 1–2048 или диапазон min-max'}]:[])
