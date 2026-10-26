@@ -2016,6 +2016,32 @@ mod tests {
         assert!(proxy_outbound(&user, &broken, &host, "auto").is_none());
     }
     #[test]
+    fn ss2022_aes128_uses_distinct_matching_user_key() {
+        let encode = |byte: u8, len: usize| {
+            base64::engine::general_purpose::STANDARD.encode(vec![byte; len])
+        };
+        let server = encode(7, 16);
+        let client128 = encode(8, 16);
+        let client256 = encode(9, 32);
+        let user = json!({
+            "xrayId":"550e8400-e29b-41d4-a716-446655440000",
+            "ssPassword128":client128,"ssPassword":client256
+        });
+        let inbound = json!({"protocol":"shadowsocks",
+            "settings":{"method":"2022-blake3-aes-128-gcm","password":server},
+            "streamSettings":{"network":"raw","security":"none"}});
+        let host = json!({"address":"vpn.example.org","externalPort":443});
+        let proxy = proxy_outbound(&user, &inbound, &host, "auto").unwrap();
+        assert_eq!(
+            proxy["settings"]["password"],
+            json!(format!("{server}:{client128}"))
+        );
+        assert!(crate::subscription_json::build_feed(vec![proxy], &json!({})).is_ok());
+        let mut legacy = user.clone();
+        legacy.as_object_mut().unwrap().remove("ssPassword128");
+        assert!(proxy_outbound(&legacy, &inbound, &host, "auto").is_none());
+    }
+    #[test]
     fn insecure_trojan_and_missing_ss2022_key_fail_closed() {
         let user = json!({"xrayId":"550e8400-e29b-41d4-a716-446655440000"});
         let host = json!({"address":"vpn.example.org","externalPort":443});
