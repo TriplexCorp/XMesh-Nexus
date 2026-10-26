@@ -323,7 +323,6 @@ fn configure_masque_credentials(
     stream: &mut Value,
     user: &Value,
     inbound: &Value,
-    uuid: &str,
 ) -> Option<()> {
     // MASQUE uses HTTP Basic username/password in transport settings, not UUID
     // in its outbound settings. The server uses the same stat email as username.
@@ -434,7 +433,7 @@ fn proxy_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> 
     };
     let mut stream = stream;
     if protocol == "masque" {
-        configure_masque_credentials(&mut stream, user, inbound, uuid)?;
+        configure_masque_credentials(&mut stream, user, inbound)?;
     }
     if protocol == "hysteria" {
         if !stream["hysteriaSettings"].is_object() {
