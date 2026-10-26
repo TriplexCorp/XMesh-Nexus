@@ -1,5 +1,15 @@
 # XMesh Nexus — Enterprise hardening roadmap
 
+## FinalMask guided configuration — 2026-10-26
+
+- [x] Replace the default dual-JSON modal with responsive selectable cards and guided steps; keep advanced JSON available.
+- [x] Generate 256-bit random shared secrets locally for TCP Sudoku and UDP Salamander; let JSON subscription projection inherit symmetric server layers.
+- [x] Add client-only TCP Fragment and UDP Noise presets with conservative defaults, reset action, transport filtering and preservation of existing complex chains.
+- [x] Add JavaScript regression assertions for generation, inheritance and client-only semantics; update RU/EN UI and refresh asset cache versions.
+- [ ] Confirm the full CI suite on `main` and actual Xray-core configuration validation.
+- [ ] Validate client compatibility with live Xray nodes and extend the guided interface for remaining layer types, directional chain ordering and QUIC advanced settings.
+
+
 ## XRAY STUDIO template completeness — 2026-10-26
 
 - [x] Introduce transport-aware default `tlsSettings.alpn` for XHTTP/RAW, gRPC, WebSocket/HTTPUpgrade, Hysteria and MASQUE.
