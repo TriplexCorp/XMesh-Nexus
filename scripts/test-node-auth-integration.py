@@ -2,6 +2,7 @@
 """Real signature and replay tests against disposable CI PostgreSQL / XMesh API."""
 import hashlib
 import json
+import re
 import os
 import subprocess
 import tempfile
@@ -13,6 +14,11 @@ from urllib.request import Request, urlopen
 BASE = os.getenv("XMESH_TEST_URL", "http://127.0.0.1:8080").rstrip("/")
 USER = os.getenv("ADMIN_USERNAME", "admin")
 PASSWORD = os.environ["ADMIN_PASSWORD"]
+# Match the exact fixed update target advertised by the compiled backend.
+VERSION_SOURCE = (Path(__file__).resolve().parents[1] / "backend/src/node_runtime.rs").read_text(encoding="utf-8")
+VERSION_MATCH = re.search(r'pub const CONTROL_AGENT_VERSION: &str = "(control-v[0-9]+[.][0-9]+[.][0-9]+)";', VERSION_SOURCE)
+assert VERSION_MATCH, "Backend agent update version constant missing"
+CONTROL_AGENT_VERSION = VERSION_MATCH.group(1)
 
 
 def request(method, path, payload=None, *, headers=None, cookie=None, origin=None):
@@ -171,17 +177,17 @@ def main():
         code,agent_command,_=request("POST",f"/nodes/{node}/agent-update",{},
                                     cookie=cookie,origin=BASE)
         assert_status(code,202,"admin queued a fixed agent self-update")
-        assert agent_command["targetVersion"]=="control-v4.3.2"
+        assert agent_command["targetVersion"]==CONTROL_AGENT_VERSION
         code,_,_=request("POST",f"/nodes/{node}/restart",{},
                          cookie=cookie,origin=BASE)
         assert_status(code,409,"agent update prevents overlapping restart commands")
         code,polled,_=signed_post("/node/restart/poll",{"node_id":node})
         assert_status(code,200,"signed v4 node receives agent update")
         assert polled["command"]=={
-            "id":agent_command["id"],"action":"update_agent","targetVersion":"control-v4.3.2"}
+            "id":agent_command["id"],"action":"update_agent","targetVersion":CONTROL_AGENT_VERSION}
         code,_,_=signed_post("/node/restart/ack",{
             "node_id":node,"command_id":agent_command["id"],
-            "success":True,"detail":"Agent control-v4.3.2 installed and verified"})
+            "success":True,"detail":f"Agent {CONTROL_AGENT_VERSION} installed and verified"})
         assert_status(code,200,"signed node confirms agent update")
         code,last_command,_=request("GET",f"/nodes/{node}/restart",cookie=cookie)
         assert_status(code,200,"admin reads confirmed agent-update status")
