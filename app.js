@@ -2147,6 +2147,7 @@ async function loadUserSubscription(id){
         '<button type="button" class="btn sm user-sub-copy-main" data-user-sub-copy="'+id+'" title="'+(panelIsEnglish()?'Copy subscription link':'Скопировать ссылку')+'">'+ic('copy')+(panelIsEnglish()?'Copy':'Копировать')+'</button></div>'+
         '<div class="user-sub-actions"><button type="button" class="gh sm" data-user-sub-open="'+id+'">'+ic('external-link')+(panelIsEnglish()?'Open subscription':'Открыть')+'</button>'+
         '<button type="button" class="gh sm" data-user-sub-create="'+id+'">'+ic('refresh-cw')+(panelIsEnglish()?'Rotate':'Перевыпустить')+'</button>'+
+        (sessionUser?.role==='owner'?'<button type="button" class="gh sm" data-user-credentials-rotate="'+id+'" title="'+(panelIsEnglish()?'Rotate URL and ALL VPN credentials':'Перевыпустить ссылку и ВСЕ VPN-реквизиты')+'">'+ic('shield-check')+(panelIsEnglish()?'Rotate VPN access':'Перевыпустить VPN-доступ')+'</button>':'')+
         '<button type="button" class="gh sm user-sub-revoke" data-user-sub-revoke="'+id+'">'+ic('shield-off')+(panelIsEnglish()?'Revoke':'Отозвать')+'</button></div></div>';
     }else{
       const message=result.legacy?(panelIsEnglish()?'Old link remains active, but its secret cannot be recovered. Rotate it once to enable persistent display.':'Старая ссылка продолжает действовать, но её секрет нельзя восстановить из хеша. Один раз перевыпустите её для постоянного отображения.'):(panelIsEnglish()?'No subscription has been issued yet.':'Подписка ещё не создана.');
@@ -3846,6 +3847,20 @@ document.addEventListener('click',async e=>{
         toast(panelIsEnglish()?'Subscription saved':'Подписка сохранена');
       }
     }catch(error){toast('Ошибка подписки: '+(error.message||'API'))}
+    finally{b.disabled=false}
+  }
+  else if(b=g('[data-user-credentials-rotate]')){
+    const id=Number(b.dataset.userCredentialsRotate);
+    const warning=panelIsEnglish()?'Reissue the subscription URL and ALL VPN credentials? Already imported VLESS, Hysteria2 and Shadowsocks connections will stop working once nodes resync. Disconnected nodes may retain old credentials until their offline policy expires.':'Полностью перевыпустить ссылку и ВСЕ VPN-реквизиты? Уже импортированные VLESS, Hysteria2 и Shadowsocks подключения перестанут работать после синхронизации нод. На отключённых нодах старые ключи могут действовать до истечения офлайн-политики.';
+    if(!await panelConfirm(warning,{danger:true,title:panelIsEnglish()?'Replace VPN credentials':'Перевыпуск VPN-реквизитов'}))return;
+    b.disabled=true;
+    try{
+      const result=await backendRequest('/api/v1/users/'+encodeURIComponent(id)+'/credentials/rotate',{method:'POST'});
+      const current=DB.users.find(u=>u.id===id);
+      if(current)current.xrayId=result.xrayId;
+      await loadUserSubscription(id);
+      toast(panelIsEnglish()?'New VPN credentials issued. Update client imports and verify each node has synced.':'Новые VPN-ключи выпущены. Обновите импорты клиентов и проверьте синхронизацию каждой ноды.');
+    }catch(error){toast('Ошибка перевыпуска: '+(error.message||'API'))}
     finally{b.disabled=false}
   }
   else if(b=g('[data-user-sub-copy]')){
