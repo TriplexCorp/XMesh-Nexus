@@ -788,6 +788,7 @@ function openComposer(){
    if(key==='protocol'&&autoTag){opts.tag=(newValue==='custom'?(opts.customProtocol||'custom'):newValue)+'-main';if(newValue==='socks')opts.port=10808;if(newValue==='http')opts.port=10809;}
    if(key==='protocol'&&['hysteria','masque'].includes(newValue)){opts.transport=newValue;opts.security='tls';}
    if(key==='protocol'&&['socks','http'].includes(newValue)){opts.transport='raw';opts.security='none';}
+   if(key==='protocol'&&newValue!=='vless'&&opts.transport==='xdrive'){opts.transport='raw';opts.security='none';}
    if(key==='transport'&&newValue==='xdrive'){opts.protocol='vless';opts.security='none';}
    if(key==='transport'){if(newValue==='xhttp')opts.path='/xhttp';if(newValue==='ws')opts.path='/ws';if(newValue==='grpc')opts.path='grpc';}
    refresh();return;
