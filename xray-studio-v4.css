@@ -1461,3 +1461,9 @@ body>.sv-studio-portal ::-webkit-scrollbar-button:single-button:vertical:end:inc
 @media(prefers-reduced-motion:reduce){.xm-studio-modal .xm-studio-modal-choice{transition:none}}
 
 .xm-studio-modal--cards{width:min(49rem,calc(100vw - 2rem))}
+
+/* Expanded responsive FinalMask catalog. */
+.xm-studio-modal--cards{width:min(66rem,calc(100vw - 2rem));max-height:min(88vh,900px);overflow-y:auto}
+.xm-studio-modal--cards .xm-studio-modal-cardchoices{grid-template-columns:repeat(3,minmax(0,1fr));max-height:min(56vh,610px);overflow-y:auto;align-content:start;padding:.15rem}
+@media(max-width:850px){.xm-studio-modal--cards .xm-studio-modal-cardchoices{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:580px){.xm-studio-modal--cards .xm-studio-modal-cardchoices{grid-template-columns:1fr;max-height:55vh}}
