@@ -1611,6 +1611,7 @@ async function homeP(){
     if(n.disabled)return ['Отключён','--mu'];
     const runtime=homeRuntime.get(Number(n.id));
     if(runtime?.connected===true){
+      if(!n.profileId||runtime.desiredRevisionSource==='awaiting_profile')return ['Подключена · ждёт профиль','--mu'];
       if(runtime.xrayRunning===false)return ['Xray остановлен','--wr'];
       if(runtime.routerRunning===false)return ['Маршрутизатор остановлен','--wr'];
       return ['Агент онлайн','--ok'];
@@ -3045,7 +3046,7 @@ const nodeRuntimeState=(node,runtime)=>{
     return {label:(node.disabled&&node.disabledReason==='traffic_limit')?'Лимит исчерпан · Xray остановлен':'Отключена · Xray остановлен',kind:'disabled'};
   }
   if(!runtime?.connected)return {label:runtime?.lastSeenAt?'Нет связи':'Не подключена',kind:'offline'};
-  if(runtime.desiredRevisionSource==='awaiting_profile')
+  if(runtime.desiredRevisionSource==='awaiting_profile'||!node.profileId)
     return {label:'Подключена · ждёт профиль',kind:'unknown'};
   if(runtime.xrayRunning===true&&runtime.routerRunning===true)return {label:'Активна',kind:'online'};
   if(runtime.xrayRunning===false)return {label:'Xray остановлен',kind:'offline'};
@@ -3364,7 +3365,7 @@ async function nodesP(){
     const trafficGb=l.networkTotalBytes===null?null:l.networkTotalBytes*nodeTrafficFactor(n)/1073741824;
     const k=n.limit&&trafficGb!==null?cl(trafficGb/n.limit,0,1):0,tc=k>.9?'--er':k>.75?'--wr':'--c3';
     return `<div class="card nc${n.disabled?' off':''}" data-node-card-id="${n.id}"><div class="h"><span class="fg">${flagView(n.flag)}</span><div class="node-identity"><b>${esc(n.name)}</b><br><small class="mu">${viewerMode()?'Адрес скрыт':esc(n.addr||'—')+(n.port?':'+esc(n.port):'')}</small>${n.hosting?.trim()?`<span class="node-hosting" title="Хостинг">${ic('building-2')}${esc(n.hosting.trim())}</span>`:''}</div><div class="node-live-badges"><span class="node-xray-version" data-node-xray-version title="Версия по последнему heartbeat">${renderNodeXrayVersion(n.id,runtime.get(n.id))}</span><span class="node-agent-version" data-node-agent-version title="Версия управляющего агента">${renderNodeAgentVersion(n.id,runtime.get(n.id))}</span><span data-node-runtime-state class="node-runtime-pill node-runtime-${nodeRuntimeState(n,runtime.get(n.id)).kind}"><span class="node-runtime-dot" aria-hidden="true"></span>${esc(nodeRuntimeState(n,runtime.get(n.id)).label)}</span></div></div>
-      <div class="kvg"><div><span title="Пользователи с активным доступом через inbound этой ноды, не число текущих подключений">Активные пользователи</span><b>${s.nodeOn[n.id]??0}</b><div class="node-online-clients" title="Онлайн-клиенты по свежей телеметрии агента ноды"><span>Пользователи онлайн</span><b>${m?.onlineClients!=null&&Number.isFinite(Number(m.onlineClients))?Math.max(0,Math.trunc(Number(m.onlineClients))):"—"}</b></div></div><div><span>XRAY STUDIO</span>${p?esc(p.name)+'<br><small class="mu" data-node-profile-status="'+esc(n.id)+'" title="Проверка подписанной политики и реально используемой конфигурации Xray">'+esc(nodeProfileStatus(runtime.get(n.id)))+'</small>':n.profileId?'<span class="er">Профиль ID '+esc(n.profileId)+' не найден</span>':'—'}</div></div>
+      <div class="kvg"><div><span title="Пользователи с активным доступом через inbound этой ноды, не число текущих подключений">Активные пользователи</span><b>${s.nodeOn[n.id]??0}</b><div class="node-online-clients" title="Онлайн-клиенты по свежей телеметрии агента ноды"><span>Пользователи онлайн</span><b>${m?.onlineClients!=null&&Number.isFinite(Number(m.onlineClients))?Math.max(0,Math.trunc(Number(m.onlineClients))):"—"}</b></div></div><div><span>XRAY STUDIO</span>${p?esc(p.name)+'<br><small class="mu" data-node-profile-status="'+esc(n.id)+'" title="Проверка подписанной политики и реально используемой конфигурации Xray">'+esc(nodeProfileStatus(runtime.get(n.id)))+'</small>':n.profileId?'<span class="er">Профиль ID '+esc(n.profileId)+' не найден</span>':'<span class="mu" data-node-profile-status="'+esc(n.id)+'">Профиль пока не назначен</span>'}</div></div>
       ${n.geoEnabled?`<div class="node-ip-rotation active" title="${esc(geoStatus?.lastError||'Подтверждение от управляющего агента, не проверка фактической блокировки рекламы')}"><span class="node-ip-indicator" aria-hidden="true"></span><span>GeoData · ${esc(geoLabel)}${geoFileCount?' · '+geoFileCount+' файла(ов)':''}</span></div>`:''}
       ${n.rotationEnabled?`<div class="node-ip-rotation active" aria-label="Пул IP-ротации"><span class="node-ip-indicator" aria-hidden="true"></span><span>IP-пул · ${nodeRotationIPs(n).length} адресов</span></div>`:''}
       <div class="node-gauges">
