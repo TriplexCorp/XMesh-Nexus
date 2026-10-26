@@ -667,8 +667,8 @@ const operations={
       {name:'password',label:'Общий секрет',value:secret,wide:true,required:true},
       ...(salamander?[{name:'packetSize',label:'Gecko packetSize (необязательно)',value:'',wide:true,placeholder:'512-1200',
        validate:value=>!value||(/^[0-9]{1,5}(?:-[0-9]{1,5})?$/.test(value)&&
-        value.split('-').every(v=>Number(v)>0&&Number(v)<=65535)&&
-        (!value.includes('-')||Number(value.split('-')[0])<=Number(value.split('-')[1])))?'':'Нужен размер 1–65535 или диапазон min-max'}]:[])
+        value.split('-').every(v=>Number(v)>0&&Number(v)<=2048)&&
+        (!value.includes('-')||Number(value.split('-')[0])<=Number(value.split('-')[1])))?'':'Нужен размер 1–2048 или диапазон min-max'}]:[])
      ]
     });
     if(!result)return;
