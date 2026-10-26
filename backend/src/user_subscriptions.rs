@@ -15,14 +15,19 @@ use sha2::{Digest, Sha256};
 use sqlx::Row;
 use std::{collections::HashMap, fmt::Write as _};
 
-// Encrypt recoverable bearer secrets at rest with a separately derived key.
-// TOTP_ENCRYPTION_KEY must stay stable across upgrades; raw token never enters
-// audit logs, the user JSON record or public settings.
-fn subscription_cipher(state: &AppState) -> Result<Aes256Gcm, ApiError> {
+// Each recoverable subscription secret has an independent 256-bit AEAD key.
+// "v2:" identifies ciphertexts written with SUBSCRIPTION_ENCRYPTION_KEY;
+// unprefixed legacy ciphertexts use TOTP_ENCRYPTION_KEY only for migration.
+// Never log bearer URLs, raw secrets, ciphertexts or key material.
+const SUBSCRIPTION_CIPHER_V2: &str = "v2:";
+fn subscription_cipher(state: &AppState) -> Aes256Gcm {
+    Aes256Gcm::new_from_slice(&state.subscription_key).expect("validated AES-256 key")
+}
+fn legacy_subscription_cipher(state: &AppState) -> Result<Aes256Gcm, ApiError> {
     let master = state.totp_key.as_ref().ok_or_else(|| {
         ApiError::new(
             StatusCode::SERVICE_UNAVAILABLE,
-            "Subscription encryption requires TOTP_ENCRYPTION_KEY",
+            "Legacy subscription migration requires original TOTP_ENCRYPTION_KEY",
         )
     })?;
     let mut hash = Sha256::new();
@@ -32,14 +37,14 @@ fn subscription_cipher(state: &AppState) -> Result<Aes256Gcm, ApiError> {
     Aes256Gcm::new_from_slice(&key).map_err(|_| {
         ApiError::new(
             StatusCode::INTERNAL_SERVER_ERROR,
-            "Subscription cipher unavailable",
+            "Legacy subscription cipher unavailable",
         )
     })
 }
 fn encrypt_token(state: &AppState, user_id: i64, token: &str) -> Result<String, ApiError> {
     let mut nonce = [0u8; 12];
     OsRng.fill_bytes(&mut nonce);
-    let encrypted = subscription_cipher(state)?
+    let encrypted = subscription_cipher(state)
         .encrypt(
             Nonce::from_slice(&nonce),
             Payload {
@@ -55,7 +60,7 @@ fn encrypt_token(state: &AppState, user_id: i64, token: &str) -> Result<String, 
         })?;
     let mut bytes = nonce.to_vec();
     bytes.extend(encrypted);
-    Ok(hex::encode(bytes))
+    Ok(format!("{SUBSCRIPTION_CIPHER_V2}{}", hex::encode(bytes)))
 }
 fn decrypt_token(
     state: &AppState,
@@ -63,7 +68,12 @@ fn decrypt_token(
     encoded: &str,
     expected_hash: &str,
 ) -> Result<String, ApiError> {
-    let bytes = hex::decode(encoded).map_err(|_| {
+    let (cipher, payload) = if let Some(encoded_v2) = encoded.strip_prefix(SUBSCRIPTION_CIPHER_V2) {
+        (subscription_cipher(state), encoded_v2)
+    } else {
+        (legacy_subscription_cipher(state)?, encoded)
+    };
+    let bytes = hex::decode(payload).map_err(|_| {
         ApiError::new(
             StatusCode::SERVICE_UNAVAILABLE,
             "Stored subscription is corrupt",
@@ -75,7 +85,7 @@ fn decrypt_token(
             "Stored subscription is corrupt",
         ));
     }
-    let raw = subscription_cipher(state)?
+    let raw = cipher
         .decrypt(
             Nonce::from_slice(&bytes[..12]),
             Payload {
@@ -102,6 +112,37 @@ fn decrypt_token(
         ));
     }
     Ok(token)
+}
+// Migrate old recoverable tokens in-place during startup, without changing
+// their URLs or hash index. Fail startup if the original MFA key is missing:
+// silently losing legacy subscription links is worse than refusing an upgrade.
+// A conditional update never overwrites a concurrent administrator rotation.
+pub async fn migrate_legacy_ciphertexts(state: &AppState) -> anyhow::Result<()> {
+    let rows = sqlx::query(
+        "SELECT user_id,token_hash,token_ciphertext FROM user_subscription_tokens
+         WHERE token_ciphertext IS NOT NULL AND token_ciphertext NOT LIKE 'v2:%'"
+    )
+    .fetch_all(&state.pool)
+    .await?;
+    for row in rows {
+        let user_id: i64 = row.try_get("user_id")?;
+        let hash: String = row.try_get("token_hash")?;
+        let previous: String = row.try_get("token_ciphertext")?;
+        let raw = decrypt_token(state, user_id, &previous, &hash)
+            .map_err(|_| anyhow::anyhow!("Unable to migrate legacy subscription encryption for user {user_id}; restore original TOTP_ENCRYPTION_KEY"))?;
+        let upgraded = encrypt_token(state, user_id, &raw)
+            .map_err(|_| anyhow::anyhow!("Subscription encryption migration failed for user {user_id}"))?;
+        sqlx::query(
+            "UPDATE user_subscription_tokens SET token_ciphertext=$1
+             WHERE user_id=$2 AND token_ciphertext=$3"
+        )
+        .bind(upgraded)
+        .bind(user_id)
+        .bind(previous)
+        .execute(&state.pool)
+        .await?;
+    }
+    Ok(())
 }
 fn bad(msg: &'static str) -> ApiError {
     ApiError::new(StatusCode::BAD_REQUEST, msg)
