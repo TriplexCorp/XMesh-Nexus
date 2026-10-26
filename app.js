@@ -2154,6 +2154,12 @@ async function loadUserSubscription(id){
       target.innerHTML='<p class="user-sub-note">'+esc(message)+'</p><div class="act"><button type="button" class="btn sm" data-user-sub-create="'+id+'">'+ic('link')+(result.legacy?(panelIsEnglish()?'Rotate legacy link':'Перевыпустить старую ссылку'):(panelIsEnglish()?'Create subscription':'Создать подписку'))+'</button>'+
         (result.legacy?'<button type="button" class="gh sm" data-user-sub-revoke="'+id+'">'+ic('shield-off')+(panelIsEnglish()?'Revoke':'Отозвать')+'</button>':'')+'</div>';
     }
+    if(result.credentialsSeparated===false){
+      const legacyNotice=panelIsEnglish()?
+       'Legacy credentials: several VPN protocols still share the VLESS UUID. Use Rotate VPN access to isolate them (requires reconnecting clients).':
+       'Старые реквизиты: несколько VPN-протоколов пока используют один VLESS UUID. Для разделения ключей выполните «Перевыпустить VPN-доступ» (потребуется обновить подключения).';
+      target.insertAdjacentHTML('afterbegin','<p class="user-sub-note user-sub-legacy-warning">'+esc(legacyNotice)+'</p>');
+    }
   }catch(error){
     if(!target.isConnected)return;
     target.textContent=(panelIsEnglish()?'Subscription loading error: ':'Ошибка загрузки подписки: ')+(error.message||'API');
@@ -2517,6 +2523,9 @@ async function syncXrayUserToProfile(user){
 }
 async function removeXrayUserFromProfiles(user){
  if(!user?.xrayId)return;
+ const keys=new Set([user.xrayId,...['vmess','trojan','shadowsocks','hysteria','masque','socks','http']
+  .map(protocol=>managedUserCredential(user,protocol))]);
+ const emailPrefix='xmesh-u'+Number(user.id)+'--';
  const email=String(user.username||'').replace(/[<>"]/g,'').slice(0,64);
  for(const profile of DB.profiles){
   try{
@@ -2526,7 +2535,8 @@ async function removeXrayUserFromProfiles(user){
     const settings=inbound.settings||{};
     for(const key of ['users','clients']){
      if(Array.isArray(settings[key])){
-      const filtered=settings[key].filter(c=>c.id!==user.xrayId&&c.password!==user.xrayId&&c.pass!==user.xrayId&&c.auth!==user.xrayId&&(!email||c.email!==email));
+      const filtered=settings[key].filter(c=>!keys.has(c.id)&&!keys.has(c.password)&&!keys.has(c.pass)&&!keys.has(c.auth)
+       &&!(c.email&&String(c.email).startsWith(emailPrefix))&&(!email||c.email!==email));
       if(filtered.length!==settings[key].length){settings[key]=filtered;changed=true}
      }
     }
