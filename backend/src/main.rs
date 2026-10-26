@@ -38,7 +38,6 @@ use tower_http::{
     compression::CompressionLayer, limit::RequestBodyLimitLayer, services::ServeDir,
     trace::TraceLayer,
 };
-use uuid::Uuid;
 
 // Recent verified Xray traffic, not a live TCP-session count.
 const USER_ONLINE_WINDOW_MS: i64 = 45_000;
