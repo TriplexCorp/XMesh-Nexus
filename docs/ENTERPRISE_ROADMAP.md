@@ -1,5 +1,7 @@
 ## Node updates from Nexus UI (2026-10-26)
 
+- [x] Major release **control-v5.0.0**; existing control-v4 nodes remain eligible for signed UI-initiated upgrades, and both v4/v5 heartbeats are accepted during rollout.
+
 - [x] Signed **Update Agent** action in Nodes installs the control agent, managed Xray synchronizer, policy guard, TLS/ACME helpers, GeoData and metrics helpers, and upgrades the Docker router without requiring a manual SSH deployment.
 - [x] After a successful agent upgrade, queue an immediate managed Xray reconciliation (nonblocking); the periodic timer remains the retry path.
 - [x] Mixed XHTTP ALPN `h3 + h2 + http/1.1` routes TCP and UDP on the same public port in XMesh Node.
