@@ -41,6 +41,7 @@ if [[ ! -f .env ]]; then
   redis_password="$(openssl rand -hex 32)"
   admin_password="$(openssl rand -hex 32)"
   totp_key="$(openssl rand -hex 32)"
+  subscription_key="$(openssl rand -hex 32)"
   cat > .env <<EOF
 POSTGRES_PASSWORD=${db_password}
 APP_DB_PASSWORD=${app_password}
@@ -49,6 +50,7 @@ DB_MAX_CONNECTIONS=20
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=${admin_password}
 TOTP_ENCRYPTION_KEY=${totp_key}
+SUBSCRIPTION_ENCRYPTION_KEY=${subscription_key}
 COOKIE_SECURE=true
 APP_BIND=127.0.0.1
 APP_PORT=8080
@@ -102,6 +104,8 @@ done
 # Existing installations may contain an empty TOTP_ENCRYPTION_KEY.
 # Verify without replacing a nonempty key (which is required to decrypt existing TOTP secrets).
 bash deploy/ensure-totp-key.sh .env
+# Subscription links use a distinct, persistent secret. Never regenerate on updates.
+bash deploy/ensure-subscription-key.sh .env
 
 # Persist the operator's HTTPS FQDN and ACME email once, never rewriting
 # an existing installation's DNS identity or secret material.
