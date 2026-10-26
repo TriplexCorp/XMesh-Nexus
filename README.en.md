@@ -6,6 +6,10 @@
 
 > **Source-code status as of October 24, 2026:** this is an actively developed project. The repository **does** include public subscription endpoints, native Xray client JSON generation, managed-node integration and Xray-derived user traffic accounting. Running VPN traffic still requires a separately installed [XMesh-Node](https://github.com/TriplexCorp/XMesh-Node) runtime on each VPS, working Xray configuration and correct networking. A feature existing in the code or UI does not prove that a particular node has applied it successfully.
 
+## FinalMask: TCP, UDP and QUIC (October 26, 2026)
+
+XRAY STUDIO now separates server FinalMask from xmesh.clientFinalmask metadata. Native Xray JSON subscriptions automatically inherit only compatible symmetric layers (TCP Sudoku/header-custom; UDP Salamander/Gecko, Sudoku, mkcp-legacy, header-custom). Directional features such as fragment, noise, xmc, xdns, xicmp, realm, udphop and endpoint-specific QUIC parameters use explicit client configuration. Mismatched or incomplete layers are not silently exported. See the [complete FinalMask compatibility matrix](docs/FINALMASK_COMPATIBILITY.md). Source and regression tests are committed; real-client connectivity still requires deployment and integration testing.
+
 ## Implementation status
 
 | Area | Implemented | Prerequisites / limits |
