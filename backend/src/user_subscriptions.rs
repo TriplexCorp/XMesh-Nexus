@@ -346,6 +346,37 @@ fn configure_masque_credentials(stream: &mut Value, user: &Value, inbound: &Valu
     Some(())
 }
 
+// Pre-2022 Shadowsocks uses its own high-entropy passphrase; SS2022 still
+// requires both independent Base64 PSKs in ServerPSK:UserPSK format.
+fn shadowsocks_outbound_password(user: &Value, inbound: &Value, method: &str) -> Option<String> {
+    if !method.starts_with("2022-") {
+        return crate::user_credentials::for_protocol(user, "shadowsocks").map(str::to_owned);
+    }
+    let server = inbound
+        .get("settings")
+        .and_then(|settings| nonempty(settings, "password"))?;
+    let field = if method == "2022-blake3-aes-128-gcm" {
+        "ssPassword128"
+    } else {
+        "ssPassword"
+    };
+    let client = nonempty(user, field)?;
+    let expected_length = if method == "2022-blake3-aes-128-gcm" {
+        16
+    } else {
+        32
+    };
+    let valid_psk = |value: &str| {
+        base64::engine::general_purpose::STANDARD
+            .decode(value)
+            .is_ok_and(|bytes| bytes.len() == expected_length)
+    };
+    if !valid_psk(server) || !valid_psk(client) {
+        return None;
+    }
+    Some(format!("{server}:{client}"))
+}
+
 fn proxy_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> Option<Value> {
     if nonempty(inbound, "protocol") == Some("vless") {
         return vless_outbound(user, inbound, host, device);
@@ -380,33 +411,7 @@ fn proxy_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> 
             let method = inbound
                 .get("settings")
                 .and_then(|v| nonempty(v, "method"))?;
-            let password = if method.starts_with("2022-") {
-                // Xray SS2022 multi-user requires ServerPSK:UserPSK on outbound.
-                let server = inbound
-                    .get("settings")
-                    .and_then(|v| nonempty(v, "password"))?;
-                let key_field = if method == "2022-blake3-aes-128-gcm" {
-                    "ssPassword128"
-                } else {
-                    "ssPassword"
-                };
-                let client = nonempty(user, key_field)?;
-                let decode =
-                    |value: &str| base64::engine::general_purpose::STANDARD.decode(value).ok();
-                let len = if method == "2022-blake3-aes-128-gcm" {
-                    16
-                } else {
-                    32
-                };
-                if decode(server).as_ref().is_none_or(|v| v.len() != len)
-                    || decode(client).as_ref().is_none_or(|v| v.len() != len)
-                {
-                    return None;
-                }
-                format!("{server}:{client}")
-            } else {
-                crate::user_credentials::for_protocol(user, "shadowsocks")?.to_owned()
-            };
+            let password = shadowsocks_outbound_password(user, inbound, method)?;
             json!({"address":address,"port":port,"method":method,"password":password})
         }
         "masque" => {
