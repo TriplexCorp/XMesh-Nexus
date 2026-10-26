@@ -620,19 +620,67 @@ const operations={
    const inbound=getInbound(parse(),selected.index);
    const current=inbound.streamSettings?.finalmask||{};
    const client=inbound.xmesh?.clientFinalmask||{};
-   // Guided mode: the JSON editor below remains available for expert layers.
+   // Match the backend transport matrix: QUIC/H3 is not always TCP.
    const network=String(inbound.streamSettings?.network||'raw').toLowerCase();
    const alpn=inbound.streamSettings?.tlsSettings?.alpn||[];
-   const quic=network==='hysteria'||network==='masque'||(network==='xhttp'&&alpn.includes('h3'));
-   const udp=['hysteria','masque','mkcp','kcp'].includes(network)||
-     (network==='xhttp'&&alpn.includes('h3'));
-   const tcp=!['hysteria','masque','mkcp','kcp'].includes(network);
+   const hasAlpn=Array.isArray(alpn)&&alpn.length>0;
+   const h3=alpn.includes('h3'),h2=alpn.includes('h2');
+   const kcp=network==='mkcp'||network==='kcp';
+   const hysteria=network==='hysteria',masque=network==='masque',xhttp=network==='xhttp';
+   const quic=hysteria||((masque||xhttp)&&(!hasAlpn&&masque||h3));
+   const udp=hysteria||kcp||((xhttp||masque)&&(!hasAlpn&&masque||h3));
+   const tcp=['raw','tcp','ws','websocket','grpc','httpupgrade'].includes(network)||
+     ((xhttp||masque)&&(!hasAlpn||h2));
+   const sharedTypes=['sudoku','salamander','header-custom','mkcp-legacy'];
+   // Explicit clientFinalmask REPLACES the automatic projection. Preserve all
+   // required symmetric server layers when a guided client-only preset is added.
+   const sharedFor=(ib,direction)=>{
+    const keys={sudoku:['password','ascii','customTable','customTables','paddingMin','paddingMax'],
+     salamander:['password','packetSize'],'header-custom':direction==='tcp'?['clients','servers']:['client','server'],
+     'mkcp-legacy':['header','value']};
+    return (ib.streamSettings?.finalmask?.[direction]||[]).filter(v=>sharedTypes.includes(v?.type)).map(v=>({
+     type:v.type,settings:Object.fromEntries(Object.entries(v.settings||{}).filter(([key])=>keys[v.type].includes(key)))
+    }));
+   };
+   const ensureClientLayers=ib=>{
+    const required={tcp:sharedFor(ib,'tcp'),udp:sharedFor(ib,'udp')};
+    ib.xmesh??={};
+    const previous=ib.xmesh.clientFinalmask;
+    const explicit=previous&&Object.keys(previous).length>0;
+    if(!explicit){
+     ib.xmesh.clientFinalmask={};
+     for(const dir of ['tcp','udp'])if(required[dir].length)ib.xmesh.clientFinalmask[dir]=required[dir];
+    }else{
+     for(const dir of ['tcp','udp']){
+      const supplied=(previous[dir]||[]).filter(v=>sharedTypes.includes(v?.type));
+      if(JSON.stringify(supplied)!==JSON.stringify(required[dir]))
+       throw Error('Клиентская маска не согласована с серверной ('+dir+'). Используйте «Расширенный JSON».');
+     }
+    }
+    return ib.xmesh.clientFinalmask;
+   };
    const choices=[
-    ...(tcp?[{value:'sudoku',label:'TCP · Sudoku',description:'Симметричная TCP-маска, общий секрет генерируется автоматически.'}]:[]),
-    ...(tcp?[{value:'fragment',label:'TCP · Fragment',description:'Клиентская фрагментация TLS ClientHello; готовые безопасные параметры, пароль не нужен.'}]:[]),
-    ...(udp?[{value:'salamander',label:'UDP · Salamander / Gecko',description:'Маска QUIC/UDP, автоматический общий пароль и необязательный packetSize.'}]:[]),
-    ...(udp?[{value:'noise',label:'UDP · Noise',description:'Клиентский случайный UDP-шум перед данными; пароль не нужен.'}]:[]),
-    {value:'advanced',label:'Расширенный JSON',description:'Направленные слои, QUIC-параметры и нестандартные настройки.'},
+    ...(tcp?[
+     {value:'sudoku',label:'TCP · Sudoku',description:'Общая обфускация с автоматически сгенерированным секретом.'},
+     {value:'tcp-header',label:'TCP · Header Custom',description:'Серверный и клиентский протоколоподобный заголовок; последовательности JSON.'},
+     {value:'fragment',label:'TCP · Fragment',description:'Клиентская фрагментация TLS ClientHello / первых пакетов.'},
+     {value:'tcp-xmc',label:'TCP · XMC',description:'Клиентская маскировка Minecraft. Требуется совместимый Xray-core и пароль.'},
+     {value:'tcp-filter',label:'TCP · Filter',description:'Только inbound: белый/чёрный список IP-адресов источника.'}
+    ]:[]),
+    ...(udp?[
+     {value:'salamander',label:'UDP · Salamander / Gecko',description:'Общий пароль; Gecko активируется packetSize только на QUIC.'},
+     {value:'udp-sudoku',label:'UDP · Sudoku',description:'Общая UDP-обфускация с криптографически случайным секретом.'},
+     {value:'udp-header',label:'UDP · Header Custom',description:'Произвольные байтовые заголовки client/server; общий формат.'},
+     {value:'udp-mkcp',label:'UDP · mKCP Legacy',description:'Симметричная имитация заголовков DNS, DTLS, SRTP, uTP и др.'},
+     {value:'noise',label:'UDP · Noise',description:'Клиентские шумовые пакеты; параметры и задержки.'},
+     {value:'udp-hop',label:'UDP · Port Hopping',description:'Только клиент: требует настроенных портов и firewall/NAT.'},
+     {value:'udp-xicmp',label:'UDP · XICMP',description:'Клиентские ICMP-пакеты; зависят от ОС и разрешений.'},
+     {value:'udp-realm',label:'UDP · Realm',description:'Клиентская маска STUN/WebRTC; нужна Realm-инфраструктура.'},
+     ...(kcp?[{value:'udp-xdns',label:'UDP · XDNS (mKCP)',description:'DNS-туннель через NS и собственный домен, только mKCP.'}]:[]),
+     {value:'udp-filter',label:'UDP · Filter',description:'Только inbound: фильтрация IP-адресов отправителей UDP.'}
+    ]:[]),
+    ...(quic?[{value:'quic-params',label:'QUIC · Params',description:'Клиентские congestion, окна, таймеры и udpHop.'}]:[]),
+    {value:'advanced',label:'Расширенный JSON',description:'Полные цепочки TCP/UDP, обе стороны и QUIC-параметры.'},
     {value:'clear',label:'Сбросить FinalMask',description:'Удалить серверную и клиентскую маски этого inbound.'}
    ];
    const action=await dialog.request({
@@ -657,10 +705,6 @@ const operations={
    if(['fragment','noise'].includes(action.action)){
     const fragment=action.action==='fragment',direction=fragment?'tcp':'udp';
     if(fragment&&!tcp||!fragment&&!udp)throw Error('Маска несовместима с транспортом');
-    // Directional layers belong on the client, and cannot silently replace
-    // a required symmetric layer already present on the server.
-    if(inbound.streamSettings?.finalmask?.[direction]?.length)
-     throw Error('На сервере уже есть маски этого направления. Настройте совместную цепочку клиента в расширенном JSON.');
     const ok=await dialog.confirm({
      title:fragment?'TCP · Fragment':'UDP · Noise',
      description:fragment?
@@ -676,26 +720,28 @@ const operations={
     mutate(doc=>{
      const ib=getInbound(doc,selected.index);
      if(ib.tag!==selected.tag)throw Error('Inbound изменился');
-     ib.xmesh??={};ib.xmesh.clientFinalmask??={};
-     const layers=ib.xmesh.clientFinalmask[direction]??=[];
+     const mask=ensureClientLayers(ib);
+     const layers=mask[direction]??=[];
      const index=layers.findIndex(v=>v?.type===action.action);
      const layer={type:action.action,settings};
      if(index>=0)layers[index]=layer;else layers.push(layer);
      if(layers.length>16)throw Error('FinalMask: максимум 16 слоёв');
-     ib.xmesh.clientFinalmask[direction]=layers;
+     mask[direction]=layers;
     },'Клиентская FinalMask '+action.action+' добавлена');
     return;
    }
-   if(['sudoku','salamander'].includes(action.action)){
+   if(['sudoku','udp-sudoku','salamander'].includes(action.action)){
     const salamander=action.action==='salamander';
-    if(salamander&&!udp||!salamander&&!tcp)throw Error('FinalMask несовместим с выбранным транспортом');
+    const direction=salamander||action.action==='udp-sudoku'?'udp':'tcp';
+    const kind=salamander?'salamander':'sudoku';
+    if(direction==='udp'&&!udp||direction==='tcp'&&!tcp)throw Error('FinalMask несовместим с выбранным транспортом');
     if(inbound.xmesh?.clientFinalmask&&Object.keys(inbound.xmesh.clientFinalmask).length)
      throw Error('У inbound есть явная клиентская маска. Сначала согласуйте её в расширенном JSON.');
     if(!crypto?.getRandomValues)throw Error('Криптографический генератор недоступен');
     const bytes=new Uint8Array(32);crypto.getRandomValues(bytes);
     const secret=Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
     const result=await dialog.request({
-     title:salamander?'UDP · Salamander / Gecko':'TCP · Sudoku',
+     title:salamander?'UDP · Salamander / Gecko':direction.toUpperCase()+' · Sudoku',
      description:'Секрет сгенерирован безопасным генератором браузера. Слой будет добавлен в серверный JSON и унаследован клиентской JSON-подпиской.',
      confirmLabel:'Создать маску',
      fields:[
@@ -708,7 +754,6 @@ const operations={
     });
     if(!result)return;
     if(area.value!==selected.source){notify('JSON изменился. Повторите действие.');return}
-    const direction=salamander?'udp':'tcp';
     mutate(doc=>{
      const ib=getInbound(doc,selected.index);
      if(ib.tag!==selected.tag)throw Error('Inbound изменился');
@@ -716,11 +761,124 @@ const operations={
      const layers=ib.streamSettings.finalmask[direction]??=[];
      const settings={password:result.password};
      if(salamander&&result.packetSize)settings.packetSize=result.packetSize;
-     const layer={type:action.action,settings},index=layers.findIndex(v=>v?.type===action.action);
+     const layer={type:kind,settings},index=layers.findIndex(v=>v?.type===kind);
      if(index>=0)layers[index]=layer;else layers.push(layer);
      if(layers.length>16)throw Error('FinalMask: максимум 16 слоёв');
      ib.streamSettings.finalmask[direction]=layers;
-    },'FinalMask '+action.action+' создан; клиентская подписка наследует симметричную маску');
+    },'FinalMask '+kind+' создан; клиентская подписка наследует симметричную маску');
+    return;
+   }
+   // Every supported FinalMask type has a guided entry. Complex types expose
+   // only their own settings JSON, not a misleading, hard-coded pseudo-schema.
+   const recipes={
+    'tcp-header':{side:'server',direction:'tcp',kind:'header-custom',
+     title:'TCP · Header Custom',help:'clients / servers: массивы последовательностей. Обе стороны обязаны совпадать.',
+     defaults:{clients:[[{type:'str',packet:'HELLO'}]],servers:[[{type:'str',packet:'WELCOME'}]]}},
+    'udp-header':{side:'server',direction:'udp',kind:'header-custom',
+     title:'UDP · Header Custom',help:'client / server: элементы с type + packet или rand. Не путать с TCP clients/servers.',
+     defaults:{client:[{type:'hex',packet:'a1b2c3d4'}],server:[{type:'hex',packet:'d4c3b2a1'}]}},
+    'udp-mkcp':{side:'server',direction:'udp',kind:'mkcp-legacy',
+     title:'UDP · mKCP Legacy',help:'header: dns, dtls, srtp, utp, wechat, wireguard или пустая строка; value: домен/секрет.',
+     defaults:{header:'dtls',value:''}},
+    'tcp-xmc':{side:'client',direction:'tcp',kind:'xmc',
+     title:'TCP · XMC',help:'Нужны пароль и поддержка XMC установленной версией клиента Xray-core.',
+     defaults:{password:''}},
+    'tcp-filter':{side:'server',direction:'tcp',kind:'filter',
+     title:'TCP · IP Filter',help:'Inbound-only. Укажите непустой allowedSourceIPs или blockedSourceIPs.',
+     defaults:{allowedSourceIPs:[],blockedSourceIPs:[]}},
+    'udp-filter':{side:'server',direction:'udp',kind:'filter',
+     title:'UDP · IP Filter',help:'Inbound-only. Укажите непустой allowedSourceIPs или blockedSourceIPs.',
+     defaults:{allowedSourceIPs:[],blockedSourceIPs:[]}},
+    'udp-xdns':{side:'client',direction:'udp',kind:'xdns',
+     title:'UDP · XDNS',help:'Только mKCP. Настройте NS, свой домен и DNS-резолверы; клиентский MTU отдельно.',
+     defaults:{domains:[{names:[],types:[16]}],resolvers:[{addrs:[]}]}},
+    'udp-xicmp':{side:'client',direction:'udp',kind:'xicmp',
+     title:'UDP · XICMP',help:'Необходимы права ОС на ICMP; dgram доступен не на всех платформах.',
+     defaults:{dgram:false,ips:[]}},
+    'udp-realm':{side:'client',direction:'udp',kind:'realm',
+     title:'UDP · Realm',help:'Введите действительный realm:// или realm+http:// URL; нужна Realm/STUN-инфраструктура.',
+     defaults:{url:'',stunServers:['stun.nextcloud.com:3478'],ipMode:'dual'}},
+    'udp-hop':{side:'client',direction:'udp',kind:'udphop',
+     title:'UDP · Port Hopping',help:'Требуются firewall/NAT и согласованные порты; udphop помещается в конец цепочки.',
+     defaults:{mode:'perconnremote',interval:'5-10',remotePorts:''}},
+    'quic-params':{side:'client',direction:'quic',kind:null,
+     title:'QUIC · Client Params',help:'Только QUIC. Клиентские значения не копируются с сервера автоматически.',
+     defaults:{congestion:'bbr',maxIdleTimeout:30,keepAlivePeriod:10}}
+   };
+   if(Object.prototype.hasOwnProperty.call(recipes,action.action)){
+    const recipe=recipes[action.action];
+    if(recipe.direction==='quic'&&!quic||recipe.direction==='tcp'&&!tcp||recipe.direction==='udp'&&!udp)
+     throw Error('FinalMask несовместим с выбранным транспортом');
+    if(recipe.side==='server'&&Object.keys(client).length)
+     throw Error('У inbound есть явная клиентская маска. Согласуйте общую цепочку в расширенном JSON.');
+    const previous=recipe.direction==='quic'?client.quicParams:
+     (recipe.side==='server'?current:client)[recipe.direction]?.find(v=>v?.type===recipe.kind)?.settings;
+    const validateSettings=value=>{
+     let s;
+     try{s=JSON.parse(value)}catch{return 'Некорректный JSON'}
+     if(!s||typeof s!=='object'||Array.isArray(s))return 'Настройки должны быть JSON-объектом';
+     if(recipe.kind==='header-custom'){
+      const fields=recipe.direction==='tcp'?['clients','servers']:['client','server'];
+      if(fields.some(key=>!Array.isArray(s[key])))return 'Требуются массивы '+fields.join(' и ');
+     }
+     if(recipe.kind==='mkcp-legacy'&&(!['','dns','dtls','srtp','utp','wechat','wireguard'].includes(s.header??'')||
+      (s.value!=null&&typeof s.value!=='string')))return 'Неверный header или value';
+     if(recipe.kind==='xmc'&&(!s.password||typeof s.password!=='string'))return 'Укажите пароль XMC';
+     if(recipe.kind==='filter'&&(!Array.isArray(s.allowedSourceIPs)||!Array.isArray(s.blockedSourceIPs)||
+      !s.allowedSourceIPs.length&&!s.blockedSourceIPs.length))return 'Укажите хотя бы один IP/CIDR/GeoIP';
+     if(recipe.kind==='xdns'&&(!Array.isArray(s.domains)||!s.domains.some(d=>Array.isArray(d.names)&&d.names.some(Boolean))))
+      return 'Нужен хотя бы один домен в domains[].names';
+     if(recipe.kind==='realm'&&(!['realm://','realm+http://'].some(prefix=>s.url?.startsWith(prefix))))
+      return 'Введите Realm URL с realm:// или realm+http://';
+     if(recipe.kind==='xicmp'&&(s.dgram!=null&&typeof s.dgram!=='boolean'||s.ips!=null&&!Array.isArray(s.ips)))
+      return 'dgram должен быть boolean, ips — массивом';
+     if(recipe.kind==='udphop'&&(!s.mode||s.mode.split(',').some(mode=>!['intervallocal','intervalremote','perconnremote'].includes(mode.trim()))||
+      s.mode.includes('intervallocal')&&!hysteria&&!(xhttp&&h3)||
+      /intervalremote|perconnremote/.test(s.mode)&&!s.remotePorts))
+      return 'Проверьте mode и remotePorts; intervallocal возможен только для Hysteria/XHTTP H3';
+     if(recipe.direction==='quic'){
+      if(s.congestion&&!['reno','bbr','brutal','force-brutal'].includes(s.congestion))
+       return 'Неизвестный congestion';
+      if(s.maxIdleTimeout!=null&&(s.maxIdleTimeout<4||s.maxIdleTimeout>120))return 'maxIdleTimeout: 4–120 с';
+      if(s.keepAlivePeriod!=null&&s.keepAlivePeriod!==0&&(s.keepAlivePeriod<2||s.keepAlivePeriod>60))
+       return 'keepAlivePeriod: 0 или 2–60 с';
+      if(s.maxIncomingStreams!==undefined)return 'maxIncomingStreams — серверный параметр, не клиентский';
+     }
+     return '';
+    };
+    const result=await dialog.request({
+     title:recipe.title,description:recipe.help+' Изменения появятся в JSON редактора после подтверждения. Сохраните профиль и проверьте работу ядра и клиента.',
+     confirmLabel:'Добавить маску',selectFirst:false,
+     fields:[{name:'settings',label:'Настройки · JSON',type:'textarea',wide:true,rows:11,
+      value:JSON.stringify(previous??recipe.defaults,null,2),required:true,validate:validateSettings}]
+    });
+    if(!result)return;
+    if(area.value!==selected.source){notify('JSON изменился. Повторите действие.');return}
+    const settings=JSON.parse(result.settings);
+    mutate(doc=>{
+     const ib=getInbound(doc,selected.index);
+     if(ib.tag!==selected.tag)throw Error('Inbound изменился');
+     if(recipe.side==='server'){
+      ib.streamSettings??={};ib.streamSettings.finalmask??={};
+     }
+     const target=recipe.side==='client'?ensureClientLayers(ib):ib.streamSettings.finalmask;
+     if(recipe.direction==='quic'){target.quicParams=settings;return}
+     const list=target[recipe.direction]??[];
+     const idx=list.findIndex(v=>v?.type===recipe.kind);
+     const layer={type:recipe.kind,settings};
+     if(idx>=0)list[idx]=layer;else list.push(layer);
+     if(list.length>16)throw Error('FinalMask: максимум 16 слоёв');
+     // Inbound filter and client port hopping should be outermost.
+     if(recipe.kind==='filter'||recipe.kind==='udphop'){
+      const at=list.indexOf(layer);list.splice(at,1);list.push(layer);
+     }else{
+      const last=list.findIndex(v=>v?.type===(recipe.side==='server'?'filter':'udphop'));
+      if(last>=0&&last<list.length-1){
+       list.splice(list.indexOf(layer),1);list.splice(last,0,layer);
+      }
+     }
+     target[recipe.direction]=list;
+    },'FinalMask '+recipe.title+' добавлена. Сохраните профиль и проверьте конфигурацию.');
     return;
    }
    if(action.action!=='advanced')throw Error('Неизвестный тип маски');
