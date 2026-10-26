@@ -3904,7 +3904,9 @@ document.addEventListener('click',async e=>{
         // Update ALL cached protocol keys, not only the VLESS UUID: otherwise
         // a subsequent admin client export could reuse stale credentials.
         try{
-          const refreshed=await backendRequest('/api/v1/collections/users/'+encodeURIComponent(id));
+          const refreshedList=await backendRequest('/api/v1/collections/users');
+          const refreshed=refreshedList.items?.find(u=>Number(u.id)===id);
+          if(!refreshed)throw new Error('Updated user missing from database list');
           Object.assign(current,refreshed);
         }catch(_){current.xrayId=result.xrayId}
       }
