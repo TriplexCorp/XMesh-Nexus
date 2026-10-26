@@ -1,3 +1,11 @@
+## Node TLS health in UI (2026-10-26)
+
+- [x] Signed heartbeat includes read-only TLS certificate health (state, domain, issuer, validity dates, remaining days, detected renewal configuration, bounded error code).
+- [x] Node cards show TLS health, expiration and detailed issuer/renewal information without exposing private keys or certificate PEM.
+- [x] Update Agent deploys the certificate inspector automatically; target agent release is **control-v5.1.0**.
+- [x] TLS telemetry is stored in a dedicated JSONB column and returned by the existing authenticated node runtime endpoint.
+- [ ] Confirm certificate renewal timer is actually enabled on deployed hosts and run an end-to-end ACME renewal test; the UI must not claim a renewal succeeded without evidence.
+
 ## Node updates from Nexus UI (2026-10-26)
 
 - [x] Major release **control-v5.0.0**; existing control-v4 nodes remain eligible for signed UI-initiated upgrades, and both v4/v5 heartbeats are accepted during rollout.
