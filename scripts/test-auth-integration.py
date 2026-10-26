@@ -85,11 +85,19 @@ def main():
     check(status, 201, "owner creates viewer protection test user")
     user_id = user["id"]
     assert user.get("xrayId"), "owner must receive original Xray UUID"
+    credential_fields = ("vmessId", "trojanPassword", "hysteriaPassword",
+                         "masquePassword", "ssLegacyPassword")
+    assert len(user["vmessId"]) == 36 and user["vmessId"] != user["xrayId"]
+    isolated_passwords = [user[key] for key in credential_fields[1:]]
+    assert all(len(password) == 64 for password in isolated_passwords)
+    assert len(set(isolated_passwords + [user["xrayId"], user["vmessId"]])) == 6
     status, listing, _ = api("GET", "/collections/users", cookie=viewer_cookie)
     check(status, 200, "viewer reads redacted users")
     exposed = next(entry for entry in listing["items"] if entry["id"] == user_id)
     assert exposed["username"] == "ci_viewer_audit"
     assert "xrayId" not in exposed
+    for key in credential_fields:
+        assert key not in exposed
     assert user["xrayId"] not in json.dumps(listing)
     status, data, _ = api("GET", "/bootstrap", cookie=viewer_cookie)
     check(status, 200, "viewer bootstrap is redacted")
@@ -119,6 +127,11 @@ def main():
     status, new_sub, _ = api("GET", f"/users/{user_id}/subscription", cookie=owner_cookie)
     check(status, 200, "read regenerated subscription token")
     assert new_sub["token"] != old_token
+    status, new_user, _ = api("GET", f"/collections/users/{user_id}", cookie=owner_cookie)
+    check(status, 200, "read rotated independent protocol credentials")
+    for key in credential_fields:
+        assert new_user[key] != user[key], f"{key} not rotated"
+    assert len({new_user[key] for key in credential_fields}) == 5
 
 
 
