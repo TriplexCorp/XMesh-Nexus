@@ -63,6 +63,9 @@ for(const [i,entry] of versions.entries()){
 }
 assert.equal(C.buildInbound({protocol:'hysteria',transport:'hysteria',security:'tls',tag:'hy',port:443}).settings.version,2);
 assert.equal(C.buildInbound({protocol:'hysteria',transport:'hysteria',security:'tls',tag:'hy',port:443}).streamSettings.hysteriaSettings.version,2);
+const masque=C.buildInbound({protocol:'masque',transport:'masque',security:'tls',tag:'mq',port:443});
+assert.deepEqual(Array.from(masque.settings.address),['10.129.0.1/24'],'MASQUE must have a server tunnel address');
+assert.deepEqual(Array.from(masque.settings.users),[],'MASQUE must expose user slots for panel provisioning');
 // Transport-specific TLS ALPN must be generated and editable in the UI.
 for(const [transport,expected] of [
  ['xhttp',['h2','http/1.1']],['grpc',['h2']],
