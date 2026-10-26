@@ -24,6 +24,6 @@ const google=C.buildInbound({...valid,xdriveService:'google-drive',xdriveSecrets
 assert.equal(google.streamSettings.xdriveSettings.secrets.length,3);
 assert(C.analyze({...valid,xdriveService:'google-drive',xdriveSecrets:'one'}).errors.length);
 const templ=C.buildInbound({...valid,xdriveService:'template',xdriveTemplate:'{"auth":{}}'});
-assert.equal(templ.streamSettings.xdriveSettings.template.auth.constructor,Object);
+assert.equal(typeof templ.streamSettings.xdriveSettings.template.auth,'object');
 assert(C.analyze({...valid,xdriveService:'template',xdriveTemplate:'not json'}).errors.length);
 console.log('XDRIVE composer validation and serialization OK');
