@@ -4009,8 +4009,8 @@ document.addEventListener('click',async e=>{
     try{
       const runtime=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/runtime');
       if(!runtime.connected)throw new Error('Нет свежей связи с управляющим агентом. Проверьте подключение ноды.');
-      if(!/^control-v4[.]/.test(String(runtime.version||''))){
-        throw new Error('Agent '+(runtime.version||'неизвестной версии')+' не поддерживает дистанционное самообновление. Требуется один раз установить Agent v4 штатным скриптом на ноде; затем SSH больше не нужен.');
+      if(!/^control-v(?:4|5)[.][0-9]+[.][0-9]+$/.test(String(runtime.version||''))){
+        throw new Error('Agent '+(runtime.version||'неизвестной версии')+' не поддерживает дистанционное самообновление. Для старых версий требуется однократная установка актуального агента на ноде.');
       }
       const confirmed=await panelConfirm(
         'Обновить управляющий Agent на «'+node.name+'»? Нода самостоятельно загрузит фиксированные компоненты XMesh из официальных репозиториев и проверит установку. Ed25519-ключ и настройки останутся на месте.',
