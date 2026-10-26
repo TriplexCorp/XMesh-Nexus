@@ -305,7 +305,9 @@ const ENT={
       const interval=Number(data.rotationIntervalHours||24);
       if(data.rotationEnabled&&(!Number.isInteger(interval)||interval<1||interval>720))return 'Интервал IP-ротации должен быть от 1 до 720 часов.';
       const nodeProfile=DB.profiles.find(p=>String(p.id)===String(data.profileId));
-      const requiresTLS=nodeProfile&&inbs(nodeProfile).some(ib=>ib.streamSettings?.security==='tls');
+      if(!nodeProfile)return 'Назначьте узлу существующий XRAY STUDIO-профиль перед установкой XMesh Node.';
+      if(inbs(nodeProfile).length!==1)return 'Для автоматической установки XMesh Node профиль XRAY STUDIO должен содержать ровно один inbound.';
+      const requiresTLS=inbs(nodeProfile).some(ib=>ib.streamSettings?.security==='tls');
       if(requiresTLS&&!data.tlsAutoProvision&&!data.tlsManualProvision)
         return 'TLS-профиль: включите управляемый TLS либо подтвердите предварительную установку сертификатов на ноде.';
       if(data.tlsAutoProvision&&data.tlsManualProvision)
@@ -316,7 +318,7 @@ const ENT={
         if(!/^[^\\s@]+@[a-z0-9.-]+\\.[a-z]{2,}$/i.test(email))return 'Управляемый TLS: укажите контактный email ACME.';
       }
       const port=Number(data.xrayLocalPort||0),nodePort=Number(data.port||0);
-      if(port&&(!Number.isInteger(port)||port<1||port>65535))return 'Локальный порт Xray должен быть от 1 до 65535.';
+      if(!Number.isInteger(port)||port<1||port>65535)return 'Укажите локальный порт Xray от 1 до 65535 перед установкой ноды.';
       if(port&&port===nodePort)return 'Порт Xray должен отличаться от порта XMesh Node на том же сетевом интерфейсе.';
       if(data.billingDueDate&&!/^\d{4}-\d{2}-\d{2}$/.test(data.billingDueDate))return 'Дата аренды: ГГГГ-ММ-ДД.';
       if(data.billingDueDate&&!Number.isFinite(Date.parse(data.billingDueDate+'T00:00:00Z')))return 'Некорректная дата аренды.';
