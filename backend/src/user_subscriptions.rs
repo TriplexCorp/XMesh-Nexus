@@ -319,11 +319,7 @@ fn vless_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> 
 // Native outbound credentials follow each protocol's schema, never the
 // inbound settings or a shared user UUID. Pre-upgrade users retain their
 // original credentials until an explicit owner-only rekey.
-fn configure_masque_credentials(
-    stream: &mut Value,
-    user: &Value,
-    inbound: &Value,
-) -> Option<()> {
+fn configure_masque_credentials(stream: &mut Value, user: &Value, inbound: &Value) -> Option<()> {
     // MASQUE uses HTTP Basic username/password in transport settings, not UUID
     // in its outbound settings. The server uses the same stat email as username.
     let record_id = user.get("id").and_then(Value::as_i64)?;
@@ -651,7 +647,9 @@ pub async fn status(
     let row=sqlx::query("SELECT token_hash,token_ciphertext,created_at FROM user_subscription_tokens WHERE user_id=$1")
   .bind(id).fetch_optional(&state.pool).await?;
     let Some(row) = row else {
-        return Ok(Json(json!({"enabled":false,"token":null,"legacy":false,"credentialsSeparated":separated})));
+        return Ok(Json(
+            json!({"enabled":false,"token":null,"legacy":false,"credentialsSeparated":separated}),
+        ));
     };
     let encrypted: Option<String> = row.try_get("token_ciphertext")?;
     let hash: String = row.try_get("token_hash")?;
