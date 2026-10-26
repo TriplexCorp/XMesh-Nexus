@@ -108,6 +108,18 @@ def main():
           "viewer denied XRAY STUDIO profiles")
     check(api("GET", "/nodes/1/restart", cookie=viewer_cookie)[0], 403,
           "viewer denied node command history")
+    check(api("POST", f"/users/{user_id}/credentials/rotate", cookie=viewer_cookie)[0], 403,
+          "viewer forbidden from rotating VPN credentials")
+    old_status, old_sub, _ = api("GET", f"/users/{user_id}/subscription", cookie=owner_cookie)
+    check(old_status, 200, "read existing subscription token")
+    old_token = old_sub["token"]
+    status, changed, _ = api("POST", f"/users/{user_id}/credentials/rotate", cookie=owner_cookie)
+    check(status, 200, "owner rotates VPN and subscription credentials")
+    assert changed["xrayId"] != user["xrayId"] and changed["requiresNodeSync"]
+    status, new_sub, _ = api("GET", f"/users/{user_id}/subscription", cookie=owner_cookie)
+    check(status, 200, "read regenerated subscription token")
+    assert new_sub["token"] != old_token
+
 
 
 
