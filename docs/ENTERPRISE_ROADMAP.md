@@ -1,5 +1,16 @@
 # XMesh Nexus — Enterprise hardening roadmap
 
+## XRAY STUDIO template completeness — 2026-10-26
+
+- [x] Introduce transport-aware default `tlsSettings.alpn` for XHTTP/RAW, gRPC, WebSocket/HTTPUpgrade, Hysteria and MASQUE.
+- [x] Expose editable ALPN and TLS certificate/private-key file paths in the interactive composer; preserve an existing inbound's TLS values when reopening it.
+- [x] Add warnings for loopback binding, missing TLS credentials and empty users; validate ALPN syntax and gRPC h2 requirement.
+- [x] Add composer regression assertions for automatic ALPN, manual override, TLS file pairing and UI fields.
+- [ ] Verify tests and full GitHub Actions CI on `main`; run real Xray-core configuration validation for each transport.
+- [ ] Add deployment-aware guided profiles (direct VPS vs reverse proxy), without changing existing loopback defaults behind operators' backs.
+- [ ] Expand automated client/server compatibility, certificate discovery and deployment diagnostics; never generate fictitious keys or paths.
+
+
 ## CI stabilization checkpoint — 2026-10-26
 
 **Scope:** recent FinalMask implementation, English copy audit and presence regression checks. All changes are committed directly to `main`; the following items distinguish source changes from verified gates.
