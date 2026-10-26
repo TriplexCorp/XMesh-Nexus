@@ -973,7 +973,7 @@ async fn create_record(
         // disclose another. Existing users without these fields keep legacy
         // xrayId credentials until an explicit owner-initiated rekey.
         object.insert("vmessId".into(), json!(Uuid::new_v4().to_string()));
-        for key in ["trojanPassword", "hysteriaPassword", "masquePassword", "ssLegacyPassword"] {
+        for key in ["trojanPassword", "hysteriaPassword", "masquePassword", "ssLegacyPassword", "httpPassword", "socksPassword"] {
             let mut secret = [0u8; 32];
             aes_gcm::aead::OsRng.fill_bytes(&mut secret);
             object.insert(key.into(), json!(hex::encode(secret)));
@@ -1133,7 +1133,8 @@ async fn update_record(
         // Credential material is immutable via generic CRUD. Only the
         // dedicated owner-only rotation endpoint can replace these secrets.
         for key in ["ssPassword", "ssPassword128", "vmessId", "trojanPassword",
-                    "hysteriaPassword", "masquePassword", "ssLegacyPassword"] {
+                    "hysteriaPassword", "masquePassword", "ssLegacyPassword",
+                    "httpPassword", "socksPassword"] {
             patch_object.remove(key);
         }
     }
