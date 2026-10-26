@@ -2624,6 +2624,8 @@ function xrayClientSample(){
  const path=endpoint?.path||v('path')||'/';
  const host=endpoint?.host||v('host')||sni;
  const uuid=v('uuid')||'REPLACE_WITH_USER_UUID';
+ const previewPassword=(kind,explicit='')=>xrayManualPassword(
+  kind,v('uuid').trim(),v('tag').trim()||'inbound-1',explicit);
  const flow=protocol==='vless'&&['tls','reality'].includes(security)&&network==='raw'?v('flow'):'';
  const vlessEncMode=v('vlessenc-mode')||'off';
  const vlessEncRequired=protocol==='vless'&&(network==='xdrive'||vlessEncMode!=='off');
@@ -2631,16 +2633,16 @@ function xrayClientSample(){
  if(['dokodemo-door','tunnel','tun'].includes(protocol))return {...xrayClientLocalDefaults(),remarks:$('#xpb-name')?.value.trim()||'XRAY STUDIO client',note:'Для этого inbound нет прямого одноимённого клиентского outbound. Используйте совместимый клиентский протокол или полный JSON-режим.',outbounds:[]};
  if(protocol==='vless')settings={vnext:[{address,port,users:[{id:uuid,encryption:vlessEncRequired?(v('vless-encryption').trim()||'REPLACE_WITH_VLESS_ENCRYPTION_CONFIG'):'none',...(flow?{flow}:{})}]}]};
  else if(protocol==='vmess')settings={vnext:[{address,port,users:[{id:uuid,alterId:0,security:v('vmess-security')||'auto'}]}]};
- else if(protocol==='trojan')settings={servers:[{address,port,password:uuid}]};
+ else if(protocol==='trojan')settings={servers:[{address,port,password:previewPassword('trojan')}]};
  else if(protocol==='shadowsocks'){
   const method=v('ss-method')||'chacha20-ietf-poly1305';
   const serverPassword=v('ss-password')||(method.startsWith('2022-')?'REPLACE_WITH_VALID_SS2022_SERVER_KEY':'REPLACE_WITH_STRONG_SERVER_PASSWORD');
-  const userPassword=v('ss-user-password')||(method.startsWith('2022-')?'REPLACE_WITH_VALID_SS2022_USER_KEY':uuid);
+  const userPassword=v('ss-user-password')||(method.startsWith('2022-')?'REPLACE_WITH_VALID_SS2022_USER_KEY':previewPassword('shadowsocks'));
   const multiUser=Boolean(uuid)&&!(method==='2022-blake3-chacha20-poly1305');
   const password=method.startsWith('2022-')?(multiUser?serverPassword+':'+userPassword:serverPassword):(multiUser?userPassword:serverPassword);
   settings={servers:[{address,port,method,password}]};
- }else if(protocol==='socks'||protocol==='mixed')settings={servers:[{address,port,...(v('socks-auth')==='password'?{users:[{user:(v('name')||'xmesh').toLowerCase().replace(/[^a-z0-9_.-]/g,'-'),pass:uuid}]}:{})}]};
- else if(protocol==='http')settings={servers:[{address,port,...(uuid?{users:[{user:(v('name')||'xmesh').toLowerCase().replace(/[^a-z0-9_.-]/g,'-'),pass:uuid}]}:{})}]};
+ }else if(protocol==='socks'||protocol==='mixed')settings={servers:[{address,port,...(v('socks-auth')==='password'?{users:[{user:(v('name')||'xmesh').toLowerCase().replace(/[^a-z0-9_.-]/g,'-'),pass:previewPassword('socks')}]}:{})}]};
+ else if(protocol==='http')settings={servers:[{address,port,...(uuid?{users:[{user:(v('name')||'xmesh').toLowerCase().replace(/[^a-z0-9_.-]/g,'-'),pass:previewPassword('http')}]}:{})}]};
  else if(protocol==='wireguard')settings={secretKey:'REPLACE_WITH_CLIENT_PRIVATE_KEY',address:['10.0.0.2/32'],peers:[{endpoint:address+':'+port,publicKey:'REPLACE_WITH_SERVER_PUBLIC_KEY',allowedIPs:['0.0.0.0/0','::/0']}]};
  else if(protocol==='hysteria')settings={version:2,address,port};
  else if(protocol==='masque')settings={address,port,remoteDNS:['1.1.1.1','8.8.8.8']};
@@ -2653,8 +2655,8 @@ function xrayClientSample(){
  if(network==='grpc')streamSettings.grpcSettings={serviceName:path.replace(/^\//,'')||'grpc',multiMode:v('grpc-mode')==='multi'};
  if(network==='httpupgrade')streamSettings.httpupgradeSettings={path,host};
  if(network==='mkcp')streamSettings.kcpSettings={seed:v('kcp-seed')||''};
- if(network==='hysteria')streamSettings.hysteriaSettings={version:2,auth:v('hy-auth')||uuid,udpIdleTimeout:cl(+v('hy-idle')||60,2,600)};
- if(network==='masque')streamSettings.masqueSettings={host:v('masque-host')||sni,path:v('masque-path')||'/masque',...(v('masque-user')?{user:v('masque-user')}:{}),...(v('masque-pass')?{pass:v('masque-pass')}:{})};
+ if(network==='hysteria')streamSettings.hysteriaSettings={version:2,auth:previewPassword('hysteria',v('hy-auth')),udpIdleTimeout:cl(+v('hy-idle')||60,2,600)};
+ if(network==='masque')streamSettings.masqueSettings={host:v('masque-host')||sni,path:v('masque-path')||'/masque',...(v('masque-user')?{user:v('masque-user')}:{}),{pass:previewPassword('masque',v('masque-pass'))}};
  if(network==='xdrive'){
   const service=v('xdrive-service')||'local',secrets=String(v('xdrive-secrets')||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
   let template;if(service==='template'){try{template=JSON.parse(v('xdrive-template')||'{}')}catch(e){template={}}}
