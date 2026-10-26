@@ -408,14 +408,15 @@ pub fn client_stream(inbound: &Value, host: &Value, device: &str) -> Option<Valu
     // copies server-only layers, and rejects incomplete client/server chains.
     // A deliberately authored clientFinalmask overrides automatic inheritance.
     let explicit = client_metadata(inbound, host, "clientFinalmask");
-    match crate::subscription_finalmask::project(
-        network, &out, stream.get("finalmask"), explicit
-    ) {
+    match crate::subscription_finalmask::project(network, &out, stream.get("finalmask"), explicit) {
         Ok(Some(mask)) => out["finalmask"] = mask,
         Ok(None) => {}
         Err(reason) => {
-            tracing::warn!(network, reason,
-                "Unsupported FinalMask client projection: omitting incompatible outbound");
+            tracing::warn!(
+                network,
+                reason,
+                "Unsupported FinalMask client projection: omitting incompatible outbound"
+            );
             return None;
         }
     }
@@ -495,8 +496,10 @@ mod tests {
         assert!(client_stream(&inbound, &host, "auto").is_none());
         let explicit = json!({"address":"198.51.100.1","clientFinalmask":{"udp":[
             {"type":"salamander","settings":{"password":"shared-obfs"}}]}});
-        assert_eq!(client_stream(&inbound, &explicit, "auto").unwrap()["finalmask"],
-            explicit["clientFinalmask"]);
+        assert_eq!(
+            client_stream(&inbound, &explicit, "auto").unwrap()["finalmask"],
+            explicit["clientFinalmask"]
+        );
         let mismatched = json!({"address":"198.51.100.1","clientFinalmask":{"udp":[
             {"type":"salamander","settings":{"password":"wrong-password"}}]}});
         assert!(client_stream(&inbound, &mismatched, "auto").is_none());
@@ -508,28 +511,52 @@ mod tests {
             "finalmask":{"udp":[{"type":"salamander","settings":{
                 "password":"shared","packetSize":"512-1200"}}]}}});
         let client = client_stream(&inbound, &json!({"address":"198.51.100.1"}), "auto").unwrap();
-        assert_eq!(client["finalmask"]["udp"][0]["settings"]["password"], "shared");
-        assert_eq!(client["finalmask"]["udp"][0]["settings"]["packetSize"], "512-1200");
+        assert_eq!(
+            client["finalmask"]["udp"][0]["settings"]["password"],
+            "shared"
+        );
+        assert_eq!(
+            client["finalmask"]["udp"][0]["settings"]["packetSize"],
+            "512-1200"
+        );
     }
     #[test]
     fn non_hysteria_does_not_inherit_salamander() {
         let inbound = json!({"streamSettings":{"network":"raw","security":"tls",
             "tlsSettings":{"serverName":"example.org"},
             "finalmask":{"udp":[{"type":"salamander","settings":{"password":"secret"}}]}}});
-        assert!(client_stream(&inbound, &json!({"address":"example.org"}), "auto")
-            .unwrap().get("finalmask").is_none());
+        assert!(
+            client_stream(&inbound, &json!({"address":"example.org"}), "auto")
+                .unwrap()
+                .get("finalmask")
+                .is_none()
+        );
     }
     #[test]
     fn symmetric_sudoku_is_exported_for_tcp_and_udp_transports() {
-        for (network, direction) in [("raw", "tcp"), ("xhttp", "tcp"), ("grpc", "tcp"),
-            ("hysteria", "udp"), ("masque", "udp"), ("mkcp", "udp")] {
+        for (network, direction) in [
+            ("raw", "tcp"),
+            ("xhttp", "tcp"),
+            ("grpc", "tcp"),
+            ("hysteria", "udp"),
+            ("masque", "udp"),
+            ("mkcp", "udp"),
+        ] {
             let mut inbound = json!({"streamSettings":{"network":network,"security":"tls",
                 "tlsSettings":{"serverName":"example.org"}}});
             inbound["streamSettings"]["finalmask"][direction] = json!([
                 {"type":"sudoku","settings":{"password":"shared","paddingMin":2,"serverOnly":"hidden"}}]);
-            let client = client_stream(&inbound, &json!({"address":"example.org"}), "auto").unwrap();
-            assert_eq!(client["finalmask"][direction][0]["settings"]["password"], "shared");
-            assert!(client["finalmask"][direction][0]["settings"].get("serverOnly").is_none());
+            let client =
+                client_stream(&inbound, &json!({"address":"example.org"}), "auto").unwrap();
+            assert_eq!(
+                client["finalmask"][direction][0]["settings"]["password"],
+                "shared"
+            );
+            assert!(
+                client["finalmask"][direction][0]["settings"]
+                    .get("serverOnly")
+                    .is_none()
+            );
         }
     }
     #[test]
