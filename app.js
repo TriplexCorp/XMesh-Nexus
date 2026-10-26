@@ -287,7 +287,7 @@ const ENT={
     {k:'rotationIntervalHours',l:'Смена адреса каждые, ч',t:'num',h:'1–720 часов. По умолчанию 24. Адрес закреплён за пользователем между обновлениями подписки.'},
     {k:'rotationIps',l:'Пул внешних IP-адресов',t:'area',rows:7,h:'Один IPv4 или IPv6 на строку. Добавляйте только IP, реально назначенные VPS и доступные клиентам. До 256 адресов. Основной адрес узла остаётся прежним.'}],
 
-    def:()=>({flag:'',mult:1,limit:0,resetDay:1,tlsAutoProvision:false,rotationEnabled:false,rotationIntervalHours:24,rotationIps:'',billingCurrency:'EUR',billingPeriod:'monthly',billingRemindDays:7,billingPrice:0}),
+    def:()=>({flag:'',port:443,xrayLocalPort:13456,mult:1,limit:0,resetDay:1,tlsAutoProvision:false,rotationEnabled:false,rotationIntervalHours:24,rotationIps:'',billingCurrency:'EUR',billingPeriod:'monthly',billingRemindDays:7,billingPrice:0}),
     chk:data=>{
       const address=String(data.addr??'');
       const ipv4=address.split('.');
