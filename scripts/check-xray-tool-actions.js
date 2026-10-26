@@ -144,6 +144,14 @@ async function run(){
  await autoTCP.run('finalmask');
  assert.equal(autoTCP.doc().inbounds[0].streamSettings.finalmask.tcp[0].type,'sudoku');
  assert.match(autoTCP.doc().inbounds[0].streamSettings.finalmask.tcp[0].settings.password,/^[a-f0-9]{64}$/);
+ const fragmentPreset=harness(sample(),{requestValues:{action:'fragment'}});
+ await fragmentPreset.run('finalmask');
+ assert.equal(fragmentPreset.doc().inbounds[0].xmesh.clientFinalmask.tcp[0].type,'fragment');
+ assert.equal(fragmentPreset.doc().inbounds[0].streamSettings.finalmask,undefined,'Fragment stays client-only');
+ const noisePreset=harness(hysteria,{requestValues:{action:'noise'}});
+ await noisePreset.run('finalmask');
+ assert.equal(noisePreset.doc().inbounds[0].xmesh.clientFinalmask.udp[0].type,'noise');
+ assert.equal(noisePreset.doc().inbounds[0].streamSettings.finalmask,undefined,'Noise stays client-only');
  const reset=harness(withMask,{requestValues:{action:'clear'}});
  await reset.run('finalmask');
  assert.equal(reset.doc().inbounds[0].streamSettings.finalmask,undefined,'Reset deletes server mask');
