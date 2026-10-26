@@ -625,8 +625,9 @@ const operations={
    const alpn=inbound.streamSettings?.tlsSettings?.alpn||[];
    const udp=['hysteria','masque','mkcp','kcp'].includes(network)||
      (network==='xhttp'&&alpn.includes('h3'));
+   const tcp=!['hysteria','masque','mkcp','kcp'].includes(network);
    const choices=[
-    {value:'sudoku',label:'TCP · Sudoku',description:'Симметричная TCP-маска, общий секрет генерируется автоматически.'},
+    ...(tcp?[{value:'sudoku',label:'TCP · Sudoku',description:'Симметричная TCP-маска, общий секрет генерируется автоматически.'}]:[]),
     ...(udp?[{value:'salamander',label:'UDP · Salamander / Gecko',description:'Маска QUIC/UDP, автоматический общий пароль и необязательный packetSize.'}]:[]),
     {value:'advanced',label:'Расширенный JSON',description:'Направленные слои, QUIC-параметры и нестандартные настройки.'},
     {value:'clear',label:'Сбросить FinalMask',description:'Удалить серверную и клиентскую маски этого inbound.'}
@@ -634,7 +635,7 @@ const operations={
    const action=await dialog.request({
     title:'FinalMask · конструктор',description:'Выберите готовую маску. Секрет генерируется криптографически в браузере, совместимые серверные слои автоматически попадают в JSON-подписку.',
     confirmLabel:'Продолжить',selectFirst:false,
-    fields:[{name:'action',label:'Выберите тип маски',type:'cards',wide:true,value:udp?'salamander':'sudoku',options:choices}]
+    fields:[{name:'action',label:'Выберите тип маски',type:'cards',wide:true,value:udp?'salamander':tcp?'sudoku':'advanced',options:choices}]
    });
    if(!action)return;
    if(area.value!==selected.source){notify('JSON изменился. Повторите действие.');return}
@@ -652,7 +653,7 @@ const operations={
    }
    if(['sudoku','salamander'].includes(action.action)){
     const salamander=action.action==='salamander';
-    if(salamander&&!udp)throw Error('UDP Salamander несовместим с выбранным транспортом');
+    if(salamander&&!udp||!salamander&&!tcp)throw Error('FinalMask несовместим с выбранным транспортом');
     if(inbound.xmesh?.clientFinalmask&&Object.keys(inbound.xmesh.clientFinalmask).length)
      throw Error('У inbound есть явная клиентская маска. Сначала согласуйте её в расширенном JSON.');
     if(!crypto?.getRandomValues)throw Error('Криптографический генератор недоступен');
