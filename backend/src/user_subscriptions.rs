@@ -120,7 +120,7 @@ fn decrypt_token(
 pub async fn migrate_legacy_ciphertexts(state: &AppState) -> anyhow::Result<()> {
     let rows = sqlx::query(
         "SELECT user_id,token_hash,token_ciphertext FROM user_subscription_tokens
-         WHERE token_ciphertext IS NOT NULL AND token_ciphertext NOT LIKE 'v2:%'"
+         WHERE token_ciphertext IS NOT NULL AND token_ciphertext NOT LIKE 'v2:%'",
     )
     .fetch_all(&state.pool)
     .await?;
@@ -130,11 +130,12 @@ pub async fn migrate_legacy_ciphertexts(state: &AppState) -> anyhow::Result<()> 
         let previous: String = row.try_get("token_ciphertext")?;
         let raw = decrypt_token(state, user_id, &previous, &hash)
             .map_err(|_| anyhow::anyhow!("Unable to migrate legacy subscription encryption for user {user_id}; restore original TOTP_ENCRYPTION_KEY"))?;
-        let upgraded = encrypt_token(state, user_id, &raw)
-            .map_err(|_| anyhow::anyhow!("Subscription encryption migration failed for user {user_id}"))?;
+        let upgraded = encrypt_token(state, user_id, &raw).map_err(|_| {
+            anyhow::anyhow!("Subscription encryption migration failed for user {user_id}")
+        })?;
         sqlx::query(
             "UPDATE user_subscription_tokens SET token_ciphertext=$1
-             WHERE user_id=$2 AND token_ciphertext=$3"
+             WHERE user_id=$2 AND token_ciphertext=$3",
         )
         .bind(upgraded)
         .bind(user_id)
@@ -553,13 +554,12 @@ pub async fn rotate_credentials(
         return Err(bad("Invalid user ID"));
     }
     let mut tx = state.pool.begin().await?;
-    let row = sqlx::query(
-        "SELECT data FROM panel_records WHERE collection='users' AND id=$1 FOR UPDATE",
-    )
-    .bind(id)
-    .fetch_optional(&mut *tx)
-    .await?
-    .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "User not found"))?;
+    let row =
+        sqlx::query("SELECT data FROM panel_records WHERE collection='users' AND id=$1 FOR UPDATE")
+            .bind(id)
+            .fetch_optional(&mut *tx)
+            .await?
+            .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "User not found"))?;
     let mut user: Value = row.try_get("data")?;
     let old_uuid = user.get("xrayId").and_then(Value::as_str).unwrap_or("");
     let new_uuid = loop {
@@ -568,9 +568,9 @@ pub async fn rotate_credentials(
             break proposed;
         }
     };
-    let object = user.as_object_mut().ok_or_else(|| {
-        ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Invalid user record")
-    })?;
+    let object = user
+        .as_object_mut()
+        .ok_or_else(|| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Invalid user record"))?;
     let mut ss256 = [0u8; 32];
     let mut ss128 = [0u8; 16];
     OsRng.fill_bytes(&mut ss256);
