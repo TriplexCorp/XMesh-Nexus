@@ -661,27 +661,28 @@ const operations={
     }
     return ib.xmesh.clientFinalmask;
    };
+   // Show the entire catalog, but prevent invalid transport combinations.
+   const choice=(value,label,description,available,disabledReason)=>({
+    value,label,description:available?description:description+' · Недоступно: '+disabledReason,
+    disabled:!available,disabledReason:available?'':disabledReason
+   });
    const choices=[
-    ...(tcp?[
-     {value:'sudoku',label:'TCP · Sudoku',description:'Общая обфускация с автоматически сгенерированным секретом.'},
-     {value:'tcp-header',label:'TCP · Header Custom',description:'Серверный и клиентский протоколоподобный заголовок; последовательности JSON.'},
-     {value:'fragment',label:'TCP · Fragment',description:'Клиентская фрагментация TLS ClientHello / первых пакетов.'},
-     {value:'tcp-xmc',label:'TCP · XMC',description:'Клиентская маскировка Minecraft. Требуется совместимый Xray-core и пароль.'},
-     {value:'tcp-filter',label:'TCP · Filter',description:'Только inbound: белый/чёрный список IP-адресов источника.'}
-    ]:[]),
-    ...(udp?[
-     {value:'salamander',label:'UDP · Salamander / Gecko',description:'Общий пароль; Gecko активируется packetSize только на QUIC.'},
-     {value:'udp-sudoku',label:'UDP · Sudoku',description:'Общая UDP-обфускация с криптографически случайным секретом.'},
-     {value:'udp-header',label:'UDP · Header Custom',description:'Произвольные байтовые заголовки client/server; общий формат.'},
-     {value:'udp-mkcp',label:'UDP · mKCP Legacy',description:'Симметричная имитация заголовков DNS, DTLS, SRTP, uTP и др.'},
-     {value:'noise',label:'UDP · Noise',description:'Клиентские шумовые пакеты; параметры и задержки.'},
-     {value:'udp-hop',label:'UDP · Port Hopping',description:'Только клиент: требует настроенных портов и firewall/NAT.'},
-     {value:'udp-xicmp',label:'UDP · XICMP',description:'Клиентские ICMP-пакеты; зависят от ОС и разрешений.'},
-     {value:'udp-realm',label:'UDP · Realm',description:'Клиентская маска STUN/WebRTC; нужна Realm-инфраструктура.'},
-     ...(kcp?[{value:'udp-xdns',label:'UDP · XDNS (mKCP)',description:'DNS-туннель через NS и собственный домен, только mKCP.'}]:[]),
-     {value:'udp-filter',label:'UDP · Filter',description:'Только inbound: фильтрация IP-адресов отправителей UDP.'}
-    ]:[]),
-    ...(quic?[{value:'quic-params',label:'QUIC · Params',description:'Клиентские congestion, окна, таймеры и udpHop.'}]:[]),
+    choice('sudoku','TCP · Sudoku','Общая обфускация с автоматически сгенерированным секретом.',tcp,'нужен TCP'),
+    choice('tcp-header','TCP · Header Custom','Общий протоколоподобный заголовок; последовательности JSON.',tcp,'нужен TCP'),
+    choice('fragment','TCP · Fragment','Клиентская фрагментация TLS ClientHello / первых пакетов.',tcp,'нужен TCP'),
+    choice('tcp-xmc','TCP · XMC','Клиентская маскировка Minecraft, нужен пароль и Xray-core.',tcp,'нужен TCP'),
+    choice('tcp-filter','TCP · Filter','Inbound: фильтрация IP-адресов источника.',tcp,'нужен TCP'),
+    choice('salamander','UDP · Salamander / Gecko','Общий пароль; Gecko через packetSize (только QUIC).',udp,'нужен UDP'),
+    choice('udp-sudoku','UDP · Sudoku','Общая обфускация с криптографическим секретом.',udp,'нужен UDP'),
+    choice('udp-header','UDP · Header Custom','Произвольные байтовые заголовки client/server.',udp,'нужен UDP'),
+    choice('udp-mkcp','UDP · mKCP Legacy','Имитация заголовков DNS, DTLS, SRTP, uTP и др.',udp,'нужен UDP'),
+    choice('noise','UDP · Noise','Клиентские шумовые UDP-пакеты.',udp,'нужен UDP'),
+    choice('udp-hop','UDP · Port Hopping','Клиентские прыжки по портам; требуются NAT/firewall.',udp,'нужен UDP'),
+    choice('udp-xdns','UDP · XDNS','DNS-туннель через NS и свой домен.',kcp,'только mKCP'),
+    choice('udp-xicmp','UDP · XICMP','Клиентские ICMP-пакеты; нужны разрешения ОС.',udp,'нужен UDP'),
+    choice('udp-realm','UDP · Realm','Клиентская маска STUN/WebRTC; нужна Realm-инфраструктура.',udp,'нужен UDP'),
+    choice('udp-filter','UDP · Filter','Inbound: фильтрация UDP по IP источника.',udp,'нужен UDP'),
+    choice('quic-params','QUIC · Params','Клиентские congestion, окна, таймеры и udpHop.',quic,'нужен QUIC / HTTP3'),
     {value:'advanced',label:'Расширенный JSON',description:'Полные цепочки TCP/UDP, обе стороны и QUIC-параметры.'},
     {value:'clear',label:'Сбросить FinalMask',description:'Удалить серверную и клиентскую маски этого inbound.'}
    ];
