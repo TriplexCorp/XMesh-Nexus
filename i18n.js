@@ -783,6 +783,62 @@ window.XMeshI18n=(()=>{
     ["Не удалось удалить:","Could not delete:"]
   ];
   for(const [ru,en] of studioEnglishTranslations)dict.set(ru,en);
+  // Dual-ended FinalMask editor and transport compatibility diagnostics.
+  for(const [ru,en] of [
+  [
+    ": требуется массив до 16 слоёв",
+    ": requires an array of at most 16 layers"
+  ],
+  [
+    ": каждый слой требует type и settings",
+    ": each layer requires type and settings"
+  ],
+  [
+    "FinalMask quicParams должен быть объектом",
+    "FinalMask quicParams must be an object"
+  ],
+  [
+    "FinalMask filter используется только на сервере",
+    "FinalMask filter is server-only"
+  ],
+  [
+    "Разрешены tcp, udp, quicParams",
+    "Allowed fields: tcp, udp, quicParams"
+  ],
+  [
+    ": нужен массив не более 16 слоёв",
+    ": requires an array of at most 16 layers"
+  ],
+  [
+    ": нужны type и settings",
+    ": requires type and settings"
+  ],
+  [
+    "FinalMask · сервер и клиент",
+    "FinalMask · server and client"
+  ],
+  [
+    "Автоэкспорт: TCP Sudoku/header-custom; UDP Salamander/Gecko, Sudoku, mkcp-legacy, header-custom. Для направленных масок задайте clientFinalmask отдельно. QUIC-параметры задаются индивидуально.",
+    "Auto-export: TCP Sudoku/header-custom; UDP Salamander/Gecko, Sudoku, mkcp-legacy, header-custom. Configure directional masks separately via clientFinalmask. QUIC parameters are endpoint-specific."
+  ],
+  [
+    "Сервер · streamSettings.finalmask",
+    "Server · streamSettings.finalmask"
+  ],
+  [
+    "Клиент · xmesh.clientFinalmask (JSON подписки)",
+    "Client · xmesh.clientFinalmask (subscription JSON)"
+  ],
+  [
+    "filter допустим только на серверном inbound",
+    "filter is only allowed on a server inbound"
+  ],
+  [
+    "Серверная и клиентская FinalMask обновлены",
+    "Server and client FinalMask updated"
+  ]
+])dict.set(ru,en);
+
 
   // Fleet explorer search, filters and accessible controls.
   for(const [ru,en] of [
