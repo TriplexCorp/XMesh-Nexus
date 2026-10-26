@@ -27,7 +27,7 @@ assert.match(backend,/LEAST\(\$3::BIGINT,\$4::BIGINT\)/);
 // Cache-busting revisions evolve independently from the presence feature.
 // Require the live entry point to reference a versioned app.js instead of
 // pinning this regression test to an obsolete deployment revision.
-assert.match(html,/<script\\s+src=["']app\\.js\\?v=[A-Za-z0-9._-]+["']><\\/script>/,
+assert.match(html,/<script\s+src=["']app\.js\?v=[A-Za-z0-9._-]+["']><\/script>/,
  'index.html must load the versioned app.js entry point');
 
 // Behavioral model of the counters/source-time gate; protects the intended
