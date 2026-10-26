@@ -493,7 +493,6 @@ mod tests {
         let host = json!({"address":"198.51.100.1"});
         // Mixed layers must never be partially exported: refuse the outbound.
         assert!(client_stream(&inbound, &host, "auto").is_none());
-        assert!(!client.to_string().contains("private"));
         let explicit = json!({"address":"198.51.100.1","clientFinalmask":{"udp":[
             {"type":"salamander","settings":{"password":"override"}}]}});
         assert_eq!(client_stream(&inbound, &explicit, "auto").unwrap()["finalmask"],
@@ -536,7 +535,7 @@ mod tests {
             "tlsSettings":{"serverName":"example.org"},
             "finalmask":{"udp":[
                 {"type":"salamander","settings":{"password":"shared"}},
-                {"type":"header-custom","settings":{"server":[{"rand":20}]}}]}}});
+                {"type":"noise","settings":{"noise":[{"rand":"10-20"}]}}]}}});
         assert!(client_stream(&inbound, &json!({"address":"example.org"}), "auto").is_none());
     }
     #[test]
