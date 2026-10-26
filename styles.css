@@ -5975,3 +5975,33 @@ body>.stats-user-overlay .stats-user-pane .stats-detail-chart{
     grid-template-columns:minmax(0,1fr);
   }
 }
+
+
+/* Node editor: compact TLS controls without changing the three-column layout. */
+dialog#dlg.node-wide .node-tls-settings{
+  grid-column:1/-1;min-width:0;margin:1rem 0 0;padding:1rem;
+  border:1px solid var(--ln);border-radius:var(--ui-control-radius);
+  background:color-mix(in srgb,var(--s2) 58%,var(--s1));
+}
+dialog#dlg.node-wide .node-tls-settings legend{
+  padding:0 .4rem;font-size:.88rem;font-weight:750;color:var(--tx);
+}
+dialog#dlg.node-wide .node-tls-help{
+  margin:0 0 .85rem;color:var(--mu);font-size:.78rem;line-height:1.45;
+}
+dialog#dlg.node-wide .node-tls-modes,
+dialog#dlg.node-wide .node-tls-details{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem 1rem;
+}
+dialog#dlg.node-wide .node-tls-modes{margin-bottom:.85rem}
+dialog#dlg.node-wide .node-tls-settings .f{min-width:0;margin:0}
+dialog#dlg.node-wide .node-tls-settings .f>span:first-child{
+  color:var(--mu);font-size:.81rem;font-weight:640;
+}
+dialog#dlg.node-wide .node-tls-settings :is(input:not([type="checkbox"]),select){
+  width:100%;min-width:0;box-sizing:border-box;
+}
+@media(max-width:680px){
+  dialog#dlg.node-wide .node-tls-modes,
+  dialog#dlg.node-wide .node-tls-details{grid-template-columns:minmax(0,1fr)}
+}
