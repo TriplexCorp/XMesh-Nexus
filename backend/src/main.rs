@@ -891,6 +891,7 @@ async fn create_record(
     // Authoritative, unpredictable, immutable per-user Xray identity. Never trust
     // a client-provided UUID for a newly created account.
     if collection == "users" {
+        use aes_gcm::aead::rand_core::RngCore as _;
         use base64::Engine as _;
         object.insert("xrayId".into(), Value::String(Uuid::new_v4().to_string()));
         // SS2022 multi-user keys must be cryptographically random, persistent,
