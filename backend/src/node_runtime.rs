@@ -996,7 +996,6 @@ fn configure_private_xray_stats(config: &mut Value) -> Result<(), ApiError> {
 
 fn proxy_user_client_entry(
     user: &Value,
-    id: &str,
     uuid: &uuid::Uuid,
     tag: &str,
     protocol: &str,
@@ -1015,10 +1014,23 @@ fn proxy_user_client_entry(
         .collect::<String>();
     let email = format!("xmesh-u{record_id}--{encoded_tag}");
     let entry = match protocol {
-        "vless" | "vmess" => json!({"id":uuid.to_string(),"level":0,"email":email}),
-        "trojan" => json!({"password":uuid.to_string(),"level":0,"email":email}),
-        "hysteria" => json!({"auth":uuid.to_string(),"level":0,"email":email}),
-        "masque" => json!({"pass":uuid.to_string(),"level":0,"email":email}),
+        "vless" => json!({"id":uuid.to_string(),"level":0,"email":email}),
+        "vmess" => json!({
+            "id":crate::user_credentials::for_protocol(user, "vmess")?,
+            "level":0,"email":email
+        }),
+        "trojan" => json!({
+            "password":crate::user_credentials::for_protocol(user, "trojan")?,
+            "level":0,"email":email
+        }),
+        "hysteria" => json!({
+            "auth":crate::user_credentials::for_protocol(user, "hysteria")?,
+            "level":0,"email":email
+        }),
+        "masque" => json!({
+            "pass":crate::user_credentials::for_protocol(user, "masque")?,
+            "level":0,"email":email
+        }),
         "shadowsocks" => {
             // SS2022 passwords must be valid PSKs; never use a plain UUID
             // as a 2022 cipher key. Require an explicit per-user key.
@@ -1030,7 +1042,7 @@ fn proxy_user_client_entry(
                 };
                 user.get(field).and_then(Value::as_str).unwrap_or("")
             } else {
-                id
+                crate::user_credentials::for_protocol(user, "shadowsocks")?
             };
             if password.is_empty() {
                 return None;
@@ -1155,7 +1167,7 @@ fn provision_proxy_users(
                 continue;
             }
             if let Some(entry) =
-                proxy_user_client_entry(user, id, &uuid, tag, &protocol, &ss_method)
+                proxy_user_client_entry(user, &uuid, tag, &protocol, &ss_method)
             {
                 entries.push(entry);
             }
