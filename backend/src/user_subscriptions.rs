@@ -96,7 +96,7 @@ fn decrypt_token(
         .map_err(|_| {
             ApiError::new(
                 StatusCode::SERVICE_UNAVAILABLE,
-                "Subscription decryption failed; verify TOTP_ENCRYPTION_KEY",
+                "Subscription decryption failed; verify the configured subscription encryption key",
             )
         })?;
     let token = String::from_utf8(raw).map_err(|_| {
