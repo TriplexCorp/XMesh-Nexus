@@ -1459,7 +1459,19 @@ fn ensure_masque_address(config: &mut Value) -> Result<(), ApiError> {
 }
 
 fn configure_node_managed_tls(node: &Value, config: &mut Value) -> Result<Option<Value>, ApiError> {
-    if node.get("tlsAutoProvision").and_then(Value::as_bool) != Some(true) { return Ok(None); }
+    if node.get("tlsAutoProvision").and_then(Value::as_bool) != Some(true) {
+        // Legacy records without the new field retain their existing manual
+        // provisioning contract. New records must choose explicitly.
+        if node.get("tlsAutoProvision").and_then(Value::as_bool) == Some(false)
+            && node.get("tlsManualProvision").and_then(Value::as_bool) != Some(true)
+            && config.get("inbounds").and_then(Value::as_array).is_some_and(|items|
+                items.iter().any(|ib| ib.get("streamSettings")
+                    .and_then(|s| s.get("security")).and_then(Value::as_str) == Some("tls"))) {
+            return Err(ApiError::new(StatusCode::CONFLICT,
+                "TLS node needs managed ACME settings or explicit externally provisioned certificates."));
+        }
+        return Ok(None);
+    }
     let domain = node.get("tlsDomain").and_then(Value::as_str).unwrap_or("").trim().to_ascii_lowercase();
     let email = node.get("tlsAcmeEmail").and_then(Value::as_str).unwrap_or("").trim();
     let valid_domain = domain.len() <= 253 && domain.contains('.')
