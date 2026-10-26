@@ -2169,7 +2169,13 @@ mod provision_tests {
             {"tag":"SS","protocol":"shadowsocks","settings":{"method":"aes-256-gcm"}}
         ]});
         let squads = vec![json!({"id":4,"inb":["VL","VM","TR","HY","MQ","SS"]})];
-        provision_proxy_users(&mut config, std::slice::from_ref(&user), &squads, 1_800_000_000_000).unwrap();
+        provision_proxy_users(
+            &mut config,
+            std::slice::from_ref(&user),
+            &squads,
+            1_800_000_000_000,
+        )
+        .unwrap();
         let credentials = [
             ("id", "xrayId"),
             ("id", "vmessId"),
@@ -2187,7 +2193,13 @@ mod provision_tests {
         }
         let legacy = json!({"id":7,"xrayId":"550e8400-e29b-41d4-a716-446655440000","squads":[4]});
         let mut old = json!({"inbounds":[{"tag":"HY","protocol":"hysteria","settings":{}}]});
-        provision_proxy_users(&mut old, std::slice::from_ref(&legacy), &squads, 1_800_000_000_000).unwrap();
+        provision_proxy_users(
+            &mut old,
+            std::slice::from_ref(&legacy),
+            &squads,
+            1_800_000_000_000,
+        )
+        .unwrap();
         assert_eq!(
             old["inbounds"][0]["settings"]["users"][0]["auth"],
             legacy["xrayId"]
