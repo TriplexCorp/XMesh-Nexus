@@ -628,7 +628,9 @@ const operations={
    const tcp=!['hysteria','masque','mkcp','kcp'].includes(network);
    const choices=[
     ...(tcp?[{value:'sudoku',label:'TCP · Sudoku',description:'Симметричная TCP-маска, общий секрет генерируется автоматически.'}]:[]),
+    ...(tcp?[{value:'fragment',label:'TCP · Fragment',description:'Клиентская фрагментация TLS ClientHello; готовые безопасные параметры, пароль не нужен.'}]:[]),
     ...(udp?[{value:'salamander',label:'UDP · Salamander / Gecko',description:'Маска QUIC/UDP, автоматический общий пароль и необязательный packetSize.'}]:[]),
+    ...(udp?[{value:'noise',label:'UDP · Noise',description:'Клиентский случайный UDP-шум перед данными; пароль не нужен.'}]:[]),
     {value:'advanced',label:'Расширенный JSON',description:'Направленные слои, QUIC-параметры и нестандартные настройки.'},
     {value:'clear',label:'Сбросить FinalMask',description:'Удалить серверную и клиентскую маски этого inbound.'}
    ];
@@ -649,6 +651,38 @@ const operations={
      if(ib.streamSettings)delete ib.streamSettings.finalmask;
      if(ib.xmesh){delete ib.xmesh.clientFinalmask;if(!Object.keys(ib.xmesh).length)delete ib.xmesh}
     },'FinalMask удалён');
+    return;
+   }
+   if(['fragment','noise'].includes(action.action)){
+    const fragment=action.action==='fragment',direction=fragment?'tcp':'udp';
+    if(fragment&&!tcp||!fragment&&!udp)throw Error('Маска несовместима с транспортом');
+    // Directional layers belong on the client, and cannot silently replace
+    // a required symmetric layer already present on the server.
+    if(inbound.streamSettings?.finalmask?.[direction]?.length)
+     throw Error('На сервере уже есть маски этого направления. Настройте совместную цепочку клиента в расширенном JSON.');
+    const ok=await dialog.confirm({
+     title:fragment?'TCP · Fragment':'UDP · Noise',
+     description:fragment?
+      'Будет добавлена только клиентская фрагментация TLS ClientHello с параметрами lengths 3-5 / 6-8 / 10-20, delays 10-20. Поддержка зависит от клиента.':
+      'Будет добавлен только клиентский UDP-шум (8–32 случайных байта, задержка 10–20 мс). Это может увеличить расход трафика.',
+     confirmLabel:'Добавить клиентскую маску'
+    });
+    if(!ok)return;
+    if(area.value!==selected.source){notify('JSON изменился. Повторите действие.');return}
+    const settings=fragment?
+     {packets:'tlshello',lengths:['3-5','6-8','10-20'],delays:['10-20'],maxSplit:'3-6'}:
+     {reset:'30-60',noise:[{rand:'8-32',delay:'10-20'}]};
+    mutate(doc=>{
+     const ib=getInbound(doc,selected.index);
+     if(ib.tag!==selected.tag)throw Error('Inbound изменился');
+     ib.xmesh??={};ib.xmesh.clientFinalmask??={};
+     const layers=ib.xmesh.clientFinalmask[direction]??=[];
+     const index=layers.findIndex(v=>v?.type===action.action);
+     const layer={type:action.action,settings};
+     if(index>=0)layers[index]=layer;else layers.push(layer);
+     if(layers.length>16)throw Error('FinalMask: максимум 16 слоёв');
+     ib.xmesh.clientFinalmask[direction]=layers;
+    },'Клиентская FinalMask '+action.action+' добавлена');
     return;
    }
    if(['sudoku','salamander'].includes(action.action)){
