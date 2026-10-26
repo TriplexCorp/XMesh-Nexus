@@ -122,6 +122,7 @@ async function run(){
  const withMask=JSON.parse(JSON.stringify(hysteria));
  withMask.inbounds[0].streamSettings.finalmask={udp:[{type:'salamander',settings:{password:'shared'}}]};
  const paired=harness(withMask,{requestValues:{
+  action:'advanced',
   json:JSON.stringify({udp:[{type:'salamander',settings:{password:'shared-2'}}]}),
   client:JSON.stringify({udp:[{type:'noise',settings:{noise:[{rand:'10-20'}]}}]})
  }});
@@ -132,6 +133,25 @@ async function run(){
  assert.equal(pairedInbound.xmesh.clientFinalmask.udp[0].type,'noise');
  assert.equal(pairedInbound.streamSettings.finalmask.udp[0].type,'salamander',
   'client mask must not overwrite server mask');
+ // Guided presets generate a fresh cryptographic secret; the client inherits shared masks.
+ const autoUDP=harness(hysteria);
+ await autoUDP.run('finalmask');
+ const autoLayer=autoUDP.doc().inbounds[0].streamSettings.finalmask.udp[0];
+ assert.equal(autoLayer.type,'salamander');
+ assert.match(autoLayer.settings.password,/^[a-f0-9]{64}$/,'Generate a 256-bit random shared secret');
+ assert.equal(autoUDP.doc().inbounds[0].xmesh?.clientFinalmask,undefined,'Shared masks inherit automatically');
+ const autoTCP=harness(sample(),{requestValues:{action:'sudoku'}});
+ await autoTCP.run('finalmask');
+ assert.equal(autoTCP.doc().inbounds[0].streamSettings.finalmask.tcp[0].type,'sudoku');
+ assert.match(autoTCP.doc().inbounds[0].streamSettings.finalmask.tcp[0].settings.password,/^[a-f0-9]{64}$/);
+ const reset=harness(withMask,{requestValues:{action:'clear'}});
+ await reset.run('finalmask');
+ assert.equal(reset.doc().inbounds[0].streamSettings.finalmask,undefined,'Reset deletes server mask');
+ const explicitClient=JSON.parse(JSON.stringify(withMask));
+ explicitClient.inbounds[0].xmesh={clientFinalmask:{udp:[{type:'noise',settings:{noise:[{rand:'10-20'}]}}]}};
+ const preserve=harness(explicitClient,{requestValues:{action:'salamander'}});
+ await preserve.run('finalmask');
+ assert.deepEqual(preserve.doc(),explicitClient,'Guided mode refuses to overwrite a custom client mask');
  const tlsEdit=harness(hysteria,{requestValues:{json:'{"certificates":[],"minVersion":"1.3"}'}});
  await tlsEdit.run('tls');
  assert.equal(tlsEdit.doc().inbounds[0].streamSettings.tlsSettings.minVersion,'1.3');
