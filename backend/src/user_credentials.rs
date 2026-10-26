@@ -115,7 +115,14 @@ mod tests {
         assert!(is_isolated(&user));
         assert_ne!(user["vmessId"], user["xrayId"]);
         assert!(Uuid::parse_str(for_protocol(&user, "vmess").unwrap()).is_ok());
-        for protocol in ["trojan", "shadowsocks", "hysteria", "masque", "http", "socks"] {
+        for protocol in [
+            "trojan",
+            "shadowsocks",
+            "hysteria",
+            "masque",
+            "http",
+            "socks",
+        ] {
             let secret = for_protocol(&user, protocol).unwrap();
             assert_eq!(secret.len(), 64, "{protocol}");
             assert!(secret.bytes().all(|b| b.is_ascii_hexdigit()));
@@ -130,7 +137,14 @@ mod tests {
         let user = json!({"xrayId":"550e8400-e29b-41d4-a716-446655440000"});
         assert!(!is_isolated(&user));
         for protocol in [
-            "vless", "vmess", "trojan", "shadowsocks", "hysteria", "masque", "http", "socks",
+            "vless",
+            "vmess",
+            "trojan",
+            "shadowsocks",
+            "hysteria",
+            "masque",
+            "http",
+            "socks",
         ] {
             assert_eq!(for_protocol(&user, protocol), user["xrayId"].as_str());
         }
