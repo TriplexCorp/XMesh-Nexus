@@ -613,6 +613,9 @@ function openComposer(){
   opts.path=primary.streamSettings?.xhttpSettings?.path||primary.streamSettings?.wsSettings?.path||primary.streamSettings?.grpcSettings?.serviceName||'/xhttp';
   opts.target=primary.streamSettings?.realitySettings?.target||'';
   opts.sni=primary.streamSettings?.realitySettings?.serverNames?.[0]||'';
+   opts.alpn=primary.streamSettings?.tlsSettings?.alpn?.join(', ')||'auto';
+   opts.certificateFile=primary.streamSettings?.tlsSettings?.certificates?.[0]?.certificateFile||'';
+   opts.keyFile=primary.streamSettings?.tlsSettings?.certificates?.[0]?.keyFile||'';
  }
  opts.tag=(opts.protocol==='custom'?(opts.customProtocol||'server'):opts.protocol)+'-main';
  opts.name='Новая конфигурация';
@@ -635,6 +638,9 @@ function openComposer(){
            '<label><span>Тег inbound</span><input data-compose-field="tag" maxlength="64" autocomplete="off" spellcheck="false"></label>'+
            '<label><span>Порт</span><input data-compose-field="port" type="number" min="1" max="65535"></label>'+
            '<label><span>Listen</span><input data-compose-field="listen" placeholder="127.0.0.1" spellcheck="false"></label>'+
+           '<label data-compose-when="alpn" class="sv-compose-field-wide"><span>ALPN (auto / h2 / h3 / http/1.1)</span><input data-compose-field="alpn" placeholder="auto" spellcheck="false"></label>'+
+           '<label data-compose-when="certificateFile" class="sv-compose-field-wide"><span>TLS certificateFile (путь на ноде)</span><input data-compose-field="certificateFile" placeholder="/etc/letsencrypt/live/domain/fullchain.pem" spellcheck="false"></label>'+
+           '<label data-compose-when="keyFile" class="sv-compose-field-wide"><span>TLS keyFile (путь на ноде)</span><input data-compose-field="keyFile" placeholder="/etc/letsencrypt/live/domain/privkey.pem" spellcheck="false"></label>'+
            '<label data-compose-when="path" class="sv-compose-field-wide"><span>Путь / serviceName</span><input data-compose-field="path" spellcheck="false"></label>'+
            '<label data-compose-when="target" class="sv-compose-field-wide"><span>REALITY target (домен:порт)</span><input data-compose-field="target" placeholder="your-domain.example:443" autocomplete="off" spellcheck="false"></label>'+
            '<label data-compose-when="sni" class="sv-compose-field-wide"><span>REALITY SNI</span><input data-compose-field="sni" placeholder="your-domain.example" autocomplete="off" spellcheck="false"></label>'+
@@ -680,6 +686,7 @@ function openComposer(){
   const flags={
    path:['xhttp','ws','grpc','httpupgrade'].includes(network),
    target:security==='reality',sni:security==='reality',
+    alpn:security==='tls',certificateFile:security==='tls',keyFile:security==='tls',
    method:protocol==='shadowsocks',customProtocol:protocol==='custom',
    customTransport:network==='custom'
   };
