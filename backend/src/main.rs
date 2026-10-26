@@ -301,7 +301,10 @@ fn protected_routes(state: &AppState) -> Router<AppState> {
         .route("/system/stats", get(get_system_stats))
         .route("/statistics/overview", get(get_statistics_overview))
         .route("/statistics/leaders", get(get_statistics_leaders))
-        .route("/statistics/period-leaders", get(get_statistics_period_leaders))
+        .route(
+            "/statistics/period-leaders",
+            get(get_statistics_period_leaders),
+        )
         .route("/metrics/traffic", get(get_traffic_metrics))
         .route(
             "/metrics/traffic/bucket-detail",
@@ -310,7 +313,10 @@ fn protected_routes(state: &AppState) -> Router<AppState> {
         .route("/users/presence", get(get_user_presence))
         .route("/users/{id}/traffic", get(get_user_traffic))
         .route("/users/{id}/traffic/history", get(get_user_traffic_history))
-        .route("/users/{id}/traffic/observations", get(get_user_traffic_observations))
+        .route(
+            "/users/{id}/traffic/observations",
+            get(get_user_traffic_observations),
+        )
         .route(
             "/nodes/{id}/metrics-key",
             post(node_auth::enroll).delete(node_auth::revoke),
@@ -3573,7 +3579,14 @@ mod subscription_host_protocol_tests {
 
     #[test]
     fn all_exportable_inbounds_can_be_used_by_hosts() {
-        for protocol in ["vless", "vmess", "trojan", "shadowsocks", "hysteria", "masque"] {
+        for protocol in [
+            "vless",
+            "vmess",
+            "trojan",
+            "shadowsocks",
+            "hysteria",
+            "masque",
+        ] {
             let inbound = json!({"tag":"test","protocol":protocol});
             assert!(subscription_host_protocol_supported(&inbound), "{protocol}");
         }
@@ -3630,7 +3643,9 @@ async fn validate_host_binding(pool: &PgPool, host: &Value) -> Result<(), ApiErr
         })
         .ok_or_else(|| bad("Выбранный inbound отсутствует в XRAY STUDIO профиле."))?;
     if !subscription_host_protocol_supported(inbound) {
-        return Err(bad("Выбранный inbound не поддерживается генератором JSON-подписок."));
+        return Err(bad(
+            "Выбранный inbound не поддерживается генератором JSON-подписок.",
+        ));
     }
     let all_nodes = load_records(pool, "nodes").await?;
     for node_id in nodes {
