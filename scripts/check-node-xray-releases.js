@@ -30,7 +30,7 @@ assert.match(update,/\.bind\(\s*&actor\.username\s*\)\s*\.bind\(\s*target\s*\)/)
 assert.match(runtime,/RETURNING id,action,target_version/);
 assert.match(runtime,/"targetVersion":row\.try_get/);
 assert.match(migration,/ADD COLUMN target_version TEXT/);
-assert.match(agent,/AGENT_VERSION="control-v4[.][0-9]+[.][0-9]+"/);
+assert.match(agent,/AGENT_VERSION="control-v[4-9][.][0-9]+[.][0-9]+"/,'managed runtime must advertise a supported v4+ agent');
 assert.match(agent,/update_managed_xray "\$target_version"/);
 assert.match(agent,/local image_tag="\$\{version#v\}"/);
 assert.match(agent,/ghcr\.io\/xtls\/xray-core:\$image_tag/);
