@@ -94,16 +94,16 @@ mod tests {
         let mut obj = Map::new();
         provision(&mut obj);
         let user = Value::Object(obj);
-        let vless_uuid = for_protocol(&user, "vless", "").unwrap();
-        let vmess_uuid = for_protocol(&user, "vmess", "").unwrap();
-        assert_ne!(vless_uuid, vmess_uuid);
+        let primary_identity = for_protocol(&user, "vless", "").unwrap();
+        let alternative_identity = for_protocol(&user, "vmess", "").unwrap();
+        assert_ne!(primary_identity, alternative_identity);
         let mut secrets = std::collections::HashSet::new();
         for protocol in ["trojan", "hysteria", "masque", "shadowsocks"] {
             let secret = for_protocol(&user, protocol, "aes-256-gcm").unwrap();
             assert_eq!(secret.len(), 64);
             assert!(secrets.insert(secret));
-            assert_ne!(secret, vless_uuid);
-            assert_ne!(secret, vmess_uuid);
+            assert_ne!(secret, primary_identity);
+            assert_ne!(secret, alternative_identity);
         }
         assert_eq!(secrets.len(), 4);
         assert_eq!(
