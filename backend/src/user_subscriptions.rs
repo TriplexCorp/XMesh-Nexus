@@ -2027,8 +2027,38 @@ mod tests {
         assert!(!feed.to_string().contains("SECRET_PRIVATE"));
     }
     #[test]
-    fn per_user_multi_protocol_credentials_match_node_conventions() {
+    fn legacy_accounts_keep_existing_imports_until_owner_rekey() {
         let user = json!({"xrayId":"550e8400-e29b-41d4-a716-446655440000"});
+        let host = json!({"address":"vpn.example.org","externalPort":443});
+        for protocol in ["vmess", "trojan", "shadowsocks", "hysteria", "masque"] {
+            let network = match protocol {
+                "hysteria" => "hysteria",
+                "masque" => "masque",
+                _ => "raw",
+            };
+            let settings = if protocol == "shadowsocks" {
+                json!({"method":"aes-256-gcm"})
+            } else {
+                json!({})
+            };
+            let inbound = json!({"protocol":protocol,"tag":"LEGACY","settings":settings,
+              "streamSettings":{"network":network,"security":"tls",
+                "tlsSettings":{"serverName":"vpn.example.org"}}});
+            let mut entry = user.clone();
+            entry["id"] = json!(42);
+            let proxy = proxy_outbound(&entry, &inbound, &host, "auto").unwrap();
+            let actual = match protocol {
+                "hysteria" => &proxy["streamSettings"]["hysteriaSettings"]["auth"],
+                "masque" => &proxy["streamSettings"]["masqueSettings"]["pass"],
+                "vmess" => &proxy["settings"]["id"],
+                _ => &proxy["settings"]["password"],
+            };
+            assert_eq!(actual, &user["xrayId"], "{protocol}");
+        }
+    }
+    #[test]
+    fn per_user_multi_protocol_credentials_match_node_conventions() {
+        let user = Value::Object(crate::user_credentials::generate());
         let host = json!({"address":"vpn.example.org","externalPort":443});
         for (protocol, settings, field) in [
             ("vmess", json!({}), "id"),
@@ -2050,7 +2080,12 @@ mod tests {
             } else {
                 &proxy["settings"][field]
             };
-            assert_eq!(auth, &user["xrayId"], "{protocol}");
+            assert_eq!(
+                auth.as_str(),
+                crate::user_credentials::for_protocol(&user, protocol),
+                "{protocol}"
+            );
+            assert_ne!(auth, &user["xrayId"], "independent {protocol} credential");
             assert!(crate::subscription_json::build_feed(vec![proxy], &json!({})).is_ok());
         }
     }
@@ -2110,7 +2145,8 @@ mod tests {
     }
     #[test]
     fn masque_client_basic_auth_matches_provisioned_user() {
-        let user = json!({"id":42,"xrayId":"550e8400-e29b-41d4-a716-446655440000"});
+        let mut user = Value::Object(crate::user_credentials::generate());
+        user["id"] = json!(42);
         let inbound = json!({"tag":"CDN NL","protocol":"masque",
    "settings":{"address":["10.0.0.1/24"]},
    "streamSettings":{"method":"masque","security":"tls",
@@ -2126,7 +2162,7 @@ mod tests {
         );
         assert_eq!(
             proxy["streamSettings"]["masqueSettings"]["pass"],
-            user["xrayId"]
+            user["masquePassword"]
         );
         assert!(
             !proxy
