@@ -182,7 +182,7 @@ fn validate_layer(
             if src
                 .get("domains")
                 .and_then(Value::as_array)
-                .is_none_or(|v| v.is_empty())
+                .is_none_or(Vec::is_empty)
             {
                 return Err("xdns requires a non-empty domains array");
             }
@@ -233,7 +233,7 @@ fn validate_layer(
             if src
                 .get("noise")
                 .and_then(Value::as_array)
-                .is_none_or(|v| v.is_empty())
+                .is_none_or(Vec::is_empty)
             {
                 return Err("UDP noise requires a non-empty noise array");
             }
