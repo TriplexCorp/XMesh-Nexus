@@ -2460,11 +2460,11 @@ async function syncXrayUserToProfile(user){
   }else if(inbound.protocol==='vmess'){
    const list=inbound.settings.users||(inbound.settings.users=[]);
    if(Array.isArray(inbound.settings.clients)){for(const legacy of inbound.settings.clients){if(legacy.id&&!list.some(x=>x.id===legacy.id))list.push({...legacy})}delete inbound.settings.clients}
-   if(!list.some(x=>x.id===user.xrayId))list.push({id:user.xrayId,level:0,email,alterId:0});
+   if(!list.some(x=>x.id===(user.vmessId||user.xrayId)))list.push({id:user.vmessId||user.xrayId,level:0,email,alterId:0});
    changed++;
   }else if(inbound.protocol==='trojan'){
    const list=inbound.settings.clients||(inbound.settings.clients=[]);
-   if(!list.some(x=>x.password===user.xrayId))list.push({password:user.xrayId,email,level:0});
+   if(!list.some(x=>x.password===(user.trojanPassword||user.xrayId)))list.push({password:user.trojanPassword||user.xrayId,email,level:0});
    changed++;
   }else if(inbound.protocol==='http'){
    const list=inbound.settings.users||(inbound.settings.users=[]);
@@ -2478,17 +2478,17 @@ async function syncXrayUserToProfile(user){
   }else if(inbound.protocol==='hysteria'){
    inbound.settings.version=2;
    const list=inbound.settings.users||(inbound.settings.users=[]);
-   if(!list.some(x=>x.auth===user.xrayId||x.email===email))list.push({auth:user.xrayId,level:0,email});
+   if(!list.some(x=>x.auth===(user.hysteriaPassword||user.xrayId)||x.email===email))list.push({auth:user.hysteriaPassword||user.xrayId,level:0,email});
    changed++;
   }else if(inbound.protocol==='masque'){
    const list=inbound.settings.users||(inbound.settings.users=[]);
-   if(!list.some(x=>x.pass===user.xrayId||x.email===email))list.push({pass:user.xrayId,level:0,email});
+   if(!list.some(x=>x.pass===(user.masquePassword||user.xrayId)||x.email===email))list.push({pass:user.masquePassword||user.xrayId,level:0,email});
    changed++;
   }else if(inbound.protocol==='shadowsocks'){
    const method=String(inbound.settings.method||'chacha20-ietf-poly1305');
    if(method.startsWith('2022-')){skipped.push(inbound.tag||'Shadowsocks 2022');continue}
    const list=inbound.settings.users||(inbound.settings.users=[]);
-   if(!list.some(x=>x.password===user.xrayId||x.email===email))list.push({password:user.xrayId,method,level:0,email});
+   if(!list.some(x=>x.password===(user.ssLegacyPassword||user.xrayId)||x.email===email))list.push({password:user.ssLegacyPassword||user.xrayId,method,level:0,email});
    changed++;
   }
  }
@@ -2512,7 +2512,8 @@ async function removeXrayUserFromProfiles(user){
     const settings=inbound.settings||{};
     for(const key of ['users','clients']){
      if(Array.isArray(settings[key])){
-      const filtered=settings[key].filter(c=>c.id!==user.xrayId&&c.password!==user.xrayId&&c.pass!==user.xrayId&&c.auth!==user.xrayId&&(!email||c.email!==email));
+      const secrets=[user.xrayId,user.vmessId,user.trojanPassword,user.hysteriaPassword,user.masquePassword,user.ssLegacyPassword].filter(Boolean);
+      const filtered=settings[key].filter(c=>!secrets.includes(c.id)&&!secrets.includes(c.password)&&!secrets.includes(c.pass)&&!secrets.includes(c.auth)&&(!email||c.email!==email));
       if(filtered.length!==settings[key].length){settings[key]=filtered;changed=true}
      }
     }
