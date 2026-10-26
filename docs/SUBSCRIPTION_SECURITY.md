@@ -49,6 +49,28 @@ On managed installations, the root `xmeshctl` update refreshes the
 panel's Nginx vhost. If a custom host requires a manual update, review
 `deploy/install-panel-host.sh` before applying it.
 
+## Protocol credential isolation
+
+All **new** accounts get independently generated authentication secrets:
+VLESS receives a UUID v4; VMess receives a *different* UUID v4;
+Trojan, Hysteria2, MASQUE and classic Shadowsocks receive their own
+independent 256-bit CSPRNG passwords; Shadowsocks 2022 continues to
+use independent, standards-compliant 128/256-bit PSKs.
+
+The native client subscription JSON and the managed-node Xray runtime
+both resolve these fields through the same server-side function, keeping
+authentication material consistent across both sides.
+
+Existing accounts retain their previously imported UUID-based passwords
+on all legacy protocols until the owner explicitly selects
+**Rotate VPN access**. This deliberate compatibility fallback prevents
+a routine panel upgrade from breaking installed VPN clients. The full
+rotation simultaneously provisions distinct credentials, replaces the
+subscription URL, and requires remote node reconciliation. To isolate
+older accounts, the owner must perform this action and have their clients
+reimport the new subscription. A simple subscription-link rotation does
+**not** change any protocol password.
+
 ## Two distinct actions
 
 **Rotate subscription link** replaces only the bearer URL. It immediately

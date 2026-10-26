@@ -4,6 +4,8 @@ const fs=require('node:fs');
 const assert=require('node:assert/strict');
 const read=path=>fs.readFileSync(path,'utf8');
 const backend=read('backend/src/user_subscriptions.rs');
+const protocols=read('backend/src/protocol_credentials.rs');
+const node=read('backend/src/node_runtime.rs');
 const main=read('backend/src/main.rs');
 const host=read('deploy/install-panel-host.sh');
 const app=read('app.js');
@@ -36,4 +38,15 @@ assert.match(app,/requiresNodeSync|синхронизацию каждой но�
 assert.match(test,/viewer forbidden from rotating VPN credentials/);
 assert.ok(!/token_expire_at|token_ttl|expires_at.*user_subscription_tokens/.test(backend),
   'Subscription bearer URLs must not be assigned a rolling TTL');
+for(const protocol of ['vmess','trojan','hysteria','masque','shadowsocks']){
+  assert.match(backend,new RegExp('for_protocol\\(\\s*user,\\s*"'+protocol+'"'),'Subscription feed must issue dedicated '+protocol+' secret');
+  assert.match(node,new RegExp('for_protocol\\(\\s*user,\\s*"'+protocol+'"'),'Node authorization must use matching '+protocol+' secret');
+}
+assert.match(protocols,/fn secret256\(\) -> String/);
+assert.match(protocols,/OsRng\.fill_bytes\(&mut bytes\)/);
+assert.match(protocols,/pub fn provision/);
+assert.match(protocols,/fn existing_records_keep_legacy_passwords_until_explicit_rekey/);
+assert.match(protocols,/fn rekey_changes_all_protocol_credentials/);
+assert.match(main,/protocol_credentials::provision\(object\)/);
+assert.match(backend,/crate::protocol_credentials::provision\(object\)/);
 console.log('Subscription key separation, logging redaction, indefinite tokens, rotation contract: PASS');
