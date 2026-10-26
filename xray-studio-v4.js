@@ -655,6 +655,7 @@ function openComposer(){
            '<label data-compose-when="xdriveRemoteFolder" class="sv-compose-field-wide"><span>XDRIVE remoteFolder</span><input data-compose-field="xdriveRemoteFolder" spellcheck="false"></label>'+
            '<label data-compose-when="xdriveSecrets" class="sv-compose-field-wide"><span>XDRIVE secrets (по одному на строку)</span><textarea data-compose-field="xdriveSecrets" rows="3" autocomplete="off" spellcheck="false"></textarea></label>'+
            '<label data-compose-when="xdriveTemplate" class="sv-compose-field-wide"><span>XDRIVE template (JSON)</span><textarea data-compose-field="xdriveTemplate" rows="6" spellcheck="false"></textarea></label>'+
+           '<label data-compose-when="sniFallbackRoutes" class="sv-compose-field-wide"><span>SNI Fallback · один TLS-порт → локальные inbound</span><textarea data-compose-field="sniFallbackRoutes" rows="5" spellcheck="false" placeholder="vmess.example.com 10001&#10;trojan.example.com 10002"></textarea><small>По одной строке: SNI и локальный TCP-порт. Работает после TLS для fallback-трафика VLESS/Trojan; целевые inbound должны слушать 127.0.0.1 без повторного TLS.</small></label>'+
            '<label data-compose-when="path" class="sv-compose-field-wide"><span>Путь / serviceName</span><input data-compose-field="path" spellcheck="false"></label>'+
            '<label data-compose-when="target" class="sv-compose-field-wide"><span>REALITY target (домен:порт)</span><input data-compose-field="target" placeholder="your-domain.example:443" autocomplete="off" spellcheck="false"></label>'+
            '<label data-compose-when="sni" class="sv-compose-field-wide"><span>REALITY SNI</span><input data-compose-field="sni" placeholder="your-domain.example" autocomplete="off" spellcheck="false"></label>'+
@@ -699,6 +700,7 @@ function openComposer(){
   const protocol=opts.protocol,network=opts.transport,security=opts.security;
   const flags={
    path:['xhttp','ws','grpc','httpupgrade'].includes(network),
+   sniFallbackRoutes:['vless','trojan'].includes(protocol)&&network==='raw'&&security==='tls',
    target:security==='reality',sni:security==='reality',
     alpn:security==='tls',certificateFile:security==='tls',keyFile:security==='tls',
    vlessDecryption:network==='xdrive',xdriveService:network==='xdrive',
