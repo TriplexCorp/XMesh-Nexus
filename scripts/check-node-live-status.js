@@ -19,8 +19,6 @@ assert(stateStart>=0&&stateEnd>stateStart,'Node runtime state function must exis
 const state=vm.runInNewContext(app.slice(stateStart,stateEnd)+';nodeRuntimeState');
 const healthy={connected:true,xrayRunning:true,routerRunning:true};
 const assigned={disabled:false,profileId:17};
-assert.equal(state({disabled:false},healthy).kind,'unknown','Without an assigned profile the node must be awaiting configuration');
-const assigned={disabled:false,profileId:17};
 assert.equal(state(assigned,healthy).kind,'online');
 assert.equal(state({disabled:false},healthy).kind,'unknown','An unassigned node must wait for a profile even when both services report running');
 assert.equal(state(assigned,{...healthy,connected:false,lastSeenAt:Date.now()}).kind,'offline','Stale heartbeats must never mark a node active');
