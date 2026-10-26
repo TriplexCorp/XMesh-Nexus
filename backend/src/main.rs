@@ -358,6 +358,10 @@ fn protected_routes(state: &AppState) -> Router<AppState> {
                 .delete(user_subscriptions::revoke),
         )
         .route(
+            "/users/{id}/credentials/rotate",
+            post(user_subscriptions::rotate_credentials),
+        )
+        .route(
             "/users/{id}/client-json",
             get(user_subscriptions::admin_client_json),
         )
