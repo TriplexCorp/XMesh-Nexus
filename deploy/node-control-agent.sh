@@ -11,7 +11,7 @@ export LC_ALL=C
 [[ "$XMESH_API_URL" == https://* ]] || exit 2
 XMESH_API_URL="${XMESH_API_URL%/}"
 KEY="${XMESH_METRICS_PRIVATE_KEY:-/etc/xmesh-node-metrics/node.key}"
-AGENT_VERSION="control-v5.1.1"
+AGENT_VERSION="control-v5.1.2"
 UNIT="${XMESH_XRAY_UNIT:-xray.service}"
 # Only root-owned local configuration can choose a unit. Remote responses never do.
 [[ "$UNIT" =~ ^[A-Za-z0-9_.@-]+\.service$ ]] || { echo "Invalid systemd unit" >&2; exit 2; }
@@ -59,9 +59,16 @@ xray_running(){
  if docker inspect -f '{{.State.Running}}' xmesh-managed-xray 2>/dev/null | grep -qx true; then return 0; fi
  systemctl is-active --quiet "$UNIT"
 }
+router_running(){
+ # The edge router and managed Xray are independent processes: report each
+ # one's actual state rather than pretending Xray health implies router health.
+ if docker inspect -f '{{.State.Running}}' xmesh-node 2>/dev/null | grep -qx true;then return 0;fi
+ systemctl is-active --quiet xmesh-node.service
+}
 heartbeat(){
- local xr=false version='' raw=''
+ local xr=false router=false version='' raw=''
  if xray_running;then xr=true;fi
+ if router_running;then router=true;fi
  if docker inspect -f '{{.State.Running}}' xmesh-managed-xray 2>/dev/null | grep -qx true;then
   raw="$(timeout 5 docker exec xmesh-managed-xray xray version 2>/dev/null || true)"
  elif command -v xray >/dev/null 2>&1;then
@@ -113,7 +120,7 @@ except (ValueError,TypeError,KeyError):
   if [[ "$parsed_revision" =~ ^[a-f0-9]{64}$ ]];then revision_json="\"$parsed_revision\"";fi
  fi
  local ack=''
- ack="$(signed_post '/api/v1/node/heartbeat' "{\"node_id\":$XMESH_NODE_ID,\"version\":\"$AGENT_VERSION\",\"xray_version\":\"$version\",\"xray_running\":$xr,\"router_running\":$xr,\"geoData\":$geo_data,\"tlsStatus\":$tls_status,\"appliedRevision\":$revision_json,\"profileCheck\":\"$profile_check\"}")"
+ ack="$(signed_post '/api/v1/node/heartbeat' "{\"node_id\":$XMESH_NODE_ID,\"version\":\"$AGENT_VERSION\",\"xray_version\":\"$version\",\"xray_running\":$xr,\"router_running\":$router,\"geoData\":$geo_data,\"tlsStatus\":$tls_status,\"appliedRevision\":$revision_json,\"profileCheck\":\"$profile_check\"}")"
  # Reconcile missing desired-state records without treating a node-supplied
  # digest as authoritative. Rate-limit even when the panel requests repeatedly.
  if [[ "$xr" == true && -f /etc/systemd/system/xmesh-xray-sync.service ]] &&

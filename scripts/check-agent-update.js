@@ -28,6 +28,9 @@ assert.ok(agent.includes('AGENT_VERSION="'+target[1]+'"'),'Installer must report
 assert.match(runtime,/version LIKE 'control-v5[.]%'/,'Agent updates must accept control-v5');
 assert.match(migration,/CHECK \(action IN \('restart_xray', 'update_xray', 'update_agent'\)\)/);
 assert.match(agent,/AGENT_VERSION="control-v[45][.][0-9]+[.][0-9]+"/);
+assert.match(agent,/router_running\(\)\{/,'Control agent needs an independent edge-router health probe');
+assert.match(agent,/if router_running;then router=true;fi/,'Router heartbeat must come from its own process');
+assert.ok(agent.includes('router_running\\":$router'),'Router status must not be copied from Xray health');
 assert.match(agent,/if action not in \("restart_xray","update_xray","update_agent"\)/);
 assert.match(agent,/systemctl start --wait xmesh-node-agent-upgrade[.]service/);
 assert.match(agent,/signed_post '\/api\/v1\/node\/restart\/ack'/);
