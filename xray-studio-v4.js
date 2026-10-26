@@ -641,6 +641,11 @@ function openComposer(){
            '<label data-compose-when="alpn" class="sv-compose-field-wide"><span>ALPN (auto / h2 / h3 / http/1.1)</span><input data-compose-field="alpn" placeholder="auto" spellcheck="false"></label>'+
            '<label data-compose-when="certificateFile" class="sv-compose-field-wide"><span>TLS certificateFile (путь на ноде)</span><input data-compose-field="certificateFile" placeholder="/etc/letsencrypt/live/domain/fullchain.pem" spellcheck="false"></label>'+
            '<label data-compose-when="keyFile" class="sv-compose-field-wide"><span>TLS keyFile (путь на ноде)</span><input data-compose-field="keyFile" placeholder="/etc/letsencrypt/live/domain/privkey.pem" spellcheck="false"></label>'+
+           '<label data-compose-when="vlessDecryption" class="sv-compose-field-wide"><span>VLESS Encryption · decryption (xray vlessenc)</span><input data-compose-field="vlessDecryption" autocomplete="off" spellcheck="false"></label>'+
+           '<label data-compose-when="xdriveService"><span>XDRIVE service</span><select data-compose-field="xdriveService"><option value="local">local</option><option value="google-drive">google-drive</option><option value="template">template</option></select></label>'+
+           '<label data-compose-when="xdriveRemoteFolder" class="sv-compose-field-wide"><span>XDRIVE remoteFolder</span><input data-compose-field="xdriveRemoteFolder" spellcheck="false"></label>'+
+           '<label data-compose-when="xdriveSecrets" class="sv-compose-field-wide"><span>XDRIVE secrets (по одному на строку)</span><textarea data-compose-field="xdriveSecrets" rows="3" autocomplete="off" spellcheck="false"></textarea></label>'+
+           '<label data-compose-when="xdriveTemplate" class="sv-compose-field-wide"><span>XDRIVE template (JSON)</span><textarea data-compose-field="xdriveTemplate" rows="6" spellcheck="false"></textarea></label>'+
            '<label data-compose-when="path" class="sv-compose-field-wide"><span>Путь / serviceName</span><input data-compose-field="path" spellcheck="false"></label>'+
            '<label data-compose-when="target" class="sv-compose-field-wide"><span>REALITY target (домен:порт)</span><input data-compose-field="target" placeholder="your-domain.example:443" autocomplete="off" spellcheck="false"></label>'+
            '<label data-compose-when="sni" class="sv-compose-field-wide"><span>REALITY SNI</span><input data-compose-field="sni" placeholder="your-domain.example" autocomplete="off" spellcheck="false"></label>'+
@@ -687,6 +692,10 @@ function openComposer(){
    path:['xhttp','ws','grpc','httpupgrade'].includes(network),
    target:security==='reality',sni:security==='reality',
     alpn:security==='tls',certificateFile:security==='tls',keyFile:security==='tls',
+   vlessDecryption:network==='xdrive',xdriveService:network==='xdrive',
+   xdriveRemoteFolder:network==='xdrive',
+   xdriveSecrets:network==='xdrive'&&['google-drive','template'].includes(opts.xdriveService),
+   xdriveTemplate:network==='xdrive'&&opts.xdriveService==='template',
    method:protocol==='shadowsocks',customProtocol:protocol==='custom',
    customTransport:network==='custom'
   };
@@ -770,6 +779,7 @@ function openComposer(){
    if(key==='protocol'&&autoTag){opts.tag=(newValue==='custom'?(opts.customProtocol||'custom'):newValue)+'-main';if(newValue==='socks')opts.port=10808;if(newValue==='http')opts.port=10809;}
    if(key==='protocol'&&['hysteria','masque'].includes(newValue)){opts.transport=newValue;opts.security='tls';}
    if(key==='protocol'&&['socks','http'].includes(newValue)){opts.transport='raw';opts.security='none';}
+   if(key==='transport'&&newValue==='xdrive'){opts.protocol='vless';opts.security='none';}
    if(key==='transport'){if(newValue==='xhttp')opts.path='/xhttp';if(newValue==='ws')opts.path='/ws';if(newValue==='grpc')opts.path='grpc';}
    refresh();return;
   }
@@ -787,6 +797,7 @@ function openComposer(){
   if(!field)return;
   opts[field]=event.target.type==='checkbox'?event.target.checked:event.target.value;
   if(field==='tag')autoTag=false;
+  if(field==='xdriveService')renderFields();
   renderPreview();
  });
  scope.addEventListener('change',event=>{
