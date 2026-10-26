@@ -62,5 +62,30 @@ const gen=require('../client-config.js');
   {...inbound,streamSettings:{network:'raw',security:'reality',realitySettings:{shortIds:['aa'],serverNames:['www.example.com']}}}),
   /Reality: требуются публичный ключ/,
   'Absent public key must fail closed');
+ // Admin-side exports must match the managed node's per-protocol credentials.
+ const different={
+  ...user,vmessId:crypto.randomUUID(),trojanPassword:crypto.randomBytes(32).toString('hex'),
+  ssLegacyPassword:crypto.randomBytes(32).toString('hex')
+ };
+ const tls={tag:'AUTH',port:443,streamSettings:{network:'raw',security:'tls',
+  tlsSettings:{serverName:'vpn.example.org'}},settings:{}};
+ const vmess=gen.build(different,host,{...tls,protocol:'vmess'});
+ assert.equal(vmess.outbounds[0].settings.vnext[0].users[0].id,different.vmessId);
+ const trojan=gen.build(different,host,{...tls,protocol:'trojan'});
+ assert.equal(trojan.outbounds[0].settings.servers[0].password,different.trojanPassword);
+ const legacySS=gen.build(different,host,{...tls,protocol:'shadowsocks',
+  settings:{method:'aes-256-gcm',password:'SERVER_PASSWORD_MUST_NOT_LEAK'}});
+ assert.equal(legacySS.outbounds[0].settings.servers[0].password,different.ssLegacyPassword);
+ const serverPSK=crypto.randomBytes(32).toString('base64');
+ const clientPSK=crypto.randomBytes(32).toString('base64');
+ const modernSS=gen.build({...different,ssPassword:clientPSK},host,
+  {...tls,protocol:'shadowsocks',settings:{method:'2022-blake3-aes-256-gcm',
+   password:serverPSK}});
+ assert.equal(modernSS.outbounds[0].settings.servers[0].password,serverPSK+':'+clientPSK);
+ assert.throws(()=>gen.build({...different,trojanPassword:'broken'},host,
+  {...tls,protocol:'trojan'}),/Повреждён секрет/);
+ assert.equal(gen.build(user,host,{...tls,protocol:'trojan'})
+  .outbounds[0].settings.servers[0].password,user.xrayId,
+  'Pre-upgrade user imports remain functional until explicit rekey');
  console.log('Per-user Marzban-style Client JSON, auto Reality key, DNS/routing, access controls: PASS');
 })().catch(error=>{console.error(error);process.exitCode=1});
