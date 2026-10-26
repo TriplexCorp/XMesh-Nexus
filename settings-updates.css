@@ -28,6 +28,10 @@
 #panel-update-card .update-action-row > button:disabled{
   cursor:wait;
 }
+/* A read-only/admin view may have only the status button. */
+#core-panel .update-action-row:has(>button:only-child){
+  grid-template-columns:minmax(0,12.5rem);
+}
 @media(max-width:650px){
   #core-panel .update-action-row,
   #panel-update-card .update-action-row{
