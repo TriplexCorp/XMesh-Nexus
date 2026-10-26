@@ -1459,3 +1459,5 @@ body>.sv-studio-portal ::-webkit-scrollbar-button:single-button:vertical:end:inc
 .xm-studio-modal .xm-studio-modal-choice:focus-visible{outline:2px solid var(--xm-dialog-accent);outline-offset:3px}
 @media(max-width:580px){.xm-studio-modal .xm-studio-modal-cardchoices{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){.xm-studio-modal .xm-studio-modal-choice{transition:none}}
+
+.xm-studio-modal--cards{width:min(49rem,calc(100vw - 2rem))}
