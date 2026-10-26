@@ -166,9 +166,16 @@ activate() {
   die 'Issued TLS certificate does not match the panel FQDN'
  site=/etc/nginx/conf.d/xmesh-nexus.conf
  # Do not shadow a pre-existing Nginx virtual host for the same domain.
- for other in /etc/nginx/conf.d/*.conf /etc/nginx/nginx.conf; do
+ for other in /etc/nginx/conf.d/*.conf /etc/nginx/sites-enabled/* /etc/nginx/nginx.conf; do
   [[ -f "$other" && "$other" != "$site" ]] || continue
-  if grep -Eq "^[[:space:]]*server_name[[:space:]].*(^|[[:space:]])${domain//./\\.}([[:space:];]|$)" "$other"; then
+  # Match whole server_name tokens rather than a regex built from a hostname.
+  if awk -v domain="$domain" '
+   /^[[:space:]]*server_name[[:space:]]+/ {
+    sub(/;.*/, "")
+    for (i=2; i<=NF; i++) if ($i == domain) { found=1; exit }
+   }
+   END { exit !found }
+  ' "$other"; then
    die "Another Nginx site already owns $domain: $other"
   fi
  done
