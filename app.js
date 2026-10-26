@@ -274,6 +274,7 @@ const ENT={
       }],['Вкл.',swc('hosts')]]},
   nodes:{t:'Узлы',nw:'Узел',s:'id',fs:[{k:'name',l:'Название',req:1},{k:'hosting',l:'Хостинг (необязательно)',h:'Например: Cloudrix, Hetzner, OVH. Отображается в карточке узла.'},{k:'flag',l:'Страна и флаг',t:'country'},{k:'addr',l:'Адрес ноды',req:1,ph:'1.2.3.4, 2001:db8::1 или nl1.example.com',h:'IPv4, IPv6 без скобок или домен. Порт указывается отдельно.'},{k:'port',l:'Порт ноды',t:'num',req:1},{k:'profileId',l:'XRAY STUDIO',t:'sel',o:()=>DB.profiles.map(p=>[p.id,p.name])},{k:'xrayLocalPort',l:'Локальный порт Xray',t:'num',h:'Порт Xray на 127.0.0.1; не публичный порт ноды.'},
     {k:'tlsAutoProvision',l:'Управляемый TLS (Let’s Encrypt)',t:'bool',h:'Только при явном включении. Требует домен ноды, email ACME и доступный TCP/80. Панель подпишет параметры; сертификат выпускается на ноде.'},
+    {k:'tlsManualProvision',l:'Внешний TLS-сертификат уже установлен',t:'bool',h:'Выберите только если сертификаты из XRAY STUDIO уже доступны на этой ноде. Несовместимо с управляемым TLS.'},
     {k:'tlsDomain',l:'TLS-домен ноды',ph:'node.example.com',h:'DNS-имя, которым вы управляете. Используется только при управляемом TLS. Никаких глобальных доменов.'},
     {k:'tlsAcmeEmail',l:'Контакт ACME (email)',ph:'admin@example.com',h:'Email для регистрации Let’s Encrypt и уведомлений о сертификате.'},{k:'mult',l:'Коэффициент трафика',t:'num',h:'1 — без изменений, 2 — считать вдвое'},{k:'limit',l:'Лимит трафика, ГБ',t:'num',h:'0 — без лимита'},{k:'resetDay',l:'День сброса счётчика',t:'num'},
     {k:'billingPrice',l:'Стоимость аренды',t:'num'},
@@ -287,7 +288,7 @@ const ENT={
     {k:'rotationIntervalHours',l:'Смена адреса каждые, ч',t:'num',h:'1–720 часов. По умолчанию 24. Адрес закреплён за пользователем между обновлениями подписки.'},
     {k:'rotationIps',l:'Пул внешних IP-адресов',t:'area',rows:7,h:'Один IPv4 или IPv6 на строку. Добавляйте только IP, реально назначенные VPS и доступные клиентам. До 256 адресов. Основной адрес узла остаётся прежним.'}],
 
-    def:()=>({flag:'',port:443,xrayLocalPort:13456,mult:1,limit:0,resetDay:1,tlsAutoProvision:false,rotationEnabled:false,rotationIntervalHours:24,rotationIps:'',billingCurrency:'EUR',billingPeriod:'monthly',billingRemindDays:7,billingPrice:0}),
+    def:()=>({flag:'',port:443,xrayLocalPort:13456,mult:1,limit:0,resetDay:1,tlsAutoProvision:false,tlsManualProvision:false,rotationEnabled:false,rotationIntervalHours:24,rotationIps:'',billingCurrency:'EUR',billingPeriod:'monthly',billingRemindDays:7,billingPrice:0}),
     chk:data=>{
       const address=String(data.addr??'');
       const ipv4=address.split('.');
@@ -303,6 +304,12 @@ const ENT={
       const issue=nodeRotationValidate(data);if(issue)return issue;
       const interval=Number(data.rotationIntervalHours||24);
       if(data.rotationEnabled&&(!Number.isInteger(interval)||interval<1||interval>720))return 'Интервал IP-ротации должен быть от 1 до 720 часов.';
+      const nodeProfile=DB.profiles.find(p=>String(p.id)===String(data.profileId));
+      const requiresTLS=nodeProfile&&inbs(nodeProfile).some(ib=>ib.streamSettings?.security==='tls');
+      if(requiresTLS&&!data.tlsAutoProvision&&!data.tlsManualProvision)
+        return 'TLS-профиль: включите управляемый TLS либо подтвердите предварительную установку сертификатов на ноде.';
+      if(data.tlsAutoProvision&&data.tlsManualProvision)
+        return 'Выберите только один способ управления сертификатом.';
       if(data.tlsAutoProvision){
         const domain=String(data.tlsDomain||'').trim().toLowerCase(),email=String(data.tlsAcmeEmail||'').trim();
         if(!/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(domain))return 'Управляемый TLS: укажите корректный DNS-домен ноды.';
@@ -2986,7 +2993,7 @@ function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id
   // GeoData belongs to its own node service dialog, never the general editor.
   // Keep tab / screen-reader order in sync with the wide four-column layout.
   // New fields remain supported and follow the explicitly grouped core fields.
-  const nodeCoreOrder=['name','hosting','flag','profileId','addr','port','xrayLocalPort','tlsAutoProvision','tlsDomain','tlsAcmeEmail','mult','limit','resetDay'];
+  const nodeCoreOrder=['name','hosting','flag','profileId','addr','port','xrayLocalPort','tlsAutoProvision','tlsManualProvision','tlsDomain','tlsAcmeEmail','mult','limit','resetDay'];
   const arrangedNodeCoreFields=k==='nodes'
     ?[...nodeCoreFields].sort((a,b)=>{
       const ia=nodeCoreOrder.indexOf(a.k),ib=nodeCoreOrder.indexOf(b.k);
