@@ -1907,6 +1907,50 @@ mod tests {
         }
     }
     #[test]
+    fn finalmask_survives_full_json_subscription_for_every_proxy_protocol() {
+        let user = json!({"id":42,"xrayId":"550e8400-e29b-41d4-a716-446655440000"});
+        let host = json!({"address":"vpn.example.org","externalPort":443,"sni":"vpn.example.org"});
+        for (protocol,network) in [("vless","raw"),("vmess","raw"),("trojan","raw"),
+            ("shadowsocks","raw"),("hysteria","hysteria"),("masque","masque")] {
+            let udp = matches!(network,"hysteria" | "masque");
+            let mask = if udp {
+                json!({"udp":[{"type":"salamander","settings":{"password":"shared-secret"}}]})
+            } else {
+                json!({"tcp":[{"type":"sudoku","settings":{"password":"shared-secret"}}]})
+            };
+            let settings = match protocol {
+                "vless" => json!({"decryption":"none","users":[]}),
+                "shadowsocks" => json!({"method":"aes-256-gcm"}),
+                "hysteria" => json!({"version":2,"users":[]}),
+                _ => json!({"users":[]}),
+            };
+            let inbound = json!({"tag":"main","protocol":protocol,"port":443,
+                "settings":settings,
+                "streamSettings":{"network":network,"security":"tls",
+                    "tlsSettings":{"serverName":"vpn.example.org","alpn":["h3"]},
+                    "finalmask":mask}});
+            let proxy = proxy_outbound(&user,&inbound,&host,"auto")
+                .unwrap_or_else(|| panic!("failed to create {protocol} outbound"));
+            let feed = crate::subscription_json::build_feed(vec![proxy],&json!({}))
+                .unwrap_or_else(|_| panic!("failed to export {protocol} feed"));
+            let direction = if udp {"udp"} else {"tcp"};
+            assert_eq!(feed[0]["outbounds"][0]["streamSettings"]["finalmask"][direction][0]
+                ["settings"]["password"],"shared-secret","{protocol}");
+        }
+    }
+    #[test]
+    fn incompatible_mask_cannot_be_served_as_unmasked_outbound() {
+        let user=json!({"xrayId":"550e8400-e29b-41d4-a716-446655440000"});
+        let host=json!({"address":"vpn.example.org","sni":"vpn.example.org","externalPort":443});
+        let inbound=json!({"tag":"hysteria-main","protocol":"hysteria","port":443,
+            "settings":{"version":2,"users":[]},
+            "streamSettings":{"network":"hysteria","security":"tls",
+                "tlsSettings":{"serverName":"vpn.example.org","alpn":["h3"]},
+                "finalmask":{"udp":[{"type":"salamander","settings":{"password":"shared"}},
+                    {"type":"unknown-layer","settings":{}}]}}});
+        assert!(proxy_outbound(&user,&inbound,&host,"auto").is_none());
+    }
+    #[test]
     fn masque_client_basic_auth_matches_provisioned_user() {
         let user = json!({"id":42,"xrayId":"550e8400-e29b-41d4-a716-446655440000"});
         let inbound = json!({"tag":"CDN NL","protocol":"masque",
