@@ -818,6 +818,8 @@ window.XMeshI18n=(()=>{
   dict.set("Добавить клиентскую маску","Add client mask");
   dict.set("Клиентская FinalMask ","Client FinalMask ");
   dict.set(" добавлена"," added");
+  dict.set("Клиентская FinalMask","Client FinalMask");
+  dict.set("добавлена","added");
 // FinalMask guided builder UI.
   dict.set("Симметричная TCP-маска, общий секрет генерируется автоматически.","Symmetric TCP mask with an automatically generated shared secret.");
   dict.set("Маска QUIC/UDP, автоматический общий пароль и необязательный packetSize.","QUIC/UDP mask with an auto-generated shared secret and optional packetSize.");
