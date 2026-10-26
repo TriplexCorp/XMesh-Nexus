@@ -85,6 +85,21 @@ def main():
     check(status, 201, "owner creates viewer protection test user")
     user_id = user["id"]
     assert user.get("xrayId"), "owner must receive original Xray UUID"
+    protocol_secrets = ["vmessId", "trojanPassword", "hysteriaPassword",
+                        "masquePassword", "ssLegacyPassword", "httpPassword", "socksPassword"]
+    assert all(user.get(field) for field in protocol_secrets)
+    assert len({user["xrayId"], *(user[field] for field in protocol_secrets)}) == 8
+    assert all(len(user[field]) == 64 for field in protocol_secrets if field != "vmessId")
+    status, issued, _ = api("GET", f"/users/{user_id}/subscription", cookie=owner_cookie)
+    check(status, 200, "new account uses isolated protocol credentials")
+    assert issued["credentialsSeparated"] is True
+    old_secrets = {field: user[field] for field in protocol_secrets}
+    # The generic user patch is not authorized to replace cryptographic keys.
+    injected = {field: "a" * 64 for field in protocol_secrets}
+    status, protected, _ = api("PATCH", f"/collections/users/{user_id}", injected, owner_cookie)
+    check(status, 200, "generic user patch does not change secrets")
+    for field in protocol_secrets:
+        assert protected[field] == old_secrets[field], field
     status, listing, _ = api("GET", "/collections/users", cookie=viewer_cookie)
     check(status, 200, "viewer reads redacted users")
     exposed = next(entry for entry in listing["items"] if entry["id"] == user_id)
@@ -116,9 +131,15 @@ def main():
     status, changed, _ = api("POST", f"/users/{user_id}/credentials/rotate", cookie=owner_cookie)
     check(status, 200, "owner rotates VPN and subscription credentials")
     assert changed["xrayId"] != user["xrayId"] and changed["requiresNodeSync"]
+    status, changed_user, _ = api("GET", f"/collections/users/{user_id}", cookie=owner_cookie)
+    check(status, 200, "full rekey persists separate credentials")
+    for field in protocol_secrets:
+        assert changed_user[field] != old_secrets[field], field
+    assert len({changed_user["xrayId"], *(changed_user[field] for field in protocol_secrets)}) == 8
     status, new_sub, _ = api("GET", f"/users/{user_id}/subscription", cookie=owner_cookie)
     check(status, 200, "read regenerated subscription token")
     assert new_sub["token"] != old_token
+    assert new_sub["credentialsSeparated"] is True
 
 
 
