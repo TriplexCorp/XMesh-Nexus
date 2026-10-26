@@ -162,8 +162,10 @@ async function run(){
  const udpCatalog=autoUDP.requests[0].fields[0].options.map(opt=>opt.value);
  for(const id of ['salamander','udp-sudoku','udp-header','udp-mkcp','noise','udp-hop','udp-xicmp','udp-realm','udp-filter','quic-params'])
   assert.ok(udpCatalog.includes(id),'UDP catalog must expose '+id);
- assert.ok(!udpCatalog.includes('udp-xdns'),'XDNS cannot run on Hysteria/QUIC');
- assert.ok(!tcpCatalog.includes('udp-sudoku'),'No UDP choices for TCP-only inbound');
+ assert.equal(autoUDP.requests[0].fields[0].options.find(o=>o.value==='udp-xdns').disabled,true,
+  'XDNS should be visible but disabled for Hysteria/QUIC');
+ assert.equal(autoTCP.requests[0].fields[0].options.find(o=>o.value==='udp-sudoku').disabled,true,
+  'UDP choices should be visible but disabled for TCP-only inbound');
  const udpSudoku=harness(hysteria,{requestValues:{action:'udp-sudoku'}});
  await udpSudoku.run('finalmask');
  assert.equal(udpSudoku.doc().inbounds[0].streamSettings.finalmask.udp[0].type,'sudoku');
@@ -207,7 +209,8 @@ async function run(){
   action:'udp-xdns',settings:'{"domains":[{"names":["t.example.com"],"types":[16]}],"resolvers":[{"addrs":["udp://1.1.1.1:53"]}]}'
  }});
  await dnsTunnel.run('finalmask');
- assert.ok(dnsTunnel.requests[0].fields[0].options.some(opt=>opt.value==='udp-xdns'),'mKCP exposes XDNS');
+ assert.equal(dnsTunnel.requests[0].fields[0].options.find(opt=>opt.value==='udp-xdns').disabled,false,
+  'mKCP enables XDNS');
  assert.equal(dnsTunnel.doc().inbounds[0].xmesh.clientFinalmask.udp[0].type,'xdns');
  // Adding client-only masks must preserve shared symmetric server layers in client override.
  const layeredNoise=harness(withMask,{requestValues:{action:'noise'}});
