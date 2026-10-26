@@ -122,6 +122,11 @@ def main():
     status, new_sub, _ = api("GET", f"/users/{user_id}/subscription", cookie=owner_cookie)
     check(status, 200, "read regenerated subscription token")
     assert new_sub["token"] != old_token
+    status, fresh, _ = api("GET", f"/collections/users/{user_id}", cookie=owner_cookie)
+    check(status, 200, "rekeyed credentials persisted")
+    for field in ["xrayId", "vmessId", "trojanPassword", "hysteriaPassword",
+                  "masquePassword", "ssLegacyPassword", "ssPassword", "ssPassword128"]:
+        assert fresh[field] != user[field]
 
 
 
