@@ -7,7 +7,6 @@ const {spawnSync}=require('node:child_process');
 const ui=fs.readFileSync('app.js','utf8');
 const css=fs.readFileSync('styles.css','utf8');
 assert.match(ui,/const nodeCoreOrder=\['name','hosting','flag','profileId','addr','port','xrayLocalPort','tlsAutoProvision','tlsManualProvision','tlsDomain','tlsAcmeEmail','mult','limit','resetDay'\]/);
-assert.match(ui,/node-tls-settings/,'TLS mode and certificate editor stays visible');
 assert.match(ui,/node-tls-settings/,'Node editor must keep the managed TLS certificate controls');
 assert.match(ui,/arrangedNodeCoreFields\.map/);
 assert.match(ui,/node-section-intro/);
