@@ -2365,6 +2365,22 @@ function xrayXhttpSettings(path,host,side){
  return config;
 }
 
+// Manual XRAY STUDIO preview uses a stable, per-protocol random secret while
+// the editor is open. Its server/client previews must agree, but must never
+// reuse a VLESS UUID as a password or persist secrets into browser storage.
+const xrayManualSecrets=new Map();
+function xrayManualPassword(protocol,user,tag,explicit=''){
+ const specified=String(explicit||'').trim();
+ if(specified)return specified;
+ const key=[protocol,user,tag].join(':');
+ if(!xrayManualSecrets.has(key)){
+  if(!globalThis.crypto?.getRandomValues)throw new Error('Для генерации VPN-паролей требуется HTTPS.');
+  const bytes=new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  xrayManualSecrets.set(key,Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join(''));
+ }
+ return xrayManualSecrets.get(key);
+}
 function xrayBuilderConfig(){
  const v=id=>$('#xpb-'+id)?.value||'';
  const protocol=v('protocol')||'vless';
@@ -2388,7 +2404,8 @@ function xrayBuilderConfig(){
  const ssMethod=v('ss-method')||'chacha20-ietf-poly1305';
  const ss2022=ssMethod.startsWith('2022-');
  const ssServerPassword=v('ss-password').trim()||(ss2022?'REPLACE_WITH_VALID_SS2022_SERVER_KEY':'REPLACE_WITH_STRONG_SERVER_PASSWORD');
- const ssUserPassword=v('ss-user-password').trim()||(ss2022?'REPLACE_WITH_VALID_SS2022_USER_KEY':(uuid||'REPLACE_WITH_USER_PASSWORD'));
+ const authKey=(protocol,explicit='')=>xrayManualPassword(protocol,uuid,tag,explicit);
+ const ssUserPassword=v('ss-user-password').trim()||(ss2022?'REPLACE_WITH_VALID_SS2022_USER_KEY':authKey('shadowsocks'));
  const lines=value=>String(value||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
  let xdriveTemplate;
  if(network==='xdrive'&&v('xdrive-service')==='template'){
@@ -2398,17 +2415,17 @@ function xrayBuilderConfig(){
  const settings={
   vless:{users:[],decryption:vlessEncRequired?(v('vless-decryption').trim()||'REPLACE_WITH_VLESS_ENCRYPTION_CONFIG'):'none'},
   vmess:{users:[],default:{alterId:0}},
-  trojan:{clients:[]},
+  trojan:{users:uuid?[{password:authKey('trojan'),level:0,email}]:[]},
   shadowsocks:{network:'tcp,udp',method:ssMethod,...(ss2022||!uuid?{password:ssServerPassword}:{}),...(uuid?{users:[{password:ssUserPassword,...(ss2022?{}:{method:ssMethod}),level:0,email}]}:{})},
-  socks:{auth:v('socks-auth')||'noauth',users:(v('socks-auth')==='password'&&uuid)?[{user:login,pass:uuid}]:[],udp:true,ip:'127.0.0.1'},
+  socks:{auth:v('socks-auth')||'noauth',users:(v('socks-auth')==='password'&&uuid)?[{user:login,pass:authKey('socks')}]:[],udp:true,ip:'127.0.0.1'},
   mixed:{auth:v('socks-auth')||'noauth',users:(v('socks-auth')==='password'&&uuid)?[{user:login,pass:uuid}]:[],udp:true,ip:'127.0.0.1'},
-  http:{users:uuid?[{user:login,pass:uuid}]:[],allowTransparent:false,userLevel:0},
+  http:{users:uuid?[{user:login,pass:authKey('http')}]:[],allowTransparent:false,userLevel:0},
   'dokodemo-door':{address:v('doko-address')||'127.0.0.1',port:cl(+v('doko-port')||53,1,65535),network:v('doko-network')||'tcp,udp',followRedirect:false},
   tunnel:{address:v('doko-address')||'127.0.0.1',port:cl(+v('doko-port')||53,1,65535),network:v('doko-network')||'tcp,udp',followRedirect:false},
   wireguard:{secretKey:v('wg-secret-key').trim()||'REPLACE_WITH_WIREGUARD_SERVER_PRIVATE_KEY',address:list(v('wg-address')||'10.0.0.1/32'),peers:v('wg-public-key').trim()?[{publicKey:v('wg-public-key').trim(),...(v('wg-pre-shared-key').trim()?{preSharedKey:v('wg-pre-shared-key').trim()}:{}),keepAlive:cl(+v('wg-keepalive')||0,0,65535),allowedIPs:list(v('wg-allowed-ips')||'0.0.0.0/0,::/0'),email,level:0}]:[],mtu:cl(+v('wg-mtu')||1420,1280,65535)},
-  hysteria:{version:2,users:uuid?[{auth:uuid,level:0,email}]:[]},
+  hysteria:{version:2,users:uuid?[{auth:authKey('hysteria',v('hy-auth')),level:0,email}]:[]},
   tun:{name:v('tun-name')||'',desc:v('tun-desc')||'Wintun',mtu:cl(+v('tun-mtu')||1500,576,9000),gateway:list(v('tun-gateway')),dns:list(v('tun-dns')),userLevel:0,...(list(v('tun-routes')).length?{autoSystemRoutingTable:list(v('tun-routes')),autoOutboundsInterface:'auto'}:{})},
-  masque:{users:uuid?[{pass:uuid,level:0,email}]:[],address:list(v('masque-address')||'10.0.0.1/32'),mtu:cl(+v('masque-mtu')||1400,1280,65535)}
+  masque:{users:uuid?[{pass:authKey('masque',v('masque-pass')),level:0,email}]:[],address:list(v('masque-address')||'10.0.0.1/32'),mtu:cl(+v('masque-mtu')||1400,1280,65535)}
  }[protocol]||{};
  if(protocol==='vless'&&security!=='none'&&network==='raw'&&v('flow'))settings.users[0]&& (settings.users[0].flow=v('flow'));
  const inbound={tag,protocol,settings};
@@ -2421,7 +2438,7 @@ function xrayBuilderConfig(){
   if(network==='httpupgrade')ss.httpupgradeSettings={path,host:v('host')};
   if(network==='mkcp')ss.kcpSettings={mtu:1350,tti:20,uplinkCapacity:5,downlinkCapacity:20,congestion:false,readBufferSize:2,writeBufferSize:2,seed:v('kcp-seed')||''};
   if(network==='raw')ss.rawSettings={header:v('raw-header')==='http'?{type:'http',request:{version:'1.1',method:'GET',path:[path],headers:{Host:[v('host')||sni||'example.com'],'User-Agent':['Mozilla/5.0'],'Accept-Encoding':['gzip, deflate'],'Connection':['keep-alive']}}}:{type:'none'}};
-  if(network==='hysteria')ss.hysteriaSettings={version:2,auth:v('hy-auth').trim()||(protocol==='hysteria'?'':uuid),udpIdleTimeout:cl(+v('hy-idle')||60,2,600),masquerade:{type:v('hy-masq-type')||'',...(v('hy-masq-dir').trim()?{dir:v('hy-masq-dir').trim()}:{}),...(v('hy-masq-url').trim()?{url:v('hy-masq-url').trim()}:{}),...(v('hy-masq-content').trim()?{content:v('hy-masq-content').trim()}:{}),...(v('hy-masq-type')==='string'?{statusCode:cl(+v('hy-masq-status')||200,100,599)}:{})}};
+  if(network==='hysteria')ss.hysteriaSettings={version:2,auth:authKey('hysteria',v('hy-auth')),udpIdleTimeout:cl(+v('hy-idle')||60,2,600),masquerade:{type:v('hy-masq-type')||'',...(v('hy-masq-dir').trim()?{dir:v('hy-masq-dir').trim()}:{}),...(v('hy-masq-url').trim()?{url:v('hy-masq-url').trim()}:{}),...(v('hy-masq-content').trim()?{content:v('hy-masq-content').trim()}:{}),...(v('hy-masq-type')==='string'?{statusCode:cl(+v('hy-masq-status')||200,100,599)}:{})}};
   if(network==='masque')ss.masqueSettings={host:v('masque-host').trim()||sni||'example.com',path:v('masque-path').trim()||'/masque',...(v('masque-user').trim()?{user:v('masque-user').trim()}:{}),...(v('masque-pass').trim()?{pass:v('masque-pass').trim()}:{}),headers:{}};
   if(network==='xdrive'){
    const service=v('xdrive-service')||'local',secrets=lines(v('xdrive-secrets'));
