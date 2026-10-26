@@ -3559,7 +3559,7 @@ pub(crate) async fn ensure_ss2022_user_keys(
             .await?;
         }
     }
-Ok(())
+    Ok(())
 }
 
 async fn load_records(pool: &PgPool, collection: &str) -> Result<Vec<Value>, ApiError> {
