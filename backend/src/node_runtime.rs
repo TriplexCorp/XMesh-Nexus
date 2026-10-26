@@ -1387,7 +1387,7 @@ struct CompiledNodeProfile {
 fn node_awaits_profile(node: &Value) -> bool {
     match node.get("profileId") {
         None | Some(Value::Null) => true,
-        Some(Value::String(value)) => value.trim().is_empty(),
+        Some(Value::String(value)) => value.trim().is_empty() || value.trim() == "0",
         Some(Value::Number(value)) => value.as_i64() == Some(0),
         _ => false,
     }
@@ -1736,7 +1736,7 @@ mod provision_tests {
     fn profile_assignment_is_optional_until_provisioning() {
         for node in [
             json!({}), json!({"profileId":null}), json!({"profileId":""}),
-            json!({"profileId":"  "}), json!({"profileId":0})
+            json!({"profileId":"  "}), json!({"profileId":0}), json!({"profileId":"0"})
         ] {
             assert!(node_awaits_profile(&node), "{node:?}");
         }
