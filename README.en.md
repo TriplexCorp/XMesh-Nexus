@@ -36,7 +36,7 @@ The generator does not invent DNS names, certificate files, private keys, users 
 - Added translations for page navigation, the agent installation timeout and the expanded FinalMask catalog. Existing English translation debt is still tracked in `scripts/english-coverage-baseline.json`; this is not complete localization.
 - Updated the user-presence regression guard to check a versioned `app.js` entry point without pinning an obsolete cache-busting revision; corrected a follow-up regex escaping error.
 - Applied **61 Rustfmt changes from the CI diff** across `main.rs`, `node_runtime.rs`, `subscription_finalmask.rs`, `subscription_transport.rs`, and `user_subscriptions.rs`.
-- **Verification (October 26):** [Backend CI #40304117546](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40304117546) for code commit `150978cc` has completed the `cli`, `rust` (including frontend checks) and `subscription-build` jobs successfully. API integration was still running when these notes were updated. **Do not infer a green end-to-end pipeline or browser validation.**
+- **Verification (October 26):** [Backend CI #40304117546](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40304117546) **completed successfully** for code commit `150978cc`. Passed jobs: `cli`, `rust` (frontend, Rustfmt, Rust tests, strict Clippy, Docker build), `subscription-build` and `API authentication integration`. This confirms CI for that revision, **not** browser or live-node VPN end-to-end validation.
 
 
 **Documentation:** [Русский](README.md) · **English**
@@ -189,7 +189,7 @@ Principal directories/files: `app.js`, `styles.css`, `xray-studio-v4.js`, `subsc
 
 ## Release maturity and verification
 
-Tracked improvement plan: **[Enterprise hardening roadmap](docs/ENTERPRISE_ROADMAP.md)** — six stages with acceptance criteria and current status.
+Tracked improvement plan: **[Enterprise hardening roadmap](docs/ENTERPRISE_ROADMAP.md)** — seven workstreams with acceptance criteria and current status.
 
 XMesh Nexus is under **active development**. Unit tests, cryptographic signatures, and administration features **are not a claim of certified enterprise or high-availability readiness**. `compose.yaml` deploys one API, one PostgreSQL/TimescaleDB instance and one Redis instance, without automatic database failover. Redis disk persistence is disabled (`appendonly no`, `save ""`): treat it as ephemeral and verify that temporary-state loss cannot undermine policy enforcement.
 
