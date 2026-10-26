@@ -32,7 +32,9 @@ function request(spec={}){
   fields.forEach(field=>{
    const wrap=make('label','xm-studio-modal-field'+(field.wide?' is-wide':''));
    const label=make('span','xm-studio-modal-label',field.label||field.name);
-   const control=field.type==='textarea'?document.createElement('textarea'):field.type==='select'?document.createElement('select'):document.createElement('input');
+   const cards=field.type==='cards';
+    const control=cards?document.createElement('input'):field.type==='textarea'?document.createElement('textarea'):field.type==='select'?document.createElement('select'):document.createElement('input');
+    if(cards){control.type='hidden';}
    control.name=field.name;
    if(field.type!=='select'&&field.type!=='textarea')control.type=field.type||'text';
    control.autocomplete='off';
