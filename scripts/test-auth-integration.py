@@ -127,8 +127,9 @@ def main():
     status, new_sub, _ = api("GET", f"/users/{user_id}/subscription", cookie=owner_cookie)
     check(status, 200, "read regenerated subscription token")
     assert new_sub["token"] != old_token
-    status, new_user, _ = api("GET", f"/collections/users/{user_id}", cookie=owner_cookie)
+    status, listing, _ = api("GET", "/collections/users", cookie=owner_cookie)
     check(status, 200, "read rotated independent protocol credentials")
+    new_user = next(entry for entry in listing["items"] if entry["id"] == user_id)
     for key in credential_fields:
         assert new_user[key] != user[key], f"{key} not rotated"
     assert len({new_user[key] for key in credential_fields}) == 7
