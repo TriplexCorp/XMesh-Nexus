@@ -14,6 +14,7 @@ window.XMeshI18n=(()=>{
     // Protocol-isolated VPN account credentials and migration warnings
     'Старые реквизиты: несколько VPN-протоколов пока используют один VLESS UUID. Для разделения ключей выполните «Перевыпустить VPN-доступ» (потребуется обновить подключения).':'Legacy credentials: several VPN protocols still share the VLESS UUID. Use Rotate VPN access to isolate them (requires reconnecting clients).',
     'Некорректные VPN-реквизиты. Выполните перевыпуск доступа.':'Invalid VPN credentials. Rotate VPN access.',
+    'Для генерации VPN-паролей требуется HTTPS.':'Secure password generation requires HTTPS.',
     // Owner-only credential compromise response
     'Новые VPN-ключи выпущены. Обновите импорты клиентов и проверьте синхронизацию каждой ноды.':'New VPN credentials issued. Refresh client imports and verify every node has synchronized.',
     'Ошибка перевыпуска:':'Credential rotation failed:',
