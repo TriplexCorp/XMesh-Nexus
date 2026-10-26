@@ -181,6 +181,8 @@ jobs:
             -D clippy::pedantic \
             -D clippy::nursery \
             -F unsafe-code
+      - name: Verify independent subscription keys, URL redaction and credential rekey contract
+        run: node scripts/check-subscription-security.js
       - name: Verify automated Ubuntu host installation and nginx TLS template
         run: bash scripts/check-install-host.sh
       - name: Validate installer and Docker Compose
