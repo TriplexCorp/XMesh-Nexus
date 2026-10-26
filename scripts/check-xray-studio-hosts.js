@@ -58,7 +58,7 @@ for(const protocol of [...protocols,'socks']){
   streamSettings:{network:protocol==='hysteria'?'hysteria':'raw',security:'tls'}}]})};
  const DB={profiles:[profile],nodes:[{id:27,profileId:11,disabled:false}]};
  const check=createValidator(DB);
- const host={disabled:false,remark:'Poland',address:'pl.free-tier.shop',port:443,
+ const host={disabled:false,remark:'Example node',address:'node.example.org',port:443,
   profileId:11,tag:'main',nodes:[27]};
  if(protocol==='socks')assert.match(check(host),/не поддерживается/);
  else assert.equal(check(host),'',protocol+' host must be accepted');
