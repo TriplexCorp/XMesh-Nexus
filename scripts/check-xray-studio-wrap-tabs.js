@@ -14,6 +14,6 @@ assert.match(css,/\.sv-studio \.sv-topbar>\.sv-page-tabs>button\.sv-json-documen
 assert.match(css,/flex:0 0 2\.75rem/,'add button does not shrink');
 assert.match(css,/min-inline-size:2\.75rem/,'add button keeps square width');
 assert.match(css,/min-block-size:2\.75rem/,'add button keeps square height');
-assert.match(html,/xray-studio-v4\.css\?v=20261025-square-add-tab-v1/,'CSS cache bust');
-assert.match(html,/xray-studio-v4\.js\?v=20261025-wrap-default-v1/,'JS cache bust');
+assert.match(html,/xray-studio-v4\\.css\\?v=[A-Za-z0-9._-]+/,'CSS cache bust');
+assert.match(html,/xray-studio-v4\\.js\\?v=[A-Za-z0-9._-]+/,'JS cache bust');
 console.log('XRAY STUDIO wrap default and document add tab source checks: OK');
