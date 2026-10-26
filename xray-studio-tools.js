@@ -642,6 +642,8 @@ const operations={
      type:v.type,settings:Object.fromEntries(Object.entries(v.settings||{}).filter(([key])=>keys[v.type].includes(key)))
     }));
    };
+   const stableJson=value=>JSON.stringify(value,(key,v)=>v&&typeof v==='object'&&!Array.isArray(v)?
+    Object.fromEntries(Object.keys(v).sort().map(k=>[k,v[k]])):v);
    const ensureClientLayers=ib=>{
     const required={tcp:sharedFor(ib,'tcp'),udp:sharedFor(ib,'udp')};
     ib.xmesh??={};
@@ -653,7 +655,7 @@ const operations={
     }else{
      for(const dir of ['tcp','udp']){
       const supplied=(previous[dir]||[]).filter(v=>sharedTypes.includes(v?.type));
-      if(JSON.stringify(supplied)!==JSON.stringify(required[dir]))
+      if(stableJson(supplied)!==stableJson(required[dir]))
        throw Error('Клиентская маска не согласована с серверной ('+dir+'). Используйте «Расширенный JSON».');
      }
     }
@@ -726,6 +728,11 @@ const operations={
      const layer={type:action.action,settings};
      if(index>=0)layers[index]=layer;else layers.push(layer);
      if(layers.length>16)throw Error('FinalMask: максимум 16 слоёв');
+     if(action.action==='noise'){
+      const hop=layers.findIndex(v=>v?.type==='udphop');
+      const noiseAt=layers.indexOf(layer);
+      if(hop>=0&&noiseAt>hop){layers.splice(noiseAt,1);layers.splice(hop,0,layer)}
+     }
      mask[direction]=layers;
     },'Клиентская FinalMask '+action.action+' добавлена');
     return;
@@ -764,6 +771,9 @@ const operations={
      const layer={type:kind,settings},index=layers.findIndex(v=>v?.type===kind);
      if(index>=0)layers[index]=layer;else layers.push(layer);
      if(layers.length>16)throw Error('FinalMask: максимум 16 слоёв');
+     const filter=layers.findIndex(v=>v?.type==='filter');
+     const at=layers.indexOf(layer);
+     if(filter>=0&&at>filter){layers.splice(at,1);layers.splice(filter,0,layer)}
      ib.streamSettings.finalmask[direction]=layers;
     },'FinalMask '+kind+' создан; клиентская подписка наследует симметричную маску');
     return;
@@ -809,7 +819,7 @@ const operations={
     const recipe=recipes[action.action];
     if(recipe.direction==='quic'&&!quic||recipe.direction==='tcp'&&!tcp||recipe.direction==='udp'&&!udp)
      throw Error('FinalMask несовместим с выбранным транспортом');
-    if(recipe.side==='server'&&Object.keys(client).length)
+    if(recipe.side==='server'&&recipe.kind!=='filter'&&Object.keys(client).length)
      throw Error('У inbound есть явная клиентская маска. Согласуйте общую цепочку в расширенном JSON.');
     const previous=recipe.direction==='quic'?client.quicParams:
      (recipe.side==='server'?current:client)[recipe.direction]?.find(v=>v?.type===recipe.kind)?.settings;
