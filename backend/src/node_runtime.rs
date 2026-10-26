@@ -1409,6 +1409,32 @@ fn configure_local_xray_inbound(config: &mut Value, port: u64) -> Result<(), Api
 }
 
 
+
+fn ensure_masque_address(config: &mut Value) -> Result<(), ApiError> {
+    let inbounds = config.get_mut("inbounds").and_then(Value::as_array_mut)
+        .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Profile has no inbounds."))?;
+    for inbound in inbounds {
+        if inbound.get("protocol").and_then(Value::as_str) != Some("masque") { continue; }
+        let stream = inbound.get("streamSettings");
+        if stream.and_then(|v| v.get("network")).and_then(Value::as_str) != Some("masque")
+            || stream.and_then(|v| v.get("security")).and_then(Value::as_str) != Some("tls") {
+            return Err(ApiError::new(StatusCode::CONFLICT, "MASQUE requires masque transport and TLS."));
+        }
+        let settings = inbound.get_mut("settings").and_then(Value::as_object_mut)
+            .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "MASQUE settings must be an object."))?;
+        // Backward compatibility for saved composer profiles created before
+        // the required tunnel address was generated. Individual overrides win.
+        if !settings.contains_key("address") {
+            settings.insert("address".to_owned(), json!(["10.129.0.1/24"]));
+        }
+        if settings.get("address").and_then(Value::as_array)
+            .is_none_or(|a| a.is_empty() || a.iter().any(|v| v.as_str().is_none_or(str::is_empty))) {
+            return Err(ApiError::new(StatusCode::CONFLICT, "MASQUE requires non-empty address ranges."));
+        }
+    }
+    Ok(())
+}
+
 fn configure_node_managed_tls(node: &Value, config: &mut Value) -> Result<Option<Value>, ApiError> {
     if node.get("tlsAutoProvision").and_then(Value::as_bool) != Some(true) { return Ok(None); }
     let domain = node.get("tlsDomain").and_then(Value::as_str).unwrap_or("").trim().to_ascii_lowercase();
@@ -1492,6 +1518,7 @@ async fn compile_node_profile(
         }
     };
     configure_local_xray_inbound(&mut config, port)?;
+    ensure_masque_address(&mut config)?;
     let tls_provision = configure_node_managed_tls(&node, &mut config)?;
     let users = crate::load_records(&state.pool, "users").await?;
     let squads = crate::load_records(&state.pool, "squads").await?;
@@ -1777,5 +1804,33 @@ mod provision_tests {
                 .len(),
             1
         );
+    }
+}
+
+#[cfg(test)]
+mod node_tls_masque_contract_tests {
+    use super::*;
+    #[test]
+    fn managed_tls_is_opt_in_and_node_scoped() {
+        let mut config = json!({"inbounds":[{"protocol":"masque","settings":{},
+            "streamSettings":{"network":"masque","security":"tls","tlsSettings":{
+                "certificates":[{"certificateFile":"/etc/letsencrypt/live/old.example/fullchain.pem",
+                "keyFile":"/etc/letsencrypt/live/old.example/privkey.pem"}]}}}]});
+        ensure_masque_address(&mut config).unwrap();
+        assert_eq!(config["inbounds"][0]["settings"]["address"][0], "10.129.0.1/24");
+        let node = json!({"tlsAutoProvision":true,"tlsDomain":"new.example.org",
+            "tlsAcmeEmail":"ops@example.org"});
+        let signed = configure_node_managed_tls(&node, &mut config).unwrap().unwrap();
+        assert_eq!(signed["domain"], "new.example.org");
+        assert_eq!(config["inbounds"][0]["streamSettings"]["tlsSettings"]["certificates"][0]["certificateFile"],
+            "/etc/letsencrypt/live/new.example.org/fullchain.pem");
+        let mut manual = json!({"inbounds":[]});
+        assert!(configure_node_managed_tls(&json!({}), &mut manual).unwrap().is_none());
+    }
+    #[test]
+    fn managed_tls_rejects_missing_acme_identity() {
+        let mut config = json!({"inbounds":[{"streamSettings":{"security":"tls"}}]});
+        assert!(configure_node_managed_tls(&json!({"tlsAutoProvision":true,
+            "tlsDomain":"example.org"}), &mut config).is_err());
     }
 }
