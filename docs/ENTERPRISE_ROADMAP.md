@@ -1,3 +1,10 @@
+## Node updates from Nexus UI (2026-10-26)
+
+- [x] Signed **Update Agent** action in Nodes installs the control agent, managed Xray synchronizer, policy guard, TLS/ACME helpers, GeoData and metrics helpers, and upgrades the Docker router without requiring a manual SSH deployment.
+- [x] After a successful agent upgrade, queue an immediate managed Xray reconciliation (nonblocking); the periodic timer remains the retry path.
+- [x] Mixed XHTTP ALPN `h3 + h2 + http/1.1` routes TCP and UDP on the same public port in XMesh Node.
+- [ ] Validate HTTP/3 end-to-end with a compatible client and confirm UDP/443 is allowed by the hosting firewall. Panel-driven update success alone does not prove H3 connectivity.
+
 # XMesh Nexus — Enterprise hardening roadmap
 
 ## Shadowsocks 2022 per-user credentials — 2026-10-26
