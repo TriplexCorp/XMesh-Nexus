@@ -1432,3 +1432,30 @@ body>.sv-studio-portal ::-webkit-scrollbar-button:single-button:vertical:end:inc
  border-color:var(--vaccent);
  color:var(--vaccent);
 }
+
+
+/* FinalMask guided recipe cards: full-width, keyboard accessible choices. */
+.xm-studio-modal .xm-studio-modal-cardchoices{
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem;margin-top:.3rem;
+}
+.xm-studio-modal .xm-studio-modal-choice{
+ display:flex;flex-direction:column;align-items:flex-start;gap:.3rem;text-align:left;
+ min-width:0;min-height:5.4rem;padding:.9rem 1rem;cursor:pointer;
+ border:1px solid var(--ln,#344052);border-radius:var(--ui-control-radius,12px);
+ background:var(--s2,#202c38);color:var(--tx,#fff);
+ transition:background .15s,border-color .15s,box-shadow .15s;
+}
+.xm-studio-modal .xm-studio-modal-choice strong{font-size:.83rem;font-weight:800;line-height:1.4}
+.xm-studio-modal .xm-studio-modal-choice small{font-size:.71rem;line-height:1.5;color:var(--mu,#9bacc0)}
+.xm-studio-modal .xm-studio-modal-choice:hover{
+ background:color-mix(in srgb,var(--xm-dialog-accent) 8%,var(--s2,#202c38));
+ border-color:color-mix(in srgb,var(--xm-dialog-accent) 65%,var(--ln,#344052));
+}
+.xm-studio-modal .xm-studio-modal-choice[aria-pressed=true]{
+ background:color-mix(in srgb,var(--xm-dialog-accent) 12%,var(--s2,#202c38));
+ border-color:var(--xm-dialog-accent);
+ box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--xm-dialog-accent) 35%,transparent);
+}
+.xm-studio-modal .xm-studio-modal-choice:focus-visible{outline:2px solid var(--xm-dialog-accent);outline-offset:3px}
+@media(max-width:580px){.xm-studio-modal .xm-studio-modal-cardchoices{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.xm-studio-modal .xm-studio-modal-choice{transition:none}}
