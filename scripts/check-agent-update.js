@@ -33,7 +33,9 @@ assert.match(updater,/if \[\[ "\$MODE" != --remote \]\]/);
 
 assert.match(updater,/declare -f update_router/,'Router upgrade must execute in the scoped worker');
 assert.match(updater,/export HOME=\/run\/xmesh-node-router-upgrade/,'Systemd-constrained Docker builds need a writable HOME');
-assert.match(updater,/export DOCKER_CONFIG="\$HOME\/\.docker"/,'Buildx must not write to inaccessible /root/.docker');
+assert.match(updater,/export DOCKER_CONFIG="\$HOME\/\.docker"/,'Docker must not write to inaccessible /root/.docker');
+assert.match(updater,/export BUILDX_CONFIG="\$HOME\/\.buildx"/,'Buildx must keep state in writable /run');
+assert.match(updater,/docker --config "\$DOCKER_CONFIG" compose build xmesh-node/,'Compose builds must explicitly use Docker config in writable /run');
 assert.match(updater,/export XDG_CACHE_HOME="\$HOME\/\.cache"/,'Buildx cache needs writable runtime path');
 assert.match(updater,/export TMPDIR="\$HOME\/tmp"/,'Compose metadata must not use read-only /tmp');
 assert.match(updater,/ReadWritePaths=\/run/,'The isolated router upgrade worker must be able to write Docker state');
@@ -41,8 +43,8 @@ assert.match(updater,/ReadWritePaths=\/run/,'The isolated router upgrade worker 
 assert.match(updater,/systemd-run --quiet --wait --collect --pipe/,'Router upgrade must be checked synchronously');
 assert.match(updater,/--property=ReadWritePaths=\/opt\/xmesh-node/,'Router worker needs write access to the installed source');
 assert.match(updater,/git -C "\$dir" fetch --unshallow origin main/,'Router source clone is shallow after bootstrap');
-assert.match(updater,/docker compose run --rm --no-deps xmesh-node -check/,'Rebuilt router must be validated');
-assert.match(updater,/docker compose up -d --no-deps --force-recreate xmesh-node/,'Router must actually be restarted');
+assert.match(updater,/docker --config "\$DOCKER_CONFIG" compose run --rm --no-deps xmesh-node -check/,'Rebuilt router must be validated');
+assert.match(updater,/docker --config "\$DOCKER_CONFIG" compose up -d --no-deps --force-recreate xmesh-node/,'Router must actually be restarted');
 assert.doesNotMatch(updater,/then\\n echo/,'Do not embed literal backslash-n in Bash');
 assert.match(runtime,/INTERVAL '15 minutes'/,'Long full-node upgrades must not expire after 180 seconds');
 assert.match(runtime,/control-v4\.3\.8/,'Panel must advertise the current full node runtime release');
