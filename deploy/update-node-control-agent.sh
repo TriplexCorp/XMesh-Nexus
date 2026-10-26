@@ -59,6 +59,11 @@ trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp" "$profile
 curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 \
  https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/main/deploy/xmesh-tls-provision.py -o "$tls_tmp"
 python3 -m py_compile "$tls_tmp"
+tls_status_tmp="$(mktemp)"
+curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 \
+ https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/main/deploy/xmesh-tls-status.py -o "$tls_status_tmp"
+python3 -m py_compile "$tls_status_tmp"
+grep -q 'certificate_file_missing' "$tls_status_tmp" || { echo "TLS health helper validation failed" >&2;exit 1; }
 grep -q 'letsencrypt-http01' "$tls_tmp" || { echo "TLS worker missing signed ACME contract support" >&2;exit 1; }
 renew_tmp="$(mktemp)"
 trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp" "$profile_tmp" "$tls_tmp" "$renew_tmp"' EXIT
@@ -168,6 +173,8 @@ install -o root -g root -m 0700 "$policy_tmp" /usr/local/libexec/.xmesh-policy-g
 mv -f /usr/local/libexec/.xmesh-policy-guard.new /usr/local/libexec/xmesh-policy-guard.py
 install -o root -g root -m 0700 "$geo_tmp" /usr/local/libexec/.xmesh-geodata-sync.new
 mv -f /usr/local/libexec/.xmesh-geodata-sync.new /usr/local/libexec/xmesh-geodata-sync.py
+install -o root -g root -m 0700 "$tls_status_tmp" /usr/local/libexec/.xmesh-tls-status.new
+mv -f /usr/local/libexec/.xmesh-tls-status.new /usr/local/libexec/xmesh-tls-status.py
 install -o root -g root -m 0700 "$tls_tmp" /usr/local/libexec/.xmesh-tls-provision.new
 mv -f /usr/local/libexec/.xmesh-tls-provision.new /usr/local/libexec/xmesh-tls-provision.py
 install -o root -g root -m 0700 "$renew_tmp" /usr/local/sbin/.xmesh-tls-renew-hook.new
