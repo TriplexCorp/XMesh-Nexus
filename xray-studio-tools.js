@@ -620,6 +620,74 @@ const operations={
    const inbound=getInbound(parse(),selected.index);
    const current=inbound.streamSettings?.finalmask||{};
    const client=inbound.xmesh?.clientFinalmask||{};
+   // Guided mode: the JSON editor below remains available for expert layers.
+   const network=String(inbound.streamSettings?.network||'raw').toLowerCase();
+   const alpn=inbound.streamSettings?.tlsSettings?.alpn||[];
+   const udp=['hysteria','masque','mkcp','kcp'].includes(network)||
+     (network==='xhttp'&&alpn.includes('h3'));
+   const choices=[
+    {value:'sudoku',label:'TCP · Sudoku',description:'Симметричная TCP-маска, общий секрет генерируется автоматически.'},
+    ...(udp?[{value:'salamander',label:'UDP · Salamander / Gecko',description:'Маска QUIC/UDP, автоматический общий пароль и необязательный packetSize.'}]:[]),
+    {value:'advanced',label:'Расширенный JSON',description:'Направленные слои, QUIC-параметры и нестандартные настройки.'},
+    {value:'clear',label:'Сбросить FinalMask',description:'Удалить серверную и клиентскую маски этого inbound.'}
+   ];
+   const action=await dialog.request({
+    title:'FinalMask · конструктор',description:'Выберите готовую маску. Секрет генерируется криптографически в браузере, совместимые серверные слои автоматически попадают в JSON-подписку.',
+    confirmLabel:'Продолжить',selectFirst:false,
+    fields:[{name:'action',label:'Выберите тип маски',type:'cards',wide:true,value:udp?'salamander':'sudoku',options:choices}]
+   });
+   if(!action)return;
+   if(area.value!==selected.source){notify('JSON изменился. Повторите действие.');return}
+   if(action.action==='clear'){
+    const ok=await dialog.confirm({title:'Удалить FinalMask?',description:'Будут удалены серверная и клиентская маски выбранного inbound.',danger:true,confirmLabel:'Удалить'});
+    if(!ok)return;
+    if(area.value!==selected.source){notify('JSON изменился. Повторите действие.');return}
+    mutate(doc=>{
+     const ib=getInbound(doc,selected.index);
+     if(ib.tag!==selected.tag)throw Error('Inbound изменился');
+     if(ib.streamSettings)delete ib.streamSettings.finalmask;
+     if(ib.xmesh){delete ib.xmesh.clientFinalmask;if(!Object.keys(ib.xmesh).length)delete ib.xmesh}
+    },'FinalMask удалён');
+    return;
+   }
+   if(['sudoku','salamander'].includes(action.action)){
+    const salamander=action.action==='salamander';
+    if(salamander&&!udp)throw Error('UDP Salamander несовместим с выбранным транспортом');
+    if(inbound.xmesh?.clientFinalmask&&Object.keys(inbound.xmesh.clientFinalmask).length)
+     throw Error('У inbound есть явная клиентская маска. Сначала согласуйте её в расширенном JSON.');
+    if(!crypto?.getRandomValues)throw Error('Криптографический генератор недоступен');
+    const bytes=new Uint8Array(32);crypto.getRandomValues(bytes);
+    const secret=Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
+    const result=await dialog.request({
+     title:salamander?'UDP · Salamander / Gecko':'TCP · Sudoku',
+     description:'Секрет сгенерирован безопасным генератором браузера. Слой будет добавлен в серверный JSON и унаследован клиентской JSON-подпиской.',
+     confirmLabel:'Создать маску',
+     fields:[
+      {name:'password',label:'Общий секрет',value:secret,wide:true,required:true},
+      ...(salamander?[{name:'packetSize',label:'Gecko packetSize (необязательно)',value:'',wide:true,placeholder:'512-1200',
+       validate:value=>!value||(/^[0-9]{1,5}(?:-[0-9]{1,5})?$/.test(value)&&
+        value.split('-').every(v=>Number(v)>0&&Number(v)<=65535)&&
+        (!value.includes('-')||Number(value.split('-')[0])<=Number(value.split('-')[1])))?'':'Нужен размер 1–65535 или диапазон min-max'}]:[])
+     ]
+    });
+    if(!result)return;
+    if(area.value!==selected.source){notify('JSON изменился. Повторите действие.');return}
+    const direction=salamander?'udp':'tcp';
+    mutate(doc=>{
+     const ib=getInbound(doc,selected.index);
+     if(ib.tag!==selected.tag)throw Error('Inbound изменился');
+     ib.streamSettings??={};ib.streamSettings.finalmask??={};
+     const layers=ib.streamSettings.finalmask[direction]??=[];
+     const settings={password:result.password};
+     if(salamander&&result.packetSize)settings.packetSize=result.packetSize;
+     const layer={type:action.action,settings},index=layers.findIndex(v=>v?.type===action.action);
+     if(index>=0)layers[index]=layer;else layers.push(layer);
+     if(layers.length>16)throw Error('FinalMask: максимум 16 слоёв');
+     ib.streamSettings.finalmask[direction]=layers;
+    },'FinalMask '+action.action+' создан; клиентская подписка наследует симметричную маску');
+    return;
+   }
+   if(action.action!=='advanced')throw Error('Неизвестный тип маски');
    const check=value=>{
     try{
      const data=JSON.parse(value);
