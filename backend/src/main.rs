@@ -17,6 +17,7 @@ mod subscription_settings;
 mod subscription_transport;
 mod subscription_user_agent;
 mod user_subscriptions;
+mod user_credentials;
 
 use axum::{
     Json, Router,
@@ -37,7 +38,6 @@ use tower_http::{
     compression::CompressionLayer, limit::RequestBodyLimitLayer, services::ServeDir,
     trace::TraceLayer,
 };
-use uuid::Uuid;
 
 // Recent verified Xray traffic, not a live TCP-session count.
 const USER_ONLINE_WINDOW_MS: i64 = 45_000;
@@ -968,7 +968,9 @@ async fn create_record(
     if collection == "users" {
         use aes_gcm::aead::rand_core::RngCore as _;
         use base64::Engine as _;
-        object.insert("xrayId".into(), Value::String(Uuid::new_v4().to_string()));
+        // Never accept client-supplied credentials. New accounts get an
+        // unrelated identity/password for each supported protocol.
+        object.extend(user_credentials::generate());
         // SS2022 multi-user keys must be cryptographically random, persistent,
         // and shared by the node policy and the generated client subscription.
         let mut key256 = [0u8; 32];
@@ -1123,6 +1125,10 @@ async fn update_record(
     if collection == "users" {
         patch_object.remove("ssPassword");
         patch_object.remove("ssPassword128");
+        // Only the audited owner-only full rotation may replace secrets.
+        for field in user_credentials::INDEPENDENT_FIELDS {
+            patch_object.remove(field);
+        }
     }
 
     let mut tx = state.pool.begin().await?;
