@@ -6,8 +6,12 @@ prepare_only=0
 if [[ "${1:-}" == "--prepare-only" ]]; then prepare_only=1; fi
 if [[ "$prepare_only" == 0 ]]; then
   if [[ "$EUID" -ne 0 ]]; then
-    echo "Full panel installation needs root privileges. Run: sudo ./install.sh" >&2
-    exit 1
+    if ! command -v sudo >/dev/null 2>&1; then
+      echo "Full installation requires root privileges (sudo not found)." >&2
+      exit 1
+    fi
+    # Preserve only the documented non-interactive installer inputs.
+    exec sudo --preserve-env=PANEL_DOMAIN,PANEL_ACME_EMAIL bash "$0" "$@"
   fi
   # Ubuntu host bootstrap: Docker, Nginx mainline, Certbot. No tenant domain
   # is embedded in the installer or the public repository.
