@@ -249,6 +249,28 @@ pub async fn heartbeat(
         "/api/v1/node/heartbeat",
     )
     .await?;
+    // A standalone Go edge router still reports its historical 0.1.0 heartbeat.
+    // It does not supervise Xray. Never let that report replace an authoritative
+    // control agent's version, Xray health, desired revision or TLS state.
+    // Legacy router-only nodes can still report health until a control agent
+    // takes ownership of the record.
+    if report.version == "0.1.0" {
+        sqlx::query(
+            "INSERT INTO node_runtime_heartbeats
+             (node_id,version,router_running,xray_running,received_at)
+             VALUES($1,$2,$3,FALSE,NOW())
+             ON CONFLICT(node_id) DO UPDATE SET
+                 router_running=EXCLUDED.router_running,
+                 received_at=NOW()
+             WHERE node_runtime_heartbeats.version='0.1.0'",
+        )
+        .bind(report.node_id)
+        .bind(&report.version)
+        .bind(report.router_running)
+        .execute(&state.pool)
+        .await?;
+        return Ok(Json(json!({"accepted":true,"reconcileDesired":false})));
+    }
     sqlx::query(
         "INSERT INTO node_runtime_heartbeats(node_id,version,router_running,xray_running,xray_version,geo_data,applied_revision,profile_check,tls_status,received_at)
          VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW()) ON CONFLICT(node_id) DO UPDATE
@@ -657,7 +679,7 @@ pub async fn request_xray_update(
 
 // Remote agent upgrades are a fixed local action, never a command string or URL.
 // Only v4+ nodes understand this action. Older nodes need one bootstrap upgrade.
-pub const CONTROL_AGENT_VERSION: &str = "control-v5.1.1";
+pub const CONTROL_AGENT_VERSION: &str = "control-v5.1.2";
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
