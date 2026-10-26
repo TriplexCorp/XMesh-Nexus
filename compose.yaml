@@ -66,6 +66,7 @@ services:
       PANEL_UPDATE_REQUEST: /run/xmesh/panel-update-request
       PANEL_UPDATE_STATUS: /run/xmesh/panel-update-status
       TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:-}
+      SUBSCRIPTION_ENCRYPTION_KEY: ${SUBSCRIPTION_ENCRYPTION_KEY:?Run ./install.sh to provision subscription key}
       RUST_LOG: info,tower_http=info,sqlx=warn
     depends_on:
       db:

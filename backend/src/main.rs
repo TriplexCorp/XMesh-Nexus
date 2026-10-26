@@ -167,6 +167,7 @@ pub struct AppState {
     pub core: CoreManager,
     pub cookie_secure: bool,
     pub totp_key: Option<[u8; 32]>,
+    pub subscription_key: [u8; 32],
     pub node_policy_signer: std::sync::Arc<node_policy::PolicySigner>,
 }
 
@@ -357,6 +358,10 @@ fn protected_routes(state: &AppState) -> Router<AppState> {
                 .delete(user_subscriptions::revoke),
         )
         .route(
+            "/users/{id}/credentials/rotate",
+            post(user_subscriptions::rotate_credentials),
+        )
+        .route(
             "/users/{id}/client-json",
             get(user_subscriptions::admin_client_json),
         )
@@ -464,7 +469,11 @@ fn application_router(state: AppState) -> Router {
         .fallback_service(ServeDir::new(static_dir).append_index_html_on_directories(false))
         .layer(RequestBodyLimitLayer::new(2 * 1024 * 1024))
         .layer(CompressionLayer::new())
-        .layer(TraceLayer::new_for_http())
+        // Never put request URIs into telemetry: public subscription routes
+        // contain bearer secrets in the path, including custom Studio paths.
+        .layer(TraceLayer::new_for_http().make_span_with(
+            |request: &Request| tracing::info_span!("http_request", method = %request.method()),
+        ))
         .layer(middleware::from_fn(security_headers))
         .layer(middleware::from_fn(csrf_guard))
         .with_state(state)
@@ -603,14 +612,31 @@ async fn main() -> anyhow::Result<()> {
     if totp_key.is_none() {
         tracing::warn!("TOTP_ENCRYPTION_KEY is not configured: MFA enrollment is unavailable");
     }
+    // A separate long-lived 256-bit secret must be provisioned by install.sh.
+    // Never silently derive new subscription encryption from the TOTP key.
+    let subscription_hex = env::var("SUBSCRIPTION_ENCRYPTION_KEY").map_err(|_| {
+        anyhow::anyhow!("SUBSCRIPTION_ENCRYPTION_KEY is missing; run ./install.sh --prepare-only")
+    })?;
+    if subscription_hex.len() != 64 {
+        anyhow::bail!("SUBSCRIPTION_ENCRYPTION_KEY must be 64 hexadecimal characters");
+    }
+    let subscription_bytes = hex::decode(&subscription_hex)
+        .map_err(|_| anyhow::anyhow!("SUBSCRIPTION_ENCRYPTION_KEY must be hexadecimal"))?;
+    let subscription_key: [u8; 32] = subscription_bytes
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("SUBSCRIPTION_ENCRYPTION_KEY length is invalid"))?;
     let state = AppState {
         pool,
         redis,
         core,
         cookie_secure,
         totp_key,
+        subscription_key,
         node_policy_signer,
     };
+    // Old tokens remain valid; only their encrypted display/recovery copy is
+    // rewrapped. Keep the old TOTP key until this migration finishes.
+    user_subscriptions::migrate_legacy_ciphertexts(&state).await?;
     state.core.launch_startup_update();
 
     let app = application_router(state);
@@ -733,7 +759,7 @@ async fn security_headers(request: Request, next: Next) -> Response {
     );
     headers.insert(
         HeaderName::from_static("referrer-policy"),
-        HeaderValue::from_static("same-origin"),
+        HeaderValue::from_static("no-referrer"),
     );
     headers.insert(
         HeaderName::from_static("content-security-policy"),

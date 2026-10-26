@@ -181,6 +181,8 @@ jobs:
             -D clippy::pedantic \
             -D clippy::nursery \
             -F unsafe-code
+      - name: Verify independent subscription keys, URL redaction and credential rekey contract
+        run: node scripts/check-subscription-security.js
       - name: Verify automated Ubuntu host installation and nginx TLS template
         run: bash scripts/check-install-host.sh
       - name: Validate installer and Docker Compose
@@ -190,6 +192,7 @@ jobs:
           REDIS_PASSWORD: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
           ADMIN_PASSWORD: 9876543210abcdef9876543210abcdef9876543210abcdef
           DASHBOARD_PATH: /dashboard/0123456789abcdef0123456789abcdef0123456789abcdef
+          SUBSCRIPTION_ENCRYPTION_KEY: "1234567812345678123456781234567812345678123456781234567812345678"
         run: |
           bash -n install.sh
           bash -n xmeshctl
@@ -217,6 +220,7 @@ jobs:
       ADMIN_USERNAME: admin
       ADMIN_PASSWORD: 9876543210abcdef9876543210abcdef9876543210abcdef
       TOTP_ENCRYPTION_KEY: 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+      SUBSCRIPTION_ENCRYPTION_KEY: "1234567812345678123456781234567812345678123456781234567812345678"
       COOKIE_SECURE: "false"
       DASHBOARD_PATH: /dashboard/0123456789abcdef0123456789abcdef0123456789abcdef
     steps:

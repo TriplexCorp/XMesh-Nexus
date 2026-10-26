@@ -23,6 +23,9 @@ grep -Fq 'ssl_certificate_key /etc/letsencrypt/live/panel.example.org/privkey.pe
 grep -Fq 'proxy_pass http://127.0.0.1:8080;' <<< "$config"
 grep -Fq 'proxy_set_header Host $host;' <<< "$config"
 grep -Fq 'return 301 https://$host$request_uri;' <<< "$config"
+[[ "$(grep -c 'access_log off;' <<< "$config")" == 2 ]] || { echo 'Both vhosts must suppress bearer URL access logs' >&2; exit 1; }
+[[ "$(grep -c 'error_log /var/log/nginx/xmesh-nexus-error.log crit;' <<< "$config")" == 2 ]] || { echo 'Nginx URI-bearing error diagnostics must be minimized' >&2; exit 1; }
+grep -Fq 'bash deploy/ensure-subscription-key.sh .env' install.sh
 if bash "$host" render-nginx panel.example.org '8080;return 200' >/dev/null 2>&1; then
   echo 'Unsafe upstream port accepted' >&2; exit 1
 fi
