@@ -287,8 +287,17 @@ fi
 # Replace atomically because this script can itself be executing.
 install -o root -g root -m 0700 "$self_tmp" /usr/local/sbin/.xmesh-update-agent.new
 mv -f /usr/local/sbin/.xmesh-update-agent.new /usr/local/sbin/xmesh-update-agent
+# An Update Agent click must deploy the new sync logic immediately, not
+# require a second SSH command or wait for the next timer interval.
+# Queue it asynchronously: image pulls and ACME may take longer than the
+# signed command acknowledgement timeout. The timer remains the fallback.
+if systemctl list-unit-files xmesh-xray-sync.service --no-legend 2>/dev/null | grep -q '^xmesh-xray-sync.service'; then
+ if ! systemctl start --no-block xmesh-xray-sync.service; then
+  echo "WARNING: Unable to queue immediate Xray reconciliation; timer will retry." >&2
+ fi
+fi
 if [[ "$MODE" != --remote ]]; then
  systemctl start xmesh-node-control.service
 fi
 echo "Signed node control, offline policy verifier and pinned Xray synchronizer installed."
-echo "Check reconciliation: systemctl start xmesh-xray-sync.service && journalctl -u xmesh-xray-sync.service -n 30 --no-pager"
+echo "Xray reconciliation queued automatically; check node status in Nexus."
