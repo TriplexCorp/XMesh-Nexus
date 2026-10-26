@@ -319,11 +319,7 @@ fn vless_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> 
 // Native outbound credentials follow the protocol schema, never the inbound
 // settings shape. The node provisions these per-user credentials from xrayId.
 // Shadowsocks-2022 requires a separately provisioned per-user key.
-fn configure_masque_credentials(
-    stream: &mut Value,
-    user: &Value,
-    inbound: &Value,
-) -> Option<()> {
+fn configure_masque_credentials(stream: &mut Value, user: &Value, inbound: &Value) -> Option<()> {
     // MASQUE uses HTTP Basic username/password in transport settings, not UUID
     // in its outbound settings. The server uses the same stat email as username.
     let record_id = user.get("id").and_then(Value::as_i64)?;
@@ -345,7 +341,9 @@ fn configure_masque_credentials(
         stream["masqueSettings"] = json!({});
     }
     stream["masqueSettings"]["user"] = json!(format!("xmesh-u{record_id}--{encoded}"));
-    stream["masqueSettings"]["pass"] = json!(crate::protocol_credentials::for_protocol(user, "masque", "")?);
+    stream["masqueSettings"]["pass"] = json!(crate::protocol_credentials::for_protocol(
+        user, "masque", ""
+    )?);
     Some(())
 }
 
@@ -369,7 +367,9 @@ fn proxy_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> 
         return None;
     }
     let settings = match protocol {
-        "vmess" => json!({"address":address,"port":port,"id":crate::protocol_credentials::for_protocol(user, "vmess", "")?,"security":"auto"}),
+        "vmess" => {
+            json!({"address":address,"port":port,"id":crate::protocol_credentials::for_protocol(user, "vmess", "")?,"security":"auto"})
+        }
         "trojan" => {
             if security == "none" {
                 return None;
@@ -440,7 +440,9 @@ fn proxy_outbound(user: &Value, inbound: &Value, host: &Value, device: &str) -> 
             stream["hysteriaSettings"] = json!({});
         }
         stream["hysteriaSettings"]["version"] = json!(2);
-        stream["hysteriaSettings"]["auth"] = json!(crate::protocol_credentials::for_protocol(user, "hysteria", "")?);
+        stream["hysteriaSettings"]["auth"] = json!(crate::protocol_credentials::for_protocol(
+            user, "hysteria", ""
+        )?);
     }
     let tag = nonempty(host, "remark")
         .or_else(|| nonempty(inbound, "tag"))
