@@ -3493,12 +3493,14 @@ async fn request_panel_update(
     }
     // An accepted request is not proof that the host systemd worker ran.
     // Keep pending requests visible and reject duplicate button presses.
-    let pending = tokio::fs::read_to_string(&request_file).await.map_err(|_| {
-        ApiError::new(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "Не удалось проверить очередь обновления на хосте.",
-        )
-    })?;
+    let pending = tokio::fs::read_to_string(&request_file)
+        .await
+        .map_err(|_| {
+            ApiError::new(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Не удалось проверить очередь обновления на хосте.",
+            )
+        })?;
     if pending.trim() == "update" {
         return Err(ApiError::new(
             StatusCode::CONFLICT,
@@ -3552,9 +3554,7 @@ async fn get_panel_update_status(
     // The root-owned watcher clears the request before it sets "running".
     // Until then report queued, never stale "success" or "idle".
     let pending = match env::var("PANEL_UPDATE_REQUEST") {
-        Ok(path) => tokio::fs::read_to_string(path)
-            .await
-            .unwrap_or_default(),
+        Ok(path) => tokio::fs::read_to_string(path).await.unwrap_or_default(),
         Err(_) => String::new(),
     };
     let status = if pending.trim() == "update" && status != "running" {
