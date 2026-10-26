@@ -25,9 +25,18 @@ const newInbound=(protocol='vless',tag='inbound-1')=>({
 function migrateInboundProtocol(inbound,next){
  if(inbound.protocol===next)return;
  const previous=inbound.protocol;
- inbound.protocol=next;inbound.settings=inboundSettingsFor(next);
- if(next==='hysteria')inbound.streamSettings={network:'hysteria',security:'tls',hysteriaSettings:{version:2}};
- else if(previous==='hysteria')inbound.streamSettings={network:'raw',security:'none'};
+ inbound.protocol=next;
+ // Credentials and protocol-specific options must never be inherited across protocols.
+ inbound.settings=inboundSettingsFor(next);
+ const network=inbound.streamSettings?.network||'raw';
+ // QUIC-only Hysteria has its own transport and TLS settings. Reset it when leaving.
+ if(next==='hysteria'){
+  inbound.streamSettings={network:'hysteria',security:'tls',hysteriaSettings:{version:2},tlsSettings:{certificates:[],alpn:['h3']}};
+ }else if(previous==='hysteria'||network==='hysteria'||network==='masque'){
+  inbound.streamSettings={network:'raw',security:'none'};
+ }else if(network==='xdrive'&&next!=='vless'){
+  inbound.streamSettings={network:'raw',security:'none'};
+ }
 }
 function generateRealityShortId(){const bytes=new Uint8Array(8);crypto.getRandomValues(bytes);return Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');}
 const defaultDoc=()=>({log:{loglevel:'warning'},inbounds:[{tag:'vless-main',listen:'127.0.0.1',port:443,protocol:'vless',settings:{users:[],decryption:'none'},streamSettings:{network:'xhttp',security:'none',xhttpSettings:{path:'/xhttp',mode:'auto'}}}],outbounds:[{tag:'direct',protocol:'freedom'}],routing:{domainStrategy:'AsIs',rules:[]}});
