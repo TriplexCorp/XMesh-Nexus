@@ -577,7 +577,7 @@ pub async fn rotate_credentials(
     OsRng.fill_bytes(&mut ss128);
     object.insert("xrayId".to_owned(), json!(new_uuid));
     object.insert("vmessId".to_owned(), json!(uuid::Uuid::new_v4().to_string()));
-    for key in ["trojanPassword", "hysteriaPassword", "masquePassword", "ssLegacyPassword"] {
+    for key in ["trojanPassword", "hysteriaPassword", "masquePassword", "ssLegacyPassword", "httpPassword", "socksPassword"] {
         let mut secret = [0u8; 32];
         OsRng.fill_bytes(&mut secret);
         object.insert(key.to_owned(), json!(hex::encode(secret)));
