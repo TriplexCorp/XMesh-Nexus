@@ -603,7 +603,7 @@ pub async fn request_xray_update(
     let active = sqlx::query_scalar::<_, bool>(
         "SELECT EXISTS(SELECT 1 FROM node_runtime_heartbeats
          WHERE node_id=$1 AND received_at>NOW()-INTERVAL '90 seconds'
-           AND (version LIKE 'control-v3%' OR version LIKE 'control-v4%'))",
+           AND (version LIKE 'control-v3.%' OR version LIKE 'control-v4.%' OR version LIKE 'control-v5.%'))",
     )
     .bind(node_id)
     .fetch_one(&state.pool)
@@ -611,7 +611,7 @@ pub async fn request_xray_update(
     if !active {
         return Err(ApiError::new(
             StatusCode::CONFLICT,
-            "Для выбора версии требуется управляющий агент control-v3 на узле.",
+            "Для выбора версии требуется активный управляющий агент control-v3/v4/v5 на узле.",
         ));
     }
     // Claiming an update is exclusive with a pending restart.
