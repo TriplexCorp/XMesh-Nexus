@@ -1,6 +1,12 @@
 (function(){
 'use strict';
 const KEYS=['geoEnabled','geoUpdateHours','geoSiteUrl','geoIpUrl','geoExtraSources'];
+// Match the server-side signed GeoData manifest defaults. These are actual
+// sources, not placeholders; prefill only unset values (including legacy nodes).
+const DEFAULT_GEODATA={
+ geoSiteUrl:'https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat',
+ geoIpUrl:'https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat'
+};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const field=(name,label,value,opts={})=>{
  const id='ng-'+name;
@@ -40,8 +46,8 @@ function open({node,modal,updateNode,notify,afterSave}){
  '<div class="geo-divider"></div>'+field('geoUpdateHours','Интервал проверки, часов',n.geoUpdateHours??24,{number:true,hint:'Автоматически, от 6 до 168 часов'})+
  '<div class="geo-hint">Изменения применяются после синхронизации ноды. Маршруты настраиваются отдельно — кнопка «Маршрутизация» в карточке узла.</div></section>'+
  '<section class="geo-secondary"><div class="geo-section-title"><span>02</span><div><h3>Источники</h3><p>HTTPS-адреса и дополнительные файлы</p></div></div>'+
- field('geoSiteUrl','GeoSite',n.geoSiteUrl||'',{placeholder:'Стандартный geosite.dat',hint:'Пустое поле — источник по умолчанию'})+
- field('geoIpUrl','GeoIP',n.geoIpUrl||'',{placeholder:'Стандартный geoip.dat',hint:'Пустое поле — источник по умолчанию'})+
+ field('geoSiteUrl','GeoSite',n.geoSiteUrl||DEFAULT_GEODATA.geoSiteUrl,{placeholder:DEFAULT_GEODATA.geoSiteUrl,hint:'Loyalsoldier · актуальный релиз geosite.dat · можно изменить'})+
+ field('geoIpUrl','GeoIP',n.geoIpUrl||DEFAULT_GEODATA.geoIpUrl,{placeholder:DEFAULT_GEODATA.geoIpUrl,hint:'Loyalsoldier · актуальный релиз geoip.dat · можно изменить'})+
  field('geoExtraSources','Дополнительные .dat',n.geoExtraSources||'',{area:true,rows:4,placeholder:'custom.dat https://example.org/custom.dat',hint:'Имя файла · HTTPS-ссылка · необязательный SHA-256'})+
  '</section></div>'+ 
  '<div class="geo-foot"><output class="geo-feedback" aria-live="polite"></output><div class="geo-buttons"><button type="button" class="gh geo-refresh" data-geo-refresh>Обновить сейчас</button><button type="submit" class="btn geo-save">Сохранить настройки</button></div></div></form>';
