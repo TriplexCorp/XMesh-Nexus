@@ -30,7 +30,7 @@ const sample=()=>({
 });
 
 function harness(documentValue,{confirmValue=true,confirmHandler,requestValues,realityKeys,selectorUI=false}={}){
- const calls=[],listeners={},confirmCalls=[],clipboard=[];
+ const calls=[],listeners={},confirmCalls=[],clipboard=[],requests=[];
  const area={
    value:JSON.stringify(documentValue,null,2),selectionStart:0,selectionEnd:0,
    focus(){},setSelectionRange(){},
@@ -62,6 +62,7 @@ function harness(documentValue,{confirmValue=true,confirmHandler,requestValues,r
  win.XMeshStudioDialogs={
   async confirm(spec){confirmCalls.push(spec.title||spec.description||'confirm');return confirmHandler?confirmHandler(spec.title||spec.description||''):confirmValue},
   async request(spec){
+   requests.push(spec);
    if(!confirmValue)return null;
    return Object.fromEntries((spec.fields||[]).map(field=>[field.name,String(requestValues?.[field.name]??field.value??'')]));
   }
@@ -72,7 +73,7 @@ function harness(documentValue,{confirmValue=true,confirmHandler,requestValues,r
    realityKeys:realityKeys||(async()=>({privateKey:NEW_PRIVATE,publicKey:NEW_PUBLIC}))
  });
  return {
-   area,host,status,issue,issueMessage,calls,confirmCalls,clipboard,
+   area,host,status,issue,issueMessage,calls,confirmCalls,clipboard,requests,
    refresh(){toolHandle.refresh()},
    selectInbound(index){
     inboundSelector.value=String(index);
@@ -152,6 +153,83 @@ async function run(){
  await noisePreset.run('finalmask');
  assert.equal(noisePreset.doc().inbounds[0].xmesh.clientFinalmask.udp[0].type,'noise');
  assert.equal(noisePreset.doc().inbounds[0].streamSettings.finalmask,undefined,'Noise stays client-only');
+
+ // Full catalog includes all supported protocol layers; Gecko is Salamander packetSize,
+ // not a separate Xray layer type. Unsupported transports must not offer XDNS.
+ const tcpCatalog=autoTCP.requests[0].fields[0].options.map(opt=>opt.value);
+ for(const id of ['sudoku','tcp-header','fragment','tcp-xmc','tcp-filter','advanced','clear'])
+  assert.ok(tcpCatalog.includes(id),'TCP catalog must expose '+id);
+ const udpCatalog=autoUDP.requests[0].fields[0].options.map(opt=>opt.value);
+ for(const id of ['salamander','udp-sudoku','udp-header','udp-mkcp','noise','udp-hop','udp-xicmp','udp-realm','udp-filter','quic-params'])
+  assert.ok(udpCatalog.includes(id),'UDP catalog must expose '+id);
+ assert.ok(!udpCatalog.includes('udp-xdns'),'XDNS cannot run on Hysteria/QUIC');
+ assert.ok(!tcpCatalog.includes('udp-sudoku'),'No UDP choices for TCP-only inbound');
+ const udpSudoku=harness(hysteria,{requestValues:{action:'udp-sudoku'}});
+ await udpSudoku.run('finalmask');
+ assert.equal(udpSudoku.doc().inbounds[0].streamSettings.finalmask.udp[0].type,'sudoku');
+ assert.match(udpSudoku.doc().inbounds[0].streamSettings.finalmask.udp[0].settings.password,/^[0-9a-f]{64}$/);
+ const tcpHeader=harness(sample(),{requestValues:{action:'tcp-header'}});
+ await tcpHeader.run('finalmask');
+ assert.equal(tcpHeader.doc().inbounds[0].streamSettings.finalmask.tcp[0].type,'header-custom');
+ assert.ok(Array.isArray(tcpHeader.doc().inbounds[0].streamSettings.finalmask.tcp[0].settings.clients[0]));
+ const udpHeader=harness(hysteria,{requestValues:{action:'udp-header'}});
+ await udpHeader.run('finalmask');
+ assert.equal(udpHeader.doc().inbounds[0].streamSettings.finalmask.udp[0].settings.client[0].type,'hex');
+ const mkcpMask=harness(hysteria,{requestValues:{action:'udp-mkcp'}});
+ await mkcpMask.run('finalmask');
+ assert.equal(mkcpMask.doc().inbounds[0].streamSettings.finalmask.udp[0].type,'mkcp-legacy');
+ const serverFilter=harness(sample(),{requestValues:{
+  action:'tcp-filter',settings:JSON.stringify({allowedSourceIPs:['192.0.2.0/24'],blockedSourceIPs:[]})
+ }});
+ await serverFilter.run('finalmask');
+ assert.equal(serverFilter.doc().inbounds[0].streamSettings.finalmask.tcp[0].type,'filter');
+ assert.equal(serverFilter.doc().inbounds[0].xmesh?.clientFinalmask,undefined,'Never project inbound filter');
+ const minecraft=harness(sample(),{requestValues:{action:'tcp-xmc',settings:'{"password":"client-password"}'}});
+ await minecraft.run('finalmask');
+ assert.equal(minecraft.doc().inbounds[0].xmesh.clientFinalmask.tcp[0].type,'xmc');
+ const xicmp=harness(hysteria,{requestValues:{action:'udp-xicmp'}});
+ await xicmp.run('finalmask');
+ assert.equal(xicmp.doc().inbounds[0].xmesh.clientFinalmask.udp[0].type,'xicmp');
+ const realm=harness(hysteria,{requestValues:{action:'udp-realm',settings:'{"url":"realm://token@example.org/id"}'}});
+ await realm.run('finalmask');
+ assert.equal(realm.doc().inbounds[0].xmesh.clientFinalmask.udp[0].type,'realm');
+ const hopping=harness(hysteria,{requestValues:{
+  action:'udp-hop',settings:'{"mode":"perconnremote","remotePorts":"20000-50000","interval":"5-10"}'
+ }});
+ await hopping.run('finalmask');
+ assert.equal(hopping.doc().inbounds[0].xmesh.clientFinalmask.udp.at(-1).type,'udphop');
+ const quicParams=harness(hysteria,{requestValues:{action:'quic-params'}});
+ await quicParams.run('finalmask');
+ assert.equal(quicParams.doc().inbounds[0].xmesh.clientFinalmask.quicParams.congestion,'bbr');
+ const mkcpTransport=JSON.parse(JSON.stringify(hysteria));
+ mkcpTransport.inbounds[0].streamSettings.network='mkcp';
+ const dnsTunnel=harness(mkcpTransport,{requestValues:{
+  action:'udp-xdns',settings:'{"domains":[{"names":["t.example.com"],"types":[16]}],"resolvers":[{"addrs":["udp://1.1.1.1:53"]}]}'
+ }});
+ await dnsTunnel.run('finalmask');
+ assert.ok(dnsTunnel.requests[0].fields[0].options.some(opt=>opt.value==='udp-xdns'),'mKCP exposes XDNS');
+ assert.equal(dnsTunnel.doc().inbounds[0].xmesh.clientFinalmask.udp[0].type,'xdns');
+ // Adding client-only masks must preserve shared symmetric server layers in client override.
+ const layeredNoise=harness(withMask,{requestValues:{action:'noise'}});
+ await layeredNoise.run('finalmask');
+ assert.deepEqual(layeredNoise.doc().inbounds[0].xmesh.clientFinalmask.udp.map(v=>v.type),
+  ['salamander','noise'],'Client mask must retain required Salamander');
+ const layeredHop=harness(withMask,{requestValues:{
+  action:'udp-hop',settings:'{"mode":"perconnremote","remotePorts":"20000-50000"}'
+ }});
+ await layeredHop.run('finalmask');
+ assert.deepEqual(layeredHop.doc().inbounds[0].xmesh.clientFinalmask.udp.map(v=>v.type),
+  ['salamander','udphop'],'UDP hop must follow inherited Salamander');
+ const maskedQUIC=harness(withMask,{requestValues:{action:'quic-params'}});
+ await maskedQUIC.run('finalmask');
+ assert.deepEqual(maskedQUIC.doc().inbounds[0].xmesh.clientFinalmask.udp.map(v=>v.type),
+  ['salamander'],'QUIC params cannot drop symmetric layers');
+ assert.ok(maskedQUIC.doc().inbounds[0].xmesh.clientFinalmask.quicParams);
+ const invalidHop=harness(hysteria,{requestValues:{action:'udp-hop'}});
+ await invalidHop.run('finalmask');
+ const hopValidation=invalidHop.requests[1].fields[0].validate;
+ assert.ok(hopValidation('{"mode":"invalid","remotePorts":"100-200"}'),'Reject invalid UDP hop mode');
+
  const reset=harness(withMask,{requestValues:{action:'clear'}});
  await reset.run('finalmask');
  assert.equal(reset.doc().inbounds[0].streamSettings.finalmask,undefined,'Reset deletes server mask');
