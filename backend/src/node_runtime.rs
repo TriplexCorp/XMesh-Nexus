@@ -1414,6 +1414,26 @@ fn ensure_masque_address(config: &mut Value) -> Result<(), ApiError> {
     let inbounds = config.get_mut("inbounds").and_then(Value::as_array_mut)
         .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Profile has no inbounds."))?;
     for inbound in inbounds {
+        // One managed edge router can expose one transport family per inbound.
+        // Mixed h3+TCP ALPN cannot be silently routed through only one port.
+        let stream = inbound.get("streamSettings");
+        let network = stream.and_then(|v| v.get("network")).and_then(Value::as_str).unwrap_or("");
+        let alpn = stream.and_then(|v| v.get("tlsSettings")).and_then(|v| v.get("alpn"))
+            .and_then(Value::as_array);
+        if matches!(network, "masque" | "xhttp") {
+            if let Some(alpn) = alpn {
+                let h3 = alpn.iter().any(|a| a.as_str() == Some("h3"));
+                if h3 && alpn.len() != 1 {
+                    return Err(ApiError::new(StatusCode::CONFLICT,
+                        "Node-managed H3 requires exclusive ALPN h3 (mixed TCP/UDP is unsupported)."));
+                }
+            }
+            if network == "masque" && alpn.is_none_or(|a| a.len() != 1 ||
+                !matches!(a[0].as_str(), Some("h3" | "h2"))) {
+                return Err(ApiError::new(StatusCode::CONFLICT,
+                    "Node-managed MASQUE requires ALPN h3 or h2 explicitly."));
+            }
+        }
         if inbound.get("protocol").and_then(Value::as_str) != Some("masque") { continue; }
         let stream = inbound.get("streamSettings");
         if stream.and_then(|v| v.get("network")).and_then(Value::as_str) != Some("masque")
