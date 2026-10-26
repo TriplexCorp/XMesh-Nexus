@@ -24,7 +24,11 @@ assert.match(backend,/metrics->>'userStatsAccepted'='true'/);
 assert.match(backend,/sample\.uplink_bytes >= previous\.last_uplink_bytes/);
 assert.match(backend,/sample\.downlink_bytes >= previous\.last_downlink_bytes/);
 assert.match(backend,/LEAST\(\$3::BIGINT,\$4::BIGINT\)/);
-assert.match(html,/app\.js\?v=20261024-presence-fix-v4/);
+// Cache-busting revisions evolve independently from the presence feature.
+// Require the live entry point to reference a versioned app.js instead of
+// pinning this regression test to an obsolete deployment revision.
+assert.match(html,/<script\\s+src=["']app\\.js\\?v=[A-Za-z0-9._-]+["']><\\/script>/,
+ 'index.html must load the versioned app.js entry point');
 
 // Behavioral model of the counters/source-time gate; protects the intended
 // edge-case matrix alongside the signed Postgres integration test.
