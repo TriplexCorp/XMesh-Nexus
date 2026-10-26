@@ -2381,6 +2381,15 @@ function xrayManualPassword(protocol,user,tag,explicit=''){
  }
  return xrayManualSecrets.get(key);
 }
+const xrayManualVmessIds=new Map();
+function xrayManualVmessId(user,tag){
+ const key=[user,tag].join(':');
+ if(!xrayManualVmessIds.has(key)){
+  if(!globalThis.crypto?.randomUUID)throw new Error('Для генерации VPN-паролей требуется HTTPS.');
+  xrayManualVmessIds.set(key,crypto.randomUUID());
+ }
+ return xrayManualVmessIds.get(key);
+}
 function xrayBuilderConfig(){
  const v=id=>$('#xpb-'+id)?.value||'';
  const protocol=v('protocol')||'vless';
@@ -2414,7 +2423,7 @@ function xrayBuilderConfig(){
  }
  const settings={
   vless:{users:[],decryption:vlessEncRequired?(v('vless-decryption').trim()||'REPLACE_WITH_VLESS_ENCRYPTION_CONFIG'):'none'},
-  vmess:{users:[],default:{alterId:0}},
+  vmess:{users:uuid?[{id:xrayManualVmessId(uuid,tag),level:0,email,alterId:0}]:[],default:{alterId:0}},
   trojan:{users:uuid?[{password:authKey('trojan'),level:0,email}]:[]},
   shadowsocks:{network:'tcp,udp',method:ssMethod,...(ss2022||!uuid?{password:ssServerPassword}:{}),...(uuid?{users:[{password:ssUserPassword,...(ss2022?{}:{method:ssMethod}),level:0,email}]}:{})},
   socks:{auth:v('socks-auth')||'noauth',users:(v('socks-auth')==='password'&&uuid)?[{user:login,pass:authKey('socks')}]:[],udp:true,ip:'127.0.0.1'},
@@ -2632,7 +2641,7 @@ function xrayClientSample(){
  let outProtocol=protocol,settings;
  if(['dokodemo-door','tunnel','tun'].includes(protocol))return {...xrayClientLocalDefaults(),remarks:$('#xpb-name')?.value.trim()||'XRAY STUDIO client',note:'Для этого inbound нет прямого одноимённого клиентского outbound. Используйте совместимый клиентский протокол или полный JSON-режим.',outbounds:[]};
  if(protocol==='vless')settings={vnext:[{address,port,users:[{id:uuid,encryption:vlessEncRequired?(v('vless-encryption').trim()||'REPLACE_WITH_VLESS_ENCRYPTION_CONFIG'):'none',...(flow?{flow}:{})}]}]};
- else if(protocol==='vmess')settings={vnext:[{address,port,users:[{id:uuid,alterId:0,security:v('vmess-security')||'auto'}]}]};
+ else if(protocol==='vmess')settings={vnext:[{address,port,users:[{id:xrayManualVmessId(v('uuid').trim(),v('tag').trim()||'inbound-1'),alterId:0,security:v('vmess-security')||'auto'}]}]};
  else if(protocol==='trojan')settings={servers:[{address,port,password:previewPassword('trojan')}]};
  else if(protocol==='shadowsocks'){
   const method=v('ss-method')||'chacha20-ietf-poly1305';
