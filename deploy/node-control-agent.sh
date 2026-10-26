@@ -83,6 +83,11 @@ except (OSError,ValueError,TypeError):
 PY
 )"
  fi
+ local tls_status='null'
+ if [[ -r /usr/local/libexec/xmesh-tls-status.py ]];then
+  tls_status="$(timeout 7 python3 /usr/local/libexec/xmesh-tls-status.py 2>/dev/null || printf 'null')"
+  [[ "$tls_status" == \{*\} ]] || tls_status='null'
+ fi
  local revision_json='null' profile_check='helper_missing' report=''
  if [[ "$xr" == false ]];then
   profile_check='xray_stopped'
@@ -108,7 +113,7 @@ except (ValueError,TypeError,KeyError):
   if [[ "$parsed_revision" =~ ^[a-f0-9]{64}$ ]];then revision_json="\"$parsed_revision\"";fi
  fi
  local ack=''
- ack="$(signed_post '/api/v1/node/heartbeat' "{\"node_id\":$XMESH_NODE_ID,\"version\":\"$AGENT_VERSION\",\"xray_version\":\"$version\",\"xray_running\":$xr,\"router_running\":$xr,\"geoData\":$geo_data,\"appliedRevision\":$revision_json,\"profileCheck\":\"$profile_check\"}")"
+ ack="$(signed_post '/api/v1/node/heartbeat' "{\"node_id\":$XMESH_NODE_ID,\"version\":\"$AGENT_VERSION\",\"xray_version\":\"$version\",\"xray_running\":$xr,\"router_running\":$xr,\"geoData\":$geo_data,\"tlsStatus\":$tls_status,\"appliedRevision\":$revision_json,\"profileCheck\":\"$profile_check\"}")"
  # Reconcile missing desired-state records without treating a node-supplied
  # digest as authoritative. Rate-limit even when the panel requests repeatedly.
  if [[ "$xr" == true && -f /etc/systemd/system/xmesh-xray-sync.service ]] &&
