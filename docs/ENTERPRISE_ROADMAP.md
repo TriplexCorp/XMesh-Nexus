@@ -1,5 +1,14 @@
 # XMesh Nexus — Enterprise hardening roadmap
 
+## Shadowsocks 2022 per-user credentials — 2026-10-26
+
+- [x] Identify why SS2022 outbounds silently disappear: `proxy_outbound` and managed node generation require `ssPassword`, previously absent on ordinary user records.
+- [x] Generate stable CSPRNG-backed AES-128/AES-256 SS2022 user keys on creation and conditionally backfill older records before node and subscription generation.
+- [x] Protect keys from generic user updates; validate AES-128 selection with a regression test.
+- [ ] Verify full Rustfmt, Rust tests, Clippy and production CI after these changes.
+- [ ] Confirm Xray node policy deployment and that the client receives a working `ServerPSK:UserPSK` with an actual SS2022 client.
+
+
 ## FinalMask guided configuration — 2026-10-26
 
 - [x] Replace the default dual-JSON modal with responsive selectable cards and guided steps; keep advanced JSON available.
