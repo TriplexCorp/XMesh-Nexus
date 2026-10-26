@@ -66,7 +66,7 @@ python3 -m py_compile "$tls_status_tmp"
 grep -q 'certificate_file_missing' "$tls_status_tmp" || { echo "TLS health helper validation failed" >&2;exit 1; }
 grep -q 'letsencrypt-http01' "$tls_tmp" || { echo "TLS worker missing signed ACME contract support" >&2;exit 1; }
 renew_tmp="$(mktemp)"
-trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp" "$profile_tmp" "$tls_tmp" "$renew_tmp"' EXIT
+trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp" "$profile_tmp" "$tls_tmp" "${tls_status_tmp:-}" "$renew_tmp"' EXIT
 curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 \
  https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/main/deploy/xmesh-tls-renew-hook.sh -o "$renew_tmp"
 bash -n "$renew_tmp"
