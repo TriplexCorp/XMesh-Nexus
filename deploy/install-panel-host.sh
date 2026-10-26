@@ -102,6 +102,10 @@ server {
     listen 80;
     listen [::]:80;
     server_name $domain;
+    # Subscription URLs are bearer credentials, including configurable paths.
+    # Never record request lines/URIs on this managed virtual host.
+    access_log off;
+    error_log /var/log/nginx/xmesh-nexus-error.log crit;
     return 301 https://\$host\$request_uri;
 }
 server {
@@ -109,6 +113,9 @@ server {
     listen [::]:443 ssl;
     http2 on;
     server_name $domain;
+    # Neither standard nor JSON access logs may capture subscription tokens.
+    access_log off;
+    error_log /var/log/nginx/xmesh-nexus-error.log crit;
     ssl_certificate     /etc/letsencrypt/live/$domain/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/$domain/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
