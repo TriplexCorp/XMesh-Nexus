@@ -55,12 +55,28 @@ const presets=[
 ];
 const defaults={protocol:'vless',transport:'xhttp',security:'reality',name:'Новая конфигурация',
  tag:'vless-main',port:443,listen:'127.0.0.1',path:'/xhttp',target:'',sni:'',
+ alpn:'auto',certificateFile:'',keyFile:'',
  method:'2022-blake3-aes-256-gcm',mode:'new',customProtocol:'',customTransport:'',allowExperimental:false};
 const selected=(options,field)=>String(field==='protocol'&&options.protocol==='custom'?options.customProtocol:
  field==='transport'&&options.transport==='custom'?options.customTransport:options[field]||'').trim().toLowerCase();
 const normalize=options=>({...defaults,...(options||{})});
 const isNetworkAllowed=(network,security)=>security!=='reality'||['raw','xhttp','grpc'].includes(network);
 const specialProtocol=p=>p==='hysteria'||p==='masque';
+// ALPN is negotiated by TLS, not inferred from the VLESS protocol name.
+// Keep transport-specific safe defaults while permitting explicit overrides.
+const recommendedAlpn=t=>t==='grpc'?['h2']:
+ ['ws','httpupgrade'].includes(t)?['http/1.1']:
+ t==='masque'?['h3']:
+ t==='hysteria'?['h3']:
+ ['xhttp','raw'].includes(t)?['h2','http/1.1']:[];
+function parsedAlpn(input,transport){
+ const text=String(input??'auto').trim();
+ if(!text||text.toLowerCase()==='auto')return recommendedAlpn(transport);
+ const values=text.split(',').map(v=>v.trim()).filter(Boolean);
+ if(!values.length||values.length>4||new Set(values).size!==values.length||
+    values.some(v=>!['h2','h3','http/1.1'].includes(v)))throw Error('ALPN: используйте auto, h2, h3 или http/1.1 через запятую без повторов.');
+ return values;
+}
 function analyze(input){
  const o=normalize(input),p=selected(o,'protocol'),t=selected(o,'transport'),s=selected(o,'security');
  const errors=[],warnings=[],info=[];
@@ -74,7 +90,17 @@ function analyze(input){
  if((p==='vless'||p==='trojan')&&s==='none')warnings.push('Для публичного соединения нужна транспортная защита или предусмотренные Xray исключения (доверенная сеть / VLESS Encryption).');
  if(['shadowsocks','socks'].includes(p)&&(t!=='raw'||s!=='none'))warnings.push('Для '+p.toUpperCase()+' обычный UDP может обходить выбранный транспорт и TLS/REALITY. Для UDP изучите XUDP.');
  if(s==='reality')warnings.push('REALITY требует корректные target/SNI и действующий X25519 privateKey. Нажмите REALITY после создания либо используйте генератор.');
- if(s==='tls')warnings.push('Для TLS понадобятся действующие сертификаты и имена сервера; пустой сертификат не позволит запустить публичный inbound.');
+ if(s==='tls'){
+  let alpn=[];
+  try{alpn=parsedAlpn(o.alpn,t)}catch(e){errors.push(e.message)}
+  if(t==='grpc'&&!alpn.includes('h2'))errors.push('gRPC через TLS требует ALPN h2.');
+  if(['ws','httpupgrade'].includes(t)&&!alpn.includes('http/1.1'))warnings.push('Для WebSocket/HTTPUpgrade предпочтителен ALPN http/1.1; h2 требует проверенного reverse proxy.');
+  if(['masque','hysteria'].includes(t)&&!alpn.includes('h3'))warnings.push('Проверьте QUIC/HTTP3: без h3 выбранный транспорт может не работать как ожидается.');
+  if(Boolean(o.certificateFile)!==Boolean(o.keyFile))errors.push('Для TLS укажите оба пути: certificateFile и keyFile.');
+  if(!o.certificateFile&&!o.keyFile)warnings.push('TLS-сертификат не настроен: добавьте реальные certificateFile/keyFile, доступные процессу Xray.');
+ }
+ if(String(o.listen).trim()==='127.0.0.1'&&!['socks','http'].includes(p))warnings.push('Inbound доступен только локально: для внешних клиентов нужен reverse proxy или явная смена Listen.');
+ if(['vless','vmess','trojan','hysteria'].includes(p))info.push('В шаблоне users пустой: клиентов требуется добавить через панель или Xray до подключения.');
  if(p==='hysteria')warnings.push('Hysteria2 требует пользователей и валидные TLS-сертификаты.');
  if(p==='masque')warnings.push('MASQUE требует корректные настройки UDP/HTTP3 и TLS.');
  if(p==='shadowsocks')info.push('Пароль Shadowsocks 2022 генерируется криптографически при создании; клиенты должны получить тот же ключ.');
@@ -125,7 +151,15 @@ function buildInbound(input,{shadowsocksPassword,realityKeys}={}){
   case 'hysteria':streamSettings.hysteriaSettings={version:2};break;
   case 'masque':streamSettings.masqueSettings={};break;
  }
- if(s==='tls')streamSettings.tlsSettings={certificates:[]};
+ if(s==='tls'){
+  const alpn=parsedAlpn(o.alpn,t);
+  const certificateFile=String(o.certificateFile||'').trim(),keyFile=String(o.keyFile||'').trim();
+  if(Boolean(certificateFile)!==Boolean(keyFile))throw Error('TLS требует одновременно certificateFile и keyFile.');
+  streamSettings.tlsSettings={
+   ...(alpn.length?{alpn}:{}),
+   certificates:certificateFile?[{certificateFile,keyFile}]:[]
+  };
+ }
  if(s==='reality'){
   const target=String(o.target||'').trim(),sni=String(o.sni||'').trim();
   streamSettings.realitySettings={
