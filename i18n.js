@@ -783,6 +783,32 @@ window.XMeshI18n=(()=>{
     ["Не удалось удалить:","Could not delete:"]
   ];
   for(const [ru,en] of studioEnglishTranslations)dict.set(ru,en);
+  for(const [ru,en] of [
+  [
+    "Сервер. Автоэкспорт: TCP Sudoku, header-custom; UDP Salamander/Gecko, Sudoku, mkcp-legacy, header-custom.",
+    "Server. Auto-export: TCP Sudoku, header-custom; UDP Salamander/Gecko, Sudoku, mkcp-legacy, header-custom."
+  ],
+  [
+    "Клиентская FinalMask · подписки",
+    "Client FinalMask · subscriptions"
+  ],
+  [
+    "Явная клиентская сторона: fragment, xmc, noise, xdns (mKCP), xicmp, realm, udphop и quicParams. Имеет приоритет над автоэкспортом. Проверяйте версию Xray на устройстве.",
+    "Explicit client-side: fragment, xmc, noise, xdns (mKCP), xicmp, realm, udphop and quicParams. Overrides automatic export. Check the Xray version on the device."
+  ],
+  [
+    "FinalMask — TCP / UDP / QUIC",
+    "FinalMask — TCP / UDP / QUIC"
+  ],
+  [
+    "streamSettings.finalmask (JSON)",
+    "streamSettings.finalmask (JSON)"
+  ],
+  [
+    "Серверная сторона. Автоматически экспортируются общие TCP: Sudoku, header-custom; UDP: Salamander/Gecko, Sudoku, mkcp-legacy, header-custom. Остальные требуют отдельного клиентского JSON.",
+    "Server-side. Shared TCP Sudoku/header-custom and UDP Salamander/Gecko, Sudoku, mkcp-legacy, header-custom are exported automatically. Other masks require separate client-side JSON."
+  ]
+])dict.set(ru,en);
   // Dual-ended FinalMask editor and transport compatibility diagnostics.
   for(const [ru,en] of [
   [
