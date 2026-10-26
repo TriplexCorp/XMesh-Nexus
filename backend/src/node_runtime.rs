@@ -1015,10 +1015,18 @@ fn proxy_user_client_entry(
     let email = format!("xmesh-u{record_id}--{encoded_tag}");
     let entry = match protocol {
         "vless" => json!({"id":uuid.to_string(),"level":0,"email":email}),
-        "vmess" => json!({"id":crate::protocol_credentials::for_protocol(user, "vmess", "")?,"level":0,"email":email}),
-        "trojan" => json!({"password":crate::protocol_credentials::for_protocol(user, "trojan", "")?,"level":0,"email":email}),
-        "hysteria" => json!({"auth":crate::protocol_credentials::for_protocol(user, "hysteria", "")?,"level":0,"email":email}),
-        "masque" => json!({"pass":crate::protocol_credentials::for_protocol(user, "masque", "")?,"level":0,"email":email}),
+        "vmess" => {
+            json!({"id":crate::protocol_credentials::for_protocol(user, "vmess", "")?,"level":0,"email":email})
+        }
+        "trojan" => {
+            json!({"password":crate::protocol_credentials::for_protocol(user, "trojan", "")?,"level":0,"email":email})
+        }
+        "hysteria" => {
+            json!({"auth":crate::protocol_credentials::for_protocol(user, "hysteria", "")?,"level":0,"email":email})
+        }
+        "masque" => {
+            json!({"pass":crate::protocol_credentials::for_protocol(user, "masque", "")?,"level":0,"email":email})
+        }
         "shadowsocks" => {
             // SS2022 passwords must be valid PSKs; never use a plain UUID
             // as a 2022 cipher key. Require an explicit per-user key.
@@ -1154,9 +1162,7 @@ fn provision_proxy_users(
             if !seen.insert(uuid) {
                 continue;
             }
-            if let Some(entry) =
-                proxy_user_client_entry(user, &uuid, tag, &protocol, &ss_method)
-            {
+            if let Some(entry) = proxy_user_client_entry(user, &uuid, tag, &protocol, &ss_method) {
                 entries.push(entry);
             }
         }
