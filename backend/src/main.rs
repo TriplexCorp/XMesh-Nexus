@@ -4030,6 +4030,19 @@ mod reality_profile_autofill_validation_tests {
     }
 
     #[test]
+    fn rejects_incomplete_tls_certificate_pair() {
+        let config = json!({"inbounds":[{
+            "tag":"tls-in",
+            "protocol":"trojan",
+            "port":443,
+            "streamSettings":{"network":"raw","security":"tls",
+                "tlsSettings":{"certificates":[{"certificateFile":"/etc/ssl/cert.pem"}]}}
+        }]});
+        let profile = json!({"name":"incomplete TLS","config":config.to_string()});
+        assert!(validate_record("profiles", &profile).is_err());
+    }
+
+    #[test]
     fn accepts_canonical_x25519_and_hex_short_id() {
         let valid = profile(&"A".repeat(43), "0123456789abcdef", "reality");
         assert!(validate_record("profiles", &valid).is_ok());
