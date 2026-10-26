@@ -272,7 +272,7 @@ const ENT={
         if(i.streamSettings?.security==='reality'&&!(r.publicKey||i.publicKey||i.streamSettings?.realitySettings?.publicKey))return chip('Нет REALITY publicKey','--wr');
         return chip(r.disabled?'Выключен':'Настроен',r.disabled?'--mu':'--ok');
       }],['Вкл.',swc('hosts')]]},
-  nodes:{t:'Узлы',nw:'Узел',s:'id',fs:[{k:'name',l:'Название',req:1},{k:'hosting',l:'Хостинг (необязательно)',h:'Например: Cloudrix, Hetzner, OVH. Отображается в карточке узла.'},{k:'flag',l:'Страна и флаг',t:'country'},{k:'addr',l:'Адрес ноды',req:1,ph:'1.2.3.4, 2001:db8::1 или nl1.example.com',h:'IPv4, IPv6 без скобок или домен. Порт указывается отдельно.'},{k:'port',l:'Порт ноды',t:'num',req:1},{k:'profileId',l:'XRAY STUDIO',t:'sel',o:()=>DB.profiles.map(p=>[p.id,p.name])},{k:'xrayLocalPort',l:'Локальный порт Xray',t:'num',h:'Порт Xray на 127.0.0.1; не публичный порт ноды.'},
+  nodes:{t:'Узлы',nw:'Узел',s:'id',fs:[{k:'name',l:'Название',req:1},{k:'hosting',l:'Хостинг (необязательно)',h:'Например: Cloudrix, Hetzner, OVH. Отображается в карточке узла.'},{k:'flag',l:'Страна и флаг',t:'country'},{k:'addr',l:'Адрес ноды',req:1,ph:'1.2.3.4, 2001:db8::1 или nl1.example.com',h:'IPv4, IPv6 без скобок или домен. Порт указывается отдельно.'},{k:'port',l:'Порт ноды',t:'num',req:1},{k:'profileId',l:'XRAY STUDIO (можно позже)',t:'sel',h:'Не требуется для подключения ноды. После назначения профиля конфигурация Xray применится автоматически.',o:()=>DB.profiles.map(p=>[p.id,p.name])},{k:'xrayLocalPort',l:'Локальный порт Xray',t:'num',h:'Порт Xray на 127.0.0.1; не публичный порт ноды.'},
     {k:'tlsAutoProvision',l:'Управляемый TLS (Let’s Encrypt)',t:'bool',h:'Только при явном включении. Требует домен ноды, email ACME и доступный TCP/80. Панель подпишет параметры; сертификат выпускается на ноде.'},
     {k:'tlsManualProvision',l:'Внешний TLS-сертификат уже установлен',t:'bool',h:'Выберите только если сертификаты из XRAY STUDIO уже доступны на этой ноде. Несовместимо с управляемым TLS.'},
     {k:'tlsDomain',l:'TLS-домен ноды',ph:'node.example.com',h:'DNS-имя, которым вы управляете. Используется только при управляемом TLS. Никаких глобальных доменов.'},
@@ -304,10 +304,10 @@ const ENT={
       const issue=nodeRotationValidate(data);if(issue)return issue;
       const interval=Number(data.rotationIntervalHours||24);
       if(data.rotationEnabled&&(!Number.isInteger(interval)||interval<1||interval>720))return 'Интервал IP-ротации должен быть от 1 до 720 часов.';
+      // Enrolling a fresh node needs no XRAY STUDIO profile. Configuration is
+      // optional until an operator assigns a profile to the enrolled node.
       const nodeProfile=DB.profiles.find(p=>String(p.id)===String(data.profileId));
-      if(!nodeProfile)return 'Назначьте узлу существующий XRAY STUDIO-профиль перед установкой XMesh Node.';
-      if(inbs(nodeProfile).length!==1)return 'Для автоматической установки XMesh Node профиль XRAY STUDIO должен содержать ровно один inbound.';
-      const requiresTLS=inbs(nodeProfile).some(ib=>ib.streamSettings?.security==='tls');
+      const requiresTLS=nodeProfile&&inbs(nodeProfile).some(ib=>ib.streamSettings?.security==='tls');
       if(requiresTLS&&!data.tlsAutoProvision&&!data.tlsManualProvision)
         return 'TLS-профиль: включите управляемый TLS либо подтвердите предварительную установку сертификатов на ноде.';
       if(data.tlsAutoProvision&&data.tlsManualProvision)
@@ -318,7 +318,7 @@ const ENT={
         if(!/^[^\\s@]+@[a-z0-9.-]+\\.[a-z]{2,}$/i.test(email))return 'Управляемый TLS: укажите контактный email ACME.';
       }
       const port=Number(data.xrayLocalPort||0),nodePort=Number(data.port||0);
-      if(!Number.isInteger(port)||port<1||port>65535)return 'Укажите локальный порт Xray от 1 до 65535 перед установкой ноды.';
+      if(port&&(!Number.isInteger(port)||port<1||port>65535))return 'Локальный порт Xray должен быть от 1 до 65535.';
       if(port&&port===nodePort)return 'Порт Xray должен отличаться от порта XMesh Node на том же сетевом интерфейсе.';
       if(data.billingDueDate&&!/^\d{4}-\d{2}-\d{2}$/.test(data.billingDueDate))return 'Дата аренды: ГГГГ-ММ-ДД.';
       if(data.billingDueDate&&!Number.isFinite(Date.parse(data.billingDueDate+'T00:00:00Z')))return 'Некорректная дата аренды.';
