@@ -908,6 +908,17 @@ window.XMeshI18n=(()=>{
   dict.set("maxIdleTimeout: 4–120 с","maxIdleTimeout: 4–120 seconds");
   dict.set("keepAlivePeriod: 0 или 2–60 с","keepAlivePeriod: 0 or 2–60 seconds");
   dict.set("У inbound есть явная клиентская маска. Сначала согласуйте её в расширенном JSON.","The inbound has an explicit client mask. Reconcile it in Advanced JSON first.");
+  // Panel software update queue states and button feedback.
+  dict.set("Запрос в очереди: системный updater ещё не начал работу. Если статус не меняется, проверьте xmesh-panel-update.path и журнал сервиса.","Update queued: the host updater has not started yet. If this does not change, check xmesh-panel-update.path and service logs.");
+  dict.set("Обновление выполняется на сервере. Соединение с панелью может прерваться.","The host is updating the panel. The dashboard connection may be interrupted.");
+  dict.set("Системный updater завершил работу. Проверьте версию панели и состояние сервисов.","The system updater has finished. Verify the panel version and service health.");
+  dict.set("Ошибка обновления. Проверьте journalctl -u xmesh-panel-update.service и /var/log/xmesh-nexus/update.log.","Update failed. Check journalctl -u xmesh-panel-update.service and /var/log/xmesh-nexus/update.log.");
+  dict.set("Системный updater недоступен: выполните sudo bash install.sh на хосте и проверьте xmesh-panel-update.path.","The system updater is unavailable: run sudo bash install.sh on the host and check xmesh-panel-update.path.");
+  dict.set("Неизвестное состояние системного обновления.","Unknown system update state.");
+  dict.set("Запрос принят. Ожидаем подтверждения системного updater.","Request accepted; waiting for the system updater to confirm execution.");
+  dict.set("Обновление не запущено.","No update is running.");
+  dict.set("Обновление уже находится в очереди. Проверьте systemd updater.","An update is already queued. Check the systemd updater.");
+  dict.set("Не удалось проверить очередь обновления на хосте.","Unable to inspect the host update queue.");
   // Guided XRAY STUDIO TLS composer diagnostics.
   dict.set("ALPN: используйте auto, h2, h3 или http/1.1 через запятую без повторов.","ALPN: use auto, h2, h3 or http/1.1 separated by commas without duplicates.");
   dict.set("gRPC через TLS требует ALPN h2.","gRPC over TLS requires ALPN h2.");
