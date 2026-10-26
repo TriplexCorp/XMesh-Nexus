@@ -2049,6 +2049,51 @@ mod tests {
         }
     }
     #[test]
+    fn isolated_protocol_passwords_are_used_instead_of_vless_uuid() {
+        let user = json!({
+            "id":42,
+            "xrayId":"550e8400-e29b-41d4-a716-446655440000",
+            "vmessId":"550e8400-e29b-41d4-a716-446655440123",
+            "trojanPassword":"11".repeat(32),
+            "hysteriaPassword":"22".repeat(32),
+            "masquePassword":"33".repeat(32),
+            "ssLegacyPassword":"44".repeat(32),
+        });
+        let host = json!({"address":"vpn.example.org","externalPort":443});
+        for (protocol, credentials, field) in [
+            ("vmess", "vmessId", "id"),
+            ("trojan", "trojanPassword", "password"),
+            ("shadowsocks", "ssLegacyPassword", "password"),
+            ("hysteria", "hysteriaPassword", "auth"),
+            ("masque", "masquePassword", "pass"),
+        ] {
+            let network = match protocol {
+                "hysteria" => "hysteria",
+                "masque" => "masque",
+                _ => "xhttp",
+            };
+            let inbound = json!({"protocol":protocol,"tag":"EDGE",
+                "settings": if protocol == "shadowsocks" {json!({"method":"aes-256-gcm"})} else {json!({})},
+                "streamSettings":{"network":network,"method":network,"security":"tls",
+                "tlsSettings":{"serverName":"vpn.example.org"}}});
+            let proxy = proxy_outbound(&user, &inbound, &host, "auto").unwrap();
+            let value = match protocol {
+                "hysteria" => &proxy["streamSettings"]["hysteriaSettings"][field],
+                "masque" => &proxy["streamSettings"]["masqueSettings"][field],
+                _ => &proxy["settings"][field],
+            };
+            assert_eq!(value, &user[credentials], "{protocol}");
+            assert_ne!(value, &user["xrayId"], "{protocol} leaked VLESS UUID");
+        }
+        // Users created before this feature keep unchanged credentials until
+        // the owner explicitly rotates their VPN access.
+        let legacy = json!({"id":42,"xrayId":"550e8400-e29b-41d4-a716-446655440000"});
+        let inbound = json!({"protocol":"hysteria","tag":"HY","settings":{},
+            "streamSettings":{"network":"hysteria","security":"tls"}});
+        let proxy = proxy_outbound(&legacy, &inbound, &host, "auto").unwrap();
+        assert_eq!(proxy["streamSettings"]["hysteriaSettings"]["auth"], legacy["xrayId"]);
+    }
+    #[test]
     fn finalmask_survives_full_json_subscription_for_every_proxy_protocol() {
         let user = json!({"id":42,"xrayId":"550e8400-e29b-41d4-a716-446655440000"});
         let host = json!({"address":"vpn.example.org","externalPort":443,"sni":"vpn.example.org"});
