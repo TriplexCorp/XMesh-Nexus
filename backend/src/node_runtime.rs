@@ -36,6 +36,12 @@ fn profile_compile_error_code(error: &ApiError) -> &'static str {
         "invalid_inbound_settings"
     } else if message.starts_with("XRAY STUDIO profile already defines an API") {
         "conflicting_stats_api"
+    } else if message.starts_with("Choose either managed ACME TLS") {
+        "conflicting_tls_modes"
+    } else if message.starts_with("Managed TLS requires") {
+        "managed_tls_validation"
+    } else if message.starts_with("TLS node needs managed ACME") {
+        "tls_mode_required"
     } else if message.starts_with("Node disabled") {
         "node_disabled"
     } else if message.starts_with("GeoData") {
@@ -1459,6 +1465,14 @@ fn ensure_masque_address(config: &mut Value) -> Result<(), ApiError> {
 }
 
 fn configure_node_managed_tls(node: &Value, config: &mut Value) -> Result<Option<Value>, ApiError> {
+    if node.get("tlsAutoProvision").and_then(Value::as_bool) == Some(true)
+        && node.get("tlsManualProvision").and_then(Value::as_bool) == Some(true)
+    {
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "Choose either managed ACME TLS or an external certificate, not both.",
+        ));
+    }
     if node.get("tlsAutoProvision").and_then(Value::as_bool) != Some(true) {
         // Legacy records without the new field retain their existing manual
         // provisioning contract. New records must choose explicitly.
@@ -1677,6 +1691,18 @@ pub async fn desired_config(
 #[cfg(test)]
 mod provision_tests {
     use super::*;
+    #[test]
+    fn managed_tls_rejects_conflicting_provisioning_modes() {
+        let node = json!({"tlsAutoProvision": true, "tlsManualProvision": true});
+        let mut config = json!({"inbounds": [{
+            "streamSettings": {"security": "tls", "tlsSettings": {}}
+        }]});
+        let failure = configure_node_managed_tls(&node, &mut config).unwrap_err();
+        assert_eq!(
+            profile_compile_error_code(&failure),
+            "conflicting_tls_modes"
+        );
+    }
     #[test]
     fn node_desired_config_uses_local_xray_port_not_public_port() {
         let node = json!({"xrayLocalPort": "5000", "port": 443});
