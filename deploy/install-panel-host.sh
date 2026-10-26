@@ -74,14 +74,14 @@ configure_domain() {
  domain="${PANEL_DOMAIN:-$existing_domain}"
  if [[ -z "$domain" ]]; then
   [[ -t 0 ]] || die 'Set PANEL_DOMAIN and PANEL_ACME_EMAIL in non-interactive mode'
-  IFS= read -r -p 'Введите домен панели (panel.example.org): ' domain || die 'Domain input cancelled'
+  IFS= read -r -p 'Enter panel domain (panel.example.org): ' domain || die 'Domain input cancelled'
  fi
  domain="${domain,,}"
  valid_domain "$domain" || die 'Invalid domain. Provide a public FQDN only (no scheme, port or wildcard)'
  email="${PANEL_ACME_EMAIL:-$existing_email}"
  if [[ -z "$email" ]]; then
   [[ -t 0 ]] || die 'Set PANEL_ACME_EMAIL in non-interactive mode'
-  IFS= read -r -p "Email для Let's Encrypt: " email || die 'Email input cancelled'
+  IFS= read -r -p "Let's Encrypt contact email: " email || die 'Email input cancelled'
  fi
  valid_email "$email" || die 'Invalid email for ACME'
  [[ -z "$existing_domain" || "$existing_domain" == "$domain" ]] ||
