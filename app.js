@@ -2507,7 +2507,8 @@ async function removeXrayUserFromProfiles(user){
     const settings=inbound.settings||{};
     for(const key of ['users','clients']){
      if(Array.isArray(settings[key])){
-      const filtered=settings[key].filter(c=>c.id!==user.xrayId&&c.password!==user.xrayId&&c.pass!==user.xrayId&&c.auth!==user.xrayId&&(!email||c.email!==email));
+      const credentials=[user.xrayId,user.vmessId,user.trojanPassword,user.hysteriaPassword,user.masquePassword,user.ssLegacyPassword,user.ssPassword,user.ssPassword128].filter(Boolean);
+      const filtered=settings[key].filter(c=>!credentials.includes(c.id)&&!credentials.includes(c.password)&&!credentials.includes(c.pass)&&!credentials.includes(c.auth)&&(!email||c.email!==email));
       if(filtered.length!==settings[key].length){settings[key]=filtered;changed=true}
      }
     }
