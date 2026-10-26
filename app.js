@@ -3584,6 +3584,13 @@ async function setP(){
   let coreView={desired_version:'latest',installed_version:null,latest_version:null,status:'unknown',progress:null,last_error:null,architecture:'unknown'};
   try{coreView=await backendRequest('/api/v1/core')}catch(e){coreView.last_error=e.message}
   const coreLabel=coreView.status=='updating'?'Обновляется':coreView.status=='ready'?'Установлено':coreView.status=='error'?'Ошибка':'Не установлено';
+  const ownerUpdates=sessionUser?.role==='owner';
+  let panelUpdateView={status:'unavailable'};
+  if(ownerUpdates){
+    try{panelUpdateView=await backendRequest('/api/v1/panel/update')}
+    catch(error){panelUpdateView={status:'unavailable',error:error.message}}
+    if(['queued','running'].includes(panelUpdateView.status))setTimeout(startPanelUpdateWatch,0);
+  }
   return [`<div class="appearance-layout">
 <div class="appearance-column">
     <section class="card sg"><div class="settings-appearance-header">
@@ -3630,15 +3637,15 @@ async function setP(){
     <div class="setting-row"><div class="setting-copy"><b>Автопроверка статуса</b><small>Проверять Xray-core в фоне, только когда панель открыта и вкладка активна.</small></div><label class="sw"><input type="checkbox" id="auto-core-refresh" ${C.autoCoreRefresh?'checked':''} aria-label="Автоматически проверять статус Xray-core"><span></span></label></div>
     <div class="setting-row"><div class="setting-copy"><b>Интервал проверки</b><small>Как часто опрашивать backend, если автопроверка включена.</small></div><div class="setting-control"><select id="core-refresh-seconds" aria-label="Интервал проверки Xray-core"><option value="15" ${Number(C.coreRefreshSeconds)===15?'selected':''}>Каждые 15 секунд</option><option value="30" ${Number(C.coreRefreshSeconds)===30?'selected':''}>Каждые 30 секунд</option><option value="60" ${Number(C.coreRefreshSeconds)===60?'selected':''}>Каждую минуту</option><option value="120" ${Number(C.coreRefreshSeconds)===120?'selected':''}>Каждые 2 минуты</option></select></div></div>
     <div class="sg" style="gap:.6rem"><label class="f"><span>Версия для установки</span><input id="core-target" value="${esc(coreView.desired_version||'latest')}" placeholder="latest или v26.10.10" autocomplete="off"><small>Значение latest выбирает самый свежий опубликованный релиз GitHub. По умолчанию используется latest.</small></label></div>
-    <div class="act"><button class="gh" type="button" data-core-refresh>Проверить статус</button><button class="btn" type="button" data-core-update>Установить / обновить</button></div>
+    <div class="act update-action-row"><button class="gh" type="button" data-core-refresh>Проверить статус</button>${ownerUpdates?'<button class="btn" type="button" data-core-update>Установить / обновить</button>':''}</div>
     <div class="history-placeholder" id="core-message">${esc(coreView.last_error||coreView.progress||'Обновление ядра выполняется отдельно от запуска VPN-трафика.')}</div>
   </div>
-  <div class="card" id="panel-update-card">
+  ${ownerUpdates?`<div class="card" id="panel-update-card">
     <div class="hd"><div><h3>Обновление XMesh Nexus</h3><p>Обновление панели из GitHub main с резервной копией PostgreSQL и пересборкой Docker.</p></div><span class="chip">Owner</span></div>
     <p class="note">Обновление выполняет отдельный системный сервис. У веб-панели нет доступа к Docker socket и произвольным командам. Во время обновления соединение с интерфейсом прервётся.</p>
-    <div class="act"><button type="button" class="gh" data-panel-update-status>Проверить состояние</button><button type="button" class="btn" data-panel-update>Обновить панель</button></div>
-    <div class="history-placeholder" id="panel-update-message">Для веб-обновления требуется установить системный сервис через install.sh.</div>
-  </div>
+    <div class="act update-action-row"><button type="button" class="gh" data-panel-update-status>Проверить состояние</button><button type="button" class="btn" data-panel-update>Обновить панель</button></div>
+    <div class="history-placeholder" id="panel-update-message" role="status" aria-live="polite">${esc(panelUpdateView.error||panelUpdateStatusText(panelUpdateView.status))}</div>
+  </div>`:''}
   <div class="card"><div class="hd"><div><h3>Данные панели</h3><p>Настройки и записи хранятся в PostgreSQL. Экспортируйте JSON перед переносом или резервным копированием.</p></div><button class="gh" id="gx">${ic('dl')}Скачать резервную копию</button></div><p class="note">На этом этапе панель и backend управляют данными и бинарником Xray-core. Запуск VPN-трафика и управление удалёнными узлами пока не подключены.</p></div>`]
 }
 
@@ -4206,11 +4213,8 @@ document.addEventListener('click',async e=>{
   else if(b=g('[data-cf]')){dlg.close();CF&&CF()}
   else if(b=g('[data-panel-update-status]')){
     b.disabled=true;
-    try{
-      const state=await backendRequest('/api/v1/panel/update');
-      const labels={idle:'Обновление не запущено.',running:'Обновление выполняется на сервере…',success:'Обновление завершено. Перезагрузите страницу.',failed:'Ошибка обновления. Проверьте journalctl -u xmesh-panel-update.service',unavailable:'Системный сервис обновления недоступен. Выполните bash install.sh от root.'};
-      const target=$('#panel-update-message');if(target)target.textContent=labels[state.status]||state.status;
-    }catch(err){const target=$('#panel-update-message');if(target)target.textContent=err.message}
+    try{await refreshPanelUpdateStatus(true)}
+    catch(err){const target=$('#panel-update-message');if(target)target.textContent=err.message;toast(err.message)}
     finally{b.disabled=false}
   }
   else if(b=g('[data-panel-update]')){
@@ -4218,12 +4222,14 @@ document.addEventListener('click',async e=>{
     b.disabled=true;
     try{
       const result=await backendRequest('/api/v1/panel/update',{method:'POST',body:JSON.stringify({})});
-      const target=$('#panel-update-message');if(target)target.textContent=result.message||'Запрос принят.';
-      toast('Обновление передано системному сервису');
+      const target=$('#panel-update-message');
+      if(target)target.textContent=result.message||panelUpdateStatusText('queued');
+      toast('Запрос принят. Ожидаем подтверждения системного updater.');
+      startPanelUpdateWatch();
     }catch(err){const target=$('#panel-update-message');if(target)target.textContent=err.message;toast(err.message)}
     finally{b.disabled=false}
   }
-  else if(b=g('[data-core-refresh]')){try{await refreshCoreStatus(true)}catch(err){toast(err.message)}}
+  else if(b=g('[data-core-refresh]')){b.disabled=true;try{await refreshCoreStatus(true)}catch(err){toast(err.message)}finally{b.disabled=false}}
   else if(b=g('[data-core-update]')){const target=$('#core-target')?.value.trim()||'latest';b.disabled=true;try{const result=await backendRequest('/api/v1/core/update',{method:'POST',body:JSON.stringify({version:target})});$('#core-message').textContent=result.message||'Обновление запущено';await refreshCoreStatus();setTimeout(()=>refreshCoreStatus().catch(()=>{}),1800)}catch(err){$('#core-message').textContent=err.message;toast(err.message)}finally{b.disabled=false}}
   else if(b=g('[data-pi]')){const x=PI[+b.dataset.pi];if(x){dlg.close();x.r()}}
   else if(g('#more'))modal(`<div class="box"><h2>Разделы</h2>${FLAT.map(([k,i,l])=>`<button class="pi" data-go="${k}">${ic(i)}<span>${l}</span></button>`).join('')}</div>`);
@@ -4839,6 +4845,36 @@ function syncCoreBadge(state){
   }
   if(settings)settings.title='Настройки Xray-core · '+status;
   if(dot)dot.style.setProperty('--c',state.status==='ready'?'var(--ok)':state.status==='error'?'var(--er)':state.status==='updating'?'var(--wr)':'var(--mu)');
+}
+const panelUpdateStatusText=status=>({
+  idle:'Обновление не запущено.',
+  queued:'Запрос в очереди: системный updater ещё не начал работу. Если статус не меняется, проверьте xmesh-panel-update.path и журнал сервиса.',
+  running:'Обновление выполняется на сервере. Соединение с панелью может прерваться.',
+  success:'Системный updater завершил работу. Проверьте версию панели и состояние сервисов.',
+  failed:'Ошибка обновления. Проверьте journalctl -u xmesh-panel-update.service и /var/log/xmesh-nexus/update.log.',
+  unavailable:'Системный updater недоступен: выполните sudo bash install.sh на хосте и проверьте xmesh-panel-update.path.'
+})[status]||'Неизвестное состояние системного обновления.';
+let panelUpdateWatchTimer=null;
+function stopPanelUpdateWatch(){
+  if(panelUpdateWatchTimer!==null){clearInterval(panelUpdateWatchTimer);panelUpdateWatchTimer=null}
+}
+function startPanelUpdateWatch(){
+  if(panelUpdateWatchTimer!==null)return;
+  panelUpdateWatchTimer=setInterval(async()=>{
+    if(!$('#panel-update-card')){stopPanelUpdateWatch();return}
+    if(document.hidden||!backendReady)return;
+    try{await refreshPanelUpdateStatus()}catch(_){/* Panel may restart during the update. */}
+  },5000);
+}
+async function refreshPanelUpdateStatus(showToast=false){
+  const state=await backendRequest('/api/v1/panel/update');
+  const message=panelUpdateStatusText(state.status);
+  const target=$('#panel-update-message');
+  if(target)target.textContent=message;
+  if(['queued','running'].includes(state.status))startPanelUpdateWatch();
+  else stopPanelUpdateWatch();
+  if(showToast)toast(message);
+  return state;
 }
 async function refreshCoreStatus(showToast=false){
   const state=await backendRequest('/api/v1/core');
