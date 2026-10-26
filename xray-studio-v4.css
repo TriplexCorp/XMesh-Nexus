@@ -1435,14 +1435,16 @@ body>.sv-studio-portal ::-webkit-scrollbar-button:single-button:vertical:end:inc
 
 
 /* FinalMask catalog: wide modal with a bounded scroll region and responsive columns. */
-.xm-studio-modal--cards{
- width:min(72rem,calc(100vw - 2rem));
+/* FinalMask is a native <dialog>; styles.css has a more-specific global
+   width rule for dialog:not(...). Override it at the dialog level. */
+dialog.xm-studio-modal.xm-studio-modal--cards{
+ width:min(84rem,calc(100vw - 2rem))!important;
  max-width:calc(100vw - 2rem);
  max-height:calc(100dvh - 2rem);
  overflow-y:auto;
 }
 .xm-studio-modal .xm-studio-modal-cardchoices{
- display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.7rem;margin-top:.3rem;
+ display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.7rem;margin-top:.3rem;
 }
 .xm-studio-modal .xm-studio-modal-choice{
  display:flex;flex-direction:column;align-items:flex-start;gap:.3rem;text-align:left;
@@ -1469,7 +1471,8 @@ body>.sv-studio-portal ::-webkit-scrollbar-button:single-button:vertical:end:inc
 .xm-studio-modal .xm-studio-modal-choice:disabled:hover{
  background:var(--s2,#202c38);border-color:var(--ln,#344052);
 }
-@media(max-width:900px){.xm-studio-modal .xm-studio-modal-cardchoices{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:1100px){.xm-studio-modal .xm-studio-modal-cardchoices{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:760px){.xm-studio-modal .xm-studio-modal-cardchoices{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:580px){.xm-studio-modal .xm-studio-modal-cardchoices{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){.xm-studio-modal .xm-studio-modal-choice{transition:none}}
 
