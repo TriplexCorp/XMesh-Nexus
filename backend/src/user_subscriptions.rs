@@ -1924,10 +1924,11 @@ mod tests {
                 "hysteria" => json!({"version":2,"users":[]}),
                 _ => json!({"users":[]}),
             };
+            let alpn = if udp { "h3" } else { "h2" };
             let inbound = json!({"tag":"main","protocol":protocol,"port":443,
                 "settings":settings,
                 "streamSettings":{"network":network,"security":"tls",
-                    "tlsSettings":{"serverName":"vpn.example.org","alpn":["h3"]},
+                    "tlsSettings":{"serverName":"vpn.example.org","alpn":[alpn]},
                     "finalmask":mask}});
             let proxy = proxy_outbound(&user,&inbound,&host,"auto")
                 .unwrap_or_else(|| panic!("failed to create {protocol} outbound"));
