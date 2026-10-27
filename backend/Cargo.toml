@@ -4,7 +4,13 @@ version = "0.1.0"
 edition = "2024"
 publish = false
 
+[features]
+default = []
+# Build only in an audited OpenSSL 3.5+ environment; disabled in production Docker.
+xsp-v2-experimental = ["dep:openssl"]
+
 [dependencies]
+openssl = { version = "=0.10.81", optional = true }
 base64 = "0.22"
 anyhow = "1"
 argon2 = "0.5"
