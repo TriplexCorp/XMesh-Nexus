@@ -55,11 +55,11 @@ assert.match(updater,/docker --config "\$DOCKER_CONFIG" compose up -d --no-deps 
 assert.doesNotMatch(updater,/then\\n echo/,'Do not embed literal backslash-n in Bash');
 assert.match(runtime,/INTERVAL '15 minutes'/,'Long full-node upgrades must not expire after 180 seconds');
 assert.match(updater,/xmesh-policy-guard[.]py -o "\$policy_tmp"/,'Agent update must fetch updated signed policy guard');
-assert.match(updater,/xmesh-profile-attest[.]py -o "\\$profile_tmp"/,
+assert.match(updater,/xmesh-profile-attest[.]py -o "\$profile_tmp"/,
   'Agent updater must fetch the profile attestation helper');
-assert.match(updater,/python3 -m py_compile "\\$profile_tmp"/,
+assert.match(updater,/python3 -m py_compile "\$profile_tmp"/,
   'Attestation helper must pass Python syntax check before installation');
-assert.match(updater,/grep -q 'verify_envelope' "\\$profile_tmp"/,
+assert.match(updater,/grep -q 'verify_envelope' "\$profile_tmp"/,
   'Attestation helper must retain signed-policy verification');
 assert.match(updater,/mv -f \/usr\/local\/libexec\/\.xmesh-profile-attest[.]new \/usr\/local\/libexec\/xmesh-profile-attest[.]py/,
   'Verified helper must be installed atomically');
