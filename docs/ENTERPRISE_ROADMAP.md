@@ -62,6 +62,9 @@
 
 ## Следующий инженерный P0: server-side XSP-v2 cutover — OPEN
 
+**Staging crypto-инкремент (27 октября 2026):** в [Nexus PR #35](https://github.com/TriplexCorp/XMesh-Nexus/pull/35) и [Node PR #14](https://github.com/TriplexCorp/XMesh-Node/pull/14) добавлены **экспериментальные** Ed25519+ML-DSA-65 signing/verification primitives для доверенно подписанного permit и Node applied ACK, pinning по `panel_response`/`node_request`, связность epochs/key IDs/requestId/nonce/TTL/digest и негативные тесты. Это **не** server-issued permit и не фактический cutover: пока отсутствуют protected signer provisioning, freeze реального digest пары из PostgreSQL, persistent nonce/idempotency, durable Node commit/ACK, транзакционный Nexus epoch switch, signed receipt и crash/recovery. [Точная граница реализации](XSP_V2_SIGNED_CUTOVER_STAGING.md). Production `XMESH1` не меняется.
+
+
 1. [ ] Security/architecture review: threat model и wire registry, роли `node_request`/`panel_response`, ключи, epoch, lease/nonce, переходы состояний и recovery. Зафиксировать инварианты до серверной реализации.
 2. [x] **Staging prepare/dual PoP реализованы и проверены:** владелец одобряет только точную *публичную* пару в `0102`, Go подписывает домен `XSP2-KEY-ROTATE-PREPARE-V1`, Rust проверяет обе подписи и помечает `proved_at` с one-use TTL; старый ключ остаётся действующим ([Nexus #30](https://github.com/TriplexCorp/XMesh-Nexus/pull/30), [Node #10](https://github.com/TriplexCorp/XMesh-Node/pull/10)). **Подтверждение Node и cutover ещё отсутствуют.**
 3. [ ] **Следующий PR — подписанное доверенное разрешение Nexus→Node и signed Node cutover/applied ACK:** зафиксировать канонические байты и domains, `nodeId`, `fromEpoch/toEpoch`, key IDs, `requestId`, digest и nonce, TTL/replay и фактическое persisted Node-состояние. Неподписанный `200 proofVerified` **не** разрешает активацию.
