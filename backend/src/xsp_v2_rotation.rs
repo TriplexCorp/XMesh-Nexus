@@ -339,19 +339,20 @@ mod tests {
         assert_eq!(ed_id, digest_id("ed-", &ed));
         assert_eq!(pq_id, digest_id("pq-", &pq));
         let challenge: [u8; 32] = hex::decode(proof["challengeHex"].as_str().unwrap())
-            .unwrap().try_into().unwrap();
+            .unwrap()
+            .try_into()
+            .unwrap();
         let ed_sig = strict_base64(proof["ed25519SignatureB64"].as_str().unwrap(), 64).unwrap();
         let pq_sig = strict_base64(proof["mldsa65SignatureB64"].as_str().unwrap(), 3309).unwrap();
-        let signed = rotation_input(node, (from, to), &challenge,
-            &ed, &pq, ed_id, pq_id).unwrap();
+        let signed = rotation_input(node, (from, to), &challenge, &ed, &pq, ed_id, pq_id).unwrap();
         assert!(verify_proof(&signed, &ed, &pq, &ed_sig, &pq_sig).is_ok());
         // A rotation signature cannot be replayed as initial enrollment.
-        let initial = crate::xsp_v2_enrollment::proof_input(
-            node, to, &challenge, &ed, &pq, ed_id, pq_id,
-        ).unwrap();
+        let initial =
+            crate::xsp_v2_enrollment::proof_input(node, to, &challenge, &ed, &pq, ed_id, pq_id)
+                .unwrap();
         assert!(verify_proof(&initial, &ed, &pq, &ed_sig, &pq_sig).is_err());
-        let changed = rotation_input(node, (from + 1, to + 1), &challenge,
-            &ed, &pq, ed_id, pq_id).unwrap();
+        let changed =
+            rotation_input(node, (from + 1, to + 1), &challenge, &ed, &pq, ed_id, pq_id).unwrap();
         assert!(verify_proof(&changed, &ed, &pq, &ed_sig, &pq_sig).is_err());
     }
 
