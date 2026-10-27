@@ -453,6 +453,15 @@ ML-DSA-65 signatures/public keys существенно больше Ed25519; н
 - **Потеря связи в середине активации:** стороны продолжают сверять persisted migrationId/epoch; неизвестное состояние означает **не применять новый config**, а не принимать legacy.
 - **При компрометации ключей:** incident runbook; не выдавать автоматическое безусловное «разрешить Xray».
 
+## PR01 foundation checkpoint — 2026-10-27
+
+- [x] Draft [XSP_V2_WIRE_SPEC.md](XSP_V2_WIRE_SPEC.md): candidate `xsp2-wire-candidate-1`, exact byte order, bounds, endpoint/direction binding and downgrade/replay threat model. Same document in both repos.
+- [x] Shared public [XSP_V2_VECTORS.json](XSP_V2_VECTORS.json) (request + response, no signing secrets) is identical in both repos. Rust, Go and independent JS test-only encoders compare exact bytes and negative mutations.
+- [ ] Record passing *latest* CI runs in **both** repositories after code-format fixes, then complete design and security review. Mark the wire as frozen only after explicit approval; compatibility-breaking changes need schema/version increment.
+- [ ] PR02: real library-backed Ed25519 **AND** ML-DSA-65 cross-language signing, negative KATs and TLS X25519MLKEM768 negotiation spike.
+
+**No production v2 endpoint, key generation, suite floor or agent switch has been added.** This checkpoint does **not** close XSP-v2 or any cryptographic acceptance gate.
+
 ## 15. Последовательность Pull Requests и acceptance gates
 
 **PR 01 — XSP-v2 specification & threat model (оба репозитория, docs/tests)**  
