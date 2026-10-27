@@ -27,6 +27,8 @@ mod xsp_v2_enrollment;
 mod xsp_v2_rotation;
 
 #[cfg(test)]
+mod xsp_v2_cutover_contract_tests;
+#[cfg(test)]
 mod xsp_v2_wire_tests;
 
 use axum::{
