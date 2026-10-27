@@ -126,6 +126,15 @@ This roadmap tracks verified improvements, not feature claims. A stage is comple
 
 **Status:** [ ] NOT IMPLEMENTED / NOT VERIFIED. **Priority:** highest; start this work before new features. **Scope:** XMesh Nexus control plane and XMesh Node agents; coordinate changes in **both repositories**. This is a planned security upgrade, not a claim that existing Ed25519 traffic is already post-quantum secure.
 
+**Implementation checkpoint — 2026-10-27 (PR01 foundation, not deployed):**
+
+- [x] Audited current Nexus Ed25519 `XMESH1` requests, node enrollment, separately signed policy, unsigned command response gap, Node Go heartbeat, and actual external TLS termination.
+- [x] Added draft [XSP_V2_WIRE_SPEC.md](XSP_V2_WIRE_SPEC.md) and identical [XSP_V2_VECTORS.json](XSP_V2_VECTORS.json) to Nexus and XMesh-Node `main`.
+- [x] Added *test-only* binary encoders/negative fixtures in Nexus Rust, Go Node and independent JavaScript; the CI suite runs the applicable tests. No PQ-signing code, keys, new API paths or agent activation were introduced.
+- [ ] Confirm **green CI in both repositories on matching PR01 revisions** and owner/security review of message registry, exact binary encoding, key purpose and error/replay model.
+- [ ] Select and audit viable ML-DSA-65 Rust/Go cryptographic providers and real TLS termination before PR02; enforce cross-signing interop and *both* valid signatures with bounded parsers.
+- [ ] Rehearse migration on disposable nodes; v1 traffic must continue unchanged until explicit per-node activation. **XSP-v2 itself remains NOT IMPLEMENTED / NOT VERIFIED.**
+
 **Full engineering blueprint:** [Hybrid Post-Quantum Security — XSP-v2 complete implementation plan](HYBRID_POST_QUANTUM_SECURITY_IMPLEMENTATION_PLAN.md) (20 sections: architecture, source-file map, wire format, identity, TLS, migration, PRs, tests, acceptance gates). Follow the detailed plan as the implementation source of truth; the checklist below is a short milestone overview.
 
 **Goal:** protect authenticity/integrity of node policies, commands and telemetry against future quantum-capable forgery, and protect confidentiality of node↔panel control traffic against *harvest now, decrypt later* attacks. These are **separate** security properties; embedding a PQ key inside an Ed25519 key is not a valid design.
