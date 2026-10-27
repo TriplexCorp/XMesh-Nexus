@@ -72,6 +72,34 @@ revocation and for the future `receipt_sent` state until those cases receive
 a separately reviewed protocol. PostgreSQL roles, row deletion protection and
 auditable append-only history remain further security work.
 
+### Immutable signed receipt outbox (staging-only)
+
+After the verified PostgreSQL commit and historical ACK readback, a separate
+Rust operation `store_or_load_signed_receipt_staging` accepts **only** an
+existing, cryptographically verified Nexus Ed25519 **AND** ML-DSA-65 receipt
+matching the exact original permit and signed ACK. Migration
+`0105_node_xsp_signed_commit_receipt_outbox.sql` creates a single immutable
+receipt-envelope row per (authenticated Node, request), with a composite
+foreign key to the original cutover ledger, exact hashes, epochs, and an
+insert trigger that requires the original ledger to be `ack_verified`.
+
+The Rust writer first revalidates the signed historical ACK, then locks
+the same suite/ledger rows and confirms their state is unchanged; only then
+does it insert the exact signed receipt. Subsequent identical retries
+return the **original signed bytes**. Different signed JSON bytes, corrupt
+records or a mismatched request/pin fail closed. Both UPDATE and DELETE on
+the outbox are rejected by a database trigger. The OpenSSL 3.5 +
+throwaway PostgreSQL CI test verifies signed receipts, exact duplicate,
+incompatible retry and SQL immutability.
+
+**Not a production endpoint:** No signer credentials or private keys are
+stored in SQL; the receipt must be independently signed by a protected
+`panel_response` signer before calling the writer. No authenticated
+Node-only HTTP route, trusted TLS terminator, deployment, Node vault
+attestation or guaranteed crash-proof disk/KMS monotonicity is supplied
+by this staging component. Signed receipt storage also does not authorize
+key retirement.
+
 ### Critical remaining gates
 
 - **Protected panel signer / authenticated transport**: no enabled server route, KMS/HSM signer, deployed pinned trust root or independently reviewed approval flow. Do not connect this helper to an untrusted API.
