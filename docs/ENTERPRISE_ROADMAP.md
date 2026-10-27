@@ -13,7 +13,15 @@
 | XRAY STUDIO / JSON | Конструктор, SS2022, JSON-подписки, полный каталог FinalMask и адаптивное окно до 84rem | Проверка реального Xray, клиентов и диалога на разных экранах |
 | Статистика и доступ | Исторические метрики, карточки, RBAC и автономные политики | Нагрузочные, отказоустойчивые и security regression тесты |
 | Криптография control plane | Production `XMESH1`/Ed25519; XSP-v2 Rust↔Go dual signatures, строгий decoder, staging owner-approved **initial epoch-1 enrollment**, локальный Node `prepare/prove/activate/recover` ([PR #5](https://github.com/TriplexCorp/XMesh-Node/pull/5), [#6](https://github.com/TriplexCorp/XMesh-Node/pull/6)), [Nexus rekey guard #24](https://github.com/TriplexCorp/XMesh-Nexus/pull/24); всё **не развёрнуто** | **P0:** signed server-side two-phase cutover/ACK, backup/KMS, Nexus `panel_response` signer, signed v2 replies, independent review/KAT/fuzz, реальный TLS ingress/canary |
-| Качество релиза | Исторический полный CI успешен на `918d42fa` (#40432809267); актуальный Nexus run на `3fc80b70` **завершился с ошибкой Rustfmt**, после чего внесено исправление | Подтвердить полный зелёный Backend CI именно последнего SHA, PostgreSQL integration, browser/live-node e2e и rollback gates |
+| Качество релиза | [Nexus Backend CI на PR #26 `8534aa2` — success](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40449358858), включая PostgreSQL/API integration и миграцию `0101`; [Node CI `main` `0a11efa` — success](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40448354429) | Подтвердить CI на **последнем** Nexus `main` после документационных merge, обновить панель на VPS, проверить безопасный rollback/browser e2e |
+
+## Практическая поддержка нод — устранён конфликт регистрации HTTP 409
+
+- [x] Legacy Node Ed25519 re-enrollment теперь отделён от initial enrollment: обычная выдача токена заранее отказывает для уже зарегистрированного ID; owner-only `/api/v1/nodes/{id}/enrollment/reissue` требует осознанного подтверждения в UI ([Nexus PR #26](https://github.com/TriplexCorp/XMesh-Nexus/pull/26)).
+- [x] Миграция `0101` добавляет default-deny `allow_key_replacement`; короткоживущий token + proof нового Ed25519-ключа проверяются **до** атомарной замены старого. Неверная подпись не отключает старую ноду; XSP-v2 suite/epoch не понижаются. PostgreSQL-интеграция проверена: [Backend CI #40449358858](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40449358858).
+- [x] Bootstrap Node объясняет `409` и `401/403`, не печатает секреты и сохраняет локальный ключ для повторной попытки ([Node PR #7](https://github.com/TriplexCorp/XMesh-Node/pull/7), [Node CI `main` #40448354429](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40448354429)).
+- [ ] **Владельцу:** обновить установленную панель, повторно выдать recovery-token для Node 13, проверить системные службы и статус; если прежний сервер должен оставаться активным — вместо восстановления создать новый ID. Слияние PR не выполняет SSH/деплой VPS.
+- [ ] **Безопасность:** это восстановление **legacy XMESH1/Ed25519**, не XSP-v2 двухфазный cutover/ACK; независимый PQ production gate остаётся открыт.
 
 ## Текущий P0 — сводка реализации и проверки (27 октября 2026)
 
@@ -24,8 +32,9 @@
 | PR01 wire/PR02 dual signatures | [x] Исходники + двусторонние Rust↔Go тесты | Freeze протокола, сторонний FIPS 204 KAT и fuzz |
 | Strict decoder + heartbeat/replay | [x] Staging-only parser и проверка **Ed25519 AND ML-DSA-65**, транзакционный nonce | Signed Nexus→Node responses, policy/revision/command ACK |
 | Key vault/owner initial enrollment | [x] AES-GCM staging vault + локальные prepare/prove/activate/recover Node; [x] владелец одобряет **начальный** keyset epoch 1, 10-min challenge/PoP; [x] старый unsafe rekey запрещён | [ ] Отдельный транзакционный Nexus two-phase cutover с подписанным Node ACK, удержанием старого доверия до принятия новой пары, retirement, KMS/backup/recovery |
+| Legacy Node enrollment HTTP 409 | [x] [Nexus #26](https://github.com/TriplexCorp/XMesh-Nexus/pull/26): owner-only reissue, 10-минутный replacement-scoped token, Ed25519 PoP и атомарный swap **после** проверки; [Node #7](https://github.com/TriplexCorp/XMesh-Node/pull/7): диагностируемый bootstrap без утечки токена, оба в `main` | [ ] Обновить установленную Nexus VPS, вручную проверить переподключение Node 13 и отсутствие потери управления до успешного proof; если старая VPS должна работать, использовать отдельный Node ID |
 | PR07 hybrid TLS | [x] Изолированный Nginx/OpenSSL/Go TLS1.3/X25519MLKEM768, SNI/CA/downgrade checks | **Реальная** отдельная VPS, DNS/ACME и проверка всех hop'ов |
-| Full CI последнего кода | [x] **Success на `main` `f5f3e06`** | [Nexus Backend CI #40444076259](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40444076259): Rustfmt, 136 Rust unit tests, strict Clippy, Docker и PostgreSQL/API integration, включая `0099`/`0100`. [Crypto PoC #40444076298](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40444076298) — success. Это не production-подтверждение XSP-v2 |
+| Последний проверенный Backend CI | [x] **Success на PR #26 `8534aa2`** | [Backend CI #40449358858](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40449358858): Rustfmt, Rust tests, strict Clippy, Docker и PostgreSQL/API integration, включая additive migration `0101` и реальные проверки owner-approved Ed25519 recovery. Повторный CI на новом `main` отслеживается отдельно; это не проверка VPS |
 | Strict production activation | [ ] **Выключено** | Независимый security-review, зафиксированный suite-floor на обеих сторонах, canary и отдельное одобрение владельца |
 
 **Исторические CI по конкретным SHA:** [Nexus Crypto #40440784297](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40440784297) — success на `b860ac7a`; [Node Crypto #40440580172](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40440580172) — success на `dba0c3e0`; [Node CI #40440956290](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40440956290) — success на `84b384db`. Эти более ранние проверки не являются доказательством текущего `main`; актуальные успешные прогоны приведены строкой выше.
@@ -195,7 +204,7 @@ Details: [experimental gateway, vault, TLS and blockers](XSP_V2_EXPERIMENTAL_GAT
 **Acceptance gate:** do not mark enterprise readiness or full CI stabilization complete until the above checks have actual passing evidence.
 
 
-**Baseline:** 2026-10-24 · **Progress reviewed:** 2026-10-27 · **Target branch:** `main` · **Status:** XSP-v2 staging implementation and isolated Crypto CI green on referenced revisions; most recent full Nexus CI requires re-verification after a Rustfmt failure; not enterprise-production certified.
+**Baseline:** 2026-10-24 · **Progress reviewed:** 2026-10-27 · **Target branch:** `main` · **Status:** XSP-v2 staging implementation only; strict PQ not enabled; PR #26 Backend CI including PostgreSQL/API recovery passed on `8534aa2`. Latest `main` and live VPS still require independent release verification; not enterprise-production certified.
 
 This roadmap tracks verified improvements, not feature claims. A stage is complete only after the listed acceptance criteria pass in CI and, where required, on a disposable real Xray node. A green source-level assertion alone does not count as production evidence.
 
