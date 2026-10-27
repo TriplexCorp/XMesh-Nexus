@@ -201,8 +201,12 @@ chmod 0444 /certs/unrelated.pem
             timeout=20,
         )
         combined = openssl.stdout + openssl.stderr
-        if "Protocol version: TLSv1.3" not in combined or "X25519MLKEM768" not in combined:
-            raise RuntimeError("OpenSSL did not independently observe TLS1.3/X25519MLKEM768")
+        if (
+            "Protocol version: TLSv1.3" not in combined
+            or "X25519MLKEM768" not in combined
+            or "Verification: OK" not in combined
+        ):
+            raise RuntimeError("OpenSSL did not independently observe trusted TLS1.3/X25519MLKEM768")
         print("PASS: independent OpenSSL observation agrees with Go probe")
 
         def expect_tls_failure(label: str, *openssl_args: str) -> None:
@@ -255,6 +259,7 @@ chmod 0444 /certs/unrelated.pem
                 "--entrypoint", "openssl", probe_image,
                 "s_client",
                 "-quiet",
+                "-ign_eof",
                 "-connect", f"{ALIAS}:8444",
                 "-servername", HOSTNAME,
                 "-verify_hostname", HOSTNAME,
