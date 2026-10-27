@@ -67,6 +67,7 @@ services:
       PANEL_UPDATE_STATUS: /run/xmesh/panel-update-status
       TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:-}
       SUBSCRIPTION_ENCRYPTION_KEY: ${SUBSCRIPTION_ENCRYPTION_KEY:?Run ./install.sh to provision subscription key}
+      XSP_V2_SIGNER_SOCKET_PATH: /run/xmesh-signer/signer.sock
       RUST_LOG: info,tower_http=info,sqlx=warn
     depends_on:
       db:
@@ -80,6 +81,7 @@ services:
       - ./deploy/runtime/dashboard-path:/run/xmesh/dashboard-path:rw
       - ./deploy/runtime/panel-update-request:/run/xmesh/panel-update-request:rw
       - ./deploy/runtime/panel-update-status:/run/xmesh/panel-update-status:ro
+      - xsp_v2_signer_socket:/run/xmesh-signer
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=64m,mode=1777
@@ -89,6 +91,38 @@ services:
       - no-new-privileges:true
     restart: unless-stopped
 
+  xsp-v2-signer:
+    # Opt-in only. The default production stack does not start this component.
+    profiles: ["xsp-v2-staging"]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.xsp-signer
+    command: ["--xsp-v2-signer"]
+    environment:
+      XSP_V2_SIGNER_DATABASE_URL: ${XSP_V2_SIGNER_DATABASE_URL:-}
+      XSP_V2_SIGNER_SOCKET_PATH: /run/xmesh-signer/signer.sock
+      XSP_V2_SIGNER_ED25519_KEY_FILE: /run/xmesh-signer-keys/panel-ed25519.pem
+      XSP_V2_SIGNER_MLDSA65_KEY_FILE: /run/xmesh-signer-keys/panel-mldsa65.pem
+      XSP_V2_SIGNER_EXPECTED_ED_KEY_ID: ${XSP_V2_SIGNER_EXPECTED_ED_KEY_ID:-}
+      XSP_V2_SIGNER_EXPECTED_PQ_KEY_ID: ${XSP_V2_SIGNER_EXPECTED_PQ_KEY_ID:-}
+      XSP_V2_SIGNER_ISSUER_ID: ${XSP_V2_SIGNER_ISSUER_ID:-xmesh-nexus-panel}
+      RUST_LOG: warn,sqlx=error
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - xsp_v2_signer_socket:/run/xmesh-signer
+      - ${XSP_V2_SIGNER_KEYS_DIR:-/etc/xmesh-nexus/xsp-v2-signer}:/run/xmesh-signer-keys:ro
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   core_data:
+  xsp_v2_signer_socket:
