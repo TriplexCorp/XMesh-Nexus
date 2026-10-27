@@ -1,0 +1,41 @@
+#!/usr/bin/env node
+"use strict";
+// CI inventory guard: this checks essential staging artifacts remain tracked
+// in the checkout. It is NOT proof of cryptographic or cutover correctness.
+const fs=require("node:fs");
+const assert=require("node:assert/strict");
+
+const expected=[
+  "backend/migrations/0099_node_xsp_v2_public_state.sql",
+  "backend/migrations/0100_node_xsp_owner_key_approval.sql",
+  "backend/migrations/0102_node_xsp_rotation_preparations.sql",
+  "backend/migrations/0103_node_xsp_cutover_permit_ledger.sql",
+  "backend/migrations/0104_node_xsp_cutover_ledger_immutability.sql",
+  "backend/src/xsp_v2_candidate_binding.rs",
+  "backend/src/xsp_v2_db_candidate_snapshot.rs",
+  "backend/src/xsp_v2_signed_cutover.rs",
+  "backend/src/xsp_v2_permit_ledger_writer.rs",
+  "docs/XSP_V2_CUTOVER_CONTRACT_VECTORS.json",
+  "docs/XSP_V2_CUTOVER_CANDIDATE_VECTORS.json",
+  "docs/XSP_V2_SIGNED_CUTOVER_STAGING.md",
+  "docs/XSP_V2_STAGING_VERIFIED_PERMIT_WRITER.md",
+  "scripts/test-xsp-v2-ledger-integration.sh"
+];
+for(const name of expected){
+  assert(fs.statSync(name).isFile(),`XSP-v2 main checkpoint missing: ${name}`);
+}
+const core=fs.readFileSync("backend/src/main.rs","utf8");
+const experimental=[
+  "xsp_v2_signed_cutover",
+  "xsp_v2_db_candidate_snapshot",
+  "xsp_v2_permit_ledger_writer"
+];
+for(const name of experimental){
+  // Reject accidental loss of the experimental feature boundary:
+  const check=new RegExp("#\\[cfg\\(feature = \"xsp-v2-experimental\"\\)\\]\\s*mod "+name+";");
+  assert(check.test(core),`XSP-v2 module must remain feature gated: ${name}`);
+}
+const config=JSON.parse(fs.readFileSync("docs/XSP_V2_CUTOVER_CONTRACT_VECTORS.json","utf8"));
+assert.equal(config.schema,"xsp2-cutover-contract-1");
+assert(config.permit && config.ack,"missing permit/ACK shared golden vectors");
+console.log(`PASS: ${expected.length} tracked Nexus XSP-v2 artifacts and experimental feature gates`);
