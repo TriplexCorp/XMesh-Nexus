@@ -21,6 +21,8 @@ mod subscription_user_agent;
 mod user_subscriptions;
 #[cfg(feature = "xsp-v2-experimental")]
 mod xsp_v2_api;
+#[cfg(feature = "xsp-v2-experimental")]
+mod xsp_v2_enrollment;
 
 #[cfg(test)]
 mod xsp_v2_wire_tests;
@@ -411,10 +413,24 @@ fn protected_routes(state: &AppState) -> Router<AppState> {
         ))
 }
 
-fn experimental_v2_routes() -> Router<AppState> {
+fn experimental_v2_routes(state: &AppState) -> Router<AppState> {
     let router = Router::new();
     #[cfg(feature = "xsp-v2-experimental")]
-    let router = router.route("/api/v2/node/heartbeat", post(xsp_v2_api::heartbeat));
+    let router = router
+        .route("/api/v2/node/heartbeat", post(xsp_v2_api::heartbeat))
+        .route("/api/v2/node/keys/claim", post(xsp_v2_enrollment::claim))
+        .merge(
+            Router::new()
+                .route(
+                    "/api/v2/admin/nodes/{id}/key-approval",
+                    post(xsp_v2_enrollment::approve),
+                )
+                .route_layer(middleware::from_fn_with_state(
+                    state.clone(),
+                    auth::require_session,
+                )),
+        );
+    let _ = state;
     router
 }
 
@@ -482,7 +498,7 @@ fn application_router(state: AppState) -> Router {
                 .merge(protected)
                 .fallback(|| async { StatusCode::NOT_FOUND }),
         )
-        .merge(experimental_v2_routes())
+        .merge(experimental_v2_routes(&state))
         .nest_service("/flags", ServeDir::new(format!("{static_dir}/flags")))
         .fallback_service(ServeDir::new(static_dir).append_index_html_on_directories(false))
         .layer(RequestBodyLimitLayer::new(2 * 1024 * 1024))
