@@ -887,6 +887,14 @@ mod signed_tests {
                 .unwrap();
         assert_eq!((epoch_before, state_before.as_str()), (1, "issued"));
 
+        // Before committing, a readback must fail closed.
+        assert!(
+            crate::xsp_v2_ack_epoch_commit::readback_committed_applied_ack_staging(
+                &pool, node_id, &permit.request_id, &signed_ack, &panel_pin,
+            )
+            .await
+            .is_err()
+        );
         let committed = crate::xsp_v2_ack_epoch_commit::commit_fresh_applied_ack_staging(
             &pool,
             node_id,
