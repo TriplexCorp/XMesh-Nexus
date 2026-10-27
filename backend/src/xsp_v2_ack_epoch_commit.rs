@@ -285,10 +285,10 @@ async fn readback_committed_applied_ack_staging_inner(
          FROM node_xsp_suite_state WHERE node_id=$1"
     };
     let suite = sqlx::query(suite_query)
-    .bind(authenticated_node_id)
-    .fetch_optional(&mut *tx)
-    .await?
-    .context("missing XSP-v2 suite for committed ACK readback")?;
+        .bind(authenticated_node_id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .context("missing XSP-v2 suite for committed ACK readback")?;
     let floor: i16 = suite.try_get("minimum_suite")?;
     let phase: String = suite.try_get("activation_phase")?;
     let active_epoch: i64 = suite.try_get("key_epoch")?;
@@ -316,11 +316,11 @@ async fn readback_committed_applied_ack_staging_inner(
          WHERE node_id=$1 AND request_id=$2"
     };
     let ledger = sqlx::query(ledger_query)
-    .bind(authenticated_node_id)
-    .bind(request_id)
-    .fetch_optional(&mut *tx)
-    .await?
-    .context("no previously committed ACK for this request")?;
+        .bind(authenticated_node_id)
+        .bind(request_id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .context("no previously committed ACK for this request")?;
     let state: String = ledger.try_get("state")?;
     // 'receipt_sent' requires an independently designed, signed receipt
     // and will only be supported by its own reviewed recovery protocol.
@@ -364,11 +364,11 @@ async fn readback_committed_applied_ack_staging_inner(
          ORDER BY key_epoch"
     };
     let pair = sqlx::query(pair_query)
-    .bind(authenticated_node_id)
-    .bind(from_epoch)
-    .bind(to_epoch)
-    .fetch_all(&mut *tx)
-    .await?;
+        .bind(authenticated_node_id)
+        .bind(from_epoch)
+        .bind(to_epoch)
+        .fetch_all(&mut *tx)
+        .await?;
     if pair.len() != 2 {
         bail!("missing or revoked historical public keysets");
     }
