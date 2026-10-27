@@ -236,7 +236,7 @@ async fn validated_claim_token(
         "SELECT node_id FROM node_enrollment_tokens
          WHERE token_hash=$1 AND consumed_at IS NULL AND expires_at>NOW()",
     )
-    .bind(&hash)
+    .bind(hash)
     .fetch_optional(&mut **tx)
     .await?
     .ok_or_else(|| {
@@ -257,7 +257,7 @@ async fn validated_claim_token(
         "SELECT node_id,allow_key_replacement FROM node_enrollment_tokens
          WHERE token_hash=$1 AND consumed_at IS NULL AND expires_at>NOW() FOR UPDATE",
     )
-    .bind(&hash)
+    .bind(hash)
     .fetch_optional(&mut **tx)
     .await?
     .ok_or_else(|| {
