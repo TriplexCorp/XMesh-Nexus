@@ -230,11 +230,18 @@ fn xsp_v2_cutover_contract_vectors_and_negative_cases() {
 
     invalid = f.permit.clone();
     invalid.permit_sha256_hex = f.permit_input_sha256_hex.clone();
-    assert!(signing_input(&invalid).is_err(), "pre-authorized applied claim");
+    assert!(
+        signing_input(&invalid).is_err(),
+        "pre-authorized applied claim"
+    );
 
     let mut changed = f.permit.clone();
     changed.request_id = "other-valid-request".into();
-    assert_ne!(signing_input(&changed).unwrap(), permit, "request ID binding");
+    assert_ne!(
+        signing_input(&changed).unwrap(),
+        permit,
+        "request ID binding"
+    );
 
     for candidate in [
         Cutover {
