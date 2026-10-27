@@ -15,6 +15,11 @@ ENTRYPOINT ["nginx", "-g", "daemon off;"]
 
 FROM runtime-base AS runtime
 
+# C2-B is a separate opt-in image target so the proven C2-A runtime remains
+# unchanged. Neither target is referenced by default Compose or install.sh.
+FROM runtime-base AS runtime-c2b
+COPY deploy/xsp-v2-ingress/nginx-c2b.conf /etc/nginx/nginx.conf
+
 # Disposable C2-A origin verifier. It shares numeric GID 10003 with ingress so
 # the ingress can connect to the UDS, but runs under a different UID and checks
 # SO_PEERCRED before trusting forwarded certificate evidence.
@@ -28,6 +33,12 @@ COPY deploy/xsp-v2-ingress/origin_probe.py /usr/local/bin/xsp-origin-probe
 USER 10004:10003
 WORKDIR /nonexistent
 ENTRYPOINT ["python3", "/usr/local/bin/xsp-origin-probe"]
+
+# C2-B origin gate reuses the same no-network UID/GID/peercred boundary but has
+# a separate executable and explicit staging-only route gate.
+FROM origin-probe AS origin-ack-gate
+COPY deploy/xsp-v2-ingress/origin_ack_gate.py /usr/local/bin/xsp-origin-ack-gate
+ENTRYPOINT ["python3", "/usr/local/bin/xsp-origin-ack-gate"]
 
 # Test client only: OpenSSL CLI is deliberately absent from the ingress runtime.
 FROM debian:trixie-slim AS probe
