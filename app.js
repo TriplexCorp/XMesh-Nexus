@@ -3986,12 +3986,14 @@ document.addEventListener('click',async e=>{
         issued=await backendRequest(enrollPath,{method:'POST'});
       }catch(error){
         if(error.status!==409||!error.message.includes('already has a registered key'))throw error;
-        const node=DB.nodes.find(n=>Number(n.id)===id);
-        const approved=await panelConfirm(
-          'Узел «'+(node?.name||('#'+id))+'» уже зарегистрирован под другим Ed25519-ключом. '
-          +'Переподключить эту запись к новой VPS? Действующий ключ сохранится до успешного '
-          +'подтверждения новой нодой. После замены старая нода потеряет управление. '
-          +'Если старая нода должна продолжить работу, отмените и создайте новый узел.'
+        const approved=await panelConfirm(panelIsEnglish()
+          ? `Node #${id} already has another Ed25519 key. Reconnect it to this VPS? The
+old key will remain valid until successful proof from the new node. Afterwards,
+the old node will lose access. Cancel and create a new Node ID if both must work.`
+          : `Узел #${id} уже зарегистрирован с другим Ed25519-ключом.
+Переподключить его к новой VPS? Старый ключ останется действующим до успешной
+проверки подписи новой ноды. Затем старая нода потеряет управление.
+Если обе ноды должны работать, отмените и создайте новый ID узла.`
         );
         if(!approved)return;
         issued=await backendRequest(enrollPath+'/reissue',{method:'POST'});
