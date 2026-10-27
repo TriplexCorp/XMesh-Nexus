@@ -19,7 +19,7 @@ use sha2::{Digest, Sha256};
 use sqlx::Row;
 use uuid::Uuid;
 
-pub(crate) const PURPOSE: &str = "node_request";
+pub const PURPOSE: &str = "node_request";
 /// Only the initial epoch-1 enrollment is safe with the current staging API.
 /// Rotating an already enrolled identity requires a separate, authenticated
 /// two-phase cutover with a Node ACK. Never revoke old public keys here.
@@ -27,17 +27,17 @@ fn initial_enrollment_allowed(floor: i16, phase: &str, current: i64, proposed: i
     floor == 1 && current == 0 && proposed == 1 && matches!(phase, "legacy" | "discovered")
 }
 
-pub(crate) fn denied() -> ApiError {
+pub fn denied() -> ApiError {
     ApiError::new(StatusCode::UNAUTHORIZED, "Invalid XSP-v2 enrollment proof")
 }
-pub(crate) fn staging() -> Result<(), ApiError> {
+pub fn staging() -> Result<(), ApiError> {
     if std::env::var("XSP_V2_EXPERIMENTAL_HEARTBEAT").as_deref() == Ok("staging-only") {
         Ok(())
     } else {
         Err(ApiError::new(StatusCode::NOT_FOUND, "Not found"))
     }
 }
-pub(crate) fn ascii(bytes: &mut Vec<u8>, value: &str, max_len: usize) -> Result<(), ApiError> {
+pub fn ascii(bytes: &mut Vec<u8>, value: &str, max_len: usize) -> Result<(), ApiError> {
     if value.is_empty() || value.len() > max_len || !value.bytes().all(|b| b.is_ascii_graphic()) {
         return Err(denied());
     }
@@ -49,11 +49,11 @@ pub(crate) fn ascii(bytes: &mut Vec<u8>, value: &str, max_len: usize) -> Result<
     bytes.extend_from_slice(value.as_bytes());
     Ok(())
 }
-pub(crate) fn digest_id(prefix: &str, public: &[u8]) -> String {
+pub fn digest_id(prefix: &str, public: &[u8]) -> String {
     let hash = Sha256::digest(public);
     format!("{prefix}{}", hex::encode(&hash[..12]))
 }
-pub(crate) fn strict_base64(raw: &str, expected: usize) -> Result<Vec<u8>, ApiError> {
+pub fn strict_base64(raw: &str, expected: usize) -> Result<Vec<u8>, ApiError> {
     if raw.len() > expected.div_ceil(3) * 4 {
         return Err(denied());
     }
@@ -66,7 +66,7 @@ pub(crate) fn strict_base64(raw: &str, expected: usize) -> Result<Vec<u8>, ApiEr
 
 /// Exact binary proof input, signed independently with Ed25519 AND ML-DSA-65.
 /// It binds the public keys, purpose, node, epoch, key IDs and owner challenge.
-pub(crate) fn proof_input(
+pub fn proof_input(
     node: i64,
     epoch: i64,
     challenge: &[u8; 32],
@@ -89,7 +89,7 @@ pub(crate) fn proof_input(
     ascii(&mut input, pq_id, 64)?;
     Ok(input)
 }
-pub(crate) fn verify_proof(
+pub fn verify_proof(
     input: &[u8],
     ed: &[u8],
     pq: &[u8],
