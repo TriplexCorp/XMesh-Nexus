@@ -1,6 +1,6 @@
 //! Isolated XSP-v2 rotation PREPARATION only. No cutover, revocation,
 //! suite change or trusted HTTP approval response exists in this module.
-//! Running Node software must NEVER treat proof_verified as activation.
+//! Running Node software must NEVER treat `proof_verified` as activation.
 use crate::{
     ApiError, AppState,
     auth::AuthUser,
@@ -30,7 +30,7 @@ fn rotation_allowed(floor: i16, phase: &str, from: i64, to: i64) -> bool {
 
 /// Distinct domain from initial enrollment, with both from/to epochs pinned.
 /// Purpose/key IDs/public bytes have exactly the same bounded encoding as v1
-/// enrollment PoP; no signature can be replayed across those endpoints.
+/// enrollment `PoP`; no signature can be replayed across those endpoints.
 fn rotation_input(
     node: i64,
     epochs: (i64, i64),
