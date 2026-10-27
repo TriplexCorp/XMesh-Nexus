@@ -347,10 +347,7 @@ fn validate_pin(p: &TrustedPublic, m: &Cutover, purpose: &str) -> Result<(), &'s
     Ok(())
 }
 const fn time_ok(m: &Cutover, now_ms: i64) -> Result<(), &'static str> {
-    if now_ms <= 0
-        || now_ms > m.expires_at_ms
-        || now_ms.abs_diff(m.issued_at_ms) > 120_000
-    {
+    if now_ms <= 0 || now_ms > m.expires_at_ms || now_ms.abs_diff(m.issued_at_ms) > 120_000 {
         return Err("expired or future signed cutover message");
     }
     Ok(())
