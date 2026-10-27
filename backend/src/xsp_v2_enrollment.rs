@@ -408,7 +408,8 @@ mod tests {
         let mut bad_pq = pq_sig.clone();
         bad_pq[0] ^= 1;
         assert!(verify_proof(&signed, &ed, &pq, &ed_sig, &bad_pq).is_err());
-        let wrong_epoch = proof_input(node, epoch + 1, &challenge, &ed, &pq, ed_id, pq_id).unwrap();
+        let wrong_epoch =
+            proof_input(node, epoch + 1, &challenge, &ed, &pq, ed_id, pq_id).unwrap();
         assert!(verify_proof(&wrong_epoch, &ed, &pq, &ed_sig, &pq_sig).is_err());
     }
 
@@ -420,7 +421,10 @@ mod tests {
         let ed_id = digest_id("ed-", &ed);
         let pq_id = digest_id("pq-", &pq);
         let a = proof_input(42, 1, &nonce, &ed, &pq, &ed_id, &pq_id).unwrap();
-        assert_eq!(hex::encode(Sha256::digest(&a)), "902160cf06cde566b7150667d0cbbdd2971e7507d5f640925602b6fc703035a0");
+        assert_eq!(
+            hex::encode(Sha256::digest(&a)),
+            "902160cf06cde566b7150667d0cbbdd2971e7507d5f640925602b6fc703035a0"
+        );
         assert!(a.starts_with(b"XSP2-KEY-ENROLL-V1\0"));
         assert_ne!(
             a,
