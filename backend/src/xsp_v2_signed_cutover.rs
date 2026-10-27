@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 #[derive(Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Cutover {
     kind: String,
     issuer_id: String,
@@ -580,6 +580,13 @@ mod signed_tests {
             verify_signed_applied_ack(&ack_bytes, &verified, &next_pin, ack.expires_at_ms + 1)
                 .is_err()
         );
+        // Signed critical metadata may not be silently extended in the wire format.
+        let extra = String::from_utf8(signed.clone()).unwrap().replacen(
+            "\"kind\":\"permit\"",
+            "\"kind\":\"permit\",\"undeclaredCriticalField\":true",
+            1,
+        );
+        assert!(parse_signed(extra.as_bytes()).is_err());
         let mut corrupt = parse_signed(&signed).unwrap();
         corrupt.message.request_id = "tampered".into();
         let tampered = serde_json::to_vec(&corrupt).unwrap();
