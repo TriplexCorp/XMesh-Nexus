@@ -256,9 +256,9 @@ pub async fn heartbeat(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::{Value, json};
     use ed25519_dalek::{Signer as _, SigningKey};
     use openssl::sign::Signer as PQSigner;
+    use serde_json::{Value, json};
 
     #[test]
     fn shared_wire_heartbeat_canonical_and_invalid_cases() {
@@ -295,8 +295,8 @@ mod tests {
             .try_into()
             .unwrap();
         let ed_private = SigningKey::from_bytes(&ed_seed);
-        let pq_private = PKey::private_key_from_seed(None, KeyType::ML_DSA_65, None, &pq_seed)
-            .unwrap();
+        let pq_private =
+            PKey::private_key_from_seed(None, KeyType::ML_DSA_65, None, &pq_seed).unwrap();
         let mut pq_signer = PQSigner::new_without_digest(&pq_private).unwrap();
         let mut authentic = parsed;
         authentic.ed_signature = ed_private.sign(&authentic.canonical).to_bytes();
