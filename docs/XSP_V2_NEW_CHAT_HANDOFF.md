@@ -4,6 +4,18 @@
 
 **Новое обязательное решение владельца (27.10.2026):** конечный XSP-v2 — **безальтернативный PQ-only control plane**. Никаких настроек режима для пользователей, downgrade/legacy-fallback, классического TLS-only, Ed25519-only и неподписанных команд. Обязательны одновременно TLS 1.3 `X25519MLKEM768` с реальной проверкой группы/сертификата и Ed25519 **AND** ML-DSA-65; отсутствие любого требования = Node **не подключается**. В старом production коде `XMESH1` пока остаётся только как **не мигрированная установка**, которую нельзя незаметно отключать до готовности secure control plane и разрешённой замены. [См. обязательную политику](XSP_V2_PQ_ONLY_SECURITY_POLICY.md). Не трактовать `strict-pq` как будущий UI-переключатель.
 
+## Текущий проверенный handoff — после Nexus #55 и Node #26 (27.10.2026)
+
+**Точная точка в GitHub:** Nexus `main` = `7507437102df59c3bbd4682170c1b81300fdd565` ([#55](https://github.com/TriplexCorp/XMesh-Nexus/pull/55)); Node `main` = `d2f916bfef36f7093de0cf0d57744f8f40c423cb` ([#26](https://github.com/TriplexCorp/XMesh-Node/pull/26)). Все XSP-v2 PR #54/#55 и Node #23–26 слиты. Единственный открытый Nexus PR #20 относится к FinalMask, не PQ. Это **снимок**, перед будущей работой заново проверить main.
+
+**Подтверждённый post-merge CI:** Nexus Backend [#40536860094](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40536860094), Crypto [#40536860140](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40536860140), User Presence [#40536860723](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40536860723), GeoData/Routing [#40536860386](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40536860386) — **success** на указанном SHA. Node Go Crypto [#40531422433](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40531422433) и Node CI [#40531422490](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40531422490) — **success** на Node SHA.
+
+**Что есть:** Rust PostgreSQL atomic ACK commit/readback, Nexus V1 receipt с Ed25519 **AND** ML-DSA-65 ([#54](https://github.com/TriplexCorp/XMesh-Nexus/pull/54)), append-only exact-byte receipt outbox / миграция `0105` ([#55](https://github.com/TriplexCorp/XMesh-Nexus/pull/55)); Node PQ-only `tlsprobe.DialStrict`, Go receipt verifier, fsynced receipt journal и HTTPS ACK→receipt клиент ([#23–26](https://github.com/TriplexCorp/XMesh-Node/pull/26)). Клиент проверен против **локального TLS-сервера**, а не против настоящего Nexus ACK route.
+
+**Что делать дальше (P0-C):** защищённый отдельно управляемый `panel_response` signer (ключи, pinning, owner approval), авторизованный `POST /api/v2/node/keys/rotation/ack` в Nexus, обязательный TLS 1.3 `X25519MLKEM768` на каждом соответствующем сегменте, доставка **точно сохранённого** dual-signed receipt, затем подключение к основному Agent и end-to-end испытания с потерей ответов, сбоями и откатом. Не разрешать user-selectable downgrade/legacy fallback. Отдельная криптографическая и CI готовность **не** является доказательством рабочего production PQ control plane.
+
+_Разделы ниже содержат исторический снимок до PR #54–55 и Node #23–26. Старые указания «Следующий P0-B», «receipt не существует» и прошлые SHA не считать текущими._
+
 ## 1. Цель владельца и границы
 
 **Репозитории:**
