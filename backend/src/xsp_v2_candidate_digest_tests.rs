@@ -72,6 +72,19 @@ fn canonical(c: &Candidate) -> Result<Vec<u8>, &'static str> {
             return Err("invalid public key blob");
         }
     }
+    // IDs are fingerprint selectors, not arbitrary labels: reject a changed
+    // key ID even when the attacker controls matching candidate metadata.
+    for (key_id, prefix, key) in [
+        (&c.from_ed_key_id, "ed-", &c.from_ed_public),
+        (&c.from_pq_key_id, "pq-", &c.from_pq_public),
+        (&c.to_ed_key_id, "ed-", &c.to_ed_public),
+        (&c.to_pq_key_id, "pq-", &c.to_pq_public),
+    ] {
+        let hash = Sha256::digest(key);
+        if key_id != &format!("{prefix}{}", hex::encode(&hash[..12])) {
+            return Err("candidate key ID/fingerprint mismatch");
+        }
+    }
     let mut bytes = b"XSP2-CUTOVER-CANDIDATE-V1\0".to_vec();
     bytes.push(1);
     for n in [c.node_id, c.from_epoch, c.to_epoch] {
