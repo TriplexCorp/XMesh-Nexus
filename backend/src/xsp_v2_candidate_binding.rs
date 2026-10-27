@@ -170,7 +170,7 @@ mod tests {
         changed = base.clone();
         changed.from_epoch += 1;
         assert!(candidate_sha256(&changed).is_err());
-        changed = base.clone();
+        changed = base;
         changed.to_epoch += 1;
         assert!(candidate_sha256(&changed).is_err());
     }
