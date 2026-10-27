@@ -33,11 +33,19 @@ else
 fi
 
 echo "Creating/refreshing the SELECT-only xmesh_signer_reader database role..."
+# Keep the secret out of the local process argument list. The temporary
+# psql input is private and deleted even when provisioning fails.
+temporary_sql="$(mktemp)"
+chmod 600 "$temporary_sql"
+trap 'rm -f "$temporary_sql"' EXIT
+{
+  printf "\\set signer_password '%s'\\n" "$password"
+  cat deploy/postgres/20-create-xsp-v2-signer-role.sql
+} > "$temporary_sql"
 docker compose exec -T db psql \
   --username postgres \
   --dbname xmesh \
   --set=ON_ERROR_STOP=1 \
-  --set=signer_password="$password" \
-  < deploy/postgres/20-create-xsp-v2-signer-role.sql
+  < "$temporary_sql"
 
 echo "Signer DB role provisioned. The signer stays disabled unless the xsp-v2-staging profile is explicitly enabled."
