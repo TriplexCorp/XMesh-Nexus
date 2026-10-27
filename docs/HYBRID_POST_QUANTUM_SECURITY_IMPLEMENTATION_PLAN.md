@@ -453,6 +453,17 @@ ML-DSA-65 signatures/public keys существенно больше Ed25519; н
 - **Потеря связи в середине активации:** стороны продолжают сверять persisted migrationId/epoch; неизвестное состояние означает **не применять новый config**, а не принимать legacy.
 - **При компрометации ключей:** incident runbook; не выдавать автоматическое безусловное «разрешить Xray».
 
+## PR02 isolated crypto interoperability checkpoint — 2026-10-27
+
+- [x] Independent `crypto/mldsa` ML-DSA-65 implementation via nested Go 1.27.3 research module in XMesh-Node, without changing the production Go 1.23 router/toolchain.
+- [x] Separate Rust `openssl = 0.10.81`/OpenSSL 3.5+ test crate in Nexus (not linked to the main API).
+- [x] Common publicly disclosed test-only `XSP_V2_CRYPTO_POC.json` seeds and SHA-256 key/signature digests; both Go and OpenSSL independently reproduce ML-DSA-65 outputs and compare the two shared wire directions.
+- [x] Negative Ed25519 **AND** ML-DSA-65 tests: missing, altered, substituted-key and mismatched-message signatures cannot pass an isolated PoC verifier.
+- [ ] Record green isolated and production CI evidence for latest revisions of both repositories. Complete direct signed-artifact Rust↔Go exchange, FIPS 204 known-answer tests, fuzzing and security review before declaring PR02 accepted.
+- [ ] Next: strict JSON decoding, durable replay/epoch policy, a hybrid TLS 1.3 X25519MLKEM768 handshake probe with actual terminator. None are enabled in production.
+
+**Provider decision (research only):** Go 1.27.3 `crypto/mldsa`; Rust `openssl` 0.10.81 with OpenSSL 3.5+ EVP ML-DSA-65. Do not equate verified local algorithm interoperability with an audited cryptosystem or a production migration. Details: [XSP_V2_CRYPTO_POC.md](XSP_V2_CRYPTO_POC.md).
+
 ## PR01 foundation checkpoint — 2026-10-27
 
 - [x] Draft [XSP_V2_WIRE_SPEC.md](XSP_V2_WIRE_SPEC.md): candidate `xsp2-wire-candidate-1`, exact byte order, bounds, endpoint/direction binding and downgrade/replay threat model. Same document in both repos.
