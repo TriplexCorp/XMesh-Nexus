@@ -20,6 +20,8 @@ mod subscription_transport;
 mod subscription_user_agent;
 mod user_subscriptions;
 #[cfg(feature = "xsp-v2-experimental")]
+mod xsp_v2_ack_epoch_commit;
+#[cfg(feature = "xsp-v2-experimental")]
 mod xsp_v2_ack_ledger_validator;
 #[cfg(feature = "xsp-v2-experimental")]
 mod xsp_v2_api;
