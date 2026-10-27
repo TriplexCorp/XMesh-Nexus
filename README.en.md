@@ -15,6 +15,14 @@ The installer requests your domain and Let's Encrypt email (or accepts `PANEL_DO
 
 **Managed node bootstrap is automated, too:** use **Nodes → Connect node and metrics** inside Nexus and run the generated token-free bootstrap command on an Ubuntu node VPS. It installs Docker/Compose if needed and provisions the router, Ed25519 enrollment and metrics/control timers. [Node onboarding](https://github.com/TriplexCorp/XMesh-Node#быстрое-подключение-из-xmesh-nexus-docker--метрики). Standalone installation of the router is a separate option.
 
+## Recover an existing Node enrollment (HTTP 409, October 27, 2026)
+
+A bootstrap `POST /api/v1/node/enroll` response of **HTTP 409** means that this Node ID already has a *different* registered Ed25519 public key. This differs from the normal `202 awaiting_profile` state and has nothing to do with XSP-v2. Fixes are merged into `main`: [Nexus PR #26](https://github.com/TriplexCorp/XMesh-Nexus/pull/26) and [Node PR #7](https://github.com/TriplexCorp/XMesh-Node/pull/7).
+
+**To reconnect:** first deploy the current Nexus panel using **Settings → Update XMesh Nexus → Update panel** and verify completion. Then select the existing Node → **Connect node agent**. An owner must explicitly approve replacing the registered identity. Nexus issues a dedicated 10-minute single-use recovery token via `POST /api/v1/nodes/{id}/enrollment/reissue`. The bootstrap preserves its local Ed25519 private key and proves possession; Nexus retains the old trusted key **until** the new proof is verified and the replacement is committed atomically in PostgreSQL. After successful replacement, the old agent loses authorization. Never share the token, private key, or `.env`.
+
+**If both VPS instances must remain active, create a separate Node ID instead of recovering the old one.** Additive migration `0101_node_enrollment_owner_recovery.sql` defaults key replacement to denied; the owner-scoped flow applies to **legacy Ed25519**, not experimental PQ rotation. [Nexus PostgreSQL/API integration passed on PR #26](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40449358858); [Node `main` CI passed after #7](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40448354429). Merging does not automatically update a running VPS.
+
 ## XSP-v2 — current P0: hybrid post-quantum control-plane security (October 27, 2026)
 
 **Status: experimental staging and isolated CI only. XSP-v2 is NOT enabled on live nodes.** The existing automatic Docker/Nginx/HTTPS installer, `XMESH1`/Ed25519 control plane, Xray data plane and Go 1.23 production Node remain unchanged. **`strict-pq` is OFF**, and normal Nexus Docker builds do not compile the optional v2 API routes.
