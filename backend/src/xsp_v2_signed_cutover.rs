@@ -1056,7 +1056,7 @@ mod signed_tests {
             &permit.request_id,
             &signed_ack,
             &panel_pin,
-            |_| {
+            |_| async {
                 signing_calls.set(signing_calls.get() + 1);
                 Ok(signed_receipt.clone())
             },
@@ -1072,7 +1072,7 @@ mod signed_tests {
                 &permit.request_id,
                 &signed_ack,
                 &panel_pin,
-                |_| panic!("retry must never invoke protected signer"),
+                |_| async { panic!("retry must never invoke protected signer") },
             )
             .await
             .expect("existing immutable receipt returned without signing again");
@@ -1085,7 +1085,7 @@ mod signed_tests {
                 "not-the-original-request",
                 &signed_ack,
                 &panel_pin,
-                |_| panic!("invalid ACK must never invoke signer"),
+                |_| async { panic!("invalid ACK must never invoke signer") },
             )
             .await
             .is_err()
