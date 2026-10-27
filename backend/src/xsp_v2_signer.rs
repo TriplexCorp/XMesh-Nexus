@@ -367,7 +367,7 @@ pub async fn run() -> Result<()> {
         "signer database sessions must default to read-only"
     );
     let privileged: bool = sqlx::query_scalar(
-        "SELECT rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication
+        "SELECT rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication OR rolbypassrls
          FROM pg_roles WHERE rolname=current_user",
     )
     .fetch_one(&pool)
@@ -375,6 +375,18 @@ pub async fn run() -> Result<()> {
     ensure!(
         !privileged,
         "signer database role has privileged attributes"
+    );
+    let has_role_memberships: bool = sqlx::query_scalar(
+        "SELECT EXISTS (
+           SELECT 1 FROM pg_auth_members
+           WHERE member=(SELECT oid FROM pg_roles WHERE rolname=current_user)
+         )",
+    )
+    .fetch_one(&pool)
+    .await?;
+    ensure!(
+        !has_role_memberships,
+        "signer database role must not inherit or SET ROLE to another role"
     );
 
     let socket_path = env::var_os("XSP_V2_SIGNER_SOCKET_PATH")
