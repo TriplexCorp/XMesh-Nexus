@@ -49,15 +49,17 @@ def command(*args: str, input_text: str | None = None, check: bool = True, timeo
 
 
 def parse_json_body(response: str) -> dict[str, object]:
-    for line in response.splitlines():
-        candidate = line.strip()
-        if candidate.startswith("{") and candidate.endswith("}"):
-            try:
-                value = json.loads(candidate)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(value, dict):
-                return value
+    decoder = json.JSONDecoder()
+    start = response.find("{")
+    while start >= 0:
+        try:
+            value, _end = decoder.raw_decode(response[start:])
+        except json.JSONDecodeError:
+            start = response.find("{", start + 1)
+            continue
+        if isinstance(value, dict):
+            return value
+        start = response.find("{", start + 1)
     raise RuntimeError(f"missing JSON response body: {response[-1200:]}")
 
 
