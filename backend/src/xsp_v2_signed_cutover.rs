@@ -327,6 +327,18 @@ pub struct VerifiedPermit {
     message: Cutover,
     input_hash: String,
 }
+
+impl VerifiedPermit {
+    /// Original cryptographically authenticated and purpose-bound permit.
+    pub const fn message(&self) -> &Cutover {
+        &self.message
+    }
+
+    /// SHA-256 of the exact canonical signing input, not its outer JSON.
+    pub fn canonical_sha256_hex(&self) -> &str {
+        &self.input_hash
+    }
+}
 fn key_id(prefix: &str, raw: &[u8]) -> String {
     let hash = Sha256::digest(raw);
     format!("{prefix}{}", hex::encode(&hash[..12]))
