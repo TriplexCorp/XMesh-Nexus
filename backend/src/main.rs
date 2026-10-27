@@ -24,6 +24,8 @@ mod xsp_v2_api;
 #[cfg(feature = "xsp-v2-experimental")]
 mod xsp_v2_candidate_binding;
 #[cfg(feature = "xsp-v2-experimental")]
+mod xsp_v2_db_candidate_snapshot;
+#[cfg(feature = "xsp-v2-experimental")]
 mod xsp_v2_enrollment;
 #[cfg(feature = "xsp-v2-experimental")]
 mod xsp_v2_rotation;
