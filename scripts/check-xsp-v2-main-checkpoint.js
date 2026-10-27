@@ -15,6 +15,7 @@ const expected=[
   "backend/src/xsp_v2_db_candidate_snapshot.rs",
   "backend/src/xsp_v2_signed_cutover.rs",
   "backend/src/xsp_v2_permit_ledger_writer.rs",
+  "backend/src/xsp_v2_ack_ledger_validator.rs",
   "docs/XSP_V2_CUTOVER_CONTRACT_VECTORS.json",
   "docs/XSP_V2_CUTOVER_CANDIDATE_VECTORS.json",
   "docs/XSP_V2_SIGNED_CUTOVER_STAGING.md",
@@ -28,7 +29,8 @@ const core=fs.readFileSync("backend/src/main.rs","utf8");
 const experimental=[
   "xsp_v2_signed_cutover",
   "xsp_v2_db_candidate_snapshot",
-  "xsp_v2_permit_ledger_writer"
+  "xsp_v2_permit_ledger_writer",
+  "xsp_v2_ack_ledger_validator"
 ];
 for(const name of experimental){
   // Reject accidental loss of the experimental feature boundary:
