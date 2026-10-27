@@ -20,6 +20,12 @@ use sqlx::Row;
 use uuid::Uuid;
 
 const PURPOSE: &str = "node_request";
+/// Only the initial epoch-1 enrollment is safe with the current staging API.
+/// Rotating an already enrolled identity requires a separate, authenticated
+/// two-phase cutover with a Node ACK. Never revoke old public keys here.
+fn initial_enrollment_allowed(floor: i16, phase: &str, current: i64, proposed: i64) -> bool {
+    floor == 1 && current == 0 && proposed == 1 && matches!(phase, "legacy" | "discovered")
+}
 
 fn denied() -> ApiError {
     ApiError::new(StatusCode::UNAUTHORIZED, "Invalid XSP-v2 enrollment proof")
@@ -174,7 +180,7 @@ pub async fn approve(
     let floor: i16 = row.try_get("minimum_suite")?;
     let phase: String = row.try_get("activation_phase")?;
     let current: i64 = row.try_get("key_epoch")?;
-    if floor != 1 || phase == "strict" || current.checked_add(1) != Some(input.key_epoch) {
+    if !initial_enrollment_allowed(floor, &phase, current, input.key_epoch) {
         return Err(ApiError::new(
             StatusCode::CONFLICT,
             "XSP-v2 epoch or suite floor mismatch",
@@ -312,7 +318,7 @@ pub async fn claim(
     let floor: i16 = suite.try_get("minimum_suite")?;
     let phase: String = suite.try_get("activation_phase")?;
     let epoch: i64 = suite.try_get("key_epoch")?;
-    if floor != 1 || phase == "strict" || epoch.checked_add(1) != Some(input.key_epoch) {
+    if !initial_enrollment_allowed(floor, &phase, epoch, input.key_epoch) {
         return Err(denied());
     }
     let pending = sqlx::query(
@@ -346,8 +352,8 @@ pub async fn claim(
         &pq_id,
     )?;
     verify_proof(&signing_input, &ed, &pq, &ed_sig, &pq_sig)?;
-    // Insert new keys before revoking previous keys, atomically with epoch.
-    // On error, old keys and the outstanding approval remain untouched.
+    // First-time enrollment only. No previously active key may be revoked
+    // without a separately authenticated Node cutover acknowledgement.
     sqlx::query(
         "INSERT INTO node_xsp_public_keysets
          (node_id,purpose,key_epoch,ed25519_key_id,mldsa65_key_id,
@@ -360,15 +366,6 @@ pub async fn claim(
     .bind(&pq_id)
     .bind(&ed)
     .bind(&pq)
-    .execute(&mut *tx)
-    .await?;
-    sqlx::query(
-        "UPDATE node_xsp_public_keysets SET revoked_at=NOW()
-         WHERE node_id=$1 AND purpose='node_request' AND key_epoch<$2
-           AND revoked_at IS NULL",
-    )
-    .bind(input.node_id)
-    .bind(input.key_epoch)
     .execute(&mut *tx)
     .await?;
     finish_claim_epoch(&mut tx, input.node_id, input.key_epoch).await?;
@@ -434,6 +431,26 @@ mod tests {
         assert!(verify_proof(&signed, &ed, &pq, &ed_sig, &bad_pq).is_err());
         let wrong_epoch = proof_input(node, epoch + 1, &challenge, &ed, &pq, ed_id, pq_id).unwrap();
         assert!(verify_proof(&wrong_epoch, &ed, &pq, &ed_sig, &pq_sig).is_err());
+    }
+
+    #[test]
+    fn staged_enrollment_rejects_unacknowledged_key_rotation() {
+        assert!(initial_enrollment_allowed(1, "legacy", 0, 1));
+        assert!(initial_enrollment_allowed(1, "discovered", 0, 1));
+        for (floor, phase, current, proposed) in [
+            (1, "legacy", 1, 2),
+            (1, "dual_enrolled", 1, 2),
+            (1, "shadow", 1, 2),
+            (2, "strict", 1, 2),
+            (1, "legacy", 0, 2),
+            (1, "shadow", 0, 1),
+            (1, "strict", 0, 1),
+        ] {
+            assert!(
+                !initial_enrollment_allowed(floor, phase, current, proposed),
+                "unsafe rekey should not proceed: {phase}"
+            );
+        }
     }
 
     #[test]

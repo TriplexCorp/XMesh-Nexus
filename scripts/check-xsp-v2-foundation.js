@@ -56,7 +56,16 @@ assert.match(enrollment,/crate::require_owner\(&actor\)/);
 assert.match(enrollment,/verify_proof\(&signing_input, &ed, &pq, &ed_sig, &pq_sig\)/);
 assert.match(enrollment,/consumed_at IS NULL AND expires_at>NOW\(\)/);
 assert.match(enrollment,/activation_phase='dual_enrolled'/);
-assert.match(enrollment,/UPDATE node_xsp_public_keysets SET revoked_at=NOW\(\)/);
+// The old one-shot rotation could revoke active Node keys before any signed
+// cutover ACK. This source contract now forbids such revocation and requires
+// both endpoints to call the initial-only guard. Its positive/negative cases
+// are additionally exercised by the Rust test suite.
+assert.match(enrollment,/fn initial_enrollment_allowed\(/);
+assert.match(enrollment,/current == 0 && proposed == 1/);
+assert.match(enrollment,/!initial_enrollment_allowed\(floor, &phase, current, input.key_epoch\)/);
+assert.match(enrollment,/!initial_enrollment_allowed\(floor, &phase, epoch, input.key_epoch\)/);
+assert(!/UPDATE node_xsp_public_keysets SET revoked_at=NOW\(\)/.test(enrollment),
+ 'Staging claim must never revoke an active key before a signed Node cutover ACK');
 assert(!rust.includes('InsecureSkipVerify'),'Experimental API must not disable TLS trust');
 console.log('Production defaults: opt-in v2 route excluded from Docker, Compose and installer: OK');
 console.log('XSP-v2 dormant foundation: public-key state, non-decreasing floor, and loopback-only TLS ingress: OK');
