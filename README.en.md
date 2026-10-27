@@ -8,65 +8,71 @@ XMesh Nexus manages Nodes, users, subscriptions, Xray configuration, telemetry a
 
 ## Current XSP-v2 checkpoint — 28 October 2026
 
-**Latest verified Nexus implementation checkpoint:** [`d295ea7fd17dbcda6db6f946bb892277a55dd001`](https://github.com/TriplexCorp/XMesh-Nexus/commit/d295ea7fd17dbcda6db6f946bb892277a55dd001), merge of [PR #64](https://github.com/TriplexCorp/XMesh-Nexus/pull/64).
+**Latest verified Nexus implementation checkpoint:** [`5b8840051ca8562417c6b4f00d65753a165bb598`](https://github.com/TriplexCorp/XMesh-Nexus/commit/5b8840051ca8562417c6b4f00d65753a165bb598), merge of [PR #66](https://github.com/TriplexCorp/XMesh-Nexus/pull/66).
 
-P0-C1 — the dedicated PQ-only Node ingress — is complete in **isolated staging/process scope** on that exact implementation SHA:
+P0-C2-A — authenticated Node identity plus the protected ingress→origin boundary — is complete in **isolated staging/process scope**:
 
-- [XSP-v2 Hybrid TLS Probe #40592253543](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40592253543) — **success**, including `Dedicated PQ-only ingress container and network E2E`;
-- [Backend CI #40592253598](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40592253598) — **success**;
-- pre-merge exact head `05bfdc16892632d0ac264542c2b3b9cf30e6acb0` also passed Hybrid TLS #40591238253 and Backend CI #40591238382.
+- exact pre-merge head `fc8317a8849e7dbcd300e82eaf5804f6d4d17876` passed [Hybrid TLS #40599041487](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40599041487) and [Backend CI #40599041548](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40599041548);
+- post-merge [Hybrid TLS #40600684179](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40600684179) — **success**, including `PQ client identity and Unix origin boundary E2E`;
+- post-merge [Backend CI #40600684106](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40600684106) — **success**.
 
-The earlier signer P0 from PR #61 remains complete in staging/process scope.
+The signer P0 from PR #61 and dedicated PQ-only ingress P0-C1 from PR #64 remain complete in their stated staging/process scopes.
 
-**Current XMesh-Node staging transport checkpoint:** [`79cee45174f7670707d22a269784fe117c44743c`](https://github.com/TriplexCorp/XMesh-Node/commit/79cee45174f7670707d22a269784fe117c44743c), merge of [Node PR #29](https://github.com/TriplexCorp/XMesh-Node/pull/29). On that exact merge SHA, [Node CI #40597143811](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40597143811) and [XSP-v2 Crypto PoC #40597143829](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40597143829) both passed. The isolated Go 1.27 diagnostic path now proves strict TLS 1.3 + `X25519MLKEM768` with an ML-DSA-65 client certificate and fail-closed rejection of anonymous, classical, wrong-algorithm and untrusted client identities.
+**Current XMesh-Node staging transport checkpoint:** [`79cee45174f7670707d22a269784fe117c44743c`](https://github.com/TriplexCorp/XMesh-Node/commit/79cee45174f7670707d22a269784fe117c44743c), merge of [Node PR #29](https://github.com/TriplexCorp/XMesh-Node/pull/29). [Node CI #40597143811](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40597143811) and [XSP-v2 Crypto PoC #40597143829](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40597143829) passed on that merge SHA.
 
-Production Node still uses the legacy Go 1.23 control path; the Go 1.27 XSP-v2 transport/client-auth code remains isolated research/staging code and does not by itself authorize an XSP/2 application message.
+Production Node still uses the legacy Go 1.23 control path. The Go 1.27 XSP-v2 transport/client-auth code remains isolated staging/research code; C2-A does not activate production XSP-v2.
 
 ### P0-C1 — complete
 
-PR #64 proves a dedicated disposable ingress boundary with:
+PR #64 proves the dedicated Node→TLS-terminator boundary with TLS **1.3 only**, actually negotiated `X25519MLKEM768`, trusted certificate/hostname verification, fresh handshakes and fail-closed downgrade negatives. The C1 runtime remains isolated from the Nexus API and inactive in default installer/Compose deployment.
 
-- a separate non-root Nginx runtime on container port `8444`;
-- TLS **1.3 only** and mandatory negotiated `X25519MLKEM768`;
-- trusted certificate and exact hostname/SNI verification;
-- fresh-handshake proof with tickets/cache and early data disabled;
-- independent agreement between the strict XMesh-Node Go 1.27 probe and OpenSSL 3.5+;
-- fail-closed rejection of TLS 1.2, X25519-only, wrong hostname and untrusted CA;
-- a read-only root filesystem, dropped capabilities, `no-new-privileges`, internal/no-egress test network and no published host port;
-- no `proxy_pass`, no API/backend container and no onward application hop;
-- inert HTTP 404 for `/`, `/api/v2/node/keys/rotation/ack` and `/api/v1/node/heartbeat`;
-- no default activation from `compose.yaml` or the installer.
+### P0-C2-A — complete
 
-This proves **one Node → TLS terminator hop only**. It does not prove a future terminator → origin/API hop and does not authorize production deployment.
+PR #66 proves this isolated staging boundary:
 
-### CURRENT P0 — P0-C2: authorized ACK route behind a reviewed origin boundary
+`Node test client → TLS1.3/X25519MLKEM768 + ML-DSA-65 client identity → dedicated ingress → protected Unix-domain socket → disposable origin verifier`
 
-The next gate is **not** “proxy the ACK path to the existing API”. Before `POST /api/v2/node/keys/rotation/ack` can be accepted, the ingress→origin boundary and Node identity must be independently trustworthy.
+The process/container E2E proves that:
 
-Node PR #29 supplies a tested **ML-DSA-65 mutual-TLS client identity primitive** for the isolated Go 1.27 staging probe. C2-A must now preserve that authenticated identity across the ingress→origin boundary without trusting caller-controlled headers/body fields.
+- the Node staging client uses an **ML-DSA-65** client certificate on the mandatory hybrid TLS hop;
+- ingress verifies the client certificate and strips caller-controlled headers/body before the origin transition;
+- exactly one reviewed forwarding path targets `/run/xmesh-origin/xsp-v2-origin.sock`;
+- the origin has no network listener/published port and validates ingress `SO_PEERCRED` UID/GID;
+- trusted Node identity is derived from the verified client-certificate SPKI SHA-256 pinned mapping, never from caller `nodeId`, arbitrary headers, source IP or legacy `XMESH1` identity;
+- forged identity/verification/certificate headers, anonymous/wrong/classical clients and direct-origin impersonation fail closed;
+- C1 transport downgrade negatives remain enforced;
+- ACK, heartbeat and ordinary application paths remain inert in this boundary.
 
-P0-C2 must:
+C2-A does **not** connect the origin verifier to the Nexus API/database and does not authorize an ACK application message.
 
-1. define and prove a narrow ingress→origin trust boundary; an unreviewed plaintext/classical network hop is not acceptable;
-2. keep the ACK route staging-only, feature/runtime gated and unreachable through the normal public/default API path;
-3. derive trusted Node identity from an independently authenticated boundary — never from body `nodeId`, arbitrary headers or legacy `XMESH1` identity;
-4. require Ed25519 **AND** ML-DSA-65 and bind identity to the exact ACK bytes, permit, request ID, nonce, candidate, epoch and historical keysets;
-5. use the protected signer and immutable receipt outbox; an HTTP success code never substitutes for the signed receipt;
-6. preserve idempotent retry and exact first durable receipt bytes;
-7. fail closed on transport/auth/signature/state/replay/signer failures, with no legacy authenticated fallback;
-8. pass process-level positive, negative, replay, concurrency and lost-response E2E before merge.
+### CURRENT P0 — P0-C2-B: narrow staging ACK route
+
+The next code gate is to expose exactly one experimental Node-only operation behind the proven C2-A identity boundary:
+
+`POST /api/v2/node/keys/rotation/ack`
+
+C2-B must:
+
+1. expose only that ACK operation — never a broad proxy to the existing API;
+2. remain feature/runtime gated so default production has no active XSP-v2 route;
+3. consume trusted Node identity from C2-A without trusting caller-controlled identity metadata;
+4. enforce exact XSP/2 message type/direction/method/path plus strict content-type, size and timeout bounds;
+5. preserve secret-safe logging and fail closed if the C2-A boundary is unavailable or invalid;
+6. keep `strict-pq` OFF and production deployment unchanged.
+
+C2-C then connects dual Ed25519 **AND** ML-DSA-65 ACK authorization, atomic state transition, signer and immutable receipt. C2-D proves retry/failure/full E2E before production-capable Agent integration.
 
 ### Security guardrails
 
 - `strict-pq` remains **OFF**.
-- Production control-plane behavior remains legacy `XMESH1` / Ed25519 until an explicitly approved replacement is ready.
-- The target XSP-v2 product has no user-selectable fallback to `XMESH1`, Ed25519-only, X25519-only, TLS 1.2 or insecure certificate verification.
-- The dedicated ingress remains experimental and is not activated by the default installer/Compose stack.
-- `POST /api/v2/node/keys/rotation/ack` is still intentionally unmounted at this checkpoint.
-- A GitHub merge is not a production deployment. PR #64 and Node PR #29 did not change production VPS, DNS, firewall, public Nginx, production DB, real Node keys or live VPN credentials.
+- Production control-plane behavior remains legacy `XMESH1` / Ed25519 until separately approved replacement gates are complete.
+- No target-product fallback to XMESH1, Ed25519-only, X25519-only, TLS 1.2 or insecure certificate validation.
+- Experimental ingress/origin is not activated by default installer/Compose.
+- `POST /api/v2/node/keys/rotation/ack` remains intentionally **unmounted** at this checkpoint; C2-B has not begun.
+- GitHub merge is not production deployment. No production VPS/DNS/firewall/public Nginx/DB/live-key/VPN-credential changes are implied.
 - Xray continues to carry user VPN traffic.
 
-For exact requirements and gate order, read [ENTERPRISE_ROADMAP.md](docs/ENTERPRISE_ROADMAP.md) and [XSP_V2_PQ_ONLY_SECURITY_POLICY.md](docs/XSP_V2_PQ_ONLY_SECURITY_POLICY.md).
+For exact gate requirements, read [ENTERPRISE_ROADMAP.md](docs/ENTERPRISE_ROADMAP.md) and [XSP_V2_PQ_ONLY_SECURITY_POLICY.md](docs/XSP_V2_PQ_ONLY_SECURITY_POLICY.md).
 
 ## Architecture
 
@@ -77,8 +83,12 @@ Administrator ─HTTPS─> Nexus public Nginx ─loopback─> XMesh Nexus (Rust/
                                                     │
                                                    Redis
 
-Future XSP-v2 Node path (not production-activated):
-Node ─TLS1.3/X25519MLKEM768 + ML-DSA-65 client identity─> dedicated Node ingress ─[P0-C2 boundary TBD/proven]─> staging ACK handler
+Experimental XSP-v2 staging boundary (not production-activated):
+Node ─TLS1.3/X25519MLKEM768 + ML-DSA-65 client identity─> dedicated Node ingress
+                                                        │
+                                                        └─protected UDS─> origin verifier
+                                                                            │
+                                                              [C2-B ACK route not mounted]
 ```
 
 ## Install
@@ -118,7 +128,7 @@ The default Nexus backend does not compile `xsp-v2-experimental`. Do not weaken 
 - [Enterprise Roadmap](docs/ENTERPRISE_ROADMAP.md)
 - [XSP-v2 PQ-only security policy](docs/XSP_V2_PQ_ONLY_SECURITY_POLICY.md)
 - [XSP-v2 signer E2E](docs/XSP_V2_SIGNER_E2E.md)
-- [XSP-v2 TLS / dedicated ingress proof](docs/XSP_V2_TLS_PROBE.md)
+- [XSP-v2 TLS / ingress-origin proof](docs/XSP_V2_TLS_PROBE.md)
 - [Subscription security](docs/SUBSCRIPTION_SECURITY.md)
 
 Historical long-form README content through 27 October 2026 is preserved under [`docs/archive/`](docs/archive/). Archived “current/next P0” statements do not override the current Roadmap.
