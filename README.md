@@ -40,6 +40,14 @@ bash install.sh
 
 **Если две VPS должны работать одновременно, не переподключайте прежний ID — создайте вторую запись Node с отдельным ID.** Исправление не включает experimental XSP-v2 и не является подписанным двухфазным PQ cutover. Миграция `0101_node_enrollment_owner_recovery.sql` добавляет default-deny флаг для owner-approved **legacy** Ed25519 recovery. [Полный Backend CI с PostgreSQL/API integration на PR #26 — success](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40449358858); [Node CI на `main` после #7 — success](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40448354429). Перед живой эксплуатацией требуется обновить установленную панель; слияние PR само VPS не обновляет.
 
+## Исправление статуса «Проверка профиля не установлена» (27 октября 2026)
+
+**Причина:** это подписанный отчёт Node `profileCheck=helper_missing`: при первичной установке bootstrap раньше не загружал `/usr/local/libexec/xmesh-profile-attest.py`, хотя контрольный агент ожидал его. Рабочий Xray и Agent могли быть активны, но подписанное подтверждение корректности применённого JSON отсутствовало. Исправлено в [XMesh-Node PR #9](https://github.com/TriplexCorp/XMesh-Node/pull/9): новый bootstrap скачивает attestation helper из зафиксированного SHA, проверяет его Python-синтаксис и устанавливает перед первым Xray sync.
+
+**Для существующих узлов (например, «Польша-2»):** обновите Nexus и нажмите **Узлы → Обновить Agent**. Target `control-v5.1.3` обеспечивает новое подтверждение версии после переустановки helper штатным `deploy/update-node-control-agent.sh`. Обновление не перевыпускает приватный Ed25519-ключ, не отменяет проверки подписи политики и не требует удаления текущего Hysteria2-профиля. После завершения дождитесь нового heartbeat: `profileCheck=verified` подтверждается только сверкой подписанной политики, digest активного Xray JSON и read-only mount. Ошибки `policy_invalid`/`active_config_mismatch` требуют отдельного анализа, не скрываются как `verified`.
+
+Если обновление неудачно, на ноде проверьте `sudo python3 /usr/local/libexec/xmesh-profile-attest.py --json` и `sudo journalctl -u xmesh-node-agent-upgrade.service -n 80 --no-pager`; на основной панели обновление из GitHub также требует фактического развёртывания на VPS. **Production XSP-v2 не включался.**
+
 ## XSP-v2 — актуальный P0: гибридная безопасность (27 октября 2026)
 
 **Состояние: staging / лабораторные проверки. На рабочих нодах XSP-v2 не включён.** Панель, Docker/Compose, установленный Nginx, Xray и протокол `XMESH1`/Ed25519 продолжают работать по прежней схеме. `strict-pq` отключён; экспериментальные API не входят в обычный Docker-образ Nexus.
@@ -114,7 +122,7 @@ bash install.sh
 
 **Активная разработка — 27 октября 2026.** В репозитории реализованы ключевые механизмы управления; [Backend CI #40304117546](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40304117546) успешно завершился для кодового коммита `150978cc`. Это **не** статус «enterprise-ready»: реальное тестирование транспортов/клиентов, ACME-продление и аварийные сценарии требуют отдельного подтверждения. См. [Enterprise Roadmap](docs/ENTERPRISE_ROADMAP.md).
 
-**Текущий агент в коде:** `control-v5.1.2` (`deploy/node-control-agent.sh`). Обновление через панель предусмотрено для поддерживаемых установок v4/v5; первоначальная установка, восстановление или устаревшие systemd-юниты могут потребовать действий на сервере.
+**Текущий агент в коде:** `control-v5.1.3` (`deploy/node-control-agent.sh`). Обновление через панель предусмотрено для поддерживаемых установок v4/v5; первоначальная установка, восстановление или устаревшие systemd-юниты могут потребовать действий на сервере.
 
 ---
 
