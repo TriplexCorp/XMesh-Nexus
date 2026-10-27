@@ -425,7 +425,10 @@ fn experimental_v2_routes(state: &AppState) -> Router<AppState> {
     let router = router
         .route("/api/v2/node/heartbeat", post(xsp_v2_api::heartbeat))
         .route("/api/v2/node/keys/claim", post(xsp_v2_enrollment::claim))
-        .route("/api/v2/node/keys/rotation/prove", post(xsp_v2_rotation::prove))
+        .route(
+            "/api/v2/node/keys/rotation/prove",
+            post(xsp_v2_rotation::prove),
+        )
         .merge(
             Router::new()
                 .route(
