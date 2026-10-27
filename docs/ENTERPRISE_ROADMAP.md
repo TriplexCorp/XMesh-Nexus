@@ -15,6 +15,18 @@
 | Криптография control plane | Действующий Ed25519 (`XMESH1`); XSP-v2 PR01 wire-векторы, PR02 Ed25519 **AND** ML-DSA-65 Rust↔Go и PR07 TLS1.3/X25519MLKEM768 — **только изолированные PoC и CI** | **P0:** security review, строгий декодер, replay/epoch/suite-floor, ключи и enrollment; отдельный node-only TLS endpoint, реальный canary и безопасная миграция |
 | Качество релиза | Зелёный Backend CI на `main` (коммит `150978cc`, запуск #40304117546); статические и API-интеграционные проверки | Browser/live-node e2e, проверка rollback и обязательные release gates |
 
+## XSP-v2 P0 — owner-approved dual-key enrollment + rotation (staging checkpoint, 27 October 2026)
+
+- [x] **CI compatibility:** removed an OpenSSL-3.5-only ML-DSA private-key generation call from ordinary Nexus backend tests; dedicated OpenSSL 3.5 Rust/Go Crypto CI remains responsible for actual PQ signing and interoperability.
+- [x] **Owner-gated staging registration:** `0100_node_xsp_owner_key_approval.sql` holds only PUBLIC key IDs/bytes and SHA-256 of a 32-byte challenge. Owner-authenticated `POST /api/v2/admin/nodes/{id}/key-approval` approves the **exact next epoch and exact public keys**, with a 10-minute expiry; it requires a trusted existing v1 node identity.
+- [x] **Both proofs mandatory:** staging-only `POST /api/v2/node/keys/claim` looks up the pre-approved keys, verifies Ed25519 **AND** ML-DSA-65 on the same purpose/node/epoch/challenge-bound bytes and atomically updates public keys, key epoch and challenge state. Rotation revokes older node-request keys; new phase is `dual_enrolled`, **not** `strict`. Unauthenticated/expired/stale/replayed claims cannot register arbitrary keys.
+- [x] **Node staging tooling:** `keytool prove` signs the owner challenge from the AES-GCM encrypted vault. Rust and Go share a golden binary-input SHA-256. Isolated CI generates new encrypted Go keys and checks real cross-language Rust/OpenSSL signature verification and mutations. PostgreSQL integration checks bounded approval lifetime and length/uniqueness constraints.
+- [ ] **Production blockers remain:** trusted owner-facing UI, secure isolated HTTPS endpoint and proof of every TLS hop, two-phase rotation with old-key retention until cutover, signed server responses, durable monotonic floor at both peers, audited key recovery, FIPS 204 KAT/fuzz and external review. **No live node or public panel is migrated.**
+
+Implementation and manual staging boundaries: [XSP_V2_OWNER_KEY_ENROLLMENT.md](XSP_V2_OWNER_KEY_ENROLLMENT.md).
+
+---
+
 ## XSP-v2 P0 continuation — dual-signature staging API, sealed keys, live Nginx laboratory (27 October 2026)
 
 - [x] **Rust staging heartbeat:** only with non-default `xsp-v2-experimental` Cargo feature and runtime `XSP_V2_EXPERIMENTAL_HEARTBEAT=staging-only`, validates exact envelope and **both** Ed25519/ML-DSA-65 signatures against pinned unrevoked PostgreSQL keys and atomically inserts replay nonce. Accepts only `shadow` phase, returns unsigned 204, never dispatches policies/commands. Normal production Docker has **no v2 route**.
