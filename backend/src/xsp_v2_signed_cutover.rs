@@ -11,33 +11,34 @@ use sha2::{Digest, Sha256};
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct Cutover {
-    kind: String,
-    issuer_id: String,
-    signer_ed_key_id: String,
+pub struct Cutover {
+    pub kind: String,
+    pub issuer_id: String,
+    pub signer_ed_key_id: String,
     #[serde(rename = "signerPQKeyId")]
-    signer_pq_key_id: String,
-    node_id: u64,
-    from_epoch: u64,
-    to_epoch: u64,
-    request_id: String,
-    from_ed_key_id: String,
+    pub signer_pq_key_id: String,
+    pub node_id: u64,
+    pub from_epoch: u64,
+    pub to_epoch: u64,
+    pub request_id: String,
+    pub from_ed_key_id: String,
     #[serde(rename = "fromPQKeyId")]
-    from_pq_key_id: String,
-    to_ed_key_id: String,
+    pub from_pq_key_id: String,
+    pub to_ed_key_id: String,
     #[serde(rename = "toPQKeyId")]
-    to_pq_key_id: String,
-    method: String,
-    path: String,
-    issued_at_ms: i64,
-    expires_at_ms: i64,
-    permit_nonce_hex: String,
-    nonce_hex: String,
-    candidate_sha256_hex: String,
-    permit_sha256_hex: String,
-    applied_state_sha256_hex: String,
+    pub to_pq_key_id: String,
+    pub method: String,
+    pub path: String,
+    pub issued_at_ms: i64,
+    pub expires_at_ms: i64,
+    pub permit_nonce_hex: String,
+    pub nonce_hex: String,
+    pub candidate_sha256_hex: String,
+    pub permit_sha256_hex: String,
+    pub applied_state_sha256_hex: String,
 }
 
+#[cfg(test)]
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ContractFixture {
