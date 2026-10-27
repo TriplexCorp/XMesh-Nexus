@@ -8,8 +8,7 @@
 #![allow(dead_code)]
 use crate::{
     xsp_v2_ack_epoch_commit::readback_committed_applied_ack_staging,
-    xsp_v2_commit_receipt::verify_staging_commit_receipt,
-    xsp_v2_signed_cutover::TrustedPublic,
+    xsp_v2_commit_receipt::verify_staging_commit_receipt, xsp_v2_signed_cutover::TrustedPublic,
 };
 use anyhow::{Context as _, Result, bail};
 use sha2::{Digest as _, Sha256};
