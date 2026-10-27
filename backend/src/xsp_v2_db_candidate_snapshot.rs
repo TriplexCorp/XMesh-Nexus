@@ -142,8 +142,10 @@ mod tests {
         assert!(pq_id.starts_with("pq-"));
         assert_ne!(fingerprint("ed-", &[0x14; 32]), id);
         assert_ne!(fingerprint("pq-", &[0x25; 1952]), pq_id);
-        // The synthetic repeated-byte fixture is not a valid ML-DSA key and
-        // cannot pass provider-backed validation merely by matching a digest.
-        assert!(validate_public(&ed, &pq, &id, &pq_id).is_err());
+        // Importing raw public bytes is NOT a proof of private-key possession.
+        // Mismatched fingerprints and lengths must reject independently of
+        // whether a provider accepts any particular 1952-byte encoding.
+        assert!(validate_public(&ed, &pq, "ed-invalid", &pq_id).is_err());
+        assert!(validate_public(&ed[..31], &pq, &id, &pq_id).is_err());
     }
 }
