@@ -249,6 +249,8 @@ jobs:
           done
           docker compose logs --tail=120 panel
           exit 1
+      - name: Exercise dormant XSP-v2 public key epoch and replay migration in disposable PostgreSQL
+        run: bash scripts/test-xsp-v2-schema-integration.sh
       - name: Exercise signed node identity, tamper resistance and replay rejection
         run: python3 scripts/test-node-auth-integration.py
       - name: Exercise real RBAC, MFA and revocation API
