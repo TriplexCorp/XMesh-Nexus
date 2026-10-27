@@ -25,6 +25,8 @@ mod xsp_v2_api;
 mod xsp_v2_enrollment;
 #[cfg(feature = "xsp-v2-experimental")]
 mod xsp_v2_rotation;
+#[cfg(feature = "xsp-v2-experimental")]
+mod xsp_v2_signed_cutover;
 
 #[cfg(test)]
 mod xsp_v2_cutover_contract_tests;
