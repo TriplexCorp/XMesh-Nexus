@@ -39,7 +39,7 @@ REVOKE ALL PRIVILEGES ON SCHEMA public FROM xmesh_signer_reader;
 GRANT USAGE ON SCHEMA public TO xmesh_signer_reader;
 
 -- Clear stale direct grants to all pre-existing objects before granting the
--- exact four tables needed for cryptographic readback.
+-- exact five tables needed for cryptographic readback and receipt dedupe.
 REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM xmesh_signer_reader;
 REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM xmesh_signer_reader;
 REVOKE ALL PRIVILEGES ON ALL ROUTINES IN SCHEMA public FROM xmesh_signer_reader;
