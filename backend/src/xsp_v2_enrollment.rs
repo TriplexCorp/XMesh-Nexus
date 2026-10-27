@@ -389,14 +389,8 @@ mod tests {
             .unwrap()
             .try_into()
             .unwrap();
-        let ed_sig = strict_base64(
-            proof["ed25519SignatureB64"].as_str().unwrap(),
-            64,
-        ).unwrap();
-        let pq_sig = strict_base64(
-            proof["mldsa65SignatureB64"].as_str().unwrap(),
-            3309,
-        ).unwrap();
+        let ed_sig = strict_base64(proof["ed25519SignatureB64"].as_str().unwrap(), 64).unwrap();
+        let pq_sig = strict_base64(proof["mldsa65SignatureB64"].as_str().unwrap(), 3309).unwrap();
         let signed = proof_input(node, epoch, &challenge, &ed, &pq, ed_id, pq_id).unwrap();
         assert!(verify_proof(&signed, &ed, &pq, &ed_sig, &pq_sig).is_ok());
         let mut changed = signed.clone();
@@ -408,8 +402,7 @@ mod tests {
         let mut bad_pq = pq_sig.clone();
         bad_pq[0] ^= 1;
         assert!(verify_proof(&signed, &ed, &pq, &ed_sig, &bad_pq).is_err());
-        let wrong_epoch =
-            proof_input(node, epoch + 1, &challenge, &ed, &pq, ed_id, pq_id).unwrap();
+        let wrong_epoch = proof_input(node, epoch + 1, &challenge, &ed, &pq, ed_id, pq_id).unwrap();
         assert!(verify_proof(&wrong_epoch, &ed, &pq, &ed_sig, &pq_sig).is_err());
     }
 
