@@ -951,6 +951,42 @@ mod signed_tests {
             .await
             .is_err()
         );
+        // Readback proves only the exact historical database ACK, never
+        // creates a receipt or repeats the epoch compare-and-swap.
+        let evidence = crate::xsp_v2_ack_epoch_commit::readback_committed_applied_ack_staging(
+            &pool,
+            node_id,
+            &permit.request_id,
+            &signed_ack,
+            &panel_pin,
+        )
+        .await
+        .expect("verified committed ACK readback");
+        assert_eq!((evidence.from_epoch, evidence.to_epoch), (1, 2));
+        assert_eq!(evidence.node_id, node_id);
+        assert_eq!(evidence.request_id, permit.request_id);
+        assert_eq!(
+            evidence.canonical_permit_sha256_hex,
+            digest(&signing_input(&permit).unwrap())
+        );
+        assert_eq!(evidence.signed_ack_envelope_sha256_hex, digest(&signed_ack));
+        let mut tampered_retry = signed_ack.clone();
+        tampered_retry.push(b' ');
+        assert!(
+            crate::xsp_v2_ack_epoch_commit::readback_committed_applied_ack_staging(
+                &pool, node_id, &permit.request_id, &tampered_retry, &panel_pin,
+            )
+            .await
+            .is_err()
+        );
+        assert!(
+            crate::xsp_v2_ack_epoch_commit::readback_committed_applied_ack_staging(
+                &pool, node_id, &permit.request_id, &signed_ack, &next_pin,
+            )
+            .await
+            .is_err()
+        );
+
         let unchanged: i64 =
             sqlx::query_scalar("SELECT key_epoch FROM node_xsp_suite_state WHERE node_id=$1")
                 .bind(node_id)
