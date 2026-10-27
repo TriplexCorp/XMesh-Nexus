@@ -50,6 +50,8 @@
 - Node: `security/xspv2/poc-go/cutover/{signed.go,permit_journal_linux.go,applied_ack_journal_linux.go,committed_vault_ack_linux.go,candidate.go}`, `security/xspv2/poc-go/keyring/{two_phase.go,applied_attestation.go}`.
 - Спецификации: [signed cutover/ACK](XSP_V2_SIGNED_CUTOVER_ACK_CONTRACT.md), [signed staging](XSP_V2_SIGNED_CUTOVER_STAGING.md), [approved candidate](XSP_V2_CUTOVER_CANDIDATE_BINDING.md), [ledger immutability](XSP_V2_LEDGER_STATE_INVARIANTS.md), [atomic ACK commit](XSP_V2_STAGING_ATOMIC_ACK_EPOCH_COMMIT.md), [applied Node vault](https://github.com/TriplexCorp/XMesh-Node/blob/main/docs/XSP_V2_APPLIED_ACK_VAULT_GATE.md).
 
+**Новый P0-B в работе:** отдельный [канонический signed commit receipt V1](XSP_V2_SIGNED_COMMIT_RECEIPT.md), Rust signer только от внутреннего DB readback и Go1.27 Node verifier по сохранённому permit/ACK. Оба слоя остаются изолированными от действующих маршрутов, production signer, durable receipt outbox и рабочего Node Agent; следующий шаг — end-to-end PQ-only transport и подписанные команды/ответы. Нельзя считать тестовый receipt разрешением удалять прежние ключи.
+
 ## 4. Что НЕ готово — реальные P0-блокеры
 
 1. **Отдельно защищённый Nexus `panel_response` signing service / trust pinning / owner authorization** и durable signing-intent/outbox: подпись, фиксация в PostgreSQL и доставка permit не становятся атомарными сами собой. Ключи и pins **не** брать из недоверенного запроса.
