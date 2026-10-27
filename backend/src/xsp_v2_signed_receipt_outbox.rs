@@ -275,7 +275,7 @@ pub async fn load_committed_signed_receipt_staging(
 ///
 /// The signing callback is an **injected staging boundary**, NOT a signer
 /// implementation: the eventual caller must use a separately protected
-/// panel_response signing service with independently pinned public keys.
+/// `panel_response` signing service with independently pinned public keys.
 /// The API process must never hold, import or log private signing keys.
 /// Neither this helper nor signed ACK bytes authenticate a network caller:
 /// the calling route must independently establish a PQ-only TLS hop and
