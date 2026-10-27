@@ -6,6 +6,7 @@ on:
       - "security/xspv2/poc-rust/**"
       - "backend/src/xsp_v2_api.rs"
       - "backend/src/xsp_v2_enrollment.rs"
+      - "scripts/make-xsp-owner-proof-fixture.py"
       - "backend/migrations/0100_node_xsp_owner_key_approval.sql"
       - "backend/src/main.rs"
       - "backend/Cargo.toml"
@@ -17,6 +18,7 @@ on:
       - "security/xspv2/poc-rust/**"
       - "backend/src/xsp_v2_api.rs"
       - "backend/src/xsp_v2_enrollment.rs"
+      - "scripts/make-xsp-owner-proof-fixture.py"
       - "backend/migrations/0100_node_xsp_owner_key_approval.sql"
       - "backend/src/main.rs"
       - "backend/Cargo.toml"
@@ -57,6 +59,12 @@ jobs:
           cd "$GITHUB_WORKSPACE"
           cargo build --manifest-path security/xspv2/poc-rust/Cargo.toml --bin interop
           XSP_GO_CLI="$RUNNER_TEMP/xsp-go-interop" XSP_RUST_CLI="$GITHUB_WORKSPACE/security/xspv2/poc-rust/target/debug/interop" python3 scripts/check-xsp-cross-language.py
+      - name: Generate one-use Go encrypted-vault proof for Rust cross-language enrollment test
+        run: |
+          cd xmesh-node/security/xspv2/poc-go
+          go build -o "$RUNNER_TEMP/xsp-keytool" ./cmd/keytool
+          cd "$GITHUB_WORKSPACE"
+          XSP_GO_KEYTOOL="$RUNNER_TEMP/xsp-keytool" python3 scripts/make-xsp-owner-proof-fixture.py
       - name: Compile and run experimental XSP-v2 heartbeat verifier tests (no production switch)
         run: |
           cargo test --manifest-path backend/Cargo.toml --features xsp-v2-experimental --bin xmesh-api -- xsp_v2_api::tests
