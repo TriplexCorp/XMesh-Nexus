@@ -27,7 +27,6 @@ fn initial_enrollment_allowed(floor: i16, phase: &str, current: i64, proposed: i
     floor == 1 && current == 0 && proposed == 1 && matches!(phase, "legacy" | "discovered")
 }
 
-
 fn denied() -> ApiError {
     ApiError::new(StatusCode::UNAUTHORIZED, "Invalid XSP-v2 enrollment proof")
 }
