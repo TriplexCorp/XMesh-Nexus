@@ -41,6 +41,8 @@ mod xsp_v2_rotation;
 mod xsp_v2_signed_cutover;
 #[cfg(feature = "xsp-v2-experimental")]
 mod xsp_v2_signed_receipt_outbox;
+#[cfg(feature = "xsp-v2-experimental")]
+mod xsp_v2_signer;
 
 #[cfg(test)]
 mod xsp_v2_candidate_digest_tests;
@@ -563,6 +565,19 @@ async fn main() -> anyhow::Result<()> {
         )
         .json()
         .init();
+
+    let command = env::args().nth(1);
+    #[cfg(feature = "xsp-v2-experimental")]
+    match command.as_deref() {
+        Some("--xsp-v2-signer") => return xsp_v2_signer::run().await,
+        Some("--xsp-v2-signer-print-identity") => return xsp_v2_signer::print_identity(),
+        Some(_) => anyhow::bail!("unknown xmesh-api command"),
+        None => {}
+    }
+    #[cfg(not(feature = "xsp-v2-experimental"))]
+    if command.is_some() {
+        anyhow::bail!("this binary was built without XSP-v2 signer support");
+    }
 
     let database_url =
         env::var("DATABASE_URL").map_err(|_| anyhow::anyhow!("DATABASE_URL is required"))?;
