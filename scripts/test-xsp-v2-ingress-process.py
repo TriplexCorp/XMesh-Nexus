@@ -20,6 +20,7 @@ import os
 from pathlib import Path
 import secrets
 import subprocess
+import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -82,6 +83,8 @@ def main() -> None:
     sessions = f"{prefix}-sessions"
     origin_socket = f"{prefix}-origin-socket"
     containers: list[str] = []
+    client_material = tempfile.TemporaryDirectory(prefix=f"{prefix}-client-material-")
+    client_material_path = Path(client_material.name)
 
     def go_probe(check: bool = True, mutual: bool = False):
         probe_args = [
@@ -180,6 +183,29 @@ set -e
         if not version.startswith("OpenSSL 3."):
             raise RuntimeError(f"unexpected OpenSSL runtime: {version}")
 
+        # Generate disposable client X.509/PKCS#8 material with the exact Go
+        # 1.27 stack that must later load it. OpenSSL/Nginx must then prove they
+        # can consume that same standards-encoded ML-DSA material.
+        command(
+            "go", "run",
+            str(ROOT / "scripts/generate-xsp-v2-mldsa-test-certs.go"),
+            "-out", str(client_material_path),
+            timeout=60,
+        )
+        required_client_files = [
+            "client-ca.pem",
+            "client.pem",
+            "client-key.pem",
+            "other-client.pem",
+            "other-client-key.pem",
+            "classical-client.pem",
+            "classical-client-key.pem",
+            "client-spki.sha256",
+        ]
+        for name in required_client_files:
+            if not (client_material_path / name).is_file():
+                raise RuntimeError(f"Go ML-DSA fixture generator omitted {name}")
+
         cert_setup = r"""
 set -eu
 umask 077
@@ -192,45 +218,17 @@ openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
   -addext "subjectAltName=DNS:unrelated.xsp.invalid" \
   -days 1 -keyout /certs/unrelated-key.pem -out /certs/unrelated.pem >/dev/null 2>&1
 
-# Throwaway ML-DSA-65 client CA and the one pinned Node identity.
-openssl genpkey -algorithm ML-DSA-65 -out /certs/client-ca-key.pem
-openssl req -new -x509 -key /certs/client-ca-key.pem \
-  -subj "/CN=XSP-v2 disposable ML-DSA client CA" -days 1 \
-  -addext "basicConstraints=critical,CA:TRUE" \
-  -addext "keyUsage=critical,keyCertSign,cRLSign" \
-  -out /certs/client-ca.pem
-cat >/tmp/client.ext <<'EOF'
-basicConstraints=critical,CA:FALSE
-keyUsage=critical,digitalSignature
-extendedKeyUsage=clientAuth
-EOF
-openssl genpkey -algorithm ML-DSA-65 -out /certs/client-key.pem
-openssl req -new -key /certs/client-key.pem -subj "/CN=untrusted-text-node-id" -out /tmp/client.csr
-openssl x509 -req -in /tmp/client.csr -CA /certs/client-ca.pem -CAkey /certs/client-ca-key.pem \
-  -CAcreateserial -days 1 -extfile /tmp/client.ext -out /certs/client.pem
-
-# A second valid ML-DSA-65 cert under the same CA must NOT map to the pinned Node.
-openssl genpkey -algorithm ML-DSA-65 -out /certs/other-client-key.pem
-openssl req -new -key /certs/other-client-key.pem -subj "/CN=another-node" -out /tmp/other.csr
-openssl x509 -req -in /tmp/other.csr -CA /certs/client-ca.pem -CAkey /certs/client-ca-key.pem \
-  -days 1 -extfile /tmp/client.ext -out /certs/other-client.pem
-
-# A classical client cert signed by the same trusted ML-DSA CA must also fail
-# the pinned-origin identity mapping even if the TLS library accepts the chain.
-openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out /certs/classical-client-key.pem
-openssl req -new -key /certs/classical-client-key.pem -subj "/CN=classical-client" -out /tmp/classical.csr
-openssl x509 -req -in /tmp/classical.csr -CA /certs/client-ca.pem -CAkey /certs/client-ca-key.pem \
-  -days 1 -extfile /tmp/client.ext -out /certs/classical-client.pem
-
-openssl x509 -in /certs/client.pem -pubkey -noout \
-  | openssl pkey -pubin -outform DER \
-  | openssl dgst -sha256 \
-  | sed 's/^.*= //' >/certs/client-spki.sha256
+# Copy Go 1.27-generated ML-DSA-65 CA/client PKCS#8 + X.509 fixtures into the
+# throwaway Docker volume. This makes Go/OpenSSL/Nginx interop part of the gate.
+for name in client-ca.pem client.pem client-key.pem other-client.pem other-client-key.pem \
+  classical-client.pem classical-client-key.pem client-spki.sha256; do
+  cp "/client-material/$name" "/certs/$name"
+done
 
 test "$(wc -c </certs/client-spki.sha256)" -eq 65
 chown 0:10003 /certs/privkey.pem /certs/fullchain.pem /certs/client-ca.pem
 chmod 0440 /certs/privkey.pem /certs/fullchain.pem /certs/client-ca.pem
-chmod 0400 /certs/unrelated-key.pem /certs/client-ca-key.pem /certs/client-key.pem \
+chmod 0400 /certs/unrelated-key.pem /certs/client-key.pem \
   /certs/other-client-key.pem /certs/classical-client-key.pem
 chmod 0444 /certs/unrelated.pem /certs/client.pem /certs/other-client.pem \
   /certs/classical-client.pem /certs/client-spki.sha256
@@ -238,6 +236,7 @@ chmod 0444 /certs/unrelated.pem /certs/client.pem /certs/other-client.pem \
         command(
             "docker", "run", "--rm", "--user", "0:0",
             "--mount", f"type=volume,src={certs},dst=/certs",
+            "--mount", f"type=bind,src={client_material_path},dst=/client-material,readonly",
             "--entrypoint", "/bin/sh", probe_image, "-ceu", cert_setup,
             timeout=60,
         )
@@ -570,6 +569,7 @@ grep -Eiq 'curve|group|SSL|unknown|invalid' /tmp/out
         command("docker", "network", "rm", network, check=False)
         if not args.skip_build:
             command("docker", "image", "rm", "-f", runtime_image, origin_image, probe_image, check=False)
+        client_material.cleanup()
 
 
 if __name__ == "__main__":
