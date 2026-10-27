@@ -8,14 +8,35 @@
 | Направление | Реализовано в коде | Следующий критерий приёмки |
 | --- | --- | --- |
 | Управление инфраструктурой | Ноды, профили, подписанные политики, команды, обновление агента из UI | Проверка обновления и восстановления на реальной VPS |
-| TLS / ACME | HTTP-01 provisioning, TLS-статус сертификата в карточке ноды, телеметрия `control-v5.1.0` | Реальное продление, диагностика ошибок ACME и подтверждение успешного обновления сертификата |
+| TLS / ACME | Автоматическая установка Docker/Compose, Nginx Mainline, Certbot/HTTPS для панели; HTTP-01 provisioning, контроль сертификата ноды, агент `control-v5.1.2` | Проверка реального продления ACME и восстановление на VPS; гибридный TLS Node→Nexus пока только в лаборатории |
 | GeoData | Подписанный manifest, HTTPS-загрузка и обновление, дефолтные GeoSite/GeoIP Loyalsoldier | Проверка актуальности, отказов источника и применения данных на тестовой ноде |
 | XRAY STUDIO / JSON | Конструктор, SS2022, JSON-подписки, полный каталог FinalMask и адаптивное окно до 84rem | Проверка реального Xray, клиентов и диалога на разных экранах |
 | Статистика и доступ | Исторические метрики, карточки, RBAC и автономные политики | Нагрузочные, отказоустойчивые и security regression тесты |
-| Криптография control plane | Действующий Ed25519 (`XMESH1`); XSP-v2 PR01 wire-векторы, PR02 Ed25519 **AND** ML-DSA-65 Rust↔Go и PR07 TLS1.3/X25519MLKEM768 — **только изолированные PoC и CI** | **P0:** security review, строгий декодер, replay/epoch/suite-floor, ключи и enrollment; отдельный node-only TLS endpoint, реальный canary и безопасная миграция |
-| Качество релиза | Зелёный Backend CI на `main` (коммит `150978cc`, запуск #40304117546); статические и API-интеграционные проверки | Browser/live-node e2e, проверка rollback и обязательные release gates |
+| Криптография control plane | Production `XMESH1`/Ed25519; XSP-v2 Rust↔Go dual signatures, строгий decoder, AES-GCM staging vault, owner-approved dual-key enrollment/rotation, транзакционные nonce/epoch и lab TLS1.3/X25519MLKEM768 — **не развёрнуто** | **P0:** успешный полный Backend CI, независимый security review/KAT/fuzz, двухфазная ротация и восстановление, signed v2 responses/ACK, защищённый Node-side suite floor, реальный ingress/canary |
+| Качество релиза | Исторический полный CI успешен на `918d42fa` (#40432809267); актуальный Nexus run на `3fc80b70` **завершился с ошибкой Rustfmt**, после чего внесено исправление | Подтвердить полный зелёный Backend CI именно последнего SHA, PostgreSQL integration, browser/live-node e2e и rollback gates |
 
-## XSP-v2 P0 — owner-approved dual-key enrollment + rotation (staging checkpoint, 27 October 2026)
+## Текущий P0 — сводка реализации и проверки (27 октября 2026)
+
+**Лабораторная реализация ≠ production-защита.** XSP-v2 выключен в штатном Docker/Compose/Nginx и в рабочем Go 1.23 Node; текущие `XMESH1`/Ed25519, автоматическая установка панели и работа Xray не заменены. Обе экспериментальные операции регистрации ключей требуют `xsp-v2-experimental` при сборке **и** `XSP_V2_EXPERIMENTAL_HEARTBEAT=staging-only` в отдельной тестовой среде.
+
+| Gate | Статус | Следующая проверка |
+| --- | --- | --- |
+| PR01 wire/PR02 dual signatures | [x] Исходники + двусторонние Rust↔Go тесты | Freeze протокола, сторонний FIPS 204 KAT и fuzz |
+| Strict decoder + heartbeat/replay | [x] Staging-only parser и проверка **Ed25519 AND ML-DSA-65**, транзакционный nonce | Signed Nexus→Node responses, policy/revision/command ACK |
+| Key vault/owner enrollment | [x] Go AES-GCM PoC; `0099`/`0100` публичные keysets/challenge; одобрение владельца, 10-минутный PoP и транзакционная смена epoch/revoke | Двухфазная ротация со старым ключом до cutover, backup/KMS, recovery, UI и аудит |
+| PR07 hybrid TLS | [x] Изолированный Nginx/OpenSSL/Go TLS1.3/X25519MLKEM768, SNI/CA/downgrade checks | **Реальная** отдельная VPS, DNS/ACME и проверка всех hop'ов |
+| Full CI последнего кода | [ ] **Не подтверждён зелёным** | [Nexus Backend CI `3fc80b70` #40440948889](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40440948889) упал на Rustfmt; последующий исправляющий коммит требует повторной проверки |
+| Strict production activation | [ ] **Выключено** | Независимый security-review, зафиксированный suite-floor на обеих сторонах, canary и отдельное одобрение владельца |
+
+**Подтверждённые CI по конкретным SHA:** [Nexus Crypto #40440784297](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40440784297) — success на `b860ac7a`; [Node Crypto #40440580172](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40440580172) — success на `dba0c3e0`; [Node CI #40440956290](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40440956290) — success на `84b384db`. Эти результаты не подтверждают эксплуатацию на VPS или полный Nexus Backend CI после последних правок.
+
+**Очередность работ:** (1) полный зелёный Nexus CI + тесты миграции `0100`; (2) owner UI и отказоустойчивая двухфазная ротация/backup; (3) подписанные ответы/конфигурации/ACK без replay; (4) выделенный node-only TLS endpoint + измеренный canary; (5) FIPS KAT/fuzz/review и строго управляемое включение без downgrade.
+
+Подробности: [Owner-approved enrollment](XSP_V2_OWNER_KEY_ENROLLMENT.md) · [staging API/TLS](XSP_V2_EXPERIMENTAL_GATEWAY.md) · [полный план внедрения](HYBRID_POST_QUANTUM_SECURITY_IMPLEMENTATION_PLAN.md).
+
+---
+
+## История P0 — staging owner-approved dual-key enrollment (27 October 2026)
 
 - [x] **CI compatibility:** removed an OpenSSL-3.5-only ML-DSA private-key generation call from ordinary Nexus backend tests; dedicated OpenSSL 3.5 Rust/Go Crypto CI remains responsible for actual PQ signing and interoperability.
 - [x] **Owner-gated staging registration:** `0100_node_xsp_owner_key_approval.sql` holds only PUBLIC key IDs/bytes and SHA-256 of a 32-byte challenge. Owner-authenticated `POST /api/v2/admin/nodes/{id}/key-approval` approves the **exact next epoch and exact public keys**, with a 10-minute expiry; it requires a trusted existing v1 node identity.
@@ -32,7 +53,7 @@ Implementation and manual staging boundaries: [XSP_V2_OWNER_KEY_ENROLLMENT.md](X
 - [x] **Rust staging heartbeat:** only with non-default `xsp-v2-experimental` Cargo feature and runtime `XSP_V2_EXPERIMENTAL_HEARTBEAT=staging-only`, validates exact envelope and **both** Ed25519/ML-DSA-65 signatures against pinned unrevoked PostgreSQL keys and atomically inserts replay nonce. Accepts only `shadow` phase, returns unsigned 204, never dispatches policies/commands. Normal production Docker has **no v2 route**.
 - [x] **Encrypted Node research vault:** Go 1.27.3 AES-256-GCM independent keypairs and external 32-byte wrapping key with 0600/0700 ownership, atomic rotation and monotonic epoch floor. Not an operational key service or HSM; privileged rollback/recovery still open.
 - [x] **Real Nginx lab:** loopback TLS1.3/X25519MLKEM768 template, throwaway cert and authenticated handshake, negative TLS1.2/X25519/hostname and HTTP-only-404 checks. [Nginx CI passed](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40439086025). No live server change.
-- [ ] **Before activation:** owner-approved dual-key enrollment, protected recovery/backup, signed responses, applied ACKs, role-separated persisted suite floor at Node and Nexus, KAT/fuzz/security review and operational TLS verification on an actual disposable VPS.
+- [ ] **Before activation:** owner-approved enrollment существует только на staging; для production нужны защищённый канал/owner UI, двухфазная ротация, backup/recovery, signed responses и applied ACK, persist suite floor на Node и Nexus, KAT/fuzz/security review и реальная disposable VPS с проверенным TLS.
 
 Details: [experimental gateway, vault, TLS and blockers](XSP_V2_EXPERIMENTAL_GATEWAY.md).
 
@@ -45,7 +66,7 @@ Details: [experimental gateway, vault, TLS and blockers](XSP_V2_EXPERIMENTAL_GAT
 - [x] **Ephemeral dual-key generation (Node):** `security/xspv2/poc-go/keyring/volatile.go` creates independently randomized Ed25519 and ML-DSA-65 keys in memory, exposes only algorithm-labeled public metadata, and tests signing/rotation/randomness. **No disk storage, enrollment, KMS, private-key backup or production integration.**
 - [x] **Additive public metadata migration (Nexus):** `0099_node_xsp_v2_public_state.sql` stores PUBLIC verification keys, per-node epochs/minimum suite, and unique replay nonces. Default minimum suite is legacy; trigger prevents ordinary UPDATE from lowering minimum suite/key epoch. No strict rows, endpoints or private keys are provisioned.
 - [x] **Inert node-only Nginx template:** `deploy/xsp-v2-node-ingress.nginx.conf.example` listens **loopback :8444 only**, requires TLS 1.3 and only X25519MLKEM768, and returns **404 for every HTTP path**. Neither installer nor public vhost loads it. `scripts/check-xsp-v2-foundation.js` protects these invariants in Nexus CI.
-- [ ] **Security blockers:** signature verification integrated into handlers, trusted key enrollment/at-rest storage, role-separated DB operations, atomic nonce/revision/side-effect transactions, durable node-side suite pinning and recovery. **A DB UPDATE trigger does not stop DELETE/privileged DBA rollback.**
+- [ ] **Security blockers:** в staging heartbeat и регистрации уже реализована проверка двух подписей; в production всё ещё нет проверяемых подписанных ответов/команд, защищённой регистрации и постоянного key store, атомарного nonce+policy side effect, role-separated DB operations, долговечного Node-side suite pinning и recovery. **DB UPDATE-триггер не останавливает DELETE или rollback привилегированного DBA.**
 - [ ] **Operational blockers:** approved dedicated node-only TLS gateway, valid CA/SNI, measured negotiation at real canary endpoint and every proxy hop, complete FIPS 204 external KAT/fuzz and independent review. **No public listener, SSH/host changes or Node migration performed.**
 
 **Evidence:** isolated [Node Go Crypto CI](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40435069749) and [Node CI](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40435069677) were green on `1224913b`, including parser and volatile-key unit tests; later documentation commits require their own checks. Full Nexus CI for the new SQL/template revisions is verified separately in [Actions](https://github.com/TriplexCorp/XMesh-Nexus/actions/workflows/backend-ci.yml).
@@ -61,11 +82,11 @@ Details: [experimental gateway, vault, TLS and blockers](XSP_V2_EXPERIMENTAL_GAT
 | **PR01 — wire/spec** | [x] Черновая спецификация + общие тестовые векторы | Совпадают в Rust/Go/JS; формальный security review и окончательное утверждение формата ещё нужны |
 | **PR02 — Ed25519 + ML-DSA-65** | [x] Изолированный крипто-PoC | Прямые тесты **Go → Rust** и **Rust → Go** требуют обе подписи; изменение сообщения, отсутствие и порча подписи отвергаются. [Nexus Crypto CI](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40431220079), [Node Crypto CI](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40432027022) |
 | **PR07 — TLS 1.3 + X25519MLKEM768** | [x] Лабораторный TLS-probe, **не развёрнут** | Реальные handshake OpenSSL 3.5 ↔ Go 1.27.3 с проверкой согласованной группы, CA/SNI и отказом TLS 1.2, X25519-only и неверным сертификатам. [Nexus TLS CI](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40432661499) |
-| **Продакшен XSP-v2** | [ ] Не внедрён | Нет новых v2 API/безопасного enrollment, хранилища ключей, подтверждённого node-only ingress, реальной защиты control plane и миграции нод |
+| **Production XSP-v2** | [ ] Не внедрён | Есть **экспериментальные** v2 API, owner-approved PoP и зашифрованный тестовый vault; **нет** включённого v2 control plane, production ключевого хранилища, подписанных ответов, выделенного реального ingress и миграции Node |
 
-**CI по версиям:** [XMesh-Node #40433732915](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40433732915) завершился успешно на `f56d09a1`. [Nexus Backend CI #40432809267](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40432809267) **завершился успешно** на `918d42fa`: `cli`, `rust`, `subscription-build` и API integration. Это результаты **конкретных SHA**, а не автоматическое подтверждение CI для последующих документационных изменений.
+**Исторический CI по версиям:** [Nexus Backend CI #40432809267](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40432809267) — success на `918d42fa`; более поздние результаты и текущий незакрытый Rustfmt gate отражены в сводке P0 выше. Исторический зелёный запуск **не** подтверждает последний `main`.
 
-**Следующая очередь:** (1) security review, независимый FIPS 204 KAT/fuzz и freeze протокола; (2) защита приватных ключей, owner-mediated enrollment, подписанный v2 verifier, транзакционный nonce/revision и durable floor **на обеих сторонах**; (3) отдельный реально работающий node-only HTTPS endpoint с замерами всех CDN/LB → origin сегментов; (4) staged enrollment/canary + fail-closed и recovery на реальных нодах. Новые parser/таблицы/template — **только foundation**. **Не ужесточать публичный Nginx для панели/подписок без отдельного плана совместимости.**
+**Следующая очередь:** закрыть актуальный CI и secure owner enrollment UX; затем двухфазная ротация/backup, подписанные ответы/ACK и durable suite-floor на обеих сторонах; после — выделенный HTTPS ingress, реальный canary и независимая приёмка. **Публичный Nginx панели/подписок не ужесточать без плана совместимости.**
 
 Ссылки: [wire specification](XSP_V2_WIRE_SPEC.md) · [crypto PoC](XSP_V2_CRYPTO_POC.md) · [hybrid TLS probe](XSP_V2_TLS_PROBE.md) · [полный XSP-v2 план](HYBRID_POST_QUANTUM_SECURITY_IMPLEMENTATION_PLAN.md).
 
@@ -174,7 +195,7 @@ Details: [experimental gateway, vault, TLS and blockers](XSP_V2_EXPERIMENTAL_GAT
 **Acceptance gate:** do not mark enterprise readiness or full CI stabilization complete until the above checks have actual passing evidence.
 
 
-**Baseline:** 2026-10-24 · **Progress reviewed:** 2026-10-27 · **Target branch:** `main` · **Status:** historical CI green at `150978cc` and isolated XSP-v2 PoC CI green (see dated checkpoint); not enterprise-production certified.
+**Baseline:** 2026-10-24 · **Progress reviewed:** 2026-10-27 · **Target branch:** `main` · **Status:** XSP-v2 staging implementation and isolated Crypto CI green on referenced revisions; most recent full Nexus CI requires re-verification after a Rustfmt failure; not enterprise-production certified.
 
 This roadmap tracks verified improvements, not feature claims. A stage is complete only after the listed acceptance criteria pass in CI and, where required, on a disposable real Xray node. A green source-level assertion alone does not count as production evidence.
 
