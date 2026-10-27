@@ -91,7 +91,12 @@ fn decode_b64(src: &str, limit: usize, exact: Option<usize>) -> Result<Vec<u8>, 
     Ok(raw)
 }
 
-fn parse(raw: &[u8], now_ms: i64) -> Result<Parsed, ApiError> {
+fn parse_for(
+    raw: &[u8],
+    now_ms: i64,
+    message_type: &str,
+    path: &str,
+) -> Result<Parsed, ApiError> {
     if raw.is_empty() || raw.len() > MAX_RAW {
         return Err(bad());
     }
@@ -101,9 +106,9 @@ fn parse(raw: &[u8], now_ms: i64) -> Result<Parsed, ApiError> {
     if e.protocol != "XSP/2"
         || e.suite != "Ed25519+ML-DSA-65"
         || e.direction != 1
-        || e.message_type != "node.heartbeat"
+        || e.message_type != message_type
         || e.method != "POST"
-        || e.path != "/api/v2/node/heartbeat"
+        || e.path != path
         || e.node_id <= 0
         || e.key_epoch <= 0
         || e.issuer_id != format!("node-{}", e.node_id)
@@ -121,7 +126,7 @@ fn parse(raw: &[u8], now_ms: i64) -> Result<Parsed, ApiError> {
         .map_err(|_| bad())?
         .try_into()
         .map_err(|_| bad())?;
-    if hex::encode(nonce) != e.nonce_hex {
+    if hex::encode(nonce) != e.nonce_hex || nonce.iter().all(|byte| *byte == 0) {
         return Err(bad());
     }
     let payload = decode_b64(&e.payload_b64, MAX_PAYLOAD, None)?;
@@ -153,6 +158,43 @@ fn parse(raw: &[u8], now_ms: i64) -> Result<Parsed, ApiError> {
         ed_signature,
         pq_signature,
     })
+}
+
+fn parse(raw: &[u8], now_ms: i64) -> Result<Parsed, ApiError> {
+    parse_for(raw, now_ms, "node.heartbeat", "/api/v2/node/heartbeat")
+}
+
+const ACK_RECOVERY_PATH: &str = "/api/v2/node/keys/rotation/ack";
+const ACK_RECOVERY_MESSAGE: &str = "node.rotation.ack.recovery";
+
+/// Decode an independently signed Node identity assertion bound to the exact
+/// original ACK bytes. A signed ACK is NOT itself transport authentication.
+fn parse_recovery_authority(
+    raw_auth: &[u8],
+    exact_saved_ack: &[u8],
+    trusted_transport_node_id: i64,
+    request_id: &str,
+    now_ms: i64,
+) -> Result<Parsed, ApiError> {
+    if trusted_transport_node_id <= 0
+        || exact_saved_ack.is_empty()
+        || exact_saved_ack.len() > 16 * 1024
+        || request_id.is_empty()
+        || request_id.len() > 64
+    {
+        return Err(bad());
+    }
+    let parsed = parse_for(raw_auth, now_ms, ACK_RECOVERY_MESSAGE, ACK_RECOVERY_PATH)?;
+    if parsed.value.node_id != trusted_transport_node_id || parsed.value.request_id != request_id {
+        return Err(bad());
+    }
+    // The canonical XSP2 envelope signs SHA-256 of the decoded payload.
+    // Comparing the original bytes disallows unrelated signed requests.
+    let payload = decode_b64(&parsed.value.payload_b64, 16 * 1024, None)?;
+    if payload != exact_saved_ack {
+        return Err(bad());
+    }
+    Ok(parsed)
 }
 
 fn verify_both(parsed: &Parsed, ed: &[u8], pq: &[u8]) -> Result<(), ApiError> {
@@ -251,6 +293,90 @@ pub async fn heartbeat(
     }
     tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Authenticate an independent, doubly-signed Node recovery assertion against
+/// the OWNER-ENROLLED public keyset and consume its nonce exactly once.
+///
+/// This is a feature-gated STAGING verifier, not a network route or TLS server.
+/// The trusted Node ID MUST be obtained from an independently authenticated,
+/// verified TLS 1.3 X25519MLKEM768 ingress; never derive it from headers, the
+/// caller's envelope, the ACK, or the legacy XMESH1 identity. A future route
+/// MUST additionally verify the original committed ACK and signed receipt.
+/// A successful assertion is NOT authorization to issue a new receipt.
+///
+/// # Errors
+/// Fails on wrong Node/path/type/ACK/request/nonce/timestamps, non-staging
+/// suite, unapproved or revoked keys, missing Ed25519 OR ML-DSA-65 signature,
+/// concurrent/replayed nonce, and any database failure.
+pub async fn authenticate_committed_ack_recovery_staging(
+    pool: &sqlx::PgPool,
+    trusted_transport_node_id: i64,
+    request_id: &str,
+    signed_auth_envelope: &[u8],
+    exact_saved_ack: &[u8],
+) -> Result<(), ApiError> {
+    let now_ms = i64::try_from(
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| bad())?
+            .as_millis(),
+    )
+    .map_err(|_| bad())?;
+    let parsed = parse_recovery_authority(
+        signed_auth_envelope,
+        exact_saved_ack,
+        trusted_transport_node_id,
+        request_id,
+        now_ms,
+    )?;
+    let e = &parsed.value;
+    let mut tx = pool.begin().await?;
+    let suite = sqlx::query(
+        "SELECT minimum_suite,activation_phase,key_epoch
+         FROM node_xsp_suite_state WHERE node_id=$1 FOR UPDATE",
+    )
+    .bind(trusted_transport_node_id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(bad)?;
+    let floor: i16 = suite.try_get("minimum_suite")?;
+    let phase: String = suite.try_get("activation_phase")?;
+    let epoch: i64 = suite.try_get("key_epoch")?;
+    if floor != 1 || !matches!(phase.as_str(), "dual_enrolled" | "shadow") || epoch != e.key_epoch {
+        return Err(bad());
+    }
+    let key = sqlx::query(
+        "SELECT ed25519_public,mldsa65_public
+         FROM node_xsp_public_keysets
+         WHERE node_id=$1 AND purpose='node_request' AND key_epoch=$2
+           AND ed25519_key_id=$3 AND mldsa65_key_id=$4 AND revoked_at IS NULL",
+    )
+    .bind(trusted_transport_node_id)
+    .bind(e.key_epoch)
+    .bind(&e.ed25519_key_id)
+    .bind(&e.mldsa65_key_id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(bad)?;
+    let ed: Vec<u8> = key.try_get("ed25519_public")?;
+    let pq: Vec<u8> = key.try_get("mldsa65_public")?;
+    verify_both(&parsed, &ed, &pq)?;
+    let inserted = sqlx::query(
+        "INSERT INTO node_xsp_replay_nonces(node_id,key_epoch,direction,nonce,request_id)
+         VALUES($1,$2,1,$3,$4) ON CONFLICT DO NOTHING",
+    )
+    .bind(trusted_transport_node_id)
+    .bind(e.key_epoch)
+    .bind(parsed.nonce.to_vec())
+    .bind(request_id)
+    .execute(&mut *tx)
+    .await?;
+    if inserted.rows_affected() != 1 {
+        return Err(bad());
+    }
+    tx.commit().await?;
+    Ok(())
 }
 
 #[cfg(test)]
