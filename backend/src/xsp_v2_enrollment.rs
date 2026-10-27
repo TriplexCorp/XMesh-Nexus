@@ -367,31 +367,34 @@ mod tests {
         let nonce = [9u8; 32];
         let ed = [1u8; 32];
         let pq = [2u8; 1952];
-        let a = proof_input(42, 1, &nonce, &ed, &pq, "ed-test", "pq-test").unwrap();
+        let ed_id = digest_id("ed-", &ed);
+        let pq_id = digest_id("pq-", &pq);
+        let a = proof_input(42, 1, &nonce, &ed, &pq, &ed_id, &pq_id).unwrap();
+        assert_eq!(hex::encode(Sha256::digest(&a)), "902160cf06cde566b7150667d0cbbdd2971e7507d5f640925602b6fc703035a0");
         assert!(a.starts_with(b"XSP2-KEY-ENROLL-V1\0"));
         assert_ne!(
             a,
-            proof_input(42, 2, &nonce, &ed, &pq, "ed-test", "pq-test").unwrap()
+            proof_input(42, 2, &nonce, &ed, &pq, &ed_id, &pq_id).unwrap()
         );
         assert_ne!(
             a,
-            proof_input(43, 1, &nonce, &ed, &pq, "ed-test", "pq-test").unwrap()
+            proof_input(43, 1, &nonce, &ed, &pq, &ed_id, &pq_id).unwrap()
         );
         let mut other_nonce = nonce;
         other_nonce[0] ^= 1;
         assert_ne!(
             a,
-            proof_input(42, 1, &other_nonce, &ed, &pq, "ed-test", "pq-test").unwrap()
+            proof_input(42, 1, &other_nonce, &ed, &pq, &ed_id, &pq_id).unwrap()
         );
         let mut other_pq = pq;
         other_pq[0] ^= 1;
         assert_ne!(
             a,
-            proof_input(42, 1, &nonce, &ed, &other_pq, "ed-test", "pq-test").unwrap()
+            proof_input(42, 1, &nonce, &ed, &other_pq, &ed_id, &pq_id).unwrap()
         );
         assert_ne!(
             a,
-            proof_input(42, 1, &nonce, &ed, &pq, "ed-other", "pq-test").unwrap()
+            proof_input(42, 1, &nonce, &ed, &pq, "ed-other", &pq_id).unwrap()
         );
         assert!(proof_input(0, 1, &nonce, &ed, &pq, "ed", "pq").is_err());
         assert!(proof_input(42, 0, &nonce, &ed, &pq, "ed", "pq").is_err());
