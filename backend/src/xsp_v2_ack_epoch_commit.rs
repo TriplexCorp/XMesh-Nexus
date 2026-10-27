@@ -215,16 +215,56 @@ pub struct StagingStoredACKEvidence {
 /// request/Node, tampered envelope or digest, bad Ed25519 or ML-DSA-65
 /// signatures, changed historical keysets, missing replay nonce, revoked
 /// public keys, changed epoch or a non-staging suite. No SQL writes occur.
-#[expect(
-    clippy::too_many_lines,
-    reason = "locked historical signed ACK verification boundary"
-)]
 pub async fn readback_committed_applied_ack_staging(
     pool: &PgPool,
     authenticated_node_id: i64,
     request_id: &str,
     signed_ack_bytes: &[u8],
     pinned_panel: &TrustedPublic,
+) -> Result<StagingStoredACKEvidence> {
+    readback_committed_applied_ack_staging_inner(
+        pool,
+        authenticated_node_id,
+        request_id,
+        signed_ack_bytes,
+        pinned_panel,
+        true,
+    )
+    .await
+}
+
+/// Signer-side read-only verification. Does not take PostgreSQL row locks and
+/// only requires SELECT privileges; the API rechecks the same receipt evidence
+/// under locks before inserting the signed bytes into the immutable outbox.
+pub async fn readback_committed_applied_ack_signer_staging(
+    pool: &PgPool,
+    authenticated_node_id: i64,
+    request_id: &str,
+    signed_ack_bytes: &[u8],
+    pinned_panel: &TrustedPublic,
+) -> Result<StagingStoredACKEvidence> {
+    readback_committed_applied_ack_staging_inner(
+        pool,
+        authenticated_node_id,
+        request_id,
+        signed_ack_bytes,
+        pinned_panel,
+        false,
+    )
+    .await
+}
+
+#[expect(
+    clippy::too_many_lines,
+    reason = "historical signed ACK verification shared by locked API and read-only signer"
+)]
+async fn readback_committed_applied_ack_staging_inner(
+    pool: &PgPool,
+    authenticated_node_id: i64,
+    request_id: &str,
+    signed_ack_bytes: &[u8],
+    pinned_panel: &TrustedPublic,
+    lock_rows: bool,
 ) -> Result<StagingStoredACKEvidence> {
     if authenticated_node_id <= 0
         || request_id.is_empty()
@@ -237,10 +277,14 @@ pub async fn readback_committed_applied_ack_staging(
     }
     let mut tx = pool.begin().await?;
     // Always take the suite lock FIRST, just as in the new-ACK commit path.
-    let suite = sqlx::query(
+    let suite_query = if lock_rows {
         "SELECT minimum_suite,activation_phase,key_epoch
-         FROM node_xsp_suite_state WHERE node_id=$1 FOR UPDATE",
-    )
+         FROM node_xsp_suite_state WHERE node_id=$1 FOR UPDATE"
+    } else {
+        "SELECT minimum_suite,activation_phase,key_epoch
+         FROM node_xsp_suite_state WHERE node_id=$1"
+    };
+    let suite = sqlx::query(suite_query)
     .bind(authenticated_node_id)
     .fetch_optional(&mut *tx)
     .await?
@@ -252,7 +296,7 @@ pub async fn readback_committed_applied_ack_staging(
         bail!("committed ACK readback requires a non-strict staging suite");
     }
 
-    let ledger = sqlx::query(
+    let ledger_query = if lock_rows {
         "SELECT state,from_epoch,to_epoch,candidate_sha256,
                 permit_nonce,permit_input_sha256,signed_permit,
                 signed_applied_ack,applied_ack_sha256,
@@ -260,8 +304,18 @@ pub async fn readback_committed_applied_ack_staging(
                 (EXTRACT(EPOCH FROM expires_at)*1000)::bigint AS expires_ms,
                 (EXTRACT(EPOCH FROM ack_verified_at)*1000)::bigint AS verified_ms
          FROM node_xsp_cutover_permit_ledger
-         WHERE node_id=$1 AND request_id=$2 FOR UPDATE",
-    )
+         WHERE node_id=$1 AND request_id=$2 FOR UPDATE"
+    } else {
+        "SELECT state,from_epoch,to_epoch,candidate_sha256,
+                permit_nonce,permit_input_sha256,signed_permit,
+                signed_applied_ack,applied_ack_sha256,
+                (EXTRACT(EPOCH FROM issued_at)*1000)::bigint AS issued_ms,
+                (EXTRACT(EPOCH FROM expires_at)*1000)::bigint AS expires_ms,
+                (EXTRACT(EPOCH FROM ack_verified_at)*1000)::bigint AS verified_ms
+         FROM node_xsp_cutover_permit_ledger
+         WHERE node_id=$1 AND request_id=$2"
+    };
+    let ledger = sqlx::query(ledger_query)
     .bind(authenticated_node_id)
     .bind(request_id)
     .fetch_optional(&mut *tx)
@@ -294,14 +348,22 @@ pub async fn readback_committed_applied_ack_staging(
     // The prior and new PUBLIC verification keys are the durable historical
     // keysets; the mutable 'pending' preparation must NOT be trusted for a
     // replay after it may have been consumed or replaced.
-    let pair = sqlx::query(
+    let pair_query = if lock_rows {
         "SELECT key_epoch,ed25519_key_id,mldsa65_key_id,
                 ed25519_public,mldsa65_public
          FROM node_xsp_public_keysets
          WHERE node_id=$1 AND purpose='node_request'
            AND key_epoch IN ($2,$3) AND revoked_at IS NULL
-         ORDER BY key_epoch FOR SHARE",
-    )
+         ORDER BY key_epoch FOR SHARE"
+    } else {
+        "SELECT key_epoch,ed25519_key_id,mldsa65_key_id,
+                ed25519_public,mldsa65_public
+         FROM node_xsp_public_keysets
+         WHERE node_id=$1 AND purpose='node_request'
+           AND key_epoch IN ($2,$3) AND revoked_at IS NULL
+         ORDER BY key_epoch"
+    };
+    let pair = sqlx::query(pair_query)
     .bind(authenticated_node_id)
     .bind(from_epoch)
     .bind(to_epoch)
