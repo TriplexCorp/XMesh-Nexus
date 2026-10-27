@@ -249,26 +249,29 @@ chmod 0444 /certs/unrelated.pem
         print("PASS: TLS1.2, X25519-only, wrong hostname and untrusted certificate fail closed")
 
         for path in ["/", "/api/v2/node/keys/rotation/ack", "/api/v1/node/heartbeat"]:
-            request = (
-                f"GET {path} HTTP/1.1\r\nHost: {HOSTNAME}\r\nConnection: close\r\n\r\n"
-            )
+            http_script = f"""
+set -eu
+set +e
+timeout 3s openssl s_client -quiet -ign_eof \
+  -connect {ALIAS}:8444 \
+  -servername {HOSTNAME} \
+  -verify_hostname {HOSTNAME} -verify_return_error \
+  -CAfile /certs/fullchain.pem -tls1_3 -groups X25519MLKEM768 <<'EOF'
+GET {path} HTTP/1.1\r
+Host: {HOSTNAME}\r
+Connection: close\r
+\r
+EOF
+rc=$?
+set -e
+[ "$rc" -eq 0 ] || [ "$rc" -eq 124 ]
+"""
             result = command(
                 "docker", "run", "--rm",
                 "--network", network,
                 "--mount", f"type=volume,src={certs},dst=/certs,readonly",
-                "--entrypoint", "openssl", probe_image,
-                "s_client",
-                "-quiet",
-                "-no_ign_eof",
-                "-connect", f"{ALIAS}:8444",
-                "-servername", HOSTNAME,
-                "-verify_hostname", HOSTNAME,
-                "-verify_return_error",
-                "-CAfile", "/certs/fullchain.pem",
-                "-tls1_3",
-                "-groups", "X25519MLKEM768",
-                input_text=request,
-                timeout=20,
+                "--entrypoint", "/bin/sh", probe_image, "-ceu", http_script,
+                timeout=10,
             )
             response = result.stdout + result.stderr
             if "404 Not Found" not in response or "\nLocation:" in response or "\r\nLocation:" in response:
