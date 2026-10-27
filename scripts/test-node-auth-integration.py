@@ -416,7 +416,7 @@ def main():
         assert_status(code, 401, "incorrect Ed25519 proof cannot replace active key")
 
         def signed_recovery_probe(key_path):
-            probe_body = {"node_id": node, "cpu_percent": 24.2}
+            probe_body = {"node_id": node, "cpu_percent": 24.2, "metrics": {"unit": "signed-recovery-test"}}
             probe_raw = json.dumps(probe_body, separators=(",", ":")).encode()
             probe_time = int(time.time())
             probe_nonce = os.urandom(16).hex()
