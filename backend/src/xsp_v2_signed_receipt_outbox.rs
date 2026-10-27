@@ -158,6 +158,124 @@ pub async fn store_or_load_signed_receipt_staging(
     Ok(stored_receipt)
 }
 
+
+/// Read back the ORIGINAL immutable Nexus receipt after a lost response.
+///
+/// Unlike the insert helper, this path requires no signer and never creates
+/// another receipt or repeats the key-epoch CAS. Its caller MUST already
+/// have authenticated the Node over an independently verified PQ-only TLS
+/// channel and provisioned the panel's trusted public keys out of band.
+/// Caller-provided ACK bytes and node ID are NOT transport authentication.
+///
+/// # Errors
+/// Fail closed on missing receipt, invalid or changed committed ACK evidence,
+/// mismatched epoch, request, digest, or either panel receipt signature.
+#[expect(
+    clippy::too_many_lines,
+    reason = "locked historical receipt and PostgreSQL ledger verification boundary"
+)]
+pub async fn load_committed_signed_receipt_staging(
+    pool: &PgPool,
+    authenticated_node_id: i64,
+    request_id: &str,
+    signed_ack_bytes: &[u8],
+    pinned_panel: &TrustedPublic,
+) -> Result<Vec<u8>> {
+    // The independent readback checks both signed Node ACK and panel permit,
+    // the historical keysets, recorded nonce, and the precise committed epoch.
+    let evidence = readback_committed_applied_ack_staging(
+        pool,
+        authenticated_node_id,
+        request_id,
+        signed_ack_bytes,
+        pinned_panel,
+    )
+    .await?;
+
+    let mut tx = pool.begin().await?;
+    // Maintain suite -> ledger -> receipt lock order; recheck that the
+    // committed state has not changed after the independent readback.
+    let suite = sqlx::query(
+        "SELECT minimum_suite,activation_phase,key_epoch
+         FROM node_xsp_suite_state WHERE node_id=$1 FOR SHARE",
+    )
+    .bind(authenticated_node_id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .context("no suite for durable receipt readback")?;
+    let floor: i16 = suite.try_get("minimum_suite")?;
+    let phase: String = suite.try_get("activation_phase")?;
+    let epoch: i64 = suite.try_get("key_epoch")?;
+    if floor != 1
+        || !matches!(phase.as_str(), "dual_enrolled" | "shadow")
+        || epoch != evidence.to_epoch
+    {
+        bail!("receipt readback suite or epoch has changed");
+    }
+    let ledger = sqlx::query(
+        "SELECT state,from_epoch,to_epoch,permit_input_sha256,
+                applied_ack_sha256,signed_applied_ack
+         FROM node_xsp_cutover_permit_ledger
+         WHERE node_id=$1 AND request_id=$2 FOR SHARE",
+    )
+    .bind(authenticated_node_id)
+    .bind(request_id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .context("no committed ACK for durable receipt")?;
+    let state: String = ledger.try_get("state")?;
+    let from_epoch: i64 = ledger.try_get("from_epoch")?;
+    let to_epoch: i64 = ledger.try_get("to_epoch")?;
+    let permit_digest: Vec<u8> = ledger.try_get("permit_input_sha256")?;
+    let ack_digest: Vec<u8> = ledger.try_get("applied_ack_sha256")?;
+    let stored_ack: Vec<u8> = ledger.try_get("signed_applied_ack")?;
+    let expected_permit = hex::decode(&evidence.canonical_permit_sha256_hex)?;
+    let expected_ack = Sha256::digest(signed_ack_bytes);
+    if state != "ack_verified"
+        || from_epoch != evidence.from_epoch
+        || to_epoch != evidence.to_epoch
+        || permit_digest != expected_permit
+        || ack_digest.as_slice() != expected_ack.as_slice()
+        || stored_ack != signed_ack_bytes
+    {
+        bail!("committed ACK changed since signed receipt readback");
+    }
+
+    let row = sqlx::query(
+        "SELECT from_epoch,to_epoch,permit_input_sha256,
+                applied_ack_sha256,signed_receipt_sha256,signed_receipt
+         FROM node_xsp_signed_commit_receipt_outbox
+         WHERE node_id=$1 AND request_id=$2 FOR SHARE",
+    )
+    .bind(authenticated_node_id)
+    .bind(request_id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .context("no durable signed receipt: never infer one from ACK or HTTP status")?;
+    let receipt: Vec<u8> = row.try_get("signed_receipt")?;
+    let receipt_digest: Vec<u8> = row.try_get("signed_receipt_sha256")?;
+    let saved_permit: Vec<u8> = row.try_get("permit_input_sha256")?;
+    let saved_ack_digest: Vec<u8> = row.try_get("applied_ack_sha256")?;
+    let saved_from: i64 = row.try_get("from_epoch")?;
+    let saved_to: i64 = row.try_get("to_epoch")?;
+    if receipt.is_empty()
+        || receipt.len() > 16 * 1024
+        || receipt_digest.as_slice() != Sha256::digest(&receipt).as_slice()
+        || saved_permit != permit_digest
+        || saved_ack_digest != ack_digest
+        || saved_from != from_epoch
+        || saved_to != to_epoch
+    {
+        bail!("signed receipt outbox row is corrupt or mismatched");
+    }
+    // An exact DB row or digest is never sufficient: verify both independently
+    // pinned Ed25519 AND ML-DSA-65 signatures on the original signed bytes.
+    verify_staging_commit_receipt(&receipt, pinned_panel, &evidence)
+        .map_err(anyhow::Error::msg)?;
+    tx.commit().await?;
+    Ok(receipt)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
