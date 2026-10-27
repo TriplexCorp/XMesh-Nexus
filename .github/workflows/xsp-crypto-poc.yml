@@ -129,6 +129,7 @@ jobs:
           cargo test --manifest-path backend/Cargo.toml --features xsp-v2-experimental --bin xmesh-api -- xsp_v2_ack_epoch_commit::tests
           cargo test --manifest-path backend/Cargo.toml --features xsp-v2-experimental --bin xmesh-api -- xsp_v2_commit_receipt::tests
           cargo test --manifest-path backend/Cargo.toml --features xsp-v2-experimental --bin xmesh-api -- xsp_v2_signed_receipt_outbox::tests
+          cargo test --manifest-path backend/Cargo.toml --features xsp-v2-experimental --bin xmesh-api -- xsp_v2_signer::tests
           XSP_V2_REQUIRE_PQ_CUTOVER_TESTS=1 cargo test --manifest-path backend/Cargo.toml --features xsp-v2-experimental --bin xmesh-api -- xsp_v2_signed_cutover::signed_tests
       - name: Verify real dual-signed ACK via Rust verifier and disposable PostgreSQL
         env:

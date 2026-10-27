@@ -2,24 +2,26 @@
 
 ## Актуальный статус XSP-v2 / P0 — 27 октября 2026
 
-**Проверенный рубеж до этой правки документации:** Nexus `main` [`00f6554064fee1bd5063cea89b0823cda92d8623`](https://github.com/TriplexCorp/XMesh-Nexus/commit/00f6554064fee1bd5063cea89b0823cda92d8623): [Backend CI #40555331757](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40555331757) и [OpenSSL 3.5 PQ Crypto #40555331903](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40555331903) — **SUCCESS на точном SHA**. Текущий проверенный Node `main` [`d4572b406ac9a209cfbade84a4390569bd38ba92`](https://github.com/TriplexCorp/XMesh-Node/commit/d4572b406ac9a209cfbade84a4390569bd38ba92), [Node CI #40539584412](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40539584412) — success. После обновления документации проверять CI уже на новом SHA отдельно; старые SHA далее — исторические снимки.
+**Кодовый checkpoint:** Nexus [`c057b5aecd7d41ac8ff84de52b8f8ad153770a0a`](https://github.com/TriplexCorp/XMesh-Nexus/commit/c057b5aecd7d41ac8ff84de52b8f8ad153770a0a). [OpenSSL 3.5 / PQ Crypto CI #40571523930](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40571523930) — success на этом SHA. [Backend CI #40571523905](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40571523905) — live статус в GitHub Actions. После этого checkpoint внесены документационные и workflow-правки; проверяйте CI на актуальном `main`.
 
-| Этап | Статус на проверенном рубеже | Следующий обязательный gate |
+| Этап | Статус | Следующий обязательный gate |
 | --- | --- | --- |
-| Nexus signed ACK, atomic epoch CAS и historical DB readback | **Готово в staging**; проверяется Ed25519 **AND** ML-DSA-65, оригинальный permit, nonce, candidate и key epoch | Привязка к независимо аутентифицированному Node caller |
-| Nexus signed commit receipt и `0105` immutable outbox | **Готово в staging** ([Nexus #54](https://github.com/TriplexCorp/XMesh-Nexus/pull/54), [#55](https://github.com/TriplexCorp/XMesh-Nexus/pull/55)); точные сохранённые байты, неизменность и повторная выдача | Least-privilege SQL roles, audit, recovery/rollback |
-| `load_committed_signed_receipt_staging` | **Готово в staging**; reverify ACK/permit/DB и **обеих** подписей Nexus, без signer и повторного CAS | Использовать только после настоящей TLS/Node identity проверки |
-| SQL `0106`: запрет `TRUNCATE` / `TRUNCATE CASCADE` | **Готово и протестировано** в PostgreSQL; блокирует обход row-level UPDATE/DELETE trigger | Привилегированная роль БД, администратор и snapshot rollback остаются отдельными угрозами |
-| `issue_or_recover_signed_receipt_staging` | **Готово как feature-gated staging orchestration**; verified DB witness, первая подписанная квитанция через injected callback, повтор **без повторного signing**, конкурентный retry fail-closed/recovery | **P0-C:** реальный защищённый `panel_response` signing service; не хранить приватные ключи в API/БД/HTTP/logs |
-| Node #23–26: TLS dialer, verifier, journal, HTTPS ACK→receipt | **Изолированные staging компоненты**, local TLS test E2E; не Nexus network E2E | Рабочий Agent, vault durability, protected monotonic floor |
-| **P0-C:** signer + authorized ACK API + TLS 1.3 `X25519MLKEM768` ingress | **Не завершено**: нет защищённого signer/реального `POST /api/v2/node/keys/rotation/ack` / проверенной межузловой PQ-only цепочки | Authenticated Node identity; owner authorization + pins; signer custody; validate every TLS hop; refuse downgrade |
-| **P0-D:** Nexus ↔ Node real permit/ACK/commit/receipt/retry + Agent integration | **Не завершено** | Signed commands/config/no-command, applied-state binding, real transport E2E |
-| **P0-E:** crash, SIGKILL, power loss, lost response, rollback, anti-rollback, least-privilege review и disposable canary | **Не завершено** | Независимый security review + явное решение о canary/production |
-| Production XSP-v2 | `strict-pq` **OFF**; действующие `XMESH1` без изменений, Xray обслуживает VPN data-plane | Включать только после доказанного PQ-only E2E и review |
+| Nexus signed ACK, permit verification, epoch CAS/readback | **Готово в staging**; Ed25519 **AND** ML-DSA-65, nonce, permit, epoch и historical DB evidence перепроверяются | Независимая TLS identity Node перед любым сетевым действием |
+| Receipt + immutable outbox `0105`, guard `0106` | **Готово в staging**; exact bytes, dedupe, restore после lost response; `TRUNCATE`/`CASCADE` блокируется | Recovery/rollback проверки и привилегии БД |
+| `issue_or_recover_signed_receipt_staging` | **Готово в staging**; проверенный DB witness, async signer boundary, retry возвращает исходные байты без повторной подписи | Проверка реального signer sidecar socket round-trip |
+| Isolated `panel_response` signer sidecar | **Реализован как opt-in experimental scaffold**: отдельный binary mode/image/profile, Unix socket, peer UID/GID, ключевые ID pins, отдельные PEM mounts, read-only `xmesh_signer_reader`, checks privilege/membership, receipt-exists guard | Реальный отдельный процесс в disposable E2E и проверка provisioning SQL в тестовом PostgreSQL |
+| Signer provisioning | **Скрипты добавлены**: owner-approved initial fingerprints и least-privilege role; не HSM и не production custody | Review работы с ключами, backup/rotation, owner approval и root trust boundary |
+| Node #23–26 | **Изолированные staging-компоненты**; local TLS test server, не настоящий Nexus ingress | Рабочий Agent и полный network E2E |
+| **P0-C:** TLS 1.3 `X25519MLKEM768` ingress + authorized ACK route | **Не завершено**: нет доказанного PQ-only ingress и реального `POST /api/v2/node/keys/rotation/ack` | Проверять фактическую TLS-группу на каждом hop; authenticated Node identity; fail closed без fallback |
+| **P0-D:** permit → applied ACK → commit → signed receipt/retry в основном Agent | **Не завершено** | Сквозной Nexus ↔ Node E2E, signed commands/config и Applied-state binding |
+| **P0-E:** crash, lost response, SIGKILL/power loss, snapshot rollback, anti-rollback, independent review | **Не завершено** | Disposable canary только после security review и явного допуска |
+| Production XSP-v2 | `strict-pq` **OFF**; legacy `XMESH1` не менялся, Xray остаётся user VPN data-plane | Не активировать до доказанного PQ-only E2E и отдельного deployment approval |
 
-**Дальнейший порядок P0:** (1) независимая Node identity + owner-approved/pinned `panel_response` signer, (2) узкий авторизованный staging ACK route и действительный TLS 1.3 `X25519MLKEM768` на **каждом** hop, (3) реальный Node↔Nexus E2E с точным durable retry и отказами, (4) production Agent + signed commands/config, (5) rollback/privilege/security review, затем разрешённый disposable canary. **Нельзя** считать callback signer'ом, database SHA — криптографическим доказательством, staging TLS — production ingress, а CI — деплоем на VPS. Без обеих подписей Ed25519 **AND** ML-DSA-65 и строго PQ TLS — fail closed, никакого fallback на `XMESH1` для XSP-v2.
+**Следующий порядок работ:** (1) запустить настоящий signer sidecar в disposable PostgreSQL-сценарии и проверить Unix-socket round-trip с read-only role, pins, replay и уже сохранённой receipt; (2) построить отдельный TLS 1.3 `X25519MLKEM768` ingress, который подтверждает negotiated group на каждом hop; (3) подключить узкий ACK API только за этой границей; (4) интегрировать основной Node Agent и выполнить failure/recovery E2E; (5) review/rollback gates и только затем canary.
 
-_Ниже сохранена история до новых recovery/`0106`/issue-or-recover изменений. Устаревшие «следующий P0», `main` SHA и статусы не переопределяют эту таблицу._
+**Строгие ограничения:** не считать наличие sidecar эквивалентом HSM; не включать его production-профиль автоматически; не подключать ACK route через обычный Nginx TLS, пока невозможно проверить PQ-only negotiation; никакого downgrade на `XMESH1` для XSP-v2. VPS не менялись, `strict-pq` остаётся выключенным.
+
+_Ниже сохранена история прежних checkpoints. Она не переопределяет таблицу и текущий порядок P0._
 
 ## Архивные инженерные checkpoints (история, не текущий план)
 

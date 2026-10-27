@@ -1,88 +1,20 @@
 # XSP-v2 signed Nexus commit receipt — staging protocol V1
 
-## Authenticated recovery staging boundary — 27 October 2026
+## Isolated signer-sidecar checkpoint — 27 October 2026
 
-The feature-gated `recover_authenticated_committed_receipt_staging` composes
-two separate checks: (1) `authenticate_committed_ack_recovery_staging` validates
-a **fresh, doubly signed** Node identity assertion over the exact original ACK
-bytes, method/path, Node ID, request ID and a one-use nonce against the
-approved Node public keyset in PostgreSQL, and (2)
-`load_committed_signed_receipt_staging` independently re-verifies the
-committed ACK and original **Ed25519 AND ML-DSA-65** panel receipt before
-returning the persisted bytes. A consumed recovery nonce requires a new
-signed recovery assertion on subsequent attempts. No signer is called
-when recovering an existing receipt.
+The new feature-gated `xsp_v2_signer` is a separate process mode of the experimental Rust binary (`--xsp-v2-signer`), packaged by `backend/Dockerfile.xsp-signer` and exposed only through the opt-in `xsp-v2-staging` Compose profile. It does not bind a TCP port. The API-side wrapper `issue_or_recover_via_protected_signer_staging` calls it over a local Unix socket.
 
-**Security limit:** the Node ID supplied to the composite MUST originate
-from an independently authenticated and verified **TLS 1.3
-`X25519MLKEM768`** ingress. Neither the signed ACK nor a signed recovery
-assertion proves who opened the network connection. The composite is
-**not mounted on any HTTP route**, so it does not provide a working external
-ACK API. A separate protected `panel_response` signer, verified TLS hops,
-owner-approved trust pins, complete real Nexus↔Node E2E and external review
-are still outstanding. Do not activate `strict-pq` or infer production
-readiness from Rust/PostgreSQL tests.
+**Trust boundary:** the sidecar requires root-owned, single-link Ed25519 and ML-DSA-65 PEM files mounted only in its own container, explicit owner-approved public-key ID pins, a non-symlink signer-owned socket directory, and matching Unix peer UID/GID. Requests have strict JSON, bounded size and timeouts. The API container receives no private-key volume.
 
-The foundation CI guard now asserts that the experimental composite exists
-and the real `/api/v2/node/keys/rotation/ack` route remains **unmounted**
-until its transport and signer trust boundaries are implemented and reviewed.
+Before signing, the sidecar independently verifies the exact committed ACK/permit from PostgreSQL through `xmesh_signer_reader`. At startup it requires that role name, `default_transaction_read_only=on`, no superuser/CREATEDB/CREATEROLE/replication/BYPASSRLS attributes and no other role memberships. It has `SELECT` grants only on the suite state, public keysets, replay nonce, permit ledger and immutable receipt outbox. If a receipt for the same Node/request already exists, signer refuses another issuance. The API then rechecks the receipt under its locked DB path before persisting exact signed bytes.
 
-## Staging issue-or-recover checkpoint (27 October 2026)
+Provisioning scripts: `scripts/provision-xsp-v2-signer-keys.sh` (interactive approval of initial public fingerprints, no overwrite) and `scripts/provision-xsp-v2-signer-db-role.sh` (isolated read-only DB role and password). The Compose profile is disabled by default and requires explicit provisioning to start.
 
-The feature-gated `issue_or_recover_signed_receipt_staging` orchestrator
-in `backend/src/xsp_v2_signed_receipt_outbox.rs` first cryptographically
-revalidates the **exact previously committed** signed ACK and panel permit
-against DB historical evidence. If an immutable receipt exists, it retrieves
-the same original bytes and rechecks **both Ed25519 AND ML-DSA-65** signatures
-without invoking any signing component or repeating the epoch CAS.
+**Remaining gate:** the source compiles and the OpenSSL 3.5 Crypto CI passes on source checkpoint [`c057b5a`](https://github.com/TriplexCorp/XMesh-Nexus/commit/c057b5aecd7d41ac8ff84de52b8f8ad153770a0a), but a real separate-process Unix-socket round-trip with the restricted database role is not yet covered by the disposable E2E. This is an isolated staging signer, **not** HSM/hardware custody: the host root administrator remains trusted.
 
-For an ACK whose commit is verified but whose receipt is not yet present, it
-accepts signed bytes only from an **injected trusted signing boundary**, verifies
-them against the pinned `panel_response` public pair and exact committed
-evidence, and persists them immutably. If a concurrent writer wins with another
-valid signed encoding, a retry returns the original verified stored receipt.
-Missing, corrupted or uncommitted state fails closed. Real PostgreSQL/OpenSSL
-tests cover the first issuance, exact-byte retry without signing again, and
-wrong request rejection.
-
-**This is not a protected signer implementation or HTTP endpoint.** An actual
-external signing service, independently authenticated Node identity, owner
-approval, verified end-to-end TLS 1.3 `X25519MLKEM768` ingress, Agent integration,
-full crash/rollback tests and security review are still mandatory. The
-experimental feature stays disabled in production; do not put private keys
-inside the API process or treat signed ACK bytes as transport authentication.
-
-## Current staging recovery checkpoint (27 October 2026)
-
-Nexus [#55](https://github.com/TriplexCorp/XMesh-Nexus/pull/55) already provides
-an immutable PostgreSQL exact-byte signed receipt outbox. The newer
-`load_committed_signed_receipt_staging` helper in
-`backend/src/xsp_v2_signed_receipt_outbox.rs` implements a **read-only
-retry/recovery path**: it revalidates the original committed dual-signed Node
-ACK and Nexus permit, acquires suite → ledger → outbox locks, checks the
-recorded key epoch, request ID and all stored digests, and re-verifies BOTH
-independently pinned Ed25519 and ML-DSA-65 Nexus receipt signatures before
-returning the original receipt bytes. Missing or corrupt receipts fail closed,
-even when an ACK was committed; no re-signing or second epoch CAS occurs.
-OpenSSL 3.5 + PostgreSQL signed integration tests cover successful recovery
-and mismatched ACK, request, or panel pin.
-
-**Still missing:** authenticating a real Node HTTP caller independently of the
-signed ACK, a separately protected `panel_response` signer/custodian, a
-production-approved PQ-only TLS 1.3 `X25519MLKEM768` ingress, a deployed
-Nexus `POST /api/v2/node/keys/rotation/ack` handler, real Nexus ↔ Node
-end-to-end delivery and rollback/recovery security gates. The helper MUST NOT
-be exposed as a public route or used to infer transport authentication.
-`strict-pq` remains OFF in the current legacy deployment.
-
-_The original protocol-design checklist below is retained as historical
-context; its statement that durable outbox is not implemented is superseded
-by this checkpoint._
+**Still intentionally missing:** a verified TLS 1.3 `X25519MLKEM768` ingress checking the negotiated group on every hop and a real authorized `POST /api/v2/node/keys/rotation/ack` route. `recover_authenticated_committed_receipt_staging` and `issue_or_recover_via_protected_signer_staging` have no HTTP route. Do not enable `strict-pq`.
 
 
-**Status:** internal Rust producer and Go 1.27 Node verifier. **NOT** an
-authenticated live network endpoint, durable receipt outbox, trusted panel
-signing service, integrated production Agent or permission to retire keys.
 
 ## Security purpose
 
