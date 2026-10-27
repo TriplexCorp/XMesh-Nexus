@@ -48,8 +48,12 @@ fn process(v: Record) -> Result<Record, String> {
             let pq_public = &pq_der[pq_der.len() - 1952..];
             let mut ed_sign = Signer::new_without_digest(&ed).map_err(|e| e.to_string())?;
             let mut pq_sign = Signer::new_without_digest(&pq).map_err(|e| e.to_string())?;
-            let ed_signature = ed_sign.sign_oneshot_to_vec(&message).map_err(|e| e.to_string())?;
-            let pq_signature = pq_sign.sign_oneshot_to_vec(&message).map_err(|e| e.to_string())?;
+            let ed_signature = ed_sign
+                .sign_oneshot_to_vec(&message)
+                .map_err(|e| e.to_string())?;
+            let pq_signature = pq_sign
+                .sign_oneshot_to_vec(&message)
+                .map_err(|e| e.to_string())?;
             if ed_signature.len() != 64 || pq_signature.len() != 3309 {
                 return Err("incorrect signature size".into());
             }
@@ -70,15 +74,20 @@ fn process(v: Record) -> Result<Record, String> {
             let pq_sig = decode(&v.pq_signature_hex, 3309)?;
             let ed = PKey::public_key_from_raw_bytes(&ed_public, Id::ED25519)
                 .map_err(|e| e.to_string())?;
-            let pq = PKey::public_key_from_raw_bytes_ex(
-                None, KeyType::ML_DSA_65, None, &pq_public
-            ).map_err(|e| e.to_string())?;
+            let pq = PKey::public_key_from_raw_bytes_ex(None, KeyType::ML_DSA_65, None, &pq_public)
+                .map_err(|e| e.to_string())?;
             let mut ed_check = Verifier::new_without_digest(&ed).map_err(|e| e.to_string())?;
             let mut pq_check = Verifier::new_without_digest(&pq).map_err(|e| e.to_string())?;
-            if !ed_check.verify_oneshot(&ed_sig, &message).map_err(|e| e.to_string())? {
+            if !ed_check
+                .verify_oneshot(&ed_sig, &message)
+                .map_err(|e| e.to_string())?
+            {
                 return Err("invalid Ed25519 signature".into());
             }
-            if !pq_check.verify_oneshot(&pq_sig, &message).map_err(|e| e.to_string())? {
+            if !pq_check
+                .verify_oneshot(&pq_sig, &message)
+                .map_err(|e| e.to_string())?
+            {
                 return Err("invalid ML-DSA-65 signature".into());
             }
             Ok(Record {
@@ -92,7 +101,10 @@ fn process(v: Record) -> Result<Record, String> {
 
 fn main() {
     let mut source = Vec::new();
-    if let Err(error) = io::stdin().take(2 * 1024 * 1024 + 1).read_to_end(&mut source) {
+    if let Err(error) = io::stdin()
+        .take(2 * 1024 * 1024 + 1)
+        .read_to_end(&mut source)
+    {
         eprintln!("failed to read message: {error}");
         std::process::exit(1);
     }
@@ -105,7 +117,10 @@ fn main() {
         .and_then(process);
     match result {
         Ok(value) => {
-            println!("{}", serde_json::to_string(&value).expect("serialize test output"));
+            println!(
+                "{}",
+                serde_json::to_string(&value).expect("serialize test output")
+            );
         }
         Err(error) => {
             eprintln!("XSP test-only verification failed: {error}");
