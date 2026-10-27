@@ -1,5 +1,33 @@
 # XSP-v2 signed Nexus commit receipt — staging protocol V1
 
+## Current staging recovery checkpoint (27 October 2026)
+
+Nexus [#55](https://github.com/TriplexCorp/XMesh-Nexus/pull/55) already provides
+an immutable PostgreSQL exact-byte signed receipt outbox. The newer
+`load_committed_signed_receipt_staging` helper in
+`backend/src/xsp_v2_signed_receipt_outbox.rs` implements a **read-only
+retry/recovery path**: it revalidates the original committed dual-signed Node
+ACK and Nexus permit, acquires suite → ledger → outbox locks, checks the
+recorded key epoch, request ID and all stored digests, and re-verifies BOTH
+independently pinned Ed25519 and ML-DSA-65 Nexus receipt signatures before
+returning the original receipt bytes. Missing or corrupt receipts fail closed,
+even when an ACK was committed; no re-signing or second epoch CAS occurs.
+OpenSSL 3.5 + PostgreSQL signed integration tests cover successful recovery
+and mismatched ACK, request, or panel pin.
+
+**Still missing:** authenticating a real Node HTTP caller independently of the
+signed ACK, a separately protected `panel_response` signer/custodian, a
+production-approved PQ-only TLS 1.3 `X25519MLKEM768` ingress, a deployed
+Nexus `POST /api/v2/node/keys/rotation/ack` handler, real Nexus ↔ Node
+end-to-end delivery and rollback/recovery security gates. The helper MUST NOT
+be exposed as a public route or used to infer transport authentication.
+`strict-pq` remains OFF in the current legacy deployment.
+
+_The original protocol-design checklist below is retained as historical
+context; its statement that durable outbox is not implemented is superseded
+by this checkpoint._
+
+
 **Status:** internal Rust producer and Go 1.27 Node verifier. **NOT** an
 authenticated live network endpoint, durable receipt outbox, trusted panel
 signing service, integrated production Agent or permission to retire keys.
