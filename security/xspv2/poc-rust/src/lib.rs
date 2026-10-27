@@ -82,14 +82,12 @@ mod tests {
             version::version()
         );
         let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../../docs/");
-        let crypto: CryptoVectors = serde_json::from_slice(
-            &fs::read(format!("{dir}XSP_V2_CRYPTO_POC.json")).unwrap(),
-        )
-        .unwrap();
-        let wire: WireDocument = serde_json::from_slice(
-            &fs::read(format!("{dir}XSP_V2_VECTORS.json")).unwrap(),
-        )
-        .unwrap();
+        let crypto: CryptoVectors =
+            serde_json::from_slice(&fs::read(format!("{dir}XSP_V2_CRYPTO_POC.json")).unwrap())
+                .unwrap();
+        let wire: WireDocument =
+            serde_json::from_slice(&fs::read(format!("{dir}XSP_V2_VECTORS.json")).unwrap())
+                .unwrap();
         assert_eq!(crypto.schema, "xsp2-crypto-poc-1");
         assert!(crypto.context.is_empty());
         assert_eq!(crypto.records.len(), 2);
@@ -101,9 +99,8 @@ mod tests {
             let pq_seed = decode_hex(&row.mldsa_seed_hex, 32);
 
             let ed_private = PKey::private_key_from_raw_bytes(&ed_seed, Id::ED25519).unwrap();
-            let pq_private =
-                PKey::private_key_from_seed(None, KeyType::ML_DSA_65, None, &pq_seed)
-                    .expect("OpenSSL 3.5 ML-DSA-65 provider missing");
+            let pq_private = PKey::private_key_from_seed(None, KeyType::ML_DSA_65, None, &pq_seed)
+                .expect("OpenSSL 3.5 ML-DSA-65 provider missing");
             assert!(pq_private.is_a(KeyType::ML_DSA_65));
 
             let ed_raw_pub = ed_private.raw_public_key().unwrap();
@@ -127,18 +124,26 @@ mod tests {
 
             let ed_public = PKey::public_key_from_raw_bytes(&ed_raw_pub, Id::ED25519).unwrap();
             let pq_public = PKey::public_key_from_der(&pq_public_der).unwrap();
-            assert!(verify_both(&ed_public, &pq_public, &input, &ed_sig, &pq_sig));
+            assert!(verify_both(
+                &ed_public, &pq_public, &input, &ed_sig, &pq_sig
+            ));
             let mut changed = input.clone();
             changed[0] ^= 1;
-            assert!(!verify_both(&ed_public, &pq_public, &changed, &ed_sig, &pq_sig));
+            assert!(!verify_both(
+                &ed_public, &pq_public, &changed, &ed_sig, &pq_sig
+            ));
             assert!(!verify_both(&ed_public, &pq_public, &input, &[], &pq_sig));
             assert!(!verify_both(&ed_public, &pq_public, &input, &ed_sig, &[]));
             let mut bad_ed = ed_sig.clone();
             bad_ed[0] ^= 1;
-            assert!(!verify_both(&ed_public, &pq_public, &input, &bad_ed, &pq_sig));
+            assert!(!verify_both(
+                &ed_public, &pq_public, &input, &bad_ed, &pq_sig
+            ));
             let mut bad_pq = pq_sig.clone();
             bad_pq[0] ^= 1;
-            assert!(!verify_both(&ed_public, &pq_public, &input, &ed_sig, &bad_pq));
+            assert!(!verify_both(
+                &ed_public, &pq_public, &input, &ed_sig, &bad_pq
+            ));
             let mut wrong_ed = ed_raw_pub.clone();
             wrong_ed[0] ^= 1;
             if let Ok(other) = PKey::public_key_from_raw_bytes(&wrong_ed, Id::ED25519) {
