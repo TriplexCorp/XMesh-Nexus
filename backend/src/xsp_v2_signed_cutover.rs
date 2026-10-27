@@ -987,10 +987,7 @@ mod signed_tests {
         // the independently pinned panel public pair. No client-held
         // signing key or caller-supplied DB digest can mint this witness.
         let signed_receipt = crate::xsp_v2_commit_receipt::sign_staging_commit_receipt(
-            &evidence,
-            &panel_pin,
-            &panel_ed,
-            &panel_pq,
+            &evidence, &panel_pin, &panel_ed, &panel_pq,
         )
         .expect("dual-signed receipt for committed DB ACK");
         crate::xsp_v2_commit_receipt::verify_staging_commit_receipt(
