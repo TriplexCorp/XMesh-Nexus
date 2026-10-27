@@ -1029,7 +1029,7 @@ mod signed_tests {
             "Ed25519-only commit receipt is forbidden"
         );
         assert_eq!(evidence.ack_nonce_hex, ack.nonce_hex);
-        assert_eq!(evidence.candidate_sha256_hex, candidate_hash);
+        assert_eq!(evidence.candidate_sha256_hex, permit.candidate_sha256_hex);
 
         let mut tampered_retry = signed_ack.clone();
         tampered_retry.push(b' ');
