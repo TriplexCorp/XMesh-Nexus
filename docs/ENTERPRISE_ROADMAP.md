@@ -1,6 +1,6 @@
 # XMesh Nexus — Enterprise Roadmap
 
-> **Статус: активная разработка · 26 октября 2026 · целевая ветка: `main`**  
+> **Статус: активная разработка · 27 октября 2026 · целевая ветка: `main`**  
 > Реализация в исходниках ≠ успешный CI ≠ подтверждённая эксплуатация на VPS. Завершённые пункты ниже означают наличие реализации, если отдельно не указана проверка.
 
 ## Краткая карта развития
@@ -12,8 +12,27 @@
 | GeoData | Подписанный manifest, HTTPS-загрузка и обновление, дефолтные GeoSite/GeoIP Loyalsoldier | Проверка актуальности, отказов источника и применения данных на тестовой ноде |
 | XRAY STUDIO / JSON | Конструктор, SS2022, JSON-подписки, полный каталог FinalMask и адаптивное окно до 84rem | Проверка реального Xray, клиентов и диалога на разных экранах |
 | Статистика и доступ | Исторические метрики, карточки, RBAC и автономные политики | Нагрузочные, отказоустойчивые и security regression тесты |
-| Криптография control plane | Ed25519-подписи политик и команд | **P0:** проектирование и реализация гибридной PQ-защиты без downgrade |
+| Криптография control plane | Действующий Ed25519 (`XMESH1`); XSP-v2 PR01 wire-векторы, PR02 Ed25519 **AND** ML-DSA-65 Rust↔Go и PR07 TLS1.3/X25519MLKEM768 — **только изолированные PoC и CI** | **P0:** security review, строгий декодер, replay/epoch/suite-floor, ключи и enrollment; отдельный node-only TLS endpoint, реальный canary и безопасная миграция |
 | Качество релиза | Зелёный Backend CI на `main` (коммит `150978cc`, запуск #40304117546); статические и API-интеграционные проверки | Browser/live-node e2e, проверка rollback и обязательные release gates |
+
+## XSP-v2 — срез готовности на 27 октября 2026 (P0)
+
+**Важное различие:** лабораторный CI подтверждает проверенный криптографический механизм, **но не** включённую PQ-защиту нод или инфраструктуры Nexus. Рабочие Node (Go 1.23), `XMESH1`/Ed25519, публичный Nginx и Xray не переключались на XSP-v2. `strict-pq` и защита от downgrade на уровне состояния нод **не активированы**.
+
+| Этап | Состояние | Подтверждение / незавершённое |
+| --- | --- | --- |
+| **PR01 — wire/spec** | [x] Черновая спецификация + общие тестовые векторы | Совпадают в Rust/Go/JS; формальный security review и окончательное утверждение формата ещё нужны |
+| **PR02 — Ed25519 + ML-DSA-65** | [x] Изолированный крипто-PoC | Прямые тесты **Go → Rust** и **Rust → Go** требуют обе подписи; изменение сообщения, отсутствие и порча подписи отвергаются. [Nexus Crypto CI](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40431220079), [Node Crypto CI](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40432027022) |
+| **PR07 — TLS 1.3 + X25519MLKEM768** | [x] Лабораторный TLS-probe, **не развёрнут** | Реальные handshake OpenSSL 3.5 ↔ Go 1.27.3 с проверкой согласованной группы, CA/SNI и отказом TLS 1.2, X25519-only и неверным сертификатам. [Nexus TLS CI](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40432661499) |
+| **Продакшен XSP-v2** | [ ] Не внедрён | Нет новых v2 API/безопасного enrollment, хранилища ключей, подтверждённого node-only ingress, реальной защиты control plane и миграции нод |
+
+**CI по версиям:** [XMesh-Node #40432873804](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40432873804) завершился успешно на `f984201c`. В [Nexus Backend CI #40432809267](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40432809267) на `918d42fa` `cli`, `rust` и `subscription-build` прошли; API integration ещё выполнялся при фиксации этого среза. Это исторические результаты **конкретных SHA**, не обещание результата CI для следующих документационных коммитов.
+
+**Следующая очередь:** (1) review и freeze протокола/криптопровайдеров, FIPS 204 KAT и fuzz-декодера; (2) durable `minimumSuite`, key epochs, replay state, двухсторонняя аутентификация ответов/команд; (3) отдельный node-only HTTPS ingress с замерами всех CDN/LB → origin сегментов; (4) staged enrollment/canary + fail-closed и recovery на реальных нодах. **Не ужесточать публичный Nginx для панели/подписок без отдельного плана совместимости.**
+
+Ссылки: [wire specification](XSP_V2_WIRE_SPEC.md) · [crypto PoC](XSP_V2_CRYPTO_POC.md) · [hybrid TLS probe](XSP_V2_TLS_PROBE.md) · [полный XSP-v2 план](HYBRID_POST_QUANTUM_SECURITY_IMPLEMENTATION_PLAN.md).
+
+---
 
 ## Обновления 26 октября 2026
 
@@ -118,25 +137,26 @@
 **Acceptance gate:** do not mark enterprise readiness or full CI stabilization complete until the above checks have actual passing evidence.
 
 
-**Baseline:** 2026-10-24 · **Progress reviewed:** 2026-10-26 · **Target branch:** `main` · **Status:** source CI green at `150978cc`, not enterprise-production certified.
+**Baseline:** 2026-10-24 · **Progress reviewed:** 2026-10-27 · **Target branch:** `main` · **Status:** historical CI green at `150978cc` and isolated XSP-v2 PoC CI green (see dated checkpoint); not enterprise-production certified.
 
 This roadmap tracks verified improvements, not feature claims. A stage is complete only after the listed acceptance criteria pass in CI and, where required, on a disposable real Xray node. A green source-level assertion alone does not count as production evidence.
 
-## PRIORITY #1 — P0: Hybrid post-quantum security for Nexus ↔ Node (NEXT TASK)
+## PRIORITY #1 — P0: Hybrid post-quantum security for Nexus ↔ Node (IN PROGRESS)
 
-**Status:** [ ] NOT IMPLEMENTED / NOT VERIFIED. **Priority:** highest; start this work before new features. **Scope:** XMesh Nexus control plane and XMesh Node agents; coordinate changes in **both repositories**. This is a planned security upgrade, not a claim that existing Ed25519 traffic is already post-quantum secure.
+**Status:** [~] IN PROGRESS — PR01/PR02/PR07 research and laboratory CI implemented; **production XSP-v2 NOT IMPLEMENTED / NOT VERIFIED**. **Priority:** highest. **Scope:** Nexus control plane + Node agents, across both repositories. Active `XMESH1`/Ed25519 communication is **not** post-quantum secure.
 
 **Implementation checkpoint — 2026-10-27 (PR01 foundation, not deployed):**
 
 - [x] Audited current Nexus Ed25519 `XMESH1` requests, node enrollment, separately signed policy, unsigned command response gap, Node Go heartbeat, and actual external TLS termination.
 - [x] Added draft [XSP_V2_WIRE_SPEC.md](XSP_V2_WIRE_SPEC.md) and identical [XSP_V2_VECTORS.json](XSP_V2_VECTORS.json) to Nexus and XMesh-Node `main`.
 - [x] Added *test-only* binary encoders/negative fixtures in Nexus Rust, Go Node and independent JavaScript; the CI suite runs the applicable tests. No PQ-signing code, keys, new API paths or agent activation were introduced.
-- [ ] Confirm **green CI in both repositories on matching PR01 revisions** and owner/security review of message registry, exact binary encoding, key purpose and error/replay model.
+- [x] Shared-vector and isolated cryptographic/TLS CI have passed in both repositories (see dated run links above).
+- [ ] Owner/security review and freeze of message registry, exact bytes, key purpose, error/replay model and downgrade semantics; CI passing does **not** constitute approval.
 - [x] **PR02 isolated crypto PoC (2026-10-27):** add [XSP_V2_CRYPTO_POC.md](XSP_V2_CRYPTO_POC.md), public demo-only key/signature digest vectors, standard Go 1.27.3 `crypto/mldsa` tests and Rust/OpenSSL 3.5 EVP tests. Both require Ed25519 **AND** ML-DSA-65 and reject tampering/missing signatures; independent OpenSSL deterministic signature digests match Go's known fixture. Separate CI workflows keep production Go 1.23/Node and Nexus backend unchanged.
 - [x] **PR02 interoperability:** Go 1.27.3 and Rust/OpenSSL 3.5 directly exchanged signed Ed25519 **AND** ML-DSA-65 records in both directions in isolated Nexus Crypto CI (including negative tests for missing/corrupt signatures, altered payload and substituted keys). Public deterministic key/signature test vectors also match.
 - [x] **PR07 lab TLS spike (2026-10-27):** [XSP_V2_TLS_PROBE.md](XSP_V2_TLS_PROBE.md) documents an isolated Go 1.27.3 strict X25519MLKEM768 full-handshake verifier and separate OpenSSL 3.5 test server. Both verify the observed group, TLS 1.3, trusted certificate/hostname and decline classical-only TLS 1.3, TLS 1.2, invalid certificates and resumption. [Dedicated TLS CI](https://github.com/TriplexCorp/XMesh-Nexus/actions/workflows/xsp-hybrid-tls.yml) covers real handshakes. **This is laboratory evidence, not a live Nexus deployment.**
-- [ ] **PR02/PR07 production gates:** latest main CI in both repositories, external FIPS 204 KATs/fuzzing, independent security review, audited proxy/CDN→origin hops, measured TLS negotiation on real canary endpoints and controlled no-downgrade rollout. **No production XSP-v2 authentication or strict mode yet.**
-- [ ] Rehearse migration on disposable nodes; v1 traffic must continue unchanged until explicit per-node activation. **XSP-v2 itself remains NOT IMPLEMENTED / NOT VERIFIED.**
+- [ ] **PR02/PR07 acceptance beyond laboratory:** full main CI after the latest code changes; external FIPS 204 KATs, fuzzing, independent security review, actual proxy/CDN→origin TLS audit, real canary TLS negotiation and controlled no-downgrade rollout. **No production XSP-v2 authentication or strict mode yet.**
+- [ ] Rehearse migration on disposable nodes; v1 traffic must continue unchanged until explicit per-node activation. **The XSP-v2 production control plane remains NOT IMPLEMENTED / NOT VERIFIED.**
 
 **Full engineering blueprint:** [Hybrid Post-Quantum Security — XSP-v2 complete implementation plan](HYBRID_POST_QUANTUM_SECURITY_IMPLEMENTATION_PLAN.md) (20 sections: architecture, source-file map, wire format, identity, TLS, migration, PRs, tests, acceptance gates). Follow the detailed plan as the implementation source of truth; the checklist below is a short milestone overview.
 
