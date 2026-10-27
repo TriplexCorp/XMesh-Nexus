@@ -1,5 +1,15 @@
 # XMesh Nexus
 
+## Current XSP-v2 checkpoint — after Nexus PR #55 (27 October 2026)
+
+**Latest reported merged Nexus `main` SHA:** `7507437102df59c3bbd4682170c1b81300fdd565`. [PR #55](https://github.com/TriplexCorp/XMesh-Nexus/pull/55) adds a **staging-only immutable PostgreSQL signed-commit-receipt outbox** (migration `0105_node_xsp_signed_commit_receipt_outbox.sql`, Rust `xsp_v2_signed_receipt_outbox.rs`). It cryptographically revalidates the original signed ACK, checks **both Ed25519 AND ML-DSA-65** Nexus receipt signatures, binds exact envelope bytes to Node, request, permit/ACK and key epoch, returns byte-identical receipts for identical retries without repeating epoch CAS, rejects replacement and forbids SQL UPDATE/DELETE.
+
+**Reported post-merge checks on that SHA:** Backend CI (API/PostgreSQL), OpenSSL 3.5/PQ Crypto CI (real signatures and PostgreSQL), User Presence Integrity, and GeoData/Routing — all **success**. This verifies repository tests, **not live deployment or an integrated network exchange**.
+
+**Node side:** isolated PQ-only HTTPS client plus dual-signed receipt verification and persistent journal are available; neither constitutes production Agent integration. **Next P0:** authorized Nexus API/Node identity, separately protected `panel_response` signer and pinned trust, TLS 1.3 `X25519MLKEM768` ingress, followed by true Nexus ↔ Node permit → applied ACK → atomic commit → identical signed receipt/retry E2E. Crash/recovery, independent anti-rollback and security review remain separate gates. **`strict-pq` OFF**; legacy `XMESH1` remains running until explicitly migrated; Xray still handles VPN traffic. [Roadmap](docs/ENTERPRISE_ROADMAP.md) · [handoff](docs/XSP_V2_NEW_CHAT_HANDOFF.md).
+
+_The #50/#51 checkpoint and “next P0: create receipt” statements below are historical, superseded by this checkpoint._
+
 ## Resume development in a new chat — read this first (27 October 2026)
 
 **Next development session:** read the [XSP-v2 handoff](docs/XSP_V2_NEW_CHAT_HANDOFF.md) and [Enterprise Roadmap](docs/ENTERPRISE_ROADMAP.md), then independently verify both repositories' current `main`, open PRs and Actions. Latest verified milestones are merged Nexus [#55](https://github.com/TriplexCorp/XMesh-Nexus/pull/55) and Node [#26](https://github.com/TriplexCorp/XMesh-Node/pull/26); historical stages below are not current TODOs.
