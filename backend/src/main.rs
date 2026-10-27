@@ -29,6 +29,8 @@ mod xsp_v2_rotation;
 mod xsp_v2_signed_cutover;
 
 #[cfg(test)]
+mod xsp_v2_candidate_digest_tests;
+#[cfg(test)]
 mod xsp_v2_cutover_contract_tests;
 #[cfg(test)]
 mod xsp_v2_wire_tests;
