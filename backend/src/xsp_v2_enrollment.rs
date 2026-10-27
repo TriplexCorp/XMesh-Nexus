@@ -255,7 +255,11 @@ fn decode_claim_proof(input: &Claim) -> Result<DecodedClaimProof, ApiError> {
     }
     let ed_sig = strict_base64(&input.ed25519_signature_b64, 64)?;
     let pq_sig = strict_base64(&input.mldsa65_signature_b64, 3309)?;
-    Ok(DecodedClaimProof { challenge, ed_sig, pq_sig })
+    Ok(DecodedClaimProof {
+        challenge,
+        ed_sig,
+        pq_sig,
+    })
 }
 
 /// Persist the new epoch and mark approval consumed in the caller's transaction.
@@ -291,7 +295,11 @@ pub async fn claim(
     Json(input): Json<Claim>,
 ) -> Result<Json<Value>, ApiError> {
     staging()?;
-    let DecodedClaimProof { challenge, ed_sig, pq_sig } = decode_claim_proof(&input)?;
+    let DecodedClaimProof {
+        challenge,
+        ed_sig,
+        pq_sig,
+    } = decode_claim_proof(&input)?;
     let mut tx = state.pool.begin().await?;
     let suite = sqlx::query(
         "SELECT minimum_suite,activation_phase,key_epoch
