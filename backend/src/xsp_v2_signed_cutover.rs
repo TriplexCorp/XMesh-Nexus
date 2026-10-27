@@ -1212,7 +1212,11 @@ mod signed_tests {
         recovery_auth["signatures"]["ed25519"] =
             serde_json::json!(STANDARD.encode(next_ed.sign(&next_signing_input).to_bytes()));
         recovery_auth["signatures"]["mldsa65"] = serde_json::json!(
-            STANDARD.encode(auth_pq_signer.sign_oneshot_to_vec(&next_signing_input).unwrap())
+            STANDARD.encode(
+                auth_pq_signer
+                    .sign_oneshot_to_vec(&next_signing_input)
+                    .unwrap()
+            )
         );
         let fresh_auth_raw = serde_json::to_vec(&recovery_auth).unwrap();
         let retried = crate::xsp_v2_api::recover_authenticated_committed_receipt_staging(
@@ -1226,7 +1230,11 @@ mod signed_tests {
         .await
         .expect("fresh one-use Node assertion recovers identical signed bytes");
         assert_eq!(retried, saved);
-        assert_eq!(signing_calls.get(), 1, "auth recovery must never call signer");
+        assert_eq!(
+            signing_calls.get(),
+            1,
+            "auth recovery must never call signer"
+        );
         // Lost HTTP response: recover the previously signed immutable bytes
         // without any signer/private key and without replaying epoch CAS.
         let recovered = crate::xsp_v2_signed_receipt_outbox::load_committed_signed_receipt_staging(
