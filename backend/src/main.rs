@@ -23,6 +23,8 @@ mod user_subscriptions;
 mod xsp_v2_api;
 #[cfg(feature = "xsp-v2-experimental")]
 mod xsp_v2_enrollment;
+#[cfg(feature = "xsp-v2-experimental")]
+mod xsp_v2_rotation;
 
 #[cfg(test)]
 mod xsp_v2_wire_tests;
@@ -423,11 +425,16 @@ fn experimental_v2_routes(state: &AppState) -> Router<AppState> {
     let router = router
         .route("/api/v2/node/heartbeat", post(xsp_v2_api::heartbeat))
         .route("/api/v2/node/keys/claim", post(xsp_v2_enrollment::claim))
+        .route("/api/v2/node/keys/rotation/prove", post(xsp_v2_rotation::prove))
         .merge(
             Router::new()
                 .route(
                     "/api/v2/admin/nodes/{id}/key-approval",
                     post(xsp_v2_enrollment::approve),
+                )
+                .route(
+                    "/api/v2/admin/nodes/{id}/rotation/prepare",
+                    post(xsp_v2_rotation::prepare),
                 )
                 .route_layer(middleware::from_fn_with_state(
                     state.clone(),
