@@ -255,6 +255,8 @@ jobs:
         run: |
           bash -n scripts/test-xsp-v2-ledger-integration.sh
           bash scripts/test-xsp-v2-ledger-integration.sh
+      - name: Test XSP-v2 staging cutover ledger immutability in disposable PostgreSQL
+        run: bash scripts/test-xsp-cutover-ledger-integration.sh
       - name: Exercise signed node identity, tamper resistance and replay rejection
         run: python3 scripts/test-node-auth-integration.py
       - name: Exercise real RBAC, MFA and revocation API
