@@ -400,7 +400,7 @@ def main():
         new_public = subprocess.check_output(
             ["openssl", "pkey", "-in", str(new_keyfile), "-pubout", "-outform", "DER"])[-32:].hex()
         assert new_public != public
-        proof_input = (f"XMESH-ENROLL-V1\\n{recovery['token']}\\n{new_public}\\n").encode()
+        proof_input = (f"XMESH-ENROLL-V1\n{recovery['token']}\n{new_public}\n").encode()
         proof_path = Path(directory) / "recovery-proof.txt"
         proof_path.write_bytes(proof_input)
         new_signature = subprocess.check_output(
@@ -420,9 +420,9 @@ def main():
             probe_raw = json.dumps(probe_body, separators=(",", ":")).encode()
             probe_time = int(time.time())
             probe_nonce = os.urandom(16).hex()
-            data = (f"XMESH1\\nPOST\\n/api/v1/metrics/ingest\\n{node}\\n"
-                    f"{probe_time}\\n{probe_nonce}\\n"
-                    f"{hashlib.sha256(probe_raw).hexdigest()}\\n").encode()
+            data = (f"XMESH1\nPOST\n/api/v1/metrics/ingest\n{node}\n"
+                    f"{probe_time}\n{probe_nonce}\n"
+                    f"{hashlib.sha256(probe_raw).hexdigest()}\n").encode()
             probe_path = Path(directory) / "recovery-metrics.txt"
             probe_path.write_bytes(data)
             signed = subprocess.check_output(
