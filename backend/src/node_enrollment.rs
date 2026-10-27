@@ -198,51 +198,7 @@ pub async fn claim(
     })?;
     let hash = hex::encode(Sha256::digest(input.token.as_bytes()));
     let mut tx = state.pool.begin().await?;
-    // Look up the candidate token without locking it, to find its Node ID.
-    // The Node row is always locked FIRST; then the still-valid token is
-    // rechecked FOR UPDATE, avoiding deadlocks with owner re-issuance.
-    let node_id = sqlx::query_scalar::<_, i64>(
-        "SELECT node_id FROM node_enrollment_tokens
-         WHERE token_hash=$1 AND consumed_at IS NULL AND expires_at>NOW()",
-    )
-    .bind(&hash)
-    .fetch_optional(&mut *tx)
-    .await?
-    .ok_or_else(|| {
-        ApiError::new(
-            StatusCode::UNAUTHORIZED,
-            "Enrollment token expired or invalid",
-        )
-    })?;
-    let node =
-        sqlx::query("SELECT id FROM panel_records WHERE collection='nodes' AND id=$1 FOR UPDATE")
-            .bind(node_id)
-            .fetch_optional(&mut *tx)
-            .await?;
-    if node.is_none() {
-        return Err(ApiError::new(StatusCode::NOT_FOUND, "Node not found"));
-    }
-    let token_row = sqlx::query(
-        "SELECT node_id,allow_key_replacement FROM node_enrollment_tokens
-         WHERE token_hash=$1 AND consumed_at IS NULL AND expires_at>NOW() FOR UPDATE",
-    )
-    .bind(&hash)
-    .fetch_optional(&mut *tx)
-    .await?
-    .ok_or_else(|| {
-        ApiError::new(
-            StatusCode::UNAUTHORIZED,
-            "Enrollment token expired or invalid",
-        )
-    })?;
-    let confirmed_node: i64 = token_row.try_get("node_id")?;
-    if confirmed_node != node_id {
-        return Err(ApiError::new(
-            StatusCode::UNAUTHORIZED,
-            "Enrollment token scope changed",
-        ));
-    }
-    let replacement_authorized: bool = token_row.try_get("allow_key_replacement")?;
+    let (node_id, replacement_authorized) = validated_claim_token(&mut tx, &hash).await?;
     let replaced =
         register_enrollment_key(&mut tx, node_id, &input.public_key, replacement_authorized)
             .await?;
@@ -265,6 +221,60 @@ pub async fn claim(
     Ok(Json(
         json!({"nodeId":node_id,"enrolled":true,"keyReplaced":replaced}),
     ))
+}
+
+/// Lock the Node identity before its one-use token, even if the owner
+/// concurrently reissues an enrollment, to avoid opposite lock ordering.
+async fn validated_claim_token(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    hash: &str,
+) -> Result<(i64, bool), ApiError> {
+    // Look up the candidate token without locking it, to find its Node ID.
+    // The Node row is always locked FIRST; then the still-valid token is
+    // rechecked FOR UPDATE, avoiding deadlocks with owner re-issuance.
+    let node_id = sqlx::query_scalar::<_, i64>(
+        "SELECT node_id FROM node_enrollment_tokens
+         WHERE token_hash=$1 AND consumed_at IS NULL AND expires_at>NOW()",
+    )
+    .bind(&hash)
+    .fetch_optional(&mut **tx)
+    .await?
+    .ok_or_else(|| {
+        ApiError::new(
+            StatusCode::UNAUTHORIZED,
+            "Enrollment token expired or invalid",
+        )
+    })?;
+    let node =
+        sqlx::query("SELECT id FROM panel_records WHERE collection='nodes' AND id=$1 FOR UPDATE")
+            .bind(node_id)
+            .fetch_optional(&mut **tx)
+            .await?;
+    if node.is_none() {
+        return Err(ApiError::new(StatusCode::NOT_FOUND, "Node not found"));
+    }
+    let token_row = sqlx::query(
+        "SELECT node_id,allow_key_replacement FROM node_enrollment_tokens
+         WHERE token_hash=$1 AND consumed_at IS NULL AND expires_at>NOW() FOR UPDATE",
+    )
+    .bind(&hash)
+    .fetch_optional(&mut **tx)
+    .await?
+    .ok_or_else(|| {
+        ApiError::new(
+            StatusCode::UNAUTHORIZED,
+            "Enrollment token expired or invalid",
+        )
+    })?;
+    let confirmed_node: i64 = token_row.try_get("node_id")?;
+    if confirmed_node != node_id {
+        return Err(ApiError::new(
+            StatusCode::UNAUTHORIZED,
+            "Enrollment token scope changed",
+        ));
+    }
+    let replacement_authorized: bool = token_row.try_get("allow_key_replacement")?;
+    Ok((node_id, replacement_authorized))
 }
 
 /// Commit key replacement only after the token and Ed25519 proof were verified.
