@@ -1,0 +1,31 @@
+# XSP-v2 PR07/PR03 STAGING TEMPLATE — NOT INSTALLED BY ANY SCRIPT.
+# Offline/loopback-only TLS GROUP verification. There is NO production API v2 yet.
+# Requires a dedicated server with nginx built against OpenSSL 3.5+, a TEST
+# certificate for the intended SNI and explicit operator review.
+#
+# DO NOT COPY to sites-enabled on the public panel host as-is.
+# DO NOT replace the existing Nexus :443 vhost; no public listening socket.
+# All HTTP requests fail closed with 404 even if the TLS handshake succeeds.
+server {
+    listen 127.0.0.1:8444 ssl;
+    server_name node-only.example.invalid;
+
+    # THIS standalone listening socket MUST NOT share a legacy TLS 1.2 default
+    # server. Group negotiation must be verified with the independent Go probe.
+    ssl_protocols TLSv1.3;
+    ssl_ecdh_curve X25519MLKEM768;
+
+    ssl_certificate     /path/to/staging/fullchain.pem;
+    ssl_certificate_key /path/to/staging/privkey.pem;
+    ssl_session_tickets off;
+    ssl_session_cache off;
+
+    access_log off;
+    error_log /var/log/nginx/xmesh-xsp2-lab-error.log warn;
+    server_tokens off;
+    client_max_body_size 1m;
+
+    # No proxy_pass or v2 endpoint on purpose. Unauthenticated/legacy callers
+    # MUST NEVER reach current XMESH1 APIs through an experimental ingress.
+    location / { return 404; }
+}
