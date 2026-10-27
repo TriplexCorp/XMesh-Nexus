@@ -378,6 +378,54 @@ pub async fn authenticate_committed_ack_recovery_staging(
     Ok(())
 }
 
+
+/// Recover ONLY the previously stored original dual-signed receipt after
+/// independent Node authentication and one-use recovery proof.
+///
+/// This does not issue/sign a missing receipt or update any key epoch. Before
+/// calling this dormant staging function, a future trusted ingress must have
+/// *independently* verified the remote Node's identity AND the actual
+/// negotiated TLS 1.3 X25519MLKEM768 group on every relevant TLS hop.
+/// Neither headers nor the signed ACK are proof of a PQ-protected transport.
+/// `panel_pin` must be independently provisioned as trusted panel_response
+/// Ed25519 AND ML-DSA-65 public keys, never taken from the wire.
+///
+/// The recovery proof consumes a nonce even if receipt readback then fails.
+/// The Node may retry with a FRESH doubly signed recovery proof, not the
+/// consumed nonce. This function intentionally has no HTTP route.
+///
+/// # Errors
+/// Rejects invalid or replayed Node proof, incorrect independently verified
+/// transport identity, missing/tampered outbox, DB/epoch mismatch, or either
+/// invalid panel signature. Never returns unverified receipt bytes.
+#[allow(dead_code)] // Deliberately dormant until genuine authenticated PQ ingress.
+pub async fn recover_authenticated_committed_receipt_staging(
+    pool: &sqlx::PgPool,
+    trusted_pq_tls_node_id: i64,
+    request_id: &str,
+    signed_recovery_proof: &[u8],
+    exact_saved_ack: &[u8],
+    panel_pin: &crate::xsp_v2_signed_cutover::TrustedPublic,
+) -> Result<Vec<u8>, ApiError> {
+    authenticate_committed_ack_recovery_staging(
+        pool,
+        trusted_pq_tls_node_id,
+        request_id,
+        signed_recovery_proof,
+        exact_saved_ack,
+    )
+    .await?;
+    crate::xsp_v2_signed_receipt_outbox::load_committed_signed_receipt_staging(
+        pool,
+        trusted_pq_tls_node_id,
+        request_id,
+        exact_saved_ack,
+        panel_pin,
+    )
+    .await
+    .map_err(|_| ApiError::new(StatusCode::UNAUTHORIZED, "Invalid XSP-v2 receipt recovery"))
+}
+
 #[cfg(test)]
 pub fn recovery_signing_input_for_test(
     raw_auth: &[u8],
