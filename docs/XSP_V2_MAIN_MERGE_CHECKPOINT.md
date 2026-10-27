@@ -1,5 +1,7 @@
 # XSP-v2 main-branch checkpoint and remaining cutover gates
 
+> **Исторический снимок, не текущий статус.** Этот файл составлен **до** слияния [Nexus #46](https://github.com/TriplexCorp/XMesh-Nexus/pull/46) и Node [#20](https://github.com/TriplexCorp/XMesh-Node/pull/20); записи «Open at checkpoint» ниже больше не определяют актуальный набор PR. Для нового диалога читать прежде всего [XSP_V2_NEW_CHAT_HANDOFF.md](XSP_V2_NEW_CHAT_HANDOFF.md) и [Enterprise Roadmap](ENTERPRISE_ROADMAP.md), затем проверять GitHub `main`, открытые PR и CI.
+
 **Checkpoint: 27 October 2026.** This file records repository state at this date, not proof that XSP-v2 is enabled on production.
 
 ## Already merged into `main`

@@ -1,97 +1,59 @@
 # XMesh Nexus — Enterprise Roadmap
 
-> **Статус: активная разработка · 27 октября 2026 · целевая ветка: `main`**  
-> Реализация в исходниках ≠ успешный CI ≠ подтверждённая эксплуатация на VPS. Завершённые пункты ниже означают наличие реализации, если отдельно не указана проверка.
+> **Текущий инженерный статус: 27 октября 2026.** Следующему ChatGPT-диалогу: **начать с [XSP-v2 — handoff и точные следующие действия](XSP_V2_NEW_CHAT_HANDOFF.md)**, сверить `main`, открытые PR и CI двух репозиториев. Сначала свежий статус ниже, затем **исторические** этапы этого большого Roadmap. Реализация ≠ CI ≠ e2e ≠ security review ≠ production activation.
 
-## Краткая карта развития
+## Состояние на сегодня — что находится в `main`
 
-| Направление | Реализовано в коде | Следующий критерий приёмки |
+| Направление | Проверенный рубеж | Следующий gate |
 | --- | --- | --- |
-| Управление инфраструктурой | Ноды, профили, подписанные политики, команды, обновление агента из UI; операционная приёмка Node 13 на реальной VPS подтверждена оператором 27.10.2026 | Cold boot/backup-restore/fault-injection отдельно открыты |
-| TLS / ACME | Автоматическая установка Docker/Compose, Nginx Mainline, Certbot/HTTPS для панели; HTTP-01 provisioning, контроль сертификата ноды, агент `control-v5.1.3` | Проверка реального продления ACME и восстановление на VPS; гибридный TLS Node→Nexus пока только в лаборатории |
-| GeoData | Подписанный manifest, HTTPS-загрузка и обновление, дефолтные GeoSite/GeoIP Loyalsoldier | Проверка актуальности, отказов источника и применения данных на тестовой ноде |
-| XRAY STUDIO / JSON | Конструктор, SS2022, JSON-подписки, полный каталог FinalMask и адаптивное окно до 84rem | Проверка реального Xray, клиентов и диалога на разных экранах |
-| Статистика и доступ | Исторические метрики, карточки, RBAC и автономные политики | Нагрузочные, отказоустойчивые и security regression тесты |
-| Криптография control plane | Production `XMESH1`/Ed25519; XSP-v2 Rust↔Go dual signatures, строгий decoder, staging initial enrollment epoch 1 и **owner-approved rotation prepare/dual-PoP** через публичную миграцию `0102` ([Nexus #30](https://github.com/TriplexCorp/XMesh-Nexus/pull/30), [Node #10](https://github.com/TriplexCorp/XMesh-Node/pull/10)); всё experimental и **не активировано** | **P0:** подписанное доверенное Nexus→Node разрешение cutover, доказательство реально применённой новой эпохи с signed Node ACK, транзакционное переключение/retirement и crash/replay/recovery тесты; затем `panel_response` signer, signed v2 control plane, KMS, hybrid TLS canary, внешний review |
-| Качество релиза | Nexus PR #30 и Node #10: staging prepare/dual PoP прошли CI; [Nexus docs-main `1401e62` Backend CI — success](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40458198696); [Node docs-main `fce36f4` Node CI — success](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40458031717) | [x] Операторская VPS-приёмка Node 13: Agent v5.1.3, verified, applied=desired, TLS/H3, controlled restart; [ ] независимые backup/restore, ACME renewal и CI следующего docs-PR |
+| **Production VPN/data-plane** | Nexus + XMesh Node управляют Xray; оператор подтвердил реальный **VLESS/XHTTP/TLS/H3** на «Польша-2» Node 13, signed policy/attestation, `applied=desired` и работу после контролируемого restart. Пользовательский VPN-трафик шифруется Xray/TLS | Backup/restore, cold boot, ACME renewal, power-loss отдельно не проверены |
+| **Production control-plane** | Продолжает работать `XMESH1`/Ed25519; Agent `control-v5.1.3` и bootstrap/metrics | НЕ активировать `strict-pq` до E2E и review |
+| **Experimental PQ crypto** | Shared contract/Go↔Rust test vectors, Ed25519 **и** ML-DSA-65 signed permit/ACK primitives ([Nexus #34/#35](https://github.com/TriplexCorp/XMesh-Nexus/pull/35), [Node #13/#14](https://github.com/TriplexCorp/XMesh-Node/pull/14)); подготовленная двойная публичная пара / owner proof [Nexus #30](https://github.com/TriplexCorp/XMesh-Nexus/pull/30), [Node #10](https://github.com/TriplexCorp/XMesh-Node/pull/10) | KAT/fuzz, signer custody, реальное доверенное end-to-end управление |
+| **Approved candidate binding** | old/new key IDs и публичные байты, cross-language digest, snapshot под PostgreSQL row lock ([Nexus #40/#41/#42](https://github.com/TriplexCorp/XMesh-Nexus/pull/42), [Node #15/#16](https://github.com/TriplexCorp/XMesh-Node/pull/16)) | Trust pin provisioning, verified owner-facing approval |
+| **PostgreSQL cutover state** | Пассивный permit/ACK ledger `0103`, rollback guard `0104`, verified permit writer [#43](https://github.com/TriplexCorp/XMesh-Nexus/pull/43), DB-backed ACK verifier [#44](https://github.com/TriplexCorp/XMesh-Nexus/pull/44) | Transactional/fault-injection tests, immutable history/least privileges |
+| **Staging atomic ACK → epoch CAS** | **Nexus [PR #46](https://github.com/TriplexCorp/XMesh-Nexus/pull/46) слит**: `xsp_v2_ack_epoch_commit.rs` в отдельной транзакции проверяет signed ACK, сохраняет one-use nonce и новый public keyset, делает CAS key epoch и сохраняет immutable ACK | **Код не вызывается ни одним работающим API**, нет идемпотентной квитанции после commit, нет испытаний БД с обрывами и параллельностью |
+| **Node applied state + journals** | Isolated Go 1.27: fsynced permit journal [#17](https://github.com/TriplexCorp/XMesh-Node/pull/17), signed ACK journal [#18](https://github.com/TriplexCorp/XMesh-Node/pull/18), проверка applied encrypted vault + floor + старой/новой пары и lifecycle lock [#19](https://github.com/TriplexCorp/XMesh-Node/pull/19) | Anti-rollback вне полного дискового snapshot, receive/verify signed receipt, интеграция в реальный агент |
+| **Репозиторный контроль** | Nexus [#45](https://github.com/TriplexCorp/XMesh-Nexus/pull/45) / Node [#20](https://github.com/TriplexCorp/XMesh-Node/pull/20): main artifact CI-inventory checks | Сверять свежий `main` и CI после каждого merge; CI inventory не является security audit |
+| **Hybrid TLS** | Изолированный TLS 1.3/OpenSSL/Nginx эксперимент с `X25519MLKEM768` | Отдельный node-only e2e ingress + disposable canary; не заявлять PQ клиентского Xray из этого теста |
 
-## Практическая поддержка нод — восстановлена проверка применённого профиля
+### Базовый проверенный `main` до документационного handoff-PR
 
-- [x] [Node PR #9](https://github.com/TriplexCorp/XMesh-Node/pull/9): managed bootstrap прежде не устанавливал `xmesh-profile-attest.py`, что вызывало правдивое `profileCheck=helper_missing` даже при запущенном Xray. Новый bootstrap проверяет и атомарно устанавливает локальный attestation helper **до** первой синхронизации.
-- [x] Nexus release `control-v5.1.3`: штатная команда **«Обновить Agent»** на v5.1.2 получает новую версию и устанавливает тот же helper без смены Ed25519, политики или активного профиля. Двунаправленная проверка состояния остаётся fail-closed: `verified` только после криптографической сверки подписанного envelope, конфигурации и read-only mount.
-- [x] **Польша-2 / Node 13 (27.10.2026, операторские свидетельства):** Agent `control-v5.1.3`, независимая локальная `status=verified`, Nexus `profileApplicationStatus=applied`, `appliedRevision=desiredRevision`; действительный сертификат Let's Encrypt, реальный клиент **VLESS/XHTTP/TLS/H3**, восстановление работы после контролируемого перезапуска Xray/router. Hysteria2 не используется на этой ноде; это не подтверждение аварийного восстановления или XSP-v2.
-- [ ] Реальный trust/ACK XSP-v2 остаётся отдельной нерешённой P0-задачей.
+- **Nexus:** `d458b7b7f25d318f20ee29d3d8c90e725d5c98bd` (merge #46). [Crypto #40493480111](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40493480111) **success**, [User Presence #40493480123](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40493480123) **success**, [Backend #40493480354](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40493480354) **выполнялся на момент фиксации**. Последний ранее завершённый Backend [#40488049025](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40488049025) **success** на `8b6f0242`.
+- **Node:** `e91560c892bc0783b62924864baede24c676722d` (merge #20). [Node CI #40488181345](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40488181345) **success**; предшествующий [Go Crypto #40480677062](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40480677062) success.
+- **Открытые XSP-v2 PR на момент снимка: отсутствовали.** Nexus [#20](https://github.com/TriplexCorp/XMesh-Nexus/pull/20) — независимый UI FinalMask PR. Все упомянутые PQ PR до #46 влиты в `main`. После этого handoff merge SHA изменятся: **никогда не считать таблицу вечным текущим состоянием**.
 
-## Практическая поддержка нод — устранён конфликт регистрации HTTP 409
+## P0 — что делать в новом диалоге (по порядку)
 
-- [x] Legacy Node Ed25519 re-enrollment теперь отделён от initial enrollment: обычная выдача токена заранее отказывает для уже зарегистрированного ID; owner-only `/api/v1/nodes/{id}/enrollment/reissue` требует осознанного подтверждения в UI ([Nexus PR #26](https://github.com/TriplexCorp/XMesh-Nexus/pull/26)).
-- [x] Миграция `0101` добавляет default-deny `allow_key_replacement`; короткоживущий token + proof нового Ed25519-ключа проверяются **до** атомарной замены старого. Неверная подпись не отключает старую ноду; XSP-v2 suite/epoch не понижаются. PostgreSQL-интеграция проверена: [Backend CI #40449358858](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40449358858).
-- [x] Bootstrap Node объясняет `409` и `401/403`, не печатает секреты и сохраняет локальный ключ для повторной попытки ([Node PR #7](https://github.com/TriplexCorp/XMesh-Node/pull/7), [Node CI `main` #40448354429](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40448354429)).
-- [ ] **Legacy HTTP 409 recovery:** тестировать owner-approved replacement только на отдельной disposable ноде; **не перевыпускать токен и не заменять доверенный ключ работающей Node 13** ради теста. Слияние PR не выполняет развёртывание VPS.
-- [ ] **Безопасность:** это восстановление **legacy XMESH1/Ed25519**, не XSP-v2 двухфазный cutover/ACK; независимый PQ production gate остаётся открыт.
+1. [ ] **Сначала** проверить GitHub `main`, новые PR и завершение post-merge Backend CI (в том числе после #46) обоих репозиториев. Не принимать старые SHA/CI за сегодняшний статус.
+2. [ ] **P0-A: PostgreSQL concurrency/fault-injection:** проверить на disposable PostgreSQL вызовы `xsp_v2_permit_ledger_writer.rs`, `xsp_v2_ack_ledger_validator.rs`, `xsp_v2_ack_epoch_commit.rs` (правильные старые/новые публичные ключи, две подписи, одноразовый nonce, CAS, rollback при любой ошибке, гонки, потеря ACK, сбой после commit). Закрепить это отдельным CI workflow/интеграционными тестами. Сохранять старые public keys; не включать feature в production.
+3. [ ] **P0-B: idempotent committed ACK read-back и signed commit receipt:** запрос после потери ACK/receipt должен возвращать *ранее зафиксированный* результат с проверяемым dual-signed Nexus receipt без повторного смены эпохи. Отдельный canonical contract, signed receipt с permit+ACK digest, epoch и request ID; Node проверяет receipt по заранее pinned `panel_response`.
+4. [ ] **P0-C: signer и цельный workflow:** protected `panel_response` signing (KMS/isolated service), authenticated owner approval и durable permit outbox; гарантировать выдачу permit **только после DB commit**. Node применяет новую encrypted пару и защищённый floor, затем сохраняет dual-signed ACK; Nexus подтверждает commit, Node хранит старые ключи до отдельного retirement.
+5. [ ] **P0-D: recovery/security gates:** restored disk/DB vault, node crash между записью ключей и ACK, одноразовость/повторы/потеря сообщений, API auth, least-privilege DB роли/DELETE, anti-rollback, FIPS 204 KAT/fuzz, Rust↔Go реальные взаимные подписи, disposable-node e2e canary, независимый review; только затем согласие владельца на production `strict-pq` и постепенное включение.
 
-## Операционная приёмка «Польша-2» (Node 13) — PASS (27 октября 2026)
+**Процесс обязателен:** feature branch → PR → GitHub Backend CI + Crypto CI (или Node CI + Go Crypto CI), review → merge в `main` → повторная проверка файлов, PR и post-merge CI. Пользователь прямо просил не оставлять проверенные правки в незлитых ветках. Проверять конкретный SHA, а не только зелёный бейдж на другом commit. Если CI не зелёный или безопасность не проверена — честно оставить draft.
 
-**Источник:** показанные оператором выводы SSH, ответ Nexus `GET /api/v1/nodes/13/runtime` и подтверждённое оператором подключение клиента по мобильной сети. Это не независимая лабораторная проверка и не подтверждение production XSP-v2.
+**Границы:** нет полной production XSP-v2 ротации, защищённого signer, server-signed receipt, anti-rollback полного snapshot и e2e canary. Отдельный Go 1.27 PoC НЕ равен работающему Node Agent Go 1.23. Работающий VPN = Xray; XMesh не должен повторно шифровать пользовательский трафик. Переустановка «Польша-2» владельцу допустима, но не считать это автоматическим разрешением на разрушительные действия без бэкапа и явной команды.
 
-- [x] Agent `control-v5.1.3`, установлен `xmesh-profile-attest.py`, три systemd-таймера активны.
-- [x] Локальная attestation: `status=verified`, revision `17fe9deee53f3230ae45cac2553f9fc68b8a2604f1864c9f7af34dcf8d6bfecf`.
-- [x] Nexus Node **13**: `connected=true`, `profileCheck=verified`, `profileApplicationStatus=applied`, `desiredRevisionSource=current`, `appliedRevision=desiredRevision` на той же ревизии. Отдельная Node 1 имеет другую, тоже согласованную ревизию.
-- [x] Настоящий профиль: **VLESS + XHTTP + TLS + ALPN `h3`** (не Hysteria2). Xray `127.0.0.1:12431/udp`; XMesh-Node `listen_udp=:443`, `udp_backend=127.0.0.1:12431`. Локальный routing подтверждён инспекцией реального router config; внешний трафик подтверждён клиентом.
-- [x] TLS status `valid`: Let's Encrypt, `pl2.free-tier.shop`, сертификат до **2027-01-25 03:36:40 UTC**, `autoRenew=true` (это не тест успешного продления).
-- [x] После `docker restart xmesh-managed-xray` и `docker restart xmesh-node` оба контейнера работали с `restart=unless-stopped`, UDP/443 и UDP/12431 слушали, локальная attestation оставалась `verified`, оператор подтвердил работу клиента.
-- [ ] **Не входило в приёмку:** cold boot VPS, backup/restore, power-loss/corrupted vault recovery, журнал длительных отказов, отдельная проверка квот, ACME renewal, fault injection и повторный снимок Nexus `/runtime` **после** перезапуска. Не отмечать их выполненными.
-- [ ] Legacy HTTP 409 recovery остаётся отдельным сценарием для тестовой ноды. Действующую Node 13 не перевыпускать.
-- [ ] Следующий инженерный P0: подписанное разрешение Nexus→Node на XSP-v2 cutover и dual-signed Node applied ACK. Production `XMESH1` остаётся действующим, `strict-pq` — OFF.
+## Операционная приёмка «Польша-2» — PASS в узком смысле (27.10.2026)
 
-## P0 staging — подготовка ротации без cutover (27 октября 2026)
+- [x] Оператор подтвердил Node 13: Agent `control-v5.1.3`; локально `status=verified`, revision `17fe9deee53f3230ae45cac2553f9fc68b8a2604f1864c9f7af34dcf8d6bfecf`.
+- [x] До restart Nexus `GET /api/v1/nodes/13/runtime`: `connected=true`, `profileApplicationStatus=applied`, `profileCheck=verified`, `appliedRevision=desiredRevision`.
+- [x] **VLESS/XHTTP/TLS/ALPN H3**, UDP public/443 → Xray `127.0.0.1:12431`, реальный клиент через мобильную сеть. Не Hysteria2; TCP backend для H3-only этим тестом не доказан.
+- [x] После контролируемого `docker restart` Xray/router возобновились `restart=unless-stopped`; местная attestation оставалась `verified`.
+- [x] На момент проверки Let's Encrypt сертификат имел состояние `valid`, истекал **2027-01-25 03:36:40 UTC**, `autoRenew=true`.
+- [ ] **Не проверялось:** реальное ACME-продление, cold boot, полный backup/restore, power-loss, отдельный legacy HTTP 409 recovery (только disposable), independent penetration review, production strict PQ и /runtime после restart.
 
-- [x] Добавлена **неактивная** миграция `0102_node_xsp_rotation_preparations.sql` для owner-approved PUBLIC пары с 10-минутным challenge hash, `fromEpoch → nextEpoch` и одноразовым `proved_at`. Эпоха действующих ключей, minimum suite и private vault не меняются.
-- [x] Изолированные endpoints **только с feature `xsp-v2-experimental` и staging-only runtime flag**: owner `/api/v2/admin/nodes/{id}/rotation/prepare` и `/api/v2/node/keys/rotation/prove` с обеими подписями Ed25519 + ML-DSA-65. Ответ содержит `cutoverAuthorized:false`; **это не разрешение активировать prepared keyset**.
-- [x] Node Go 1.27 keytool `prove-prepared` подписывает отдельный домен `XSP2-KEY-ROTATE-PREPARE-V1` с old/new epochs, Node ID, purpose, challenge и обоими key IDs; подпись нельзя переиспользовать для initial enrollment.
-- [x] **CI подтверждён по конкретным коммитам:** [Node PR #10](https://github.com/TriplexCorp/XMesh-Node/pull/10), [Node CI #40455408036](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40455408036) и [Go Crypto #40455408130](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40455408130) — success; [Nexus PR #30](https://github.com/TriplexCorp/XMesh-Nexus/pull/30), [полный Backend CI #40456461465](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40456461465) с PostgreSQL миграцией `0102` и [Rust/OpenSSL Crypto #40456461449](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40456461449) с **реальным Go→Rust proof** — success. Код влит в `main` Node `4714307` / Nexus `d58980a`. Следующий gate — отдельно подписанный Node cutover ACK; CI не подтверждает production. [Спецификация](XSP_V2_STAGING_ROTATION_PREPARE.md).
-- [ ] **Не реализованы:** signed server acceptance, Node cutover/applied ACK, атомарный switch/retirement старой пары, durable replay/recovery, production strict-PQ. Действующие ноды не мигрированы.
+## Исходники и специальные документы для возобновления
 
-### Критерии приёмки следующего P0 (до любых изменений на production)
-
-- [ ] **Протокол подписанного разрешения:** независимый доверенный `panel_response`/issuer key, canonical envelope и purpose/domain separation; Node не интерпретирует unsigned prepare/proof HTTP-ответ как разрешение сменить ключ.
-- [ ] **Подтверждение фактического cutover:** Node хранит новую эпоху с защищённым локальным floor, возвращает dual-signed ACK, привязанный к Node ID, ключам, одноразовому запросу, digest и durable applied state.
-- [ ] **Безопасная атомарность:** Nexus сохраняет старый public keyset действующим до валидации ACK и commit, обеспечивает идемпотентность/anti-replay; отдельная политика retirement и recovery при обрыве связи.
-- [ ] **Отрицательные/аварийные тесты:** неверный ключ, подпись, nonce, epoch, запрос/ответ, повторный или потерянный ACK, параллельный owner prepare, restart и восстановление после сбоя.
-- [ ] **Только после этого:** staging canary на изолированном node-only TLS 1.3/X25519MLKEM768 ingress; security review и отдельное согласие владельца на production activation.
-
-## Следующий инженерный P0: server-side XSP-v2 cutover — OPEN
-
-**Staging crypto-инкремент (27 октября 2026):** в [Nexus PR #35](https://github.com/TriplexCorp/XMesh-Nexus/pull/35) и [Node PR #14](https://github.com/TriplexCorp/XMesh-Node/pull/14) добавлены **экспериментальные** Ed25519+ML-DSA-65 signing/verification primitives для доверенно подписанного permit и Node applied ACK, pinning по `panel_response`/`node_request`, связность epochs/key IDs/requestId/nonce/TTL/digest и негативные тесты. Это **не** server-issued permit и не фактический cutover: пока отсутствуют protected signer provisioning, freeze реального digest пары из PostgreSQL, persistent nonce/idempotency, durable Node commit/ACK, транзакционный Nexus epoch switch, signed receipt и crash/recovery. [Точная граница реализации](XSP_V2_SIGNED_CUTOVER_STAGING.md). Production `XMESH1` не меняется.
-
-
-1. [ ] Security/architecture review: threat model и wire registry, роли `node_request`/`panel_response`, ключи, epoch, lease/nonce, переходы состояний и recovery. Зафиксировать инварианты до серверной реализации.
-2. [x] **Staging prepare/dual PoP реализованы и проверены:** владелец одобряет только точную *публичную* пару в `0102`, Go подписывает домен `XSP2-KEY-ROTATE-PREPARE-V1`, Rust проверяет обе подписи и помечает `proved_at` с one-use TTL; старый ключ остаётся действующим ([Nexus #30](https://github.com/TriplexCorp/XMesh-Nexus/pull/30), [Node #10](https://github.com/TriplexCorp/XMesh-Node/pull/10)). **Подтверждение Node и cutover ещё отсутствуют.**
-3. [ ] **Следующий PR — подписанное доверенное разрешение Nexus→Node и signed Node cutover/applied ACK:** зафиксировать канонические байты и domains, `nodeId`, `fromEpoch/toEpoch`, key IDs, `requestId`, digest и nonce, TTL/replay и фактическое persisted Node-состояние. Неподписанный `200 proofVerified` **не** разрешает активацию.
-4. [ ] **После подтверждённого ACK** атомарно изменить доверенный keyset/epoch и запустить отдельный retirement прежних ключей; crash/network loss, повторный ACK, гонки, неверный digest, stale epochs, восстановление sealed previous keyset, suite-floor/downgrade — негативные и fault-injection PostgreSQL/Go/Rust тесты. Initial `/api/v2/node/keys/claim` для rotation не использовать.
-5. [ ] Следом: изолированный `panel_response` signer, signed config/commands/**no-command**/ACK с durable anti-replay, выделенный TLS 1.3 `X25519MLKEM768` canary, внешний FIPS 204 KAT/fuzz/review. Production XSP-v2 и `strict-pq` пока **не включать**.
-
-## Текущий P0 — сводка реализации и проверки (27 октября 2026)
-
-**Лабораторная реализация ≠ production-защита.** XSP-v2 выключен в штатном Docker/Compose/Nginx и в рабочем Go 1.23 Node; текущие `XMESH1`/Ed25519, автоматическая установка панели и работа Xray не заменены. Обе экспериментальные операции регистрации ключей требуют `xsp-v2-experimental` при сборке **и** `XSP_V2_EXPERIMENTAL_HEARTBEAT=staging-only` в отдельной тестовой среде.
-
-| Gate | Статус | Следующая проверка |
-| --- | --- | --- |
-| PR01 wire/PR02 dual signatures | [x] Исходники + двусторонние Rust↔Go тесты | Freeze протокола, сторонний FIPS 204 KAT и fuzz |
-| Strict decoder + heartbeat/replay | [x] Staging-only parser и проверка **Ed25519 AND ML-DSA-65**, транзакционный nonce | Signed Nexus→Node responses, policy/revision/command ACK |
-| Key vault / enrollment / staging rotation | [x] Go AES-GCM vault и локальные prepare/prove/activate/recover; owner-approved первый epoch 1, [x] **staging prepare+dual PoP новой публичной пары без смены активной эпохи** ([Nexus #30](https://github.com/TriplexCorp/XMesh-Nexus/pull/30), [Node #10](https://github.com/TriplexCorp/XMesh-Node/pull/10)); unsafe one-step rekey запрещён | [ ] Signed Nexus acceptance/Node applied ACK, атомарное переключение/retirement *после ACK*, protected KMS/backup/recovery и реальные staging fault tests |
-| Legacy Node enrollment HTTP 409 | [x] [Nexus #26](https://github.com/TriplexCorp/XMesh-Nexus/pull/26) + [Node #7](https://github.com/TriplexCorp/XMesh-Node/pull/7): owner-only reissue с проверкой подписи до замены | [ ] Live recovery на отдельной disposable Node; **не трогать работающую Node 13** |
-| PR07 hybrid TLS | [x] Изолированный Nginx/OpenSSL/Go TLS1.3/X25519MLKEM768, SNI/CA/downgrade checks | **Реальная** отдельная VPS, DNS/ACME и проверка всех hop'ов |
-| Последний проверенный Backend CI | [x] **Nexus PR #30 `fb334b5` — success** | [Backend CI #40456461465](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40456461465) включает Rustfmt, unit tests, strict Clippy, Docker, PostgreSQL/API migration `0102`; [Crypto #40456461449](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40456461449) подтверждает фактические Go→Rust dual-signatures. [Node `main` `4714307` CI #40455937718](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40455937718) — success. Новый Nexus `main` `5e3db55` [Backend CI #40457374564](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40457374564) **успешно завершён**, включая PostgreSQL/API integration; последующие docs-коммиты проверяются отдельно. |
-| Strict production activation | [ ] **Выключено** | Независимый security-review, зафиксированный suite-floor на обеих сторонах, canary и отдельное одобрение владельца |
-
-**Исторические CI по конкретным SHA:** [Nexus Crypto #40440784297](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40440784297) — success на `b860ac7a`; [Node Crypto #40440580172](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40440580172) — success на `dba0c3e0`; [Node CI #40440956290](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40440956290) — success на `84b384db`. Актуальные обычные CI `main` приведены строкой выше; они не заменяют внешний KAT/security review и проверку XSP-v2 на VPS.
-
-**Очередность работ (P0 на 27 октября):** (1) [x] Код первоначальной dual enrollment и безопасного Node vault, миграции `0099`–`0101`; (2) [x] **Staging `prepare/prove` без cutover — Nexus #30 / Node #10, CI подтверждён**; (3) [x] В исходниках устранены legacy Node `409` и отсутствие attestation helper/Agent v5.1.3; (4) [x] **Операционная приёмка «Польша-2» (Node 13)** — VLESS/XHTTP/TLS/H3, `verified`, applied=desired, TLS и восстановление после штатного restart (операторские данные; аварийный rollback/backup restore отдельно открыты); (5) [ ] **Следующий инженерный P0:** зафиксировать wire/trust model и реализовать *подписанное Nexus→Node разрешение, signed Node applied/cutover ACK*, затем транзакционное переключение и отзыв старой пары; (6) [ ] Отказоустойчивость, replay/duplicate/lost ACK и recovery; (7) [ ] `panel_response` signer, dual-signed config/commands/no-command, hybrid TLS canary, KAT/fuzz и security review. `strict-pq` выключен.
-
-Подробности: [Owner-approved enrollment](XSP_V2_OWNER_KEY_ENROLLMENT.md) · [staging API/TLS](XSP_V2_EXPERIMENTAL_GATEWAY.md) · [полный план внедрения](HYBRID_POST_QUANTUM_SECURITY_IMPLEMENTATION_PLAN.md).
+- **Обязательный handoff:** [XSP_V2_NEW_CHAT_HANDOFF.md](XSP_V2_NEW_CHAT_HANDOFF.md)
+- **Схема доверия:** [XSP_V2_SIGNED_CUTOVER_ACK_CONTRACT.md](XSP_V2_SIGNED_CUTOVER_ACK_CONTRACT.md), [XSP_V2_CUTOVER_CANDIDATE_BINDING.md](XSP_V2_CUTOVER_CANDIDATE_BINDING.md)
+- **Nexus staging:** [XSP_V2_STAGING_VERIFIED_PERMIT_WRITER.md](XSP_V2_STAGING_VERIFIED_PERMIT_WRITER.md), [XSP_V2_STAGING_LOCKED_ACK_ADJUDICATION.md](XSP_V2_STAGING_LOCKED_ACK_ADJUDICATION.md), [XSP_V2_STAGING_ATOMIC_ACK_EPOCH_COMMIT.md](XSP_V2_STAGING_ATOMIC_ACK_EPOCH_COMMIT.md)
+- **Node staging:** [XSP_V2_APPLIED_ACK_VAULT_GATE.md](https://github.com/TriplexCorp/XMesh-Node/blob/main/docs/XSP_V2_APPLIED_ACK_VAULT_GATE.md), [XSP_V2_VERIFIED_PERMIT_JOURNAL.md](https://github.com/TriplexCorp/XMesh-Node/blob/main/docs/XSP_V2_VERIFIED_PERMIT_JOURNAL.md).
+- Файл [XSP_V2_MAIN_MERGE_CHECKPOINT.md](XSP_V2_MAIN_MERGE_CHECKPOINT.md) — **исторический** до нового commit #46; не использовать вместо актуального handoff.
 
 ---
+
+## Исторические этапы (ниже сохранены исходные подробности; старые статусы/«следующий P0» могут устареть)
 
 ## История P0 — staging owner-approved dual-key enrollment (27 October 2026)
 
