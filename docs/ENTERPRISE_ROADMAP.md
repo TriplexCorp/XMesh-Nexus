@@ -15,6 +15,16 @@
 | Криптография control plane | Действующий Ed25519 (`XMESH1`); XSP-v2 PR01 wire-векторы, PR02 Ed25519 **AND** ML-DSA-65 Rust↔Go и PR07 TLS1.3/X25519MLKEM768 — **только изолированные PoC и CI** | **P0:** security review, строгий декодер, replay/epoch/suite-floor, ключи и enrollment; отдельный node-only TLS endpoint, реальный canary и безопасная миграция |
 | Качество релиза | Зелёный Backend CI на `main` (коммит `150978cc`, запуск #40304117546); статические и API-интеграционные проверки | Browser/live-node e2e, проверка rollback и обязательные release gates |
 
+## XSP-v2 P0 continuation — dual-signature staging API, sealed keys, live Nginx laboratory (27 October 2026)
+
+- [x] **Rust staging heartbeat:** only with non-default `xsp-v2-experimental` Cargo feature and runtime `XSP_V2_EXPERIMENTAL_HEARTBEAT=staging-only`, validates exact envelope and **both** Ed25519/ML-DSA-65 signatures against pinned unrevoked PostgreSQL keys and atomically inserts replay nonce. Accepts only `shadow` phase, returns unsigned 204, never dispatches policies/commands. Normal production Docker has **no v2 route**.
+- [x] **Encrypted Node research vault:** Go 1.27.3 AES-256-GCM independent keypairs and external 32-byte wrapping key with 0600/0700 ownership, atomic rotation and monotonic epoch floor. Not an operational key service or HSM; privileged rollback/recovery still open.
+- [x] **Real Nginx lab:** loopback TLS1.3/X25519MLKEM768 template, throwaway cert and authenticated handshake, negative TLS1.2/X25519/hostname and HTTP-only-404 checks. [Nginx CI passed](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40439086025). No live server change.
+- [ ] **Before activation:** owner-approved dual-key enrollment, protected recovery/backup, signed responses, applied ACKs, role-separated persisted suite floor at Node and Nexus, KAT/fuzz/security review and operational TLS verification on an actual disposable VPS.
+
+Details: [experimental gateway, vault, TLS and blockers](XSP_V2_EXPERIMENTAL_GATEWAY.md).
+
+---
 ## XSP-v2 P0 continuation — strict parser, public-key epoch state and node-only TLS skeleton (27 October 2026)
 
 **Implemented as pre-production foundations, not switched on.** See [XSP_V2_P0_FOUNDATION.md](XSP_V2_P0_FOUNDATION.md) (identical in Nexus/Node).
