@@ -1,9 +1,12 @@
 //! Staging-only, independent XSP-v2 signed permit and applied ACK primitives.
 //! No API route, issuer key storage, replay database or active key switching.
-use serde::{Deserialize, Serialize};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use ed25519_dalek::{Signature, Signer as _, SigningKey, Verifier as _, VerifyingKey};
-use openssl::{pkey::{KeyType, PKey, Private}, sign::{Signer as PQSigner, Verifier as PQVerifier}};
+use openssl::{
+    pkey::{KeyType, PKey, Private},
+    sign::{Signer as PQSigner, Verifier as PQVerifier},
+};
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -283,7 +286,6 @@ fn xsp_v2_cutover_contract_vectors_and_negative_cases() {
     }
 }
 
-
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DualSignatures {
@@ -359,9 +361,16 @@ fn strict_signature(input: &str, exact: usize) -> Result<Vec<u8>, &'static str> 
     }
     Ok(raw)
 }
-fn verify_both_signed(signed: &SignedCutover, trusted: &TrustedPublic) -> Result<Vec<u8>, &'static str> {
+fn verify_both_signed(
+    signed: &SignedCutover,
+    trusted: &TrustedPublic,
+) -> Result<Vec<u8>, &'static str> {
     let input = signing_input(&signed.message)?;
-    let ed: [u8; 32] = trusted.ed_public.as_slice().try_into().map_err(|_| "bad Ed public")?;
+    let ed: [u8; 32] = trusted
+        .ed_public
+        .as_slice()
+        .try_into()
+        .map_err(|_| "bad Ed public")?;
     let ed_sig: [u8; 64] = strict_signature(&signed.signatures.ed25519, 64)?
         .try_into()
         .map_err(|_| "bad Ed signature")?;
@@ -370,10 +379,15 @@ fn verify_both_signed(signed: &SignedCutover, trusted: &TrustedPublic) -> Result
     ed_public
         .verify(&input, &Signature::from_bytes(&ed_sig))
         .map_err(|_| "invalid Ed25519 signature")?;
-    let pq_public = PKey::public_key_from_raw_bytes_ex(None, KeyType::ML_DSA_65, None, &trusted.pq_public)
-        .map_err(|_| "invalid PQ public")?;
-    let mut verify = PQVerifier::new_without_digest(&pq_public).map_err(|_| "PQ verifier unavailable")?;
-    if !verify.verify_oneshot(&pq_sig, &input).map_err(|_| "PQ verification failure")? {
+    let pq_public =
+        PKey::public_key_from_raw_bytes_ex(None, KeyType::ML_DSA_65, None, &trusted.pq_public)
+            .map_err(|_| "invalid PQ public")?;
+    let mut verify =
+        PQVerifier::new_without_digest(&pq_public).map_err(|_| "PQ verifier unavailable")?;
+    if !verify
+        .verify_oneshot(&pq_sig, &input)
+        .map_err(|_| "PQ verification failure")?
+    {
         return Err("invalid ML-DSA-65 signature");
     }
     Ok(input)
@@ -383,7 +397,8 @@ fn parse_signed(raw: &[u8]) -> Result<SignedCutover, &'static str> {
         return Err("signed cutover envelope too large");
     }
     // Derived Serde structs reject duplicate and unknown fields, including nested signatures.
-    let signed: SignedCutover = serde_json::from_slice(raw).map_err(|_| "invalid signed cutover JSON")?;
+    let signed: SignedCutover =
+        serde_json::from_slice(raw).map_err(|_| "invalid signed cutover JSON")?;
     signing_input(&signed.message)?;
     Ok(signed)
 }
@@ -457,7 +472,9 @@ pub fn sign_staging_permit(
     validate_pin(trusted, message, "panel_response")?;
     let input = signing_input(message)?;
     let mut pq_signer = PQSigner::new_without_digest(pq).map_err(|_| "PQ signer unavailable")?;
-    let pq_sig = pq_signer.sign_oneshot_to_vec(&input).map_err(|_| "PQ signing failed")?;
+    let pq_sig = pq_signer
+        .sign_oneshot_to_vec(&input)
+        .map_err(|_| "PQ signing failed")?;
     let signed = SignedCutover {
         message: message.clone(),
         signatures: DualSignatures {
@@ -473,81 +490,136 @@ pub fn sign_staging_permit(
 mod signed_tests {
     use super::*;
 
-    fn key_pair(ed_seed: u8, pq_seed: u8, purpose: &str, issuer: &str, node: u64)
-        -> (SigningKey, PKey<Private>, TrustedPublic)
-    {
+    fn key_pair(
+        ed_seed: u8,
+        pq_seed: u8,
+        purpose: &str,
+        issuer: &str,
+        node: u64,
+    ) -> (SigningKey, PKey<Private>, TrustedPublic) {
         let ed = SigningKey::from_bytes(&[ed_seed; 32]);
         let pq = PKey::private_key_from_seed(None, KeyType::ML_DSA_65, None, &[pq_seed; 32])
             .expect("OpenSSL 3.5 ML-DSA-65 unavailable");
         let der = pq.public_key_to_der().unwrap();
-        let pq_pub = der[der.len()-1952..].to_vec();
+        let pq_pub = der[der.len() - 1952..].to_vec();
         let ed_pub = ed.verifying_key().to_bytes().to_vec();
         let pin = TrustedPublic {
-            purpose: purpose.into(), issuer_id: issuer.into(), node_id: node,
+            purpose: purpose.into(),
+            issuer_id: issuer.into(),
+            node_id: node,
             ed_key_id: key_id("ed-", &ed_pub),
             pq_key_id: key_id("pq-", &pq_pub),
-            ed_public: ed_pub, pq_public: pq_pub,
+            ed_public: ed_pub,
+            pq_public: pq_pub,
         };
-        (ed,pq,pin)
+        (ed, pq, pin)
     }
     fn signed_with(s: &Cutover, ed: &SigningKey, pq: &PKey<Private>) -> Vec<u8> {
         let input = signing_input(s).unwrap();
         let mut signer = PQSigner::new_without_digest(pq).unwrap();
         let pq_sig = signer.sign_oneshot_to_vec(&input).unwrap();
-        serde_json::to_vec(&SignedCutover{
-            message:s.clone(), signatures: DualSignatures{
-                ed25519:STANDARD.encode(ed.sign(&input).to_bytes()),
-                mldsa65:STANDARD.encode(pq_sig),
-            }
-        }).unwrap()
+        serde_json::to_vec(&SignedCutover {
+            message: s.clone(),
+            signatures: DualSignatures {
+                ed25519: STANDARD.encode(ed.sign(&input).to_bytes()),
+                mldsa65: STANDARD.encode(pq_sig),
+            },
+        })
+        .unwrap()
     }
     #[test]
     fn real_dual_signature_permit_and_ack_fail_closed() {
-        let f: ContractFixture = serde_json::from_str(include_str!("../../docs/XSP_V2_CUTOVER_CONTRACT_VECTORS.json")).unwrap();
-        let (ed, pq, pin) = key_pair(7,9,"panel_response", &f.permit.issuer_id, f.permit.node_id);
-        let (next_ed, next_pq, next_pin) = key_pair(8,10,"node_request", &f.ack.issuer_id, f.ack.node_id);
+        let f: ContractFixture = serde_json::from_str(include_str!(
+            "../../docs/XSP_V2_CUTOVER_CONTRACT_VECTORS.json"
+        ))
+        .unwrap();
+        let (ed, pq, pin) = key_pair(
+            7,
+            9,
+            "panel_response",
+            &f.permit.issuer_id,
+            f.permit.node_id,
+        );
+        let (next_ed, next_pq, next_pin) =
+            key_pair(8, 10, "node_request", &f.ack.issuer_id, f.ack.node_id);
         let mut permit = f.permit.clone();
         permit.signer_ed_key_id = pin.ed_key_id.clone();
         permit.signer_pq_key_id = pin.pq_key_id.clone();
         permit.to_ed_key_id = next_pin.ed_key_id.clone();
         permit.to_pq_key_id = next_pin.pq_key_id.clone();
         let approved = ExpectedPermit {
-            node_id:permit.node_id,from_epoch:permit.from_epoch,to_epoch:permit.to_epoch,
-            request_id:permit.request_id.clone(),from_ed_key_id:permit.from_ed_key_id.clone(),
-            from_pq_key_id:permit.from_pq_key_id.clone(),
-            to_ed_key_id:permit.to_ed_key_id.clone(),to_pq_key_id:permit.to_pq_key_id.clone(),
-            candidate_sha256_hex:permit.candidate_sha256_hex.clone(),
+            node_id: permit.node_id,
+            from_epoch: permit.from_epoch,
+            to_epoch: permit.to_epoch,
+            request_id: permit.request_id.clone(),
+            from_ed_key_id: permit.from_ed_key_id.clone(),
+            from_pq_key_id: permit.from_pq_key_id.clone(),
+            to_ed_key_id: permit.to_ed_key_id.clone(),
+            to_pq_key_id: permit.to_pq_key_id.clone(),
+            candidate_sha256_hex: permit.candidate_sha256_hex.clone(),
         };
-        let signed = sign_staging_permit(&permit,&pin,&ed,&pq).unwrap();
-        let verified = verify_signed_permit(&signed,&pin,&approved,permit.issued_at_ms+1000).unwrap();
-        let mut ack=f.ack.clone();
+        let signed = sign_staging_permit(&permit, &pin, &ed, &pq).unwrap();
+        let verified =
+            verify_signed_permit(&signed, &pin, &approved, permit.issued_at_ms + 1000).unwrap();
+        let mut ack = f.ack.clone();
         ack.to_ed_key_id = next_pin.ed_key_id.clone();
         ack.to_pq_key_id = next_pin.pq_key_id.clone();
         ack.signer_ed_key_id = next_pin.ed_key_id.clone();
         ack.signer_pq_key_id = next_pin.pq_key_id.clone();
         ack.permit_sha256_hex = verified.input_hash.clone();
-        let ack_bytes = signed_with(&ack,&next_ed,&next_pq);
-        assert!(verify_signed_applied_ack(&ack_bytes,&verified,&next_pin,ack.issued_at_ms+1000).is_ok());
-        assert!(verify_signed_applied_ack(&ack_bytes,&verified,&pin,ack.issued_at_ms+1000).is_err());
-        assert!(verify_signed_applied_ack(&ack_bytes,&verified,&next_pin,ack.expires_at_ms+1).is_err());
+        let ack_bytes = signed_with(&ack, &next_ed, &next_pq);
+        assert!(
+            verify_signed_applied_ack(&ack_bytes, &verified, &next_pin, ack.issued_at_ms + 1000)
+                .is_ok()
+        );
+        assert!(
+            verify_signed_applied_ack(&ack_bytes, &verified, &pin, ack.issued_at_ms + 1000)
+                .is_err()
+        );
+        assert!(
+            verify_signed_applied_ack(&ack_bytes, &verified, &next_pin, ack.expires_at_ms + 1)
+                .is_err()
+        );
         let mut corrupt = parse_signed(&signed).unwrap();
-        corrupt.message.request_id="tampered".into();
-        let tampered=serde_json::to_vec(&corrupt).unwrap();
-        assert!(verify_signed_permit(&tampered,&pin,&approved,permit.issued_at_ms+1000).is_err());
+        corrupt.message.request_id = "tampered".into();
+        let tampered = serde_json::to_vec(&corrupt).unwrap();
+        assert!(
+            verify_signed_permit(&tampered, &pin, &approved, permit.issued_at_ms + 1000).is_err()
+        );
         let mut missing = parse_signed(&signed).unwrap();
-        missing.signatures.mldsa65=STANDARD.encode([0u8;3309]);
-        assert!(verify_signed_permit(&serde_json::to_vec(&missing).unwrap(),&pin,&approved,permit.issued_at_ms+1000).is_err());
-        missing=parse_signed(&signed).unwrap();
-        missing.signatures.ed25519=STANDARD.encode([0u8;64]);
-        assert!(verify_signed_permit(&serde_json::to_vec(&missing).unwrap(),&pin,&approved,permit.issued_at_ms+1000).is_err());
-        let mut wrong_ack=ack.clone();
-        wrong_ack.request_id="replayed-request".into();
-        let wrong=signed_with(&wrong_ack,&next_ed,&next_pq);
-        assert!(verify_signed_applied_ack(&wrong,&verified,&next_pin,ack.issued_at_ms+1).is_err());
-        let mut invalid=ack.clone();
+        missing.signatures.mldsa65 = STANDARD.encode([0u8; 3309]);
+        assert!(
+            verify_signed_permit(
+                &serde_json::to_vec(&missing).unwrap(),
+                &pin,
+                &approved,
+                permit.issued_at_ms + 1000
+            )
+            .is_err()
+        );
+        missing = parse_signed(&signed).unwrap();
+        missing.signatures.ed25519 = STANDARD.encode([0u8; 64]);
+        assert!(
+            verify_signed_permit(
+                &serde_json::to_vec(&missing).unwrap(),
+                &pin,
+                &approved,
+                permit.issued_at_ms + 1000
+            )
+            .is_err()
+        );
+        let mut wrong_ack = ack.clone();
+        wrong_ack.request_id = "replayed-request".into();
+        let wrong = signed_with(&wrong_ack, &next_ed, &next_pq);
+        assert!(
+            verify_signed_applied_ack(&wrong, &verified, &next_pin, ack.issued_at_ms + 1).is_err()
+        );
+        let mut invalid = ack.clone();
         invalid.candidate_sha256_hex = digest(b"not approved");
-        let wrong=signed_with(&invalid,&next_ed,&next_pq);
-        assert!(verify_signed_applied_ack(&wrong,&verified,&next_pin,ack.issued_at_ms+1).is_err());
-        assert!(verify_signed_permit(&signed,&pin,&approved,permit.expires_at_ms+1).is_err());
+        let wrong = signed_with(&invalid, &next_ed, &next_pq);
+        assert!(
+            verify_signed_applied_ack(&wrong, &verified, &next_pin, ack.issued_at_ms + 1).is_err()
+        );
+        assert!(verify_signed_permit(&signed, &pin, &approved, permit.expires_at_ms + 1).is_err());
     }
 }
