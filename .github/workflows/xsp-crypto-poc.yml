@@ -21,6 +21,15 @@ jobs:
     container: rust:1.99-trixie
     steps:
       - uses: actions/checkout@v4
+      - name: Fetch XMesh-Node test-only Go verifier
+        uses: actions/checkout@v4
+        with:
+          repository: TriplexCorp/XMesh-Node
+          path: xmesh-node
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache: false
       - name: Install OpenSSL 3.5 development headers
         run: |
           apt-get update
@@ -31,6 +40,13 @@ jobs:
       - name: Validate isolated Rust ML-DSA provider, hybrid signatures and negative cases
         run: |
           cargo test --manifest-path security/xspv2/poc-rust/Cargo.toml --all-targets
+      - name: Cross-verify real Go and Rust signed artifacts in BOTH directions
+        run: |
+          cd xmesh-node/security/xspv2/poc-go
+          go build -o "$RUNNER_TEMP/xsp-go-interop" ./cmd/interop
+          cd "$GITHUB_WORKSPACE"
+          cargo build --manifest-path security/xspv2/poc-rust/Cargo.toml --bin interop
+          XSP_GO_CLI="$RUNNER_TEMP/xsp-go-interop" XSP_RUST_CLI="$GITHUB_WORKSPACE/security/xspv2/poc-rust/target/debug/interop" python3 scripts/check-xsp-cross-language.py
       - name: Check Rust PoC formatting
         run: |
           rustup component add rustfmt
