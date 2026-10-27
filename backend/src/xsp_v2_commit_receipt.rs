@@ -2,8 +2,7 @@
 //! NOT a live API route, a key-custody mechanism, or Node key-retirement consent.
 #![allow(dead_code)]
 use crate::{
-    xsp_v2_ack_epoch_commit::StagingStoredACKEvidence,
-    xsp_v2_signed_cutover::TrustedPublic,
+    xsp_v2_ack_epoch_commit::StagingStoredACKEvidence, xsp_v2_signed_cutover::TrustedPublic,
 };
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use ed25519_dalek::{Signature, Signer as _, SigningKey, Verifier as _, VerifyingKey};
@@ -64,7 +63,11 @@ fn ascii(out: &mut Vec<u8>, value: &str, max: usize) -> Result<(), &'static str>
     if value.is_empty() || value.len() > max || !value.bytes().all(|b| b.is_ascii_graphic()) {
         return Err("invalid receipt ASCII field");
     }
-    out.extend_from_slice(&u32::try_from(value.len()).map_err(|_| "length")?.to_be_bytes());
+    out.extend_from_slice(
+        &u32::try_from(value.len())
+            .map_err(|_| "length")?
+            .to_be_bytes(),
+    );
     out.extend_from_slice(value.as_bytes());
     Ok(())
 }
@@ -223,7 +226,11 @@ pub fn verify_staging_commit_receipt(
         return Err("receipt not bound to committed ledger evidence");
     }
     validated_pin(panel_pin, &signed.message)?;
-    let ed_bytes: [u8; 32] = panel_pin.ed_public.as_slice().try_into().map_err(|_| "bad Ed key")?;
+    let ed_bytes: [u8; 32] = panel_pin
+        .ed_public
+        .as_slice()
+        .try_into()
+        .map_err(|_| "bad Ed key")?;
     let ed_verifier = VerifyingKey::from_bytes(&ed_bytes).map_err(|_| "bad Ed25519 public")?;
     let ed_sig: [u8; 64] = exact_b64(&signed.signatures.ed25519, 64)?
         .try_into()
@@ -232,10 +239,9 @@ pub fn verify_staging_commit_receipt(
         .verify(&input, &Signature::from_bytes(&ed_sig))
         .map_err(|_| "receipt Ed25519 verification failed")?;
     let pq_sig = exact_b64(&signed.signatures.mldsa65, 3309)?;
-    let pq_public = PKey::public_key_from_raw_bytes_ex(
-        None, KeyType::ML_DSA_65, None, &panel_pin.pq_public,
-    )
-    .map_err(|_| "bad panel ML-DSA public key")?;
+    let pq_public =
+        PKey::public_key_from_raw_bytes_ex(None, KeyType::ML_DSA_65, None, &panel_pin.pq_public)
+            .map_err(|_| "bad panel ML-DSA public key")?;
     let mut pq_verifier =
         PQVerifier::new_without_digest(&pq_public).map_err(|_| "PQ verifier unavailable")?;
     if !pq_verifier
@@ -259,7 +265,10 @@ mod tests {
         assert_eq!(fixture.schema, "xsp2-commit-receipt-1");
         let input = canonical(&fixture.message).unwrap();
         assert_eq!(hex::encode(&input), fixture.signing_input_hex);
-        assert_eq!(hex::encode(Sha256::digest(&input)), fixture.signing_input_sha256_hex);
+        assert_eq!(
+            hex::encode(Sha256::digest(&input)),
+            fixture.signing_input_sha256_hex
+        );
         let mut wrong = fixture.message.clone();
         wrong.protocol = "XMESH1".into();
         assert!(canonical(&wrong).is_err());
