@@ -1,5 +1,20 @@
 # XMesh Nexus
 
+## Fully automated installation — Docker, Nginx and HTTPS included
+
+**You do not need to install Docker, Docker Compose, Nginx or Certbot by hand.** On a clean **Ubuntu 22.04/24.04 LTS** VPS, install Git, point a public DNS A/AAAA record for the panel domain to the VPS and allow inbound TCP/80 and TCP/443. Then:
+
+```bash
+sudo apt-get update && sudo apt-get install -y git
+git clone https://github.com/TriplexCorp/XMesh-Nexus.git
+cd XMesh-Nexus
+bash install.sh
+```
+
+The installer requests your domain and Let's Encrypt email (or accepts `PANEL_DOMAIN`/`PANEL_ACME_EMAIL`), installs **Docker Engine + Buildx/Compose, official Nginx Mainline and Certbot**, generates secrets and the initial admin account, runs PostgreSQL/TimescaleDB, Redis and the API, waits for readiness, issues a trusted TLS certificate and configures the HTTP → HTTPS reverse proxy. The API binds only to **`127.0.0.1:8080`**; the public entrypoint is Nginx on your domain. DNS/firewall and secure storage of credentials are still your responsibility. [Full setup and updates](#install-the-panel).
+
+**Managed node bootstrap is automated, too:** use **Nodes → Connect node and metrics** inside Nexus and run the generated token-free bootstrap command on an Ubuntu node VPS. It installs Docker/Compose if needed and provisions the router, Ed25519 enrollment and metrics/control timers. [Node onboarding](https://github.com/TriplexCorp/XMesh-Node#быстрое-подключение-из-xmesh-nexus-docker--метрики). Standalone installation of the router is a separate option.
+
 ## XSP-v2 — hybrid post-quantum security status (October 27, 2026)
 
 **Laboratory implementation exists; protection is not deployed to live nodes.** PR01 provides a draft [domain-separated wire specification](docs/XSP_V2_WIRE_SPEC.md) with identical Node/Nexus test vectors. PR02 contains isolated Rust/OpenSSL 3.5 and Go 1.27.3 **Ed25519 AND ML-DSA-65** implementations; direct **Go → Rust and Rust → Go** signed-message interchange rejects missing/corrupted signatures, key substitution and tampered messages. [Crypto PoC and gates](docs/XSP_V2_CRYPTO_POC.md) · [Nexus crypto CI (passed)](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40431220079).
@@ -67,7 +82,7 @@ XRAY STUDIO now separates server FinalMask from xmesh.clientFinalmask metadata. 
 | **XRAY STUDIO** | Editable Xray JSON, full transport-aware FinalMask preset catalog, profile tools and inbound/host/node associations | The public subscription generator does not support every protocol offered by the editor |
 | **Managed nodes** | Ed25519 enrollment, signed requests, heartbeats, desired configuration, restart/update commands | Node-side execution is provided by [XMesh-Node](https://github.com/TriplexCorp/XMesh-Node) |
 | **Subscriptions** | Token issuing/revocation, public URL, HTML portal, native Xray JSON, RU/EN, User-Agent device negotiation | Rust outbound generation supports VLESS, VMess, Trojan, Shadowsocks (including SS2022), Hysteria2 and MASQUE, subject to valid protocol/transport settings and client support |
-| **SUBSCRIPTION STUDIO** | Domain/name, portal appearance, client-app catalog, JSON and balancer settings | DNS, HTTPS and reverse-proxy routing are operator responsibilities |
+| **SUBSCRIPTION STUDIO** | Domain/name, portal appearance, client-app catalog, JSON and balancer settings | The panel domain gets automated Nginx/HTTPS from `install.sh`; custom subscription domains, DNS and external proxy routing need correct operator configuration |
 | **Statistics** | Node RX/TX and system metrics; per-user/per-inbound traffic counters and diagnostic pages | Xray StatsService and up-to-date agents must report real samples |
 | **Security** | Server-enforced owner/admin/viewer roles, Argon2, sessions, rate limiting, TOTP, audit log | This is not a claim of a complete penetration test or guaranteed vulnerability-free deployment |
 | **IP pools** | Up to **256 addresses**, validation and persisted per-node/per-user round-robin cursor | Public native JSON uses sticky per-user/per-node IP rotation for unambiguous direct endpoints |
@@ -88,38 +103,58 @@ Restart and update requests are asynchronous. A successfully queued request is n
 
 ## Install the panel
 
-Requirements: Linux, Docker Engine, Docker Compose plugin, Git and OpenSSL.
+**Supported host automation: Ubuntu 22.04/24.04 LTS.** Start with a root/sudo-capable VPS, a public FQDN that resolves to it (including any AAAA record), and reachable **TCP/80 and TCP/443**. **Git is the only package you need to install first**:
 
 ```bash
+sudo apt-get update && sudo apt-get install -y git
 git clone https://github.com/TriplexCorp/XMesh-Nexus.git
 cd XMesh-Nexus
-chmod +x install.sh
-./install.sh
+bash install.sh
 ```
 
-The installer provisions `.env`, secrets, the initial administrator and a dashboard entry path. Store the credentials and keys securely. Never commit `.env` or subscription tokens.
+`install.sh` requests sudo when necessary and **automatically provisions**:
 
-By default, the host exposes the panel on **`127.0.0.1:8080`**. Put an **HTTPS reverse proxy** in front of it, keep the admin API private and do not expose PostgreSQL or Redis to the internet. Keep `COOKIE_SECURE=true` in production.
+1. Docker Engine/CLI, Buildx and the Docker Compose plugin from Docker's signed Ubuntu repository; Nginx Mainline from nginx.org's signed repository; Certbot and required host packages.
+2. Secure `.env` permissions, randomly generated PostgreSQL/Redis/admin secrets, stable MFA/subscription keys and a unique dashboard URL path; on re-install, existing credentials and volumes are preserved.
+3. PostgreSQL/TimescaleDB, private Redis and Rust API containers through Compose, with readiness checks **before** publishing HTTPS.
+4. A Let's Encrypt **HTTP-01** certificate via Certbot and the managed `/etc/nginx/conf.d/xmesh-nexus.conf` vhost with HTTP → HTTPS redirect and reverse proxy to `127.0.0.1:8080`. Nginx is temporarily stopped for standalone certificate validation; on config failure, the previous managed vhost is restored.
+5. Root-owned systemd watchers for dashboard-path synchronization and owner-requested panel updates.
+
+For non-interactive deployment supply your own real domain/email:
+
+```bash
+sudo PANEL_DOMAIN=panel.example.org PANEL_ACME_EMAIL=ops@example.org bash install.sh
+```
+
+**Operator prerequisites remain:** working DNS pointing at this VPS, valid inbound firewall/NAT rules for 80/443, access to your admin password in the private `.env` and a secure backup. The installer does **not** register DNS, open a cloud firewall, overwrite other domains' Nginx vhosts or publish PostgreSQL/Redis ports. The API stays on loopback. Keep `COOKIE_SECURE=true`, never share `.env` or subscription tokens, and avoid `docker compose down -v` (removes persistent volumes).
+
+Operational diagnostics:
 
 ```bash
 docker compose ps
 docker compose logs --tail=100 panel
 docker compose logs --tail=100 db
-bash xmeshctl
+sudo bash xmeshctl
 ```
-
-The `xmeshctl` helper supports operational checks, logs, backups and updates. **Do not use `docker compose down -v` for routine upgrades**: it deletes persistent volumes.
 
 ### Update
 
-Frontend assets are baked into the panel image. A `git pull` alone does not refresh the running container:
+**Preferred supported path:** **Settings → Update XMesh Nexus → Update panel** (owner-only) or the interactive CLI menu:
+
+```bash
+sudo bash xmeshctl
+```
+
+The UI request is handled by a separate root-owned `xmesh-panel-update.path/.service` worker installed during setup; the web API has no Docker socket. `xmeshctl` backs up PostgreSQL, checks local Git changes, fast-forwards the configured upstream, preserves existing credentials, rebuilds the Docker image, and can refresh the managed Nginx vhost when run as root. A **queued** update means accepted, **not finished**; inspect `running/success/failed` and `/var/log/xmesh-nexus/update.log`.
+
+For a manual, operator-controlled update **after creating a backup**:
 
 ```bash
 git pull --ff-only origin main
 docker compose up -d --build
 ```
 
-Back up first, then check panel logs and node health. Updating the control plane **does not automatically prove that every node runtime is current**. See [panel updates and telemetry](docs/PANEL_UPDATE_AND_TELEMETRY.md).
+A `git pull` alone does **not** replace the running image's bundled frontend assets. Panel updates do **not** automatically update every node runtime: use **Nodes → Update Agent** separately and confirm heartbeat, profile application and Xray process state. See [panel update and telemetry](docs/PANEL_UPDATE_AND_TELEMETRY.md).
 
 ### Backup and persistent secrets
 
@@ -219,7 +254,7 @@ Some static assertions under `scripts/` depend on source text and can fail after
 2. **Public subscriptions produce native Xray JSON only.** Several protocols are implemented, but not every editor, transport and client-app combination has end-to-end verification.
 3. **IP rotation is integrated into the public native JSON feed for unambiguous direct-node endpoints only.** CDN and external proxy hostnames are intentionally excluded.
 4. **Per-user offline enforcement is bounded, not a strict global quota guarantee across disconnected nodes.**
-5. **Operators must configure DNS, HTTPS reverse proxy, VPS addresses and agent updates.**
+5. **Operators must configure DNS, VPS firewall/addressing and any custom external proxy.** Standard Nginx HTTPS for the panel is already automated by `install.sh`; independently deployed nodes and their traffic still require validation.
 6. **Network-interface RX/TX is not the same as Xray per-user accounting.**
 
 ---
