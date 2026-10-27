@@ -349,24 +349,24 @@ async fn serve_connection(
     Ok(())
 }
 
-/// Dedicated entrypoint selected only by the explicit signer command argument.
-pub async fn run() -> Result<()> {
-    let keys = load_signing_material(true)?;
+async fn connect_signer_pool() -> Result<PgPool> {
     let database_url =
         env::var("XSP_V2_SIGNER_DATABASE_URL").context("XSP_V2_SIGNER_DATABASE_URL is required")?;
     ensure!(
         !database_url.trim().is_empty(),
         "XSP_V2_SIGNER_DATABASE_URL must target xmesh_signer_reader"
     );
-    let pool = PgPoolOptions::new()
+    PgPoolOptions::new()
         .max_connections(4)
         .acquire_timeout(Duration::from_secs(5))
         .connect(&database_url)
         .await
-        .context("connect signer read-only PostgreSQL role")?;
+        .context("connect signer read-only PostgreSQL role")
+}
 
+async fn validate_signer_database_role(pool: &PgPool) -> Result<()> {
     let current_role: String = sqlx::query_scalar("SELECT current_user")
-        .fetch_one(&pool)
+        .fetch_one(pool)
         .await?;
     ensure!(
         current_role == "xmesh_signer_reader",
@@ -374,7 +374,7 @@ pub async fn run() -> Result<()> {
     );
     let is_read_only: bool =
         sqlx::query_scalar("SELECT current_setting('transaction_read_only') = 'on'")
-            .fetch_one(&pool)
+            .fetch_one(pool)
             .await?;
     ensure!(
         is_read_only,
@@ -384,7 +384,7 @@ pub async fn run() -> Result<()> {
         "SELECT rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication OR rolbypassrls
          FROM pg_roles WHERE rolname=current_user",
     )
-    .fetch_one(&pool)
+    .fetch_one(pool)
     .await?;
     ensure!(
         !privileged,
@@ -396,13 +396,16 @@ pub async fn run() -> Result<()> {
            WHERE member=(SELECT oid FROM pg_roles WHERE rolname=current_user)
          )",
     )
-    .fetch_one(&pool)
+    .fetch_one(pool)
     .await?;
     ensure!(
         !has_role_memberships,
         "signer database role must not inherit or SET ROLE to another role"
     );
+    Ok(())
+}
 
+fn bind_signer_socket() -> Result<(PathBuf, UnixListener)> {
     let socket_path = env::var_os("XSP_V2_SIGNER_SOCKET_PATH")
         .map_or_else(|| PathBuf::from(SOCKET_PATH_DEFAULT), PathBuf::from);
     ensure!(
@@ -421,7 +424,6 @@ pub async fn run() -> Result<()> {
             && parent_metadata.permissions().mode() & 0o777 == 0o750,
         "signer socket directory must be a non-symlink signer-owned 0750 directory"
     );
-
     match fs::symlink_metadata(&socket_path) {
         Ok(metadata) => {
             ensure!(
@@ -438,6 +440,15 @@ pub async fn run() -> Result<()> {
     let listener = UnixListener::bind(&socket_path).context("bind protected signer socket")?;
     fs::set_permissions(&socket_path, fs::Permissions::from_mode(0o660))
         .context("set protected signer socket permissions")?;
+    Ok((socket_path, listener))
+}
+
+/// Dedicated entrypoint selected only by the explicit signer command argument.
+pub async fn run() -> Result<()> {
+    let keys = load_signing_material(true)?;
+    let pool = connect_signer_pool().await?;
+    validate_signer_database_role(&pool).await?;
+    let (socket_path, listener) = bind_signer_socket()?;
 
     tracing::info!(
         socket = %socket_path.display(),
