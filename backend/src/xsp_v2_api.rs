@@ -379,10 +379,82 @@ pub async fn authenticate_committed_ack_recovery_staging(
     Ok(())
 }
 
+
+#[cfg(test)]
+pub(crate) fn recovery_signing_input_for_test(
+    raw_auth: &[u8],
+    exact_ack: &[u8],
+    node_id: i64,
+    request_id: &str,
+    now_ms: i64,
+) -> Result<Vec<u8>, ApiError> {
+    parse_recovery_authority(raw_auth, exact_ack, node_id, request_id, now_ms)
+        .map(|parsed| parsed.canonical)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::{Value, json};
+
+    #[test]
+    fn recovery_identity_requires_distinct_domain_exact_body_and_pinned_node() {
+        let sample: Value =
+            serde_json::from_str(include_str!("../../docs/XSP_V2_VECTORS.json")).unwrap();
+        let vector = &sample["vectors"][0];
+        let now = vector["issued_at_ms"].as_i64().unwrap();
+        let node = vector["node_id"].as_i64().unwrap();
+        let request = vector["request_id"].as_str().unwrap();
+        let ack = b"exact-signed-ack-serialization";
+        let mut v = json!({
+            "protocol":"XSP/2","suite":"Ed25519+ML-DSA-65",
+            "direction":1,"messageType":ACK_RECOVERY_MESSAGE,
+            "issuerId":format!("node-{node}"),"nodeId":node,
+            "method":"POST","path":ACK_RECOVERY_PATH,
+            "ed25519KeyId":vector["ed_key_id"],
+            "mldsa65KeyId":vector["pq_key_id"],
+            "keyEpoch":vector["key_epoch"],
+            "issuedAtMs":now,"expiresAtMs":now + 60_000,
+            "nonceHex":"99".repeat(16),"requestId":request,
+            "revision":"","payloadB64":STANDARD.encode(ack),
+            "signatures":{
+                "ed25519":STANDARD.encode([0u8;64]),
+                "mldsa65":STANDARD.encode(vec![0u8;3309])
+            }
+        });
+        let encoded = serde_json::to_vec(&v).unwrap();
+        let parsed = parse_recovery_authority(&encoded, ack, node, request, now).unwrap();
+        assert!(verify_both(&parsed, &[1u8; 32], &[2u8; 1952]).is_err());
+        assert!(parse(&encoded, now).is_err(), "heartbeat domain must differ");
+        assert!(parse_recovery_authority(&encoded, ack, node + 1, request, now).is_err());
+        assert!(parse_recovery_authority(&encoded, b"changed", node, request, now).is_err());
+        assert!(parse_recovery_authority(&encoded, ack, node, "wrong-id", now).is_err());
+        assert!(parse_recovery_authority(&encoded, ack, node, request, now + 120_001).is_err());
+        for (field, invalid) in [
+            ("messageType", json!("node.heartbeat")),
+            ("path", json!("/api/v2/node/heartbeat")),
+            ("method", json!("GET")),
+            ("nonceHex", json!("00".repeat(16))),
+            ("issuerId", json!("untrusted")),
+            ("payloadB64", json!(STANDARD.encode(b"other-ack"))),
+            ("keyEpoch", json!(0)),
+        ] {
+            let saved = v[field].clone();
+            v[field] = invalid;
+            assert!(
+                parse_recovery_authority(
+                    &serde_json::to_vec(&v).unwrap(),
+                    ack,
+                    node,
+                    request,
+                    now
+                )
+                .is_err(),
+                "{field} must be rejected"
+            );
+            v[field] = saved;
+        }
+    }
 
     #[test]
     fn shared_wire_heartbeat_canonical_and_invalid_cases() {
