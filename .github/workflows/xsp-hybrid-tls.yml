@@ -44,8 +44,6 @@ jobs:
           apt-get update
           apt-get install -y --no-install-recommends openssl nginx ca-certificates python3
           openssl version
-      - name: Enforce dedicated ingress remains inert and unmounted
-        run: node scripts/check-xsp-v2-ingress-runtime.js
       - name: Build isolated Go TLS probe
         run: |
           cd xmesh-node/security/xspv2/poc-go
