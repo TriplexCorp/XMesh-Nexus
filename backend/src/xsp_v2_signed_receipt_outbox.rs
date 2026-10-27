@@ -270,6 +270,105 @@ pub async fn load_committed_signed_receipt_staging(
     Ok(receipt)
 }
 
+
+/// Complete a previously committed ACK into exactly one durable signed
+/// receipt, or recover the original bytes after a lost network response.
+///
+/// The signing callback is an **injected staging boundary**, NOT a signer
+/// implementation: the eventual caller must use a separately protected
+/// panel_response signing service with independently pinned public keys.
+/// The API process must never hold, import or log private signing keys.
+/// Neither this helper nor signed ACK bytes authenticate a network caller:
+/// the calling route must independently establish a PQ-only TLS hop and
+/// authenticated/authorized Node identity before reaching this helper.
+///
+/// Only a separately verified committed DB ACK can reach the signer. An
+/// existing outbox row always goes through full historical DB and BOTH panel
+/// signature verification, and never calls the signer again. Concurrent
+/// insertion of another valid receipt is resolved by returning the original
+/// independently verified durable bytes; all other failures remain closed.
+///
+/// # Errors
+/// Rejects uncommitted or forged ACK, mismatched Node/request/epoch, missing
+/// public pins, corrupt durable receipt, untrusted signature or DB failures.
+pub async fn issue_or_recover_signed_receipt_staging<F>(
+    pool: &PgPool,
+    authenticated_node_id: i64,
+    request_id: &str,
+    signed_ack_bytes: &[u8],
+    pinned_panel: &TrustedPublic,
+    sign_from_verified_commit: F,
+) -> Result<Vec<u8>>
+where
+    F: FnOnce(&crate::xsp_v2_ack_epoch_commit::StagingStoredACKEvidence) -> Result<Vec<u8>>,
+{
+    // Only this opaque, nonconstructible DB witness can be passed to the
+    // signing callback. No caller-supplied epoch/digest authorizes signing.
+    let evidence = readback_committed_applied_ack_staging(
+        pool,
+        authenticated_node_id,
+        request_id,
+        signed_ack_bytes,
+        pinned_panel,
+    )
+    .await?;
+
+    let existing: bool = sqlx::query_scalar(
+        "SELECT EXISTS (
+           SELECT 1 FROM node_xsp_signed_commit_receipt_outbox
+           WHERE node_id=$1 AND request_id=$2
+         )",
+    )
+    .bind(authenticated_node_id)
+    .bind(request_id)
+    .fetch_one(pool)
+    .await?;
+    if existing {
+        // Never trust an outbox existence bit alone, never re-sign on retries.
+        return load_committed_signed_receipt_staging(
+            pool,
+            authenticated_node_id,
+            request_id,
+            signed_ack_bytes,
+            pinned_panel,
+        )
+        .await;
+    }
+
+    let signed_bytes = sign_from_verified_commit(&evidence)?;
+    // This validates both signatures and locked relational evidence before
+    // durable insert. Signatures alone never commit or switch the epoch.
+    match store_or_load_signed_receipt_staging(
+        pool,
+        authenticated_node_id,
+        request_id,
+        signed_ack_bytes,
+        &signed_bytes,
+        pinned_panel,
+    )
+    .await
+    {
+        Ok(saved) => Ok(saved),
+        Err(original_error) => {
+            // A concurrent writer may have won with different exact signed
+            // bytes (e.g. randomized PQ signatures). A safe retry must use
+            // the first durable receipt, never overwrite it or sign again.
+            // If the stored receipt is missing/invalid, this fails closed.
+            load_committed_signed_receipt_staging(
+                pool,
+                authenticated_node_id,
+                request_id,
+                signed_ack_bytes,
+                pinned_panel,
+            )
+            .await
+            .with_context(|| {
+                format!("signed receipt insertion failed: {original_error:#}")
+            })
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
