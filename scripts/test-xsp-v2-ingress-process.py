@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
-"""Disposable XSP-v2 dedicated ingress process/container E2E.
+"""Disposable XSP-v2 ingress + protected origin-boundary process E2E.
 
-Builds an isolated Nginx/OpenSSL 3.5+ runtime, creates throwaway TLS material,
-proves the exact TLS 1.3 X25519MLKEM768 handshake with both the Node Go probe
-and OpenSSL, and verifies the ingress stays HTTP-inert with no backend hop.
+P0-C1 properties remain mandatory: TLS 1.3, negotiated X25519MLKEM768,
+trusted server certificate/SNI, no resumption substitute, no classical fallback.
+
+P0-C2-A adds one test-only identity endpoint. The endpoint requires a verified
+client certificate, strips caller headers/body, proxies only over a Unix socket,
+and the disposable origin verifies SO_PEERCRED plus a pinned ML-DSA-65 SPKI.
+The ACK and legacy application routes remain unmounted/inert 404.
 
 Never connects to an existing Nexus API, production DB, production key store,
 public listener, DNS, or VPS.
@@ -16,11 +20,14 @@ import os
 from pathlib import Path
 import secrets
 import subprocess
+import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
 HOSTNAME = "node-ingress.xsp.invalid"
 ALIAS = "xsp-ingress"
+IDENTITY_PATH = "/__xsp_v2_identity_probe"
+TRUSTED_NODE_ID = 4242
 
 
 def command(*args: str, input_text: str | None = None, check: bool = True, timeout: int = 120):
@@ -41,6 +48,21 @@ def command(*args: str, input_text: str | None = None, check: bool = True, timeo
     return result
 
 
+def parse_json_body(response: str) -> dict[str, object]:
+    decoder = json.JSONDecoder()
+    start = response.find("{")
+    while start >= 0:
+        try:
+            value, _end = decoder.raw_decode(response[start:])
+        except json.JSONDecodeError:
+            start = response.find("{", start + 1)
+            continue
+        if isinstance(value, dict):
+            return value
+        start = response.find("{", start + 1)
+    raise RuntimeError(f"missing JSON response body: {response[-1200:]}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--go-probe", required=True, help="Freshly built XMesh-Node Go 1.27 tlsprobe binary")
@@ -54,14 +76,29 @@ def main() -> None:
     token = secrets.token_hex(5)
     prefix = f"xsp-ingress-e2e-{token}"
     runtime_image = f"xmesh-xsp-ingress:{token}"
+    origin_image = f"xmesh-xsp-origin-probe:{token}"
     probe_image = f"xmesh-xsp-ingress-probe:{token}"
     network = f"{prefix}-net"
     ingress = f"{prefix}-ingress"
+    origin = f"{prefix}-origin"
     certs = f"{prefix}-certs"
     sessions = f"{prefix}-sessions"
+    origin_socket = f"{prefix}-origin-socket"
     containers: list[str] = []
+    client_material = tempfile.TemporaryDirectory(prefix=f"{prefix}-client-material-")
+    client_material_path = Path(client_material.name)
 
-    def go_probe(check: bool = True):
+    def go_probe(check: bool = True, mutual: bool = False):
+        probe_args = [
+            "-address", f"{ALIAS}:8444",
+            "-servername", HOSTNAME,
+            "-ca-file", "/certs/fullchain.pem",
+        ]
+        if mutual:
+            probe_args.extend([
+                "-client-cert", "/certs/client.pem",
+                "-client-key", "/certs/client-key.pem",
+            ])
         return command(
             "docker", "run", "--rm",
             "--network", network,
@@ -69,27 +106,70 @@ def main() -> None:
             "--mount", f"type=bind,src={probe_binary},dst=/usr/local/bin/xsp-tlsprobe,readonly",
             "--entrypoint", "/usr/local/bin/xsp-tlsprobe",
             probe_image,
-            "-address", f"{ALIAS}:8444",
-            "-servername", HOSTNAME,
-            "-ca-file", "/certs/fullchain.pem",
+            *probe_args,
             check=check,
             timeout=20,
         )
 
-    def assert_single_ingress() -> None:
+    def assert_single_ingress_network_member() -> None:
         data = json.loads(command("docker", "network", "inspect", network).stdout)[0]
         names = sorted(container["Name"] for container in data.get("Containers", {}).values())
         if names != [ingress]:
             raise RuntimeError(f"unexpected persistent containers on isolated ingress network: {names}")
 
+    def https_request(
+        path: str,
+        cert: str | None = None,
+        key: str | None = None,
+        extra_headers: tuple[str, ...] = (),
+        check: bool = True,
+    ):
+        cert_args = ""
+        if cert and key:
+            cert_args = f"-cert /certs/{cert} -key /certs/{key}"
+        headers = "\n".join(extra_headers)
+        if headers:
+            headers += "\n"
+        script = f"""
+set -eu
+set +e
+timeout 4s openssl s_client -quiet -ign_eof \
+  -connect {ALIAS}:8444 \
+  -servername {HOSTNAME} \
+  -verify_hostname {HOSTNAME} -verify_return_error \
+  -CAfile /certs/fullchain.pem -tls1_3 -groups X25519MLKEM768 \
+  {cert_args} <<'EOF'
+GET {path} HTTP/1.1\r
+Host: {HOSTNAME}\r
+{headers}Connection: close\r
+\r
+EOF
+rc=$?
+set -e
+[ "$rc" -eq 0 ] || [ "$rc" -eq 124 ]
+"""
+        return command(
+            "docker", "run", "--rm",
+            "--network", network,
+            "--mount", f"type=volume,src={certs},dst=/certs,readonly",
+            "--entrypoint", "/bin/sh", probe_image, "-ceu", script,
+            check=check,
+            timeout=12,
+        )
+
     try:
         command("docker", "network", "create", "--internal", network)
         command("docker", "volume", "create", certs)
         command("docker", "volume", "create", sessions)
+        command("docker", "volume", "create", origin_socket)
 
         if not args.skip_build:
             dockerfile = ROOT / "deploy/xsp-v2-ingress/Dockerfile"
-            for target, tag in [("runtime", runtime_image), ("probe", probe_image)]:
+            for target, tag in [
+                ("runtime", runtime_image),
+                ("origin-probe", origin_image),
+                ("probe", probe_image),
+            ]:
                 command(
                     "docker", "build",
                     "-f", str(dockerfile),
@@ -105,6 +185,29 @@ def main() -> None:
         if not version.startswith("OpenSSL 3."):
             raise RuntimeError(f"unexpected OpenSSL runtime: {version}")
 
+        # Generate disposable client X.509/PKCS#8 material with the exact Go
+        # 1.27 stack that must later load it. OpenSSL/Nginx must then prove they
+        # can consume that same standards-encoded ML-DSA material.
+        command(
+            "go", "run",
+            str(ROOT / "scripts/generate-xsp-v2-mldsa-test-certs.go"),
+            "-out", str(client_material_path),
+            timeout=60,
+        )
+        required_client_files = [
+            "client-ca.pem",
+            "client.pem",
+            "client-key.pem",
+            "other-client.pem",
+            "other-client-key.pem",
+            "classical-client.pem",
+            "classical-client-key.pem",
+            "client-spki.sha256",
+        ]
+        for name in required_client_files:
+            if not (client_material_path / name).is_file():
+                raise RuntimeError(f"Go ML-DSA fixture generator omitted {name}")
+
         cert_setup = r"""
 set -eu
 umask 077
@@ -116,16 +219,76 @@ openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
   -subj "/CN=unrelated.xsp.invalid" \
   -addext "subjectAltName=DNS:unrelated.xsp.invalid" \
   -days 1 -keyout /certs/unrelated-key.pem -out /certs/unrelated.pem >/dev/null 2>&1
-chown 0:10003 /certs/privkey.pem /certs/fullchain.pem
-chmod 0440 /certs/privkey.pem /certs/fullchain.pem
-chmod 0400 /certs/unrelated-key.pem
-chmod 0444 /certs/unrelated.pem
+
+# Copy Go 1.27-generated ML-DSA-65 CA/client PKCS#8 + X.509 fixtures into the
+# throwaway Docker volume. This makes Go/OpenSSL/Nginx interop part of the gate.
+for name in client-ca.pem client.pem client-key.pem other-client.pem other-client-key.pem \
+  classical-client.pem classical-client-key.pem client-spki.sha256; do
+  cp "/client-material/$name" "/certs/$name"
+done
+
+test "$(wc -c </certs/client-spki.sha256)" -eq 65
+chown 0:10003 /certs/privkey.pem /certs/fullchain.pem /certs/client-ca.pem
+chmod 0440 /certs/privkey.pem /certs/fullchain.pem /certs/client-ca.pem
+chmod 0400 /certs/unrelated-key.pem /certs/client-key.pem \
+  /certs/other-client-key.pem /certs/classical-client-key.pem
+chmod 0444 /certs/unrelated.pem /certs/client.pem /certs/other-client.pem \
+  /certs/classical-client.pem /certs/client-spki.sha256
 """
         command(
             "docker", "run", "--rm", "--user", "0:0",
             "--mount", f"type=volume,src={certs},dst=/certs",
+            "--mount", f"type=bind,src={client_material_path},dst=/client-material,readonly",
             "--entrypoint", "/bin/sh", probe_image, "-ceu", cert_setup,
+            timeout=60,
         )
+        expected_spki = command(
+            "docker", "run", "--rm",
+            "--mount", f"type=volume,src={certs},dst=/certs,readonly",
+            "--entrypoint", "/bin/sh", probe_image, "-ceu", "cat /certs/client-spki.sha256",
+        ).stdout.strip()
+        if len(expected_spki) != 64:
+            raise RuntimeError("invalid disposable client SPKI fingerprint")
+
+        # Initialize the shared UDS directory. The origin owns the directory;
+        # ingress GID can traverse/connect but cannot replace the socket entry.
+        command(
+            "docker", "run", "--rm", "--user", "0:0", "--network", "none",
+            "--mount", f"type=volume,src={origin_socket},dst=/run/xmesh-origin",
+            "--entrypoint", "/bin/sh", origin_image, "-ceu",
+            "chown 10004:10003 /run/xmesh-origin && chmod 0750 /run/xmesh-origin",
+        )
+
+        command(
+            "docker", "run", "-d",
+            "--name", origin,
+            "--network", "none",
+            "--read-only",
+            "--tmpfs", "/tmp:rw,noexec,nosuid,size=8m,mode=1777",
+            "--cap-drop=ALL",
+            "--security-opt=no-new-privileges",
+            "--mount", f"type=volume,src={origin_socket},dst=/run/xmesh-origin",
+            "-e", f"XSP_EXPECTED_CLIENT_SPKI_SHA256={expected_spki}",
+            "-e", f"XSP_EXPECTED_NODE_ID={TRUSTED_NODE_ID}",
+            "-e", "XSP_EXPECTED_INGRESS_UID=10003",
+            "-e", "XSP_EXPECTED_INGRESS_GID=10003",
+            origin_image,
+        )
+        containers.append(origin)
+
+        for _ in range(40):
+            ready = command(
+                "docker", "run", "--rm", "--network", "none",
+                "--mount", f"type=volume,src={origin_socket},dst=/run/xmesh-origin,readonly",
+                "--entrypoint", "/bin/sh", probe_image, "-ceu",
+                "test -S /run/xmesh-origin/xsp-v2-origin.sock",
+                check=False,
+            )
+            if ready.returncode == 0:
+                break
+            time.sleep(0.1)
+        else:
+            raise RuntimeError("origin Unix socket never became ready")
 
         command(
             "docker", "run", "-d",
@@ -137,6 +300,7 @@ chmod 0444 /certs/unrelated.pem
             "--cap-drop=ALL",
             "--security-opt=no-new-privileges",
             "--mount", f"type=volume,src={certs},dst=/run/xmesh-ingress-certs,readonly",
+            "--mount", f"type=volume,src={origin_socket},dst=/run/xmesh-origin",
             runtime_image,
         )
         containers.append(ingress)
@@ -154,10 +318,21 @@ chmod 0444 /certs/unrelated.pem
         if host_config.get("PortBindings"):
             raise RuntimeError("disposable ingress must not publish any host port")
 
+        origin_inspect = json.loads(command("docker", "inspect", origin).stdout)[0]
+        if origin_inspect["Config"].get("User") != "10004:10003":
+            raise RuntimeError("origin probe must use separate UID and shared ingress GID")
+        origin_host = origin_inspect["HostConfig"]
+        if origin_host.get("NetworkMode") != "none" or origin_host.get("PortBindings"):
+            raise RuntimeError("origin probe must have no network or published ports")
+        if not origin_host.get("ReadonlyRootfs") or "ALL" not in (origin_host.get("CapDrop") or []):
+            raise RuntimeError("origin probe must be read-only and capability-free")
+        if not any("no-new-privileges" in item for item in origin_host.get("SecurityOpt") or []):
+            raise RuntimeError("origin probe must enforce no-new-privileges")
+
         net = json.loads(command("docker", "network", "inspect", network).stdout)[0]
         if not net.get("Internal"):
             raise RuntimeError("E2E network must be internal/no-egress")
-        assert_single_ingress()
+        assert_single_ingress_network_member()
 
         report = None
         last_error = ""
@@ -180,8 +355,18 @@ chmod 0444 /certs/unrelated.pem
         }
         if report != expected:
             raise RuntimeError(f"unexpected Go strict probe report: {report}")
-        assert_single_ingress()
-        print("PASS: Go strict probe verified TLS1.3 + actual X25519MLKEM768 + certificate/SNI")
+        print("PASS: C1 strict Go probe still verifies TLS1.3 + X25519MLKEM768 + server identity")
+
+        mutual = go_probe(mutual=True)
+        mutual_report = json.loads(mutual.stdout)
+        expected_mutual = {
+            **expected,
+            "clientCertificateAlgorithm": "ML-DSA-65",
+            "clientCertificatePresented": True,
+        }
+        if mutual_report != expected_mutual:
+            raise RuntimeError(f"unexpected Go mutual probe report: {mutual_report}")
+        print("PASS: Go 1.27 probe presented mandatory ML-DSA-65 client identity on the hybrid TLS hop")
 
         openssl = command(
             "docker", "run", "--rm",
@@ -207,7 +392,7 @@ chmod 0444 /certs/unrelated.pem
             or "Verification: OK" not in combined
         ):
             raise RuntimeError("OpenSSL did not independently observe trusted TLS1.3/X25519MLKEM768")
-        print("PASS: independent OpenSSL observation agrees with Go probe")
+        print("PASS: independent OpenSSL observation agrees with Go transport probe")
 
         def expect_tls_failure(label: str, *openssl_args: str) -> None:
             result = command(
@@ -246,37 +431,88 @@ chmod 0444 /certs/unrelated.pem
             "-CAfile", "/certs/unrelated.pem", "-verify_hostname", HOSTNAME,
             "-verify_return_error", "-tls1_3", "-groups", "X25519MLKEM768",
         )
-        print("PASS: TLS1.2, X25519-only, wrong hostname and untrusted certificate fail closed")
+        print("PASS: TLS1.2, X25519-only, wrong hostname and untrusted server certificate fail closed")
 
+        # Existing application paths remain inert even when a valid client cert exists.
         for path in ["/", "/api/v2/node/keys/rotation/ack", "/api/v1/node/heartbeat"]:
-            http_script = f"""
-set -eu
-set +e
-timeout 3s openssl s_client -quiet -ign_eof \
-  -connect {ALIAS}:8444 \
-  -servername {HOSTNAME} \
-  -verify_hostname {HOSTNAME} -verify_return_error \
-  -CAfile /certs/fullchain.pem -tls1_3 -groups X25519MLKEM768 <<'EOF'
-GET {path} HTTP/1.1\r
-Host: {HOSTNAME}\r
-Connection: close\r
-\r
-EOF
-rc=$?
-set -e
-[ "$rc" -eq 0 ] || [ "$rc" -eq 124 ]
-"""
-            result = command(
-                "docker", "run", "--rm",
-                "--network", network,
-                "--mount", f"type=volume,src={certs},dst=/certs,readonly",
-                "--entrypoint", "/bin/sh", probe_image, "-ceu", http_script,
-                timeout=10,
-            )
+            result = https_request(path, "client.pem", "client-key.pem")
             response = result.stdout + result.stderr
             if "404 Not Found" not in response or "\nLocation:" in response or "\r\nLocation:" in response:
-                raise RuntimeError(f"inert ingress contract failed for {path}")
-        print("PASS: HTTPS is inert 404; ACK and legacy routes are not reachable")
+                raise RuntimeError(f"inert application-path contract failed for {path}")
+        print("PASS: ACK and legacy routes remain inert 404; C2-A mounts no application API")
+
+        # The one test-only identity path must fail without a verified client cert.
+        anonymous = https_request(IDENTITY_PATH)
+        anonymous_response = anonymous.stdout + anonymous.stderr
+        if "403 Forbidden" not in anonymous_response or "200 OK" in anonymous_response:
+            raise RuntimeError("identity probe accepted an anonymous TLS client")
+
+        # A caller-provided Node ID/header is stripped. Identity comes only from
+        # the verified certificate SPKI and the protected local UDS boundary.
+        valid = https_request(
+            IDENTITY_PATH,
+            "client.pem",
+            "client-key.pem",
+            (
+                "X-XSP-V2-Trusted-Node-ID: 999999",
+                "X-XSP-V2-Client-Verify: SUCCESS",
+                "X-XSP-V2-Client-Cert: forged",
+            ),
+        )
+        valid_response = valid.stdout + valid.stderr
+        if "200 OK" not in valid_response:
+            raise RuntimeError(f"valid mTLS identity probe failed: {valid_response[-1200:]}")
+        identity = parse_json_body(valid_response)
+        expected_identity = {
+            "clientSpkiSha256": expected_spki,
+            "originTransport": "unix-peercred",
+            "trustedNodeId": TRUSTED_NODE_ID,
+        }
+        if identity != expected_identity or "999999" in valid_response:
+            raise RuntimeError(f"origin trusted caller-controlled identity material: {identity}")
+        print("PASS: verified ML-DSA-65 SPKI maps to trusted Node ID; spoofed headers are stripped")
+
+        # Other valid certificates under the same CA cannot impersonate the
+        # pinned Node identity. Classical certs are included as a fail-closed control.
+        for label, cert, key in [
+            ("different ML-DSA-65 client", "other-client.pem", "other-client-key.pem"),
+            ("classical ECDSA client", "classical-client.pem", "classical-client-key.pem"),
+        ]:
+            rejected = https_request(IDENTITY_PATH, cert, key, check=False)
+            rejected_response = rejected.stdout + rejected.stderr
+            if "200 OK" in rejected_response:
+                raise RuntimeError(f"{label} impersonated the pinned Node identity")
+        print("PASS: same-CA different/PQ and classical client identities cannot impersonate the pinned Node")
+
+        # Even with filesystem access and shared GID, a process under a different
+        # UID cannot forge Nginx client-cert evidence directly into the origin UDS.
+        forged_direct = r'''
+import socket
+path = "/run/xmesh-origin/xsp-v2-origin.sock"
+s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+s.settimeout(3)
+s.connect(path)
+s.sendall(b"GET /identity-probe HTTP/1.1\r\nHost: forged\r\nX-XSP-V2-Client-Verify: SUCCESS\r\nX-XSP-V2-Client-Cert: forged\r\nConnection: close\r\n\r\n")
+data = b""
+while True:
+    try:
+        part = s.recv(4096)
+    except socket.timeout:
+        break
+    if not part:
+        break
+    data += part
+print(data.decode("utf-8", "replace"))
+if b"403" not in data or b"200 OK" in data:
+    raise SystemExit(1)
+'''
+        command(
+            "docker", "run", "--rm", "--network", "none", "--user", "10005:10003",
+            "--mount", f"type=volume,src={origin_socket},dst=/run/xmesh-origin,readonly",
+            "--entrypoint", "python3", origin_image, "-c", forged_direct,
+            timeout=10,
+        )
+        print("PASS: Unix SO_PEERCRED rejects forged origin calls from a different UID")
 
         session_script = f"""
 set -eu
@@ -318,21 +554,24 @@ grep -Eiq 'curve|group|SSL|unknown|invalid' /tmp/out
             "--user", "10003:10003",
             "--tmpfs", "/tmp:rw,noexec,nosuid,size=8m,mode=1777",
             "--mount", f"type=volume,src={certs},dst=/run/xmesh-ingress-certs,readonly",
+            "--mount", f"type=volume,src={origin_socket},dst=/run/xmesh-origin",
             "--entrypoint", "/bin/sh", runtime_image, "-ceu", bad_group,
             timeout=20,
         )
         print("PASS: unavailable/invalid mandatory group cannot become classical fallback")
 
-        assert_single_ingress()
-        print("INGRESS PROCESS E2E: PASS (one internal TLS hop, no backend/API hop, no production activation)")
+        assert_single_ingress_network_member()
+        print("INGRESS/ORIGIN C2-A PROCESS E2E: PASS (mTLS identity + Unix peercred/SPKI pin, ACK still unmounted)")
     finally:
         for name in reversed(containers):
             command("docker", "rm", "-f", name, check=False)
         command("docker", "volume", "rm", certs, check=False)
         command("docker", "volume", "rm", sessions, check=False)
+        command("docker", "volume", "rm", origin_socket, check=False)
         command("docker", "network", "rm", network, check=False)
         if not args.skip_build:
-            command("docker", "image", "rm", "-f", runtime_image, probe_image, check=False)
+            command("docker", "image", "rm", "-f", runtime_image, origin_image, probe_image, check=False)
+        client_material.cleanup()
 
 
 if __name__ == "__main__":
