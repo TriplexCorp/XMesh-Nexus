@@ -11,6 +11,7 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    'Проверка профиля не установлена · нажмите «Обновить Agent»':'Profile verification helper missing · click Update Agent',
     // Owner-only credential compromise response
     'Новые VPN-ключи выпущены. Обновите импорты клиентов и проверьте синхронизацию каждой ноды.':'New VPN credentials issued. Refresh client imports and verify every node has synchronized.',
     'Ошибка перевыпуска:':'Credential rotation failed:',
