@@ -30,6 +30,8 @@ ACK_PATH = "/api/v2/node/keys/rotation/ack"
 MAX_CERT_HEADER = 24 * 1024
 MAX_ACK_BODY = 16 * 1024
 MAX_SIGNATURE_TEXT = 8 * 1024
+MAX_U64 = (1 << 64) - 1
+MAX_I64 = (1 << 63) - 1
 MESSAGE_KEYS = {
     "kind", "issuerId", "signerEdKeyId", "signerPQKeyId", "nodeId",
     "fromEpoch", "toEpoch", "requestId", "fromEdKeyId", "fromPQKeyId",
@@ -37,6 +39,19 @@ MESSAGE_KEYS = {
     "expiresAtMs", "permitNonceHex", "nonceHex", "candidateSha256Hex",
     "permitSha256Hex", "appliedStateSha256Hex",
 }
+
+
+class DuplicateKeyError(ValueError):
+    pass
+
+
+def strict_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    value: dict[str, object] = {}
+    for key, item in pairs:
+        if key in value:
+            raise DuplicateKeyError("duplicate JSON key")
+        value[key] = item
+    return value
 
 
 def spki_sha256(cert_pem: bytes) -> str:
@@ -154,8 +169,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_json(400, {"error": "invalid staging ACK"})
             return
         try:
-            envelope = json.loads(raw)
-        except (UnicodeDecodeError, json.JSONDecodeError):
+            envelope = json.loads(raw, object_pairs_hook=strict_object)
+        except (UnicodeDecodeError, json.JSONDecodeError, DuplicateKeyError):
             self.send_json(400, {"error": "invalid staging ACK"})
             return
         if type(envelope) is not dict or set(envelope) != {"message", "signatures"}:
@@ -187,8 +202,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
             or message["method"] != "POST"
             or message["path"] != ACK_PATH
             or message["fromEpoch"] <= 0
+            or message["fromEpoch"] > MAX_U64
+            or message["toEpoch"] > MAX_U64
             or message["toEpoch"] != message["fromEpoch"] + 1
             or message["issuedAtMs"] <= 0
+            or message["issuedAtMs"] > MAX_I64
+            or message["expiresAtMs"] > MAX_I64
             or message["expiresAtMs"] <= message["issuedAtMs"]
             or message["expiresAtMs"] - message["issuedAtMs"] > 60_000
             or abs(now_ms - message["issuedAtMs"]) > 120_000
