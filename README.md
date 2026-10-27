@@ -24,7 +24,9 @@
 
 **PR02 (27 октября):** начата изолированная проверка криптографических алгоритмов. Go 1.27.3 `crypto/mldsa` и Rust `openssl` 0.10.81/OpenSSL 3.5 тестируют **Ed25519 AND ML-DSA-65** над общими XSP-v2 wire-векторами. Публичные демо-seed и SHA-256 подписи позволяют независимо сравнить результаты Go с OpenSSL. **Прямой CI-тест Go → Rust и Rust → Go уже прошёл**: обе подписи обязательны, повреждение и отсутствие одной отвергаются. Развёрнуты отдельные CI workflows, не связанные с рабочими нодами. Инструкции и открытые критерии: [Crypto PoC](docs/XSP_V2_CRYPTO_POC.md).
 
-**Важная граница:** это ещё **не работающая PQ-защита**: ML-DSA-65-подписи, действующий TLS X25519MLKEM768, верификация на production endpoint, хранение ключей и запрет downgrade появятся на следующих этапах только после security review и проверок. `XMESH1` и существующие Ed25519-политики нод сохранены. Полная последовательность — [XSP-v2 implementation plan](docs/HYBRID_POST_QUANTUM_SECURITY_IMPLEMENTATION_PLAN.md) и [Roadmap](docs/ENTERPRISE_ROADMAP.md).
+**TLS spike (27 октября):** добавлен отдельный [гибридный TLS-probe и план развёртывания](docs/XSP_V2_TLS_PROBE.md). Изолированные тесты Go/OpenSSL 3.5 подтверждают фактическую группу X25519MLKEM768, проверенный сертификат и отказ при TLS 1.2/X25519-only и неверном сертификате. Рабочие Nginx, Node и TLS-конфигурации не изменены.
+
+**Важная граница:** это ещё **не работающая PQ-защита**: двойная ML-DSA+Ed25519-аутентификация и TLS X25519MLKEM768 существуют лишь в тестовых PoC. На production endpoint ещё нет hybrid TLS, хранение ключей и защита от downgrade на уровне состояния нод не включены; нужен security-review и безопасная миграция. `XMESH1` и действующие Ed25519-политики нод сохранены. Полная последовательность — [XSP-v2 implementation plan](docs/HYBRID_POST_QUANTUM_SECURITY_IMPLEMENTATION_PLAN.md) и [Roadmap](docs/ENTERPRISE_ROADMAP.md).
 
 ## Почему XMesh Nexus
 
