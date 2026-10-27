@@ -186,6 +186,14 @@ pub struct StagingStoredACKEvidence {
     pub to_epoch: i64,
     pub canonical_permit_sha256_hex: String,
     pub signed_ack_envelope_sha256_hex: String,
+    /// Exact verified ACK replay nonce, recorded by PostgreSQL.
+    pub ack_nonce_hex: String,
+    /// Candidate identity digest bound to the signed permit and ACK.
+    pub candidate_sha256_hex: String,
+    /// PostgreSQL's original ACK verification/commit timestamp, in milliseconds.
+    pub committed_at_ms: i64,
+    /// Prevent external construction of "verified" evidence from untrusted values.
+    _readback_checked: (),
 }
 
 /// Read-only recovery of the EXACT earlier dual-signed ACK after its DB commit.
@@ -388,6 +396,10 @@ pub async fn readback_committed_applied_ack_staging(
         to_epoch,
         canonical_permit_sha256_hex: verified_permit.canonical_sha256_hex().into(),
         signed_ack_envelope_sha256_hex: hex::encode(exact_digest),
+        ack_nonce_hex: hex::encode(nonce),
+        candidate_sha256_hex: hex::encode(candidate_hash),
+        committed_at_ms: committed_ms,
+        _readback_checked: (),
     })
 }
 

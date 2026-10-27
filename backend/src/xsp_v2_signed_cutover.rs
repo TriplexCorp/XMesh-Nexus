@@ -982,6 +982,55 @@ mod signed_tests {
             digest(&signing_input(&permit).unwrap())
         );
         assert_eq!(evidence.signed_ack_envelope_sha256_hex, digest(&signed_ack));
+        // Issue an actual two-algorithm Nexus receipt only from the trusted
+        // PostgreSQL readback witness, then immediately reverify it under
+        // the independently pinned panel public pair. No client-held
+        // signing key or caller-supplied DB digest can mint this witness.
+        let signed_receipt = crate::xsp_v2_commit_receipt::sign_staging_commit_receipt(
+            &evidence, &panel_pin, &panel_ed, &panel_pq,
+        )
+        .expect("dual-signed receipt for committed DB ACK");
+        crate::xsp_v2_commit_receipt::verify_staging_commit_receipt(
+            &signed_receipt,
+            &panel_pin,
+            &evidence,
+        )
+        .expect("both Nexus signatures and exact DB evidence verified");
+        assert!(
+            crate::xsp_v2_commit_receipt::verify_staging_commit_receipt(
+                &signed_receipt,
+                &next_pin,
+                &evidence,
+            )
+            .is_err(),
+            "cannot accept receipt signed under Node keys as panel keys"
+        );
+        let mut tampered_receipt: serde_json::Value =
+            serde_json::from_slice(&signed_receipt).unwrap();
+        tampered_receipt["message"]["requestId"] = serde_json::json!("different");
+        assert!(
+            crate::xsp_v2_commit_receipt::verify_staging_commit_receipt(
+                &serde_json::to_vec(&tampered_receipt).unwrap(),
+                &panel_pin,
+                &evidence,
+            )
+            .is_err(),
+            "wrong request is not a valid Nexus commit receipt"
+        );
+        tampered_receipt = serde_json::from_slice(&signed_receipt).unwrap();
+        tampered_receipt["signatures"]["mldsa65"] = serde_json::json!("");
+        assert!(
+            crate::xsp_v2_commit_receipt::verify_staging_commit_receipt(
+                &serde_json::to_vec(&tampered_receipt).unwrap(),
+                &panel_pin,
+                &evidence,
+            )
+            .is_err(),
+            "Ed25519-only commit receipt is forbidden"
+        );
+        assert_eq!(evidence.ack_nonce_hex, ack.nonce_hex);
+        assert_eq!(evidence.candidate_sha256_hex, permit.candidate_sha256_hex);
+
         let mut tampered_retry = signed_ack.clone();
         tampered_retry.push(b' ');
         assert!(
