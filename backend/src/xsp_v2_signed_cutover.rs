@@ -1145,10 +1145,9 @@ mod signed_tests {
         let mut auth_pq_signer = PQSigner::new_without_digest(&next_pq).unwrap();
         recovery_auth["signatures"]["ed25519"] =
             serde_json::json!(STANDARD.encode(next_ed.sign(&canonical_auth).to_bytes()));
-        recovery_auth["signatures"]["mldsa65"] =
-            serde_json::json!(STANDARD.encode(
-                auth_pq_signer.sign_oneshot_to_vec(&canonical_auth).unwrap()
-            ));
+        recovery_auth["signatures"]["mldsa65"] = serde_json::json!(
+            STANDARD.encode(auth_pq_signer.sign_oneshot_to_vec(&canonical_auth).unwrap())
+        );
         let recovery_auth_raw = serde_json::to_vec(&recovery_auth).unwrap();
         assert!(
             crate::xsp_v2_api::authenticate_committed_ack_recovery_staging(
