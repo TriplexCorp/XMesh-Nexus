@@ -67,7 +67,16 @@ with tempfile.TemporaryDirectory(prefix="xsp-nginx-") as work:
         assert re.search(r"Protocol version:\s*TLSv1\.3",valid.stderr),valid.stderr
         assert re.search(r"Negotiated TLS1\.3 group:\s*X25519MLKEM768\b",valid.stderr),valid.stderr
         assert "Verification: OK" in valid.stderr,valid.stderr
-        assert "404 Not Found" in valid.stdout,valid.stdout[-1800:]
+        # -brief is a handshake diagnostic and can exit at stdin EOF before
+        # receiving HTTP output; read the 404 response in a separate TLS call.
+        http=run(["openssl","s_client","-connect","127.0.0.1:8444",
+          "-servername","node-only.example.invalid",
+          "-verify_hostname","node-only.example.invalid",
+          "-verify_return_error","-CAfile",str(cert),
+          "-tls1_3","-groups","X25519MLKEM768","-quiet","-ign_eof"],
+          input="GET / HTTP/1.1\r\nHost: node-only.example.invalid\r\nConnection: close\r\n\r\n")
+        assert http.returncode==0,http.stderr[-1600:]
+        assert "404 Not Found" in http.stdout,http.stdout[-1800:]
         assert sclient("X25519").returncode!=0,"accepted classical TLS downgrade"
         assert sclient("X25519MLKEM768",tls13=False).returncode!=0,"accepted TLS1.2"
         assert sclient("X25519MLKEM768",hostname="wrong.example.invalid").returncode!=0,"wrong SNI accepted"
