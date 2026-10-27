@@ -39,7 +39,7 @@ temporary_sql="$(mktemp)"
 chmod 600 "$temporary_sql"
 trap 'rm -f "$temporary_sql"' EXIT
 {
-  printf "\\set signer_password '%s'\\n" "$password"
+  printf '\\set signer_password %s\n' "$password"
   cat deploy/postgres/20-create-xsp-v2-signer-role.sql
 } > "$temporary_sql"
 docker compose exec -T db psql \
