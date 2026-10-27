@@ -61,11 +61,7 @@ pub fn canonical_candidate(candidate: &CandidatePublic) -> Result<Vec<u8>, &'sta
 
     let mut result = b"XSP2-CUTOVER-CANDIDATE-V1\0".to_vec();
     result.push(1);
-    for value in [
-        candidate.node_id,
-        candidate.from_epoch,
-        candidate.to_epoch,
-    ] {
+    for value in [candidate.node_id, candidate.from_epoch, candidate.to_epoch] {
         result.extend_from_slice(&value.to_be_bytes());
     }
     bounded_ascii(&mut result, &candidate.purpose, 12)?;
