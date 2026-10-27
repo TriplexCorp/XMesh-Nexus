@@ -1,5 +1,30 @@
 # XSP-v2 signed Nexus commit receipt — staging protocol V1
 
+## Staging issue-or-recover checkpoint (27 October 2026)
+
+The feature-gated `issue_or_recover_signed_receipt_staging` orchestrator
+in `backend/src/xsp_v2_signed_receipt_outbox.rs` first cryptographically
+revalidates the **exact previously committed** signed ACK and panel permit
+against DB historical evidence. If an immutable receipt exists, it retrieves
+the same original bytes and rechecks **both Ed25519 AND ML-DSA-65** signatures
+without invoking any signing component or repeating the epoch CAS.
+
+For an ACK whose commit is verified but whose receipt is not yet present, it
+accepts signed bytes only from an **injected trusted signing boundary**, verifies
+them against the pinned `panel_response` public pair and exact committed
+evidence, and persists them immutably. If a concurrent writer wins with another
+valid signed encoding, a retry returns the original verified stored receipt.
+Missing, corrupted or uncommitted state fails closed. Real PostgreSQL/OpenSSL
+tests cover the first issuance, exact-byte retry without signing again, and
+wrong request rejection.
+
+**This is not a protected signer implementation or HTTP endpoint.** An actual
+external signing service, independently authenticated Node identity, owner
+approval, verified end-to-end TLS 1.3 `X25519MLKEM768` ingress, Agent integration,
+full crash/rollback tests and security review are still mandatory. The
+experimental feature stays disabled in production; do not put private keys
+inside the API process or treat signed ACK bytes as transport authentication.
+
 ## Current staging recovery checkpoint (27 October 2026)
 
 Nexus [#55](https://github.com/TriplexCorp/XMesh-Nexus/pull/55) already provides
