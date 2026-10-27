@@ -1046,17 +1046,50 @@ mod signed_tests {
             .is_err(),
             "no signed outbox row means no recoverable receipt"
         );
-        let saved = crate::xsp_v2_signed_receipt_outbox::store_or_load_signed_receipt_staging(
+        // Only the first delivery calls the isolated signing boundary.
+        // The caller supplies an already signed envelope from independent
+        // signing custody; this test must not create a live signer.
+        let signing_calls = std::cell::Cell::new(0_usize);
+        let saved = crate::xsp_v2_signed_receipt_outbox::issue_or_recover_signed_receipt_staging(
             &pool,
             node_id,
             &permit.request_id,
             &signed_ack,
-            &signed_receipt,
             &panel_pin,
+            |_| {
+                signing_calls.set(signing_calls.get() + 1);
+                Ok(signed_receipt.clone())
+            },
         )
         .await
         .expect("exact dual-signed Nexus receipt was durably stored");
         assert_eq!(saved, signed_receipt);
+        assert_eq!(signing_calls.get(), 1);
+        let recovered_without_signer =
+            crate::xsp_v2_signed_receipt_outbox::issue_or_recover_signed_receipt_staging(
+                &pool,
+                node_id,
+                &permit.request_id,
+                &signed_ack,
+                &panel_pin,
+                |_| panic!("retry must never invoke protected signer"),
+            )
+            .await
+            .expect("existing immutable receipt returned without signing again");
+        assert_eq!(recovered_without_signer, saved);
+        assert_eq!(signing_calls.get(), 1);
+        assert!(
+            crate::xsp_v2_signed_receipt_outbox::issue_or_recover_signed_receipt_staging(
+                &pool,
+                node_id,
+                "not-the-original-request",
+                &signed_ack,
+                &panel_pin,
+                |_| panic!("invalid ACK must never invoke signer"),
+            )
+            .await
+            .is_err()
+        );
         let repeated = crate::xsp_v2_signed_receipt_outbox::store_or_load_signed_receipt_staging(
             &pool,
             node_id,
