@@ -231,8 +231,14 @@ pub struct Claim {
     mldsa65_signature_b64: String,
 }
 
+struct DecodedClaimProof {
+    challenge: [u8; 32],
+    ed_sig: Vec<u8>,
+    pq_sig: Vec<u8>,
+}
+
 /// Decode the bounded proof before taking database locks.
-fn decode_claim_proof(input: &Claim) -> Result<([u8; 32], Vec<u8>, Vec<u8>), ApiError> {
+fn decode_claim_proof(input: &Claim) -> Result<DecodedClaimProof, ApiError> {
     if input.node_id <= 0
         || input.purpose != PURPOSE
         || input.key_epoch <= 0
@@ -249,7 +255,7 @@ fn decode_claim_proof(input: &Claim) -> Result<([u8; 32], Vec<u8>, Vec<u8>), Api
     }
     let ed_sig = strict_base64(&input.ed25519_signature_b64, 64)?;
     let pq_sig = strict_base64(&input.mldsa65_signature_b64, 3309)?;
-    Ok((challenge, ed_sig, pq_sig))
+    Ok(DecodedClaimProof { challenge, ed_sig, pq_sig })
 }
 
 /// Persist the new epoch and mark approval consumed in the caller's transaction.
@@ -285,7 +291,7 @@ pub async fn claim(
     Json(input): Json<Claim>,
 ) -> Result<Json<Value>, ApiError> {
     staging()?;
-    let (challenge, ed_sig, pq_sig) = decode_claim_proof(&input)?;
+    let DecodedClaimProof { challenge, ed_sig, pq_sig } = decode_claim_proof(&input)?;
     let mut tx = state.pool.begin().await?;
     let suite = sqlx::query(
         "SELECT minimum_suite,activation_phase,key_epoch
