@@ -1,6 +1,6 @@
 # XMesh Hybrid Post-Quantum Security — полный план внедрения XSP-v2
 
-> **Статус:** PLANNED / NOT IMPLEMENTED / NOT VERIFIED  
+> **Статус (27.10.2026):** лабораторные PR01/PR02/PR07 test-only PoC реализованы и имеют успешные специализированные CI; **production XSP-v2 NOT IMPLEMENTED / NOT VERIFIED**  
 > **Приоритет:** P0 / задача №1 перед новыми функциями.  
 > **Дата планирования:** 2026-10-25.  
 > **Репозитории:** [XMesh-Nexus](https://github.com/TriplexCorp/XMesh-Nexus) и [XMesh-Node](https://github.com/TriplexCorp/XMesh-Node).  
@@ -453,6 +453,13 @@ ML-DSA-65 signatures/public keys существенно больше Ed25519; н
 - **Потеря связи в середине активации:** стороны продолжают сверять persisted migrationId/epoch; неизвестное состояние означает **не применять новый config**, а не принимать legacy.
 - **При компрометации ключей:** incident runbook; не выдавать автоматическое безусловное «разрешить Xray».
 
+## PR07 laboratory CI evidence — 2026-10-27
+
+- **Node:** [Node CI #40432873804](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40432873804) completed successfully for `f984201c` with test-only Go TLS probing.
+- **Nexus:** [XSP-v2 Hybrid TLS #40432661499](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40432661499) completed successfully for `0ee54bd9`; Go + OpenSSL independently checked the negotiated TLS group and downgrade behavior.
+- **Nexus full backend:** [Backend CI #40432809267](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40432809267) for `918d42fa` had successful `cli`, `rust` and `subscription-build`; API integration was still underway when reviewed. The run may finish later; this is not a claim of all-green CI on subsequent documentation commits.
+- No live VPS/proxy checks or strict activation have been performed. **Next:** freeze the wire contract after review, external KAT/fuzz, durable key epoch/anti-replay/rollback security, dedicated node ingress and measured canary proof.
+
 ## PR02 isolated crypto interoperability checkpoint — 2026-10-27
 
 - [x] Independent `crypto/mldsa` ML-DSA-65 implementation via nested Go 1.27.3 research module in XMesh-Node, without changing the production Go 1.23 router/toolchain.
@@ -471,7 +478,7 @@ ML-DSA-65 signatures/public keys существенно больше Ed25519; н
 - [x] Draft [XSP_V2_WIRE_SPEC.md](XSP_V2_WIRE_SPEC.md): candidate `xsp2-wire-candidate-1`, exact byte order, bounds, endpoint/direction binding and downgrade/replay threat model. Same document in both repos.
 - [x] Shared public [XSP_V2_VECTORS.json](XSP_V2_VECTORS.json) (request + response, no signing secrets) is identical in both repos. Rust, Go and independent JS test-only encoders compare exact bytes and negative mutations.
 - [ ] Record passing *latest* CI runs in **both** repositories after code-format fixes, then complete design and security review. Mark the wire as frozen only after explicit approval; compatibility-breaking changes need schema/version increment.
-- [ ] PR02: real library-backed Ed25519 **AND** ML-DSA-65 cross-language signing, negative KATs and TLS X25519MLKEM768 negotiation spike.
+- [x] PR02 laboratory: реальные Ed25519 **AND** ML-DSA-65 Rust↔Go подписи и негативные тесты; PR07 laboratory: реальные OpenSSL/Go TLS 1.3 X25519MLKEM768 рукопожатия и downgrade-тесты. **Это не FIPS 204 external KAT/security review и не production.**
 
 **No production v2 endpoint, key generation, suite floor or agent switch has been added.** This checkpoint does **not** close XSP-v2 or any cryptographic acceptance gate.
 
@@ -484,10 +491,10 @@ ML-DSA-65 signatures/public keys существенно больше Ed25519; н
 - **Gate:** архитектурный review подписан; реализация ещё не меняет production.
 
 **PR 02 — Crypto interoperability PoC (Rust + Go)**  
-- [ ] Go 1.27+ upgrade, `crypto/mldsa` sign/verify.
-- [ ] Rust ML-DSA-65 через проверенный provider/EVP binding с pinning; выбрать runtime OpenSSL.
-- [ ] Совпадение `signing_input` и положительных/отрицательных проверок по vectors.
-- [ ] Constant-time primitives библиотек, bounded decoding, no key leaks; review зависимостей.
+- [x] Go 1.27.3 `crypto/mldsa` **в отдельном тестовом модуле**; рабочий Node остаётся Go 1.23.
+- [x] Rust тестовый crate с `openssl = 0.10.81` / OpenSSL 3.5+ EVP ML-DSA-65, не включённый в production.
+- [x] Общий `signing_input`, golden vectors и прямое Go→Rust и Rust→Go dual-signature тестирование, включая отказ при tampering.
+- [ ] Независимый аудит криптопровайдера, внешний FIPS 204 KAT, fuzzing/strict bounded decoding, защита ключей и review зависимостей. Тестовый CLI не используется для реального enrollment.
 - **Gate:** Rust signs→Go verifies и Go signs→Rust verifies; обе подписи обязательны; CI зелёный.
 
 **PR 03 — DB/key lifecycle (Nexus)**  
@@ -519,7 +526,8 @@ ML-DSA-65 signatures/public keys существенно больше Ed25519; н
 - [ ] Validate actual Nginx/OpenSSL build, all CDN/LB ingress hops, node-only endpoint, certificates and staged rollback on an isolated canary; existing public Nginx still allows TLS 1.2 and has no hard PQ group guarantee.  
 - [ ] Совместимый TLS terminator; node-only endpoint; сертификаты и hostname validation.
 - [ ] Для strict node требовать TLS 1.3 + X25519MLKEM768, проверять negotiated result.
-- [ ] CI/integration probe, TLS 1.2/old curve/invalid cert отрицательные тесты; CDN hops и resumption.
+- [x] CI лабораторно: OpenSSL `s_server` + независимый Go TLS probe, полный handshake, X25519-only/TLS1.2/wrong-CA/wrong-host негативные тесты; resumption не считается доказательством нового hybrid handshake.
+- [ ] Проверить реальные CDN/LB/Nginx→origin сегменты и resumption/cert renewal/rollback на выделенном canary. **CI лаборатории не подтверждает TLS в production.**
 - **Gate:** доказан фактический PQ hybrid handshake, при подмене группы — fail closed.
 
 **PR 08 — Enrollment, migration, downgrade lock (оба)**  
@@ -558,9 +566,9 @@ ML-DSA-65 signatures/public keys существенно больше Ed25519; н
 
 ### 16.2. TLS transport
 
-- [ ] Full handshake TLS 1.3+X25519MLKEM768 реально зафиксирован.
-- [ ] Negotiated classic-only, TLS 1.2, insecure cert, wrong hostname → reject для strict Node.
-- [ ] CDN, proxy, ingress и resumption coverage документированы.
+- [x] **Лабораторно:** real full handshake TLS 1.3+X25519MLKEM768 и проверка negotiated group/OpenSSL↔Go (см. [TLS-probe CI](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40432661499)).
+- [x] **Лабораторно:** strict probe отвергает negotiated X25519-only, TLS1.2, неверный CA/hostname, incomplete/resumed handshake.
+- [ ] **Production:** доказать TLS1.3+X25519MLKEM768 в каждом обязательном TLS-сегменте реальной VPS, снять DNS/SNI/сертификат evidence и описать resumption/proxy mapping.
 - [ ] Проверить timeout, repeated reconnects, DNS failures, proxy restarts; no insecure fallback.
 
 ### 16.3. Recovery / resilience
