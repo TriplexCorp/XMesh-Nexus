@@ -15,6 +15,21 @@
 | Криптография control plane | Действующий Ed25519 (`XMESH1`); XSP-v2 PR01 wire-векторы, PR02 Ed25519 **AND** ML-DSA-65 Rust↔Go и PR07 TLS1.3/X25519MLKEM768 — **только изолированные PoC и CI** | **P0:** security review, строгий декодер, replay/epoch/suite-floor, ключи и enrollment; отдельный node-only TLS endpoint, реальный canary и безопасная миграция |
 | Качество релиза | Зелёный Backend CI на `main` (коммит `150978cc`, запуск #40304117546); статические и API-интеграционные проверки | Browser/live-node e2e, проверка rollback и обязательные release gates |
 
+## XSP-v2 P0 continuation — strict parser, public-key epoch state and node-only TLS skeleton (27 October 2026)
+
+**Implemented as pre-production foundations, not switched on.** See [XSP_V2_P0_FOUNDATION.md](XSP_V2_P0_FOUNDATION.md) (identical in Nexus/Node).
+
+- [x] **Strict test-only decoder (Node):** Go 1.27.3 `security/xspv2/poc-go/envelope/strict.go` enforces JSON object uniqueness including nested keys, known endpoint/type/direction, canonical Base64, signature lengths, bounds, Unix millisecond expiry order, nonce/epoch and byte-for-byte shared wire vectors. Returns `Untrusted`; **does not verify signatures or authenticate an identity**. Negative tests in isolated Go CI.
+- [x] **Ephemeral dual-key generation (Node):** `security/xspv2/poc-go/keyring/volatile.go` creates independently randomized Ed25519 and ML-DSA-65 keys in memory, exposes only algorithm-labeled public metadata, and tests signing/rotation/randomness. **No disk storage, enrollment, KMS, private-key backup or production integration.**
+- [x] **Additive public metadata migration (Nexus):** `0029_node_xsp_v2_public_state.sql` stores PUBLIC verification keys, per-node epochs/minimum suite, and unique replay nonces. Default minimum suite is legacy; trigger prevents ordinary UPDATE from lowering minimum suite/key epoch. No strict rows, endpoints or private keys are provisioned.
+- [x] **Inert node-only Nginx template:** `deploy/xsp-v2-node-ingress.nginx.conf.example` listens **loopback :8444 only**, requires TLS 1.3 and only X25519MLKEM768, and returns **404 for every HTTP path**. Neither installer nor public vhost loads it. `scripts/check-xsp-v2-foundation.js` protects these invariants in Nexus CI.
+- [ ] **Security blockers:** signature verification integrated into handlers, trusted key enrollment/at-rest storage, role-separated DB operations, atomic nonce/revision/side-effect transactions, durable node-side suite pinning and recovery. **A DB UPDATE trigger does not stop DELETE/privileged DBA rollback.**
+- [ ] **Operational blockers:** approved dedicated node-only TLS gateway, valid CA/SNI, measured negotiation at real canary endpoint and every proxy hop, complete FIPS 204 external KAT/fuzz and independent review. **No public listener, SSH/host changes or Node migration performed.**
+
+**Evidence:** isolated [Node Go Crypto CI](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40435069749) and [Node CI](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40435069677) were green on `1224913b`, including parser and volatile-key unit tests; later documentation commits require their own checks. Full Nexus CI for the new SQL/template revisions is verified separately in [Actions](https://github.com/TriplexCorp/XMesh-Nexus/actions/workflows/backend-ci.yml).
+
+---
+
 ## XSP-v2 — срез готовности на 27 октября 2026 (P0)
 
 **Важное различие:** лабораторный CI подтверждает проверенный криптографический механизм, **но не** включённую PQ-защиту нод или инфраструктуры Nexus. Рабочие Node (Go 1.23), `XMESH1`/Ed25519, публичный Nginx и Xray не переключались на XSP-v2. `strict-pq` и защита от downgrade на уровне состояния нод **не активированы**.
@@ -28,7 +43,7 @@
 
 **CI по версиям:** [XMesh-Node #40433732915](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40433732915) завершился успешно на `f56d09a1`. [Nexus Backend CI #40432809267](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40432809267) **завершился успешно** на `918d42fa`: `cli`, `rust`, `subscription-build` и API integration. Это результаты **конкретных SHA**, а не автоматическое подтверждение CI для последующих документационных изменений.
 
-**Следующая очередь:** (1) review и freeze протокола/криптопровайдеров, FIPS 204 KAT и fuzz-декодера; (2) durable `minimumSuite`, key epochs, replay state, двухсторонняя аутентификация ответов/команд; (3) отдельный node-only HTTPS ingress с замерами всех CDN/LB → origin сегментов; (4) staged enrollment/canary + fail-closed и recovery на реальных нодах. **Не ужесточать публичный Nginx для панели/подписок без отдельного плана совместимости.**
+**Следующая очередь:** (1) security review, независимый FIPS 204 KAT/fuzz и freeze протокола; (2) защита приватных ключей, owner-mediated enrollment, подписанный v2 verifier, транзакционный nonce/revision и durable floor **на обеих сторонах**; (3) отдельный реально работающий node-only HTTPS endpoint с замерами всех CDN/LB → origin сегментов; (4) staged enrollment/canary + fail-closed и recovery на реальных нодах. Новые parser/таблицы/template — **только foundation**. **Не ужесточать публичный Nginx для панели/подписок без отдельного плана совместимости.**
 
 Ссылки: [wire specification](XSP_V2_WIRE_SPEC.md) · [crypto PoC](XSP_V2_CRYPTO_POC.md) · [hybrid TLS probe](XSP_V2_TLS_PROBE.md) · [полный XSP-v2 план](HYBRID_POST_QUANTUM_SECURITY_IMPLEMENTATION_PLAN.md).
 
