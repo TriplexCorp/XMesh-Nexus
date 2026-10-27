@@ -12,6 +12,7 @@ on:
       - "backend/src/xsp_v2_db_candidate_snapshot.rs"
       - "backend/src/xsp_v2_permit_ledger_writer.rs"
       - "backend/src/xsp_v2_ack_ledger_validator.rs"
+      - "backend/src/xsp_v2_ack_epoch_commit.rs"
       - "docs/XSP_V2_CUTOVER_CANDIDATE_VECTORS.json"
       - "backend/migrations/0102_node_xsp_rotation_preparations.sql"
       - "scripts/make-xsp-owner-proof-fixture.py"
@@ -84,6 +85,7 @@ jobs:
           cargo test --manifest-path backend/Cargo.toml --features xsp-v2-experimental --bin xmesh-api -- xsp_v2_db_candidate_snapshot::tests
           cargo test --manifest-path backend/Cargo.toml --features xsp-v2-experimental --bin xmesh-api -- xsp_v2_permit_ledger_writer::tests
           cargo test --manifest-path backend/Cargo.toml --features xsp-v2-experimental --bin xmesh-api -- xsp_v2_ack_ledger_validator::tests
+          cargo test --manifest-path backend/Cargo.toml --features xsp-v2-experimental --bin xmesh-api -- xsp_v2_ack_epoch_commit::tests
           XSP_V2_REQUIRE_PQ_CUTOVER_TESTS=1 cargo test --manifest-path backend/Cargo.toml --features xsp-v2-experimental --bin xmesh-api -- xsp_v2_signed_cutover::signed_tests
       - name: Verify Rust PoC and experimental backend formatting
         run: |
