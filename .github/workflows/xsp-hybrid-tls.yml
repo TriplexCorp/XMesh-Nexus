@@ -1,0 +1,43 @@
+name: XSP-v2 Hybrid TLS Probe (test-only)
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/check-xsp-hybrid-tls.py"
+      - ".github/workflows/xsp-hybrid-tls.yml"
+      - "docs/XSP_V2_TLS_PROBE.md"
+  pull_request:
+    paths:
+      - "scripts/check-xsp-hybrid-tls.py"
+      - ".github/workflows/xsp-hybrid-tls.yml"
+      - "docs/XSP_V2_TLS_PROBE.md"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  tls-hybrid:
+    runs-on: ubuntu-latest
+    container: rust:1.99-trixie
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout XMesh-Node test-only Go TLS probe
+        uses: actions/checkout@v4
+        with:
+          repository: TriplexCorp/XMesh-Node
+          path: xmesh-node
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache: false
+      - name: Install OpenSSL 3.5+ and Python tooling
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends openssl ca-certificates python3
+          openssl version
+      - name: Build isolated Go TLS probe
+        run: |
+          cd xmesh-node/security/xspv2/poc-go
+          go build -o "$RUNNER_TEMP/xsp-tlsprobe" ./cmd/tlsprobe
+      - name: Verify actual group, trust chain, hostname, and reject classical downgrade
+        run: |
+          XSP_GO_TLS_PROBE="$RUNNER_TEMP/xsp-tlsprobe" python3 scripts/check-xsp-hybrid-tls.py
