@@ -28,11 +28,11 @@ mod xsp_v2_db_candidate_snapshot;
 #[cfg(feature = "xsp-v2-experimental")]
 mod xsp_v2_enrollment;
 #[cfg(feature = "xsp-v2-experimental")]
+mod xsp_v2_permit_ledger_writer;
+#[cfg(feature = "xsp-v2-experimental")]
 mod xsp_v2_rotation;
 #[cfg(feature = "xsp-v2-experimental")]
 mod xsp_v2_signed_cutover;
-#[cfg(feature = "xsp-v2-experimental")]
-mod xsp_v2_permit_ledger_writer;
 
 #[cfg(test)]
 mod xsp_v2_candidate_digest_tests;
