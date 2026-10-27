@@ -1109,6 +1109,92 @@ mod signed_tests {
         .await
         .unwrap();
         assert_eq!(receipt_count, 1);
+
+        // Independent Node caller proof is a SECOND dual-signed envelope;
+        // possession of a committed ACK alone never authenticates TLS caller.
+        let auth_now = i64::try_from(
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis(),
+        )
+        .unwrap();
+        let mut recovery_auth = serde_json::json!({
+            "protocol":"XSP/2","suite":"Ed25519+ML-DSA-65",
+            "direction":1,"messageType":"node.rotation.ack.recovery",
+            "issuerId":format!("node-{node}"),"nodeId":node_id,
+            "method":"POST","path":"/api/v2/node/keys/rotation/ack",
+            "ed25519KeyId":next_pin.ed_key_id,
+            "mldsa65KeyId":next_pin.pq_key_id,
+            "keyEpoch":2,"issuedAtMs":auth_now,"expiresAtMs":auth_now + 60_000,
+            "nonceHex":"a3".repeat(16),"requestId":permit.request_id,
+            "revision":"","payloadB64":STANDARD.encode(&signed_ack),
+            "signatures":{
+                "ed25519":STANDARD.encode([0u8;64]),
+                "mldsa65":STANDARD.encode(vec![0u8;3309])
+            }
+        });
+        let canonical_auth = crate::xsp_v2_api::recovery_signing_input_for_test(
+            &serde_json::to_vec(&recovery_auth).unwrap(),
+            &signed_ack,
+            node_id,
+            &permit.request_id,
+            auth_now,
+        )
+        .expect("exact signed recovery auth domain");
+        let mut auth_pq_signer = PQSigner::new_without_digest(&next_pq).unwrap();
+        recovery_auth["signatures"]["ed25519"] =
+            serde_json::json!(STANDARD.encode(next_ed.sign(&canonical_auth).to_bytes()));
+        recovery_auth["signatures"]["mldsa65"] =
+            serde_json::json!(STANDARD.encode(
+                auth_pq_signer.sign_oneshot_to_vec(&canonical_auth).unwrap()
+            ));
+        let recovery_auth_raw = serde_json::to_vec(&recovery_auth).unwrap();
+        assert!(
+            crate::xsp_v2_api::authenticate_committed_ack_recovery_staging(
+                &pool,
+                node_id + 1,
+                &permit.request_id,
+                &recovery_auth_raw,
+                &signed_ack,
+            )
+            .await
+            .is_err(),
+            "an unrelated TLS-authenticated Node must not use another Node's signed assertion"
+        );
+        assert!(
+            crate::xsp_v2_api::authenticate_committed_ack_recovery_staging(
+                &pool,
+                node_id,
+                &permit.request_id,
+                &recovery_auth_raw,
+                b"incorrect-ack-bytes",
+            )
+            .await
+            .is_err(),
+            "request proof must bind exact serialized signed ACK"
+        );
+        crate::xsp_v2_api::authenticate_committed_ack_recovery_staging(
+            &pool,
+            node_id,
+            &permit.request_id,
+            &recovery_auth_raw,
+            &signed_ack,
+        )
+        .await
+        .expect("both Node signatures, approved epoch and one-use nonce verified");
+        assert!(
+            crate::xsp_v2_api::authenticate_committed_ack_recovery_staging(
+                &pool,
+                node_id,
+                &permit.request_id,
+                &recovery_auth_raw,
+                &signed_ack,
+            )
+            .await
+            .is_err(),
+            "the same Node auth nonce must never authenticate a second request"
+        );
         // Lost HTTP response: recover the previously signed immutable bytes
         // without any signer/private key and without replaying epoch CAS.
         let recovered = crate::xsp_v2_signed_receipt_outbox::load_committed_signed_receipt_staging(
