@@ -158,7 +158,6 @@ pub async fn store_or_load_signed_receipt_staging(
     Ok(stored_receipt)
 }
 
-
 /// Read back the ORIGINAL immutable Nexus receipt after a lost response.
 ///
 /// Unlike the insert helper, this path requires no signer and never creates
@@ -270,8 +269,7 @@ pub async fn load_committed_signed_receipt_staging(
     }
     // An exact DB row or digest is never sufficient: verify both independently
     // pinned Ed25519 AND ML-DSA-65 signatures on the original signed bytes.
-    verify_staging_commit_receipt(&receipt, pinned_panel, &evidence)
-        .map_err(anyhow::Error::msg)?;
+    verify_staging_commit_receipt(&receipt, pinned_panel, &evidence).map_err(anyhow::Error::msg)?;
     tx.commit().await?;
     Ok(receipt)
 }
