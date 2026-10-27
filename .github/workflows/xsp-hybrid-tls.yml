@@ -5,14 +5,20 @@ on:
     paths:
       - "scripts/check-xsp-hybrid-tls.py"
       - "scripts/check-xsp-nginx-isolated.py"
+      - "scripts/check-xsp-v2-ingress-runtime.js"
+      - "scripts/test-xsp-v2-ingress-process.py"
       - "deploy/xsp-v2-node-ingress.nginx.conf.example"
+      - "deploy/xsp-v2-ingress/**"
       - ".github/workflows/xsp-hybrid-tls.yml"
       - "docs/XSP_V2_TLS_PROBE.md"
   pull_request:
     paths:
       - "scripts/check-xsp-hybrid-tls.py"
       - "scripts/check-xsp-nginx-isolated.py"
+      - "scripts/check-xsp-v2-ingress-runtime.js"
+      - "scripts/test-xsp-v2-ingress-process.py"
       - "deploy/xsp-v2-node-ingress.nginx.conf.example"
+      - "deploy/xsp-v2-ingress/**"
       - ".github/workflows/xsp-hybrid-tls.yml"
       - "docs/XSP_V2_TLS_PROBE.md"
   workflow_dispatch:
@@ -47,3 +53,29 @@ jobs:
       - name: Verify actual group, trust chain, hostname, and reject classical downgrade
         run: |
           XSP_GO_TLS_PROBE="$RUNNER_TEMP/xsp-tlsprobe" python3 scripts/check-xsp-hybrid-tls.py
+
+  ingress-process-e2e:
+    name: Dedicated PQ-only ingress container and network E2E
+    needs: tls-hybrid
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout XMesh-Node strict Go TLS probe
+        uses: actions/checkout@v4
+        with:
+          repository: TriplexCorp/XMesh-Node
+          path: xmesh-node
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache: false
+      - name: Enforce source/runtime isolation contract
+        run: node scripts/check-xsp-v2-ingress-runtime.js
+      - name: Build strict Node TLS probe
+        run: |
+          cd xmesh-node/security/xspv2/poc-go
+          go build -o "$RUNNER_TEMP/xsp-tlsprobe" ./cmd/tlsprobe
+      - name: Exercise real isolated ingress process and one-hop topology
+        run: |
+          python3 scripts/test-xsp-v2-ingress-process.py --go-probe "$RUNNER_TEMP/xsp-tlsprobe"

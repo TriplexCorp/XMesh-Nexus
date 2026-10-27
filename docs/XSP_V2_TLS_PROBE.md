@@ -1,57 +1,100 @@
-# XSP-v2 — PR07 hybrid TLS transport probe (27 October 2026)
+# XSP-v2 — hybrid TLS transport and dedicated ingress proof
 
-> **Research / test-only checkpoint. Do not enable strict-pq or edit production TLS/Nginx based on this file.** These tests exercise full TLS handshakes against ephemeral test servers; they do NOT mean production Nexus ↔ Node is hybrid-protected. XSP-v2 signed-message authentication, minimum suite/epoch persistence, per-node key migration and certificate lifecycle are separate, unfinished gates.
+> **Experimental / test-only. Do not enable `strict-pq`, edit production TLS/Nginx, expose the ACK route, or change live Nodes based on this file.**
 
-## 1. What is actually deployed today
+## Target transport invariant
 
-- Nexus `backend/src/main.rs` serves **HTTP** behind a separately deployed TLS reverse proxy. `deploy/install-panel-host.sh` generates a generic Nginx public HTTPS vhost, currently specifying `ssl_protocols TLSv1.2 TLSv1.3`. It does **not** force a post-quantum group. **The public dashboard and subscriptions must not be switched to strict mode in this experimental stage.**
-- The production XMesh-Node router is built with **Go 1.23**, while the isolated test-only Go probe uses **Go 1.27.3** in nested `security/xspv2/poc-go`; no production Node binary, service, agent update, certificate or Nginx configuration is modified.
-- An HTTPS chain can have independent termination hops: **Node → CDN/LB → Nginx → Nexus**. Verifying one TLS connection proves **only that one hop**. The current final Nginx → backend hop is HTTP and is **not** given TLS/PQ confidentiality by the external handshake.
-- Hybrid **key agreement** (`X25519MLKEM768`, RFC 10024) is distinct from dual **message signatures** (Ed25519 AND ML-DSA-65). An ECDSA or RSA X.509 certificate is not itself post-quantum authenticated. Both security properties and classical certificate trust are required by the eventual threat model.
+For the future XSP-v2 Node control plane, transport succeeds only when all of the following are true:
 
-## 2. Strict diagnostic contract
+- TLS **1.3**;
+- the **actually negotiated** key-exchange group is exactly `X25519MLKEM768`;
+- the certificate chain is trusted and the intended hostname/SNI is verified;
+- the proof is a fresh full handshake, not a resumed session standing in for new hybrid key agreement;
+- there is no automatic fallback to TLS 1.2, X25519-only, insecure verification or legacy `XMESH1`;
+- every protected network hop is accounted for independently.
 
-The Node research-only package `tlsprobe` and command `cmd/tlsprobe` enforce the following for a **new, complete handshake**:
+Hybrid TLS key agreement is separate from XSP/2 message authentication. Security-critical XSP/2 messages still require **Ed25519 AND ML-DSA-65**. User VPN traffic remains the Xray data-plane.
 
-1. TLS **1.3 only**; no TLS 1.2 or automatic fallback.
-2. Offer **only** `tls.X25519MLKEM768`. Read `tls.ConnectionState.CurveID` after the handshake; reject anything else. This checks the **negotiated** key exchange, not a supported-groups list, advertising or successful generic HTTPS response.
-3. Verify the server's X.509 chain against the OS roots (or a consciously chosen **local lab** CA) and verify the exact intended DNS hostname/SNI. Never use `InsecureSkipVerify`, `curl -k`, `--insecure` or accept arbitrary certificates for diagnostics.
-4. Reject absent peer certificate chains, incomplete handshake and resumption. A resumed session may not prove a new hybrid key agreement; the probe disables session caching and checks `DidResume`.
-5. Have a bounded timeout, close the connection, send **no HTTP requests**, and emit only a minimal confirmation report. It neither enrolls a node nor changes any security floor, keys, config or policy.
+## Current production reality
 
-The verifier also rejects an observed classical `CurveID` **even if TLS 1.3 and the certificate are valid**. Its associated tests demonstrate why simply enforcing TLS 1.3 is insufficient.
+The normal Nexus public HTTPS vhost and production Node Agent have **not** been migrated to this transport. The working production control plane remains legacy `XMESH1`/Ed25519 and `strict-pq` remains OFF.
 
-### Manual probe of an operator-chosen terminator
+A chain such as `Node → CDN/LB → Nginx → Nexus` contains multiple independent hops. A PQ handshake at one edge does not make an unreviewed plaintext or classical origin hop post-quantum confidential.
 
-Requires Go 1.27.3; run from **XMesh-Node**, only against an endpoint you administer:
+## Existing laboratory proof
 
-```bash
-cd security/xspv2/poc-go
-go run ./cmd/tlsprobe -address node-api.example.com:443 -servername node-api.example.com
-```
+The repository already contains two independent diagnostics:
 
-A successful output confirms only that connection's **TLS 1.3 / X25519MLKEM768 / verified certificate / fresh handshake**. A non-zero exit means strict-PQ is **not proven**; leave the deployment in existing legacy mode. For local throwaway test CAs only, `-ca-file /path/to/local-ca.pem` can add a trust anchor; never use it to blindly accept internet endpoints.
+1. `scripts/check-xsp-nginx-isolated.py` starts a throwaway Nginx/OpenSSL 3.5+ listener and verifies TLS 1.3, negotiated `X25519MLKEM768`, certificate/hostname checks and downgrade rejection.
+2. `scripts/check-xsp-hybrid-tls.py` uses OpenSSL `s_server`/`s_client` plus the separately built XMesh-Node Go 1.27 `tlsprobe` and checks that a valid classical TLS 1.3/X25519 control server is rejected by the strict Node probe.
 
-### Provider and proxy inventory before future activation
+The Node `tlsprobe.DialStrict` constructor:
 
-Check **exact** TLS terminator (Nginx/Caddy/HAProxy/CDN/LB) and linked crypto library, not only `openssl version` on the host. For Nginx, inspect `nginx -V` and an appropriately redacted `nginx -T`; verify that its TLS library actually supports `X25519MLKEM768` and that configuration/virtual host selects that group. OpenSSL 3.5+ and its `-groups X25519MLKEM768` option can be used for a separate independent diagnostic. OpenSSL upstream documentation: https://docs.openssl.org/3.5/man3/SSL_CONF_cmd/. Do not assume an unmodified Nginx vhost negotiates the hybrid group just because the linked library supports it.
+- sets minimum and maximum TLS version to TLS 1.3;
+- offers only `tls.X25519MLKEM768`;
+- performs normal certificate/hostname verification;
+- disables the session cache;
+- rejects `DidResume`;
+- reads `tls.ConnectionState.CurveID` and rejects any negotiated group other than `X25519MLKEM768`;
+- has no `InsecureSkipVerify`, compatibility curve or legacy fallback parameter.
 
-For a future dedicated node-only endpoint, the likely prerequisites are TLS 1.3-only, an explicitly constrained `X25519MLKEM768` group, trusted certificate/hostname/SNI, exact signed path mapping, measured current negotiation and an intentionally planned compatibility window. Any actual Nginx changes need a **separate reviewed change** with `nginx -t`, staged restart/reload, DNS/ACME/renewal checks, canary metrics, and a rollback procedure that does not lower a node's durable `minimumSuite`.
+These tests prove a laboratory handshake only.
 
-## 3. CI evidence and negative controls
+## P0-C1 — dedicated process/container ingress E2E
 
-- The Node isolated Go workflow runs `go test -race -count=1 ./...` in `poc-go`; `tlsprobe/probe_test.go` uses fresh test certificates and an actual TCP/TLS listener, verifying a full `CurveID == X25519MLKEM768` handshake. Negative scenarios include TLS 1.2, TLS 1.3 X25519-only server, incorrect hostname, untrusted certificate and resumed/incomplete handshake state.
-- The Nexus isolated `.github/workflows/xsp-hybrid-tls.yml` tests **real OpenSSL 3.5+ `s_server`/`s_client` handshakes**, verifies the reported group and chain, and invokes the separately built Go CLI against the same ephemeral OpenSSL server. It additionally establishes a **valid classical TLS 1.3 X25519 control handshake**, then asserts the strict Go hybrid probe refuses it.
-- All test CAs/keys are generated at runtime and discarded. No real tenant secrets, public proxy settings or running nodes are touched.
-- A green local or CI test **does not prove** the production ingress TLS terminator uses X25519MLKEM768, nor does it prove security on every TLS leg.
+The current P0 adds a **dedicated disposable ingress runtime** under `deploy/xsp-v2-ingress/` and a process-level E2E test. It intentionally has no backend application hop.
 
-## 4. Still-open security gates
+### Runtime boundary
 
-- [ ] Measure and record live canary Node → real HTTPS terminator handshake group, certificate chain and SNI; repeat across all regional proxies. **No probe has been run against the user's VPS.**
-- [ ] Inventory and either secure or formally assess CDN/LB → origin and Nginx → API boundaries. The existing HTTP backend hop cannot be claimed to use hybrid TLS.
-- [ ] Add durable per-node `minimumSuite`/epoch, atomic replay state, verified **responses and commands**, authenticated two-phase enrollment, key rotation and recovery. Refuse v1 fallback only **after** explicit owner-approved strict activation.
-- [ ] Review TLS termination configuration and potential separate node-only endpoint; test ACME renewal, availability, session resumption, time drift, partial failure, downgrade telemetry and recovery.
-- [ ] Independent security review, FIPS 204 known-answer/fuzz coverage, rollout on disposable VPS, backups and signed rollback protections.
-- [ ] Before publishing production-ready claims, record latest **green CI in both repositories** and real, recorded canary evidence.
+The test runtime:
 
-**Activation remains disabled.** PR07 research validates the TLS mechanism only; it is not a deployed strict-PQ node transport.
+- uses a dedicated non-root UID/GID;
+- listens only on container port `8444`;
+- is started on a Docker `--internal` network with **no published host port**;
+- runs with a read-only root filesystem, dropped capabilities and `no-new-privileges`;
+- receives only throwaway TLS certificate material;
+- disables access logging, TLS session tickets/cache and early data;
+- contains no `proxy_pass` or `upstream`;
+- returns HTTP **404** for every path.
+
+Neither `compose.yaml` nor `install.sh` activates this runtime. `POST /api/v2/node/keys/rotation/ack` remains unmounted from the Rust API.
+
+### Process E2E contract
+
+`scripts/test-xsp-v2-ingress-process.py` builds and starts the real ingress image and proves:
+
+- one persistent container exists on the isolated internal network and there is no Nexus/API backend container on that network;
+- the strict Go 1.27 Node probe reports exactly TLS1.3, `X25519MLKEM768`, verified certificate and full handshake;
+- an independent OpenSSL 3.5+ client observes the same TLS version and negotiated group;
+- TLS 1.2 fails;
+- TLS 1.3 with only X25519 fails;
+- wrong hostname fails;
+- an unrelated trust anchor fails;
+- HTTP `/`, the future ACK path and a legacy Node API path all remain inert 404 and do not redirect;
+- server-side session reuse cannot substitute for a fresh hybrid proof;
+- an unavailable/invalid mandatory group makes Nginx configuration fail instead of silently selecting a classical group.
+
+All certificates/keys, containers, networks and volumes are throwaway and are removed after the test. No production API, DB, DNS, certificate, key or VPS is contacted.
+
+`.github/workflows/xsp-hybrid-tls.yml` keeps the earlier laboratory tests and adds a separate **Dedicated PQ-only ingress container and network E2E** job. Passing CI is required before this P0 may be called complete.
+
+## What this still does NOT prove
+
+Even a green process E2E does not yet prove a deployed production Node↔Nexus path. In particular it does not provide:
+
+- a public/production listener, DNS or ACME lifecycle;
+- application-level Node authentication/authorization;
+- the XSP-v2 ACK HTTP handler;
+- a secure terminator→Nexus origin hop;
+- production Agent integration;
+- production key enrollment/rotation/retirement;
+- full snapshot anti-rollback;
+- independent penetration/security review.
+
+## Next gate after this transport P0
+
+Only after the dedicated ingress proof passes review, merge and post-merge CI may the project design the narrow `POST /api/v2/node/keys/rotation/ack` route behind that proven boundary.
+
+That later route must independently authenticate Node identity and bind it to the exact dual-signed ACK, permit, request ID, nonce, epoch, candidate and immutable receipt outbox. A successful HTTP status is never a substitute for the signed receipt, and a failed PQ handshake must never create a legacy authenticated session.
+
+**Activation remains disabled.**
