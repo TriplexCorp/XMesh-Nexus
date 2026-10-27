@@ -100,9 +100,10 @@ fn repeated_byte(s: &str, size: usize) -> Vec<u8> {
     vec![u8::from_str_radix(s, 16).unwrap(); size]
 }
 fn fixture() -> (Candidate, Fixture) {
-    let v: Fixture =
-        serde_json::from_str(include_str!("../../docs/XSP_V2_CUTOVER_CANDIDATE_VECTORS.json"))
-            .unwrap();
+    let v: Fixture = serde_json::from_str(include_str!(
+        "../../docs/XSP_V2_CUTOVER_CANDIDATE_VECTORS.json"
+    ))
+    .unwrap();
     assert_eq!(v.schema, "xsp2-cutover-candidate-public-binding-1");
     let c = Candidate {
         node_id: v.node_id,
