@@ -1,6 +1,6 @@
 //! Staging-only, owner-approved XSP-v2 Node dual-key enrollment and rotation.
 //! Not present in production builds. Never activates strict PQ and never
-//! enrolls panel_response keys or transmits private keys.
+//! enrolls `panel_response` keys or transmits private keys.
 use crate::{ApiError, AppState, auth::AuthUser};
 use axum::{
     Json,
@@ -48,7 +48,7 @@ fn digest_id(prefix: &str, public: &[u8]) -> String {
     format!("{prefix}{}", hex::encode(&hash[..12]))
 }
 fn strict_base64(raw: &str, expected: usize) -> Result<Vec<u8>, ApiError> {
-    if raw.len() > ((expected + 2) / 3) * 4 {
+    if raw.len() > expected.div_ceil(3) * 4 {
         return Err(denied());
     }
     let decoded = STANDARD.decode(raw).map_err(|_| denied())?;
@@ -231,13 +231,8 @@ pub struct Claim {
     mldsa65_signature_b64: String,
 }
 
-/// Unauthenticated claim is safe only with an owner-issued, one-use challenge
-/// AND possession proof of BOTH already-approved private keys.
-pub async fn claim(
-    State(state): State<AppState>,
-    Json(input): Json<Claim>,
-) -> Result<Json<Value>, ApiError> {
-    staging()?;
+/// Decode the bounded proof before taking database locks.
+fn decode_claim_proof(input: &Claim) -> Result<([u8; 32], Vec<u8>, Vec<u8>), ApiError> {
     if input.node_id <= 0
         || input.purpose != PURPOSE
         || input.key_epoch <= 0
@@ -254,6 +249,43 @@ pub async fn claim(
     }
     let ed_sig = strict_base64(&input.ed25519_signature_b64, 64)?;
     let pq_sig = strict_base64(&input.mldsa65_signature_b64, 3309)?;
+    Ok((challenge, ed_sig, pq_sig))
+}
+
+/// Persist the new epoch and mark approval consumed in the caller's transaction.
+async fn finish_claim_epoch(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    node_id: i64,
+    key_epoch: i64,
+) -> Result<(), ApiError> {
+    // A rotation pauses shadow verification; explicit owner reapproval is
+    // needed to resume shadow. Never activates strict mode or lowers suite.
+    sqlx::query(
+        "UPDATE node_xsp_suite_state SET key_epoch=$2,activation_phase='dual_enrolled'
+         WHERE node_id=$1",
+    )
+    .bind(node_id)
+    .bind(key_epoch)
+    .execute(&mut **tx)
+    .await?;
+    sqlx::query(
+        "UPDATE node_xsp_key_enrollment_approvals SET consumed_at=NOW()
+         WHERE node_id=$1 AND purpose='node_request'",
+    )
+    .bind(node_id)
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
+/// Unauthenticated claim is safe only with an owner-issued, one-use challenge
+/// AND possession proof of BOTH already-approved private keys.
+pub async fn claim(
+    State(state): State<AppState>,
+    Json(input): Json<Claim>,
+) -> Result<Json<Value>, ApiError> {
+    staging()?;
+    let (challenge, ed_sig, pq_sig) = decode_claim_proof(&input)?;
     let mut tx = state.pool.begin().await?;
     let suite = sqlx::query(
         "SELECT minimum_suite,activation_phase,key_epoch
@@ -325,23 +357,7 @@ pub async fn claim(
     .bind(input.key_epoch)
     .execute(&mut *tx)
     .await?;
-    // A rotation pauses shadow verification; explicit owner reapproval is
-    // needed to resume shadow. Never activates strict mode or lowers suite.
-    sqlx::query(
-        "UPDATE node_xsp_suite_state SET key_epoch=$2,activation_phase='dual_enrolled'
-         WHERE node_id=$1",
-    )
-    .bind(input.node_id)
-    .bind(input.key_epoch)
-    .execute(&mut *tx)
-    .await?;
-    sqlx::query(
-        "UPDATE node_xsp_key_enrollment_approvals SET consumed_at=NOW()
-         WHERE node_id=$1 AND purpose='node_request'",
-    )
-    .bind(input.node_id)
-    .execute(&mut *tx)
-    .await?;
+    finish_claim_epoch(&mut tx, input.node_id, input.key_epoch).await?;
     tx.commit().await?;
     crate::audit(
         &state.pool,
@@ -404,6 +420,24 @@ mod tests {
         assert!(verify_proof(&signed, &ed, &pq, &ed_sig, &bad_pq).is_err());
         let wrong_epoch = proof_input(node, epoch + 1, &challenge, &ed, &pq, ed_id, pq_id).unwrap();
         assert!(verify_proof(&wrong_epoch, &ed, &pq, &ed_sig, &pq_sig).is_err());
+    }
+
+    #[test]
+    fn claim_proof_decoder_rejects_noncanonical_inputs() {
+        let valid = Claim {
+            node_id: 42,
+            purpose: PURPOSE.to_owned(),
+            key_epoch: 1,
+            challenge_hex: "09".repeat(32),
+            ed25519_signature_b64: STANDARD.encode([1u8; 64]),
+            mldsa65_signature_b64: STANDARD.encode([2u8; 3309]),
+        };
+        assert!(decode_claim_proof(&valid).is_ok());
+        let invalid_uppercase = Claim {
+            challenge_hex: "AA".repeat(32),
+            ..valid
+        };
+        assert!(decode_claim_proof(&invalid_uppercase).is_err());
     }
 
     #[test]
