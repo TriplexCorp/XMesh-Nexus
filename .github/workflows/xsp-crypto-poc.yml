@@ -1,0 +1,33 @@
+name: XSP-v2 Crypto PoC (Rust/OpenSSL 3.5)
+on:
+  push:
+    branches: [main]
+    paths:
+      - "security/xspv2/poc-rust/**"
+      - "docs/XSP_V2_CRYPTO_POC.json"
+      - "docs/XSP_V2_VECTORS.json"
+      - ".github/workflows/xsp-crypto-poc.yml"
+  pull_request:
+    paths:
+      - "security/xspv2/poc-rust/**"
+      - "docs/XSP_V2_CRYPTO_POC.json"
+      - "docs/XSP_V2_VECTORS.json"
+      - ".github/workflows/xsp-crypto-poc.yml"
+permissions:
+  contents: read
+jobs:
+  crypto:
+    runs-on: ubuntu-latest
+    container: rust:1.99-trixie
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install OpenSSL 3.5 development headers
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends pkg-config libssl-dev
+          openssl version
+      - name: Validate isolated Rust ML-DSA provider, hybrid signatures and negative cases
+        run: |
+          cargo test --manifest-path security/xspv2/poc-rust/Cargo.toml --all-targets
+      - name: Check Rust PoC formatting
+        run: cargo fmt --manifest-path security/xspv2/poc-rust/Cargo.toml --all -- --check
