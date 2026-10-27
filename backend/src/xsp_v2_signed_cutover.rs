@@ -890,7 +890,11 @@ mod signed_tests {
         // Before committing, a readback must fail closed.
         assert!(
             crate::xsp_v2_ack_epoch_commit::readback_committed_applied_ack_staging(
-                &pool, node_id, &permit.request_id, &signed_ack, &panel_pin,
+                &pool,
+                node_id,
+                &permit.request_id,
+                &signed_ack,
+                &panel_pin,
             )
             .await
             .is_err()
@@ -982,14 +986,22 @@ mod signed_tests {
         tampered_retry.push(b' ');
         assert!(
             crate::xsp_v2_ack_epoch_commit::readback_committed_applied_ack_staging(
-                &pool, node_id, &permit.request_id, &tampered_retry, &panel_pin,
+                &pool,
+                node_id,
+                &permit.request_id,
+                &tampered_retry,
+                &panel_pin,
             )
             .await
             .is_err()
         );
         assert!(
             crate::xsp_v2_ack_epoch_commit::readback_committed_applied_ack_staging(
-                &pool, node_id, &permit.request_id, &signed_ack, &next_pin,
+                &pool,
+                node_id,
+                &permit.request_id,
+                &signed_ack,
+                &next_pin,
             )
             .await
             .is_err()
@@ -997,7 +1009,11 @@ mod signed_tests {
 
         assert!(
             crate::xsp_v2_ack_epoch_commit::readback_committed_applied_ack_staging(
-                &pool, node_id, "unknown-ack-request", &signed_ack, &panel_pin,
+                &pool,
+                node_id,
+                "unknown-ack-request",
+                &signed_ack,
+                &panel_pin,
             )
             .await
             .is_err()
