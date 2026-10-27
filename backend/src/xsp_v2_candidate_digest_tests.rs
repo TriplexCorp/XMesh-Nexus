@@ -197,7 +197,7 @@ fn candidate_rejects_invalid_public_material() {
     invalid = base.clone();
     invalid.from_ed_public.fill(0);
     assert!(canonical(&invalid).is_err());
-    invalid = base.clone();
+    invalid = base;
     invalid.from_pq_public.fill(0);
     assert!(canonical(&invalid).is_err());
 }
