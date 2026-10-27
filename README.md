@@ -1,5 +1,15 @@
 # XMesh Nexus
 
+## Актуальный XSP-v2 checkpoint — после Nexus PR #55 (27.10.2026)
+
+**Текущая точка:** Nexus `main` на SHA `7507437102df59c3bbd4682170c1b81300fdd565` после [#55](https://github.com/TriplexCorp/XMesh-Nexus/pull/55) (подтверждено в отчёте о post-merge проверке). [#55](https://github.com/TriplexCorp/XMesh-Nexus/pull/55) добавил экспериментальный PostgreSQL immutable signed commit receipt outbox (миграция `0105_node_xsp_signed_commit_receipt_outbox.sql`, Rust `xsp_v2_signed_receipt_outbox.rs`). Исходный ACK перепроверяется криптографически; receipt привязывается к Node ID, request ID, permit, ACK и epoch; проверяются **обе** подписи Ed25519 **AND** ML-DSA-65. Точные сохранённые байты возвращаются на идентичный retry без повторного epoch CAS; другая квитанция отвергается; SQL блокирует UPDATE/DELETE. Тесты включают реальные подписи и PostgreSQL/TimescaleDB.
+
+**Post-merge CI на указанном SHA (по подтверждённому отчёту):** Backend CI с API/PostgreSQL — success; OpenSSL 3.5 PQ Crypto CI — success; User Presence Integrity — success; GeoData/Routing — success. Это **не доказательство развёртывания на VPS, работающего HTTPS API или сетевого E2E**.
+
+**Node staging:** PQ-only HTTPS-клиент, проверка dual-signed Nexus commit receipt и его устойчивое journal-сохранение существуют как изолированные компоненты; production Node Agent и серверный путь всё ещё не соединены. **Новый следующий P0:** авторизованный Nexus API, независимо защищённый `panel_response` signer (никаких секретов в SQL/параметрах HTTP), строгая проверка Node identity и TLS 1.3 `X25519MLKEM768`, затем доказанный сквозной Nexus ↔ Node permit → applied ACK → atomic commit → identical signed receipt/retry. После этого — fault/recovery, независимый anti-rollback и security review. **`strict-pq` OFF, `XMESH1` для ещё не мигрированных узлов без изменений, Xray обслуживает VPN data-plane.** [Roadmap](docs/ENTERPRISE_ROADMAP.md) · [handoff](docs/XSP_V2_NEW_CHAT_HANDOFF.md).
+
+_Следующие ниже снимки #50/#51 и формулировки «следующий P0 — receipt» исторические и уступают этому checkpoint._
+
 ## Продолжение разработки в новом диалоге — обязательная точка входа (27.10.2026)
 
 **Если ты новый ChatGPT-ассистент, сначала изучи [актуальный XSP-v2 handoff: статус GitHub, merge inventory, CI и следующий P0](docs/XSP_V2_NEW_CHAT_HANDOFF.md), затем [Enterprise Roadmap](docs/ENTERPRISE_ROADMAP.md), после чего сверь `main` и открытые PR [Nexus](https://github.com/TriplexCorp/XMesh-Nexus/pulls) / [Node](https://github.com/TriplexCorp/XMesh-Node/pulls) и последние GitHub Actions.** Handoff обновлён до слитого [Nexus #50](https://github.com/TriplexCorp/XMesh-Nexus/pull/50): атомарный DB ACK/epoch CAS, реальные тесты Ed25519 + ML-DSA-65 с TimescaleDB и read-only проверяемое восстановление истории committed ACK. Ниже сохранены исторические этапы.
