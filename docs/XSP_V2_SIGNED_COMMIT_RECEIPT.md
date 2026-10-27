@@ -1,5 +1,32 @@
 # XSP-v2 signed Nexus commit receipt — staging protocol V1
 
+## Authenticated recovery staging boundary — 27 October 2026
+
+The feature-gated `recover_authenticated_committed_receipt_staging` composes
+two separate checks: (1) `authenticate_committed_ack_recovery_staging` validates
+a **fresh, doubly signed** Node identity assertion over the exact original ACK
+bytes, method/path, Node ID, request ID and a one-use nonce against the
+approved Node public keyset in PostgreSQL, and (2)
+`load_committed_signed_receipt_staging` independently re-verifies the
+committed ACK and original **Ed25519 AND ML-DSA-65** panel receipt before
+returning the persisted bytes. A consumed recovery nonce requires a new
+signed recovery assertion on subsequent attempts. No signer is called
+when recovering an existing receipt.
+
+**Security limit:** the Node ID supplied to the composite MUST originate
+from an independently authenticated and verified **TLS 1.3
+`X25519MLKEM768`** ingress. Neither the signed ACK nor a signed recovery
+assertion proves who opened the network connection. The composite is
+**not mounted on any HTTP route**, so it does not provide a working external
+ACK API. A separate protected `panel_response` signer, verified TLS hops,
+owner-approved trust pins, complete real Nexus↔Node E2E and external review
+are still outstanding. Do not activate `strict-pq` or infer production
+readiness from Rust/PostgreSQL tests.
+
+The foundation CI guard now asserts that the experimental composite exists
+and the real `/api/v2/node/keys/rotation/ack` route remains **unmounted**
+until its transport and signer trust boundaries are implemented and reviewed.
+
 ## Staging issue-or-recover checkpoint (27 October 2026)
 
 The feature-gated `issue_or_recover_signed_receipt_staging` orchestrator
