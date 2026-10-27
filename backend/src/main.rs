@@ -10,6 +10,9 @@ mod node_policy;
 mod node_rotation;
 mod node_routing;
 mod node_runtime;
+
+#[cfg(feature = "xsp-v2-experimental")]
+mod xsp_v2_api;
 mod protocol_credentials;
 mod security;
 mod subscription_finalmask;
@@ -408,8 +411,19 @@ fn protected_routes(state: &AppState) -> Router<AppState> {
         ))
 }
 
+fn experimental_v2_routes() -> Router<AppState> {
+    let router = Router::new();
+    #[cfg(feature = "xsp-v2-experimental")]
+    let router = router.route("/api/v2/node/heartbeat", post(xsp_v2_api::heartbeat));
+    router
+}
+
 fn application_router(state: AppState) -> Router {
     let protected = protected_routes(&state);
+    // Experimental staging heartbeat has no control-plane side effects and is
+    // ABSENT from production builds (default features). It stays 404 until
+    // XSP_V2_EXPERIMENTAL_HEARTBEAT=staging-only is explicitly set.
+
     let public = Router::new()
         .route("/health/live", get(health_live))
         .route("/health/ready", get(health_ready))
@@ -468,6 +482,7 @@ fn application_router(state: AppState) -> Router {
                 .merge(protected)
                 .fallback(|| async { StatusCode::NOT_FOUND }),
         )
+        .merge(experimental_v2_routes())
         .nest_service("/flags", ServeDir::new(format!("{static_dir}/flags")))
         .fallback_service(ServeDir::new(static_dir).append_index_html_on_directories(false))
         .layer(RequestBodyLimitLayer::new(2 * 1024 * 1024))
