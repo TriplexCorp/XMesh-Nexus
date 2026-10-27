@@ -667,19 +667,30 @@ mod signed_tests {
     // independently approved DB public keysets, real dual-signed applied ACK,
     // the production-isolated Rust verifier, and the actual atomic DB helper.
     // No HTTP route, signer installation, node activation or key retirement.
-    #[expect(clippy::too_many_lines, reason = "full signed cutover database integration fixture")]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "full signed cutover database integration fixture"
+    )]
     #[tokio::test]
     async fn real_postgres_signed_ack_commit_and_fail_closed() {
         let required = std::env::var("XSP_V2_REQUIRE_PQ_DB_TESTS").as_deref() == Ok("1");
         if openssl::version::number() < 0x3050_0000 {
-            assert!(!required, "required OpenSSL 3.5 ML-DSA provider unavailable");
+            assert!(
+                !required,
+                "required OpenSSL 3.5 ML-DSA provider unavailable"
+            );
             return;
         }
         let Ok(url) = std::env::var("XSP_V2_TEST_DATABASE_URL") else {
-            assert!(!required, "required disposable PostgreSQL service unavailable");
+            assert!(
+                !required,
+                "required disposable PostgreSQL service unavailable"
+            );
             return;
         };
-        let pool = sqlx::PgPool::connect(&url).await.expect("disposable DB connection");
+        let pool = sqlx::PgPool::connect(&url)
+            .await
+            .expect("disposable DB connection");
         sqlx::migrate!("./migrations")
             .run(&pool)
             .await
@@ -709,18 +720,15 @@ mod signed_tests {
             pending_ed_public: next_pin.ed_public.clone(),
             pending_pq_public: next_pin.pq_public.clone(),
         };
-        let candidate_hash = hex::encode(
-            crate::xsp_v2_candidate_binding::candidate_sha256(&material).unwrap(),
-        );
+        let candidate_hash =
+            hex::encode(crate::xsp_v2_candidate_binding::candidate_sha256(&material).unwrap());
         // A fresh throwaway service DB is required; never operate on a real VPS.
         let mut tx = pool.begin().await.unwrap();
-        sqlx::query(
-            "INSERT INTO node_metric_keys(node_id,public_key) VALUES($1,repeat('ab',32))",
-        )
-        .bind(node_id)
-        .execute(&mut *tx)
-        .await
-        .unwrap();
+        sqlx::query("INSERT INTO node_metric_keys(node_id,public_key) VALUES($1,repeat('ab',32))")
+            .bind(node_id)
+            .execute(&mut *tx)
+            .await
+            .unwrap();
         sqlx::query(
             "INSERT INTO node_xsp_suite_state(node_id,minimum_suite,activation_phase,key_epoch)
              VALUES($1,1,'dual_enrolled',1)",
@@ -793,8 +801,7 @@ mod signed_tests {
         permit.candidate_sha256_hex = candidate_hash;
         permit.permit_sha256_hex = "00".repeat(32);
         permit.applied_state_sha256_hex = "00".repeat(32);
-        let signed_permit =
-            sign_staging_permit(&permit, &panel_pin, &panel_ed, &panel_pq).unwrap();
+        let signed_permit = sign_staging_permit(&permit, &panel_pin, &panel_ed, &panel_pq).unwrap();
         let mut issue_tx = pool.begin().await.unwrap();
         let stored = crate::xsp_v2_permit_ledger_writer::persist_verified_permit(
             &mut issue_tx,
@@ -841,7 +848,12 @@ mod signed_tests {
         let signed_wrong_ack = signed_with(&wrong_ack, &next_ed, &next_pq);
         assert!(
             crate::xsp_v2_ack_epoch_commit::commit_fresh_applied_ack_staging(
-                &pool, node_id, &permit.request_id, &signed_wrong_ack, &panel_pin, now,
+                &pool,
+                node_id,
+                &permit.request_id,
+                &signed_wrong_ack,
+                &panel_pin,
+                now,
             )
             .await
             .is_err()
@@ -861,20 +873,18 @@ mod signed_tests {
             .await
             .is_err()
         );
-        let epoch_before: i64 = sqlx::query_scalar(
-            "SELECT key_epoch FROM node_xsp_suite_state WHERE node_id=$1",
-        )
-        .bind(node_id)
-        .fetch_one(&pool)
-        .await
-        .unwrap();
-        let state_before: String = sqlx::query_scalar(
-            "SELECT state FROM node_xsp_cutover_permit_ledger WHERE node_id=$1",
-        )
-        .bind(node_id)
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+        let epoch_before: i64 =
+            sqlx::query_scalar("SELECT key_epoch FROM node_xsp_suite_state WHERE node_id=$1")
+                .bind(node_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        let state_before: String =
+            sqlx::query_scalar("SELECT state FROM node_xsp_cutover_permit_ledger WHERE node_id=$1")
+                .bind(node_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!((epoch_before, state_before.as_str()), (1, "issued"));
 
         let committed = crate::xsp_v2_ack_epoch_commit::commit_fresh_applied_ack_staging(
@@ -888,7 +898,10 @@ mod signed_tests {
         .await
         .expect("real signed ACK committed through exact Rust/SQL path");
         assert_eq!((committed.from_epoch, committed.to_epoch), (1, 2));
-        assert_eq!(committed.signed_ack_envelope_sha256_hex, digest(&signed_ack));
+        assert_eq!(
+            committed.signed_ack_envelope_sha256_hex,
+            digest(&signed_ack)
+        );
         let (epoch_after, floor): (i64, i16) = sqlx::query_as(
             "SELECT key_epoch,minimum_suite FROM node_xsp_suite_state WHERE node_id=$1",
         )
@@ -897,15 +910,14 @@ mod signed_tests {
         .await
         .unwrap();
         assert_eq!((epoch_after, floor), (2, 1));
-        let (ledger_state, stored_ack, stored_hash): (String, Vec<u8>, Vec<u8>) =
-            sqlx::query_as(
-                "SELECT state,signed_applied_ack,applied_ack_sha256
+        let (ledger_state, stored_ack, stored_hash): (String, Vec<u8>, Vec<u8>) = sqlx::query_as(
+            "SELECT state,signed_applied_ack,applied_ack_sha256
                  FROM node_xsp_cutover_permit_ledger WHERE node_id=$1",
-            )
-            .bind(node_id)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
+        )
+        .bind(node_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
         assert_eq!(ledger_state, "ack_verified");
         assert_eq!(stored_ack, signed_ack);
         assert_eq!(stored_hash, Sha256::digest(&signed_ack).as_slice());
@@ -917,31 +929,34 @@ mod signed_tests {
         .fetch_one(&pool)
         .await
         .unwrap();
-        let replay_nonces: i64 = sqlx::query_scalar(
-            "SELECT count(*) FROM node_xsp_replay_nonces WHERE node_id=$1",
-        )
-        .bind(node_id)
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+        let replay_nonces: i64 =
+            sqlx::query_scalar("SELECT count(*) FROM node_xsp_replay_nonces WHERE node_id=$1")
+                .bind(node_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!((retained, replay_nonces), (2, 1));
 
         // Until a separately designed durable signed receipt/read-back exists,
         // retrying the exact ACK MUST FAIL CLOSED, not commit another epoch.
         assert!(
             crate::xsp_v2_ack_epoch_commit::commit_fresh_applied_ack_staging(
-                &pool, node_id, &permit.request_id, &signed_ack, &panel_pin, now,
+                &pool,
+                node_id,
+                &permit.request_id,
+                &signed_ack,
+                &panel_pin,
+                now,
             )
             .await
             .is_err()
         );
-        let unchanged: i64 = sqlx::query_scalar(
-            "SELECT key_epoch FROM node_xsp_suite_state WHERE node_id=$1",
-        )
-        .bind(node_id)
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+        let unchanged: i64 =
+            sqlx::query_scalar("SELECT key_epoch FROM node_xsp_suite_state WHERE node_id=$1")
+                .bind(node_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!(unchanged, 2);
         // No private keys are ever placed in PostgreSQL; the disposable CI
         // service, including its signing fixture data, is destroyed afterward.
