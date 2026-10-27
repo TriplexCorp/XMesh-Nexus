@@ -24,8 +24,10 @@ jobs:
       - name: Install OpenSSL 3.5 development headers
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends pkg-config libssl-dev
+          apt-get install -y --no-install-recommends pkg-config libssl-dev python3
           openssl version
+      - name: Cross-verify OpenSSL deterministic signatures against Go's public digest fixtures
+        run: python3 scripts/check-xsp-crypto-openssl.py
       - name: Validate isolated Rust ML-DSA provider, hybrid signatures and negative cases
         run: |
           cargo test --manifest-path security/xspv2/poc-rust/Cargo.toml --all-targets
