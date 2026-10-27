@@ -32,8 +32,10 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system --gid 10001 xmesh \
     && useradd --system --uid 10001 --gid xmesh --home-dir /nonexistent --shell /usr/sbin/nologin xmesh \
-    && mkdir -p /app/static /var/lib/xmesh/core \
-    && chown -R xmesh:xmesh /app /var/lib/xmesh
+    && mkdir -p /app/static /var/lib/xmesh/core /run/xmesh-signer \
+    && chown -R xmesh:xmesh /app /var/lib/xmesh \
+    && chown 10002:10001 /run/xmesh-signer \
+    && chmod 0750 /run/xmesh-signer
 COPY --from=builder /build/output/xmesh-api /usr/local/bin/xmesh-api
 COPY --from=flag-assets /flags/package/flags/4x3/ /app/static/flags/
 # MIT license for bundled flag-icons assets.
