@@ -394,7 +394,6 @@ pub async fn issue_or_recover_via_protected_signer_staging(
     .await
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
