@@ -11,8 +11,6 @@ mod node_rotation;
 mod node_routing;
 mod node_runtime;
 
-#[cfg(feature = "xsp-v2-experimental")]
-mod xsp_v2_api;
 mod protocol_credentials;
 mod security;
 mod subscription_finalmask;
@@ -21,6 +19,8 @@ mod subscription_settings;
 mod subscription_transport;
 mod subscription_user_agent;
 mod user_subscriptions;
+#[cfg(feature = "xsp-v2-experimental")]
+mod xsp_v2_api;
 
 #[cfg(test)]
 mod xsp_v2_wire_tests;
