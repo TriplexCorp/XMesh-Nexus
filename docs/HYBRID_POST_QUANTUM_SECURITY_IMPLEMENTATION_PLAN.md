@@ -455,9 +455,9 @@ ML-DSA-65 signatures/public keys существенно больше Ed25519; н
 
 ## PR07 laboratory CI evidence — 2026-10-27
 
-- **Node:** [Node CI #40432873804](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40432873804) completed successfully for `f984201c` with test-only Go TLS probing.
-- **Nexus:** [XSP-v2 Hybrid TLS #40432661499](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40432661499) completed successfully for `0ee54bd9`; Go + OpenSSL independently checked the negotiated TLS group and downgrade behavior.
-- **Nexus full backend:** [Backend CI #40432809267](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40432809267) for `918d42fa` had successful `cli`, `rust` and `subscription-build`; API integration was still underway when reviewed. The run may finish later; this is not a claim of all-green CI on subsequent documentation commits.
+- **Node:** [Node CI #40433732915](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40433732915) **passed** at `f56d09a1`, following the isolated Go TLS probe tests.
+- **Nexus:** [XSP-v2 Hybrid TLS #40432661499](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40432661499) **passed** at `0ee54bd9`; Go + OpenSSL independently checked the negotiated TLS group and downgrade behavior.
+- **Nexus full backend:** [Backend CI #40432809267](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40432809267) **passed** at `918d42fa`, including `cli`, `rust`, `subscription-build` and API authentication integration. This is verified only for this code SHA, not an automatic green check for subsequent docs-only commits.
 - No live VPS/proxy checks or strict activation have been performed. **Next:** freeze the wire contract after review, external KAT/fuzz, durable key epoch/anti-replay/rollback security, dedicated node ingress and measured canary proof.
 
 ## PR02 isolated crypto interoperability checkpoint — 2026-10-27
