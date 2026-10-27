@@ -43,15 +43,44 @@ full disk restore, cross-process concurrency, retry-after-commit receipt,
 protected signer, transport API or active Node is exercised. The ephemeral
 PostgreSQL credential must never be reused outside GitHub CI.
 
+### Committed ACK readback (isolated staging, read-only)
+
+`readback_committed_applied_ack_staging` offers an internal, **read-only**
+verification path for an ACK whose original `commit_fresh_applied_ack_staging`
+transaction succeeded but the response was lost. It locks the suite first,
+requires the exact `ack_verified` ledger row and current matching staging
+epoch, and compares the caller's authenticated Node/request identity and
+**byte-for-byte** signed ACK with the stored envelope and SHA-256.
+
+Unlike fresh cutover verification, the helper never trusts a possibly
+replaced pending preparation row. It recomputes the original candidate digest
+from the preserved previous and new **public** verification keysets, verifies
+the *stored* permit against an independently pinned panel public pair, verifies
+the *stored* ACK under the new Node Ed25519 and ML-DSA-65 keys, checks the
+ledger's permit digest/nonce/original time fields, and requires the original
+replay nonce to be present for the same request and epoch. It validates signed
+TTL against PostgreSQL's recorded `ack_verified_at` **commit-time evidence**,
+rather than incorrectly rejecting an otherwise valid historical record because
+a retry happened after message expiry. It never inserts or updates data.
+
+This returns a `StagingStoredACKEvidence` struct **inside the process**.
+It is **not** cryptographically signed Nexus confirmation, a replayable
+network response, an API handler, evidence of Node vault durability, or
+authorization to delete a Node ACK journal or retire previous keys.
+Readback currently fails closed after subsequent epoch transitions or key
+revocation and for the future `receipt_sent` state until those cases receive
+a separately reviewed protocol. PostgreSQL roles, row deletion protection and
+auditable append-only history remain further security work.
+
 ### Critical remaining gates
 
 - **Protected panel signer / authenticated transport**: no enabled server route, KMS/HSM signer, deployed pinned trust root or independently reviewed approval flow. Do not connect this helper to an untrusted API.
 - **Database integration under fault injection**: PostgreSQL unique/replay/ACK/epoch CAS tests, duplicate request and parallel transactions, SQL error between each statement and process crash after DB commit. The current compile/unit tests do NOT establish all these invariants in a live database.
-- **Split-brain and restart handling**: the helper only processes a freshly issued, still-valid ACK. After DB commit, duplicate requests must be answered from an independently validated **previously committed ledger row** without trying to apply the epoch again. It does not yet provide that replay-safe recovery protocol.
+- **Split-brain and restart handling**: internal readback now validates a committed ledger ACK without a second epoch CAS, but there is still NO authenticated network retry response, durable signed receipt, post-epoch-transition recovery, or crash/power-loss end-to-end test. A database witness must not be treated as a Node-visible commit receipt.
 - **Signed server commit receipt**: no signed receipt binding permit SHA-256, ACK SHA-256, nodeId, target epoch and nonce has been designed and durably stored. Node must retain pending ACK until it verifies such a receipt.
 - **Durable Node keys and anti-rollback**: the Node journal and applied-vault tests do not prevent rollback when an attacker restores the entire disk/floor and master key; out-of-band KMS or remote monotonic proof required.
 - **Independent security review and disposable canary**: required before production rollout. No `XMESH1` or `strict-pq` changes, and Xray/user traffic is unaffected.
 
 ## Integrity statement
 
-The helper returns `StagingACKCommit` only after DB transaction commit. That struct is **not a cryptographic receipt** and must never be used by Node as authorization to retire previous keys or delete its durable ACK journal.
+The fresh helper returns `StagingACKCommit` after DB transaction commit; the readback helper returns `StagingStoredACKEvidence` after validating committed history. **Neither struct is a cryptographic receipt**, and neither may authorize Node key retirement or deletion of its durable ACK journal.
