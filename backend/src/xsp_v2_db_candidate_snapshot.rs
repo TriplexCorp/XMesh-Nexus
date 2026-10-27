@@ -121,7 +121,8 @@ pub async fn load_locked_candidate(
         pending_ed_public: next_ed,
         pending_pq_public: next_pq,
     };
-    let candidate_sha256_hex = hex::encode(candidate_sha256(&material)?);
+    let digest = candidate_sha256(&material).map_err(anyhow::Error::msg)?;
+    let candidate_sha256_hex = hex::encode(digest);
     Ok(LockedCandidate {
         material,
         candidate_sha256_hex,
