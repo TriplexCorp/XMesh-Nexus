@@ -405,12 +405,11 @@ mod tests {
         let mut missing = ed_sig.clone();
         missing.clear();
         assert!(verify_proof(&signed, &ed, &pq, &missing, &pq_sig).is_err());
-        let mut bad_pq = pq_sig;
+        let mut bad_pq = pq_sig.clone();
         bad_pq[0] ^= 1;
         assert!(verify_proof(&signed, &ed, &pq, &ed_sig, &bad_pq).is_err());
-        let mut wrong_epoch = proof_input(node, epoch + 1, &challenge, &ed, &pq, ed_id, pq_id).unwrap();
-        assert!(verify_proof(&wrong_epoch, &ed, &pq, &ed_sig, &bad_pq).is_err());
-        wrong_epoch[0] ^= 1;
+        let wrong_epoch = proof_input(node, epoch + 1, &challenge, &ed, &pq, ed_id, pq_id).unwrap();
+        assert!(verify_proof(&wrong_epoch, &ed, &pq, &ed_sig, &pq_sig).is_err());
     }
 
     #[test]
