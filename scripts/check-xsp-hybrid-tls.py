@@ -154,7 +154,7 @@ def main():
         try:
             result = openssl_client(q, dest / "cert.pem", group="X25519")
             require(result, True, "classical TLS1.3 control handshake")
-            assert re.search(r"Negotiated TLS1\.3 group:\s*X25519\b", result.stderr), result.stderr
+            assert re.search(r"(?:Negotiated TLS1\.3 group:\s*X25519\b|Peer Temp Key:\s*X25519,)", result.stderr), result.stderr
             require(openssl_client(q, dest / "cert.pem"),
                     False, "strict hybrid client against classical-only server")
             probe(q, dest / "cert.pem", success=False)
