@@ -51,7 +51,7 @@ jobs:
     container: rust:1.99-trixie
     services:
       postgres:
-        image: postgres:16
+        image: timescale/timescaledb:2.30.0-pg18
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: xsp-ci-throwaway
