@@ -537,6 +537,9 @@ mod signed_tests {
         })
         .unwrap()
     }
+    // A single in-memory signing context exercises both algorithms and all
+    // failure paths without weakening or fragmenting the trust assertions.
+    #[expect(clippy::too_many_lines, reason = "cryptographic negative test covers many tamper variants")]
     #[test]
     fn real_dual_signature_permit_and_ack_fail_closed() {
         // Ubuntu default Backend CI links older OpenSSL without ML-DSA-65.
@@ -579,7 +582,7 @@ mod signed_tests {
         let signed = sign_staging_permit(&permit, &pin, &ed, &pq).unwrap();
         let verified =
             verify_signed_permit(&signed, &pin, &approved, permit.issued_at_ms + 1000).unwrap();
-        let mut ack = f.ack.clone();
+        let mut ack = f.ack;
         ack.to_ed_key_id = next_pin.ed_key_id.clone();
         ack.to_pq_key_id = next_pin.pq_key_id.clone();
         ack.signer_ed_key_id = next_pin.ed_key_id.clone();
