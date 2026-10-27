@@ -290,7 +290,7 @@ pub async fn load_committed_signed_receipt_staging(
 /// # Errors
 /// Rejects uncommitted or forged ACK, mismatched Node/request/epoch, missing
 /// public pins, corrupt durable receipt, untrusted signature or DB failures.
-pub async fn issue_or_recover_signed_receipt_staging<F>(
+pub async fn issue_or_recover_signed_receipt_staging<F, Fut>(
     pool: &PgPool,
     authenticated_node_id: i64,
     request_id: &str,
@@ -299,7 +299,8 @@ pub async fn issue_or_recover_signed_receipt_staging<F>(
     sign_from_verified_commit: F,
 ) -> Result<Vec<u8>>
 where
-    F: FnOnce(&crate::xsp_v2_ack_epoch_commit::StagingStoredACKEvidence) -> Result<Vec<u8>>,
+    F: FnOnce(&crate::xsp_v2_ack_epoch_commit::StagingStoredACKEvidence) -> Fut,
+    Fut: Future<Output = Result<Vec<u8>>>,
 {
     // Only this opaque, nonconstructible DB witness can be passed to the
     // signing callback. No caller-supplied epoch/digest authorizes signing.
@@ -334,7 +335,7 @@ where
         .await;
     }
 
-    let signed_bytes = sign_from_verified_commit(&evidence)?;
+    let signed_bytes = sign_from_verified_commit(&evidence).await?;
     // This validates both signatures and locked relational evidence before
     // durable insert. Signatures alone never commit or switch the epoch.
     match store_or_load_signed_receipt_staging(
@@ -365,6 +366,34 @@ where
         }
     }
 }
+
+/// API-side orchestration using the separate Unix-socket `panel_response`
+/// signer. The signer re-reads the exact committed ACK from PostgreSQL using
+/// a SELECT-only role before loading any private key. Its receipt is then
+/// rechecked against a locked DB readback before this process can persist it.
+///
+/// Intentionally not routed from HTTP until authenticated PQ-only Node ingress
+/// is implemented and reviewed. No private key enters this process.
+#[allow(dead_code)] // Wired by the forthcoming authorized ACK route only.
+pub async fn issue_or_recover_via_protected_signer_staging(
+    pool: &PgPool,
+    authenticated_node_id: i64,
+    request_id: &str,
+    signed_ack_bytes: &[u8],
+    pinned_panel: &TrustedPublic,
+    socket_path: &std::path::Path,
+) -> Result<Vec<u8>> {
+    super::xsp_v2_signer::issue_or_recover_via_socket(
+        pool,
+        authenticated_node_id,
+        request_id,
+        signed_ack_bytes,
+        pinned_panel,
+        socket_path,
+    )
+    .await
+}
+
 
 #[cfg(test)]
 mod tests {
