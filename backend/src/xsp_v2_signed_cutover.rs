@@ -1032,6 +1032,20 @@ mod signed_tests {
         // crypto revalidation against the locked committed ACK. Repeated
         // delivery MUST return the very same envelope, never mint a second
         // receipt or alter the original epoch.
+        // An ACK commit without a durable signed receipt must NEVER be
+        // misrepresented as a successful retry response.
+        assert!(
+            crate::xsp_v2_signed_receipt_outbox::load_committed_signed_receipt_staging(
+                &pool,
+                node_id,
+                &permit.request_id,
+                &signed_ack,
+                &panel_pin,
+            )
+            .await
+            .is_err(),
+            "no signed outbox row means no recoverable receipt"
+        );
         let saved = crate::xsp_v2_signed_receipt_outbox::store_or_load_signed_receipt_staging(
             &pool,
             node_id,
@@ -1062,6 +1076,56 @@ mod signed_tests {
         .await
         .unwrap();
         assert_eq!(receipt_count, 1);
+        // Lost HTTP response: recover the previously signed immutable bytes
+        // without any signer/private key and without replaying epoch CAS.
+        let recovered = crate::xsp_v2_signed_receipt_outbox::load_committed_signed_receipt_staging(
+            &pool,
+            node_id,
+            &permit.request_id,
+            &signed_ack,
+            &panel_pin,
+        )
+        .await
+        .expect("signed receipt was recovered independently from outbox");
+        assert_eq!(recovered, saved);
+        assert!(
+            crate::xsp_v2_signed_receipt_outbox::load_committed_signed_receipt_staging(
+                &pool,
+                node_id,
+                "not-the-original-request",
+                &signed_ack,
+                &panel_pin,
+            )
+            .await
+            .is_err(),
+            "wrong request cannot read a stored receipt"
+        );
+        assert!(
+            crate::xsp_v2_signed_receipt_outbox::load_committed_signed_receipt_staging(
+                &pool,
+                node_id,
+                &permit.request_id,
+                &signed_ack,
+                &next_pin,
+            )
+            .await
+            .is_err(),
+            "Node's public pair is not the trusted panel signer"
+        );
+        let mut altered_ack_for_recovery = signed_ack.clone();
+        altered_ack_for_recovery.push(b' ');
+        assert!(
+            crate::xsp_v2_signed_receipt_outbox::load_committed_signed_receipt_staging(
+                &pool,
+                node_id,
+                &permit.request_id,
+                &altered_ack_for_recovery,
+                &panel_pin,
+            )
+            .await
+            .is_err(),
+            "different ACK envelope cannot retrieve an original receipt"
+        );
 
         // A semantically equivalent but byte-different receipt is NOT an
         // allowed replacement (even if its signatures remain valid).
