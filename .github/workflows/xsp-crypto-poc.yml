@@ -75,7 +75,7 @@ jobs:
           cargo test --manifest-path backend/Cargo.toml --features xsp-v2-experimental --bin xmesh-api -- xsp_v2_api::tests
           cargo test --manifest-path backend/Cargo.toml --features xsp-v2-experimental --bin xmesh-api -- xsp_v2_enrollment::tests
           cargo test --manifest-path backend/Cargo.toml --features xsp-v2-experimental --bin xmesh-api -- xsp_v2_rotation::tests
-          cargo test --manifest-path backend/Cargo.toml --features xsp-v2-experimental --bin xmesh-api -- xsp_v2_signed_cutover::signed_tests
+          XSP_V2_REQUIRE_PQ_CUTOVER_TESTS=1 cargo test --manifest-path backend/Cargo.toml --features xsp-v2-experimental --bin xmesh-api -- xsp_v2_signed_cutover::signed_tests
       - name: Check Rust PoC formatting
         run: |
           rustup component add rustfmt
