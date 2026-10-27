@@ -1,0 +1,31 @@
+# syntax=docker/dockerfile:1.7
+# Separate OpenSSL 3.5+ image for the experimental receipt signer. This target
+# is never used by the default panel build or exposed through a TCP port.
+FROM rust:1.99-trixie AS builder
+WORKDIR /build/backend
+ENV CARGO_INCREMENTAL=0
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends pkg-config libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+COPY backend/Cargo.toml ./Cargo.toml
+COPY backend/src ./src
+COPY backend/migrations ./migrations
+RUN cargo build --release --features xsp-v2-experimental --bin xmesh-api \
+    && mkdir -p /build/output \
+    && cp target/release/xmesh-api /build/output/xmesh-api
+
+FROM debian:trixie-slim AS runtime
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates libssl3t64 \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system --gid 10001 xmesh \
+    && useradd --system --uid 10002 --gid xmesh --home-dir /nonexistent --shell /usr/sbin/nologin xmesh-signer \
+    && mkdir -p /run/xmesh-signer /run/xmesh-signer-keys \
+    && chown 10002:10001 /run/xmesh-signer \
+    && chmod 0750 /run/xmesh-signer
+COPY --from=builder /build/output/xmesh-api /usr/local/bin/xmesh-api
+USER 10002:10001
+WORKDIR /app
+HEALTHCHECK --interval=15s --timeout=3s --start-period=20s --retries=3 \
+  CMD test -S /run/xmesh-signer/signer.sock
+ENTRYPOINT ["/usr/local/bin/xmesh-api"]
