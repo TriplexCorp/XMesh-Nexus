@@ -10,7 +10,6 @@ verification, database mutation, signer call, or production activation.
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 import secrets
 import subprocess
@@ -21,6 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 HOSTNAME = "node-ingress.xsp.invalid"
 ALIAS = "xsp-ingress-c2b"
 ACK_PATH = "/api/v2/node/keys/rotation/ack"
+IDENTITY_PATH = "/__xsp_v2_identity_probe"
 TRUSTED_NODE_ID = 4242
 
 
@@ -135,11 +135,7 @@ def main() -> None:
             request_headers.append(f"Content-Length: {len(body.encode())}")
         request_headers.extend(extra_headers)
         raw = f"{method} {path} HTTP/1.1\r\n" + "\r\n".join(request_headers) + f"\r\n\r\n{body}"
-        args = [
-            "docker", "run", "--rm",
-            "--network", network,
-            "--mount", f"type=volume,src={certs},dst=/certs,readonly",
-            "--entrypoint", "openssl", probe_image,
+        openssl_args = [
             "s_client", "-quiet", "-ign_eof",
             "-connect", f"{ALIAS}:8444",
             "-servername", HOSTNAME,
@@ -149,8 +145,27 @@ def main() -> None:
             "-tls1_3", "-groups", "X25519MLKEM768",
         ]
         if cert and key:
-            args.extend(["-cert", f"/certs/{cert}", "-key", f"/certs/{key}"])
-        return command(*args, input_text=raw, check=False, timeout=12)
+            openssl_args.extend(["-cert", f"/certs/{cert}", "-key", f"/certs/{key}"])
+        # s_client -ign_eof is intentionally used so stdin EOF cannot truncate a
+        # server response. Bound the client externally and preserve its output;
+        # status assertions below, not process longevity, decide test success.
+        shell = r'''
+set +e
+timeout 5s openssl "$@"
+rc=$?
+if [ "$rc" -ne 0 ] && [ "$rc" -ne 124 ]; then
+  exit "$rc"
+fi
+exit 0
+'''
+        return command(
+            "docker", "run", "--rm",
+            "--network", network,
+            "--mount", f"type=volume,src={certs},dst=/certs,readonly",
+            "--entrypoint", "/bin/sh", probe_image,
+            "-ceu", shell, "xsp-c2b-probe", *openssl_args,
+            input_text=raw, check=False, timeout=12,
+        )
 
     def response_text(result: subprocess.CompletedProcess[str]) -> str:
         return (result.stdout or "") + (result.stderr or "")
@@ -198,6 +213,19 @@ def main() -> None:
             },
             separators=(",", ":"),
         )
+
+    def wait_ingress_ready() -> None:
+        last = ""
+        for _ in range(30):
+            response = response_text(
+                https_request("GET", IDENTITY_PATH, "", content_type=None, include_length=False)
+            )
+            if "200 OK" in response:
+                return
+            last = response[-800:]
+            time.sleep(0.2)
+        logs = command("docker", "logs", "--tail", "40", ingress, check=False)
+        raise RuntimeError(f"C2-B ingress never became ready: {last}\n{logs.stderr[-1200:]}")
 
     try:
         command("docker", "network", "create", "--internal", network)
@@ -295,12 +323,14 @@ chmod 0444 /certs/client.pem /certs/other-client.pem /certs/classical-client.pem
         if members != [ingress]:
             raise RuntimeError(f"unexpected persistent C2-B network members: {members}")
 
+        wait_ingress_ready()
         ack = make_ack()
         expect_status("runtime gate off", https_request("POST", ACK_PATH, ack), "404 Not Found")
         print("PASS: C2-B ACK route stays 404 until staging-only runtime gate is enabled")
 
         stop_origin()
         start_origin(enabled=True)
+        wait_ingress_ready()
 
         valid = https_request(
             "POST", ACK_PATH, ack,
@@ -358,7 +388,13 @@ chmod 0444 /certs/client.pem /certs/other-client.pem /certs/classical-client.pem
             https_request("POST", ACK_PATH, make_ack(kind="permit")),
             "400 Bad Request",
         )
-        print("PASS: ACK envelope is bound to trusted Node, ACK class/direction role, and exact method/path")
+        duplicate_kind = ack.replace('"kind":"ack"', '"kind":"ack","kind":"ack"', 1)
+        expect_status(
+            "duplicate JSON key",
+            https_request("POST", ACK_PATH, duplicate_kind),
+            "400 Bad Request",
+        )
+        print("PASS: ACK envelope binds trusted Node/class/path and rejects duplicate JSON keys")
 
         for label, cert, key in [
             ("different ML-DSA-65 client", "other-client.pem", "other-client-key.pem"),
