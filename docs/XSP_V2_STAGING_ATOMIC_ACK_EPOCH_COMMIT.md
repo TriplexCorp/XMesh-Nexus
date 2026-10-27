@@ -10,6 +10,21 @@ The helper `commit_fresh_applied_ack_staging` starts and owns one PostgreSQL tra
 4. Transitions the exact ledger request from `issued` to `ack_verified`, persisting signed ACK bytes and SHA-256. Trigger 0104 prevents replacing that authenticated receipt evidence.
 5. Calls `tx.commit()` only when all steps have succeeded, so a DB statement error leaves no partial logical commit.
 
+### Disposable PostgreSQL SQL harness (P0-A, partial)
+
+`scripts/test-xsp-v2-ack-epoch-atomicity.sh` runs in Backend CI against a
+**disposable PostgreSQL container**. It exercises forced SQL aborts after each
+of the four DB statements and competing transactions for the *same* nonce,
+then checks that only one ACK/epoch commit survives, replay is rejected, and
+the old public key remains. A ready advisory lock synchronizes the concurrent
+test sessions; it is **test-only** and not part of the cutover protocol.
+
+**Security limit:** the test inserts placeholder signed envelopes and directly
+issues SQL; it does **not** invoke `commit_fresh_applied_ack_staging`, verify
+Ed25519/ML-DSA-65, simulate an OS crash/power loss, or provide safe
+retry-after-commit/read-back. Full Rust→PostgreSQL signed integration and
+failure/recovery tests remain P0 blockers.
+
 ### Critical remaining gates
 
 - **Protected panel signer / authenticated transport**: no enabled server route, KMS/HSM signer, deployed pinned trust root or independently reviewed approval flow. Do not connect this helper to an untrusted API.
