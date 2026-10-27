@@ -49,6 +49,18 @@ jobs:
   crypto:
     runs-on: ubuntu-latest
     container: rust:1.99-trixie
+    services:
+      postgres:
+        image: timescale/timescaledb:2.30.0-pg18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: xsp-ci-throwaway
+          POSTGRES_DB: xsp_cutover_ci
+        options: >-
+          --health-cmd "pg_isready -U postgres -d xsp_cutover_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     steps:
       - uses: actions/checkout@v4
       - name: Fetch XMesh-Node test-only Go verifier
@@ -94,6 +106,12 @@ jobs:
           cargo test --manifest-path backend/Cargo.toml --features xsp-v2-experimental --bin xmesh-api -- xsp_v2_ack_ledger_validator::tests
           cargo test --manifest-path backend/Cargo.toml --features xsp-v2-experimental --bin xmesh-api -- xsp_v2_ack_epoch_commit::tests
           XSP_V2_REQUIRE_PQ_CUTOVER_TESTS=1 cargo test --manifest-path backend/Cargo.toml --features xsp-v2-experimental --bin xmesh-api -- xsp_v2_signed_cutover::signed_tests
+      - name: Verify real dual-signed ACK via Rust verifier and disposable PostgreSQL
+        env:
+          XSP_V2_TEST_DATABASE_URL: postgres://postgres:xsp-ci-throwaway@postgres:5432/xsp_cutover_ci
+          XSP_V2_REQUIRE_PQ_DB_TESTS: "1"
+        run: |
+          cargo test --manifest-path backend/Cargo.toml --features xsp-v2-experimental --bin xmesh-api -- xsp_v2_signed_cutover::signed_tests::real_postgres_signed_ack_commit_and_fail_closed --exact --nocapture
       - name: Verify Rust PoC and experimental backend formatting
         run: |
           rustup component add rustfmt clippy

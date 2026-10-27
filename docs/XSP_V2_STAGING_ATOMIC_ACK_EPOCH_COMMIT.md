@@ -25,6 +25,24 @@ Ed25519/ML-DSA-65, simulate an OS crash/power loss, or provide safe
 retry-after-commit/read-back. Full Rust→PostgreSQL signed integration and
 failure/recovery tests remain P0 blockers.
 
+### Real dual-signature → Rust → PostgreSQL integration (isolated CI)
+
+The dedicated OpenSSL 3.5 crypto workflow now runs
+`real_postgres_signed_ack_commit_and_fail_closed` against a disposable PostgreSQL
+TimescaleDB/PostgreSQL 18 service with the actual application migrations `0099–0104`. CI generates
+throwaway Ed25519/ML-DSA-65 keypairs **in memory**, stores independently
+approved public keysets, persists an authentic signed Nexus permit using
+`persist_verified_permit`, then passes a genuinely dual-signed Node ACK through
+`commit_fresh_applied_ack_staging`. The test checks DB epoch CAS, nonce,
+immutable ledger bytes/digest, old public-key retention, unchanged suite floor,
+and rejection of altered request IDs, missing PQ signature and duplicate ACK.
+
+This is **not** proof of production readiness: PoP approval is represented by a
+test-only database fixture, not a real owner flow or Node vault; no kill -9,
+full disk restore, cross-process concurrency, retry-after-commit receipt,
+protected signer, transport API or active Node is exercised. The ephemeral
+PostgreSQL credential must never be reused outside GitHub CI.
+
 ### Critical remaining gates
 
 - **Protected panel signer / authenticated transport**: no enabled server route, KMS/HSM signer, deployed pinned trust root or independently reviewed approval flow. Do not connect this helper to an untrusted API.
