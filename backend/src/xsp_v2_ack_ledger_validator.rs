@@ -75,9 +75,12 @@ pub async fn adjudicate_new_applied_ack(
     pinned_panel: &TrustedPublic,
     now_ms: i64,
 ) -> Result<AdjudicatedACK> {
-    if node_id <= 0 || request_id.is_empty() || request_id.len() > 64
+    if node_id <= 0
+        || request_id.is_empty()
+        || request_id.len() > 64
         || !request_id.bytes().all(|b| b.is_ascii_graphic())
-        || signed_ack_bytes.is_empty() || signed_ack_bytes.len() > 16 * 1024
+        || signed_ack_bytes.is_empty()
+        || signed_ack_bytes.len() > 16 * 1024
         || now_ms <= 0
     {
         bail!("invalid ACK request context or envelope length");
@@ -112,10 +115,14 @@ pub async fn adjudicate_new_applied_ack(
     // The expected digest and both complete keysets come from independently
     // locked, already owner-approved and dual-PoP-proved DB rows.
     let expected = from_trusted_snapshot(&snapshot, request_id);
-    let verified = verify_signed_permit(
-        &stored.signed_permit, pinned_panel, &expected, now_ms,
-    ).map_err(anyhow::Error::msg)?;
-    check_issued_record(&stored, &snapshot, verified.message(), verified.canonical_sha256_hex())?;
+    let verified = verify_signed_permit(&stored.signed_permit, pinned_panel, &expected, now_ms)
+        .map_err(anyhow::Error::msg)?;
+    check_issued_record(
+        &stored,
+        &snapshot,
+        verified.message(),
+        verified.canonical_sha256_hex(),
+    )?;
 
     let candidate = &snapshot.material;
     let next = TrustedPublic {
@@ -151,18 +158,23 @@ mod tests {
     fn ledger_metadata_must_match_signed_permit_and_owner_approved_keys() {
         let vector: serde_json::Value = serde_json::from_str(include_str!(
             "../../docs/XSP_V2_CUTOVER_CONTRACT_VECTORS.json"
-        )).unwrap();
+        ))
+        .unwrap();
         let p: Cutover = serde_json::from_value(vector["permit"].clone()).unwrap();
         let snapshot = LockedCandidate {
             material: CandidatePublic {
-                node_id: p.node_id, from_epoch: p.from_epoch, to_epoch: p.to_epoch,
+                node_id: p.node_id,
+                from_epoch: p.from_epoch,
+                to_epoch: p.to_epoch,
                 purpose: "node_request".into(),
                 from_ed_key_id: p.from_ed_key_id.clone(),
                 from_pq_key_id: p.from_pq_key_id.clone(),
                 to_ed_key_id: p.to_ed_key_id.clone(),
                 to_pq_key_id: p.to_pq_key_id.clone(),
-                active_ed_public: vec![1; 32], active_pq_public: vec![2; 1952],
-                pending_ed_public: vec![3; 32], pending_pq_public: vec![4; 1952],
+                active_ed_public: vec![1; 32],
+                active_pq_public: vec![2; 1952],
+                pending_ed_public: vec![3; 32],
+                pending_pq_public: vec![4; 1952],
             },
             candidate_sha256_hex: p.candidate_sha256_hex.clone(),
             approved_by: "owner-42".into(),
@@ -178,33 +190,41 @@ mod tests {
             permit_input_sha256: hex::decode(hash).unwrap(),
             permit_nonce: hex::decode(&p.permit_nonce_hex).unwrap(),
         };
-        assert!(check_issued_record(&row,&snapshot,&p,hash).is_ok());
+        assert!(check_issued_record(&row, &snapshot, &p, hash).is_ok());
         let mut bad = clone_for_test(&row);
-        bad.state="ack_verified".into();
-        assert!(check_issued_record(&bad,&snapshot,&p,hash).is_err());
-        bad.state="aborted".into();
-        assert!(check_issued_record(&bad,&snapshot,&p,hash).is_err());
-        bad=clone_for_test(&row);bad.issued_by="attacker".into();
-        assert!(check_issued_record(&bad,&snapshot,&p,hash).is_err());
-        bad=clone_for_test(&row);bad.from_epoch+=1;
-        assert!(check_issued_record(&bad,&snapshot,&p,hash).is_err());
-        bad=clone_for_test(&row);bad.permit_nonce[0]^=1;
-        assert!(check_issued_record(&bad,&snapshot,&p,hash).is_err());
-        bad=clone_for_test(&row);bad.permit_input_sha256[0]^=1;
-        assert!(check_issued_record(&bad,&snapshot,&p,hash).is_err());
-        bad=clone_for_test(&row);bad.candidate_sha256[0]^=1;
-        assert!(check_issued_record(&bad,&snapshot,&p,hash).is_err());
-        let mut incorrect=p.clone();incorrect.from_epoch+=1;
-        assert!(check_issued_record(&row,&snapshot,&incorrect,hash).is_err());
+        bad.state = "ack_verified".into();
+        assert!(check_issued_record(&bad, &snapshot, &p, hash).is_err());
+        bad.state = "aborted".into();
+        assert!(check_issued_record(&bad, &snapshot, &p, hash).is_err());
+        bad = clone_for_test(&row);
+        bad.issued_by = "attacker".into();
+        assert!(check_issued_record(&bad, &snapshot, &p, hash).is_err());
+        bad = clone_for_test(&row);
+        bad.from_epoch += 1;
+        assert!(check_issued_record(&bad, &snapshot, &p, hash).is_err());
+        bad = clone_for_test(&row);
+        bad.permit_nonce[0] ^= 1;
+        assert!(check_issued_record(&bad, &snapshot, &p, hash).is_err());
+        bad = clone_for_test(&row);
+        bad.permit_input_sha256[0] ^= 1;
+        assert!(check_issued_record(&bad, &snapshot, &p, hash).is_err());
+        bad = clone_for_test(&row);
+        bad.candidate_sha256[0] ^= 1;
+        assert!(check_issued_record(&bad, &snapshot, &p, hash).is_err());
+        let mut incorrect = p.clone();
+        incorrect.from_epoch += 1;
+        assert!(check_issued_record(&row, &snapshot, &incorrect, hash).is_err());
     }
-    fn clone_for_test(row:&LedgerRecord)->LedgerRecord {
+    fn clone_for_test(row: &LedgerRecord) -> LedgerRecord {
         LedgerRecord {
-            state:row.state.clone(),issued_by:row.issued_by.clone(),
-            from_epoch:row.from_epoch,to_epoch:row.to_epoch,
-            signed_permit:row.signed_permit.clone(),
-            candidate_sha256:row.candidate_sha256.clone(),
-            permit_input_sha256:row.permit_input_sha256.clone(),
-            permit_nonce:row.permit_nonce.clone(),
+            state: row.state.clone(),
+            issued_by: row.issued_by.clone(),
+            from_epoch: row.from_epoch,
+            to_epoch: row.to_epoch,
+            signed_permit: row.signed_permit.clone(),
+            candidate_sha256: row.candidate_sha256.clone(),
+            permit_input_sha256: row.permit_input_sha256.clone(),
+            permit_nonce: row.permit_nonce.clone(),
         }
     }
 }
