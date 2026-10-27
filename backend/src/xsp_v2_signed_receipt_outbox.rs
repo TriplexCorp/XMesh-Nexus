@@ -169,10 +169,6 @@ pub async fn store_or_load_signed_receipt_staging(
 /// # Errors
 /// Fail closed on missing receipt, invalid or changed committed ACK evidence,
 /// mismatched epoch, request, digest, or either panel receipt signature.
-#[expect(
-    clippy::too_many_lines,
-    reason = "locked historical receipt and PostgreSQL ledger verification boundary"
-)]
 pub async fn load_committed_signed_receipt_staging(
     pool: &PgPool,
     authenticated_node_id: i64,
