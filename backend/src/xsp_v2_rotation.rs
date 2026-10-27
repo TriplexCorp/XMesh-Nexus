@@ -318,6 +318,44 @@ pub async fn prove(
 mod tests {
     use super::*;
     #[test]
+    fn verify_actual_go_prepared_rotation_signatures() {
+        let Ok(path) = std::env::var("XSP_V2_ROTATION_PROOF_FIXTURE") else {
+            return;
+        };
+        let blob = std::fs::read(path).expect("ephemeral Go prepared rotation proof");
+        let v: serde_json::Value = serde_json::from_slice(&blob).unwrap();
+        let public = &v["public"];
+        let proof = &v["proof"];
+        let node = public["nodeId"].as_i64().unwrap();
+        let to = public["keyEpoch"].as_i64().unwrap();
+        let from = proof["fromEpoch"].as_i64().unwrap();
+        assert_eq!(node, proof["nodeId"].as_i64().unwrap());
+        assert_eq!(to, proof["keyEpoch"].as_i64().unwrap());
+        assert_eq!(proof["purpose"], "node_request");
+        let ed = strict_base64(public["ed25519Public"].as_str().unwrap(), 32).unwrap();
+        let pq = strict_base64(public["mldsa65Public"].as_str().unwrap(), 1952).unwrap();
+        let ed_id = public["ed25519KeyId"].as_str().unwrap();
+        let pq_id = public["mldsa65KeyId"].as_str().unwrap();
+        assert_eq!(ed_id, digest_id("ed-", &ed));
+        assert_eq!(pq_id, digest_id("pq-", &pq));
+        let challenge: [u8; 32] = hex::decode(proof["challengeHex"].as_str().unwrap())
+            .unwrap().try_into().unwrap();
+        let ed_sig = strict_base64(proof["ed25519SignatureB64"].as_str().unwrap(), 64).unwrap();
+        let pq_sig = strict_base64(proof["mldsa65SignatureB64"].as_str().unwrap(), 3309).unwrap();
+        let signed = rotation_input(node, (from, to), &challenge,
+            &ed, &pq, ed_id, pq_id).unwrap();
+        assert!(verify_proof(&signed, &ed, &pq, &ed_sig, &pq_sig).is_ok());
+        // A rotation signature cannot be replayed as initial enrollment.
+        let initial = crate::xsp_v2_enrollment::proof_input(
+            node, to, &challenge, &ed, &pq, ed_id, pq_id,
+        ).unwrap();
+        assert!(verify_proof(&initial, &ed, &pq, &ed_sig, &pq_sig).is_err());
+        let changed = rotation_input(node, (from + 1, to + 1), &challenge,
+            &ed, &pq, ed_id, pq_id).unwrap();
+        assert!(verify_proof(&changed, &ed, &pq, &ed_sig, &pq_sig).is_err());
+    }
+
+    #[test]
     fn stage_guard_rejects_strict_legacy_skips_and_rollbacks() {
         assert!(rotation_allowed(1, "dual_enrolled", 1, 2));
         assert!(rotation_allowed(1, "shadow", 8, 9));
