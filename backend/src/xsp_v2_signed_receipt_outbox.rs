@@ -27,6 +27,10 @@ use sqlx::{PgPool, Row};
 /// from authenticated and PQ-protected context and use a separately protected
 /// signer. It may only deliver these bytes after verifying its own TLS hop,
 /// authorization, and replay-safe request identity.
+#[expect(
+    clippy::too_many_lines,
+    reason = "locked cryptographic receipt and immutable PostgreSQL outbox trust boundary"
+)]
 pub async fn store_or_load_signed_receipt_staging(
     pool: &PgPool,
     authenticated_node_id: i64,
