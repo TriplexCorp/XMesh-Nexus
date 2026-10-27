@@ -51,22 +51,20 @@ async fn issue_token(
     }
     let mut tx = state.pool.begin().await?;
     // All issue/claim flows lock the Node record before touching token rows.
-    let found = sqlx::query(
-        "SELECT id FROM panel_records WHERE collection='nodes' AND id=$1 FOR UPDATE",
-    )
-    .bind(node_id)
-    .fetch_optional(&mut *tx)
-    .await?;
+    let found =
+        sqlx::query("SELECT id FROM panel_records WHERE collection='nodes' AND id=$1 FOR UPDATE")
+            .bind(node_id)
+            .fetch_optional(&mut *tx)
+            .await?;
     if found.is_none() {
         return Err(ApiError::new(StatusCode::NOT_FOUND, "Node not found"));
     }
-    let has_key = sqlx::query_scalar::<_, i64>(
-        "SELECT node_id FROM node_metric_keys WHERE node_id=$1",
-    )
-    .bind(node_id)
-    .fetch_optional(&mut *tx)
-    .await?
-    .is_some();
+    let has_key =
+        sqlx::query_scalar::<_, i64>("SELECT node_id FROM node_metric_keys WHERE node_id=$1")
+            .bind(node_id)
+            .fetch_optional(&mut *tx)
+            .await?
+            .is_some();
     if has_key && !replace {
         return Err(ApiError::new(
             StatusCode::CONFLICT,
@@ -102,7 +100,11 @@ async fn issue_token(
     crate::audit(
         &state.pool,
         &actor.username,
-        if replace { "node.enrollment_recovery_approved" } else { "node.enrollment_issued" },
+        if replace {
+            "node.enrollment_recovery_approved"
+        } else {
+            "node.enrollment_issued"
+        },
         Some("nodes"),
         Some(node_id),
         json!({"keyReplacementAuthorized": replace}),
@@ -206,13 +208,17 @@ pub async fn claim(
     .bind(&hash)
     .fetch_optional(&mut *tx)
     .await?
-    .ok_or_else(|| ApiError::new(StatusCode::UNAUTHORIZED, "Enrollment token expired or invalid"))?;
-    let node = sqlx::query(
-        "SELECT id FROM panel_records WHERE collection='nodes' AND id=$1 FOR UPDATE",
-    )
-    .bind(node_id)
-    .fetch_optional(&mut *tx)
-    .await?;
+    .ok_or_else(|| {
+        ApiError::new(
+            StatusCode::UNAUTHORIZED,
+            "Enrollment token expired or invalid",
+        )
+    })?;
+    let node =
+        sqlx::query("SELECT id FROM panel_records WHERE collection='nodes' AND id=$1 FOR UPDATE")
+            .bind(node_id)
+            .fetch_optional(&mut *tx)
+            .await?;
     if node.is_none() {
         return Err(ApiError::new(StatusCode::NOT_FOUND, "Node not found"));
     }
@@ -223,15 +229,23 @@ pub async fn claim(
     .bind(&hash)
     .fetch_optional(&mut *tx)
     .await?
-    .ok_or_else(|| ApiError::new(StatusCode::UNAUTHORIZED, "Enrollment token expired or invalid"))?;
+    .ok_or_else(|| {
+        ApiError::new(
+            StatusCode::UNAUTHORIZED,
+            "Enrollment token expired or invalid",
+        )
+    })?;
     let confirmed_node: i64 = token_row.try_get("node_id")?;
     if confirmed_node != node_id {
-        return Err(ApiError::new(StatusCode::UNAUTHORIZED, "Enrollment token scope changed"));
+        return Err(ApiError::new(
+            StatusCode::UNAUTHORIZED,
+            "Enrollment token scope changed",
+        ));
     }
     let replacement_authorized: bool = token_row.try_get("allow_key_replacement")?;
-    let replaced = register_enrollment_key(
-        &mut tx, node_id, &input.public_key, replacement_authorized,
-    ).await?;
+    let replaced =
+        register_enrollment_key(&mut tx, node_id, &input.public_key, replacement_authorized)
+            .await?;
     sqlx::query("UPDATE node_enrollment_tokens SET consumed_at=NOW() WHERE token_hash=$1")
         .bind(hash)
         .execute(&mut *tx)
@@ -248,9 +262,10 @@ pub async fn claim(
         )
         .await;
     }
-    Ok(Json(json!({"nodeId":node_id,"enrolled":true,"keyReplaced":replaced})))
+    Ok(Json(
+        json!({"nodeId":node_id,"enrolled":true,"keyReplaced":replaced}),
+    ))
 }
-
 
 /// Commit key replacement only after the token and Ed25519 proof were verified.
 /// Never let a normal enrollment token replace an already trusted identity.
