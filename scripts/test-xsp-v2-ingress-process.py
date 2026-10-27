@@ -259,7 +259,7 @@ chmod 0444 /certs/unrelated.pem
                 "--entrypoint", "openssl", probe_image,
                 "s_client",
                 "-quiet",
-                "-ign_eof",
+                "-no_ign_eof",
                 "-connect", f"{ALIAS}:8444",
                 "-servername", HOSTNAME,
                 "-verify_hostname", HOSTNAME,
