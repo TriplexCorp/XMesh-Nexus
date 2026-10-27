@@ -1028,6 +1028,109 @@ mod signed_tests {
             .is_err(),
             "Ed25519-only commit receipt is forbidden"
         );
+        // Genuine dual-signed receipt bytes become durable only after
+        // crypto revalidation against the locked committed ACK. Repeated
+        // delivery MUST return the very same envelope, never mint a second
+        // receipt or alter the original epoch.
+        let saved = crate::xsp_v2_signed_receipt_outbox::store_or_load_signed_receipt_staging(
+            &pool,
+            node_id,
+            &permit.request_id,
+            &signed_ack,
+            &signed_receipt,
+            &panel_pin,
+        )
+        .await
+        .expect("exact dual-signed Nexus receipt was durably stored");
+        assert_eq!(saved, signed_receipt);
+        let repeated = crate::xsp_v2_signed_receipt_outbox::store_or_load_signed_receipt_staging(
+            &pool,
+            node_id,
+            &permit.request_id,
+            &signed_ack,
+            &signed_receipt,
+            &panel_pin,
+        )
+        .await
+        .expect("identical receipt retry is idempotent");
+        assert_eq!(repeated, saved);
+        let receipt_count: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM node_xsp_signed_commit_receipt_outbox WHERE node_id=$1",
+        )
+        .bind(node_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(receipt_count, 1);
+
+        // A semantically equivalent but byte-different receipt is NOT an
+        // allowed replacement (even if its signatures remain valid).
+        let mut altered_envelope = signed_receipt.clone();
+        altered_envelope.push(b' ');
+        assert!(
+            crate::xsp_v2_signed_receipt_outbox::store_or_load_signed_receipt_staging(
+                &pool,
+                node_id,
+                &permit.request_id,
+                &signed_ack,
+                &altered_envelope,
+                &panel_pin,
+            )
+            .await
+            .is_err(),
+            "a distinct serialized receipt replaced original signed bytes"
+        );
+        assert!(
+            crate::xsp_v2_signed_receipt_outbox::store_or_load_signed_receipt_staging(
+                &pool,
+                node_id,
+                "not-the-original-request",
+                &signed_ack,
+                &signed_receipt,
+                &panel_pin,
+            )
+            .await
+            .is_err()
+        );
+        assert!(
+            crate::xsp_v2_signed_receipt_outbox::store_or_load_signed_receipt_staging(
+                &pool,
+                node_id,
+                &permit.request_id,
+                &signed_ack,
+                &signed_receipt,
+                &next_pin,
+            )
+            .await
+            .is_err()
+        );
+        // Storage is append-only even for direct SQL callers.
+        assert!(
+            sqlx::query(
+                "UPDATE node_xsp_signed_commit_receipt_outbox
+                 SET signed_receipt=signed_receipt WHERE node_id=$1",
+            )
+            .bind(node_id)
+            .execute(&pool)
+            .await
+            .is_err()
+        );
+        assert!(
+            sqlx::query("DELETE FROM node_xsp_signed_commit_receipt_outbox WHERE node_id=$1")
+                .bind(node_id)
+                .execute(&pool)
+                .await
+                .is_err()
+        );
+        let original_from_storage: Vec<u8> = sqlx::query_scalar(
+            "SELECT signed_receipt FROM node_xsp_signed_commit_receipt_outbox WHERE node_id=$1",
+        )
+        .bind(node_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(original_from_storage, saved);
+
         assert_eq!(evidence.ack_nonce_hex, ack.nonce_hex);
         assert_eq!(evidence.candidate_sha256_hex, permit.candidate_sha256_hex);
 

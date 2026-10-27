@@ -3,7 +3,7 @@
 const fs=require('node:fs'),assert=require('node:assert/strict');
 const sql=fs.readFileSync('backend/migrations/0099_node_xsp_v2_public_state.sql','utf8');
 const migrationVersions=fs.readdirSync('backend/migrations').filter(name=>/^\d{4}_.+\.sql$/.test(name)).map(name=>Number(name.slice(0,4)));
-assert.equal(Math.max(...migrationVersions),104,'Immutable signed cutover ledger migration must follow 0103');
+assert.equal(Math.max(...migrationVersions),105,'Signed receipt outbox migration 0105 must follow immutable cutover ledger 0104');
 assert.equal(migrationVersions.filter(version=>version===102).length,1,'Expected one migration version 0102');
 
 assert.equal(migrationVersions.filter(version=>version===103).length,1,'Expected one migration version 0103');
@@ -32,6 +32,18 @@ assert.match(ledgerGuard,/NEW\.state NOT IN \('issued', 'ack_verified', 'aborted
 assert.match(ledgerGuard,/NEW\.applied_ack_sha256, NEW\.signed_applied_ack/);
 assert(!/\b(?:UPDATE|DELETE)\s+node_xsp_(?:suite_state|public_keysets)\b/i.test(ledgerGuard.replace(/--[^\n]*/g,'')),
     'Staging ledger guard must not rotate trusted keys or lower the floor');
+
+assert.equal(migrationVersions.filter(version=>version===105).length,1,'Expected one immutable receipt outbox migration 0105');
+const outbox=fs.readFileSync('backend/migrations/0105_node_xsp_signed_commit_receipt_outbox.sql','utf8');
+assert.match(outbox,/CREATE TABLE node_xsp_signed_commit_receipt_outbox/);
+assert.match(outbox,/PRIMARY KEY \(node_id,request_id\)/);
+assert.match(outbox,/ON DELETE RESTRICT/);
+assert.match(outbox,/CREATE FUNCTION xsp2_signed_receipt_outbox_guard\(\) RETURNS TRIGGER/);
+assert.match(outbox,/BEFORE UPDATE OR DELETE ON node_xsp_signed_commit_receipt_outbox/);
+assert.match(outbox,/committed\.state <> 'ack_verified'/);
+assert.match(outbox,/committed\.applied_ack_sha256 IS DISTINCT FROM NEW\.applied_ack_sha256/);
+assert(!/private_key|private_seed|plaintext_secret/i.test(outbox.replace(/--[^\n]*/g,'')),
+  'Signed receipt outbox must not persist private keys');
 
 const rotations=fs.readFileSync('backend/migrations/0102_node_xsp_rotation_preparations.sql','utf8');
 assert.match(rotations,/CREATE TABLE node_xsp_rotation_preparations/);
