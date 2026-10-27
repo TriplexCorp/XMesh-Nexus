@@ -461,7 +461,8 @@ ML-DSA-65 signatures/public keys существенно больше Ed25519; н
 - [x] Negative Ed25519 **AND** ML-DSA-65 tests: missing, altered, substituted-key and mismatched-message signatures cannot pass an isolated PoC verifier.
 - [x] Direct **Rust → Go** and **Go → Rust** signed-artifact exchange (both Ed25519 and ML-DSA-65 mandatory, tampering/downgrade rejected) in test-only isolated workflow.
 - [ ] Record green isolated and production CI evidence for latest revisions of both repositories; complete external FIPS 204 known-answer tests, fuzzing and independent security review before declaring PR02 accepted.
-- [ ] Next: strict JSON decoding, durable replay/epoch policy, a hybrid TLS 1.3 X25519MLKEM768 handshake probe with actual terminator. None are enabled in production.
+- [x] **PR07 isolated TLS spike:** [XSP_V2_TLS_PROBE.md](XSP_V2_TLS_PROBE.md) and cross-implementation Go/OpenSSL 3.5 laboratory CI test an actual TLS 1.3 X25519MLKEM768 connection, negotiated CurveID, X.509/hostname verification and downgrade/error rejection. The probe is not installed in operational agents.
+- [ ] **Next:** strict JSON decoding, durable replay/epoch policy and an approved node-only TLS terminator with real canary evidence for every required hop. No hybrid TLS or strict suite is active in production.
 
 **Provider decision (research only):** Go 1.27.3 `crypto/mldsa`; Rust `openssl` 0.10.81 with OpenSSL 3.5+ EVP ML-DSA-65. Do not equate verified local algorithm interoperability with an audited cryptosystem or a production migration. Details: [XSP_V2_CRYPTO_POC.md](XSP_V2_CRYPTO_POC.md).
 
@@ -514,6 +515,8 @@ ML-DSA-65 signatures/public keys существенно больше Ed25519; н
 - **Gate:** строгая аутентификация всех security-sensitive потоков, все existing API tests проходят.
 
 **PR 07 — Hybrid TLS deployment (proxy + Node)**  
+- [x] Test-only hybrid TLS/Go+OpenSSL handshake probe with negative TLS group, hostname, CA and version cases; [docs](XSP_V2_TLS_PROBE.md).  
+- [ ] Validate actual Nginx/OpenSSL build, all CDN/LB ingress hops, node-only endpoint, certificates and staged rollback on an isolated canary; existing public Nginx still allows TLS 1.2 and has no hard PQ group guarantee.  
 - [ ] Совместимый TLS terminator; node-only endpoint; сертификаты и hostname validation.
 - [ ] Для strict node требовать TLS 1.3 + X25519MLKEM768, проверять negotiated result.
 - [ ] CI/integration probe, TLS 1.2/old curve/invalid cert отрицательные тесты; CDN hops и resumption.
