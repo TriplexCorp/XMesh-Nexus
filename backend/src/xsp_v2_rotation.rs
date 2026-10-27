@@ -25,9 +25,10 @@ fn rotation_allowed(floor: i16, phase: &str, from: i64, to: i64) -> bool {
 /// Purpose/key IDs/public bytes have exactly the same bounded encoding as v1
 /// enrollment PoP; no signature can be replayed across those endpoints.
 fn rotation_input(
-    node: i64, from: i64, to: i64, challenge: &[u8; 32],
+    node: i64, epochs: (i64, i64), challenge: &[u8; 32],
     ed: &[u8], pq: &[u8], ed_id: &str, pq_id: &str,
 ) -> Result<Vec<u8>, ApiError> {
+    let (from, to) = epochs;
     if node <= 0 || from <= 0 || from.checked_add(1) != Some(to)
         || ed.len() != 32 || pq.len() != 1952
     {
@@ -193,7 +194,7 @@ pub async fn prove(
     let pq: Vec<u8> = row.try_get("mldsa65_public")?;
     let ed_id: String = row.try_get("ed25519_key_id")?;
     let pq_id: String = row.try_get("mldsa65_key_id")?;
-    let signed = rotation_input(input.node_id, from, input.key_epoch,
+    let signed = rotation_input(input.node_id, (from, input.key_epoch),
         &proof.challenge, &ed, &pq, &ed_id, &pq_id)?;
     verify_proof(&signed, &ed, &pq, &proof.ed_sig, &proof.pq_sig)?;
     sqlx::query(
@@ -233,12 +234,12 @@ mod tests {
         let pq=[2u8;1952];
         let ed_id=digest_id("ed-",&ed);
         let pq_id=digest_id("pq-",&pq);
-        let a=rotation_input(42,1,2,&challenge,&ed,&pq,&ed_id,&pq_id).unwrap();
+        let a=rotation_input(42,(1,2),&challenge,&ed,&pq,&ed_id,&pq_id).unwrap();
         assert!(a.starts_with(b"XSP2-KEY-ROTATE-PREPARE-V1\0"));
-        assert!(!a.starts_with(b"XSP2-KEY-ENROLL-V1\\0"));
-        assert_ne!(a,rotation_input(42,2,3,&challenge,&ed,&pq,&ed_id,&pq_id).unwrap());
-        assert_ne!(a,rotation_input(43,1,2,&challenge,&ed,&pq,&ed_id,&pq_id).unwrap());
-        assert!(rotation_input(42,2,2,&challenge,&ed,&pq,&ed_id,&pq_id).is_err());
+        assert!(!a.starts_with(b"XSP2-KEY-ENROLL-V1\0"));
+        assert_ne!(a,rotation_input(42,(2,3),&challenge,&ed,&pq,&ed_id,&pq_id).unwrap());
+        assert_ne!(a,rotation_input(43,(1,2),&challenge,&ed,&pq,&ed_id,&pq_id).unwrap());
+        assert!(rotation_input(42,(2,2),&challenge,&ed,&pq,&ed_id,&pq_id).is_err());
     }
     #[test]
     fn rotation_decoder_requires_canonical_bounded_proof() {
