@@ -7,6 +7,8 @@
 >
 > Schema identifier: `xsp2-wire-candidate-1`. Any incompatible decision must advance the schema/protocol version and regenerate all three independent vector checks. Do not use the candidate for a production signing key until reviewed.
 
+**Updated product requirement (27 October 2026):** the shipping XSP-v2 control plane is **PQ-only with no user-selectable mode and no classical/v1 downgrade**. Mandatory verified TLS 1.3 `X25519MLKEM768` plus Ed25519 **AND** ML-DSA-65 signatures, or refuse connection. Historical v1 facts and staging compatibility fixtures below document unfinished migration, **not a permitted option in the final product**. See [binding PQ-only policy](XSP_V2_PQ_ONLY_SECURITY_POLICY.md).
+
 ## 1. Scope, trust boundaries and observed v1 facts
 
 | Message / component | Observed today | v2 security requirement |
