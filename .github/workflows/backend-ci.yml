@@ -131,6 +131,8 @@ jobs:
           python3 scripts/test-node-presence.py
       - name: Ensure online status expires and signed telemetry cannot replay
         run: node scripts/check-user-presence.js
+      - name: Check dormant XSP-v2 public key state and loopback TLS ingress
+        run: node scripts/check-xsp-v2-foundation.js
       - name: Check XSP-v2 candidate wire input independently (no production activation)
         run: node scripts/check-xsp-v2-wire.js
       - name: Test Xray-core and panel update buttons, queue and responsive layout
