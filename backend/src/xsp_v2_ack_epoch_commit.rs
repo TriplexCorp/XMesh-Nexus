@@ -187,8 +187,7 @@ mod tests {
             r#"{"message":{"nonceHex":"ZZ112233445566778899aabbccddeeff"}}"#,
             r#"{"message":{"nonceHex":"00000000000000000000000000000000"}}"#,
             r#"{"message":{"nonceHex":"00112233445566778899AABBCCDDEEFF"}}"#,
-        ]
-        {
+        ] {
             assert!(checked_ack_nonce(value.as_bytes()).is_err());
         }
     }
