@@ -13,10 +13,7 @@
 use anyhow::{Context, Result, ensure};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use ed25519_dalek::SigningKey;
-use openssl::{
-    pkey::{KeyType, PKey, Private},
-    sign::Signer as PQSigner,
-};
+use openssl::pkey::{KeyType, PKey, Private};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use sqlx::{PgPool, postgres::PgPoolOptions};
@@ -229,7 +226,7 @@ fn validate_request(request: &SignRequest) -> Result<Vec<u8>> {
 fn panel_pin_for_node(template: &TrustedPublic, node_id: i64) -> Result<TrustedPublic> {
     ensure!(node_id > 0, "invalid node ID");
     let node_id = u64::try_from(node_id).context("node ID out of range")?;
-    let mut pin = TrustedPublic {
+    let pin = TrustedPublic {
         purpose: template.purpose.clone(),
         issuer_id: template.issuer_id.clone(),
         node_id,
