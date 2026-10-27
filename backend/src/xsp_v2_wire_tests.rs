@@ -79,7 +79,7 @@ fn canonical_input(vector: &WireVector) -> Result<Vec<u8>, &'static str> {
     }
     if vector.method != "POST"
         || !vector.path.starts_with("/api/v2/node/")
-        || vector.path.contains(['?', '#', '\\'])
+        || vector.path.contains(&['?', '#', '\\'][..])
         || vector.path.contains("..")
     {
         return Err("invalid HTTP binding");
