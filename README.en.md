@@ -23,6 +23,12 @@ A bootstrap `POST /api/v1/node/enroll` response of **HTTP 409** means that this 
 
 **If both VPS instances must remain active, create a separate Node ID instead of recovering the old one.** Additive migration `0101_node_enrollment_owner_recovery.sql` defaults key replacement to denied; the owner-scoped flow applies to **legacy Ed25519**, not experimental PQ rotation. [Nexus PostgreSQL/API integration passed on PR #26](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40449358858); [Node `main` CI passed after #7](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40448354429). Merging does not automatically update a running VPS.
 
+## Fix missing Node profile verification helper (October 27, 2026)
+
+A running Xray container and an active Node Agent can still report **"Profile verification not installed"**. This reflects a genuine signed `profileCheck=helper_missing` heartbeat: the original managed bootstrap installed policy guard and Xray sync but omitted `/usr/local/libexec/xmesh-profile-attest.py`. [Node PR #9](https://github.com/TriplexCorp/XMesh-Node/pull/9) now installs the pinned, syntax-checked helper **before** first sync.
+
+**Existing nodes:** deploy the updated Nexus panel and click **Nodes → Update Agent**. Nexus requests `control-v5.1.3`, whose fixed updater installs the independent profile-attestation module and refreshes the control heartbeat. It does **not** rotate your Ed25519 identity or disable signed policy checks. A successful `profileCheck=verified` must result from checking the signed policy, configuration digest and actual read-only Xray container mount; missing or invalid evidence still returns a distinct error status. If the update fails, inspect `sudo python3 /usr/local/libexec/xmesh-profile-attest.py --json` and `sudo journalctl -u xmesh-node-agent-upgrade.service -n 80 --no-pager` on the VPS. No PQ/strict production activation is involved.
+
 ## XSP-v2 — current P0: hybrid post-quantum control-plane security (October 27, 2026)
 
 **Status: experimental staging and isolated CI only. XSP-v2 is NOT enabled on live nodes.** The existing automatic Docker/Nginx/HTTPS installer, `XMESH1`/Ed25519 control plane, Xray data plane and Go 1.23 production Node remain unchanged. **`strict-pq` is OFF**, and normal Nexus Docker builds do not compile the optional v2 API routes.

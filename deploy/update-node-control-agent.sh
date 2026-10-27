@@ -53,7 +53,9 @@ trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp" "$profile
 curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 \
  https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/main/deploy/xmesh-profile-attest.py -o "$profile_tmp"
 python3 -m py_compile "$profile_tmp"
-grep -q 'xmesh-managed-xray' "$profile_tmp" || { echo "Invalid profile attestation helper" >&2;exit 1; }
+grep -q 'xmesh-managed-xray' "$profile_tmp" && grep -q 'verify_envelope' "$profile_tmp" || {
+ echo "Invalid signed profile attestation helper" >&2;exit 1;
+}
 tls_tmp="$(mktemp)"
 trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp" "$profile_tmp" "${tls_tmp:-}" "${renew_tmp:-}"' EXIT
 curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 \
