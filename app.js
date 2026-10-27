@@ -3126,7 +3126,7 @@ const PROFILE_CHECK_LABELS={
   xray_stopped:'Xray не запущен',
   mount_mismatch:'Xray использует другой файл конфигурации',
   container_unavailable:'Нет доступа к контейнеру Xray',
-  helper_missing:'Проверка профиля не установлена',
+  helper_missing:'Проверка профиля не установлена · нажмите «Обновить Agent»',
   helper_error:'Ошибка проверки профиля'
 };
 function nodeProfileStatus(runtime){
