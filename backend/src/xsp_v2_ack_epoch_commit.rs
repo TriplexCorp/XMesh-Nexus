@@ -34,9 +34,7 @@ fn checked_ack_nonce(raw: &[u8]) -> Result<[u8; 16]> {
     if hex::encode(&bytes) != nonce || bytes.iter().all(|v| *v == 0) {
         bail!("noncanonical ACK nonce");
     }
-    Ok(bytes
-        .try_into()
-        .map_err(|_| anyhow::anyhow!("ACK nonce length"))?)
+    bytes.try_into().map_err(|_| anyhow::anyhow!("ACK nonce length"))
 }
 
 /// Validates a fresh, new-key dual-signed ACK from the **original locked**
