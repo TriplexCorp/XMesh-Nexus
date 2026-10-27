@@ -48,5 +48,6 @@ GRANT SELECT ON TABLE
     node_xsp_suite_state,
     node_xsp_public_keysets,
     node_xsp_replay_nonces,
-    node_xsp_cutover_permit_ledger
+    node_xsp_cutover_permit_ledger,
+    node_xsp_signed_commit_receipt_outbox
 TO xmesh_signer_reader;
