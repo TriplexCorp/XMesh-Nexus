@@ -1186,6 +1186,22 @@ mod signed_tests {
                 .await
                 .is_err()
         );
+        // UPDATE/DELETE row triggers are insufficient: PostgreSQL TRUNCATE
+        // fires only statement-level triggers and could erase all receipts.
+        assert!(
+            sqlx::query("TRUNCATE TABLE node_xsp_signed_commit_receipt_outbox")
+                .execute(&pool)
+                .await
+                .is_err(),
+            "TRUNCATE must not bypass the signed receipt immutability guarantee"
+        );
+        assert!(
+            sqlx::query("TRUNCATE TABLE node_xsp_signed_commit_receipt_outbox CASCADE")
+                .execute(&pool)
+                .await
+                .is_err(),
+            "TRUNCATE CASCADE must also fail closed"
+        );
         let original_from_storage: Vec<u8> = sqlx::query_scalar(
             "SELECT signed_receipt FROM node_xsp_signed_commit_receipt_outbox WHERE node_id=$1",
         )
