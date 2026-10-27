@@ -19,6 +19,9 @@ mod subscription_transport;
 mod subscription_user_agent;
 mod user_subscriptions;
 
+#[cfg(test)]
+mod xsp_v2_wire_tests;
+
 use axum::{
     Json, Router,
     body::Bytes,
