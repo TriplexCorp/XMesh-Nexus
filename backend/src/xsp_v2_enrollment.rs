@@ -66,7 +66,7 @@ pub(crate) fn strict_base64(raw: &str, expected: usize) -> Result<Vec<u8>, ApiEr
 
 /// Exact binary proof input, signed independently with Ed25519 AND ML-DSA-65.
 /// It binds the public keys, purpose, node, epoch, key IDs and owner challenge.
-fn proof_input(
+pub(crate) fn proof_input(
     node: i64,
     epoch: i64,
     challenge: &[u8; 32],
