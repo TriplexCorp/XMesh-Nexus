@@ -78,7 +78,7 @@ fn put_ascii(bytes: &mut Vec<u8>, value: &str, max: usize, optional: bool) -> Re
 }
 
 fn decode_b64(src: &str, limit: usize, exact: Option<usize>) -> Result<Vec<u8>, ApiError> {
-    if src.len() > (limit + 2) / 3 * 4 {
+    if src.len() > limit.div_ceil(3) * 4 {
         return Err(bad());
     }
     let raw = STANDARD.decode(src).map_err(|_| bad())?;
