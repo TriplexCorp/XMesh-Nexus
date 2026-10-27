@@ -266,6 +266,20 @@ async fn sign_committed_ack(
         &pin,
     )
     .await?;
+    let receipt_already_saved: bool = sqlx::query_scalar(
+        "SELECT EXISTS (
+           SELECT 1 FROM node_xsp_signed_commit_receipt_outbox
+           WHERE node_id=$1 AND request_id=$2
+         )",
+    )
+    .bind(request.node_id)
+    .bind(&request.request_id)
+    .fetch_one(pool)
+    .await?;
+    ensure!(
+        !receipt_already_saved,
+        "receipt already exists; retrieve exact bytes from the immutable API outbox"
+    );
     sign_staging_commit_receipt(&evidence, &pin, &keys.ed25519, &keys.mldsa65)
         .map_err(anyhow::Error::msg)
 }
