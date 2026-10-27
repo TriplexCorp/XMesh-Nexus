@@ -31,6 +31,19 @@ with tempfile.TemporaryDirectory(prefix="xsp-enrollment-ci-") as home:
     assert proof["keyEpoch"] == public["keyEpoch"]
     assert proof["challengeHex"] == challenge
     assert len(proof["mldsa65SignatureB64"]) > 4000
+    # Distinct one-use challenge with a ROTATION domain, including old/new
+    # epochs. Neither private key nor active vault key material is exported.
+    prepared = run("prepare-rotation", "-key", master, "-vault", vault, "-expected-epoch", "1")
+    rotated = run("prove-prepared", "-key", master, "-vault", vault,
+                  "-expected-epoch", "1", "-challenge", challenge)
+    assert prepared["keyEpoch"] == 2
+    assert rotated["fromEpoch"] == 1 and rotated["keyEpoch"] == 2
+    assert rotated["nodeId"] == 42 and rotated["challengeHex"] == challenge
+    rotation_path = runner_temp / "xsp-rotation-proof.json"
+    rotation_path.write_text(json.dumps({"public": prepared, "proof": rotated}) + "\n")
+    rotation_path.chmod(0o600)
+    with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env:
+        env.write(f"XSP_V2_ROTATION_PROOF_FIXTURE={rotation_path}\n")
     fixture_path = runner_temp / "xsp-owner-proof.json"
     fixture_path.write_text(json.dumps({"public": public, "proof": proof}) + "\n")
     fixture_path.chmod(0o600)

@@ -3,7 +3,13 @@
 const fs=require('node:fs'),assert=require('node:assert/strict');
 const sql=fs.readFileSync('backend/migrations/0099_node_xsp_v2_public_state.sql','utf8');
 const migrationVersions=fs.readdirSync('backend/migrations').filter(name=>/^\d{4}_.+\.sql$/.test(name)).map(name=>Number(name.slice(0,4)));
-assert.equal(Math.max(...migrationVersions),101,'Owner recovery migration must follow 0100');
+assert.equal(Math.max(...migrationVersions),102,'Staging-only rotation preparation migration must follow 0101');
+assert.equal(migrationVersions.filter(version=>version===102).length,1,'Expected one migration version 0102');
+const rotations=fs.readFileSync('backend/migrations/0102_node_xsp_rotation_preparations.sql','utf8');
+assert.match(rotations,/CREATE TABLE node_xsp_rotation_preparations/);
+assert.match(rotations,/proved_at TIMESTAMPTZ/);
+assert.match(rotations,/CHECK \(to_epoch = from_epoch \+ 1\)/);
+assert(!/private_key|private_seed|password/.test(rotations.replace(/--[^\n]*/g,'')),'Never persist PQ/Ed private key material');
 assert.equal(migrationVersions.filter(version=>version===101).length,1,'Expected one migration version 0101');
 const recovery=fs.readFileSync('backend/migrations/0101_node_enrollment_owner_recovery.sql','utf8');
 assert.match(recovery,/allow_key_replacement BOOLEAN NOT NULL DEFAULT FALSE/);
@@ -69,6 +75,15 @@ assert.match(enrollment,/!initial_enrollment_allowed\(floor, &phase, current, in
 assert.match(enrollment,/!initial_enrollment_allowed\(floor, &phase, epoch, input.key_epoch\)/);
 assert(!/UPDATE node_xsp_public_keysets SET revoked_at=NOW\(\)/.test(enrollment),
  'Staging claim must never revoke an active key before a signed Node cutover ACK');
+const rotation=fs.readFileSync('backend/src/xsp_v2_rotation.rs','utf8');
+assert.match(rotation,/XSP2-KEY-ROTATE-PREPARE-V1/);
+assert.match(rotation,/verify_proof\(&signed, &ed, &pq/);
+assert.match(rotation,/fn rotation_allowed\(/);
+assert.match(rotation,/cutoverAuthorized":false/);
+assert(!/UPDATE node_xsp_public_keysets SET revoked_at=NOW\(\)/.test(rotation),'Proof must not revoke old keys');
+assert(!/UPDATE node_xsp_suite_state SET/.test(rotation),'Proof must not advance active epoch');
+assert.match(main,/xsp_v2_rotation::prepare/);
+assert.match(main,/xsp_v2_rotation::prove/);
 assert(!rust.includes('InsecureSkipVerify'),'Experimental API must not disable TLS trust');
 console.log('Production defaults: opt-in v2 route excluded from Docker, Compose and installer: OK');
 console.log('XSP-v2 dormant foundation: public-key state, non-decreasing floor, and loopback-only TLS ingress: OK');

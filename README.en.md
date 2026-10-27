@@ -29,6 +29,8 @@ A running Xray container and an active Node Agent can still report **"Profile ve
 
 **Existing nodes:** deploy the updated Nexus panel and click **Nodes → Update Agent**. Nexus requests `control-v5.1.3`, whose fixed updater installs the independent profile-attestation module and refreshes the control heartbeat. It does **not** rotate your Ed25519 identity or disable signed policy checks. A successful `profileCheck=verified` must result from checking the signed policy, configuration digest and actual read-only Xray container mount; missing or invalid evidence still returns a distinct error status. If the update fails, inspect `sudo python3 /usr/local/libexec/xmesh-profile-attest.py --json` and `sudo journalctl -u xmesh-node-agent-upgrade.service -n 80 --no-pager` on the VPS. No PQ/strict production activation is involved.
 
+**New staging rotation preparation:** owner-approved PUBLIC pending keyset in migration `0102`, ten-minute challenge and two-signature PoP from `keytool prove-prepared` under a rotation-only domain binding old/new epochs. Server records verified proof only; **no active epoch change, old-key revocation, signed cutover ACK or strict-PQ activation**. [Research boundaries](docs/XSP_V2_STAGING_ROTATION_PREPARE.md).
+
 ## XSP-v2 — current P0: hybrid post-quantum control-plane security (October 27, 2026)
 
 **Status: experimental staging and isolated CI only. XSP-v2 is NOT enabled on live nodes.** The existing automatic Docker/Nginx/HTTPS installer, `XMESH1`/Ed25519 control plane, Xray data plane and Go 1.23 production Node remain unchanged. **`strict-pq` is OFF**, and normal Nexus Docker builds do not compile the optional v2 API routes.

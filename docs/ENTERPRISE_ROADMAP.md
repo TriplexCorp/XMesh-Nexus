@@ -40,6 +40,14 @@
 - [ ] Проверить Hysteria2 с реальным клиентом, TLS/ACME, квоты, журнал ошибок и безопасный restart/rollback.
 - [ ] На отдельной тестовой Node проверить owner-approved recovery для `HTTP 409`; не переназначать ID работающей VPS без явного согласия.
 
+## P0 staging — подготовка ротации без cutover (27 октября 2026)
+
+- [x] Добавлена **неактивная** миграция `0102_node_xsp_rotation_preparations.sql` для owner-approved PUBLIC пары с 10-минутным challenge hash, `fromEpoch → nextEpoch` и одноразовым `proved_at`. Эпоха действующих ключей, minimum suite и private vault не меняются.
+- [x] Изолированные endpoints **только с feature `xsp-v2-experimental` и staging-only runtime flag**: owner `/api/v2/admin/nodes/{id}/rotation/prepare` и `/api/v2/node/keys/rotation/prove` с обеими подписями Ed25519 + ML-DSA-65. Ответ содержит `cutoverAuthorized:false`; **это не разрешение активировать prepared keyset**.
+- [x] Node Go 1.27 keytool `prove-prepared` подписывает отдельный домен `XSP2-KEY-ROTATE-PREPARE-V1` с old/new epochs, Node ID, purpose, challenge и обоими key IDs; подпись нельзя переиспользовать для initial enrollment.
+- [ ] Проверить CI обоих PR, PostgreSQL 0102 constraints и тестовые Rust/Go vector-digest до закрытия этапа. [Спецификация](XSP_V2_STAGING_ROTATION_PREPARE.md).
+- [ ] **Не реализованы:** signed server acceptance, Node cutover/applied ACK, атомарный switch/retirement старой пары, durable replay/recovery, production strict-PQ. Действующие ноды не мигрированы.
+
 ## Следующий инженерный P0: server-side XSP-v2 cutover — OPEN
 
 1. [ ] Security/architecture review: threat model и wire registry, роли `node_request`/`panel_response`, ключи, epoch, lease/nonce, переходы состояний и recovery. Зафиксировать инварианты до серверной реализации.
