@@ -380,6 +380,72 @@ def main():
                              cookie=cookie,origin=BASE)
             assert_status(code,200,f"clean up autonomous {collection}")
 
+        # Owner-authorized recovery after a new VPS generated its own key.
+        # The old key MUST remain valid until BOTH the 10-min token and
+        # Ed25519 possession proof from the new key are successfully verified.
+        code, _, _ = request("POST", f"/nodes/{node}/enrollment",
+                             cookie=cookie, origin=BASE)
+        assert_status(code, 409, "ordinary enrollment cannot rotate registered key")
+        code, _, _ = request("POST", f"/nodes/{node}/enrollment/reissue",
+                             origin=BASE)
+        assert code in (401, 403), "recovery must require owner session"
+        code, recovery, _ = request("POST", f"/nodes/{node}/enrollment/reissue",
+                                     cookie=cookie, origin=BASE)
+        assert_status(code, 200, "owner explicitly authorizes one-time key recovery")
+        assert recovery["keyReplacementAuthorized"] is True
+        assert recovery["nodeId"] == node and len(recovery["token"]) == 64
+        new_keyfile = Path(directory) / "recovery.pem"
+        subprocess.run(["openssl", "genpkey", "-algorithm", "Ed25519",
+                        "-out", str(new_keyfile)], check=True, capture_output=True)
+        new_public = subprocess.check_output(
+            ["openssl", "pkey", "-in", str(new_keyfile), "-pubout", "-outform", "DER"])[-32:].hex()
+        assert new_public != public
+        proof_input = (f"XMESH-ENROLL-V1\n{recovery['token']}\n{new_public}\n").encode()
+        proof_path = Path(directory) / "recovery-proof.txt"
+        proof_path.write_bytes(proof_input)
+        new_signature = subprocess.check_output(
+            ["openssl", "pkeyutl", "-sign", "-rawin",
+             "-inkey", str(new_keyfile), "-in", str(proof_path)]).hex()
+        recovery_body = {
+            "token": recovery["token"],
+            "publicKey": new_public,
+            "proof": new_signature,
+        }
+        code, _, _ = request("POST", "/node/enroll",
+                             {**recovery_body, "proof": "00" * 64})
+        assert_status(code, 401, "incorrect Ed25519 proof cannot replace active key")
+
+        def signed_recovery_probe(key_path):
+            probe_body = {"node_id": node, "cpu_percent": 24.2, "metrics": {"unit": "signed-recovery-test"}}
+            probe_raw = json.dumps(probe_body, separators=(",", ":")).encode()
+            probe_time = int(time.time())
+            probe_nonce = os.urandom(16).hex()
+            data = (f"XMESH1\nPOST\n/api/v1/metrics/ingest\n{node}\n"
+                    f"{probe_time}\n{probe_nonce}\n"
+                    f"{hashlib.sha256(probe_raw).hexdigest()}\n").encode()
+            probe_path = Path(directory) / "recovery-metrics.txt"
+            probe_path.write_bytes(data)
+            signed = subprocess.check_output(
+                ["openssl", "pkeyutl", "-sign", "-rawin",
+                 "-inkey", str(key_path), "-in", str(probe_path)])
+            return request("POST", "/metrics/ingest", probe_body, headers={
+                "X-XMesh-Timestamp": str(probe_time),
+                "X-XMesh-Nonce": probe_nonce,
+                "X-XMesh-Signature": signed.hex(),
+            })[0]
+
+        assert_status(signed_recovery_probe(keyfile), 201,
+                      "old key remains usable until validated recovery claim")
+        code, claimed, _ = request("POST", "/node/enroll", recovery_body)
+        assert_status(code, 200, "new proven key atomically replaces registered identity")
+        assert claimed["keyReplaced"] is True
+        code, _, _ = request("POST", "/node/enroll", recovery_body)
+        assert_status(code, 401, "recovery token is strictly single-use")
+        assert_status(signed_recovery_probe(keyfile), 401,
+                      "old key stops working only after successful replacement")
+        assert_status(signed_recovery_probe(new_keyfile), 201,
+                      "new key can send signed telemetry after atomic replacement")
+
         code, _, _ = request("DELETE", f"/nodes/{node}/metrics-key",
                              cookie=cookie, origin=BASE)
         assert_status(code, 200, "owner revokes signed identity")

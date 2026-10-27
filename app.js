@@ -152,7 +152,11 @@ async function backendRequest(path,options={}){
   catch(e){throw new Error('Не удалось связаться с backend API. Проверьте контейнеры Docker.')}
   const payload=await response.json().catch(()=>({}));
   if(response.status===401&&backendReady){backendReady=false;showAuthGate('Сессия завершена. Войдите снова.')}
-  if(!response.ok)throw new Error(payload.error||'Ошибка backend API ('+response.status+').');
+  if(!response.ok){
+    const error=new Error(payload.error||'Ошибка backend API ('+response.status+').');
+    error.status=response.status;
+    throw error;
+  }
   return payload;
 }
 const lat=()=>Promise.resolve();
@@ -3976,11 +3980,29 @@ document.addEventListener('click',async e=>{
     if(location.protocol!=='https:'){toast('Для подключения требуется HTTPS');return}
     b.disabled=true;
     try{
-      const issued=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/enrollment',{method:'POST'});
-      const url='https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/53f40b001d91173f63bf53aec0988fa650376d12/bootstrap.sh';
+      const enrollPath='/api/v1/nodes/'+encodeURIComponent(id)+'/enrollment';
+      let issued;
+      try{
+        issued=await backendRequest(enrollPath,{method:'POST'});
+      }catch(error){
+        if(error.status!==409||!error.message.includes('already has a registered key'))throw error;
+        const approved=await panelConfirm(panelIsEnglish()
+          ? `Node #${id} already has another Ed25519 key. Reconnect it to this VPS? The
+old key will remain valid until successful proof from the new node. Afterwards,
+the old node will lose access. Cancel and create a new Node ID if both must work.`
+          : `Узел #${id} уже зарегистрирован с другим Ed25519-ключом.
+Переподключить его к новой VPS? Старый ключ останется действующим до успешной
+проверки подписи новой ноды. Затем старая нода потеряет управление.
+Если обе ноды должны работать, отмените и создайте новый ID узла.`
+        );
+        if(!approved)return;
+        issued=await backendRequest(enrollPath+'/reissue',{method:'POST'});
+      }
+      const url='https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/0a11efae2bc9fdc87729bc2d8738e1caf1cf8bc6/bootstrap.sh';
       const command='curl --proto "=https" --tlsv1.2 -H "Cache-Control: no-cache" -fsSLo /tmp/xmesh-bootstrap.sh '+url+' && grep -q "Installing Docker Engine and Compose from Docker" /tmp/xmesh-bootstrap.sh && sudo bash /tmp/xmesh-bootstrap.sh '+location.origin+' '+id+' '+(Number(DB.nodes.find(node=>Number(node.id)===id)?.port)||8443);
       modal('<div class="box node-setup"><div class="bar2 node-setup-head"><div><h2>Подключение узла</h2><p>Два шага для установки XMesh Node</p></div><button class="ia" data-x aria-label="Закрыть">'+ic('x')+'</button></div>'+
         '<section class="node-setup-step"><div class="node-setup-step-title"><span class="node-setup-number">1</span><div><h3>Команда для VPS</h3><p>Скопируйте и запустите в терминале сервера.</p></div></div><textarea id="node-bootstrap-command" readonly spellcheck="false" rows="4" aria-label="Команда установки">'+esc(command)+'</textarea><button type="button" class="btn node-setup-copy" data-copy-node-bootstrap>'+ic('copy')+'Скопировать команду</button></section>'+
+        (issued.keyReplacementAuthorized?'<p class="note" role="alert">Переподключение ранее зарегистрированной ноды: её старый ключ останется действующим до подтверждения нового. После успешного подключения старая нода потеряет доступ.</p>':'')+
         '<section class="node-setup-step"><div class="node-setup-step-title"><span class="node-setup-number">2</span><div><h3>Токен подключения</h3><p>Вставьте его, когда установщик запросит токен.</p></div></div><input id="node-bootstrap-token" type="password" readonly autocomplete="off" aria-label="Одноразовый токен подключения" value="'+esc(issued.token)+'"><div class="node-setup-token-actions"><span>Действует 10 минут · не передавайте другим</span><button type="button" class="gh" data-copy-node-token>'+ic('copy')+'Скопировать токен</button></div></section></div>','wide');
     }catch(error){toast('Ошибка выдачи команды: '+(error.message||'API'))}
     finally{b.disabled=false}

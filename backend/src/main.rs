@@ -375,6 +375,10 @@ fn protected_routes(state: &AppState) -> Router<AppState> {
         )
         .route("/nodes/{id}/enrollment", post(node_enrollment::issue))
         .route(
+            "/nodes/{id}/enrollment/reissue",
+            post(node_enrollment::reissue),
+        )
+        .route(
             "/admins",
             get(admin_accounts::list).post(admin_accounts::create),
         )
