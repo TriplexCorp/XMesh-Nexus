@@ -211,7 +211,7 @@ mod tests {
         bad = clone_for_test(&row);
         bad.candidate_sha256[0] ^= 1;
         assert!(check_issued_record(&bad, &snapshot, &p, hash).is_err());
-        let mut incorrect = p.clone();
+        let mut incorrect = p;
         incorrect.from_epoch += 1;
         assert!(check_issued_record(&row, &snapshot, &incorrect, hash).is_err());
     }
