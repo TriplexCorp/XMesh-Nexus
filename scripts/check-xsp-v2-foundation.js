@@ -3,7 +3,8 @@
 const fs=require('node:fs'),assert=require('node:assert/strict');
 const sql=fs.readFileSync('backend/migrations/0099_node_xsp_v2_public_state.sql','utf8');
 const migrationVersions=fs.readdirSync('backend/migrations').filter(name=>/^\d{4}_.+\.sql$/.test(name)).map(name=>Number(name.slice(0,4)));
-assert.equal(Math.max(...migrationVersions),105,'Signed receipt outbox migration 0105 must follow immutable cutover ledger 0104');
+assert(migrationVersions.includes(104) && migrationVersions.includes(105) && migrationVersions.includes(106),
+ 'Signed receipt migration chain 0104 -> 0105 -> 0106 must remain present');
 assert.equal(migrationVersions.filter(version=>version===102).length,1,'Expected one migration version 0102');
 
 assert.equal(migrationVersions.filter(version=>version===103).length,1,'Expected one migration version 0103');
@@ -44,6 +45,16 @@ assert.match(outbox,/committed\.state <> 'ack_verified'/);
 assert.match(outbox,/committed\.applied_ack_sha256 IS DISTINCT FROM NEW\.applied_ack_sha256/);
 assert(!/private_key|private_seed|plaintext_secret/i.test(outbox.replace(/--[^\n]*/g,'')),
   'Signed receipt outbox must not persist private keys');
+
+assert.equal(migrationVersions.filter(version=>version===106).length,1,
+ 'Expected one migration version 0106');
+const truncateGuard=fs.readFileSync('backend/migrations/0106_node_xsp_signed_receipt_truncate_guard.sql','utf8');
+assert.match(truncateGuard,/BEFORE TRUNCATE ON node_xsp_signed_commit_receipt_outbox/);
+assert.match(truncateGuard,/FOR EACH STATEMENT/);
+assert.match(truncateGuard,/CREATE FUNCTION xsp2_signed_receipt_outbox_deny_truncate\(\) RETURNS TRIGGER/);
+assert.match(truncateGuard,/REVOKE TRUNCATE ON node_xsp_signed_commit_receipt_outbox FROM PUBLIC/);
+assert(!/private_key|private_seed|plaintext_secret/i.test(truncateGuard.replace(/--[^\n]*/g,'')),
+ 'Receipt truncate guard may not persist private keys');
 
 const rotations=fs.readFileSync('backend/migrations/0102_node_xsp_rotation_preparations.sql','utf8');
 assert.match(rotations,/CREATE TABLE node_xsp_rotation_preparations/);
