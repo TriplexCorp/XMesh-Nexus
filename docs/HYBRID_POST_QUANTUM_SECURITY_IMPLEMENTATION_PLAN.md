@@ -453,6 +453,16 @@ ML-DSA-65 signatures/public keys существенно больше Ed25519; н
 - **Потеря связи в середине активации:** стороны продолжают сверять persisted migrationId/epoch; неизвестное состояние означает **не применять новый config**, а не принимать legacy.
 - **При компрометации ключей:** incident runbook; не выдавать автоматическое безусловное «разрешить Xray».
 
+## Experimental P0 API, sealed keys and Nginx CI checkpoint — 2026-10-27
+
+- [x] Optional Rust `xsp-v2-experimental` Cargo feature compiles an isolated `/api/v2/node/heartbeat` handler using OpenSSL 3.5+ ML-DSA-65 and `ed25519-dalek`. Runtime flag `XSP_V2_EXPERIMENTAL_HEARTBEAT=staging-only` is also required; standard Bookworm Docker build includes **no** v2 endpoint.
+- [x] Strict request canonicalization verifies **Ed25519 AND ML-DSA-65** from non-revoked enrolled PostgreSQL public keys; suite and epoch locked in a transaction together with unique nonce replay insert. Accepts only shadow state, returns **unsigned 204**, never commands, config or ACK.
+- [x] Isolated Node Go 1.27.3 sealed key vault: AES-256-GCM wrapping of randomized Ed25519 + ML-DSA seeds, separate root-owned 0600 master file, mode 0700 directory, key-purpose/epoch AAD, expected-epoch rotation, anti-rollback local floor and failing-closed crash semantics; CLI prints public-only material.
+- [x] Real Nginx/OpenSSL CI over **loopback-only** 8444 with ephemeral certificate, verified TLS 1.3/X25519MLKEM768 negotiation, hostname and 404-only HTTP, rejected TLS1.2/classical-only group. **No public VPS endpoint tested**.
+- [ ] Deployment blockers: authenticated dual-key enrollment/rotation, independent master-key backup/recovery/KMS, signed server responses and applied policy ACK, end-to-end per-hop real TLS proof, monotonic suite on both peers, FIPS 204 KAT/fuzz and formal security review. **Strict-pq is OFF**.
+
+Full boundaries and non-production instructions: [XSP_V2_EXPERIMENTAL_GATEWAY.md](XSP_V2_EXPERIMENTAL_GATEWAY.md).
+
 ## P0 security foundation checkpoint — 2026-10-27
 
 - [x] Node isolated `envelope/strict.go` decoder: complete candidate JSON byte bounds and duplicate checks, exact known route/direction/type, canonical Base64, nonce/epoch constraints, shared wire golden vectors; returns **Untrusted**, never identity/authenticated payload.
