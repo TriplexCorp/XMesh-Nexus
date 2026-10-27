@@ -2,6 +2,9 @@
 'use strict';
 const fs=require('node:fs'),assert=require('node:assert/strict');
 const sql=fs.readFileSync('backend/migrations/0099_node_xsp_v2_public_state.sql','utf8');
+const migrationVersions=fs.readdirSync('backend/migrations').filter(name=>/^\d{4}_.+\.sql$/.test(name)).map(name=>Number(name.slice(0,4)));
+assert.equal(Math.max(...migrationVersions),99,'XSP-v2 migration must follow previously shipped 0098, never backfill out-of-order 0029');
+assert.equal(migrationVersions.filter(version=>version===99).length,1,'Expected one migration version 0099');
 const nginx=fs.readFileSync('deploy/xsp-v2-node-ingress.nginx.conf.example','utf8');
 const live=fs.readFileSync('deploy/install-panel-host.sh','utf8');
 for(const name of ['node_xsp_suite_state','node_xsp_public_keysets','node_xsp_replay_nonces']){
