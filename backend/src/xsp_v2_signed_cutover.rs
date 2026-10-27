@@ -995,6 +995,13 @@ mod signed_tests {
             .is_err()
         );
 
+        assert!(
+            crate::xsp_v2_ack_epoch_commit::readback_committed_applied_ack_staging(
+                &pool, node_id, "unknown-ack-request", &signed_ack, &panel_pin,
+            )
+            .await
+            .is_err()
+        );
         let unchanged: i64 =
             sqlx::query_scalar("SELECT key_epoch FROM node_xsp_suite_state WHERE node_id=$1")
                 .bind(node_id)
