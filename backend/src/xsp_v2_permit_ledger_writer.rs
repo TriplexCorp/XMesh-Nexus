@@ -16,7 +16,7 @@ pub struct StoredPermit {
     pub reused: bool,
 }
 
-fn from_trusted_snapshot(s: &LockedCandidate, request_id: &str) -> ExpectedPermit {
+pub fn from_trusted_snapshot(s: &LockedCandidate, request_id: &str) -> ExpectedPermit {
     let m: &CandidatePublic = &s.material;
     ExpectedPermit {
         node_id: m.node_id,
