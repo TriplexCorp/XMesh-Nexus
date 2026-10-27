@@ -48,6 +48,8 @@ bash install.sh
 
 Если обновление неудачно, на ноде проверьте `sudo python3 /usr/local/libexec/xmesh-profile-attest.py --json` и `sudo journalctl -u xmesh-node-agent-upgrade.service -n 80 --no-pager`; на основной панели обновление из GitHub также требует фактического развёртывания на VPS. **Production XSP-v2 не включался.**
 
+**Новый staging этап ротации:** owner может зарегистрировать **подготовленную**, ещё неактивную публичную пару в `0102` и получить challenge для двойного PoP от `keytool prove-prepared`. Подписи используют отдельный домен ротации и исходную/новую эпохи. Сервер лишь фиксирует proof, **не отзывает старые ключи, не меняет `key_epoch` и не разрешает cutover**. [Подробные границы](docs/XSP_V2_STAGING_ROTATION_PREPARE.md); до security review и signed Node ACK это staging-only.
+
 ## XSP-v2 — актуальный P0: гибридная безопасность (27 октября 2026)
 
 **Состояние: staging / лабораторные проверки. На рабочих нодах XSP-v2 не включён.** Панель, Docker/Compose, установленный Nginx, Xray и протокол `XMESH1`/Ed25519 продолжают работать по прежней схеме. `strict-pq` отключён; экспериментальные API не входят в обычный Docker-образ Nexus.
