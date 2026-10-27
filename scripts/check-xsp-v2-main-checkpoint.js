@@ -11,6 +11,8 @@ const expected=[
   "backend/migrations/0102_node_xsp_rotation_preparations.sql",
   "backend/migrations/0103_node_xsp_cutover_permit_ledger.sql",
   "backend/migrations/0104_node_xsp_cutover_ledger_immutability.sql",
+  "backend/migrations/0105_node_xsp_signed_commit_receipt_outbox.sql",
+  "backend/migrations/0106_node_xsp_signed_receipt_truncate_guard.sql",
   "backend/src/xsp_v2_candidate_binding.rs",
   "backend/src/xsp_v2_db_candidate_snapshot.rs",
   "backend/src/xsp_v2_signed_cutover.rs",
