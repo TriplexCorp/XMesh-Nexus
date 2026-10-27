@@ -29,7 +29,7 @@ failure/recovery tests remain P0 blockers.
 
 The dedicated OpenSSL 3.5 crypto workflow now runs
 `real_postgres_signed_ack_commit_and_fail_closed` against a disposable PostgreSQL
-service with the actual application migrations `0099–0104`. CI generates
+TimescaleDB/PostgreSQL 18 service with the actual application migrations `0099–0104`. CI generates
 throwaway Ed25519/ML-DSA-65 keypairs **in memory**, stores independently
 approved public keysets, persists an authentic signed Nexus permit using
 `persist_verified_permit`, then passes a genuinely dual-signed Node ACK through
