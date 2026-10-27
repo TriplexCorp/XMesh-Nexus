@@ -1,5 +1,8 @@
 //! Staging-only, independent XSP-v2 signed permit and applied ACK primitives.
 //! No API route, issuer key storage, replay database or active key switching.
+// Staging public helpers are intentionally not linked from production HTTP routes.
+// Scope the unused-code exception here, not globally in the API binary.
+#![allow(dead_code)]
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use ed25519_dalek::{Signature, Signer as _, SigningKey, Verifier as _, VerifyingKey};
 use openssl::{
@@ -343,10 +346,10 @@ fn validate_pin(p: &TrustedPublic, m: &Cutover, purpose: &str) -> Result<(), &'s
     }
     Ok(())
 }
-fn time_ok(m: &Cutover, now_ms: i64) -> Result<(), &'static str> {
+const fn time_ok(m: &Cutover, now_ms: i64) -> Result<(), &'static str> {
     if now_ms <= 0
         || now_ms > m.expires_at_ms
-        || (now_ms as i128 - m.issued_at_ms as i128).abs() > 120_000
+        || (i128::from(now_ms) - i128::from(m.issued_at_ms)).abs() > 120_000
     {
         return Err("expired or future signed cutover message");
     }
@@ -414,7 +417,7 @@ fn permit_matches(m: &Cutover, want: &ExpectedPermit) -> bool {
         && m.to_pq_key_id == want.to_pq_key_id
         && m.candidate_sha256_hex == want.candidate_sha256_hex
 }
-/// Verifies a dual-signed panel permit against an *independently* pinned panel_response pair
+/// Verifies a dual-signed panel permit against an *independently* pinned `panel_response` pair
 /// and expected frozen owner-approved proposal. Caller MUST persist anti-replay state
 /// and establish local vault floor before any activation.
 pub fn verify_signed_permit(
@@ -490,17 +493,26 @@ pub fn sign_staging_permit(
 #[cfg(test)]
 mod signed_tests {
     use super::*;
+    use std::process::Command;
 
     fn key_pair(
         ed_seed: u8,
-        pq_seed: u8,
+        _pq_seed: u8,
         purpose: &str,
         issuer: &str,
         node: u64,
     ) -> (SigningKey, PKey<Private>, TrustedPublic) {
         let ed = SigningKey::from_bytes(&[ed_seed; 32]);
-        let pq = PKey::private_key_from_seed(None, KeyType::ML_DSA_65, None, &[pq_seed; 32])
-            .expect("OpenSSL 3.5 ML-DSA-65 unavailable");
+        // OpenSSL 3.5+ CLI is present in the dedicated crypto job only.
+        // Use portable PEM decoding so ordinary OpenSSL 3.0 Backend CI can
+        // still compile every feature without relying on a 3.5-only Rust API.
+        let generated = Command::new("openssl")
+            .args(["genpkey", "-algorithm", "ML-DSA-65"])
+            .output()
+            .expect("OpenSSL CLI unavailable for the PQ integration test");
+        assert!(generated.status.success(), "ML-DSA-65 provider unavailable");
+        let pq = PKey::private_key_from_pem(&generated.stdout)
+            .expect("generated ML-DSA-65 private key is invalid");
         let der = pq.public_key_to_der().unwrap();
         let pq_pub = der[der.len() - 1952..].to_vec();
         let ed_pub = ed.verifying_key().to_bytes().to_vec();
@@ -530,6 +542,14 @@ mod signed_tests {
     }
     #[test]
     fn real_dual_signature_permit_and_ack_fail_closed() {
+        // Ubuntu default Backend CI links older OpenSSL without ML-DSA-65.
+        // The dedicated OpenSSL 3.5 crypto workflow MUST set this environment
+        // variable, so there is no silent skip where real PQ tests are required.
+        let require_pq = std::env::var("XSP_V2_REQUIRE_PQ_CUTOVER_TESTS").as_deref() == Ok("1");
+        if openssl::version::number() < 0x3050_0000 {
+            assert!(!require_pq, "required PQ crypto provider is unavailable");
+            return;
+        }
         let f: ContractFixture = serde_json::from_str(include_str!(
             "../../docs/XSP_V2_CUTOVER_CONTRACT_VECTORS.json"
         ))
