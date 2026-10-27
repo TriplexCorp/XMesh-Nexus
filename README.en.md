@@ -1,5 +1,13 @@
 # XMesh Nexus
 
+## XSP-v2 — hybrid post-quantum security status (October 27, 2026)
+
+**Laboratory implementation exists; protection is not deployed to live nodes.** PR01 provides a draft [domain-separated wire specification](docs/XSP_V2_WIRE_SPEC.md) with identical Node/Nexus test vectors. PR02 contains isolated Rust/OpenSSL 3.5 and Go 1.27.3 **Ed25519 AND ML-DSA-65** implementations; direct **Go → Rust and Rust → Go** signed-message interchange rejects missing/corrupted signatures, key substitution and tampered messages. [Crypto PoC and gates](docs/XSP_V2_CRYPTO_POC.md) · [Nexus crypto CI (passed)](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40431220079).
+
+**PR07 laboratory TLS probe:** an isolated Go 1.27.3 diagnostic client and OpenSSL 3.5 test terminator demonstrate a real TLS 1.3 full handshake with the **negotiated** `X25519MLKEM768` group, validated certificate chain and hostname, and fail-closed behavior against TLS 1.2, X25519-only TLS 1.3, invalid CA/name and resumptions. [Technical probe and deployment prerequisites](docs/XSP_V2_TLS_PROBE.md) · [TLS CI (passed)](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40432661499) · [Node CI (passed)](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40432873804).
+
+**Production boundary:** none of these PoCs changes the running `XMESH1`/Ed25519 authentication, Node Go 1.23 runtime, Nginx public TLS setup, Xray data plane or API. No Node or panel has been claimed to use strict-PQ. There is no deployed two-signature endpoint, persistent `minimumSuite`, key lifecycle, or proven TLS negotiation across every CDN/LB → origin hop. **Next:** protocol/security review, external FIPS 204 KATs and fuzzing, approved node-only TLS terminator, disposable-canary evidence and staged enrollment/recovery before any strict activation. Track this in the [Enterprise Roadmap](docs/ENTERPRISE_ROADMAP.md) and [full security implementation plan](docs/HYBRID_POST_QUANTUM_SECURITY_IMPLEMENTATION_PLAN.md).
+
 ## Shadowsocks 2022 JSON subscription delivery (October 26, 2026)
 
 Fixed a missing Shadowsocks 2022 outbound cause: node policies and subscription generation required a per-user `ssPassword` that regular user creation did not provision. New users now receive persistent cryptographically random PSKs; older accounts are conditionally backfilled in PostgreSQL before subscription or node-policy reads, without rotating existing keys. `2022-blake3-aes-128-gcm` uses a separate 16-byte `ssPassword128`, while 256-bit methods use the 32-byte `ssPassword`. Client JSON contains `ServerPSK:UserPSK`; the corresponding key must also reach the Xray node. Invalid or missing credentials still fail closed. **Verify the new node policy and actual client connectivity after upgrading.**
@@ -43,7 +51,7 @@ The generator does not invent DNS names, certificate files, private keys, users 
 
 **XMesh Nexus** is a self-hosted Xray-core infrastructure management panel for users, nodes, hosts, squads, XRAY STUDIO, subscriptions, monitoring and administration. The API is built with **Rust (Tokio/Axum)**, persistent data uses **PostgreSQL 18 + TimescaleDB**, ephemeral state uses **Redis 7**, and the panel is deployed with Docker Compose.
 
-> **Source-code status as of October 26, 2026:** this is an actively developed project. The repository **does** include public subscription endpoints, native Xray client JSON generation, managed-node integration and Xray-derived user traffic accounting. Running VPN traffic still requires a separately installed [XMesh-Node](https://github.com/TriplexCorp/XMesh-Node) runtime on each VPS, working Xray configuration and correct networking. A feature existing in the code or UI does not prove that a particular node has applied it successfully.
+> **Source-code status as of October 27, 2026:** this is an actively developed project. The repository **does** include public subscription endpoints, native Xray client JSON generation, managed-node integration and Xray-derived user traffic accounting. Running VPN traffic still requires a separately installed [XMesh-Node](https://github.com/TriplexCorp/XMesh-Node) runtime on each VPS, working Xray configuration and correct networking. A feature existing in the code or UI does not prove that a particular node has applied it successfully.
 
 ## FinalMask: TCP, UDP and QUIC (October 26, 2026)
 
