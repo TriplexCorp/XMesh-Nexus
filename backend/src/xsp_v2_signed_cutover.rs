@@ -539,7 +539,7 @@ mod signed_tests {
     }
     // A single in-memory signing context exercises both algorithms and all
     // failure paths without weakening or fragmenting the trust assertions.
-    #[expect(clippy::too_many_lines, reason = "cryptographic negative test covers many tamper variants")]
+    #[expect(clippy::too_many_lines, reason = "adversarial signature matrix")]
     #[test]
     fn real_dual_signature_permit_and_ack_fail_closed() {
         // Ubuntu default Backend CI links older OpenSSL without ML-DSA-65.
