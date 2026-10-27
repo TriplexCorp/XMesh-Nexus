@@ -457,7 +457,7 @@ ML-DSA-65 signatures/public keys существенно больше Ed25519; н
 
 - [x] Node isolated `envelope/strict.go` decoder: complete candidate JSON byte bounds and duplicate checks, exact known route/direction/type, canonical Base64, nonce/epoch constraints, shared wire golden vectors; returns **Untrusted**, never identity/authenticated payload.
 - [x] Node isolated `keyring/volatile.go`: independent Go 1.27.3 cryptographic key generation Ed25519 + ML-DSA-65, purpose+epoch public key identities, signing tests. **Ephemeral test-only, no protected at-rest private keys or enrollment.**
-- [x] Nexus additive `0029_node_xsp_v2_public_state.sql`: PUBLIC keysets only (Ed25519 32B / ML-DSA-65 1952B), legacy-default suite/epoch state and uniqueness-indexed replay nonces. Trigger blocks normal UPDATE downgrade, **not privileged DELETE/DB rollback**. No production authentication uses the state.
+- [x] Nexus additive `0099_node_xsp_v2_public_state.sql`: PUBLIC keysets only (Ed25519 32B / ML-DSA-65 1952B), legacy-default suite/epoch state and uniqueness-indexed replay nonces. Trigger blocks normal UPDATE downgrade, **not privileged DELETE/DB rollback**. No production authentication uses the state.
 - [x] Inert `deploy/xsp-v2-node-ingress.nginx.conf.example`: `127.0.0.1:8444`, TLS1.3-only hybrid group, sessions disabled, placeholder certs, 404 to every request. Not installed and not an operational v2 endpoint.
 - [ ] Next: vetted private key encryption/KMS or OS storage, authenticated enrollment, two-signature verification and atomic replay+side-effect, durable suite floors with role-separated recovery, real node-only HTTPS endpoint, canary and operator/security sign-off.
 
