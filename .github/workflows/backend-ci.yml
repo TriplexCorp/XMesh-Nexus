@@ -251,6 +251,10 @@ jobs:
           exit 1
       - name: Exercise dormant XSP-v2 public key epoch and replay migration in disposable PostgreSQL
         run: bash scripts/test-xsp-v2-schema-integration.sh
+      - name: Exercise XSP-v2 cutover ledger immutability and replay constraints in disposable PostgreSQL
+        run: |
+          bash -n scripts/test-xsp-v2-ledger-integration.sh
+          bash scripts/test-xsp-v2-ledger-integration.sh
       - name: Exercise signed node identity, tamper resistance and replay rejection
         run: python3 scripts/test-node-auth-integration.py
       - name: Exercise real RBAC, MFA and revocation API
