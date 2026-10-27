@@ -39,7 +39,7 @@ fn from_trusted_snapshot(s: &LockedCandidate, request_id: &str) -> ExpectedPermi
 /// The caller must commit this same transaction BEFORE permit delivery.
 ///
 /// # Errors
-/// Rejects stale/expired approvals, missing dual PoP, wrong actor/request,
+/// Rejects stale/expired approvals, missing dual `PoP`, wrong actor/request,
 /// reused/conflicting nonce, changed permit envelope, or signature mismatch.
 /// No key epoch or suite floor can change through this function.
 pub async fn persist_verified_permit(
