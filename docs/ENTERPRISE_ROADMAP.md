@@ -8,12 +8,19 @@
 | Направление | Реализовано в коде | Следующий критерий приёмки |
 | --- | --- | --- |
 | Управление инфраструктурой | Ноды, профили, подписанные политики, команды, обновление агента из UI | Проверка обновления и восстановления на реальной VPS |
-| TLS / ACME | Автоматическая установка Docker/Compose, Nginx Mainline, Certbot/HTTPS для панели; HTTP-01 provisioning, контроль сертификата ноды, агент `control-v5.1.2` | Проверка реального продления ACME и восстановление на VPS; гибридный TLS Node→Nexus пока только в лаборатории |
+| TLS / ACME | Автоматическая установка Docker/Compose, Nginx Mainline, Certbot/HTTPS для панели; HTTP-01 provisioning, контроль сертификата ноды, агент `control-v5.1.3` | Проверка реального продления ACME и восстановление на VPS; гибридный TLS Node→Nexus пока только в лаборатории |
 | GeoData | Подписанный manifest, HTTPS-загрузка и обновление, дефолтные GeoSite/GeoIP Loyalsoldier | Проверка актуальности, отказов источника и применения данных на тестовой ноде |
 | XRAY STUDIO / JSON | Конструктор, SS2022, JSON-подписки, полный каталог FinalMask и адаптивное окно до 84rem | Проверка реального Xray, клиентов и диалога на разных экранах |
 | Статистика и доступ | Исторические метрики, карточки, RBAC и автономные политики | Нагрузочные, отказоустойчивые и security regression тесты |
 | Криптография control plane | Production `XMESH1`/Ed25519; XSP-v2 Rust↔Go dual signatures, строгий decoder, staging owner-approved **initial epoch-1 enrollment**, локальный Node `prepare/prove/activate/recover` ([PR #5](https://github.com/TriplexCorp/XMesh-Node/pull/5), [#6](https://github.com/TriplexCorp/XMesh-Node/pull/6)), [Nexus rekey guard #24](https://github.com/TriplexCorp/XMesh-Nexus/pull/24); всё **не развёрнуто** | **P0:** signed server-side two-phase cutover/ACK, backup/KMS, Nexus `panel_response` signer, signed v2 replies, independent review/KAT/fuzz, реальный TLS ingress/canary |
 | Качество релиза | [Nexus Backend CI на PR #26 `8534aa2` — success](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40449358858), включая PostgreSQL/API integration и миграцию `0101`; [Node CI `main` `0a11efa` — success](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40448354429) | Подтвердить CI на **последнем** Nexus `main` после документационных merge, обновить панель на VPS, проверить безопасный rollback/browser e2e |
+
+## Практическая поддержка нод — восстановлена проверка применённого профиля
+
+- [x] [Node PR #9](https://github.com/TriplexCorp/XMesh-Node/pull/9): managed bootstrap прежде не устанавливал `xmesh-profile-attest.py`, что вызывало правдивое `profileCheck=helper_missing` даже при запущенном Xray. Новый bootstrap проверяет и атомарно устанавливает локальный attestation helper **до** первой синхронизации.
+- [x] Nexus release `control-v5.1.3`: штатная команда **«Обновить Agent»** на v5.1.2 получает новую версию и устанавливает тот же helper без смены Ed25519, политики или активного профиля. Двунаправленная проверка состояния остаётся fail-closed: `verified` только после криптографической сверки подписанного envelope, конфигурации и read-only mount.
+- [ ] Подтвердить на реальной ноде «Польша-2» после развёртывания Nexus и обновления Agent: исчезновение `helper_missing`, фактический `verified`/applied revision, корректность Hysteria2, TLS-сертификата и клиентского подключения. CI не заменяет VPS-проверку.
+- [ ] Реальный trust/ACK XSP-v2 остаётся отдельной нерешённой P0-задачей.
 
 ## Практическая поддержка нод — устранён конфликт регистрации HTTP 409
 
