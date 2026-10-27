@@ -2,8 +2,8 @@
 //!
 //! This module is compiled only with xsp-v2-experimental. The sidecar is a
 //! dedicated process/container, not an HTTP route. It accepts local Unix-socket
-//! requests only from the XMesh API UID/GID, independently reads and verifies
-//! the committed ACK using the xmesh_signer_reader SELECT-only database role,
+//! requests only from the `XMesh` API UID/GID, independently reads and verifies
+//! the committed ACK using the `xmesh_signer_reader` SELECT-only database role,
 //! and signs only after that database readback succeeds.
 //!
 //! The default panel image does not compile this feature and never receives
@@ -302,15 +302,8 @@ async fn serve_connection(
     }
     .await;
 
-    let response = match result {
-        Ok(receipt) => SignResponse {
-            protocol: "XSP/2".into(),
-            action: "sign-committed-receipt-result".into(),
-            ok: true,
-            signed_receipt_b64: Some(STANDARD.encode(receipt)),
-            error_code: None,
-        },
-        Err(_) => {
+    let response = result.map_or_else(
+        |_| {
             tracing::warn!("XSP-v2 signer rejected a request");
             SignResponse {
                 protocol: "XSP/2".into(),
@@ -319,8 +312,15 @@ async fn serve_connection(
                 signed_receipt_b64: None,
                 error_code: Some("request_rejected".into()),
             }
-        }
-    };
+        },
+        |receipt| SignResponse {
+            protocol: "XSP/2".into(),
+            action: "sign-committed-receipt-result".into(),
+            ok: true,
+            signed_receipt_b64: Some(STANDARD.encode(receipt)),
+            error_code: None,
+        },
+    );
     let response_bytes = serde_json::to_vec(&response)?;
     ensure!(
         response_bytes.len() <= MAX_SIGN_RESPONSE_BYTES,
