@@ -85,7 +85,8 @@ pub async fn persist_verified_permit(
            WHERE node_id=$1 AND purpose='node_request'
              AND from_epoch=$2 AND to_epoch=$3
              AND proved_at IS NOT NULL
-             AND expires_at>=to_timestamp(($4::double precision)/1000.0)
+             AND expires_at >= to_timestamp(($4::bigint / 1000)::double precision)
+                 + (($4::bigint % 1000) * INTERVAL '1 millisecond')
          )",
     )
     .bind(node_id)
@@ -135,8 +136,10 @@ pub async fn persist_verified_permit(
           permit_nonce,permit_input_sha256,signed_permit,issued_at,
           expires_at,issued_by)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,
-                 to_timestamp(($9::double precision)/1000.0),
-                 to_timestamp(($10::double precision)/1000.0),$11)",
+                 to_timestamp(($9::bigint / 1000)::double precision)
+                 + (($9::bigint % 1000) * INTERVAL '1 millisecond'),
+                 to_timestamp(($10::bigint / 1000)::double precision)
+                 + (($10::bigint % 1000) * INTERVAL '1 millisecond'),$11)",
     )
     .bind(node_id)
     .bind(expected_request_id)
