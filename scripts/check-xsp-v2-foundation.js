@@ -111,6 +111,18 @@ assert.match(rust,/minimum_suite=1|floor != 1/);
 assert.match(rust,/phase != "shadow"/);
 assert.match(rust,/verify_both\(&parsed, &ed, &pq\)/);
 assert.match(rust,/INSERT INTO node_xsp_replay_nonces/);
+// A signed ACK or a valid receipt is NOT independent Node transport identity.
+// This staging-only composite must never become an HTTP route before the
+// authenticated PQ-only ingress and protected signer security review.
+assert.match(rust,/pub async fn recover_authenticated_committed_receipt_staging\(/);
+assert.match(rust,/authenticate_committed_ack_recovery_staging\(/);
+assert.match(rust,/load_committed_signed_receipt_staging\(/);
+assert(!/\.route\s*\(\s*["'`]\/api\/v2\/node\/keys\/rotation\/ack["'`]/.test(main),
+ 'Never expose the ACK route before independent PQ-only TLS identity and signer review');
+assert(!/post\s*\(\s*xsp_v2_api::recover_authenticated_committed_receipt_staging\s*\)/.test(main),
+ 'Never mount staging receipt recovery over HTTP without approved trust plumbing');
+assert(!live.includes('/api/v2/node/keys/rotation/ack'),
+ 'Live installer must not expose the dormant rotation ACK route');
 const enrollment=fs.readFileSync('backend/src/xsp_v2_enrollment.rs','utf8');
 assert.match(enrollment,/crate::require_owner\(&actor\)/);
 assert.match(enrollment,/verify_proof\(&signing_input, &ed, &pq, &ed_sig, &pq_sig\)/);
