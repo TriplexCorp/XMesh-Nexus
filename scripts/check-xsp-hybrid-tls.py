@@ -116,11 +116,14 @@ def main():
         ]
         require(call(cmd), True, "create ephemeral test certificate")
         # Incorrect trust root must never be accepted, regardless of matching name.
-        require(call(cmd[:-8] + [
+        other_cmd = [
+            "openssl", "req", "-x509", "-newkey", "ec",
+            "-pkeyopt", "ec_paramgen_curve:P-256", "-noenc",
             "-keyout", str(dest / "other.key"), "-out", str(dest / "other.crt"),
             "-days", "1", "-subj", "/CN=localhost",
             "-addext", "subjectAltName=DNS:localhost",
-        ]), True, "create unrelated test CA")
+        ]
+        require(call(other_cmd), True, "create unrelated test CA")
 
         p = port()
         server = tls_server(dest, p, GROUP)
