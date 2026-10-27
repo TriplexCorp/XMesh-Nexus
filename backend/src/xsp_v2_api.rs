@@ -91,12 +91,7 @@ fn decode_b64(src: &str, limit: usize, exact: Option<usize>) -> Result<Vec<u8>, 
     Ok(raw)
 }
 
-fn parse_for(
-    raw: &[u8],
-    now_ms: i64,
-    message_type: &str,
-    path: &str,
-) -> Result<Parsed, ApiError> {
+fn parse_for(raw: &[u8], now_ms: i64, message_type: &str, path: &str) -> Result<Parsed, ApiError> {
     if raw.is_empty() || raw.len() > MAX_RAW {
         return Err(bad());
     }
@@ -379,7 +374,6 @@ pub async fn authenticate_committed_ack_recovery_staging(
     Ok(())
 }
 
-
 #[cfg(test)]
 pub(crate) fn recovery_signing_input_for_test(
     raw_auth: &[u8],
@@ -425,7 +419,10 @@ mod tests {
         let encoded = serde_json::to_vec(&v).unwrap();
         let parsed = parse_recovery_authority(&encoded, ack, node, request, now).unwrap();
         assert!(verify_both(&parsed, &[1u8; 32], &[2u8; 1952]).is_err());
-        assert!(parse(&encoded, now).is_err(), "heartbeat domain must differ");
+        assert!(
+            parse(&encoded, now).is_err(),
+            "heartbeat domain must differ"
+        );
         assert!(parse_recovery_authority(&encoded, ack, node + 1, request, now).is_err());
         assert!(parse_recovery_authority(&encoded, b"changed", node, request, now).is_err());
         assert!(parse_recovery_authority(&encoded, ack, node, "wrong-id", now).is_err());
@@ -442,14 +439,8 @@ mod tests {
             let saved = v[field].clone();
             v[field] = invalid;
             assert!(
-                parse_recovery_authority(
-                    &serde_json::to_vec(&v).unwrap(),
-                    ack,
-                    node,
-                    request,
-                    now
-                )
-                .is_err(),
+                parse_recovery_authority(&serde_json::to_vec(&v).unwrap(), ack, node, request, now)
+                    .is_err(),
                 "{field} must be rejected"
             );
             v[field] = saved;
