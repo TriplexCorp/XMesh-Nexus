@@ -362,6 +362,57 @@ pub async fn claim(
 #[cfg(test)]
 mod tests {
     use super::*;
+    // This proof is produced by the independent Go 1.27.3 encrypted keytool
+    // during the isolated OpenSSL 3.5 CI job. Standard backend builds run the
+    // format tests without accessing any real or test private keys.
+    #[test]
+    fn go_encrypted_vault_signatures_are_verified_by_rust() {
+        let Ok(file) = std::env::var("XSP_V2_OWNER_PROOF_FIXTURE") else {
+            return;
+        };
+        let blob = std::fs::read(file).expect("Go-generated ephemeral proof fixture");
+        let v: serde_json::Value = serde_json::from_slice(&blob).unwrap();
+        let public = &v["public"];
+        let proof = &v["proof"];
+        let node = public["nodeId"].as_i64().unwrap();
+        let epoch = public["keyEpoch"].as_i64().unwrap();
+        let ed_id = public["ed25519KeyId"].as_str().unwrap();
+        let pq_id = public["mldsa65KeyId"].as_str().unwrap();
+        let ed = strict_base64(public["ed25519Public"].as_str().unwrap(), 32).unwrap();
+        let pq = strict_base64(public["mldsa65Public"].as_str().unwrap(), 1952).unwrap();
+        assert_eq!(ed_id, digest_id("ed-", &ed));
+        assert_eq!(pq_id, digest_id("pq-", &pq));
+        assert_eq!(proof["nodeId"].as_i64().unwrap(), node);
+        assert_eq!(proof["keyEpoch"].as_i64().unwrap(), epoch);
+        assert_eq!(proof["purpose"], "node_request");
+        let challenge: [u8; 32] = hex::decode(proof["challengeHex"].as_str().unwrap())
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let ed_sig = strict_base64(
+            proof["ed25519SignatureB64"].as_str().unwrap(),
+            64,
+        ).unwrap();
+        let pq_sig = strict_base64(
+            proof["mldsa65SignatureB64"].as_str().unwrap(),
+            3309,
+        ).unwrap();
+        let signed = proof_input(node, epoch, &challenge, &ed, &pq, ed_id, pq_id).unwrap();
+        assert!(verify_proof(&signed, &ed, &pq, &ed_sig, &pq_sig).is_ok());
+        let mut changed = signed.clone();
+        changed[0] ^= 1;
+        assert!(verify_proof(&changed, &ed, &pq, &ed_sig, &pq_sig).is_err());
+        let mut missing = ed_sig.clone();
+        missing.clear();
+        assert!(verify_proof(&signed, &ed, &pq, &missing, &pq_sig).is_err());
+        let mut bad_pq = pq_sig;
+        bad_pq[0] ^= 1;
+        assert!(verify_proof(&signed, &ed, &pq, &ed_sig, &bad_pq).is_err());
+        let mut wrong_epoch = proof_input(node, epoch + 1, &challenge, &ed, &pq, ed_id, pq_id).unwrap();
+        assert!(verify_proof(&wrong_epoch, &ed, &pq, &ed_sig, &bad_pq).is_err());
+        wrong_epoch[0] ^= 1;
+    }
+
     #[test]
     fn approval_proof_binds_identity_epoch_nonce_keys_and_purpose() {
         let nonce = [9u8; 32];
