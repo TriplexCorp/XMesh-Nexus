@@ -61,9 +61,7 @@ fn canonical_input(vector: &WireVector) -> Result<Vec<u8>, &'static str> {
         "node.security.activate" | "node.keys.rotate" | "node.security.recover" => 3,
         _ => return Err("unknown message type"),
     };
-    if !matches!(vector.direction_id, 1 | 2)
-        || allowed_direction & vector.direction_id == 0
-    {
+    if !matches!(vector.direction_id, 1 | 2) || allowed_direction & vector.direction_id == 0 {
         return Err("invalid direction");
     }
     if vector.node_id == 0
@@ -120,7 +118,12 @@ fn xsp_v2_shared_canonical_vectors_and_negative_cases() {
     assert_eq!(document.vectors.len(), 2);
     for vector in document.vectors {
         let input = canonical_input(&vector).expect("canonical input");
-        assert_eq!(hex::encode(&input), vector.signing_input_hex, "{}", vector.id);
+        assert_eq!(
+            hex::encode(&input),
+            vector.signing_input_hex,
+            "{}",
+            vector.id
+        );
         assert_eq!(
             hex::encode(Sha256::digest(vector.payload_utf8.as_bytes())),
             vector.payload_sha256,
@@ -132,7 +135,11 @@ fn xsp_v2_shared_canonical_vectors_and_negative_cases() {
         assert_ne!(canonical_input(&changed).unwrap(), input, "payload binding");
         changed = vector.clone();
         changed.path.push_str("/altered");
-        assert_ne!(canonical_input(&changed).unwrap(), input, "endpoint binding");
+        assert_ne!(
+            canonical_input(&changed).unwrap(),
+            input,
+            "endpoint binding"
+        );
         changed = vector.clone();
         changed.direction_id = 3;
         assert!(canonical_input(&changed).is_err(), "direction rejection");
