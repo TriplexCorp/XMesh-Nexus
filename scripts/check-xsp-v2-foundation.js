@@ -3,7 +3,10 @@
 const fs=require('node:fs'),assert=require('node:assert/strict');
 const sql=fs.readFileSync('backend/migrations/0099_node_xsp_v2_public_state.sql','utf8');
 const migrationVersions=fs.readdirSync('backend/migrations').filter(name=>/^\d{4}_.+\.sql$/.test(name)).map(name=>Number(name.slice(0,4)));
-assert.equal(Math.max(...migrationVersions),100,'XSP-v2 enrollment approval migration must follow 0099');
+assert.equal(Math.max(...migrationVersions),101,'Owner recovery migration must follow 0100');
+assert.equal(migrationVersions.filter(version=>version===101).length,1,'Expected one migration version 0101');
+const recovery=fs.readFileSync('backend/migrations/0101_node_enrollment_owner_recovery.sql','utf8');
+assert.match(recovery,/allow_key_replacement BOOLEAN NOT NULL DEFAULT FALSE/);
 assert.equal(migrationVersions.filter(version=>version===99).length,1,'Expected one migration version 0099');
 assert.equal(migrationVersions.filter(version=>version===100).length,1,'Expected one migration version 0100');
 const approval=fs.readFileSync('backend/migrations/0100_node_xsp_owner_key_approval.sql','utf8');
