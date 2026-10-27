@@ -3998,7 +3998,7 @@ the old node will lose access. Cancel and create a new Node ID if both must work
         if(!approved)return;
         issued=await backendRequest(enrollPath+'/reissue',{method:'POST'});
       }
-      const url='https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/53f40b001d91173f63bf53aec0988fa650376d12/bootstrap.sh';
+      const url='https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/0a11efae2bc9fdc87729bc2d8738e1caf1cf8bc6/bootstrap.sh';
       const command='curl --proto "=https" --tlsv1.2 -H "Cache-Control: no-cache" -fsSLo /tmp/xmesh-bootstrap.sh '+url+' && grep -q "Installing Docker Engine and Compose from Docker" /tmp/xmesh-bootstrap.sh && sudo bash /tmp/xmesh-bootstrap.sh '+location.origin+' '+id+' '+(Number(DB.nodes.find(node=>Number(node.id)===id)?.port)||8443);
       modal('<div class="box node-setup"><div class="bar2 node-setup-head"><div><h2>Подключение узла</h2><p>Два шага для установки XMesh Node</p></div><button class="ia" data-x aria-label="Закрыть">'+ic('x')+'</button></div>'+
         '<section class="node-setup-step"><div class="node-setup-step-title"><span class="node-setup-number">1</span><div><h3>Команда для VPS</h3><p>Скопируйте и запустите в терминале сервера.</p></div></div><textarea id="node-bootstrap-command" readonly spellcheck="false" rows="4" aria-label="Команда установки">'+esc(command)+'</textarea><button type="button" class="btn node-setup-copy" data-copy-node-bootstrap>'+ic('copy')+'Скопировать команду</button></section>'+
