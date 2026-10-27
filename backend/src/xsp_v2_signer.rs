@@ -34,8 +34,7 @@ use tokio::{
 
 use crate::{
     xsp_v2_ack_epoch_commit::readback_committed_applied_ack_signer_staging,
-    xsp_v2_commit_receipt::sign_staging_commit_receipt,
-    xsp_v2_signed_cutover::TrustedPublic,
+    xsp_v2_commit_receipt::sign_staging_commit_receipt, xsp_v2_signed_cutover::TrustedPublic,
 };
 
 const SOCKET_PATH_DEFAULT: &str = "/run/xmesh-signer/signer.sock";
@@ -124,8 +123,7 @@ fn load_signing_material(check_pins: bool) -> Result<SigningMaterial> {
     );
 
     let pq_pem = read_private_key_file(&pq_path)?;
-    let mldsa65 =
-        PKey::private_key_from_pem(&pq_pem).context("load ML-DSA-65 signer PEM")?;
+    let mldsa65 = PKey::private_key_from_pem(&pq_pem).context("load ML-DSA-65 signer PEM")?;
     let public_der = mldsa65
         .public_key_to_der()
         .context("derive ML-DSA-65 public key")?;
@@ -154,11 +152,9 @@ fn load_signing_material(check_pins: bool) -> Result<SigningMaterial> {
         );
     }
     let issuer_id = if check_pins {
-        env::var("XSP_V2_SIGNER_ISSUER_ID")
-            .context("XSP_V2_SIGNER_ISSUER_ID is required")?
+        env::var("XSP_V2_SIGNER_ISSUER_ID").context("XSP_V2_SIGNER_ISSUER_ID is required")?
     } else {
-        env::var("XSP_V2_SIGNER_ISSUER_ID")
-            .unwrap_or_else(|_| "xmesh-nexus-panel".to_owned())
+        env::var("XSP_V2_SIGNER_ISSUER_ID").unwrap_or_else(|_| "xmesh-nexus-panel".to_owned())
     };
     ensure!(
         !issuer_id.is_empty()
@@ -207,7 +203,10 @@ fn validate_request(request: &SignRequest) -> Result<Vec<u8>> {
         request.node_id > 0
             && !request.request_id.is_empty()
             && request.request_id.len() <= 64
-            && request.request_id.bytes().all(|byte| byte.is_ascii_graphic()),
+            && request
+                .request_id
+                .bytes()
+                .all(|byte| byte.is_ascii_graphic()),
         "invalid node or request identity"
     );
     ensure!(
@@ -279,7 +278,9 @@ async fn serve_connection(
     pool: &PgPool,
     keys: &SigningMaterial,
 ) -> Result<()> {
-    let peer = stream.peer_cred().context("read signer socket peer credentials")?;
+    let peer = stream
+        .peer_cred()
+        .context("read signer socket peer credentials")?;
     ensure!(
         peer.uid() == API_UID && peer.gid() == SHARED_GID,
         "unexpected process credentials on signer socket"
@@ -296,7 +297,8 @@ async fn serve_connection(
         !raw.is_empty() && raw.len() <= MAX_SIGN_REQUEST_BYTES,
         "invalid signer request size"
     );
-    let request: SignRequest = serde_json::from_slice(&raw).context("invalid signer request JSON")?;
+    let request: SignRequest =
+        serde_json::from_slice(&raw).context("invalid signer request JSON")?;
     let result = async {
         let ack = validate_request(&request)?;
         sign_committed_ack(pool, keys, &request, &ack).await
@@ -339,8 +341,8 @@ async fn serve_connection(
 /// Dedicated entrypoint selected only by the explicit signer command argument.
 pub async fn run() -> Result<()> {
     let keys = load_signing_material(true)?;
-    let database_url = env::var("XSP_V2_SIGNER_DATABASE_URL")
-        .context("XSP_V2_SIGNER_DATABASE_URL is required")?;
+    let database_url =
+        env::var("XSP_V2_SIGNER_DATABASE_URL").context("XSP_V2_SIGNER_DATABASE_URL is required")?;
     ensure!(
         !database_url.trim().is_empty(),
         "XSP_V2_SIGNER_DATABASE_URL must target xmesh_signer_reader"
@@ -373,11 +375,17 @@ pub async fn run() -> Result<()> {
     )
     .fetch_one(&pool)
     .await?;
-    ensure!(!privileged, "signer database role has privileged attributes");
+    ensure!(
+        !privileged,
+        "signer database role has privileged attributes"
+    );
 
     let socket_path = env::var_os("XSP_V2_SIGNER_SOCKET_PATH")
         .map_or_else(|| PathBuf::from(SOCKET_PATH_DEFAULT), PathBuf::from);
-    ensure!(socket_path.is_absolute(), "signer socket path must be absolute");
+    ensure!(
+        socket_path.is_absolute(),
+        "signer socket path must be absolute"
+    );
     let parent = socket_path
         .parent()
         .context("signer socket path must have a parent directory")?;
@@ -416,7 +424,10 @@ pub async fn run() -> Result<()> {
     );
 
     loop {
-        let (stream, _) = listener.accept().await.context("accept signer connection")?;
+        let (stream, _) = listener
+            .accept()
+            .await
+            .context("accept signer connection")?;
         if serve_connection(stream, &pool, &keys).await.is_err() {
             // Never log request bodies, receipts, signatures, private material or DB URLs.
             tracing::warn!("XSP-v2 signer connection rejected");
@@ -500,9 +511,12 @@ async fn request_receipt_from_socket(
     let mut raw_response = Vec::new();
     {
         let mut limited = (&mut stream).take((MAX_SIGN_RESPONSE_BYTES + 1) as u64);
-        timeout(Duration::from_secs(5), limited.read_to_end(&mut raw_response))
-            .await
-            .context("signer response read timeout")??;
+        timeout(
+            Duration::from_secs(5),
+            limited.read_to_end(&mut raw_response),
+        )
+        .await
+        .context("signer response read timeout")??;
     }
     ensure!(
         !raw_response.is_empty() && raw_response.len() <= MAX_SIGN_RESPONSE_BYTES,
@@ -567,7 +581,10 @@ mod tests {
 
     #[test]
     fn signer_key_id_is_stable_and_separated_by_algorithm() {
-        assert_ne!(signer_key_id("ed-", &[7u8; 32]), signer_key_id("pq-", &[7u8; 32]));
+        assert_ne!(
+            signer_key_id("ed-", &[7u8; 32]),
+            signer_key_id("pq-", &[7u8; 32])
+        );
         assert_eq!(signer_key_id("ed-", &[7u8; 32]).len(), 27);
         assert!(signer_key_id("ed-", &[7u8; 32]).starts_with("ed-"));
     }
