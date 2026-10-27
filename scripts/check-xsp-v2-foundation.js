@@ -3,8 +3,24 @@
 const fs=require('node:fs'),assert=require('node:assert/strict');
 const sql=fs.readFileSync('backend/migrations/0099_node_xsp_v2_public_state.sql','utf8');
 const migrationVersions=fs.readdirSync('backend/migrations').filter(name=>/^\d{4}_.+\.sql$/.test(name)).map(name=>Number(name.slice(0,4)));
-assert.equal(Math.max(...migrationVersions),102,'Staging-only rotation preparation migration must follow 0101');
+assert.equal(Math.max(...migrationVersions),103,'Passive signed cutover ledger migration must follow 0102');
 assert.equal(migrationVersions.filter(version=>version===102).length,1,'Expected one migration version 0102');
+
+assert.equal(migrationVersions.filter(version=>version===103).length,1,'Expected one migration version 0103');
+const ledger=fs.readFileSync('backend/migrations/0103_node_xsp_cutover_permit_ledger.sql','utf8');
+assert.match(ledger,/CREATE TABLE node_xsp_cutover_permit_ledger/);
+assert.match(ledger,/UNIQUE \(node_id, permit_nonce\)/);
+assert.match(ledger,/UNIQUE \(node_id, permit_input_sha256\)/);
+assert.match(ledger,/PRIMARY KEY \(node_id, request_id\)/);
+assert.match(ledger,/CREATE UNIQUE INDEX node_xsp_cutover_one_issued_per_node/);
+assert.match(ledger,/octet_length\(signed_permit\) BETWEEN 1 AND 16384/);
+assert.match(ledger,/state IN \('issued','ack_verified','receipt_sent','aborted'\)/);
+assert.match(ledger,/INTERVAL '60 seconds'/);
+assert(!/private_key|private_seed|plaintext_secret/i.test(ledger.replace(/--[^\n]*/g,'')),
+    'The signed permit ledger must never persist private keys');
+assert(!/\b(?:UPDATE|DELETE)\s+node_xsp_(?:suite_state|public_keysets)\b/i.test(ledger.replace(/--[^\n]*/g,'')),
+    'The passive ledger must never change the trusted epoch or public keys');
+
 const rotations=fs.readFileSync('backend/migrations/0102_node_xsp_rotation_preparations.sql','utf8');
 assert.match(rotations,/CREATE TABLE node_xsp_rotation_preparations/);
 assert.match(rotations,/proved_at TIMESTAMPTZ/);
