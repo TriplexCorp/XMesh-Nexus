@@ -1201,6 +1201,9 @@ mod signed_tests {
         // A lost HTTP response can be retried only with a NEW independently
         // signed one-use assertion. The original receipt must not change.
         recovery_auth["nonceHex"] = serde_json::json!("a4".repeat(16));
+        // OpenSSL one-shot signer contexts are single-use: create a fresh
+        // context per independent signed recovery request.
+        let mut retry_pq_signer = PQSigner::new_without_digest(&next_pq).unwrap();
         let next_signing_input = crate::xsp_v2_api::recovery_signing_input_for_test(
             &serde_json::to_vec(&recovery_auth).unwrap(),
             &signed_ack,
@@ -1213,7 +1216,7 @@ mod signed_tests {
             serde_json::json!(STANDARD.encode(next_ed.sign(&next_signing_input).to_bytes()));
         recovery_auth["signatures"]["mldsa65"] = serde_json::json!(
             STANDARD.encode(
-                auth_pq_signer
+                retry_pq_signer
                     .sign_oneshot_to_vec(&next_signing_input)
                     .unwrap()
             )
