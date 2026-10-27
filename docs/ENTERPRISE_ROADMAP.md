@@ -6,11 +6,13 @@ This file defines the **current order of work**. Historical roadmaps/checkpoints
 
 ### Verified source checkpoints
 
-- **Nexus `main`:** [`d295ea7fd17dbcda6db6f946bb892277a55dd001`](https://github.com/TriplexCorp/XMesh-Nexus/commit/d295ea7fd17dbcda6db6f946bb892277a55dd001), merge of [PR #64](https://github.com/TriplexCorp/XMesh-Nexus/pull/64).
-- **Node `main` baseline:** [`d4572b406ac9a209cfbade84a4390569bd38ba92`](https://github.com/TriplexCorp/XMesh-Node/commit/d4572b406ac9a209cfbade84a4390569bd38ba92).
-- On the Nexus merge SHA, [XSP-v2 Hybrid TLS Probe #40592253543](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40592253543) — **success**, including **Dedicated PQ-only ingress container and network E2E**.
-- On the same merge SHA, [Backend CI #40592253598](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40592253598) — **success**.
+- **Latest verified Nexus implementation checkpoint:** [`d295ea7fd17dbcda6db6f946bb892277a55dd001`](https://github.com/TriplexCorp/XMesh-Nexus/commit/d295ea7fd17dbcda6db6f946bb892277a55dd001), merge of [PR #64](https://github.com/TriplexCorp/XMesh-Nexus/pull/64).
+- **Current XMesh-Node staging transport checkpoint:** [`79cee45174f7670707d22a269784fe117c44743c`](https://github.com/TriplexCorp/XMesh-Node/commit/79cee45174f7670707d22a269784fe117c44743c), merge of [Node PR #29](https://github.com/TriplexCorp/XMesh-Node/pull/29).
+- On the Nexus implementation checkpoint, [XSP-v2 Hybrid TLS Probe #40592253543](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40592253543) — **success**, including **Dedicated PQ-only ingress container and network E2E**.
+- On the same Nexus implementation checkpoint, [Backend CI #40592253598](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40592253598) — **success**.
 - PR #64 pre-merge exact head `05bfdc16892632d0ac264542c2b3b9cf30e6acb0` passed [Hybrid TLS #40591238253](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40591238253) and [Backend CI #40591238382](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40591238382).
+- On the Node merge SHA, [Node CI #40597143811](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40597143811) and [XSP-v2 Crypto PoC #40597143829](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40597143829) — **success**.
+- Node PR #29 proves, in the isolated Go 1.27 staging probe, strict TLS 1.3 + `X25519MLKEM768` with an **ML-DSA-65 client certificate**, including fail-closed rejection of anonymous, classical, wrong-algorithm and untrusted client identities.
 - The earlier isolated signer P0 remains completed from PR #61 with its own pre/post-merge process/crypto/backend evidence.
 
 A green test proves only its stated boundary. Code existence ≠ E2E ≠ security review ≠ production deployment.
@@ -38,7 +40,8 @@ All of the following are mandatory, never alternatives:
 | Signed commit receipt + immutable outbox | **STAGING PASS** | Exact durable bytes, dedupe/recovery, truncate guards; not arbitrary multi-epoch recovery |
 | Isolated `panel_response` signer | **P0 COMPLETE in staging/process scope** | Real image/process/socket, key isolation, least-privilege DB role, failure/concurrency/recovery tests |
 | P0-C1: dedicated PQ-only Node ingress | **P0 COMPLETE in isolated network/process scope** | PR #64: real isolated ingress, actual hybrid negotiation, fail-closed negatives, one-hop topology, pre/post-merge CI |
-| **P0-C2: authorized ACK route + origin trust boundary** | **CURRENT P0** | Prove the ingress→origin boundary and trusted Node identity before mounting a narrow staging ACK route |
+| Node mutual-TLS identity prerequisite | **P0-C2-A PREREQUISITE COMPLETE in isolated probe scope** | Node PR #29: ML-DSA-65 client-auth primitive with strict hybrid transport and negative identity tests |
+| **P0-C2: authorized ACK route + origin trust boundary** | **CURRENT P0** | Preserve the authenticated Node identity across the ingress→origin boundary before mounting a narrow staging ACK route |
 | P0-D: production-capable Agent workflow | **BLOCKED on C2** | Integrate trusted permit → applied state → ACK → signed receipt/retry; signed configs/commands/responses |
 | P0-E: recovery/security release gates | **BLOCKED** | Crash/power-loss/snapshot rollback, anti-rollback, backup/rotation, fuzz/KAT, independent security review |
 | Production XSP-v2 rollout | **NOT AUTHORIZED** | Disposable canary and explicit deployment approval only after all previous gates |
@@ -53,7 +56,7 @@ Remaining signer limits include host-root/DB-admin trust, no whole-machine snaps
 
 ## Completed P0-C1 — dedicated PQ-only Node ingress
 
-Merged as PR #64 and re-verified after merge on exact `main` SHA `d295ea7fd17dbcda6db6f946bb892277a55dd001`.
+Merged as PR #64 and re-verified after merge on exact implementation SHA `d295ea7fd17dbcda6db6f946bb892277a55dd001`.
 
 ### A. Dedicated runtime boundary
 
@@ -98,6 +101,24 @@ Merged as PR #64 and re-verified after merge on exact `main` SHA `d295ea7fd17dbc
 
 C1 is **not** a production Nexus↔Node deployment. It does not mount the ACK route, authenticate an application request, forward to the Nexus API, modify production DNS/ACME/firewall/public Nginx, update the production Agent, enable `strict-pq` or rotate live keys.
 
+## Completed P0-C2-A prerequisite — Node ML-DSA-65 mutual TLS identity probe
+
+Merged as XMesh-Node PR #29 and re-verified after merge on Node SHA `79cee45174f7670707d22a269784fe117c44743c`.
+
+The isolated Go 1.27 staging probe now proves:
+
+- [x] TLS 1.3 with the actually negotiated group `X25519MLKEM768`.
+- [x] A client certificate using exactly ML-DSA-65 on the valid mutual-TLS path.
+- [x] The server really requested and accepted the client certificate; client-side handshake completion alone is not treated as proof of server acceptance.
+- [x] Anonymous/no-client-certificate attempts fail closed.
+- [x] ML-DSA-44 client identities fail closed where ML-DSA-65 is mandatory.
+- [x] Classical ECDSA client identities fail closed.
+- [x] Untrusted ML-DSA-65 client identities fail closed.
+- [x] Classical X25519-only transport fails closed.
+- [x] Node CI and XSP-v2 Crypto PoC passed pre-merge and post-merge.
+
+This is a **transport identity primitive only**. It does not authorize an ACK application message and production Agent code remains on the legacy Go 1.23 control path.
+
 ## CURRENT P0 — P0-C2: authorized ACK route behind a reviewed origin boundary
 
 ### Goal
@@ -107,6 +128,8 @@ Expose exactly one experimental Node-only ACK operation **only after** the trans
 A design that merely adds `proxy_pass http://...` and trusts an injected `X-Node-ID` header is **not acceptable**. A body `nodeId`, arbitrary header, source IP, or legacy `XMESH1` credential cannot become the trusted transport identity for XSP-v2.
 
 ### C2-A — ingress→origin trust boundary
+
+Node PR #29 provides the tested mutual-TLS identity primitive at the edge. C2-A must preserve that authenticated identity across the ingress→origin transition without converting it into caller-controlled metadata.
 
 Before mounting the route:
 

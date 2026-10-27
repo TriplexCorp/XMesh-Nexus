@@ -8,15 +8,19 @@ XMesh Nexus manages nodes, users, subscriptions, Xray configuration, telemetry a
 
 ## Current XSP-v2 engineering checkpoint — 28 October 2026
 
-**Nexus `main`:** [`d295ea7fd17dbcda6db6f946bb892277a55dd001`](https://github.com/TriplexCorp/XMesh-Nexus/commit/d295ea7fd17dbcda6db6f946bb892277a55dd001), merge of [PR #64](https://github.com/TriplexCorp/XMesh-Nexus/pull/64).
+**Latest verified Nexus implementation checkpoint:** [`d295ea7fd17dbcda6db6f946bb892277a55dd001`](https://github.com/TriplexCorp/XMesh-Nexus/commit/d295ea7fd17dbcda6db6f946bb892277a55dd001), merge of [PR #64](https://github.com/TriplexCorp/XMesh-Nexus/pull/64).
 
-P0-C1 — dedicated PQ-only Node ingress — is complete in **isolated staging/process scope** on that exact merge SHA:
+P0-C1 — dedicated PQ-only Node ingress — is complete in **isolated staging/process scope** on that exact implementation SHA:
 
 - [XSP-v2 Hybrid TLS Probe #40592253543](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40592253543) — **success**, including `Dedicated PQ-only ingress container and network E2E`;
 - [Backend CI #40592253598](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40592253598) — **success**;
 - pre-merge exact head `05bfdc16892632d0ac264542c2b3b9cf30e6acb0` also passed Hybrid TLS #40591238253 and Backend CI #40591238382.
 
-The previous signer P0 remains complete in staging/process scope from PR #61. **Node baseline:** [`d4572b406ac9a209cfbade84a4390569bd38ba92`](https://github.com/TriplexCorp/XMesh-Node/commit/d4572b406ac9a209cfbade84a4390569bd38ba92). Production Node still uses the legacy Go 1.23 control path; Go 1.27 XSP-v2 code remains isolated research/staging code.
+The previous signer P0 remains complete in staging/process scope from PR #61.
+
+**Current XMesh-Node staging transport checkpoint:** [`79cee45174f7670707d22a269784fe117c44743c`](https://github.com/TriplexCorp/XMesh-Node/commit/79cee45174f7670707d22a269784fe117c44743c), merge of [Node PR #29](https://github.com/TriplexCorp/XMesh-Node/pull/29). On that exact merge SHA, [Node CI #40597143811](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40597143811) and [XSP-v2 Crypto PoC #40597143829](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40597143829) both passed. The isolated Go 1.27 diagnostic path now proves strict TLS 1.3 + `X25519MLKEM768` with an ML-DSA-65 client certificate and fail-closed rejection of anonymous, classical, wrong-algorithm and untrusted client identities.
+
+Production Node still uses the legacy Go 1.23 control path; the Go 1.27 XSP-v2 transport/client-auth code remains isolated research/staging code and does not by itself authorize an XSP/2 application message.
 
 ### P0-C1 — completed
 
@@ -39,6 +43,8 @@ This proves **one Node → TLS terminator hop only**. It does not prove a future
 
 The next gate is **not** “just proxy the ACK path to the existing API”. Before `POST /api/v2/node/keys/rotation/ack` can be accepted, the ingress→origin boundary and Node identity must be independently trustworthy.
 
+Node PR #29 supplies a tested **ML-DSA-65 mutual-TLS client identity primitive** for the isolated Go 1.27 staging probe. C2-A must now preserve that authenticated identity across the ingress→origin boundary without trusting caller-controlled headers/body fields.
+
 P0-C2 must:
 
 1. define and prove a narrow ingress→origin trust boundary; an unreviewed plaintext/classical network hop is not acceptable;
@@ -57,7 +63,7 @@ P0-C2 must:
 - No user-selectable fallback to `XMESH1`, Ed25519-only, X25519-only, TLS 1.2 or insecure certificate verification is allowed in the target XSP-v2 product.
 - The dedicated ingress remains experimental and is not activated by the default installer/Compose stack.
 - `POST /api/v2/node/keys/rotation/ack` is still intentionally unmounted at this checkpoint.
-- A GitHub merge is **not** a VPS deployment. PR #64 did not change production VPS, DNS, firewall, public Nginx, production DB, real Node keys or live user VPN credentials.
+- A GitHub merge is **not** a VPS deployment. PR #64 and Node PR #29 did not change production VPS, DNS, firewall, public Nginx, production DB, real Node keys or live user VPN credentials.
 - Xray continues to carry user VPN traffic.
 
 For exact requirements and gate order, read [ENTERPRISE_ROADMAP.md](docs/ENTERPRISE_ROADMAP.md) and [XSP_V2_PQ_ONLY_SECURITY_POLICY.md](docs/XSP_V2_PQ_ONLY_SECURITY_POLICY.md).
@@ -72,7 +78,7 @@ Administrator ─HTTPS─> Nexus public Nginx ─loopback─> XMesh Nexus (Rust/
                                                    Redis
 
 Future XSP-v2 Node path (not production-activated):
-Node ─TLS1.3/X25519MLKEM768─> dedicated Node ingress ─[P0-C2 boundary TBD/proven]─> staging ACK handler
+Node ─TLS1.3/X25519MLKEM768 + ML-DSA-65 client identity─> dedicated Node ingress ─[P0-C2 boundary TBD/proven]─> staging ACK handler
 ```
 
 ## Installation
