@@ -1424,4 +1424,5 @@ mod signed_tests {
         drop(old_ed);
         drop(old_pq);
     }
+    include!("xsp_v2_signer_e2e_tests.rs");
 }

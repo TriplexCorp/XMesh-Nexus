@@ -33,9 +33,14 @@ END
 $$;
 
 REVOKE ALL PRIVILEGES ON DATABASE xmesh FROM xmesh_signer_reader;
+-- PUBLIC privileges cannot be removed from a single role. Disallow public
+-- object creation, including temporary objects; xmesh_app retains its explicit
+-- schema CREATE grant. Provision only after migrations and review existing users.
+REVOKE CREATE, TEMPORARY ON DATABASE xmesh FROM PUBLIC;
 GRANT CONNECT ON DATABASE xmesh TO xmesh_signer_reader;
 
 REVOKE ALL PRIVILEGES ON SCHEMA public FROM xmesh_signer_reader;
+REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 GRANT USAGE ON SCHEMA public TO xmesh_signer_reader;
 
 -- Clear stale direct grants to all pre-existing objects before granting the
@@ -43,6 +48,25 @@ GRANT USAGE ON SCHEMA public TO xmesh_signer_reader;
 REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM xmesh_signer_reader;
 REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM xmesh_signer_reader;
 REVOKE ALL PRIVILEGES ON ALL ROUTINES IN SCHEMA public FROM xmesh_signer_reader;
+
+-- Table-level REVOKE does not clear separate column-level grants.
+DO $$
+DECLARE
+    granted_column RECORD;
+BEGIN
+    FOR granted_column IN
+        SELECT n.nspname, c.relname, a.attname
+        FROM pg_attribute AS a
+        JOIN pg_class AS c ON c.oid = a.attrelid
+        JOIN pg_namespace AS n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'public' AND c.relkind IN ('r','p','v','m','f')
+          AND a.attnum > 0 AND NOT a.attisdropped AND a.attacl IS NOT NULL
+    LOOP
+        EXECUTE format('REVOKE ALL PRIVILEGES (%I) ON TABLE %I.%I FROM xmesh_signer_reader',
+                       granted_column.attname, granted_column.nspname, granted_column.relname);
+    END LOOP;
+END
+$$;
 
 GRANT SELECT ON TABLE
     node_xsp_suite_state,

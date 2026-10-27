@@ -1,20 +1,37 @@
 # syntax=docker/dockerfile:1.7
-# Separate OpenSSL 3.5+ image for the experimental receipt signer. This target
-# is never used by the default panel build or exposed through a TCP port.
-FROM rust:1.99-trixie AS builder
+# Separate OpenSSL 3.5+ experimental signer. Default builds keep test code out
+# of the runtime; the E2E harness explicitly requests SIGNER_BUILD_TESTS=1.
+ARG SIGNER_BUILDER_IMAGE=rust:1.99-trixie
+FROM ${SIGNER_BUILDER_IMAGE} AS builder
 WORKDIR /build/backend
-ENV CARGO_INCREMENTAL=0
+ENV CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=4 \
+    CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends pkg-config libssl-dev \
+    && apt-get install -y --no-install-recommends pkg-config libssl-dev python3 \
     && rm -rf /var/lib/apt/lists/*
-COPY backend/Cargo.toml ./Cargo.toml
-COPY backend/src ./src
-COPY backend/migrations ./migrations
-RUN cargo build --release --features xsp-v2-experimental --bin xmesh-api \
-    && mkdir -p /build/output \
-    && cp target/release/xmesh-api /build/output/xmesh-api
+ARG SIGNER_BUILD_PROFILE=release
+ARG SIGNER_BUILD_TESTS=0
+# Read-only source mounts avoid duplicating large toolchain layers on vfs.
+# Cache mounts retain dependencies and outputs without baking them into images.
+RUN --mount=type=secret,id=proxy_ca \
+    --mount=type=bind,source=backend,target=/source/backend \
+    --mount=type=bind,source=docs,target=/source/docs \
+    --mount=type=cache,id=xmesh-signer-registry,target=/usr/local/cargo/registry \
+    --mount=type=cache,id=xmesh-signer-target,target=/build/backend/target \
+    set -eu; \
+    if [ -f /run/secrets/proxy_ca ]; then export CARGO_HTTP_CAINFO=/run/secrets/proxy_ca CARGO_HTTP_PROXY_CAINFO=/run/secrets/proxy_ca; fi; \
+    cp /source/backend/Cargo.toml .; \
+    cp -a /source/backend/src /source/backend/migrations .; \
+    cp -a /source/docs /build/docs; \
+    cargo build --profile "$SIGNER_BUILD_PROFILE" --features xsp-v2-experimental --bin xmesh-api; \
+    mkdir -p /build/output; \
+    if [ "$SIGNER_BUILD_PROFILE" = dev ]; then cp target/debug/xmesh-api /build/output/xmesh-api; else cp "target/$SIGNER_BUILD_PROFILE/xmesh-api" /build/output/xmesh-api; fi; \
+    if [ "$SIGNER_BUILD_TESTS" = 1 ]; then \
+      cargo test --features xsp-v2-experimental --bin xmesh-api --no-run --message-format=json > /build/test-artifacts.json; \
+      python3 -c 'import json,shutil; rows=[json.loads(line) for line in open("/build/test-artifacts.json")]; bins=[r["executable"] for r in rows if r.get("reason")=="compiler-artifact" and r.get("profile",{}).get("test") and r.get("executable")]; assert len(bins)==1; shutil.copy2(bins[0],"/build/output/signer-e2e-tests")'; \
+    fi
 
-FROM debian:trixie-slim AS runtime
+FROM debian:trixie-slim AS runtime-base
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates libssl3t64 \
     && rm -rf /var/lib/apt/lists/* \
@@ -29,3 +46,14 @@ WORKDIR /app
 HEALTHCHECK --interval=15s --timeout=3s --start-period=20s --retries=3 \
   CMD test -S /run/xmesh-signer/signer.sock
 ENTRYPOINT ["/usr/local/bin/xmesh-api"]
+
+FROM runtime-base AS signer-tests
+USER 0:0
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /build/output/signer-e2e-tests /build/output/signer-e2e-tests
+ENTRYPOINT ["/build/output/signer-e2e-tests"]
+
+# Keep the default build target production-isolated, without the test runner.
+FROM runtime-base AS runtime

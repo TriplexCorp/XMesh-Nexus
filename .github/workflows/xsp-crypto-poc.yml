@@ -16,6 +16,8 @@ on:
       - "backend/src/xsp_v2_commit_receipt.rs"
       - "backend/src/xsp_v2_signed_receipt_outbox.rs"
       - "backend/src/xsp_v2_signer.rs"
+      - "backend/src/xsp_v2_signer_e2e_tests.rs"
+      - "scripts/test-xsp-v2-signer-integration.py"
       - "backend/Dockerfile.xsp-signer"
       - "compose.yaml"
       - "deploy/postgres/20-create-xsp-v2-signer-role.sql"
@@ -46,6 +48,8 @@ on:
       - "backend/src/xsp_v2_commit_receipt.rs"
       - "backend/src/xsp_v2_signed_receipt_outbox.rs"
       - "backend/src/xsp_v2_signer.rs"
+      - "backend/src/xsp_v2_signer_e2e_tests.rs"
+      - "scripts/test-xsp-v2-signer-integration.py"
       - "backend/Dockerfile.xsp-signer"
       - "compose.yaml"
       - "deploy/postgres/20-create-xsp-v2-signer-role.sql"
@@ -142,6 +146,17 @@ jobs:
           rustup component add rustfmt clippy
           cargo fmt --manifest-path security/xspv2/poc-rust/Cargo.toml --all -- --check
           cargo fmt --manifest-path backend/Cargo.toml --all -- --check
+          rustfmt --edition 2024 --check backend/src/xsp_v2_signer_e2e_tests.rs
       - name: Strict experimental XSP-v2 backend Clippy
         run: |
           cargo clippy --manifest-path backend/Cargo.toml --all-targets --features xsp-v2-experimental -- -D warnings -D clippy::pedantic -D clippy::nursery -F unsafe-code
+
+  signer-process-e2e:
+    name: Isolated signer image, ACL and Unix-socket E2E
+    needs: crypto
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build real signer and exercise disposable process boundary
+        run: python3 scripts/test-xsp-v2-signer-integration.py

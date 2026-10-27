@@ -312,7 +312,12 @@ async fn serve_connection(
         serde_json::from_slice(&raw).context("invalid signer request JSON")?;
     let result = async {
         let ack = validate_request(&request)?;
-        sign_committed_ack(pool, keys, &request, &ack).await
+        timeout(
+            Duration::from_secs(4),
+            sign_committed_ack(pool, keys, &request, &ack),
+        )
+        .await
+        .context("signer database/signing deadline exceeded")?
     }
     .await;
 
@@ -359,6 +364,17 @@ async fn connect_signer_pool() -> Result<PgPool> {
     PgPoolOptions::new()
         .max_connections(4)
         .acquire_timeout(Duration::from_secs(5))
+        .after_connect(|connection, _| {
+            Box::pin(async move {
+                sqlx::query("SET statement_timeout='2s'")
+                    .execute(&mut *connection)
+                    .await?;
+                sqlx::query("SET lock_timeout='1s'")
+                    .execute(connection)
+                    .await?;
+                Ok(())
+            })
+        })
         .connect(&database_url)
         .await
         .context("connect signer read-only PostgreSQL role")
@@ -401,6 +417,36 @@ async fn validate_signer_database_role(pool: &PgPool) -> Result<()> {
     ensure!(
         !has_role_memberships,
         "signer database role must not inherit or SET ROLE to another role"
+    );
+    let excessive_access: bool = sqlx::query_scalar(
+        "SELECT has_database_privilege(current_database(), 'CREATE')
+          OR has_database_privilege(current_database(), 'TEMP')
+          OR has_schema_privilege('public', 'CREATE')
+          OR EXISTS (
+            SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+            WHERE n.nspname='public' AND c.relkind IN ('r','p','v','m','f')
+              AND (has_table_privilege(c.oid, 'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                OR has_any_column_privilege(c.oid, 'INSERT,UPDATE,REFERENCES')
+                OR (c.relname NOT IN ('node_xsp_suite_state','node_xsp_public_keysets',
+                     'node_xsp_replay_nonces','node_xsp_cutover_permit_ledger',
+                     'node_xsp_signed_commit_receipt_outbox')
+                    AND (has_table_privilege(c.oid, 'SELECT')
+                      OR has_any_column_privilege(c.oid, 'SELECT')))))
+          OR EXISTS (
+            SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+            WHERE n.nspname='public' AND c.relkind='S'
+              AND CASE WHEN c.relkind='S'
+                  THEN has_sequence_privilege(c.oid, 'USAGE,SELECT,UPDATE') ELSE false END)
+          OR EXISTS (
+            SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+            WHERE n.nspname='public' AND p.prosecdef
+              AND has_function_privilege(p.oid, 'EXECUTE'))",
+    )
+    .fetch_one(pool)
+    .await?;
+    ensure!(
+        !excessive_access,
+        "signer database role has excessive effective object privileges"
     );
     Ok(())
 }
@@ -578,6 +624,16 @@ async fn request_receipt_from_socket(
         "protected signer returned noncanonical receipt bytes"
     );
     Ok(bytes)
+}
+
+#[cfg(test)]
+pub async fn request_receipt_for_test(
+    socket_path: &Path,
+    node_id: i64,
+    request_id: &str,
+    signed_ack_bytes: &[u8],
+) -> Result<Vec<u8>> {
+    request_receipt_from_socket(socket_path, node_id, request_id, signed_ack_bytes).await
 }
 
 #[cfg(test)]
