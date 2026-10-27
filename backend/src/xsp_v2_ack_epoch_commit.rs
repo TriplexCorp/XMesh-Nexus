@@ -3,8 +3,7 @@
 //! This helper is intentionally UNCALLED until database fault-injection review.
 #![allow(dead_code)]
 use crate::{
-    xsp_v2_ack_ledger_validator::adjudicate_new_applied_ack,
-    xsp_v2_signed_cutover::TrustedPublic,
+    xsp_v2_ack_ledger_validator::adjudicate_new_applied_ack, xsp_v2_signed_cutover::TrustedPublic,
 };
 use anyhow::{Context as _, Result, bail};
 use sqlx::{PgPool, Row};
@@ -35,7 +34,9 @@ fn checked_ack_nonce(raw: &[u8]) -> Result<[u8; 16]> {
     if hex::encode(&bytes) != nonce || bytes.iter().all(|v| *v == 0) {
         bail!("noncanonical ACK nonce");
     }
-    Ok(bytes.try_into().map_err(|_| anyhow::anyhow!("ACK nonce length"))?)
+    Ok(bytes
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("ACK nonce length"))?)
 }
 
 /// Validates a fresh, new-key dual-signed ACK from the **original locked**
