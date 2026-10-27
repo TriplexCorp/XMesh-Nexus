@@ -9,14 +9,17 @@ struct Cutover {
     kind: String,
     issuer_id: String,
     signer_ed_key_id: String,
+    #[serde(rename = "signerPQKeyId")]
     signer_pq_key_id: String,
     node_id: u64,
     from_epoch: u64,
     to_epoch: u64,
     request_id: String,
     from_ed_key_id: String,
+    #[serde(rename = "fromPQKeyId")]
     from_pq_key_id: String,
     to_ed_key_id: String,
+    #[serde(rename = "toPQKeyId")]
     to_pq_key_id: String,
     method: String,
     path: String,
