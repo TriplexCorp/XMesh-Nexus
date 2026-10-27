@@ -236,6 +236,8 @@ mod tests {
         let pq_id=digest_id("pq-",&pq);
         let a=rotation_input(42,(1,2),&challenge,&ed,&pq,&ed_id,&pq_id).unwrap();
         assert!(a.starts_with(b"XSP2-KEY-ROTATE-PREPARE-V1\0"));
+        assert_eq!(hex::encode(Sha256::digest(&a)),
+            "8191a5107cbaabfc54a1e6653e7b647c29a98754912fbcf498c54f6daaa422e2");
         assert!(!a.starts_with(b"XSP2-KEY-ENROLL-V1\0"));
         assert_ne!(a,rotation_input(42,(2,3),&challenge,&ed,&pq,&ed_id,&pq_id).unwrap());
         assert_ne!(a,rotation_input(43,(1,2),&challenge,&ed,&pq,&ed_id,&pq_id).unwrap());
