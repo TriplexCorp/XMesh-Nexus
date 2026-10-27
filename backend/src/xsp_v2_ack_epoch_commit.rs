@@ -176,7 +176,6 @@ pub async fn commit_fresh_applied_ack_staging(
     })
 }
 
-
 /// Internal, database-only witness to a previously committed ACK.
 /// NOT a signed server receipt, network response, permission to retire keys,
 /// or proof that the Node has a durable vault or rollback-resistant epoch.
@@ -208,7 +207,10 @@ pub struct StagingStoredACKEvidence {
 /// request/Node, tampered envelope or digest, bad Ed25519 or ML-DSA-65
 /// signatures, changed historical keysets, missing replay nonce, revoked
 /// public keys, changed epoch or a non-staging suite. No SQL writes occur.
-#[expect(clippy::too_many_lines, reason = "locked historical signed ACK verification boundary")]
+#[expect(
+    clippy::too_many_lines,
+    reason = "locked historical signed ACK verification boundary"
+)]
 pub async fn readback_committed_applied_ack_staging(
     pool: &PgPool,
     authenticated_node_id: i64,
@@ -265,10 +267,7 @@ pub async fn readback_committed_applied_ack_staging(
     }
     let from_epoch: i64 = ledger.try_get("from_epoch")?;
     let to_epoch: i64 = ledger.try_get("to_epoch")?;
-    if from_epoch <= 0
-        || from_epoch.checked_add(1) != Some(to_epoch)
-        || active_epoch != to_epoch
-    {
+    if from_epoch <= 0 || from_epoch.checked_add(1) != Some(to_epoch) || active_epoch != to_epoch {
         bail!("ACK ledger epoch does not match current staging suite");
     }
     let stored_ack: Vec<u8> = ledger.try_get("signed_applied_ack")?;
