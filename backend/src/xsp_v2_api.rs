@@ -378,7 +378,6 @@ pub async fn authenticate_committed_ack_recovery_staging(
     Ok(())
 }
 
-
 /// Recover ONLY the previously stored original dual-signed receipt after
 /// independent Node authentication and one-use recovery proof.
 ///
