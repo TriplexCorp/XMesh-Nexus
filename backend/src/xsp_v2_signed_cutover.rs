@@ -1173,27 +1173,60 @@ mod signed_tests {
             .is_err(),
             "request proof must bind exact serialized signed ACK"
         );
-        crate::xsp_v2_api::authenticate_committed_ack_recovery_staging(
-            &pool,
-            node_id,
-            &permit.request_id,
-            &recovery_auth_raw,
-            &signed_ack,
-        )
-        .await
-        .expect("both Node signatures, approved epoch and one-use nonce verified");
-        assert!(
-            crate::xsp_v2_api::authenticate_committed_ack_recovery_staging(
+        let authenticated_receipt =
+            crate::xsp_v2_api::recover_authenticated_committed_receipt_staging(
                 &pool,
                 node_id,
                 &permit.request_id,
                 &recovery_auth_raw,
                 &signed_ack,
+                &panel_pin,
+            )
+            .await
+            .expect("independent dual Node authentication must recover the exact stored receipt");
+        assert_eq!(authenticated_receipt, saved);
+        assert!(
+            crate::xsp_v2_api::recover_authenticated_committed_receipt_staging(
+                &pool,
+                node_id,
+                &permit.request_id,
+                &recovery_auth_raw,
+                &signed_ack,
+                &panel_pin,
             )
             .await
             .is_err(),
-            "the same Node auth nonce must never authenticate a second request"
+            "the same Node auth nonce must not retrieve a receipt twice"
         );
+        // A lost HTTP response can be retried only with a NEW independently
+        // signed one-use assertion. The original receipt must not change.
+        recovery_auth["nonceHex"] = serde_json::json!("a4".repeat(16));
+        let next_signing_input = crate::xsp_v2_api::recovery_signing_input_for_test(
+            &serde_json::to_vec(&recovery_auth).unwrap(),
+            &signed_ack,
+            node_id,
+            &permit.request_id,
+            auth_now,
+        )
+        .expect("fresh nonzero recovery nonce is valid");
+        recovery_auth["signatures"]["ed25519"] =
+            serde_json::json!(STANDARD.encode(next_ed.sign(&next_signing_input).to_bytes()));
+        recovery_auth["signatures"]["mldsa65"] = serde_json::json!(
+            STANDARD.encode(auth_pq_signer.sign_oneshot_to_vec(&next_signing_input).unwrap())
+        );
+        let fresh_auth_raw = serde_json::to_vec(&recovery_auth).unwrap();
+        let retried = crate::xsp_v2_api::recover_authenticated_committed_receipt_staging(
+            &pool,
+            node_id,
+            &permit.request_id,
+            &fresh_auth_raw,
+            &signed_ack,
+            &panel_pin,
+        )
+        .await
+        .expect("fresh one-use Node assertion recovers identical signed bytes");
+        assert_eq!(retried, saved);
+        assert_eq!(signing_calls.get(), 1, "auth recovery must never call signer");
         // Lost HTTP response: recover the previously signed immutable bytes
         // without any signer/private key and without replaying epoch CAS.
         let recovered = crate::xsp_v2_signed_receipt_outbox::load_committed_signed_receipt_staging(
