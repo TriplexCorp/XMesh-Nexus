@@ -7,7 +7,7 @@ use crate::{
     xsp_v2_db_candidate_snapshot::{LockedCandidate, load_locked_candidate},
     xsp_v2_signed_cutover::{ExpectedPermit, TrustedPublic, verify_signed_permit},
 };
-use anyhow::{Context as _, Result, bail};
+use anyhow::{Result, bail};
 use sqlx::{Postgres, Row, Transaction};
 
 pub struct StoredPermit {
@@ -116,7 +116,7 @@ pub async fn persist_verified_permit(
         let original_candidate: Vec<u8> = row.try_get("candidate_sha256")?;
         let state: String = row.try_get("state")?;
         if state == "aborted"
-            || original != signed_bytes
+            || original.as_slice() != signed_bytes
             || original_hash != permit_hash
             || original_candidate != candidate
         {
