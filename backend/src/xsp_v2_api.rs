@@ -159,11 +159,14 @@ fn parse(raw: &[u8], now_ms: i64) -> Result<Parsed, ApiError> {
     parse_for(raw, now_ms, "node.heartbeat", "/api/v2/node/heartbeat")
 }
 
+#[allow(dead_code)] // Staging-only: no authenticated PQ ingress or route is wired.
 const ACK_RECOVERY_PATH: &str = "/api/v2/node/keys/rotation/ack";
+#[allow(dead_code)] // Domain reserved for the isolated recovery verifier.
 const ACK_RECOVERY_MESSAGE: &str = "node.rotation.ack.recovery";
 
 /// Decode an independently signed Node identity assertion bound to the exact
 /// original ACK bytes. A signed ACK is NOT itself transport authentication.
+#[allow(dead_code)] // Parsed only by the feature-gated, currently uncalled verifier.
 fn parse_recovery_authority(
     raw_auth: &[u8],
     exact_saved_ack: &[u8],
@@ -304,6 +307,7 @@ pub async fn heartbeat(
 /// Fails on wrong Node/path/type/ACK/request/nonce/timestamps, non-staging
 /// suite, unapproved or revoked keys, missing Ed25519 OR ML-DSA-65 signature,
 /// concurrent/replayed nonce, and any database failure.
+#[allow(dead_code)] // Deliberately not wired into any production or staging HTTP route.
 pub async fn authenticate_committed_ack_recovery_staging(
     pool: &sqlx::PgPool,
     trusted_transport_node_id: i64,
@@ -375,7 +379,7 @@ pub async fn authenticate_committed_ack_recovery_staging(
 }
 
 #[cfg(test)]
-pub(crate) fn recovery_signing_input_for_test(
+pub fn recovery_signing_input_for_test(
     raw_auth: &[u8],
     exact_ack: &[u8],
     node_id: i64,
