@@ -386,7 +386,7 @@ pub async fn authenticate_committed_ack_recovery_staging(
 /// *independently* verified the remote Node's identity AND the actual
 /// negotiated TLS 1.3 X25519MLKEM768 group on every relevant TLS hop.
 /// Neither headers nor the signed ACK are proof of a PQ-protected transport.
-/// `panel_pin` must be independently provisioned as trusted panel_response
+/// `panel_pin` must be independently provisioned as trusted `panel_response`
 /// Ed25519 AND ML-DSA-65 public keys, never taken from the wire.
 ///
 /// The recovery proof consumes a nonce even if receipt readback then fails.
