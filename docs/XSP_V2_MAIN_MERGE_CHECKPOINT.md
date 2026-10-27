@@ -13,16 +13,17 @@
 | Approved pending public keys from locked PostgreSQL snapshot | #42 | — | Staging transaction guard |
 | Permit/ACK persistent schema + monotonic state triggers | #38, #39 | — | Additive migrations, no automatic cutover |
 | Validated signed permit persistence | #43 | — | Staging-only writer, no signer provisioning |
+| ACK verification against original saved signed permit | #44 | — | Read-only pinned-key staging checker |
 | Node ACK journal and fsync | — | #18 | Offline Go experimental module |
 | New-key active vault attestation before ACK | — | #19 | Offline Go experimental module |
 
 The original reference-ledger design from Nexus #37 preceded migrations 0103/0104 and is **not** a replacement migration. Its important unsolved requirements are retained in the failure checklist below. Avoid merging its old duplicate SQL as if it were an upgrade to the actual 0103/0104 schema.
 
-**Open at checkpoint:** Nexus #44 (read-only ACK verification against the original locked permit, awaiting final CI/security review), Nexus #37 (obsolete design proposal, superseded by the actual staging migrations), and Nexus #20 (separate FinalMask UI work, unrelated to this security work). XMesh-Node has no open PRs at this checkpoint.
+**Open at checkpoint:** Nexus #37 (obsolete design proposal, superseded by the actual staging migrations), Nexus #20 (separate FinalMask UI work, unrelated to this security work), and Nexus #45 (this checkpoint CI/inventory update, awaiting validation). XMesh-Node has no open PRs at this checkpoint.
 
 ## No forgotten safety prerequisites
 
-- [ ] Read-only ACK checker #44 merged only after green **all** relevant CI.
+- [x] Read-only ACK checker #44 merged after green Backend, Crypto and User Presence CI; no live route or cutover.
 - [ ] Owner/approved-request control, protected `panel_response` signing service with pinned distribution/rotation and auditable key custody. A signed message or `PoP` alone is not authorization.
 - [ ] Transactional signing intent/outbox: signer invocation and PostgreSQL commit cannot be made atomic merely by holding a SQL row lock. No permit may be delivered before durable issuance; duplicate retries must return the identical signed bytes.
 - [ ] Node can durably and exclusively activate the exact pending pair, with anti-rollback floor outside a wholly restorable filesystem. Software-only `fsync` is not hardware anti-rollback.
