@@ -10,6 +10,10 @@
 - **Следующий P0:** *канонический dual-signed Nexus commit receipt*: separate domain/version, permit hash, ACK envelope hash, Node+request+epoch+nonce binding, negative Rust/Go test vectors. После этого durable receipt/outbox, protected signer, Node verifier, auth transport и fault/recovery e2e. Внутренний DB readback **не** является signed receipt.
 - **Без изменений production:** `XMESH1`/Ed25519 живой; `strict-pq` **OFF**, Xray шифрует VPN data-plane, рабочая «Польша-2» не трогалась.
 
+### Решение об архитектуре: XSP-v2 строго PQ-only, без выбора пользователя
+
+**Обязательное требование к конечному продукту:** Node **не соединяется** с Nexus, если не подтверждён TLS 1.3 с `X25519MLKEM768`, действительная идентичность TLS-сервера и обе подписи Ed25519 **AND** ML-DSA-65 у управляющих сообщений. Нет чекбокса `strict-pq`, переключателя на `XMESH1`, `Ed25519-only` или `X25519-only`, опции `--insecure` либо автоматического downgrade; отсутствие ключей/библиотек/корректной эпохи = **fail closed**. На этапе замены старых агентов необходимы полноценная PQ-регистрация, trusted signer, Node verifier, signed receipt и согласованный TLS ingress; до этого действующие legacy-инстансы продолжают работать только как **ещё не мигрированная инфраструктура**, а не как предлагаемый пользователю режим. [Обязательная PQ-only политика](XSP_V2_PQ_ONLY_SECURITY_POLICY.md).
+
 ## Состояние на сегодня — что находится в `main`
 
 | Направление | Проверенный рубеж | Следующий gate |
