@@ -270,7 +270,6 @@ pub async fn load_committed_signed_receipt_staging(
     Ok(receipt)
 }
 
-
 /// Complete a previously committed ACK into exactly one durable signed
 /// receipt, or recover the original bytes after a lost network response.
 ///
@@ -362,9 +361,7 @@ where
                 pinned_panel,
             )
             .await
-            .with_context(|| {
-                format!("signed receipt insertion failed: {original_error:#}")
-            })
+            .with_context(|| format!("signed receipt insertion failed: {original_error:#}"))
         }
     }
 }
