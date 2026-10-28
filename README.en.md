@@ -8,24 +8,20 @@ XMesh Nexus manages Nodes, users, subscriptions, Xray configuration, telemetry a
 
 ## Current XSP-v2 checkpoint — 28 October 2026
 
-**Latest verified Nexus implementation checkpoint:** [`037290bbb31dc6e5d155a14b8ddf58a31e21066f`](https://github.com/TriplexCorp/XMesh-Nexus/commit/037290bbb31dc6e5d155a14b8ddf58a31e21066f), merge of [PR #73](https://github.com/TriplexCorp/XMesh-Nexus/pull/73).
+**Latest verified Nexus implementation checkpoint:** [`5acccfa1877016e464290b20ebba537c0b5bbad3`](https://github.com/TriplexCorp/XMesh-Nexus/commit/5acccfa1877016e464290b20ebba537c0b5bbad3), merge of [PR #77](https://github.com/TriplexCorp/XMesh-Nexus/pull/77).
 
-**Latest clean documentation/main checkpoint:** [`9900f8c99efc59f86699a6c0ab35c3b39b211d37`](https://github.com/TriplexCorp/XMesh-Nexus/commit/9900f8c99efc59f86699a6c0ab35c3b39b211d37), merge of docs-only [PR #74](https://github.com/TriplexCorp/XMesh-Nexus/pull/74). Post-merge [Backend CI #40724165330](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40724165330) completed **success** on that exact SHA. This documentation-only checkpoint does not supersede `037290...` as the verified C2-D1 implementation evidence.
+This closes the first focused **P0-C2-D2** sub-gate: exact historical network recovery after the original ACK freshness window. It does **not** complete C2-D2 as a whole.
 
-P0-C2-D1 — the integrated real-Node staging E2E — is complete in **isolated staging/process scope**:
+Exact post-merge evidence on `5acccfa1877016e464290b20ebba537c0b5bbad3`:
 
-`Node strict client → TLS1.3/X25519MLKEM768 + ML-DSA-65 mTLS → trusted ingress/origin → dual-signed ACK auth/DB commit → isolated signer → Node-verified durable dual-signed receipt`
+- [XSP-v2 C2-D2 Expired Recovery E2E #40735842801](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40735842801) — **success**;
+- [XSP-v2 C2-C ACK Authorization #40735843175](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40735843175) — **success**;
+- [XSP-v2 Hybrid TLS Probe #40735843132](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40735843132) — **success**;
+- [Backend CI #40735843093](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40735843093) — **success**.
 
-Exact post-merge evidence on `037290bbb31dc6e5d155a14b8ddf58a31e21066f`:
+The previous D1 implementation checkpoint remains [`037290bbb31dc6e5d155a14b8ddf58a31e21066f`](https://github.com/TriplexCorp/XMesh-Nexus/commit/037290bbb31dc6e5d155a14b8ddf58a31e21066f), merge of PR #73. D1 proved the integrated real-Node chain; PR #77 closes only the expired exact-recovery gap discovered at the D1 boundary.
 
-- [XSP-v2 C2-D1 Integrated Process E2E #40720824028](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40720824028) — **success**;
-- [Backend CI #40720823715](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40720823715) — **success**.
-
-The C2-D1 workflow pins verified XMesh-Node merge [`3c49fd9b81293f53f7bc599a4bfab5a4c2040164`](https://github.com/TriplexCorp/XMesh-Node/commit/3c49fd9b81293f53f7bc599a4bfab5a4c2040164), merge of Node PR #30, so cross-repository evidence is reproducible.
-
-Earlier signer P0, C1 PQ-only ingress, C2-A trusted origin, C2-B narrow ACK gate and C2-C cryptographic ACK/transaction/signer gates remain complete in their stated staging/process scopes.
-
-Production Node still uses the legacy Go 1.23 control path. Go 1.27 XSP-v2 code remains staging/research code. `strict-pq` remains OFF and no production VPS, DNS, firewall, public Nginx, production PostgreSQL or real-key change has been made.
+Production Node still uses the legacy Go 1.23 control path. Go 1.27 XSP-v2 transport/cutover code remains staging/research code. `strict-pq` remains OFF and no production VPS, DNS, firewall, public Nginx, production PostgreSQL or real-key change has been made.
 
 ## Completed XSP-v2 gates
 
@@ -88,26 +84,52 @@ D1 proves:
 - a restarted Node test process can re-authenticate an already-durable local permit/ACK/receipt witness after permit expiry without treating that expired permit as a new command;
 - no host-published port is introduced and the production Agent remains untouched.
 
-D1 intentionally does **not** weaken ACK freshness. Network retransmission of an expired ACK is still rejected and belongs to D2.
+D1 intentionally did not weaken ACK freshness. A second stale network ACK stayed rejected, which exposed the historical-recovery requirement now closed by PR #77.
 
-## CURRENT P0 — P0-C2-D2: failure, retry and recovery matrix
+### First P0-C2-D2 sub-gate — expired exact network recovery — COMPLETE
 
-Overall P0-C2-D remains **CURRENT P0** until D2 passes. D2 must preserve the D1 chain while closing every remaining failure/recovery requirement.
+PR #77 proves a distinct historical-recovery domain without weakening the state-changing ACK route:
 
-The clean starting point for D2 is `main` at `9900f8c99efc59f86699a6c0ab35c3b39b211d37` with post-merge Backend CI green. D2 implementation work must start from a new focused branch and must not reuse D1/docs branches as security evidence.
+`real strict Node → TLS1.3/X25519MLKEM768 + ML-DSA-65 mTLS → exact historical recovery operation → trusted origin → XSP2C2H1 UDS domain → committed ACK + immutable receipt lookup → exact stored receipt → Node verification`
 
-1. exact network retry after the ACK freshness window returns the same durable receipt bytes **only** for an exact already-committed ACK, with no stale new transition, re-signing or second epoch transition;
-2. racing duplicate ACKs, replay and mismatched payloads fail or converge only to the immutable committed record;
-3. lost response before durable ACK commit;
-4. lost response after ACK commit but before durable receipt persistence/reply;
-5. lost response after durable receipt persistence, with exact-byte recovery and no re-signing;
-6. signer, DB, origin and C2-C outage/restart fail closed without legacy fallback;
-7. restarts around security-state transitions preserve durable recovery semantics;
-8. failed PQ handshake, wrong client certificate or downgrade attempt cannot reach the ACK operation through a legacy authenticated session;
-9. no new public port, broad proxy, classical-only internal hop or signer-key exposure appears;
-10. old keys remain retained until a separate retirement workflow;
-11. HTTP status alone is never success; the Node must validate the exact dual-signed receipt;
-12. fixed-head PR CI/review/merge and post-merge exact-SHA CI are mandatory before P0-D.
+It proves:
+
+- the ordinary fresh ACK route still rejects the expired ACK;
+- historical recovery is separately distinguishable and remains behind the same authenticated PQ transport identity;
+- the recovery ACK must match exact already-committed durable evidence;
+- C2-C recovery reads only an already-durable immutable receipt and does not run fresh ACK commit/CAS;
+- the signer can be stopped during recovery; no re-signing is required;
+- the exact stored receipt is returned, epoch does not advance again, and outbox cardinality stays one;
+- a mismatched ACK cannot recover another receipt;
+- an alternate valid ML-DSA client identity cannot recover the pinned Node's receipt;
+- HTTP status alone is still not success: the Node verifies the dual-signed receipt and bindings.
+
+This is a **partial C2-D2 completion only**.
+
+## CURRENT P0 — remaining P0-C2-D2 failure / retry / recovery matrix
+
+Overall P0-C2-D remains **CURRENT P0**. The current verified implementation checkpoint is `5acccfa1877016e464290b20ebba537c0b5bbad3`.
+
+Completed in PR #77:
+
+1. exact network retry after the original ACK freshness window for an exact already-committed ACK;
+2. exact immutable receipt recovery with no stale new transition, no re-signing and no second epoch transition;
+3. targeted mismatched-ACK and alternate-client recovery negatives.
+
+Still required before C2-D2 is complete:
+
+1. complete racing duplicate ACK, replay and mismatched-payload convergence coverage;
+2. lost response before durable ACK commit;
+3. lost response after ACK commit but before durable receipt persistence/reply;
+4. lost response after durable receipt persistence under an injected lost-response condition;
+5. signer, DB, origin and C2-C outage/restart behavior across the integrated Node path;
+6. restart around security-state transitions with durable recovery semantics;
+7. failed PQ handshake, wrong client certificate and downgrade/no-legacy-fallback proof;
+8. integrated topology assertions: no new public port, broad proxy, classical-only internal hop or signer-key exposure;
+9. old-key retention/no automatic retirement across the remaining failure matrix;
+10. final fixed-head PR CI/review/merge and post-merge exact-SHA CI before P0-D.
+
+The next focused sub-gate is the **lost-response and duplicate/race convergence matrix**. It must preserve PR #77's recovery design and fail closed rather than broadening stale authorization.
 
 After all of C2-D, the next major gate is **P0-D**: integrate the proven XSP-v2 transport/state machine into a production-capable Agent workflow so an operator can eventually update an Agent from the Nexus UI and have migration, validation and recovery happen automatically.
 
@@ -116,7 +138,7 @@ After all of C2-D, the next major gate is **P0-D**: integrate the proven XSP-v2 
 - `strict-pq` remains **OFF**.
 - Production control-plane behavior remains legacy `XMESH1` / Ed25519 until separately approved replacement gates are complete.
 - No target-product fallback to XMESH1, Ed25519-only, X25519-only, TLS 1.2 or insecure certificate validation.
-- C2-D1 is staging/process proof, not production activation.
+- D1 and the completed first D2 recovery sub-gate are isolated staging/process proofs, not production activation.
 - A GitHub merge is not a production deployment.
 - Xray continues to carry user VPN traffic.
 
