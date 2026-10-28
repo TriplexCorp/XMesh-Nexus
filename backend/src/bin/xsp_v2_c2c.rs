@@ -42,6 +42,7 @@ use tokio::{
 use xsp_v2_signed_cutover::{Cutover, TrustedPublic};
 
 const REQUEST_MAGIC: &[u8; 8] = b"XSP2C2C1";
+const RECOVERY_REQUEST_MAGIC: &[u8; 8] = b"XSP2C2H1";
 const RESPONSE_MAGIC: &[u8; 8] = b"XSP2C2R1";
 const MAX_ACK_BYTES: usize = 16 * 1024;
 const MAX_REQUEST_BYTES: usize = 8 + 8 + 4 + MAX_ACK_BYTES;
@@ -53,6 +54,12 @@ const SOCKET_GROUP: u32 = 10_003;
 const SOCKET_PATH_DEFAULT: &str = "/run/xmesh-c2c/c2c.sock";
 const SIGNER_SOCKET_DEFAULT: &str = "/run/xmesh-signer/signer.sock";
 const PANEL_PIN_DEFAULT: &str = "/run/xmesh-c2c-public/panel-pin.json";
+
+#[derive(Clone, Copy)]
+enum RequestMode {
+    Authorize,
+    HistoricalRecovery,
+}
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -82,6 +89,7 @@ struct Config {
     pool: PgPool,
     panel_template: TrustedPublic,
     signer_socket: PathBuf,
+    historical_recovery_enabled: bool,
 }
 
 fn decode_canonical_b64(value: &str, exact: usize) -> Result<Vec<u8>> {
@@ -308,12 +316,18 @@ fn bind_socket() -> Result<(PathBuf, UnixListener)> {
     Ok((socket_path, listener))
 }
 
-fn parse_request(raw: &[u8]) -> Result<(i64, Vec<u8>)> {
+fn parse_request(raw: &[u8]) -> Result<(RequestMode, i64, Vec<u8>)> {
     ensure!(
         raw.len() >= 20 && raw.len() <= MAX_REQUEST_BYTES,
         "invalid C2-C request size"
     );
-    ensure!(&raw[..8] == REQUEST_MAGIC, "invalid C2-C request domain");
+    let mode = if &raw[..8] == REQUEST_MAGIC {
+        RequestMode::Authorize
+    } else if &raw[..8] == RECOVERY_REQUEST_MAGIC {
+        RequestMode::HistoricalRecovery
+    } else {
+        anyhow::bail!("invalid C2-C request domain")
+    };
     let node_raw: [u8; 8] = raw[8..16].try_into().context("invalid Node field")?;
     let node_u64 = u64::from_be_bytes(node_raw);
     let node_id = i64::try_from(node_u64).context("trusted Node ID exceeds PostgreSQL range")?;
@@ -328,7 +342,7 @@ fn parse_request(raw: &[u8]) -> Result<(i64, Vec<u8>)> {
         raw.len() == 20 + ack_len,
         "trailing or truncated C2-C request bytes"
     );
-    Ok((node_id, raw[20..].to_vec()))
+    Ok((mode, node_id, raw[20..].to_vec()))
 }
 
 fn ack_context(raw: &[u8], trusted_node_id: i64) -> Result<String> {
@@ -404,6 +418,27 @@ async fn authorize_and_receipt(config: &Config, node_id: i64, ack: &[u8]) -> Res
     .await
 }
 
+async fn recover_historical_receipt(
+    config: &Config,
+    node_id: i64,
+    ack: &[u8],
+) -> Result<Vec<u8>> {
+    ensure!(
+        config.historical_recovery_enabled,
+        "historical receipt recovery is not enabled"
+    );
+    let request_id = ack_context(ack, node_id)?;
+    let pin = panel_pin_for_node(&config.panel_template, node_id)?;
+    xsp_v2_signed_receipt_outbox::load_committed_signed_receipt_staging(
+        &config.pool,
+        node_id,
+        &request_id,
+        ack,
+        &pin,
+    )
+    .await
+}
+
 fn response(ok: bool, payload: &[u8]) -> Result<Vec<u8>> {
     ensure!(
         payload.len() <= MAX_RECEIPT_BYTES,
@@ -433,13 +468,18 @@ async fn serve_connection(mut stream: UnixStream, config: Arc<Config>) -> Result
             .context("C2-C request read timeout")??;
     }
     let outcome = async {
-        let (node_id, ack) = parse_request(&raw)?;
-        timeout(
-            Duration::from_secs(10),
-            authorize_and_receipt(&config, node_id, &ack),
-        )
-        .await
-        .context("C2-C authorization deadline exceeded")?
+        let (mode, node_id, ack) = parse_request(&raw)?;
+        let operation = async {
+            match mode {
+                RequestMode::Authorize => authorize_and_receipt(&config, node_id, &ack).await,
+                RequestMode::HistoricalRecovery => {
+                    recover_historical_receipt(&config, node_id, &ack).await
+                }
+            }
+        };
+        timeout(Duration::from_secs(10), operation)
+            .await
+            .context("C2-C authorization deadline exceeded")?
     }
     .await;
     let bytes = match outcome {
@@ -460,6 +500,11 @@ async fn run() -> Result<()> {
         env::var("XSP_V2_C2C_ACK_AUTH").as_deref() == Ok("staging-only"),
         "C2-C service requires XSP_V2_C2C_ACK_AUTH=staging-only"
     );
+    let recovery_gate = env::var("XSP_V2_C2D_HISTORICAL_RECOVERY").unwrap_or_default();
+    ensure!(
+        recovery_gate.is_empty() || recovery_gate == "staging-only",
+        "XSP_V2_C2D_HISTORICAL_RECOVERY must be unset or staging-only"
+    );
     let panel_template = load_panel_pin()?;
     let pool = connect_pool().await?;
     validate_database_role(&pool).await?;
@@ -474,6 +519,7 @@ async fn run() -> Result<()> {
         pool,
         panel_template,
         signer_socket,
+        historical_recovery_enabled: recovery_gate == "staging-only",
     });
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
