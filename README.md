@@ -8,19 +8,19 @@ XMesh Nexus manages nodes, users, subscriptions, Xray configuration, telemetry a
 
 ## Current XSP-v2 engineering checkpoint — 28 October 2026
 
-**Latest verified Nexus implementation checkpoint:** [`5b8840051ca8562417c6b4f00d65753a165bb598`](https://github.com/TriplexCorp/XMesh-Nexus/commit/5b8840051ca8562417c6b4f00d65753a165bb598), merge of [PR #66](https://github.com/TriplexCorp/XMesh-Nexus/pull/66).
+**Latest verified Nexus implementation checkpoint:** [`a3e18fae4cf9cd0d354e536ede285d952c54d1c8`](https://github.com/TriplexCorp/XMesh-Nexus/commit/a3e18fae4cf9cd0d354e536ede285d952c54d1c8), merge of [PR #69](https://github.com/TriplexCorp/XMesh-Nexus/pull/69).
 
-P0-C2-A — authenticated Node identity plus the protected ingress→origin boundary — is complete in **isolated staging/process scope** on that exact merge SHA:
+P0-C2-B — the narrow staging ACK structural gate behind the proven hybrid-mTLS → protected-UDS identity boundary — is complete in **isolated staging/process scope**:
 
-- pre-merge exact head `fc8317a8849e7dbcd300e82eaf5804f6d4d17876` passed [XSP-v2 Hybrid TLS Probe #40599041487](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40599041487) and [Backend CI #40599041548](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40599041548);
-- post-merge [XSP-v2 Hybrid TLS Probe #40600684179](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40600684179) — **success**, including `PQ client identity and Unix origin boundary E2E`;
-- post-merge [Backend CI #40600684106](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40600684106) — **success**, including strict Clippy, Docker build and disposable API/authentication integration.
+- exact pre-merge head `4e079378f6f43eedced167b5fdde7d1b37568ad4` passed [XSP-v2 Hybrid TLS Probe #40606304019](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40606304019) and [Backend CI #40606304071](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40606304071);
+- post-merge [XSP-v2 Hybrid TLS Probe #40607355530](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40607355530) — **success**, including `tls-hybrid`, `PQ client identity and Unix origin boundary E2E`, and `C2-B narrow staging ACK route E2E`;
+- post-merge [Backend CI #40607355446](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40607355446) — **success**, including strict Clippy, Docker build and disposable API/authentication integration.
 
-The earlier isolated signer P0 from PR #61 and dedicated PQ-only ingress P0-C1 from PR #64 remain completed in their stated staging/process scopes.
+The earlier isolated signer P0 from PR #61, dedicated PQ-only ingress P0-C1 from PR #64 and trusted ingress→origin identity boundary P0-C2-A from PR #66 remain completed in their stated staging/process scopes.
 
 **Current XMesh-Node staging transport checkpoint:** [`79cee45174f7670707d22a269784fe117c44743c`](https://github.com/TriplexCorp/XMesh-Node/commit/79cee45174f7670707d22a269784fe117c44743c), merge of [Node PR #29](https://github.com/TriplexCorp/XMesh-Node/pull/29). On that exact merge SHA, [Node CI #40597143811](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40597143811) and [XSP-v2 Crypto PoC #40597143829](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40597143829) passed.
 
-Production Node still uses the legacy Go 1.23 control path. The Go 1.27 XSP-v2 transport/client-auth code remains isolated staging/research code; C2-A does not activate production XSP-v2.
+Production Node still uses the legacy Go 1.23 control path. The Go 1.27 XSP-v2 transport/client-auth code remains isolated staging/research code; C2-B does not activate production XSP-v2.
 
 ### P0-C1 — completed
 
@@ -41,44 +41,57 @@ PR #66 extended the isolated boundary to:
 
 `Node test client → TLS1.3/X25519MLKEM768 + ML-DSA-65 client identity → dedicated ingress → protected Unix-domain socket → disposable origin verifier`
 
-The process/container E2E proves:
+The process/container E2E proves that trusted Node identity comes from the verified ML-DSA-65 client-certificate SPKI plus the protected Unix peer credential, not from caller headers/body/source IP or legacy `XMESH1` identity. Spoofed headers, anonymous/wrong/classical clients and direct-origin impersonation fail closed.
 
-- the strict Node Go 1.27 staging client presents an **ML-DSA-65** client certificate on the mandatory hybrid TLS hop;
-- the ingress verifies the client certificate and strips caller-controlled request headers/body before the origin transition;
-- the ingress has exactly one reviewed forwarding path and it targets only the protected Unix socket `/run/xmesh-origin/xsp-v2-origin.sock`;
-- the origin has no network listener or published port and checks Linux `SO_PEERCRED` for the expected ingress UID/GID;
-- the origin derives the trusted Node identity from the verified client-certificate SPKI SHA-256 pinned mapping, not from body `nodeId`, arbitrary headers, source IP or legacy `XMESH1` identity;
-- caller attempts to forge trusted identity/verification/certificate headers fail to control the derived identity;
-- anonymous, wrong-client, classical-client and alternate/direct-origin impersonation paths fail closed;
-- TLS downgrade negatives from C1 remain enforced;
-- the existing ACK path, legacy heartbeat and ordinary application paths remain inert in this isolated boundary.
+### P0-C2-B — completed
 
-C2-A deliberately does **not** connect the origin verifier to the Nexus API or database and does **not** authorize an ACK application message.
+PR #69 adds a **separate opt-in staging runtime**; it does not modify the default production API path.
 
-### CURRENT P0 — P0-C2-B: narrow staging ACK route
+The isolated path is:
 
-The next code gate is to mount exactly one experimental operation behind the already-proven C2-A boundary:
+`Node test client → TLS1.3/X25519MLKEM768 + verified ML-DSA-65 client identity → dedicated C2-B ingress → protected UDS → structural ACK gate`
 
-`POST /api/v2/node/keys/rotation/ack`
+C2-B proves:
 
-C2-B must:
+- only exact `POST /api/v2/node/keys/rotation/ack` is mounted as an application operation;
+- there is no broad proxy to the existing Nexus API and no TCP/plaintext backend hop;
+- caller-controlled headers are stripped before the UDS transition;
+- the origin re-checks `SO_PEERCRED`, verified client-certificate evidence and pinned SPKI→Node mapping;
+- the route is runtime-gated by `XSP_V2_C2B_ACK_ROUTE=staging-only`; otherwise it returns 404;
+- method/path/content type/Content-Length/body size/deadline and strict JSON structure are bounded;
+- trusted transport Node ID is bound to the ACK body Node identity and issuer;
+- wrong Node/class/path/epoch/time/nonce/digest/key-role structures, duplicate JSON keys, anonymous/alternate/classical clients, direct UDS forgery and oversized bodies fail closed;
+- unrelated routes remain inert;
+- default `compose.yaml`, `install.sh` and `backend/src/main.rs` do **not** activate or mount this ACK route.
 
-1. expose only that Node-only ACK operation in the experimental staging path — no broad proxy to the legacy/default API;
-2. remain feature-gated and runtime-gated so the default production backend has no active XSP-v2 network route;
-3. consume the trusted Node identity supplied by the C2-A boundary without trusting caller body/header/source-IP identity;
-4. enforce the exact XSP/2 message type, direction, method/path, content type, request-size and timeout bounds;
-5. preserve secret-safe logging and fail closed if the trusted boundary is absent or invalid;
-6. keep `strict-pq` OFF and production deployment unchanged.
+A C2-B `202 Accepted` deliberately returns `authorizationStatus: "not-verified"`. It is **not** proof of an authorized key transition, does not verify ACK signatures, does not mutate PostgreSQL, does not consume replay state, does not advance an epoch, does not call the signer and does not issue a receipt.
 
-After C2-B, C2-C performs the full Ed25519 **AND** ML-DSA-65 ACK authorization/transaction/signing path, and C2-D proves retry/failure/end-to-end behavior before production-capable Agent integration begins.
+### CURRENT P0 — P0-C2-C: cryptographic ACK authorization and transaction
+
+The next gate connects the already-proven transport/identity/route boundary to the existing XSP-v2 cryptographic and durable-state foundations.
+
+C2-C must:
+
+1. verify **Ed25519 AND ML-DSA-65** against the owner-enrolled `node_request` keyset for the required pending/to epoch;
+2. bind the trusted transport Node ID to the exact ACK bytes, request ID, nonce, candidate, permit, epoch and committed ledger state;
+3. consume replay evidence exactly once and reject stale/revoked/wrong-node/wrong-epoch/wrong-path/wrong-request/wrong-candidate evidence;
+4. preserve the already-proven atomic ACK→epoch PostgreSQL transition semantics;
+5. call the isolated signer only after committed ACK evidence exists;
+6. reverify signer output in the API-side trust boundary and persist/recover immutable first durable receipt bytes;
+7. never treat HTTP status alone as policy success — the Node requires a valid signed receipt;
+8. keep production deployment unchanged and `strict-pq` OFF.
+
+C2-C must not create a spoofable trusted-ID header or a new classical/TCP hop between the C2-B boundary and the cryptographic verifier. The exact internal handoff is security-review scope before implementation.
+
+After C2-C, C2-D proves retry/failure/full end-to-end behavior before production-capable Agent integration begins.
 
 ### Security guardrails
 
 - `strict-pq` remains **OFF**.
 - Current production control-plane behavior remains legacy `XMESH1` / Ed25519 until an explicitly approved replacement is ready.
-- No user-selectable fallback to `XMESH1`, Ed25519-only, X25519-only, TLS 1.2 or insecure certificate verification is allowed in the target XSP-v2 product.
-- The dedicated ingress/origin boundary remains experimental and is not activated by the default installer/Compose stack.
-- `POST /api/v2/node/keys/rotation/ack` is still intentionally **unmounted** at this checkpoint; C2-B has not begun.
+- No target-product fallback to `XMESH1`, Ed25519-only, X25519-only, TLS 1.2 or insecure certificate verification is allowed.
+- The dedicated C2-B ACK route exists only in the separate opt-in experimental staging runtime and is not activated by default installer/Compose or the normal Rust API router.
+- C2-B success is structural only; cryptographic authorization, DB transition, signer invocation and signed receipt remain C2-C.
 - A GitHub merge is **not** a VPS deployment. These gates did not change production VPS, DNS, firewall, public Nginx, production PostgreSQL, real Node keys or live user VPN credentials.
 - Xray continues to carry user VPN traffic.
 
@@ -94,11 +107,11 @@ Administrator ─HTTPS─> Nexus public Nginx ─loopback─> XMesh Nexus (Rust/
                                                    Redis
 
 Experimental XSP-v2 staging boundary (not production-activated):
-Node ─TLS1.3/X25519MLKEM768 + ML-DSA-65 client identity─> dedicated Node ingress
+Node ─TLS1.3/X25519MLKEM768 + ML-DSA-65 client identity─> dedicated C2-B ingress
                                                         │
-                                                        └─protected UDS─> origin verifier
+                                                        └─protected UDS─> structural ACK gate
                                                                             │
-                                                              [C2-B ACK route not mounted]
+                                                    [C2-C crypto/DB/signer/receipt not connected yet]
 ```
 
 ## Installation
@@ -129,7 +142,7 @@ The managed installer provisions Docker/Compose, PostgreSQL/TimescaleDB, Redis, 
 
 Security-sensitive changes follow:
 
-`focused branch → PR → required CI → review → merge fixed head SHA → post-merge CI on exact SHA → documentation checkpoint → next gate`.
+`focused branch → PR → required CI → review → merge fixed head SHA → post-merge CI on exact SHA → documentation checkpoint → branch cleanup → next gate`.
 
 The default Nexus backend does **not** compile `xsp-v2-experimental`. Do not weaken strict Clippy/security contracts merely to make CI green. Tests and source review do not replace runtime/VPS verification or an independent security assessment.
 

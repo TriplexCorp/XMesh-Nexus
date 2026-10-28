@@ -4,17 +4,16 @@
 
 This file defines the **current order of work**. Historical roadmaps/checkpoints under [`archive/`](archive/) do **not** override this document.
 
+A green test proves only its stated boundary. Code existence ≠ E2E ≠ security review ≠ production deployment.
+
 ## Verified source checkpoints
 
-- **Nexus C2-A implementation checkpoint:** [`5b8840051ca8562417c6b4f00d65753a165bb598`](https://github.com/TriplexCorp/XMesh-Nexus/commit/5b8840051ca8562417c6b4f00d65753a165bb598), merge of [PR #66](https://github.com/TriplexCorp/XMesh-Nexus/pull/66).
-- PR #66 exact pre-merge head `fc8317a8849e7dbcd300e82eaf5804f6d4d17876` passed [XSP-v2 Hybrid TLS Probe #40599041487](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40599041487) and [Backend CI #40599041548](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40599041548).
-- On the exact C2-A merge SHA, [XSP-v2 Hybrid TLS Probe #40600684179](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40600684179) — **success**, including `PQ client identity and Unix origin boundary E2E`.
-- On the same C2-A merge SHA, [Backend CI #40600684106](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40600684106) — **success**, including strict Clippy, Docker build and disposable API/authentication integration.
-- **XMesh-Node staging transport checkpoint:** [`79cee45174f7670707d22a269784fe117c44743c`](https://github.com/TriplexCorp/XMesh-Node/commit/79cee45174f7670707d22a269784fe117c44743c), merge of [Node PR #29](https://github.com/TriplexCorp/XMesh-Node/pull/29).
-- On the Node merge SHA, [Node CI #40597143811](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40597143811) and [XSP-v2 Crypto PoC #40597143829](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40597143829) — **success**.
-- Earlier signer P0 (PR #61) and dedicated PQ-only ingress P0-C1 (PR #64) remain complete in their stated staging/process scopes.
-
-A green test proves only its stated boundary. Code existence ≠ E2E ≠ security review ≠ production deployment.
+- **Nexus C2-B implementation checkpoint:** [`a3e18fae4cf9cd0d354e536ede285d952c54d1c8`](https://github.com/TriplexCorp/XMesh-Nexus/commit/a3e18fae4cf9cd0d354e536ede285d952c54d1c8), merge of [PR #69](https://github.com/TriplexCorp/XMesh-Nexus/pull/69).
+- PR #69 exact pre-merge head `4e079378f6f43eedced167b5fdde7d1b37568ad4` passed [XSP-v2 Hybrid TLS Probe #40606304019](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40606304019) and [Backend CI #40606304071](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40606304071).
+- On exact C2-B merge SHA, [XSP-v2 Hybrid TLS Probe #40607355530](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40607355530) — **success**, including `tls-hybrid`, `PQ client identity and Unix origin boundary E2E`, and `C2-B narrow staging ACK route E2E`.
+- On the same C2-B merge SHA, [Backend CI #40607355446](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40607355446) — **success**, including strict Clippy, Docker build and disposable PostgreSQL/Redis/API authentication integration.
+- **XMesh-Node staging transport checkpoint:** [`79cee45174f7670707d22a269784fe117c44743c`](https://github.com/TriplexCorp/XMesh-Node/commit/79cee45174f7670707d22a269784fe117c44743c), merge of [Node PR #29](https://github.com/TriplexCorp/XMesh-Node/pull/29); [Node CI #40597143811](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40597143811) and [XSP-v2 Crypto PoC #40597143829](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40597143829) passed.
+- Earlier signer P0 (PR #61), dedicated PQ-only ingress P0-C1 (PR #64) and trusted ingress→origin identity boundary P0-C2-A (PR #66) remain complete in their stated staging/process scopes.
 
 ## Binding XSP-v2 target invariant
 
@@ -23,7 +22,7 @@ The finished XSP-v2 control plane has one policy: **fail closed**.
 All are mandatory:
 
 1. **Transport:** TLS 1.3 with actually negotiated `X25519MLKEM768`, trusted certificate chain, correct hostname/SNI and no unreviewed weaker hop.
-2. **Messages:** Ed25519 **AND** ML-DSA-65 verification for security-critical XSP/2 messages.
+2. **Messages:** Ed25519 **AND** ML-DSA-65 verification for every security-critical XSP/2 message.
 3. **Binding/state:** exact sender/recipient, direction, method/path, payload/revision, request ID, nonce, key epoch and expiry; durable replay protection and monotonic security state.
 4. **Key custody/enrollment:** verified owner authorization, proof of possession, pinned trust roots and protected private-key boundaries.
 5. **Failure:** missing PQ support, invalid signature/certificate/state, stale epoch, replay or unavailable security component means reject — never automatic fallback to `XMESH1`, Ed25519-only, X25519-only, TLS 1.2 or insecure verification.
@@ -35,14 +34,14 @@ All are mandatory:
 | Gate | Status | Evidence / required next |
 | --- | --- | --- |
 | Dual-signed permit / applied ACK primitives | **STAGING PASS** | Ed25519 AND ML-DSA-65; canonical permit/nonce/epoch/candidate bindings |
-| Atomic ACK → epoch commit/readback | **STAGING PASS** | PostgreSQL transaction/CAS and committed evidence; not yet a network route |
+| Atomic ACK → epoch commit/readback | **STAGING PASS** | PostgreSQL transaction/CAS and committed evidence; integration into network path is C2-C |
 | Signed commit receipt + immutable outbox | **STAGING PASS** | Exact durable bytes, dedupe/recovery and mutation guards |
 | Isolated `panel_response` signer | **P0 COMPLETE — staging/process** | PR #61; process/socket/key isolation/DB-role/failure/recovery evidence |
 | P0-C1 dedicated PQ-only Node ingress | **P0 COMPLETE — isolated network/process** | PR #64; actual hybrid negotiation, fail-closed negatives, one-hop topology |
 | Node ML-DSA-65 client identity primitive | **C2-A PREREQUISITE COMPLETE** | Node PR #29; mutual-TLS client identity and negative cases |
-| P0-C2-A ingress→origin trust boundary | **P0 COMPLETE — isolated staging/process** | PR #66; verified client identity → stripped ingress → protected UDS → peer-credential/pinned-SPKI origin identity |
-| **P0-C2-B narrow staging ACK route** | **CURRENT P0** | Mount exactly one gated ACK operation behind C2-A; no broad legacy API proxy |
-| P0-C2-C ACK crypto/transaction/signer | **BLOCKED on C2-B** | Dual signature auth, replay/epoch bindings, atomic commit, immutable signed receipt |
+| P0-C2-A ingress→origin trust boundary | **P0 COMPLETE — isolated staging/process** | PR #66; verified client identity → stripped ingress → protected UDS → peercred/pinned-SPKI Node identity |
+| P0-C2-B narrow staging ACK route | **P0 COMPLETE — isolated staging/process** | PR #69; one exact gated ACK structural operation, no broad proxy, no crypto/DB authorization |
+| **P0-C2-C ACK crypto/transaction/signer** | **CURRENT P0** | Connect trusted boundary to dual-signature auth, replay/epoch/permit binding, atomic commit and immutable signed receipt |
 | P0-C2-D retry/failure/full E2E | **BLOCKED on C2-C** | Node strict TLS → boundary → ACK → DB → signer → receipt → retry/recovery |
 | P0-D production-capable Agent workflow | **BLOCKED on C2** | Integrate real Agent migration/control state and update path |
 | P0-E recovery/security release gates | **BLOCKED** | Crash/snapshot/rollback/backup/rotation/fuzz/KAT/independent review |
@@ -56,114 +55,97 @@ Limits remain: host root/DB admin are trusted; this is not an HSM; whole-machine
 
 ## Completed P0-C1 — dedicated PQ-only Node ingress
 
-Merged in PR #64. Proven:
+PR #64 proved:
 
-- [x] Dedicated experimental runtime; default installer/Compose do not activate it.
-- [x] TLS 1.3 only.
-- [x] Actually negotiated group exactly `X25519MLKEM768`.
+- [x] TLS 1.3 only with actually negotiated `X25519MLKEM768`.
 - [x] Trusted certificate and exact hostname/SNI.
-- [x] Fresh handshake proof; tickets/cache/early data disabled for evidence.
-- [x] TLS 1.2, X25519-only, wrong hostname and untrusted certificate fail closed.
+- [x] Fresh handshakes; tickets/cache/early data disabled for evidence.
+- [x] TLS 1.2, X25519-only, wrong-hostname and untrusted-certificate negatives fail closed.
 - [x] Strict Node Go 1.27 probe and independent OpenSSL observation agree.
-- [x] Non-root/read-only/cap-drop/no-new-privileges disposable runtime.
+- [x] Non-root/read-only/cap-drop/no-new-privileges disposable ingress.
 - [x] No Nexus/API/backend hop at C1.
-- [x] ACK/heartbeat/default application paths remain inert 404.
+- [x] Default installer/Compose do not activate the experimental ingress.
 
-C1 proved **Node → TLS terminator only**. It did not claim end-to-end protection through an application origin.
+## Completed P0-C2-A — trusted Node identity and protected origin boundary
 
-## Completed P0-C2-A prerequisite — Node ML-DSA-65 mutual TLS identity
-
-Merged as Node PR #29. The isolated Go 1.27 staging probe proves:
-
-- [x] TLS 1.3 + actually negotiated `X25519MLKEM768`.
-- [x] Client certificate algorithm exactly ML-DSA-65 on the valid path.
-- [x] Server-side client-certificate acceptance is proven, not inferred only from local client handshake completion.
-- [x] Anonymous/no-cert, ML-DSA-44, classical ECDSA, untrusted ML-DSA-65 and classical X25519-only cases fail closed.
-- [x] Pre/post-merge Node CI and Go 1.27 crypto CI pass.
-
-This is a transport identity primitive only. Production Agent remains on the legacy Go 1.23 control path.
-
-## Completed P0-C2-A — ingress→origin trust boundary
-
-Merged as Nexus PR #66 and re-verified on exact merge SHA `5b8840051ca8562417c6b4f00d65753a165bb598`.
-
-Tested path:
+Node PR #29 plus Nexus PR #66 prove:
 
 `Node test client → TLS1.3/X25519MLKEM768 + ML-DSA-65 client identity → ingress → protected UDS → disposable origin verifier`
 
-### A. Edge identity
+- [x] Ingress verifies the ML-DSA-65 client certificate on the strict hybrid TLS connection.
+- [x] Caller headers/body/source IP/legacy identity are not trusted Node-ID sources.
+- [x] Caller-controlled headers/body are stripped before the identity transition.
+- [x] Origin has no network listener/published port and validates `SO_PEERCRED` UID/GID.
+- [x] Trusted Node ID is derived from a pinned mapping of verified client-certificate SPKI SHA-256.
+- [x] Anonymous/wrong/classical clients, forged headers and direct-origin impersonation fail closed.
+- [x] C1 downgrade requirements remain enforced.
 
-- [x] Ingress verifies the client certificate on the strict hybrid TLS connection.
-- [x] C1 TLS/downgrade requirements remain enforced.
-- [x] Anonymous, wrong/untrusted and classical client identities fail closed.
+C2-A did not authorize an ACK or connect the origin identity proof to Nexus state transitions.
 
-### B. Origin transition
+## Completed P0-C2-B — narrow staging ACK structural gate
 
-- [x] Caller-controlled request headers/body are not forwarded as trusted identity.
-- [x] The ingress has exactly one reviewed forwarding path for the C2-A identity probe.
-- [x] Forwarding targets the Unix socket `/run/xmesh-origin/xsp-v2-origin.sock`, not a TCP/plaintext network backend.
-- [x] The disposable origin has no network listener or published host port.
-- [x] The origin validates Linux `SO_PEERCRED` against the expected ingress UID/GID.
-- [x] The origin derives the trusted Node identity from a pinned mapping of the verified client certificate SPKI SHA-256.
-- [x] Body `nodeId`, arbitrary trusted-node headers, source IP and legacy `XMESH1` identity are not trusted Node-ID sources.
+Merged as Nexus PR #69 and re-verified on exact merge SHA `a3e18fae4cf9cd0d354e536ede285d952c54d1c8`.
 
-### C. Negative/alternate path evidence
+Tested path:
 
-- [x] Forged caller identity/verification/certificate headers cannot select trusted Node identity.
-- [x] Direct/alternate origin impersonation fails without the expected UDS peer credential.
-- [x] Missing/wrong client identity fails before trusted origin identity is produced.
-- [x] Existing ACK, heartbeat and general API routes remain unmounted/inert in this isolated boundary.
+`Node test client → strict hybrid mTLS → dedicated C2-B ingress → protected UDS → staging ACK structural gate`
 
-### D. CI/process evidence
+### Acceptance evidence
 
-- [x] PR #66 exact-head Hybrid/C2-A E2E passed.
-- [x] PR #66 exact-head Backend CI passed.
-- [x] Review surface had no submitted review or unresolved inline review thread at merge time.
-- [x] Merge used fixed head `fc8317a8849e7dbcd300e82eaf5804f6d4d17876`.
-- [x] Post-merge Hybrid/C2-A E2E passed on exact merge SHA `5b8840051ca8562417c6b4f00d65753a165bb598`.
-- [x] Post-merge Backend CI passed on the same exact SHA.
+- [x] Only exact `POST /api/v2/node/keys/rotation/ack` is mounted as an application operation.
+- [x] Separate opt-in `runtime-c2b` and `origin-ack-gate` targets preserve the earlier C2-A runtime.
+- [x] Runtime requires `XSP_V2_C2B_ACK_ROUTE=staging-only`; without it the ACK path is 404.
+- [x] Default `compose.yaml`, `install.sh` and normal `backend/src/main.rs` do not activate or mount this ACK operation.
+- [x] No broad proxy, generic upstream or TCP/plaintext backend hop was introduced.
+- [x] ACK traffic crosses only the protected Unix socket.
+- [x] Caller-controlled headers are stripped; origin re-checks `SO_PEERCRED`, verified client certificate and pinned SPKI→Node identity.
+- [x] Body `nodeId`/issuer must match the trusted transport Node identity.
+- [x] Exact method/path/content type/Content-Length/body-size/time bounds are enforced.
+- [x] Strict envelope/message/signature-object key sets reject duplicate/unknown structures.
+- [x] Epoch increment, issuer/key-role, nonce/digest and signed metadata structural bindings are checked.
+- [x] Anonymous, alternate ML-DSA, classical client, body-identity spoof, wrong class/path, duplicate JSON key, direct UDS forgery and oversized-body cases fail closed.
+- [x] Unrelated routes remain inert.
+- [x] Exact-head pre-merge Hybrid and Backend CI passed.
+- [x] Fixed-head PR #69 merged.
+- [x] Post-merge Hybrid/C2-A/C2-B E2E passed on exact merge SHA.
+- [x] Post-merge Backend CI including disposable DB/API integration passed on the same SHA.
 
-### C2-A limits
+### C2-B limit — binding
 
-C2-A does **not** connect the origin verifier to the Nexus API/database, authorize an ACK message, enable `strict-pq`, update production Agent behavior or change any production VPS/DNS/firewall/public Nginx/live key.
+C2-B `202 Accepted` explicitly returns `authorizationStatus: "not-verified"`.
 
-## CURRENT P0 — P0-C2-B: narrow staging ACK route
+C2-B does **not** verify Ed25519/ML-DSA-65 ACK signatures, consume replay state, mutate PostgreSQL, advance a key epoch, call the signer, persist a receipt or establish policy success. Those are C2-C.
+
+## CURRENT P0 — P0-C2-C: cryptographic ACK authorization and transaction
 
 ### Goal
 
-Expose exactly one experimental Node-only ACK operation behind the proven C2-A boundary:
+Connect the proven C2-B transport/identity/route boundary to the existing dual-signature, durable ACK/epoch, isolated signer and immutable receipt foundations **without introducing a spoofable identity handoff or a weaker backend hop**.
 
-`POST /api/v2/node/keys/rotation/ack`
+### Mandatory architecture review before code
 
-Do **not** expose a broad proxy to the existing API.
+- [ ] Choose one reviewed internal handoff from C2-B trusted origin identity to the Rust cryptographic/DB boundary.
+- [ ] The handoff must not trust an ordinary HTTP header, body field, source IP or legacy `XMESH1` identity as `trusted_transport_node_id`.
+- [ ] Do not add a new TCP/classical-only hop. Prefer a protected local boundary with independently checkable peer identity (for example a dedicated Unix socket/process boundary).
+- [ ] Keep the default production router and installer path unchanged until a later production gate.
+- [ ] Reuse existing XSP-v2 ledger/signer/receipt primitives rather than create a second competing state machine.
 
 ### Required acceptance criteria
 
-- [ ] Mount only the ACK operation in the experimental staging path.
-- [ ] Feature-gate and runtime-gate it; default production backend remains without active XSP-v2 network routes.
-- [ ] The normal public/default API path cannot reach the staging ACK handler.
-- [ ] Consume the trusted Node identity created by C2-A; never authorize from body `nodeId`, arbitrary headers, source IP or legacy `XMESH1` identity.
-- [ ] Require exact XSP/2 message type, sender/recipient direction and `POST /api/v2/node/keys/rotation/ack` method/path binding.
-- [ ] Enforce exact content type, strict request size/deadline bounds and secret-safe/no-body logging.
-- [ ] Missing/invalid C2-A boundary identity fails closed.
-- [ ] Keep unrelated routes inert and default deployment unchanged.
-- [ ] Add process-level positive and alternate/public-path/spoofing negative tests.
-- [ ] PR CI, review, fixed-head merge and post-merge exact-SHA CI required before C2-C begins.
-
-C2-B does **not** by itself declare the ACK cryptographically authorized; that is C2-C.
-
-## P0-C2-C — cryptographic ACK authorization and transaction
-
-Only after C2-B:
-
-- [ ] Verify **Ed25519 AND ML-DSA-65** against the owner-enrolled Node request keyset for the required epoch.
-- [ ] Bind trusted Node identity to exact ACK bytes, request ID, nonce, candidate, permit, epoch and committed ledger state.
-- [ ] Require recovery/authority assertion where the staged recovery flow requires it, bound to exact saved ACK bytes.
-- [ ] Consume replay nonce exactly once; reject stale/revoked/wrong-epoch/wrong-node/wrong-path/wrong-request/wrong-candidate evidence.
-- [ ] Preserve already-proven atomic ACK→epoch semantics.
+- [ ] Verify **Ed25519 AND ML-DSA-65** against the owner-enrolled `node_request` pending/to-epoch keyset.
+- [ ] Bind trusted transport Node ID to exact ACK bytes, request ID, permit, candidate, from/to epoch, key IDs, nonce and expiry.
+- [ ] Match ACK against the exact persisted permit/owner-approved proposal, not caller-supplied permit state.
+- [ ] Consume durable replay evidence exactly once; reject stale/revoked/wrong-node/wrong-epoch/wrong-path/wrong-request/wrong-candidate evidence.
+- [ ] Preserve the already-proven atomic ACK→epoch PostgreSQL CAS/commit semantics.
+- [ ] Keep old public keys unretired; retirement remains a separate authorized workflow.
 - [ ] Call the isolated signer only after committed ACK evidence exists.
-- [ ] Reverify signer output in the API and persist/recover immutable first durable receipt bytes.
-- [ ] HTTP status alone never means policy success; Node requires a valid signed receipt.
+- [ ] Signer independently re-reads committed evidence through its least-privilege DB role.
+- [ ] Reverify signer result in the API-side trust boundary and persist/recover immutable first durable receipt bytes.
+- [ ] Existing durable receipt returns exact stored bytes; ordinary retry must not request a new signature.
+- [ ] Do not overclaim exactly-once signing before first durable outbox INSERT; test the known sign→insert concurrency/loss boundary explicitly.
+- [ ] HTTP success alone never means policy success; Node requires a valid dual-signed commit receipt.
+- [ ] Positive, tamper, replay, wrong-key/epoch/Node/path/request/candidate, concurrent duplicate, signer-down, DB-stall and rollback/failure tests appropriate to C2-C are required.
+- [ ] PR CI, review, fixed-head merge and post-merge exact-SHA CI are required before C2-D.
 
 ## P0-C2-D — failure / retry / full E2E
 
@@ -217,7 +199,7 @@ For each security-sensitive gate:
 7. merge only a fixed reviewed head SHA;
 8. re-check post-merge `main` and CI on the exact SHA;
 9. update this Roadmap/README with claims no stronger than the evidence;
-10. clean up merged/superseded working branches after verifying their unique changes are in `main`;
+10. verify all current changes are in `main` and clean up merged/superseded working branches;
 11. only then start the next gate.
 
 Never rewrite already-applied SQL migrations for cleanup; use additive migrations. Never weaken strict Clippy/security checks merely for green CI. Never treat a GitHub merge as production deployment.
