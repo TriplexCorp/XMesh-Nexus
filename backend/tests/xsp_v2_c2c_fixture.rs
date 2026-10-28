@@ -39,7 +39,12 @@ fn key_id(prefix: &str, raw: &[u8]) -> String {
     format!("{prefix}{}", hex::encode(&Sha256::digest(raw)[..12]))
 }
 
-fn key_pair(seed: u8, purpose: &str, issuer: &str, node: u64) -> (SigningKey, PKey<Private>, TrustedPublic) {
+fn key_pair(
+    seed: u8,
+    purpose: &str,
+    issuer: &str,
+    node: u64,
+) -> (SigningKey, PKey<Private>, TrustedPublic) {
     let ed = SigningKey::from_bytes(&[seed; 32]);
     let generated = Command::new("openssl")
         .args(["genpkey", "-algorithm", "ML-DSA-65"])
@@ -173,7 +178,8 @@ async fn prepare_uncommitted_c2c_fixture() {
         pending_ed_public: next_pin.ed_public.clone(),
         pending_pq_public: next_pin.pq_public.clone(),
     };
-    let candidate_hash = hex::encode(xsp_v2_candidate_binding::candidate_sha256(&material).unwrap());
+    let candidate_hash =
+        hex::encode(xsp_v2_candidate_binding::candidate_sha256(&material).unwrap());
 
     let mut tx = pool.begin().await.unwrap();
     sqlx::query("INSERT INTO node_metric_keys(node_id,public_key) VALUES($1,$2)")
@@ -221,7 +227,13 @@ async fn prepare_uncommitted_c2c_fixture() {
     .unwrap();
     tx.commit().await.unwrap();
 
-    let now = i64::try_from(SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis()).unwrap();
+    let now = i64::try_from(
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis(),
+    )
+    .unwrap();
     let permit = Cutover {
         kind: "permit".into(),
         issuer_id: panel_pin.issuer_id.clone(),
@@ -314,16 +326,33 @@ async fn prepare_uncommitted_c2c_fixture() {
         "pqId": pin_json["mldsa65KeyId"],
         "issuer": pin_json["issuerId"],
     });
-    fs::write(public.join("panel-pin.json"), serde_json::to_vec(&pin_json).unwrap()).unwrap();
-    fs::write(public.join("fixture.json"), serde_json::to_vec(&fixture_json).unwrap()).unwrap();
-    fs::set_permissions(public.join("panel-pin.json"), fs::Permissions::from_mode(0o444)).unwrap();
-    fs::set_permissions(public.join("fixture.json"), fs::Permissions::from_mode(0o444)).unwrap();
+    fs::write(
+        public.join("panel-pin.json"),
+        serde_json::to_vec(&pin_json).unwrap(),
+    )
+    .unwrap();
+    fs::write(
+        public.join("fixture.json"),
+        serde_json::to_vec(&fixture_json).unwrap(),
+    )
+    .unwrap();
+    fs::set_permissions(
+        public.join("panel-pin.json"),
+        fs::Permissions::from_mode(0o444),
+    )
+    .unwrap();
+    fs::set_permissions(
+        public.join("fixture.json"),
+        fs::Permissions::from_mode(0o444),
+    )
+    .unwrap();
 
-    let epoch: i64 = sqlx::query_scalar("SELECT key_epoch FROM node_xsp_suite_state WHERE node_id=$1")
-        .bind(node_id)
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+    let epoch: i64 =
+        sqlx::query_scalar("SELECT key_epoch FROM node_xsp_suite_state WHERE node_id=$1")
+            .bind(node_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
     assert_eq!(epoch, 1, "fixture must leave ACK uncommitted");
     let state: String = sqlx::query_scalar(
         "SELECT state FROM node_xsp_cutover_permit_ledger WHERE node_id=$1 AND request_id=$2",
