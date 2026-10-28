@@ -8,22 +8,22 @@ XMesh Nexus manages nodes, users, subscriptions, Xray configuration, telemetry a
 
 ## Current XSP-v2 engineering checkpoint — 28 October 2026
 
-**Latest verified Nexus implementation checkpoint:** [`37b9e49da1a9fd43657dd167ebb9d5e9a4580091`](https://github.com/TriplexCorp/XMesh-Nexus/commit/37b9e49da1a9fd43657dd167ebb9d5e9a4580091), merge of [PR #71](https://github.com/TriplexCorp/XMesh-Nexus/pull/71).
+**Latest verified Nexus implementation checkpoint:** [`037290bbb31dc6e5d155a14b8ddf58a31e21066f`](https://github.com/TriplexCorp/XMesh-Nexus/commit/037290bbb31dc6e5d155a14b8ddf58a31e21066f), merge of [PR #73](https://github.com/TriplexCorp/XMesh-Nexus/pull/73).
 
-P0-C2-C — cryptographic ACK authorization, atomic PostgreSQL state transition, protected signer invocation and immutable signed receipt recovery — is complete in **isolated staging/process scope**.
+P0-C2-D1 — integrated real-Node staging E2E — is complete in **isolated staging/process scope**. It connects the real Go 1.27 Node staging cutover client to the already-proven C2-A/B/C path:
 
-Exact post-merge evidence on `37b9e49da1a9fd43657dd167ebb9d5e9a4580091`:
+`Node strict client → TLS1.3/X25519MLKEM768 + ML-DSA-65 mTLS → trusted ingress/origin → dual-signed ACK auth/DB commit → isolated signer → Node-verified durable dual-signed receipt`
 
-- [XSP-v2 C2-C ACK Authorization #40700626539](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40700626539) — **success**;
-- [Backend CI #40700626558](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40700626558) — **success**;
-- [XSP-v2 Crypto PoC #40700626631](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40700626631) — **success**;
-- [XSP-v2 Hybrid TLS Probe #40700626545](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40700626545) — **success**.
+Exact post-merge evidence on `037290bbb31dc6e5d155a14b8ddf58a31e21066f`:
 
-The earlier isolated signer P0 from PR #61, dedicated PQ-only ingress P0-C1 from PR #64, trusted ingress→origin identity boundary P0-C2-A from PR #66 and narrow staging ACK gate P0-C2-B from PR #69 remain complete in their stated staging/process scopes.
+- [XSP-v2 C2-D1 Integrated Process E2E #40720824028](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40720824028) — **success**;
+- [Backend CI #40720823715](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40720823715) — **success**.
 
-**Current XMesh-Node staging transport checkpoint:** [`79cee45174f7670707d22a269784fe117c44743c`](https://github.com/TriplexCorp/XMesh-Node/commit/79cee45174f7670707d22a269784fe117c44743c), merge of [Node PR #29](https://github.com/TriplexCorp/XMesh-Node/pull/29). [Node CI #40597143811](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40597143811) and [XSP-v2 Crypto PoC #40597143829](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40597143829) passed on that merge SHA.
+The C2-D1 workflow pins the verified XMesh-Node prerequisite merge [`3c49fd9b81293f53f7bc599a4bfab5a4c2040164`](https://github.com/TriplexCorp/XMesh-Node/commit/3c49fd9b81293f53f7bc599a4bfab5a4c2040164), merge of Node PR #30, so the cross-repository evidence is reproducible.
 
-Production Node still uses the legacy Go 1.23 control path. The Go 1.27 XSP-v2 transport/client-auth code remains staging/research code. `strict-pq` remains OFF and no production VPS, DNS, firewall, public Nginx, production PostgreSQL or real-key change has been made.
+The earlier isolated signer P0 from PR #61, dedicated PQ-only ingress P0-C1 from PR #64, trusted ingress→origin identity boundary P0-C2-A from PR #66, narrow staging ACK gate P0-C2-B from PR #69 and cryptographic ACK/transaction/signer gate P0-C2-C from PR #71 remain complete in their stated staging/process scopes.
+
+Production Node still uses the legacy Go 1.23 control path. The Go 1.27 XSP-v2 transport/cutover code remains staging/research code. `strict-pq` remains OFF and no production VPS, DNS, firewall, public Nginx, production PostgreSQL or real-key change has been made.
 
 ## Completed XSP-v2 gates
 
@@ -77,32 +77,51 @@ C2-C proves:
 - C2-C does not mount signer private keys and the C2-C process itself has no TCP listener;
 - default production router/Compose/installer remain unchanged.
 
-Known limit: C2-C does **not** claim exactly-once signing before the first durable outbox INSERT. The first durable receipt remains authoritative. Full Node→TLS→ACK→receipt retry/restart behavior is the next gate.
+Known limit: C2-C does **not** claim exactly-once signing before the first durable outbox INSERT. The first durable receipt remains authoritative.
 
-## CURRENT P0 — P0-C2-D: failure, retry and full end-to-end proof
+### P0-C2-D1 — real Node integrated E2E — COMPLETE
 
-C2-D must prove the entire staging chain as one system:
+PR #73 proves the first integrated half of C2-D using the real staging Node cutover code rather than injecting only at the trusted origin boundary.
 
-`Node strict PQ/hybrid TLS → trusted ingress/origin identity → ACK auth/commit → isolated signer → signed receipt → retry/recovery`
+D1 proves:
 
-Required acceptance work:
+- the Node validates and journals the exact signed permit and ACK;
+- the ACK exchange uses strict TLS 1.3 + actually negotiated `X25519MLKEM768` + ML-DSA-65 mutual TLS;
+- another otherwise-valid ML-DSA client identity cannot impersonate the pinned Node;
+- the same request crosses ingress → protected UDS origin → C2-C → PostgreSQL → isolated signer;
+- the Node accepts success only after verifying the **Ed25519 AND ML-DSA-65** commit receipt and durably journaling it;
+- a restarted Node test process can re-authenticate the already-durable local permit/ACK/receipt witness after permit expiry without treating that expired permit as a new command;
+- no host-published port is introduced and the production Agent remains untouched.
 
-1. exact retry returns the same durable receipt bytes and performs no second epoch transition;
+D1 deliberately does **not** weaken ACK freshness. Network retransmission of an expired ACK is still rejected by the origin freshness gate and belongs to C2-D2.
+
+## CURRENT P0 — P0-C2-D2: failure, retry and recovery matrix
+
+Overall P0-C2-D remains **CURRENT P0** until D2 passes. D2 must preserve the already-proven D1 chain while closing every remaining failure/recovery requirement.
+
+Required acceptance work remains:
+
+1. define and prove exact network retry after the original ACK freshness window, returning the same durable receipt bytes **only** for an exact already-committed ACK; it must never authorize a new stale state transition, re-sign, or perform a second epoch transition;
 2. racing duplicate ACKs, replay and mismatched payloads fail or converge only to the immutable committed record;
-3. lost responses before and after durable commit are exercised explicitly;
-4. signer unavailable, DB stall, boundary unavailable and process restart fail closed without fallback;
-5. failed PQ handshake cannot reach an authenticated legacy session for the same XSP-v2 operation;
-6. process/container E2E must include the real strict Node TLS client rather than starting only at the already-trusted origin boundary;
-7. PR CI/review/fixed-head merge/post-merge exact-SHA CI must pass before production-capable Agent integration begins.
+3. exercise lost response before durable ACK commit;
+4. exercise lost response after ACK commit but before durable receipt persistence/reply;
+5. exercise lost response after durable receipt persistence; retry must recover exact bytes without re-signing;
+6. signer unavailable, DB stall, origin unavailable, C2-C unavailable and their process restarts fail closed without legacy fallback;
+7. restart C2-C/origin/signer around security-state transitions and prove durable recovery semantics;
+8. failed PQ handshake, wrong client certificate or downgrade attempt cannot reach the ACK operation through an authenticated legacy session;
+9. verify no new public port, broad proxy, classical-only internal hop or signer-key exposure appears in the integrated topology;
+10. preserve old-key retention and no automatic retirement;
+11. no success is inferred from HTTP status alone; the Node must validate the exact dual-signed receipt;
+12. PR CI/review/fixed-head merge/post-merge exact-SHA CI must pass before production-capable Agent integration begins.
 
-After C2-D, the next major gate is **P0-D**: integrate the proven XSP-v2 transport/state machine into a production-capable Agent workflow so the operator can eventually update an Agent from the Nexus UI and have migration, validation and recovery happen automatically.
+After all of C2-D, the next major gate is **P0-D**: integrate the proven XSP-v2 transport/state machine into a production-capable Agent workflow so the operator can eventually update an Agent from the Nexus UI and have migration, validation and recovery happen automatically.
 
 ## Security guardrails
 
 - `strict-pq` remains **OFF**.
 - Production control-plane behavior remains legacy `XMESH1` / Ed25519 until separately approved replacement gates are complete.
 - No target-product fallback to XMESH1, Ed25519-only, X25519-only, TLS 1.2 or insecure certificate verification is allowed.
-- C2-C is staging/process proof, not production activation.
+- C2-D1 is staging/process proof, not production activation.
 - A GitHub merge is **not** a VPS deployment.
 - Xray continues to carry user VPN traffic.
 
@@ -124,6 +143,7 @@ Node strict client
                   ├─ PostgreSQL ACK/epoch state
                   └─ protected UDS isolated signer
                       └─ immutable dual-signed receipt
+                          └─ Node verifies + durable local journal
 ```
 
 ## Installation
