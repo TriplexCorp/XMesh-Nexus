@@ -212,6 +212,9 @@ def main() -> None:
             command("docker", "network", "create", "--internal", network)
             for volume in volumes.values():
                 command("docker", "volume", "create", volume)
+            # Pull the Node test image before issuing the short-lived fixture permit;
+            # registry latency must never consume the authenticated permit window.
+            command("docker", "pull", "golang:1.27.3-trixie", timeout=600)
 
             command(
                 "docker", "build", "-f", str(ROOT / "backend/Dockerfile.xsp-signer"),
@@ -250,19 +253,20 @@ def main() -> None:
             else:
                 raise RuntimeError("disposable PostgreSQL did not become ready")
 
-            launch(
-                helper,
-                tests_image,
-                [
-                    "--network", network,
-                    "--mount", f"type=volume,src={volumes['keys']},dst=/keys",
-                    "--mount", f"type=volume,src={volumes['public']},dst=/public",
-                    "--mount", f"type=volume,src={volumes['signer']},dst=/run/xmesh-signer",
-                    "--mount", f"type=volume,src={volumes['c2c']},dst=/run/xmesh-c2c",
-                    "--mount", f"type=volume,src={volumes['origin']},dst=/run/xmesh-origin",
-                ],
-                ["sleep", "infinity"],
-            )
+            # c2c-tests has the fixture binary as its default entrypoint. Override it
+            # so this helper stays alive while we use docker exec for fixture setup.
+            helper_cmd = [
+                "docker", "run", "-d", "--name", helper, "--entrypoint", "sleep",
+                "--network", network,
+                "--mount", f"type=volume,src={volumes['keys']},dst=/keys",
+                "--mount", f"type=volume,src={volumes['public']},dst=/public",
+                "--mount", f"type=volume,src={volumes['signer']},dst=/run/xmesh-signer",
+                "--mount", f"type=volume,src={volumes['c2c']},dst=/run/xmesh-c2c",
+                "--mount", f"type=volume,src={volumes['origin']},dst=/run/xmesh-origin",
+                tests_image, "infinity",
+            ]
+            command(*helper_cmd)
+            containers.append(helper)
             command(
                 "docker", "exec", "-i", helper, "python3", "-c",
                 "import os;"
@@ -346,8 +350,10 @@ openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
 for name in client-ca.pem client.pem client-key.pem other-client.pem other-client-key.pem classical-client.pem classical-client-key.pem client-spki.sha256; do
   cp "/client-material/$name" "/certs/$name"
 done
-chmod 0400 /certs/privkey.pem /certs/client-key.pem /certs/other-client-key.pem /certs/classical-client-key.pem
-chmod 0444 /certs/fullchain.pem /certs/client-ca.pem /certs/client.pem /certs/other-client.pem /certs/classical-client.pem /certs/client-spki.sha256
+chown 0:10003 /certs/privkey.pem /certs/fullchain.pem /certs/client-ca.pem
+chmod 0440 /certs/privkey.pem /certs/fullchain.pem /certs/client-ca.pem
+chmod 0400 /certs/client-key.pem /certs/other-client-key.pem /certs/classical-client-key.pem
+chmod 0444 /certs/client.pem /certs/other-client.pem /certs/classical-client.pem /certs/client-spki.sha256
 '''
             command(
                 "docker", "run", "--rm", "--user", "0:0",
@@ -400,6 +406,13 @@ chmod 0444 /certs/fullchain.pem /certs/client-ca.pem /certs/client.pem /certs/ot
             )
             time.sleep(1)
 
+            # Prove the pinned transport identity rejects another otherwise-valid
+            # ML-DSA client before any successful ACK commit or durable receipt exists.
+            run_node("different ML-DSA client identity", "other-client.pem", "other-client-key.pem", expect_success=False)
+            if sql(f"SELECT key_epoch FROM node_xsp_suite_state WHERE node_id={node_id};").stdout.strip() != from_epoch:
+                raise RuntimeError("alternate client identity changed the key epoch")
+            print("PASS: alternate ML-DSA client cannot impersonate the pinned Node across the full route")
+
             run_node("full C2-D first exchange")
             epoch = sql(f"SELECT key_epoch FROM node_xsp_suite_state WHERE node_id={node_id};").stdout.strip()
             state = sql(
@@ -421,9 +434,6 @@ chmod 0444 /certs/fullchain.pem /certs/client-ca.pem /certs/client.pem /certs/ot
             ).stdout.strip() != "1":
                 raise RuntimeError("Node retry produced a second receipt")
             print("PASS: Node restart/retry verifies the same durable receipt with signer offline")
-
-            run_node("different ML-DSA client identity", "other-client.pem", "other-client-key.pem", expect_success=False)
-            print("PASS: alternate ML-DSA client cannot impersonate the pinned Node across the full route")
 
             inspect = json.loads(command("docker", "inspect", ingress).stdout)[0]
             if inspect["HostConfig"].get("PortBindings"):
