@@ -53,6 +53,11 @@ jobs:
           grep -Fq 'XSP2C2H1' deploy/xsp-v2-ingress/origin_ack_gate.py backend/src/bin/xsp_v2_c2c.rs
           grep -Fq 'load_committed_signed_receipt_staging' backend/src/bin/xsp_v2_c2c.rs
           grep -Fq 'expired ACK was incorrectly accepted as a fresh state-changing command' scripts/xsp-v2-c2d-node-client_test.go
+          grep -Fq 'XSP_V2_C2D_HISTORICAL_RECOVERY' deploy/xsp-v2-ingress/origin_ack_gate.py backend/src/bin/xsp_v2_c2c.rs
+          grep -Fq 'RECOVERY_GATE != "staging-only"' deploy/xsp-v2-ingress/origin_ack_gate.py
+          grep -Fq 'historical_recovery_enabled' backend/src/bin/xsp_v2_c2c.rs
+          test "$(grep -Fc 'XSP_V2_C2D_HISTORICAL_RECOVERY' scripts/test-xsp-v2-c2d-full-e2e.py)" -eq 2
+          ! grep -R --line-number --fixed-strings 'XSP_V2_C2D_HISTORICAL_RECOVERY' compose.yaml install.sh backend/src/main.rs
 
   full-process-e2e:
     name: Node strict PQ mTLS -> expired ACK -> exact immutable receipt recovery
