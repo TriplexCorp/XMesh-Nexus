@@ -147,8 +147,10 @@ def authorize_c2c(node_id: int, raw_ack: bytes, *, recovery: bool = False) -> by
         client.close()
 
 
-class UnixHTTPServer(socketserver.UnixStreamServer):
+class UnixHTTPServer(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
     allow_reuse_address = False
+    daemon_threads = True
+    request_queue_size = 32
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
