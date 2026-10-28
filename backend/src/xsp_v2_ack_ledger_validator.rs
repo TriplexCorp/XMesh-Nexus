@@ -3,7 +3,7 @@
 //! There is no trust epoch advancement, receipt signer or key retirement.
 #![allow(dead_code)]
 use crate::{
-    xsp_v2_db_candidate_snapshot::{LockedCandidate, load_locked_candidate},
+    xsp_v2_db_candidate_snapshot::{LockedCandidate, load_candidate_under_suite_lock},
     xsp_v2_permit_ledger_writer::from_trusted_snapshot,
     xsp_v2_signed_cutover::{
         Cutover, TrustedPublic, verify_signed_applied_ack, verify_signed_permit,
@@ -54,14 +54,19 @@ fn check_issued_record(
     Ok(())
 }
 
-/// Authenticates the ACK under **new prepared public keys read from locked DB**
-/// and matches it to the EXACT signed permit persisted by Nexus.
+/// Authenticates the ACK under **new prepared public keys read under the suite
+/// serialization lock** and matches it to the EXACT signed permit persisted by
+/// Nexus. The staging-only C2-C database role deliberately has no UPDATE
+/// privilege on key material, so ACK adjudication does not request row locks on
+/// key tables; every staged mutation of those rows must acquire the suite row
+/// first, and this transaction keeps that suite row locked through commit.
 ///
 /// The caller must obtain `node_id` from authenticated node context
 /// and the pinned panel-response keypair from independently trusted config.
-/// Owner approval is established by the locked database row, NOT the ACK.
-/// All locks remain held by `tx` on return and must be kept through any
-/// subsequent application transaction. This function makes **no DB writes**.
+/// Owner approval is established by the serialized database snapshot, NOT the
+/// ACK. The suite and ledger locks remain held by `tx` on return and must be
+/// kept through any subsequent application transaction. This function makes
+/// **no DB writes**.
 ///
 /// # Errors
 /// Refuses unknown/expired permissions, missing owner approval or dual `PoP`,
@@ -86,9 +91,10 @@ pub async fn adjudicate_new_applied_ack(
         bail!("invalid ACK request context or envelope length");
     }
 
-    // Lock ordering is exactly the same as permit issuance: suite row,
-    // old keyset, pending keyset, then cutover ledger row. Do not invert it.
-    let snapshot = load_locked_candidate(tx, node_id).await?;
+    // Canonical order remains suite row first, then the permit ledger row.
+    // Active/pending key rows are read while the suite row is exclusively
+    // locked; staged key mutation paths acquire that same suite lock first.
+    let snapshot = load_candidate_under_suite_lock(tx, node_id).await?;
     let row = sqlx::query(
         "SELECT state,issued_by,from_epoch,to_epoch,signed_permit,
                 candidate_sha256,permit_input_sha256,permit_nonce
@@ -113,7 +119,7 @@ pub async fn adjudicate_new_applied_ack(
 
     // The permit is loaded from DB, NEVER supplied by an ACK claimant.
     // The expected digest and both complete keysets come from independently
-    // locked, already owner-approved and dual-PoP-proved DB rows.
+    // owner-approved and dual-PoP-proved rows serialized by the suite lock.
     let expected = from_trusted_snapshot(&snapshot, request_id);
     let verified = verify_signed_permit(&stored.signed_permit, pinned_panel, &expected, now_ms)
         .map_err(anyhow::Error::msg)?;
