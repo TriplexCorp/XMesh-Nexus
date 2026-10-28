@@ -76,12 +76,12 @@ func c2dPinValue(t *testing.T, raw c2dPin) PinnedPublic {
 	}
 }
 
-// c2dRecoverHistoricalPermitForReceiptRetry is deliberately narrower than a
+// c2dRecoverHistoricalPermitForDurableReceipt is deliberately narrower than a
 // normal permit reload. It is available only to this injected C2-D test file
 // and reconstructs a VerifiedPermit marker only after durable permit, ACK and
 // receipt journals already exist and their exact bindings/signatures verify.
 // It cannot authorize a new cutover from an expired permit.
-func c2dRecoverHistoricalPermitForReceiptRetry(
+func c2dRecoverHistoricalPermitForDurableReceipt(
 	journal string,
 	signedPermit []byte,
 	panel PinnedPublic,
@@ -173,7 +173,7 @@ func TestC2DFullExchange(t *testing.T) {
 	now := time.Now().UnixMilli()
 	permit, err := PersistVerifiedPermit(journal, signedPermit, panel, want, now)
 	if err != nil {
-		_, recovered, recoverErr := c2dRecoverHistoricalPermitForReceiptRetry(
+		_, recovered, recoverErr := c2dRecoverHistoricalPermitForDurableReceipt(
 			journal, signedPermit, panel, next, want, bundle.Expected.ToEpoch, now,
 		)
 		if recoverErr != nil {
