@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
-"""Disposable P0-C2-B/C staging ACK origin gate.
+"""Disposable P0-C2-B/C/D2 staging ACK and receipt-recovery origin gate.
 
-C2-B performs only structural validation behind the proven C2-A Unix peer/client
+C2-B performs structural validation behind the proven C2-A Unix peer/client
 certificate boundary. When the explicit C2-C staging gate is enabled, the same
 trusted Node identity and exact ACK bytes are handed to the Rust cryptographic
-service over a second peer-credential-protected Unix socket. No caller header,
-body field, source IP, or legacy identity becomes trusted transport identity.
+service over a second peer-credential-protected Unix socket. D2 historical
+recovery uses a distinct HTTP path and a distinct C2-C request domain so an
+expired ACK can only request immutable durable receipt readback; it can never
+be reinterpreted as a fresh state-changing ACK. No caller header, body field,
+source IP, or legacy identity becomes trusted transport identity.
 """
 from __future__ import annotations
 
@@ -28,14 +31,17 @@ EXPECTED_SPKI = os.environ.get("XSP_EXPECTED_CLIENT_SPKI_SHA256", "").strip().lo
 EXPECTED_NODE_ID = os.environ.get("XSP_EXPECTED_NODE_ID", "").strip()
 ACK_GATE = os.environ.get("XSP_V2_C2B_ACK_ROUTE", "")
 C2C_GATE = os.environ.get("XSP_V2_C2C_ACK_AUTH", "")
+RECOVERY_GATE = os.environ.get("XSP_V2_C2D_HISTORICAL_RECOVERY", "")
 C2C_SOCKET_PATH = Path(os.environ.get("XSP_V2_C2C_SOCKET_PATH", "/run/xmesh-c2c/c2c.sock"))
 ACK_PATH = "/api/v2/node/keys/rotation/ack"
+RECOVERY_PATH = "/api/v2/node/keys/rotation/ack/recover"
 MAX_CERT_HEADER = 24 * 1024
 MAX_ACK_BODY = 16 * 1024
 MAX_SIGNATURE_TEXT = 8 * 1024
 MAX_U64 = (1 << 64) - 1
 MAX_I64 = (1 << 63) - 1
 C2C_REQUEST_MAGIC = b"XSP2C2C1"
+C2C_RECOVERY_REQUEST_MAGIC = b"XSP2C2H1"
 C2C_RESPONSE_MAGIC = b"XSP2C2R1"
 C2C_UID = 10001
 C2C_GID = 10001
@@ -103,10 +109,11 @@ def read_exact(stream: socket.socket, size: int) -> bytes:
     return bytes(out)
 
 
-def authorize_c2c(node_id: int, raw_ack: bytes) -> bytes:
+def authorize_c2c(node_id: int, raw_ack: bytes, *, historical_recovery: bool = False) -> bytes:
     if node_id <= 0 or len(raw_ack) <= 0 or len(raw_ack) > MAX_ACK_BODY:
         raise ValueError("invalid C2-C local request")
-    frame = C2C_REQUEST_MAGIC + struct.pack(">Q", node_id) + struct.pack(">I", len(raw_ack)) + raw_ack
+    magic = C2C_RECOVERY_REQUEST_MAGIC if historical_recovery else C2C_REQUEST_MAGIC
+    frame = magic + struct.pack(">Q", node_id) + struct.pack(">I", len(raw_ack)) + raw_ack
     client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     client.settimeout(12)
     try:
@@ -187,7 +194,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_json(200, {"originTransport": "unix-peercred", "trustedNodeId": node_id})
 
     def do_POST(self) -> None:
-        if self.path != ACK_PATH or ACK_GATE != "staging-only":
+        is_ack = self.path == ACK_PATH and ACK_GATE == "staging-only"
+        is_recovery = (
+            self.path == RECOVERY_PATH
+            and ACK_GATE == "staging-only"
+            and RECOVERY_GATE == "staging-only"
+        )
+        if not (is_ack or is_recovery):
             self.send_json(404, {"error": "not found"})
             return
         node_id = self.trusted_node_id()
@@ -256,8 +269,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
             or message["expiresAtMs"] > MAX_I64
             or message["expiresAtMs"] <= message["issuedAtMs"]
             or message["expiresAtMs"] - message["issuedAtMs"] > 60_000
-            or abs(now_ms - message["issuedAtMs"]) > 120_000
-            or now_ms > message["expiresAtMs"]
+            or message["issuedAtMs"] > now_ms + 120_000
+            or (
+                not is_recovery
+                and (
+                    now_ms - message["issuedAtMs"] > 120_000
+                    or now_ms > message["expiresAtMs"]
+                )
+            )
         ):
             self.send_json(400, {"error": "invalid staging ACK"})
             return
@@ -283,7 +302,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return
         if C2C_GATE == "staging-only":
             try:
-                receipt = authorize_c2c(node_id, raw)
+                receipt = authorize_c2c(node_id, raw, historical_recovery=is_recovery)
             except (OSError, ValueError, struct.error):
                 self.send_json(503, {"error": "C2-C authorization unavailable or rejected"})
                 return
@@ -293,6 +312,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
             self.wfile.write(receipt)
+            return
+        if is_recovery:
+            self.send_json(503, {"error": "historical recovery requires C2-C authorization"})
             return
         self.send_json(
             202,
@@ -311,6 +333,8 @@ def main() -> None:
         raise SystemExit("XSP_EXPECTED_NODE_ID must be a positive integer")
     if C2C_GATE not in ("", "staging-only"):
         raise SystemExit("XSP_V2_C2C_ACK_AUTH must be unset or staging-only")
+    if RECOVERY_GATE not in ("", "staging-only"):
+        raise SystemExit("XSP_V2_C2D_HISTORICAL_RECOVERY must be unset or staging-only")
     SOCKET_PATH.parent.mkdir(parents=True, exist_ok=True)
     try:
         SOCKET_PATH.unlink()
