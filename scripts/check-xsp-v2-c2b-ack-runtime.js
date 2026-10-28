@@ -45,6 +45,8 @@ must(/client_body_timeout\s+5s\s*;/.test(active), 'ACK ingress body timeout miss
 
 must(/location\s+=\s+\/api\/v2\/node\/keys\/rotation\/ack\s*\{/.test(active),
   'exact C2-B ACK location missing');
+must(/location\s+=\s+\/api\/v2\/node\/keys\/rotation\/ack\/recover\s*\{/.test(active),
+  'exact D2 historical recovery location missing');
 must(/if\s*\(\$request_method\s*!=\s*POST\)\s*\{\s*return\s+405\s*;/s.test(active),
   'ACK location must reject every non-POST method');
 must(/if\s*\(\$ssl_client_verify\s*!=\s*SUCCESS\)\s*\{\s*return\s+403\s*;/s.test(active),
@@ -55,8 +57,8 @@ must(/if\s*\(\$http_transfer_encoding\s*!=\s*""\)\s*\{\s*return\s+400\s*;/s.test
   'ACK location must reject transfer-encoding ambiguity');
 must(/if\s*\(\$http_content_length\s*=\s*""\)\s*\{\s*return\s+411\s*;/s.test(active),
   'ACK location must require an explicit bounded Content-Length');
-must((active.match(/proxy_pass_request_headers\s+off\s*;/g) || []).length === 2,
-  'both C2-A probe and C2-B ACK path must strip caller-controlled headers');
+must((active.match(/proxy_pass_request_headers\s+off\s*;/g) || []).length === 3,
+  'C2-A probe, C2-B ACK and D2 recovery paths must strip caller-controlled headers');
 must(/proxy_request_buffering\s+on\s*;/.test(active),
   'C2-B ACK body must be fully buffered before the UDS origin transition');
 must(/X-XSP-V2-Client-Verify\s+\$ssl_client_verify\s*;/.test(active),
@@ -67,8 +69,10 @@ must(/Content-Type\s+application\/json\s*;/.test(active),
   'origin content type must be generated after ingress validation');
 must(/proxy_pass\s+http:\/\/unix:\/run\/xmesh-origin\/xsp-v2-origin\.sock:\/api\/v2\/node\/keys\/rotation\/ack\s*;/.test(active),
   'C2-B ACK must cross only the protected Unix socket');
-must((active.match(/\bproxy_pass\b/g) || []).length === 2,
-  'C2-B config may proxy only identity probe plus exact ACK');
+must(/proxy_pass\s+http:\/\/unix:\/run\/xmesh-origin\/xsp-v2-origin\.sock:\/api\/v2\/node\/keys\/rotation\/ack\/recover\s*;/.test(active),
+  'D2 historical recovery must cross only the protected Unix socket');
+must((active.match(/\bproxy_pass\b/g) || []).length === 3,
+  'staging ingress may proxy only identity probe, exact ACK and exact historical recovery');
 must(!/\bupstream\b/.test(active), 'C2-B must not introduce a generic upstream block');
 must(!/proxy_pass\s+https?:\/\/(?!unix:)/.test(active), 'C2-B must not proxy over TCP/IP');
 must(/location\s+\/\s*\{\s*return\s+404\s*;/s.test(active),
@@ -102,4 +106,4 @@ for (const source of [compose, installer]) {
 must(!main.includes('"/api/v2/node/keys/rotation/ack"'),
   'default/experimental Rust API must not mount the ACK route during C2-B');
 
-console.log('XSP-v2 C2-B contract: OK (exact gated ACK over proven mTLS -> UDS boundary; no crypto/DB authorization yet)');
+console.log('XSP-v2 C2-B contract: OK (exact gated ACK plus exact D2 recovery over proven mTLS -> UDS boundary; no broad proxy)');
