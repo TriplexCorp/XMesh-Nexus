@@ -52,6 +52,7 @@ jobs:
           test -z "$(gofmt -d scripts/xsp-v2-c2d-race_test.go)"
           ! grep -R --line-number --fixed-strings 'strict-pq=on' scripts/test-xsp-v2-c2d2-lost-response-races.py scripts/xsp-v2-c2d-race_test.go
           ! grep -R --line-number -E '(-p|--publish)[ =]' scripts/test-xsp-v2-c2d2-lost-response-races.py
+          grep -Fq 'request.Host = serverName' scripts/xsp-v2-c2d-node-client_test.go
           grep -Fq 'XSP_V2_C2D_TEST_FAULT' deploy/xsp-v2-ingress/origin_ack_gate.py
           grep -Fq 'drop-before-c2c' deploy/xsp-v2-ingress/origin_ack_gate.py scripts/test-xsp-v2-c2d2-lost-response-races.py
           grep -Fq 'drop-on-c2c-failure' deploy/xsp-v2-ingress/origin_ack_gate.py scripts/test-xsp-v2-c2d2-lost-response-races.py
@@ -89,7 +90,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: TriplexCorp/XMesh-Node
-          ref: 2cbe3a82473fc199c2354497eaf009707603f3f2
+          ref: 0ae78244ef0ef763bea6ce198dde6e83eb11ff1f
           path: xmesh-node
       - uses: actions/setup-go@v5
         with:
