@@ -78,6 +78,14 @@ def main() -> None:
         cert_material = temp / "client-material"
         cert_material.mkdir()
         bundle_path = temp / "node-bundle.json"
+        # A disposable source copy keeps the checked-out Node tree immutable while
+        # making the C2-D package-local test a real member of the cutover package.
+        node_runtime = temp / "node-poc"
+        shutil.copytree(node_module, node_runtime)
+        shutil.copy2(
+            ROOT / "scripts/xsp-v2-c2d-node-client_test.go",
+            node_runtime / "cutover/c2d_e2e_test.go",
+        )
 
         def envfile(name: str, values: dict[str, str]) -> str:
             path = temp / name
@@ -190,8 +198,7 @@ def main() -> None:
                 "-e", "XSP_C2D_CA_FILE=/certs/fullchain.pem",
                 "-e", f"XSP_C2D_CLIENT_CERT=/certs/{cert}",
                 "-e", f"XSP_C2D_CLIENT_KEY=/certs/{key}",
-                "--mount", f"type=bind,src={node_module},dst=/src,readonly",
-                "--mount", f"type=bind,src={ROOT / 'scripts/xsp-v2-c2d-node-client_test.go'},dst=/src/cutover/c2d_e2e_test.go,readonly",
+                "--mount", f"type=bind,src={node_runtime},dst=/src,readonly",
                 "--mount", f"type=bind,src={bundle_path},dst=/fixture/node-bundle.json,readonly",
                 "--mount", f"type=volume,src={volumes['certs']},dst=/certs,readonly",
                 "--mount", f"type=volume,src={volumes['journal']},dst=/journal",
@@ -204,8 +211,11 @@ def main() -> None:
             combined = (result.stdout or "") + (result.stderr or "")
             if expect_success and (result.returncode != 0 or "--- PASS: TestC2DFullExchange" not in combined):
                 raise RuntimeError(f"{label} Node exchange failed: {combined[-2400:]}")
-            if not expect_success and result.returncode == 0:
-                raise RuntimeError(f"{label} unexpectedly succeeded")
+            if not expect_success:
+                if result.returncode == 0:
+                    raise RuntimeError(f"{label} unexpectedly succeeded")
+                if "strict mutual-PQ ACK/receipt exchange failed" not in combined:
+                    raise RuntimeError(f"{label} failed before authenticated transport check: {combined[-1800:]}")
             return combined
 
         try:
