@@ -112,6 +112,24 @@ func TestC2DFullExchange(t *testing.T) {
 	if err := os.Chmod(journal, 0o700); err != nil {
 		t.Fatal(err)
 	}
+	receiptPath := filepath.Join(journal, commitReceiptJournalName)
+	if _, statErr := os.Stat(receiptPath); statErr == nil {
+		signed, decodeErr := Decode(signedPermit)
+		if decodeErr != nil {
+			t.Fatalf("cannot inspect historical permit expiry: %v", decodeErr)
+		}
+		waitMS := signed.Message.ExpiresAtMS - time.Now().UnixMilli() + 25
+		if waitMS > 65_000 {
+			t.Fatalf("historical retry fixture expiry is unexpectedly distant: %dms", waitMS)
+		}
+		if waitMS > 0 {
+			t.Logf("waiting %dms to cross the original permit freshness window", waitMS)
+			time.Sleep(time.Duration(waitMS) * time.Millisecond)
+		}
+	} else if !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("receipt journal state unavailable before permit reload: %v", statErr)
+	}
+
 	now := time.Now().UnixMilli()
 	permit, err := PersistVerifiedPermit(journal, signedPermit, panel, want, now)
 	historicalRecovery := false
@@ -124,7 +142,7 @@ func TestC2DFullExchange(t *testing.T) {
 	}
 
 	if !historicalRecovery {
-		if _, statErr := os.Stat(filepath.Join(journal, commitReceiptJournalName)); errors.Is(statErr, os.ErrNotExist) {
+		if _, statErr := os.Stat(receiptPath); errors.Is(statErr, os.ErrNotExist) {
 			if _, err := persistVerifiedAppliedACK(journal, signedACK, permit, next, now); err != nil {
 				t.Fatalf("ACK verification/journal failed: %v", err)
 			}
