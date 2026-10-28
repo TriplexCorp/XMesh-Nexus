@@ -51,4 +51,10 @@ assert_rejected "rotation raw challenge size" "UPDATE node_xsp_rotation_preparat
 assert_rejected "invalid public key size" "INSERT INTO node_xsp_public_keysets(node_id,purpose,key_epoch,ed25519_key_id,mldsa65_key_id,ed25519_public,mldsa65_public) VALUES($node_id,'panel_response',1,'bad-ed','bad-pq',decode('ab','hex'),decode(repeat('bb',1952),'hex'));"
 state="$("${psql_cmd[@]}" -Atq -c "SELECT minimum_suite || ':' || activation_phase || ':' || key_epoch FROM node_xsp_suite_state WHERE node_id=$node_id;")"
 if [[ "$state" != "2:strict:1" ]]; then echo "FAILED unexpected floor: $state" >&2; exit 1; fi
+
 echo 'XSP-v2 schema: downgrade, replay, public key length constraints passed.'
+
+# P0-D release identity is a separate inert append-only foundation, but run it
+# in this same disposable PostgreSQL checkpoint so migration invariants are real.
+bash -n scripts/test-xsp-agent-release-manifest-integration.sh
+bash scripts/test-xsp-agent-release-manifest-integration.sh
