@@ -8,18 +8,16 @@ XMesh Nexus manages nodes, users, subscriptions, Xray configuration, telemetry a
 
 ## Current XSP-v2 engineering checkpoint — 28 October 2026
 
-**Latest verified Nexus implementation checkpoint:** [`86e01727443389c89b1b3d633206d3f4bc274838`](https://github.com/TriplexCorp/XMesh-Nexus/commit/86e01727443389c89b1b3d633206d3f4bc274838), merge of [PR #84](https://github.com/TriplexCorp/XMesh-Nexus/pull/84).
+**Latest verified Nexus implementation checkpoint:** [`a756f1ac705c5f2c013cee8f706ee8714f720d98`](https://github.com/TriplexCorp/XMesh-Nexus/commit/a756f1ac705c5f2c013cee8f706ee8714f720d98), merge of [PR #86](https://github.com/TriplexCorp/XMesh-Nexus/pull/86).
 
-PR #84 is a focused **P0-C2-D2 transport-alignment prerequisite** on top of the two already-complete D2 sub-gates. It aligns Nexus historical recovery with the current XMesh-Node native recovery contract before the remaining outage/restart matrix; it does **not** complete C2-D2 as a whole.
+PR #86 closes the focused **P0-C2-D2 integrated outage/restart sub-gate** on top of the already-complete expired-recovery, lost-response/race and transport-alignment work. It does **not** yet complete C2-D2 as a whole: the final integrated failed-PQ / wrong-client / downgrade / no-legacy-fallback proof at the ACK-operation boundary remains open.
 
-Exact post-merge evidence on `86e01727443389c89b1b3d633206d3f4bc274838`:
+Exact post-merge evidence on `a756f1ac705c5f2c013cee8f706ee8714f720d98`:
 
-- [XSP-v2 C2-D2 Lost Response and Race E2E #40764476292](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40764476292) — **success**;
-- [XSP-v2 C2-D2 Expired Recovery E2E #40764476261](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40764476261) — **success**;
-- [XSP-v2 Hybrid TLS Probe #40764476202](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40764476202) — **success**;
-- [Backend CI #40764476247](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40764476247) — **success**.
+- [XSP-v2 C2-D2 Lost Response and Race E2E #40771123783](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40771123783) — **success**, including the integrated outage/restart matrix;
+- [Backend CI #40771123762](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40771123762) — **success**.
 
-The current D2 workflows pin XMesh-Node [`2cbe3a82473fc199c2354497eaf009707603f3f2`](https://github.com/TriplexCorp/XMesh-Node/commit/2cbe3a82473fc199c2354497eaf009707603f3f2), which provides the native `RecoverSignedACKReceipt` transport and package-private historical permit/ACK verifier. The prior lost-response/race implementation checkpoint remains [`39e1589c82c52fe0c4af6fd5fc4d64aa782a465e`](https://github.com/TriplexCorp/XMesh-Nexus/commit/39e1589c82c52fe0c4af6fd5fc4d64aa782a465e), merge of PR #82; the prior expired-recovery checkpoint remains [`5acccfa1877016e464290b20ebba537c0b5bbad3`](https://github.com/TriplexCorp/XMesh-Nexus/commit/5acccfa1877016e464290b20ebba537c0b5bbad3), merge of PR #77. The D1 implementation checkpoint remains [`037290bbb31dc6e5d155a14b8ddf58a31e21066f`](https://github.com/TriplexCorp/XMesh-Nexus/commit/037290bbb31dc6e5d155a14b8ddf58a31e21066f), merge of PR #73.
+The current D2 workflows pin XMesh-Node [`2cbe3a82473fc199c2354497eaf009707603f3f2`](https://github.com/TriplexCorp/XMesh-Node/commit/2cbe3a82473fc199c2354497eaf009707603f3f2), which provides the native `RecoverSignedACKReceipt` transport and package-private historical permit/ACK verifier. The prior transport-alignment checkpoint is [`86e01727443389c89b1b3d633206d3f4bc274838`](https://github.com/TriplexCorp/XMesh-Nexus/commit/86e01727443389c89b1b3d633206d3f4bc274838), merge of PR #84; the prior lost-response/race checkpoint is [`39e1589c82c52fe0c4af6fd5fc4d64aa782a465e`](https://github.com/TriplexCorp/XMesh-Nexus/commit/39e1589c82c52fe0c4af6fd5fc4d64aa782a465e), merge of PR #82; and the expired-recovery checkpoint is [`5acccfa1877016e464290b20ebba537c0b5bbad3`](https://github.com/TriplexCorp/XMesh-Nexus/commit/5acccfa1877016e464290b20ebba537c0b5bbad3), merge of PR #77. The D1 implementation checkpoint remains [`037290bbb31dc6e5d155a14b8ddf58a31e21066f`](https://github.com/TriplexCorp/XMesh-Nexus/commit/037290bbb31dc6e5d155a14b8ddf58a31e21066f), merge of PR #73.
 
 Production Node still uses the legacy Go 1.23 control path. Go 1.27 XSP-v2 transport/cutover code remains staging/research code. `strict-pq` remains OFF and no production VPS, DNS, firewall, public Nginx, production PostgreSQL or real-key change has been made.
 
@@ -130,13 +128,31 @@ PR #84 aligns the already-proven D2 recovery behavior with the current XMesh-Nod
 - D2 workflows pin Node `2cbe3a82473fc199c2354497eaf009707603f3f2`;
 - the ordinary stale ACK route, mismatched recovery negatives, explicit staging-only historical-recovery gate and no-production-activation constraints remain unchanged.
 
-The two D2 sub-gates plus this transport alignment are still a **partial C2-D2 completion only**.
+### Third P0-C2-D2 sub-gate — integrated outage/restart convergence — COMPLETE
 
-## CURRENT P0 — remaining P0-C2-D2 failure / retry / recovery matrix
+PR #86 extends the real-Node failure matrix with actual disposable process outages and restarts rather than introducing another state machine or a caller-controlled bypass.
 
-Overall P0-C2-D remains **CURRENT P0**. The current verified implementation checkpoint is `86e01727443389c89b1b3d633206d3f4bc274838`.
+It proves:
 
-Completed in PR #77, PR #82 and aligned to the current Node transport in PR #84:
+- origin outage before commit fails closed and leaves the permit `issued`;
+- C2-C outage before commit fails closed and leaves the permit `issued`;
+- PostgreSQL outage before commit fails closed; DB restart plus C2-C reconnect preserve the uncommitted state;
+- signer outage after durable ACK/epoch commit leaves `ack_verified` state but no receipt and no false Node success;
+- C2-C restart while signer is unavailable, followed by signer restart, converges the already-committed ACK to one durable receipt;
+- origin + C2-C restart after durable receipt preserves exact ordinary fresh retry/recovery with the signer offline;
+- PostgreSQL outage after durable receipt fails closed, then DB/C2-C/origin restart returns the same authoritative receipt/state;
+- after the original ACK expires, native `/ack/recover` historical recovery still returns only the same immutable receipt after the complete restart history;
+- replay nonce cardinality remains exactly one;
+- both old and new public-key epochs remain present and unrevoked, with no automatic retirement;
+- ingress/C2-C/origin expose no host-published ports, origin remains `network=none`, C2-C/origin do not mount signer private keys, C2-C PID 1 has no TCP listener, and the process network remains internal/no-egress.
+
+The three D2 behavior sub-gates plus transport alignment are still a **partial C2-D2 completion only** until the final integrated transport-negative/no-legacy proof passes.
+
+## CURRENT P0 — final P0-C2-D2 transport-negative / no-legacy gate
+
+Overall P0-C2-D remains **CURRENT P0**. The current verified implementation checkpoint is `a756f1ac705c5f2c013cee8f706ee8714f720d98`.
+
+Completed in PR #77, PR #82, PR #84 and PR #86:
 
 1. exact historical network recovery after the original ACK freshness window, with no stale new transition, re-signing or second epoch transition;
 2. lost response before durable ACK commit;
@@ -144,20 +160,18 @@ Completed in PR #77, PR #82 and aligned to the current Node transport in PR #84:
 4. lost response after durable receipt persistence plus exact signer-off retry/recovery;
 5. eight-way exact fresh duplicate race convergence to one authoritative receipt/epoch;
 6. fresh mismatched/tampered retry rejection without durable-state mutation;
-7. targeted alternate-client and historical mismatched-ACK recovery negatives;
-8. native current-Node `/ack/recover` transport alignment without weakening freshness or recovery gating.
+7. native current-Node `/ack/recover` transport alignment without weakening freshness or recovery gating;
+8. real origin/C2-C/PostgreSQL/signer outages and restarts around uncommitted, committed-without-receipt and durable-receipt states;
+9. replay nonce cardinality, old-key retention and complete topology invariants across those outage/restart transitions.
 
 Still required before C2-D2 is complete:
 
-1. remaining replay coverage outside the exact-fresh duplicate race, especially across outage/restart boundaries;
-2. signer, DB, origin and C2-C outage/restart behavior across the integrated Node path;
-3. restart around security-state transitions with durable recovery semantics;
-4. failed PQ handshake, wrong client certificate and downgrade/no-legacy-fallback proof at the integrated ACK-operation boundary;
-5. integrated topology assertions across the complete remaining matrix: no new public port, broad proxy, classical-only internal hop or signer-key exposure;
-6. old-key retention/no automatic retirement across the remaining failure/retry matrix;
-7. full C2-D2 fixed-head PR CI/review/merge and post-merge exact-SHA lifecycle before P0-D.
+1. integrated failed-PQ / wrong-client / downgrade negatives at the real ACK-operation boundary: TLS 1.2, X25519-only/classical-only negotiation, wrong client certificate, wrong hostname/SNI or trust root must fail before policy success and leave durable ACK/epoch/receipt state unchanged;
+2. prove those transport failures do not trigger or reach an authenticated legacy/XMESH1 fallback path; unrelated/legacy paths on the dedicated XSP-v2 ingress must remain inert;
+3. full final C2-D2 fixed-head PR CI/review/merge and post-merge exact-SHA lifecycle;
+4. only after that final proof may documentation mark C2-D complete and open P0-D.
 
-The next focused sub-gate is the **integrated outage/restart matrix** for signer, DB, origin and C2-C boundaries. It must preserve the exact-recovery design, fail closed without legacy fallback, and carry the remaining replay/old-key assertions needed for those transitions.
+The next focused sub-gate is therefore the **integrated transport-negative/no-legacy matrix**. It must reuse the proven real Node/PQ ingress/ACK topology, assert no durable-state mutation for every failed transport/identity attempt, and must not add a fallback route or a weaker authenticated session.
 
 After all of C2-D, the next major gate is **P0-D**: integrate the proven XSP-v2 transport/state machine into a production-capable Agent workflow so an operator can eventually update an Agent from the Nexus UI and have migration, validation and recovery happen automatically.
 
