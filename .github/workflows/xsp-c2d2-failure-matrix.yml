@@ -45,10 +45,11 @@ jobs:
         with:
           go-version: '1.27.3'
           cache: false
-      - name: Check D2 failure injection and race contracts
+      - name: Check D2 failure, outage/restart and race contracts
         run: |
           python3 -m py_compile scripts/test-xsp-v2-c2d2-lost-response-races.py deploy/xsp-v2-ingress/origin_ack_gate.py
           test -f scripts/xsp-v2-c2d-race_test.go
+          test -z "$(gofmt -d scripts/xsp-v2-c2d-race_test.go)"
           ! grep -R --line-number --fixed-strings 'strict-pq=on' scripts/test-xsp-v2-c2d2-lost-response-races.py scripts/xsp-v2-c2d-race_test.go
           ! grep -R --line-number -E '(-p|--publish)[ =]' scripts/test-xsp-v2-c2d2-lost-response-races.py
           grep -Fq 'XSP_V2_C2D_TEST_FAULT' deploy/xsp-v2-ingress/origin_ack_gate.py
@@ -60,11 +61,25 @@ jobs:
           grep -Fq 'request_queue_size = 32' deploy/xsp-v2-ingress/origin_ack_gate.py
           grep -Fq 'reloadVerifiedPermitForReceiptRetry' scripts/xsp-v2-c2d-race_test.go
           ! grep -Fq 'c2dRecoverHistoricalPermitForDurableReceipt' scripts/xsp-v2-c2d-race_test.go scripts/xsp-v2-c2d-node-client_test.go
+          grep -Fq 'TestC2DExactFreshOutageFailsClosed' scripts/xsp-v2-c2d-race_test.go scripts/test-xsp-v2-c2d2-lost-response-races.py
+          grep -Fq 'TestC2DExactFreshNetworkRetry' scripts/xsp-v2-c2d-race_test.go scripts/test-xsp-v2-c2d2-lost-response-races.py
           grep -Fq 'TestC2DExactDuplicateNetworkRace' scripts/xsp-v2-c2d-race_test.go scripts/test-xsp-v2-c2d2-lost-response-races.py
           grep -Fq 'TestC2DFreshMismatchedRetryRejected' scripts/xsp-v2-c2d-race_test.go scripts/test-xsp-v2-c2d2-lost-response-races.py
+          grep -Fq 'TestC2DExpiredNetworkRecovery' scripts/test-xsp-v2-c2d2-lost-response-races.py
+          test "$(grep -Fc 'XSP_V2_C2D_HISTORICAL_RECOVERY' scripts/test-xsp-v2-c2d2-lost-response-races.py)" -eq 2
+          grep -Fq 'stop_now(origin)' scripts/test-xsp-v2-c2d2-lost-response-races.py
+          grep -Fq 'stop_now(c2c)' scripts/test-xsp-v2-c2d2-lost-response-races.py
+          grep -Fq 'stop_now(db)' scripts/test-xsp-v2-c2d2-lost-response-races.py
+          grep -Fq 'stop_now(signer)' scripts/test-xsp-v2-c2d2-lost-response-races.py
+          grep -Fq 'docker", "start", db' scripts/test-xsp-v2-c2d2-lost-response-races.py
+          grep -Fq 'node_xsp_replay_nonces' scripts/test-xsp-v2-c2d2-lost-response-races.py
+          grep -Fq 'revoked_at IS NULL' scripts/test-xsp-v2-c2d2-lost-response-races.py
+          grep -Fq 'C2-C process must not listen on TCP' scripts/test-xsp-v2-c2d2-lost-response-races.py
+          grep -Fq 'NetworkMode") != "none"' scripts/test-xsp-v2-c2d2-lost-response-races.py
+          grep -Fq '/run/xmesh-signer-keys' scripts/test-xsp-v2-c2d2-lost-response-races.py
 
   full-process-e2e:
-    name: Real Node lost-response windows and exact duplicate race convergence
+    name: Real Node lost-response, outage/restart and duplicate-race convergence
     needs: source-contract
     runs-on: ubuntu-latest
     timeout-minutes: 55
@@ -83,5 +98,5 @@ jobs:
       - name: Verify Node staging module before cross-repo E2E
         working-directory: xmesh-node/security/xspv2/poc-go
         run: go test ./...
-      - name: Exercise integrated lost-response and duplicate/race convergence matrix
+      - name: Exercise integrated lost-response, outage/restart and duplicate/race matrix
         run: python3 scripts/test-xsp-v2-c2d2-lost-response-races.py --node-repo xmesh-node

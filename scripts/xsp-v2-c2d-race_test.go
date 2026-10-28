@@ -42,6 +42,96 @@ func c2dStrictClientMaterial(t *testing.T) (*x509.CertPool, tls.Certificate) {
 	return roots, clientCertificate
 }
 
+func c2dRequireExactFreshJournaledACK(t *testing.T) ([]byte, VerifiedPermit, c2dBundle, PinnedPublic, PinnedPublic) {
+	t.Helper()
+	bundle, _, signedACK, panel, next, want := c2dLoadBundle(t)
+	journal := c2dRequired(t, "XSP_C2D_JOURNAL_DIR")
+	permit, err := reloadVerifiedPermitForReceiptRetry(journal, panel, want, next)
+	if err != nil {
+		t.Fatalf("durable permit/ACK chain unavailable: %v", err)
+	}
+	savedACK, err := ReadJournaledSignedACK(journal)
+	if err != nil {
+		t.Fatalf("durable signed ACK unavailable: %v", err)
+	}
+	if !bytes.Equal(savedACK, signedACK) {
+		t.Fatal("fixture ACK differs from the exact durable Node ACK")
+	}
+	parsedACK, err := Decode(signedACK)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UnixMilli()
+	if now > parsedACK.Message.ExpiresAtMS {
+		t.Fatalf("fresh retry probe requires unexpired ACK: now=%d expires=%d", now, parsedACK.Message.ExpiresAtMS)
+	}
+	return signedACK, permit, bundle, panel, next
+}
+
+// TestC2DExactFreshOutageFailsClosed sends the exact already-journaled fresh
+// ACK over the real strict mutual-PQ transport with a deliberately short
+// context. It succeeds as a test only when the unavailable downstream boundary
+// does NOT produce policy success. Transport failure and non-200 are both
+// fail-closed outcomes; HTTP 200 is forbidden for this negative probe.
+func TestC2DExactFreshOutageFailsClosed(t *testing.T) {
+	signedACK, _, _, _, _ := c2dRequireExactFreshJournaledACK(t)
+	roots, clientCertificate := c2dStrictClientMaterial(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
+	defer cancel()
+	status, _, requestErr := c2dStrictPost(
+		ctx,
+		c2dRequired(t, "XSP_C2D_ADDRESS"),
+		c2dRequired(t, "XSP_C2D_SERVER_NAME"),
+		roots,
+		clientCertificate,
+		signedACKEndpoint,
+		signedACK,
+	)
+	if requestErr == nil && status == http.StatusOK {
+		t.Fatal("unavailable security boundary returned policy success")
+	}
+}
+
+// TestC2DExactFreshNetworkRetry proves a single fresh retry after process
+// restart still traverses the ordinary ACK route, receives the authoritative
+// durable receipt and re-verifies/persists it using the native Node code. It
+// does not create a new ACK, widen freshness or use historical recovery.
+func TestC2DExactFreshNetworkRetry(t *testing.T) {
+	_, permit, bundle, panel, next := c2dRequireExactFreshJournaledACK(t)
+	journal := c2dRequired(t, "XSP_C2D_JOURNAL_DIR")
+	roots, clientCertificate := c2dStrictClientMaterial(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	result, err := ExchangeSignedACKForReceipt(
+		ctx,
+		c2dRequired(t, "XSP_C2D_ADDRESS"),
+		c2dRequired(t, "XSP_C2D_SERVER_NAME"),
+		roots,
+		clientCertificate,
+		journal,
+		panel,
+		permit,
+		next,
+		bundle.Expected.ToEpoch,
+		time.Now().UnixMilli(),
+	)
+	if err != nil {
+		t.Fatalf("exact fresh restart retry failed: %v", err)
+	}
+	if result.NodeID != bundle.Expected.NodeID || result.ToEpoch != bundle.Expected.ToEpoch || result.RequestID != bundle.Expected.RequestID {
+		t.Fatalf("restart retry receipt correlation mismatch: %+v", result)
+	}
+	reloaded, err := ReloadVerifiedCommitReceiptForJournal(
+		journal, panel, permit, next, bundle.Expected.ToEpoch, time.Now().UnixMilli(),
+	)
+	if err != nil {
+		t.Fatalf("restart retry durable receipt reload failed: %v", err)
+	}
+	if reloaded.NodeID != result.NodeID || reloaded.ToEpoch != result.ToEpoch || reloaded.RequestID != result.RequestID {
+		t.Fatal("restart retry durable receipt differs from verified network receipt")
+	}
+}
+
 func TestC2DExactDuplicateNetworkRace(t *testing.T) {
 	bundle, _, signedACK, panel, next, want := c2dLoadBundle(t)
 	journal := c2dRequired(t, "XSP_C2D_JOURNAL_DIR")
