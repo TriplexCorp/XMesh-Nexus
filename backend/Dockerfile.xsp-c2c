@@ -4,7 +4,7 @@
 ARG C2C_BUILDER_IMAGE=rust:1.99-trixie
 FROM ${C2C_BUILDER_IMAGE} AS builder
 WORKDIR /build/backend
-ENV CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=4 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0
+ENV CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=4 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_TARGET_DIR=/build/backend/target
 RUN apt-get update \
     && apt-get install -y --no-install-recommends pkg-config libssl-dev openssl \
     && rm -rf /var/lib/apt/lists/*
@@ -16,14 +16,15 @@ RUN --mount=type=secret,id=proxy_ca \
     --mount=type=cache,id=xmesh-c2c-target,target=/build/backend/target \
     set -eu; \
     if [ -f /run/secrets/proxy_ca ]; then export CARGO_HTTP_CAINFO=/run/secrets/proxy_ca CARGO_HTTP_PROXY_CAINFO=/run/secrets/proxy_ca; fi; \
-    cp /source/backend/Cargo.toml .; \
+    mkdir -p c2c; \
+    cp /source/backend/c2c/Cargo.toml c2c/Cargo.toml; \
     cp -a /source/backend/src /source/backend/migrations .; \
     cp -a /source/docs /build/docs; \
-    cargo build --release --features xsp-v2-experimental --bin xsp-v2-c2c; \
+    cargo build --manifest-path c2c/Cargo.toml --release --features xsp-v2-experimental --bin xsp-v2-c2c; \
     mkdir -p /build/output; \
     cp target/release/xsp-v2-c2c /build/output/xsp-v2-c2c; \
     if [ "$C2C_BUILD_TESTS" = 1 ]; then \
-      cargo build --release --features xsp-v2-experimental --bin xsp-v2-c2c-fixture; \
+      cargo build --manifest-path c2c/Cargo.toml --release --features xsp-v2-experimental --bin xsp-v2-c2c-fixture; \
       cp target/release/xsp-v2-c2c-fixture /build/output/xsp-v2-c2c-fixture; \
     fi
 
