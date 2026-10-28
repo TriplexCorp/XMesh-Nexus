@@ -236,7 +236,7 @@ def main() -> None:
             ]
             raw = f"POST {path} HTTP/1.1\r\n" + "\r\n".join(headers) + f"\r\n\r\n{payload}"
             openssl = [
-                "openssl", "s_client", "-quiet", "-ign_eof",
+                "s_client", "-quiet", "-ign_eof",
                 "-connect", f"{ALIAS}:8444",
                 "-servername", servername,
                 "-verify_hostname", verify_hostname,
@@ -253,7 +253,7 @@ def main() -> None:
                 "docker", "run", "--rm", "-i",
                 "--network", network,
                 "--mount", f"type=volume,src={volumes['certs']},dst=/certs,readonly",
-                probe_image, *openssl,
+                "--entrypoint", "openssl", probe_image, *openssl,
                 input_text=raw, check=False, timeout=10,
             )
 
