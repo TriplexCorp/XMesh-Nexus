@@ -325,7 +325,7 @@ fn parse_request(raw: &[u8]) -> Result<(i64, Vec<u8>, bool)> {
     let node_u64 = u64::from_be_bytes(node_raw);
     let node_id = i64::try_from(node_u64).context("trusted Node ID exceeds PostgreSQL range")?;
     ensure!(node_id > 0, "invalid trusted Node ID");
-    let len_raw: [u8; 4] = raw[16..20].try_into().context("ACK length overflow")?;
+    let len_raw: [u8; 4] = raw[16..20].try_into().context("invalid ACK length")?;
     let ack_len = usize::try_from(u32::from_be_bytes(len_raw)).context("ACK length overflow")?;
     ensure!(
         ack_len > 0 && ack_len <= MAX_ACK_BYTES,
