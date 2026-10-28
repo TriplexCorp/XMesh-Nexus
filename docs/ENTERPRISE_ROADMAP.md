@@ -8,13 +8,15 @@ A green test proves only its stated boundary. Code existence ≠ E2E ≠ securit
 
 ## Verified source checkpoints
 
+- **Latest Nexus C2-D2 transport-alignment checkpoint:** [`86e01727443389c89b1b3d633206d3f4bc274838`](https://github.com/TriplexCorp/XMesh-Nexus/commit/86e01727443389c89b1b3d633206d3f4bc274838), merge of [PR #84](https://github.com/TriplexCorp/XMesh-Nexus/pull/84).
+- PR #84 aligns the external historical recovery transport with current XMesh-Node: exact `POST /api/v2/node/keys/rotation/ack/recover`, native Node `RecoverSignedACKReceipt`, package-private historical permit/ACK verification, and current Node pin `2cbe3a82473fc199c2354497eaf009707603f3f2`. It does not claim the remaining outage/restart matrix.
+- On exact merge SHA `86e01727443389c89b1b3d633206d3f4bc274838`, [C2-D2 Lost Response and Race E2E #40764476292](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40764476292), [C2-D2 Expired Recovery E2E #40764476261](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40764476261), [Hybrid TLS #40764476202](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40764476202) and [Backend CI #40764476247](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40764476247) completed **success**.
+- **Current XMesh-Node D2 staging transport checkpoint:** [`2cbe3a82473fc199c2354497eaf009707603f3f2`](https://github.com/TriplexCorp/XMesh-Node/commit/2cbe3a82473fc199c2354497eaf009707603f3f2), merge of Node PR #32. Current Nexus D2 workflows pin this exact SHA.
 - **Nexus C2-D2 lost-response / duplicate-race implementation checkpoint:** [`39e1589c82c52fe0c4af6fd5fc4d64aa782a465e`](https://github.com/TriplexCorp/XMesh-Nexus/commit/39e1589c82c52fe0c4af6fd5fc4d64aa782a465e), merge of [PR #82](https://github.com/TriplexCorp/XMesh-Nexus/pull/82).
-- PR #82 exact pre-merge head `6089cd2a041ef3ceb2681e41b45107f15c025453` passed the new D2 lost-response/race E2E plus C2-D2 expired recovery, C2-C, Hybrid TLS and Backend CI workflows.
-- On exact merge SHA `39e1589c82c52fe0c4af6fd5fc4d64aa782a465e`, [C2-D2 Lost Response and Race E2E #40756182067](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40756182067), [C2-D2 Expired Recovery E2E #40756182117](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40756182117), [C2-C ACK Authorization #40756181976](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40756181976), [Hybrid TLS #40756182148](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40756182148) and [Backend CI #40756182352](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40756182352) completed **success**.
+- PR #82 exact pre-merge head `6089cd2a041ef3ceb2681e41b45107f15c025453` passed the new D2 lost-response/race E2E plus C2-D2 expired recovery, C2-C, Hybrid TLS and Backend CI workflows; all corresponding post-merge workflows passed on `39e1589c82c52fe0c4af6fd5fc4d64aa782a465e`.
 - **Nexus C2-D2 expired exact-recovery implementation checkpoint:** [`5acccfa1877016e464290b20ebba537c0b5bbad3`](https://github.com/TriplexCorp/XMesh-Nexus/commit/5acccfa1877016e464290b20ebba537c0b5bbad3), merge of [PR #77](https://github.com/TriplexCorp/XMesh-Nexus/pull/77).
 - **Nexus C2-D1 implementation checkpoint:** [`037290bbb31dc6e5d155a14b8ddf58a31e21066f`](https://github.com/TriplexCorp/XMesh-Nexus/commit/037290bbb31dc6e5d155a14b8ddf58a31e21066f), merge of [PR #73](https://github.com/TriplexCorp/XMesh-Nexus/pull/73). Exact pre-merge and post-merge D1 E2E / Backend CI passed.
-- **Clean documentation/main checkpoint before D2 runtime work:** [`9900f8c99efc59f86699a6c0ab35c3b39b211d37`](https://github.com/TriplexCorp/XMesh-Nexus/commit/9900f8c99efc59f86699a6c0ab35c3b39b211d37), merge of docs-only [PR #74](https://github.com/TriplexCorp/XMesh-Nexus/pull/74), with post-merge Backend CI #40724165330 **success**.
-- **XMesh-Node D1 staging transport checkpoint pinned by the current Nexus D2 E2E:** [`3c49fd9b81293f53f7bc599a4bfab5a4c2040164`](https://github.com/TriplexCorp/XMesh-Node/commit/3c49fd9b81293f53f7bc599a4bfab5a4c2040164), merge of Node PR #30.
+- **Historical XMesh-Node D1 staging transport checkpoint:** [`3c49fd9b81293f53f7bc599a4bfab5a4c2040164`](https://github.com/TriplexCorp/XMesh-Node/commit/3c49fd9b81293f53f7bc599a4bfab5a4c2040164), merge of Node PR #30; this remains the exact D1 evidence but is no longer the current D2 workflow pin.
 - **Nexus C2-C implementation checkpoint:** [`37b9e49da1a9fd43657dd167ebb9d5e9a4580091`](https://github.com/TriplexCorp/XMesh-Nexus/commit/37b9e49da1a9fd43657dd167ebb9d5e9a4580091), merge of [PR #71](https://github.com/TriplexCorp/XMesh-Nexus/pull/71).
 - Earlier signer P0 (PR #61), dedicated PQ-only ingress P0-C1 (PR #64), trusted ingress→origin identity boundary P0-C2-A (PR #66), narrow staging ACK gate P0-C2-B (PR #69), C2-C ACK crypto/transaction/signer (PR #71) and C2-D1 real-Node integration (PR #73) remain complete in their stated staging/process scopes.
 
@@ -48,6 +50,7 @@ All are mandatory:
 | P0-C2-D1 real Node integrated E2E | **P0 COMPLETE — isolated staging/process** | PR #73; pinned Node SHA → strict PQ mTLS → ACK commit → signer → Node-verified durable receipt |
 | P0-C2-D2 expired exact network recovery | **SUB-GATE COMPLETE — isolated staging/process** | PR #77; expired fresh ACK rejected, exact historical recovery returns immutable receipt without re-sign/second epoch transition |
 | P0-C2-D2 lost-response + exact duplicate-race convergence | **SUB-GATE COMPLETE — isolated staging/process** | PR #82; pre-commit loss, post-commit signer loss, post-receipt loss, signer-off exact recovery, 8-way exact race and fresh mismatch negative |
+| P0-C2-D2 current Node recovery transport alignment | **PREREQUISITE COMPLETE — isolated staging/process** | PR #84; external `/ack/recover`, native Node recovery primitives, Node `2cbe3a8…`, post-merge D2/Hybrid/Backend green |
 | **P0-C2-D2 remaining failure/retry/recovery matrix** | **CURRENT P0** | Integrated outages/restarts, remaining replay coverage, downgrade/no-legacy and complete topology/old-key assertions |
 | P0-D production-capable Agent workflow | **BLOCKED on full C2-D** | Integrate real Agent migration/control state and update path |
 | P0-E recovery/security release gates | **BLOCKED** | Crash/snapshot/rollback/backup/rotation/fuzz/KAT/independent review |
@@ -217,11 +220,25 @@ The integrated proof keeps the same real pinned Node and authenticated staging t
 - [x] Fixed-head PR #82 merged as `39e1589c82c52fe0c4af6fd5fc4d64aa782a465e`.
 - [x] Post-merge D2 lost-response/race, expired recovery, C2-C, Hybrid TLS and Backend CI workflows all passed on that exact merge SHA.
 
-These two D2 sub-gates remain a **partial C2-D2 completion only**. Outage/restart, remaining replay, integrated downgrade/no-legacy and complete old-key/topology assertions are still open.
+## P0-C2-D2 prerequisite complete — current Node recovery transport alignment
+
+Merged as Nexus PR #84 and re-verified on exact merge SHA `86e01727443389c89b1b3d633206d3f4bc274838`.
+
+This checkpoint does not add a new failure-semantics claim. It updates the already-proven recovery path to the current native Node staging contract before the remaining D2 matrix:
+
+- [x] External historical recovery uses exact `POST /api/v2/node/keys/rotation/ack/recover`; obsolete external `/ack/recovery` is not mounted.
+- [x] The protected origin retains the internal `/recovery` operation and `XSP2C2H1` domain; external spelling does not collapse the trust boundary.
+- [x] Positive Node recovery uses native `reloadVerifiedPermitForReceiptRetry` plus `RecoverSignedACKReceipt` rather than a Nexus-owned historical transport helper.
+- [x] D2 workflows pin exact Node SHA `2cbe3a82473fc199c2354497eaf009707603f3f2`.
+- [x] Stale fresh-ACK rejection, mismatched recovery negatives, the explicit `XSP_V2_C2D_HISTORICAL_RECOVERY=staging-only` gate and no-production-activation constraints remain intact.
+- [x] Exact-head PR #84 checks passed and fixed head merged.
+- [x] Post-merge Lost Response/Race, Expired Recovery, Hybrid TLS and Backend CI all passed on the exact merge SHA.
+
+The two D2 behavior sub-gates plus this transport prerequisite remain a **partial C2-D2 completion only**. Outage/restart, remaining replay, integrated downgrade/no-legacy and complete old-key/topology assertions are still open.
 
 ## CURRENT P0 — P0-C2-D2: remaining failure / retry / recovery matrix
 
-Overall **P0-C2-D remains CURRENT P0**. The current verified Nexus implementation checkpoint is `39e1589c82c52fe0c4af6fd5fc4d64aa782a465e`. Every next runtime/test change must start from current `main` after the documentation checkpoint and remain focused on the still-open D2 criteria.
+Overall **P0-C2-D remains CURRENT P0**. The current verified Nexus implementation checkpoint is `86e01727443389c89b1b3d633206d3f4bc274838`. Every next runtime/test change must start from current `main` after this documentation checkpoint and remain focused on the still-open D2 criteria.
 
 ### Goal
 
@@ -241,6 +258,7 @@ Preserve the proven D1 chain plus the historical-recovery and lost-response/race
 - [x] Exercise lost response after ACK commit while durable receipt issuance is unavailable; fail closed without false success. **PR #82**
 - [x] Exercise lost response after durable receipt persistence; exact retry recovers the same bytes with the signer offline and no second epoch transition. **PR #82**
 - [x] Prove eight-way exact fresh duplicate/race convergence and a fresh mismatched-payload negative without durable-state mutation. **PR #82**
+- [x] Re-pin the integrated D2 proof to the current native Node recovery transport and exact external `/ack/recover` endpoint without weakening the internal recovery domain or freshness gate. **PR #84**
 - [ ] Complete remaining replay coverage outside the exact-fresh duplicate race, especially across outage/restart transitions.
 - [ ] Signer unavailable, DB stall/unavailability, origin boundary unavailable and C2-C unavailable all fail closed without legacy fallback across the integrated Node path.
 - [ ] Restart C2-C/origin/signer around security-state transitions and prove durable recovery semantics.
