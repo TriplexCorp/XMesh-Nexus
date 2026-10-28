@@ -159,7 +159,7 @@ fi
 exit 0
 '''
         return command(
-            "docker", "run", "--rm",
+            "docker", "run", "--rm", "-i",
             "--network", network,
             "--mount", f"type=volume,src={certs},dst=/certs,readonly",
             "--entrypoint", "/bin/sh", probe_image,
