@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Disposable P0-C2-D full Node -> PQ mTLS -> ACK -> receipt process E2E.
+"""Disposable P0-C2-D Node -> PQ mTLS -> ACK -> receipt/recovery process E2E.
 
 This joins the already-reviewed C2-A/B/C components with the XMesh-Node Go 1.27
 staging cutover client. It does not modify the production Agent, publish a host
@@ -78,8 +78,6 @@ def main() -> None:
         cert_material = temp / "client-material"
         cert_material.mkdir()
         bundle_path = temp / "node-bundle.json"
-        # A disposable source copy keeps the checked-out Node tree immutable while
-        # making the C2-D package-local test a real member of the cutover package.
         node_runtime = temp / "node-poc"
         shutil.copytree(node_module, node_runtime)
         shutil.copy2(
@@ -187,7 +185,14 @@ def main() -> None:
             )
             wait_socket(c2c, "/run/xmesh-c2c/c2c.sock", "10001:10001")
 
-        def run_node(label: str, cert: str = "client.pem", key: str = "client-key.pem", expect_success: bool = True) -> str:
+        def run_node(
+            label: str,
+            cert: str = "client.pem",
+            key: str = "client-key.pem",
+            *,
+            test_name: str = "TestC2DFullExchange",
+            expect_success: bool = True,
+        ) -> str:
             result = command(
                 "docker", "run", "--rm",
                 "--network", network,
@@ -204,26 +209,21 @@ def main() -> None:
                 "--mount", f"type=volume,src={volumes['journal']},dst=/journal",
                 "--workdir", "/src",
                 "golang:1.27.3-trixie",
-                "go", "test", "./cutover", "-run", "^TestC2DFullExchange$", "-count=1", "-v",
+                "go", "test", "./cutover", "-run", f"^{test_name}$", "-count=1", "-v",
                 check=False,
                 timeout=180,
             )
             combined = (result.stdout or "") + (result.stderr or "")
-            if expect_success and (result.returncode != 0 or "--- PASS: TestC2DFullExchange" not in combined):
-                raise RuntimeError(f"{label} Node exchange failed: {combined[-2400:]}")
-            if not expect_success:
-                if result.returncode == 0:
-                    raise RuntimeError(f"{label} unexpectedly succeeded")
-                if "strict mutual-PQ ACK/receipt exchange failed" not in combined:
-                    raise RuntimeError(f"{label} failed before authenticated transport check: {combined[-1800:]}")
+            if expect_success and (result.returncode != 0 or f"--- PASS: {test_name}" not in combined):
+                raise RuntimeError(f"{label} Node test failed: {combined[-2400:]}")
+            if not expect_success and result.returncode == 0:
+                raise RuntimeError(f"{label} unexpectedly succeeded")
             return combined
 
         try:
             command("docker", "network", "create", "--internal", network)
             for volume in volumes.values():
                 command("docker", "volume", "create", volume)
-            # Pull the Node test image before issuing the short-lived fixture permit;
-            # registry latency must never consume the authenticated permit window.
             command("docker", "pull", "golang:1.27.3-trixie", timeout=600)
 
             command(
@@ -263,8 +263,6 @@ def main() -> None:
             else:
                 raise RuntimeError("disposable PostgreSQL did not become ready")
 
-            # c2c-tests has the fixture binary as its default entrypoint. Override it
-            # so this helper stays alive while we use docker exec for fixture setup.
             helper_cmd = [
                 "docker", "run", "-d", "--name", helper, "--entrypoint", "sleep",
                 "--network", network,
@@ -302,6 +300,9 @@ def main() -> None:
             panel = json.loads(command("docker", "exec", helper, "cat", "/public/panel-pin.json").stdout)
             node_id = int(public["nodeId"])
             request_id = str(public["requestId"])
+            signed_ack_raw = base64.b64decode(public["ackB64"], validate=True)
+            ack_message = json.loads(signed_ack_raw)["message"]
+            ack_expires_ms = int(ack_message["expiresAtMs"])
 
             signer_sql = (ROOT / "deploy/postgres/20-create-xsp-v2-signer-role.sql").read_text()
             c2c_sql = (ROOT / "deploy/postgres/21-create-xsp-v2-c2c-role.sql").read_text()
@@ -416,8 +417,6 @@ chmod 0444 /certs/client.pem /certs/other-client.pem /certs/classical-client.pem
             )
             time.sleep(1)
 
-            # Prove the pinned transport identity rejects another otherwise-valid
-            # ML-DSA client before any successful ACK commit or durable receipt exists.
             run_node("different ML-DSA client identity", "other-client.pem", "other-client-key.pem", expect_success=False)
             if sql(f"SELECT key_epoch FROM node_xsp_suite_state WHERE node_id={node_id};").stdout.strip() != from_epoch:
                 raise RuntimeError("alternate client identity changed the key epoch")
@@ -445,13 +444,39 @@ chmod 0444 /certs/client.pem /certs/other-client.pem /certs/classical-client.pem
                 raise RuntimeError("Node retry produced a second receipt")
             print("PASS: Node restart/retry verifies the same durable receipt with signer offline")
 
+            # D2: wait until the original signed ACK is definitely outside its
+            # freshness window. The normal state-changing route must remain closed.
+            delay = max(0.0, (ack_expires_ms + 350 - int(time.time() * 1000)) / 1000.0)
+            if delay:
+                time.sleep(delay)
+            if int(time.time() * 1000) <= ack_expires_ms:
+                raise RuntimeError("failed to reach historical ACK recovery window")
+
+            run_node(
+                "alternate identity historical recovery",
+                "other-client.pem", "other-client-key.pem",
+                test_name="TestC2DExpiredNetworkRecovery",
+                expect_success=False,
+            )
+            run_node(
+                "expired exact historical recovery",
+                test_name="TestC2DExpiredNetworkRecovery",
+            )
+            epoch_after = sql(f"SELECT key_epoch FROM node_xsp_suite_state WHERE node_id={node_id};").stdout.strip()
+            outbox_after = sql(
+                f"SELECT count(*) FROM node_xsp_signed_commit_receipt_outbox WHERE node_id={node_id} AND request_id='{request_id}';"
+            ).stdout.strip()
+            if (epoch_after, outbox_after) != (str(to_epoch), "1"):
+                raise RuntimeError(f"historical recovery mutated durable state: epoch={epoch_after} outbox={outbox_after}")
+            print("PASS: expired exact ACK recovers identical durable receipt over real strict PQ mTLS with signer offline")
+
             inspect = json.loads(command("docker", "inspect", ingress).stdout)[0]
             if inspect["HostConfig"].get("PortBindings"):
                 raise RuntimeError("C2-D ingress unexpectedly published a host port")
             net = json.loads(command("docker", "network", "inspect", network).stdout)[0]
             if not net.get("Internal"):
                 raise RuntimeError("C2-D process network must be internal/no-egress")
-            print("C2-D FULL PROCESS E2E: PASS (staging/test only; production Agent untouched)")
+            print("C2-D2 EXPIRED RECOVERY PROCESS E2E: PASS (staging/test only; production Agent untouched)")
         finally:
             for name in reversed(containers):
                 command("docker", "rm", "-f", name, check=False)
