@@ -83,6 +83,7 @@ struct Config {
     pool: PgPool,
     panel_template: TrustedPublic,
     signer_socket: PathBuf,
+    historical_recovery_enabled: bool,
 }
 
 fn decode_canonical_b64(value: &str, exact: usize) -> Result<Vec<u8>> {
@@ -324,7 +325,7 @@ fn parse_request(raw: &[u8]) -> Result<(i64, Vec<u8>, bool)> {
     let node_u64 = u64::from_be_bytes(node_raw);
     let node_id = i64::try_from(node_u64).context("trusted Node ID exceeds PostgreSQL range")?;
     ensure!(node_id > 0, "invalid trusted Node ID");
-    let len_raw: [u8; 4] = raw[16..20].try_into().context("invalid ACK length")?;
+    let len_raw: [u8; 4] = raw[16..20].try_into().context("ACK length overflow")?;
     let ack_len = usize::try_from(u32::from_be_bytes(len_raw)).context("ACK length overflow")?;
     ensure!(
         ack_len > 0 && ack_len <= MAX_ACK_BYTES,
@@ -411,6 +412,10 @@ async fn authorize_and_receipt(config: &Config, node_id: i64, ack: &[u8]) -> Res
 }
 
 async fn recover_durable_receipt(config: &Config, node_id: i64, ack: &[u8]) -> Result<Vec<u8>> {
+    ensure!(
+        config.historical_recovery_enabled,
+        "historical receipt recovery is not enabled"
+    );
     let request_id = ack_context(ack, node_id)?;
     let pin = panel_pin_for_node(&config.panel_template, node_id)?;
     xsp_v2_signed_receipt_outbox::load_committed_signed_receipt_staging(
@@ -482,6 +487,11 @@ async fn run() -> Result<()> {
         env::var("XSP_V2_C2C_ACK_AUTH").as_deref() == Ok("staging-only"),
         "C2-C service requires XSP_V2_C2C_ACK_AUTH=staging-only"
     );
+    let recovery_gate = env::var("XSP_V2_C2D_HISTORICAL_RECOVERY").unwrap_or_default();
+    ensure!(
+        recovery_gate.is_empty() || recovery_gate == "staging-only",
+        "XSP_V2_C2D_HISTORICAL_RECOVERY must be unset or staging-only"
+    );
     let panel_template = load_panel_pin()?;
     let pool = connect_pool().await?;
     validate_database_role(&pool).await?;
@@ -496,6 +506,7 @@ async fn run() -> Result<()> {
         pool,
         panel_template,
         signer_socket,
+        historical_recovery_enabled: recovery_gate == "staging-only",
     });
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
