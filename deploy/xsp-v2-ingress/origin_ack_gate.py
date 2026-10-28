@@ -5,6 +5,10 @@ The normal ACK operation retains the strict C2-B freshness checks. C2-D2 adds a
 distinct historical recovery operation that is reachable only through the same
 verified PQ mTLS -> protected UDS identity boundary and may request only exact
 immutable receipt readback for an already-expired, already-committed ACK.
+
+The optional XSP_V2_C2D_TEST_FAULT modes are test-only response-loss injection
+points for the disposable C2-D2 process E2E. They never bypass identity,
+structure, freshness, cryptographic authorization or durable-state checks.
 """
 from __future__ import annotations
 
@@ -29,6 +33,13 @@ ACK_GATE = os.environ.get("XSP_V2_C2B_ACK_ROUTE", "")
 C2C_GATE = os.environ.get("XSP_V2_C2C_ACK_AUTH", "")
 RECOVERY_GATE = os.environ.get("XSP_V2_C2D_HISTORICAL_RECOVERY", "")
 C2C_SOCKET_PATH = Path(os.environ.get("XSP_V2_C2C_SOCKET_PATH", "/run/xmesh-c2c/c2c.sock"))
+TEST_FAULT = os.environ.get("XSP_V2_C2D_TEST_FAULT", "").strip()
+TEST_FAULTS = {
+    "",
+    "drop-before-c2c",
+    "drop-on-c2c-failure",
+    "drop-after-c2c-success",
+}
 ACK_PATH = "/api/v2/node/keys/rotation/ack"
 RECOVERY_PATH = ACK_PATH + "/recovery"
 MAX_CERT_HEADER = 24 * 1024
@@ -146,6 +157,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def log_message(self, _format: str, *args: object) -> None:
         return
+
+    def drop_response(self) -> None:
+        """Close the disposable test connection without emitting HTTP status."""
+        self.close_connection = True
+        try:
+            self.connection.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
 
     def send_json(self, status: int, value: dict[str, object]) -> None:
         raw = json.dumps(value, separators=(",", ":"), sort_keys=True).encode()
@@ -268,9 +287,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_json(400, {"error": "invalid staging ACK"})
             return
         if recovery:
-            # Historical recovery is deliberately a different operation. It is
-            # valid only after the signed ACK's original freshness window has
-            # closed. Exact committed DB evidence is checked inside C2-C.
             if now_ms <= message["expiresAtMs"]:
                 self.send_json(409, {"error": "historical recovery requires expired ACK"})
                 return
@@ -298,10 +314,19 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_json(400, {"error": "invalid staging ACK"})
             return
         if C2C_GATE == "staging-only":
+            if not recovery and TEST_FAULT == "drop-before-c2c":
+                self.drop_response()
+                return
             try:
                 receipt = authorize_c2c(node_id, raw, recovery=recovery)
             except (OSError, ValueError, struct.error):
+                if not recovery and TEST_FAULT == "drop-on-c2c-failure":
+                    self.drop_response()
+                    return
                 self.send_json(503, {"error": "C2-C authorization unavailable or rejected"})
+                return
+            if not recovery and TEST_FAULT == "drop-after-c2c-success":
+                self.drop_response()
                 return
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -332,6 +357,10 @@ def main() -> None:
         raise SystemExit("XSP_V2_C2C_ACK_AUTH must be unset or staging-only")
     if RECOVERY_GATE not in ("", "staging-only"):
         raise SystemExit("XSP_V2_C2D_HISTORICAL_RECOVERY must be unset or staging-only")
+    if TEST_FAULT not in TEST_FAULTS:
+        raise SystemExit("XSP_V2_C2D_TEST_FAULT is not an approved disposable E2E fault mode")
+    if TEST_FAULT and C2C_GATE != "staging-only":
+        raise SystemExit("C2-D2 test faults require the explicit staging-only C2-C gate")
     SOCKET_PATH.parent.mkdir(parents=True, exist_ok=True)
     try:
         SOCKET_PATH.unlink()
