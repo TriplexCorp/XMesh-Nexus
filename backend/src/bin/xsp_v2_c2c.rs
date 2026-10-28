@@ -418,11 +418,7 @@ async fn authorize_and_receipt(config: &Config, node_id: i64, ack: &[u8]) -> Res
     .await
 }
 
-async fn recover_historical_receipt(
-    config: &Config,
-    node_id: i64,
-    ack: &[u8],
-) -> Result<Vec<u8>> {
+async fn recover_historical_receipt(config: &Config, node_id: i64, ack: &[u8]) -> Result<Vec<u8>> {
     ensure!(
         config.historical_recovery_enabled,
         "historical receipt recovery is not enabled"
