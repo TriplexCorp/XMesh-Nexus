@@ -15,7 +15,10 @@ const files = execFileSync('git', ['ls-files', '-z']).toString('utf8').split('\0
 const violations = [];
 for (const path of files) {
   const name = path.toLocaleLowerCase('ru-RU');
-  const content = fs.readFileSync(path).toString('utf8').toLocaleLowerCase('ru-RU');
+  const stat = fs.lstatSync(path);
+  const content = stat.isSymbolicLink()
+    ? ''
+    : fs.readFileSync(path).toString('utf8').toLocaleLowerCase('ru-RU');
   if (markers.some(marker => name.includes(marker) || content.includes(marker))) violations.push(path);
 }
 assert.deepEqual(violations, [], 'Unexpected provider-specific branding in tracked files: '+violations.join(', '));
