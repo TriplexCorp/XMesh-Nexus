@@ -27,6 +27,7 @@ EXPECTED_SPKI = os.environ.get("XSP_EXPECTED_CLIENT_SPKI_SHA256", "").strip().lo
 EXPECTED_NODE_ID = os.environ.get("XSP_EXPECTED_NODE_ID", "").strip()
 ACK_GATE = os.environ.get("XSP_V2_C2B_ACK_ROUTE", "")
 C2C_GATE = os.environ.get("XSP_V2_C2C_ACK_AUTH", "")
+RECOVERY_GATE = os.environ.get("XSP_V2_C2D_HISTORICAL_RECOVERY", "")
 C2C_SOCKET_PATH = Path(os.environ.get("XSP_V2_C2C_SOCKET_PATH", "/run/xmesh-c2c/c2c.sock"))
 ACK_PATH = "/api/v2/node/keys/rotation/ack"
 RECOVERY_PATH = ACK_PATH + "/recovery"
@@ -193,6 +194,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if self.path not in (ACK_PATH, RECOVERY_PATH) or ACK_GATE != "staging-only":
             self.send_json(404, {"error": "not found"})
             return
+        if recovery and RECOVERY_GATE != "staging-only":
+            self.send_json(404, {"error": "historical recovery unavailable"})
+            return
         node_id = self.trusted_node_id()
         if node_id is None:
             self.send_json(403, {"error": "untrusted origin identity"})
@@ -326,6 +330,8 @@ def main() -> None:
         raise SystemExit("XSP_EXPECTED_NODE_ID must be a positive integer")
     if C2C_GATE not in ("", "staging-only"):
         raise SystemExit("XSP_V2_C2C_ACK_AUTH must be unset or staging-only")
+    if RECOVERY_GATE not in ("", "staging-only"):
+        raise SystemExit("XSP_V2_C2D_HISTORICAL_RECOVERY must be unset or staging-only")
     SOCKET_PATH.parent.mkdir(parents=True, exist_ok=True)
     try:
         SOCKET_PATH.unlink()

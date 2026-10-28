@@ -164,6 +164,7 @@ def main() -> None:
                 "c2c.env",
                 {
                     "XSP_V2_C2C_ACK_AUTH": "staging-only",
+                    "XSP_V2_C2D_HISTORICAL_RECOVERY": "staging-only",
                     "XSP_V2_C2C_DATABASE_URL": f"postgresql://xmesh_c2c_writer:{c2c_password}@{db}:5432/xmesh",
                     "XSP_V2_C2C_PANEL_PIN_FILE": "/run/xmesh-c2c-public/panel-pin.json",
                     "XSP_V2_C2C_SOCKET_PATH": "/run/xmesh-c2c/c2c.sock",
@@ -389,6 +390,7 @@ chmod 0444 /certs/client.pem /certs/other-client.pem /certs/classical-client.pem
                     "XSP_EXPECTED_INGRESS_GID": "10003",
                     "XSP_V2_C2B_ACK_ROUTE": "staging-only",
                     "XSP_V2_C2C_ACK_AUTH": "staging-only",
+                    "XSP_V2_C2D_HISTORICAL_RECOVERY": "staging-only",
                     "XSP_V2_C2C_SOCKET_PATH": "/run/xmesh-c2c/c2c.sock",
                 },
             )
