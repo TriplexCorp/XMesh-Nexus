@@ -49,6 +49,7 @@ jobs:
           test -f scripts/xsp-v2-c2d-node-client_test.go
           ! grep -R --line-number --fixed-strings 'strict-pq=on' scripts/test-xsp-v2-c2d-full-e2e.py scripts/xsp-v2-c2d-node-client_test.go
           ! grep -R --line-number -E '(-p|--publish)[ =]' scripts/test-xsp-v2-c2d-full-e2e.py
+          grep -Fq 'request.Host = serverName' scripts/xsp-v2-c2d-node-client_test.go
           grep -Fq 'signedACKRecoveryEndpoint' scripts/xsp-v2-c2d-node-client_test.go
           grep -Fq 'RecoverSignedACKReceipt' scripts/xsp-v2-c2d-node-client_test.go
           grep -Fq 'reloadVerifiedPermitForReceiptRetry' scripts/xsp-v2-c2d-node-client_test.go
@@ -76,7 +77,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: TriplexCorp/XMesh-Node
-          ref: 2cbe3a82473fc199c2354497eaf009707603f3f2
+          ref: 0ae78244ef0ef763bea6ce198dde6e83eb11ff1f
           path: xmesh-node
       - uses: actions/setup-go@v5
         with:
