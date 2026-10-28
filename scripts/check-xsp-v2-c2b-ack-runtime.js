@@ -45,8 +45,10 @@ must(/client_body_timeout\s+5s\s*;/.test(active), 'ACK ingress body timeout miss
 
 must(/location\s+=\s+\/api\/v2\/node\/keys\/rotation\/ack\s*\{/.test(active),
   'exact C2-B ACK location missing');
-must(/location\s+=\s+\/api\/v2\/node\/keys\/rotation\/ack\/recovery\s*\{/.test(active),
-  'exact C2-D2 historical recovery location missing');
+must(/location\s+=\s+\/api\/v2\/node\/keys\/rotation\/ack\/recover\s*\{/.test(active),
+  'exact current-Node C2-D2 historical recovery location missing');
+must(!/location\s+=\s+\/api\/v2\/node\/keys\/rotation\/ack\/recovery\s*\{/.test(active),
+  'obsolete external C2-D2 /recovery location must not remain mounted');
 must(/if\s*\(\$request_method\s*!=\s*POST\)\s*\{\s*return\s+405\s*;/s.test(active),
   'ACK locations must reject every non-POST method');
 must(/if\s*\(\$ssl_client_verify\s*!=\s*SUCCESS\)\s*\{\s*return\s+403\s*;/s.test(active),

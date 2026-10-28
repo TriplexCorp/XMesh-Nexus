@@ -49,7 +49,13 @@ jobs:
           test -f scripts/xsp-v2-c2d-node-client_test.go
           ! grep -R --line-number --fixed-strings 'strict-pq=on' scripts/test-xsp-v2-c2d-full-e2e.py scripts/xsp-v2-c2d-node-client_test.go
           ! grep -R --line-number -E '(-p|--publish)[ =]' scripts/test-xsp-v2-c2d-full-e2e.py
-          grep -Fq '/api/v2/node/keys/rotation/ack/recovery' scripts/xsp-v2-c2d-node-client_test.go deploy/xsp-v2-ingress/origin_ack_gate.py
+          grep -Fq 'signedACKRecoveryEndpoint' scripts/xsp-v2-c2d-node-client_test.go
+          grep -Fq 'RecoverSignedACKReceipt' scripts/xsp-v2-c2d-node-client_test.go
+          grep -Fq 'reloadVerifiedPermitForReceiptRetry' scripts/xsp-v2-c2d-node-client_test.go
+          ! grep -Fq 'c2dRecoveryEndpoint' scripts/xsp-v2-c2d-node-client_test.go
+          grep -Fq 'location = /api/v2/node/keys/rotation/ack/recover {' deploy/xsp-v2-ingress/nginx-c2b.conf
+          ! grep -Fq 'location = /api/v2/node/keys/rotation/ack/recovery {' deploy/xsp-v2-ingress/nginx-c2b.conf
+          grep -Fq 'RECOVERY_PATH = ACK_PATH + "/recovery"' deploy/xsp-v2-ingress/origin_ack_gate.py
           grep -Fq 'XSP2C2H1' deploy/xsp-v2-ingress/origin_ack_gate.py backend/src/bin/xsp_v2_c2c.rs
           grep -Fq 'load_committed_signed_receipt_staging' backend/src/bin/xsp_v2_c2c.rs
           grep -Fq 'expired ACK was incorrectly accepted as a fresh state-changing command' scripts/xsp-v2-c2d-node-client_test.go
@@ -70,7 +76,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: TriplexCorp/XMesh-Node
-          ref: 3c49fd9b81293f53f7bc599a4bfab5a4c2040164
+          ref: 2cbe3a82473fc199c2354497eaf009707603f3f2
           path: xmesh-node
       - uses: actions/setup-go@v5
         with:

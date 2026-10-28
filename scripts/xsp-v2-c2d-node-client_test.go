@@ -24,8 +24,6 @@ import (
 	"github.com/TriplexCorp/XMesh-Node/security/xspv2/poc-go/tlsprobe"
 )
 
-const c2dRecoveryEndpoint = "/api/v2/node/keys/rotation/ack/recovery"
-
 type c2dPin struct {
 	IssuerID    string `json:"issuerId"`
 	NodeID      uint64 `json:"nodeId"`
@@ -120,62 +118,6 @@ func c2dLoadBundle(t *testing.T) (c2dBundle, []byte, []byte, PinnedPublic, Pinne
 	return bundle, signedPermit, signedACK, panel, next, want
 }
 
-// c2dRecoverHistoricalPermitForDurableReceipt is deliberately narrower than a
-// normal permit reload. It reconstructs a VerifiedPermit marker only after
-// durable permit, ACK and receipt journals already exist and exact bindings and
-// signatures verify. It cannot authorize a new cutover from an expired permit.
-func c2dRecoverHistoricalPermitForDurableReceipt(
-	journal string,
-	signedPermit []byte,
-	panel PinnedPublic,
-	next PinnedPublic,
-	want ExpectedPermit,
-	minEpoch uint64,
-	nowMS int64,
-) (VerifiedPermit, VerifiedCommitReceipt, error) {
-	var emptyPermit VerifiedPermit
-	var emptyReceipt VerifiedCommitReceipt
-	permitRow, err := readPermitFile(filepath.Join(journal, journalName))
-	if err != nil {
-		return emptyPermit, emptyReceipt, err
-	}
-	if !bytes.Equal(permitRow.SignedPermit, signedPermit) || permitRow.EnvelopeSHA256 != sha(signedPermit) {
-		return emptyPermit, emptyReceipt, errors.New("historical permit bytes differ from durable journal")
-	}
-	signed, err := Decode(signedPermit)
-	if err != nil {
-		return emptyPermit, emptyReceipt, err
-	}
-	if signed.Message.Kind != "permit" || !permitMatches(signed.Message, want) {
-		return emptyPermit, emptyReceipt, errors.New("historical permit no longer matches approved request")
-	}
-	if err = checkPublic(panel, signed.Message, "panel_response"); err != nil {
-		return emptyPermit, emptyReceipt, err
-	}
-	canonical, err := verifyBoth(signed, panel)
-	if err != nil {
-		return emptyPermit, emptyReceipt, err
-	}
-	permit := VerifiedPermit{message: signed.Message, inputHash: sha(canonical)}
-	if permit.PermitDigest() != permitRow.PermitDigest {
-		return emptyPermit, emptyReceipt, errors.New("historical permit digest differs from durable journal")
-	}
-
-	ack, err := checkSavedACKForReceipt(journal, permit)
-	if err != nil {
-		return emptyPermit, emptyReceipt, err
-	}
-	receiptRow, err := readCommitReceiptRecord(filepath.Join(journal, commitReceiptJournalName))
-	if err != nil {
-		return emptyPermit, emptyReceipt, err
-	}
-	verified, err := verifyReceiptJournalRow(receiptRow, ack, panel, permit, next, minEpoch, nowMS)
-	if err != nil {
-		return emptyPermit, emptyReceipt, err
-	}
-	return permit, verified, nil
-}
-
 func c2dStrictPost(ctx context.Context, address, serverName string, roots *x509.CertPool,
 	clientCertificate tls.Certificate, path string, body []byte) (int, []byte, error) {
 	if ctx == nil || address == "" || serverName == "" || path == "" {
@@ -243,11 +185,15 @@ func TestC2DFullExchange(t *testing.T) {
 	now := time.Now().UnixMilli()
 	permit, err := PersistVerifiedPermit(journal, signedPermit, panel, want, now)
 	if err != nil {
-		_, recovered, recoverErr := c2dRecoverHistoricalPermitForDurableReceipt(
-			journal, signedPermit, panel, next, want, bundle.Expected.ToEpoch, now,
-		)
+		recoveredPermit, recoverErr := reloadVerifiedPermitForReceiptRetry(journal, panel, want, next)
 		if recoverErr != nil {
 			t.Fatalf("permit verification/journal failed: %v", recoverErr)
+		}
+		recovered, recoverErr := ReloadVerifiedCommitReceiptForJournal(
+			journal, panel, recoveredPermit, next, bundle.Expected.ToEpoch, now,
+		)
+		if recoverErr != nil {
+			t.Fatalf("historical durable receipt reload failed: %v", recoverErr)
 		}
 		if recovered.NodeID != bundle.Expected.NodeID || recovered.ToEpoch != bundle.Expected.ToEpoch || recovered.RequestID != bundle.Expected.RequestID {
 			t.Fatalf("historical durable receipt correlation mismatch: %+v", recovered)
@@ -316,14 +262,18 @@ func TestC2DFullExchange(t *testing.T) {
 }
 
 func TestC2DExpiredNetworkRecovery(t *testing.T) {
-	bundle, signedPermit, signedACK, panel, next, want := c2dLoadBundle(t)
+	bundle, _, signedACK, panel, next, want := c2dLoadBundle(t)
 	journal := c2dRequired(t, "XSP_C2D_JOURNAL_DIR")
 	now := time.Now().UnixMilli()
-	permit, recovered, err := c2dRecoverHistoricalPermitForDurableReceipt(
-		journal, signedPermit, panel, next, want, bundle.Expected.ToEpoch, now,
+	permit, err := reloadVerifiedPermitForReceiptRetry(journal, panel, want, next)
+	if err != nil {
+		t.Fatalf("historical permit/ACK chain unavailable: %v", err)
+	}
+	recovered, err := ReloadVerifiedCommitReceiptForJournal(
+		journal, panel, permit, next, bundle.Expected.ToEpoch, now,
 	)
 	if err != nil {
-		t.Fatalf("historical durable chain unavailable: %v", err)
+		t.Fatalf("historical durable receipt unavailable: %v", err)
 	}
 	parsedACK, err := Decode(signedACK)
 	if err != nil {
@@ -381,7 +331,7 @@ func TestC2DExpiredNetworkRecovery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	status, _, err = c2dStrictPost(ctx, address, serverName, roots, clientCertificate, c2dRecoveryEndpoint, tamperedACK)
+	status, _, err = c2dStrictPost(ctx, address, serverName, roots, clientCertificate, signedACKRecoveryEndpoint, tamperedACK)
 	if err != nil {
 		t.Fatalf("strict mismatched recovery request failed unexpectedly: %v", err)
 	}
@@ -389,19 +339,30 @@ func TestC2DExpiredNetworkRecovery(t *testing.T) {
 		t.Fatal("mismatched historical ACK recovered a receipt")
 	}
 
-	status, receipt, err := c2dStrictPost(ctx, address, serverName, roots, clientCertificate, c2dRecoveryEndpoint, signedACK)
+	result, err := RecoverSignedACKReceipt(
+		ctx,
+		address,
+		serverName,
+		roots,
+		clientCertificate,
+		journal,
+		panel,
+		permit,
+		next,
+		bundle.Expected.ToEpoch,
+		time.Now().UnixMilli(),
+	)
 	if err != nil {
-		t.Fatalf("strict historical receipt recovery failed: %v", err)
+		t.Fatalf("native strict historical receipt recovery failed: %v", err)
 	}
-	if status != http.StatusOK {
-		t.Fatalf("historical recovery did not return durable receipt: HTTP %d body=%q", status, receipt)
+	if result.NodeID != recovered.NodeID || result.ToEpoch != recovered.ToEpoch || result.RequestID != recovered.RequestID {
+		t.Fatalf("native historical recovery correlation mismatch: %+v", result)
 	}
-	if !bytes.Equal(receipt, receiptRow.SignedReceipt) {
-		t.Fatal("historical network recovery did not return exact durable receipt bytes")
+	persistedAfter, err := readCommitReceiptRecord(filepath.Join(journal, commitReceiptJournalName))
+	if err != nil {
+		t.Fatal(err)
 	}
-	if _, err := PersistVerifiedCommitReceiptForJournal(
-		journal, receipt, panel, permit, next, bundle.Expected.ToEpoch, time.Now().UnixMilli(),
-	); err != nil {
-		t.Fatalf("recovered exact receipt no longer verifies against durable Node state: %v", err)
+	if !bytes.Equal(persistedAfter.SignedReceipt, receiptRow.SignedReceipt) {
+		t.Fatal("native historical recovery changed authoritative durable receipt bytes")
 	}
 }
