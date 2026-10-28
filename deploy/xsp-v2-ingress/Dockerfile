@@ -41,8 +41,12 @@ COPY deploy/xsp-v2-ingress/origin_ack_gate.py /usr/local/bin/xsp-origin-ack-gate
 ENTRYPOINT ["python3", "/usr/local/bin/xsp-origin-ack-gate"]
 
 # Test client only: OpenSSL CLI is deliberately absent from the ingress runtime.
+# The tiny dispatcher preserves the historical shell-style probe interface while
+# also allowing transport-negative tests to invoke `openssl ...` directly.
 FROM debian:trixie-slim AS probe
 RUN apt-get update \
     && apt-get install -y --no-install-recommends openssl ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-ENTRYPOINT ["/bin/sh"]
+    && rm -rf /var/lib/apt/lists/* \
+    && printf '%s\n' '#!/bin/sh' 'set -eu' 'if [ "${1-}" = "openssl" ]; then exec "$@"; fi' 'exec /bin/sh "$@"' > /usr/local/bin/xsp-probe-entrypoint \
+    && chmod 0755 /usr/local/bin/xsp-probe-entrypoint
+ENTRYPOINT ["/usr/local/bin/xsp-probe-entrypoint"]
