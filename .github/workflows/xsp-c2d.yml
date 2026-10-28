@@ -1,4 +1,4 @@
-name: XSP-v2 C2-D1 Integrated Process E2E (test-only)
+name: XSP-v2 C2-D2 Expired Recovery E2E (test-only)
 on:
   push:
     branches: [main]
@@ -43,17 +43,19 @@ jobs:
         with:
           go-version: '1.27.3'
           cache: false
-      - name: Check C2-D1 harness syntax and staging boundary
+      - name: Check C2-D2 harness syntax and recovery boundary
         run: |
-          python3 -m py_compile scripts/test-xsp-v2-c2d-full-e2e.py
+          python3 -m py_compile scripts/test-xsp-v2-c2d-full-e2e.py deploy/xsp-v2-ingress/origin_ack_gate.py
           test -f scripts/xsp-v2-c2d-node-client_test.go
           ! grep -R --line-number --fixed-strings 'strict-pq=on' scripts/test-xsp-v2-c2d-full-e2e.py scripts/xsp-v2-c2d-node-client_test.go
           ! grep -R --line-number -E '(-p|--publish)[ =]' scripts/test-xsp-v2-c2d-full-e2e.py
-          grep -Fq 'network retry of' scripts/xsp-v2-c2d-node-client_test.go
-          grep -Fq 'belongs to D2' scripts/xsp-v2-c2d-node-client_test.go
+          grep -Fq '/api/v2/node/keys/rotation/ack/recovery' scripts/xsp-v2-c2d-node-client_test.go deploy/xsp-v2-ingress/origin_ack_gate.py
+          grep -Fq 'XSP2C2H1' deploy/xsp-v2-ingress/origin_ack_gate.py backend/src/bin/xsp_v2_c2c.rs
+          grep -Fq 'load_committed_signed_receipt_staging' backend/src/bin/xsp_v2_c2c.rs
+          grep -Fq 'expired ACK was incorrectly accepted as a fresh state-changing command' scripts/xsp-v2-c2d-node-client_test.go
 
   full-process-e2e:
-    name: Node strict PQ mTLS -> ACK commit -> signer -> verified durable receipt
+    name: Node strict PQ mTLS -> expired ACK -> exact immutable receipt recovery
     needs: source-contract
     runs-on: ubuntu-latest
     timeout-minutes: 55
@@ -72,5 +74,5 @@ jobs:
       - name: Verify Node staging module before cross-repo E2E
         working-directory: xmesh-node/security/xspv2/poc-go
         run: go test ./...
-      - name: Exercise C2-D1 integrated process and durable local restart boundary
+      - name: Exercise C2-D2 expired exact recovery over the integrated process topology
         run: python3 scripts/test-xsp-v2-c2d-full-e2e.py --node-repo xmesh-node
