@@ -1,0 +1,73 @@
+name: XSP-v2 C2-D Full Process E2E (test-only)
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/c2c/**"
+      - "backend/src/bin/xsp_v2_c2c.rs"
+      - "backend/src/bin/xsp_v2_c2c_fixture.rs"
+      - "backend/src/xsp_v2_**"
+      - "backend/Dockerfile.xsp-c2c"
+      - "backend/Dockerfile.xsp-signer"
+      - "deploy/postgres/20-create-xsp-v2-signer-role.sql"
+      - "deploy/postgres/21-create-xsp-v2-c2c-role.sql"
+      - "deploy/xsp-v2-ingress/**"
+      - "scripts/generate-xsp-v2-mldsa-test-certs.go"
+      - "scripts/xsp-v2-c2d-node-client_test.go"
+      - "scripts/test-xsp-v2-c2d-full-e2e.py"
+      - ".github/workflows/xsp-c2d.yml"
+  pull_request:
+    paths:
+      - "backend/c2c/**"
+      - "backend/src/bin/xsp_v2_c2c.rs"
+      - "backend/src/bin/xsp_v2_c2c_fixture.rs"
+      - "backend/src/xsp_v2_**"
+      - "backend/Dockerfile.xsp-c2c"
+      - "backend/Dockerfile.xsp-signer"
+      - "deploy/postgres/20-create-xsp-v2-signer-role.sql"
+      - "deploy/postgres/21-create-xsp-v2-c2c-role.sql"
+      - "deploy/xsp-v2-ingress/**"
+      - "scripts/generate-xsp-v2-mldsa-test-certs.go"
+      - "scripts/xsp-v2-c2d-node-client_test.go"
+      - "scripts/test-xsp-v2-c2d-full-e2e.py"
+      - ".github/workflows/xsp-c2d.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache: false
+      - name: Check C2-D harness syntax and staging boundary
+        run: |
+          python3 -m py_compile scripts/test-xsp-v2-c2d-full-e2e.py
+          test -f scripts/xsp-v2-c2d-node-client_test.go
+          ! grep -R --line-number --fixed-strings 'strict-pq=on' scripts/test-xsp-v2-c2d-full-e2e.py scripts/xsp-v2-c2d-node-client_test.go
+          ! grep -R --line-number -E '(-p|--publish)[ =]' scripts/test-xsp-v2-c2d-full-e2e.py
+
+  full-process-e2e:
+    name: Node strict PQ mTLS -> ACK commit -> signer -> verified durable receipt
+    needs: source-contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout XMesh-Node verified staging client
+        uses: actions/checkout@v4
+        with:
+          repository: TriplexCorp/XMesh-Node
+          path: xmesh-node
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache: false
+      - name: Verify Node staging module before cross-repo E2E
+        working-directory: xmesh-node/security/xspv2/poc-go
+        run: go test ./...
+      - name: Exercise full C2-D process and retry boundary
+        run: python3 scripts/test-xsp-v2-c2d-full-e2e.py --node-repo xmesh-node
