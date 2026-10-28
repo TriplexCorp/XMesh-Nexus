@@ -42,6 +42,7 @@ use tokio::{
 use xsp_v2_signed_cutover::{Cutover, TrustedPublic};
 
 const REQUEST_MAGIC: &[u8; 8] = b"XSP2C2C1";
+const RECOVERY_REQUEST_MAGIC: &[u8; 8] = b"XSP2C2H1";
 const RESPONSE_MAGIC: &[u8; 8] = b"XSP2C2R1";
 const MAX_ACK_BYTES: usize = 16 * 1024;
 const MAX_REQUEST_BYTES: usize = 8 + 8 + 4 + MAX_ACK_BYTES;
@@ -85,9 +86,7 @@ struct Config {
 }
 
 fn decode_canonical_b64(value: &str, exact: usize) -> Result<Vec<u8>> {
-    let bytes = STANDARD
-        .decode(value)
-        .context("invalid public-key Base64")?;
+    let bytes = STANDARD.decode(value).context("invalid public-key Base64")?;
     ensure!(
         bytes.len() == exact && STANDARD.encode(&bytes) == value,
         "noncanonical public-key Base64"
@@ -104,10 +103,7 @@ fn load_panel_pin() -> Result<TrustedPublic> {
         .map_or_else(|| PathBuf::from(PANEL_PIN_DEFAULT), PathBuf::from);
     let metadata = fs::symlink_metadata(&path)
         .with_context(|| format!("inspect C2-C panel pin file {}", path.display()))?;
-    ensure!(
-        metadata.file_type().is_file(),
-        "panel pin must be a regular file"
-    );
+    ensure!(metadata.file_type().is_file(), "panel pin must be a regular file");
     ensure!(metadata.uid() == 0, "panel pin file must be root-owned");
     ensure!(
         metadata.permissions().mode() & 0o022 == 0,
@@ -124,10 +120,7 @@ fn load_panel_pin() -> Result<TrustedPublic> {
     );
     let ed_public = decode_canonical_b64(&pin.ed25519_public_b64, 32)?;
     let pq_public = decode_canonical_b64(&pin.mldsa65_public_b64, 1952)?;
-    let ed_array: [u8; 32] = ed_public
-        .as_slice()
-        .try_into()
-        .context("Ed25519 public length")?;
+    let ed_array: [u8; 32] = ed_public.as_slice().try_into().context("Ed25519 public length")?;
     VerifyingKey::from_bytes(&ed_array).context("invalid Ed25519 panel public key")?;
     PKey::public_key_from_raw_bytes_ex(None, KeyType::ML_DSA_65, None, &pq_public)
         .context("invalid ML-DSA-65 panel public key/provider")?;
@@ -168,10 +161,7 @@ fn panel_pin_for_node(template: &TrustedPublic, node_id: i64) -> Result<TrustedP
 async fn connect_pool() -> Result<PgPool> {
     let database_url =
         env::var("XSP_V2_C2C_DATABASE_URL").context("XSP_V2_C2C_DATABASE_URL is required")?;
-    ensure!(
-        !database_url.trim().is_empty(),
-        "C2-C database URL is empty"
-    );
+    ensure!(!database_url.trim().is_empty(), "C2-C database URL is empty");
     PgPoolOptions::new()
         .max_connections(8)
         .acquire_timeout(Duration::from_secs(5))
@@ -192,9 +182,7 @@ async fn connect_pool() -> Result<PgPool> {
 }
 
 async fn validate_database_role(pool: &PgPool) -> Result<()> {
-    let current_role: String = sqlx::query_scalar("SELECT current_user")
-        .fetch_one(pool)
-        .await?;
+    let current_role: String = sqlx::query_scalar("SELECT current_user").fetch_one(pool).await?;
     ensure!(
         current_role == "xmesh_c2c_writer",
         "C2-C database role must be xmesh_c2c_writer"
@@ -214,10 +202,7 @@ async fn validate_database_role(pool: &PgPool) -> Result<()> {
     )
     .fetch_one(pool)
     .await?;
-    ensure!(
-        !memberships,
-        "C2-C database role must not inherit or SET ROLE"
-    );
+    ensure!(!memberships, "C2-C database role must not inherit or SET ROLE");
     let excessive: bool = sqlx::query_scalar(
         "SELECT has_database_privilege(current_database(), 'CREATE')
           OR has_database_privilege(current_database(), 'TEMP')
@@ -259,23 +244,15 @@ async fn validate_database_role(pool: &PgPool) -> Result<()> {
     )
     .fetch_one(pool)
     .await?;
-    ensure!(
-        !excessive,
-        "C2-C database role has excessive effective privileges"
-    );
+    ensure!(!excessive, "C2-C database role has excessive effective privileges");
     Ok(())
 }
 
 fn bind_socket() -> Result<(PathBuf, UnixListener)> {
     let socket_path = env::var_os("XSP_V2_C2C_SOCKET_PATH")
         .map_or_else(|| PathBuf::from(SOCKET_PATH_DEFAULT), PathBuf::from);
-    ensure!(
-        socket_path.is_absolute(),
-        "C2-C socket path must be absolute"
-    );
-    let parent = socket_path
-        .parent()
-        .context("C2-C socket requires parent")?;
+    ensure!(socket_path.is_absolute(), "C2-C socket path must be absolute");
+    let parent = socket_path.parent().context("C2-C socket requires parent")?;
     let metadata = fs::symlink_metadata(parent).context("inspect C2-C socket directory")?;
     ensure!(
         metadata.file_type().is_dir()
@@ -308,27 +285,29 @@ fn bind_socket() -> Result<(PathBuf, UnixListener)> {
     Ok((socket_path, listener))
 }
 
-fn parse_request(raw: &[u8]) -> Result<(i64, Vec<u8>)> {
+fn parse_request(raw: &[u8]) -> Result<(i64, Vec<u8>, bool)> {
     ensure!(
         raw.len() >= 20 && raw.len() <= MAX_REQUEST_BYTES,
         "invalid C2-C request size"
     );
-    ensure!(&raw[..8] == REQUEST_MAGIC, "invalid C2-C request domain");
+    let recovery = if &raw[..8] == RECOVERY_REQUEST_MAGIC {
+        true
+    } else {
+        ensure!(&raw[..8] == REQUEST_MAGIC, "invalid C2-C request domain");
+        false
+    };
     let node_raw: [u8; 8] = raw[8..16].try_into().context("invalid Node field")?;
     let node_u64 = u64::from_be_bytes(node_raw);
     let node_id = i64::try_from(node_u64).context("trusted Node ID exceeds PostgreSQL range")?;
     ensure!(node_id > 0, "invalid trusted Node ID");
     let len_raw: [u8; 4] = raw[16..20].try_into().context("invalid ACK length")?;
     let ack_len = usize::try_from(u32::from_be_bytes(len_raw)).context("ACK length overflow")?;
-    ensure!(
-        ack_len > 0 && ack_len <= MAX_ACK_BYTES,
-        "invalid ACK length"
-    );
+    ensure!(ack_len > 0 && ack_len <= MAX_ACK_BYTES, "invalid ACK length");
     ensure!(
         raw.len() == 20 + ack_len,
         "trailing or truncated C2-C request bytes"
     );
-    Ok((node_id, raw[20..].to_vec()))
+    Ok((node_id, raw[20..].to_vec(), recovery))
 }
 
 fn ack_context(raw: &[u8], trusted_node_id: i64) -> Result<String> {
@@ -347,10 +326,7 @@ fn ack_context(raw: &[u8], trusted_node_id: i64) -> Result<String> {
             && message.path == "/api/v2/node/keys/rotation/ack"
             && !message.request_id.is_empty()
             && message.request_id.len() <= 64
-            && message
-                .request_id
-                .bytes()
-                .all(|byte| byte.is_ascii_graphic()),
+            && message.request_id.bytes().all(|byte| byte.is_ascii_graphic()),
         "ACK is not bound to trusted local transport identity"
     );
     Ok(message.request_id)
@@ -404,11 +380,21 @@ async fn authorize_and_receipt(config: &Config, node_id: i64, ack: &[u8]) -> Res
     .await
 }
 
+async fn recover_durable_receipt(config: &Config, node_id: i64, ack: &[u8]) -> Result<Vec<u8>> {
+    let request_id = ack_context(ack, node_id)?;
+    let pin = panel_pin_for_node(&config.panel_template, node_id)?;
+    xsp_v2_signed_receipt_outbox::load_committed_signed_receipt_staging(
+        &config.pool,
+        node_id,
+        &request_id,
+        ack,
+        &pin,
+    )
+    .await
+}
+
 fn response(ok: bool, payload: &[u8]) -> Result<Vec<u8>> {
-    ensure!(
-        payload.len() <= MAX_RECEIPT_BYTES,
-        "C2-C response payload too large"
-    );
+    ensure!(payload.len() <= MAX_RECEIPT_BYTES, "C2-C response payload too large");
     let mut out = Vec::with_capacity(13 + payload.len());
     out.extend_from_slice(RESPONSE_MAGIC);
     out.push(u8::from(ok));
@@ -418,9 +404,7 @@ fn response(ok: bool, payload: &[u8]) -> Result<Vec<u8>> {
 }
 
 async fn serve_connection(mut stream: UnixStream, config: Arc<Config>) -> Result<()> {
-    let peer = stream
-        .peer_cred()
-        .context("read C2-C origin peer credentials")?;
+    let peer = stream.peer_cred().context("read C2-C origin peer credentials")?;
     ensure!(
         peer.uid() == ORIGIN_UID && peer.gid() == ORIGIN_GID,
         "unexpected process credentials on C2-C socket"
@@ -433,11 +417,14 @@ async fn serve_connection(mut stream: UnixStream, config: Arc<Config>) -> Result
             .context("C2-C request read timeout")??;
     }
     let outcome = async {
-        let (node_id, ack) = parse_request(&raw)?;
-        timeout(
-            Duration::from_secs(10),
-            authorize_and_receipt(&config, node_id, &ack),
-        )
+        let (node_id, ack, recovery) = parse_request(&raw)?;
+        timeout(Duration::from_secs(10), async {
+            if recovery {
+                recover_durable_receipt(&config, node_id, &ack).await
+            } else {
+                authorize_and_receipt(&config, node_id, &ack).await
+            }
+        })
         .await
         .context("C2-C authorization deadline exceeded")?
     }
@@ -465,10 +452,7 @@ async fn run() -> Result<()> {
     validate_database_role(&pool).await?;
     let signer_socket = env::var_os("XSP_V2_SIGNER_SOCKET_PATH")
         .map_or_else(|| PathBuf::from(SIGNER_SOCKET_DEFAULT), PathBuf::from);
-    ensure!(
-        signer_socket.is_absolute(),
-        "signer socket path must be absolute"
-    );
+    ensure!(signer_socket.is_absolute(), "signer socket path must be absolute");
     let (socket_path, listener) = bind_socket()?;
     let config = Arc::new(Config {
         pool,
