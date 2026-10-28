@@ -61,6 +61,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: TriplexCorp/XMesh-Node
+          ref: 3c49fd9b81293f53f7bc599a4bfab5a4c2040164
           path: xmesh-node
       - uses: actions/setup-go@v5
         with:
