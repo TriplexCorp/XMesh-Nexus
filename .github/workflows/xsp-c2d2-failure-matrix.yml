@@ -1,0 +1,85 @@
+name: XSP-v2 C2-D2 Lost Response and Race E2E (test-only)
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/c2c/**"
+      - "backend/src/bin/xsp_v2_c2c.rs"
+      - "backend/src/bin/xsp_v2_c2c_fixture.rs"
+      - "backend/src/xsp_v2_**"
+      - "backend/Dockerfile.xsp-c2c"
+      - "backend/Dockerfile.xsp-signer"
+      - "deploy/postgres/20-create-xsp-v2-signer-role.sql"
+      - "deploy/postgres/21-create-xsp-v2-c2c-role.sql"
+      - "deploy/xsp-v2-ingress/**"
+      - "scripts/generate-xsp-v2-mldsa-test-certs.go"
+      - "scripts/xsp-v2-c2d-node-client_test.go"
+      - "scripts/xsp-v2-c2d-race_test.go"
+      - "scripts/test-xsp-v2-c2d2-lost-response-races.py"
+      - ".github/workflows/xsp-c2d2-failure-matrix.yml"
+  pull_request:
+    paths:
+      - "backend/c2c/**"
+      - "backend/src/bin/xsp_v2_c2c.rs"
+      - "backend/src/bin/xsp_v2_c2c_fixture.rs"
+      - "backend/src/xsp_v2_**"
+      - "backend/Dockerfile.xsp-c2c"
+      - "backend/Dockerfile.xsp-signer"
+      - "deploy/postgres/20-create-xsp-v2-signer-role.sql"
+      - "deploy/postgres/21-create-xsp-v2-c2c-role.sql"
+      - "deploy/xsp-v2-ingress/**"
+      - "scripts/generate-xsp-v2-mldsa-test-certs.go"
+      - "scripts/xsp-v2-c2d-node-client_test.go"
+      - "scripts/xsp-v2-c2d-race_test.go"
+      - "scripts/test-xsp-v2-c2d2-lost-response-races.py"
+      - ".github/workflows/xsp-c2d2-failure-matrix.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache: false
+      - name: Check D2 failure injection and race contracts
+        run: |
+          python3 -m py_compile scripts/test-xsp-v2-c2d2-lost-response-races.py deploy/xsp-v2-ingress/origin_ack_gate.py
+          test -f scripts/xsp-v2-c2d-race_test.go
+          ! grep -R --line-number --fixed-strings 'strict-pq=on' scripts/test-xsp-v2-c2d2-lost-response-races.py scripts/xsp-v2-c2d-race_test.go
+          ! grep -R --line-number -E '(-p|--publish)[ =]' scripts/test-xsp-v2-c2d2-lost-response-races.py
+          grep -Fq 'XSP_V2_C2D_TEST_FAULT' deploy/xsp-v2-ingress/origin_ack_gate.py
+          grep -Fq 'drop-before-c2c' deploy/xsp-v2-ingress/origin_ack_gate.py scripts/test-xsp-v2-c2d2-lost-response-races.py
+          grep -Fq 'drop-on-c2c-failure' deploy/xsp-v2-ingress/origin_ack_gate.py scripts/test-xsp-v2-c2d2-lost-response-races.py
+          grep -Fq 'drop-after-c2c-success' deploy/xsp-v2-ingress/origin_ack_gate.py scripts/test-xsp-v2-c2d2-lost-response-races.py
+          grep -Fq 'TEST_FAULT and C2C_GATE != "staging-only"' deploy/xsp-v2-ingress/origin_ack_gate.py
+          grep -Fq 'class UnixHTTPServer(socketserver.ThreadingMixIn, socketserver.UnixStreamServer)' deploy/xsp-v2-ingress/origin_ack_gate.py
+          grep -Fq 'request_queue_size = 32' deploy/xsp-v2-ingress/origin_ack_gate.py
+          grep -Fq 'TestC2DExactDuplicateNetworkRace' scripts/xsp-v2-c2d-race_test.go scripts/test-xsp-v2-c2d2-lost-response-races.py
+          grep -Fq 'TestC2DFreshMismatchedRetryRejected' scripts/xsp-v2-c2d-race_test.go scripts/test-xsp-v2-c2d2-lost-response-races.py
+
+  full-process-e2e:
+    name: Real Node lost-response windows and exact duplicate race convergence
+    needs: source-contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout XMesh-Node verified staging client
+        uses: actions/checkout@v4
+        with:
+          repository: TriplexCorp/XMesh-Node
+          ref: 3c49fd9b81293f53f7bc599a4bfab5a4c2040164
+          path: xmesh-node
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache: false
+      - name: Verify Node staging module before cross-repo E2E
+        working-directory: xmesh-node/security/xspv2/poc-go
+        run: go test ./...
+      - name: Exercise integrated lost-response and duplicate/race convergence matrix
+        run: python3 scripts/test-xsp-v2-c2d2-lost-response-races.py --node-repo xmesh-node
