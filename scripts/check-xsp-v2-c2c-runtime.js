@@ -62,6 +62,8 @@ assert.match(origin, /SO_PEERCRED/);
 assert.match(origin, /C2C_UID = 10001/);
 assert.match(origin, /client\.getsockopt[\s\S]*unexpected C2-C service peer[\s\S]*client\.sendall/,
   'origin must authenticate the C2-C peer before sending ACK bytes');
+assert.match(origin, /is_recovery and now_ms <= message\["expiresAtMs"\]/,
+  'historical recovery must be rejected until the original ACK has actually expired');
 assert.match(origin, /not is_recovery[\s\S]*now_ms > message\["expiresAtMs"\]/,
   'ordinary state-changing ACK route must retain freshness and expiry rejection');
 assert.match(origin, /authorizationStatus": "not-verified"/,
