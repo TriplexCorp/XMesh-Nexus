@@ -1,4 +1,4 @@
-name: XSP-v2 C2-D Full Process E2E (test-only)
+name: XSP-v2 C2-D1 Integrated Process E2E (test-only)
 on:
   push:
     branches: [main]
@@ -43,7 +43,7 @@ jobs:
         with:
           go-version: '1.27.3'
           cache: false
-      - name: Check C2-D harness syntax and staging boundary
+      - name: Check C2-D1 harness syntax and staging boundary
         run: |
           python3 -m py_compile scripts/test-xsp-v2-c2d-full-e2e.py
           test -f scripts/xsp-v2-c2d-node-client_test.go
@@ -70,5 +70,5 @@ jobs:
       - name: Verify Node staging module before cross-repo E2E
         working-directory: xmesh-node/security/xspv2/poc-go
         run: go test ./...
-      - name: Exercise full C2-D process and retry boundary
+      - name: Exercise C2-D1 integrated process and durable local restart boundary
         run: python3 scripts/test-xsp-v2-c2d-full-e2e.py --node-repo xmesh-node
