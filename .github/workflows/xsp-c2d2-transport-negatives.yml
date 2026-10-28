@@ -59,8 +59,8 @@ jobs:
           grep -Fq 'ssl_reject_handshake on;' deploy/xsp-v2-ingress/nginx-c2b.conf
           test "$(grep -Fc 'ssl_protocols TLSv1.3;' deploy/xsp-v2-ingress/nginx-c2b.conf)" -eq 2
           test "$(grep -Fc 'ssl_ecdh_curve X25519MLKEM768;' deploy/xsp-v2-ingress/nginx-c2b.conf)" -eq 2
-          grep -Fq 'xsp-probe-entrypoint' deploy/xsp-v2-ingress/Dockerfile
-          grep -Fq 'if [ "${1-}" = "openssl" ]; then exec "$@"; fi' deploy/xsp-v2-ingress/Dockerfile
+          grep -Fq 'ENTRYPOINT ["/bin/sh"]' deploy/xsp-v2-ingress/Dockerfile
+          grep -Fq 'exec /usr/bin/openssl "$@"' deploy/xsp-v2-ingress/Dockerfile
           grep -Fq 'location = /api/v2/node/keys/rotation/ack {' deploy/xsp-v2-ingress/nginx-c2b.conf
           grep -Fq 'location = /api/v2/node/keys/rotation/ack/recover {' deploy/xsp-v2-ingress/nginx-c2b.conf
           grep -Fq 'location / {' deploy/xsp-v2-ingress/nginx-c2b.conf
