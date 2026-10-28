@@ -118,7 +118,8 @@ s.close();sys.stdout.buffer.write(out)
             )
             request_file.unlink(missing_ok=True)
             wire = (result.stdout or "").encode("latin1")
-            if b"\r\n\r\n" not in wire:
+            separator = b"\r\n\r\n" if b"\r\n\r\n" in wire else b"\n\n" if b"\n\n" in wire else None
+            if separator is None:
                 if uid == 10003:
                     details = [f"client_rc={result.returncode}"]
                     if result.stderr:
@@ -129,8 +130,8 @@ s.close();sys.stdout.buffer.write(out)
                         details.append(f"{service}={safe}")
                     raise RuntimeError("trusted origin request returned no HTTP response: " + " | ".join(details))
                 return 0, wire
-            head, body = wire.split(b"\r\n\r\n", 1)
-            first = head.split(b"\r\n", 1)[0].split()
+            head, body = wire.split(separator, 1)
+            first = head.splitlines()[0].split()
             return (int(first[1]) if len(first) >= 2 and first[1].isdigit() else 0), body
 
         def direct_c2c_wrong_peer(node_id: int, ack: bytes) -> None:
