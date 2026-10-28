@@ -431,7 +431,7 @@ chmod 0444 /certs/client.pem /certs/other-client.pem /certs/classical-client.pem
             outbox = sql(
                 f"SELECT count(*) FROM node_xsp_signed_commit_receipt_outbox WHERE node_id={node_id} AND request_id='{request_id}';"
             ).stdout.strip()
-            if (epoch, state, outbox) != (str(to_epoch), "receipt_sent", "1"):
+            if (epoch, state, outbox) != (str(to_epoch), "ack_verified", "1"):
                 raise RuntimeError(f"full C2-D commit state invalid: {epoch}/{state}/{outbox}")
             print("PASS: real Node strict mutual-PQ client reached ACK commit and verified durable signed receipt")
 
