@@ -8,31 +8,33 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
 
 type c2dPin struct {
-	IssuerID     string `json:"issuerId"`
-	NodeID       uint64 `json:"nodeId"`
-	Purpose      string `json:"purpose"`
-	EdKeyID      string `json:"edKeyId"`
-	PQKeyID      string `json:"pqKeyId"`
-	EdPublicB64  string `json:"edPublicB64"`
-	PQPublicB64  string `json:"pqPublicB64"`
+	IssuerID    string `json:"issuerId"`
+	NodeID      uint64 `json:"nodeId"`
+	Purpose     string `json:"purpose"`
+	EdKeyID     string `json:"edKeyId"`
+	PQKeyID     string `json:"pqKeyId"`
+	EdPublicB64 string `json:"edPublicB64"`
+	PQPublicB64 string `json:"pqPublicB64"`
 }
 
 type c2dExpected struct {
-	NodeID                 uint64 `json:"nodeId"`
-	FromEpoch              uint64 `json:"fromEpoch"`
-	ToEpoch                uint64 `json:"toEpoch"`
-	RequestID              string `json:"requestId"`
-	FromEdKeyID            string `json:"fromEdKeyId"`
-	FromPQKeyID            string `json:"fromPQKeyId"`
-	ToEdKeyID              string `json:"toEdKeyId"`
-	ToPQKeyID              string `json:"toPQKeyId"`
-	CandidateSHA256Hex     string `json:"candidateSha256Hex"`
+	NodeID             uint64 `json:"nodeId"`
+	FromEpoch          uint64 `json:"fromEpoch"`
+	ToEpoch            uint64 `json:"toEpoch"`
+	RequestID          string `json:"requestId"`
+	FromEdKeyID        string `json:"fromEdKeyId"`
+	FromPQKeyID        string `json:"fromPQKeyId"`
+	ToEdKeyID          string `json:"toEdKeyId"`
+	ToPQKeyID          string `json:"toPQKeyId"`
+	CandidateSHA256Hex string `json:"candidateSha256Hex"`
 }
 
 type c2dBundle struct {
@@ -71,6 +73,61 @@ func c2dPinValue(t *testing.T, raw c2dPin) PinnedPublic {
 		EdPublic: ed,
 		PQPublic: pq,
 	}
+}
+
+// c2dRecoverHistoricalPermitForReceiptRetry is deliberately narrower than a
+// normal permit reload. It is available only to this injected C2-D test file
+// and reconstructs a VerifiedPermit marker only after durable permit, ACK and
+// receipt journals already exist and their exact bindings/signatures verify.
+// It cannot authorize a new cutover from an expired permit.
+func c2dRecoverHistoricalPermitForReceiptRetry(
+	journal string,
+	signedPermit []byte,
+	panel PinnedPublic,
+	next PinnedPublic,
+	want ExpectedPermit,
+	minEpoch uint64,
+	nowMS int64,
+) (VerifiedPermit, error) {
+	var empty VerifiedPermit
+	permitRow, err := readPermitFile(filepath.Join(journal, journalName))
+	if err != nil {
+		return empty, err
+	}
+	if !bytes.Equal(permitRow.SignedPermit, signedPermit) || permitRow.EnvelopeSHA256 != sha(signedPermit) {
+		return empty, errors.New("historical permit bytes differ from durable journal")
+	}
+	signed, err := Decode(signedPermit)
+	if err != nil {
+		return empty, err
+	}
+	if signed.Message.Kind != "permit" || !permitMatches(signed.Message, want) {
+		return empty, errors.New("historical permit no longer matches approved request")
+	}
+	if err = checkPublic(panel, signed.Message, "panel_response"); err != nil {
+		return empty, err
+	}
+	canonical, err := verifyBoth(signed, panel)
+	if err != nil {
+		return empty, err
+	}
+	permit := VerifiedPermit{message: signed.Message, inputHash: sha(canonical)}
+	if permit.PermitDigest() != permitRow.PermitDigest {
+		return empty, errors.New("historical permit digest differs from durable journal")
+	}
+
+	ack, err := checkSavedACKForReceipt(journal, permit)
+	if err != nil {
+		return empty, err
+	}
+	receiptRow, err := readCommitReceiptRecord(filepath.Join(journal, commitReceiptJournalName))
+	if err != nil {
+		return empty, err
+	}
+	if _, err = verifyReceiptJournalRow(receiptRow, ack, panel, permit, next, minEpoch, nowMS); err != nil {
+		return empty, err
+	}
+	return permit, nil
 }
 
 func TestC2DFullExchange(t *testing.T) {
@@ -113,10 +170,22 @@ func TestC2DFullExchange(t *testing.T) {
 	now := time.Now().UnixMilli()
 	permit, err := PersistVerifiedPermit(journal, signedPermit, panel, want, now)
 	if err != nil {
-		t.Fatalf("permit verification/journal failed: %v", err)
+		if !errors.Is(err, os.ErrNotExist) {
+			permit, err = c2dRecoverHistoricalPermitForReceiptRetry(
+				journal, signedPermit, panel, next, want, bundle.Expected.ToEpoch, now,
+			)
+		}
+		if err != nil {
+			t.Fatalf("permit verification/journal failed: %v", err)
+		}
 	}
-	if _, err := persistVerifiedAppliedACK(journal, signedACK, permit, next, now); err != nil {
-		t.Fatalf("ACK verification/journal failed: %v", err)
+
+	if _, statErr := os.Stat(filepath.Join(journal, commitReceiptJournalName)); errors.Is(statErr, os.ErrNotExist) {
+		if _, err := persistVerifiedAppliedACK(journal, signedACK, permit, next, now); err != nil {
+			t.Fatalf("ACK verification/journal failed: %v", err)
+		}
+	} else if statErr != nil {
+		t.Fatalf("receipt journal state unavailable: %v", statErr)
 	}
 
 	caPEM, err := os.ReadFile(c2dRequired(t, "XSP_C2D_CA_FILE"))
