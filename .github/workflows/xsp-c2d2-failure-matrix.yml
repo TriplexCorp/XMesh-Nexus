@@ -58,6 +58,8 @@ jobs:
           grep -Fq 'TEST_FAULT and C2C_GATE != "staging-only"' deploy/xsp-v2-ingress/origin_ack_gate.py
           grep -Fq 'class UnixHTTPServer(socketserver.ThreadingMixIn, socketserver.UnixStreamServer)' deploy/xsp-v2-ingress/origin_ack_gate.py
           grep -Fq 'request_queue_size = 32' deploy/xsp-v2-ingress/origin_ack_gate.py
+          grep -Fq 'reloadVerifiedPermitForReceiptRetry' scripts/xsp-v2-c2d-race_test.go
+          ! grep -Fq 'c2dRecoverHistoricalPermitForDurableReceipt' scripts/xsp-v2-c2d-race_test.go scripts/xsp-v2-c2d-node-client_test.go
           grep -Fq 'TestC2DExactDuplicateNetworkRace' scripts/xsp-v2-c2d-race_test.go scripts/test-xsp-v2-c2d2-lost-response-races.py
           grep -Fq 'TestC2DFreshMismatchedRetryRejected' scripts/xsp-v2-c2d-race_test.go scripts/test-xsp-v2-c2d2-lost-response-races.py
 
