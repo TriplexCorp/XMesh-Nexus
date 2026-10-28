@@ -4,6 +4,11 @@ version = "0.1.0"
 edition = "2024"
 publish = false
 
+[[bin]]
+name = "xsp-v2-c2c"
+path = "src/bin/xsp_v2_c2c.rs"
+required-features = ["xsp-v2-experimental"]
+
 [features]
 default = []
 # Build only in an audited OpenSSL 3.5+ environment; disabled in production Docker.

@@ -1,0 +1,83 @@
+name: XSP-v2 C2-C ACK Authorization (test-only)
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/Cargo.toml"
+      - "backend/src/bin/xsp_v2_c2c.rs"
+      - "backend/tests/xsp_v2_c2c_fixture.rs"
+      - "backend/src/xsp_v2_ack_epoch_commit.rs"
+      - "backend/src/xsp_v2_ack_ledger_validator.rs"
+      - "backend/src/xsp_v2_candidate_binding.rs"
+      - "backend/src/xsp_v2_commit_receipt.rs"
+      - "backend/src/xsp_v2_db_candidate_snapshot.rs"
+      - "backend/src/xsp_v2_permit_ledger_writer.rs"
+      - "backend/src/xsp_v2_signed_cutover.rs"
+      - "backend/src/xsp_v2_signed_receipt_outbox.rs"
+      - "backend/src/xsp_v2_signer.rs"
+      - "backend/Dockerfile.xsp-c2c"
+      - "backend/Dockerfile.xsp-signer"
+      - "deploy/postgres/20-create-xsp-v2-signer-role.sql"
+      - "deploy/postgres/21-create-xsp-v2-c2c-role.sql"
+      - "deploy/xsp-v2-ingress/origin_ack_gate.py"
+      - "scripts/check-xsp-v2-c2c-runtime.js"
+      - "scripts/test-xsp-v2-c2c-integration.py"
+      - "scripts/generate-xsp-v2-mldsa-test-certs.go"
+      - ".github/workflows/xsp-c2c.yml"
+  pull_request:
+    paths:
+      - "backend/Cargo.toml"
+      - "backend/src/bin/xsp_v2_c2c.rs"
+      - "backend/tests/xsp_v2_c2c_fixture.rs"
+      - "backend/src/xsp_v2_ack_epoch_commit.rs"
+      - "backend/src/xsp_v2_ack_ledger_validator.rs"
+      - "backend/src/xsp_v2_candidate_binding.rs"
+      - "backend/src/xsp_v2_commit_receipt.rs"
+      - "backend/src/xsp_v2_db_candidate_snapshot.rs"
+      - "backend/src/xsp_v2_permit_ledger_writer.rs"
+      - "backend/src/xsp_v2_signed_cutover.rs"
+      - "backend/src/xsp_v2_signed_receipt_outbox.rs"
+      - "backend/src/xsp_v2_signer.rs"
+      - "backend/Dockerfile.xsp-c2c"
+      - "backend/Dockerfile.xsp-signer"
+      - "deploy/postgres/20-create-xsp-v2-signer-role.sql"
+      - "deploy/postgres/21-create-xsp-v2-c2c-role.sql"
+      - "deploy/xsp-v2-ingress/origin_ack_gate.py"
+      - "scripts/check-xsp-v2-c2c-runtime.js"
+      - "scripts/test-xsp-v2-c2c-integration.py"
+      - "scripts/generate-xsp-v2-mldsa-test-certs.go"
+      - ".github/workflows/xsp-c2c.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-contract:
+    name: C2-C local boundary and least-privilege source contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify no TCP/header identity handoff or production activation
+        run: node scripts/check-xsp-v2-c2c-runtime.js
+      - name: Check Python harness syntax
+        run: |
+          python3 -m py_compile deploy/xsp-v2-ingress/origin_ack_gate.py
+          python3 -m py_compile scripts/test-xsp-v2-c2c-integration.py
+
+  c2c-process-e2e:
+    name: Dual-signed ACK commit, protected signer and immutable receipt E2E
+    needs: source-contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache: false
+      - name: Verify Go fixture helper builds
+        run: go build ./scripts/generate-xsp-v2-mldsa-test-certs.go
+      - name: Exercise C2-C process/DB/signer boundary
+        run: python3 scripts/test-xsp-v2-c2c-integration.py

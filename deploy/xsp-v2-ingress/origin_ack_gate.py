@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Disposable P0-C2-B staging ACK structural gate.
+"""Disposable P0-C2-B/C staging ACK origin gate.
 
-This process is deliberately NOT the C2-C cryptographic ACK verifier. It accepts
-only one exact operation after independently checking the C2-A Unix peer/client
-certificate boundary, then validates the signed-cutover envelope shape and
-trusted Node binding without performing signature verification or DB mutation.
+C2-B performs only structural validation behind the proven C2-A Unix peer/client
+certificate boundary. When the explicit C2-C staging gate is enabled, the same
+trusted Node identity and exact ACK bytes are handed to the Rust cryptographic
+service over a second peer-credential-protected Unix socket. No caller header,
+body field, source IP, or legacy identity becomes trusted transport identity.
 """
 from __future__ import annotations
 
@@ -26,12 +27,18 @@ EXPECTED_GID = int(os.environ.get("XSP_EXPECTED_INGRESS_GID", "10003"))
 EXPECTED_SPKI = os.environ.get("XSP_EXPECTED_CLIENT_SPKI_SHA256", "").strip().lower()
 EXPECTED_NODE_ID = os.environ.get("XSP_EXPECTED_NODE_ID", "").strip()
 ACK_GATE = os.environ.get("XSP_V2_C2B_ACK_ROUTE", "")
+C2C_GATE = os.environ.get("XSP_V2_C2C_ACK_AUTH", "")
+C2C_SOCKET_PATH = Path(os.environ.get("XSP_V2_C2C_SOCKET_PATH", "/run/xmesh-c2c/c2c.sock"))
 ACK_PATH = "/api/v2/node/keys/rotation/ack"
 MAX_CERT_HEADER = 24 * 1024
 MAX_ACK_BODY = 16 * 1024
 MAX_SIGNATURE_TEXT = 8 * 1024
 MAX_U64 = (1 << 64) - 1
 MAX_I64 = (1 << 63) - 1
+C2C_REQUEST_MAGIC = b"XSP2C2C1"
+C2C_RESPONSE_MAGIC = b"XSP2C2R1"
+C2C_UID = 10001
+C2C_GID = 10001
 MESSAGE_KEYS = {
     "kind", "issuerId", "signerEdKeyId", "signerPQKeyId", "nodeId",
     "fromEpoch", "toEpoch", "requestId", "fromEdKeyId", "fromPQKeyId",
@@ -86,6 +93,46 @@ def bounded_ascii(value: object, maximum: int) -> bool:
     )
 
 
+def read_exact(stream: socket.socket, size: int) -> bytes:
+    out = bytearray()
+    while len(out) < size:
+        chunk = stream.recv(size - len(out))
+        if not chunk:
+            raise ValueError("truncated C2-C response")
+        out.extend(chunk)
+    return bytes(out)
+
+
+def authorize_c2c(node_id: int, raw_ack: bytes) -> bytes:
+    if node_id <= 0 or len(raw_ack) <= 0 or len(raw_ack) > MAX_ACK_BODY:
+        raise ValueError("invalid C2-C local request")
+    frame = C2C_REQUEST_MAGIC + struct.pack(">Q", node_id) + struct.pack(">I", len(raw_ack)) + raw_ack
+    client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    client.settimeout(12)
+    try:
+        client.connect(str(C2C_SOCKET_PATH))
+        peer = client.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize("3i"))
+        _pid, uid, gid = struct.unpack("3i", peer)
+        if uid != C2C_UID or gid != C2C_GID:
+            raise ValueError("unexpected C2-C service peer")
+        client.sendall(frame)
+        client.shutdown(socket.SHUT_WR)
+        header = read_exact(client, 13)
+        if header[:8] != C2C_RESPONSE_MAGIC or header[8] not in (0, 1):
+            raise ValueError("invalid C2-C response domain")
+        length = struct.unpack(">I", header[9:13])[0]
+        if length > MAX_ACK_BODY:
+            raise ValueError("C2-C response too large")
+        payload = read_exact(client, length)
+        if client.recv(1) != b"":
+            raise ValueError("trailing C2-C response bytes")
+        if header[8] != 1 or not payload:
+            raise ValueError("C2-C authorization rejected")
+        return payload
+    finally:
+        client.close()
+
+
 class UnixHTTPServer(socketserver.UnixStreamServer):
     allow_reuse_address = False
 
@@ -95,7 +142,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
     sys_version = ""
 
     def log_message(self, _format: str, *args: object) -> None:
-        # Never log certificates, ACK bodies, signatures, nonces, or key IDs.
         return
 
     def send_json(self, status: int, value: dict[str, object]) -> None:
@@ -130,7 +176,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         node_id = int(EXPECTED_NODE_ID)
         return node_id if node_id > 0 else None
 
-    def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
+    def do_GET(self) -> None:
         if self.path != "/identity-probe":
             self.send_json(404, {"error": "not found"})
             return
@@ -140,7 +186,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return
         self.send_json(200, {"originTransport": "unix-peercred", "trustedNodeId": node_id})
 
-    def do_POST(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
+    def do_POST(self) -> None:
         if self.path != ACK_PATH or ACK_GATE != "staging-only":
             self.send_json(404, {"error": "not found"})
             return
@@ -235,6 +281,19 @@ class Handler(http.server.BaseHTTPRequestHandler):
         ):
             self.send_json(400, {"error": "invalid staging ACK"})
             return
+        if C2C_GATE == "staging-only":
+            try:
+                receipt = authorize_c2c(node_id, raw)
+            except (OSError, ValueError, struct.error):
+                self.send_json(503, {"error": "C2-C authorization unavailable or rejected"})
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(receipt)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(receipt)
+            return
         self.send_json(
             202,
             {
@@ -250,6 +309,8 @@ def main() -> None:
         raise SystemExit("XSP_EXPECTED_CLIENT_SPKI_SHA256 must be lowercase SHA-256 hex")
     if not EXPECTED_NODE_ID.isdigit() or int(EXPECTED_NODE_ID) <= 0:
         raise SystemExit("XSP_EXPECTED_NODE_ID must be a positive integer")
+    if C2C_GATE not in ("", "staging-only"):
+        raise SystemExit("XSP_V2_C2C_ACK_AUTH must be unset or staging-only")
     SOCKET_PATH.parent.mkdir(parents=True, exist_ok=True)
     try:
         SOCKET_PATH.unlink()

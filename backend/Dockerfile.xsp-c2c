@@ -1,0 +1,51 @@
+# syntax=docker/dockerfile:1.7
+# Disposable P0-C2-C local authorization service. It is not referenced by the
+# default Compose stack or installer and contains no private panel signing key.
+ARG C2C_BUILDER_IMAGE=rust:1.99-trixie
+FROM ${C2C_BUILDER_IMAGE} AS builder
+WORKDIR /build/backend
+ENV CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=4 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends pkg-config libssl-dev openssl python3 \
+    && rm -rf /var/lib/apt/lists/*
+ARG C2C_BUILD_TESTS=0
+RUN --mount=type=secret,id=proxy_ca \
+    --mount=type=bind,source=backend,target=/source/backend \
+    --mount=type=bind,source=docs,target=/source/docs \
+    --mount=type=cache,id=xmesh-c2c-registry,target=/usr/local/cargo/registry \
+    --mount=type=cache,id=xmesh-c2c-target,target=/build/backend/target \
+    set -eu; \
+    if [ -f /run/secrets/proxy_ca ]; then export CARGO_HTTP_CAINFO=/run/secrets/proxy_ca CARGO_HTTP_PROXY_CAINFO=/run/secrets/proxy_ca; fi; \
+    cp /source/backend/Cargo.toml .; \
+    cp -a /source/backend/src /source/backend/migrations /source/backend/tests .; \
+    cp -a /source/docs /build/docs; \
+    cargo build --release --features xsp-v2-experimental --bin xsp-v2-c2c; \
+    mkdir -p /build/output; \
+    cp target/release/xsp-v2-c2c /build/output/xsp-v2-c2c; \
+    if [ "$C2C_BUILD_TESTS" = 1 ]; then \
+      cargo test --features xsp-v2-experimental --test xsp_v2_c2c_fixture --no-run --message-format=json > /build/c2c-test-artifacts.json; \
+      python3 -c 'import json,shutil; rows=[json.loads(line) for line in open("/build/c2c-test-artifacts.json")]; bins=[r["executable"] for r in rows if r.get("reason")=="compiler-artifact" and r.get("profile",{}).get("test") and r.get("target",{}).get("name")=="xsp_v2_c2c_fixture" and r.get("executable")]; assert len(bins)==1; shutil.copy2(bins[0],"/build/output/xsp-v2-c2c-fixture")'; \
+    fi
+
+FROM debian:trixie-slim AS runtime-base
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates libssl3t64 \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system --gid 10001 xmesh \
+    && groupadd --system --gid 10003 xmesh-origin-shared \
+    && useradd --system --uid 10001 --gid xmesh --groups xmesh-origin-shared \
+       --home-dir /nonexistent --shell /usr/sbin/nologin xmesh-c2c
+COPY --from=builder /build/output/xsp-v2-c2c /usr/local/bin/xsp-v2-c2c
+USER 10001:10001
+WORKDIR /nonexistent
+ENTRYPOINT ["/usr/local/bin/xsp-v2-c2c"]
+
+FROM runtime-base AS runtime
+
+FROM runtime-base AS c2c-tests
+USER 0:0
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 openssl \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /build/output/xsp-v2-c2c-fixture /build/output/xsp-v2-c2c-fixture
+ENTRYPOINT ["/build/output/xsp-v2-c2c-fixture"]
