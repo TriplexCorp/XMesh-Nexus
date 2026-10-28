@@ -1,4 +1,4 @@
-name: XSP-v2 C2-D1 Integrated Process E2E (test-only)
+name: XSP-v2 C2-D2 Historical Receipt Recovery E2E (test-only)
 on:
   push:
     branches: [main]
@@ -15,6 +15,7 @@ on:
       - "scripts/generate-xsp-v2-mldsa-test-certs.go"
       - "scripts/xsp-v2-c2d-node-client_test.go"
       - "scripts/test-xsp-v2-c2d-full-e2e.py"
+      - "scripts/check-xsp-v2-c2c-runtime.js"
       - ".github/workflows/xsp-c2d.yml"
   pull_request:
     paths:
@@ -30,6 +31,7 @@ on:
       - "scripts/generate-xsp-v2-mldsa-test-certs.go"
       - "scripts/xsp-v2-c2d-node-client_test.go"
       - "scripts/test-xsp-v2-c2d-full-e2e.py"
+      - "scripts/check-xsp-v2-c2c-runtime.js"
       - ".github/workflows/xsp-c2d.yml"
   workflow_dispatch:
 permissions:
@@ -43,27 +45,32 @@ jobs:
         with:
           go-version: '1.27.3'
           cache: false
-      - name: Check C2-D1 harness syntax and staging boundary
+      - name: Check C2-D2 historical recovery boundary
         run: |
-          python3 -m py_compile scripts/test-xsp-v2-c2d-full-e2e.py
+          python3 -m py_compile scripts/test-xsp-v2-c2d-full-e2e.py deploy/xsp-v2-ingress/origin_ack_gate.py
+          node scripts/check-xsp-v2-c2c-runtime.js
           test -f scripts/xsp-v2-c2d-node-client_test.go
           ! grep -R --line-number --fixed-strings 'strict-pq=on' scripts/test-xsp-v2-c2d-full-e2e.py scripts/xsp-v2-c2d-node-client_test.go
           ! grep -R --line-number -E '(-p|--publish)[ =]' scripts/test-xsp-v2-c2d-full-e2e.py
-          grep -Fq 'network retry of' scripts/xsp-v2-c2d-node-client_test.go
-          grep -Fq 'belongs to D2' scripts/xsp-v2-c2d-node-client_test.go
+          grep -Fq 'RecoverSignedACKReceipt' scripts/xsp-v2-c2d-node-client_test.go
+          grep -Fq 'reloadVerifiedPermitForReceiptRetry' scripts/xsp-v2-c2d-node-client_test.go
+          grep -Fq 'C2-D2 historical network recovery complete' scripts/xsp-v2-c2d-node-client_test.go
+          grep -Fq 'XSP2C2H1' deploy/xsp-v2-ingress/origin_ack_gate.py backend/src/bin/xsp_v2_c2c.rs
+          grep -Fq 'load_committed_signed_receipt_staging' backend/src/bin/xsp_v2_c2c.rs
+          grep -Fq '/api/v2/node/keys/rotation/ack/recover' deploy/xsp-v2-ingress/nginx-c2b.conf
 
   full-process-e2e:
-    name: Node strict PQ mTLS -> ACK commit -> signer -> verified durable receipt
+    name: Expired exact ACK -> strict PQ recovery -> immutable durable receipt
     needs: source-contract
     runs-on: ubuntu-latest
     timeout-minutes: 55
     steps:
       - uses: actions/checkout@v4
-      - name: Checkout XMesh-Node verified staging client
+      - name: Checkout XMesh-Node verified D2 recovery prerequisite
         uses: actions/checkout@v4
         with:
           repository: TriplexCorp/XMesh-Node
-          ref: 3c49fd9b81293f53f7bc599a4bfab5a4c2040164
+          ref: 2cbe3a82473fc199c2354497eaf009707603f3f2
           path: xmesh-node
       - uses: actions/setup-go@v5
         with:
@@ -72,5 +79,5 @@ jobs:
       - name: Verify Node staging module before cross-repo E2E
         working-directory: xmesh-node/security/xspv2/poc-go
         run: go test ./...
-      - name: Exercise C2-D1 integrated process and durable local restart boundary
+      - name: Exercise C2-D2 expired exact network recovery with signer offline
         run: python3 scripts/test-xsp-v2-c2d-full-e2e.py --node-repo xmesh-node
