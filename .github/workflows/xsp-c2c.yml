@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - "backend/Cargo.toml"
+      - "backend/c2c/Cargo.toml"
       - "backend/src/bin/xsp_v2_c2c.rs"
       - "backend/src/bin/xsp_v2_c2c_fixture.rs"
       - "backend/src/xsp_v2_ack_epoch_commit.rs"
@@ -28,6 +29,7 @@ on:
   pull_request:
     paths:
       - "backend/Cargo.toml"
+      - "backend/c2c/Cargo.toml"
       - "backend/src/bin/xsp_v2_c2c.rs"
       - "backend/src/bin/xsp_v2_c2c_fixture.rs"
       - "backend/src/xsp_v2_ack_epoch_commit.rs"
@@ -68,9 +70,29 @@ jobs:
           python3 -m py_compile deploy/xsp-v2-ingress/origin_ack_gate.py
           python3 -m py_compile scripts/test-xsp-v2-c2c-integration.py
 
+  c2c-rust-lint:
+    name: C2-C isolated package strict Clippy
+    runs-on: ubuntu-latest
+    container: rust:1.99-trixie
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install OpenSSL 3.5 development headers
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends pkg-config libssl-dev
+          rustup component add clippy rustfmt
+      - name: Verify isolated package formatting and strict Clippy
+        run: |
+          cargo fmt --manifest-path backend/c2c/Cargo.toml --all -- --check
+          cargo clippy --manifest-path backend/c2c/Cargo.toml --bins --features xsp-v2-experimental -- \
+            -D warnings \
+            -D clippy::pedantic \
+            -D clippy::nursery \
+            -F unsafe-code
+
   c2c-process-e2e:
     name: Dual-signed ACK commit, protected signer and immutable receipt E2E
-    needs: source-contract
+    needs: [source-contract, c2c-rust-lint]
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
