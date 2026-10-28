@@ -11,6 +11,7 @@ A green test proves only its stated boundary. Code existence ≠ E2E ≠ securit
 - **Nexus C2-D1 implementation checkpoint:** [`037290bbb31dc6e5d155a14b8ddf58a31e21066f`](https://github.com/TriplexCorp/XMesh-Nexus/commit/037290bbb31dc6e5d155a14b8ddf58a31e21066f), merge of [PR #73](https://github.com/TriplexCorp/XMesh-Nexus/pull/73).
 - PR #73 exact pre-merge head `298fba8b17f08bd306ab3f68c998354da3c643b5` passed Backend CI and XSP-v2 C2-D1 Integrated Process E2E.
 - On exact merge SHA `037290bbb31dc6e5d155a14b8ddf58a31e21066f`, [C2-D1 Integrated Process E2E #40720824028](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40720824028) and [Backend CI #40720823715](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40720823715) completed **success**.
+- **Clean documentation/main checkpoint after D1:** [`9900f8c99efc59f86699a6c0ab35c3b39b211d37`](https://github.com/TriplexCorp/XMesh-Nexus/commit/9900f8c99efc59f86699a6c0ab35c3b39b211d37), merge of docs-only [PR #74](https://github.com/TriplexCorp/XMesh-Nexus/pull/74). Post-merge [Backend CI #40724165330](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40724165330) completed **success** on that exact SHA. This is the clean starting point for C2-D2 and does not supersede the D1 implementation evidence above.
 - **XMesh-Node C2-D staging transport checkpoint:** [`3c49fd9b81293f53f7bc599a4bfab5a4c2040164`](https://github.com/TriplexCorp/XMesh-Node/commit/3c49fd9b81293f53f7bc599a4bfab5a4c2040164), merge of [Node PR #30](https://github.com/TriplexCorp/XMesh-Node/pull/30); Node CI and Go 1.27 Crypto passed on exact head and post-merge. The Nexus D1 workflow pins this exact Node SHA.
 - **Nexus C2-C implementation checkpoint:** [`37b9e49da1a9fd43657dd167ebb9d5e9a4580091`](https://github.com/TriplexCorp/XMesh-Nexus/commit/37b9e49da1a9fd43657dd167ebb9d5e9a4580091), merge of [PR #71](https://github.com/TriplexCorp/XMesh-Nexus/pull/71).
 - Earlier signer P0 (PR #61), dedicated PQ-only ingress P0-C1 (PR #64), trusted ingress→origin identity boundary P0-C2-A (PR #66), narrow staging ACK gate P0-C2-B (PR #69) and C2-C ACK crypto/transaction/signer (PR #71) remain complete in their stated staging/process scopes.
@@ -43,7 +44,7 @@ All are mandatory:
 | P0-C2-B narrow staging ACK route | **P0 COMPLETE — isolated staging/process** | PR #69; exact gated ACK structural operation, no broad proxy |
 | P0-C2-C ACK crypto/transaction/signer | **P0 COMPLETE — isolated staging/process** | PR #71; dual-signature ACK auth, atomic commit, protected signer, immutable receipt/recovery |
 | P0-C2-D1 real Node integrated E2E | **P0 COMPLETE — isolated staging/process** | PR #73; pinned Node SHA → strict PQ mTLS → ACK commit → signer → Node-verified durable receipt |
-| **P0-C2-D2 failure/retry/recovery matrix** | **CURRENT P0** | Expired exact retry, lost-response windows, races, outages/restarts, downgrade/no-legacy proof |
+| **P0-C2-D2 failure/retry/recovery matrix** | **CURRENT P0** | Start from clean `9900f8c...`; expired exact retry, lost-response windows, races, outages/restarts, downgrade/no-legacy proof |
 | P0-D production-capable Agent workflow | **BLOCKED on full C2-D** | Integrate real Agent migration/control state and update path |
 | P0-E recovery/security release gates | **BLOCKED** | Crash/snapshot/rollback/backup/rotation/fuzz/KAT/independent review |
 | Production XSP-v2 rollout | **NOT AUTHORIZED** | Disposable canary + explicit production approval after all gates |
@@ -169,6 +170,8 @@ Therefore D1 does **not** claim expired ACK network retransmission/recovery. Thi
 ## CURRENT P0 — P0-C2-D2: failure / retry / recovery matrix
 
 Overall **P0-C2-D remains CURRENT P0**. It is not complete until all D2 criteria below pass in the integrated real-Node topology.
+
+**Clean D2 starting checkpoint:** Nexus `main` at `9900f8c99efc59f86699a6c0ab35c3b39b211d37`, with post-merge Backend CI #40724165330 **success**. This checkpoint is docs-only relative to D1; new D2 runtime/test work must be isolated on a focused branch from this clean base.
 
 ### Goal
 
