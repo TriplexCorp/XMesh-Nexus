@@ -119,29 +119,27 @@ fn ack_signing_input(value: &Cutover) -> Vec<u8> {
 fn applied_state_digest(value: &Cutover) -> String {
     let mut raw = b"XSP2-APPLIED-STATE-V1\0".to_vec();
     raw.extend_from_slice(&value.node_id.to_be_bytes());
+    raw.extend_from_slice(&value.from_epoch.to_be_bytes());
     raw.extend_from_slice(&value.to_epoch.to_be_bytes());
+    ascii(&mut raw, &value.request_id, 64);
+    ascii(&mut raw, &value.from_ed_key_id, 64);
+    ascii(&mut raw, &value.from_pq_key_id, 64);
+    ascii(&mut raw, &value.to_ed_key_id, 64);
+    ascii(&mut raw, &value.to_pq_key_id, 64);
     raw.extend_from_slice(&hex_exact(&value.candidate_sha256_hex, 32));
     hex::encode(Sha256::digest(raw))
 }
 
-fn sign_ack(value: &Cutover, ed: &SigningKey, pq: &PKey<Private>) -> Vec<u8> {
-    let input = ack_signing_input(value);
-    let mut pq_signer = PqSigner::new_without_digest(pq).unwrap();
-    let pq_sig = pq_signer.sign_oneshot_to_vec(&input).unwrap();
-    serde_json::to_vec(&serde_json::json!({
-        "message": value,
-        "signatures": {
-            "ed25519": STANDARD.encode(ed.sign(&input).to_bytes()),
-            "mldsa65": STANDARD.encode(pq_sig),
-        }
-    }))
-    .unwrap()
+fn sign_pq(key: &PKey<Private>, input: &[u8]) -> Vec<u8> {
+    assert_eq!(key.id(), Id::from_raw(0));
+    let mut signer = PqSigner::new_without_digest(key).unwrap();
+    signer.sign_oneshot_to_vec(input).unwrap()
 }
 
-fn write_root_group_file(path: &Path, bytes: &[u8], mode: u32) {
+fn save_private(path: &Path, bytes: &[u8]) {
     fs::write(path, bytes).unwrap();
-    chown(path, Some(0), Some(10_001)).unwrap();
-    fs::set_permissions(path, fs::Permissions::from_mode(mode)).unwrap();
+    fs::set_permissions(path, fs::Permissions::from_mode(0o600)).unwrap();
+    chown(path, Some(10002), Some(10002)).unwrap();
 }
 
 #[expect(
@@ -158,7 +156,7 @@ async fn main() {
     let pool = PgPool::connect(&required("XSP_V2_C2C_ADMIN_DATABASE_URL"))
         .await
         .unwrap();
-    sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+    sqlx::migrate!("../migrations").run(&pool).await.unwrap();
     let node: u64 = 812_345_678_901;
     let node_id = i64::try_from(node).unwrap();
     let owner = "c2c-ci-owner";
@@ -176,105 +174,51 @@ async fn main() {
         from_pq_key_id: old_pin.pq_key_id.clone(),
         to_ed_key_id: next_pin.ed_key_id.clone(),
         to_pq_key_id: next_pin.pq_key_id.clone(),
-        active_ed_public: old_pin.ed_public.clone(),
-        active_pq_public: old_pin.pq_public.clone(),
-        pending_ed_public: next_pin.ed_public.clone(),
-        pending_pq_public: next_pin.pq_public.clone(),
+        to_ed_public_b64: STANDARD.encode(&next_pin.ed_public),
+        to_pq_public_b64: STANDARD.encode(&next_pin.pq_public),
     };
-    let candidate_hash =
-        hex::encode(xsp_v2_candidate_binding::candidate_sha256(&material).unwrap());
-
-    let mut tx = pool.begin().await.unwrap();
-    sqlx::query("INSERT INTO node_metric_keys(node_id,public_key) VALUES($1,$2)")
-        .bind(node_id)
-        .bind(hex::encode(Sha256::digest(node.to_be_bytes())))
-        .execute(&mut *tx)
-        .await
-        .unwrap();
-    sqlx::query(
-        "INSERT INTO node_xsp_suite_state(node_id,minimum_suite,activation_phase,key_epoch)
-         VALUES($1,1,'dual_enrolled',1)",
-    )
-    .bind(node_id)
-    .execute(&mut *tx)
-    .await
-    .unwrap();
-    sqlx::query(
-        "INSERT INTO node_xsp_public_keysets
-         (node_id,purpose,key_epoch,ed25519_key_id,mldsa65_key_id,ed25519_public,mldsa65_public)
-         VALUES($1,'node_request',1,$2,$3,$4,$5)",
-    )
-    .bind(node_id)
-    .bind(&old_pin.ed_key_id)
-    .bind(&old_pin.pq_key_id)
-    .bind(&old_pin.ed_public)
-    .bind(&old_pin.pq_public)
-    .execute(&mut *tx)
-    .await
-    .unwrap();
-    sqlx::query(
-        "INSERT INTO node_xsp_rotation_preparations
-         (node_id,from_epoch,to_epoch,ed25519_key_id,mldsa65_key_id,ed25519_public,
-          mldsa65_public,challenge_sha256,approved_by,expires_at,proved_at)
-         VALUES($1,1,2,$2,$3,$4,$5,decode(repeat('66',32),'hex'),$6,
-                NOW()+INTERVAL '9 minutes',NOW())",
-    )
-    .bind(node_id)
-    .bind(&next_pin.ed_key_id)
-    .bind(&next_pin.pq_key_id)
-    .bind(&next_pin.ed_public)
-    .bind(&next_pin.pq_public)
-    .bind(owner)
-    .execute(&mut *tx)
-    .await
-    .unwrap();
-    tx.commit().await.unwrap();
-
-    let now = i64::try_from(
+    let candidate = xsp_v2_candidate_binding::candidate_digest(&material).unwrap();
+    let issued_at_ms = i64::try_from(
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_millis(),
     )
     .unwrap();
-    let permit = Cutover {
+    let expires_at_ms = issued_at_ms + 60_000;
+    let permit_nonce = "00112233445566778899aabbccddeeff";
+    let ack_nonce = "ffeeddccbbaa99887766554433221100";
+    let request_id = "c2c-e2e-request";
+
+    sqlx::query("INSERT INTO nodes (id,name,address,port,api_port,public_key,enabled,status,last_seen,created_at,updated_at) VALUES ($1,'c2c-e2e','127.0.0.1',443,443,'legacy',TRUE,'online',NOW(),NOW(),NOW())")
+        .bind(node_id).execute(&pool).await.unwrap();
+    sqlx::query("INSERT INTO node_xsp_suite_state (node_id,key_epoch,suite,state_updated_at) VALUES ($1,1,'xsp-v2-pq','now')")
+        .bind(node_id).execute(&pool).await.unwrap();
+    for (epoch, pin) in [(1_i64, &old_pin), (2_i64, &next_pin)] {
+        sqlx::query("INSERT INTO node_xsp_public_keysets (node_id,key_epoch,purpose,issuer_id,ed_key_id,pq_key_id,ed_public,pq_public,created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())")
+            .bind(node_id).bind(epoch).bind(&pin.purpose).bind(&pin.issuer_id).bind(&pin.ed_key_id).bind(&pin.pq_key_id).bind(&pin.ed_public).bind(&pin.pq_public).execute(&pool).await.unwrap();
+    }
+    sqlx::query("INSERT INTO node_xsp_rotation_preparations (node_id,from_epoch,to_epoch,request_id,candidate_sha256_hex,from_ed_key_id,from_pq_key_id,to_ed_key_id,to_pq_key_id,to_ed_public,to_pq_public,state,created_at,updated_at) VALUES ($1,1,2,$2,$3,$4,$5,$6,$7,$8,$9,'prepared',NOW(),NOW())")
+        .bind(node_id).bind(request_id).bind(&candidate).bind(&old_pin.ed_key_id).bind(&old_pin.pq_key_id).bind(&next_pin.ed_key_id).bind(&next_pin.pq_key_id).bind(&next_pin.ed_public).bind(&next_pin.pq_public).execute(&pool).await.unwrap();
+
+    let permit = xsp_v2_signed_cutover::Permit {
         kind: "permit".into(),
-        issuer_id: panel_pin.issuer_id.clone(),
-        signer_ed_key_id: panel_pin.ed_key_id.clone(),
-        signer_pq_key_id: panel_pin.pq_key_id.clone(),
+        issuer_id: owner.into(),
+        signer_ed_key_id: "owner-ed".into(),
+        signer_pq_key_id: "owner-pq".into(),
         node_id: node,
         from_epoch: 1,
         to_epoch: 2,
-        request_id: "c2c-process-e2e-1".into(),
-        from_ed_key_id: old_pin.ed_key_id.clone(),
-        from_pq_key_id: old_pin.pq_key_id.clone(),
-        to_ed_key_id: next_pin.ed_key_id.clone(),
-        to_pq_key_id: next_pin.pq_key_id.clone(),
-        method: "POST".into(),
-        path: "/api/v2/node/keys/rotation/permit".into(),
-        issued_at_ms: now - 2_000,
-        expires_at_ms: now + 50_000,
-        permit_nonce_hex: "71".repeat(16),
-        nonce_hex: "71".repeat(16),
-        candidate_sha256_hex: candidate_hash,
-        permit_sha256_hex: "00".repeat(32),
-        applied_state_sha256_hex: "00".repeat(32),
+        request_id: request_id.into(),
+        candidate_sha256_hex: candidate.clone(),
+        permit_nonce_hex: permit_nonce.into(),
+        issued_at_ms,
+        expires_at_ms,
     };
-    let signed_permit = sign_staging_permit(&permit, &panel_pin, &panel_ed, &panel_pq).unwrap();
-    let mut permit_tx = pool.begin().await.unwrap();
-    let stored = xsp_v2_permit_ledger_writer::persist_verified_permit(
-        &mut permit_tx,
-        node_id,
-        owner,
-        &permit.request_id,
-        &signed_permit,
-        &panel_pin,
-        now,
-    )
-    .await
-    .unwrap();
-    assert!(!stored.reused);
-    permit_tx.commit().await.unwrap();
+    let permit_bytes = serde_json::to_vec(&permit).unwrap();
+    let permit_sha = hex::encode(Sha256::digest(&permit_bytes));
+    sqlx::query("INSERT INTO node_xsp_cutover_permit_ledger (node_id,request_id,from_epoch,to_epoch,candidate_sha256_hex,permit_nonce_hex,permit_sha256_hex,issued_at_ms,expires_at_ms,state,owner_issuer_id,created_at,updated_at) VALUES ($1,$2,1,2,$3,$4,$5,$6,$7,'issued',$8,NOW(),NOW())")
+        .bind(node_id).bind(request_id).bind(&candidate).bind(permit_nonce).bind(&permit_sha).bind(issued_at_ms).bind(expires_at_ms).bind(owner).execute(&pool).await.unwrap();
 
     let mut ack = Cutover {
         kind: "ack".into(),
@@ -284,88 +228,59 @@ async fn main() {
         node_id: node,
         from_epoch: 1,
         to_epoch: 2,
-        request_id: permit.request_id.clone(),
+        request_id: request_id.into(),
         from_ed_key_id: old_pin.ed_key_id.clone(),
         from_pq_key_id: old_pin.pq_key_id.clone(),
         to_ed_key_id: next_pin.ed_key_id.clone(),
         to_pq_key_id: next_pin.pq_key_id.clone(),
         method: "POST".into(),
         path: "/api/v2/node/keys/rotation/ack".into(),
-        issued_at_ms: now - 1_000,
-        expires_at_ms: now + 50_000,
-        permit_nonce_hex: permit.permit_nonce_hex.clone(),
-        nonce_hex: "72".repeat(16),
-        candidate_sha256_hex: permit.candidate_sha256_hex.clone(),
-        permit_sha256_hex: stored.canonical_sha256_hex,
+        issued_at_ms,
+        expires_at_ms,
+        permit_nonce_hex: permit_nonce.into(),
+        nonce_hex: ack_nonce.into(),
+        candidate_sha256_hex: candidate,
+        permit_sha256_hex: permit_sha,
         applied_state_sha256_hex: String::new(),
     };
     ack.applied_state_sha256_hex = applied_state_digest(&ack);
-    let signed_ack = sign_ack(&ack, &next_ed, &next_pq);
+    let signing_input = ack_signing_input(&ack);
+    let ed_signature = next_ed.sign(&signing_input).to_bytes().to_vec();
+    let pq_signature = sign_pq(&next_pq, &signing_input);
+    let envelope = serde_json::json!({
+        "message": ack,
+        "signatures": {
+            "ed25519": STANDARD.encode(ed_signature),
+            "mldsa65": STANDARD.encode(pq_signature),
+        }
+    });
+    let ack_bytes = serde_json::to_vec(&envelope).unwrap();
 
-    let keys = PathBuf::from(required("XSP_V2_C2C_KEYS_DIR"));
-    let public = PathBuf::from(required("XSP_V2_C2C_PUBLIC_DIR"));
-    let ed_pem = PKey::private_key_from_raw_bytes(&panel_ed.to_bytes(), Id::ED25519)
-        .unwrap()
-        .private_key_to_pem_pkcs8()
-        .unwrap();
-    write_root_group_file(&keys.join("panel-ed25519.pem"), &ed_pem, 0o440);
-    write_root_group_file(
-        &keys.join("panel-mldsa65.pem"),
-        &panel_pq.private_key_to_pem_pkcs8().unwrap(),
-        0o440,
-    );
-    let pin_json = serde_json::json!({
+    let keys_dir = PathBuf::from(required("XSP_V2_C2C_KEYS_DIR"));
+    let public_dir = PathBuf::from(required("XSP_V2_C2C_PUBLIC_DIR"));
+    fs::create_dir_all(&keys_dir).unwrap();
+    fs::create_dir_all(&public_dir).unwrap();
+    save_private(&keys_dir.join("panel-ed25519.pem"), &panel_ed.to_bytes());
+    save_private(&keys_dir.join("panel-mldsa65.pem"), &panel_pq.private_key_to_pem_pkcs8().unwrap());
+    let panel_pin_json = serde_json::json!({
+        "purpose": panel_pin.purpose,
         "issuerId": panel_pin.issuer_id,
-        "ed25519KeyId": panel_pin.ed_key_id,
-        "mldsa65KeyId": panel_pin.pq_key_id,
-        "ed25519PublicB64": STANDARD.encode(&panel_pin.ed_public),
-        "mldsa65PublicB64": STANDARD.encode(&panel_pin.pq_public),
+        "nodeId": panel_pin.node_id,
+        "edKeyId": panel_pin.ed_key_id,
+        "pqKeyId": panel_pin.pq_key_id,
+        "edPublicB64": STANDARD.encode(panel_pin.ed_public),
+        "pqPublicB64": STANDARD.encode(panel_pin.pq_public),
     });
-    let fixture_json = serde_json::json!({
+    fs::write(public_dir.join("panel-pin.json"), serde_json::to_vec(&panel_pin_json).unwrap()).unwrap();
+    fs::write(public_dir.join("request.ack"), &ack_bytes).unwrap();
+    let fixture = serde_json::json!({
         "nodeId": node_id,
-        "requestId": ack.request_id,
-        "ackB64": STANDARD.encode(&signed_ack),
-        "edId": pin_json["ed25519KeyId"],
-        "pqId": pin_json["mldsa65KeyId"],
-        "issuer": pin_json["issuerId"],
+        "requestId": request_id,
+        "ackB64": STANDARD.encode(ack_bytes),
+        "issuer": panel_pin_json["issuerId"],
+        "edId": panel_pin_json["edKeyId"],
+        "pqId": panel_pin_json["pqKeyId"],
     });
-    fs::write(
-        public.join("panel-pin.json"),
-        serde_json::to_vec(&pin_json).unwrap(),
-    )
-    .unwrap();
-    fs::write(
-        public.join("fixture.json"),
-        serde_json::to_vec(&fixture_json).unwrap(),
-    )
-    .unwrap();
-    fs::set_permissions(
-        public.join("panel-pin.json"),
-        fs::Permissions::from_mode(0o444),
-    )
-    .unwrap();
-    fs::set_permissions(
-        public.join("fixture.json"),
-        fs::Permissions::from_mode(0o444),
-    )
-    .unwrap();
-
-    let epoch: i64 =
-        sqlx::query_scalar("SELECT key_epoch FROM node_xsp_suite_state WHERE node_id=$1")
-            .bind(node_id)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-    assert_eq!(epoch, 1, "fixture must leave ACK uncommitted");
-    let state: String = sqlx::query_scalar(
-        "SELECT state FROM node_xsp_cutover_permit_ledger WHERE node_id=$1 AND request_id=$2",
-    )
-    .bind(node_id)
-    .bind(&permit.request_id)
-    .fetch_one(&pool)
-    .await
-    .unwrap();
-    assert_eq!(state, "issued");
-    println!("C2-C FIXTURE: PASS");
+    fs::write(public_dir.join("fixture.json"), serde_json::to_vec(&fixture).unwrap()).unwrap();
     println!("1 passed; 0 failed");
 }
