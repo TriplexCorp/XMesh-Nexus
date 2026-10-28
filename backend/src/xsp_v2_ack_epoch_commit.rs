@@ -98,8 +98,9 @@ pub async fn commit_fresh_applied_ack_staging(
         bail!("ACK nonce was not durably registered");
     }
 
-    // Only the independently approved+proved pending public pair, locked by
-    // adjudicate_new_applied_ack, can become the next verifier. Old rows stay.
+    // Only the independently approved+proved pending public pair, serialized
+    // by the suite lock held by adjudicate_new_applied_ack, can become the next
+    // verifier. Old rows stay.
     let inserted = sqlx::query(
         "INSERT INTO node_xsp_public_keysets
              (node_id,purpose,key_epoch,ed25519_key_id,mldsa65_key_id,
@@ -202,8 +203,11 @@ pub struct StagingStoredACKEvidence {
 /// function never calls the fresh ACK writer and never advances an epoch.
 /// The historical permit and ACK are reverified cryptographically using the
 /// immutable signed envelopes, independently pinned panel public keys, and
-/// BOTH exact public-key epochs kept in PostgreSQL. It checks the durable
-/// one-use nonce, original ledger digest/bindings, and committed suite epoch.
+/// BOTH exact public-key epochs kept in PostgreSQL. Key rows are read while
+/// the suite serialization lock is held rather than locked independently;
+/// staged key mutation paths must acquire that same suite lock first.
+/// It checks the durable one-use nonce, original ledger digest/bindings, and
+/// committed suite epoch.
 ///
 /// Freshness is checked against the **database-recorded ACK commit time**,
 /// NOT against caller-provided historical time and NOT against the retry time.
@@ -276,7 +280,8 @@ async fn readback_committed_applied_ack_staging_inner(
         bail!("invalid ACK readback authentication context or envelope");
     }
     let mut tx = pool.begin().await?;
-    // Always take the suite lock FIRST, just as in the new-ACK commit path.
+    // Always take the suite lock FIRST in the locked path. This suite row is
+    // the canonical serializer for staged key mutations and epoch changes.
     let suite_query = if lock_rows {
         "SELECT minimum_suite,activation_phase,key_epoch
          FROM node_xsp_suite_state WHERE node_id=$1 FOR UPDATE"
@@ -345,30 +350,24 @@ async fn readback_committed_applied_ack_staging_inner(
         bail!("invalid committed ACK historical timestamps");
     }
 
-    // The prior and new PUBLIC verification keys are the durable historical
-    // keysets; the mutable 'pending' preparation must NOT be trusted for a
-    // replay after it may have been consumed or replaced.
-    let pair_query = if lock_rows {
+    // The prior and new PUBLIC verification keys are durable historical rows.
+    // In the locked path they are read under the canonical suite-row lock;
+    // requiring FOR SHARE here would unnecessarily require UPDATE privilege on
+    // key material from the least-privilege C2-C role. The signer path remains
+    // fully SELECT-only. The mutable pending preparation is never trusted here.
+    let pair = sqlx::query(
         "SELECT key_epoch,ed25519_key_id,mldsa65_key_id,
                 ed25519_public,mldsa65_public
          FROM node_xsp_public_keysets
          WHERE node_id=$1 AND purpose='node_request'
            AND key_epoch IN ($2,$3) AND revoked_at IS NULL
-         ORDER BY key_epoch FOR SHARE"
-    } else {
-        "SELECT key_epoch,ed25519_key_id,mldsa65_key_id,
-                ed25519_public,mldsa65_public
-         FROM node_xsp_public_keysets
-         WHERE node_id=$1 AND purpose='node_request'
-           AND key_epoch IN ($2,$3) AND revoked_at IS NULL
-         ORDER BY key_epoch"
-    };
-    let pair = sqlx::query(pair_query)
-        .bind(authenticated_node_id)
-        .bind(from_epoch)
-        .bind(to_epoch)
-        .fetch_all(&mut *tx)
-        .await?;
+         ORDER BY key_epoch",
+    )
+    .bind(authenticated_node_id)
+    .bind(from_epoch)
+    .bind(to_epoch)
+    .fetch_all(&mut *tx)
+    .await?;
     if pair.len() != 2 {
         bail!("missing or revoked historical public keysets");
     }

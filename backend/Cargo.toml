@@ -3,6 +3,11 @@ name = "xmesh-api"
 version = "0.1.0"
 edition = "2024"
 publish = false
+autobins = false
+
+[[bin]]
+name = "xmesh-api"
+path = "src/main.rs"
 
 [features]
 default = []
