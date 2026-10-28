@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Disposable P0-C2-D2 lost-response / duplicate-race process E2E.
+"""Disposable P0-C2-D2 lost-response / outage-restart / duplicate-race E2E.
 
-This reuses the reviewed C2-A/B/C/D strict Node topology and injects response
-loss only at the staging origin boundary. It never weakens ACK freshness,
-cryptographic authorization, trusted transport identity or durable state.
+This reuses the reviewed C2-A/B/C/D strict Node topology. Response-loss faults
+remain confined to the staging origin boundary, while outage/restart cases stop
+real disposable signer, PostgreSQL, origin and C2-C processes. Nothing here
+weakens ACK freshness, cryptographic authorization, trusted transport identity
+or durable state.
 """
 from __future__ import annotations
 
@@ -129,6 +131,17 @@ def main() -> None:
             logs = command("docker", "logs", "--tail", "60", container, check=False)
             raise RuntimeError(f"socket {path} not ready: {(logs.stdout + logs.stderr)[-1800:]}")
 
+        def wait_db() -> None:
+            for _ in range(100):
+                if command("docker", "exec", db, "pg_isready", "-U", "postgres", "-d", "xmesh", check=False).returncode == 0:
+                    return
+                time.sleep(0.25)
+            logs = command("docker", "logs", "--tail", "80", db, check=False)
+            raise RuntimeError(f"disposable PostgreSQL did not become ready: {(logs.stdout + logs.stderr)[-1800:]}")
+
+        def stop_now(name: str) -> None:
+            command("docker", "stop", "-t", "0", name, check=False)
+
         def boot_signer(public: dict[str, object]) -> None:
             command("docker", "rm", "-f", signer, check=False)
             signer_env = envfile(
@@ -156,10 +169,12 @@ def main() -> None:
             wait_socket(signer, "/run/xmesh-signer/signer.sock", "10002:10001")
 
         def boot_c2c() -> None:
+            command("docker", "rm", "-f", c2c, check=False)
             c2c_env = envfile(
                 "c2c.env",
                 {
                     "XSP_V2_C2C_ACK_AUTH": "staging-only",
+                    "XSP_V2_C2D_HISTORICAL_RECOVERY": "staging-only",
                     "XSP_V2_C2C_DATABASE_URL": f"postgresql://xmesh_c2c_writer:{c2c_password}@{db}:5432/xmesh",
                     "XSP_V2_C2C_PANEL_PIN_FILE": "/run/xmesh-c2c-public/panel-pin.json",
                     "XSP_V2_C2C_SOCKET_PATH": "/run/xmesh-c2c/c2c.sock",
@@ -190,6 +205,7 @@ def main() -> None:
                 "XSP_EXPECTED_INGRESS_GID": "10003",
                 "XSP_V2_C2B_ACK_ROUTE": "staging-only",
                 "XSP_V2_C2C_ACK_AUTH": "staging-only",
+                "XSP_V2_C2D_HISTORICAL_RECOVERY": "staging-only",
                 "XSP_V2_C2C_SOCKET_PATH": "/run/xmesh-c2c/c2c.sock",
             }
             if fault:
@@ -246,6 +262,21 @@ def main() -> None:
             ).stdout.strip()
             return epoch, state, outbox
 
+        def assert_committed_security_state(node_id: int, request_id: str, from_epoch: str, to_epoch: str) -> None:
+            if durable_state(node_id, request_id) != (to_epoch, "ack_verified", "1"):
+                raise RuntimeError(f"committed durable state changed: {durable_state(node_id, request_id)}")
+            replay_count = sql(
+                f"SELECT count(*) FROM node_xsp_replay_nonces WHERE node_id={node_id};"
+            ).stdout.strip()
+            if replay_count != "1":
+                raise RuntimeError(f"retries/restarts changed replay nonce cardinality: {replay_count}")
+            key_rows = sql(
+                f"SELECT key_epoch||':'||(revoked_at IS NULL) FROM node_xsp_public_keysets "
+                f"WHERE node_id={node_id} ORDER BY key_epoch;"
+            ).stdout.splitlines()
+            if key_rows != [f"{from_epoch}:true", f"{to_epoch}:true"]:
+                raise RuntimeError(f"old/new public key retention violated: {key_rows}")
+
         try:
             command("docker", "network", "create", "--internal", network)
             for volume in volumes.values():
@@ -274,12 +305,7 @@ def main() -> None:
                 db, "timescale/timescaledb:2.30.0-pg18",
                 ["--network", network, "--env-file", db_env, "--mount", f"type=volume,src={volumes['db']},dst=/var/lib/postgresql"],
             )
-            for _ in range(80):
-                if command("docker", "exec", db, "pg_isready", "-U", "postgres", "-d", "xmesh", check=False).returncode == 0:
-                    break
-                time.sleep(0.5)
-            else:
-                raise RuntimeError("disposable PostgreSQL did not become ready")
+            wait_db()
 
             command(
                 "docker", "run", "-d", "--name", helper, "--entrypoint", "sleep", "--network", network,
@@ -300,6 +326,36 @@ def main() -> None:
                 "os.chmod('/public',0o755)",
             )
 
+            # Generate transport material before issuing the short-lived ACK so
+            # outage/restart actions, not test compilation/certificate setup,
+            # consume the freshness window.
+            command("go", "run", str(ROOT / "scripts/generate-xsp-v2-mldsa-test-certs.go"), "-out", str(cert_material), timeout=90)
+            cert_setup = r'''
+set -eu
+umask 077
+openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+  -subj "/CN=node-ingress.xsp.invalid" \
+  -addext "subjectAltName=DNS:node-ingress.xsp.invalid" \
+  -days 1 -keyout /certs/privkey.pem -out /certs/fullchain.pem >/dev/null 2>&1
+for name in client-ca.pem client.pem client-key.pem client-spki.sha256; do
+  cp "/client-material/$name" "/certs/$name"
+done
+chown 0:10003 /certs/privkey.pem /certs/fullchain.pem /certs/client-ca.pem
+chmod 0440 /certs/privkey.pem /certs/fullchain.pem /certs/client-ca.pem
+chmod 0400 /certs/client-key.pem
+chmod 0444 /certs/client.pem /certs/client-spki.sha256
+'''
+            command(
+                "docker", "run", "--rm", "--user", "0:0",
+                "--mount", f"type=volume,src={volumes['certs']},dst=/certs",
+                "--mount", f"type=bind,src={cert_material},dst=/client-material,readonly",
+                "--entrypoint", "/bin/sh", probe_image, "-ceu", cert_setup,
+            )
+            expected_spki = command(
+                "docker", "run", "--rm", "--mount", f"type=volume,src={volumes['certs']},dst=/certs,readonly",
+                "--entrypoint", "/bin/sh", probe_image, "-ceu", "cat /certs/client-spki.sha256",
+            ).stdout.strip()
+
             fixture = command(
                 "docker", "exec", "-e", "XSP_V2_C2C_FIXTURE=1",
                 "-e", f"XSP_V2_C2C_ADMIN_DATABASE_URL={admin_url}",
@@ -312,6 +368,8 @@ def main() -> None:
             panel = json.loads(command("docker", "exec", helper, "cat", "/public/panel-pin.json").stdout)
             node_id = int(public["nodeId"])
             request_id = str(public["requestId"])
+            signed_ack_raw = base64.b64decode(public["ackB64"], validate=True)
+            ack_expires_ms = int(json.loads(signed_ack_raw)["message"]["expiresAtMs"])
 
             signer_sql = (ROOT / "deploy/postgres/20-create-xsp-v2-signer-role.sql").read_text()
             c2c_sql = (ROOT / "deploy/postgres/21-create-xsp-v2-c2c-role.sql").read_text()
@@ -353,33 +411,6 @@ def main() -> None:
             bundle_path.write_text(json.dumps(bundle, separators=(",", ":")))
             bundle_path.chmod(0o600)
 
-            command("go", "run", str(ROOT / "scripts/generate-xsp-v2-mldsa-test-certs.go"), "-out", str(cert_material), timeout=90)
-            cert_setup = r'''
-set -eu
-umask 077
-openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
-  -subj "/CN=node-ingress.xsp.invalid" \
-  -addext "subjectAltName=DNS:node-ingress.xsp.invalid" \
-  -days 1 -keyout /certs/privkey.pem -out /certs/fullchain.pem >/dev/null 2>&1
-for name in client-ca.pem client.pem client-key.pem client-spki.sha256; do
-  cp "/client-material/$name" "/certs/$name"
-done
-chown 0:10003 /certs/privkey.pem /certs/fullchain.pem /certs/client-ca.pem
-chmod 0440 /certs/privkey.pem /certs/fullchain.pem /certs/client-ca.pem
-chmod 0400 /certs/client-key.pem
-chmod 0444 /certs/client.pem /certs/client-spki.sha256
-'''
-            command(
-                "docker", "run", "--rm", "--user", "0:0",
-                "--mount", f"type=volume,src={volumes['certs']},dst=/certs",
-                "--mount", f"type=bind,src={cert_material},dst=/client-material,readonly",
-                "--entrypoint", "/bin/sh", probe_image, "-ceu", cert_setup,
-            )
-            expected_spki = command(
-                "docker", "run", "--rm", "--mount", f"type=volume,src={volumes['certs']},dst=/certs,readonly",
-                "--entrypoint", "/bin/sh", probe_image, "-ceu", "cat /certs/client-spki.sha256",
-            ).stdout.strip()
-
             boot_signer(public)
             boot_c2c()
             boot_origin(expected_spki, node_id, "drop-before-c2c")
@@ -395,49 +426,141 @@ chmod 0444 /certs/client.pem /certs/client-spki.sha256
             )
             time.sleep(1)
 
+            # Existing lost-before-commit proof also establishes the exact local
+            # Node permit/ACK journal used by the real outage probes below.
             run_node(expect_success=False)
             if durable_state(node_id, request_id) != (from_epoch, "issued", "0"):
                 raise RuntimeError(f"lost-before-commit mutated durable state: {durable_state(node_id, request_id)}")
             print("PASS: lost response before C2-C leaves ACK/epoch uncommitted")
 
-            command("docker", "stop", signer)
+            boot_origin(expected_spki, node_id)
+            stop_now(origin)
+            run_node("TestC2DExactFreshOutageFailsClosed")
+            if durable_state(node_id, request_id) != (from_epoch, "issued", "0"):
+                raise RuntimeError(f"origin outage before commit mutated durable state: {durable_state(node_id, request_id)}")
+            print("PASS: origin outage before commit fails closed without durable mutation")
+            boot_origin(expected_spki, node_id)
+
+            stop_now(c2c)
+            run_node("TestC2DExactFreshOutageFailsClosed")
+            if durable_state(node_id, request_id) != (from_epoch, "issued", "0"):
+                raise RuntimeError(f"C2-C outage before commit mutated durable state: {durable_state(node_id, request_id)}")
+            print("PASS: C2-C outage before commit fails closed without durable mutation")
+            boot_c2c()
+
+            stop_now(db)
+            run_node("TestC2DExactFreshOutageFailsClosed")
+            command("docker", "start", db)
+            wait_db()
+            boot_c2c()
+            if durable_state(node_id, request_id) != (from_epoch, "issued", "0"):
+                raise RuntimeError(f"PostgreSQL outage before commit mutated durable state: {durable_state(node_id, request_id)}")
+            print("PASS: PostgreSQL outage/restart before commit fails closed and preserves issued state")
+
+            stop_now(signer)
             boot_origin(expected_spki, node_id, "drop-on-c2c-failure")
             run_node(expect_success=False)
             if durable_state(node_id, request_id) != (to_epoch, "ack_verified", "0"):
                 raise RuntimeError(f"lost-after-ACK-commit state invalid: {durable_state(node_id, request_id)}")
-            print("PASS: lost response after durable ACK commit leaves no receipt and no false Node success")
+            print("PASS: signer outage after durable ACK commit leaves no receipt and no false Node success")
 
+            # Restart C2-C while the signer is still unavailable, then restart the
+            # signer and prove exact retry can finish the already-committed state.
+            stop_now(c2c)
+            boot_c2c()
             boot_signer(public)
             boot_origin(expected_spki, node_id, "drop-after-c2c-success")
             run_node(expect_success=False)
             if durable_state(node_id, request_id) != (to_epoch, "ack_verified", "1"):
                 raise RuntimeError(f"lost-after-receipt state invalid: {durable_state(node_id, request_id)}")
-            print("PASS: receipt is durable before injected lost HTTP reply")
+            print("PASS: C2-C/signer restart after ACK transition converges to one durable receipt")
 
-            command("docker", "stop", signer)
+            stop_now(signer)
             boot_origin(expected_spki, node_id)
             run_node()
-            if durable_state(node_id, request_id) != (to_epoch, "ack_verified", "1"):
-                raise RuntimeError(f"exact signer-off recovery mutated state: {durable_state(node_id, request_id)}")
+            assert_committed_security_state(node_id, request_id, from_epoch, to_epoch)
             print("PASS: exact retry after lost durable-receipt reply recovers with signer offline")
 
+            # Restart both local trust-boundary processes after the receipt is
+            # durable. A single ordinary fresh retry must still return and verify
+            # exactly the authoritative receipt without a live signer.
+            stop_now(origin)
+            stop_now(c2c)
+            boot_c2c()
+            boot_origin(expected_spki, node_id)
+            run_node("TestC2DExactFreshNetworkRetry")
+            assert_committed_security_state(node_id, request_id, from_epoch, to_epoch)
+            print("PASS: origin/C2-C restart after durable receipt preserves exact fresh recovery")
+
+            # DB unavailability after receipt persistence must not let the Node
+            # infer success. After a hard DB restart, the exact fresh retry must
+            # recover the same immutable receipt and unchanged security state.
+            stop_now(db)
+            run_node("TestC2DExactFreshOutageFailsClosed")
+            command("docker", "start", db)
+            wait_db()
+            boot_c2c()
+            boot_origin(expected_spki, node_id)
+            run_node("TestC2DExactFreshNetworkRetry")
+            assert_committed_security_state(node_id, request_id, from_epoch, to_epoch)
+            print("PASS: PostgreSQL outage/restart after durable receipt fails closed then recovers exact state")
+
             run_node("TestC2DExactDuplicateNetworkRace")
-            if durable_state(node_id, request_id) != (to_epoch, "ack_verified", "1"):
-                raise RuntimeError(f"duplicate race mutated state: {durable_state(node_id, request_id)}")
+            assert_committed_security_state(node_id, request_id, from_epoch, to_epoch)
             print("PASS: eight concurrent exact fresh retries converge to the one durable receipt")
 
             run_node("TestC2DFreshMismatchedRetryRejected")
-            if durable_state(node_id, request_id) != (to_epoch, "ack_verified", "1"):
-                raise RuntimeError(f"mismatched retry mutated state: {durable_state(node_id, request_id)}")
-            print("PASS: fresh mismatched payload fails closed without state mutation")
+            assert_committed_security_state(node_id, request_id, from_epoch, to_epoch)
+            print("PASS: fresh mismatched payload fails closed without state mutation after restarts")
 
-            inspect = json.loads(command("docker", "inspect", ingress).stdout)[0]
-            if inspect["HostConfig"].get("PortBindings"):
-                raise RuntimeError("C2-D2 ingress unexpectedly published a host port")
+            # Cross the original ACK expiry after all process restarts. The same
+            # native Node historical-recovery test first proves the ordinary
+            # state-changing route rejects the stale ACK, then recovers only the
+            # exact immutable receipt over /ack/recover with the signer offline.
+            delay = max(0.0, (ack_expires_ms + 350 - int(time.time() * 1000)) / 1000.0)
+            if delay:
+                time.sleep(delay)
+            if int(time.time() * 1000) <= ack_expires_ms:
+                raise RuntimeError("failed to reach historical ACK recovery window")
+            run_node("TestC2DExpiredNetworkRecovery")
+            assert_committed_security_state(node_id, request_id, from_epoch, to_epoch)
+            print("PASS: expired exact recovery survives signer/DB/origin/C2-C restart history")
+
+            # Integrated topology/retention assertions carried through the full
+            # outage/restart matrix.
+            for name in [ingress, c2c, origin]:
+                inspect = json.loads(command("docker", "inspect", name).stdout)[0]
+                if inspect["HostConfig"].get("PortBindings"):
+                    raise RuntimeError(f"{name} unexpectedly publishes a host port")
+            origin_inspect = json.loads(command("docker", "inspect", origin).stdout)[0]
+            if origin_inspect["HostConfig"].get("NetworkMode") != "none":
+                raise RuntimeError("protected origin must remain network-none")
+            for name in [c2c, origin]:
+                mounts = json.loads(command("docker", "inspect", "-f", "{{json .Mounts}}", name).stdout)
+                if any(m.get("Destination") == "/run/xmesh-signer-keys" or m.get("Name") == volumes["keys"] for m in mounts):
+                    raise RuntimeError(f"{name} must never mount signer private keys")
+            tcp = command("docker", "exec", c2c, "cat", "/proc/net/tcp", "/proc/net/tcp6").stdout.splitlines()
+            listener_inodes = {
+                parts[9]
+                for line in tcp
+                if len(parts := line.split()) > 9 and parts[3] == "0A"
+            }
+            pid1_fds = command(
+                "docker", "exec", c2c, "sh", "-c",
+                "for f in /proc/1/fd/*; do readlink \"$f\" 2>/dev/null || true; done",
+            ).stdout.splitlines()
+            pid1_socket_inodes = {
+                value[8:-1]
+                for value in pid1_fds
+                if value.startswith("socket:[") and value.endswith("]")
+            }
+            if listener_inodes & pid1_socket_inodes:
+                raise RuntimeError("C2-C process must not listen on TCP")
             net = json.loads(command("docker", "network", "inspect", network).stdout)[0]
             if not net.get("Internal"):
                 raise RuntimeError("C2-D2 process network must be internal/no-egress")
-            print("C2-D2 LOST-RESPONSE/RACE PROCESS E2E: PASS (staging/test only; production Agent untouched)")
+            assert_committed_security_state(node_id, request_id, from_epoch, to_epoch)
+            print("C2-D2 FAILURE/OUTAGE/RESTART MATRIX: PASS (staging/test only; production Agent untouched)")
         finally:
             for name in reversed(containers):
                 command("docker", "rm", "-f", name, check=False)
