@@ -270,6 +270,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             or message["expiresAtMs"] <= message["issuedAtMs"]
             or message["expiresAtMs"] - message["issuedAtMs"] > 60_000
             or message["issuedAtMs"] > now_ms + 120_000
+            or (is_recovery and now_ms <= message["expiresAtMs"])
             or (
                 not is_recovery
                 and (
