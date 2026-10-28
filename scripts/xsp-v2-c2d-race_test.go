@@ -76,7 +76,7 @@ func c2dRequireExactFreshJournaledACK(t *testing.T) ([]byte, VerifiedPermit, c2d
 func TestC2DExactFreshOutageFailsClosed(t *testing.T) {
 	signedACK, _, _, _, _ := c2dRequireExactFreshJournaledACK(t)
 	roots, clientCertificate := c2dStrictClientMaterial(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	status, _, requestErr := c2dStrictPost(
 		ctx,

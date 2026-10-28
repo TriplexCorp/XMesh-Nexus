@@ -131,6 +131,7 @@ func c2dStrictPost(ctx context.Context, address, serverName string, roots *x509.
 	if err != nil {
 		return 0, nil, err
 	}
+	request.Host = serverName
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Accept", "application/json")
 	request.Header.Set("Accept-Encoding", "identity")
