@@ -124,11 +124,14 @@ pub async fn store_or_load_signed_receipt_staging(
     .execute(&mut *tx)
     .await?;
 
+    // The suite and ledger rows above are the canonical serializers. The
+    // outbox row is immutable, so a plain SELECT is sufficient here and keeps
+    // the least-privilege C2-C role free of UPDATE rights on receipt evidence.
     let stored = sqlx::query(
         "SELECT from_epoch,to_epoch,permit_input_sha256,
                 applied_ack_sha256,signed_receipt_sha256,signed_receipt
          FROM node_xsp_signed_commit_receipt_outbox
-         WHERE node_id=$1 AND request_id=$2 FOR SHARE",
+         WHERE node_id=$1 AND request_id=$2",
     )
     .bind(authenticated_node_id)
     .bind(request_id)
@@ -188,8 +191,9 @@ pub async fn load_committed_signed_receipt_staging(
     .await?;
 
     let mut tx = pool.begin().await?;
-    // Maintain suite -> ledger -> receipt lock order; recheck that the
-    // committed state has not changed after the independent readback.
+    // Maintain suite -> ledger serialization; the immutable outbox row itself
+    // is read without a row lock so the C2-C role needs no UPDATE privilege on
+    // signed receipt evidence.
     let suite = sqlx::query(
         "SELECT minimum_suite,activation_phase,key_epoch
          FROM node_xsp_suite_state WHERE node_id=$1 FOR SHARE",
@@ -240,7 +244,7 @@ pub async fn load_committed_signed_receipt_staging(
         "SELECT from_epoch,to_epoch,permit_input_sha256,
                 applied_ack_sha256,signed_receipt_sha256,signed_receipt
          FROM node_xsp_signed_commit_receipt_outbox
-         WHERE node_id=$1 AND request_id=$2 FOR SHARE",
+         WHERE node_id=$1 AND request_id=$2",
     )
     .bind(authenticated_node_id)
     .bind(request_id)
