@@ -6,7 +6,7 @@ FROM ${C2C_BUILDER_IMAGE} AS builder
 WORKDIR /build/backend
 ENV CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=4 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends pkg-config libssl-dev openssl python3 \
+    && apt-get install -y --no-install-recommends pkg-config libssl-dev openssl \
     && rm -rf /var/lib/apt/lists/*
 ARG C2C_BUILD_TESTS=0
 RUN --mount=type=secret,id=proxy_ca \
@@ -17,14 +17,14 @@ RUN --mount=type=secret,id=proxy_ca \
     set -eu; \
     if [ -f /run/secrets/proxy_ca ]; then export CARGO_HTTP_CAINFO=/run/secrets/proxy_ca CARGO_HTTP_PROXY_CAINFO=/run/secrets/proxy_ca; fi; \
     cp /source/backend/Cargo.toml .; \
-    cp -a /source/backend/src /source/backend/migrations /source/backend/tests .; \
+    cp -a /source/backend/src /source/backend/migrations .; \
     cp -a /source/docs /build/docs; \
     cargo build --release --features xsp-v2-experimental --bin xsp-v2-c2c; \
     mkdir -p /build/output; \
     cp target/release/xsp-v2-c2c /build/output/xsp-v2-c2c; \
     if [ "$C2C_BUILD_TESTS" = 1 ]; then \
-      cargo test --features xsp-v2-experimental --test xsp_v2_c2c_fixture --no-run --message-format=json > /build/c2c-test-artifacts.json; \
-      python3 -c 'import json,shutil; rows=[json.loads(line) for line in open("/build/c2c-test-artifacts.json")]; bins=[r["executable"] for r in rows if r.get("reason")=="compiler-artifact" and r.get("profile",{}).get("test") and r.get("target",{}).get("name")=="xsp_v2_c2c_fixture" and r.get("executable")]; assert len(bins)==1; shutil.copy2(bins[0],"/build/output/xsp-v2-c2c-fixture")'; \
+      cargo build --release --features xsp-v2-experimental --bin xsp-v2-c2c-fixture; \
+      cp target/release/xsp-v2-c2c-fixture /build/output/xsp-v2-c2c-fixture; \
     fi
 
 FROM debian:trixie-slim AS runtime-base

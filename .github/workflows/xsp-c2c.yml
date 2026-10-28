@@ -5,7 +5,7 @@ on:
     paths:
       - "backend/Cargo.toml"
       - "backend/src/bin/xsp_v2_c2c.rs"
-      - "backend/tests/xsp_v2_c2c_fixture.rs"
+      - "backend/src/bin/xsp_v2_c2c_fixture.rs"
       - "backend/src/xsp_v2_ack_epoch_commit.rs"
       - "backend/src/xsp_v2_ack_ledger_validator.rs"
       - "backend/src/xsp_v2_candidate_binding.rs"
@@ -28,7 +28,7 @@ on:
     paths:
       - "backend/Cargo.toml"
       - "backend/src/bin/xsp_v2_c2c.rs"
-      - "backend/tests/xsp_v2_c2c_fixture.rs"
+      - "backend/src/bin/xsp_v2_c2c_fixture.rs"
       - "backend/src/xsp_v2_ack_epoch_commit.rs"
       - "backend/src/xsp_v2_ack_ledger_validator.rs"
       - "backend/src/xsp_v2_candidate_binding.rs"

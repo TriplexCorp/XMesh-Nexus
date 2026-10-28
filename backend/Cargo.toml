@@ -8,6 +8,13 @@ publish = false
 name = "xsp-v2-c2c"
 path = "src/bin/xsp_v2_c2c.rs"
 required-features = ["xsp-v2-experimental"]
+test = false
+
+[[bin]]
+name = "xsp-v2-c2c-fixture"
+path = "src/bin/xsp_v2_c2c_fixture.rs"
+required-features = ["xsp-v2-experimental"]
+test = false
 
 [features]
 default = []

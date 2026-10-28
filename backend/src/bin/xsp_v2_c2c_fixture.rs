@@ -1,12 +1,12 @@
 #![cfg(feature = "xsp-v2-experimental")]
 
-#[path = "../src/xsp_v2_candidate_binding.rs"]
+#[path = "../xsp_v2_candidate_binding.rs"]
 mod xsp_v2_candidate_binding;
-#[path = "../src/xsp_v2_db_candidate_snapshot.rs"]
+#[path = "../xsp_v2_db_candidate_snapshot.rs"]
 mod xsp_v2_db_candidate_snapshot;
-#[path = "../src/xsp_v2_permit_ledger_writer.rs"]
+#[path = "../xsp_v2_permit_ledger_writer.rs"]
 mod xsp_v2_permit_ledger_writer;
-#[path = "../src/xsp_v2_signed_cutover.rs"]
+#[path = "../xsp_v2_signed_cutover.rs"]
 mod xsp_v2_signed_cutover;
 
 use base64::{Engine as _, engine::general_purpose::STANDARD};
@@ -27,11 +27,6 @@ use std::{
 use xsp_v2_signed_cutover::{Cutover, TrustedPublic, sign_staging_permit};
 
 fn required(name: &str) -> String {
-    assert_eq!(
-        env::var("XSP_V2_C2C_FIXTURE").as_deref(),
-        Ok("1"),
-        "disposable C2-C fixture harness required"
-    );
     env::var(name).expect("required C2-C fixture setting missing")
 }
 
@@ -149,9 +144,13 @@ fn write_root_group_file(path: &Path, bytes: &[u8], mode: u32) {
     fs::set_permissions(path, fs::Permissions::from_mode(mode)).unwrap();
 }
 
-#[tokio::test]
-#[ignore = "requires disposable C2-C integration harness"]
-async fn prepare_uncommitted_c2c_fixture() {
+#[tokio::main]
+async fn main() {
+    assert_eq!(
+        env::var("XSP_V2_C2C_FIXTURE").as_deref(),
+        Ok("1"),
+        "disposable C2-C fixture harness required"
+    );
     let pool = PgPool::connect(&required("XSP_V2_C2C_ADMIN_DATABASE_URL"))
         .await
         .unwrap();
@@ -363,4 +362,6 @@ async fn prepare_uncommitted_c2c_fixture() {
     .await
     .unwrap();
     assert_eq!(state, "issued");
+    println!("C2-C FIXTURE: PASS");
+    println!("1 passed; 0 failed");
 }

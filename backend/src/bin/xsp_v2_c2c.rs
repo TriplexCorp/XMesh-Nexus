@@ -19,7 +19,7 @@ mod xsp_v2_signed_receipt_outbox;
 #[path = "../xsp_v2_signer.rs"]
 mod xsp_v2_signer;
 
-use anyhow::{Context as _, Result, bail, ensure};
+use anyhow::{Context as _, Result, ensure};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use ed25519_dalek::VerifyingKey;
 use openssl::pkey::{KeyType, PKey};
@@ -29,7 +29,7 @@ use sqlx::{PgPool, postgres::PgPoolOptions};
 use std::{
     env, fs,
     os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt},
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
