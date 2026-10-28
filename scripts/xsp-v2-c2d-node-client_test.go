@@ -3,6 +3,7 @@
 package cutover
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -170,11 +171,9 @@ func TestC2DFullExchange(t *testing.T) {
 	now := time.Now().UnixMilli()
 	permit, err := PersistVerifiedPermit(journal, signedPermit, panel, want, now)
 	if err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
-			permit, err = c2dRecoverHistoricalPermitForReceiptRetry(
-				journal, signedPermit, panel, next, want, bundle.Expected.ToEpoch, now,
-			)
-		}
+		permit, err = c2dRecoverHistoricalPermitForReceiptRetry(
+			journal, signedPermit, panel, next, want, bundle.Expected.ToEpoch, now,
+		)
 		if err != nil {
 			t.Fatalf("permit verification/journal failed: %v", err)
 		}
