@@ -7,6 +7,7 @@ const {spawnSync}=require('node:child_process');
 const api=fs.readFileSync('backend/src/main.rs','utf8');
 const runtime=fs.readFileSync('backend/src/node_runtime.rs','utf8');
 const migration=fs.readFileSync('backend/migrations/0024_node_agent_updates.sql','utf8');
+const releaseManifest=fs.readFileSync('backend/migrations/0107_node_xsp_agent_release_manifests.sql','utf8');
 const agent=fs.readFileSync('deploy/node-control-agent.sh','utf8');
 const updater=fs.readFileSync('deploy/update-node-control-agent.sh','utf8');
 const installer=fs.readFileSync('deploy/install-node-metrics-agent.sh','utf8');
@@ -27,6 +28,21 @@ assert.ok(target,'Panel must advertise a numbered control runtime');
 assert.ok(agent.includes('AGENT_VERSION="'+target[1]+'"'),'Installer must report the same runtime version as the panel');
 assert.match(runtime,/version LIKE 'control-v5[.]%'/,'Agent updates must accept control-v5');
 assert.match(migration,/CHECK \(action IN \('restart_xray', 'update_xray', 'update_agent'\)\)/);
+
+// P0-D starts with an inert append-only release identity ledger. It must not
+// broaden the existing remote command surface or encode a caller-selected URL.
+assert.match(releaseManifest,/CREATE TABLE node_xsp_agent_release_manifests/);
+assert.match(releaseManifest,/version TEXT NOT NULL UNIQUE/,'One version must have one immutable identity');
+assert.match(releaseManifest,/source_revision ~ '\^\[0-9a-f\]\{40\}\$'/,'Source revision must be a canonical Git commit SHA');
+assert.match(releaseManifest,/artifact_sha256 ~ '\^\[0-9a-f\]\{64\}\$'/,'Artifact digest must be canonical SHA-256');
+assert.match(releaseManifest,/UNIQUE \(source_revision, artifact_sha256\)/);
+assert.match(releaseManifest,/BEFORE UPDATE OR DELETE ON node_xsp_agent_release_manifests/);
+assert.match(releaseManifest,/BEFORE TRUNCATE ON node_xsp_agent_release_manifests/);
+assert.match(releaseManifest,/append-only/);
+assert.doesNotMatch(releaseManifest,/\b(url|uri|script|command)\b\s+TEXT/i,
+  'Release manifest must never introduce remotely selected executable locations or commands');
+assert.doesNotMatch(releaseManifest,/strict-pq=on/,'Manifest foundation must not activate strict PQ');
+
 assert.match(agent,/AGENT_VERSION="control-v[45][.][0-9]+[.][0-9]+"/);
 assert.match(agent,/router_running\(\)\{/,'Control agent needs an independent edge-router health probe');
 assert.match(agent,/if router_running;then router=true;fi/,'Router heartbeat must come from its own process');
@@ -83,4 +99,4 @@ for(const file of ['deploy/node-control-agent.sh','deploy/update-node-control-ag
 }
 const syntax=spawnSync(process.execPath,['--check','app.js'],{encoding:'utf8'});
 assert.equal(syntax.status,0,syntax.stderr);
-console.log('Signed remote Agent upgrade, version reporting and install contract: OK');
+console.log('Signed remote Agent upgrade, immutable release identity and install contract: OK');
