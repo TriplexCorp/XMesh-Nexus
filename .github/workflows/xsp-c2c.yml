@@ -22,6 +22,7 @@ on:
       - "deploy/postgres/20-create-xsp-v2-signer-role.sql"
       - "deploy/postgres/21-create-xsp-v2-c2c-role.sql"
       - "deploy/xsp-v2-ingress/origin_ack_gate.py"
+      - "deploy/xsp-v2-ingress/nginx-c2b.conf"
       - "scripts/check-xsp-v2-c2c-runtime.js"
       - "scripts/test-xsp-v2-c2c-integration.py"
       - "scripts/generate-xsp-v2-mldsa-test-certs.go"
@@ -47,6 +48,7 @@ on:
       - "deploy/postgres/20-create-xsp-v2-signer-role.sql"
       - "deploy/postgres/21-create-xsp-v2-c2c-role.sql"
       - "deploy/xsp-v2-ingress/origin_ack_gate.py"
+      - "deploy/xsp-v2-ingress/nginx-c2b.conf"
       - "scripts/check-xsp-v2-c2c-runtime.js"
       - "scripts/test-xsp-v2-c2c-integration.py"
       - "scripts/generate-xsp-v2-mldsa-test-certs.go"
@@ -56,14 +58,14 @@ permissions:
   contents: read
 jobs:
   source-contract:
-    name: C2-C local boundary and least-privilege source contract
+    name: C2-C / D2 historical recovery source contract
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Verify no TCP/header identity handoff or production activation
+      - name: Verify protected local boundary and signer-free historical recovery
         run: node scripts/check-xsp-v2-c2c-runtime.js
       - name: Check Python harness syntax
         run: |
@@ -91,7 +93,7 @@ jobs:
             -F unsafe-code
 
   c2c-process-e2e:
-    name: Dual-signed ACK commit, protected signer and immutable receipt E2E
+    name: Dual-signed ACK commit and historical receipt recovery E2E
     needs: [source-contract, c2c-rust-lint]
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -103,5 +105,5 @@ jobs:
           cache: false
       - name: Verify Go fixture helper builds
         run: go build ./scripts/generate-xsp-v2-mldsa-test-certs.go
-      - name: Exercise C2-C process/DB/signer boundary
+      - name: Exercise C2-C process/DB/signer/recovery boundary
         run: python3 scripts/test-xsp-v2-c2c-integration.py
