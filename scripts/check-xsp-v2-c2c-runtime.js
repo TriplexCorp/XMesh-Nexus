@@ -9,6 +9,7 @@ const c2cCargo = read('backend/c2c/Cargo.toml');
 const service = read('backend/src/bin/xsp_v2_c2c.rs');
 const fixture = read('backend/src/bin/xsp_v2_c2c_fixture.rs');
 const origin = read('deploy/xsp-v2-ingress/origin_ack_gate.py');
+const ingress = read('deploy/xsp-v2-ingress/nginx-c2b.conf');
 const docker = read('backend/Dockerfile.xsp-c2c');
 const role = read('deploy/postgres/21-create-xsp-v2-c2c-role.sql');
 const test = read('scripts/test-xsp-v2-c2c-integration.py');
@@ -35,16 +36,47 @@ assert.match(service, /commit_fresh_applied_ack_staging/);
 assert.match(service, /readback_committed_applied_ack_staging/);
 assert.match(service, /issue_or_recover_via_protected_signer_staging/);
 assert.match(service, /XSP2C2C1/);
+assert.match(service, /XSP2C2H1/,
+  'historical recovery must use a distinct protected C2-C request domain');
+assert.match(service, /recover_historical_receipt/);
+assert.match(service, /load_committed_signed_receipt_staging/);
+const recoveryFunction = service.match(
+  /async fn recover_historical_receipt\([\s\S]*?\n}\n\nfn response/
+)?.[0] || '';
+assert(recoveryFunction,
+  'historical recovery function must remain independently reviewable');
+assert.doesNotMatch(recoveryFunction,
+  /commit_fresh_applied_ack_staging|issue_or_recover_via_protected_signer_staging|signer_socket/,
+  'historical recovery must never commit an ACK, advance epoch, or invoke signer');
+assert.match(recoveryFunction, /load_committed_signed_receipt_staging/,
+  'historical recovery must only load independently verified durable receipt bytes');
 assert.doesNotMatch(service, /TcpListener|axum::|reqwest::|X-XSP-V2-Trusted-Node-ID/,
   'C2-C must not add TCP/HTTP/header identity handoff');
 
 assert.match(origin, /C2C_GATE == "staging-only"/);
+assert.match(origin, /RECOVERY_PATH = "\/api\/v2\/node\/keys\/rotation\/ack\/recover"/);
+assert.match(origin, /XSP_V2_C2D_HISTORICAL_RECOVERY/);
+assert.match(origin, /XSP2C2H1/,
+  'origin must hand historical recovery to a distinct C2-C domain');
 assert.match(origin, /SO_PEERCRED/);
 assert.match(origin, /C2C_UID = 10001/);
 assert.match(origin, /client\.getsockopt[\s\S]*unexpected C2-C service peer[\s\S]*client\.sendall/,
   'origin must authenticate the C2-C peer before sending ACK bytes');
+assert.match(origin, /not is_recovery[\s\S]*now_ms > message\["expiresAtMs"\]/,
+  'ordinary state-changing ACK route must retain freshness and expiry rejection');
 assert.match(origin, /authorizationStatus": "not-verified"/,
   'C2-B behavior must remain when C2-C gate is off');
+
+assert.match(ingress, /location = \/api\/v2\/node\/keys\/rotation\/ack \{/,
+  'fresh ACK must remain an exact ingress location');
+assert.match(ingress, /location = \/api\/v2\/node\/keys\/rotation\/ack\/recover \{/,
+  'historical recovery must be an exact ingress location');
+assert.match(ingress, /ssl_protocols TLSv1\.3;/);
+assert.match(ingress, /ssl_ecdh_curve X25519MLKEM768;/);
+assert.match(ingress, /proxy_pass_request_headers off;/,
+  'caller-controlled recovery headers must not cross the ingress trust boundary');
+assert.doesNotMatch(ingress, /proxy_pass http:\/\/[^u]|location ~|location \/api\/v2\/node/,
+  'D2 recovery must not introduce a broad application proxy');
 
 assert.match(docker, /--manifest-path c2c\/Cargo\.toml/,
   'C2-C image must build from the isolated Cargo package');
@@ -60,13 +92,20 @@ assert.doesNotMatch(role, /GRANT ALL/);
 
 for (const [name, text] of [['compose.yaml', compose], ['install.sh', installer], ['backend/src/main.rs', main]]) {
   assert(!text.includes('XSP_V2_C2C_') && !text.includes('xsp-v2-c2c'), `${name} must not activate C2-C`);
+  assert(!text.includes('XSP_V2_C2D_HISTORICAL_RECOVERY'), `${name} must not activate D2 historical recovery`);
 }
 assert.match(test, /missing signer must fail HTTP success/);
 assert.match(test, /concurrent exact retry/);
 assert.match(test, /DB stall fails closed/);
 assert.match(test, /old public keys remain unretired/);
+assert.match(test, /expired ordinary ACK must remain rejected/,
+  'process E2E must prove normal freshness was not weakened');
+assert.match(test, /historical recovery returns exact durable receipt/,
+  'process E2E must prove exact signer-free durable recovery');
 assert.match(workflow, /test-xsp-v2-c2c-integration\.py/);
 assert.match(workflow, /check-xsp-v2-c2c-runtime\.js/);
 assert.match(workflow, /backend\/c2c\/Cargo\.toml/);
+assert.match(workflow, /deploy\/xsp-v2-ingress\/nginx-c2b\.conf/,
+  'C2-C/D2 workflow must run when the protected ingress recovery route changes');
 assert.match(workflow, /C2-C isolated package strict Clippy/);
-console.log('C2-C staging runtime/security contract: PASS');
+console.log('C2-C/D2 historical recovery staging runtime/security contract: PASS');
