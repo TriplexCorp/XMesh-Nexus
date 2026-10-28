@@ -6,7 +6,9 @@ on:
       - "scripts/check-xsp-hybrid-tls.py"
       - "scripts/check-xsp-nginx-isolated.py"
       - "scripts/check-xsp-v2-ingress-runtime.js"
+      - "scripts/check-xsp-v2-c2b-ack-runtime.js"
       - "scripts/test-xsp-v2-ingress-process.py"
+      - "scripts/test-xsp-v2-c2b-ack-process.py"
       - "scripts/generate-xsp-v2-mldsa-test-certs.go"
       - "deploy/xsp-v2-node-ingress.nginx.conf.example"
       - "deploy/xsp-v2-ingress/**"
@@ -17,7 +19,9 @@ on:
       - "scripts/check-xsp-hybrid-tls.py"
       - "scripts/check-xsp-nginx-isolated.py"
       - "scripts/check-xsp-v2-ingress-runtime.js"
+      - "scripts/check-xsp-v2-c2b-ack-runtime.js"
       - "scripts/test-xsp-v2-ingress-process.py"
+      - "scripts/test-xsp-v2-c2b-ack-process.py"
       - "scripts/generate-xsp-v2-mldsa-test-certs.go"
       - "deploy/xsp-v2-node-ingress.nginx.conf.example"
       - "deploy/xsp-v2-ingress/**"
@@ -81,3 +85,19 @@ jobs:
       - name: Exercise hybrid mTLS identity and protected Unix origin hop
         run: |
           python3 scripts/test-xsp-v2-ingress-process.py --go-probe "$RUNNER_TEMP/xsp-tlsprobe"
+
+  c2b-ack-e2e:
+    name: C2-B narrow staging ACK route E2E
+    needs: ingress-process-e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache: false
+      - name: Enforce C2-B exact-route and production-isolation contract
+        run: node scripts/check-xsp-v2-c2b-ack-runtime.js
+      - name: Exercise exact ACK gate behind the proven mTLS to Unix boundary
+        run: python3 scripts/test-xsp-v2-c2b-ack-process.py
