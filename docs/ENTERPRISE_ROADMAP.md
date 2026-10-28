@@ -8,11 +8,12 @@ A green test proves only its stated boundary. Code existence ≠ E2E ≠ securit
 
 ## Verified source checkpoints
 
+- **Nexus C2-D1 implementation checkpoint:** [`037290bbb31dc6e5d155a14b8ddf58a31e21066f`](https://github.com/TriplexCorp/XMesh-Nexus/commit/037290bbb31dc6e5d155a14b8ddf58a31e21066f), merge of [PR #73](https://github.com/TriplexCorp/XMesh-Nexus/pull/73).
+- PR #73 exact pre-merge head `298fba8b17f08bd306ab3f68c998354da3c643b5` passed Backend CI and XSP-v2 C2-D1 Integrated Process E2E.
+- On exact merge SHA `037290bbb31dc6e5d155a14b8ddf58a31e21066f`, [C2-D1 Integrated Process E2E #40720824028](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40720824028) and [Backend CI #40720823715](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40720823715) completed **success**.
+- **XMesh-Node C2-D staging transport checkpoint:** [`3c49fd9b81293f53f7bc599a4bfab5a4c2040164`](https://github.com/TriplexCorp/XMesh-Node/commit/3c49fd9b81293f53f7bc599a4bfab5a4c2040164), merge of [Node PR #30](https://github.com/TriplexCorp/XMesh-Node/pull/30); Node CI and Go 1.27 Crypto passed on exact head and post-merge. The Nexus D1 workflow pins this exact Node SHA.
 - **Nexus C2-C implementation checkpoint:** [`37b9e49da1a9fd43657dd167ebb9d5e9a4580091`](https://github.com/TriplexCorp/XMesh-Nexus/commit/37b9e49da1a9fd43657dd167ebb9d5e9a4580091), merge of [PR #71](https://github.com/TriplexCorp/XMesh-Nexus/pull/71).
-- PR #71 exact pre-merge head `4c781cc8dcc5530c5062a0e7224051734b1e6633` passed Backend CI, XSP-v2 Crypto PoC, Hybrid TLS and C2-C ACK Authorization.
-- On exact merge SHA `37b9e49da1a9fd43657dd167ebb9d5e9a4580091`, [C2-C ACK Authorization #40700626539](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40700626539), [Backend CI #40700626558](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40700626558), [Crypto PoC #40700626631](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40700626631) and [Hybrid TLS #40700626545](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40700626545) all completed **success**.
-- **XMesh-Node staging transport checkpoint:** [`79cee45174f7670707d22a269784fe117c44743c`](https://github.com/TriplexCorp/XMesh-Node/commit/79cee45174f7670707d22a269784fe117c44743c), merge of [Node PR #29](https://github.com/TriplexCorp/XMesh-Node/pull/29); Node CI #40597143811 and XSP-v2 Crypto PoC #40597143829 passed.
-- Earlier signer P0 (PR #61), dedicated PQ-only ingress P0-C1 (PR #64), trusted ingress→origin identity boundary P0-C2-A (PR #66) and narrow staging ACK gate P0-C2-B (PR #69) remain complete in their stated staging/process scopes.
+- Earlier signer P0 (PR #61), dedicated PQ-only ingress P0-C1 (PR #64), trusted ingress→origin identity boundary P0-C2-A (PR #66), narrow staging ACK gate P0-C2-B (PR #69) and C2-C ACK crypto/transaction/signer (PR #71) remain complete in their stated staging/process scopes.
 
 ## Binding XSP-v2 target invariant
 
@@ -41,8 +42,9 @@ All are mandatory:
 | P0-C2-A ingress→origin trust boundary | **P0 COMPLETE — isolated staging/process** | PR #66; verified client identity → protected UDS → peercred/pinned-SPKI Node identity |
 | P0-C2-B narrow staging ACK route | **P0 COMPLETE — isolated staging/process** | PR #69; exact gated ACK structural operation, no broad proxy |
 | P0-C2-C ACK crypto/transaction/signer | **P0 COMPLETE — isolated staging/process** | PR #71; dual-signature ACK auth, atomic commit, protected signer, immutable receipt/recovery |
-| **P0-C2-D retry/failure/full E2E** | **CURRENT P0** | Real strict Node TLS → trusted boundary → ACK → DB → signer → receipt → retry/restart |
-| P0-D production-capable Agent workflow | **BLOCKED on C2-D** | Integrate real Agent migration/control state and update path |
+| P0-C2-D1 real Node integrated E2E | **P0 COMPLETE — isolated staging/process** | PR #73; pinned Node SHA → strict PQ mTLS → ACK commit → signer → Node-verified durable receipt |
+| **P0-C2-D2 failure/retry/recovery matrix** | **CURRENT P0** | Expired exact retry, lost-response windows, races, outages/restarts, downgrade/no-legacy proof |
+| P0-D production-capable Agent workflow | **BLOCKED on full C2-D** | Integrate real Agent migration/control state and update path |
 | P0-E recovery/security release gates | **BLOCKED** | Crash/snapshot/rollback/backup/rotation/fuzz/KAT/independent review |
 | Production XSP-v2 rollout | **NOT AUTHORIZED** | Disposable canary + explicit production approval after all gates |
 
@@ -129,37 +131,79 @@ Tested local path:
 
 ### C2-C limits — binding
 
-C2-C starts from the already-proven trusted C2-B origin boundary. It is **not yet** the full real Node→TLS→ACK→receipt/retry process E2E.
+C2-C starts from the already-proven trusted C2-B origin boundary. It does **not** by itself prove the full real Node→TLS→ACK→receipt/retry process chain.
 
 C2-C also does **not** claim exactly-once signing before the first durable outbox INSERT. A concurrent/lost pre-persistence signature may exist; the first durable immutable receipt remains authoritative. No production key retirement or production activation is authorized.
 
-## CURRENT P0 — P0-C2-D: failure / retry / full E2E
+## Completed P0-C2-D1 — real Node integrated E2E
+
+Merged as Nexus PR #73 and re-verified on exact merge SHA `037290bbb31dc6e5d155a14b8ddf58a31e21066f`.
+
+Tested integrated path:
+
+`real XMesh-Node Go 1.27 staging client → strict TLS1.3/X25519MLKEM768 + ML-DSA-65 mTLS → dedicated ingress → protected origin UDS → C2-C ACK auth/commit → PostgreSQL → isolated signer → dual-signed commit receipt → Node receipt verification + durable journal`
+
+### D1 acceptance evidence
+
+- [x] The cross-repository workflow pins exact Node merge SHA `3c49fd9b81293f53f7bc599a4bfab5a4c2040164`; no floating Node `main` is used as security evidence.
+- [x] The real Node staging cutover package verifies and journals the exact signed permit and ACK before the network exchange.
+- [x] The same Node path uses mandatory TLS 1.3 + actually negotiated `X25519MLKEM768` + ML-DSA-65 mutual TLS.
+- [x] Another otherwise-valid ML-DSA client certificate cannot impersonate the pinned Node identity and cannot change the epoch.
+- [x] The request crosses the already-reviewed ingress→origin→C2-C boundaries rather than being injected only at the trusted origin.
+- [x] C2-C performs the existing Ed25519 AND ML-DSA-65 ACK authorization and atomic ACK→epoch commit.
+- [x] The isolated signer issues the commit receipt only after committed evidence exists.
+- [x] The Node does not infer policy success from HTTP status: it verifies both receipt signatures and exact permit/ACK/epoch/request bindings, then durably journals the receipt.
+- [x] A restarted Node test process can re-authenticate an already-durable local permit/ACK/receipt witness after permit expiry without treating that expired permit as a new command.
+- [x] No host-published port is introduced; the integrated Docker network remains internal/test-only.
+- [x] Production Agent code, default installer/Compose, `strict-pq`, live DB/keys and production infrastructure remain untouched.
+- [x] Exact-head D1 E2E and Backend CI passed on PR head `298fba8b17f08bd306ab3f68c998354da3c643b5`.
+- [x] PR #73 merged as `037290bbb31dc6e5d155a14b8ddf58a31e21066f`.
+- [x] Post-merge D1 E2E #40720824028 and Backend CI #40720823715 passed on that exact merge SHA.
+
+### D1 limit discovered and preserved
+
+D1 intentionally does **not** weaken ACK freshness. A second network submission of an ACK after its freshness window is rejected by the origin structural gate. That is correct for a new operation but means exact durable-receipt recovery across an expired ACK needs a distinct historical-recovery protocol.
+
+Therefore D1 does **not** claim expired ACK network retransmission/recovery. This remains a mandatory C2-D2 requirement. The future D2 mechanism must never turn a stale ACK into a new state transition: it may recover only an exact already-committed durable record and must not re-sign or advance the epoch again.
+
+## CURRENT P0 — P0-C2-D2: failure / retry / recovery matrix
+
+Overall **P0-C2-D remains CURRENT P0**. It is not complete until all D2 criteria below pass in the integrated real-Node topology.
 
 ### Goal
 
-Prove the complete staged control-plane chain as one integrated process/network system:
+Preserve the proven D1 chain and demonstrate that every ambiguous network/process failure converges safely:
 
-`real strict Node test client → TLS1.3/X25519MLKEM768 + ML-DSA-65 client identity → trusted ingress/origin boundary → ACK auth/commit → isolated signer → signed receipt → retry/recovery`
+`real strict Node → PQ mTLS → trusted boundary → ACK durable state → receipt durable state → exact recovery or fail-closed`
 
 ### Required acceptance criteria
 
-- [ ] Use the real strict Node Go 1.27 transport/client-auth probe in the end-to-end path rather than injecting a request only at the already-trusted origin boundary.
+- [x] Use the real strict Node Go 1.27 transport/client-auth/cutover path in the integrated E2E rather than injecting only at the trusted origin. **D1**
+- [x] Node verifies the exact dual-signed receipt rather than inferring success from HTTP status. **D1**
+- [x] Alternate ML-DSA client identity cannot impersonate the pinned Node in the integrated route. **D1**
+- [x] No host-published port is introduced by the D1 integrated topology. **D1**
+- [ ] Define and prove exact **network** retry after the original ACK freshness window. Recovery may succeed only if trusted transport Node identity plus exact request/epoch/ACK bytes/hash match already-committed durable evidence and an immutable durable receipt; it must never authorize a fresh stale transition, re-sign, or advance the epoch again.
 - [ ] Exact retry returns the same durable receipt bytes and performs no second epoch transition.
 - [ ] Racing duplicate ACKs/replays/mismatched payloads fail or converge only to the immutable committed record.
 - [ ] Exercise lost network response before durable ACK commit.
 - [ ] Exercise lost response after ACK commit but before durable receipt persistence/reply.
 - [ ] Exercise lost response after durable receipt persistence; retry must recover exact bytes without re-signing.
-- [ ] Signer unavailable, DB stall, origin/C2-C boundary unavailable and process restart all fail closed without legacy fallback.
-- [ ] Restart C2-C/origin/signer around security state transitions and prove durable recovery semantics.
+- [ ] Signer unavailable, DB stall, origin boundary unavailable and C2-C unavailable all fail closed without legacy fallback.
+- [ ] Restart C2-C/origin/signer around security-state transitions and prove durable recovery semantics.
 - [ ] Failed PQ handshake, wrong client certificate or downgrade attempt cannot reach the ACK operation through an authenticated legacy session.
-- [ ] Verify no new public port, broad proxy, classical-only internal hop or signer-key exposure appears in the integrated topology.
-- [ ] Preserve old-key retention and no automatic retirement.
-- [ ] No success may be inferred from HTTP status alone; the Node must validate the exact dual-signed receipt.
+- [ ] Verify no new public port, broad proxy, classical-only internal hop or signer-key exposure appears across the integrated failure/recovery topology.
+- [ ] Preserve old-key retention and no automatic retirement across every failure/retry path.
 - [ ] PR CI, review, fixed-head merge and post-merge exact-SHA CI are required before P0-D.
+
+### D2 architectural constraint — binding
+
+Do **not** solve expired retry by simply increasing/ignoring `issuedAtMs`/`expiresAtMs`, accepting a generic stale ACK, adding a weak fallback route, or trusting caller-controlled recovery headers.
+
+A valid historical-recovery path must be independently distinguishable from a fresh state-changing ACK and must be bound to the authenticated PQ transport Node identity plus exact durable committed evidence. If the durable record/receipt is missing or mismatched, reject. If any component is unavailable in a way that prevents proving the durable match, fail closed.
 
 ## P0-D — production-capable Agent workflow
 
-After C2-D:
+After full C2-D:
 
 - integrate the proven Go 1.27 strict transport and XSP/2 primitives into a production-capable Agent design;
 - provision trusted panel pins and verified Node key custody;
