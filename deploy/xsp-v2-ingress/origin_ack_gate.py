@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Disposable P0-C2-B/C staging ACK origin gate.
+"""Disposable P0-C2-B/C/D staging ACK origin gate.
 
-C2-B performs only structural validation behind the proven C2-A Unix peer/client
-certificate boundary. When the explicit C2-C staging gate is enabled, the same
-trusted Node identity and exact ACK bytes are handed to the Rust cryptographic
-service over a second peer-credential-protected Unix socket. No caller header,
+Fresh ACK submission performs the original structural freshness validation behind
+the proven C2-A Unix peer/client-certificate boundary. Historical receipt
+recovery is a separate exact route and C2-C request domain: it may carry an
+expired *already-signed* ACK only for read-only durable receipt lookup. The
+signed ACK remains bound to the original ACK command path. No caller header,
 body field, source IP, or legacy identity becomes trusted transport identity.
 """
 from __future__ import annotations
@@ -30,12 +31,14 @@ ACK_GATE = os.environ.get("XSP_V2_C2B_ACK_ROUTE", "")
 C2C_GATE = os.environ.get("XSP_V2_C2C_ACK_AUTH", "")
 C2C_SOCKET_PATH = Path(os.environ.get("XSP_V2_C2C_SOCKET_PATH", "/run/xmesh-c2c/c2c.sock"))
 ACK_PATH = "/api/v2/node/keys/rotation/ack"
+RECOVERY_PATH = "/api/v2/node/keys/rotation/ack/recover"
 MAX_CERT_HEADER = 24 * 1024
 MAX_ACK_BODY = 16 * 1024
 MAX_SIGNATURE_TEXT = 8 * 1024
 MAX_U64 = (1 << 64) - 1
 MAX_I64 = (1 << 63) - 1
 C2C_REQUEST_MAGIC = b"XSP2C2C1"
+C2C_RECOVERY_REQUEST_MAGIC = b"XSP2C2H1"
 C2C_RESPONSE_MAGIC = b"XSP2C2R1"
 C2C_UID = 10001
 C2C_GID = 10001
@@ -103,10 +106,11 @@ def read_exact(stream: socket.socket, size: int) -> bytes:
     return bytes(out)
 
 
-def authorize_c2c(node_id: int, raw_ack: bytes) -> bytes:
+def authorize_c2c(node_id: int, raw_ack: bytes, *, historical_recovery: bool) -> bytes:
     if node_id <= 0 or len(raw_ack) <= 0 or len(raw_ack) > MAX_ACK_BODY:
         raise ValueError("invalid C2-C local request")
-    frame = C2C_REQUEST_MAGIC + struct.pack(">Q", node_id) + struct.pack(">I", len(raw_ack)) + raw_ack
+    magic = C2C_RECOVERY_REQUEST_MAGIC if historical_recovery else C2C_REQUEST_MAGIC
+    frame = magic + struct.pack(">Q", node_id) + struct.pack(">I", len(raw_ack)) + raw_ack
     client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     client.settimeout(12)
     try:
@@ -127,7 +131,7 @@ def authorize_c2c(node_id: int, raw_ack: bytes) -> bytes:
         if client.recv(1) != b"":
             raise ValueError("trailing C2-C response bytes")
         if header[8] != 1 or not payload:
-            raise ValueError("C2-C authorization rejected")
+            raise ValueError("C2-C authorization/recovery rejected")
         return payload
     finally:
         client.close()
@@ -187,9 +191,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_json(200, {"originTransport": "unix-peercred", "trustedNodeId": node_id})
 
     def do_POST(self) -> None:
-        if self.path != ACK_PATH or ACK_GATE != "staging-only":
+        if self.path not in (ACK_PATH, RECOVERY_PATH) or ACK_GATE != "staging-only":
             self.send_json(404, {"error": "not found"})
             return
+        historical_recovery = self.path == RECOVERY_PATH
         node_id = self.trusted_node_id()
         if node_id is None:
             self.send_json(403, {"error": "untrusted origin identity"})
@@ -240,7 +245,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if any(type(message[name]) is not int for name in integer_fields):
             self.send_json(400, {"error": "invalid staging ACK"})
             return
-        now_ms = int(time.time() * 1000)
         if (
             message["kind"] != "ack"
             or message["nodeId"] != node_id
@@ -256,11 +260,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
             or message["expiresAtMs"] > MAX_I64
             or message["expiresAtMs"] <= message["issuedAtMs"]
             or message["expiresAtMs"] - message["issuedAtMs"] > 60_000
-            or abs(now_ms - message["issuedAtMs"]) > 120_000
-            or now_ms > message["expiresAtMs"]
         ):
             self.send_json(400, {"error": "invalid staging ACK"})
             return
+        if not historical_recovery:
+            now_ms = int(time.time() * 1000)
+            if abs(now_ms - message["issuedAtMs"]) > 120_000 or now_ms > message["expiresAtMs"]:
+                self.send_json(400, {"error": "invalid staging ACK"})
+                return
         for name in (
             "requestId", "issuerId", "signerEdKeyId", "signerPQKeyId",
             "fromEdKeyId", "fromPQKeyId", "toEdKeyId", "toPQKeyId",
@@ -283,9 +290,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return
         if C2C_GATE == "staging-only":
             try:
-                receipt = authorize_c2c(node_id, raw)
+                receipt = authorize_c2c(node_id, raw, historical_recovery=historical_recovery)
             except (OSError, ValueError, struct.error):
-                self.send_json(503, {"error": "C2-C authorization unavailable or rejected"})
+                self.send_json(503, {"error": "C2-C authorization/recovery unavailable or rejected"})
                 return
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
