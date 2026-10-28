@@ -19,6 +19,7 @@ RUN --mount=type=secret,id=proxy_ca \
     mkdir -p c2c; \
     cp /source/backend/c2c/Cargo.toml c2c/Cargo.toml; \
     cp -a /source/backend/src /source/backend/migrations .; \
+    ln -s ../migrations c2c/migrations; \
     cp -a /source/docs /build/docs; \
     cargo build --manifest-path c2c/Cargo.toml --release --features xsp-v2-experimental --bin xsp-v2-c2c; \
     mkdir -p /build/output; \
