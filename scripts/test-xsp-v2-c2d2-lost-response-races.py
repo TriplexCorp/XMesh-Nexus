@@ -225,7 +225,7 @@ def main() -> None:
                 "--mount", f"type=volume,src={volumes['journal']},dst=/journal",
                 "--workdir", "/src",
                 "golang:1.27.3-trixie",
-                "go", "test", "./cutover", "-run", f"^{test_name}$", "-count=1", "-v",
+                "/src/c2d2.test", "-test.run", f"^{test_name}$", "-test.count=1", "-test.v",
                 check=False,
                 timeout=180,
             )
@@ -251,6 +251,14 @@ def main() -> None:
             for volume in volumes.values():
                 command("docker", "volume", "create", volume)
             command("docker", "pull", "golang:1.27.3-trixie", timeout=600)
+            command(
+                "docker", "run", "--rm",
+                "--mount", f"type=bind,src={node_runtime},dst=/src",
+                "--workdir", "/src",
+                "golang:1.27.3-trixie",
+                "go", "test", "-c", "./cutover", "-o", "/src/c2d2.test",
+                timeout=180,
+            )
 
             command("docker", "build", "-f", str(ROOT / "backend/Dockerfile.xsp-signer"), "--target", "runtime", "-t", signer_image, str(ROOT), timeout=900)
             for target, tag in [("runtime", c2c_image), ("c2c-tests", tests_image)]:
