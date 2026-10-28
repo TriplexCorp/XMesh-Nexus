@@ -173,7 +173,7 @@ func TestC2DFullExchange(t *testing.T) {
 	now := time.Now().UnixMilli()
 	permit, err := PersistVerifiedPermit(journal, signedPermit, panel, want, now)
 	if err != nil {
-		permit, recovered, recoverErr := c2dRecoverHistoricalPermitForReceiptRetry(
+		_, recovered, recoverErr := c2dRecoverHistoricalPermitForReceiptRetry(
 			journal, signedPermit, panel, next, want, bundle.Expected.ToEpoch, now,
 		)
 		if recoverErr != nil {
@@ -186,7 +186,6 @@ func TestC2DFullExchange(t *testing.T) {
 		// durable local receipt chain with the signer offline. A network retry of
 		// an expired ACK is intentionally NOT attempted here: origin freshness
 		// remains fail-closed and the exact expired-retry protocol belongs to D2.
-		_ = permit
 		return
 	}
 
