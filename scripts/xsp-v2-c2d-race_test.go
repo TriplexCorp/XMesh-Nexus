@@ -43,14 +43,17 @@ func c2dStrictClientMaterial(t *testing.T) (*x509.CertPool, tls.Certificate) {
 }
 
 func TestC2DExactDuplicateNetworkRace(t *testing.T) {
-	bundle, signedPermit, signedACK, panel, next, want := c2dLoadBundle(t)
+	bundle, _, signedACK, panel, next, want := c2dLoadBundle(t)
 	journal := c2dRequired(t, "XSP_C2D_JOURNAL_DIR")
 	now := time.Now().UnixMilli()
-	_, _, err := c2dRecoverHistoricalPermitForDurableReceipt(
-		journal, signedPermit, panel, next, want, bundle.Expected.ToEpoch, now,
-	)
+	permit, err := reloadVerifiedPermitForReceiptRetry(journal, panel, want, next)
 	if err != nil {
-		t.Fatalf("durable chain unavailable before duplicate race: %v", err)
+		t.Fatalf("durable permit/ACK chain unavailable before duplicate race: %v", err)
+	}
+	if _, err = ReloadVerifiedCommitReceiptForJournal(
+		journal, panel, permit, next, bundle.Expected.ToEpoch, now,
+	); err != nil {
+		t.Fatalf("durable receipt unavailable before duplicate race: %v", err)
 	}
 	parsedACK, err := Decode(signedACK)
 	if err != nil {
