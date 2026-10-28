@@ -119,6 +119,15 @@ s.close();sys.stdout.buffer.write(out)
             request_file.unlink(missing_ok=True)
             wire = (result.stdout or "").encode("latin1")
             if b"\r\n\r\n" not in wire:
+                if uid == 10003:
+                    details = [f"client_rc={result.returncode}"]
+                    if result.stderr:
+                        details.append("client=" + result.stderr[-800:].replace("\n", " "))
+                    for service in (origin, c2c):
+                        logs = command("docker", "logs", "--tail", "30", service, check=False)
+                        safe = (logs.stdout + logs.stderr)[-1200:].replace("\n", " ")
+                        details.append(f"{service}={safe}")
+                    raise RuntimeError("trusted origin request returned no HTTP response: " + " | ".join(details))
                 return 0, wire
             head, body = wire.split(b"\r\n\r\n", 1)
             first = head.split(b"\r\n", 1)[0].split()
