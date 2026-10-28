@@ -10,6 +10,8 @@ XMesh Nexus manages Nodes, users, subscriptions, Xray configuration, telemetry a
 
 **Latest verified Nexus implementation checkpoint:** [`037290bbb31dc6e5d155a14b8ddf58a31e21066f`](https://github.com/TriplexCorp/XMesh-Nexus/commit/037290bbb31dc6e5d155a14b8ddf58a31e21066f), merge of [PR #73](https://github.com/TriplexCorp/XMesh-Nexus/pull/73).
 
+**Latest clean documentation/main checkpoint:** [`9900f8c99efc59f86699a6c0ab35c3b39b211d37`](https://github.com/TriplexCorp/XMesh-Nexus/commit/9900f8c99efc59f86699a6c0ab35c3b39b211d37), merge of docs-only [PR #74](https://github.com/TriplexCorp/XMesh-Nexus/pull/74). Post-merge [Backend CI #40724165330](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40724165330) completed **success** on that exact SHA. This documentation-only checkpoint does not supersede `037290...` as the verified C2-D1 implementation evidence.
+
 P0-C2-D1 — the integrated real-Node staging E2E — is complete in **isolated staging/process scope**:
 
 `Node strict client → TLS1.3/X25519MLKEM768 + ML-DSA-65 mTLS → trusted ingress/origin → dual-signed ACK auth/DB commit → isolated signer → Node-verified durable dual-signed receipt`
@@ -90,7 +92,9 @@ D1 intentionally does **not** weaken ACK freshness. Network retransmission of an
 
 ## CURRENT P0 — P0-C2-D2: failure, retry and recovery matrix
 
-Overall P0-C2-D remains **CURRENT P0** until D2 passes. D2 must preserve the D1 chain while closing every remaining failure/recovery requirement:
+Overall P0-C2-D remains **CURRENT P0** until D2 passes. D2 must preserve the D1 chain while closing every remaining failure/recovery requirement.
+
+The clean starting point for D2 is `main` at `9900f8c99efc59f86699a6c0ab35c3b39b211d37` with post-merge Backend CI green. D2 implementation work must start from a new focused branch and must not reuse D1/docs branches as security evidence.
 
 1. exact network retry after the ACK freshness window returns the same durable receipt bytes **only** for an exact already-committed ACK, with no stale new transition, re-signing or second epoch transition;
 2. racing duplicate ACKs, replay and mismatched payloads fail or converge only to the immutable committed record;
