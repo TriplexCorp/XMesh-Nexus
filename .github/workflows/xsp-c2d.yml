@@ -49,6 +49,8 @@ jobs:
           test -f scripts/xsp-v2-c2d-node-client_test.go
           ! grep -R --line-number --fixed-strings 'strict-pq=on' scripts/test-xsp-v2-c2d-full-e2e.py scripts/xsp-v2-c2d-node-client_test.go
           ! grep -R --line-number -E '(-p|--publish)[ =]' scripts/test-xsp-v2-c2d-full-e2e.py
+          grep -Fq 'network retry of' scripts/xsp-v2-c2d-node-client_test.go
+          grep -Fq 'belongs to D2' scripts/xsp-v2-c2d-node-client_test.go
 
   full-process-e2e:
     name: Node strict PQ mTLS -> ACK commit -> signer -> verified durable receipt
