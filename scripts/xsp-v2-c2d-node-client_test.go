@@ -89,46 +89,48 @@ func c2dRecoverHistoricalPermitForReceiptRetry(
 	want ExpectedPermit,
 	minEpoch uint64,
 	nowMS int64,
-) (VerifiedPermit, error) {
-	var empty VerifiedPermit
+) (VerifiedPermit, VerifiedCommitReceipt, error) {
+	var emptyPermit VerifiedPermit
+	var emptyReceipt VerifiedCommitReceipt
 	permitRow, err := readPermitFile(filepath.Join(journal, journalName))
 	if err != nil {
-		return empty, err
+		return emptyPermit, emptyReceipt, err
 	}
 	if !bytes.Equal(permitRow.SignedPermit, signedPermit) || permitRow.EnvelopeSHA256 != sha(signedPermit) {
-		return empty, errors.New("historical permit bytes differ from durable journal")
+		return emptyPermit, emptyReceipt, errors.New("historical permit bytes differ from durable journal")
 	}
 	signed, err := Decode(signedPermit)
 	if err != nil {
-		return empty, err
+		return emptyPermit, emptyReceipt, err
 	}
 	if signed.Message.Kind != "permit" || !permitMatches(signed.Message, want) {
-		return empty, errors.New("historical permit no longer matches approved request")
+		return emptyPermit, emptyReceipt, errors.New("historical permit no longer matches approved request")
 	}
 	if err = checkPublic(panel, signed.Message, "panel_response"); err != nil {
-		return empty, err
+		return emptyPermit, emptyReceipt, err
 	}
 	canonical, err := verifyBoth(signed, panel)
 	if err != nil {
-		return empty, err
+		return emptyPermit, emptyReceipt, err
 	}
 	permit := VerifiedPermit{message: signed.Message, inputHash: sha(canonical)}
 	if permit.PermitDigest() != permitRow.PermitDigest {
-		return empty, errors.New("historical permit digest differs from durable journal")
+		return emptyPermit, emptyReceipt, errors.New("historical permit digest differs from durable journal")
 	}
 
 	ack, err := checkSavedACKForReceipt(journal, permit)
 	if err != nil {
-		return empty, err
+		return emptyPermit, emptyReceipt, err
 	}
 	receiptRow, err := readCommitReceiptRecord(filepath.Join(journal, commitReceiptJournalName))
 	if err != nil {
-		return empty, err
+		return emptyPermit, emptyReceipt, err
 	}
-	if _, err = verifyReceiptJournalRow(receiptRow, ack, panel, permit, next, minEpoch, nowMS); err != nil {
-		return empty, err
+	verified, err := verifyReceiptJournalRow(receiptRow, ack, panel, permit, next, minEpoch, nowMS)
+	if err != nil {
+		return emptyPermit, emptyReceipt, err
 	}
-	return permit, nil
+	return permit, verified, nil
 }
 
 func TestC2DFullExchange(t *testing.T) {
@@ -171,12 +173,21 @@ func TestC2DFullExchange(t *testing.T) {
 	now := time.Now().UnixMilli()
 	permit, err := PersistVerifiedPermit(journal, signedPermit, panel, want, now)
 	if err != nil {
-		permit, err = c2dRecoverHistoricalPermitForReceiptRetry(
+		permit, recovered, recoverErr := c2dRecoverHistoricalPermitForReceiptRetry(
 			journal, signedPermit, panel, next, want, bundle.Expected.ToEpoch, now,
 		)
-		if err != nil {
-			t.Fatalf("permit verification/journal failed: %v", err)
+		if recoverErr != nil {
+			t.Fatalf("permit verification/journal failed: %v", recoverErr)
 		}
+		if recovered.NodeID != bundle.Expected.NodeID || recovered.ToEpoch != bundle.Expected.ToEpoch || recovered.RequestID != bundle.Expected.RequestID {
+			t.Fatalf("historical durable receipt correlation mismatch: %+v", recovered)
+		}
+		// D1 proves that a restarted Node process can re-authenticate the already
+		// durable local receipt chain with the signer offline. A network retry of
+		// an expired ACK is intentionally NOT attempted here: origin freshness
+		// remains fail-closed and the exact expired-retry protocol belongs to D2.
+		_ = permit
+		return
 	}
 
 	if _, statErr := os.Stat(filepath.Join(journal, commitReceiptJournalName)); errors.Is(statErr, os.ErrNotExist) {
