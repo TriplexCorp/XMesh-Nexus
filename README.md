@@ -2,100 +2,109 @@
 
 **Self-hosted control plane for Xray-powered VPN infrastructure.**
 
-XMesh Nexus manages nodes, users, subscriptions, Xray configuration, telemetry and security state. The user VPN data-plane remains **Xray-core**; XMesh is the control plane and must not be described as an additional VPN encryption layer.
+XMesh Nexus manages nodes, users, subscriptions, Xray configuration, telemetry and security state. The user VPN data-plane remains **Xray-core**; XMesh is the control plane and must not be described as an extra encryption layer around user VPN traffic.
 
 [English](README.en.md) · [Enterprise Roadmap](docs/ENTERPRISE_ROADMAP.md) · [XSP-v2 security policy](docs/XSP_V2_PQ_ONLY_SECURITY_POLICY.md) · [XMesh Node](https://github.com/TriplexCorp/XMesh-Node)
 
 ## Current XSP-v2 engineering checkpoint — 28 October 2026
 
-**Latest verified Nexus implementation checkpoint:** [`a3e18fae4cf9cd0d354e536ede285d952c54d1c8`](https://github.com/TriplexCorp/XMesh-Nexus/commit/a3e18fae4cf9cd0d354e536ede285d952c54d1c8), merge of [PR #69](https://github.com/TriplexCorp/XMesh-Nexus/pull/69).
+**Latest verified Nexus implementation checkpoint:** [`37b9e49da1a9fd43657dd167ebb9d5e9a4580091`](https://github.com/TriplexCorp/XMesh-Nexus/commit/37b9e49da1a9fd43657dd167ebb9d5e9a4580091), merge of [PR #71](https://github.com/TriplexCorp/XMesh-Nexus/pull/71).
 
-P0-C2-B — the narrow staging ACK structural gate behind the proven hybrid-mTLS → protected-UDS identity boundary — is complete in **isolated staging/process scope**:
+P0-C2-C — cryptographic ACK authorization, atomic PostgreSQL state transition, protected signer invocation and immutable signed receipt recovery — is complete in **isolated staging/process scope**.
 
-- exact pre-merge head `4e079378f6f43eedced167b5fdde7d1b37568ad4` passed [XSP-v2 Hybrid TLS Probe #40606304019](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40606304019) and [Backend CI #40606304071](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40606304071);
-- post-merge [XSP-v2 Hybrid TLS Probe #40607355530](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40607355530) — **success**, including `tls-hybrid`, `PQ client identity and Unix origin boundary E2E`, and `C2-B narrow staging ACK route E2E`;
-- post-merge [Backend CI #40607355446](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40607355446) — **success**, including strict Clippy, Docker build and disposable API/authentication integration.
+Exact post-merge evidence on `37b9e49da1a9fd43657dd167ebb9d5e9a4580091`:
 
-The earlier isolated signer P0 from PR #61, dedicated PQ-only ingress P0-C1 from PR #64 and trusted ingress→origin identity boundary P0-C2-A from PR #66 remain completed in their stated staging/process scopes.
+- [XSP-v2 C2-C ACK Authorization #40700626539](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40700626539) — **success**;
+- [Backend CI #40700626558](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40700626558) — **success**;
+- [XSP-v2 Crypto PoC #40700626631](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40700626631) — **success**;
+- [XSP-v2 Hybrid TLS Probe #40700626545](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40700626545) — **success**.
 
-**Current XMesh-Node staging transport checkpoint:** [`79cee45174f7670707d22a269784fe117c44743c`](https://github.com/TriplexCorp/XMesh-Node/commit/79cee45174f7670707d22a269784fe117c44743c), merge of [Node PR #29](https://github.com/TriplexCorp/XMesh-Node/pull/29). On that exact merge SHA, [Node CI #40597143811](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40597143811) and [XSP-v2 Crypto PoC #40597143829](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40597143829) passed.
+The earlier isolated signer P0 from PR #61, dedicated PQ-only ingress P0-C1 from PR #64, trusted ingress→origin identity boundary P0-C2-A from PR #66 and narrow staging ACK gate P0-C2-B from PR #69 remain complete in their stated staging/process scopes.
 
-Production Node still uses the legacy Go 1.23 control path. The Go 1.27 XSP-v2 transport/client-auth code remains isolated staging/research code; C2-B does not activate production XSP-v2.
+**Current XMesh-Node staging transport checkpoint:** [`79cee45174f7670707d22a269784fe117c44743c`](https://github.com/TriplexCorp/XMesh-Node/commit/79cee45174f7670707d22a269784fe117c44743c), merge of [Node PR #29](https://github.com/TriplexCorp/XMesh-Node/pull/29). [Node CI #40597143811](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40597143811) and [XSP-v2 Crypto PoC #40597143829](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40597143829) passed on that merge SHA.
 
-### P0-C1 — completed
+Production Node still uses the legacy Go 1.23 control path. The Go 1.27 XSP-v2 transport/client-auth code remains staging/research code. `strict-pq` remains OFF and no production VPS, DNS, firewall, public Nginx, production PostgreSQL or real-key change has been made.
 
-PR #64 proved the dedicated Node→TLS-terminator boundary:
+## Completed XSP-v2 gates
 
-- TLS **1.3 only** with actually negotiated `X25519MLKEM768`;
-- trusted certificate and exact hostname/SNI verification;
-- fresh full handshakes; no resumption/early-data substitute;
-- fail-closed TLS 1.2, X25519-only, wrong-hostname and untrusted-CA negatives;
-- non-root/read-only/cap-drop/no-new-privileges disposable ingress;
-- no Nexus/API/backend hop at C1;
-- ACK and legacy application paths remained inert 404;
-- default installer/Compose did not activate the experimental ingress.
+### P0 — isolated signer
 
-### P0-C2-A — completed
+PR #61 proved the separate signer process/socket boundary, protected key mounts, peer UID/GID checks, owner-approved Ed25519/ML-DSA-65 pins, least-privilege read-only signer DB role, committed ACK readback and immutable receipt recovery.
 
-PR #66 extended the isolated boundary to:
+### P0-C1 — dedicated PQ-only ingress
 
-`Node test client → TLS1.3/X25519MLKEM768 + ML-DSA-65 client identity → dedicated ingress → protected Unix-domain socket → disposable origin verifier`
+PR #64 proved:
 
-The process/container E2E proves that trusted Node identity comes from the verified ML-DSA-65 client-certificate SPKI plus the protected Unix peer credential, not from caller headers/body/source IP or legacy `XMESH1` identity. Spoofed headers, anonymous/wrong/classical clients and direct-origin impersonation fail closed.
+- TLS **1.3 only**;
+- actually negotiated `X25519MLKEM768`;
+- trusted certificate and exact hostname/SNI;
+- fail-closed TLS 1.2, classical X25519-only, wrong-hostname and untrusted-CA negatives;
+- no classical backend hop at the C1 boundary;
+- default installer/Compose remain unchanged.
 
-### P0-C2-B — completed
+### P0-C2-A — trusted Node identity / protected origin
 
-PR #69 adds a **separate opt-in staging runtime**; it does not modify the default production API path.
+PR #66 proved:
 
-The isolated path is:
+`Node test client → TLS1.3/X25519MLKEM768 + ML-DSA-65 client identity → dedicated ingress → protected UDS → origin verifier`
 
-`Node test client → TLS1.3/X25519MLKEM768 + verified ML-DSA-65 client identity → dedicated C2-B ingress → protected UDS → structural ACK gate`
+Trusted Node identity comes from the verified ML-DSA-65 client-certificate SPKI plus protected Unix peer credentials, not caller headers/body/source IP or legacy `XMESH1` identity.
 
-C2-B proves:
+### P0-C2-B — narrow ACK route
 
-- only exact `POST /api/v2/node/keys/rotation/ack` is mounted as an application operation;
-- there is no broad proxy to the existing Nexus API and no TCP/plaintext backend hop;
-- caller-controlled headers are stripped before the UDS transition;
-- the origin re-checks `SO_PEERCRED`, verified client-certificate evidence and pinned SPKI→Node mapping;
-- the route is runtime-gated by `XSP_V2_C2B_ACK_ROUTE=staging-only`; otherwise it returns 404;
-- method/path/content type/Content-Length/body size/deadline and strict JSON structure are bounded;
-- trusted transport Node ID is bound to the ACK body Node identity and issuer;
-- wrong Node/class/path/epoch/time/nonce/digest/key-role structures, duplicate JSON keys, anonymous/alternate/classical clients, direct UDS forgery and oversized bodies fail closed;
-- unrelated routes remain inert;
-- default `compose.yaml`, `install.sh` and `backend/src/main.rs` do **not** activate or mount this ACK route.
+PR #69 mounted only exact staging `POST /api/v2/node/keys/rotation/ack` behind the proven hybrid-mTLS→UDS identity boundary. It introduced no broad proxy, no generic API route and no classical/TCP backend hop. C2-B remained structural-only and deliberately returned `authorizationStatus: "not-verified"`.
 
-A C2-B `202 Accepted` deliberately returns `authorizationStatus: "not-verified"`. It is **not** proof of an authorized key transition, does not verify ACK signatures, does not mutate PostgreSQL, does not consume replay state, does not advance an epoch, does not call the signer and does not issue a receipt.
+### P0-C2-C — cryptographic ACK authorization and transaction — COMPLETE
 
-### CURRENT P0 — P0-C2-C: cryptographic ACK authorization and transaction
+PR #71 connects the trusted C2-B origin boundary to the existing XSP-v2 cryptographic and durable-state foundations without creating a second state machine.
 
-The next gate connects the already-proven transport/identity/route boundary to the existing XSP-v2 cryptographic and durable-state foundations.
+The tested local path is:
 
-C2-C must:
+`trusted C2-B origin → protected UDS C2-C service → dual-signature ACK verification → PostgreSQL ACK/epoch commit → isolated signer → immutable dual-signed receipt`
 
-1. verify **Ed25519 AND ML-DSA-65** against the owner-enrolled `node_request` keyset for the required pending/to epoch;
-2. bind the trusted transport Node ID to the exact ACK bytes, request ID, nonce, candidate, permit, epoch and committed ledger state;
-3. consume replay evidence exactly once and reject stale/revoked/wrong-node/wrong-epoch/wrong-path/wrong-request/wrong-candidate evidence;
-4. preserve the already-proven atomic ACK→epoch PostgreSQL transition semantics;
-5. call the isolated signer only after committed ACK evidence exists;
-6. reverify signer output in the API-side trust boundary and persist/recover immutable first durable receipt bytes;
-7. never treat HTTP status alone as policy success — the Node requires a valid signed receipt;
-8. keep production deployment unchanged and `strict-pq` OFF.
+C2-C proves:
 
-C2-C must not create a spoofable trusted-ID header or a new classical/TCP hop between the C2-B boundary and the cryptographic verifier. The exact internal handoff is security-review scope before implementation.
+- ACK authorization requires **Ed25519 AND ML-DSA-65** against the owner-enrolled `node_request` keyset;
+- trusted transport Node ID is bound to exact ACK bytes, request ID, nonce, permit, candidate and epoch state;
+- stale/tampered/wrong-peer evidence fails closed;
+- the existing atomic ACK→epoch PostgreSQL transition is reused;
+- the dedicated `xmesh_c2c_writer` role is least-privilege and cannot perform DDL/TEMP/unrelated reads/deletes/truncates/key retirement;
+- signer-down after ACK commit returns no policy success and no receipt;
+- after signer recovery, concurrent exact retries converge to one durable dual-signed receipt;
+- once that receipt exists, retry with signer offline returns the exact stored bytes without a second epoch transition;
+- DB stall fails closed;
+- old public keys remain unretired; key retirement is still a separate future gate;
+- C2-C does not mount signer private keys and the C2-C process itself has no TCP listener;
+- default production router/Compose/installer remain unchanged.
 
-After C2-C, C2-D proves retry/failure/full end-to-end behavior before production-capable Agent integration begins.
+Known limit: C2-C does **not** claim exactly-once signing before the first durable outbox INSERT. The first durable receipt remains authoritative. Full Node→TLS→ACK→receipt retry/restart behavior is the next gate.
 
-### Security guardrails
+## CURRENT P0 — P0-C2-D: failure, retry and full end-to-end proof
+
+C2-D must prove the entire staging chain as one system:
+
+`Node strict PQ/hybrid TLS → trusted ingress/origin identity → ACK auth/commit → isolated signer → signed receipt → retry/recovery`
+
+Required acceptance work:
+
+1. exact retry returns the same durable receipt bytes and performs no second epoch transition;
+2. racing duplicate ACKs, replay and mismatched payloads fail or converge only to the immutable committed record;
+3. lost responses before and after durable commit are exercised explicitly;
+4. signer unavailable, DB stall, boundary unavailable and process restart fail closed without fallback;
+5. failed PQ handshake cannot reach an authenticated legacy session for the same XSP-v2 operation;
+6. process/container E2E must include the real strict Node TLS client rather than starting only at the already-trusted origin boundary;
+7. PR CI/review/fixed-head merge/post-merge exact-SHA CI must pass before production-capable Agent integration begins.
+
+After C2-D, the next major gate is **P0-D**: integrate the proven XSP-v2 transport/state machine into a production-capable Agent workflow so the operator can eventually update an Agent from the Nexus UI and have migration, validation and recovery happen automatically.
+
+## Security guardrails
 
 - `strict-pq` remains **OFF**.
-- Current production control-plane behavior remains legacy `XMESH1` / Ed25519 until an explicitly approved replacement is ready.
-- No target-product fallback to `XMESH1`, Ed25519-only, X25519-only, TLS 1.2 or insecure certificate verification is allowed.
-- The dedicated C2-B ACK route exists only in the separate opt-in experimental staging runtime and is not activated by default installer/Compose or the normal Rust API router.
-- C2-B success is structural only; cryptographic authorization, DB transition, signer invocation and signed receipt remain C2-C.
-- A GitHub merge is **not** a VPS deployment. These gates did not change production VPS, DNS, firewall, public Nginx, production PostgreSQL, real Node keys or live user VPN credentials.
+- Production control-plane behavior remains legacy `XMESH1` / Ed25519 until separately approved replacement gates are complete.
+- No target-product fallback to XMESH1, Ed25519-only, X25519-only, TLS 1.2 or insecure certificate verification is allowed.
+- C2-C is staging/process proof, not production activation.
+- A GitHub merge is **not** a VPS deployment.
 - Xray continues to carry user VPN traffic.
-
-For exact requirements and gate order, read [ENTERPRISE_ROADMAP.md](docs/ENTERPRISE_ROADMAP.md) and [XSP_V2_PQ_ONLY_SECURITY_POLICY.md](docs/XSP_V2_PQ_ONLY_SECURITY_POLICY.md).
 
 ## Architecture
 
@@ -106,17 +115,20 @@ Administrator ─HTTPS─> Nexus public Nginx ─loopback─> XMesh Nexus (Rust/
                                                     │
                                                    Redis
 
-Experimental XSP-v2 staging boundary (not production-activated):
-Node ─TLS1.3/X25519MLKEM768 + ML-DSA-65 client identity─> dedicated C2-B ingress
-                                                        │
-                                                        └─protected UDS─> structural ACK gate
-                                                                            │
-                                                    [C2-C crypto/DB/signer/receipt not connected yet]
+Experimental XSP-v2 staging path (not production-activated):
+Node strict client
+  └─ TLS1.3 / X25519MLKEM768 + ML-DSA-65 client identity
+      └─ dedicated ingress
+          └─ protected UDS origin
+              └─ protected UDS C2-C authorization service
+                  ├─ PostgreSQL ACK/epoch state
+                  └─ protected UDS isolated signer
+                      └─ immutable dual-signed receipt
 ```
 
 ## Installation
 
-Supported automated host installation targets Ubuntu 22.04/24.04 LTS. You need a public domain whose DNS points to the Nexus VPS, TCP/80 and TCP/443 reachable for the managed HTTPS setup, and Git installed.
+Supported automated host installation targets Ubuntu 22.04/24.04 LTS. You need a public domain whose DNS points to the Nexus VPS, TCP/80 and TCP/443 reachable for managed HTTPS, and Git installed.
 
 ```bash
 sudo apt-get update && sudo apt-get install -y git
