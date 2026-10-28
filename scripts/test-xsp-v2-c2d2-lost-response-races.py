@@ -388,7 +388,7 @@ chmod 0444 /certs/client.pem /certs/client-spki.sha256
             time.sleep(1)
 
             run_node(expect_success=False)
-            if durable_state(node_id, request_id) != (from_epoch, "permit_issued", "0"):
+            if durable_state(node_id, request_id) != (from_epoch, "issued", "0"):
                 raise RuntimeError(f"lost-before-commit mutated durable state: {durable_state(node_id, request_id)}")
             print("PASS: lost response before C2-C leaves ACK/epoch uncommitted")
 
