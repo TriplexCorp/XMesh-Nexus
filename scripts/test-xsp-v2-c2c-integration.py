@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Disposable P0-C2-C ACK auth/commit/signer/receipt process E2E.
+"""Disposable P0-C2-C / C2-D2 historical recovery process E2E.
 
 Starts at the already-proven C2-A/C2-B trusted origin boundary: a disposable
 UID 10003 process supplies the same verified-client-certificate evidence over
 the protected origin UDS. No public port, production key, live DB, or strict-pq
-activation is used. Full Node->TLS->origin->C2-C retry E2E remains C2-D.
+activation is used. This proves only the local historical-recovery sub-gate;
+full real Node->PQ TLS->origin D2 failure/retry/recovery E2E remains separate.
 """
 from __future__ import annotations
 
@@ -19,6 +20,8 @@ import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
+ACK_PATH = "/api/v2/node/keys/rotation/ack"
+RECOVERY_PATH = "/api/v2/node/keys/rotation/ack/recover"
 
 
 def command(*args: str, input_text: str | None = None, check: bool = True, timeout: int = 180):
@@ -94,10 +97,15 @@ def main() -> None:
             logs = command("docker", "logs", "--tail", "50", container, check=False)
             raise RuntimeError(f"socket {path} not ready: {(logs.stdout + logs.stderr)[-1600:]}")
 
-        def origin_request(raw_ack: bytes, *, uid: int = 10003) -> tuple[int, bytes]:
+        def origin_request(
+            raw_ack: bytes,
+            *,
+            uid: int = 10003,
+            path: str = ACK_PATH,
+        ) -> tuple[int, bytes]:
             script = r'''import os,socket,urllib.parse,sys
-sock=os.environ['ORIGIN_SOCKET'];ack=open('/public/request.ack','rb').read();cert=open('/client/client.pem','rb').read()
-headers=[b'POST /api/v2/node/keys/rotation/ack HTTP/1.1',b'Host: c2c.invalid',b'Connection: close',b'Content-Type: application/json',f'Content-Length: {len(ack)}'.encode(),b'X-XSP-V2-Client-Verify: SUCCESS',b'X-XSP-V2-Client-Cert: '+urllib.parse.quote_from_bytes(cert,safe='').encode()]
+sock=os.environ['ORIGIN_SOCKET'];path=os.environ['REQUEST_PATH'].encode();ack=open('/public/request.ack','rb').read();cert=open('/client/client.pem','rb').read()
+headers=[b'POST '+path+b' HTTP/1.1',b'Host: c2c.invalid',b'Connection: close',b'Content-Type: application/json',f'Content-Length: {len(ack)}'.encode(),b'X-XSP-V2-Client-Verify: SUCCESS',b'X-XSP-V2-Client-Cert: '+urllib.parse.quote_from_bytes(cert,safe='').encode()]
 s=socket.socket(socket.AF_UNIX);s.settimeout(15);s.connect(sock);s.sendall(b'\r\n'.join(headers)+b'\r\n\r\n'+ack);s.shutdown(socket.SHUT_WR);out=b''
 while True:
  p=s.recv(65536)
@@ -110,6 +118,7 @@ s.close();sys.stdout.buffer.write(out)
             result = command(
                 "docker", "run", "--rm", "--network", "none", "--user", f"{uid}:10003",
                 "-e", "ORIGIN_SOCKET=/run/xmesh-origin/xsp-v2-origin.sock",
+                "-e", f"REQUEST_PATH={path}",
                 "--mount", f"type=volume,src={volumes['origin']},dst=/run/xmesh-origin",
                 "--mount", f"type=bind,src={request_file},dst=/public/request.ack,readonly",
                 "--mount", f"type=bind,src={cert_dir},dst=/client,readonly",
@@ -176,6 +185,7 @@ assert out==b'',out
             command("docker", "rm", "-f", c2c, check=False)
             c2c_env = envfile("c2c.env", {
                 "XSP_V2_C2C_ACK_AUTH": "staging-only",
+                "XSP_V2_C2D_HISTORICAL_RECOVERY": "staging-only",
                 "XSP_V2_C2C_DATABASE_URL": f"postgresql://xmesh_c2c_writer:{c2c_password}@{db}:5432/xmesh",
                 "XSP_V2_C2C_PANEL_PIN_FILE": "/run/xmesh-c2c-public/panel-pin.json",
                 "XSP_V2_C2C_SOCKET_PATH": "/run/xmesh-c2c/c2c.sock",
@@ -261,6 +271,7 @@ assert out==b'',out
                 "XSP_EXPECTED_NODE_ID": str(node_id),
                 "XSP_EXPECTED_INGRESS_UID": "10003", "XSP_EXPECTED_INGRESS_GID": "10003",
                 "XSP_V2_C2B_ACK_ROUTE": "staging-only", "XSP_V2_C2C_ACK_AUTH": "staging-only",
+                "XSP_V2_C2D_HISTORICAL_RECOVERY": "staging-only",
                 "XSP_V2_C2C_SOCKET_PATH": "/run/xmesh-c2c/c2c.sock",
             })
             launch(origin, origin_image, [
@@ -281,6 +292,13 @@ assert out==b'',out
             if (epoch, state, outbox) != ("2", "ack_verified", "0"):
                 raise RuntimeError(f"post-commit/signer-down state invalid: {epoch}/{state}/{outbox}")
             print("PASS: ACK commits atomically, but signer-down returns no policy success and no receipt")
+
+            recovery_status, _ = origin_request(ack, path=RECOVERY_PATH)
+            if recovery_status == 200:
+                raise RuntimeError("historical recovery must never synthesize a missing receipt")
+            if sql(f"SELECT count(*) FROM node_xsp_signed_commit_receipt_outbox WHERE node_id={node_id};").stdout.strip() != "0":
+                raise RuntimeError("historical recovery created a receipt without signer evidence")
+            print("PASS: historical recovery fails closed when durable receipt is missing and does not sign")
 
             boot_signer(public)
             with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
@@ -359,13 +377,40 @@ assert out==b'',out
                 raise RuntimeError("C2-C process must not listen on TCP")
             print("PASS: C2-C and origin remain local-only; C2-C has no signer key mount or TCP listener")
 
+            ack_message = json.loads(ack)["message"]
+            expires_at_ms = int(ack_message["expiresAtMs"])
+            wait_seconds = max(0.0, (expires_at_ms - int(time.time() * 1000)) / 1000 + 0.25)
+            if wait_seconds:
+                time.sleep(wait_seconds)
+            status, _ = origin_request(ack)
+            if status != 400:
+                raise RuntimeError(f"expired ordinary ACK must remain rejected, got {status}")
+            print("PASS: expired ordinary ACK must remain rejected; freshness was not weakened")
+
+            status, historical = origin_request(ack, path=RECOVERY_PATH)
+            if status != 200 or historical != receipt:
+                raise RuntimeError("historical recovery returns exact durable receipt only")
+            epoch_after = sql(f"SELECT key_epoch FROM node_xsp_suite_state WHERE node_id={node_id};").stdout.strip()
+            outbox_after = sql(f"SELECT count(*) FROM node_xsp_signed_commit_receipt_outbox WHERE node_id={node_id};").stdout.strip()
+            if (epoch_after, outbox_after) != ("2", "1"):
+                raise RuntimeError(f"historical recovery mutated security state: {epoch_after}/{outbox_after}")
+            print("PASS: historical recovery returns exact durable receipt with signer offline and no second epoch transition")
+
+            status, _ = origin_request(bad_ack, path=RECOVERY_PATH)
+            if status == 200:
+                raise RuntimeError("historical recovery accepted mismatched/tampered exact ACK evidence")
+            status, _ = origin_request(ack, uid=10005, path=RECOVERY_PATH)
+            if status not in (0, 403):
+                raise RuntimeError("historical recovery accepted wrong trusted-origin peer")
+            print("PASS: historical recovery rejects mismatched ACK and wrong transport identity")
+
             sensitive = [admin_password, signer_password, c2c_password, base64.b64encode(ack).decode(), "BEGIN PRIVATE KEY"]
             for name in [c2c, origin, signer]:
                 logs = command("docker", "logs", name, check=False)
                 combined = logs.stdout + logs.stderr
                 if any(value and value in combined for value in sensitive):
                     raise RuntimeError(f"{name} leaked sensitive material in logs")
-            print("C2-C PROCESS E2E: PASS (staging only; full Node TLS E2E remains C2-D)")
+            print("C2-C / D2 HISTORICAL RECOVERY PROCESS E2E: PASS (staging only; real Node PQ-network D2 remains separate)")
         finally:
             for name in reversed(containers):
                 command("docker", "rm", "-f", name, check=False)
