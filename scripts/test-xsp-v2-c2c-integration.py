@@ -341,8 +341,22 @@ assert out==b'',out
             if any(m.get("Destination") == "/run/xmesh-signer-keys" or m.get("Name") == volumes["keys"] for m in c2c_mounts):
                 raise RuntimeError("C2-C service must never mount signer private keys")
             tcp = command("docker", "exec", c2c, "cat", "/proc/net/tcp", "/proc/net/tcp6").stdout.splitlines()
-            if any(len(line.split()) > 3 and line.split()[3] == "0A" for line in tcp):
-                raise RuntimeError("C2-C service must not listen on TCP")
+            listener_inodes = {
+                parts[9]
+                for line in tcp
+                if len(parts := line.split()) > 9 and parts[3] == "0A"
+            }
+            pid1_fds = command(
+                "docker", "exec", c2c, "sh", "-c",
+                "for f in /proc/1/fd/*; do readlink \"$f\" 2>/dev/null || true; done",
+            ).stdout.splitlines()
+            pid1_socket_inodes = {
+                value[8:-1]
+                for value in pid1_fds
+                if value.startswith("socket:[") and value.endswith("]")
+            }
+            if listener_inodes & pid1_socket_inodes:
+                raise RuntimeError("C2-C process must not listen on TCP")
             print("PASS: C2-C and origin remain local-only; C2-C has no signer key mount or TCP listener")
 
             sensitive = [admin_password, signer_password, c2c_password, base64.b64encode(ack).decode(), "BEGIN PRIVATE KEY"]
