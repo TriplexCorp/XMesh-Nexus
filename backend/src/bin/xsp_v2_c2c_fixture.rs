@@ -144,6 +144,10 @@ fn write_root_group_file(path: &Path, bytes: &[u8], mode: u32) {
     fs::set_permissions(path, fs::Permissions::from_mode(mode)).unwrap();
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "linear disposable C2-C cryptographic fixture setup"
+)]
 #[tokio::main]
 async fn main() {
     assert_eq!(

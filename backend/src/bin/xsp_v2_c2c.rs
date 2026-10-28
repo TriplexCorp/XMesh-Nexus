@@ -16,7 +16,7 @@ mod xsp_v2_permit_ledger_writer;
 mod xsp_v2_signed_cutover;
 #[path = "../xsp_v2_signed_receipt_outbox.rs"]
 mod xsp_v2_signed_receipt_outbox;
-#[path = "../xsp_v2_signer.rs"]
+#[path = "../xsp_v2_signer_client.rs"]
 mod xsp_v2_signer;
 
 use anyhow::{Context as _, Result, ensure};
