@@ -1,24 +1,14 @@
-use crate::{ApiError, AppState, node_auth};
+use crate::{ApiError, AppState};
 use axum::{
-    body::{Body, Bytes},
-    extract::State,
-    http::{HeaderMap, StatusCode, header},
+    body::Body,
+    http::{StatusCode, header},
     response::Response,
 };
-use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use sqlx::Row;
 use std::path::{Path, PathBuf};
 
-const ARTIFACT_ROUTE: &str = "/api/v1/node/agent/releases/artifact";
 const MAX_AGENT_ARTIFACT_BYTES: u64 = 64 * 1024 * 1024;
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct AgentArtifactRequest {
-    node_id: i64,
-    version: String,
-}
 
 fn staging_agent_migration_enabled() -> bool {
     std::env::var("XSP_V2_P0D_AGENT_MIGRATION").ok().as_deref() == Some("staging-only")
@@ -128,15 +118,14 @@ async fn read_verified_artifact(root: &Path, digest: &str) -> Result<Vec<u8>, Ap
     Ok(bytes)
 }
 
-/// Authenticated, staging-only artifact delivery for a command that is already
-/// claimed and bound to an immutable release manifest. The caller chooses only
-/// the version from its signed poll identity; filesystem paths and URLs are
-/// always server controlled and the content-addressed bytes are re-hashed before
-/// they leave Nexus.
-pub async fn download(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-    body: Bytes,
+/// Return bytes only for the release already bound to the node's claimed
+/// `update_agent` command. Authentication is intentionally performed by the
+/// existing signed restart-poll handler before entering this helper. The caller
+/// selects only the manifest version; source path and digest stay server-side.
+pub async fn download_claimed(
+    state: &AppState,
+    node_id: i64,
+    version: &str,
 ) -> Result<Response, ApiError> {
     if !staging_agent_migration_enabled() {
         return Err(ApiError::new(
@@ -144,23 +133,12 @@ pub async fn download(
             "Staging Agent migration mode is disabled.",
         ));
     }
-    let request: AgentArtifactRequest = serde_json::from_slice(&body)
-        .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Invalid Agent artifact request."))?;
-    if request.node_id <= 0 || !valid_release_version(&request.version) {
+    if node_id <= 0 || !valid_release_version(version) {
         return Err(ApiError::new(
             StatusCode::BAD_REQUEST,
             "Invalid Agent artifact request.",
         ));
     }
-
-    node_auth::authenticate_for(
-        &state,
-        &headers,
-        request.node_id,
-        &body,
-        ARTIFACT_ROUTE,
-    )
-    .await?;
 
     let row = sqlx::query(
         "SELECT m.version,m.source_revision,m.artifact_sha256
@@ -170,8 +148,8 @@ pub async fn download(
            AND c.target_version=$2 AND m.version=$2
          ORDER BY c.id DESC LIMIT 1",
     )
-    .bind(request.node_id)
-    .bind(&request.version)
+    .bind(node_id)
+    .bind(version)
     .fetch_optional(&state.pool)
     .await?
     .ok_or_else(|| {
@@ -181,10 +159,10 @@ pub async fn download(
         )
     })?;
 
-    let version = row.try_get::<String, _>("version")?;
+    let manifest_version = row.try_get::<String, _>("version")?;
     let source_revision = row.try_get::<String, _>("source_revision")?;
     let digest = row.try_get::<String, _>("artifact_sha256")?;
-    if version != request.version
+    if manifest_version != version
         || source_revision.len() != 40
         || !source_revision
             .bytes()
