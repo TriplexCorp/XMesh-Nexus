@@ -1,0 +1,44 @@
+name: XSP-v2 P0-E4a Evidence Bundle
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/xsp-v2-p0e4a-evidence-bundle.py"
+      - "scripts/test-xsp-v2-p0e4a-evidence-bundle.py"
+      - "docs/XSP_V2_P0E4A_EVIDENCE_BUNDLE.md"
+      - ".github/workflows/xsp-p0e4a-evidence-bundle.yml"
+  pull_request:
+    paths:
+      - "scripts/xsp-v2-p0e4a-evidence-bundle.py"
+      - "scripts/test-xsp-v2-p0e4a-evidence-bundle.py"
+      - "docs/XSP_V2_P0E4A_EVIDENCE_BUNDLE.md"
+      - ".github/workflows/xsp-p0e4a-evidence-bundle.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evidence-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enforce offline non-qualifying boundary
+        run: |
+          set -euo pipefail
+          src=scripts/xsp-v2-p0e4a-evidence-bundle.py
+          doc=docs/XSP_V2_P0E4A_EVIDENCE_BUNDLE.md
+          python3 -m py_compile "$src" scripts/test-xsp-v2-p0e4a-evidence-bundle.py
+          ! grep -E 'subprocess|socket|urllib|requests|httpx|paramiko|os\.system|exec\(|eval\(|UPDATE |INSERT |DELETE |TRUNCATE |strict-pq=on' "$src"
+          grep -Fq '"physicalPowerLossQualified": False' "$src"
+          grep -Fq 'physicalPowerLossQualified` to be exactly `false`' "$doc"
+          grep -Fq 'cannot know that electricity was physically removed' "$doc"
+          grep -Fq 'P0-E4a remains open until real representative hardware/storage abrupt-power runs are executed and independently reviewed.' "$doc"
+      - name: Run evidence-bundle fail-closed tests
+        run: python3 scripts/test-xsp-v2-p0e4a-evidence-bundle.py -v
+      - name: State evidence limit
+        run: |
+          echo 'PASS: evidence files are integrity/cross-bound, not physically attested.'
+          echo 'physicalPowerLossQualified=false remains mandatory.'
+          echo 'P0-E4a remains OPEN pending real representative external power-cut evidence.'
