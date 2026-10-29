@@ -1,0 +1,235 @@
+name: Temporary P0-E3a docs checkpoint
+
+on:
+  push:
+    branches:
+      - docs/p0e3a-checkpoint-p0e3b-current
+
+permissions:
+  contents: write
+
+jobs:
+  update-docs:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: docs/p0e3a-checkpoint-p0e3b-current
+          fetch-depth: 1
+      - name: Update README and roadmap checkpoint
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          MERGE = "f19d01e021efaa727bbba82672143005a96338b7"
+          PR = "https://github.com/TriplexCorp/XMesh-Nexus/pull/112"
+          E3A_RUN = "https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40862058873"
+          CRYPTO_RUN = "https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40862058598"
+          C2C_RUN = "https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40862058488"
+          BACKEND_RUN = "https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40862058513"
+
+          def replace_once(text: str, old: str, new: str, label: str) -> str:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected exactly one match, found {count}")
+              return text.replace(old, new, 1)
+
+          def replace_between(text: str, start: str, end: str, body: str, label: str) -> str:
+              if text.count(start) != 1 or text.count(end) != 1:
+                  raise SystemExit(f"{label}: marker count mismatch")
+              i = text.index(start)
+              j = text.index(end, i)
+              return text[:i] + body + text[j:]
+
+          def insert_before_once(text: str, anchor: str, addition: str, label: str) -> str:
+              if text.count(anchor) != 1:
+                  raise SystemExit(f"{label}: expected exactly one anchor")
+              return text.replace(anchor, addition + anchor, 1)
+
+          def replace_line_prefix(text: str, prefix: str, replacement: str, label: str) -> str:
+              lines = text.splitlines(keepends=True)
+              indexes = [i for i, line in enumerate(lines) if line.startswith(prefix)]
+              if len(indexes) != 1:
+                  raise SystemExit(f"{label}: expected one line prefix, found {len(indexes)}")
+              newline = "\n" if lines[indexes[0]].endswith("\n") else ""
+              lines[indexes[0]] = replacement.rstrip("\n") + newline
+              return "".join(lines)
+
+          README_SECTION = """## CURRENT P0 — P0-E recovery/security release gates
+
+### Completed P0-E work
+
+- **P0-E1a COMPLETE — process-crash/fsync-order durability:** Node PR #38 + Nexus PR #107 prove deterministic fail-closed restart/recovery across hard process termination at the critical local keyring durability boundaries. This does not prove physical power-loss/controller-cache behavior.
+- **P0-E2a COMPLETE — one-sided Agent snapshot anti-rollback:** Node PR #39 + Nexus PR #108 prove a fully self-consistent old Agent snapshot cannot use a current unchanged Nexus permit; applied-state attestation rejects it before network I/O.
+- **P0-E2b COMPLETE — one-sided PostgreSQL snapshot rollback:** PR #109 proves a real database dump/restore rollback cannot silently rewrite state already witnessed by a current Agent, and that restore-time least-privilege database ACL re-hardening is part of the recovery contract.
+- **P0-E3a COMPLETE — owner/off-host monotonic recovery checkpoint:** PR #112 adds an experimental-only offline owner-held checkpoint derived from the existing authoritative dual-signed commit receipt. The checkpoint binds Node identity, the receipt's committed `toEpoch` recovery floor and the exact signed-receipt digest to independently provisioned `panel_response` Ed25519 + ML-DSA-65 pins. A coordinated old local restore below that floor and same-epoch receipt divergence fail closed; no second recovery counter, automatic reset, rekey or production path is introduced.
+
+### CURRENT sub-gate — P0-E3b coordinated backup/restore recovery procedure
+
+P0-E3b must prove a **complete coordinated recovery procedure** for PostgreSQL together with the persistent Agent/signing/encryption identity material required to interpret that database state, while keeping the newest P0-E3a owner/off-host checkpoint outside the rollback domain. A mutually consistent old Agent + Nexus/PostgreSQL restore must be rejected before any security-state mutation or network action when it is older than the off-host recovery floor; an exact current recovery set must validate and recover without resetting epochs/replay state, regenerating identities or weakening transport/signature requirements.
+
+After P0-E3b, P0-E still must close:
+
+1. physical power-loss / storage-controller-cache behavior beyond the bounded process-crash proof;
+2. owner-authorized key rotation/recovery and explicit old-key retirement policy;
+3. parser/protocol fuzzing plus FIPS 204 / algorithm known-answer validation where applicable;
+4. independent security review of the final migration/production architecture and operational observability without secret/key leakage.
+
+`strict-pq` remains **OFF** throughout P0-E unless a later explicit production/release gate separately authorizes activation. Production rollout remains separately gated and unauthorized.
+
+"""
+
+          for filename in ["README.md", "README.en.md"]:
+              path = Path(filename)
+              text = path.read_text()
+              text = replace_line_prefix(
+                  text,
+                  "**Latest verified Nexus recovery/security checkpoint:**",
+                  f"**Latest verified Nexus recovery/security checkpoint:** [`{MERGE}`](https://github.com/TriplexCorp/XMesh-Nexus/commit/{MERGE}), merge of [PR #112]({PR}).",
+                  f"{filename} latest checkpoint",
+              )
+              text = replace_once(
+                  text,
+                  "**P0-C2-D and P0-D are COMPLETE. P0-E remains the CURRENT P0. P0-E1a, P0-E2a and P0-E2b are COMPLETE within their explicitly bounded scopes; P0-E3a is the CURRENT sub-gate.** The production-capable Agent path remains default-disabled and production rollout remains unauthorized.",
+                  "**P0-C2-D and P0-D are COMPLETE. P0-E remains the CURRENT P0. P0-E1a, P0-E2a, P0-E2b and P0-E3a are COMPLETE within their explicitly bounded scopes; P0-E3b is the CURRENT sub-gate.** The production-capable Agent path remains default-disabled and production rollout remains unauthorized.",
+                  f"{filename} status",
+              )
+              if "**PR #112 / P0-E3a owner/off-host monotonic recovery checkpoint:**" in text:
+                  raise SystemExit(f"{filename}: PR #112 checkpoint already present")
+              checkpoint_block = f"""
+- **PR #112 / P0-E3a owner/off-host monotonic recovery checkpoint:** an experimental-only offline verifier reuses the existing authoritative dual-signed commit receipt instead of creating a second security state machine. The owner-held off-host witness binds Node identity, committed `toEpoch`, exact receipt digest/bytes and independently provisioned `panel_response` Ed25519 + ML-DSA-65 pins. Local state below the witness floor, same-epoch receipt divergence, wrong Node/pins or either invalid signature fail closed. The witness itself must remain outside both Agent and Nexus/PostgreSQL rollback domains; this gate does not yet prove a complete operational backup set.
+
+Exact post-merge P0-E3a evidence on `{MERGE}`:
+
+- [XSP-v2 P0-E3a Off-host Recovery Checkpoint #9]({E3A_RUN}) — **success**, including real Ed25519 + ML-DSA-65 verification, source-boundary checks, formatting and strict Clippy.
+- [XSP-v2 Crypto PoC #213]({CRYPTO_RUN}), [C2-C #61]({C2C_RUN}) and [Backend CI #3632]({BACKEND_RUN}) — **success** on the exact merge SHA, preserving the existing crypto/signer/DB boundary and full backend/disposable API regression matrix.
+
+"""
+              text = insert_before_once(
+                  text,
+                  "Exact post-merge P0-E2b evidence on ",
+                  checkpoint_block,
+                  f"{filename} E3a evidence",
+              )
+              text = replace_between(
+                  text,
+                  "## CURRENT P0 — P0-E recovery/security release gates\n",
+                  "## Security guardrails\n",
+                  README_SECTION,
+                  f"{filename} P0-E section",
+              )
+              text = text.replace(
+                  "P0-D completion and P0-E1a/P0-E2a/P0-E2b evidence",
+                  "P0-D completion and P0-E1a/P0-E2a/P0-E2b/P0-E3a evidence",
+              )
+              text = text.replace(
+                  "Completed P0-D capabilities/evidence and bounded P0-E1a/P0-E2a/P0-E2b proofs",
+                  "Completed P0-D capabilities/evidence and bounded P0-E1a/P0-E2a/P0-E2b/P0-E3a proofs",
+              )
+              doc_anchor = "- [XSP-v2 P0-E PostgreSQL snapshot rollback](docs/XSP_V2_P0E_POSTGRES_SNAPSHOT_ROLLBACK.md)\n"
+              if "docs/XSP_V2_P0E_OFFHOST_RECOVERY_CHECKPOINT.md" not in text:
+                  text = replace_once(
+                      text,
+                      doc_anchor,
+                      doc_anchor + "- [XSP-v2 P0-E owner/off-host recovery checkpoint](docs/XSP_V2_P0E_OFFHOST_RECOVERY_CHECKPOINT.md)\n",
+                      f"{filename} documentation link",
+                  )
+              path.write_text(text)
+
+          roadmap = Path("docs/ENTERPRISE_ROADMAP.md")
+          text = roadmap.read_text()
+          latest = (
+              f"- **Latest completed Nexus P0-E recovery/security checkpoint:** [`{MERGE}`](https://github.com/TriplexCorp/XMesh-Nexus/commit/{MERGE}), merge of [PR #112]({PR}). P0-E3a proves a bounded independent owner/off-host monotonic rollback witness derived from the existing authoritative dual-signed commit receipt; P0-E3b coordinated backup/restore recovery is the current sub-gate.\n"
+              f"- **P0-E3a / PR #112:** the experimental-only offline checkpoint binds Node identity, the dual-signed receipt `toEpoch` recovery floor, exact receipt digest/bytes and independently provisioned `panel_response` Ed25519 + ML-DSA-65 pins. A coordinated old local restore below that floor, same-epoch receipt divergence, wrong identity/pins or either invalid signature fail closed. No second recovery counter, automatic state reset/rekey, network route, DB mutation or production activation was introduced.\n"
+              f"- On exact Nexus merge SHA `{MERGE}`, [P0-E3a Off-host Recovery Checkpoint #9]({E3A_RUN}), [Crypto #213]({CRYPTO_RUN}), [C2-C #61]({C2C_RUN}) and [Backend CI #3632]({BACKEND_RUN}) all completed **success**. The witness/pins must remain outside both local rollback domains; rollback of the off-host trust domain itself remains outside this proof."
+          )
+          text = replace_line_prefix(
+              text,
+              "- **Latest completed Nexus P0-E recovery/security checkpoint:**",
+              latest,
+              "roadmap latest checkpoint",
+          )
+          text = replace_line_prefix(
+              text,
+              "| **P0-E3a owner/off-host monotonic recovery checkpoint**",
+              "| **P0-E3a owner/off-host monotonic recovery checkpoint** | **COMPLETE — bounded independent witness proof** | PR #112; existing dual-signed commit receipt becomes the owner-held off-host floor; coordinated old local restore and same-epoch receipt divergence fail closed |",
+              "roadmap E3a table",
+          )
+          e3a_table = "| **P0-E3a owner/off-host monotonic recovery checkpoint** | **COMPLETE — bounded independent witness proof** | PR #112; existing dual-signed commit receipt becomes the owner-held off-host floor; coordinated old local restore and same-epoch receipt divergence fail closed |\n"
+          if "| **P0-E3b coordinated backup/restore recovery procedure**" not in text:
+              text = replace_once(
+                  text,
+                  e3a_table,
+                  e3a_table + "| **P0-E3b coordinated backup/restore recovery procedure** | **CURRENT sub-gate** | Bind real PostgreSQL + persistent Agent/signing/encryption identity backups to the independent E3a witness and prove old coordinated restore rejects before mutation |\n",
+                  "roadmap E3b table insert",
+              )
+          text = replace_line_prefix(
+              text,
+              "| **P0-E recovery/security release gates**",
+              "| **P0-E recovery/security release gates** | **CURRENT P0** | E1a/E2a/E2b/E3a complete within bounded scopes; still requires E3b coordinated backup/restore, physical power-loss proof, owner-authorized recovery + old-key retirement, fuzz/KAT, independent review and observability |",
+              "roadmap overall table",
+          )
+
+          roadmap_section = """#### P0-E3a — owner/off-host monotonic recovery checkpoint — COMPLETE
+
+PR #112 adds the first independent recovery witness outside the Agent and Nexus/PostgreSQL rollback domains without creating a second security state machine. The experimental-only offline `xsp-v2-recovery-checkpoint` tool accepts an independently provisioned `panel_response` public pin plus the existing authoritative dual-signed commit receipt. It verifies Ed25519 **AND** ML-DSA-65, derives the recovery floor directly from the receipt's committed `toEpoch`, stores the exact signed receipt bytes and SHA-256 digest, and binds the checkpoint to the exact Node and signer identity.
+
+Recovery verification rejects a local epoch below the off-host floor as coordinated rollback. At the same epoch it additionally requires the exact authoritative receipt digest, so a mutually consistent but different re-signed history cannot replace the witnessed commit. Wrong Node identity, altered checkpoint metadata, noncanonical receipt encoding, mismatched pins, or either invalid signature also fail closed. The tool has no HTTP route, DB mutation, remote action or automatic reset/rekey path; `strict-pq` remains OFF.
+
+This is a bounded third-trust-domain proof. It assumes the newest owner-held checkpoint and public pins themselves remain outside the rollback event. It does **not** yet prove that a complete operational backup set contains every PostgreSQL/Agent/signing/encryption identity required for deterministic disaster recovery.
+
+### CURRENT sub-gate — P0-E3b coordinated backup/restore recovery procedure
+
+P0-E3b must turn the E3a witness into a complete disposable disaster-recovery proof. A backup set must capture PostgreSQL together with the persistent Agent and cryptographic identity material needed to interpret that security state, while the newest E3a checkpoint remains independently owner-held/off-host.
+
+Acceptance requires:
+
+- restore a mutually consistent **old** Agent + Nexus/PostgreSQL + identity backup and reject it against the newer E3a witness before any security-state mutation or network action;
+- restore an exact **current** backup set and prove it validates against the witness without epoch/replay reset, key regeneration, enrollment replacement or receipt rewriting;
+- prove missing, mismatched or mixed-generation backup components fail closed rather than being silently reconstructed;
+- restore reviewed signer/C2-C least-privilege database ACLs without changing the XSP-v2 security tuple;
+- keep caller-controlled URLs/scripts/commands and weaker transport/legacy fallback out of the recovery path;
+- keep `strict-pq` OFF and production topology unchanged.
+
+After P0-E3b, P0-E still must close:
+
+1. physical power-loss / storage-controller-cache behavior beyond P0-E1a's bounded process-crash/fsync proof;
+2. owner-authorized key rotation/recovery and explicit old-key retirement policy;
+3. parser/protocol fuzzing plus FIPS 204 / algorithm known-answer validation where applicable;
+4. independent security review of the final migration/production architecture;
+5. operational observability without secret/key leakage.
+
+Completion of individual P0-E items does not authorize production rollout. `strict-pq` remains OFF unless a later explicit release/production gate separately authorizes activation.
+
+"""
+          text = replace_between(
+              text,
+              "### CURRENT sub-gate — P0-E3a owner/off-host monotonic recovery checkpoint\n",
+              "## Production rollout — NOT AUTHORIZED\n",
+              roadmap_section,
+              "roadmap detailed E3 section",
+          )
+          text = text.replace(
+              "No production activation is authorized by C2-D, P0-D or the completed bounded P0-E1a/P0-E2a/P0-E2b proofs.",
+              "No production activation is authorized by C2-D, P0-D or the completed bounded P0-E1a/P0-E2a/P0-E2b/P0-E3a proofs.",
+          )
+          text = text.replace(
+              "Completed P0-D gates through Node PR #37 and Nexus PR #105, plus bounded P0-E1a/P0-E2a/P0-E2b evidence",
+              "Completed P0-D gates through Node PR #37 and Nexus PR #105, plus bounded P0-E1a/P0-E2a/P0-E2b/P0-E3a evidence",
+          )
+          text = text.replace(
+              "P0-E2a and P0-E2b do not detect coordinated rollback when all local witnesses are rolled back together; P0-E3a exists specifically to add an independent non-rolled-back recovery authority.",
+              "P0-E3a detects coordinated local rollback only while the independent owner/off-host witness remains current; P0-E3b must now bind complete backup/restore procedures and persistent identities to that witness.",
+          )
+          roadmap.write_text(text)
+          PY
+
+          git diff --check
+          git diff -- README.md README.en.md docs/ENTERPRISE_ROADMAP.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md README.en.md docs/ENTERPRISE_ROADMAP.md
+          git commit -m "docs(xsp-v2): checkpoint P0-E3a and start P0-E3b"
+          git push origin HEAD:docs/p0e3a-checkpoint-p0e3b-current
