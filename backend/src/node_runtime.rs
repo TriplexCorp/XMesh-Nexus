@@ -374,17 +374,26 @@ pub async fn poll_restart(
                 let release_version = row
                     .try_get::<Option<String>, _>("release_version")?
                     .ok_or_else(|| {
-                        ApiError::new(StatusCode::CONFLICT, "Bound Agent release identity is missing.")
+                        ApiError::new(
+                            StatusCode::CONFLICT,
+                            "Bound Agent release identity is missing.",
+                        )
                     })?;
                 let source_revision = row
                     .try_get::<Option<String>, _>("source_revision")?
                     .ok_or_else(|| {
-                        ApiError::new(StatusCode::CONFLICT, "Bound Agent release identity is missing.")
+                        ApiError::new(
+                            StatusCode::CONFLICT,
+                            "Bound Agent release identity is missing.",
+                        )
                     })?;
                 let artifact_sha256 = row
                     .try_get::<Option<String>, _>("artifact_sha256")?
                     .ok_or_else(|| {
-                        ApiError::new(StatusCode::CONFLICT, "Bound Agent release identity is missing.")
+                        ApiError::new(
+                            StatusCode::CONFLICT,
+                            "Bound Agent release identity is missing.",
+                        )
                     })?;
                 if action != "update_agent"
                     || target_version.as_deref() != Some(release_version.as_str())
@@ -479,17 +488,26 @@ pub async fn acknowledge_restart(
             let expected_version = row
                 .try_get::<Option<String>, _>("release_version")?
                 .ok_or_else(|| {
-                    ApiError::new(StatusCode::CONFLICT, "Bound Agent release identity is missing.")
+                    ApiError::new(
+                        StatusCode::CONFLICT,
+                        "Bound Agent release identity is missing.",
+                    )
                 })?;
             let expected_revision = row
                 .try_get::<Option<String>, _>("source_revision")?
                 .ok_or_else(|| {
-                    ApiError::new(StatusCode::CONFLICT, "Bound Agent release identity is missing.")
+                    ApiError::new(
+                        StatusCode::CONFLICT,
+                        "Bound Agent release identity is missing.",
+                    )
                 })?;
             let expected_digest = row
                 .try_get::<Option<String>, _>("artifact_sha256")?
                 .ok_or_else(|| {
-                    ApiError::new(StatusCode::CONFLICT, "Bound Agent release identity is missing.")
+                    ApiError::new(
+                        StatusCode::CONFLICT,
+                        "Bound Agent release identity is missing.",
+                    )
                 })?;
             let target_version = row.try_get::<Option<String>, _>("target_version")?;
             let action = row.try_get::<String, _>("action")?;
@@ -517,7 +535,11 @@ pub async fn acknowledge_restart(
         }
     };
 
-    let state_name = if report.success { "succeeded" } else { "failed" };
+    let state_name = if report.success {
+        "succeeded"
+    } else {
+        "failed"
+    };
     let (ack_version, ack_revision, ack_digest, ack_success) = match ack_identity {
         Some(identity) => (
             Some(identity.version.as_str()),
