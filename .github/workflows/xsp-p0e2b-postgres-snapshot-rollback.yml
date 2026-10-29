@@ -62,6 +62,11 @@ jobs:
           grep -Fq 'pg_restore", "-U", "postgres", "-d", "xmesh", "--exit-on-error"' scripts/test-xsp-v2-p0e2b-postgres-snapshot-rollback.py
           grep -Fq 'restored != (from_epoch, "issued", "0", "0")' scripts/test-xsp-v2-p0e2b-postgres-snapshot-rollback.py
           grep -Fq 'recommitted != (to_epoch, "ack_verified", "1", "1")' scripts/test-xsp-v2-p0e2b-postgres-snapshot-rollback.py
+          grep -Fq 'def provision_security_roles()' scripts/test-xsp-v2-p0e2b-postgres-snapshot-rollback.py
+          grep -Fq 'drifted_signer = excessive_security_role_privileges("xmesh_signer_reader")' scripts/test-xsp-v2-p0e2b-postgres-snapshot-rollback.py
+          grep -Fq 'drifted_c2c = excessive_security_role_privileges("xmesh_c2c_writer")' scripts/test-xsp-v2-p0e2b-postgres-snapshot-rollback.py
+          grep -Fq 'restore re-hardening removed ACL drift without mutating XSP-v2 security state' scripts/test-xsp-v2-p0e2b-postgres-snapshot-rollback.py
+          grep -Fq 'Never weaken the signer self-check.' scripts/test-xsp-v2-p0e2b-postgres-snapshot-rollback.py
           grep -Fq 'TestP0E2BPostgresSnapshotRollbackCurrentAgentWitness' scripts/test-xsp-v2-p0e2b-postgres-snapshot-rollback.py scripts/xsp-v2-p0e2b-db-rollback_test.go
           grep -Fq 'PersistVerifiedCommitReceiptForJournal' scripts/xsp-v2-p0e2b-db-rollback_test.go
           grep -Fq 'bytes.Equal(after.SignedReceipt, before.SignedReceipt)' scripts/xsp-v2-p0e2b-db-rollback_test.go
