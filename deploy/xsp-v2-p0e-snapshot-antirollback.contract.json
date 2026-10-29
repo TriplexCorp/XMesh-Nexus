@@ -1,0 +1,32 @@
+{
+  "schema": "xsp2-p0e-snapshot-antirollback-1",
+  "productionActivation": false,
+  "strictPqDefault": "off",
+  "verifiedNodeSource": {
+    "repository": "TriplexCorp/XMesh-Node",
+    "revision": "3fffa9fd74195114a7c4e573a8a11e075c84f403",
+    "pullRequest": 39
+  },
+  "proofBoundary": {
+    "name": "P0-E2a-one-sided-agent-snapshot-rollback",
+    "completeLocalStateRootRestored": true,
+    "restoredSnapshotLocallySelfConsistent": true,
+    "currentDualSignedNexusPermitRedelivered": true,
+    "runtimeAttestationPrecedesExchangeNetwork": true,
+    "runtimeAttestationPrecedesRecoveryNetwork": true,
+    "exchangeRejectedBeforeTcpConnect": true,
+    "recoveryRejectedBeforeTcpConnect": true,
+    "sameSnapshotLocalMarkerIsIndependentWitness": false
+  },
+  "notProvenByThisGate": {
+    "coordinatedNodeAndNexusRollback": true,
+    "postgresqlSnapshotRestore": true,
+    "offHostOwnerMonotonicCheckpoint": true,
+    "physicalPowerRemoval": true,
+    "controllerOrDriveWriteCacheDurability": true,
+    "backupRestore": true,
+    "oldKeyRetirement": true,
+    "productionRollout": true
+  },
+  "nextRequiredGate": "P0-E2b-postgresql-snapshot-rollback-and-cross-domain-detection"
+}
