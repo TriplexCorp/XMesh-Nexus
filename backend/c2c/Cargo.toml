@@ -13,6 +13,10 @@ path = "../src/bin/xsp_v2_c2c.rs"
 name = "xsp-v2-c2c-fixture"
 path = "../src/bin/xsp_v2_c2c_fixture.rs"
 
+[[bin]]
+name = "xsp-v2-p0e3a-fixture"
+path = "../src/bin/xsp_v2_p0e3a_fixture.rs"
+
 [features]
 default = []
 xsp-v2-experimental = ["dep:openssl"]
