@@ -68,6 +68,7 @@ services:
       TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:-}
       SUBSCRIPTION_ENCRYPTION_KEY: ${SUBSCRIPTION_ENCRYPTION_KEY:?Run ./install.sh to provision subscription key}
       XSP_V2_SIGNER_SOCKET_PATH: /run/xmesh-signer/signer.sock
+      XSP_V2_P0D_AGENT_MIGRATION: ${XSP_V2_P0D_AGENT_MIGRATION:-}
       RUST_LOG: info,tower_http=info,sqlx=warn
     depends_on:
       db:
