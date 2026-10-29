@@ -16,7 +16,7 @@ for(const filename of migrations){
 assert(versions.has(20) && versions.has(21) && versions.has(23),'Xray update migrations must exist');
 const migration=fs.readFileSync('backend/migrations/0020_managed_xray_updates.sql','utf8');
 assert.match(migration,/update_xray/);
-const api=fs.readFileSync('backend/src/node_runtime.rs','utf8');
+const api=fs.readFileSync('backend/src/node_runtime.rs','utf8')+'\n'+fs.readFileSync('backend/src/node_runtime_legacy.rs','utf8');
 const router=fs.readFileSync('backend/src/main.rs','utf8');
 const agent=fs.readFileSync('deploy/node-control-agent.sh','utf8');
 const frontend=fs.readFileSync('app.js','utf8');
