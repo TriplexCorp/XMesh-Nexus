@@ -9,9 +9,7 @@ mod xsp_v2_signed_cutover;
 
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use ed25519_dalek::SigningKey;
-use openssl::{
-    pkey::{Id, PKey, Private},
-};
+use openssl::pkey::{Id, PKey, Private};
 use serde::Deserialize;
 use sha2::{Digest as _, Sha256};
 use sqlx::PgPool;
@@ -51,10 +49,22 @@ fn key_id(prefix: &str, raw: &[u8]) -> String {
 }
 
 fn decode_agent(node: u64, raw: AgentPublic) -> TrustedPublic {
-    let ed_public = STANDARD.decode(raw.ed_public_b64).expect("Agent Ed25519 public key invalid");
-    let pq_public = STANDARD.decode(raw.pq_public_b64).expect("Agent ML-DSA-65 public key invalid");
-    assert_eq!(raw.ed_key_id, key_id("ed-", &ed_public), "Agent Ed25519 key ID mismatch");
-    assert_eq!(raw.pq_key_id, key_id("pq-", &pq_public), "Agent ML-DSA-65 key ID mismatch");
+    let ed_public = STANDARD
+        .decode(raw.ed_public_b64)
+        .expect("Agent Ed25519 public key invalid");
+    let pq_public = STANDARD
+        .decode(raw.pq_public_b64)
+        .expect("Agent ML-DSA-65 public key invalid");
+    assert_eq!(
+        raw.ed_key_id,
+        key_id("ed-", &ed_public),
+        "Agent Ed25519 key ID mismatch"
+    );
+    assert_eq!(
+        raw.pq_key_id,
+        key_id("pq-", &pq_public),
+        "Agent ML-DSA-65 key ID mismatch"
+    );
     TrustedPublic {
         purpose: "node_request".into(),
         issuer_id: format!("node-{node}"),
@@ -104,9 +114,15 @@ async fn main() {
     );
     let agent_raw = fs::read(required("XSP_V2_P0E3A_AGENT_PUBLIC_FILE")).unwrap();
     let agent: AgentPublicFile = serde_json::from_slice(&agent_raw).unwrap();
-    assert!(agent.node_id > 0 && agent.node_id <= i64::MAX as u64);
-    assert_eq!(agent.old.key_epoch, 1, "P0-E3a fixture requires epoch-1 snapshot base");
-    assert_eq!(agent.next.key_epoch, 2, "P0-E3a fixture requires one prepared rotation");
+    assert!(agent.node_id > 0 && i64::try_from(agent.node_id).is_ok());
+    assert_eq!(
+        agent.old.key_epoch, 1,
+        "P0-E3a fixture requires epoch-1 snapshot base"
+    );
+    assert_eq!(
+        agent.next.key_epoch, 2,
+        "P0-E3a fixture requires one prepared rotation"
+    );
     let node = agent.node_id;
     let node_id = i64::try_from(node).unwrap();
     let old_pin = decode_agent(node, agent.old);
@@ -132,7 +148,8 @@ async fn main() {
         pending_ed_public: next_pin.ed_public.clone(),
         pending_pq_public: next_pin.pq_public.clone(),
     };
-    let candidate_hash = hex::encode(xsp_v2_candidate_binding::candidate_sha256(&material).unwrap());
+    let candidate_hash =
+        hex::encode(xsp_v2_candidate_binding::candidate_sha256(&material).unwrap());
 
     let mut tx = pool.begin().await.unwrap();
     sqlx::query("INSERT INTO node_metric_keys(node_id,public_key) VALUES($1,$2)")
@@ -173,7 +190,13 @@ async fn main() {
     .unwrap();
     tx.commit().await.unwrap();
 
-    let now = i64::try_from(SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis()).unwrap();
+    let now = i64::try_from(
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis(),
+    )
+    .unwrap();
     let permit = Cutover {
         kind: "permit".into(),
         issuer_id: panel_pin.issuer_id.clone(),
@@ -239,17 +262,37 @@ async fn main() {
         "pqId": pin_json["mldsa65KeyId"],
         "issuer": pin_json["issuerId"],
     });
-    fs::write(public.join("panel-pin.json"), serde_json::to_vec(&pin_json).unwrap()).unwrap();
-    fs::write(public.join("fixture-p0e3a.json"), serde_json::to_vec(&fixture_json).unwrap()).unwrap();
-    fs::set_permissions(public.join("panel-pin.json"), fs::Permissions::from_mode(0o444)).unwrap();
-    fs::set_permissions(public.join("fixture-p0e3a.json"), fs::Permissions::from_mode(0o444)).unwrap();
+    fs::write(
+        public.join("panel-pin.json"),
+        serde_json::to_vec(&pin_json).unwrap(),
+    )
+    .unwrap();
+    fs::write(
+        public.join("fixture-p0e3a.json"),
+        serde_json::to_vec(&fixture_json).unwrap(),
+    )
+    .unwrap();
+    fs::set_permissions(
+        public.join("panel-pin.json"),
+        fs::Permissions::from_mode(0o444),
+    )
+    .unwrap();
+    fs::set_permissions(
+        public.join("fixture-p0e3a.json"),
+        fs::Permissions::from_mode(0o444),
+    )
+    .unwrap();
 
-    let epoch: i64 = sqlx::query_scalar("SELECT key_epoch FROM node_xsp_suite_state WHERE node_id=$1")
-        .bind(node_id)
-        .fetch_one(&pool)
-        .await
-        .unwrap();
-    assert_eq!(epoch, 1, "fixture must leave Agent-generated candidate uncommitted");
+    let epoch: i64 =
+        sqlx::query_scalar("SELECT key_epoch FROM node_xsp_suite_state WHERE node_id=$1")
+            .bind(node_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        epoch, 1,
+        "fixture must leave Agent-generated candidate uncommitted"
+    );
     let state: String = sqlx::query_scalar(
         "SELECT state FROM node_xsp_cutover_permit_ledger WHERE node_id=$1 AND request_id=$2",
     )
