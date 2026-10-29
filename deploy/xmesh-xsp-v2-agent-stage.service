@@ -23,4 +23,6 @@ RestrictSUIDSGID=true
 LockPersonality=true
 CapabilityBoundingSet=
 AmbientCapabilities=
-ReadWritePaths=/run /var/lib/xmesh-agent
+StateDirectory=xmesh-agent
+StateDirectoryMode=0700
+ReadWritePaths=/run/xmesh-node-control /var/lib/xmesh-agent
