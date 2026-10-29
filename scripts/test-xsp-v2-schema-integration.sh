@@ -58,3 +58,7 @@ echo 'XSP-v2 schema: downgrade, replay, public key length constraints passed.'
 # in this same disposable PostgreSQL checkpoint so migration invariants are real.
 bash -n scripts/test-xsp-agent-release-manifest-integration.sh
 bash scripts/test-xsp-agent-release-manifest-integration.sh
+
+# P0-D1c uses the same disposable API/DB to prove the HTTP authorization and
+# orchestration boundary when the explicit staging-only process gate is enabled.
+python3 scripts/test-xsp-agent-orchestration-api.py
