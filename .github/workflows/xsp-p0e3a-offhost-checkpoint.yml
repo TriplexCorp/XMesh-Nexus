@@ -42,7 +42,11 @@ jobs:
           grep -Fq 'receipt Ed25519 signature invalid' backend/src/bin/xsp_v2_recovery_checkpoint.rs
       - name: Run real Ed25519 + ML-DSA-65 checkpoint tests
         run: |
-          cargo test --manifest-path backend/Cargo.toml --features xsp-v2-experimental --bin xsp-v2-recovery-checkpoint -- --nocapture
+          set -euo pipefail
+          openssl genpkey -algorithm ML-DSA-65 -outform DER -out /tmp/xsp-p0e3a-mldsa65.der
+          XMESH_P0E3A_TEST_MLDSA65_DER=/tmp/xsp-p0e3a-mldsa65.der \
+            cargo test --manifest-path backend/Cargo.toml --features xsp-v2-experimental --bin xsp-v2-recovery-checkpoint -- --nocapture
+          rm -f /tmp/xsp-p0e3a-mldsa65.der
       - name: Check formatting
         run: |
           rustup component add rustfmt
