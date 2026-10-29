@@ -1,0 +1,93 @@
+name: XSP-v2 P0-E2b PostgreSQL Snapshot Rollback
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/c2c/**"
+      - "backend/src/bin/xsp_v2_c2c.rs"
+      - "backend/src/bin/xsp_v2_c2c_fixture.rs"
+      - "backend/src/xsp_v2_**"
+      - "backend/Dockerfile.xsp-c2c"
+      - "backend/Dockerfile.xsp-signer"
+      - "deploy/postgres/20-create-xsp-v2-signer-role.sql"
+      - "deploy/postgres/21-create-xsp-v2-c2c-role.sql"
+      - "deploy/xsp-v2-ingress/**"
+      - "scripts/generate-xsp-v2-mldsa-test-certs.go"
+      - "scripts/xsp-v2-c2d-node-client_test.go"
+      - "scripts/xsp-v2-c2d-race_test.go"
+      - "scripts/xsp-v2-p0e2b-db-rollback_test.go"
+      - "scripts/test-xsp-v2-p0e2b-postgres-snapshot-rollback.py"
+      - ".github/workflows/xsp-p0e2b-postgres-snapshot-rollback.yml"
+  pull_request:
+    paths:
+      - "backend/c2c/**"
+      - "backend/src/bin/xsp_v2_c2c.rs"
+      - "backend/src/bin/xsp_v2_c2c_fixture.rs"
+      - "backend/src/xsp_v2_**"
+      - "backend/Dockerfile.xsp-c2c"
+      - "backend/Dockerfile.xsp-signer"
+      - "deploy/postgres/20-create-xsp-v2-signer-role.sql"
+      - "deploy/postgres/21-create-xsp-v2-c2c-role.sql"
+      - "deploy/xsp-v2-ingress/**"
+      - "scripts/generate-xsp-v2-mldsa-test-certs.go"
+      - "scripts/xsp-v2-c2d-node-client_test.go"
+      - "scripts/xsp-v2-c2d-race_test.go"
+      - "scripts/xsp-v2-p0e2b-db-rollback_test.go"
+      - "scripts/test-xsp-v2-p0e2b-postgres-snapshot-rollback.py"
+      - ".github/workflows/xsp-p0e2b-postgres-snapshot-rollback.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache: false
+      - name: Check real snapshot rollback and current-Agent witness contract
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/test-xsp-v2-p0e2b-postgres-snapshot-rollback.py
+          test -z "$(gofmt -d scripts/xsp-v2-p0e2b-db-rollback_test.go)"
+          ! grep -R --line-number --fixed-strings 'strict-pq=on' scripts/test-xsp-v2-p0e2b-postgres-snapshot-rollback.py scripts/xsp-v2-p0e2b-db-rollback_test.go
+          ! grep -R --line-number -E '(-p|--publish)[ =]' scripts/test-xsp-v2-p0e2b-postgres-snapshot-rollback.py
+          grep -Fq 'pg_dump", "-U", "postgres", "-d", "xmesh", "-Fc"' scripts/test-xsp-v2-p0e2b-postgres-snapshot-rollback.py
+          grep -Fq 'DROP DATABASE xmesh WITH (FORCE); CREATE DATABASE xmesh;' scripts/test-xsp-v2-p0e2b-postgres-snapshot-rollback.py
+          grep -Fq 'pg_restore", "-U", "postgres", "-d", "xmesh", "--exit-on-error"' scripts/test-xsp-v2-p0e2b-postgres-snapshot-rollback.py
+          grep -Fq 'restored != (from_epoch, "issued", "0", "0")' scripts/test-xsp-v2-p0e2b-postgres-snapshot-rollback.py
+          grep -Fq 'recommitted != (to_epoch, "ack_verified", "1", "1")' scripts/test-xsp-v2-p0e2b-postgres-snapshot-rollback.py
+          grep -Fq 'TestP0E2BPostgresSnapshotRollbackCurrentAgentWitness' scripts/test-xsp-v2-p0e2b-postgres-snapshot-rollback.py scripts/xsp-v2-p0e2b-db-rollback_test.go
+          grep -Fq 'PersistVerifiedCommitReceiptForJournal' scripts/xsp-v2-p0e2b-db-rollback_test.go
+          grep -Fq 'bytes.Equal(after.SignedReceipt, before.SignedReceipt)' scripts/xsp-v2-p0e2b-db-rollback_test.go
+          grep -Fq 'silently replaced its authoritative receipt' scripts/xsp-v2-p0e2b-db-rollback_test.go
+          grep -Fq 'request.Host = serverName' scripts/xsp-v2-c2d-node-client_test.go
+          grep -Fq 'coordinated Node+Nexus rollback remains unproven' scripts/test-xsp-v2-p0e2b-postgres-snapshot-rollback.py
+
+  full-process-e2e:
+    name: Real PostgreSQL restore against current Agent receipt witness
+    needs: source-contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout exact current XMesh-Node P0-E2a checkpoint
+        uses: actions/checkout@v4
+        with:
+          repository: TriplexCorp/XMesh-Node
+          ref: 3fffa9fd74195114a7c4e573a8a11e075c84f403
+          path: xmesh-node
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache: false
+      - name: Verify exact Node security module before cross-domain rollback E2E
+        working-directory: xmesh-node/security/xspv2/poc-go
+        run: go test ./...
+      - name: Exercise real pg_dump/pg_restore rollback against current Agent journal
+        run: python3 scripts/test-xsp-v2-p0e2b-postgres-snapshot-rollback.py --node-repo xmesh-node
