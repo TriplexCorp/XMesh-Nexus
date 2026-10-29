@@ -6,9 +6,11 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HELPER="$ROOT/deploy/xsp-v2-agent-staged-apply.sh"
 [[ -f "$HELPER" ]] || { echo 'staged helper missing' >&2; exit 1; }
 bash -n "$HELPER"
+command -v sudo >/dev/null 2>&1 || { echo 'sudo is required for staged lifecycle test' >&2; exit 1; }
+sudo -n true
 
 TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+trap 'sudo rm -rf -- "$TMP"' EXIT
 BASE="$TMP/agent"
 FAKEBIN="$TMP/bin"
 mkdir -p "$FAKEBIN"
@@ -132,6 +134,20 @@ BAD='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 write_identity 'p0d2-bad-digest' '3333333333333333333333333333333333333333' "$BAD"
 if run_apply "$F2"; then
   echo 'digest mismatch unexpectedly succeeded' >&2
+  exit 1
+fi
+assert_active "$V2" "$R2" "$D2"
+
+# Matching bytes but a mismatched embedded release identity must also fail
+# before activation. A sidecar/manifest alone is not sufficient proof.
+V_BAD='p0d2-embedded-wrong'
+R_BAD='3333333333333333333333333333333333333333'
+F_BAD="$TMP/agent-identity-mismatch"
+make_fixture "$F_BAD" "$V_BAD" "$R_BAD"
+D_BAD="$(sha256sum "$F_BAD" | awk '{print $1}')"
+write_identity 'p0d2-expected' "$R_BAD" "$D_BAD"
+if run_apply "$F_BAD"; then
+  echo 'embedded identity mismatch unexpectedly succeeded' >&2
   exit 1
 fi
 assert_active "$V2" "$R2" "$D2"
