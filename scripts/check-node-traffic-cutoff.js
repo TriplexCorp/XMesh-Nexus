@@ -2,7 +2,7 @@
 'use strict';
 const assert=require('node:assert/strict'),fs=require('node:fs');
 const backend=fs.readFileSync('backend/src/main.rs','utf8');
-const runtime=fs.readFileSync('backend/src/node_runtime.rs','utf8');
+const runtime=fs.readFileSync('backend/src/node_runtime.rs','utf8')+'\n'+fs.readFileSync('backend/src/node_runtime_legacy.rs','utf8');
 const agent=fs.readFileSync('deploy/node-control-agent.sh','utf8');
 const updater=fs.readFileSync('deploy/update-node-control-agent.sh','utf8');
 const app=fs.readFileSync('app.js','utf8');
