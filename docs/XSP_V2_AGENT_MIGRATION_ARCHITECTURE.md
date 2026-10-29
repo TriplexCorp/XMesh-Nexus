@@ -25,7 +25,7 @@ Xray remains the VPN data-plane. The root Go router remains a separately version
 
 XMesh-Node already contains the side-by-side `agent/xspv2` Go 1.27.3 module introduced by Node PR #34 and fail-closed source-contract hardening from PR #35.
 
-That module is the only approved starting point for the future production-capable XSP-v2 Agent. It already provides a production-style private state root and a thin bridge into the proven XSP-v2 cutover implementation. It must **reuse**, not copy, the existing strict transport / permit / signed ACK / dual-signed receipt / historical recovery state machine.
+That module is the only approved starting point for the future production-capable XSP-v2 Agent. It already provides a production-style private state root and a thin bridge into the proven XSP-v2 cutover implementation. It must reuse, not copy, the existing strict transport / permit / signed ACK / dual-signed receipt / historical recovery state machine.
 
 The migration must therefore converge on one state machine:
 
