@@ -8,6 +8,11 @@ A green test proves only its stated boundary. Code existence ≠ E2E ≠ securit
 
 ## Verified source checkpoints
 
+- **Latest completed Nexus P0-E recovery/security checkpoint:** [`f9a9c636f83a3a2ef7122fef7c3f3bc2bc76b7d4`](https://github.com/TriplexCorp/XMesh-Nexus/commit/f9a9c636f83a3a2ef7122fef7c3f3bc2bc76b7d4), merge of [PR #109](https://github.com/TriplexCorp/XMesh-Nexus/pull/109). P0-E2b proves one-sided PostgreSQL snapshot rollback against a current Agent receipt witness with restore-time database privilege re-hardening. Coordinated Agent + Nexus/PostgreSQL rollback remains outside this gate.
+- **P0-E2b / PR #109:** a disposable real `pg_dump` / drop+create / `pg_restore` boundary restores PostgreSQL to the exact pre-ACK tuple while the Agent journal remains current. The first restore exposed default database-level privilege drift; the recovery contract now re-applies the reviewed idempotent signer/C2-C least-privilege provisioning, requires CREATE/TEMP/public-schema CREATE removal and proves re-hardening does not mutate XSP-v2 security state. The current Agent keeps its first authoritative dual-signed receipt immutable and rejects silent replacement after server rollback.
+- On exact Nexus merge SHA `f9a9c636f83a3a2ef7122fef7c3f3bc2bc76b7d4`, [XSP-v2 P0-E2b PostgreSQL Snapshot Rollback #6](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40846810762) completed **success**, including the real PostgreSQL restore boundary, restore-time ACL re-hardening and current-Agent receipt witness.
+- **P0-E2a / Node PR #39 + Nexus PR #108:** current XMesh-Node checkpoint [`3fffa9fd74195114a7c4e573a8a11e075c84f403`](https://github.com/TriplexCorp/XMesh-Node/commit/3fffa9fd74195114a7c4e573a8a11e075c84f403), merge of Node PR #39, proves a complete locally self-consistent old Agent state-root snapshot fails closed before real network I/O when the unchanged current dual-signed Nexus permit is re-delivered. Nexus PR #108 pins that exact Node proof. Coordinated Node + Nexus/PostgreSQL rollback is explicitly unproven by this gate.
+- **P0-E1a / Node PR #38 + Nexus PR #107:** Node checkpoint [`8a86227f369aed2e6e952f1e41af52c7414aa4e3`](https://github.com/TriplexCorp/XMesh-Node/commit/8a86227f369aed2e6e952f1e41af52c7414aa4e3) proves hard process termination at the critical keyring durability checkpoints around retained previous identity, monotonic epoch floor and active-vault replacement. Nexus PR #107 pins the exact source contract. This is process/filesystem fsync-order evidence only; physical power removal, controller-cache and storage-firmware behavior remain unproven.
 - **Latest completed Nexus P0-D implementation checkpoint:** [`698d5e43d59c0c95532d513b39d95e42a2af4f20`](https://github.com/TriplexCorp/XMesh-Nexus/commit/698d5e43d59c0c95532d513b39d95e42a2af4f20), merge of [PR #105](https://github.com/TriplexCorp/XMesh-Nexus/pull/105).
 - **P0-D1a / PR #90:** immutable append-only Agent release identity `{version, sourceRevision, artifactSha256}` in PostgreSQL. Version/source/artifact identity cannot be rebound; UPDATE/DELETE/TRUNCATE are rejected. No production execution path was activated.
 - **P0-D1b / PR #91:** an approved immutable release identity can be atomically bound to the existing fixed-action `update_agent` single-flight command queue. Binding attach/remove/replace after row creation is rejected; normal lifecycle state transitions remain legal. No HTTP/API caller, poll payload or Agent/updater execution changed in this gate.
@@ -66,7 +71,11 @@ All are mandatory:
 | Disposable real Nexus↔Node Agent migration/update E2E | **COMPLETE — staging/real Agent E2E** | PR #103; real Go 1.27 artifacts, signed lifecycle, lost-response retry, restart, rollback, durable ACK evidence, default production gate restored OFF |
 | Durable real-Agent security state + authenticated authority binding | **COMPLETE — production-capable/default-disabled Agent boundary** | Node PR #37 + Nexus PR #105; durable exact rotation attestation, monotonic floors/retained keys across restart, fail-closed corruption/rollback, authenticated `Address`/`ServerName` separation with no proxy/redirect |
 | **P0-D production-capable Agent workflow** | **COMPLETE — default-disabled, not production activated** | Acceptance boundary satisfied by PR #90/#91/#93/#95/#97/#98/#99/#101/#103/#105 + Node PR #37; `strict-pq` stays OFF |
-| **P0-E recovery/security release gates** | **CURRENT P0** | Crash/power loss, snapshot/anti-rollback, backup/restore, key rotation/recovery, fuzz/KAT, independent security review and observability |
+| P0-E1a process-crash / fsync-order durability | **COMPLETE — bounded process/filesystem proof** | Node PR #38 + Nexus PR #107; hard process-crash checkpoints and restart/recovery. Physical power-loss/controller-cache behavior remains unproven |
+| P0-E2a one-sided Agent snapshot anti-rollback | **COMPLETE — bounded one-sided rollback proof** | Node PR #39 + Nexus PR #108; restored old Agent state rejected against current unchanged Nexus permit before network I/O |
+| P0-E2b one-sided PostgreSQL snapshot rollback | **COMPLETE — disposable real DB restore proof** | PR #109; real `pg_dump`/`pg_restore`, restore ACL re-hardening, current-Agent immutable receipt witness |
+| **P0-E3a owner/off-host monotonic recovery checkpoint** | **CURRENT sub-gate** | Introduce an independent non-rolled-back owner/off-host trust domain that binds Agent identity and Nexus/PostgreSQL security state; prove coordinated rollback detection without automatic reset/bypass |
+| **P0-E recovery/security release gates** | **CURRENT P0** | E1a/E2a/E2b complete within bounded scopes; still requires P0-E3a, physical power-loss proof, complete backup/restore, owner-authorized recovery + old-key retirement, fuzz/KAT, independent review and observability |
 | Production XSP-v2 rollout | **NOT AUTHORIZED** | P0-E + disposable canary + explicit production approval required |
 
 ## Completed P0-C2-D — integrated real-Node proof
@@ -75,7 +84,7 @@ All are mandatory:
 
 PR #73 proved:
 
-`real XMesh-Node Go 1.27 staging client → strict TLS1.3/X25519MLKEM768 + ML-DSA-65 mTLS → dedicated ingress → protected origin UDS → C2-C ACK auth/commit → PostgreSQL → isolated signer → dual-signed commit receipt → Node receipt verification + durable journal`
+`real XMesh-Node Go 1.27 staging client → strict TLS1.3/X25519MLKEM768 + ML-DSA-65 mTLS → dedicated ingress → protected origin UDS → C2-C ACK auth/commit → PostgreSQL → isolated signer → dual-signed receipt → Node verification + durable journal`
 
 The Node verifies/journals the signed permit and ACK, accepts success only after dual-signature receipt verification and durable local persistence, and cannot be impersonated by another valid ML-DSA client identity. D1 preserved freshness and did not authorize stale network commands.
 
@@ -203,21 +212,55 @@ P0-D is complete: the production-capable Agent workflow exists behind explicit n
 
 ## CURRENT P0 — P0-E recovery/security release gates
 
-P0-E must prove the deployment/recovery properties needed before canary/production consideration:
+### Completed P0-E sub-gates
 
-- crash and power-loss during security-state transitions;
-- filesystem/database snapshot and anti-rollback behavior;
-- backup/restore of DB plus persistent security identities;
-- owner-authorized key rotation and recovery, including retirement policy;
-- parser/protocol fuzzing and FIPS 204 / algorithm known-answer validation where applicable;
-- independent security review of the final migration/production architecture;
-- operational observability without secret/key leakage.
+#### P0-E1a — process-crash / fsync-order durability — COMPLETE
+
+Node PR #38 and Nexus PR #107 prove deterministic restart/recovery across hard process termination at the local rotation durability boundaries. The proof exercises crashes after durable retention of the old active identity, after the monotonic epoch floor advances and after the active vault replacement, plus recovery-path crash checkpoints. Durable writes require file fsync, atomic rename and parent-directory fsync before the next security transition can be treated as committed.
+
+The crash injector is test-only and excluded from the normal Agent build. This gate is intentionally bounded: it does not claim physical power removal, controller/cache flush behavior, storage firmware guarantees, snapshot anti-rollback, complete backup/restore or production rollout.
+
+#### P0-E2a — one-sided Agent snapshot anti-rollback — COMPLETE
+
+Node PR #39 and Nexus PR #108 restore a complete old Agent state root that is locally self-consistent, while the current Nexus state and unchanged current dual-signed permit remain outside the rollback domain. The real `agent/xspv2` runtime must attest the exact applied rotation before `Exchange` or `Recover`; the old snapshot cannot satisfy the current permit and fails closed before TCP/network I/O.
+
+This proves one-sided Agent rollback only. A coordinated rollback of both the Agent state and Nexus/PostgreSQL to mutually consistent old snapshots requires a separate non-rolled-back authority.
+
+#### P0-E2b — one-sided PostgreSQL snapshot rollback — COMPLETE
+
+PR #109 reverses the failure domain. It takes a real custom-format `pg_dump` while the durable server tuple is exactly pre-ACK, commits through the normal strict-PQ ACK path, persists the first verified dual-signed receipt in the Agent journal, then drops/recreates/restores PostgreSQL while leaving the Agent journal current.
+
+The restore must re-establish the reviewed least-privilege signer/C2-C database roles before the security sidecars restart. The proof requires that ACL re-hardening itself not mutate the XSP-v2 epoch/ledger/outbox/replay tuple. After restore, exact ACK replay can only converge if the server reproduces the same authoritative receipt; a different otherwise-valid re-signed receipt is rejected by the current Agent without replacing its first journaled evidence.
+
+This proves one-sided PostgreSQL rollback with an independent current-Agent witness. It does **not** prove coordinated rollback detection, complete backup-set correctness or owner-authorized disaster recovery.
+
+### CURRENT sub-gate — P0-E3a owner/off-host monotonic recovery checkpoint
+
+P0-E3a must add an **independent, non-rolled-back owner/off-host trust domain**. That domain must bind a monotonic recovery checkpoint to the Agent security identity and the Nexus/PostgreSQL security state closely enough to detect a coordinated rollback where both sides are restored to mutually consistent old snapshots.
+
+P0-E3a must preserve all existing fail-closed rules:
+
+- no automatic epoch/replay reset;
+- no automatic key regeneration or enrollment replacement;
+- no caller-selected weaker transport or legacy fallback;
+- no second hidden security state machine that can disagree with the existing Agent/Nexus journals;
+- recovery authorization must be explicit, auditable and cryptographically bound to the exact security identity/state being recovered;
+- `strict-pq` stays OFF and no production topology is activated by this gate.
+
+After P0-E3a, P0-E still must close:
+
+1. physical power-loss / storage-controller-cache behavior beyond P0-E1a's bounded process-crash/fsync proof;
+2. complete backup/restore of PostgreSQL together with persistent signing/encryption/Agent identities and coordinated restore/recovery procedures;
+3. owner-authorized key rotation/recovery and explicit old-key retirement policy;
+4. parser/protocol fuzzing plus FIPS 204 / algorithm known-answer validation where applicable;
+5. independent security review of the final migration/production architecture;
+6. operational observability without secret/key leakage.
 
 Completion of individual P0-E items does not authorize production rollout. `strict-pq` remains OFF unless a later explicit release/production gate separately authorizes activation.
 
 ## Production rollout — NOT AUTHORIZED
 
-No production activation is authorized by C2-D or P0-D completion.
+No production activation is authorized by C2-D, P0-D or the completed bounded P0-E1a/P0-E2a/P0-E2b proofs.
 
 Before production rollout:
 
@@ -231,8 +274,9 @@ Before production rollout:
 
 - `strict-pq` remains **OFF**.
 - Production Agent remains on the deployed legacy control path until P0-E and later rollout gates explicitly authorize replacement.
-- Completed P0-D gates through Node PR #37 and Nexus PR #105 are default-disabled production-capable foundations/evidence; none authorize production migration.
+- Completed P0-D gates through Node PR #37 and Nexus PR #105, plus bounded P0-E1a/P0-E2a/P0-E2b evidence, remain default-disabled foundations/proofs; none authorize production migration.
 - No target-product fallback to XMESH1, Ed25519-only, X25519-only, TLS 1.2 or insecure certificate validation.
+- P0-E2a and P0-E2b do not detect coordinated rollback when all local witnesses are rolled back together; P0-E3a exists specifically to add an independent non-rolled-back recovery authority.
 - A GitHub merge is not a production deployment.
 - Xray remains the user VPN data-plane.
 - Historical/archive documents do not override this roadmap.
