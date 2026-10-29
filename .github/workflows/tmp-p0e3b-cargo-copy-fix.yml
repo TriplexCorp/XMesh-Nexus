@@ -1,0 +1,31 @@
+name: Temporary P0-E3b writable Cargo build fix
+
+on:
+  push:
+    branches: [feat/xsp-v2-p0e3b-coordinated-backup-restore]
+    paths: [".github/workflows/tmp-p0e3b-cargo-copy-fix.yml"]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/xsp-v2-p0e3b-coordinated-backup-restore
+      - name: Build recovery helper from writable copy
+        run: |
+          set -euo pipefail
+          python3 -c 'from pathlib import Path; p=Path("scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py"); s=p.read_text(); old="CARGO_TARGET_DIR=/work/cargo-target cargo build --locked --manifest-path /src/backend/Cargo.toml "; new="rm -rf /work/backend-build && cp -a /src/backend /work/backend-build && CARGO_TARGET_DIR=/work/cargo-target cargo build --manifest-path /work/backend-build/Cargo.toml "; assert s.count(old)==1, s.count(old); p.write_text(s.replace(old,new))'
+          python3 -m py_compile scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py
+          git diff --check
+      - name: Commit writable Cargo copy fix
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py
+          git commit -m 'fix(xsp-v2): build E3a recovery tool from writable copy'
+          git push origin HEAD:feat/xsp-v2-p0e3b-coordinated-backup-restore
