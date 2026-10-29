@@ -467,14 +467,17 @@ mod tests {
     use super::*;
     use ed25519_dalek::{Signer as _, SigningKey};
     use openssl::{
-        pkey::{KeyType, PKey, Private},
+        pkey::{PKey, Private},
         sign::Signer as PqSigner,
     };
 
     fn test_material() -> (SigningKey, PKey<Private>, PanelPin) {
         let ed = SigningKey::from_bytes(&[7_u8; 32]);
-        let pq = PKey::private_key_from_seed(None, KeyType::ML_DSA_65, None, &[9_u8; 32])
-            .expect("OpenSSL 3.5 ML-DSA-65 provider missing");
+        let pq_der_path = env::var_os("XMESH_P0E3A_TEST_MLDSA65_DER")
+            .expect("dedicated OpenSSL 3.5 CI must provide XMESH_P0E3A_TEST_MLDSA65_DER");
+        let pq_der = fs::read(&pq_der_path).expect("read ML-DSA-65 private DER fixture");
+        let pq = PKey::private_key_from_der(&pq_der)
+            .expect("OpenSSL 3.5 ML-DSA-65 private DER unavailable");
         let pq_der = pq.public_key_to_der().expect("ML-DSA public DER");
         let pq_public = pq_der[pq_der.len() - 1952..].to_vec();
         let ed_public = ed.verifying_key().to_bytes().to_vec();
