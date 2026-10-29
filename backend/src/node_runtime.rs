@@ -32,11 +32,11 @@ pub const CONTROL_AGENT_VERSION: &str = "control-v5.1.3";
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct LegacyAgentUpdateRequest {}
+pub struct LegacyAgentUpdateRequest {}
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct AgentMigrationUpdateRequest {
+pub struct AgentMigrationUpdateRequest {
     release_version: String,
 }
 
@@ -244,6 +244,30 @@ mod p0d_agent_orchestration_tests {
         assert!(!staging_agent_migration_value_enabled(Some("staging")));
         assert!(!staging_agent_migration_value_enabled(Some("STAGING-ONLY")));
         assert!(staging_agent_migration_value_enabled(Some("staging-only")));
+    }
+
+    #[test]
+    fn request_schema_keeps_legacy_empty_and_migration_version_only() {
+        assert!(matches!(
+            serde_json::from_str::<AgentUpdateRequest>("{}").unwrap(),
+            AgentUpdateRequest::Legacy(_)
+        ));
+        assert!(matches!(
+            serde_json::from_str::<AgentUpdateRequest>(
+                r#"{"releaseVersion":"control-v5.2.0"}"#
+            )
+            .unwrap(),
+            AgentUpdateRequest::Migration(_)
+        ));
+        for rejected in [
+            r#"{"releaseVersion":null}"#,
+            r#"{"artifactSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}"#,
+            r#"{"url":"https://example.invalid/agent"}"#,
+            r#"{"command":"custom"}"#,
+            r#"{"releaseVersion":"control-v5.2.0","sourceRevision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}"#,
+        ] {
+            assert!(serde_json::from_str::<AgentUpdateRequest>(rejected).is_err());
+        }
     }
 
     #[test]
