@@ -19,6 +19,7 @@ const app=fs.readFileSync('app.js','utf8');
 const css=fs.readFileSync('styles.css','utf8');
 const tests=fs.readFileSync('scripts/test-node-auth-integration.py','utf8');
 const orchestration=fs.readFileSync('scripts/test-xsp-agent-orchestration-api.py','utf8');
+const migrationDesign=fs.readFileSync('docs/XSP_V2_AGENT_MIGRATION_ARCHITECTURE.md','utf8');
 
 assert.match(api,/\/nodes\/\{id\}\/agent-update/);
 assert.match(runtimeEntry,/pub async fn request_agent_update/);
@@ -49,7 +50,6 @@ assert.doesNotMatch(releaseManifest,/\b(url|uri|script|command)\b\s+TEXT/i,
 assert.doesNotMatch(releaseManifest,/strict-pq=on/,'Manifest foundation must not activate strict PQ');
 
 // P0-D1b binds that immutable identity to the existing update_agent queue only.
-// No new remotely executable action or caller-selected location is introduced.
 assert.match(migrationBinding,/ADD COLUMN release_manifest_id BIGINT/);
 assert.match(migrationBinding,/REFERENCES node_xsp_agent_release_manifests\(id\) ON DELETE RESTRICT/);
 assert.match(migrationBinding,/CHECK \(release_manifest_id IS NULL OR action = 'update_agent'\)/);
@@ -86,17 +86,12 @@ assert.doesNotMatch(runtimeEntry,/\b(url|uri|script|shell|command_text)\s*:/i,
   'D1c request schema must never accept caller-selected executable input');
 assert.doesNotMatch(runtimeEntry,/strict-pq=on/,'D1c must not activate strict PQ');
 
-// Current P0-D sub-gate: exact release identity must move through the existing
-// authenticated poll/apply/ACK lifecycle. Bound success cannot be inferred from
-// a version-only heartbeat and legacy commands remain identity-free.
-assert.match(runtimeEntry,/pub async fn poll_restart/,
-  'P0-D identity propagation must overlay the existing signed poll endpoint');
+// Exact release identity moves through the existing authenticated poll/apply/ACK lifecycle.
+assert.match(runtimeEntry,/pub async fn poll_restart/);
 assert.match(runtimeEntry,/LEFT JOIN node_xsp_agent_release_manifests m ON m[.]id=c[.]release_manifest_id/);
-assert.match(runtimeEntry,/command\["releaseIdentity"\]/,
-  'Bound poll must emit exact immutable release identity');
-assert.match(runtimeEntry,/pub async fn acknowledge_restart/,
-  'P0-D identity propagation must overlay the existing signed ACK endpoint');
-assert.match(runtimeEntry,/FOR UPDATE OF c/,'ACK must lock the claimed command before identity comparison');
+assert.match(runtimeEntry,/command\["releaseIdentity"\]/);
+assert.match(runtimeEntry,/pub async fn acknowledge_restart/);
+assert.match(runtimeEntry,/FOR UPDATE OF c/);
 assert.match(runtimeEntry,/Bound Agent command requires exact release identity acknowledgement/);
 assert.match(runtimeEntry,/release_ack_version=\$5/);
 assert.match(runtimeEntry,/release_ack_received_at=CASE WHEN \$5::TEXT IS NULL THEN NULL ELSE NOW\(\) END/);
@@ -122,14 +117,11 @@ assert.match(agent,/router_running\(\)\{/,'Control agent needs an independent ed
 assert.match(agent,/if router_running;then router=true;fi/,'Router heartbeat must come from its own process');
 assert.ok(agent.includes('router_running\\":$router'),'Router status must not be copied from Xray health');
 assert.match(agent,/if action not in \("restart_xray","update_xray","update_agent"\)/);
-assert.match(agent,/releaseIdentity/,'Agent must parse the optional bound release identity');
-assert.match(agent,/set\(identity\)!=\{"version","sourceRevision","artifactSha256"\}/,
-  'Agent must reject partial or extra release identity fields');
-assert.match(agent,/stage_agent_release_identity\(\)/,
-  'Agent must preserve exact identity locally across the fixed updater apply step');
+assert.match(agent,/releaseIdentity/);
+assert.match(agent,/set\(identity\)!=\{"version","sourceRevision","artifactSha256"\}/);
+assert.match(agent,/stage_agent_release_identity\(\)/);
 assert.match(agent,/RELEASE_IDENTITY_FILE=\/run\/xmesh-node-control\/agent-release-identity[.]json/);
-assert.match(agent,/ack_identity=.*releaseIdentity/,
-  'Bound Agent ACK must echo the exact release identity');
+assert.match(agent,/ack_identity=.*releaseIdentity/);
 assert.match(agent,/systemctl start --wait xmesh-node-agent-upgrade[.]service/);
 assert.match(agent,/signed_post '\/api\/v1\/node\/restart\/ack'/);
 assert.match(updater,/MODE="\$\{1:-manual\}"/);
@@ -137,34 +129,27 @@ assert.match(updater,/xmesh-node-agent-upgrade[.]service/);
 assert.match(updater,/if \[\[ "\$MODE" != --remote \]\]/);
 
 assert.match(updater,/declare -f update_router/,'Router upgrade must execute in the scoped worker');
-assert.match(updater,/export HOME=\/run\/xmesh-node-router-upgrade/,'Systemd-constrained Docker builds need a writable HOME');
-assert.match(updater,/export DOCKER_CONFIG="\$HOME\/\.docker"/,'Docker must not write to inaccessible /root/.docker');
-assert.match(updater,/export BUILDX_CONFIG="\$HOME\/\.buildx"/,'Buildx must keep state in writable /run');
-assert.match(updater,/docker --config "\$DOCKER_CONFIG" compose build xmesh-node/,'Compose builds must explicitly use Docker config in writable /run');
-assert.match(updater,/export XDG_CACHE_HOME="\$HOME\/\.cache"/,'Buildx cache needs writable runtime path');
-assert.match(updater,/export TMPDIR="\$HOME\/tmp"/,'Compose metadata must not use read-only /tmp');
-assert.match(updater,/ReadWritePaths=\/run/,'The isolated router upgrade worker must be able to write Docker state');
-
-assert.match(updater,/systemd-run --quiet --wait --collect --pipe/,'Router upgrade must be checked synchronously');
-assert.match(updater,/--property=ReadWritePaths=\/opt\/xmesh-node/,'Router worker needs write access to the installed source');
-assert.match(updater,/git -C "\$dir" fetch --unshallow origin main/,'Router source clone is shallow after bootstrap');
-assert.match(updater,/docker --config "\$DOCKER_CONFIG" compose run --rm --no-deps xmesh-node -check/,'Rebuilt router must be validated');
-assert.match(updater,/docker --config "\$DOCKER_CONFIG" compose up -d --no-deps --force-recreate xmesh-node/,'Router must actually be restarted');
+assert.match(updater,/export HOME=\/run\/xmesh-node-router-upgrade/);
+assert.match(updater,/export DOCKER_CONFIG="\$HOME\/\.docker"/);
+assert.match(updater,/export BUILDX_CONFIG="\$HOME\/\.buildx"/);
+assert.match(updater,/docker --config "\$DOCKER_CONFIG" compose build xmesh-node/);
+assert.match(updater,/export XDG_CACHE_HOME="\$HOME\/\.cache"/);
+assert.match(updater,/export TMPDIR="\$HOME\/tmp"/);
+assert.match(updater,/ReadWritePaths=\/run/);
+assert.match(updater,/systemd-run --quiet --wait --collect --pipe/);
+assert.match(updater,/--property=ReadWritePaths=\/opt\/xmesh-node/);
+assert.match(updater,/git -C "\$dir" fetch --unshallow origin main/);
+assert.match(updater,/docker --config "\$DOCKER_CONFIG" compose run --rm --no-deps xmesh-node -check/);
+assert.match(updater,/docker --config "\$DOCKER_CONFIG" compose up -d --no-deps --force-recreate xmesh-node/);
 assert.doesNotMatch(updater,/then\\n echo/,'Do not embed literal backslash-n in Bash');
 assert.match(runtime,/INTERVAL '15 minutes'/,'Long full-node upgrades must not expire after 180 seconds');
-assert.match(updater,/xmesh-policy-guard[.]py -o "\$policy_tmp"/,'Agent update must fetch updated signed policy guard');
-assert.match(updater,/xmesh-profile-attest[.]py -o "\$profile_tmp"/,
-  'Agent updater must fetch the profile attestation helper');
-assert.match(updater,/python3 -m py_compile "\$profile_tmp"/,
-  'Attestation helper must pass Python syntax check before installation');
-assert.match(updater,/grep -q 'verify_envelope' "\$profile_tmp"/,
-  'Attestation helper must retain signed-policy verification');
-assert.match(updater,/mv -f \/usr\/local\/libexec\/\.xmesh-profile-attest[.]new \/usr\/local\/libexec\/xmesh-profile-attest[.]py/,
-  'Verified helper must be installed atomically');
-assert.match(agent,/profile_check='helper_missing'/,
-  'Missing verifier must remain a visible fail-closed status');
-assert.match(app,/helper_missing:'Проверка профиля не установлена · нажмите «Обновить Agent»'/,
-  'UI must explain how to repair the missing verifier');
+assert.match(updater,/xmesh-policy-guard[.]py -o "\$policy_tmp"/);
+assert.match(updater,/xmesh-profile-attest[.]py -o "\$profile_tmp"/);
+assert.match(updater,/python3 -m py_compile "\$profile_tmp"/);
+assert.match(updater,/grep -q 'verify_envelope' "\$profile_tmp"/);
+assert.match(updater,/mv -f \/usr\/local\/libexec\/\.xmesh-profile-attest[.]new \/usr\/local\/libexec\/xmesh-profile-attest[.]py/);
+assert.match(agent,/profile_check='helper_missing'/);
+assert.match(app,/helper_missing:'Проверка профиля не установлена · нажмите «Обновить Agent»'/);
 
 assert.match(installer,/xmesh-node-agent-upgrade[.]service/);
 assert.match(installer,/\/usr\/local\/sbin\/xmesh-update-agent/);
@@ -178,10 +163,35 @@ assert.match(orchestration,/bound ACK without release identity fails closed/);
 assert.match(orchestration,/bound migration cannot become success from version-only heartbeat/);
 assert.match(orchestration,/exact immutable release identity is durable ACK evidence/);
 
+// P0-D real Agent integration design: lock down component identity, reuse and rollback.
+assert.match(migrationDesign,/root Go 1\.23 router is not the control Agent/,
+  'Migration design must distinguish the edge router from the control Agent');
+assert.match(migrationDesign,/\/usr\/local\/sbin\/xmesh-node-control/);
+assert.match(migrationDesign,/xmesh-node-control\.service/);
+assert.match(migrationDesign,/xmesh-node-control\.timer/);
+assert.match(migrationDesign,/xmesh-node-agent-upgrade\.service/);
+assert.match(migrationDesign,/agent\/xspv2/,'Go 1.27 migration must reuse the Node Agent artifact boundary');
+assert.match(migrationDesign,/Go 1\.27\.3/);
+assert.match(migrationDesign,/bedbec74413a5ea86f69aca685f24bf028775a98/,
+  'Design must pin the reviewed Node PR #34/#35 artifact checkpoint');
+assert.match(migrationDesign,/reuse, not copy/,
+  'Design must forbid a parallel XSP-v2 state machine');
+assert.match(migrationDesign,/last-known-good/,'Rollback boundary must be defined before apply work');
+assert.match(migrationDesign,/There is \*\*no silent downgrade\*\*/);
+assert.match(migrationDesign,/old shell Agent or Go Agent missing required PQ\/state support \| fail closed/);
+assert.match(migrationDesign,/XMESH1, Ed25519-only, X25519-only, TLS 1\.2/);
+assert.match(migrationDesign,/Address.*direct TCP connect target/);
+assert.match(migrationDesign,/ServerName.*authenticated authority/);
+assert.match(migrationDesign,/remote action remains exactly `update_agent`/);
+assert.match(migrationDesign,/must not roll security epochs\/replay floors backwards/);
+assert.match(migrationDesign,/`strict-pq` remains OFF/);
+assert.doesNotMatch(migrationDesign,/production activation authorized/i,
+  'Design gate must not authorize production activation');
+
 for(const file of ['deploy/node-control-agent.sh','deploy/update-node-control-agent.sh','deploy/install-node-metrics-agent.sh']){
   const result=spawnSync('bash',['-n',file],{encoding:'utf8'});
   assert.equal(result.status,0, file+': '+result.stderr);
 }
 const syntax=spawnSync(process.execPath,['--check','app.js'],{encoding:'utf8'});
 assert.equal(syntax.status,0,syntax.stderr);
-console.log('Signed remote Agent upgrade, immutable release identity/binding and authenticated poll/apply/ACK identity contract: OK');
+console.log('Signed Agent upgrade, release identity lifecycle and Go 1.27 migration architecture contract: OK');
