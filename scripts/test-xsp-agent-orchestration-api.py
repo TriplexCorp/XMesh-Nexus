@@ -3,7 +3,8 @@
 import json
 import os
 import subprocess
-from urllib.error import HTTPError
+import time
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 BASE = os.getenv("XMESH_TEST_URL", "http://127.0.0.1:8080").rstrip("/")
@@ -14,6 +15,7 @@ ADMIN_PASSWORD = "ci-p0d-admin-password-0123456789"
 RELEASE = "control-v99.1.0-p0d-api"
 REVISION = "89abcdef0123456789abcdef0123456789abcdef"
 DIGEST = "89abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567"
+GATE = "XSP_V2_P0D_AGENT_MIGRATION"
 
 
 def request(method, path, payload=None, *, cookie=None, origin=BASE):
@@ -60,9 +62,38 @@ def sql(statement):
     return subprocess.check_output(command, text=True).strip()
 
 
+def wait_ready():
+    for _ in range(120):
+        try:
+            with urlopen(BASE + "/api/v1/health/ready", timeout=3) as response:
+                if response.status == 200:
+                    return
+        except (HTTPError, URLError, TimeoutError):
+            pass
+        time.sleep(1)
+    subprocess.run(["docker", "compose", "logs", "--tail=120", "panel"], check=False)
+    raise AssertionError("XMesh API did not become ready after panel recreation")
+
+
+def recreate_panel(gate_value):
+    env = os.environ.copy()
+    if gate_value is None:
+        env.pop(GATE, None)
+    else:
+        env[GATE] = gate_value
+    subprocess.run(
+        ["docker", "compose", "up", "-d", "--no-deps", "--force-recreate", "panel"],
+        check=True,
+        env=env,
+    )
+    wait_ready()
+
+
 def main():
-    assert os.getenv("XSP_V2_P0D_AGENT_MIGRATION") == "staging-only", (
-        "P0-D1c integration must run only with the explicit staging-only gate")
+    # The surrounding integration job starts the normal default-disabled panel.
+    # Recreate only that API container with the exact opt-in value, then restore
+    # it before returning so later CI continues under normal production defaults.
+    recreate_panel("staging-only")
 
     owner_cookie = login(OWNER, OWNER_PASSWORD)
     code, node, _ = request(
@@ -146,6 +177,15 @@ def main():
         "POST", f"/nodes/{node_id}/agent-update",
         {"releaseVersion": RELEASE}, cookie=owner_cookie)
     expect(code, 409, "single-flight conflict remains authoritative")
+
+    # Restore the default process environment and prove the same migration
+    # request becomes unavailable without the exact staging-only opt-in.
+    recreate_panel(None)
+    owner_cookie = login(OWNER, OWNER_PASSWORD)
+    code, _, _ = request(
+        "POST", f"/nodes/{node_id}/agent-update",
+        {"releaseVersion": RELEASE}, cookie=owner_cookie)
+    expect(code, 404, "migration API disappears again when staging gate is disabled")
 
     print("P0-D1c owner-only staging Agent orchestration API integration passed.")
 
