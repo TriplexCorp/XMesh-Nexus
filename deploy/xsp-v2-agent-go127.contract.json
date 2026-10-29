@@ -1,10 +1,10 @@
 {
-  "schema": "xsp2-agent-go127-integration-v1",
+  "schema": "xsp2-agent-go127-integration-v2",
   "productionActivation": false,
   "strictPqDefault": "off",
   "verifiedNodeSource": {
     "repository": "TriplexCorp/XMesh-Node",
-    "revision": "bedbec74413a5ea86f69aca685f24bf028775a98"
+    "revision": "5e8ee562915a570eb49ed46d59d723f233f3cc68"
   },
   "productionRouter": {
     "role": "edge-router-data-plane-adjacent",
@@ -38,7 +38,20 @@
     "productionActivated": false,
     "mayReplaceProductionRouter": false,
     "mayCreateParallelCommandQueue": false,
-    "securityPrimitiveModule": "security/xspv2/poc-go"
+    "securityPrimitiveModule": "security/xspv2/poc-go",
+    "durableSecurityState": {
+      "cutoverJournalDirectory": "cutover",
+      "keyStateDirectory": "keys",
+      "nodeRequestVault": "keys/node-request.vault",
+      "nodeRequestMasterKey": "keys/node-request.master",
+      "prepareMayCreateOrRegenerateIdentity": false,
+      "appliedRotationAttestation": "keyring.AttestAppliedRotation",
+      "persistedEpochFloorRequired": true,
+      "preparedCandidateRetentionRequired": true,
+      "previousIdentityRetentionRequired": true,
+      "packageRollbackMayLowerSecurityFloor": false,
+      "corruptOrStaleState": "fail-closed"
+    }
   },
   "go127SecurityRuntime": {
     "role": "reused-strict-xsp-v2-security-primitives",
@@ -56,6 +69,16 @@
     "inboundNetworkListener": false,
     "mayReplaceProductionRouter": false,
     "mayCreateParallelCommandQueue": false
+  },
+  "authenticatedAuthority": {
+    "directConnectField": "Address",
+    "authenticatedServerNameField": "ServerName",
+    "tlsSniFromServerName": true,
+    "certificateHostnameFromServerName": true,
+    "httpAuthorityFromServerName": true,
+    "proxyAllowed": false,
+    "redirectAllowed": false,
+    "alternateAuthorityAllowed": false
   },
   "migrationRules": {
     "legacyUnboundUpdateRemainsCompatible": true,
@@ -79,6 +102,7 @@
     "callerSelectedExecutableLocation": false,
     "callerSelectedDownloadUrl": false,
     "lastKnownGoodRequiredBeforeApply": true,
-    "downloadVerifyApplyIsFutureGate": true
+    "stagedDownloadVerifyApplyRollbackComplete": true,
+    "packageIdentitySeparatedFromSecurityState": true
   }
 }

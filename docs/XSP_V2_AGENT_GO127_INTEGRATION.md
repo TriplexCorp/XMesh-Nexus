@@ -1,103 +1,93 @@
 # XSP-v2 real Agent integration / Go 1.27 boundary
 
-Status: **P0-D staging design contract; no production activation**.
+Status: **P0-D staging implementation contract; no production activation**.
 
-This document defines the integration boundary for the next production-capable Agent work. It does not enable `strict-pq`, replace the production XMesh-Node router, download or apply a new executable, or authorize production rollout.
+This document defines the verified production-capable Agent boundary after staged package lifecycle, disposable real-Agent E2E, and durable-state hardening. It does not enable `strict-pq`, replace the production XMesh-Node router, retire the deployed shell control Agent, or authorize production rollout.
 
-The machine-readable authority for this gate is [`deploy/xsp-v2-agent-go127.contract.json`](../deploy/xsp-v2-agent-go127.contract.json). CI validates that contract against the exact pinned XMesh-Node source checkpoint rather than trusting documentation alone. The detailed migration architecture is also recorded in [`XSP_V2_AGENT_MIGRATION_ARCHITECTURE.md`](XSP_V2_AGENT_MIGRATION_ARCHITECTURE.md).
+The machine-readable authority is [`deploy/xsp-v2-agent-go127.contract.json`](../deploy/xsp-v2-agent-go127.contract.json). CI validates that contract against exact XMesh-Node merge `5e8ee562915a570eb49ed46d59d723f233f3cc68` (Node PR #37), not against a moving branch.
 
 ## Verified component split
 
-The managed node is not one monolithic "Go Agent".
+1. **Production XMesh-Node edge router** remains the root Go 1.23 module and root Docker image. It is not the signed control Agent and this gate does not change it.
+2. **Existing signed control/update Agent** remains Nexus `deploy/node-control-agent.sh` plus `xmesh-node-agent-upgrade.service`. Remote action authority remains exactly `update_agent`; no second command queue exists.
+3. **Go 1.27.3 Agent artifact boundary is `agent/xspv2`** in XMesh-Node. It is side-by-side and not installed or activated by default.
+4. **Security primitives are reused, not copied** from `security/xspv2/poc-go`: `envelope`, `keyring`, `tlsprobe`, and `cutover`.
 
-1. **Production XMesh-Node edge router**
-   - source: `TriplexCorp/XMesh-Node` root module;
-   - verified source checkpoint: `bedbec74413a5ea86f69aca685f24bf028775a98` (Node PR #34 plus fail-closed contract hardening in PR #35);
-   - Go language line: `go 1.23`;
-   - production image is built from the root `Dockerfile`;
-   - in managed bootstrap, router configuration intentionally does not retain `panel_url`, `node_id` or `private_key_file`, so the router is not the signed control heartbeat authority.
+The production-capable wrapper delegates signed ACK exchange/recovery to `cutover` and durable key-state attestation to `keyring`. There is no shell or router copy of the XSP-v2 state machine.
 
-2. **Existing signed control/update Agent**
-   - implementation: Nexus `deploy/node-control-agent.sh` installed as a fixed systemd-controlled worker;
-   - updater: Nexus `deploy/update-node-control-agent.sh` through `xmesh-node-agent-upgrade.service`;
-   - remote action remains exactly `update_agent`;
-   - PR #90/#91/#93/#95 already bind immutable release identity and carry exact identity through signed poll/apply/ACK;
-   - this worker remains the lifecycle/command authority during migration. The Go 1.27 Agent integration must not introduce another remote command queue.
+## Completed staged package lifecycle
 
-3. **Production-capable Go 1.27 Agent integration module**
-   - source module: `agent/xspv2` in the pinned Node checkpoint;
-   - module path: `github.com/TriplexCorp/XMesh-Node/agent/xspv2`;
-   - Go language line: `go 1.27.3`;
-   - private state root: `/var/lib/xmesh-agent/xsp-v2`;
-   - it is not installed or activated by default;
-   - it is the real Agent-side integration boundary and does not replace the root edge router.
+The **staged download / verify / apply / rollback** gate is complete in Nexus PR #101, and disposable real Nexus↔Node migration/update retry/restart/rollback proof is complete in PR #103.
 
-4. **Reused Go 1.27 XSP-v2 security primitives**
-   - dependency module: `security/xspv2/poc-go`;
-   - module path: `github.com/TriplexCorp/XMesh-Node/security/xspv2/poc-go`;
-   - Go language line: `go 1.27.3`;
-   - reusable package boundaries already proven in staging include `envelope`, `keyring`, `tlsprobe` and `cutover`;
-   - `agent/xspv2` depends on this module and its runtime bridge imports `cutover` rather than copying the protocol/state machine;
-   - `cutover` contains the durable permit/applied-ACK/commit-receipt journal and recovery primitives used by the completed C2-D proof.
+The staged updater accepts only the immutable server-approved `{version, sourceRevision, artifactSha256}` identity, stages into a non-active content-addressed location, verifies exact SHA-256 and embedded source identity before activation, retains a last-known-good package/service boundary, switches atomically, and rolls package/service state back on failure. Caller-selected URL/script/command/executable location remains forbidden.
 
-## Integration decision
+Package identity and package rollback are deliberately separate from durable security state. Rolling back an Agent package does not authorize lowering an XSP-v2 key epoch, deleting signed journals, regenerating enrolled identities, or changing the protocol of an operation already in the migrated path.
 
-The Go 1.27 **Agent artifact boundary is `agent/xspv2`**. It is a production-capable, side-by-side Agent integration module whose security behavior is implemented by reusing `security/xspv2/poc-go` primitives.
+## Durable real-Agent security state
 
-The existing signed shell control Agent remains responsible for accepting only the fixed `update_agent` lifecycle selected by Nexus until a later explicit cutover gate. A migrated operation may invoke the Go 1.27 Agent integration/runtime, which in turn reuses the strict XSP-v2 transport, envelope/key custody, cutover journal and recovery behavior already proven in isolated staging.
+XMesh-Node PR #37 establishes the real-Agent layout under `/var/lib/xmesh-agent/xsp-v2`:
 
-Neither the Agent integration module nor its security dependency may expose a new inbound TCP control listener, accept an arbitrary executable path, accept a caller-selected download URL, replace the edge router, or create a second command queue. Remote-action authority remains the existing signed control Agent and immutable release manifest until an explicitly reviewed later cutover.
+```text
+/var/lib/xmesh-agent/xsp-v2/
+├── cutover/                  # exact permit / signed ACK / commit-receipt journals
+└── keys/                     # encrypted Node identity + monotonic key epoch floor
+    ├── node-request.master
+    ├── node-request.vault
+    ├── node-request.vault.min-epoch
+    ├── node-request.vault.next
+    └── node-request.vault.previous
+```
 
-## Packaging and release boundary
+`state.Prepare` creates only the private `cutover/` and `keys/` directory boundaries. It does not initialize, replace, reset, retire, or regenerate enrollment identities.
 
-A future Go 1.27 Agent artifact must be built from an **exact approved Node source revision** and must have an **exact SHA-256 artifact digest**. Those values must equal the immutable Nexus release manifest before any apply operation.
+Before `runtime.Exchange` or `runtime.Recover` can perform network I/O, the wrapper calls **`keyring.AttestAppliedRotation`** through the real-Agent state package. The reused keyring primitive proves all of the following together under the wrapping-key lock:
 
-The next implementation gate will define staged download, verify, apply and rollback. This gate deliberately does not implement those phases. Before an apply can exist, the updater must have a last-known-good package boundary that survives failed verification, failed start and restart recovery.
+- the persisted epoch floor equals the exact expected `toEpoch`;
+- the active encrypted vault is the prepared candidate;
+- the authenticated `.next` snapshot is the exact new identity;
+- the authenticated `.previous` snapshot retains the exact prior identity;
+- active Node ID, purpose, epoch and public key fingerprints match the signed permit.
 
-The production Go 1.23 router image is outside this migration package. A Go 1.27 Agent package must not silently cause the router Dockerfile/module to move to another Go version.
+The runtime then compares that durable active public identity byte-for-byte with the authenticated pending signer used by the signed ACK lifecycle. A wrong minimum epoch, substituted public key, restored old active vault, lowered/corrupt floor, missing old-key snapshot, malformed/symlinked state, or mismatched layout fails closed **before transport**.
 
-## Mixed-version rules
+Restart tests prove re-running `state.Prepare` preserves master/vault/floor/previous/next bytes unchanged. The durable permit/ACK/receipt material continues to use the already-proven cutover journals with exact binding, immutable retry, atomic rename, file `fsync`, parent-directory `fsync`, and corruption/conflict rejection. This is the durable real-Agent security state boundary; no parallel replay/epoch state machine is introduced.
 
-Compatibility is asymmetric by design:
+Old keys remain retained until a separately authorized retirement workflow exists.
 
-- **Legacy unbound `update_agent`:** existing behavior remains compatible and identity-free.
-- **Bound staged migration + no Go 1.27 Agent/runtime:** fail closed; do not report success and do not fall back to a legacy migrated operation.
-- **Go 1.27 Agent/runtime + peer without required strict XSP-v2 support:** fail closed.
-- **Missing/invalid permit, ACK, receipt, epoch/replay state or strict transport:** fail closed.
-- **Transport failure or unavailable security component:** fail closed.
-- **No automatic fallback** to XMESH1, Ed25519-only, X25519-only, TLS 1.2 or insecure certificate verification for a migrated operation.
+## Authenticated transport authority
 
-Legacy production traffic/control behavior remains deployed until a later explicit migration/release gate. This rule does not retroactively convert ordinary legacy operations into strict-XSP-v2 operations.
+Direct routing and authenticated authority remain intentionally separate:
 
-## Reuse instead of a parallel state machine
+- `Address` is only the direct TCP connect target and may be an internal alias or IP;
+- `ServerName` is the authenticated TLS authority;
+- TLS SNI and certificate hostname verification use `ServerName`;
+- **HTTP authority (`Host`) is set to the same authenticated `ServerName`**;
+- proxy use is disabled;
+- redirects are rejected;
+- an alternate host, legacy route, TLS downgrade, or XMESH1 retry cannot replace that authority after an operation enters the migrated XSP-v2 path.
 
-The production-capable `agent/xspv2` module must reuse the verified Go 1.27 security package boundaries:
+The wrapper reuses the existing strict `cutover` transport and never recreates it with a generic `http.Client` or secondary TLS configuration.
 
-- `envelope` for the XSP-v2 message/envelope primitives;
-- `keyring` for verified key material handling;
-- `tlsprobe` for the strict transport authority/negotiation behavior;
-- `cutover` for permit, ACK, receipt, journal, replay/epoch and recovery behavior.
+## Mixed-version and rollback rules
 
-Current Node source proves this relationship directly: `agent/xspv2/go.mod` requires `security/xspv2/poc-go`, and `agent/xspv2/runtime/transport_linux.go` delegates exchange/recovery to `cutover`. New integration work may adapt those packages to the real filesystem/service layout, but must not duplicate their security state machine in shell, the router, or a second Go module.
+- Legacy unbound `update_agent` remains compatible and distinct.
+- Manifest-bound staged migration without the required Go 1.27 runtime/state fails closed.
+- Missing/invalid permit, ACK, receipt, durable key state, minimum epoch, strict transport, or authenticated authority fails closed.
+- No automatic fallback to XMESH1, Ed25519-only, X25519-only, TLS 1.2, insecure certificate validation, proxy-selected authority, or redirect-selected authority.
+- Package rollback may restore a previously verified executable/service tuple but may not lower the security floor, delete cutover evidence, retire old keys, or regenerate enrollment identities.
 
-## Runtime authority and rollback
+## Machine-checked acceptance for this boundary
 
-The existing updater already has a fixed systemd entrypoint and preserves/rolls back managed router source on failed router upgrade. The Go 1.27 Agent package requires its own exact last-known-good package slot before apply is implemented.
+Nexus CI fetches exact XMesh-Node `5e8ee562915a570eb49ed46d59d723f233f3cc68` and proves:
 
-Rollback must restore an exact previously verified package identity, not a moving branch/tag. It must not roll security epochs/replay floors backwards, delete durable ACK/receipt evidence, regenerate enrollment identities automatically, or lower the security mode of an operation that has already entered the migrated strict-XSP-v2 lifecycle.
+- root router remains Go 1.23;
+- `agent/xspv2` remains Go 1.27.3 and depends on `security/xspv2/poc-go`;
+- real-Agent state has separate `cutover/` and `keys/` boundaries;
+- applied-state attestation reuses `keyring.AttestAppliedRotation` and requires floor + active candidate + retained old/new snapshots;
+- restart/corruption/rollback negative tests exist at the real-Agent boundary;
+- `Exchange` and `Recover` attest durable state before strict transport;
+- HTTP authority remains bound to `ServerName`, with proxy and redirect disabled;
+- fixed `update_agent` authority and immutable release identity remain unchanged;
+- staged package lifecycle is complete while production activation remains false.
 
-## Acceptance boundary for this gate
-
-This integration-design gate is complete only when CI proves against the pinned XMesh-Node checkpoint that:
-
-- root production router module remains Go 1.23 and its Dockerfile remains Go 1.23 based;
-- the production-capable `agent/xspv2` integration module exists and remains Go 1.27.3;
-- `agent/xspv2` requires the exact `security/xspv2/poc-go` module and its runtime delegates to `cutover`;
-- the reused security module remains Go 1.27.3 and retains `envelope`, `keyring`, `tlsprobe` and `cutover` package boundaries;
-- managed bootstrap keeps signed control reporting separate from the router;
-- Nexus still uses the fixed `update_agent` action and fixed updater service;
-- the machine-readable contract forbids production activation, parallel command queues and downgrade fallback.
-
-After that, the CURRENT P0-D work moves to **staged download / verify / apply / rollback**.
-
-`strict-pq` remains **OFF**. Production rollout remains **NOT AUTHORIZED**.
+`strict-pq` remains **OFF**. Production rollout remains **NOT AUTHORIZED**. P0-D overall is evaluated only after this Nexus contract PR itself passes exact-head CI, fixed-head merge, and exact post-merge CI.
