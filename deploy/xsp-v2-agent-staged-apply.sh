@@ -26,7 +26,7 @@ source "$ENV_FILE"
 [[ "$XMESH_NODE_ID" =~ ^[1-9][0-9]*$ ]] || { echo 'invalid node id' >&2; exit 2; }
 KEY="${XMESH_METRICS_PRIVATE_KEY:-/etc/xmesh-node-metrics/node.key}"
 [[ -f "$KEY" && ! -L "$KEY" && -r "$KEY" ]] || { echo 'node signing key unavailable' >&2; exit 1; }
-for command_name in curl openssl python3 sha256sum install mv ln readlink; do
+for command_name in curl openssl python3 sha256sum install mv ln readlink timeout awk chmod; do
   command -v "$command_name" >/dev/null 2>&1 || { echo "$command_name is required" >&2; exit 1; }
 done
 
@@ -96,11 +96,11 @@ identity_matches(){
   local binary="$1" output
   [[ -f "$binary" && ! -L "$binary" && -x "$binary" ]] || return 1
   output="$(timeout 10 "$binary" --identity 2>/dev/null)" || return 1
-  printf '%s' "$output" | python3 - "$VERSION" "$SOURCE_REVISION" <<'PY'
+  python3 - "$output" "$VERSION" "$SOURCE_REVISION" <<'PY'
 import json,sys
-expected={'version':sys.argv[1],'sourceRevision':sys.argv[2]}
+expected={'version':sys.argv[2],'sourceRevision':sys.argv[3]}
 try:
-    value=json.load(sys.stdin)
+    value=json.loads(sys.argv[1])
 except (json.JSONDecodeError,UnicodeDecodeError):
     raise SystemExit(1)
 if value != expected:
@@ -144,14 +144,56 @@ finally:
 PY
 }
 
-write_pointer_metadata(){
-  local destination="$1" kind="$2" target="$3"
-  python3 - "$destination" "$kind" "$target" <<'PY'
+write_last_good_shell(){
+  local shell_version='unknown'
+  if [[ -x /usr/local/sbin/xmesh-node-control ]]; then
+    shell_version="$(/usr/local/sbin/xmesh-node-control --version 2>/dev/null || printf 'unknown')"
+  fi
+  python3 - "$LAST_GOOD" "$shell_version" "$STATE_ROOT" <<'PY'
 import json,os,sys,tempfile,time
-path,kind,target=sys.argv[1:]
-value={'kind':kind,'target':target or None,'recordedAt':int(time.time())}
-dirname=os.path.dirname(path)
-fd,tmp=tempfile.mkstemp(prefix='.pointer.',dir=dirname,text=True)
+path,version,state_root=sys.argv[1:]
+value={
+  'kind':'deployed-shell-control-agent',
+  'controlAuthority':'xmesh-node-control.service',
+  'executable':'/usr/local/sbin/xmesh-node-control',
+  'version':version,
+  'stateRoot':state_root,
+  'recordedAt':int(time.time())
+}
+fd,tmp=tempfile.mkstemp(prefix='.last-good.',dir=os.path.dirname(path),text=True)
+try:
+    with os.fdopen(fd,'w',encoding='utf-8') as stream:
+        json.dump(value,stream,separators=(',',':'));stream.write('\n');stream.flush();os.fsync(stream.fileno())
+    os.chmod(tmp,0o600);os.replace(tmp,path)
+finally:
+    try: os.unlink(tmp)
+    except FileNotFoundError: pass
+PY
+}
+
+write_last_good_package(){
+  local target="$1" package_dir="$BASE/$target"
+  python3 - "$LAST_GOOD" "$target" "$package_dir/identity.json" "$STATE_ROOT" <<'PY'
+import json,os,re,sys,tempfile,time
+path,target,identity_path,state_root=sys.argv[1:]
+if not re.fullmatch(r'releases/[0-9a-f]{64}',target):
+    raise SystemExit('invalid last-known-good target')
+with open(identity_path,encoding='utf-8') as stream:
+    identity=json.load(stream)
+if set(identity) != {'version','sourceRevision','artifactSha256'}:
+    raise SystemExit('invalid last-known-good identity')
+if identity['artifactSha256'] != target.split('/',1)[1]:
+    raise SystemExit('last-known-good digest/target mismatch')
+value={
+  'kind':'go-agent-package',
+  'target':target,
+  'identity':identity,
+  'controlAuthority':'xmesh-node-control.service',
+  'activationMode':'side-by-side-package-pointer',
+  'stateRoot':state_root,
+  'recordedAt':int(time.time())
+}
+fd,tmp=tempfile.mkstemp(prefix='.last-good.',dir=os.path.dirname(path),text=True)
 try:
     with os.fdopen(fd,'w',encoding='utf-8') as stream:
         json.dump(value,stream,separators=(',',':'));stream.write('\n');stream.flush();os.fsync(stream.fileno())
@@ -169,11 +211,11 @@ if [[ -e "$CURRENT" || -L "$CURRENT" ]]; then
   [[ "$old_target" =~ ^releases/[0-9a-f]{64}$ ]] || { echo 'active Agent package pointer escaped releases' >&2; exit 1; }
   old_dir="$BASE/$old_target"
   [[ -d "$old_dir" && ! -L "$old_dir" ]] || { echo 'last-known-good package is unavailable' >&2; exit 1; }
-  write_pointer_metadata "$LAST_GOOD" 'go-agent-package' "$old_target"
+  write_last_good_package "$old_target"
 else
   # First side-by-side Go package still has the deployed shell Agent as the
   # authoritative last-known-good control implementation.
-  write_pointer_metadata "$LAST_GOOD" 'deployed-shell-control-agent' ''
+  write_last_good_shell
 fi
 
 package_rel="releases/$ARTIFACT_SHA256"
