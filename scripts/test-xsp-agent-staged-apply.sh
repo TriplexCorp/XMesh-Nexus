@@ -87,10 +87,10 @@ run_apply(){
 
 assert_active(){
   local version="$1" revision="$2" digest="$3"
-  [[ -L "$BASE/current" ]]
-  [[ "$(readlink "$BASE/current")" == "releases/$digest" ]]
-  [[ "$(sha256sum "$BASE/releases/$digest/xmesh-agent-xspv2" | awk '{print $1}')" == "$digest" ]]
-  python3 - "$BASE/active.json" "$version" "$revision" "$digest" <<'PY'
+  sudo test -L "$BASE/current"
+  [[ "$(sudo readlink "$BASE/current")" == "releases/$digest" ]]
+  [[ "$(sudo sha256sum "$BASE/releases/$digest/xmesh-agent-xspv2" | awk '{print $1}')" == "$digest" ]]
+  sudo python3 - "$BASE/active.json" "$version" "$revision" "$digest" <<'PY'
 import json,sys
 with open(sys.argv[1],encoding='utf-8') as f: value=json.load(f)
 assert value == {'version':sys.argv[2],'sourceRevision':sys.argv[3],'artifactSha256':sys.argv[4]}, value
@@ -105,7 +105,7 @@ D1="$(sha256sum "$F1" | awk '{print $1}')"
 write_identity "$V1" "$R1" "$D1"
 run_apply "$F1"
 assert_active "$V1" "$R1" "$D1"
-python3 - "$BASE/last-known-good.json" <<'PY'
+sudo python3 - "$BASE/last-known-good.json" <<'PY'
 import json,sys
 with open(sys.argv[1],encoding='utf-8') as f: value=json.load(f)
 assert value['kind']=='deployed-shell-control-agent', value
@@ -120,7 +120,7 @@ D2="$(sha256sum "$F2" | awk '{print $1}')"
 write_identity "$V2" "$R2" "$D2"
 run_apply "$F2"
 assert_active "$V2" "$R2" "$D2"
-python3 - "$BASE/last-known-good.json" "$D1" "$V1" "$R1" <<'PY'
+sudo python3 - "$BASE/last-known-good.json" "$D1" "$V1" "$R1" <<'PY'
 import json,sys
 with open(sys.argv[1],encoding='utf-8') as f: value=json.load(f)
 assert value['kind']=='go-agent-package', value
@@ -165,11 +165,12 @@ if run_apply "$F3"; then
   exit 1
 fi
 assert_active "$V2" "$R2" "$D2"
-[[ "$(readlink "$BASE/current")" == "releases/$D2" ]]
+[[ "$(sudo readlink "$BASE/current")" == "releases/$D2" ]]
 
 # The durable security-state root is shared across package slots and must never
 # be replaced by rollback.
-[[ -d "$BASE/xsp-v2" && ! -L "$BASE/xsp-v2" ]]
-[[ "$(stat -c '%a' "$BASE/xsp-v2")" == 700 ]]
+sudo test -d "$BASE/xsp-v2"
+sudo test ! -L "$BASE/xsp-v2"
+[[ "$(sudo stat -c '%a' "$BASE/xsp-v2")" == 700 ]]
 
 echo 'staged Agent package apply/rollback lifecycle: OK'
