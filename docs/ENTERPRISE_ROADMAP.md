@@ -8,7 +8,9 @@ A green test proves only its stated boundary. Code existence ≠ E2E ≠ securit
 
 ## Verified source checkpoints
 
-- **Latest completed Nexus P0-E recovery/security checkpoint:** [`f9a9c636f83a3a2ef7122fef7c3f3bc2bc76b7d4`](https://github.com/TriplexCorp/XMesh-Nexus/commit/f9a9c636f83a3a2ef7122fef7c3f3bc2bc76b7d4), merge of [PR #109](https://github.com/TriplexCorp/XMesh-Nexus/pull/109). P0-E2b proves one-sided PostgreSQL snapshot rollback against a current Agent receipt witness with restore-time database privilege re-hardening. Coordinated Agent + Nexus/PostgreSQL rollback remains outside this gate.
+- **Latest completed Nexus P0-E recovery/security checkpoint:** [`f19d01e021efaa727bbba82672143005a96338b7`](https://github.com/TriplexCorp/XMesh-Nexus/commit/f19d01e021efaa727bbba82672143005a96338b7), merge of [PR #112](https://github.com/TriplexCorp/XMesh-Nexus/pull/112). P0-E3a proves a bounded independent owner/off-host monotonic rollback witness derived from the existing authoritative dual-signed commit receipt; P0-E3b coordinated backup/restore recovery is the current sub-gate.
+- **P0-E3a / PR #112:** the experimental-only offline checkpoint binds Node identity, the dual-signed receipt `toEpoch` recovery floor, exact receipt digest/bytes and independently provisioned `panel_response` Ed25519 + ML-DSA-65 pins. A coordinated old local restore below that floor, same-epoch receipt divergence, wrong identity/pins or either invalid signature fail closed. No second recovery counter, automatic state reset/rekey, network route, DB mutation or production activation was introduced.
+- On exact Nexus merge SHA `f19d01e021efaa727bbba82672143005a96338b7`, [P0-E3a Off-host Recovery Checkpoint #9](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40862058873), [Crypto #213](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40862058598), [C2-C #61](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40862058488) and [Backend CI #3632](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40862058513) all completed **success**. The witness/pins must remain outside both local rollback domains; rollback of the off-host trust domain itself remains outside this proof.
 - **P0-E2b / PR #109:** a disposable real `pg_dump` / drop+create / `pg_restore` boundary restores PostgreSQL to the exact pre-ACK tuple while the Agent journal remains current. The first restore exposed default database-level privilege drift; the recovery contract now re-applies the reviewed idempotent signer/C2-C least-privilege provisioning, requires CREATE/TEMP/public-schema CREATE removal and proves re-hardening does not mutate XSP-v2 security state. The current Agent keeps its first authoritative dual-signed receipt immutable and rejects silent replacement after server rollback.
 - On exact Nexus merge SHA `f9a9c636f83a3a2ef7122fef7c3f3bc2bc76b7d4`, [XSP-v2 P0-E2b PostgreSQL Snapshot Rollback #6](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40846810762) completed **success**, including the real PostgreSQL restore boundary, restore-time ACL re-hardening and current-Agent receipt witness.
 - **P0-E2a / Node PR #39 + Nexus PR #108:** current XMesh-Node checkpoint [`3fffa9fd74195114a7c4e573a8a11e075c84f403`](https://github.com/TriplexCorp/XMesh-Node/commit/3fffa9fd74195114a7c4e573a8a11e075c84f403), merge of Node PR #39, proves a complete locally self-consistent old Agent state-root snapshot fails closed before real network I/O when the unchanged current dual-signed Nexus permit is re-delivered. Nexus PR #108 pins that exact Node proof. Coordinated Node + Nexus/PostgreSQL rollback is explicitly unproven by this gate.
@@ -74,8 +76,9 @@ All are mandatory:
 | P0-E1a process-crash / fsync-order durability | **COMPLETE — bounded process/filesystem proof** | Node PR #38 + Nexus PR #107; hard process-crash checkpoints and restart/recovery. Physical power-loss/controller-cache behavior remains unproven |
 | P0-E2a one-sided Agent snapshot anti-rollback | **COMPLETE — bounded one-sided rollback proof** | Node PR #39 + Nexus PR #108; restored old Agent state rejected against current unchanged Nexus permit before network I/O |
 | P0-E2b one-sided PostgreSQL snapshot rollback | **COMPLETE — disposable real DB restore proof** | PR #109; real `pg_dump`/`pg_restore`, restore ACL re-hardening, current-Agent immutable receipt witness |
-| **P0-E3a owner/off-host monotonic recovery checkpoint** | **CURRENT sub-gate** | Introduce an independent non-rolled-back owner/off-host trust domain that binds Agent identity and Nexus/PostgreSQL security state; prove coordinated rollback detection without automatic reset/bypass |
-| **P0-E recovery/security release gates** | **CURRENT P0** | E1a/E2a/E2b complete within bounded scopes; still requires P0-E3a, physical power-loss proof, complete backup/restore, owner-authorized recovery + old-key retirement, fuzz/KAT, independent review and observability |
+| **P0-E3a owner/off-host monotonic recovery checkpoint** | **COMPLETE — bounded independent witness proof** | PR #112; existing dual-signed commit receipt becomes the owner-held off-host floor; coordinated old local restore and same-epoch receipt divergence fail closed |
+| **P0-E3b coordinated backup/restore recovery procedure** | **CURRENT sub-gate** | Bind real PostgreSQL + persistent Agent/signing/encryption identity backups to the independent E3a witness and prove old coordinated restore rejects before mutation |
+| **P0-E recovery/security release gates** | **CURRENT P0** | E1a/E2a/E2b/E3a complete within bounded scopes; still requires E3b coordinated backup/restore, physical power-loss proof, owner-authorized recovery + old-key retirement, fuzz/KAT, independent review and observability |
 | Production XSP-v2 rollout | **NOT AUTHORIZED** | P0-E + disposable canary + explicit production approval required |
 
 ## Completed P0-C2-D — integrated real-Node proof
@@ -234,33 +237,40 @@ The restore must re-establish the reviewed least-privilege signer/C2-C database 
 
 This proves one-sided PostgreSQL rollback with an independent current-Agent witness. It does **not** prove coordinated rollback detection, complete backup-set correctness or owner-authorized disaster recovery.
 
-### CURRENT sub-gate — P0-E3a owner/off-host monotonic recovery checkpoint
+#### P0-E3a — owner/off-host monotonic recovery checkpoint — COMPLETE
 
-P0-E3a must add an **independent, non-rolled-back owner/off-host trust domain**. That domain must bind a monotonic recovery checkpoint to the Agent security identity and the Nexus/PostgreSQL security state closely enough to detect a coordinated rollback where both sides are restored to mutually consistent old snapshots.
+PR #112 adds the first independent recovery witness outside the Agent and Nexus/PostgreSQL rollback domains without creating a second security state machine. The experimental-only offline `xsp-v2-recovery-checkpoint` tool accepts an independently provisioned `panel_response` public pin plus the existing authoritative dual-signed commit receipt. It verifies Ed25519 **AND** ML-DSA-65, derives the recovery floor directly from the receipt's committed `toEpoch`, stores the exact signed receipt bytes and SHA-256 digest, and binds the checkpoint to the exact Node and signer identity.
 
-P0-E3a must preserve all existing fail-closed rules:
+Recovery verification rejects a local epoch below the off-host floor as coordinated rollback. At the same epoch it additionally requires the exact authoritative receipt digest, so a mutually consistent but different re-signed history cannot replace the witnessed commit. Wrong Node identity, altered checkpoint metadata, noncanonical receipt encoding, mismatched pins, or either invalid signature also fail closed. The tool has no HTTP route, DB mutation, remote action or automatic reset/rekey path; `strict-pq` remains OFF.
 
-- no automatic epoch/replay reset;
-- no automatic key regeneration or enrollment replacement;
-- no caller-selected weaker transport or legacy fallback;
-- no second hidden security state machine that can disagree with the existing Agent/Nexus journals;
-- recovery authorization must be explicit, auditable and cryptographically bound to the exact security identity/state being recovered;
-- `strict-pq` stays OFF and no production topology is activated by this gate.
+This is a bounded third-trust-domain proof. It assumes the newest owner-held checkpoint and public pins themselves remain outside the rollback event. It does **not** yet prove that a complete operational backup set contains every PostgreSQL/Agent/signing/encryption identity required for deterministic disaster recovery.
 
-After P0-E3a, P0-E still must close:
+### CURRENT sub-gate — P0-E3b coordinated backup/restore recovery procedure
+
+P0-E3b must turn the E3a witness into a complete disposable disaster-recovery proof. A backup set must capture PostgreSQL together with the persistent Agent and cryptographic identity material needed to interpret that security state, while the newest E3a checkpoint remains independently owner-held/off-host.
+
+Acceptance requires:
+
+- restore a mutually consistent **old** Agent + Nexus/PostgreSQL + identity backup and reject it against the newer E3a witness before any security-state mutation or network action;
+- restore an exact **current** backup set and prove it validates against the witness without epoch/replay reset, key regeneration, enrollment replacement or receipt rewriting;
+- prove missing, mismatched or mixed-generation backup components fail closed rather than being silently reconstructed;
+- restore reviewed signer/C2-C least-privilege database ACLs without changing the XSP-v2 security tuple;
+- keep caller-controlled URLs/scripts/commands and weaker transport/legacy fallback out of the recovery path;
+- keep `strict-pq` OFF and production topology unchanged.
+
+After P0-E3b, P0-E still must close:
 
 1. physical power-loss / storage-controller-cache behavior beyond P0-E1a's bounded process-crash/fsync proof;
-2. complete backup/restore of PostgreSQL together with persistent signing/encryption/Agent identities and coordinated restore/recovery procedures;
-3. owner-authorized key rotation/recovery and explicit old-key retirement policy;
-4. parser/protocol fuzzing plus FIPS 204 / algorithm known-answer validation where applicable;
-5. independent security review of the final migration/production architecture;
-6. operational observability without secret/key leakage.
+2. owner-authorized key rotation/recovery and explicit old-key retirement policy;
+3. parser/protocol fuzzing plus FIPS 204 / algorithm known-answer validation where applicable;
+4. independent security review of the final migration/production architecture;
+5. operational observability without secret/key leakage.
 
 Completion of individual P0-E items does not authorize production rollout. `strict-pq` remains OFF unless a later explicit release/production gate separately authorizes activation.
 
 ## Production rollout — NOT AUTHORIZED
 
-No production activation is authorized by C2-D, P0-D or the completed bounded P0-E1a/P0-E2a/P0-E2b proofs.
+No production activation is authorized by C2-D, P0-D or the completed bounded P0-E1a/P0-E2a/P0-E2b/P0-E3a proofs.
 
 Before production rollout:
 
@@ -274,9 +284,9 @@ Before production rollout:
 
 - `strict-pq` remains **OFF**.
 - Production Agent remains on the deployed legacy control path until P0-E and later rollout gates explicitly authorize replacement.
-- Completed P0-D gates through Node PR #37 and Nexus PR #105, plus bounded P0-E1a/P0-E2a/P0-E2b evidence, remain default-disabled foundations/proofs; none authorize production migration.
+- Completed P0-D gates through Node PR #37 and Nexus PR #105, plus bounded P0-E1a/P0-E2a/P0-E2b/P0-E3a evidence, remain default-disabled foundations/proofs; none authorize production migration.
 - No target-product fallback to XMESH1, Ed25519-only, X25519-only, TLS 1.2 or insecure certificate validation.
-- P0-E2a and P0-E2b do not detect coordinated rollback when all local witnesses are rolled back together; P0-E3a exists specifically to add an independent non-rolled-back recovery authority.
+- P0-E3a detects coordinated local rollback only while the independent owner/off-host witness remains current; P0-E3b must now bind complete backup/restore procedures and persistent identities to that witness.
 - A GitHub merge is not a production deployment.
 - Xray remains the user VPN data-plane.
 - Historical/archive documents do not override this roadmap.

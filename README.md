@@ -8,9 +8,9 @@ XMesh Nexus manages nodes, users, subscriptions, Xray configuration, telemetry a
 
 ## Current XSP-v2 engineering checkpoint — 29 October 2026
 
-**Latest verified Nexus recovery/security checkpoint:** [`f9a9c636f83a3a2ef7122fef7c3f3bc2bc76b7d4`](https://github.com/TriplexCorp/XMesh-Nexus/commit/f9a9c636f83a3a2ef7122fef7c3f3bc2bc76b7d4), merge of [PR #109](https://github.com/TriplexCorp/XMesh-Nexus/pull/109).
+**Latest verified Nexus recovery/security checkpoint:** [`f19d01e021efaa727bbba82672143005a96338b7`](https://github.com/TriplexCorp/XMesh-Nexus/commit/f19d01e021efaa727bbba82672143005a96338b7), merge of [PR #112](https://github.com/TriplexCorp/XMesh-Nexus/pull/112).
 
-**P0-C2-D and P0-D are COMPLETE. P0-E remains the CURRENT P0. P0-E1a, P0-E2a and P0-E2b are COMPLETE within their explicitly bounded scopes; P0-E3a is the CURRENT sub-gate.** The production-capable Agent path remains default-disabled and production rollout remains unauthorized.
+**P0-C2-D and P0-D are COMPLETE. P0-E remains the CURRENT P0. P0-E1a, P0-E2a, P0-E2b and P0-E3a are COMPLETE within their explicitly bounded scopes; P0-E3b is the CURRENT sub-gate.** The production-capable Agent path remains default-disabled and production rollout remains unauthorized.
 
 Completed foundations and recovery/security checkpoints now include:
 
@@ -25,10 +25,14 @@ Completed foundations and recovery/security checkpoints now include:
 - **Node PR #38 + Nexus PR #107 / P0-E1a process-crash durability:** the keyring transition is exercised with hard process termination after each durability checkpoint around retained previous identity, monotonic epoch floor and active-vault replacement. The proof requires temp-file fsync, atomic rename and parent-directory fsync ordering and demonstrates deterministic restart/recovery. This is bounded process/filesystem evidence; it does **not** claim physical power removal, controller-cache or storage-firmware behavior.
 - **Node PR #39 + Nexus PR #108 / P0-E2a one-sided Agent snapshot anti-rollback:** a complete locally self-consistent old Agent security-state snapshot is restored while Nexus remains current. Re-delivery of the unchanged current dual-signed permit fails closed before real `Exchange` or `Recover` performs network I/O. Coordinated rollback of both Agent and Nexus/PostgreSQL is deliberately outside this gate.
 - **PR #109 / P0-E2b one-sided PostgreSQL snapshot rollback:** a disposable real `pg_dump` → drop/recreate database → `pg_restore` rollback restores PostgreSQL to the exact pre-ACK tuple while the Agent journal remains current. Restore-time database ACL drift is detected and the reviewed signer/C2-C least-privilege provisioning is re-applied without mutating XSP-v2 security state. The current Agent accepts only the same authoritative dual-signed receipt bytes and rejects silent receipt replacement. Coordinated rollback remains outside this gate.
+- **PR #112 / P0-E3a owner/off-host monotonic recovery checkpoint:** an experimental-only offline verifier introduces the independent third trust domain needed for coordinated-rollback detection without adding a second mutable security state machine. The monotonic recovery floor is derived from the existing immutable dual-signed commit receipt `toEpoch`; the exact receipt bytes are verified against independently provisioned `panel_response` Ed25519 and ML-DSA-65 public pins. Local state below the off-host floor and same-epoch receipt divergence fail closed. There is no HTTP route, database mutation, automatic reset/rekey, weaker fallback or production activation. The bounded proof assumes the owner presents the newest trusted checkpoint and that the off-host checkpoint/pins are outside the Agent and Nexus/PostgreSQL rollback domains.
 
-Exact post-merge P0-E2b evidence on `f9a9c636f83a3a2ef7122fef7c3f3bc2bc76b7d4`:
+Exact post-merge P0-E3a evidence on `f19d01e021efaa727bbba82672143005a96338b7`:
 
-- [XSP-v2 P0-E2b PostgreSQL Snapshot Rollback #6](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40846810762) — **success** on the exact merge SHA, including the real PostgreSQL restore boundary, restore-time ACL re-hardening and current-Agent receipt witness.
+- [XSP-v2 P0-E3a Off-host Recovery Checkpoint #9](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40862058873) — **success** on the exact merge SHA, including real Ed25519 + ML-DSA-65 receipt verification, coordinated-old-state rejection, tamper/wrong-node negatives, formatting and strict test-target Clippy.
+- [XSP-v2 Crypto PoC #213](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40862058598), [C2-C #61](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40862058488) and [Backend CI #3632](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40862058513) — **success** on the exact merge SHA, preserving the existing crypto/signer/DB boundary and full backend/disposable API regression matrix.
+
+Previous P0-E2b evidence remains [XSP-v2 P0-E2b PostgreSQL Snapshot Rollback #6](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40846810762) — **success** on `f9a9c636f83a3a2ef7122fef7c3f3bc2bc76b7d4`, including the real PostgreSQL restore boundary, restore-time ACL re-hardening and current-Agent receipt witness.
 
 The previous P0-D implementation checkpoint remains [`698d5e43d59c0c95532d513b39d95e42a2af4f20`](https://github.com/TriplexCorp/XMesh-Nexus/commit/698d5e43d59c0c95532d513b39d95e42a2af4f20), merge of [PR #105](https://github.com/TriplexCorp/XMesh-Nexus/pull/105). Its [Backend CI #3605](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40835127285) completed **success**. The disposable real-Agent migration/update proof remains [XSP-v2 P0-D real Agent E2E #10](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40827536439) on PR #103 merge SHA `7df13962aae871f04677b47e0f05a7f6ab906e72` — **success**.
 
@@ -36,7 +40,7 @@ The current verified XMesh-Node P0-E2a checkpoint is [`3fffa9fd74195114a7c4e573a
 
 The previous complete C2-D implementation checkpoint remains [`7e0b42ea4847b273ba8cd55a0ff3e043a420c377`](https://github.com/TriplexCorp/XMesh-Nexus/commit/7e0b42ea4847b273ba8cd55a0ff3e043a420c377), merge of [PR #88](https://github.com/TriplexCorp/XMesh-Nexus/pull/88). Its exact post-merge C2-D transport-negative, lost-response/race, expired-recovery, Hybrid TLS and Backend CI matrix remains valid within that stated isolated staging/process boundary.
 
-Production behavior remains unchanged. The root XMesh-Node edge router remains on its Go 1.23 production path; the signed shell/systemd control Agent remains the deployed command authority; the Go 1.27 migration/package path remains behind explicit non-default staging gates. `strict-pq` remains **OFF**. P0-D completion and P0-E1a/P0-E2a/P0-E2b evidence do **not** authorize production VPS/DNS/firewall/public-Nginx/key-material changes, Agent cutover or rollout.
+Production behavior remains unchanged. The root XMesh-Node edge router remains on its Go 1.23 production path; the signed shell/systemd control Agent remains the deployed command authority; the Go 1.27 migration/package path remains behind explicit non-default staging gates. `strict-pq` remains **OFF**. P0-D completion and P0-E1a/P0-E2a/P0-E2b/P0-E3a evidence do **not** authorize production VPS/DNS/firewall/public-Nginx/key-material changes, Agent cutover or rollout.
 
 ## Completed XSP-v2 gates
 
@@ -125,15 +129,16 @@ P0-D acceptance is satisfied by the default-disabled production-capable Agent wo
 - **P0-E1a COMPLETE — process-crash/fsync-order durability:** Node PR #38 + Nexus PR #107 prove deterministic fail-closed restart/recovery across hard process termination at the critical local keyring durability boundaries. This does not prove physical power-loss/controller-cache behavior.
 - **P0-E2a COMPLETE — one-sided Agent snapshot anti-rollback:** Node PR #39 + Nexus PR #108 prove a fully self-consistent old Agent snapshot cannot use a current unchanged Nexus permit; applied-state attestation rejects it before network I/O.
 - **P0-E2b COMPLETE — one-sided PostgreSQL snapshot rollback:** PR #109 proves a real database dump/restore rollback cannot silently rewrite state already witnessed by a current Agent, and that restore-time least-privilege database ACL re-hardening is part of the recovery contract.
+- **P0-E3a COMPLETE — owner/off-host monotonic recovery checkpoint:** PR #112 proves an offline third-domain checkpoint can derive its floor from the existing dual-signed commit receipt, independently verify both signer keys/signatures, reject coordinated old local state and same-epoch receipt divergence, and do so without a new mutable counter, remote API, DB mutation or recovery bypass. The bounded trust assumption is that the newest checkpoint and its independently provisioned pins do not roll back with Agent/Nexus state.
 
-### CURRENT sub-gate — P0-E3a owner/off-host monotonic recovery checkpoint
+### CURRENT sub-gate — P0-E3b coordinated backup/restore proof
 
-P0-E3a must introduce an **independent, non-rolled-back owner/off-host trust domain** that can bind a monotonic recovery checkpoint to the Agent security identity and the Nexus/PostgreSQL security state. This is required to detect a coordinated rollback in which both the Agent state root and Nexus/PostgreSQL are restored to mutually consistent old snapshots. P0-E3a must not create an automatic recovery bypass, silently reset epochs/replay state, or weaken the existing dual-signature/strict-transport invariants.
+P0-E3b must bind the completed E3a off-host witness to a **real disposable coordinated Agent + Nexus/PostgreSQL backup/restore procedure**. The proof must snapshot an older mutually consistent Agent/DB state, advance normally to a newer committed epoch/receipt, preserve the newest off-host checkpoint outside both rollback domains, restore both local sides to the old snapshots, and reject that coordinated restore before any security operation or network mutation. An exact current/new restore must validate; wrong-node, tampered, mismatched or stale checkpoint inputs must fail closed. The restore procedure must reuse the existing Agent/Nexus journals and E3a witness rather than create another security state machine, automatic epoch/replay reset, key regeneration, enrollment replacement or weaker fallback.
 
-After P0-E3a, P0-E still must close:
+After P0-E3b, P0-E still must close:
 
 1. physical power-loss / storage-controller-cache behavior beyond the bounded process-crash proof;
-2. complete backup/restore of PostgreSQL plus persistent security identities, including coordinated restore/recovery procedures;
+2. production-grade backup/restore handling for persistent signing/encryption/Agent identities and operational recovery procedures beyond the disposable coordinated proof;
 3. owner-authorized key rotation/recovery and explicit old-key retirement policy;
 4. parser/protocol fuzzing plus FIPS 204 / algorithm known-answer validation where applicable;
 5. independent security review of the final migration/production architecture and operational observability without secret/key leakage.
@@ -146,7 +151,8 @@ After P0-E3a, P0-E still must close:
 - Production control-plane behavior remains legacy `XMESH1` / Ed25519 until separately approved P0-E and rollout gates authorize migration.
 - No target-product fallback to XMESH1, Ed25519-only, X25519-only, TLS 1.2 or insecure certificate validation.
 - Completed C2-D evidence is isolated staging/process evidence, not production activation.
-- Completed P0-D capabilities/evidence and bounded P0-E1a/P0-E2a/P0-E2b proofs remain default-disabled staging/production-capable foundations; none authorize production rollout.
+- Completed P0-D capabilities/evidence and bounded P0-E1a/P0-E2a/P0-E2b/P0-E3a proofs remain default-disabled staging/production-capable foundations; none authorize production rollout.
+- P0-E3a adds an independent coordinated-rollback witness only when the newest trusted checkpoint/pins remain outside the rolled-back local domains; P0-E3b must prove the real coordinated restore procedure consumes that witness correctly.
 - A GitHub merge is not a production deployment.
 - Xray continues to carry user VPN traffic.
 
@@ -210,6 +216,7 @@ The default Nexus backend does not compile `xsp-v2-experimental`. Do not weaken 
 - [XSP-v2 P0-E crash durability](docs/XSP_V2_P0E_CRASH_DURABILITY.md)
 - [XSP-v2 P0-E snapshot anti-rollback](docs/XSP_V2_P0E_SNAPSHOT_ANTIROLLBACK.md)
 - [XSP-v2 P0-E PostgreSQL snapshot rollback](docs/XSP_V2_P0E_POSTGRES_SNAPSHOT_ROLLBACK.md)
+- [XSP-v2 P0-E owner/off-host recovery checkpoint](docs/XSP_V2_P0E_OFFHOST_RECOVERY_CHECKPOINT.md)
 - [XSP-v2 signer E2E](docs/XSP_V2_SIGNER_E2E.md)
 - [XSP-v2 TLS / ingress-origin proof](docs/XSP_V2_TLS_PROBE.md)
 - [Subscription security](docs/SUBSCRIPTION_SECURITY.md)
