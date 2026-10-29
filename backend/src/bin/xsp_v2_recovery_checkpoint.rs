@@ -533,7 +533,7 @@ mod tests {
         let exact = LocalRecoveryState {
             node_id: 13,
             key_epoch: 5,
-            current_receipt_sha256_hex: Some(checkpoint.receipt_sha256_hex.clone()),
+            current_receipt_sha256_hex: Some(checkpoint.receipt_sha256_hex),
         };
         assert!(verify_checkpoint(&checkpoint_bytes, &pin, &exact).is_ok());
 
