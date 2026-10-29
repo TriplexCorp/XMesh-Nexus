@@ -53,10 +53,19 @@ def read_regular(path: Path, limit: int = MAX_JSON) -> bytes:
     return raw
 
 
+def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            fail(f"duplicate JSON field: {key}")
+        result[key] = value
+    return result
+
+
 def load_json(path: Path) -> tuple[dict[str, Any], bytes]:
     raw = read_regular(path)
     try:
-        value = json.loads(raw)
+        value = json.loads(raw, object_pairs_hook=unique_object)
     except json.JSONDecodeError as exc:
         raise EvidenceError(f"invalid JSON in {path}") from exc
     if not isinstance(value, dict):
