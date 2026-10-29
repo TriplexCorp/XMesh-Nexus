@@ -28,6 +28,7 @@ jobs:
         run: |
           set -euo pipefail
           src=scripts/xsp-v2-p0e4a-storage-preflight.py
+          doc=docs/XSP_V2_P0E4A_STORAGE_QUALIFICATION.md
           python3 -m py_compile "$src" scripts/test-xsp-v2-p0e4a-storage-preflight.py
           ! grep -E 'mount\(|umount|blockdev|hdparm|nvme .*set-feature|docker .* stop|docker .* restart|ALTER SYSTEM|UPDATE |INSERT |DELETE |TRUNCATE |strict-pq=on' "$src"
           grep -Fq '"physicalPowerLossQualified": False' "$src"
@@ -37,7 +38,9 @@ jobs:
           grep -Fq 'target path must not traverse symlinks' "$src"
           grep -Fq 'os.O_EXCL' "$src"
           grep -Fq 'os.fsync(handle.fileno())' "$src"
-          grep -Fq 'not physical power-loss qualification' docs/XSP_V2_P0E4A_STORAGE_QUALIFICATION.md
+          grep -Fq 'A successful P0-E4a preflight is **not** a physical power-loss qualification' "$doc"
+          grep -Fq '"physicalPowerLossQualified": false' "$doc"
+          grep -Fq 'GitHub-hosted CI is **not** recorded as physical power-loss evidence' "$doc"
       - name: Run storage-preflight policy tests
         run: python3 scripts/test-xsp-v2-p0e4a-storage-preflight.py -v
 
