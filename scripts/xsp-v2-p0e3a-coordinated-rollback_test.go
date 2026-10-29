@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -53,16 +54,16 @@ type p0e3aExpected struct {
 }
 
 type p0e3aBundle struct {
-	SignedPermitB64 string         `json:"signedPermitB64"`
-	Panel           p0e3aPin       `json:"panel"`
-	Next            p0e3aPin       `json:"next"`
-	Expected        p0e3aExpected  `json:"expected"`
+	SignedPermitB64 string        `json:"signedPermitB64"`
+	Panel           p0e3aPin      `json:"panel"`
+	Next            p0e3aPin      `json:"next"`
+	Expected        p0e3aExpected `json:"expected"`
 }
 
 type agentPublic struct {
-	KeyEpoch   uint64 `json:"keyEpoch"`
-	EdKeyID    string `json:"edKeyId"`
-	PQKeyID    string `json:"pqKeyId"`
+	KeyEpoch    uint64 `json:"keyEpoch"`
+	EdKeyID     string `json:"edKeyId"`
+	PQKeyID     string `json:"pqKeyId"`
 	EdPublicB64 string `json:"edPublicB64"`
 	PQPublicB64 string `json:"pqPublicB64"`
 }
@@ -114,10 +115,10 @@ func pinValue(t *testing.T, raw p0e3aPin) cutover.PinnedPublic {
 	}
 	return cutover.PinnedPublic{
 		IssuerID: raw.IssuerID,
-		Purpose: raw.Purpose,
-		NodeID: raw.NodeID,
-		EdKeyID: raw.EdKeyID,
-		PQKeyID: raw.PQKeyID,
+		Purpose:  raw.Purpose,
+		NodeID:   raw.NodeID,
+		EdKeyID:  raw.EdKeyID,
+		PQKeyID:  raw.PQKeyID,
 		EdPublic: ed,
 		PQPublic: pq,
 	}
@@ -138,14 +139,14 @@ func loadBundle(t *testing.T) (p0e3aBundle, []byte, cutover.PinnedPublic, cutove
 		t.Fatal(err)
 	}
 	want := cutover.ExpectedPermit{
-		NodeID: bundle.Expected.NodeID,
-		FromEpoch: bundle.Expected.FromEpoch,
-		ToEpoch: bundle.Expected.ToEpoch,
-		RequestID: bundle.Expected.RequestID,
-		FromEdKeyID: bundle.Expected.FromEdKeyID,
-		FromPQKeyID: bundle.Expected.FromPQKeyID,
-		ToEdKeyID: bundle.Expected.ToEdKeyID,
-		ToPQKeyID: bundle.Expected.ToPQKeyID,
+		NodeID:             bundle.Expected.NodeID,
+		FromEpoch:          bundle.Expected.FromEpoch,
+		ToEpoch:            bundle.Expected.ToEpoch,
+		RequestID:          bundle.Expected.RequestID,
+		FromEdKeyID:        bundle.Expected.FromEdKeyID,
+		FromPQKeyID:        bundle.Expected.FromPQKeyID,
+		ToEdKeyID:          bundle.Expected.ToEdKeyID,
+		ToPQKeyID:          bundle.Expected.ToPQKeyID,
 		CandidateSHA256Hex: bundle.Expected.CandidateSHA256Hex,
 	}
 	return bundle, permitRaw, pinValue(t, bundle.Panel), pinValue(t, bundle.Next), want
@@ -162,9 +163,9 @@ func layoutFor(t *testing.T) state.Layout {
 
 func publicJSON(pub keyring.PublicBundle) agentPublic {
 	return agentPublic{
-		KeyEpoch: pub.KeyEpoch,
-		EdKeyID: pub.EdKeyID,
-		PQKeyID: pub.PQKeyID,
+		KeyEpoch:    pub.KeyEpoch,
+		EdKeyID:     pub.EdKeyID,
+		PQKeyID:     pub.PQKeyID,
 		EdPublicB64: base64.StdEncoding.EncodeToString(pub.EdPublic),
 		PQPublicB64: base64.StdEncoding.EncodeToString(pub.PQPublic),
 	}
@@ -285,26 +286,26 @@ func signedACKFromVault(t *testing.T, layout state.Layout, permit cutover.Verifi
 	p := permit.Message()
 	now := time.Now().UnixMilli()
 	ack := cutover.Message{
-		Kind: "ack",
-		IssuerID: fmt.Sprintf("node-%d", p.NodeID),
-		SignerEdKeyID: p.ToEdKeyID,
-		SignerPQKeyID: p.ToPQKeyID,
-		NodeID: p.NodeID,
-		FromEpoch: p.FromEpoch,
-		ToEpoch: p.ToEpoch,
-		RequestID: p.RequestID,
-		FromEdKeyID: p.FromEdKeyID,
-		FromPQKeyID: p.FromPQKeyID,
-		ToEdKeyID: p.ToEdKeyID,
-		ToPQKeyID: p.ToPQKeyID,
-		Method: "POST",
-		Path: "/api/v2/node/keys/rotation/ack",
-		IssuedAtMS: now,
-		ExpiresAtMS: now + 50_000,
-		PermitNonceHex: p.PermitNonceHex,
-		NonceHex: "82" + p.PermitNonceHex[2:],
+		Kind:               "ack",
+		IssuerID:           fmt.Sprintf("node-%d", p.NodeID),
+		SignerEdKeyID:      p.ToEdKeyID,
+		SignerPQKeyID:      p.ToPQKeyID,
+		NodeID:             p.NodeID,
+		FromEpoch:          p.FromEpoch,
+		ToEpoch:            p.ToEpoch,
+		RequestID:          p.RequestID,
+		FromEdKeyID:        p.FromEdKeyID,
+		FromPQKeyID:        p.FromPQKeyID,
+		ToEdKeyID:          p.ToEdKeyID,
+		ToPQKeyID:          p.ToPQKeyID,
+		Method:             "POST",
+		Path:               "/api/v2/node/keys/rotation/ack",
+		IssuedAtMS:         now,
+		ExpiresAtMS:        now + 50_000,
+		PermitNonceHex:     p.PermitNonceHex,
+		NonceHex:           "82" + p.PermitNonceHex[2:],
 		CandidateSHA256Hex: p.CandidateSHA256Hex,
-		PermitSHA256Hex: permit.PermitDigest(),
+		PermitSHA256Hex:    permit.PermitDigest(),
 	}
 	var err error
 	ack.AppliedStateSHA256Hex, err = cutover.StateDigest(ack)
@@ -352,18 +353,18 @@ func ownerPin(t *testing.T) (ed25519.PrivateKey, *mldsa.PrivateKey, OwnerPublic,
 	}
 	pqPublic := pqPrivate.PublicKey().Bytes()
 	pin := OwnerPublic{
-		OwnerID: "p0e3a-offhost-owner",
-		Purpose: "owner_recovery",
-		EdKeyID: keyID("ed-", edPublic),
-		PQKeyID: keyID("pq-", pqPublic),
+		OwnerID:  "p0e3a-offhost-owner",
+		Purpose:  "owner_recovery",
+		EdKeyID:  keyID("ed-", edPublic),
+		PQKeyID:  keyID("pq-", pqPublic),
 		EdPublic: edPublic,
 		PQPublic: pqPublic,
 	}
 	file := ownerPinFile{
-		OwnerID: pin.OwnerID,
-		Purpose: pin.Purpose,
-		EdKeyID: pin.EdKeyID,
-		PQKeyID: pin.PQKeyID,
+		OwnerID:  pin.OwnerID,
+		Purpose:  pin.Purpose,
+		EdKeyID:  pin.EdKeyID,
+		PQKeyID:  pin.PQKeyID,
 		EdPublic: base64.StdEncoding.EncodeToString(pin.EdPublic),
 		PQPublic: base64.StdEncoding.EncodeToString(pin.PQPublic),
 	}
@@ -431,12 +432,12 @@ func phaseCommitAndCheckpoint(t *testing.T) {
 	}
 	receiptDigest := shaHex(envelope.Bytes())
 	nexus := NexusState{
-		NodeID: uint64(snapshot.NodeID),
-		KeyEpoch: snapshot.KeyEpoch,
-		RequestID: bundle.Expected.RequestID,
-		PermitState: "ack_verified",
+		NodeID:           uint64(snapshot.NodeID),
+		KeyEpoch:         snapshot.KeyEpoch,
+		RequestID:        bundle.Expected.RequestID,
+		PermitState:      "ack_verified",
 		ReceiptSHA256Hex: receiptDigest,
-		OutboxCount: 1,
+		OutboxCount:      1,
 		ReplayNonceCount: 1,
 	}
 	local, err := EvidenceFromDurableAgent(layout, envRequired(t, "XSP_P0E3A_SERVER_NAME"), envelope, nexus)
@@ -449,22 +450,21 @@ func phaseCommitAndCheckpoint(t *testing.T) {
 	}
 	edPrivate, pqPrivate, pin, pinFile := ownerPin(t)
 	genesis := Checkpoint{
-		Generation: 1,
-		PreviousCheckpointSHA256Hex: string(make([]byte, 0)),
-		NodeID: uint64(snapshot.NodeID),
-		ServerAuthority: envRequired(t, "XSP_P0E3A_SERVER_NAME"),
-		KeyEpoch: snapshot.KeyEpoch,
-		NodeEdKeyID: snapshot.EdKeyID,
-		NodePQKeyID: snapshot.PQKeyID,
-		CommitRequestID: bundle.Expected.RequestID,
-		CommitReceiptSHA256Hex: receiptDigest,
-		NexusStateSHA256Hex: nexusDigest,
-		IssuedAtMS: time.Now().UnixMilli(),
-		OwnerID: pin.OwnerID,
-		OwnerEdKeyID: pin.EdKeyID,
-		OwnerPQKeyID: pin.PQKeyID,
+		Generation:                  1,
+		PreviousCheckpointSHA256Hex: strings.Repeat("0", 64),
+		NodeID:                      uint64(snapshot.NodeID),
+		ServerAuthority:             envRequired(t, "XSP_P0E3A_SERVER_NAME"),
+		KeyEpoch:                    snapshot.KeyEpoch,
+		NodeEdKeyID:                 snapshot.EdKeyID,
+		NodePQKeyID:                 snapshot.PQKeyID,
+		CommitRequestID:             bundle.Expected.RequestID,
+		CommitReceiptSHA256Hex:      receiptDigest,
+		NexusStateSHA256Hex:         nexusDigest,
+		IssuedAtMS:                  time.Now().UnixMilli(),
+		OwnerID:                     pin.OwnerID,
+		OwnerEdKeyID:                pin.EdKeyID,
+		OwnerPQKeyID:                pin.PQKeyID,
 	}
-	genesis.PreviousCheckpointSHA256Hex = fmt.Sprintf("%064x", 0)
 	signedGenesis, err := Sign(genesis, edPrivate, pqPrivate)
 	if err != nil {
 		t.Fatal(err)
@@ -524,9 +524,12 @@ func loadOwnerPin(t *testing.T, path string) OwnerPublic {
 		t.Fatal(err)
 	}
 	return OwnerPublic{
-		OwnerID: file.OwnerID, Purpose: file.Purpose,
-		EdKeyID: file.EdKeyID, PQKeyID: file.PQKeyID,
-		EdPublic: ed, PQPublic: pq,
+		OwnerID:  file.OwnerID,
+		Purpose:  file.Purpose,
+		EdKeyID:  file.EdKeyID,
+		PQKeyID:  file.PQKeyID,
+		EdPublic: ed,
+		PQPublic: pq,
 	}
 }
 
@@ -545,7 +548,7 @@ func phaseVerifyRollback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	floor, err := strconv.ParseUint(string([]byte{floorRaw[0]}), 10, 64)
+	floor, err := strconv.ParseUint(strings.TrimSpace(string(floorRaw)), 10, 64)
 	if err != nil || floor != 2 {
 		t.Fatalf("invalid independent off-host floor: %q", floorRaw)
 	}
