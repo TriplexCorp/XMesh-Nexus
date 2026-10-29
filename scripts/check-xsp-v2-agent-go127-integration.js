@@ -139,7 +139,7 @@ function verify(nodeRoot){
   assert.match(design,/strict-pq` remains \*\*OFF\*\*/);
   assert.match(architecture,/only approved starting point for the future production-capable XSP-v2 Agent/);
   assert.match(architecture,/agent\/xspv2/);
-  assert.match(architecture,/security\/xspv2\/poc-go\/cutover/);
+  assert.match(architecture,/thin bridge into the proven XSP-v2 cutover implementation/);
   assert.doesNotMatch(JSON.stringify(contract),/strict-pq=on/i);
 
   console.log(`PASS: P0-D Go 1.27 Agent wrapper + reused security primitives verified against XMesh-Node ${actualRevision}`);
