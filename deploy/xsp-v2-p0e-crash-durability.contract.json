@@ -1,0 +1,38 @@
+{
+  "schema": "xsp2-p0e-crash-durability-1",
+  "productionActivation": false,
+  "strictPqDefault": "off",
+  "verifiedNodeSource": {
+    "repository": "TriplexCorp/XMesh-Node",
+    "revision": "8a86227f369aed2e6e952f1e41af52c7414aa4e3",
+    "pullRequest": 38
+  },
+  "proofBoundary": {
+    "name": "P0-E1a-process-crash-fsync-order",
+    "realProductionRotationFunctions": true,
+    "subprocessHardExit": true,
+    "activationDurableBoundaries": [
+      "after-previous",
+      "after-floor",
+      "after-active"
+    ],
+    "recoveryDurableBoundaries": [
+      "after-recovery-abort",
+      "after-recovery-active"
+    ],
+    "normalAgentContainsCrashInjector": false,
+    "oldIdentityAcceptedAfterFloorAdvance": false,
+    "recoveryMayLowerEpochFloor": false,
+    "previousIdentityRetainedAfterForwardRecovery": true,
+    "preparedCandidateRetainedAfterForwardRecovery": true
+  },
+  "notProvenByThisGate": {
+    "physicalPowerRemoval": true,
+    "controllerOrDriveWriteCacheDurability": true,
+    "filesystemSnapshotAntiRollback": true,
+    "postgresqlBackupRestore": true,
+    "oldKeyRetirement": true,
+    "productionRollout": true
+  },
+  "nextRequiredGate": "P0-E1b-physical-power-loss-and-filesystem-durability"
+}
