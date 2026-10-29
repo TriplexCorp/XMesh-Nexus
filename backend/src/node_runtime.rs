@@ -24,12 +24,6 @@ use sqlx::Row;
 // entrypoint. The legacy implementation uses the same fixed version.
 pub const CONTROL_AGENT_VERSION: &str = "control-v5.1.3";
 
-// Compatibility markers for the pre-D1c static checker. They describe the
-// byte-for-byte legacy module delegated to below; they are not executable code.
-// pub struct AgentUpdateRequest {}
-// crate::require_mutation(&actor)
-// VALUES($1,'update_agent',$2,$3)
-
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LegacyAgentUpdateRequest {}
