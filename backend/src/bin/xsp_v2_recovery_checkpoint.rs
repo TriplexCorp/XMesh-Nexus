@@ -104,19 +104,37 @@ struct VerificationResult {
 
 fn read_bounded(path: &Path, limit: usize) -> Result<Vec<u8>> {
     let metadata = fs::metadata(path).with_context(|| format!("stat {}", path.display()))?;
-    ensure!(metadata.is_file(), "{} is not a regular file", path.display());
+    ensure!(
+        metadata.is_file(),
+        "{} is not a regular file",
+        path.display()
+    );
     let length = usize::try_from(metadata.len()).context("input file too large")?;
-    ensure!(length > 0 && length <= limit, "{} has invalid size", path.display());
+    ensure!(
+        length > 0 && length <= limit,
+        "{} has invalid size",
+        path.display()
+    );
     let bytes = fs::read(path).with_context(|| format!("read {}", path.display()))?;
-    ensure!(bytes.len() == length, "{} changed while reading", path.display());
+    ensure!(
+        bytes.len() == length,
+        "{} changed while reading",
+        path.display()
+    );
     Ok(bytes)
 }
 
 fn strict_hex(value: &str, count: usize, label: &str) -> Result<Vec<u8>> {
     ensure!(value.len() == count * 2, "{label} has invalid length");
     let raw = hex::decode(value).with_context(|| format!("{label} is not hex"))?;
-    ensure!(hex::encode(&raw) == value, "{label} is not canonical lowercase hex");
-    ensure!(raw.iter().any(|byte| *byte != 0), "{label} must not be all-zero");
+    ensure!(
+        hex::encode(&raw) == value,
+        "{label} is not canonical lowercase hex"
+    );
+    ensure!(
+        raw.iter().any(|byte| *byte != 0),
+        "{label} must not be all-zero"
+    );
     Ok(raw)
 }
 
@@ -125,13 +143,18 @@ fn exact_base64(value: &str, count: usize, label: &str) -> Result<Vec<u8>> {
         .decode(value)
         .with_context(|| format!("{label} is not Base64"))?;
     ensure!(raw.len() == count, "{label} has invalid decoded length");
-    ensure!(STANDARD.encode(&raw) == value, "{label} is not canonical Base64");
+    ensure!(
+        STANDARD.encode(&raw) == value,
+        "{label} is not canonical Base64"
+    );
     Ok(raw)
 }
 
 fn ascii(out: &mut Vec<u8>, value: &str, max: usize) -> Result<()> {
     ensure!(
-        !value.is_empty() && value.len() <= max && value.bytes().all(|byte| byte.is_ascii_graphic()),
+        !value.is_empty()
+            && value.len() <= max
+            && value.bytes().all(|byte| byte.is_ascii_graphic()),
         "invalid receipt ASCII field"
     );
     let length = u32::try_from(value.len()).context("receipt field length overflow")?;
@@ -184,7 +207,10 @@ fn trusted_key_id(prefix: &str, public: &[u8]) -> String {
 }
 
 fn decode_pin(pin: &PanelPin) -> Result<(Vec<u8>, Vec<u8>)> {
-    ensure!(pin.purpose == "panel_response", "pin purpose must be panel_response");
+    ensure!(
+        pin.purpose == "panel_response",
+        "pin purpose must be panel_response"
+    );
     ensure!(pin.node_id > 0, "pin node ID is invalid");
     ensure!(
         !pin.issuer_id.is_empty() && pin.issuer_id.len() <= 64,
@@ -208,7 +234,8 @@ fn verify_signed_receipt(raw: &[u8], pin: &PanelPin) -> Result<CommitReceipt> {
         !raw.is_empty() && raw.len() <= MAX_RECEIPT_BYTES,
         "invalid signed receipt size"
     );
-    let signed: SignedReceipt = serde_json::from_slice(raw).context("invalid signed receipt JSON")?;
+    let signed: SignedReceipt =
+        serde_json::from_slice(raw).context("invalid signed receipt JSON")?;
     let input = receipt_signing_input(&signed.message)?;
     let (ed_public, pq_public) = decode_pin(pin)?;
     ensure!(
@@ -234,7 +261,8 @@ fn verify_signed_receipt(raw: &[u8], pin: &PanelPin) -> Result<CommitReceipt> {
     let pq_signature = exact_base64(&signed.signatures.mldsa65, 3309, "ML-DSA-65 signature")?;
     let pq_key = PKey::public_key_from_raw_bytes_ex(None, KeyType::ML_DSA_65, None, &pq_public)
         .context("invalid ML-DSA-65 public key")?;
-    let mut verifier = PqVerifier::new_without_digest(&pq_key).context("ML-DSA-65 verifier unavailable")?;
+    let mut verifier =
+        PqVerifier::new_without_digest(&pq_key).context("ML-DSA-65 verifier unavailable")?;
     ensure!(
         verifier
             .verify_oneshot(&pq_signature, &input)
@@ -267,9 +295,19 @@ fn verify_checkpoint(
     );
     let checkpoint: RecoveryCheckpoint =
         serde_json::from_slice(checkpoint_bytes).context("invalid recovery checkpoint JSON")?;
-    ensure!(checkpoint.schema == CHECKPOINT_SCHEMA, "unsupported recovery checkpoint schema");
-    ensure!(checkpoint.node_id > 0 && checkpoint.minimum_epoch > 0, "invalid checkpoint identity or epoch");
-    strict_hex(&checkpoint.receipt_sha256_hex, 32, "checkpoint receipt digest")?;
+    ensure!(
+        checkpoint.schema == CHECKPOINT_SCHEMA,
+        "unsupported recovery checkpoint schema"
+    );
+    ensure!(
+        checkpoint.node_id > 0 && checkpoint.minimum_epoch > 0,
+        "invalid checkpoint identity or epoch"
+    );
+    strict_hex(
+        &checkpoint.receipt_sha256_hex,
+        32,
+        "checkpoint receipt digest",
+    )?;
 
     let signed_receipt = STANDARD
         .decode(&checkpoint.signed_receipt_base64)
@@ -292,7 +330,10 @@ fn verify_checkpoint(
         receipt.node_id == checkpoint.node_id && receipt.to_epoch == checkpoint.minimum_epoch,
         "checkpoint identity or monotonic epoch is not derived from its dual-signed receipt"
     );
-    ensure!(local.node_id == checkpoint.node_id, "local state belongs to a different Node");
+    ensure!(
+        local.node_id == checkpoint.node_id,
+        "local state belongs to a different Node"
+    );
     ensure!(
         local.key_epoch >= checkpoint.minimum_epoch,
         "coordinated rollback detected: local epoch is below the off-host recovery floor"
@@ -332,9 +373,15 @@ fn parse_flag(args: &[String], flag: &str) -> Result<String> {
 }
 
 fn ensure_exact_flags(args: &[String], flags: &[&str]) -> Result<()> {
-    ensure!(args.len() == flags.len() * 2, "unexpected command arguments");
+    ensure!(
+        args.len() == flags.len() * 2,
+        "unexpected command arguments"
+    );
     for flag in flags {
-        ensure!(args.iter().filter(|arg| arg.as_str() == *flag).count() == 1, "{flag} must appear exactly once");
+        ensure!(
+            args.iter().filter(|arg| arg.as_str() == *flag).count() == 1,
+            "{flag} must appear exactly once"
+        );
     }
     Ok(())
 }
@@ -359,10 +406,15 @@ fn create_command(args: &[String]) -> Result<()> {
         .mode(0o600)
         .open(&out_path)
         .with_context(|| format!("create new checkpoint {out_path}; refusing overwrite"))?;
-    file.write_all(&output).context("write recovery checkpoint")?;
-    file.write_all(b"\n").context("finish recovery checkpoint")?;
+    file.write_all(&output)
+        .context("write recovery checkpoint")?;
+    file.write_all(b"\n")
+        .context("finish recovery checkpoint")?;
     file.sync_all().context("fsync recovery checkpoint")?;
-    println!("created node={} minimumEpoch={} receiptSha256={}", checkpoint.node_id, checkpoint.minimum_epoch, checkpoint.receipt_sha256_hex);
+    println!(
+        "created node={} minimumEpoch={} receiptSha256={}",
+        checkpoint.node_id, checkpoint.minimum_epoch, checkpoint.receipt_sha256_hex
+    );
     Ok(())
 }
 
@@ -379,15 +431,18 @@ fn verify_command(args: &[String]) -> Result<()> {
     )?)
     .with_context(|| format!("parse local recovery state {local_path}"))?;
     let verified = verify_checkpoint(&checkpoint, &pin, &local)?;
-    println!("{}", serde_json::to_string(&verified).context("serialize verification result")?);
+    println!(
+        "{}",
+        serde_json::to_string(&verified).context("serialize verification result")?
+    );
     Ok(())
 }
 
 fn run() -> Result<()> {
     let mut args = env::args().skip(1);
-    let command = args.next().context(
-        "usage: xsp-v2-recovery-checkpoint <create|verify> --pin ...",
-    )?;
+    let command = args
+        .next()
+        .context("usage: xsp-v2-recovery-checkpoint <create|verify> --pin ...")?;
     let rest: Vec<String> = args.collect();
     match command.as_str() {
         "create" => create_command(&rest),
@@ -450,9 +505,7 @@ mod tests {
         };
         let input = receipt_signing_input(&message).expect("canonical receipt");
         let mut pq_signer = PqSigner::new_without_digest(pq).expect("PQ signer");
-        let pq_signature = pq_signer
-            .sign_oneshot_to_vec(&input)
-            .expect("PQ signature");
+        let pq_signature = pq_signer.sign_oneshot_to_vec(&input).expect("PQ signature");
         serde_json::to_vec(&SignedReceipt {
             message,
             signatures: DualSignatures {
@@ -525,7 +578,10 @@ mod tests {
             key_epoch: 5,
             current_receipt_sha256_hex: Some(checkpoint.receipt_sha256_hex.clone()),
         };
-        assert!(verify_checkpoint(&serde_json::to_vec(&checkpoint).unwrap(), &pin, &wrong_node).is_err());
+        assert!(
+            verify_checkpoint(&serde_json::to_vec(&checkpoint).unwrap(), &pin, &wrong_node)
+                .is_err()
+        );
 
         let mut signed: SignedReceipt = serde_json::from_slice(&receipt).unwrap();
         signed.message.request_id = "tampered-request".into();
