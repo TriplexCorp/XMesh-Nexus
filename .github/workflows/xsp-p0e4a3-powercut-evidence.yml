@@ -1,0 +1,139 @@
+name: XSP-v2 P0-E4a3 Power-cut Evidence Contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/xsp-v2-p0e4a3-powercut-evidence.py"
+      - "docs/XSP_V2_P0E4A3_POWERCUT_EVIDENCE.md"
+      - ".github/workflows/xsp-p0e4a3-powercut-evidence.yml"
+  pull_request:
+    paths:
+      - "scripts/xsp-v2-p0e4a3-powercut-evidence.py"
+      - "docs/XSP_V2_P0E4A3_POWERCUT_EVIDENCE.md"
+      - ".github/workflows/xsp-p0e4a3-powercut-evidence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evidence-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify offline/read-only boundary
+        run: |
+          set -euo pipefail
+          src=scripts/xsp-v2-p0e4a3-powercut-evidence.py
+          doc=docs/XSP_V2_P0E4A3_POWERCUT_EVIDENCE.md
+          python3 -m py_compile "$src"
+          ! grep -E 'subprocess|requests|urllib|socket|os\.system|exec\(|systemctl|reboot|shutdown|poweroff|strict-pq=on' "$src"
+          grep -Fq '"physicalPowerLossQualified": False' "$src"
+          grep -Fq 'GitHub CI' "$doc"
+          grep -Fq 'P0-E4a remains OPEN' "$doc"
+          grep -Fq '50c770c8bbb917b04ca893ac5b8d29e6c7f9af7e' "$src" "$doc"
+          grep -Fq 'after-recovery-active' "$src" "$doc"
+
+      - name: Exercise all five evidence outcomes and fail-closed negatives
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/p0e4a3"
+          mkdir -p "$work"
+          python3 - "$work" <<'PY'
+          import hashlib,json,os,sys
+          root=sys.argv[1]
+          base={
+            'schema':'xsp2-p0e4a-storage-preflight-1','target':'/var/lib/xmesh','kernel':'Linux 6.x',
+            'mount':{'source':'/dev/nvme0n1p1','fstype':'ext4','options':'rw','target':'/'},
+            'device':{'device':'nvme0n1','writeCache':'write through','rotational':'0','fua':'1'},
+            'baselineEligible':True,'physicalPowerLossQualified':False,'failures':[],
+            'requiredNextEvidence':['real abrupt power required'],'scope':'CI fixture only; not physical evidence',
+          }
+          agent=dict(base); agent['role']='agent-state'; agent['postgres']=None
+          pg=dict(base); pg['role']='nexus-postgres'; pg['postgres']={
+            'fsync':'on','full_page_writes':'on','synchronous_commit':'on','wal_sync_method':'fdatasync'}
+          for name,obj in [('agent.json',agent),('pg.json',pg)]:
+            open(os.path.join(root,name),'w').write(json.dumps(obj,separators=(',',':')))
+          def sha(name): return hashlib.sha256(open(os.path.join(root,name),'rb').read()).hexdigest()
+          common={
+            'schema':'xsp2-p0e4a3-powercut-evidence-1','runId':'lab-run-0001',
+            'nodeSourceRevision':'50c770c8bbb917b04ca893ac5b8d29e6c7f9af7e',
+            'nexusSourceRevision':'6983bd9168c160968d8ed46ab862b8b1ee85c8ae',
+            'labBinarySha256Hex':'11'*32,'nodeId':812345678901,
+            'rotation':{'fromEpoch':7,'toEpoch':8,'fromEdKeyId':'ed-old-0001','fromPQKeyId':'pq-old-0001','toEdKeyId':'ed-new-0001','toPQKeyId':'pq-new-0001'},
+            'controllerEvent':{'controllerId':'pdu-lab-001','eventId':'event-0001','action':'power-off','observedAtMs':2000,'rawEventSha256Hex':'22'*32},
+            'bootBeforeId':'boot-old-0001',
+            'postgresRecovery':{'recoveryObserved':True,'readyAtMs':4000,'fsync':'on','fullPageWrites':'on','synchronousCommit':'on','walSyncMethod':'fdatasync','securityTupleSha256Hex':'33'*32,'integrityChecksPassed':True},
+            'offhostWitness':{'checkpointSha256Hex':'44'*32,'nodeId':812345678901,'minimumEpoch':7,'receiptSha256Hex':'55'*32},
+            'storageEvidence':{'agentPreflightSha256Hex':sha('agent.json'),'postgresPreflightSha256Hex':sha('pg.json'),'reviewedProfileId':'profile-0001','plpEvidenceId':'plp-review-0001'},
+            'review':{'operator':'reviewer-0001','reviewedAtMs':6000,'notesSha256Hex':'66'*32},
+          }
+          cases={
+            'after-previous':('previous-complete',7,'ed-old-0001','pq-old-0001'),
+            'after-floor':('next-complete',8,'ed-new-0001','pq-new-0001'),
+            'after-active':('next-complete',8,'ed-new-0001','pq-new-0001'),
+            'after-recovery-abort':('previous-complete',7,'ed-old-0001','pq-old-0001'),
+            'after-recovery-active':('next-complete',8,'ed-new-0001','pq-new-0001'),
+          }
+          for point,(classification,epoch,ed,pq) in cases.items():
+            e=json.loads(json.dumps(common)); e['checkpoint']=point
+            e['arm']={'marker':f"XSP2-POWERCUT-ARMED-V1 run={e['runId']} point={point}",'observedAtMs':1000}
+            e['postBoot']={'bootId':'boot-new-0001','recoveredAtMs':5000,'classification':classification,'keyEpoch':epoch,'activeEdKeyId':ed,'activePQKeyId':pq,'securityStateSha256Hex':'77'*32,'networkAttemptedBeforeValidation':False}
+            open(os.path.join(root,point+'.json'),'w').write(json.dumps(e,separators=(',',':')))
+          PY
+
+          for point in after-previous after-floor after-active after-recovery-abort after-recovery-active; do
+            out="$(python3 scripts/xsp-v2-p0e4a3-powercut-evidence.py \
+              --evidence "$work/$point.json" --agent-preflight "$work/agent.json" --postgres-preflight "$work/pg.json")"
+            echo "$out"
+            echo "$out" | grep -Fq '"physicalPowerLossQualified":false'
+            echo "$out" | grep -Fq '"status":"evidence-contract-valid"'
+          done
+
+          cp "$work/after-floor.json" "$work/bad-source.json"
+          python3 - "$work/bad-source.json" <<'PY'
+          import json,sys
+          p=sys.argv[1]; x=json.load(open(p)); x['nodeSourceRevision']='0'*40; open(p,'w').write(json.dumps(x,separators=(',',':')))
+          PY
+          if python3 scripts/xsp-v2-p0e4a3-powercut-evidence.py --evidence "$work/bad-source.json" --agent-preflight "$work/agent.json" --postgres-preflight "$work/pg.json"; then
+            echo 'wrong Node source unexpectedly accepted' >&2; exit 1
+          fi
+
+          cp "$work/after-floor.json" "$work/bad-boot.json"
+          python3 - "$work/bad-boot.json" <<'PY'
+          import json,sys
+          p=sys.argv[1]; x=json.load(open(p)); x['postBoot']['bootId']=x['bootBeforeId']; open(p,'w').write(json.dumps(x,separators=(',',':')))
+          PY
+          if python3 scripts/xsp-v2-p0e4a3-powercut-evidence.py --evidence "$work/bad-boot.json" --agent-preflight "$work/agent.json" --postgres-preflight "$work/pg.json"; then
+            echo 'unchanged boot ID unexpectedly accepted' >&2; exit 1
+          fi
+
+          cp "$work/after-floor.json" "$work/bad-outcome.json"
+          python3 - "$work/bad-outcome.json" <<'PY'
+          import json,sys
+          p=sys.argv[1]; x=json.load(open(p)); x['postBoot']['classification']='previous-complete'; x['postBoot']['keyEpoch']=7; x['postBoot']['activeEdKeyId']='ed-old-0001'; x['postBoot']['activePQKeyId']='pq-old-0001'; open(p,'w').write(json.dumps(x,separators=(',',':')))
+          PY
+          if python3 scripts/xsp-v2-p0e4a3-powercut-evidence.py --evidence "$work/bad-outcome.json" --agent-preflight "$work/agent.json" --postgres-preflight "$work/pg.json"; then
+            echo 'wrong post-floor outcome unexpectedly accepted' >&2; exit 1
+          fi
+
+          cp "$work/after-floor.json" "$work/bad-event.json"
+          python3 - "$work/bad-event.json" <<'PY'
+          import json,sys
+          p=sys.argv[1]; x=json.load(open(p)); x['controllerEvent']['observedAtMs']=200000; open(p,'w').write(json.dumps(x,separators=(',',':')))
+          PY
+          if python3 scripts/xsp-v2-p0e4a3-powercut-evidence.py --evidence "$work/bad-event.json" --agent-preflight "$work/agent.json" --postgres-preflight "$work/pg.json"; then
+            echo 'unbound delayed controller event unexpectedly accepted' >&2; exit 1
+          fi
+
+          cp "$work/pg.json" "$work/bad-pg.json"
+          python3 - "$work/bad-pg.json" <<'PY'
+          import json,sys
+          p=sys.argv[1]; x=json.load(open(p)); x['physicalPowerLossQualified']=True; open(p,'w').write(json.dumps(x,separators=(',',':')))
+          PY
+          if python3 scripts/xsp-v2-p0e4a3-powercut-evidence.py --evidence "$work/after-floor.json" --agent-preflight "$work/agent.json" --postgres-preflight "$work/bad-pg.json"; then
+            echo 'preflight claiming physical qualification unexpectedly accepted' >&2; exit 1
+          fi
+
+          echo 'P0-E4A3 EVIDENCE CONTRACT: PASS (schema/negative tests only; NOT physical power-loss evidence)'
