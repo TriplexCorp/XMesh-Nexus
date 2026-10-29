@@ -14,10 +14,27 @@ The disposable E2E uses the real C2-D strict-PQ process topology and performs an
 4. execute the normal strict-PQ ACK path and require `(to_epoch, ack_verified, outbox=1, replay=1)` while the Agent persists the first verified dual-signed commit receipt;
 5. stop database clients, drop/recreate `xmesh`, and restore the saved dump with `pg_restore`;
 6. require PostgreSQL to be back at the exact pre-ACK tuple while the Agent journal volume is deliberately untouched;
-7. replay the exact still-fresh signed ACK through the real hybrid-mTLS ingress/C2-C/signer path;
-8. require one bounded server-side re-commit, then prove the current Agent never replaces its first authoritative receipt bytes.
+7. prove the recreated database has reintroduced database-level effective privilege drift for the security roles, then re-apply the reviewed idempotent signer/C2-C least-privilege provisioning and require that hardening not mutate the XSP-v2 durable tuple;
+8. only after role hardening, restart the security sidecars and replay the exact still-fresh signed ACK through the real hybrid-mTLS ingress/C2-C/signer path;
+9. require one bounded server-side re-commit, then prove the current Agent never replaces its first authoritative receipt bytes.
 
 No SQL `UPDATE` or trigger bypass is used to simulate the rollback. The rollback is a real database dump/restore boundary.
+
+## Restore-time database privilege invariant
+
+The first real restore attempt exposed an important operational invariant rather than a cryptographic failure: after `DROP DATABASE` / `CREATE DATABASE` / `pg_restore`, the isolated signer correctly refused to start with `signer database role has excessive effective object privileges`.
+
+A per-database `pg_dump` restores database contents, object ACLs and security rows, but recreating the database object itself reintroduces PostgreSQL's default database-level privileges. In particular, effective `TEMP`/database privilege can again flow through `PUBLIC`. Those database-object ACLs are not made safe merely because table ACLs in the dump were restored.
+
+Therefore P0-E2b treats restore-time privilege re-hardening as part of the recovery contract, not as an optional deployment detail:
+
+- re-run `20-create-xsp-v2-signer-role.sql` and `21-create-xsp-v2-c2c-role.sql` after the database is recreated/restored;
+- require the signer role to have no effective database `CREATE`/`TEMP` or public-schema `CREATE` privilege;
+- require the C2-C role to have no effective database `CREATE`/`TEMP` or public-schema `CREATE` privilege beyond its reviewed table/column grants;
+- require the XSP-v2 `(epoch, permit state, outbox count, replay count)` tuple to remain unchanged by re-hardening;
+- retain the signer's runtime least-privilege self-check unchanged. A restore that omits re-hardening must fail closed rather than starting the signer with excessive authority.
+
+This is why a green data restore alone is insufficient evidence for a secure backup/restore procedure.
 
 ## Current-Agent independent witness
 
@@ -32,7 +49,7 @@ The E2E additionally reloads the original journal after the retry and requires t
 
 ## Security meaning and limits
 
-P0-E2b proves that **one-sided PostgreSQL rollback cannot silently rewrite the authoritative state already witnessed by a current Agent**. It does not claim the rolled-back server can independently know that its database moved backward before the current Agent presents contradictory evidence.
+P0-E2b proves that **one-sided PostgreSQL rollback cannot silently rewrite the authoritative state already witnessed by a current Agent**, provided the restore procedure re-establishes the reviewed least-privilege database boundary before security sidecars are restarted. It does not claim the rolled-back server can independently know that its database moved backward before the current Agent presents contradictory evidence.
 
 A coordinated rollback of both PostgreSQL and the Agent journal to mutually consistent old snapshots remains outside this gate. That class requires an independent third trust domain, such as an owner-held/off-host monotonic recovery checkpoint, and belongs to the backup/restore and owner-authorized recovery gates.
 
