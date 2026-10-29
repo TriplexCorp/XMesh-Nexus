@@ -18,49 +18,8 @@ jobs:
       - name: Fix toolbox bootstrap/offline boundary
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path('scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py')
-          s = p.read_text()
-          old = '''            command(
-                "docker", "run", "-d", "--name", toolbox, "--network", "none",
-                "--mount", f"type=bind,src={ROOT},dst=/src,readonly",
-                "--mount", f"type=bind,src={tmp},dst=/work",
-                "rust:1.99-trixie", "sleep", "infinity", timeout=120,
-            )
-            toolbox_run("bash", "-ceu", "apt-get update >/dev/null && apt-get install -y --no-install-recommends pkg-config libssl-dev openssl ca-certificates >/dev/null", timeout=300)
-            toolbox_run(
-                "bash", "-ceu",
-                "CARGO_TARGET_DIR=/work/cargo-target cargo build --locked --manifest-path /src/backend/Cargo.toml "
-                "--features xsp-v2-experimental --bin xsp-v2-recovery-checkpoint >/dev/null && "
-                "cp /work/cargo-target/debug/xsp-v2-recovery-checkpoint /work/recovery-tool",
-                timeout=900,
-            )
-'''
-          new = '''            command(
-                "docker", "run", "-d", "--name", toolbox,
-                "--mount", f"type=bind,src={ROOT},dst=/src,readonly",
-                "--mount", f"type=bind,src={tmp},dst=/work",
-                "rust:1.99-trixie", "sleep", "infinity", timeout=120,
-            )
-            toolbox_run("bash", "-ceu", "apt-get update >/dev/null && apt-get install -y --no-install-recommends pkg-config libssl-dev openssl ca-certificates >/dev/null", timeout=300)
-            toolbox_run(
-                "bash", "-ceu",
-                "CARGO_TARGET_DIR=/work/cargo-target cargo build --locked --manifest-path /src/backend/Cargo.toml "
-                "--features xsp-v2-experimental --bin xsp-v2-recovery-checkpoint >/dev/null && "
-                "cp /work/cargo-target/debug/xsp-v2-recovery-checkpoint /work/recovery-tool",
-                timeout=900,
-            )
-            # Bootstrap may use the runner network only to install/build dependencies.
-            # Every recovery identity/signature/checkpoint operation below runs offline.
-            command("docker", "network", "disconnect", "bridge", toolbox, timeout=30)
-            networks = json.loads(command("docker", "inspect", toolbox, "--format", "{{json .NetworkSettings.Networks}}").stdout)
-            if networks:
-                raise RuntimeError(f"P0-E3b crypto toolbox retained a network after bootstrap: {networks}")
-'''
-          assert s.count(old) == 1, s.count(old)
-          p.write_text(s.replace(old, new))
-          PY
+          python3 -c 'from pathlib import Path; p=Path("scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py"); s=p.read_text(); old="\"docker\", \"run\", \"-d\", \"--name\", toolbox, \"--network\", \"none\","; new="\"docker\", \"run\", \"-d\", \"--name\", toolbox,"; assert s.count(old)==1, s.count(old); p.write_text(s.replace(old,new))'
+          python3 -c 'from pathlib import Path; p=Path("scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py"); s=p.read_text(); old="                timeout=900,\n            )\n\n            # Real protected panel_response"; new="                timeout=900,\n            )\n            # Bootstrap may use the runner network only to install/build dependencies.\n            # Every recovery identity/signature/checkpoint operation below runs offline.\n            command(\"docker\", \"network\", \"disconnect\", \"bridge\", toolbox, timeout=30)\n            networks = json.loads(command(\"docker\", \"inspect\", toolbox, \"--format\", \"{{json .NetworkSettings.Networks}}\").stdout)\n            if networks:\n                raise RuntimeError(f\"P0-E3b crypto toolbox retained a network after bootstrap: {networks}\")\n\n            # Real protected panel_response"; assert s.count(old)==1, s.count(old); p.write_text(s.replace(old,new))'
           python3 -m py_compile scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py
           git diff --check
       - name: Commit offline boundary fix
