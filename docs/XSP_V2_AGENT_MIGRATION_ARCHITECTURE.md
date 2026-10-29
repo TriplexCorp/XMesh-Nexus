@@ -86,7 +86,7 @@ Before any future apply mutates the active Agent, the node must have a complete 
 - durable Agent state root version;
 - enrollment/key references that must survive rollback.
 
-Rollback is local and bounded. It restores the previous Agent package/service state and reuses the same enrolled identity and durable security state. It must never roll security epochs/replay floors backwards, delete an ACK/receipt journal, generate replacement keys automatically, or reinterpret an older Agent as permission to use a weaker protocol.
+Rollback is local and bounded. It restores the previous Agent package/service state and reuses the same enrolled identity and durable security state. It must not roll security epochs/replay floors backwards, delete an ACK/receipt journal, generate replacement keys automatically, or reinterpret an older Agent as permission to use a weaker protocol.
 
 A failed apply, failed self-check, failed authenticated startup, missing receipt, or failed post-start health proof is failure. Nexus must not mark the migration successful until the exact authenticated ACK/receipt requirements of the selected migration phase are satisfied.
 
