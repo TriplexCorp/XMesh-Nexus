@@ -11,12 +11,14 @@ const runtime=runtimeEntry+'\n'+runtimeLegacy;
 const migration=fs.readFileSync('backend/migrations/0024_node_agent_updates.sql','utf8');
 const releaseManifest=fs.readFileSync('backend/migrations/0107_node_xsp_agent_release_manifests.sql','utf8');
 const migrationBinding=fs.readFileSync('backend/migrations/0108_node_xsp_agent_migration_binding.sql','utf8');
+const releaseAck=fs.readFileSync('backend/migrations/0109_node_xsp_agent_release_ack_identity.sql','utf8');
 const agent=fs.readFileSync('deploy/node-control-agent.sh','utf8');
 const updater=fs.readFileSync('deploy/update-node-control-agent.sh','utf8');
 const installer=fs.readFileSync('deploy/install-node-metrics-agent.sh','utf8');
 const app=fs.readFileSync('app.js','utf8');
 const css=fs.readFileSync('styles.css','utf8');
 const tests=fs.readFileSync('scripts/test-node-auth-integration.py','utf8');
+const orchestration=fs.readFileSync('scripts/test-xsp-agent-orchestration-api.py','utf8');
 
 assert.match(api,/\/nodes\/\{id\}\/agent-update/);
 assert.match(runtimeEntry,/pub async fn request_agent_update/);
@@ -84,11 +86,50 @@ assert.doesNotMatch(runtimeEntry,/\b(url|uri|script|shell|command_text)\s*:/i,
   'D1c request schema must never accept caller-selected executable input');
 assert.doesNotMatch(runtimeEntry,/strict-pq=on/,'D1c must not activate strict PQ');
 
+// Current P0-D sub-gate: exact release identity must move through the existing
+// authenticated poll/apply/ACK lifecycle. Bound success cannot be inferred from
+// a version-only heartbeat and legacy commands remain identity-free.
+assert.match(runtimeEntry,/pub async fn poll_restart/,
+  'P0-D identity propagation must overlay the existing signed poll endpoint');
+assert.match(runtimeEntry,/LEFT JOIN node_xsp_agent_release_manifests m ON m[.]id=c[.]release_manifest_id/);
+assert.match(runtimeEntry,/command\["releaseIdentity"\]/,
+  'Bound poll must emit exact immutable release identity');
+assert.match(runtimeEntry,/pub async fn acknowledge_restart/,
+  'P0-D identity propagation must overlay the existing signed ACK endpoint');
+assert.match(runtimeEntry,/FOR UPDATE OF c/,'ACK must lock the claimed command before identity comparison');
+assert.match(runtimeEntry,/Bound Agent command requires exact release identity acknowledgement/);
+assert.match(runtimeEntry,/release_ack_version=\$5/);
+assert.match(runtimeEntry,/release_ack_received_at=CASE WHEN \$5::TEXT IS NULL THEN NULL ELSE NOW\(\) END/);
+assert.match(runtimeEntry,/Legacy command must not carry Agent release identity/);
+assert.doesNotMatch(runtimeEntry,/\b(url|uri|script|shell|command_text)\s*:/i,
+  'Poll/ACK identity must not add executable input');
+
+assert.match(releaseAck,/ADD COLUMN release_ack_version TEXT/);
+assert.match(releaseAck,/ADD COLUMN release_ack_source_revision TEXT/);
+assert.match(releaseAck,/ADD COLUMN release_ack_artifact_sha256 TEXT/);
+assert.match(releaseAck,/ADD COLUMN release_ack_success BOOLEAN/);
+assert.match(releaseAck,/CREATE OR REPLACE FUNCTION validate_node_xsp_agent_release_ack_identity/);
+assert.match(releaseAck,/XSP-v2 Agent release ACK identity is immutable/);
+assert.match(releaseAck,/legacy Agent command cannot carry XSP-v2 release ACK identity/);
+assert.match(releaseAck,/XSP-v2 Agent release ACK identity mismatch/);
+assert.match(releaseAck,/NEW[.]state = 'succeeded'/);
+assert.match(releaseAck,/NEW[.]release_ack_success IS DISTINCT FROM TRUE/,
+  'Bound heartbeat-only success must be ignored unless exact successful ACK evidence exists');
+assert.doesNotMatch(releaseAck,/strict-pq=on/,'ACK identity gate must not activate strict PQ');
+
 assert.match(agent,/AGENT_VERSION="control-v[45][.][0-9]+[.][0-9]+"/);
 assert.match(agent,/router_running\(\)\{/,'Control agent needs an independent edge-router health probe');
 assert.match(agent,/if router_running;then router=true;fi/,'Router heartbeat must come from its own process');
 assert.ok(agent.includes('router_running\\":$router'),'Router status must not be copied from Xray health');
 assert.match(agent,/if action not in \("restart_xray","update_xray","update_agent"\)/);
+assert.match(agent,/releaseIdentity/,'Agent must parse the optional bound release identity');
+assert.match(agent,/set\(identity\)!=\{"version","sourceRevision","artifactSha256"\}/,
+  'Agent must reject partial or extra release identity fields');
+assert.match(agent,/stage_agent_release_identity\(\)/,
+  'Agent must preserve exact identity locally across the fixed updater apply step');
+assert.match(agent,/RELEASE_IDENTITY_FILE=\/run\/xmesh-node-control\/agent-release-identity[.]json/);
+assert.match(agent,/ack_identity=.*releaseIdentity/,
+  'Bound Agent ACK must echo the exact release identity');
 assert.match(agent,/systemctl start --wait xmesh-node-agent-upgrade[.]service/);
 assert.match(agent,/signed_post '\/api\/v1\/node\/restart\/ack'/);
 assert.match(updater,/MODE="\$\{1:-manual\}"/);
@@ -133,6 +174,9 @@ assert.match(app,/Date\.now\(\)\+900000/,'Full node update UI must wait 15 minut
 assert.match(app,/\/api\/v1\/nodes\/'\+encodeURIComponent\(id\)\+'\/agent-update/);
 assert.match(css,/\[data-agent-update\]/);
 assert.match(tests,/admin queued a fixed agent self-update/);
+assert.match(orchestration,/bound ACK without release identity fails closed/);
+assert.match(orchestration,/bound migration cannot become success from version-only heartbeat/);
+assert.match(orchestration,/exact immutable release identity is durable ACK evidence/);
 
 for(const file of ['deploy/node-control-agent.sh','deploy/update-node-control-agent.sh','deploy/install-node-metrics-agent.sh']){
   const result=spawnSync('bash',['-n',file],{encoding:'utf8'});
@@ -140,4 +184,4 @@ for(const file of ['deploy/node-control-agent.sh','deploy/update-node-control-ag
 }
 const syntax=spawnSync(process.execPath,['--check','app.js'],{encoding:'utf8'});
 assert.equal(syntax.status,0,syntax.stderr);
-console.log('Signed remote Agent upgrade, immutable release identity/binding and P0-D1c staging orchestration contract: OK');
+console.log('Signed remote Agent upgrade, immutable release identity/binding and authenticated poll/apply/ACK identity contract: OK');
