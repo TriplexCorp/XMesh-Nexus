@@ -110,7 +110,9 @@ PY
 }
 
 verify_package(){
-  local package_dir="$1" binary="$package_dir/xmesh-agent-xspv2" actual identity_file="$package_dir/identity.json"
+  local package_dir="$1" actual
+  local binary="$package_dir/xmesh-agent-xspv2"
+  local identity_file="$package_dir/identity.json"
   [[ -d "$package_dir" && ! -L "$package_dir" ]] || return 1
   [[ -f "$binary" && ! -L "$binary" && -x "$binary" ]] || return 1
   [[ -f "$identity_file" && ! -L "$identity_file" ]] || return 1
@@ -211,7 +213,9 @@ PY
 }
 
 write_last_good_package(){
-  local target="$1" package_dir="$BASE/$target" identity_file="$package_dir/identity.json"
+  local target="$1"
+  local package_dir="$BASE/$target"
+  local identity_file="$package_dir/identity.json"
   [[ -f "$identity_file" && ! -L "$identity_file" ]] || return 1
   python3 - "$LAST_GOOD" "$target" "$identity_file" "$STATE_ROOT" <<'PY'
 import json,os,re,sys,tempfile,time
