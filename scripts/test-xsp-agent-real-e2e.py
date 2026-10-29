@@ -141,8 +141,23 @@ def make_curl_rewriter(directory: Path):
     script = directory / "curl"
     script.write_text(f"""#!/usr/bin/env bash
 set -Eeuo pipefail
+# The production helper correctly permits HTTPS only. This disposable test has
+# a loopback HTTP Nexus, so the shim removes those two transport flags only when
+# translating the fixed test origin; all signed body/header semantics are kept.
 args=()
+skip_next=false
 for value in "$@"; do
+  if [[ "$skip_next" == true ]]; then
+    skip_next=false
+    continue
+  fi
+  if [[ "$value" == --proto ]]; then
+    skip_next=true
+    continue
+  fi
+  if [[ "$value" == --tlsv1.2 ]]; then
+    continue
+  fi
   if [[ "$value" == https://panel.example.test* ]]; then
     value="http://127.0.0.1:8080${{value#https://panel.example.test}}"
   fi
