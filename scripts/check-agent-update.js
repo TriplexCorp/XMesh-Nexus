@@ -71,7 +71,7 @@ assert.match(runtimeEntry,/rename_all = "camelCase", deny_unknown_fields/);
 assert.match(runtimeEntry,/XSP_V2_P0D_AGENT_MIGRATION/);
 assert.match(runtimeEntry,/value == Some\("staging-only"\)/,
   'Migration gate must require the exact staging-only value');
-assert.match(runtimeEntry,/crate::require_owner\(&actor\)/,
+assert.match(runtimeEntry,/crate::require_owner\(actor\)/,
   'Release selection must require owner authorization');
 assert.match(runtimeEntry,/FROM stage_node_xsp_agent_migration\(\$1,\$2,\$3\)/,
   'D1c must reuse the D1b atomic manifest-binding primitive');
