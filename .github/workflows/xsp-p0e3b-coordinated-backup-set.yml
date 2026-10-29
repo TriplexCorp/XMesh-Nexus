@@ -1,0 +1,143 @@
+name: XSP-v2 P0-E3b Coordinated Backup Set
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/xsp-v2-p0e3b-backup-set.py"
+      - "docs/XSP_V2_P0E3B_COORDINATED_BACKUP_RESTORE.md"
+      - ".github/workflows/xsp-p0e3b-coordinated-backup-set.yml"
+  pull_request:
+    paths:
+      - "scripts/xsp-v2-p0e3b-backup-set.py"
+      - "docs/XSP_V2_P0E3B_COORDINATED_BACKUP_RESTORE.md"
+      - ".github/workflows/xsp-p0e3b-coordinated-backup-set.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify verifier remains offline and fail-closed
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/xsp-v2-p0e3b-backup-set.py
+          ! grep -E 'requests|urllib|socket|subprocess|os\.system|strict-pq=on|UPDATE |INSERT |DELETE |TRUNCATE ' scripts/xsp-v2-p0e3b-backup-set.py
+          grep -Fq 'coordinated rollback detected: backup-set epoch is below off-host recovery floor' scripts/xsp-v2-p0e3b-backup-set.py
+          grep -Fq 'backup set is missing or adds security components' scripts/xsp-v2-p0e3b-backup-set.py
+          grep -Fq 'same-epoch backup set has a different authoritative receipt' scripts/xsp-v2-p0e3b-backup-set.py
+          grep -Fq 'stat.S_ISLNK' scripts/xsp-v2-p0e3b-backup-set.py
+
+  real-backup-inventory:
+    needs: source-contract
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: p0e3b-ci-only
+          POSTGRES_DB: xmesh
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d xmesh"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Build real current backup inventory and reject rollback/mixed/missing sets
+        env:
+          PGPASSWORD: p0e3b-ci-only
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/p0e3b-current"
+          mkdir -p "$root/source-agent" "$root/source-signer" "$root/source-mtls"
+
+          psql -h 127.0.0.1 -U postgres -d xmesh -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE TABLE xsp_recovery_probe(node_id BIGINT PRIMARY KEY, key_epoch BIGINT NOT NULL, receipt_sha256 TEXT NOT NULL);
+          INSERT INTO xsp_recovery_probe VALUES (812345678901, 2, repeat('ab', 32));
+          SQL
+          pg_dump -h 127.0.0.1 -U postgres -d xmesh -Fc -f "$root/postgres.dump"
+          test "$(stat -c %s "$root/postgres.dump")" -gt 1024
+
+          printf '%s\n' 'agent durable state epoch=2' > "$root/source-agent/epoch-floor"
+          printf '%s\n' 'immutable receipt digest=abababababababababababababababababababababababababababababababab' > "$root/source-agent/receipt"
+          tar -C "$root/source-agent" -cf "$root/agent-state.tar" .
+
+          openssl genpkey -algorithm ED25519 -out "$root/source-signer/panel-ed25519.pem"
+          printf '%s\n' 'CI placeholder inventory member; real ML-DSA validity is separately enforced by P0-E3a/Crypto workflows' > "$root/source-signer/panel-mldsa65.pem"
+          tar -C "$root/source-signer" -cf "$root/signer-keys.tar" .
+
+          openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -subj '/CN=p0e3b-ci.invalid' -days 1 \
+            -keyout "$root/source-mtls/client-key.pem" -out "$root/source-mtls/client.pem" >/dev/null 2>&1
+          tar -C "$root/source-mtls" -cf "$root/mtls-identity.tar" .
+
+          cat > "$root/panel-pin.json" <<'JSON'
+          {"purpose":"panel_response","issuerId":"p0e3b-ci-panel","nodeId":812345678901,"edKeyId":"inventory-only","pqKeyId":"inventory-only"}
+          JSON
+
+          python3 - "$root" <<'PY'
+          import hashlib,json,os,sys
+          root=sys.argv[1]
+          files={
+            'postgres':'postgres.dump','agentState':'agent-state.tar','signerKeys':'signer-keys.tar',
+            'panelPin':'panel-pin.json','mtlsIdentity':'mtls-identity.tar',
+          }
+          components={}
+          for name,rel in files.items():
+            path=os.path.join(root,rel)
+            raw=open(path,'rb').read()
+            components[name]={'path':rel,'sha256Hex':hashlib.sha256(raw).hexdigest(),'size':len(raw)}
+          manifest={
+            'schema':'xsp2-coordinated-backup-set-1','nodeId':812345678901,'keyEpoch':2,
+            'authoritativeReceiptSha256Hex':'ab'*32,'components':components,
+          }
+          open(os.path.join(root,'manifest.json'),'w').write(json.dumps(manifest,separators=(',',':')))
+          checkpoint={
+            'schema':'xsp2-owner-offhost-recovery-checkpoint-1','nodeId':812345678901,'minimumEpoch':2,
+            'receiptSha256Hex':'ab'*32,'signedReceiptBase64':'ZXh0ZXJuYWwtd2l0bmVzcy1vbmx5',
+          }
+          open(os.path.join(root,'offhost-checkpoint.json'),'w').write(json.dumps(checkpoint,separators=(',',':')))
+          PY
+
+          python3 scripts/xsp-v2-p0e3b-backup-set.py --root "$root" --checkpoint "$root/offhost-checkpoint.json"
+
+          cp -a "$root" "$RUNNER_TEMP/p0e3b-old"
+          python3 - "$RUNNER_TEMP/p0e3b-old/manifest.json" <<'PY'
+          import json,sys
+          p=sys.argv[1]; m=json.load(open(p)); m['keyEpoch']=1; open(p,'w').write(json.dumps(m,separators=(',',':')))
+          PY
+          if python3 scripts/xsp-v2-p0e3b-backup-set.py --root "$RUNNER_TEMP/p0e3b-old" --checkpoint "$root/offhost-checkpoint.json"; then
+            echo 'old coordinated backup unexpectedly passed E3a floor' >&2; exit 1
+          fi
+
+          cp -a "$root" "$RUNNER_TEMP/p0e3b-mixed"
+          printf '%s\n' 'different-generation-agent-state' >> "$RUNNER_TEMP/p0e3b-mixed/agent-state.tar"
+          if python3 scripts/xsp-v2-p0e3b-backup-set.py --root "$RUNNER_TEMP/p0e3b-mixed" --checkpoint "$root/offhost-checkpoint.json"; then
+            echo 'mixed-generation component unexpectedly passed digest binding' >&2; exit 1
+          fi
+
+          cp -a "$root" "$RUNNER_TEMP/p0e3b-missing"
+          rm "$RUNNER_TEMP/p0e3b-missing/signer-keys.tar"
+          if python3 scripts/xsp-v2-p0e3b-backup-set.py --root "$RUNNER_TEMP/p0e3b-missing" --checkpoint "$root/offhost-checkpoint.json"; then
+            echo 'missing signer identity unexpectedly passed' >&2; exit 1
+          fi
+
+          cp -a "$root" "$RUNNER_TEMP/p0e3b-divergent"
+          python3 - "$RUNNER_TEMP/p0e3b-divergent/manifest.json" <<'PY'
+          import json,sys
+          p=sys.argv[1]; m=json.load(open(p)); m['authoritativeReceiptSha256Hex']='cd'*32; open(p,'w').write(json.dumps(m,separators=(',',':')))
+          PY
+          if python3 scripts/xsp-v2-p0e3b-backup-set.py --root "$RUNNER_TEMP/p0e3b-divergent" --checkpoint "$root/offhost-checkpoint.json"; then
+            echo 'same-epoch divergent receipt unexpectedly passed' >&2; exit 1
+          fi
+
+          echo 'P0-E3B BACKUP SET CONTRACT: PASS'
+          echo 'Scope: inventory/floor binding only; real coordinated restore execution remains the next E3b layer.'
