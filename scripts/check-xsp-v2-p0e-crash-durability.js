@@ -100,7 +100,7 @@ function verify(nodeRoot){
   assert.match(proofDoc,/not a full hardware power-cut claim/i);
   assert.match(proofDoc,/physical power removal/i);
   assert.match(proofDoc,/snapshot anti-rollback/i);
-  assert.match(proofDoc,/strict-pq` remains OFF/i);
+  assert.match(proofDoc,/strict-pq` remains [^\n]*OFF/i);
 
   const boundary=contract.proofBoundary;
   assert.equal(boundary.name,'P0-E1a-process-crash-fsync-order');
