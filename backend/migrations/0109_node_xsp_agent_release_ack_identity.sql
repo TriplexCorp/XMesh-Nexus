@@ -42,14 +42,16 @@ DECLARE
 BEGIN
   -- Once authenticated ACK evidence exists, it is historical evidence and may
   -- never be rewritten, removed or rebound by later lifecycle/heartbeat work.
-  IF TG_OP = 'UPDATE' AND OLD.release_ack_received_at IS NOT NULL AND (
-       NEW.release_ack_version IS DISTINCT FROM OLD.release_ack_version
-       OR NEW.release_ack_source_revision IS DISTINCT FROM OLD.release_ack_source_revision
-       OR NEW.release_ack_artifact_sha256 IS DISTINCT FROM OLD.release_ack_artifact_sha256
-       OR NEW.release_ack_success IS DISTINCT FROM OLD.release_ack_success
-       OR NEW.release_ack_received_at IS DISTINCT FROM OLD.release_ack_received_at
-     ) THEN
-    RAISE EXCEPTION 'XSP-v2 Agent release ACK identity is immutable';
+  IF TG_OP = 'UPDATE' THEN
+    IF OLD.release_ack_received_at IS NOT NULL AND (
+         NEW.release_ack_version IS DISTINCT FROM OLD.release_ack_version
+         OR NEW.release_ack_source_revision IS DISTINCT FROM OLD.release_ack_source_revision
+         OR NEW.release_ack_artifact_sha256 IS DISTINCT FROM OLD.release_ack_artifact_sha256
+         OR NEW.release_ack_success IS DISTINCT FROM OLD.release_ack_success
+         OR NEW.release_ack_received_at IS DISTINCT FROM OLD.release_ack_received_at
+       ) THEN
+      RAISE EXCEPTION 'XSP-v2 Agent release ACK identity is immutable';
+    END IF;
   END IF;
 
   -- An unbound legacy command must never acquire fabricated migration identity.
@@ -85,11 +87,12 @@ BEGIN
   -- but silently ignore it for bound migrations. This keeps heartbeat itself
   -- healthy while guaranteeing that a missing/failed identity ACK is never
   -- upgraded to success by a later matching-version heartbeat.
-  IF TG_OP = 'UPDATE'
-     AND NEW.state = 'succeeded'
-     AND OLD.state IS DISTINCT FROM 'succeeded'
-     AND (NEW.release_ack_received_at IS NULL OR NEW.release_ack_success IS DISTINCT FROM TRUE) THEN
-    RETURN OLD;
+  IF TG_OP = 'UPDATE' THEN
+    IF NEW.state = 'succeeded'
+       AND OLD.state IS DISTINCT FROM 'succeeded'
+       AND (NEW.release_ack_received_at IS NULL OR NEW.release_ack_success IS DISTINCT FROM TRUE) THEN
+      RETURN OLD;
+    END IF;
   END IF;
 
   RETURN NEW;
