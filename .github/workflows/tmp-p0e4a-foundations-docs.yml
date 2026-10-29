@@ -1,0 +1,62 @@
+name: Temporary P0-E4a Foundations Docs Update
+
+on:
+  push:
+    branches: [docs/p0e4a-foundations-checkpoint]
+    paths:
+      - '.tmp/update_p0e4a_foundations_docs.py'
+      - '.github/workflows/tmp-p0e4a-foundations-docs.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: docs/p0e4a-foundations-checkpoint
+          fetch-depth: 0
+      - name: Require PR #117 post-merge Backend CI to be green
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, time, urllib.request
+          url='https://api.github.com/repos/TriplexCorp/XMesh-Nexus/actions/runs/40963109551'
+          for _ in range(60):
+              with urllib.request.urlopen(url, timeout=20) as response:
+                  run=json.load(response)
+              status=run.get('status')
+              conclusion=run.get('conclusion')
+              print(f'Backend #3667: status={status} conclusion={conclusion}')
+              if status == 'completed':
+                  if conclusion != 'success':
+                      raise SystemExit('Backend #3667 did not complete successfully')
+                  break
+              time.sleep(10)
+          else:
+              raise SystemExit('Backend #3667 did not finish within the bounded docs-update window')
+          PY
+      - name: Apply assert-checked documentation checkpoint
+        run: python3 .tmp/update_p0e4a_foundations_docs.py
+      - name: Verify documentation-only result
+        run: |
+          set -euo pipefail
+          git diff --check
+          changed="$(git diff --name-only | sort)"
+          expected="$(printf '%s\n' README.en.md README.md docs/ENTERPRISE_ROADMAP.md | sort)"
+          test "$changed" = "$expected"
+          grep -Fq 'P0-E4a remains the CURRENT sub-gate' README.md
+          grep -Fq 'P0-E4a remains the CURRENT sub-gate' README.en.md
+          grep -Fq 'P0-E4a remains open' docs/ENTERPRISE_ROADMAP.md
+          grep -Fq 'physicalPowerLossQualified=false' docs/ENTERPRISE_ROADMAP.md
+      - name: Commit checkpoint docs
+        run: |
+          set -euo pipefail
+          git config user.name 'Xmesh Creator'
+          git config user.email 'Aselis3d@gmail.com'
+          git add README.md README.en.md docs/ENTERPRISE_ROADMAP.md
+          git commit -m 'docs(xsp-v2): checkpoint P0-E4a foundations'
+          git push origin HEAD:docs/p0e4a-foundations-checkpoint
