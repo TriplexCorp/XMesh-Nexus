@@ -115,7 +115,7 @@ try:
   print(status+" -")
 except (ValueError,TypeError,KeyError):
  print("helper_error -")
-')" 
+')"
   read -r profile_check parsed_revision <<< "$parsed"
   if [[ "$parsed_revision" =~ ^[a-f0-9]{64}$ ]];then revision_json="\"$parsed_revision\"";fi
  fi
@@ -230,6 +230,22 @@ update_managed_xray(){
 # docker restart after a denied node is stopped.
 STATE_DIR=/var/lib/xmesh-node-control
 MARKER="$STATE_DIR/forced-stop"
+RELEASE_IDENTITY_FILE=/run/xmesh-node-control/agent-release-identity.json
+stage_agent_release_identity(){
+ local version="$1" revision="$2" digest="$3" tmp
+ [[ "$version" =~ ^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$ ]] || return 1
+ [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || return 1
+ [[ "$digest" =~ ^[0-9a-f]{64}$ ]] || return 1
+ install -d -m 0700 /run/xmesh-node-control
+ tmp="$(mktemp /run/xmesh-node-control/release.XXXXXXXX)" || return 1
+ printf '{"version":"%s","sourceRevision":"%s","artifactSha256":"%s"}\n' \
+  "$version" "$revision" "$digest" > "$tmp"
+ chmod 600 "$tmp"
+ mv -f "$tmp" "$RELEASE_IDENTITY_FILE"
+}
+clear_agent_release_identity(){
+ rm -f "$RELEASE_IDENTITY_FILE"
+}
 stop_xray(){
  mkdir -p "$STATE_DIR"
  chmod 700 "$STATE_DIR"
@@ -246,7 +262,8 @@ stop_xray(){
   # traffic again. Never stop arbitrary remote-specified services.
   timeout 30 systemctl disable --now "$UNIT" >/dev/null || return 1
   if systemctl is-active --quiet "$UNIT";then
-   echo "CRITICAL: systemd Xray still active after stop" >&2;return 1
+   echo "CRITICAL: systemd Xray still active after stop" >&2
+   return 1
   fi
   printf 'systemd\n' > "$MARKER"
  fi
@@ -293,25 +310,39 @@ if [[ -f "$MARKER" ]];then
  heartbeat
 fi
 command_info="$(printf '%s' "$reply" | python3 -c '
-import json,sys
+import json,re,sys
 obj=json.load(sys.stdin)
 cmd=obj.get("command")
 if not cmd:sys.exit(0)
+if not isinstance(cmd,dict):sys.exit(2)
 action=cmd.get("action")
 if action not in ("restart_xray","update_xray","update_agent"):sys.exit(2)
 value=cmd.get("id")
 if not isinstance(value,int) or isinstance(value,bool) or value<=0:sys.exit(2)
 version=cmd.get("targetVersion")
+identity=cmd.get("releaseIdentity")
+release_version=source_revision=artifact_sha256="-"
 if action=="update_xray":
- if not isinstance(version,str) or not __import__("re").fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,63}",version):sys.exit(2)
+ if identity is not None:sys.exit(2)
+ if not isinstance(version,str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,63}",version):sys.exit(2)
 elif action=="update_agent":
- if not isinstance(version,str) or not __import__("re").fullmatch(r"control-v[0-9]+[.][0-9]+[.][0-9]+",version):sys.exit(2)
+ if not isinstance(version,str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,63}",version):sys.exit(2)
+ if identity is not None:
+  if not isinstance(identity,dict) or set(identity)!={"version","sourceRevision","artifactSha256"}:sys.exit(2)
+  release_version=identity.get("version")
+  source_revision=identity.get("sourceRevision")
+  artifact_sha256=identity.get("artifactSha256")
+  if release_version!=version:sys.exit(2)
+  if not isinstance(release_version,str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,63}",release_version):sys.exit(2)
+  if not isinstance(source_revision,str) or not re.fullmatch(r"[0-9a-f]{40}",source_revision):sys.exit(2)
+  if not isinstance(artifact_sha256,str) or not re.fullmatch(r"[0-9a-f]{64}",artifact_sha256):sys.exit(2)
 else:
+ if identity is not None:sys.exit(2)
  version="-"
-print(str(value)+" "+action+" "+version)
+print(" ".join((str(value),action,version,release_version,source_revision,artifact_sha256)))
 ')"
 [[ -n "$command_info" ]] || exit 0
-read -r command_id action target_version <<< "$command_info"
+read -r command_id action target_version release_version source_revision artifact_sha256 <<< "$command_info"
 [[ "$command_id" =~ ^[1-9][0-9]*$ ]] || exit 2
 success=false
 detail='Command failed'
@@ -319,17 +350,36 @@ if [[ "$action" == update_xray ]];then
  if update_managed_xray "$target_version";then success=true;fi
 elif [[ "$action" == update_agent ]];then
  # Only the installed systemd unit may update the agent. The API does not
- # provide executable commands, paths or URLs.
- if ! systemctl cat xmesh-node-agent-upgrade.service >/dev/null 2>&1;then
-  detail='Agent updater service missing; reinstall control-v4 first'
- elif timeout 650 systemctl start --wait xmesh-node-agent-upgrade.service &&
-      grep -Fxq "AGENT_VERSION=\"$target_version\"" /usr/local/sbin/xmesh-node-control;then
-  success=true
-  detail='Agent installed and version verified'
+ # provide executable commands, paths or URLs. A bound staged migration keeps
+ # its exact immutable identity in a root-only local file throughout apply;
+ # the updater path itself remains the same fixed pre-installed service.
+ clear_agent_release_identity
+ if [[ "$release_version" != - ]];then
+  if ! stage_agent_release_identity "$release_version" "$source_revision" "$artifact_sha256";then
+   detail='Invalid or unstorable Agent release identity'
+  elif ! systemctl cat xmesh-node-agent-upgrade.service >/dev/null 2>&1;then
+   detail='Agent updater service missing; reinstall control-v4 first'
+  elif timeout 650 systemctl start --wait xmesh-node-agent-upgrade.service &&
+       grep -Fxq "AGENT_VERSION=\"$target_version\"" /usr/local/sbin/xmesh-node-control;then
+   success=true
+   detail='Agent installed and release identity preserved'
+  else
+   unit_result="$(systemctl show --property=Result --value xmesh-node-agent-upgrade.service 2>/dev/null || true)"
+   [[ "$unit_result" =~ ^[a-zA-Z0-9_-]{1,40}$ ]] || unit_result=unknown
+   detail="Agent update failed (systemd: $unit_result); journalctl -u xmesh-node-agent-upgrade.service"
+  fi
  else
-  unit_result="$(systemctl show --property=Result --value xmesh-node-agent-upgrade.service 2>/dev/null || true)"
-  [[ "$unit_result" =~ ^[a-zA-Z0-9_-]{1,40}$ ]] || unit_result=unknown
-  detail="Agent update failed (systemd: $unit_result); journalctl -u xmesh-node-agent-upgrade.service"
+  if ! systemctl cat xmesh-node-agent-upgrade.service >/dev/null 2>&1;then
+   detail='Agent updater service missing; reinstall control-v4 first'
+  elif timeout 650 systemctl start --wait xmesh-node-agent-upgrade.service &&
+       grep -Fxq "AGENT_VERSION=\"$target_version\"" /usr/local/sbin/xmesh-node-control;then
+   success=true
+   detail='Agent installed and version verified'
+  else
+   unit_result="$(systemctl show --property=Result --value xmesh-node-agent-upgrade.service 2>/dev/null || true)"
+   [[ "$unit_result" =~ ^[a-zA-Z0-9_-]{1,40}$ ]] || unit_result=unknown
+   detail="Agent update failed (systemd: $unit_result); journalctl -u xmesh-node-agent-upgrade.service"
+  fi
  fi
 elif [[ "$action" == restart_xray ]];then
  if restart_xray;then
@@ -341,6 +391,16 @@ elif [[ "$action" == restart_xray ]];then
 else
  exit 2
 fi
-signed_post '/api/v1/node/restart/ack' \
- "{\"node_id\":$XMESH_NODE_ID,\"command_id\":$command_id,\"success\":$success,\"detail\":\"$detail\"}" >/dev/null
+ack_identity=''
+if [[ "$release_version" != - ]];then
+ ack_identity=",\"releaseIdentity\":{\"version\":\"$release_version\",\"sourceRevision\":\"$source_revision\",\"artifactSha256\":\"$artifact_sha256\"}"
+fi
+ack_payload="{\"node_id\":$XMESH_NODE_ID,\"command_id\":$command_id,\"success\":$success,\"detail\":\"$detail\"$ack_identity}"
+if signed_post '/api/v1/node/restart/ack' "$ack_payload" >/dev/null;then
+ if [[ "$release_version" != - ]];then clear_agent_release_identity;fi
+else
+ # Keep the root-only identity evidence for diagnostics if transport/ACK fails;
+ # the server remains non-success and will never accept heartbeat-only success.
+ exit 1
+fi
 heartbeat
