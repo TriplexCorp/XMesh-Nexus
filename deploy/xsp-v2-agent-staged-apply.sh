@@ -62,7 +62,7 @@ ensure_real_directory(){
     [[ -d "$path" ]] || { echo "non-directory path rejected: $path" >&2; return 1; }
     chmod "$mode" "$path"
   else
-    install -d -o root -g root -m "$mode" "$path"
+    install -d -m "$mode" "$path"
   fi
 }
 ensure_real_directory "$BASE" 0700
@@ -126,6 +126,41 @@ expected={'version':sys.argv[2],'sourceRevision':sys.argv[3],'artifactSha256':sy
 if value != expected:
     raise SystemExit(1)
 PY
+}
+
+# Revalidate the package that would receive rollback before changing `current`.
+# Its own immutable identity, not the incoming release identity, is authoritative.
+verify_previous_package(){
+  local target="$1" package_dir binary identity_file digest actual runtime
+  [[ "$target" =~ ^releases/[0-9a-f]{64}$ ]] || return 1
+  digest="${target#releases/}"
+  package_dir="$BASE/$target"
+  binary="$package_dir/xmesh-agent-xspv2"
+  identity_file="$package_dir/identity.json"
+  [[ -d "$package_dir" && ! -L "$package_dir" ]] || return 1
+  [[ -f "$binary" && ! -L "$binary" && -x "$binary" ]] || return 1
+  [[ -f "$identity_file" && ! -L "$identity_file" ]] || return 1
+  actual="$(sha256sum "$binary" | awk '{print $1}')" || return 1
+  [[ "$actual" == "$digest" ]] || return 1
+  runtime="$(timeout 10 "$binary" --identity 2>/dev/null)" || return 1
+  python3 - "$runtime" "$identity_file" "$digest" <<'PY'
+import json,re,sys
+runtime=json.loads(sys.argv[1])
+with open(sys.argv[2],encoding='utf-8') as stream:
+    identity=json.load(stream)
+if set(identity) != {'version','sourceRevision','artifactSha256'}:
+    raise SystemExit(1)
+if identity.get('artifactSha256') != sys.argv[3]:
+    raise SystemExit(1)
+version=identity.get('version'); revision=identity.get('sourceRevision')
+if not isinstance(version,str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._+-]{0,63}',version):
+    raise SystemExit(1)
+if not isinstance(revision,str) or not re.fullmatch(r'[0-9a-f]{40}',revision):
+    raise SystemExit(1)
+if runtime != {'version':version,'sourceRevision':revision}:
+    raise SystemExit(1)
+PY
+  timeout 20 "$binary" --check-state "$STATE_ROOT" >/dev/null
 }
 
 write_identity(){
@@ -216,6 +251,7 @@ if [[ -e "$CURRENT" || -L "$CURRENT" ]]; then
   [[ "$old_target" =~ ^releases/[0-9a-f]{64}$ ]] || { echo 'active Agent package pointer escaped releases' >&2; exit 1; }
   old_dir="$BASE/$old_target"
   [[ -d "$old_dir" && ! -L "$old_dir" ]] || { echo 'last-known-good package is unavailable' >&2; exit 1; }
+  verify_previous_package "$old_target" || { echo 'last-known-good package failed re-verification' >&2; exit 1; }
   write_last_good_package "$old_target"
 else
   # First side-by-side Go package still has the deployed shell Agent as the
