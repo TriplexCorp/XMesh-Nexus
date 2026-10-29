@@ -8,6 +8,7 @@ const api=fs.readFileSync('backend/src/main.rs','utf8');
 const runtime=fs.readFileSync('backend/src/node_runtime.rs','utf8');
 const migration=fs.readFileSync('backend/migrations/0024_node_agent_updates.sql','utf8');
 const releaseManifest=fs.readFileSync('backend/migrations/0107_node_xsp_agent_release_manifests.sql','utf8');
+const migrationBinding=fs.readFileSync('backend/migrations/0108_node_xsp_agent_migration_binding.sql','utf8');
 const agent=fs.readFileSync('deploy/node-control-agent.sh','utf8');
 const updater=fs.readFileSync('deploy/update-node-control-agent.sh','utf8');
 const installer=fs.readFileSync('deploy/install-node-metrics-agent.sh','utf8');
@@ -42,6 +43,22 @@ assert.match(releaseManifest,/append-only/);
 assert.doesNotMatch(releaseManifest,/\b(url|uri|script|command)\b\s+TEXT/i,
   'Release manifest must never introduce remotely selected executable locations or commands');
 assert.doesNotMatch(releaseManifest,/strict-pq=on/,'Manifest foundation must not activate strict PQ');
+
+// P0-D1b binds that immutable identity to the existing update_agent queue only.
+// No new remotely executable action or caller-selected location is introduced.
+assert.match(migrationBinding,/ADD COLUMN release_manifest_id BIGINT/);
+assert.match(migrationBinding,/REFERENCES node_xsp_agent_release_manifests\(id\) ON DELETE RESTRICT/);
+assert.match(migrationBinding,/CHECK \(release_manifest_id IS NULL OR action = 'update_agent'\)/);
+assert.match(migrationBinding,/CREATE OR REPLACE FUNCTION validate_node_xsp_agent_migration_binding/);
+assert.match(migrationBinding,/NEW\.target_version IS DISTINCT FROM manifest_version/);
+assert.match(migrationBinding,/bound XSP-v2 Agent migration identity is immutable/);
+assert.match(migrationBinding,/CREATE OR REPLACE FUNCTION stage_node_xsp_agent_migration/);
+assert.match(migrationBinding,/p_node_id, 'update_agent', p_requested_by, manifest\.version, manifest\.id/);
+assert.match(migrationBinding,/ON CONFLICT DO NOTHING/,'Existing single-flight queue must remain authoritative');
+assert.match(migrationBinding,/node already has an active control command/);
+assert.doesNotMatch(migrationBinding,/\b(url|uri|script|command_text|shell)\b\s+(TEXT|VARCHAR)/i,
+  'Migration binding must not add remotely selected executable input');
+assert.doesNotMatch(migrationBinding,/strict-pq=on/,'Binding primitive must not activate strict PQ');
 
 assert.match(agent,/AGENT_VERSION="control-v[45][.][0-9]+[.][0-9]+"/);
 assert.match(agent,/router_running\(\)\{/,'Control agent needs an independent edge-router health probe');
@@ -99,4 +116,4 @@ for(const file of ['deploy/node-control-agent.sh','deploy/update-node-control-ag
 }
 const syntax=spawnSync(process.execPath,['--check','app.js'],{encoding:'utf8'});
 assert.equal(syntax.status,0,syntax.stderr);
-console.log('Signed remote Agent upgrade, immutable release identity and install contract: OK');
+console.log('Signed remote Agent upgrade, immutable release identity/binding and install contract: OK');
