@@ -235,13 +235,7 @@ pub async fn request_agent_update(
             .await
         }
         AgentUpdateRequest::Migration(request) => {
-            request_staging_agent_migration(
-                &state,
-                &actor,
-                node_id,
-                &request.release_version,
-            )
-            .await
+            request_staging_agent_migration(&state, &actor, node_id, &request.release_version).await
         }
     }
 }
