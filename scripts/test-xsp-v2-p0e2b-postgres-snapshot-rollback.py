@@ -268,6 +268,18 @@ def main() -> None:
             replay = sql(f"SELECT count(*) FROM node_xsp_replay_nonces WHERE node_id={node_id};").stdout.strip()
             return epoch, state, outbox, replay
 
+        def excessive_security_role_privileges(role: str) -> bool:
+            value = sql(
+                "SELECT ("
+                f"has_database_privilege('{role}', 'xmesh', 'CREATE') OR "
+                f"has_database_privilege('{role}', 'xmesh', 'TEMP') OR "
+                f"has_schema_privilege('{role}', 'public', 'CREATE')"
+                ")::text;"
+            ).stdout.strip()
+            if value not in {"true", "false", "t", "f"}:
+                raise RuntimeError(f"unexpected privilege probe result for {role}: {value!r}")
+            return value in {"true", "t"}
+
         try:
             command("docker", "network", "create", "--internal", network)
             for volume in volumes.values():
@@ -381,8 +393,16 @@ chmod 0444 /certs/client.pem /certs/client-spki.sha256
 
             signer_sql = (ROOT / "deploy/postgres/20-create-xsp-v2-signer-role.sql").read_text()
             c2c_sql = (ROOT / "deploy/postgres/21-create-xsp-v2-c2c-role.sql").read_text()
-            sql("\\set signer_password " + signer_password + "\n" + signer_sql)
-            sql("\\set c2c_password " + c2c_password + "\n" + c2c_sql)
+
+            def provision_security_roles() -> None:
+                sql("\\set signer_password " + signer_password + "\n" + signer_sql)
+                sql("\\set c2c_password " + c2c_password + "\n" + c2c_sql)
+
+            provision_security_roles()
+            if excessive_security_role_privileges("xmesh_signer_reader"):
+                raise RuntimeError("initial signer role provisioning left excessive effective privileges")
+            if excessive_security_role_privileges("xmesh_c2c_writer"):
+                raise RuntimeError("initial C2-C role provisioning left excessive database/schema privileges")
 
             permit_row = sql(
                 f"SELECT from_epoch||'|'||to_epoch||'|'||encode(candidate_sha256,'hex')||'|'||encode(signed_permit,'base64') "
@@ -425,7 +445,9 @@ chmod 0444 /certs/client.pem /certs/client-spki.sha256
                 raise RuntimeError(f"unexpected pre-snapshot state: {pre}")
 
             # REAL database snapshot: not SQL row rewriting. This dump captures
-            # the exact issued/pre-ACK PostgreSQL state and security-role grants.
+            # the exact issued/pre-ACK PostgreSQL rows and object ACLs. Database-
+            # level privileges belong to the database object itself and therefore
+            # must be explicitly re-hardened after DROP/CREATE + pg_restore.
             command(
                 "docker", "exec", db,
                 "pg_dump", "-U", "postgres", "-d", "xmesh", "-Fc",
@@ -488,6 +510,32 @@ chmod 0444 /certs/client.pem /certs/client-spki.sha256
             if restored != (from_epoch, "issued", "0", "0"):
                 raise RuntimeError(f"pg_restore did not return to exact pre-ACK state: {restored}")
             print("PASS: real pg_dump/pg_restore returned PostgreSQL to exact pre-ACK security state")
+
+            # A recreated PostgreSQL database receives default database-level
+            # privileges; a per-database pg_dump cannot encode those CREATE/TEMP
+            # ACLs. The signer previously exposed this by refusing to start with
+            # "excessive effective object privileges". The restore procedure must
+            # re-apply the reviewed idempotent least-privilege provisioning before
+            # any security sidecar is restarted. Never weaken the signer self-check.
+            drifted_signer = excessive_security_role_privileges("xmesh_signer_reader")
+            drifted_c2c = excessive_security_role_privileges("xmesh_c2c_writer")
+            if not drifted_signer or not drifted_c2c:
+                raise RuntimeError(
+                    "expected recreated database-level privilege drift was not observed for both security roles"
+                )
+            print("PASS: restore reproduced database-level ACL drift that security sidecars must not accept")
+
+            provision_security_roles()
+            if excessive_security_role_privileges("xmesh_signer_reader"):
+                raise RuntimeError("restore re-hardening left excessive signer privileges")
+            if excessive_security_role_privileges("xmesh_c2c_writer"):
+                raise RuntimeError("restore re-hardening left excessive C2-C database/schema privileges")
+            rehardened = durable_state(node_id, request_id)
+            if rehardened != restored:
+                raise RuntimeError(
+                    f"least-privilege restore hardening mutated security state: before={restored} after={rehardened}"
+                )
+            print("PASS: restore re-hardening removed ACL drift without mutating XSP-v2 security state")
 
             if int(time.time() * 1000) + 5000 >= ack_expires_ms:
                 raise RuntimeError(
