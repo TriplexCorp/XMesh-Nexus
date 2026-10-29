@@ -44,7 +44,8 @@ SH
 chmod 755 "$FAKEBIN/curl"
 
 make_fixture(){
-  local path="$1" version="$2" revision="$3" fail_after_switch="${4:-false}" counter="$TMP/counter-$(basename "$path")"
+  local path="$1" version="$2" revision="$3" fail_after_switch="${4:-false}"
+  local counter="$TMP/counter-$(basename "$path")"
   cat > "$path" <<EOF
 #!/usr/bin/env bash
 set -Eeuo pipefail
