@@ -25,4 +25,4 @@ CapabilityBoundingSet=
 AmbientCapabilities=
 StateDirectory=xmesh-agent
 StateDirectoryMode=0700
-ReadWritePaths=/run/xmesh-node-control /var/lib/xmesh-agent
+ReadWritePaths=/run /var/lib/xmesh-agent
