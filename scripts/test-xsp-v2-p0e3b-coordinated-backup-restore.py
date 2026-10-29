@@ -473,7 +473,7 @@ def main() -> None:
             toolbox_run("bash", "-ceu", "apt-get update >/dev/null && apt-get install -y --no-install-recommends pkg-config libssl-dev openssl ca-certificates >/dev/null", timeout=300)
             toolbox_run(
                 "bash", "-ceu",
-                "CARGO_TARGET_DIR=/work/cargo-target cargo build --locked --manifest-path /src/backend/Cargo.toml "
+                "rm -rf /work/backend-build && cp -a /src/backend /work/backend-build && CARGO_TARGET_DIR=/work/cargo-target cargo build --manifest-path /work/backend-build/Cargo.toml "
                 "--features xsp-v2-experimental --bin xsp-v2-recovery-checkpoint >/dev/null && "
                 "cp /work/cargo-target/debug/xsp-v2-recovery-checkpoint /work/recovery-tool",
                 timeout=900,
