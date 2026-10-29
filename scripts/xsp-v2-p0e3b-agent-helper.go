@@ -23,13 +23,13 @@ import (
 const maxJournalBytes = 32 * 1024
 
 type panelPinJSON struct {
-	Purpose              string `json:"purpose"`
-	IssuerID             string `json:"issuerId"`
-	NodeID               uint64 `json:"nodeId"`
-	EdKeyID              string `json:"edKeyId"`
-	PQKeyID              string `json:"pqKeyId"`
-	Ed25519PublicBase64   string `json:"ed25519PublicBase64"`
-	MLDSA65PublicBase64   string `json:"mldsa65PublicBase64"`
+	Purpose             string `json:"purpose"`
+	IssuerID            string `json:"issuerId"`
+	NodeID              uint64 `json:"nodeId"`
+	EdKeyID             string `json:"edKeyId"`
+	PQKeyID             string `json:"pqKeyId"`
+	Ed25519PublicBase64 string `json:"ed25519PublicBase64"`
+	MLDSA65PublicBase64 string `json:"mldsa65PublicBase64"`
 }
 
 type permitJournal struct {
@@ -61,21 +61,21 @@ type receiptJournal struct {
 }
 
 type keyView struct {
-	NodeID          uint64 `json:"nodeId"`
-	Purpose         string `json:"purpose"`
-	KeyEpoch        uint64 `json:"keyEpoch"`
-	EdKeyID         string `json:"edKeyId"`
-	PQKeyID         string `json:"pqKeyId"`
-	EdPublicBase64  string `json:"edPublicBase64"`
-	PQPublicBase64  string `json:"pqPublicBase64"`
+	NodeID         uint64 `json:"nodeId"`
+	Purpose        string `json:"purpose"`
+	KeyEpoch       uint64 `json:"keyEpoch"`
+	EdKeyID        string `json:"edKeyId"`
+	PQKeyID        string `json:"pqKeyId"`
+	EdPublicBase64 string `json:"edPublicBase64"`
+	PQPublicBase64 string `json:"pqPublicBase64"`
 }
 
 type localState struct {
-	NodeID                   uint64  `json:"nodeId"`
-	KeyEpoch                 uint64  `json:"keyEpoch"`
-	CurrentReceiptSHA256Hex  *string `json:"currentReceiptSha256Hex"`
-	EdKeyID                  string  `json:"edKeyId"`
-	PQKeyID                  string  `json:"pqKeyId"`
+	NodeID                  uint64  `json:"nodeId"`
+	KeyEpoch                uint64  `json:"keyEpoch"`
+	CurrentReceiptSHA256Hex *string `json:"currentReceiptSha256Hex"`
+	EdKeyID                 string  `json:"edKeyId"`
+	PQKeyID                 string  `json:"pqKeyId"`
 }
 
 func fail(err error) {
@@ -261,7 +261,7 @@ func expectedPermit(prior, next keyring.PublicBundle, message cutover.Message) (
 }
 
 func commandInit(args []string) error {
-	if len(args) != 3 || args[0] != "--root" || args[2] == "" {
+	if len(args) != 2 || args[0] != "--root" || args[1] == "" {
 		return errors.New("usage: init --root ABSOLUTE_ROOT")
 	}
 	layout, err := state.Prepare(args[1])
@@ -480,11 +480,11 @@ func commandApply(args []string) error {
 	}
 	view, _ := keyViewOf(opened)
 	return writeJSON("-", map[string]any{
-		"current": view,
-		"permitDigest": permit.PermitDigest(),
-		"signedAckBase64": base64.StdEncoding.EncodeToString(ackRaw),
+		"current":            view,
+		"permitDigest":       permit.PermitDigest(),
+		"signedAckBase64":    base64.StdEncoding.EncodeToString(ackRaw),
 		"signedAckSha256Hex": shaHex(ackRaw),
-		"ackNonceHex": ack.NonceHex,
+		"ackNonceHex":        ack.NonceHex,
 	})
 }
 
@@ -554,20 +554,20 @@ func commandReceiptTemplate(args []string) error {
 		return err
 	}
 	message := cutover.CommitReceipt{
-		Protocol:               "XSP/2",
-		Kind:                   "commit_receipt",
-		IssuerID:               pin.IssuerID,
-		SignerEdKeyID:          pin.EdKeyID,
-		SignerPQKeyID:          pin.PQKeyID,
-		NodeID:                 ack.NodeID,
-		FromEpoch:              ack.FromEpoch,
-		ToEpoch:                ack.ToEpoch,
-		RequestID:              ack.RequestID,
-		CommittedAtMS:          ack.IssuedAtMS + 500,
-		AckNonceHex:            ack.NonceHex,
-		CandidateSHA256Hex:     ack.CandidateSHA256Hex,
-		PermitSHA256Hex:        permit.PermitDigest(),
-		SignedACKSHA256Hex:     shaHex(ackRaw),
+		Protocol:           "XSP/2",
+		Kind:               "commit_receipt",
+		IssuerID:           pin.IssuerID,
+		SignerEdKeyID:      pin.EdKeyID,
+		SignerPQKeyID:      pin.PQKeyID,
+		NodeID:             ack.NodeID,
+		FromEpoch:          ack.FromEpoch,
+		ToEpoch:            ack.ToEpoch,
+		RequestID:          ack.RequestID,
+		CommittedAtMS:      ack.IssuedAtMS + 500,
+		AckNonceHex:        ack.NonceHex,
+		CandidateSHA256Hex: ack.CandidateSHA256Hex,
+		PermitSHA256Hex:    permit.PermitDigest(),
+		SignedACKSHA256Hex: shaHex(ackRaw),
 	}
 	canonical, err := cutover.CommitReceiptCanonical(message)
 	if err != nil {
@@ -626,9 +626,9 @@ func commandPersistReceipt(args []string) error {
 		return err
 	}
 	return writeJSON("-", map[string]any{
-		"nodeId": verified.NodeID,
-		"toEpoch": verified.ToEpoch,
-		"requestId": verified.RequestID,
+		"nodeId":                 verified.NodeID,
+		"toEpoch":                verified.ToEpoch,
+		"requestId":              verified.RequestID,
 		"signedReceiptSha256Hex": shaHex(receiptRaw),
 	})
 }
