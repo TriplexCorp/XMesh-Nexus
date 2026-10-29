@@ -1,0 +1,112 @@
+name: XSP-v2 P0-E4a5 Node Lab Operation Contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "deploy/xsp-v2-p0e4a5-lab-operation.contract.json"
+      - "docs/XSP_V2_P0E4A5_LAB_OPERATION_CONTRACT.md"
+      - ".github/workflows/xsp-p0e4a5-node-lab-operation.yml"
+  pull_request:
+    paths:
+      - "deploy/xsp-v2-p0e4a5-lab-operation.contract.json"
+      - "docs/XSP_V2_P0E4A5_LAB_OPERATION_CONTRACT.md"
+      - ".github/workflows/xsp-p0e4a5-node-lab-operation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  node-lab-operation-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out exact merged XMesh-Node P0-E4a5 source
+        uses: actions/checkout@v4
+        with:
+          repository: TriplexCorp/XMesh-Node
+          ref: 7bf8cc92950f396e33891c8744c1f6855414154b
+          path: xmesh-node
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache: false
+
+      - name: Verify contract and bounded Node delta
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          p='deploy/xsp-v2-p0e4a5-lab-operation.contract.json'
+          x=json.load(open(p))
+          assert x['schema']=='xsp2-p0e4a5-lab-operation-contract-1'
+          assert x['node']['repository']=='TriplexCorp/XMesh-Node'
+          assert x['node']['powercutSourceRevision']=='50c770c8bbb917b04ca893ac5b8d29e6c7f9af7e'
+          assert x['node']['labRunnerRevision']=='7bf8cc92950f396e33891c8744c1f6855414154b'
+          assert x['node']['labRunnerPullRequest']==45
+          assert x['requiredCheckpoints']==['after-previous','after-floor','after-active','after-recovery-abort','after-recovery-active']
+          assert x['externalPowerControllerRequired'] is True
+          assert x['physicalPowerLossQualified'] is False
+          assert x['productionActivation'] is False
+          assert x['strictPQEnabled'] is False
+          PY
+
+          cd xmesh-node
+          old=50c770c8bbb917b04ca893ac5b8d29e6c7f9af7e
+          new=7bf8cc92950f396e33891c8744c1f6855414154b
+          git cat-file -e "$old^{commit}"
+          git cat-file -e "$new^{commit}"
+          git diff --quiet "$old" "$new" -- \
+            security/xspv2/poc-go/keyring/two_phase.go \
+            security/xspv2/poc-go/keyring/durability_checkpoint_powercut_linux.go \
+            security/xspv2/poc-go/keyring/sealed.go
+          actual="$(git diff --name-only "$old" "$new" | sort)"
+          expected="$(printf '%s\n' \
+            .github/workflows/xsp-p0e4a5-lab-operation.yml \
+            docs/XSP_V2_P0E4A5_LAB_OPERATION.md \
+            security/xspv2/poc-go/keyring/powercut_lab_operation_linux_test.go | sort)"
+          test "$actual" = "$expected"
+
+      - name: Exercise pinned five-point real-operation arm matrix
+        working-directory: xmesh-node/security/xspv2/poc-go
+        run: |
+          set -euo pipefail
+          go test -tags xspv2_powercut_qualification ./keyring \
+            -run 'TestPowercutQualification|TestPowercutLabOperation' \
+            -count=1 -v
+
+      - name: Preserve pinned process-crash proof
+        working-directory: xmesh-node/security/xspv2/poc-go
+        run: |
+          set -euo pipefail
+          go test -tags xspv2_crash_test ./keyring \
+            -run 'TestActivatePreparedRotationCrashMatrix|TestRecoverRotationCrashMatrix' \
+            -count=1 -v
+
+      - name: Reject ambiguous dual evidence build
+        working-directory: xmesh-node/security/xspv2/poc-go
+        run: |
+          set -euo pipefail
+          if go test -run '^$' -tags 'xspv2_crash_test xspv2_powercut_qualification' ./keyring; then
+            echo 'process-crash and physical-power qualification hooks compiled together' >&2
+            exit 1
+          fi
+
+      - name: Prove normal Agent excludes lab controls
+        working-directory: xmesh-node/agent/xspv2
+        run: |
+          set -euo pipefail
+          go test ./... -count=1
+          go build -trimpath -o /tmp/xmesh-agent-xspv2 ./cmd/xmesh-agent-xspv2
+          if strings /tmp/xmesh-agent-xspv2 | grep -Eq 'XMESH_XSPV2_(CRASH|POWERCUT|POWERCUT_LAB)_|EXTERNAL_POWER_CUT_LAB_ONLY'; then
+            echo 'normal Agent artifact contains durability lab controls' >&2
+            exit 1
+          fi
+
+      - name: State bounded evidence only
+        run: |
+          echo 'PASS: Node PR #45 real-operation lab runner is pinned without changing PR #44 core durability semantics.'
+          echo 'CI is not physical power-loss evidence; P0-E4a remains OPEN.'
+          echo 'strict-pq remains OFF; production rollout remains NOT AUTHORIZED.'
