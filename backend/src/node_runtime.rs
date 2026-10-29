@@ -257,10 +257,8 @@ mod p0d_agent_orchestration_tests {
             AgentUpdateRequest::Legacy(_)
         ));
         assert!(matches!(
-            serde_json::from_str::<AgentUpdateRequest>(
-                r#"{"releaseVersion":"control-v5.2.0"}"#
-            )
-            .unwrap(),
+            serde_json::from_str::<AgentUpdateRequest>(r#"{"releaseVersion":"control-v5.2.0"}"#)
+                .unwrap(),
             AgentUpdateRequest::Migration(_)
         ));
         for rejected in [
