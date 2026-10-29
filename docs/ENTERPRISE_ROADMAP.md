@@ -1,6 +1,6 @@
 # XMesh Nexus — Enterprise Roadmap
 
-## Authoritative engineering status — 28 October 2026
+## Authoritative engineering status — 29 October 2026
 
 This file defines the **current order of work**. Historical roadmaps/checkpoints under [`archive/`](archive/) do **not** override this document.
 
@@ -8,14 +8,11 @@ A green test proves only its stated boundary. Code existence ≠ E2E ≠ securit
 
 ## Verified source checkpoints
 
-- **Latest Nexus C2-D implementation checkpoint:** [`7e0b42ea4847b273ba8cd55a0ff3e043a420c377`](https://github.com/TriplexCorp/XMesh-Nexus/commit/7e0b42ea4847b273ba8cd55a0ff3e043a420c377), merge of [PR #88](https://github.com/TriplexCorp/XMesh-Nexus/pull/88).
-- PR #88 closes the final C2-D2 integrated transport-negative / no-legacy-fallback proof at the real ACK-operation boundary.
-- On exact merge SHA `7e0b42ea4847b273ba8cd55a0ff3e043a420c377`, all expected post-merge workflows completed **success**:
-  - [Transport Negative and No-Legacy E2E #40783444207](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40783444207)
-  - [Lost Response and Race E2E #40783444213](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40783444213)
-  - [Expired Recovery E2E #40783444177](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40783444177)
-  - [Hybrid TLS Probe #40783444276](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40783444276)
-  - [Backend CI #40783444179](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40783444179)
+- **Latest Nexus P0-D implementation checkpoint:** [`721a5a620c85836b9a7aee133a19ce660a8857f0`](https://github.com/TriplexCorp/XMesh-Nexus/commit/721a5a620c85836b9a7aee133a19ce660a8857f0), merge of [PR #91](https://github.com/TriplexCorp/XMesh-Nexus/pull/91).
+- **P0-D1a / PR #90:** immutable append-only Agent release identity `{version, sourceRevision, artifactSha256}` in PostgreSQL. Version/source/artifact identity cannot be rebound; UPDATE/DELETE/TRUNCATE are rejected. No production execution path was activated.
+- **P0-D1b / PR #91:** an approved immutable release identity can be atomically bound to the existing fixed-action `update_agent` single-flight command queue. Binding attach/remove/replace after row creation is rejected; normal lifecycle state transitions remain legal. No HTTP/API caller, poll payload or Agent/updater execution changed in this gate.
+- On exact merge SHA `721a5a620c85836b9a7aee133a19ce660a8857f0`, [Backend CI #40795114113](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40795114113) completed **success**, including strict Clippy, Docker build, disposable PostgreSQL migration/invariant checks and API authentication integration.
+- **Completed C2-D implementation checkpoint:** [`7e0b42ea4847b273ba8cd55a0ff3e043a420c377`](https://github.com/TriplexCorp/XMesh-Nexus/commit/7e0b42ea4847b273ba8cd55a0ff3e043a420c377), merge of [PR #88](https://github.com/TriplexCorp/XMesh-Nexus/pull/88). PR #88 closed the final C2-D2 integrated transport-negative / no-legacy-fallback proof at the real ACK-operation boundary; its exact post-merge matrix remains valid within that stated isolated staging/process scope.
 - **Current XMesh-Node staging transport checkpoint:** [`0ae78244ef0ef763bea6ce198dde6e83eb11ff1f`](https://github.com/TriplexCorp/XMesh-Node/commit/0ae78244ef0ef763bea6ce198dde6e83eb11ff1f), merge of Node PR #33.
 - Node PR #33 binds HTTP authority to the same authenticated `serverName` used for TLS SNI/certificate verification while retaining a separate direct TCP connect `address`; exact-head and post-merge Node CI/Crypto passed.
 - Prior Nexus checkpoints remain valid within their stated boundaries: C2-D2 outage/restart `a756f1ac…` (#86), transport alignment `86e01727…` (#84), lost-response/race `39e1589c…` (#82), expired recovery `5acccfa1…` (#77), D1 `037290bb…` (#73), C2-C `37b9e49d…` (#71), plus signer P0 (#61), C1 (#64), C2-A (#66) and C2-B (#69).
@@ -53,7 +50,10 @@ All are mandatory:
 | P0-C2-D2 integrated outage/restart convergence | **COMPLETE — isolated staging/process** | PR #86 |
 | P0-C2-D2 transport-negative / no-legacy proof | **COMPLETE — isolated staging/process** | PR #88 + Node PR #33; exact post-merge matrix green |
 | **P0-C2-D overall** | **COMPLETE — isolated staging/process** | Full real-Node success/failure/retry/recovery/downgrade matrix complete |
-| **P0-D production-capable Agent workflow** | **CURRENT P0** | Port proven semantics into the real Agent/migration/update workflow; disposable real Nexus↔Node E2E |
+| P0-D1a immutable Agent release identity | **COMPLETE — staging/DB foundation** | PR #90; append-only exact version/revision/SHA-256 identity |
+| P0-D1b immutable release→`update_agent` binding | **COMPLETE — staging/DB foundation** | PR #91; exact immutable binding into existing single-flight queue |
+| **P0-D1c owner-only staging orchestration API** | **CURRENT P0 sub-gate** | Reuse existing Agent-update control plane; explicit non-default gate; owner selects only a pre-approved release version; Nexus resolves revision/digest server-side |
+| **P0-D production-capable Agent workflow** | **CURRENT P0** | Complete orchestration, poll/apply/ACK identity propagation, real Agent integration and disposable Nexus↔Node E2E |
 | P0-E recovery/security release gates | **BLOCKED on P0-D** | Crash/power loss, snapshot/rollback, backup/restore, rotation, fuzz/KAT, independent review |
 | Production XSP-v2 rollout | **NOT AUTHORIZED** | Disposable canary + explicit production approval after all gates |
 
@@ -121,23 +121,58 @@ A final positive strict-PQ control after the negative matrix commits exactly one
 
 C2-D proved the security/state-machine behavior in isolated staging/process E2E. P0-D is the first gate that may move this behavior toward the actual Agent architecture. It is **not** permission to enable strict PQ in production.
 
-### P0-D required work
+### Completed P0-D foundation
 
-1. **Real Agent integration design**
-   - identify the current Go 1.23 production Agent/control paths that will be replaced or migrated;
+#### P0-D1a — immutable Agent release identity — COMPLETE
+
+PR #90 introduced an inert append-only release manifest ledger in PostgreSQL:
+
+`version + sourceRevision + artifactSha256`
+
+The identity is canonical and immutable: one version cannot be rebound to different source/artifact bytes; source revision is a lowercase 40-hex Git commit identity; artifact digest is lowercase 64-hex SHA-256; UPDATE/DELETE/TRUNCATE are rejected. The ledger does not contain a caller-selected URL, script or command and does not authorize download/apply by itself.
+
+#### P0-D1b — atomic binding to existing Agent queue — COMPLETE
+
+PR #91 introduced the DB primitive that resolves one already-approved immutable release and atomically inserts the existing fixed action `update_agent` into the existing single-flight `node_restart_commands` queue with the exact manifest foreign key.
+
+The binding cannot later be attached, removed or replaced via `UPDATE`; once bound, node/action/version/manifest/requester identity is frozen while ordinary lifecycle fields such as pending/claimed/success/failure timestamps/results remain mutable. CI explicitly caught and fixed an early trigger-order bug that had allowed manifest removal, and regression coverage now forbids removal plus post-hoc attachment.
+
+This gate did **not** change the HTTP API, signed poll payload, production Agent or updater execution behavior. No new remote action or second control plane was introduced.
+
+### CURRENT sub-gate — P0-D1c owner-only staging orchestration API
+
+Reuse the existing `POST /nodes/{id}/agent-update` control plane rather than creating a parallel endpoint/action.
+
+Required boundary:
+
+- the existing legacy `{}` request behavior remains unchanged;
+- a new migration/release-selection mode is available only when `XSP_V2_P0D_AGENT_MIGRATION=staging-only` exactly;
+- the new mode requires **owner** authorization, not merely ordinary mutation/admin authorization;
+- the caller may select only a pre-approved release **version**;
+- Nexus resolves the immutable `sourceRevision` and `artifactSha256` server-side through the approved manifest/binding primitive;
+- the request must not accept artifact digest, URL, URI, script, shell command or arbitrary executable input;
+- unknown release, disabled gate, unauthorized caller and active-command conflicts fail closed;
+- no poll payload or Agent/updater execution change belongs in this sub-gate;
+- `strict-pq` remains OFF.
+
+### Remaining P0-D required work after D1c
+
+1. **Authenticated poll/apply/ACK release identity**
+   - carry exact manifest version/revision/digest through the existing signed Agent command lifecycle;
+   - never let transport failure or missing ACK become success;
+   - keep one fixed `update_agent` action rather than introducing arbitrary commands.
+
+2. **Real Agent integration design / Go 1.27 migration**
+   - identify the current Go 1.23 production Agent/control paths to be replaced or migrated;
    - port/reuse the proven Go 1.27 XSP-v2 transport, permit/ACK/receipt and recovery primitives instead of creating another state machine;
-   - keep fixed-action Agent behavior: no remote arbitrary scripts/commands.
-
-2. **Version/toolchain migration**
-   - define the supported Go 1.27 Agent build/release path;
-   - preserve rollback to the last known-good Agent package;
+   - define the supported Go 1.27 build/release path and preserve rollback to the last known-good Agent package;
    - prevent mixed-version peers from silently negotiating weaker security.
 
-3. **Nexus-driven migration/update orchestration**
-   - define an owner-authorized migration/update request from Nexus UI/API;
-   - bind exact desired Agent version/artifact digest/revision to signed state;
+3. **Staged download / verify / apply / rollback**
    - separate download/stage/verify/apply/ACK phases;
-   - never interpret transport failure or missing receipt as success.
+   - verify exact approved artifact digest/revision before apply;
+   - preserve a last-known-good rollback path;
+   - never accept caller-selected executable locations or scripts.
 
 4. **Durable Agent state**
    - carry the proven permit/ACK/receipt journal into the real Agent filesystem/state layout;
@@ -175,7 +210,7 @@ After P0-D, prove the deployment/recovery properties needed before canary/produc
 
 ## Production rollout — NOT AUTHORIZED
 
-No production activation is authorized by C2-D completion.
+No production activation is authorized by C2-D completion or by the P0-D1 database foundations.
 
 Before production rollout:
 
@@ -189,6 +224,7 @@ Before production rollout:
 
 - `strict-pq` remains **OFF**.
 - Production Agent remains on the deployed legacy control path until P0-D/P0-E and later rollout gates explicitly authorize replacement.
+- P0-D1a/P0-D1b are inert/staging database foundations and do not authorize production migration.
 - No target-product fallback to XMESH1, Ed25519-only, X25519-only, TLS 1.2 or insecure certificate validation.
 - A GitHub merge is not a production deployment.
 - Xray remains the user VPN data-plane.
