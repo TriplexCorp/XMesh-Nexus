@@ -8,6 +8,7 @@ const api=fs.readFileSync('backend/src/main.rs','utf8');
 const runtimeEntry=fs.readFileSync('backend/src/node_runtime.rs','utf8');
 const runtimeLegacy=fs.readFileSync('backend/src/node_runtime_legacy.rs','utf8');
 const runtime=runtimeEntry+'\n'+runtimeLegacy;
+const artifactSource=fs.readFileSync('backend/src/node_agent_artifact.rs','utf8');
 const migration=fs.readFileSync('backend/migrations/0024_node_agent_updates.sql','utf8');
 const releaseManifest=fs.readFileSync('backend/migrations/0107_node_xsp_agent_release_manifests.sql','utf8');
 const migrationBinding=fs.readFileSync('backend/migrations/0108_node_xsp_agent_migration_binding.sql','utf8');
@@ -15,6 +16,9 @@ const releaseAck=fs.readFileSync('backend/migrations/0109_node_xsp_agent_release
 const agent=fs.readFileSync('deploy/node-control-agent.sh','utf8');
 const updater=fs.readFileSync('deploy/update-node-control-agent.sh','utf8');
 const installer=fs.readFileSync('deploy/install-node-metrics-agent.sh','utf8');
+const stager=fs.readFileSync('deploy/xsp-v2-agent-staged-apply.sh','utf8');
+const stageUnit=fs.readFileSync('deploy/xmesh-xsp-v2-agent-stage.service','utf8');
+const stagedLifecycleTest=fs.readFileSync('scripts/test-xsp-agent-staged-apply.sh','utf8');
 const app=fs.readFileSync('app.js','utf8');
 const css=fs.readFileSync('styles.css','utf8');
 const tests=fs.readFileSync('scripts/test-node-auth-integration.py','utf8');
@@ -120,12 +124,26 @@ assert.match(agent,/if action not in \("restart_xray","update_xray","update_agen
 assert.match(agent,/releaseIdentity/);
 assert.match(agent,/set\(identity\)!=\{"version","sourceRevision","artifactSha256"\}/);
 assert.match(agent,/stage_agent_release_identity\(\)/);
+assert.match(agent,/verify_staged_agent_package\(\)/);
 assert.match(agent,/RELEASE_IDENTITY_FILE=\/run\/xmesh-node-control\/agent-release-identity[.]json/);
 assert.match(agent,/ack_identity=.*releaseIdentity/);
 assert.match(agent,/systemctl start --wait xmesh-node-agent-upgrade[.]service/);
+assert.match(agent,/verify_staged_agent_package "\$release_version" "\$source_revision" "\$artifact_sha256"/,
+  'Bound ACK success must re-verify the exact active package identity');
+assert.match(agent,/grep -Fxq "AGENT_VERSION=\\"\$target_version\\"" \/usr\/local\/sbin\/xmesh-node-control/,
+  'Legacy identity-free update must retain the previous shell-version verification');
 assert.match(agent,/signed_post '\/api\/v1\/node\/restart\/ack'/);
+
 assert.match(updater,/MODE="\$\{1:-manual\}"/);
 assert.match(updater,/xmesh-node-agent-upgrade[.]service/);
+assert.match(updater,/RELEASE_IDENTITY_FILE=\/run\/xmesh-node-control\/agent-release-identity[.]json/);
+assert.match(updater,/"\$MODE" == --remote && -e "\$RELEASE_IDENTITY_FILE"/);
+assert.match(updater,/systemctl start --wait xmesh-xsp-v2-agent-stage[.]service/);
+assert.match(updater,/systemctl show --property=Result --value xmesh-xsp-v2-agent-stage[.]service/);
+const boundDispatch=updater.indexOf('if [[ "$MODE" == --remote && -e "$RELEASE_IDENTITY_FILE" ]]');
+const movingMainFetch=updater.indexOf('https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy/node-control-agent.sh');
+assert.ok(boundDispatch>=0 && movingMainFetch>boundDispatch,
+  'Manifest-bound remote apply must dispatch locally before any moving-main fetch');
 assert.match(updater,/if \[\[ "\$MODE" != --remote \]\]/);
 
 assert.match(updater,/declare -f update_router/,'Router upgrade must execute in the scoped worker');
@@ -151,8 +169,58 @@ assert.match(updater,/mv -f \/usr\/local\/libexec\/\.xmesh-profile-attest[.]new 
 assert.match(agent,/profile_check='helper_missing'/);
 assert.match(app,/helper_missing:'Проверка профиля не установлена · нажмите «Обновить Agent»'/);
 
+// CURRENT P0 gate: authenticated, manifest-bound staged package lifecycle.
+assert.match(runtimeEntry,/artifactVersion/,'Artifact fetch must reuse the existing signed poll schema');
+assert.match(runtimeEntry,/artifact::download_claimed\(&state, request[.]node_id, version\)/);
+assert.doesNotMatch(api,/node\/agent\/releases\/artifact/,
+  'Do not create a second Agent artifact/control endpoint');
+assert.match(artifactSource,/XSP_V2_P0D_AGENT_ARTIFACT_DIR/);
+assert.match(artifactSource,/c[.]state='claimed'/,
+  'Only an already-claimed bound migration may download bytes');
+assert.match(artifactSource,/c[.]target_version=\$2 AND m[.]version=\$2/);
+assert.match(artifactSource,/Sha256::digest\(&bytes\)/,
+  'Nexus must re-hash server-controlled bytes before delivery');
+assert.match(artifactSource,/canonical_candidate[.]parent\(\) != Some\(canonical_root[.]as_path\(\)\)/);
+assert.doesNotMatch(artifactSource,/\b(url|uri|script|command_text)\s*:/i,
+  'Artifact request must not accept caller-selected executable locations');
+
+assert.match(stager,/artifactVersion/);
+assert.match(stager,/sha256sum "\$binary"/);
+assert.match(stager,/"\$binary" --identity/);
+assert.match(stager,/"\$binary" --check-state "\$STATE_ROOT"/);
+assert.match(stager,/last-known-good[.]json/);
+assert.match(stager,/controlAuthority.*xmesh-node-control[.]service/,
+  'This gate must keep the shell control Agent authoritative');
+assert.match(stager,/ln -s "\$package_rel" "\$new_link"/);
+assert.match(stager,/mv -Tf "\$new_link" "\$CURRENT"/);
+assert.match(stager,/rollback\(\)/);
+assert.match(stager,/ln -s "\$old_target" "\$new_link"/);
+assert.match(stager,/STATE_ROOT="\$BASE\/xsp-v2"/,
+  'Security state must live outside versioned package slots');
+assert.doesNotMatch(stager,/rm -rf[^\n]*STATE_ROOT|mv[^\n]*STATE_ROOT/,
+  'Package rollback must never roll durable security state backwards');
+assert.doesNotMatch(stager,/strict-pq=on/,'Staged package gate must not activate strict PQ');
+
+assert.match(stageUnit,/^ProtectSystem=strict$/m);
+assert.match(stageUnit,/^ProtectHome=true$/m);
+assert.match(stageUnit,/^CapabilityBoundingSet=$/m);
+assert.match(stageUnit,/^AmbientCapabilities=$/m);
+assert.match(stageUnit,/^ReadWritePaths=\/run \/var\/lib\/xmesh-agent$/m);
+assert.match(stageUnit,/^ExecStart=\/usr\/local\/libexec\/xmesh-xsp-v2-agent-staged-apply$/m);
+assert.doesNotMatch(stageUnit,/WantedBy=/,
+  'Staged package executor must not be independently enabled at boot');
+
 assert.match(installer,/xmesh-node-agent-upgrade[.]service/);
 assert.match(installer,/\/usr\/local\/sbin\/xmesh-update-agent/);
+assert.match(installer,/xsp-v2-agent-staged-apply[.]sh/);
+assert.match(installer,/xmesh-xsp-v2-agent-stage[.]service/);
+assert.match(updater,/xsp-v2-agent-staged-apply[.]sh/,
+  'Legacy refresh must install the fixed staged executor for existing nodes');
+assert.match(updater,/xmesh-xsp-v2-agent-stage[.]service/);
+assert.match(stagedLifecycleTest,/digest mismatch unexpectedly succeeded/);
+assert.match(stagedLifecycleTest,/embedded identity mismatch unexpectedly succeeded/);
+assert.match(stagedLifecycleTest,/post-switch self-check failure unexpectedly succeeded/);
+
 assert.match(app,/data-node-agent-version/);
 assert.match(app,/data-agent-update/);
 assert.match(app,/Date\.now\(\)\+900000/,'Full node update UI must wait 15 minutes');
@@ -188,10 +256,22 @@ assert.match(migrationDesign,/`strict-pq` remains OFF/);
 assert.doesNotMatch(migrationDesign,/production activation authorized/i,
   'Design gate must not authorize production activation');
 
-for(const file of ['deploy/node-control-agent.sh','deploy/update-node-control-agent.sh','deploy/install-node-metrics-agent.sh']){
+for(const file of [
+  'deploy/node-control-agent.sh',
+  'deploy/update-node-control-agent.sh',
+  'deploy/install-node-metrics-agent.sh',
+  'deploy/xsp-v2-agent-staged-apply.sh',
+  'scripts/test-xsp-agent-staged-apply.sh'
+]){
   const result=spawnSync('bash',['-n',file],{encoding:'utf8'});
   assert.equal(result.status,0, file+': '+result.stderr);
 }
+const staged=spawnSync('bash',['scripts/test-xsp-agent-staged-apply.sh'],{
+  encoding:'utf8',timeout:60000
+});
+assert.equal(staged.status,0,
+  'Staged Agent lifecycle test failed:\n'+(staged.stdout||'')+'\n'+(staged.stderr||''));
+assert.match(staged.stdout,/staged Agent package apply\/rollback lifecycle: OK/);
 const syntax=spawnSync(process.execPath,['--check','app.js'],{encoding:'utf8'});
 assert.equal(syntax.status,0,syntax.stderr);
-console.log('Signed Agent upgrade, release identity lifecycle and Go 1.27 migration architecture contract: OK');
+console.log('Signed Agent upgrade, manifest-bound staged apply/rollback, release identity lifecycle and Go 1.27 migration architecture contract: OK');

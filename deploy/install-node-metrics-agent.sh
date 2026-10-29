@@ -54,6 +54,27 @@ grep -q 'xmesh-node-agent-upgrade.service' "$UPGRADER_TMP" || {
 install -o root -g root -m 0700 "$UPGRADER_TMP" /usr/local/sbin/.xmesh-update-agent.new
 mv -f /usr/local/sbin/.xmesh-update-agent.new /usr/local/sbin/xmesh-update-agent
 
+# Install the fixed, non-enabled staged Go Agent package executor. It is inert
+# until an authenticated manifest-bound `update_agent` command selects it.
+STAGER_TMP="$(mktemp)"
+STAGER_UNIT_TMP="$(mktemp)"
+trap 'rm -f "$AGENT_TMP" "$COLLECTOR_TMP" "$UPGRADER_TMP" "$STAGER_TMP" "$STAGER_UNIT_TMP"' EXIT
+curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 "$RAW_BASE/xsp-v2-agent-staged-apply.sh" -o "$STAGER_TMP"
+bash -n "$STAGER_TMP"
+grep -Fq '/var/lib/xmesh-agent' "$STAGER_TMP" || { echo "Invalid staged Agent helper" >&2; exit 1; }
+grep -Fq 'artifactVersion' "$STAGER_TMP" || { echo "Invalid staged Agent helper" >&2; exit 1; }
+curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 "$RAW_BASE/xmesh-xsp-v2-agent-stage.service" -o "$STAGER_UNIT_TMP"
+grep -Fxq 'ExecStart=/usr/local/libexec/xmesh-xsp-v2-agent-staged-apply' "$STAGER_UNIT_TMP" || {
+  echo "Invalid staged Agent service" >&2; exit 1;
+}
+grep -Fxq 'ReadWritePaths=/run /var/lib/xmesh-agent' "$STAGER_UNIT_TMP" || {
+  echo "Invalid staged Agent service sandbox" >&2; exit 1;
+}
+install -o root -g root -m 0700 "$STAGER_TMP" /usr/local/libexec/.xmesh-xsp-v2-agent-staged-apply.new
+mv -f /usr/local/libexec/.xmesh-xsp-v2-agent-staged-apply.new /usr/local/libexec/xmesh-xsp-v2-agent-staged-apply
+install -o root -g root -m 0644 "$STAGER_UNIT_TMP" /etc/systemd/system/.xmesh-xsp-v2-agent-stage.service.new
+mv -f /etc/systemd/system/.xmesh-xsp-v2-agent-stage.service.new /etc/systemd/system/xmesh-xsp-v2-agent-stage.service
+
 # Run telemetry as a dedicated unprivileged account, not root.
 if ! getent group xmesh-metrics >/dev/null; then
   groupadd --system xmesh-metrics
@@ -137,8 +158,8 @@ WantedBy=timers.target
 EOF
 
 # The privileged control worker is separate from unprivileged metrics.
-# It accepts only one hard-coded action (restart_xray) from a signed polling API;
-# no arbitrary command strings or SSH keys are delivered by the panel.
+# It accepts only fixed hard-coded actions from a signed polling API; no
+# arbitrary command strings or SSH keys are delivered by the panel.
 CONTROL_TMP="$(mktemp)"
 trap 'rm -f "$AGENT_TMP" "$COLLECTOR_TMP" "$CONTROL_TMP"' EXIT
 curl --fail --silent --show-error --location "$RAW_BASE/node-control-agent.sh" -o "$CONTROL_TMP"
@@ -226,8 +247,7 @@ Unit=xmesh-node-user-meter.service
 WantedBy=timers.target
 EOF
 
-
-# A control-v4 node may run this local, audited, fixed upgrade service.
+# A control-v4+ node may run this local, audited, fixed legacy upgrade service.
 # The privileged updater is separate from the strongly confined command poller.
 cat >/etc/systemd/system/xmesh-node-agent-upgrade.service <<'EOF'
 [Unit]
@@ -258,7 +278,6 @@ systemctl daemon-reload
 systemctl enable xmesh-node-control.timer
 systemctl restart xmesh-node-control.timer
 
-systemctl daemon-reload
 # Restart an existing timer so upgrades immediately pick up the new cadence.
 systemctl enable xmesh-node-metrics.timer
 systemctl restart xmesh-node-metrics.timer
@@ -275,7 +294,7 @@ echo "Network interface: $INTERFACE (auto detects the default-route interface)"
 echo "The first run saves a baseline. The first real rate sample arrives after the next timer interval."
 echo "Check with: systemctl status xmesh-node-metrics.timer xmesh-node-control.timer"
 echo "Logs: journalctl -u xmesh-node-metrics.service -u xmesh-node-control.service -n 30 --no-pager"
-echo "Control: this agent can restart only the root-configured Xray systemd unit."
+echo "Control: this agent accepts only fixed signed actions; staged Go Agent migration remains default-disabled."
 echo "If your Xray uses another unit, set XMESH_XRAY_UNIT in /etc/xmesh-node-metrics.env and restart the control timer."
 echo "Ed25519 public key (for troubleshooting only):"
 echo "$public_key"

@@ -3,6 +3,8 @@
 // Legacy unbound update behavior remains delegated unchanged; staged bound
 // migrations add exact immutable release identity to the existing signed
 // poll/ACK lifecycle without introducing another remote action or control plane.
+#[path = "node_agent_artifact.rs"]
+mod artifact;
 #[expect(
     dead_code,
     reason = "P0-D intentionally shadows only the preserved legacy poll/ACK handlers while keeping the reviewed legacy runtime baseline intact"
@@ -21,6 +23,7 @@ use axum::{
     body::Bytes,
     extract::{Path, State},
     http::{HeaderMap, StatusCode},
+    response::{IntoResponse, Response},
 };
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -61,6 +64,8 @@ struct AgentReleaseIdentity {
 #[serde(deny_unknown_fields)]
 struct NodeCommandPoll {
     node_id: i64,
+    #[serde(default, rename = "artifactVersion")]
+    artifact_version: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -354,18 +359,22 @@ pub async fn request_agent_update(
     }
 }
 
-/// Existing authenticated command poll, extended only for commands that already
-/// carry the immutable D1b/D1c release-manifest binding. Unbound legacy commands
-/// preserve the historical response shape and receive no fabricated identity.
+/// Existing authenticated command poll. Normal requests retain the historical
+/// JSON response. A claimed manifest-bound migration may make a second signed
+/// request with only `artifactVersion`; Nexus then returns the content-addressed
+/// bytes bound to that already-claimed command. No URL/path enters the request.
 pub async fn poll_restart(
     State(state): State<AppState>,
     headers: HeaderMap,
     body: Bytes,
-) -> Result<Json<Value>, ApiError> {
+) -> Result<Response, ApiError> {
     let request: NodeCommandPoll = serde_json::from_slice(&body)
         .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Invalid command poll."))?;
     if request.node_id <= 0 {
         return Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid node ID"));
+    }
+    if let Some(version) = request.artifact_version.as_deref() {
+        validate_release_version(version)?;
     }
     node_auth::authenticate_for(
         &state,
@@ -385,7 +394,11 @@ pub async fn poll_restart(
     .await?
     .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Node not found"))?;
     if disabled {
-        return Ok(Json(json!({"command":null,"enforceStop":true})));
+        return Ok(Json(json!({"command":null,"enforceStop":true})).into_response());
+    }
+
+    if let Some(version) = request.artifact_version.as_deref() {
+        return artifact::download_claimed(&state, request.node_id, version).await;
     }
 
     sqlx::query(
@@ -415,7 +428,7 @@ pub async fn poll_restart(
     .await?;
 
     let command = row.as_ref().map(polled_command_from_row).transpose()?;
-    Ok(Json(json!({"command":command,"enforceStop":false})))
+    Ok(Json(json!({"command":command,"enforceStop":false})).into_response())
 }
 
 /// Bound staging migrations must return the exact immutable identity they were
@@ -630,6 +643,30 @@ mod p0d_agent_orchestration_tests {
             assert!(validate_release_version(invalid).is_err(), "{invalid}");
         }
         assert!(validate_release_version(&"x".repeat(65)).is_err());
+    }
+
+    #[test]
+    fn poll_schema_preserves_legacy_node_id_and_only_adds_artifact_version() {
+        let ordinary: NodeCommandPoll = serde_json::from_str(r#"{"node_id":7}"#).unwrap();
+        assert_eq!(ordinary.node_id, 7);
+        assert!(ordinary.artifact_version.is_none());
+
+        let artifact: NodeCommandPoll =
+            serde_json::from_str(r#"{"node_id":7,"artifactVersion":"p0d2-agent"}"#).unwrap();
+        assert_eq!(artifact.artifact_version.as_deref(), Some("p0d2-agent"));
+
+        for rejected in [
+            r#"{"node_id":7,"url":"https://example.invalid/agent"}"#,
+            r#"{"node_id":7,"artifactPath":"/tmp/agent"}"#,
+            r#"{"nodeId":7}"#,
+        ] {
+            assert!(serde_json::from_str::<NodeCommandPoll>(rejected).is_err());
+        }
+        let unsafe_version: NodeCommandPoll =
+            serde_json::from_str(r#"{"node_id":7,"artifactVersion":"../bad"}"#).unwrap();
+        assert!(
+            validate_release_version(unsafe_version.artifact_version.as_deref().unwrap()).is_err()
+        );
     }
 
     #[test]

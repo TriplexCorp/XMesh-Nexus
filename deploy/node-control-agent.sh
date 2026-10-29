@@ -16,7 +16,9 @@ UNIT="${XMESH_XRAY_UNIT:-xray.service}"
 # Only root-owned local configuration can choose a unit. Remote responses never do.
 [[ "$UNIT" =~ ^[A-Za-z0-9_.@-]+\.service$ ]] || { echo "Invalid systemd unit" >&2; exit 2; }
 [[ -r "$KEY" ]] || { echo "XMesh Ed25519 key unavailable" >&2; exit 2; }
-command -v flock >/dev/null && command -v python3 >/dev/null || exit 2
+for required in flock python3 sha256sum readlink timeout; do
+ command -v "$required" >/dev/null 2>&1 || exit 2
+done
 exec 9>/run/xmesh-node-control.lock
 flock -n 9 || exit 0
 
@@ -246,6 +248,33 @@ stage_agent_release_identity(){
 clear_agent_release_identity(){
  rm -f "$RELEASE_IDENTITY_FILE"
 }
+verify_staged_agent_package(){
+ local version="$1" revision="$2" digest="$3" base=/var/lib/xmesh-agent target package binary actual identity
+ [[ "$version" =~ ^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$ ]] || return 1
+ [[ "$revision" =~ ^[0-9a-f]{40}$ && "$digest" =~ ^[0-9a-f]{64}$ ]] || return 1
+ [[ -L "$base/current" ]] || return 1
+ target="$(readlink "$base/current")"
+ [[ "$target" == "releases/$digest" ]] || return 1
+ package="$base/$target"
+ binary="$package/xmesh-agent-xspv2"
+ [[ -d "$package" && ! -L "$package" && -f "$binary" && ! -L "$binary" && -x "$binary" ]] || return 1
+ [[ -f "$package/identity.json" && ! -L "$package/identity.json" ]] || return 1
+ [[ -f "$base/active.json" && ! -L "$base/active.json" ]] || return 1
+ actual="$(sha256sum "$binary" | awk '{print $1}')" || return 1
+ [[ "$actual" == "$digest" ]] || return 1
+ identity="$(timeout 10 "$binary" --identity 2>/dev/null)" || return 1
+ python3 - "$identity" "$version" "$revision" "$package/identity.json" "$base/active.json" "$digest" <<'PY'
+import json,sys
+runtime=json.loads(sys.argv[1])
+expected_runtime={'version':sys.argv[2],'sourceRevision':sys.argv[3]}
+if runtime != expected_runtime: raise SystemExit(1)
+expected_full={**expected_runtime,'artifactSha256':sys.argv[6]}
+for path in sys.argv[4:6]:
+ with open(path,encoding='utf-8') as stream: value=json.load(stream)
+ if value != expected_full: raise SystemExit(1)
+PY
+ timeout 20 "$binary" --check-state "$base/xsp-v2" >/dev/null
+}
 stop_xray(){
  mkdir -p "$STATE_DIR"
  chmod 700 "$STATE_DIR"
@@ -349,24 +378,23 @@ detail='Command failed'
 if [[ "$action" == update_xray ]];then
  if update_managed_xray "$target_version";then success=true;fi
 elif [[ "$action" == update_agent ]];then
- # Only the installed systemd unit may update the agent. The API does not
- # provide executable commands, paths or URLs. A bound staged migration keeps
- # its exact immutable identity in a root-only local file throughout apply;
- # the updater path itself remains the same fixed pre-installed service.
  clear_agent_release_identity
  if [[ "$release_version" != - ]];then
+  # Manifest-bound migration still goes through the existing fixed upgrade
+  # service. Its updater detects the root-only identity and dispatches only to
+  # the pre-installed staged package unit; it never enters the moving-main path.
   if ! stage_agent_release_identity "$release_version" "$source_revision" "$artifact_sha256";then
    detail='Invalid or unstorable Agent release identity'
   elif ! systemctl cat xmesh-node-agent-upgrade.service >/dev/null 2>&1;then
-   detail='Agent updater service missing; reinstall control-v4 first'
+   detail='Agent updater service missing; update the control Agent first'
   elif timeout 650 systemctl start --wait xmesh-node-agent-upgrade.service &&
-       grep -Fxq "AGENT_VERSION=\"$target_version\"" /usr/local/sbin/xmesh-node-control;then
+       verify_staged_agent_package "$release_version" "$source_revision" "$artifact_sha256";then
    success=true
-   detail='Agent installed and release identity preserved'
+   detail='Staged Agent package activated and exact release identity verified'
   else
    unit_result="$(systemctl show --property=Result --value xmesh-node-agent-upgrade.service 2>/dev/null || true)"
    [[ "$unit_result" =~ ^[a-zA-Z0-9_-]{1,40}$ ]] || unit_result=unknown
-   detail="Agent update failed (systemd: $unit_result); journalctl -u xmesh-node-agent-upgrade.service"
+   detail="Staged Agent apply failed (systemd: $unit_result); previous package remains/restored"
   fi
  else
   if ! systemctl cat xmesh-node-agent-upgrade.service >/dev/null 2>&1;then

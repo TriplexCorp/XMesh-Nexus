@@ -11,6 +11,32 @@ command -v curl >/dev/null && command -v systemctl >/dev/null || exit 1
 [[ -f /etc/systemd/system/xmesh-node-control.service ]] || {
  echo "Control service missing, enroll node first" >&2;exit 1;
 }
+
+# A manifest-bound remote migration reuses this same fixed updater service, but
+# it must never enter the legacy moving-main update path. The signed control
+# worker writes the exact immutable identity first; only a pre-installed local
+# staged executor may consume it. Missing/invalid local wiring fails closed.
+RELEASE_IDENTITY_FILE=/run/xmesh-node-control/agent-release-identity.json
+if [[ "$MODE" == --remote && -e "$RELEASE_IDENTITY_FILE" ]];then
+ [[ -f "$RELEASE_IDENTITY_FILE" && ! -L "$RELEASE_IDENTITY_FILE" ]] || {
+  echo "Bound Agent release identity is not a regular file" >&2;exit 1
+ }
+ [[ -x /usr/local/libexec/xmesh-xsp-v2-agent-staged-apply ]] || {
+  echo "Staged Agent executor is not installed" >&2;exit 1
+ }
+ [[ -f /etc/systemd/system/xmesh-xsp-v2-agent-stage.service &&
+    ! -L /etc/systemd/system/xmesh-xsp-v2-agent-stage.service ]] || {
+  echo "Staged Agent service is not installed" >&2;exit 1
+ }
+ if ! timeout 210 systemctl start --wait xmesh-xsp-v2-agent-stage.service;then
+  echo "Staged Agent package apply failed" >&2;exit 1
+ fi
+ [[ "$(systemctl show --property=Result --value xmesh-xsp-v2-agent-stage.service 2>/dev/null)" == success ]] || {
+  echo "Staged Agent service did not complete successfully" >&2;exit 1
+ }
+ exit 0
+fi
+
 tmp="$(mktemp)"
 trap 'rm -f "$tmp"' EXIT
 curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 \
@@ -49,7 +75,7 @@ curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 \
 bash -n "$metrics_tmp"
 grep -q 'xmesh-node-user-metrics.json' "$metrics_tmp" || { echo "Metrics agent cannot read autonomous counters" >&2;exit 1; }
 profile_tmp="$(mktemp)"
-trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp" "$profile_tmp" "${tls_tmp:-}" "${renew_tmp:-}"' EXIT
+trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp" "$profile_tmp" "${tls_tmp:-}" "${renew_tmp:-}" "${stage_tmp:-}" "${stage_service_tmp:-}"' EXIT
 curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 \
  https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/main/deploy/xmesh-profile-attest.py -o "$profile_tmp"
 python3 -m py_compile "$profile_tmp"
@@ -57,7 +83,7 @@ grep -q 'xmesh-managed-xray' "$profile_tmp" && grep -q 'verify_envelope' "$profi
  echo "Invalid signed profile attestation helper" >&2;exit 1;
 }
 tls_tmp="$(mktemp)"
-trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp" "$profile_tmp" "${tls_tmp:-}" "${renew_tmp:-}"' EXIT
+trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp" "$profile_tmp" "${tls_tmp:-}" "${renew_tmp:-}" "${stage_tmp:-}" "${stage_service_tmp:-}"' EXIT
 curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 \
  https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/main/deploy/xmesh-tls-provision.py -o "$tls_tmp"
 python3 -m py_compile "$tls_tmp"
@@ -68,10 +94,31 @@ python3 -m py_compile "$tls_status_tmp"
 grep -q 'certificate_file_missing' "$tls_status_tmp" || { echo "TLS health helper validation failed" >&2;exit 1; }
 grep -q 'letsencrypt-http01' "$tls_tmp" || { echo "TLS worker missing signed ACME contract support" >&2;exit 1; }
 renew_tmp="$(mktemp)"
-trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp" "$profile_tmp" "$tls_tmp" "${tls_status_tmp:-}" "$renew_tmp"' EXIT
+trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp" "$profile_tmp" "$tls_tmp" "${tls_status_tmp:-}" "$renew_tmp" "${stage_tmp:-}" "${stage_service_tmp:-}"' EXIT
 curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 \
  https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/main/deploy/xmesh-tls-renew-hook.sh -o "$renew_tmp"
 bash -n "$renew_tmp"
+
+# Install the fixed local staged-package executor during an ordinary legacy
+# Agent refresh. A later manifest-bound `update_agent` never downloads executor
+# code: it can only invoke these already-installed, root-owned files.
+stage_tmp="$(mktemp)"
+stage_service_tmp="$(mktemp)"
+trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp" "$profile_tmp" "$tls_tmp" "${tls_status_tmp:-}" "$renew_tmp" "$stage_tmp" "$stage_service_tmp"' EXIT
+curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 \
+ https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy/xsp-v2-agent-staged-apply.sh -o "$stage_tmp"
+bash -n "$stage_tmp"
+grep -q "artifactVersion" "$stage_tmp" && grep -q -- "--identity" "$stage_tmp" &&
+ grep -q "last-known-good.json" "$stage_tmp" || {
+  echo "Invalid staged Agent executor" >&2;exit 1
+ }
+curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 \
+ https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy/xmesh-xsp-v2-agent-stage.service -o "$stage_service_tmp"
+grep -Fq 'ExecStart=/usr/local/libexec/xmesh-xsp-v2-agent-staged-apply' "$stage_service_tmp" &&
+ grep -Fq 'ReadWritePaths=/run /var/lib/xmesh-agent' "$stage_service_tmp" || {
+  echo "Invalid staged Agent systemd unit" >&2;exit 1
+ }
+
 # Update the Docker router as part of the same node release. Resolve the
 # installation from the container's config bind rather than guessing /root.
 update_router() {
@@ -117,7 +164,7 @@ update_router() {
  # source checkout may have updated while the container is still outdated.
  # Refuse rewritten history; never silently discard administrator changes.
  git -C "$dir" merge-base --is-ancestor "$previous" FETCH_HEAD || {
-  echo "Router repository cannot fast-forward safely" >&2; return 1;
+  echo "Router repository cannot fast-forward safely" >&2; return 1
  }
  git -C "$dir" merge --ff-only FETCH_HEAD || return 1
  if (cd "$dir" && docker --config "$DOCKER_CONFIG" compose build xmesh-node &&
@@ -136,7 +183,7 @@ update_router() {
 }
 # Validate the updater itself before changing any installed components.
 self_tmp="$(mktemp)"
-trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp" "$profile_tmp" "$self_tmp" "${tls_tmp:-}" "${renew_tmp:-}"' EXIT
+trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp" "$profile_tmp" "$self_tmp" "${tls_tmp:-}" "${renew_tmp:-}" "$stage_tmp" "$stage_service_tmp"' EXIT
 curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 \
  https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy/update-node-control-agent.sh -o "$self_tmp"
 bash -n "$self_tmp"
@@ -146,7 +193,7 @@ grep -q 'xmesh-node-agent-upgrade.service' "$self_tmp" || { echo "Invalid agent 
 # transient systemd unit with writable access only to the installation tree.
 # This also works on nodes still running the previous upgrade unit definition.
 router_helper="$(mktemp)"
-trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp" "$profile_tmp" "$self_tmp" "$router_helper" "${tls_tmp:-}" "${renew_tmp:-}"' EXIT
+trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp" "$profile_tmp" "$self_tmp" "$router_helper" "${tls_tmp:-}" "${renew_tmp:-}" "$stage_tmp" "$stage_service_tmp"' EXIT
 {
  printf '%s\n' '#!/usr/bin/env bash' 'set -Eeuo pipefail'
  declare -f update_router
@@ -169,6 +216,8 @@ if [[ -f /usr/local/sbin/xmesh-node-control ]];then
 fi
 cp -p /usr/local/sbin/xmesh-xray-sync /usr/local/sbin/xmesh-xray-sync.bak
 install -d -o root -g root -m 0755 /usr/local/libexec
+install -o root -g root -m 0700 "$stage_tmp" /usr/local/libexec/.xmesh-xsp-v2-agent-staged-apply.new
+mv -f /usr/local/libexec/.xmesh-xsp-v2-agent-staged-apply.new /usr/local/libexec/xmesh-xsp-v2-agent-staged-apply
 install -o root -g root -m 0700 "$profile_tmp" /usr/local/libexec/.xmesh-profile-attest.new
 mv -f /usr/local/libexec/.xmesh-profile-attest.new /usr/local/libexec/xmesh-profile-attest.py
 install -o root -g root -m 0700 "$policy_tmp" /usr/local/libexec/.xmesh-policy-guard.new
@@ -274,6 +323,8 @@ RestrictSUIDSGID=true
 LockPersonality=true
 ReadWritePaths=/usr/local/sbin /usr/local/libexec /etc/systemd/system /var/lib/xmesh-node-control /var/lib/xmesh-xray-sync -/opt/xmesh-node -/root/XMesh-Node /run
 EOF
+install -o root -g root -m 0644 "$stage_service_tmp" /etc/systemd/system/.xmesh-xsp-v2-agent-stage.service.new
+mv -f /etc/systemd/system/.xmesh-xsp-v2-agent-stage.service.new /etc/systemd/system/xmesh-xsp-v2-agent-stage.service
 systemctl daemon-reload
 # The autonomous policy guard only takes effect while the reconciliation timer
 # runs. Upgrading an existing node must reactivate an inactive sync timer.

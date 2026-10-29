@@ -69,6 +69,7 @@ services:
       SUBSCRIPTION_ENCRYPTION_KEY: ${SUBSCRIPTION_ENCRYPTION_KEY:?Run ./install.sh to provision subscription key}
       XSP_V2_SIGNER_SOCKET_PATH: /run/xmesh-signer/signer.sock
       XSP_V2_P0D_AGENT_MIGRATION: ${XSP_V2_P0D_AGENT_MIGRATION:-}
+      XSP_V2_P0D_AGENT_ARTIFACT_DIR: /run/xmesh-agent-artifacts
       RUST_LOG: info,tower_http=info,sqlx=warn
     depends_on:
       db:
@@ -82,6 +83,7 @@ services:
       - ./deploy/runtime/dashboard-path:/run/xmesh/dashboard-path:rw
       - ./deploy/runtime/panel-update-request:/run/xmesh/panel-update-request:rw
       - ./deploy/runtime/panel-update-status:/run/xmesh/panel-update-status:ro
+      - ./deploy/runtime/xsp-v2-agent-artifacts:/run/xmesh-agent-artifacts:ro
       - xsp_v2_signer_socket:/run/xmesh-signer
     read_only: true
     tmpfs:
