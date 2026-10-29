@@ -54,4 +54,4 @@ jobs:
       - name: Strict Clippy
         run: |
           rustup component add clippy
-          cargo clippy --manifest-path backend/Cargo.toml --features xsp-v2-experimental --bin xsp-v2-recovery-checkpoint -- -D warnings -D clippy::pedantic -D clippy::nursery -F unsafe-code
+          cargo clippy --manifest-path backend/Cargo.toml --features xsp-v2-experimental --bin xsp-v2-recovery-checkpoint --tests -- -D warnings -D clippy::pedantic -D clippy::nursery -F unsafe-code
