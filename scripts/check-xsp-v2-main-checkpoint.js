@@ -4,6 +4,7 @@
 // in the checkout. It is NOT proof of cryptographic or cutover correctness.
 const fs=require("node:fs");
 const assert=require("node:assert/strict");
+const {spawnSync}=require("node:child_process");
 
 const expected=[
   "backend/migrations/0099_node_xsp_v2_public_state.sql",
@@ -18,10 +19,13 @@ const expected=[
   "backend/src/xsp_v2_signed_cutover.rs",
   "backend/src/xsp_v2_permit_ledger_writer.rs",
   "backend/src/xsp_v2_ack_ledger_validator.rs",
+  "deploy/xsp-v2-agent-go127.contract.json",
+  "docs/XSP_V2_AGENT_GO127_INTEGRATION.md",
   "docs/XSP_V2_CUTOVER_CONTRACT_VECTORS.json",
   "docs/XSP_V2_CUTOVER_CANDIDATE_VECTORS.json",
   "docs/XSP_V2_SIGNED_CUTOVER_STAGING.md",
   "docs/XSP_V2_STAGING_VERIFIED_PERMIT_WRITER.md",
+  "scripts/check-xsp-v2-agent-go127-integration.js",
   "scripts/test-xsp-v2-ledger-integration.sh"
 ];
 for(const name of expected){
@@ -42,4 +46,13 @@ for(const name of experimental){
 const config=JSON.parse(fs.readFileSync("docs/XSP_V2_CUTOVER_CONTRACT_VECTORS.json","utf8"));
 assert.equal(config.schema,"xsp2-cutover-contract-1");
 assert(config.permit && config.ack,"missing permit/ACK shared golden vectors");
-console.log(`PASS: ${expected.length} tracked Nexus XSP-v2 artifacts and experimental feature gates`);
+
+const integration=spawnSync(process.execPath,["scripts/check-xsp-v2-agent-go127-integration.js"],{
+  encoding:"utf8",
+  stdio:["ignore","pipe","pipe"]
+});
+if(integration.stdout)process.stdout.write(integration.stdout);
+if(integration.stderr)process.stderr.write(integration.stderr);
+assert.equal(integration.status,0,"P0-D Go 1.27 Agent integration contract failed");
+
+console.log(`PASS: ${expected.length} tracked Nexus XSP-v2 artifacts, experimental feature gates and pinned Go 1.27 Agent integration source contract`);
