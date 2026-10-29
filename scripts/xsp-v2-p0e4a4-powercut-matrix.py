@@ -56,6 +56,10 @@ def verify_matrix(evidence_dir: Path, agent_preflight: Path, postgres_preflight:
     e4a3 = load_e3a3()
     if not evidence_dir.is_dir():
         fail("evidence directory is missing")
+    expected_names = {f"{point}.json" for point in POINTS}
+    actual_names = {entry.name for entry in evidence_dir.iterdir()}
+    if actual_names != expected_names:
+        fail("evidence directory must contain exactly the five required checkpoint files")
 
     rows: list[dict[str, Any]] = []
     run_ids: set[str] = set()
@@ -129,7 +133,8 @@ def verify_matrix(evidence_dir: Path, agent_preflight: Path, postgres_preflight:
             "postBootEpoch": result["postBootEpoch"],
         })
 
-    assert baseline is not None
+    if baseline is None:
+        fail("no matrix evidence was validated")
     return {
         "schema": MATRIX_SCHEMA,
         "status": "matrix-complete-for-independent-review",
