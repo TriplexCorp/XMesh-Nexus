@@ -1,0 +1,67 @@
+name: Temporary strengthen P0-E4a evidence binding
+
+on:
+  push:
+    branches: [feat/xsp-v2-p0e4a-evidence-bundle]
+    paths:
+      - '.github/workflows/tmp-strengthen-p0e4a-evidence.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  strengthen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/xsp-v2-p0e4a-evidence-bundle
+      - name: Strengthen embedded E3a checkpoint and pin consistency
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/xsp-v2-p0e4a-evidence-bundle.py')
+          s=p.read_text()
+          assert s.count('import argparse\n') == 1
+          s=s.replace('import argparse\n','import argparse\nimport base64\nimport binascii\n',1)
+          assert s.count('MAX_COMPONENT = 256 * 1024\n') == 1
+          s=s.replace('MAX_COMPONENT = 256 * 1024\n','MAX_COMPONENT = 256 * 1024\nMAX_SIGNED_RECEIPT = 16 * 1024\n',1)
+          needle='''def require_positive_int(value: Any, label: str) -> int:\n    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:\n        raise EvidenceError(f"{label} must be a positive integer")\n    return value\n\n\n'''
+          assert s.count(needle) == 1
+          helper='''def canonical_base64(value: Any, expected_len: int | None, label: str) -> bytes:\n    if not isinstance(value, str) or not value:\n        raise EvidenceError(f"{label} is missing")\n    try:\n        raw = base64.b64decode(value, validate=True)\n    except (binascii.Error, ValueError) as exc:\n        raise EvidenceError(f"{label} is not canonical Base64") from exc\n    if expected_len is not None and len(raw) != expected_len:\n        raise EvidenceError(f"{label} has invalid decoded length")\n    if base64.b64encode(raw).decode("ascii") != value:\n        raise EvidenceError(f"{label} is not canonical Base64")\n    return raw\n\n\ndef key_id(prefix: str, public: bytes) -> str:\n    return prefix + hashlib.sha256(public).hexdigest()[:24]\n\n\n'''
+          s=s.replace(needle, needle+helper,1)
+          old='''    require_hex(value["receiptSha256Hex"], HEX64_RE, "checkpoint receiptSha256Hex")\n    if not isinstance(value["signedReceiptBase64"], str) or not value["signedReceiptBase64"]:\n        raise EvidenceError("checkpoint signed receipt is missing")\n    return value\n\n\ndef validate_arm'''
+          new='''    receipt_digest = require_hex(value["receiptSha256Hex"], HEX64_RE, "checkpoint receiptSha256Hex")\n    signed_receipt = canonical_base64(value["signedReceiptBase64"], None, "checkpoint signed receipt")\n    if not signed_receipt or len(signed_receipt) > MAX_SIGNED_RECEIPT:\n        raise EvidenceError("checkpoint signed receipt has invalid size")\n    if sha256(signed_receipt) != receipt_digest:\n        raise EvidenceError("checkpoint embedded signed receipt digest mismatch")\n    return value\n\n\ndef validate_panel_pin(raw: bytes, node_id: int) -> None:\n    value = parse_json_bytes(raw, "panel pin")\n    exact_keys(value, {\n        "purpose", "issuerId", "nodeId", "edKeyId", "pqKeyId",\n        "ed25519PublicBase64", "mldsa65PublicBase64",\n    }, "panel pin")\n    if value["purpose"] != "panel_response":\n        raise EvidenceError("panel pin purpose must be panel_response")\n    if require_positive_int(value["nodeId"], "panel pin nodeId") != node_id:\n        raise EvidenceError("panel pin Node mismatch")\n    issuer = value["issuerId"]\n    if not isinstance(issuer, str) or not issuer or len(issuer) > 64 or any(ord(ch) < 33 or ord(ch) > 126 for ch in issuer):\n        raise EvidenceError("panel pin issuerId is invalid")\n    ed = canonical_base64(value["ed25519PublicBase64"], 32, "panel Ed25519 public key")\n    pq = canonical_base64(value["mldsa65PublicBase64"], 1952, "panel ML-DSA-65 public key")\n    if value["edKeyId"] != key_id("ed-", ed):\n        raise EvidenceError("panel Ed25519 key ID does not match public key")\n    if value["pqKeyId"] != key_id("pq-", pq):\n        raise EvidenceError("panel ML-DSA-65 key ID does not match public key")\n\n\ndef validate_arm'''
+          assert s.count(old) == 1
+          s=s.replace(old,new,1)
+          old2='''    # The panel pin bytes are integrity-bound here, but cryptographic validation\n    # belongs to the existing P0-E3a verifier. Requiring a non-empty strict JSON\n    # object prevents accidental omission without inventing a second verifier.\n    pin = parse_json_bytes(loaded["panelPin"], "panel pin")\n    if not pin:\n        raise EvidenceError("panel pin is empty")\n'''
+          new2='''    # The panel pin bytes are integrity- and identity-bound here, while actual\n    # Ed25519 + ML-DSA-65 verification remains exclusively in the P0-E3a verifier.\n    validate_panel_pin(loaded["panelPin"], node_id)\n'''
+          assert s.count(old2) == 1
+          s=s.replace(old2,new2,1)
+          p.write_text(s)
+
+          t=Path('scripts/test-xsp-v2-p0e4a-evidence-bundle.py')
+          q=t.read_text()
+          assert q.count('RECEIPT = "ab" * 32\n') == 1
+          q=q.replace('RECEIPT = "ab" * 32\n','SIGNED_RECEIPT = b\'{"message":"synthetic-e3a-receipt"}\'\nRECEIPT = hashlib.sha256(SIGNED_RECEIPT).hexdigest()\nED_PUBLIC = bytes(range(32))\nPQ_PUBLIC = bytes((index % 251 for index in range(1952)))\n',1)
+          q=q.replace('''                "signedReceiptBase64": "eyJub3QiOiJhLXJlYWwtcmVjZWlwdCJ9",\n''','''                "signedReceiptBase64": __import__("base64").b64encode(SIGNED_RECEIPT).decode(),\n''',1)
+          oldpin='''            "panel-pin.json": {\n                "purpose": "panel_response",\n                "issuerId": "lab-panel",\n                "nodeId": NODE,\n                "edKeyId": "ed-placeholder",\n                "pqKeyId": "pq-placeholder",\n            },\n'''
+          newpin='''            "panel-pin.json": {\n                "purpose": "panel_response",\n                "issuerId": "lab-panel",\n                "nodeId": NODE,\n                "edKeyId": "ed-" + hashlib.sha256(ED_PUBLIC).hexdigest()[:24],\n                "pqKeyId": "pq-" + hashlib.sha256(PQ_PUBLIC).hexdigest()[:24],\n                "ed25519PublicBase64": __import__("base64").b64encode(ED_PUBLIC).decode(),\n                "mldsa65PublicBase64": __import__("base64").b64encode(PQ_PUBLIC).decode(),\n            },\n'''
+          assert q.count(oldpin) == 1
+          q=q.replace(oldpin,newpin,1)
+          insert='''\n    def test_rejects_checkpoint_embedded_receipt_digest_divergence(self):\n        temp, fixture = self.fixture()\n        self.addCleanup(temp.cleanup)\n        fixture.mutate("checkpoint.json", lambda doc: doc.__setitem__("receiptSha256Hex", "ef" * 32))\n        with self.assertRaisesRegex(mod.EvidenceError, "embedded signed receipt digest mismatch"):\n            mod.verify(fixture.manifest_path, fixture.root)\n\n    def test_rejects_panel_pin_for_different_node(self):\n        temp, fixture = self.fixture()\n        self.addCleanup(temp.cleanup)\n        fixture.mutate("panel-pin.json", lambda doc: doc.__setitem__("nodeId", NODE + 1))\n        with self.assertRaisesRegex(mod.EvidenceError, "panel pin Node mismatch"):\n            mod.verify(fixture.manifest_path, fixture.root)\n'''
+          marker='''    def test_rejects_duplicate_json_fields(self):\n'''
+          assert q.count(marker) == 1
+          q=q.replace(marker,insert+'\n'+marker,1)
+          t.write_text(q)
+          PY
+          python3 -m py_compile scripts/xsp-v2-p0e4a-evidence-bundle.py scripts/test-xsp-v2-p0e4a-evidence-bundle.py
+          python3 scripts/test-xsp-v2-p0e4a-evidence-bundle.py -v
+      - name: Commit strengthening
+        run: |
+          set -euo pipefail
+          git config user.name 'Xmesh Creator'
+          git config user.email 'Aselis3d@gmail.com'
+          git add scripts/xsp-v2-p0e4a-evidence-bundle.py scripts/test-xsp-v2-p0e4a-evidence-bundle.py
+          git commit -m 'security(xsp-v2): strengthen E4a E3a evidence binding'
+          git push origin HEAD:feat/xsp-v2-p0e4a-evidence-bundle
