@@ -8,9 +8,11 @@ XMesh Nexus manages Nodes, users, subscriptions, Xray configuration, telemetry a
 
 ## Current XSP-v2 checkpoint — 29 October 2026
 
-**Latest verified Nexus implementation checkpoint:** [`698d5e43d59c0c95532d513b39d95e42a2af4f20`](https://github.com/TriplexCorp/XMesh-Nexus/commit/698d5e43d59c0c95532d513b39d95e42a2af4f20), merge of [PR #105](https://github.com/TriplexCorp/XMesh-Nexus/pull/105).
+**Latest verified Nexus recovery/security checkpoint:** [`f9a9c636f83a3a2ef7122fef7c3f3bc2bc76b7d4`](https://github.com/TriplexCorp/XMesh-Nexus/commit/f9a9c636f83a3a2ef7122fef7c3f3bc2bc76b7d4), merge of [PR #109](https://github.com/TriplexCorp/XMesh-Nexus/pull/109).
 
-**P0-C2-D and P0-D are COMPLETE. P0-E is the CURRENT P0.** The bounded release-identity foundations, signed release lifecycle, real-Agent Go 1.27 integration design, staged package lifecycle, disposable real-Agent migration/update E2E, durable real-Agent security state and authenticated authority binding are complete:
+**P0-C2-D and P0-D are COMPLETE. P0-E remains the CURRENT P0. P0-E1a, P0-E2a and P0-E2b are COMPLETE within their explicitly bounded scopes; P0-E3a is the CURRENT sub-gate.** The production-capable Agent path remains default-disabled and production rollout remains unauthorized.
+
+Completed foundations and recovery/security checkpoints now include:
 
 - **PR #90 / P0-D1a:** append-only exact Agent release identity `{version, sourceRevision, artifactSha256}` in PostgreSQL. A version cannot be silently rebound; UPDATE/DELETE/TRUNCATE are rejected; no URL/script/command input and no production activation were introduced.
 - **PR #91 / P0-D1b:** the immutable release identity can be atomically bound to the existing fixed-action `update_agent` single-flight queue. The binding cannot be attached, removed or replaced later with `UPDATE`; normal command lifecycle state transitions remain legal. No HTTP/API caller, poll payload or Agent/updater execution path changed in this gate.
@@ -20,18 +22,21 @@ XMesh Nexus manages Nodes, users, subscriptions, Xray configuration, telemetry a
 - **PR #101 / staged download, verify, apply and rollback:** approved Go 1.27 Agent bytes are delivered only from the server-controlled content-addressed artifact source over the existing signed control plane. The staged helper verifies exact manifest SHA-256 plus the binary's embedded `version`/`sourceRevision` before activation, retains last-known-good state, switches atomically and rolls package/service state back on failure without rewinding durable security state. Caller URL/path/script input remains impossible and the production gate remains disabled by default.
 - **PR #103 / disposable real Nexus↔Node migration/update E2E + lost-response recovery:** manifest-bound claimed commands can be redelivered after a lost poll response within the bounded migration window, and a completed bound ACK may be replayed idempotently only when every durable result/detail/release-identity field matches exactly. A real disposable Nexus builds two pinned Go 1.27.3 Node Agent artifacts, proves signed claim/download/apply/ACK, exact lost-response retry, restart/idempotent apply, deterministic rollback to the last-known-good Agent, preserved security-state root, non-exact replay rejection and restoration of the default-disabled production gate.
 - **Node PR #37 + Nexus PR #105 / durable real-Agent security state + authenticated authority binding:** the real `agent/xspv2` layout persists the proven key/cutover journals under the private Agent state root, attests exact applied rotation before network operations, preserves monotonic epoch/replay floors and retained old/new key material across restart, and fails closed on stale/corrupt/rolled-back state. Nexus pins the merged Node source and machine-checks that the reused strict transport keeps direct connect `address` separate from authenticated `serverName`, binds TLS SNI/certificate verification/HTTP Host to that authority, disables proxy use and rejects redirects.
+- **Node PR #38 + Nexus PR #107 / P0-E1a process-crash durability:** the keyring transition is exercised with hard process termination after each durability checkpoint around retained previous identity, monotonic epoch floor and active-vault replacement. The proof requires temp-file fsync, atomic rename and parent-directory fsync ordering and demonstrates deterministic restart/recovery. This is bounded process/filesystem evidence; it does **not** claim physical power removal, controller-cache or storage-firmware behavior.
+- **Node PR #39 + Nexus PR #108 / P0-E2a one-sided Agent snapshot anti-rollback:** a complete locally self-consistent old Agent security-state snapshot is restored while Nexus remains current. Re-delivery of the unchanged current dual-signed permit fails closed before real `Exchange` or `Recover` performs network I/O. Coordinated rollback of both Agent and Nexus/PostgreSQL is deliberately outside this gate.
+- **PR #109 / P0-E2b one-sided PostgreSQL snapshot rollback:** a disposable real `pg_dump` → drop/recreate database → `pg_restore` rollback restores PostgreSQL to the exact pre-ACK tuple while the Agent journal remains current. Restore-time database ACL drift is detected and the reviewed signer/C2-C least-privilege provisioning is re-applied without mutating XSP-v2 security state. The current Agent accepts only the same authoritative dual-signed receipt bytes and rejects silent receipt replacement. Coordinated rollback remains outside this gate.
 
-Exact post-merge evidence on `698d5e43d59c0c95532d513b39d95e42a2af4f20`:
+Exact post-merge P0-E2b evidence on `f9a9c636f83a3a2ef7122fef7c3f3bc2bc76b7d4`:
 
-- [Backend CI #3605](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40835127285) — **success**, including the pinned current-Node durable-state/authority source contract, strict Clippy/pedantic/nursery, Docker build and disposable PostgreSQL/API authentication integration.
+- [XSP-v2 P0-E2b PostgreSQL Snapshot Rollback #6](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40846810762) — **success** on the exact merge SHA, including the real PostgreSQL restore boundary, restore-time ACL re-hardening and current-Agent receipt witness.
 
-The disposable real-Agent migration/update proof remains [XSP-v2 P0-D real Agent E2E #10](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40827536439) on PR #103 merge SHA `7df13962aae871f04677b47e0f05a7f6ab906e72` — **success**, including real Go 1.27.3 artifact apply, lost-response retry, restart, rollback and restoration of the default-disabled production gate.
+The previous P0-D implementation checkpoint remains [`698d5e43d59c0c95532d513b39d95e42a2af4f20`](https://github.com/TriplexCorp/XMesh-Nexus/commit/698d5e43d59c0c95532d513b39d95e42a2af4f20), merge of [PR #105](https://github.com/TriplexCorp/XMesh-Nexus/pull/105). Its [Backend CI #3605](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40835127285) completed **success**. The disposable real-Agent migration/update proof remains [XSP-v2 P0-D real Agent E2E #10](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40827536439) on PR #103 merge SHA `7df13962aae871f04677b47e0f05a7f6ab906e72` — **success**.
 
-The current verified XMesh-Node **durable Agent state / authority** checkpoint is [`5e8ee562915a570eb49ed46d59d723f233f3cc68`](https://github.com/TriplexCorp/XMesh-Node/commit/5e8ee562915a570eb49ed46d59d723f233f3cc68), merge of Node PR #37. Exact post-merge [Agent Artifact #11](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40832589401) and [Node CI #463](https://github.com/TriplexCorp/XMesh-Node/actions/runs/40832589436) both completed **success**. The earlier transport checkpoint [`0ae78244ef0ef763bea6ce198dde6e83eb11ff1f`](https://github.com/TriplexCorp/XMesh-Node/commit/0ae78244ef0ef763bea6ce198dde6e83eb11ff1f), merge of Node PR #33, remains the original authority-binding proof.
+The current verified XMesh-Node P0-E2a checkpoint is [`3fffa9fd74195114a7c4e573a8a11e075c84f403`](https://github.com/TriplexCorp/XMesh-Node/commit/3fffa9fd74195114a7c4e573a8a11e075c84f403), merge of Node PR #39. The earlier durable Agent state / authority checkpoint remains [`5e8ee562915a570eb49ed46d59d723f233f3cc68`](https://github.com/TriplexCorp/XMesh-Node/commit/5e8ee562915a570eb49ed46d59d723f233f3cc68), merge of Node PR #37.
 
 The previous complete C2-D implementation checkpoint remains [`7e0b42ea4847b273ba8cd55a0ff3e043a420c377`](https://github.com/TriplexCorp/XMesh-Nexus/commit/7e0b42ea4847b273ba8cd55a0ff3e043a420c377), merge of [PR #88](https://github.com/TriplexCorp/XMesh-Nexus/pull/88). Its exact post-merge C2-D transport-negative, lost-response/race, expired-recovery, Hybrid TLS and Backend CI matrix remains valid within that stated isolated staging/process boundary.
 
-Production behavior remains unchanged. The root XMesh-Node edge router remains on its Go 1.23 production path; the signed shell/systemd control Agent remains the deployed command authority; the Go 1.27 migration/package path remains behind explicit non-default staging gates. `strict-pq` remains **OFF**. P0-D completion, Node PR #37 and Nexus PR #105 do **not** authorize production VPS/DNS/firewall/public-Nginx/key-material changes, Agent cutover or rollout.
+Production behavior remains unchanged. The root XMesh-Node edge router remains on its Go 1.23 production path; the signed shell/systemd control Agent remains the deployed command authority; the Go 1.27 migration/package path remains behind explicit non-default staging gates. `strict-pq` remains **OFF**. P0-D completion and P0-E1a/P0-E2a/P0-E2b evidence do **not** authorize production VPS/DNS/firewall/public-Nginx/key-material changes, Agent cutover or rollout.
 
 ## Completed XSP-v2 gates
 
@@ -115,14 +120,23 @@ P0-D acceptance is satisfied by the default-disabled production-capable Agent wo
 
 ## CURRENT P0 — P0-E recovery/security release gates
 
-P0-E must prove the deployment/recovery properties required before any canary or production consideration:
+### Completed P0-E work
 
-1. crash and power-loss behavior during security-state transitions;
-2. filesystem/database snapshot and anti-rollback behavior;
-3. backup/restore of PostgreSQL together with persistent security identities;
-4. owner-authorized key rotation/recovery and explicit old-key retirement policy;
-5. parser/protocol fuzzing plus FIPS 204 / algorithm known-answer validation where applicable;
-6. independent security review of the final migration/production architecture and operational observability without secret/key leakage.
+- **P0-E1a COMPLETE — process-crash/fsync-order durability:** Node PR #38 + Nexus PR #107 prove deterministic fail-closed restart/recovery across hard process termination at the critical local keyring durability boundaries. This does not prove physical power-loss/controller-cache behavior.
+- **P0-E2a COMPLETE — one-sided Agent snapshot anti-rollback:** Node PR #39 + Nexus PR #108 prove a fully self-consistent old Agent snapshot cannot use a current unchanged Nexus permit; applied-state attestation rejects it before network I/O.
+- **P0-E2b COMPLETE — one-sided PostgreSQL snapshot rollback:** PR #109 proves a real database dump/restore rollback cannot silently rewrite state already witnessed by a current Agent, and that restore-time least-privilege database ACL re-hardening is part of the recovery contract.
+
+### CURRENT sub-gate — P0-E3a owner/off-host monotonic recovery checkpoint
+
+P0-E3a must introduce an **independent, non-rolled-back owner/off-host trust domain** that can bind a monotonic recovery checkpoint to the Agent security identity and the Nexus/PostgreSQL security state. This is required to detect a coordinated rollback in which both the Agent state root and Nexus/PostgreSQL are restored to mutually consistent old snapshots. P0-E3a must not create an automatic recovery bypass, silently reset epochs/replay state, or weaken the existing dual-signature/strict-transport invariants.
+
+After P0-E3a, P0-E still must close:
+
+1. physical power-loss / storage-controller-cache behavior beyond the bounded process-crash proof;
+2. complete backup/restore of PostgreSQL plus persistent security identities, including coordinated restore/recovery procedures;
+3. owner-authorized key rotation/recovery and explicit old-key retirement policy;
+4. parser/protocol fuzzing plus FIPS 204 / algorithm known-answer validation where applicable;
+5. independent security review of the final migration/production architecture and operational observability without secret/key leakage.
 
 `strict-pq` remains **OFF** throughout P0-E unless a later explicit production/release gate separately authorizes activation. Production rollout remains separately gated and unauthorized.
 
@@ -132,7 +146,7 @@ P0-E must prove the deployment/recovery properties required before any canary or
 - Production control-plane behavior remains legacy `XMESH1` / Ed25519 until separately approved P0-E and rollout gates authorize migration.
 - No target-product fallback to XMESH1, Ed25519-only, X25519-only, TLS 1.2 or insecure certificate validation.
 - Completed C2-D evidence is isolated staging/process evidence, not production activation.
-- Completed P0-D capabilities/evidence, including PR #101/#103/#105 and Node PR #37, remain default-disabled staging/production-capable foundations; none authorize production rollout.
+- Completed P0-D capabilities/evidence and bounded P0-E1a/P0-E2a/P0-E2b proofs remain default-disabled staging/production-capable foundations; none authorize production rollout.
 - A GitHub merge is not a production deployment.
 - Xray continues to carry user VPN traffic.
 
@@ -193,6 +207,9 @@ The default Nexus backend does not compile `xsp-v2-experimental`. Do not weaken 
 
 - [Enterprise Roadmap](docs/ENTERPRISE_ROADMAP.md)
 - [XSP-v2 PQ-only security policy](docs/XSP_V2_PQ_ONLY_SECURITY_POLICY.md)
+- [XSP-v2 P0-E crash durability](docs/XSP_V2_P0E_CRASH_DURABILITY.md)
+- [XSP-v2 P0-E snapshot anti-rollback](docs/XSP_V2_P0E_SNAPSHOT_ANTIROLLBACK.md)
+- [XSP-v2 P0-E PostgreSQL snapshot rollback](docs/XSP_V2_P0E_POSTGRES_SNAPSHOT_ROLLBACK.md)
 - [XSP-v2 signer E2E](docs/XSP_V2_SIGNER_E2E.md)
 - [XSP-v2 TLS / ingress-origin proof](docs/XSP_V2_TLS_PROBE.md)
 - [Subscription security](docs/SUBSCRIPTION_SECURITY.md)
