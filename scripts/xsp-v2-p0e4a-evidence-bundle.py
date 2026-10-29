@@ -15,6 +15,7 @@ import json
 import os
 from pathlib import Path
 import re
+import stat
 import sys
 from typing import Any
 
@@ -69,7 +70,7 @@ def read_regular(path: Path, limit: int) -> bytes:
         info = path.lstat()
     except OSError as exc:
         raise EvidenceError(f"cannot stat {path}: {exc}") from exc
-    if path.is_symlink() or not info.is_file():
+    if path.is_symlink() or not stat.S_ISREG(info.st_mode):
         raise EvidenceError(f"{path} is not a non-symlink regular file")
     if info.st_size <= 0 or info.st_size > limit:
         raise EvidenceError(f"{path} has invalid size")
@@ -304,7 +305,7 @@ def main() -> int:
     root = Path(args.root)
     try:
         root_info = root.lstat()
-        if root.is_symlink() or not root_info.is_dir():
+        if root.is_symlink() or not stat.S_ISDIR(root_info.st_mode):
             raise EvidenceError("evidence root must be a non-symlink directory")
         result = verify(manifest, root)
     except (EvidenceError, OSError) as exc:
