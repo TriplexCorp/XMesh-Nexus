@@ -170,9 +170,7 @@ fn polled_command_from_row(row: &sqlx::postgres::PgRow) -> Result<Value, ApiErro
                     "Bound Agent release identity is missing.",
                 )
             })?;
-        if action != "update_agent"
-            || target_version.as_deref() != Some(release_version.as_str())
-        {
+        if action != "update_agent" || target_version.as_deref() != Some(release_version.as_str()) {
             return Err(ApiError::new(
                 StatusCode::CONFLICT,
                 "Bound Agent release identity does not match the queued command.",
