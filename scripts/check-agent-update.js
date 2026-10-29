@@ -5,7 +5,9 @@ const fs=require('node:fs');
 const {spawnSync}=require('node:child_process');
 
 const api=fs.readFileSync('backend/src/main.rs','utf8');
-const runtime=fs.readFileSync('backend/src/node_runtime.rs','utf8');
+const runtimeEntry=fs.readFileSync('backend/src/node_runtime.rs','utf8');
+const runtimeLegacy=fs.readFileSync('backend/src/node_runtime_legacy.rs','utf8');
+const runtime=runtimeEntry+'\n'+runtimeLegacy;
 const migration=fs.readFileSync('backend/migrations/0024_node_agent_updates.sql','utf8');
 const releaseManifest=fs.readFileSync('backend/migrations/0107_node_xsp_agent_release_manifests.sql','utf8');
 const migrationBinding=fs.readFileSync('backend/migrations/0108_node_xsp_agent_migration_binding.sql','utf8');
@@ -17,17 +19,17 @@ const css=fs.readFileSync('styles.css','utf8');
 const tests=fs.readFileSync('scripts/test-node-auth-integration.py','utf8');
 
 assert.match(api,/\/nodes\/\{id\}\/agent-update/);
-assert.match(runtime,/pub async fn request_agent_update/);
-assert.match(runtime,/pub struct AgentUpdateRequest \{\}/);
+assert.match(runtimeEntry,/pub async fn request_agent_update/);
+assert.match(runtimeLegacy,/pub struct AgentUpdateRequest \{\}/);
 assert.match(runtime,/deny_unknown_fields/);
-assert.match(runtime,/crate::require_mutation\(&actor\)/);
-assert.match(runtime,/version LIKE 'control-v4\.%'/);
-assert.match(runtime,/VALUES\(\$1,'update_agent',\$2,\$3\)/);
-assert.match(runtime,/pub const CONTROL_AGENT_VERSION/);
-const target=runtime.match(/pub const CONTROL_AGENT_VERSION: &str = "(control-v[4-9]\.[0-9]+\.[0-9]+)";/);
+assert.match(runtimeLegacy,/crate::require_mutation\(&actor\)/);
+assert.match(runtimeLegacy,/version LIKE 'control-v4\.%'/);
+assert.match(runtimeLegacy,/VALUES\(\$1,'update_agent',\$2,\$3\)/);
+assert.match(runtimeLegacy,/pub const CONTROL_AGENT_VERSION/);
+const target=runtimeLegacy.match(/pub const CONTROL_AGENT_VERSION: &str = "(control-v[4-9]\.[0-9]+\.[0-9]+)";/);
 assert.ok(target,'Panel must advertise a numbered control runtime');
 assert.ok(agent.includes('AGENT_VERSION="'+target[1]+'"'),'Installer must report the same runtime version as the panel');
-assert.match(runtime,/version LIKE 'control-v5[.]%'/,'Agent updates must accept control-v5');
+assert.match(runtimeLegacy,/version LIKE 'control-v5[.]%'/,'Agent updates must accept control-v5');
 assert.match(migration,/CHECK \(action IN \('restart_xray', 'update_xray', 'update_agent'\)\)/);
 
 // P0-D starts with an inert append-only release identity ledger. It must not
@@ -59,6 +61,28 @@ assert.match(migrationBinding,/node already has an active control command/);
 assert.doesNotMatch(migrationBinding,/\b(url|uri|script|command_text|shell)\b\s+(TEXT|VARCHAR)/i,
   'Migration binding must not add remotely selected executable input');
 assert.doesNotMatch(migrationBinding,/strict-pq=on/,'Binding primitive must not activate strict PQ');
+
+// P0-D1c reuses the same endpoint. `{}` is delegated into the previous handler;
+// release selection is exact-gated, owner-only and resolves identity server-side.
+assert.match(runtimeEntry,/path = "node_runtime_legacy[.]rs"/,
+  'D1c must preserve the previous runtime implementation as the legacy path');
+assert.match(runtimeEntry,/release_version: String/);
+assert.match(runtimeEntry,/rename_all = "camelCase", deny_unknown_fields/);
+assert.match(runtimeEntry,/XSP_V2_P0D_AGENT_MIGRATION/);
+assert.match(runtimeEntry,/value == Some\("staging-only"\)/,
+  'Migration gate must require the exact staging-only value');
+assert.match(runtimeEntry,/crate::require_owner\(&actor\)/,
+  'Release selection must require owner authorization');
+assert.match(runtimeEntry,/FROM stage_node_xsp_agent_migration\(\$1,\$2,\$3\)/,
+  'D1c must reuse the D1b atomic manifest-binding primitive');
+assert.match(runtimeEntry,/Approved Agent release was not found/);
+assert.match(runtimeEntry,/AgentUpdateRequest::Legacy\(_\)/);
+assert.match(runtimeEntry,/legacy::request_agent_update/,
+  'Legacy empty requests must execute the previous handler');
+assert.match(runtimeEntry,/AgentUpdateRequest::Migration\(request\)/);
+assert.doesNotMatch(runtimeEntry,/\b(url|uri|script|shell|command_text)\s*:/i,
+  'D1c request schema must never accept caller-selected executable input');
+assert.doesNotMatch(runtimeEntry,/strict-pq=on/,'D1c must not activate strict PQ');
 
 assert.match(agent,/AGENT_VERSION="control-v[45][.][0-9]+[.][0-9]+"/);
 assert.match(agent,/router_running\(\)\{/,'Control agent needs an independent edge-router health probe');
@@ -116,4 +140,4 @@ for(const file of ['deploy/node-control-agent.sh','deploy/update-node-control-ag
 }
 const syntax=spawnSync(process.execPath,['--check','app.js'],{encoding:'utf8'});
 assert.equal(syntax.status,0,syntax.stderr);
-console.log('Signed remote Agent upgrade, immutable release identity/binding and install contract: OK');
+console.log('Signed remote Agent upgrade, immutable release identity/binding and P0-D1c staging orchestration contract: OK');
