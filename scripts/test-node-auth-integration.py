@@ -14,8 +14,15 @@ from urllib.request import Request, urlopen
 BASE = os.getenv("XMESH_TEST_URL", "http://127.0.0.1:8080").rstrip("/")
 USER = os.getenv("ADMIN_USERNAME", "admin")
 PASSWORD = os.environ["ADMIN_PASSWORD"]
-# Match the exact fixed update target advertised by the compiled backend.
-VERSION_SOURCE = (Path(__file__).resolve().parents[1] / "backend/src/node_runtime.rs").read_text(encoding="utf-8")
+# Match the exact fixed update target advertised by the compiled backend. The
+# P0-D retry overlay intentionally keeps the PR #101 staged runtime in a
+# separate reviewed module, so source-reading integration checks must inspect
+# both files instead of forcing a duplicate version constant into Rust.
+RUNTIME_ROOT = Path(__file__).resolve().parents[1] / "backend/src"
+VERSION_SOURCE = "\n".join(
+    (RUNTIME_ROOT / name).read_text(encoding="utf-8")
+    for name in ("node_runtime.rs", "node_runtime_p0d_staged.rs")
+)
 VERSION_MATCH = re.search(r'pub const CONTROL_AGENT_VERSION: &str = "(control-v[0-9]+[.][0-9]+[.][0-9]+)";', VERSION_SOURCE)
 assert VERSION_MATCH, "Backend agent update version constant missing"
 CONTROL_AGENT_VERSION = VERSION_MATCH.group(1)
