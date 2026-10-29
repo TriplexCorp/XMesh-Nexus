@@ -169,7 +169,7 @@ fn receipt_signing_input(message: &CommitReceipt) -> Result<Vec<u8>> {
             && message.kind == "commit_receipt"
             && message.issuer_id != format!("node-{}", message.node_id)
             && message.node_id > 0
-            && message.node_id <= i64::MAX as u64
+            && i64::try_from(message.node_id).is_ok()
             && message.from_epoch > 0
             && message.from_epoch.checked_add(1) == Some(message.to_epoch)
             && message.committed_at_ms > 0,
@@ -327,8 +327,12 @@ fn verify_checkpoint(
     );
     let receipt = verify_signed_receipt(&signed_receipt, pin)?;
     ensure!(
-        receipt.node_id == checkpoint.node_id && receipt.to_epoch == checkpoint.minimum_epoch,
-        "checkpoint identity or monotonic epoch is not derived from its dual-signed receipt"
+        receipt.node_id == checkpoint.node_id,
+        "checkpoint Node identity is not derived from its dual-signed receipt"
+    );
+    ensure!(
+        receipt.to_epoch == checkpoint.minimum_epoch,
+        "checkpoint monotonic epoch is not derived from its dual-signed receipt"
     );
     ensure!(
         local.node_id == checkpoint.node_id,
