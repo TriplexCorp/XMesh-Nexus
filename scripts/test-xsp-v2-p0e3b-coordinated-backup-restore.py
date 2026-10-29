@@ -535,7 +535,12 @@ def main() -> None:
             wait_db()
             for migration in MIGRATIONS:
                 sql((ROOT / "backend/migrations" / migration).read_text())
-            provision_roles()
+            try:
+                provision_roles()
+            except Exception as exc:
+                inspect = command("docker", "inspect", db, "--format", "{{json .State}}", check=False).stdout.strip()
+                logs = command("docker", "logs", "--tail", "160", db, check=False).stdout
+                raise RuntimeError(f"initial PostgreSQL role provisioning failed: {exc}; state={inspect}; logs={logs[-7000:]}") from exc
             metric_key = hashlib.sha256(str(NODE_ID).encode()).hexdigest()
             sql(
                 "BEGIN;"
@@ -705,6 +710,7 @@ def main() -> None:
             print("mixed/missing/tampered recovery components rejected: PASS")
             print("strict-pq remains OFF; production rollout remains NOT AUTHORIZED")
         finally:
+            command("docker", "exec", toolbox, "chown", "-R", f"{host_uid}:{host_gid}", "/work", check=False, timeout=60)
             command("docker", "rm", "-f", toolbox, check=False, timeout=60)
             command("docker", "rm", "-f", db, check=False, timeout=60)
 
