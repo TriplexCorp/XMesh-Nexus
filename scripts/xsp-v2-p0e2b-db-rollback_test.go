@@ -88,7 +88,7 @@ func TestP0E2BPostgresSnapshotRollbackCurrentAgentWitness(t *testing.T) {
 	if !bytes.Equal(after.SignedReceipt, before.SignedReceipt) {
 		t.Fatal("PostgreSQL rollback changed current Agent authoritative receipt bytes")
 	}
-	if after.RequestID != before.RequestID || after.ToEpoch != before.ToEpoch || after.SignedACKSHA256Hex != before.SignedACKSHA256Hex {
+	if after.RequestID != before.RequestID || after.ToEpoch != before.ToEpoch || after.SignedACKEnvelopeSHA256 != before.SignedACKEnvelopeSHA256 {
 		t.Fatal("PostgreSQL rollback changed current Agent receipt correlation evidence")
 	}
 	if _, err := ReloadVerifiedCommitReceiptForJournal(
