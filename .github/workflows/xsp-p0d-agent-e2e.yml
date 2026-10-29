@@ -1,0 +1,139 @@
+name: XSP-v2 P0-D real Agent E2E
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/src/node_runtime.rs"
+      - "backend/src/node_runtime_p0d_staged.rs"
+      - "backend/src/node_agent_artifact.rs"
+      - "backend/migrations/0107_node_xsp_agent_release_manifests.sql"
+      - "backend/migrations/0108_node_xsp_agent_migration_binding.sql"
+      - "backend/migrations/0109_node_xsp_agent_release_ack_identity.sql"
+      - "deploy/xsp-v2-agent-staged-apply.sh"
+      - "scripts/test-xsp-agent-real-e2e.py"
+      - ".github/workflows/xsp-p0d-agent-e2e.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/src/node_runtime.rs"
+      - "backend/src/node_runtime_p0d_staged.rs"
+      - "backend/src/node_agent_artifact.rs"
+      - "deploy/xsp-v2-agent-staged-apply.sh"
+      - "scripts/test-xsp-agent-real-e2e.py"
+      - ".github/workflows/xsp-p0d-agent-e2e.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: xsp-p0d-agent-e2e-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
+
+jobs:
+  real-agent-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      POSTGRES_PASSWORD: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      APP_DB_PASSWORD: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
+      REDIS_PASSWORD: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: 9876543210abcdef9876543210abcdef9876543210abcdef
+      TOTP_ENCRYPTION_KEY: 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+      SUBSCRIPTION_ENCRYPTION_KEY: "1234567812345678123456781234567812345678123456781234567812345678"
+      COOKIE_SECURE: "false"
+      DASHBOARD_PATH: /dashboard/0123456789abcdef0123456789abcdef0123456789abcdef
+      XSP_V2_P0D_AGENT_MIGRATION: staging-only
+      P0D_NODE_SOURCE_REVISION: 5b810d9d0864e6c22fa0c0d176982ef4cbf04b20
+      P0D_AGENT_VERSION_A: p0d-real-e2e-a
+      P0D_AGENT_VERSION_B: p0d-real-e2e-b
+    steps:
+      - name: Check out Nexus exact PR head
+        uses: actions/checkout@v7
+
+      - name: Check out pinned XMesh-Node Agent source
+        uses: actions/checkout@v7
+        with:
+          repository: TriplexCorp/XMesh-Node
+          ref: 5b810d9d0864e6c22fa0c0d176982ef4cbf04b20
+          path: xmesh-node
+
+      - name: Use Go 1.27.3 for production-capable Agent artifacts
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache: false
+
+      - name: Build two real pinned Node Agent release artifacts
+        working-directory: xmesh-node/agent/xspv2
+        run: |
+          set -Eeuo pipefail
+          test "$(go version | awk '{print $3}')" = "go1.27.3"
+          test "$(git rev-parse HEAD)" = "$P0D_NODE_SOURCE_REVISION"
+          go test ./...
+          go build -trimpath \
+            -ldflags "-X main.version=$P0D_AGENT_VERSION_A -X main.sourceRevision=$P0D_NODE_SOURCE_REVISION" \
+            -o /tmp/xmesh-agent-a ./cmd/xmesh-agent-xspv2
+          go build -trimpath \
+            -ldflags "-X main.version=$P0D_AGENT_VERSION_B -X main.sourceRevision=$P0D_NODE_SOURCE_REVISION" \
+            -o /tmp/xmesh-agent-b ./cmd/xmesh-agent-xspv2
+          /tmp/xmesh-agent-a --identity
+          /tmp/xmesh-agent-b --identity
+          test "$(sha256sum /tmp/xmesh-agent-a | awk '{print $1}')" != \
+               "$(sha256sum /tmp/xmesh-agent-b | awk '{print $1}')"
+
+      - name: Populate server-controlled content-addressed artifact source
+        run: |
+          set -Eeuo pipefail
+          mkdir -p deploy/runtime/xsp-v2-agent-artifacts
+          digest_a="$(sha256sum /tmp/xmesh-agent-a | awk '{print $1}')"
+          digest_b="$(sha256sum /tmp/xmesh-agent-b | awk '{print $1}')"
+          install -m 0755 /tmp/xmesh-agent-a "deploy/runtime/xsp-v2-agent-artifacts/$digest_a.bin"
+          install -m 0755 /tmp/xmesh-agent-b "deploy/runtime/xsp-v2-agent-artifacts/$digest_b.bin"
+          printf '%s\n' "$DASHBOARD_PATH" > deploy/runtime/dashboard-path
+          chmod 0666 deploy/runtime/dashboard-path
+          echo "P0D_AGENT_ARTIFACT_A=$PWD/deploy/runtime/xsp-v2-agent-artifacts/$digest_a.bin" >> "$GITHUB_ENV"
+          echo "P0D_AGENT_ARTIFACT_B=$PWD/deploy/runtime/xsp-v2-agent-artifacts/$digest_b.bin" >> "$GITHUB_ENV"
+
+      - name: Start disposable Nexus with staging-only migration gate
+        run: docker compose up --build -d
+
+      - name: Wait for Nexus migrations and API readiness
+        run: |
+          set -Eeuo pipefail
+          for i in $(seq 1 120); do
+            if curl --fail --silent http://127.0.0.1:8080/api/v1/health/ready >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose logs --tail=180 panel
+          exit 1
+
+      - name: Prove real signed migration, lost-response retry, restart and rollback
+        run: |
+          set -Eeuo pipefail
+          python3 -m py_compile scripts/test-xsp-agent-real-e2e.py
+          bash -n deploy/xsp-v2-agent-staged-apply.sh
+          python3 scripts/test-xsp-agent-real-e2e.py
+
+      - name: Prove default production gate remains disabled after E2E
+        if: success()
+        run: |
+          set -Eeuo pipefail
+          XSP_V2_P0D_AGENT_MIGRATION= docker compose up -d --no-deps --force-recreate panel
+          for i in $(seq 1 60); do
+            curl --fail --silent http://127.0.0.1:8080/api/v1/health/ready >/dev/null && break
+            sleep 1
+          done
+          test "$(docker compose exec -T panel sh -c 'printf %s "$XSP_V2_P0D_AGENT_MIGRATION"')" = ""
+
+      - name: Disposable diagnostics on failure
+        if: failure()
+        run: docker compose logs --tail=220
+
+      - name: Remove disposable Nexus state
+        if: always()
+        run: docker compose down --volumes --remove-orphans
