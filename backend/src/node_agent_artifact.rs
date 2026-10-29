@@ -83,7 +83,10 @@ async fn read_verified_artifact(root: &Path, digest: &str) -> Result<Vec<u8>, Ap
 
     let candidate = canonical_root.join(filename);
     let metadata = tokio::fs::symlink_metadata(&candidate).await.map_err(|_| {
-        ApiError::new(StatusCode::NOT_FOUND, "Approved Agent artifact is unavailable.")
+        ApiError::new(
+            StatusCode::NOT_FOUND,
+            "Approved Agent artifact is unavailable.",
+        )
     })?;
     if metadata.file_type().is_symlink()
         || !metadata.is_file()
@@ -96,7 +99,10 @@ async fn read_verified_artifact(root: &Path, digest: &str) -> Result<Vec<u8>, Ap
         ));
     }
     let canonical_candidate = tokio::fs::canonicalize(&candidate).await.map_err(|_| {
-        ApiError::new(StatusCode::NOT_FOUND, "Approved Agent artifact is unavailable.")
+        ApiError::new(
+            StatusCode::NOT_FOUND,
+            "Approved Agent artifact is unavailable.",
+        )
     })?;
     if canonical_candidate.parent() != Some(canonical_root.as_path()) {
         return Err(ApiError::new(
@@ -106,7 +112,10 @@ async fn read_verified_artifact(root: &Path, digest: &str) -> Result<Vec<u8>, Ap
     }
 
     let bytes = tokio::fs::read(&canonical_candidate).await.map_err(|_| {
-        ApiError::new(StatusCode::NOT_FOUND, "Approved Agent artifact is unavailable.")
+        ApiError::new(
+            StatusCode::NOT_FOUND,
+            "Approved Agent artifact is unavailable.",
+        )
     })?;
     let actual = hex::encode(Sha256::digest(&bytes));
     if actual != digest {
