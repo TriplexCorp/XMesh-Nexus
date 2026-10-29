@@ -580,15 +580,13 @@ mod tests {
         tampered.receipt_sha256_hex = "66".repeat(32);
         assert!(verify_checkpoint(&serde_json::to_vec(&tampered).unwrap(), &pin, &local).is_err());
 
+        let checkpoint_bytes = serde_json::to_vec(&checkpoint).unwrap();
         let wrong_node = LocalRecoveryState {
             node_id: 14,
             key_epoch: 5,
-            current_receipt_sha256_hex: Some(checkpoint.receipt_sha256_hex.clone()),
+            current_receipt_sha256_hex: Some(checkpoint.receipt_sha256_hex),
         };
-        assert!(
-            verify_checkpoint(&serde_json::to_vec(&checkpoint).unwrap(), &pin, &wrong_node)
-                .is_err()
-        );
+        assert!(verify_checkpoint(&checkpoint_bytes, &pin, &wrong_node).is_err());
 
         let mut signed: SignedReceipt = serde_json::from_slice(&receipt).unwrap();
         signed.message.request_id = "tampered-request".into();
