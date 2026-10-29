@@ -12,6 +12,7 @@ on:
       - "backend/migrations/0109_node_xsp_agent_release_ack_identity.sql"
       - "deploy/xsp-v2-agent-staged-apply.sh"
       - "scripts/test-xsp-agent-real-e2e.py"
+      - "scripts/xsp-agent-e2e-sha256sum"
       - ".github/workflows/xsp-p0d-agent-e2e.yml"
   push:
     branches: [main]
@@ -21,6 +22,7 @@ on:
       - "backend/src/node_agent_artifact.rs"
       - "deploy/xsp-v2-agent-staged-apply.sh"
       - "scripts/test-xsp-agent-real-e2e.py"
+      - "scripts/xsp-agent-e2e-sha256sum"
       - ".github/workflows/xsp-p0d-agent-e2e.yml"
   workflow_dispatch:
 
@@ -96,6 +98,11 @@ jobs:
           chmod 0666 deploy/runtime/dashboard-path
           echo "P0D_AGENT_ARTIFACT_A=$PWD/deploy/runtime/xsp-v2-agent-artifacts/$digest_a.bin" >> "$GITHUB_ENV"
           echo "P0D_AGENT_ARTIFACT_B=$PWD/deploy/runtime/xsp-v2-agent-artifacts/$digest_b.bin" >> "$GITHUB_ENV"
+          # CI-only deterministic post-switch failure. The shim delegates every
+          # digest check until `current` points at release B, so download,
+          # embedded identity and pre-activation verification remain real.
+          printf '%s\n' "$digest_b" | sudo tee /tmp/xmesh-p0d-e2e-fail-digest >/dev/null
+          sudo install -o root -g root -m 0755 scripts/xsp-agent-e2e-sha256sum /usr/local/bin/sha256sum
 
       - name: Start disposable Nexus with staging-only migration gate
         run: docker compose up --build -d
