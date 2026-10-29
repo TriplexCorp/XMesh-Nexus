@@ -10,7 +10,9 @@ version='control-v99.0.0-p0d-ci'
 revision='0123456789abcdef0123456789abcdef01234567'
 digest='0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
 node=990001
+legacy_node=990002
 public_key='1111111111111111111111111111111111111111111111111111111111111111'
+legacy_public_key='2222222222222222222222222222222222222222222222222222222222222222'
 
 assert_rejected(){
   local label="$1" statement="$2"
@@ -37,8 +39,8 @@ count=$("${psql_cmd[@]}" -Atq -c "SELECT COUNT(*) FROM node_xsp_agent_release_ma
 [[ "$count" == '1' ]] || { echo 'FAIL: append-only Agent release identity changed after rejection checks' >&2; exit 1; }
 
 # The migration binding reuses the existing authenticated single-flight command
-# table. Seed only a disposable node identity so the FK is real.
-"${psql_cmd[@]}" -q -c "INSERT INTO node_metric_keys(node_id,public_key) VALUES($node,'$public_key');"
+# table. Seed only disposable node identities so the FKs are real.
+"${psql_cmd[@]}" -q -c "INSERT INTO node_metric_keys(node_id,public_key) VALUES($node,'$public_key'),($legacy_node,'$legacy_public_key');"
 
 binding=$("${psql_cmd[@]}" -Atq -F '|' -c "SELECT command_id,manifest_id,version,source_revision,artifact_sha256 FROM stage_node_xsp_agent_migration($node,'$version','ci-owner');")
 IFS='|' read -r command_id manifest_id bound_version bound_revision bound_digest <<< "$binding"
@@ -64,7 +66,16 @@ assert_rejected 'bound target version rewrite' "UPDATE node_restart_commands SET
 assert_rejected 'bound manifest removal' "UPDATE node_restart_commands SET release_manifest_id=NULL WHERE id=$command_id;"
 assert_rejected 'bound action rewrite' "UPDATE node_restart_commands SET action='restart_xray' WHERE id=$command_id;"
 assert_rejected 'second active migration command' "SELECT * FROM stage_node_xsp_agent_migration($node,'$version','ci-owner');"
-assert_rejected 'unknown release migration' "SELECT * FROM stage_node_xsp_agent_migration(990002,'control-v404.0.0','ci-owner');"
+assert_rejected 'unknown release migration' "SELECT * FROM stage_node_xsp_agent_migration($legacy_node,'control-v404.0.0','ci-owner');"
+
+# A pre-existing unbound legacy update command must not be convertible into a
+# P0-D migration by UPDATE. Exact manifest binding is valid only when the atomic
+# staging primitive creates the command and manifest identity together.
+legacy_command=$("${psql_cmd[@]}" -Atq -c "INSERT INTO node_restart_commands(node_id,action,requested_by,target_version) VALUES($legacy_node,'update_agent','legacy-admin','$version') RETURNING id;")
+[[ "$legacy_command" =~ ^[1-9][0-9]*$ ]] || { echo 'FAIL: legacy command seed missing' >&2; exit 1; }
+assert_rejected 'post-hoc manifest attachment' "UPDATE node_restart_commands SET release_manifest_id=$manifest_id WHERE id=$legacy_command;"
+legacy_binding=$("${psql_cmd[@]}" -Atq -c "SELECT COALESCE(release_manifest_id::text,'NULL') FROM node_restart_commands WHERE id=$legacy_command;")
+[[ "$legacy_binding" == 'NULL' ]] || { echo 'FAIL: rejected post-hoc binding changed legacy command' >&2; exit 1; }
 
 row=$("${psql_cmd[@]}" -Atq -F '|' -c "SELECT c.action,c.target_version,m.source_revision,m.artifact_sha256,c.state FROM node_restart_commands c JOIN node_xsp_agent_release_manifests m ON m.id=c.release_manifest_id WHERE c.id=$command_id;")
 [[ "$row" == "update_agent|$version|$revision|$digest|claimed" ]] || {
