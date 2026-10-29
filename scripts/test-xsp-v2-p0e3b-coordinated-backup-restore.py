@@ -152,16 +152,27 @@ def main() -> None:
             )
 
         def wait_db() -> None:
-            for _ in range(160):
+            for _ in range(240):
+                logs = command("docker", "logs", "--tail", "220", db, check=False)
+                combined = (logs.stdout or "") + (logs.stderr or "")
                 probe = command(
                     "docker", "exec", db, "pg_isready", "-U", "postgres", "-d", "xmesh",
                     check=False, timeout=10,
                 )
-                if probe.returncode == 0:
-                    return
+                # TimescaleDB init starts a temporary server, runs/tunes extensions,
+                # shuts it down, then starts the final server. Do not accept the
+                # temporary readiness window: require the second ready transition.
+                if combined.count("database system is ready to accept connections") >= 2 and probe.returncode == 0:
+                    time.sleep(0.25)
+                    stable = command(
+                        "docker", "exec", db, "pg_isready", "-U", "postgres", "-d", "xmesh",
+                        check=False, timeout=10,
+                    )
+                    if stable.returncode == 0:
+                        return
                 time.sleep(0.25)
-            logs = command("docker", "logs", "--tail", "120", db, check=False)
-            raise RuntimeError(f"PostgreSQL did not become ready: {(logs.stdout + logs.stderr)[-3000:]}")
+            logs = command("docker", "logs", "--tail", "220", db, check=False)
+            raise RuntimeError(f"final PostgreSQL server did not become ready: {(logs.stdout + logs.stderr)[-5000:]}")
 
         def provision_roles() -> None:
             signer_sql = (ROOT / "deploy/postgres/20-create-xsp-v2-signer-role.sql").read_text()
