@@ -1,0 +1,72 @@
+{
+  "schema": "xsp2-agent-go127-integration-v1",
+  "productionActivation": false,
+  "strictPqDefault": "off",
+  "verifiedNodeSource": {
+    "repository": "TriplexCorp/XMesh-Node",
+    "revision": "0ae78244ef0ef763bea6ce198dde6e83eb11ff1f"
+  },
+  "productionRouter": {
+    "role": "edge-router-data-plane-adjacent",
+    "modulePath": "github.com/TriplexCorp/XMesh-Node",
+    "moduleDirectory": ".",
+    "goVersion": "1.23",
+    "dockerfile": "Dockerfile",
+    "controlReporterInManagedDeployment": false,
+    "mustRemainUnchangedByThisGate": true
+  },
+  "signedControlAgent": {
+    "role": "fixed-control-lifecycle-orchestrator",
+    "implementation": "deploy/node-control-agent.sh",
+    "updater": "deploy/update-node-control-agent.sh",
+    "fixedAction": "update_agent",
+    "systemdUpdater": "xmesh-node-agent-upgrade.service",
+    "migrationGate": "XSP_V2_P0D_AGENT_MIGRATION=staging-only",
+    "releaseIdentity": [
+      "version",
+      "sourceRevision",
+      "artifactSha256"
+    ]
+  },
+  "go127SecurityRuntime": {
+    "role": "strict-xsp-v2-security-runtime",
+    "modulePath": "github.com/TriplexCorp/XMesh-Node/security/xspv2/poc-go",
+    "moduleDirectory": "security/xspv2/poc-go",
+    "goVersion": "1.27.3",
+    "reusePackages": [
+      "envelope",
+      "keyring",
+      "tlsprobe",
+      "cutover"
+    ],
+    "integrationModel": "local-fixed-helper",
+    "remoteActionAuthority": "signedControlAgent",
+    "inboundNetworkListener": false,
+    "mayReplaceProductionRouter": false,
+    "mayCreateParallelCommandQueue": false
+  },
+  "migrationRules": {
+    "legacyUnboundUpdateRemainsCompatible": true,
+    "boundMigrationRequiresExactReleaseIdentity": true,
+    "missingSecurityRuntime": "fail-closed",
+    "mixedVersionMigratedOperation": "fail-closed",
+    "missingOrInvalidReceipt": "fail-closed",
+    "transportFailure": "fail-closed",
+    "automaticFallback": false,
+    "forbiddenFallbacks": [
+      "XMESH1",
+      "Ed25519-only",
+      "X25519-only",
+      "TLS1.2",
+      "insecure-certificate-verification"
+    ]
+  },
+  "packagingBoundary": {
+    "sourceRevisionMustEqualApprovedManifest": true,
+    "artifactSha256MustEqualApprovedManifest": true,
+    "callerSelectedExecutableLocation": false,
+    "callerSelectedDownloadUrl": false,
+    "lastKnownGoodRequiredBeforeApply": true,
+    "downloadVerifyApplyIsFutureGate": true
+  }
+}
