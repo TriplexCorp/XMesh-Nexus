@@ -3,14 +3,14 @@
 // Legacy unbound update behavior remains delegated unchanged; staged bound
 // migrations add exact immutable release identity to the existing signed
 // poll/ACK lifecycle without introducing another remote action or control plane.
+#[path = "node_agent_artifact.rs"]
+mod artifact;
 #[expect(
     dead_code,
     reason = "P0-D intentionally shadows only the preserved legacy poll/ACK handlers while keeping the reviewed legacy runtime baseline intact"
 )]
 #[path = "node_runtime_legacy.rs"]
 mod legacy;
-#[path = "node_agent_artifact.rs"]
-mod artifact;
 
 // The legacy module remains the implementation for every existing runtime
 // route. Local items below intentionally shadow only the bounded P0-D surfaces.
@@ -651,10 +651,8 @@ mod p0d_agent_orchestration_tests {
         assert_eq!(ordinary.node_id, 7);
         assert!(ordinary.artifact_version.is_none());
 
-        let artifact: NodeCommandPoll = serde_json::from_str(
-            r#"{"node_id":7,"artifactVersion":"p0d2-agent"}"#,
-        )
-        .unwrap();
+        let artifact: NodeCommandPoll =
+            serde_json::from_str(r#"{"node_id":7,"artifactVersion":"p0d2-agent"}"#).unwrap();
         assert_eq!(artifact.artifact_version.as_deref(), Some("p0d2-agent"));
 
         for rejected in [
@@ -664,11 +662,11 @@ mod p0d_agent_orchestration_tests {
         ] {
             assert!(serde_json::from_str::<NodeCommandPoll>(rejected).is_err());
         }
-        let unsafe_version: NodeCommandPoll = serde_json::from_str(
-            r#"{"node_id":7,"artifactVersion":"../bad"}"#,
-        )
-        .unwrap();
-        assert!(validate_release_version(unsafe_version.artifact_version.as_deref().unwrap()).is_err());
+        let unsafe_version: NodeCommandPoll =
+            serde_json::from_str(r#"{"node_id":7,"artifactVersion":"../bad"}"#).unwrap();
+        assert!(
+            validate_release_version(unsafe_version.artifact_version.as_deref().unwrap()).is_err()
+        );
     }
 
     #[test]
