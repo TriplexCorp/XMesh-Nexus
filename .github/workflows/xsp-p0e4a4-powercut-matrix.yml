@@ -1,0 +1,117 @@
+name: XSP-v2 P0-E4a4 Power-cut Matrix Contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/xsp-v2-p0e4a3-powercut-evidence.py"
+      - "scripts/xsp-v2-p0e4a4-powercut-matrix.py"
+      - "docs/XSP_V2_P0E4A4_POWERCUT_MATRIX.md"
+      - ".github/workflows/xsp-p0e4a4-powercut-matrix.yml"
+  pull_request:
+    paths:
+      - "scripts/xsp-v2-p0e4a3-powercut-evidence.py"
+      - "scripts/xsp-v2-p0e4a4-powercut-matrix.py"
+      - "docs/XSP_V2_P0E4A4_POWERCUT_MATRIX.md"
+      - ".github/workflows/xsp-p0e4a4-powercut-matrix.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  matrix-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify matrix tool reuses E4a3 and cannot qualify hardware
+        run: |
+          set -euo pipefail
+          src=scripts/xsp-v2-p0e4a4-powercut-matrix.py
+          python3 -m py_compile scripts/xsp-v2-p0e4a3-powercut-evidence.py "$src"
+          ! grep -E 'subprocess|requests|urllib|socket|os\.system|systemctl|reboot|shutdown|poweroff|strict-pq=on' "$src"
+          grep -Fq 'xsp-v2-p0e4a3-powercut-evidence.py' "$src"
+          grep -Fq 'physicalPowerLossQualified": False' "$src"
+          grep -Fq 'matrix-complete-for-independent-review' "$src"
+
+      - name: Build synthetic five-point review matrix and fail closed on reuse/mixing
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/p0e4a4"
+          evidence="$work/evidence"
+          mkdir -p "$evidence"
+          python3 - "$work" "$evidence" <<'PY'
+          import hashlib,json,os,sys
+          root,evidence=sys.argv[1:3]
+          pre={
+            'schema':'xsp2-p0e4a-storage-preflight-1','target':'/var/lib/xmesh','kernel':'Linux 6.x',
+            'mount':{'source':'/dev/nvme0n1p1','fstype':'ext4','options':'rw','target':'/'},
+            'device':{'device':'nvme0n1','writeCache':'write through','rotational':'0','fua':'1'},
+            'baselineEligible':True,'physicalPowerLossQualified':False,'failures':[],
+            'requiredNextEvidence':['real abrupt power required'],'scope':'CI synthetic fixture; not physical evidence',
+          }
+          agent=dict(pre); agent['role']='agent-state'; agent['postgres']=None
+          pg=dict(pre); pg['role']='nexus-postgres'; pg['postgres']={
+            'fsync':'on','full_page_writes':'on','synchronous_commit':'on','wal_sync_method':'fdatasync'}
+          for name,obj in [('agent.json',agent),('pg.json',pg)]:
+            open(os.path.join(root,name),'w').write(json.dumps(obj,separators=(',',':')))
+          def sha(path): return hashlib.sha256(open(path,'rb').read()).hexdigest()
+          agent_sha=sha(os.path.join(root,'agent.json')); pg_sha=sha(os.path.join(root,'pg.json'))
+          cases={
+            'after-previous':('previous-complete',7,'ed-old-0001','pq-old-0001'),
+            'after-floor':('next-complete',8,'ed-new-0001','pq-new-0001'),
+            'after-active':('next-complete',8,'ed-new-0001','pq-new-0001'),
+            'after-recovery-abort':('previous-complete',7,'ed-old-0001','pq-old-0001'),
+            'after-recovery-active':('next-complete',8,'ed-new-0001','pq-new-0001'),
+          }
+          for idx,(point,(classification,epoch,ed,pq)) in enumerate(cases.items(),1):
+            run=f'lab-run-{idx:04d}'
+            item={
+              'schema':'xsp2-p0e4a3-powercut-evidence-1','runId':run,'checkpoint':point,
+              'nodeSourceRevision':'50c770c8bbb917b04ca893ac5b8d29e6c7f9af7e',
+              'nexusSourceRevision':'6983bd9168c160968d8ed46ab862b8b1ee85c8ae',
+              'labBinarySha256Hex':'11'*32,'nodeId':812345678901,
+              'rotation':{'fromEpoch':7,'toEpoch':8,'fromEdKeyId':'ed-old-0001','fromPQKeyId':'pq-old-0001','toEdKeyId':'ed-new-0001','toPQKeyId':'pq-new-0001'},
+              'arm':{'marker':f'XSP2-POWERCUT-ARMED-V1 run={run} point={point}','observedAtMs':1000+idx*10000},
+              'controllerEvent':{'controllerId':'pdu-lab-001','eventId':f'event-{idx:04d}','action':'power-off','observedAtMs':2000+idx*10000,'rawEventSha256Hex':f'{idx:02x}'*32},
+              'bootBeforeId':f'boot-old-{idx:04d}',
+              'postBoot':{'bootId':f'boot-new-{idx:04d}','recoveredAtMs':5000+idx*10000,'classification':classification,'keyEpoch':epoch,'activeEdKeyId':ed,'activePQKeyId':pq,'securityStateSha256Hex':f'{idx+16:02x}'*32,'networkAttemptedBeforeValidation':False},
+              'postgresRecovery':{'recoveryObserved':True,'readyAtMs':4000+idx*10000,'fsync':'on','fullPageWrites':'on','synchronousCommit':'on','walSyncMethod':'fdatasync','securityTupleSha256Hex':f'{idx+32:02x}'*32,'integrityChecksPassed':True},
+              'offhostWitness':{'checkpointSha256Hex':'44'*32,'nodeId':812345678901,'minimumEpoch':7,'receiptSha256Hex':'55'*32},
+              'storageEvidence':{'agentPreflightSha256Hex':agent_sha,'postgresPreflightSha256Hex':pg_sha,'reviewedProfileId':'profile-0001','plpEvidenceId':'plp-review-0001'},
+              'review':{'operator':'reviewer-0001','reviewedAtMs':6000+idx*10000,'notesSha256Hex':f'{idx+48:02x}'*32},
+            }
+            open(os.path.join(evidence,point+'.json'),'w').write(json.dumps(item,separators=(',',':')))
+          PY
+
+          out="$(python3 scripts/xsp-v2-p0e4a4-powercut-matrix.py \
+            --evidence-dir "$evidence" --agent-preflight "$work/agent.json" --postgres-preflight "$work/pg.json")"
+          echo "$out"
+          echo "$out" | grep -Fq '"status":"matrix-complete-for-independent-review"'
+          echo "$out" | grep -Fq '"physicalPowerLossQualified":false'
+
+          cp -a "$evidence" "$work/reused-event"
+          python3 - "$work/reused-event/after-floor.json" "$work/reused-event/after-previous.json" <<'PY'
+          import json,sys
+          dst,src=sys.argv[1:3]; a=json.load(open(dst)); b=json.load(open(src)); a['controllerEvent']['eventId']=b['controllerEvent']['eventId']; open(dst,'w').write(json.dumps(a,separators=(',',':')))
+          PY
+          if python3 scripts/xsp-v2-p0e4a4-powercut-matrix.py --evidence-dir "$work/reused-event" --agent-preflight "$work/agent.json" --postgres-preflight "$work/pg.json"; then
+            echo 'matrix reused one controller event ID' >&2; exit 1
+          fi
+
+          cp -a "$evidence" "$work/mixed-binary"
+          python3 - "$work/mixed-binary/after-active.json" <<'PY'
+          import json,sys
+          p=sys.argv[1]; x=json.load(open(p)); x['labBinarySha256Hex']='aa'*32; open(p,'w').write(json.dumps(x,separators=(',',':')))
+          PY
+          if python3 scripts/xsp-v2-p0e4a4-powercut-matrix.py --evidence-dir "$work/mixed-binary" --agent-preflight "$work/agent.json" --postgres-preflight "$work/pg.json"; then
+            echo 'matrix mixed lab binary generations' >&2; exit 1
+          fi
+
+          cp -a "$evidence" "$work/missing-point"
+          rm "$work/missing-point/after-recovery-active.json"
+          if python3 scripts/xsp-v2-p0e4a4-powercut-matrix.py --evidence-dir "$work/missing-point" --agent-preflight "$work/agent.json" --postgres-preflight "$work/pg.json"; then
+            echo 'matrix accepted a missing durability point' >&2; exit 1
+          fi
+
+          echo 'P0-E4A4 MATRIX CONTRACT: PASS (synthetic review-prep only; NOT physical qualification)'
