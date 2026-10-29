@@ -1,0 +1,95 @@
+name: XSP-v2 P0-E4a Storage Preflight
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/xsp-v2-p0e4a-storage-preflight.py"
+      - "scripts/test-xsp-v2-p0e4a-storage-preflight.py"
+      - "docs/XSP_V2_P0E4A_STORAGE_QUALIFICATION.md"
+      - ".github/workflows/xsp-p0e4a-storage-preflight.yml"
+  pull_request:
+    paths:
+      - "scripts/xsp-v2-p0e4a-storage-preflight.py"
+      - "scripts/test-xsp-v2-p0e4a-storage-preflight.py"
+      - "docs/XSP_V2_P0E4A_STORAGE_QUALIFICATION.md"
+      - ".github/workflows/xsp-p0e4a-storage-preflight.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enforce bounded read-only qualification contract
+        run: |
+          set -euo pipefail
+          src=scripts/xsp-v2-p0e4a-storage-preflight.py
+          doc=docs/XSP_V2_P0E4A_STORAGE_QUALIFICATION.md
+          python3 -m py_compile "$src" scripts/test-xsp-v2-p0e4a-storage-preflight.py
+          ! grep -E 'mount\(|umount|blockdev|hdparm|nvme .*set-feature|docker .* stop|docker .* restart|ALTER SYSTEM|UPDATE |INSERT |DELETE |TRUNCATE |strict-pq=on' "$src"
+          grep -Fq '"physicalPowerLossQualified": False' "$src"
+          grep -Fq 'write-back cache detected: independent controller/device power-loss-protection evidence is mandatory' "$src"
+          grep -Fq 'PostgreSQL fsync must be on' "$src"
+          grep -Fq 'PostgreSQL full_page_writes must be on' "$src"
+          grep -Fq 'target path must not traverse symlinks' "$src"
+          grep -Fq 'os.O_EXCL' "$src"
+          grep -Fq 'os.fsync(handle.fileno())' "$src"
+          grep -Fq 'A successful P0-E4a preflight is **not** a physical power-loss qualification' "$doc"
+          grep -Fq '"physicalPowerLossQualified": false' "$doc"
+          grep -Fq 'GitHub-hosted CI is **not** recorded as physical power-loss evidence' "$doc"
+      - name: Run storage-preflight policy tests
+        run: python3 scripts/test-xsp-v2-p0e4a-storage-preflight.py -v
+
+  postgres-settings:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read real disposable PostgreSQL durability settings
+        run: |
+          set -euo pipefail
+          name=xsp-p0e4a-pg-$RANDOM
+          trap 'docker rm -f "$name" >/dev/null 2>&1 || true' EXIT
+          docker run -d --name "$name" -e POSTGRES_PASSWORD=p0e4a -e POSTGRES_DB=xmesh postgres:18 >/dev/null
+          ready=0
+          for _ in $(seq 1 120); do
+            # The official image can briefly expose its temporary initdb server.
+            # Require PID 1 to have exec'd the final postgres process before
+            # treating a successful SQL probe as steady-state readiness.
+            pid1="$(docker exec "$name" cat /proc/1/comm 2>/dev/null || true)"
+            if [ "$pid1" = postgres ] && \
+               [ "$(docker exec "$name" psql -X -qAt -U postgres -d xmesh -c 'SELECT 1' 2>/dev/null || true)" = 1 ]; then
+              ready=1
+              break
+            fi
+            sleep 0.25
+          done
+          if [ "$ready" -ne 1 ]; then
+            docker logs "$name" >&2 || true
+            echo 'PostgreSQL never reached final steady-state readiness' >&2
+            exit 1
+          fi
+          python3 - "$name" <<'PY'
+          import importlib.util
+          from pathlib import Path
+          import sys
+          path = Path('scripts/xsp-v2-p0e4a-storage-preflight.py')
+          spec = importlib.util.spec_from_file_location('probe', path)
+          mod = importlib.util.module_from_spec(spec)
+          assert spec and spec.loader
+          spec.loader.exec_module(mod)
+          settings = mod.postgres_settings(sys.argv[1])
+          assert settings['fsync'] == 'on', settings
+          assert settings['full_page_writes'] == 'on', settings
+          assert settings['synchronous_commit'] in mod.SAFE_PG_SYNC, settings
+          assert settings['wal_sync_method'], settings
+          print(settings)
+          PY
+      - name: State CI boundary explicitly
+        run: |
+          echo 'CI validates probe policy only.'
+          echo 'physicalPowerLossQualified=false remains mandatory until separate real power-cut evidence exists.'
