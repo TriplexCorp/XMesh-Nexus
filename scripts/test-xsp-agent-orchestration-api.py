@@ -103,6 +103,13 @@ def main():
     expect(code, 201, "owner creates disposable D1c node")
     node_id = int(node["id"])
 
+    # Runtime heartbeats are intentionally anchored to an enrolled node metric
+    # identity by FK. Seed only a disposable public key; no private key or
+    # bearer credential exists in this integration fixture.
+    sql(
+        "INSERT INTO node_metric_keys(node_id,public_key) "
+        f"VALUES({node_id},repeat('ab',32));"
+    )
     sql(
         "INSERT INTO node_runtime_heartbeats(node_id,version,router_running,xray_running,received_at) "
         f"VALUES({node_id},'control-v4.0.0',TRUE,TRUE,NOW()) "
