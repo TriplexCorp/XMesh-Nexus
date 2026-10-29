@@ -6,23 +6,24 @@ XMesh Nexus manages nodes, users, subscriptions, Xray configuration, telemetry a
 
 [English](README.en.md) · [Enterprise Roadmap](docs/ENTERPRISE_ROADMAP.md) · [XSP-v2 security policy](docs/XSP_V2_PQ_ONLY_SECURITY_POLICY.md) · [XMesh Node](https://github.com/TriplexCorp/XMesh-Node)
 
-## Current XSP-v2 engineering checkpoint — 28 October 2026
+## Current XSP-v2 engineering checkpoint — 29 October 2026
 
-**Latest verified Nexus implementation checkpoint:** [`7e0b42ea4847b273ba8cd55a0ff3e043a420c377`](https://github.com/TriplexCorp/XMesh-Nexus/commit/7e0b42ea4847b273ba8cd55a0ff3e043a420c377), merge of [PR #88](https://github.com/TriplexCorp/XMesh-Nexus/pull/88).
+**Latest verified Nexus implementation checkpoint:** [`721a5a620c85836b9a7aee133a19ce660a8857f0`](https://github.com/TriplexCorp/XMesh-Nexus/commit/721a5a620c85836b9a7aee133a19ce660a8857f0), merge of [PR #91](https://github.com/TriplexCorp/XMesh-Nexus/pull/91).
 
-**P0-C2-D is COMPLETE in its stated isolated staging/process scope.** PR #88 closed the last C2-D2 transport-negative / no-legacy-fallback gate on top of the already-complete expired-recovery, lost-response/race, current-Node transport alignment and outage/restart matrices.
+**P0-C2-D remains COMPLETE and P0-D is the CURRENT P0.** The first two bounded P0-D foundations are now complete:
 
-Exact post-merge evidence on `7e0b42ea4847b273ba8cd55a0ff3e043a420c377`:
+- **PR #90 / P0-D1a:** append-only exact Agent release identity `{version, sourceRevision, artifactSha256}` in PostgreSQL. A version cannot be silently rebound; UPDATE/DELETE/TRUNCATE are rejected; no URL/script/command input and no production activation were introduced.
+- **PR #91 / P0-D1b:** the immutable release identity can be atomically bound to the existing fixed-action `update_agent` single-flight queue. The binding cannot be attached, removed or replaced later with `UPDATE`; normal command lifecycle state transitions remain legal. No HTTP/API caller, poll payload or Agent/updater execution path changed in this gate.
 
-- [C2-D2 Transport Negative and No-Legacy E2E #40783444207](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40783444207) — **success**;
-- [C2-D2 Lost Response and Race E2E #40783444213](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40783444213) — **success**;
-- [C2-D2 Expired Recovery E2E #40783444177](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40783444177) — **success**;
-- [Hybrid TLS Probe #40783444276](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40783444276) — **success**;
-- [Backend CI #40783444179](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40783444179) — **success**.
+Exact post-merge evidence on `721a5a620c85836b9a7aee133a19ce660a8857f0`:
+
+- [Backend CI #40795114113](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40795114113) — **success**, including strict Clippy, Docker build, disposable PostgreSQL migrations/invariants and API authentication integration.
+
+The previous complete C2-D implementation checkpoint remains [`7e0b42ea4847b273ba8cd55a0ff3e043a420c377`](https://github.com/TriplexCorp/XMesh-Nexus/commit/7e0b42ea4847b273ba8cd55a0ff3e043a420c377), merge of [PR #88](https://github.com/TriplexCorp/XMesh-Nexus/pull/88). Its exact post-merge C2-D transport-negative, lost-response/race, expired-recovery, Hybrid TLS and Backend CI matrix remains valid within that stated isolated staging/process boundary.
 
 The current verified XMesh-Node staging transport checkpoint is [`0ae78244ef0ef763bea6ce198dde6e83eb11ff1f`](https://github.com/TriplexCorp/XMesh-Node/commit/0ae78244ef0ef763bea6ce198dde6e83eb11ff1f), merge of Node PR #33. It keeps the direct TCP dial target separate from the authenticated application authority while explicitly binding HTTP `Host` to the same `serverName` used for TLS SNI and certificate verification. This prevents a connect-only Docker alias/IP from selecting a weaker virtual host after a valid strict-PQ handshake.
 
-Production Node still uses the legacy Go 1.23 control path. The Go 1.27 XSP-v2 transport/cutover code remains staging/research code. `strict-pq` remains **OFF**. No production VPS, DNS, firewall, public Nginx, live PostgreSQL, production key material or production Agent has been changed by C2-D.
+Production Node still uses the legacy Go 1.23 control path. The Go 1.27 XSP-v2 transport/cutover code remains staging/research code. `strict-pq` remains **OFF**. PR #90/#91 changed only the inert/staging release-identity and database-binding foundations; they did not activate XSP-v2, change the production Agent updater, or modify production VPS/DNS/firewall/public-Nginx/key material.
 
 ## Completed XSP-v2 gates
 
@@ -89,16 +90,23 @@ A positive strict-PQ control after the negative matrix still commits exactly one
 
 ## CURRENT P0 — P0-D production-capable Agent workflow
 
-C2-D established the required transport, identity, cryptographic authorization, durable state, recovery, concurrency, outage/restart and downgrade/no-fallback behavior in isolated staging/process E2E. The next gate is to integrate those proven semantics into a **production-capable Agent design** without enabling them in production by default.
+C2-D established the required transport, identity, cryptographic authorization, durable state, recovery, concurrency, outage/restart and downgrade/no-fallback behavior in isolated staging/process E2E. P0-D integrates those proven semantics into a **production-capable Agent design** without enabling them in production by default.
 
-P0-D must:
+### P0-D progress
 
-1. port the proven Go 1.27 strict transport/state-machine behavior into the real Agent workflow rather than maintaining a parallel PoC-only client;
-2. define a controlled migration/update path that can eventually be orchestrated from the Nexus UI;
-3. preserve exact permit/ACK/receipt journaling, monotonic epoch/replay state, rollback/recovery and old-key-retention semantics;
-4. keep the verified TLS authority binding (`address` for direct connect; authenticated `serverName` for SNI, certificate verification and HTTP authority);
-5. prove disposable real Nexus↔Node migration/update E2E before any production activation;
-6. keep `strict-pq` OFF unless a later explicit release/production gate authorizes activation.
+- **P0-D1a COMPLETE — immutable release identity:** PR #90 created the append-only exact release manifest ledger.
+- **P0-D1b COMPLETE — atomic queue binding:** PR #91 bound an approved immutable manifest to the existing fixed-action `update_agent` single-flight queue without broadening the remote command surface.
+- **CURRENT sub-gate — owner-only staging orchestration API:** extend the existing Agent update control plane behind an explicit non-default staging gate so an owner can select only a pre-approved release version; Nexus must resolve its immutable revision/digest server-side. Legacy `{}` update behavior must remain unchanged, and the caller must never supply an artifact digest, URL, script or command.
+
+P0-D still must:
+
+1. expose the bounded owner-only staging orchestration path without creating a second control plane or new remote action;
+2. carry exact release identity through the authenticated poll/apply/ACK lifecycle;
+3. port the proven Go 1.27 strict transport/state-machine behavior into the real Agent workflow rather than maintaining a parallel PoC-only client;
+4. preserve exact permit/ACK/receipt journaling, monotonic epoch/replay state, rollback/recovery and old-key-retention semantics;
+5. keep the verified TLS authority binding (`address` for direct connect; authenticated `serverName` for SNI, certificate verification and HTTP authority);
+6. prove disposable real Nexus↔Node migration/update E2E before any production activation;
+7. keep `strict-pq` OFF unless a later explicit release/production gate authorizes activation.
 
 P0-E remains after P0-D: crash/power-loss, snapshot/rollback, backup/restore, key rotation/recovery, fuzz/KAT and independent security-review release gates. Production rollout remains separately gated and unauthorized.
 
@@ -108,6 +116,7 @@ P0-E remains after P0-D: crash/power-loss, snapshot/rollback, backup/restore, ke
 - Production control-plane behavior remains legacy `XMESH1` / Ed25519 until separately approved migration and release gates are complete.
 - No target-product fallback to XMESH1, Ed25519-only, X25519-only, TLS 1.2 or insecure certificate validation.
 - Completed C2-D evidence is isolated staging/process evidence, not production activation.
+- P0-D1a/P0-D1b are database/staging foundations; they do not authorize or activate production migration.
 - A GitHub merge is not a production deployment.
 - Xray continues to carry user VPN traffic.
 
