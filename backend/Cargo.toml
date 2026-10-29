@@ -9,6 +9,11 @@ autobins = false
 name = "xmesh-api"
 path = "src/main.rs"
 
+[[bin]]
+name = "xsp-v2-recovery-checkpoint"
+path = "src/bin/xsp_v2_recovery_checkpoint.rs"
+required-features = ["xsp-v2-experimental"]
+
 [features]
 default = []
 # Build only in an audited OpenSSL 3.5+ environment; disabled in production Docker.

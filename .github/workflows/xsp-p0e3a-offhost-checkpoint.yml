@@ -1,0 +1,57 @@
+name: XSP-v2 P0-E3a Off-host Recovery Checkpoint
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/src/bin/xsp_v2_recovery_checkpoint.rs"
+      - "backend/Cargo.toml"
+      - "docs/XSP_V2_P0E_OFFHOST_RECOVERY_CHECKPOINT.md"
+      - ".github/workflows/xsp-p0e3a-offhost-checkpoint.yml"
+  pull_request:
+    paths:
+      - "backend/src/bin/xsp_v2_recovery_checkpoint.rs"
+      - "backend/Cargo.toml"
+      - "docs/XSP_V2_P0E_OFFHOST_RECOVERY_CHECKPOINT.md"
+      - ".github/workflows/xsp-p0e3a-offhost-checkpoint.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  recovery-checkpoint:
+    runs-on: ubuntu-latest
+    container: rust:1.99-trixie
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install OpenSSL 3.5 development headers
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends pkg-config libssl-dev
+          openssl version
+      - name: Verify source boundary stays off-host and non-activating
+        run: |
+          set -euo pipefail
+          test -z "$(grep -R --line-number --fixed-strings 'strict-pq=on' backend/src/bin/xsp_v2_recovery_checkpoint.rs docs/XSP_V2_P0E_OFFHOST_RECOVERY_CHECKPOINT.md || true)"
+          ! grep -E 'reqwest|TcpStream|axum|Router|sqlx|UPDATE |INSERT |DELETE |TRUNCATE ' backend/src/bin/xsp_v2_recovery_checkpoint.rs
+          grep -Fq 'create_new(true)' backend/src/bin/xsp_v2_recovery_checkpoint.rs
+          grep -Fq 'coordinated rollback detected' backend/src/bin/xsp_v2_recovery_checkpoint.rs
+          grep -Fq 'same-epoch local receipt differs from the off-host authoritative witness' backend/src/bin/xsp_v2_recovery_checkpoint.rs
+          grep -Fq 'receipt ML-DSA-65 signature invalid' backend/src/bin/xsp_v2_recovery_checkpoint.rs
+          grep -Fq 'receipt Ed25519 signature invalid' backend/src/bin/xsp_v2_recovery_checkpoint.rs
+      - name: Run real Ed25519 + ML-DSA-65 checkpoint tests
+        run: |
+          set -euo pipefail
+          openssl genpkey -algorithm ML-DSA-65 -outform DER -out /tmp/xsp-p0e3a-mldsa65.der
+          XMESH_P0E3A_TEST_MLDSA65_DER=/tmp/xsp-p0e3a-mldsa65.der \
+            cargo test --manifest-path backend/Cargo.toml --features xsp-v2-experimental --bin xsp-v2-recovery-checkpoint -- --nocapture
+          rm -f /tmp/xsp-p0e3a-mldsa65.der
+      - name: Check formatting
+        run: |
+          rustup component add rustfmt
+          cargo fmt --manifest-path backend/Cargo.toml --all -- --check
+      - name: Strict Clippy
+        run: |
+          rustup component add clippy
+          cargo clippy --manifest-path backend/Cargo.toml --features xsp-v2-experimental --bin xsp-v2-recovery-checkpoint --tests -- -D warnings -D clippy::pedantic -D clippy::nursery -F unsafe-code
