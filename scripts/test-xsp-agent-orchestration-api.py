@@ -104,11 +104,12 @@ def main():
     node_id = int(node["id"])
 
     # Runtime heartbeats are intentionally anchored to an enrolled node metric
-    # identity by FK. Seed only a disposable public key; no private key or
-    # bearer credential exists in this integration fixture.
+    # identity by FK. Derive the disposable public identity from the node id so
+    # this fixture cannot collide with identities created by earlier CI tests.
+    metric_public_key = f"{node_id:064x}"
     sql(
         "INSERT INTO node_metric_keys(node_id,public_key) "
-        f"VALUES({node_id},repeat('ab',32));"
+        f"VALUES({node_id},'{metric_public_key}');"
     )
     sql(
         "INSERT INTO node_runtime_heartbeats(node_id,version,router_running,xray_running,received_at) "
