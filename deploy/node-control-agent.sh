@@ -16,7 +16,9 @@ UNIT="${XMESH_XRAY_UNIT:-xray.service}"
 # Only root-owned local configuration can choose a unit. Remote responses never do.
 [[ "$UNIT" =~ ^[A-Za-z0-9_.@-]+\.service$ ]] || { echo "Invalid systemd unit" >&2; exit 2; }
 [[ -r "$KEY" ]] || { echo "XMesh Ed25519 key unavailable" >&2; exit 2; }
-command -v flock >/dev/null && command -v python3 >/dev/null || exit 2
+for required in flock python3 sha256sum readlink timeout; do
+ command -v "$required" >/dev/null 2>&1 || exit 2
+done
 exec 9>/run/xmesh-node-control.lock
 flock -n 9 || exit 0
 
@@ -256,6 +258,8 @@ verify_staged_agent_package(){
  package="$base/$target"
  binary="$package/xmesh-agent-xspv2"
  [[ -d "$package" && ! -L "$package" && -f "$binary" && ! -L "$binary" && -x "$binary" ]] || return 1
+ [[ -f "$package/identity.json" && ! -L "$package/identity.json" ]] || return 1
+ [[ -f "$base/active.json" && ! -L "$base/active.json" ]] || return 1
  actual="$(sha256sum "$binary" | awk '{print $1}')" || return 1
  [[ "$actual" == "$digest" ]] || return 1
  identity="$(timeout 10 "$binary" --identity 2>/dev/null)" || return 1
@@ -376,19 +380,19 @@ if [[ "$action" == update_xray ]];then
 elif [[ "$action" == update_agent ]];then
  clear_agent_release_identity
  if [[ "$release_version" != - ]];then
-  # Manifest-bound migration uses the dedicated fixed staged executor. The
-  # legacy updater remains untouched for identity-free `{}` commands.
+  # Manifest-bound migration still goes through the existing fixed upgrade
+  # service. Its updater detects the root-only identity and dispatches only to
+  # the pre-installed staged package unit; it never enters the moving-main path.
   if ! stage_agent_release_identity "$release_version" "$source_revision" "$artifact_sha256";then
    detail='Invalid or unstorable Agent release identity'
-  elif [[ ! -x /usr/local/libexec/xmesh-xsp-v2-agent-staged-apply ]] ||
-       ! systemctl cat xmesh-xsp-v2-agent-stage.service >/dev/null 2>&1;then
-   detail='Staged Agent executor missing; update the control Agent first'
-  elif timeout 220 systemctl start --wait xmesh-xsp-v2-agent-stage.service &&
+  elif ! systemctl cat xmesh-node-agent-upgrade.service >/dev/null 2>&1;then
+   detail='Agent updater service missing; update the control Agent first'
+  elif timeout 650 systemctl start --wait xmesh-node-agent-upgrade.service &&
        verify_staged_agent_package "$release_version" "$source_revision" "$artifact_sha256";then
    success=true
    detail='Staged Agent package activated and exact release identity verified'
   else
-   unit_result="$(systemctl show --property=Result --value xmesh-xsp-v2-agent-stage.service 2>/dev/null || true)"
+   unit_result="$(systemctl show --property=Result --value xmesh-node-agent-upgrade.service 2>/dev/null || true)"
    [[ "$unit_result" =~ ^[a-zA-Z0-9_-]{1,40}$ ]] || unit_result=unknown
    detail="Staged Agent apply failed (systemd: $unit_result); previous package remains/restored"
   fi
