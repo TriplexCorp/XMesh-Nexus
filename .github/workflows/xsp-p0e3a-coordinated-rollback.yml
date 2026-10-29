@@ -1,0 +1,95 @@
+name: XSP-v2 P0-E3a Coordinated Rollback
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/c2c/**"
+      - "backend/src/bin/xsp_v2_c2c.rs"
+      - "backend/src/bin/xsp_v2_p0e3a_fixture.rs"
+      - "backend/src/xsp_v2_**"
+      - "backend/Dockerfile.xsp-c2c"
+      - "backend/Dockerfile.xsp-signer"
+      - "deploy/postgres/20-create-xsp-v2-signer-role.sql"
+      - "deploy/postgres/21-create-xsp-v2-c2c-role.sql"
+      - "deploy/xsp-v2-ingress/**"
+      - "scripts/generate-xsp-v2-mldsa-test-certs.go"
+      - "scripts/xsp-v2-p0e3a-coordinated-rollback_test.go"
+      - "scripts/test-xsp-v2-p0e3a-coordinated-rollback.py"
+      - "docs/XSP_V2_P0E_COORDINATED_ROLLBACK.md"
+      - ".github/workflows/xsp-p0e3a-coordinated-rollback.yml"
+  pull_request:
+    paths:
+      - "backend/c2c/**"
+      - "backend/src/bin/xsp_v2_c2c.rs"
+      - "backend/src/bin/xsp_v2_p0e3a_fixture.rs"
+      - "backend/src/xsp_v2_**"
+      - "backend/Dockerfile.xsp-c2c"
+      - "backend/Dockerfile.xsp-signer"
+      - "deploy/postgres/20-create-xsp-v2-signer-role.sql"
+      - "deploy/postgres/21-create-xsp-v2-c2c-role.sql"
+      - "deploy/xsp-v2-ingress/**"
+      - "scripts/generate-xsp-v2-mldsa-test-certs.go"
+      - "scripts/xsp-v2-p0e3a-coordinated-rollback_test.go"
+      - "scripts/test-xsp-v2-p0e3a-coordinated-rollback.py"
+      - "docs/XSP_V2_P0E_COORDINATED_ROLLBACK.md"
+      - ".github/workflows/xsp-p0e3a-coordinated-rollback.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache: false
+      - name: Check coordinated rollback / off-host witness contract
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/test-xsp-v2-p0e3a-coordinated-rollback.py
+          gofmt -d scripts/xsp-v2-p0e3a-coordinated-rollback_test.go | tee /tmp/p0e3a-gofmt.diff
+          test ! -s /tmp/p0e3a-gofmt.diff
+          ! grep -R --line-number --fixed-strings 'strict-pq=on' scripts/test-xsp-v2-p0e3a-coordinated-rollback.py scripts/xsp-v2-p0e3a-coordinated-rollback_test.go docs/XSP_V2_P0E_COORDINATED_ROLLBACK.md
+          ! grep -R --line-number -E '(-p|--publish)[ =]' scripts/test-xsp-v2-p0e3a-coordinated-rollback.py
+          grep -Fq '41fdf669d9ff9c6f0b9d2518fd0404c65d2f3826' .github/workflows/xsp-p0e3a-coordinated-rollback.yml
+          grep -Fq 'pg_dump", "-U", "postgres", "-d", "xmesh", "-Fc"' scripts/test-xsp-v2-p0e3a-coordinated-rollback.py
+          grep -Fq 'DROP DATABASE xmesh WITH (FORCE); CREATE DATABASE xmesh;' scripts/test-xsp-v2-p0e3a-coordinated-rollback.py
+          grep -Fq 'pg_restore", "-U", "postgres", "-d", "xmesh", "--exit-on-error"' scripts/test-xsp-v2-p0e3a-coordinated-rollback.py
+          grep -Fq 'run_agent_phase("verify-rollback", network_mode="none")' scripts/test-xsp-v2-p0e3a-coordinated-rollback.py
+          grep -Fq 'VerifyDurableAgentPreflight' scripts/xsp-v2-p0e3a-coordinated-rollback_test.go
+          grep -Fq 'EvidenceFromDurableAgent' scripts/xsp-v2-p0e3a-coordinated-rollback_test.go
+          grep -Fq 'VerifyLocal' scripts/xsp-v2-p0e3a-coordinated-rollback_test.go
+          grep -Fq 'checkpoint-current.json' scripts/test-xsp-v2-p0e3a-coordinated-rollback.py scripts/xsp-v2-p0e3a-coordinated-rollback_test.go
+          grep -Fq 'generation-floor' scripts/xsp-v2-p0e3a-coordinated-rollback_test.go
+          grep -Fq 'offhost_after != offhost_before' scripts/test-xsp-v2-p0e3a-coordinated-rollback.py
+          grep -Fq 'fully committed older backup-set recovery remains P0-E3b' scripts/test-xsp-v2-p0e3a-coordinated-rollback.py docs/XSP_V2_P0E_COORDINATED_ROLLBACK.md
+
+  coordinated-restore-e2e:
+    name: Real Agent + PostgreSQL restore against independent owner checkpoint
+    needs: source-contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout exact XMesh-Node P0-E3a preflight checkpoint
+        uses: actions/checkout@v4
+        with:
+          repository: TriplexCorp/XMesh-Node
+          ref: 41fdf669d9ff9c6f0b9d2518fd0404c65d2f3826
+          path: xmesh-node
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache: false
+      - name: Verify exact Node P0-E3a recovery implementation
+        run: |
+          set -euo pipefail
+          (cd xmesh-node/security/xspv2/poc-go && go test ./...)
+          (cd xmesh-node/agent/xspv2 && go test ./...)
+      - name: Exercise coordinated real Agent + PostgreSQL rollback rejection
+        run: python3 scripts/test-xsp-v2-p0e3a-coordinated-rollback.py --node-repo xmesh-node
