@@ -114,4 +114,10 @@ jobs:
             echo 'matrix accepted a missing durability point' >&2; exit 1
           fi
 
+          cp -a "$evidence" "$work/extra-point"
+          printf '%s\n' '{"unexpected":"sixth-file"}' > "$work/extra-point/unreviewed-extra.json"
+          if python3 scripts/xsp-v2-p0e4a4-powercut-matrix.py --evidence-dir "$work/extra-point" --agent-preflight "$work/agent.json" --postgres-preflight "$work/pg.json"; then
+            echo 'matrix accepted an unreviewed extra evidence file' >&2; exit 1
+          fi
+
           echo 'P0-E4A4 MATRIX CONTRACT: PASS (synthetic review-prep only; NOT physical qualification)'
