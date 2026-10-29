@@ -1,0 +1,32 @@
+name: Temporary P0-E3b DB diagnostics
+
+on:
+  push:
+    branches: [feat/xsp-v2-p0e3b-coordinated-backup-restore]
+    paths: [".github/workflows/tmp-p0e3b-db-diagnostics.yml"]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/xsp-v2-p0e3b-coordinated-backup-restore
+      - name: Add exact DB diagnostics and cleanup ownership
+        run: |
+          set -euo pipefail
+          python3 -c 'from pathlib import Path; p=Path("scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py"); s=p.read_text(); old="            provision_roles()\n            metric_key = hashlib.sha256(str(NODE_ID).encode()).hexdigest()"; new="            try:\n                provision_roles()\n            except Exception as exc:\n                inspect = command(\"docker\", \"inspect\", db, \"--format\", \"{{json .State}}\", check=False).stdout.strip()\n                logs = command(\"docker\", \"logs\", \"--tail\", \"160\", db, check=False).stdout\n                raise RuntimeError(f\"initial PostgreSQL role provisioning failed: {exc}; state={inspect}; logs={logs[-7000:]}\") from exc\n            metric_key = hashlib.sha256(str(NODE_ID).encode()).hexdigest()"; assert s.count(old)==1, s.count(old); p.write_text(s.replace(old,new))'
+          python3 -c 'from pathlib import Path; p=Path("scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py"); s=p.read_text(); old="        finally:\n            command(\"docker\", \"rm\", \"-f\", toolbox, check=False, timeout=60)\n            command(\"docker\", \"rm\", \"-f\", db, check=False, timeout=60)"; new="        finally:\n            command(\"docker\", \"exec\", toolbox, \"chown\", \"-R\", f\"{host_uid}:{host_gid}\", \"/work\", check=False, timeout=60)\n            command(\"docker\", \"rm\", \"-f\", toolbox, check=False, timeout=60)\n            command(\"docker\", \"rm\", \"-f\", db, check=False, timeout=60)"; assert s.count(old)==1, s.count(old); p.write_text(s.replace(old,new))'
+          python3 -m py_compile scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py
+          git diff --check
+      - name: Commit diagnostics
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py
+          git commit -m 'test(xsp-v2): expose E3b PostgreSQL failure state'
+          git push origin HEAD:feat/xsp-v2-p0e3b-coordinated-backup-restore
