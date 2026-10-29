@@ -11,7 +11,6 @@ import hashlib
 import json
 import os
 import shutil
-import stat
 import subprocess
 import tempfile
 import time
@@ -144,7 +143,9 @@ def make_curl_rewriter(directory: Path):
 set -Eeuo pipefail
 args=()
 for value in "$@"; do
-  value="${{value//https:\/\/panel.example.test/http:\/\/127.0.0.1:8080}}"
+  if [[ "$value" == https://panel.example.test* ]]; then
+    value="http://127.0.0.1:8080${{value#https://panel.example.test}}"
+  fi
   args+=("$value")
 done
 exec {real_curl} "${{args[@]}}"
@@ -222,8 +223,6 @@ def main():
     make_curl_rewriter(fakebin)
     base = temp / "agent"
 
-    # Release A: real positive migration. First poll response is treated as lost;
-    # a fresh signed poll must redeliver the exact same claimed immutable command.
     identity_a = {"version": VERSION_A, "sourceRevision": NODE_REVISION, "artifactSha256": digest_a}
     insert_manifest(VERSION_A, NODE_REVISION, digest_a)
     queued_a = queue(owner_cookie, node_id, VERSION_A)
@@ -247,8 +246,6 @@ def main():
         "SELECT state,result,release_ack_version,release_ack_source_revision,release_ack_artifact_sha256,"
         f"release_ack_success,release_ack_received_at::text FROM node_restart_commands WHERE id={first['id']};"
     )
-    # Simulate lost HTTP ACK response: exact same semantic ACK with a fresh nonce
-    # must converge on durable evidence without a second lifecycle transition.
     code, data, _ = signed_post("/node/restart/ack", ack_payload, node_id, key, message)
     assert code == 200 and data == {"accepted": True, "duplicate": True}, (code, data)
     after = sql(
@@ -265,17 +262,12 @@ def main():
     assert sql(f"SELECT state FROM node_restart_commands WHERE id={first['id']};") == "succeeded"
     print("PASS: non-exact completed ACK retry still fails closed")
 
-    # Process restart/idempotent package retry: rerunning the real staged helper
-    # for the same immutable artifact must keep the same active package.
     write_identity(identity_file, identity_a)
     restarted = run_helper(base, env_file, identity_file, fakebin)
     assert restarted.returncode == 0, (restarted.stdout, restarted.stderr)
     assert_active(base, identity_a)
     print("PASS: staged package apply survives Agent-process restart/idempotent retry")
 
-    # Release B: use a second real Go Agent artifact. Corrupt it only after the
-    # atomic pointer switch so pre-activation checks pass and post-switch digest
-    # verification forces rollback to the exact last-known-good release A.
     identity_b = {"version": VERSION_B, "sourceRevision": NODE_REVISION, "artifactSha256": digest_b}
     insert_manifest(VERSION_B, NODE_REVISION, digest_b)
     queued_b = queue(owner_cookie, node_id, VERSION_B)
@@ -296,15 +288,11 @@ def main():
     )
     assert row_b == f"failed|f|{VERSION_B}|{NODE_REVISION}|{digest_b}", row_b
 
-    # Durable XSP-v2 state is outside release slots and remains a real directory
-    # across both activation and rollback.
     mode = subprocess.check_output(["sudo", "stat", "-c", "%a:%F", str(base / "xsp-v2")], text=True).strip()
     assert mode == "700:directory", mode
     assert subprocess.run(["sudo", "test", "!", "-L", str(base / "xsp-v2")]).returncode == 0
     print("PASS: rollback does not replace or rewind durable security-state root")
 
-    # The migration gate is staging-only; this E2E never starts a Go control
-    # service and never enables strict-pq. Production shell authority remains.
     assert not (base / "strict-pq-enabled").exists()
     print("P0-D disposable real Nexus<->Node Agent migration/update E2E passed.")
 
