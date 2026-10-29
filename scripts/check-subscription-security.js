@@ -5,7 +5,7 @@ const assert=require('node:assert/strict');
 const read=path=>fs.readFileSync(path,'utf8');
 const backend=read('backend/src/user_subscriptions.rs');
 const protocols=read('backend/src/protocol_credentials.rs');
-const node=read('backend/src/node_runtime.rs');
+const node=read('backend/src/node_runtime.rs')+'\n'+read('backend/src/node_runtime_legacy.rs');
 const main=read('backend/src/main.rs');
 const host=read('deploy/install-panel-host.sh');
 const app=read('app.js');
