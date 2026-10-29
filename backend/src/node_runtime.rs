@@ -159,7 +159,11 @@ async fn request_staging_agent_migration(
     .await
     {
         Ok(row) => row,
-        Err(error) if error.to_string().contains("node already has an active control command") => {
+        Err(error)
+            if error
+                .to_string()
+                .contains("node already has an active control command") =>
+        {
             return Err(ApiError::new(
                 StatusCode::CONFLICT,
                 "Узел уже выполняет другую команду управления.",
