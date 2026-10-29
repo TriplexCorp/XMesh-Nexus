@@ -221,9 +221,11 @@ mod tests {
     fn artifact_filename_is_content_addressed_only() {
         let digest = "a".repeat(64);
         assert_eq!(artifact_filename(&digest), Some(format!("{digest}.bin")));
-        for invalid in ["", "A", "../artifact", &"A".repeat(64), &"g".repeat(64)] {
+        for invalid in ["", "A", "../artifact"] {
             assert_eq!(artifact_filename(invalid), None);
         }
+        assert_eq!(artifact_filename(&"A".repeat(64)), None);
+        assert_eq!(artifact_filename(&"g".repeat(64)), None);
     }
 
     #[test]
