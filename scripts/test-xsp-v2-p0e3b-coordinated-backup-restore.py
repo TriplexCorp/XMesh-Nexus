@@ -459,7 +459,7 @@ def main() -> None:
             helper_dir = agent_module / "cmd/p0e3b-helper"
             helper_dir.mkdir(parents=True, exist_ok=True)
             shutil.copy2(ROOT / "scripts/xsp-v2-p0e3b-agent-helper.go", helper_dir / "main.go")
-            command("go", "build", "-trimpath", "-o", str(tmp / "p0e3b-agent-helper"), "./cmd/p0e3b-helper",
+            command("go", "-C", str(agent_module), "build", "-trimpath", "-o", str(tmp / "p0e3b-agent-helper"), "./cmd/p0e3b-helper",
                     timeout=180, input_text=None, check=True)
 
             # OpenSSL 3.5 / Rust toolbox is isolated from the network. It holds
@@ -591,7 +591,7 @@ def main() -> None:
                 f"{NODE_ID},'{REQUEST_ID}',1,2,decode('{candidate_digest}','hex'),decode('{permit_message['permitNonceHex']}','hex'),"
                 f"decode('{permit_digest}','hex'),decode('{signed_permit.read_bytes().hex()}','hex'),"
                 f"to_timestamp({permit_message['issuedAtMs']}/1000.0),to_timestamp({permit_message['expiresAtMs']}/1000.0),'p0e3b-owner','ack_verified',"
-                f"decode('{ack_digest}','hex'),decode('{signed_ack.read_bytes().hex()}','hex'),to_timestamp({receipt_template.stat().st_mtime_ns // 1_000_000}/1000.0));"
+                f"decode('{ack_digest}','hex'),decode('{signed_ack.read_bytes().hex()}','hex'),to_timestamp({ack_message['issuedAtMs'] + 500}/1000.0));"
                 "INSERT INTO node_xsp_public_keysets(node_id,purpose,key_epoch,ed25519_key_id,mldsa65_key_id,ed25519_public,mldsa65_public) VALUES("
                 f"{NODE_ID},'node_request',2,'{next_key['edKeyId']}','{next_key['pqKeyId']}',"
                 f"decode('{base64.b64decode(next_key['edPublicBase64']).hex()}','hex'),"
@@ -621,6 +621,7 @@ def main() -> None:
             )
             if create_checkpoint.returncode != 0:
                 raise RuntimeError("failed to create current owner/off-host recovery checkpoint")
+            toolbox_run("chown", f"{host_uid}:{host_gid}", work_path(offhost / "current-checkpoint.json"))
             checkpoint = json.loads((offhost / "current-checkpoint.json").read_text())
             if checkpoint["minimumEpoch"] != 2 or checkpoint["receiptSha256Hex"] != receipt_digest:
                 raise RuntimeError("E3a checkpoint does not bind the current committed receipt")
