@@ -1,381 +1,115 @@
-// P0-D keeps the existing node runtime implementation in
-// `node_runtime_legacy.rs` and overlays only bounded Agent-migration surfaces.
-// Legacy unbound update behavior remains delegated unchanged; staged bound
-// migrations add exact immutable release identity to the existing signed
-// poll/ACK lifecycle without introducing another remote action or control plane.
-#[path = "node_agent_artifact.rs"]
-mod artifact;
-#[expect(
-    dead_code,
-    reason = "P0-D intentionally shadows only the preserved legacy poll/ACK handlers while keeping the reviewed legacy runtime baseline intact"
-)]
-#[path = "node_runtime_legacy.rs"]
-mod legacy;
+// P0-D lost-response/restart overlay. Keep the exact PR #101 runtime as the
+// reviewed baseline and shadow only signed poll retry plus exact ACK replay.
+#[path = "node_runtime_p0d_staged.rs"]
+mod staged;
 
-// The legacy module remains the implementation for every existing runtime
-// route. Local items below intentionally shadow only the bounded P0-D surfaces.
 #[allow(hidden_glob_reexports)]
-pub use legacy::*;
+pub use staged::*;
 
 use crate::{ApiError, AppState, node_auth};
 use axum::{
-    Extension, Json,
+    Json,
     body::Bytes,
-    extract::{Path, State},
+    extract::State,
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
 };
 use serde::Deserialize;
-use serde_json::{Value, json};
+use serde_json::json;
 use sqlx::Row;
 
-// Keep the existing CI/runtime version contract visible at the orchestration
-// entrypoint. The legacy implementation uses the same fixed version.
-pub const CONTROL_AGENT_VERSION: &str = "control-v5.1.3";
-
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct LegacyAgentUpdateRequest {}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct AgentMigrationUpdateRequest {
-    release_version: String,
-}
-
-/// The existing `{}` request stays a distinct variant. Migration callers may
-/// add exactly one field (`releaseVersion`) and never executable input.
-#[derive(Deserialize)]
-#[serde(untagged)]
-pub enum AgentUpdateRequest {
-    Legacy(LegacyAgentUpdateRequest),
-    Migration(AgentMigrationUpdateRequest),
-}
-
-#[derive(Debug, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct AgentReleaseIdentity {
-    version: String,
-    source_revision: String,
-    artifact_sha256: String,
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct NodeCommandPoll {
+struct RetryPoll {
     node_id: i64,
     #[serde(default, rename = "artifactVersion")]
     artifact_version: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct RetryReleaseIdentity {
+    version: String,
+    source_revision: String,
+    artifact_sha256: String,
+}
+
+#[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct NodeCommandAck {
+struct RetryAck {
     node_id: i64,
     command_id: i64,
     success: bool,
     detail: String,
     #[serde(default, rename = "releaseIdentity")]
-    release_identity: Option<AgentReleaseIdentity>,
+    release_identity: Option<RetryReleaseIdentity>,
 }
 
-fn staging_agent_migration_value_enabled(value: Option<&str>) -> bool {
-    value == Some("staging-only")
-}
-
-fn staging_agent_migration_enabled() -> bool {
-    let value = std::env::var("XSP_V2_P0D_AGENT_MIGRATION").ok();
-    staging_agent_migration_value_enabled(value.as_deref())
-}
-
-fn validate_release_version(version: &str) -> Result<&str, ApiError> {
-    if version.trim() != version
-        || version.is_empty()
-        || version.len() > 64
-        || !version.bytes().enumerate().all(|(index, byte)| {
-            if index == 0 {
-                byte.is_ascii_alphanumeric()
-            } else {
-                byte.is_ascii_alphanumeric() || b"._+-".contains(&byte)
-            }
-        })
-    {
-        return Err(ApiError::new(
-            StatusCode::BAD_REQUEST,
-            "Invalid approved Agent release version.",
-        ));
-    }
-    Ok(version)
-}
-
-fn lowercase_hex_exact(value: &str, length: usize) -> bool {
-    value.len() == length
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
-}
-
-fn validate_release_identity(identity: &AgentReleaseIdentity) -> Result<(), ApiError> {
-    validate_release_version(&identity.version)?;
-    if !lowercase_hex_exact(&identity.source_revision, 40)
-        || !lowercase_hex_exact(&identity.artifact_sha256, 64)
-    {
-        return Err(ApiError::new(
-            StatusCode::BAD_REQUEST,
-            "Invalid Agent release identity.",
-        ));
-    }
-    Ok(())
-}
-
-fn exact_release_identity_matches(
-    expected_version: &str,
-    expected_revision: &str,
-    expected_digest: &str,
-    reported: &AgentReleaseIdentity,
-) -> bool {
-    reported.version == expected_version
-        && reported.source_revision == expected_revision
-        && reported.artifact_sha256 == expected_digest
-}
-
-fn polled_command_from_row(row: &sqlx::postgres::PgRow) -> Result<Value, ApiError> {
+fn command_from_retry_row(row: &sqlx::postgres::PgRow) -> Result<serde_json::Value, ApiError> {
     let id = row.try_get::<i64, _>("id")?;
-    let action = row.try_get::<String, _>("action")?;
-    let target_version = row.try_get::<Option<String>, _>("target_version")?;
-    let manifest_id = row.try_get::<Option<i64>, _>("release_manifest_id")?;
-    let mut command = json!({
-        "id":id,
-        "action":action,
-        "targetVersion":target_version
-    });
-
-    if manifest_id.is_some() {
-        let release_version = row
-            .try_get::<Option<String>, _>("release_version")?
-            .ok_or_else(|| {
-                ApiError::new(
-                    StatusCode::CONFLICT,
-                    "Bound Agent release identity is missing.",
-                )
-            })?;
-        let source_revision = row
-            .try_get::<Option<String>, _>("source_revision")?
-            .ok_or_else(|| {
-                ApiError::new(
-                    StatusCode::CONFLICT,
-                    "Bound Agent release identity is missing.",
-                )
-            })?;
-        let artifact_sha256 = row
-            .try_get::<Option<String>, _>("artifact_sha256")?
-            .ok_or_else(|| {
-                ApiError::new(
-                    StatusCode::CONFLICT,
-                    "Bound Agent release identity is missing.",
-                )
-            })?;
-        if action != "update_agent" || target_version.as_deref() != Some(release_version.as_str()) {
-            return Err(ApiError::new(
-                StatusCode::CONFLICT,
-                "Bound Agent release identity does not match the queued command.",
-            ));
-        }
-        command["releaseIdentity"] = json!({
-            "version":release_version,
-            "sourceRevision":source_revision,
-            "artifactSha256":artifact_sha256
-        });
-    }
-
-    Ok(command)
-}
-
-#[expect(
-    clippy::too_many_lines,
-    reason = "P0-D1c keeps gate, owner authorization, node state and atomic manifest binding in one auditable orchestration path"
-)]
-async fn request_staging_agent_migration(
-    state: &AppState,
-    actor: &crate::auth::AuthUser,
-    node_id: i64,
-    release_version: &str,
-) -> Result<(StatusCode, Json<Value>), ApiError> {
-    if !staging_agent_migration_enabled() {
+    let version = row.try_get::<String, _>("release_version")?;
+    let target = row.try_get::<Option<String>, _>("target_version")?;
+    let revision = row.try_get::<String, _>("source_revision")?;
+    let digest = row.try_get::<String, _>("artifact_sha256")?;
+    if target.as_deref() != Some(version.as_str()) {
         return Err(ApiError::new(
-            StatusCode::NOT_FOUND,
-            "Staging Agent migration mode is disabled.",
+            StatusCode::CONFLICT,
+            "Claimed Agent release identity is inconsistent.",
         ));
     }
-    crate::require_owner(actor)?;
-    if node_id <= 0 {
-        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid node ID"));
-    }
-    let target = validate_release_version(release_version)?;
+    Ok(json!({
+        "id": id,
+        "action": "update_agent",
+        "targetVersion": version,
+        "releaseIdentity": {
+            "version": version,
+            "sourceRevision": revision,
+            "artifactSha256": digest
+        }
+    }))
+}
 
-    tracing::debug!(
-        node_id,
-        legacy_default_version = CONTROL_AGENT_VERSION,
-        "Staging Agent migration request"
-    );
-
-    let node = sqlx::query_scalar::<_, Value>(
-        "SELECT data FROM panel_records WHERE collection='nodes' AND id=$1",
+async fn claimed_bound_retry(
+    state: &AppState,
+    node_id: i64,
+) -> Result<Option<sqlx::postgres::PgRow>, ApiError> {
+    Ok(sqlx::query(
+        "SELECT c.id,c.target_version,m.version AS release_version,m.source_revision,m.artifact_sha256
+         FROM node_restart_commands c
+         JOIN node_xsp_agent_release_manifests m ON m.id=c.release_manifest_id
+         WHERE c.node_id=$1 AND c.state='claimed' AND c.action='update_agent'
+           AND c.release_manifest_id IS NOT NULL
+           AND c.claimed_at>=NOW()-INTERVAL '15 minutes'
+         ORDER BY c.id LIMIT 1",
     )
     .bind(node_id)
     .fetch_optional(&state.pool)
-    .await?
-    .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Node not found"))?;
-    if node.get("disabled").and_then(Value::as_bool) == Some(true) {
-        return Err(ApiError::new(
-            StatusCode::CONFLICT,
-            "Отключённая нода не принимает команды. Сначала восстановите работу узла.",
-        ));
-    }
-
-    let active: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM node_runtime_heartbeats
-          WHERE node_id=$1 AND received_at>NOW()-INTERVAL '65 seconds'
-            AND (version LIKE 'control-v4.%' OR version LIKE 'control-v5.%'))",
-    )
-    .bind(node_id)
-    .fetch_one(&state.pool)
-    .await?;
-    if !active {
-        return Err(ApiError::new(
-            StatusCode::CONFLICT,
-            "На ноде нет активного агента с поддержкой самообновления (control-v4+). Старый агент нужно один раз обновить штатным скриптом по SSH.",
-        ));
-    }
-
-    sqlx::query(
-        "UPDATE node_restart_commands SET state='failed',
-         result='Command expired before delivery',finished_at=NOW()
-         WHERE node_id=$1 AND state IN ('pending','claimed')
-           AND ((action='update_agent' AND requested_at<NOW()-INTERVAL '15 minutes') OR (action<>'update_agent' AND requested_at<NOW()-INTERVAL '180 seconds'))",
-    )
-    .bind(node_id)
-    .execute(&state.pool)
-    .await?;
-
-    let approved: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM node_xsp_agent_release_manifests WHERE version=$1)",
-    )
-    .bind(target)
-    .fetch_one(&state.pool)
-    .await?;
-    if !approved {
-        return Err(ApiError::new(
-            StatusCode::NOT_FOUND,
-            "Approved Agent release was not found.",
-        ));
-    }
-
-    let row = match sqlx::query(
-        "SELECT command_id,manifest_id,version,source_revision,artifact_sha256
-         FROM stage_node_xsp_agent_migration($1,$2,$3)",
-    )
-    .bind(node_id)
-    .bind(target)
-    .bind(&actor.username)
-    .fetch_one(&state.pool)
-    .await
-    {
-        Ok(row) => row,
-        Err(error)
-            if error
-                .to_string()
-                .contains("node already has an active control command") =>
-        {
-            return Err(ApiError::new(
-                StatusCode::CONFLICT,
-                "Узел уже выполняет другую команду управления.",
-            ));
-        }
-        Err(error) => return Err(error.into()),
-    };
-
-    let command_id = row.try_get::<i64, _>("command_id")?;
-    let manifest_id = row.try_get::<i64, _>("manifest_id")?;
-    let version = row.try_get::<String, _>("version")?;
-    let source_revision = row.try_get::<String, _>("source_revision")?;
-    let artifact_sha256 = row.try_get::<String, _>("artifact_sha256")?;
-
-    crate::audit(
-        &state.pool,
-        &actor.username,
-        "node.agent.migration.requested",
-        Some("nodes"),
-        Some(node_id),
-        json!({
-            "commandId":command_id,
-            "manifestId":manifest_id,
-            "releaseVersion":version,
-            "sourceRevision":source_revision,
-            "artifactSha256":artifact_sha256
-        }),
-    )
-    .await;
-
-    Ok((
-        StatusCode::ACCEPTED,
-        Json(json!({
-            "id":command_id,
-            "nodeId":node_id,
-            "action":"update_agent",
-            "targetVersion":version,
-            "state":"pending",
-            "migration":{
-                "manifestId":manifest_id,
-                "sourceRevision":source_revision,
-                "artifactSha256":artifact_sha256
-            }
-        })),
-    ))
+    .await?)
 }
 
-/// Existing endpoint, two deliberately separate modes:
-/// - `{}` delegates to the byte-for-byte legacy implementation;
-/// - `{ "releaseVersion": "..." }` is owner-only and staging-gated.
-pub async fn request_agent_update(
-    State(state): State<AppState>,
-    Extension(actor): Extension<crate::auth::AuthUser>,
-    Path(node_id): Path<i64>,
-    Json(body): Json<AgentUpdateRequest>,
-) -> Result<(StatusCode, Json<Value>), ApiError> {
-    match body {
-        AgentUpdateRequest::Legacy(_) => {
-            legacy::request_agent_update(
-                State(state),
-                Extension(actor),
-                Path(node_id),
-                Json(legacy::AgentUpdateRequest {}),
-            )
-            .await
-        }
-        AgentUpdateRequest::Migration(request) => {
-            request_staging_agent_migration(&state, &actor, node_id, &request.release_version).await
-        }
-    }
-}
-
-/// Existing authenticated command poll. Normal requests retain the historical
-/// JSON response. A claimed manifest-bound migration may make a second signed
-/// request with only `artifactVersion`; Nexus then returns the content-addressed
-/// bytes bound to that already-claimed command. No URL/path enters the request.
+/// A bound migration is safe to redeliver after a lost poll response or process
+/// restart: its immutable manifest identity cannot change and staged apply is
+/// content-addressed/idempotent. Legacy claimed commands retain old behavior.
 pub async fn poll_restart(
     State(state): State<AppState>,
     headers: HeaderMap,
     body: Bytes,
 ) -> Result<Response, ApiError> {
-    let request: NodeCommandPoll = serde_json::from_slice(&body)
+    let request: RetryPoll = serde_json::from_slice(&body)
         .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Invalid command poll."))?;
     if request.node_id <= 0 {
         return Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid node ID"));
     }
-    if let Some(version) = request.artifact_version.as_deref() {
-        validate_release_version(version)?;
+    // Artifact delivery already has its own claimed-command binding in the PR
+    // #101 baseline; do not consume the node-auth nonce before delegating it.
+    if request.artifact_version.is_some() {
+        return staged::poll_restart(State(state), headers, body).await;
     }
+
+    if claimed_bound_retry(&state, request.node_id).await?.is_none() {
+        return staged::poll_restart(State(state), headers, body).await;
+    }
+
     node_auth::authenticate_for(
         &state,
         &headers,
@@ -385,78 +119,95 @@ pub async fn poll_restart(
     )
     .await?;
 
-    let disabled = sqlx::query_scalar::<_, bool>(
-        "SELECT COALESCE((data->>'disabled')::boolean,false)
-         FROM panel_records WHERE collection='nodes' AND id=$1",
-    )
-    .bind(request.node_id)
-    .fetch_optional(&state.pool)
-    .await?
-    .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Node not found"))?;
-    if disabled {
-        return Ok(Json(json!({"command":null,"enforceStop":true})).into_response());
-    }
-
-    if let Some(version) = request.artifact_version.as_deref() {
-        return artifact::download_claimed(&state, request.node_id, version).await;
-    }
-
-    sqlx::query(
-        "UPDATE node_restart_commands SET state='failed',
-         result='Command expired before delivery',finished_at=NOW()
-         WHERE node_id=$1 AND state='pending'
-           AND ((action='update_agent' AND requested_at<NOW()-INTERVAL '15 minutes') OR (action<>'update_agent' AND requested_at<NOW()-INTERVAL '180 seconds'))",
-    )
-    .bind(request.node_id)
-    .execute(&state.pool)
-    .await?;
-
-    let row = sqlx::query(
-        "WITH claimed AS (
-           UPDATE node_restart_commands SET state='claimed',claimed_at=NOW()
-           WHERE id=(SELECT id FROM node_restart_commands WHERE node_id=$1
-             AND state='pending' ORDER BY id FOR UPDATE SKIP LOCKED LIMIT 1)
-           RETURNING id,action,target_version,release_manifest_id
-         )
-         SELECT c.id,c.action,c.target_version,c.release_manifest_id,
-                m.version AS release_version,m.source_revision,m.artifact_sha256
-         FROM claimed c
-         LEFT JOIN node_xsp_agent_release_manifests m ON m.id=c.release_manifest_id",
-    )
-    .bind(request.node_id)
-    .fetch_optional(&state.pool)
-    .await?;
-
-    let command = row.as_ref().map(polled_command_from_row).transpose()?;
-    Ok(Json(json!({"command":command,"enforceStop":false})).into_response())
+    // Re-read after authentication. If lifecycle state changed concurrently,
+    // fail closed and let the next fresh signed poll observe the new state.
+    let row = claimed_bound_retry(&state, request.node_id)
+        .await?
+        .ok_or_else(|| {
+            ApiError::new(
+                StatusCode::CONFLICT,
+                "Claimed Agent command changed during retry.",
+            )
+        })?;
+    let command = command_from_retry_row(&row)?;
+    Ok(Json(json!({"command": command, "enforceStop": false})).into_response())
 }
 
-/// Bound staging migrations must return the exact immutable identity they were
-/// polled with. Legacy unbound commands continue to use the old ACK body and
-/// cannot attach fabricated migration identity.
-#[expect(
-    clippy::too_many_lines,
-    reason = "The identity lock, exact manifest comparison and lifecycle update stay together so the security boundary is auditable"
-)]
+fn exact_duplicate_ack(row: &sqlx::postgres::PgRow, report: &RetryAck) -> Result<bool, ApiError> {
+    let state_name = row.try_get::<String, _>("state")?;
+    if !matches!(state_name.as_str(), "succeeded" | "failed") {
+        return Ok(false);
+    }
+    if row
+        .try_get::<Option<i64>, _>("release_manifest_id")?
+        .is_none()
+    {
+        return Ok(false);
+    }
+    let Some(identity) = report.release_identity.as_ref() else {
+        return Ok(false);
+    };
+    let expected_success = state_name == "succeeded";
+    if report.success != expected_success
+        || row.try_get::<Option<bool>, _>("release_ack_success")? != Some(report.success)
+        || row.try_get::<Option<String>, _>("result")?.as_deref() != Some(report.detail.as_str())
+    {
+        return Ok(false);
+    }
+    let manifest_version = row.try_get::<Option<String>, _>("release_version")?;
+    let manifest_revision = row.try_get::<Option<String>, _>("source_revision")?;
+    let manifest_digest = row.try_get::<Option<String>, _>("artifact_sha256")?;
+    let ack_version = row.try_get::<Option<String>, _>("release_ack_version")?;
+    let ack_revision = row.try_get::<Option<String>, _>("release_ack_source_revision")?;
+    let ack_digest = row.try_get::<Option<String>, _>("release_ack_artifact_sha256")?;
+    Ok(manifest_version.as_deref() == Some(identity.version.as_str())
+        && manifest_revision.as_deref() == Some(identity.source_revision.as_str())
+        && manifest_digest.as_deref() == Some(identity.artifact_sha256.as_str())
+        && ack_version.as_deref() == Some(identity.version.as_str())
+        && ack_revision.as_deref() == Some(identity.source_revision.as_str())
+        && ack_digest.as_deref() == Some(identity.artifact_sha256.as_str()))
+}
+
+async fn completed_bound_row(
+    state: &AppState,
+    node_id: i64,
+    command_id: i64,
+) -> Result<Option<sqlx::postgres::PgRow>, ApiError> {
+    Ok(sqlx::query(
+        "SELECT c.state,c.result,c.release_manifest_id,c.release_ack_version,
+                c.release_ack_source_revision,c.release_ack_artifact_sha256,c.release_ack_success,
+                m.version AS release_version,m.source_revision,m.artifact_sha256
+         FROM node_restart_commands c
+         LEFT JOIN node_xsp_agent_release_manifests m ON m.id=c.release_manifest_id
+         WHERE c.node_id=$1 AND c.id=$2 AND c.state IN ('succeeded','failed')",
+    )
+    .bind(node_id)
+    .bind(command_id)
+    .fetch_optional(&state.pool)
+    .await?)
+}
+
+/// Permit only a semantically exact retry of a completed manifest-bound ACK
+/// after its HTTP response was lost. Different detail/success/identity remains a
+/// conflict, and legacy ACK duplicate behavior is unchanged.
 pub async fn acknowledge_restart(
     State(state): State<AppState>,
     headers: HeaderMap,
     body: Bytes,
-) -> Result<Json<Value>, ApiError> {
-    let report: NodeCommandAck = serde_json::from_slice(&body)
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let report: RetryAck = serde_json::from_slice(&body)
         .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Invalid command acknowledgement."))?;
-    if report.node_id <= 0
-        || report.command_id <= 0
-        || report.detail.len() > 256
-        || report.detail.chars().any(char::is_control)
-    {
-        return Err(ApiError::new(
-            StatusCode::BAD_REQUEST,
-            "Invalid command details.",
-        ));
+    if report.node_id <= 0 || report.command_id <= 0 || report.detail.len() > 256 {
+        return staged::acknowledge_restart(State(state), headers, body).await;
     }
-    if let Some(identity) = report.release_identity.as_ref() {
-        validate_release_identity(identity)?;
+
+    let candidate = completed_bound_row(&state, report.node_id, report.command_id).await?;
+    let is_exact_duplicate = match candidate.as_ref() {
+        Some(row) => exact_duplicate_ack(row, &report)?,
+        None => false,
+    };
+    if !is_exact_duplicate {
+        return staged::acknowledge_restart(State(state), headers, body).await;
     }
 
     node_auth::authenticate_for(
@@ -467,256 +218,19 @@ pub async fn acknowledge_restart(
         "/api/v1/node/restart/ack",
     )
     .await?;
-
-    let mut tx = state.pool.begin().await?;
-    let row = sqlx::query(
-        "SELECT c.action,c.target_version,c.release_manifest_id,
-                m.version AS release_version,m.source_revision,m.artifact_sha256
-         FROM node_restart_commands c
-         LEFT JOIN node_xsp_agent_release_manifests m ON m.id=c.release_manifest_id
-         WHERE c.node_id=$1 AND c.id=$2 AND c.state='claimed'
-         FOR UPDATE OF c",
-    )
-    .bind(report.node_id)
-    .bind(report.command_id)
-    .fetch_optional(&mut *tx)
-    .await?
-    .ok_or_else(|| {
-        ApiError::new(
-            StatusCode::CONFLICT,
-            "Restart command is no longer pending acknowledgement.",
-        )
-    })?;
-
-    let manifest_id = row.try_get::<Option<i64>, _>("release_manifest_id")?;
-    let ack_identity = if manifest_id.is_none() {
-        if report.release_identity.is_some() {
-            return Err(ApiError::new(
-                StatusCode::CONFLICT,
-                "Legacy command must not carry Agent release identity.",
-            ));
-        }
-        None
-    } else {
-        let expected_version = row
-            .try_get::<Option<String>, _>("release_version")?
-            .ok_or_else(|| {
-                ApiError::new(
-                    StatusCode::CONFLICT,
-                    "Bound Agent release identity is missing.",
-                )
-            })?;
-        let expected_revision = row
-            .try_get::<Option<String>, _>("source_revision")?
-            .ok_or_else(|| {
-                ApiError::new(
-                    StatusCode::CONFLICT,
-                    "Bound Agent release identity is missing.",
-                )
-            })?;
-        let expected_digest = row
-            .try_get::<Option<String>, _>("artifact_sha256")?
-            .ok_or_else(|| {
-                ApiError::new(
-                    StatusCode::CONFLICT,
-                    "Bound Agent release identity is missing.",
-                )
-            })?;
-        let target_version = row.try_get::<Option<String>, _>("target_version")?;
-        let action = row.try_get::<String, _>("action")?;
-        let reported = report.release_identity.as_ref().ok_or_else(|| {
+    let row = completed_bound_row(&state, report.node_id, report.command_id)
+        .await?
+        .ok_or_else(|| {
             ApiError::new(
                 StatusCode::CONFLICT,
-                "Bound Agent command requires exact release identity acknowledgement.",
+                "Agent acknowledgement state changed during retry.",
             )
         })?;
-        if action != "update_agent"
-            || target_version.as_deref() != Some(expected_version.as_str())
-            || !exact_release_identity_matches(
-                &expected_version,
-                &expected_revision,
-                &expected_digest,
-                reported,
-            )
-        {
-            return Err(ApiError::new(
-                StatusCode::CONFLICT,
-                "Agent release identity acknowledgement does not match the bound manifest.",
-            ));
-        }
-        Some(reported)
-    };
-
-    let state_name = if report.success {
-        "succeeded"
-    } else {
-        "failed"
-    };
-    let (ack_version, ack_revision, ack_digest, ack_success) = match ack_identity {
-        Some(identity) => (
-            Some(identity.version.as_str()),
-            Some(identity.source_revision.as_str()),
-            Some(identity.artifact_sha256.as_str()),
-            Some(report.success),
-        ),
-        None => (None, None, None, None),
-    };
-
-    let done = sqlx::query_scalar::<_, i64>(
-        "UPDATE node_restart_commands
-         SET state=$3,result=$4,finished_at=NOW(),
-             release_ack_version=$5,release_ack_source_revision=$6,
-             release_ack_artifact_sha256=$7,release_ack_success=$8,
-             release_ack_received_at=CASE WHEN $5::TEXT IS NULL THEN NULL ELSE NOW() END
-         WHERE node_id=$1 AND id=$2 AND state='claimed' RETURNING id",
-    )
-    .bind(report.node_id)
-    .bind(report.command_id)
-    .bind(state_name)
-    .bind(&report.detail)
-    .bind(ack_version)
-    .bind(ack_revision)
-    .bind(ack_digest)
-    .bind(ack_success)
-    .fetch_optional(&mut *tx)
-    .await?;
-    if done.is_none() {
+    if !exact_duplicate_ack(&row, &report)? {
         return Err(ApiError::new(
             StatusCode::CONFLICT,
-            "Restart command is no longer pending acknowledgement.",
+            "Agent acknowledgement retry does not exactly match durable evidence.",
         ));
     }
-    tx.commit().await?;
-    Ok(Json(json!({"accepted":true})))
-}
-
-#[cfg(test)]
-mod p0d_agent_orchestration_tests {
-    use super::*;
-
-    fn identity() -> AgentReleaseIdentity {
-        AgentReleaseIdentity {
-            version: "control-v5.2.0".to_owned(),
-            source_revision: "a".repeat(40),
-            artifact_sha256: "b".repeat(64),
-        }
-    }
-
-    #[test]
-    fn staging_gate_is_exact_and_non_default() {
-        assert!(!staging_agent_migration_value_enabled(None));
-        assert!(!staging_agent_migration_value_enabled(Some("")));
-        assert!(!staging_agent_migration_value_enabled(Some("1")));
-        assert!(!staging_agent_migration_value_enabled(Some("staging")));
-        assert!(!staging_agent_migration_value_enabled(Some("STAGING-ONLY")));
-        assert!(staging_agent_migration_value_enabled(Some("staging-only")));
-    }
-
-    #[test]
-    fn request_schema_keeps_legacy_empty_and_migration_version_only() {
-        assert!(matches!(
-            serde_json::from_str::<AgentUpdateRequest>("{}").unwrap(),
-            AgentUpdateRequest::Legacy(_)
-        ));
-        assert!(matches!(
-            serde_json::from_str::<AgentUpdateRequest>(r#"{"releaseVersion":"control-v5.2.0"}"#)
-                .unwrap(),
-            AgentUpdateRequest::Migration(_)
-        ));
-        for rejected in [
-            r#"{"releaseVersion":null}"#,
-            r#"{"artifactSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}"#,
-            r#"{"url":"https://example.invalid/agent"}"#,
-            r#"{"command":"custom"}"#,
-            r#"{"releaseVersion":"control-v5.2.0","sourceRevision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}"#,
-        ] {
-            assert!(serde_json::from_str::<AgentUpdateRequest>(rejected).is_err());
-        }
-    }
-
-    #[test]
-    fn release_version_validation_matches_manifest_contract() {
-        for valid in ["control-v5.1.3", "agent_1+pq", "A"] {
-            assert_eq!(validate_release_version(valid).unwrap(), valid);
-        }
-        for invalid in ["", "-bad", ".bad", " bad", "bad ", "bad/uri", "x y"] {
-            assert!(validate_release_version(invalid).is_err(), "{invalid}");
-        }
-        assert!(validate_release_version(&"x".repeat(65)).is_err());
-    }
-
-    #[test]
-    fn poll_schema_preserves_legacy_node_id_and_only_adds_artifact_version() {
-        let ordinary: NodeCommandPoll = serde_json::from_str(r#"{"node_id":7}"#).unwrap();
-        assert_eq!(ordinary.node_id, 7);
-        assert!(ordinary.artifact_version.is_none());
-
-        let artifact: NodeCommandPoll =
-            serde_json::from_str(r#"{"node_id":7,"artifactVersion":"p0d2-agent"}"#).unwrap();
-        assert_eq!(artifact.artifact_version.as_deref(), Some("p0d2-agent"));
-
-        for rejected in [
-            r#"{"node_id":7,"url":"https://example.invalid/agent"}"#,
-            r#"{"node_id":7,"artifactPath":"/tmp/agent"}"#,
-            r#"{"nodeId":7}"#,
-        ] {
-            assert!(serde_json::from_str::<NodeCommandPoll>(rejected).is_err());
-        }
-        let unsafe_version: NodeCommandPoll =
-            serde_json::from_str(r#"{"node_id":7,"artifactVersion":"../bad"}"#).unwrap();
-        assert!(
-            validate_release_version(unsafe_version.artifact_version.as_deref().unwrap()).is_err()
-        );
-    }
-
-    #[test]
-    fn ack_schema_keeps_legacy_compatible_and_accepts_exact_optional_identity() {
-        let legacy = r#"{"node_id":7,"command_id":11,"success":true,"detail":"ok"}"#;
-        let parsed: NodeCommandAck = serde_json::from_str(legacy).unwrap();
-        assert!(parsed.release_identity.is_none());
-
-        let bound = format!(
-            r#"{{"node_id":7,"command_id":11,"success":true,"detail":"ok","releaseIdentity":{{"version":"control-v5.2.0","sourceRevision":"{}","artifactSha256":"{}"}}}}"#,
-            "a".repeat(40),
-            "b".repeat(64)
-        );
-        let parsed: NodeCommandAck = serde_json::from_str(&bound).unwrap();
-        assert_eq!(parsed.release_identity.as_ref(), Some(&identity()));
-        validate_release_identity(parsed.release_identity.as_ref().unwrap()).unwrap();
-    }
-
-    #[test]
-    fn release_identity_is_exact_and_cannot_be_partially_or_loosely_bound() {
-        let expected = identity();
-        assert!(exact_release_identity_matches(
-            &expected.version,
-            &expected.source_revision,
-            &expected.artifact_sha256,
-            &expected
-        ));
-
-        let mut wrong = identity();
-        wrong.artifact_sha256 = "c".repeat(64);
-        assert!(!exact_release_identity_matches(
-            &expected.version,
-            &expected.source_revision,
-            &expected.artifact_sha256,
-            &wrong
-        ));
-
-        let invalid = AgentReleaseIdentity {
-            version: expected.version,
-            source_revision: "A".repeat(40),
-            artifact_sha256: expected.artifact_sha256,
-        };
-        assert!(validate_release_identity(&invalid).is_err());
-
-        for rejected in [
-            r#"{"node_id":7,"command_id":11,"success":true,"detail":"ok","releaseIdentity":{}}"#,
-            r#"{"node_id":7,"command_id":11,"success":true,"detail":"ok","releaseIdentity":{"version":"control-v5.2.0"}}"#,
-            r#"{"node_id":7,"command_id":11,"success":true,"detail":"ok","releaseIdentity":{"version":"control-v5.2.0","sourceRevision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","artifactSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","url":"https://example.invalid"}}"#,
-        ] {
-            assert!(serde_json::from_str::<NodeCommandAck>(rejected).is_err());
-        }
-    }
+    Ok(Json(json!({"accepted": true, "duplicate": true})))
 }
