@@ -68,7 +68,7 @@ def wait_ready():
             with urlopen(BASE + "/api/v1/health/ready", timeout=3) as response:
                 if response.status == 200:
                     return
-        except (HTTPError, URLError, TimeoutError):
+        except (HTTPError, URLError, TimeoutError, OSError):
             pass
         time.sleep(1)
     subprocess.run(["docker", "compose", "logs", "--tail=120", "panel"], check=False)
