@@ -10,6 +10,8 @@ authority for the external controller/storage facts.
 from __future__ import annotations
 
 import argparse
+import base64
+import binascii
 import hashlib
 import json
 import os
@@ -29,6 +31,7 @@ POSTBOOT_POSTGRES_SCHEMA = "xsp2-p0e4a-postboot-postgres-state-1"
 
 MAX_MANIFEST = 32 * 1024
 MAX_COMPONENT = 256 * 1024
+MAX_SIGNED_RECEIPT = 16 * 1024
 RUN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{7,63}$")
 HEX40_RE = re.compile(r"^[0-9a-f]{40}$")
 HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -115,6 +118,24 @@ def require_positive_int(value: Any, label: str) -> int:
     return value
 
 
+def canonical_base64(value: Any, expected_len: int | None, label: str) -> bytes:
+    if not isinstance(value, str) or not value:
+        raise EvidenceError(f"{label} is missing")
+    try:
+        raw = base64.b64decode(value, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise EvidenceError(f"{label} is not canonical Base64") from exc
+    if expected_len is not None and len(raw) != expected_len:
+        raise EvidenceError(f"{label} has invalid decoded length")
+    if base64.b64encode(raw).decode("ascii") != value:
+        raise EvidenceError(f"{label} is not canonical Base64")
+    return raw
+
+
+def key_id(prefix: str, public: bytes) -> str:
+    return prefix + hashlib.sha256(public).hexdigest()[:24]
+
+
 def require_bool(value: Any, expected: bool, label: str) -> None:
     if value is not expected:
         raise EvidenceError(f"{label} must be {str(expected).lower()}")
@@ -161,10 +182,34 @@ def validate_checkpoint(raw: bytes, node_id: int) -> dict[str, Any]:
     if require_positive_int(value["nodeId"], "checkpoint nodeId") != node_id:
         raise EvidenceError("off-host checkpoint Node mismatch")
     require_positive_int(value["minimumEpoch"], "checkpoint minimumEpoch")
-    require_hex(value["receiptSha256Hex"], HEX64_RE, "checkpoint receiptSha256Hex")
-    if not isinstance(value["signedReceiptBase64"], str) or not value["signedReceiptBase64"]:
-        raise EvidenceError("checkpoint signed receipt is missing")
+    receipt_digest = require_hex(value["receiptSha256Hex"], HEX64_RE, "checkpoint receiptSha256Hex")
+    signed_receipt = canonical_base64(value["signedReceiptBase64"], None, "checkpoint signed receipt")
+    if not signed_receipt or len(signed_receipt) > MAX_SIGNED_RECEIPT:
+        raise EvidenceError("checkpoint signed receipt has invalid size")
+    if sha256(signed_receipt) != receipt_digest:
+        raise EvidenceError("checkpoint embedded signed receipt digest mismatch")
     return value
+
+
+def validate_panel_pin(raw: bytes, node_id: int) -> None:
+    value = parse_json_bytes(raw, "panel pin")
+    exact_keys(value, {
+        "purpose", "issuerId", "nodeId", "edKeyId", "pqKeyId",
+        "ed25519PublicBase64", "mldsa65PublicBase64",
+    }, "panel pin")
+    if value["purpose"] != "panel_response":
+        raise EvidenceError("panel pin purpose must be panel_response")
+    if require_positive_int(value["nodeId"], "panel pin nodeId") != node_id:
+        raise EvidenceError("panel pin Node mismatch")
+    issuer = value["issuerId"]
+    if not isinstance(issuer, str) or not issuer or len(issuer) > 64 or any(ord(ch) < 33 or ord(ch) > 126 for ch in issuer):
+        raise EvidenceError("panel pin issuerId is invalid")
+    ed = canonical_base64(value["ed25519PublicBase64"], 32, "panel Ed25519 public key")
+    pq = canonical_base64(value["mldsa65PublicBase64"], 1952, "panel ML-DSA-65 public key")
+    if value["edKeyId"] != key_id("ed-", ed):
+        raise EvidenceError("panel Ed25519 key ID does not match public key")
+    if value["pqKeyId"] != key_id("pq-", pq):
+        raise EvidenceError("panel ML-DSA-65 key ID does not match public key")
 
 
 def validate_arm(raw: bytes, run_id: str, checkpoint: str) -> None:
@@ -274,12 +319,9 @@ def verify(manifest_path: Path, root: Path) -> dict[str, Any]:
     validate_preflight(loaded["agentPreflight"], "agent-state")
     validate_preflight(loaded["postgresPreflight"], "nexus-postgres")
     checkpoint_doc = validate_checkpoint(loaded["offhostCheckpoint"], node_id)
-    # The panel pin bytes are integrity-bound here, but cryptographic validation
-    # belongs to the existing P0-E3a verifier. Requiring a non-empty strict JSON
-    # object prevents accidental omission without inventing a second verifier.
-    pin = parse_json_bytes(loaded["panelPin"], "panel pin")
-    if not pin:
-        raise EvidenceError("panel pin is empty")
+    # The panel pin bytes are integrity- and identity-bound here, while actual
+    # Ed25519 + ML-DSA-65 verification remains exclusively in the P0-E3a verifier.
+    validate_panel_pin(loaded["panelPin"], node_id)
     validate_arm(loaded["armMarker"], run_id, checkpoint)
     validate_controller(loaded["controllerEvent"], run_id, checkpoint)
     validate_postboot_agent(loaded["postbootAgent"], run_id, node_id, checkpoint_doc)

@@ -17,7 +17,10 @@ spec.loader.exec_module(mod)
 RUN = "p0e4a-run-0001"
 POINT = "after-floor"
 NODE = 73
-RECEIPT = "ab" * 32
+SIGNED_RECEIPT = b'{"message":"synthetic-e3a-receipt"}'
+RECEIPT = hashlib.sha256(SIGNED_RECEIPT).hexdigest()
+ED_PUBLIC = bytes(range(32))
+PQ_PUBLIC = bytes((index % 251 for index in range(1952)))
 
 
 def dump(path: Path, value: object) -> bytes:
@@ -67,14 +70,16 @@ class BundleFixture:
                 "nodeId": NODE,
                 "minimumEpoch": 9,
                 "receiptSha256Hex": RECEIPT,
-                "signedReceiptBase64": "eyJub3QiOiJhLXJlYWwtcmVjZWlwdCJ9",
+                "signedReceiptBase64": __import__("base64").b64encode(SIGNED_RECEIPT).decode(),
             },
             "panel-pin.json": {
                 "purpose": "panel_response",
                 "issuerId": "lab-panel",
                 "nodeId": NODE,
-                "edKeyId": "ed-placeholder",
-                "pqKeyId": "pq-placeholder",
+                "edKeyId": "ed-" + hashlib.sha256(ED_PUBLIC).hexdigest()[:24],
+                "pqKeyId": "pq-" + hashlib.sha256(PQ_PUBLIC).hexdigest()[:24],
+                "ed25519PublicBase64": __import__("base64").b64encode(ED_PUBLIC).decode(),
+                "mldsa65PublicBase64": __import__("base64").b64encode(PQ_PUBLIC).decode(),
             },
             "arm.json": {
                 "schema": mod.ARM_SCHEMA,
@@ -216,6 +221,21 @@ class EvidenceBundleTests(unittest.TestCase):
         fixture.manifest["components"]["panelPin"]["sha256"] = digest(real.read_bytes())
         dump(fixture.manifest_path, fixture.manifest)
         with self.assertRaisesRegex(mod.EvidenceError, "non-symlink regular file"):
+            mod.verify(fixture.manifest_path, fixture.root)
+
+
+    def test_rejects_checkpoint_embedded_receipt_digest_divergence(self):
+        temp, fixture = self.fixture()
+        self.addCleanup(temp.cleanup)
+        fixture.mutate("checkpoint.json", lambda doc: doc.__setitem__("receiptSha256Hex", "ef" * 32))
+        with self.assertRaisesRegex(mod.EvidenceError, "embedded signed receipt digest mismatch"):
+            mod.verify(fixture.manifest_path, fixture.root)
+
+    def test_rejects_panel_pin_for_different_node(self):
+        temp, fixture = self.fixture()
+        self.addCleanup(temp.cleanup)
+        fixture.mutate("panel-pin.json", lambda doc: doc.__setitem__("nodeId", NODE + 1))
+        with self.assertRaisesRegex(mod.EvidenceError, "panel pin Node mismatch"):
             mod.verify(fixture.manifest_path, fixture.root)
 
     def test_rejects_duplicate_json_fields(self):
