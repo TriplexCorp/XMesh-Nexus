@@ -3,6 +3,10 @@
 // Legacy unbound update behavior remains delegated unchanged; staged bound
 // migrations add exact immutable release identity to the existing signed
 // poll/ACK lifecycle without introducing another remote action or control plane.
+#[expect(
+    dead_code,
+    reason = "P0-D intentionally shadows only the preserved legacy poll/ACK handlers while keeping the reviewed legacy runtime baseline intact"
+)]
 #[path = "node_runtime_legacy.rs"]
 mod legacy;
 
@@ -128,6 +132,60 @@ fn exact_release_identity_matches(
     reported.version == expected_version
         && reported.source_revision == expected_revision
         && reported.artifact_sha256 == expected_digest
+}
+
+fn polled_command_from_row(row: &sqlx::postgres::PgRow) -> Result<Value, ApiError> {
+    let id = row.try_get::<i64, _>("id")?;
+    let action = row.try_get::<String, _>("action")?;
+    let target_version = row.try_get::<Option<String>, _>("target_version")?;
+    let manifest_id = row.try_get::<Option<i64>, _>("release_manifest_id")?;
+    let mut command = json!({
+        "id":id,
+        "action":action,
+        "targetVersion":target_version
+    });
+
+    if manifest_id.is_some() {
+        let release_version = row
+            .try_get::<Option<String>, _>("release_version")?
+            .ok_or_else(|| {
+                ApiError::new(
+                    StatusCode::CONFLICT,
+                    "Bound Agent release identity is missing.",
+                )
+            })?;
+        let source_revision = row
+            .try_get::<Option<String>, _>("source_revision")?
+            .ok_or_else(|| {
+                ApiError::new(
+                    StatusCode::CONFLICT,
+                    "Bound Agent release identity is missing.",
+                )
+            })?;
+        let artifact_sha256 = row
+            .try_get::<Option<String>, _>("artifact_sha256")?
+            .ok_or_else(|| {
+                ApiError::new(
+                    StatusCode::CONFLICT,
+                    "Bound Agent release identity is missing.",
+                )
+            })?;
+        if action != "update_agent"
+            || target_version.as_deref() != Some(release_version.as_str())
+        {
+            return Err(ApiError::new(
+                StatusCode::CONFLICT,
+                "Bound Agent release identity does not match the queued command.",
+            ));
+        }
+        command["releaseIdentity"] = json!({
+            "version":release_version,
+            "sourceRevision":source_revision,
+            "artifactSha256":artifact_sha256
+        });
+    }
+
+    Ok(command)
 }
 
 #[expect(
@@ -358,61 +416,7 @@ pub async fn poll_restart(
     .fetch_optional(&state.pool)
     .await?;
 
-    let command = match row {
-        Some(row) => {
-            let id = row.try_get::<i64, _>("id")?;
-            let action = row.try_get::<String, _>("action")?;
-            let target_version = row.try_get::<Option<String>, _>("target_version")?;
-            let manifest_id = row.try_get::<Option<i64>, _>("release_manifest_id")?;
-            let mut command = json!({
-                "id":id,
-                "action":action,
-                "targetVersion":target_version
-            });
-
-            if manifest_id.is_some() {
-                let release_version = row
-                    .try_get::<Option<String>, _>("release_version")?
-                    .ok_or_else(|| {
-                        ApiError::new(
-                            StatusCode::CONFLICT,
-                            "Bound Agent release identity is missing.",
-                        )
-                    })?;
-                let source_revision = row
-                    .try_get::<Option<String>, _>("source_revision")?
-                    .ok_or_else(|| {
-                        ApiError::new(
-                            StatusCode::CONFLICT,
-                            "Bound Agent release identity is missing.",
-                        )
-                    })?;
-                let artifact_sha256 = row
-                    .try_get::<Option<String>, _>("artifact_sha256")?
-                    .ok_or_else(|| {
-                        ApiError::new(
-                            StatusCode::CONFLICT,
-                            "Bound Agent release identity is missing.",
-                        )
-                    })?;
-                if action != "update_agent"
-                    || target_version.as_deref() != Some(release_version.as_str())
-                {
-                    return Err(ApiError::new(
-                        StatusCode::CONFLICT,
-                        "Bound Agent release identity does not match the queued command.",
-                    ));
-                }
-                command["releaseIdentity"] = json!({
-                    "version":release_version,
-                    "sourceRevision":source_revision,
-                    "artifactSha256":artifact_sha256
-                });
-            }
-            Some(command)
-        }
-        None => None,
-    };
+    let command = row.as_ref().map(polled_command_from_row).transpose()?;
     Ok(Json(json!({"command":command,"enforceStop":false})))
 }
 
@@ -474,65 +478,62 @@ pub async fn acknowledge_restart(
     })?;
 
     let manifest_id = row.try_get::<Option<i64>, _>("release_manifest_id")?;
-    let ack_identity = match manifest_id {
-        None => {
-            if report.release_identity.is_some() {
-                return Err(ApiError::new(
-                    StatusCode::CONFLICT,
-                    "Legacy command must not carry Agent release identity.",
-                ));
-            }
-            None
+    let ack_identity = if manifest_id.is_none() {
+        if report.release_identity.is_some() {
+            return Err(ApiError::new(
+                StatusCode::CONFLICT,
+                "Legacy command must not carry Agent release identity.",
+            ));
         }
-        Some(_) => {
-            let expected_version = row
-                .try_get::<Option<String>, _>("release_version")?
-                .ok_or_else(|| {
-                    ApiError::new(
-                        StatusCode::CONFLICT,
-                        "Bound Agent release identity is missing.",
-                    )
-                })?;
-            let expected_revision = row
-                .try_get::<Option<String>, _>("source_revision")?
-                .ok_or_else(|| {
-                    ApiError::new(
-                        StatusCode::CONFLICT,
-                        "Bound Agent release identity is missing.",
-                    )
-                })?;
-            let expected_digest = row
-                .try_get::<Option<String>, _>("artifact_sha256")?
-                .ok_or_else(|| {
-                    ApiError::new(
-                        StatusCode::CONFLICT,
-                        "Bound Agent release identity is missing.",
-                    )
-                })?;
-            let target_version = row.try_get::<Option<String>, _>("target_version")?;
-            let action = row.try_get::<String, _>("action")?;
-            let reported = report.release_identity.as_ref().ok_or_else(|| {
+        None
+    } else {
+        let expected_version = row
+            .try_get::<Option<String>, _>("release_version")?
+            .ok_or_else(|| {
                 ApiError::new(
                     StatusCode::CONFLICT,
-                    "Bound Agent command requires exact release identity acknowledgement.",
+                    "Bound Agent release identity is missing.",
                 )
             })?;
-            if action != "update_agent"
-                || target_version.as_deref() != Some(expected_version.as_str())
-                || !exact_release_identity_matches(
-                    &expected_version,
-                    &expected_revision,
-                    &expected_digest,
-                    reported,
-                )
-            {
-                return Err(ApiError::new(
+        let expected_revision = row
+            .try_get::<Option<String>, _>("source_revision")?
+            .ok_or_else(|| {
+                ApiError::new(
                     StatusCode::CONFLICT,
-                    "Agent release identity acknowledgement does not match the bound manifest.",
-                ));
-            }
-            Some(reported)
+                    "Bound Agent release identity is missing.",
+                )
+            })?;
+        let expected_digest = row
+            .try_get::<Option<String>, _>("artifact_sha256")?
+            .ok_or_else(|| {
+                ApiError::new(
+                    StatusCode::CONFLICT,
+                    "Bound Agent release identity is missing.",
+                )
+            })?;
+        let target_version = row.try_get::<Option<String>, _>("target_version")?;
+        let action = row.try_get::<String, _>("action")?;
+        let reported = report.release_identity.as_ref().ok_or_else(|| {
+            ApiError::new(
+                StatusCode::CONFLICT,
+                "Bound Agent command requires exact release identity acknowledgement.",
+            )
+        })?;
+        if action != "update_agent"
+            || target_version.as_deref() != Some(expected_version.as_str())
+            || !exact_release_identity_matches(
+                &expected_version,
+                &expected_revision,
+                &expected_digest,
+                reported,
+            )
+        {
+            return Err(ApiError::new(
+                StatusCode::CONFLICT,
+                "Agent release identity acknowledgement does not match the bound manifest.",
+            ));
         }
+        Some(reported)
     };
 
     let state_name = if report.success {
