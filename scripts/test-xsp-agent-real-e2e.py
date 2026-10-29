@@ -308,7 +308,7 @@ def main():
     assert subprocess.run(["sudo", "test", "!", "-L", str(base / "xsp-v2")]).returncode == 0
     print("PASS: rollback does not replace or rewind durable security-state root")
 
-    assert not (base / "strict-pq-enabled").exists()
+    assert subprocess.run(["sudo", "test", "!", "-e", str(base / "strict-pq-enabled")]).returncode == 0
     print("P0-D disposable real Nexus<->Node Agent migration/update E2E passed.")
 
 
