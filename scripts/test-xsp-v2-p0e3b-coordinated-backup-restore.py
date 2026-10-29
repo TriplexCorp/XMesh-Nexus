@@ -465,7 +465,7 @@ def main() -> None:
             # OpenSSL 3.5 / Rust toolbox is isolated from the network. It holds
             # only local temporary keys and builds/runs the already-reviewed E3a verifier.
             command(
-                "docker", "run", "-d", "--name", toolbox, "--network", "none",
+                "docker", "run", "-d", "--name", toolbox,
                 "--mount", f"type=bind,src={ROOT},dst=/src,readonly",
                 "--mount", f"type=bind,src={tmp},dst=/work",
                 "rust:1.99-trixie", "sleep", "infinity", timeout=120,
@@ -478,6 +478,12 @@ def main() -> None:
                 "cp /work/cargo-target/debug/xsp-v2-recovery-checkpoint /work/recovery-tool",
                 timeout=900,
             )
+            # Bootstrap may use the runner network only to install/build dependencies.
+            # Every recovery identity/signature/checkpoint operation below runs offline.
+            command("docker", "network", "disconnect", "bridge", toolbox, timeout=30)
+            networks = json.loads(command("docker", "inspect", toolbox, "--format", "{{json .NetworkSettings.Networks}}").stdout)
+            if networks:
+                raise RuntimeError(f"P0-E3b crypto toolbox retained a network after bootstrap: {networks}")
 
             # Real protected panel_response Ed25519 + ML-DSA-65 identity.
             toolbox_run("openssl", "genpkey", "-algorithm", "ED25519", "-out", work_path(signer_root / "panel-ed25519.pem"))
