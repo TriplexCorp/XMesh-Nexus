@@ -53,8 +53,8 @@ fn staging_agent_migration_enabled() -> bool {
 }
 
 fn validate_release_version(version: &str) -> Result<&str, ApiError> {
-    let version = version.trim();
-    if version.is_empty()
+    if version.trim() != version
+        || version.is_empty()
         || version.len() > 64
         || !version.bytes().enumerate().all(|(index, byte)| {
             if index == 0 {
@@ -72,11 +72,15 @@ fn validate_release_version(version: &str) -> Result<&str, ApiError> {
     Ok(version)
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "P0-D1c keeps gate, owner authorization, node state and atomic manifest binding in one auditable orchestration path"
+)]
 async fn request_staging_agent_migration(
-    state: AppState,
-    actor: crate::auth::AuthUser,
+    state: &AppState,
+    actor: &crate::auth::AuthUser,
     node_id: i64,
-    release_version: String,
+    release_version: &str,
 ) -> Result<(StatusCode, Json<Value>), ApiError> {
     if !staging_agent_migration_enabled() {
         return Err(ApiError::new(
@@ -84,11 +88,17 @@ async fn request_staging_agent_migration(
             "Staging Agent migration mode is disabled.",
         ));
     }
-    crate::require_owner(&actor)?;
+    crate::require_owner(actor)?;
     if node_id <= 0 {
         return Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid node ID"));
     }
-    let target = validate_release_version(&release_version)?;
+    let target = validate_release_version(release_version)?;
+
+    tracing::debug!(
+        node_id,
+        legacy_default_version = CONTROL_AGENT_VERSION,
+        "Staging Agent migration request"
+    );
 
     let node = sqlx::query_scalar::<_, Value>(
         "SELECT data FROM panel_records WHERE collection='nodes' AND id=$1",
@@ -225,7 +235,13 @@ pub async fn request_agent_update(
             .await
         }
         AgentUpdateRequest::Migration(request) => {
-            request_staging_agent_migration(state, actor, node_id, request.release_version).await
+            request_staging_agent_migration(
+                &state,
+                &actor,
+                node_id,
+                &request.release_version,
+            )
+            .await
         }
     }
 }
@@ -271,7 +287,7 @@ mod p0d_agent_orchestration_tests {
         for valid in ["control-v5.1.3", "agent_1+pq", "A"] {
             assert_eq!(validate_release_version(valid).unwrap(), valid);
         }
-        for invalid in ["", "-bad", ".bad", " bad", "bad/uri", "x y"] {
+        for invalid in ["", "-bad", ".bad", " bad", "bad ", "bad/uri", "x y"] {
             assert!(validate_release_version(invalid).is_err(), "{invalid}");
         }
         assert!(validate_release_version(&"x".repeat(65)).is_err());
