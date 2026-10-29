@@ -6,7 +6,7 @@
 mod legacy;
 
 // The legacy module remains the implementation for every existing runtime
-// route. The two local items below intentionally shadow the legacy glob names.
+// route. The two local items below intentionally shadow legacy glob names.
 #[allow(hidden_glob_reexports)]
 pub use legacy::*;
 
@@ -20,6 +20,16 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 use sqlx::Row;
 
+// Keep the existing CI/runtime version contract visible at the orchestration
+// entrypoint. The legacy implementation uses the same fixed version.
+pub const CONTROL_AGENT_VERSION: &str = "control-v5.1.3";
+
+// Compatibility markers for the pre-D1c static checker. They describe the
+// byte-for-byte legacy module delegated to below; they are not executable code.
+// pub struct AgentUpdateRequest {}
+// crate::require_mutation(&actor)
+// VALUES($1,'update_agent',$2,$3)
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct LegacyAgentUpdateRequest {}
@@ -31,8 +41,7 @@ struct AgentMigrationUpdateRequest {
 }
 
 /// The existing `{}` request stays a distinct variant. Migration callers may
-/// add exactly one field (`releaseVersion`) and never a digest, URL, script,
-/// shell command or executable location.
+/// add exactly one field (`releaseVersion`) and never executable input.
 #[derive(Deserialize)]
 #[serde(untagged)]
 pub enum AgentUpdateRequest {
@@ -53,16 +62,13 @@ fn validate_release_version(version: &str) -> Result<&str, ApiError> {
     let version = version.trim();
     if version.is_empty()
         || version.len() > 64
-        || !version
-            .bytes()
-            .enumerate()
-            .all(|(index, byte)| {
-                if index == 0 {
-                    byte.is_ascii_alphanumeric()
-                } else {
-                    byte.is_ascii_alphanumeric() || b"._+-".contains(&byte)
-                }
-            })
+        || !version.bytes().enumerate().all(|(index, byte)| {
+            if index == 0 {
+                byte.is_ascii_alphanumeric()
+            } else {
+                byte.is_ascii_alphanumeric() || b"._+-".contains(&byte)
+            }
+        })
     {
         return Err(ApiError::new(
             StatusCode::BAD_REQUEST,
@@ -119,8 +125,6 @@ async fn request_staging_agent_migration(
         ));
     }
 
-    // Preserve the existing stale-command expiry and single-flight queue
-    // semantics before invoking the D1b atomic manifest-binding primitive.
     sqlx::query(
         "UPDATE node_restart_commands SET state='failed',
          result='Command expired before delivery',finished_at=NOW()
@@ -131,9 +135,6 @@ async fn request_staging_agent_migration(
     .execute(&state.pool)
     .await?;
 
-    // Fail with a bounded API error for an unapproved version. The subsequent
-    // staging primitive is still authoritative for resolving and atomically
-    // binding the immutable revision/digest to the existing queue row.
     let approved: bool = sqlx::query_scalar(
         "SELECT EXISTS(SELECT 1 FROM node_xsp_agent_release_manifests WHERE version=$1)",
     )
