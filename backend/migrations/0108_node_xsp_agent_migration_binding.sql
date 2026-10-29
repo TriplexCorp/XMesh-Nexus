@@ -20,6 +20,25 @@ AS $$
 DECLARE
   manifest_version TEXT;
 BEGIN
+  -- Binding is established only by the atomic INSERT primitive below. Never
+  -- allow UPDATE to attach, remove or replace a release manifest after a
+  -- command row already exists. Once bound, the command identity is frozen
+  -- while normal lifecycle fields (state/claimed_at/finished_at/result) remain
+  -- mutable for the existing queue/ACK flow.
+  IF TG_OP = 'UPDATE' AND (
+       NEW.release_manifest_id IS DISTINCT FROM OLD.release_manifest_id
+       OR (
+         OLD.release_manifest_id IS NOT NULL AND (
+           NEW.node_id IS DISTINCT FROM OLD.node_id
+           OR NEW.action IS DISTINCT FROM OLD.action
+           OR NEW.target_version IS DISTINCT FROM OLD.target_version
+           OR NEW.requested_by IS DISTINCT FROM OLD.requested_by
+         )
+       )
+     ) THEN
+    RAISE EXCEPTION 'bound XSP-v2 Agent migration identity is immutable';
+  END IF;
+
   IF NEW.release_manifest_id IS NULL THEN
     RETURN NEW;
   END IF;
@@ -33,15 +52,6 @@ BEGIN
     RAISE EXCEPTION 'invalid XSP-v2 Agent migration binding';
   END IF;
 
-  IF TG_OP = 'UPDATE' AND (
-       NEW.release_manifest_id IS DISTINCT FROM OLD.release_manifest_id
-       OR NEW.node_id IS DISTINCT FROM OLD.node_id
-       OR NEW.action IS DISTINCT FROM OLD.action
-       OR NEW.target_version IS DISTINCT FROM OLD.target_version
-       OR NEW.requested_by IS DISTINCT FROM OLD.requested_by
-     ) THEN
-    RAISE EXCEPTION 'bound XSP-v2 Agent migration identity is immutable';
-  END IF;
   RETURN NEW;
 END;
 $$;
