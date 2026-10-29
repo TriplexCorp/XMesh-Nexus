@@ -4,7 +4,7 @@
   "strictPqDefault": "off",
   "verifiedNodeSource": {
     "repository": "TriplexCorp/XMesh-Node",
-    "revision": "0ae78244ef0ef763bea6ce198dde6e83eb11ff1f"
+    "revision": "bedbec74413a5ea86f69aca685f24bf028775a98"
   },
   "productionRouter": {
     "role": "edge-router-data-plane-adjacent",
@@ -28,8 +28,20 @@
       "artifactSha256"
     ]
   },
+  "agentIntegrationModule": {
+    "role": "production-capable-agent-integration-boundary",
+    "modulePath": "github.com/TriplexCorp/XMesh-Node/agent/xspv2",
+    "moduleDirectory": "agent/xspv2",
+    "goVersion": "1.27.3",
+    "stateRoot": "/var/lib/xmesh-agent/xsp-v2",
+    "installedByDefault": false,
+    "productionActivated": false,
+    "mayReplaceProductionRouter": false,
+    "mayCreateParallelCommandQueue": false,
+    "securityPrimitiveModule": "security/xspv2/poc-go"
+  },
   "go127SecurityRuntime": {
-    "role": "strict-xsp-v2-security-runtime",
+    "role": "reused-strict-xsp-v2-security-primitives",
     "modulePath": "github.com/TriplexCorp/XMesh-Node/security/xspv2/poc-go",
     "moduleDirectory": "security/xspv2/poc-go",
     "goVersion": "1.27.3",
@@ -39,7 +51,7 @@
       "tlsprobe",
       "cutover"
     ],
-    "integrationModel": "local-fixed-helper",
+    "integrationModel": "dependency-of-agent-integration-module",
     "remoteActionAuthority": "signedControlAgent",
     "inboundNetworkListener": false,
     "mayReplaceProductionRouter": false,
