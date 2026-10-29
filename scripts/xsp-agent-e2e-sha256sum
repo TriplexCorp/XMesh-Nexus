@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# CI-only sha256sum shim for the disposable P0-D real Agent E2E.
+# It delegates every call to the system sha256sum except one exact real Agent
+# release after its atomic `current` pointer has switched. That creates a
+# deterministic post-switch verification failure without changing production
+# staged-apply code or corrupting the artifact before activation.
+set -Eeuo pipefail
+REAL=/usr/bin/sha256sum
+MARKER=/tmp/xmesh-p0d-e2e-fail-digest
+
+if [[ "$#" -eq 1 && -r "$MARKER" ]]; then
+  expected="$(cat "$MARKER")"
+  target="$1"
+  if [[ "$expected" =~ ^[0-9a-f]{64}$ &&
+        "$target" == */releases/"$expected"/xmesh-agent-xspv2 ]]; then
+    package_dir="$(dirname "$target")"
+    releases_dir="$(dirname "$package_dir")"
+    base="$(dirname "$releases_dir")"
+    if [[ -L "$base/current" && "$(readlink "$base/current")" == "releases/$expected" ]]; then
+      printf '%064d  %s\n' 0 "$target"
+      exit 0
+    fi
+  fi
+fi
+
+exec "$REAL" "$@"
