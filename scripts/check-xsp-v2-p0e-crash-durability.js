@@ -94,7 +94,7 @@ function verify(nodeRoot){
     'P0-E workflow must build a normal Agent artifact');
   assert.match(workflow,/strings \/tmp\/xmesh-agent-xspv2 \| grep -Fq 'XMESH_XSPV2_CRASH_POINT'/,
     'P0-E workflow must reject a normal artifact containing the crash injector');
-  assert.match(workflow,/go test -tags xspv2_crash_test [.\/]keyring/,
+  assert.match(workflow,/go test -tags xspv2_crash_test [.][\/]keyring/,
     'P0-E workflow must execute the tagged hard-exit matrix');
 
   assert.match(proofDoc,/not a full hardware power-cut claim/i);
