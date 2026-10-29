@@ -116,7 +116,7 @@ def main() -> None:
     host_uid = os.geteuid()
     host_gid = os.getegid()
 
-    with tempfile.TemporaryDirectory(prefix="xsp-p0e3b-") as tmp_raw:
+    with tempfile.TemporaryDirectory(prefix="xsp-p0e3b-", ignore_cleanup_errors=True) as tmp_raw:
         tmp = Path(tmp_raw).resolve()
         live = tmp / "live"
         agent_root = live / "agent"
@@ -527,6 +527,8 @@ def main() -> None:
                 "-e", "POSTGRES_DB=xmesh",
                 "-e", f"POSTGRES_PASSWORD={admin_password}",
                 "-e", "TIMESCALEDB_TELEMETRY=off",
+                "-e", "TS_TUNE_MEMORY=512MB",
+                "-e", "TS_TUNE_NUM_CPUS=2",
                 "timescale/timescaledb:2.30.0-pg18",
                 timeout=180,
             )
