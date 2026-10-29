@@ -1,0 +1,65 @@
+name: Temporary P0-E3b DB resource fix
+
+on:
+  push:
+    branches: [feat/xsp-v2-p0e3b-coordinated-backup-restore]
+    paths: [".github/workflows/tmp-p0e3b-db-resource-fix.yml"]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/xsp-v2-p0e3b-coordinated-backup-restore
+      - name: Bound disposable TimescaleDB and restore temp ownership
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py')
+          s = p.read_text()
+          old = '''                "-e", "POSTGRES_DB=xmesh",
+                "-e", f"POSTGRES_PASSWORD={admin_password}",
+                "-e", "TIMESCALEDB_TELEMETRY=off",
+                "timescale/timescaledb:2.30.0-pg18",
+'''
+          new = '''                "-e", "POSTGRES_DB=xmesh",
+                "-e", f"POSTGRES_PASSWORD={admin_password}",
+                "-e", "TIMESCALEDB_TELEMETRY=off",
+                "-e", "TS_TUNE_MEMORY=512MB",
+                "-e", "TS_TUNE_NUM_CPUS=2",
+                "timescale/timescaledb:2.30.0-pg18",
+'''
+          assert s.count(old) == 1, s.count(old)
+          s = s.replace(old, new)
+          old = '''        finally:
+            command("docker", "rm", "-f", toolbox, check=False, timeout=60)
+            command("docker", "rm", "-f", db, check=False, timeout=60)
+'''
+          new = '''        finally:
+            # The toolbox runs as root; return every bind-mounted build/cache file
+            # to the runner before TemporaryDirectory attempts cleanup.
+            command(
+                "docker", "exec", toolbox, "chown", "-R", f"{host_uid}:{host_gid}", "/work",
+                check=False, timeout=60,
+            )
+            command("docker", "rm", "-f", toolbox, check=False, timeout=60)
+            command("docker", "rm", "-f", db, check=False, timeout=60)
+'''
+          assert s.count(old) == 1, s.count(old)
+          p.write_text(s.replace(old, new))
+          PY
+          python3 -m py_compile scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py
+          git diff --check
+      - name: Commit resource and cleanup fix
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py
+          git commit -m 'fix(xsp-v2): bound E3b disposable DB resources'
+          git push origin HEAD:feat/xsp-v2-p0e3b-coordinated-backup-restore
