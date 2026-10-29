@@ -30,6 +30,7 @@ Completed foundations and recovery/security checkpoints now include:
 Exact post-merge P0-E3a evidence on `f19d01e021efaa727bbba82672143005a96338b7`:
 
 - [XSP-v2 P0-E3a Off-host Recovery Checkpoint #9](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40862058873) — **success** on the exact merge SHA, including real Ed25519 + ML-DSA-65 receipt verification, coordinated-old-state rejection, tamper/wrong-node negatives, formatting and strict test-target Clippy.
+- [XSP-v2 Crypto PoC #213](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40862058598), [C2-C #61](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40862058488) and [Backend CI #3632](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40862058513) — **success** on the exact merge SHA, preserving the existing crypto/signer/DB boundary and full backend/disposable API regression matrix.
 
 Previous P0-E2b evidence remains [XSP-v2 P0-E2b PostgreSQL Snapshot Rollback #6](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40846810762) — **success** on `f9a9c636f83a3a2ef7122fef7c3f3bc2bc76b7d4`, including the real PostgreSQL restore boundary, restore-time ACL re-hardening and current-Agent receipt witness.
 
