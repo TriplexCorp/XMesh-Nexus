@@ -1,0 +1,70 @@
+name: XSP-v2 P0-E4a Node Power-cut Contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "deploy/xsp-v2-p0e4a-powercut-arm.contract.json"
+      - "scripts/check-xsp-v2-p0e4a-powercut-arm.js"
+      - "docs/XSP_V2_P0E4A_NODE_POWERCUT_ARM_CONTRACT.md"
+      - ".github/workflows/xsp-p0e4a-node-powercut-contract.yml"
+  pull_request:
+    paths:
+      - "deploy/xsp-v2-p0e4a-powercut-arm.contract.json"
+      - "scripts/check-xsp-v2-p0e4a-powercut-arm.js"
+      - "docs/XSP_V2_P0E4A_NODE_POWERCUT_ARM_CONTRACT.md"
+      - ".github/workflows/xsp-p0e4a-node-powercut-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  node-powercut-source-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out exact merged XMesh-Node P0-E4a2 source
+        uses: actions/checkout@v4
+        with:
+          repository: TriplexCorp/XMesh-Node
+          ref: 50c770c8bbb917b04ca893ac5b8d29e6c7f9af7e
+          path: xmesh-node
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify exact pinned source contract
+        run: node scripts/check-xsp-v2-p0e4a-powercut-arm.js xmesh-node
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache: false
+      - name: Exercise pinned lab-only power-cut arm tests
+        working-directory: xmesh-node/security/xspv2/poc-go
+        run: |
+          set -euo pipefail
+          go test -tags xspv2_powercut_qualification ./keyring \
+            -run '^TestPowercutQualification' -count=1 -v
+      - name: Prove crash and physical-power evidence tags cannot coexist
+        working-directory: xmesh-node/security/xspv2/poc-go
+        run: |
+          set -euo pipefail
+          if go test -run '^$' -tags 'xspv2_crash_test xspv2_powercut_qualification' ./keyring; then
+            echo 'ambiguous dual evidence build unexpectedly compiled' >&2
+            exit 1
+          fi
+      - name: Prove normal Agent artifact excludes qualification controls
+        working-directory: xmesh-node/agent/xspv2
+        run: |
+          set -euo pipefail
+          go test ./... -count=1
+          go build -trimpath -o /tmp/xmesh-agent-xspv2 ./cmd/xmesh-agent-xspv2
+          if strings /tmp/xmesh-agent-xspv2 | grep -Eq 'XMESH_XSPV2_CRASH_POINT|XMESH_XSPV2_POWERCUT_POINT|EXTERNAL_POWER_CUT_LAB_ONLY'; then
+            echo 'normal Agent artifact contains test/lab durability controls' >&2
+            exit 1
+          fi
+      - name: State bounded evidence only
+        run: |
+          echo 'PASS: Node PR #44 lab arming primitive is pinned and independently machine-checked.'
+          echo 'P0-E4a remains OPEN: GitHub CI is not representative physical power-loss evidence.'
+          echo 'strict-pq remains OFF; production rollout remains NOT AUTHORIZED.'

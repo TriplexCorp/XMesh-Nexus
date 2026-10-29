@@ -1,0 +1,33 @@
+{
+  "schema": "xsp2-p0e4a-powercut-arm-contract-1",
+  "productionActivation": false,
+  "strictPqDefault": "off",
+  "verifiedNodeSource": {
+    "repository": "TriplexCorp/XMesh-Node",
+    "revision": "50c770c8bbb917b04ca893ac5b8d29e6c7f9af7e",
+    "pullRequest": 44
+  },
+  "proofBoundary": {
+    "name": "P0-E4a-external-powercut-arm-primitive",
+    "labBuildTagOnly": true,
+    "normalAgentHookNoop": true,
+    "processCrashInjectorSeparate": true,
+    "dualEvidenceBuildRejected": true,
+    "boundedCheckpointSelection": true,
+    "inheritedSignalFdOnly": true,
+    "exactArmMarker": true,
+    "securityTransitionBlocksAfterArm": true,
+    "autonomousPowerControl": false,
+    "networkControlPath": false,
+    "shellCommandControlPath": false
+  },
+  "notProvenByThisGate": {
+    "physicalPowerRemovalOccurred": true,
+    "controllerOrDriveWriteCacheDurability": true,
+    "powerLossProtectionCorrectness": true,
+    "postgresqlAbruptPowerRecovery": true,
+    "representativeHardwareQualification": true,
+    "productionRollout": true
+  },
+  "nextRequiredEvidence": "P0-E4a-representative-physical-powercut-matrix"
+}
