@@ -1,0 +1,25 @@
+{
+  "schema": "xsp2-p0e4a5-lab-operation-contract-1",
+  "node": {
+    "repository": "TriplexCorp/XMesh-Node",
+    "powercutSourceRevision": "50c770c8bbb917b04ca893ac5b8d29e6c7f9af7e",
+    "labRunnerRevision": "7bf8cc92950f396e33891c8744c1f6855414154b",
+    "labRunnerPullRequest": 45
+  },
+  "requiredCheckpoints": [
+    "after-previous",
+    "after-floor",
+    "after-active",
+    "after-recovery-abort",
+    "after-recovery-active"
+  ],
+  "armMarkerPrefix": "XSP2-POWERCUT-ARMED-V1",
+  "armBuildTag": "xspv2_powercut_qualification",
+  "crashBuildTag": "xspv2_crash_test",
+  "externalPowerControllerRequired": true,
+  "e4a3EvidenceContract": "scripts/xsp-v2-p0e4a3-powercut-evidence.py",
+  "e4a4MatrixContract": "scripts/xsp-v2-p0e4a4-powercut-matrix.py",
+  "physicalPowerLossQualified": false,
+  "productionActivation": false,
+  "strictPQEnabled": false
+}
