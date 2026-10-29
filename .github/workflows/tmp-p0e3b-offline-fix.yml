@@ -1,0 +1,73 @@
+name: Temporary P0-E3b offline toolbox fix
+
+on:
+  push:
+    branches: [feat/xsp-v2-p0e3b-coordinated-backup-restore]
+    paths: [".github/workflows/tmp-p0e3b-offline-fix.yml"]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/xsp-v2-p0e3b-coordinated-backup-restore
+      - name: Fix toolbox bootstrap/offline boundary
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py')
+          s = p.read_text()
+          old = '''            command(
+                "docker", "run", "-d", "--name", toolbox, "--network", "none",
+                "--mount", f"type=bind,src={ROOT},dst=/src,readonly",
+                "--mount", f"type=bind,src={tmp},dst=/work",
+                "rust:1.99-trixie", "sleep", "infinity", timeout=120,
+            )
+            toolbox_run("bash", "-ceu", "apt-get update >/dev/null && apt-get install -y --no-install-recommends pkg-config libssl-dev openssl ca-certificates >/dev/null", timeout=300)
+            toolbox_run(
+                "bash", "-ceu",
+                "CARGO_TARGET_DIR=/work/cargo-target cargo build --locked --manifest-path /src/backend/Cargo.toml "
+                "--features xsp-v2-experimental --bin xsp-v2-recovery-checkpoint >/dev/null && "
+                "cp /work/cargo-target/debug/xsp-v2-recovery-checkpoint /work/recovery-tool",
+                timeout=900,
+            )
+'''
+          new = '''            command(
+                "docker", "run", "-d", "--name", toolbox,
+                "--mount", f"type=bind,src={ROOT},dst=/src,readonly",
+                "--mount", f"type=bind,src={tmp},dst=/work",
+                "rust:1.99-trixie", "sleep", "infinity", timeout=120,
+            )
+            toolbox_run("bash", "-ceu", "apt-get update >/dev/null && apt-get install -y --no-install-recommends pkg-config libssl-dev openssl ca-certificates >/dev/null", timeout=300)
+            toolbox_run(
+                "bash", "-ceu",
+                "CARGO_TARGET_DIR=/work/cargo-target cargo build --locked --manifest-path /src/backend/Cargo.toml "
+                "--features xsp-v2-experimental --bin xsp-v2-recovery-checkpoint >/dev/null && "
+                "cp /work/cargo-target/debug/xsp-v2-recovery-checkpoint /work/recovery-tool",
+                timeout=900,
+            )
+            # Bootstrap may use the runner network only to install/build dependencies.
+            # Every recovery identity/signature/checkpoint operation below runs offline.
+            command("docker", "network", "disconnect", "bridge", toolbox, timeout=30)
+            networks = json.loads(command("docker", "inspect", toolbox, "--format", "{{json .NetworkSettings.Networks}}").stdout)
+            if networks:
+                raise RuntimeError(f"P0-E3b crypto toolbox retained a network after bootstrap: {networks}")
+'''
+          assert s.count(old) == 1, s.count(old)
+          p.write_text(s.replace(old, new))
+          PY
+          python3 -m py_compile scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py
+          git diff --check
+      - name: Commit offline boundary fix
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py
+          git commit -m 'fix(xsp-v2): bootstrap E3b toolbox before offline recovery'
+          git push origin HEAD:feat/xsp-v2-p0e3b-coordinated-backup-restore
