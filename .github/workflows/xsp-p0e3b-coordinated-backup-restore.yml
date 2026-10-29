@@ -1,0 +1,99 @@
+name: XSP-v2 P0-E3b Coordinated Backup Restore
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/src/bin/xsp_v2_recovery_checkpoint.rs"
+      - "backend/migrations/0012_signed_node_metrics.sql"
+      - "backend/migrations/0099_node_xsp_v2_public_state.sql"
+      - "backend/migrations/0102_node_xsp_rotation_preparations.sql"
+      - "backend/migrations/0103_node_xsp_cutover_permit_ledger.sql"
+      - "backend/migrations/0104_node_xsp_cutover_ledger_immutability.sql"
+      - "backend/migrations/0105_node_xsp_signed_commit_receipt_outbox.sql"
+      - "backend/migrations/0106_node_xsp_signed_receipt_truncate_guard.sql"
+      - "deploy/postgres/20-create-xsp-v2-signer-role.sql"
+      - "deploy/postgres/21-create-xsp-v2-c2c-role.sql"
+      - "scripts/xsp-v2-p0e3b-agent-helper.go"
+      - "scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py"
+      - "docs/XSP_V2_P0E_COORDINATED_BACKUP_RESTORE.md"
+      - ".github/workflows/xsp-p0e3b-coordinated-backup-restore.yml"
+  pull_request:
+    paths:
+      - "backend/src/bin/xsp_v2_recovery_checkpoint.rs"
+      - "backend/migrations/0012_signed_node_metrics.sql"
+      - "backend/migrations/0099_node_xsp_v2_public_state.sql"
+      - "backend/migrations/0102_node_xsp_rotation_preparations.sql"
+      - "backend/migrations/0103_node_xsp_cutover_permit_ledger.sql"
+      - "backend/migrations/0104_node_xsp_cutover_ledger_immutability.sql"
+      - "backend/migrations/0105_node_xsp_signed_commit_receipt_outbox.sql"
+      - "backend/migrations/0106_node_xsp_signed_receipt_truncate_guard.sql"
+      - "deploy/postgres/20-create-xsp-v2-signer-role.sql"
+      - "deploy/postgres/21-create-xsp-v2-c2c-role.sql"
+      - "scripts/xsp-v2-p0e3b-agent-helper.go"
+      - "scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py"
+      - "docs/XSP_V2_P0E_COORDINATED_BACKUP_RESTORE.md"
+      - ".github/workflows/xsp-p0e3b-coordinated-backup-restore.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache: false
+      - name: Check bounded coordinated-recovery contract
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py
+          test -z "$(gofmt -d scripts/xsp-v2-p0e3b-agent-helper.go)"
+          git diff --check
+          ! grep -R --line-number --fixed-strings 'strict-pq=on' \
+            scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py \
+            scripts/xsp-v2-p0e3b-agent-helper.go \
+            docs/XSP_V2_P0E_COORDINATED_BACKUP_RESTORE.md
+          ! grep -R --line-number -E '(-p|--publish)[ =]' \
+            scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py
+          grep -Fq 'xsp2-coordinated-backup-manifest-1' scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py
+          grep -Fq 'pg_dump", "-U", "postgres", "-d", "xmesh", "-Fc"' scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py
+          grep -Fq 'DROP DATABASE IF EXISTS xmesh WITH (FORCE); CREATE DATABASE xmesh;' scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py
+          grep -Fq 'pg_restore", "-U", "postgres", "-d", "xmesh", "--exit-on-error"' scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py
+          grep -Fq 'agent.tar.gz' scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py
+          grep -Fq 'signer.tar.gz' scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py
+          grep -Fq 'mtls.tar.gz' scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py
+          grep -Fq 'current-checkpoint.json' scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py
+          grep -Fq 'off-host recovery checkpoint leaked into coordinated backup set' scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py
+          grep -Fq 'keyring.Open(layout.Vault, layout.MasterKey)' scripts/xsp-v2-p0e3b-agent-helper.go
+          grep -Fq 'PersistACKForCommittedVault' scripts/xsp-v2-p0e3b-agent-helper.go
+          grep -Fq 'PersistVerifiedCommitReceiptForJournal' scripts/xsp-v2-p0e3b-agent-helper.go
+          grep -Fq 'coordinated rollback detected' scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py
+          grep -Fq 'production rollout remains NOT AUTHORIZED' scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py
+
+  full-recovery-e2e:
+    name: Real coordinated Agent + PostgreSQL + identity restore
+    needs: source-contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout exact current XMesh-Node P0-E2a checkpoint
+        uses: actions/checkout@v4
+        with:
+          repository: TriplexCorp/XMesh-Node
+          ref: 3fffa9fd74195114a7c4e573a8a11e075c84f403
+          path: xmesh-node
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache: false
+      - name: Verify exact durable Agent module before coordinated recovery
+        working-directory: xmesh-node/agent/xspv2
+        run: go test ./... -count=1
+      - name: Exercise real coordinated backup and restore against independent E3a witness
+        run: python3 scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py --node-repo xmesh-node
