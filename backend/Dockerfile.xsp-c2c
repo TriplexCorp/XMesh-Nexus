@@ -25,8 +25,9 @@ RUN --mount=type=secret,id=proxy_ca \
     mkdir -p /build/output; \
     cp target/release/xsp-v2-c2c /build/output/xsp-v2-c2c; \
     if [ "$C2C_BUILD_TESTS" = 1 ]; then \
-      cargo build --manifest-path c2c/Cargo.toml --release --features xsp-v2-experimental --bin xsp-v2-c2c-fixture; \
+      cargo build --manifest-path c2c/Cargo.toml --release --features xsp-v2-experimental --bin xsp-v2-c2c-fixture --bin xsp-v2-p0e3a-fixture; \
       cp target/release/xsp-v2-c2c-fixture /build/output/xsp-v2-c2c-fixture; \
+      cp target/release/xsp-v2-p0e3a-fixture /build/output/xsp-v2-p0e3a-fixture; \
     fi
 
 FROM debian:trixie-slim AS runtime-base
@@ -50,4 +51,5 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends python3 openssl \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /build/output/xsp-v2-c2c-fixture /build/output/xsp-v2-c2c-fixture
+COPY --from=builder /build/output/xsp-v2-p0e3a-fixture /build/output/xsp-v2-p0e3a-fixture
 ENTRYPOINT ["/build/output/xsp-v2-c2c-fixture"]
