@@ -106,7 +106,10 @@ pub async fn poll_restart(
         return staged::poll_restart(State(state), headers, body).await;
     }
 
-    if claimed_bound_retry(&state, request.node_id).await?.is_none() {
+    if claimed_bound_retry(&state, request.node_id)
+        .await?
+        .is_none()
+    {
         return staged::poll_restart(State(state), headers, body).await;
     }
 
@@ -160,12 +163,14 @@ fn exact_duplicate_ack(row: &sqlx::postgres::PgRow, report: &RetryAck) -> Result
     let ack_version = row.try_get::<Option<String>, _>("release_ack_version")?;
     let ack_revision = row.try_get::<Option<String>, _>("release_ack_source_revision")?;
     let ack_digest = row.try_get::<Option<String>, _>("release_ack_artifact_sha256")?;
-    Ok(manifest_version.as_deref() == Some(identity.version.as_str())
-        && manifest_revision.as_deref() == Some(identity.source_revision.as_str())
-        && manifest_digest.as_deref() == Some(identity.artifact_sha256.as_str())
-        && ack_version.as_deref() == Some(identity.version.as_str())
-        && ack_revision.as_deref() == Some(identity.source_revision.as_str())
-        && ack_digest.as_deref() == Some(identity.artifact_sha256.as_str()))
+    Ok(
+        manifest_version.as_deref() == Some(identity.version.as_str())
+            && manifest_revision.as_deref() == Some(identity.source_revision.as_str())
+            && manifest_digest.as_deref() == Some(identity.artifact_sha256.as_str())
+            && ack_version.as_deref() == Some(identity.version.as_str())
+            && ack_revision.as_deref() == Some(identity.source_revision.as_str())
+            && ack_digest.as_deref() == Some(identity.artifact_sha256.as_str()),
+    )
 }
 
 async fn completed_bound_row(
