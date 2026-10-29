@@ -55,10 +55,24 @@ jobs:
           name=xsp-p0e4a-pg-$RANDOM
           trap 'docker rm -f "$name" >/dev/null 2>&1 || true' EXIT
           docker run -d --name "$name" -e POSTGRES_PASSWORD=p0e4a -e POSTGRES_DB=xmesh postgres:18 >/dev/null
-          for _ in $(seq 1 80); do
-            docker exec "$name" pg_isready -U postgres -d xmesh >/dev/null 2>&1 && break
+          ready=0
+          for _ in $(seq 1 120); do
+            # The official image can briefly expose its temporary initdb server.
+            # Require PID 1 to have exec'd the final postgres process before
+            # treating a successful SQL probe as steady-state readiness.
+            pid1="$(docker exec "$name" cat /proc/1/comm 2>/dev/null || true)"
+            if [ "$pid1" = postgres ] && \
+               [ "$(docker exec "$name" psql -X -qAt -U postgres -d xmesh -c 'SELECT 1' 2>/dev/null || true)" = 1 ]; then
+              ready=1
+              break
+            fi
             sleep 0.25
           done
+          if [ "$ready" -ne 1 ]; then
+            docker logs "$name" >&2 || true
+            echo 'PostgreSQL never reached final steady-state readiness' >&2
+            exit 1
+          fi
           python3 - "$name" <<'PY'
           import importlib.util
           from pathlib import Path
