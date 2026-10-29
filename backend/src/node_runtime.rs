@@ -61,10 +61,10 @@ struct AgentReleaseIdentity {
 }
 
 #[derive(Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(deny_unknown_fields)]
 struct NodeCommandPoll {
     node_id: i64,
-    #[serde(default)]
+    #[serde(default, rename = "artifactVersion")]
     artifact_version: Option<String>,
 }
 
@@ -646,33 +646,29 @@ mod p0d_agent_orchestration_tests {
     }
 
     #[test]
-    fn poll_schema_allows_only_node_and_optional_artifact_version() {
-        let ordinary: NodeCommandPoll = serde_json::from_str(r#"{"nodeId":7}"#).unwrap();
+    fn poll_schema_preserves_legacy_node_id_and_only_adds_artifact_version() {
+        let ordinary: NodeCommandPoll = serde_json::from_str(r#"{"node_id":7}"#).unwrap();
         assert_eq!(ordinary.node_id, 7);
         assert!(ordinary.artifact_version.is_none());
 
         let artifact: NodeCommandPoll = serde_json::from_str(
-            r#"{"nodeId":7,"artifactVersion":"p0d2-agent"}"#,
+            r#"{"node_id":7,"artifactVersion":"p0d2-agent"}"#,
         )
         .unwrap();
         assert_eq!(artifact.artifact_version.as_deref(), Some("p0d2-agent"));
 
         for rejected in [
-            r#"{"nodeId":7,"artifactVersion":"../bad"}"#,
-            r#"{"nodeId":7,"url":"https://example.invalid/agent"}"#,
-            r#"{"nodeId":7,"artifactPath":"/tmp/agent"}"#,
+            r#"{"node_id":7,"url":"https://example.invalid/agent"}"#,
+            r#"{"node_id":7,"artifactPath":"/tmp/agent"}"#,
+            r#"{"nodeId":7}"#,
         ] {
-            let parsed = serde_json::from_str::<NodeCommandPoll>(rejected);
-            if let Ok(request) = parsed {
-                assert!(
-                    request
-                        .artifact_version
-                        .as_deref()
-                        .map_or(true, |version| validate_release_version(version).is_err()),
-                    "unsafe artifact selector unexpectedly passed validation"
-                );
-            }
+            assert!(serde_json::from_str::<NodeCommandPoll>(rejected).is_err());
         }
+        let unsafe_version: NodeCommandPoll = serde_json::from_str(
+            r#"{"node_id":7,"artifactVersion":"../bad"}"#,
+        )
+        .unwrap();
+        assert!(validate_release_version(unsafe_version.artifact_version.as_deref().unwrap()).is_err());
     }
 
     #[test]
