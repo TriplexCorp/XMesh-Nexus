@@ -20,12 +20,15 @@ const expected=[
   "backend/src/xsp_v2_permit_ledger_writer.rs",
   "backend/src/xsp_v2_ack_ledger_validator.rs",
   "deploy/xsp-v2-agent-go127.contract.json",
+  "deploy/xsp-v2-p0e-crash-durability.contract.json",
   "docs/XSP_V2_AGENT_GO127_INTEGRATION.md",
+  "docs/XSP_V2_P0E_CRASH_DURABILITY.md",
   "docs/XSP_V2_CUTOVER_CONTRACT_VECTORS.json",
   "docs/XSP_V2_CUTOVER_CANDIDATE_VECTORS.json",
   "docs/XSP_V2_SIGNED_CUTOVER_STAGING.md",
   "docs/XSP_V2_STAGING_VERIFIED_PERMIT_WRITER.md",
   "scripts/check-xsp-v2-agent-go127-integration.js",
+  "scripts/check-xsp-v2-p0e-crash-durability.js",
   "scripts/test-xsp-v2-ledger-integration.sh"
 ];
 for(const name of expected){
@@ -55,4 +58,12 @@ if(integration.stdout)process.stdout.write(integration.stdout);
 if(integration.stderr)process.stderr.write(integration.stderr);
 assert.equal(integration.status,0,"P0-D Go 1.27 Agent integration contract failed");
 
-console.log(`PASS: ${expected.length} tracked Nexus XSP-v2 artifacts, experimental feature gates and pinned Go 1.27 Agent integration source contract`);
+const crashDurability=spawnSync(process.execPath,["scripts/check-xsp-v2-p0e-crash-durability.js"],{
+  encoding:"utf8",
+  stdio:["ignore","pipe","pipe"]
+});
+if(crashDurability.stdout)process.stdout.write(crashDurability.stdout);
+if(crashDurability.stderr)process.stderr.write(crashDurability.stderr);
+assert.equal(crashDurability.status,0,"P0-E1a crash durability source contract failed");
+
+console.log(`PASS: ${expected.length} tracked Nexus XSP-v2 artifacts, experimental feature gates, pinned P0-D Agent integration and P0-E1a crash-durability source contracts`);
