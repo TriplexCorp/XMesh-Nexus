@@ -4,14 +4,13 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const app=fs.readFileSync('app.js','utf8');
 const css=fs.readFileSync('styles.css','utf8');
-const runtime=fs.readFileSync('backend/src/node_runtime.rs','utf8');
+const runtime=fs.readFileSync('backend/src/node_runtime.rs','utf8')+'\n'+fs.readFileSync('backend/src/node_runtime_legacy.rs','utf8');
 assert.match(app,/data-node-card-id/);
 assert.match(app,/data-node-runtime-state/);
 assert.match(app,/data-node-xray-version/);
 assert.match(app,/async function refreshNodeRuntime\(\)/);
 assert.match(app,/Promise\.all\(\[refreshNodeMetrics\(\),refreshNodeRuntime\(\)\]\)/);
 assert.match(app,/setInterval\(\(\)=>\{void poll\(\)\},5000\)/);
-// Evaluate the actual status decision, not its source formatting.
 const vm=require('node:vm');
 const stateStart=app.indexOf('const nodeRuntimeState=');
 const stateEnd=app.indexOf('const nodeAgentUpdating=',stateStart);
