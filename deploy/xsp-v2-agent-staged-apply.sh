@@ -18,6 +18,7 @@ LAST_GOOD="$BASE/last-known-good.json"
 
 [[ "${EUID}" -eq 0 ]] || { echo 'staged Agent apply requires root' >&2; exit 1; }
 [[ -f "$ENV_FILE" && ! -L "$ENV_FILE" ]] || { echo 'node environment is unavailable' >&2; exit 1; }
+[[ -f "$IDENTITY_FILE" && ! -L "$IDENTITY_FILE" ]] || { echo 'release identity is unavailable' >&2; exit 1; }
 # shellcheck disable=SC1090
 source "$ENV_FILE"
 : "${XMESH_API_URL:?Missing panel URL}"
@@ -109,13 +110,15 @@ PY
 }
 
 verify_package(){
-  local package_dir="$1" binary="$package_dir/xmesh-agent-xspv2" actual
+  local package_dir="$1" binary="$package_dir/xmesh-agent-xspv2" actual identity_file="$package_dir/identity.json"
   [[ -d "$package_dir" && ! -L "$package_dir" ]] || return 1
+  [[ -f "$binary" && ! -L "$binary" && -x "$binary" ]] || return 1
+  [[ -f "$identity_file" && ! -L "$identity_file" ]] || return 1
   actual="$(sha256sum "$binary" | awk '{print $1}')" || return 1
   [[ "$actual" == "$ARTIFACT_SHA256" ]] || return 1
   identity_matches "$binary" || return 1
   timeout 20 "$binary" --check-state "$STATE_ROOT" >/dev/null || return 1
-  python3 - "$package_dir/identity.json" "$VERSION" "$SOURCE_REVISION" "$ARTIFACT_SHA256" <<'PY'
+  python3 - "$identity_file" "$VERSION" "$SOURCE_REVISION" "$ARTIFACT_SHA256" <<'PY'
 import json,sys
 with open(sys.argv[1],encoding='utf-8') as stream:
     value=json.load(stream)
@@ -146,8 +149,9 @@ PY
 
 write_last_good_shell(){
   local shell_version='unknown'
-  if [[ -x /usr/local/sbin/xmesh-node-control ]]; then
-    shell_version="$(/usr/local/sbin/xmesh-node-control --version 2>/dev/null || printf 'unknown')"
+  if [[ -f /usr/local/sbin/xmesh-node-control && ! -L /usr/local/sbin/xmesh-node-control ]];then
+    shell_version="$(awk -F'"' '/^AGENT_VERSION="[A-Za-z0-9._+-]+"$/ {print $2; exit}' /usr/local/sbin/xmesh-node-control)"
+    [[ "$shell_version" =~ ^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$ ]] || shell_version='unknown'
   fi
   python3 - "$LAST_GOOD" "$shell_version" "$STATE_ROOT" <<'PY'
 import json,os,sys,tempfile,time
@@ -172,8 +176,9 @@ PY
 }
 
 write_last_good_package(){
-  local target="$1" package_dir="$BASE/$target"
-  python3 - "$LAST_GOOD" "$target" "$package_dir/identity.json" "$STATE_ROOT" <<'PY'
+  local target="$1" package_dir="$BASE/$target" identity_file="$package_dir/identity.json"
+  [[ -f "$identity_file" && ! -L "$identity_file" ]] || return 1
+  python3 - "$LAST_GOOD" "$target" "$identity_file" "$STATE_ROOT" <<'PY'
 import json,os,re,sys,tempfile,time
 path,target,identity_path,state_root=sys.argv[1:]
 if not re.fullmatch(r'releases/[0-9a-f]{64}',target):
