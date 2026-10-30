@@ -25,11 +25,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check out exact frozen Nexus review target
+      - name: Check out exact refreshed Nexus review target
         uses: actions/checkout@v4
         with:
           repository: TriplexCorp/XMesh-Nexus
-          ref: 5cdb7825fcc51f8a7d296b992a7da4492ed2ce8e
+          ref: 8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091
           path: xmesh-nexus-reviewed
           fetch-depth: 0
 
@@ -41,21 +41,36 @@ jobs:
           path: xmesh-node-reviewed
           fetch-depth: 0
 
-      - name: Verify machine-readable handoff and external blockers
+      - name: Verify machine-readable refreshed handoff and external blockers
         run: |
           set -euo pipefail
           python3 - <<'PY'
           import json
           p='deploy/xsp-v2-p0e-security-review-handoff.contract.json'
           x=json.load(open(p))
-          assert x['schema']=='xsp2-p0e-security-review-handoff-contract-1'
+          assert x['schema']=='xsp2-p0e-security-review-handoff-contract-2'
           assert x['nexus']=={
             'repository':'TriplexCorp/XMesh-Nexus',
-            'sourceRevision':'5cdb7825fcc51f8a7d296b992a7da4492ed2ce8e',
+            'sourceRevision':'8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091',
           }
           assert x['node']=={
             'repository':'TriplexCorp/XMesh-Node',
             'sourceRevision':'083dc181c5e175f89007f4b93111cd5c45a69d97',
+          }
+          assert x['previousReviewFreeze']=={
+            'handoffMerge':'7b84a9e45f9e9cf815b95a06d1560f84d8d3f0a2',
+            'nexusSourceRevision':'5cdb7825fcc51f8a7d296b992a7da4492ed2ce8e',
+            'nodeSourceRevision':'083dc181c5e175f89007f4b93111cd5c45a69d97',
+            'supersededForCurrentMain':True,
+            'securityRelevantNexusMergesAfterFreeze':[
+              '36ee6f7a5b1686f9c0d51beda5d24e84830982c7',
+              '03679120726ff06005eff903909b262fb1271960',
+            ],
+          }
+          assert x['stagingIngressHardeningCheckpoint']=={
+            'c2aRustOriginMerge':'36ee6f7a5b1686f9c0d51beda5d24e84830982c7',
+            'c2bcdRustAckRecoveryMerge':'03679120726ff06005eff903909b262fb1271960',
+            'authoritativeDocsMerge':'8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091',
           }
           assert x['observabilityCheckpoint']=={
             'nexusMerge':'5cdb7825fcc51f8a7d296b992a7da4492ed2ce8e',
@@ -77,6 +92,7 @@ jobs:
             'default-off-redacted-observability',
             'production-migration-no-fallback-and-rollback',
           } == set(domains)
+          assert len(x['requiredImplementationEvidence']) >= 15
           assert x['requiredExternalBlockers']==[
             'independent-security-review-findings-and-signoff',
             'p0-e4a-five-representative-physical-abrupt-power-runs-and-independent-review',
@@ -90,17 +106,20 @@ jobs:
       - name: Verify frozen repository revisions exactly
         run: |
           set -euo pipefail
-          test "$(git -C xmesh-nexus-reviewed rev-parse HEAD)" = '5cdb7825fcc51f8a7d296b992a7da4492ed2ce8e'
+          test "$(git -C xmesh-nexus-reviewed rev-parse HEAD)" = '8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091'
           test "$(git -C xmesh-node-reviewed rev-parse HEAD)" = '083dc181c5e175f89007f4b93111cd5c45a69d97'
 
-      - name: Verify required evidence index exists at frozen Nexus revision
+      - name: Verify required evidence index exists at refreshed Nexus revision
         run: |
           set -euo pipefail
           python3 - <<'PY'
           import json, pathlib
           x=json.load(open('deploy/xsp-v2-p0e-security-review-handoff.contract.json'))
           root=pathlib.Path('xmesh-nexus-reviewed')
-          for rel in x['requiredEvidenceDocuments'] + x['requiredMachineContracts']:
+          required=(x['requiredEvidenceDocuments'] + x['requiredMachineContracts'] +
+                    x['requiredImplementationEvidence'])
+          assert len(required)==len(set(required)), 'duplicate review evidence path'
+          for rel in required:
             p=root/rel
             assert p.is_file(), f'missing frozen review evidence: {rel}'
             assert p.stat().st_size > 0, f'empty frozen review evidence: {rel}'
@@ -140,6 +159,24 @@ jobs:
           assert obs['readOnly'] is True and obs['defaultOff'] is True
           PY
 
+      - name: Verify frozen Rust ingress and ACK source contracts
+        run: |
+          set -euo pipefail
+          test -f xmesh-nexus-reviewed/deploy/xsp-v2-ingress/origin_probe.rs
+          test ! -e xmesh-nexus-reviewed/deploy/xsp-v2-ingress/origin_probe.py
+          test -f xmesh-nexus-reviewed/deploy/xsp-v2-ingress/origin-ack-rs/src/main.rs
+          test ! -e xmesh-nexus-reviewed/deploy/xsp-v2-ingress/origin_ack_gate.py
+          grep -Fq 'SO_PEERCRED' xmesh-nexus-reviewed/deploy/xsp-v2-ingress/origin_probe.rs
+          grep -Fq 'SO_PEERCRED' xmesh-nexus-reviewed/deploy/xsp-v2-ingress/origin-ack-rs/src/main.rs
+          grep -Fq 'const REQUEST_QUEUE_SIZE: i32 = 32' xmesh-nexus-reviewed/deploy/xsp-v2-ingress/origin-ack-rs/src/main.rs
+          grep -Fq '#[serde(deny_unknown_fields)]' xmesh-nexus-reviewed/deploy/xsp-v2-ingress/origin-ack-rs/src/main.rs
+          (
+            cd xmesh-nexus-reviewed
+            node scripts/check-xsp-v2-ingress-runtime.js
+            node scripts/check-xsp-v2-c2b-ack-runtime.js
+            node scripts/check-xsp-v2-c2c-runtime.js
+          )
+
       - name: Verify normative no-fallback and open-gate statements
         run: |
           set -euo pipefail
@@ -147,16 +184,17 @@ jobs:
           handoff='docs/XSP_V2_P0E_SECURITY_REVIEW_HANDOFF.md'
           grep -Fqi 'independent security review' "$policy"
           grep -Fqi 'Absolutely no user-selectable fallback' "$policy"
-          grep -Fq 'review-preparation / evidence-freeze only' "$handoff"
+          grep -Fq 'review-preparation / refreshed evidence-freeze only' "$handoff"
           grep -Fq 'P0-E4a remains OPEN' "$handoff"
           grep -Fq '`strict-pq` remains OFF' "$handoff"
           grep -Fq 'production rollout remains NOT AUTHORIZED' "$handoff"
           grep -Fq 'cannot substitute' "$handoff"
+          grep -Fq '03679120726ff06005eff903909b262fb1271960' "$handoff"
 
-      - name: Verify no runtime source is part of this handoff delta
+      - name: Verify no runtime source is part of this refreshed handoff delta
         run: |
           set -euo pipefail
-          changed="$(git diff --name-only 5cdb7825fcc51f8a7d296b992a7da4492ed2ce8e...HEAD | sort)"
+          changed="$(git diff --name-only 8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091...HEAD | sort)"
           expected="$(printf '%s\n' \
             .github/workflows/xsp-p0e-security-review-handoff.yml \
             deploy/xsp-v2-p0e-security-review-handoff.contract.json \
@@ -165,6 +203,6 @@ jobs:
 
       - name: State preparation-only evidence
         run: |
-          echo 'PASS: exact Nexus/Node security-review target and evidence index are frozen for independent review.'
+          echo 'PASS: refreshed exact Nexus/Node security-review target and Rust implementation evidence are frozen for independent review.'
           echo 'This CI does not perform or satisfy the independent security review and does not qualify physical power loss.'
           echo 'P0-E4a and independent review remain OPEN; strict-pq remains OFF; production rollout remains NOT AUTHORIZED.'
