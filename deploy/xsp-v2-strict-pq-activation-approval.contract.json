@@ -8,6 +8,7 @@
   ],
   "maxNodesPerApproval": 50,
   "maxApprovalWindowSeconds": 86400,
+  "requiredApprovalAuthority": "release-owner",
   "requiredTransportPolicy": {
     "tlsProtocols": ["TLSv1.3"],
     "keyExchange": "X25519MLKEM768",
