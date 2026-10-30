@@ -18,7 +18,7 @@ from typing import Any
 
 SCHEMA = "xsp2-p0e4a3-powercut-evidence-1"
 PREFLIGHT_SCHEMA = "xsp2-p0e4a-storage-preflight-1"
-PINNED_NODE_SHA = "50c770c8bbb917b04ca893ac5b8d29e6c7f9af7e"
+PINNED_NODE_SHA = "34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb"
 MAX_JSON = 128 * 1024
 MAX_EVENT_DELAY_MS = 120_000
 TOKEN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{7,63}$")
