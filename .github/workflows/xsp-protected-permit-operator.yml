@@ -32,18 +32,19 @@ jobs:
           components: rustfmt
 
       # Temporary authoring aid: source is public and contains no secrets.
-      # Remove this step once the two new binaries are committed rustfmt-clean.
-      - name: Emit rustfmt-clean protected permit sources
-        run: |
-          cargo fmt --manifest-path backend/Cargo.toml --all
-          echo '===BEGIN_OPERATOR_B64==='
-          base64 -w0 backend/src/bin/xsp_v2_permit_operator.rs
-          echo
-          echo '===END_OPERATOR_B64==='
-          echo '===BEGIN_SIGNER_B64==='
-          base64 -w0 backend/src/bin/xsp_v2_permit_signer.rs
-          echo
-          echo '===END_SIGNER_B64==='
+      # Remove these two steps once the formatted sources are committed.
+      - name: Format protected permit sources
+        run: cargo fmt --manifest-path backend/Cargo.toml --all
+
+      - name: Upload rustfmt-clean sources
+        uses: actions/upload-artifact@v4
+        with:
+          name: xsp-protected-permit-rustfmt
+          path: |
+            backend/src/bin/xsp_v2_permit_operator.rs
+            backend/src/bin/xsp_v2_permit_signer.rs
+          if-no-files-found: error
+          retention-days: 1
 
       - name: Static fail-closed boundary checks
         run: node scripts/check-xsp-v2-protected-permit-operator.js
