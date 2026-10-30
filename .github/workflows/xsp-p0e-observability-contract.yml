@@ -1,0 +1,184 @@
+name: XSP-v2 P0-E Observability Contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "deploy/xsp-v2-p0e-observability.contract.json"
+      - "docs/XSP_V2_P0E_OBSERVABILITY.md"
+      - ".github/workflows/xsp-p0e-observability-contract.yml"
+  pull_request:
+    paths:
+      - "deploy/xsp-v2-p0e-observability.contract.json"
+      - "docs/XSP_V2_P0E_OBSERVABILITY.md"
+      - ".github/workflows/xsp-p0e-observability-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-observability-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out exact merged XMesh-Node observability source
+        uses: actions/checkout@v4
+        with:
+          repository: TriplexCorp/XMesh-Node
+          ref: 083dc181c5e175f89007f4b93111cd5c45a69d97
+          path: xmesh-node
+          fetch-depth: 0
+
+      - name: Check out exact merged XMesh-Nexus observability source
+        uses: actions/checkout@v4
+        with:
+          repository: TriplexCorp/XMesh-Nexus
+          ref: ccb9e384dca47f0c1a69c0ecd82461d523344c7a
+          path: xmesh-nexus-reviewed
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache: false
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt,clippy
+
+      - name: Verify machine-readable contract
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          p='deploy/xsp-v2-p0e-observability.contract.json'
+          x=json.load(open(p))
+          assert x['schema']=='xsp2-p0e-observability-contract-1'
+          assert x['node']=={
+            'repository':'TriplexCorp/XMesh-Node',
+            'sourceRevision':'083dc181c5e175f89007f4b93111cd5c45a69d97',
+            'pullRequest':51,
+            'previousReviewedRevision':'ffebcc30424463dd0afcdb8226bcd4b48c019bff',
+          }
+          assert x['nexus']=={
+            'repository':'TriplexCorp/XMesh-Nexus',
+            'sourceRevision':'ccb9e384dca47f0c1a69c0ecd82461d523344c7a',
+            'pullRequest':133,
+            'previousReviewedRevision':'3be8c71dff44ef67ec71f70d440dfed31123a385',
+          }
+          assert x['nodeSchema']=='xsp2-node-observability-1'
+          assert x['nexusSchema']=='xsp2-nexus-observability-1'
+          assert x['runtimeGate']=={'environment':'XSP_V2_OBSERVABILITY','value':'staging-only'}
+          for key in ('defaultOff','perNodeOnly','nodeLocalOnly','nexusOperatorOnly','readOnly'):
+            assert x[key] is True
+          for key in ('durableMutationAllowed','rawPrivateKeysExposed','rawPublicKeyBytesExposed',
+                      'replayablePayloadsExposed','networkRouteAdded','physicalPowerLossQualified',
+                      'independentSecurityReviewComplete','productionActivation','strictPQEnabled'):
+            assert x[key] is False
+          PY
+
+      - name: Verify exact Node PR 51 delta
+        working-directory: xmesh-node
+        run: |
+          set -euo pipefail
+          old=ffebcc30424463dd0afcdb8226bcd4b48c019bff
+          new=083dc181c5e175f89007f4b93111cd5c45a69d97
+          git cat-file -e "$old^{commit}"
+          git cat-file -e "$new^{commit}"
+          actual="$(git diff --name-only "$old" "$new" | sort)"
+          expected="$(printf '%s\n' \
+            .github/workflows/xsp-p0e-observability-local.yml \
+            agent/xspv2/cmd/xmesh-agent-xspv2-observe/main.go \
+            agent/xspv2/observability/local_linux.go \
+            agent/xspv2/observability/local_linux_test.go | sort)"
+          test "$actual" = "$expected"
+
+      - name: Verify exact Nexus PR 133 delta
+        working-directory: xmesh-nexus-reviewed
+        run: |
+          set -euo pipefail
+          old=3be8c71dff44ef67ec71f70d440dfed31123a385
+          new=ccb9e384dca47f0c1a69c0ecd82461d523344c7a
+          git cat-file -e "$old^{commit}"
+          git cat-file -e "$new^{commit}"
+          actual="$(git diff --name-only "$old" "$new" | sort)"
+          expected="$(printf '%s\n' \
+            .github/workflows/xsp-p0e-observability-safe-db.yml \
+            backend/Cargo.toml \
+            backend/src/bin/xsp_v2_observability.rs | sort)"
+          test "$actual" = "$expected"
+
+      - name: Verify Node local read-only and redaction boundary
+        working-directory: xmesh-node
+        run: |
+          set -euo pipefail
+          src='agent/xspv2/observability/local_linux.go'
+          cli='agent/xspv2/cmd/xmesh-agent-xspv2-observe/main.go'
+          grep -Fq 'const Schema = "xsp2-node-observability-1"' "$src"
+          grep -Fq 'state.Open(root)' "$src"
+          grep -Fq 'state.DescribeCurrent(layout)' "$src"
+          grep -Fq 'keyring.DescribeRetirement(layout.Vault, layout.MasterKey)' "$src"
+          grep -Fq 'ReadOnly:   true' "$src"
+          grep -Fq 'os.Getenv("XSP_V2_OBSERVABILITY") != observabilityGate' "$cli"
+          grep -Fq 'const observabilityGate = "staging-only"' "$cli"
+          grep -Fq 'exactly --state-root is required' "$cli"
+          if grep -n -E '"net/http"|http[.]|exec[.]Command|os[.](Remove|Rename|Create|WriteFile)|Mkdir(All)?|Chmod' "$src" "$cli"; then
+            echo 'Node observability widened beyond local read-only inspection' >&2
+            exit 1
+          fi
+          if grep -n -E 'Private|privateKey|PublicKey|publicKey|AuthorizationSHA256|authorizationSha|SignedPermit|SignedApplied|SignedReceipt|Nonce' "$src"; then
+            echo 'Node observability exposes a forbidden security payload field' >&2
+            exit 1
+          fi
+
+      - name: Verify Nexus default-off read-only and redaction boundary
+        working-directory: xmesh-nexus-reviewed
+        run: |
+          set -euo pipefail
+          src='backend/src/bin/xsp_v2_observability.rs'
+          cargo='backend/Cargo.toml'
+          grep -Fq 'name = "xsp-v2-observability"' "$cargo"
+          grep -Fq 'required-features = ["xsp-v2-observability"]' "$cargo"
+          grep -Fq 'xsp-v2-observability = []' "$cargo"
+          grep -Fq 'const SCHEMA: &str = "xsp2-nexus-observability-1";' "$src"
+          grep -Fq 'XSP_V2_OBSERVABILITY' "$src"
+          grep -Fq 'staging-only' "$src"
+          grep -Fq 'max_connections(1)' "$src"
+          grep -Fq 'read_only: true' "$src"
+          grep -Fq 'production_activated: false' "$src"
+          grep -Fq 'strict_pq_enabled: false' "$src"
+          if grep -nEi '\b(INSERT|UPDATE|DELETE|TRUNCATE|ALTER|DROP|CREATE)[[:space:]]' "$src"; then
+            echo 'Nexus observability contains mutating SQL' >&2
+            exit 1
+          fi
+          if grep -nE 'ed25519_public|mldsa65_public|challenge_sha256|permit_nonce|permit_input_sha256|signed_permit|applied_ack_sha256|signed_applied_ack|request_id|signed_receipt_sha256|signed_receipt|release_ack_version|release_ack_source_revision|release_ack_artifact_sha256|result[[:space:]]*[,)]' "$src"; then
+            echo 'Nexus observability names a replayable or sensitive payload column' >&2
+            exit 1
+          fi
+          if grep -nE 'axum::|Router::|route\(|reqwest::|TcpListener|UnixListener' "$src"; then
+            echo 'Nexus observability added a network service/client surface' >&2
+            exit 1
+          fi
+
+      - name: Re-run pinned Node observability proof
+        working-directory: xmesh-node/agent/xspv2
+        run: |
+          set -euo pipefail
+          go test ./observability -count=1
+          go build ./cmd/xmesh-agent-xspv2-observe
+
+      - name: Re-run pinned Nexus observability build and lint
+        working-directory: xmesh-nexus-reviewed
+        run: |
+          set -euo pipefail
+          cargo fmt --manifest-path backend/Cargo.toml --all -- --check
+          cargo build --manifest-path backend/Cargo.toml --features xsp-v2-observability --bin xsp-v2-observability
+          cargo clippy --manifest-path backend/Cargo.toml --features xsp-v2-observability --bin xsp-v2-observability -- -D warnings
+
+      - name: State bounded evidence only
+        run: |
+          echo 'PASS: exact merged Node PR #51 and Nexus PR #133 observability sources are pinned and independently re-verified.'
+          echo 'The surfaces remain per-node, default-off, read-only and redacted; no HTTP/API/network route or durable mutation is introduced.'
+          echo 'P0-E4a physical power-loss qualification and independent security review remain OPEN; strict-pq remains OFF and production rollout remains NOT AUTHORIZED.'
