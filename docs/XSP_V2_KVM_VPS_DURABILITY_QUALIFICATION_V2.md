@@ -1,12 +1,15 @@
 # XSP-v2 KVM VPS durability qualification v2
 
-Status: **versioned acceptance policy for real KVM guest crash-consistency evidence; non-activating**.
+Status: **versioned, topology-aware acceptance policy for real KVM durability evidence; non-activating**.
 
-This v2 profile exists because the real operator-facing KVM runner was added to XMesh-Node after the reviewed v5 production runtime target was frozen. It preserves that runtime target exactly while binding the later qualification-only tooling revision separately.
+This v2 profile exists for two reasons:
 
-The original v1 contract, verifier and v5 review bundle remain historical and are not rewritten or reinterpreted.
+1. the operator-facing KVM runner was added to XMesh-Node after the reviewed v5 production runtime target was frozen;
+2. the deployed architecture uses **separate failure domains** for XMesh-Node and Nexus/PostgreSQL, so a Node VPS hard stop cannot honestly be claimed as a PostgreSQL recovery event.
 
-## Exact binding
+The original v1 contract/verifier and the frozen v5 review bundle remain historical evidence and are not rewritten or reinterpreted.
+
+## Exact source binding
 
 Production runtime target:
 
@@ -20,13 +23,29 @@ Qualification tooling:
 - runner: `security/xspv2/poc-go/cmd/xspv2-kvm-qualify/main.go`
 - required build tag: `xspv2_powercut_qualification`
 
-The delta from the runtime Node revision to the tooling revision is restricted to the five qualification-only files listed in the v2 contract. CI verifies that exact path set and proves the normal Agent built from the tooling revision still excludes the qualification marker/control strings.
+The delta from the runtime Node revision to the qualification revision is restricted to the five qualification-only files listed in the v2 contract. CI verifies that exact delta and proves the normal Agent binary excludes qualification controls.
 
-This separation means a result must not pretend the production runtime revision itself contained the operator runner. The result records both revisions and the SHA-256 of the exact runner binary used for the real runs.
+A real result records both Node revisions and the SHA-256 of the exact qualification binary.
 
-## Exact Node binding
+## Topology boundary
 
-A completed result contains one positive `subjectNodeId`, and every run must use that same Node ID. The operator must pass the real Node ID to the runner:
+The production topology is represented explicitly:
+
+- `nodeStateScope=isolated-qualification-keyring`;
+- Node and Nexus/PostgreSQL have different failure-domain identifiers;
+- the five Node hard-stop cycles qualify the Node keyring implementation on the actual subject Node host;
+- PostgreSQL crash/recovery is qualified independently on the Nexus/PostgreSQL host;
+- the production off-host monotonic floor is verified independently using the existing `xsp-v2-recovery-checkpoint verify` tool.
+
+The manual KVM runner intentionally never touches the production Agent vault. Therefore its temporary epoch/key IDs are **qualification state**, not production Node key IDs. V2 does not compare those temporary epochs to the production off-host floor.
+
+This is a composition of three independent evidence domains, not a claim that one VPS power event crashed all components.
+
+## Exact subject Node binding
+
+A completed result contains one positive `subjectNodeId`, and every Node crash run must use that same Node ID.
+
+For the current qualification host the operator must pass the real panel Node ID to the runner, for example:
 
 ```bash
 ./xspv2-kvm-qualify arm \
@@ -35,11 +54,11 @@ A completed result contains one positive `subjectNodeId`, and every run must use
   --node-id <REAL_NODE_ID>
 ```
 
-A crash matrix executed with a placeholder Node ID is useful diagnostic evidence but is not accepted as the final issue-#138 result unless that placeholder is in fact the real Node ID.
+A matrix run with a placeholder Node ID is diagnostic only and is not accepted as the final issue-#138 result unless the value is the real Node ID.
 
-## Five required real crash cycles
+## A. Five required real Node crash cycles
 
-The required matrix remains unchanged:
+The Node matrix is:
 
 1. `after-previous` → `previous-complete`
 2. `after-floor` → `next-complete`
@@ -47,45 +66,83 @@ The required matrix remains unchanged:
 4. `after-recovery-abort` → `previous-complete`
 5. `after-recovery-active` → `next-complete`
 
-Allowed crash methods remain `provider-hard-stop` and `guest-kernel-panic`. Ordinary shutdown/reboot, process or service restart, container restart and snapshot rollback do not qualify.
+Each run requires:
 
-## Evidence bundle
-
-The v2 result binds the preserved raw evidence archive with:
-
-- `evidenceBundle.archiveName`
-- `evidenceBundle.archiveSha256`
-
-It also binds the exact qualification runner with `qualificationTooling.binarySha256`.
-
-Each run still requires:
-
-- unique run ID and checkpoint;
-- crash method plus SHA-256 of preserved provider-event/crash-trigger evidence;
+- unique run ID and exact checkpoint;
+- allowed crash method (`provider-hard-stop` preferred, `guest-kernel-panic` fallback);
+- SHA-256 of preserved crash-trigger/provider-event evidence;
 - different pre/post Linux boot IDs;
-- the exact subject Node ID;
-- from/to epoch and Ed25519/ML-DSA-65 key identities;
+- exact subject Node ID;
+- from/to qualification epoch and Ed25519/ML-DSA-65 key IDs;
 - exact expected complete post-boot identity;
-- Agent security-state SHA-256;
-- `networkAttemptedBeforeValidation=false`;
-- PostgreSQL recovery observed and integrity checks passed;
-- `fsync=on`, `full_page_writes=on`, accepted `synchronous_commit`, and non-empty WAL sync method;
-- PostgreSQL security-tuple SHA-256;
-- off-host monotonic recovery-floor checkpoint and receipt SHA-256 values.
+- qualification security-state SHA-256;
+- `networkAttemptedBeforeValidation=false`.
 
 All five run IDs and crash-evidence hashes must be unique.
 
+Ordinary shutdown/reboot, process/service/container restart and snapshot rollback do not qualify.
+
+## B. Independent Nexus/PostgreSQL crash recovery
+
+Because PostgreSQL is not on the Node VPS, v2 requires a separate real crash/recovery record from the Nexus/PostgreSQL failure domain.
+
+That record must contain:
+
+- the same `subjectNodeId` whose XSP-v2 security tuple is being checked;
+- an allowed abrupt crash method and preserved crash-evidence SHA-256;
+- a separate evidence-record SHA-256;
+- different Nexus-host pre/post boot IDs;
+- `recoveryObserved=true`;
+- `integrityChecksPassed=true`;
+- `fsync=on`;
+- `full_page_writes=on`;
+- accepted `synchronous_commit` (`on`, `remote_apply`, or `remote_write`);
+- non-empty `wal_sync_method`;
+- SHA-256 of the subject Node's security tuple before and after recovery.
+
+The before/after security-tuple digests must be identical. The PostgreSQL crash-event digest must also be distinct from every Node crash-event digest, proving that the result does not reuse one event across different failure domains.
+
+## C. Independent production off-host witness
+
+V2 separately binds the real production recovery floor for the subject Node.
+
+The result records:
+
+- Node ID;
+- SHA-256 of the preserved off-host checkpoint;
+- SHA-256 of the embedded authoritative receipt;
+- SHA-256 of the `xsp-v2-recovery-checkpoint verify` output;
+- `verificationStatus=verified`;
+- `minimumEpoch`;
+- independently validated production `localEpoch`.
+
+The verifier requires `localEpoch >= minimumEpoch` and exact Node identity. This witness is production state; it is intentionally not derived from the isolated qualification keyring.
+
+## Evidence bundle
+
+The final result binds one preserved aggregate archive with:
+
+- `evidenceBundle.archiveName`;
+- `evidenceBundle.archiveSha256`.
+
+The archive should contain the five Node run manifests/post-boot records, five preserved Node crash-event records, the independent PostgreSQL crash/recovery record and raw crash evidence, the off-host checkpoint and verification result, and operator/provider risk-acceptance material.
+
 ## Provider storage boundary
 
-The result must explicitly record the VPS provider and storage class, use:
+Because Node and Nexus/PostgreSQL are separate failure domains, provider-storage trust is recorded for both:
+
+- `providerStorage.node`;
+- `providerStorage.nexusPostgres`.
+
+Each record names the provider and storage class, uses:
 
 `storageTrustBoundary=provider-managed-block-storage`
 
-and include attributable, timestamped release-owner risk acceptance for:
+and contains attributable, timestamped release-owner acceptance of:
 
 `providerStorageDurabilityAssumed=true`.
 
-The accepted risk statement acknowledges reliance on the provider honoring durable guest block-device flush semantics. It does not claim physical host/controller/PLP testing.
+The risk statement acknowledges reliance on the provider honoring durable guest block-device flush semantics. It does not claim physical host/controller/PLP testing.
 
 ## Verification
 
@@ -97,13 +154,17 @@ Verifier:
 
 ```bash
 python3 scripts/verify-xsp-v2-kvm-vps-durability-v2.py \
-  --result /path/to/kvm-vps-five-run-result-v2.json
+  --result /path/to/kvm-vps-durability-result-v2.json
 ```
 
 A successful result reports:
 
 ```text
 status=kvm-vps-durability-qualified-for-release-gate
+topologyAware=true
+nodeCrashMatrixQualified=true
+postgresCrashRecoveryQualified=true
+offhostProductionWitnessVerified=true
 guestCrashConsistencyQualified=true
 providerStorageDurabilityAssumed=true
 physicalPowerLossQualified=false
@@ -112,15 +173,17 @@ productionActivation=false
 strictPQEnabled=false
 ```
 
-The verifier also reports the bound runtime Node revision, qualification tooling revision, subject Node ID, evidence archive SHA-256 and matrix SHA-256.
+CI fixtures exercise parser/policy behavior only and are never real production qualification evidence.
 
 ## Relationship to frozen v5 review evidence
 
-The v5 review bundle remains immutable evidence for its exact contents. This v2 qualification policy does not alter that historical bundle. Before an independent review is accepted for a release candidate, the later qualification-tooling binding and any resulting accepted evidence must be included in a new reviewed checkpoint/package rather than silently attributed to v5.
+The v5 review bundle remains immutable evidence for its exact contents. This v2 policy does not alter that historical bundle. The later qualification-tooling binding and any accepted real evidence must be included in a new reviewed checkpoint/package before an independent review can authorize a release candidate.
 
 ## Production boundary
 
-Passing this verifier does **not** enable `strict-pq` and does **not** authorize production activation. The expected claims remain:
+Passing this verifier does **not** enable `strict-pq` and does **not** authorize production activation.
+
+Expected claims remain:
 
 ```text
 guestCrashConsistencyQualified=true
