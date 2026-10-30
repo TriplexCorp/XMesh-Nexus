@@ -1,0 +1,80 @@
+{
+  "schema": "xsp2-p0e4a-qualification-review-result-contract-1",
+  "resultSchema": "xsp2-p0e4a-qualification-review-result-1",
+  "verificationSchema": "xsp2-p0e4a-qualification-review-verification-1",
+  "reviewedSources": {
+    "nodePowercutSourceRevision": "50c770c8bbb917b04ca893ac5b8d29e6c7f9af7e",
+    "nodeLabRunnerRevision": "7bf8cc92950f396e33891c8744c1f6855414154b",
+    "nexusE4a3Merge": "d57e74ef73f704b2229347c4f8712c5c1e527b0b",
+    "nexusE4a4Merge": "8ca408fd50169ef4311a30b6248c2a4743e6a3a5",
+    "nexusE4a5Merge": "a34d0999ca519e2a81e68d92ec7136cd606518d4",
+    "nexusE4a6Merge": "2889864d6ec7f89202d8d82f2feda87501f0f349"
+  },
+  "matrixContract": {
+    "schema": "xsp2-p0e4a4-powercut-matrix-1",
+    "status": "matrix-complete-for-independent-review",
+    "physicalPowerLossQualified": false
+  },
+  "handoffResultContract": {
+    "status": "physical-run-handoff-verified-for-independent-review",
+    "physicalPowerLossQualified": false
+  },
+  "requiredCheckpoints": [
+    "after-previous",
+    "after-floor",
+    "after-active",
+    "after-recovery-abort",
+    "after-recovery-active"
+  ],
+  "expectedOutcomes": {
+    "after-previous": "previous-complete",
+    "after-floor": "next-complete",
+    "after-active": "next-complete",
+    "after-recovery-abort": "previous-complete",
+    "after-recovery-active": "next-complete"
+  },
+  "requiredEvidenceAttestations": [
+    "allFiveRunsActuallyUsedAbruptPhysicalPowerRemoval",
+    "rawControllerRecordsReviewed",
+    "changedBootIdentitiesReviewed",
+    "agentPostBootSecurityStateReviewed",
+    "postgresWalRecoveryIntegrityReviewed",
+    "storageControllerCachePLPSemanticsReviewed",
+    "offhostE3aWitnessReviewed",
+    "matrixDigestAndPerRunBindingsReviewed"
+  ],
+  "findingSeverities": [
+    "critical",
+    "high",
+    "medium",
+    "low",
+    "info"
+  ],
+  "findingStatuses": [
+    "open",
+    "remediated",
+    "accepted-risk",
+    "not-applicable"
+  ],
+  "signoffDecisions": [
+    "qualify",
+    "qualify-with-findings",
+    "reject"
+  ],
+  "recommendationPolicy": {
+    "eligibleDecisions": [
+      "qualify",
+      "qualify-with-findings"
+    ],
+    "allEvidenceAttestationsMustBeTrue": true,
+    "releaseBlockingFindingsMustBeRemediated": true,
+    "qualificationScopeChangeRequiresNewFiveRunMatrix": true
+  },
+  "requiredFalseClaims": [
+    "productionActivation",
+    "strictPQEnabled"
+  ],
+  "independentReviewerRequired": true,
+  "automaticPhysicalQualification": false,
+  "automaticIssueClosure": false
+}

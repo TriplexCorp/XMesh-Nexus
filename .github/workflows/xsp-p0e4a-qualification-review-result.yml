@@ -1,0 +1,321 @@
+name: XSP-v2 P0-E4a Qualification Review Result Contract
+
+on:
+  pull_request:
+    paths:
+      - "deploy/xsp-v2-p0e4a-qualification-review-result.contract.json"
+      - "scripts/verify-xsp-v2-p0e4a-qualification-review-result.py"
+      - "docs/XSP_V2_P0E4A_QUALIFICATION_REVIEW_RESULT.md"
+      - ".github/workflows/xsp-p0e4a-qualification-review-result.yml"
+  push:
+    branches: [main]
+    paths:
+      - "deploy/xsp-v2-p0e4a-qualification-review-result.contract.json"
+      - "scripts/verify-xsp-v2-p0e4a-qualification-review-result.py"
+      - "docs/XSP_V2_P0E4A_QUALIFICATION_REVIEW_RESULT.md"
+      - ".github/workflows/xsp-p0e4a-qualification-review-result.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualification-review-result-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compile verifier and validate bounded contract
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/verify-xsp-v2-p0e4a-qualification-review-result.py
+          python3 - <<'PY'
+          import json
+          p='deploy/xsp-v2-p0e4a-qualification-review-result.contract.json'
+          x=json.load(open(p))
+          assert x['schema']=='xsp2-p0e4a-qualification-review-result-contract-1'
+          assert x['resultSchema']=='xsp2-p0e4a-qualification-review-result-1'
+          assert x['verificationSchema']=='xsp2-p0e4a-qualification-review-verification-1'
+          assert x['reviewedSources']=={
+            'nodePowercutSourceRevision':'50c770c8bbb917b04ca893ac5b8d29e6c7f9af7e',
+            'nodeLabRunnerRevision':'7bf8cc92950f396e33891c8744c1f6855414154b',
+            'nexusE4a3Merge':'d57e74ef73f704b2229347c4f8712c5c1e527b0b',
+            'nexusE4a4Merge':'8ca408fd50169ef4311a30b6248c2a4743e6a3a5',
+            'nexusE4a5Merge':'a34d0999ca519e2a81e68d92ec7136cd606518d4',
+            'nexusE4a6Merge':'2889864d6ec7f89202d8d82f2feda87501f0f349',
+          }
+          assert x['requiredCheckpoints']==[
+            'after-previous','after-floor','after-active',
+            'after-recovery-abort','after-recovery-active'
+          ]
+          assert x['matrixContract']['physicalPowerLossQualified'] is False
+          assert x['handoffResultContract']['physicalPowerLossQualified'] is False
+          assert x['independentReviewerRequired'] is True
+          assert x['automaticPhysicalQualification'] is False
+          assert x['automaticIssueClosure'] is False
+          assert set(x['requiredFalseClaims'])=={'productionActivation','strictPQEnabled'}
+          PY
+
+      - name: Generate synthetic contract fixtures only
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import copy, hashlib, json
+          from pathlib import Path
+
+          contract=json.load(open('deploy/xsp-v2-p0e4a-qualification-review-result.contract.json'))
+          work=Path('/tmp/p0e4a-qualification-result')
+          handoffs=work/'handoffs'
+          handoffs.mkdir(parents=True)
+
+          points=contract['requiredCheckpoints']
+          outcomes=contract['expectedOutcomes']
+          epochs={
+            'after-previous':7,
+            'after-floor':8,
+            'after-active':8,
+            'after-recovery-abort':7,
+            'after-recovery-active':8,
+          }
+          rows=[]
+          handoff_hashes={}
+          for index,point in enumerate(points,1):
+            evidence_sha=f'{index:02x}'*32
+            row={
+              'checkpoint':point,
+              'runId':f'physical-run-{index:04d}',
+              'controllerEventId':f'pdu-event-{index:04d}',
+              'evidenceSha256Hex':evidence_sha,
+              'expectedOutcome':outcomes[point],
+              'postBootEpoch':epochs[point],
+            }
+            rows.append(row)
+            handoff={
+              'status':'physical-run-handoff-verified-for-independent-review',
+              'runId':row['runId'],
+              'checkpoint':point,
+              'planSha256Hex':f'{index+16:02x}'*32,
+              'evidenceSha256Hex':evidence_sha,
+              'controllerEventSha256Hex':f'{index+32:02x}'*32,
+              'physicalPowerLossQualified':False,
+              'scope':'SYNTHETIC CI contract fixture only; not physical evidence.',
+            }
+            raw=(json.dumps(handoff,sort_keys=True,separators=(',',':'))+'\n').encode()
+            path=handoffs/f'{point}.json'
+            path.write_bytes(raw)
+            handoff_hashes[point]=hashlib.sha256(raw).hexdigest()
+
+          matrix={
+            'schema':'xsp2-p0e4a4-powercut-matrix-1',
+            'status':'matrix-complete-for-independent-review',
+            'physicalPowerLossQualified':False,
+            'nodeId':812345678901,
+            'nodeSourceRevision':contract['reviewedSources']['nodePowercutSourceRevision'],
+            'nexusSourceRevision':contract['reviewedSources']['nexusE4a5Merge'],
+            'labBinarySha256Hex':'aa'*32,
+            'reviewedProfileId':'reviewed-storage-profile-0001',
+            'plpEvidenceId':'plp-evidence-0001',
+            'matrixSha256Hex':'bb'*32,
+            'runs':rows,
+            'scope':'SYNTHETIC CI five-point contract fixture; independent physical-lab review remains required.',
+          }
+          matrix_raw=(json.dumps(matrix,sort_keys=True,separators=(',',':'))+'\n').encode()
+          matrix_path=work/'matrix.json'
+          matrix_path.write_bytes(matrix_raw)
+
+          scope={
+            'nodeId':matrix['nodeId'],
+            'nodeSourceRevision':matrix['nodeSourceRevision'],
+            'labRunnerRevision':contract['reviewedSources']['nodeLabRunnerRevision'],
+            'nexusSourceRevision':matrix['nexusSourceRevision'],
+            'labBinarySha256Hex':matrix['labBinarySha256Hex'],
+            'reviewedProfileId':matrix['reviewedProfileId'],
+            'plpEvidenceId':matrix['plpEvidenceId'],
+            'matrixSha256Hex':matrix['matrixSha256Hex'],
+            'matrixResultSha256Hex':hashlib.sha256(matrix_raw).hexdigest(),
+          }
+          attestations={key:True for key in contract['requiredEvidenceAttestations']}
+          base={
+            'schema':contract['resultSchema'],
+            'qualificationScope':scope,
+            'handoffResultSha256ByCheckpoint':handoff_hashes,
+            'reviewer':{
+              'name':'Synthetic Independent Lab Reviewer',
+              'organization':'Synthetic External Lab',
+              'independent':True,
+            },
+            'reviewDate':'2026-10-30',
+            'evidenceAttestations':attestations,
+            'externalReport':{
+              'sha256Hex':'cc'*32,
+              'references':['synthetic-ci:external-report-fixture'],
+            },
+            'findings':[],
+            'signoff':{
+              'decision':'qualify',
+              'statement':'Synthetic parser/closure fixture only; NOT a physical qualification result.',
+              'signerName':'Synthetic Independent Lab Reviewer',
+              'signerOrganization':'Synthetic External Lab',
+              'signedAt':'2026-10-30T00:00:00Z',
+            },
+            'claims':{
+              'productionActivation':False,
+              'strictPQEnabled':False,
+            },
+          }
+          def write(name,obj):
+            (work/name).write_text(json.dumps(obj,indent=2,sort_keys=True)+'\n')
+          write('eligible.json',base)
+
+          reject=copy.deepcopy(base)
+          reject['signoff']['decision']='reject'
+          reject['evidenceAttestations']['rawControllerRecordsReviewed']=False
+          write('reject.json',reject)
+
+          unresolved=copy.deepcopy(base)
+          unresolved['signoff']['decision']='qualify-with-findings'
+          unresolved['findings']=[{
+            'id':'SYN-PWR-001','severity':'high','status':'open','releaseBlocking':True,
+            'qualificationScopeChanged':False,'title':'Synthetic unresolved release blocker',
+            'evidence':['synthetic-ci:finding'],'disposition':'Synthetic fixture only.',
+          }]
+          write('unresolved.json',unresolved)
+
+          changed=copy.deepcopy(base)
+          changed['signoff']['decision']='qualify-with-findings'
+          changed['findings']=[{
+            'id':'SYN-PWR-002','severity':'low','status':'remediated','releaseBlocking':False,
+            'qualificationScopeChanged':True,'title':'Synthetic qualification-scope change',
+            'evidence':['synthetic-ci:finding'],'disposition':'Synthetic fixture; requires a new five-run matrix.',
+          }]
+          write('scope-changed.json',changed)
+
+          wrong_scope=copy.deepcopy(base)
+          wrong_scope['qualificationScope']['labBinarySha256Hex']='dd'*32
+          write('wrong-scope.json',wrong_scope)
+
+          non_independent=copy.deepcopy(base)
+          non_independent['reviewer']['independent']=False
+          write('non-independent.json',non_independent)
+
+          bad_claim=copy.deepcopy(base)
+          bad_claim['claims']['strictPQEnabled']=True
+          write('bad-claim.json',bad_claim)
+
+          impossible_claim=copy.deepcopy(base)
+          impossible_claim['physicalPowerLossQualified']=True
+          write('impossible-auto-qualification.json',impossible_claim)
+
+          mismatched_handoff=copy.deepcopy(base)
+          mismatched_handoff['handoffResultSha256ByCheckpoint']['after-active']='ee'*32
+          write('mismatched-handoff.json',mismatched_handoff)
+          PY
+
+      - name: Prove synthetic recommendation never auto-qualifies hardware
+        run: |
+          set -euo pipefail
+          root=/tmp/p0e4a-qualification-result
+          python3 scripts/verify-xsp-v2-p0e4a-qualification-review-result.py \
+            --matrix-result "$root/matrix.json" \
+            --handoff-results-dir "$root/handoffs" \
+            --result "$root/eligible.json" \
+            --require-qualification-recommendation \
+            | tee /tmp/p0e4a-eligible-verification.json
+          grep -Fq '"validReviewResult": true' /tmp/p0e4a-eligible-verification.json
+          grep -Fq '"reviewerRecommendsQualification": true' /tmp/p0e4a-eligible-verification.json
+          grep -Fq '"requiresExplicitReviewedCheckpoint": true' /tmp/p0e4a-eligible-verification.json
+          grep -Fq '"physicalPowerLossQualified": false' /tmp/p0e4a-eligible-verification.json
+          grep -Fq '"reviewedCheckpointCount": 5' /tmp/p0e4a-eligible-verification.json
+          grep -Fq '"handoffResultCount": 5' /tmp/p0e4a-eligible-verification.json
+
+      - name: Prove valid rejection is evidence but not a qualification recommendation
+        run: |
+          set -euo pipefail
+          root=/tmp/p0e4a-qualification-result
+          python3 scripts/verify-xsp-v2-p0e4a-qualification-review-result.py \
+            --matrix-result "$root/matrix.json" --handoff-results-dir "$root/handoffs" \
+            --result "$root/reject.json" | tee /tmp/p0e4a-reject-verification.json
+          grep -Fq '"validReviewResult": true' /tmp/p0e4a-reject-verification.json
+          grep -Fq '"reviewerRecommendsQualification": false' /tmp/p0e4a-reject-verification.json
+          grep -Fq '"physicalPowerLossQualified": false' /tmp/p0e4a-reject-verification.json
+          if python3 scripts/verify-xsp-v2-p0e4a-qualification-review-result.py \
+            --matrix-result "$root/matrix.json" --handoff-results-dir "$root/handoffs" \
+            --result "$root/reject.json" --require-qualification-recommendation; then
+            echo 'synthetic rejection unexpectedly recommended qualification' >&2
+            exit 1
+          fi
+
+      - name: Prove unresolved finding and scope change fail recommendation closed
+        run: |
+          set -euo pipefail
+          root=/tmp/p0e4a-qualification-result
+          for fixture in unresolved scope-changed; do
+            python3 scripts/verify-xsp-v2-p0e4a-qualification-review-result.py \
+              --matrix-result "$root/matrix.json" --handoff-results-dir "$root/handoffs" \
+              --result "$root/${fixture}.json" | tee "/tmp/${fixture}.verification.json"
+            grep -Fq '"reviewerRecommendsQualification": false' "/tmp/${fixture}.verification.json"
+            grep -Fq '"physicalPowerLossQualified": false' "/tmp/${fixture}.verification.json"
+            if python3 scripts/verify-xsp-v2-p0e4a-qualification-review-result.py \
+              --matrix-result "$root/matrix.json" --handoff-results-dir "$root/handoffs" \
+              --result "$root/${fixture}.json" --require-qualification-recommendation; then
+              echo "${fixture} unexpectedly recommended qualification" >&2
+              exit 1
+            fi
+          done
+          grep -Fq '"requiresNewFiveRunMatrix": true' /tmp/scope-changed.verification.json
+
+      - name: Prove wrong scope, handoff binding, independence and unsafe claims are rejected
+        run: |
+          set -euo pipefail
+          root=/tmp/p0e4a-qualification-result
+          for fixture in wrong-scope mismatched-handoff non-independent bad-claim impossible-auto-qualification; do
+            if python3 scripts/verify-xsp-v2-p0e4a-qualification-review-result.py \
+              --matrix-result "$root/matrix.json" --handoff-results-dir "$root/handoffs" \
+              --result "$root/${fixture}.json"; then
+              echo "${fixture} unexpectedly validated" >&2
+              exit 1
+            fi
+          done
+
+      - name: Prove missing or extra handoff result fails closed
+        run: |
+          set -euo pipefail
+          root=/tmp/p0e4a-qualification-result
+          cp -a "$root/handoffs" "$root/handoffs-missing"
+          rm "$root/handoffs-missing/after-active.json"
+          if python3 scripts/verify-xsp-v2-p0e4a-qualification-review-result.py \
+            --matrix-result "$root/matrix.json" --handoff-results-dir "$root/handoffs-missing" \
+            --result "$root/eligible.json"; then
+            echo 'missing handoff result unexpectedly validated' >&2
+            exit 1
+          fi
+          cp -a "$root/handoffs" "$root/handoffs-extra"
+          printf '%s\n' '{"synthetic":"unexpected sixth result"}' > "$root/handoffs-extra/extra.json"
+          if python3 scripts/verify-xsp-v2-p0e4a-qualification-review-result.py \
+            --matrix-result "$root/matrix.json" --handoff-results-dir "$root/handoffs-extra" \
+            --result "$root/eligible.json"; then
+            echo 'extra handoff result unexpectedly validated' >&2
+            exit 1
+          fi
+
+      - name: Verify PR delta is qualification-result preparation only
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          changed="$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" | sort)"
+          expected="$(printf '%s\n' \
+            .github/workflows/xsp-p0e4a-qualification-review-result.yml \
+            deploy/xsp-v2-p0e4a-qualification-review-result.contract.json \
+            docs/XSP_V2_P0E4A_QUALIFICATION_REVIEW_RESULT.md \
+            scripts/verify-xsp-v2-p0e4a-qualification-review-result.py | sort)"
+          test "$changed" = "$expected"
+
+      - name: State synthetic contract evidence only
+        run: |
+          echo 'PASS: P0-E4a returned-review contract is bound to the existing five-run matrix/handoff outputs and fails closed on unsafe recommendation states.'
+          echo 'All CI inputs are SYNTHETIC contract fixtures, not physical power-loss evidence.'
+          echo 'The verifier always reports physicalPowerLossQualified=false and requires a later explicit reviewed checkpoint.'
+          echo 'Issue #138 remains OPEN; strict-pq remains OFF; production rollout remains NOT AUTHORIZED.'
