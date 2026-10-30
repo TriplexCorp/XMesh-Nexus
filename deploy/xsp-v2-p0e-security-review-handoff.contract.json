@@ -1,22 +1,28 @@
 {
-  "schema": "xsp2-p0e-security-review-handoff-contract-2",
+  "schema": "xsp2-p0e-security-review-handoff-contract-3",
   "nexus": {
     "repository": "TriplexCorp/XMesh-Nexus",
-    "sourceRevision": "8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091"
+    "sourceRevision": "0bab1a48cff570b3abe405bcda4dc242b23b8a4b"
   },
   "node": {
     "repository": "TriplexCorp/XMesh-Node",
     "sourceRevision": "083dc181c5e175f89007f4b93111cd5c45a69d97"
   },
   "previousReviewFreeze": {
-    "handoffMerge": "7b84a9e45f9e9cf815b95a06d1560f84d8d3f0a2",
-    "nexusSourceRevision": "5cdb7825fcc51f8a7d296b992a7da4492ed2ce8e",
+    "handoffMerge": "553bbfa70d993a5c53b054ea1105fc8feb0c1827",
+    "nexusSourceRevision": "8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091",
     "nodeSourceRevision": "083dc181c5e175f89007f4b93111cd5c45a69d97",
-    "supersededForCurrentMain": true,
-    "securityRelevantNexusMergesAfterFreeze": [
-      "36ee6f7a5b1686f9c0d51beda5d24e84830982c7",
-      "03679120726ff06005eff903909b262fb1271960"
+    "supersededForCurrentReleaseControlState": true,
+    "releaseControlMergesAfterFreeze": [
+      "497def9b950d57152f2e0ca2abb7eb0657a8d22f",
+      "b71c0d0c641b5e0f6a60785586486b18dbb45db3",
+      "0bab1a48cff570b3abe405bcda4dc242b23b8a4b"
     ]
+  },
+  "runtimeBaseline": {
+    "nexusSourceRevision": "8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091",
+    "nodeSourceRevision": "083dc181c5e175f89007f4b93111cd5c45a69d97",
+    "criticalRuntimePathsMustBeUnchanged": true
   },
   "stagingIngressHardeningCheckpoint": {
     "c2aRustOriginMerge": "36ee6f7a5b1686f9c0d51beda5d24e84830982c7",
@@ -27,6 +33,15 @@
     "nexusMerge": "5cdb7825fcc51f8a7d296b992a7da4492ed2ce8e",
     "nexusImplementationMerge": "ccb9e384dca47f0c1a69c0ecd82461d523344c7a",
     "nodeImplementationMerge": "083dc181c5e175f89007f4b93111cd5c45a69d97"
+  },
+  "releaseControlCheckpoint": {
+    "disposableCanaryRehearsalMerge": "497def9b950d57152f2e0ca2abb7eb0657a8d22f",
+    "productionRolloutPlanMerge": "b71c0d0c641b5e0f6a60785586486b18dbb45db3",
+    "strictPqActivationApprovalMerge": "0bab1a48cff570b3abe405bcda4dc242b23b8a4b",
+    "finalReleaseCanarySatisfied": false,
+    "productionActivation": false,
+    "strictPQEnabled": false,
+    "legacyXMESH1Retired": false
   },
   "requiredReviewDomains": [
     "protocol-and-canonicalization",
@@ -51,13 +66,19 @@
     "docs/XSP_V2_P0E_PARSER_FUZZ.md",
     "docs/XSP_V2_P0E_MLDSA65_FIPS204_ACVP.md",
     "docs/XSP_V2_P0E_OBSERVABILITY.md",
+    "docs/XSP_V2_DISPOSABLE_CANARY_REHEARSAL.md",
+    "docs/XSP_V2_PRODUCTION_ROLLOUT_PLAN.md",
+    "docs/XSP_V2_STRICT_PQ_ACTIVATION_APPROVAL.md",
     "docs/ENTERPRISE_ROADMAP.md"
   ],
   "requiredMachineContracts": [
     "deploy/xsp-v2-p0e-owner-retirement-durable-erasure.contract.json",
     "deploy/xsp-v2-p0e-parser-fuzz.contract.json",
     "deploy/xsp-v2-p0e-mldsa65-fips204-acvp.contract.json",
-    "deploy/xsp-v2-p0e-observability.contract.json"
+    "deploy/xsp-v2-p0e-observability.contract.json",
+    "deploy/xsp-v2-disposable-canary-rehearsal.contract.json",
+    "deploy/xsp-v2-production-rollout-plan.contract.json",
+    "deploy/xsp-v2-strict-pq-activation-approval.contract.json"
   ],
   "requiredImplementationEvidence": [
     "deploy/xsp-v2-ingress/Dockerfile",
@@ -69,12 +90,17 @@
     "scripts/check-xsp-v2-c2c-runtime.js",
     "scripts/test-xsp-v2-ingress-process.py",
     "scripts/test-xsp-v2-c2b-ack-process.py",
+    "scripts/verify-xsp-v2-production-rollout-plan.py",
+    "scripts/verify-xsp-v2-strict-pq-activation-approval.py",
     ".github/workflows/xsp-hybrid-tls.yml",
     ".github/workflows/xsp-c2c.yml",
     ".github/workflows/xsp-c2d.yml",
     ".github/workflows/xsp-c2d2-failure-matrix.yml",
     ".github/workflows/xsp-c2d2-transport-negatives.yml",
-    ".github/workflows/xsp-p0e2b-postgres-snapshot-rollback.yml"
+    ".github/workflows/xsp-p0e2b-postgres-snapshot-rollback.yml",
+    ".github/workflows/xsp-release-disposable-canary-rehearsal.yml",
+    ".github/workflows/xsp-production-rollout-plan-contract.yml",
+    ".github/workflows/xsp-strict-pq-activation-approval.yml"
   ],
   "requiredExternalBlockers": [
     "independent-security-review-findings-and-signoff",
