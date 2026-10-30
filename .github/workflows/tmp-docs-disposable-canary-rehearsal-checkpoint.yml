@@ -1,0 +1,110 @@
+name: Temporary disposable-canary rehearsal docs checkpoint
+
+on:
+  push:
+    branches: [docs/disposable-canary-rehearsal-checkpoint]
+    paths:
+      - ".github/workflows/tmp-docs-disposable-canary-rehearsal-checkpoint.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: docs/disposable-canary-rehearsal-checkpoint
+          fetch-depth: 0
+      - name: Patch authoritative docs exactly once
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          MERGE='497def9b950d57152f2e0ca2abb7eb0657a8d22f'
+          EXACT_RUN='41017508108'
+          POST_RUN='41018421184'
+          ARTIFACT_ID='12961000620'
+          ARTIFACT_DIGEST='cea8da4de7eb579d6bd190b7a646c0ed22e7bed3d17a99608553e7ca94a7d1c5'
+
+          readme_para=(
+            f"**Latest verified disposable release-canary rehearsal checkpoint:** [`{MERGE}`](https://github.com/TriplexCorp/XMesh-Nexus/commit/{MERGE}), merge of [PR #150](https://github.com/TriplexCorp/XMesh-Nexus/pull/150). PR #150 composes the existing real Agent install/upgrade/lost-response/restart/LKG rollback proof, the real E3b coordinated backup/restore proof against current reviewed Node `083dc181c5e175f89007f4b93111cd5c45a69d97`, and both default-off redacted observability surfaces into one disposable pre-release rehearsal. Exact-head run `{EXACT_RUN}` and post-merge run `{POST_RUN}` completed **success**; post-merge artifact `{ARTIFACT_ID}` has transport digest `sha256:{ARTIFACT_DIGEST}`. **This proves canary-harness readiness only: `finalReleaseCanarySatisfied=false`, P0-E issues #137/#138 remain OPEN, and the exact post-P0-E release candidate must rerun the complete canary.**"
+          )
+
+          for name in ('README.md','README.en.md'):
+            p=Path(name); text=p.read_text()
+            marker='**Latest verified disposable release-canary rehearsal checkpoint:**'
+            if marker in text:
+              raise SystemExit(f'{name}: canary checkpoint already present')
+            anchor='**Latest verified P0-E4a returned-review acceptance checkpoint:**'
+            lines=text.splitlines()
+            hits=[i for i,l in enumerate(lines) if l.startswith(anchor)]
+            if len(hits)!=1:
+              raise SystemExit(f'{name}: expected one P0-E4a checkpoint anchor, got {len(hits)}')
+            lines.insert(hits[0]+1, '')
+            lines.insert(hits[0]+2, readme_para)
+            text='\n'.join(lines)+'\n'
+            old='Neither a handoff, an individual gate nor green CI authorizes production rollout.'
+            new='The disposable release-canary rehearsal harness is COMPLETE as preparation only; the exact post-P0-E release candidate must rerun it before the final canary gate can be satisfied. Neither a handoff, an individual gate nor green CI authorizes production rollout.'
+            if text.count(old)!=1:
+              raise SystemExit(f'{name}: expected one summary non-authorization sentence')
+            text=text.replace(old,new,1)
+            p.write_text(text)
+
+          p=Path('docs/ENTERPRISE_ROADMAP.md'); text=p.read_text()
+          marker='- **Disposable release-canary rehearsal / Nexus PR #150:**'
+          if marker in text:
+            raise SystemExit('roadmap: canary checkpoint already present')
+          lines=text.splitlines()
+          anchor='- **Latest P0-E4a returned-review acceptance / Nexus PR #148:**'
+          hits=[i for i,l in enumerate(lines) if l.startswith(anchor)]
+          if len(hits)!=1:
+            raise SystemExit(f'roadmap: expected one PR #148 verified-source anchor, got {len(hits)}')
+          road=(
+            f"- **Disposable release-canary rehearsal / Nexus PR #150:** merge [`{MERGE}`](https://github.com/TriplexCorp/XMesh-Nexus/commit/{MERGE}) adds a bounded pre-release harness over the already-frozen runtime target. Exact-head run `{EXACT_RUN}` and post-merge run `{POST_RUN}` are **success** across source/freeze checks, real Agent install/upgrade/retry/restart/LKG rollback, current-Node E3b coordinated recovery, and Node-local + Nexus durable-state redacted observability. Post-merge artifact `{ARTIFACT_ID}` records bounded rehearsal evidence. This is harness readiness only: `finalReleaseCanarySatisfied=false`; P0-E must complete first and the exact release candidate must rerun the full canary."
+          )
+          lines.insert(hits[0]+1, road)
+
+          table_anchor='| P0-E4a returned-review result acceptance |'
+          hits=[i for i,l in enumerate(lines) if l.startswith(table_anchor)]
+          if len(hits)!=1:
+            raise SystemExit(f'roadmap: expected one returned-review table row, got {len(hits)}')
+          lines.insert(hits[0]+1, '| Disposable release-canary rehearsal harness | **COMPLETE — pre-release harness readiness only** | PR #150; exact-head + post-merge real lifecycle/recovery/observability rehearsal green; final exact-candidate canary still required after P0-E |')
+
+          prod_hits=[i for i,l in enumerate(lines) if l.startswith('3. a disposable canary must prove install/upgrade/rollback/recovery/observability;')]
+          if len(prod_hits)!=1:
+            raise SystemExit(f'roadmap: expected one production canary requirement, got {len(prod_hits)}')
+          lines[prod_hits[0]]='3. after P0-E is complete, the exact release candidate must pass the disposable canary for install/upgrade/rollback/recovery/observability; PR #150 proves the harness is executable beforehand but does not satisfy this final-candidate gate;'
+
+          guard='- A pre-P0-E disposable canary rehearsal is preparation evidence only; any security-relevant remediation changes the release candidate and requires the complete canary to be rerun after the affected scope is re-frozen/re-reviewed.'
+          guard_anchor='- A GitHub merge is not a production deployment.'
+          hits=[i for i,l in enumerate(lines) if l==guard_anchor]
+          if len(hits)!=1:
+            raise SystemExit(f'roadmap: expected one GitHub-merge guardrail, got {len(hits)}')
+          lines.insert(hits[0], guard)
+          p.write_text('\n'.join(lines)+'\n')
+          PY
+
+          grep -Fq 'Latest verified disposable release-canary rehearsal checkpoint' README.md
+          grep -Fq 'Latest verified disposable release-canary rehearsal checkpoint' README.en.md
+          grep -Fq 'Disposable release-canary rehearsal / Nexus PR #150' docs/ENTERPRISE_ROADMAP.md
+          grep -Fq 'finalReleaseCanarySatisfied=false' README.md
+          grep -Fq 'finalReleaseCanarySatisfied=false' README.en.md
+          grep -Fq 'finalReleaseCanarySatisfied=false' docs/ENTERPRISE_ROADMAP.md
+          grep -Fq 'strict-pq` remains **OFF**' docs/ENTERPRISE_ROADMAP.md
+          grep -Fq 'Production XSP-v2 rollout | **NOT AUTHORIZED**' docs/ENTERPRISE_ROADMAP.md
+
+          git config user.name 'Xmesh Creator'
+          git config user.email 'Aselis3d@gmail.com'
+          git add README.md README.en.md docs/ENTERPRISE_ROADMAP.md
+          git commit -m 'docs(xsp-v2): record disposable canary rehearsal checkpoint'
+          git push origin HEAD:docs/disposable-canary-rehearsal-checkpoint
+
+      - name: Self-clean temporary workflow
+        run: |
+          set -Eeuo pipefail
+          git rm .github/workflows/tmp-docs-disposable-canary-rehearsal-checkpoint.yml
+          git commit -m 'ci(docs): remove temporary canary checkpoint helper'
+          git push origin HEAD:docs/disposable-canary-rehearsal-checkpoint
