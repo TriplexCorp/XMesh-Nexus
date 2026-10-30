@@ -4,8 +4,10 @@
   "strictPqDefault": "off",
   "verifiedNodeSource": {
     "repository": "TriplexCorp/XMesh-Node",
-    "revision": "50c770c8bbb917b04ca893ac5b8d29e6c7f9af7e",
-    "pullRequest": 44
+    "revision": "34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb",
+    "pullRequest": 52,
+    "powercutHookOriginRevision": "50c770c8bbb917b04ca893ac5b8d29e6c7f9af7e",
+    "powercutHookOriginPullRequest": 44
   },
   "proofBoundary": {
     "name": "P0-E4a-external-powercut-arm-primitive",
