@@ -12,9 +12,9 @@
     }
   },
   "reviewerBundle": {
-    "workflowRun": 41050277455,
-    "deterministicTarSha256": "143ef26ff84281689e2ec2e2046cc06ec9ef5344a96b5f39edd4f877e014dbf3",
-    "payloadSha256": "f473c70f70a23fe91a057ee7b6db4747528a965019397563cfc91590205261f2"
+    "workflowRun": 41054352179,
+    "deterministicTarSha256": "9d213e9281f0ffbbc3da21f9f3814d6e7fbef1e6b5273f6e9cb12175c63273c4",
+    "payloadSha256": "7b118084777d59e1ef1791d6375c32c1c44cf6bcdf9a03a2b0648a7ad9f263f2"
   },
   "requiredReviewDomains": [
     "protocol-and-canonicalization",
