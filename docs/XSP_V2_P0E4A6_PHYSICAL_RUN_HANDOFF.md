@@ -30,9 +30,20 @@ The handoff pins the already-reviewed E4a source identities:
 
 The exact lab executable is additionally bound by SHA-256. A source revision alone is not accepted as executable identity.
 
+## E3a witness prerequisite
+
+Before `prepare`, the newest off-host E3a checkpoint must already have been checked with the existing `xsp-v2-recovery-checkpoint verify` tool against the exact pre-cut local epoch. Preserve the JSON verifier output outside the tested host failure domain.
+
+E4a6 requires both:
+
+- the original off-host checkpoint file; and
+- the preserved E3a verification result with exact fields `status=verified`, matching Node ID, matching minimum epoch, matching receipt digest and `localEpoch == rotation.fromEpoch`.
+
+The SHA-256 of that verification result is frozen into the handoff plan and must be supplied again after reboot. E4a6 therefore does not elevate an unverified checkpoint-shaped JSON document into a trusted recovery witness.
+
 ## `prepare` — pre-cut immutable handoff
 
-Run `prepare` only after the representative storage stack has passed the existing E4a1 preflight and the newest independently held E3a checkpoint is available.
+Run `prepare` only after the representative storage stack has passed the existing E4a1 preflight and the newest independently held E3a checkpoint has been verified as above.
 
 The command requires:
 
@@ -42,12 +53,12 @@ The command requires:
 - exact from/to epoch and Ed25519/ML-DSA-65 key identities;
 - exact lab binary bytes;
 - `agent-state` and `nexus-postgres` preflight reports;
-- newest off-host E3a checkpoint;
+- newest off-host E3a checkpoint plus its preserved verification result;
 - reviewed storage-profile ID and PLP/controller evidence ID;
 - external controller identity;
 - pre-cut boot ID.
 
-It validates that both preflights are `baselineEligible=true` and still have `physicalPowerLossQualified=false`, checks the off-host Node/floor binding, computes every required digest and creates a new `0600` fsynced plan without overwriting an existing path.
+It validates that both preflights are `baselineEligible=true` and still have `physicalPowerLossQualified=false`, checks the off-host Node/floor/verified-receipt binding, computes every required digest and creates a new `0600` fsynced plan without overwriting an existing path.
 
 The plan includes the exact required arm marker:
 
@@ -70,6 +81,7 @@ After the real Node operation emits the inherited-FD arm marker, a **physically 
 
 Preserve the following raw records outside the tested host failure domain:
 
+- E3a verification result used before the cut;
 - arm observation JSON `{marker, observedAtMs}`;
 - external controller metadata `{controllerId, eventId, action, observedAtMs}`;
 - the raw controller event record itself;
@@ -81,9 +93,9 @@ The external action must remain exactly `power-off`; the existing E4a3 verifier 
 
 ## `verify` — post-boot binding
 
-`verify` first calls the existing `scripts/xsp-v2-p0e4a3-powercut-evidence.py` verifier. It does not copy or weaken E4a3 rules.
+`verify` first checks that the preserved E3a verification result has the exact SHA-256 frozen before the cut. It then calls the existing `scripts/xsp-v2-p0e4a3-powercut-evidence.py` verifier. It does not copy or weaken E4a3 rules.
 
-It then adds the operator-handoff checks that E4a3 intentionally cannot infer from one assembled JSON document:
+It adds the operator-handoff checks that E4a3 intentionally cannot infer from one assembled JSON document:
 
 1. final evidence must match the prepared run ID/checkpoint/source/binary/Node/rotation/boot/storage/off-host fields exactly;
 2. controller identity must be the one fixed before the run;
@@ -114,14 +126,15 @@ Repeat the following with a unique run/controller event/boot pair for every chec
 For each point:
 
 1. collect/retain the common E4a1 preflight reports and E3a witness outside the tested failure domain;
-2. build the exact E4a5 lab binary and retain its SHA-256;
-3. run E4a6 `prepare` before the real operation;
-4. start the real E4a5 operation with the exact plan run ID/checkpoint and inherited arm FD;
-5. when the exact marker is observed, let the independent controller perform the abrupt power-off;
-6. after reboot, collect the changed boot ID, Agent recovery evidence and PostgreSQL recovery/integrity evidence **before any XSP-v2 network operation**;
-7. preserve raw controller records and review notes off-host;
-8. assemble the existing strict E4a3 evidence JSON and run E4a6 `verify`;
-9. preserve the plan, raw records, final evidence and verifier output together for independent review.
+2. run the existing E3a verifier against the exact pre-cut local state and preserve its JSON result;
+3. build the exact E4a5 lab binary and retain its SHA-256;
+4. run E4a6 `prepare` before the real operation;
+5. start the real E4a5 operation with the exact plan run ID/checkpoint and inherited arm FD;
+6. when the exact marker is observed, let the independent controller perform the abrupt power-off;
+7. after reboot, collect the changed boot ID, Agent recovery evidence and PostgreSQL recovery/integrity evidence **before any XSP-v2 network operation**;
+8. preserve raw controller records and review notes off-host;
+9. assemble the existing strict E4a3 evidence JSON and run E4a6 `verify`;
+10. preserve the plan, E3a verification, raw records, final evidence and verifier output together for independent review.
 
 After all five real runs pass E4a6, run the existing E4a4 matrix verifier over exactly those five E4a3 bundles.
 
