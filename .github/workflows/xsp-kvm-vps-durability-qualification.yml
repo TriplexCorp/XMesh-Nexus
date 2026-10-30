@@ -1,0 +1,121 @@
+name: XSP-v2 KVM VPS Durability Qualification Contract
+
+on:
+  pull_request:
+    paths:
+      - "deploy/xsp-v2-kvm-vps-durability-qualification.contract.json"
+      - "scripts/verify-xsp-v2-kvm-vps-durability.py"
+      - "docs/XSP_V2_KVM_VPS_DURABILITY_QUALIFICATION.md"
+      - ".github/workflows/xsp-kvm-vps-durability-qualification.yml"
+  push:
+    branches: [main]
+    paths:
+      - "deploy/xsp-v2-kvm-vps-durability-qualification.contract.json"
+      - "scripts/verify-xsp-v2-kvm-vps-durability.py"
+      - "docs/XSP_V2_KVM_VPS_DURABILITY_QUALIFICATION.md"
+      - ".github/workflows/xsp-kvm-vps-durability-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  kvm-vps-durability-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile verifier and validate policy boundary
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/verify-xsp-v2-kvm-vps-durability.py
+          python3 - <<'PY'
+          import json
+          c=json.load(open('deploy/xsp-v2-kvm-vps-durability-qualification.contract.json'))
+          assert c['deploymentClass']=='kvm-vps'
+          assert c['runtimeTarget']['nexusRevision']=='12b3170996bc062ee16c79659a6378e5e425fd0e'
+          assert c['runtimeTarget']['nodeRevision']=='34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb'
+          assert c['requiredClaims']['guestCrashConsistencyQualified'] is True
+          assert c['requiredClaims']['providerStorageDurabilityAssumed'] is True
+          assert c['requiredClaims']['physicalPowerLossQualified'] is False
+          assert c['requiredClaims']['productionActivation'] is False
+          assert c['requiredClaims']['strictPQEnabled'] is False
+          assert set(c['allowedCrashMethods'])=={'provider-hard-stop','guest-kernel-panic'}
+          assert len(c['requiredCheckpoints'])==5
+          PY
+
+      - name: Generate synthetic positive and fail-closed fixtures
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/kvm-vps"
+          mkdir -p "$work"
+          python3 - "$work" <<'PY'
+          import copy,json,os,sys
+          root=sys.argv[1]
+          target={'nexusRevision':'12b3170996bc062ee16c79659a6378e5e425fd0e','nodeRevision':'34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb'}
+          cases=[
+            ('after-previous','previous-complete'),
+            ('after-floor','next-complete'),
+            ('after-active','next-complete'),
+            ('after-recovery-abort','previous-complete'),
+            ('after-recovery-active','next-complete'),
+          ]
+          runs=[]
+          for i,(point,outcome) in enumerate(cases,1):
+            previous=outcome=='previous-complete'
+            runs.append({
+              'runId':f'kvm-run-{i:04d}','checkpoint':point,
+              'crashMethod':'provider-hard-stop' if i<5 else 'guest-kernel-panic',
+              'crashEvidenceSha256':f'{i:02x}'*32,
+              'bootBeforeId':f'boot-before-{i:04d}','bootAfterId':f'boot-after-{i:04d}','nodeId':812345678901,
+              'rotation':{'fromEpoch':7,'toEpoch':8,'fromEdKeyId':'ed-old-0001','fromPQKeyId':'pq-old-0001','toEdKeyId':'ed-new-0001','toPQKeyId':'pq-new-0001'},
+              'postBoot':{'classification':outcome,'keyEpoch':7 if previous else 8,'activeEdKeyId':'ed-old-0001' if previous else 'ed-new-0001','activePQKeyId':'pq-old-0001' if previous else 'pq-new-0001','securityStateSha256':f'{i+16:02x}'*32,'networkAttemptedBeforeValidation':False},
+              'postgresRecovery':{'recoveryObserved':True,'integrityChecksPassed':True,'fsync':'on','fullPageWrites':'on','synchronousCommit':'on','walSyncMethod':'fdatasync','securityTupleSha256':f'{i+32:02x}'*32},
+              'offhostWitness':{'checkpointSha256':f'{i+48:02x}'*32,'minimumEpoch':7,'receiptSha256':f'{i+64:02x}'*32},
+            })
+          base={
+            'schema':'xsp2-kvm-vps-durability-qualification-result-1','deploymentClass':'kvm-vps','target':target,
+            'providerStorage':{'provider':'Example VPS Provider','storageClass':'provider-block-storage','storageTrustBoundary':'provider-managed-block-storage','providerStorageDurabilityAssumed':True,'riskAcceptedBy':'release-owner-0001','riskAcceptedAt':'2026-10-30T12:00:00Z','riskStatement':'Provider physical host, controller and PLP are outside guest control; durable guest flush semantics are accepted as an external provider trust assumption.'},
+            'runs':runs,
+            'claims':{'guestCrashConsistencyQualified':True,'providerStorageDurabilityAssumed':True,'physicalPowerLossQualified':False,'productionActivation':False,'strictPQEnabled':False},
+          }
+          def write(name,obj): open(os.path.join(root,name),'w').write(json.dumps(obj,sort_keys=True,separators=(',',':'))+'\n')
+          write('eligible.json',base)
+          bad=copy.deepcopy(base); bad['deploymentClass']='bare-metal'; write('wrong-class.json',bad)
+          bad=copy.deepcopy(base); bad['target']['nodeRevision']='1'*40; write('wrong-target.json',bad)
+          bad=copy.deepcopy(base); bad['providerStorage']['providerStorageDurabilityAssumed']=False; write('no-provider-trust.json',bad)
+          bad=copy.deepcopy(base); bad['claims']['physicalPowerLossQualified']=True; write('false-physical-claim.json',bad)
+          bad=copy.deepcopy(base); bad['runs'].pop(); write('missing-checkpoint.json',bad)
+          bad=copy.deepcopy(base); bad['runs'][1]['checkpoint']=bad['runs'][0]['checkpoint']; write('duplicate-checkpoint.json',bad)
+          bad=copy.deepcopy(base); bad['runs'][1]['postBoot']['classification']='previous-complete'; bad['runs'][1]['postBoot']['keyEpoch']=7; bad['runs'][1]['postBoot']['activeEdKeyId']='ed-old-0001'; bad['runs'][1]['postBoot']['activePQKeyId']='pq-old-0001'; write('wrong-outcome.json',bad)
+          bad=copy.deepcopy(base); bad['runs'][2]['bootAfterId']=bad['runs'][2]['bootBeforeId']; write('same-boot.json',bad)
+          bad=copy.deepcopy(base); bad['runs'][3]['postBoot']['networkAttemptedBeforeValidation']=True; write('early-network.json',bad)
+          PY
+
+      - name: Prove KVM qualification positive result
+        run: |
+          set -euo pipefail
+          out="$(python3 scripts/verify-xsp-v2-kvm-vps-durability.py --result "$RUNNER_TEMP/kvm-vps/eligible.json")"
+          echo "$out"
+          echo "$out" | grep -Fq '"status":"kvm-vps-durability-qualified-for-release-gate"'
+          echo "$out" | grep -Fq '"guestCrashConsistencyQualified":true'
+          echo "$out" | grep -Fq '"providerStorageDurabilityAssumed":true'
+          echo "$out" | grep -Fq '"physicalPowerLossQualified":false'
+          echo "$out" | grep -Fq '"productionDurabilityGateEligible":true'
+          echo "$out" | grep -Fq '"productionActivation":false'
+
+      - name: Prove stale, ambiguous and false claims fail closed
+        run: |
+          set -euo pipefail
+          for f in wrong-class wrong-target no-provider-trust false-physical-claim missing-checkpoint duplicate-checkpoint wrong-outcome same-boot early-network; do
+            if python3 scripts/verify-xsp-v2-kvm-vps-durability.py --result "$RUNNER_TEMP/kvm-vps/$f.json"; then
+              echo "$f unexpectedly validated" >&2
+              exit 1
+            fi
+          done
+
+      - name: State deployment-class boundary
+        run: |
+          echo 'PASS: KVM VPS qualification can prove guest crash consistency without claiming physical hardware power-loss qualification.'
+          echo 'Real five-run evidence is still required; CI fixtures are not production qualification evidence.'
+          echo 'strict-pq remains OFF; production activation remains separate.'

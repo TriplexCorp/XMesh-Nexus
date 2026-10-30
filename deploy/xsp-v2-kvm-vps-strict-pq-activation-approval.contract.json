@@ -1,0 +1,39 @@
+{
+  "schema": "xsp2-kvm-vps-strict-pq-activation-approval-contract-1",
+  "approvalSchema": "xsp2-kvm-vps-strict-pq-activation-approval-1",
+  "deploymentClass": "kvm-vps",
+  "requiredRuntimeTarget": {
+    "nexusRuntimeRevision": "12b3170996bc062ee16c79659a6378e5e425fd0e",
+    "nodeRevision": "34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb"
+  },
+  "allowedScopeModes": ["limited-canary", "phased"],
+  "maxNodesPerApproval": 50,
+  "maxApprovalWindowSeconds": 86400,
+  "requiredApprovalAuthority": "release-owner",
+  "requiredTransportPolicy": {
+    "tlsProtocols": ["TLSv1.3"],
+    "keyExchange": "X25519MLKEM768",
+    "clientIdentity": "ML-DSA-65",
+    "criticalMessageSignatures": ["Ed25519", "ML-DSA-65"],
+    "automaticFallback": false,
+    "classicalOnlyAllowed": false
+  },
+  "requiredDecision": {
+    "strictPqAction": "enable",
+    "legacyXMESH1Action": "retain"
+  },
+  "requiredEvidence": [
+    "independentSecurityReviewAccepted",
+    "kvmVpsDurabilityQualificationAccepted",
+    "providerStorageRiskAccepted",
+    "finalCanaryPassed",
+    "rolloutPlanReviewed"
+  ],
+  "requiredFalseClaimsBeforeExecution": {
+    "productionActivation": false,
+    "strictPQEnabled": false,
+    "legacyXMESH1Retired": false,
+    "physicalPowerLossQualified": false
+  },
+  "requiresSeparateExecution": true
+}

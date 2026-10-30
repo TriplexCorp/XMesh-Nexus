@@ -1,0 +1,42 @@
+{
+  "schema": "xsp2-kvm-vps-durability-qualification-contract-1",
+  "resultSchema": "xsp2-kvm-vps-durability-qualification-result-1",
+  "deploymentClass": "kvm-vps",
+  "runtimeTarget": {
+    "nexusRevision": "12b3170996bc062ee16c79659a6378e5e425fd0e",
+    "nodeRevision": "34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb"
+  },
+  "requiredCheckpoints": [
+    "after-previous",
+    "after-floor",
+    "after-active",
+    "after-recovery-abort",
+    "after-recovery-active"
+  ],
+  "expectedOutcomes": {
+    "after-previous": "previous-complete",
+    "after-floor": "next-complete",
+    "after-active": "next-complete",
+    "after-recovery-abort": "previous-complete",
+    "after-recovery-active": "next-complete"
+  },
+  "allowedCrashMethods": [
+    "provider-hard-stop",
+    "guest-kernel-panic"
+  ],
+  "preferredCrashMethod": "provider-hard-stop",
+  "providerStorageBoundary": {
+    "storageTrustBoundary": "provider-managed-block-storage",
+    "hardwarePowerLossOutsideOperatorControl": true,
+    "physicalPowerLossQualificationRequiredForThisClass": false,
+    "explicitProviderDurabilityRiskAcceptanceRequired": true
+  },
+  "requiredClaims": {
+    "guestCrashConsistencyQualified": true,
+    "providerStorageDurabilityAssumed": true,
+    "physicalPowerLossQualified": false,
+    "productionActivation": false,
+    "strictPQEnabled": false
+  },
+  "automaticProductionActivation": false
+}
