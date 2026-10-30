@@ -1,0 +1,33 @@
+name: Temporary refreshed-freeze README wording fix
+
+on:
+  push:
+    branches:
+      - docs/p0e-refreshed-freeze-checkpoint
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: docs/p0e-refreshed-freeze-checkpoint
+          fetch-depth: 0
+
+      - name: Fix stale README wording
+        run: python3 scripts/tmp_fix_p0e_refreshed_freeze_readme.py
+
+      - name: Verify, self-clean and push
+        run: |
+          git diff --check
+          rm .github/workflows/tmp-fix-p0e-refreshed-freeze-readme.yml
+          rm scripts/tmp_fix_p0e_refreshed_freeze_readme.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md README.en.md .github/workflows/tmp-fix-p0e-refreshed-freeze-readme.yml scripts/tmp_fix_p0e_refreshed_freeze_readme.py
+          git diff --cached --check
+          git commit -m "docs(xsp-v2): align Rust hardening with refreshed freeze"
+          git push origin HEAD:docs/p0e-refreshed-freeze-checkpoint
