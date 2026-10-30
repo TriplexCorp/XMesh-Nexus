@@ -45,7 +45,13 @@ This is a composition of three independent evidence domains, not a claim that on
 
 A completed result contains one positive `subjectNodeId`, and every Node crash run must use that same Node ID.
 
-For the current qualification host the operator must pass the real panel Node ID to the runner, for example:
+For the current qualification host the confirmed panel Node ID is `13`. The exact qualification binary currently built from the pinned tooling revision has SHA-256:
+
+`4dae3081d270a721d5f91265063327e130c2a9fe7c2a959847bf363adc7edab2`
+
+Those values are evidence inputs, not hard-coded contract constants; a final result must bind the exact values actually used.
+
+The operator command shape is:
 
 ```bash
 ./xspv2-kvm-qualify arm \
@@ -54,7 +60,7 @@ For the current qualification host the operator must pass the real panel Node ID
   --node-id <REAL_NODE_ID>
 ```
 
-A matrix run with a placeholder Node ID is diagnostic only and is not accepted as the final issue-#138 result unless the value is the real Node ID.
+A matrix run with a placeholder Node ID is diagnostic only and is not accepted as the final issue-#138 result unless the value is the real Node ID. The already-completed `node-id=1` five-run matrix is therefore retained as diagnostic crash-consistency evidence, not as the final #138 Node matrix.
 
 ## A. Five required real Node crash cycles
 
@@ -126,6 +132,12 @@ The final result binds one preserved aggregate archive with:
 - `evidenceBundle.archiveSha256`.
 
 The archive should contain the five Node run manifests/post-boot records, five preserved Node crash-event records, the independent PostgreSQL crash/recovery record and raw crash evidence, the off-host checkpoint and verification result, and operator/provider risk-acceptance material.
+
+The diagnostic archive already produced from the placeholder-Node matrix has SHA-256:
+
+`4300f3028a68ef03e2c52b45966fe0709e0d0a82caf564b888dd53d0edc1e8af`
+
+It must remain labelled diagnostic and must not be substituted for the final aggregate archive.
 
 ## Provider storage boundary
 
