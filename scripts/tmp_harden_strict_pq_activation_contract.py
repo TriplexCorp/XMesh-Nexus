@@ -61,17 +61,3 @@ if text.count(old) != 1:
     raise SystemExit('verifier: requiredEvidence block mismatch')
 text = text.replace(old, new, 1)
 p.write_text(text)
-
-p = Path('.github/workflows/xsp-strict-pq-activation-approval.yml')
-text = p.read_text()
-old = """          x = copy.deepcopy(base); x['scope']['privateKey'] = 'forbidden'; dump('bad-private-field.json', x)\n          PY\n"""
-new = """          x = copy.deepcopy(base); x['scope']['privateKey'] = 'forbidden'; dump('bad-private-field.json', x)\n\n          contract = json.load(open('deploy/xsp-v2-strict-pq-activation-approval.contract.json', encoding='utf-8'))\n          x = copy.deepcopy(contract); x['maxNodesPerApproval'] = 51; dump('bad-contract-nodes.json', x)\n          x = copy.deepcopy(contract); x['maxApprovalWindowSeconds'] = 172800; dump('bad-contract-window.json', x)\n          x = copy.deepcopy(contract); x['forbiddenFieldNames'].remove('privateKey'); dump('bad-contract-forbidden.json', x)\n          PY\n"""
-if text.count(old) != 1:
-    raise SystemExit('workflow: fixture anchor mismatch')
-text = text.replace(old, new, 1)
-old = """          ! python3 scripts/verify-xsp-v2-strict-pq-activation-approval.py \\\n            --approval /tmp/eligible.json --require-eligible --now 2026-10-30T11:00:00Z\n"""
-new = """          ! python3 scripts/verify-xsp-v2-strict-pq-activation-approval.py \\\n            --approval /tmp/eligible.json --require-eligible --now 2026-10-30T11:00:00Z\n          for contract in /tmp/bad-contract-nodes.json /tmp/bad-contract-window.json /tmp/bad-contract-forbidden.json; do\n            ! python3 scripts/verify-xsp-v2-strict-pq-activation-approval.py \\\n              --approval /tmp/eligible.json --contract "$contract" "${common[@]}"\n          done\n"""
-if text.count(old) != 1:
-    raise SystemExit('workflow: negative-test anchor mismatch')
-text = text.replace(old, new, 1)
-p.write_text(text)
