@@ -44,18 +44,20 @@ USER 10004:10003
 WORKDIR /nonexistent
 ENTRYPOINT ["/usr/local/bin/xsp-origin-probe"]
 
-# C2-B/D still uses the pre-existing Python ACK gate during this bounded first
-# migration. It inherits the proven Rust C2-A peercred/SPKI runtime boundary,
-# then adds Python only in this later opt-in image target. A subsequent PR will
-# migrate this larger ACK/recovery state machine separately.
+# The ACK/recovery gate has a substantially larger JSON + C2-C state machine,
+# so it is built as an isolated Cargo crate with serde's strict typed decoder.
+FROM rust:1.99-trixie AS origin-ack-builder
+WORKDIR /src
+COPY deploy/xsp-v2-ingress/origin-ack-rs/Cargo.toml /src/Cargo.toml
+COPY deploy/xsp-v2-ingress/origin-ack-rs/src /src/src
+RUN cargo test --release \
+    && cargo build --release
+
+# C2-B/C/D uses the same no-network UID/GID/OpenSSL boundary but executes only
+# the compiled Rust ACK/recovery binary. No Python interpreter is present.
 FROM origin-probe AS origin-ack-gate
-USER 0:0
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends python3 \
-    && rm -rf /var/lib/apt/lists/*
-COPY deploy/xsp-v2-ingress/origin_ack_gate.py /usr/local/bin/xsp-origin-ack-gate
-USER 10004:10003
-ENTRYPOINT ["python3", "/usr/local/bin/xsp-origin-ack-gate"]
+COPY --from=origin-ack-builder /src/target/release/xsp-origin-ack-gate /usr/local/bin/xsp-origin-ack-gate
+ENTRYPOINT ["/usr/local/bin/xsp-origin-ack-gate"]
 
 # Test client only: OpenSSL and socat stay outside both ingress/origin runtime
 # images. The tiny `nc -w SEC -U PATH` compatibility wrapper is test-only and

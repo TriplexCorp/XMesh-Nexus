@@ -47,19 +47,21 @@ jobs:
           cache: false
       - name: Check D2 failure, outage/restart and race contracts
         run: |
-          python3 -m py_compile scripts/test-xsp-v2-c2d2-lost-response-races.py deploy/xsp-v2-ingress/origin_ack_gate.py
+          python3 -m py_compile scripts/test-xsp-v2-c2d2-lost-response-races.py
+          test -f deploy/xsp-v2-ingress/origin-ack-rs/src/main.rs
           test -f scripts/xsp-v2-c2d-race_test.go
           test -z "$(gofmt -d scripts/xsp-v2-c2d-race_test.go)"
           ! grep -R --line-number --fixed-strings 'strict-pq=on' scripts/test-xsp-v2-c2d2-lost-response-races.py scripts/xsp-v2-c2d-race_test.go
           ! grep -R --line-number -E '(-p|--publish)[ =]' scripts/test-xsp-v2-c2d2-lost-response-races.py
           grep -Fq 'request.Host = serverName' scripts/xsp-v2-c2d-node-client_test.go
-          grep -Fq 'XSP_V2_C2D_TEST_FAULT' deploy/xsp-v2-ingress/origin_ack_gate.py
-          grep -Fq 'drop-before-c2c' deploy/xsp-v2-ingress/origin_ack_gate.py scripts/test-xsp-v2-c2d2-lost-response-races.py
-          grep -Fq 'drop-on-c2c-failure' deploy/xsp-v2-ingress/origin_ack_gate.py scripts/test-xsp-v2-c2d2-lost-response-races.py
-          grep -Fq 'drop-after-c2c-success' deploy/xsp-v2-ingress/origin_ack_gate.py scripts/test-xsp-v2-c2d2-lost-response-races.py
-          grep -Fq 'TEST_FAULT and C2C_GATE != "staging-only"' deploy/xsp-v2-ingress/origin_ack_gate.py
-          grep -Fq 'class UnixHTTPServer(socketserver.ThreadingMixIn, socketserver.UnixStreamServer)' deploy/xsp-v2-ingress/origin_ack_gate.py
-          grep -Fq 'request_queue_size = 32' deploy/xsp-v2-ingress/origin_ack_gate.py
+          grep -Fq 'XSP_V2_C2D_TEST_FAULT' deploy/xsp-v2-ingress/origin-ack-rs/src/main.rs
+          grep -Fq 'drop-before-c2c' deploy/xsp-v2-ingress/origin-ack-rs/src/main.rs scripts/test-xsp-v2-c2d2-lost-response-races.py
+          grep -Fq 'drop-on-c2c-failure' deploy/xsp-v2-ingress/origin-ack-rs/src/main.rs scripts/test-xsp-v2-c2d2-lost-response-races.py
+          grep -Fq 'drop-after-c2c-success' deploy/xsp-v2-ingress/origin-ack-rs/src/main.rs scripts/test-xsp-v2-c2d2-lost-response-races.py
+          grep -Fq 'test_fault != TestFault::None && c2c_gate != "staging-only"' deploy/xsp-v2-ingress/origin-ack-rs/src/main.rs
+          grep -Fq 'thread::spawn(move || handle_connection' deploy/xsp-v2-ingress/origin-ack-rs/src/main.rs
+          grep -Fq 'const REQUEST_QUEUE_SIZE: i32 = 32' deploy/xsp-v2-ingress/origin-ack-rs/src/main.rs
+          grep -Fq 'listen(listener.as_raw_fd(), REQUEST_QUEUE_SIZE)' deploy/xsp-v2-ingress/origin-ack-rs/src/main.rs
           grep -Fq 'reloadVerifiedPermitForReceiptRetry' scripts/xsp-v2-c2d-race_test.go
           ! grep -Fq 'c2dRecoverHistoricalPermitForDurableReceipt' scripts/xsp-v2-c2d-race_test.go scripts/xsp-v2-c2d-node-client_test.go
           grep -Fq 'TestC2DExactFreshOutageFailsClosed' scripts/xsp-v2-c2d-race_test.go scripts/test-xsp-v2-c2d2-lost-response-races.py
