@@ -44,7 +44,7 @@ assert.match(origin, /const C2C_UID: u32 = 10001/);
 assert.match(origin, /const C2C_GID: u32 = 10001/);
 assert.match(origin, /peer_credentials\(&client\)[\s\S]*unexpected C2-C service peer[\s\S]*write_all\(&frame\)/,
   'origin must authenticate the C2-C peer before sending ACK bytes');
-assert.match(origin, /authorizationStatus\":\"not-verified/,
+assert.match(origin, /authorizationStatus":"not-verified/,
   'C2-B behavior must remain when C2-C gate is off');
 assert.doesNotMatch(origin, /TcpStream|reqwest::|X-XSP-V2-Trusted-Node-ID/,
   'Rust origin ACK gate must retain local Unix-only C2-C and transport identity boundaries');
