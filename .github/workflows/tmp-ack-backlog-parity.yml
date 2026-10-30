@@ -1,0 +1,72 @@
+name: Temporary ACK backlog parity patch
+on:
+  push:
+    branches: [refactor/xsp-origin-ack-rust]
+    paths:
+      - ".github/workflows/tmp-ack-backlog-parity.yml"
+permissions:
+  contents: write
+jobs:
+  patch-and-clean:
+    runs-on: ubuntu-latest
+    container: rust:1.99-trixie
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/xsp-origin-ack-rust
+          fetch-depth: 0
+      - name: Preserve Python gate backlog semantics in Rust and self-clean
+        run: |
+          apt-get update >/dev/null
+          apt-get install -y --no-install-recommends python3 >/dev/null
+          rustup component add rustfmt
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_exact(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              if text.count(old) != 1:
+                  raise SystemExit(f"expected exactly one match in {path}: {old!r}")
+              p.write_text(text.replace(old, new))
+
+          rust = "deploy/xsp-v2-ingress/origin-ack-rs/src/main.rs"
+          replace_exact(
+              rust,
+              "const MAX_SIGNATURE_TEXT: usize = 8 * 1024;\nconst OPENSSL_TIMEOUT: Duration = Duration::from_secs(5);",
+              "const MAX_SIGNATURE_TEXT: usize = 8 * 1024;\nconst REQUEST_QUEUE_SIZE: i32 = 32;\nconst OPENSSL_TIMEOUT: Duration = Duration::from_secs(5);",
+          )
+          replace_exact(
+              rust,
+              "    fn umask(mask: u32) -> u32;\n}",
+              "    fn umask(mask: u32) -> u32;\n    fn listen(socket: i32, backlog: i32) -> i32;\n}",
+          )
+          replace_exact(
+              rust,
+              "    let listener = listener.map_err(|error| format!(\"cannot bind origin socket: {error}\"))?;\n    fs::set_permissions(path, fs::Permissions::from_mode(0o660))",
+              "    let listener = listener.map_err(|error| format!(\"cannot bind origin socket: {error}\"))?;\n    // SAFETY: `listener` is a live listening Unix socket. Repeating listen(2)\n    // only tightens the pending connection queue to the reviewed Python gate's\n    // fixed backlog of 32; it does not change the socket identity or path.\n    let listen_result = unsafe { listen(listener.as_raw_fd(), REQUEST_QUEUE_SIZE) };\n    if listen_result != 0 {\n        return Err(\"cannot set origin socket backlog\".to_owned());\n    }\n    fs::set_permissions(path, fs::Permissions::from_mode(0o660))",
+          )
+
+          checker = "scripts/check-xsp-v2-c2b-ack-runtime.js"
+          replace_exact(
+              checker,
+              "must(origin.includes('DropBeforeC2c') && origin.includes('DropOnC2cFailure') && origin.includes('DropAfterC2cSuccess'),\n  'disposable D2 response-loss fault domains must remain explicit and allowlisted');",
+              "must(origin.includes('DropBeforeC2c') && origin.includes('DropOnC2cFailure') && origin.includes('DropAfterC2cSuccess'),\n  'disposable D2 response-loss fault domains must remain explicit and allowlisted');\nmust(origin.includes('const REQUEST_QUEUE_SIZE: i32 = 32') && origin.includes('listen(listener.as_raw_fd(), REQUEST_QUEUE_SIZE)'),\n  'Rust ACK gate must preserve the reviewed fixed Unix listen backlog of 32');",
+          )
+
+          matrix = ".github/workflows/xsp-c2d2-failure-matrix.yml"
+          replace_exact(
+              matrix,
+              "          grep -Fq 'thread::spawn(move || handle_connection' deploy/xsp-v2-ingress/origin-ack-rs/src/main.rs\n",
+              "          grep -Fq 'thread::spawn(move || handle_connection' deploy/xsp-v2-ingress/origin-ack-rs/src/main.rs\n          grep -Fq 'const REQUEST_QUEUE_SIZE: i32 = 32' deploy/xsp-v2-ingress/origin-ack-rs/src/main.rs\n          grep -Fq 'listen(listener.as_raw_fd(), REQUEST_QUEUE_SIZE)' deploy/xsp-v2-ingress/origin-ack-rs/src/main.rs\n",
+          )
+          PY
+          cargo fmt --manifest-path deploy/xsp-v2-ingress/origin-ack-rs/Cargo.toml --all
+          rm .github/workflows/tmp-ack-backlog-parity.yml
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deploy/xsp-v2-ingress/origin-ack-rs/src/main.rs scripts/check-xsp-v2-c2b-ack-runtime.js .github/workflows/xsp-c2d2-failure-matrix.yml .github/workflows/tmp-ack-backlog-parity.yml
+          git diff --cached --check
+          git commit -m "refactor(xsp-v2): preserve ACK listener backlog"
+          git push origin HEAD:refactor/xsp-origin-ack-rust
