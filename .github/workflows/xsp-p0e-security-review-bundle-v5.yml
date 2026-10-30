@@ -1,0 +1,103 @@
+name: XSP-v2 P0-E Security Review Bundle v5 KVM VPS
+
+on:
+  pull_request:
+    paths:
+      - "deploy/xsp-v2-p0e-security-review-handoff-v5.contract.json"
+      - "docs/XSP_V2_P0E_SECURITY_REVIEW_HANDOFF_V5.md"
+      - "scripts/build-xsp-v2-p0e-security-review-bundle-v5.py"
+      - "docs/XSP_V2_P0E_SECURITY_REVIEW_BUNDLE_V5.md"
+      - ".github/workflows/xsp-p0e-security-review-bundle-v5.yml"
+  push:
+    branches: [main]
+    paths:
+      - "deploy/xsp-v2-p0e-security-review-handoff-v5.contract.json"
+      - "docs/XSP_V2_P0E_SECURITY_REVIEW_HANDOFF_V5.md"
+      - "scripts/build-xsp-v2-p0e-security-review-bundle-v5.py"
+      - "docs/XSP_V2_P0E_SECURITY_REVIEW_BUNDLE_V5.md"
+      - ".github/workflows/xsp-p0e-security-review-bundle-v5.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reviewer-bundle-v5:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out v5 control branch
+        uses: actions/checkout@v4
+      - name: Check out frozen Nexus runtime
+        uses: actions/checkout@v4
+        with:
+          repository: TriplexCorp/XMesh-Nexus
+          ref: 12b3170996bc062ee16c79659a6378e5e425fd0e
+          path: xmesh-nexus-reviewed
+      - name: Check out frozen Node runtime
+        uses: actions/checkout@v4
+        with:
+          repository: TriplexCorp/XMesh-Node
+          ref: 34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb
+          path: xmesh-node-reviewed
+
+      - name: Build v5 bundle twice and prove deterministic payload
+        run: |
+          set -euo pipefail
+          python3 scripts/build-xsp-v2-p0e-security-review-bundle-v5.py \
+            --control-root . --nexus-root xmesh-nexus-reviewed --node-root xmesh-node-reviewed \
+            --output "$RUNNER_TEMP/v5-a" | tee "$RUNNER_TEMP/build-a.log"
+          python3 scripts/build-xsp-v2-p0e-security-review-bundle-v5.py \
+            --control-root . --nexus-root xmesh-nexus-reviewed --node-root xmesh-node-reviewed \
+            --output "$RUNNER_TEMP/v5-b" | tee "$RUNNER_TEMP/build-b.log"
+          diff -ru "$RUNNER_TEMP/v5-a" "$RUNNER_TEMP/v5-b"
+          payload_a="$(grep '^payloadSha256=' "$RUNNER_TEMP/build-a.log" | cut -d= -f2)"
+          payload_b="$(grep '^payloadSha256=' "$RUNNER_TEMP/build-b.log" | cut -d= -f2)"
+          test -n "$payload_a" && test "$payload_a" = "$payload_b"
+          echo "payloadSha256=$payload_a" | tee "$RUNNER_TEMP/v5-digests.txt"
+
+      - name: Create deterministic inner tar and bind digest
+        run: |
+          set -euo pipefail
+          tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner \
+            -cf "$RUNNER_TEMP/xsp-v2-p0e-review-v5-a.tar" -C "$RUNNER_TEMP/v5-a" .
+          tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner \
+            -cf "$RUNNER_TEMP/xsp-v2-p0e-review-v5-b.tar" -C "$RUNNER_TEMP/v5-b" .
+          sha_a="$(sha256sum "$RUNNER_TEMP/xsp-v2-p0e-review-v5-a.tar" | awk '{print $1}')"
+          sha_b="$(sha256sum "$RUNNER_TEMP/xsp-v2-p0e-review-v5-b.tar" | awk '{print $1}')"
+          test "$sha_a" = "$sha_b"
+          echo "deterministicTarSha256=$sha_a" | tee -a "$RUNNER_TEMP/v5-digests.txt"
+          cp "$RUNNER_TEMP/xsp-v2-p0e-review-v5-a.tar" "$RUNNER_TEMP/xsp-v2-p0e-review-v5.tar"
+          cat "$RUNNER_TEMP/v5-digests.txt"
+
+      - name: Verify manifest non-claims and KVM scope
+        run: |
+          set -euo pipefail
+          python3 - "$RUNNER_TEMP/v5-a/MANIFEST.json" <<'PY'
+          import json,sys
+          m=json.load(open(sys.argv[1]))
+          assert m['schema']=='xsp2-p0e-security-review-bundle-manifest-2'
+          assert m['reviewVersion']=='v5-kvm-vps'
+          assert m['deploymentClass']=='kvm-vps'
+          assert m['nexus']['sourceRevision']=='12b3170996bc062ee16c79659a6378e5e425fd0e'
+          assert m['node']['sourceRevision']=='34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb'
+          for k in ('independentSecurityReviewComplete','guestCrashConsistencyQualified','providerStorageDurabilityAssumed','physicalPowerLossQualified','productionActivation','strictPQEnabled'):
+            assert m[k] is False
+          assert len(m['requiredReviewDomains'])==11
+          PY
+
+      - name: Upload v5 reviewer transport artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: xsp-v2-p0e-security-review-v5-kvm
+          path: |
+            ${{ runner.temp }}/xsp-v2-p0e-review-v5.tar
+            ${{ runner.temp }}/v5-digests.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: State packaging boundary
+        run: |
+          echo 'PASS: deterministic v5 KVM reviewer bundle built from unchanged runtime target plus post-runtime control evidence.'
+          cat "$RUNNER_TEMP/v5-digests.txt"
+          echo 'Artifact ZIP identity is navigation only; bind the inner tar and payload SHA-256.'
+          echo 'Independent review and real KVM crash qualification remain incomplete.'

@@ -1,0 +1,83 @@
+{
+  "schema": "xsp2-p0e-security-review-handoff-contract-4",
+  "reviewVersion": "v5-kvm-vps",
+  "nexus": {
+    "repository": "TriplexCorp/XMesh-Nexus",
+    "sourceRevision": "12b3170996bc062ee16c79659a6378e5e425fd0e"
+  },
+  "node": {
+    "repository": "TriplexCorp/XMesh-Node",
+    "sourceRevision": "34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb"
+  },
+  "supersedesV4": {
+    "handoffMerge": "4413219370501a6d9cb4fc23b6edab9179f06a6b",
+    "runtimeUnchanged": true,
+    "reason": "material release-control policy change: add deploymentClass=kvm-vps durability and activation path"
+  },
+  "releaseControlCheckpoint": {
+    "bareMetalE4aRebindMerge": "af87c9e99c8ab358a87c36120ff121b4b5275653",
+    "kvmVpsPolicyMerge": "9bc592c875058f213da38d4565ab77dad015461c",
+    "activeDeploymentClass": "kvm-vps",
+    "bareMetalPhysicalProfileRetained": true,
+    "productionActivation": false,
+    "strictPQEnabled": false,
+    "legacyXMESH1Retired": false
+  },
+  "requiredReviewDomains": [
+    "protocol-and-canonicalization",
+    "hybrid-cryptography-and-key-purpose-binding",
+    "pq-only-transport-and-node-identity",
+    "isolated-signer-and-key-custody",
+    "postgresql-replay-ack-epoch-and-receipt",
+    "agent-local-durability-and-rollback",
+    "coordinated-backup-restore-and-off-host-floor",
+    "owner-authorized-key-retirement",
+    "parser-fuzz-and-external-mldsa65-vectors",
+    "default-off-redacted-observability",
+    "production-migration-no-fallback-and-rollback"
+  ],
+  "requiredSourceEvidence": [
+    "docs/XSP_V2_PQ_ONLY_SECURITY_POLICY.md",
+    "docs/XSP_V2_WIRE_SPEC.md",
+    "docs/XSP_V2_SIGNER_E2E.md",
+    "docs/XSP_V2_P0E_COORDINATED_BACKUP_RESTORE.md",
+    "docs/XSP_V2_P0E_OWNER_RETIREMENT_DURABLE_ERASURE.md",
+    "docs/XSP_V2_P0E_PARSER_FUZZ.md",
+    "docs/XSP_V2_P0E_MLDSA65_FIPS204_ACVP.md",
+    "docs/XSP_V2_P0E_OBSERVABILITY.md",
+    "docs/XSP_V2_DISPOSABLE_CANARY_REHEARSAL.md",
+    "docs/XSP_V2_PRODUCTION_ROLLOUT_PLAN.md",
+    "docs/XSP_V2_STRICT_PQ_ACTIVATION_APPROVAL.md",
+    "docs/XSP_V2_AI_ASSISTED_INTERNAL_SECURITY_AUDIT_2026-10-30.md",
+    "deploy/xsp-v2-ingress/nginx-c2b.conf",
+    "scripts/verify-xsp-v2-production-rollout-plan.py",
+    "scripts/verify-xsp-v2-strict-pq-activation-approval.py"
+  ],
+  "requiredControlEvidence": [
+    "deploy/xsp-v2-p0e4a-powercut-arm.contract.json",
+    "deploy/xsp-v2-p0e4a5-lab-operation.contract.json",
+    "scripts/xsp-v2-p0e4a3-powercut-evidence.py",
+    "scripts/xsp-v2-p0e4a6-physical-run-handoff-v4.py",
+    "docs/XSP_V2_P0E4A6_PHYSICAL_RUN_HANDOFF.md",
+    "deploy/xsp-v2-kvm-vps-durability-qualification.contract.json",
+    "scripts/verify-xsp-v2-kvm-vps-durability.py",
+    "docs/XSP_V2_KVM_VPS_DURABILITY_QUALIFICATION.md",
+    ".github/workflows/xsp-kvm-vps-durability-qualification.yml",
+    "deploy/xsp-v2-kvm-vps-strict-pq-activation-approval.contract.json",
+    "scripts/verify-xsp-v2-kvm-vps-strict-pq-activation-approval.py",
+    "docs/XSP_V2_KVM_VPS_STRICT_PQ_ACTIVATION_APPROVAL.md",
+    ".github/workflows/xsp-kvm-vps-strict-pq-activation-approval.yml"
+  ],
+  "requiredExternalBlockers": [
+    "independent-security-review-findings-and-signoff",
+    "kvm-vps-five-real-crash-consistency-runs"
+  ],
+  "reviewPackageFrozen": true,
+  "deploymentClass": "kvm-vps",
+  "independentSecurityReviewComplete": false,
+  "guestCrashConsistencyQualified": false,
+  "providerStorageDurabilityAssumed": false,
+  "physicalPowerLossQualified": false,
+  "productionActivation": false,
+  "strictPQEnabled": false
+}
