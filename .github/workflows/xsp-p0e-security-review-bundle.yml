@@ -1,0 +1,127 @@
+name: XSP-v2 P0-E Reproducible Security Review Bundle
+
+on:
+  pull_request:
+    paths:
+      - "scripts/build-xsp-v2-p0e-security-review-bundle.py"
+      - ".github/workflows/xsp-p0e-security-review-bundle.yml"
+      - "docs/XSP_V2_P0E_SECURITY_REVIEW_BUNDLE.md"
+      - "deploy/xsp-v2-p0e-security-review-handoff.contract.json"
+      - "docs/XSP_V2_P0E_SECURITY_REVIEW_HANDOFF.md"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/build-xsp-v2-p0e-security-review-bundle.py"
+      - ".github/workflows/xsp-p0e-security-review-bundle.yml"
+      - "docs/XSP_V2_P0E_SECURITY_REVIEW_BUNDLE.md"
+      - "deploy/xsp-v2-p0e-security-review-handoff.contract.json"
+      - "docs/XSP_V2_P0E_SECURITY_REVIEW_HANDOFF.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-review-bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out bundle control tooling
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check out exact frozen Nexus review target
+        uses: actions/checkout@v4
+        with:
+          repository: TriplexCorp/XMesh-Nexus
+          ref: 8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091
+          path: xmesh-nexus-reviewed
+          fetch-depth: 0
+
+      - name: Check out exact frozen Node review target
+        uses: actions/checkout@v4
+        with:
+          repository: TriplexCorp/XMesh-Node
+          ref: 083dc181c5e175f89007f4b93111cd5c45a69d97
+          path: xmesh-node-reviewed
+          fetch-depth: 0
+
+      - name: Build bundle twice and prove reproducibility
+        run: |
+          set -euo pipefail
+          python3 scripts/build-xsp-v2-p0e-security-review-bundle.py \
+            --control-root . \
+            --nexus-root xmesh-nexus-reviewed \
+            --node-root xmesh-node-reviewed \
+            --output dist/xsp-v2-p0e-security-review-bundle
+          python3 scripts/build-xsp-v2-p0e-security-review-bundle.py \
+            --control-root . \
+            --nexus-root xmesh-nexus-reviewed \
+            --node-root xmesh-node-reviewed \
+            --output /tmp/xsp-v2-p0e-security-review-bundle-rebuild
+          diff -r \
+            dist/xsp-v2-p0e-security-review-bundle \
+            /tmp/xsp-v2-p0e-security-review-bundle-rebuild
+
+      - name: Verify content-addressed manifest
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          root = Path('dist/xsp-v2-p0e-security-review-bundle')
+          manifest = json.loads((root / 'MANIFEST.json').read_text())
+          assert manifest['schema'] == 'xsp2-p0e-security-review-bundle-manifest-1'
+          assert manifest['nexus']['sourceRevision'] == '8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091'
+          assert manifest['node']['sourceRevision'] == '083dc181c5e175f89007f4b93111cd5c45a69d97'
+          assert manifest['reviewPackageFrozen'] is True
+          for key in ('independentSecurityReviewComplete', 'physicalPowerLossQualified',
+                      'productionActivation', 'strictPQEnabled'):
+              assert manifest[key] is False
+
+          records = manifest['files']
+          paths = [record['path'] for record in records]
+          assert len(paths) == len(set(paths))
+          assert 'source/XMesh-Nexus-8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091.tar' in paths
+          assert 'source/XMesh-Node-083dc181c5e175f89007f4b93111cd5c45a69d97.tar' in paths
+          for record in records:
+              path = root / record['path']
+              assert path.is_file(), record['path']
+              data = path.read_bytes()
+              assert len(data) == record['size'], record['path']
+              assert hashlib.sha256(data).hexdigest() == record['sha256'], record['path']
+
+          sums = (root / 'SHA256SUMS').read_bytes()
+          assert hashlib.sha256(sums).hexdigest() == manifest['payloadSha256']
+          assert b'MANIFEST.json' not in sums
+          assert b'SHA256SUMS' not in sums
+          PY
+
+      - name: Create deterministic transport archive
+        run: |
+          set -euo pipefail
+          tar --sort=name \
+            --mtime='UTC 1970-01-01' \
+            --owner=0 --group=0 --numeric-owner \
+            -cf dist/xsp-v2-p0e-security-review-bundle.tar \
+            -C dist xsp-v2-p0e-security-review-bundle
+          sha256sum dist/xsp-v2-p0e-security-review-bundle.tar \
+            > dist/xsp-v2-p0e-security-review-bundle.tar.sha256
+          cat dist/xsp-v2-p0e-security-review-bundle.tar.sha256
+
+      - name: Upload reviewer convenience artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: xsp-v2-p0e-security-review-bundle
+          path: |
+            dist/xsp-v2-p0e-security-review-bundle.tar
+            dist/xsp-v2-p0e-security-review-bundle.tar.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: State bounded non-claims
+        run: |
+          echo 'PASS: reproducible reviewer convenience bundle built from the exact frozen Nexus/Node revisions.'
+          echo 'The bundle does not perform independent review, qualify physical power loss, enable strict-pq, or authorize production rollout.'
