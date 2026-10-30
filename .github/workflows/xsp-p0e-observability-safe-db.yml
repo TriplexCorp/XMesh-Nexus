@@ -1,0 +1,186 @@
+name: XSP-v2 P0-E Safe DB Observability
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/Cargo.toml"
+      - "backend/src/bin/xsp_v2_observability.rs"
+      - ".github/workflows/xsp-p0e-observability-safe-db.yml"
+  pull_request:
+    paths:
+      - "backend/Cargo.toml"
+      - "backend/src/bin/xsp_v2_observability.rs"
+      - ".github/workflows/xsp-p0e-observability-safe-db.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  safe-db-observability:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: xmesh_observe
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d xmesh_observe"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/xmesh_observe
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.91.0
+          components: rustfmt,clippy
+
+      - name: Enforce default-off read-only source boundary
+        run: |
+          set -euo pipefail
+          cargo fmt --manifest-path backend/Cargo.toml --all -- --check
+          grep -Fq 'required-features = ["xsp-v2-observability"]' backend/Cargo.toml
+          grep -Fq 'xsp-v2-observability = []' backend/Cargo.toml
+          grep -Fq 'XSP_V2_OBSERVABILITY' backend/src/bin/xsp_v2_observability.rs
+          grep -Fq 'staging-only' backend/src/bin/xsp_v2_observability.rs
+          grep -Fq 'max_connections(1)' backend/src/bin/xsp_v2_observability.rs
+
+          if grep -nEi '\b(INSERT|UPDATE|DELETE|TRUNCATE|ALTER|DROP|CREATE)[[:space:]]' backend/src/bin/xsp_v2_observability.rs; then
+            echo 'observability binary contains mutating SQL' >&2
+            exit 1
+          fi
+          if grep -nE 'ed25519_public|mldsa65_public|challenge_sha256|permit_nonce|permit_input_sha256|signed_permit|applied_ack_sha256|signed_applied_ack|request_id|signed_receipt_sha256|signed_receipt|release_ack_version|release_ack_source_revision|release_ack_artifact_sha256|result[[:space:]]*[,)]' backend/src/bin/xsp_v2_observability.rs; then
+            echo 'observability binary selects or names replayable/sensitive payload columns' >&2
+            exit 1
+          fi
+
+      - name: Build and lint operator-only binary
+        run: |
+          set -euo pipefail
+          cargo build --manifest-path backend/Cargo.toml --features xsp-v2-observability --bin xsp-v2-observability
+          cargo clippy --manifest-path backend/Cargo.toml --features xsp-v2-observability --bin xsp-v2-observability -- -D warnings
+
+      - name: Prove exact runtime gate is default-off
+        run: |
+          set -euo pipefail
+          if backend/target/debug/xsp-v2-observability --node-id 42 >/tmp/observe-off.out 2>/tmp/observe-off.err; then
+            echo 'observability unexpectedly ran without exact staging gate' >&2
+            exit 1
+          fi
+          grep -Fxq 'XSP_V2_OBSERVABILITY must equal staging-only' /tmp/observe-off.err
+          test ! -s /tmp/observe-off.out
+
+      - name: Create representative schema with secret sentinels
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE TABLE node_xsp_suite_state (
+            node_id BIGINT PRIMARY KEY, minimum_suite SMALLINT NOT NULL,
+            activation_phase TEXT NOT NULL, key_epoch BIGINT NOT NULL,
+            last_verified_revision TEXT, updated_at TIMESTAMPTZ NOT NULL
+          );
+          CREATE TABLE node_xsp_rotation_preparations (
+            node_id BIGINT NOT NULL, purpose TEXT NOT NULL, from_epoch BIGINT NOT NULL,
+            to_epoch BIGINT NOT NULL, ed25519_key_id TEXT NOT NULL, mldsa65_key_id TEXT NOT NULL,
+            ed25519_public TEXT NOT NULL, mldsa65_public TEXT NOT NULL,
+            challenge_sha256 TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL,
+            expires_at TIMESTAMPTZ NOT NULL, proved_at TIMESTAMPTZ,
+            PRIMARY KEY(node_id,purpose)
+          );
+          CREATE TABLE node_xsp_cutover_permit_ledger (
+            node_id BIGINT NOT NULL, request_id TEXT NOT NULL, state TEXT NOT NULL,
+            permit_nonce TEXT NOT NULL, permit_input_sha256 TEXT NOT NULL,
+            signed_permit TEXT NOT NULL, applied_ack_sha256 TEXT,
+            signed_applied_ack TEXT, ack_verified_at TIMESTAMPTZ,
+            PRIMARY KEY(node_id,request_id)
+          );
+          CREATE TABLE node_xsp_signed_commit_receipt_outbox (
+            node_id BIGINT NOT NULL, request_id TEXT NOT NULL, signed_receipt_sha256 TEXT NOT NULL,
+            signed_receipt TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL,
+            PRIMARY KEY(node_id,request_id)
+          );
+          CREATE TABLE node_xsp_replay_nonces (
+            node_id BIGINT NOT NULL, nonce TEXT NOT NULL, request_id TEXT NOT NULL,
+            used_at TIMESTAMPTZ NOT NULL
+          );
+          CREATE TABLE node_restart_commands (
+            node_id BIGINT NOT NULL, action TEXT NOT NULL, state TEXT NOT NULL,
+            release_manifest_id BIGINT, release_ack_received_at TIMESTAMPTZ,
+            release_ack_version TEXT, release_ack_source_revision TEXT,
+            release_ack_artifact_sha256 TEXT, result TEXT NOT NULL
+          );
+
+          INSERT INTO node_xsp_suite_state VALUES
+            (42,2,'strict',7,'SECRET_REVISION',to_timestamp(1700000000));
+          INSERT INTO node_xsp_rotation_preparations VALUES
+            (42,'node_request',7,8,'ed-next','pq-next','SECRET_ED_PUBLIC','SECRET_PQ_PUBLIC',
+             'SECRET_CHALLENGE',to_timestamp(1700000000),to_timestamp(1700000300),to_timestamp(1700000010));
+          INSERT INTO node_xsp_cutover_permit_ledger VALUES
+            (42,'SECRET_REQ_1','issued','SECRET_NONCE_1','SECRET_PERMIT_HASH_1','SECRET_PERMIT_1',NULL,NULL,NULL),
+            (42,'SECRET_REQ_2','ack_verified','SECRET_NONCE_2','SECRET_PERMIT_HASH_2','SECRET_PERMIT_2','SECRET_ACK_HASH_2','SECRET_ACK_2',to_timestamp(1700000020)),
+            (42,'SECRET_REQ_3','receipt_sent','SECRET_NONCE_3','SECRET_PERMIT_HASH_3','SECRET_PERMIT_3','SECRET_ACK_HASH_3','SECRET_ACK_3',to_timestamp(1700000030)),
+            (42,'SECRET_REQ_4','aborted','SECRET_NONCE_4','SECRET_PERMIT_HASH_4','SECRET_PERMIT_4',NULL,NULL,NULL);
+          INSERT INTO node_xsp_signed_commit_receipt_outbox VALUES
+            (42,'SECRET_REQ_3','SECRET_RECEIPT_HASH','SECRET_RECEIPT',to_timestamp(1700000040));
+          INSERT INTO node_xsp_replay_nonces VALUES
+            (42,'SECRET_REPLAY_NONCE_1','SECRET_REPLAY_REQ_1',to_timestamp(1700000050)),
+            (42,'SECRET_REPLAY_NONCE_2','SECRET_REPLAY_REQ_2',to_timestamp(1700000060));
+          INSERT INTO node_restart_commands VALUES
+            (42,'update_agent','pending',1,NULL,NULL,NULL,NULL,'SECRET_RESULT_1'),
+            (42,'update_agent','succeeded',1,to_timestamp(1700000070),'SECRET_VERSION','SECRET_SOURCE','SECRET_ARTIFACT','SECRET_RESULT_2'),
+            (42,'restart_xray','failed',NULL,NULL,NULL,NULL,NULL,'SECRET_RESULT_3');
+          SQL
+
+      - name: Run sanitized read-only report and prove no durable mutation
+        run: |
+          set -euo pipefail
+          before="$(psql "$DATABASE_URL" -Atc "SELECT string_agg(v,'|' ORDER BY v) FROM (SELECT 'suite:'||node_id||':'||key_epoch v FROM node_xsp_suite_state UNION ALL SELECT 'permit:'||node_id||':'||state||':'||request_id FROM node_xsp_cutover_permit_ledger UNION ALL SELECT 'receipt:'||node_id||':'||request_id FROM node_xsp_signed_commit_receipt_outbox UNION ALL SELECT 'replay:'||node_id||':'||nonce FROM node_xsp_replay_nonces UNION ALL SELECT 'cmd:'||node_id||':'||action||':'||state||':'||result FROM node_restart_commands) s")"
+
+          XSP_V2_OBSERVABILITY=staging-only backend/target/debug/xsp-v2-observability --node-id 42 > /tmp/observe.json
+
+          after="$(psql "$DATABASE_URL" -Atc "SELECT string_agg(v,'|' ORDER BY v) FROM (SELECT 'suite:'||node_id||':'||key_epoch v FROM node_xsp_suite_state UNION ALL SELECT 'permit:'||node_id||':'||state||':'||request_id FROM node_xsp_cutover_permit_ledger UNION ALL SELECT 'receipt:'||node_id||':'||request_id FROM node_xsp_signed_commit_receipt_outbox UNION ALL SELECT 'replay:'||node_id||':'||nonce FROM node_xsp_replay_nonces UNION ALL SELECT 'cmd:'||node_id||':'||action||':'||state||':'||result FROM node_restart_commands) s")"
+          test "$before" = "$after"
+          ! grep -Fq 'SECRET_' /tmp/observe.json
+
+          python3 - <<'PY'
+          import json
+          x=json.load(open('/tmp/observe.json'))
+          assert x['schema']=='xsp2-nexus-observability-1'
+          assert x['nodeId']==42
+          assert x['suite']=={
+            'minimumSuite':2,'activationPhase':'strict','keyEpoch':7,'updatedAtMs':1700000000000
+          }
+          assert x['preparation']=={
+            'fromEpoch':7,'toEpoch':8,'ed25519KeyId':'ed-next','mldsa65KeyId':'pq-next',
+            'proved':True,'expiresAtMs':1700000300000
+          }
+          assert x['permits']['total']==4
+          assert x['permits']['issued']==1
+          assert x['permits']['ackVerified']==1
+          assert x['permits']['receiptSent']==1
+          assert x['permits']['aborted']==1
+          assert x['permits']['latestAckVerifiedAtMs']==1700000030000
+          assert x['durable']=={'receiptOutbox':1,'replayNonces':2,'latestReceiptAtMs':1700000040000}
+          assert x['agentUpdates']=={
+            'total':2,'pending':1,'claimed':0,'succeeded':1,'failed':0,'exactAckEvidence':1
+          }
+          assert x['readOnly'] is True
+          assert x['productionActivated'] is False
+          assert x['strictPqEnabled'] is False
+          allowed={'schema','nodeId','suite','preparation','permits','durable','agentUpdates','readOnly','productionActivated','strictPqEnabled'}
+          assert set(x)==allowed
+          PY
+
+      - name: State bounded evidence only
+        run: |
+          echo 'PASS: Nexus XSP-v2 DB observability is per-node, read-only, default-off and redacts replayable/sensitive payload columns.'
+          echo 'Only bounded state/status/count/timestamp/key-ID metadata is emitted; raw public keys, nonces, permits, ACKs, receipts, signatures and result/detail payloads are absent.'
+          echo 'No HTTP route or production activation is added; strict-pq remains OFF and production rollout remains NOT AUTHORIZED.'
