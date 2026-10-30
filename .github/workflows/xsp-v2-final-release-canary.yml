@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Verify final-canary control contract
+      - name: Verify exact-candidate canary control contract
         run: |
           set -Eeuo pipefail
           python3 - <<'PY'
@@ -50,12 +50,14 @@ jobs:
               'nexus-durable-redacted-observability',
           ]
           assert c['prerequisites']=={
-              'issue137IndependentSecurityReviewClosed':True,
+              'issue137IndependentSecurityReviewClosed':False,
               'issue138KvmDurabilityClosed':True,
-              'requiresExactReleaseCandidateRerun':True,
+              'requiresIndependentSecurityReviewResult':True,
+              'requiresExactReleaseCandidateRerunAfterP0E':True,
           }
           assert c['successClaims']=={
-              'finalReleaseCanarySatisfied':True,
+              'exactCandidateCanaryPassed':True,
+              'finalReleaseCanarySatisfied':False,
               'productionActivation':False,
               'strictPQEnabled':False,
               'legacyXMESH1Retired':False,
@@ -85,8 +87,8 @@ jobs:
       DASHBOARD_PATH: /dashboard/0123456789abcdef0123456789abcdef0123456789abcdef
       XSP_V2_P0D_AGENT_MIGRATION: staging-only
       P0D_NODE_SOURCE_REVISION: 34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb
-      P0D_AGENT_VERSION_A: final-canary-a
-      P0D_AGENT_VERSION_B: final-canary-b
+      P0D_AGENT_VERSION_A: exact-candidate-canary-a
+      P0D_AGENT_VERSION_B: exact-candidate-canary-b
     steps:
       - name: Check out exact reviewed XMesh-Nexus runtime
         uses: actions/checkout@v4
@@ -238,12 +240,12 @@ jobs:
         run: bash scripts/test-xsp-v2-canary-observability.sh
 
   final-result:
-    name: Emit exact-candidate final canary evidence
+    name: Emit exact-candidate canary evidence
     needs: [source-contract, agent-lifecycle, coordinated-recovery, redacted-observability]
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: Require every final-canary domain to pass
+      - name: Require every exact-candidate canary domain to pass
         env:
           SOURCE_RESULT: ${{ needs.source-contract.result }}
           LIFECYCLE_RESULT: ${{ needs.agent-lifecycle.result }}
@@ -256,9 +258,9 @@ jobs:
           test "$LIFECYCLE_RESULT" = success
           test "$RECOVERY_RESULT" = success
           test "$OBSERVABILITY_RESULT" = success
-          cat > final-release-canary-result.json <<JSON
+          cat > exact-candidate-canary-result.json <<JSON
           {
-            "schema": "xsp2-final-release-canary-result-1",
+            "schema": "xsp2-exact-candidate-canary-result-1",
             "harnessRevision": "$HARNESS_REVISION",
             "releaseCandidate": {
               "nexusRevision": "$RELEASE_NEXUS_REVISION",
@@ -270,18 +272,20 @@ jobs:
               "coordinatedRecovery": "$RECOVERY_RESULT",
               "redactedObservability": "$OBSERVABILITY_RESULT"
             },
-            "finalReleaseCanarySatisfied": true,
+            "exactCandidateCanaryPassed": true,
+            "finalReleaseCanarySatisfied": false,
+            "blockedBy": ["independent-security-review-137"],
             "productionActivation": false,
             "strictPQEnabled": false,
             "legacyXMESH1Retired": false
           }
           JSON
-          python3 -m json.tool final-release-canary-result.json >/dev/null
-          cat final-release-canary-result.json
-          sha256sum final-release-canary-result.json
+          python3 -m json.tool exact-candidate-canary-result.json >/dev/null
+          cat exact-candidate-canary-result.json
+          sha256sum exact-candidate-canary-result.json
       - uses: actions/upload-artifact@v4
         with:
-          name: xsp-v2-final-release-canary-result
-          path: final-release-canary-result.json
+          name: xsp-v2-exact-candidate-canary-result
+          path: exact-candidate-canary-result.json
           if-no-files-found: error
           retention-days: 30
