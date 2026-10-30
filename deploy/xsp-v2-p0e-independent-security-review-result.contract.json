@@ -4,7 +4,7 @@
   "frozenTarget": {
     "nexus": {
       "repository": "TriplexCorp/XMesh-Nexus",
-      "sourceRevision": "8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091"
+      "sourceRevision": "0bab1a48cff570b3abe405bcda4dc242b23b8a4b"
     },
     "node": {
       "repository": "TriplexCorp/XMesh-Node",
@@ -12,9 +12,9 @@
     }
   },
   "reviewerBundle": {
-    "workflowRun": 41013465969,
-    "deterministicTarSha256": "f095f19217a072ef7919663744fcdfbc847783eb23be5a64b0f8df37b8952ced",
-    "payloadSha256": "fb3a9bb9c3de2a462a8b338357b0a068dfdbe70a05f0dca81735006786b25b38"
+    "workflowRun": 41037503656,
+    "deterministicTarSha256": "bac34400ac9b646c8a0f64ca9495e380ff0afce373310787c96385b9e40486bf",
+    "payloadSha256": "33c8f07f4513cb03400c8b7af2f34f804661a79501336206482c0f426866620a"
   },
   "requiredReviewDomains": [
     "protocol-and-canonicalization",
