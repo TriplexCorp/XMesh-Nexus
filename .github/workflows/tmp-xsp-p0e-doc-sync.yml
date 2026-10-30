@@ -2,14 +2,15 @@ name: Temporary XSP-v2 P0-E docs sync
 
 on:
   push:
-    branches: [docs/xsp-v2-security-review-current]
+    branches:
+      - docs/xsp-v2-security-review-current
 
 permissions:
   contents: write
 
 jobs:
   sync-docs:
-    if: github.actor != 'github-actions[bot]'
+    if: ${{ github.actor != 'github-actions[bot]' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,126 +18,25 @@ jobs:
           ref: docs/xsp-v2-security-review-current
           fetch-depth: 0
 
-      - name: Apply exact checkpoint/status replacements
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
+      - name: Apply exact status replacements
+        run: python3 scripts/tmp-xsp-p0e-doc-sync.py
 
-          readmes = [Path('README.md'), Path('README.en.md')]
+      - name: Remove temporary sync helpers
+        run: rm .github/workflows/tmp-xsp-p0e-doc-sync.yml scripts/tmp-xsp-p0e-doc-sync.py
 
-          old_latest = """**Latest verified Nexus P0-E recovery/security checkpoint:** [`a477c1f6067da2e8ecab0344433d1691c3c75b47`](https://github.com/TriplexCorp/XMesh-Nexus/commit/a477c1f6067da2e8ecab0344433d1691c3c75b47), merge of [PR #131](https://github.com/TriplexCorp/XMesh-Nexus/pull/131). Since the P0-E4a6 physical-run handoff checkpoint, Node PRs #46–#50 plus Nexus PRs #127–#131 have closed the bounded owner-authorized old-key retirement chain, added strict recovery/retirement parser fuzz smoke, and pinned an external official NIST ACVP ML-DSA-65 FIPS 204 signature-verification corpus. **P0-E4a itself remains CURRENT/OPEN until five representative physical abrupt-power runs are actually executed and independently reviewed.**"""
-          new_latest = """**Latest verified Nexus P0-E review-preparation checkpoint:** [`7b84a9e45f9e9cf815b95a06d1560f84d8d3f0a2`](https://github.com/TriplexCorp/XMesh-Nexus/commit/7b84a9e45f9e9cf815b95a06d1560f84d8d3f0a2), merge of [PR #135](https://github.com/TriplexCorp/XMesh-Nexus/pull/135). Node PR #51 plus Nexus PRs #133–#134 close bounded default-off redacted observability, and PR #135 freezes the exact Node/Nexus evidence package for independent security review. **The independent security review itself is still OPEN, and P0-E4a remains CURRENT/OPEN until five representative physical abrupt-power runs are actually executed and independently reviewed.**"""
-
-          old_summary = """**P0-C2-D and P0-D are COMPLETE. P0-E remains the CURRENT P0. P0-E1a, P0-E2a, P0-E2b, P0-E3a and P0-E3b are COMPLETE within their explicitly bounded scopes. P0-E4a1–P0-E4a6 software/lab-preparation gates are COMPLETE, but representative physical power-loss qualification remains outstanding. The bounded owner-authorized old-key retirement flow and the current parser-fuzz / ML-DSA-65 external FIPS 204 verification-vector gates are also COMPLETE. The remaining repo-side P0-E software work is operational observability without secret/key leakage, followed by independent review of the final migration/production architecture; neither completion nor any green CI authorizes production rollout.** The production-capable Agent path remains default-disabled and `strict-pq` remains OFF."""
-          new_summary = """**P0-C2-D and P0-D are COMPLETE. P0-E remains the CURRENT P0. P0-E1a, P0-E2a, P0-E2b, P0-E3a and P0-E3b are COMPLETE within their explicitly bounded scopes. P0-E4a1–P0-E4a6 software/lab-preparation gates are COMPLETE, but representative physical power-loss qualification remains outstanding. Bounded owner-authorized retirement, parser-fuzz, external ML-DSA-65 verification vectors and default-off redacted observability are COMPLETE. The independent security-review handoff/evidence freeze is also COMPLETE as preparation only; independent review findings/sign-off and representative P0-E4a physical power-loss qualification remain OPEN. Neither a handoff, an individual gate nor green CI authorizes production rollout.** The production-capable Agent path remains default-disabled and `strict-pq` remains OFF."""
-
-          old_current = """### CURRENT repo-side software sub-gate — operational observability
-
-With bounded retirement, parser fuzzing and external ML-DSA-65 verification-vector checks now complete, the next implementable P0-E repository gate is **operational observability without secret/key leakage**. It must expose enough bounded health/audit state to diagnose enrollment/cutover/recovery/retirement failures and security-component availability without logging private keys, raw bearer material, MFA secrets, full signed permits/ACKs/receipts, or other replayable sensitive payloads. This observability gate must remain default-safe and cannot activate the production XSP-v2 path.
-
-After observability, P0-E still requires an **independent security review of the final migration/production architecture**. The five real E4a physical-power experiments and their independent evidence review remain a parallel external/hardware blocker. Completion of these individual gates still does not authorize production rollout."""
-          new_current = """### CURRENT repo-side release sub-gate — independent security review
-
-Bounded operational observability is COMPLETE. Node PR #51 plus Nexus PRs #133/#134 provide default-off local/DB read-only redacted views and an exact cross-repo checkpoint under `XSP_V2_OBSERVABILITY=staging-only`, without a network observability route, durable security-state mutation or production activation.
-
-Nexus PR #135 freezes the independent-review target at Nexus `5cdb7825fcc51f8a7d296b992a7da4492ed2ce8e` and Node `083dc181c5e175f89007f4b93111cd5c45a69d97`, indexes 11 required review domains/evidence, and deliberately keeps `independentSecurityReviewComplete=false`, `physicalPowerLossQualified=false`, `productionActivation=false` and `strictPQEnabled=false`. This is review preparation only.
-
-Closing the repo-side P0-E review gate now requires an independently attributable security-review result and sign-off for those frozen revisions, or a newly frozen target after any security-relevant remediation. The five real E4a physical-power experiments and their independent evidence review remain the parallel external/hardware blocker. Neither the handoff nor green CI counts as independent review or authorizes production rollout."""
-
-          obs_bullet = "- **Node PR #51 + Nexus PRs #133–#134 / bounded default-off redacted observability:** Node merge `083dc181c5e175f89007f4b93111cd5c45a69d97` adds a local read-only snapshot; Nexus PR #133 adds a feature-gated per-node read-only DB view; PR #134 pins and re-verifies both exact merges. Both sides require exact `XSP_V2_OBSERVABILITY=staging-only`, exclude sensitive/replayable payloads and leave production activation/`strict-pq` false; no observability network route or security-state mutation is introduced.\n"
-          review_bullet = "- **Nexus PR #135 / independent security-review handoff freeze:** Nexus merge `7b84a9e45f9e9cf815b95a06d1560f84d8d3f0a2` freezes exact review targets Nexus `5cdb7825fcc51f8a7d296b992a7da4492ed2ce8e` + Node `083dc181c5e175f89007f4b93111cd5c45a69d97`, 11 mandatory review domains and the evidence index while explicitly keeping independent review, physical qualification, production activation and `strict-pq` OPEN/OFF. This is preparation, not external sign-off.\n"
-          marker = "- **Node PR #50 + Nexus PR #131 / external ML-DSA-65 FIPS 204 sigVer vectors:**"
-
-          for path in readmes:
-            text = path.read_text()
-            for old, new, label in [
-              (old_latest, new_latest, 'latest checkpoint'),
-              (old_summary, new_summary, 'P0-E summary'),
-              (old_current, new_current, 'current repo-side gate'),
-            ]:
-              count = text.count(old)
-              assert count == 1, f'{path}: expected exactly one {label}, found {count}'
-              text = text.replace(old, new, 1)
-            if 'Node PR #51 + Nexus PRs #133–#134 / bounded default-off redacted observability' not in text:
-              lines = text.splitlines(keepends=True)
-              indexes = [i for i,line in enumerate(lines) if line.startswith(marker)]
-              assert len(indexes) == 1, f'{path}: expected one ML-DSA bullet, found {len(indexes)}'
-              i = indexes[0]
-              lines[i+1:i+1] = [obs_bullet, review_bullet]
-              text = ''.join(lines)
-            path.write_text(text)
-
-          roadmap = Path('docs/ENTERPRISE_ROADMAP.md')
-          text = roadmap.read_text()
-
-          old_road_latest = """- **Latest verified Nexus P0-E recovery/security checkpoint:** [`a477c1f6067da2e8ecab0344433d1691c3c75b47`](https://github.com/TriplexCorp/XMesh-Nexus/commit/a477c1f6067da2e8ecab0344433d1691c3c75b47), merge of [PR #131](https://github.com/TriplexCorp/XMesh-Nexus/pull/131). Since P0-E4a6, Node PRs #46–#50 plus Nexus PRs #127–#131 close the bounded owner-authorized old-key retirement chain, add strict recovery/retirement parser fuzz smoke and pin an external official NIST ACVP ML-DSA-65 FIPS 204 signature-verification corpus. P0-E4a itself remains OPEN until five representative physical abrupt-power experiments are executed and independently reviewed. The current implementable repo-side P0-E software gate is operational observability without secret/key leakage."""
-          new_road_latest = """- **Latest verified Nexus P0-E review-preparation checkpoint:** [`7b84a9e45f9e9cf815b95a06d1560f84d8d3f0a2`](https://github.com/TriplexCorp/XMesh-Nexus/commit/7b84a9e45f9e9cf815b95a06d1560f84d8d3f0a2), merge of [PR #135](https://github.com/TriplexCorp/XMesh-Nexus/pull/135). Node PR #51 plus Nexus PRs #133–#134 close bounded default-off redacted observability; PR #135 freezes the exact Node/Nexus evidence package for external independent security review. The current repo-side P0-E release gate is independent security-review findings/sign-off. P0-E4a remains OPEN until five representative physical abrupt-power experiments are executed and independently reviewed."""
-          assert text.count(old_road_latest) == 1
-          text = text.replace(old_road_latest, new_road_latest, 1)
-
-          table_replacements = {
-            "| **P0-E operational observability without secret/key leakage** | **CURRENT repo-side software sub-gate** | Add bounded health/audit visibility for security operations and component availability without private keys, bearer/MFA material or replayable signed payloads |":
-            "| **P0-E operational observability without secret/key leakage** | **COMPLETE — bounded default-off read-only evidence** | Node PR #51 + Nexus PRs #133–#134; local/DB redacted read-only views, exact cross-repo pin, no network route or production activation |",
-            "| Independent security review | **OPEN — after final repo-side architecture is frozen** | Independent review of migration/production architecture, threat model, trust/custody/rollback/observability boundaries and deployment plan |":
-            "| Independent security review | **CURRENT repo-side release sub-gate — external sign-off required** | PR #135 freezes exact Node/Nexus targets and evidence package; independent findings, remediation disposition and sign-off must come from an external reviewer |",
-            "| **P0-E recovery/security release gates** | **CURRENT P0** | Remaining blockers: real E4a physical-power matrix + independent review, operational observability, then final independent security review |":
-            "| **P0-E recovery/security release gates** | **CURRENT P0** | Remaining blockers: real E4a physical-power matrix + independent evidence review, and independent architecture/security findings/sign-off; observability and review handoff are complete |",
-          }
-          for old, new in table_replacements.items():
-            count = text.count(old)
-            assert count == 1, f'roadmap table replacement count {count}: {old}'
-            text = text.replace(old, new, 1)
-
-          if '**Bounded default-off redacted observability / Node PR #51 + Nexus PRs #133–#134:**' not in text:
-            marker_road = '- **P0-E3b / PR #114:**'
-            assert text.count(marker_road) == 1
-            insert = (
-              "- **Bounded default-off redacted observability / Node PR #51 + Nexus PRs #133–#134:** Node merge [`083dc181c5e175f89007f4b93111cd5c45a69d97`](https://github.com/TriplexCorp/XMesh-Node/commit/083dc181c5e175f89007f4b93111cd5c45a69d97) adds the local read-only snapshot. Nexus PR #133 merge [`ccb9e384dca47f0c1a69c0ecd82461d523344c7a`](https://github.com/TriplexCorp/XMesh-Nexus/commit/ccb9e384dca47f0c1a69c0ecd82461d523344c7a) adds the default-off per-node DB view, and PR #134 merge [`5cdb7825fcc51f8a7d296b992a7da4492ed2ce8e`](https://github.com/TriplexCorp/XMesh-Nexus/commit/5cdb7825fcc51f8a7d296b992a7da4492ed2ce8e) pins/re-verifies both exact implementations. The shared gate is `XSP_V2_OBSERVABILITY=staging-only`; outputs are read-only/redacted and no observability network route or production activation is added.\n"
-              "- **Independent security-review handoff / Nexus PR #135:** Nexus merge [`7b84a9e45f9e9cf815b95a06d1560f84d8d3f0a2`](https://github.com/TriplexCorp/XMesh-Nexus/commit/7b84a9e45f9e9cf815b95a06d1560f84d8d3f0a2) freezes exact review targets Nexus `5cdb7825fcc51f8a7d296b992a7da4492ed2ce8e` and Node `083dc181c5e175f89007f4b93111cd5c45a69d97`, 11 required review domains, evidence documents/contracts and the two remaining external blockers. The contract explicitly leaves `independentSecurityReviewComplete=false`, `physicalPowerLossQualified=false`, `productionActivation=false` and `strictPQEnabled=false`; it is preparation, not independent review.\n"
-            )
-            text = text.replace(marker_road, insert + marker_road, 1)
-
-          old_road_current = """### CURRENT repo-side software sub-gate — operational observability without secret/key leakage
-
-With bounded owner-authorized retirement, parser fuzz smoke and the external ML-DSA-65 verification-vector gate complete, the next implementable repository-side P0-E gate is **operational observability without secret/key leakage**.
-
-Acceptance must provide enough bounded health/audit state to diagnose security-critical operation classes and component availability — enrollment/migration, rotation/cutover, receipt recovery, backup/recovery checks and retirement — while preventing logging/export of private keys, raw bearer or MFA material, master keys, full signed permits/ACKs/receipts, raw signature blobs, or other replayable sensitive payloads. Stable non-secret identifiers/digests, operation class, bounded result/reason categories, component health and correlation IDs may be exposed only where they are already authorized and useful. The observability path must remain read-only with respect to XSP-v2 security state, must not weaken fail-closed behavior, and must not activate the production XSP-v2 path.
-
-After observability, P0-E still requires an **independent security review of the final migration/production architecture**. The real five-run E4a physical-power matrix and its independent evidence review remain a parallel external/hardware blocker. Completion of these individual gates does not authorize rollout."""
-          new_road_current = """### CURRENT repo-side release sub-gate — independent security review
-
-Bounded operational observability is COMPLETE. Node PR #51 plus Nexus PR #133 implement default-off redacted read-only local/DB views under exact `XSP_V2_OBSERVABILITY=staging-only`; Nexus PR #134 pins the exact cross-repo source/delta and re-runs the bounded proof. No observability network route, durable security-state mutation or production activation is introduced.
-
-Nexus PR #135 at `7b84a9e45f9e9cf815b95a06d1560f84d8d3f0a2` freezes the independent-review handoff around exact Nexus target `5cdb7825fcc51f8a7d296b992a7da4492ed2ce8e` and Node target `083dc181c5e175f89007f4b93111cd5c45a69d97`, 11 required review domains, evidence documents/contracts and two still-open external blockers. Its contract deliberately keeps `independentSecurityReviewComplete=false`, `physicalPowerLossQualified=false`, `productionActivation=false` and `strictPQEnabled=false`.
-
-The current repo-side release blocker is therefore the **independent security review findings and sign-off** for those frozen revisions, or a newly frozen target after any security-relevant remediation. The real five-run E4a physical-power matrix and independent evidence review remain the parallel external/hardware blocker. Neither the handoff nor green CI counts as independent review or authorizes rollout."""
-          count = text.count(old_road_current)
-          assert count == 1, f'roadmap current section count {count}'
-          text = text.replace(old_road_current, new_road_current, 1)
-
-          old_guard = "- Completed P0-D gates through Node PR #37 and Nexus PR #105, plus bounded P0-E1a/P0-E2a/P0-E2b/P0-E3a/P0-E3b, P0-E4a1–P0-E4a6, owner-retirement, parser-fuzz and external-vector evidence remain default-disabled proofs; none authorize production migration or substitute for the real E4a physical-power matrix."
-          new_guard = "- Completed P0-D gates through Node PR #37 and Nexus PR #105, plus bounded P0-E1a/P0-E2a/P0-E2b/P0-E3a/P0-E3b, P0-E4a1–P0-E4a6, owner-retirement, parser-fuzz, external-vector, observability and security-review-handoff evidence remain default-disabled proofs; none authorize production migration, substitute for independent security review or substitute for the real E4a physical-power matrix."
-          assert text.count(old_guard) == 1
-          text = text.replace(old_guard, new_guard, 1)
-          old_review_guard = "- Bounded fuzz and NIST-vector gates do not replace independent security review."
-          new_review_guard = "- Bounded fuzz, NIST-vector, observability and review-handoff gates do not replace independent security review."
-          assert text.count(old_review_guard) == 1
-          text = text.replace(old_review_guard, new_review_guard, 1)
-
-          roadmap.write_text(text)
-          PY
-
-          rm .github/workflows/tmp-xsp-p0e-doc-sync.yml
-
-      - name: Commit synchronized docs and remove temporary workflow
+      - name: Commit synchronized docs
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add README.md README.en.md docs/ENTERPRISE_ROADMAP.md .github/workflows/tmp-xsp-p0e-doc-sync.yml
-          expected="$(printf '%s\n' README.en.md README.md docs/ENTERPRISE_ROADMAP.md .github/workflows/tmp-xsp-p0e-doc-sync.yml | sort)"
+          git add -A
           changed="$(git diff --cached --name-only | sort)"
+          expected="$(printf '%s\n' \
+            .github/workflows/tmp-xsp-p0e-doc-sync.yml \
+            README.en.md \
+            README.md \
+            docs/ENTERPRISE_ROADMAP.md \
+            scripts/tmp-xsp-p0e-doc-sync.py | sort)"
           test "$changed" = "$expected"
           git commit -m 'docs(xsp-v2): mark observability complete and review current'
           git push origin HEAD:docs/xsp-v2-security-review-current
