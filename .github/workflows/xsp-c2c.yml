@@ -21,7 +21,7 @@ on:
       - "backend/Dockerfile.xsp-signer"
       - "deploy/postgres/20-create-xsp-v2-signer-role.sql"
       - "deploy/postgres/21-create-xsp-v2-c2c-role.sql"
-      - "deploy/xsp-v2-ingress/origin_ack_gate.py"
+      - "deploy/xsp-v2-ingress/origin-ack-rs/**"
       - "scripts/check-xsp-v2-c2c-runtime.js"
       - "scripts/test-xsp-v2-c2c-integration.py"
       - "scripts/generate-xsp-v2-mldsa-test-certs.go"
@@ -46,7 +46,7 @@ on:
       - "backend/Dockerfile.xsp-signer"
       - "deploy/postgres/20-create-xsp-v2-signer-role.sql"
       - "deploy/postgres/21-create-xsp-v2-c2c-role.sql"
-      - "deploy/xsp-v2-ingress/origin_ack_gate.py"
+      - "deploy/xsp-v2-ingress/origin-ack-rs/**"
       - "scripts/check-xsp-v2-c2c-runtime.js"
       - "scripts/test-xsp-v2-c2c-integration.py"
       - "scripts/generate-xsp-v2-mldsa-test-certs.go"
@@ -65,10 +65,8 @@ jobs:
           node-version: '24'
       - name: Verify no TCP/header identity handoff or production activation
         run: node scripts/check-xsp-v2-c2c-runtime.js
-      - name: Check Python harness syntax
-        run: |
-          python3 -m py_compile deploy/xsp-v2-ingress/origin_ack_gate.py
-          python3 -m py_compile scripts/test-xsp-v2-c2c-integration.py
+      - name: Check Python integration harness syntax
+        run: python3 -m py_compile scripts/test-xsp-v2-c2c-integration.py
 
   c2c-rust-lint:
     name: C2-C isolated package strict Clippy
@@ -89,6 +87,10 @@ jobs:
             -D clippy::pedantic \
             -D clippy::nursery \
             -F unsafe-code
+      - name: Verify Rust origin ACK gate formatting and Clippy
+        run: |
+          cargo fmt --manifest-path deploy/xsp-v2-ingress/origin-ack-rs/Cargo.toml --all -- --check
+          cargo clippy --manifest-path deploy/xsp-v2-ingress/origin-ack-rs/Cargo.toml --all-targets -- -D warnings
 
   c2c-process-e2e:
     name: Dual-signed ACK commit, protected signer and immutable receipt E2E
