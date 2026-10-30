@@ -4,7 +4,7 @@
 # the operator receives only the independent public pin and signer Unix socket.
 ARG PERMIT_BUILDER_IMAGE=rust:1.99-trixie
 FROM ${PERMIT_BUILDER_IMAGE} AS builder
-WORKDIR /build/backend
+WORKDIR /build/backend/xsp-permit
 ENV CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=4 CARGO_PROFILE_RELEASE_DEBUG=0
 RUN apt-get update \
     && apt-get install -y --no-install-recommends pkg-config libssl-dev \
@@ -13,11 +13,12 @@ RUN --mount=type=secret,id=proxy_ca \
     --mount=type=bind,source=backend,target=/source/backend \
     --mount=type=bind,source=docs,target=/source/docs \
     --mount=type=cache,id=xmesh-permit-registry,target=/usr/local/cargo/registry \
-    --mount=type=cache,id=xmesh-permit-target,target=/build/backend/target \
+    --mount=type=cache,id=xmesh-permit-target,target=/build/backend/xsp-permit/target \
     set -eu; \
     if [ -f /run/secrets/proxy_ca ]; then export CARGO_HTTP_CAINFO=/run/secrets/proxy_ca CARGO_HTTP_PROXY_CAINFO=/run/secrets/proxy_ca; fi; \
-    cp /source/backend/Cargo.toml .; \
-    cp -a /source/backend/src /source/backend/migrations .; \
+    cp /source/backend/xsp-permit/Cargo.toml .; \
+    mkdir -p /build/backend/src; \
+    cp -a /source/backend/src/. /build/backend/src/; \
     cp -a /source/docs /build/docs; \
     cargo build --release --features xsp-v2-experimental \
       --bin xsp-v2-permit-signer --bin xsp-v2-permit-operator; \
