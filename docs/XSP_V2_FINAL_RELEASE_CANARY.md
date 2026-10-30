@@ -1,61 +1,52 @@
-# XSP-v2 final release canary
+# XSP-v2 exact-candidate canary / final-canary gate
 
 ## Status
 
-This is the **post-P0-E exact-candidate final canary** required before production rollout-plan approval and the bounded KVM `strict-pq` activation approval.
-
-It is intentionally separate from the historical pre-P0-E disposable-canary rehearsal. The old rehearsal remains historical evidence and is not reused as the final release canary.
-
-## Exact candidate
-
-The final canary is bound to the reviewed production runtime target:
+The workflow exercises the exact reviewed production candidate:
 
 - XMesh-Nexus: `12b3170996bc062ee16c79659a6378e5e425fd0e`
 - XMesh-Node: `34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb`
 
-The workflow may run from a newer control/tooling revision only if the protected runtime paths are unchanged relative to the Nexus runtime target.
+During release-gate verification on 30 October 2026, issue #137 was found to have been closed without attributable independent external review evidence. It has therefore been reopened. Issue #138 remains complete.
 
-## Prerequisites
+Accordingly, the current exact-candidate canary may prove the runtime composition and all disposable canary domains, but **must not** claim `finalReleaseCanarySatisfied=true` until #137 is genuinely accepted and the exact candidate is rerun after that acceptance.
 
-This gate is post-P0-E. It assumes the repository has already recorded completion of:
+## Exact-runtime execution
 
-- issue #137 independent security review;
-- issue #138 KVM VPS durability qualification.
+Each real canary job checks out Nexus revision `12b3170996bc062ee16c79659a6378e5e425fd0e` directly, rather than treating later control/tooling commits as the runtime candidate. XMesh-Node is separately checked out at `34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb`.
 
-Those gates retain their own evidence/verifiers. The canary does not replace or synthesize them.
+This preserves the reviewed runtime boundary while allowing newer control-plane workflow files to orchestrate the test.
 
 ## Required domains
 
-`.github/workflows/xsp-v2-final-release-canary.yml` requires all of the following to pass on the exact candidate:
+`.github/workflows/xsp-v2-final-release-canary.yml` requires all of the following to pass:
 
 1. real Agent install/upgrade/lost-response/retry/restart/rollback lifecycle;
 2. coordinated backup/restore/recovery with recovery-floor protection;
 3. Node-local redacted observability;
 4. Nexus durable redacted observability.
 
-The Agent is built from exact Node revision `34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb` with the existing signed/content-addressed migration path. The Nexus runtime paths are checked against exact revision `12b3170996bc062ee16c79659a6378e5e425fd0e` before the real disposable jobs are allowed to run.
+The existing real proof implementations are executed from the exact Nexus runtime checkout; they are not reimplemented by the newer workflow.
 
-## Success result
+## Current successful-result boundary
 
-Only after every domain succeeds, the workflow emits and uploads `final-release-canary-result.json` using schema `xsp2-final-release-canary-result-1`.
-
-A successful result records:
+While #137 is open, a fully green exact-candidate run emits `exact-candidate-canary-result.json` with:
 
 ```json
 {
-  "finalReleaseCanarySatisfied": true,
+  "exactCandidateCanaryPassed": true,
+  "finalReleaseCanarySatisfied": false,
+  "blockedBy": ["independent-security-review-137"],
   "productionActivation": false,
   "strictPQEnabled": false,
   "legacyXMESH1Retired": false
 }
 ```
 
-The SHA-256 of that exact result is the canary binding used by the later production rollout-plan gate and strict-PQ activation approval.
+This is useful candidate evidence, but it is **not** the final release-canary artifact consumed by rollout-plan eligibility.
 
-## Run checkpoint
+## Final release rule
 
-The first authoritative post-P0-E run is intentionally triggered after the final-canary workflow is present on `main`, so GitHub evaluates it as a normal pull-request check against the exact candidate above.
+After a real attributable external result closes #137 and passes `scripts/verify-xsp-v2-p0e-independent-security-review-result.py --require-closure-eligible`, the exact same reviewed candidate must rerun the complete canary. Only that post-#137 run may emit `finalReleaseCanarySatisfied=true` and supply the final canary SHA-256 to the production rollout-plan gate.
 
-## Non-claims
-
-This workflow does not deploy production, change DNS/firewall/Nginx production state, enable `strict-pq`, or retire XMESH1. A successful final canary advances the release sequence to the separately reviewed rollout/rollback plan.
+The later rollout-plan review and KVM strict-PQ activation approval remain separate gates. No canary run itself enables `strict-pq` or activates production.
