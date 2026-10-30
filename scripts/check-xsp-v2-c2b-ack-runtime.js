@@ -12,7 +12,8 @@ function must(condition, message) {
 
 const dockerfile = read('deploy/xsp-v2-ingress/Dockerfile');
 const nginx = read('deploy/xsp-v2-ingress/nginx-c2b.conf');
-const origin = read('deploy/xsp-v2-ingress/origin_ack_gate.py');
+const origin = read('deploy/xsp-v2-ingress/origin-ack-rs/src/main.rs');
+const originCargo = read('deploy/xsp-v2-ingress/origin-ack-rs/Cargo.toml');
 const compose = read('compose.yaml');
 const installer = read('install.sh');
 const main = read('backend/src/main.rs');
@@ -20,15 +21,27 @@ const active = nginx
   .split('\n')
   .filter(line => !line.trimStart().startsWith('#'))
   .join('\n');
+const ackStage = dockerfile.split('FROM origin-probe AS origin-ack-gate')[1]
+  ?.split('FROM debian:trixie-slim AS probe')[0] || '';
 
 must(/FROM\s+runtime-base\s+AS\s+runtime-c2b/.test(dockerfile),
   'dedicated C2-B ingress image target missing');
 must(/COPY\s+deploy\/xsp-v2-ingress\/nginx-c2b\.conf\s+\/etc\/nginx\/nginx\.conf/.test(dockerfile),
   'C2-B runtime must use its dedicated config');
+must(/FROM\s+rust:1\.99-trixie\s+AS\s+origin-ack-builder/.test(dockerfile),
+  'C2-B/D ACK gate must use the pinned Rust builder');
+must(/cargo\s+test\s+--release/.test(dockerfile) && /cargo\s+build\s+--release/.test(dockerfile),
+  'Rust ACK gate builder must execute its unit tests before release build');
 must(/FROM\s+origin-probe\s+AS\s+origin-ack-gate/.test(dockerfile),
   'dedicated C2-B origin ACK target missing');
-must(/origin_ack_gate\.py\s+\/usr\/local\/bin\/xsp-origin-ack-gate/.test(dockerfile),
-  'C2-B origin target must install only the staging ACK gate');
+must(/COPY\s+--from=origin-ack-builder\s+\/src\/target\/release\/xsp-origin-ack-gate\s+\/usr\/local\/bin\/xsp-origin-ack-gate/.test(dockerfile),
+  'C2-B/D runtime must copy only the compiled Rust ACK gate');
+must(/ENTRYPOINT\s+\["\/usr\/local\/bin\/xsp-origin-ack-gate"\]/.test(ackStage),
+  'C2-B/D runtime must execute the compiled Rust ACK gate directly');
+must(!/\bpython3\b/.test(ackStage) && !/origin_ack_gate\.py/.test(ackStage),
+  'C2-B/D origin runtime must not contain or execute Python');
+must(/serde\s*=/.test(originCargo) && /serde_json\s*=/.test(originCargo),
+  'Rust ACK gate must use a typed serde decoder rather than ad-hoc JSON parsing');
 
 must(/listen\s+8444\s+ssl\s*;/.test(active), 'C2-B dedicated TLS listener missing');
 must(/ssl_protocols\s+TLSv1\.3\s*;/.test(active), 'C2-B must remain TLS1.3-only');
@@ -89,21 +102,32 @@ must(origin.includes('XSP_EXPECTED_INGRESS_UID') && origin.includes('XSP_EXPECTE
   'C2-B origin must pin ingress UID/GID');
 must(origin.includes('XSP_V2_C2B_ACK_ROUTE') && origin.includes('staging-only'),
   'C2-B route must have an explicit staging-only runtime gate');
-must(origin.includes('ACK_PATH = "/api/v2/node/keys/rotation/ack"'),
+must(origin.includes('const ACK_PATH: &str = "/api/v2/node/keys/rotation/ack"'),
   'origin must bind the exact ACK path');
-must(origin.includes('RECOVERY_PATH = ACK_PATH + "/recovery"'),
+must(origin.includes('const RECOVERY_PATH: &str = "/api/v2/node/keys/rotation/ack/recovery"'),
   'origin must bind a distinct exact historical recovery path');
-must(origin.includes('message["kind"] != "ack"'), 'origin must bind the ACK message class');
-must(origin.includes('message["nodeId"] != node_id'), 'origin must bind body Node ID to trusted transport Node ID');
-must(origin.includes('message["issuerId"] != f"node-{node_id}"'), 'origin must bind Node sender identity');
-must(origin.includes('message["method"] != "POST"') && origin.includes('message["path"] != ACK_PATH'),
+must((origin.match(/#\[serde\(deny_unknown_fields\)\]/g) || []).length >= 3,
+  'top-level, message and signature JSON objects must reject unknown fields');
+must(origin.includes('serde_json::from_slice(&raw)'),
+  'ACK body must be decoded into the strict typed envelope');
+must(origin.includes('message.kind != "ack"'), 'origin must bind the ACK message class');
+must(origin.includes('message.node_id != trusted_node_id'),
+  'origin must bind body Node ID to trusted transport Node ID');
+must(origin.includes('message.issuer_id != expected_issuer'), 'origin must bind Node sender identity');
+must(origin.includes('message.method != "POST"') && origin.includes('message.path != ACK_PATH'),
   'origin must keep signed ACK metadata bound to the original state-changing ACK path');
-must(origin.includes('now_ms <= message["expiresAtMs"]'),
+must(origin.includes('if now_ms <= message.expires_at_ms'),
   'historical recovery must require the original ACK freshness window to be closed');
-must(origin.includes('C2C_RECOVERY_REQUEST_MAGIC = b"XSP2C2H1"'),
+must(origin.includes('C2C_RECOVERY_REQUEST_MAGIC') && origin.includes('b"XSP2C2H1"'),
   'historical recovery must use a distinct protected C2-C request domain');
-must(origin.includes('"authorizationStatus": "not-verified"'),
+must(origin.includes('C2C_UID: u32 = 10001') && origin.includes('C2C_GID: u32 = 10001'),
+  'origin must authenticate the protected C2-C service peer');
+must(origin.includes('authorize_c2c(config, node_id, &raw, recovery)'),
+  'authorized C2-C transition must receive the exact raw ACK bytes');
+must(origin.includes('"authorizationStatus":"not-verified"'),
   'C2-B structural-only mode must explicitly state that cryptographic authorization has not occurred');
+must(origin.includes('DropBeforeC2c') && origin.includes('DropOnC2cFailure') && origin.includes('DropAfterC2cSuccess'),
+  'disposable D2 response-loss fault domains must remain explicit and allowlisted');
 must(!origin.includes('X-XSP-V2-Trusted-Node-ID'),
   'origin must never trust a forwarded caller Node ID header');
 
@@ -114,4 +138,4 @@ for (const source of [compose, installer]) {
 must(!main.includes('"/api/v2/node/keys/rotation/ack"'),
   'default/experimental Rust API must not mount the ACK route during C2-B/D2 staging proof');
 
-console.log('XSP-v2 C2-B/D2 contract: OK (two exact gated ACK operations over proven mTLS -> UDS boundary; no broad proxy)');
+console.log('XSP-v2 C2-B/D2 contract: OK (Rust ACK/recovery gate over proven mTLS -> UDS boundary; no Python runtime, no broad proxy)');
