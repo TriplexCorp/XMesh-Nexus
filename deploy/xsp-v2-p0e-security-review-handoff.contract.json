@@ -1,12 +1,27 @@
 {
-  "schema": "xsp2-p0e-security-review-handoff-contract-1",
+  "schema": "xsp2-p0e-security-review-handoff-contract-2",
   "nexus": {
     "repository": "TriplexCorp/XMesh-Nexus",
-    "sourceRevision": "5cdb7825fcc51f8a7d296b992a7da4492ed2ce8e"
+    "sourceRevision": "8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091"
   },
   "node": {
     "repository": "TriplexCorp/XMesh-Node",
     "sourceRevision": "083dc181c5e175f89007f4b93111cd5c45a69d97"
+  },
+  "previousReviewFreeze": {
+    "handoffMerge": "7b84a9e45f9e9cf815b95a06d1560f84d8d3f0a2",
+    "nexusSourceRevision": "5cdb7825fcc51f8a7d296b992a7da4492ed2ce8e",
+    "nodeSourceRevision": "083dc181c5e175f89007f4b93111cd5c45a69d97",
+    "supersededForCurrentMain": true,
+    "securityRelevantNexusMergesAfterFreeze": [
+      "36ee6f7a5b1686f9c0d51beda5d24e84830982c7",
+      "03679120726ff06005eff903909b262fb1271960"
+    ]
+  },
+  "stagingIngressHardeningCheckpoint": {
+    "c2aRustOriginMerge": "36ee6f7a5b1686f9c0d51beda5d24e84830982c7",
+    "c2bcdRustAckRecoveryMerge": "03679120726ff06005eff903909b262fb1271960",
+    "authoritativeDocsMerge": "8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091"
   },
   "observabilityCheckpoint": {
     "nexusMerge": "5cdb7825fcc51f8a7d296b992a7da4492ed2ce8e",
@@ -35,13 +50,31 @@
     "docs/XSP_V2_P0E_OWNER_RETIREMENT_DURABLE_ERASURE.md",
     "docs/XSP_V2_P0E_PARSER_FUZZ.md",
     "docs/XSP_V2_P0E_MLDSA65_FIPS204_ACVP.md",
-    "docs/XSP_V2_P0E_OBSERVABILITY.md"
+    "docs/XSP_V2_P0E_OBSERVABILITY.md",
+    "docs/ENTERPRISE_ROADMAP.md"
   ],
   "requiredMachineContracts": [
     "deploy/xsp-v2-p0e-owner-retirement-durable-erasure.contract.json",
     "deploy/xsp-v2-p0e-parser-fuzz.contract.json",
     "deploy/xsp-v2-p0e-mldsa65-fips204-acvp.contract.json",
     "deploy/xsp-v2-p0e-observability.contract.json"
+  ],
+  "requiredImplementationEvidence": [
+    "deploy/xsp-v2-ingress/Dockerfile",
+    "deploy/xsp-v2-ingress/origin_probe.rs",
+    "deploy/xsp-v2-ingress/origin-ack-rs/Cargo.toml",
+    "deploy/xsp-v2-ingress/origin-ack-rs/src/main.rs",
+    "scripts/check-xsp-v2-ingress-runtime.js",
+    "scripts/check-xsp-v2-c2b-ack-runtime.js",
+    "scripts/check-xsp-v2-c2c-runtime.js",
+    "scripts/test-xsp-v2-ingress-process.py",
+    "scripts/test-xsp-v2-c2b-ack-process.py",
+    ".github/workflows/xsp-hybrid-tls.yml",
+    ".github/workflows/xsp-c2c.yml",
+    ".github/workflows/xsp-c2d.yml",
+    ".github/workflows/xsp-c2d2-failure-matrix.yml",
+    ".github/workflows/xsp-c2d2-transport-negatives.yml",
+    ".github/workflows/xsp-p0e2b-postgres-snapshot-rollback.yml"
   ],
   "requiredExternalBlockers": [
     "independent-security-review-findings-and-signoff",
