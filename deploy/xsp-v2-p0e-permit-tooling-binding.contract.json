@@ -1,0 +1,37 @@
+{
+  "schema": "xsp2-p0e-permit-tooling-binding-contract-1",
+  "resultSchema": "xsp2-p0e-permit-tooling-binding-result-1",
+  "productionRuntimeTarget": {
+    "nexusRevision": "12b3170996bc062ee16c79659a6378e5e425fd0e"
+  },
+  "tooling": {
+    "revision": "c00c6dcf1dba0ef923dd23371bc17b9dec781602",
+    "toolingBaseRevision": "40d146fd3c24888cf65fa83333bdb376d0572439",
+    "runtimeBaseRevision": "12b3170996bc062ee16c79659a6378e5e425fd0e",
+    "manifestPath": "backend/xsp-permit/Cargo.toml",
+    "signerPath": "backend/src/bin/xsp_v2_permit_signer.rs",
+    "operatorPath": "backend/src/bin/xsp_v2_permit_operator.rs",
+    "dockerfilePath": "backend/Dockerfile.xsp-permit",
+    "requiredFeature": "xsp-v2-experimental",
+    "issuerGate": "XSP_V2_PROTECTED_PERMIT_ISSUER=staging-only",
+    "operatorGate": "XSP_V2_PROTECTED_PERMIT_OPERATOR=staging-only",
+    "productionPanelExcludesPermitTargets": true,
+    "allowedDeltaPaths": [
+      ".github/workflows/xsp-protected-permit-operator.yml",
+      "backend/Dockerfile.xsp-permit",
+      "backend/src/bin/xsp_v2_permit_operator.rs",
+      "backend/src/bin/xsp_v2_permit_signer.rs",
+      "backend/xsp-permit/Cargo.toml",
+      "deploy/postgres/22-create-xsp-v2-permit-signer-role.sql",
+      "docs/XSP_V2_PROTECTED_PERMIT_OPERATOR.md",
+      "scripts/check-xsp-v2-protected-permit-operator.js",
+      "scripts/test-xsp-v2-protected-permit-operator.py"
+    ]
+  },
+  "requiredClaims": {
+    "stagingOnly": true,
+    "productionRuntimeSourceUnchanged": true,
+    "strictPQEnabled": false,
+    "productionActivation": false
+  }
+}
