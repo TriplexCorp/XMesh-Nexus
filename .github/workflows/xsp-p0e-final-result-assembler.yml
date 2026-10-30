@@ -1,0 +1,17 @@
+name: XSP-v2 P0-E Final Result Assembler
+
+on:
+  pull_request:
+    paths:
+      - "scripts/assemble-xsp-v2-kvm-vps-durability-result-v2.py"
+      - ".github/workflows/xsp-p0e-final-result-assembler.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m py_compile scripts/assemble-xsp-v2-kvm-vps-durability-result-v2.py
