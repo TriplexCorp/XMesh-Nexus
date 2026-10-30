@@ -1,0 +1,42 @@
+{
+  "schema": "xsp2-p0e-parser-fuzz-contract-1",
+  "node": {
+    "repository": "TriplexCorp/XMesh-Node",
+    "sourceRevision": "fc1548171aad331b8a7851a895a7f18a5440e858",
+    "pullRequest": 49,
+    "previousReviewedRevision": "3d2fc155ead11e86a2872ad12fbe28f157bb24db"
+  },
+  "productionCodeChanged": false,
+  "fuzzTargets": [
+    "FuzzDecodeRecoveryCheckpoint",
+    "FuzzDecodeRetirementRequest",
+    "FuzzDecodeRetirementAuthorization"
+  ],
+  "strictDecoders": [
+    "Decode",
+    "DecodeRetirementRequest",
+    "DecodeRetirementAuthorization"
+  ],
+  "acceptedInputInvariant": "decode -> canonical validation -> JSON marshal -> strict decode -> semantic equality",
+  "seedClasses": [
+    "structurally-valid",
+    "malformed-partial",
+    "empty",
+    "empty-object",
+    "null",
+    "array",
+    "trailing-json",
+    "unknown-field",
+    "non-utf8"
+  ],
+  "goVersion": "1.27.3",
+  "fuzzSecondsPerTarget": 15,
+  "parallelWorkers": 1,
+  "boundedSmokeOnly": true,
+  "exhaustiveFuzzingClaimed": false,
+  "externalFIPS204KATClaimed": false,
+  "independentSecurityReviewClaimed": false,
+  "physicalPowerLossQualified": false,
+  "productionActivation": false,
+  "strictPQEnabled": false
+}

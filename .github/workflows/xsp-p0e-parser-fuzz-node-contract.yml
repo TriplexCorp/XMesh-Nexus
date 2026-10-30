@@ -1,0 +1,119 @@
+name: XSP-v2 P0-E Node Parser Fuzz Contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "deploy/xsp-v2-p0e-parser-fuzz.contract.json"
+      - "docs/XSP_V2_P0E_PARSER_FUZZ.md"
+      - ".github/workflows/xsp-p0e-parser-fuzz-node-contract.yml"
+  pull_request:
+    paths:
+      - "deploy/xsp-v2-p0e-parser-fuzz.contract.json"
+      - "docs/XSP_V2_P0E_PARSER_FUZZ.md"
+      - ".github/workflows/xsp-p0e-parser-fuzz-node-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  node-parser-fuzz-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out exact merged XMesh-Node parser-fuzz source
+        uses: actions/checkout@v4
+        with:
+          repository: TriplexCorp/XMesh-Node
+          ref: fc1548171aad331b8a7851a895a7f18a5440e858
+          path: xmesh-node
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache: false
+
+      - name: Verify contract and exact Node PR 49 delta
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          x=json.load(open('deploy/xsp-v2-p0e-parser-fuzz.contract.json'))
+          assert x['schema']=='xsp2-p0e-parser-fuzz-contract-1'
+          assert x['node']['repository']=='TriplexCorp/XMesh-Node'
+          assert x['node']['sourceRevision']=='fc1548171aad331b8a7851a895a7f18a5440e858'
+          assert x['node']['pullRequest']==49
+          assert x['node']['previousReviewedRevision']=='3d2fc155ead11e86a2872ad12fbe28f157bb24db'
+          assert x['productionCodeChanged'] is False
+          assert x['fuzzTargets']==[
+              'FuzzDecodeRecoveryCheckpoint',
+              'FuzzDecodeRetirementRequest',
+              'FuzzDecodeRetirementAuthorization',
+          ]
+          assert x['strictDecoders']==['Decode','DecodeRetirementRequest','DecodeRetirementAuthorization']
+          assert x['goVersion']=='1.27.3'
+          assert x['fuzzSecondsPerTarget']==15
+          assert x['parallelWorkers']==1
+          assert x['boundedSmokeOnly'] is True
+          assert x['exhaustiveFuzzingClaimed'] is False
+          assert x['externalFIPS204KATClaimed'] is False
+          assert x['independentSecurityReviewClaimed'] is False
+          assert x['physicalPowerLossQualified'] is False
+          assert x['productionActivation'] is False
+          assert x['strictPQEnabled'] is False
+          PY
+
+          cd xmesh-node
+          old=3d2fc155ead11e86a2872ad12fbe28f157bb24db
+          new=fc1548171aad331b8a7851a895a7f18a5440e858
+          git cat-file -e "$old^{commit}"
+          git cat-file -e "$new^{commit}"
+          actual="$(git diff --name-only "$old" "$new" | sort)"
+          expected="$(printf '%s\n' \
+            .github/workflows/xsp-p0e-parser-fuzz.yml \
+            agent/xspv2/recovery/parser_fuzz_test.go | sort)"
+          test "$actual" = "$expected"
+
+      - name: Verify strict parser fuzz source boundary
+        working-directory: xmesh-node
+        run: |
+          set -euo pipefail
+          gofmt -d agent/xspv2/recovery/parser_fuzz_test.go | tee /tmp/xsp-parser-fuzz-gofmt.diff
+          test ! -s /tmp/xsp-parser-fuzz-gofmt.diff
+          grep -Fq 'FuzzDecodeRecoveryCheckpoint' agent/xspv2/recovery/parser_fuzz_test.go
+          grep -Fq 'FuzzDecodeRetirementRequest' agent/xspv2/recovery/parser_fuzz_test.go
+          grep -Fq 'FuzzDecodeRetirementAuthorization' agent/xspv2/recovery/parser_fuzz_test.go
+          grep -Fq 'Canonical(decoded.Checkpoint)' agent/xspv2/recovery/parser_fuzz_test.go
+          grep -Fq 'validateRetirementRequest(decoded)' agent/xspv2/recovery/parser_fuzz_test.go
+          grep -Fq 'CanonicalRetirementAuthorization(decoded.Authorization)' agent/xspv2/recovery/parser_fuzz_test.go
+          grep -Fq 'reflect.DeepEqual(decoded, roundTrip)' agent/xspv2/recovery/parser_fuzz_test.go
+          test "$(grep -c 'reflect.DeepEqual(decoded, roundTrip)' agent/xspv2/recovery/parser_fuzz_test.go)" -eq 3
+
+      - name: Re-run pinned recovery unit suite
+        working-directory: xmesh-node/agent/xspv2
+        run: go test ./recovery -count=1
+
+      - name: Re-run pinned checkpoint decoder fuzz smoke
+        working-directory: xmesh-node/agent/xspv2
+        env:
+          GOMAXPROCS: "2"
+        run: go test ./recovery -run '^$' -fuzz '^FuzzDecodeRecoveryCheckpoint$' -fuzztime=15s -parallel=1
+
+      - name: Re-run pinned retirement request decoder fuzz smoke
+        working-directory: xmesh-node/agent/xspv2
+        env:
+          GOMAXPROCS: "2"
+        run: go test ./recovery -run '^$' -fuzz '^FuzzDecodeRetirementRequest$' -fuzztime=15s -parallel=1
+
+      - name: Re-run pinned retirement authorization decoder fuzz smoke
+        working-directory: xmesh-node/agent/xspv2
+        env:
+          GOMAXPROCS: "2"
+        run: go test ./recovery -run '^$' -fuzz '^FuzzDecodeRetirementAuthorization$' -fuzztime=15s -parallel=1
+
+      - name: State bounded evidence only
+        run: |
+          echo 'PASS: exact merged Node PR #49 strict security parser fuzz smoke is pinned and independently re-verified.'
+          echo 'External/version-pinned FIPS 204 ML-DSA KAT remains a separate open gate.'
+          echo 'P0-E4a remains OPEN; strict-pq remains OFF; production rollout remains NOT AUTHORIZED.'
