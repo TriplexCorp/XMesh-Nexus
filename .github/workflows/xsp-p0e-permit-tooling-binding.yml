@@ -1,0 +1,199 @@
+name: XSP-v2 P0-E Permit Tooling Binding
+
+on:
+  pull_request:
+    paths:
+      - 'deploy/xsp-v2-p0e-permit-tooling-binding.contract.json'
+      - 'scripts/verify-xsp-v2-p0e-permit-tooling-binding.py'
+      - 'docs/XSP_V2_P0E_PERMIT_TOOLING_BINDING.md'
+      - '.github/workflows/xsp-p0e-permit-tooling-binding.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'deploy/xsp-v2-p0e-permit-tooling-binding.contract.json'
+      - 'scripts/verify-xsp-v2-p0e-permit-tooling-binding.py'
+      - 'docs/XSP_V2_P0E_PERMIT_TOOLING_BINDING.md'
+      - '.github/workflows/xsp-p0e-permit-tooling-binding.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  permit-tooling-binding:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate contract and verifier syntax
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/verify-xsp-v2-p0e-permit-tooling-binding.py
+          python3 - <<'PY'
+          import json
+          c=json.load(open('deploy/xsp-v2-p0e-permit-tooling-binding.contract.json'))
+          assert c['schema']=='xsp2-p0e-permit-tooling-binding-contract-1'
+          assert c['productionRuntimeTarget']['nexusRevision']=='12b3170996bc062ee16c79659a6378e5e425fd0e'
+          t=c['tooling']
+          assert t['revision']=='c00c6dcf1dba0ef923dd23371bc17b9dec781602'
+          assert t['toolingBaseRevision']=='40d146fd3c24888cf65fa83333bdb376d0572439'
+          assert t['runtimeBaseRevision']==c['productionRuntimeTarget']['nexusRevision']
+          assert t['requiredFeature']=='xsp-v2-experimental'
+          assert t['productionPanelExcludesPermitTargets'] is True
+          assert c['requiredClaims']=={
+            'stagingOnly':True,
+            'productionRuntimeSourceUnchanged':True,
+            'strictPQEnabled':False,
+            'productionActivation':False,
+          }
+          PY
+
+      - name: Prove exact source ancestry and bounded PR 172 delta
+        run: |
+          set -euo pipefail
+          runtime='12b3170996bc062ee16c79659a6378e5e425fd0e'
+          tooling_base='40d146fd3c24888cf65fa83333bdb376d0572439'
+          tooling='c00c6dcf1dba0ef923dd23371bc17b9dec781602'
+          nexus="$RUNNER_TEMP/XMesh-Nexus-binding"
+          git init "$nexus"
+          git -C "$nexus" remote add origin https://github.com/TriplexCorp/XMesh-Nexus.git
+          git -C "$nexus" fetch --no-tags --depth=1 origin "$runtime" "$tooling_base" "$tooling"
+
+          git -C "$nexus" diff --quiet "$runtime" "$tooling_base" -- backend/src backend/Cargo.toml || {
+            echo 'production backend source changed between reviewed runtime and tooling base' >&2
+            git -C "$nexus" diff --name-status "$runtime" "$tooling_base" -- backend/src backend/Cargo.toml >&2
+            exit 1
+          }
+
+          git -C "$nexus" diff --name-status "$tooling_base" "$tooling" | LC_ALL=C sort > "$RUNNER_TEMP/actual-delta.txt"
+          python3 - "$RUNNER_TEMP/expected-delta.txt" <<'PY'
+          import json,sys
+          c=json.load(open('deploy/xsp-v2-p0e-permit-tooling-binding.contract.json'))
+          with open(sys.argv[1],'w') as f:
+              for path in sorted(c['tooling']['allowedDeltaPaths']):
+                  f.write('A\t'+path+'\n')
+          PY
+          diff -u "$RUNNER_TEMP/expected-delta.txt" "$RUNNER_TEMP/actual-delta.txt"
+
+          first_parent="$(
+            git -C "$nexus" cat-file -p "$tooling" |
+            sed -n 's/^parent //p' |
+            head -1
+          )"
+          test "$first_parent" = "$tooling_base"
+          echo 'PASS: reviewed runtime source is unchanged and PR #172 delta is exact'
+
+      - name: Prove staging-only target isolation at exact tooling revision
+        run: |
+          set -euo pipefail
+          tooling='c00c6dcf1dba0ef923dd23371bc17b9dec781602'
+          nexus="$RUNNER_TEMP/XMesh-Nexus-binding"
+          git -C "$nexus" checkout --detach "$tooling"
+
+          ! grep -Eq 'name = "xsp-v2-permit-(signer|operator)"' "$nexus/backend/Cargo.toml"
+          grep -Fq 'name = "xsp-v2-permit-signer"' "$nexus/backend/xsp-permit/Cargo.toml"
+          grep -Fq 'name = "xsp-v2-permit-operator"' "$nexus/backend/xsp-permit/Cargo.toml"
+          grep -Fq 'required-features = ["xsp-v2-experimental"]' "$nexus/backend/xsp-permit/Cargo.toml"
+          grep -Fq 'XSP_V2_PROTECTED_PERMIT_ISSUER' "$nexus/backend/src/bin/xsp_v2_permit_signer.rs"
+          grep -Fq 'XSP_V2_PROTECTED_PERMIT_OPERATOR' "$nexus/backend/src/bin/xsp_v2_permit_operator.rs"
+          grep -Fq 'staging-only' "$nexus/backend/src/bin/xsp_v2_permit_signer.rs"
+          grep -Fq 'staging-only' "$nexus/backend/src/bin/xsp_v2_permit_operator.rs"
+          grep -Fq 'USER 10006:10001' "$nexus/backend/Dockerfile.xsp-permit"
+          grep -Fq 'USER 10007:10005' "$nexus/backend/Dockerfile.xsp-permit"
+          echo 'PASS: permit tooling remains outside default panel and requires staging-only gates'
+
+      - name: Build exact permit tooling and generate synthetic binding evidence
+        run: |
+          set -euo pipefail
+          nexus="$RUNNER_TEMP/XMesh-Nexus-binding"
+          signer_image='xmesh-xsp-permit-signer:binding-ci'
+          operator_image='xmesh-xsp-permit-operator:binding-ci'
+
+          docker build -f "$nexus/backend/Dockerfile.xsp-permit" --target permit-signer -t "$signer_image" "$nexus"
+          docker build -f "$nexus/backend/Dockerfile.xsp-permit" --target permit-operator -t "$operator_image" "$nexus"
+
+          signer_cid="$(docker create "$signer_image")"
+          operator_cid="$(docker create "$operator_image")"
+          trap 'docker rm -f "$signer_cid" "$operator_cid" >/dev/null 2>&1 || true' EXIT
+          docker cp "$signer_cid:/usr/local/bin/xsp-v2-permit-signer" "$RUNNER_TEMP/xsp-v2-permit-signer"
+          docker cp "$operator_cid:/usr/local/bin/xsp-v2-permit-operator" "$RUNNER_TEMP/xsp-v2-permit-operator"
+
+          signer_sha="$(sha256sum "$RUNNER_TEMP/xsp-v2-permit-signer" | awk '{print $1}')"
+          operator_sha="$(sha256sum "$RUNNER_TEMP/xsp-v2-permit-operator" | awk '{print $1}')"
+          test "$signer_sha" != "$operator_sha"
+
+          {
+            echo 'schema=xsp2-p0e-permit-tooling-build-evidence-1'
+            echo 'productionRuntimeNexusRevision=12b3170996bc062ee16c79659a6378e5e425fd0e'
+            echo 'toolingBaseRevision=40d146fd3c24888cf65fa83333bdb376d0572439'
+            echo 'toolingRevision=c00c6dcf1dba0ef923dd23371bc17b9dec781602'
+            echo "signerImageId=$(docker image inspect "$signer_image" --format '{{.Id}}')"
+            echo "operatorImageId=$(docker image inspect "$operator_image" --format '{{.Id}}')"
+            echo "permitSignerBinarySha256=$signer_sha"
+            echo "permitOperatorBinarySha256=$operator_sha"
+          } > "$RUNNER_TEMP/build-evidence.txt"
+          evidence_sha="$(sha256sum "$RUNNER_TEMP/build-evidence.txt" | awk '{print $1}')"
+
+          python3 - "$RUNNER_TEMP/eligible.json" "$signer_sha" "$operator_sha" "$evidence_sha" <<'PY'
+          import json,sys
+          out,signer,operator,evidence=sys.argv[1:]
+          value={
+            'schema':'xsp2-p0e-permit-tooling-binding-result-1',
+            'productionRuntimeTarget':{'nexusRevision':'12b3170996bc062ee16c79659a6378e5e425fd0e'},
+            'tooling':{
+              'revision':'c00c6dcf1dba0ef923dd23371bc17b9dec781602',
+              'toolingBaseRevision':'40d146fd3c24888cf65fa83333bdb376d0572439',
+              'runtimeBaseRevision':'12b3170996bc062ee16c79659a6378e5e425fd0e',
+              'permitSignerBinarySha256':signer,
+              'permitOperatorBinarySha256':operator,
+              'buildEvidenceSha256':evidence,
+            },
+            'claims':{
+              'stagingOnly':True,
+              'productionRuntimeSourceUnchanged':True,
+              'strictPQEnabled':False,
+              'productionActivation':False,
+            },
+          }
+          open(out,'w').write(json.dumps(value,sort_keys=True,separators=(',',':'))+'\n')
+          PY
+
+          python3 scripts/verify-xsp-v2-p0e-permit-tooling-binding.py --result "$RUNNER_TEMP/eligible.json" | tee "$RUNNER_TEMP/verified.txt"
+          grep -Fq '"permitToolingBound":true' "$RUNNER_TEMP/verified.txt"
+          grep -Fq '"strictPQEnabled":false' "$RUNNER_TEMP/verified.txt"
+          grep -Fq '"productionActivation":false' "$RUNNER_TEMP/verified.txt"
+
+      - name: Prove tampering fails closed
+        run: |
+          set -euo pipefail
+          python3 - "$RUNNER_TEMP/eligible.json" "$RUNNER_TEMP" <<'PY'
+          import copy,json,os,sys
+          source,root=sys.argv[1:]
+          base=json.load(open(source))
+          cases={}
+          bad=copy.deepcopy(base); bad['productionRuntimeTarget']['nexusRevision']='1'*40; cases['wrong-runtime']=bad
+          bad=copy.deepcopy(base); bad['tooling']['revision']='2'*40; cases['wrong-tooling']=bad
+          bad=copy.deepcopy(base); bad['tooling']['toolingBaseRevision']='3'*40; cases['wrong-tooling-base']=bad
+          bad=copy.deepcopy(base); bad['tooling']['runtimeBaseRevision']='4'*40; cases['wrong-runtime-base']=bad
+          bad=copy.deepcopy(base); bad['tooling']['permitOperatorBinarySha256']=bad['tooling']['permitSignerBinarySha256']; cases['same-binary']=bad
+          bad=copy.deepcopy(base); bad['tooling']['buildEvidenceSha256']='0'*64; cases['zero-evidence']=bad
+          bad=copy.deepcopy(base); bad['claims']['stagingOnly']=False; cases['not-staging-only']=bad
+          bad=copy.deepcopy(base); bad['claims']['strictPQEnabled']=True; cases['false-strict-claim']=bad
+          bad=copy.deepcopy(base); bad['claims']['productionActivation']=True; cases['false-production-claim']=bad
+          for name,value in cases.items():
+              open(os.path.join(root,name+'.json'),'w').write(json.dumps(value,sort_keys=True,separators=(',',':'))+'\n')
+          PY
+          for f in wrong-runtime wrong-tooling wrong-tooling-base wrong-runtime-base same-binary zero-evidence not-staging-only false-strict-claim false-production-claim; do
+            if python3 scripts/verify-xsp-v2-p0e-permit-tooling-binding.py --result "$RUNNER_TEMP/$f.json"; then
+              echo "$f unexpectedly validated" >&2
+              exit 1
+            fi
+          done
+          echo 'PASS: permit tooling binding rejects revision, binary and activation-claim tampering'
+
+      - name: State non-activating boundary
+        run: |
+          echo 'PASS: exact PR #172 permit tooling is separately bound to reviewed Nexus runtime 12b317...'
+          echo 'CI build evidence is synthetic policy/tool evidence, not real #137/#138 evidence.'
+          echo 'strict-pq remains OFF; production activation remains NOT AUTHORIZED.'
