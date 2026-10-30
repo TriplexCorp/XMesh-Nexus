@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'backend/Cargo.toml'
+      - 'backend/xsp-permit/Cargo.toml'
       - 'backend/Dockerfile.xsp-permit'
       - 'backend/src/bin/xsp_v2_permit_signer.rs'
       - 'backend/src/bin/xsp_v2_permit_operator.rs'
@@ -33,7 +34,7 @@ jobs:
           components: rustfmt
 
       - name: Rustfmt is clean
-        run: cargo fmt --manifest-path backend/Cargo.toml --all -- --check
+        run: cargo fmt --manifest-path backend/xsp-permit/Cargo.toml --all -- --check
 
       - name: Static fail-closed boundary checks
         run: node scripts/check-xsp-v2-protected-permit-operator.js
