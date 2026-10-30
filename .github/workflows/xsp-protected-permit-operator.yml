@@ -14,6 +14,7 @@ on:
       - 'deploy/postgres/22-create-xsp-v2-permit-signer-role.sql'
       - 'docs/XSP_V2_PROTECTED_PERMIT_OPERATOR.md'
       - 'scripts/check-xsp-v2-protected-permit-operator.js'
+      - 'scripts/test-xsp-v2-protected-permit-operator.py'
       - '.github/workflows/xsp-protected-permit-operator.yml'
   workflow_dispatch:
 
@@ -58,3 +59,12 @@ jobs:
           test "$(docker image inspect xmesh-xsp-permit-signer:ci --format '{{.Config.User}}')" = '10006:10001'
           test "$(docker image inspect xmesh-xsp-permit-operator:ci --format '{{.Config.User}}')" = '10007:10005'
           echo 'PASS: permit signer/operator images use separate runtime identities'
+
+  protected-permit-process-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Protected permit signer/operator process E2E
+        run: python3 scripts/test-xsp-v2-protected-permit-operator.py
