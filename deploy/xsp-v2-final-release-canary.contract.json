@@ -1,0 +1,25 @@
+{
+  "schema": "xsp2-final-release-canary-contract-1",
+  "scope": "post-P0-E exact-candidate disposable final canary",
+  "releaseCandidate": {
+    "nexusRevision": "12b3170996bc062ee16c79659a6378e5e425fd0e",
+    "nodeRevision": "34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb"
+  },
+  "requiredDomains": [
+    "install-upgrade-lost-response-restart-rollback",
+    "coordinated-backup-restore-recovery",
+    "node-local-redacted-observability",
+    "nexus-durable-redacted-observability"
+  ],
+  "prerequisites": {
+    "issue137IndependentSecurityReviewClosed": true,
+    "issue138KvmDurabilityClosed": true,
+    "requiresExactReleaseCandidateRerun": true
+  },
+  "successClaims": {
+    "finalReleaseCanarySatisfied": true,
+    "productionActivation": false,
+    "strictPQEnabled": false,
+    "legacyXMESH1Retired": false
+  }
+}
