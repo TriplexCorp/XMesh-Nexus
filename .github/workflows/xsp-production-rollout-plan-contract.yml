@@ -1,0 +1,316 @@
+name: XSP-v2 Production Rollout Plan Contract
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "deploy/xsp-v2-production-rollout-plan.contract.json"
+      - "scripts/verify-xsp-v2-production-rollout-plan.py"
+      - "docs/XSP_V2_PRODUCTION_ROLLOUT_PLAN.md"
+      - ".github/workflows/xsp-production-rollout-plan-contract.yml"
+  push:
+    branches: [main]
+    paths:
+      - "deploy/xsp-v2-production-rollout-plan.contract.json"
+      - "scripts/verify-xsp-v2-production-rollout-plan.py"
+      - "docs/XSP_V2_PRODUCTION_ROLLOUT_PLAN.md"
+      - ".github/workflows/xsp-production-rollout-plan-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rollout-plan-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Compile verifier and validate contract
+        run: |
+          set -Eeuo pipefail
+          python3 -m py_compile scripts/verify-xsp-v2-production-rollout-plan.py
+          python3 -m json.tool deploy/xsp-v2-production-rollout-plan.contract.json >/dev/null
+          python3 - <<'PY'
+          import json
+          c=json.load(open('deploy/xsp-v2-production-rollout-plan.contract.json', encoding='utf-8'))
+          assert c['schema']=='xsp2-production-rollout-plan-contract-1'
+          assert c['planSchema']=='xsp2-production-rollout-plan-1'
+          assert c['requiredSeparateDecisions']=={
+            'strictPqActivation': {'action':'remain-off','approved':False},
+            'legacyXMESH1Retirement': {'action':'retain','approved':False},
+          }
+          assert c['baselineInvariants']['panelAppBind']=='127.0.0.1'
+          assert c['baselineInvariants']['panelPublicPorts']==[80,443]
+          assert c['baselineInvariants']['databaseHostPublished'] is False
+          assert c['baselineInvariants']['redisHostPublished'] is False
+          assert c['baselineInvariants']['xspIngressTlsProtocols']==['TLSv1.3']
+          assert c['baselineInvariants']['xspIngressKeyExchange']=='X25519MLKEM768'
+          assert c['baselineInvariants']['xspIngressClientIdentity']=='ML-DSA-65'
+          PY
+      - name: Generate synthetic structural and gate-eligible fixtures only
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import copy, json
+          from pathlib import Path
+
+          h=lambda c: c*64
+          base={
+            'schema':'xsp2-production-rollout-plan-1',
+            'planId':'synthetic-rollout-001',
+            'createdAt':'2026-10-30T07:00:00Z',
+            'releaseCandidate':{
+              'nexusRevision':'1'*40,
+              'nodeRevision':'2'*40,
+              'nexusImageSha256':'sha256:'+h('3'),
+              'agentArtifactSha256':h('4'),
+              'canaryResultSha256':None,
+            },
+            'gates':{
+              'p0EComplete':False,
+              'independentSecurityReviewAccepted':False,
+              'independentSecurityReviewResultSha256':None,
+              'physicalPowerQualificationAccepted':False,
+              'physicalPowerQualificationResultSha256':None,
+              'finalCanaryPassed':False,
+            },
+            'topology':{
+              'panelFqdn':'panel.example.com',
+              'panelPublicPorts':[80,443],
+              'panelAppBind':'127.0.0.1',
+              'panelAppPort':8080,
+              'databaseHostPublished':False,
+              'redisHostPublished':False,
+              'xspIngress':{
+                'fqdn':'node-control.example.com',
+                'port':8444,
+                'tlsProtocols':['TLSv1.3'],
+                'keyExchange':'X25519MLKEM768',
+                'clientIdentity':'ML-DSA-65',
+                'legacySharedListener':False,
+                'unknownSniRejected':True,
+                'exactRoutes':['/api/v2/node/keys/rotation/ack','/api/v2/node/keys/rotation/ack/recover'],
+              },
+            },
+            'dns':{
+              'changes':[{
+                'id':'dns-xsp-ingress','name':'node-control.example.com','type':'A',
+                'before':'192.0.2.10','after':'192.0.2.20','ttl':300,'rollbackValue':'192.0.2.10'
+              }],
+              'noChangeReason':None,
+            },
+            'firewall':{
+              'changes':[{
+                'id':'fw-xsp-ingress','direction':'ingress','protocol':'tcp','port':8444,
+                'source':'198.51.100.0/24','action':'allow','rationale':'Dedicated reviewed XSP-v2 Node ingress',
+                'rollbackAction':'remove'
+              }],
+              'noChangeReason':None,
+            },
+            'nginx':{
+              'changes':[{
+                'id':'nginx-xsp-ingress','purpose':'xsp-v2-ingress','serverName':'node-control.example.com',
+                'listen':'0.0.0.0:8444','upstream':'unix:/run/xmesh-origin/xsp-v2-origin.sock',
+                'tlsProtocols':['TLSv1.3'],'keyExchange':'X25519MLKEM768','clientIdentity':'ML-DSA-65',
+                'configSha256':h('a'),'rollbackConfigSha256':h('b'),'accessLog':False,'exactLocationsOnly':True
+              }],
+              'noChangeReason':None,
+            },
+            'database':{
+              'backupSha256':h('c'),'backupMethod':'pg_dump-custom','restoreVerified':True,
+              'migrationIds':['20261030_xsp2_release_candidate'], 'aclManifestSha256':h('d'),
+              'recoveryCheckpointSha256':h('e'),'secretsPreserved':True,
+              'databaseHostPublished':False,'rollbackTested':True,
+            },
+            'keyMaterial':{
+              'entries':[{
+                'purpose':'panel-response-signer','keyId':'panel-response-2026q4',
+                'publicFingerprintSha256':h('f'),'custodyDomain':'root-owned signer host',
+                'source':'public fingerprint and key identifier only','activationStage':'stage-2-security-services'
+              }],
+              'noChangeReason':None,
+              'ownerPrivateKeysRemainOffline':True,
+              'persistentSecretsPreserved':True,
+              'signerKeysReadOnly':True,
+            },
+            'stages':[
+              {'id':'stage-1-backup','order':1,'domains':['database','verification'],
+               'preChecks':['P0-E evidence references present'],'successChecks':['verified custom-format backup exists'],
+               'rollbackRef':'rollback-main'},
+              {'id':'stage-2-security-services','order':2,'domains':['topology','dns','firewall','nginx','key-material','agent'],
+               'preChecks':['backup and rollback inputs preserved'],'successChecks':['dedicated ingress rejects unknown SNI and legacy transport'],
+               'rollbackRef':'rollback-main'},
+              {'id':'stage-3-observe','order':3,'domains':['observability','verification'],
+               'preChecks':['candidate services healthy'],'successChecks':['redacted health and recovery checks pass'],
+               'rollbackRef':'rollback-main'},
+            ],
+            'rollback':{
+              'databaseBackupSha256':h('c'),'nginxRollbackConfigSha256':h('b'),
+              'dnsRollbackPrepared':True,'firewallRollbackPrepared':True,'agentLastKnownGood':True,
+              'offhostRecoveryCheckpointSha256':h('e'),'abortOnFailedCheck':True,'noSecurityStateRewind':True,
+            },
+            'observability':{
+              'healthChecks':['panel readiness','signed Agent status','redacted XSP-v2 state','PostgreSQL recovery health'],
+              'redacted':True,'noSecretLogging':True,'newNetworkRoute':False,
+            },
+            'review':{
+              'author':'release-author','reviewer':'release-reviewer','reviewerOrganization':'example-ops',
+              'separateFromAuthor':True,'approved':False,'reviewedAt':None,
+              'evidence':['topology diff','DNS and firewall delta','Nginx config digest','backup/rollback evidence'],
+            },
+            'separateDecisions':{
+              'strictPqActivation':{'action':'remain-off','approved':False},
+              'legacyXMESH1Retirement':{'action':'retain','approved':False},
+            },
+            'claims':{
+              'productionActivation':False,'strictPQEnabled':False,'legacyXMESH1Retired':False,
+            },
+          }
+          Path('/tmp/prepared.json').write_text(json.dumps(base, indent=2)+'\n')
+          eligible=copy.deepcopy(base)
+          eligible['planId']='synthetic-rollout-gate-eligible'
+          eligible['releaseCandidate']['canaryResultSha256']=h('5')
+          eligible['gates'].update({
+            'p0EComplete':True,
+            'independentSecurityReviewAccepted':True,
+            'independentSecurityReviewResultSha256':h('6'),
+            'physicalPowerQualificationAccepted':True,
+            'physicalPowerQualificationResultSha256':h('7'),
+            'finalCanaryPassed':True,
+          })
+          eligible['review']['approved']=True
+          eligible['review']['reviewedAt']='2026-10-30T07:30:00Z'
+          Path('/tmp/eligible.json').write_text(json.dumps(eligible, indent=2)+'\n')
+          PY
+      - name: Prove draft plan is valid but cannot satisfy rollout-plan gate
+        run: |
+          set -Eeuo pipefail
+          out="$(python3 scripts/verify-xsp-v2-production-rollout-plan.py --plan /tmp/prepared.json)"
+          echo "$out"
+          OUT="$out" python3 - <<'PY'
+          import json,os
+          x=json.loads(os.environ['OUT'])
+          assert x['status']=='valid-production-rollout-plan'
+          assert x['reviewReady'] is True
+          assert x['rolloutPlanGateEligible'] is False
+          assert x['releaseCandidate']['canaryResultSha256'] is None
+          assert x['requiresP0EComplete'] is True
+          assert x['requiresFinalCanary'] is True
+          assert x['productionActivation'] is False
+          assert x['strictPQEnabled'] is False
+          assert x['legacyXMESH1Retired'] is False
+          PY
+          if python3 scripts/verify-xsp-v2-production-rollout-plan.py \
+              --plan /tmp/prepared.json --require-gate-eligible \
+              --expected-nexus-revision "$(printf '1%.0s' {1..40})" \
+              --expected-node-revision "$(printf '2%.0s' {1..40})" \
+              --expected-canary-result-sha256 "$(printf '5%.0s' {1..64})"; then
+            echo 'draft plan unexpectedly satisfied gate' >&2; exit 1
+          fi
+      - name: Prove synthetic fully reviewed plan can satisfy only the plan gate
+        run: |
+          set -Eeuo pipefail
+          out="$(python3 scripts/verify-xsp-v2-production-rollout-plan.py \
+            --plan /tmp/eligible.json --require-gate-eligible \
+            --expected-nexus-revision "$(printf '1%.0s' {1..40})" \
+            --expected-node-revision "$(printf '2%.0s' {1..40})" \
+            --expected-canary-result-sha256 "$(printf '5%.0s' {1..64})")"
+          echo "$out"
+          OUT="$out" python3 - <<'PY'
+          import json,os
+          x=json.loads(os.environ['OUT'])
+          assert x['rolloutPlanGateEligible'] is True
+          assert x['requiresP0EComplete'] is False
+          assert x['requiresIndependentSecurityReview'] is False
+          assert x['requiresPhysicalPowerQualification'] is False
+          assert x['requiresFinalCanary'] is False
+          assert x['requiresSeparatePlanReview'] is False
+          assert x['productionActivation'] is False
+          assert x['strictPQEnabled'] is False
+          assert x['legacyXMESH1Retired'] is False
+          PY
+      - name: Prove candidate and prerequisite binding fails closed
+        run: |
+          set -Eeuo pipefail
+          bad="$(printf '9%.0s' {1..40})"
+          if python3 scripts/verify-xsp-v2-production-rollout-plan.py \
+              --plan /tmp/eligible.json --require-gate-eligible \
+              --expected-nexus-revision "$bad" \
+              --expected-node-revision "$(printf '2%.0s' {1..40})" \
+              --expected-canary-result-sha256 "$(printf '5%.0s' {1..64})"; then
+            echo 'wrong exact candidate unexpectedly accepted' >&2; exit 1
+          fi
+          python3 - <<'PY'
+          import copy,json
+          x=json.load(open('/tmp/prepared.json'))
+          x['gates']['finalCanaryPassed']=True
+          json.dump(x,open('/tmp/bad-missing-canary.json','w'))
+          x=json.load(open('/tmp/eligible.json'))
+          x['gates']['p0EComplete']=False
+          json.dump(x,open('/tmp/bad-p0e.json','w'))
+          PY
+          ! python3 scripts/verify-xsp-v2-production-rollout-plan.py --plan /tmp/bad-missing-canary.json
+          ! python3 scripts/verify-xsp-v2-production-rollout-plan.py \
+              --plan /tmp/bad-p0e.json --require-gate-eligible \
+              --expected-nexus-revision "$(printf '1%.0s' {1..40})" \
+              --expected-node-revision "$(printf '2%.0s' {1..40})" \
+              --expected-canary-result-sha256 "$(printf '5%.0s' {1..64})"
+      - name: Prove topology, transport and rollback invariants fail closed
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import copy,json
+          base=json.load(open('/tmp/eligible.json'))
+          cases={}
+          x=copy.deepcopy(base); x['topology']['panelAppBind']='0.0.0.0'; cases['public-app-bind']=x
+          x=copy.deepcopy(base); x['topology']['databaseHostPublished']=True; cases['public-db']=x
+          x=copy.deepcopy(base); x['topology']['xspIngress']['tlsProtocols']=['TLSv1.2','TLSv1.3']; cases['tls12']=x
+          x=copy.deepcopy(base); x['topology']['xspIngress']['legacySharedListener']=True; cases['shared-listener']=x
+          x=copy.deepcopy(base); x['nginx']['changes'][0]['accessLog']=True; cases['xsp-access-log']=x
+          x=copy.deepcopy(base); x['rollback']['noSecurityStateRewind']=False; cases['rewind']=x
+          x=copy.deepcopy(base); x['rollback']['nginxRollbackConfigSha256']='8'*64; cases['wrong-nginx-rollback']=x
+          x=copy.deepcopy(base); x['database']['backupMethod']='plain-sql'; cases['backup-method']=x
+          x=copy.deepcopy(base); x['stages'][1]['order']=1; cases['stage-order']=x
+          for name,value in cases.items():
+              with open('/tmp/bad-'+name+'.json','w') as f: json.dump(value,f)
+          PY
+          for f in /tmp/bad-public-app-bind.json /tmp/bad-public-db.json /tmp/bad-tls12.json \
+                   /tmp/bad-shared-listener.json /tmp/bad-xsp-access-log.json /tmp/bad-rewind.json \
+                   /tmp/bad-wrong-nginx-rollback.json /tmp/bad-backup-method.json /tmp/bad-stage-order.json; do
+            ! python3 scripts/verify-xsp-v2-production-rollout-plan.py --plan "$f"
+          done
+      - name: Prove secret, arbitrary execution and activation side effects are rejected
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import copy,json
+          base=json.load(open('/tmp/eligible.json'))
+          x=copy.deepcopy(base); x['command']='curl example'; json.dump(x,open('/tmp/bad-command.json','w'))
+          x=copy.deepcopy(base); x['review']['evidence'].append('-----BEGIN PRIVATE KEY-----'); json.dump(x,open('/tmp/bad-private.json','w'))
+          x=copy.deepcopy(base); x['separateDecisions']['strictPqActivation']={'action':'activate','approved':True}; json.dump(x,open('/tmp/bad-strictpq.json','w'))
+          x=copy.deepcopy(base); x['separateDecisions']['legacyXMESH1Retirement']={'action':'retire','approved':True}; json.dump(x,open('/tmp/bad-retire.json','w'))
+          x=copy.deepcopy(base); x['claims']['productionActivation']=True; json.dump(x,open('/tmp/bad-activation.json','w'))
+          x=copy.deepcopy(base); x['review']['reviewer']=x['review']['author']; json.dump(x,open('/tmp/bad-self-review.json','w'))
+          PY
+          for f in /tmp/bad-command.json /tmp/bad-private.json /tmp/bad-strictpq.json \
+                   /tmp/bad-retire.json /tmp/bad-activation.json /tmp/bad-self-review.json; do
+            ! python3 scripts/verify-xsp-v2-production-rollout-plan.py --plan "$f"
+          done
+      - name: Prove rollout contract PR changes preparation tooling only
+        if: github.event_name == 'pull_request'
+        run: |
+          set -Eeuo pipefail
+          git fetch --no-tags origin "$GITHUB_BASE_REF"
+          mapfile -t changed < <(git diff --name-only "origin/$GITHUB_BASE_REF...HEAD")
+          printf '%s\n' "${changed[@]}"
+          test "${#changed[@]}" -eq 4
+          allowed='^(.github/workflows/xsp-production-rollout-plan-contract.yml|deploy/xsp-v2-production-rollout-plan.contract.json|docs/XSP_V2_PRODUCTION_ROLLOUT_PLAN.md|scripts/verify-xsp-v2-production-rollout-plan.py)$'
+          printf '%s\n' "${changed[@]}" | grep -Ev "$allowed" && exit 1 || true
+      - name: State synthetic contract evidence only
+        run: |
+          cat <<'EOF'
+          PASS: the production rollout plan contract is fail-closed preparation tooling.
+          Synthetic fixtures do not constitute P0-E completion, a final canary, an approved real rollout plan, production activation, strict-PQ approval, or XMESH1 retirement approval.
+          EOF

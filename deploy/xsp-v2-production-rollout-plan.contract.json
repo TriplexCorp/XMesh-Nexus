@@ -1,0 +1,68 @@
+{
+  "schema": "xsp2-production-rollout-plan-contract-1",
+  "planSchema": "xsp2-production-rollout-plan-1",
+  "requiredChangeDomains": [
+    "topology",
+    "dns",
+    "firewall",
+    "nginx",
+    "database",
+    "key-material"
+  ],
+  "allowedDnsTypes": ["A", "AAAA", "CNAME"],
+  "allowedFirewallActions": ["allow", "deny"],
+  "allowedStageDomains": [
+    "topology",
+    "dns",
+    "firewall",
+    "nginx",
+    "database",
+    "key-material",
+    "agent",
+    "observability",
+    "verification"
+  ],
+  "requiredFalseClaims": [
+    "productionActivation",
+    "strictPQEnabled",
+    "legacyXMESH1Retired"
+  ],
+  "requiredSeparateDecisions": {
+    "strictPqActivation": {
+      "action": "remain-off",
+      "approved": false
+    },
+    "legacyXMESH1Retirement": {
+      "action": "retain",
+      "approved": false
+    }
+  },
+  "forbiddenFieldNames": [
+    "command",
+    "commands",
+    "script",
+    "scripts",
+    "shell",
+    "privateKey",
+    "privateKeyPem",
+    "secret",
+    "secrets",
+    "password",
+    "token",
+    "credential",
+    "credentials",
+    "url",
+    "urls"
+  ],
+  "baselineInvariants": {
+    "panelAppBind": "127.0.0.1",
+    "panelPublicPorts": [80, 443],
+    "databaseHostPublished": false,
+    "redisHostPublished": false,
+    "xspIngressTlsProtocols": ["TLSv1.3"],
+    "xspIngressKeyExchange": "X25519MLKEM768",
+    "xspIngressClientIdentity": "ML-DSA-65",
+    "xspIngressLegacySharedListener": false,
+    "xspIngressUnknownSniRejected": true
+  }
+}
