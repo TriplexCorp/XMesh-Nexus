@@ -1,0 +1,71 @@
+{
+  "schema": "xsp2-p0e-independent-security-review-result-contract-1",
+  "resultSchema": "xsp2-p0e-independent-security-review-result-1",
+  "frozenTarget": {
+    "nexus": {
+      "repository": "TriplexCorp/XMesh-Nexus",
+      "sourceRevision": "8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091"
+    },
+    "node": {
+      "repository": "TriplexCorp/XMesh-Node",
+      "sourceRevision": "083dc181c5e175f89007f4b93111cd5c45a69d97"
+    }
+  },
+  "reviewerBundle": {
+    "workflowRun": 41013465969,
+    "deterministicTarSha256": "f095f19217a072ef7919663744fcdfbc847783eb23be5a64b0f8df37b8952ced",
+    "payloadSha256": "fb3a9bb9c3de2a462a8b338357b0a068dfdbe70a05f0dca81735006786b25b38"
+  },
+  "requiredReviewDomains": [
+    "protocol-and-canonicalization",
+    "hybrid-cryptography-and-key-purpose-binding",
+    "pq-only-transport-and-node-identity",
+    "isolated-signer-and-key-custody",
+    "postgresql-replay-ack-epoch-and-receipt",
+    "agent-local-durability-and-rollback",
+    "coordinated-backup-restore-and-off-host-floor",
+    "owner-authorized-key-retirement",
+    "parser-fuzz-and-external-mldsa65-vectors",
+    "default-off-redacted-observability",
+    "production-migration-no-fallback-and-rollback"
+  ],
+  "domainDispositions": [
+    "pass",
+    "pass-with-findings",
+    "fail"
+  ],
+  "findingSeverities": [
+    "critical",
+    "high",
+    "medium",
+    "low",
+    "info"
+  ],
+  "findingStatuses": [
+    "open",
+    "remediated",
+    "accepted-risk",
+    "not-applicable"
+  ],
+  "signoffDecisions": [
+    "approve",
+    "approve-with-findings",
+    "reject"
+  ],
+  "closurePolicy": {
+    "eligibleDecisions": [
+      "approve",
+      "approve-with-findings"
+    ],
+    "allDomainsMustAvoidFail": true,
+    "releaseBlockingFindingsMustBeRemediated": true,
+    "securityRelevantCodeChangeRequiresRefreeze": true
+  },
+  "requiredFalseClaims": [
+    "physicalPowerLossQualified",
+    "productionActivation",
+    "strictPQEnabled"
+  ],
+  "independentReviewRequired": true,
+  "automaticIssueClosure": false
+}
