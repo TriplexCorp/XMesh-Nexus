@@ -20,6 +20,12 @@
       "security/xspv2/poc-go/keyring/kvm_qualification_linux_test.go"
     ]
   },
+  "topologyRequirements": {
+    "nodeStateScope": "isolated-qualification-keyring",
+    "nodeAndNexusPostgresSeparateFailureDomains": true,
+    "independentPostgresCrashRecoveryRequired": true,
+    "independentOffhostProductionWitnessRequired": true
+  },
   "requiredCheckpoints": [
     "after-previous",
     "after-floor",
