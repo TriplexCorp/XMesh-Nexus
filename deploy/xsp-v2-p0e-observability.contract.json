@@ -1,0 +1,35 @@
+{
+  "schema": "xsp2-p0e-observability-contract-1",
+  "node": {
+    "repository": "TriplexCorp/XMesh-Node",
+    "sourceRevision": "083dc181c5e175f89007f4b93111cd5c45a69d97",
+    "pullRequest": 51,
+    "previousReviewedRevision": "ffebcc30424463dd0afcdb8226bcd4b48c019bff"
+  },
+  "nexus": {
+    "repository": "TriplexCorp/XMesh-Nexus",
+    "sourceRevision": "ccb9e384dca47f0c1a69c0ecd82461d523344c7a",
+    "pullRequest": 133,
+    "previousReviewedRevision": "3be8c71dff44ef67ec71f70d440dfed31123a385"
+  },
+  "nodeSchema": "xsp2-node-observability-1",
+  "nexusSchema": "xsp2-nexus-observability-1",
+  "runtimeGate": {
+    "environment": "XSP_V2_OBSERVABILITY",
+    "value": "staging-only"
+  },
+  "defaultOff": true,
+  "perNodeOnly": true,
+  "nodeLocalOnly": true,
+  "nexusOperatorOnly": true,
+  "readOnly": true,
+  "durableMutationAllowed": false,
+  "rawPrivateKeysExposed": false,
+  "rawPublicKeyBytesExposed": false,
+  "replayablePayloadsExposed": false,
+  "networkRouteAdded": false,
+  "physicalPowerLossQualified": false,
+  "independentSecurityReviewComplete": false,
+  "productionActivation": false,
+  "strictPQEnabled": false
+}
