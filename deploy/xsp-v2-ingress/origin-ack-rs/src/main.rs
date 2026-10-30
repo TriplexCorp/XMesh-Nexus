@@ -71,9 +71,9 @@ impl TestFault {
             "drop-before-c2c" => Ok(Self::DropBeforeC2c),
             "drop-on-c2c-failure" => Ok(Self::DropOnC2cFailure),
             "drop-after-c2c-success" => Ok(Self::DropAfterC2cSuccess),
-            _ => Err(
-                "XSP_V2_C2D_TEST_FAULT is not an approved disposable E2E fault mode".to_owned(),
-            ),
+            _ => {
+                Err("XSP_V2_C2D_TEST_FAULT is not an approved disposable E2E fault mode".to_owned())
+            }
         }
     }
 }
@@ -108,9 +108,7 @@ impl Config {
                 .bytes()
                 .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
         {
-            return Err(
-                "XSP_EXPECTED_CLIENT_SPKI_SHA256 must be lowercase SHA-256 hex".to_owned(),
-            );
+            return Err("XSP_EXPECTED_CLIENT_SPKI_SHA256 must be lowercase SHA-256 hex".to_owned());
         }
         let expected_node_id = env::var("XSP_EXPECTED_NODE_ID")
             .unwrap_or_default()
@@ -136,9 +134,7 @@ impl Config {
         let test_fault =
             TestFault::parse(env::var("XSP_V2_C2D_TEST_FAULT").unwrap_or_default().trim())?;
         if test_fault != TestFault::None && c2c_gate != "staging-only" {
-            return Err(
-                "C2-D2 test faults require the explicit staging-only C2-C gate".to_owned(),
-            );
+            return Err("C2-D2 test faults require the explicit staging-only C2-C gate".to_owned());
         }
 
         Ok(Self {
@@ -746,9 +742,7 @@ fn handle_get(stream: &mut UnixStream, request: &HttpRequest, config: &Config) {
         send_json(stream, 403, &error_json("untrusted origin identity"));
         return;
     };
-    let body = format!(
-        r#"{{"originTransport":"unix-peercred","trustedNodeId":{node_id}}}"#
-    );
+    let body = format!(r#"{{"originTransport":"unix-peercred","trustedNodeId":{node_id}}}"#);
     send_json(stream, 200, &body);
 }
 
@@ -963,21 +957,14 @@ mod tests {
     #[test]
     fn strict_schema_accepts_exact_envelope() {
         let envelope: AckEnvelope = serde_json::from_str(&valid_json()).expect("valid envelope");
-        assert_eq!(
-            validate_envelope(&envelope, 4242, false, 1_000_000),
-            Ok(())
-        );
+        assert_eq!(validate_envelope(&envelope, 4242, false, 1_000_000), Ok(()));
     }
 
     #[test]
     fn duplicate_and_unknown_fields_fail_closed() {
-        let duplicate =
-            valid_json().replace(r#""kind":"ack","#, r#""kind":"ack","kind":"ack","#);
+        let duplicate = valid_json().replace(r#""kind":"ack","#, r#""kind":"ack","kind":"ack","#);
         assert!(serde_json::from_str::<AckEnvelope>(&duplicate).is_err());
-        let unknown = valid_json().replace(
-            r#""kind":"ack","#,
-            r#""kind":"ack","unexpected":1,"#,
-        );
+        let unknown = valid_json().replace(r#""kind":"ack","#, r#""kind":"ack","unexpected":1,"#);
         assert!(serde_json::from_str::<AckEnvelope>(&unknown).is_err());
     }
 
@@ -988,10 +975,7 @@ mod tests {
             validate_envelope(&envelope, 4242, true, 1_060_000),
             Err(ValidationError::RecoveryNotExpired)
         );
-        assert_eq!(
-            validate_envelope(&envelope, 4242, true, 1_060_001),
-            Ok(())
-        );
+        assert_eq!(validate_envelope(&envelope, 4242, true, 1_060_001), Ok(()));
     }
 
     #[test]
