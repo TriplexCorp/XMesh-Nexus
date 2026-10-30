@@ -32,7 +32,8 @@ jobs:
           grep -Fq '"physicalPowerLossQualified": False' "$src"
           grep -Fq 'GitHub CI' "$doc"
           grep -Fq 'P0-E4a remains OPEN' "$doc"
-          grep -Fq '50c770c8bbb917b04ca893ac5b8d29e6c7f9af7e' "$src" "$doc"
+          grep -Fq '34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb' "$src" "$doc"
+          grep -Fq '50c770c8bbb917b04ca893ac5b8d29e6c7f9af7e' "$doc"
           grep -Fq 'after-recovery-active' "$src" "$doc"
 
       - name: Exercise all five evidence outcomes and fail-closed negatives
@@ -45,8 +46,8 @@ jobs:
           root=sys.argv[1]
           base={
             'schema':'xsp2-p0e4a-storage-preflight-1','target':'/var/lib/xmesh','kernel':'Linux 6.x',
-            'mount':{'source':'/dev/nvme0n1p1','fstype':'ext4','options':'rw','target':'/'},
-            'device':{'device':'nvme0n1','writeCache':'write through','rotational':'0','fua':'1'},
+            'mount':{'source':'/dev/vda1','fstype':'ext4','options':'rw','target':'/'},
+            'device':{'device':'vda','writeCache':'write through','rotational':'0','fua':'1'},
             'baselineEligible':True,'physicalPowerLossQualified':False,'failures':[],
             'requiredNextEvidence':['real abrupt power required'],'scope':'CI fixture only; not physical evidence',
           }
@@ -58,7 +59,7 @@ jobs:
           def sha(name): return hashlib.sha256(open(os.path.join(root,name),'rb').read()).hexdigest()
           common={
             'schema':'xsp2-p0e4a3-powercut-evidence-1','runId':'lab-run-0001',
-            'nodeSourceRevision':'50c770c8bbb917b04ca893ac5b8d29e6c7f9af7e',
+            'nodeSourceRevision':'34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb',
             'nexusSourceRevision':'6983bd9168c160968d8ed46ab862b8b1ee85c8ae',
             'labBinarySha256Hex':'11'*32,'nodeId':812345678901,
             'rotation':{'fromEpoch':7,'toEpoch':8,'fromEdKeyId':'ed-old-0001','fromPQKeyId':'pq-old-0001','toEdKeyId':'ed-new-0001','toPQKeyId':'pq-new-0001'},
