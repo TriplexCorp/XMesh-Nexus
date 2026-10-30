@@ -27,7 +27,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Compile verifier and validate exact v4 acceptance binding
+      - name: Compile verifier and validate exact v5 KVM acceptance binding
         run: |
           set -euo pipefail
           python3 -m py_compile scripts/verify-xsp-v2-p0e-independent-security-review-result.py
@@ -47,9 +47,9 @@ jobs:
             },
           }
           assert x['reviewerBundle']=={
-            'workflowRun':41050277455,
-            'deterministicTarSha256':'143ef26ff84281689e2ec2e2046cc06ec9ef5344a96b5f39edd4f877e014dbf3',
-            'payloadSha256':'f473c70f70a23fe91a057ee7b6db4747528a965019397563cfc91590205261f2',
+            'workflowRun':41054352179,
+            'deterministicTarSha256':'9d213e9281f0ffbbc3da21f9f3814d6e7fbef1e6b5273f6e9cb12175c63273c4',
+            'payloadSha256':'7b118084777d59e1ef1791d6375c32c1c44cf6bcdf9a03a2b0648a7ad9f263f2',
           }
           assert len(x['requiredReviewDomains'])==11
           assert len(set(x['requiredReviewDomains']))==11
@@ -123,25 +123,11 @@ jobs:
           }]
           write('rejection.json',rejection)
 
-          wrong=copy.deepcopy(base)
-          wrong['target']['nexus']['sourceRevision']='0'*40
-          write('wrong-sha.json',wrong)
-
-          missing=copy.deepcopy(base)
-          missing['reviewDomains'].pop()
-          write('missing-domain.json',missing)
-
-          duplicate=copy.deepcopy(base)
-          duplicate['reviewDomains'][-1]['domain']=duplicate['reviewDomains'][0]['domain']
-          write('duplicate-domain.json',duplicate)
-
-          nonind=copy.deepcopy(base)
-          nonind['reviewer']['independent']=False
-          write('non-independent.json',nonind)
-
-          badclaim=copy.deepcopy(base)
-          badclaim['claims']['strictPQEnabled']=True
-          write('bad-claim.json',badclaim)
+          wrong=copy.deepcopy(base); wrong['target']['nexus']['sourceRevision']='0'*40; write('wrong-sha.json',wrong)
+          missing=copy.deepcopy(base); missing['reviewDomains'].pop(); write('missing-domain.json',missing)
+          duplicate=copy.deepcopy(base); duplicate['reviewDomains'][-1]['domain']=duplicate['reviewDomains'][0]['domain']; write('duplicate-domain.json',duplicate)
+          nonind=copy.deepcopy(base); nonind['reviewer']['independent']=False; write('non-independent.json',nonind)
+          badclaim=copy.deepcopy(base); badclaim['claims']['strictPQEnabled']=True; write('bad-claim.json',badclaim)
 
           unresolved=copy.deepcopy(base)
           unresolved['signoff']['decision']='approve-with-findings'
@@ -219,7 +205,7 @@ jobs:
           done
           grep -Fq '"requiresRefreeze": true' /tmp/requires-refreeze.json
 
-      - name: Verify v4 rebinding changes acceptance tooling only
+      - name: Verify v5 rebinding changes acceptance tooling only
         if: github.event_name == 'pull_request'
         run: |
           set -euo pipefail
@@ -233,6 +219,7 @@ jobs:
 
       - name: State bounded evidence only
         run: |
-          echo 'PASS: independent-review result acceptance is bound to the exact v4 remediated target and post-merge reviewer bundle.'
+          echo 'PASS: independent-review result acceptance is bound to the exact v5 KVM review package and authoritative post-merge reviewer bundle.'
           echo 'Synthetic fixtures are contract tests only; issue #137 still requires a real attributable independent result.'
-          echo 'Issue #138 remains separate; strict-pq remains OFF; production rollout remains NOT AUTHORIZED.'
+          echo 'Issue #138 is the separate KVM five-run crash-consistency gate; physicalPowerLossQualified remains false for kvm-vps.'
+          echo 'strict-pq remains OFF; production rollout remains NOT AUTHORIZED.'
