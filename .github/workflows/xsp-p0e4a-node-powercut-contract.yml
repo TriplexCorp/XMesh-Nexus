@@ -24,27 +24,39 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Check out exact merged XMesh-Node P0-E4a2 source
+      - name: Check out exact remediated v4 XMesh-Node source
         uses: actions/checkout@v4
         with:
           repository: TriplexCorp/XMesh-Node
-          ref: 50c770c8bbb917b04ca893ac5b8d29e6c7f9af7e
+          ref: 34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb
           path: xmesh-node
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Verify exact pinned source contract
+      - name: Verify exact current source contract
         run: node scripts/check-xsp-v2-p0e4a-powercut-arm.js xmesh-node
+      - name: Preserve PR #44 hook provenance
+        run: |
+          set -euo pipefail
+          old=50c770c8bbb917b04ca893ac5b8d29e6c7f9af7e
+          current=34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb
+          git -C xmesh-node cat-file -e "$old^{commit}"
+          git -C xmesh-node cat-file -e "$current^{commit}"
+          git -C xmesh-node diff --quiet "$old" "$current" -- \
+            security/xspv2/poc-go/keyring/durability_checkpoint_powercut_linux.go \
+            security/xspv2/poc-go/keyring/durability_checkpoint_powercut_linux_test.go
       - uses: actions/setup-go@v5
         with:
           go-version: '1.27.3'
           cache: false
-      - name: Exercise pinned lab-only power-cut arm tests
+      - name: Exercise current lab-only power-cut arm tests
         working-directory: xmesh-node/security/xspv2/poc-go
         run: |
           set -euo pipefail
           go test -tags xspv2_powercut_qualification ./keyring \
             -run '^TestPowercutQualification' -count=1 -v
+          go test ./keyring -run '^TestCreateMasterKeyLeavesSyncablePrivateDurableEntry$' -count=1 -v
       - name: Prove crash and physical-power evidence tags cannot coexist
         working-directory: xmesh-node/security/xspv2/poc-go
         run: |
@@ -65,6 +77,7 @@ jobs:
           fi
       - name: State bounded evidence only
         run: |
-          echo 'PASS: Node PR #44 lab arming primitive is pinned and independently machine-checked.'
+          echo 'PASS: current v4 Node lab arming primitive and master-key durability remediation are machine-checked.'
+          echo 'PR #44 remains provenance only; current qualification evidence must bind Node 34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb.'
           echo 'P0-E4a remains OPEN: GitHub CI is not representative physical power-loss evidence.'
           echo 'strict-pq remains OFF; production rollout remains NOT AUTHORIZED.'
