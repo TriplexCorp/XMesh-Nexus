@@ -9,6 +9,7 @@ A green test proves only its stated boundary. Code existence ≠ E2E ≠ securit
 ## Verified source checkpoints
 
 - **Latest verified Nexus P0-E review-preparation checkpoint:** [`7b84a9e45f9e9cf815b95a06d1560f84d8d3f0a2`](https://github.com/TriplexCorp/XMesh-Nexus/commit/7b84a9e45f9e9cf815b95a06d1560f84d8d3f0a2), merge of [PR #135](https://github.com/TriplexCorp/XMesh-Nexus/pull/135). Node PR #51 plus Nexus PRs #133–#134 close bounded default-off redacted observability; PR #135 freezes the exact Node/Nexus evidence package for external independent security review. The current repo-side P0-E release gate is independent security-review findings/sign-off. P0-E4a remains OPEN until five representative physical abrupt-power experiments are executed and independently reviewed.
+- **Latest staging ingress/runtime hardening / Nexus PRs #139–#140:** PR #139 merge [`36ee6f7a5b1686f9c0d51beda5d24e84830982c7`](https://github.com/TriplexCorp/XMesh-Nexus/commit/36ee6f7a5b1686f9c0d51beda5d24e84830982c7) replaces the C2-A Python origin verifier with dependency-free Rust while preserving the reviewed `SO_PEERCRED`/UID/GID/SPKI/fixed-Node/UDS trust boundary. PR #140 merge [`03679120726ff06005eff903909b262fb1271960`](https://github.com/TriplexCorp/XMesh-Nexus/commit/03679120726ff06005eff903909b262fb1271960) replaces the C2-B/C/D Python ACK/recovery origin with an isolated Rust 2024/`serde` implementation while preserving strict schema/freshness/recovery binding, protected C2-C framing and peer credentials, exact raw ACK forwarding, bounded response handling, response-loss fault domains, thread-per-connection behavior and Unix backlog 32. Exact-head Backend CI, Hybrid TLS, C2-C authorization, expired recovery, lost-response/race, transport-negative/no-legacy and PostgreSQL rollback workflows are green. These are security-relevant post-#135 changes, so the PR #135 frozen Nexus target does **not** cover current `main`; a refreshed review freeze is required before independent sign-off can close P0-E.
 - **Owner-authorized retirement authorization / Node PR #46 + Nexus PR #127:** Node merge [`e0f6bc01de98aad488fce73e1e605ba24f566bb1`](https://github.com/TriplexCorp/XMesh-Node/commit/e0f6bc01de98aad488fce73e1e605ba24f566bb1) introduces the canonical `XSP2-OWNER-RETIRE-PREVIOUS-V1` authorization, requires both Ed25519 and ML-DSA-65 owner signatures and binds the decision to the exact Node identity, authenticated server authority, previous→active epochs/key IDs and current signed off-host recovery checkpoint. Nexus PR #127 pins and independently re-verifies that read-only source contract.
 - **Offline retirement issuance / Node PR #47 + Nexus PR #128:** Node merge [`cd1f187a06ea6f320023027e06e1a57d2be81af3`](https://github.com/TriplexCorp/XMesh-Node/commit/cd1f187a06ea6f320023027e06e1a57d2be81af3) exports a public-only request from the retained rotation and adds an offline owner signer that re-verifies the checkpoint and requires protected owner-owned mode-0600 unencrypted PKCS#8 keys. Owner private keys never enter Nexus or normal Agent state. Nexus merge [`a01fd9a57fda4fbf143a69195e1275d6a1ccb68e`](https://github.com/TriplexCorp/XMesh-Nexus/commit/a01fd9a57fda4fbf143a69195e1275d6a1ccb68e), PR #128, pins that exact flow; its dedicated post-merge contract and Backend CI completed success.
 - **Crash-safe durable old-key erasure / Node PR #48 + Nexus PR #129:** Node merge [`3d2fc155ead11e86a2872ad12fbe28f157bb24db`](https://github.com/TriplexCorp/XMesh-Node/commit/3d2fc155ead11e86a2872ad12fbe28f157bb24db) persists an authenticated HMAC-SHA256 retirement intent under the existing Agent master key before deleting retained material. Only `.previous` and `.next` may be erased; active vault and monotonic epoch floor are preserved. Parent-directory fsync, crash checkpoints, exact idempotent resume, rollback/reintroduction floors and the single non-test high-level caller are tested. Nexus merge [`a85a0cc4a42da446f85e891d7b38ee52fd5b5e3d`](https://github.com/TriplexCorp/XMesh-Nexus/commit/a85a0cc4a42da446f85e891d7b38ee52fd5b5e3d), PR #129, pins the exact 13-file Node delta and re-runs the Agent/keyring/crash proofs.
@@ -66,8 +67,8 @@ All are mandatory:
 | Signed commit receipt + immutable outbox | **STAGING PASS** | Exact durable bytes, dedupe/recovery and mutation guards |
 | Isolated `panel_response` signer | **P0 COMPLETE — staging/process** | PR #61 |
 | P0-C1 dedicated PQ-only Node ingress | **P0 COMPLETE — isolated network/process** | PR #64 |
-| P0-C2-A ingress→origin trust boundary | **P0 COMPLETE — isolated staging/process** | PR #66 |
-| P0-C2-B narrow staging ACK route | **P0 COMPLETE — isolated staging/process** | PR #69 |
+| P0-C2-A ingress→origin trust boundary | **P0 COMPLETE — isolated staging/process; Rust runtime hardened** | PR #66 proof + PR #139 Rust origin implementation hardening; C2-A runtime contains no Python |
+| P0-C2-B narrow staging ACK route | **P0 COMPLETE — isolated staging/process; Rust runtime hardened** | PR #69 proof + PR #140 Rust ACK/recovery origin hardening; C2-B/C/D origin runtime contains no Python |
 | P0-C2-C ACK crypto/transaction/signer | **P0 COMPLETE — isolated staging/process** | PR #71 |
 | P0-C2-D1 real Node integrated E2E | **P0 COMPLETE — isolated staging/process** | PR #73 |
 | P0-C2-D2 expired exact recovery | **COMPLETE — isolated staging/process** | PR #77 |
@@ -101,11 +102,19 @@ All are mandatory:
 | ML-DSA-65 FIPS 204 external sigVer vectors | **COMPLETE — bounded API-compatible external-vector evidence** | Node PR #50 + Nexus PR #131; pinned official NIST ACVP source/blobs, 1 group / 15 cases / 3 valid / 12 invalid; not ACVP certification |
 | **P0-E4a physical power-loss / storage durability** | **CURRENT external/hardware sub-gate** | Execute and independently review five representative abrupt-power runs on qualified storage/controller stacks; no torn/lowered security state after power loss |
 | **P0-E operational observability without secret/key leakage** | **COMPLETE — bounded default-off read-only evidence** | Node PR #51 + Nexus PRs #133–#134; local/DB redacted read-only views, exact cross-repo pin, no network route or production activation |
-| Independent security review | **CURRENT repo-side release sub-gate — external sign-off required** | PR #135 freezes exact Node/Nexus targets and evidence package; independent findings, remediation disposition and sign-off must come from an external reviewer |
-| **P0-E recovery/security release gates** | **CURRENT P0** | Remaining blockers: real E4a physical-power matrix + independent evidence review, and independent architecture/security findings/sign-off; observability and review handoff are complete |
+| Independent security review | **CURRENT repo-side release sub-gate — refreshed freeze + external sign-off required** | PR #135 freeze predates security-relevant PRs #139/#140; freeze current exact Node/Nexus targets, then obtain independent findings, remediation disposition and sign-off |
+| **P0-E recovery/security release gates** | **CURRENT P0** | Remaining blockers: real E4a physical-power matrix + independent evidence review, plus refreshed post-#140 review freeze and independent architecture/security findings/sign-off; observability and the earlier review handoff are complete |
 | Production XSP-v2 rollout | **NOT AUTHORIZED** | P0-E + disposable canary + explicit production approval required |
 
 ## Completed P0-C2-D — integrated real-Node proof
+
+### Post-C2 Rust origin/runtime hardening — COMPLETE
+
+PR #139 replaces the C2-A Python origin process with a dependency-free Rust implementation while preserving the existing hybrid-mTLS→UDS trust boundary: Linux `SO_PEERCRED`, pinned ingress UID/GID, exact client SPKI SHA-256, fixed trusted Node identity and UDS-only handling remain authoritative. The dedicated C2-A runtime image contains neither Python nor a Rust toolchain.
+
+PR #140 then replaces the larger C2-B/C/D Python ACK/recovery origin state machine with an isolated Rust 2024 crate. Strict typed `serde` decoding rejects unknown/duplicate fields; ACK Node/issuer/method/path/epoch/freshness binding, historical recovery only after expiry, protected `XSP2C2C1` / `XSP2C2H1` / `XSP2C2R1` framing, C2-C peercred `10001:10001`, exact raw ACK forwarding, response-size/trailing-byte checks, the three disposable response-loss fault domains, thread-per-connection behavior and the reviewed Unix backlog of 32 are preserved. The exact-head PR #140 Hybrid TLS, C2-B, C2-C, recovery, race/outage, transport-negative/no-legacy, PostgreSQL rollback and Backend CI matrix completed success.
+
+These changes harden the implementation of already-complete isolated C2 boundaries; they do not create a new production activation claim or weaken any prior acceptance invariant. Because they landed after the PR #135 independent-review freeze, current `main` must be re-frozen for external review before the repo-side P0-E review gate can close.
 
 ### D1 — real Node happy-path integration
 
@@ -334,7 +343,9 @@ Bounded operational observability is COMPLETE. Node PR #51 plus Nexus PR #133 im
 
 Nexus PR #135 at `7b84a9e45f9e9cf815b95a06d1560f84d8d3f0a2` freezes the independent-review handoff around exact Nexus target `5cdb7825fcc51f8a7d296b992a7da4492ed2ce8e` and Node target `083dc181c5e175f89007f4b93111cd5c45a69d97`, 11 required review domains, evidence documents/contracts and two still-open external blockers. Its contract deliberately keeps `independentSecurityReviewComplete=false`, `physicalPowerLossQualified=false`, `productionActivation=false` and `strictPQEnabled=false`.
 
-The current repo-side release blocker is therefore the **independent security review findings and sign-off** for those frozen revisions, or a newly frozen target after any security-relevant remediation. The real five-run E4a physical-power matrix and independent evidence review remain the parallel external/hardware blocker. Neither the handoff nor green CI counts as independent review or authorizes rollout.
+PRs #139 and #140 landed after that freeze and change the security-sensitive staging origin/ACK/recovery runtime implementation. The PR #135 package remains useful historical review-preparation evidence, but its frozen Nexus target no longer represents current `main`.
+
+The current repo-side release blocker is therefore a **refreshed exact review freeze that includes the merged Rust ingress/runtime hardening, followed by independent security-review findings, remediation disposition and sign-off**. The real five-run E4a physical-power matrix and independent evidence review remain the parallel external/hardware blocker. Neither the earlier handoff, the Rust migration nor green CI counts as independent review or authorizes rollout.
 
 ## Production rollout — NOT AUTHORIZED
 
@@ -357,6 +368,7 @@ Before production rollout:
 - P0-E3a supplies the independent rollback floor and P0-E3b proves the disposable coordinated backup/restore procedure consumes it correctly. P0-E4a1–P0-E4a6 prepare and machine-check the storage/lab/evidence boundary; only five representative external abrupt-power runs plus independent review can close P0-E4a.
 - Owner-retirement authorization/issuance/erasure remains bounded and offline/default-disabled; it does not create a production retirement API.
 - Bounded fuzz, NIST-vector, observability and review-handoff gates do not replace independent security review.
+- The PR #135 frozen Nexus review target predates PRs #139/#140; current `main` requires a refreshed exact freeze before independent sign-off can apply to the release candidate.
 - A GitHub merge is not a production deployment.
 - Xray remains the user VPN data-plane.
 - Historical/archive documents do not override this roadmap.
