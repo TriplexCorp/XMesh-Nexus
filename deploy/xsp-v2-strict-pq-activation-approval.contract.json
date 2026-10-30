@@ -1,0 +1,53 @@
+{
+  "schema": "xsp2-strict-pq-activation-approval-contract-1",
+  "approvalSchema": "xsp2-strict-pq-activation-approval-1",
+  "verifierResultSchema": "xsp2-strict-pq-activation-approval-verifier-1",
+  "allowedScopeModes": [
+    "limited-canary",
+    "phased"
+  ],
+  "maxNodesPerApproval": 50,
+  "maxApprovalWindowSeconds": 86400,
+  "requiredApprovalAuthority": "release-owner",
+  "requiredTransportPolicy": {
+    "tlsProtocols": ["TLSv1.3"],
+    "keyExchange": "X25519MLKEM768",
+    "clientIdentity": "ML-DSA-65",
+    "criticalMessageSignatures": ["Ed25519", "ML-DSA-65"],
+    "automaticFallback": false,
+    "classicalOnlyAllowed": false
+  },
+  "requiredDecision": {
+    "strictPqAction": "enable",
+    "legacyXMESH1Action": "retain"
+  },
+  "requiredFalseClaimsBeforeExecution": [
+    "productionActivation",
+    "strictPQEnabled",
+    "legacyXMESH1Retired"
+  ],
+  "requiredEvidence": [
+    "p0EComplete",
+    "independentSecurityReviewAccepted",
+    "physicalPowerQualificationAccepted",
+    "finalCanaryPassed",
+    "rolloutPlanEligible"
+  ],
+  "forbiddenFieldNames": [
+    "command",
+    "commands",
+    "script",
+    "scripts",
+    "shell",
+    "privateKey",
+    "privateKeyPem",
+    "secret",
+    "secrets",
+    "password",
+    "token",
+    "credential",
+    "credentials",
+    "url",
+    "urls"
+  ]
+}

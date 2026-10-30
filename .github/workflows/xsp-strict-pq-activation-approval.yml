@@ -1,0 +1,228 @@
+name: XSP-v2 Strict-PQ Activation Approval Contract
+
+on:
+  pull_request:
+    paths:
+      - 'deploy/xsp-v2-strict-pq-activation-approval.contract.json'
+      - 'scripts/verify-xsp-v2-strict-pq-activation-approval.py'
+      - 'docs/XSP_V2_STRICT_PQ_ACTIVATION_APPROVAL.md'
+      - '.github/workflows/xsp-strict-pq-activation-approval.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'deploy/xsp-v2-strict-pq-activation-approval.contract.json'
+      - 'scripts/verify-xsp-v2-strict-pq-activation-approval.py'
+      - 'docs/XSP_V2_STRICT_PQ_ACTIVATION_APPROVAL.md'
+      - '.github/workflows/xsp-strict-pq-activation-approval.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  strict-pq-activation-approval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check verifier syntax and non-executing boundary
+        run: |
+          python3 -m py_compile scripts/verify-xsp-v2-strict-pq-activation-approval.py
+          python3 scripts/verify-xsp-v2-strict-pq-activation-approval.py --help >/dev/null
+          ! grep -En '\b(subprocess|socket|requests|urllib|paramiko)\b|os[.]system|Popen|systemctl|docker[[:space:]]|ssh[[:space:]]' scripts/verify-xsp-v2-strict-pq-activation-approval.py
+
+      - name: Build synthetic contract fixtures
+        run: |
+          python3 - <<'PY'
+          import copy, json
+
+          base = {
+              "schema": "xsp2-strict-pq-activation-approval-1",
+              "decisionId": "activation-2026-10-30-a",
+              "createdAt": "2026-10-30T10:00:00Z",
+              "expiresAt": "2026-10-30T12:00:00Z",
+              "releaseCandidate": {
+                  "nexusRevision": "1" * 40,
+                  "nodeRevision": "2" * 40,
+                  "nexusImageSha256": "sha256:" + "3" * 64,
+                  "agentArtifactSha256": "4" * 64,
+                  "finalCanaryResultSha256": "5" * 64,
+                  "rolloutPlanSha256": "6" * 64,
+              },
+              "evidence": {
+                  "p0EComplete": True,
+                  "independentSecurityReviewAccepted": True,
+                  "independentSecurityReviewResultSha256": "7" * 64,
+                  "physicalPowerQualificationAccepted": True,
+                  "physicalPowerQualificationResultSha256": "8" * 64,
+                  "finalCanaryPassed": True,
+                  "rolloutPlanEligible": True,
+                  "rolloutPlanVerifierResultSha256": "9" * 64,
+              },
+              "scope": {
+                  "mode": "limited-canary",
+                  "rolloutId": "pq-canary-a",
+                  "nodeIds": ["node-001", "node-002"],
+                  "panelFqdn": "panel.example.com",
+                  "xspIngressFqdn": "pq.example.com",
+                  "xspIngressPort": 8443,
+              },
+              "policy": {
+                  "tlsProtocols": ["TLSv1.3"],
+                  "keyExchange": "X25519MLKEM768",
+                  "clientIdentity": "ML-DSA-65",
+                  "criticalMessageSignatures": ["Ed25519", "ML-DSA-65"],
+                  "automaticFallback": False,
+                  "classicalOnlyAllowed": False,
+                  "strictPqAction": "enable",
+                  "legacyXMESH1Action": "retain",
+              },
+              "approval": {
+                  "approver": "release-owner-example",
+                  "authority": "release-owner",
+                  "approved": True,
+                  "approvedAt": "2026-10-30T10:15:00Z",
+                  "approvalRecordSha256": "a" * 64,
+                  "rationale": "Synthetic positive fixture for contract semantics only.",
+              },
+              "claims": {
+                  "productionActivation": False,
+                  "strictPQEnabled": False,
+                  "legacyXMESH1Retired": False,
+              },
+          }
+
+          def dump(name, obj):
+              with open('/tmp/' + name, 'w', encoding='utf-8') as fh:
+                  json.dump(obj, fh, sort_keys=True)
+
+          dump('eligible.json', base)
+
+          pending = copy.deepcopy(base)
+          pending['evidence'] = {
+              "p0EComplete": False,
+              "independentSecurityReviewAccepted": False,
+              "independentSecurityReviewResultSha256": None,
+              "physicalPowerQualificationAccepted": False,
+              "physicalPowerQualificationResultSha256": None,
+              "finalCanaryPassed": False,
+              "rolloutPlanEligible": False,
+              "rolloutPlanVerifierResultSha256": None,
+          }
+          pending['approval']['approved'] = False
+          pending['approval']['approvedAt'] = None
+          pending['approval']['approvalRecordSha256'] = None
+          pending['approval']['rationale'] = 'Synthetic pending fixture.'
+          dump('pending.json', pending)
+
+          x = copy.deepcopy(base); x['policy']['automaticFallback'] = True; dump('bad-fallback.json', x)
+          x = copy.deepcopy(base); x['policy']['classicalOnlyAllowed'] = True; dump('bad-classical.json', x)
+          x = copy.deepcopy(base); x['policy']['legacyXMESH1Action'] = 'retire'; dump('bad-retire.json', x)
+          x = copy.deepcopy(base); x['claims']['strictPQEnabled'] = True; dump('bad-strict-claim.json', x)
+          x = copy.deepcopy(base); x['claims']['productionActivation'] = True; dump('bad-prod-claim.json', x)
+          x = copy.deepcopy(base); x['scope']['nodeIds'] = ['*']; dump('bad-wildcard.json', x)
+          x = copy.deepcopy(base); x['evidence']['independentSecurityReviewAccepted'] = False; x['evidence']['independentSecurityReviewResultSha256'] = None; dump('bad-p0e-chain.json', x)
+          x = copy.deepcopy(base); x['approval']['approved'] = False; x['approval']['approvedAt'] = None; x['approval']['approvalRecordSha256'] = None; dump('bad-unapproved.json', x)
+          x = copy.deepcopy(base); x['releaseCandidate']['rolloutPlanSha256'] = 'b' * 64; dump('bad-plan-binding.json', x)
+          x = copy.deepcopy(base); x['evidence']['independentSecurityReviewResultSha256'] = 'b' * 64; dump('bad-review-evidence-binding.json', x)
+          x = copy.deepcopy(base); x['evidence']['physicalPowerQualificationResultSha256'] = 'c' * 64; dump('bad-power-evidence-binding.json', x)
+          x = copy.deepcopy(base); x['evidence']['rolloutPlanVerifierResultSha256'] = 'd' * 64; dump('bad-rollout-verifier-binding.json', x)
+          x = copy.deepcopy(base); x['scope']['privateKey'] = 'forbidden'; dump('bad-private-field.json', x)
+
+          contract = json.load(open('deploy/xsp-v2-strict-pq-activation-approval.contract.json', encoding='utf-8'))
+          x = copy.deepcopy(contract); x['maxNodesPerApproval'] = 51; dump('bad-contract-nodes.json', x)
+          x = copy.deepcopy(contract); x['maxApprovalWindowSeconds'] = 172800; dump('bad-contract-window.json', x)
+          x = copy.deepcopy(contract); x['forbiddenFieldNames'].remove('privateKey'); dump('bad-contract-forbidden.json', x)
+          PY
+
+      - name: Prove structurally valid pending approval stays ineligible
+        run: |
+          python3 scripts/verify-xsp-v2-strict-pq-activation-approval.py \
+            --approval /tmp/pending.json \
+            --now 2026-10-30T11:00:00Z > /tmp/pending-result.json
+          python3 - <<'PY'
+          import json
+          x=json.load(open('/tmp/pending-result.json'))
+          assert x['activationApprovalEligible'] is False
+          assert x['strictPQEnabled'] is False
+          assert x['productionActivation'] is False
+          assert x['legacyXMESH1Retired'] is False
+          assert x['requiresSeparateExecution'] is True
+          PY
+
+      - name: Prove synthetic eligible approval is exact-bound but non-executing
+        run: |
+          python3 scripts/verify-xsp-v2-strict-pq-activation-approval.py \
+            --approval /tmp/eligible.json \
+            --require-eligible \
+            --now 2026-10-30T11:00:00Z \
+            --expected-nexus-revision 1111111111111111111111111111111111111111 \
+            --expected-node-revision 2222222222222222222222222222222222222222 \
+            --expected-nexus-image-sha256 sha256:3333333333333333333333333333333333333333333333333333333333333333 \
+            --expected-agent-artifact-sha256 4444444444444444444444444444444444444444444444444444444444444444 \
+            --expected-final-canary-sha256 5555555555555555555555555555555555555555555555555555555555555555 \
+            --expected-rollout-plan-sha256 6666666666666666666666666666666666666666666666666666666666666666 \
+            --expected-security-review-result-sha256 7777777777777777777777777777777777777777777777777777777777777777 \
+            --expected-physical-qualification-result-sha256 8888888888888888888888888888888888888888888888888888888888888888 \
+            --expected-rollout-plan-verifier-result-sha256 9999999999999999999999999999999999999999999999999999999999999999 \
+            > /tmp/eligible-result.json
+          python3 - <<'PY'
+          import json
+          x=json.load(open('/tmp/eligible-result.json'))
+          assert x['evidenceReady'] is True
+          assert x['releaseOwnerApproved'] is True
+          assert x['approvalWindowCurrent'] is True
+          assert x['activationApprovalEligible'] is True
+          assert x['strictPQEnabled'] is False
+          assert x['productionActivation'] is False
+          assert x['legacyXMESH1Retired'] is False
+          assert x['requiresSeparateExecution'] is True
+          assert x['requiresSeparateXMESH1RetirementDecision'] is True
+          assert x['scope']['nodeIds'] == ['node-001', 'node-002']
+          PY
+
+      - name: Prove fail-closed negatives
+        run: |
+          common=(
+            --require-eligible
+            --now 2026-10-30T11:00:00Z
+            --expected-nexus-revision 1111111111111111111111111111111111111111
+            --expected-node-revision 2222222222222222222222222222222222222222
+            --expected-nexus-image-sha256 sha256:3333333333333333333333333333333333333333333333333333333333333333
+            --expected-agent-artifact-sha256 4444444444444444444444444444444444444444444444444444444444444444
+            --expected-final-canary-sha256 5555555555555555555555555555555555555555555555555555555555555555
+            --expected-rollout-plan-sha256 6666666666666666666666666666666666666666666666666666666666666666
+            --expected-security-review-result-sha256 7777777777777777777777777777777777777777777777777777777777777777
+            --expected-physical-qualification-result-sha256 8888888888888888888888888888888888888888888888888888888888888888
+            --expected-rollout-plan-verifier-result-sha256 9999999999999999999999999999999999999999999999999999999999999999
+          )
+          for f in \
+            /tmp/bad-fallback.json \
+            /tmp/bad-classical.json \
+            /tmp/bad-retire.json \
+            /tmp/bad-strict-claim.json \
+            /tmp/bad-prod-claim.json \
+            /tmp/bad-wildcard.json \
+            /tmp/bad-p0e-chain.json \
+            /tmp/bad-unapproved.json \
+            /tmp/bad-plan-binding.json \
+            /tmp/bad-review-evidence-binding.json \
+            /tmp/bad-power-evidence-binding.json \
+            /tmp/bad-rollout-verifier-binding.json \
+            /tmp/bad-private-field.json; do
+            ! python3 scripts/verify-xsp-v2-strict-pq-activation-approval.py --approval "$f" "${common[@]}"
+          done
+          ! python3 scripts/verify-xsp-v2-strict-pq-activation-approval.py \
+            --approval /tmp/eligible.json "${common[@]}" --now 2026-10-31T11:00:00Z
+          ! python3 scripts/verify-xsp-v2-strict-pq-activation-approval.py \
+            --approval /tmp/eligible.json --require-eligible --now 2026-10-30T11:00:00Z
+          for contract in /tmp/bad-contract-nodes.json /tmp/bad-contract-window.json /tmp/bad-contract-forbidden.json; do
+            ! python3 scripts/verify-xsp-v2-strict-pq-activation-approval.py \
+              --approval /tmp/eligible.json --contract "$contract" "${common[@]}"
+          done
+
+      - name: State bounded evidence only
+        run: |
+          echo 'Synthetic fixtures prove activation-approval contract semantics only.'
+          echo 'No workflow step enables strict-pq, changes production topology, or retires XMESH1.'
+          echo 'Issues #137/#138 and the exact post-P0-E final canary remain real prerequisites.'
+          echo 'strict-pq remains OFF; production rollout remains NOT AUTHORIZED.'
