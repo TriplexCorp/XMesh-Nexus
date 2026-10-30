@@ -58,10 +58,17 @@ USER 10004:10003
 ENTRYPOINT ["python3", "/usr/local/bin/xsp-origin-ack-gate"]
 
 # Test client only: OpenSSL and socat stay outside both ingress/origin runtime
-# images. socat drives the negative SO_PEERCRED test without reintroducing a
-# Python interpreter into the Rust origin image.
+# images. The tiny `nc -w SEC -U PATH` compatibility wrapper is test-only and
+# translates the existing negative-peer harness to socat's Unix-connect mode.
 FROM debian:trixie-slim AS probe
 RUN apt-get update \
     && apt-get install -y --no-install-recommends openssl ca-certificates socat \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && printf '%s\n' \
+       '#!/bin/sh' \
+       'set -eu' \
+       '[ "$#" -eq 4 ] && [ "$1" = "-w" ] && [ "$3" = "-U" ]' \
+       'exec socat -T"$2" - "UNIX-CONNECT:$4"' \
+       > /usr/local/bin/nc \
+    && chmod 0755 /usr/local/bin/nc
 ENTRYPOINT ["/bin/sh"]
