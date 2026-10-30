@@ -62,9 +62,7 @@ impl Config {
             || !expected_spki.bytes().all(|byte| byte.is_ascii_hexdigit())
             || expected_spki.bytes().any(|byte| byte.is_ascii_uppercase())
         {
-            return Err(
-                "XSP_EXPECTED_CLIENT_SPKI_SHA256 must be lowercase SHA-256 hex".to_owned(),
-            );
+            return Err("XSP_EXPECTED_CLIENT_SPKI_SHA256 must be lowercase SHA-256 hex".to_owned());
         }
         let expected_node_id = env::var("XSP_EXPECTED_NODE_ID")
             .unwrap_or_default()
@@ -125,7 +123,9 @@ fn percent_decode(value: &str) -> Vec<u8> {
     let mut index = 0;
     while index < bytes.len() {
         if bytes[index] == b'%' && index + 2 < bytes.len() {
-            if let (Some(high), Some(low)) = (hex_value(bytes[index + 1]), hex_value(bytes[index + 2])) {
+            if let (Some(high), Some(low)) =
+                (hex_value(bytes[index + 1]), hex_value(bytes[index + 2]))
+            {
                 output.push((high << 4) | low);
                 index += 3;
                 continue;
@@ -281,7 +281,11 @@ fn read_request(stream: &mut UnixStream) -> Result<Request, String> {
             .split_once(':')
             .ok_or_else(|| "invalid HTTP header".to_owned())?;
         let name = name.trim();
-        if name.is_empty() || !name.bytes().all(|byte| byte.is_ascii_alphanumeric() || byte == b'-') {
+        if name.is_empty()
+            || !name
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+        {
             return Err("invalid HTTP header name".to_owned());
         }
         headers.push((name.to_owned(), value.trim().to_owned()));
@@ -362,7 +366,8 @@ fn handle_connection(mut stream: UnixStream, config: &Config) {
 
 fn bind_listener(path: &Path) -> Result<UnixListener, String> {
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|error| format!("cannot create socket directory: {error}"))?;
+        fs::create_dir_all(parent)
+            .map_err(|error| format!("cannot create socket directory: {error}"))?;
     }
     match fs::remove_file(path) {
         Ok(()) => {}
