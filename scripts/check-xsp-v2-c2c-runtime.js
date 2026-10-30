@@ -8,7 +8,7 @@ const cargo = read('backend/Cargo.toml');
 const c2cCargo = read('backend/c2c/Cargo.toml');
 const service = read('backend/src/bin/xsp_v2_c2c.rs');
 const fixture = read('backend/src/bin/xsp_v2_c2c_fixture.rs');
-const origin = read('deploy/xsp-v2-ingress/origin_ack_gate.py');
+const origin = read('deploy/xsp-v2-ingress/origin-ack-rs/src/main.rs');
 const docker = read('backend/Dockerfile.xsp-c2c');
 const role = read('deploy/postgres/21-create-xsp-v2-c2c-role.sql');
 const test = read('scripts/test-xsp-v2-c2c-integration.py');
@@ -38,13 +38,16 @@ assert.match(service, /XSP2C2C1/);
 assert.doesNotMatch(service, /TcpListener|axum::|reqwest::|X-XSP-V2-Trusted-Node-ID/,
   'C2-C must not add TCP/HTTP/header identity handoff');
 
-assert.match(origin, /C2C_GATE == "staging-only"/);
+assert.match(origin, /config\.c2c_gate == "staging-only"/);
 assert.match(origin, /SO_PEERCRED/);
-assert.match(origin, /C2C_UID = 10001/);
-assert.match(origin, /client\.getsockopt[\s\S]*unexpected C2-C service peer[\s\S]*client\.sendall/,
+assert.match(origin, /const C2C_UID: u32 = 10001/);
+assert.match(origin, /const C2C_GID: u32 = 10001/);
+assert.match(origin, /peer_credentials\(&client\)[\s\S]*unexpected C2-C service peer[\s\S]*write_all\(&frame\)/,
   'origin must authenticate the C2-C peer before sending ACK bytes');
-assert.match(origin, /authorizationStatus": "not-verified"/,
+assert.match(origin, /authorizationStatus\":\"not-verified/,
   'C2-B behavior must remain when C2-C gate is off');
+assert.doesNotMatch(origin, /TcpStream|reqwest::|X-XSP-V2-Trusted-Node-ID/,
+  'Rust origin ACK gate must retain local Unix-only C2-C and transport identity boundaries');
 
 assert.match(docker, /--manifest-path c2c\/Cargo\.toml/,
   'C2-C image must build from the isolated Cargo package');
