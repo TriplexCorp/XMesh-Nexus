@@ -76,7 +76,12 @@ jobs:
           PY
           diff -u "$RUNNER_TEMP/expected-delta.txt" "$RUNNER_TEMP/actual-delta.txt"
 
-          test "$(git -C "$nexus" rev-parse "$tooling^1")" = "$tooling_base"
+          first_parent="$(
+            git -C "$nexus" cat-file -p "$tooling" |
+            sed -n 's/^parent //p' |
+            head -1
+          )"
+          test "$first_parent" = "$tooling_base"
           echo 'PASS: reviewed runtime source is unchanged and PR #172 delta is exact'
 
       - name: Prove staging-only target isolation at exact tooling revision
