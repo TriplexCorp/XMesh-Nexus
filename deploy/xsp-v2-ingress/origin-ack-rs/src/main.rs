@@ -563,7 +563,8 @@ fn read_body(stream: &mut UnixStream, initial: &[u8], length: usize) -> Result<V
     let mut buffer = [0_u8; 2048];
     while body.len() < length {
         let remaining = length - body.len();
-        match stream.read(&mut buffer[..remaining.min(buffer.len())]) {
+        let read_limit = remaining.min(buffer.len());
+        match stream.read(&mut buffer[..read_limit]) {
             Ok(0) => return Err(BodyError::Invalid),
             Ok(read) => body.extend_from_slice(&buffer[..read]),
             Err(error)
