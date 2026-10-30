@@ -69,7 +69,9 @@ impl TestFault {
             "drop-before-c2c" => Ok(Self::DropBeforeC2c),
             "drop-on-c2c-failure" => Ok(Self::DropOnC2cFailure),
             "drop-after-c2c-success" => Ok(Self::DropAfterC2cSuccess),
-            _ => Err("XSP_V2_C2D_TEST_FAULT is not an approved disposable E2E fault mode".to_owned()),
+            _ => {
+                Err("XSP_V2_C2D_TEST_FAULT is not an approved disposable E2E fault mode".to_owned())
+            }
         }
     }
 }
@@ -127,11 +129,8 @@ impl Config {
         let c2c_socket_path = PathBuf::from(
             env::var("XSP_V2_C2C_SOCKET_PATH").unwrap_or_else(|_| DEFAULT_C2C_SOCKET.to_owned()),
         );
-        let test_fault = TestFault::parse(
-            env::var("XSP_V2_C2D_TEST_FAULT")
-                .unwrap_or_default()
-                .trim(),
-        )?;
+        let test_fault =
+            TestFault::parse(env::var("XSP_V2_C2D_TEST_FAULT").unwrap_or_default().trim())?;
         if test_fault != TestFault::None && c2c_gate != "staging-only" {
             return Err("C2-D2 test faults require the explicit staging-only C2-C gate".to_owned());
         }
@@ -327,7 +326,8 @@ fn current_time_ms() -> Result<i64, String> {
     let duration = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(|_| "system time is before Unix epoch".to_owned())?;
-    i64::try_from(duration.as_millis()).map_err(|_| "system time exceeds i64 milliseconds".to_owned())
+    i64::try_from(duration.as_millis())
+        .map_err(|_| "system time exceeds i64 milliseconds".to_owned())
 }
 
 fn peer_credentials(stream: &UnixStream) -> Result<(u32, u32), String> {
@@ -566,7 +566,12 @@ fn read_body(stream: &mut UnixStream, initial: &[u8], length: usize) -> Result<V
         match stream.read(&mut buffer[..remaining.min(buffer.len())]) {
             Ok(0) => return Err(BodyError::Invalid),
             Ok(read) => body.extend_from_slice(&buffer[..read]),
-            Err(error) if matches!(error.kind(), io::ErrorKind::TimedOut | io::ErrorKind::WouldBlock) => {
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    io::ErrorKind::TimedOut | io::ErrorKind::WouldBlock
+                ) =>
+            {
                 return Err(BodyError::Timeout);
             }
             Err(_) => return Err(BodyError::Timeout),
@@ -639,7 +644,8 @@ fn authorize_c2c(
     if &header[..8] != C2C_RESPONSE_MAGIC || !matches!(header[8], 0 | 1) {
         return Err("invalid C2-C response domain".to_owned());
     }
-    let response_length = u32::from_be_bytes(header[9..13].try_into().expect("4-byte slice")) as usize;
+    let response_length =
+        u32::from_be_bytes(header[9..13].try_into().expect("4-byte slice")) as usize;
     if response_length > MAX_ACK_BODY {
         return Err("C2-C response too large".to_owned());
     }
@@ -698,7 +704,10 @@ fn send_json(stream: &mut UnixStream, status: u16, body: &str) {
 }
 
 fn error_json(message: &str) -> String {
-    format!(r#"{{"error":{}}}"#, serde_json::to_string(message).expect("static error string"))
+    format!(
+        r#"{{"error":{}}}"#,
+        serde_json::to_string(message).expect("static error string")
+    )
 }
 
 fn drop_response(stream: &UnixStream) {
@@ -730,15 +739,15 @@ fn handle_get(stream: &mut UnixStream, request: &HttpRequest, config: &Config) {
         send_json(stream, 403, &error_json("untrusted origin identity"));
         return;
     };
-    let body = format!(
-        r#"{{"originTransport":"unix-peercred","trustedNodeId":{node_id}}}"#
-    );
+    let body = format!(r#"{{"originTransport":"unix-peercred","trustedNodeId":{node_id}}}"#);
     send_json(stream, 200, &body);
 }
 
 fn handle_post(stream: &mut UnixStream, request: HttpRequest, config: &Config) {
     let recovery = request.path == RECOVERY_PATH;
-    if (request.path != ACK_PATH && request.path != RECOVERY_PATH) || config.ack_gate != "staging-only" {
+    if (request.path != ACK_PATH && request.path != RECOVERY_PATH)
+        || config.ack_gate != "staging-only"
+    {
         send_json(stream, 404, &error_json("not found"));
         return;
     }
@@ -756,7 +765,9 @@ fn handle_post(stream: &mut UnixStream, request: HttpRequest, config: &Config) {
         return;
     }
     let raw_length = match request.header("Content-Length") {
-        Ok(Some(value)) if value.bytes().all(|byte| byte.is_ascii_digit()) && !value.is_empty() => value,
+        Ok(Some(value)) if value.bytes().all(|byte| byte.is_ascii_digit()) && !value.is_empty() => {
+            value
+        }
         _ => {
             send_json(stream, 411, &error_json("content length required"));
             return;
@@ -936,23 +947,14 @@ mod tests {
     #[test]
     fn strict_schema_accepts_exact_envelope() {
         let envelope: AckEnvelope = serde_json::from_str(&valid_json()).expect("valid envelope");
-        assert_eq!(
-            validate_envelope(&envelope, 4242, false, 1_000_000),
-            Ok(())
-        );
+        assert_eq!(validate_envelope(&envelope, 4242, false, 1_000_000), Ok(()));
     }
 
     #[test]
     fn duplicate_and_unknown_fields_fail_closed() {
-        let duplicate = valid_json().replace(
-            r#""kind":"ack","#,
-            r#""kind":"ack","kind":"ack","#,
-        );
+        let duplicate = valid_json().replace(r#""kind":"ack","#, r#""kind":"ack","kind":"ack","#);
         assert!(serde_json::from_str::<AckEnvelope>(&duplicate).is_err());
-        let unknown = valid_json().replace(
-            r#""kind":"ack","#,
-            r#""kind":"ack","unexpected":1,"#,
-        );
+        let unknown = valid_json().replace(r#""kind":"ack","#, r#""kind":"ack","unexpected":1,"#);
         assert!(serde_json::from_str::<AckEnvelope>(&unknown).is_err());
     }
 
@@ -963,10 +965,7 @@ mod tests {
             validate_envelope(&envelope, 4242, true, 1_060_000),
             Err(ValidationError::RecoveryNotExpired)
         );
-        assert_eq!(
-            validate_envelope(&envelope, 4242, true, 1_060_001),
-            Ok(())
-        );
+        assert_eq!(validate_envelope(&envelope, 4242, true, 1_060_001), Ok(()));
     }
 
     #[test]
