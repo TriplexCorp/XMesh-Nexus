@@ -1,0 +1,125 @@
+name: XSP-v2 P0-E Security Review Handoff v5 KVM VPS
+
+on:
+  pull_request:
+    paths:
+      - "deploy/xsp-v2-p0e-security-review-handoff-v5.contract.json"
+      - "docs/XSP_V2_P0E_SECURITY_REVIEW_HANDOFF_V5.md"
+      - "scripts/build-xsp-v2-p0e-security-review-bundle-v5.py"
+      - ".github/workflows/xsp-p0e-security-review-handoff-v5.yml"
+      - ".github/workflows/xsp-p0e-security-review-bundle-v5.yml"
+      - "docs/XSP_V2_P0E_SECURITY_REVIEW_BUNDLE_V5.md"
+  push:
+    branches: [main]
+    paths:
+      - "deploy/xsp-v2-p0e-security-review-handoff-v5.contract.json"
+      - "docs/XSP_V2_P0E_SECURITY_REVIEW_HANDOFF_V5.md"
+      - "scripts/build-xsp-v2-p0e-security-review-bundle-v5.py"
+      - ".github/workflows/xsp-p0e-security-review-handoff-v5.yml"
+      - ".github/workflows/xsp-p0e-security-review-bundle-v5.yml"
+      - "docs/XSP_V2_P0E_SECURITY_REVIEW_BUNDLE_V5.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  frozen-review-handoff-v5:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out v5 control branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check out unchanged v5 Nexus runtime target
+        uses: actions/checkout@v4
+        with:
+          repository: TriplexCorp/XMesh-Nexus
+          ref: 12b3170996bc062ee16c79659a6378e5e425fd0e
+          path: xmesh-nexus-reviewed
+          fetch-depth: 0
+      - name: Check out unchanged v5 Node runtime target
+        uses: actions/checkout@v4
+        with:
+          repository: TriplexCorp/XMesh-Node
+          ref: 34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb
+          path: xmesh-node-reviewed
+          fetch-depth: 0
+
+      - name: Verify v5 machine contract and deployment boundary
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,pathlib
+          c=json.load(open('deploy/xsp-v2-p0e-security-review-handoff-v5.contract.json'))
+          assert c['schema']=='xsp2-p0e-security-review-handoff-contract-4'
+          assert c['reviewVersion']=='v5-kvm-vps'
+          assert c['nexus']['sourceRevision']=='12b3170996bc062ee16c79659a6378e5e425fd0e'
+          assert c['node']['sourceRevision']=='34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb'
+          assert c['supersedesV4']['runtimeUnchanged'] is True
+          assert c['releaseControlCheckpoint']['bareMetalE4aRebindMerge']=='af87c9e99c8ab358a87c36120ff121b4b5275653'
+          assert c['releaseControlCheckpoint']['kvmVpsPolicyMerge']=='9bc592c875058f213da38d4565ab77dad015461c'
+          assert c['releaseControlCheckpoint']['activeDeploymentClass']=='kvm-vps'
+          assert c['deploymentClass']=='kvm-vps'
+          assert len(c['requiredReviewDomains'])==11 and len(set(c['requiredReviewDomains']))==11
+          assert c['requiredExternalBlockers']==['independent-security-review-findings-and-signoff','kvm-vps-five-real-crash-consistency-runs']
+          for key in ('independentSecurityReviewComplete','guestCrashConsistencyQualified','providerStorageDurabilityAssumed','physicalPowerLossQualified','productionActivation','strictPQEnabled'):
+            assert c[key] is False
+          for rel in c['requiredControlEvidence']:
+            p=pathlib.Path(rel); assert p.is_file() and p.stat().st_size>0, rel
+          PY
+
+      - name: Verify runtime target remains exactly v4
+        run: |
+          set -euo pipefail
+          test "$(git -C xmesh-nexus-reviewed rev-parse HEAD)" = '12b3170996bc062ee16c79659a6378e5e425fd0e'
+          test "$(git -C xmesh-node-reviewed rev-parse HEAD)" = '34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb'
+
+      - name: Verify source evidence exists at frozen runtime target
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,pathlib
+          c=json.load(open('deploy/xsp-v2-p0e-security-review-handoff-v5.contract.json'))
+          root=pathlib.Path('xmesh-nexus-reviewed')
+          for rel in c['requiredSourceEvidence']:
+            p=root/rel; assert p.is_file() and p.stat().st_size>0, rel
+          PY
+
+      - name: Verify KVM release-control invariants
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/verify-xsp-v2-kvm-vps-durability.py scripts/verify-xsp-v2-kvm-vps-strict-pq-activation-approval.py scripts/build-xsp-v2-p0e-security-review-bundle-v5.py
+          python3 - <<'PY'
+          import json
+          d=json.load(open('deploy/xsp-v2-kvm-vps-durability-qualification.contract.json'))
+          a=json.load(open('deploy/xsp-v2-kvm-vps-strict-pq-activation-approval.contract.json'))
+          assert d['deploymentClass']=='kvm-vps'
+          assert d['runtimeTarget']=={'nexusRevision':'12b3170996bc062ee16c79659a6378e5e425fd0e','nodeRevision':'34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb'}
+          assert d['requiredClaims']['guestCrashConsistencyQualified'] is True
+          assert d['requiredClaims']['providerStorageDurabilityAssumed'] is True
+          assert d['requiredClaims']['physicalPowerLossQualified'] is False
+          assert a['deploymentClass']=='kvm-vps'
+          assert a['requiredTransportPolicy']['automaticFallback'] is False
+          assert a['requiredTransportPolicy']['classicalOnlyAllowed'] is False
+          assert a['requiredDecision']=={'strictPqAction':'enable','legacyXMESH1Action':'retain'}
+          assert a['requiredFalseClaimsBeforeExecution']['physicalPowerLossQualified'] is False
+          assert a['requiresSeparateExecution'] is True
+          PY
+
+      - name: Verify v5 normative statements
+        run: |
+          set -euo pipefail
+          doc=docs/XSP_V2_P0E_SECURITY_REVIEW_HANDOFF_V5.md
+          grep -Fq '12b3170996bc062ee16c79659a6378e5e425fd0e' "$doc"
+          grep -Fq '34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb' "$doc"
+          grep -Fq 'deploymentClass=kvm-vps' "$doc"
+          grep -Fq 'physicalPowerLossQualified=false' "$doc"
+          grep -Fq '#137' "$doc"
+          grep -Fq '#138' "$doc"
+          grep -Fq '`strict-pq` remains OFF' "$doc"
+
+      - name: State v5 preparation-only evidence
+        run: |
+          echo 'PASS: v5 keeps the remediated runtime frozen and adds the KVM deployment policy to mandatory independent-review scope.'
+          echo 'No runtime activation, independent review, or real KVM crash qualification is performed by this workflow.'
