@@ -405,41 +405,26 @@ chmod 0444 /certs/client.pem /certs/other-client.pem /certs/classical-client.pem
                 raise RuntimeError(f"{label} impersonated pinned C2-B Node identity")
         print("PASS: alternate/PQ and classical client identities cannot impersonate the pinned Node")
 
-        forged_direct = f'''
-import socket
-body = {ack!r}.encode()
-s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-s.settimeout(3)
-s.connect("/run/xmesh-origin/xsp-v2-origin.sock")
-request = (
-    b"POST {ACK_PATH} HTTP/1.1\\r\\n"
-    b"Host: forged\\r\\n"
-    b"X-XSP-V2-Client-Verify: SUCCESS\\r\\n"
-    b"X-XSP-V2-Client-Cert: forged\\r\\n"
-    b"Content-Type: application/json\\r\\n"
-    + f"Content-Length: {{len(body)}}\\r\\nConnection: close\\r\\n\\r\\n".encode()
-    + body
-)
-s.sendall(request)
-data = b""
-while True:
-    try:
-        part = s.recv(4096)
-    except socket.timeout:
-        break
-    if not part:
-        break
-    data += part
-print(data.decode("utf-8", "replace"))
-if b"403" not in data or b"202 Accepted" in data:
-    raise SystemExit(1)
-'''
-        command(
-            "docker", "run", "--rm", "--network", "none", "--user", "10005:10003",
-            "--mount", f"type=volume,src={origin_socket},dst=/run/xmesh-origin,readonly",
-            "--entrypoint", "python3", origin_image, "-c", forged_direct,
-            timeout=10,
+        forged_request = (
+            f"POST {ACK_PATH} HTTP/1.1\r\n"
+            "Host: forged\r\n"
+            "X-XSP-V2-Client-Verify: SUCCESS\r\n"
+            "X-XSP-V2-Client-Cert: forged\r\n"
+            "Content-Type: application/json\r\n"
+            f"Content-Length: {len(ack.encode())}\r\n"
+            "Connection: close\r\n\r\n"
+            f"{ack}"
         )
+        forged_direct = command(
+            "docker", "run", "--rm", "-i", "--network", "none", "--user", "10005:10003",
+            "--mount", f"type=volume,src={origin_socket},dst=/run/xmesh-origin,readonly",
+            "--entrypoint", "/usr/local/bin/nc", probe_image,
+            "-w", "3", "-U", "/run/xmesh-origin/xsp-v2-origin.sock",
+            input_text=forged_request, check=False, timeout=10,
+        )
+        forged_response = response_text(forged_direct)
+        if "403 Forbidden" not in forged_response or "202 Accepted" in forged_response:
+            raise RuntimeError(f"direct UDS forgery was not rejected: {forged_response[-1200:]}")
         print("PASS: direct UDS forgery fails SO_PEERCRED even with forged verification headers")
 
         oversized = "x" * (17 * 1024)
