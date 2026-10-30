@@ -32,9 +32,9 @@ struct PermitCounts {
     total: i64,
     issued: i64,
     ack_verified: i64,
-    committed: i64,
-    failed: i64,
-    latest_committed_at_ms: Option<i64>,
+    receipt_sent: i64,
+    aborted: i64,
+    latest_ack_verified_at_ms: Option<i64>,
 }
 
 #[derive(Serialize)]
@@ -134,11 +134,11 @@ async fn collect(pool: &PgPool, node_id: i64) -> Result<Snapshot> {
 
     let permit_row = sqlx::query(
         "SELECT COUNT(*)::BIGINT AS total, \
-         COUNT(*) FILTER (WHERE status='issued')::BIGINT AS issued, \
-         COUNT(*) FILTER (WHERE status='ack_verified')::BIGINT AS ack_verified, \
-         COUNT(*) FILTER (WHERE status='committed')::BIGINT AS committed, \
-         COUNT(*) FILTER (WHERE status='failed')::BIGINT AS failed, \
-         (EXTRACT(EPOCH FROM MAX(committed_at)) * 1000)::BIGINT AS latest_committed_at_ms \
+         COUNT(*) FILTER (WHERE state='issued')::BIGINT AS issued, \
+         COUNT(*) FILTER (WHERE state='ack_verified')::BIGINT AS ack_verified, \
+         COUNT(*) FILTER (WHERE state='receipt_sent')::BIGINT AS receipt_sent, \
+         COUNT(*) FILTER (WHERE state='aborted')::BIGINT AS aborted, \
+         (EXTRACT(EPOCH FROM MAX(ack_verified_at)) * 1000)::BIGINT AS latest_ack_verified_at_ms \
          FROM node_xsp_cutover_permit_ledger WHERE node_id=$1",
     )
     .bind(node_id)
@@ -149,9 +149,9 @@ async fn collect(pool: &PgPool, node_id: i64) -> Result<Snapshot> {
         total: permit_row.try_get("total")?,
         issued: permit_row.try_get("issued")?,
         ack_verified: permit_row.try_get("ack_verified")?,
-        committed: permit_row.try_get("committed")?,
-        failed: permit_row.try_get("failed")?,
-        latest_committed_at_ms: permit_row.try_get("latest_committed_at_ms")?,
+        receipt_sent: permit_row.try_get("receipt_sent")?,
+        aborted: permit_row.try_get("aborted")?,
+        latest_ack_verified_at_ms: permit_row.try_get("latest_ack_verified_at_ms")?,
     };
 
     let durable_row = sqlx::query(
