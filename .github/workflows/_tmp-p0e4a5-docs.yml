@@ -1,0 +1,41 @@
+name: Temporary P0-E4a5 docs updater
+
+on:
+  push:
+    branches: [docs/p0e4a5-checkpoint-physical-runs-current]
+    paths:
+      - "scripts/_tmp_update_p0e4a5_docs.py"
+      - ".github/workflows/_tmp-p0e4a5-docs.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: docs/p0e4a5-checkpoint-physical-runs-current
+          fetch-depth: 0
+      - name: Apply exact checkpoint patch
+        run: python3 scripts/_tmp_update_p0e4a5_docs.py
+      - name: Validate final documentation diff
+        run: |
+          set -euo pipefail
+          git diff --check
+          actual="$(git diff --name-only | sort)"
+          expected="$(printf '%s\n' README.en.md README.md docs/ENTERPRISE_ROADMAP.md | sort)"
+          test "$actual" = "$expected"
+          grep -Fq 'a34d0999ca519e2a81e68d92ec7136cd606518d4' README.md README.en.md docs/ENTERPRISE_ROADMAP.md
+          grep -Fq '7bf8cc92950f396e33891c8744c1f6855414154b' README.md README.en.md docs/ENTERPRISE_ROADMAP.md
+          grep -Fq 'P0-E4a5' README.md README.en.md docs/ENTERPRISE_ROADMAP.md
+          grep -Fq 'P0-E4a remains open' README.md README.en.md docs/ENTERPRISE_ROADMAP.md
+      - name: Commit documentation checkpoint
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add README.md README.en.md docs/ENTERPRISE_ROADMAP.md
+          git commit -m 'docs(xsp-v2): checkpoint P0-E4a5 lab readiness'
+          git push origin HEAD:docs/p0e4a5-checkpoint-physical-runs-current
