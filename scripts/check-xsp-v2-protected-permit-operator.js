@@ -13,9 +13,9 @@ for (const name of ['xsp-v2-permit-signer','xsp-v2-permit-operator']) {
   assert.match(cargo, new RegExp(`name = "${name}"[\\s\\S]*required-features = \\["xsp-v2-experimental"\\]`));
 }
 
-assert.match(signer,/XSP_V2_PROTECTED_PERMIT_ISSUER.*staging-only/);
+assert.match(signer,/XSP_V2_PROTECTED_PERMIT_ISSUER[\s\S]{0,120}staging-only/);
 assert.match(signer,/xmesh_permit_signer_reader/);
-assert.match(signer,/default read-only|default read-only|read-only/);
+assert.match(signer,/read-only/);
 assert.match(signer,/sign-approved-permit/);
 assert.match(signer,/load_approved_candidate/);
 assert.match(signer,/approved_by == authenticated_owner/);
@@ -27,20 +27,20 @@ assert.match(signer,/peer\.uid\(\) == OPERATOR_UID && peer\.gid\(\) == OPERATOR_
 assert.doesNotMatch(signer,/INSERT INTO|UPDATE node_xsp|DELETE FROM node_xsp/,
   'permit signer must remain SELECT-only');
 
-assert.match(operator,/XSP_V2_PROTECTED_PERMIT_OPERATOR.*staging-only/);
+assert.match(operator,/XSP_V2_PROTECTED_PERMIT_OPERATOR[\s\S]{0,120}staging-only/);
 assert.match(operator,/current_user == "xmesh_app"/);
 assert.match(operator,/panel_auth_users WHERE username=\$1 FOR UPDATE/);
 assert.match(operator,/role == "owner"/);
-assert.match(operator,/Argon2::default\(\)\.verify_password/);
+assert.match(operator,/Argon2::default\(\)[\s\S]{0,120}\.verify_password/);
 assert.match(operator,/load_locked_candidate\(&mut tx/);
 assert.match(operator,/snapshot\.approved_by == args\.owner/);
 assert.match(operator,/persist_verified_permit/);
-assert.match(operator,/tx\.commit\(\)\.await/);
+assert.match(operator,/tx\.commit\(\)[\s\S]{0,80}\.await/);
 assert.match(operator,/peer\.uid\(\) == SIGNER_UID && peer\.gid\(\) == SIGNER_GID/);
 assert.match(operator,/signedPermitB64/);
-assert.match(operator,/"cutoverAuthorized":true/);
-assert.match(operator,/"strictActivated":false/);
-assert.match(operator,/"productionActivation":false/);
+assert.match(operator,/"cutoverAuthorized"\s*:\s*true/);
+assert.match(operator,/"strictActivated"\s*:\s*false/);
+assert.match(operator,/"productionActivation"\s*:\s*false/);
 assert.doesNotMatch(operator,/panel-ed25519\.pem|panel-mldsa65\.pem|PRIVATE KEY/,
   'operator must not reference signer private key material');
 
