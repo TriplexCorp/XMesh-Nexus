@@ -1,0 +1,40 @@
+name: Temporary P0-E4a6 Docs Cleanup
+
+on:
+  push:
+    branches:
+      - docs/p0e4a6-checkpoint-physical-runs-current
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fix superseded E4a5 wording
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          old = "This is the last bounded software-preparation layer, **not** physical power-loss qualification."
+          new = "This is the final bounded real-operation reachability/source-contract layer before the E4a6 physical-run handoff, **not** physical power-loss qualification."
+          for name in ("README.md", "README.en.md"):
+              path = Path(name)
+              text = path.read_text()
+              if text.count(old) != 1:
+                  raise SystemExit(f"{name}: expected one superseded E4a5 sentence, got {text.count(old)}")
+              path.write_text(text.replace(old, new, 1))
+          PY
+          git diff --check
+          test "$(git diff --name-only | sort | tr '\n' ' ')" = "README.en.md README.md "
+      - name: Commit semantic cleanup
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add README.md README.en.md
+          git commit -m 'docs(xsp-v2): align E4a5 wording with E4a6 handoff'
+          git push origin HEAD:docs/p0e4a6-checkpoint-physical-runs-current
