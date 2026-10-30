@@ -1,0 +1,30 @@
+{
+  "schema": "xsp2-p0e-owner-retirement-offline-issuance-contract-1",
+  "node": {
+    "repository": "TriplexCorp/XMesh-Node",
+    "sourceRevision": "cd1f187a06ea6f320023027e06e1a57d2be81af3",
+    "pullRequest": 47,
+    "previousReviewedRevision": "e0f6bc01de98aad488fce73e1e605ba24f566bb1"
+  },
+  "requestSchema": "xsp2-owner-retirement-request-1",
+  "authorizationDomain": "XSP2-OWNER-RETIRE-PREVIOUS-V1",
+  "ownerSignatureAlgorithms": [
+    "Ed25519",
+    "ML-DSA-65"
+  ],
+  "maximumAuthorizationLifetimeMs": 300000,
+  "agentRequestIsPublicOnly": true,
+  "agentStateOpenIsReadOnly": true,
+  "offlineSignerReverifiesCheckpoint": true,
+  "ownerPrivateKeysRemainOffHost": true,
+  "ownerPrivateKeyFileMode": "0600",
+  "ownerPrivateKeyFormat": "PKCS#8 PEM",
+  "rejectsSymlinkedOwnerKeyPaths": true,
+  "requiresExactCheckpointDigest": true,
+  "requiresExactRetainedRotation": true,
+  "oldKeyErasureEnabled": false,
+  "networkRouteAdded": false,
+  "physicalPowerLossQualified": false,
+  "productionActivation": false,
+  "strictPQEnabled": false
+}
