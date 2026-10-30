@@ -60,12 +60,12 @@ def read_regular(path: Path, limit: int = MAX_JSON) -> bytes:
 
 
 def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-    out: dict[str, Any] = {}
+    result: dict[str, Any] = {}
     for key, value in pairs:
-        if key in out:
+        if key in result:
             fail(f"duplicate JSON field: {key}")
-        out[key] = value
-    return out
+        result[key] = value
+    return result
 
 
 def load_json(path: Path, limit: int = MAX_JSON) -> tuple[dict[str, Any], bytes]:
@@ -123,7 +123,7 @@ def validate_rotation(rotation: dict[str, Any]) -> tuple[int, int]:
     return from_epoch, to_epoch
 
 
-def validate_preflight(path: Path, role: str) -> tuple[str, dict[str, Any]]:
+def validate_preflight(path: Path, role: str) -> str:
     report, raw = load_json(path)
     if report.get("schema") != PREFLIGHT_SCHEMA or report.get("role") != role:
         fail(f"wrong {role} preflight schema/role")
@@ -131,11 +131,16 @@ def validate_preflight(path: Path, role: str) -> tuple[str, dict[str, Any]]:
         fail(f"{role} preflight is not baseline eligible")
     if report.get("physicalPowerLossQualified") is not False:
         fail(f"{role} preflight illegally claims physical qualification")
-    return digest(raw), report
+    return digest(raw)
 
 
-def validate_offhost(path: Path, node_id: int, from_epoch: int) -> dict[str, Any]:
-    checkpoint, raw = load_json(path)
+def validate_offhost(
+    checkpoint_path: Path,
+    verification_path: Path,
+    node_id: int,
+    from_epoch: int,
+) -> tuple[dict[str, Any], str]:
+    checkpoint, raw = load_json(checkpoint_path)
     exact_fields(checkpoint, {
         "schema", "nodeId", "minimumEpoch", "receiptSha256Hex", "signedReceiptBase64"
     }, "off-host checkpoint")
@@ -149,12 +154,29 @@ def validate_offhost(path: Path, node_id: int, from_epoch: int) -> dict[str, Any
     receipt = sha64(checkpoint["receiptSha256Hex"], "off-host receipt digest")
     if not isinstance(checkpoint["signedReceiptBase64"], str) or not checkpoint["signedReceiptBase64"]:
         fail("off-host checkpoint is missing signed receipt bytes")
-    return {
+
+    verified, verified_raw = load_json(verification_path)
+    exact_fields(verified, {
+        "status", "nodeId", "localEpoch", "minimumEpoch", "checkpointReceiptSha256Hex"
+    }, "E3a verification result")
+    if verified["status"] != "verified":
+        fail("E3a verification result is not verified")
+    if positive(verified["nodeId"], "verified Node ID") != node_id:
+        fail("E3a verification result belongs to another Node")
+    if positive(verified["localEpoch"], "verified local epoch") != from_epoch:
+        fail("E3a verification result is not bound to the exact pre-cut epoch")
+    if positive(verified["minimumEpoch"], "verified minimum epoch") != minimum:
+        fail("E3a verification floor differs from checkpoint")
+    if sha64(verified["checkpointReceiptSha256Hex"], "verified receipt digest") != receipt:
+        fail("E3a verified receipt differs from checkpoint")
+
+    witness = {
         "checkpointSha256Hex": digest(raw),
         "nodeId": node_id,
         "minimumEpoch": minimum,
         "receiptSha256Hex": receipt,
     }
+    return witness, digest(verified_raw)
 
 
 def load_e4a3() -> ModuleType:
@@ -169,8 +191,7 @@ def load_e4a3() -> ModuleType:
 
 def write_new(path: Path, value: dict[str, Any]) -> None:
     raw = json.dumps(value, sort_keys=True, separators=(",", ":")).encode() + b"\n"
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
-    fd = os.open(path, flags, 0o600)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     try:
         with os.fdopen(fd, "wb", closefd=True) as handle:
             handle.write(raw)
@@ -200,11 +221,12 @@ def prepare(args: argparse.Namespace) -> dict[str, Any]:
 
     rotation, _ = load_json(Path(args.rotation))
     from_epoch, _ = validate_rotation(rotation)
-    agent_sha, _ = validate_preflight(Path(args.agent_preflight), "agent-state")
-    pg_sha, _ = validate_preflight(Path(args.postgres_preflight), "nexus-postgres")
-    witness = validate_offhost(Path(args.offhost_checkpoint), node_id, from_epoch)
-    binary_raw = read_regular(Path(args.lab_binary), MAX_RAW * 256)
-    binary_sha = digest(binary_raw)
+    agent_sha = validate_preflight(Path(args.agent_preflight), "agent-state")
+    pg_sha = validate_preflight(Path(args.postgres_preflight), "nexus-postgres")
+    witness, verification_sha = validate_offhost(
+        Path(args.offhost_checkpoint), Path(args.offhost_verification), node_id, from_epoch
+    )
+    binary_sha = digest(read_regular(Path(args.lab_binary), MAX_RAW * 256))
 
     plan = {
         "schema": SCHEMA,
@@ -225,6 +247,7 @@ def prepare(args: argparse.Namespace) -> dict[str, Any]:
             "plpEvidenceId": token(args.plp_evidence_id, "PLP evidence ID"),
         },
         "offhostWitness": witness,
+        "offhostVerificationSha256Hex": verification_sha,
         "requiredArmMarker": f"XSP2-POWERCUT-ARMED-V1 run={run_id} point={checkpoint}",
         "externalPowerControllerRequired": True,
         "physicalPowerLossQualified": False,
@@ -246,21 +269,13 @@ def prepare(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def compare_plan(plan: dict[str, Any], evidence: dict[str, Any]) -> None:
-    pairs = (
-        ("runId", "runId"),
-        ("checkpoint", "checkpoint"),
-        ("nodeSourceRevision", "nodeSourceRevision"),
-        ("nexusSourceRevision", "nexusSourceRevision"),
-        ("labBinarySha256Hex", "labBinarySha256Hex"),
-        ("nodeId", "nodeId"),
-        ("rotation", "rotation"),
-        ("bootBeforeId", "bootBeforeId"),
-        ("storageEvidence", "storageEvidence"),
-        ("offhostWitness", "offhostWitness"),
-    )
-    for plan_key, evidence_key in pairs:
-        if plan.get(plan_key) != evidence.get(evidence_key):
-            fail(f"final evidence differs from prepared handoff field {plan_key}")
+    for key in (
+        "runId", "checkpoint", "nodeSourceRevision", "nexusSourceRevision",
+        "labBinarySha256Hex", "nodeId", "rotation", "bootBeforeId",
+        "storageEvidence", "offhostWitness",
+    ):
+        if plan.get(key) != evidence.get(key):
+            fail(f"final evidence differs from prepared handoff field {key}")
     if evidence.get("controllerEvent", {}).get("controllerId") != plan.get("controllerId"):
         fail("final evidence uses a different external controller")
     if evidence.get("arm", {}).get("marker") != plan.get("requiredArmMarker"):
@@ -270,9 +285,10 @@ def compare_plan(plan: dict[str, Any], evidence: dict[str, Any]) -> None:
 def verify(args: argparse.Namespace) -> dict[str, Any]:
     plan, plan_raw = load_json(Path(args.plan))
     exact_fields(plan, {
-        "schema", "runId", "checkpoint", "nodeSourceRevision", "labRunnerRevision", "nexusSourceRevision",
-        "labBinarySha256Hex", "nodeId", "rotation", "bootBeforeId", "controllerId", "storageEvidence",
-        "offhostWitness", "requiredArmMarker", "externalPowerControllerRequired", "physicalPowerLossQualified",
+        "schema", "runId", "checkpoint", "nodeSourceRevision", "labRunnerRevision",
+        "nexusSourceRevision", "labBinarySha256Hex", "nodeId", "rotation", "bootBeforeId",
+        "controllerId", "storageEvidence", "offhostWitness", "offhostVerificationSha256Hex",
+        "requiredArmMarker", "externalPowerControllerRequired", "physicalPowerLossQualified",
         "productionActivation", "strictPQEnabled"
     }, "handoff plan")
     if plan["schema"] != SCHEMA:
@@ -285,6 +301,10 @@ def verify(args: argparse.Namespace) -> dict[str, Any]:
         fail("handoff plan weakens the physical-controller/qualification boundary")
     if plan["productionActivation"] is not False or plan["strictPQEnabled"] is not False:
         fail("handoff plan attempts production activation")
+
+    verification_raw = read_regular(Path(args.offhost_verification))
+    if digest(verification_raw) != plan["offhostVerificationSha256Hex"]:
+        fail("preserved E3a verification result differs from prepared handoff")
 
     e4a3 = load_e4a3()
     e4a3_result = e4a3.verify(
@@ -316,9 +336,9 @@ def verify(args: argparse.Namespace) -> dict[str, Any]:
     notes_raw = read_regular(Path(args.review_notes), MAX_RAW)
     if digest(notes_raw) != evidence["review"]["notesSha256Hex"]:
         fail("review notes digest differs from final evidence")
-
     if e4a3_result.get("physicalPowerLossQualified") is not False:
         fail("E4a3 verifier returned an impossible qualification claim")
+
     return {
         "status": "physical-run-handoff-verified-for-independent-review",
         "runId": plan["runId"],
@@ -334,6 +354,7 @@ def verify(args: argparse.Namespace) -> dict[str, Any]:
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser()
     sub = root.add_subparsers(dest="command", required=True)
+
     prep = sub.add_parser("prepare")
     prep.add_argument("--checkpoint", required=True, choices=POINTS)
     prep.add_argument("--run-id", required=True)
@@ -343,6 +364,7 @@ def parser() -> argparse.ArgumentParser:
     prep.add_argument("--agent-preflight", required=True)
     prep.add_argument("--postgres-preflight", required=True)
     prep.add_argument("--offhost-checkpoint", required=True)
+    prep.add_argument("--offhost-verification", required=True)
     prep.add_argument("--storage-profile-id", required=True)
     prep.add_argument("--plp-evidence-id", required=True)
     prep.add_argument("--controller-id", required=True)
@@ -354,6 +376,7 @@ def parser() -> argparse.ArgumentParser:
     check.add_argument("--evidence", required=True)
     check.add_argument("--agent-preflight", required=True)
     check.add_argument("--postgres-preflight", required=True)
+    check.add_argument("--offhost-verification", required=True)
     check.add_argument("--arm-observation", required=True)
     check.add_argument("--controller-meta", required=True)
     check.add_argument("--controller-raw", required=True)
