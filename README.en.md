@@ -4,56 +4,61 @@
 
 XMesh Nexus manages Nodes, users, subscriptions, Xray configuration, telemetry, and security state. User VPN traffic remains the **Xray-core data-plane**; XMesh is the control plane, not an additional encryption layer around user traffic.
 
-[Русский](README.md) · [Enterprise Roadmap](docs/ENTERPRISE_ROADMAP.md) · [Current P0-E checkpoint](P0E_CHECKPOINT.md) · [XSP-v2 security policy](docs/XSP_V2_PQ_ONLY_SECURITY_POLICY.md) · [XMesh Node](https://github.com/TriplexCorp/XMesh-Node)
+[Русский](README.md) · [Enterprise Roadmap](docs/ENTERPRISE_ROADMAP.md) · [Current P0-E checkpoint](P0E_CHECKPOINT.md) · [Stage 1/2 evidence](docs/XSP_V2_P0E_STAGE1_STAGE2_EVIDENCE_2026-10-30.md) · [XSP-v2 security policy](docs/XSP_V2_PQ_ONLY_SECURITY_POLICY.md) · [XMesh Node](https://github.com/TriplexCorp/XMesh-Node)
 
 ## Current XSP-v2 checkpoint — 30 October 2026
 
-### P0-E: most real KVM durability qualification work is complete; production activation remains prohibited
+### P0-E: crash qualification, live cutover, and off-host recovery witness are complete; production activation remains prohibited
 
 The reviewed production runtime remains frozen at:
 
 - **XMesh-Nexus:** `12b3170996bc062ee16c79659a6378e5e425fd0e` — PR #163;
 - **XMesh-Node:** `34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb` — Node PR #52.
 
-Security-relevant staging/qualification tooling is versioned separately and does **not** replace this runtime target.
+Qualification tooling and live evidence do not replace this frozen runtime target.
 
-### Completed work
+### #138 — completed real evidence boundaries
 
-Repo-side P0-E tooling, contracts, and fail-closed release-control gates are complete. A substantial part of the **real** #138 qualification is also complete:
+- Node KVM abrupt-crash matrix: **COMPLETE 5/5**;
+- independent Nexus/PostgreSQL crash/recovery: **COMPLETE**;
+- protected permit tooling binding/live build: **PASS**;
+- protected Node 13 epoch `1 → 2` cutover / ACK / immutable receipt: **COMPLETE**;
+- independent off-host production recovery-floor witness: **COMPLETE**.
 
-- **Node KVM crash matrix: COMPLETE — 5/5** real abrupt guest-crash runs on Node 13;
-- **independent Nexus/PostgreSQL crash/recovery: COMPLETE** in its own failure domain;
-- PostgreSQL abrupt-crash recovery/integrity and durable settings were verified;
-- topology-aware KVM VPS v2 contract/verifier merged in PR #171;
-- protected permit signer/operator merged in PR #172;
-- exact permit-tooling binding to the reviewed Nexus runtime merged in PR #173;
-- live exact-tooling build/binding: **PASS**, `permitToolingBound=true`;
-- durable session handoff/checkpoint merged in PR #174.
+Key SHA-256 values:
 
-The Node crash matrix and PostgreSQL crash/recovery are **separate failure-domain evidence**, as required by topology-aware v2. PostgreSQL is no longer modeled as if it crashed inside every Node crash run.
+```text
+applied ACK
+07ccd07a317b6797b637d6cd0b1cc5c79fb90ef0c771c3ee7cc2b6aab79016a9
+
+immutable commit receipt
+daf40d33fa63d35f6f02fbcae417c4f4a4262d31bd9a0d1f11493ca018925ae9
+
+recovery checkpoint
+bc730df3a2078027cc4cbb4982da622dc8970dd49796fd9cbc0566a6364a3069
+
+recovery verification result
+4de873d0a5e9f85d245a9c880c0f75884117875888b5aedee4d4934cd64c5569
+```
+
+The off-host verifier confirmed:
+
+```text
+status=verified
+nodeId=13
+minimumEpoch=2
+localEpoch=2
+```
 
 ### Remaining #138 work
 
-**No additional five-run crash matrix or repeat crash loop is required.** The remaining work is the short operational tail:
+Do not repeat the crash matrix, cutover, or recovery witness merely to advance paperwork. Remaining work is:
 
-1. fresh owner-approved `prepare/prove` for the existing candidate;
-2. protected dual-signed cutover permit;
-3. Node `1 → 2` activation only under that valid permit;
-4. real applied ACK → atomic Nexus/C2-C epoch commit → immutable dual-signed commit receipt;
-5. independent **off-host production recovery-floor witness**;
-6. explicit attributable **provider-storage risk acceptance**;
-7. aggregate the evidence and run the topology-aware v2 verifier.
+1. explicit attributable provider-storage risk acceptance;
+2. aggregate evidence/result assembly;
+3. final topology-aware v2 verifier.
 
-Only the whole-result verifier may mark #138 complete and report:
-
-```text
-guestCrashConsistencyQualified=true
-providerStorageDurabilityAssumed=true
-productionDurabilityGateEligible=true
-physicalPowerLossQualified=false
-```
-
-Until then the correct state remains:
+Until the whole-result verifier passes, the correct claims remain:
 
 ```text
 guestCrashConsistencyQualified=false
@@ -65,7 +70,7 @@ productionActivation=false
 
 ### #137 — separate external blocker
 
-**#137 independent external security review/sign-off of the current v5 package remains OPEN.** AI review, project-owner review, CI, fixtures, or internal testing cannot satisfy it.
+**#137 independent external security review/sign-off of the current v5 package remains OPEN.** AI review, project-owner review, CI, or internal testing cannot satisfy it.
 
 Authoritative v5 reviewer bundle:
 
@@ -77,59 +82,21 @@ Authoritative v5 reviewer bundle:
 ### Current fast path
 
 ```text
-#138: crash matrix 5/5 COMPLETE
-     + PostgreSQL crash/recovery COMPLETE
-     + permit tooling bound PASS
-             ↓
-real cutover 1→2 + ACK + immutable receipt
-             ↓
-off-host recovery witness
+#138 crash/recovery + cutover + off-host witness COMPLETE
              ↓
 provider-storage risk acceptance
              ↓
-final topology-aware v2 verifier
+aggregate evidence + final topology-aware v2 verifier
              ↓
 #138 COMPLETE
 
 #137 independent external review proceeds separately
 ```
 
-After #137 and #138 are genuinely complete, release control still requires:
-
-```text
-exact production release candidate
-        ↓
-full final canary on exact candidate
-        ↓
-independently reviewed rollout/rollback plan
-        ↓
-bounded KVM strict-PQ approval
-        ↓
-separate production execution
-```
-
-## Core XSP-v2 security properties
-
-The architecture preserves:
-
-- mandatory mTLS on the dedicated PQ ingress;
-- TLS 1.3 only and negotiated `X25519MLKEM768`;
-- ML-DSA-65 Node/client identity;
-- Ed25519 **AND** ML-DSA-65 critical-message authorization;
-- isolated signer/key custody;
-- PostgreSQL transactionality for replay / ACK / epoch / receipt;
-- crash-safe Agent state and monotonic epoch/replay floors;
-- durable initial master-key provisioning;
-- independent off-host recovery floor;
-- owner-authorized previous-key retirement;
-- parser fuzzing and external ML-DSA-65 vectors;
-- default-off redacted observability;
-- `automaticFallback=false`;
-- `classicalOnlyAllowed=false`;
-- production-capable paths default-disabled until an explicit release decision.
+After #137/#138 are complete, separate release gates still remain: exact production candidate, final canary, reviewed rollout/rollback plan, bounded KVM strict-PQ approval, and separate production execution.
 
 ## Production status
 
 **Production PQ activation is NOT AUTHORIZED.** `strict-pq` remains **OFF**, XMESH1 remains retained, and `physicalPowerLossQualified=false` remains the correct KVM claim.
 
-When resuming in a new session, read [`P0E_CHECKPOINT.md`](P0E_CHECKPOINT.md) first, then [`docs/ENTERPRISE_ROADMAP.md`](docs/ENTERPRISE_ROADMAP.md).
+When resuming, read [`P0E_CHECKPOINT.md`](P0E_CHECKPOINT.md), then [`docs/ENTERPRISE_ROADMAP.md`](docs/ENTERPRISE_ROADMAP.md) and [`docs/XSP_V2_P0E_STAGE1_STAGE2_EVIDENCE_2026-10-30.md`](docs/XSP_V2_P0E_STAGE1_STAGE2_EVIDENCE_2026-10-30.md).
