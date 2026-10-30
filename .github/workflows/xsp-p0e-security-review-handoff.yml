@@ -1,0 +1,170 @@
+name: XSP-v2 P0-E Security Review Handoff
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "deploy/xsp-v2-p0e-security-review-handoff.contract.json"
+      - "docs/XSP_V2_P0E_SECURITY_REVIEW_HANDOFF.md"
+      - ".github/workflows/xsp-p0e-security-review-handoff.yml"
+  pull_request:
+    paths:
+      - "deploy/xsp-v2-p0e-security-review-handoff.contract.json"
+      - "docs/XSP_V2_P0E_SECURITY_REVIEW_HANDOFF.md"
+      - ".github/workflows/xsp-p0e-security-review-handoff.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  frozen-review-handoff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check out exact frozen Nexus review target
+        uses: actions/checkout@v4
+        with:
+          repository: TriplexCorp/XMesh-Nexus
+          ref: 5cdb7825fcc51f8a7d296b992a7da4492ed2ce8e
+          path: xmesh-nexus-reviewed
+          fetch-depth: 0
+
+      - name: Check out exact frozen Node review target
+        uses: actions/checkout@v4
+        with:
+          repository: TriplexCorp/XMesh-Node
+          ref: 083dc181c5e175f89007f4b93111cd5c45a69d97
+          path: xmesh-node-reviewed
+          fetch-depth: 0
+
+      - name: Verify machine-readable handoff and external blockers
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          p='deploy/xsp-v2-p0e-security-review-handoff.contract.json'
+          x=json.load(open(p))
+          assert x['schema']=='xsp2-p0e-security-review-handoff-contract-1'
+          assert x['nexus']=={
+            'repository':'TriplexCorp/XMesh-Nexus',
+            'sourceRevision':'5cdb7825fcc51f8a7d296b992a7da4492ed2ce8e',
+          }
+          assert x['node']=={
+            'repository':'TriplexCorp/XMesh-Node',
+            'sourceRevision':'083dc181c5e175f89007f4b93111cd5c45a69d97',
+          }
+          assert x['observabilityCheckpoint']=={
+            'nexusMerge':'5cdb7825fcc51f8a7d296b992a7da4492ed2ce8e',
+            'nexusImplementationMerge':'ccb9e384dca47f0c1a69c0ecd82461d523344c7a',
+            'nodeImplementationMerge':'083dc181c5e175f89007f4b93111cd5c45a69d97',
+          }
+          domains=x['requiredReviewDomains']
+          assert len(domains)==11 and len(set(domains))==11
+          assert {
+            'protocol-and-canonicalization',
+            'hybrid-cryptography-and-key-purpose-binding',
+            'pq-only-transport-and-node-identity',
+            'isolated-signer-and-key-custody',
+            'postgresql-replay-ack-epoch-and-receipt',
+            'agent-local-durability-and-rollback',
+            'coordinated-backup-restore-and-off-host-floor',
+            'owner-authorized-key-retirement',
+            'parser-fuzz-and-external-mldsa65-vectors',
+            'default-off-redacted-observability',
+            'production-migration-no-fallback-and-rollback',
+          } == set(domains)
+          assert x['requiredExternalBlockers']==[
+            'independent-security-review-findings-and-signoff',
+            'p0-e4a-five-representative-physical-abrupt-power-runs-and-independent-review',
+          ]
+          assert x['reviewPackageFrozen'] is True
+          for key in ('independentSecurityReviewComplete','physicalPowerLossQualified',
+                      'productionActivation','strictPQEnabled'):
+            assert x[key] is False
+          PY
+
+      - name: Verify frozen repository revisions exactly
+        run: |
+          set -euo pipefail
+          test "$(git -C xmesh-nexus-reviewed rev-parse HEAD)" = '5cdb7825fcc51f8a7d296b992a7da4492ed2ce8e'
+          test "$(git -C xmesh-node-reviewed rev-parse HEAD)" = '083dc181c5e175f89007f4b93111cd5c45a69d97'
+
+      - name: Verify required evidence index exists at frozen Nexus revision
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, pathlib
+          x=json.load(open('deploy/xsp-v2-p0e-security-review-handoff.contract.json'))
+          root=pathlib.Path('xmesh-nexus-reviewed')
+          for rel in x['requiredEvidenceDocuments'] + x['requiredMachineContracts']:
+            p=root/rel
+            assert p.is_file(), f'missing frozen review evidence: {rel}'
+            assert p.stat().st_size > 0, f'empty frozen review evidence: {rel}'
+          PY
+
+      - name: Verify machine contracts remain bounded and non-production
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, pathlib
+          root=pathlib.Path('xmesh-nexus-reviewed')
+          files=[
+            'deploy/xsp-v2-p0e-owner-retirement-durable-erasure.contract.json',
+            'deploy/xsp-v2-p0e-parser-fuzz.contract.json',
+            'deploy/xsp-v2-p0e-mldsa65-fips204-acvp.contract.json',
+            'deploy/xsp-v2-p0e-observability.contract.json',
+          ]
+          forbidden_true={
+            'productionActivation','strictPQEnabled','physicalPowerLossQualified',
+            'independentSecurityReviewComplete',
+          }
+          def walk(v, where='root'):
+            if isinstance(v, dict):
+              for k,val in v.items():
+                if k in forbidden_true:
+                  assert val is False, f'{where}.{k} unexpectedly true/non-false: {val!r}'
+                walk(val, where+'.'+k)
+            elif isinstance(v, list):
+              for i,val in enumerate(v): walk(val, f'{where}[{i}]')
+          for rel in files:
+            obj=json.load(open(root/rel))
+            assert isinstance(obj.get('schema'), str) and obj['schema'].startswith('xsp2-')
+            walk(obj, rel)
+          obs=json.load(open(root/'deploy/xsp-v2-p0e-observability.contract.json'))
+          assert obs['nexus']['sourceRevision']=='ccb9e384dca47f0c1a69c0ecd82461d523344c7a'
+          assert obs['node']['sourceRevision']=='083dc181c5e175f89007f4b93111cd5c45a69d97'
+          assert obs['readOnly'] is True and obs['defaultOff'] is True
+          PY
+
+      - name: Verify normative no-fallback and open-gate statements
+        run: |
+          set -euo pipefail
+          policy='xmesh-nexus-reviewed/docs/XSP_V2_PQ_ONLY_SECURITY_POLICY.md'
+          handoff='docs/XSP_V2_P0E_SECURITY_REVIEW_HANDOFF.md'
+          grep -Fqi 'independent security review' "$policy"
+          grep -Fqi 'Absolutely no user-selectable fallback' "$policy"
+          grep -Fq 'review-preparation / evidence-freeze only' "$handoff"
+          grep -Fq 'P0-E4a remains OPEN' "$handoff"
+          grep -Fq '`strict-pq` remains OFF' "$handoff"
+          grep -Fq 'production rollout remains NOT AUTHORIZED' "$handoff"
+          grep -Fq 'cannot substitute' "$handoff"
+
+      - name: Verify no runtime source is part of this handoff delta
+        run: |
+          set -euo pipefail
+          changed="$(git diff --name-only 5cdb7825fcc51f8a7d296b992a7da4492ed2ce8e...HEAD | sort)"
+          expected="$(printf '%s\n' \
+            .github/workflows/xsp-p0e-security-review-handoff.yml \
+            deploy/xsp-v2-p0e-security-review-handoff.contract.json \
+            docs/XSP_V2_P0E_SECURITY_REVIEW_HANDOFF.md | sort)"
+          test "$changed" = "$expected"
+
+      - name: State preparation-only evidence
+        run: |
+          echo 'PASS: exact Nexus/Node security-review target and evidence index are frozen for independent review.'
+          echo 'This CI does not perform or satisfy the independent security review and does not qualify physical power loss.'
+          echo 'P0-E4a and independent review remain OPEN; strict-pq remains OFF; production rollout remains NOT AUTHORIZED.'

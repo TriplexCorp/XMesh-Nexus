@@ -1,0 +1,55 @@
+{
+  "schema": "xsp2-p0e-security-review-handoff-contract-1",
+  "nexus": {
+    "repository": "TriplexCorp/XMesh-Nexus",
+    "sourceRevision": "5cdb7825fcc51f8a7d296b992a7da4492ed2ce8e"
+  },
+  "node": {
+    "repository": "TriplexCorp/XMesh-Node",
+    "sourceRevision": "083dc181c5e175f89007f4b93111cd5c45a69d97"
+  },
+  "observabilityCheckpoint": {
+    "nexusMerge": "5cdb7825fcc51f8a7d296b992a7da4492ed2ce8e",
+    "nexusImplementationMerge": "ccb9e384dca47f0c1a69c0ecd82461d523344c7a",
+    "nodeImplementationMerge": "083dc181c5e175f89007f4b93111cd5c45a69d97"
+  },
+  "requiredReviewDomains": [
+    "protocol-and-canonicalization",
+    "hybrid-cryptography-and-key-purpose-binding",
+    "pq-only-transport-and-node-identity",
+    "isolated-signer-and-key-custody",
+    "postgresql-replay-ack-epoch-and-receipt",
+    "agent-local-durability-and-rollback",
+    "coordinated-backup-restore-and-off-host-floor",
+    "owner-authorized-key-retirement",
+    "parser-fuzz-and-external-mldsa65-vectors",
+    "default-off-redacted-observability",
+    "production-migration-no-fallback-and-rollback"
+  ],
+  "requiredEvidenceDocuments": [
+    "docs/XSP_V2_PQ_ONLY_SECURITY_POLICY.md",
+    "docs/XSP_V2_WIRE_SPEC.md",
+    "docs/XSP_V2_SIGNER_E2E.md",
+    "docs/XSP_V2_P0E_COORDINATED_BACKUP_RESTORE.md",
+    "docs/XSP_V2_P0E4A6_PHYSICAL_RUN_HANDOFF.md",
+    "docs/XSP_V2_P0E_OWNER_RETIREMENT_DURABLE_ERASURE.md",
+    "docs/XSP_V2_P0E_PARSER_FUZZ.md",
+    "docs/XSP_V2_P0E_MLDSA65_FIPS204_ACVP.md",
+    "docs/XSP_V2_P0E_OBSERVABILITY.md"
+  ],
+  "requiredMachineContracts": [
+    "deploy/xsp-v2-p0e-owner-retirement-durable-erasure.contract.json",
+    "deploy/xsp-v2-p0e-parser-fuzz.contract.json",
+    "deploy/xsp-v2-p0e-mldsa65-fips204-acvp.contract.json",
+    "deploy/xsp-v2-p0e-observability.contract.json"
+  ],
+  "requiredExternalBlockers": [
+    "independent-security-review-findings-and-signoff",
+    "p0-e4a-five-representative-physical-abrupt-power-runs-and-independent-review"
+  ],
+  "reviewPackageFrozen": true,
+  "independentSecurityReviewComplete": false,
+  "physicalPowerLossQualified": false,
+  "productionActivation": false,
+  "strictPQEnabled": false
+}
