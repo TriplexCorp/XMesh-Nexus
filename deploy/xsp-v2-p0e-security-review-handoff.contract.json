@@ -2,11 +2,11 @@
   "schema": "xsp2-p0e-security-review-handoff-contract-3",
   "nexus": {
     "repository": "TriplexCorp/XMesh-Nexus",
-    "sourceRevision": "0bab1a48cff570b3abe405bcda4dc242b23b8a4b"
+    "sourceRevision": "12b3170996bc062ee16c79659a6378e5e425fd0e"
   },
   "node": {
     "repository": "TriplexCorp/XMesh-Node",
-    "sourceRevision": "083dc181c5e175f89007f4b93111cd5c45a69d97"
+    "sourceRevision": "34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb"
   },
   "previousReviewFreeze": {
     "handoffMerge": "553bbfa70d993a5c53b054ea1105fc8feb0c1827",
@@ -19,15 +19,29 @@
       "0bab1a48cff570b3abe405bcda4dc242b23b8a4b"
     ]
   },
-  "runtimeBaseline": {
-    "nexusSourceRevision": "8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091",
+  "supersededV3ReviewTarget": {
+    "nexusSourceRevision": "0bab1a48cff570b3abe405bcda4dc242b23b8a4b",
     "nodeSourceRevision": "083dc181c5e175f89007f4b93111cd5c45a69d97",
+    "internalAuditMerge": "424d99d8a9822c2e8157e5cdbb15c423e99f10ef",
+    "supersededBySecurityRemediation": true
+  },
+  "securityRemediationCheckpoint": {
+    "nexusMandatoryTlsClientAuthMerge": "12b3170996bc062ee16c79659a6378e5e425fd0e",
+    "nodeMasterKeyDirectoryFsyncMerge": "34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb",
+    "resolvedInternalFindings": [
+      "AI-LOW-001",
+      "AI-LOW-002"
+    ]
+  },
+  "runtimeBaseline": {
+    "nexusSourceRevision": "12b3170996bc062ee16c79659a6378e5e425fd0e",
+    "nodeSourceRevision": "34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb",
     "criticalRuntimePathsMustBeUnchanged": true
   },
   "stagingIngressHardeningCheckpoint": {
     "c2aRustOriginMerge": "36ee6f7a5b1686f9c0d51beda5d24e84830982c7",
     "c2bcdRustAckRecoveryMerge": "03679120726ff06005eff903909b262fb1271960",
-    "authoritativeDocsMerge": "8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091"
+    "mandatoryTlsClientAuthMerge": "12b3170996bc062ee16c79659a6378e5e425fd0e"
   },
   "observabilityCheckpoint": {
     "nexusMerge": "5cdb7825fcc51f8a7d296b992a7da4492ed2ce8e",
@@ -69,6 +83,7 @@
     "docs/XSP_V2_DISPOSABLE_CANARY_REHEARSAL.md",
     "docs/XSP_V2_PRODUCTION_ROLLOUT_PLAN.md",
     "docs/XSP_V2_STRICT_PQ_ACTIVATION_APPROVAL.md",
+    "docs/XSP_V2_AI_ASSISTED_INTERNAL_SECURITY_AUDIT_2026-10-30.md",
     "docs/ENTERPRISE_ROADMAP.md"
   ],
   "requiredMachineContracts": [
@@ -82,6 +97,7 @@
   ],
   "requiredImplementationEvidence": [
     "deploy/xsp-v2-ingress/Dockerfile",
+    "deploy/xsp-v2-ingress/nginx-c2b.conf",
     "deploy/xsp-v2-ingress/origin_probe.rs",
     "deploy/xsp-v2-ingress/origin-ack-rs/Cargo.toml",
     "deploy/xsp-v2-ingress/origin-ack-rs/src/main.rs",
@@ -90,6 +106,7 @@
     "scripts/check-xsp-v2-c2c-runtime.js",
     "scripts/test-xsp-v2-ingress-process.py",
     "scripts/test-xsp-v2-c2b-ack-process.py",
+    "scripts/test-xsp-v2-c2d2-transport-negatives.py",
     "scripts/verify-xsp-v2-production-rollout-plan.py",
     "scripts/verify-xsp-v2-strict-pq-activation-approval.py",
     ".github/workflows/xsp-hybrid-tls.yml",
