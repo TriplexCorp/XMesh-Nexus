@@ -59,6 +59,13 @@ PR #125 at `{MERGE}` closes the remaining repo-side operator ambiguity before re
 This is the final repository-side preparation layer. It does **not** execute or simulate a power cut. Closing P0-E4a still requires all five real external BMC/PDU abrupt-power runs on the reviewed representative storage/controller/PLP stack, successful E4a6 verification for each run, the real E4a4 five-point matrix, and independent review of the raw physical/storage/WAL evidence.
 """
 
+GATE_ROWS = [
+    "| P0-E4a3 physical power-cut evidence contract | **COMPLETE — bounded evidence tooling** | PR #121; strict one-run schema/verifier binds source, binary, arm/controller event, reboot, Agent/PostgreSQL state and E3a witness; synthetic CI is not physical evidence |",
+    "| P0-E4a4 five-point power-cut review matrix | **COMPLETE — bounded review tooling** | PR #122; deterministic matrix over exactly the five required checkpoints, rejects duplicates/mixed generations; does not qualify hardware |",
+    "| P0-E4a5 real-operation lab reachability/source contract | **COMPLETE — bounded lab readiness** | Node PR #45 + Nexus PR #123; all five inherited-FD arm points reached through real activation/recovery operations; normal Agent contains no lab controls |",
+    "| P0-E4a6 physical-run handoff | **COMPLETE — bounded lab preparation** | PR #125; freezes pre-cut identity/evidence inputs and binds post-boot E4a3 evidence to separately preserved physical-lab records; never controls power or claims qualification |",
+]
+
 
 def replace_latest(text: str) -> str:
     lines = text.splitlines()
@@ -126,13 +133,18 @@ def update_roadmap() -> None:
     if "- **P0-E4a6 / PR #125:**" not in text:
         text = insert_after_line(text, "**P0-E4a5 / Node PR #45 + Nexus PR #123:**", ROADMAP_VERIFIED)
 
-    if "| P0-E4a6 physical-run handoff |" not in text:
-        table_row = (
-            "| P0-E4a6 physical-run handoff | **COMPLETE — bounded lab preparation** | PR #125; freezes pre-cut "
-            "identity/evidence inputs and binds post-boot E4a3 evidence to separately preserved physical-lab records; "
-            "never controls power or claims qualification |"
-        )
-        text = insert_after_line(text, "| P0-E4a5", table_row)
+    if "| P0-E4a3 physical power-cut evidence contract |" not in text:
+        lines = text.splitlines()
+        anchors = [i for i, line in enumerate(lines) if line.startswith("| P0-E4a2 external power-cut arm/source contract |")]
+        if len(anchors) != 1:
+            raise RuntimeError(f"expected one E4a2 gate-table row, got {len(anchors)}")
+        pos = anchors[0] + 1
+        for row in GATE_ROWS:
+            lines.insert(pos, row)
+            pos += 1
+        text = "\n".join(lines) + ("\n" if text.endswith("\n") else "")
+    elif "| P0-E4a6 physical-run handoff |" not in text:
+        raise RuntimeError("partial E4a3–E4a6 gate-table update detected")
 
     text = text.replace(
         "plus bounded E4a1/E4a2 foundations complete; still requires the real E4a physical-power matrix",
@@ -167,5 +179,9 @@ for path in [*README_FILES, ROADMAP]:
     assert MERGE in text, path
     assert "P0-E4a remains" in text or "P0-E4a itself remains" in text, path
     assert "physicalPowerLossQualified=false" in text, path
+
+roadmap = ROADMAP.read_text()
+for gate in ("P0-E4a3 physical power-cut evidence contract", "P0-E4a4 five-point power-cut review matrix", "P0-E4a5 real-operation lab reachability/source contract", "P0-E4a6 physical-run handoff"):
+    assert roadmap.count(gate) >= 1, gate
 
 print("P0-E4a6 docs update: PASS")
