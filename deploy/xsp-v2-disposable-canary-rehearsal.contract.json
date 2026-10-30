@@ -1,0 +1,33 @@
+{
+  "schema": "xsp2-disposable-canary-rehearsal-contract-1",
+  "scope": "pre-release rehearsal only",
+  "frozenRuntimeTarget": {
+    "nexusRevision": "8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091",
+    "nodeRevision": "083dc181c5e175f89007f4b93111cd5c45a69d97"
+  },
+  "requiredDomains": [
+    "install-upgrade-lost-response-restart-rollback",
+    "coordinated-backup-restore-recovery",
+    "node-local-redacted-observability",
+    "nexus-durable-redacted-observability"
+  ],
+  "requiredRuntimeGates": {
+    "agentMigration": "staging-only",
+    "observability": "staging-only"
+  },
+  "releaseEligibility": {
+    "requiresP0EComplete": true,
+    "requiresIndependentSecurityReviewIssue137": true,
+    "requiresPhysicalPowerQualificationIssue138": true,
+    "requiresExactReleaseCandidateRerun": true,
+    "requiresSeparatelyReviewedProductionRolloutPlan": true
+  },
+  "claims": {
+    "canaryHarnessVerified": false,
+    "finalReleaseCanarySatisfied": false,
+    "independentSecurityReviewComplete": false,
+    "physicalPowerLossQualified": false,
+    "productionActivation": false,
+    "strictPQEnabled": false
+  }
+}

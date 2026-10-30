@@ -1,0 +1,291 @@
+name: XSP-v2 Disposable Release Canary Rehearsal
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "deploy/xsp-v2-disposable-canary-rehearsal.contract.json"
+      - "scripts/test-xsp-v2-canary-observability.sh"
+      - ".github/workflows/xsp-release-disposable-canary-rehearsal.yml"
+      - "docs/XSP_V2_DISPOSABLE_CANARY_REHEARSAL.md"
+  push:
+    branches: [main]
+    paths:
+      - "deploy/xsp-v2-disposable-canary-rehearsal.contract.json"
+      - "scripts/test-xsp-v2-canary-observability.sh"
+      - ".github/workflows/xsp-release-disposable-canary-rehearsal.yml"
+      - "docs/XSP_V2_DISPOSABLE_CANARY_REHEARSAL.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: xsp-release-canary-rehearsal-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FROZEN_NEXUS_REVISION: 8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091
+  FROZEN_NODE_REVISION: 083dc181c5e175f89007f4b93111cd5c45a69d97
+
+jobs:
+  source-contract:
+    name: Freeze and non-production contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify exact frozen runtime scope is unchanged
+        run: |
+          set -Eeuo pipefail
+          git cat-file -e "$FROZEN_NEXUS_REVISION^{commit}"
+          git diff --exit-code "$FROZEN_NEXUS_REVISION" HEAD -- \
+            backend/src \
+            backend/migrations \
+            deploy/node-control-agent.sh \
+            deploy/xsp-v2-agent-staged-apply.sh \
+            deploy/postgres \
+            docker-compose.yml \
+            Dockerfile
+
+          python3 - <<'PY'
+          import json
+          c=json.load(open('deploy/xsp-v2-disposable-canary-rehearsal.contract.json', encoding='utf-8'))
+          assert c['schema']=='xsp2-disposable-canary-rehearsal-contract-1'
+          assert c['frozenRuntimeTarget']=={
+              'nexusRevision':'8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091',
+              'nodeRevision':'083dc181c5e175f89007f4b93111cd5c45a69d97',
+          }
+          assert c['requiredDomains']==[
+              'install-upgrade-lost-response-restart-rollback',
+              'coordinated-backup-restore-recovery',
+              'node-local-redacted-observability',
+              'nexus-durable-redacted-observability',
+          ]
+          assert c['releaseEligibility']['requiresP0EComplete'] is True
+          assert c['releaseEligibility']['requiresExactReleaseCandidateRerun'] is True
+          assert c['claims']=={
+              'canaryHarnessVerified':False,
+              'finalReleaseCanarySatisfied':False,
+              'independentSecurityReviewComplete':False,
+              'physicalPowerLossQualified':False,
+              'productionActivation':False,
+              'strictPQEnabled':False,
+          }
+          PY
+
+          bash -n scripts/test-xsp-v2-canary-observability.sh
+          ! grep -R -n --fixed-strings 'strict-pq=on' \
+            deploy/xsp-v2-disposable-canary-rehearsal.contract.json \
+            scripts/test-xsp-v2-canary-observability.sh \
+            docs/XSP_V2_DISPOSABLE_CANARY_REHEARSAL.md
+          ! grep -R -n -E 'productionActivation[" :]+true|strictPQEnabled[" :]+true|finalReleaseCanarySatisfied[" :]+true' \
+            deploy/xsp-v2-disposable-canary-rehearsal.contract.json \
+            docs/XSP_V2_DISPOSABLE_CANARY_REHEARSAL.md
+
+  agent-lifecycle:
+    name: Real install, upgrade, retry, restart and rollback
+    needs: source-contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      POSTGRES_PASSWORD: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      APP_DB_PASSWORD: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
+      REDIS_PASSWORD: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: 9876543210abcdef9876543210abcdef9876543210abcdef
+      TOTP_ENCRYPTION_KEY: 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+      SUBSCRIPTION_ENCRYPTION_KEY: "1234567812345678123456781234567812345678123456781234567812345678"
+      COOKIE_SECURE: "false"
+      DASHBOARD_PATH: /dashboard/0123456789abcdef0123456789abcdef0123456789abcdef
+      XSP_V2_P0D_AGENT_MIGRATION: staging-only
+      P0D_NODE_SOURCE_REVISION: 083dc181c5e175f89007f4b93111cd5c45a69d97
+      P0D_AGENT_VERSION_A: release-canary-a
+      P0D_AGENT_VERSION_B: release-canary-b
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out exact reviewed XMesh-Node source
+        uses: actions/checkout@v4
+        with:
+          repository: TriplexCorp/XMesh-Node
+          ref: 083dc181c5e175f89007f4b93111cd5c45a69d97
+          path: xmesh-node
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache: false
+      - name: Build two real current Agent artifacts
+        working-directory: xmesh-node/agent/xspv2
+        run: |
+          set -Eeuo pipefail
+          test "$(go version | awk '{print $3}')" = "go1.27.3"
+          test "$(git rev-parse HEAD)" = "$P0D_NODE_SOURCE_REVISION"
+          go test ./... -count=1
+          go build -trimpath -ldflags "-X main.version=$P0D_AGENT_VERSION_A -X main.sourceRevision=$P0D_NODE_SOURCE_REVISION" -o /tmp/xmesh-agent-a ./cmd/xmesh-agent-xspv2
+          go build -trimpath -ldflags "-X main.version=$P0D_AGENT_VERSION_B -X main.sourceRevision=$P0D_NODE_SOURCE_REVISION" -o /tmp/xmesh-agent-b ./cmd/xmesh-agent-xspv2
+          /tmp/xmesh-agent-a --identity
+          /tmp/xmesh-agent-b --identity
+      - name: Populate content-addressed disposable artifact source
+        run: |
+          set -Eeuo pipefail
+          mkdir -p deploy/runtime/xsp-v2-agent-artifacts
+          digest_a="$(sha256sum /tmp/xmesh-agent-a | awk '{print $1}')"
+          digest_b="$(sha256sum /tmp/xmesh-agent-b | awk '{print $1}')"
+          test "$digest_a" != "$digest_b"
+          install -m 0755 /tmp/xmesh-agent-a "deploy/runtime/xsp-v2-agent-artifacts/$digest_a.bin"
+          install -m 0755 /tmp/xmesh-agent-b "deploy/runtime/xsp-v2-agent-artifacts/$digest_b.bin"
+          printf '%s\n' "$DASHBOARD_PATH" > deploy/runtime/dashboard-path
+          chmod 0666 deploy/runtime/dashboard-path
+          echo "P0D_AGENT_ARTIFACT_A=$PWD/deploy/runtime/xsp-v2-agent-artifacts/$digest_a.bin" >> "$GITHUB_ENV"
+          echo "P0D_AGENT_ARTIFACT_B=$PWD/deploy/runtime/xsp-v2-agent-artifacts/$digest_b.bin" >> "$GITHUB_ENV"
+          printf '%s\n' "$digest_b" | sudo tee /tmp/xmesh-p0d-e2e-fail-digest >/dev/null
+          sudo install -o root -g root -m 0755 scripts/xsp-agent-e2e-sha256sum /usr/local/bin/sha256sum
+      - name: Start disposable Nexus with exact staging migration gate
+        run: docker compose up --build -d
+      - name: Wait for disposable Nexus readiness
+        run: |
+          set -Eeuo pipefail
+          for i in $(seq 1 120); do
+            curl --fail --silent http://127.0.0.1:8080/api/v1/health/ready >/dev/null && exit 0
+            sleep 2
+          done
+          docker compose logs --tail=180 panel
+          exit 1
+      - name: Reuse real signed Agent migration lifecycle proof
+        run: |
+          set -Eeuo pipefail
+          python3 -m py_compile scripts/test-xsp-agent-real-e2e.py
+          bash -n deploy/xsp-v2-agent-staged-apply.sh
+          python3 scripts/test-xsp-agent-real-e2e.py
+      - name: Prove migration gate returns to default-off
+        run: |
+          set -Eeuo pipefail
+          XSP_V2_P0D_AGENT_MIGRATION= docker compose up -d --no-deps --force-recreate panel
+          for i in $(seq 1 60); do
+            curl --fail --silent http://127.0.0.1:8080/api/v1/health/ready >/dev/null && break
+            sleep 1
+          done
+          test "$(docker compose exec -T panel sh -c 'printf %s "$XSP_V2_P0D_AGENT_MIGRATION"')" = ""
+      - name: Diagnostics on failure
+        if: failure()
+        run: docker compose logs --tail=240
+      - name: Destroy disposable lifecycle environment
+        if: always()
+        run: docker compose down --volumes --remove-orphans
+
+  coordinated-recovery:
+    name: Real coordinated backup and restore recovery
+    needs: source-contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out exact reviewed XMesh-Node source
+        uses: actions/checkout@v4
+        with:
+          repository: TriplexCorp/XMesh-Node
+          ref: 083dc181c5e175f89007f4b93111cd5c45a69d97
+          path: xmesh-node
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache: false
+      - name: Re-run current Agent regression before recovery
+        working-directory: xmesh-node/agent/xspv2
+        run: go test ./... -count=1
+      - name: Reuse real E3b coordinated backup/restore proof on current Node
+        run: |
+          set -Eeuo pipefail
+          python3 -m py_compile scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py
+          python3 scripts/test-xsp-v2-p0e3b-coordinated-backup-restore.py --node-repo xmesh-node
+
+  redacted-observability:
+    name: Node-local and Nexus durable-state observability
+    needs: source-contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: xmesh_canary_observe
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d xmesh_canary_observe"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/xmesh_canary_observe
+      NODE_REPO: xmesh-node
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out exact reviewed XMesh-Node source
+        uses: actions/checkout@v4
+        with:
+          repository: TriplexCorp/XMesh-Node
+          ref: 083dc181c5e175f89007f4b93111cd5c45a69d97
+          path: xmesh-node
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache: false
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Prove both observability surfaces remain default-off, read-only and redacted
+        run: bash scripts/test-xsp-v2-canary-observability.sh
+
+  rehearsal-result:
+    name: Emit bounded rehearsal evidence
+    needs: [source-contract, agent-lifecycle, coordinated-recovery, redacted-observability]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every rehearsal domain to pass
+        env:
+          SOURCE_RESULT: ${{ needs.source-contract.result }}
+          LIFECYCLE_RESULT: ${{ needs.agent-lifecycle.result }}
+          RECOVERY_RESULT: ${{ needs.coordinated-recovery.result }}
+          OBSERVABILITY_RESULT: ${{ needs.redacted-observability.result }}
+          HARNESS_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -Eeuo pipefail
+          test "$SOURCE_RESULT" = success
+          test "$LIFECYCLE_RESULT" = success
+          test "$RECOVERY_RESULT" = success
+          test "$OBSERVABILITY_RESULT" = success
+          cat > canary-rehearsal-result.json <<JSON
+          {
+            "schema": "xsp2-disposable-canary-rehearsal-result-1",
+            "harnessRevision": "$HARNESS_REVISION",
+            "frozenRuntimeTarget": {
+              "nexusRevision": "$FROZEN_NEXUS_REVISION",
+              "nodeRevision": "$FROZEN_NODE_REVISION"
+            },
+            "domains": {
+              "sourceContract": "$SOURCE_RESULT",
+              "agentLifecycle": "$LIFECYCLE_RESULT",
+              "coordinatedRecovery": "$RECOVERY_RESULT",
+              "redactedObservability": "$OBSERVABILITY_RESULT"
+            },
+            "canaryHarnessVerified": true,
+            "finalReleaseCanarySatisfied": false,
+            "requiresP0EComplete": true,
+            "requiresExactReleaseCandidateRerun": true,
+            "independentSecurityReviewComplete": false,
+            "physicalPowerLossQualified": false,
+            "productionActivation": false,
+            "strictPQEnabled": false
+          }
+          JSON
+          python3 -m json.tool canary-rehearsal-result.json >/dev/null
+          cat canary-rehearsal-result.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xsp-v2-disposable-canary-rehearsal-result
+          path: canary-rehearsal-result.json
+          if-no-files-found: error
+          retention-days: 30
