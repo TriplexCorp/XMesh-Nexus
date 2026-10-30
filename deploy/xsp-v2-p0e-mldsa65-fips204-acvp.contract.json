@@ -1,0 +1,43 @@
+{
+  "schema": "xsp2-p0e-mldsa65-fips204-acvp-contract-1",
+  "node": {
+    "repository": "TriplexCorp/XMesh-Node",
+    "sourceRevision": "ffebcc30424463dd0afcdb8226bcd4b48c019bff",
+    "pullRequest": 50,
+    "previousReviewedRevision": "fc1548171aad331b8a7851a895a7f18a5440e858"
+  },
+  "nist": {
+    "repository": "usnistgov/ACVP-Server",
+    "sourceRevision": "a7f283cdc87d2d6dd93c1bac59e5622c5f9f8324",
+    "vectorDirectory": "gen-val/json-files/ML-DSA-sigVer-FIPS204",
+    "promptBlob": "22b0803253f7aa24644229acd04c387d260e874a",
+    "expectedResultsBlob": "dba8bcfe5f090503c9390701c11677389752cecd",
+    "registrationBlob": "23dcb3ef6e694c4e95c99914e581fb2b37ba1bc8"
+  },
+  "algorithm": "ML-DSA-65",
+  "standardRevision": "FIPS204",
+  "mode": "sigVer",
+  "goVersion": "1.27.3",
+  "compatibleGroupSelection": {
+    "parameterSet": "ML-DSA-65",
+    "signatureInterface": "external",
+    "preHash": "pure",
+    "externalMu": false
+  },
+  "verifiedGroups": 1,
+  "verifiedCases": 15,
+  "expectedValidCases": 3,
+  "expectedInvalidCases": 12,
+  "officialExpectedResultRequiredForEverySelectedCase": true,
+  "positiveAndNegativeCasesRequired": true,
+  "productionCodeChanged": false,
+  "acvpCertificationClaimed": false,
+  "exhaustiveImplementationAssuranceClaimed": false,
+  "preHashCoverageClaimed": false,
+  "externalMuCoverageClaimed": false,
+  "internalInterfaceCoverageClaimed": false,
+  "physicalPowerLossQualified": false,
+  "independentSecurityReviewClaimed": false,
+  "productionActivation": false,
+  "strictPQEnabled": false
+}
