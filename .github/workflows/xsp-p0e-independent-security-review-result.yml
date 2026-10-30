@@ -37,10 +37,11 @@ jobs:
           x=json.load(open(p))
           assert x['schema']=='xsp2-p0e-independent-security-review-result-contract-1'
           assert x['resultSchema']=='xsp2-p0e-independent-security-review-result-1'
-          assert x['frozenTarget']['nexus']['sourceRevision']=='8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091'
+          assert x['frozenTarget']['nexus']['sourceRevision']=='0bab1a48cff570b3abe405bcda4dc242b23b8a4b'
           assert x['frozenTarget']['node']['sourceRevision']=='083dc181c5e175f89007f4b93111cd5c45a69d97'
-          assert x['reviewerBundle']['deterministicTarSha256']=='f095f19217a072ef7919663744fcdfbc847783eb23be5a64b0f8df37b8952ced'
-          assert x['reviewerBundle']['payloadSha256']=='fb3a9bb9c3de2a462a8b338357b0a068dfdbe70a05f0dca81735006786b25b38'
+          assert x['reviewerBundle']['workflowRun']==41037503656
+          assert x['reviewerBundle']['deterministicTarSha256']=='bac34400ac9b646c8a0f64ca9495e380ff0afce373310787c96385b9e40486bf'
+          assert x['reviewerBundle']['payloadSha256']=='33c8f07f4513cb03400c8b7af2f34f804661a79501336206482c0f426866620a'
           assert len(x['requiredReviewDomains'])==11
           assert len(set(x['requiredReviewDomains']))==11
           assert x['independentReviewRequired'] is True
@@ -228,13 +229,12 @@ jobs:
           expected="$(printf '%s\n' \
             .github/workflows/xsp-p0e-independent-security-review-result.yml \
             deploy/xsp-v2-p0e-independent-security-review-result.contract.json \
-            docs/XSP_V2_P0E_INDEPENDENT_SECURITY_REVIEW_RESULT.md \
-            scripts/verify-xsp-v2-p0e-independent-security-review-result.py | sort)"
+            docs/XSP_V2_P0E_INDEPENDENT_SECURITY_REVIEW_RESULT.md | sort)"
           test "$changed" = "$expected"
 
       - name: State bounded evidence only
         run: |
-          echo 'PASS: independent-review result contract is bound to the exact frozen target and fails closed on ambiguous/unsafe closure states.'
+          echo 'PASS: independent-review result contract is bound to the exact v3 review snapshot and post-merge reviewer bundle and fails closed on ambiguous/unsafe closure states.'
           echo 'Synthetic fixtures are contract tests only and are not an independent security review.'
           echo 'Issue #137 still requires an attributable external result; issue #138 physical qualification remains separate.'
           echo 'strict-pq remains OFF; production rollout remains NOT AUTHORIZED.'
