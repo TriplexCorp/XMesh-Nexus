@@ -128,6 +128,8 @@ must(origin.includes('"authorizationStatus":"not-verified"'),
   'C2-B structural-only mode must explicitly state that cryptographic authorization has not occurred');
 must(origin.includes('DropBeforeC2c') && origin.includes('DropOnC2cFailure') && origin.includes('DropAfterC2cSuccess'),
   'disposable D2 response-loss fault domains must remain explicit and allowlisted');
+must(origin.includes('const REQUEST_QUEUE_SIZE: i32 = 32') && origin.includes('listen(listener.as_raw_fd(), REQUEST_QUEUE_SIZE)'),
+  'Rust ACK gate must preserve the reviewed fixed Unix listen backlog of 32');
 must(!origin.includes('X-XSP-V2-Trusted-Node-ID'),
   'origin must never trust a forwarded caller Node ID header');
 
