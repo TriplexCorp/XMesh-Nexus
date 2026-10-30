@@ -123,6 +123,9 @@ jobs:
           x = copy.deepcopy(base); x['evidence']['independentSecurityReviewAccepted'] = False; x['evidence']['independentSecurityReviewResultSha256'] = None; dump('bad-p0e-chain.json', x)
           x = copy.deepcopy(base); x['approval']['approved'] = False; x['approval']['approvedAt'] = None; x['approval']['approvalRecordSha256'] = None; dump('bad-unapproved.json', x)
           x = copy.deepcopy(base); x['releaseCandidate']['rolloutPlanSha256'] = 'b' * 64; dump('bad-plan-binding.json', x)
+          x = copy.deepcopy(base); x['evidence']['independentSecurityReviewResultSha256'] = 'b' * 64; dump('bad-review-evidence-binding.json', x)
+          x = copy.deepcopy(base); x['evidence']['physicalPowerQualificationResultSha256'] = 'c' * 64; dump('bad-power-evidence-binding.json', x)
+          x = copy.deepcopy(base); x['evidence']['rolloutPlanVerifierResultSha256'] = 'd' * 64; dump('bad-rollout-verifier-binding.json', x)
           x = copy.deepcopy(base); x['scope']['privateKey'] = 'forbidden'; dump('bad-private-field.json', x)
 
           contract = json.load(open('deploy/xsp-v2-strict-pq-activation-approval.contract.json', encoding='utf-8'))
@@ -158,6 +161,9 @@ jobs:
             --expected-agent-artifact-sha256 4444444444444444444444444444444444444444444444444444444444444444 \
             --expected-final-canary-sha256 5555555555555555555555555555555555555555555555555555555555555555 \
             --expected-rollout-plan-sha256 6666666666666666666666666666666666666666666666666666666666666666 \
+            --expected-security-review-result-sha256 7777777777777777777777777777777777777777777777777777777777777777 \
+            --expected-physical-qualification-result-sha256 8888888888888888888888888888888888888888888888888888888888888888 \
+            --expected-rollout-plan-verifier-result-sha256 9999999999999999999999999999999999999999999999999999999999999999 \
             > /tmp/eligible-result.json
           python3 - <<'PY'
           import json
@@ -185,6 +191,9 @@ jobs:
             --expected-agent-artifact-sha256 4444444444444444444444444444444444444444444444444444444444444444
             --expected-final-canary-sha256 5555555555555555555555555555555555555555555555555555555555555555
             --expected-rollout-plan-sha256 6666666666666666666666666666666666666666666666666666666666666666
+            --expected-security-review-result-sha256 7777777777777777777777777777777777777777777777777777777777777777
+            --expected-physical-qualification-result-sha256 8888888888888888888888888888888888888888888888888888888888888888
+            --expected-rollout-plan-verifier-result-sha256 9999999999999999999999999999999999999999999999999999999999999999
           )
           for f in \
             /tmp/bad-fallback.json \
@@ -196,6 +205,9 @@ jobs:
             /tmp/bad-p0e-chain.json \
             /tmp/bad-unapproved.json \
             /tmp/bad-plan-binding.json \
+            /tmp/bad-review-evidence-binding.json \
+            /tmp/bad-power-evidence-binding.json \
+            /tmp/bad-rollout-verifier-binding.json \
             /tmp/bad-private-field.json; do
             ! python3 scripts/verify-xsp-v2-strict-pq-activation-approval.py --approval "$f" "${common[@]}"
           done
