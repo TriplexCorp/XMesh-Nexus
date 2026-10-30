@@ -498,7 +498,8 @@ async fn validate_database_role(pool: &PgPool) -> Result<()> {
           OR EXISTS (
             SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
             WHERE n.nspname='public' AND c.relkind='S'
-              AND has_sequence_privilege(c.oid,'USAGE,SELECT,UPDATE'))",
+              AND CASE WHEN c.relkind='S'
+                  THEN has_sequence_privilege(c.oid,'USAGE,SELECT,UPDATE') ELSE false END)",
     )
     .fetch_one(pool)
     .await?;
