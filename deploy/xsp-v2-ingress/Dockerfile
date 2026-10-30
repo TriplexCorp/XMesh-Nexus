@@ -57,11 +57,11 @@ COPY deploy/xsp-v2-ingress/origin_ack_gate.py /usr/local/bin/xsp-origin-ack-gate
 USER 10004:10003
 ENTRYPOINT ["python3", "/usr/local/bin/xsp-origin-ack-gate"]
 
-# Test client only: OpenSSL and netcat stay outside both ingress/origin runtime
-# images. `nc -U` drives the negative SO_PEERCRED test without reintroducing a
+# Test client only: OpenSSL and socat stay outside both ingress/origin runtime
+# images. socat drives the negative SO_PEERCRED test without reintroducing a
 # Python interpreter into the Rust origin image.
 FROM debian:trixie-slim AS probe
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends openssl ca-certificates netcat-openbsd \
+    && apt-get install -y --no-install-recommends openssl ca-certificates socat \
     && rm -rf /var/lib/apt/lists/*
 ENTRYPOINT ["/bin/sh"]
