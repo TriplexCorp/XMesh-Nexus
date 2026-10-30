@@ -1,0 +1,123 @@
+name: XSP-v2 P0-E Node Owner-retirement Offline Issuance
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "deploy/xsp-v2-p0e-owner-retirement-offline-issuance.contract.json"
+      - "docs/XSP_V2_P0E_OWNER_RETIREMENT_OFFLINE_ISSUANCE.md"
+      - ".github/workflows/xsp-p0e-owner-retirement-offline-issuance-node-contract.yml"
+  pull_request:
+    paths:
+      - "deploy/xsp-v2-p0e-owner-retirement-offline-issuance.contract.json"
+      - "docs/XSP_V2_P0E_OWNER_RETIREMENT_OFFLINE_ISSUANCE.md"
+      - ".github/workflows/xsp-p0e-owner-retirement-offline-issuance-node-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  node-offline-owner-retirement-issuance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out exact merged XMesh-Node offline issuance source
+        uses: actions/checkout@v4
+        with:
+          repository: TriplexCorp/XMesh-Node
+          ref: cd1f187a06ea6f320023027e06e1a57d2be81af3
+          path: xmesh-node
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache: false
+
+      - name: Verify contract and exact Node PR 47 delta
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          p='deploy/xsp-v2-p0e-owner-retirement-offline-issuance.contract.json'
+          x=json.load(open(p))
+          assert x['schema']=='xsp2-p0e-owner-retirement-offline-issuance-contract-1'
+          assert x['node']['repository']=='TriplexCorp/XMesh-Node'
+          assert x['node']['sourceRevision']=='cd1f187a06ea6f320023027e06e1a57d2be81af3'
+          assert x['node']['pullRequest']==47
+          assert x['node']['previousReviewedRevision']=='e0f6bc01de98aad488fce73e1e605ba24f566bb1'
+          assert x['requestSchema']=='xsp2-owner-retirement-request-1'
+          assert x['authorizationDomain']=='XSP2-OWNER-RETIRE-PREVIOUS-V1'
+          assert x['ownerSignatureAlgorithms']==['Ed25519','ML-DSA-65']
+          assert x['maximumAuthorizationLifetimeMs']==300000
+          assert x['agentRequestIsPublicOnly'] is True
+          assert x['agentStateOpenIsReadOnly'] is True
+          assert x['offlineSignerReverifiesCheckpoint'] is True
+          assert x['ownerPrivateKeysRemainOffHost'] is True
+          assert x['ownerPrivateKeyFileMode']=='0600'
+          assert x['ownerPrivateKeyFormat']=='PKCS#8 PEM'
+          assert x['rejectsSymlinkedOwnerKeyPaths'] is True
+          assert x['requiresExactCheckpointDigest'] is True
+          assert x['requiresExactRetainedRotation'] is True
+          assert x['oldKeyErasureEnabled'] is False
+          assert x['networkRouteAdded'] is False
+          assert x['physicalPowerLossQualified'] is False
+          assert x['productionActivation'] is False
+          assert x['strictPQEnabled'] is False
+          PY
+
+          cd xmesh-node
+          old=e0f6bc01de98aad488fce73e1e605ba24f566bb1
+          new=cd1f187a06ea6f320023027e06e1a57d2be81af3
+          git cat-file -e "$old^{commit}"
+          git cat-file -e "$new^{commit}"
+          actual="$(git diff --name-only "$old" "$new" | sort)"
+          expected="$(printf '%s\n' \
+            .github/workflows/xsp-p0e-owner-retirement-offline-issuance.yml \
+            agent/xspv2/cmd/xmesh-xspv2-retirement-request/main.go \
+            agent/xspv2/cmd/xmesh-xspv2-retirement-sign/main.go \
+            agent/xspv2/cmd/xmesh-xspv2-retirement-sign/main_test.go \
+            agent/xspv2/recovery/retirement_request.go \
+            agent/xspv2/recovery/retirement_request_test.go \
+            agent/xspv2/state/open_linux_test.go \
+            agent/xspv2/state/state_linux.go | sort)"
+          test "$actual" = "$expected"
+
+      - name: Verify offline custody and no-mutation boundaries
+        working-directory: xmesh-node
+        run: |
+          set -euo pipefail
+          grep -Fq 'xsp2-owner-retirement-request-1' agent/xspv2/recovery/retirement_request.go
+          grep -Fq 'VerifySignature(checkpoint, pin)' agent/xspv2/recovery/retirement_request.go
+          grep -Fq 'SignRetirementAuthorization' agent/xspv2/recovery/retirement_request.go
+          grep -Fq 'func Open(root string)' agent/xspv2/state/state_linux.go
+          grep -Fq 'owner private key must be a non-symlink regular file with mode 0600' agent/xspv2/cmd/xmesh-xspv2-retirement-sign/main.go
+          grep -Fq 'ParsePKCS8PrivateKey' agent/xspv2/cmd/xmesh-xspv2-retirement-sign/main.go
+          grep -Fq 'MLDSA65' agent/xspv2/cmd/xmesh-xspv2-retirement-sign/main.go
+
+          ! grep -n -E 'net/http|http[.]|XMESH1|strict-pq=on|os[.](Remove|Rename|Create)|os[.]WriteFile|Mkdir(All)?|Chmod' \
+            agent/xspv2/cmd/xmesh-xspv2-retirement-request/main.go \
+            agent/xspv2/cmd/xmesh-xspv2-retirement-sign/main.go \
+            agent/xspv2/recovery/retirement_request.go
+
+          awk '/^func Open\(root string\)/{inside=1} /^\/\/ Prepare creates/{inside=0} inside{print}' \
+            agent/xspv2/state/state_linux.go > /tmp/open-body.txt
+          test -s /tmp/open-body.txt
+          ! grep -n -E 'Mkdir(All)?|Chmod|Remove|Rename|WriteFile|Create' /tmp/open-body.txt
+
+      - name: Re-run pinned Go 1.27 Agent proof
+        working-directory: xmesh-node/agent/xspv2
+        run: go test ./... -count=1
+
+      - name: Build pinned offline request and signer tools
+        working-directory: xmesh-node/agent/xspv2
+        run: |
+          set -euo pipefail
+          go build ./cmd/xmesh-xspv2-retirement-request
+          go build ./cmd/xmesh-xspv2-retirement-sign
+
+      - name: State bounded evidence only
+        run: |
+          echo 'PASS: exact merged Node PR #47 offline retirement issuance flow is pinned and independently re-verified.'
+          echo 'No old key is erased; owner private keys remain off-host and outside Nexus/normal Agent state.'
+          echo 'P0-E4a remains OPEN; strict-pq remains OFF; production rollout remains NOT AUTHORIZED.'
