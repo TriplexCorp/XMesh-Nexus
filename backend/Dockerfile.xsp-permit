@@ -1,0 +1,50 @@
+# syntax=docker/dockerfile:1.7
+# Protected XSP-v2 permit issuance components. Neither target is referenced by
+# the default production stack. The signer alone receives panel private keys;
+# the operator receives only the independent public pin and signer Unix socket.
+ARG PERMIT_BUILDER_IMAGE=rust:1.99-trixie
+FROM ${PERMIT_BUILDER_IMAGE} AS builder
+WORKDIR /build/backend
+ENV CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=4 CARGO_PROFILE_RELEASE_DEBUG=0
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends pkg-config libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+RUN --mount=type=secret,id=proxy_ca \
+    --mount=type=bind,source=backend,target=/source/backend \
+    --mount=type=bind,source=docs,target=/source/docs \
+    --mount=type=cache,id=xmesh-permit-registry,target=/usr/local/cargo/registry \
+    --mount=type=cache,id=xmesh-permit-target,target=/build/backend/target \
+    set -eu; \
+    if [ -f /run/secrets/proxy_ca ]; then export CARGO_HTTP_CAINFO=/run/secrets/proxy_ca CARGO_HTTP_PROXY_CAINFO=/run/secrets/proxy_ca; fi; \
+    cp /source/backend/Cargo.toml .; \
+    cp -a /source/backend/src /source/backend/migrations .; \
+    cp -a /source/docs /build/docs; \
+    cargo build --release --features xsp-v2-experimental \
+      --bin xsp-v2-permit-signer --bin xsp-v2-permit-operator; \
+    mkdir -p /build/output; \
+    cp target/release/xsp-v2-permit-signer /build/output/; \
+    cp target/release/xsp-v2-permit-operator /build/output/
+
+FROM debian:trixie-slim AS runtime-base
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates libssl3t64 \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system --gid 10001 xmesh \
+    && groupadd --system --gid 10005 xmesh-permit-operator \
+    && useradd --system --uid 10006 --gid xmesh --groups xmesh-permit-operator \
+       --home-dir /nonexistent --shell /usr/sbin/nologin xmesh-permit-signer \
+    && useradd --system --uid 10007 --gid xmesh-permit-operator \
+       --home-dir /nonexistent --shell /usr/sbin/nologin xmesh-permit-operator
+WORKDIR /nonexistent
+
+FROM runtime-base AS permit-signer
+COPY --from=builder /build/output/xsp-v2-permit-signer /usr/local/bin/xsp-v2-permit-signer
+USER 10006:10001
+HEALTHCHECK --interval=15s --timeout=3s --start-period=10s --retries=3 \
+  CMD test -S /run/xmesh-permit-signer/permit.sock
+ENTRYPOINT ["/usr/local/bin/xsp-v2-permit-signer"]
+
+FROM runtime-base AS permit-operator
+COPY --from=builder /build/output/xsp-v2-permit-operator /usr/local/bin/xsp-v2-permit-operator
+USER 10007:10005
+ENTRYPOINT ["/usr/local/bin/xsp-v2-permit-operator"]
