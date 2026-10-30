@@ -22,6 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Check out exact frozen Nexus review target
         uses: actions/checkout@v4
@@ -144,7 +146,7 @@ jobs:
           policy='xmesh-nexus-reviewed/docs/XSP_V2_PQ_ONLY_SECURITY_POLICY.md'
           handoff='docs/XSP_V2_P0E_SECURITY_REVIEW_HANDOFF.md'
           grep -Fqi 'independent security review' "$policy"
-          grep -Fqi 'no fallback' "$policy"
+          grep -Fqi 'Absolutely no user-selectable fallback' "$policy"
           grep -Fq 'review-preparation / evidence-freeze only' "$handoff"
           grep -Fq 'P0-E4a remains OPEN' "$handoff"
           grep -Fq '`strict-pq` remains OFF' "$handoff"
@@ -154,7 +156,7 @@ jobs:
       - name: Verify no runtime source is part of this handoff delta
         run: |
           set -euo pipefail
-          changed="$(git diff --name-only origin/main...HEAD | sort)"
+          changed="$(git diff --name-only 5cdb7825fcc51f8a7d296b992a7da4492ed2ce8e...HEAD | sort)"
           expected="$(printf '%s\n' \
             .github/workflows/xsp-p0e-security-review-handoff.yml \
             deploy/xsp-v2-p0e-security-review-handoff.contract.json \
