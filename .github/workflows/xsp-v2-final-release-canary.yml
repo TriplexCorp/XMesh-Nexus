@@ -32,21 +32,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Verify exact reviewed runtime scope is unchanged
+      - name: Verify final-canary control contract
         run: |
           set -Eeuo pipefail
-          git cat-file -e "$RELEASE_NEXUS_REVISION^{commit}"
-          git diff --exit-code "$RELEASE_NEXUS_REVISION" HEAD -- \
-            backend/src \
-            backend/migrations \
-            deploy/node-control-agent.sh \
-            deploy/xsp-v2-agent-staged-apply.sh \
-            deploy/postgres \
-            docker-compose.yml \
-            Dockerfile
-
           python3 - <<'PY'
           import json
           c=json.load(open('deploy/xsp-v2-final-release-canary.contract.json', encoding='utf-8'))
@@ -73,8 +61,6 @@ jobs:
               'legacyXMESH1Retired':False,
           }
           PY
-
-          bash -n scripts/test-xsp-v2-canary-observability.sh
           ! grep -R -n --fixed-strings 'strict-pq=on' \
             deploy/xsp-v2-final-release-canary.contract.json \
             docs/XSP_V2_FINAL_RELEASE_CANARY.md
@@ -102,7 +88,10 @@ jobs:
       P0D_AGENT_VERSION_A: final-canary-a
       P0D_AGENT_VERSION_B: final-canary-b
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out exact reviewed XMesh-Nexus runtime
+        uses: actions/checkout@v4
+        with:
+          ref: 12b3170996bc062ee16c79659a6378e5e425fd0e
       - name: Check out exact reviewed XMesh-Node source
         uses: actions/checkout@v4
         with:
@@ -113,6 +102,8 @@ jobs:
         with:
           go-version: '1.27.3'
           cache: false
+      - name: Verify exact Nexus checkout
+        run: test "$(git rev-parse HEAD)" = "$RELEASE_NEXUS_REVISION"
       - name: Build two exact-candidate Agent artifacts
         working-directory: xmesh-node/agent/xspv2
         run: |
@@ -178,7 +169,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 65
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out exact reviewed XMesh-Nexus runtime
+        uses: actions/checkout@v4
+        with:
+          ref: 12b3170996bc062ee16c79659a6378e5e425fd0e
       - name: Check out exact reviewed XMesh-Node source
         uses: actions/checkout@v4
         with:
@@ -189,6 +183,8 @@ jobs:
         with:
           go-version: '1.27.3'
           cache: false
+      - name: Verify exact Nexus checkout
+        run: test "$(git rev-parse HEAD)" = "$RELEASE_NEXUS_REVISION"
       - name: Re-run exact-candidate Agent regression before recovery
         working-directory: xmesh-node/agent/xspv2
         run: go test ./... -count=1
@@ -221,7 +217,10 @@ jobs:
       DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/xmesh_canary_observe
       NODE_REPO: xmesh-node
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out exact reviewed XMesh-Nexus runtime
+        uses: actions/checkout@v4
+        with:
+          ref: 12b3170996bc062ee16c79659a6378e5e425fd0e
       - name: Check out exact reviewed XMesh-Node source
         uses: actions/checkout@v4
         with:
@@ -233,6 +232,8 @@ jobs:
           go-version: '1.27.3'
           cache: false
       - uses: dtolnay/rust-toolchain@stable
+      - name: Verify exact Nexus checkout
+        run: test "$(git rev-parse HEAD)" = "$RELEASE_NEXUS_REVISION"
       - name: Prove both observability surfaces remain default-off, read-only and redacted
         run: bash scripts/test-xsp-v2-canary-observability.sh
 
