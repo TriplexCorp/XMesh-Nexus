@@ -1,6 +1,6 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use serde::Serialize;
-use sqlx::{postgres::PgPoolOptions, PgPool, Row};
+use sqlx::{PgPool, Row, postgres::PgPoolOptions};
 use std::env;
 
 const GATE: &str = "staging-only";
@@ -73,11 +73,15 @@ struct Snapshot {
 
 fn parse_node_id() -> Result<i64> {
     let mut args = env::args().skip(1);
-    let flag = args.next().context("exactly --node-id <positive integer> is required")?;
+    let flag = args
+        .next()
+        .context("exactly --node-id <positive integer> is required")?;
     if flag != "--node-id" {
         bail!("exactly --node-id <positive integer> is required");
     }
-    let raw = args.next().context("exactly --node-id <positive integer> is required")?;
+    let raw = args
+        .next()
+        .context("exactly --node-id <positive integer> is required")?;
     if args.next().is_some() {
         bail!("exactly --node-id <positive integer> is required");
     }
