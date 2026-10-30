@@ -124,6 +124,11 @@ jobs:
           x = copy.deepcopy(base); x['approval']['approved'] = False; x['approval']['approvedAt'] = None; x['approval']['approvalRecordSha256'] = None; dump('bad-unapproved.json', x)
           x = copy.deepcopy(base); x['releaseCandidate']['rolloutPlanSha256'] = 'b' * 64; dump('bad-plan-binding.json', x)
           x = copy.deepcopy(base); x['scope']['privateKey'] = 'forbidden'; dump('bad-private-field.json', x)
+
+          contract = json.load(open('deploy/xsp-v2-strict-pq-activation-approval.contract.json', encoding='utf-8'))
+          x = copy.deepcopy(contract); x['maxNodesPerApproval'] = 51; dump('bad-contract-nodes.json', x)
+          x = copy.deepcopy(contract); x['maxApprovalWindowSeconds'] = 172800; dump('bad-contract-window.json', x)
+          x = copy.deepcopy(contract); x['forbiddenFieldNames'].remove('privateKey'); dump('bad-contract-forbidden.json', x)
           PY
 
       - name: Prove structurally valid pending approval stays ineligible
@@ -198,6 +203,10 @@ jobs:
             --approval /tmp/eligible.json "${common[@]}" --now 2026-10-31T11:00:00Z
           ! python3 scripts/verify-xsp-v2-strict-pq-activation-approval.py \
             --approval /tmp/eligible.json --require-eligible --now 2026-10-30T11:00:00Z
+          for contract in /tmp/bad-contract-nodes.json /tmp/bad-contract-window.json /tmp/bad-contract-forbidden.json; do
+            ! python3 scripts/verify-xsp-v2-strict-pq-activation-approval.py \
+              --approval /tmp/eligible.json --contract "$contract" "${common[@]}"
+          done
 
       - name: State bounded evidence only
         run: |
