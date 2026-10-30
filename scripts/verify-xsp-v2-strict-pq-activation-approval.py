@@ -204,10 +204,10 @@ def validate_contract(contract: dict[str, Any]) -> None:
         fail("contract.allowedScopeModes must remain limited-canary, phased")
     max_nodes = contract["maxNodesPerApproval"]
     max_window = contract["maxApprovalWindowSeconds"]
-    if not isinstance(max_nodes, int) or isinstance(max_nodes, bool) or not 1 <= max_nodes <= 100:
-        fail("contract.maxNodesPerApproval must be integer 1..100")
-    if not isinstance(max_window, int) or isinstance(max_window, bool) or not 60 <= max_window <= 86400:
-        fail("contract.maxApprovalWindowSeconds must be integer 60..86400")
+    if max_nodes != 50:
+        fail("contract.maxNodesPerApproval must remain exactly 50")
+    if max_window != 86400:
+        fail("contract.maxApprovalWindowSeconds must remain exactly 86400")
     if contract["requiredApprovalAuthority"] != "release-owner":
         fail("contract.requiredApprovalAuthority must remain release-owner")
     policy = require_dict(contract["requiredTransportPolicy"], "contract.requiredTransportPolicy")
@@ -249,6 +249,24 @@ def validate_contract(contract: dict[str, Any]) -> None:
         "rolloutPlanEligible",
     ]:
         fail("contract.requiredEvidence changed")
+    if contract["forbiddenFieldNames"] != [
+        "command",
+        "commands",
+        "script",
+        "scripts",
+        "shell",
+        "privateKey",
+        "privateKeyPem",
+        "secret",
+        "secrets",
+        "password",
+        "token",
+        "credential",
+        "credentials",
+        "url",
+        "urls",
+    ]:
+        fail("contract.forbiddenFieldNames changed")
 
 
 def validate_release_candidate(value: Any) -> dict[str, str]:
