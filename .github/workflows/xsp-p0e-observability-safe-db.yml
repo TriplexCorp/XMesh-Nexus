@@ -40,7 +40,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.91.0
           components: rustfmt,clippy
 
       - name: Enforce default-off read-only source boundary
