@@ -351,11 +351,13 @@ chmod 0444 /certs/client.pem /certs/other-client.pem /certs/classical-client.pem
             raise RuntimeError(f"C2-B trusted caller-controlled identity material: {result}")
         print("PASS: exact ACK reaches structural gate via trusted mTLS -> UDS Node identity only")
 
-        expect_status(
+        anonymous_response = expect_status(
             "anonymous ACK",
             https_request("POST", ACK_PATH, ack, cert=None, key=None),
-            "403 Forbidden",
+            "400 Bad Request",
         )
+        if "No required SSL certificate was sent" not in anonymous_response:
+            raise RuntimeError(f"anonymous ACK was not rejected by handshake-level mTLS: {anonymous_response[-1400:]}")
         expect_status("wrong ACK method", https_request("GET", ACK_PATH, ""), "405 Not Allowed")
         expect_status(
             "wrong content type",
@@ -367,7 +369,7 @@ chmod 0444 /certs/client.pem /certs/other-client.pem /certs/classical-client.pem
             https_request("POST", ACK_PATH, ack, include_length=False),
             "411 Length Required",
         )
-        print("PASS: method, media type, length, and client-auth ingress gates fail closed")
+        print("PASS: method, media type, length, and handshake-level client-auth gates fail closed")
 
         for path in ["/", "/api/v1/node/heartbeat", "/api/v2/node/heartbeat", ACK_PATH + "/extra"]:
             expect_status(f"inert path {path}", https_request("POST", path, ack), "404 Not Found")
