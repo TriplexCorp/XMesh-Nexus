@@ -1,0 +1,176 @@
+name: XSP-v2 KVM VPS Durability Qualification v2
+
+on:
+  pull_request:
+    paths:
+      - "deploy/xsp-v2-kvm-vps-durability-qualification-v2.contract.json"
+      - "scripts/verify-xsp-v2-kvm-vps-durability-v2.py"
+      - "docs/XSP_V2_KVM_VPS_DURABILITY_QUALIFICATION_V2.md"
+      - ".github/workflows/xsp-kvm-vps-durability-qualification-v2.yml"
+  push:
+    branches: [main]
+    paths:
+      - "deploy/xsp-v2-kvm-vps-durability-qualification-v2.contract.json"
+      - "scripts/verify-xsp-v2-kvm-vps-durability-v2.py"
+      - "docs/XSP_V2_KVM_VPS_DURABILITY_QUALIFICATION_V2.md"
+      - ".github/workflows/xsp-kvm-vps-durability-qualification-v2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  kvm-vps-durability-v2:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache: false
+
+      - name: Compile verifier and validate versioned boundary
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/verify-xsp-v2-kvm-vps-durability-v2.py
+          python3 - <<'PY'
+          import json
+          c=json.load(open('deploy/xsp-v2-kvm-vps-durability-qualification-v2.contract.json'))
+          assert c['schema']=='xsp2-kvm-vps-durability-qualification-contract-2'
+          assert c['deploymentClass']=='kvm-vps'
+          assert c['runtimeTarget']['nexusRevision']=='12b3170996bc062ee16c79659a6378e5e425fd0e'
+          assert c['runtimeTarget']['nodeRevision']=='34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb'
+          q=c['qualificationTooling']
+          assert q['nodeRevision']=='3e3b5aa80d3d3e6b3729805ea6cb3092f3103abb'
+          assert q['runtimeBaseRevision']==c['runtimeTarget']['nodeRevision']
+          assert q['requiredBuildTag']=='xspv2_powercut_qualification'
+          assert q['productionAgentExcludesQualificationControls'] is True
+          assert c['requiredClaims']['guestCrashConsistencyQualified'] is True
+          assert c['requiredClaims']['providerStorageDurabilityAssumed'] is True
+          assert c['requiredClaims']['physicalPowerLossQualified'] is False
+          assert c['requiredClaims']['productionActivation'] is False
+          assert c['requiredClaims']['strictPQEnabled'] is False
+          assert len(c['requiredCheckpoints'])==5
+          PY
+
+      - name: Prove qualification tooling is an additive bounded delta
+        run: |
+          set -euo pipefail
+          base='34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb'
+          tool='3e3b5aa80d3d3e6b3729805ea6cb3092f3103abb'
+          node="$RUNNER_TEMP/XMesh-Node"
+          git init "$node"
+          git -C "$node" remote add origin https://github.com/TriplexCorp/XMesh-Node.git
+          git -C "$node" fetch --no-tags --depth=1 origin "$base" "$tool"
+          git -C "$node" diff --name-status "$base" "$tool" | LC_ALL=C sort > "$RUNNER_TEMP/actual-delta.txt"
+          cat > "$RUNNER_TEMP/expected-delta.txt" <<'EOF'
+          A	.github/workflows/xsp-p0e-kvm-manual-qualification.yml
+          A	docs/XSP_V2_KVM_MANUAL_QUALIFICATION.md
+          A	security/xspv2/poc-go/cmd/xspv2-kvm-qualify/main.go
+          A	security/xspv2/poc-go/keyring/kvm_qualification_linux.go
+          A	security/xspv2/poc-go/keyring/kvm_qualification_linux_test.go
+          EOF
+          LC_ALL=C sort -o "$RUNNER_TEMP/expected-delta.txt" "$RUNNER_TEMP/expected-delta.txt"
+          diff -u "$RUNNER_TEMP/expected-delta.txt" "$RUNNER_TEMP/actual-delta.txt"
+          git -C "$node" checkout --detach "$tool"
+
+          cd "$node/security/xspv2/poc-go"
+          go build -trimpath -tags xspv2_powercut_qualification -o "$RUNNER_TEMP/xspv2-kvm-qualify" ./cmd/xspv2-kvm-qualify
+
+          cd "$node/agent/xspv2"
+          go build -trimpath -o "$RUNNER_TEMP/xmesh-agent-xspv2" ./cmd/xmesh-agent-xspv2
+          if strings "$RUNNER_TEMP/xmesh-agent-xspv2" | grep -Eq 'XSP2-POWERCUT-ARMED-V1|xspv2-kvm-qualification'; then
+            echo 'normal Agent unexpectedly contains qualification controls' >&2
+            exit 1
+          fi
+
+      - name: Generate synthetic positive and fail-closed fixtures
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/kvm-vps-v2"
+          mkdir -p "$work"
+          python3 - "$work" <<'PY'
+          import copy,json,os,sys
+          root=sys.argv[1]
+          target={'nexusRevision':'12b3170996bc062ee16c79659a6378e5e425fd0e','nodeRevision':'34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb'}
+          tooling={
+            'nodeRevision':'3e3b5aa80d3d3e6b3729805ea6cb3092f3103abb',
+            'runtimeBaseRevision':'34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb',
+            'runnerPath':'security/xspv2/poc-go/cmd/xspv2-kvm-qualify/main.go',
+            'buildTag':'xspv2_powercut_qualification',
+            'binarySha256':'ab'*32,
+          }
+          subject=812345678901
+          cases=[
+            ('after-previous','previous-complete'),
+            ('after-floor','next-complete'),
+            ('after-active','next-complete'),
+            ('after-recovery-abort','previous-complete'),
+            ('after-recovery-active','next-complete'),
+          ]
+          runs=[]
+          for i,(point,outcome) in enumerate(cases,1):
+            previous=outcome=='previous-complete'
+            runs.append({
+              'runId':f'kvm-run-{i:04d}','checkpoint':point,
+              'crashMethod':'provider-hard-stop',
+              'crashEvidenceSha256':f'{i:02x}'*32,
+              'bootBeforeId':f'boot-before-{i:04d}','bootAfterId':f'boot-after-{i:04d}','nodeId':subject,
+              'rotation':{'fromEpoch':7,'toEpoch':8,'fromEdKeyId':'ed-old-0001','fromPQKeyId':'pq-old-0001','toEdKeyId':'ed-new-0001','toPQKeyId':'pq-new-0001'},
+              'postBoot':{'classification':outcome,'keyEpoch':7 if previous else 8,'activeEdKeyId':'ed-old-0001' if previous else 'ed-new-0001','activePQKeyId':'pq-old-0001' if previous else 'pq-new-0001','securityStateSha256':f'{i+16:02x}'*32,'networkAttemptedBeforeValidation':False},
+              'postgresRecovery':{'recoveryObserved':True,'integrityChecksPassed':True,'fsync':'on','fullPageWrites':'on','synchronousCommit':'on','walSyncMethod':'fdatasync','securityTupleSha256':f'{i+32:02x}'*32},
+              'offhostWitness':{'checkpointSha256':f'{i+48:02x}'*32,'minimumEpoch':7,'receiptSha256':f'{i+64:02x}'*32},
+            })
+          base={
+            'schema':'xsp2-kvm-vps-durability-qualification-result-2','deploymentClass':'kvm-vps',
+            'target':target,'qualificationTooling':tooling,'subjectNodeId':subject,
+            'evidenceBundle':{'archiveName':'xspv2-kvm-evidence.tar.gz','archiveSha256':'cd'*32},
+            'providerStorage':{'provider':'Example VPS Provider','storageClass':'provider-block-storage','storageTrustBoundary':'provider-managed-block-storage','providerStorageDurabilityAssumed':True,'riskAcceptedBy':'release-owner-0001','riskAcceptedAt':'2026-10-30T12:00:00Z','riskStatement':'Provider physical host, controller and PLP are outside guest control; durable guest flush semantics are accepted as an external provider trust assumption.'},
+            'runs':runs,
+            'claims':{'guestCrashConsistencyQualified':True,'providerStorageDurabilityAssumed':True,'physicalPowerLossQualified':False,'productionActivation':False,'strictPQEnabled':False},
+          }
+          def write(name,obj):
+            open(os.path.join(root,name),'w').write(json.dumps(obj,sort_keys=True,separators=(',',':'))+'\n')
+          write('eligible.json',base)
+          bad=copy.deepcopy(base); bad['target']['nodeRevision']='1'*40; write('wrong-target.json',bad)
+          bad=copy.deepcopy(base); bad['qualificationTooling']['nodeRevision']='2'*40; write('wrong-tooling.json',bad)
+          bad=copy.deepcopy(base); bad['qualificationTooling']['runtimeBaseRevision']='3'*40; write('wrong-tooling-base.json',bad)
+          bad=copy.deepcopy(base); bad['runs'][1]['nodeId']=subject+1; write('mixed-node.json',bad)
+          bad=copy.deepcopy(base); bad['providerStorage']['providerStorageDurabilityAssumed']=False; write('no-provider-trust.json',bad)
+          bad=copy.deepcopy(base); bad['claims']['physicalPowerLossQualified']=True; write('false-physical-claim.json',bad)
+          bad=copy.deepcopy(base); bad['runs'].pop(); write('missing-checkpoint.json',bad)
+          bad=copy.deepcopy(base); bad['runs'][1]['checkpoint']=bad['runs'][0]['checkpoint']; write('duplicate-checkpoint.json',bad)
+          bad=copy.deepcopy(base); bad['runs'][1]['postBoot']['classification']='previous-complete'; bad['runs'][1]['postBoot']['keyEpoch']=7; bad['runs'][1]['postBoot']['activeEdKeyId']='ed-old-0001'; bad['runs'][1]['postBoot']['activePQKeyId']='pq-old-0001'; write('wrong-outcome.json',bad)
+          bad=copy.deepcopy(base); bad['runs'][2]['bootAfterId']=bad['runs'][2]['bootBeforeId']; write('same-boot.json',bad)
+          bad=copy.deepcopy(base); bad['runs'][3]['postBoot']['networkAttemptedBeforeValidation']=True; write('early-network.json',bad)
+          PY
+
+      - name: Prove v2 positive result
+        run: |
+          set -euo pipefail
+          out="$(python3 scripts/verify-xsp-v2-kvm-vps-durability-v2.py --result "$RUNNER_TEMP/kvm-vps-v2/eligible.json")"
+          echo "$out"
+          echo "$out" | grep -Fq '"status":"kvm-vps-durability-qualified-for-release-gate"'
+          echo "$out" | grep -Fq '"runtimeNodeRevision":"34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb"'
+          echo "$out" | grep -Fq '"qualificationToolingRevision":"3e3b5aa80d3d3e6b3729805ea6cb3092f3103abb"'
+          echo "$out" | grep -Fq '"subjectNodeId":812345678901'
+          echo "$out" | grep -Fq '"guestCrashConsistencyQualified":true'
+          echo "$out" | grep -Fq '"physicalPowerLossQualified":false'
+          echo "$out" | grep -Fq '"productionDurabilityGateEligible":true'
+          echo "$out" | grep -Fq '"productionActivation":false'
+
+      - name: Prove stale, mixed-subject and false claims fail closed
+        run: |
+          set -euo pipefail
+          for f in wrong-target wrong-tooling wrong-tooling-base mixed-node no-provider-trust false-physical-claim missing-checkpoint duplicate-checkpoint wrong-outcome same-boot early-network; do
+            if python3 scripts/verify-xsp-v2-kvm-vps-durability-v2.py --result "$RUNNER_TEMP/kvm-vps-v2/$f.json"; then
+              echo "$f unexpectedly validated" >&2
+              exit 1
+            fi
+          done
+
+      - name: State versioned evidence boundary
+        run: |
+          echo 'PASS: v2 separates frozen production runtime from later qualification-only Node tooling.'
+          echo 'CI fixtures are not real #138 evidence; exact real Node ID and five external crash runs remain mandatory.'
+          echo 'strict-pq remains OFF; production activation remains separate.'
