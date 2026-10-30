@@ -8,9 +8,9 @@ XMesh Nexus manages Nodes, users, subscriptions, Xray configuration, telemetry a
 
 ## Current XSP-v2 checkpoint — 30 October 2026
 
-**Latest verified Nexus recovery/security checkpoint:** [`2889864d6ec7f89202d8d82f2feda87501f0f349`](https://github.com/TriplexCorp/XMesh-Nexus/commit/2889864d6ec7f89202d8d82f2feda87501f0f349), merge of [PR #125](https://github.com/TriplexCorp/XMesh-Nexus/pull/125). PR #125 completes the bounded P0-E4a6 physical-run handoff on top of E4a1–E4a5: the exact run/checkpoint/rotation, pinned source revisions, lab-binary SHA-256, E4a1 preflight digests, independently verified E3a witness, controller identity and pre-cut boot ID are frozen before a real cut; post-boot verification reuses E4a3 and binds separately preserved arm/controller/Agent/PostgreSQL/review records. **P0-E4a itself remains CURRENT/OPEN until five representative physical abrupt-power runs are actually executed and independently reviewed.**
+**Latest verified Nexus P0-E recovery/security checkpoint:** [`a477c1f6067da2e8ecab0344433d1691c3c75b47`](https://github.com/TriplexCorp/XMesh-Nexus/commit/a477c1f6067da2e8ecab0344433d1691c3c75b47), merge of [PR #131](https://github.com/TriplexCorp/XMesh-Nexus/pull/131). Since the P0-E4a6 physical-run handoff checkpoint, Node PRs #46–#50 plus Nexus PRs #127–#131 have closed the bounded owner-authorized old-key retirement chain, added strict recovery/retirement parser fuzz smoke, and pinned an external official NIST ACVP ML-DSA-65 FIPS 204 signature-verification corpus. **P0-E4a itself remains CURRENT/OPEN until five representative physical abrupt-power runs are actually executed and independently reviewed.**
 
-**P0-C2-D and P0-D are COMPLETE. P0-E remains the CURRENT P0. P0-E1a, P0-E2a, P0-E2b, P0-E3a and P0-E3b are COMPLETE within their explicitly bounded scopes. P0-E4a remains the CURRENT sub-gate; inside it, E4a1 storage preflight, E4a2 external arming, E4a3 evidence contract, E4a4 five-point review matrix, E4a5 real-operation lab reachability/source pin and E4a6 physical-run handoff are COMPLETE within bounded software/lab-preparation scopes. Representative physical power-loss qualification is still outstanding.** The production-capable Agent path remains default-disabled and production rollout remains unauthorized.
+**P0-C2-D and P0-D are COMPLETE. P0-E remains the CURRENT P0. P0-E1a, P0-E2a, P0-E2b, P0-E3a and P0-E3b are COMPLETE within their explicitly bounded scopes. P0-E4a1–P0-E4a6 software/lab-preparation gates are COMPLETE, but representative physical power-loss qualification remains outstanding. The bounded owner-authorized old-key retirement flow and the current parser-fuzz / ML-DSA-65 external FIPS 204 verification-vector gates are also COMPLETE. The remaining repo-side P0-E software work is operational observability without secret/key leakage, followed by independent review of the final migration/production architecture; neither completion nor any green CI authorizes production rollout.** The production-capable Agent path remains default-disabled and `strict-pq` remains OFF.
 
 Completed foundations and recovery/security checkpoints now include:
 
@@ -33,6 +33,11 @@ Completed foundations and recovery/security checkpoints now include:
 - **PR #122 / P0-E4a4 five-point power-cut review matrix:** aggregates exactly one valid E4a3 bundle for each of `after-previous`, `after-floor`, `after-active`, `after-recovery-abort` and `after-recovery-active`, rejects duplicates/mixed source/storage generations and produces a deterministic matrix digest/review handle. Synthetic fixtures prove the review tooling only; hardware remains unqualified.
 - **Node PR #45 + Nexus PR #123 / P0-E4a5 real-operation lab reachability:** Node merge `7bf8cc92950f396e33891c8744c1f6855414154b` drives the real `ActivatePreparedRotation` / `RecoverRotation` operations to all five inherited-FD arm points while remaining test-only. Nexus merge `a34d0999ca519e2a81e68d92ec7136cd606518d4` pins both the original reviewed power-cut/core source `50c770c8bbb917b04ca893ac5b8d29e6c7f9af7e` and the runner source `7bf8cc92950f396e33891c8744c1f6855414154b`, proves the core keyring/hook files are byte-identical across them, re-runs all five real-operation arm paths, preserves the crash matrix and proves normal Agent artifacts contain no lab controls. This is the final bounded real-operation reachability/source-contract layer before the E4a6 physical-run handoff, **not** physical power-loss qualification.
 - **PR #125 / P0-E4a6 physical-run handoff:** adds the final repo-side operator handoff before real power-cut execution. `prepare` freezes exact run/checkpoint/Node rotation, reviewed source revisions, exact lab-binary SHA-256, Agent/PostgreSQL preflight digests, controller identity, pre-cut boot ID and the SHA-256 of an existing E3a verifier result bound to the exact pre-cut epoch. `verify` first requires that same preserved E3a verification result, then reuses the existing E4a3 verifier and additionally binds the final bundle to separately preserved arm observation, raw external controller event, post-boot Agent record, PostgreSQL recovery record and review notes. The tool contains no network/power-control path and always leaves `physicalPowerLossQualified=false`; real BMC/PDU cuts and independent review remain required.
+- **Node PR #46 + Nexus PR #127 / owner-authorized old-key retirement authorization:** the retained previous→active rotation can be authorized only by a canonical `XSP2-OWNER-RETIRE-PREVIOUS-V1` artifact carrying both Ed25519 and ML-DSA-65 owner signatures and bound to the exact Node, authenticated server authority, epochs/key IDs and signed off-host recovery checkpoint. This first layer is read-only and cannot erase keys.
+- **Node PR #47 + Nexus PR #128 / offline retirement issuance:** the Agent exports a public-only request from the exact retained rotation; an offline owner signer re-verifies the signed off-host checkpoint and signs the request with both owner keys. Owner private keys remain off-host and are accepted only from canonical non-symlink owner-owned mode-0600 unencrypted PKCS#8 files. No network/API issuance route is added.
+- **Node PR #48 + Nexus PR #129 / crash-safe durable old-key erasure:** after exact owner authorization, the keyring persists an authenticated HMAC-SHA256 retirement intent before deleting retained snapshots. Only `.previous` and `.next` may be erased; the active vault and monotonic epoch floor are never erased. Parent-directory fsync, crash checkpoints, exact idempotent resume, retirement rollback/reintroduction floors and a single non-test high-level caller are independently checked. This is local durable retirement evidence, not physical power-loss qualification.
+- **Node PR #49 + Nexus PR #130 / bounded strict security parser fuzzing:** native Go fuzz targets exercise the off-host checkpoint, retirement request and retirement authorization decoders with malformed/trailing/unknown/non-UTF8 input classes. Every accepted input must survive canonical/schema validation and strict decode→marshal→decode semantic equality. The dedicated CI is intentionally bounded smoke coverage, not an exhaustive fuzzing claim.
+- **Node PR #50 + Nexus PR #131 / external ML-DSA-65 FIPS 204 sigVer vectors:** the exact Node test-only delta is verified against `usnistgov/ACVP-Server` revision `a7f283cdc87d2d6dd93c1bac59e5622c5f9f8324` and pinned vector blobs. The Go 1.27.3-compatible scope is ML-DSA-65 / external interface / pure / `externalMu=false`; the pinned slice is exactly **1 group / 15 cases / 3 expected-valid / 12 expected-invalid**, all matching NIST expected results. This is external verification-vector evidence, **not** ACVP certification or exhaustive implementation assurance.
 
 Exact bounded P0-E4a foundation evidence:
 
@@ -60,11 +65,11 @@ Previous P0-E2b evidence remains [XSP-v2 P0-E2b PostgreSQL Snapshot Rollback #6]
 
 The previous P0-D implementation checkpoint remains [`698d5e43d59c0c95532d513b39d95e42a2af4f20`](https://github.com/TriplexCorp/XMesh-Nexus/commit/698d5e43d59c0c95532d513b39d95e42a2af4f20), merge of [PR #105](https://github.com/TriplexCorp/XMesh-Nexus/pull/105). Its [Backend CI #3605](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40835127285) completed **success**. The disposable real-Agent migration/update proof remains [XSP-v2 P0-D real Agent E2E #10](https://github.com/TriplexCorp/XMesh-Nexus/actions/runs/40827536439) on PR #103 merge SHA `7df13962aae871f04677b47e0f05a7f6ab906e72` — **success**.
 
-The current verified XMesh-Node P0-E4a5 lab-runner checkpoint is [`7bf8cc92950f396e33891c8744c1f6855414154b`](https://github.com/TriplexCorp/XMesh-Node/commit/7bf8cc92950f396e33891c8744c1f6855414154b), merge of Node PR #45; the reviewed core power-cut/keyring source remains `50c770c8bbb917b04ca893ac5b8d29e6c7f9af7e` from Node PR #44 and is separately pinned by the E4a3/E4a5 contracts. The earlier P0-E2a snapshot anti-rollback checkpoint remains [`3fffa9fd74195114a7c4e573a8a11e075c84f403`](https://github.com/TriplexCorp/XMesh-Node/commit/3fffa9fd74195114a7c4e573a8a11e075c84f403), merge of Node PR #39. The earlier durable Agent state / authority checkpoint remains [`5e8ee562915a570eb49ed46d59d723f233f3cc68`](https://github.com/TriplexCorp/XMesh-Node/commit/5e8ee562915a570eb49ed46d59d723f233f3cc68), merge of Node PR #37.
+The current verified XMesh-Node security-test checkpoint is [`ffebcc30424463dd0afcdb8226bcd4b48c019bff`](https://github.com/TriplexCorp/XMesh-Node/commit/ffebcc30424463dd0afcdb8226bcd4b48c019bff), merge of Node PR #50; it layers the test-only NIST ACVP ML-DSA-65 gate on top of the parser-fuzz checkpoint `fc1548171aad331b8a7851a895a7f18a5440e858` and durable retirement checkpoint `3d2fc155ead11e86a2872ad12fbe28f157bb24db`. The P0-E4a5 lab-runner checkpoint remains `7bf8cc92950f396e33891c8744c1f6855414154b`, and the reviewed core power-cut/keyring source remains `50c770c8bbb917b04ca893ac5b8d29e6c7f9af7e` from Node PR #44.
 
 The previous complete C2-D implementation checkpoint remains [`7e0b42ea4847b273ba8cd55a0ff3e043a420c377`](https://github.com/TriplexCorp/XMesh-Nexus/commit/7e0b42ea4847b273ba8cd55a0ff3e043a420c377), merge of [PR #88](https://github.com/TriplexCorp/XMesh-Nexus/pull/88). Its exact post-merge C2-D transport-negative, lost-response/race, expired-recovery, Hybrid TLS and Backend CI matrix remains valid within that stated isolated staging/process boundary.
 
-Production behavior remains unchanged. The root XMesh-Node edge router remains on its Go 1.23 production path; the signed shell/systemd control Agent remains the deployed command authority; the Go 1.27 migration/package path remains behind explicit non-default staging gates. `strict-pq` remains **OFF**. P0-D completion and P0-E1a/P0-E2a/P0-E2b/P0-E3a/P0-E3b evidence do **not** authorize production VPS/DNS/firewall/public-Nginx/key-material changes, Agent cutover or rollout.
+Production behavior remains unchanged. The root XMesh-Node edge router remains on its Go 1.23 production path; the signed shell/systemd control Agent remains the deployed command authority; the Go 1.27 migration/package path remains behind explicit non-default staging gates. `strict-pq` remains **OFF**. Completed P0-D and bounded P0-E evidence do **not** authorize production VPS/DNS/firewall/public-Nginx/key-material changes, Agent cutover or rollout.
 
 ## Completed XSP-v2 gates
 
@@ -82,7 +87,7 @@ PR #66 proved:
 
 `Node test client → TLS1.3/X25519MLKEM768 + ML-DSA-65 client identity → dedicated ingress → protected Unix-domain socket → origin verifier`
 
-Trusted Node identity comes from verified ML-DSA-65 client-certificate SPKI plus protected Unix peer credentials, never caller `nodeId`, arbitrary headers, source IP or legacy `XMESH1` identity.
+Trusted Node identity comes from the verified ML-DSA-65 client-certificate SPKI plus protected Unix peer credentials, never caller `nodeId`, arbitrary headers, source IP or legacy `XMESH1` identity.
 
 ### P0-C2-B — narrow ACK route — COMPLETE
 
@@ -104,17 +109,17 @@ PR #73 proved the real staging Node cutover path end to end:
 
 `XMesh-Node Go 1.27 staging client → strict hybrid mTLS → ingress → protected origin UDS → C2-C → PostgreSQL → isolated signer → dual-signed receipt → Node verification + durable journal`
 
-D1 deliberately preserved ACK freshness and exposed the need for a separate historical-recovery domain instead of allowing stale commands.
+D1 intentionally preserved ACK freshness and exposed the need for a separate historical-recovery domain rather than permitting stale commands.
 
 ### P0-C2-D2 — failure / retry / recovery / downgrade matrix — COMPLETE
 
 C2-D2 was closed incrementally and then re-verified together on PR #88:
 
 - **PR #77:** expired exact network recovery over the distinct `/ack/recover` / internal `XSP2C2H1` domain; fresh expired ACK remains rejected; no re-signing or second epoch transition.
-- **PR #82:** lost-response windows, signer-off exact retry, eight-way exact duplicate-race convergence and fresh mismatch rejection.
+- **PR #82:** lost-response windows, signer-off exact retry, eight-way exact duplicate race convergence and fresh mismatch rejection.
 - **PR #84:** current XMesh-Node native recovery transport alignment and exact external `/api/v2/node/keys/rotation/ack/recover` contract.
 - **PR #86:** real origin/C2-C/PostgreSQL/signer outages and restarts around uncommitted, committed-without-receipt and durable-receipt states; replay cardinality, old-key retention and topology invariants remain intact.
-- **Node PR #33:** authenticated application-authority binding — HTTP `Host` equals verified TLS `serverName`, while the direct TCP connect address may remain an internal alias/IP.
+- **Node PR #33:** authenticated application authority binding — HTTP `Host` equals verified TLS `serverName`, while the direct TCP connect address may remain an internal alias/IP.
 - **PR #88:** final full ACK-boundary transport-negative/no-legacy proof.
 
 The final PR #88 matrix proves all of the following fail closed **without durable ACK/epoch/receipt/replay mutation**:
@@ -155,6 +160,9 @@ P0-D acceptance is satisfied by the default-disabled production-capable Agent wo
 - **P0-E2b COMPLETE — one-sided PostgreSQL snapshot rollback:** PR #109 proves a real database dump/restore rollback cannot silently rewrite state already witnessed by a current Agent, and that restore-time least-privilege database ACL re-hardening is part of the recovery contract.
 - **P0-E3a COMPLETE — owner/off-host monotonic recovery checkpoint:** PR #112 proves an offline third-domain checkpoint can derive its floor from the existing dual-signed commit receipt, independently verify both signer keys/signatures, reject coordinated old local state and same-epoch receipt divergence, and do so without a new mutable counter, remote API, DB mutation or recovery bypass. The bounded trust assumption is that the newest checkpoint and its independently provisioned pins do not roll back with Agent/Nexus state.
 - **P0-E3b COMPLETE — coordinated backup/restore recovery:** PR #114 proves a disposable exact-current restore and coordinated-old restore boundary across PostgreSQL, complete Agent state, signer identity and mTLS identity. The current set validates against the owner-held E3a witness without resets/regeneration; the old set and mixed/missing/tampered components fail closed, while database ACL re-hardening preserves the security tuple.
+- **Owner-authorized old-key retirement COMPLETE — bounded authorization/issuance/erasure:** Node PRs #46–#48 + Nexus PRs #127–#129 prove exact dual-owner authorization, offline owner-key custody/issuance, durable authenticated retirement intent, crash-safe erasure of only retained `.previous`/`.next` snapshots and persistent rollback/reintroduction floors. No production/API retirement path is enabled.
+- **Strict recovery/retirement parser fuzz smoke COMPLETE — bounded robustness evidence:** Node PR #49 + Nexus PR #130 add native Go fuzz targets for the security JSON decoders with canonical/strict round-trip invariants. This is bounded CI smoke, not exhaustive fuzzing.
+- **ML-DSA-65 FIPS 204 external verification vectors COMPLETE — bounded API-compatible scope:** Node PR #50 + Nexus PR #131 pin official NIST ACVP source revision/blobs and verify exactly 1 compatible group / 15 cases / 3 valid / 12 invalid against Go 1.27.3 `crypto/mldsa`. This is not ACVP certification and does not claim unsupported preHash/externalMu/internal-interface coverage.
 
 #### P0-E4a1 — storage durability preflight — COMPLETE (bounded preflight)
 
@@ -168,18 +176,17 @@ Node PR #44 at `50c770c8bbb917b04ca893ac5b8d29e6c7f9af7e` adds a lab-only build 
 
 This gate proves only that a representative lab can synchronize an external abrupt-power event to the intended durability boundary without introducing a production remote-control path. It does **not** prove that the cut happened or that any storage stack survived it correctly.
 
-### CURRENT sub-gate — P0-E4a physical power-loss / storage durability
+### CURRENT external/hardware sub-gate — P0-E4a physical power-loss / storage durability
 
-P0-E4a1 through P0-E4a5 now provide the reviewed storage preflight, external arming, strict evidence schema, five-point review matrix and real-operation lab-runner/source contract, but **P0-E4a remains open**. The remaining acceptance evidence must come from five real representative abrupt host/device power-loss runs plus independent review; a normal process kill, VM stop/snapshot, successful `fsync(2)` return, synthetic evidence fixture, preflight PASS or GitHub CI run is not sufficient.
+P0-E4a1 through P0-E4a6 provide the reviewed storage preflight, external arming, strict evidence schema, five-point review matrix, real-operation lab runner/source contract and physical-run handoff, but **P0-E4a remains open**. The remaining acceptance evidence must come from five real representative abrupt host/device power-loss runs plus independent review; a normal process kill, VM stop/snapshot, successful `fsync(2)` return, synthetic evidence fixture, preflight PASS or GitHub CI run is not sufficient.
 
 Acceptance requires a reviewed supported-storage test matrix that exercises abrupt host/power loss at the critical Agent keyring/journal and PostgreSQL durability boundaries, records the filesystem/virtual-disk/controller/cache flush semantics being relied on, and proves recovery is either the previous complete state or the next complete state — never a lowered epoch floor, torn active identity, fabricated ACK/receipt success or silently reconstructed security state. Configurations whose storage stack cannot provide the required durable-flush semantics must fail qualification rather than weaken the protocol. The independent E3a witness remains the external rollback floor. `strict-pq` stays OFF and production topology remains unchanged.
 
-After P0-E4a, P0-E still must close:
+### CURRENT repo-side software sub-gate — operational observability
 
-1. owner-authorized key rotation/recovery and explicit old-key retirement policy;
-2. parser/protocol fuzzing plus FIPS 204 / algorithm known-answer validation where applicable;
-3. independent security review of the final migration/production architecture;
-4. operational observability without secret/key leakage.
+With bounded retirement, parser fuzzing and external ML-DSA-65 verification-vector checks now complete, the next implementable P0-E repository gate is **operational observability without secret/key leakage**. It must expose enough bounded health/audit state to diagnose enrollment/cutover/recovery/retirement failures and security-component availability without logging private keys, raw bearer material, MFA secrets, full signed permits/ACKs/receipts, or other replayable sensitive payloads. This observability gate must remain default-safe and cannot activate the production XSP-v2 path.
+
+After observability, P0-E still requires an **independent security review of the final migration/production architecture**. The five real E4a physical-power experiments and their independent evidence review remain a parallel external/hardware blocker. Completion of these individual gates still does not authorize production rollout.
 
 `strict-pq` remains **OFF** throughout P0-E unless a later explicit production/release gate separately authorizes activation. Production rollout remains separately gated and unauthorized.
 
@@ -189,8 +196,8 @@ After P0-E4a, P0-E still must close:
 - Production control-plane behavior remains legacy `XMESH1` / Ed25519 until separately approved P0-E and rollout gates authorize migration.
 - No target-product fallback to XMESH1, Ed25519-only, X25519-only, TLS 1.2 or insecure certificate validation.
 - Completed C2-D evidence is isolated staging/process evidence, not production activation.
-- Completed P0-D capabilities/evidence and bounded P0-E1a/P0-E2a/P0-E2b/P0-E3a/P0-E3b proofs remain default-disabled staging/production-capable foundations; none authorize production rollout.
-- P0-E3a provides the independent coordinated-rollback witness and P0-E3b proves the disposable coordinated restore procedure consumes it correctly; P0-E4a now owns the remaining host/storage power-loss durability boundary.
+- Completed P0-D capabilities/evidence and bounded P0-E recovery, retirement, parser-fuzz and external-vector proofs remain default-disabled staging/production-capable foundations; none authorize production rollout.
+- P0-E3a provides the independent coordinated-rollback witness and P0-E3b proves the disposable coordinated restore procedure consumes it correctly; P0-E4a still owns the remaining host/storage physical power-loss durability boundary.
 - A GitHub merge is not a production deployment.
 - Xray continues to carry user VPN traffic.
 
@@ -256,6 +263,9 @@ The default Nexus backend does not compile `xsp-v2-experimental`. Do not weaken 
 - [XSP-v2 P0-E PostgreSQL snapshot rollback](docs/XSP_V2_P0E_POSTGRES_SNAPSHOT_ROLLBACK.md)
 - [XSP-v2 P0-E owner/off-host recovery checkpoint](docs/XSP_V2_P0E_OFFHOST_RECOVERY_CHECKPOINT.md)
 - [XSP-v2 P0-E coordinated backup/restore recovery](docs/XSP_V2_P0E_COORDINATED_BACKUP_RESTORE.md)
+- [XSP-v2 P0-E durable owner-retirement erasure](docs/XSP_V2_P0E_OWNER_RETIREMENT_DURABLE_ERASURE.md)
+- [XSP-v2 P0-E bounded parser fuzzing](docs/XSP_V2_P0E_PARSER_FUZZ.md)
+- [XSP-v2 P0-E ML-DSA-65 FIPS 204 ACVP vectors](docs/XSP_V2_P0E_MLDSA65_FIPS204_ACVP.md)
 - [XSP-v2 signer E2E](docs/XSP_V2_SIGNER_E2E.md)
 - [XSP-v2 TLS / ingress-origin proof](docs/XSP_V2_TLS_PROBE.md)
 - [Subscription security](docs/SUBSCRIPTION_SECURITY.md)
