@@ -4,14 +4,16 @@ Status: **external-review result acceptance tooling only**. This document and it
 
 ## Purpose
 
-Issue #137 requires an independently attributable security-review result for the already-frozen target. The review handoff and reproducible bundle define what is reviewed; this contract defines the minimum machine-checkable shape of the reviewer's returned findings/sign-off so that closure cannot depend on ambiguous prose or an accidentally different source revision.
+Issue #137 requires an independently attributable security-review result for the current frozen review snapshot. The v3 handoff and reproducible bundle define what is reviewed; this contract defines the minimum machine-checkable shape of the reviewer's returned findings/sign-off so closure cannot depend on ambiguous prose or an accidentally different source revision.
 
-The frozen source target remains:
+The exact v3 review target is:
 
-- XMesh-Nexus `8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091`
+- XMesh-Nexus `0bab1a48cff570b3abe405bcda4dc242b23b8a4b`
 - XMesh-Node `083dc181c5e175f89007f4b93111cd5c45a69d97`
 
-The optional reviewer convenience bundle produced by PR #144 is tied to the same target. Its deterministic inner tar SHA-256 is `f095f19217a072ef7919663744fcdfbc847783eb23be5a64b0f8df37b8952ced` and its payload digest is `fb3a9bb9c3de2a462a8b338357b0a068dfdbe70a05f0dca81735006786b25b38`.
+The earlier Nexus revision `8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091` remains the frozen **runtime baseline**. PR #156 proved the protected runtime paths were unchanged between that baseline and the v3 Nexus snapshot while adding the final non-executing release-control architecture from PRs #150, #152 and #155 to the review scope. An external result for issue #137 must therefore bind the v3 review snapshot `0bab1a48...`, not the older runtime baseline by itself.
+
+The authoritative post-merge v3 reviewer bundle was produced by workflow run `41037503656` after PR #156 merged. Its GitHub artifact ID is `12967634062` for navigation only; the cryptographic result contract binds the deterministic inner tar SHA-256 `bac34400ac9b646c8a0f64ca9495e380ff0afce373310787c96385b9e40486bf` and payload digest `33c8f07f4513cb03400c8b7af2f34f804661a79501336206482c0f426866620a`.
 
 ## Required result shape
 
@@ -35,7 +37,7 @@ Every required domain appears exactly once and uses one of:
 - `pass-with-findings`
 - `fail`
 
-The 11 domain identifiers are inherited exactly from the PR #142 handoff contract:
+The 11 domain identifiers are inherited exactly from the v3 PR #156 handoff contract:
 
 1. `protocol-and-canonicalization`
 2. `hybrid-cryptography-and-key-purpose-binding`
@@ -48,6 +50,8 @@ The 11 domain identifiers are inherited exactly from the PR #142 handoff contrac
 9. `parser-fuzz-and-external-mldsa65-vectors`
 10. `default-off-redacted-observability`
 11. `production-migration-no-fallback-and-rollback`
+
+Domain 11 now explicitly includes the final release-control architecture: the disposable exact-candidate canary rehearsal (#150), separately reviewed production rollout-plan acceptance (#152), explicit bounded strict-PQ activation approval (#155), no automatic fallback, and separate later XMESH1 retirement.
 
 ## Findings
 
@@ -65,7 +69,7 @@ Each finding requires:
 
 A release-blocking finding is closure-ineligible until its status is `remediated`.
 
-If remediation changes security-relevant code, the current review result is **closure-ineligible regardless of reviewer approval**: the changed code must first become a new exact frozen target and the affected scope must be re-reviewed. The verifier reports `requiresRefreeze=true` for that case rather than pretending approval transfers to a different revision.
+If remediation changes security-relevant code or materially changes the reviewed release-control policy, the current review result is **closure-ineligible regardless of reviewer approval**: the changed scope must first become a new exact frozen target and be re-reviewed. The verifier reports `requiresRefreeze=true` for a security-relevant code remediation rather than pretending approval transfers to a different revision.
 
 ## Sign-off and closure eligibility
 
@@ -86,7 +90,7 @@ The following is illustrative only; evidence strings must point to the external 
   "target": {
     "nexus": {
       "repository": "TriplexCorp/XMesh-Nexus",
-      "sourceRevision": "8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091"
+      "sourceRevision": "0bab1a48cff570b3abe405bcda4dc242b23b8a4b"
     },
     "node": {
       "repository": "TriplexCorp/XMesh-Node",
@@ -146,4 +150,6 @@ Exit status `2` means the review result is structurally valid but cannot close t
 
 ## Boundary
 
-Passing this verifier is not a production release decision. Issue #138 remains the separate five-run physical abrupt-power qualification gate, `strict-pq` remains OFF, and production rollout remains NOT AUTHORIZED until the later explicit rollout/release gates are satisfied.
+Passing this verifier is not a production release decision. Issue #138 remains the separate five-run physical abrupt-power qualification gate. After #137 and #138 genuinely close, the exact final release candidate still requires the full disposable canary, a separately reviewed real rollout/rollback plan, an explicit bounded strict-PQ approval, and a separate execution step. XMESH1 retirement remains a later separate decision.
+
+Until those gates close, `strict-pq` remains OFF and production rollout remains NOT AUTHORIZED.
