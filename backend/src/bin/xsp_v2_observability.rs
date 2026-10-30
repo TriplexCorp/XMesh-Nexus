@@ -92,8 +92,8 @@ fn parse_node_id() -> Result<i64> {
     Ok(node_id)
 }
 
-async fn collect(pool: &PgPool, node_id: i64) -> Result<Snapshot> {
-    let suite = sqlx::query(
+async fn read_suite(pool: &PgPool, node_id: i64) -> Result<Option<SuiteState>> {
+    sqlx::query(
         "SELECT minimum_suite::INT AS minimum_suite, activation_phase, key_epoch, \
          (EXTRACT(EPOCH FROM updated_at) * 1000)::BIGINT AS updated_at_ms \
          FROM node_xsp_suite_state WHERE node_id=$1",
@@ -111,9 +111,11 @@ async fn collect(pool: &PgPool, node_id: i64) -> Result<Snapshot> {
         })
     })
     .transpose()
-    .context("decode suite state")?;
+    .context("decode suite state")
+}
 
-    let preparation = sqlx::query(
+async fn read_preparation(pool: &PgPool, node_id: i64) -> Result<Option<PreparationState>> {
+    sqlx::query(
         "SELECT from_epoch, to_epoch, ed25519_key_id, mldsa65_key_id, \
          (proved_at IS NOT NULL) AS proved, \
          (EXTRACT(EPOCH FROM expires_at) * 1000)::BIGINT AS expires_at_ms \
@@ -134,9 +136,11 @@ async fn collect(pool: &PgPool, node_id: i64) -> Result<Snapshot> {
         })
     })
     .transpose()
-    .context("decode rotation preparation")?;
+    .context("decode rotation preparation")
+}
 
-    let permit_row = sqlx::query(
+async fn read_permits(pool: &PgPool, node_id: i64) -> Result<PermitCounts> {
+    let row = sqlx::query(
         "SELECT COUNT(*)::BIGINT AS total, \
          COUNT(*) FILTER (WHERE state='issued')::BIGINT AS issued, \
          COUNT(*) FILTER (WHERE state='ack_verified')::BIGINT AS ack_verified, \
@@ -149,16 +153,18 @@ async fn collect(pool: &PgPool, node_id: i64) -> Result<Snapshot> {
     .fetch_one(pool)
     .await
     .context("read permit counts")?;
-    let permits = PermitCounts {
-        total: permit_row.try_get("total")?,
-        issued: permit_row.try_get("issued")?,
-        ack_verified: permit_row.try_get("ack_verified")?,
-        receipt_sent: permit_row.try_get("receipt_sent")?,
-        aborted: permit_row.try_get("aborted")?,
-        latest_ack_verified_at_ms: permit_row.try_get("latest_ack_verified_at_ms")?,
-    };
+    Ok(PermitCounts {
+        total: row.try_get("total")?,
+        issued: row.try_get("issued")?,
+        ack_verified: row.try_get("ack_verified")?,
+        receipt_sent: row.try_get("receipt_sent")?,
+        aborted: row.try_get("aborted")?,
+        latest_ack_verified_at_ms: row.try_get("latest_ack_verified_at_ms")?,
+    })
+}
 
-    let durable_row = sqlx::query(
+async fn read_durable(pool: &PgPool, node_id: i64) -> Result<DurableCounts> {
+    let row = sqlx::query(
         "SELECT \
          (SELECT COUNT(*)::BIGINT FROM node_xsp_signed_commit_receipt_outbox WHERE node_id=$1) AS receipt_outbox, \
          (SELECT COUNT(*)::BIGINT FROM node_xsp_replay_nonces WHERE node_id=$1) AS replay_nonces, \
@@ -169,13 +175,15 @@ async fn collect(pool: &PgPool, node_id: i64) -> Result<Snapshot> {
     .fetch_one(pool)
     .await
     .context("read durable counts")?;
-    let durable = DurableCounts {
-        receipt_outbox: durable_row.try_get("receipt_outbox")?,
-        replay_nonces: durable_row.try_get("replay_nonces")?,
-        latest_receipt_at_ms: durable_row.try_get("latest_receipt_at_ms")?,
-    };
+    Ok(DurableCounts {
+        receipt_outbox: row.try_get("receipt_outbox")?,
+        replay_nonces: row.try_get("replay_nonces")?,
+        latest_receipt_at_ms: row.try_get("latest_receipt_at_ms")?,
+    })
+}
 
-    let update_row = sqlx::query(
+async fn read_agent_updates(pool: &PgPool, node_id: i64) -> Result<AgentUpdateCounts> {
+    let row = sqlx::query(
         "SELECT COUNT(*)::BIGINT AS total, \
          COUNT(*) FILTER (WHERE state='pending')::BIGINT AS pending, \
          COUNT(*) FILTER (WHERE state='claimed')::BIGINT AS claimed, \
@@ -188,24 +196,26 @@ async fn collect(pool: &PgPool, node_id: i64) -> Result<Snapshot> {
     .bind(node_id)
     .fetch_one(pool)
     .await
-    .context("read bound Agent update counts")?;
-    let agent_updates = AgentUpdateCounts {
-        total: update_row.try_get("total")?,
-        pending: update_row.try_get("pending")?,
-        claimed: update_row.try_get("claimed")?,
-        succeeded: update_row.try_get("succeeded")?,
-        failed: update_row.try_get("failed")?,
-        exact_ack_evidence: update_row.try_get("exact_ack_evidence")?,
-    };
+    .context("read bound Agent action counts")?;
+    Ok(AgentUpdateCounts {
+        total: row.try_get("total")?,
+        pending: row.try_get("pending")?,
+        claimed: row.try_get("claimed")?,
+        succeeded: row.try_get("succeeded")?,
+        failed: row.try_get("failed")?,
+        exact_ack_evidence: row.try_get("exact_ack_evidence")?,
+    })
+}
 
+async fn collect(pool: &PgPool, node_id: i64) -> Result<Snapshot> {
     Ok(Snapshot {
         schema: SCHEMA,
         node_id,
-        suite,
-        preparation,
-        permits,
-        durable,
-        agent_updates,
+        suite: read_suite(pool, node_id).await?,
+        preparation: read_preparation(pool, node_id).await?,
+        permits: read_permits(pool, node_id).await?,
+        durable: read_durable(pool, node_id).await?,
+        agent_updates: read_agent_updates(pool, node_id).await?,
         read_only: true,
         production_activated: false,
         strict_pq_enabled: false,
