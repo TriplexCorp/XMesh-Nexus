@@ -29,6 +29,8 @@ A real result records both Node revisions and the SHA-256 of the exact qualifica
 
 ## Topology boundary
 
+XMesh Nexus is the control plane with PostgreSQL/Redis while XMesh-Node is a separate runtime on VPN nodes. The real Node-13 qualification host was also checked directly: it has no PostgreSQL service, process, listener on 5432, `psql`, or `pg_isready`. Therefore one Node VPS stop/start cannot honestly satisfy PostgreSQL crash-recovery evidence.
+
 The production topology is represented explicitly:
 
 - `nodeStateScope=isolated-qualification-keyring`;
