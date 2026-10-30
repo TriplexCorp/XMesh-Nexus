@@ -8,115 +8,152 @@ XMesh Nexus управляет Nodes, пользователями, подпис
 
 ## Текущий XSP-v2 checkpoint — 30 октября 2026
 
-### P0-E: repo-side подготовка завершена, production activation пока запрещён
+### P0-E: repo-side подготовка завершена; active deployment class = `kvm-vps`; production activation пока запрещён
 
-Вся текущая repo-side подготовка к production PQ собрана и fail-closed:
+Текущий production runtime после security-аудита и remediation заморожен на:
 
-- disposable release-canary rehearsal — готов;
-- production rollout-plan verifier — готов;
-- explicit bounded `strict-pq` activation approval gate — готов;
-- independent-review handoff и reproducible reviewer bundle — готовы;
-- independent-review result contract/verifier — привязан к актуальному v3 review snapshot;
-- physical abrupt-power lab handoff, five-run matrix tooling и returned-review verifier — готовы.
+- **XMesh-Nexus:** `12b3170996bc062ee16c79659a6378e5e425fd0e` — PR #163, mandatory TLS client authentication на dedicated PQ ingress;
+- **XMesh-Node:** `34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb` — Node PR #52, durable parent-directory `fsync` при initial master-key provisioning.
 
-Это **не** означает, что production PQ уже разрешён. До закрытия внешних P0-E блокеров остаются:
+AI-assisted internal audit (PR #162) не является independent external sign-off, но его два Low findings (`AI-LOW-001`, `AI-LOW-002`) исправлены и включены в текущий frozen runtime.
 
-- **#137 — independent external security review/sign-off**;
-- **#138 — пять реальных representative abrupt-power runs + independent review**.
+### Independent-review package v5
 
-Пока они не закрыты:
+PR #168 создал текущий **v5 KVM VPS review package**. Runtime по сравнению с v4 не изменился; новая версия freeze понадобилась из-за material release-control policy change после PRs #166/#167.
 
-- `strict-pq` = **OFF**;
-- `productionActivation=false`;
-- `physicalPowerLossQualified=false`;
-- `independentSecurityReviewComplete=false`;
-- legacy XMESH1 остаётся активным/retained;
-- production rollout = **NOT AUTHORIZED**.
+Авторитетный post-merge v5 reviewer bundle:
 
-### Актуальный security-review target
+- workflow run: `41054352179`;
+- GitHub artifact ID: `12974974581` — только transport/navigation metadata;
+- deterministic inner tar SHA-256: `9d213e9281f0ffbbc3da21f9f3814d6e7fbef1e6b5273f6e9cb12175c63273c4`;
+- payload SHA-256: `7b118084777d59e1ef1791d6375c32c1c44cf6bcdf9a03a2b0648a7ad9f263f2`.
 
-PR #156 (`700cd64c56df9c5f3ab3870cbb64ba5f31747351`) обновил handoff до **v3 review snapshot**, чтобы внешний review покрывал не только runtime, но и финальную release-control архитектуру из PR #150, #152 и #155.
+PR #169 перевязал machine-checkable independent-review result acceptance на этот v5 package. Старые v3/v4 bundles остаются историческими checkpoint’ами и больше не являются current acceptance identity.
 
-Актуальная связка для внешнего review:
+### Почему #138 теперь KVM, а не bare metal
 
-- **Nexus review snapshot:** `0bab1a48cff570b3abe405bcda4dc242b23b8a4b`;
-- **Node review target:** `083dc181c5e175f89007f4b93111cd5c45a69d97`;
-- **protected Nexus runtime baseline:** `8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091`.
+Текущий production deployment — KVM VPS: оператор не контролирует физический host, BMC/PDU, storage controller, write cache или PLP. Поэтому bare-metal physical-power qualification сохранён как отдельный профиль, но больше не является обязательным для `deploymentClass=kvm-vps`.
 
-`8c64a8e…` больше не является полным current review snapshot: это runtime baseline. PR #156 доказал, что защищённые runtime paths между runtime baseline и v3 snapshot остаются эквивалентными, а в scope review добавлены release-control/evidence изменения.
+Для KVM production durability gate требует **пять реальных guest crash-consistency runs** на тех же security checkpoints:
 
-### Reviewer bundle v3
+1. `after-previous` → `previous-complete`;
+2. `after-floor` → `next-complete`;
+3. `after-active` → `next-complete`;
+4. `after-recovery-abort` → `previous-complete`;
+5. `after-recovery-active` → `next-complete`.
 
-Авторитетный post-merge v3 reviewer bundle произведён после PR #156:
+Предпочтительный crash method — provider `hard-stop/reset`, если он гарантированно не выполняет orderly guest shutdown. Если такой операции у VPS-провайдера нет, policy допускает `guest-kernel-panic` как более слабый guest-failure boundary.
 
-- workflow run: `41037503656`;
-- deterministic inner tar SHA-256: `bac34400ac9b646c8a0f64ca9495e380ff0afce373310787c96385b9e40486bf`;
-- payload SHA-256: `33c8f07f4513cb03400c8b7af2f34f804661a79501336206482c0f426866620a`;
-- GitHub artifact ID: `12967634062` — только transport/navigation metadata.
+KVM qualification **не** притворяется physical-power тестом. Для этого класса правильные claims после успешной квалификации:
 
-PR #159 (`6c901233da816b90021f03dc766c039ad3c7f070`) перевязал machine-checkable independent-review result contract на этот v3 snapshot и bundle. Сам verifier остался fail-closed и не выполняет review за внешнего аудитора.
+```text
+guestCrashConsistencyQualified=true
+providerStorageDurabilityAssumed=true
+physicalPowerLossQualified=false
+```
+
+Физическая долговечность provider-managed block storage остаётся внешним trust boundary и требует явного attributable risk acceptance.
+
+### Оставшиеся P0-E блокеры
+
+- **#137 — independent external security review/sign-off** текущего v5 package;
+- **#138 — пять реальных KVM VPS crash-consistency runs + provider-storage risk acceptance**.
+
+Пока они не закрыты реальными evidence:
+
+```text
+independentSecurityReviewComplete=false
+guestCrashConsistencyQualified=false
+providerStorageDurabilityAssumed=false
+physicalPowerLossQualified=false
+finalReleaseCanarySatisfied=false
+productionActivation=false
+strictPQEnabled=false
+legacyXMESH1Retired=false
+```
+
+`strict-pq` остаётся **OFF**, XMESH1 — retained, production rollout — **NOT AUTHORIZED**.
 
 ### Release-control checkpoints
 
-- **PR #150 / disposable canary rehearsal:** harness readiness доказана; `finalReleaseCanarySatisfied=false`. После реального закрытия P0-E exact release candidate должен пройти полный canary ещё раз.
-- **PR #152 / rollout-plan acceptance:** verifier требует exact candidate, закрытые external P0-E evidence, final canary, explicit topology/DNS/firewall/Nginx/PostgreSQL/key/observability/rollback dispositions и independent plan review. Сам gate ничего не деплоит.
-- **PR #155 / strict-PQ activation approval:** отдельный explicit approval gate, bounded до максимум 50 named Nodes и максимум 24 часов. Он запрещает automatic fallback/classical-only downgrade и отделяет `strictPqAction=enable` от `legacyXMESH1Action=retain`.
+Repo-side gates уже готовы и fail-closed:
 
-Даже eligible approval намеренно возвращает:
+- disposable exact-candidate canary rehearsal;
+- independent-review handoff, deterministic bundle и returned-result verifier;
+- KVM VPS durability qualification contract/verifier;
+- retained bare-metal E4a physical profile, теперь привязанный к remediated Node PR #52;
+- production rollout/rollback plan verification;
+- отдельный KVM VPS strict-PQ approval gate;
+- historical bare-metal strict-PQ approval profile.
+
+KVM strict-PQ approval сохраняет обязательные invariants:
+
+- TLS 1.3 only;
+- `X25519MLKEM768` hybrid key exchange;
+- ML-DSA-65 client identity;
+- Ed25519 **AND** ML-DSA-65 critical-message signatures;
+- `automaticFallback=false`;
+- `classicalOnlyAllowed=false`;
+- максимум 50 named Nodes;
+- максимум 24 часа на approval window;
+- `strictPqAction=enable` отдельно от `legacyXMESH1Action=retain`.
+
+Даже полностью eligible KVM approval намеренно возвращает:
 
 ```text
 strictPQEnabled=false
 productionActivation=false
 legacyXMESH1Retired=false
+physicalPowerLossQualified=false
 requiresSeparateExecution=true
 ```
 
-То есть approval и фактическая production execution — отдельные действия.
+Approval и фактическая production execution — разные действия.
 
-### Что уже COMPLETE
-
-P0-C2-D и P0-D завершены. В P0-E завершены все repo-side software/lab-preparation gates, включая process-crash durability, one-sided Agent/PostgreSQL rollback resistance, coordinated backup/restore, off-host monotonic recovery floor, owner-authorized retirement, parser fuzzing, external ML-DSA-65 vectors, default-off redacted observability, physical-run handoff/tooling, canary rehearsal, rollout-plan verification и strict-PQ approval gate.
-
-Текущая production граница проста:
+### Текущая production последовательность
 
 ```text
 repo-side P0-E preparation COMPLETE
         ↓
-#137 independent external security review
+#137 independent external review of v5 package
         +
-#138 five real abrupt-power runs + independent review
+#138 five real KVM guest crash-consistency runs
+     + provider-storage risk acceptance
         ↓
-exact-candidate final canary
+exact production release candidate
+        ↓
+full final canary on exact candidate
         ↓
 independently reviewed rollout/rollback plan
         ↓
-explicit bounded strict-PQ approval
+bounded KVM strict-PQ approval
         ↓
 separate production execution
 ```
 
-Любое security-relevant изменение runtime или существенное изменение reviewed release-control policy после freeze может потребовать re-freeze/re-review соответствующего scope.
+Любое новое security-relevant runtime изменение или material release-policy изменение после v5 снова требует re-freeze/re-review соответствующего scope.
 
 ## Основные XSP-v2 security свойства
 
-Текущая архитектура P0-E основана на следующих invariants:
+Текущая архитектура сохраняет:
 
-- TLS 1.3 only для dedicated PQ ingress;
-- `X25519MLKEM768` negotiated hybrid key exchange;
-- ML-DSA-65 client identity;
-- Ed25519 **AND** ML-DSA-65 critical-message signatures;
+- mandatory mTLS на dedicated PQ ingress;
+- TLS 1.3 only и negotiated `X25519MLKEM768`;
+- ML-DSA-65 Node/client identity;
+- Ed25519 **AND** ML-DSA-65 для critical-message authorization;
 - isolated signer/key-custody boundary;
 - PostgreSQL transactionality для replay/ACK/epoch/receipt state;
 - crash-safe Agent security state и monotonic epoch/replay floors;
+- durable initial master-key provisioning с parent-directory sync;
 - independent off-host recovery floor;
-- owner-authorized old-key retirement;
+- owner-authorized previous-key retirement;
+- parser fuzzing и external ML-DSA-65 vectors;
+- default-off redacted observability;
 - no automatic fallback / no classical-only production downgrade;
-- production-capable paths default-disabled до явного release decision.
+- production-capable paths default-disabled до explicit release decision.
 
-Подробная последовательность работ и authoritative status находятся в [`docs/ENTERPRISE_ROADMAP.md`](docs/ENTERPRISE_ROADMAP.md). Специализированные contracts, handoff guides и evidence documents находятся в `docs/`, `deploy/`, `scripts/` и `.github/workflows/`.
+Подробный authoritative status и порядок работ находятся в [`docs/ENTERPRISE_ROADMAP.md`](docs/ENTERPRISE_ROADMAP.md).
 
 ## Production status
 
-**Production PQ activation сейчас НЕ разрешён.**
-
-До закрытия #137 и #138 не следует менять production flags, выдавать `strict-pq` за enabled или считать green CI заменой независимого review/physical qualification. XMESH1 остаётся retained до отдельного более позднего решения о retirement.
+**Production PQ activation сейчас НЕ разрешён.** Green CI, внутренний аудит, synthetic fixtures или готовые contracts не заменяют реальные #137/#138 evidence. После их закрытия всё равно нужны final canary, reviewed rollout/rollback plan, bounded KVM approval и отдельный execution step.

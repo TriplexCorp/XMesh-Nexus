@@ -2,116 +2,147 @@
 
 ## Authoritative engineering status — 30 October 2026
 
-This file defines the **current order of work**. Historical checkpoints and archived roadmap snapshots do not override this document.
+This file defines the **current order of work**. Historical checkpoints and archived roadmap snapshots do not override it.
 
-A green test proves only its stated boundary. Code existence ≠ E2E ≠ independent security review ≠ physical qualification ≠ production deployment.
+A green test proves only its stated boundary. Code existence ≠ E2E ≠ independent security review ≠ real deployment-class durability evidence ≠ production deployment.
 
-## Current source state
+## Current frozen runtime and review package
 
-- **Current independent-review snapshot:** Nexus `0bab1a48cff570b3abe405bcda4dc242b23b8a4b` + Node `083dc181c5e175f89007f4b93111cd5c45a69d97`.
-- **Protected Nexus runtime baseline:** `8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091`.
-- **Production state:** `strict-pq=OFF`, `productionActivation=false`, XMESH1 retained.
+Current security-remediated runtime target:
 
-PR #156 (`700cd64c56df9c5f3ab3870cbb64ba5f31747351`) refreshed the independent-review handoff to v3. The review snapshot deliberately includes the final non-executing release-control architecture from PRs #150, #152, and #155 while preserving the older `8c64a8e…` revision as the protected runtime baseline. The handoff CI proves the protected runtime paths remain equivalent across that boundary.
+- **XMesh-Nexus:** `12b3170996bc062ee16c79659a6378e5e425fd0e` — PR #163, mandatory TLS client authentication on the dedicated PQ ingress;
+- **XMesh-Node:** `34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb` — Node PR #52, parent-directory durability for initial master-key creation.
 
-PR #159 (`6c901233da816b90021f03dc766c039ad3c7f070`) retargets the machine-checkable independent-review result acceptance contract to the v3 snapshot and authoritative post-merge reviewer bundle.
+The AI-assisted internal audit in PR #162 found two Low issues (`AI-LOW-001`, `AI-LOW-002`). Both were remediated; the internal audit remains `independent=false` and cannot satisfy #137.
 
-## Current reviewer bundle
+The current external-review package is **v5 KVM VPS**, created by PR #168. Runtime is unchanged from v4; v5 exists because PRs #166/#167 materially changed the reviewed release-control policy.
 
-Authoritative v3 reviewer bundle:
+Authoritative post-merge v5 reviewer bundle:
 
-- workflow run: `41037503656`;
-- deterministic inner tar SHA-256: `bac34400ac9b646c8a0f64ca9495e380ff0afce373310787c96385b9e40486bf`;
-- payload SHA-256: `33c8f07f4513cb03400c8b7af2f34f804661a79501336206482c0f426866620a`;
-- GitHub artifact ID: `12967634062` — transport/navigation metadata only.
+- workflow run: `41054352179`;
+- GitHub artifact ID: `12974974581` — navigation/transport metadata only;
+- deterministic inner tar SHA-256: `9d213e9281f0ffbbc3da21f9f3814d6e7fbef1e6b5273f6e9cb12175c63273c4`;
+- payload SHA-256: `7b118084777d59e1ef1791d6375c32c1c44cf6bcdf9a03a2b0648a7ad9f263f2`.
 
-The bundle and its result contract are evidence transport/acceptance mechanisms. They do **not** perform or replace the external review.
+PR #169 binds machine-checkable #137 result acceptance to this exact package. Older v3/v4 packages are historical evidence only.
+
+## Deployment-class model
+
+### Active class: `kvm-vps`
+
+The current production target is a KVM VPS. The operator does not control the physical host, BMC/PDU, storage controller, write cache, or PLP boundary.
+
+For this class:
+
+- XMesh qualifies guest-visible Agent/PostgreSQL crash consistency;
+- provider-managed block storage is an explicit external trust boundary;
+- provider durability risk must be accepted explicitly by the release owner;
+- `physicalPowerLossQualified=false` remains mandatory and correct;
+- production eligibility uses the KVM-specific durability and strict-PQ approval gates.
+
+### Retained class: bare metal
+
+The original E4a physical-power profile remains available for deployments where the operator controls representative hardware and can trigger real BMC/PDU/controller power removal.
+
+PR #166 rebound that retained physical profile to the current remediated Node PR #52 target while preserving Node PR #44/#45 only as provenance for the original power-cut hook and lab runner.
+
+Passing KVM qualification does not claim bare-metal physical qualification, and the bare-metal profile does not block the active KVM production path.
 
 ## P0 status
 
 ### P0-C2-D — COMPLETE
 
-The authenticated command path, exact ACK/recovery semantics, protected origin boundary, response-loss handling, and transport-negative/no-legacy checks are complete within their stated staging/security scope.
+Authenticated command path, exact ACK/recovery semantics, protected origin boundary, response-loss handling, transport-negative/no-legacy checks, and mandatory TLS client-authentication boundary are complete within their stated scope.
 
 ### P0-D — COMPLETE
 
-The durable Agent release identity, staged apply/rollback, real Agent migration/update path, authenticated authority binding, durable security state, and exact release-artifact binding are complete within their stated scope.
+Durable Agent release identity, staged apply/rollback, real Agent migration/update path, authenticated authority binding, durable security state, exact release-artifact binding, and parent-directory durable master-key provisioning are complete within their stated scope.
 
 ### P0-E — CURRENT
 
-All repo-side software and release-control preparation currently required before production PQ is complete. Remaining blockers are external evidence, not missing CI scaffolding.
+Repo-side software, evidence contracts, deterministic review packaging, and both deployment-class release-control profiles are complete. Remaining blockers require real external/operational evidence.
 
 ## P0-E completed repo-side gates
 
-The following are COMPLETE as bounded repo-side preparation/evidence tooling:
+Completed bounded preparation/tooling includes:
 
-- process-crash durability;
-- one-sided Agent snapshot anti-rollback;
-- one-sided PostgreSQL snapshot rollback resistance;
-- off-host monotonic recovery checkpoint;
-- coordinated backup/restore and old-set rejection;
-- storage durability preflight;
-- external power-cut arming readiness;
-- single-run physical evidence contract;
-- five-checkpoint abrupt-power matrix tooling;
-- real-operation lab reachability;
-- physical-run handoff and post-boot evidence binding;
-- returned independent qualification-review result contract/verifier;
-- owner-authorized previous-key retirement authorization;
-- offline owner issuance;
-- crash-safe durable old-key erasure;
-- bounded parser fuzzing;
-- external ML-DSA-65 FIPS 204 verification vectors;
+- process-crash durability and crash matrices;
+- one-sided Agent/PostgreSQL rollback resistance;
+- coordinated backup/restore and off-host monotonic recovery floor;
+- owner-authorized previous-key retirement and durable erasure;
+- parser fuzzing and external ML-DSA-65 FIPS 204 verification vectors;
 - default-off redacted observability;
-- v3 independent security-review handoff;
-- reproducible reviewer bundle;
-- v3 independent-review result acceptance;
+- mandatory-mTLS ingress hardening (`AI-LOW-001` remediation);
+- initial master-key directory durability (`AI-LOW-002` remediation);
+- bare-metal E4a arm/evidence/matrix/handoff profile rebound to current Node target;
+- KVM VPS five-run durability qualification contract/verifier;
+- provider-storage trust/risk-acceptance boundary;
+- v5 independent-review handoff and reproducible reviewer bundle;
+- v5 independent-review result acceptance;
 - disposable release-canary rehearsal;
-- production rollout-plan acceptance verifier;
-- explicit strict-PQ activation approval gate.
+- production rollout/rollback plan tooling;
+- KVM VPS bounded strict-PQ approval gate;
+- retained bare-metal strict-PQ approval profile.
 
 None of these repo-side gates by itself authorizes production.
 
 ## Remaining P0-E blockers
 
-### #137 — independent external security review — OPEN
+### #137 — independent external security review of v5 — OPEN
 
 Required external evidence:
 
 - attributable independent reviewer identity/organization/date;
-- review bound to Nexus `0bab1a48cff570b3abe405bcda4dc242b23b8a4b` and Node `083dc181c5e175f89007f4b93111cd5c45a69d97`;
+- review bound to Nexus `12b3170996bc062ee16c79659a6378e5e425fd0e` and Node `34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb`;
+- use of the authoritative v5 reviewer bundle hashes above;
 - all 11 mandatory review domains covered exactly once;
+- explicit review of `AI-LOW-001` and `AI-LOW-002` remediation;
+- explicit review in domains 6 and 11 of the KVM five-run model, provider-storage trust assumption, KVM/bare-metal separation, and KVM-specific activation gate;
 - findings with severity, evidence, affected trust boundary, and disposition;
 - no unresolved release-blocking finding;
-- explicit `approve` or `approve-with-findings` sign-off eligible under the verifier;
-- any security-relevant remediation or material release-control change triggers re-freeze/re-review of the affected scope.
+- `approve` or `approve-with-findings` sign-off accepted by the verifier.
 
-Project-owner self-review, green CI, synthetic fixtures, packaging, or the handoff itself do not satisfy this blocker.
+Project-owner review, AI internal review, green CI, synthetic fixtures, packaging, or handoff generation do not satisfy #137.
 
-### #138 — five representative real abrupt-power runs — OPEN
+### #138 — KVM VPS five-run crash-consistency qualification — OPEN
 
-Exactly one real externally triggered abrupt-power experiment is required at each checkpoint on the same reviewed representative storage/controller/PLP scope:
+One **real** guest crash cycle is required at every existing durability checkpoint:
 
-1. `after-previous`
-2. `after-floor`
-3. `after-active`
-4. `after-recovery-abort`
-5. `after-recovery-active`
+1. `after-previous` → `previous-complete`;
+2. `after-floor` → `next-complete`;
+3. `after-active` → `next-complete`;
+4. `after-recovery-abort` → `previous-complete`;
+5. `after-recovery-active` → `next-complete`.
 
-Each run must preserve the real controller/BMC/PDU event, pre/post boot IDs, exact binaries/source revisions, Agent state, PostgreSQL/WAL recovery state, storage/preflight evidence, off-host witness binding, and E4a6 verification output.
+Allowed methods:
 
-Process kills, VM stops/snapshots, synthetic CI, or successful `fsync(2)` returns are not physical qualification evidence.
+- `provider-hard-stop` — preferred when the provider operation is documented not to perform orderly guest shutdown;
+- `guest-kernel-panic` — accepted fallback when no provider lifecycle primitive exists.
 
-After all five runs, the exact five-run matrix and raw evidence require independent review and a qualification recommendation accepted by the existing verifier. Scope-changing findings require a new five-run matrix.
+Ordinary orderly `shutdown`, `reboot`, service/process/container restart, snapshot restore, or synthetic CI do not satisfy this gate.
+
+Each run must preserve unique crash evidence, changed boot identity, exact rotation identity/epoch, post-boot Agent state digest, PostgreSQL recovery/integrity evidence, durable PostgreSQL settings, and off-host monotonic floor evidence.
+
+A completed KVM result must additionally record provider/storage class and explicit attributable acceptance of the provider-managed block-storage durability trust assumption.
+
+Successful KVM qualification means:
+
+```text
+guestCrashConsistencyQualified=true
+providerStorageDurabilityAssumed=true
+physicalPowerLossQualified=false
+productionDurabilityGateEligible=true
+```
+
+It does not authorize production by itself.
 
 ## Post-P0-E release sequence
 
-Closing #137 and #138 does **not** directly switch production on. The release sequence remains fail-closed:
-
 ```text
-#137 independent external security review COMPLETE
+#137 independent external review of v5 COMPLETE
             +
-#138 real physical abrupt-power qualification COMPLETE
+#138 KVM five-run crash qualification COMPLETE
+     + provider-storage risk accepted
             ↓
 exact production release candidate selected
             ↓
@@ -119,78 +150,90 @@ full disposable final canary rerun on exact candidate
             ↓
 real rollout/rollback plan bound to exact candidate and evidence
             ↓
-independent review of that rollout/rollback plan
+independent review of rollout/rollback plan
             ↓
-explicit bounded strict-PQ activation approval
+bounded KVM strict-PQ activation approval
             ↓
 separate production execution
 ```
 
+Closing #137/#138 does **not** directly enable PQ.
+
 ## Disposable final canary
 
-PR #150 proves the rehearsal harness is ready, but the recorded rehearsal is not the final production canary. The exact candidate chosen after P0-E completion must rerun the full canary.
+PR #150 proves the rehearsal harness, not the final production candidate. After #137/#138 close, the exact candidate must rerun the full canary.
 
-Until that happens:
+Until then:
 
-- `finalReleaseCanarySatisfied=false`;
-- no rollout plan can become release-eligible;
-- no strict-PQ approval can become execution-eligible.
+```text
+finalReleaseCanarySatisfied=false
+```
 
-## Production rollout-plan gate
+## Rollout/rollback plan
 
-PR #152 defines the non-executing rollout-plan acceptance policy. A real candidate plan must bind:
+The historical PR #152 verifier remains useful for structural plan validation, but its old bare-metal `physicalPowerQualificationAccepted` eligibility condition must **not** be lied about for KVM.
 
-- exact Nexus/Node candidate revisions and production artifact digests;
-- accepted #137 security-review evidence;
-- accepted #138 physical-qualification evidence;
-- final exact-candidate canary result;
-- topology and named rollout scope;
+For the active KVM release path, the reviewed plan must still bind:
+
+- exact Nexus/Node candidate revisions and artifact digests;
+- accepted #137 review result;
+- accepted #138 KVM durability result;
+- provider-storage risk acceptance;
+- exact final-canary evidence;
+- named topology and rollout scope;
 - DNS/firewall/Nginx dispositions;
 - PostgreSQL migration/recovery disposition;
 - key/certificate/signer handling;
 - observability and rollback criteria;
 - independent plan reviewer approval.
 
-The verifier never performs deployment changes and cannot set production activation flags.
+The KVM strict-PQ approval gate binds the accepted plan/review hashes directly rather than fabricating the old physical qualification boolean.
 
-## Explicit strict-PQ activation approval
+## KVM strict-PQ activation approval
 
-PR #155 defines the final non-executing authorization gate before production execution.
+The KVM-specific non-executing authorization gate requires:
 
-Policy invariants include:
+- exact runtime/candidate identity;
+- accepted independent security review;
+- accepted KVM five-run durability result;
+- explicit provider-storage risk acceptance;
+- final exact-candidate canary;
+- independently reviewed rollout/rollback plan;
+- `limited-canary` or `phased` scope;
+- at most 50 named Nodes;
+- at most a 24-hour approval window;
+- release-owner authority.
 
-- one exact release candidate;
-- accepted external security-review evidence;
-- accepted physical-qualification evidence;
-- accepted rollout-plan evidence;
-- exact final-canary evidence;
-- explicit named-Node scope only;
-- maximum 50 Nodes per approval;
-- maximum 24-hour approval window;
-- TLS 1.3 + `X25519MLKEM768` + ML-DSA-65 identity;
+Transport/security invariants cannot be weakened:
+
+- TLS 1.3 only;
+- `X25519MLKEM768`;
+- ML-DSA-65 client identity;
 - Ed25519 **AND** ML-DSA-65 critical-message signatures;
 - `automaticFallback=false`;
-- no classical-only downgrade;
-- `strictPqAction=enable` separated from `legacyXMESH1Action=retain`.
+- `classicalOnlyAllowed=false`;
+- `strictPqAction=enable`;
+- `legacyXMESH1Action=retain`.
 
 Even an eligible approval still reports:
 
 ```text
+physicalPowerLossQualified=false
 strictPQEnabled=false
 productionActivation=false
 legacyXMESH1Retired=false
 requiresSeparateExecution=true
 ```
 
-Production execution must therefore remain a distinct reviewed action.
+Production execution remains a distinct reviewed action.
 
 ## XMESH1 retirement
 
-Initial PQ activation does not retire XMESH1. XMESH1 remains retained during first strict-PQ activation and requires a later explicit retirement decision with its own evidence and rollback considerations.
+Initial strict-PQ activation does not retire XMESH1. XMESH1 remains retained during first activation and requires a later explicit retirement decision with separate evidence and rollback considerations.
 
-## Security-review domains
+## Mandatory security-review domains
 
-The external #137 review must cover all 11 domains as one migration/production architecture:
+The external #137 reviewer must cover all eleven domains:
 
 1. protocol and canonicalization;
 2. hybrid cryptography and key-purpose binding;
@@ -204,34 +247,36 @@ The external #137 review must cover all 11 domains as one migration/production a
 10. default-off redacted observability;
 11. production migration, no-fallback, release-control, and rollback architecture.
 
-Domain 11 explicitly includes the final release-control architecture from PRs #150, #152, and #155.
+For v5, domains 6 and 11 explicitly include the KVM deployment policy and provider-storage trust boundary.
 
 ## Core production security invariants
 
-Production PQ must not weaken the following invariants:
+Production PQ must preserve:
 
-- TLS 1.3 only on the dedicated PQ ingress;
-- actually negotiated `X25519MLKEM768` hybrid key exchange;
-- ML-DSA-65 client identity;
+- mandatory client authentication on the dedicated PQ ingress;
+- TLS 1.3 only and negotiated `X25519MLKEM768`;
+- ML-DSA-65 Node/client identity;
 - Ed25519 and ML-DSA-65 dual critical-message authorization;
 - isolated signer/key custody;
 - durable monotonic replay/epoch state;
-- crash-safe Agent state transitions;
+- crash-safe Agent state transitions and durable master-key creation;
 - off-host rollback witness/floor;
 - exact release-artifact identity;
 - owner-authorized retirement;
 - no automatic fallback;
 - no classical-only production mode;
-- production-capable paths remain default-disabled until all explicit release decisions are satisfied.
+- production-capable paths default-disabled until all explicit release decisions are satisfied.
 
 ## Current production decision
 
 **Production PQ activation is NOT AUTHORIZED.**
 
-Current required state:
+Current state:
 
 ```text
 independentSecurityReviewComplete=false
+guestCrashConsistencyQualified=false
+providerStorageDurabilityAssumed=false
 physicalPowerLossQualified=false
 finalReleaseCanarySatisfied=false
 productionActivation=false
@@ -239,4 +284,4 @@ strictPQEnabled=false
 legacyXMESH1Retired=false
 ```
 
-The only legitimate way to change that state is to complete the external blockers and then pass the existing exact-candidate release sequence. New runtime code should not be added merely to manufacture progress while the v3 review target is frozen, because security-relevant changes can invalidate the current review scope.
+The legitimate path forward is to collect real #137/#138 evidence, then run the exact-candidate release sequence. New security-relevant runtime or material release-policy changes require another freeze/re-review rather than silently transferring old approval.
