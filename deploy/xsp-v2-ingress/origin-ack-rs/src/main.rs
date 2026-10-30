@@ -26,6 +26,7 @@ const MAX_CERT_HEADER: usize = 24 * 1024;
 const MAX_HTTP_HEADERS: usize = 32 * 1024;
 const MAX_ACK_BODY: usize = 16 * 1024;
 const MAX_SIGNATURE_TEXT: usize = 8 * 1024;
+const REQUEST_QUEUE_SIZE: i32 = 32;
 const OPENSSL_TIMEOUT: Duration = Duration::from_secs(5);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(3);
 const C2C_TIMEOUT: Duration = Duration::from_secs(12);
@@ -52,6 +53,7 @@ unsafe extern "C" {
         option_len: *mut u32,
     ) -> i32;
     fn umask(mask: u32) -> u32;
+    fn listen(socket: i32, backlog: i32) -> i32;
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -69,9 +71,9 @@ impl TestFault {
             "drop-before-c2c" => Ok(Self::DropBeforeC2c),
             "drop-on-c2c-failure" => Ok(Self::DropOnC2cFailure),
             "drop-after-c2c-success" => Ok(Self::DropAfterC2cSuccess),
-            _ => {
-                Err("XSP_V2_C2D_TEST_FAULT is not an approved disposable E2E fault mode".to_owned())
-            }
+            _ => Err(
+                "XSP_V2_C2D_TEST_FAULT is not an approved disposable E2E fault mode".to_owned(),
+            ),
         }
     }
 }
@@ -106,7 +108,9 @@ impl Config {
                 .bytes()
                 .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
         {
-            return Err("XSP_EXPECTED_CLIENT_SPKI_SHA256 must be lowercase SHA-256 hex".to_owned());
+            return Err(
+                "XSP_EXPECTED_CLIENT_SPKI_SHA256 must be lowercase SHA-256 hex".to_owned(),
+            );
         }
         let expected_node_id = env::var("XSP_EXPECTED_NODE_ID")
             .unwrap_or_default()
@@ -132,7 +136,9 @@ impl Config {
         let test_fault =
             TestFault::parse(env::var("XSP_V2_C2D_TEST_FAULT").unwrap_or_default().trim())?;
         if test_fault != TestFault::None && c2c_gate != "staging-only" {
-            return Err("C2-D2 test faults require the explicit staging-only C2-C gate".to_owned());
+            return Err(
+                "C2-D2 test faults require the explicit staging-only C2-C gate".to_owned(),
+            );
         }
 
         Ok(Self {
@@ -740,7 +746,9 @@ fn handle_get(stream: &mut UnixStream, request: &HttpRequest, config: &Config) {
         send_json(stream, 403, &error_json("untrusted origin identity"));
         return;
     };
-    let body = format!(r#"{{"originTransport":"unix-peercred","trustedNodeId":{node_id}}}"#);
+    let body = format!(
+        r#"{{"originTransport":"unix-peercred","trustedNodeId":{node_id}}}"#
+    );
     send_json(stream, 200, &body);
 }
 
@@ -882,6 +890,13 @@ fn bind_listener(path: &Path) -> Result<UnixListener, String> {
         umask(previous_umask);
     }
     let listener = listener.map_err(|error| format!("cannot bind origin socket: {error}"))?;
+    // SAFETY: `listener` is a live listening Unix socket. Repeating listen(2)
+    // only tightens the pending connection queue to the reviewed Python gate's
+    // fixed backlog of 32; it does not change the socket identity or path.
+    let listen_result = unsafe { listen(listener.as_raw_fd(), REQUEST_QUEUE_SIZE) };
+    if listen_result != 0 {
+        return Err("cannot set origin socket backlog".to_owned());
+    }
     fs::set_permissions(path, fs::Permissions::from_mode(0o660))
         .map_err(|error| format!("cannot chmod origin socket: {error}"))?;
     Ok(listener)
@@ -948,14 +963,21 @@ mod tests {
     #[test]
     fn strict_schema_accepts_exact_envelope() {
         let envelope: AckEnvelope = serde_json::from_str(&valid_json()).expect("valid envelope");
-        assert_eq!(validate_envelope(&envelope, 4242, false, 1_000_000), Ok(()));
+        assert_eq!(
+            validate_envelope(&envelope, 4242, false, 1_000_000),
+            Ok(())
+        );
     }
 
     #[test]
     fn duplicate_and_unknown_fields_fail_closed() {
-        let duplicate = valid_json().replace(r#""kind":"ack","#, r#""kind":"ack","kind":"ack","#);
+        let duplicate =
+            valid_json().replace(r#""kind":"ack","#, r#""kind":"ack","kind":"ack","#);
         assert!(serde_json::from_str::<AckEnvelope>(&duplicate).is_err());
-        let unknown = valid_json().replace(r#""kind":"ack","#, r#""kind":"ack","unexpected":1,"#);
+        let unknown = valid_json().replace(
+            r#""kind":"ack","#,
+            r#""kind":"ack","unexpected":1,"#,
+        );
         assert!(serde_json::from_str::<AckEnvelope>(&unknown).is_err());
     }
 
@@ -966,7 +988,10 @@ mod tests {
             validate_envelope(&envelope, 4242, true, 1_060_000),
             Err(ValidationError::RecoveryNotExpired)
         );
-        assert_eq!(validate_envelope(&envelope, 4242, true, 1_060_001), Ok(()));
+        assert_eq!(
+            validate_envelope(&envelope, 4242, true, 1_060_001),
+            Ok(())
+        );
     }
 
     #[test]
