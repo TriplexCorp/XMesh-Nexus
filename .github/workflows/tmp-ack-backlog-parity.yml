@@ -1,4 +1,5 @@
 name: Temporary ACK backlog parity patch
+# Re-triggered after ACK compile/lint fixes; this workflow must self-delete on success.
 on:
   push:
     branches: [refactor/xsp-origin-ack-rust]
