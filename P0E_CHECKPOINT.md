@@ -4,7 +4,11 @@ Authoritative live qualification/session handoff:
 
 [`docs/XSP_V2_P0E_LIVE_QUALIFICATION_CHECKPOINT_2026-10-30.md`](docs/XSP_V2_P0E_LIVE_QUALIFICATION_CHECKPOINT_2026-10-30.md)
 
-Read that file together with [`docs/ENTERPRISE_ROADMAP.md`](docs/ENTERPRISE_ROADMAP.md) before resuming P0-E work.
+Latest Stage 1/Stage 2 evidence addendum:
+
+[`docs/XSP_V2_P0E_STAGE1_STAGE2_EVIDENCE_2026-10-30.md`](docs/XSP_V2_P0E_STAGE1_STAGE2_EVIDENCE_2026-10-30.md)
+
+Read those files together with [`docs/ENTERPRISE_ROADMAP.md`](docs/ENTERPRISE_ROADMAP.md) before resuming P0-E work.
 
 Current recorded boundary:
 
