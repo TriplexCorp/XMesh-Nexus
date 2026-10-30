@@ -1,0 +1,122 @@
+name: XSP-v2 P0-E Node ML-DSA-65 FIPS 204 ACVP Contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "deploy/xsp-v2-p0e-mldsa65-fips204-acvp.contract.json"
+      - "docs/XSP_V2_P0E_MLDSA65_FIPS204_ACVP.md"
+      - ".github/workflows/xsp-p0e-mldsa65-fips204-acvp-node-contract.yml"
+  pull_request:
+    paths:
+      - "deploy/xsp-v2-p0e-mldsa65-fips204-acvp.contract.json"
+      - "docs/XSP_V2_P0E_MLDSA65_FIPS204_ACVP.md"
+      - ".github/workflows/xsp-p0e-mldsa65-fips204-acvp-node-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  node-mldsa65-fips204-acvp-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out exact merged XMesh-Node ACVP source
+        uses: actions/checkout@v4
+        with:
+          repository: TriplexCorp/XMesh-Node
+          ref: ffebcc30424463dd0afcdb8226bcd4b48c019bff
+          path: xmesh-node
+          fetch-depth: 0
+      - name: Check out exact NIST ACVP ML-DSA FIPS 204 vectors
+        uses: actions/checkout@v4
+        with:
+          repository: usnistgov/ACVP-Server
+          ref: a7f283cdc87d2d6dd93c1bac59e5622c5f9f8324
+          path: nist-acvp
+          fetch-depth: 1
+          sparse-checkout: |
+            gen-val/json-files/ML-DSA-sigVer-FIPS204
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache: false
+
+      - name: Verify contract, exact Node delta and external vector pins
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          x=json.load(open('deploy/xsp-v2-p0e-mldsa65-fips204-acvp.contract.json'))
+          assert x['schema']=='xsp2-p0e-mldsa65-fips204-acvp-contract-1'
+          assert x['node']=={
+              'repository':'TriplexCorp/XMesh-Node',
+              'sourceRevision':'ffebcc30424463dd0afcdb8226bcd4b48c019bff',
+              'pullRequest':50,
+              'previousReviewedRevision':'fc1548171aad331b8a7851a895a7f18a5440e858',
+          }
+          assert x['nist']['repository']=='usnistgov/ACVP-Server'
+          assert x['nist']['sourceRevision']=='a7f283cdc87d2d6dd93c1bac59e5622c5f9f8324'
+          assert x['nist']['promptBlob']=='22b0803253f7aa24644229acd04c387d260e874a'
+          assert x['nist']['expectedResultsBlob']=='dba8bcfe5f090503c9390701c11677389752cecd'
+          assert x['nist']['registrationBlob']=='23dcb3ef6e694c4e95c99914e581fb2b37ba1bc8'
+          assert x['algorithm']=='ML-DSA-65'
+          assert x['standardRevision']=='FIPS204'
+          assert x['mode']=='sigVer'
+          assert x['goVersion']=='1.27.3'
+          assert x['compatibleGroupSelection']=={
+              'parameterSet':'ML-DSA-65',
+              'signatureInterface':'external',
+              'preHash':'pure',
+              'externalMu':False,
+          }
+          assert (x['verifiedGroups'],x['verifiedCases'],x['expectedValidCases'],x['expectedInvalidCases'])==(1,15,3,12)
+          assert x['officialExpectedResultRequiredForEverySelectedCase'] is True
+          assert x['positiveAndNegativeCasesRequired'] is True
+          assert x['productionCodeChanged'] is False
+          assert x['acvpCertificationClaimed'] is False
+          assert x['exhaustiveImplementationAssuranceClaimed'] is False
+          assert x['preHashCoverageClaimed'] is False
+          assert x['externalMuCoverageClaimed'] is False
+          assert x['internalInterfaceCoverageClaimed'] is False
+          assert x['physicalPowerLossQualified'] is False
+          assert x['independentSecurityReviewClaimed'] is False
+          assert x['productionActivation'] is False
+          assert x['strictPQEnabled'] is False
+          PY
+
+          cd xmesh-node
+          old=fc1548171aad331b8a7851a895a7f18a5440e858
+          new=ffebcc30424463dd0afcdb8226bcd4b48c019bff
+          git cat-file -e "$old^{commit}"
+          git cat-file -e "$new^{commit}"
+          actual="$(git diff --name-only "$old" "$new" | sort)"
+          expected="$(printf '%s\n' \
+            .github/workflows/xsp-p0e-mldsa65-fips204-acvp.yml \
+            agent/xspv2/recovery/mldsa_fips204_acvp_test.go | sort)"
+          test "$actual" = "$expected"
+
+          cd ../nist-acvp
+          test "$(git rev-parse HEAD)" = "a7f283cdc87d2d6dd93c1bac59e5622c5f9f8324"
+          test "$(git rev-parse HEAD:gen-val/json-files/ML-DSA-sigVer-FIPS204/prompt.json)" = "22b0803253f7aa24644229acd04c387d260e874a"
+          test "$(git rev-parse HEAD:gen-val/json-files/ML-DSA-sigVer-FIPS204/expectedResults.json)" = "dba8bcfe5f090503c9390701c11677389752cecd"
+          test "$(git rev-parse HEAD:gen-val/json-files/ML-DSA-sigVer-FIPS204/registration.json)" = "23dcb3ef6e694c4e95c99914e581fb2b37ba1bc8"
+
+      - name: Re-run exact NIST ACVP ML-DSA-65 compatible sigVer subset
+        working-directory: xmesh-node/agent/xspv2
+        env:
+          NIST_ACVP_MLDSA_SIGVER_DIR: ${{ github.workspace }}/nist-acvp/gen-val/json-files/ML-DSA-sigVer-FIPS204
+        run: |
+          set -euo pipefail
+          output="$(go test ./recovery -run '^TestMLDSA65FIPS204NISTACVPSigVer$' -count=1 -v)"
+          printf '%s\n' "$output"
+          grep -Fq 'groups=1 cases=15 valid=3 invalid=12' <<<"$output"
+
+      - name: State bounded evidence only
+        run: |
+          echo 'PASS: exact merged Node PR #50 matches the pinned official NIST ACVP ML-DSA-65 FIPS 204 sigVer subset.'
+          echo 'Verified scope: 1 compatible group / 15 cases / 3 valid / 12 invalid.'
+          echo 'No ACVP certification, exhaustive assurance, preHash/externalMu/internal-interface coverage, production activation or physical qualification is claimed.'
+          echo 'strict-pq remains OFF; production rollout remains NOT AUTHORIZED.'
