@@ -1,0 +1,106 @@
+name: XSP-v2 P0-E Node Owner-retirement Contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "deploy/xsp-v2-p0e-owner-retirement.contract.json"
+      - "docs/XSP_V2_P0E_OWNER_RETIREMENT_CONTRACT.md"
+      - ".github/workflows/xsp-p0e-owner-retirement-node-contract.yml"
+  pull_request:
+    paths:
+      - "deploy/xsp-v2-p0e-owner-retirement.contract.json"
+      - "docs/XSP_V2_P0E_OWNER_RETIREMENT_CONTRACT.md"
+      - ".github/workflows/xsp-p0e-owner-retirement-node-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  node-owner-retirement-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out exact merged XMesh-Node owner-retirement source
+        uses: actions/checkout@v4
+        with:
+          repository: TriplexCorp/XMesh-Node
+          ref: e0f6bc01de98aad488fce73e1e605ba24f566bb1
+          path: xmesh-node
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache: false
+
+      - name: Verify contract and exact Node delta
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          p='deploy/xsp-v2-p0e-owner-retirement.contract.json'
+          x=json.load(open(p))
+          assert x['schema']=='xsp2-p0e-owner-retirement-contract-1'
+          assert x['node']['repository']=='TriplexCorp/XMesh-Node'
+          assert x['node']['sourceRevision']=='e0f6bc01de98aad488fce73e1e605ba24f566bb1'
+          assert x['node']['pullRequest']==46
+          assert x['node']['previousReviewedRevision']=='7bf8cc92950f396e33891c8744c1f6855414154b'
+          assert x['authorizationDomain']=='XSP2-OWNER-RETIRE-PREVIOUS-V1'
+          assert x['ownerSignatureAlgorithms']==['Ed25519','ML-DSA-65']
+          assert x['maximumAuthorizationLifetimeMs']==300000
+          assert x['requiresCurrentOffHostCheckpoint'] is True
+          assert x['requiresExactCheckpointDigest'] is True
+          assert x['requiresIndependentGenerationFloor'] is True
+          assert x['requiresExactRetainedPreviousIdentity'] is True
+          assert x['requiresExactRetainedCandidateIdentity'] is True
+          assert x['requiresActiveEqualsRetainedCandidate'] is True
+          assert x['authorizationIsReadOnly'] is True
+          assert x['oldKeyErasureEnabled'] is False
+          assert x['networkRouteAdded'] is False
+          assert x['physicalPowerLossQualified'] is False
+          assert x['productionActivation'] is False
+          assert x['strictPQEnabled'] is False
+          PY
+
+          cd xmesh-node
+          old=7bf8cc92950f396e33891c8744c1f6855414154b
+          new=e0f6bc01de98aad488fce73e1e605ba24f566bb1
+          git cat-file -e "$old^{commit}"
+          git cat-file -e "$new^{commit}"
+          actual="$(git diff --name-only "$old" "$new" | sort)"
+          expected="$(printf '%s\n' \
+            .github/workflows/xsp-p0e-owner-retirement.yml \
+            agent/xspv2/recovery/retirement.go \
+            agent/xspv2/recovery/retirement_test.go \
+            agent/xspv2/state/durable_linux.go \
+            security/xspv2/poc-go/keyring/retained_rotation.go \
+            security/xspv2/poc-go/keyring/retained_rotation_test.go | sort)"
+          test "$actual" = "$expected"
+
+      - name: Verify owner authorization remains read-only and dual-signed
+        working-directory: xmesh-node
+        run: |
+          set -euo pipefail
+          grep -Fq 'XSP2-OWNER-RETIRE-PREVIOUS-V1' agent/xspv2/recovery/retirement.go
+          grep -Fq 'owner retirement Ed25519 signature invalid' agent/xspv2/recovery/retirement.go
+          grep -Fq 'owner retirement ML-DSA-65 signature invalid' agent/xspv2/recovery/retirement.go
+          grep -Fq 'retirement authorization is not bound to the accepted owner recovery checkpoint' agent/xspv2/recovery/retirement.go
+          grep -Fq 'retained Agent key state does not match owner retirement authorization' agent/xspv2/recovery/retirement.go
+          grep -Fq 'bytes.Equal(activeRaw, candidateRaw)' security/xspv2/poc-go/keyring/retained_rotation.go
+          ! grep -n -E 'os[.](Remove|Rename)|atomicFile|net/http|http[.]|XMESH1|strict-pq=on' agent/xspv2/recovery/retirement.go
+          ! grep -n -E 'os[.](Remove|Rename)|atomicFile' agent/xspv2/state/durable_linux.go
+
+      - name: Re-run pinned Go 1.27 owner-retirement proof
+        working-directory: xmesh-node/agent/xspv2
+        run: go test ./... -count=1
+
+      - name: Re-run pinned retained-keyring proof
+        working-directory: xmesh-node/security/xspv2/poc-go
+        run: go test ./keyring/... -count=1
+
+      - name: State bounded evidence only
+        run: |
+          echo 'PASS: exact merged Node PR #46 owner-retirement authorization contract is pinned and independently re-verified.'
+          echo 'No old key is erased by this gate; P0-E4a physical qualification remains OPEN.'
+          echo 'strict-pq remains OFF; production rollout remains NOT AUTHORIZED.'
