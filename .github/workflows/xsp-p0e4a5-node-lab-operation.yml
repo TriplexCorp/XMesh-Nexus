@@ -22,11 +22,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Check out exact merged XMesh-Node P0-E4a5 source
+      - name: Check out exact remediated XMesh-Node qualification source
         uses: actions/checkout@v4
         with:
           repository: TriplexCorp/XMesh-Node
-          ref: 7bf8cc92950f396e33891c8744c1f6855414154b
+          ref: 34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb
           path: xmesh-node
           fetch-depth: 0
       - uses: actions/setup-go@v5
@@ -34,7 +34,7 @@ jobs:
           go-version: '1.27.3'
           cache: false
 
-      - name: Verify contract and bounded Node delta
+      - name: Verify contract, provenance and preserved lab hooks
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -43,9 +43,13 @@ jobs:
           x=json.load(open(p))
           assert x['schema']=='xsp2-p0e4a5-lab-operation-contract-1'
           assert x['node']['repository']=='TriplexCorp/XMesh-Node'
-          assert x['node']['powercutSourceRevision']=='50c770c8bbb917b04ca893ac5b8d29e6c7f9af7e'
-          assert x['node']['labRunnerRevision']=='7bf8cc92950f396e33891c8744c1f6855414154b'
-          assert x['node']['labRunnerPullRequest']==45
+          assert x['node']['powercutSourceRevision']=='34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb'
+          assert x['node']['labRunnerRevision']=='34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb'
+          assert x['node']['qualificationTargetPullRequest']==52
+          assert x['node']['powercutHookOriginRevision']=='50c770c8bbb917b04ca893ac5b8d29e6c7f9af7e'
+          assert x['node']['powercutHookOriginPullRequest']==44
+          assert x['node']['labRunnerOriginRevision']=='7bf8cc92950f396e33891c8744c1f6855414154b'
+          assert x['node']['labRunnerOriginPullRequest']==45
           assert x['requiredCheckpoints']==['after-previous','after-floor','after-active','after-recovery-abort','after-recovery-active']
           assert x['externalPowerControllerRequired'] is True
           assert x['physicalPowerLossQualified'] is False
@@ -54,22 +58,22 @@ jobs:
           PY
 
           cd xmesh-node
-          old=50c770c8bbb917b04ca893ac5b8d29e6c7f9af7e
-          new=7bf8cc92950f396e33891c8744c1f6855414154b
-          git cat-file -e "$old^{commit}"
-          git cat-file -e "$new^{commit}"
-          git diff --quiet "$old" "$new" -- \
-            security/xspv2/poc-go/keyring/two_phase.go \
+          hook_origin=50c770c8bbb917b04ca893ac5b8d29e6c7f9af7e
+          runner_origin=7bf8cc92950f396e33891c8744c1f6855414154b
+          current=34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb
+          git cat-file -e "$hook_origin^{commit}"
+          git cat-file -e "$runner_origin^{commit}"
+          git cat-file -e "$current^{commit}"
+          git merge-base --is-ancestor "$hook_origin" "$current"
+          git merge-base --is-ancestor "$runner_origin" "$current"
+          git diff --quiet "$hook_origin" "$current" -- \
             security/xspv2/poc-go/keyring/durability_checkpoint_powercut_linux.go \
-            security/xspv2/poc-go/keyring/sealed.go
-          actual="$(git diff --name-only "$old" "$new" | sort)"
-          expected="$(printf '%s\n' \
-            .github/workflows/xsp-p0e4a5-lab-operation.yml \
-            docs/XSP_V2_P0E4A5_LAB_OPERATION.md \
-            security/xspv2/poc-go/keyring/powercut_lab_operation_linux_test.go | sort)"
-          test "$actual" = "$expected"
+            security/xspv2/poc-go/keyring/durability_checkpoint_powercut_linux_test.go
+          git diff --quiet "$runner_origin" "$current" -- \
+            security/xspv2/poc-go/keyring/powercut_lab_operation_linux_test.go
+          test -f security/xspv2/poc-go/keyring/master_key_durability_linux_test.go
 
-      - name: Exercise pinned five-point real-operation arm matrix
+      - name: Exercise current five-point real-operation arm matrix
         working-directory: xmesh-node/security/xspv2/poc-go
         run: |
           set -euo pipefail
@@ -77,10 +81,11 @@ jobs:
             -run 'TestPowercutQualification|TestPowercutLabOperation' \
             -count=1 -v
 
-      - name: Preserve pinned process-crash proof
+      - name: Preserve process-crash and normal keyring proofs on current target
         working-directory: xmesh-node/security/xspv2/poc-go
         run: |
           set -euo pipefail
+          go test ./keyring -count=1
           go test -tags xspv2_crash_test ./keyring \
             -run 'TestActivatePreparedRotationCrashMatrix|TestRecoverRotationCrashMatrix' \
             -count=1 -v
@@ -107,6 +112,6 @@ jobs:
 
       - name: State bounded evidence only
         run: |
-          echo 'PASS: Node PR #45 real-operation lab runner is pinned without changing PR #44 core durability semantics.'
-          echo 'CI is not physical power-loss evidence; P0-E4a remains OPEN.'
+          echo 'PASS: current Node PR #52 qualification source preserves the PR #44/#45 lab hooks while including later reviewed durability remediations.'
+          echo 'CI is not physical power-loss evidence; the bare-metal profile remains unqualified until real external power removal.'
           echo 'strict-pq remains OFF; production rollout remains NOT AUTHORIZED.'

@@ -45,8 +45,8 @@ jobs:
           root,evidence=sys.argv[1:3]
           pre={
             'schema':'xsp2-p0e4a-storage-preflight-1','target':'/var/lib/xmesh','kernel':'Linux 6.x',
-            'mount':{'source':'/dev/nvme0n1p1','fstype':'ext4','options':'rw','target':'/'},
-            'device':{'device':'nvme0n1','writeCache':'write through','rotational':'0','fua':'1'},
+            'mount':{'source':'/dev/vda1','fstype':'ext4','options':'rw','target':'/'},
+            'device':{'device':'vda','writeCache':'write through','rotational':'0','fua':'1'},
             'baselineEligible':True,'physicalPowerLossQualified':False,'failures':[],
             'requiredNextEvidence':['real abrupt power required'],'scope':'CI synthetic fixture; not physical evidence',
           }
@@ -68,7 +68,7 @@ jobs:
             run=f'lab-run-{idx:04d}'
             item={
               'schema':'xsp2-p0e4a3-powercut-evidence-1','runId':run,'checkpoint':point,
-              'nodeSourceRevision':'50c770c8bbb917b04ca893ac5b8d29e6c7f9af7e',
+              'nodeSourceRevision':'34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb',
               'nexusSourceRevision':'6983bd9168c160968d8ed46ab862b8b1ee85c8ae',
               'labBinarySha256Hex':'11'*32,'nodeId':812345678901,
               'rotation':{'fromEpoch':7,'toEpoch':8,'fromEdKeyId':'ed-old-0001','fromPQKeyId':'pq-old-0001','toEdKeyId':'ed-new-0001','toPQKeyId':'pq-new-0001'},
