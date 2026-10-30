@@ -51,8 +51,10 @@ must(/ssl_session_cache\s+off\s*;/.test(active), 'TLS session cache must stay di
 must(/ssl_early_data\s+off\s*;/.test(active), 'TLS early data must stay disabled');
 must(/ssl_client_certificate\s+\/run\/xmesh-ingress-certs\/client-ca\.pem\s*;/.test(active),
   'C2-B client trust anchor missing');
-must(/ssl_verify_client\s+optional\s*;/.test(active),
-  'diagnostic handshake compatibility must remain explicit');
+must(/ssl_verify_client\s+on\s*;/.test(active),
+  'C2-B/D2 must reject unverified clients during the TLS handshake');
+must(!/ssl_verify_client\s+optional\s*;/.test(active),
+  'C2-B/D2 must not defer client-certificate rejection to HTTP routing');
 must(/client_max_body_size\s+16k\s*;/.test(active), 'ACK ingress body bound missing');
 must(/client_body_timeout\s+5s\s*;/.test(active), 'ACK ingress body timeout missing');
 
@@ -65,7 +67,7 @@ must(!/location\s+=\s+\/api\/v2\/node\/keys\/rotation\/ack\/recovery\s*\{/.test(
 must(/if\s*\(\$request_method\s*!=\s*POST\)\s*\{\s*return\s+405\s*;/s.test(active),
   'ACK locations must reject every non-POST method');
 must(/if\s*\(\$ssl_client_verify\s*!=\s*SUCCESS\)\s*\{\s*return\s+403\s*;/s.test(active),
-  'ACK locations must require verified client certificate');
+  'ACK locations must retain verified-client defense in depth');
 must(/if\s*\(\$http_content_type\s*!=\s*"application\/json"\)\s*\{\s*return\s+415\s*;/s.test(active),
   'ACK locations must require exact application/json');
 must(/if\s*\(\$http_transfer_encoding\s*!=\s*""\)\s*\{\s*return\s+400\s*;/s.test(active),
@@ -140,4 +142,4 @@ for (const source of [compose, installer]) {
 must(!main.includes('"/api/v2/node/keys/rotation/ack"'),
   'default/experimental Rust API must not mount the ACK route during C2-B/D2 staging proof');
 
-console.log('XSP-v2 C2-B/D2 contract: OK (Rust ACK/recovery gate over proven mTLS -> UDS boundary; no Python runtime, no broad proxy)');
+console.log('XSP-v2 C2-B/D2 contract: OK (Rust ACK/recovery gate over handshake-enforced mTLS -> UDS boundary; no Python runtime, no broad proxy)');
