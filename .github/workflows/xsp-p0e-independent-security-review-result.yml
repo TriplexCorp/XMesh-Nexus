@@ -27,52 +27,63 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Compile verifier and validate machine contract
+      - name: Compile verifier and validate exact v4 acceptance binding
         run: |
           set -euo pipefail
           python3 -m py_compile scripts/verify-xsp-v2-p0e-independent-security-review-result.py
           python3 - <<'PY'
           import json
-          p='deploy/xsp-v2-p0e-independent-security-review-result.contract.json'
-          x=json.load(open(p))
+          x=json.load(open('deploy/xsp-v2-p0e-independent-security-review-result.contract.json'))
           assert x['schema']=='xsp2-p0e-independent-security-review-result-contract-1'
           assert x['resultSchema']=='xsp2-p0e-independent-security-review-result-1'
-          assert x['frozenTarget']['nexus']['sourceRevision']=='0bab1a48cff570b3abe405bcda4dc242b23b8a4b'
-          assert x['frozenTarget']['node']['sourceRevision']=='083dc181c5e175f89007f4b93111cd5c45a69d97'
-          assert x['reviewerBundle']['workflowRun']==41037503656
-          assert x['reviewerBundle']['deterministicTarSha256']=='bac34400ac9b646c8a0f64ca9495e380ff0afce373310787c96385b9e40486bf'
-          assert x['reviewerBundle']['payloadSha256']=='33c8f07f4513cb03400c8b7af2f34f804661a79501336206482c0f426866620a'
+          assert x['frozenTarget']=={
+            'nexus':{
+              'repository':'TriplexCorp/XMesh-Nexus',
+              'sourceRevision':'12b3170996bc062ee16c79659a6378e5e425fd0e',
+            },
+            'node':{
+              'repository':'TriplexCorp/XMesh-Node',
+              'sourceRevision':'34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb',
+            },
+          }
+          assert x['reviewerBundle']=={
+            'workflowRun':41050277455,
+            'deterministicTarSha256':'143ef26ff84281689e2ec2e2046cc06ec9ef5344a96b5f39edd4f877e014dbf3',
+            'payloadSha256':'f473c70f70a23fe91a057ee7b6db4747528a965019397563cfc91590205261f2',
+          }
           assert len(x['requiredReviewDomains'])==11
           assert len(set(x['requiredReviewDomains']))==11
           assert x['independentReviewRequired'] is True
           assert x['automaticIssueClosure'] is False
+          assert x['closurePolicy']=={
+            'eligibleDecisions':['approve','approve-with-findings'],
+            'allDomainsMustAvoidFail':True,
+            'releaseBlockingFindingsMustBeRemediated':True,
+            'securityRelevantCodeChangeRequiresRefreeze':True,
+          }
           assert set(x['requiredFalseClaims'])=={
             'physicalPowerLossQualified','productionActivation','strictPQEnabled'
           }
           PY
 
-      - name: Generate synthetic positive, rejection and negative fixtures
+      - name: Generate synthetic contract fixtures
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import copy
-          import json
+          import copy, json
           from pathlib import Path
 
           c=json.load(open('deploy/xsp-v2-p0e-independent-security-review-result.contract.json'))
-          domains=[
-            {
-              'domain': d,
-              'disposition': 'pass',
-              'summary': f'Synthetic CI disposition for {d}.',
-              'evidence': [f'synthetic-ci:{d}'],
-            }
-            for d in c['requiredReviewDomains']
-          ]
+          domains=[{
+            'domain': d,
+            'disposition':'pass',
+            'summary':f'Synthetic CI disposition for {d}.',
+            'evidence':[f'synthetic-ci:{d}'],
+          } for d in c['requiredReviewDomains']]
           base={
-            'schema': c['resultSchema'],
-            'target': copy.deepcopy(c['frozenTarget']),
-            'reviewer': {
+            'schema':c['resultSchema'],
+            'target':copy.deepcopy(c['frozenTarget']),
+            'reviewer':{
               'name':'Synthetic External Reviewer',
               'organization':'Synthetic Independent Review Lab',
               'independent':True,
@@ -93,8 +104,7 @@ jobs:
               'strictPQEnabled':False,
             },
           }
-          out=Path('/tmp/xsp-review-result-fixtures')
-          out.mkdir()
+          out=Path('/tmp/xsp-review-result-fixtures'); out.mkdir()
           def write(name,obj):
             (out/name).write_text(json.dumps(obj,indent=2,sort_keys=True)+'\n')
 
@@ -104,11 +114,8 @@ jobs:
           rejection['reviewDomains'][0]['disposition']='fail'
           rejection['signoff']['decision']='reject'
           rejection['findings']=[{
-            'id':'SYN-001',
-            'severity':'high',
-            'status':'open',
-            'releaseBlocking':True,
-            'securityRelevantCodeChange':False,
+            'id':'SYN-001','severity':'high','status':'open',
+            'releaseBlocking':True,'securityRelevantCodeChange':False,
             'title':'Synthetic release blocker',
             'domains':[c['requiredReviewDomains'][0]],
             'evidence':['synthetic-ci:finding'],
@@ -116,34 +123,31 @@ jobs:
           }]
           write('rejection.json',rejection)
 
-          wrong_sha=copy.deepcopy(base)
-          wrong_sha['target']['nexus']['sourceRevision']='0'*40
-          write('wrong-sha.json',wrong_sha)
+          wrong=copy.deepcopy(base)
+          wrong['target']['nexus']['sourceRevision']='0'*40
+          write('wrong-sha.json',wrong)
 
-          missing_domain=copy.deepcopy(base)
-          missing_domain['reviewDomains'].pop()
-          write('missing-domain.json',missing_domain)
+          missing=copy.deepcopy(base)
+          missing['reviewDomains'].pop()
+          write('missing-domain.json',missing)
 
-          duplicate_domain=copy.deepcopy(base)
-          duplicate_domain['reviewDomains'][-1]['domain']=duplicate_domain['reviewDomains'][0]['domain']
-          write('duplicate-domain.json',duplicate_domain)
+          duplicate=copy.deepcopy(base)
+          duplicate['reviewDomains'][-1]['domain']=duplicate['reviewDomains'][0]['domain']
+          write('duplicate-domain.json',duplicate)
 
-          non_independent=copy.deepcopy(base)
-          non_independent['reviewer']['independent']=False
-          write('non-independent.json',non_independent)
+          nonind=copy.deepcopy(base)
+          nonind['reviewer']['independent']=False
+          write('non-independent.json',nonind)
 
-          bad_claim=copy.deepcopy(base)
-          bad_claim['claims']['strictPQEnabled']=True
-          write('bad-claim.json',bad_claim)
+          badclaim=copy.deepcopy(base)
+          badclaim['claims']['strictPQEnabled']=True
+          write('bad-claim.json',badclaim)
 
           unresolved=copy.deepcopy(base)
           unresolved['signoff']['decision']='approve-with-findings'
           unresolved['findings']=[{
-            'id':'SYN-002',
-            'severity':'medium',
-            'status':'open',
-            'releaseBlocking':True,
-            'securityRelevantCodeChange':False,
+            'id':'SYN-002','severity':'medium','status':'open',
+            'releaseBlocking':True,'securityRelevantCodeChange':False,
             'title':'Synthetic unresolved release blocker',
             'domains':[c['requiredReviewDomains'][1]],
             'evidence':['synthetic-ci:finding'],
@@ -154,11 +158,8 @@ jobs:
           refreeze=copy.deepcopy(base)
           refreeze['signoff']['decision']='approve-with-findings'
           refreeze['findings']=[{
-            'id':'SYN-003',
-            'severity':'low',
-            'status':'remediated',
-            'releaseBlocking':False,
-            'securityRelevantCodeChange':True,
+            'id':'SYN-003','severity':'low','status':'remediated',
+            'releaseBlocking':False,'securityRelevantCodeChange':True,
             'title':'Synthetic security-relevant remediation',
             'domains':[c['requiredReviewDomains'][2]],
             'evidence':['synthetic-ci:finding'],
@@ -167,24 +168,22 @@ jobs:
           write('requires-refreeze.json',refreeze)
           PY
 
-      - name: Prove eligible approval contract
+      - name: Prove closure-eligible approval validates
         run: |
           set -euo pipefail
           python3 scripts/verify-xsp-v2-p0e-independent-security-review-result.py \
             --result /tmp/xsp-review-result-fixtures/eligible.json \
-            --require-closure-eligible \
-            | tee /tmp/eligible-verification.json
-          grep -Fq '"closureEligible": true' /tmp/eligible-verification.json
-          grep -Fq '"reviewedDomainCount": 11' /tmp/eligible-verification.json
+            --require-closure-eligible | tee /tmp/eligible.json
+          grep -Fq '"closureEligible": true' /tmp/eligible.json
+          grep -Fq '"reviewedDomainCount": 11' /tmp/eligible.json
 
-      - name: Prove valid rejection is not closure eligible
+      - name: Prove valid rejection cannot satisfy closure gate
         run: |
           set -euo pipefail
           python3 scripts/verify-xsp-v2-p0e-independent-security-review-result.py \
-            --result /tmp/xsp-review-result-fixtures/rejection.json \
-            | tee /tmp/rejection-verification.json
-          grep -Fq '"validReviewResult": true' /tmp/rejection-verification.json
-          grep -Fq '"closureEligible": false' /tmp/rejection-verification.json
+            --result /tmp/xsp-review-result-fixtures/rejection.json | tee /tmp/rejection.json
+          grep -Fq '"validReviewResult": true' /tmp/rejection.json
+          grep -Fq '"closureEligible": false' /tmp/rejection.json
           if python3 scripts/verify-xsp-v2-p0e-independent-security-review-result.py \
             --result /tmp/xsp-review-result-fixtures/rejection.json \
             --require-closure-eligible; then
@@ -192,7 +191,7 @@ jobs:
             exit 1
           fi
 
-      - name: Prove malformed and wrong-target results fail closed
+      - name: Prove malformed, stale and unsafe claims fail closed
         run: |
           set -euo pipefail
           for fixture in wrong-sha missing-domain duplicate-domain non-independent bad-claim; do
@@ -203,14 +202,14 @@ jobs:
             fi
           done
 
-      - name: Prove unresolved blocker and security-relevant remediation cannot close gate
+      - name: Prove unresolved blocker and changed-code remediation cannot close
         run: |
           set -euo pipefail
           for fixture in unresolved-blocker requires-refreeze; do
             python3 scripts/verify-xsp-v2-p0e-independent-security-review-result.py \
               --result "/tmp/xsp-review-result-fixtures/${fixture}.json" \
-              | tee "/tmp/${fixture}-verification.json"
-            grep -Fq '"closureEligible": false' "/tmp/${fixture}-verification.json"
+              | tee "/tmp/${fixture}.json"
+            grep -Fq '"closureEligible": false' "/tmp/${fixture}.json"
             if python3 scripts/verify-xsp-v2-p0e-independent-security-review-result.py \
               --result "/tmp/xsp-review-result-fixtures/${fixture}.json" \
               --require-closure-eligible; then
@@ -218,9 +217,9 @@ jobs:
               exit 1
             fi
           done
-          grep -Fq '"requiresRefreeze": true' /tmp/requires-refreeze-verification.json
+          grep -Fq '"requiresRefreeze": true' /tmp/requires-refreeze.json
 
-      - name: Verify result-contract delta is preparation tooling only
+      - name: Verify v4 rebinding changes acceptance tooling only
         if: github.event_name == 'pull_request'
         run: |
           set -euo pipefail
@@ -234,7 +233,6 @@ jobs:
 
       - name: State bounded evidence only
         run: |
-          echo 'PASS: independent-review result contract is bound to the exact v3 review snapshot and post-merge reviewer bundle and fails closed on ambiguous/unsafe closure states.'
-          echo 'Synthetic fixtures are contract tests only and are not an independent security review.'
-          echo 'Issue #137 still requires an attributable external result; issue #138 physical qualification remains separate.'
-          echo 'strict-pq remains OFF; production rollout remains NOT AUTHORIZED.'
+          echo 'PASS: independent-review result acceptance is bound to the exact v4 remediated target and post-merge reviewer bundle.'
+          echo 'Synthetic fixtures are contract tests only; issue #137 still requires a real attributable independent result.'
+          echo 'Issue #138 remains separate; strict-pq remains OFF; production rollout remains NOT AUTHORIZED.'
