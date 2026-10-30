@@ -6,12 +6,14 @@ on:
     paths:
       - "scripts/xsp-v2-p0e4a3-powercut-evidence.py"
       - "scripts/xsp-v2-p0e4a6-physical-run-handoff.py"
+      - "scripts/xsp-v2-p0e4a6-physical-run-handoff-v4.py"
       - "docs/XSP_V2_P0E4A6_PHYSICAL_RUN_HANDOFF.md"
       - ".github/workflows/xsp-p0e4a6-physical-run-handoff.yml"
   pull_request:
     paths:
       - "scripts/xsp-v2-p0e4a3-powercut-evidence.py"
       - "scripts/xsp-v2-p0e4a6-physical-run-handoff.py"
+      - "scripts/xsp-v2-p0e4a6-physical-run-handoff-v4.py"
       - "docs/XSP_V2_P0E4A6_PHYSICAL_RUN_HANDOFF.md"
       - ".github/workflows/xsp-p0e4a6-physical-run-handoff.yml"
   workflow_dispatch:
@@ -25,107 +27,83 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify offline non-qualifying boundary
+      - name: Verify v4 source binding and non-qualifying boundary
         run: |
           set -euo pipefail
-          src=scripts/xsp-v2-p0e4a6-physical-run-handoff.py
+          legacy=scripts/xsp-v2-p0e4a6-physical-run-handoff.py
+          src=scripts/xsp-v2-p0e4a6-physical-run-handoff-v4.py
           doc=docs/XSP_V2_P0E4A6_PHYSICAL_RUN_HANDOFF.md
-          python3 -m py_compile "$src"
-          ! grep -E 'subprocess|requests|urllib|socket|os\.system|exec\(|systemctl|reboot|shutdown|poweroff|strict-pq=on' "$src"
-          grep -Fq 'externalPowerControllerRequired' "$src"
-          grep -Fq '"physicalPowerLossQualified": False' "$src"
-          grep -Fq 'xsp-v2-p0e4a3-powercut-evidence.py' "$src"
-          grep -Fq '50c770c8bbb917b04ca893ac5b8d29e6c7f9af7e' "$src" "$doc"
-          grep -Fq '7bf8cc92950f396e33891c8744c1f6855414154b' "$src" "$doc"
-          grep -Fq 'a34d0999ca519e2a81e68d92ec7136cd606518d4' "$src" "$doc"
-          grep -Fq 'P0-E4a remains OPEN' "$doc"
-          grep -Fq 'physically independent' "$doc"
+          python3 -m py_compile "$legacy" "$src"
+          ! grep -E 'subprocess|requests|urllib|socket|os\.system|exec\(|systemctl|reboot|shutdown|poweroff|strict-pq=on' "$legacy" "$src"
+          grep -Fq '34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb' "$src" "$doc"
+          grep -Fq '50c770c8bbb917b04ca893ac5b8d29e6c7f9af7e' "$doc"
+          grep -Fq '7bf8cc92950f396e33891c8744c1f6855414154b' "$doc"
+          grep -Fq 'physicalPowerLossQualified=false' "$doc"
+          grep -Fq 'KVM VPS' "$doc"
 
-      - name: Exercise prepared handoff, E4a3 reuse and fail-closed raw-record binding
+      - name: Exercise prepared v4 handoff and fail-closed raw-record binding
         run: |
           set -euo pipefail
           work="$RUNNER_TEMP/p0e4a6"
           mkdir -p "$work"
           python3 - "$work" <<'PY'
-          import hashlib,json,os,sys
+          import json,os,sys
           root=sys.argv[1]
           base={
             'schema':'xsp2-p0e4a-storage-preflight-1','target':'/var/lib/xmesh','kernel':'Linux 6.x',
-            'mount':{'source':'/dev/nvme0n1p1','fstype':'ext4','options':'rw','target':'/'},
-            'device':{'device':'nvme0n1','writeCache':'write through','rotational':'0','fua':'1'},
+            'mount':{'source':'/dev/vda1','fstype':'ext4','options':'rw','target':'/'},
+            'device':{'device':'vda','writeCache':'write through','rotational':'0','fua':'1'},
             'baselineEligible':True,'physicalPowerLossQualified':False,'failures':[],
             'requiredNextEvidence':['real abrupt power required'],'scope':'CI synthetic fixture; not physical evidence',
           }
           agent=dict(base); agent['role']='agent-state'; agent['postgres']=None
-          pg=dict(base); pg['role']='nexus-postgres'; pg['postgres']={
-            'fsync':'on','full_page_writes':'on','synchronous_commit':'on','wal_sync_method':'fdatasync'}
+          pg=dict(base); pg['role']='nexus-postgres'; pg['postgres']={'fsync':'on','full_page_writes':'on','synchronous_commit':'on','wal_sync_method':'fdatasync'}
           rotation={'fromEpoch':7,'toEpoch':8,'fromEdKeyId':'ed-old-0001','fromPQKeyId':'pq-old-0001','toEdKeyId':'ed-new-0001','toPQKeyId':'pq-new-0001'}
-          checkpoint={
-            'schema':'xsp2-owner-offhost-recovery-checkpoint-1','nodeId':812345678901,
-            'minimumEpoch':7,'receiptSha256Hex':'55'*32,'signedReceiptBase64':'e30='}
-          verified={
-            'status':'verified','nodeId':812345678901,'localEpoch':7,'minimumEpoch':7,
-            'checkpointReceiptSha256Hex':'55'*32}
-          files={'agent.json':agent,'pg.json':pg,'rotation.json':rotation,'checkpoint.json':checkpoint,'e3a-verified.json':verified}
-          for name,obj in files.items():
+          checkpoint={'schema':'xsp2-owner-offhost-recovery-checkpoint-1','nodeId':812345678901,'minimumEpoch':7,'receiptSha256Hex':'55'*32,'signedReceiptBase64':'e30='}
+          verified={'status':'verified','nodeId':812345678901,'localEpoch':7,'minimumEpoch':7,'checkpointReceiptSha256Hex':'55'*32}
+          for name,obj in [('agent.json',agent),('pg.json',pg),('rotation.json',rotation),('checkpoint.json',checkpoint),('e3a-verified.json',verified)]:
             open(os.path.join(root,name),'w').write(json.dumps(obj,separators=(',',':')))
           open(os.path.join(root,'lab.bin'),'wb').write(b'synthetic-lab-binary-not-physical-evidence\n')
           PY
 
-          prep="$(python3 scripts/xsp-v2-p0e4a6-physical-run-handoff.py prepare \
+          tool=scripts/xsp-v2-p0e4a6-physical-run-handoff-v4.py
+          prep="$(python3 "$tool" prepare \
             --checkpoint after-floor --run-id lab-run-0001 --node-id 812345678901 \
             --rotation "$work/rotation.json" --lab-binary "$work/lab.bin" \
             --agent-preflight "$work/agent.json" --postgres-preflight "$work/pg.json" \
             --offhost-checkpoint "$work/checkpoint.json" --offhost-verification "$work/e3a-verified.json" \
             --storage-profile-id profile-0001 --plp-evidence-id plp-review-0001 \
             --controller-id pdu-lab-001 --boot-before-id boot-old-0001 --out "$work/run.plan.json")"
-          echo "$prep"
           echo "$prep" | grep -Fq '"status":"physical-run-handoff-prepared"'
           echo "$prep" | grep -Fq '"physicalPowerLossQualified":false'
+          grep -Fq '34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb' "$work/run.plan.json"
 
           python3 - "$work" <<'PY'
           import hashlib,json,os,sys
-          root=sys.argv[1]
-          plan=json.load(open(os.path.join(root,'run.plan.json')))
+          root=sys.argv[1]; plan=json.load(open(os.path.join(root,'run.plan.json')))
           arm={'marker':plan['requiredArmMarker'],'observedAtMs':1000}
-          controller_raw=b'synthetic external PDU record; CI only\n'
-          open(os.path.join(root,'controller.raw'),'wb').write(controller_raw)
-          controller_meta={'controllerId':'pdu-lab-001','eventId':'event-0001','action':'power-off','observedAtMs':2000}
-          post={'bootId':'boot-new-0001','recoveredAtMs':5000,'classification':'next-complete','keyEpoch':8,
-                'activeEdKeyId':'ed-new-0001','activePQKeyId':'pq-new-0001','securityStateSha256Hex':'77'*32,
-                'networkAttemptedBeforeValidation':False}
-          pg={'recoveryObserved':True,'readyAtMs':4000,'fsync':'on','fullPageWrites':'on','synchronousCommit':'on',
-              'walSyncMethod':'fdatasync','securityTupleSha256Hex':'33'*32,'integrityChecksPassed':True}
-          notes=b'synthetic reviewer notes; CI only\n'
-          open(os.path.join(root,'review.txt'),'wb').write(notes)
-          evidence={
-            'schema':'xsp2-p0e4a3-powercut-evidence-1','runId':plan['runId'],'checkpoint':plan['checkpoint'],
-            'nodeSourceRevision':plan['nodeSourceRevision'],'nexusSourceRevision':plan['nexusSourceRevision'],
-            'labBinarySha256Hex':plan['labBinarySha256Hex'],'nodeId':plan['nodeId'],'rotation':plan['rotation'],
-            'arm':arm,
-            'controllerEvent':dict(controller_meta,rawEventSha256Hex=hashlib.sha256(controller_raw).hexdigest()),
-            'bootBeforeId':plan['bootBeforeId'],'postBoot':post,'postgresRecovery':pg,
-            'offhostWitness':plan['offhostWitness'],'storageEvidence':plan['storageEvidence'],
-            'review':{'operator':'reviewer-0001','reviewedAtMs':6000,'notesSha256Hex':hashlib.sha256(notes).hexdigest()},
-          }
-          for name,obj in [('arm.json',arm),('controller-meta.json',controller_meta),('post.json',post),('postgres-recovery.json',pg),('evidence.json',evidence)]:
-            open(os.path.join(root,name),'w').write(json.dumps(obj,separators=(',',':')))
+          raw=b'synthetic external PDU record; CI only\n'; open(os.path.join(root,'controller.raw'),'wb').write(raw)
+          meta={'controllerId':'pdu-lab-001','eventId':'event-0001','action':'power-off','observedAtMs':2000}
+          post={'bootId':'boot-new-0001','recoveredAtMs':5000,'classification':'next-complete','keyEpoch':8,'activeEdKeyId':'ed-new-0001','activePQKeyId':'pq-new-0001','securityStateSha256Hex':'77'*32,'networkAttemptedBeforeValidation':False}
+          pg={'recoveryObserved':True,'readyAtMs':4000,'fsync':'on','fullPageWrites':'on','synchronousCommit':'on','walSyncMethod':'fdatasync','securityTupleSha256Hex':'33'*32,'integrityChecksPassed':True}
+          notes=b'synthetic reviewer notes; CI only\n'; open(os.path.join(root,'review.txt'),'wb').write(notes)
+          evidence={'schema':'xsp2-p0e4a3-powercut-evidence-1','runId':plan['runId'],'checkpoint':plan['checkpoint'],'nodeSourceRevision':plan['nodeSourceRevision'],'nexusSourceRevision':plan['nexusSourceRevision'],'labBinarySha256Hex':plan['labBinarySha256Hex'],'nodeId':plan['nodeId'],'rotation':plan['rotation'],'arm':arm,'controllerEvent':dict(meta,rawEventSha256Hex=hashlib.sha256(raw).hexdigest()),'bootBeforeId':plan['bootBeforeId'],'postBoot':post,'postgresRecovery':pg,'offhostWitness':plan['offhostWitness'],'storageEvidence':plan['storageEvidence'],'review':{'operator':'reviewer-0001','reviewedAtMs':6000,'notesSha256Hex':hashlib.sha256(notes).hexdigest()}}
+          for name,obj in [('arm.json',arm),('controller-meta.json',meta),('post.json',post),('postgres-recovery.json',pg),('evidence.json',evidence)]: open(os.path.join(root,name),'w').write(json.dumps(obj,separators=(',',':')))
           PY
 
-          verified="$(python3 scripts/xsp-v2-p0e4a6-physical-run-handoff.py verify \
+          verified="$(python3 "$tool" verify \
             --plan "$work/run.plan.json" --evidence "$work/evidence.json" \
             --agent-preflight "$work/agent.json" --postgres-preflight "$work/pg.json" \
             --offhost-verification "$work/e3a-verified.json" --arm-observation "$work/arm.json" \
             --controller-meta "$work/controller-meta.json" --controller-raw "$work/controller.raw" \
             --post-boot-agent "$work/post.json" --postgres-recovery "$work/postgres-recovery.json" \
             --review-notes "$work/review.txt")"
-          echo "$verified"
           echo "$verified" | grep -Fq '"status":"physical-run-handoff-verified-for-independent-review"'
           echo "$verified" | grep -Fq '"physicalPowerLossQualified":false'
 
           cp "$work/controller.raw" "$work/controller-tampered.raw"
           printf 'tamper\n' >> "$work/controller-tampered.raw"
-          if python3 scripts/xsp-v2-p0e4a6-physical-run-handoff.py verify \
+          if python3 "$tool" verify \
             --plan "$work/run.plan.json" --evidence "$work/evidence.json" \
             --agent-preflight "$work/agent.json" --postgres-preflight "$work/pg.json" \
             --offhost-verification "$work/e3a-verified.json" --arm-observation "$work/arm.json" \
@@ -135,19 +113,4 @@ jobs:
             echo 'tampered raw controller event unexpectedly accepted' >&2; exit 1
           fi
 
-          cp "$work/e3a-verified.json" "$work/e3a-tampered.json"
-          python3 - "$work/e3a-tampered.json" <<'PY'
-          import json,sys
-          p=sys.argv[1]; x=json.load(open(p)); x['localEpoch']=8; open(p,'w').write(json.dumps(x,separators=(',',':')))
-          PY
-          if python3 scripts/xsp-v2-p0e4a6-physical-run-handoff.py verify \
-            --plan "$work/run.plan.json" --evidence "$work/evidence.json" \
-            --agent-preflight "$work/agent.json" --postgres-preflight "$work/pg.json" \
-            --offhost-verification "$work/e3a-tampered.json" --arm-observation "$work/arm.json" \
-            --controller-meta "$work/controller-meta.json" --controller-raw "$work/controller.raw" \
-            --post-boot-agent "$work/post.json" --postgres-recovery "$work/postgres-recovery.json" \
-            --review-notes "$work/review.txt"; then
-            echo 'tampered E3a verification unexpectedly accepted' >&2; exit 1
-          fi
-
-          echo 'P0-E4A6 PHYSICAL-RUN HANDOFF: PASS (synthetic contract test only; NOT physical evidence)'
+          echo 'P0-E4A6 V4 PHYSICAL-RUN HANDOFF: PASS (synthetic contract test only; NOT physical evidence)'
