@@ -1,0 +1,37 @@
+{
+  "schema": "xsp2-p0e-owner-retirement-durable-erasure-contract-1",
+  "node": {
+    "repository": "TriplexCorp/XMesh-Node",
+    "sourceRevision": "3d2fc155ead11e86a2872ad12fbe28f157bb24db",
+    "pullRequest": 48,
+    "previousReviewedRevision": "cd1f187a06ea6f320023027e06e1a57d2be81af3"
+  },
+  "authorizationDomain": "XSP2-OWNER-RETIRE-PREVIOUS-V1",
+  "retirementMarkerDomain": "XSP2-RETIRED-ROTATION-V1",
+  "retirementMarkerAuthentication": "HMAC-SHA256 existing Agent master key",
+  "authorizationDigestBindsBothOwnerSignatures": true,
+  "durableIntentBeforeErasure": true,
+  "retiredSnapshots": [
+    ".previous",
+    ".next"
+  ],
+  "activeVaultErasureAllowed": false,
+  "epochFloorErasureAllowed": false,
+  "parentDirectoryFsyncAfterEachDeletion": true,
+  "crashCheckpoints": [
+    "after-retirement-intent",
+    "after-retirement-previous",
+    "after-retirement-next"
+  ],
+  "exactResumeAfterDurableIntent": true,
+  "retirementRollbackFloor": true,
+  "retirementMarkersChainMonotonically": true,
+  "reintroducedRetiredSnapshotsRejected": true,
+  "vaultReinitializationOverRetirementHistoryRejected": true,
+  "singleNonTestAgentCaller": true,
+  "ownerPrivateKeysRemainOffHost": true,
+  "networkRouteAdded": false,
+  "physicalPowerLossQualified": false,
+  "productionActivation": false,
+  "strictPQEnabled": false
+}
