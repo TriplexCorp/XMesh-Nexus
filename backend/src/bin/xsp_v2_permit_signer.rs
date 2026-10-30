@@ -102,7 +102,10 @@ fn read_private_key_file(path: &Path) -> Result<Vec<u8>> {
         mode & 0o027 == 0 && mode & 0o0100 == 0 && mode & 0o0040 != 0,
         "permit signer key file must be group-readable only"
     );
-    ensure!(metadata.nlink() == 1, "permit signer key file must have one hard link");
+    ensure!(
+        metadata.nlink() == 1,
+        "permit signer key file must have one hard link"
+    );
     fs::read(path).with_context(|| format!("read permit signer key file {}", path.display()))
 }
 
@@ -122,14 +125,22 @@ fn load_signing_material() -> Result<SigningMaterial> {
     let ed25519 = SigningKey::from_bytes(&ed_seed);
     let ed_public = ed25519.verifying_key().to_bytes().to_vec();
     ensure!(
-        ed_key.raw_public_key().context("read permit Ed25519 public key")? == ed_public,
+        ed_key
+            .raw_public_key()
+            .context("read permit Ed25519 public key")?
+            == ed_public,
         "permit Ed25519 PEM pair mismatch"
     );
 
     let pq_pem = read_private_key_file(&pq_path)?;
     let mldsa65 = PKey::private_key_from_pem(&pq_pem).context("load permit ML-DSA-65 PEM")?;
-    let public_der = mldsa65.public_key_to_der().context("derive permit ML-DSA public key")?;
-    ensure!(public_der.len() >= 1952, "permit ML-DSA public DER too short");
+    let public_der = mldsa65
+        .public_key_to_der()
+        .context("derive permit ML-DSA public key")?;
+    ensure!(
+        public_der.len() >= 1952,
+        "permit ML-DSA public DER too short"
+    );
     let pq_public = public_der[public_der.len() - 1952..].to_vec();
     PKey::public_key_from_raw_bytes_ex(None, KeyType::ML_DSA_65, None, &pq_public)
         .context("validate permit ML-DSA-65 public key")?;
@@ -175,7 +186,10 @@ fn load_signing_material() -> Result<SigningMaterial> {
 fn panel_pin_for_node(template: &TrustedPublic, node_id: i64) -> Result<TrustedPublic> {
     ensure!(node_id > 0, "invalid permit Node ID");
     let node_id = u64::try_from(node_id).context("permit Node ID overflow")?;
-    ensure!(template.issuer_id != format!("node-{node_id}"), "panel issuer impersonates Node");
+    ensure!(
+        template.issuer_id != format!("node-{node_id}"),
+        "panel issuer impersonates Node"
+    );
     Ok(TrustedPublic {
         purpose: template.purpose.clone(),
         issuer_id: template.issuer_id.clone(),
@@ -188,7 +202,10 @@ fn panel_pin_for_node(template: &TrustedPublic, node_id: i64) -> Result<TrustedP
 }
 
 fn validate_public(ed: &[u8], pq: &[u8], ed_id: &str, pq_id: &str) -> Result<()> {
-    ensure!(ed.len() == 32 && pq.len() == 1952, "invalid candidate public key lengths");
+    ensure!(
+        ed.len() == 32 && pq.len() == 1952,
+        "invalid candidate public key lengths"
+    );
     ensure!(
         key_id("ed-", ed) == ed_id && key_id("pq-", pq) == pq_id,
         "candidate public key fingerprint mismatch"
@@ -226,7 +243,7 @@ async fn load_approved_candidate(
            ON p.node_id=s.node_id AND p.purpose='node_request'
           AND p.from_epoch=s.key_epoch AND p.to_epoch=s.key_epoch+1
           AND p.proved_at IS NOT NULL AND p.expires_at>NOW()
-         WHERE s.node_id=$1"
+         WHERE s.node_id=$1",
     )
     .bind(node_id)
     .fetch_optional(pool)
@@ -247,7 +264,10 @@ async fn load_approved_candidate(
             && from_epoch.checked_add(1) == Some(to_epoch),
         "candidate suite state is not eligible for staged permit"
     );
-    ensure!(approved_by == authenticated_owner, "permit owner differs from approved candidate owner");
+    ensure!(
+        approved_by == authenticated_owner,
+        "permit owner differs from approved candidate owner"
+    );
 
     let from_ed_key_id: String = row.try_get("from_ed_key_id")?;
     let from_pq_key_id: String = row.try_get("from_pq_key_id")?;
@@ -261,7 +281,12 @@ async fn load_approved_candidate(
         from_ed_key_id != to_ed_key_id && from_pq_key_id != to_pq_key_id,
         "candidate reuses active key IDs"
     );
-    validate_public(&from_ed_public, &from_pq_public, &from_ed_key_id, &from_pq_key_id)?;
+    validate_public(
+        &from_ed_public,
+        &from_pq_public,
+        &from_ed_key_id,
+        &from_pq_key_id,
+    )?;
     validate_public(&to_ed_public, &to_pq_public, &to_ed_key_id, &to_pq_key_id)?;
 
     let material = CandidatePublic {
@@ -278,9 +303,8 @@ async fn load_approved_candidate(
         pending_ed_public: to_ed_public,
         pending_pq_public: to_pq_public,
     };
-    let candidate_sha256_hex = hex::encode(
-        candidate_sha256(&material).map_err(anyhow::Error::msg)?
-    );
+    let candidate_sha256_hex =
+        hex::encode(candidate_sha256(&material).map_err(anyhow::Error::msg)?);
     let preparation_expires_at_ms: i64 = row.try_get("prep_expires_ms")?;
     Ok(ApprovedCandidate {
         material,
@@ -290,19 +314,31 @@ async fn load_approved_candidate(
 }
 
 fn validate_request(request: &SignRequest) -> Result<()> {
-    ensure!(request.protocol == "XSP/2", "invalid permit signer protocol");
-    ensure!(request.action == "sign-approved-permit", "invalid permit signer action");
+    ensure!(
+        request.protocol == "XSP/2",
+        "invalid permit signer protocol"
+    );
+    ensure!(
+        request.action == "sign-approved-permit",
+        "invalid permit signer action"
+    );
     ensure!(
         request.node_id > 0
             && !request.request_id.is_empty()
             && request.request_id.len() <= 64
-            && request.request_id.bytes().all(|byte| byte.is_ascii_graphic()),
+            && request
+                .request_id
+                .bytes()
+                .all(|byte| byte.is_ascii_graphic()),
         "invalid permit request identity"
     );
     ensure!(
         !request.authenticated_owner.is_empty()
             && request.authenticated_owner.len() <= 128
-            && request.authenticated_owner.bytes().all(|byte| byte.is_ascii_graphic()),
+            && request
+                .authenticated_owner
+                .bytes()
+                .all(|byte| byte.is_ascii_graphic()),
         "invalid authenticated owner identity"
     );
     Ok(())
@@ -314,12 +350,13 @@ async fn sign_approved_permit(
     request: &SignRequest,
 ) -> Result<Vec<u8>> {
     validate_request(request)?;
-    let candidate = load_approved_candidate(pool, request.node_id, &request.authenticated_owner).await?;
+    let candidate =
+        load_approved_candidate(pool, request.node_id, &request.authenticated_owner).await?;
 
     if let Some(existing) = sqlx::query(
         "SELECT signed_permit,issued_by,state
          FROM node_xsp_cutover_permit_ledger
-         WHERE node_id=$1 AND request_id=$2"
+         WHERE node_id=$1 AND request_id=$2",
     )
     .bind(request.node_id)
     .bind(&request.request_id)
@@ -329,8 +366,14 @@ async fn sign_approved_permit(
         let issued_by: String = existing.try_get("issued_by")?;
         let state: String = existing.try_get("state")?;
         let signed_permit: Vec<u8> = existing.try_get("signed_permit")?;
-        ensure!(issued_by == request.authenticated_owner && state != "aborted", "stored permit is not reusable");
-        ensure!(!signed_permit.is_empty() && signed_permit.len() <= 16 * 1024, "stored permit invalid");
+        ensure!(
+            issued_by == request.authenticated_owner && state != "aborted",
+            "stored permit is not reusable"
+        );
+        ensure!(
+            !signed_permit.is_empty() && signed_permit.len() <= 16 * 1024,
+            "stored permit invalid"
+        );
         return Ok(signed_permit);
     }
 
@@ -338,12 +381,15 @@ async fn sign_approved_permit(
         "SELECT EXISTS(
            SELECT 1 FROM node_xsp_cutover_permit_ledger
            WHERE node_id=$1 AND state='issued'
-         )"
+         )",
     )
     .bind(request.node_id)
     .fetch_one(pool)
     .await?;
-    ensure!(!other_issued, "another cutover permit is already issued for this Node");
+    ensure!(
+        !other_issued,
+        "another cutover permit is already issued for this Node"
+    );
 
     let issued_at_ms = now_ms()?;
     let expires_at_ms = issued_at_ms
@@ -379,8 +425,7 @@ async fn sign_approved_permit(
         permit_sha256_hex: "00".repeat(32),
         applied_state_sha256_hex: "00".repeat(32),
     };
-    sign_staging_permit(&message, &pin, &keys.ed25519, &keys.mldsa65)
-        .map_err(anyhow::Error::msg)
+    sign_staging_permit(&message, &pin, &keys.ed25519, &keys.mldsa65).map_err(anyhow::Error::msg)
 }
 
 async fn connect_pool() -> Result<PgPool> {
@@ -391,8 +436,12 @@ async fn connect_pool() -> Result<PgPool> {
         .acquire_timeout(Duration::from_secs(5))
         .after_connect(|connection, _| {
             Box::pin(async move {
-                sqlx::query("SET statement_timeout='2s'").execute(&mut *connection).await?;
-                sqlx::query("SET lock_timeout='1s'").execute(connection).await?;
+                sqlx::query("SET statement_timeout='2s'")
+                    .execute(&mut *connection)
+                    .await?;
+                sqlx::query("SET lock_timeout='1s'")
+                    .execute(connection)
+                    .await?;
                 Ok(())
             })
         })
@@ -402,15 +451,24 @@ async fn connect_pool() -> Result<PgPool> {
 }
 
 async fn validate_database_role(pool: &PgPool) -> Result<()> {
-    let current_role: String = sqlx::query_scalar("SELECT current_user").fetch_one(pool).await?;
-    ensure!(current_role == "xmesh_permit_signer_reader", "wrong permit signer DB role");
-    let read_only: bool = sqlx::query_scalar("SELECT current_setting('transaction_read_only')='on'")
+    let current_role: String = sqlx::query_scalar("SELECT current_user")
         .fetch_one(pool)
         .await?;
-    ensure!(read_only, "permit signer database role must default read-only");
+    ensure!(
+        current_role == "xmesh_permit_signer_reader",
+        "wrong permit signer DB role"
+    );
+    let read_only: bool =
+        sqlx::query_scalar("SELECT current_setting('transaction_read_only')='on'")
+            .fetch_one(pool)
+            .await?;
+    ensure!(
+        read_only,
+        "permit signer database role must default read-only"
+    );
     let privileged: bool = sqlx::query_scalar(
         "SELECT rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication OR rolbypassrls
-         FROM pg_roles WHERE rolname=current_user"
+         FROM pg_roles WHERE rolname=current_user",
     )
     .fetch_one(pool)
     .await?;
@@ -419,7 +477,7 @@ async fn validate_database_role(pool: &PgPool) -> Result<()> {
         "SELECT EXISTS(
            SELECT 1 FROM pg_auth_members
            WHERE member=(SELECT oid FROM pg_roles WHERE rolname=current_user)
-         )"
+         )",
     )
     .fetch_one(pool)
     .await?;
@@ -440,7 +498,7 @@ async fn validate_database_role(pool: &PgPool) -> Result<()> {
           OR EXISTS (
             SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
             WHERE n.nspname='public' AND c.relkind='S'
-              AND has_sequence_privilege(c.oid,'USAGE,SELECT,UPDATE'))"
+              AND has_sequence_privilege(c.oid,'USAGE,SELECT,UPDATE'))",
     )
     .fetch_one(pool)
     .await?;
@@ -451,9 +509,15 @@ async fn validate_database_role(pool: &PgPool) -> Result<()> {
 fn bind_socket() -> Result<(PathBuf, UnixListener)> {
     let socket_path = env::var_os("XSP_V2_PERMIT_SIGNER_SOCKET_PATH")
         .map_or_else(|| PathBuf::from(SOCKET_PATH_DEFAULT), PathBuf::from);
-    ensure!(socket_path.is_absolute(), "permit signer socket path must be absolute");
-    let parent = socket_path.parent().context("permit signer socket parent missing")?;
-    let metadata = fs::symlink_metadata(parent).context("inspect permit signer socket directory")?;
+    ensure!(
+        socket_path.is_absolute(),
+        "permit signer socket path must be absolute"
+    );
+    let parent = socket_path
+        .parent()
+        .context("permit signer socket parent missing")?;
+    let metadata =
+        fs::symlink_metadata(parent).context("inspect permit signer socket directory")?;
     ensure!(
         metadata.file_type().is_dir()
             && metadata.uid() == SIGNER_UID
@@ -490,7 +554,9 @@ async fn serve_connection(
     pool: &PgPool,
     keys: &SigningMaterial,
 ) -> Result<()> {
-    let peer = stream.peer_cred().context("read permit operator peer credentials")?;
+    let peer = stream
+        .peer_cred()
+        .context("read permit operator peer credentials")?;
     ensure!(
         peer.uid() == OPERATOR_UID && peer.gid() == OPERATOR_GID,
         "unexpected process credentials on permit signer socket"
@@ -502,11 +568,18 @@ async fn serve_connection(
             .await
             .context("permit signer request read timeout")??;
     }
-    ensure!(!raw.is_empty() && raw.len() <= MAX_REQUEST_BYTES, "invalid permit signer request size");
-    let request: SignRequest = serde_json::from_slice(&raw).context("invalid permit signer request JSON")?;
-    let result = timeout(Duration::from_secs(5), sign_approved_permit(pool, keys, &request))
-        .await
-        .context("permit signer database/signing deadline exceeded")?;
+    ensure!(
+        !raw.is_empty() && raw.len() <= MAX_REQUEST_BYTES,
+        "invalid permit signer request size"
+    );
+    let request: SignRequest =
+        serde_json::from_slice(&raw).context("invalid permit signer request JSON")?;
+    let result = timeout(
+        Duration::from_secs(5),
+        sign_approved_permit(pool, keys, &request),
+    )
+    .await
+    .context("permit signer database/signing deadline exceeded")?;
     let response = match result {
         Ok(permit) => SignResponse {
             protocol: "XSP/2".into(),
@@ -527,7 +600,10 @@ async fn serve_connection(
         }
     };
     let response_bytes = serde_json::to_vec(&response)?;
-    ensure!(response_bytes.len() <= MAX_RESPONSE_BYTES, "permit signer response too large");
+    ensure!(
+        response_bytes.len() <= MAX_RESPONSE_BYTES,
+        "permit signer response too large"
+    );
     timeout(Duration::from_secs(3), async {
         stream.write_all(&response_bytes).await?;
         stream.shutdown().await
@@ -558,7 +634,10 @@ async fn main() -> Result<()> {
         "XSP-v2 protected permit signer ready"
     );
     loop {
-        let (stream, _) = listener.accept().await.context("accept permit signer connection")?;
+        let (stream, _) = listener
+            .accept()
+            .await
+            .context("accept permit signer connection")?;
         if serve_connection(stream, &pool, &keys).await.is_err() {
             tracing::warn!("XSP-v2 permit signer connection rejected");
         }
