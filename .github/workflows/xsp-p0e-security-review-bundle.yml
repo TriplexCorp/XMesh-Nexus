@@ -30,11 +30,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check out exact frozen Nexus review target
+      - name: Check out exact v3 Nexus review snapshot
         uses: actions/checkout@v4
         with:
           repository: TriplexCorp/XMesh-Nexus
-          ref: 8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091
+          ref: 0bab1a48cff570b3abe405bcda4dc242b23b8a4b
           path: xmesh-nexus-reviewed
           fetch-depth: 0
 
@@ -74,7 +74,7 @@ jobs:
           root = Path('dist/xsp-v2-p0e-security-review-bundle')
           manifest = json.loads((root / 'MANIFEST.json').read_text())
           assert manifest['schema'] == 'xsp2-p0e-security-review-bundle-manifest-1'
-          assert manifest['nexus']['sourceRevision'] == '8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091'
+          assert manifest['nexus']['sourceRevision'] == '0bab1a48cff570b3abe405bcda4dc242b23b8a4b'
           assert manifest['node']['sourceRevision'] == '083dc181c5e175f89007f4b93111cd5c45a69d97'
           assert manifest['reviewPackageFrozen'] is True
           for key in ('independentSecurityReviewComplete', 'physicalPowerLossQualified',
@@ -84,7 +84,7 @@ jobs:
           records = manifest['files']
           paths = [record['path'] for record in records]
           assert len(paths) == len(set(paths))
-          assert 'source/XMesh-Nexus-8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091.tar' in paths
+          assert 'source/XMesh-Nexus-0bab1a48cff570b3abe405bcda4dc242b23b8a4b.tar' in paths
           assert 'source/XMesh-Node-083dc181c5e175f89007f4b93111cd5c45a69d97.tar' in paths
           for record in records:
               path = root / record['path']
@@ -123,5 +123,6 @@ jobs:
 
       - name: State bounded non-claims
         run: |
-          echo 'PASS: reproducible reviewer convenience bundle built from the exact frozen Nexus/Node revisions.'
+          echo 'PASS: reproducible reviewer convenience bundle built from the exact v3 Nexus/Node review snapshot.'
+          echo 'The old Nexus 8c64 runtime baseline remains separately protected by the handoff runtime-equivalence check.'
           echo 'The bundle does not perform independent review, qualify physical power loss, enable strict-pq, or authorize production rollout.'

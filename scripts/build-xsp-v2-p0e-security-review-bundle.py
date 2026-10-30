@@ -135,7 +135,7 @@ def main() -> int:
     contract_bytes = contract_file.read_bytes()
     contract = json.loads(contract_bytes)
 
-    if contract.get("schema") != "xsp2-p0e-security-review-handoff-contract-2":
+    if contract.get("schema") != "xsp2-p0e-security-review-handoff-contract-3":
         fail("unsupported or stale handoff contract schema")
     if contract.get("reviewPackageFrozen") is not True:
         fail("review package is not marked frozen")

@@ -25,11 +25,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check out exact refreshed Nexus review target
+      - name: Check out exact v3 Nexus review snapshot
         uses: actions/checkout@v4
         with:
           repository: TriplexCorp/XMesh-Nexus
-          ref: 8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091
+          ref: 0bab1a48cff570b3abe405bcda4dc242b23b8a4b
           path: xmesh-nexus-reviewed
           fetch-depth: 0
 
@@ -41,41 +41,46 @@ jobs:
           path: xmesh-node-reviewed
           fetch-depth: 0
 
-      - name: Verify machine-readable refreshed handoff and external blockers
+      - name: Verify machine-readable v3 handoff and external blockers
         run: |
           set -euo pipefail
           python3 - <<'PY'
           import json
           p='deploy/xsp-v2-p0e-security-review-handoff.contract.json'
           x=json.load(open(p))
-          assert x['schema']=='xsp2-p0e-security-review-handoff-contract-2'
+          assert x['schema']=='xsp2-p0e-security-review-handoff-contract-3'
           assert x['nexus']=={
             'repository':'TriplexCorp/XMesh-Nexus',
-            'sourceRevision':'8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091',
+            'sourceRevision':'0bab1a48cff570b3abe405bcda4dc242b23b8a4b',
           }
           assert x['node']=={
             'repository':'TriplexCorp/XMesh-Node',
             'sourceRevision':'083dc181c5e175f89007f4b93111cd5c45a69d97',
           }
           assert x['previousReviewFreeze']=={
-            'handoffMerge':'7b84a9e45f9e9cf815b95a06d1560f84d8d3f0a2',
-            'nexusSourceRevision':'5cdb7825fcc51f8a7d296b992a7da4492ed2ce8e',
+            'handoffMerge':'553bbfa70d993a5c53b054ea1105fc8feb0c1827',
+            'nexusSourceRevision':'8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091',
             'nodeSourceRevision':'083dc181c5e175f89007f4b93111cd5c45a69d97',
-            'supersededForCurrentMain':True,
-            'securityRelevantNexusMergesAfterFreeze':[
-              '36ee6f7a5b1686f9c0d51beda5d24e84830982c7',
-              '03679120726ff06005eff903909b262fb1271960',
+            'supersededForCurrentReleaseControlState':True,
+            'releaseControlMergesAfterFreeze':[
+              '497def9b950d57152f2e0ca2abb7eb0657a8d22f',
+              'b71c0d0c641b5e0f6a60785586486b18dbb45db3',
+              '0bab1a48cff570b3abe405bcda4dc242b23b8a4b',
             ],
           }
-          assert x['stagingIngressHardeningCheckpoint']=={
-            'c2aRustOriginMerge':'36ee6f7a5b1686f9c0d51beda5d24e84830982c7',
-            'c2bcdRustAckRecoveryMerge':'03679120726ff06005eff903909b262fb1271960',
-            'authoritativeDocsMerge':'8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091',
+          assert x['runtimeBaseline']=={
+            'nexusSourceRevision':'8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091',
+            'nodeSourceRevision':'083dc181c5e175f89007f4b93111cd5c45a69d97',
+            'criticalRuntimePathsMustBeUnchanged':True,
           }
-          assert x['observabilityCheckpoint']=={
-            'nexusMerge':'5cdb7825fcc51f8a7d296b992a7da4492ed2ce8e',
-            'nexusImplementationMerge':'ccb9e384dca47f0c1a69c0ecd82461d523344c7a',
-            'nodeImplementationMerge':'083dc181c5e175f89007f4b93111cd5c45a69d97',
+          assert x['releaseControlCheckpoint']=={
+            'disposableCanaryRehearsalMerge':'497def9b950d57152f2e0ca2abb7eb0657a8d22f',
+            'productionRolloutPlanMerge':'b71c0d0c641b5e0f6a60785586486b18dbb45db3',
+            'strictPqActivationApprovalMerge':'0bab1a48cff570b3abe405bcda4dc242b23b8a4b',
+            'finalReleaseCanarySatisfied':False,
+            'productionActivation':False,
+            'strictPQEnabled':False,
+            'legacyXMESH1Retired':False,
           }
           domains=x['requiredReviewDomains']
           assert len(domains)==11 and len(set(domains))==11
@@ -92,7 +97,9 @@ jobs:
             'default-off-redacted-observability',
             'production-migration-no-fallback-and-rollback',
           } == set(domains)
-          assert len(x['requiredImplementationEvidence']) >= 15
+          assert len(x['requiredEvidenceDocuments']) >= 13
+          assert len(x['requiredMachineContracts']) >= 7
+          assert len(x['requiredImplementationEvidence']) >= 20
           assert x['requiredExternalBlockers']==[
             'independent-security-review-findings-and-signoff',
             'p0-e4a-five-representative-physical-abrupt-power-runs-and-independent-review',
@@ -106,10 +113,33 @@ jobs:
       - name: Verify frozen repository revisions exactly
         run: |
           set -euo pipefail
-          test "$(git -C xmesh-nexus-reviewed rev-parse HEAD)" = '8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091'
+          test "$(git -C xmesh-nexus-reviewed rev-parse HEAD)" = '0bab1a48cff570b3abe405bcda4dc242b23b8a4b'
           test "$(git -C xmesh-node-reviewed rev-parse HEAD)" = '083dc181c5e175f89007f4b93111cd5c45a69d97'
 
-      - name: Verify required evidence index exists at refreshed Nexus revision
+      - name: Prove critical runtime paths are unchanged from v2 runtime baseline
+        run: |
+          set -euo pipefail
+          baseline='8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091'
+          reviewed='0bab1a48cff570b3abe405bcda4dc242b23b8a4b'
+          changed="$(git -C xmesh-nexus-reviewed diff --name-only "$baseline" "$reviewed" -- \
+            backend \
+            app.js \
+            compose.yaml \
+            install.sh \
+            xmeshctl \
+            security/xspv2 \
+            deploy/xsp-v2-ingress \
+            deploy/node-control-agent.sh \
+            deploy/update-node-control-agent.sh \
+            deploy/xsp-v2-agent-staged-apply.sh \
+            deploy/xmesh-xsp-v2-agent-stage.service)"
+          if [ -n "$changed" ]; then
+            echo 'security-relevant runtime drift detected after v2 freeze:' >&2
+            printf '%s\n' "$changed" >&2
+            exit 1
+          fi
+
+      - name: Verify required evidence index exists at v3 Nexus snapshot
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -136,10 +166,13 @@ jobs:
             'deploy/xsp-v2-p0e-parser-fuzz.contract.json',
             'deploy/xsp-v2-p0e-mldsa65-fips204-acvp.contract.json',
             'deploy/xsp-v2-p0e-observability.contract.json',
+            'deploy/xsp-v2-disposable-canary-rehearsal.contract.json',
+            'deploy/xsp-v2-production-rollout-plan.contract.json',
+            'deploy/xsp-v2-strict-pq-activation-approval.contract.json',
           ]
           forbidden_true={
             'productionActivation','strictPQEnabled','physicalPowerLossQualified',
-            'independentSecurityReviewComplete',
+            'independentSecurityReviewComplete','legacyXMESH1Retired',
           }
           def walk(v, where='root'):
             if isinstance(v, dict):
@@ -177,6 +210,26 @@ jobs:
             node scripts/check-xsp-v2-c2c-runtime.js
           )
 
+      - name: Verify final release-control evidence is present but non-executing
+        run: |
+          set -euo pipefail
+          root=xmesh-nexus-reviewed
+          for f in \
+            docs/XSP_V2_DISPOSABLE_CANARY_REHEARSAL.md \
+            docs/XSP_V2_PRODUCTION_ROLLOUT_PLAN.md \
+            docs/XSP_V2_STRICT_PQ_ACTIVATION_APPROVAL.md \
+            scripts/verify-xsp-v2-production-rollout-plan.py \
+            scripts/verify-xsp-v2-strict-pq-activation-approval.py \
+            .github/workflows/xsp-release-disposable-canary-rehearsal.yml \
+            .github/workflows/xsp-production-rollout-plan-contract.yml \
+            .github/workflows/xsp-strict-pq-activation-approval.yml; do
+            test -s "$root/$f"
+          done
+          grep -Fq 'finalReleaseCanarySatisfied=false' "$root/docs/XSP_V2_DISPOSABLE_CANARY_REHEARSAL.md"
+          grep -Fq '"productionActivation": false' "$root/docs/XSP_V2_PRODUCTION_ROLLOUT_PLAN.md"
+          grep -Fq 'strictPQEnabled=false' "$root/docs/XSP_V2_STRICT_PQ_ACTIVATION_APPROVAL.md"
+          grep -Fq 'requiresSeparateExecution' "$root/docs/XSP_V2_STRICT_PQ_ACTIVATION_APPROVAL.md"
+
       - name: Verify normative no-fallback and open-gate statements
         run: |
           set -euo pipefail
@@ -189,20 +242,25 @@ jobs:
           grep -Fq '`strict-pq` remains OFF' "$handoff"
           grep -Fq 'production rollout remains NOT AUTHORIZED' "$handoff"
           grep -Fq 'cannot substitute' "$handoff"
-          grep -Fq '03679120726ff06005eff903909b262fb1271960' "$handoff"
+          grep -Fq '0bab1a48cff570b3abe405bcda4dc242b23b8a4b' "$handoff"
+          grep -Fq '497def9b950d57152f2e0ca2abb7eb0657a8d22f' "$handoff"
+          grep -Fq 'b71c0d0c641b5e0f6a60785586486b18dbb45db3' "$handoff"
 
-      - name: Verify no runtime source is part of this refreshed handoff delta
+      - name: Verify no runtime source is part of this v3 handoff delta
         run: |
           set -euo pipefail
-          changed="$(git diff --name-only 8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091...HEAD | sort)"
+          changed="$(git diff --name-only 0bab1a48cff570b3abe405bcda4dc242b23b8a4b...HEAD | sort)"
           expected="$(printf '%s\n' \
+            .github/workflows/xsp-p0e-security-review-bundle.yml \
             .github/workflows/xsp-p0e-security-review-handoff.yml \
             deploy/xsp-v2-p0e-security-review-handoff.contract.json \
-            docs/XSP_V2_P0E_SECURITY_REVIEW_HANDOFF.md | sort)"
+            docs/XSP_V2_P0E_SECURITY_REVIEW_BUNDLE.md \
+            docs/XSP_V2_P0E_SECURITY_REVIEW_HANDOFF.md \
+            scripts/build-xsp-v2-p0e-security-review-bundle.py | sort)"
           test "$changed" = "$expected"
 
       - name: State preparation-only evidence
         run: |
-          echo 'PASS: refreshed exact Nexus/Node security-review target and Rust implementation evidence are frozen for independent review.'
+          echo 'PASS: v3 exact Nexus/Node review snapshot includes final release controls while critical runtime paths remain unchanged from the v2 runtime baseline.'
           echo 'This CI does not perform or satisfy the independent security review and does not qualify physical power loss.'
           echo 'P0-E4a and independent review remain OPEN; strict-pq remains OFF; production rollout remains NOT AUTHORIZED.'
