@@ -226,7 +226,7 @@ jobs:
             test -s "$root/$f"
           done
           grep -Fq 'finalReleaseCanarySatisfied=false' "$root/docs/XSP_V2_DISPOSABLE_CANARY_REHEARSAL.md"
-          grep -Fq 'productionActivation=false' "$root/docs/XSP_V2_PRODUCTION_ROLLOUT_PLAN.md"
+          grep -Fq '"productionActivation": false' "$root/docs/XSP_V2_PRODUCTION_ROLLOUT_PLAN.md"
           grep -Fq 'strictPQEnabled=false' "$root/docs/XSP_V2_STRICT_PQ_ACTIVATION_APPROVAL.md"
           grep -Fq 'requiresSeparateExecution' "$root/docs/XSP_V2_STRICT_PQ_ACTIVATION_APPROVAL.md"
 
