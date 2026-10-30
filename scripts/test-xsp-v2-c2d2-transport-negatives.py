@@ -289,6 +289,15 @@ def main() -> None:
             assert_uncommitted(label, node_id, request_id, from_epoch)
             print(f"PASS: {label} is rejected with {status} and cannot mutate durable state")
 
+        def expect_required_client_cert_rejection(label: str, result: subprocess.CompletedProcess[str], node_id: int, request_id: str, from_epoch: str) -> None:
+            response = text(result)
+            if "400 Bad Request" not in response or "No required SSL certificate was sent" not in response:
+                raise RuntimeError(f"{label}: mandatory client-certificate rejection missing: {response[-1800:]}")
+            if "200 OK" in response or "202 Accepted" in response:
+                raise RuntimeError(f"{label} also contained policy success: {response[-1800:]}")
+            assert_uncommitted(label, node_id, request_id, from_epoch)
+            print(f"PASS: {label} is rejected by mandatory mTLS before ACK routing and cannot mutate durable state")
+
         try:
             command("docker", "network", "create", "--internal", network)
             for volume in volumes.values():
@@ -421,7 +430,7 @@ chmod 0444 /certs/client.pem /certs/other-client.pem /certs/classical-client.pem
                 tls_request(cert="other-client.pem", key="other-client-key.pem"),
                 "403 Forbidden", node_id, request_id, from_epoch,
             )
-            expect_http_rejection(
+            expect_required_client_cert_rejection(
                 "XMESH1 headers without authenticated PQ client identity on exact ACK route",
                 tls_request(
                     cert=None, key=None,
@@ -431,7 +440,7 @@ chmod 0444 /certs/client.pem /certs/other-client.pem /certs/classical-client.pem
                         "X-XMesh-Signature: " + "00" * 64,
                     ),
                 ),
-                "403 Forbidden", node_id, request_id, from_epoch,
+                node_id, request_id, from_epoch,
             )
             expect_http_rejection(
                 "legacy XMESH1 heartbeat path on dedicated XSP-v2 ingress",
