@@ -246,18 +246,43 @@ jobs:
           grep -Fq '497def9b950d57152f2e0ca2abb7eb0657a8d22f' "$handoff"
           grep -Fq 'b71c0d0c641b5e0f6a60785586486b18dbb45db3' "$handoff"
 
-      - name: Verify no runtime source is part of this v3 handoff delta
+      - name: Verify handoff changes are limited to review-control files
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          changed="$(git diff --name-only 0bab1a48cff570b3abe405bcda4dc242b23b8a4b...HEAD | sort)"
-          expected="$(printf '%s\n' \
+          if [ "$EVENT_NAME" = 'pull_request' ]; then
+            base="$PR_BASE_SHA"
+            head="$PR_HEAD_SHA"
+            changed="$(git diff --name-only "$base...$head" | sort)"
+          else
+            parents="$(git rev-list --parents -n 1 HEAD)"
+            parent_count=$(( $(wc -w <<<"$parents") - 1 ))
+            if [ "$parent_count" -gt 1 ]; then
+              base="$(git rev-parse HEAD^1)"
+            else
+              base="$(git rev-parse HEAD^)"
+            fi
+            changed="$(git diff --name-only "$base" HEAD | sort)"
+          fi
+
+          allowed="$(printf '%s\n' \
             .github/workflows/xsp-p0e-security-review-bundle.yml \
             .github/workflows/xsp-p0e-security-review-handoff.yml \
             deploy/xsp-v2-p0e-security-review-handoff.contract.json \
             docs/XSP_V2_P0E_SECURITY_REVIEW_BUNDLE.md \
             docs/XSP_V2_P0E_SECURITY_REVIEW_HANDOFF.md \
             scripts/build-xsp-v2-p0e-security-review-bundle.py | sort)"
-          test "$changed" = "$expected"
+
+          test -n "$changed"
+          while IFS= read -r path; do
+            grep -Fxq "$path" <<<"$allowed" || {
+              echo "non-review-control file changed in handoff delta: $path" >&2
+              exit 1
+            }
+          done <<<"$changed"
 
       - name: State preparation-only evidence
         run: |
