@@ -52,6 +52,10 @@ A successful result records:
 
 The SHA-256 of that exact result is the canary binding used by the later production rollout-plan gate and strict-PQ activation approval.
 
+## Run checkpoint
+
+The first authoritative post-P0-E run is intentionally triggered after the final-canary workflow is present on `main`, so GitHub evaluates it as a normal pull-request check against the exact candidate above.
+
 ## Non-claims
 
 This workflow does not deploy production, change DNS/firewall/Nginx production state, enable `strict-pq`, or retire XMESH1. A successful final canary advances the release sequence to the separately reviewed rollout/rollback plan.
