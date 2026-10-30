@@ -60,6 +60,8 @@ jobs:
           grep -Fq 'drop-after-c2c-success' deploy/xsp-v2-ingress/origin-ack-rs/src/main.rs scripts/test-xsp-v2-c2d2-lost-response-races.py
           grep -Fq 'test_fault != TestFault::None && c2c_gate != "staging-only"' deploy/xsp-v2-ingress/origin-ack-rs/src/main.rs
           grep -Fq 'thread::spawn(move || handle_connection' deploy/xsp-v2-ingress/origin-ack-rs/src/main.rs
+          grep -Fq 'const REQUEST_QUEUE_SIZE: i32 = 32' deploy/xsp-v2-ingress/origin-ack-rs/src/main.rs
+          grep -Fq 'listen(listener.as_raw_fd(), REQUEST_QUEUE_SIZE)' deploy/xsp-v2-ingress/origin-ack-rs/src/main.rs
           grep -Fq 'reloadVerifiedPermitForReceiptRetry' scripts/xsp-v2-c2d-race_test.go
           ! grep -Fq 'c2dRecoverHistoricalPermitForDurableReceipt' scripts/xsp-v2-c2d-race_test.go scripts/xsp-v2-c2d-node-client_test.go
           grep -Fq 'TestC2DExactFreshOutageFailsClosed' scripts/xsp-v2-c2d-race_test.go scripts/test-xsp-v2-c2d2-lost-response-races.py
