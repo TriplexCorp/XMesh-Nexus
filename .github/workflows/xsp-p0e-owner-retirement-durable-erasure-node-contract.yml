@@ -1,0 +1,146 @@
+name: XSP-v2 P0-E Node Owner-retirement Durable Erasure
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "deploy/xsp-v2-p0e-owner-retirement-durable-erasure.contract.json"
+      - "docs/XSP_V2_P0E_OWNER_RETIREMENT_DURABLE_ERASURE.md"
+      - ".github/workflows/xsp-p0e-owner-retirement-durable-erasure-node-contract.yml"
+  pull_request:
+    paths:
+      - "deploy/xsp-v2-p0e-owner-retirement-durable-erasure.contract.json"
+      - "docs/XSP_V2_P0E_OWNER_RETIREMENT_DURABLE_ERASURE.md"
+      - ".github/workflows/xsp-p0e-owner-retirement-durable-erasure-node-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  node-durable-owner-retirement-erasure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out exact merged XMesh-Node durable erasure source
+        uses: actions/checkout@v4
+        with:
+          repository: TriplexCorp/XMesh-Node
+          ref: 3d2fc155ead11e86a2872ad12fbe28f157bb24db
+          path: xmesh-node
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache: false
+
+      - name: Verify contract and exact Node PR 48 delta
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          p='deploy/xsp-v2-p0e-owner-retirement-durable-erasure.contract.json'
+          x=json.load(open(p))
+          assert x['schema']=='xsp2-p0e-owner-retirement-durable-erasure-contract-1'
+          assert x['node']['repository']=='TriplexCorp/XMesh-Node'
+          assert x['node']['sourceRevision']=='3d2fc155ead11e86a2872ad12fbe28f157bb24db'
+          assert x['node']['pullRequest']==48
+          assert x['node']['previousReviewedRevision']=='cd1f187a06ea6f320023027e06e1a57d2be81af3'
+          assert x['authorizationDomain']=='XSP2-OWNER-RETIRE-PREVIOUS-V1'
+          assert x['retirementMarkerDomain']=='XSP2-RETIRED-ROTATION-V1'
+          assert x['retirementMarkerAuthentication']=='HMAC-SHA256 existing Agent master key'
+          assert x['authorizationDigestBindsBothOwnerSignatures'] is True
+          assert x['durableIntentBeforeErasure'] is True
+          assert x['retiredSnapshots']==['.previous','.next']
+          assert x['activeVaultErasureAllowed'] is False
+          assert x['epochFloorErasureAllowed'] is False
+          assert x['parentDirectoryFsyncAfterEachDeletion'] is True
+          assert x['crashCheckpoints']==['after-retirement-intent','after-retirement-previous','after-retirement-next']
+          assert x['exactResumeAfterDurableIntent'] is True
+          assert x['retirementRollbackFloor'] is True
+          assert x['retirementMarkersChainMonotonically'] is True
+          assert x['reintroducedRetiredSnapshotsRejected'] is True
+          assert x['vaultReinitializationOverRetirementHistoryRejected'] is True
+          assert x['singleNonTestAgentCaller'] is True
+          assert x['ownerPrivateKeysRemainOffHost'] is True
+          assert x['networkRouteAdded'] is False
+          assert x['physicalPowerLossQualified'] is False
+          assert x['productionActivation'] is False
+          assert x['strictPQEnabled'] is False
+          PY
+
+          cd xmesh-node
+          old=cd1f187a06ea6f320023027e06e1a57d2be81af3
+          new=3d2fc155ead11e86a2872ad12fbe28f157bb24db
+          git cat-file -e "$old^{commit}"
+          git cat-file -e "$new^{commit}"
+          actual="$(git diff --name-only "$old" "$new" | sort)"
+          expected="$(printf '%s\n' \
+            .github/workflows/xsp-p0d-agent.yml \
+            .github/workflows/xsp-p0e-owner-retirement-durable-erasure.yml \
+            agent/xspv2/recovery/retirement.go \
+            agent/xspv2/recovery/retirement_erasure_crash_linux_test.go \
+            agent/xspv2/recovery/retirement_erasure_test.go \
+            security/xspv2/poc-go/keyring/applied_attestation.go \
+            security/xspv2/poc-go/keyring/retained_rotation.go \
+            security/xspv2/poc-go/keyring/retirement.go \
+            security/xspv2/poc-go/keyring/retirement_crash_linux_test.go \
+            security/xspv2/poc-go/keyring/retirement_floor_test.go \
+            security/xspv2/poc-go/keyring/retirement_test.go \
+            security/xspv2/poc-go/keyring/sealed.go \
+            security/xspv2/poc-go/keyring/two_phase.go | sort)"
+          test "$actual" = "$expected"
+
+      - name: Verify durable erasure and fail-closed source boundaries
+        working-directory: xmesh-node
+        run: |
+          set -euo pipefail
+          grep -Fq 'XSP2-RETIRED-ROTATION-V1' security/xspv2/poc-go/keyring/retirement.go
+          grep -Fq 'hmac.New(sha256.New, key)' security/xspv2/poc-go/keyring/retirement.go
+          grep -Fq 'RetirementAuthorizationDigest' agent/xspv2/recovery/retirement.go
+          grep -Fq 'RetireAuthorizedPrevious' agent/xspv2/recovery/retirement.go
+          grep -Fq 'after-retirement-intent' security/xspv2/poc-go/keyring/retirement.go
+          grep -Fq 'after-retirement-previous' security/xspv2/poc-go/keyring/retirement.go
+          grep -Fq 'after-retirement-next' security/xspv2/poc-go/keyring/retirement.go
+          grep -Fq 'retirement floor rejected rolled-back persisted epoch floor' security/xspv2/poc-go/keyring/retirement.go
+          grep -Fq 'retirement history exists; vault reinitialization refused' security/xspv2/poc-go/keyring/sealed.go
+
+          test "$(grep -c 'os.Remove(previousPath(vault))' security/xspv2/poc-go/keyring/retirement.go)" -eq 1
+          test "$(grep -c 'os.Remove(stagedPath(vault))' security/xspv2/poc-go/keyring/retirement.go)" -eq 1
+          ! grep -n 'os.Remove(vault)' security/xspv2/poc-go/keyring/retirement.go
+          ! grep -n 'os.Remove(floorPath' security/xspv2/poc-go/keyring/retirement.go
+          test "$(grep -c 'syncParent(vault)' security/xspv2/poc-go/keyring/retirement.go)" -ge 2
+
+          ! grep -R -n -E 'net/http|http[.]|XMESH1|strict-pq=on|CreateMasterKey|Generate\(' \
+            agent/xspv2/recovery/retirement.go \
+            security/xspv2/poc-go/keyring/retirement.go
+
+          mapfile -t production_calls < <(grep -R -n --include='*.go' --exclude='*_test.go' \
+            'keyring.RetireAppliedRotation(' agent/xspv2 || true)
+          printf '%s\n' "${production_calls[@]}"
+          test "${#production_calls[@]}" -eq 1
+          [[ "${production_calls[0]}" == agent/xspv2/recovery/retirement.go:* ]]
+
+          grep -Fq "! -name '*_test.go'" .github/workflows/xsp-p0d-agent.yml
+
+      - name: Re-run pinned Go 1.27 Agent proof
+        working-directory: xmesh-node/agent/xspv2
+        run: go test ./... -count=1
+
+      - name: Re-run keyring retirement and rollback-floor proof
+        working-directory: xmesh-node/security/xspv2/poc-go
+        run: go test ./keyring/... -count=1
+
+      - name: Re-run keyring retirement crash matrix
+        working-directory: xmesh-node/security/xspv2/poc-go
+        run: go test -tags xspv2_crash_test ./keyring -run '^TestRetireAppliedRotationCrashMatrix$' -count=1
+
+      - name: Re-run owner-authorized resume crash proof
+        working-directory: xmesh-node/agent/xspv2
+        run: go test -tags xspv2_crash_test ./recovery -run '^TestRetireAuthorizedPreviousResumesAfterDurableIntentPastExpiry$' -count=1
+
+      - name: State bounded evidence only
+        run: |
+          echo 'PASS: exact merged Node PR #48 crash-safe owner-authorized old-key erasure is pinned and independently re-verified.'
+          echo 'Only retained .previous/.next snapshots may be erased after a durable authenticated intent; active vault/floor remain protected.'
+          echo 'P0-E4a remains OPEN; strict-pq remains OFF; production rollout remains NOT AUTHORIZED.'
