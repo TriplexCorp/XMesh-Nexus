@@ -536,6 +536,21 @@ def validate(
     expect_equal(candidate["agentArtifactSha256"], args.expected_agent_artifact_sha256, "releaseCandidate.agentArtifactSha256")
     expect_equal(candidate["finalCanaryResultSha256"], args.expected_final_canary_sha256, "releaseCandidate.finalCanaryResultSha256")
     expect_equal(candidate["rolloutPlanSha256"], args.expected_rollout_plan_sha256, "releaseCandidate.rolloutPlanSha256")
+    if (
+        args.expected_security_review_result_sha256 is not None
+        and evidence["independentSecurityReviewResultSha256"] != args.expected_security_review_result_sha256
+    ):
+        fail("evidence.independentSecurityReviewResultSha256 does not match expected external review evidence")
+    if (
+        args.expected_physical_qualification_result_sha256 is not None
+        and evidence["physicalPowerQualificationResultSha256"] != args.expected_physical_qualification_result_sha256
+    ):
+        fail("evidence.physicalPowerQualificationResultSha256 does not match expected physical qualification evidence")
+    if (
+        args.expected_rollout_plan_verifier_result_sha256 is not None
+        and evidence["rolloutPlanVerifierResultSha256"] != args.expected_rollout_plan_verifier_result_sha256
+    ):
+        fail("evidence.rolloutPlanVerifierResultSha256 does not match expected rollout-plan verifier evidence")
 
     evidence_ready = all(
         evidence[name]
@@ -563,6 +578,9 @@ def validate(
                 ("--expected-agent-artifact-sha256", args.expected_agent_artifact_sha256),
                 ("--expected-final-canary-sha256", args.expected_final_canary_sha256),
                 ("--expected-rollout-plan-sha256", args.expected_rollout_plan_sha256),
+                ("--expected-security-review-result-sha256", args.expected_security_review_result_sha256),
+                ("--expected-physical-qualification-result-sha256", args.expected_physical_qualification_result_sha256),
+                ("--expected-rollout-plan-verifier-result-sha256", args.expected_rollout_plan_verifier_result_sha256),
             )
             if value is None
         ]
@@ -612,6 +630,9 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--expected-agent-artifact-sha256")
     p.add_argument("--expected-final-canary-sha256")
     p.add_argument("--expected-rollout-plan-sha256")
+    p.add_argument("--expected-security-review-result-sha256")
+    p.add_argument("--expected-physical-qualification-result-sha256")
+    p.add_argument("--expected-rollout-plan-verifier-result-sha256")
     p.add_argument("--now", help="ISO-8601 verification time; defaults to current UTC")
     return p
 

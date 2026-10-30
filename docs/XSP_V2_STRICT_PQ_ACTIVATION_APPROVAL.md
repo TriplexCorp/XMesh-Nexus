@@ -29,7 +29,10 @@ An eligibility-checking invocation requires exact expected values for:
 - Nexus production image SHA-256;
 - Agent artifact SHA-256;
 - final **post-P0-E** canary result SHA-256;
-- independently reviewed production rollout-plan SHA-256.
+- independently reviewed production rollout-plan SHA-256;
+- independently validated security-review result SHA-256;
+- independently validated physical-qualification result SHA-256;
+- rollout-plan verifier-result SHA-256.
 
 The approval itself must additionally record accepted evidence for:
 
@@ -87,7 +90,10 @@ python3 scripts/verify-xsp-v2-strict-pq-activation-approval.py \
   --expected-nexus-image-sha256 sha256:<64-hex> \
   --expected-agent-artifact-sha256 <64-hex> \
   --expected-final-canary-sha256 <64-hex> \
-  --expected-rollout-plan-sha256 <64-hex>
+  --expected-rollout-plan-sha256 <64-hex> \
+  --expected-security-review-result-sha256 <64-hex> \
+  --expected-physical-qualification-result-sha256 <64-hex> \
+  --expected-rollout-plan-verifier-result-sha256 <64-hex>
 ```
 
 The real execution step must consume the same exact identities and approval digest. This PR deliberately does not define or run that execution step because the real external P0-E evidence does not yet exist.
