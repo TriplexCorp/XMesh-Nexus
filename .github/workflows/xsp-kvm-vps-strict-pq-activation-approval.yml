@@ -1,0 +1,89 @@
+name: XSP-v2 KVM VPS Strict-PQ Activation Approval
+
+on:
+  pull_request:
+    paths:
+      - "deploy/xsp-v2-kvm-vps-strict-pq-activation-approval.contract.json"
+      - "scripts/verify-xsp-v2-kvm-vps-strict-pq-activation-approval.py"
+      - "docs/XSP_V2_KVM_VPS_STRICT_PQ_ACTIVATION_APPROVAL.md"
+      - ".github/workflows/xsp-kvm-vps-strict-pq-activation-approval.yml"
+  push:
+    branches: [main]
+    paths:
+      - "deploy/xsp-v2-kvm-vps-strict-pq-activation-approval.contract.json"
+      - "scripts/verify-xsp-v2-kvm-vps-strict-pq-activation-approval.py"
+      - "docs/XSP_V2_KVM_VPS_STRICT_PQ_ACTIVATION_APPROVAL.md"
+      - ".github/workflows/xsp-kvm-vps-strict-pq-activation-approval.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  kvm-vps-activation-approval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile verifier and generate fixtures
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/verify-xsp-v2-kvm-vps-strict-pq-activation-approval.py
+          work="$RUNNER_TEMP/kvm-approval"; mkdir -p "$work"
+          python3 - "$work" <<'PY'
+          import copy,json,os,sys
+          root=sys.argv[1]
+          base={
+            'schema':'xsp2-kvm-vps-strict-pq-activation-approval-1',
+            'deploymentClass':'kvm-vps',
+            'releaseCandidate':{
+              'nexusRuntimeRevision':'12b3170996bc062ee16c79659a6378e5e425fd0e',
+              'nodeRevision':'34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb',
+              'nexusImageSha256':'sha256:'+'1'*64,'agentArtifactSha256':'2'*64},
+            'evidence':{
+              'independentSecurityReviewAccepted':True,'independentSecurityReviewResultSha256':'3'*64,
+              'kvmVpsDurabilityQualificationAccepted':True,'kvmVpsDurabilityResultSha256':'4'*64,
+              'providerStorageRiskAccepted':True,
+              'finalCanaryPassed':True,'finalCanaryResultSha256':'5'*64,
+              'rolloutPlanReviewed':True,'rolloutPlanSha256':'6'*64,'rolloutPlanReviewSha256':'7'*64},
+            'scope':{'mode':'limited-canary','nodes':['node-0001'],'validFrom':'2026-10-30T12:00:00Z','validUntil':'2026-10-30T18:00:00Z'},
+            'transportPolicy':{'tlsProtocols':['TLSv1.3'],'keyExchange':'X25519MLKEM768','clientIdentity':'ML-DSA-65','criticalMessageSignatures':['Ed25519','ML-DSA-65'],'automaticFallback':False,'classicalOnlyAllowed':False},
+            'decision':{'strictPqAction':'enable','legacyXMESH1Action':'retain'},
+            'approval':{'authority':'release-owner','approvedBy':'release-owner-0001','approvedAt':'2026-10-30T13:00:00Z','statement':'Authorize bounded KVM VPS strict-PQ activation after exact evidence review.'},
+            'claims':{'productionActivation':False,'strictPQEnabled':False,'legacyXMESH1Retired':False,'physicalPowerLossQualified':False},
+          }
+          def write(name,obj): open(os.path.join(root,name),'w').write(json.dumps(obj,sort_keys=True,separators=(',',':'))+'\n')
+          write('eligible.json',base)
+          bad=copy.deepcopy(base); bad['deploymentClass']='bare-metal'; write('wrong-class.json',bad)
+          bad=copy.deepcopy(base); bad['releaseCandidate']['nodeRevision']='8'*40; write('wrong-target.json',bad)
+          bad=copy.deepcopy(base); bad['evidence']['kvmVpsDurabilityQualificationAccepted']=False; write('no-kvm-durability.json',bad)
+          bad=copy.deepcopy(base); bad['evidence']['providerStorageRiskAccepted']=False; write('no-provider-risk.json',bad)
+          bad=copy.deepcopy(base); bad['transportPolicy']['automaticFallback']=True; write('fallback.json',bad)
+          bad=copy.deepcopy(base); bad['claims']['physicalPowerLossQualified']=True; write('false-physical.json',bad)
+          bad=copy.deepcopy(base); bad['scope']['nodes']=['node-0001']*2; write('duplicate-node.json',bad)
+          bad=copy.deepcopy(base); bad['scope']['validUntil']='2026-10-31T14:00:01Z'; write('long-window.json',bad)
+          PY
+
+      - name: Prove eligible approval remains non-executing
+        run: |
+          set -euo pipefail
+          out="$(python3 scripts/verify-xsp-v2-kvm-vps-strict-pq-activation-approval.py --approval "$RUNNER_TEMP/kvm-approval/eligible.json")"
+          echo "$out"
+          echo "$out" | grep -Fq '"status":"kvm-vps-strict-pq-approval-eligible"'
+          echo "$out" | grep -Fq '"requiresSeparateExecution":true'
+          echo "$out" | grep -Fq '"strictPQEnabled":false'
+          echo "$out" | grep -Fq '"productionActivation":false'
+          echo "$out" | grep -Fq '"physicalPowerLossQualified":false'
+
+      - name: Prove wrong profile and weakened gates fail closed
+        run: |
+          set -euo pipefail
+          for f in wrong-class wrong-target no-kvm-durability no-provider-risk fallback false-physical duplicate-node long-window; do
+            if python3 scripts/verify-xsp-v2-kvm-vps-strict-pq-activation-approval.py --approval "$RUNNER_TEMP/kvm-approval/$f.json"; then
+              echo "$f unexpectedly validated" >&2; exit 1
+            fi
+          done
+
+      - name: State bounded authorization only
+        run: |
+          echo 'PASS: KVM VPS strict-PQ approval requires review + KVM durability + provider-risk acceptance + canary + reviewed rollout plan.'
+          echo 'The verifier never activates production; execution remains separate.'
