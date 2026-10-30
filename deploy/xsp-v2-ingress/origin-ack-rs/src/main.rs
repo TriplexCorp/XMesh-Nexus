@@ -119,11 +119,11 @@ impl Config {
 
         let ack_gate = env::var("XSP_V2_C2B_ACK_ROUTE").unwrap_or_default();
         let c2c_gate = env::var("XSP_V2_C2C_ACK_AUTH").unwrap_or_default();
-        if c2c_gate != "" && c2c_gate != "staging-only" {
+        if !c2c_gate.is_empty() && c2c_gate != "staging-only" {
             return Err("XSP_V2_C2C_ACK_AUTH must be unset or staging-only".to_owned());
         }
         let recovery_gate = env::var("XSP_V2_C2D_HISTORICAL_RECOVERY").unwrap_or_default();
-        if recovery_gate != "" && recovery_gate != "staging-only" {
+        if !recovery_gate.is_empty() && recovery_gate != "staging-only" {
             return Err("XSP_V2_C2D_HISTORICAL_RECOVERY must be unset or staging-only".to_owned());
         }
         let c2c_socket_path = PathBuf::from(
@@ -360,14 +360,14 @@ fn percent_decode(value: &str) -> Vec<u8> {
     let mut output = Vec::with_capacity(bytes.len());
     let mut index = 0;
     while index < bytes.len() {
-        if bytes[index] == b'%' && index + 2 < bytes.len() {
-            if let (Some(high), Some(low)) =
+        if bytes[index] == b'%'
+            && index + 2 < bytes.len()
+            && let (Some(high), Some(low)) =
                 (hex_value(bytes[index + 1]), hex_value(bytes[index + 2]))
-            {
-                output.push((high << 4) | low);
-                index += 3;
-                continue;
-            }
+        {
+            output.push((high << 4) | low);
+            index += 3;
+            continue;
         }
         output.push(bytes[index]);
         index += 1;
