@@ -8,8 +8,6 @@ XMesh Nexus управляет Nodes, пользователями, подпис
 
 ## Текущий XSP-v2 checkpoint — 30 октября 2026
 
-**Текущий `main`:** `6c901233da816b90021f03dc766c039ad3c7f070`, merge PR #159.
-
 ### P0-E: repo-side подготовка завершена, production activation пока запрещён
 
 Вся текущая repo-side подготовка к production PQ собрана и fail-closed:

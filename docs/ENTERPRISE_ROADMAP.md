@@ -8,7 +8,6 @@ A green test proves only its stated boundary. Code existence ≠ E2E ≠ indepen
 
 ## Current source state
 
-- **Current Nexus `main`:** `6c901233da816b90021f03dc766c039ad3c7f070` — merge of PR #159.
 - **Current independent-review snapshot:** Nexus `0bab1a48cff570b3abe405bcda4dc242b23b8a4b` + Node `083dc181c5e175f89007f4b93111cd5c45a69d97`.
 - **Protected Nexus runtime baseline:** `8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091`.
 - **Production state:** `strict-pq=OFF`, `productionActivation=false`, XMESH1 retained.

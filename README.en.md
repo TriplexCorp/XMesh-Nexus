@@ -8,8 +8,6 @@ XMesh Nexus manages Nodes, users, subscriptions, Xray configuration, telemetry, 
 
 ## Current XSP-v2 checkpoint — 30 October 2026
 
-**Current `main`:** `6c901233da816b90021f03dc766c039ad3c7f070`, merge of PR #159.
-
 ### P0-E: repo-side preparation is complete; production activation is still prohibited
 
 All current repo-side preparation for production PQ is implemented and fail-closed:
