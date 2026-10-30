@@ -2,9 +2,13 @@
   "schema": "xsp2-p0e4a5-lab-operation-contract-1",
   "node": {
     "repository": "TriplexCorp/XMesh-Node",
-    "powercutSourceRevision": "50c770c8bbb917b04ca893ac5b8d29e6c7f9af7e",
-    "labRunnerRevision": "7bf8cc92950f396e33891c8744c1f6855414154b",
-    "labRunnerPullRequest": 45
+    "powercutSourceRevision": "34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb",
+    "labRunnerRevision": "34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb",
+    "qualificationTargetPullRequest": 52,
+    "powercutHookOriginRevision": "50c770c8bbb917b04ca893ac5b8d29e6c7f9af7e",
+    "powercutHookOriginPullRequest": 44,
+    "labRunnerOriginRevision": "7bf8cc92950f396e33891c8744c1f6855414154b",
+    "labRunnerOriginPullRequest": 45
   },
   "requiredCheckpoints": [
     "after-previous",
