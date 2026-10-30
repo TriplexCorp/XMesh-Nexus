@@ -487,29 +487,17 @@ chmod 0444 /certs/unrelated.pem /certs/client.pem /certs/other-client.pem \
         # Even with filesystem access and shared GID, a process under a different
         # UID cannot forge Nginx client-cert evidence directly into the origin UDS.
         forged_direct = r'''
-import socket
-path = "/run/xmesh-origin/xsp-v2-origin.sock"
-s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-s.settimeout(3)
-s.connect(path)
-s.sendall(b"GET /identity-probe HTTP/1.1\r\nHost: forged\r\nX-XSP-V2-Client-Verify: SUCCESS\r\nX-XSP-V2-Client-Cert: forged\r\nConnection: close\r\n\r\n")
-data = b""
-while True:
-    try:
-        part = s.recv(4096)
-    except socket.timeout:
-        break
-    if not part:
-        break
-    data += part
-print(data.decode("utf-8", "replace"))
-if b"403" not in data or b"200 OK" in data:
-    raise SystemExit(1)
+set -eu
+request='GET /identity-probe HTTP/1.1\r\nHost: forged\r\nX-XSP-V2-Client-Verify: SUCCESS\r\nX-XSP-V2-Client-Cert: forged\r\nConnection: close\r\n\r\n'
+response="$(printf '%b' "$request" | nc -w 3 -U /run/xmesh-origin/xsp-v2-origin.sock || true)"
+printf '%s\n' "$response"
+printf '%s' "$response" | grep -q '403 Forbidden'
+! printf '%s' "$response" | grep -q '200 OK'
 '''
         command(
             "docker", "run", "--rm", "--network", "none", "--user", "10005:10003",
             "--mount", f"type=volume,src={origin_socket},dst=/run/xmesh-origin,readonly",
-            "--entrypoint", "python3", origin_image, "-c", forged_direct,
+            "--entrypoint", "/bin/sh", probe_image, "-ceu", forged_direct,
             timeout=10,
         )
         print("PASS: Unix SO_PEERCRED rejects forged origin calls from a different UID")

@@ -50,6 +50,12 @@ jobs:
           apt-get update
           apt-get install -y --no-install-recommends openssl nginx ca-certificates python3
           openssl version
+      - name: Format, compile and unit-test Rust C2-A origin probe
+        run: |
+          rustup component add rustfmt
+          rustfmt --edition 2024 --check deploy/xsp-v2-ingress/origin_probe.rs
+          rustc --edition=2024 --test deploy/xsp-v2-ingress/origin_probe.rs -o "$RUNNER_TEMP/xsp-origin-probe-tests"
+          "$RUNNER_TEMP/xsp-origin-probe-tests"
       - name: Build isolated Go TLS probe
         run: |
           cd xmesh-node/security/xspv2/poc-go

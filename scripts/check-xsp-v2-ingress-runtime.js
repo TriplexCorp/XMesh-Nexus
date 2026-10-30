@@ -12,7 +12,7 @@ function must(condition, message) {
 
 const dockerfile = read('deploy/xsp-v2-ingress/Dockerfile');
 const nginx = read('deploy/xsp-v2-ingress/nginx.conf');
-const originProbe = read('deploy/xsp-v2-ingress/origin_probe.py');
+const originProbe = read('deploy/xsp-v2-ingress/origin_probe.rs');
 const compose = read('compose.yaml');
 const installer = read('install.sh');
 const main = read('backend/src/main.rs');
@@ -20,13 +20,23 @@ const nginxActive = nginx
   .split('\n')
   .filter(line => !line.trimStart().startsWith('#'))
   .join('\n');
+const originStage = dockerfile.split('FROM debian:trixie-slim AS origin-probe')[1]
+  ?.split('FROM origin-probe AS origin-ack-gate')[0] || '';
 
 must(/USER\s+10003:10003/.test(dockerfile), 'ingress runtime must use dedicated non-root UID/GID');
 must(/EXPOSE\s+8444/.test(dockerfile), 'ingress runtime must expose only dedicated container port 8444');
 must(!/openssl\s+ca-certificates/.test(dockerfile.split('FROM runtime-base AS runtime')[0]),
   'ingress runtime should not need the OpenSSL CLI');
+must(/FROM\s+rust:1\.99-trixie\s+AS\s+origin-probe-builder/.test(dockerfile),
+  'C2-A origin probe must be compiled with the pinned Rust builder');
 must(/FROM\s+debian:trixie-slim\s+AS\s+origin-probe/.test(dockerfile),
   'C2-A disposable origin-probe image target missing');
+must(/COPY\s+--from=origin-probe-builder\s+\/tmp\/xsp-origin-probe\s+\/usr\/local\/bin\/xsp-origin-probe/.test(dockerfile),
+  'C2-A runtime must copy only the compiled Rust origin binary');
+must(/ENTRYPOINT\s+\["\/usr\/local\/bin\/xsp-origin-probe"\]/.test(originStage),
+  'C2-A runtime must execute the compiled Rust origin binary directly');
+must(!/\bpython3\b/.test(originStage) && !/origin_probe\.py/.test(originStage),
+  'C2-A origin runtime must not contain or execute Python');
 must(/USER\s+10004:10003/.test(dockerfile),
   'origin probe must use separate UID and shared ingress GID');
 
@@ -69,6 +79,8 @@ must(originProbe.includes('XSP_EXPECTED_CLIENT_SPKI_SHA256'),
   'origin probe must pin the client SPKI rather than trust a caller Node ID');
 must(originProbe.includes('XSP_EXPECTED_INGRESS_UID') && originProbe.includes('XSP_EXPECTED_INGRESS_GID'),
   'origin probe must pin ingress UID/GID');
+must(originProbe.includes('Command::new("openssl")'),
+  'Rust origin probe must preserve direct SPKI extraction through the reviewed OpenSSL boundary');
 must(!originProbe.includes('X-XSP-V2-Trusted-Node-ID'),
   'origin probe must not trust a forwarded Node ID header');
 
@@ -79,4 +91,4 @@ for (const source of [compose, installer]) {
 must(!main.includes('"/api/v2/node/keys/rotation/ack"'),
   'ACK route must remain unmounted until C2-A origin identity is proven');
 
-console.log('XSP-v2 ingress C2-A contract: OK (hybrid TLS, mTLS identity probe, Unix peercred origin, ACK unmounted)');
+console.log('XSP-v2 ingress C2-A contract: OK (Rust origin, hybrid TLS, mTLS identity probe, Unix peercred, ACK unmounted)');
