@@ -10,7 +10,10 @@ mod xsp_v2_permit_ledger_writer;
 mod xsp_v2_signed_cutover;
 
 use anyhow::{Context, Result, ensure};
-use argon2::{Argon2, password_hash::{PasswordHash, PasswordVerifier}};
+use argon2::{
+    Argon2,
+    password_hash::{PasswordHash, PasswordVerifier},
+};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use ed25519_dalek::VerifyingKey;
 use openssl::pkey::{KeyType, PKey};
@@ -119,16 +122,26 @@ fn parse_args() -> Result<Args> {
             && request_id.bytes().all(|byte| byte.is_ascii_graphic()),
         "request ID must be 1..64 printable ASCII bytes"
     );
-    Ok(Args { node_id, owner, request_id })
+    Ok(Args {
+        node_id,
+        owner,
+        request_id,
+    })
 }
 
 fn read_password() -> Result<String> {
     let mut password = String::new();
-    io::stdin().lock().read_line(&mut password).context("read owner password from stdin")?;
+    io::stdin()
+        .lock()
+        .read_line(&mut password)
+        .context("read owner password from stdin")?;
     while matches!(password.as_bytes().last(), Some(b'\n' | b'\r')) {
         password.pop();
     }
-    ensure!(!password.is_empty() && password.len() <= 1024, "invalid owner password input");
+    ensure!(
+        !password.is_empty() && password.len() <= 1024,
+        "invalid owner password input"
+    );
     Ok(password)
 }
 
@@ -148,16 +161,25 @@ fn key_id(prefix: &str, public: &[u8]) -> String {
 
 fn decode_canonical_b64(value: &str, exact: usize) -> Result<Vec<u8>> {
     let raw = STANDARD.decode(value).context("invalid panel pin Base64")?;
-    ensure!(raw.len() == exact && STANDARD.encode(&raw) == value, "noncanonical panel pin Base64");
+    ensure!(
+        raw.len() == exact && STANDARD.encode(&raw) == value,
+        "noncanonical panel pin Base64"
+    );
     Ok(raw)
 }
 
 fn load_panel_pin(path: &Path, node_id: i64) -> Result<TrustedPublic> {
     let metadata = fs::symlink_metadata(path)
         .with_context(|| format!("inspect panel pin {}", path.display()))?;
-    ensure!(metadata.file_type().is_file(), "panel pin must be a regular file");
+    ensure!(
+        metadata.file_type().is_file(),
+        "panel pin must be a regular file"
+    );
     ensure!(metadata.uid() == 0, "panel pin must be root-owned");
-    ensure!(metadata.permissions().mode() & 0o022 == 0, "panel pin must not be group/world writable");
+    ensure!(
+        metadata.permissions().mode() & 0o022 == 0,
+        "panel pin must not be group/world writable"
+    );
     ensure!(metadata.len() <= 16 * 1024, "panel pin file too large");
     let pin: PanelPinFile = serde_json::from_slice(&fs::read(path).context("read panel pin")?)
         .context("invalid panel pin JSON")?;
@@ -169,7 +191,10 @@ fn load_panel_pin(path: &Path, node_id: i64) -> Result<TrustedPublic> {
     );
     let ed_public = decode_canonical_b64(&pin.ed25519_public_b64, 32)?;
     let pq_public = decode_canonical_b64(&pin.mldsa65_public_b64, 1952)?;
-    let ed_array: [u8; 32] = ed_public.as_slice().try_into().context("panel Ed25519 length")?;
+    let ed_array: [u8; 32] = ed_public
+        .as_slice()
+        .try_into()
+        .context("panel Ed25519 length")?;
     VerifyingKey::from_bytes(&ed_array).context("invalid panel Ed25519 public key")?;
     PKey::public_key_from_raw_bytes_ex(None, KeyType::ML_DSA_65, None, &pq_public)
         .context("invalid panel ML-DSA-65 public key/provider")?;
@@ -179,7 +204,10 @@ fn load_panel_pin(path: &Path, node_id: i64) -> Result<TrustedPublic> {
         "panel pin key IDs do not match exact public bytes"
     );
     let node_id = u64::try_from(node_id).context("panel pin Node ID overflow")?;
-    ensure!(pin.issuer_id != format!("node-{node_id}"), "panel pin issuer impersonates Node");
+    ensure!(
+        pin.issuer_id != format!("node-{node_id}"),
+        "panel pin issuer impersonates Node"
+    );
     Ok(TrustedPublic {
         purpose: "panel_response".into(),
         issuer_id: pin.issuer_id,
@@ -198,8 +226,12 @@ async fn connect_pool() -> Result<PgPool> {
         .acquire_timeout(Duration::from_secs(5))
         .after_connect(|connection, _| {
             Box::pin(async move {
-                sqlx::query("SET statement_timeout='5s'").execute(&mut *connection).await?;
-                sqlx::query("SET lock_timeout='3s'").execute(connection).await?;
+                sqlx::query("SET statement_timeout='5s'")
+                    .execute(&mut *connection)
+                    .await?;
+                sqlx::query("SET lock_timeout='3s'")
+                    .execute(connection)
+                    .await?;
                 Ok(())
             })
         })
@@ -209,22 +241,33 @@ async fn connect_pool() -> Result<PgPool> {
 }
 
 async fn validate_database_identity(pool: &PgPool) -> Result<()> {
-    let current_user: String = sqlx::query_scalar("SELECT current_user").fetch_one(pool).await?;
-    ensure!(current_user == "xmesh_app", "protected permit operator must use xmesh_app database role");
+    let current_user: String = sqlx::query_scalar("SELECT current_user")
+        .fetch_one(pool)
+        .await?;
+    ensure!(
+        current_user == "xmesh_app",
+        "protected permit operator must use xmesh_app database role"
+    );
     let privileged: bool = sqlx::query_scalar(
         "SELECT rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication OR rolbypassrls
-         FROM pg_roles WHERE rolname=current_user"
+         FROM pg_roles WHERE rolname=current_user",
     )
     .fetch_one(pool)
     .await?;
-    ensure!(!privileged, "protected permit operator database role is privileged");
+    ensure!(
+        !privileged,
+        "protected permit operator database role is privileged"
+    );
     Ok(())
 }
 
 fn inspect_socket(path: &Path) -> Result<()> {
     let metadata = fs::symlink_metadata(path)
         .with_context(|| format!("inspect permit signer socket {}", path.display()))?;
-    ensure!(metadata.file_type().is_socket(), "permit signer path is not a Unix socket");
+    ensure!(
+        metadata.file_type().is_socket(),
+        "permit signer path is not a Unix socket"
+    );
     ensure!(
         metadata.uid() == SIGNER_UID
             && metadata.gid() == SOCKET_GROUP
@@ -249,11 +292,16 @@ async fn request_signed_permit(
         authenticated_owner: owner.into(),
     };
     let raw = serde_json::to_vec(&request)?;
-    ensure!(raw.len() <= MAX_REQUEST_BYTES, "permit signer request too large");
+    ensure!(
+        raw.len() <= MAX_REQUEST_BYTES,
+        "permit signer request too large"
+    );
     let mut stream = timeout(Duration::from_secs(3), UnixStream::connect(socket_path))
         .await
         .context("permit signer socket connect timeout")??;
-    let peer = stream.peer_cred().context("read permit signer peer credentials")?;
+    let peer = stream
+        .peer_cred()
+        .context("read permit signer peer credentials")?;
     ensure!(
         peer.uid() == SIGNER_UID && peer.gid() == SIGNER_GID,
         "unexpected peer on permit signer socket"
@@ -267,13 +315,19 @@ async fn request_signed_permit(
     let mut response_raw = Vec::new();
     {
         let mut limited = (&mut stream).take((MAX_RESPONSE_BYTES + 1) as u64);
-        timeout(Duration::from_secs(6), limited.read_to_end(&mut response_raw))
-            .await
-            .context("permit signer response read timeout")??;
+        timeout(
+            Duration::from_secs(6),
+            limited.read_to_end(&mut response_raw),
+        )
+        .await
+        .context("permit signer response read timeout")??;
     }
-    ensure!(!response_raw.is_empty() && response_raw.len() <= MAX_RESPONSE_BYTES, "invalid permit signer response size");
-    let response: SignResponse = serde_json::from_slice(&response_raw)
-        .context("invalid permit signer response JSON")?;
+    ensure!(
+        !response_raw.is_empty() && response_raw.len() <= MAX_RESPONSE_BYTES,
+        "invalid permit signer response size"
+    );
+    let response: SignResponse =
+        serde_json::from_slice(&response_raw).context("invalid permit signer response JSON")?;
     ensure!(
         response.protocol == "XSP/2"
             && response.action == "sign-approved-permit-result"
@@ -281,8 +335,12 @@ async fn request_signed_permit(
             && response.error_code.is_none(),
         "protected permit signer rejected the request"
     );
-    let encoded = response.signed_permit_b64.context("permit signer omitted signed permit")?;
-    let permit = STANDARD.decode(&encoded).context("invalid signed permit Base64")?;
+    let encoded = response
+        .signed_permit_b64
+        .context("permit signer omitted signed permit")?;
+    let permit = STANDARD
+        .decode(&encoded)
+        .context("invalid signed permit Base64")?;
     ensure!(
         !permit.is_empty() && permit.len() <= 16 * 1024 && STANDARD.encode(&permit) == encoded,
         "permit signer returned noncanonical permit bytes"
@@ -312,7 +370,7 @@ async fn main() -> Result<()> {
         .await?;
     let account = sqlx::query(
         "SELECT username,role,password_hash,is_active
-         FROM panel_auth_users WHERE username=$1 FOR UPDATE"
+         FROM panel_auth_users WHERE username=$1 FOR UPDATE",
     )
     .bind(&args.owner)
     .fetch_optional(&mut *tx)
@@ -322,25 +380,29 @@ async fn main() -> Result<()> {
     let role: String = account.try_get("role")?;
     let password_hash: String = account.try_get("password_hash")?;
     let active: bool = account.try_get("is_active")?;
-    ensure!(active && role == "owner" && username == args.owner, "operator account is not an active owner");
-    let parsed_hash = PasswordHash::new(&password_hash).map_err(|_| anyhow::anyhow!("invalid stored owner password hash"))?;
-    let password_ok = Argon2::default().verify_password(password.as_bytes(), &parsed_hash).is_ok();
+    ensure!(
+        active && role == "owner" && username == args.owner,
+        "operator account is not an active owner"
+    );
+    let parsed_hash = PasswordHash::new(&password_hash)
+        .map_err(|_| anyhow::anyhow!("invalid stored owner password hash"))?;
+    let password_ok = Argon2::default()
+        .verify_password(password.as_bytes(), &parsed_hash)
+        .is_ok();
     password.clear();
     ensure!(password_ok, "owner authentication failed");
 
     let snapshot = load_locked_candidate(&mut tx, args.node_id).await?;
-    ensure!(snapshot.approved_by == args.owner, "authenticated owner differs from candidate approver");
+    ensure!(
+        snapshot.approved_by == args.owner,
+        "authenticated owner differs from candidate approver"
+    );
     let from_epoch = snapshot.material.from_epoch;
     let to_epoch = snapshot.material.to_epoch;
     let candidate_sha256_hex = snapshot.candidate_sha256_hex.clone();
 
-    let signed_permit = request_signed_permit(
-        &signer_socket,
-        args.node_id,
-        &args.request_id,
-        &args.owner,
-    )
-    .await?;
+    let signed_permit =
+        request_signed_permit(&signer_socket, args.node_id, &args.request_id, &args.owner).await?;
     let verified_at_ms = now_ms()?;
     let stored = xsp_v2_permit_ledger_writer::persist_verified_permit(
         &mut tx,
@@ -352,7 +414,9 @@ async fn main() -> Result<()> {
         verified_at_ms,
     )
     .await?;
-    tx.commit().await.context("commit protected permit transaction")?;
+    tx.commit()
+        .await
+        .context("commit protected permit transaction")?;
 
     println!(
         "{}",
