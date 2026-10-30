@@ -82,7 +82,7 @@ struct Args {
     request_id: String,
 }
 
-fn usage() -> &'static str {
+const fn usage() -> &'static str {
     "usage: xsp-v2-permit-operator --node NODE_ID --owner OWNER [--request-id ASCII_ID]\n\
 Reads the owner password from stdin. Never pass the password as an argument or environment variable."
 }
@@ -100,7 +100,7 @@ fn parse_args() -> Result<Args> {
             }
             "--owner" => owner = Some(values.next().context("--owner requires a value")?),
             "--request-id" => {
-                request_id = Some(values.next().context("--request-id requires a value")?)
+                request_id = Some(values.next().context("--request-id requires a value")?);
             }
             "--help" | "-h" => anyhow::bail!(usage()),
             _ => anyhow::bail!("unknown argument {flag}\n{}", usage()),
