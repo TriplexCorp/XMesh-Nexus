@@ -1,0 +1,53 @@
+name: XSP v2 Protected Permit Operator
+
+on:
+  pull_request:
+    paths:
+      - 'backend/Cargo.toml'
+      - 'backend/Dockerfile.xsp-permit'
+      - 'backend/src/bin/xsp_v2_permit_signer.rs'
+      - 'backend/src/bin/xsp_v2_permit_operator.rs'
+      - 'backend/src/xsp_v2_candidate_binding.rs'
+      - 'backend/src/xsp_v2_db_candidate_snapshot.rs'
+      - 'backend/src/xsp_v2_permit_ledger_writer.rs'
+      - 'backend/src/xsp_v2_signed_cutover.rs'
+      - 'deploy/postgres/22-create-xsp-v2-permit-signer-role.sql'
+      - 'docs/XSP_V2_PROTECTED_PERMIT_OPERATOR.md'
+      - 'scripts/check-xsp-v2-protected-permit-operator.js'
+      - '.github/workflows/xsp-protected-permit-operator.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  protected-permit-boundary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Static fail-closed boundary checks
+        run: node scripts/check-xsp-v2-protected-permit-operator.js
+
+      - name: Build protected permit signer
+        run: |
+          docker build \
+            -f backend/Dockerfile.xsp-permit \
+            --target permit-signer \
+            -t xmesh-xsp-permit-signer:ci \
+            .
+
+      - name: Build owner-authenticated permit operator
+        run: |
+          docker build \
+            -f backend/Dockerfile.xsp-permit \
+            --target permit-operator \
+            -t xmesh-xsp-permit-operator:ci \
+            .
+
+      - name: Runtime identity separation
+        run: |
+          test "$(docker image inspect xmesh-xsp-permit-signer:ci --format '{{.Config.User}}')" = '10006:10001'
+          test "$(docker image inspect xmesh-xsp-permit-operator:ci --format '{{.Config.User}}')" = '10007:10005'
+          echo 'PASS: permit signer/operator images use separate runtime identities'
