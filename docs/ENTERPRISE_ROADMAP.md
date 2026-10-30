@@ -6,25 +6,23 @@ This file defines the **current order of work**. Historical checkpoints do not o
 
 A green test proves only its stated boundary. Code existence ≠ E2E ≠ independent security review ≠ real deployment-class durability evidence ≠ production deployment.
 
-For exact per-run evidence SHA-256 values and session-resume state, also read [`../P0E_CHECKPOINT.md`](../P0E_CHECKPOINT.md) and the dated live qualification handoff linked from it.
+For detailed historical evidence, also read [`../P0E_CHECKPOINT.md`](../P0E_CHECKPOINT.md) and the dated live qualification handoff linked from it.
 
 ## Current frozen runtime and review package
 
 Reviewed production runtime target remains:
 
-- **XMesh-Nexus:** `12b3170996bc062ee16c79659a6378e5e425fd0e` — PR #163, mandatory TLS client authentication on the dedicated PQ ingress;
-- **XMesh-Node:** `34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb` — Node PR #52, parent-directory durability for initial master-key creation.
+- **XMesh-Nexus:** `12b3170996bc062ee16c79659a6378e5e425fd0e` — PR #163;
+- **XMesh-Node:** `34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb` — Node PR #52.
 
 Qualification/staging tooling introduced later is bound separately and does **not** silently replace the production runtime target.
 
-Current external-review package is **v5 KVM VPS**:
+Current independent-review package remains **v5 KVM VPS**:
 
 - workflow run `41054352179`;
 - GitHub artifact ID `12974974581`;
 - deterministic inner tar SHA-256 `9d213e9281f0ffbbc3da21f9f3814d6e7fbef1e6b5273f6e9cb12175c63273c4`;
 - payload SHA-256 `7b118084777d59e1ef1791d6375c32c1c44cf6bcdf9a03a2b0648a7ad9f263f2`.
-
-PR #169 binds machine-checkable #137 result acceptance to this exact package. The AI-assisted internal audit remains `independent=false` and cannot satisfy #137.
 
 ## Deployment-class model
 
@@ -40,8 +38,6 @@ Therefore:
 - provider-managed storage durability remains an explicit external trust boundary;
 - `physicalPowerLossQualified=false` remains mandatory and correct for this deployment class.
 
-PR #171 merged the topology-aware KVM VPS durability v2 contract/verifier. It intentionally stopped pretending that a Node VPS crash also crashes PostgreSQL.
-
 ## P0 status
 
 ### P0-C2-D — COMPLETE
@@ -54,15 +50,17 @@ Durable Agent release identity, staged apply/rollback, real Agent migration/upda
 
 ### P0-E — CURRENT
 
-Repo-side software/evidence tooling is complete and the expensive real crash phase of #138 is substantially complete. Remaining work is now primarily the live cutover/receipt chain plus two external/operational witnesses.
+The expensive crash phase and the real protected cutover phase are complete. The remaining #138 tail is now **three stages only**: off-host recovery-floor witness, provider-storage risk acceptance, and aggregate topology-aware v2 verification.
 
-## P0-E completed repo-side gates
+Production activation remains unauthorized.
 
-Completed bounded preparation/tooling includes:
+## Completed P0-E repo-side gates
+
+Completed preparation/tooling includes:
 
 - process-crash durability and crash matrices;
 - one-sided Agent/PostgreSQL rollback resistance;
-- coordinated backup/restore and off-host monotonic recovery floor tooling;
+- coordinated backup/restore and off-host monotonic recovery-floor tooling;
 - owner-authorized previous-key retirement and durable erasure;
 - parser fuzzing and external ML-DSA-65 FIPS 204 verification vectors;
 - default-off redacted observability;
@@ -72,8 +70,8 @@ Completed bounded preparation/tooling includes:
 - protected permit signer/operator — PR #172;
 - protected permit tooling source/binary binding — PR #173;
 - durable live qualification handoff — PR #174;
-- provider-storage trust/risk-acceptance boundary;
-- v5 independent-review handoff, bundle and result acceptance;
+- provider-storage trust/risk-acceptance contract boundary;
+- v5 independent-review handoff/bundle/result-acceptance tooling;
 - disposable release-canary rehearsal;
 - production rollout/rollback plan tooling;
 - KVM VPS bounded strict-PQ approval gate;
@@ -93,22 +91,22 @@ All five required Node guest crash checkpoints have accepted real runs:
 4. `after-recovery-abort` → `previous-complete` — PASS;
 5. `after-recovery-active` → `next-complete` — PASS.
 
-Canonical aggregate evidence already preserved:
+Canonical aggregate evidence:
 
 - `nodeRuns` JSON SHA-256: `019c88d1d8c40f5803da746cfb8e6f881eee0c4070992b215209b3e9ac50dac0`;
 - five-run bundle SHA-256: `27ee2b275efef60052c70b2c5f771422f61eedb2e105a6e90501d01503e60e31`.
 
-An earlier orderly shutdown attempt is non-qualifying and must remain diagnostic evidence only.
+An earlier orderly shutdown attempt remains diagnostic only and must not be counted.
 
-**No new five-run crash matrix is required. Do not repeat these crashes unless later evidence proves corruption or invalidates them.**
+**No new five-run crash matrix is required.**
 
 ### B. Independent Nexus/PostgreSQL abrupt crash/recovery — COMPLETE
 
-The Nexus/PostgreSQL failure domain has its own accepted abrupt crash/recovery evidence:
+Accepted separate failure-domain evidence:
 
 - crash method: `provider-hard-stop`;
-- pre/post security tuple SHA-256 remained identical: `c35df84ea54b5efb7203103ed5d769770db6ffc39fd8a4f974b452ec9ed65be5`;
-- recovery observed and integrity checks passed;
+- pre/post security tuple SHA-256 unchanged: `c35df84ea54b5efb7203103ed5d769770db6ffc39fd8a4f974b452ec9ed65be5`;
+- recovery/integrity checks passed;
 - `fsync=on`;
 - `full_page_writes=on`;
 - `synchronous_commit=on`;
@@ -116,17 +114,13 @@ The Nexus/PostgreSQL failure domain has its own accepted abrupt crash/recovery e
 - PostgreSQL event archive SHA-256: `21996209bbae7edf240f66e5066cfffb5912446f33167425d1c0e7196d177433`;
 - PostgreSQL result JSON SHA-256: `2d5bae53da3b31f77bce79c09848e0cfba121d8b0c1602c818d364a45f1d4040`.
 
-This evidence is independent of the five Node crashes by design.
-
 ### C. Protected permit tooling — IMPLEMENTED, BOUND, LIVE BUILD PASS
-
-PR #172 added a staging-only protected permit signer/operator without enabling strict-PQ or production activation. PR #173 bound that tooling to the reviewed Nexus runtime without changing the production runtime target.
 
 Exact tooling revision:
 
 `c00c6dcf1dba0ef923dd23371bc17b9dec781602`
 
-Observed live exact-tooling build/binding result:
+Observed live build/binding:
 
 ```text
 permitToolingBound=true
@@ -138,43 +132,85 @@ strictPQEnabled=false
 productionActivation=false
 ```
 
-The earlier expired proved proposal was cleared only after confirming it was expired/proved and before any cutover ledger or receipt existed. That cleanup is not itself cutover evidence.
+### D. Real protected `epoch 1 → 2` cutover/ACK/receipt — COMPLETE
 
-## #138 remaining work — accelerated path
+The existing Node 13 prepared candidate was used; candidate keys were **not regenerated**.
 
-The heavy crash-testing phase is over. Remaining work should be executed as consolidated fail-closed stages rather than microscopic manual checks.
+Observed sequence:
 
-### Stage 1 — one real protected `1 → 2` cutover chain
+1. fresh owner-authenticated `prepare` — PASS;
+2. Node PoP `prove-prepared` for the same `.next` candidate — PASS;
+3. protected permit operator obtained a real dual-signed permit — PASS;
+4. Node independently verified and durably journaled the permit — PASS;
+5. Node activated the exact approved candidate to epoch 2 — PASS;
+6. Node monotonic floor advanced to 2 — PASS;
+7. Node created and durably journaled a real dual-signed applied ACK — PASS;
+8. C2-C atomically committed Nexus public-key/epoch/ACK state — PASS;
+9. Nexus reached epoch 2 — PASS;
+10. isolated signer produced the immutable dual-signed commit receipt — PASS;
+11. Node independently verified and durably journaled the exact receipt — PASS.
 
-Use the existing prepared Node candidate identity; do not regenerate private candidate keys.
+Final observed state:
 
-Required sequence:
+```text
+requestId=node13-q138-cutover-20261030-01
+nodeEpoch=2
+nodeFloor=2
+nexusEpoch=2
+ledgerState=ack_verified
+receiptOutbox=1
+strictPQEnabled=false
+productionActivation=false
+```
 
-1. fresh owner-approved `prepare`;
-2. Node proof-of-possession (`prove`) for the same candidate;
-3. protected permit operator obtains a real dual-signed permit from the isolated signer;
-4. Node activates the candidate **only** under that authenticated permit;
-5. Node produces a real dual-signed applied ACK;
-6. C2-C atomically commits public key/epoch/ACK state;
-7. isolated signer emits the immutable dual-signed commit receipt.
+Exact evidence SHA-256:
 
-Evidence must bind the exact permit, candidate digest, ACK and receipt. `strict-pq` remains OFF throughout.
+- protected permit operator result: `ac88343dde50076ad3779d9cb1a62b029b14c4b6d3e89fa6ba894fb16d90cba7`;
+- Node-verified canonical permit digest: `132906a49cfa7cdebb9fc0b346f93963802b73cc23aca1a333b2d449727fd642`;
+- signed permit envelope: `1aba4ca1e0c7361eb0280a0d1de9254c0649cbdb8bed3e7d05774bb6b5b5625e`;
+- signed applied ACK: `07ccd07a317b6797b637d6cd0b1cc5c79fb90ef0c771c3ee7cc2b6aab79016a9`;
+- signed commit receipt: `daf40d33fa63d35f6f02fbcae417c4f4a4262d31bd9a0d1f11493ca018925ae9`;
+- qualification helper: `baa53a928fc4cc55ed48c954395435f446873dfa5aab4808afd5d87ab351c3ff`.
 
-### Stage 2 — off-host production recovery-floor witness
+`ledgerState=ack_verified` is **correct for the frozen runtime**. The signed receipt is stored separately in immutable `node_xsp_signed_commit_receipt_outbox`; the receipt writer requires `ack_verified` and does not mutate the ledger into `receipt_sent`.
+
+The cutover evidence proves only this boundary. It does **not** by itself satisfy the off-host witness, provider-storage acceptance, aggregate verifier, external review, final canary, activation approval, or production execution.
+
+## #138 remaining work — exactly 3 stages
+
+### Stage 2 — off-host production recovery-floor witness — PENDING
 
 Create and verify the production recovery checkpoint on an independent/off-host trust location. The witness cannot be merely another copy inside the same Nexus/PostgreSQL failure domain.
 
-Required result includes a real verified checkpoint/receipt binding for the subject Node and a monotonic floor that cannot be rolled back by restoring only the primary database.
+Required result must bind the real subject Node and prove a monotonic recovery floor that cannot be rolled back by restoring only the primary database.
 
-### Stage 3 — provider-storage risk acceptance
+### Stage 3 — provider-storage risk acceptance — PENDING
 
-Record explicit attributable acceptance for both relevant KVM provider-storage trust boundaries. This is a governance/evidence step, not another crash test.
+Record explicit attributable acceptance for **both** relevant KVM provider-storage trust boundaries:
 
-Do not infer provider identity or acceptance from hostnames, CI, or operator behavior.
+- Node provider/storage class;
+- Nexus/PostgreSQL provider/storage class.
 
-### Stage 4 — aggregate result + v2 verifier
+Required claim remains:
 
-Assemble the real Node runs, PostgreSQL record, off-host witness, provider acceptance and exact tooling/runtime bindings into the v2 result/evidence bundle.
+```text
+storageTrustBoundary=provider-managed-block-storage
+providerStorageDurabilityAssumed=true
+physicalPowerLossQualified=false
+```
+
+Provider identity/storage class must not be inferred from hostnames.
+
+### Stage 4 — aggregate result + topology-aware v2 verifier — PENDING
+
+Assemble:
+
+- five Node real crash runs;
+- independent PostgreSQL crash/recovery evidence;
+- exact runtime/tooling bindings;
+- completed real protected cutover/ACK/receipt evidence;
+- off-host production recovery-floor witness;
+- attributable provider-storage acceptance.
 
 Only the whole topology-aware verifier may establish:
 
@@ -185,54 +221,79 @@ physicalPowerLossQualified=false
 productionDurabilityGateEligible=true
 ```
 
-Until that verifier passes, the authoritative claims remain false.
+Until verifier PASS, these release-gate claims remain false.
 
-## #137 — independent external security review of v5 — OPEN
+## #137 — independent external security review: ISSUE CLOSED, ACCEPTANCE EVIDENCE NOT PRESENT
 
-This remains a separate external blocker and can proceed in parallel with the final #138 operational tail.
+GitHub issue metadata currently reports #137 as `closed/completed`.
 
-Required external evidence includes:
+However, the accessible issue thread and repository do **not** contain an attributable external v5 result/sign-off that satisfies the independent-review result contract. The latest visible review evidence is the AI-assisted internal audit with `independent=false`, explicitly documented as insufficient for #137.
+
+Therefore the authoritative security claim remains:
+
+```text
+independentSecurityReviewComplete=false
+```
+
+The issue state alone is not sufficient evidence for the release gate. A real external result must still provide:
 
 - attributable independent reviewer identity/organization/date;
-- review bound to the frozen Nexus/Node runtime and authoritative v5 bundle;
+- exact binding to Nexus `12b3170996bc062ee16c79659a6378e5e425fd0e` and Node `34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb`;
+- binding to the authoritative v5 bundle;
 - all 11 mandatory review domains;
-- explicit review of prior Low remediations and KVM/provider-storage policy;
-- findings with severity, evidence, trust boundary and disposition;
+- explicit KVM/provider-storage policy review;
+- findings with severity/evidence/trust-boundary/disposition;
 - no unresolved release-blocking finding;
-- machine-accepted `approve` or `approve-with-findings` sign-off.
+- machine-accepted `approve` or `approve-with-findings` result.
 
-Project-owner review, AI review, green CI, synthetic fixtures, packaging or handoff generation do not satisfy #137.
+If such evidence exists outside the currently accessible repository/issue thread, it must be attached or linked and verified before changing `independentSecurityReviewComplete`.
 
 ## Current qualification state
 
 ```text
+P0-C2-D = COMPLETE
+P0-D = COMPLETE
+P0-E = CURRENT
+
 #138 Node five-run matrix = COMPLETE
 #138 independent PostgreSQL crash/recovery = COMPLETE
 #138 permit tooling bound/live build = PASS
-#138 protected live cutover/ACK/receipt = PENDING
+#138 protected live cutover/ACK/receipt = COMPLETE
 #138 off-host production recovery witness = PENDING
 #138 provider-storage risk acceptance = PENDING
-#138 aggregate v2 verifier = PENDING
-#137 independent external review = OPEN
+#138 aggregate topology-aware v2 verifier = PENDING
+
+#137 GitHub issue metadata = CLOSED/COMPLETED
+#137 attributable external v5 acceptance evidence = NOT PRESENT/NOT VERIFIED
 
 independentSecurityReviewComplete=false
 guestCrashConsistencyQualified=false
 providerStorageDurabilityAssumed=false
 physicalPowerLossQualified=false
+productionDurabilityGateEligible=false
 finalReleaseCanarySatisfied=false
 strictPQEnabled=false
 productionActivation=false
 legacyXMESH1Retired=false
 ```
 
-## Post-P0-E release sequence
-
-After #137 and #138 are genuinely complete:
+## Fastest safe path from here
 
 ```text
+off-host production recovery-floor witness
+            ↓
+provider-storage risk acceptance
+            ↓
+aggregate topology-aware #138 verifier
+            ↓
+#138 COMPLETE
+
+in parallel:
+real attributable #137 external result accepted
+            ↓
 exact production release candidate selected
             ↓
-full disposable final canary rerun on exact candidate
+full disposable final canary on exact candidate
             ↓
 real rollout/rollback plan bound to exact candidate/evidence
             ↓
@@ -274,4 +335,4 @@ requiresSeparateExecution=true
 
 **Production PQ activation is NOT AUTHORIZED.**
 
-The immediate engineering priority is no longer more crash loops. It is to finish the single real protected cutover/ACK/receipt chain, create the independent off-host witness, record provider risk acceptance, and run the final topology-aware #138 verifier while #137 proceeds independently.
+Immediate priority: finish the three remaining #138 stages and obtain/verify genuine external #137 evidence. Do not repeat the completed crash matrix or completed epoch-1→2 cutover unless later evidence proves corruption.
