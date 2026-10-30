@@ -2,7 +2,8 @@
 const fs = require('node:fs');
 const assert = require('node:assert/strict');
 
-const cargo = fs.readFileSync('backend/Cargo.toml','utf8');
+const apiCargo = fs.readFileSync('backend/Cargo.toml','utf8');
+const permitCargo = fs.readFileSync('backend/xsp-permit/Cargo.toml','utf8');
 const signer = fs.readFileSync('backend/src/bin/xsp_v2_permit_signer.rs','utf8');
 const operator = fs.readFileSync('backend/src/bin/xsp_v2_permit_operator.rs','utf8');
 const sql = fs.readFileSync('deploy/postgres/22-create-xsp-v2-permit-signer-role.sql','utf8');
@@ -10,8 +11,14 @@ const dockerfile = fs.readFileSync('backend/Dockerfile.xsp-permit','utf8');
 const doc = fs.readFileSync('docs/XSP_V2_PROTECTED_PERMIT_OPERATOR.md','utf8');
 
 for (const name of ['xsp-v2-permit-signer','xsp-v2-permit-operator']) {
-  assert.match(cargo, new RegExp(`name = "${name}"[\\s\\S]*required-features = \\["xsp-v2-experimental"\\]`));
+  assert.match(permitCargo, new RegExp(`name = "${name}"[\\s\\S]*required-features = \\["xsp-v2-experimental"\\]`));
 }
+assert.doesNotMatch(
+  apiCargo,
+  /name = "xsp-v2-permit-(?:signer|operator)"/,
+  'protected permit binaries must remain outside API all-target test harness',
+);
+assert.match(dockerfile,/cp \/source\/backend\/xsp-permit\/Cargo\.toml/);
 
 assert.match(signer,/XSP_V2_PROTECTED_PERMIT_ISSUER[\s\S]{0,120}staging-only/);
 assert.match(signer,/xmesh_permit_signer_reader/);
@@ -61,4 +68,4 @@ assert.match(doc,/strictActivated=false/);
 assert.match(doc,/productionActivation=false/);
 assert.match(doc,/does \*\*not\*\* activate the Node vault/);
 
-console.log('PASS: protected permit signer/operator boundary is explicit and fail-closed');
+console.log('PASS: protected permit signer/operator boundary is explicit, isolated, and fail-closed');
