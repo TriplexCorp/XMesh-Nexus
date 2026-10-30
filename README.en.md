@@ -8,43 +8,68 @@ XMesh Nexus manages Nodes, users, subscriptions, Xray configuration, telemetry, 
 
 ## Current XSP-v2 checkpoint — 30 October 2026
 
-### P0-E: most real KVM durability qualification work is complete; production activation remains prohibited
+### P0-E: real protected `1 → 2` cutover COMPLETE; #138 has 3 stages left
 
 The reviewed production runtime remains frozen at:
 
 - **XMesh-Nexus:** `12b3170996bc062ee16c79659a6378e5e425fd0e` — PR #163;
 - **XMesh-Node:** `34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb` — Node PR #52.
 
-Security-relevant staging/qualification tooling is versioned separately and does **not** replace this runtime target.
+Qualification/staging tooling is versioned separately and **does not replace** this production runtime target.
 
 ### Completed work
 
-Repo-side P0-E tooling, contracts, and fail-closed release-control gates are complete. A substantial part of the **real** #138 qualification is also complete:
+- **Node KVM abrupt-crash matrix: COMPLETE — 5/5**;
+- **independent Nexus/PostgreSQL abrupt crash/recovery: COMPLETE**;
+- topology-aware KVM VPS v2 contract/verifier — PR #171;
+- protected permit signer/operator — PR #172;
+- exact permit-tooling source/binary binding — PR #173;
+- durable live qualification checkpoint — PR #174;
+- live exact-tooling build/binding — **PASS**;
+- fresh owner-authenticated `prepare` — **PASS**;
+- Node proof-of-possession for the existing `.next` candidate — **PASS**;
+- **real protected Node 13 cutover `epoch 1 → 2`: COMPLETE**;
+- Node monotonic floor after cutover: **2**;
+- real dual-signed applied ACK: **VERIFIED + DURABLE**;
+- atomic Nexus/C2-C epoch commit: **Nexus epoch 2**;
+- immutable dual-signed commit receipt: **VERIFIED + DURABLE**;
+- signed receipt outbox rows: **1**.
 
-- **Node KVM crash matrix: COMPLETE — 5/5** real abrupt guest-crash runs on Node 13;
-- **independent Nexus/PostgreSQL crash/recovery: COMPLETE** in its own failure domain;
-- PostgreSQL abrupt-crash recovery/integrity and durable settings were verified;
-- topology-aware KVM VPS v2 contract/verifier merged in PR #171;
-- protected permit signer/operator merged in PR #172;
-- exact permit-tooling binding to the reviewed Nexus runtime merged in PR #173;
-- live exact-tooling build/binding: **PASS**, `permitToolingBound=true`;
-- durable session handoff/checkpoint merged in PR #174.
+### Live cutover evidence
 
-The Node crash matrix and PostgreSQL crash/recovery are **separate failure-domain evidence**, as required by topology-aware v2. PostgreSQL is no longer modeled as if it crashed inside every Node crash run.
+Critical #138 Stage 1 completed end-to-end using the existing candidate without regenerating keys:
 
-### Remaining #138 work
+```text
+requestId=node13-q138-cutover-20261030-01
+nodeEpoch=2
+nodeFloor=2
+nexusEpoch=2
+ledgerState=ack_verified
+receiptOutbox=1
+strictPQEnabled=false
+productionActivation=false
+```
 
-**No additional five-run crash matrix or repeat crash loop is required.** The remaining work is the short operational tail:
+Evidence SHA-256:
 
-1. fresh owner-approved `prepare/prove` for the existing candidate;
-2. protected dual-signed cutover permit;
-3. Node `1 → 2` activation only under that valid permit;
-4. real applied ACK → atomic Nexus/C2-C epoch commit → immutable dual-signed commit receipt;
-5. independent **off-host production recovery-floor witness**;
-6. explicit attributable **provider-storage risk acceptance**;
-7. aggregate the evidence and run the topology-aware v2 verifier.
+- protected permit operator result: `ac88343dde50076ad3779d9cb1a62b029b14c4b6d3e89fa6ba894fb16d90cba7`;
+- canonical permit digest verified by Node: `132906a49cfa7cdebb9fc0b346f93963802b73cc23aca1a333b2d449727fd642`;
+- permit envelope: `1aba4ca1e0c7361eb0280a0d1de9254c0649cbdb8bed3e7d05774bb6b5b5625e`;
+- signed applied ACK: `07ccd07a317b6797b637d6cd0b1cc5c79fb90ef0c771c3ee7cc2b6aab79016a9`;
+- signed commit receipt: `daf40d33fa63d35f6f02fbcae417c4f4a4262d31bd9a0d1f11493ca018925ae9`;
+- qualification helper built against the exact frozen Node runtime: `baa53a928fc4cc55ed48c954395435f446873dfa5aab4808afd5d87ab351c3ff`.
 
-Only the whole-result verifier may mark #138 complete and report:
+`ledgerState=ack_verified` is the **expected final state for the frozen runtime**: the immutable receipt is stored separately in `node_xsp_signed_commit_receipt_outbox`; the receipt writer requires an `ack_verified` committed ledger row and does not transition it to a separate `receipt_sent` state.
+
+### Remaining #138 work — exactly 3 stages
+
+No additional crash loops or repeated cutover are required.
+
+1. **Off-host production recovery-floor witness** — create and independently verify the production recovery checkpoint/receipt outside the Nexus/PostgreSQL failure domain.
+2. **Provider-storage risk acceptance** — separately and attributably record provider name/storage class and acceptance of provider-managed block-storage risk for Node and Nexus/PostgreSQL.
+3. **Aggregate evidence + topology-aware v2 verifier** — combine Node runs, PostgreSQL evidence, live cutover, off-host witness, provider acceptance, and exact runtime/tooling bindings into one result and obtain verifier PASS.
+
+Only the whole-result verifier may establish:
 
 ```text
 guestCrashConsistencyQualified=true
@@ -53,7 +78,7 @@ productionDurabilityGateEligible=true
 physicalPowerLossQualified=false
 ```
 
-Until then the correct state remains:
+Until then the authoritative state remains:
 
 ```text
 guestCrashConsistencyQualified=false
@@ -61,13 +86,23 @@ providerStorageDurabilityAssumed=false
 physicalPowerLossQualified=false
 strictPQEnabled=false
 productionActivation=false
+finalReleaseCanarySatisfied=false
+legacyXMESH1Retired=false
 ```
 
-### #137 — separate external blocker
+### #137 — GitHub issue is closed, security gate is not evidenced as complete
 
-**#137 independent external security review/sign-off of the current v5 package remains OPEN.** AI review, project-owner review, CI, fixtures, or internal testing cannot satisfy it.
+GitHub metadata currently shows issue #137 as `closed/completed`, but the accessible issue thread and repository contain **no attributable external v5 result/sign-off** that satisfies the acceptance contract. The latest visible review is the AI-assisted internal audit with `independent=false`, which explicitly does not satisfy #137.
 
-Authoritative v5 reviewer bundle:
+Therefore, until a real external result is present and verified, the correct security claim remains:
+
+```text
+independentSecurityReviewComplete=false
+```
+
+The issue's `closed` state does not substitute for external review evidence and does not authorize strict-PQ or production activation.
+
+The authoritative v5 reviewer bundle remains:
 
 - workflow run: `41054352179`;
 - GitHub artifact ID: `12974974581`;
@@ -77,34 +112,26 @@ Authoritative v5 reviewer bundle:
 ### Current fast path
 
 ```text
-#138: crash matrix 5/5 COMPLETE
-     + PostgreSQL crash/recovery COMPLETE
-     + permit tooling bound PASS
+#138 Stage 1 real cutover/ACK/receipt = COMPLETE
              ↓
-real cutover 1→2 + ACK + immutable receipt
-             ↓
-off-host recovery witness
+off-host recovery-floor witness
              ↓
 provider-storage risk acceptance
              ↓
-final topology-aware v2 verifier
+aggregate topology-aware v2 verifier
              ↓
 #138 COMPLETE
 
-#137 independent external review proceeds separately
-```
-
-After #137 and #138 are genuinely complete, release control still requires:
-
-```text
+#137 external evidence must be genuinely accepted
+             ↓
 exact production release candidate
-        ↓
+             ↓
 full final canary on exact candidate
-        ↓
+             ↓
 independently reviewed rollout/rollback plan
-        ↓
+             ↓
 bounded KVM strict-PQ approval
-        ↓
+             ↓
 separate production execution
 ```
 
@@ -132,4 +159,4 @@ The architecture preserves:
 
 **Production PQ activation is NOT AUTHORIZED.** `strict-pq` remains **OFF**, XMESH1 remains retained, and `physicalPowerLossQualified=false` remains the correct KVM claim.
 
-When resuming in a new session, read [`P0E_CHECKPOINT.md`](P0E_CHECKPOINT.md) first, then [`docs/ENTERPRISE_ROADMAP.md`](docs/ENTERPRISE_ROADMAP.md).
+When resuming, read [`P0E_CHECKPOINT.md`](P0E_CHECKPOINT.md) first, then [`docs/ENTERPRISE_ROADMAP.md`](docs/ENTERPRISE_ROADMAP.md).
