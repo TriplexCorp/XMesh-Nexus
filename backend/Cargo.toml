@@ -15,18 +15,6 @@ path = "src/bin/xsp_v2_recovery_checkpoint.rs"
 required-features = ["xsp-v2-experimental"]
 
 [[bin]]
-name = "xsp-v2-permit-signer"
-path = "src/bin/xsp_v2_permit_signer.rs"
-required-features = ["xsp-v2-experimental"]
-test = false
-
-[[bin]]
-name = "xsp-v2-permit-operator"
-path = "src/bin/xsp_v2_permit_operator.rs"
-required-features = ["xsp-v2-experimental"]
-test = false
-
-[[bin]]
 name = "xsp-v2-observability"
 path = "src/bin/xsp_v2_observability.rs"
 required-features = ["xsp-v2-observability"]
