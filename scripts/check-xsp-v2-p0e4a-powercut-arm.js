@@ -25,17 +25,21 @@ function verify(nodeRoot){
   assert.equal(contract.productionActivation,false);
   assert.equal(contract.strictPqDefault,'off');
   assert.equal(contract.verifiedNodeSource.repository,'TriplexCorp/XMesh-Node');
-  assert.equal(contract.verifiedNodeSource.revision,'50c770c8bbb917b04ca893ac5b8d29e6c7f9af7e');
-  assert.equal(contract.verifiedNodeSource.pullRequest,44);
+  assert.equal(contract.verifiedNodeSource.revision,'34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb');
+  assert.equal(contract.verifiedNodeSource.pullRequest,52);
+  assert.equal(contract.verifiedNodeSource.powercutHookOriginRevision,'50c770c8bbb917b04ca893ac5b8d29e6c7f9af7e');
+  assert.equal(contract.verifiedNodeSource.powercutHookOriginPullRequest,44);
 
   const actual=execFileSync('git',['-C',nodeRoot,'rev-parse','HEAD'],{encoding:'utf8'}).trim();
-  assert.equal(actual,contract.verifiedNodeSource.revision,'must inspect exact merged Node PR #44 source');
+  assert.equal(actual,contract.verifiedNodeSource.revision,'must inspect exact remediated v4 Node source');
 
   const normal=read(nodeRoot,'security/xspv2/poc-go/keyring/durability_checkpoint.go');
   const crash=read(nodeRoot,'security/xspv2/poc-go/keyring/durability_checkpoint_crash.go');
   const lab=read(nodeRoot,'security/xspv2/poc-go/keyring/durability_checkpoint_powercut_linux.go');
   const labTest=read(nodeRoot,'security/xspv2/poc-go/keyring/durability_checkpoint_powercut_linux_test.go');
   const rotation=read(nodeRoot,'security/xspv2/poc-go/keyring/two_phase.go');
+  const sealed=read(nodeRoot,'security/xspv2/poc-go/keyring/sealed.go');
+  const masterDurability=read(nodeRoot,'security/xspv2/poc-go/keyring/master_key_durability_linux_test.go');
   const workflow=read(nodeRoot,'.github/workflows/xsp-p0e4a-powercut-arm.yml');
   const crashWorkflow=read(nodeRoot,'.github/workflows/xsp-p0e-crash-durability.yml');
   const proofDoc=read(nodeRoot,'docs/XSP_V2_P0E4A_POWERCUT_ARM.md');
@@ -47,7 +51,7 @@ function verify(nodeRoot){
   assert.match(lab,/^\/\/go:build linux && xspv2_powercut_qualification && !xspv2_crash_test$/m);
 
   for(const point of ['after-previous','after-floor','after-active','after-recovery-abort','after-recovery-active']){
-    assert.match(rotation,new RegExp(`rotationDurabilityCheckpoint\\("${point}"\\)`),`missing existing durability checkpoint ${point}`);
+    assert.match(rotation,new RegExp(`rotationDurabilityCheckpoint\\("${point}"\\)`),`missing durability checkpoint ${point}`);
     assert.match(lab,new RegExp(`"${point}"`),`lab allowlist missing ${point}`);
   }
 
@@ -71,6 +75,12 @@ function verify(nodeRoot){
   assert.match(labTest,/XSP2-POWERCUT-ARMED-V1 run=p0e4a-lab-run-0001 point=after-previous/);
   assert.match(labTest,/cmd[.]Process[.]Kill\(\)/,
     'CI may terminate its helper only after proving the lab hook remained blocked');
+
+  // v4 qualification must exercise the remediated provisioning durability path.
+  assert.match(sealed,/func syncParentDir\(path string\) error/);
+  assert.match(sealed,/if err = syncParentDir\(path\); err != nil \{/);
+  assert.match(masterDurability,/TestCreateMasterKeyLeavesSyncablePrivateDurableEntry/);
+
   assert.match(workflow,/Reject ambiguous dual evidence build/);
   assert.match(workflow,/xspv2_crash_test xspv2_powercut_qualification/);
   assert.match(workflow,/normal Agent artifact contains a test\/lab durability hook/);
@@ -91,7 +101,7 @@ function verify(nodeRoot){
     assert.equal(contract.notProvenByThisGate[key],true,`${key} must remain explicitly unproven`);
   }
   assert.equal(contract.nextRequiredEvidence,'P0-E4a-representative-physical-powercut-matrix');
-  console.log(`PASS: P0-E4a Node power-cut arm source contract verified at ${actual}`);
+  console.log(`PASS: P0-E4a Node power-cut arm source contract verified at v4 ${actual}`);
 }
 
 let temporaryRoot=null;
