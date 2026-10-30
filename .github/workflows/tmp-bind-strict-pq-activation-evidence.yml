@@ -1,0 +1,34 @@
+name: Temporary strict-PQ activation evidence binding hardening
+
+on:
+  push:
+    branches:
+      - release/strict-pq-activation-approval-contract
+
+permissions:
+  contents: write
+
+jobs:
+  bind:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/strict-pq-activation-approval-contract
+          fetch-depth: 0
+
+      - name: Apply exact verifier/docs hardening
+        run: python3 scripts/tmp_bind_strict_pq_activation_evidence.py
+
+      - name: Verify, self-clean and push
+        run: |
+          python3 -m py_compile scripts/verify-xsp-v2-strict-pq-activation-approval.py
+          git diff --check
+          rm .github/workflows/tmp-bind-strict-pq-activation-evidence.yml
+          rm scripts/tmp_bind_strict_pq_activation_evidence.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/verify-xsp-v2-strict-pq-activation-approval.py docs/XSP_V2_STRICT_PQ_ACTIVATION_APPROVAL.md .github/workflows/tmp-bind-strict-pq-activation-evidence.yml scripts/tmp_bind_strict_pq_activation_evidence.py
+          git diff --cached --check
+          git commit -m "security(xsp-v2): bind activation approval to exact external evidence"
+          git push origin HEAD:release/strict-pq-activation-approval-contract
