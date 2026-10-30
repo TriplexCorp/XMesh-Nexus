@@ -1,83 +1,89 @@
 # XSP-v2 P0-E reproducible security-review bundle
 
-Status: **reviewer convenience tooling only**. This bundle does not perform, replace, or declare an independent security review. It does not qualify physical power-loss durability, enable `strict-pq`, or authorize production rollout.
+Status: **reviewer convenience tooling only**. The bundle does not perform, replace, or declare an independent security review. It does not qualify physical power-loss durability, enable `strict-pq`, or authorize production rollout.
+
+## Current v4 source binding
+
+The bundle is now tied to the security-remediated v4 target:
+
+- XMesh-Nexus `12b3170996bc062ee16c79659a6378e5e425fd0e`;
+- XMesh-Node `34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb`.
+
+The previous v3 pair (`0bab1a48cff570b3abe405bcda4dc242b23b8a4b` + `083dc181c5e175f89007f4b93111cd5c45a69d97`) is historical only after remediation of internal findings `AI-LOW-001` and `AI-LOW-002`.
+
+The machine-readable source of truth is `deploy/xsp-v2-p0e-security-review-handoff.contract.json`.
 
 ## Purpose
 
-The independent reviewer should be able to receive one self-contained artifact whose contents are cryptographically tied to the current P0-E review snapshot instead of reconstructing the package manually from repository links.
+An independent reviewer should receive one self-contained artifact whose contents are cryptographically tied to the exact v4 review target rather than reconstructing the package manually from repository links.
 
-The builder consumes the current machine-readable handoff contract as control metadata and then verifies/checks out exactly:
-
-- XMesh-Nexus review snapshot `0bab1a48cff570b3abe405bcda4dc242b23b8a4b`
-- XMesh-Node `083dc181c5e175f89007f4b93111cd5c45a69d97`
-
-The previous PR #142 Nexus review target `8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091` remains the frozen **runtime baseline**. The v3 review snapshot adds the release-control architecture from PRs #150, #152 and #155. The handoff workflow must separately prove that critical runtime paths are unchanged between the old runtime baseline and the v3 snapshot.
-
-This bundle tooling itself is outside the reviewed source snapshot and cannot silently change either reviewed revision.
+The builder verifies the exact checkout identities from the handoff contract and produces deterministic source archives plus indexed review evidence.
 
 ## Bundle contents
 
-`python3 scripts/build-xsp-v2-p0e-security-review-bundle.py` creates a directory containing:
+`python3 scripts/build-xsp-v2-p0e-security-review-bundle.py` creates:
 
-- deterministic `git archive` tar files for the exact v3 Nexus and Node review revisions;
+- deterministic `git archive` tar files for the exact v4 Nexus and Node revisions;
 - the current handoff contract and handoff guide under `control/`;
-- copies of every Nexus evidence document, machine contract, implementation file, source-contract script, process harness, release-control verifier and workflow indexed by the handoff contract under `evidence/nexus/`;
-- `REVIEW_SCOPE.md` with the exact source revisions, 11 mandatory review domains, remaining external blockers, and explicit non-claims;
-- `SHA256SUMS` covering every payload file other than the checksum/manifest files themselves;
-- `MANIFEST.json` with the contract hash, exact source revisions, per-file SHA-256/size records, and a digest of `SHA256SUMS`.
+- every Nexus evidence document, machine contract and implementation evidence path indexed by the handoff contract under `evidence/nexus/`;
+- the AI-assisted internal audit as explicit non-independent remediation context;
+- `REVIEW_SCOPE.md` with exact revisions, all 11 review domains, remaining external blockers and explicit non-claims;
+- `SHA256SUMS` covering every payload file except the checksum/manifest files themselves;
+- `MANIFEST.json` with the control-contract digest, exact source revisions, per-file SHA-256/size records and the digest of `SHA256SUMS`.
 
-The builder refuses a Nexus or Node checkout whose `HEAD` differs from the contract's frozen `sourceRevision`, refuses missing/duplicate indexed evidence, and keeps the current control metadata separate from the frozen source archives.
+The builder refuses a Nexus or Node checkout whose `HEAD` differs from the contract's frozen source revision, refuses missing or duplicate indexed evidence, and keeps current control metadata separate from the frozen source archives.
 
-## Why the v3 snapshot moved while runtime did not
+## What changed from v3
 
-The old runtime baseline already contains the reviewed Rust ingress/ACK/recovery implementation. After that freeze, three non-executing release-control layers were added:
+v4 is not a documentation-only refresh. It intentionally includes exactly two security-relevant remediation deltas:
 
-1. PR #150 disposable canary rehearsal;
-2. PR #152 exact-candidate production rollout-plan acceptance;
-3. PR #155 explicit bounded strict-PQ activation approval.
+1. Nexus PR #163 requires a verified client certificate in the dedicated C2-B/D2 TLS authentication policy (`ssl_verify_client on`) while retaining route-level verification as defense in depth. Negative E2E coverage proves anonymous/XMESH1-header attempts cannot reach ACK policy success or mutate durable ACK/epoch/receipt state.
+2. Node PR #52 makes initial master-key provisioning durable with parent-directory `fsync` after file sync/close and adds Linux regression coverage.
 
-Those controls are part of the mandatory `production-migration-no-fallback-and-rollback` review domain. An external review that omitted them would not cover the final release architecture. The v3 handoff therefore advances the review snapshot while separately requiring byte-level Git equivalence for critical runtime paths.
+The companion handoff CI compares v3 to v4 and rejects any additional critical Nexus runtime or Node security-source drift outside those remediations.
 
 ## CI reproducibility proof
 
 `.github/workflows/xsp-p0e-security-review-bundle.yml`:
 
 1. checks out the control tooling;
-2. separately checks out exact Nexus `0bab1a48cff570b3abe405bcda4dc242b23b8a4b` and Node `083dc181c5e175f89007f4b93111cd5c45a69d97`;
-3. builds the bundle twice into independent directories and requires a recursive byte-for-byte diff to be empty;
-4. independently recalculates every manifest SHA-256/size record;
-5. creates a deterministic transport tar with sorted names, zeroed timestamps, numeric owner/group `0`, and writes its SHA-256;
-6. uploads the tar plus checksum as a 30-day GitHub Actions artifact.
+2. checks out exact Nexus `12b3170996bc062ee16c79659a6378e5e425fd0e` and Node `34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb`;
+3. builds the bundle twice independently and requires a recursive byte-for-byte diff to be empty;
+4. recalculates every manifest SHA-256 and size record;
+5. verifies that the internal audit is included as evidence while all production/qualification claims remain false;
+6. prints the manifest payload SHA-256, control-contract SHA-256 and file count;
+7. creates a deterministic tar with sorted names, epoch timestamps and numeric owner/group `0`;
+8. prints the deterministic tar SHA-256;
+9. uploads the tar plus checksum as `xsp-v2-p0e-security-review-bundle-v4` with 30-day retention.
 
-The companion handoff workflow independently proves the protected runtime paths did not change between Nexus runtime baseline `8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091` and v3 review snapshot `0bab1a48cff570b3abe405bcda4dc242b23b8a4b`.
-
-The outer GitHub artifact ZIP is merely transport. The authoritative reviewer integrity values are the deterministic inner tar checksum plus the bundle's `MANIFEST.json` / `SHA256SUMS`.
+The outer GitHub artifact ZIP is only transport. Authoritative integrity values are the deterministic inner tar checksum and `MANIFEST.json` / `SHA256SUMS` digests.
 
 ## Local use
 
-With exact checkouts available locally:
+With exact v4 checkouts available locally:
 
 ```bash
 python3 scripts/build-xsp-v2-p0e-security-review-bundle.py \
   --control-root . \
-  --nexus-root /path/to/XMesh-Nexus-at-0bab1a48 \
-  --node-root /path/to/XMesh-Node-at-083dc181 \
+  --nexus-root /path/to/XMesh-Nexus-at-12b31709 \
+  --node-root /path/to/XMesh-Node-at-34d3d7ef \
   --output /tmp/xsp-v2-p0e-security-review-bundle
 ```
 
-The script is standard-library Python plus the local `git` executable. It performs no network calls and never writes into either reviewed checkout.
+The builder uses standard-library Python and local `git`; it performs no network calls and does not write into either reviewed checkout.
 
 ## Review and release boundary
 
-A successful bundle workflow proves only that the evidence package is reproducibly assembled from the frozen revisions and that its bytes are content-addressed. It does **not** prove that the architecture is secure or satisfy any independent-review finding.
+A green bundle workflow proves reproducible assembly and content addressing only. It does **not** prove the system secure and cannot satisfy the independent-review requirement.
 
-The independent reviewer must still produce attributable findings, remediation disposition, and final sign-off for the v3 review snapshot tracked by issue #137. Separately, P0-E4a issue #138 still requires five representative real abrupt-power experiments and independent evidence review.
+Issue #137 must receive an attributable independent result for the exact v4 revisions. Issue #138 separately requires five representative real abrupt-power experiments on the reviewed storage/controller/PLP stack plus independent evidence review.
 
-After both external P0-E gates are genuinely complete, the exact release candidate still must rerun the complete disposable canary, supply a separately reviewed real rollout/rollback plan, obtain an explicit bounded strict-PQ approval, and execute activation as a separate step. XMESH1 retirement remains a later separate decision.
+After both external gates are legitimately complete, the exact release candidate must still run the final canary, pass the reviewed rollout-plan gate, obtain bounded strict-PQ activation approval, and execute activation separately. XMESH1 retirement remains a later independent decision.
 
-Until those gates close:
+Until then:
 
-- `independentSecurityReviewComplete=false`
-- `physicalPowerLossQualified=false`
-- `productionActivation=false`
-- `strictPQEnabled=false`
+- `independentSecurityReviewComplete=false`;
+- `physicalPowerLossQualified=false`;
+- `productionActivation=false`;
+- `strictPQEnabled=false`;
+- `strict-pq` remains OFF.

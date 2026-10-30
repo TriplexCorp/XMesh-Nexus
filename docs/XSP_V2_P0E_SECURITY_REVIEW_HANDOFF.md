@@ -1,107 +1,154 @@
 # XSP-v2 P0-E independent security-review handoff
 
-Status: **review-preparation / refreshed evidence-freeze only**. This document does not perform, replace or declare an independent security review. It does not qualify physical power-loss durability, enable `strict-pq`, or authorize production rollout.
+Status: **review-preparation / v4 evidence freeze only**. This handoff does not perform, replace, or declare an independent security review. It does not qualify physical power-loss durability, enable `strict-pq`, or authorize production rollout.
 
-## Frozen review target
+## Frozen v4 review target
 
-This v3 handoff freezes the current review snapshot at:
+The current independent-review package is frozen at the two security-remediated source revisions:
 
-- XMesh-Nexus: `0bab1a48cff570b3abe405bcda4dc242b23b8a4b` — merge of PR #155, after the bounded disposable-canary rehearsal (#150), production rollout-plan acceptance gate (#152), and explicit strict-PQ activation approval gate (#155).
-- XMesh-Node: `083dc181c5e175f89007f4b93111cd5c45a69d97` — Node PR #51 bounded local observability on top of the completed retirement/parser/FIPS-204 evidence chain.
+- XMesh-Nexus: `12b3170996bc062ee16c79659a6378e5e425fd0e` — merge of PR #163, mandatory TLS client authentication for the dedicated C2-B/D2 ingress plus regression updates proving anonymous/no-legacy requests cannot reach ACK policy success or mutate durable state.
+- XMesh-Node: `34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb` — merge of PR #52, durable parent-directory `fsync` before initial master-key provisioning reports success, with Linux regression coverage.
 
-The previous PR #142 freeze targeted Nexus `8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091` plus the same Node revision. That target remains the frozen **runtime baseline**. The v3 Nexus snapshot advances only review/release-control tooling and documentation; the handoff CI must prove that the critical runtime paths are unchanged between `8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091` and `0bab1a48cff570b3abe405bcda4dc242b23b8a4b`.
+The machine-readable binding is `deploy/xsp-v2-p0e-security-review-handoff.contract.json`.
 
-This refresh is required because the mandatory `production-migration-no-fallback-and-rollback` domain must review the actual final release-control architecture, not only the earlier runtime implementation. If either repository later advances in security-relevant runtime code or the release-control policy changes materially, the package is stale and the affected scope must be re-frozen/re-reviewed.
+## Why v3 was superseded
 
-The machine-readable freeze is `deploy/xsp-v2-p0e-security-review-handoff.contract.json`.
+The previous v3 target was:
 
-## Runtime implementation scope retained from the v2 freeze
+- Nexus `0bab1a48cff570b3abe405bcda4dc242b23b8a4b`;
+- Node `083dc181c5e175f89007f4b93111cd5c45a69d97`.
 
-The external reviewer must explicitly include the Rust origin/runtime hardening that remains part of the unchanged runtime baseline:
+An AI-assisted internal review was recorded in PR #162 / merge `424d99d8a9822c2e8157e5cdbb15c423e99f10ef`. That review was explicitly internal (`independent=false`) and identified two Low-severity hardening findings:
 
-- PR #139 merge `36ee6f7a5b1686f9c0d51beda5d24e84830982c7`: replaces the C2-A Python origin verifier with dependency-free Rust while preserving Linux `SO_PEERCRED`, pinned ingress UID/GID, exact client SPKI SHA-256, fixed trusted Node identity and UDS-only handling. The dedicated runtime contains neither Python nor a Rust toolchain.
-- PR #140 merge `03679120726ff06005eff903909b262fb1271960`: replaces the C2-B/C/D Python ACK/recovery origin state machine with an isolated Rust 2024/`serde` implementation while preserving strict schema and duplicate-field rejection, ACK Node/issuer/method/path/epoch/freshness binding, historical recovery only after expiry, protected `XSP2C2C1` / `XSP2C2H1` / `XSP2C2R1` framing, C2-C peer credentials `10001:10001`, exact raw ACK forwarding, response-size/trailing-byte checks, the three disposable response-loss fault domains, thread-per-connection behavior and Unix listen backlog 32.
+1. `AI-LOW-001`: the dedicated ingress used `ssl_verify_client optional`, so an anonymous TLS client was rejected only after entering HTTP route policy. There was no authentication bypass, but verified client identity was not mandatory at the TLS-authentication policy itself.
+2. `AI-LOW-002`: initial Node master-key creation synced the file contents but did not sync the parent directory entry before reporting provisioning success.
 
-PR #140 Backend CI, Hybrid TLS, C2-C authorization, expired recovery, lost-response/race, transport-negative/no-legacy and PostgreSQL rollback workflows completed successfully. That CI is supporting implementation evidence only; it does not satisfy the independent-review requirement.
+Both findings changed security-relevant code when remediated. Under the existing review-result policy, a security-relevant remediation invalidates the affected frozen scope. Therefore v3 is historical evidence only and must not be accepted as the current release-review target.
 
-## Release-control scope added after the v2 freeze
+## Remediation evidence
 
-The v3 review snapshot additionally requires the reviewer to examine the final non-executing release controls that landed after PR #142:
+### AI-LOW-001 — remediated in Nexus PR #163
 
-- PR #150 merge `497def9b950d57152f2e0ca2abb7eb0657a8d22f`: disposable release-canary rehearsal composing real Agent install/upgrade/retry/restart/LKG rollback, coordinated E3b restore, and default-off redacted observability. It proves harness readiness only and keeps `finalReleaseCanarySatisfied=false` until the exact post-P0-E candidate is rerun.
-- PR #152 merge `b71c0d0c641b5e0f6a60785586486b18dbb45db3`: fail-closed production rollout-plan verifier requiring exact-candidate evidence, external review/physical qualification, final canary, explicit topology/DNS/firewall/Nginx/PostgreSQL/key/observability/rollback dispositions and separate plan review. It never performs deployment.
-- PR #155 merge `0bab1a48cff570b3abe405bcda4dc242b23b8a4b`: explicit strict-PQ activation approval gate bound to the exact candidate, final canary, reviewed rollout plan and external evidence digests, with a bounded named-Node scope and short approval window. Even an eligible approval keeps `strictPQEnabled=false`, `productionActivation=false`, `legacyXMESH1Retired=false` and requires a separate execution step.
+The dedicated C2-B/D2 ingress now requires:
 
-The release decision remains intentionally split: first PQ activation may retain legacy XMESH1; XMESH1 retirement is a later, separately approved action. Automatic fallback, classical-only activation and bundling XMESH1 retirement into initial strict-PQ activation remain forbidden.
+```nginx
+ssl_verify_client on;
+```
+
+The exact ACK/recovery locations still retain `$ssl_client_verify == SUCCESS` as defense in depth. Runtime contracts reject any return to `optional` for this active staging boundary. E2E negatives require no-certificate/XMESH1-header attempts to fail under mandatory mTLS before ACK policy success and verify that PostgreSQL ACK/epoch/receipt/replay state remains unchanged.
+
+TLS 1.3 key exchange occurs before client-certificate acceptance, so this remediation does **not** claim to eliminate generic pre-authentication TLS/KEM CPU cost. Production connection/rate/resource controls remain a deployment concern.
+
+The PR head passed Backend CI plus the dedicated Hybrid TLS, C2-D2 transport-negative/no-legacy, expired-recovery, lost-response/race, and PostgreSQL snapshot-rollback workflows before merge.
+
+### AI-LOW-002 — remediated in Node PR #52
+
+`CreateMasterKey` now reports success only after:
+
+1. exclusive 0600 file creation;
+2. random master-key write;
+3. file `fsync`;
+4. successful close;
+5. parent-directory `fsync`.
+
+The existing atomic sealed-state helper reuses the same directory-sync primitive. New Linux coverage checks private-file invariants, directory syncability, and refusal to overwrite an existing master key.
+
+The PR passed Node CI, XSP-v2 crypto PoC, crash durability, snapshot anti-rollback, owner-retirement durable erasure, Agent artifact, P0-E4a arming, and E4a5 lab-operation checks before merge.
+
+## Review-scope provenance
+
+The v2 runtime freeze at Nexus `8c64a8e5c06cec12fb34b13c5cb2cb789f5ce091` and Node `083dc181c5e175f89007f4b93111cd5c45a69d97` remains historical provenance for the original completed runtime chain.
+
+The v3 target added final release-control architecture through Nexus `0bab1a48cff570b3abe405bcda4dc242b23b8a4b` while retaining the same Node revision.
+
+The v4 target intentionally advances security-relevant runtime scope only for the two remediations above. The v4 handoff CI must prove the bounded delta:
+
+- within Nexus critical runtime paths, v3 -> v4 changes only `deploy/xsp-v2-ingress/nginx-c2b.conf`;
+- within Node `security/xspv2` and `agent/xspv2`, v3 -> v4 changes only `security/xspv2/poc-go/keyring/sealed.go` and `security/xspv2/poc-go/keyring/master_key_durability_linux_test.go`.
+
+Review/test files that encode the new expected mandatory-mTLS behavior are included as evidence, but they are not treated as additional production runtime state machines.
+
+## Runtime implementation scope
+
+The reviewer must retain the full prior XSP-v2 architecture in scope, including:
+
+- strict protocol/canonicalization and purpose/direction binding;
+- Ed25519 **and** ML-DSA-65 critical-message signatures;
+- TLS 1.3 `X25519MLKEM768` transport, ML-DSA-65 Node identity, authenticated authority/Host binding, downgrade rejection and no XMESH1/classical fallback on XSP-v2;
+- the Rust C2-A origin and C2-B/C/D ACK/recovery boundary with Linux `SO_PEERCRED`, exact client SPKI/Node identity, strict typed JSON, bounded framing and exact UDS transitions;
+- isolated panel-response signer and least-privilege PostgreSQL roles;
+- transactional permit/replay/ACK/epoch/receipt behavior and immutable receipt evidence;
+- Agent vault/floor/journal crash durability and rollback rejection;
+- coordinated backup/restore plus independently protected owner/off-host monotonic floor;
+- dual-owner-authorized prior-key retirement and anti-resurrection state;
+- parser fuzzing and bounded external NIST ACVP ML-DSA-65 verification-vector evidence;
+- default-off redacted observability;
+- exact-candidate canary, rollout-plan and strict-PQ approval controls.
+
+## Final release-control scope retained
+
+The v4 review still includes the non-executing release controls from v3:
+
+- PR #150 / `497def9b950d57152f2e0ca2abb7eb0657a8d22f`: disposable release-canary rehearsal;
+- PR #152 / `b71c0d0c641b5e0f6a60785586486b18dbb45db3`: production rollout-plan verifier;
+- PR #155 / `0bab1a48cff570b3abe405bcda4dc242b23b8a4b`: bounded strict-PQ activation approval gate.
+
+Those controls still require the exact post-P0-E candidate, accepted independent review, accepted physical qualification, final canary and reviewed rollout evidence before an approval can become eligible. Approval remains non-executing and initial strict-PQ activation retains XMESH1; XMESH1 retirement is a later separate decision.
+
+Automatic fallback and classical-only activation remain forbidden.
 
 ## Required independent review domains
 
-The external reviewer must cover at least the following boundaries as one migration/production architecture rather than approving each green CI job in isolation:
+The independent reviewer must cover all eleven domains as one system:
 
-1. protocol canonicalization, domain separation, identity/direction/purpose binding and malformed-input behavior;
-2. Ed25519 + ML-DSA-65 hybrid signing semantics and key-purpose separation;
-3. TLS 1.3 `X25519MLKEM768`, ML-DSA-65 Node identity, authenticated authority/Host binding, downgrade rejection and absence of an XMESH1/classical fallback on the XSP-v2 path;
-4. isolated signer process/socket boundary, filesystem/peer credentials, DB reader privileges and private-key custody assumptions;
-5. PostgreSQL permit/replay/ACK/epoch/receipt transactionality, immutable evidence and lost-response/idempotent recovery semantics;
-6. Agent local vault/floor/journal durability, crash recovery and one-sided rollback rejection;
-7. coordinated backup/restore, independent owner/off-host monotonic floor and trust-domain separation;
-8. owner-authorized retirement, offline owner-key custody, durable retirement intent, retained-key erasure and anti-resurrection floors;
-9. parser fuzz scope and the externally pinned NIST ACVP ML-DSA-65 verification-vector scope/limitations;
-10. default-off redacted Node/Nexus observability and its no-secret/no-replayable-payload boundary;
-11. the final production migration, rollback, key provisioning, deployment/topology, exact-candidate canary, reviewed rollout plan, explicit activation approval and fail-closed/no-fallback policy.
+1. protocol and canonicalization;
+2. hybrid cryptography and key-purpose binding;
+3. PQ-only transport and Node identity;
+4. isolated signer and key custody;
+5. PostgreSQL replay / ACK / epoch / receipt transactionality;
+6. Agent local durability and rollback;
+7. coordinated backup/restore and off-host recovery floor;
+8. owner-authorized key retirement;
+9. parser fuzzing and external ML-DSA-65 verification vectors;
+10. default-off redacted observability;
+11. production migration, no-fallback and rollback architecture.
+
+For v4, domains 3 and 6 must explicitly review the remediation changes rather than relying on the previous v3 conclusions.
 
 ## Frozen evidence index
 
-At frozen Nexus review snapshot `0bab1a48cff570b3abe405bcda4dc242b23b8a4b`, the package includes the normative/security evidence documents and machine contracts listed by the companion JSON contract, including:
+The companion contract enumerates the required evidence documents, machine contracts and implementation evidence. It includes the internal audit as historical/remediation context, but that document remains explicitly non-independent.
 
-- `docs/XSP_V2_PQ_ONLY_SECURITY_POLICY.md`
-- `docs/XSP_V2_WIRE_SPEC.md`
-- `docs/XSP_V2_SIGNER_E2E.md`
-- `docs/XSP_V2_P0E_COORDINATED_BACKUP_RESTORE.md`
-- `docs/XSP_V2_P0E4A6_PHYSICAL_RUN_HANDOFF.md`
-- `docs/XSP_V2_P0E_OWNER_RETIREMENT_DURABLE_ERASURE.md`
-- `docs/XSP_V2_P0E_PARSER_FUZZ.md`
-- `docs/XSP_V2_P0E_MLDSA65_FIPS204_ACVP.md`
-- `docs/XSP_V2_P0E_OBSERVABILITY.md`
-- `docs/XSP_V2_DISPOSABLE_CANARY_REHEARSAL.md`
-- `docs/XSP_V2_PRODUCTION_ROLLOUT_PLAN.md`
-- `docs/XSP_V2_STRICT_PQ_ACTIVATION_APPROVAL.md`
-- `docs/ENTERPRISE_ROADMAP.md`
-
-The contract also enumerates the concrete C2-A/C2-B/C2-C/C2-D Rust implementation and regression evidence plus the release-control verifier/workflow evidence for #150/#152/#155. Existing CI and test evidence is supporting material; repository-controlled tests cannot satisfy the independent-review requirement.
-
-## Trust domains the reviewer must keep distinct
-
-The architecture intentionally relies on several separate failure/rollback domains:
-
-- the Node Agent's private local security state;
-- Nexus/PostgreSQL durable control-plane state;
-- the isolated panel-response signer and its protected signing identity;
-- the staging ingress/origin boundary and the protected C2-C local authorization boundary;
-- owner/off-host recovery checkpoint and independently provisioned verification pins;
-- the external storage/controller/power-control evidence domain used by P0-E4a;
-- the human/independent review and bounded release-authorization process that supplies external evidence digests to the rollout and activation verifiers.
-
-A review must explicitly evaluate correlated compromise or rollback assumptions between these domains. In particular, the owner/off-host floor cannot be stored only inside the same coordinated rollback domain it is intended to detect, ingress identity metadata must not become a caller-controlled replacement for the reviewed peer-credential/SPKI boundary, and release approvals must not be self-issued by the artifact they are supposed to authorize.
+The reviewer package contains exact source archives for the v4 Nexus and Node revisions plus the indexed control/evidence files. Existing CI is corroborating evidence only and cannot substitute for independent review.
 
 ## Required reviewer output
 
-The independent review is not complete merely because this handoff exists. Closure requires an externally attributable review result that records at least:
+A closure-eligible external result must record at least:
 
-- the exact Nexus and Node revisions reviewed;
-- reviewer identity/organization and review date;
-- scope and methodology;
-- findings with severity and affected trust boundary;
-- disposition/remediation evidence for release-blocking findings;
-- explicit statement on the Rust origin/ACK/recovery migration;
-- explicit statement on the #150/#152/#155 exact-candidate canary, rollout-plan, approval and no-fallback architecture;
+- exact Nexus `12b3170996bc062ee16c79659a6378e5e425fd0e` and Node `34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb` revisions;
+- attributable reviewer identity/organization and review date;
+- scope and methodology covering all eleven domains;
+- findings, severity, affected trust boundary and disposition;
+- explicit review of `AI-LOW-001` and `AI-LOW-002` remediation;
+- explicit review of Rust ingress/origin/ACK/recovery boundaries;
+- explicit review of the final canary/rollout/activation/no-fallback architecture;
 - remaining limitations;
-- an unambiguous approval/sign-off or rejection for the reviewed revisions.
+- unambiguous approval, approval-with-findings, or rejection.
 
-Any remediation that changes security-relevant code or materially changes the release-control policy invalidates the affected frozen scope and requires a new freeze/re-review.
+A later security-relevant code or material release-policy change makes the affected v4 scope stale and requires another freeze/re-review.
 
-## External blocker that remains independent of this review package
+## External blockers remain open
 
-P0-E4a remains OPEN. The repository already contains the E4a1–E4a6 preflight, arming, evidence, matrix, real-operation and operator-handoff tooling, but qualification still requires five real representative abrupt-power runs on the reviewed storage/controller/PLP stack plus independent evidence review. CI, SIGKILL, VM stop/snapshot and synthetic fixtures cannot substitute for those physical experiments.
+The independent security review tracked by issue #137 remains required for this **v4** target. The internal AI review and repository CI are supporting evidence only.
 
-The final production release decision therefore still depends on both the independent architecture/security review and the outstanding P0-E4a physical evidence, followed by an exact post-P0-E canary, a separately reviewed rollout plan, an explicit bounded strict-PQ approval, and a separate execution step. `strict-pq` remains OFF and production rollout remains NOT AUTHORIZED.
+P0-E4a / issue #138 also remains externally bounded. Qualification still requires five representative real abrupt-power experiments on the reviewed storage/controller/PLP stack plus independent review of the raw evidence. Process kills, VM stop/snapshot, synthetic fixtures, and successful `fsync(2)` calls do not substitute for those experiments.
+
+Until both external blockers are legitimately satisfied and the exact-candidate release sequence is completed:
+
+- `independentSecurityReviewComplete=false`;
+- `physicalPowerLossQualified=false`;
+- `productionActivation=false`;
+- `strictPQEnabled=false`;
+- `strict-pq` remains OFF;
+- production rollout remains NOT AUTHORIZED;
+- XMESH1 remains retained.
