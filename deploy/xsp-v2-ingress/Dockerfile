@@ -57,9 +57,11 @@ COPY deploy/xsp-v2-ingress/origin_ack_gate.py /usr/local/bin/xsp-origin-ack-gate
 USER 10004:10003
 ENTRYPOINT ["python3", "/usr/local/bin/xsp-origin-ack-gate"]
 
-# Test client only: OpenSSL CLI is deliberately absent from the ingress runtime.
+# Test client only: OpenSSL and netcat stay outside both ingress/origin runtime
+# images. `nc -U` drives the negative SO_PEERCRED test without reintroducing a
+# Python interpreter into the Rust origin image.
 FROM debian:trixie-slim AS probe
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends openssl ca-certificates \
+    && apt-get install -y --no-install-recommends openssl ca-certificates netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 ENTRYPOINT ["/bin/sh"]
