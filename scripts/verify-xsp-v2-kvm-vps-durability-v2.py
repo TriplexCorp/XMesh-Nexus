@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
-"""Validate versioned KVM VPS guest crash-consistency qualification evidence.
+"""Validate topology-aware KVM VPS durability qualification evidence.
 
 Version 2 keeps the reviewed production runtime target separate from the later,
-qualification-only Node tooling revision used to arm/inspect real crash runs.
-It never treats guest failure as physical host/storage power-loss evidence.
+qualification-only Node tooling revision. It also models the deployed topology:
+XMesh-Node and Nexus/PostgreSQL are separate failure domains. The five real Node
+crash runs therefore qualify the isolated Node keyring implementation on the
+subject host, while PostgreSQL crash recovery and the production off-host
+recovery floor are independently evidenced and composed at the release gate.
+
+This verifier never treats guest failure as physical host/storage power-loss
+evidence and never enables production strict-pq.
 """
 from __future__ import annotations
 
@@ -121,13 +127,13 @@ def validate_rotation(value: Any, where: str) -> dict[str, Any]:
     return value
 
 
-def validate_run(run: Any, index: int, contract: dict[str, Any], subject_node_id: int) -> tuple[str, str, str]:
-    where = f"result.runs[{index}]"
+def validate_node_run(run: Any, index: int, contract: dict[str, Any], subject_node_id: int) -> tuple[str, str, str]:
+    where = f"result.nodeRuns[{index}]"
     if not isinstance(run, dict):
         fail(f"{where} must be an object")
     exact(run, {
         "runId","checkpoint","crashMethod","crashEvidenceSha256","bootBeforeId","bootAfterId",
-        "nodeId","rotation","postBoot","postgresRecovery","offhostWitness"
+        "nodeId","rotation","postBoot"
     }, where)
     run_id = token(run["runId"], f"{where}.runId")
     point = nonempty(run["checkpoint"], f"{where}.checkpoint", 64)
@@ -165,32 +171,85 @@ def validate_run(run: Any, index: int, contract: dict[str, Any], subject_node_id
     expected_pq = rotation["fromPQKeyId"] if previous else rotation["toPQKeyId"]
     if epoch != expected_epoch or post["activeEdKeyId"] != expected_ed or post["activePQKeyId"] != expected_pq:
         fail(f"{where}.postBoot does not match the complete expected identity")
-
-    pg = run["postgresRecovery"]
-    if not isinstance(pg, dict):
-        fail(f"{where}.postgresRecovery must be an object")
-    exact(pg, {"recoveryObserved","integrityChecksPassed","fsync","fullPageWrites","synchronousCommit","walSyncMethod","securityTupleSha256"}, f"{where}.postgresRecovery")
-    if boolean(pg["recoveryObserved"], f"{where}.postgresRecovery.recoveryObserved") is not True:
-        fail(f"{where} lacks PostgreSQL recovery evidence")
-    if boolean(pg["integrityChecksPassed"], f"{where}.postgresRecovery.integrityChecksPassed") is not True:
-        fail(f"{where} PostgreSQL integrity checks failed")
-    if pg["fsync"] != "on" or pg["fullPageWrites"] != "on":
-        fail(f"{where} PostgreSQL durability settings are invalid")
-    if pg["synchronousCommit"] not in {"on","remote_apply","remote_write"}:
-        fail(f"{where} synchronousCommit is unsupported")
-    nonempty(pg["walSyncMethod"], f"{where}.postgresRecovery.walSyncMethod", 64)
-    sha(pg["securityTupleSha256"], f"{where}.postgresRecovery.securityTupleSha256")
-
-    witness = run["offhostWitness"]
-    if not isinstance(witness, dict):
-        fail(f"{where}.offhostWitness must be an object")
-    exact(witness, {"checkpointSha256","minimumEpoch","receiptSha256"}, f"{where}.offhostWitness")
-    sha(witness["checkpointSha256"], f"{where}.offhostWitness.checkpointSha256")
-    floor = positive(witness["minimumEpoch"], f"{where}.offhostWitness.minimumEpoch")
-    sha(witness["receiptSha256"], f"{where}.offhostWitness.receiptSha256")
-    if floor > rotation["fromEpoch"] or epoch < floor:
-        fail(f"{where} violates off-host monotonic floor")
     return point, run_id, crash_hash
+
+
+def validate_storage(value: Any, where: str, contract: dict[str, Any]) -> None:
+    if not isinstance(value, dict):
+        fail(f"{where} must be an object")
+    exact(value, {
+        "provider","storageClass","storageTrustBoundary","providerStorageDurabilityAssumed",
+        "riskAcceptedBy","riskAcceptedAt","riskStatement"
+    }, where)
+    nonempty(value["provider"], f"{where}.provider", 128)
+    nonempty(value["storageClass"], f"{where}.storageClass", 128)
+    if value["storageTrustBoundary"] != contract["providerStorageBoundary"]["storageTrustBoundary"]:
+        fail(f"{where}.storageTrustBoundary is wrong")
+    if boolean(value["providerStorageDurabilityAssumed"], f"{where}.providerStorageDurabilityAssumed") is not True:
+        fail(f"{where} must explicitly accept provider storage durability")
+    nonempty(value["riskAcceptedBy"], f"{where}.riskAcceptedBy", 128)
+    timestamp(value["riskAcceptedAt"], f"{where}.riskAcceptedAt")
+    nonempty(value["riskStatement"], f"{where}.riskStatement", 2048)
+
+
+def validate_postgres(value: Any, contract: dict[str, Any], subject_node_id: int, node_crash_hashes: set[str]) -> str:
+    where = "result.postgresCrashRecovery"
+    if not isinstance(value, dict):
+        fail(f"{where} must be an object")
+    exact(value, {
+        "subjectNodeId","crashMethod","crashEvidenceSha256","evidenceSha256",
+        "bootBeforeId","bootAfterId","recoveryObserved","integrityChecksPassed",
+        "fsync","fullPageWrites","synchronousCommit","walSyncMethod",
+        "securityTupleBeforeSha256","securityTupleAfterSha256"
+    }, where)
+    if positive(value["subjectNodeId"], f"{where}.subjectNodeId") != subject_node_id:
+        fail(f"{where}.subjectNodeId does not match result.subjectNodeId")
+    method = nonempty(value["crashMethod"], f"{where}.crashMethod", 64)
+    if method not in contract["allowedCrashMethods"]:
+        fail(f"{where}.crashMethod is unsupported")
+    crash_hash = sha(value["crashEvidenceSha256"], f"{where}.crashEvidenceSha256")
+    if crash_hash in node_crash_hashes:
+        fail("PostgreSQL crash evidence must identify an independent failure-domain event")
+    sha(value["evidenceSha256"], f"{where}.evidenceSha256")
+    before = token(value["bootBeforeId"], f"{where}.bootBeforeId")
+    after = token(value["bootAfterId"], f"{where}.bootAfterId")
+    if before == after:
+        fail("PostgreSQL evidence did not cross a reboot boundary")
+    if boolean(value["recoveryObserved"], f"{where}.recoveryObserved") is not True:
+        fail("PostgreSQL recovery was not observed")
+    if boolean(value["integrityChecksPassed"], f"{where}.integrityChecksPassed") is not True:
+        fail("PostgreSQL integrity checks did not pass")
+    if value["fsync"] != "on" or value["fullPageWrites"] != "on":
+        fail("PostgreSQL durability settings are invalid")
+    if value["synchronousCommit"] not in {"on","remote_apply","remote_write"}:
+        fail("PostgreSQL synchronousCommit is unsupported")
+    nonempty(value["walSyncMethod"], f"{where}.walSyncMethod", 64)
+    before_tuple = sha(value["securityTupleBeforeSha256"], f"{where}.securityTupleBeforeSha256")
+    after_tuple = sha(value["securityTupleAfterSha256"], f"{where}.securityTupleAfterSha256")
+    if before_tuple != after_tuple:
+        fail("PostgreSQL subject security tuple changed across crash recovery")
+    return crash_hash
+
+
+def validate_offhost(value: Any, subject_node_id: int) -> None:
+    where = "result.offhostProductionWitness"
+    if not isinstance(value, dict):
+        fail(f"{where} must be an object")
+    exact(value, {
+        "nodeId","checkpointSha256","receiptSha256","verificationResultSha256",
+        "verificationStatus","minimumEpoch","localEpoch"
+    }, where)
+    if positive(value["nodeId"], f"{where}.nodeId") != subject_node_id:
+        fail(f"{where}.nodeId does not match result.subjectNodeId")
+    sha(value["checkpointSha256"], f"{where}.checkpointSha256")
+    sha(value["receiptSha256"], f"{where}.receiptSha256")
+    sha(value["verificationResultSha256"], f"{where}.verificationResultSha256")
+    if value["verificationStatus"] != "verified":
+        fail(f"{where}.verificationStatus must be verified")
+    floor = positive(value["minimumEpoch"], f"{where}.minimumEpoch")
+    local = positive(value["localEpoch"], f"{where}.localEpoch")
+    if local < floor:
+        fail("production local epoch is below the independently verified off-host floor")
 
 
 def verify(result_path: Path, contract_path: Path) -> dict[str, Any]:
@@ -199,13 +258,30 @@ def verify(result_path: Path, contract_path: Path) -> dict[str, Any]:
     if contract.get("schema") != "xsp2-kvm-vps-durability-qualification-contract-2":
         fail("unsupported contract schema")
     exact(result, {
-        "schema","deploymentClass","target","qualificationTooling","subjectNodeId",
-        "evidenceBundle","providerStorage","runs","claims"
+        "schema","deploymentClass","topology","target","qualificationTooling","subjectNodeId",
+        "evidenceBundle","providerStorage","nodeRuns","postgresCrashRecovery",
+        "offhostProductionWitness","claims"
     }, "result")
     if result["schema"] != contract["resultSchema"]:
         fail("unsupported result schema")
     if result["deploymentClass"] != contract["deploymentClass"]:
         fail("wrong deploymentClass")
+
+    topology = result["topology"]
+    if not isinstance(topology, dict):
+        fail("result.topology must be an object")
+    exact(topology, {"nodeStateScope","nodeFailureDomain","nexusPostgresFailureDomain","separateFailureDomains"}, "result.topology")
+    requirements = contract["topologyRequirements"]
+    if topology["nodeStateScope"] != requirements["nodeStateScope"]:
+        fail("wrong Node state scope")
+    if boolean(topology["separateFailureDomains"], "result.topology.separateFailureDomains") is not True:
+        fail("Node and Nexus/PostgreSQL must be represented as separate failure domains")
+    node_domain = token(topology["nodeFailureDomain"], "result.topology.nodeFailureDomain")
+    pg_domain = token(topology["nexusPostgresFailureDomain"], "result.topology.nexusPostgresFailureDomain")
+    if node_domain == pg_domain:
+        fail("Node and Nexus/PostgreSQL failure-domain identifiers must differ")
+    if requirements.get("nodeAndNexusPostgresSeparateFailureDomains") is not True:
+        fail("contract does not require the deployed separate-domain topology")
 
     target = result["target"]
     if not isinstance(target, dict):
@@ -223,7 +299,7 @@ def verify(result_path: Path, contract_path: Path) -> dict[str, Any]:
     exact(tool, {"nodeRevision","runtimeBaseRevision","runnerPath","buildTag","binarySha256"}, "result.qualificationTooling")
     sha(tool["nodeRevision"], "result.qualificationTooling.nodeRevision", 40)
     sha(tool["runtimeBaseRevision"], "result.qualificationTooling.runtimeBaseRevision", 40)
-    sha(tool["binarySha256"], "result.qualificationTooling.binarySha256")
+    binary_sha = sha(tool["binarySha256"], "result.qualificationTooling.binarySha256")
     if tool["nodeRevision"] != expected_tool["nodeRevision"]:
         fail("wrong qualification tooling Node revision")
     if tool["runtimeBaseRevision"] != expected_tool["runtimeBaseRevision"] or tool["runtimeBaseRevision"] != target["nodeRevision"]:
@@ -247,34 +323,35 @@ def verify(result_path: Path, contract_path: Path) -> dict[str, Any]:
     provider = result["providerStorage"]
     if not isinstance(provider, dict):
         fail("result.providerStorage must be an object")
-    exact(provider, {"provider","storageClass","storageTrustBoundary","providerStorageDurabilityAssumed","riskAcceptedBy","riskAcceptedAt","riskStatement"}, "result.providerStorage")
-    nonempty(provider["provider"], "result.providerStorage.provider", 128)
-    nonempty(provider["storageClass"], "result.providerStorage.storageClass", 128)
-    if provider["storageTrustBoundary"] != contract["providerStorageBoundary"]["storageTrustBoundary"]:
-        fail("wrong storage trust boundary")
-    if boolean(provider["providerStorageDurabilityAssumed"], "result.providerStorage.providerStorageDurabilityAssumed") is not True:
-        fail("provider storage durability assumption must be explicit")
-    nonempty(provider["riskAcceptedBy"], "result.providerStorage.riskAcceptedBy", 128)
-    timestamp(provider["riskAcceptedAt"], "result.providerStorage.riskAcceptedAt")
-    nonempty(provider["riskStatement"], "result.providerStorage.riskStatement", 2048)
+    exact(provider, {"node","nexusPostgres"}, "result.providerStorage")
+    validate_storage(provider["node"], "result.providerStorage.node", contract)
+    validate_storage(provider["nexusPostgres"], "result.providerStorage.nexusPostgres", contract)
 
-    runs = result["runs"]
+    runs = result["nodeRuns"]
     if not isinstance(runs, list) or len(runs) != len(contract["requiredCheckpoints"]):
-        fail("result.runs must contain exactly five runs")
+        fail("result.nodeRuns must contain exactly five runs")
     points: list[str] = []
     run_ids: list[str] = []
     crash_hashes: list[str] = []
     for i, run in enumerate(runs):
-        point, run_id, crash_hash = validate_run(run, i, contract, subject_node_id)
+        point, run_id, crash_hash = validate_node_run(run, i, contract, subject_node_id)
         points.append(point)
         run_ids.append(run_id)
         crash_hashes.append(crash_hash)
     if set(points) != set(contract["requiredCheckpoints"]) or len(points) != len(set(points)):
-        fail("required checkpoints must appear exactly once")
+        fail("required Node checkpoints must appear exactly once")
     if len(run_ids) != len(set(run_ids)):
-        fail("run IDs must be unique")
+        fail("Node run IDs must be unique")
     if len(crash_hashes) != len(set(crash_hashes)):
-        fail("crash evidence hashes must be unique")
+        fail("Node crash evidence hashes must be unique")
+
+    if requirements.get("independentPostgresCrashRecoveryRequired") is not True:
+        fail("contract does not require independent PostgreSQL crash recovery evidence")
+    postgres_crash_hash = validate_postgres(result["postgresCrashRecovery"], contract, subject_node_id, set(crash_hashes))
+
+    if requirements.get("independentOffhostProductionWitnessRequired") is not True:
+        fail("contract does not require an independent production off-host witness")
+    validate_offhost(result["offhostProductionWitness"], subject_node_id)
 
     claims = result["claims"]
     if not isinstance(claims, dict):
@@ -286,10 +363,17 @@ def verify(result_path: Path, contract_path: Path) -> dict[str, Any]:
     return {
         "status": "kvm-vps-durability-qualified-for-release-gate",
         "deploymentClass": "kvm-vps",
-        "runCount": len(runs),
+        "topologyAware": True,
+        "nodeStateScope": topology["nodeStateScope"],
+        "nodeRunCount": len(runs),
+        "nodeCrashMatrixQualified": True,
+        "postgresCrashRecoveryQualified": True,
+        "offhostProductionWitnessVerified": True,
         "subjectNodeId": subject_node_id,
         "runtimeNodeRevision": target["nodeRevision"],
         "qualificationToolingRevision": tool["nodeRevision"],
+        "qualificationBinarySha256": binary_sha,
+        "postgresCrashEvidenceSha256": postgres_crash_hash,
         "evidenceArchiveSha256": archive_sha,
         "matrixSha256": hashlib.sha256(raw).hexdigest(),
         "guestCrashConsistencyQualified": True,
@@ -309,7 +393,7 @@ def main() -> int:
     try:
         out = verify(Path(args.result), Path(args.contract))
     except (ValidationError, OSError) as exc:
-        print(f"KVM VPS durability qualification v2 rejected: {exc}", file=sys.stderr)
+        print(f"KVM VPS durability qualification rejected: {exc}", file=sys.stderr)
         return 2
     print(json.dumps(out, sort_keys=True, separators=(",", ":")))
     return 0
