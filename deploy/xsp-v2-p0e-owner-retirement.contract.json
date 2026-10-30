@@ -1,0 +1,27 @@
+{
+  "schema": "xsp2-p0e-owner-retirement-contract-1",
+  "node": {
+    "repository": "TriplexCorp/XMesh-Node",
+    "sourceRevision": "e0f6bc01de98aad488fce73e1e605ba24f566bb1",
+    "pullRequest": 46,
+    "previousReviewedRevision": "7bf8cc92950f396e33891c8744c1f6855414154b"
+  },
+  "authorizationDomain": "XSP2-OWNER-RETIRE-PREVIOUS-V1",
+  "ownerSignatureAlgorithms": [
+    "Ed25519",
+    "ML-DSA-65"
+  ],
+  "maximumAuthorizationLifetimeMs": 300000,
+  "requiresCurrentOffHostCheckpoint": true,
+  "requiresExactCheckpointDigest": true,
+  "requiresIndependentGenerationFloor": true,
+  "requiresExactRetainedPreviousIdentity": true,
+  "requiresExactRetainedCandidateIdentity": true,
+  "requiresActiveEqualsRetainedCandidate": true,
+  "authorizationIsReadOnly": true,
+  "oldKeyErasureEnabled": false,
+  "networkRouteAdded": false,
+  "physicalPowerLossQualified": false,
+  "productionActivation": false,
+  "strictPQEnabled": false
+}
