@@ -14,10 +14,17 @@ name = "xsp-v2-recovery-checkpoint"
 path = "src/bin/xsp_v2_recovery_checkpoint.rs"
 required-features = ["xsp-v2-experimental"]
 
+[[bin]]
+name = "xsp-v2-observability"
+path = "src/bin/xsp_v2_observability.rs"
+required-features = ["xsp-v2-observability"]
+
 [features]
 default = []
 # Build only in an audited OpenSSL 3.5+ environment; disabled in production Docker.
 xsp-v2-experimental = ["dep:openssl"]
+# Operator-only read path; disabled by default and not built into production Docker.
+xsp-v2-observability = []
 
 [dependencies]
 openssl = { version = "=0.10.81", optional = true }
