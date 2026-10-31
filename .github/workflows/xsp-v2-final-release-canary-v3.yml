@@ -60,15 +60,7 @@ jobs:
           set -Eeuo pipefail
           python3 - <<'PY'
           import json
-          x={
-            'schema':'xsp2-kvm-vps-strict-pq-activation-approval-2','deploymentClass':'kvm-vps',
-            'releaseCandidate':{'nexusRuntimeRevision':'a1267ae186f74d5e21561e3b64fc7375d499132e','nodeRevision':'64709ce8f5f0ce80e2c0bab59b4476347825e57c','nexusImageSha256':'sha256:'+'1'*64,'agentArtifactSha256':'2'*64},
-            'evidence':{'aiAssistedSecurityReviewAccepted':True,'aiAssistedSecurityReviewResultSha256':'3'*64,'kvmVpsDurabilityQualificationAccepted':True,'kvmVpsDurabilityResultSha256':'4'*64,'providerStorageRiskAccepted':True,'providerStorageRiskAcceptanceSha256':'5'*64,'finalCanaryPassed':True,'finalCanaryResultSha256':'6'*64,'rolloutPlanReviewed':True,'rolloutPlanSha256':'7'*64,'rolloutPlanReviewSha256':'8'*64},
-            'scope':{'mode':'limited-canary','nodes':['node-13'],'validFrom':'2026-10-31T00:00:00Z','validUntil':'2026-10-31T23:59:00Z'},
-            'transportPolicy':{'tlsProtocols':['TLSv1.3'],'keyExchange':'X25519MLKEM768','clientIdentity':'ML-DSA-65','criticalMessageSignatures':['Ed25519','ML-DSA-65'],'automaticFallback':False,'classicalOnlyAllowed':False},
-            'decision':{'strictPqAction':'enable','legacyXMESH1Action':'retain'},
-            'approval':{'authority':'release-owner','approvedBy':'Triplex','approvedAt':'2026-10-31T12:00:00Z','statement':'bounded canary'},
-            'claims':{'productionActivation':False,'strictPQEnabled':False,'legacyXMESH1Retired':False,'physicalPowerLossQualified':False}}
+          x={'schema':'xsp2-kvm-vps-strict-pq-activation-approval-2','deploymentClass':'kvm-vps','releaseCandidate':{'nexusRuntimeRevision':'a1267ae186f74d5e21561e3b64fc7375d499132e','nodeRevision':'64709ce8f5f0ce80e2c0bab59b4476347825e57c','nexusImageSha256':'sha256:'+'1'*64,'agentArtifactSha256':'2'*64},'evidence':{'aiAssistedSecurityReviewAccepted':True,'aiAssistedSecurityReviewResultSha256':'3'*64,'kvmVpsDurabilityQualificationAccepted':True,'kvmVpsDurabilityResultSha256':'4'*64,'providerStorageRiskAccepted':True,'providerStorageRiskAcceptanceSha256':'5'*64,'finalCanaryPassed':True,'finalCanaryResultSha256':'6'*64,'rolloutPlanReviewed':True,'rolloutPlanSha256':'7'*64,'rolloutPlanReviewSha256':'8'*64},'scope':{'mode':'limited-canary','nodes':['node-13'],'validFrom':'2026-10-31T00:00:00Z','validUntil':'2026-10-31T23:59:00Z'},'transportPolicy':{'tlsProtocols':['TLSv1.3'],'keyExchange':'X25519MLKEM768','clientIdentity':'ML-DSA-65','criticalMessageSignatures':['Ed25519','ML-DSA-65'],'automaticFallback':False,'classicalOnlyAllowed':False},'decision':{'strictPqAction':'enable','legacyXMESH1Action':'retain'},'approval':{'authority':'release-owner','approvedBy':'Triplex','approvedAt':'2026-10-31T12:00:00Z','statement':'bounded canary'},'claims':{'productionActivation':False,'strictPQEnabled':False,'legacyXMESH1Retired':False,'physicalPowerLossQualified':False}}
           json.dump(x,open('/tmp/good.json','w'))
           a=json.loads(json.dumps(x));a['transportPolicy']['classicalOnlyAllowed']=True;json.dump(a,open('/tmp/fallback.json','w'))
           a=json.loads(json.dumps(x));a['evidence']['aiAssistedSecurityReviewAccepted']=False;json.dump(a,open('/tmp/no-review.json','w'))
@@ -103,15 +95,17 @@ jobs:
           docker build --target runtime -f backend/Dockerfile.xsp-c2c -t xsp-v3-c2c .
           docker build --target origin-ack-gate -f deploy/xsp-v2-ingress/Dockerfile -t xsp-v3-origin .
           docker build --target runtime-c2b -f deploy/xsp-v2-ingress/Dockerfile -t xsp-v3-ingress .
-      - name: Compute exact candidate bindings
+      - name: Compute reproducible exact candidate bindings
         id: bind
         run: |
           python3 - <<'PY' > /tmp/bindings
-          import hashlib,json,subprocess
+          import hashlib,json
           agent=hashlib.sha256(open('/tmp/xmesh-agent-xspv2-activate','rb').read()).hexdigest()
           ident=json.load(open('/tmp/identity.json'));assert ident['sourceRevision']=='64709ce8f5f0ce80e2c0bab59b4476347825e57c' and ident['artifactSha256']==agent
-          images={k:subprocess.check_output(['docker','image','inspect','--format={{.Id}}',v],text=True).strip() for k,v in {'signer':'xsp-v3-signer','c2c':'xsp-v3-c2c','origin':'xsp-v3-origin','ingress':'xsp-v3-ingress'}.items()}
-          manifest={'schema':'xsp2-production-runtime-image-manifest-1','nexusRevision':'a1267ae186f74d5e21561e3b64fc7375d499132e','nodeRevision':'64709ce8f5f0ce80e2c0bab59b4476347825e57c','images':images}
+          root='runtime/'
+          files=['backend/Dockerfile.xsp-signer','backend/Dockerfile.xsp-c2c','deploy/xsp-v2-ingress/Dockerfile','deploy/xsp-v2-ingress/nginx-c2b.conf','deploy/xsp-v2-production/compose.strict-pq.yaml']
+          hashes={p:hashlib.sha256(open(root+p,'rb').read()).hexdigest() for p in files}
+          manifest={'schema':'xsp2-production-runtime-build-manifest-1','nexusRevision':'a1267ae186f74d5e21561e3b64fc7375d499132e','nodeRevision':'64709ce8f5f0ce80e2c0bab59b4476347825e57c','builds':[{'service':'strict-signer','dockerfile':'backend/Dockerfile.xsp-signer','target':'default'},{'service':'strict-c2c','dockerfile':'backend/Dockerfile.xsp-c2c','target':'runtime'},{'service':'strict-origin','dockerfile':'deploy/xsp-v2-ingress/Dockerfile','target':'origin-ack-gate'},{'service':'strict-ingress','dockerfile':'deploy/xsp-v2-ingress/Dockerfile','target':'runtime-c2b'}],'sourceFileSha256':hashes}
           raw=(json.dumps(manifest,sort_keys=True,separators=(',',':'))+'\n').encode();open('/tmp/runtime-bundle-manifest.json','wb').write(raw)
           print(agent);print(hashlib.sha256(raw).hexdigest())
           PY
@@ -121,7 +115,12 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: xsp-v2-production-bindings-v3
-          path: /tmp/runtime-bundle-manifest.json
+          path: |
+            /tmp/xmesh-agent-xspv2-activate
+            /tmp/identity.json
+            /tmp/runtime-bundle-manifest.json
+          if-no-files-found: error
+          retention-days: 30
 
   final-result:
     needs: [gates-and-carry-forward, production-bindings]
@@ -139,7 +138,7 @@ jobs:
           python3 - "$AGENT_SHA" "$BUNDLE_SHA" "$SECURITY_SHA" "$CARRY_SHA" <<'PY'
           import json,sys
           a,b,s,c=sys.argv[1:]
-          x={'schema':'xsp2-final-release-canary-result-3','releaseCandidate':{'nexusRevision':'a1267ae186f74d5e21561e3b64fc7375d499132e','nodeRevision':'64709ce8f5f0ce80e2c0bab59b4476347825e57c','nexusImageSha256':'sha256:'+b,'agentArtifactSha256':a},'evidence':{'aiAssistedSecurityReviewResultSha256':s,'durabilityCarryForwardSha256':c,'previousFinalCanaryResultSha256':'b29fb94428b0c5fcfff776ee73cb808d6df0400dcc9b247f5ab7ca42c6f0f400','providerStorageRiskAcceptanceSha256':'49a311a8bf871c6afcaa5841622b9f1e28e74675452671abc4e970f644dec604'},'carryForwardDomains':['agentLifecycle','coordinatedRecovery','redactedObservability'],'rerunDomains':['productionActivationArtifactBinding','nexusFourImageRuntimeBundle','approvalV2NegativeControls'],'finalReleaseCanarySatisfied':True,'productionActivation':False,'strictPQEnabled':False,'legacyXMESH1Retired':False,'physicalPowerLossQualified':False}
+          x={'schema':'xsp2-final-release-canary-result-3','releaseCandidate':{'nexusRevision':'a1267ae186f74d5e21561e3b64fc7375d499132e','nodeRevision':'64709ce8f5f0ce80e2c0bab59b4476347825e57c','nexusImageSha256':'sha256:'+b,'agentArtifactSha256':a},'evidence':{'aiAssistedSecurityReviewResultSha256':s,'durabilityCarryForwardSha256':c,'previousFinalCanaryResultSha256':'b29fb94428b0c5fcfff776ee73cb808d6df0400dcc9b247f5ab7ca42c6f0f400','providerStorageRiskAcceptanceSha256':'49a311a8bf871c6afcaa5841622b9f1e28e74675452671abc4e970f644dec604'},'carryForwardDomains':['agentLifecycle','coordinatedRecovery','redactedObservability'],'rerunDomains':['productionActivationArtifactBinding','nexusRuntimeBuildManifest','approvalV2NegativeControls'],'finalReleaseCanarySatisfied':True,'productionActivation':False,'strictPQEnabled':False,'legacyXMESH1Retired':False,'physicalPowerLossQualified':False}
           json.dump(x,open('final-release-canary-v3-result.json','w'),sort_keys=True,separators=(',',':'));open('final-release-canary-v3-result.json','a').write('\n');print(json.dumps(x,sort_keys=True,separators=(',',':')))
           PY
           sha256sum final-release-canary-v3-result.json
