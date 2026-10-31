@@ -81,12 +81,11 @@ assert.match(strictBootstrap,/Для новой или заменённой VPS 
 assert.match(strictBootstrap,/Node\/Xray не запустятся без подтверждённой strict-PQ активации/,
  'UI must state the fail-closed runtime invariant');
 
-// Repair confirmation and command dialogs must use the redesigned large surface
-// and place a cancel-safe close action in the top-right corner.
-assert.match(html,/<link rel="stylesheet" href="\/node-dialogs\.css\?v=20261101-repair-dialogs-v1">/,
- 'Node dialog redesign stylesheet must be loaded');
-assert.match(html,/<script src="\/node-dialogs\.js\?v=20261101-repair-dialogs-v1"><\/script>/,
- 'Node dialog behavior enhancer must be loaded');
+// Redesigned modal surfaces share one cache-busted dialog asset layer.
+assert.match(html,/<link rel="stylesheet" href="\/node-dialogs\.css\?v=20261101-user-create-v2">/,
+ 'Dialog redesign stylesheet must be cache-busted');
+assert.match(html,/<script src="\/node-dialogs\.js\?v=20261101-user-create-v2"><\/script>/,
+ 'Dialog behavior enhancer must be cache-busted');
 assert.match(dialogCss,/dialog\.xm-action-confirm:has\(\.xm-action-confirm-icon\)\{[\s\S]*width:min\(760px/,
  'Registered-node confirmation must no longer use the tiny shared width');
 assert.match(dialogCss,/\.xm-action-confirm-close\{[\s\S]*grid-area:close/,
@@ -99,14 +98,37 @@ assert.match(dialogJs,/cancel\.click\(\)/,
  'Injected confirmation X must delegate to the existing cancel action so promises resolve');
 assert.match(strictBootstrap,/node-setup-title-wrap/,'Strict-PQ dialog must expose the redesigned header structure');
 assert.match(strictBootstrap,/node-setup-identity-note/,'Strict-PQ identity warning must use the redesigned note surface');
+
+// New-user dialog keeps existing form contracts while presenting the new
+// grouped, wide and responsive design.
+assert.match(dialogJs,/userNew=function userNewRedesigned\(\)/,
+ 'New-user action must be overridden after app.js without changing the generic form renderer');
+assert.match(dialogJs,/class="box user-create-dialog" data-k="user" method="dialog"/,
+ 'Redesigned form must preserve the existing user submit contract');
+assert.match(dialogJs,/id="tplsel"/,'Template handler must keep its existing selector');
+assert.match(dialogJs,/data-generate-username/,'Username generator action must be preserved');
+assert.match(dialogJs,/decorate\('xrayProfileId'/,'Xray profile assignment must remain in the form');
+assert.match(dialogJs,/decorate\('squads'/,'Squad assignment must remain in the form');
+assert.match(dialogJs,/decorate\('hold'/,'On-hold expiry mode must remain in the form');
+assert.match(dialogJs,/name="desc"/,'Description must still submit through the existing user payload');
+assert.match(dialogJs,/class="user-create-close" data-x/,'New-user dialog must place a native cancel close control in the header');
+assert.match(dialogCss,/#dlg\.user-create-modal\{[\s\S]*width:min\(1120px/,
+ 'New-user dialog must use the wide desktop surface');
+assert.match(dialogCss,/\.user-create-limits-grid\{[\s\S]*grid-template-columns:1fr 1fr 1\.25fr 1fr/,
+ 'Desktop limits must use the four-column layout from the redesign');
+assert.match(dialogCss,/@media\(max-width:620px\)[\s\S]*\.user-create-limits-grid\{grid-template-columns:1fr\}/,
+ 'New-user dialog must collapse cleanly on narrow phones');
+assert.match(dialogCss,/\.user-create-footer\{[\s\S]*justify-content:flex-end/,
+ 'Create/cancel actions must stay in a dedicated footer');
+
 assert.match(dockerfile,/node-dialogs\.css node-dialogs\.js/,
- 'Production panel image must package the node dialog redesign assets');
+ 'Production panel image must package the dialog redesign assets');
 assert.match(dockerfile,/app\.js user-fingerprint-override\.js node-bootstrap-v6\.js unified-selects\.js/,
  'Production panel image must package user fingerprint control and the strict-PQ bootstrap override');
 
 assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length,'CSS braces must remain balanced');
-assert.equal((dialogCss.match(/\{/g)||[]).length,(dialogCss.match(/\}/g)||[]).length,'Node dialog CSS braces must remain balanced');
+assert.equal((dialogCss.match(/\{/g)||[]).length,(dialogCss.match(/\}/g)||[]).length,'Dialog CSS braces must remain balanced');
 new Function(app);
 new Function(strictBootstrap);
 new Function(dialogJs);
-console.log('Node action: redesigned repair dialogs + exact-release strict-PQ same-VPS identity repair contract OK');
+console.log('Node action: redesigned repair + new-user dialogs and exact-release strict-PQ repair contract OK');
