@@ -1,0 +1,138 @@
+{
+  "schema": "xsp2-p0e-ai-assisted-security-review-result-1",
+  "assuranceModel": "ai-assisted-internal-plus-release-owner-risk-acceptance",
+  "target": {
+    "nexus": {"repository":"TriplexCorp/XMesh-Nexus","sourceRevision":"a1267ae186f74d5e21561e3b64fc7375d499132e"},
+    "node": {"repository":"TriplexCorp/XMesh-Node","sourceRevision":"64709ce8f5f0ce80e2c0bab59b4476347825e57c"}
+  },
+  "reviewBundle": {
+    "workflowRun": 41054352179,
+    "deterministicTarSha256": "9d213e9281f0ffbbc3da21f9f3814d6e7fbef1e6b5273f6e9cb12175c63273c4",
+    "payloadSha256": "7b118084777d59e1ef1791d6375c32c1c44cf6bcdf9a03a2b0648a7ad9f263f2"
+  },
+  "reviewer": {
+    "name": "ChatGPT / GPT-5.6 Sol",
+    "role": "AI-assisted internal security reviewer working with the release owner",
+    "independent": false
+  },
+  "reviewDate": "2026-10-31",
+  "reviewDomains": [
+    {
+      "domain":"protocol-and-canonicalization",
+      "disposition":"pass",
+      "summary":"The production delta does not alter the established signed permit/ACK/receipt wire formats or canonical protocol parsers. The new activation boundary consumes the already-verified journaled permit and uses strict JSON decoding for its local config/approval inputs; exact approval SHA-256 is rebound before network I/O.",
+      "evidence":["v5 baseline review bundle","Node 34d3d7ef..64709ce8 protected-path diff","agent/xspv2/activation/execute_linux.go"]
+    },
+    {
+      "domain":"hybrid-cryptography-and-key-purpose-binding",
+      "disposition":"pass",
+      "summary":"No signature algorithm, key-purpose binding or key material format is changed. Production execution reuses runtime.Exchange/Recover and the existing Ed25519 AND ML-DSA-65 permit/ACK/receipt verification chain; approval v2 forbids classical-only mode.",
+      "evidence":["unchanged cutover crypto/runtime protected paths","approval v2 requiredTransportPolicy","Node Agent Artifact CI"]
+    },
+    {
+      "domain":"pq-only-transport-and-node-identity",
+      "disposition":"pass",
+      "summary":"The isolated production ingress uses the already-reviewed TLS 1.3/X25519MLKEM768 configuration with mandatory client certificate verification. Node execution loads explicit roots/client identity and reuses strict mutual-PQ Dial/Exchange; redirects, proxy fallback and classical fallback remain absent.",
+      "evidence":["deploy/xsp-v2-production/compose.strict-pq.yaml","deploy/xsp-v2-ingress/nginx-c2b.conf unchanged from qualified target","agent/xspv2/runtime unchanged"]
+    },
+    {
+      "domain":"isolated-signer-and-key-custody",
+      "disposition":"pass-with-findings",
+      "summary":"Production runs the existing signer as an isolated read-only service with dedicated UDS and separately mounted key directory; C2-C connects only through the signer socket. Key-file ownership/mode checks remain inside the signer and fail closed. Host provisioning of signer keys remains an operator trust boundary.",
+      "evidence":["backend/Dockerfile.xsp-signer","backend/src/xsp_v2_signer.rs unchanged","strict-PQ production overlay"]
+    },
+    {
+      "domain":"postgresql-replay-ack-epoch-and-receipt",
+      "disposition":"pass",
+      "summary":"The production delta does not modify existing durable XSP-v2 tables, migrations, C2-C transaction logic, signer receipt logic or origin ACK/recovery implementation. The only new PostgreSQL provisioning file creates a least-privilege permit-signer role and contains no CREATE/ALTER/DROP/TRUNCATE TABLE operation.",
+      "evidence":["durability carry-forward workflow","deploy/postgres/22-create-xsp-v2-permit-signer-role.sql","unchanged backend/src/xsp_v2_c2c.rs and origin-ack-rs"]
+    },
+    {
+      "domain":"agent-local-durability-and-rollback",
+      "disposition":"pass",
+      "summary":"No qualified Agent state, keyring sealed-state or strict transport implementation is modified. The new one-shot activation binary reads existing durable active state and refuses an approval whose expected candidate differs from the active epoch/key IDs. Crash durability and snapshot anti-rollback CI remain green on the production Node target.",
+      "evidence":["Node 64709ce CI: crash durability success","Node 64709ce CI: snapshot anti-rollback success","durability carry-forward protected-path diff"]
+    },
+    {
+      "domain":"coordinated-backup-restore-and-off-host-floor",
+      "disposition":"pass-with-findings",
+      "summary":"Existing recovery-floor/off-host logic is unchanged and #138 evidence is carried forward only after exact protected-path diff checks. Provider-managed KVM storage remains an accepted external durability trust boundary and physical power loss is not claimed.",
+      "evidence":["#138 result fd8ef8e680e999bb95ef5b081806eb24a32f1537a7d1f6cd678ecd41591c6a0f","provider acceptance 49a311a8bf871c6afcaa5841622b9f1e28e74675452671abc4e970f644dec604","xsp-v2-kvm-durability-carry-forward workflow"]
+    },
+    {
+      "domain":"owner-authorized-key-retirement",
+      "disposition":"pass",
+      "summary":"The production activation path explicitly retains XMESH1 and contains no key retirement operation. Existing owner-authorized retirement protocol and anti-resurrection state are unchanged and remain a separate later action.",
+      "evidence":["approval v2 legacyXMESH1Action=retain","Node activation result legacyXMESH1Retired=false","existing retirement paths unchanged"]
+    },
+    {
+      "domain":"parser-fuzz-and-external-mldsa65-vectors",
+      "disposition":"pass-with-findings",
+      "summary":"Existing parser fuzz and external ML-DSA-65 vector evidence remains applicable because core protocol/crypto parsers are unchanged. The new local activation JSON parser is bounded and unknown-field rejecting but is not separately fuzz-certified; this is an informational assurance limitation rather than a release blocker.",
+      "evidence":["v5 fuzz/vector evidence","Node activation unit tests","core parser/crypto paths unchanged"]
+    },
+    {
+      "domain":"default-off-redacted-observability",
+      "disposition":"pass",
+      "summary":"The new strict-PQ production services are under an explicit Compose profile and are absent from default startup. Stack readiness records strictPQEnabled=false; only a verified Node receipt result can produce the final durable activation record. Existing observability paths are unchanged.",
+      "evidence":["compose profile xsp-v2-strict-pq","production execute/finalize scripts","production runtime CI merged Compose validation"]
+    },
+    {
+      "domain":"production-migration-no-fallback-and-rollback",
+      "disposition":"pass-with-findings",
+      "summary":"The missing production execution layer is now explicit: approval-bound launcher starts isolated signer/C2-C/origin/ingress, Node one-shot executor re-binds approval/source/artifact/scope/window/durable state before strict-PQ exchange, finalization requires verified receipt evidence, and rollback is manual and preserves Node state/XMESH1. No automatic/classical-only fallback exists. Existing standalone services retain their historical staging-only compatibility token internally; production authorization is the outer root-owned approval launcher and bounded Node approval.",
+      "evidence":["Nexus PR #186 production runtime CI success","Node PR #54/#55 CI success","approval v2 contract/verifier","production execute/finalize/rollback scripts"]
+    }
+  ],
+  "findings": [
+    {
+      "id":"AI-V6-INFO-001",
+      "severity":"info",
+      "status":"accepted-risk",
+      "releaseBlocking":false,
+      "securityRelevantCodeChange":false,
+      "title":"KVM provider durability remains an external trust boundary",
+      "domains":["coordinated-backup-restore-and-off-host-floor","production-migration-no-fallback-and-rollback"],
+      "evidence":["provider-storage acceptance SHA256 49a311a8bf871c6afcaa5841622b9f1e28e74675452671abc4e970f644dec604","physicalPowerLossQualified=false"],
+      "disposition":"Release owner continues to accept provider-managed durable-flush semantics for the KVM deployment class without claiming host/controller/PLP physical qualification."
+    },
+    {
+      "id":"AI-V6-INFO-002",
+      "severity":"info",
+      "status":"accepted-risk",
+      "releaseBlocking":false,
+      "securityRelevantCodeChange":false,
+      "title":"Security assurance remains AI-assisted/internal rather than organizationally independent",
+      "domains":["production-migration-no-fallback-and-rollback"],
+      "evidence":["reviewer.independent=false","releaseOwnerRiskAcceptance in this result"],
+      "disposition":"Release owner explicitly accepts the reduced organizational-independence assurance while retaining technical fail-closed gates, exact-candidate canary and bounded execution."
+    },
+    {
+      "id":"AI-V6-INFO-003",
+      "severity":"info",
+      "status":"accepted-risk",
+      "releaseBlocking":false,
+      "securityRelevantCodeChange":false,
+      "title":"Standalone signer/C2-C/origin binaries retain historical staging-only compatibility tokens",
+      "domains":["isolated-signer-and-key-custody","production-migration-no-fallback-and-rollback"],
+      "evidence":["deploy/xsp-v2-production/compose.strict-pq.yaml","production execute launcher approval verification"],
+      "disposition":"The tokens are not treated as production authorization. Production exposure is controlled by the default-off Compose profile, root-only approval launcher, exact approval verification and Node-side approval/artifact/scope/window checks. Direct Docker/root administration remains an operator trust boundary."
+    }
+  ],
+  "signoff": {
+    "decision":"approve-with-findings",
+    "statement":"AI-assisted internal delta review of the production-capable XSP-v2 target found no unresolved Critical, High, Medium or Low release-blocking vulnerability. Core cryptography, durable key state, ACK/receipt transactionality and strict transport remain unchanged; the new production execution layer is bounded, default-off, approval-bound and has no automatic/classical fallback.",
+    "signedAt":"2026-10-31T12:29:02+03:00"
+  },
+  "releaseOwnerRiskAcceptance": {
+    "accepted":true,
+    "acceptedBy":"Triplex",
+    "acceptedAt":"2026-10-31T12:29:02+03:00",
+    "statement":"Release owner accepts the AI-assisted internal assurance model, the documented KVM provider-storage trust boundary, and the root/operator administration boundary of the isolated production services. This acceptance does not waive durability carry-forward verification, exact-target final canary, rollout/rollback review, bounded approval, verified receipt finalization, no-fallback policy, or separate XMESH1 retirement."
+  },
+  "claims": {
+    "physicalPowerLossQualified":false,
+    "productionActivation":false,
+    "strictPQEnabled":false
+  }
+}
