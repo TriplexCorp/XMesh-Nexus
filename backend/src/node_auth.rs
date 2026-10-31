@@ -390,7 +390,9 @@ pub async fn revoke(
         json!({"allCredentialsRevoked":true,"strictPQ":product.is_some()}),
     )
     .await;
-    Ok(Json(json!({"revoked":revoked,"allCredentialsRevoked":true})))
+    Ok(Json(
+        json!({"revoked":revoked,"allCredentialsRevoked":true}),
+    ))
 }
 
 #[cfg(test)]
@@ -453,9 +455,49 @@ mod tests {
             "x-xmesh-signature",
             hex::encode(sig.to_bytes()).parse().unwrap(),
         );
-        assert!(verified_signature(&public, &headers, 42, raw, timestamp, "/api/v1/metrics/ingest").is_ok());
-        assert!(verified_signature(&public, &headers, 43, raw, timestamp, "/api/v1/metrics/ingest").is_err());
-        assert!(verified_signature(&public, &headers, 42, br#"{"node_id":43}"#, timestamp, "/api/v1/metrics/ingest").is_err());
-        assert!(verified_signature(&public, &headers, 42, raw, timestamp + 121, "/api/v1/metrics/ingest").is_err());
+        assert!(
+            verified_signature(
+                &public,
+                &headers,
+                42,
+                raw,
+                timestamp,
+                "/api/v1/metrics/ingest"
+            )
+            .is_ok()
+        );
+        assert!(
+            verified_signature(
+                &public,
+                &headers,
+                43,
+                raw,
+                timestamp,
+                "/api/v1/metrics/ingest"
+            )
+            .is_err()
+        );
+        assert!(
+            verified_signature(
+                &public,
+                &headers,
+                42,
+                br#"{"node_id":43}"#,
+                timestamp,
+                "/api/v1/metrics/ingest"
+            )
+            .is_err()
+        );
+        assert!(
+            verified_signature(
+                &public,
+                &headers,
+                42,
+                raw,
+                timestamp + 121,
+                "/api/v1/metrics/ingest"
+            )
+            .is_err()
+        );
     }
 }
