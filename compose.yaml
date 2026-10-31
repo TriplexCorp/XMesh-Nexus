@@ -134,8 +134,8 @@ services:
   xsp-v2-product-ingress:
     profiles: ["xsp-v2-product"]
     build:
-      context: ./deploy/xsp-v2-ingress
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: deploy/xsp-v2-ingress/Dockerfile
       target: runtime-c2b
     depends_on:
       xsp-v2-product-gateway:
