@@ -205,15 +205,22 @@ if ! docker compose up -d --build --wait --wait-timeout 180; then
   exit 1
 fi
 
-# HTTPS is configured only after the API is healthy. Failure leaves database
-# volumes intact and never publishes the app beyond 127.0.0.1.
+# v6 major release: every clean install/reinstall prepares the persistent
+# post-quantum control-plane foundation. Existing signer/CA identity is never
+# silently rotated. Per-node strict-PQ activation remains separately verified.
+echo "Provisioning XMesh Nexus v6 POSTQUANTUM foundation..."
+bash scripts/provision-xsp-v2-v6-foundation.sh
+
+# HTTPS is configured only after the API is healthy and PQ foundation is ready.
+# Failure leaves database volumes and cryptographic identity intact.
 bash deploy/install-panel-host.sh activate "$PWD/.env"
 
 echo
-echo "XMesh Nexus panel is healthy and ready."
+echo "XMesh Nexus v6.0.0 POSTQUANTUM panel is healthy and ready."
 echo "PostgreSQL stores persistent panel data; Redis provides shared login throttling."
 echo "Redis is private to the Compose network and is not published on a host port."
 echo "Panel stays on loopback; Nginx terminates TLS for PANEL_DOMAIN."
+echo "Strict-PQ foundation is provisioned; node activation remains fail-closed and receipt-verified."
 printf 'Dashboard entrypoint: %s\n' "$dashboard_path"
 echo 'This path is stored in .env (mode 600). Save your full HTTPS URL.'
 if [[ "$created_env" == "1" ]]; then
