@@ -1,0 +1,131 @@
+services:
+  xsp-v2-strict-signer:
+    profiles: ["xsp-v2-strict-pq"]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.xsp-signer
+    command: ["--xsp-v2-signer"]
+    environment:
+      XSP_V2_SIGNER_DATABASE_URL: ${XSP_V2_SIGNER_DATABASE_URL:?provision signer reader role first}
+      XSP_V2_SIGNER_SOCKET_PATH: /run/xmesh-signer/signer.sock
+      XSP_V2_SIGNER_ED25519_KEY_FILE: /run/xmesh-signer-keys/panel-ed25519.pem
+      XSP_V2_SIGNER_MLDSA65_KEY_FILE: /run/xmesh-signer-keys/panel-mldsa65.pem
+      XSP_V2_SIGNER_EXPECTED_ED_KEY_ID: ${XSP_V2_SIGNER_EXPECTED_ED_KEY_ID:?missing signer Ed25519 key id}
+      XSP_V2_SIGNER_EXPECTED_PQ_KEY_ID: ${XSP_V2_SIGNER_EXPECTED_PQ_KEY_ID:?missing signer ML-DSA-65 key id}
+      XSP_V2_SIGNER_ISSUER_ID: ${XSP_V2_SIGNER_ISSUER_ID:-xmesh-nexus-panel}
+      RUST_LOG: warn,sqlx=error
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - type: bind
+        source: ${XSP_V2_STRICT_PQ_RUNTIME_DIR:?missing runtime dir}/signer
+        target: /run/xmesh-signer
+      - type: bind
+        source: ${XSP_V2_SIGNER_KEYS_DIR:?missing signer keys dir}
+        target: /run/xmesh-signer-keys
+        read_only: true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+
+  xsp-v2-strict-c2c:
+    profiles: ["xsp-v2-strict-pq"]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.xsp-c2c
+      target: runtime
+    environment:
+      XSP_V2_C2C_ACK_AUTH: staging-only
+      XSP_V2_C2D_HISTORICAL_RECOVERY: staging-only
+      XSP_V2_C2C_DATABASE_URL: ${XSP_V2_C2C_DATABASE_URL:?provision c2c writer role first}
+      XSP_V2_C2C_PANEL_PIN_FILE: /run/xmesh-c2c-public/panel-pin.json
+      XSP_V2_C2C_SOCKET_PATH: /run/xmesh-c2c/c2c.sock
+      XSP_V2_SIGNER_SOCKET_PATH: /run/xmesh-signer/signer.sock
+      RUST_LOG: warn,sqlx=error
+    depends_on:
+      db:
+        condition: service_healthy
+      xsp-v2-strict-signer:
+        condition: service_healthy
+    volumes:
+      - type: bind
+        source: ${XSP_V2_STRICT_PQ_RUNTIME_DIR:?missing runtime dir}/c2c
+        target: /run/xmesh-c2c
+      - type: bind
+        source: ${XSP_V2_STRICT_PQ_RUNTIME_DIR:?missing runtime dir}/signer
+        target: /run/xmesh-signer
+      - type: bind
+        source: ${XSP_V2_PANEL_PIN_FILE:?missing panel pin file}
+        target: /run/xmesh-c2c-public/panel-pin.json
+        read_only: true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+
+  xsp-v2-strict-origin:
+    profiles: ["xsp-v2-strict-pq"]
+    build:
+      context: .
+      dockerfile: deploy/xsp-v2-ingress/Dockerfile
+      target: origin-ack-gate
+    environment:
+      XSP_ORIGIN_SOCKET: /run/xmesh-origin/xsp-v2-origin.sock
+      XSP_EXPECTED_INGRESS_UID: "10003"
+      XSP_EXPECTED_INGRESS_GID: "10003"
+      XSP_EXPECTED_CLIENT_SPKI_SHA256: ${XSP_V2_STRICT_PQ_CLIENT_SPKI_SHA256:?missing approved Node client SPKI}
+      XSP_EXPECTED_NODE_ID: ${XSP_V2_STRICT_PQ_NODE_ID:?missing approved Node id}
+      XSP_V2_C2B_ACK_ROUTE: staging-only
+      XSP_V2_C2C_ACK_AUTH: staging-only
+      XSP_V2_C2D_HISTORICAL_RECOVERY: staging-only
+      XSP_V2_C2C_SOCKET_PATH: /run/xmesh-c2c/c2c.sock
+      XSP_V2_C2D_TEST_FAULT: ""
+    depends_on:
+      xsp-v2-strict-c2c:
+        condition: service_started
+    volumes:
+      - type: bind
+        source: ${XSP_V2_STRICT_PQ_RUNTIME_DIR:?missing runtime dir}/origin
+        target: /run/xmesh-origin
+      - type: bind
+        source: ${XSP_V2_STRICT_PQ_RUNTIME_DIR:?missing runtime dir}/c2c
+        target: /run/xmesh-c2c
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+
+  xsp-v2-strict-ingress:
+    profiles: ["xsp-v2-strict-pq"]
+    build:
+      context: .
+      dockerfile: deploy/xsp-v2-ingress/Dockerfile
+      target: runtime-c2b
+    depends_on:
+      xsp-v2-strict-origin:
+        condition: service_started
+    ports:
+      - "${XSP_V2_STRICT_PQ_BIND:-127.0.0.1}:${XSP_V2_STRICT_PQ_PORT:-8444}:8444"
+    volumes:
+      - type: bind
+        source: ${XSP_V2_STRICT_PQ_RUNTIME_DIR:?missing runtime dir}/origin
+        target: /run/xmesh-origin
+      - type: bind
+        source: ${XSP_V2_INGRESS_CERTS_DIR:?missing ingress certificate dir}
+        target: /run/xmesh-ingress-certs
+        read_only: true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,mode=1777
+      - /var/cache/nginx:rw,noexec,nosuid,size=16m,mode=0750
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
