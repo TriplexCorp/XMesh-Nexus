@@ -1,48 +1,65 @@
 # Current P0-E checkpoint
 
-Authoritative live qualification/session handoff:
+Authoritative production activation record:
 
-[`docs/XSP_V2_P0E_LIVE_QUALIFICATION_CHECKPOINT_2026-10-30.md`](docs/XSP_V2_P0E_LIVE_QUALIFICATION_CHECKPOINT_2026-10-30.md)
+[`docs/XSP_V2_PRODUCTION_ACTIVATION_2026-10-31.md`](docs/XSP_V2_PRODUCTION_ACTIVATION_2026-10-31.md)
 
-Stage 1/Stage 2 evidence addendum:
+Historical qualification records remain available in:
 
-[`docs/XSP_V2_P0E_STAGE1_STAGE2_EVIDENCE_2026-10-30.md`](docs/XSP_V2_P0E_STAGE1_STAGE2_EVIDENCE_2026-10-30.md)
+- [`docs/XSP_V2_P0E_LIVE_QUALIFICATION_CHECKPOINT_2026-10-30.md`](docs/XSP_V2_P0E_LIVE_QUALIFICATION_CHECKPOINT_2026-10-30.md)
+- [`docs/XSP_V2_P0E_STAGE1_STAGE2_EVIDENCE_2026-10-30.md`](docs/XSP_V2_P0E_STAGE1_STAGE2_EVIDENCE_2026-10-30.md)
+- [`docs/XSP_V2_P0E_138_CLOSURE_2026-10-30.md`](docs/XSP_V2_P0E_138_CLOSURE_2026-10-30.md)
 
-Final #138 closure checkpoint:
-
-[`docs/XSP_V2_P0E_138_CLOSURE_2026-10-30.md`](docs/XSP_V2_P0E_138_CLOSURE_2026-10-30.md)
-
-Read those files together with [`docs/ENTERPRISE_ROADMAP.md`](docs/ENTERPRISE_ROADMAP.md) before resuming P0-E work.
-
-Current recorded boundary:
+## Current authoritative boundary — 31 October 2026
 
 ```text
-#137 independent external review: OPEN
-#138 Node five-run matrix: COMPLETE
-#138 independent PostgreSQL crash/recovery: COMPLETE
-#138 protected live cutover/ACK/receipt: COMPLETE
-#138 off-host production recovery witness: COMPLETE
-#138 provider-storage risk acceptance: COMPLETE
-#138 aggregate topology-aware v2 verifier: PASS
 #138 KVM VPS durability qualification: COMPLETE
+provider-storage risk acceptance: COMPLETE
+#137 replacement governance review: CLOSED
+final canary v3: PASS
+rollout/rollback review: COMPLETE
+bounded Node 13 approval: COMPLETE
+production receipt recovery: COMPLETE
+Nexus production finalization: COMPLETE
 
-guestCrashConsistencyQualified=true
-providerStorageDurabilityAssumed=true
+productionActivation=true
+strictPQEnabled=true
+nodeId=13
+minimumEpoch=2
+legacyXMESH1Retired=false
 physicalPowerLossQualified=false
-productionDurabilityGateEligible=true
-strictPQEnabled=false
-productionActivation=false
+automaticFallback=false
+classicalOnlyAllowed=false
 ```
 
-Final #138 evidence identities:
+## Frozen production target
 
 ```text
-aggregate evidence archive SHA-256  f05792da5210a85d44e2a230d5c6bcc68421b2208c4c655f3e7c44b8475cb78d
-final result JSON SHA-256            fd8ef8e680e999bb95ef5b081806eb24a32f1537a7d1f6cd678ecd41591c6a0f
-verifier output SHA-256              667b4ab5c3cd63a581d7dd5c8ef5e6db220c70904b9a1e50fc12f9161f3fe598
-provider acceptance SHA-256          49a311a8bf871c6afcaa5841622b9f1e28e74675452671abc4e970f644dec604
+Nexus a1267ae186f74d5e21561e3b64fc7375d499132e
+Node  64709ce8f5f0ce80e2c0bab59b4476347825e57c
+Agent a5f8e739b381640e4ac1d632dfef47d879ebc4c6ce7c4fbd8fab5744ad9cdd63
 ```
 
-The topology-aware v2 verifier returned `status=kvm-vps-durability-qualified-for-release-gate`, `nodeCrashMatrixQualified=true`, `postgresCrashRecoveryQualified=true`, `offhostProductionWitnessVerified=true`, and `productionDurabilityGateEligible=true` for subject Node 13.
+Release-control/tooling commits after the freeze may not alter the frozen runtime build inputs.
 
-#138 completion does not authorize production PQ activation. The next release blocker is #137 independent external security review; after #137, the release sequence still requires an exact production candidate, final canary, independently reviewed rollout/rollback plan, bounded KVM strict-PQ approval, and separate production execution.
+## Production evidence identities
+
+```text
+approval SHA-256          b2e43b137d4ea5b24b1313899e57701608874e059bdf5d5d2ba9f263ba866259
+Node result SHA-256       ac1025fdc4bf2b433d1e596a7a35dd14deca94bcc44a10866c72c31b76d2fe9f
+receipt binding SHA-256   1747647618cb1a824b85ef379646da242de7846e8c3ebff0bfdad9bc078ecb39
+activation SHA-256        6cfb4dc49edacff87033bbd99ca45ad7279813b4a10a5cbe958d5348e8a0ee9d
+activatedAt               2026-10-31T10:52:13Z
+```
+
+The canonical JSON copies are stored under [`docs/evidence/`](docs/evidence/).
+
+## Governance / claims
+
+The accepted governance model is **AI-assisted internal review + explicit release-owner risk acceptance**. It must not be described as an independent external security audit.
+
+`physicalPowerLossQualified=false` remains mandatory for the current KVM VPS deployment class. XMESH1 remains retained during the initial strict-PQ rollout. No automatic/classical fallback is authorized.
+
+## Scope
+
+The production claim is bounded to **Node 13**. A broader rollout requires a separate bounded decision/approval and must not be inferred from this checkpoint.
