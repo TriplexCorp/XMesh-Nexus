@@ -67,6 +67,7 @@ services:
       PANEL_UPDATE_STATUS: /run/xmesh/panel-update-status
       TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:-}
       SUBSCRIPTION_ENCRYPTION_KEY: ${SUBSCRIPTION_ENCRYPTION_KEY:?Run ./install.sh to provision subscription key}
+      XSP_V2_PRODUCT_INTERNAL_TOKEN: ${XSP_V2_PRODUCT_INTERNAL_TOKEN:?Run ./install.sh first}
       XSP_V2_SIGNER_SOCKET_PATH: /run/xmesh-signer/signer.sock
       XSP_V2_P0D_AGENT_MIGRATION: ${XSP_V2_P0D_AGENT_MIGRATION:-}
       XSP_V2_P0D_AGENT_ARTIFACT_DIR: /run/xmesh-agent-artifacts
@@ -94,8 +95,69 @@ services:
       - no-new-privileges:true
     restart: unless-stopped
 
+  xsp-v2-product-gateway:
+    profiles: ["xsp-v2-product"]
+    build:
+      context: ./deploy/xsp-v2-product-gateway
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://xmesh_app:${APP_DB_PASSWORD:?Run ./install.sh first}@db:5432/xmesh
+      XSP_V2_PRODUCT_INTERNAL_TOKEN: ${XSP_V2_PRODUCT_INTERNAL_TOKEN:?Run ./install.sh first}
+      XSP_V2_PRODUCT_PUBLIC_ADDRESS: ${PANEL_DOMAIN:?Run ./install.sh first}:8444
+      XSP_V2_PRODUCT_SERVER_NAME: node-ingress.xsp.invalid
+      XSP_V2_PRODUCT_PANEL_URL: http://panel:8080
+    depends_on:
+      db:
+        condition: service_healthy
+      panel:
+        condition: service_started
+    ports:
+      - "127.0.0.1:8082:8081"
+    volumes:
+      - ${XSP_V2_SIGNER_KEYS_DIR:-/etc/xmesh-nexus/xsp-v2-signer}:/run/xmesh-signer-keys:ro
+      - ${XSP_V2_INGRESS_CERTS_DIR:-/etc/xmesh-nexus/xsp-v2-ingress}:/run/xmesh-ingress-certs:ro
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/xmesh-xsp-v2-product-gateway", "--healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    restart: unless-stopped
+
+  xsp-v2-product-ingress:
+    profiles: ["xsp-v2-product"]
+    build:
+      context: ./deploy/xsp-v2-ingress
+      dockerfile: Dockerfile
+      target: runtime-c2b
+    depends_on:
+      xsp-v2-product-gateway:
+        condition: service_healthy
+    ports:
+      - "0.0.0.0:8444:8444"
+    volumes:
+      - ./deploy/xsp-v2-ingress/nginx-product.conf:/etc/nginx/nginx.conf:ro
+      - ${XSP_V2_INGRESS_CERTS_DIR:-/etc/xmesh-nexus/xsp-v2-ingress}:/run/xmesh-ingress-certs:ro
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,mode=1777
+      - /var/cache/nginx:rw,noexec,nosuid,size=16m,mode=0755
+      - /run:rw,noexec,nosuid,size=4m,mode=0755
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
   xsp-v2-signer:
-    # Opt-in only. The default production stack does not start this component.
+    # Historical/staging signer service. Product v6 uses the dedicated gateway.
     profiles: ["xsp-v2-staging"]
     build:
       context: .

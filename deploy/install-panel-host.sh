@@ -10,48 +10,27 @@ valid_domain() {
  [[ "$domain" != *..* && "$domain" != .* && "$domain" != *. ]] || return 1
  local -a labels
  IFS='.' read -ra labels <<< "$domain"
- for label in "${labels[@]}"; do
-  [[ ${#label} -ge 1 && ${#label} -le 63 && "$label" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]] || return 1
- done
+ for label in "${labels[@]}"; do [[ ${#label} -ge 1 && ${#label} -le 63 && "$label" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]] || return 1; done
  case "$domain" in *.localhost|*.local|*.test|*.example|*.invalid) return 1;; esac
 }
-valid_email() {
- local value="$1" host
- [[ ${#value} -le 254 && "$value" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+$ ]] || return 1
- host="${value##*@}"
- valid_domain "${host,,}"
-}
+valid_email() { local value="$1" host; [[ ${#value} -le 254 && "$value" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+$ ]] || return 1; host="${value##*@}"; valid_domain "${host,,}"; }
 get_setting() { sed -n "s/^${1}=//p" "$2" | tail -n 1; }
-add_setting() {
- [[ -f "$3" && ! -L "$3" ]] || die 'Unsafe .env path'
- printf '%s=%s\n' "$1" "$2" >> "$3"
- chmod 600 "$3"
-}
+add_setting() { [[ -f "$3" && ! -L "$3" ]] || die 'Unsafe .env path'; printf '%s=%s\n' "$1" "$2" >> "$3"; chmod 600 "$3"; }
 install_deps() {
  root_only
- [[ -r /etc/os-release ]] || die 'Cannot detect host OS'
- . /etc/os-release
- [[ "$ID" == ubuntu && "$VERSION_CODENAME" =~ ^(jammy|noble)$ ]] ||
-  die 'Automated host installation supports Ubuntu 22.04/24.04 LTS'
+ [[ -r /etc/os-release ]] || die 'Cannot detect host OS'; . /etc/os-release
+ [[ "$ID" == ubuntu && "$VERSION_CODENAME" =~ ^(jammy|noble)$ ]] || die 'Automated host installation supports Ubuntu 22.04/24.04 LTS'
  export DEBIAN_FRONTEND=noninteractive
  apt-get update
  apt-get install -y ca-certificates curl gnupg lsb-release ubuntu-keyring openssl git iproute2
  install -d -m 0755 /etc/apt/keyrings
  curl --proto '=https' --tlsv1.2 -fsSLo /etc/apt/keyrings/docker.asc https://download.docker.com/linux/ubuntu/gpg
  chmod 0644 /etc/apt/keyrings/docker.asc
- printf 'deb [arch=%s signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu %s stable\n' \
-  "$(dpkg --print-architecture)" "$VERSION_CODENAME" > /etc/apt/sources.list.d/docker.list
- local key_tmp
- key_tmp="$(mktemp)"
- if ! curl --proto '=https' --tlsv1.2 -fsSLo "$key_tmp" https://nginx.org/keys/nginx_signing.key ||
-    ! gpg --batch --yes --dearmor -o /usr/share/keyrings/nginx-archive-keyring.gpg "$key_tmp"; then
-  rm -f "$key_tmp"
-  die 'Unable to install official Nginx signing key'
- fi
- rm -f "$key_tmp"
- chmod 0644 /usr/share/keyrings/nginx-archive-keyring.gpg
- printf 'deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] https://nginx.org/packages/mainline/ubuntu %s nginx\n' \
-  "$VERSION_CODENAME" > /etc/apt/sources.list.d/nginx.list
+ printf 'deb [arch=%s signed-by=%s] https://download.docker.com/linux/ubuntu %s stable\n' "$(dpkg --print-architecture)" /etc/apt/keyrings/docker.asc "$VERSION_CODENAME" > /etc/apt/sources.list.d/docker.list
+ local key_tmp; key_tmp="$(mktemp)"
+ if ! curl --proto '=https' --tlsv1.2 -fsSLo "$key_tmp" https://nginx.org/keys/nginx_signing.key || ! gpg --batch --yes --dearmor -o /usr/share/keyrings/nginx-archive-keyring.gpg "$key_tmp"; then rm -f "$key_tmp"; die 'Unable to install official Nginx signing key'; fi
+ rm -f "$key_tmp"; chmod 0644 /usr/share/keyrings/nginx-archive-keyring.gpg
+ printf 'deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] https://nginx.org/packages/mainline/ubuntu %s nginx\n' "$VERSION_CODENAME" > /etc/apt/sources.list.d/nginx.list
  cat > /etc/apt/preferences.d/99-xmesh-nginx <<'PIN'
 Package: nginx
 Pin: origin nginx.org
@@ -59,37 +38,22 @@ Pin-Priority: 900
 PIN
  apt-get update
  apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin nginx certbot
- systemctl enable --now docker
- systemctl enable nginx
- # Certbot's standalone HTTP-01 temporarily owns TCP/80.
- systemctl start nginx || printf 'Nginx is not running; inspect the TCP/80 listener.\n' >&2
+ systemctl enable --now docker; systemctl enable nginx; systemctl start nginx || printf 'Nginx is not running; inspect the TCP/80 listener.\n' >&2
  docker compose version >/dev/null 2>&1 || die 'Docker Compose plugin not available'
 }
 configure_domain() {
  root_only
  local file="$1" domain email existing_domain existing_email
  [[ -f "$file" && ! -L "$file" ]] || die 'Missing safe .env'
- existing_domain="$(get_setting PANEL_DOMAIN "$file")"
- existing_email="$(get_setting PANEL_ACME_EMAIL "$file")"
- domain="${PANEL_DOMAIN:-$existing_domain}"
- if [[ -z "$domain" ]]; then
-  [[ -t 0 ]] || die 'Set PANEL_DOMAIN and PANEL_ACME_EMAIL in non-interactive mode'
-  IFS= read -r -p 'Enter panel domain (panel.example.org): ' domain || die 'Domain input cancelled'
- fi
- domain="${domain,,}"
- valid_domain "$domain" || die 'Invalid domain. Provide a public FQDN only (no scheme, port or wildcard)'
+ existing_domain="$(get_setting PANEL_DOMAIN "$file")"; existing_email="$(get_setting PANEL_ACME_EMAIL "$file")"; domain="${PANEL_DOMAIN:-$existing_domain}"
+ if [[ -z "$domain" ]]; then [[ -t 0 ]] || die 'Set PANEL_DOMAIN and PANEL_ACME_EMAIL in non-interactive mode'; IFS= read -r -p 'Enter panel domain (panel.example.org): ' domain || die 'Domain input cancelled'; fi
+ domain="${domain,,}"; valid_domain "$domain" || die 'Invalid domain. Provide a public FQDN only (no scheme, port or wildcard)'
  email="${PANEL_ACME_EMAIL:-$existing_email}"
- if [[ -z "$email" ]]; then
-  [[ -t 0 ]] || die 'Set PANEL_ACME_EMAIL in non-interactive mode'
-  IFS= read -r -p "Let's Encrypt contact email: " email || die 'Email input cancelled'
- fi
+ if [[ -z "$email" ]]; then [[ -t 0 ]] || die 'Set PANEL_DOMAIN and PANEL_ACME_EMAIL in non-interactive mode'; IFS= read -r -p "Let's Encrypt contact email: " email || die 'Email input cancelled'; fi
  valid_email "$email" || die 'Invalid email for ACME'
- [[ -z "$existing_domain" || "$existing_domain" == "$domain" ]] ||
-  die "Panel domain is already $existing_domain. Update .env explicitly for a planned migration."
- [[ -z "$existing_email" || "$existing_email" == "$email" ]] ||
-  die 'An ACME email is already configured. Update .env explicitly to change it.'
- [[ -n "$existing_domain" ]] || add_setting PANEL_DOMAIN "$domain" "$file"
- [[ -n "$existing_email" ]] || add_setting PANEL_ACME_EMAIL "$email" "$file"
+ [[ -z "$existing_domain" || "$existing_domain" == "$domain" ]] || die "Panel domain is already $existing_domain. Update .env explicitly for a planned migration."
+ [[ -z "$existing_email" || "$existing_email" == "$email" ]] || die 'An ACME email is already configured. Update .env explicitly to change it.'
+ [[ -n "$existing_domain" ]] || add_setting PANEL_DOMAIN "$domain" "$file"; [[ -n "$existing_email" ]] || add_setting PANEL_ACME_EMAIL "$email" "$file"
  printf 'Panel domain configured: %s\n' "$domain"
 }
 render_nginx() {
@@ -97,13 +61,11 @@ render_nginx() {
  valid_domain "$domain" || die 'Invalid Nginx domain'
  [[ "$port" =~ ^[0-9]{1,5}$ ]] && (( 10#$port >= 1 && 10#$port <= 65535 )) || die 'Invalid local panel port'
  cat <<EOF
-# XMesh Nexus — managed vhost. The application is bound to loopback only.
+# XMesh Nexus v6 — the normal HTTPS endpoint is NOT a node control-plane.
 server {
     listen 80;
     listen [::]:80;
     server_name $domain;
-    # Subscription URLs are bearer credentials, including configurable paths.
-    # Never record request lines/URIs on this managed virtual host.
     access_log off;
     error_log /var/log/nginx/xmesh-nexus-error.log crit;
     return 301 https://\$host\$request_uri;
@@ -113,7 +75,6 @@ server {
     listen [::]:443 ssl;
     http2 on;
     server_name $domain;
-    # Neither standard nor JSON access logs may capture subscription tokens.
     access_log off;
     error_log /var/log/nginx/xmesh-nexus-error.log crit;
     ssl_certificate     /etc/letsencrypt/live/$domain/fullchain.pem;
@@ -125,6 +86,27 @@ server {
     server_tokens off;
     add_header Strict-Transport-Security "max-age=31536000" always;
     client_max_body_size 2m;
+
+    # Classical HTTPS is permitted only for the single-use owner-authorized
+    # enrollment exchange. It cannot carry operational node traffic.
+    location = /api/v2/product/enroll {
+        limit_except POST { deny all; }
+        proxy_pass http://127.0.0.1:8082/enroll;
+        proxy_http_version 1.1;
+        proxy_set_header Host strict-pq-enrollment;
+        proxy_set_header Content-Type application/json;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_connect_timeout 10s;
+        proxy_send_timeout 30s;
+        proxy_read_timeout 30s;
+        proxy_buffering off;
+    }
+
+    # v6 security invariant: no direct XMESH1 node/control/telemetry path exists
+    # on the public panel endpoint. Operational requests use TCP/8444 strict-PQ.
+    location = /api/v1/metrics/ingest { return 404; }
+    location ^~ /api/v1/node/ { return 404; }
+
     location / {
         proxy_pass http://127.0.0.1:$port;
         proxy_http_version 1.1;
@@ -146,64 +128,25 @@ activate() {
  root_only
  local file="$1" domain email port bind cert key site other old tmp
  [[ -f "$file" && ! -L "$file" ]] || die 'Missing safe .env'
- domain="$(get_setting PANEL_DOMAIN "$file")"
- email="$(get_setting PANEL_ACME_EMAIL "$file")"
- port="$(get_setting APP_PORT "$file")"
- bind="$(get_setting APP_BIND "$file")"
- port="${port:-8080}"; bind="${bind:-127.0.0.1}"
- valid_domain "$domain" || die 'Invalid PANEL_DOMAIN'
- valid_email "$email" || die 'Invalid PANEL_ACME_EMAIL'
- [[ "$bind" == 127.0.0.1 ]] || die 'APP_BIND must be 127.0.0.1 for public HTTPS'
+ domain="$(get_setting PANEL_DOMAIN "$file")"; email="$(get_setting PANEL_ACME_EMAIL "$file")"; port="$(get_setting APP_PORT "$file")"; bind="$(get_setting APP_BIND "$file")"; port="${port:-8080}"; bind="${bind:-127.0.0.1}"
+ valid_domain "$domain" || die 'Invalid PANEL_DOMAIN'; valid_email "$email" || die 'Invalid PANEL_ACME_EMAIL'; [[ "$bind" == 127.0.0.1 ]] || die 'APP_BIND must be 127.0.0.1 for public HTTPS'
  [[ "$port" =~ ^[0-9]{1,5}$ ]] && (( 10#$port >= 1 && 10#$port <= 65535 )) || die 'Invalid APP_PORT'
- cert="/etc/letsencrypt/live/$domain/fullchain.pem"
- key="/etc/letsencrypt/live/$domain/privkey.pem"
- if [[ ! -s "$cert" || ! -s "$key" ]] ||
-    ! openssl x509 -in "$cert" -noout -checkend 2592000 >/dev/null 2>&1 ||
-    ! openssl x509 -in "$cert" -noout -checkhost "$domain" >/dev/null 2>&1; then
+ cert="/etc/letsencrypt/live/$domain/fullchain.pem"; key="/etc/letsencrypt/live/$domain/privkey.pem"
+ if [[ ! -s "$cert" || ! -s "$key" ]] || ! openssl x509 -in "$cert" -noout -checkend 2592000 >/dev/null 2>&1 || ! openssl x509 -in "$cert" -noout -checkhost "$domain" >/dev/null 2>&1; then
   echo "Requesting trusted TLS certificate for $domain using HTTP-01 on TCP/80..."
-  if ! certbot certonly --standalone --preferred-challenges http --non-interactive --agree-tos \
-    --email "$email" -d "$domain" --cert-name "$domain" \
-    --pre-hook 'systemctl stop nginx' --post-hook 'systemctl start nginx'; then
-   systemctl start nginx || true
-   die 'ACME failed. Check DNS A/AAAA, inbound TCP/80 and existing port listeners.'
-  fi
+  if ! certbot certonly --standalone --preferred-challenges http --non-interactive --agree-tos --email "$email" -d "$domain" --cert-name "$domain" --pre-hook 'systemctl stop nginx' --post-hook 'systemctl start nginx'; then systemctl start nginx || true; die 'ACME failed. Check DNS A/AAAA, inbound TCP/80 and existing port listeners.'; fi
  fi
- [[ -s "$cert" && -s "$key" ]] || die 'TLS certificate/key missing after ACME'
- openssl x509 -in "$cert" -noout -checkhost "$domain" >/dev/null 2>&1 ||
-  die 'Issued TLS certificate does not match the panel FQDN'
+ [[ -s "$cert" && -s "$key" ]] || die 'TLS certificate/key missing after ACME'; openssl x509 -in "$cert" -noout -checkhost "$domain" >/dev/null 2>&1 || die 'Issued TLS certificate does not match the panel FQDN'
  site=/etc/nginx/conf.d/xmesh-nexus.conf
- # Do not shadow a pre-existing Nginx virtual host for the same domain.
  for other in /etc/nginx/conf.d/*.conf /etc/nginx/sites-enabled/* /etc/nginx/nginx.conf; do
   [[ -f "$other" && "$other" != "$site" ]] || continue
-  # Match whole server_name tokens rather than a regex built from a hostname.
-  if awk -v domain="$domain" '
-   /^[[:space:]]*server_name[[:space:]]+/ {
-    sub(/;.*/, "")
-    for (i=2; i<=NF; i++) if ($i == domain) { found=1; exit }
-   }
-   END { exit !found }
-  ' "$other"; then
-   die "Another Nginx site already owns $domain: $other"
-  fi
+  if awk -v domain="$domain" '/^[[:space:]]*server_name[[:space:]]+/ {sub(/;.*/, "");for (i=2;i<=NF;i++) if ($i==domain){found=1;exit}} END {exit !found}' "$other"; then die "Another Nginx site already owns $domain: $other"; fi
  done
- if [[ -e "$site" ]]; then
-  [[ -f "$site" && ! -L "$site" ]] || die 'Refusing to overwrite non-regular Nginx config'
- fi
- old="$(mktemp)"
- if [[ -f "$site" ]]; then cp -p "$site" "$old"; else : > "$old"; fi
- tmp="$(mktemp /etc/nginx/conf.d/.xmesh-nexus.XXXXXXXX)"
- render_nginx "$domain" "$port" > "$tmp"
- chmod 0644 "$tmp"
- mv -f "$tmp" "$site"
- if ! nginx -t || ! systemctl reload nginx; then
-  if [[ -s "$old" ]]; then cp -p "$old" "$site"; else rm -f "$site"; fi
-  nginx -t >/dev/null 2>&1 && systemctl reload nginx || true
-  rm -f "$old"
-  die 'Nginx verification failed; previous site configuration restored'
- fi
- rm -f "$old"
- systemctl enable --now nginx
- printf 'Panel HTTPS endpoint: https://%s\n' "$domain"
+ if [[ -e "$site" ]]; then [[ -f "$site" && ! -L "$site" ]] || die 'Refusing to overwrite non-regular Nginx config'; fi
+ old="$(mktemp)"; if [[ -f "$site" ]]; then cp -p "$site" "$old"; else : > "$old"; fi
+ tmp="$(mktemp /etc/nginx/conf.d/.xmesh-nexus.XXXXXXXX)"; render_nginx "$domain" "$port" > "$tmp"; chmod 0644 "$tmp"; mv -f "$tmp" "$site"
+ if ! nginx -t || ! systemctl reload nginx; then if [[ -s "$old" ]]; then cp -p "$old" "$site"; else rm -f "$site"; fi; nginx -t >/dev/null 2>&1 && systemctl reload nginx || true; rm -f "$old"; die 'Nginx verification failed; previous site configuration restored'; fi
+ rm -f "$old"; systemctl enable --now nginx; printf 'Panel HTTPS endpoint: https://%s\n' "$domain"
 }
 case "${1:-}" in
  deps) install_deps ;;

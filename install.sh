@@ -23,7 +23,13 @@ created_env=0
 new_dashboard_path="/dashboard/$(openssl rand -hex 24)"
 if [[ ! -f .env ]]; then
   umask 077
-  db_password="$(openssl rand -hex 32)"; app_password="$(openssl rand -hex 32)"; redis_password="$(openssl rand -hex 32)"; admin_password="$(openssl rand -hex 32)"; totp_key="$(openssl rand -hex 32)"; subscription_key="$(openssl rand -hex 32)"
+  db_password="$(openssl rand -hex 32)"
+  app_password="$(openssl rand -hex 32)"
+  redis_password="$(openssl rand -hex 32)"
+  admin_password="$(openssl rand -hex 32)"
+  totp_key="$(openssl rand -hex 32)"
+  subscription_key="$(openssl rand -hex 32)"
+  product_internal_token="$(openssl rand -hex 32)"
   cat > .env <<EOF
 POSTGRES_PASSWORD=${db_password}
 APP_DB_PASSWORD=${app_password}
@@ -33,17 +39,35 @@ ADMIN_USERNAME=admin
 ADMIN_PASSWORD=${admin_password}
 TOTP_ENCRYPTION_KEY=${totp_key}
 SUBSCRIPTION_ENCRYPTION_KEY=${subscription_key}
+XSP_V2_PRODUCT_INTERNAL_TOKEN=${product_internal_token}
 COOKIE_SECURE=true
 APP_BIND=127.0.0.1
 APP_PORT=8080
 DASHBOARD_PATH=${new_dashboard_path}
 EOF
-  chmod 600 .env; created_env=1
-else
-  if ! grep -q '^REDIS_PASSWORD=' .env; then printf '\nREDIS_PASSWORD=%s\n' "$(openssl rand -hex 32)" >> .env; echo "Generated REDIS_PASSWORD for the Redis service."; fi
-  if ! grep -q '^DB_MAX_CONNECTIONS=' .env; then printf 'DB_MAX_CONNECTIONS=20\n' >> .env; fi
-  if ! grep -q '^DASHBOARD_PATH=' .env; then printf 'DASHBOARD_PATH=%s\n' "$new_dashboard_path" >> .env; echo 'Created a unique dashboard path for this installation.'; fi
   chmod 600 .env
+  created_env=1
+else
+  if ! grep -q '^REDIS_PASSWORD=' .env; then
+    printf '\nREDIS_PASSWORD=%s\n' "$(openssl rand -hex 32)" >> .env
+    echo "Generated REDIS_PASSWORD for the Redis service."
+  fi
+  if ! grep -q '^DB_MAX_CONNECTIONS=' .env; then printf 'DB_MAX_CONNECTIONS=20\n' >> .env; fi
+  if ! grep -q '^DASHBOARD_PATH=' .env; then
+    printf 'DASHBOARD_PATH=%s\n' "$new_dashboard_path" >> .env
+    echo 'Created a unique dashboard path for this installation.'
+  fi
+  if ! grep -q '^XSP_V2_PRODUCT_INTERNAL_TOKEN=' .env; then
+    printf 'XSP_V2_PRODUCT_INTERNAL_TOKEN=%s\n' "$(openssl rand -hex 32)" >> .env
+    echo 'Created the private strict-PQ gateway authorization secret.'
+  fi
+  chmod 600 .env
+fi
+
+product_internal_token="$(sed -n 's/^XSP_V2_PRODUCT_INTERNAL_TOKEN=//p' .env | tail -n 1)"
+if [[ ! "$product_internal_token" =~ ^[0-9a-f]{64}$ ]]; then
+  echo 'Invalid XSP_V2_PRODUCT_INTERNAL_TOKEN in .env; expected 64 lowercase hex characters.' >&2
+  exit 1
 fi
 
 dashboard_path="$(sed -n 's/^DASHBOARD_PATH=//p' .env | tail -n 1)"
@@ -119,10 +143,17 @@ if [[ "$prepare_only" == "1" ]]; then
 fi
 
 docker compose config --quiet
-panel_bind="${APP_BIND:-$(sed -n 's/^APP_BIND=//p' .env | tail -n 1)}"; panel_port="${APP_PORT:-$(sed -n 's/^APP_PORT=//p' .env | tail -n 1)}"; panel_bind="${panel_bind:-127.0.0.1}"; panel_port="${panel_port:-8080}"
-if [[ ! "$panel_port" =~ ^[0-9]{1,5}$ ]] || (( 10#$panel_port < 1 || 10#$panel_port > 65535 )); then echo "Invalid APP_PORT: expected 1-65535." >&2; exit 1; fi
+panel_bind="${APP_BIND:-$(sed -n 's/^APP_BIND=//p' .env | tail -n 1)}"
+panel_port="${APP_PORT:-$(sed -n 's/^APP_PORT=//p' .env | tail -n 1)}"
+panel_bind="${panel_bind:-127.0.0.1}"
+panel_port="${panel_port:-8080}"
+if [[ ! "$panel_port" =~ ^[0-9]{1,5}$ ]] || (( 10#$panel_port < 1 || 10#$panel_port > 65535 )); then
+  echo "Invalid APP_PORT: expected 1-65535." >&2
+  exit 1
+fi
 if command -v ss >/dev/null 2>&1 && ss -H -ltn "( sport = :$panel_port )" | grep -q .; then
-  existing_panel="$(docker compose ps -a -q panel 2>/dev/null || true)"; existing_mapping=""
+  existing_panel="$(docker compose ps -a -q panel 2>/dev/null || true)"
+  existing_mapping=""
   if [[ -n "$existing_panel" ]]; then existing_mapping="$(docker port "$existing_panel" 8080/tcp 2>/dev/null || true)"; fi
   if ! printf '%s\n' "$existing_mapping" | grep -Eq "(^|:)${panel_port}$"; then
     echo "ERROR: Host TCP/$panel_port is already occupied; panel cannot bind to $panel_bind:$panel_port." >&2
@@ -133,7 +164,8 @@ if command -v ss >/dev/null 2>&1 && ss -H -ltn "( sport = :$panel_port )" | grep
   fi
 fi
 if ! docker compose up -d --build --wait --wait-timeout 180; then
-  echo "ERROR: Panel was not healthy after Compose startup." >&2; docker compose ps >&2 || true
+  echo "ERROR: Panel was not healthy after Compose startup." >&2
+  docker compose ps >&2 || true
   echo "Inspect: docker compose logs --tail=80 panel" >&2
   echo "Check Docker DNS/network: docker network inspect xmesh-nexus_default" >&2
   echo "Existing PostgreSQL and Redis volumes have been preserved." >&2
@@ -142,6 +174,19 @@ fi
 
 echo "Provisioning XMesh Nexus v6 POSTQUANTUM foundation..."
 bash scripts/provision-xsp-v2-v6-foundation.sh
+
+# Product control plane is not optional in v6. It starts only after its ML-DSA
+# issuer material exists, and install fails closed if the hybrid ingress or
+# gateway cannot become ready. The classical panel remains bound to loopback.
+echo "Starting XMesh v6 strict-PQ product control plane..."
+if ! docker compose --profile xsp-v2-product up -d --build --wait --wait-timeout 180; then
+  echo "ERROR: strict-PQ product gateway/ingress failed to become ready; installation is not operational." >&2
+  docker compose --profile xsp-v2-product ps >&2 || true
+  docker compose --profile xsp-v2-product logs --tail=100 xsp-v2-product-gateway xsp-v2-product-ingress >&2 || true
+  exit 1
+fi
+
+docker compose --profile xsp-v2-product ps xsp-v2-product-gateway xsp-v2-product-ingress
 bash deploy/install-panel-host.sh activate "$PWD/.env"
 
 echo
@@ -149,7 +194,7 @@ echo "XMesh Nexus v6.0.0 POSTQUANTUM panel is healthy and ready."
 echo "PostgreSQL stores persistent panel data; Redis provides shared login throttling."
 echo "Redis is private to the Compose network and is not published on a host port."
 echo "Panel stays on loopback; Nginx terminates TLS for PANEL_DOMAIN."
-echo "Strict-PQ foundation is provisioned; node activation remains fail-closed and receipt-verified."
+echo "Strict-PQ product gateway is mandatory; operational node APIs are not exposed on classical HTTPS."
 printf 'Dashboard entrypoint: %s\n' "$dashboard_path"
 echo 'This path is stored in .env (mode 600). Save your full HTTPS URL.'
 if [[ "$created_env" == "1" ]]; then
@@ -160,4 +205,4 @@ else
   echo "Administrator credentials were not reset."
 fi
 echo
-docker compose ps
+docker compose --profile xsp-v2-product ps

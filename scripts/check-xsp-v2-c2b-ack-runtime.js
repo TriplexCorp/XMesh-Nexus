@@ -135,10 +135,22 @@ must(origin.includes('const REQUEST_QUEUE_SIZE: i32 = 32') && origin.includes('l
 must(!origin.includes('X-XSP-V2-Trusted-Node-ID'),
   'origin must never trust a forwarded caller Node ID header');
 
-for (const source of [compose, installer]) {
-  must(!source.includes('xsp-v2-ingress') && !source.includes('xsp-v2-node-ingress'),
-    'default production setup must not activate the experimental ingress runtime');
-}
+// The historical C2-B ACK ingress remains staging-only. XMesh v6 additionally
+// has a distinct mandatory product ingress; do not confuse that reviewed
+// production service with the experimental C2-B/C2-D staging route merely
+// because both reuse the hardened ingress image directory/target.
+must(!/^\s{2}xsp-v2-ingress:\s*$/m.test(compose)
+    && !/^\s{2}xsp-v2-node-ingress:\s*$/m.test(compose),
+  'default production Compose must not mount the experimental C2-B ingress service');
+must(!installer.includes('--profile xsp-v2-staging')
+    && !installer.includes('xsp-v2-node-ingress'),
+  'default installer must not activate the experimental C2-B staging profile/service');
+must(/^\s{2}xsp-v2-product-ingress:\s*$/m.test(compose)
+    && compose.includes('profiles: ["xsp-v2-product"]')
+    && compose.includes('./deploy/xsp-v2-ingress/nginx-product.conf:/etc/nginx/nginx.conf:ro'),
+  'v6 product ingress must remain an explicitly named, dedicated product-profile service');
+must(installer.includes('docker compose --profile xsp-v2-product up -d --build --wait --wait-timeout 180'),
+  'v6 installer must fail closed on mandatory product ingress/gateway startup');
 must(!main.includes('"/api/v2/node/keys/rotation/ack"'),
   'default/experimental Rust API must not mount the ACK route during C2-B/D2 staging proof');
 
