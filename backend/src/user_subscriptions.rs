@@ -59,6 +59,42 @@ async fn token_fingerprint(state: &AppState, token: &str) -> Result<Option<Strin
     user_fingerprint(state, id).await
 }
 
+// The product contract says an empty user override inherits the host and an
+// empty host fingerprint means chrome. Older hosts may predate the explicit
+// `fp` field, so generated client JSON must materialize that final fallback
+// instead of merely showing it in the editor. Existing non-empty host values
+// are preserved; a per-user override is applied afterwards.
+fn ensure_default_fingerprint(value: &mut Value) {
+    match value {
+        Value::Array(items) => {
+            for item in items {
+                ensure_default_fingerprint(item);
+            }
+        }
+        Value::Object(object) => {
+            for key in ["tlsSettings", "realitySettings"] {
+                if let Some(settings) = object.get_mut(key).and_then(Value::as_object_mut) {
+                    let missing = settings
+                        .get("fingerprint")
+                        .and_then(Value::as_str)
+                        .map(str::trim)
+                        .is_none_or(str::is_empty);
+                    if missing {
+                        settings.insert(
+                            "fingerprint".to_owned(),
+                            Value::String("chrome".to_owned()),
+                        );
+                    }
+                }
+            }
+            for child in object.values_mut() {
+                ensure_default_fingerprint(child);
+            }
+        }
+        _ => {}
+    }
+}
+
 fn apply_fingerprint(value: &mut Value, fingerprint: &str) {
     match value {
         Value::Array(items) => {
@@ -87,9 +123,6 @@ async fn patch_response_fingerprint(
     response: Response,
     fingerprint: Option<String>,
 ) -> Result<Response, ApiError> {
-    let Some(fingerprint) = fingerprint else {
-        return Ok(response);
-    };
     let is_json = response
         .headers()
         .get(header::CONTENT_TYPE)
@@ -111,7 +144,10 @@ async fn patch_response_fingerprint(
             "Subscription JSON unavailable",
         )
     })?;
-    apply_fingerprint(&mut value, &fingerprint);
+    ensure_default_fingerprint(&mut value);
+    if let Some(fingerprint) = fingerprint {
+        apply_fingerprint(&mut value, &fingerprint);
+    }
     let rendered = serde_json::to_vec(&value).map_err(|_| {
         ApiError::new(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -139,6 +175,7 @@ pub async fn admin_client_json(
         Query(options),
     )
     .await?;
+    ensure_default_fingerprint(&mut response.0);
     if let Some(fingerprint) = fingerprint {
         apply_fingerprint(&mut response.0, &fingerprint);
     }
@@ -168,6 +205,25 @@ mod tests {
     use serde_json::json;
 
     #[test]
+    fn default_fingerprint_is_materialized_without_overwriting_host_choice() {
+        let mut feed = json!({
+            "outbounds":[
+                {"streamSettings":{"security":"tls","tlsSettings":{"serverName":"tls.example"}}},
+                {"streamSettings":{"security":"reality","realitySettings":{"serverName":"reality.example","fingerprint":"safari"}}}
+            ]
+        });
+        ensure_default_fingerprint(&mut feed);
+        assert_eq!(
+            feed["outbounds"][0]["streamSettings"]["tlsSettings"]["fingerprint"],
+            "chrome"
+        );
+        assert_eq!(
+            feed["outbounds"][1]["streamSettings"]["realitySettings"]["fingerprint"],
+            "safari"
+        );
+    }
+
+    #[test]
     fn individual_fingerprint_overrides_only_tls_and_reality_client_settings() {
         let mut feed = json!({
             "outbounds":[
@@ -176,6 +232,7 @@ mod tests {
                 {"streamSettings":{"security":"none"}}
             ]
         });
+        ensure_default_fingerprint(&mut feed);
         apply_fingerprint(&mut feed, "safari");
         assert_eq!(
             feed["outbounds"][0]["streamSettings"]["tlsSettings"]["fingerprint"],
