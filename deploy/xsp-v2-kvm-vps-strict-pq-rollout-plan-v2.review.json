@@ -1,0 +1,18 @@
+{
+  "schema": "xsp2-kvm-vps-strict-pq-rollout-plan-review-1",
+  "planSha256": "7ce7a159b2851dd1a55f5f2810d43aeaf5a70e73dc4e0f886c975f55b2f65364",
+  "releaseCandidate": {
+    "nexusRevision": "a1267ae186f74d5e21561e3b64fc7375d499132e",
+    "nodeRevision": "64709ce8f5f0ce80e2c0bab59b4476347825e57c"
+  },
+  "reviewedBy": "ChatGPT / GPT-5.6 Sol + Triplex release owner",
+  "reviewedAt": "2026-10-31T12:39:35+03:00",
+  "accepted": true,
+  "statement": "The exact Node 13 limited-canary rollout plan is accepted. It binds the production-capable runtime target and canary hashes, keeps strict-PQ default-off until bounded approval execution, provisions endpoint/key/certificate material outside Git, uses verified historical receipt recovery as the preferred Node execution path, requires receipt-bound Nexus finalization, retains XMESH1, and permits only explicit manual rollback without automatic/classical fallback or epoch lowering.",
+  "claims": {
+    "productionActivation": false,
+    "strictPQEnabled": false,
+    "legacyXMESH1Retired": false,
+    "physicalPowerLossQualified": false
+  }
+}
