@@ -17,7 +17,7 @@ const app=fs.readFileSync('app.js','utf8');
 const studio=fs.readFileSync('xray-studio-v4.js','utf8');
 const html=fs.readFileSync('index.html','utf8');
 const docker=fs.readFileSync('backend/Dockerfile','utf8');
-const server=fs.readFileSync('backend/src/user_subscriptions.rs','utf8');
+const server=fs.readFileSync('backend/src/user_subscriptions.rs','utf8')+'\n'+fs.readFileSync('backend/src/user_subscriptions_base.rs','utf8');
 assert(!app.includes("['hosts','link','Хосты',1]"),'Duplicate Hosts navigation must stay retired');
 assert(app.includes("hosts:['Хосты',()=>simple(['hosts'])]"),'Hosts route must render the dedicated Hosts page');
 assert(app.includes("['hosts','globe-2','Хосты']"),'Hosts navigation must remain accessible');
