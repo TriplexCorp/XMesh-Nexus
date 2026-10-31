@@ -200,9 +200,30 @@ The enrollment metadata advertises `<PANEL_DOMAIN>:443` for the v6 product contr
 
 ## Updating Nexus
 
-### Recommended: panel update action
+### Recommended manual terminal update
 
-The installed product has an owner-authorized update path.
+For an operator working over SSH, use the supported interactive CLI:
+
+```bash
+cd /path/to/XMesh-Nexus
+sudo bash xmeshctl
+```
+
+Choose:
+
+```text
+4) Обновить из GitHub и пересобрать
+```
+
+The CLI verifies the Git repository/upstream, asks for explicit confirmation, creates a PostgreSQL backup, fetches and fast-forwards the configured upstream branch, runs installer preparation, validates Docker Compose and rebuilds the stack. On a managed host, running it as root also reapplies the host-side HTTPS/single-public-443 topology.
+
+Do not normally invoke `xmeshctl --web-update` yourself; that flag is the internal non-interactive entrypoint used by the privileged web/systemd updater.
+
+See `CLI_UPDATE.md` for the operator-facing update contract.
+
+### Panel update action
+
+The installed product also has an owner-authorized update path in the web UI.
 
 The API does **not** receive a Docker socket or execute arbitrary shell. Instead it writes a fixed update request marker; a root-owned systemd service invokes:
 
@@ -347,7 +368,8 @@ Treat the queue response as request acceptance only. Check:
 - `PRODUCT_GUIDE.md` — product features and component responsibilities
 - `XRAY_STUDIO_GUIDE.md` — Xray configuration workspace
 - `AUTONOMOUS_NODES.md` — node behavior and signed operations
-- `PANEL_UPDATE_AND_TELEMETRY.md` — update path and telemetry
+- `CLI_UPDATE.md` — operator-facing manual update through `sudo bash xmeshctl`
+- `PANEL_UPDATE_AND_TELEMETRY.md` — web/systemd update path and telemetry
 - `SECURITY_NODE_IDENTITY.md` — node identity security
 - `SUBSCRIPTION_SECURITY.md` — subscription security model
 - `XSP_V2_PRODUCTION_ACTIVATION_2026-10-31.md` — bounded strict-PQ production evidence
