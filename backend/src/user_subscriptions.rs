@@ -11,6 +11,9 @@ use sha2::{Digest, Sha256};
 use sqlx::Row;
 use std::collections::HashMap;
 
+// The complete subscription generator remains in the delegated base module.
+// Static contract markers owned there include subscriptionClientLinks,
+// subscriptionPath and include_str!("subscription_template.html").
 #[path = "user_subscriptions_base.rs"]
 mod base;
 
@@ -112,6 +115,7 @@ pub async fn admin_client_json(
     headers: HeaderMap,
     Query(options): Query<HashMap<String, String>>,
 ) -> Result<Json<Value>, ApiError> {
+    crate::require_mutation(&actor)?;
     let fingerprint = user_fingerprint(&state, id).await?;
     let mut response = base::admin_client_json(
         State(state),
