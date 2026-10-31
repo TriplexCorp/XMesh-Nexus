@@ -203,6 +203,7 @@ jobs:
           ADMIN_PASSWORD: 9876543210abcdef9876543210abcdef9876543210abcdef
           DASHBOARD_PATH: /dashboard/0123456789abcdef0123456789abcdef0123456789abcdef
           SUBSCRIPTION_ENCRYPTION_KEY: "1234567812345678123456781234567812345678123456781234567812345678"
+          XSP_V2_PRODUCT_INTERNAL_TOKEN: "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
         run: |
           bash -n install.sh
           bash -n xmeshctl
@@ -218,7 +219,6 @@ jobs:
       - name: Build Docker image
         run: docker build -f backend/Dockerfile -t xmesh-nexus:ci .
 
-
   integration:
     name: API authentication integration
     runs-on: ubuntu-latest
@@ -231,6 +231,7 @@ jobs:
       ADMIN_PASSWORD: 9876543210abcdef9876543210abcdef9876543210abcdef
       TOTP_ENCRYPTION_KEY: 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
       SUBSCRIPTION_ENCRYPTION_KEY: "1234567812345678123456781234567812345678123456781234567812345678"
+      XSP_V2_PRODUCT_INTERNAL_TOKEN: "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
       COOKIE_SECURE: "false"
       DASHBOARD_PATH: /dashboard/0123456789abcdef0123456789abcdef0123456789abcdef
     steps:
