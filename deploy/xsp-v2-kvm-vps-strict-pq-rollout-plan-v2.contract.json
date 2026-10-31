@@ -1,0 +1,39 @@
+{
+  "schema": "xsp2-kvm-vps-strict-pq-rollout-plan-contract-2",
+  "planSchema": "xsp2-kvm-vps-strict-pq-rollout-plan-2",
+  "deploymentClass": "kvm-vps",
+  "requiredRuntimeTarget": {
+    "nexusRevision": "a1267ae186f74d5e21561e3b64fc7375d499132e",
+    "nodeRevision": "64709ce8f5f0ce80e2c0bab59b4476347825e57c"
+  },
+  "requiredScope": {"mode":"limited-canary","nodes":["node-13"]},
+  "requiredTransportPolicy": {
+    "tlsProtocols":["TLSv1.3"],
+    "keyExchange":"X25519MLKEM768",
+    "clientIdentity":"ML-DSA-65",
+    "criticalMessageSignatures":["Ed25519","ML-DSA-65"],
+    "automaticFallback":false,
+    "classicalOnlyAllowed":false
+  },
+  "requiredExecution": {
+    "nexusPrepare":"scripts/xsp-v2-strict-pq-production-execute.sh",
+    "nodeExecuteBinary":"xmesh-agent-xspv2-activate",
+    "nodePreferredMode":"recover",
+    "nexusFinalize":"scripts/xsp-v2-strict-pq-production-finalize.sh",
+    "successRequiresVerifiedReceipt":true
+  },
+  "requiredRollback": {
+    "manualOnly":true,
+    "script":"scripts/xsp-v2-strict-pq-production-rollback.sh",
+    "automaticFallback":false,
+    "lowerNodeEpoch":false,
+    "eraseNodeSecurityState":false,
+    "legacyXMESH1Retained":true
+  },
+  "requiredFalseClaimsBeforeExecution": {
+    "productionActivation":false,
+    "strictPQEnabled":false,
+    "legacyXMESH1Retired":false,
+    "physicalPowerLossQualified":false
+  }
+}
