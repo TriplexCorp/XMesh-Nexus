@@ -11,6 +11,7 @@ on:
       - scripts/check-install-host.sh
       - scripts/provision-xsp-v2-v6-foundation.sh
       - scripts/test-xsp-v2-product-mldsa-key-format.sh
+      - scripts/test-xsp-v2-product-ingress-runtime.sh
       - .github/workflows/product-ingress-build.yml
   pull_request:
     branches: [main]
@@ -22,6 +23,7 @@ on:
       - scripts/check-install-host.sh
       - scripts/provision-xsp-v2-v6-foundation.sh
       - scripts/test-xsp-v2-product-mldsa-key-format.sh
+      - scripts/test-xsp-v2-product-ingress-runtime.sh
       - .github/workflows/product-ingress-build.yml
 
 permissions:
@@ -55,3 +57,5 @@ jobs:
         run: docker compose --profile xsp-v2-product config --quiet
       - name: Build strict-PQ product control plane exactly as installer will
         run: docker compose --profile xsp-v2-product build xsp-v2-product-gateway xsp-v2-product-ingress
+      - name: Start product ingress under production read-only/non-root constraints
+        run: bash scripts/test-xsp-v2-product-ingress-runtime.sh
