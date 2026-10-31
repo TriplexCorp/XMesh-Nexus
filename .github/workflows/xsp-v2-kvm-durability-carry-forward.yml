@@ -1,0 +1,87 @@
+name: XSP-v2 KVM Durability Carry-Forward
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "deploy/xsp-v2-kvm-vps-durability-carry-forward-v1.json"
+      - ".github/workflows/xsp-v2-kvm-durability-carry-forward.yml"
+  push:
+    branches: [main]
+    paths:
+      - "deploy/xsp-v2-kvm-vps-durability-carry-forward-v1.json"
+      - ".github/workflows/xsp-v2-kvm-durability-carry-forward.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  carry-forward:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Nexus history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check out exact new Node target
+        uses: actions/checkout@v4
+        with:
+          repository: TriplexCorp/XMesh-Node
+          ref: 64709ce8f5f0ce80e2c0bab59b4476347825e57c
+          path: node-new
+          fetch-depth: 0
+      - name: Prove carry-forward manifest and Nexus protected paths
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import json,re
+          p='deploy/xsp-v2-kvm-vps-durability-carry-forward-v1.json'
+          x=json.load(open(p))
+          assert x['schema']=='xsp2-kvm-vps-durability-carry-forward-1'
+          assert x['deploymentClass']=='kvm-vps'
+          assert x['qualifiedTarget']=={
+            'nexusRevision':'12b3170996bc062ee16c79659a6378e5e425fd0e',
+            'nodeRevision':'34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb'}
+          assert x['productionTarget']=={
+            'nexusRevision':'a1267ae186f74d5e21561e3b64fc7375d499132e',
+            'nodeRevision':'64709ce8f5f0ce80e2c0bab59b4476347825e57c'}
+          for v in x['evidence'].values(): assert re.fullmatch(r'[0-9a-f]{64}',v) and set(v) != {'0'}
+          assert x['claims']=={
+            'nodeQualifiedDurabilityPathsUnchanged':True,
+            'nexusQualifiedPersistencePathsUnchanged':True,
+            'fiveRunCrashMatrixCarriedForward':True,
+            'postgresCrashRecoveryCarriedForward':True,
+            'providerStorageDurabilityAssumed':True,
+            'physicalPowerLossQualified':False,
+            'productionActivation':False,
+            'strictPQEnabled':False}
+          PY
+          git diff --quiet 12b3170996bc062ee16c79659a6378e5e425fd0e..a1267ae186f74d5e21561e3b64fc7375d499132e -- \
+            backend/migrations \
+            backend/src/xsp_v2_c2c.rs \
+            backend/src/xsp_v2_signer.rs \
+            deploy/xsp-v2-ingress/origin-ack-rs/src/main.rs \
+            deploy/xsp-v2-ingress/nginx-c2b.conf
+          # The only new PostgreSQL provisioning delta is a least-privilege
+          # permit-signer role; it must not define/alter durable tables.
+          test "$(git diff --name-only 12b3170996bc062ee16c79659a6378e5e425fd0e..a1267ae186f74d5e21561e3b64fc7375d499132e -- deploy/postgres)" = "deploy/postgres/22-create-xsp-v2-permit-signer-role.sql"
+          ! grep -Ei '\b(CREATE|ALTER|DROP|TRUNCATE)[[:space:]]+TABLE\b' deploy/postgres/22-create-xsp-v2-permit-signer-role.sql
+      - name: Prove Node protected durability/runtime paths are unchanged
+        working-directory: node-new
+        run: |
+          set -Eeuo pipefail
+          git diff --quiet 34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb..64709ce8f5f0ce80e2c0bab59b4476347825e57c -- \
+            agent/xspv2/state \
+            agent/xspv2/runtime \
+            security/xspv2/poc-go/keyring/sealed.go \
+            security/xspv2/poc-go/cutover/pq_only_ack_receipt_exchange_linux.go \
+            security/xspv2/poc-go/cutover/permit_journal_linux.go \
+            security/xspv2/poc-go/cutover/commit_receipt_journal_linux.go
+          mapfile -t changed < <(git diff --name-only 34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb..64709ce8f5f0ce80e2c0bab59b4476347825e57c)
+          for f in "${changed[@]}"; do
+            case "$f" in
+              .github/workflows/*|docs/*|security/xspv2/poc-go/cmd/xspv2-kvm-qualify/*|security/xspv2/poc-go/keyring/kvm_qualification_linux.go|security/xspv2/poc-go/keyring/kvm_qualification_linux_test.go|security/xspv2/poc-go/cutover/production_recovery_linux.go|agent/xspv2/activation/*|agent/xspv2/cmd/xmesh-agent-xspv2-activate/*) ;;
+              *) echo "unexpected Node delta outside carry-forward allowlist: $f" >&2; exit 1 ;;
+            esac
+          done
