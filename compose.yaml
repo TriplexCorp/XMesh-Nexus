@@ -141,7 +141,7 @@ services:
     ports:
       - "0.0.0.0:8444:8444"
     volumes:
-      - ./deploy/xsp-v2-ingress/nginx-c2b.conf:/etc/nginx/nginx.conf:ro
+      - ./deploy/xsp-v2-ingress/nginx-product.conf:/etc/nginx/nginx.conf:ro
       - ${XSP_V2_INGRESS_CERTS_DIR:-/etc/xmesh-nexus/xsp-v2-ingress}:/run/xmesh-ingress-certs:ro
     read_only: true
     tmpfs:
