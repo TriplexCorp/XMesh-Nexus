@@ -18,6 +18,8 @@ for invalid in '' example localhost '*.example.org' 'https://example.org' \
 done
 config="$(bash "$host" render-nginx panel.example.org 8080)"
 grep -Fq 'server_name panel.example.org;' <<< "$config"
+grep -Fq 'listen 127.0.0.1:8443 ssl;' <<< "$config"
+! grep -Fq 'listen 443 ssl;' <<< "$config"
 grep -Fq 'ssl_certificate     /etc/letsencrypt/live/panel.example.org/fullchain.pem;' <<< "$config"
 grep -Fq 'ssl_certificate_key /etc/letsencrypt/live/panel.example.org/privkey.pem;' <<< "$config"
 grep -Fq 'proxy_pass http://127.0.0.1:8080;' <<< "$config"
@@ -25,6 +27,18 @@ grep -Fq 'proxy_set_header Host $host;' <<< "$config"
 grep -Fq 'return 301 https://$host$request_uri;' <<< "$config"
 [[ "$(grep -c 'access_log off;' <<< "$config")" == 2 ]] || { echo 'Both vhosts must suppress bearer URL access logs' >&2; exit 1; }
 [[ "$(grep -c 'error_log /var/log/nginx/xmesh-nexus-error.log crit;' <<< "$config")" == 2 ]] || { echo 'Nginx URI-bearing error diagnostics must be minimized' >&2; exit 1; }
+
+mux="$(bash "$host" render-haproxy)"
+grep -Fq 'bind 0.0.0.0:443' <<< "$mux"
+grep -Fq 'bind [::]:443 v6only' <<< "$mux"
+grep -Fq 'req_ssl_sni -i node-ingress.xsp.invalid' <<< "$mux"
+grep -Fq 'server panel 127.0.0.1:8443' <<< "$mux"
+grep -Fq 'server strict_pq 127.0.0.1:8444' <<< "$mux"
+
+grep -Fq 'XSP_V2_PRODUCT_PUBLIC_ADDRESS: ${PANEL_DOMAIN:?Run ./install.sh first}:443' compose.yaml
+grep -Fq '127.0.0.1:8444:8444' compose.yaml
+! grep -Fq '0.0.0.0:8444:8444' compose.yaml
+grep -Fq 'TCP/8444 must remain closed externally' "$host"
 grep -Fq 'bash deploy/ensure-subscription-key.sh .env' install.sh
 if bash "$host" render-nginx panel.example.org '8080;return 200' >/dev/null 2>&1; then
   echo 'Unsafe upstream port accepted' >&2; exit 1
@@ -35,4 +49,4 @@ grep -Fq 'bash deploy/install-panel-host.sh deps' install.sh
 grep -Fq 'bash deploy/install-panel-host.sh domain "$PWD/.env"' install.sh
 grep -Fq 'bash deploy/install-panel-host.sh activate "$PWD/.env"' install.sh
 grep -Fq 'docker compose up -d --build --wait --wait-timeout' install.sh
-echo 'Panel host installer: syntax, hostname validation, nginx template and integration contracts OK.'
+echo 'Panel host installer: single public 443 mux, loopback TLS backends and integration contracts OK.'
