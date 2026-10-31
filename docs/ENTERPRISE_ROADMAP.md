@@ -2,18 +2,17 @@
 
 ## Authoritative engineering status — 31 October 2026
 
-XSP-v2 P0-E has reached a real bounded production activation on canary Node 13.
-
-Current authoritative state:
+XSP-v2 P0-E has reached a real bounded production activation on canary Node 13, and the next productization milestone is **XMesh v6.0.0 POSTQUANTUM**.
 
 ```text
 P0-C2-D = COMPLETE
 P0-D = COMPLETE
 P0-E bounded Node 13 production activation = COMPLETE
+v6 POSTQUANTUM install/update productization = CURRENT
 
+Node 13:
 productionActivation=true
 strictPQEnabled=true
-nodeId=13
 minimumEpoch=2
 legacyXMESH1Retired=false
 physicalPowerLossQualified=false
@@ -21,159 +20,93 @@ automaticFallback=false
 classicalOnlyAllowed=false
 ```
 
-The production claim is deliberately narrow. It applies to Node 13 only and does not authorize an automatic fleet-wide rollout.
+The production claim remains deliberately narrow: `strictPQEnabled=true` is proven for Node 13. v6 generalizes **packaging, provisioning and update delivery**, not the evidence claim for unactivated nodes.
 
-## Frozen production target
+## v6.0.0 POSTQUANTUM major
 
-Reviewed production runtime target:
+### Nexus v6
 
-- **XMesh-Nexus:** `a1267ae186f74d5e21561e3b64fc7375d499132e`;
-- **XMesh-Node:** `64709ce8f5f0ce80e2c0bab59b4476347825e57c`;
-- **Nexus runtime manifest/image binding:** `sha256:af27a110220f98880dc539141d614683741a05fbd3afd30792819b3192b9ef45`;
-- **approved production Agent artifact:** `a5f8e739b381640e4ac1d632dfef47d879ebc4c6ce7c4fbd8fab5744ad9cdd63`.
+Target product behavior:
 
-Later release-control/tooling commits are allowed only while the frozen runtime build inputs remain byte-identical to this target.
+- `VERSION=6.0.0` is the authoritative panel release version;
+- clean install provisions persistent Ed25519 + ML-DSA-65 signer identity and public panel pin;
+- clean install provisions TLS 1.3 hybrid ingress server identity plus ML-DSA-65 client CA for future per-node identities;
+- least-privilege signer/C2-C database roles are provisioned with generated persistent credentials on fresh installs;
+- reinstall/update is **non-rotating**: existing signer keys, CA identity and legacy DB credentials are never silently replaced;
+- `install.sh --prepare-only`, used by the web updater, migrates the v6 PQ foundation while the existing database is healthy;
+- foundation state explicitly distinguishes `strictPQFoundationReady=true` from per-node `strictPQEnabled=true`.
 
-## P0-E completed release gates
+### Agent / Node v6
 
-### Durability / qualification
+Target product behavior:
 
-- Node KVM abrupt-crash matrix: **COMPLETE 5/5**;
-- independent Nexus/PostgreSQL crash/recovery: **COMPLETE**;
-- off-host monotonic recovery witness: **COMPLETE**;
-- provider-storage risk acceptance: **COMPLETE**;
-- topology-aware KVM VPS verifier: **PASS**;
-- `physicalPowerLossQualified=false`: preserved as the correct deployment-class claim.
+- XMesh Node `VERSION=6.0.0`;
+- moving production Agent version `control-v6.0.0`;
+- normal Node install and fresh enrollment install the production `xmesh-agent-xspv2-activate` binary;
+- the binary is built from the exact checked-out Node revision with the reviewed Go 1.27.3 toolchain and self-verifies `{version, sourceRevision, artifactSha256}`;
+- normal **Update Agent** accepts an authenticated transition from existing v4/v5 control agents, fast-forwards only the official XMesh-Node repository, updates the router, installs the PQ runtime and fails the entire major update if PQ identity verification fails;
+- staged immutable release migration and last-known-good rollback remain available; durable XSP-v2 security state is not rolled back with package slots.
 
-Canonical KVM durability result SHA-256:
+### v6 security boundary
 
-`fd8ef8e680e999bb95ef5b081806eb24a32f1537a7d1f6cd678ecd41591c6a0f`
+v6 does **not** turn readiness into activation. A node reaches `strictPQEnabled=true` only after its own authenticated PQ identity and the existing bounded, fail-closed receipt/finalization flow.
 
-Provider-storage risk acceptance SHA-256:
-
-`49a311a8bf871c6afcaa5841622b9f1e28e74675452671abc4e970f644dec604`
-
-### Security / governance
-
-The accepted release governance is:
-
-**AI-assisted internal review + explicit release-owner risk acceptance.**
-
-It must not be represented as an independent external audit.
-
-- AI-assisted security review v6 result SHA-256: `2efb039f6581eb50b52c3b0f34c2d44cc320fbf2e1883f472e047746cfcba1a5`;
-- #137: **CLOSED** under the replacement governance policy;
-- rollout/rollback plan review: **COMPLETE**.
-
-### Final release candidate / canary
-
-- final canary v3: **PASS**;
-- final canary result SHA-256: `ef8beb21746890ad5169b71e7a8d937b6043519513e6381471c0f6d11d62f287`;
-- rollout plan SHA-256: `7ce7a159b2851dd1a55f5f2810d43aeaf5a70e73dc4e0f886c975f55b2f65364`;
-- rollout review SHA-256: `93ee69fe8caca8846368865cf8d141ab96cf6e521f2cce5dd4c4559fdbc91585`.
-
-### Bounded approval
-
-The Node 13 strict-PQ approval was bounded by node scope and validity window and required:
+Required policy remains:
 
 - TLS 1.3 only;
 - `X25519MLKEM768`;
 - ML-DSA-65 client identity;
 - Ed25519 + ML-DSA-65 critical signatures;
-- `automaticFallback=false`;
-- `classicalOnlyAllowed=false`;
-- `strictPqAction=enable`;
-- `legacyXMESH1Action=retain`.
+- no automatic/classical fallback;
+- XMESH1 retained until a separate retirement decision.
 
-Approval SHA-256:
+## Proven Node 13 production evidence
 
-`b2e43b137d4ea5b24b1313899e57701608874e059bdf5d5d2ba9f263ba866259`
+The earlier frozen canary target remains the historical evidence base:
 
-## Production activation — COMPLETE
+- Nexus runtime `a1267ae186f74d5e21561e3b64fc7375d499132e`;
+- Node runtime `64709ce8f5f0ce80e2c0bab59b4476347825e57c`;
+- Nexus runtime manifest/image `sha256:af27a110220f98880dc539141d614683741a05fbd3afd30792819b3192b9ef45`;
+- approved activation artifact `a5f8e739b381640e4ac1d632dfef47d879ebc4c6ce7c4fbd8fab5744ad9cdd63`.
 
-The dedicated strict-PQ Nexus stack reached readiness first with:
+Production evidence:
 
-```text
-productionStackReady=true
-strictPQEnabled=false
-legacyXMESH1Retired=false
-```
-
-This readiness state was intentionally not treated as production activation.
-
-Node 13 then ran the approved production Agent in `recover` mode against the existing committed epoch-2 state. The Agent returned:
-
-```text
-status=strict-pq-node-cutover-receipt-verified
-mode=recover
-nodeId=13
-minimumEpoch=2
-strictPQEnabled=true
-legacyXMESH1Retired=false
-```
-
-Node result SHA-256:
-
-`ac1025fdc4bf2b433d1e596a7a35dd14deca94bcc44a10866c72c31b76d2fe9f`
-
-Receipt binding SHA-256:
-
-`1747647618cb1a824b85ef379646da242de7846e8c3ebff0bfdad9bc078ecb39`
-
-Nexus then consumed that exact result and finalized:
-
-```text
-productionActivation=true
-strictPQEnabled=true
-legacyXMESH1Retired=false
-physicalPowerLossQualified=false
-```
-
-Activation timestamp: `2026-10-31T10:52:13Z`.
-
-Activation record SHA-256:
-
-`6cfb4dc49edacff87033bbd99ca45ad7279813b4a10a5cbe958d5348e8a0ee9d`
+- bounded approval SHA-256 `b2e43b137d4ea5b24b1313899e57701608874e059bdf5d5d2ba9f263ba866259`;
+- Node result SHA-256 `ac1025fdc4bf2b433d1e596a7a35dd14deca94bcc44a10866c72c31b76d2fe9f`;
+- receipt binding SHA-256 `1747647618cb1a824b85ef379646da242de7846e8c3ebff0bfdad9bc078ecb39`;
+- activation record SHA-256 `6cfb4dc49edacff87033bbd99ca45ad7279813b4a10a5cbe958d5348e8a0ee9d`;
+- activation timestamp `2026-10-31T10:52:13Z`.
 
 Full evidence: [`XSP_V2_PRODUCTION_ACTIVATION_2026-10-31.md`](XSP_V2_PRODUCTION_ACTIVATION_2026-10-31.md).
 
-## Production orchestration hardening
+## Completed release gates
 
-The live Node 13 rollout exposed release-control defects outside the frozen crypto/runtime build inputs:
+- KVM VPS durability qualification #138: **COMPLETE**;
+- provider-storage risk acceptance: **COMPLETE**;
+- `physicalPowerLossQualified=false`: correct deployment-class claim;
+- AI-assisted security review v6: **COMPLETE**;
+- governance: **AI-assisted internal review + explicit release-owner risk acceptance**;
+- #137: **CLOSED** under that replacement governance policy, with no external-independent-audit claim;
+- final canary v3: **PASS**;
+- bounded Node 13 activation / receipt recovery / Nexus finalization: **COMPLETE**;
+- live rollout orchestration hardening: **COMPLETE**.
 
-1. direct execution of the base shell launcher depended on a checkout executable bit;
-2. execute/finalize/rollback used Python `open(path, os.O_RDONLY)` instead of `os.open(...)` for directory `fsync`;
-3. C2-C and ingress depended on operator source-directory permissions for bind-mounted panel-pin/TLS material;
-4. the launcher could emit readiness while C2-C/ingress had already entered restart loops.
+Do not rerun the completed durability matrix, historical cutover, final canary or recovery witness merely for v6 packaging changes unless the reviewed crypto/runtime security assumptions materially change.
 
-The post-activation control-plane patch therefore:
-
-- invokes the base launcher through `bash`;
-- uses correct `os.open` directory durability calls;
-- stages C2-C public pin material for GID 10001 and ingress TLS material for GID 10003 into runtime-owned least-privilege paths;
-- requires all four strict-PQ services to be running/non-restarting and ingress port 8444 to be published before writing readiness evidence;
-- adds CI assertions for those exact regression classes.
-
-These changes are release-control/tooling hardening and do **not** alter the frozen production runtime build inputs.
-
-## Current production decision
-
-**Strict-PQ is active in production for bounded canary Node 13.**
-
-XMESH1 remains retained. There is no automatic/classical fallback. `physicalPowerLossQualified=false` remains the correct KVM VPS claim.
-
-A broader rollout is a separate release decision. It requires a new bounded scope/approval and must not be inferred from the Node 13 activation evidence.
-
-## Next engineering sequence
+## Current release sequence
 
 ```text
-Node 13 bounded production activation COMPLETE
+Node v6.0.0 POSTQUANTUM PR + CI
             ↓
-merge live rollout orchestration hardening + evidence
+merge XMesh-Node v6 to main
             ↓
-observe/operate bounded canary without weakening strict-PQ policy
+Nexus v6.0.0 POSTQUANTUM PR + CI
             ↓
-prepare a separate phased expansion decision if broader rollout is desired
+merge XMesh-Nexus v6 to main
+            ↓
+standard install/update paths are PQ-ready
+            ↓
+per-node strict-PQ activation remains receipt-verified and separately bounded
 ```
 
-Do not rerun the completed KVM durability matrix, cutover, final canary, or historical recovery witness unless the frozen runtime/security assumptions materially change.
+A broader fleet activation is a separate release decision. v6 removes the manual packaging/install gap; it does not weaken or bypass the per-node production activation gate.

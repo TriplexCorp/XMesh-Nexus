@@ -16,13 +16,21 @@ for(const filename of migrations){
 assert(versions.has(20) && versions.has(21) && versions.has(23),'Xray update migrations must exist');
 const migration=fs.readFileSync('backend/migrations/0020_managed_xray_updates.sql','utf8');
 assert.match(migration,/update_xray/);
-const api=fs.readFileSync('backend/src/node_runtime.rs','utf8')+'\n'+fs.readFileSync('backend/src/node_runtime_legacy.rs','utf8');
+const entry=fs.readFileSync('backend/src/node_runtime.rs','utf8');
+const legacy=fs.readFileSync('backend/src/node_runtime_legacy.rs','utf8');
+const api=entry+'\n'+legacy;
 const router=fs.readFileSync('backend/src/main.rs','utf8');
 const agent=fs.readFileSync('deploy/node-control-agent.sh','utf8');
 const frontend=fs.readFileSync('app.js','utf8');
 assert.match(router,/\/nodes\/\{id\}\/xray-update/);
 assert.match(api,/pub async fn request_xray_update/);
-const restart=api.slice(api.indexOf('pub async fn request_restart('),api.indexOf('pub async fn available_xray_releases('));
+// v6 shadows request_restart and request_xray_update in the same overlay. Scope
+// this invariant to the restart function itself instead of slicing through the
+// following legitimate Xray-update handler, which necessarily binds `target`.
+const restartStart=entry.indexOf('pub async fn request_restart(');
+const restartEnd=entry.indexOf('pub async fn request_xray_update(',restartStart);
+assert(restartStart>=0 && restartEnd>restartStart,'Cannot isolate v6 restart handler');
+const restart=entry.slice(restartStart,restartEnd);
 assert.doesNotMatch(restart,/\.bind\(target\)/,'Restart cannot bind an undefined Xray release target');
 assert.match(api,/if disabled \{/,'Disabled nodes must enforce Xray shutdown via control poll');
 assert.match(api,/version LIKE 'control-v3%'/);
