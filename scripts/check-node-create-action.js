@@ -50,9 +50,9 @@ assert.match(html,/app\.js\?v=[a-z0-9-]+/,'Update JS cache');
 // XMesh v6 security invariant: the UI must override the historical installer
 // handler and pin the reviewed strict-PQ-only Node release. The Node bootstrap
 // itself blocks router/Xray startup until a durable verified receipt exists.
-assert.match(html,/<script src="node-bootstrap-v6\.js\?v=20261031-strict-pq-only"><\/script>/,
- 'Panel must load the strict-PQ bootstrap override after app.js');
-assert.ok(html.indexOf('app.js?v=')<html.indexOf('node-bootstrap-v6.js?v='),
+assert.match(html,/<script src="\/node-bootstrap-v6\.js\?v=20261031-strict-pq-only"><\/script>/,
+ 'Panel must load the strict-PQ bootstrap override from an absolute dashboard-safe asset path');
+assert.ok(html.indexOf('app.js?v=')<html.indexOf('/node-bootstrap-v6.js?v='),
  'Strict-PQ bootstrap override must load after the historical app handler');
 assert.match(strictBootstrap,/XMESH_V6_NODE_BOOTSTRAP_SHA='7b6ec04d7dfe6e9b785f9988b5c43afb64499456'/,
  'Fresh Node installation must pin the reviewed XMesh-Node strict-PQ-only release');
