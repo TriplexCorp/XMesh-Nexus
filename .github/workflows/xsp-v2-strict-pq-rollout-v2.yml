@@ -1,0 +1,62 @@
+name: XSP-v2 Strict-PQ Rollout v2
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "deploy/xsp-v2-kvm-vps-strict-pq-rollout-plan-v2*"
+      - "scripts/verify-xsp-v2-kvm-vps-strict-pq-rollout-plan-v2.py"
+      - "scripts/xsp-v2-strict-pq-production-execute-v2.sh"
+      - ".github/workflows/xsp-v2-strict-pq-rollout-v2.yml"
+  push:
+    branches: [main]
+    paths:
+      - "deploy/xsp-v2-kvm-vps-strict-pq-rollout-plan-v2*"
+      - "scripts/verify-xsp-v2-kvm-vps-strict-pq-rollout-plan-v2.py"
+      - "scripts/xsp-v2-strict-pq-production-execute-v2.sh"
+      - ".github/workflows/xsp-v2-strict-pq-rollout-v2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-rollout:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify plan, review binding and fail-closed execution wrapper
+        run: |
+          set -Eeuo pipefail
+          bash -n scripts/xsp-v2-strict-pq-production-execute-v2.sh
+          python3 -m py_compile scripts/verify-xsp-v2-kvm-vps-strict-pq-rollout-plan-v2.py
+          python3 scripts/verify-xsp-v2-kvm-vps-strict-pq-rollout-plan-v2.py \
+            --plan deploy/xsp-v2-kvm-vps-strict-pq-rollout-plan-v2.json | tee /tmp/rollout-verification.json
+          python3 - <<'PY'
+          import hashlib,json
+          plan_path='deploy/xsp-v2-kvm-vps-strict-pq-rollout-plan-v2.json'
+          review_path='deploy/xsp-v2-kvm-vps-strict-pq-rollout-plan-v2.review.json'
+          plan_raw=open(plan_path,'rb').read(); review_raw=open(review_path,'rb').read()
+          plan_sha=hashlib.sha256(plan_raw).hexdigest(); review_sha=hashlib.sha256(review_raw).hexdigest()
+          assert plan_sha=='7ce7a159b2851dd1a55f5f2810d43aeaf5a70e73dc4e0f886c975f55b2f65364'
+          assert review_sha=='93ee69fe8caca8846368865cf8d141ab96cf6e521f2cce5dd4c4559fdbc91585'
+          plan=json.loads(plan_raw); review=json.loads(review_raw); verify=json.load(open('/tmp/rollout-verification.json'))
+          assert review['planSha256']==plan_sha and review['accepted'] is True
+          assert review['releaseCandidate']=={'nexusRevision':plan['releaseCandidate']['nexusRevision'],'nodeRevision':plan['releaseCandidate']['nodeRevision']}
+          assert verify['status']=='kvm-vps-strict-pq-rollout-plan-reviewed'
+          assert verify['planSha256']==plan_sha and verify['rolloutPlanReviewed'] is True
+          assert verify['automaticFallback'] is False and verify['productionActivation'] is False and verify['strictPQEnabled'] is False
+          PY
+      - name: Prove fallback/scope/review weakening is rejected
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import copy,json
+          x=json.load(open('deploy/xsp-v2-kvm-vps-strict-pq-rollout-plan-v2.json'))
+          a=copy.deepcopy(x);a['transportPolicy']['classicalOnlyAllowed']=True;json.dump(a,open('/tmp/bad-fallback.json','w'))
+          a=copy.deepcopy(x);a['scope']['nodes']=['node-14'];json.dump(a,open('/tmp/bad-scope.json','w'))
+          a=copy.deepcopy(x);a['review']['reviewed']=False;json.dump(a,open('/tmp/bad-review.json','w'))
+          PY
+          ! python3 scripts/verify-xsp-v2-kvm-vps-strict-pq-rollout-plan-v2.py --plan /tmp/bad-fallback.json
+          ! python3 scripts/verify-xsp-v2-kvm-vps-strict-pq-rollout-plan-v2.py --plan /tmp/bad-scope.json
+          ! python3 scripts/verify-xsp-v2-kvm-vps-strict-pq-rollout-plan-v2.py --plan /tmp/bad-review.json
