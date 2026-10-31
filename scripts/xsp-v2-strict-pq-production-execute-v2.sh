@@ -45,4 +45,6 @@ PY
 )"
 [[ "$EXPECTED" = "$ACTUAL" ]] || { echo "runtime bundle mismatch: approval=$EXPECTED local=$ACTUAL" >&2; exit 1; }
 
-exec "$ROOT/scripts/xsp-v2-strict-pq-production-execute.sh" "$APPROVAL"
+# Invoke through bash so checkout executable bits cannot block a valid,
+# already-verified production execution path.
+exec bash "$ROOT/scripts/xsp-v2-strict-pq-production-execute.sh" "$APPROVAL"
