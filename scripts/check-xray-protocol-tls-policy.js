@@ -17,64 +17,46 @@ const sandbox={
 vm.runInNewContext(source,sandbox,{filename:'xray-studio-protocol-tls.js'});
 const policy=sandbox.window.XMeshProtocolTlsPolicy;
 const normalize=policy?.normalizeInbound;
-assert.equal(typeof normalize,'function','Smart security policy must export normalizeInbound');
-assert.equal(typeof policy?.desiredSecurity,'function','Smart security policy must expose its decision function');
+assert.equal(typeof normalize,'function','TLS policy must export normalizeInbound');
+assert.equal(typeof policy?.desiredSecurity,'function','TLS policy must expose its decision function');
 
 const cert={certificateFile:'/etc/xray/server.crt',keyFile:'/etc/xray/server.key'};
 
-const trojan={protocol:'trojan',streamSettings:{network:'raw',security:'none',tlsSettings:{certificates:[cert]}}};
-assert.equal(normalize(trojan),true);
-assert.equal(trojan.streamSettings.security,'tls','Trojan must enable TLS automatically');
-assert.deepEqual(trojan.streamSettings.tlsSettings.certificates[0],cert,'Trojan certificate paths must be preserved');
+const vlessXhttpNone={protocol:'vless',streamSettings:{network:'xhttp',security:'none',tlsSettings:{certificates:[cert]}}};
+assert.equal(normalize(vlessXhttpNone),false);
+assert.equal(vlessXhttpNone.streamSettings.security,'none','VLESS + XHTTP + NONE must stay NONE; VLESS Encryption may be intentional');
+assert.deepEqual(vlessXhttpNone.streamSettings.tlsSettings.certificates[0],cert,'Dormant TLS material must not be destroyed');
 
-const vlessXhttp={protocol:'vless',streamSettings:{network:'xhttp',security:'none'}};
-assert.equal(normalize(vlessXhttp),true);
-assert.equal(vlessXhttp.streamSettings.security,'tls','VLESS + XHTTP must automatically enable TLS');
+const vlessXhttpTls={protocol:'vless',streamSettings:{network:'xhttp',security:'tls'}};
+assert.equal(normalize(vlessXhttpTls),false);
+assert.equal(vlessXhttpTls.streamSettings.security,'tls','Explicit TLS selection must remain active');
+assert.ok(vlessXhttpTls.streamSettings.tlsSettings,'Selecting TLS must provision tlsSettings');
+assert.ok(Array.isArray(vlessXhttpTls.streamSettings.tlsSettings.certificates),'Selecting TLS must expose certificates collection');
 
-const vlessXhttpReality={protocol:'vless',streamSettings:{network:'xhttp',security:'reality',realitySettings:{serverNames:['example.org']}}};
+const vlessXhttpReality={protocol:'vless',streamSettings:{network:'xhttp',security:'reality',tlsSettings:{certificates:[cert]},realitySettings:{serverNames:['example.org']}}};
 assert.equal(normalize(vlessXhttpReality),false);
-assert.equal(vlessXhttpReality.streamSettings.security,'reality','Valid VLESS + XHTTP + REALITY must be preserved');
+assert.equal(vlessXhttpReality.streamSettings.security,'reality','Explicit REALITY selection must remain authoritative');
+assert.deepEqual(vlessXhttpReality.streamSettings.tlsSettings.certificates[0],cert,'Switching away from TLS must not erase reusable certificate paths');
 
-const vmessWs={protocol:'vmess',streamSettings:{network:'ws',security:'none'}};
-assert.equal(normalize(vmessWs),true);
-assert.equal(vmessWs.streamSettings.security,'tls','VMess + WebSocket must automatically enable TLS');
+const vmessWsNone={protocol:'vmess',streamSettings:{network:'ws',security:'none'}};
+assert.equal(normalize(vmessWsNone),false);
+assert.equal(vmessWsNone.streamSettings.security,'none','Protocol/transport must never silently enable TLS');
 
-const grpcReality={protocol:'vless',streamSettings:{network:'grpc',security:'reality',realitySettings:{privateKey:'configured'}}};
-assert.equal(normalize(grpcReality),false);
-assert.equal(grpcReality.streamSettings.security,'reality','Valid gRPC REALITY must not be overwritten by TLS');
+const trojanNone={protocol:'trojan',streamSettings:{network:'raw',security:'none'}};
+assert.equal(normalize(trojanNone),false);
+assert.equal(trojanNone.streamSettings.security,'none','Even protocol-specific requirements must be left to validation, not silent rewriting');
 
-const realityToWs={protocol:'vless',streamSettings:{network:'ws',security:'reality',realitySettings:{serverNames:['example.org']}}};
-assert.equal(normalize(realityToWs),true);
-assert.equal(realityToWs.streamSettings.security,'tls','Incompatible REALITY on WebSocket must be repaired to TLS');
+const hysteriaNone={protocol:'hysteria',streamSettings:{network:'hysteria',security:'none'}};
+assert.equal(normalize(hysteriaNone),false);
+assert.equal(hysteriaNone.streamSettings.security,'none','Hysteria security selection must not be silently rewritten by this policy');
 
-const vlessRawTls={protocol:'vless',streamSettings:{network:'raw',security:'tls',tlsSettings:{certificates:[cert]}}};
-assert.equal(normalize(vlessRawTls),false);
-assert.equal(vlessRawTls.streamSettings.security,'tls','Explicit VLESS RAW TLS must be preserved');
+const unknown={protocol:'vless',streamSettings:{network:'raw',security:'unexpected'}};
+assert.equal(normalize(unknown),true);
+assert.equal(unknown.streamSettings.security,'none','Unknown/missing security values must fail closed to none');
 
-const vlessRawConfigured={protocol:'vless',streamSettings:{network:'raw',security:'none',tlsSettings:{certificates:[cert]}}};
-assert.equal(normalize(vlessRawConfigured),true);
-assert.equal(vlessRawConfigured.streamSettings.security,'tls','VLESS RAW should reuse complete configured TLS material');
+assert.ok((listeners.change||[]).length>0,'Policy must observe Security selector changes');
+assert.match(source,/dataset\.field!=='security'/,'Policy must only react to the Security selector');
+assert.doesNotMatch(source,/field!=='protocol'/,'Protocol changes must not drive TLS activation');
+assert.doesNotMatch(source,/field!=='transport'/,'Transport changes must not drive TLS activation');
 
-const xdrive={protocol:'vless',streamSettings:{network:'xdrive',security:'tls',tlsSettings:{certificates:[cert]}}};
-assert.equal(normalize(xdrive),true);
-assert.equal(xdrive.streamSettings.security,'none','XDRIVE must disable stream TLS automatically');
-assert.deepEqual(xdrive.streamSettings.tlsSettings.certificates[0],cert,'Disabling TLS must not destroy reusable certificate paths');
-
-const socks={protocol:'socks',streamSettings:{network:'xhttp',security:'tls'}};
-assert.equal(normalize(socks),true);
-assert.equal(socks.streamSettings.network,'raw','SOCKS must normalize to RAW transport');
-assert.equal(socks.streamSettings.security,'none','SOCKS must not inherit public TLS mode');
-
-const hysteria={protocol:'hysteria',streamSettings:{network:'raw',security:'none',tlsSettings:{certificates:[]}}};
-assert.equal(normalize(hysteria),true);
-assert.equal(hysteria.streamSettings.network,'hysteria','Hysteria2 must select its native transport');
-assert.equal(hysteria.streamSettings.security,'tls','Hysteria2 must enable TLS automatically');
-assert.ok(hysteria.streamSettings.tlsSettings.alpn.includes('h3'),'Hysteria2 must ensure h3 ALPN');
-
-const masque={protocol:'masque',streamSettings:{network:'raw',security:'none'}};
-assert.equal(normalize(masque),true);
-assert.equal(masque.streamSettings.network,'masque','MASQUE must select its native transport');
-assert.equal(masque.streamSettings.security,'tls','MASQUE must enable TLS automatically');
-assert.ok(masque.streamSettings.tlsSettings.alpn.includes('h3'),'MASQUE must ensure h3 ALPN');
-
-console.log('XRAY STUDIO smart protocol/transport security policy: OK');
+console.log('XRAY STUDIO authoritative security/TLS activation policy: OK');
