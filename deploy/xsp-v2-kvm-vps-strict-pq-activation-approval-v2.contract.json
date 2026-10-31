@@ -3,7 +3,7 @@
   "approvalSchema": "xsp2-kvm-vps-strict-pq-activation-approval-2",
   "deploymentClass": "kvm-vps",
   "requiredRuntimeTarget": {
-    "nexusRuntimeRevision": "24e9468e4df29fbea8f214f9021da403bdd6dab0",
+    "nexusRuntimeRevision": "a1267ae186f74d5e21561e3b64fc7375d499132e",
     "nodeRevision": "64709ce8f5f0ce80e2c0bab59b4476347825e57c"
   },
   "nexusImageSha256Semantics": "sha256:<64hex> of canonical JSON manifest binding strict-signer, strict-c2c, strict-origin and strict-ingress production image IDs for the exact Nexus runtime revision",
