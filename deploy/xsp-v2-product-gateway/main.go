@@ -46,19 +46,19 @@ type releaseIdentity struct {
 }
 
 type enrollRequest struct {
-	Token                string          `json:"token"`
-	NodeID               int64           `json:"nodeId"`
-	Purpose              string          `json:"purpose"`
-	KeyEpoch             int64           `json:"keyEpoch"`
-	ChallengeHex          string          `json:"challengeHex"`
-	Ed25519KeyID          string          `json:"ed25519KeyId"`
-	MLDSA65KeyID          string          `json:"mldsa65KeyId"`
-	Ed25519PublicB64      string          `json:"ed25519PublicB64"`
-	MLDSA65PublicB64      string          `json:"mldsa65PublicB64"`
-	Ed25519SignatureB64   string          `json:"ed25519SignatureB64"`
-	MLDSA65SignatureB64   string          `json:"mldsa65SignatureB64"`
-	TLSPublicKeyB64       string          `json:"tlsPublicKeyB64"`
-	ReleaseIdentity       releaseIdentity `json:"releaseIdentity"`
+	Token               string          `json:"token"`
+	NodeID              int64           `json:"nodeId"`
+	Purpose             string          `json:"purpose"`
+	KeyEpoch            int64           `json:"keyEpoch"`
+	ChallengeHex        string          `json:"challengeHex"`
+	Ed25519KeyID        string          `json:"ed25519KeyId"`
+	MLDSA65KeyID        string          `json:"mldsa65KeyId"`
+	Ed25519PublicB64    string          `json:"ed25519PublicB64"`
+	MLDSA65PublicB64    string          `json:"mldsa65PublicB64"`
+	Ed25519SignatureB64 string          `json:"ed25519SignatureB64"`
+	MLDSA65SignatureB64 string          `json:"mldsa65SignatureB64"`
+	TLSPublicKeyB64     string          `json:"tlsPublicKeyB64"`
+	ReleaseIdentity     releaseIdentity `json:"releaseIdentity"`
 }
 
 type signatures struct {
@@ -67,24 +67,24 @@ type signatures struct {
 }
 
 type envelope struct {
-	Protocol      string     `json:"protocol"`
-	Suite         string     `json:"suite"`
-	Direction     uint8      `json:"direction"`
-	MessageType   string     `json:"messageType"`
-	IssuerID      string     `json:"issuerId"`
-	NodeID        int64      `json:"nodeId"`
-	Method        string     `json:"method"`
-	Path          string     `json:"path"`
-	Ed25519KeyID  string     `json:"ed25519KeyId"`
-	MLDSA65KeyID  string     `json:"mldsa65KeyId"`
-	KeyEpoch      int64      `json:"keyEpoch"`
-	IssuedAtMS    int64      `json:"issuedAtMs"`
-	ExpiresAtMS   int64      `json:"expiresAtMs"`
-	NonceHex      string     `json:"nonceHex"`
-	RequestID     string     `json:"requestId"`
-	Revision      string     `json:"revision"`
-	PayloadB64    string     `json:"payloadB64"`
-	Signatures    signatures `json:"signatures"`
+	Protocol     string     `json:"protocol"`
+	Suite        string     `json:"suite"`
+	Direction    uint8      `json:"direction"`
+	MessageType  string     `json:"messageType"`
+	IssuerID     string     `json:"issuerId"`
+	NodeID       int64      `json:"nodeId"`
+	Method       string     `json:"method"`
+	Path         string     `json:"path"`
+	Ed25519KeyID string     `json:"ed25519KeyId"`
+	MLDSA65KeyID string     `json:"mldsa65KeyId"`
+	KeyEpoch     int64      `json:"keyEpoch"`
+	IssuedAtMS   int64      `json:"issuedAtMs"`
+	ExpiresAtMS  int64      `json:"expiresAtMs"`
+	NonceHex     string     `json:"nonceHex"`
+	RequestID    string     `json:"requestId"`
+	Revision     string     `json:"revision"`
+	PayloadB64   string     `json:"payloadB64"`
+	Signatures   signatures `json:"signatures"`
 }
 
 type parsedEnvelope struct {
@@ -97,23 +97,20 @@ type parsedEnvelope struct {
 }
 
 type tunnelPayload struct {
-	Path      string `json:"path"`
-	BodyB64   string `json:"bodyB64"`
-	Timestamp int64  `json:"timestamp"`
-	Nonce     string `json:"nonce"`
-	Signature string `json:"signature"`
+	Path    string `json:"path"`
+	BodyB64 string `json:"bodyB64"`
 }
 
 type nodeIdentity struct {
-	State       string
-	KeyEpoch    int64
-	EdKeyID     string
-	PQKeyID     string
-	EdPublic    []byte
-	PQPublic    []byte
-	TLSSPKI     []byte
-	ReleaseRev  string
-	Receipt     []byte
+	State               string
+	KeyEpoch            int64
+	EdKeyID             string
+	PQKeyID             string
+	EdPublic            []byte
+	PQPublic            []byte
+	TLSSPKI             []byte
+	ReleaseRev          string
+	Receipt             []byte
 	ActivationRequestID string
 }
 
@@ -130,6 +127,7 @@ type gateway struct {
 	publicAddress string
 	serverName    string
 	panelURL      string
+	internalToken string
 	httpClient    *http.Client
 }
 
@@ -473,11 +471,11 @@ func newGateway(ctx context.Context) (*gateway, error) {
 	edPub := ed.Public().(ed25519.PublicKey)
 	pqPub := pq.PublicKey().Bytes()
 	pin := map[string]any{
-		"issuerId":          issuerID,
-		"ed25519KeyId":      fingerprint("ed-", edPub),
-		"mldsa65KeyId":      fingerprint("pq-", pqPub),
-		"ed25519PublicB64":  b64.EncodeToString(edPub),
-		"mldsa65PublicB64":  b64.EncodeToString(pqPub),
+		"issuerId":         issuerID,
+		"ed25519KeyId":     fingerprint("ed-", edPub),
+		"mldsa65KeyId":     fingerprint("pq-", pqPub),
+		"ed25519PublicB64": b64.EncodeToString(edPub),
+		"mldsa65PublicB64": b64.EncodeToString(pqPub),
 	}
 	address := os.Getenv("XSP_V2_PRODUCT_PUBLIC_ADDRESS")
 	if address == "" || strings.ContainsAny(address, "/@?#") {
@@ -491,12 +489,20 @@ func newGateway(ctx context.Context) (*gateway, error) {
 	if panelURL == "" {
 		panelURL = "http://panel:8080"
 	}
+	internalToken := os.Getenv("XSP_V2_PRODUCT_INTERNAL_TOKEN")
+	if len(internalToken) != 64 || strings.ToLower(internalToken) != internalToken {
+		return nil, errors.New("XSP_V2_PRODUCT_INTERNAL_TOKEN must be 64 lowercase hex characters")
+	}
+	if _, err := hex.DecodeString(internalToken); err != nil {
+		return nil, errors.New("XSP_V2_PRODUCT_INTERNAL_TOKEN is not hexadecimal")
+	}
 	return &gateway{
 		db: pool, panelEd: ed, panelPQ: pq,
 		panelEdID: fingerprint("ed-", edPub), panelPQID: fingerprint("pq-", pqPub), panelPin: pin,
 		clientCA: caCert, clientCAKey: caKey, serverCAPEM: serverCAPEM,
 		publicAddress: address, serverName: serverName, panelURL: strings.TrimRight(panelURL, "/"),
-		httpClient: &http.Client{Timeout: 20 * time.Second},
+		internalToken: internalToken,
+		httpClient:    &http.Client{Timeout: 20 * time.Second},
 	}, nil
 }
 
@@ -519,12 +525,12 @@ func (g *gateway) issueClientCertificate(nodeID int64, publicDER []byte) (string
 	}
 	now := time.Now().UTC()
 	tpl := &x509.Certificate{
-		SerialNumber: serial,
-		Subject:      pkix.Name{CommonName: fmt.Sprintf("xmesh-node-%d", nodeID)},
-		NotBefore:    now.Add(-5 * time.Minute),
-		NotAfter:     now.Add(397 * 24 * time.Hour),
-		KeyUsage:     x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		SerialNumber:          serial,
+		Subject:               pkix.Name{CommonName: fmt.Sprintf("xmesh-node-%d", nodeID)},
+		NotBefore:             now.Add(-5 * time.Minute),
+		NotAfter:              now.Add(397 * 24 * time.Hour),
+		KeyUsage:              x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 		BasicConstraintsValid: true,
 	}
 	der, err := x509.CreateCertificate(rand.Reader, tpl, g.clientCA, pub, g.clientCAKey)
@@ -819,12 +825,16 @@ func (g *gateway) activate(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusForbidden, "node is not eligible for activation")
 		return
 	}
-	receiptPayload, _ := json.Marshal(map[string]any{
+	receiptPayload, err := json.Marshal(map[string]any{
 		"schema": "xmesh-v6-strict-pq-activation-receipt-1", "nodeId": parsed.Env.NodeID,
 		"keyEpoch": parsed.Env.KeyEpoch, "requestBindingSha256": hex.EncodeToString(requestHash[:]),
 		"productionActivation": true, "strictPQEnabled": true, "automaticClassicalFallback": false,
 		"activatedAt": time.Now().UTC().Format(time.RFC3339Nano),
 	})
+	if err != nil {
+		fail(w, http.StatusInternalServerError, "cannot encode strict-PQ activation receipt")
+		return
+	}
 	receipt, err := g.signResponse(parsed.Env.NodeID, parsed.Env.KeyEpoch, "panel.product.activation-receipt", "/api/v2/product/activate", parsed.Env.RequestID, n.ReleaseRev, receiptPayload)
 	if err != nil {
 		fail(w, http.StatusServiceUnavailable, "cannot sign strict-PQ activation receipt")
@@ -861,10 +871,11 @@ func (g *gateway) activate(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusConflict, "strict-PQ activation replay rejected")
 		return
 	}
-	if _, err = tx.Exec(ctx,
+	result, err := tx.Exec(ctx,
 		"UPDATE node_xsp_product_nodes SET state='active',activation_request_id=$2,activation_request_sha256=$3,receipt_sha256=$4,receipt_envelope=$5,activated_at=NOW() WHERE node_id=$1 AND state='enrolled'",
-		parsed.Env.NodeID, parsed.Env.RequestID, requestHash[:], receiptHash[:], receipt); err != nil {
-		fail(w, http.StatusServiceUnavailable, "cannot persist strict-PQ activation")
+		parsed.Env.NodeID, parsed.Env.RequestID, requestHash[:], receiptHash[:], receipt)
+	if err != nil || result.RowsAffected() != 1 {
+		fail(w, http.StatusConflict, "strict-PQ activation state changed concurrently")
 		return
 	}
 	if _, err = tx.Exec(ctx, "UPDATE node_xsp_suite_state SET minimum_suite=2,activation_phase='strict',key_epoch=$2 WHERE node_id=$1", parsed.Env.NodeID, parsed.Env.KeyEpoch); err != nil {
@@ -882,16 +893,11 @@ func (g *gateway) activate(w http.ResponseWriter, r *http.Request) {
 }
 
 var allowedTunnelPaths = map[string]bool{
-	"/api/v1/metrics/ingest":     true,
-	"/api/v1/node/heartbeat":     true,
-	"/api/v1/node/restart/poll":  true,
-	"/api/v1/node/restart/ack":   true,
+	"/api/v1/metrics/ingest":      true,
+	"/api/v1/node/heartbeat":      true,
+	"/api/v1/node/restart/poll":   true,
+	"/api/v1/node/restart/ack":    true,
 	"/api/v1/node/desired-config": true,
-}
-
-func canonicalXMESH1(path string, nodeID, timestamp int64, nonce string, body []byte) string {
-	digest := sha256.Sum256(body)
-	return fmt.Sprintf("XMESH1\nPOST\n%s\n%d\n%d\n%s\n%s\n", path, nodeID, timestamp, nonce, hex.EncodeToString(digest[:]))
 }
 
 func (g *gateway) tunnel(w http.ResponseWriter, r *http.Request) {
@@ -925,32 +931,38 @@ func (g *gateway) tunnel(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusUnauthorized, "strict-PQ tunnel authentication failed")
 		return
 	}
+	if err := checkUniqueJSONKeys(parsed.Payload); err != nil {
+		fail(w, http.StatusBadRequest, "invalid strict-PQ tunnel payload")
+		return
+	}
 	var inner tunnelPayload
-	if err := json.Unmarshal(parsed.Payload, &inner); err != nil || !allowedTunnelPaths[inner.Path] {
+	decoder := json.NewDecoder(bytes.NewReader(parsed.Payload))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&inner); err != nil || !allowedTunnelPaths[inner.Path] {
 		fail(w, http.StatusBadRequest, "unregistered strict-PQ tunnel operation")
 		return
 	}
+	if err := decoder.Decode(new(any)); err != io.EOF {
+		fail(w, http.StatusBadRequest, "trailing strict-PQ tunnel payload")
+		return
+	}
 	body, err := decodeCanonicalB64(inner.BodyB64, -1, maxPayloadBytes)
-	if err != nil || len(inner.Nonce) != 32 || strings.ToLower(inner.Nonce) != inner.Nonce || len(inner.Signature) != 128 || strings.ToLower(inner.Signature) != inner.Signature {
-		fail(w, http.StatusBadRequest, "invalid inner request binding")
+	if err != nil {
+		fail(w, http.StatusBadRequest, "invalid tunneled request body")
 		return
 	}
-	innerNonce, err := hex.DecodeString(inner.Nonce)
-	if err != nil || len(innerNonce) != 16 || time.Now().Unix()-inner.Timestamp > 120 || inner.Timestamp-time.Now().Unix() > 120 {
-		fail(w, http.StatusUnauthorized, "stale inner request")
-		return
-	}
-	innerSig, err := hex.DecodeString(inner.Signature)
-	if err != nil || len(innerSig) != ed25519.SignatureSize || !ed25519.Verify(n.EdPublic, []byte(canonicalXMESH1(inner.Path, parsed.Env.NodeID, inner.Timestamp, inner.Nonce, body)), innerSig) {
-		fail(w, http.StatusUnauthorized, "inner Ed25519 binding rejected")
-		return
-	}
+
 	tx, err := g.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		fail(w, http.StatusServiceUnavailable, "database unavailable")
 		return
 	}
-	nonce, _ := hex.DecodeString(parsed.Env.NonceHex)
+	nonce, err := hex.DecodeString(parsed.Env.NonceHex)
+	if err != nil || len(nonce) != 16 {
+		_ = tx.Rollback(ctx)
+		fail(w, http.StatusBadRequest, "invalid strict-PQ replay nonce")
+		return
+	}
 	if _, err = tx.Exec(ctx, "INSERT INTO node_xsp_product_nonces(node_id,key_epoch,direction,nonce,request_id) VALUES($1,$2,1,$3,$4)", parsed.Env.NodeID, parsed.Env.KeyEpoch, nonce, parsed.Env.RequestID); err != nil {
 		_ = tx.Rollback(ctx)
 		fail(w, http.StatusConflict, "strict-PQ tunnel replay rejected")
@@ -967,9 +979,10 @@ func (g *gateway) tunnel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-XMesh-Timestamp", strconv.FormatInt(inner.Timestamp, 10))
-	req.Header.Set("X-XMesh-Nonce", inner.Nonce)
-	req.Header.Set("X-XMesh-Signature", inner.Signature)
+	req.Header.Set("Origin", g.panelURL)
+	req.Header.Set("X-XSP-Product-Internal", g.internalToken)
+	req.Header.Set("X-XSP-Product-Node-Id", strconv.FormatInt(parsed.Env.NodeID, 10))
+	req.Header.Set("X-XSP-Product-Path", inner.Path)
 	resp, err := g.httpClient.Do(req)
 	if err != nil {
 		fail(w, http.StatusBadGateway, "internal panel operation unavailable")
@@ -981,7 +994,11 @@ func (g *gateway) tunnel(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadGateway, "internal panel response invalid")
 		return
 	}
-	wrappedPayload, _ := json.Marshal(map[string]any{"status": resp.StatusCode, "bodyB64": b64.EncodeToString(responseBody)})
+	wrappedPayload, err := json.Marshal(map[string]any{"status": resp.StatusCode, "bodyB64": b64.EncodeToString(responseBody)})
+	if err != nil {
+		fail(w, http.StatusInternalServerError, "cannot encode strict-PQ panel response")
+		return
+	}
 	wrapped, err := g.signResponse(parsed.Env.NodeID, parsed.Env.KeyEpoch, "panel.product.tunnel-response", "/api/v2/product/tunnel", parsed.Env.RequestID, n.ReleaseRev, wrappedPayload)
 	if err != nil {
 		fail(w, http.StatusServiceUnavailable, "cannot dual-sign strict-PQ response")
@@ -1005,7 +1022,9 @@ func main() {
 	mux.HandleFunc("/enroll", g.enroll)
 	mux.HandleFunc("/activate", g.activate)
 	mux.HandleFunc("/tunnel", g.tunnel)
-	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) { writeJSON(w, http.StatusOK, map[string]any{"status": "strict-pq-ready"}) })
+	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{"status": "strict-pq-ready"})
+	})
 	server := &http.Server{
 		Addr:              ":8081",
 		Handler:           mux,
