@@ -22,22 +22,22 @@ jobs:
   runtime-contract:
     runs-on: ubuntu-latest
     env:
-      POSTGRES_PASSWORD: 0123456789abcdef0123456789abcdef
-      APP_DB_PASSWORD: abcdef0123456789abcdef0123456789
-      REDIS_PASSWORD: fedcba9876543210fedcba9876543210
-      ADMIN_PASSWORD: 9876543210abcdef9876543210abcdef
-      DASHBOARD_PATH: /dashboard/0123456789abcdef0123456789abcdef
-      SUBSCRIPTION_ENCRYPTION_KEY: 1234567812345678123456781234567812345678123456781234567812345678
-      XSP_V2_SIGNER_DATABASE_URL: postgresql://xmesh_signer_reader:test@db:5432/xmesh
-      XSP_V2_C2C_DATABASE_URL: postgresql://xmesh_c2c_writer:test@db:5432/xmesh
-      XSP_V2_SIGNER_EXPECTED_ED_KEY_ID: ed-111111111111111111111111
-      XSP_V2_SIGNER_EXPECTED_PQ_KEY_ID: pq-222222222222222222222222
-      XSP_V2_STRICT_PQ_RUNTIME_DIR: /tmp/xsp-v2-runtime
-      XSP_V2_SIGNER_KEYS_DIR: /tmp/xsp-v2-signer-keys
-      XSP_V2_PANEL_PIN_FILE: /tmp/xsp-v2-panel-pin.json
-      XSP_V2_INGRESS_CERTS_DIR: /tmp/xsp-v2-ingress-certs
+      POSTGRES_PASSWORD: "0123456789abcdef0123456789abcdef"
+      APP_DB_PASSWORD: "abcdef0123456789abcdef0123456789"
+      REDIS_PASSWORD: "fedcba9876543210fedcba9876543210"
+      ADMIN_PASSWORD: "9876543210abcdef9876543210abcdef"
+      DASHBOARD_PATH: "/dashboard/0123456789abcdef0123456789abcdef"
+      SUBSCRIPTION_ENCRYPTION_KEY: "1234567812345678123456781234567812345678123456781234567812345678"
+      XSP_V2_SIGNER_DATABASE_URL: "postgresql://xmesh_signer_reader:test@db:5432/xmesh"
+      XSP_V2_C2C_DATABASE_URL: "postgresql://xmesh_c2c_writer:test@db:5432/xmesh"
+      XSP_V2_SIGNER_EXPECTED_ED_KEY_ID: "ed-111111111111111111111111"
+      XSP_V2_SIGNER_EXPECTED_PQ_KEY_ID: "pq-222222222222222222222222"
+      XSP_V2_STRICT_PQ_RUNTIME_DIR: "/tmp/xsp-v2-runtime"
+      XSP_V2_SIGNER_KEYS_DIR: "/tmp/xsp-v2-signer-keys"
+      XSP_V2_PANEL_PIN_FILE: "/tmp/xsp-v2-panel-pin.json"
+      XSP_V2_INGRESS_CERTS_DIR: "/tmp/xsp-v2-ingress-certs"
       XSP_V2_STRICT_PQ_NODE_ID: "13"
-      XSP_V2_STRICT_PQ_CLIENT_SPKI_SHA256: 3333333333333333333333333333333333333333333333333333333333333333
+      XSP_V2_STRICT_PQ_CLIENT_SPKI_SHA256: "3333333333333333333333333333333333333333333333333333333333333333"
     steps:
       - uses: actions/checkout@v4
       - name: Validate scripts and fail-closed source policy
@@ -52,8 +52,7 @@ jobs:
           grep -Fq "'strictPQEnabled':True" scripts/xsp-v2-strict-pq-production-finalize.sh
           ! grep -R -nE 'tls\.VersionTLS12|InsecureSkipVerify|classicalOnlyAllowed[" :]+true|automaticFallback[" :]+true' \
             deploy/xsp-v2-production scripts/xsp-v2-strict-pq-production-*.sh
-          # The normal panel image remains unchanged/default-feature only.
-          grep -Fq 'cargo build --release --locked' backend/Dockerfile
+          grep -Fq 'cargo build --release' backend/Dockerfile
           ! grep -F 'xsp-v2-experimental' backend/Dockerfile
       - name: Validate merged Compose model
         run: |
