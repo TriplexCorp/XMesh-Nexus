@@ -99,14 +99,25 @@ async fn patch_response_fingerprint(
         return Ok(response);
     }
     let (mut parts, body) = response.into_parts();
-    let bytes = to_bytes(body, 16 * 1024 * 1024)
-        .await
-        .map_err(|_| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Subscription body unavailable"))?;
-    let mut value: Value = serde_json::from_slice(&bytes)
-        .map_err(|_| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Subscription JSON unavailable"))?;
+    let bytes = to_bytes(body, 16 * 1024 * 1024).await.map_err(|_| {
+        ApiError::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Subscription body unavailable",
+        )
+    })?;
+    let mut value: Value = serde_json::from_slice(&bytes).map_err(|_| {
+        ApiError::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Subscription JSON unavailable",
+        )
+    })?;
     apply_fingerprint(&mut value, &fingerprint);
-    let rendered = serde_json::to_vec(&value)
-        .map_err(|_| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "Subscription JSON unavailable"))?;
+    let rendered = serde_json::to_vec(&value).map_err(|_| {
+        ApiError::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Subscription JSON unavailable",
+        )
+    })?;
     parts.headers.remove(header::CONTENT_LENGTH);
     Ok(Response::from_parts(parts, Body::from(rendered)))
 }
@@ -146,13 +157,8 @@ pub async fn portal_route(
         .map(|(_, token)| token.to_owned())
         .unwrap_or_default();
     let fingerprint = token_fingerprint(&state, &token).await?;
-    let response = base::portal_route(
-        State(state),
-        OriginalUri(uri),
-        headers,
-        Query(options),
-    )
-    .await?;
+    let response =
+        base::portal_route(State(state), OriginalUri(uri), headers, Query(options)).await?;
     patch_response_fingerprint(response, fingerprint).await
 }
 
@@ -171,8 +177,18 @@ mod tests {
             ]
         });
         apply_fingerprint(&mut feed, "safari");
-        assert_eq!(feed["outbounds"][0]["streamSettings"]["tlsSettings"]["fingerprint"], "safari");
-        assert_eq!(feed["outbounds"][1]["streamSettings"]["realitySettings"]["fingerprint"], "safari");
-        assert!(feed["outbounds"][2]["streamSettings"].get("fingerprint").is_none());
+        assert_eq!(
+            feed["outbounds"][0]["streamSettings"]["tlsSettings"]["fingerprint"],
+            "safari"
+        );
+        assert_eq!(
+            feed["outbounds"][1]["streamSettings"]["realitySettings"]["fingerprint"],
+            "safari"
+        );
+        assert!(
+            feed["outbounds"][2]["streamSettings"]
+                .get("fingerprint")
+                .is_none()
+        );
     }
 }
