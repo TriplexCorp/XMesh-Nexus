@@ -1,0 +1,88 @@
+name: XSP-v2 Strict-PQ Production Runtime
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "deploy/xsp-v2-production/**"
+      - "scripts/xsp-v2-strict-pq-production-*.sh"
+      - ".github/workflows/xsp-v2-strict-pq-production-runtime.yml"
+  push:
+    branches: [main]
+    paths:
+      - "deploy/xsp-v2-production/**"
+      - "scripts/xsp-v2-strict-pq-production-*.sh"
+      - ".github/workflows/xsp-v2-strict-pq-production-runtime.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-contract:
+    runs-on: ubuntu-latest
+    env:
+      POSTGRES_PASSWORD: 0123456789abcdef0123456789abcdef
+      APP_DB_PASSWORD: abcdef0123456789abcdef0123456789
+      REDIS_PASSWORD: fedcba9876543210fedcba9876543210
+      ADMIN_PASSWORD: 9876543210abcdef9876543210abcdef
+      DASHBOARD_PATH: /dashboard/0123456789abcdef0123456789abcdef
+      SUBSCRIPTION_ENCRYPTION_KEY: 1234567812345678123456781234567812345678123456781234567812345678
+      XSP_V2_SIGNER_DATABASE_URL: postgresql://xmesh_signer_reader:test@db:5432/xmesh
+      XSP_V2_C2C_DATABASE_URL: postgresql://xmesh_c2c_writer:test@db:5432/xmesh
+      XSP_V2_SIGNER_EXPECTED_ED_KEY_ID: ed-111111111111111111111111
+      XSP_V2_SIGNER_EXPECTED_PQ_KEY_ID: pq-222222222222222222222222
+      XSP_V2_STRICT_PQ_RUNTIME_DIR: /tmp/xsp-v2-runtime
+      XSP_V2_SIGNER_KEYS_DIR: /tmp/xsp-v2-signer-keys
+      XSP_V2_PANEL_PIN_FILE: /tmp/xsp-v2-panel-pin.json
+      XSP_V2_INGRESS_CERTS_DIR: /tmp/xsp-v2-ingress-certs
+      XSP_V2_STRICT_PQ_NODE_ID: "13"
+      XSP_V2_STRICT_PQ_CLIENT_SPKI_SHA256: 3333333333333333333333333333333333333333333333333333333333333333
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate scripts and fail-closed source policy
+        run: |
+          set -Eeuo pipefail
+          bash -n scripts/xsp-v2-strict-pq-production-execute.sh
+          bash -n scripts/xsp-v2-strict-pq-production-finalize.sh
+          bash -n scripts/xsp-v2-strict-pq-production-rollback.sh
+          grep -Fq 'profiles: ["xsp-v2-strict-pq"]' deploy/xsp-v2-production/compose.strict-pq.yaml
+          grep -Fq 'XSP_V2_C2D_TEST_FAULT: ""' deploy/xsp-v2-production/compose.strict-pq.yaml
+          grep -Fq 'automaticFallback' scripts/xsp-v2-strict-pq-production-rollback.sh
+          grep -Fq "'strictPQEnabled':True" scripts/xsp-v2-strict-pq-production-finalize.sh
+          ! grep -R -nE 'tls\.VersionTLS12|InsecureSkipVerify|classicalOnlyAllowed[" :]+true|automaticFallback[" :]+true' \
+            deploy/xsp-v2-production scripts/xsp-v2-strict-pq-production-*.sh
+          # The normal panel image remains unchanged/default-feature only.
+          grep -Fq 'cargo build --release --locked' backend/Dockerfile
+          ! grep -F 'xsp-v2-experimental' backend/Dockerfile
+      - name: Validate merged Compose model
+        run: |
+          set -Eeuo pipefail
+          mkdir -p "$XSP_V2_STRICT_PQ_RUNTIME_DIR" "$XSP_V2_SIGNER_KEYS_DIR" "$XSP_V2_INGRESS_CERTS_DIR"
+          : > "$XSP_V2_PANEL_PIN_FILE"
+          docker compose -f compose.yaml -f deploy/xsp-v2-production/compose.strict-pq.yaml \
+            --profile xsp-v2-strict-pq config --format json > /tmp/compose.json
+          python3 - <<'PY'
+          import json
+          c=json.load(open('/tmp/compose.json'))
+          s=c['services']
+          required={'xsp-v2-strict-signer','xsp-v2-strict-c2c','xsp-v2-strict-origin','xsp-v2-strict-ingress'}
+          assert required <= set(s)
+          exposed=[]
+          for name in required:
+              assert s[name].get('read_only') is True
+              assert 'ALL' in s[name].get('cap_drop',[])
+              assert 'no-new-privileges:true' in s[name].get('security_opt',[])
+              if s[name].get('ports'): exposed.append(name)
+          assert exposed==['xsp-v2-strict-ingress'], exposed
+          origin=s['xsp-v2-strict-origin']['environment']
+          assert origin['XSP_V2_C2D_TEST_FAULT']==''
+          assert origin['XSP_EXPECTED_NODE_ID']=='13'
+          assert s['xsp-v2-strict-ingress']['ports'][0]['target']==8444
+          PY
+      - name: Build isolated strict-PQ runtime images
+        run: |
+          set -Eeuo pipefail
+          docker compose -f compose.yaml -f deploy/xsp-v2-production/compose.strict-pq.yaml \
+            --profile xsp-v2-strict-pq build \
+            xsp-v2-strict-signer xsp-v2-strict-c2c xsp-v2-strict-origin xsp-v2-strict-ingress
