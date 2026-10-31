@@ -163,7 +163,12 @@ pub async fn request_restart(
     .bind(&actor.username)
     .fetch_optional(&state.pool)
     .await?
-    .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Узел уже выполняет команду управления."))?;
+    .ok_or_else(|| {
+        ApiError::new(
+            StatusCode::CONFLICT,
+            "Узел уже выполняет команду управления.",
+        )
+    })?;
     crate::audit(
         &state.pool,
         &actor.username,
@@ -173,7 +178,10 @@ pub async fn request_restart(
         json!({"commandId":id}),
     )
     .await;
-    Ok((StatusCode::ACCEPTED, Json(json!({"id":id,"nodeId":node_id,"state":"pending"}))))
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(json!({"id":id,"nodeId":node_id,"state":"pending"})),
+    ))
 }
 
 /// v6 shadow for fixed, allow-listed Xray release updates. Request shape stays
@@ -203,7 +211,10 @@ pub async fn request_xray_update(
             .bytes()
             .all(|c| c.is_ascii_alphanumeric() || b"._+-".contains(&c))
     {
-        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Некорректная версия Xray"));
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Некорректная версия Xray",
+        ));
     }
     let releases = state
         .core
@@ -251,7 +262,12 @@ pub async fn request_xray_update(
     .bind(target)
     .fetch_optional(&state.pool)
     .await?
-    .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Узел уже выполняет команду управления."))?;
+    .ok_or_else(|| {
+        ApiError::new(
+            StatusCode::CONFLICT,
+            "Узел уже выполняет команду управления.",
+        )
+    })?;
     crate::audit(
         &state.pool,
         &actor.username,
@@ -263,7 +279,9 @@ pub async fn request_xray_update(
     .await;
     Ok((
         StatusCode::ACCEPTED,
-        Json(json!({"id":id,"nodeId":node_id,"action":"update_xray","targetVersion":target,"state":"pending"})),
+        Json(
+            json!({"id":id,"nodeId":node_id,"action":"update_xray","targetVersion":target,"state":"pending"}),
+        ),
     ))
 }
 
@@ -277,7 +295,10 @@ pub async fn request_agent_update(
     Json(body): Json<Value>,
 ) -> Result<(StatusCode, Json<Value>), ApiError> {
     let Some(object) = body.as_object() else {
-        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid Agent update request"));
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Invalid Agent update request",
+        ));
     };
     if !object.is_empty() {
         let parsed: staged::AgentUpdateRequest = serde_json::from_value(body)
@@ -341,7 +362,12 @@ pub async fn request_agent_update(
     .bind(CONTROL_AGENT_VERSION)
     .fetch_optional(&state.pool)
     .await?
-    .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Узел уже выполняет другую команду управления."))?;
+    .ok_or_else(|| {
+        ApiError::new(
+            StatusCode::CONFLICT,
+            "Узел уже выполняет другую команду управления.",
+        )
+    })?;
     crate::audit(
         &state.pool,
         &actor.username,
