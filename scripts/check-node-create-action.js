@@ -25,8 +25,6 @@ for(const selector of [
  '.nodes-toolbar .node-create-action:hover{',
  '.nodes-toolbar .node-create-action:focus-visible{'
 ])assert(css.includes(selector),'Missing action styling: '+selector);
-// A missing CSS semicolon silently invalidates the configured radius and the
-// following background declaration. Validate the *full* button declaration.
 const nodeActionRule=css.match(/\.nodes-toolbar \.node-create-action\{([^}]*)\}/s);
 assert(nodeActionRule,'Missing New Node CSS rule');
 assert.match(nodeActionRule[1],/border-radius:\s*var\(--ui-control-radius\)\s*;/,
@@ -50,16 +48,18 @@ assert.match(html,/styles\.css\?v=[a-z0-9-]+/,'Update CSS cache');
 assert.match(html,/app\.js\?v=[a-z0-9-]+/,'Update JS cache');
 
 // XMesh v6 security invariant: the UI must override the historical installer
-// handler and pin the reviewed strict-PQ-only Node merge. The Node bootstrap
+// handler and pin the reviewed strict-PQ-only Node release. The Node bootstrap
 // itself blocks router/Xray startup until a durable verified receipt exists.
 assert.match(html,/<script src="node-bootstrap-v6\.js\?v=20261031-strict-pq-only"><\/script>/,
  'Panel must load the strict-PQ bootstrap override after app.js');
 assert.ok(html.indexOf('app.js?v=')<html.indexOf('node-bootstrap-v6.js?v='),
  'Strict-PQ bootstrap override must load after the historical app handler');
-assert.match(strictBootstrap,/XMESH_V6_NODE_BOOTSTRAP_SHA='fdfcdf915810018e7017f6706ad63c51181fa7c6'/,
- 'Fresh Node installation must pin the reviewed XMesh-Node strict-PQ-only merge');
+assert.match(strictBootstrap,/XMESH_V6_NODE_BOOTSTRAP_SHA='7b6ec04d7dfe6e9b785f9988b5c43afb64499456'/,
+ 'Fresh Node installation must pin the reviewed XMesh-Node strict-PQ-only release');
 assert.match(strictBootstrap,/XMesh Node v6 fresh installer\. Security invariant:/,
  'The downloaded installer must be marker-checked as the v6 fail-closed bootstrap');
+assert.match(strictBootstrap,/sudo env XMESH_NODE_RELEASE_REF='\+XMESH_V6_NODE_BOOTSTRAP_SHA\+' bash \/tmp\/xmesh-bootstrap-v6\.sh/,
+ 'Panel command must make the reviewed release SHA authoritative inside bootstrap checkout');
 assert.match(strictBootstrap,/document\.addEventListener\('click',xmeshV6StrictPqBootstrapClick,true\)/,
  'Strict-PQ handler must capture the bootstrap click before the historical handler');
 assert.match(strictBootstrap,/\/api\/v1\/nodes\/'\+encodeURIComponent\(id\)\+'\/enrollment'/,
@@ -74,4 +74,4 @@ assert.match(dockerfile,/app\.js node-bootstrap-v6\.js unified-selects\.js/,
 assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length,'CSS braces must remain balanced');
 new Function(app);
 new Function(strictBootstrap);
-console.log('Node action: visuals + pinned v6 strict-PQ-only bootstrap contract OK');
+console.log('Node action: visuals + exact-release v6 strict-PQ-only bootstrap contract OK');
