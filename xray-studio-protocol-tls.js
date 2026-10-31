@@ -12,6 +12,7 @@
  let pending=null;
  const snapshots=new WeakMap();
  const rewriting=new WeakSet();
+ const forceNextRandomization=new WeakSet();
  const URL_SAFE='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 
  const FRAGMENT_DEFAULT={packets:'tlshello',lengths:['3-5','6-8','10-20'],delays:['10-20'],maxSplit:'3-6'};
@@ -125,7 +126,7 @@
   layer.settings=factory();
   return true;
  }
- function randomizeInbound(inbound,previous){
+ function randomizeInbound(inbound,previous,forceXhttp=false){
   if(!inbound||typeof inbound!=='object')return false;
   let changed=false;
   const stream=inbound.streamSettings??=( {} );
@@ -138,7 +139,7 @@
    const path=String(xhttp.path||'');
    const beforePath=String(beforeStream.xhttpSettings?.path||'');
    const becameXhttp=beforeNetwork!=='xhttp';
-   const generatedPlaceholder=(!path||path==='/xhttp')&&(becameXhttp||beforePath!==path);
+   const generatedPlaceholder=(!path||path==='/xhttp')&&(forceXhttp||becameXhttp||beforePath!==path);
    if(generatedPlaceholder){xhttp.path=randomXhttpPath();changed=true}
   }
 
@@ -153,11 +154,11 @@
   changed=changedLayerSettings(finalmask,beforeFinalmask,'udp','header-custom',UDP_HEADER_DEFAULT,randomUdpHeaderSettings)||changed;
   return changed;
  }
- function randomizeDocument(doc,previous){
+ function randomizeDocument(doc,previous,forceXhttp=false){
   if(!doc||typeof doc!=='object'||!Array.isArray(doc.inbounds))return false;
   let changed=false;
   doc.inbounds.forEach((inbound,index)=>{
-   changed=randomizeInbound(inbound,findPreviousInbound(previous,inbound,index))||changed;
+   changed=randomizeInbound(inbound,findPreviousInbound(previous,inbound,index),forceXhttp)||changed;
   });
   return changed;
  }
@@ -167,7 +168,10 @@
  }
  function seedFromNode(node){
   const root=studioRoot(node);if(!root)return;
-  seedSource(sourceOf(root));
+  const source=sourceOf(root);
+  seedSource(source);
+  const trigger=node?.closest?.('[data-compose-apply],[data-tool="inbound"],[data-tool="xhttp"]');
+  if(trigger&&source)forceNextRandomization.add(source);
  }
  function seedAll(){
   if(typeof document.querySelectorAll!=='function')return;
@@ -176,8 +180,10 @@
  function applyRandomization(source){
   let doc;try{doc=JSON.parse(source.value)}catch{return false}
   const previous=snapshots.get(source);
+  const forceXhttp=forceNextRandomization.has(source);
+  if(forceXhttp)forceNextRandomization.delete(source);
   if(!previous){snapshots.set(source,clone(doc));return false}
-  const changed=randomizeDocument(doc,previous);
+  const changed=randomizeDocument(doc,previous,forceXhttp);
   snapshots.set(source,clone(doc));
   if(!changed)return false;
   source.value=JSON.stringify(doc,null,2);
