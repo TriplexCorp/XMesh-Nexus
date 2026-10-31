@@ -44,12 +44,20 @@ jobs:
         run: |
           set -Eeuo pipefail
           bash -n scripts/xsp-v2-strict-pq-production-execute.sh
+          bash -n scripts/xsp-v2-strict-pq-production-execute-v2.sh
           bash -n scripts/xsp-v2-strict-pq-production-finalize.sh
           bash -n scripts/xsp-v2-strict-pq-production-rollback.sh
           grep -Fq 'profiles: ["xsp-v2-strict-pq"]' deploy/xsp-v2-production/compose.strict-pq.yaml
           grep -Fq 'XSP_V2_C2D_TEST_FAULT: ""' deploy/xsp-v2-production/compose.strict-pq.yaml
           grep -Fq 'automaticFallback' scripts/xsp-v2-strict-pq-production-rollback.sh
           grep -Fq "'strictPQEnabled':True" scripts/xsp-v2-strict-pq-production-finalize.sh
+          grep -Fq 'exec bash "$ROOT/scripts/xsp-v2-strict-pq-production-execute.sh"' scripts/xsp-v2-strict-pq-production-execute-v2.sh
+          grep -Fq 'install -d -o root -g 10001 -m 0750 "$RUNTIME_DIR/c2c-public"' scripts/xsp-v2-strict-pq-production-execute.sh
+          grep -Fq 'install -d -o root -g 10003 -m 0750 "$RUNTIME_DIR/ingress-certs"' scripts/xsp-v2-strict-pq-production-execute.sh
+          grep -Fq 'os.open(os.path.dirname(path),os.O_RDONLY)' scripts/xsp-v2-strict-pq-production-execute.sh
+          grep -Fq 'os.open(os.path.dirname(out),os.O_RDONLY)' scripts/xsp-v2-strict-pq-production-finalize.sh
+          grep -Fq 'os.open(os.path.dirname(out),os.O_RDONLY)' scripts/xsp-v2-strict-pq-production-rollback.sh
+          ! grep -R -nF 'with open(os.path.dirname(' scripts/xsp-v2-strict-pq-production-*.sh
           ! grep -R -nE 'tls\.VersionTLS12|InsecureSkipVerify|classicalOnlyAllowed[" :]+true|automaticFallback[" :]+true' \
             deploy/xsp-v2-production scripts/xsp-v2-strict-pq-production-*.sh
           grep -Fq 'cargo build --release' backend/Dockerfile
