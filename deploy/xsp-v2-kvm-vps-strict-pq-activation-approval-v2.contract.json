@@ -6,6 +6,18 @@
     "nexusRuntimeRevision": "a1267ae186f74d5e21561e3b64fc7375d499132e",
     "nodeRevision": "64709ce8f5f0ce80e2c0bab59b4476347825e57c"
   },
+  "requiredCandidateBindings": {
+    "nexusImageSha256": "sha256:af27a110220f98880dc539141d614683741a05fbd3afd30792819b3192b9ef45",
+    "agentArtifactSha256": "a5f8e739b381640e4ac1d632dfef47d879ebc4c6ce7c4fbd8fab5744ad9cdd63"
+  },
+  "requiredEvidenceHashes": {
+    "aiAssistedSecurityReviewResultSha256": "2efb039f6581eb50b52c3b0f34c2d44cc320fbf2e1883f472e047746cfcba1a5",
+    "kvmVpsDurabilityResultSha256": "fd8ef8e680e999bb95ef5b081806eb24a32f1537a7d1f6cd678ecd41591c6a0f",
+    "providerStorageRiskAcceptanceSha256": "49a311a8bf871c6afcaa5841622b9f1e28e74675452671abc4e970f644dec604",
+    "finalCanaryResultSha256": "ef8beb21746890ad5169b71e7a8d937b6043519513e6381471c0f6d11d62f287",
+    "rolloutPlanSha256": "7ce7a159b2851dd1a55f5f2810d43aeaf5a70e73dc4e0f886c975f55b2f65364",
+    "rolloutPlanReviewSha256": "93ee69fe8caca8846368865cf8d141ab96cf6e521f2cce5dd4c4559fdbc91585"
+  },
   "nexusImageSha256Semantics": "legacy field name: sha256:<64hex> of canonical xsp2-production-runtime-build-manifest-1 JSON binding exact Nexus revision, strict-signer/c2c/origin/ingress Docker build recipes, production overlay and ingress configuration; it is not a host-specific Docker layer/image ID",
   "requiredAssuranceModel": "ai-assisted-internal-plus-release-owner-risk-acceptance",
   "allowedScopeModes": ["limited-canary", "phased"],

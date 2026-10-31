@@ -1,0 +1,53 @@
+{
+  "schema": "xsp2-kvm-vps-strict-pq-activation-approval-2",
+  "deploymentClass": "kvm-vps",
+  "releaseCandidate": {
+    "nexusRuntimeRevision": "a1267ae186f74d5e21561e3b64fc7375d499132e",
+    "nodeRevision": "64709ce8f5f0ce80e2c0bab59b4476347825e57c",
+    "nexusImageSha256": "sha256:af27a110220f98880dc539141d614683741a05fbd3afd30792819b3192b9ef45",
+    "agentArtifactSha256": "a5f8e739b381640e4ac1d632dfef47d879ebc4c6ce7c4fbd8fab5744ad9cdd63"
+  },
+  "evidence": {
+    "aiAssistedSecurityReviewAccepted": true,
+    "aiAssistedSecurityReviewResultSha256": "2efb039f6581eb50b52c3b0f34c2d44cc320fbf2e1883f472e047746cfcba1a5",
+    "kvmVpsDurabilityQualificationAccepted": true,
+    "kvmVpsDurabilityResultSha256": "fd8ef8e680e999bb95ef5b081806eb24a32f1537a7d1f6cd678ecd41591c6a0f",
+    "providerStorageRiskAccepted": true,
+    "providerStorageRiskAcceptanceSha256": "49a311a8bf871c6afcaa5841622b9f1e28e74675452671abc4e970f644dec604",
+    "finalCanaryPassed": true,
+    "finalCanaryResultSha256": "ef8beb21746890ad5169b71e7a8d937b6043519513e6381471c0f6d11d62f287",
+    "rolloutPlanReviewed": true,
+    "rolloutPlanSha256": "7ce7a159b2851dd1a55f5f2810d43aeaf5a70e73dc4e0f886c975f55b2f65364",
+    "rolloutPlanReviewSha256": "93ee69fe8caca8846368865cf8d141ab96cf6e521f2cce5dd4c4559fdbc91585"
+  },
+  "scope": {
+    "mode": "limited-canary",
+    "nodes": ["node-13"],
+    "validFrom": "2026-10-31T12:43:00+03:00",
+    "validUntil": "2026-11-01T11:43:00+03:00"
+  },
+  "transportPolicy": {
+    "tlsProtocols": ["TLSv1.3"],
+    "keyExchange": "X25519MLKEM768",
+    "clientIdentity": "ML-DSA-65",
+    "criticalMessageSignatures": ["Ed25519", "ML-DSA-65"],
+    "automaticFallback": false,
+    "classicalOnlyAllowed": false
+  },
+  "decision": {
+    "strictPqAction": "enable",
+    "legacyXMESH1Action": "retain"
+  },
+  "approval": {
+    "authority": "release-owner",
+    "approvedBy": "Triplex",
+    "approvedAt": "2026-10-31T12:43:33+03:00",
+    "statement": "Authorize bounded production strict-PQ execution for Node 13 only against the exact reviewed and canaried runtime. Require TLS 1.3 X25519MLKEM768, ML-DSA-65 client identity, Ed25519 plus ML-DSA-65 critical signatures, no automatic or classical-only fallback, exact artifact/evidence hashes, verified receipt finalization, and retained XMESH1."
+  },
+  "claims": {
+    "productionActivation": false,
+    "strictPQEnabled": false,
+    "legacyXMESH1Retired": false,
+    "physicalPowerLossQualified": false
+  }
+}

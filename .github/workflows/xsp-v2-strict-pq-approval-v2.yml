@@ -1,0 +1,63 @@
+name: XSP-v2 Strict-PQ Approval v2
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "deploy/xsp-v2-kvm-vps-strict-pq-activation-approval-v2*"
+      - "scripts/verify-xsp-v2-kvm-vps-strict-pq-activation-approval-v2*.py"
+      - "scripts/xsp-v2-strict-pq-production-execute-v2.sh"
+      - ".github/workflows/xsp-v2-strict-pq-approval-v2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-approval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify exact pinned approval and current Node 13 scope
+        run: |
+          set -Eeuo pipefail
+          bash -n scripts/xsp-v2-strict-pq-production-execute-v2.sh
+          python3 -m py_compile scripts/verify-xsp-v2-kvm-vps-strict-pq-activation-approval-v2.py
+          python3 -m py_compile scripts/verify-xsp-v2-kvm-vps-strict-pq-activation-approval-v2-pinned.py
+          python3 scripts/verify-xsp-v2-kvm-vps-strict-pq-activation-approval-v2-pinned.py \
+            --approval deploy/xsp-v2-kvm-vps-strict-pq-activation-approval-v2.json \
+            --require-current-window --require-node 13 | tee /tmp/approval-verification.json
+          python3 - <<'PY'
+          import json
+          v=json.load(open('/tmp/approval-verification.json'))
+          assert v['status']=='kvm-vps-strict-pq-approval-eligible'
+          assert v['nodeCount']==1
+          assert v['strictPqAction']=='enable'
+          assert v['legacyXMESH1Action']=='retain'
+          assert v['productionActivation'] is False
+          assert v['strictPQEnabled'] is False
+          assert v['physicalPowerLossQualified'] is False
+          assert v['requiresSeparateExecution'] is True
+          PY
+          sha256sum deploy/xsp-v2-kvm-vps-strict-pq-activation-approval-v2.json
+      - name: Prove candidate evidence scope and fallback substitution fail closed
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import copy,json
+          p='deploy/xsp-v2-kvm-vps-strict-pq-activation-approval-v2.json'
+          x=json.load(open(p))
+          cases={}
+          a=copy.deepcopy(x);a['releaseCandidate']['agentArtifactSha256']='f'*64;cases['agent']=a
+          a=copy.deepcopy(x);a['releaseCandidate']['nexusImageSha256']='sha256:'+'e'*64;cases['bundle']=a
+          a=copy.deepcopy(x);a['evidence']['finalCanaryResultSha256']='d'*64;cases['canary']=a
+          a=copy.deepcopy(x);a['evidence']['rolloutPlanReviewSha256']='c'*64;cases['rollout']=a
+          a=copy.deepcopy(x);a['scope']['nodes']=['node-14'];cases['scope']=a
+          a=copy.deepcopy(x);a['transportPolicy']['automaticFallback']=True;cases['fallback']=a
+          for name,value in cases.items():
+              json.dump(value,open('/tmp/bad-'+name+'.json','w'))
+          PY
+          for name in agent bundle canary rollout scope fallback; do
+            ! python3 scripts/verify-xsp-v2-kvm-vps-strict-pq-activation-approval-v2-pinned.py \
+              --approval "/tmp/bad-$name.json" --require-current-window --require-node 13
+          done

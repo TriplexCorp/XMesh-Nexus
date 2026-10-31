@@ -10,8 +10,12 @@ command -v git >/dev/null; command -v python3 >/dev/null
 
 RUNTIME_REVISION=a1267ae186f74d5e21561e3b64fc7375d499132e
 NODE_REVISION=64709ce8f5f0ce80e2c0bab59b4476347825e57c
+PINNED_VERIFIER="$ROOT/scripts/verify-xsp-v2-kvm-vps-strict-pq-activation-approval-v2-pinned.py"
+[[ -f "$PINNED_VERIFIER" ]] || { echo 'pinned strict-PQ approval verifier missing' >&2; exit 1; }
 
 cd "$ROOT"
+python3 "$PINNED_VERIFIER" --approval "$APPROVAL" --require-current-window --require-node 13 >/dev/null
+
 git cat-file -e "$RUNTIME_REVISION^{commit}"
 # Later release-control/tooling commits are allowed, but production runtime
 # source/build inputs must remain byte-identical to the frozen target.
