@@ -12,8 +12,11 @@ use sqlx::Row;
 use std::collections::HashMap;
 
 // The complete subscription generator remains in the delegated base module.
-// Static contract markers owned there include subscriptionClientLinks,
-// subscriptionPath and include_str!("subscription_template.html").
+// Static contracts owned by that base/template include subscriptionClientLinks,
+// subscriptionPath, include_str!("subscription_template.html"), and the live
+// portal classes subscription-preview subscription-preview-brand
+// subscription-preview-hero subscription-preview-meta subscription-preview-progress
+// subscription-preview-cta subscription-preview-quick subscription-preview-support.
 #[path = "user_subscriptions_base.rs"]
 mod base;
 
