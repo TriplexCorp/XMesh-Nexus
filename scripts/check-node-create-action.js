@@ -68,8 +68,8 @@ assert.match(strictBootstrap,/enrollPath\+'\/reissue'/,
  'Explicit owner-approved recovery must remain available without silent key replacement');
 assert.match(strictBootstrap,/Node\/Xray не запустятся без подтверждённой strict-PQ активации/,
  'UI must state the fail-closed runtime invariant');
-assert.match(dockerfile,/app\.js node-bootstrap-v6\.js unified-selects\.js/,
- 'Production panel image must package the strict-PQ bootstrap override');
+assert.match(dockerfile,/app\.js user-fingerprint-override\.js node-bootstrap-v6\.js unified-selects\.js/,
+ 'Production panel image must package both user fingerprint control and the strict-PQ bootstrap override');
 
 assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length,'CSS braces must remain balanced');
 new Function(app);
