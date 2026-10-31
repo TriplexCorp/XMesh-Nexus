@@ -1,0 +1,41 @@
+{
+  "schema": "xsp2-kvm-vps-strict-pq-activation-approval-contract-2",
+  "approvalSchema": "xsp2-kvm-vps-strict-pq-activation-approval-2",
+  "deploymentClass": "kvm-vps",
+  "requiredRuntimeTarget": {
+    "nexusRuntimeRevision": "24e9468e4df29fbea8f214f9021da403bdd6dab0",
+    "nodeRevision": "64709ce8f5f0ce80e2c0bab59b4476347825e57c"
+  },
+  "nexusImageSha256Semantics": "sha256:<64hex> of canonical JSON manifest binding strict-signer, strict-c2c, strict-origin and strict-ingress production image IDs for the exact Nexus runtime revision",
+  "requiredAssuranceModel": "ai-assisted-internal-plus-release-owner-risk-acceptance",
+  "allowedScopeModes": ["limited-canary", "phased"],
+  "maxNodesPerApproval": 50,
+  "maxApprovalWindowSeconds": 86400,
+  "requiredApprovalAuthority": "release-owner",
+  "requiredTransportPolicy": {
+    "tlsProtocols": ["TLSv1.3"],
+    "keyExchange": "X25519MLKEM768",
+    "clientIdentity": "ML-DSA-65",
+    "criticalMessageSignatures": ["Ed25519", "ML-DSA-65"],
+    "automaticFallback": false,
+    "classicalOnlyAllowed": false
+  },
+  "requiredDecision": {
+    "strictPqAction": "enable",
+    "legacyXMESH1Action": "retain"
+  },
+  "requiredEvidence": [
+    "aiAssistedSecurityReviewAccepted",
+    "kvmVpsDurabilityQualificationAccepted",
+    "providerStorageRiskAccepted",
+    "finalCanaryPassed",
+    "rolloutPlanReviewed"
+  ],
+  "requiredFalseClaimsBeforeExecution": {
+    "productionActivation": false,
+    "strictPQEnabled": false,
+    "legacyXMESH1Retired": false,
+    "physicalPowerLossQualified": false
+  },
+  "requiresSeparateExecution": true
+}
