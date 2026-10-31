@@ -54,8 +54,8 @@ assert.match(html,/<script src="\/node-bootstrap-v6\.js\?v=20261031-strict-pq-on
  'Panel must load the strict-PQ bootstrap override from an absolute dashboard-safe asset path');
 assert.ok(html.indexOf('app.js?v=')<html.indexOf('/node-bootstrap-v6.js?v='),
  'Strict-PQ bootstrap override must load after the historical app handler');
-assert.match(strictBootstrap,/XMESH_V6_NODE_BOOTSTRAP_SHA='2745b03677fc6e12761021c5dad6d48138af87d4'/,
- 'Fresh Node installation must pin the reviewed XMesh-Node strict-PQ-only release');
+assert.match(strictBootstrap,/XMESH_V6_NODE_BOOTSTRAP_SHA='fc09f0e2ff2214da19954b0104619a75c2ceca9e'/,
+ 'Fresh Node installation must pin the reviewed XMesh-Node release with durable receipt and GeoData transport fixes');
 assert.match(strictBootstrap,/XMesh Node v6 fresh installer\. Security invariant:/,
  'The downloaded installer must be marker-checked as the v6 fail-closed bootstrap');
 assert.match(strictBootstrap,/sudo env XMESH_NODE_RELEASE_REF='\+XMESH_V6_NODE_BOOTSTRAP_SHA\+' bash \/tmp\/xmesh-bootstrap-v6\.sh/,
