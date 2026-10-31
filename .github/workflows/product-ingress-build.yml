@@ -1,4 +1,4 @@
-name: XSP-v2 Product Ingress Build
+name: XSP-v2 Product Control Plane Build
 
 on:
   push:
@@ -6,6 +6,7 @@ on:
     paths:
       - compose.yaml
       - deploy/xsp-v2-ingress/**
+      - deploy/xsp-v2-product-gateway/**
       - scripts/check-install-host.sh
       - .github/workflows/product-ingress-build.yml
   pull_request:
@@ -13,6 +14,7 @@ on:
     paths:
       - compose.yaml
       - deploy/xsp-v2-ingress/**
+      - deploy/xsp-v2-product-gateway/**
       - scripts/check-install-host.sh
       - .github/workflows/product-ingress-build.yml
 
@@ -20,14 +22,14 @@ permissions:
   contents: read
 
 jobs:
-  product-ingress-build:
+  product-control-plane-build:
     runs-on: ubuntu-latest
     env:
       POSTGRES_PASSWORD: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
       APP_DB_PASSWORD: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
       REDIS_PASSWORD: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
-      ADMIN_PASSWORD: 9876543210abcdef9876543210abcdef9876543210abcdef
-      DASHBOARD_PATH: /dashboard/0123456789abcdef0123456789abcdef0123456789abcdef
+      ADMIN_PASSWORD: 9876543210abcdef9876543210abcdef9876543210abcdef9876543210abcdef
+      DASHBOARD_PATH: /dashboard/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
       SUBSCRIPTION_ENCRYPTION_KEY: "1234567812345678123456781234567812345678123456781234567812345678"
       XSP_V2_PRODUCT_INTERNAL_TOKEN: "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
       PANEL_DOMAIN: ci.example.invalid
@@ -35,7 +37,13 @@ jobs:
       - uses: actions/checkout@v7
       - name: Verify installer/build-context contract
         run: bash scripts/check-install-host.sh
+      - name: Verify committed gateway module lock
+        run: |
+          test -s deploy/xsp-v2-product-gateway/go.sum
+          grep -Fq 'github.com/jackc/pgx/v5 v5.7.6 h1:' deploy/xsp-v2-product-gateway/go.sum
+          grep -Fq 'COPY go.mod go.sum ./' deploy/xsp-v2-product-gateway/Dockerfile
+          grep -Fq 'go build -mod=readonly' deploy/xsp-v2-product-gateway/Dockerfile
       - name: Validate product Compose model
         run: docker compose --profile xsp-v2-product config --quiet
-      - name: Build strict-PQ product ingress exactly as installer will
-        run: docker compose --profile xsp-v2-product build xsp-v2-product-ingress
+      - name: Build strict-PQ product control plane exactly as installer will
+        run: docker compose --profile xsp-v2-product build xsp-v2-product-gateway xsp-v2-product-ingress
