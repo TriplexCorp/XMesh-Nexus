@@ -319,9 +319,32 @@ Ports `8443` and `8444` are internal loopback ports, not firewall requirements.
 
 ## Updates
 
+### Manual CLI update
+
+The supported operator-facing terminal update path is:
+
+```bash
+cd /path/to/XMesh-Nexus
+sudo bash xmeshctl
+```
+
+Then choose:
+
+```text
+4) Обновить из GitHub и пересобрать
+```
+
+The CLI asks for confirmation, creates a PostgreSQL backup, fetches and fast-forwards the configured upstream branch, runs installer preparation, validates Docker Compose and rebuilds the stack. On a managed host when run as root, it also reapplies the host-side single-public-443 topology.
+
+`xmeshctl --web-update` is the internal non-interactive entrypoint used by the owner-authorized web/systemd updater; operators should normally use `sudo bash xmeshctl` for manual updates.
+
+### Web update
+
 The owner-authorized web update path does not give the API a Docker socket or arbitrary shell. A root-owned worker runs `xmeshctl --web-update` with locking and a PostgreSQL backup.
 
 The host installer reapplies the single-443 topology during upgrade and recreates the current v6 product gateway/ingress so an old public `:8444` mapping cannot survive an upgrade.
+
+More: [CLI update](docs/CLI_UPDATE.md) · [Panel Update & Telemetry](docs/PANEL_UPDATE_AND_TELEMETRY.md).
 
 ---
 
@@ -332,6 +355,7 @@ The host installer reapplies the single-443 topology during upgrade and recreate
 | **[Documentation Index](docs/README.md)** | Entry point for current documentation |
 | **[Product Guide](docs/PRODUCT_GUIDE.md)** | Full product feature set and subsystem boundaries |
 | **[Installation & Operations](docs/INSTALLATION.md)** | Installation, public 80/443 topology, updates, backup and troubleshooting |
+| **[CLI Update](docs/CLI_UPDATE.md)** | Manual panel update through `sudo bash xmeshctl` |
 | **[XRAY STUDIO Guide](docs/XRAY_STUDIO_GUIDE.md)** | Security semantics, XHTTP, FinalMask, fingerprint and client projection |
 | **[Development Checkpoint](docs/DEVELOPMENT_CHECKPOINT_2026-10-31.md)** | Critical contracts for future development |
 | [Enterprise Roadmap](docs/ENTERPRISE_ROADMAP.md) | Engineering and release readiness |
