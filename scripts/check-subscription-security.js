@@ -3,7 +3,7 @@
 const fs=require('node:fs');
 const assert=require('node:assert/strict');
 const read=path=>fs.readFileSync(path,'utf8');
-const backend=read('backend/src/user_subscriptions.rs');
+const backend=read('backend/src/user_subscriptions.rs')+'\n'+read('backend/src/user_subscriptions_base.rs');
 const protocols=read('backend/src/protocol_credentials.rs');
 const node=read('backend/src/node_runtime.rs')+'\n'+read('backend/src/node_runtime_legacy.rs');
 const main=read('backend/src/main.rs');
