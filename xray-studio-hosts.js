@@ -16,7 +16,7 @@ window.XMeshStudioHosts=(()=>{
      '<details class="sv-advanced"><summary>Клиентские переопределения</summary><p class="sv-muted">Укажите только отличия от настроек inbound. Transport и Security не дублируются.</p>'+
      '<div class="sv-two">'+field('Внешний SNI','sni','vpn.example.com')+field('Host','host','cdn.example.com')+'</div>'+
      '<div class="sv-two">'+field('Path','path','/xhttp')+
-      '<label class="sv-field"><span>Fingerprint</span><select data-endpoint="fp"><option value="">По умолчанию</option><option value="chrome">Chrome</option><option value="firefox">Firefox</option><option value="safari">Safari</option><option value="ios">iOS</option></select></label></div>'+
+      '<label class="sv-field"><span>Fingerprint</span><select data-endpoint="fp"><option value="chrome">Chrome (по умолчанию)</option><option value="firefox">Firefox</option><option value="safari">Safari</option><option value="ios">iOS</option></select></label></div>'+
      '<div class="sv-two">'+field('ALPN','alpn','h2,http/1.1')+field('gRPC Service Name','serviceName','service')+'</div>'+
      '<div class="sv-two">'+field('REALITY Public Key','publicKey')+field('REALITY Short ID','shortId')+'</div>'+
      '<div class="sv-two">'+field('REALITY Spider X','spiderX','/')+field('Код страны','countryCode','DE')+'</div>'+
@@ -65,7 +65,8 @@ window.XMeshStudioHosts=(()=>{
       if(profile()==null||!tag()){ctx.notify('Сначала сохраните профиль и выберите inbound.');return}
       editing=h?.id??null;
       qs('[data-endpoint-title]').textContent=h?'Изменить подключение':'Новое подключение';
-      for(const k of ['remark','address','sni','host','path','fp','publicKey','shortId','alpn','serviceName','spiderX','countryCode','clientEncryption'])set(k,h?.[k]||'');
+      for(const k of ['remark','address','sni','host','path','publicKey','shortId','alpn','serviceName','spiderX','countryCode','clientEncryption'])set(k,h?.[k]||'');
+      set('fp',h?.fp||'chrome');
       set('port',h?.port||443);set('enabled',h?.disabled?'no':'yes');
       const nodes=qs('[data-endpoint-nodes]');nodes.replaceChildren();
       for(const n of connected()){
@@ -100,7 +101,7 @@ window.XMeshStudioHosts=(()=>{
       }
       if(editing!=null&&!old)return ctx.notify('Подключение не найдено.');
       const data={remark,address,port,tag:tag(),profileId:profile(),
-        sni:value('sni'),host:value('host'),path:value('path'),fp:value('fp'),
+        sni:value('sni'),host:value('host'),path:value('path'),fp:value('fp')||'chrome',
         publicKey:value('publicKey'),shortId:value('shortId'),
         alpn:value('alpn'),serviceName:value('serviceName'),spiderX:value('spiderX'),
         countryCode:value('countryCode').toUpperCase(),clientEncryption:value('clientEncryption'),
