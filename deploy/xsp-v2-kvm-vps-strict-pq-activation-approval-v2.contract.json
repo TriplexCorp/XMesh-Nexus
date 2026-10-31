@@ -6,7 +6,7 @@
     "nexusRuntimeRevision": "a1267ae186f74d5e21561e3b64fc7375d499132e",
     "nodeRevision": "64709ce8f5f0ce80e2c0bab59b4476347825e57c"
   },
-  "nexusImageSha256Semantics": "sha256:<64hex> of canonical JSON manifest binding strict-signer, strict-c2c, strict-origin and strict-ingress production image IDs for the exact Nexus runtime revision",
+  "nexusImageSha256Semantics": "legacy field name: sha256:<64hex> of canonical xsp2-production-runtime-build-manifest-1 JSON binding exact Nexus revision, strict-signer/c2c/origin/ingress Docker build recipes, production overlay and ingress configuration; it is not a host-specific Docker layer/image ID",
   "requiredAssuranceModel": "ai-assisted-internal-plus-release-owner-risk-acceptance",
   "allowedScopeModes": ["limited-canary", "phased"],
   "maxNodesPerApproval": 50,
