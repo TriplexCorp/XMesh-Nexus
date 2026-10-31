@@ -7,7 +7,7 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/xmesh-xsp-v2-produ
 
 FROM debian:trixie-slim
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates \
+ && apt-get install -y --no-install-recommends ca-certificates curl \
  && rm -rf /var/lib/apt/lists/* \
  && groupadd --gid 10001 xmesh-crypto \
  && useradd --uid 10004 --gid 10001 --no-create-home --shell /usr/sbin/nologin xmesh-product
