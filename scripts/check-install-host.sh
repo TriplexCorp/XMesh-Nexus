@@ -53,7 +53,15 @@ if '      dockerfile: deploy/xsp-v2-ingress/Dockerfile\n' not in body:
     raise SystemExit('xsp-v2-product-ingress must use the repo-root-relative ingress Dockerfile path')
 if '      target: runtime-c2b\n' not in body:
     raise SystemExit('xsp-v2-product-ingress must keep the reviewed runtime-c2b target')
+if '    healthcheck:\n' not in body or "nginx -t -q" not in body:
+    raise SystemExit('xsp-v2-product-ingress must have an Nginx runtime healthcheck so --wait cannot accept a crash-looping container')
 PY
+for temp in client_body proxy fastcgi uwsgi scgi; do
+  grep -Fq "${temp}_temp_path /tmp/${temp};" deploy/xsp-v2-ingress/nginx-product.conf || {
+    echo "Product ingress ${temp} temp path must stay on writable /tmp" >&2
+    exit 1
+  }
+done
 grep -Fq 'docker port "$ingress_id" 8444/tcp' "$host"
 grep -Fq "expected 127.0.0.1:8444" "$host"
 grep -Fq 'ExecStart=/usr/sbin/haproxy -W -db -f /etc/xmesh-nexus/haproxy-443.cfg' "$host"
@@ -72,4 +80,4 @@ grep -Fq 'docker compose up -d --build --wait --wait-timeout' install.sh
 # PQ provisioning may atomically replace mounted key files. The product runtime
 # must not reuse an unhealthy/backed-off container created before that migration.
 grep -Fq 'docker compose --profile xsp-v2-product up -d --build --force-recreate --wait --wait-timeout 180' install.sh
-echo 'Panel host installer: single public 443 mux, loopback TLS backends, repo-root product ingress build context, post-key-migration runtime recreation and integration contracts OK.'
+echo 'Panel host installer: single public 443 mux, loopback TLS backends, writable product-ingress temp paths, ingress healthcheck, repo-root build context, post-key-migration runtime recreation and integration contracts OK.'
