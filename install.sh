@@ -177,9 +177,11 @@ bash scripts/provision-xsp-v2-v6-foundation.sh
 
 # Product control plane is not optional in v6. It starts only after its ML-DSA
 # issuer material exists, and install fails closed if the hybrid ingress or
-# gateway cannot become ready. The classical panel remains bound to loopback.
+# gateway cannot become ready. Key provisioning may atomically replace private
+# key files while an older unhealthy container is in restart backoff, so the
+# product containers must be recreated to guarantee a fresh mount/runtime view.
 echo "Starting XMesh v6 strict-PQ product control plane..."
-if ! docker compose --profile xsp-v2-product up -d --build --wait --wait-timeout 180; then
+if ! docker compose --profile xsp-v2-product up -d --build --force-recreate --wait --wait-timeout 180; then
   echo "ERROR: strict-PQ product gateway/ingress failed to become ready; installation is not operational." >&2
   docker compose --profile xsp-v2-product ps >&2 || true
   docker compose --profile xsp-v2-product logs --tail=100 xsp-v2-product-gateway xsp-v2-product-ingress >&2 || true
