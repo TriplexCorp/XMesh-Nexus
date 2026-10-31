@@ -21,7 +21,7 @@
  const UDP_HEADER_DEFAULT={client:[{type:'hex',packet:'a1b2c3d4'}],server:[{type:'hex',packet:'d4c3b2a1'}]};
 
  function studioRoot(node){return node?.closest?.('#xm-studio-v4')||null}
- function sourceOf(root){return root?.querySelector?.('[data-v="source"]')||null}
+ function sourceOf(root){return root?.querySelector?.('[data-v="source"]')||root?.querySelector?.('[data-xm="manual"]')||null}
  function clone(value){return value==null?value:JSON.parse(JSON.stringify(value))}
  function sameJson(a,b){return JSON.stringify(a)===JSON.stringify(b)}
  function randomValues(view){
@@ -170,7 +170,7 @@
   const root=studioRoot(node);if(!root)return;
   const source=sourceOf(root);
   seedSource(source);
-  const trigger=node?.closest?.('[data-compose-apply],[data-tool="inbound"],[data-tool="xhttp"]');
+  const trigger=node?.closest?.('[data-compose-apply],[data-tool="inbound"]');
   if(trigger&&source)forceNextRandomization.add(source);
  }
  function seedAll(){
@@ -211,8 +211,288 @@
   source.dispatchEvent(new Event('input',{bubbles:true}));
  }
 
+ // XHTTP constructor -------------------------------------------------------
+ function xhttpExtraObject(xhttp){
+  const raw=xhttp?.extra;
+  if(raw==null||raw==='')return {};
+  if(typeof raw==='object'&&!Array.isArray(raw))return clone(raw);
+  if(typeof raw==='string'){
+   let parsed;try{parsed=JSON.parse(raw)}catch{throw Error('xhttpSettings.extra содержит некорректный JSON')}
+   if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))throw Error('xhttpSettings.extra должен быть JSON-объектом');
+   return parsed;
+  }
+  throw Error('xhttpSettings.extra должен быть объектом или JSON-строкой');
+ }
+ function writeXhttpExtra(xhttp,extra){
+  if(extra&&Object.keys(extra).length)xhttp.extra=extra;
+  else delete xhttp.extra;
+ }
+ function effectiveXhttpValue(xhttp,extra,key,fallback){
+  if(Object.prototype.hasOwnProperty.call(extra,key))return extra[key];
+  if(Object.prototype.hasOwnProperty.call(xhttp||{},key))return xhttp[key];
+  return fallback;
+ }
+ function ensureXhttpSettings(inbound){
+  if(!inbound||typeof inbound!=='object')throw Error('Inbound отсутствует');
+  const stream=inbound.streamSettings??=( {} );
+  stream.network='xhttp';
+  if(!stream.xhttpSettings||typeof stream.xhttpSettings!=='object'||Array.isArray(stream.xhttpSettings))stream.xhttpSettings={};
+  const xhttp=stream.xhttpSettings;
+  if(!String(xhttp.path||'').trim()||xhttp.path==='/xhttp')xhttp.path=randomXhttpPath();
+  if(!String(xhttp.mode||'').trim())xhttp.mode='auto';
+  return xhttp;
+ }
+ function xhttpSelection(root,doc){
+  const list=Array.isArray(doc?.inbounds)?doc.inbounds:[];
+  if(!list.length)throw Error('В конфигурации нет inbound');
+  const toolSelect=root.querySelector('[data-tool-inbound]');
+  const formSelect=root.querySelector('[data-field="inboundSelect"]');
+  const raw=toolSelect?.value??formSelect?.value??'0';
+  const index=Number(raw);
+  if(!Number.isInteger(index)||index<0||index>=list.length)throw Error('Некорректно выбран inbound');
+  return {index,tag:list[index]?.tag??null,inbound:list[index]};
+ }
+ function setToolStatus(root,message){
+  const target=root.querySelector('[data-tool-status]');
+  if(target)target.textContent=String(message||'');
+ }
+ function commitXhttp(root,index,tag,mutator,label){
+  const source=sourceOf(root);if(!source)throw Error('JSON-редактор XRAY STUDIO не найден');
+  let doc;try{doc=JSON.parse(source.value)}catch(e){throw Error('Исправьте JSON перед настройкой XHTTP: '+e.message)}
+  const inbound=Array.isArray(doc.inbounds)?doc.inbounds[index]:null;
+  if(!inbound||inbound.tag!==tag)throw Error('Выбранный inbound изменился. Повторите действие.');
+  mutator(inbound,doc);
+  source.value=JSON.stringify(doc,null,2);
+  snapshots.set(source,clone(doc));
+  source.dispatchEvent(new Event('input',{bubbles:true}));
+  setToolStatus(root,label);
+ }
+ function rangeOrInteger(value,{min=0,allowEmpty=false}={}){
+  const text=String(value??'').trim();
+  if(!text&&allowEmpty)return '';
+  if(/^-?\d+$/.test(text))return Number(text)>=min?'':'Минимальное значение: '+min;
+  const match=text.match(/^(-?\d+)-(-?\d+)$/);
+  if(!match)return 'Введите целое число или диапазон min-max';
+  const a=Number(match[1]),b=Number(match[2]);
+  return a>=min&&b>=a?'':'Диапазон должен быть не меньше '+min+' и min ≤ max';
+ }
+ function numberOrRangeValue(value){
+  const text=String(value??'').trim();
+  return /^-?\d+$/.test(text)?Number(text):text;
+ }
+ function jsonObject(value,label){
+  let parsed;try{parsed=JSON.parse(value)}catch{return {error:label+': некорректный JSON'}}
+  if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))return {error:label+': требуется JSON-объект'};
+  return {value:parsed};
+ }
+ async function confirmXhttpSwitch(dialog,source,initial,selection){
+  const network=String(selection.inbound?.streamSettings?.network||'raw').toLowerCase();
+  if(network==='xhttp')return true;
+  const ok=await dialog.confirm({
+   eyebrow:'XRAY STUDIO / XHTTP',
+   title:'Переключить транспорт на XHTTP?',
+   description:'Inbound «'+(selection.tag||'Inbound')+'» сейчас использует '+network.toUpperCase()+'. После переключения старые настройки транспорта останутся в JSON, но перестанут быть активными.',
+   notice:'TLS и REALITY не меняются: Security остаётся отдельной настройкой.',
+   confirmLabel:'Переключить на XHTTP'
+  });
+  if(!ok)return false;
+  if(source.value!==initial){setToolStatus(studioRoot(source),'JSON изменился. Повторите настройку XHTTP.');return false}
+  return true;
+ }
+ async function openXhttpMenu(root){
+  const dialog=window.XMeshStudioDialogs;
+  if(!dialog?.request||!dialog?.confirm){setToolStatus(root,'Диалоговый модуль XRAY STUDIO не загружен');return}
+  const source=sourceOf(root);if(!source){return}
+  let doc;try{doc=JSON.parse(source.value)}catch(e){setToolStatus(root,'Исправьте JSON: '+e.message);return}
+  let selection;try{selection=xhttpSelection(root,doc)}catch(e){setToolStatus(root,e.message);return}
+  const initial=source.value;
+  const inbound=selection.inbound;
+  const stream=inbound.streamSettings||{};
+  const xhttp=stream.xhttpSettings&&typeof stream.xhttpSettings==='object'&&!Array.isArray(stream.xhttpSettings)?stream.xhttpSettings:{};
+  const mode=String(xhttp.mode||'auto');
+  const currentNetwork=String(stream.network||'raw').toUpperCase();
+  const choices=[
+   {value:'auto',label:'AUTO · Универсальный',description:'Автовыбор XHTTP режима. Для обычной конфигурации достаточно Path.'},
+   {value:'packet-up',label:'PACKET-UP · Совместимость',description:'Раздельные POST-запросы вверх и потоковый download; наиболее совместим с CDN и reverse proxy.'},
+   {value:'stream-up',label:'STREAM-UP · Потоковый upload',description:'Потоковый upload + отдельный download. Хорошо подходит для H2/REALITY и совместимых прокси.'},
+   {value:'stream-one',label:'STREAM-ONE · Один поток',description:'Один двунаправленный HTTP-запрос; быстрее и проще, но менее универсален через некоторые CDN.'},
+   {value:'basic',label:'Основные параметры',description:'Path, Host и Mode в одном окне.'},
+   {value:'rotate-path',label:'Новый случайный Path',description:'Сгенерировать новый 64-символьный URL-safe Path криптографическим генератором.'},
+   {value:'headers-padding',label:'Headers & Padding',description:'HTTP headers, xPaddingBytes, gRPC/SSE header switches.'},
+   {value:'packet-tuning',label:'PACKET-UP · Тюнинг',description:'Размер POST, интервал клиентских POST и серверный буфер.'},
+   {value:'stream-tuning',label:'STREAM-UP · Keepalive',description:'Серверный интервал padding keepalive для stream-up.'},
+   {value:'xmux',label:'XMUX',description:'Concurrency, reuse limits, HTTP request limits и keepalive H2/H3.'},
+   {value:'advanced',label:'Расширенный JSON',description:'Полностью редактировать streamSettings.xhttpSettings вручную.'},
+   {value:'reset-extra',label:'Сбросить расширенные параметры',description:'Удалить extra, сохранив Path, Host и Mode.'}
+  ];
+  const action=await dialog.request({
+   eyebrow:'XRAY STUDIO / XHTTP',
+   title:'XHTTP · конструктор',
+   description:'Выберите режим или группу параметров. Текущий транспорт: '+currentNetwork+' · режим: '+mode+'.',
+   notice:'Path генерируется случайно. Security (TLS / REALITY / none) управляется отдельно и этим меню не переключается.',
+   confirmLabel:'Продолжить',selectFirst:false,
+   fields:[{name:'action',label:'Настройки XHTTP',type:'cards',wide:true,value:['auto','packet-up','stream-up','stream-one'].includes(mode)?mode:'basic',options:choices}]
+  });
+  if(!action)return;
+  if(source.value!==initial){setToolStatus(root,'JSON изменился. Повторите настройку XHTTP.');return}
+  if(!(await confirmXhttpSwitch(dialog,source,initial,selection)))return;
+
+  const simpleModes=new Set(['auto','packet-up','stream-up','stream-one']);
+  if(simpleModes.has(action.action)){
+   commitXhttp(root,selection.index,selection.tag,ib=>{ensureXhttpSettings(ib).mode=action.action},'XHTTP: режим '+action.action+' применён');
+   return;
+  }
+  if(action.action==='rotate-path'){
+   commitXhttp(root,selection.index,selection.tag,ib=>{ensureXhttpSettings(ib).path=randomXhttpPath()},'XHTTP: создан новый случайный Path');
+   return;
+  }
+  if(action.action==='reset-extra'){
+   const ok=await dialog.confirm({
+    eyebrow:'XRAY STUDIO / XHTTP',title:'Сбросить расширенные XHTTP параметры?',
+    description:'Будет удалён только xhttpSettings.extra. Path, Host и Mode сохранятся.',danger:true,confirmLabel:'Сбросить extra'
+   });
+   if(!ok)return;
+   if(source.value!==initial){setToolStatus(root,'JSON изменился. Повторите действие.');return}
+   commitXhttp(root,selection.index,selection.tag,ib=>{const settings=ensureXhttpSettings(ib);delete settings.extra},'XHTTP: расширенные параметры сброшены');
+   return;
+  }
+
+  let latest;try{latest=JSON.parse(source.value)}catch{return}
+  const current=latest.inbounds?.[selection.index];
+  if(!current||current.tag!==selection.tag){setToolStatus(root,'Inbound изменился. Повторите действие.');return}
+  const settings=current.streamSettings?.xhttpSettings&&typeof current.streamSettings.xhttpSettings==='object'&&!Array.isArray(current.streamSettings.xhttpSettings)?current.streamSettings.xhttpSettings:{};
+  let extra;try{extra=xhttpExtraObject(settings)}catch(e){setToolStatus(root,e.message);return}
+
+  if(action.action==='basic'){
+   const response=await dialog.request({
+    eyebrow:'XRAY STUDIO / XHTTP',title:'XHTTP · основные параметры',
+    description:'Path должен совпадать на сервере и клиенте. Host обычно можно оставить пустым.',confirmLabel:'Применить',
+    fields:[
+     {name:'path',label:'Path',wide:true,value:String(settings.path||randomXhttpPath()),required:true,maxLength:512,
+      validate:value=>value.startsWith('/')&&!/\s/.test(value)?'':'Path должен начинаться с / и не содержать пробелы'},
+     {name:'host',label:'Host · необязательно',wide:true,value:String(settings.host||''),placeholder:'example.com'},
+     {name:'mode',label:'Mode',type:'select',wide:true,value:String(settings.mode||'auto'),options:[
+      {value:'auto',label:'auto'},{value:'packet-up',label:'packet-up'},{value:'stream-up',label:'stream-up'},{value:'stream-one',label:'stream-one'}]}
+    ]
+   });
+   if(!response)return;
+   commitXhttp(root,selection.index,selection.tag,ib=>{const target=ensureXhttpSettings(ib);target.path=response.path;target.mode=response.mode;if(response.host)target.host=response.host;else delete target.host},'XHTTP: основные параметры обновлены');
+   return;
+  }
+
+  if(action.action==='headers-padding'){
+   const headers=effectiveXhttpValue(settings,extra,'headers',{});
+   const response=await dialog.request({
+    eyebrow:'XRAY STUDIO / XHTTP',title:'XHTTP · Headers & Padding',
+    description:'Header padding уменьшает фиксированные признаки длины HTTP-заголовков. Параметры сохраняются в extra и могут экспортироваться клиенту.',confirmLabel:'Применить',
+    fields:[
+     {name:'headers',label:'Headers · JSON',type:'textarea',wide:true,rows:6,value:JSON.stringify(headers&&typeof headers==='object'?headers:{},null,2),required:true,
+      validate:value=>jsonObject(value,'Headers').error||''},
+     {name:'xPaddingBytes',label:'xPaddingBytes',wide:true,value:String(effectiveXhttpValue(settings,extra,'xPaddingBytes','100-1000')),required:true,
+      help:'Например 100-1000',validate:value=>rangeOrInteger(value,{min:0})},
+     {name:'noGRPCHeader',label:'Отключить gRPC header',type:'select',value:String(Boolean(effectiveXhttpValue(settings,extra,'noGRPCHeader',false))),options:[{value:'false',label:'Нет'},{value:'true',label:'Да'}]},
+     {name:'noSSEHeader',label:'Отключить SSE header',type:'select',value:String(Boolean(effectiveXhttpValue(settings,extra,'noSSEHeader',false))),options:[{value:'false',label:'Нет'},{value:'true',label:'Да'}]}
+    ]
+   });
+   if(!response)return;
+   const parsedHeaders=jsonObject(response.headers,'Headers');if(parsedHeaders.error){setToolStatus(root,parsedHeaders.error);return}
+   commitXhttp(root,selection.index,selection.tag,ib=>{
+    const target=ensureXhttpSettings(ib),body=xhttpExtraObject(target);
+    body.headers=parsedHeaders.value;body.xPaddingBytes=numberOrRangeValue(response.xPaddingBytes);
+    body.noGRPCHeader=response.noGRPCHeader==='true';body.noSSEHeader=response.noSSEHeader==='true';writeXhttpExtra(target,body);
+   },'XHTTP: headers и padding обновлены');
+   return;
+  }
+
+  if(action.action==='packet-tuning'){
+   const response=await dialog.request({
+    eyebrow:'XRAY STUDIO / XHTTP',title:'XHTTP · PACKET-UP tuning',
+    description:'Диапазоны уменьшают фиксированный паттерн. Серверные параметры остаются на inbound, совместимые клиентские экспортируются подпиской.',confirmLabel:'Применить',
+    fields:[
+     {name:'scMaxEachPostBytes',label:'Макс. данных в POST',wide:true,value:String(effectiveXhttpValue(settings,extra,'scMaxEachPostBytes',1000000)),required:true,validate:value=>rangeOrInteger(value,{min:1})},
+     {name:'scMinPostsIntervalMs',label:'Мин. интервал POST · ms',wide:true,value:String(effectiveXhttpValue(settings,extra,'scMinPostsIntervalMs',30)),required:true,validate:value=>rangeOrInteger(value,{min:0})},
+     {name:'scMaxBufferedPosts',label:'Серверный буфер POST',wide:true,value:String(effectiveXhttpValue(settings,extra,'scMaxBufferedPosts',30)),required:true,validate:value=>rangeOrInteger(value,{min:1})}
+    ]
+   });
+   if(!response)return;
+   commitXhttp(root,selection.index,selection.tag,ib=>{
+    const target=ensureXhttpSettings(ib),body=xhttpExtraObject(target);
+    body.scMaxEachPostBytes=numberOrRangeValue(response.scMaxEachPostBytes);
+    body.scMinPostsIntervalMs=numberOrRangeValue(response.scMinPostsIntervalMs);
+    body.scMaxBufferedPosts=numberOrRangeValue(response.scMaxBufferedPosts);writeXhttpExtra(target,body);
+   },'XHTTP: PACKET-UP параметры обновлены');
+   return;
+  }
+
+  if(action.action==='stream-tuning'){
+   const response=await dialog.request({
+    eyebrow:'XRAY STUDIO / XHTTP',title:'XHTTP · STREAM-UP keepalive',
+    description:'scStreamUpServerSecs задаёт интервал серверного padding keepalive. -1 отключает механизм.',confirmLabel:'Применить',
+    fields:[{name:'scStreamUpServerSecs',label:'scStreamUpServerSecs',wide:true,value:String(effectiveXhttpValue(settings,extra,'scStreamUpServerSecs','20-80')),required:true,
+     help:'Например 20-80 или -1',validate:value=>value==='-1'?'':rangeOrInteger(value,{min:0})}]
+   });
+   if(!response)return;
+   commitXhttp(root,selection.index,selection.tag,ib=>{const target=ensureXhttpSettings(ib),body=xhttpExtraObject(target);body.scStreamUpServerSecs=numberOrRangeValue(response.scStreamUpServerSecs);writeXhttpExtra(target,body)},'XHTTP: STREAM-UP keepalive обновлён');
+   return;
+  }
+
+  if(action.action==='xmux'){
+   const currentXmux=extra.xmux&&typeof extra.xmux==='object'&&!Array.isArray(extra.xmux)?extra.xmux:{};
+   const response=await dialog.request({
+    eyebrow:'XRAY STUDIO / XHTTP',title:'XHTTP · XMUX',
+    description:'XMUX управляет повторным использованием H2/H3 соединений. maxConcurrency и maxConnections не должны одновременно быть ненулевыми.',confirmLabel:'Применить',
+    fields:[
+     {name:'maxConcurrency',label:'maxConcurrency',wide:true,value:String(currentXmux.maxConcurrency??'16-32'),required:true,validate:value=>rangeOrInteger(value,{min:0})},
+     {name:'maxConnections',label:'maxConnections',wide:true,value:String(currentXmux.maxConnections??0),required:true,validate:value=>rangeOrInteger(value,{min:0})},
+     {name:'cMaxReuseTimes',label:'cMaxReuseTimes',wide:true,value:String(currentXmux.cMaxReuseTimes??0),required:true,validate:value=>rangeOrInteger(value,{min:0})},
+     {name:'hMaxRequestTimes',label:'hMaxRequestTimes',wide:true,value:String(currentXmux.hMaxRequestTimes??'600-900'),required:true,validate:value=>rangeOrInteger(value,{min:0})},
+     {name:'hMaxReusableSecs',label:'hMaxReusableSecs',wide:true,value:String(currentXmux.hMaxReusableSecs??'1800-3000'),required:true,validate:value=>rangeOrInteger(value,{min:0})},
+     {name:'hKeepAlivePeriod',label:'hKeepAlivePeriod',wide:true,value:String(currentXmux.hKeepAlivePeriod??0),required:true,validate:value=>/^-?\d+$/.test(value)?'':'Введите целое число'}
+    ],
+    validate:values=>{
+     const active=value=>String(value).trim()!=='0';
+     return active(values.maxConcurrency)&&active(values.maxConnections)?'maxConcurrency и maxConnections конфликтуют: оставьте один из них равным 0.':'';
+    }
+   });
+   if(!response)return;
+   commitXhttp(root,selection.index,selection.tag,ib=>{
+    const target=ensureXhttpSettings(ib),body=xhttpExtraObject(target);
+    body.xmux={
+     maxConcurrency:numberOrRangeValue(response.maxConcurrency),maxConnections:numberOrRangeValue(response.maxConnections),
+     cMaxReuseTimes:numberOrRangeValue(response.cMaxReuseTimes),hMaxRequestTimes:numberOrRangeValue(response.hMaxRequestTimes),
+     hMaxReusableSecs:numberOrRangeValue(response.hMaxReusableSecs),hKeepAlivePeriod:Number(response.hKeepAlivePeriod)
+    };writeXhttpExtra(target,body);
+   },'XHTTP: XMUX обновлён');
+   return;
+  }
+
+  if(action.action==='advanced'){
+   const initialSettings=Object.keys(settings).length?settings:{path:randomXhttpPath(),mode:'auto'};
+   const response=await dialog.request({
+    eyebrow:'XRAY STUDIO / XHTTP',title:'XHTTP · расширенный JSON',
+    description:'Полный объект streamSettings.xhttpSettings. Используйте этот режим для новых или редких параметров Xray-core.',confirmLabel:'Применить',
+    fields:[{name:'json',label:'xhttpSettings · JSON',type:'textarea',wide:true,rows:14,value:JSON.stringify(initialSettings,null,2),required:true,
+     validate:value=>jsonObject(value,'xhttpSettings').error||''}]
+   });
+   if(!response)return;
+   const parsed=jsonObject(response.json,'xhttpSettings');if(parsed.error){setToolStatus(root,parsed.error);return}
+   commitXhttp(root,selection.index,selection.tag,ib=>{const streamSettings=ib.streamSettings??={};streamSettings.network='xhttp';streamSettings.xhttpSettings=parsed.value;ensureXhttpSettings(ib)},'XHTTP: расширенный JSON применён');
+  }
+ }
+
  document.addEventListener('pointerdown',event=>seedFromNode(event.target),true);
  document.addEventListener('focusin',event=>seedFromNode(event.target),true);
+
+ // Capture the XHTTP tool before the legacy one-click handler in
+ // xray-studio-tools.js. This keeps the existing palette button while replacing
+ // its old "focus JSON" behavior with the same card UI used by FinalMask.
+ document.addEventListener('click',event=>{
+  const button=event.target?.closest?.('[data-tool="xhttp"]');
+  if(!button)return;
+  const root=studioRoot(button);if(!root)return;
+  event.preventDefault();event.stopImmediatePropagation();
+  Promise.resolve(openXhttpMenu(root)).catch(error=>setToolStatus(root,'XHTTP: '+error.message));
+ },true);
 
  document.addEventListener('change',event=>{
   const select=event.target;
@@ -244,6 +524,7 @@
  window.XMeshProtocolTlsPolicy={
   normalizeInbound,desiredSecurity,
   randomXhttpPath,randomizeDocument,
-  randomFragmentSettings,randomNoiseSettings,randomTcpHeaderSettings,randomUdpHeaderSettings
+  randomFragmentSettings,randomNoiseSettings,randomTcpHeaderSettings,randomUdpHeaderSettings,
+  ensureXhttpSettings,xhttpExtraObject,openXhttpMenu
  };
 })();
