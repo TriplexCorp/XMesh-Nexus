@@ -69,4 +69,7 @@ grep -Fq 'bash deploy/install-panel-host.sh deps' install.sh
 grep -Fq 'bash deploy/install-panel-host.sh domain "$PWD/.env"' install.sh
 grep -Fq 'bash deploy/install-panel-host.sh activate "$PWD/.env"' install.sh
 grep -Fq 'docker compose up -d --build --wait --wait-timeout' install.sh
-echo 'Panel host installer: single public 443 mux, loopback TLS backends, repo-root product ingress build context and integration contracts OK.'
+# PQ provisioning may atomically replace mounted key files. The product runtime
+# must not reuse an unhealthy/backed-off container created before that migration.
+grep -Fq 'docker compose --profile xsp-v2-product up -d --build --force-recreate --wait --wait-timeout 180' install.sh
+echo 'Panel host installer: single public 443 mux, loopback TLS backends, repo-root product ingress build context, post-key-migration runtime recreation and integration contracts OK.'
