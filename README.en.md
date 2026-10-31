@@ -4,99 +4,74 @@
 
 XMesh Nexus manages Nodes, users, subscriptions, Xray configuration, telemetry, and security state. User VPN traffic remains the **Xray-core data-plane**; XMesh is the control plane, not an additional encryption layer around user traffic.
 
-[Русский](README.md) · [Enterprise Roadmap](docs/ENTERPRISE_ROADMAP.md) · [Current P0-E checkpoint](P0E_CHECKPOINT.md) · [Stage 1/2 evidence](docs/XSP_V2_P0E_STAGE1_STAGE2_EVIDENCE_2026-10-30.md) · [XSP-v2 security policy](docs/XSP_V2_PQ_ONLY_SECURITY_POLICY.md) · [XMesh Node](https://github.com/TriplexCorp/XMesh-Node)
+[Русский](README.md) · [Enterprise Roadmap](docs/ENTERPRISE_ROADMAP.md) · [P0-E checkpoint](P0E_CHECKPOINT.md) · [Production activation evidence](docs/XSP_V2_PRODUCTION_ACTIVATION_2026-10-31.md) · [XSP-v2 security policy](docs/XSP_V2_PQ_ONLY_SECURITY_POLICY.md) · [XMesh Node](https://github.com/TriplexCorp/XMesh-Node)
 
-## Current XSP-v2 checkpoint — 30 October 2026
+## Current XSP-v2 checkpoint — 31 October 2026
 
-### P0-E: crash qualification, live cutover, and off-host recovery witness are complete; production activation remains prohibited
+### P0-E: bounded production strict-PQ activation is complete on Node 13
 
-The reviewed production runtime remains frozen at:
-
-- **XMesh-Nexus:** `12b3170996bc062ee16c79659a6378e5e425fd0e` — PR #163;
-- **XMesh-Node:** `34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb` — Node PR #52.
-
-Qualification tooling and live evidence do not replace this frozen runtime target.
-
-### #138 — completed real evidence boundaries
-
-- Node KVM abrupt-crash matrix: **COMPLETE 5/5**;
-- independent Nexus/PostgreSQL crash/recovery: **COMPLETE**;
-- protected permit tooling binding/live build: **PASS**;
-- protected Node 13 epoch `1 → 2` cutover / ACK / immutable receipt: **COMPLETE**;
-- independent off-host production recovery-floor witness: **COMPLETE**.
-
-Key SHA-256 values:
+The bounded production canary Node 13 now has the finalized state:
 
 ```text
-applied ACK
-07ccd07a317b6797b637d6cd0b1cc5c79fb90ef0c771c3ee7cc2b6aab79016a9
-
-immutable commit receipt
-daf40d33fa63d35f6f02fbcae417c4f4a4262d31bd9a0d1f11493ca018925ae9
-
-recovery checkpoint
-bc730df3a2078027cc4cbb4982da622dc8970dd49796fd9cbc0566a6364a3069
-
-recovery verification result
-4de873d0a5e9f85d245a9c880c0f75884117875888b5aedee4d4934cd64c5569
-```
-
-The off-host verifier confirmed:
-
-```text
-status=verified
+productionActivation=true
+strictPQEnabled=true
 nodeId=13
 minimumEpoch=2
-localEpoch=2
-```
-
-### Remaining #138 work
-
-Do not repeat the crash matrix, cutover, or recovery witness merely to advance paperwork. Remaining work is:
-
-1. explicit attributable provider-storage risk acceptance;
-2. aggregate evidence/result assembly;
-3. final topology-aware v2 verifier.
-
-Until the whole-result verifier passes, the correct claims remain:
-
-```text
-guestCrashConsistencyQualified=false
-providerStorageDurabilityAssumed=false
+legacyXMESH1Retired=false
 physicalPowerLossQualified=false
-strictPQEnabled=false
-productionActivation=false
+automaticFallback=false
+classicalOnlyAllowed=false
 ```
 
-### #137 — separate external blocker
+This is a real production claim established only after the verified Node receipt and Nexus finalization, not a readiness, CI, or staging claim.
 
-**#137 independent external security review/sign-off of the current v5 package remains OPEN.** AI review, project-owner review, CI, or internal testing cannot satisfy it.
+### Frozen production target
 
-Authoritative v5 reviewer bundle:
+- **XMesh-Nexus runtime:** `a1267ae186f74d5e21561e3b64fc7375d499132e`;
+- **XMesh-Node runtime:** `64709ce8f5f0ce80e2c0bab59b4476347825e57c`;
+- **Nexus runtime manifest/image binding:** `sha256:af27a110220f98880dc539141d614683741a05fbd3afd30792819b3192b9ef45`;
+- **approved Node activation artifact:** `a5f8e739b381640e4ac1d632dfef47d879ebc4c6ce7c4fbd8fab5744ad9cdd63`.
 
-- workflow run: `41054352179`;
-- GitHub artifact ID: `12974974581`;
-- deterministic inner tar SHA-256: `9d213e9281f0ffbbc3da21f9f3814d6e7fbef1e6b5273f6e9cb12175c63273c4`;
-- payload SHA-256: `7b118084777d59e1ef1791d6375c32c1c44cf6bcdf9a03a2b0648a7ad9f263f2`.
+Later release-control/tooling commits are permitted only while the frozen runtime build inputs remain byte-identical.
 
-### Current fast path
+### Production evidence
 
-```text
-#138 crash/recovery + cutover + off-host witness COMPLETE
-             ↓
-provider-storage risk acceptance
-             ↓
-aggregate evidence + final topology-aware v2 verifier
-             ↓
-#138 COMPLETE
+- bounded approval SHA-256: `b2e43b137d4ea5b24b1313899e57701608874e059bdf5d5d2ba9f263ba866259`;
+- verified Node result SHA-256: `ac1025fdc4bf2b433d1e596a7a35dd14deca94bcc44a10866c72c31b76d2fe9f`;
+- receipt binding SHA-256: `1747647618cb1a824b85ef379646da242de7846e8c3ebff0bfdad9bc078ecb39`;
+- finalized activation record SHA-256: `6cfb4dc49edacff87033bbd99ca45ad7279813b4a10a5cbe958d5348e8a0ee9d`;
+- activated at: `2026-10-31T10:52:13Z`.
 
-#137 independent external review proceeds separately
-```
+Full record: [`docs/XSP_V2_PRODUCTION_ACTIVATION_2026-10-31.md`](docs/XSP_V2_PRODUCTION_ACTIVATION_2026-10-31.md).
 
-After #137/#138 are complete, separate release gates still remain: exact production candidate, final canary, reviewed rollout/rollback plan, bounded KVM strict-PQ approval, and separate production execution.
+### Closed release gates
+
+- #138 KVM VPS durability qualification: **COMPLETE**;
+- provider-storage risk acceptance: **COMPLETE**;
+- `physicalPowerLossQualified=false`: **retained as the correct KVM claim**;
+- governance: **AI-assisted internal review + explicit release-owner risk acceptance**;
+- #137: **CLOSED** under that replacement governance policy, without claiming an external independent audit;
+- final canary v3: **PASS**;
+- rollout/rollback review: **COMPLETE**;
+- bounded Node 13 activation approval: **COMPLETE**;
+- production receipt recovery + Nexus finalization: **COMPLETE**.
+
+### Security boundary
+
+The strict-PQ canary uses:
+
+- TLS 1.3 only;
+- `X25519MLKEM768`;
+- ML-DSA-65 client identity;
+- Ed25519 + ML-DSA-65 critical signatures;
+- no automatic/classical fallback.
+
+XMESH1 is **not retired** and remains retained during the initial rollout.
+
+### Live rollout hardening
+
+The live execution exposed release-control defects outside the frozen crypto/runtime target: executable-bit dependency, incorrect directory `fsync`, bind-mounted panel-pin/certificate permissions, and a readiness marker that could be emitted while services were already restart-looping. Production orchestration is hardened for those cases and CI now covers the regressions without changing the frozen runtime build inputs.
 
 ## Production status
 
-**Production PQ activation is NOT AUTHORIZED.** `strict-pq` remains **OFF**, XMESH1 remains retained, and `physicalPowerLossQualified=false` remains the correct KVM claim.
-
-When resuming, read [`P0E_CHECKPOINT.md`](P0E_CHECKPOINT.md), then [`docs/ENTERPRISE_ROADMAP.md`](docs/ENTERPRISE_ROADMAP.md) and [`docs/XSP_V2_P0E_STAGE1_STAGE2_EVIDENCE_2026-10-30.md`](docs/XSP_V2_P0E_STAGE1_STAGE2_EVIDENCE_2026-10-30.md).
+**Strict-PQ is active in production on bounded canary Node 13.** This does not automatically authorize a wider rollout: expanding scope requires a separate bounded release decision/approval. XMESH1 remains retained, and `physicalPowerLossQualified=false` remains the correct KVM VPS claim.
