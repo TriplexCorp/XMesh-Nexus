@@ -30,8 +30,11 @@ async function xmeshV6StrictPqBootstrapClick(event){
     }catch(error){
       if(error.status!==409||!String(error.message||'').includes('already has a registered key'))throw error;
       const approved=await panelConfirm(panelIsEnglish()
-        ? `Node #${id} already has an identity. Continue to repair/reconnect it. If it is legacy, this explicitly authorizes legacy re-enrollment. If it is already XSP-v2, no identity will be rotated: the panel will generate a same-VPS repair command that reuses the durable strict-PQ receipt. Do not use the tokenless repair path for a replacement VPS.`
-        : `Узел #${id} уже зарегистрирован. Продолжить repair/переподключение? Для legacy identity это явно разрешит legacy re-enrollment. Если identity уже XSP-v2, она не будет ротироваться: панель выдаст repair-команду для той же VPS с переиспользованием durable strict-PQ receipt. Не используйте repair без токена для новой/заменённой VPS.`);
+        ? `Node #${id} is already registered.\n\nContinuing starts the repair / reconnect flow. A legacy identity explicitly authorizes legacy re-enrollment; an existing XSP-v2 identity is preserved and the panel issues a same-VPS repair command that reuses the durable strict-PQ receipt.\n\nDo not use this tokenless repair flow for a new or replacement VPS.`
+        : `Узел #${id} уже зарегистрирован.\n\nПродолжение запустит repair / переподключение. Для legacy identity это явно разрешит legacy re-enrollment; существующая XSP-v2 identity будет сохранена, а панель выдаст repair-команду для этой же VPS с переиспользованием durable strict-PQ receipt.\n\nНе используйте repair без токена для новой или заменённой VPS.`,{
+          title:panelIsEnglish()?'Confirm node repair':'Подтверждение',
+          confirmLabel:panelIsEnglish()?'Continue':'Продолжить'
+        });
       if(!approved)return;
       try{
         issued=await backendRequest(enrollPath+'/reissue',{method:'POST'});
@@ -55,16 +58,16 @@ async function xmeshV6StrictPqBootstrapClick(event){
       ' && sudo env XMESH_NODE_RELEASE_REF='+XMESH_V6_NODE_BOOTSTRAP_SHA+' bash /tmp/xmesh-bootstrap-v6.sh '+location.origin+' '+id+' '+port;
     const commandTitle=reuseExistingIdentity?'Команда repair для текущей VPS':'Команда для чистого VPS';
     const commandDescription=reuseExistingIdentity
-      ?'Запустите только на той же VPS, где сохранена strict-PQ identity. Установщик сначала криптографически проверит durable activation receipt и не запросит новый enrollment token.'
-      :'Скопируйте и запустите. Она скачивает и checkout’ит только pinned v6 strict-PQ release.';
+      ?'Запустите только на той же VPS, где сохранена strict-PQ identity. Установщик криптографически проверит durable activation receipt и не запросит новый enrollment token.'
+      :'Скопируйте и запустите команду на чистой VPS. Она скачивает и checkout’ит только pinned v6 strict-PQ release.';
     const identityNote=reuseExistingIdentity
-      ?'<p class="note" role="alert"><strong>Identity сохраняется.</strong> Новый enrollment token не выдаётся и ключи не ротируются. Этот путь предназначен только для repair той же VPS с сохранённым <code>/var/lib/xmesh-agent/product/active.json</code>. Для новой/заменённой VPS требуется отдельный XSP-v2 recovery/rotation flow.</p>'
-      :(issued.keyReplacementAuthorized?'<p class="note" role="alert">Recovery/reinstall: старая legacy identity останется действующей до успешного proof новой strict-PQ identity.</p>':'');
+      ?'<div class="node-setup-identity-note" role="note"><span class="node-setup-note-icon">'+ic('shield')+'</span><p><strong>Identity сохраняется.</strong> Новый enrollment token не выдаётся, ключи не ротируются. Этот путь предназначен только для repair той же VPS с сохранённым <code>/var/lib/xmesh-agent/product/active.json</code>. Для новой или заменённой VPS требуется отдельный XSP-v2 recovery/rotation flow.</p></div>'
+      :(issued.keyReplacementAuthorized?'<div class="node-setup-identity-note" role="note"><span class="node-setup-note-icon">'+ic('shield')+'</span><p>Recovery/reinstall: старая legacy identity останется действующей до успешного proof новой strict-PQ identity.</p></div>':'');
     const tokenSection=reuseExistingIdentity?'':
       '<section class="node-setup-step"><div class="node-setup-step-title"><span class="node-setup-number">2</span><div><h3>Одноразовый токен</h3><p>Вставьте его в скрытый запрос установщика. После этого enrollment → hybrid TLS → verified receipt выполняются автоматически до запуска Node/Xray.</p></div></div><input id="node-bootstrap-token" type="password" readonly autocomplete="off" aria-label="Одноразовый токен подключения" value="'+esc(issued.token)+'"><div class="node-setup-token-actions"><span>Действует 10 минут · одноразовый</span><button type="button" class="gh" data-copy-node-token>'+ic('copy')+'Скопировать токен</button></div></section>';
 
-    modal('<div class="box node-setup"><div class="bar2 node-setup-head"><div><h2>POSTQUANTUM подключение узла</h2><p>Установщик fail-closed: Node/Xray не запустятся без подтверждённой strict-PQ активации.</p></div><button class="ia" data-x aria-label="Закрыть">'+ic('x')+'</button></div>'+
-      '<section class="node-setup-step"><div class="node-setup-step-title"><span class="node-setup-number">1</span><div><h3>'+commandTitle+'</h3><p>'+commandDescription+'</p></div></div><textarea id="node-bootstrap-command" readonly spellcheck="false" rows="4" aria-label="Команда установки">'+esc(command)+'</textarea><button type="button" class="btn node-setup-copy" data-copy-node-bootstrap>'+ic('copy')+'Скопировать команду</button></section>'+
+    modal('<div class="box node-setup"><div class="bar2 node-setup-head"><div class="node-setup-title-wrap"><span class="node-setup-badge">'+ic('layers')+'</span><div><h2>POSTQUANTUM подключение узла</h2><p>Установщик fail-closed: Node/Xray не запустятся без подтверждённой strict-PQ активации.</p></div></div><button class="node-setup-close" data-x aria-label="Закрыть">'+ic('x')+'</button></div>'+
+      '<section class="node-setup-step"><div class="node-setup-step-title"><span class="node-setup-number">1</span><div><h3>'+commandTitle+'</h3><p>'+commandDescription+'</p></div></div><textarea id="node-bootstrap-command" readonly spellcheck="false" rows="5" aria-label="Команда установки">'+esc(command)+'</textarea><button type="button" class="btn node-setup-copy" data-copy-node-bootstrap>'+ic('copy')+'Скопировать команду</button></section>'+
       identityNote+tokenSection+'</div>','wide');
   }catch(error){
     toast('Ошибка выдачи strict-PQ установки: '+(error.message||'API'));

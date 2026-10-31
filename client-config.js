@@ -62,6 +62,7 @@
     spiderX:nonempty(host.spiderX)||'/'};
   }else if(security==='tls'){
    result.tlsSettings={serverName:domain||nonempty(host.address),
+    fingerprint:nonempty(host.fp)||nonempty(host.fingerprint)||'chrome',
     ...(source.tlsSettings?.alpn?{alpn:copy(source.tlsSettings.alpn)}:{})};
   }else if(security!=='none'){
    throw new Error('Неизвестный режим защиты '+security+'. Требуется ручная проверка Xray.');

@@ -4,6 +4,8 @@ const fs=require('node:fs');
 const assert=require('node:assert/strict');
 const app=fs.readFileSync('app.js','utf8');
 const css=fs.readFileSync('styles.css','utf8');
+const dialogCss=fs.readFileSync('node-dialogs.css','utf8');
+const dialogJs=fs.readFileSync('node-dialogs.js','utf8');
 const html=fs.readFileSync('index.html','utf8');
 const strictBootstrap=fs.readFileSync('node-bootstrap-v6.js','utf8');
 const dockerfile=fs.readFileSync('backend/Dockerfile','utf8');
@@ -50,7 +52,7 @@ assert.match(html,/app\.js\?v=[a-z0-9-]+/,'Update JS cache');
 // XMesh v6 security invariant: the UI must override the historical installer
 // handler and pin the reviewed strict-PQ-only Node release. The Node bootstrap
 // itself blocks router/Xray startup until a durable verified receipt exists.
-assert.match(html,/<script src="\/node-bootstrap-v6\.js\?v=20261031-strict-pq-only"><\/script>/,
+assert.match(html,/<script src="\/node-bootstrap-v6\.js\?v=20261101-strict-pq-dialogs-v1"><\/script>/,
  'Panel must load the strict-PQ bootstrap override from an absolute dashboard-safe asset path');
 assert.ok(html.indexOf('app.js?v=')<html.indexOf('/node-bootstrap-v6.js?v='),
  'Strict-PQ bootstrap override must load after the historical app handler');
@@ -72,16 +74,39 @@ assert.match(strictBootstrap,/reuseExistingIdentity=true/,
  'Same-VPS XSP-v2 repair must reuse the existing durable identity instead of failing on legacy re-enrollment');
 assert.match(strictBootstrap,/if\(!reuseExistingIdentity&&\(!issued\|\|!Number\.isInteger\(Number\(issued\.nodeId\)\)\|\|String\(issued\.token\|\|''\)\.length!==64\)\)/,
  'Fresh/legacy bootstrap must still require a valid issued one-time token while XSP-v2 same-VPS repair is tokenless');
-assert.match(strictBootstrap,/Новый enrollment token не выдаётся и ключи не ротируются/,
+assert.match(strictBootstrap,/Новый enrollment token не выдаётся, ключи не ротируются/,
  'Repair UI must explicitly state that XSP-v2 identity is preserved');
-assert.match(strictBootstrap,/Для новой\/заменённой VPS требуется отдельный XSP-v2 recovery\/rotation flow/,
+assert.match(strictBootstrap,/Для новой или заменённой VPS требуется отдельный XSP-v2 recovery\/rotation flow/,
  'Tokenless repair must be scoped to the same VPS and must not masquerade as replacement-host recovery');
 assert.match(strictBootstrap,/Node\/Xray не запустятся без подтверждённой strict-PQ активации/,
  'UI must state the fail-closed runtime invariant');
+
+// Repair confirmation and command dialogs must use the redesigned large surface
+// and place a cancel-safe close action in the top-right corner.
+assert.match(html,/<link rel="stylesheet" href="\/node-dialogs\.css\?v=20261101-repair-dialogs-v1">/,
+ 'Node dialog redesign stylesheet must be loaded');
+assert.match(html,/<script src="\/node-dialogs\.js\?v=20261101-repair-dialogs-v1"><\/script>/,
+ 'Node dialog behavior enhancer must be loaded');
+assert.match(dialogCss,/dialog\.xm-action-confirm:has\(\.xm-action-confirm-icon\)\{[\s\S]*width:min\(760px/,
+ 'Registered-node confirmation must no longer use the tiny shared width');
+assert.match(dialogCss,/\.xm-action-confirm-close\{[\s\S]*grid-area:close/,
+ 'Confirmation close control must occupy the top-right grid area');
+assert.match(dialogCss,/#dlg:has\(\.node-setup\)\{[\s\S]*width:min\(1060px/,
+ 'Strict-PQ command dialog must use the redesigned wide layout');
+assert.match(dialogCss,/\.node-setup \.node-setup-close\{[\s\S]*right:0/,
+ 'Strict-PQ close button must be anchored on the right');
+assert.match(dialogJs,/cancel\.click\(\)/,
+ 'Injected confirmation X must delegate to the existing cancel action so promises resolve');
+assert.match(strictBootstrap,/node-setup-title-wrap/,'Strict-PQ dialog must expose the redesigned header structure');
+assert.match(strictBootstrap,/node-setup-identity-note/,'Strict-PQ identity warning must use the redesigned note surface');
+assert.match(dockerfile,/node-dialogs\.css node-dialogs\.js/,
+ 'Production panel image must package the node dialog redesign assets');
 assert.match(dockerfile,/app\.js user-fingerprint-override\.js node-bootstrap-v6\.js unified-selects\.js/,
- 'Production panel image must package both user fingerprint control and the strict-PQ bootstrap override');
+ 'Production panel image must package user fingerprint control and the strict-PQ bootstrap override');
 
 assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length,'CSS braces must remain balanced');
+assert.equal((dialogCss.match(/\{/g)||[]).length,(dialogCss.match(/\}/g)||[]).length,'Node dialog CSS braces must remain balanced');
 new Function(app);
 new Function(strictBootstrap);
-console.log('Node action: visuals + exact-release v6 strict-PQ bootstrap + same-VPS identity repair contract OK');
+new Function(dialogJs);
+console.log('Node action: redesigned repair dialogs + exact-release strict-PQ same-VPS identity repair contract OK');

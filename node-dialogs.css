@@ -1,0 +1,279 @@
+/* Node repair / strict-PQ dialog polish.
+ * Loaded after the shared panel stylesheet so these rules stay narrowly scoped
+ * to the two node-repair surfaces without changing ordinary editor dialogs. */
+
+dialog.xm-action-confirm:has(.xm-action-confirm-icon){
+  width:min(760px,calc(100vw - 2rem));
+  max-width:none;
+  max-height:min(86dvh,760px);
+  border:1px solid color-mix(in srgb,var(--a) 24%,var(--border-strong));
+  border-radius:26px;
+  overflow:hidden;
+  background:
+    radial-gradient(circle at 18% 0%,color-mix(in srgb,var(--a) 9%,transparent),transparent 38%),
+    linear-gradient(145deg,color-mix(in srgb,var(--elevated) 96%,var(--a) 4%),var(--s1));
+  color:var(--tx);
+  box-shadow:0 42px 120px -34px rgba(0,0,0,.88),0 1px 0 rgba(255,255,255,.04) inset;
+}
+dialog.xm-action-confirm:has(.xm-action-confirm-icon)::backdrop{
+  background:color-mix(in srgb,var(--xm-modal-dim) 94%,#03070d 6%);
+  -webkit-backdrop-filter:blur(14px) saturate(.82);
+  backdrop-filter:blur(14px) saturate(.82);
+}
+dialog.xm-action-confirm:has(.xm-action-confirm-icon) .xm-action-confirm-box{
+  position:relative;
+  padding:2rem 2.1rem 1.35rem;
+  display:grid;
+  grid-template-columns:3.35rem minmax(0,1fr) 2.8rem;
+  grid-template-areas:
+    "icon title close"
+    "body body body"
+    "actions actions actions";
+  align-items:center;
+  column-gap:1rem;
+  row-gap:1.25rem;
+}
+dialog.xm-action-confirm:has(.xm-action-confirm-icon) .xm-action-confirm-icon{
+  grid-area:icon;
+  width:3.35rem;
+  height:3.35rem;
+  margin:0;
+  border:1px solid color-mix(in srgb,var(--a) 20%,var(--ln));
+  border-radius:1.05rem;
+  display:grid;
+  place-items:center;
+  color:var(--a);
+  background:linear-gradient(145deg,color-mix(in srgb,var(--a) 19%,var(--s2)),color-mix(in srgb,var(--s2) 94%,transparent));
+  box-shadow:0 12px 28px -22px color-mix(in srgb,var(--a) 80%,transparent),0 1px 0 rgba(255,255,255,.04) inset;
+}
+dialog.xm-action-confirm:has(.xm-action-confirm-icon) .xm-action-confirm-icon .ic{width:1.45rem;height:1.45rem}
+dialog.xm-action-confirm:has(.xm-action-confirm-icon) h2{
+  grid-area:title;
+  margin:0;
+  font-size:clamp(1.45rem,2.3vw,2rem);
+  line-height:1.15;
+  font-weight:800;
+  letter-spacing:-.045em;
+}
+dialog.xm-action-confirm:has(.xm-action-confirm-icon) .xm-action-confirm-box>p{
+  grid-area:body;
+  margin:.15rem 0 0;
+  padding:.15rem 0 .2rem;
+  max-width:68ch;
+  color:color-mix(in srgb,var(--tx) 78%,var(--mu));
+  font-size:1rem;
+  line-height:1.72;
+  white-space:pre-line;
+}
+dialog.xm-action-confirm:has(.xm-action-confirm-icon) .xm-action-confirm-actions{
+  grid-area:actions;
+  margin:0 -2.1rem -1.35rem;
+  padding:1.15rem 2.1rem 1.3rem;
+  display:flex;
+  justify-content:flex-end;
+  align-items:center;
+  gap:.75rem;
+  border-top:1px solid var(--ln);
+  background:color-mix(in srgb,var(--bg) 18%,transparent);
+}
+dialog.xm-action-confirm:has(.xm-action-confirm-icon) .xm-action-confirm-actions button{
+  min-width:9.5rem;
+  min-height:3rem;
+  padding:.78rem 1.15rem;
+  border-radius:999px;
+  font-weight:760;
+}
+dialog.xm-action-confirm:has(.xm-action-confirm-icon) .xm-action-confirm-close{
+  grid-area:close;
+  align-self:start;
+  justify-self:end;
+  width:2.8rem;
+  height:2.8rem;
+  display:grid;
+  place-items:center;
+  border:1px solid var(--ln);
+  border-radius:.95rem;
+  color:var(--mu);
+  background:color-mix(in srgb,var(--tx) 5%,transparent);
+  transition:color .16s,border-color .16s,background .16s,transform .16s;
+}
+dialog.xm-action-confirm:has(.xm-action-confirm-icon) .xm-action-confirm-close:hover{
+  color:var(--tx);
+  border-color:color-mix(in srgb,var(--a) 28%,var(--ln));
+  background:color-mix(in srgb,var(--a) 9%,var(--s2));
+  transform:translateY(-1px);
+}
+dialog.xm-action-confirm:has(.xm-action-confirm-icon) .xm-action-confirm-close svg{width:1.15rem;height:1.15rem}
+
+/* Strict-PQ command dialog. Keep the native dialog shell transparent and let
+ * the node-setup card own the visual surface. */
+#dlg:has(.node-setup){
+  width:min(1060px,calc(100vw - 2rem));
+  max-width:none;
+  max-height:calc(100dvh - 2rem);
+  padding:0;
+  border:0;
+  overflow:visible;
+  background:transparent;
+  box-shadow:none;
+}
+#dlg:has(.node-setup)::backdrop{
+  background:color-mix(in srgb,var(--xm-modal-dim) 94%,#03070d 6%);
+  -webkit-backdrop-filter:blur(14px) saturate(.82);
+  backdrop-filter:blur(14px) saturate(.82);
+}
+#dlg:has(.node-setup) .box.node-setup{
+  position:relative;
+  width:100%;
+  max-height:calc(100dvh - 2rem);
+  margin:0;
+  padding:1.85rem;
+  overflow:auto;
+  border:1px solid color-mix(in srgb,var(--a) 28%,var(--border-strong));
+  border-radius:28px;
+  background:
+    radial-gradient(circle at 18% 0%,color-mix(in srgb,var(--a) 8%,transparent),transparent 34%),
+    linear-gradient(145deg,color-mix(in srgb,var(--elevated) 97%,var(--a) 3%),var(--s1));
+  box-shadow:0 44px 120px -38px rgba(0,0,0,.9),0 1px 0 rgba(255,255,255,.04) inset;
+}
+.node-setup .node-setup-head{
+  position:relative;
+  margin:0 0 1.35rem;
+  padding:0 4rem 1.35rem 0;
+  display:flex;
+  align-items:center;
+  gap:1rem;
+  border-bottom:1px solid var(--ln);
+}
+.node-setup .node-setup-title-wrap{display:flex;align-items:center;gap:1rem;min-width:0}
+.node-setup .node-setup-badge{
+  width:3.45rem;
+  height:3.45rem;
+  flex:none;
+  display:grid;
+  place-items:center;
+  border:1px solid color-mix(in srgb,var(--a) 20%,var(--ln));
+  border-radius:1.05rem;
+  color:var(--a);
+  background:linear-gradient(145deg,color-mix(in srgb,var(--a) 18%,var(--s2)),color-mix(in srgb,var(--s2) 94%,transparent));
+}
+.node-setup .node-setup-badge .ic{width:1.5rem;height:1.5rem}
+.node-setup .node-setup-head h2{
+  margin:0 0 .28rem;
+  font-size:clamp(1.5rem,2.3vw,2.05rem);
+  line-height:1.14;
+  letter-spacing:-.045em;
+}
+.node-setup .node-setup-head p{margin:0;color:var(--mu);font-size:.95rem;line-height:1.55}
+.node-setup .node-setup-close{
+  position:absolute;
+  top:0;
+  right:0;
+  width:2.8rem;
+  height:2.8rem;
+  display:grid;
+  place-items:center;
+  border:1px solid var(--ln);
+  border-radius:.95rem;
+  color:var(--mu);
+  background:color-mix(in srgb,var(--tx) 5%,transparent);
+  transition:color .16s,border-color .16s,background .16s,transform .16s;
+}
+.node-setup .node-setup-close:hover{
+  color:var(--tx);
+  border-color:color-mix(in srgb,var(--a) 28%,var(--ln));
+  background:color-mix(in srgb,var(--a) 9%,var(--s2));
+  transform:translateY(-1px);
+}
+.node-setup .node-setup-step{
+  margin:0;
+  padding:1.5rem;
+  border:1px solid color-mix(in srgb,var(--tx) 10%,var(--ln));
+  border-radius:1.35rem;
+  background:linear-gradient(150deg,color-mix(in srgb,var(--s2) 86%,transparent),color-mix(in srgb,var(--s1) 94%,transparent));
+  box-shadow:0 1px 0 rgba(255,255,255,.025) inset;
+}
+.node-setup .node-setup-step+.node-setup-step{margin-top:1rem}
+.node-setup .node-setup-step-title{display:flex;align-items:flex-start;gap:1rem;margin-bottom:1rem}
+.node-setup .node-setup-number{
+  width:2.65rem;
+  height:2.65rem;
+  flex:none;
+  display:grid;
+  place-items:center;
+  border-radius:.9rem;
+  color:var(--tx);
+  font-weight:800;
+  background:color-mix(in srgb,var(--a) 24%,var(--s2));
+  border:1px solid color-mix(in srgb,var(--a) 20%,var(--ln));
+}
+.node-setup .node-setup-step-title h3{margin:.05rem 0 .25rem;font-size:1.18rem;letter-spacing:-.025em}
+.node-setup .node-setup-step-title p{margin:0;max-width:78ch;color:var(--mu);font-size:.94rem;line-height:1.6}
+.node-setup #node-bootstrap-command{
+  width:100%;
+  min-height:10.75rem;
+  resize:vertical;
+  padding:1.15rem 1.25rem;
+  border:1px solid color-mix(in srgb,var(--a) 14%,var(--border-strong));
+  border-radius:1.05rem;
+  background:color-mix(in srgb,var(--bg) 52%,var(--s2));
+  color:color-mix(in srgb,var(--tx) 94%,#fff);
+  font:500 .87rem/1.7 "IBM Plex Mono",ui-monospace,SFMono-Regular,Consolas,monospace;
+  letter-spacing:0;
+  overflow:auto;
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+}
+.node-setup .node-setup-copy{
+  width:auto;
+  min-height:3rem;
+  margin-top:1rem;
+  padding:.78rem 1.15rem;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:.55rem;
+  border-radius:.9rem;
+  font-weight:780;
+}
+.node-setup .node-setup-token-actions{margin-top:.85rem;display:flex;align-items:center;justify-content:space-between;gap:.8rem;flex-wrap:wrap;color:var(--mu)}
+.node-setup #node-bootstrap-token{width:100%;margin-top:.2rem}
+.node-setup .node-setup-identity-note{
+  margin:1.25rem 0 0;
+  padding:1.05rem 1.1rem 0;
+  display:grid;
+  grid-template-columns:1.8rem minmax(0,1fr);
+  gap:.75rem;
+  align-items:start;
+  border-top:1px solid var(--ln);
+  color:var(--mu);
+  line-height:1.55;
+}
+.node-setup .node-setup-identity-note .node-setup-note-icon{
+  width:1.75rem;height:1.75rem;display:grid;place-items:center;border-radius:.65rem;
+  color:var(--a);background:color-mix(in srgb,var(--a) 10%,var(--s2));
+}
+.node-setup .node-setup-identity-note code{font-size:.86em;color:color-mix(in srgb,var(--tx) 82%,var(--mu));overflow-wrap:anywhere}
+
+@media(max-width:720px){
+  dialog.xm-action-confirm:has(.xm-action-confirm-icon){width:calc(100vw - 1rem);border-radius:20px}
+  dialog.xm-action-confirm:has(.xm-action-confirm-icon) .xm-action-confirm-box{
+    padding:1.25rem 1.15rem 1rem;
+    grid-template-columns:2.85rem minmax(0,1fr) 2.5rem;
+    column-gap:.75rem;row-gap:1rem;
+  }
+  dialog.xm-action-confirm:has(.xm-action-confirm-icon) .xm-action-confirm-icon{width:2.85rem;height:2.85rem}
+  dialog.xm-action-confirm:has(.xm-action-confirm-icon) .xm-action-confirm-actions{
+    margin:0 -1.15rem -1rem;padding:1rem 1.15rem;display:grid;grid-template-columns:1fr 1fr;
+  }
+  dialog.xm-action-confirm:has(.xm-action-confirm-icon) .xm-action-confirm-actions button{min-width:0;width:100%}
+  #dlg:has(.node-setup){width:calc(100vw - 1rem);max-height:calc(100dvh - 1rem)}
+  #dlg:has(.node-setup) .box.node-setup{max-height:calc(100dvh - 1rem);padding:1.15rem;border-radius:20px}
+  .node-setup .node-setup-head{padding-right:3.35rem}
+  .node-setup .node-setup-badge{width:2.9rem;height:2.9rem}
+  .node-setup .node-setup-step{padding:1rem}
+  .node-setup .node-setup-step-title{gap:.75rem}
+  .node-setup #node-bootstrap-command{min-height:12.5rem;font-size:.8rem}
+  .node-setup .node-setup-copy{width:100%}
+  .node-setup .node-setup-identity-note{padding-inline:.25rem}
+}
