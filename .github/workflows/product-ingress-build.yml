@@ -8,6 +8,8 @@ on:
       - deploy/xsp-v2-ingress/**
       - deploy/xsp-v2-product-gateway/**
       - scripts/check-install-host.sh
+      - scripts/provision-xsp-v2-v6-foundation.sh
+      - scripts/test-xsp-v2-product-mldsa-key-format.sh
       - .github/workflows/product-ingress-build.yml
   pull_request:
     branches: [main]
@@ -16,6 +18,8 @@ on:
       - deploy/xsp-v2-ingress/**
       - deploy/xsp-v2-product-gateway/**
       - scripts/check-install-host.sh
+      - scripts/provision-xsp-v2-v6-foundation.sh
+      - scripts/test-xsp-v2-product-mldsa-key-format.sh
       - .github/workflows/product-ingress-build.yml
 
 permissions:
@@ -43,6 +47,8 @@ jobs:
           grep -Fq 'github.com/jackc/pgx/v5 v5.7.6 h1:' deploy/xsp-v2-product-gateway/go.sum
           grep -Fq 'COPY go.mod go.sum ./' deploy/xsp-v2-product-gateway/Dockerfile
           grep -Fq 'go build -mod=readonly' deploy/xsp-v2-product-gateway/Dockerfile
+      - name: Verify ML-DSA private-key migration and Go/x509 compatibility
+        run: bash scripts/test-xsp-v2-product-mldsa-key-format.sh
       - name: Validate product Compose model
         run: docker compose --profile xsp-v2-product config --quiet
       - name: Build strict-PQ product control plane exactly as installer will
