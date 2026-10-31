@@ -38,6 +38,10 @@ grep -Fq 'server strict_pq 127.0.0.1:8444' <<< "$mux"
 grep -Fq 'XSP_V2_PRODUCT_PUBLIC_ADDRESS: ${PANEL_DOMAIN:?Run ./install.sh first}:443' compose.yaml
 grep -Fq '127.0.0.1:8444:8444' compose.yaml
 ! grep -Fq '0.0.0.0:8444:8444' compose.yaml
+grep -Fq 'docker port "$ingress_id" 8444/tcp' "$host"
+grep -Fq "expected 127.0.0.1:8444" "$host"
+grep -Fq 'ExecStart=/usr/sbin/haproxy -W -db -f /etc/xmesh-nexus/haproxy-443.cfg' "$host"
+! grep -Fq '/run/xmesh-https-mux.pid' "$host"
 grep -Fq 'TCP/8444 must remain closed externally' "$host"
 grep -Fq 'bash deploy/ensure-subscription-key.sh .env' install.sh
 if bash "$host" render-nginx panel.example.org '8080;return 200' >/dev/null 2>&1; then
