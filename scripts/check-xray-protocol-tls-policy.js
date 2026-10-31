@@ -26,6 +26,9 @@ assert.equal(typeof normalize,'function','TLS policy must export normalizeInboun
 assert.equal(typeof policy?.desiredSecurity,'function','TLS policy must expose its decision function');
 assert.equal(typeof policy?.randomXhttpPath,'function','Studio policy must export random XHTTP path generator');
 assert.equal(typeof policy?.randomizeDocument,'function','Studio policy must export generation randomizer');
+assert.equal(typeof policy?.ensureXhttpSettings,'function','Studio policy must expose XHTTP constructor normalization');
+assert.equal(typeof policy?.xhttpExtraObject,'function','Studio policy must expose XHTTP extra parser');
+assert.equal(typeof policy?.openXhttpMenu,'function','Studio policy must expose the XHTTP constructor entrypoint');
 
 const cert={certificateFile:'/etc/xray/server.crt',keyFile:'/etc/xray/server.key'};
 
@@ -67,6 +70,22 @@ assert.match(pathA,/^\/[A-Za-z0-9_-]{64}$/,'Generated XHTTP path must be a 64-ch
 assert.match(pathB,/^\/[A-Za-z0-9_-]{64}$/);
 assert.notEqual(pathA,pathB,'Consecutive generated XHTTP paths must not be reused');
 
+const rawInbound={protocol:'vless',streamSettings:{network:'raw',security:'reality'}};
+const createdXhttp=policy.ensureXhttpSettings(rawInbound);
+assert.equal(rawInbound.streamSettings.network,'xhttp','XHTTP constructor must activate XHTTP transport explicitly');
+assert.equal(createdXhttp.mode,'auto','New XHTTP settings must use auto mode by default');
+assert.match(createdXhttp.path,/^\/[A-Za-z0-9_-]{64}$/,'New XHTTP settings must get a random path immediately');
+assert.equal(rawInbound.streamSettings.security,'reality','XHTTP constructor must not rewrite Security');
+
+const existingXhttp={protocol:'vless',streamSettings:{network:'xhttp',security:'tls',xhttpSettings:{path:'/custom-path',mode:'stream-up'}}};
+const existingSettings=policy.ensureXhttpSettings(existingXhttp);
+assert.equal(existingSettings.path,'/custom-path','XHTTP constructor must preserve an existing custom path');
+assert.equal(existingSettings.mode,'stream-up','XHTTP constructor must preserve an existing explicit mode');
+assert.equal(existingXhttp.streamSettings.security,'tls','XHTTP constructor must preserve TLS selection');
+
+assert.deepEqual(policy.xhttpExtraObject({extra:'{"xPaddingBytes":"120-900","xmux":{"maxConcurrency":"8-16"}}'}),
+ {xPaddingBytes:'120-900',xmux:{maxConcurrency:'8-16'}},'XHTTP constructor must accept JSON-string extra used by existing profiles');
+
 const previousRaw={inbounds:[{tag:'main',streamSettings:{network:'raw',security:'none'}}]};
 const generatedXhttp={inbounds:[{tag:'main',streamSettings:{network:'xhttp',security:'none',xhttpSettings:{path:'/xhttp',mode:'auto'}}}]};
 assert.equal(policy.randomizeDocument(generatedXhttp,previousRaw),true,'Switching to XHTTP must replace the placeholder path');
@@ -104,9 +123,15 @@ assert.match(randomized.streamSettings.finalmask.udp[0].settings.client[0].packe
 assert.ok((listeners.change||[]).length>0,'Policy must observe Security selector changes');
 assert.ok((listeners.input||[]).length>0,'Policy must observe Studio JSON mutations for generation hardening');
 assert.ok((listeners.pointerdown||[]).length>0,'Policy must snapshot before composer/tool mutations');
+assert.ok((listeners.click||[]).length>0,'Policy must capture the XHTTP tool to open the card constructor');
+assert.match(source,/XHTTP · конструктор/,'XHTTP must use the same card-constructor presentation as FinalMask');
+assert.match(source,/type:'cards'/,'XHTTP constructor must render card choices');
+for(const label of ['AUTO · Универсальный','PACKET-UP · Совместимость','STREAM-UP · Потоковый upload','STREAM-ONE · Один поток','Headers & Padding','XMUX','Расширенный JSON'])
+ assert.ok(source.includes(label),'XHTTP constructor is missing card: '+label);
+assert.match(source,/data-tool=\\?"xhttp\\?"/,'Existing XHTTP palette button must be intercepted by the constructor');
 assert.match(source,/data-compose-apply/,'Composer apply must force a fresh generated XHTTP placeholder path');
 assert.match(source,/dataset\.field!=='security'/,'Policy must only react to the Security selector for TLS activation');
 assert.doesNotMatch(source,/field!=='protocol'/,'Protocol changes must not drive TLS activation');
 assert.doesNotMatch(source,/field!=='transport'/,'Transport changes must not drive TLS activation');
 
-console.log('XRAY STUDIO security policy + randomized XHTTP/FinalMask generation: OK');
+console.log('XRAY STUDIO security policy + randomized XHTTP/FinalMask generation + XHTTP card menu: OK');
