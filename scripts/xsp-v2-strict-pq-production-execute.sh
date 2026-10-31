@@ -64,17 +64,61 @@ assert v['requiresSeparateExecution'] is True
 PY
 
 # Numeric ownership is part of the reviewed UDS peer-credential boundary.
+# Keep the top-level runtime directory traversable, while each sensitive
+# material directory is readable only by the exact container GID that needs it.
+install -d -o root -g root -m 0755 "$RUNTIME_DIR"
 install -d -o 10002 -g 10001 -m 0750 "$RUNTIME_DIR/signer"
 install -d -o 10001 -g 10003 -m 2750 "$RUNTIME_DIR/c2c"
 install -d -o 10004 -g 10003 -m 2750 "$RUNTIME_DIR/origin"
+
+# Stage public panel pin and ingress TLS material into runtime-owned paths.
+# This avoids relying on operator source-directory ownership while preserving
+# least privilege for the fixed container identities (C2-C gid 10001,
+# ingress gid 10003). Source files remain unchanged.
+install -d -o root -g 10001 -m 0750 "$RUNTIME_DIR/c2c-public"
+install -o root -g 10001 -m 0640 "$XSP_V2_PANEL_PIN_FILE" "$RUNTIME_DIR/c2c-public/panel-pin.json"
+install -d -o root -g 10003 -m 0750 "$RUNTIME_DIR/ingress-certs"
+for file in fullchain.pem privkey.pem client-ca.pem; do
+  install -o root -g 10003 -m 0640 "$XSP_V2_INGRESS_CERTS_DIR/$file" "$RUNTIME_DIR/ingress-certs/$file"
+done
+
 export XSP_V2_STRICT_PQ_RUNTIME_DIR="$RUNTIME_DIR"
+export XSP_V2_PANEL_PIN_FILE="$RUNTIME_DIR/c2c-public/panel-pin.json"
+export XSP_V2_INGRESS_CERTS_DIR="$RUNTIME_DIR/ingress-certs"
 
 cd "$ROOT"
-docker compose -f compose.yaml -f "$OVERLAY" --profile xsp-v2-strict-pq config >/dev/null
-docker compose -f compose.yaml -f "$OVERLAY" --profile xsp-v2-strict-pq up -d --build \
+COMPOSE=(docker compose -f compose.yaml -f "$OVERLAY" --profile xsp-v2-strict-pq)
+"${COMPOSE[@]}" config >/dev/null
+"${COMPOSE[@]}" up -d --build \
   xsp-v2-strict-signer xsp-v2-strict-c2c xsp-v2-strict-origin xsp-v2-strict-ingress
 
-# A started stack is readiness for the bounded Node execution, not proof that
+# Compose service_started is not enough for production readiness: a process may
+# already be restart-looping because a bind-mounted file is unreadable. Require
+# all four bounded services to remain in running/non-restarting state before
+# emitting stack-ready evidence.
+services=(xsp-v2-strict-signer xsp-v2-strict-c2c xsp-v2-strict-origin xsp-v2-strict-ingress)
+all_running=0
+for _ in {1..10}; do
+  all_running=1
+  for service in "${services[@]}"; do
+    cid="$("${COMPOSE[@]}" ps -q "$service")"
+    if [[ -z "$cid" || "$(docker inspect -f '{{.State.Status}}:{{.State.Restarting}}' "$cid")" != 'running:false' ]]; then
+      all_running=0
+      break
+    fi
+  done
+  (( all_running == 1 )) && break
+  sleep 1
+done
+(( all_running == 1 )) || {
+  "${COMPOSE[@]}" ps >&2 || true
+  echo 'strict-PQ production services did not reach stable running state' >&2
+  exit 1
+}
+INGRESS_ID="$("${COMPOSE[@]}" ps -q xsp-v2-strict-ingress)"
+[[ -n "$(docker port "$INGRESS_ID" 8444/tcp 2>/dev/null)" ]] || { echo 'strict-PQ ingress port 8444 is not published' >&2; exit 1; }
+
+# A ready stack is readiness for the bounded Node execution, not proof that
 # the Node completed the signed cutover. strictPQEnabled stays false until the
 # Node's activation binary returns a verified immutable receipt binding.
 APPROVAL_SHA="$(sha256sum "$APPROVAL" | awk '{print $1}')"
@@ -94,6 +138,10 @@ fd,tmp=tempfile.mkstemp(prefix='.stack-ready.',dir=os.path.dirname(path),text=Tr
 with os.fdopen(fd,'w',encoding='utf-8') as f:
     json.dump(value,f,separators=(',',':'));f.write('\n');f.flush();os.fsync(f.fileno())
 os.chmod(tmp,0o600);os.replace(tmp,path)
-with open(os.path.dirname(path),os.O_RDONLY) as d: os.fsync(d.fileno())
+d=os.open(os.path.dirname(path),os.O_RDONLY)
+try:
+    os.fsync(d)
+finally:
+    os.close(d)
 print(json.dumps(value,separators=(',',':')))
 PY
