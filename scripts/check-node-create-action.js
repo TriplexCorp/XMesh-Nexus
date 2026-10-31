@@ -5,6 +5,8 @@ const assert=require('node:assert/strict');
 const app=fs.readFileSync('app.js','utf8');
 const css=fs.readFileSync('styles.css','utf8');
 const html=fs.readFileSync('index.html','utf8');
+const strictBootstrap=fs.readFileSync('node-bootstrap-v6.js','utf8');
+const dockerfile=fs.readFileSync('backend/Dockerfile','utf8');
 
 assert.match(app, /<div class="bar2 nodes-toolbar"><p class="note">/,
  'Node list toolbar must be scoped to nodes page');
@@ -46,6 +48,30 @@ assert.match(css, /@media\(max-width:390px\)\{\s*\.nodes-toolbar \.node-create-a
  'New Node button must fit narrow phones');
 assert.match(html,/styles\.css\?v=[a-z0-9-]+/,'Update CSS cache');
 assert.match(html,/app\.js\?v=[a-z0-9-]+/,'Update JS cache');
+
+// XMesh v6 security invariant: the UI must override the historical installer
+// handler and pin the reviewed strict-PQ-only Node merge. The Node bootstrap
+// itself blocks router/Xray startup until a durable verified receipt exists.
+assert.match(html,/<script src="node-bootstrap-v6\.js\?v=20261031-strict-pq-only"><\/script>/,
+ 'Panel must load the strict-PQ bootstrap override after app.js');
+assert.ok(html.indexOf('app.js?v=')<html.indexOf('node-bootstrap-v6.js?v='),
+ 'Strict-PQ bootstrap override must load after the historical app handler');
+assert.match(strictBootstrap,/XMESH_V6_NODE_BOOTSTRAP_SHA='fdfcdf915810018e7017f6706ad63c51181fa7c6'/,
+ 'Fresh Node installation must pin the reviewed XMesh-Node strict-PQ-only merge');
+assert.match(strictBootstrap,/XMesh Node v6 fresh installer\. Security invariant:/,
+ 'The downloaded installer must be marker-checked as the v6 fail-closed bootstrap');
+assert.match(strictBootstrap,/document\.addEventListener\('click',xmeshV6StrictPqBootstrapClick,true\)/,
+ 'Strict-PQ handler must capture the bootstrap click before the historical handler');
+assert.match(strictBootstrap,/\/api\/v1\/nodes\/'\+encodeURIComponent\(id\)\+'\/enrollment'/,
+ 'Bootstrap must use owner-issued one-time enrollment credentials');
+assert.match(strictBootstrap,/enrollPath\+'\/reissue'/,
+ 'Explicit owner-approved recovery must remain available without silent key replacement');
+assert.match(strictBootstrap,/Node\/Xray не запустятся без подтверждённой strict-PQ активации/,
+ 'UI must state the fail-closed runtime invariant');
+assert.match(dockerfile,/app\.js node-bootstrap-v6\.js unified-selects\.js/,
+ 'Production panel image must package the strict-PQ bootstrap override');
+
 assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length,'CSS braces must remain balanced');
 new Function(app);
-console.log('Node action: visuals, responsive styling and create handler OK');
+new Function(strictBootstrap);
+console.log('Node action: visuals + pinned v6 strict-PQ-only bootstrap contract OK');
