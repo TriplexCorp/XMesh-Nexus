@@ -3,7 +3,7 @@
 // v6 product invariant: the panel must never hand a fresh VPS an installer
 // that can enter operational state before strict-PQ activation is verified.
 // Keep this SHA pinned to the reviewed XMesh-Node strict-PQ-only release.
-const XMESH_V6_NODE_BOOTSTRAP_SHA='7b6ec04d7dfe6e9b785f9988b5c43afb64499456';
+const XMESH_V6_NODE_BOOTSTRAP_SHA='2745b03677fc6e12761021c5dad6d48138af87d4';
 const XMESH_V6_BOOTSTRAP_MARKER='XMesh Node v6 fresh installer. Security invariant:';
 
 async function xmeshV6StrictPqBootstrapClick(event){
