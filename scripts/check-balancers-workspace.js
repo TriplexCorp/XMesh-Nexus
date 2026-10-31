@@ -17,7 +17,7 @@ assert.match(engine,/let\s+smart\s*=\s*smart_enabled\(\s*setting\s*\)/);
 assert.match(engine,/enabled\(\s*opts\s*,\s*"smart"\s*,\s*false\s*\)/);
 assert.match(engine,/if\s+smart\s*&&\s*tags\.len\(\)\s*>\s*1\s*&&\s*balance\s*!=\s*"off"/);
 assert.match(engine,/fn balancers_are_opt_in_and_servers_remain_distinct/);
-const subscriptions=fs.readFileSync('backend/src/user_subscriptions.rs','utf8');
+const subscriptions=fs.readFileSync('backend/src/user_subscriptions.rs','utf8')+'\n'+fs.readFileSync('backend/src/user_subscriptions_base.rs','utf8');
 assert.match(subscriptions,/let\s+mut\s+response\s*=\s*Json\(\s*json\s*\)\.into_response\(\)/,
  'Every subscription returns native JSON regardless of SMART');
 assert.doesNotMatch(subscriptions,/vless_link\(|links\.join\(|use_vless_feed\(/,
