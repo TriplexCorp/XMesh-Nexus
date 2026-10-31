@@ -3,7 +3,7 @@
 // v6 product invariant: the panel must never hand a fresh VPS an installer
 // that can enter operational state before strict-PQ activation is verified.
 // Keep this SHA pinned to the reviewed XMesh-Node strict-PQ-only release.
-const XMESH_V6_NODE_BOOTSTRAP_SHA='66d09bc2a9d7f131e2e4c931573bc8a116286e77';
+const XMESH_V6_NODE_BOOTSTRAP_SHA='4c03a103929140d1171af5a1ac843a186f7af16c';
 const XMESH_V6_BOOTSTRAP_MARKER='XMesh Node v6 fresh installer. Security invariant:';
 const XMESH_V6_XSP_IDENTITY_CONFLICT='XSP-v2 identity already enrolled: legacy re-enrollment cannot rotate it.';
 
@@ -56,7 +56,7 @@ async function xmeshV6StrictPqBootstrapClick(event){
     const command='curl --proto "=https" --tlsv1.2 -H "Cache-Control: no-cache" -fsSLo /tmp/xmesh-bootstrap-v6.sh '+url+
       ' && grep -Fq "'+XMESH_V6_BOOTSTRAP_MARKER+'" /tmp/xmesh-bootstrap-v6.sh'+
       ' && sudo env XMESH_NODE_RELEASE_REF='+XMESH_V6_NODE_BOOTSTRAP_SHA+' bash /tmp/xmesh-bootstrap-v6.sh '+location.origin+' '+id+' '+port;
-    const commandTitle=reuseExistingIdentity?'Команда repair для текущей VPS':'Команда для чистого VPS';
+    const commandTitle=reuseExistingIdentity?'Команда repair для текущей VPS':'Команда для чистой VPS';
     const commandDescription=reuseExistingIdentity
       ?'Запустите только на той же VPS, где сохранена strict-PQ identity. Установщик криптографически проверит durable activation receipt и не запросит новый enrollment token.'
       :'Скопируйте и запустите команду на чистой VPS. Она скачивает и checkout’ит только pinned v6 strict-PQ release.';

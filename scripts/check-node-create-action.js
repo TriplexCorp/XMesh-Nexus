@@ -52,12 +52,12 @@ assert.match(html,/app\.js\?v=[a-z0-9-]+/,'Update JS cache');
 // XMesh v6 security invariant: the UI must override the historical installer
 // handler and pin the reviewed strict-PQ-only Node release. The Node bootstrap
 // itself blocks router/Xray startup until a durable verified receipt exists.
-assert.match(html,/<script src="\/node-bootstrap-v6\.js\?v=20261101-strict-pq-dialogs-v1"><\/script>/,
- 'Panel must load the strict-PQ bootstrap override from an absolute dashboard-safe asset path');
+assert.match(html,/<script src="\/node-bootstrap-v6\.js\?v=20261101-operational-timers-v2"><\/script>/,
+ 'Panel must cache-bust the strict-PQ bootstrap after changing the reviewed Node release pin');
 assert.ok(html.indexOf('app.js?v=')<html.indexOf('/node-bootstrap-v6.js?v='),
  'Strict-PQ bootstrap override must load after the historical app handler');
-assert.match(strictBootstrap,/XMESH_V6_NODE_BOOTSTRAP_SHA='66d09bc2a9d7f131e2e4c931573bc8a116286e77'/,
- 'Fresh Node installation must pin the reviewed XMesh-Node release with durable receipt, router sandbox and Certbot writable-state fixes');
+assert.match(strictBootstrap,/XMESH_V6_NODE_BOOTSTRAP_SHA='4c03a103929140d1171af5a1ac843a186f7af16c'/,
+ 'Fresh Node installation must pin the reviewed XMesh-Node release with durable receipt and fail-safe operational timer durability');
 assert.match(strictBootstrap,/XMesh Node v6 fresh installer\. Security invariant:/,
  'The downloaded installer must be marker-checked as the v6 fail-closed bootstrap');
 assert.match(strictBootstrap,/sudo env XMESH_NODE_RELEASE_REF='\+XMESH_V6_NODE_BOOTSTRAP_SHA\+' bash \/tmp\/xmesh-bootstrap-v6\.sh/,
