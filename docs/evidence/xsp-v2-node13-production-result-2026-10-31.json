@@ -1,0 +1,1 @@
+{"status":"strict-pq-node-cutover-receipt-verified","mode":"recover","nodeId":13,"approvalSha256":"b2e43b137d4ea5b24b1313899e57701608874e059bdf5d5d2ba9f263ba866259","receiptBindingSha256":"1747647618cb1a824b85ef379646da242de7846e8c3ebff0bfdad9bc078ecb39","minimumEpoch":2,"strictPQEnabled":true,"legacyXMESH1Retired":false}
