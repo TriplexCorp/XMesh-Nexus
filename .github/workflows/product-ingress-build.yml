@@ -1,0 +1,41 @@
+name: XSP-v2 Product Ingress Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - compose.yaml
+      - deploy/xsp-v2-ingress/**
+      - scripts/check-install-host.sh
+      - .github/workflows/product-ingress-build.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - compose.yaml
+      - deploy/xsp-v2-ingress/**
+      - scripts/check-install-host.sh
+      - .github/workflows/product-ingress-build.yml
+
+permissions:
+  contents: read
+
+jobs:
+  product-ingress-build:
+    runs-on: ubuntu-latest
+    env:
+      POSTGRES_PASSWORD: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      APP_DB_PASSWORD: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
+      REDIS_PASSWORD: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
+      ADMIN_PASSWORD: 9876543210abcdef9876543210abcdef9876543210abcdef
+      DASHBOARD_PATH: /dashboard/0123456789abcdef0123456789abcdef0123456789abcdef
+      SUBSCRIPTION_ENCRYPTION_KEY: "1234567812345678123456781234567812345678123456781234567812345678"
+      XSP_V2_PRODUCT_INTERNAL_TOKEN: "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+      PANEL_DOMAIN: ci.example.invalid
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify installer/build-context contract
+        run: bash scripts/check-install-host.sh
+      - name: Validate product Compose model
+        run: docker compose --profile xsp-v2-product config --quiet
+      - name: Build strict-PQ product ingress exactly as installer will
+        run: docker compose --profile xsp-v2-product build xsp-v2-product-ingress
