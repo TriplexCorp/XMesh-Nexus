@@ -77,6 +77,10 @@ const legacyPrevious={inbounds:[{tag:'legacy',streamSettings:{network:'xhttp',xh
 const legacyCurrent=JSON.parse(JSON.stringify(legacyPrevious));
 assert.equal(policy.randomizeDocument(legacyCurrent,legacyPrevious),false,'Existing legacy /xhttp path must not silently rotate on unrelated edits');
 assert.equal(legacyCurrent.inbounds[0].streamSettings.xhttpSettings.path,'/xhttp');
+const composerRebuild=JSON.parse(JSON.stringify(legacyPrevious));
+assert.equal(policy.randomizeDocument(composerRebuild,legacyPrevious,true),true,'Explicit composer rebuild must force a fresh XHTTP path');
+assert.match(composerRebuild.inbounds[0].streamSettings.xhttpSettings.path,/^\/[A-Za-z0-9_-]{64}$/);
+assert.notEqual(composerRebuild.inbounds[0].streamSettings.xhttpSettings.path,'/xhttp');
 
 const fragmentDefaults={packets:'tlshello',lengths:['3-5','6-8','10-20'],delays:['10-20'],maxSplit:'3-6'};
 const noiseDefaults={reset:'30-60',noise:[{rand:'8-32',delay:'10-20'}]};
@@ -99,6 +103,8 @@ assert.match(randomized.streamSettings.finalmask.udp[0].settings.client[0].packe
 
 assert.ok((listeners.change||[]).length>0,'Policy must observe Security selector changes');
 assert.ok((listeners.input||[]).length>0,'Policy must observe Studio JSON mutations for generation hardening');
+assert.ok((listeners.pointerdown||[]).length>0,'Policy must snapshot before composer/tool mutations');
+assert.match(source,/data-compose-apply/,'Composer apply must force a fresh generated XHTTP placeholder path');
 assert.match(source,/dataset\.field!=='security'/,'Policy must only react to the Security selector for TLS activation');
 assert.doesNotMatch(source,/field!=='protocol'/,'Protocol changes must not drive TLS activation');
 assert.doesNotMatch(source,/field!=='transport'/,'Transport changes must not drive TLS activation');
