@@ -1,9 +1,9 @@
 FROM golang:1.27.3-trixie AS build
 WORKDIR /src
-COPY go.mod ./
-RUN go mod download
+COPY go.mod go.sum ./
+RUN go mod download && go mod verify
 COPY *.go ./
-RUN CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/xmesh-xsp-v2-product-gateway .
+RUN CGO_ENABLED=0 go build -mod=readonly -trimpath -ldflags='-s -w' -o /out/xmesh-xsp-v2-product-gateway .
 
 FROM debian:trixie-slim
 RUN apt-get update \
