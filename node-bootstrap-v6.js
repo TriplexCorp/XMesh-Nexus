@@ -3,7 +3,7 @@
 // v6 product invariant: the panel must never hand a fresh VPS an installer
 // that can enter operational state before strict-PQ activation is verified.
 // Keep this SHA pinned to the reviewed XMesh-Node strict-PQ-only release.
-const XMESH_V6_NODE_BOOTSTRAP_SHA='7bd1c4ea0119891942f20b6942a7e47dcbc3d90c';
+const XMESH_V6_NODE_BOOTSTRAP_SHA='3e803dbf4eeb6135752f6a98f2ac20127b10e3a8';
 const XMESH_V6_BOOTSTRAP_MARKER='XMesh Node v6 fresh installer. Security invariant:';
 const XMESH_V6_XSP_IDENTITY_CONFLICT='XSP-v2 identity already enrolled: legacy re-enrollment cannot rotate it.';
 
@@ -37,9 +37,6 @@ async function xmeshV6StrictPqBootstrapClick(event){
         issued=await backendRequest(enrollPath+'/reissue',{method:'POST'});
       }catch(reissueError){
         if(reissueError.status===409&&String(reissueError.message||'').includes(XMESH_V6_XSP_IDENTITY_CONFLICT)){
-          // Existing XSP-v2 identity is intentionally not replaceable through the
-          // legacy Ed25519 recovery route. For the same VPS, bootstrap can safely
-          // reuse its durable strict-PQ activation receipt without issuing a token.
           reuseExistingIdentity=true;
         }else{
           throw reissueError;
