@@ -67,6 +67,7 @@ services:
       PANEL_UPDATE_STATUS: /run/xmesh/panel-update-status
       TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:-}
       SUBSCRIPTION_ENCRYPTION_KEY: ${SUBSCRIPTION_ENCRYPTION_KEY:?Run ./install.sh to provision subscription key}
+      XSP_V2_PRODUCT_INTERNAL_TOKEN: ${XSP_V2_PRODUCT_INTERNAL_TOKEN:?Run ./install.sh first}
       XSP_V2_SIGNER_SOCKET_PATH: /run/xmesh-signer/signer.sock
       XSP_V2_P0D_AGENT_MIGRATION: ${XSP_V2_P0D_AGENT_MIGRATION:-}
       XSP_V2_P0D_AGENT_ARTIFACT_DIR: /run/xmesh-agent-artifacts
@@ -101,6 +102,7 @@ services:
       dockerfile: Dockerfile
     environment:
       DATABASE_URL: postgresql://xmesh_app:${APP_DB_PASSWORD:?Run ./install.sh first}@db:5432/xmesh
+      XSP_V2_PRODUCT_INTERNAL_TOKEN: ${XSP_V2_PRODUCT_INTERNAL_TOKEN:?Run ./install.sh first}
       XSP_V2_PRODUCT_PUBLIC_ADDRESS: ${PANEL_DOMAIN:?Run ./install.sh first}:8444
       XSP_V2_PRODUCT_SERVER_NAME: node-ingress.xsp.invalid
       XSP_V2_PRODUCT_PANEL_URL: http://panel:8080
