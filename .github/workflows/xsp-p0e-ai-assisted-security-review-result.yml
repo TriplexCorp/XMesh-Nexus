@@ -1,0 +1,75 @@
+name: XSP-v2 P0-E AI-assisted Security Review Result
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "deploy/xsp-v2-p0e-ai-assisted-security-review-result.contract.json"
+      - "deploy/xsp-v2-p0e-ai-assisted-security-review-result.json"
+      - "scripts/verify-xsp-v2-p0e-ai-assisted-security-review-result.py"
+      - "docs/XSP_V2_P0E_AI_ASSISTED_SECURITY_REVIEW_V5_2026-10-31.md"
+      - ".github/workflows/xsp-p0e-ai-assisted-security-review-result.yml"
+  push:
+    branches: [main]
+    paths:
+      - "deploy/xsp-v2-p0e-ai-assisted-security-review-result.contract.json"
+      - "deploy/xsp-v2-p0e-ai-assisted-security-review-result.json"
+      - "scripts/verify-xsp-v2-p0e-ai-assisted-security-review-result.py"
+      - "docs/XSP_V2_P0E_AI_ASSISTED_SECURITY_REVIEW_V5_2026-10-31.md"
+      - ".github/workflows/xsp-p0e-ai-assisted-security-review-result.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-review-result:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and verify closure-eligible result
+        run: |
+          set -Eeuo pipefail
+          python3 -m py_compile scripts/verify-xsp-v2-p0e-ai-assisted-security-review-result.py
+          python3 -m json.tool deploy/xsp-v2-p0e-ai-assisted-security-review-result.contract.json >/dev/null
+          python3 -m json.tool deploy/xsp-v2-p0e-ai-assisted-security-review-result.json >/dev/null
+          python3 scripts/verify-xsp-v2-p0e-ai-assisted-security-review-result.py \
+            --result deploy/xsp-v2-p0e-ai-assisted-security-review-result.json \
+            --require-closure-eligible | tee /tmp/verification.json
+          python3 - <<'PY'
+          import json
+          x=json.load(open('/tmp/verification.json'))
+          assert x['validReviewResult'] is True
+          assert x['closureEligible'] is True
+          assert x['externalIndependentReviewRequired'] is False
+          assert x['reviewerIndependent'] is False
+          assert x['releaseOwnerRiskAccepted'] is True
+          assert x['reviewedDomainCount']==11
+          assert x['requiresRefreeze'] is False
+          assert x['physicalPowerLossQualified'] is False
+          assert x['productionActivation'] is False
+          assert x['strictPQEnabled'] is False
+          PY
+      - name: Prove fake independence and missing owner acceptance fail closed
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import copy,json
+          p='deploy/xsp-v2-p0e-ai-assisted-security-review-result.json'
+          x=json.load(open(p))
+          y=copy.deepcopy(x); y['reviewer']['independent']=True
+          json.dump(y,open('/tmp/bad-independent.json','w'))
+          y=copy.deepcopy(x); y['releaseOwnerRiskAcceptance']['accepted']=False
+          json.dump(y,open('/tmp/bad-no-owner-acceptance.json','w'))
+          y=copy.deepcopy(x); y['reviewDomains'][0]['disposition']='fail'
+          json.dump(y,open('/tmp/bad-domain.json','w'))
+          PY
+          ! python3 scripts/verify-xsp-v2-p0e-ai-assisted-security-review-result.py --result /tmp/bad-independent.json
+          ! python3 scripts/verify-xsp-v2-p0e-ai-assisted-security-review-result.py --result /tmp/bad-no-owner-acceptance.json --require-closure-eligible
+          ! python3 scripts/verify-xsp-v2-p0e-ai-assisted-security-review-result.py --result /tmp/bad-domain.json --require-closure-eligible
+      - name: Print evidence hashes
+        run: |
+          sha256sum \
+            deploy/xsp-v2-p0e-ai-assisted-security-review-result.contract.json \
+            deploy/xsp-v2-p0e-ai-assisted-security-review-result.json \
+            docs/XSP_V2_P0E_AI_ASSISTED_SECURITY_REVIEW_V5_2026-10-31.md
