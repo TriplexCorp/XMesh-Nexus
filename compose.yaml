@@ -154,6 +154,12 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "nginx -t -q >/dev/null 2>&1 && grep -aq '^nginx' /proc/1/cmdline"]
+      interval: 3s
+      timeout: 2s
+      retries: 20
+      start_period: 3s
     restart: unless-stopped
 
   xsp-v2-signer:

@@ -149,8 +149,8 @@ must(/^\s{2}xsp-v2-product-ingress:\s*$/m.test(compose)
     && compose.includes('profiles: ["xsp-v2-product"]')
     && compose.includes('./deploy/xsp-v2-ingress/nginx-product.conf:/etc/nginx/nginx.conf:ro'),
   'v6 product ingress must remain an explicitly named, dedicated product-profile service');
-must(installer.includes('docker compose --profile xsp-v2-product up -d --build --wait --wait-timeout 180'),
-  'v6 installer must fail closed on mandatory product ingress/gateway startup');
+must(installer.includes('docker compose --profile xsp-v2-product up -d --build --force-recreate --wait --wait-timeout 180'),
+  'v6 installer must fail closed on mandatory product ingress/gateway startup and recreate runtime after key migration');
 must(!main.includes('"/api/v2/node/keys/rotation/ack"'),
   'default/experimental Rust API must not mount the ACK route during C2-B/D2 staging proof');
 
