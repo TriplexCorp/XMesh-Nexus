@@ -12,7 +12,7 @@ cd "$ROOT"
 [[ -f VERSION && ! -L VERSION ]] || { echo "VERSION is missing" >&2; exit 1; }
 [[ "$(tr -d '\r\n' < VERSION)" == "6.0.0" ]] || { echo "This provisioner requires XMesh Nexus v6.0.0" >&2; exit 1; }
 [[ -f .env && ! -L .env ]] || { echo ".env is missing; run ./install.sh first" >&2; exit 1; }
-for cmd in docker python3 install sha256sum; do command -v "$cmd" >/dev/null 2>&1 || { echo "$cmd is required" >&2; exit 1; }; done
+for cmd in docker python3 install sha256sum cmp; do command -v "$cmd" >/dev/null 2>&1 || { echo "$cmd is required" >&2; exit 1; }; done
 docker compose version >/dev/null
 docker info >/dev/null 2>&1 || { echo "Docker daemon unavailable" >&2; exit 1; }
 
@@ -66,6 +66,25 @@ regular_pair_or_absent(){
   fi
   return 1
 }
+normalize_mldsa_seed_only(){ (
+  set -Eeuo pipefail
+  local path="$1" group="$2" mode="$3" label="$4" tmp replacement
+  [[ -f "$path" && ! -L "$path" ]] || { echo "$label ML-DSA key is not a regular file" >&2; exit 1; }
+  tmp="$(mktemp -d)"
+  replacement="${path}.seed-only.$$"
+  trap 'rm -rf "$tmp"; [[ -z "${replacement:-}" ]] || rm -f -- "$replacement"' EXIT
+  cp -- "$path" "$tmp/input.pem"
+  ossl "$tmp" pkey -in /work/input.pem -pubout -outform DER -out /work/before.der
+  ossl "$tmp" pkey -in /work/input.pem \
+    -provparam ml-dsa.output_formats=seed-only \
+    -out /work/seed-only.pem
+  ossl "$tmp" pkey -in /work/seed-only.pem -pubout -outform DER -out /work/after.der
+  cmp -s "$tmp/before.der" "$tmp/after.der" || { echo "$label ML-DSA seed-only conversion changed the public identity; refusing replacement" >&2; exit 1; }
+  install -o root -g "$group" -m "$mode" "$tmp/seed-only.pem" "$replacement"
+  mv -f -- "$replacement" "$path"
+  replacement=""
+  echo "$label ML-DSA private key normalized to Go-compatible seed-only PKCS#8 without rotating identity."
+); }
 
 build_openssl35_image
 install -d -o root -g 10001 -m 0750 "$SIGNER_DIR" "$PUBLIC_DIR"
@@ -77,11 +96,12 @@ install -d -o root -g root -m 0700 "$STATE_DIR"
 if ! regular_pair_or_absent "$SIGNER_DIR/panel-ed25519.pem" "$SIGNER_DIR/panel-mldsa65.pem" "panel signer"; then
   tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
   ossl "$tmp" genpkey -algorithm ED25519 -out /work/panel-ed25519.pem
-  ossl "$tmp" genpkey -algorithm ML-DSA-65 -out /work/panel-mldsa65.pem
+  ossl "$tmp" genpkey -provparam ml-dsa.output_formats=seed-only -algorithm ML-DSA-65 -out /work/panel-mldsa65.pem
   install -o root -g 10001 -m 0440 "$tmp/panel-ed25519.pem" "$SIGNER_DIR/panel-ed25519.pem"
   install -o root -g 10001 -m 0440 "$tmp/panel-mldsa65.pem" "$SIGNER_DIR/panel-mldsa65.pem"
   rm -rf "$tmp"; trap - EXIT
 fi
+normalize_mldsa_seed_only "$SIGNER_DIR/panel-mldsa65.pem" 10001 0440 "panel signer"
 chown root:10001 "$SIGNER_DIR/panel-ed25519.pem" "$SIGNER_DIR/panel-mldsa65.pem"; chmod 0440 "$SIGNER_DIR/panel-ed25519.pem" "$SIGNER_DIR/panel-mldsa65.pem"
 
 pubtmp="$(mktemp -d)"; trap 'rm -rf "$pubtmp"' EXIT
@@ -161,7 +181,7 @@ if [[ "$server_complete" != true ]]; then
   install -o root -g root -m 0644 "$certtmp/fullchain.pem" "$INGRESS_DIR/fullchain.pem"
 fi
 if [[ "$client_ca_present" != true ]]; then
-  ossl "$certtmp" genpkey -algorithm ML-DSA-65 -out /work/client-ca-key.pem
+  ossl "$certtmp" genpkey -provparam ml-dsa.output_formats=seed-only -algorithm ML-DSA-65 -out /work/client-ca-key.pem
   ossl "$certtmp" req -x509 -new -key /work/client-ca-key.pem -out /work/client-ca.pem -days 3650 -subj '/CN=XMesh v6 ML-DSA-65 Client CA'
   install -o root -g 10001 -m 0440 "$certtmp/client-ca-key.pem" "$INGRESS_DIR/client-ca-key.pem"
   install -o root -g root -m 0644 "$certtmp/client-ca.pem" "$INGRESS_DIR/client-ca.pem"
@@ -173,7 +193,10 @@ chown root:root "$INGRESS_DIR"; chmod 0755 "$INGRESS_DIR"
 chown root:root "$INGRESS_DIR/fullchain.pem" "$INGRESS_DIR/client-ca.pem" "$INGRESS_DIR/server-ca.pem"; chmod 0644 "$INGRESS_DIR/fullchain.pem" "$INGRESS_DIR/client-ca.pem" "$INGRESS_DIR/server-ca.pem"
 chown root:10003 "$INGRESS_DIR/privkey.pem"; chmod 0640 "$INGRESS_DIR/privkey.pem"
 chown root:root "$INGRESS_DIR/server-ca-key.pem"; chmod 0600 "$INGRESS_DIR/server-ca-key.pem"
-if [[ -f "$INGRESS_DIR/client-ca-key.pem" && ! -L "$INGRESS_DIR/client-ca-key.pem" ]]; then chown root:10001 "$INGRESS_DIR/client-ca-key.pem"; chmod 0440 "$INGRESS_DIR/client-ca-key.pem"; client_ca_key_present=true; fi
+if [[ -f "$INGRESS_DIR/client-ca-key.pem" && ! -L "$INGRESS_DIR/client-ca-key.pem" ]]; then
+  normalize_mldsa_seed_only "$INGRESS_DIR/client-ca-key.pem" 10001 0440 "client CA"
+  chown root:10001 "$INGRESS_DIR/client-ca-key.pem"; chmod 0440 "$INGRESS_DIR/client-ca-key.pem"; client_ca_key_present=true
+fi
 
 issuance_ready=false; [[ "$client_ca_key_present" == true ]] && issuance_ready=true
 python3 - "$STATE_DIR/foundation.json" "$issuance_ready" "$db_managed" "${PANEL_IDS[0]}" "${PANEL_IDS[1]}" <<'PY'
