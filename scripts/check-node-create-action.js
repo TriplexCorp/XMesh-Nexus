@@ -54,7 +54,7 @@ assert.match(html,/<script src="\/node-bootstrap-v6\.js\?v=20261031-strict-pq-on
  'Panel must load the strict-PQ bootstrap override from an absolute dashboard-safe asset path');
 assert.ok(html.indexOf('app.js?v=')<html.indexOf('/node-bootstrap-v6.js?v='),
  'Strict-PQ bootstrap override must load after the historical app handler');
-assert.match(strictBootstrap,/XMESH_V6_NODE_BOOTSTRAP_SHA='7b6ec04d7dfe6e9b785f9988b5c43afb64499456'/,
+assert.match(strictBootstrap,/XMESH_V6_NODE_BOOTSTRAP_SHA='2745b03677fc6e12761021c5dad6d48138af87d4'/,
  'Fresh Node installation must pin the reviewed XMesh-Node strict-PQ-only release');
 assert.match(strictBootstrap,/XMesh Node v6 fresh installer\. Security invariant:/,
  'The downloaded installer must be marker-checked as the v6 fail-closed bootstrap');
