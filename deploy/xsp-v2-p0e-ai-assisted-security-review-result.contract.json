@@ -1,0 +1,51 @@
+{
+  "schema": "xsp2-p0e-ai-assisted-security-review-result-contract-1",
+  "resultSchema": "xsp2-p0e-ai-assisted-security-review-result-1",
+  "assuranceModel": "ai-assisted-internal-plus-release-owner-risk-acceptance",
+  "externalIndependentReviewRequired": false,
+  "frozenTarget": {
+    "nexus": {
+      "repository": "TriplexCorp/XMesh-Nexus",
+      "sourceRevision": "12b3170996bc062ee16c79659a6378e5e425fd0e"
+    },
+    "node": {
+      "repository": "TriplexCorp/XMesh-Node",
+      "sourceRevision": "34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb"
+    }
+  },
+  "reviewBundle": {
+    "workflowRun": 41054352179,
+    "deterministicTarSha256": "9d213e9281f0ffbbc3da21f9f3814d6e7fbef1e6b5273f6e9cb12175c63273c4",
+    "payloadSha256": "7b118084777d59e1ef1791d6375c32c1c44cf6bcdf9a03a2b0648a7ad9f263f2"
+  },
+  "requiredReviewDomains": [
+    "protocol-and-canonicalization",
+    "hybrid-cryptography-and-key-purpose-binding",
+    "pq-only-transport-and-node-identity",
+    "isolated-signer-and-key-custody",
+    "postgresql-replay-ack-epoch-and-receipt",
+    "agent-local-durability-and-rollback",
+    "coordinated-backup-restore-and-off-host-floor",
+    "owner-authorized-key-retirement",
+    "parser-fuzz-and-external-mldsa65-vectors",
+    "default-off-redacted-observability",
+    "production-migration-no-fallback-and-rollback"
+  ],
+  "domainDispositions": ["pass", "pass-with-findings", "fail"],
+  "findingSeverities": ["critical", "high", "medium", "low", "info"],
+  "findingStatuses": ["open", "remediated", "accepted-risk", "not-applicable"],
+  "signoffDecisions": ["approve", "approve-with-findings", "reject"],
+  "closurePolicy": {
+    "eligibleDecisions": ["approve", "approve-with-findings"],
+    "allDomainsMustAvoidFail": true,
+    "releaseBlockingFindingsMustBeRemediated": true,
+    "securityRelevantCodeChangeRequiresRefreeze": true,
+    "releaseOwnerRiskAcceptanceRequired": true
+  },
+  "requiredFalseClaims": [
+    "physicalPowerLossQualified",
+    "productionActivation",
+    "strictPQEnabled"
+  ],
+  "automaticIssueClosure": false
+}

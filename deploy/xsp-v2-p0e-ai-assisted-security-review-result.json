@@ -1,0 +1,182 @@
+{
+  "schema": "xsp2-p0e-ai-assisted-security-review-result-1",
+  "assuranceModel": "ai-assisted-internal-plus-release-owner-risk-acceptance",
+  "target": {
+    "nexus": {
+      "repository": "TriplexCorp/XMesh-Nexus",
+      "sourceRevision": "12b3170996bc062ee16c79659a6378e5e425fd0e"
+    },
+    "node": {
+      "repository": "TriplexCorp/XMesh-Node",
+      "sourceRevision": "34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb"
+    }
+  },
+  "reviewBundle": {
+    "workflowRun": 41054352179,
+    "deterministicTarSha256": "9d213e9281f0ffbbc3da21f9f3814d6e7fbef1e6b5273f6e9cb12175c63273c4",
+    "payloadSha256": "7b118084777d59e1ef1791d6375c32c1c44cf6bcdf9a03a2b0648a7ad9f263f2"
+  },
+  "reviewer": {
+    "name": "ChatGPT / GPT-5.6 Sol",
+    "role": "AI-assisted internal security reviewer working with the project owner",
+    "independent": false
+  },
+  "reviewDate": "2026-10-31",
+  "reviewDomains": [
+    {
+      "domain": "protocol-and-canonicalization",
+      "disposition": "pass",
+      "summary": "Strict parsing, canonical encodings, domain-separated signing inputs, replay/freshness bounds and exact operation binding remain fail-closed on the frozen target.",
+      "evidence": [
+        "v5 reviewer bundle 41054352179",
+        "prior AI-assisted audit protocol/canonicalization review",
+        "frozen target 12b3170996bc062ee16c79659a6378e5e425fd0e / 34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb"
+      ]
+    },
+    {
+      "domain": "hybrid-cryptography-and-key-purpose-binding",
+      "disposition": "pass",
+      "summary": "Critical protocol messages remain bound to both Ed25519 and ML-DSA-65 verification with explicit key purpose, issuer, Node and fingerprint binding; no classical-only critical-message fallback was found.",
+      "evidence": [
+        "v5 reviewer bundle hybrid signature sources/tests",
+        "KVM activation transport policy requires Ed25519 and ML-DSA-65 critical signatures"
+      ]
+    },
+    {
+      "domain": "pq-only-transport-and-node-identity",
+      "disposition": "pass",
+      "summary": "TLS 1.3 plus X25519MLKEM768 remains mandatory and the prior LOW-001 ingress finding is remediated: verified client identity is now required at the TLS layer with ssl_verify_client on.",
+      "evidence": [
+        "deploy/xsp-v2-ingress/nginx-c2b.conf at Nexus 12b3170996bc062ee16c79659a6378e5e425fd0e",
+        "Nexus delta 0bab1a48cff570b3abe405bcda4dc242b23b8a4b..12b3170996bc062ee16c79659a6378e5e425fd0e"
+      ]
+    },
+    {
+      "domain": "isolated-signer-and-key-custody",
+      "disposition": "pass",
+      "summary": "Signer UDS peer-credential checks, key-ID pinning and least-privilege read-only database access remain the enforced custody boundary.",
+      "evidence": [
+        "v5 reviewer bundle signer sources and PostgreSQL role policy",
+        "prior AI-assisted audit isolated signer review"
+      ]
+    },
+    {
+      "domain": "postgresql-replay-ack-epoch-and-receipt",
+      "disposition": "pass",
+      "summary": "Replay nonce, prepared-key installation, epoch CAS, immutable ACK evidence and receipt binding remain transactionally coupled and fail closed.",
+      "evidence": [
+        "v5 reviewer bundle PostgreSQL migrations and ACK/receipt implementation",
+        "#138 independent PostgreSQL crash/recovery PASS"
+      ]
+    },
+    {
+      "domain": "agent-local-durability-and-rollback",
+      "disposition": "pass",
+      "summary": "The prior LOW-002 finding is remediated on the frozen Node target: master-key creation fsyncs the file and then the parent directory before reporting success; rotation/rollback durability ordering remains monotonic and fail-closed.",
+      "evidence": [
+        "XMesh-Node security/xspv2/poc-go/keyring/sealed.go at 34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb",
+        "XMesh-Node master_key_durability_linux_test.go",
+        "Node delta 083dc181c5e175f89007f4b93111cd5c45a69d97..34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb",
+        "#138 five-checkpoint Node crash matrix PASS"
+      ]
+    },
+    {
+      "domain": "coordinated-backup-restore-and-off-host-floor",
+      "disposition": "pass-with-findings",
+      "summary": "Coordinated restore and off-host recovery-floor logic are fail-closed and the live off-host witness passed; provider-managed storage remains an explicitly accepted external durability trust boundary rather than a physical-power qualification claim.",
+      "evidence": [
+        "#138 off-host production recovery witness PASS",
+        "provider-storage risk acceptance SHA256 49a311a8bf871c6afcaa5841622b9f1e28e74675452671abc4e970f644dec604",
+        "KVM durability verifier PASS"
+      ]
+    },
+    {
+      "domain": "owner-authorized-key-retirement",
+      "disposition": "pass",
+      "summary": "Retirement remains owner-authorized, checkpoint-bound and anti-resurrection protected; active identity and monotonic floor are preserved.",
+      "evidence": [
+        "v5 reviewer bundle retirement protocol and tests",
+        "prior AI-assisted audit owner-authorized retirement review"
+      ]
+    },
+    {
+      "domain": "parser-fuzz-and-external-mldsa65-vectors",
+      "disposition": "pass-with-findings",
+      "summary": "Parser fuzz invariants and external compatible ML-DSA-65 verification vectors provide meaningful negative evidence; coverage remains bounded and is not represented as formal verification or certification.",
+      "evidence": [
+        "v5 reviewer bundle parser fuzz targets",
+        "v5 reviewer bundle external ML-DSA-65 vector tests"
+      ]
+    },
+    {
+      "domain": "default-off-redacted-observability",
+      "disposition": "pass",
+      "summary": "Node and Nexus observability remain staging-gated, read-only and redacted; production activation and strict-PQ state remain false in observability outputs before execution.",
+      "evidence": [
+        "scripts/test-xsp-v2-canary-observability.sh",
+        "exact-candidate canary workflow"
+      ]
+    },
+    {
+      "domain": "production-migration-no-fallback-and-rollback",
+      "disposition": "pass-with-findings",
+      "summary": "The KVM activation policy requires exact candidate/evidence hashes, final canary and reviewed rollout evidence, fixes TLS 1.3/X25519MLKEM768/ML-DSA-65, forbids automatic or classical-only fallback, retains XMESH1 for separate retirement, and requires a separate execution step. External independent review is intentionally replaced by this AI-assisted internal review plus explicit release-owner risk acceptance.",
+      "evidence": [
+        "deploy/xsp-v2-kvm-vps-strict-pq-activation-approval.contract.json",
+        "scripts/verify-xsp-v2-kvm-vps-strict-pq-activation-approval.py",
+        "policy decision recorded 2026-10-31"
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "id": "AI-V5-INFO-001",
+      "severity": "info",
+      "status": "accepted-risk",
+      "releaseBlocking": false,
+      "securityRelevantCodeChange": false,
+      "title": "KVM provider durability remains an external trust boundary",
+      "domains": [
+        "coordinated-backup-restore-and-off-host-floor",
+        "production-migration-no-fallback-and-rollback"
+      ],
+      "evidence": [
+        "#138 provider-storage acceptance",
+        "physicalPowerLossQualified=false remains mandatory"
+      ],
+      "disposition": "Release owner accepts reliance on provider-managed block storage durable-flush semantics for the KVM deployment class; this does not claim physical host/controller/PLP qualification."
+    },
+    {
+      "id": "AI-V5-INFO-002",
+      "severity": "info",
+      "status": "accepted-risk",
+      "releaseBlocking": false,
+      "securityRelevantCodeChange": false,
+      "title": "Assurance model is AI-assisted internal review rather than an independent third-party audit",
+      "domains": [
+        "production-migration-no-fallback-and-rollback"
+      ],
+      "evidence": [
+        "reviewer.independent=false",
+        "releaseOwnerRiskAcceptance recorded in this result"
+      ],
+      "disposition": "The release owner explicitly accepts the reduced organizational-independence assurance in exchange for a complete review of all mandatory domains and retained fail-closed technical gates."
+    }
+  ],
+  "signoff": {
+    "decision": "approve-with-findings",
+    "statement": "AI-assisted internal review of the exact v5 KVM frozen target found no unresolved Critical, High, Medium or Low release-blocking vulnerability. The two Low findings from the earlier internal audit are remediated in the current frozen target. Remaining items are documented informational/accepted-risk boundaries.",
+    "signedAt": "2026-10-31T11:38:00+03:00"
+  },
+  "releaseOwnerRiskAcceptance": {
+    "accepted": true,
+    "acceptedBy": "Triplex",
+    "acceptedAt": "2026-10-31T11:38:00+03:00",
+    "statement": "Release owner explicitly replaces the mandatory independent external security-review requirement with an AI-assisted internal review plus owner risk acceptance because an external specialist is not currently practical. The owner accepts the reduced organizational-independence assurance. This does not waive the exact-candidate canary, rollout/rollback review, KVM durability evidence, provider-storage acceptance, bounded activation approval, or separate execution requirement, and it does not claim physical power-loss qualification."
+  },
+  "claims": {
+    "physicalPowerLossQualified": false,
+    "productionActivation": false,
+    "strictPQEnabled": false
+  }
+}
