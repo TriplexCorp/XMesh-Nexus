@@ -12,6 +12,7 @@ function must(condition, message) {
 
 const dockerfile = read('deploy/xsp-v2-ingress/Dockerfile');
 const nginx = read('deploy/xsp-v2-ingress/nginx.conf');
+const productNginx = read('deploy/xsp-v2-ingress/nginx-product.conf');
 const originProbe = read('deploy/xsp-v2-ingress/origin_probe.rs');
 const compose = read('compose.yaml');
 const installer = read('install.sh');
@@ -84,11 +85,24 @@ must(originProbe.includes('Command::new("openssl")'),
 must(!originProbe.includes('X-XSP-V2-Trusted-Node-ID'),
   'origin probe must not trust a forwarded Node ID header');
 
-for (const source of [compose, installer]) {
-  must(!source.includes('xsp-v2-ingress') && !source.includes('xsp-v2-node-ingress'),
-    'default production setup must not activate the experimental ingress runtime');
-}
+// The historical C2-A experimental runtime must remain absent from the default
+// production service table. The v6 product ingress is a different, explicit
+// profile and is permitted only with its strict product configuration.
+must(!/^\s{2}xsp-v2-(?:node-)?ingress:\s*$/m.test(compose),
+  'default production setup must not activate the historical experimental ingress runtime');
+must(/^\s{2}xsp-v2-product-ingress:\s*$/m.test(compose),
+  'v6 product ingress service is missing');
+must(/xsp-v2-product-ingress:[\s\S]*?profiles:\s*\["xsp-v2-product"\]/.test(compose),
+  'v6 product ingress must remain behind the explicit product profile');
+must(compose.includes('./deploy/xsp-v2-ingress/nginx-product.conf:/etc/nginx/nginx.conf:ro'),
+  'v6 product ingress must mount the product-only Nginx route table');
+must(installer.includes('docker compose --profile xsp-v2-product up'),
+  'installer must explicitly start the mandatory v6 product profile after PQ provisioning');
+must(/ssl_verify_client\s+on\s*;/.test(productNginx),
+  'v6 product ingress must require a verified client certificate at TLS layer');
+must(/ssl_ecdh_curve\s+X25519MLKEM768\s*;/.test(productNginx),
+  'v6 product ingress must require the hybrid X25519MLKEM768 group');
 must(!main.includes('"/api/v2/node/keys/rotation/ack"'),
   'ACK route must remain unmounted until C2-A origin identity is proven');
 
-console.log('XSP-v2 ingress C2-A contract: OK (Rust origin, hybrid TLS, mTLS identity probe, Unix peercred, ACK unmounted)');
+console.log('XSP-v2 ingress C2-A contract: OK; v6 product ingress is isolated behind its strict mandatory profile');
