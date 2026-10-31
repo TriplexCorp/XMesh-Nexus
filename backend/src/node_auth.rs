@@ -1,7 +1,7 @@
 //! Per-node authentication boundary.
 //!
 //! Legacy nodes retain the reviewed Ed25519/XMESH1 request format only for
-//! compatibility. XMesh v6 product nodes are different: once enrolled in
+//! compatibility. `XMesh` v6 product nodes are different: once enrolled in
 //! `node_xsp_product_nodes`, operational requests are accepted exclusively
 //! from the local strict-PQ gateway after durable product activation.
 use crate::{ApiError, AppState, auth::AuthUser};
