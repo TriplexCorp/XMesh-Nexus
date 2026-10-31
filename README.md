@@ -390,13 +390,34 @@ sudo ss -ltnp '( sport = :443 or sport = :8444 )'
 
 ## Обновления
 
+### Ручное обновление через CLI
+
+Официальный operator-facing способ обновить установленную панель из терминала:
+
+```bash
+cd /path/to/XMesh-Nexus
+sudo bash xmeshctl
+```
+
+В меню выберите:
+
+```text
+4) Обновить из GitHub и пересобрать
+```
+
+CLI перед обновлением просит подтверждение, создаёт backup PostgreSQL, выполняет `git fetch` / fast-forward update, запускает installer preparation, проверяет Docker Compose и пересобирает стек. На managed host от root он также переприменяет host-side single-public-443 topology.
+
+`xmeshctl --web-update` — внутренний non-interactive entrypoint для owner-authorized web/systemd updater; вручную обычно следует использовать именно `sudo bash xmeshctl`.
+
+### Обновление из панели
+
 Owner-authorized web update не даёт API Docker socket и arbitrary shell. API ставит фиксированный request, а root-owned worker запускает `xmeshctl --web-update` с lock и PostgreSQL backup.
 
 При обновлении host installer также переприменяет single-443 topology и пересоздаёт current v6 product gateway/ingress, чтобы старая public `:8444` mapping не сохранилась после upgrade.
 
 `queued` / HTTP `202` означает только постановку запроса в очередь.
 
-Подробнее: [PANEL_UPDATE_AND_TELEMETRY.md](docs/PANEL_UPDATE_AND_TELEMETRY.md).
+Подробнее: [CLI update](docs/CLI_UPDATE.md) · [PANEL_UPDATE_AND_TELEMETRY.md](docs/PANEL_UPDATE_AND_TELEMETRY.md).
 
 ---
 
@@ -407,6 +428,7 @@ Owner-authorized web update не даёт API Docker socket и arbitrary shell. 
 | **[Documentation Index](docs/README.md)** | Навигация по актуальной документации |
 | **[Product Guide](docs/PRODUCT_GUIDE.md)** | Полный функционал панели и границы подсистем |
 | **[Installation & Operations](docs/INSTALLATION.md)** | Установка, public 80/443 topology, update, backup, troubleshooting |
+| **[CLI Update](docs/CLI_UPDATE.md)** | Ручное обновление панели через `sudo bash xmeshctl` |
 | **[XRAY STUDIO Guide](docs/XRAY_STUDIO_GUIDE.md)** | Security semantics, XHTTP, FinalMask, fingerprint, client projection |
 | **[Development Checkpoint](docs/DEVELOPMENT_CHECKPOINT_2026-10-31.md)** | Критичные решения для будущей разработки |
 | [FinalMask Compatibility](docs/FINALMASK_COMPATIBILITY.md) | Server/client/transport compatibility |
