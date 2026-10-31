@@ -6,10 +6,11 @@ If you are new to the project, read these in order:
 
 1. [Product Guide](PRODUCT_GUIDE.md)
 2. [Installation and Operations](INSTALLATION.md)
-3. [XRAY STUDIO Operator Guide](XRAY_STUDIO_GUIDE.md)
-4. [Autonomous Nodes](AUTONOMOUS_NODES.md)
-5. [Subscription Security](SUBSCRIPTION_SECURITY.md)
-6. [Enterprise Roadmap](ENTERPRISE_ROADMAP.md)
+3. [Single Public TCP/443 Control-Plane Contract](SINGLE_PUBLIC_443_CONTROL_PLANE.md)
+4. [XRAY STUDIO Operator Guide](XRAY_STUDIO_GUIDE.md)
+5. [Autonomous Nodes](AUTONOMOUS_NODES.md)
+6. [Subscription Security](SUBSCRIPTION_SECURITY.md)
+7. [Enterprise Roadmap](ENTERPRISE_ROADMAP.md)
 
 For future development, also read the current [Development Checkpoint — 2026-10-31](DEVELOPMENT_CHECKPOINT_2026-10-31.md).
 
@@ -20,7 +21,8 @@ For future development, also read the current [Development Checkpoint — 2026-1
 | Document | Purpose |
 | --- | --- |
 | [PRODUCT_GUIDE.md](PRODUCT_GUIDE.md) | Canonical product-level feature map and component boundaries |
-| [INSTALLATION.md](INSTALLATION.md) | Supported Ubuntu installation, ports, HTTPS, updates, backups and troubleshooting |
+| [INSTALLATION.md](INSTALLATION.md) | Supported Ubuntu installation, public 80/443 topology, HTTPS, updates, backups and troubleshooting |
+| [SINGLE_PUBLIC_443_CONTROL_PLANE.md](SINGLE_PUBLIC_443_CONTROL_PLANE.md) | Binding public-port/SNI topology: public 443 only, loopback 8443/8444 |
 | [PANEL_UPDATE_AND_TELEMETRY.md](PANEL_UPDATE_AND_TELEMETRY.md) | Owner-authorized panel update path, telemetry and accounting behavior |
 | [AUTONOMOUS_NODES.md](AUTONOMOUS_NODES.md) | Managed node/Agent operational model |
 | [DEVELOPMENT_CHECKPOINT_2026-10-31.md](DEVELOPMENT_CHECKPOINT_2026-10-31.md) | Current UX/security/config invariants that future development must preserve |
@@ -50,6 +52,7 @@ For future development, also read the current [Development Checkpoint — 2026-1
 | Document | Purpose |
 | --- | --- |
 | [SECURITY_NODE_IDENTITY.md](SECURITY_NODE_IDENTITY.md) | Node identity and signed trust model |
+| [SINGLE_PUBLIC_443_CONTROL_PLANE.md](SINGLE_PUBLIC_443_CONTROL_PLANE.md) | Network exposure and TLS-boundary contract for panel and strict-PQ control traffic |
 | [SECURITY_AUDIT_2026-10-22.md](SECURITY_AUDIT_2026-10-22.md) | Historical security audit/checkpoint notes |
 | [SUBSCRIPTION_SECURITY.md](SUBSCRIPTION_SECURITY.md) | Subscription credential isolation and public endpoint security |
 
@@ -62,11 +65,14 @@ Start with:
 | Document | Purpose |
 | --- | --- |
 | [XSP_V2_PQ_ONLY_SECURITY_POLICY.md](XSP_V2_PQ_ONLY_SECURITY_POLICY.md) | Binding strict-PQ policy and no-classical-fallback rules |
+| [SINGLE_PUBLIC_443_CONTROL_PLANE.md](SINGLE_PUBLIC_443_CONTROL_PLANE.md) | Current external port 443 + internal strict-PQ ingress routing contract |
 | [XSP_V2_PRODUCTION_ACTIVATION_2026-10-31.md](XSP_V2_PRODUCTION_ACTIVATION_2026-10-31.md) | Bounded production activation/finalization evidence |
 | [ENTERPRISE_ROADMAP.md](ENTERPRISE_ROADMAP.md) | Current rollout/release gates |
 | [HYBRID_POST_QUANTUM_SECURITY_IMPLEMENTATION_PLAN.md](HYBRID_POST_QUANTUM_SECURITY_IMPLEMENTATION_PLAN.md) | Full architecture/implementation plan and historical context |
 
 The repository also contains lower-level XSP-v2 wire, signer, permit/ACK, staging, durability and recovery documents. Those documents are intentionally detailed because cryptographic rollout claims must remain evidence-bound.
+
+Some historical XSP-v2 evidence mentions a public/test `8444` listener. Do not reinterpret those frozen records as current firewall requirements. The current supported product topology is defined by `SINGLE_PUBLIC_443_CONTROL_PLANE.md`: **public 80/443 only, loopback 8443/8444**.
 
 ## Historical material
 
@@ -87,6 +93,7 @@ When a product contract changes:
 - update [DEVELOPMENT_CHECKPOINT_2026-10-31.md](DEVELOPMENT_CHECKPOINT_2026-10-31.md) or replace it with a newer dated checkpoint when the old one becomes stale;
 - update README feature claims if user-visible behavior changed;
 - keep installation ports/dependencies synchronized with `install.sh` and `compose.yaml`;
+- preserve the single-public-443 invariant unless an explicit replacement architecture is reviewed;
 - do not claim live deployment from CI alone;
 - do not claim universal client compatibility from editor support alone;
 - do not claim external independent audit unless one has actually been completed;

@@ -18,8 +18,10 @@ get_setting() { sed -n "s/^${1}=//p" "$2" | tail -n 1; }
 add_setting() { [[ -f "$3" && ! -L "$3" ]] || die 'Unsafe .env path'; printf '%s=%s\n' "$1" "$2" >> "$3"; chmod 600 "$3"; }
 install_deps() {
  root_only
+ local had_haproxy=0
  [[ -r /etc/os-release ]] || die 'Cannot detect host OS'; . /etc/os-release
  [[ "$ID" == ubuntu && "$VERSION_CODENAME" =~ ^(jammy|noble)$ ]] || die 'Automated host installation supports Ubuntu 22.04/24.04 LTS'
+ if dpkg-query -W -f='${Status}' haproxy 2>/dev/null | grep -q 'ok installed'; then had_haproxy=1; fi
  export DEBIAN_FRONTEND=noninteractive
  apt-get update
  apt-get install -y ca-certificates curl gnupg lsb-release ubuntu-keyring openssl git iproute2
@@ -37,8 +39,15 @@ Pin: origin nginx.org
 Pin-Priority: 900
 PIN
  apt-get update
- apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin nginx certbot
- systemctl enable --now docker; systemctl enable nginx; systemctl start nginx || printf 'Nginx is not running; inspect the TCP/80 listener.\n' >&2
+ apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin nginx certbot haproxy
+ systemctl enable --now docker
+ if (( had_haproxy == 1 )) && systemctl is-active --quiet haproxy.service && ! systemctl is-active --quiet xmesh-https-mux.service 2>/dev/null; then
+  die 'An existing operator-managed HAProxy service is active. Use a dedicated host or migrate that TCP/443 configuration explicitly.'
+ fi
+ # On a clean installation the distro HAProxy service may be auto-started by
+ # package installation. XMesh owns a separate, generated systemd unit instead.
+ if ! systemctl is-active --quiet xmesh-https-mux.service 2>/dev/null; then systemctl disable --now haproxy.service >/dev/null 2>&1 || true; fi
+ systemctl enable nginx; systemctl start nginx || printf 'Nginx is not running; inspect the TCP/80 listener.\n' >&2
  docker compose version >/dev/null 2>&1 || die 'Docker Compose plugin not available'
 }
 configure_domain() {
@@ -61,7 +70,8 @@ render_nginx() {
  valid_domain "$domain" || die 'Invalid Nginx domain'
  [[ "$port" =~ ^[0-9]{1,5}$ ]] && (( 10#$port >= 1 && 10#$port <= 65535 )) || die 'Invalid local panel port'
  cat <<EOF
-# XMesh Nexus v6 — the normal HTTPS endpoint is NOT a node control-plane.
+# XMesh Nexus v6 — HTTP/80 redirects publicly; HTTPS terminates on loopback
+# after the public TCP/443 SNI multiplexer selects the classical panel path.
 server {
     listen 80;
     listen [::]:80;
@@ -71,8 +81,7 @@ server {
     return 301 https://\$host\$request_uri;
 }
 server {
-    listen 443 ssl;
-    listen [::]:443 ssl;
+    listen 127.0.0.1:8443 ssl;
     http2 on;
     server_name $domain;
     access_log off;
@@ -102,8 +111,9 @@ server {
         proxy_buffering off;
     }
 
-    # v6 security invariant: no direct XMESH1 node/control/telemetry path exists
-    # on the public panel endpoint. Operational requests use TCP/8444 strict-PQ.
+    # v6 security invariant: these classical paths remain unavailable. The
+    # operational Node channel shares public TCP/443 but is selected by SNI
+    # before TLS termination and reaches the separate strict-PQ ingress.
     location = /api/v1/metrics/ingest { return 404; }
     location ^~ /api/v1/node/ { return 404; }
 
@@ -124,9 +134,105 @@ server {
 }
 EOF
 }
+render_haproxy() {
+ cat <<'EOF'
+# XMesh Nexus v6 managed public TCP/443 multiplexer.
+# TLS is not terminated here. SNI only chooses the isolated TLS endpoint.
+global
+    maxconn 4096
+
+defaults
+    mode tcp
+    timeout connect 10s
+    timeout client  60s
+    timeout server  60s
+
+frontend xmesh_public_https
+    bind 0.0.0.0:443
+    bind [::]:443 v6only
+    mode tcp
+    tcp-request inspect-delay 5s
+    tcp-request content accept if { req_ssl_hello_type 1 }
+    acl xmesh_strict_pq req_ssl_sni -i node-ingress.xsp.invalid
+    use_backend xmesh_strict_pq if xmesh_strict_pq
+    default_backend xmesh_panel_tls
+
+backend xmesh_panel_tls
+    mode tcp
+    server panel 127.0.0.1:8443
+
+backend xmesh_strict_pq
+    mode tcp
+    server strict_pq 127.0.0.1:8444
+EOF
+}
+ensure_mux_runtime() {
+ root_only
+ local file="$1" repo mux_dir mux_cfg mux_unit tmp_cfg ingress_id ingress_mapping
+ repo="$(cd -- "$(dirname -- "$file")" && pwd -P)"
+ [[ -f "$repo/compose.yaml" ]] || die 'compose.yaml not found next to .env'
+ if ! command -v haproxy >/dev/null 2>&1; then
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update
+  apt-get install -y haproxy
+  systemctl disable --now haproxy.service >/dev/null 2>&1 || true
+ elif systemctl is-active --quiet haproxy.service && ! systemctl is-active --quiet xmesh-https-mux.service; then
+  die 'Existing system HAProxy service is active. Free TCP/443 or migrate it before enabling the XMesh 443 multiplexer.'
+ fi
+
+ # Recreate the product gateway/ingress from the current Compose definition so
+ # upgrades cannot leave the old public :8444 mapping or enrollment address.
+ (cd "$repo" && docker compose --profile xsp-v2-product up -d --build --wait --wait-timeout 180 xsp-v2-product-gateway xsp-v2-product-ingress) \
+  || die 'Unable to start the v6 strict-PQ product gateway/ingress'
+
+ # Docker port publication is the authoritative exposure check even when the
+ # daemon runs without userland-proxy and therefore has no visible host socket.
+ ingress_id="$(cd "$repo" && docker compose --profile xsp-v2-product ps -q xsp-v2-product-ingress)"
+ [[ -n "$ingress_id" ]] || die 'Unable to identify the strict-PQ ingress container'
+ ingress_mapping="$(docker port "$ingress_id" 8444/tcp 2>/dev/null || true)"
+ [[ "$ingress_mapping" == '127.0.0.1:8444' ]] || die "Unsafe strict-PQ ingress publication: ${ingress_mapping:-none}; expected 127.0.0.1:8444"
+
+ # Also reject an unexpected non-Docker listener on the same port.
+ if ss -H -ltn '( sport = :8444 )' 2>/dev/null | awk '{print $4}' | grep -Evq '^(127\.0\.0\.1|\[::1\]):8444$'; then
+  die 'TCP/8444 is still publicly bound; expected loopback-only strict-PQ ingress'
+ fi
+
+ mux_dir=/etc/xmesh-nexus
+ mux_cfg="$mux_dir/haproxy-443.cfg"
+ mux_unit=/etc/systemd/system/xmesh-https-mux.service
+ install -d -o root -g root -m 0755 "$mux_dir"
+ tmp_cfg="$(mktemp "$mux_dir/.haproxy-443.XXXXXXXX")"
+ render_haproxy > "$tmp_cfg"
+ chmod 0644 "$tmp_cfg"
+ haproxy -c -f "$tmp_cfg" >/dev/null || { rm -f "$tmp_cfg"; die 'HAProxy TCP/443 multiplexer configuration is invalid'; }
+ mv -f "$tmp_cfg" "$mux_cfg"
+ cat > "$mux_unit" <<'EOF'
+[Unit]
+Description=XMesh Nexus public TCP/443 SNI multiplexer
+After=network-online.target docker.service nginx.service
+Wants=network-online.target
+Requires=nginx.service
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/haproxy -W -db -f /etc/xmesh-nexus/haproxy-443.cfg
+ExecReload=/bin/kill -USR2 $MAINPID
+Restart=always
+RestartSec=2
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+EOF
+ chmod 0644 "$mux_unit"
+ systemctl daemon-reload
+}
 activate() {
  root_only
- local file="$1" domain email port bind cert key site other old tmp
+ local file="$1" domain email port bind cert key site other old tmp ingress_id ingress_mapping
  [[ -f "$file" && ! -L "$file" ]] || die 'Missing safe .env'
  domain="$(get_setting PANEL_DOMAIN "$file")"; email="$(get_setting PANEL_ACME_EMAIL "$file")"; port="$(get_setting APP_PORT "$file")"; bind="$(get_setting APP_BIND "$file")"; port="${port:-8080}"; bind="${bind:-127.0.0.1}"
  valid_domain "$domain" || die 'Invalid PANEL_DOMAIN'; valid_email "$email" || die 'Invalid PANEL_ACME_EMAIL'; [[ "$bind" == 127.0.0.1 ]] || die 'APP_BIND must be 127.0.0.1 for public HTTPS'
@@ -137,6 +243,9 @@ activate() {
   if ! certbot certonly --standalone --preferred-challenges http --non-interactive --agree-tos --email "$email" -d "$domain" --cert-name "$domain" --pre-hook 'systemctl stop nginx' --post-hook 'systemctl start nginx'; then systemctl start nginx || true; die 'ACME failed. Check DNS A/AAAA, inbound TCP/80 and existing port listeners.'; fi
  fi
  [[ -s "$cert" && -s "$key" ]] || die 'TLS certificate/key missing after ACME'; openssl x509 -in "$cert" -noout -checkhost "$domain" >/dev/null 2>&1 || die 'Issued TLS certificate does not match the panel FQDN'
+
+ ensure_mux_runtime "$file"
+
  site=/etc/nginx/conf.d/xmesh-nexus.conf
  for other in /etc/nginx/conf.d/*.conf /etc/nginx/sites-enabled/* /etc/nginx/nginx.conf; do
   [[ -f "$other" && "$other" != "$site" ]] || continue
@@ -145,8 +254,36 @@ activate() {
  if [[ -e "$site" ]]; then [[ -f "$site" && ! -L "$site" ]] || die 'Refusing to overwrite non-regular Nginx config'; fi
  old="$(mktemp)"; if [[ -f "$site" ]]; then cp -p "$site" "$old"; else : > "$old"; fi
  tmp="$(mktemp /etc/nginx/conf.d/.xmesh-nexus.XXXXXXXX)"; render_nginx "$domain" "$port" > "$tmp"; chmod 0644 "$tmp"; mv -f "$tmp" "$site"
- if ! nginx -t || ! systemctl reload nginx; then if [[ -s "$old" ]]; then cp -p "$old" "$site"; else rm -f "$site"; fi; nginx -t >/dev/null 2>&1 && systemctl reload nginx || true; rm -f "$old"; die 'Nginx verification failed; previous site configuration restored'; fi
- rm -f "$old"; systemctl enable --now nginx; printf 'Panel HTTPS endpoint: https://%s\n' "$domain"
+ if ! nginx -t; then if [[ -s "$old" ]]; then cp -p "$old" "$site"; else rm -f "$site"; fi; rm -f "$old"; die 'Nginx verification failed; previous site configuration restored'; fi
+
+ # Switch the classical TLS listener from public :443 to loopback :8443 first,
+ # then let the SNI multiplexer become the only public owner of TCP/443.
+ if ! systemctl reload nginx; then
+  if [[ -s "$old" ]]; then cp -p "$old" "$site"; else rm -f "$site"; fi
+  nginx -t >/dev/null 2>&1 && systemctl reload nginx || true
+  rm -f "$old"
+  die 'Nginx reload failed; previous site configuration restored'
+ fi
+ if ! systemctl enable --now xmesh-https-mux.service || ! systemctl restart xmesh-https-mux.service; then
+  systemctl stop xmesh-https-mux.service >/dev/null 2>&1 || true
+  if [[ -s "$old" ]]; then cp -p "$old" "$site"; else rm -f "$site"; fi
+  nginx -t >/dev/null 2>&1 && systemctl reload nginx || true
+  rm -f "$old"
+  die 'TCP/443 multiplexer failed; previous Nginx public endpoint restored'
+ fi
+ rm -f "$old"
+ systemctl enable --now nginx
+
+ ss -H -ltn '( sport = :443 )' | grep -q . || die 'Public TCP/443 is not listening after activation'
+ ingress_id="$(cd "$(dirname -- "$file")" && docker compose --profile xsp-v2-product ps -q xsp-v2-product-ingress)"
+ ingress_mapping="$(docker port "$ingress_id" 8444/tcp 2>/dev/null || true)"
+ [[ "$ingress_mapping" == '127.0.0.1:8444' ]] || die 'Security invariant failed: strict-PQ ingress is not loopback-only after activation'
+ if ss -H -ltn '( sport = :8444 )' 2>/dev/null | awk '{print $4}' | grep -Evq '^(127\.0\.0\.1|\[::1\]):8444$'; then
+  die 'Security invariant failed: TCP/8444 became public after activation'
+ fi
+ printf 'Panel HTTPS endpoint: https://%s\n' "$domain"
+ printf 'v6 strict-PQ Node control plane: %s:443 (SNI node-ingress.xsp.invalid)\n' "$domain"
+ printf 'Public firewall requirement: TCP/80 and TCP/443 only; TCP/8444 must remain closed externally.\n'
 }
 case "${1:-}" in
  deps) install_deps ;;
@@ -154,5 +291,6 @@ case "${1:-}" in
  activate) [[ $# == 2 ]] || die 'Usage: ... activate .env'; activate "$2" ;;
  validate-domain) [[ $# == 2 ]] || die 'Usage: ... validate-domain FQDN'; valid_domain "$2" ;;
  render-nginx) [[ $# == 3 ]] || die 'Usage: ... render-nginx FQDN PORT'; render_nginx "$2" "$3" ;;
- *) die 'Usage: install-panel-host.sh {deps|domain|activate|validate-domain|render-nginx}' ;;
+ render-haproxy) [[ $# == 1 ]] || die 'Usage: ... render-haproxy'; render_haproxy ;;
+ *) die 'Usage: install-panel-host.sh {deps|domain|activate|validate-domain|render-nginx|render-haproxy}' ;;
 esac

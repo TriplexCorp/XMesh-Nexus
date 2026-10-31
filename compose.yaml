@@ -103,7 +103,7 @@ services:
     environment:
       DATABASE_URL: postgresql://xmesh_app:${APP_DB_PASSWORD:?Run ./install.sh first}@db:5432/xmesh
       XSP_V2_PRODUCT_INTERNAL_TOKEN: ${XSP_V2_PRODUCT_INTERNAL_TOKEN:?Run ./install.sh first}
-      XSP_V2_PRODUCT_PUBLIC_ADDRESS: ${PANEL_DOMAIN:?Run ./install.sh first}:8444
+      XSP_V2_PRODUCT_PUBLIC_ADDRESS: ${PANEL_DOMAIN:?Run ./install.sh first}:443
       XSP_V2_PRODUCT_SERVER_NAME: node-ingress.xsp.invalid
       XSP_V2_PRODUCT_PANEL_URL: http://panel:8080
     depends_on:
@@ -141,7 +141,7 @@ services:
       xsp-v2-product-gateway:
         condition: service_healthy
     ports:
-      - "0.0.0.0:8444:8444"
+      - "127.0.0.1:8444:8444"
     volumes:
       - ./deploy/xsp-v2-ingress/nginx-product.conf:/etc/nginx/nginx.conf:ro
       - ${XSP_V2_INGRESS_CERTS_DIR:-/etc/xmesh-nexus/xsp-v2-ingress}:/run/xmesh-ingress-certs:ro

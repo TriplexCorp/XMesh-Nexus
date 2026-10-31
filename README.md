@@ -51,11 +51,11 @@
 | Пользователи и лимиты в самописных скриптах | Пользователи, squads, сроки, квоты, трафик и подписки в одной модели |
 | Один и тот же `/xhttp` и шаблонные параметры у всех | Криптографически случайные XHTTP Path и randomized configuration helpers |
 | Advanced XHTTP приходится писать вручную | Полный карточный **XHTTP constructor** с Session ID, padding, uplink и XMUX |
-| TLS/REALITY легко сломать «умной» автоматикой | **Security selector — источник истины:** TLS / REALITY / NONE выбирает оператор |
+| TLS/REALITY легко сломать неявной автоматикой | Явный Security selector: TLS / REALITY / NONE |
 | Клиентские конфиги собираются руками | **SUBSCRIPTION STUDIO** + нативный Xray JSON + публичный портал |
 | Серверные и клиентские маски смешиваются | Раздельные `finalmask` / `xmesh.clientFinalmask` и compatibility-aware UI |
 | Разрозненные логи и счётчики | Node/system telemetry, Xray counters, user/inbound traffic и история |
-| Панель торчит напрямую наружу | Loopback backend + Nginx HTTPS + случайный dashboard path |
+| Панель и служебные API требуют разных публичных портов | **Один публичный TCP/443:** SNI multiplexer разделяет web и strict-PQ control plane |
 | Простая bearer-модель нод | Signed Node identity/commands + v6 strict-PQ operational control path |
 
 ---
@@ -79,20 +79,20 @@
 | **Analytics** | Node RX/TX, system metrics, Xray runtime, per-user/per-inbound traffic, исторические измерения |
 | **Security** | RBAC, observer least privilege, TOTP MFA/recovery, sessions, Redis login throttling, audit/security boundaries, signed node identity |
 | **Updates** | Owner-authorized panel update, managed Agent update, managed Xray update, runtime version confirmation |
-| **v6 POSTQUANTUM** | Dedicated XSP-v2 strict-PQ Nexus↔Agent operational path с fail-closed policy и evidence-bound activation |
+| **v6 POSTQUANTUM** | XSP-v2 strict-PQ Nexus↔Agent operational path с fail-closed policy и evidence-bound activation |
 
 ---
 
-## XRAY STUDIO — не «форма поверх JSON», а полноценная рабочая среда
+## XRAY STUDIO — полноценная рабочая среда
 
-XRAY STUDIO создан для двух типов работы одновременно: быстро собирать типовые профили и не мешать эксперту работать с реальным Xray JSON.
+XRAY STUDIO сочетает быстрый конструктор и работу с реальным Xray JSON.
 
 В Studio доступны:
 
 - Composer и структурированный редактор;
 - ручной JSON;
 - syntax/semantic diagnostics и targeted fixes;
-- несколько inbound в конфигурации;
+- несколько inbound в одной конфигурации;
 - transport-aware параметры;
 - TLS и REALITY;
 - XHTTP constructor;
@@ -102,15 +102,11 @@ XRAY STUDIO создан для двух типов работы одновре�
 
 ### Security выбирает оператор
 
-Панель **не угадывает TLS по протоколу или транспорту**.
-
 | `streamSettings.security` | Что происходит |
 | --- | --- |
 | `tls` | TLS certificate mode активен, `tlsSettings` доступны |
-| `reality` | используется REALITY, certificate TLS не включается автоматически |
+| `reality` | используется REALITY |
 | `none` | stream TLS выключен |
-
-Поэтому advanced-сценарии вроде **VLESS + XHTTP + NONE** не ломаются «умной» автоматикой — например, когда оператор намеренно использует VLESS Encryption.
 
 Подробно: [XRAY STUDIO Operator Guide](docs/XRAY_STUDIO_GUIDE.md).
 
@@ -118,14 +114,12 @@ XRAY STUDIO создан для двух типов работы одновре�
 
 ## XHTTP — полноценный конструктор
 
-XHTTP больше не ограничен полями `path` и `mode`.
-
-Карточное меню в стиле FinalMask покрывает реальный SplitHTTP/XHTTP surface:
+Карточное меню XHTTP покрывает SplitHTTP/XHTTP surface:
 
 - `auto`, `packet-up`, `stream-up`, `stream-one`;
 - Path / Host / Mode;
-- **криптографически случайный Path** вместо одинакового `/xhttp`;
-- browser headers и собственный headers JSON;
+- криптографически случайный Path;
+- browser/custom headers;
 - `xPaddingBytes`, placement/method/key/header, obfuscation;
 - `noGRPCHeader` / `noSSEHeader`;
 - Session ID placement/key/table/length;
@@ -135,16 +129,14 @@ XHTTP больше не ограничен полями `path` и `mode`.
 - полный XMUX;
 - `serverMaxHeaderBytes`;
 - `downloadSettings` и `h2Params`;
-- **Full randomized profile** с preview перед применением;
-- полный Advanced JSON для редких сценариев.
+- Full randomized profile с preview;
+- Advanced JSON для редких сценариев.
 
-При этом существующий custom Path не меняется сам по себе при обычном редактировании.
+Существующий custom Path не меняется сам по себе при обычном редактировании.
 
 ---
 
 ## FinalMask — TCP, UDP и QUIC
-
-В XRAY STUDIO доступен широкий FinalMask-каталог с разделением серверной и клиентской стороны.
 
 | Направление | Доступные семейства |
 | --- | --- |
@@ -152,15 +144,15 @@ XHTTP больше не ограничен полями `path` и `mode`.
 | **UDP** | Salamander/Gecko, Sudoku, Header Custom, mKCP Legacy, Noise, `udphop`, XDNS, XICMP, Realm, Filter |
 | **QUIC** | client `quicParams` |
 
-Неподходящие комбинации могут оставаться видимыми, но блокируются с объяснением причины. Для новых базовых пресетов генератор больше не оставляет всем одинаковые примеры: Fragment, Noise и Header Custom получают randomized values, а Sudoku/Salamander используют криптографические секреты.
+Неподходящие комбинации блокируются с объяснением причины. Для новых базовых пресетов Fragment, Noise и Header Custom получают randomized values, а Sudoku/Salamander используют криптографические секреты.
 
-Матрица совместимости: [FINALMASK_COMPATIBILITY.md](docs/FINALMASK_COMPATIBILITY.md).
+Матрица: [FINALMASK_COMPATIBILITY.md](docs/FINALMASK_COMPATIBILITY.md).
 
 ---
 
-## Пользователи, Hosts и индивидуальный fingerprint
+## Пользователи, Hosts и fingerprint
 
-Fingerprint работает на двух уровнях:
+Fingerprint работает по цепочке:
 
 ```text
 individual user fingerprint
@@ -170,38 +162,19 @@ individual user fingerprint
         chrome
 ```
 
-- Host по умолчанию реально сохраняет `chrome`, а не пустое значение с визуальной подсказкой.
-- В карточке пользователя есть индивидуальный override.
-- Первый вариант — **«По умолчанию»**: он наследует fingerprint хоста.
-- Если host fingerprint изменится позже, пользователь на «По умолчанию» автоматически наследует новое значение.
-- Custom user fingerprint влияет только на клиентский конфиг этого пользователя и не меняет Host.
+- Host по умолчанию сохраняет `chrome`.
+- У пользователя есть индивидуальный override.
+- **«По умолчанию»** наследует fingerprint хоста.
+- Изменение host fingerprint автоматически применяется к пользователям без override.
+- User override влияет только на клиентский конфиг этого пользователя.
 
 ---
 
 ## SUBSCRIPTION STUDIO
 
-Nexus умеет быть не только редактором Xray, но и полноценной системой выдачи клиентских конфигураций.
+Публичный портал поддерживает branding, RU/EN, цвета, logo, статус подписки, трафик/expiry, QR, copy-link, support links и встроенные/custom client apps.
 
-### Публичный портал
-
-SUBSCRIPTION STUDIO управляет реальным публичным порталом:
-
-- название/branding;
-- цвета;
-- optional logo;
-- RU/EN контент;
-- статус подписки;
-- трафик и срок действия;
-- QR;
-- copy-link;
-- support links;
-- встроенные и custom client apps.
-
-### Native Xray JSON
-
-Генератор формирует клиентские конфигурации для реализованных protocol families, включая VLESS, VMess, Trojan, Shadowsocks/SS2022, Hysteria2 и MASQUE — при условии корректных transport/security settings и поддержки конкретным клиентом.
-
-Система не заявляет магическую совместимость со всеми существующими Xray-функциями и всеми third-party clients: неподдерживаемые или неполные комбинации должны fail closed.
+Генератор формирует native Xray JSON для реализованных protocol families, включая VLESS, VMess, Trojan, Shadowsocks/SS2022, Hysteria2 и MASQUE — при корректных transport/security settings и поддержке клиента.
 
 Документы: [SUBSCRIPTION_SECURITY.md](docs/SUBSCRIPTION_SECURITY.md) · [XRAY_CLIENT_EXPORT_MATRIX.md](docs/XRAY_CLIENT_EXPORT_MATRIX.md).
 
@@ -209,34 +182,29 @@ SUBSCRIPTION STUDIO управляет реальным публичным по�
 
 ## Nodes: от bootstrap до runtime evidence
 
-Нода в XMesh — это не просто IP-адрес в таблице.
-
-Панель умеет работать с:
+Панель работает с:
 
 - отдельной identity каждой VPS;
 - bootstrap/enrollment;
-- Agent heartbeat;
-- Agent version;
-- Xray version и process state;
-- desired/applied configuration revisions;
+- Agent heartbeat/version;
+- Xray version/process state;
+- desired/applied revisions;
 - profile/application attestation where available;
 - system/network telemetry;
 - traffic accounting и quota state;
 - managed Agent/Xray updates;
 - operational errors и diagnostics.
 
-**Queued ≠ completed.** Успешная постановка restart/update/config request в очередь не считается доказательством результата. Финальный статус проверяется по свежему runtime/heartbeat evidence.
+**Queued ≠ completed.** Постановка операции в очередь не считается доказательством результата; финальное состояние проверяется по свежему runtime/heartbeat evidence.
 
 ---
 
 ## Routing, GeoData и аналитика
 
-XMesh разделяет маршрутизацию ноды и клиента.
-
 - **Node Routing** — Xray routing на managed VPS.
-- **Client Routing** — правила, которые могут проектироваться в client JSON.
+- **Client Routing** — правила для client JSON.
 - **GeoData** — GeoIP/GeoSite sources и operational state.
-- **Statistics** — node RX/TX, system metrics, Xray/user/inbound counters и исторические значения.
+- **Statistics** — node RX/TX, system metrics, Xray/user/inbound counters и история.
 
 Документы: [NODE_ROUTING.md](docs/NODE_ROUTING.md) · [CLIENT_ROUTING.md](docs/CLIENT_ROUTING.md) · [GEODATA_ROUTING.md](docs/GEODATA_ROUTING.md).
 
@@ -244,35 +212,38 @@ XMesh разделяет маршрутизацию ноды и клиента.
 
 ## Безопасность панели и control plane
 
-Безопасность здесь — часть архитектуры, а не отдельная страница настроек.
-
 ### Административный контур
 
-- RBAC;
-- read-only/observer boundary;
-- TOTP MFA;
-- recovery controls;
+- RBAC и observer boundary;
+- TOTP MFA и recovery controls;
 - session management/revocation;
 - Redis-backed login throttling;
 - secure cookies;
-- encrypted persistent MFA/subscription secrets;
-- случайный dashboard path для каждой установки;
-- панельное приложение на loopback за Nginx HTTPS.
+- persistent encrypted MFA/subscription secrets;
+- случайный dashboard path;
+- Rust backend на loopback.
 
 ### Node trust
 
 - signed Node identity;
-- подписанные/авторизованные policy/operations;
+- авторизованные policy/operations;
 - runtime verification вместо доверия одной кнопке в UI;
-- fail-closed подход к отсутствующим/некорректным security evidence.
+- fail-closed поведение при отсутствующих/некорректных security evidence.
 
-### v6 strict-PQ control plane
+### v6 strict-PQ control plane — тоже через публичный 443
 
-В v6 production XSP-v2 runtime входит в штатный install/update lifecycle. Operational node control отделён от обычного HTTPS панели и использует dedicated strict-PQ ingress.
+В v6 operational Node control **не требует отдельного публичного порта**.
 
-Политика включает TLS 1.3 `X25519MLKEM768`, ML-DSA-65 material и отсутствие automatic classical fallback на strict-PQ operational path.
+Один внешний `TCP/443` принимает оба типа соединений. Host-side SNI multiplexer **не завершает TLS**, а только направляет ClientHello:
 
-Проект имеет **реальный bounded production activation/finalization evidence для Node 13**, но это намеренно не превращается в маркетинговое утверждение «все ноды уже post-quantum».
+- обычный SNI домена панели → loopback Nginx TLS для web/admin/subscriptions;
+- `node-ingress.xsp.invalid` → отдельный loopback strict-PQ ingress.
+
+Поэтому web-панель и operational control используют один публичный порт, но **не один TLS security boundary**. Strict-PQ ingress по-прежнему самостоятельно требует TLS 1.3 `X25519MLKEM768`, ML-DSA-65 client identity и fail-closed policy.
+
+`8444` остаётся только локальным loopback backend между TCP/443 multiplexer и strict-PQ ingress. **Открывать TCP/8444 в firewall не нужно и нельзя.**
+
+Проект имеет bounded production activation/finalization evidence для Node 13; это не утверждение, что все ноды автоматически активированы в strict-PQ.
 
 Evidence: [XSP_V2_PRODUCTION_ACTIVATION_2026-10-31.md](docs/XSP_V2_PRODUCTION_ACTIVATION_2026-10-31.md) · [PQ-only security policy](docs/XSP_V2_PQ_ONLY_SECURITY_POLICY.md) · [P0-E checkpoint](P0E_CHECKPOINT.md).
 
@@ -287,13 +258,14 @@ Evidence: [XSP_V2_PRODUCTION_ACTIVATION_2026-10-31.md](docs/XSP_V2_PRODUCTION_AC
 - **Ubuntu 22.04 или 24.04 LTS**;
 - публичный домен панели;
 - DNS A/AAAA на VPS;
-- открытый **TCP/80**;
-- открытый **TCP/443**;
-- открытый **TCP/8444** для v6 operational node control plane;
+- открытый **TCP/80** для ACME/redirect;
+- открытый **TCP/443** для панели, подписок и v6 operational node control plane;
 - root/sudo;
 - outbound Internet access.
 
-Docker, Docker Compose, Nginx и Certbot заранее устанавливать не нужно.
+**Отдельный TCP/8444 наружу не открывается.**
+
+Docker, Docker Compose, Nginx, HAProxy и Certbot заранее устанавливать не нужно.
 
 ## 1. Установите Git и запустите installer
 
@@ -304,8 +276,6 @@ git clone https://github.com/TriplexCorp/XMesh-Nexus.git
 cd XMesh-Nexus
 bash install.sh
 ```
-
-Установщик попросит домен панели и email Let's Encrypt.
 
 Для non-interactive install:
 
@@ -320,7 +290,7 @@ bash install.sh
 `install.sh`:
 
 - установит Docker Engine + Compose/Buildx;
-- установит Nginx mainline и Certbot;
+- установит Nginx mainline, HAProxy и Certbot;
 - сгенерирует `.env` и независимые секреты;
 - создаст случайный `DASHBOARD_PATH`;
 - поднимет PostgreSQL/TimescaleDB и Redis;
@@ -329,12 +299,13 @@ bash install.sh
 - запустит обязательный product gateway/ingress;
 - выпустит Let's Encrypt certificate;
 - настроит HTTP→HTTPS;
+- перенесёт panel TLS termination на loopback `127.0.0.1:8443`;
+- оставит strict-PQ ingress только на loopback `127.0.0.1:8444`;
+- поднимет единый public TCP/443 SNI multiplexer;
 - оставит Rust backend на `127.0.0.1`;
 - установит host-side update helpers.
 
 ## 3. Получите URL и initial credentials
-
-На сервере:
 
 ```bash
 sudo grep -E '^(ADMIN_USERNAME|ADMIN_PASSWORD|DASHBOARD_PATH)=' .env
@@ -346,23 +317,23 @@ sudo grep -E '^(ADMIN_USERNAME|ADMIN_PASSWORD|DASHBOARD_PATH)=' .env
 https://<ваш-домен><DASHBOARD_PATH>
 ```
 
-Не публикуйте содержимое `.env` в issue, чатах или логах.
-
 ## 4. Проверьте сервисы
 
 ```bash
 docker compose --profile xsp-v2-product ps
 sudo nginx -t
+sudo systemctl status xmesh-https-mux --no-pager
+sudo ss -ltnp '( sport = :443 or sport = :8444 )'
 ```
 
-## 5. Подключите первую Node
+Ожидается: `443` публичный; `8444` — только `127.0.0.1`.
 
-В панели:
+## 5. Подключите первую Node
 
 1. откройте **Узлы / Nodes**;
 2. создайте отдельную запись Node;
 3. выберите **Подключить ноду и метрики**;
-4. выполните выданную bootstrap-команду на VPS-ноды;
+4. выполните bootstrap-команду на VPS-ноды;
 5. дождитесь heartbeat;
 6. проверьте Agent/Xray version и runtime state.
 
@@ -370,60 +341,60 @@ sudo nginx -t
 
 1. откройте **XRAY STUDIO**;
 2. выберите protocol/transport;
-3. явно выберите Security: TLS / REALITY / NONE;
-4. настройте XHTTP/FinalMask при необходимости;
+3. выберите Security: TLS / REALITY / NONE;
+4. настройте XHTTP/FinalMask;
 5. сохраните и назначьте профиль Node;
-6. дождитесь подтверждённого applied state;
+6. дождитесь applied state;
 7. создайте Host и User;
 8. проверьте subscription/client JSON реальным клиентом.
 
-Полная установка и troubleshooting: [docs/INSTALLATION.md](docs/INSTALLATION.md).
+Полная установка: [docs/INSTALLATION.md](docs/INSTALLATION.md).
 
 ---
 
 ## Архитектура
 
 ```text
-                       ┌─────────────────────────────┐
-                       │         Administrator       │
-                       └──────────────┬──────────────┘
-                                      │ HTTPS :443
-                                      ▼
-                       ┌─────────────────────────────┐
-                       │      Nginx + Let's Encrypt  │
-                       └──────────────┬──────────────┘
-                                      │ loopback
-                                      ▼
-┌────────────────┐      ┌─────────────────────────────┐      ┌────────────────┐
-│ PostgreSQL /   │◄────►│  XMesh Nexus · Rust/Axum    │◄────►│     Redis      │
-│ TimescaleDB    │      │  users · nodes · configs    │      │ auth/throttle  │
-└────────────────┘      └──────────────┬──────────────┘      └────────────────┘
-                                      │
-                         control plane│
-                                      │ strict-PQ v6 :8444
-                                      ▼
-                       ┌─────────────────────────────┐
-                       │       XMesh Node / Agent    │
-                       └──────────────┬──────────────┘
-                                      │ manages
-                                      ▼
-                       ┌─────────────────────────────┐
-                       │          Xray-core          │
-                       │  TLS/REALITY · routing      │
-                       │  XHTTP · FinalMask · stats  │
-                       └──────────────┬──────────────┘
-                                      │ VPN traffic
-                                      ▼
-                               Client devices
+ Internet
+    │
+    │ TCP/443 — единственный public HTTPS/control порт
+    ▼
+┌──────────────────────────────────────────────┐
+│ HAProxy SNI multiplexer (TLS passthrough)    │
+│                                              │
+│ panel.example.org ───────┐                   │
+│ node-ingress.xsp.invalid ├──────────────┐    │
+└──────────────────────────┼──────────────┼────┘
+                           │              │
+                 loopback  │              │ loopback
+                           ▼              ▼
+                  Nginx TLS :8443   strict-PQ ingress :8444
+                           │              │
+                           ▼              │ XSP-v2
+                    XMesh Nexus           │
+                    Rust / Axum           │
+                           │              │
+                PostgreSQL / Redis        ▼
+                                      XMesh Agent
+                                           │
+                                           ▼
+                                       Xray-core
+                                           │
+                                           ▼
+                                      VPN clients
 ```
+
+`8443` и `8444` — **внутренние loopback-порты**, не firewall requirements.
 
 ---
 
 ## Обновления
 
-Для установленной панели предусмотрен **owner-authorized web update**. API не получает Docker socket и не выполняет arbitrary shell: он ставит фиксированный update request, а root-owned systemd worker запускает `xmeshctl --web-update` с lock и PostgreSQL backup перед pull/rebuild.
+Owner-authorized web update не даёт API Docker socket и arbitrary shell. API ставит фиксированный request, а root-owned worker запускает `xmeshctl --web-update` с lock и PostgreSQL backup.
 
-`queued` / HTTP `202` означает **только постановку запроса в очередь**. После update обязательно проверяется финальный status и фактически запущенная версия.
+При обновлении host installer также переприменяет single-443 topology и пересоздаёт current v6 product gateway/ingress, чтобы старая public `:8444` mapping не сохранилась после upgrade.
+
+`queued` / HTTP `202` означает только постановку запроса в очередь.
 
 Подробнее: [PANEL_UPDATE_AND_TELEMETRY.md](docs/PANEL_UPDATE_AND_TELEMETRY.md).
 
@@ -431,26 +402,21 @@ sudo nginx -t
 
 # Документация
 
-Теперь README — это входная страница продукта, а не место хранения всех инженерных деталей. Полная документация вынесена в `docs/`.
-
 | Документ | Что внутри |
 | --- | --- |
-| **[Documentation Index](docs/README.md)** | Навигация по всей актуальной документации |
+| **[Documentation Index](docs/README.md)** | Навигация по актуальной документации |
 | **[Product Guide](docs/PRODUCT_GUIDE.md)** | Полный функционал панели и границы подсистем |
-| **[Installation & Operations](docs/INSTALLATION.md)** | Установка, порты, HTTPS, update, backup, troubleshooting |
+| **[Installation & Operations](docs/INSTALLATION.md)** | Установка, public 80/443 topology, update, backup, troubleshooting |
 | **[XRAY STUDIO Guide](docs/XRAY_STUDIO_GUIDE.md)** | Security semantics, XHTTP, FinalMask, fingerprint, client projection |
-| **[Development Checkpoint](docs/DEVELOPMENT_CHECKPOINT_2026-10-31.md)** | Критичные решения и контракты для будущей разработки |
+| **[Development Checkpoint](docs/DEVELOPMENT_CHECKPOINT_2026-10-31.md)** | Критичные решения для будущей разработки |
 | [FinalMask Compatibility](docs/FINALMASK_COMPATIBILITY.md) | Server/client/transport compatibility |
-| [Client Export Matrix](docs/XRAY_CLIENT_EXPORT_MATRIX.md) | Поддержка client JSON projection |
-| [Autonomous Nodes](docs/AUTONOMOUS_NODES.md) | Agent/node operation model |
-| [Panel Update & Telemetry](docs/PANEL_UPDATE_AND_TELEMETRY.md) | Update workflow и telemetry/accounting |
+| [Client Export Matrix](docs/XRAY_CLIENT_EXPORT_MATRIX.md) | Client JSON projection |
+| [Autonomous Nodes](docs/AUTONOMOUS_NODES.md) | Agent/node model |
+| [Panel Update & Telemetry](docs/PANEL_UPDATE_AND_TELEMETRY.md) | Update workflow и telemetry |
 | [Node Identity Security](docs/SECURITY_NODE_IDENTITY.md) | Signed node identity/trust |
-| [Subscription Security](docs/SUBSCRIPTION_SECURITY.md) | Public subscription security |
-| [Node Routing](docs/NODE_ROUTING.md) | Node-side routing |
-| [Client Routing](docs/CLIENT_ROUTING.md) | Client routing |
-| [GeoData Routing](docs/GEODATA_ROUTING.md) | GeoIP/GeoSite behavior |
+| [Subscription Security](docs/SUBSCRIPTION_SECURITY.md) | Subscription security |
 | [Enterprise Roadmap](docs/ENTERPRISE_ROADMAP.md) | Engineering/release readiness |
-| [Strict-PQ Production Evidence](docs/XSP_V2_PRODUCTION_ACTIVATION_2026-10-31.md) | Bounded production activation evidence |
+| [Strict-PQ Production Evidence](docs/XSP_V2_PRODUCTION_ACTIVATION_2026-10-31.md) | Bounded activation evidence |
 
 ---
 
@@ -464,7 +430,8 @@ sudo nginx -t
 | VPN data plane | Xray-core |
 | Node control | XMesh Node / Agent |
 | Deployment | Docker Engine · Docker Compose |
-| Public web | Nginx · Let's Encrypt / Certbot |
+| Public TCP/443 | HAProxy SNI passthrough |
+| Panel TLS | Nginx · Let's Encrypt / Certbot |
 | Control-plane PQ | XSP-v2 · TLS 1.3 hybrid ingress · ML-DSA-65 |
 | Frontend | Browser-native HTML/CSS/JavaScript · RU/EN |
 
@@ -472,26 +439,24 @@ sudo nginx -t
 
 ## Честные ограничения
 
-Профессиональная панель должна не только показывать кнопки, но и честно обозначать границы.
-
-- XMesh не предоставляет VPS автоматически — инфраструктура остаётся вашей.
-- DNS, firewall, NAT и открытые порты всё равно должны быть настроены корректно.
+- XMesh не предоставляет VPS автоматически.
+- DNS, firewall и NAT должны быть настроены корректно.
+- Для штатной v6 установки наружу нужны **80/tcp и 443/tcp; 8444/tcp должен оставаться закрытым**.
 - Editor support не означает совместимость любой комбинации с любым third-party клиентом.
-- Saved JSON не является доказательством, что Node применил конфигурацию.
-- Green CI не доказывает, что конкретный production VPS обновился.
-- Preview SUBSCRIPTION STUDIO не доказывает Internet reachability публичного URL.
-- Strict-PQ activation evidence относится к конкретному bounded rollout/evidence, а не автоматически ко всем Node.
+- Saved JSON не доказывает, что Node применила конфигурацию.
+- Green CI не доказывает, что конкретный VPS обновился.
+- Strict-PQ evidence относится к конкретному bounded rollout, а не автоматически ко всем Node.
 - Root на Nexus host остаётся высокодоверенной ролью; это не HSM boundary.
 
-XMesh строится вокруг **явного состояния, проверяемых операций и fail-closed поведения**, а не вокруг скрытия таких ограничений.
+XMesh строится вокруг **явного состояния, проверяемых операций и fail-closed поведения**.
 
 ---
 
 ## Статус разработки
 
-XMesh Nexus активно развивается. Основные feature-пути покрываются большим Backend CI: frontend regression checks, Rust formatting/tests, strict Clippy, Docker build и disposable PostgreSQL/Redis API integration.
+Основные feature-пути покрываются Backend CI: frontend regression checks, Rust formatting/tests, strict Clippy, Docker build и disposable PostgreSQL/Redis API integration.
 
-Актуальная инженерная готовность, release gates и незавершённые задачи фиксируются в [Enterprise Roadmap](docs/ENTERPRISE_ROADMAP.md), а текущие UX/implementation invariants — в [Development Checkpoint](docs/DEVELOPMENT_CHECKPOINT_2026-10-31.md).
+Актуальная готовность и release gates: [Enterprise Roadmap](docs/ENTERPRISE_ROADMAP.md). Текущие implementation invariants: [Development Checkpoint](docs/DEVELOPMENT_CHECKPOINT_2026-10-31.md).
 
 ---
 
