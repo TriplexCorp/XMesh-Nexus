@@ -2,22 +2,22 @@
 'use strict';
 const fs=require('node:fs');
 const assert=require('node:assert/strict');
-const app=fs.readFileSync('app.js','utf8');
+const overlay=fs.readFileSync('user-fingerprint-override.js','utf8');
 const subscription=fs.readFileSync('backend/src/user_subscriptions.rs','utf8');
+const base=fs.readFileSync('backend/src/user_subscriptions_base.rs','utf8');
 const hostEditor=fs.readFileSync('xray-studio-hosts.js','utf8');
-const fu=app.slice(app.indexOf('const FU='),app.indexOf('const COUNTRY_CODES='));
-assert(!fu.includes("k:'fingerprint'"),'User creation and editing must not expose fingerprint');
-assert(!app.includes('uTLS fingerprint пользователя'),'No user fingerprint field');
-assert(!app.includes('u.fingerprint'),'User list must not display or filter on user fingerprint');
-assert(!app.includes("fingerprint:d.fingerprint"),'User creation must not store an extra fingerprint');
-assert.match(app,/FE\.find\(f=>f\.k==='limit'\)/,'User traffic limit is still editable');
-assert.match(app,/FE\.find\(f=>f\.k==='strategy'\)/,'User reset strategy is still editable');
+const index=fs.readFileSync('index.html','utf8');
+const docker=fs.readFileSync('backend/Dockerfile','utf8');
+
+assert.match(overlay,/inherited\.textContent='По умолчанию'/,'User fingerprint selector must expose a visible default option');
+assert.match(overlay,/наследует fingerprint из хоста/,'Default mode must explain host inheritance');
+assert.match(overlay,/data-user-fingerprint/,'User card must expose the per-user fingerprint control');
+assert.match(overlay,/fingerprint:select\.value/,'User edit save must persist the per-user override');
+assert.match(index,/app\.js[^\n]*<\/script>\n<script src="\/user-fingerprint-override\.js/,'Override must load after app.js');
+assert.match(docker,/app\.js user-fingerprint-override\.js node-bootstrap-v6\.js/,'Backend image must package the override');
 assert.match(hostEditor,/data-endpoint="fp"/,'Host fingerprint editor remains available');
-const transport=fs.readFileSync('backend/src/subscription_transport.rs','utf8');
-assert.match(subscription,/crate::subscription_transport::client_stream\(\s*inbound\s*,\s*host\s*,\s*device\s*,?\s*\)/,
-  'Subscription must delegate stream generation to the transport projector');
-assert.match(transport,/field\(\s*host\s*,\s*"fp"\s*\)\s*\.or_else\(\s*\|\|\s*field\(\s*host\s*,\s*"fingerprint"\s*\)\s*\)/,
-  'Client TLS/REALITY fingerprint must be resolved from the host, never the user');
-assert.doesNotMatch(transport,/field\(user,"(?:fp|fingerprint)"\)/,
-  'Transport projector must not read a user fingerprint');
-console.log('Fingerprint ownership: hosts only; user forms unchanged otherwise.');
+assert.match(subscription,/user_fingerprint\(/,'Backend wrapper must read the per-user override');
+assert.match(subscription,/apply_fingerprint\(/,'Backend wrapper must project it into generated client JSON');
+assert.match(subscription,/\["tlsSettings", "realitySettings"\]/,'Override applies only to TLS/REALITY client security settings');
+assert.match(base,/crate::subscription_transport::client_stream\(inbound, host, device\)/,'Original transport projection remains intact');
+console.log('Per-user fingerprint override: user override; default inherits host, whose fallback is chrome.');
