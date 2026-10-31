@@ -38,6 +38,22 @@ grep -Fq 'server strict_pq 127.0.0.1:8444' <<< "$mux"
 grep -Fq 'XSP_V2_PRODUCT_PUBLIC_ADDRESS: ${PANEL_DOMAIN:?Run ./install.sh first}:443' compose.yaml
 grep -Fq '127.0.0.1:8444:8444' compose.yaml
 ! grep -Fq '0.0.0.0:8444:8444' compose.yaml
+python3 - <<'PY'
+from pathlib import Path
+import re
+
+compose = Path('compose.yaml').read_text()
+match = re.search(r'^  xsp-v2-product-ingress:\n(?P<body>.*?)(?=^  [A-Za-z0-9_.-]+:\n|\Z)', compose, re.M | re.S)
+if not match:
+    raise SystemExit('xsp-v2-product-ingress service is missing from compose.yaml')
+body = match.group('body')
+if '      context: .\n' not in body:
+    raise SystemExit('xsp-v2-product-ingress must build from repository root so Dockerfile COPY paths exist')
+if '      dockerfile: deploy/xsp-v2-ingress/Dockerfile\n' not in body:
+    raise SystemExit('xsp-v2-product-ingress must use the repo-root-relative ingress Dockerfile path')
+if '      target: runtime-c2b\n' not in body:
+    raise SystemExit('xsp-v2-product-ingress must keep the reviewed runtime-c2b target')
+PY
 grep -Fq 'docker port "$ingress_id" 8444/tcp' "$host"
 grep -Fq "expected 127.0.0.1:8444" "$host"
 grep -Fq 'ExecStart=/usr/sbin/haproxy -W -db -f /etc/xmesh-nexus/haproxy-443.cfg' "$host"
@@ -53,4 +69,4 @@ grep -Fq 'bash deploy/install-panel-host.sh deps' install.sh
 grep -Fq 'bash deploy/install-panel-host.sh domain "$PWD/.env"' install.sh
 grep -Fq 'bash deploy/install-panel-host.sh activate "$PWD/.env"' install.sh
 grep -Fq 'docker compose up -d --build --wait --wait-timeout' install.sh
-echo 'Panel host installer: single public 443 mux, loopback TLS backends and integration contracts OK.'
+echo 'Panel host installer: single public 443 mux, loopback TLS backends, repo-root product ingress build context and integration contracts OK.'
