@@ -1,0 +1,27 @@
+{
+  "schema": "xsp2-kvm-vps-durability-carry-forward-1",
+  "deploymentClass": "kvm-vps",
+  "qualifiedTarget": {
+    "nexusRevision": "12b3170996bc062ee16c79659a6378e5e425fd0e",
+    "nodeRevision": "34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb"
+  },
+  "productionTarget": {
+    "nexusRevision": "a1267ae186f74d5e21561e3b64fc7375d499132e",
+    "nodeRevision": "64709ce8f5f0ce80e2c0bab59b4476347825e57c"
+  },
+  "evidence": {
+    "originalDurabilityResultSha256": "fd8ef8e680e999bb95ef5b081806eb24a32f1537a7d1f6cd678ecd41591c6a0f",
+    "originalDurabilityVerificationSha256": "667b4ab5c3cd63a581d7dd5c8ef5e6db220c70904b9a1e50fc12f9161f3fe598",
+    "providerStorageRiskAcceptanceSha256": "49a311a8bf871c6afcaa5841622b9f1e28e74675452671abc4e970f644dec604"
+  },
+  "claims": {
+    "nodeQualifiedDurabilityPathsUnchanged": true,
+    "nexusQualifiedPersistencePathsUnchanged": true,
+    "fiveRunCrashMatrixCarriedForward": true,
+    "postgresCrashRecoveryCarriedForward": true,
+    "providerStorageDurabilityAssumed": true,
+    "physicalPowerLossQualified": false,
+    "productionActivation": false,
+    "strictPQEnabled": false
+  }
+}
