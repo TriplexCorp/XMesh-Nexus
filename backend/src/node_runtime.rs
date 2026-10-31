@@ -1,5 +1,5 @@
 // P0-D lost-response/restart overlay. Keep the exact PR #101 runtime as the
-// reviewed baseline and shadow only signed poll retry plus exact ACK replay.
+// reviewed baseline and shadow only bounded release-control surfaces.
 #[path = "node_runtime_p0d_staged.rs"]
 mod staged;
 
@@ -8,15 +8,20 @@ pub use staged::*;
 
 use crate::{ApiError, AppState, node_auth};
 use axum::{
-    Json,
+    Extension, Json,
     body::Bytes,
-    extract::State,
+    extract::{Path, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
 };
 use serde::Deserialize;
-use serde_json::json;
+use serde_json::{Value, json};
 use sqlx::Row;
+
+/// XMesh v6 is the first numbered POSTQUANTUM major control-Agent release.
+/// v4/v5 remain accepted only so an already enrolled node can perform the
+/// authenticated transition to v6; they are not the advertised target.
+pub const CONTROL_AGENT_VERSION: &str = "control-v6.0.0";
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -85,6 +90,274 @@ async fn claimed_bound_retry(
     .bind(node_id)
     .fetch_optional(&state.pool)
     .await?)
+}
+
+async fn control_v6_transition_active(
+    state: &AppState,
+    node_id: i64,
+    seconds: i64,
+    include_legacy_v1_v3: bool,
+) -> Result<bool, ApiError> {
+    let interval = format!("{seconds} seconds");
+    let query = if include_legacy_v1_v3 {
+        "SELECT EXISTS(SELECT 1 FROM node_runtime_heartbeats
+         WHERE node_id=$1 AND received_at>NOW()-$2::INTERVAL
+           AND (version LIKE 'control-v1%' OR version LIKE 'control-v2%' OR
+                version LIKE 'control-v3%' OR version LIKE 'control-v4%' OR
+                version LIKE 'control-v5%' OR version LIKE 'control-v6%'))"
+    } else {
+        "SELECT EXISTS(SELECT 1 FROM node_runtime_heartbeats
+         WHERE node_id=$1 AND received_at>NOW()-$2::INTERVAL
+           AND (version LIKE 'control-v3.%' OR version LIKE 'control-v4.%' OR
+                version LIKE 'control-v5.%' OR version LIKE 'control-v6.%'))"
+    };
+    Ok(sqlx::query_scalar::<_, bool>(query)
+        .bind(node_id)
+        .bind(interval)
+        .fetch_one(&state.pool)
+        .await?)
+}
+
+/// v6 shadow for the legacy restart endpoint. This exists because a genuine
+/// control-v6 heartbeat must remain eligible for the same fixed restart action.
+pub async fn request_restart(
+    State(state): State<AppState>,
+    Extension(actor): Extension<crate::auth::AuthUser>,
+    Path(node_id): Path<i64>,
+) -> Result<(StatusCode, Json<Value>), ApiError> {
+    crate::require_mutation(&actor)?;
+    if node_id <= 0 {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid node ID"));
+    }
+    let node = sqlx::query_scalar::<_, Value>(
+        "SELECT data FROM panel_records WHERE collection='nodes' AND id=$1",
+    )
+    .bind(node_id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Node not found"))?;
+    if node.get("disabled").and_then(Value::as_bool) == Some(true) {
+        return Err(ApiError::new(StatusCode::CONFLICT, "Node is disabled."));
+    }
+    if !control_v6_transition_active(&state, node_id, 90, true).await? {
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "У ноды нет подключённого управляющего агента.",
+        ));
+    }
+    sqlx::query(
+        "UPDATE node_restart_commands SET state='failed',
+         result='Управляющий агент не подтвердил выполнение вовремя',finished_at=NOW()
+         WHERE node_id=$1 AND state IN ('pending','claimed')
+           AND ((action='update_agent' AND requested_at<NOW()-INTERVAL '15 minutes') OR
+                (action<>'update_agent' AND requested_at<NOW()-INTERVAL '180 seconds'))",
+    )
+    .bind(node_id)
+    .execute(&state.pool)
+    .await?;
+    let id = sqlx::query_scalar::<_, i64>(
+        "INSERT INTO node_restart_commands(node_id,requested_by)
+         VALUES($1,$2) ON CONFLICT DO NOTHING RETURNING id",
+    )
+    .bind(node_id)
+    .bind(&actor.username)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Узел уже выполняет команду управления."))?;
+    crate::audit(
+        &state.pool,
+        &actor.username,
+        "node.restart.requested",
+        Some("nodes"),
+        Some(node_id),
+        json!({"commandId":id}),
+    )
+    .await;
+    Ok((StatusCode::ACCEPTED, Json(json!({"id":id,"nodeId":node_id,"state":"pending"}))))
+}
+
+/// v6 shadow for fixed, allow-listed Xray release updates. Request shape stays
+/// exactly `{version}`; no image URL, path or command enters from the client.
+pub async fn request_xray_update(
+    State(state): State<AppState>,
+    Extension(actor): Extension<crate::auth::AuthUser>,
+    Path(node_id): Path<i64>,
+    Json(body): Json<Value>,
+) -> Result<(StatusCode, Json<Value>), ApiError> {
+    crate::require_mutation(&actor)?;
+    if node_id <= 0 {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid node ID"));
+    }
+    let object = body
+        .as_object()
+        .filter(|value| value.len() == 1)
+        .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Invalid Xray update request"))?;
+    let target = object
+        .get("version")
+        .and_then(Value::as_str)
+        .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Некорректная версия Xray"))?
+        .trim();
+    if target.len() > 64
+        || target.is_empty()
+        || !target
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || b"._+-".contains(&c))
+    {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Некорректная версия Xray"));
+    }
+    let releases = state
+        .core
+        .all_node_releases()
+        .await
+        .map_err(|msg| ApiError::new(StatusCode::BAD_GATEWAY, msg))?;
+    if !releases.iter().any(|release| release.version == target) {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Выбранная версия отсутствует среди официальных релизов Xray",
+        ));
+    }
+    let node = sqlx::query_scalar::<_, Value>(
+        "SELECT data FROM panel_records WHERE collection='nodes' AND id=$1",
+    )
+    .bind(node_id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Node not found"))?;
+    if node.get("disabled").and_then(Value::as_bool) == Some(true) {
+        return Err(ApiError::new(StatusCode::CONFLICT, "Node is disabled."));
+    }
+    if !control_v6_transition_active(&state, node_id, 90, false).await? {
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "Для выбора версии требуется активный управляющий агент control-v3+.",
+        ));
+    }
+    sqlx::query(
+        "UPDATE node_restart_commands SET state='failed',
+         result='Command expired before delivery',finished_at=NOW()
+         WHERE node_id=$1 AND state IN ('pending','claimed')
+           AND ((action='update_agent' AND requested_at<NOW()-INTERVAL '15 minutes') OR
+                (action<>'update_agent' AND requested_at<NOW()-INTERVAL '180 seconds'))",
+    )
+    .bind(node_id)
+    .execute(&state.pool)
+    .await?;
+    let id = sqlx::query_scalar::<_, i64>(
+        "INSERT INTO node_restart_commands(node_id,action,requested_by,target_version)
+         VALUES($1,'update_xray',$2,$3) ON CONFLICT DO NOTHING RETURNING id",
+    )
+    .bind(node_id)
+    .bind(&actor.username)
+    .bind(target)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Узел уже выполняет команду управления."))?;
+    crate::audit(
+        &state.pool,
+        &actor.username,
+        "node.xray.update.requested",
+        Some("nodes"),
+        Some(node_id),
+        json!({"commandId":id,"targetVersion":target}),
+    )
+    .await;
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(json!({"id":id,"nodeId":node_id,"action":"update_xray","targetVersion":target,"state":"pending"})),
+    ))
+}
+
+/// Existing endpoint, now with a v6 legacy/default target. Manifest-bound
+/// migration requests continue to delegate to the previously reviewed staged
+/// implementation; only the empty `{}` production update target changes.
+pub async fn request_agent_update(
+    State(state): State<AppState>,
+    Extension(actor): Extension<crate::auth::AuthUser>,
+    Path(node_id): Path<i64>,
+    Json(body): Json<Value>,
+) -> Result<(StatusCode, Json<Value>), ApiError> {
+    let Some(object) = body.as_object() else {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid Agent update request"));
+    };
+    if !object.is_empty() {
+        let parsed: staged::AgentUpdateRequest = serde_json::from_value(body)
+            .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Invalid Agent update request"))?;
+        return staged::request_agent_update(
+            State(state),
+            Extension(actor),
+            Path(node_id),
+            Json(parsed),
+        )
+        .await;
+    }
+
+    crate::require_mutation(&actor)?;
+    if node_id <= 0 {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid node ID"));
+    }
+    let node = sqlx::query_scalar::<_, Value>(
+        "SELECT data FROM panel_records WHERE collection='nodes' AND id=$1",
+    )
+    .bind(node_id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Node not found"))?;
+    if node.get("disabled").and_then(Value::as_bool) == Some(true) {
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "Отключённая нода не принимает команды. Сначала восстановите работу узла.",
+        ));
+    }
+    let active = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS(SELECT 1 FROM node_runtime_heartbeats
+          WHERE node_id=$1 AND received_at>NOW()-INTERVAL '65 seconds'
+            AND (version LIKE 'control-v4.%' OR version LIKE 'control-v5.%' OR version LIKE 'control-v6.%'))",
+    )
+    .bind(node_id)
+    .fetch_one(&state.pool)
+    .await?;
+    if !active {
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "На ноде нет активного агента с поддержкой самообновления (control-v4+).",
+        ));
+    }
+    sqlx::query(
+        "UPDATE node_restart_commands SET state='failed',
+         result='Command expired before delivery',finished_at=NOW()
+         WHERE node_id=$1 AND state IN ('pending','claimed')
+           AND ((action='update_agent' AND requested_at<NOW()-INTERVAL '15 minutes') OR
+                (action<>'update_agent' AND requested_at<NOW()-INTERVAL '180 seconds'))",
+    )
+    .bind(node_id)
+    .execute(&state.pool)
+    .await?;
+    let id = sqlx::query_scalar::<_, i64>(
+        "INSERT INTO node_restart_commands(node_id,action,requested_by,target_version)
+         VALUES($1,'update_agent',$2,$3) ON CONFLICT DO NOTHING RETURNING id",
+    )
+    .bind(node_id)
+    .bind(&actor.username)
+    .bind(CONTROL_AGENT_VERSION)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Узел уже выполняет другую команду управления."))?;
+    crate::audit(
+        &state.pool,
+        &actor.username,
+        "node.agent.update.requested",
+        Some("nodes"),
+        Some(node_id),
+        json!({"commandId":id,"targetVersion":CONTROL_AGENT_VERSION,"major":"postquantum-v6"}),
+    )
+    .await;
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(json!({
+            "id":id,"nodeId":node_id,"action":"update_agent",
+            "targetVersion":CONTROL_AGENT_VERSION,"state":"pending"
+        })),
+    ))
 }
 
 /// A bound migration is safe to redeliver after a lost poll response or process
