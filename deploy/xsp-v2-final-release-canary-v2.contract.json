@@ -1,0 +1,25 @@
+{
+  "schema": "xsp2-final-release-canary-contract-2",
+  "resultSchema": "xsp2-final-release-canary-result-2",
+  "releaseCandidate": {
+    "nexusRevision": "12b3170996bc062ee16c79659a6378e5e425fd0e",
+    "nodeRevision": "34d3d7ef5b88fb62e0d7ffa70d92b9aafa3a3abb"
+  },
+  "prerequisiteEvidence": {
+    "securityAssuranceModel": "ai-assisted-internal-plus-release-owner-risk-acceptance",
+    "securityReviewResultSha256": "9248968847310be749d79da79cf692767ca3d04b806da06ce97a3d8cf871f92c",
+    "kvmDurabilityResultSha256": "fd8ef8e680e999bb95ef5b081806eb24a32f1537a7d1f6cd678ecd41591c6a0f",
+    "providerStorageAcceptanceSha256": "49a311a8bf871c6afcaa5841622b9f1e28e74675452671abc4e970f644dec604"
+  },
+  "requiredDomains": [
+    "install-upgrade-lost-response-restart-rollback",
+    "coordinated-backup-restore-recovery",
+    "node-local-redacted-observability",
+    "nexus-durable-redacted-observability"
+  ],
+  "successState": {
+    "finalCanaryPassed": true,
+    "productionExecutionPerformed": false,
+    "legacyProtocolRetired": false
+  }
+}
