@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - feat/user-fingerprint-override-20261031
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
