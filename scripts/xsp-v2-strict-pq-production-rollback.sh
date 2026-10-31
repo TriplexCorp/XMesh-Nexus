@@ -45,6 +45,10 @@ fd,tmp=tempfile.mkstemp(prefix='.rollback.',dir=os.path.dirname(out),text=True)
 with os.fdopen(fd,'w',encoding='utf-8') as f:
     json.dump(value,f,separators=(',',':'));f.write('\n');f.flush();os.fsync(f.fileno())
 os.chmod(tmp,0o600);os.replace(tmp,out)
-with open(os.path.dirname(out),os.O_RDONLY) as d: os.fsync(d.fileno())
+d=os.open(os.path.dirname(out),os.O_RDONLY)
+try:
+    os.fsync(d)
+finally:
+    os.close(d)
 print(json.dumps(value,separators=(',',':')))
 PY
