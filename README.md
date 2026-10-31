@@ -1,16 +1,28 @@
-# XMesh Nexus
+# XMesh Nexus v6.0.0 — POSTQUANTUM
 
 **Self-hosted control plane для Xray-powered VPN infrastructure.**
 
-XMesh Nexus управляет Nodes, пользователями, подписками, конфигурацией Xray, telemetry и security state. Пользовательский VPN data-plane остаётся **Xray-core**; XMesh — control plane, а не дополнительный слой шифрования поверх пользовательского трафика.
+XMesh Nexus управляет Nodes, пользователями, подписками, конфигурацией Xray, telemetry и security state. Пользовательский VPN data-plane остаётся **Xray-core**; XMesh — control plane, а XSP-v2 защищает control-plane канал между Nexus и Agent.
 
 [English](README.en.md) · [Enterprise Roadmap](docs/ENTERPRISE_ROADMAP.md) · [P0-E checkpoint](P0E_CHECKPOINT.md) · [Production activation evidence](docs/XSP_V2_PRODUCTION_ACTIVATION_2026-10-31.md) · [XSP-v2 security policy](docs/XSP_V2_PQ_ONLY_SECURITY_POLICY.md) · [XMesh Node](https://github.com/TriplexCorp/XMesh-Node)
 
-## Текущий XSP-v2 checkpoint — 31 октября 2026
+## v6.0.0 POSTQUANTUM major
 
-### P0-E: bounded production strict-PQ activation завершена на Node 13
+XMesh Nexus **6.0.0** и XMesh Agent **control-v6.0.0** — первый штатный major, в котором production XSP-v2 strict-PQ runtime входит в обычные install/update paths.
 
-В production на ограниченном canary Node 13 зафиксирован финальный state:
+### Что меняется в v6
+
+- clean install Nexus автоматически создаёт и сохраняет PQ signer identity, panel pin, TLS 1.3 hybrid ingress CA/cert material и least-privilege DB roles;
+- reinstall/update сохраняет существующие signer/CA identities и не выполняет скрытую ротацию ключей;
+- fresh Node enrollment устанавливает `control-v6.0.0` **и** production `xmesh-agent-xspv2-activate` с проверкой exact source revision + artifact SHA-256;
+- штатная кнопка **«Обновить Agent»** переводит существующие v4/v5 ноды на v6 только если router и PQ production binary установлены и identity проверена;
+- transport policy остаётся fail-closed: TLS 1.3 + `X25519MLKEM768`, ML-DSA-65 client identity, Ed25519 + ML-DSA-65 critical signatures, без automatic/classical fallback.
+
+**Важно:** `PQ-ready` не подменяет production activation. Для конкретной ноды `strictPQEnabled=true` фиксируется только после её authenticated PQ identity, bounded activation decision, verified dual-signed receipt и Nexus finalization. Установка v6 сама по себе не создаёт ложный activation claim.
+
+## Текущий production checkpoint — 31 октября 2026
+
+### P0-E: strict-PQ реально активирован на bounded canary Node 13
 
 ```text
 productionActivation=true
@@ -23,16 +35,7 @@ automaticFallback=false
 classicalOnlyAllowed=false
 ```
 
-Это реальный production claim после verified Node receipt и Nexus finalization, а не readiness/CI/staging claim.
-
-### Frozen production target
-
-- **XMesh-Nexus runtime:** `a1267ae186f74d5e21561e3b64fc7375d499132e`;
-- **XMesh-Node runtime:** `64709ce8f5f0ce80e2c0bab59b4476347825e57c`;
-- **Nexus runtime manifest/image binding:** `sha256:af27a110220f98880dc539141d614683741a05fbd3afd30792819b3192b9ef45`;
-- **approved Node activation artifact:** `a5f8e739b381640e4ac1d632dfef47d879ebc4c6ce7c4fbd8fab5744ad9cdd63`.
-
-Release-control/tooling commits после freeze разрешены только при byte-identical runtime build inputs.
+Это реальный production claim после verified Node receipt и Nexus finalization.
 
 ### Production evidence
 
@@ -44,34 +47,25 @@ Release-control/tooling commits после freeze разрешены тольк�
 
 Полная запись: [`docs/XSP_V2_PRODUCTION_ACTIVATION_2026-10-31.md`](docs/XSP_V2_PRODUCTION_ACTIVATION_2026-10-31.md).
 
-### Закрытые release gates
+### Historical frozen canary target
+
+Реальная Node 13 activation была доказана на ранее замороженном target:
+
+- Nexus runtime `a1267ae186f74d5e21561e3b64fc7375d499132e`;
+- Node runtime `64709ce8f5f0ce80e2c0bab59b4476347825e57c`;
+- Nexus runtime manifest/image `sha256:af27a110220f98880dc539141d614683741a05fbd3afd30792819b3192b9ef45`;
+- approved activation artifact `a5f8e739b381640e4ac1d632dfef47d879ebc4c6ce7c4fbd8fab5744ad9cdd63`.
+
+v6 — это packaging/install/update major поверх уже доказанного strict-PQ механизма; он не переписывает историческое evidence задним числом.
+
+### Release gates и governance
 
 - #138 KVM VPS durability qualification: **COMPLETE**;
 - provider-storage risk acceptance: **COMPLETE**;
-- `physicalPowerLossQualified=false`: **сохранён как корректный KVM claim**;
+- `physicalPowerLossQualified=false`: сохранён как корректный KVM claim;
 - governance: **AI-assisted internal review + explicit release-owner risk acceptance**;
-- #137: **CLOSED** под этой replacement governance policy, без ложного claim об external independent audit;
+- #137: **CLOSED** под replacement governance policy, без ложного claim об external independent audit;
 - final canary v3: **PASS**;
-- rollout/rollback review: **COMPLETE**;
-- bounded Node 13 activation approval: **COMPLETE**;
-- production receipt recovery + Nexus finalization: **COMPLETE**.
+- bounded Node 13 activation + receipt recovery + Nexus finalization: **COMPLETE**.
 
-### Security boundary
-
-Strict-PQ canary использует:
-
-- TLS 1.3 only;
-- `X25519MLKEM768`;
-- ML-DSA-65 client identity;
-- Ed25519 + ML-DSA-65 critical signatures;
-- no automatic/classical fallback.
-
-XMESH1 **не retired** и остаётся retained во время начального rollout.
-
-### Live rollout hardening
-
-Живой запуск выявил release-control проблемы, не меняющие frozen crypto/runtime target: executable-bit dependency, неправильный directory `fsync`, права bind-mounted panel pin/cert material и преждевременный readiness marker. Они исправляются в production orchestration и покрываются CI, не изменяя frozen runtime build inputs.
-
-## Production status
-
-**Strict-PQ включён в production на bounded canary Node 13.** Это не является автоматическим разрешением на более широкий rollout: расширение scope требует отдельного bounded release decision/approval. XMESH1 retained; `physicalPowerLossQualified=false` остаётся корректным claim для KVM VPS.
+XMESH1 **не retired** и остаётся retained. Более широкий rollout strict-PQ по-прежнему требует per-node bounded release decision/verified receipt; v6 убирает ручной packaging/install разрыв, но не ослабляет activation gate.
