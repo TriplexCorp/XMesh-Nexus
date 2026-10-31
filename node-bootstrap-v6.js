@@ -2,8 +2,8 @@
 
 // v6 product invariant: the panel must never hand a fresh VPS an installer
 // that can enter operational state before strict-PQ activation is verified.
-// Keep this SHA pinned to the reviewed XMesh-Node strict-PQ-only merge.
-const XMESH_V6_NODE_BOOTSTRAP_SHA='fdfcdf915810018e7017f6706ad63c51181fa7c6';
+// Keep this SHA pinned to the reviewed XMesh-Node strict-PQ-only release.
+const XMESH_V6_NODE_BOOTSTRAP_SHA='7b6ec04d7dfe6e9b785f9988b5c43afb64499456';
 const XMESH_V6_BOOTSTRAP_MARKER='XMesh Node v6 fresh installer. Security invariant:';
 
 async function xmeshV6StrictPqBootstrapClick(event){
@@ -42,10 +42,10 @@ async function xmeshV6StrictPqBootstrapClick(event){
     const url='https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/'+XMESH_V6_NODE_BOOTSTRAP_SHA+'/bootstrap.sh';
     const command='curl --proto "=https" --tlsv1.2 -H "Cache-Control: no-cache" -fsSLo /tmp/xmesh-bootstrap-v6.sh '+url+
       ' && grep -Fq "'+XMESH_V6_BOOTSTRAP_MARKER+'" /tmp/xmesh-bootstrap-v6.sh'+
-      ' && sudo bash /tmp/xmesh-bootstrap-v6.sh '+location.origin+' '+id+' '+port;
+      ' && sudo env XMESH_NODE_RELEASE_REF='+XMESH_V6_NODE_BOOTSTRAP_SHA+' bash /tmp/xmesh-bootstrap-v6.sh '+location.origin+' '+id+' '+port;
 
     modal('<div class="box node-setup"><div class="bar2 node-setup-head"><div><h2>POSTQUANTUM подключение узла</h2><p>Установщик fail-closed: Node/Xray не запустятся без подтверждённой strict-PQ активации.</p></div><button class="ia" data-x aria-label="Закрыть">'+ic('x')+'</button></div>'+
-      '<section class="node-setup-step"><div class="node-setup-step-title"><span class="node-setup-number">1</span><div><h3>Команда для чистого VPS</h3><p>Скопируйте и запустите. Она скачивает только pinned v6 strict-PQ bootstrap.</p></div></div><textarea id="node-bootstrap-command" readonly spellcheck="false" rows="4" aria-label="Команда установки">'+esc(command)+'</textarea><button type="button" class="btn node-setup-copy" data-copy-node-bootstrap>'+ic('copy')+'Скопировать команду</button></section>'+
+      '<section class="node-setup-step"><div class="node-setup-step-title"><span class="node-setup-number">1</span><div><h3>Команда для чистого VPS</h3><p>Скопируйте и запустите. Она скачивает и checkout’ит только pinned v6 strict-PQ release.</p></div></div><textarea id="node-bootstrap-command" readonly spellcheck="false" rows="4" aria-label="Команда установки">'+esc(command)+'</textarea><button type="button" class="btn node-setup-copy" data-copy-node-bootstrap>'+ic('copy')+'Скопировать команду</button></section>'+
       (issued.keyReplacementAuthorized?'<p class="note" role="alert">Recovery/reinstall: старая identity останется действующей до успешного proof новой strict-PQ identity.</p>':'')+
       '<section class="node-setup-step"><div class="node-setup-step-title"><span class="node-setup-number">2</span><div><h3>Одноразовый токен</h3><p>Вставьте его в скрытый запрос установщика. После этого enrollment → hybrid TLS → verified receipt выполняются автоматически до запуска Node/Xray.</p></div></div><input id="node-bootstrap-token" type="password" readonly autocomplete="off" aria-label="Одноразовый токен подключения" value="'+esc(issued.token)+'"><div class="node-setup-token-actions"><span>Действует 10 минут · одноразовый</span><button type="button" class="gh" data-copy-node-token>'+ic('copy')+'Скопировать токен</button></div></section></div>','wide');
   }catch(error){
