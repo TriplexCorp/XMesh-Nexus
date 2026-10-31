@@ -18,11 +18,13 @@ get_setting() { sed -n "s/^${1}=//p" "$2" | tail -n 1; }
 add_setting() { [[ -f "$3" && ! -L "$3" ]] || die 'Unsafe .env path'; printf '%s=%s\n' "$1" "$2" >> "$3"; chmod 600 "$3"; }
 install_deps() {
  root_only
+ local had_haproxy=0
  [[ -r /etc/os-release ]] || die 'Cannot detect host OS'; . /etc/os-release
  [[ "$ID" == ubuntu && "$VERSION_CODENAME" =~ ^(jammy|noble)$ ]] || die 'Automated host installation supports Ubuntu 22.04/24.04 LTS'
+ if dpkg-query -W -f='${Status}' haproxy 2>/dev/null | grep -q 'ok installed'; then had_haproxy=1; fi
  export DEBIAN_FRONTEND=noninteractive
  apt-get update
- apt-get install -y ca-certificates curl gnupg lsb-release ubuntu-keyring openssl git iproute2 haproxy
+ apt-get install -y ca-certificates curl gnupg lsb-release ubuntu-keyring openssl git iproute2
  install -d -m 0755 /etc/apt/keyrings
  curl --proto '=https' --tlsv1.2 -fsSLo /etc/apt/keyrings/docker.asc https://download.docker.com/linux/ubuntu/gpg
  chmod 0644 /etc/apt/keyrings/docker.asc
@@ -38,10 +40,14 @@ Pin-Priority: 900
 PIN
  apt-get update
  apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin nginx certbot haproxy
- systemctl enable --now docker; systemctl enable nginx; systemctl start nginx || printf 'Nginx is not running; inspect the TCP/80 listener.\n' >&2
- # XMesh uses a dedicated HAProxy systemd unit. Never let the distro default
- # service compete for public TCP/443 on a clean installer-managed host.
+ systemctl enable --now docker
+ if (( had_haproxy == 1 )) && systemctl is-active --quiet haproxy.service && ! systemctl is-active --quiet xmesh-https-mux.service 2>/dev/null; then
+  die 'An existing operator-managed HAProxy service is active. Use a dedicated host or migrate that TCP/443 configuration explicitly.'
+ fi
+ # On a clean installation the distro HAProxy service may be auto-started by
+ # package installation. XMesh owns a separate, generated systemd unit instead.
  if ! systemctl is-active --quiet xmesh-https-mux.service 2>/dev/null; then systemctl disable --now haproxy.service >/dev/null 2>&1 || true; fi
+ systemctl enable nginx; systemctl start nginx || printf 'Nginx is not running; inspect the TCP/80 listener.\n' >&2
  docker compose version >/dev/null 2>&1 || die 'Docker Compose plugin not available'
 }
 configure_domain() {
@@ -162,7 +168,7 @@ EOF
 }
 ensure_mux_runtime() {
  root_only
- local file="$1" repo mux_dir mux_cfg mux_unit tmp_cfg
+ local file="$1" repo mux_dir mux_cfg mux_unit tmp_cfg ingress_id ingress_mapping
  repo="$(cd -- "$(dirname -- "$file")" && pwd -P)"
  [[ -f "$repo/compose.yaml" ]] || die 'compose.yaml not found next to .env'
  if ! command -v haproxy >/dev/null 2>&1; then
@@ -179,8 +185,14 @@ ensure_mux_runtime() {
  (cd "$repo" && docker compose --profile xsp-v2-product up -d --build --wait --wait-timeout 180 xsp-v2-product-gateway xsp-v2-product-ingress) \
   || die 'Unable to start the v6 strict-PQ product gateway/ingress'
 
- # Public :8444 is forbidden. The strict-PQ ingress must be reachable only via
- # loopback from the local TCP/443 multiplexer.
+ # Docker port publication is the authoritative exposure check even when the
+ # daemon runs without userland-proxy and therefore has no visible host socket.
+ ingress_id="$(cd "$repo" && docker compose --profile xsp-v2-product ps -q xsp-v2-product-ingress)"
+ [[ -n "$ingress_id" ]] || die 'Unable to identify the strict-PQ ingress container'
+ ingress_mapping="$(docker port "$ingress_id" 8444/tcp 2>/dev/null || true)"
+ [[ "$ingress_mapping" == '127.0.0.1:8444' ]] || die "Unsafe strict-PQ ingress publication: ${ingress_mapping:-none}; expected 127.0.0.1:8444"
+
+ # Also reject an unexpected non-Docker listener on the same port.
  if ss -H -ltn '( sport = :8444 )' 2>/dev/null | awk '{print $4}' | grep -Evq '^(127\.0\.0\.1|\[::1\]):8444$'; then
   die 'TCP/8444 is still publicly bound; expected loopback-only strict-PQ ingress'
  fi
@@ -203,7 +215,7 @@ Requires=nginx.service
 
 [Service]
 Type=simple
-ExecStart=/usr/sbin/haproxy -W -db -f /etc/xmesh-nexus/haproxy-443.cfg -p /run/xmesh-https-mux.pid
+ExecStart=/usr/sbin/haproxy -W -db -f /etc/xmesh-nexus/haproxy-443.cfg
 ExecReload=/bin/kill -USR2 $MAINPID
 Restart=always
 RestartSec=2
@@ -220,7 +232,7 @@ EOF
 }
 activate() {
  root_only
- local file="$1" domain email port bind cert key site other old tmp
+ local file="$1" domain email port bind cert key site other old tmp ingress_id ingress_mapping
  [[ -f "$file" && ! -L "$file" ]] || die 'Missing safe .env'
  domain="$(get_setting PANEL_DOMAIN "$file")"; email="$(get_setting PANEL_ACME_EMAIL "$file")"; port="$(get_setting APP_PORT "$file")"; bind="$(get_setting APP_BIND "$file")"; port="${port:-8080}"; bind="${bind:-127.0.0.1}"
  valid_domain "$domain" || die 'Invalid PANEL_DOMAIN'; valid_email "$email" || die 'Invalid PANEL_ACME_EMAIL'; [[ "$bind" == 127.0.0.1 ]] || die 'APP_BIND must be 127.0.0.1 for public HTTPS'
@@ -263,6 +275,9 @@ activate() {
  systemctl enable --now nginx
 
  ss -H -ltn '( sport = :443 )' | grep -q . || die 'Public TCP/443 is not listening after activation'
+ ingress_id="$(cd "$(dirname -- "$file")" && docker compose --profile xsp-v2-product ps -q xsp-v2-product-ingress)"
+ ingress_mapping="$(docker port "$ingress_id" 8444/tcp 2>/dev/null || true)"
+ [[ "$ingress_mapping" == '127.0.0.1:8444' ]] || die 'Security invariant failed: strict-PQ ingress is not loopback-only after activation'
  if ss -H -ltn '( sport = :8444 )' 2>/dev/null | awk '{print $4}' | grep -Evq '^(127\.0\.0\.1|\[::1\]):8444$'; then
   die 'Security invariant failed: TCP/8444 became public after activation'
  fi
