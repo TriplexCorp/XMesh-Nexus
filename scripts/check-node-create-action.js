@@ -5,6 +5,8 @@ const assert=require('node:assert/strict');
 const app=fs.readFileSync('app.js','utf8');
 const css=fs.readFileSync('styles.css','utf8');
 const html=fs.readFileSync('index.html','utf8');
+const strictBootstrap=fs.readFileSync('node-bootstrap-v6.js','utf8');
+const dockerfile=fs.readFileSync('backend/Dockerfile','utf8');
 
 assert.match(app, /<div class="bar2 nodes-toolbar"><p class="note">/,
  'Node list toolbar must be scoped to nodes page');
@@ -23,8 +25,6 @@ for(const selector of [
  '.nodes-toolbar .node-create-action:hover{',
  '.nodes-toolbar .node-create-action:focus-visible{'
 ])assert(css.includes(selector),'Missing action styling: '+selector);
-// A missing CSS semicolon silently invalidates the configured radius and the
-// following background declaration. Validate the *full* button declaration.
 const nodeActionRule=css.match(/\.nodes-toolbar \.node-create-action\{([^}]*)\}/s);
 assert(nodeActionRule,'Missing New Node CSS rule');
 assert.match(nodeActionRule[1],/border-radius:\s*var\(--ui-control-radius\)\s*;/,
@@ -46,6 +46,32 @@ assert.match(css, /@media\(max-width:390px\)\{\s*\.nodes-toolbar \.node-create-a
  'New Node button must fit narrow phones');
 assert.match(html,/styles\.css\?v=[a-z0-9-]+/,'Update CSS cache');
 assert.match(html,/app\.js\?v=[a-z0-9-]+/,'Update JS cache');
+
+// XMesh v6 security invariant: the UI must override the historical installer
+// handler and pin the reviewed strict-PQ-only Node release. The Node bootstrap
+// itself blocks router/Xray startup until a durable verified receipt exists.
+assert.match(html,/<script src="\/node-bootstrap-v6\.js\?v=20261031-strict-pq-only"><\/script>/,
+ 'Panel must load the strict-PQ bootstrap override from an absolute dashboard-safe asset path');
+assert.ok(html.indexOf('app.js?v=')<html.indexOf('/node-bootstrap-v6.js?v='),
+ 'Strict-PQ bootstrap override must load after the historical app handler');
+assert.match(strictBootstrap,/XMESH_V6_NODE_BOOTSTRAP_SHA='7b6ec04d7dfe6e9b785f9988b5c43afb64499456'/,
+ 'Fresh Node installation must pin the reviewed XMesh-Node strict-PQ-only release');
+assert.match(strictBootstrap,/XMesh Node v6 fresh installer\. Security invariant:/,
+ 'The downloaded installer must be marker-checked as the v6 fail-closed bootstrap');
+assert.match(strictBootstrap,/sudo env XMESH_NODE_RELEASE_REF='\+XMESH_V6_NODE_BOOTSTRAP_SHA\+' bash \/tmp\/xmesh-bootstrap-v6\.sh/,
+ 'Panel command must make the reviewed release SHA authoritative inside bootstrap checkout');
+assert.match(strictBootstrap,/document\.addEventListener\('click',xmeshV6StrictPqBootstrapClick,true\)/,
+ 'Strict-PQ handler must capture the bootstrap click before the historical handler');
+assert.match(strictBootstrap,/\/api\/v1\/nodes\/'\+encodeURIComponent\(id\)\+'\/enrollment'/,
+ 'Bootstrap must use owner-issued one-time enrollment credentials');
+assert.match(strictBootstrap,/enrollPath\+'\/reissue'/,
+ 'Explicit owner-approved recovery must remain available without silent key replacement');
+assert.match(strictBootstrap,/Node\/Xray не запустятся без подтверждённой strict-PQ активации/,
+ 'UI must state the fail-closed runtime invariant');
+assert.match(dockerfile,/app\.js node-bootstrap-v6\.js unified-selects\.js/,
+ 'Production panel image must package the strict-PQ bootstrap override');
+
 assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length,'CSS braces must remain balanced');
 new Function(app);
-console.log('Node action: visuals, responsive styling and create handler OK');
+new Function(strictBootstrap);
+console.log('Node action: visuals + exact-release v6 strict-PQ-only bootstrap contract OK');
