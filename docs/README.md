@@ -6,11 +6,12 @@ If you are new to the project, read these in order:
 
 1. [Product Guide](PRODUCT_GUIDE.md)
 2. [Installation and Operations](INSTALLATION.md)
-3. [Single Public TCP/443 Control-Plane Contract](SINGLE_PUBLIC_443_CONTROL_PLANE.md)
-4. [XRAY STUDIO Operator Guide](XRAY_STUDIO_GUIDE.md)
-5. [Autonomous Nodes](AUTONOMOUS_NODES.md)
-6. [Subscription Security](SUBSCRIPTION_SECURITY.md)
-7. [Enterprise Roadmap](ENTERPRISE_ROADMAP.md)
+3. [CLI Update](CLI_UPDATE.md)
+4. [Single Public TCP/443 Control-Plane Contract](SINGLE_PUBLIC_443_CONTROL_PLANE.md)
+5. [XRAY STUDIO Operator Guide](XRAY_STUDIO_GUIDE.md)
+6. [Autonomous Nodes](AUTONOMOUS_NODES.md)
+7. [Subscription Security](SUBSCRIPTION_SECURITY.md)
+8. [Enterprise Roadmap](ENTERPRISE_ROADMAP.md)
 
 For future development, also read the current [Development Checkpoint — 2026-10-31](DEVELOPMENT_CHECKPOINT_2026-10-31.md).
 
@@ -22,6 +23,7 @@ For future development, also read the current [Development Checkpoint — 2026-1
 | --- | --- |
 | [PRODUCT_GUIDE.md](PRODUCT_GUIDE.md) | Canonical product-level feature map and component boundaries |
 | [INSTALLATION.md](INSTALLATION.md) | Supported Ubuntu installation, public 80/443 topology, HTTPS, updates, backups and troubleshooting |
+| [CLI_UPDATE.md](CLI_UPDATE.md) | Operator-facing manual update through `sudo bash xmeshctl` and menu item 4 |
 | [SINGLE_PUBLIC_443_CONTROL_PLANE.md](SINGLE_PUBLIC_443_CONTROL_PLANE.md) | Binding public-port/SNI topology: public 443 only, loopback 8443/8444 |
 | [PANEL_UPDATE_AND_TELEMETRY.md](PANEL_UPDATE_AND_TELEMETRY.md) | Owner-authorized panel update path, telemetry and accounting behavior |
 | [AUTONOMOUS_NODES.md](AUTONOMOUS_NODES.md) | Managed node/Agent operational model |
