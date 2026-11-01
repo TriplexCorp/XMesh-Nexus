@@ -49,7 +49,7 @@ for(const key of ['scMaxEachPostBytes','scMinPostsIntervalMs','scMaxBufferedPost
 assert.equal(dirty.extra.scStreamUpServerSecs,'20-60');
 assert.equal(dirty.extra.uplinkHTTPMethod,'POST');
 assert.equal(dirty.extra.uplinkDataPlacement,'auto');
-assert.deepEqual(api.validateSettings(dirty),[]);
+assert.equal(api.validateSettings(dirty).length,0,'normalized stream-up settings must pass strict validation');
 
 const html=fs.readFileSync('index.html','utf8');
 assert(html.indexOf('xray-studio-xhttp-strict.js')<html.indexOf('xray-studio-protocol-tls.js'),
