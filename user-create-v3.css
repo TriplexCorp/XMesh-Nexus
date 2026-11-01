@@ -1,46 +1,42 @@
-/* Enterprise create-user workspace v3.
+/* Enterprise create-user workspace v4 visual polish.
  * Loaded after node-dialogs.css so the user surface can evolve without
  * changing shared node/repair dialog contracts. */
 
 #dlg.user-create-modal{
-  width:min(1280px,calc(100vw - 2rem));
-  max-height:calc(100dvh - 1.5rem);
+  width:min(1460px,calc(100vw - 2.5rem));
+  max-height:calc(100dvh - 2rem);
 }
 #dlg.user-create-modal .user-create-dialog{
-  max-height:calc(100dvh - 1.5rem);
-  border-radius:24px;
+  max-height:calc(100dvh - 2rem);
+  border-radius:22px;
+  box-shadow:0 30px 80px rgba(0,0,0,.36),0 0 0 1px color-mix(in srgb,var(--a) 7%,transparent);
 }
 .user-create-head{
-  padding:1.35rem 1.5rem 1.2rem;
-  min-height:86px;
+  padding:1rem 1.35rem .95rem;
+  min-height:74px;
 }
-.user-create-title-wrap{gap:.9rem}
+.user-create-title-wrap{gap:.8rem}
 .user-create-title-icon{
-  width:3rem;
-  height:3rem;
-  border-radius:.95rem;
+  width:2.7rem;
+  height:2.7rem;
+  border-radius:.82rem;
 }
-.user-create-title-icon .ic{width:1.35rem;height:1.35rem}
-.user-create-eyebrow,
-.user-create-section-kicker{
-  display:block;
-  color:color-mix(in srgb,var(--a) 82%,var(--mu));
-  font-size:.64rem;
-  line-height:1.2;
-  font-weight:800;
-  letter-spacing:.12em;
-  text-transform:uppercase;
-}
-.user-create-eyebrow{margin:0 0 .28rem}
+.user-create-title-icon .ic{width:1.2rem;height:1.2rem}
+/* The visible Russian heading is enough. The duplicated English kicker made
+ * the dialog look like a design system specimen instead of a production form. */
+.user-create-eyebrow{display:none}
 .user-create-head h2{
-  margin:0 0 .18rem;
-  font-size:clamp(1.5rem,2vw,1.9rem);
-  letter-spacing:-.04em;
+  margin:0 0 .12rem;
+  font-size:clamp(1.42rem,1.7vw,1.72rem);
+  line-height:1.08;
+  letter-spacing:-.035em;
 }
-.user-create-head p{font-size:.84rem;max-width:72ch}
-/* node-dialogs.css predates the panel-wide 34px close contract and gives this
- * button a private 2.8rem square. Override those legacy dimensions explicitly
- * so the control is visually identical to all other data-x modal closes. */
+.user-create-head p{
+  margin:0;
+  font-size:.78rem;
+  line-height:1.35;
+  max-width:78ch;
+}
 .user-create-head .user-create-close{
   width:var(--xm-close-size,34px)!important;
   height:var(--xm-close-size,34px)!important;
@@ -57,82 +53,93 @@
 }
 
 .user-create-body{
-  padding:1rem 1.15rem 1.15rem;
+  padding:.8rem .9rem .9rem;
   overflow:auto;
+  overflow-x:hidden;
   scrollbar-gutter:stable;
 }
 .user-create-workspace{
   display:grid;
-  grid-template-columns:minmax(0,1.28fr) minmax(360px,.72fr);
-  gap:1rem;
-  align-items:start;
+  grid-template-columns:minmax(0,1.55fr) minmax(390px,.8fr);
+  gap:.8rem;
+  align-items:stretch;
 }
 .user-create-section{
   margin:0!important;
-  padding:1.15rem;
-  border-radius:18px;
+  padding:1rem;
+  border-radius:16px;
   min-width:0;
   background:
-    linear-gradient(160deg,color-mix(in srgb,var(--s2) 92%,transparent),color-mix(in srgb,var(--s1) 98%,transparent));
+    linear-gradient(155deg,color-mix(in srgb,var(--s2) 90%,transparent),color-mix(in srgb,var(--s1) 98%,transparent));
+  border-color:color-mix(in srgb,var(--ln) 84%,var(--a) 16%);
 }
 .user-create-section-main,
 .user-create-section-limits{min-height:100%}
 .user-create-section-extra{grid-column:1/-1}
 .user-create-section-head{
-  margin-bottom:1rem;
+  margin-bottom:.78rem;
   align-items:flex-start;
 }
 .user-create-section-icon{
-  width:2.35rem;
-  height:2.35rem;
-  border-radius:.75rem;
+  width:2.1rem;
+  height:2.1rem;
+  border-radius:.66rem;
 }
-.user-create-section-icon .ic{width:1.05rem;height:1.05rem}
-.user-create-section-kicker{margin:.05rem 0 .24rem}
+.user-create-section-icon .ic{width:.96rem;height:.96rem}
+/* Section names already communicate the hierarchy. Removing the repeated
+ * uppercase kickers quiets the interface without changing semantics. */
+.user-create-section-kicker{display:none}
 .user-create-section-head h3{
-  margin:0 0 .16rem;
-  font-size:1rem;
-  line-height:1.25;
-  letter-spacing:-.02em;
+  margin:0 0 .12rem;
+  font-size:.96rem;
+  line-height:1.2;
+  letter-spacing:-.018em;
 }
-.user-create-section-head p{font-size:.75rem;line-height:1.4}
+.user-create-section-head p{
+  margin:0;
+  font-size:.7rem;
+  line-height:1.35;
+  color:var(--mu);
+}
 
 .user-create-main-grid{
   display:grid;
   grid-template-columns:minmax(0,1fr) minmax(0,1fr);
-  gap:.85rem;
+  gap:.72rem .78rem;
   align-items:start;
 }
 .user-create-username-row{
   grid-column:1/-1;
   display:grid;
   grid-template-columns:minmax(0,1fr) auto;
-  gap:.7rem;
+  gap:.6rem;
   align-items:end;
-  padding-bottom:.1rem;
+  padding-bottom:.05rem;
 }
 .user-create-template,
 .user-create-xray{min-width:0}
 .user-create-generate{
-  min-height:2.75rem;
-  padding:.68rem .95rem;
-  border-radius:.78rem;
+  min-height:2.62rem;
+  padding:.6rem .9rem;
+  border-radius:.7rem;
+  white-space:nowrap;
 }
-.user-create-dialog .user-create-field{gap:.34rem}
+.user-create-dialog .user-create-field{gap:.26rem}
 .user-create-dialog .user-create-field>span{
-  font-size:.77rem;
-  font-weight:750;
+  font-size:.73rem;
+  font-weight:760;
+  line-height:1.25;
 }
 .user-create-dialog .user-create-field>small{
-  font-size:.68rem;
-  line-height:1.38;
+  font-size:.63rem;
+  line-height:1.34;
 }
 .user-create-dialog input:not([type=checkbox]),
 .user-create-dialog textarea,
 .user-create-dialog select,
 .user-create-dialog .xm-select-trigger{
-  min-height:2.75rem;
-  border-radius:.76rem;
+  min-height:2.62rem;
+  border-radius:.7rem;
 }
 .user-create-dialog .xm-select-shell{width:100%;min-width:0}
 .user-create-dialog .xm-select-caption{
@@ -144,41 +151,41 @@
 .user-create-limits-grid{
   display:grid;
   grid-template-columns:minmax(0,1fr) minmax(0,1fr);
-  gap:.8rem;
+  gap:.68rem;
   align-items:start;
 }
 .user-create-policy-note{
-  margin-top:.9rem;
-  padding:.78rem .85rem;
+  margin-top:.72rem;
+  padding:.62rem .68rem;
   display:grid;
-  grid-template-columns:1.8rem minmax(0,1fr);
-  gap:.65rem;
+  grid-template-columns:1.55rem minmax(0,1fr);
+  gap:.55rem;
   align-items:start;
-  border:1px solid color-mix(in srgb,var(--a) 17%,var(--ln));
-  border-radius:.85rem;
-  background:color-mix(in srgb,var(--a) 6%,var(--s1));
+  border:1px solid color-mix(in srgb,var(--a) 14%,var(--ln));
+  border-radius:.72rem;
+  background:color-mix(in srgb,var(--a) 4.5%,var(--s1));
 }
 .user-create-policy-note>span{
-  width:1.8rem;
-  height:1.8rem;
+  width:1.55rem;
+  height:1.55rem;
   display:grid;
   place-items:center;
   color:var(--a);
-  border-radius:.58rem;
-  background:color-mix(in srgb,var(--a) 11%,var(--s2));
+  border-radius:.5rem;
+  background:color-mix(in srgb,var(--a) 9%,var(--s2));
 }
-.user-create-policy-note .ic{width:.92rem;height:.92rem}
+.user-create-policy-note .ic{width:.8rem;height:.8rem}
 .user-create-policy-note p{margin:0;min-width:0}
-.user-create-policy-note b{display:block;font-size:.73rem;line-height:1.3}
-.user-create-policy-note small{display:block;margin-top:.16rem;color:var(--mu);font-size:.66rem;line-height:1.42}
+.user-create-policy-note b{display:block;font-size:.68rem;line-height:1.28}
+.user-create-policy-note small{display:block;margin-top:.1rem;color:var(--mu);font-size:.61rem;line-height:1.36}
 
+/* On desktop Metadata becomes a single compact rail instead of a second tall
+ * form row. This removes the large dead area visible in the previous version. */
 .user-create-extra-grid{
   display:grid;
-  grid-template-columns:minmax(16rem,1.2fr) minmax(0,.8fr) minmax(16rem,.9fr);
-  grid-template-areas:
-    "squads tag hold"
-    "desc desc desc";
-  gap:.9rem;
+  grid-template-columns:minmax(15rem,1.1fr) minmax(9rem,.62fr) minmax(17rem,.9fr) minmax(20rem,1.25fr);
+  grid-template-areas:"squads tag hold desc";
+  gap:.72rem;
   align-items:start;
 }
 .user-create-squads{grid-area:squads}
@@ -186,41 +193,53 @@
 .user-create-hold{grid-area:hold}
 .user-create-desc{grid-area:desc}
 .user-create-squads .ms{
-  min-height:2.75rem;
-  padding:.4rem;
-  gap:.38rem;
+  min-height:2.62rem;
+  padding:.34rem;
+  gap:.32rem;
   align-content:center;
 }
 .user-create-squads .ck{
-  min-height:1.85rem;
-  padding:.34rem .55rem;
+  min-height:1.72rem;
+  padding:.28rem .48rem;
   display:inline-flex;
   align-items:center;
-  gap:.35rem;
+  gap:.32rem;
 }
-.user-create-hold .sw{min-height:2.75rem}
-.user-create-dialog textarea{
-  min-height:4.8rem;
-  max-height:10rem;
+.user-create-hold .sw{min-height:2.62rem}
+.user-create-desc textarea{
+  min-height:2.62rem;
+  height:2.62rem;
+  max-height:6rem;
+  resize:vertical;
 }
-.user-create-error{margin:.7rem .15rem 0}
+.user-create-error{margin:.55rem .12rem 0}
 
 .user-create-footer{
-  padding:.9rem 1.15rem 1rem;
-  justify-content:space-between;
-  gap:1rem;
+  padding:.72rem .9rem .78rem;
+  justify-content:flex-end;
+  gap:.7rem;
 }
-.user-create-footer-copy{display:flex;flex-direction:column;gap:.12rem;min-width:0}
-.user-create-footer-copy b{font-size:.74rem;font-weight:760}
-.user-create-footer-copy span{color:var(--mu);font-size:.66rem}
-.user-create-footer-actions{display:flex;align-items:center;gap:.65rem;flex:none}
+/* The previous footer repeated information already stated in the header and
+ * made the bottom edge visually noisy. Keep it in the DOM for compatibility,
+ * but make the action area the only visible footer content. */
+.user-create-footer-copy{display:none}
+.user-create-footer-actions{display:flex;align-items:center;gap:.55rem;flex:none}
 .user-create-footer button{
-  min-height:2.75rem;
-  padding:.68rem 1rem;
-  border-radius:.78rem;
+  min-height:2.55rem;
+  padding:.58rem .95rem;
+  border-radius:.7rem;
 }
-.user-create-submit{min-width:12.5rem}
+.user-create-submit{min-width:12rem}
 
+@media(max-width:1220px){
+  #dlg.user-create-modal{width:calc(100vw - 1.5rem)}
+  .user-create-workspace{grid-template-columns:minmax(0,1.35fr) minmax(350px,.8fr)}
+  .user-create-extra-grid{
+    grid-template-columns:minmax(0,1fr) minmax(0,.75fr);
+    grid-template-areas:"squads tag" "hold desc";
+  }
+  .user-create-desc textarea{height:2.62rem}
+}
 @media(max-width:980px){
   #dlg.user-create-modal{width:calc(100vw - 1.25rem)}
   .user-create-workspace{grid-template-columns:minmax(0,1fr)}
@@ -228,17 +247,17 @@
   .user-create-section-main,.user-create-section-limits{min-height:0}
   .user-create-extra-grid{
     grid-template-columns:minmax(0,1fr) minmax(0,1fr);
-    grid-template-areas:"squads tag" "hold hold" "desc desc";
+    grid-template-areas:"squads tag" "hold desc";
   }
 }
 @media(max-width:680px){
   #dlg.user-create-modal{width:calc(100vw - .75rem);max-height:calc(100dvh - .75rem)}
   #dlg.user-create-modal .user-create-dialog{max-height:calc(100dvh - .75rem);border-radius:18px}
-  .user-create-head{padding:1rem 1rem .9rem;min-height:0}
-  .user-create-title-icon{width:2.65rem;height:2.65rem}
+  .user-create-head{padding:.9rem .95rem .82rem;min-height:0}
+  .user-create-title-icon{width:2.5rem;height:2.5rem}
   .user-create-head p{display:none}
-  .user-create-body{padding:.75rem}
-  .user-create-section{padding:.9rem;border-radius:14px}
+  .user-create-body{padding:.68rem}
+  .user-create-section{padding:.82rem;border-radius:14px}
   .user-create-main-grid,
   .user-create-limits-grid,
   .user-create-extra-grid{
@@ -248,8 +267,8 @@
   .user-create-username-row{grid-column:auto;grid-template-columns:minmax(0,1fr)}
   .user-create-generate{width:100%}
   .user-create-squads,.user-create-tag,.user-create-hold,.user-create-desc{grid-area:auto}
-  .user-create-footer{padding:.8rem;display:grid;grid-template-columns:1fr}
-  .user-create-footer-copy{display:none}
+  .user-create-desc textarea{height:auto;min-height:4.3rem}
+  .user-create-footer{padding:.7rem;display:grid;grid-template-columns:1fr}
   .user-create-footer-actions{display:grid;grid-template-columns:1fr 1fr;width:100%}
   .user-create-footer button,.user-create-submit,.user-create-cancel{width:100%;min-width:0}
 }
