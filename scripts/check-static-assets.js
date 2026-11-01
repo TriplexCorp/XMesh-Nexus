@@ -31,13 +31,35 @@ if(errors.length){
  const index=fs.readFileSync(path.join(root,'index.html'),'utf8');
  const tlsJs=fs.readFileSync(path.join(root,'xray-studio-tls-dialog.js'),'utf8');
  const tlsCss=fs.readFileSync(path.join(root,'xray-studio-tls-dialog.css'),'utf8');
+ const xhttpExpert=fs.readFileSync(path.join(root,'xray-studio-xhttp-expert.js'),'utf8');
  new Function(tlsJs);
+ new Function(xhttpExpert);
  assert.match(index,/xray-studio-tls-dialog\.css\?v=20261101-tls-horizontal-v3/,
    'TLS horizontal workspace stylesheet must receive a fresh cache key');
  assert.match(index,/xray-studio-tls-dialog\.js\?v=20261101-tls-workspace-v2/,
    'TLS workspace behavior cache key must remain stable when JS is unchanged');
  assert.match(index,/node-dialogs\.js\?v=20261101-agent-update-autovalidation-v1/,
    'Agent update autovalidation handler must receive a fresh cache key');
+ assert.match(index,/xray-studio-xhttp-expert\.js\?v=20261101-core-schema-v2/,
+   'Expert XHTTP editor must be cache-busted and loaded after the strict schema');
+ assert.match(dockerfile,/xray-studio-xhttp-strict\.js xray-studio-xhttp-expert\.js xray-xhttp-core-validator\.js/,
+   'Production image must package strict + expert XHTTP assets');
+ assert.match(xhttpExpert,/Session ID/);
+ assert.match(xhttpExpert,/sessionIDPlacement/);
+ assert.match(xhttpExpert,/sessionIDTable/);
+ assert.match(xhttpExpert,/sessionIDLength/);
+ assert.match(xhttpExpert,/seqPlacement/);
+ assert.match(xhttpExpert,/uplinkHTTPMethod/);
+ assert.match(xhttpExpert,/uplinkDataPlacement/);
+ assert.match(xhttpExpert,/uplinkChunkSize/);
+ assert.match(xhttpExpert,/xPaddingKey/);
+ assert.match(xhttpExpert,/xPaddingHeader/);
+ assert.match(xhttpExpert,/serverMaxHeaderBytes/);
+ assert.match(xhttpExpert,/noSSEHeader/);
+ assert.match(xhttpExpert,/window\.addEventListener\(['"]click['"],[\s\S]*true\)/,
+   'Expert XHTTP editor must intercept before the legacy document-capture menu');
+ assert.match(xhttpExpert,/Client-only поля xmux\/downloadSettings\/noGRPCHeader\/scMinPostsIntervalMs блокируются/,
+   'Server editor must keep client-only XHTTP knobs out of the guided UI');
  assert.match(dockerfile,/xray-studio-tls-dialog\.css xray-studio-tls-dialog\.js/,
    'Production image must package the TLS editor assets');
  assert.match(tlsJs,/action!==['"]tls['"]&&action!==['"]hysteria['"]/,
@@ -72,5 +94,5 @@ if(errors.length){
    'TLS summary must not return as a sticky vertical sidebar');
  assert.match(tlsCss,/@media\(max-width:760px\)/,
    'TLS dialog must remain responsive on narrow screens');
- console.log('Static asset packaging + horizontal guided TLS workspace contract: OK.');
+ console.log('Static assets + expert XHTTP schema controls + horizontal TLS workspace: OK.');
 }
