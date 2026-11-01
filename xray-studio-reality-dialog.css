@@ -1,0 +1,124 @@
+/* XRAY STUDIO / REALITY — wide, readable server-parameter workspace.
+ * Loaded after xray-studio-v4.css so this native-dialog width wins over the
+ * generic action-sheet and app-wide dialog constraints. */
+dialog.xm-studio-modal.xm-studio-modal--reality{
+  width:min(74rem,calc(100vw - 2rem))!important;
+  max-width:calc(100vw - 2rem)!important;
+  max-height:calc(100dvh - 2rem);
+  overflow:auto;
+}
+
+.xm-studio-modal--reality .xm-studio-modal-shell{
+  padding:1.55rem 1.7rem 1.35rem;
+}
+
+.xm-studio-modal--reality .xm-studio-modal-head{
+  min-height:5.2rem;
+  padding-right:3.25rem;
+  padding-bottom:1.25rem;
+  align-items:center;
+}
+
+.xm-studio-modal--reality .xm-studio-modal-mark{
+  width:3rem;
+  height:3rem;
+}
+
+.xm-studio-modal--reality .xm-studio-modal-copy h2{
+  font-size:clamp(1.45rem,2vw,1.85rem);
+  letter-spacing:-.035em;
+}
+
+.xm-studio-modal--reality .xm-studio-modal-copy p{
+  max-width:78ch;
+  line-height:1.55;
+}
+
+/* REALITY has four logical inputs. Use the desktop width for the three
+ * addressing/identity values, then give key rotation its own full-width row. */
+.xm-studio-modal--reality .xm-studio-modal-fields{
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:1rem 1.15rem;
+  margin-top:1.35rem;
+  align-items:start;
+}
+
+.xm-studio-modal--reality .xm-studio-modal-field.is-wide{
+  grid-column:auto;
+}
+
+.xm-studio-modal--reality .xm-studio-modal-field:nth-child(4){
+  grid-column:1/-1;
+  padding-top:.1rem;
+}
+
+.xm-studio-modal--reality .xm-studio-modal-field:nth-child(4) select{
+  max-width:34rem;
+}
+
+.xm-studio-modal--reality .xm-studio-modal-label{
+  font-size:.78rem;
+}
+
+.xm-studio-modal--reality .xm-studio-modal-help{
+  min-height:2.7em;
+  line-height:1.45;
+}
+
+.xm-studio-modal--reality :is(input,select){
+  min-height:3rem;
+}
+
+.xm-studio-modal--reality .xm-studio-modal-notice{
+  margin-top:1.1rem;
+}
+
+.xm-studio-modal--reality .xm-studio-modal-footer{
+  margin-top:1.2rem;
+  padding-top:1.05rem;
+}
+
+@media(max-width:980px){
+  dialog.xm-studio-modal.xm-studio-modal--reality{
+    width:min(58rem,calc(100vw - 1.25rem))!important;
+    max-width:calc(100vw - 1.25rem)!important;
+  }
+  .xm-studio-modal--reality .xm-studio-modal-fields{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .xm-studio-modal--reality .xm-studio-modal-field:nth-child(3),
+  .xm-studio-modal--reality .xm-studio-modal-field:nth-child(4){
+    grid-column:1/-1;
+  }
+  .xm-studio-modal--reality .xm-studio-modal-field:nth-child(4) select{
+    max-width:none;
+  }
+}
+
+@media(max-width:640px){
+  dialog.xm-studio-modal.xm-studio-modal--reality{
+    width:calc(100vw - .8rem)!important;
+    max-width:calc(100vw - .8rem)!important;
+    max-height:calc(100dvh - .8rem);
+  }
+  .xm-studio-modal--reality .xm-studio-modal-shell{
+    padding:1rem;
+  }
+  .xm-studio-modal--reality .xm-studio-modal-head{
+    min-height:0;
+    align-items:flex-start;
+    padding-right:2.6rem;
+  }
+  .xm-studio-modal--reality .xm-studio-modal-fields{
+    grid-template-columns:1fr;
+    gap:.9rem;
+  }
+  .xm-studio-modal--reality .xm-studio-modal-field,
+  .xm-studio-modal--reality .xm-studio-modal-field:nth-child(3),
+  .xm-studio-modal--reality .xm-studio-modal-field:nth-child(4){
+    grid-column:1/-1;
+  }
+  .xm-studio-modal--reality .xm-studio-modal-help{
+    min-height:0;
+  }
+}
