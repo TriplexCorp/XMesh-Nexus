@@ -21,11 +21,11 @@ new Function(nodeDialogs);
 const versionMatch=/^control-v([0-9]+)\.([0-9]+)\.([0-9]+)$/.exec(agentVersionRaw);
 assert.ok(versionMatch,'AGENT_VERSION must use control-vMAJOR.MINOR.PATCH');
 const versionTuple=versionMatch.slice(1).map(Number);
-assert.equal(agentVersionRaw,'control-v6.0.2','Nexus target Agent version must be control-v6.0.2');
+assert.equal(agentVersionRaw,'control-v6.0.3','Nexus target Agent version must be control-v6.0.3');
 assert.match(agentPolicy,/runtime behavior \*\*must increase the Agent version/);
 assert.match(agentPolicy,/Node product `VERSION` and Agent version are independent/);
-assert.match(gateway,/targetAgentVersion\s*=\s*"control-v6[.]0[.]2"/);
-assert.match(gateway,/previousAgentVersion\s*=\s*"control-v6[.]0[.]1"/,
+assert.match(gateway,/targetAgentVersion\s*=\s*"control-v6[.]0[.]3"/);
+assert.match(gateway,/previousAgentVersion\s*=\s*"control-v6[.]0[.]2"/,
   'rolling upgrade must keep the immediately previous Agent release enrollable');
 assert.match(gateway,/repairAgentVersion\s*=\s*"control-v6[.]0[.]0"/,
   'v6.0.0 bootstrap-hole nodes remain temporarily repairable');

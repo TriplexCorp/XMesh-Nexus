@@ -35,8 +35,8 @@ const (
 	maxPayloadBytes        = 768 * 1024
 	suite                  = "Ed25519+ML-DSA-65"
 	issuerID               = "xmesh-nexus-panel"
-	targetAgentVersion     = "control-v6.0.2"
-	previousAgentVersion   = "control-v6.0.1"
+	targetAgentVersion     = "control-v6.0.3"
+	previousAgentVersion   = "control-v6.0.2"
 	repairAgentVersion     = "control-v6.0.0"
 )
 
