@@ -30,8 +30,8 @@
  function closeIcon(){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>'}
  function certificateSummary(tls){
   const certs=Array.isArray(tls?.certificates)?tls.certificates:[];
-  if(!certs.length)return {count:0,title:'Автоматически / не закреплено',text:'В профиле нет ручного сертификата. Если для ноды настроен Managed TLS, пути сертификата добавит подписанная node-policy.'};
-  return {count:certs.length,title:certs.length===1?'1 сертификат':certs.length+' сертификата',text:'Существующий certificates сохранится без изменений. Ручные пути доступны в расширенном JSON.'};
+  if(!certs.length)return {count:0,title:'Автоматически',text:'Ручной сертификат не закреплён. Managed TLS на ноде сможет подставить сертификат через подписанную policy.'};
+  return {count:certs.length,title:certs.length===1?'1 сертификат':certs.length+' сертификата',text:'Текущий certificates сохраняется без изменений. Ручные пути доступны в Advanced JSON.'};
  }
  function tlsMode(tls,hysteria){
   if(hysteria)return '13';
@@ -40,6 +40,7 @@
   if(min==='1.2'&&max==='1.3')return '12-13';
   return 'auto';
  }
+ function modeLabel(mode){return mode==='13'?'TLS 1.3':mode==='12-13'?'TLS 1.2–1.3':'Авто'}
  function openTls(root,source,doc,index){
   const inbound=doc.inbounds[index];
   const stream=inbound.streamSettings??={};
@@ -51,41 +52,69 @@
   const alpn=hysteria&&initialAlpn.length===0?['h3']:initialAlpn;
   const cert=certificateSummary(tls);
   const tag=String(inbound.tag||('inbound #'+(index+1)));
+  const protocol=String(inbound.protocol||'—');
   const mode=tlsMode(tls,hysteria);
   const dialog=document.createElement('dialog');
   dialog.className='xm-tls-dialog';
   dialog.setAttribute('aria-labelledby','xm-tls-dialog-title');
   dialog.innerHTML=`<form method="dialog" class="xm-tls-shell" novalidate>
     <header class="xm-tls-head">
-      <span class="xm-tls-mark">${securityIcon()}</span>
-      <div class="xm-tls-head-copy"><span class="xm-tls-eyebrow">XRAY STUDIO / TLS</span><h2 id="xm-tls-dialog-title">Защита транспорта</h2><p>${esc(tag)} · ${esc(String(inbound.protocol||'—'))} / ${esc(network||'raw')}</p></div>
+      <div class="xm-tls-head-main">
+        <span class="xm-tls-mark">${securityIcon()}</span>
+        <div class="xm-tls-head-copy"><span class="xm-tls-eyebrow">XRAY STUDIO / TLS</span><h2 id="xm-tls-dialog-title">Защита транспорта</h2><p>${esc(tag)} · ${esc(protocol)} / ${esc(network||'raw')}</p></div>
+      </div>
       <button type="button" class="xm-tls-close" aria-label="Закрыть">${closeIcon()}</button>
     </header>
     <div class="xm-tls-body">
-      ${hysteria?`<section class="xm-tls-hero"><div><span class="xm-tls-hero-kicker">HYSTERIA2 / QUIC</span><strong>TLS 1.3 + ALPN h3</strong><p>Xray запускает Hysteria поверх QUIC с протоколом h3. Для этого inbound значения фиксируются как безопасный профиль по умолчанию.</p></div><span class="xm-tls-ok">Рекомендуется</span></section>`:''}
-      <section class="xm-tls-section">
-        <div class="xm-tls-section-title"><div><span>01</span><h3>Протокол TLS</h3></div><p>Версия шифрования транспортного соединения</p></div>
-        <div class="xm-tls-version-grid" role="radiogroup" aria-label="Версия TLS">
-          <label class="xm-tls-choice ${mode==='auto'?'is-selected':''}"><input type="radio" name="tlsMode" value="auto" ${mode==='auto'?'checked':''} ${hysteria?'disabled':''}><span><strong>Авто</strong><small>Оставить выбор Xray / Go TLS</small></span></label>
-          <label class="xm-tls-choice ${mode==='12-13'?'is-selected':''}"><input type="radio" name="tlsMode" value="12-13" ${mode==='12-13'?'checked':''} ${hysteria?'disabled':''}><span><strong>TLS 1.2–1.3</strong><small>Совместимый диапазон</small></span></label>
-          <label class="xm-tls-choice ${mode==='13'?'is-selected':''}"><input type="radio" name="tlsMode" value="13" ${mode==='13'?'checked':''}><span><strong>TLS 1.3</strong><small>${hysteria?'Обязательно для QUIC':'Современный TLS only'}</small></span></label>
+      ${hysteria?`<section class="xm-tls-hero"><div><span>HYSTERIA2 / QUIC</span><strong>TLS 1.3 + h3 закреплены протоколом</strong><p>Параметры транспорта останутся совместимыми с QUIC listener и не могут быть случайно ослаблены через форму.</p></div><b>LOCKED</b></section>`:''}
+      <div class="xm-tls-layout">
+        <aside class="xm-tls-summary" aria-label="Сводка TLS">
+          <div class="xm-tls-summary-title"><span>ПРОФИЛЬ</span><strong>${esc(tag)}</strong><small>${esc(protocol)} · ${esc(network||'raw')}</small></div>
+          <dl>
+            <div><dt>Режим</dt><dd>${esc(modeLabel(mode))}</dd></div>
+            <div><dt>ALPN</dt><dd>${esc(alpn.length?alpn.join(', '):'default')}</dd></div>
+            <div><dt>SNI</dt><dd>${esc(tls.serverName||'не задан')}</dd></div>
+            <div><dt>Reject SNI</dt><dd>${tls.rejectUnknownSni===true?'включён':'выключен'}</dd></div>
+          </dl>
+          <div class="xm-tls-cert-summary">
+            <span class="xm-tls-cert-icon">${securityIcon()}</span>
+            <div><small>СЕРТИФИКАТЫ</small><strong>${esc(cert.title)}</strong><p>${esc(cert.text)}</p></div>
+            <b>${cert.count}</b>
+          </div>
+          <p class="xm-tls-summary-note">Форма меняет только документируемые TLS-поля. Неизвестные tlsSettings сохраняются через Advanced JSON.</p>
+        </aside>
+
+        <div class="xm-tls-settings">
+          <section class="xm-tls-block">
+            <div class="xm-tls-block-head"><div><span>01</span><h3>Версия TLS</h3></div><p>Выберите политику шифрования без ручного JSON.</p></div>
+            <div class="xm-tls-version-grid" role="radiogroup" aria-label="Версия TLS">
+              <label class="xm-tls-choice ${mode==='auto'?'is-selected':''}"><input type="radio" name="tlsMode" value="auto" ${mode==='auto'?'checked':''} ${hysteria?'disabled':''}><span><strong>Авто</strong><small>Xray / Go TLS default</small></span></label>
+              <label class="xm-tls-choice ${mode==='12-13'?'is-selected':''}"><input type="radio" name="tlsMode" value="12-13" ${mode==='12-13'?'checked':''} ${hysteria?'disabled':''}><span><strong>1.2–1.3</strong><small>совместимый диапазон</small></span></label>
+              <label class="xm-tls-choice ${mode==='13'?'is-selected':''}"><input type="radio" name="tlsMode" value="13" ${mode==='13'?'checked':''}><span><strong>1.3</strong><small>${hysteria?'обязательно для QUIC':'только современный TLS'}</small></span></label>
+            </div>
+          </section>
+
+          <section class="xm-tls-block">
+            <div class="xm-tls-block-head"><div><span>02</span><h3>ALPN</h3></div><p>Протокол внутри TLS handshake.</p></div>
+            <div class="xm-tls-alpn-grid">
+              ${[['h3','HTTP/3 / QUIC'],['h2','HTTP/2'],['http/1.1','HTTP/1.1']].map(([value,label])=>`<label class="xm-tls-alpn ${alpn.includes(value)?'is-selected':''} ${hysteria&&value!=='h3'?'is-disabled':''}"><input type="checkbox" value="${value}" ${alpn.includes(value)?'checked':''} ${hysteria?'disabled':''}><span><strong>${value}</strong><small>${label}</small></span></label>`).join('')}
+            </div>
+            <p class="xm-tls-hint">${hysteria?'Для Hysteria2 фиксируется только h3.':'Пустой выбор удалит поле alpn и оставит default Xray.'}</p>
+          </section>
+
+          <section class="xm-tls-block xm-tls-identity">
+            <div class="xm-tls-block-head"><div><span>03</span><h3>Идентификация</h3></div><p>SNI и политика неизвестных имён.</p></div>
+            <div class="xm-tls-identity-row">
+              <label class="xm-tls-field"><span>Server Name (SNI)</span><input name="serverName" value="${esc(tls.serverName||'')}" placeholder="example.com"><small>Оставьте пустым, если inbound не требует SNI.</small></label>
+              <label class="xm-tls-switch"><input type="checkbox" name="rejectUnknownSni" ${tls.rejectUnknownSni===true?'checked':''}><span class="xm-tls-switch-ui"></span><span><strong>Reject Unknown SNI</strong><small>Отклонять SNI, не соответствующий сертификату.</small></span></label>
+            </div>
+          </section>
+
+          <details class="xm-tls-advanced"><summary><span><b>Advanced JSON</b><small>Неизвестные tlsSettings сохраняются</small></span><i>Открыть</i></summary><label><span>tlsSettings</span><textarea name="advanced" rows="10" spellcheck="false">${esc(JSON.stringify(tls,null,2))}</textarea></label><p class="xm-tls-json-error" role="alert" hidden></p></details>
         </div>
-      </section>
-      <section class="xm-tls-section">
-        <div class="xm-tls-section-title"><div><span>02</span><h3>ALPN</h3></div><p>Протокол, согласуемый внутри TLS handshake</p></div>
-        <div class="xm-tls-alpn-grid">
-          ${[['h3','HTTP/3 · QUIC'],['h2','HTTP/2'],['http/1.1','HTTP/1.1']].map(([value,label])=>`<label class="xm-tls-alpn ${alpn.includes(value)?'is-selected':''} ${hysteria&&value!=='h3'?'is-disabled':''}"><input type="checkbox" value="${value}" ${alpn.includes(value)?'checked':''} ${hysteria?'disabled':''}><span><strong>${value}</strong><small>${label}</small></span></label>`).join('')}
-        </div>
-        <p class="xm-tls-hint">${hysteria?'Для Hysteria2 используется только h3; изменение заблокировано, чтобы профиль не расходился с QUIC listener.':'Если ничего не выбрать, поле alpn будет удалено и Xray применит собственный default.'}</p>
-      </section>
-      <section class="xm-tls-section xm-tls-grid-two">
-        <label class="xm-tls-field"><span>Server Name (SNI)</span><input name="serverName" value="${esc(tls.serverName||'')}" placeholder="example.com"><small>Оставьте пустым, если SNI не требуется профилем.</small></label>
-        <label class="xm-tls-switch"><input type="checkbox" name="rejectUnknownSni" ${tls.rejectUnknownSni===true?'checked':''}><span class="xm-tls-switch-ui"></span><span><strong>Reject Unknown SNI</strong><small>Отклонять SNI, не соответствующий сертификату.</small></span></label>
-      </section>
-      <section class="xm-tls-cert"><div class="xm-tls-cert-icon">${securityIcon()}</div><div><span>СЕРТИФИКАТЫ</span><strong>${esc(cert.title)}</strong><p>${esc(cert.text)}</p></div><b>${cert.count}</b></section>
-      <details class="xm-tls-advanced"><summary><span>Расширенные tlsSettings</span><small>Неизвестные поля сохраняются</small></summary><label><span>JSON</span><textarea name="advanced" rows="10" spellcheck="false">${esc(JSON.stringify(tls,null,2))}</textarea></label><p class="xm-tls-json-error" role="alert" hidden></p></details>
+      </div>
     </div>
-    <footer class="xm-tls-footer"><button type="button" class="xm-tls-cancel">Отмена</button><button type="submit" class="xm-tls-apply">Применить TLS</button></footer>
+    <footer class="xm-tls-footer"><span>Изменения применяются только к выбранному inbound.</span><div><button type="button" class="xm-tls-cancel">Отмена</button><button type="submit" class="xm-tls-apply">Применить TLS</button></div></footer>
   </form>`;
   const form=dialog.querySelector('form'),error=dialog.querySelector('.xm-tls-json-error');
   const finish=()=>{if(dialog.open)dialog.close();dialog.remove()};
