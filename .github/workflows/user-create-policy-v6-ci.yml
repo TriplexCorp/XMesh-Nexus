@@ -5,6 +5,7 @@ on:
     paths:
       - 'user-create-policy-v6.js'
       - 'user-create-policy-v6.css'
+      - 'user-create-extra-v7.css'
       - 'user-create-v3.css'
       - 'node-dialogs.js'
       - 'index.html'
@@ -16,6 +17,7 @@ on:
     paths:
       - 'user-create-policy-v6.js'
       - 'user-create-policy-v6.css'
+      - 'user-create-extra-v7.css'
       - 'user-create-v3.css'
       - 'node-dialogs.js'
       - 'index.html'
@@ -37,7 +39,7 @@ jobs:
           package-manager-cache: false
       - name: Check policy enhancement syntax
         run: node --check user-create-policy-v6.js
-      - name: Verify aligned policy controls and duration calendar
+      - name: Verify aligned policy controls, metadata row and duration calendar
         run: node scripts/check-user-create-policy-v6.js
       - name: Verify production static packaging
         run: node scripts/check-static-assets.js
