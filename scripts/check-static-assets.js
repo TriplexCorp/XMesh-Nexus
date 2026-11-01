@@ -32,8 +32,11 @@ if(errors.length){
  const tlsJs=fs.readFileSync(path.join(root,'xray-studio-tls-dialog.js'),'utf8');
  const tlsCss=fs.readFileSync(path.join(root,'xray-studio-tls-dialog.css'),'utf8');
  const xhttpExpert=fs.readFileSync(path.join(root,'xray-studio-xhttp-expert.js'),'utf8');
+ const diagnosticsJs=fs.readFileSync(path.join(root,'diagnostics.js'),'utf8');
+ const diagnosticsCss=fs.readFileSync(path.join(root,'diagnostics.css'),'utf8');
  new Function(tlsJs);
  new Function(xhttpExpert);
+ new Function(diagnosticsJs);
  assert.match(index,/xray-studio-tls-dialog\.css\?v=20261101-tls-layout-v5/,
    'TLS dialog stylesheet must receive the specificity-fix cache key');
  assert.match(index,/xray-studio-tls-dialog\.js\?v=20261101-tls-workspace-v2/,
@@ -102,5 +105,35 @@ if(errors.length){
    'TLS summary must not return as a sticky vertical sidebar');
  assert.match(tlsCss,/@media\(max-width:760px\)/,
    'TLS dialog must remain responsive on narrow screens');
- console.log('Static assets + expert XHTTP schema controls + robust TLS dialog layout: OK.');
+
+ // Diagnostics must be a real operational workspace, not the historical in-memory demo log.
+ assert.match(index,/diagnostics\.css\?v=20261101-operations-v1/,
+   'Diagnostics workspace CSS must be cache-busted');
+ assert.match(index,/diagnostics\.js\?v=20261101-operations-v1/,
+   'Diagnostics workspace behavior must be loaded after app.js');
+ assert.ok(index.indexOf('app.js?v=')<index.indexOf('/diagnostics.js?v='),
+   'Diagnostics route override must load after the historical app route');
+ assert.match(dockerfile,/unified-selects\.js diagnostics\.js diagnostics\.css/,
+   'Production image must package diagnostics after the established bootstrap override chain');
+ assert.match(diagnosticsJs,/pages\.tools=\[['"]Диагностика['"],diagnosticsPage\]/,
+   'Diagnostics must replace the historical tools route');
+ assert.match(diagnosticsJs,/\/api\/v1\/system\/stats/,
+   'Diagnostics must read live panel system metrics');
+ assert.match(diagnosticsJs,/\/api\/v1\/nodes\/'\+encodeURIComponent\(node\.id\)\+'\/runtime/,
+   'Diagnostics must use authenticated node runtime state instead of persisted node.state');
+ assert.match(diagnosticsJs,/\/api\/v1\/security\/audit/,
+   'Owner diagnostics must include server-side audit metadata');
+ assert.match(diagnosticsJs,/Array\.isArray\(DB\?\.srh\)/,
+   'Subscription diagnostics must use persisted request events when present');
+ assert.match(diagnosticsJs,/privacyNote:'Subscription URLs, credentials, audit details and request IP addresses are intentionally excluded\.'/,
+   'Copied diagnostic report must explicitly exclude sensitive subscription/audit data');
+ assert.match(diagnosticsJs,/setInterval\(\(\)=>\{if\(location\.hash===['"]#tools['"]/,
+   'Diagnostics must refresh live health while the workspace is open');
+ assert.doesNotMatch(diagnosticsJs,/let\s+LOGS\s*=\s*\[\]/,
+   'Diagnostics must not return to an unconnected in-memory Xray log placeholder');
+ assert.match(diagnosticsCss,/\.diag-overview-grid\{display:grid/,
+   'Diagnostics must use a structured enterprise overview layout');
+ assert.match(diagnosticsCss,/@media\(max-width:760px\)/,
+   'Diagnostics workspace must remain responsive');
+ console.log('Static assets + expert XHTTP schema controls + robust TLS dialog + live Diagnostics workspace: OK.');
 }
