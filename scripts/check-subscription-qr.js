@@ -19,11 +19,14 @@ assert.match(portal,/const quiet = 4/,'Subscription QR must include a four-modul
 assert.match(portal,/x \+ quiet/);
 assert.match(portal,/y \+ quiet/);
 assert.match(portal,/compactSubscriptionUrl/,'Portal should show a shortened bearer URL rather than dumping the full token on screen');
+assert.match(portal,/brandNote:'Secure access workspace'/,'English enterprise header note must be localized');
+assert.match(portal,/brandNote:'Центр безопасного подключения'/,'Russian enterprise header note must be localized');
 const template=fs.readFileSync('backend/src/subscription_template.html','utf8');
 const publicCss=fs.readFileSync('subscription-public.css','utf8');
-assert.match(template,/subscription-portal\.js\?v=20261101-absolute-url-enterprise-v2/,'Public portal must cache-bust the absolute URL fix');
+assert.match(template,/subscription-portal\.js\?v=20261101-enterprise-workspace-v3/,'Public portal must cache-bust the enterprise workspace behavior');
 assert.match(template,/subscription-public\.css\?v=20261101-enterprise-workspace-v3/,'Public portal must cache-bust the enterprise workspace redesign');
 assert.match(template,/id="subscription-link-card"/,'Public portal must expose the enterprise subscription link surface');
+assert.match(template,/id="subscription-brand-note"/,'Public portal must expose the localized product-header note');
 assert.match(template,/class="subscription-public-workspace"/,'Public portal must use the workspace composition layer');
 assert.match(template,/class="subscription-public-brand-identity"/,'Public portal must expose a product-header identity group');
 assert.match(template,/class="subscription-public-status-stack"/,'Public portal status must be grouped as an operational rail');
