@@ -5,6 +5,7 @@ const assert=require('node:assert/strict');
 const app=fs.readFileSync('app.js','utf8');
 const css=fs.readFileSync('styles.css','utf8');
 const dialogCss=fs.readFileSync('node-dialogs.css','utf8');
+const userCss=fs.readFileSync('user-create-v3.css','utf8');
 const dialogJs=fs.readFileSync('node-dialogs.js','utf8');
 const html=fs.readFileSync('index.html','utf8');
 const strictBootstrap=fs.readFileSync('node-bootstrap-v6.js','utf8');
@@ -87,9 +88,11 @@ assert.match(strictBootstrap,/Node\/Xray не запустятся без под
 
 // Redesigned modal surfaces share one cache-busted dialog asset layer.
 assert.match(html,/<link rel="stylesheet" href="\/node-dialogs\.css\?v=20261101-user-create-v2">/,
- 'Dialog redesign stylesheet must be cache-busted');
-assert.match(html,/<script src="\/node-dialogs\.js\?v=20261101-agent-update-autovalidation-v1"><\/script>/,
- 'Dialog behavior enhancer and Agent autovalidation must be cache-busted');
+ 'Base dialog redesign stylesheet must remain available');
+assert.match(html,/<link rel="stylesheet" href="\/user-create-v3\.css\?v=20261101-enterprise-v3">/,
+ 'Enterprise create-user stylesheet must be cache-busted');
+assert.match(html,/<script src="\/node-dialogs\.js\?v=20261101-user-create-enterprise-v3"><\/script>/,
+ 'Dialog behavior enhancer must be cache-busted after create-user markup repair');
 assert.match(dialogCss,/dialog\.xm-action-confirm:has\(\.xm-action-confirm-icon\)\{[\s\S]*width:min\(760px/,
  'Registered-node confirmation must no longer use the tiny shared width');
 assert.match(dialogCss,/\.xm-action-confirm-close\{[\s\S]*grid-area:close/,
@@ -103,36 +106,51 @@ assert.match(dialogJs,/cancel\.click\(\)/,
 assert.match(strictBootstrap,/node-setup-title-wrap/,'Strict-PQ dialog must expose the redesigned header structure');
 assert.match(strictBootstrap,/node-setup-identity-note/,'Strict-PQ identity warning must use the redesigned note surface');
 
-// New-user dialog keeps existing form contracts while presenting the new
-// grouped, wide and responsive design.
+// New-user dialog keeps existing form contracts while presenting a valid,
+// horizontal enterprise workspace. This explicitly guards the malformed class
+// regression that caused native controls/options to render as loose text.
 assert.match(dialogJs,/userNew=function userNewRedesigned\(\)/,
  'New-user action must be overridden after app.js without changing the generic form renderer');
 assert.match(dialogJs,/class="box user-create-dialog" data-k="user" method="dialog"/,
  'Redesigned form must preserve the existing user submit contract');
+assert.ok(dialogJs.includes('class="f user-create-field ${extra}"'),
+ 'Decorated field class must keep its closing quote so the browser receives valid HTML');
+assert.doesNotMatch(dialogJs,/class="f user-create-field \$\{extra\}`/,
+ 'Malformed unclosed class replacement must never return');
+assert.match(dialogJs,/window\.XMeshSelects\?\.refresh\?\.\(dlg\)/,
+ 'Dynamic user selects must be explicitly enhanced after rendering');
 assert.match(dialogJs,/id="tplsel"/,'Template handler must keep its existing selector');
 assert.match(dialogJs,/data-generate-username/,'Username generator action must be preserved');
 assert.match(dialogJs,/decorate\('xrayProfileId'/,'Xray profile assignment must remain in the form');
 assert.match(dialogJs,/decorate\('squads'/,'Squad assignment must remain in the form');
 assert.match(dialogJs,/decorate\('hold'/,'On-hold expiry mode must remain in the form');
 assert.match(dialogJs,/name="desc"/,'Description must still submit through the existing user payload');
-assert.match(dialogJs,/class="user-create-close" data-x/,'New-user dialog must place a native cancel close control in the header');
-assert.match(dialogCss,/#dlg\.user-create-modal\{[\s\S]*width:min\(1120px/,
- 'New-user dialog must use the wide desktop surface');
-assert.match(dialogCss,/\.user-create-limits-grid\{[\s\S]*grid-template-columns:1fr 1fr 1\.25fr 1fr/,
- 'Desktop limits must use the four-column layout from the redesign');
-assert.match(dialogCss,/@media\(max-width:620px\)[\s\S]*\.user-create-limits-grid\{grid-template-columns:1fr\}/,
- 'New-user dialog must collapse cleanly on narrow phones');
-assert.match(dialogCss,/\.user-create-footer\{[\s\S]*justify-content:flex-end/,
- 'Create/cancel actions must stay in a dedicated footer');
+assert.match(dialogJs,/class="user-create-close" data-x aria-label="Закрыть">×<\/button>/,
+ 'New-user close control must use the shared data-x close contract');
+assert.match(dialogJs,/user-create-workspace/,'Create-user form must use the enterprise workspace wrapper');
+assert.match(dialogJs,/Умный лимит устройств/,'Device limit behavior must be explained in the creation flow');
+assert.match(userCss,/#dlg\.user-create-modal\{[\s\S]*width:min\(1280px/,
+ 'New-user dialog must use the wider desktop surface');
+assert.match(userCss,/\.user-create-workspace\{[\s\S]*grid-template-columns:minmax\(0,1\.28fr\) minmax\(360px,\.72fr\)/,
+ 'Desktop create-user workspace must use a balanced two-zone layout');
+assert.match(userCss,/\.user-create-limits-grid\{[\s\S]*grid-template-columns:minmax\(0,1fr\) minmax\(0,1fr\)/,
+ 'Limits must use readable two-column policy layout instead of four squeezed controls');
+assert.match(userCss,/\.user-create-section-extra\{grid-column:1\/-1\}/,
+ 'Metadata section must span the full desktop workspace');
+assert.match(userCss,/@media\(max-width:680px\)[\s\S]*\.user-create-limits-grid,/,
+ 'Create-user workspace must collapse cleanly on narrow screens');
+assert.match(userCss,/\.user-create-footer-actions\{display:flex/,
+ 'Create/cancel actions must stay grouped in a dedicated footer');
 
-assert.match(dockerfile,/node-dialogs\.css node-dialogs\.js/,
- 'Production panel image must package the dialog redesign assets');
+assert.match(dockerfile,/node-dialogs\.css user-create-v3\.css node-dialogs\.js/,
+ 'Production panel image must package the create-user enterprise stylesheet with dialog assets');
 assert.match(dockerfile,/app\.js user-fingerprint-override\.js node-bootstrap-v6\.js unified-selects\.js/,
  'Production panel image must package user fingerprint control and the strict-PQ bootstrap override');
 
 assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length,'CSS braces must remain balanced');
 assert.equal((dialogCss.match(/\{/g)||[]).length,(dialogCss.match(/\}/g)||[]).length,'Dialog CSS braces must remain balanced');
+assert.equal((userCss.match(/\{/g)||[]).length,(userCss.match(/\}/g)||[]).length,'Create-user CSS braces must remain balanced');
 new Function(app);
 new Function(strictBootstrap);
 new Function(dialogJs);
-console.log('Node action: redesigned repair + new-user dialogs, TLS 1.3 bootstrap and exact-release strict-PQ repair contract OK');
+console.log('Node action: redesigned repair + valid enterprise new-user dialog, TLS 1.3 bootstrap and exact-release strict-PQ repair contract OK');
