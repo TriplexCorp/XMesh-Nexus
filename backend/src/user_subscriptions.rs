@@ -58,11 +58,6 @@ async fn token_fingerprint(state: &AppState, token: &str) -> Result<Option<Strin
     user_fingerprint(state, id).await
 }
 
-// The product contract says an empty user override inherits the host and an
-// empty host fingerprint means chrome. Older hosts may predate the explicit
-// `fp` field, so generated client JSON must materialize that final fallback
-// instead of merely showing it in the editor. Existing non-empty host values
-// are preserved; a per-user override is applied afterwards.
 fn ensure_default_fingerprint(value: &mut Value) {
     match value {
         Value::Array(items) => {
@@ -79,8 +74,7 @@ fn ensure_default_fingerprint(value: &mut Value) {
                         .map(str::trim)
                         .is_none_or(str::is_empty);
                     if missing {
-                        settings
-                            .insert("fingerprint".to_owned(), Value::String("chrome".to_owned()));
+                        settings.insert("fingerprint".to_owned(), Value::String("chrome".to_owned()));
                     }
                 }
             }
@@ -228,8 +222,6 @@ pub async fn serve(
 ) -> Result<Response, ApiError> {
     let fingerprint = token_fingerprint(&state, &token).await?;
     let request_headers = headers.clone();
-    // Generate the normal subscription first. A broken/inactive subscription
-    // must never consume a trusted device slot merely because it was requested.
     let response = base::serve(
         State(state.clone()),
         Path(token.clone()),
@@ -267,7 +259,6 @@ pub async fn portal(
     if wants_feed {
         return serve(State(state), Path(token), headers, Query(options)).await;
     }
-    // Human browser views never consume a device slot.
     base::portal(State(state), Path(token), headers, Query(options)).await
 }
 
