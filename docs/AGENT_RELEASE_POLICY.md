@@ -31,6 +31,8 @@ For every production Agent release, all of the following must point to the same 
 
 A rolling upgrade may explicitly accept the immediately previous Agent version so existing nodes keep working while they upgrade. The panel must still advertise only the newest target version.
 
+Updater self-repair must validate a downloaded bootstrap against the **commanded target Agent version** from the authenticated/signed update request. It must never pin repair validation to a literal version embedded in the older running Agent; otherwise a missing updater unit could deadlock the next release.
+
 ## CI requirement
 
 The Agent update source-contract check must verify version consistency. Pull requests that change deployed Agent/runtime surfaces without increasing `AGENT_VERSION` relative to the base branch must fail CI.

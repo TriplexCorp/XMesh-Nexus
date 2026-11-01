@@ -16,6 +16,7 @@ const nodeDialogs=originalReadFileSync('node-dialogs.js','utf8');
 const agentVersionRaw=originalReadFileSync('AGENT_VERSION','utf8').trim();
 const agentPolicy=originalReadFileSync('docs/AGENT_RELEASE_POLICY.md','utf8');
 const gateway=originalReadFileSync('deploy/xsp-v2-product-gateway/main.go','utf8');
+const controlAgent=originalReadFileSync('deploy/node-control-agent.sh','utf8');
 new Function(nodeDialogs);
 
 const versionMatch=/^control-v([0-9]+)\.([0-9]+)\.([0-9]+)$/.exec(agentVersionRaw);
@@ -25,10 +26,20 @@ assert.equal(agentVersionRaw,'control-v6.0.6','Nexus target Agent version must b
 assert.match(agentPolicy,/runtime behavior \*\*must increase the Agent version/);
 assert.match(agentPolicy,/Node product `VERSION` and Agent version are independent/);
 assert.match(gateway,/targetAgentVersion\s*=\s*"control-v6[.]0[.]6"/);
-assert.match(gateway,/previousAgentVersion\s*=\s*"control-v6[.]0[.]4"/,
+assert.match(gateway,/previousAgentVersion\s*=\s*"control-v6[.]0[.]5"/,
   'rolling upgrade must keep the immediately previous Agent release enrollable');
 assert.match(gateway,/repairAgentVersion\s*=\s*"control-v6[.]0[.]0"/,
   'v6.0.0 bootstrap-hole nodes remain temporarily repairable');
+assert.match(controlAgent,/local expected_version="\$\{1:-\}"/,
+  'updater repair must receive the commanded target Agent version');
+assert.match(controlAgent,/grep -Fq "AGENT_VERSION=\\"\$expected_version\\"" "\$bootstrap"/,
+  'downloaded repair updater must be validated against the commanded target version');
+assert.match(controlAgent,/run_agent_updater "\$release_version"/,
+  'manifest-bound updates must pass the signed release version into updater repair');
+assert.match(controlAgent,/run_agent_updater "\$target_version"/,
+  'legacy fixed updates must pass the backend target version into updater repair');
+assert.doesNotMatch(controlAgent,/grep -Fq ['"]AGENT_VERSION=\\"control-v6[.]0[.]6\\"['"] "\$bootstrap"/,
+  'repair bootstrap must never pin validation to the running Agent release literal');
 
 function cmpVersion(a,b){
   for(let i=0;i<3;i++){
