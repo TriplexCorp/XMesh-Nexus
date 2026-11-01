@@ -32,10 +32,10 @@ if(errors.length){
  const tlsJs=fs.readFileSync(path.join(root,'xray-studio-tls-dialog.js'),'utf8');
  const tlsCss=fs.readFileSync(path.join(root,'xray-studio-tls-dialog.css'),'utf8');
  new Function(tlsJs);
- assert.match(index,/xray-studio-tls-dialog\.css\?v=20261101-tls-workspace-v2/,
-   'TLS workspace stylesheet must receive a fresh cache key');
+ assert.match(index,/xray-studio-tls-dialog\.css\?v=20261101-tls-horizontal-v3/,
+   'TLS horizontal workspace stylesheet must receive a fresh cache key');
  assert.match(index,/xray-studio-tls-dialog\.js\?v=20261101-tls-workspace-v2/,
-   'TLS workspace behavior must receive a fresh cache key');
+   'TLS workspace behavior cache key must remain stable when JS is unchanged');
  assert.match(index,/node-dialogs\.js\?v=20261101-agent-update-autovalidation-v1/,
    'Agent update autovalidation handler must receive a fresh cache key');
  assert.match(dockerfile,/xray-studio-tls-dialog\.css xray-studio-tls-dialog\.js/,
@@ -55,16 +55,22 @@ if(errors.length){
  assert.match(tlsJs,/const next=clone\(advanced\)/,
    'Advanced tlsSettings must be merged from the current JSON rather than rebuilt destructively');
  assert.match(tlsJs,/class="xm-tls-layout"/,
-   'TLS editor must use the flat summary + settings workspace');
+   'TLS editor must retain the guided workspace wrapper');
  assert.match(tlsJs,/class="xm-tls-summary"/,
-   'TLS editor must expose a compact transport summary rail');
- assert.match(tlsCss,/\.xm-tls-dialog\{[\s\S]*width:min\(1120px/,
-   'TLS dialog must use the wide workspace surface');
- assert.match(tlsCss,/\.xm-tls-layout\{display:grid;grid-template-columns:minmax\(220px,260px\) minmax\(0,1fr\)/,
-   'Desktop TLS layout must keep summary and controls side by side');
- assert.doesNotMatch(tlsCss,/\.xm-tls-section\{/,
-   'Legacy nested TLS section cards must not return');
- assert.match(tlsCss,/@media\(max-width:640px\)/,
+   'TLS editor must expose the transport summary strip');
+ assert.match(tlsCss,/\.xm-tls-dialog\{[\s\S]*width:min\(1380px/,
+   'TLS dialog must use the wide horizontal workspace surface');
+ assert.match(tlsCss,/\.xm-tls-layout\{display:grid;grid-template-columns:1fr/,
+   'TLS workspace must flow vertically only at the outer shell level');
+ assert.match(tlsCss,/\.xm-tls-summary\{[\s\S]*grid-template-columns:minmax\(180px,.8fr\) minmax\(430px,2fr\) minmax\(310px,1.35fr\)/,
+   'Desktop TLS summary must be a horizontal status strip');
+ assert.match(tlsCss,/\.xm-tls-settings\{[\s\S]*grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/,
+   'Desktop TLS controls must be presented as three horizontal columns');
+ assert.match(tlsCss,/\.xm-tls-advanced\{grid-column:1\/-1/,
+   'Advanced JSON must occupy a dedicated full-width lower row');
+ assert.doesNotMatch(tlsCss,/position:sticky;top:0[\s\S]*\.xm-tls-summary/,
+   'TLS summary must not return as a sticky vertical sidebar');
+ assert.match(tlsCss,/@media\(max-width:760px\)/,
    'TLS dialog must remain responsive on narrow screens');
- console.log('Static asset packaging + fresh Agent/TLS cache keys + flat guided TLS contract: OK.');
+ console.log('Static asset packaging + horizontal guided TLS workspace contract: OK.');
 }
