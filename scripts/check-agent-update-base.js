@@ -23,9 +23,9 @@ const app=fs.readFileSync('app.js','utf8');
 const css=fs.readFileSync('styles.css','utf8');
 
 assert.equal(fs.readFileSync('VERSION','utf8').trim(),'6.0.0');
-assert.equal(fs.readFileSync('AGENT_VERSION','utf8').trim(),'control-v6.0.1');
+assert.equal(fs.readFileSync('AGENT_VERSION','utf8').trim(),'control-v6.0.2');
 assert.match(api,/\/nodes\/\{id\}\/agent-update/);
-assert.match(runtimeEntry,/pub const CONTROL_AGENT_VERSION: &str = "control-v6[.]0[.]1";/);
+assert.match(runtimeEntry,/pub const CONTROL_AGENT_VERSION: &str = "control-v6[.]0[.]2";/);
 assert.match(runtimeEntry,/control_v6_transition_active/);
 for(const v of ['control-v4','control-v5','control-v6']) assert.ok(runtimeEntry.includes(v),`v6 transition must accept ${v}`);
 assert.match(runtimeEntry,/VALUES\(\$1,'update_agent',\$2,\$3\)/);
@@ -58,12 +58,15 @@ assert.match(releaseAck,/XSP-v2 Agent release ACK identity mismatch/);
 assert.match(releaseAck,/NEW[.]release_ack_success IS DISTINCT FROM TRUE/);
 
 // v6 shell control worker remains the authority for the fixed command surface.
-assert.match(agent,/AGENT_VERSION="control-v6[.]0[.]1"/);
+assert.match(agent,/AGENT_VERSION="control-v6[.]0[.]2"/);
 assert.match(agent,/if action not in \("restart_xray","update_xray","update_agent"\)/);
 assert.match(agent,/router_running\(\)/);
 assert.match(agent,/releaseIdentity/);
 assert.match(agent,/stage_agent_release_identity\(\)/);
 assert.match(agent,/verify_staged_agent_package\(\)/);
+assert.match(agent,/run_agent_updater\(\)/,'Agent must self-heal a missing updater unit');
+assert.match(agent,/systemd-run[\s\S]*xmesh-node-agent-upgrade-repair/,'Missing static updater unit must use a fixed hardened transient repair service');
+assert.match(agent,/raw[.]githubusercontent[.]com\/TriplexCorp\/XMesh-Nexus\/main\/deploy\/update-node-control-agent[.]sh/,'Missing updater executable must have a fixed-source bootstrap path');
 assert.match(agent,/signed_post '\/api\/v1\/node\/restart\/ack'/);
 assert.match(agent,/grep -Fxq "AGENT_VERSION=\\"\$target_version\\""/);
 assert.doesNotMatch(agent,/eval\s|bash -c.*\$|sh -c.*\$/,'Control worker must not execute remote shell input');
@@ -71,12 +74,12 @@ assert.doesNotMatch(agent,/eval\s|bash -c.*\$|sh -c.*\$/,'Control worker must no
 // A legacy v4/v5/v6.0.0 node upgrades to the current v6 patch using the same
 // authenticated fixed action, with a real PQ production binary and exact identity.
 assert.match(updater,/MODE="\$\{1:-manual\}"/);
-assert.match(updater,/AGENT_VERSION=\\?"control-v6[.]0[.]1/);
+assert.match(updater,/AGENT_VERSION=\\?"control-v6[.]0[.]2/);
 assert.match(updater,/XMesh-Node\/main/);
 assert.match(updater,/VERSION/);
 assert.match(updater,/6[.]0[.]0/);
 assert.match(updater,/AGENT_VERSION/);
-assert.match(updater,/control-v6[.]0[.]1/);
+assert.match(updater,/control-v6[.]0[.]2/);
 assert.match(updater,/install-xsp-v2-production-agent[.]sh/);
 assert.match(updater,/xmesh-agent-xspv2-activate --identity/);
 assert.match(updater,/xmesh-hot-user-reconcile[.]py/);
@@ -94,13 +97,13 @@ const movingMainFetch=updater.indexOf('https://raw.githubusercontent.com/Triplex
 assert.ok(boundDispatch>=0 && movingMainFetch>boundDispatch,'Manifest-bound apply must dispatch locally before moving-main fetch');
 
 // Fresh enrollment must also install a real v6 PQ runtime, not merely a badge.
-assert.match(installer,/AGENT_VERSION=\\?"control-v6[.]0[.]1/);
+assert.match(installer,/AGENT_VERSION=\\?"control-v6[.]0[.]2/);
 assert.match(installer,/install_v6_pq_runtime\(\)/);
 assert.match(installer,/install-xsp-v2-production-agent[.]sh/);
 assert.match(installer,/xmesh-agent-xspv2-activate --identity/);
 assert.match(installer,/VERSION/);
 assert.match(installer,/6[.]0[.]0/);
-assert.match(installer,/control-v6[.]0[.]1/);
+assert.match(installer,/control-v6[.]0[.]2/);
 assert.match(installer,/ReadWritePaths=.*\/usr\/local\/bin/);
 assert.match(installer,/ReadWritePaths=.*\/var\/lib\/xmesh-agent/);
 
@@ -141,4 +144,4 @@ assert.equal(staged.status,0,'Staged Agent lifecycle test failed:\n'+(staged.std
 assert.match(staged.stdout,/staged Agent package apply\/rollback lifecycle: OK/);
 const syntax=spawnSync(process.execPath,['--check','app.js'],{encoding:'utf8'});
 assert.equal(syntax.status,0,syntax.stderr);
-console.log('XMesh control-v6.0.1 POSTQUANTUM Agent upgrade/install and immutable staged migration contract: OK');
+console.log('XMesh control-v6.0.2 POSTQUANTUM Agent upgrade/install and immutable staged migration contract: OK');
