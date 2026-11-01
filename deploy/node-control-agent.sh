@@ -11,7 +11,7 @@ export LC_ALL=C
 [[ "$XMESH_API_URL" == https://* ]] || exit 2
 XMESH_API_URL="${XMESH_API_URL%/}"
 KEY="${XMESH_METRICS_PRIVATE_KEY:-/etc/xmesh-node-metrics/node.key}"
-AGENT_VERSION="control-v6.0.5"
+AGENT_VERSION="control-v6.0.6"
 UNIT="${XMESH_XRAY_UNIT:-xray.service}"
 # Only root-owned local configuration can choose a unit. Remote responses never do.
 [[ "$UNIT" =~ ^[A-Za-z0-9_.@-]+\.service$ ]] || { echo "Invalid systemd unit" >&2; exit 2; }
@@ -278,9 +278,10 @@ PY
 UPDATER_RESULT_UNIT=xmesh-node-agent-upgrade.service
 UPDATER_ERROR=''
 run_agent_updater(){
- local static_unit=xmesh-node-agent-upgrade.service transient_unit=xmesh-node-agent-upgrade-repair
+ local expected_version="${1:-}" static_unit=xmesh-node-agent-upgrade.service transient_unit=xmesh-node-agent-upgrade-repair
  local updater=/usr/local/sbin/xmesh-update-agent bootstrap='' rc=0
  UPDATER_ERROR=''
+ [[ "$expected_version" =~ ^control-v6\.[0-9]+\.[0-9]+$ ]] || { UPDATER_ERROR='Invalid expected Agent target version'; return 1; }
  if systemctl cat "$static_unit" >/dev/null 2>&1 && [[ -f "$updater" && ! -L "$updater" && -x "$updater" ]];then
   UPDATER_RESULT_UNIT="$static_unit"
   timeout 650 systemctl start --wait "$static_unit"
@@ -293,7 +294,7 @@ run_agent_updater(){
   if ! curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy/update-node-control-agent.sh -o "$bootstrap";then
    UPDATER_ERROR='Agent updater missing and verified bootstrap download failed';return 1
   fi
-  if ! bash -n "$bootstrap" || ! grep -Fq 'AGENT_VERSION="control-v6.0.5"' "$bootstrap" || ! grep -Fq 'xmesh-node-agent-upgrade.service' "$bootstrap";then
+  if ! bash -n "$bootstrap" || ! grep -Fq "AGENT_VERSION=\"$expected_version\"" "$bootstrap" || ! grep -Fq 'xmesh-node-agent-upgrade.service' "$bootstrap";then
    rm -f "$bootstrap";UPDATER_ERROR='Downloaded Agent updater failed bootstrap validation';return 1
   fi
   chmod 0700 "$bootstrap"
@@ -415,7 +416,7 @@ elif [[ "$action" == update_agent ]];then
  if [[ "$release_version" != - ]];then
   if ! stage_agent_release_identity "$release_version" "$source_revision" "$artifact_sha256";then
    detail='Invalid or unstorable Agent release identity'
-  elif run_agent_updater && verify_staged_agent_package "$release_version" "$source_revision" "$artifact_sha256";then
+  elif run_agent_updater "$release_version" && verify_staged_agent_package "$release_version" "$source_revision" "$artifact_sha256";then
    success=true;detail='Staged Agent package activated and exact release identity verified'
   else
    if [[ -n "$UPDATER_ERROR" ]];then
@@ -426,7 +427,7 @@ elif [[ "$action" == update_agent ]];then
    fi
   fi
  else
-  if run_agent_updater && grep -Fxq "AGENT_VERSION=\"$target_version\"" /usr/local/sbin/xmesh-node-control;then
+  if run_agent_updater "$target_version" && grep -Fxq "AGENT_VERSION=\"$target_version\"" /usr/local/sbin/xmesh-node-control;then
    success=true;detail='Agent installed and version verified'
   else
    if [[ -n "$UPDATER_ERROR" ]];then
