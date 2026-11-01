@@ -1,6 +1,7 @@
-/* Enterprise create-user workspace v5.
- * Reference direction: quiet Linear/Vercel-style grouping, strong focus states,
- * fewer nested boxes and a real right-aligned switch control. */
+/* Enterprise create-user workspace v5.1.
+ * Keep the quieter Nexus surface, but make controls deterministic: one focus
+ * treatment, exact control heights and a username action aligned to the input.
+ * Wide viewports also scale the workspace so browser zoom cannot make it tiny. */
 
 #dlg.user-create-modal{
   width:min(1380px,calc(100vw - 2.5rem));
@@ -36,7 +37,7 @@
 .user-create-title-icon .ic{width:1.05rem;height:1.05rem}
 .user-create-eyebrow{display:none}
 .user-create-head h2{margin:0 0 .12rem;font-size:1.28rem;line-height:1.08;letter-spacing:-.032em}
-.user-create-head p{margin:0;color:var(--mu);font-size:.68rem;line-height:1.35}
+.user-create-head p{margin:0;color:var(--mu);font-size:.7rem;line-height:1.35}
 .user-create-head .user-create-close{
   width:var(--xm-close-size,34px)!important;
   height:var(--xm-close-size,34px)!important;
@@ -49,16 +50,16 @@
   line-height:1!important;
 }
 
-.user-create-body{padding:.8rem;overflow:auto;overflow-x:hidden;scrollbar-gutter:stable}
+.user-create-body{padding:.82rem;overflow:auto;overflow-x:hidden;scrollbar-gutter:stable}
 .user-create-workspace{
   display:grid;
   grid-template-columns:minmax(0,1.72fr) minmax(360px,.78fr);
-  gap:.72rem;
+  gap:.74rem;
   align-items:stretch;
 }
 .user-create-section{
   margin:0!important;
-  padding:.9rem;
+  padding:.95rem;
   min-width:0;
   border:1px solid color-mix(in srgb,var(--ln) 90%,var(--tx) 10%);
   border-radius:14px;
@@ -67,101 +68,126 @@
 }
 .user-create-section-main,.user-create-section-limits{min-height:100%}
 .user-create-section-extra{grid-column:1/-1;background:color-mix(in srgb,var(--s2) 42%,var(--s1))}
-.user-create-section-head{display:flex;align-items:flex-start;gap:.58rem;margin-bottom:.72rem}
+.user-create-section-head{display:flex;align-items:flex-start;gap:.6rem;margin-bottom:.78rem}
 .user-create-section-icon{
-  width:1.9rem;height:1.9rem;flex:none;
+  width:1.95rem;height:1.95rem;flex:none;
   display:grid;place-items:center;
   border-radius:.58rem;
   color:var(--a);
   border:1px solid color-mix(in srgb,var(--a) 22%,var(--ln));
   background:color-mix(in srgb,var(--a) 6%,var(--s2));
 }
-.user-create-section-icon .ic{width:.86rem;height:.86rem}
+.user-create-section-icon .ic{width:.88rem;height:.88rem}
 .user-create-section-kicker{display:none}
-.user-create-section-head h3{margin:.04rem 0 .08rem;font-size:.86rem;line-height:1.18;letter-spacing:-.014em}
-.user-create-section-head p{margin:0;color:var(--mu);font-size:.62rem;line-height:1.35}
+.user-create-section-head h3{margin:.03rem 0 .09rem;font-size:.9rem;line-height:1.18;letter-spacing:-.014em}
+.user-create-section-head p{margin:0;color:var(--mu);font-size:.65rem;line-height:1.38}
 
-.user-create-main-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.66rem .72rem;align-items:start}
+.user-create-main-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.72rem .76rem;align-items:start}
 .user-create-username-row{
   grid-column:1/-1;
   display:grid;
   grid-template-columns:minmax(0,1fr) auto;
-  gap:.5rem;
-  align-items:end;
+  gap:.58rem;
+  align-items:start;
 }
 .user-create-template,.user-create-xray{min-width:0}
-.user-create-dialog .user-create-field{display:flex;flex-direction:column;gap:.24rem;min-width:0}
-.user-create-dialog .user-create-field>span{font-size:.68rem;font-weight:720;line-height:1.25;color:var(--tx)}
-.user-create-dialog .user-create-field>small{font-size:.57rem;line-height:1.35;color:var(--mu)}
+.user-create-dialog .user-create-field{display:flex;flex-direction:column;gap:.28rem;min-width:0}
+.user-create-dialog .user-create-field>span{font-size:.76rem;font-weight:720;line-height:1.2;color:var(--tx)}
+.user-create-dialog .user-create-field>small{font-size:.62rem;line-height:1.35;color:var(--mu)}
+
+/* The global form theme applies :focus and :focus-visible outlines. Neutralise
+ * both inside this dialog so a focused field has one accent edge + soft halo,
+ * not two crisp concentric borders. */
 .user-create-dialog input:not([type=checkbox]),
 .user-create-dialog textarea,
 .user-create-dialog select,
 .user-create-dialog .xm-select-trigger{
-  min-height:2.7rem;
-  border-radius:.68rem;
-  border-color:color-mix(in srgb,var(--ln) 88%,var(--tx) 12%);
+  width:100%;
+  min-width:0;
+  box-sizing:border-box;
+  border:1px solid color-mix(in srgb,var(--ln) 88%,var(--tx) 12%);
+  border-radius:.72rem;
   background:color-mix(in srgb,var(--s2) 82%,var(--s1));
   box-shadow:none;
+  outline:none!important;
+  font-size:.82rem;
 }
+.user-create-dialog input:not([type=checkbox]),
+.user-create-dialog select,
+.user-create-dialog .xm-select-trigger{
+  height:3rem;
+  min-height:3rem;
+  padding:.62rem .78rem;
+}
+.user-create-dialog textarea{min-height:3rem;padding:.68rem .78rem}
 .user-create-dialog input:not([type=checkbox]):hover,
 .user-create-dialog textarea:hover,
+.user-create-dialog select:hover,
 .user-create-dialog .xm-select-trigger:hover{border-color:color-mix(in srgb,var(--tx) 24%,var(--ln))}
+.user-create-dialog input:not([type=checkbox]):focus,
+.user-create-dialog textarea:focus,
+.user-create-dialog select:focus,
+.user-create-dialog .xm-select-trigger:focus,
 .user-create-dialog input:not([type=checkbox]):focus-visible,
 .user-create-dialog textarea:focus-visible,
 .user-create-dialog select:focus-visible,
 .user-create-dialog .xm-select-trigger:focus-visible{
-  outline:2px solid color-mix(in srgb,var(--a) 65%,transparent);
-  outline-offset:1px;
-  border-color:color-mix(in srgb,var(--a) 65%,var(--ln));
+  outline:none!important;
+  border-color:color-mix(in srgb,var(--a) 72%,var(--ln))!important;
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--a) 11%,transparent)!important;
 }
 .user-create-dialog .xm-select-shell{width:100%;min-width:0}
 .user-create-dialog .xm-select-caption{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Username action aligns with the input itself, not with the helper text below it. */
 .user-create-generate{
-  min-height:2.7rem;
-  height:2.7rem;
-  padding:.55rem .82rem;
-  border-radius:.68rem;
+  height:3rem;
+  min-height:3rem;
+  margin-top:1.19rem;
+  padding:.58rem .88rem;
+  border-radius:.72rem;
   white-space:nowrap;
-  border-color:color-mix(in srgb,var(--a) 24%,var(--ln));
+  border:1px solid color-mix(in srgb,var(--a) 24%,var(--ln));
   background:color-mix(in srgb,var(--a) 6%,var(--s2));
+  box-shadow:none;
 }
 .user-create-generate:hover{background:color-mix(in srgb,var(--a) 10%,var(--s2));border-color:color-mix(in srgb,var(--a) 40%,var(--ln))}
+.user-create-generate:focus-visible{outline:none!important;border-color:color-mix(in srgb,var(--a) 66%,var(--ln));box-shadow:0 0 0 3px color-mix(in srgb,var(--a) 11%,transparent)}
 
-.user-create-limits-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.62rem;align-items:start}
+.user-create-limits-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.68rem;align-items:start}
 .user-create-policy-note{
-  margin-top:.65rem;padding:.58rem .62rem;
-  display:grid;grid-template-columns:1.45rem minmax(0,1fr);gap:.5rem;align-items:start;
+  margin-top:.7rem;padding:.62rem .66rem;
+  display:grid;grid-template-columns:1.5rem minmax(0,1fr);gap:.52rem;align-items:start;
   border:1px solid color-mix(in srgb,var(--a) 12%,var(--ln));
-  border-radius:.68rem;
+  border-radius:.72rem;
   background:color-mix(in srgb,var(--a) 3.5%,var(--s1));
 }
-.user-create-policy-note>span{width:1.45rem;height:1.45rem;display:grid;place-items:center;color:var(--a);border-radius:.46rem;background:color-mix(in srgb,var(--a) 8%,var(--s2))}
-.user-create-policy-note .ic{width:.72rem;height:.72rem}
-.user-create-policy-note p{margin:0;min-width:0}.user-create-policy-note b{display:block;font-size:.64rem;line-height:1.28}.user-create-policy-note small{display:block;margin-top:.08rem;color:var(--mu);font-size:.55rem;line-height:1.38}
+.user-create-policy-note>span{width:1.5rem;height:1.5rem;display:grid;place-items:center;color:var(--a);border-radius:.46rem;background:color-mix(in srgb,var(--a) 8%,var(--s2))}
+.user-create-policy-note .ic{width:.74rem;height:.74rem}
+.user-create-policy-note p{margin:0;min-width:0}.user-create-policy-note b{display:block;font-size:.68rem;line-height:1.28}.user-create-policy-note small{display:block;margin-top:.1rem;color:var(--mu);font-size:.58rem;line-height:1.4}
 
 .user-create-extra-grid{
   display:grid;
   grid-template-columns:minmax(14rem,1.05fr) minmax(8rem,.55fr) minmax(18rem,.9fr) minmax(19rem,1.2fr);
   grid-template-areas:"squads tag hold desc";
-  gap:.65rem;
+  gap:.68rem;
   align-items:start;
 }
 .user-create-squads{grid-area:squads}.user-create-tag{grid-area:tag}.user-create-hold{grid-area:hold}.user-create-desc{grid-area:desc}
-.user-create-squads .ms{min-height:2.7rem;padding:.34rem;gap:.3rem;align-content:center;border-radius:.68rem;background:color-mix(in srgb,var(--s2) 82%,var(--s1))}
-.user-create-squads .ck{min-height:1.7rem;padding:.26rem .46rem;display:inline-flex;align-items:center;gap:.3rem;border-radius:.5rem}
+.user-create-squads .ms{min-height:3rem;padding:.36rem;gap:.3rem;align-content:center;border-radius:.72rem;background:color-mix(in srgb,var(--s2) 82%,var(--s1))}
+.user-create-squads .ck{min-height:1.78rem;padding:.28rem .48rem;display:inline-flex;align-items:center;gap:.3rem;border-radius:.52rem}
 
-/* Switch row: the old width:max-content rule collapsed the absolute track.
- * Keep a real 44x26 control and place it at the right edge of a settings row. */
+/* Keep a real 44x26 control and place it at the right edge of a settings row. */
 .user-create-hold{
-  min-height:3.72rem;
+  min-height:3.9rem;
   display:grid!important;
   grid-template-columns:minmax(0,1fr) auto;
   grid-template-areas:"label switch" "help switch";
-  gap:.12rem .62rem!important;
+  gap:.13rem .65rem!important;
   align-items:center;
-  padding:.5rem .58rem;
+  padding:.54rem .62rem;
   border:1px solid color-mix(in srgb,var(--ln) 88%,var(--tx) 12%);
-  border-radius:.68rem;
+  border-radius:.72rem;
   background:color-mix(in srgb,var(--s2) 82%,var(--s1));
 }
 .user-create-hold>span{grid-area:label}.user-create-hold>small{grid-area:help;margin:0!important}.user-create-hold .sw{
@@ -179,13 +205,32 @@
 .user-create-hold .sw span{position:absolute;inset:0;display:block;border-radius:999px;background:color-mix(in srgb,var(--tx) 8%,var(--s2));border:1px solid color-mix(in srgb,var(--tx) 18%,var(--ln));transition:background .18s ease,border-color .18s ease}
 .user-create-hold .sw span::after{content:"";position:absolute;width:1.08rem;height:1.08rem;left:.22rem;top:.2rem;border-radius:50%;background:color-mix(in srgb,var(--tx) 60%,var(--mu));box-shadow:0 1px 4px rgba(0,0,0,.35);transition:transform .2s cubic-bezier(.2,.8,.2,1),background .18s ease}
 .user-create-hold .sw input:checked+span{background:color-mix(in srgb,var(--a) 24%,var(--s2));border-color:color-mix(in srgb,var(--a) 55%,var(--ln))}.user-create-hold .sw input:checked+span::after{transform:translateX(1.12rem);background:var(--a)}
-.user-create-hold .sw input:focus-visible+span{outline:2px solid color-mix(in srgb,var(--a) 62%,transparent);outline-offset:2px}
+.user-create-hold .sw input:focus-visible+span{outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--a) 14%,transparent);border-color:color-mix(in srgb,var(--a) 62%,var(--ln))}
 
-.user-create-desc textarea{min-height:3.72rem;height:3.72rem;max-height:7rem;resize:vertical;padding-top:.66rem}
+.user-create-desc textarea{min-height:3.9rem;height:3.9rem;max-height:7rem;resize:vertical;padding-top:.7rem}
 .user-create-error{margin:.5rem .08rem 0;min-height:.8rem}
 
-.user-create-footer{padding:.68rem .8rem .75rem;display:flex;justify-content:flex-end;gap:.55rem;border-top:1px solid var(--ln);background:color-mix(in srgb,var(--s2) 34%,var(--s1))}
-.user-create-footer-copy{display:none}.user-create-footer-actions{display:flex;align-items:center;gap:.5rem;flex:none}.user-create-footer button{min-height:2.55rem;padding:.56rem .9rem;border-radius:.66rem}.user-create-submit{min-width:11.5rem}
+.user-create-footer{padding:.72rem .82rem .78rem;display:flex;justify-content:flex-end;gap:.55rem;border-top:1px solid var(--ln);background:color-mix(in srgb,var(--s2) 34%,var(--s1))}
+.user-create-footer-copy{display:none}.user-create-footer-actions{display:flex;align-items:center;gap:.52rem;flex:none}.user-create-footer button{min-height:2.65rem;padding:.58rem .92rem;border-radius:.68rem}.user-create-submit{min-width:11.7rem}
+
+/* On very wide CSS viewports (including browser zoom-out), the old 1380px cap
+ * made the modal physically tiny. Grow the surface and key controls with vw so
+ * the dialog remains readable without changing normal desktop density. */
+@media(min-width:1800px){
+  #dlg.user-create-modal{width:min(82vw,2100px)}
+  .user-create-head h2{font-size:max(1.28rem,.72vw)}
+  .user-create-head p{font-size:max(.7rem,.36vw)}
+  .user-create-section-head h3{font-size:max(.9rem,.48vw)}
+  .user-create-section-head p{font-size:max(.65rem,.34vw)}
+  .user-create-dialog .user-create-field>span{font-size:max(.76rem,.4vw)}
+  .user-create-dialog .user-create-field>small{font-size:max(.62rem,.32vw)}
+  .user-create-dialog input:not([type=checkbox]),
+  .user-create-dialog select,
+  .user-create-dialog .xm-select-trigger,
+  .user-create-generate{height:max(3rem,2.05vw);min-height:max(3rem,2.05vw);font-size:max(.82rem,.42vw)}
+  .user-create-policy-note b{font-size:max(.68rem,.35vw)}
+  .user-create-policy-note small{font-size:max(.58rem,.3vw)}
+}
 
 @media(max-width:1180px){
   #dlg.user-create-modal{width:calc(100vw - 1.5rem)}
@@ -205,7 +250,7 @@
   .user-create-head{padding:.82rem .88rem;min-height:0}.user-create-title-icon{width:2.3rem;height:2.3rem}.user-create-head p{display:none}
   .user-create-body{padding:.58rem}.user-create-section{padding:.74rem;border-radius:12px}
   .user-create-main-grid,.user-create-limits-grid,.user-create-extra-grid{grid-template-columns:minmax(0,1fr);grid-template-areas:none}
-  .user-create-username-row{grid-column:auto;grid-template-columns:minmax(0,1fr)}.user-create-generate{width:100%}
+  .user-create-username-row{grid-column:auto;grid-template-columns:minmax(0,1fr)}.user-create-generate{width:100%;margin-top:0}
   .user-create-squads,.user-create-tag,.user-create-hold,.user-create-desc{grid-area:auto}
   .user-create-desc textarea{height:auto;min-height:4.2rem}
   .user-create-footer{padding:.62rem;display:grid;grid-template-columns:1fr}.user-create-footer-actions{display:grid;grid-template-columns:1fr 1fr;width:100%}.user-create-footer button,.user-create-submit,.user-create-cancel{width:100%;min-width:0}
