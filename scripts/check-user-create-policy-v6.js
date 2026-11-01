@@ -1,0 +1,27 @@
+#!/usr/bin/env node
+'use strict';
+const fs=require('node:fs');
+const assert=require('node:assert/strict');
+const js=fs.readFileSync('user-create-policy-v6.js','utf8');
+const css=fs.readFileSync('user-create-policy-v6.css','utf8');
+const html=fs.readFileSync('index.html','utf8');
+const docker=fs.readFileSync('backend/Dockerfile','utf8');
+new Function(js);
+assert.match(html,/user-create-policy-v6\.css\?v=20261101-duration-calendar-v1/,'Policy calendar CSS must be cache-busted');
+assert.match(html,/user-create-policy-v6\.js\?v=20261101-duration-calendar-v1/,'Policy calendar JS must be cache-busted');
+assert.ok(html.indexOf('/node-dialogs.js?v=')<html.indexOf('/user-create-policy-v6.js?v='),'Policy enhancement must load after the base create-user dialog');
+assert.match(docker,/user-create-policy-v6\.css user-create-policy-v6\.js/,'Production image must package policy calendar assets');
+assert.match(js,/window\.userNew=function userNewPolicyCalendarV6/,'Create-user calendar must enhance the existing dialog instead of replacing submission logic');
+assert.match(js,/type="hidden" name="days"/,'Calendar UI must preserve the existing backend days field');
+assert.match(js,/\['0','∞'\],\['7','7 дней'\],\['30','30 дней'\],\['90','90 дней'\],\['180','180 дней'\]/,'Duration control must offer safe quick presets');
+assert.match(js,/data-user-create-date=/,'Calendar must support exact date selection');
+assert.match(js,/Срок начнётся с первого подключения/,'On-hold mode must explain duration semantics');
+assert.match(js,/Math\.max\(1,Math\.round\(serial\(target\)-serial\(today\(\)\)\)\)/,'Selected calendar dates must translate back into the existing integer-day contract');
+assert.match(css,/grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/,'Policy controls must retain a balanced 2x2 desktop grid');
+assert.match(css,/grid-template-rows:auto 3rem minmax\(1\.1rem,auto\)/,'Policy fields must share aligned label/control/help rows');
+assert.match(css,/input\[type=number\]::-webkit-inner-spin-button/,'Native Chromium number spinners must be suppressed');
+assert.match(css,/appearance:textfield/,'Native numeric controls must use the Nexus surface instead of browser spinner chrome');
+assert.match(css,/\.user-create-duration-calendar\{/,'Duration picker must render as a dedicated calendar popover');
+assert.match(css,/\.user-create-cal-day\.is-selected/,'Selected calendar date must have an explicit state');
+assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length,'Policy CSS braces must remain balanced');
+console.log('Create-user policy v6: aligned controls + duration calendar contract OK');

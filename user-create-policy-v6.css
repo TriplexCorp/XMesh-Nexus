@@ -1,0 +1,268 @@
+/* Create User policy v6: aligned controls + duration calendar. */
+#dlg.user-create-modal .user-create-section-limits{
+  overflow:visible;
+}
+#dlg.user-create-modal .user-create-limits-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:.78rem .82rem;
+  align-items:start;
+}
+#dlg.user-create-modal .user-create-limits-grid>.user-create-field{
+  position:relative;
+  display:grid;
+  grid-template-rows:auto 3rem minmax(1.1rem,auto);
+  gap:.34rem;
+  align-content:start;
+  min-width:0;
+  min-height:5.35rem;
+  margin:0;
+}
+#dlg.user-create-modal .user-create-limits-grid>.user-create-field>span{
+  min-height:1rem;
+  display:flex;
+  align-items:end;
+  font-size:.72rem;
+  font-weight:740;
+  line-height:1.2;
+  letter-spacing:-.01em;
+}
+#dlg.user-create-modal .user-create-limits-grid>.user-create-field>small{
+  margin:0;
+  min-height:1rem;
+  font-size:.58rem;
+  line-height:1.35;
+  color:var(--mu);
+}
+#dlg.user-create-modal .user-create-limits-grid input:not([type=checkbox]),
+#dlg.user-create-modal .user-create-limits-grid select,
+#dlg.user-create-modal .user-create-limits-grid .xm-select-shell,
+#dlg.user-create-modal .user-create-limits-grid .xm-select-trigger,
+#dlg.user-create-modal .user-create-duration-trigger{
+  width:100%;
+  height:3rem;
+  min-height:3rem;
+  margin:0;
+  box-sizing:border-box;
+}
+#dlg.user-create-modal .user-create-limits-grid input[type=number]{
+  appearance:textfield;
+  -moz-appearance:textfield;
+}
+#dlg.user-create-modal .user-create-limits-grid input[type=number]::-webkit-inner-spin-button,
+#dlg.user-create-modal .user-create-limits-grid input[type=number]::-webkit-outer-spin-button{
+  -webkit-appearance:none;
+  margin:0;
+}
+#dlg.user-create-modal .user-create-limits-grid .xm-select-shell{
+  display:block;
+}
+#dlg.user-create-modal .user-create-limits-grid .xm-select-trigger{
+  display:flex;
+  align-items:center;
+}
+
+.user-create-duration{
+  position:relative;
+  z-index:4;
+}
+.user-create-duration.is-open{z-index:80}
+.user-create-duration>input[type=hidden]{display:none!important}
+.user-create-duration-trigger{
+  display:grid!important;
+  grid-template-columns:2rem minmax(0,1fr) 1.35rem;
+  align-items:center;
+  gap:.55rem;
+  padding:.34rem .64rem!important;
+  border:1px solid color-mix(in srgb,var(--ln) 88%,var(--tx) 12%)!important;
+  border-radius:.7rem!important;
+  color:var(--tx)!important;
+  background:color-mix(in srgb,var(--s2) 82%,var(--s1))!important;
+  text-align:left;
+  box-shadow:none!important;
+  transition:border-color .16s ease,background .16s ease,box-shadow .16s ease;
+}
+.user-create-duration-trigger:hover{
+  border-color:color-mix(in srgb,var(--tx) 26%,var(--ln))!important;
+  background:color-mix(in srgb,var(--s2) 92%,var(--s1))!important;
+}
+.user-create-duration-trigger:focus-visible{
+  outline:none!important;
+  border-color:color-mix(in srgb,var(--a) 62%,var(--ln))!important;
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--a) 11%,transparent)!important;
+}
+.user-create-duration-icon{
+  width:2rem;height:2rem;
+  display:grid;place-items:center;
+  border-radius:.55rem;
+  color:var(--a);
+  background:color-mix(in srgb,var(--a) 9%,var(--s2));
+  border:1px solid color-mix(in srgb,var(--a) 18%,var(--ln));
+}
+.user-create-duration-icon svg{width:1rem;height:1rem}
+.user-create-duration-copy{min-width:0;display:grid;gap:.04rem}
+.user-create-duration-copy b{
+  min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:.72rem;line-height:1.15;font-weight:760;
+}
+.user-create-duration-copy small{
+  min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:.55rem;line-height:1.18;color:var(--mu);
+}
+.user-create-duration-chevron{display:grid;place-items:center;color:var(--mu)}
+.user-create-duration-chevron svg{width:.9rem;height:.9rem;transition:transform .18s ease}
+.user-create-duration.is-open .user-create-duration-chevron svg{transform:rotate(90deg)}
+
+.user-create-duration-calendar{
+  position:absolute;
+  top:calc(1rem + 3rem + .7rem);
+  right:0;
+  width:min(370px,calc(100vw - 2rem));
+  padding:.72rem;
+  border:1px solid color-mix(in srgb,var(--ln) 76%,var(--tx) 24%);
+  border-radius:.9rem;
+  background:color-mix(in srgb,var(--s1) 96%,var(--s2));
+  box-shadow:0 24px 70px rgba(0,0,0,.46),inset 0 1px 0 color-mix(in srgb,var(--tx) 5%,transparent);
+  backdrop-filter:blur(18px);
+  z-index:100;
+}
+.user-create-duration-calendar[hidden]{display:none!important}
+.user-create-duration-presets{
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:.28rem;
+  margin-bottom:.65rem;
+  padding-bottom:.65rem;
+  border-bottom:1px solid var(--ln);
+}
+.user-create-duration-preset{
+  min-width:0;
+  height:2rem;
+  padding:0 .34rem;
+  display:flex;align-items:center;justify-content:center;
+  border:1px solid var(--ln)!important;
+  border-radius:.5rem!important;
+  background:color-mix(in srgb,var(--s2) 78%,var(--s1))!important;
+  color:var(--mu)!important;
+  font-size:.59rem;font-weight:690;
+  white-space:nowrap;
+}
+.user-create-duration-preset:hover{
+  color:var(--tx)!important;
+  border-color:color-mix(in srgb,var(--a) 28%,var(--ln))!important;
+}
+.user-create-duration-preset.is-active{
+  color:var(--tx)!important;
+  border-color:color-mix(in srgb,var(--a) 54%,var(--ln))!important;
+  background:color-mix(in srgb,var(--a) 12%,var(--s2))!important;
+}
+.user-create-cal-head{
+  display:grid;
+  grid-template-columns:2.1rem minmax(0,1fr) 2.1rem;
+  align-items:center;
+  gap:.35rem;
+  margin-bottom:.55rem;
+}
+.user-create-cal-head strong{
+  text-align:center;
+  font-size:.75rem;
+  line-height:1.2;
+  letter-spacing:-.012em;
+}
+.user-create-cal-nav{
+  width:2.1rem;height:2.1rem;padding:0!important;
+  display:grid!important;place-items:center;
+  border:1px solid transparent!important;
+  border-radius:.55rem!important;
+  color:var(--mu)!important;
+  background:transparent!important;
+}
+.user-create-cal-nav:hover{
+  color:var(--tx)!important;
+  border-color:var(--ln)!important;
+  background:color-mix(in srgb,var(--s2) 82%,var(--s1))!important;
+}
+.user-create-cal-nav svg{width:.9rem;height:.9rem}
+.user-create-cal-weekdays,
+.user-create-cal-grid{
+  display:grid;
+  grid-template-columns:repeat(7,minmax(0,1fr));
+  gap:.2rem;
+}
+.user-create-cal-weekdays{margin-bottom:.22rem}
+.user-create-cal-weekdays span{
+  display:grid;place-items:center;
+  height:1.45rem;
+  color:var(--mu);
+  font-size:.52rem;font-weight:720;
+  text-transform:uppercase;
+}
+.user-create-cal-empty{min-height:2.15rem}
+.user-create-cal-day{
+  min-width:0;
+  height:2.15rem;
+  padding:0!important;
+  display:grid!important;place-items:center;
+  border:1px solid transparent!important;
+  border-radius:.52rem!important;
+  color:var(--tx)!important;
+  background:transparent!important;
+  font-size:.65rem;font-weight:650;
+}
+.user-create-cal-day:not(:disabled):hover{
+  border-color:var(--ln)!important;
+  background:color-mix(in srgb,var(--s2) 90%,var(--s1))!important;
+}
+.user-create-cal-day.is-today{
+  color:var(--a)!important;
+  border-color:color-mix(in srgb,var(--a) 22%,transparent)!important;
+}
+.user-create-cal-day.is-selected{
+  color:var(--btn-text)!important;
+  border-color:var(--a)!important;
+  background:var(--a)!important;
+  box-shadow:0 5px 16px color-mix(in srgb,var(--a) 20%,transparent);
+}
+.user-create-cal-day:disabled{opacity:.27;cursor:not-allowed}
+.user-create-cal-foot{
+  margin-top:.62rem;
+  padding-top:.58rem;
+  border-top:1px solid var(--ln);
+  display:flex;align-items:center;justify-content:space-between;gap:.6rem;
+}
+.user-create-cal-foot span{color:var(--mu);font-size:.55rem}
+.user-create-cal-foot button{
+  padding:.3rem .48rem!important;
+  border-radius:.46rem!important;
+  color:var(--a)!important;
+  font-size:.56rem;font-weight:720;
+  background:transparent!important;
+}
+.user-create-cal-foot button:hover{background:color-mix(in srgb,var(--a) 8%,transparent)!important}
+
+/* Keep the policy note visually subordinate and aligned to the 2x2 control grid. */
+#dlg.user-create-modal .user-create-policy-note{
+  margin-top:.72rem;
+  padding:.65rem .72rem;
+  min-height:3.15rem;
+  align-items:center;
+  border-color:color-mix(in srgb,var(--a) 11%,var(--ln));
+  background:color-mix(in srgb,var(--a) 3%,var(--s1));
+}
+
+@media(max-width:940px){
+  .user-create-duration-calendar{left:0;right:auto}
+}
+@media(max-width:680px){
+  #dlg.user-create-modal .user-create-limits-grid{grid-template-columns:minmax(0,1fr)}
+  #dlg.user-create-modal .user-create-limits-grid>.user-create-field{min-height:0}
+  .user-create-duration-calendar{
+    position:static;
+    width:100%;
+    margin-top:.4rem;
+    grid-row:auto;
+  }
+  .user-create-duration-presets{grid-template-columns:repeat(3,minmax(0,1fr))}
+}

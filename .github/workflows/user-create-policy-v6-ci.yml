@@ -1,0 +1,43 @@
+name: Create User Policy UI
+
+on:
+  pull_request:
+    paths:
+      - 'user-create-policy-v6.js'
+      - 'user-create-policy-v6.css'
+      - 'user-create-v3.css'
+      - 'node-dialogs.js'
+      - 'index.html'
+      - 'backend/Dockerfile'
+      - 'scripts/check-user-create-policy-v6.js'
+      - '.github/workflows/user-create-policy-v6-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'user-create-policy-v6.js'
+      - 'user-create-policy-v6.css'
+      - 'user-create-v3.css'
+      - 'node-dialogs.js'
+      - 'index.html'
+      - 'backend/Dockerfile'
+      - 'scripts/check-user-create-policy-v6.js'
+      - '.github/workflows/user-create-policy-v6-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  policy-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Check policy enhancement syntax
+        run: node --check user-create-policy-v6.js
+      - name: Verify aligned policy controls and duration calendar
+        run: node scripts/check-user-create-policy-v6.js
+      - name: Verify production static packaging
+        run: node scripts/check-static-assets.js
