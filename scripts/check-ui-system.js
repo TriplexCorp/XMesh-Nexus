@@ -22,8 +22,9 @@ for(const surface of ['solid','glass','raised']){
   assert(css.includes('html[data-surface='+surface+']'),'Missing shared '+surface+' material');
 }
 for(const token of [
-  '--ui-surface-panel-bg','--ui-surface-section-bg','--ui-surface-item-bg',
-  '--ui-surface-control-bg','--ui-surface-border','--ui-surface-panel-shadow','--ui-surface-filter'
+  '--ui-surface-panel-bg','--ui-surface-dialog-bg','--ui-surface-section-bg','--ui-surface-item-bg',
+  '--ui-surface-control-bg','--ui-surface-border','--ui-surface-panel-shadow','--ui-surface-dialog-shadow',
+  '--ui-dialog-section-bg','--ui-dialog-control-bg','--ui-surface-filter'
 ])assert(css.includes(token),'Missing shared token '+token);
 
 assert.match(css,/html\[data-surface=glass\][\s\S]*--ui-surface-filter:blur\(/,
@@ -37,16 +38,36 @@ assert.match(css,/html\[data-borders=strong\]/,'Strong border setting must feed 
 assert.match(css,/html\[data-density=compact\]/,'Density must feed shared spacing tokens');
 assert.match(css,/prefers-reduced-transparency/,'Glass must respect reduced-transparency preference');
 
+const raisedMatch=css.match(/html\[data-surface=raised\]\{([\s\S]*?)\n\}/);
+assert(raisedMatch,'Raised material block missing');
+const raised=raisedMatch[1];
+assert.doesNotMatch(raised,/--ui-surface-section-bg:[^;]*var\(--a\)/,
+  'Raised sections must be neutral; accent belongs to focus/selection, not slab fills');
+assert.doesNotMatch(raised,/--ui-surface-item-bg:[^;]*var\(--a\)/,
+  'Raised items must be neutral; accent belongs to focus/selection, not slab fills');
+assert.match(css,/\.appearance-layout \.setting-row\{[\s\S]*background:transparent!important/,
+  'Appearance setting rows must stay flat inside their parent card');
+assert.match(css,/dialog :where\(\[data-ui-surface="section"\],[\s\S]*box-shadow:none!important;[\s\S]*backdrop-filter:none!important/,
+  'Nested modal groups must not stack outer shadows or backdrop blur');
+assert.match(css,/dialog :where\(input:not\(\[type="range"\]\)[\s\S]*--ui-dialog-control-bg/,
+  'Modal controls must use the dialog control material');
+
 for(const role of ['panel','dialog','section','metric','item','floating']){
   assert(builder.includes("'"+role+"'"),'Builder role missing '+role);
 }
 assert.match(builder,/new MutationObserver/,'Dynamic SPA surfaces must be hydrated');
 assert.match(builder,/window\.XMeshUIBuilder/,'Builder must expose the shared runtime API');
+assert.match(builder,/node\.matches\('section'\)&&!node\.closest\('dialog'\)/,
+  'Plain semantic sections inside dialogs must remain structural by default');
 assert.match(builder,/register\('\.squad-editor-layout>section','section'\)/,
   'Squad editor must be adapted through the central builder');
 
 assert.match(docs,/Feature styles own geometry\. `ui-system\.css` owns material\./,
   'Documentation must state the geometry/material ownership rule');
+assert.match(docs,/Raised is a \*\*depth hierarchy\*\*/,
+  'Documentation must define Raised as hierarchy rather than accent tinting');
+assert.match(docs,/A modal has exactly one primary material shell\./,
+  'Documentation must define modal depth isolation');
 assert.match(docs,/Do \*\*not\*\* create `my-feature-glass\.css`/,
   'Documentation must forbid feature-specific material forks');
 
