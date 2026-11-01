@@ -33,9 +33,9 @@ if(errors.length){
  const tlsCss=fs.readFileSync(path.join(root,'xray-studio-tls-dialog.css'),'utf8');
  new Function(tlsJs);
  assert.match(index,/xray-studio-tls-dialog\.css\?v=20261101-hysteria-tls-v1/,
-   'Redesigned TLS stylesheet must be cache-busted in the panel');
+   'TLS stylesheet must remain explicitly versioned in the panel');
  assert.match(index,/xray-studio-tls-dialog\.js\?v=20261101-hysteria-tls-v1/,
-   'Redesigned TLS behavior must be cache-busted in the panel');
+   'TLS behavior must remain explicitly versioned in the panel');
  assert.match(dockerfile,/xray-studio-tls-dialog\.css xray-studio-tls-dialog\.js/,
    'Production image must package the TLS editor assets');
  assert.match(tlsJs,/action!==['"]tls['"]&&action!==['"]hysteria['"]/,
@@ -52,9 +52,17 @@ if(errors.length){
    'Applying guided TLS must explicitly preserve TLS security mode');
  assert.match(tlsJs,/const next=clone\(advanced\)/,
    'Advanced tlsSettings must be merged from the current JSON rather than rebuilt destructively');
- assert.match(tlsCss,/\.xm-tls-dialog\{[\s\S]*width:min\(980px/,
-   'TLS dialog must use the redesigned wide surface');
- assert.match(tlsCss,/@media\(max-width:720px\)/,
+ assert.match(tlsJs,/class="xm-tls-layout"/,
+   'TLS editor must use the flat summary + settings workspace');
+ assert.match(tlsJs,/class="xm-tls-summary"/,
+   'TLS editor must expose a compact transport summary rail');
+ assert.match(tlsCss,/\.xm-tls-dialog\{[\s\S]*width:min\(1120px/,
+   'TLS dialog must use the wide workspace surface');
+ assert.match(tlsCss,/\.xm-tls-layout\{display:grid;grid-template-columns:minmax\(220px,260px\) minmax\(0,1fr\)/,
+   'Desktop TLS layout must keep summary and controls side by side');
+ assert.doesNotMatch(tlsCss,/\.xm-tls-section\{/,
+   'Legacy nested TLS section cards must not return');
+ assert.match(tlsCss,/@media\(max-width:640px\)/,
    'TLS dialog must remain responsive on narrow screens');
- console.log('Static asset packaging + guided Hysteria TLS 1.3/h3 contract: OK.');
+ console.log('Static asset packaging + flat guided Hysteria TLS 1.3/h3 contract: OK.');
 }
