@@ -31,10 +31,12 @@ import (
 )
 
 const (
-	maxEnvelopeBytes = 1024 * 1024
-	maxPayloadBytes  = 768 * 1024
-	suite            = "Ed25519+ML-DSA-65"
-	issuerID         = "xmesh-nexus-panel"
+	maxEnvelopeBytes       = 1024 * 1024
+	maxPayloadBytes        = 768 * 1024
+	suite                  = "Ed25519+ML-DSA-65"
+	issuerID               = "xmesh-nexus-panel"
+	targetAgentVersion     = "control-v6.0.1"
+	previousAgentVersion   = "control-v6.0.0"
 )
 
 var b64 = base64.StdEncoding
@@ -555,7 +557,8 @@ func (g *gateway) enroll(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, "invalid strict-PQ enrollment request")
 		return
 	}
-	if req.NodeID <= 0 || req.Purpose != "node_request" || req.KeyEpoch != 1 || req.ReleaseIdentity.Version != "control-v6.0.0" ||
+	versionOK := req.ReleaseIdentity.Version == targetAgentVersion || req.ReleaseIdentity.Version == previousAgentVersion
+	if req.NodeID <= 0 || req.Purpose != "node_request" || req.KeyEpoch != 1 || !versionOK ||
 		len(req.ReleaseIdentity.SourceRevision) != 40 || len(req.ReleaseIdentity.ArtifactSHA256) != 64 {
 		fail(w, http.StatusBadRequest, "invalid XMesh v6 release identity")
 		return

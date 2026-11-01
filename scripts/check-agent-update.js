@@ -2,6 +2,7 @@
 'use strict';
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
+const {execFileSync}=require('node:child_process');
 
 // Preserve the full pre-P0-D-retry checker byte-for-byte in
 // check-agent-update-base.js. It still owns every existing upgrade/migration
@@ -12,7 +13,70 @@ const originalReadFileSync=fs.readFileSync.bind(fs);
 const overlay=originalReadFileSync('backend/src/node_runtime.rs','utf8');
 const staged=originalReadFileSync('backend/src/node_runtime_p0d_staged.rs','utf8');
 const nodeDialogs=originalReadFileSync('node-dialogs.js','utf8');
+const agentVersionRaw=originalReadFileSync('AGENT_VERSION','utf8').trim();
+const agentPolicy=originalReadFileSync('docs/AGENT_RELEASE_POLICY.md','utf8');
+const gateway=originalReadFileSync('deploy/xsp-v2-product-gateway/main.go','utf8');
 new Function(nodeDialogs);
+
+const versionMatch=/^control-v([0-9]+)\.([0-9]+)\.([0-9]+)$/.exec(agentVersionRaw);
+assert.ok(versionMatch,'AGENT_VERSION must use control-vMAJOR.MINOR.PATCH');
+const versionTuple=versionMatch.slice(1).map(Number);
+assert.equal(agentVersionRaw,'control-v6.0.1','Nexus target Agent version must be control-v6.0.1');
+assert.match(agentPolicy,/runtime behavior \*\*must increase the Agent version/);
+assert.match(agentPolicy,/Node product `VERSION` and Agent version are independent/);
+assert.match(gateway,/targetAgentVersion\s*=\s*"control-v6[.]0[.]1"/);
+assert.match(gateway,/previousAgentVersion\s*=\s*"control-v6[.]0[.]0"/,
+  'rolling upgrade must keep the immediately previous Agent release enrollable');
+
+function cmpVersion(a,b){
+  for(let i=0;i<3;i++){
+    if(a[i]!==b[i]) return a[i]-b[i];
+  }
+  return 0;
+}
+function runtimeSurface(path){
+  if(path==='AGENT_VERSION') return false;
+  if(path==='backend/src/node_runtime.rs' || path==='backend/src/node_runtime_p0d_staged.rs') return true;
+  if(path.startsWith('deploy/')){
+    if(path.endsWith('.md')) return false;
+    if(path.includes('/test') || path.startsWith('deploy/test-')) return false;
+    return true;
+  }
+  return false;
+}
+
+// Machine-enforced release policy: once the base branch has AGENT_VERSION,
+// deployed runtime/control-contract changes cannot reuse the previous version.
+const baseRef=(process.env.GITHUB_BASE_REF||'').trim();
+if(baseRef){
+  try{
+    execFileSync('git',['fetch','--no-tags','--depth=1','origin',baseRef],{stdio:'pipe'});
+    const base=`origin/${baseRef}`;
+    let baseRaw='';
+    try{
+      baseRaw=execFileSync('git',['show',`${base}:AGENT_VERSION`],{encoding:'utf8'}).trim();
+    }catch{
+      // First adoption of the canonical version file: no historical version exists.
+    }
+    const changed=execFileSync('git',['diff','--name-only',base,'HEAD'],{encoding:'utf8'})
+      .split(/\r?\n/).map(v=>v.trim()).filter(Boolean);
+    const runtimeChanged=changed.filter(runtimeSurface);
+    if(baseRaw){
+      const m=/^control-v([0-9]+)\.([0-9]+)\.([0-9]+)$/.exec(baseRaw);
+      assert.ok(m,`Base AGENT_VERSION is invalid: ${baseRaw}`);
+      const baseTuple=m.slice(1).map(Number);
+      assert.ok(cmpVersion(versionTuple,baseTuple)>=0,
+        `Agent version regression: ${agentVersionRaw} < ${baseRaw}`);
+      assert.ok(runtimeChanged.length===0 || cmpVersion(versionTuple,baseTuple)>0,
+        `Deployed Agent/runtime changed without AGENT_VERSION bump (${baseRaw} -> ${agentVersionRaw}): ${runtimeChanged.join(', ')}`);
+    }else if(runtimeChanged.length){
+      console.log('Agent version policy adoption: canonical AGENT_VERSION introduced with runtime changes');
+    }
+  }catch(err){
+    if(err && err.name==='AssertionError') throw err;
+    throw new Error(`Agent version policy check failed: ${err.message||err}`);
+  }
+}
 
 fs.readFileSync=function(path,...args){
   if(path==='backend/src/node_runtime.rs'){
@@ -63,5 +127,6 @@ assert.doesNotMatch(nodeDialogs,/runtime\.version[^\n]{0,120}(?:match|test)\(/,
 assert.match(nodeDialogs,/No client-side version allow-list/,
   'The backend-authoritative capability contract must remain explicit');
 
+console.log(`Mandatory Agent version policy: ${agentVersionRaw} OK`);
 console.log('Manifest-bound Agent lost-response retry source contract: OK');
 console.log('Backend-authoritative Agent update validation: OK');

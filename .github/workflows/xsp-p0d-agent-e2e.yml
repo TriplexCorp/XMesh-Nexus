@@ -38,15 +38,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      POSTGRES_PASSWORD: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
-      APP_DB_PASSWORD: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
-      REDIS_PASSWORD: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
-      ADMIN_USERNAME: admin
-      ADMIN_PASSWORD: 9876543210abcdef9876543210abcdef9876543210abcdef
-      TOTP_ENCRYPTION_KEY: 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
-      SUBSCRIPTION_ENCRYPTION_KEY: "1234567812345678123456781234567812345678123456781234567812345678"
       COOKIE_SECURE: "false"
-      DASHBOARD_PATH: /dashboard/0123456789abcdef0123456789abcdef0123456789abcdef
+      DASHBOARD_PATH: /dashboard/ci-p0d-real-agent-e2e
+      PANEL_DOMAIN: ci.example.invalid
       XSP_V2_P0D_AGENT_MIGRATION: staging-only
       P0D_NODE_SOURCE_REVISION: 5b810d9d0864e6c22fa0c0d176982ef4cbf04b20
       P0D_AGENT_VERSION_A: p0d-real-e2e-a
@@ -54,6 +48,21 @@ jobs:
     steps:
       - name: Check out Nexus exact PR head
         uses: actions/checkout@v7
+
+      - name: Provision disposable CI-only credentials
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          {
+            echo 'POSTGRES_PASSWORD=ci-postgres-password'
+            echo 'APP_DB_PASSWORD=ci-app-database-password'
+            echo 'REDIS_PASSWORD=ci-redis-password'
+            echo 'ADMIN_USERNAME=admin'
+            echo 'ADMIN_PASSWORD=ci-admin-password-not-for-production'
+            printf 'TOTP_ENCRYPTION_KEY=%064d\n' 0
+            printf 'SUBSCRIPTION_ENCRYPTION_KEY=%064d\n' 0
+            printf 'XSP_V2_PRODUCT_INTERNAL_TOKEN=%064d\n' 0
+          } >> "$GITHUB_ENV"
 
       - name: Check out pinned XMesh-Node Agent source
         uses: actions/checkout@v7
