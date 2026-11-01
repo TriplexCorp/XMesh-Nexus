@@ -43,7 +43,7 @@ if(errors.length){
    'TLS workspace behavior cache key must remain stable until its asset key is intentionally rotated');
  assert.match(index,/node-dialogs\.js\?v=20261101-user-create-enterprise-v3/,
    'Create-user structural repair and Agent autovalidation handler must receive the current cache key');
- assert.match(index,/user-create-v3\.css\?v=20261101-enterprise-v3/,
+ assert.match(index,/user-create-v3\.css\?v=20261101-enterprise-v4/,
    'Enterprise create-user layout must be cache-busted');
  assert.match(xhttpExpert,/Session ID/);
  assert.match(index,/xray-studio-xhttp-expert\.js\?v=20261101-core-schema-v2/,
