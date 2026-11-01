@@ -15,7 +15,8 @@
     if(!settings||typeof settings!=='object'||Array.isArray(settings))return;
     const strict=window.XMeshXhttpStrict;
     if(!strict?.validateSettings)return;
-    for(const message of strict.validateSettings(settings))issues.push({
+    const role=group==='outbounds'?'client':'server';
+    for(const message of strict.validateSettings(settings,role))issues.push({
      severity:'error',kind:'structure',code:'XHTTP_CORE_SCHEMA',message,
      line:1,column:1,start:0,end:1,path:[group,index,'streamSettings','xhttpSettings'],fix:null
     });
