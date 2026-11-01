@@ -1,0 +1,71 @@
+name: Agent v6.0.5 release alignment
+
+on:
+  push:
+    branches:
+      - fix/agent-v6.0.5-production-identity
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/agent-v6.0.5-production-identity
+          fetch-depth: 0
+      - name: Apply bounded release alignment
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          files = [
+              'AGENT_VERSION',
+              'backend/src/node_runtime.rs',
+              'deploy/install-node-metrics-agent.sh',
+              'deploy/node-control-agent.sh',
+              'deploy/update-node-control-agent.sh',
+              'deploy/xsp-v2-product-gateway/main.go',
+              'docs/AGENT_RELEASE_POLICY.md',
+              'scripts/check-agent-update-base.js',
+              'scripts/check-agent-update.js',
+          ]
+          for name in files:
+              p=Path(name); text=p.read_text(encoding='utf-8')
+              text=text.replace('control-v6.0.4','control-v6.0.5')
+              text=text.replace('control-v6[.]0[.]4','control-v6[.]0[.]5')
+              text=text.replace('v6.0.4','v6.0.5')
+              p.write_text(text,encoding='utf-8')
+
+          for name in ['deploy/xsp-v2-product-gateway/main.go','scripts/check-agent-update-base.js','scripts/check-agent-update.js']:
+              p=Path(name); text=p.read_text(encoding='utf-8')
+              text=text.replace('control-v6.0.3','control-v6.0.4')
+              text=text.replace('control-v6[.]0[.]3','control-v6[.]0[.]4')
+              text=text.replace('v6.0.3','v6.0.4')
+              p.write_text(text,encoding='utf-8')
+
+          Path('AGENT_VERSION').write_text('control-v6.0.5\n',encoding='utf-8')
+          PY
+          bash -n deploy/node-control-agent.sh deploy/update-node-control-agent.sh deploy/install-node-metrics-agent.sh
+          grep -Fxq 'control-v6.0.5' AGENT_VERSION
+          grep -Fq 'CONTROL_AGENT_VERSION: &str = "control-v6.0.5"' backend/src/node_runtime.rs
+          grep -Fq 'targetAgentVersion     = "control-v6.0.5"' deploy/xsp-v2-product-gateway/main.go
+          grep -Fq 'previousAgentVersion   = "control-v6.0.4"' deploy/xsp-v2-product-gateway/main.go
+          grep -Fq 'repairAgentVersion     = "control-v6.0.0"' deploy/xsp-v2-product-gateway/main.go
+          grep -Fq 'AGENT_VERSION="control-v6.0.5"' deploy/update-node-control-agent.sh
+          grep -Fq 'AGENT_VERSION="control-v6.0.5"' deploy/node-control-agent.sh
+          git diff --check
+      - name: Commit bounded release alignment
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/agent-v605-release-alignment-autopatch.yml
+          git add -A
+          git commit -m 'release(agent): target control-v6.0.5'
+          git push origin HEAD:fix/agent-v6.0.5-production-identity
