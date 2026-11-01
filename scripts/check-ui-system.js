@@ -6,16 +6,22 @@ const assert=require('node:assert/strict');
 const index=fs.readFileSync('index.html','utf8');
 const docker=fs.readFileSync('backend/Dockerfile','utf8');
 const css=fs.readFileSync('ui-system.css','utf8');
+const design=fs.readFileSync('design-system-v2.css','utf8');
 const builder=fs.readFileSync('ui-builder.js','utf8');
 const docs=fs.readFileSync('docs/UI_SYSTEM.md','utf8');
 const squad=fs.readFileSync('squad-editor-premium-v5.css','utf8');
 
 assert.match(index,/ui-system\.css\?v=[a-z0-9-]+/,'Unified UI stylesheet must be cache-busted');
+assert.match(index,/design-system-v2\.css\?v=[a-z0-9-]+/,'Design-system composition layer must be cache-busted');
 assert.match(index,/ui-builder\.js\?v=[a-z0-9-]+/,'Unified UI builder must be cache-busted');
+const uiPos=index.indexOf('ui-system.css?v=');
+const designPos=index.indexOf('design-system-v2.css?v=');
 const lastCss=index.lastIndexOf('<link rel="stylesheet"');
-assert(index.slice(lastCss).includes('ui-system.css'),'ui-system.css must be the final stylesheet');
+assert(uiPos>=0&&designPos>uiPos,'design-system-v2.css must load after ui-system.css');
+assert(index.slice(lastCss).includes('design-system-v2.css'),'design-system-v2.css must be the final presentation stylesheet');
 assert(index.indexOf('app.js?v=')<index.indexOf('ui-builder.js?v='),'UI builder must load after app.js');
 assert.match(docker,/ui-system\.css/,'Production image must package ui-system.css');
+assert.match(docker,/design-system-v2\.css/,'Production image must package design-system-v2.css');
 assert.match(docker,/ui-builder\.js/,'Production image must package ui-builder.js');
 
 for(const surface of ['solid','glass','raised']){
@@ -54,14 +60,10 @@ assert.match(raised,/--ui-surface-control-shadow:(?!none)[^;]+;/,
 const raisedLightMatch=css.match(/html\[data-theme=light\]\[data-surface=raised\]\{([\s\S]*?)\n\}/);
 assert(raisedLightMatch,'Light theme must have an explicit Raised depth profile');
 const raisedLight=raisedLightMatch[1];
-assert.match(raisedLight,/--ui-surface-panel-bg:/,
-  'Light Raised must define a dedicated panel tone');
-assert.match(raisedLight,/--ui-surface-panel-shadow:/,
-  'Light Raised must define visible panel elevation');
-assert.match(raisedLight,/--ui-surface-section-shadow:/,
-  'Light Raised must define a section depth level');
-assert.match(raisedLight,/--ui-surface-control-shadow:(?!none)[^;]+;/,
-  'Light Raised controls must be visibly elevated from Classic controls');
+assert.match(raisedLight,/--ui-surface-panel-bg:/,'Light Raised must define a dedicated panel tone');
+assert.match(raisedLight,/--ui-surface-panel-shadow:/,'Light Raised must define visible panel elevation');
+assert.match(raisedLight,/--ui-surface-section-shadow:/,'Light Raised must define a section depth level');
+assert.match(raisedLight,/--ui-surface-control-shadow:(?!none)[^;]+;/,'Light Raised controls must be visibly elevated from Classic controls');
 assert.doesNotMatch(raisedLight,/--ui-surface-(?:panel|section|item|control)-bg:[^;]*var\(--a\)/,
   'Light Raised depth must remain neutral instead of becoming accent-tinted slabs');
 
@@ -82,7 +84,7 @@ assert.match(css,/dialog :where\(input:not\(\[type="range"\]\)[\s\S]*--ui-dialog
 assert.match(css,/:where\(\.seg\)[\s\S]*--ui-segment-track-bg/,
   'Generic segmented controls must consume the shared segmented track token');
 assert.match(css,/:where\(\.seg button\.on\)[\s\S]*--ui-segment-active-bg[\s\S]*--ui-segment-active-border[\s\S]*--ui-segment-active-shadow/,
-  'Selected segmented options must use a dedicated premium active state, not a generic item surface');
+  'Selected segmented options must use a dedicated material active state');
 assert.match(css,/:where\(\.seg button:not\(\.on\):hover\)[\s\S]*--ui-segment-hover-bg/,
   'Inactive segmented options must retain a distinct hover state');
 assert.doesNotMatch(css,/:where\(\.seg button\.on\)\{[^}]*background:var\(--ui-surface-item-bg\)/,
@@ -94,6 +96,27 @@ assert.match(css,/:where\(\[data-ui-control="inner"\]\)[\s\S]*background:transpa
   'Composite control inner fields must stay transparent and borderless');
 assert.match(css,/\.precision-number input\[type="number"\]\{[\s\S]*background:transparent!important;[\s\S]*border:0!important/,
   'Legacy Appearance precision inputs must not render a second rectangular control inside the unit capsule');
+
+/* Design v2 owns scale/composition, while material remains in ui-system.css. */
+assert.doesNotMatch(design,/html\[data-surface=(?:solid|glass|raised)\]/,
+  'Design-system composition layer must not fork Classic/Glass/Raised materials');
+for(const token of ['--ds-control-h','--ds-card-pad','--ds-hover-bg','--ds-selected-bg']){
+  assert(design.includes(token),'Missing design-system scale token '+token);
+}
+assert.match(design,/body::before,body::after\{[^}]*animation:none!important/,
+  'Ambient decorative bloom must be restrained and non-animated');
+assert.match(design,/:where\(button,\.btn,\.ib,\.gh,\.dg,[\s\S]*:hover\{[\s\S]*transform:none!important;[\s\S]*box-shadow:none!important/,
+  'Generic hover must not use lift/bloom effects');
+assert.match(design,/\.nodes-page \.node-explorer\{[\s\S]*background:transparent!important;[\s\S]*border-bottom:/,
+  'Node explorer must be a quiet toolbar instead of another heavy card');
+assert.match(design,/\.nodes-page>\.nodes\[data-node-count="1"\]\[data-grid-mode=spacious\][\s\S]*48rem/,
+  'Single-node spacious mode must provide a genuinely large card');
+assert.match(design,/\.appearance-layout \.setting-row\{[\s\S]*min-height:4\.2rem/,
+  'Settings rows must use the larger readable control rhythm');
+assert.match(design,/\.sv-studio \.sv-workspace\{[\s\S]*height:clamp\(42rem/,
+  'XRAY Studio must prioritize the editor workspace');
+assert.match(design,/\.sv-studio \.sv-topbar\{[\s\S]*background:transparent!important;[\s\S]*border-bottom:/,
+  'XRAY Studio command chrome must be flattened into a quiet toolbar');
 
 for(const role of ['panel','dialog','section','metric','item','floating']){
   assert(builder.includes("'"+role+"'"),'Builder role missing '+role);
@@ -107,6 +130,8 @@ assert.match(builder,/register\('\.squad-editor-layout>section','section'\)/,
 
 assert.match(docs,/Feature styles own geometry\. `ui-system\.css` owns material\./,
   'Documentation must state the geometry/material ownership rule');
+assert.match(docs,/`design-system-v2\.css` owns shared scale, composition and interaction restraint/,
+  'Documentation must define the global design composition layer');
 assert.match(docs,/Raised is a \*\*depth hierarchy\*\*/,
   'Documentation must define Raised as hierarchy rather than accent tinting');
 assert.match(docs,/Light theme must preserve a visibly larger depth delta/,
@@ -119,8 +144,10 @@ assert.match(docs,/A composite control has exactly one material shell\./,
   'Documentation must define composite-control ownership');
 assert.match(docs,/Do \*\*not\*\* create `my-feature-glass\.css`/,
   'Documentation must forbid feature-specific material forks');
+assert.match(docs,/Bloom is not an interaction primitive/,
+  'Documentation must forbid bloom as the default interaction language');
 
 assert.doesNotMatch(squad,/html\[data-surface=(?:solid|glass|raised)\]/,
   'Squad editor must not implement its own Appearance material variants');
 
-console.log('Unified UI system checks passed');
+console.log('Unified UI system + Design System v2 checks passed');

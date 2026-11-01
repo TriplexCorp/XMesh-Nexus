@@ -1,24 +1,41 @@
 # XMesh Nexus UI System
 
-Status: **authoritative panel appearance contract**.
+Status: **authoritative panel appearance and composition contract**.
 
-This document exists to stop feature-by-feature visual forks. New dialogs, cards, workspaces and editor sections must use the shared UI system instead of implementing their own Classic / Glass / Raised surfaces.
+This document exists to stop feature-by-feature visual forks. New dialogs, cards, workspaces and editor sections must use the shared UI system instead of implementing their own Classic / Glass / Raised surfaces or private visual language.
 
 ## Problem this solves
 
-Historically the panel accumulated feature CSS such as `user-create-*.css`, XRAY STUDIO overrides and multiple Squad editor revisions. The Appearance page changed root settings, but many feature surfaces hard-coded their own `background`, `border`, `box-shadow` and `backdrop-filter`. As a result, selecting **Glass** could change ordinary `.card` elements while a custom dialog still looked opaque.
+Historically the panel accumulated feature CSS such as `user-create-*.css`, XRAY STUDIO overrides and multiple Squad editor revisions. The Appearance page changed root settings, but many feature surfaces hard-coded their own `background`, `border`, `box-shadow` and `backdrop-filter`. At the same time the panel accumulated a second problem: controls became small, pages gained too many nested cards, and accent hover effects turned into visible bloom.
 
-The rule is now simple:
+The rule is now:
 
 > Feature styles own geometry. `ui-system.css` owns material.
 
-Geometry means grid, width, height, padding required by the feature, overflow, responsive layout and content-specific typography. Material means background, border treatment, separators, elevation, blur/transparency and shared radius.
+`design-system-v2.css` owns shared scale, composition and interaction restraint. It is deliberately separate from material: it may make controls larger, flatten an unnecessary toolbar container, or establish a shared page rhythm, but it must consume the material tokens from `ui-system.css` rather than creating another Classic / Glass / Raised implementation.
+
+Geometry means grid, width, height, padding required by the feature, overflow, responsive layout and content-specific typography. Material means background, border treatment, separators, elevation, blur/transparency and shared radius. Shared composition means the cross-panel control scale, hierarchy, page spacing and interaction language used to keep those feature layouts coherent.
 
 ## Runtime files
 
-- `ui-system.css` — final stylesheet loaded after all feature CSS. It converts Appearance settings into shared material tokens and applies them to registered surfaces.
+- `ui-system.css` — material authority. It converts Appearance settings into shared material tokens and applies them to registered surfaces.
+- `design-system-v2.css` — final presentation layer. It consumes material tokens and owns shared control scale, hierarchy, restrained hover/focus behavior and high-level composition for core workspaces.
 - `ui-builder.js` — runtime role builder. It tags dynamic DOM with `data-ui-surface` and observes future content added by the SPA.
-- `scripts/check-ui-system.js` — CI contract. It ensures the final layer stays final, packaged, documented and connected to the three Appearance surface choices.
+- `scripts/check-ui-system.js` — CI contract. It ensures both shared layers are packaged, ordered and kept free of feature-specific material forks.
+
+## Design direction
+
+The product uses a **calm enterprise** visual language:
+
+- the primary workspace is visually dominant;
+- secondary toolbars are quiet and should not look like another card unless they genuinely need their own surface;
+- controls are large enough to read and target comfortably at normal desktop zoom;
+- accent is reserved for selection, focus and primary actions;
+- nested surfaces are minimized;
+- typography hierarchy does more work so borders and backgrounds can do less;
+- hover is a state change, not a special effect.
+
+Bloom is not an interaction primitive. Ordinary hover must not add neon glow, large accent shadows or `translateY` lift. Primary actions may change tone or border contrast, while neutral controls use a quiet surface/border delta. Persistent selection must remain more obvious than hover.
 
 ## Surface roles
 
@@ -77,6 +94,19 @@ The existing Appearance setting remains the source of truth:
 
 The same mechanism consumes global radius/border/density settings. A feature must not copy their values.
 
+## Shared composition tokens
+
+`design-system-v2.css` defines presentation tokens such as:
+
+- `--ds-control-h` — default interactive control height;
+- `--ds-card-pad` — shared top-level panel padding;
+- `--ds-page-gap` / `--ds-section-gap` — workspace rhythm;
+- `--ds-hover-bg` / `--ds-hover-border` — restrained neutral hover;
+- `--ds-selected-bg` / `--ds-selected-border` — persistent selected state;
+- `--ds-focus` — shared keyboard focus ring.
+
+These tokens must not encode a surface mode. In particular, `design-system-v2.css` must not contain `html[data-surface=solid|glass|raised]` branches.
+
 ## Raised depth model
 
 Raised is a **depth hierarchy**, not an accent-tinted theme.
@@ -88,11 +118,9 @@ Raised is a **depth hierarchy**, not an accent-tinted theme.
 - ordinary rows inside a card are not automatically promoted into surfaces;
 - the accent color is reserved for focus, selected state and deliberate emphasis rather than mixed into every section background.
 
-Light theme must preserve a visibly larger depth delta between Classic and Raised. `#fff` and the light secondary surface are too close for a 3–6% tone mix to communicate a mode change by themselves, so light Raised uses an explicit neutral tonal ladder plus stronger multi-level shadows. The difference must remain obvious at normal zoom without relying on accent tinting.
+Light theme must preserve a visibly larger depth delta between Classic and Raised. `#fff` and the light secondary surface are too close for a small tone mix to communicate a mode change by themselves, so light Raised uses an explicit neutral tonal ladder plus stronger multi-level shadows. The difference must remain obvious at normal zoom without relying on accent tinting.
 
-Generic segmented controls are material controls too: their shell follows `--ui-surface-control-bg` / `--ui-surface-control-shadow`, while the selected segment follows the item material. This keeps selectors such as Classic / Glass / Raised visually consistent with the selected surface system.
-
-This rule prevents the interface from becoming a stack of colored slabs when Raised is selected, especially when strong borders are enabled, while still making Raised perceptibly different from Classic.
+Generic segmented controls are selection controls, not glow effects. Their track follows the shared material, while the final composition layer intentionally reduces active-state bloom and keeps the selected pill recognizable through tone, border and typography.
 
 ## Glass requirement
 
@@ -122,7 +150,7 @@ A one-pixel divider between rows must use `--ui-separator`, not `--ui-surface-bo
 
 The global **Strong / Яркие** border mode strengthens actual surface and control boundaries only. It must **not** amplify row separators. `data-borders="off"` removes both borders and separators.
 
-Legacy `.setting-row` dividers are adapted centrally by `ui-system.css`; new generic row components should consume `--ui-separator` directly.
+Legacy `.setting-row` dividers are adapted centrally by `ui-system.css`; `design-system-v2.css` may reduce their visual contrast further, but it must not turn each row into a card.
 
 ## Composite controls
 
@@ -139,7 +167,21 @@ Preferred markup:
 </label>
 ```
 
-Do not allow the global input material to paint an inner field again. That creates hard rectangular seams inside a rounded capsule, especially visible in Glass. The existing Appearance `.precision-number` is the legacy reference adapter for this rule.
+Do not allow the global input material to paint an inner field again. That creates hard rectangular seams inside a rounded capsule, especially visible in Glass.
+
+## Core workspace composition
+
+### Nodes
+
+The fleet explorer is a toolbar, not a second large card. Search and filters remain first-class controls but the explorer shell itself is flattened. Node cards are deliberately larger at low node counts, metric tiles are quieter, and action buttons use the shared control height.
+
+### Settings
+
+Appearance settings use a larger vertical rhythm. Setting rows remain flat content inside their parent card; labels and descriptions carry hierarchy so horizontal rules can stay subtle. Controls should not look like a collection of unrelated tiny pills.
+
+### XRAY STUDIO
+
+XRAY STUDIO is editor-first. The code workspace is the visual anchor; top navigation and inline tools are secondary chrome. Toolbars therefore use quiet separators instead of nested card backgrounds, controls are larger, and the document inspector remains a restrained side pane.
 
 ## Radius and borders
 
@@ -153,12 +195,12 @@ A content-specific circular control may remain circular.
 
 ## Density
 
-Existing `data-density` remains authoritative. Shared surface spacing tokens are:
+Existing `data-density` remains authoritative for material spacing. The design layer establishes the comfortable default control scale and may give core workspaces explicit low-count/readability rules. Compact mode must remain usable without reverting to tiny text.
+
+Shared material spacing tokens remain:
 
 - `--ui-space-section`
 - `--ui-space-item`
-
-Feature layout may use additional spacing only when dictated by content. New generic panels should use these tokens rather than fixed pixel spacing.
 
 ## Legacy adaptation
 
@@ -173,11 +215,11 @@ When touching an old feature:
 5. for compound fields, make one shell own material and keep inner inputs transparent;
 6. remove its entry from the compatibility registry once it no longer needs one.
 
-The target state is a shrinking registry, not an expanding list of per-feature theme overrides.
-
 ## CSS load order
 
-`ui-system.css` **must be the final panel stylesheet**. This is intentional: it prevents a feature stylesheet from silently defeating Appearance after the user changes Classic / Glass / Raised.
+Feature CSS loads first. `ui-system.css` loads after feature CSS and remains the material authority. `design-system-v2.css` loads last as the cross-panel composition/interaction layer.
+
+The final design layer may consume material tokens and override excessive feature geometry, but it must not define its own Classic / Glass / Raised branches. This ordering lets us simplify legacy feature chrome without reintroducing material forks.
 
 `ui-builder.js` loads after feature scripts and observes dynamically rendered SPA content.
 
@@ -190,14 +232,11 @@ Before merging a new screen/dialog:
 3. Change border mode. The same screen must follow it without accent flooding or hardening internal row separators.
 4. Inspect compound/unit controls at high zoom. There must be only one visible capsule with no rectangular inner-input seams.
 5. Change radius. Panels, dialogs and controls must follow the shared radius contract.
-6. Change density and content width. Layout must remain usable.
+6. Change density and content width. Layout must remain usable and readable.
 7. Check dark and light theme.
-8. Do not add a feature-specific `html[data-surface=...]` implementation.
-9. If the feature needs a new generic visual role, extend the shared system and documentation instead of creating a private theme.
-
-## Squad editor reference
-
-The Squad editor is a migration/reference case. Its layout-specific CSS can still define the two-column editor, inbound list geometry and impact arrangement, while its material is overridden by `ui-system.css`. Selecting Glass therefore changes the modal shell and explicitly registered groups together, while modal depth isolation prevents every internal block from becoming another independent card.
+8. Hover neutral and primary actions. There must be no generic neon bloom or lift animation.
+9. Do not add a feature-specific `html[data-surface=...]` implementation.
+10. If the feature needs a new generic visual role, extend the shared system and documentation instead of creating a private theme.
 
 ## CI contract
 
@@ -207,4 +246,4 @@ Run:
 node scripts/check-ui-system.js
 ```
 
-The check verifies asset order, Docker packaging, root Appearance mapping, builder roles, perceptible Raised light-mode depth, modal isolation, separator hierarchy, composite-control ownership and the absence of new Squad-specific Classic/Glass/Raised forks.
+The check verifies asset order, Docker packaging, root Appearance mapping, builder roles, perceptible Raised light-mode depth, modal isolation, separator hierarchy, composite-control ownership, Design System v2 anti-bloom/scale rules and the absence of new feature-specific Classic/Glass/Raised forks.
