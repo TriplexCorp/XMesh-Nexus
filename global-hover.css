@@ -37,3 +37,22 @@
 @media(prefers-reduced-motion:reduce){
   :where(button,.btn,.ib,[role="button"],.app>aside nav a,.app>aside nav .more){transition:none!important}
 }
+
+/* Node editor viewport safety. The primary layout intentionally stays wide,
+   but the centered dialog now keeps a real lower gutter so its sticky action
+   area cannot be clipped by the browser viewport or safe-area inset. */
+dialog#dlg.node-wide{
+  max-height:calc(100dvh - 48px)!important;
+}
+dialog#dlg.node-wide > form.box{
+  max-height:calc(100dvh - 48px)!important;
+  padding-bottom:max(1.15rem,env(safe-area-inset-bottom))!important;
+  scrollbar-gutter:stable;
+}
+@media(max-height:760px){
+  dialog#dlg.node-wide{max-height:calc(100dvh - 24px)!important}
+  dialog#dlg.node-wide > form.box{
+    max-height:calc(100dvh - 24px)!important;
+    padding-bottom:max(.9rem,env(safe-area-inset-bottom))!important;
+  }
+}
