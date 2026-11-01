@@ -40,6 +40,7 @@ jobs:
     env:
       COOKIE_SECURE: "false"
       DASHBOARD_PATH: /dashboard/ci-p0d-real-agent-e2e
+      PANEL_DOMAIN: ci.example.invalid
       XSP_V2_P0D_AGENT_MIGRATION: staging-only
       P0D_NODE_SOURCE_REVISION: 5b810d9d0864e6c22fa0c0d176982ef4cbf04b20
       P0D_AGENT_VERSION_A: p0d-real-e2e-a
