@@ -1,7 +1,7 @@
-/* XMesh Nexus unified UI surface contract v4.
+/* XMesh Nexus unified UI surface contract v5.
  * Loaded LAST. It is the single visual authority for Appearance surface settings.
  * Feature styles own geometry/layout; this file owns surface material, borders,
- * separators, elevation, blur and shared radii. See docs/UI_SYSTEM.md. */
+ * separators, elevation, blur, selected states and shared radii. See docs/UI_SYSTEM.md. */
 
 :root{
   --ui-surface-panel-bg:var(--s1);
@@ -28,6 +28,22 @@
   --ui-surface-item-radius:max(8px,calc(var(--ui-control-radius,10px) + 2px));
   --ui-space-section:1rem;
   --ui-space-item:.75rem;
+
+  /* Segmented controls are a shared selection primitive. The track stays quiet;
+   * the selected pill owns emphasis through tone, accent edge and short elevation. */
+  --ui-segment-track-bg:var(--ui-surface-control-bg);
+  --ui-segment-track-border:var(--ui-surface-border);
+  --ui-segment-idle-color:color-mix(in srgb,var(--tx) 34%,var(--mu));
+  --ui-segment-hover-bg:color-mix(in srgb,var(--a) 8%,transparent);
+  --ui-segment-active-bg:linear-gradient(180deg,
+    color-mix(in srgb,var(--a) 18%,var(--ui-surface-item-bg)),
+    color-mix(in srgb,var(--a) 9%,var(--ui-surface-item-bg)));
+  --ui-segment-active-border:color-mix(in srgb,var(--a) 52%,var(--ui-surface-border));
+  --ui-segment-active-color:color-mix(in srgb,var(--tx) 90%,var(--a));
+  --ui-segment-active-shadow:0 7px 18px -12px color-mix(in srgb,var(--a) 72%,transparent),
+    0 2px 5px -3px rgba(0,0,0,.34),
+    inset 0 1px 0 color-mix(in srgb,var(--tx) 14%,transparent),
+    inset 0 0 0 1px color-mix(in srgb,var(--a) 10%,transparent);
 }
 
 html[data-density=compact]{--ui-space-section:.82rem;--ui-space-item:.58rem}
@@ -52,6 +68,13 @@ html[data-surface=solid]{
   --ui-surface-control-shadow:none;
   --ui-surface-floating-shadow:0 24px 64px -32px rgba(0,0,0,.76);
   --ui-surface-filter:none;
+  --ui-segment-active-bg:linear-gradient(180deg,
+    color-mix(in srgb,var(--a) 15%,var(--s1)),
+    color-mix(in srgb,var(--a) 8%,var(--s1)));
+  --ui-segment-active-shadow:0 5px 14px -10px color-mix(in srgb,var(--a) 58%,transparent),
+    0 1px 3px -1px rgba(0,0,0,.28),
+    inset 0 1px 0 color-mix(in srgb,var(--tx) 12%,transparent),
+    inset 0 0 0 1px color-mix(in srgb,var(--a) 9%,transparent);
 }
 
 /* Glass: transparency and blur live on the outer material. Nested dialog
@@ -77,6 +100,14 @@ html[data-surface=glass]{
   --ui-surface-control-shadow:inset 0 1px 0 color-mix(in srgb,var(--tx) 3%,transparent);
   --ui-surface-floating-shadow:0 28px 70px -34px rgba(0,0,0,.84),inset 0 1px 0 color-mix(in srgb,var(--tx) 7%,transparent);
   --ui-surface-filter:blur(18px) saturate(135%);
+  --ui-segment-active-bg:linear-gradient(180deg,
+    color-mix(in srgb,var(--a) 24%,var(--ui-surface-item-bg)),
+    color-mix(in srgb,var(--a) 12%,var(--ui-surface-item-bg)));
+  --ui-segment-active-border:color-mix(in srgb,var(--a) 58%,var(--ui-surface-border));
+  --ui-segment-active-shadow:0 8px 22px -12px color-mix(in srgb,var(--a) 76%,transparent),
+    0 2px 6px -3px rgba(0,0,0,.38),
+    inset 0 1px 0 color-mix(in srgb,var(--tx) 18%,transparent),
+    inset 0 0 0 1px color-mix(in srgb,var(--a) 12%,transparent);
 }
 
 /* Raised: depth comes from hierarchy and elevation, not accent-filled slabs.
@@ -101,6 +132,13 @@ html[data-surface=raised]{
   --ui-surface-control-shadow:0 4px 12px -10px rgba(0,0,0,.68),inset 0 1px 0 color-mix(in srgb,var(--tx) 5%,transparent);
   --ui-surface-floating-shadow:0 30px 78px -30px rgba(0,0,0,.9),0 12px 30px -20px rgba(0,0,0,.58),inset 0 1px 0 color-mix(in srgb,var(--tx) 6%,transparent);
   --ui-surface-filter:none;
+  --ui-segment-active-bg:linear-gradient(180deg,
+    color-mix(in srgb,var(--a) 18%,var(--ui-surface-item-bg)),
+    color-mix(in srgb,var(--a) 8%,var(--ui-surface-item-bg)));
+  --ui-segment-active-shadow:0 10px 24px -12px color-mix(in srgb,var(--a) 68%,transparent),
+    0 5px 12px -7px rgba(0,0,0,.56),
+    inset 0 1px 0 color-mix(in srgb,var(--tx) 15%,transparent),
+    inset 0 0 0 1px color-mix(in srgb,var(--a) 10%,transparent);
 }
 
 /* Light surfaces need a stronger tonal/elevation delta than dark surfaces.
@@ -123,6 +161,14 @@ html[data-theme=light][data-surface=raised]{
   --ui-surface-item-shadow:0 4px 10px -8px rgba(36,48,68,.24),inset 0 1px 0 rgba(255,255,255,.88);
   --ui-surface-control-shadow:0 3px 8px -6px rgba(36,48,68,.22),inset 0 1px 0 rgba(255,255,255,.90);
   --ui-surface-floating-shadow:0 22px 52px -18px rgba(36,48,68,.36),0 7px 18px -10px rgba(36,48,68,.22),inset 0 1px 0 rgba(255,255,255,.94);
+  --ui-segment-active-bg:linear-gradient(180deg,
+    color-mix(in srgb,var(--a) 13%,var(--s1)),
+    color-mix(in srgb,var(--a) 6%,var(--s1)));
+  --ui-segment-active-border:color-mix(in srgb,var(--a) 48%,var(--ln));
+  --ui-segment-active-shadow:0 8px 18px -10px color-mix(in srgb,var(--a) 40%,transparent),
+    0 4px 10px -6px rgba(36,48,68,.32),
+    inset 0 1px 0 rgba(255,255,255,.96),
+    inset 0 0 0 1px color-mix(in srgb,var(--a) 9%,transparent);
 }
 
 /* Border setting changes surface boundaries. Separators are intentionally a
@@ -193,14 +239,53 @@ html[data-borders=strong]{
   backdrop-filter:var(--ui-surface-filter)!important;
 }
 
-/* Generic segmented controls participate in the same material hierarchy. */
+/* Premium segmented control: quiet rail, clearly selected floating pill. */
 :where(.seg){
-  background:var(--ui-surface-control-bg)!important;
+  position:relative;
+  isolation:isolate;
+  gap:2px!important;
+  padding:3px!important;
+  background:var(--ui-segment-track-bg)!important;
+  border:1px solid var(--ui-segment-track-border)!important;
+  border-radius:calc(var(--ui-control-radius) + 5px)!important;
   box-shadow:var(--ui-surface-control-shadow)!important;
 }
+:where(.seg button){
+  position:relative;
+  z-index:0;
+  border:1px solid transparent!important;
+  background:transparent!important;
+  color:var(--ui-segment-idle-color)!important;
+  box-shadow:none!important;
+  font-weight:560;
+  letter-spacing:-.01em;
+  transition:background .16s ease,border-color .16s ease,color .16s ease,box-shadow .16s ease,transform .16s ease!important;
+}
 :where(.seg button.on){
-  background:var(--ui-surface-item-bg)!important;
-  box-shadow:var(--ui-surface-item-shadow)!important;
+  z-index:1;
+  background:var(--ui-segment-active-bg)!important;
+  border-color:var(--ui-segment-active-border)!important;
+  color:var(--ui-segment-active-color)!important;
+  box-shadow:var(--ui-segment-active-shadow)!important;
+  font-weight:720;
+}
+@media(hover:hover) and (pointer:fine){
+  :where(.seg button:not(.on):hover){
+    background:var(--ui-segment-hover-bg)!important;
+    border-color:color-mix(in srgb,var(--a) 20%,transparent)!important;
+    color:var(--tx)!important;
+    box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--a) 7%,transparent)!important;
+  }
+  :where(.seg button.on:hover){
+    background:var(--ui-segment-active-bg)!important;
+    border-color:color-mix(in srgb,var(--a) 70%,var(--ui-surface-border))!important;
+    color:var(--ui-segment-active-color)!important;
+    box-shadow:var(--ui-segment-active-shadow)!important;
+  }
+}
+:where(.seg button:focus-visible){
+  outline:2px solid color-mix(in srgb,var(--a) 82%,var(--tx) 18%)!important;
+  outline-offset:2px!important;
 }
 
 /* Composite controls have exactly one material shell. Use these attributes in
