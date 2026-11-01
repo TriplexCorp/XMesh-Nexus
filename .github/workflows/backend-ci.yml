@@ -50,6 +50,7 @@ jobs:
           node --version
           test "$(node -p 'process.versions.node.split(".")[0]')" = "24"
           node --check app.js
+          node --check ui-builder.js
           node --check unified-selects.js
           node --check subscription-studio.js
           node --check subscription-portal.js
@@ -109,6 +110,8 @@ jobs:
         run: node scripts/check-white-label.js
       - name: Check appearance surface choices and migration
         run: node scripts/check-appearance-surfaces.js
+      - name: Enforce unified panel UI builder and material contract
+        run: node scripts/check-ui-system.js
       - name: Check New Node button rendering and handler
         run: node scripts/check-node-create-action.js
       - name: Check optional node hosting and local flags in notifications

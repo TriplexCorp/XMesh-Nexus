@@ -1,0 +1,182 @@
+/* XMesh Nexus unified UI surface contract v1.
+ * Loaded LAST. It is the single visual authority for Appearance surface settings.
+ * Feature styles own geometry/layout; this file owns surface material, borders,
+ * elevation, blur and shared radii. See docs/UI_SYSTEM.md. */
+
+:root{
+  --ui-surface-panel-bg:var(--s1);
+  --ui-surface-section-bg:color-mix(in srgb,var(--s2) 38%,var(--s1));
+  --ui-surface-item-bg:color-mix(in srgb,var(--s1) 88%,var(--s2));
+  --ui-surface-control-bg:color-mix(in srgb,var(--s1) 92%,var(--s2));
+  --ui-surface-floating-bg:color-mix(in srgb,var(--s1) 96%,var(--s2));
+  --ui-surface-border:var(--ln);
+  --ui-surface-border-strong:var(--border-strong,var(--ln));
+  --ui-surface-panel-shadow:0 18px 48px -38px rgba(0,0,0,.72);
+  --ui-surface-section-shadow:none;
+  --ui-surface-item-shadow:none;
+  --ui-surface-filter:none;
+  --ui-surface-highlight:none;
+  --ui-surface-panel-radius:var(--ui-radius,18px);
+  --ui-surface-section-radius:max(10px,calc(var(--ui-radius,18px) - 4px));
+  --ui-surface-item-radius:max(8px,calc(var(--ui-control-radius,10px) + 2px));
+  --ui-space-section:1rem;
+  --ui-space-item:.75rem;
+}
+
+html[data-density=compact]{--ui-space-section:.82rem;--ui-space-item:.58rem}
+html[data-density=comfortable]{--ui-space-section:1rem;--ui-space-item:.75rem}
+html[data-density=spacious]{--ui-space-section:1.25rem;--ui-space-item:.92rem}
+
+/* Classic: opaque, restrained, low elevation. */
+html[data-surface=solid]{
+  --ui-surface-panel-bg:var(--s1);
+  --ui-surface-section-bg:color-mix(in srgb,var(--s2) 38%,var(--s1));
+  --ui-surface-item-bg:color-mix(in srgb,var(--s1) 88%,var(--s2));
+  --ui-surface-control-bg:color-mix(in srgb,var(--s1) 92%,var(--s2));
+  --ui-surface-floating-bg:color-mix(in srgb,var(--s1) 97%,var(--s2));
+  --ui-surface-panel-shadow:0 18px 48px -38px rgba(0,0,0,.72);
+  --ui-surface-section-shadow:none;
+  --ui-surface-item-shadow:none;
+  --ui-surface-filter:none;
+  --ui-surface-highlight:none;
+}
+
+/* Glass: transparency and backdrop blur must be visible on every registered surface. */
+html[data-surface=glass]{
+  --ui-surface-panel-bg:color-mix(in srgb,var(--s1) 60%,transparent);
+  --ui-surface-section-bg:color-mix(in srgb,var(--s2) 54%,transparent);
+  --ui-surface-item-bg:color-mix(in srgb,var(--s1) 54%,transparent);
+  --ui-surface-control-bg:color-mix(in srgb,var(--s1) 50%,transparent);
+  --ui-surface-floating-bg:color-mix(in srgb,var(--s1) 68%,transparent);
+  --ui-surface-border:color-mix(in srgb,var(--tx) 12%,transparent);
+  --ui-surface-border-strong:color-mix(in srgb,var(--tx) 17%,transparent);
+  --ui-surface-panel-shadow:0 22px 64px -42px rgba(0,0,0,.82),inset 0 1px 0 color-mix(in srgb,var(--tx) 7%,transparent);
+  --ui-surface-section-shadow:inset 0 1px 0 color-mix(in srgb,var(--tx) 5%,transparent);
+  --ui-surface-item-shadow:inset 0 1px 0 color-mix(in srgb,var(--tx) 4%,transparent);
+  --ui-surface-filter:blur(18px) saturate(135%);
+  --ui-surface-highlight:inset 0 1px 0 color-mix(in srgb,var(--tx) 6%,transparent);
+}
+
+/* Raised: opaque material, accent lift and stronger depth. */
+html[data-surface=raised]{
+  --ui-surface-panel-bg:color-mix(in srgb,var(--s1) 94%,var(--a) 6%);
+  --ui-surface-section-bg:color-mix(in srgb,var(--s2) 82%,var(--a) 18%);
+  --ui-surface-item-bg:color-mix(in srgb,var(--s1) 93%,var(--a) 7%);
+  --ui-surface-control-bg:color-mix(in srgb,var(--s1) 94%,var(--a) 6%);
+  --ui-surface-floating-bg:color-mix(in srgb,var(--s1) 90%,var(--a) 10%);
+  --ui-surface-border:color-mix(in srgb,var(--a) 20%,var(--ln));
+  --ui-surface-border-strong:color-mix(in srgb,var(--a) 30%,var(--border-strong,var(--ln)));
+  --ui-surface-panel-shadow:0 28px 72px -38px rgba(0,0,0,.86),0 10px 28px -24px color-mix(in srgb,var(--a) 38%,transparent),inset 0 1px 0 color-mix(in srgb,var(--tx) 5%,transparent);
+  --ui-surface-section-shadow:0 14px 34px -28px rgba(0,0,0,.72),inset 0 1px 0 color-mix(in srgb,var(--tx) 4%,transparent);
+  --ui-surface-item-shadow:0 10px 22px -20px rgba(0,0,0,.68);
+  --ui-surface-filter:none;
+  --ui-surface-highlight:inset 0 1px 0 color-mix(in srgb,var(--tx) 5%,transparent);
+}
+
+/* Border setting changes one token instead of restyling every component. */
+html[data-borders=off]{--ui-surface-border:transparent;--ui-surface-border-strong:transparent}
+html[data-borders=strong]{
+  --ui-surface-border:color-mix(in srgb,var(--a) 32%,var(--ln));
+  --ui-surface-border-strong:color-mix(in srgb,var(--a) 46%,var(--border-strong,var(--ln)));
+}
+
+/* Registered panel/dialog surfaces. Final-layer !important is intentional:
+ * feature CSS may define layout, never its own material implementation. */
+:where(.card,[data-ui-surface="panel"],[data-ui-surface="dialog"],dialog .box){
+  background:var(--ui-surface-panel-bg)!important;
+  border-color:var(--ui-surface-border-strong)!important;
+  border-radius:var(--ui-surface-panel-radius)!important;
+  box-shadow:var(--ui-surface-panel-shadow)!important;
+  -webkit-backdrop-filter:var(--ui-surface-filter)!important;
+  backdrop-filter:var(--ui-surface-filter)!important;
+}
+
+:where([data-ui-surface="section"]){
+  background:var(--ui-surface-section-bg)!important;
+  border-color:var(--ui-surface-border)!important;
+  border-radius:var(--ui-surface-section-radius)!important;
+  box-shadow:var(--ui-surface-section-shadow)!important;
+  -webkit-backdrop-filter:var(--ui-surface-filter)!important;
+  backdrop-filter:var(--ui-surface-filter)!important;
+}
+
+:where([data-ui-surface="metric"],[data-ui-surface="item"]){
+  background:var(--ui-surface-item-bg)!important;
+  border-color:var(--ui-surface-border)!important;
+  border-radius:var(--ui-surface-item-radius)!important;
+  box-shadow:var(--ui-surface-item-shadow)!important;
+  -webkit-backdrop-filter:var(--ui-surface-filter)!important;
+  backdrop-filter:var(--ui-surface-filter)!important;
+}
+
+:where([data-ui-surface="floating"]){
+  background:var(--ui-surface-floating-bg)!important;
+  border-color:var(--ui-surface-border-strong)!important;
+  box-shadow:var(--ui-surface-panel-shadow)!important;
+  -webkit-backdrop-filter:var(--ui-surface-filter)!important;
+  backdrop-filter:var(--ui-surface-filter)!important;
+}
+
+/* Controls belong to the same material system. This is what makes Glass visible
+ * inside forms instead of only on the outer .card. */
+:where(input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),textarea,select,.xm-select-trigger,.xm-select-button){
+  background:var(--ui-surface-control-bg)!important;
+  border-color:var(--ui-surface-border)!important;
+  box-shadow:none!important;
+  -webkit-backdrop-filter:var(--ui-surface-filter)!important;
+  backdrop-filter:var(--ui-surface-filter)!important;
+}
+
+/* Sidebar participates in the selected material instead of being a separate theme. */
+.app>aside{
+  background:var(--ui-surface-panel-bg)!important;
+  border-color:var(--ui-surface-border-strong)!important;
+  -webkit-backdrop-filter:var(--ui-surface-filter)!important;
+  backdrop-filter:var(--ui-surface-filter)!important;
+}
+
+/* Known legacy feature surfaces are adapted here centrally. New code should use
+ * data-ui-surface directly instead of adding feature-specific material CSS. */
+:where(
+  .squad-editor-layout>section,
+  .squad-preview-section,
+  .node-form-section,
+  .appearance-layout .setting-row,
+  .subscription-studio-section,
+  .sv-section
+){
+  background:var(--ui-surface-section-bg)!important;
+  border-color:var(--ui-surface-border)!important;
+  -webkit-backdrop-filter:var(--ui-surface-filter)!important;
+  backdrop-filter:var(--ui-surface-filter)!important;
+}
+
+:where(.squad-preview-stat,.stat,[class*="-kpi"],[class~="kpi"]){
+  background:var(--ui-surface-item-bg)!important;
+  border-color:var(--ui-surface-border)!important;
+  box-shadow:var(--ui-surface-item-shadow)!important;
+  -webkit-backdrop-filter:var(--ui-surface-filter)!important;
+  backdrop-filter:var(--ui-surface-filter)!important;
+}
+
+:where(.squad-inbound-row,.xm-select-popover){
+  background:var(--ui-surface-item-bg)!important;
+  border-color:var(--ui-surface-border)!important;
+  -webkit-backdrop-filter:var(--ui-surface-filter)!important;
+  backdrop-filter:var(--ui-surface-filter)!important;
+}
+
+/* Selected/active states remain accent-driven and therefore survive material changes. */
+:where([data-ui-selected="true"],.squad-inbound-row:has(input:checked)){
+  border-color:color-mix(in srgb,var(--a) 55%,var(--ui-surface-border))!important;
+}
+
+@media(prefers-reduced-transparency:reduce){
+  html[data-surface=glass]{
+    --ui-surface-panel-bg:var(--s1);
+    --ui-surface-section-bg:var(--s2);
+    --ui-surface-item-bg:var(--s1);
+    --ui-surface-control-bg:var(--s1);
+    --ui-surface-filter:none;
+  }
+}
