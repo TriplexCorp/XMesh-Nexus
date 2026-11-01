@@ -52,7 +52,10 @@
       if(!(node instanceof Element)||node.hasAttribute(ROLE_ATTR))return;
       if(node.matches('dialog .box,dialog form.box'))count+=setRole(node,'dialog')?1:0;
       else if(node.matches('.card'))count+=setRole(node,'panel')?1:0;
-      else if(node.matches('section'))count+=setRole(node,'section')?1:0;
+      /* A semantic <section> inside a modal is structural by default. The dialog
+       * shell already owns material/depth; modal groups opt in explicitly or via
+       * the central legacy registry when they genuinely need a surface. */
+      else if(node.matches('section')&&!node.closest('dialog'))count+=setRole(node,'section')?1:0;
       else if(node.matches('.squad-preview-stat,.stat,[class*="-kpi"],[class~="kpi"]'))count+=setRole(node,'metric')?1:0;
     };
     if(root instanceof Element)visit(root);
