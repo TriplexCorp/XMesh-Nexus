@@ -21,18 +21,20 @@ fi
 tmp="$(mktemp)"; trap 'rm -f "$tmp"' EXIT
 curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy/node-control-agent.sh -o "$tmp"
 bash -n "$tmp"
-grep -Fxq 'AGENT_VERSION="control-v6.0.0"' "$tmp" || { echo "Downloaded Agent is not the v6 POSTQUANTUM major" >&2;exit 1; }
+grep -Fxq 'AGENT_VERSION="control-v6.0.1"' "$tmp" || { echo "Downloaded Agent is not the current v6 POSTQUANTUM patch" >&2;exit 1; }
 grep -q 'enforceStop' "$tmp" || { echo "Downloaded agent is missing traffic cutoff support" >&2;exit 1; }
 grep -q 'pinned-image' "$tmp" || { echo "Downloaded agent does not support pinned Xray versions" >&2;exit 1; }
 
-sync_tmp="$(mktemp)"; policy_tmp="$(mktemp)"; geo_tmp="$(mktemp)"; metrics_tmp="$(mktemp)"; profile_tmp="$(mktemp)"; tls_tmp="$(mktemp)"; tls_status_tmp="$(mktemp)"; renew_tmp="$(mktemp)"; stage_tmp="$(mktemp)"; stage_service_tmp="$(mktemp)"; self_tmp="$(mktemp)"; router_helper="$(mktemp)"
-trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$geo_tmp" "$metrics_tmp" "$profile_tmp" "$tls_tmp" "$tls_status_tmp" "$renew_tmp" "$stage_tmp" "$stage_service_tmp" "$self_tmp" "$router_helper"' EXIT
+sync_tmp="$(mktemp)"; policy_tmp="$(mktemp)"; hot_tmp="$(mktemp)"; geo_tmp="$(mktemp)"; metrics_tmp="$(mktemp)"; profile_tmp="$(mktemp)"; tls_tmp="$(mktemp)"; tls_status_tmp="$(mktemp)"; renew_tmp="$(mktemp)"; stage_tmp="$(mktemp)"; stage_service_tmp="$(mktemp)"; self_tmp="$(mktemp)"; router_helper="$(mktemp)"
+trap 'rm -f "$tmp" "$sync_tmp" "$policy_tmp" "$hot_tmp" "$geo_tmp" "$metrics_tmp" "$profile_tmp" "$tls_tmp" "$tls_status_tmp" "$renew_tmp" "$stage_tmp" "$stage_service_tmp" "$self_tmp" "$router_helper"' EXIT
 
 [[ -f /usr/local/sbin/xmesh-xray-sync ]] || { echo "Managed Xray synchronizer not found. The node must be enrolled first." >&2;exit 1; }
 curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/main/deploy/xmesh-xray-sync.sh -o "$sync_tmp"
 bash -n "$sync_tmp"; grep -q 'pinned-image' "$sync_tmp" || { echo "Downloaded sync worker lacks image pin support" >&2;exit 1; }; grep -q 'xmesh-policy-guard.py' "$sync_tmp" || { echo "Sync worker cannot enforce offline policy" >&2;exit 1; }
 curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/main/deploy/xmesh-policy-guard.py -o "$policy_tmp"
 python3 -m py_compile "$policy_tmp"; grep -q 'check_signature' "$policy_tmp" || { echo "Policy verifier lacks Ed25519 verification" >&2;exit 1; }
+curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/main/deploy/xmesh-hot-user-reconcile.py -o "$hot_tmp"
+python3 -m py_compile "$hot_tmp"; grep -q 'HandlerService' "$hot_tmp" || { echo "Hot user reconciler lacks HandlerService contract" >&2;exit 1; }
 curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/main/deploy/xmesh-geodata-sync.py -o "$geo_tmp"
 python3 -m py_compile "$geo_tmp"; grep -q 'MAX_FILE_BYTES' "$geo_tmp" || { echo "GeoData synchronizer lacks size bounds" >&2;exit 1; }
 curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy/node-metrics-agent.sh -o "$metrics_tmp"
@@ -69,13 +71,14 @@ update_router() {
  new_revision="$(git -C "$dir" rev-parse HEAD)" || return 1
  [[ "$new_revision" =~ ^[0-9a-f]{40}$ ]] || return 1
  [[ -f "$dir/VERSION" && "$(tr -d '\r\n' < "$dir/VERSION")" == "6.0.0" ]] || { echo "XMesh-Node main is not v6.0.0" >&2; return 1; }
+ [[ -f "$dir/AGENT_VERSION" && "$(tr -d '\r\n' < "$dir/AGENT_VERSION")" == "control-v6.0.1" ]] || { echo "XMesh-Node main does not expose Agent control-v6.0.1" >&2; return 1; }
  [[ -f "$dir/deploy/install-xsp-v2-production-agent.sh" && ! -L "$dir/deploy/install-xsp-v2-production-agent.sh" ]] || { echo "v6 PQ Agent installer is missing" >&2; return 1; }
  if (cd "$dir" && docker --config "$DOCKER_CONFIG" compose build xmesh-node && docker --config "$DOCKER_CONFIG" compose run --rm --no-deps xmesh-node -check -config /etc/xmesh-node/config.json && docker --config "$DOCKER_CONFIG" compose up -d --no-deps --force-recreate xmesh-node && [[ "$(docker inspect -f '{{.State.Running}}' xmesh-node)" == true ]] && bash deploy/install-xsp-v2-production-agent.sh "$new_revision");then
   identity="$(/usr/local/bin/xmesh-agent-xspv2-activate --identity)" || return 1
   python3 - "$identity" "$new_revision" <<'PY'
 import json,sys
 v=json.loads(sys.argv[1])
-assert v.get('version')=='control-v6.0.0',v
+assert v.get('version')=='control-v6.0.1',v
 assert v.get('sourceRevision')==sys.argv[2],v
 assert isinstance(v.get('artifactSha256'),str) and len(v['artifactSha256'])==64,v
 PY
@@ -106,6 +109,7 @@ install -d -o root -g root -m 0755 /usr/local/libexec
 install -o root -g root -m 0700 "$stage_tmp" /usr/local/libexec/.xmesh-xsp-v2-agent-staged-apply.new; mv -f /usr/local/libexec/.xmesh-xsp-v2-agent-staged-apply.new /usr/local/libexec/xmesh-xsp-v2-agent-staged-apply
 install -o root -g root -m 0700 "$profile_tmp" /usr/local/libexec/.xmesh-profile-attest.new; mv -f /usr/local/libexec/.xmesh-profile-attest.new /usr/local/libexec/xmesh-profile-attest.py
 install -o root -g root -m 0700 "$policy_tmp" /usr/local/libexec/.xmesh-policy-guard.new; mv -f /usr/local/libexec/.xmesh-policy-guard.new /usr/local/libexec/xmesh-policy-guard.py
+install -o root -g root -m 0700 "$hot_tmp" /usr/local/libexec/.xmesh-hot-user-reconcile.new; mv -f /usr/local/libexec/.xmesh-hot-user-reconcile.new /usr/local/libexec/xmesh-hot-user-reconcile.py
 install -o root -g root -m 0700 "$geo_tmp" /usr/local/libexec/.xmesh-geodata-sync.new; mv -f /usr/local/libexec/.xmesh-geodata-sync.new /usr/local/libexec/xmesh-geodata-sync.py
 install -o root -g root -m 0700 "$tls_status_tmp" /usr/local/libexec/.xmesh-tls-status.new; mv -f /usr/local/libexec/.xmesh-tls-status.new /usr/local/libexec/xmesh-tls-status.py
 install -o root -g root -m 0700 "$tls_tmp" /usr/local/libexec/.xmesh-tls-provision.new; mv -f /usr/local/libexec/.xmesh-tls-provision.new /usr/local/libexec/xmesh-tls-provision.py
@@ -198,6 +202,6 @@ if ! systemctl start xmesh-node-user-meter.service; then echo "WARNING: Xray use
 install -o root -g root -m 0700 "$self_tmp" /usr/local/sbin/.xmesh-update-agent.new; mv -f /usr/local/sbin/.xmesh-update-agent.new /usr/local/sbin/xmesh-update-agent
 if systemctl list-unit-files xmesh-xray-sync.service --no-legend 2>/dev/null | grep -q '^xmesh-xray-sync.service'; then systemctl start --no-block xmesh-xray-sync.service || echo "WARNING: Unable to queue immediate Xray reconciliation; timer will retry." >&2;fi
 if [[ "$MODE" != --remote ]]; then systemctl start xmesh-node-control.service;fi
-grep -Fxq 'AGENT_VERSION="control-v6.0.0"' /usr/local/sbin/xmesh-node-control || { echo "v6 Agent version verification failed" >&2; exit 1; }
-/usr/local/bin/xmesh-agent-xspv2-activate --identity | python3 -c 'import json,sys;v=json.load(sys.stdin);assert v["version"]=="control-v6.0.0" and len(v["artifactSha256"])==64'
-echo "XMesh Agent v6.0.0 POSTQUANTUM installed: signed control, verified PQ runtime, offline policy and pinned Xray synchronizer are active."
+grep -Fxq 'AGENT_VERSION="control-v6.0.1"' /usr/local/sbin/xmesh-node-control || { echo "v6 Agent version verification failed" >&2; exit 1; }
+/usr/local/bin/xmesh-agent-xspv2-activate --identity | python3 -c 'import json,sys;v=json.load(sys.stdin);assert v["version"]=="control-v6.0.1" and len(v["artifactSha256"])==64'
+echo "XMesh Agent v6.0.1 POSTQUANTUM installed: signed control, verified PQ runtime, offline policy and pinned Xray synchronizer are active."
