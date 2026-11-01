@@ -3,7 +3,7 @@
 // v6 product invariant: the panel must never hand a fresh VPS an installer
 // that can enter operational state before strict-PQ activation is verified.
 // Keep this SHA pinned to the reviewed XMesh-Node strict-PQ-only release.
-const XMESH_V6_NODE_BOOTSTRAP_SHA='4c03a103929140d1171af5a1ac843a186f7af16c';
+const XMESH_V6_NODE_BOOTSTRAP_SHA='6ff742b416e1134801943bf6f64d997e68dbdcaf';
 const XMESH_V6_BOOTSTRAP_MARKER='XMesh Node v6 fresh installer. Security invariant:';
 const XMESH_V6_XSP_IDENTITY_CONFLICT='XSP-v2 identity already enrolled: legacy re-enrollment cannot rotate it.';
 
@@ -53,7 +53,10 @@ async function xmeshV6StrictPqBootstrapClick(event){
 
     const port=Number(DB.nodes.find(node=>Number(node.id)===id)?.port)||8443;
     const url='https://raw.githubusercontent.com/TriplexCorp/XMesh-Node/'+XMESH_V6_NODE_BOOTSTRAP_SHA+'/bootstrap.sh';
-    const command='curl --proto "=https" --tlsv1.2 -H "Cache-Control: no-cache" -fsSLo /tmp/xmesh-bootstrap-v6.sh '+url+
+    // --tlsv1.3 sets the minimum and --tls-max 1.3 the maximum for this public
+    // GitHub download. It is distinct from the operational XSP/2 tunnel, which
+    // remains hybrid/dual-signature and has no classical HTTP fallback.
+    const command='curl --proto "=https" --tlsv1.3 --tls-max 1.3 -H "Cache-Control: no-cache" -fsSLo /tmp/xmesh-bootstrap-v6.sh '+url+
       ' && grep -Fq "'+XMESH_V6_BOOTSTRAP_MARKER+'" /tmp/xmesh-bootstrap-v6.sh'+
       ' && sudo env XMESH_NODE_RELEASE_REF='+XMESH_V6_NODE_BOOTSTRAP_SHA+' bash /tmp/xmesh-bootstrap-v6.sh '+location.origin+' '+id+' '+port;
     const commandTitle=reuseExistingIdentity?'Команда repair для текущей VPS':'Команда для чистой VPS';
