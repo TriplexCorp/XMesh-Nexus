@@ -18,24 +18,9 @@
     return true;
   };
 
-  const register=(selector,role)=>{
-    const normalized=normalizeRole(role);
-    if(!selector||!normalized)return false;
-    if(registry.some(entry=>entry.selector===selector&&entry.role===normalized))return true;
-    registry.push({selector,role:normalized});
-    apply(document,selector,normalized);
-    return true;
-  };
-
   const apply=(root=document,selector=null,role=null)=>{
     if(!root)return 0;
     let count=0;
-    const scan=(sel,r)=>{
-      const nodes=[];
-      if(r instanceof Element&&r.matches(sel))nodes.push(r);
-      if(r.querySelectorAll)nodes.push(...r.querySelectorAll(sel));
-      for(const node of nodes)if(setRole(node,r))count++;
-    };
     if(selector&&role){
       const nodes=[];
       if(root instanceof Element&&root.matches(selector))nodes.push(root);
@@ -50,6 +35,15 @@
       for(const node of nodes)if(setRole(node,entry.role))count++;
     }
     return count;
+  };
+
+  const register=(selector,role)=>{
+    const normalized=normalizeRole(role);
+    if(!selector||!normalized)return false;
+    if(registry.some(entry=>entry.selector===selector&&entry.role===normalized))return true;
+    registry.push({selector,role:normalized});
+    apply(document,selector,normalized);
+    return true;
   };
 
   const classifySemantic=(root=document)=>{
