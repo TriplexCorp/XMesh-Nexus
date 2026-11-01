@@ -41,13 +41,15 @@ if(errors.length){
    'TLS dialog stylesheet must receive the specificity-fix cache key');
  assert.match(index,/xray-studio-tls-dialog\.js\?v=20261101-tls-workspace-v2/,
    'TLS workspace behavior cache key must remain stable until its asset key is intentionally rotated');
- assert.match(index,/node-dialogs\.js\?v=20261101-agent-update-autovalidation-v1/,
-   'Agent update autovalidation handler must receive a fresh cache key');
+ assert.match(index,/node-dialogs\.js\?v=20261101-user-create-enterprise-v3/,
+   'Create-user structural repair and Agent autovalidation handler must receive the current cache key');
+ assert.match(index,/user-create-v3\.css\?v=20261101-enterprise-v3/,
+   'Enterprise create-user layout must be cache-busted');
+ assert.match(xhttpExpert,/Session ID/);
  assert.match(index,/xray-studio-xhttp-expert\.js\?v=20261101-core-schema-v2/,
    'Expert XHTTP editor must be cache-busted and loaded after the strict schema');
  assert.match(dockerfile,/xray-studio-xhttp-strict\.js xray-studio-xhttp-expert\.js xray-xhttp-core-validator\.js/,
    'Production image must package strict + expert XHTTP assets');
- assert.match(xhttpExpert,/Session ID/);
  assert.match(xhttpExpert,/sessionIDPlacement/);
  assert.match(xhttpExpert,/sessionIDTable/);
  assert.match(xhttpExpert,/sessionIDLength/);
@@ -135,5 +137,5 @@ if(errors.length){
    'Diagnostics must use a structured enterprise overview layout');
  assert.match(diagnosticsCss,/@media\(max-width:760px\)/,
    'Diagnostics workspace must remain responsive');
- console.log('Static assets + expert XHTTP schema controls + robust TLS dialog + live Diagnostics workspace: OK.');
+ console.log('Static assets + enterprise create-user + expert XHTTP schema controls + robust TLS dialog + live Diagnostics workspace: OK.');
 }
