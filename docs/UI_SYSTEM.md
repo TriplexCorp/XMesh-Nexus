@@ -72,6 +72,7 @@ The existing Appearance setting remains the source of truth:
 - `--ui-separator`
 - `--ui-surface-panel-shadow`
 - `--ui-surface-dialog-shadow`
+- `--ui-surface-control-shadow`
 - `--ui-surface-filter`
 
 The same mechanism consumes global radius/border/density settings. A feature must not copy their values.
@@ -80,13 +81,18 @@ The same mechanism consumes global radius/border/density settings. A feature mus
 
 Raised is a **depth hierarchy**, not an accent-tinted theme.
 
-- top-level `panel`, `dialog` and `floating` surfaces own outer elevation;
-- `section` surfaces are neutral and may use only a restrained inset highlight;
-- `metric` / `item` surfaces remain low-elevation;
+- top-level `panel`, `dialog` and `floating` surfaces own the strongest outer elevation;
+- `section` surfaces use a lower neutral depth level;
+- `metric` / `item` surfaces use restrained local elevation;
+- ordinary controls may use a subtle `--ui-surface-control-shadow`, while Classic controls remain intentionally flat;
 - ordinary rows inside a card are not automatically promoted into surfaces;
 - the accent color is reserved for focus, selected state and deliberate emphasis rather than mixed into every section background.
 
-This rule prevents the interface from becoming a stack of colored slabs when Raised is selected, especially when strong borders are enabled.
+Light theme must preserve a visibly larger depth delta between Classic and Raised. `#fff` and the light secondary surface are too close for a 3–6% tone mix to communicate a mode change by themselves, so light Raised uses an explicit neutral tonal ladder plus stronger multi-level shadows. The difference must remain obvious at normal zoom without relying on accent tinting.
+
+Generic segmented controls are material controls too: their shell follows `--ui-surface-control-bg` / `--ui-surface-control-shadow`, while the selected segment follows the item material. This keeps selectors such as Classic / Glass / Raised visually consistent with the selected surface system.
+
+This rule prevents the interface from becoming a stack of colored slabs when Raised is selected, especially when strong borders are enabled, while still making Raised perceptibly different from Classic.
 
 ## Glass requirement
 
@@ -179,7 +185,7 @@ The target state is a shrinking registry, not an expanding list of per-feature t
 
 Before merging a new screen/dialog:
 
-1. Change Appearance between Classic, Glass and Raised. The surface must visibly change without recoloring every inner row.
+1. Change Appearance between Classic, Glass and Raised. The surface must visibly change without recoloring every inner row; in light theme, Classic and Raised must remain plainly distinguishable at normal zoom.
 2. Open a modal in all three modes. It must have one clear shell and must not become a stack of nested cards.
 3. Change border mode. The same screen must follow it without accent flooding or hardening internal row separators.
 4. Inspect compound/unit controls at high zoom. There must be only one visible capsule with no rectangular inner-input seams.
@@ -201,4 +207,4 @@ Run:
 node scripts/check-ui-system.js
 ```
 
-The check verifies asset order, Docker packaging, root Appearance mapping, builder roles, Raised depth rules, modal isolation, separator hierarchy, composite-control ownership and the absence of new Squad-specific Classic/Glass/Raised forks.
+The check verifies asset order, Docker packaging, root Appearance mapping, builder roles, perceptible Raised light-mode depth, modal isolation, separator hierarchy, composite-control ownership and the absence of new Squad-specific Classic/Glass/Raised forks.

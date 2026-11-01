@@ -1,4 +1,4 @@
-/* XMesh Nexus unified UI surface contract v3.
+/* XMesh Nexus unified UI surface contract v4.
  * Loaded LAST. It is the single visual authority for Appearance surface settings.
  * Feature styles own geometry/layout; this file owns surface material, borders,
  * separators, elevation, blur and shared radii. See docs/UI_SYSTEM.md. */
@@ -20,6 +20,7 @@
   --ui-surface-dialog-shadow:0 30px 82px -28px rgba(0,0,0,.72);
   --ui-surface-section-shadow:none;
   --ui-surface-item-shadow:none;
+  --ui-surface-control-shadow:none;
   --ui-surface-floating-shadow:0 24px 64px -32px rgba(0,0,0,.76);
   --ui-surface-filter:none;
   --ui-surface-panel-radius:var(--ui-radius,18px);
@@ -33,7 +34,7 @@ html[data-density=compact]{--ui-space-section:.82rem;--ui-space-item:.58rem}
 html[data-density=comfortable]{--ui-space-section:1rem;--ui-space-item:.75rem}
 html[data-density=spacious]{--ui-space-section:1.25rem;--ui-space-item:.92rem}
 
-/* Classic: opaque, restrained, low elevation. */
+/* Classic: opaque, restrained and intentionally flat. */
 html[data-surface=solid]{
   --ui-surface-panel-bg:var(--s1);
   --ui-surface-dialog-bg:var(--s1);
@@ -48,6 +49,7 @@ html[data-surface=solid]{
   --ui-surface-dialog-shadow:0 30px 82px -28px rgba(0,0,0,.72);
   --ui-surface-section-shadow:none;
   --ui-surface-item-shadow:none;
+  --ui-surface-control-shadow:none;
   --ui-surface-floating-shadow:0 24px 64px -32px rgba(0,0,0,.76);
   --ui-surface-filter:none;
 }
@@ -72,6 +74,7 @@ html[data-surface=glass]{
   --ui-surface-dialog-shadow:0 34px 96px -34px rgba(0,0,0,.86),inset 0 1px 0 color-mix(in srgb,var(--tx) 8%,transparent);
   --ui-surface-section-shadow:inset 0 1px 0 color-mix(in srgb,var(--tx) 4%,transparent);
   --ui-surface-item-shadow:inset 0 1px 0 color-mix(in srgb,var(--tx) 3%,transparent);
+  --ui-surface-control-shadow:inset 0 1px 0 color-mix(in srgb,var(--tx) 3%,transparent);
   --ui-surface-floating-shadow:0 28px 70px -34px rgba(0,0,0,.84),inset 0 1px 0 color-mix(in srgb,var(--tx) 7%,transparent);
   --ui-surface-filter:blur(18px) saturate(135%);
 }
@@ -79,24 +82,47 @@ html[data-surface=glass]{
 /* Raised: depth comes from hierarchy and elevation, not accent-filled slabs.
  * Accent remains reserved for focus, selected states and deliberate emphasis. */
 html[data-surface=raised]{
-  --ui-surface-panel-bg:color-mix(in srgb,var(--s1) 97%,var(--s2) 3%);
-  --ui-surface-dialog-bg:color-mix(in srgb,var(--s1) 96%,var(--s2) 4%);
-  --ui-surface-section-bg:color-mix(in srgb,var(--s2) 34%,var(--s1));
-  --ui-surface-item-bg:color-mix(in srgb,var(--s1) 84%,var(--s2) 16%);
-  --ui-surface-control-bg:color-mix(in srgb,var(--s1) 88%,var(--s2) 12%);
-  --ui-surface-floating-bg:color-mix(in srgb,var(--s1) 92%,var(--s2) 8%);
-  --ui-dialog-section-bg:color-mix(in srgb,var(--s2) 22%,transparent);
-  --ui-dialog-control-bg:color-mix(in srgb,var(--s1) 86%,var(--s2) 14%);
+  --ui-surface-panel-bg:color-mix(in srgb,var(--s1) 94%,var(--s2) 6%);
+  --ui-surface-dialog-bg:color-mix(in srgb,var(--s1) 92%,var(--s2) 8%);
+  --ui-surface-section-bg:color-mix(in srgb,var(--s2) 42%,var(--s1));
+  --ui-surface-item-bg:color-mix(in srgb,var(--s1) 78%,var(--s2) 22%);
+  --ui-surface-control-bg:color-mix(in srgb,var(--s1) 82%,var(--s2) 18%);
+  --ui-surface-floating-bg:color-mix(in srgb,var(--s1) 88%,var(--s2) 12%);
+  --ui-dialog-section-bg:color-mix(in srgb,var(--s2) 26%,transparent);
+  --ui-dialog-control-bg:color-mix(in srgb,var(--s1) 82%,var(--s2) 18%);
   --ui-surface-border:color-mix(in srgb,var(--tx) 9%,var(--ln));
   --ui-surface-border-strong:color-mix(in srgb,var(--tx) 13%,var(--border-strong,var(--ln)));
   --ui-dialog-section-border:color-mix(in srgb,var(--tx) 8%,transparent);
   --ui-separator:color-mix(in srgb,var(--tx) 5.5%,transparent);
-  --ui-surface-panel-shadow:0 26px 68px -40px rgba(0,0,0,.84),0 8px 22px -20px color-mix(in srgb,var(--a) 16%,transparent),inset 0 1px 0 color-mix(in srgb,var(--tx) 5%,transparent);
-  --ui-surface-dialog-shadow:0 38px 110px -38px rgba(0,0,0,.9),0 16px 42px -32px color-mix(in srgb,var(--a) 18%,transparent),inset 0 1px 0 color-mix(in srgb,var(--tx) 6%,transparent);
-  --ui-surface-section-shadow:inset 0 1px 0 color-mix(in srgb,var(--tx) 3%,transparent);
-  --ui-surface-item-shadow:none;
-  --ui-surface-floating-shadow:0 28px 72px -34px rgba(0,0,0,.86),0 10px 28px -24px color-mix(in srgb,var(--a) 14%,transparent),inset 0 1px 0 color-mix(in srgb,var(--tx) 5%,transparent);
+  --ui-surface-panel-shadow:0 28px 72px -38px rgba(0,0,0,.88),0 10px 24px -18px rgba(0,0,0,.54),inset 0 1px 0 color-mix(in srgb,var(--tx) 6%,transparent);
+  --ui-surface-dialog-shadow:0 40px 116px -34px rgba(0,0,0,.92),0 18px 46px -28px rgba(0,0,0,.62),inset 0 1px 0 color-mix(in srgb,var(--tx) 7%,transparent);
+  --ui-surface-section-shadow:0 8px 20px -18px rgba(0,0,0,.62),inset 0 1px 0 color-mix(in srgb,var(--tx) 4%,transparent);
+  --ui-surface-item-shadow:0 5px 14px -12px rgba(0,0,0,.64),inset 0 1px 0 color-mix(in srgb,var(--tx) 4%,transparent);
+  --ui-surface-control-shadow:0 4px 12px -10px rgba(0,0,0,.68),inset 0 1px 0 color-mix(in srgb,var(--tx) 5%,transparent);
+  --ui-surface-floating-shadow:0 30px 78px -30px rgba(0,0,0,.9),0 12px 30px -20px rgba(0,0,0,.58),inset 0 1px 0 color-mix(in srgb,var(--tx) 6%,transparent);
   --ui-surface-filter:none;
+}
+
+/* Light surfaces need a stronger tonal/elevation delta than dark surfaces.
+ * Without this profile, #fff and #eef2f6 collapse Raised into Classic. */
+html[data-theme=light][data-surface=raised]{
+  --ui-surface-panel-bg:color-mix(in srgb,var(--s1) 72%,var(--s2) 28%);
+  --ui-surface-dialog-bg:color-mix(in srgb,var(--s1) 78%,var(--s2) 22%);
+  --ui-surface-section-bg:color-mix(in srgb,var(--s1) 40%,var(--s2) 60%);
+  --ui-surface-item-bg:color-mix(in srgb,var(--s1) 58%,var(--s2) 42%);
+  --ui-surface-control-bg:color-mix(in srgb,var(--s1) 65%,var(--s2) 35%);
+  --ui-surface-floating-bg:color-mix(in srgb,var(--s1) 88%,var(--s2) 12%);
+  --ui-dialog-section-bg:color-mix(in srgb,var(--s2) 46%,var(--s1));
+  --ui-dialog-control-bg:color-mix(in srgb,var(--s1) 62%,var(--s2) 38%);
+  --ui-surface-border:color-mix(in srgb,var(--tx) 10%,var(--ln));
+  --ui-surface-border-strong:color-mix(in srgb,var(--tx) 14%,var(--border-strong,var(--ln)));
+  --ui-separator:color-mix(in srgb,var(--tx) 4.5%,transparent);
+  --ui-surface-panel-shadow:0 18px 42px -16px rgba(36,48,68,.34),0 6px 14px -8px rgba(36,48,68,.20),inset 0 1px 0 rgba(255,255,255,.94);
+  --ui-surface-dialog-shadow:0 30px 68px -18px rgba(36,48,68,.42),0 10px 24px -12px rgba(36,48,68,.24),inset 0 1px 0 rgba(255,255,255,.96);
+  --ui-surface-section-shadow:0 8px 18px -14px rgba(36,48,68,.28),inset 0 1px 0 rgba(255,255,255,.82);
+  --ui-surface-item-shadow:0 4px 10px -8px rgba(36,48,68,.24),inset 0 1px 0 rgba(255,255,255,.88);
+  --ui-surface-control-shadow:0 3px 8px -6px rgba(36,48,68,.22),inset 0 1px 0 rgba(255,255,255,.90);
+  --ui-surface-floating-shadow:0 22px 52px -18px rgba(36,48,68,.36),0 7px 18px -10px rgba(36,48,68,.22),inset 0 1px 0 rgba(255,255,255,.94);
 }
 
 /* Border setting changes surface boundaries. Separators are intentionally a
@@ -158,13 +184,23 @@ html[data-borders=strong]{
   backdrop-filter:var(--ui-surface-filter)!important;
 }
 
-/* Controls use shared material. */
+/* Controls use shared material; Raised may give them restrained local depth. */
 :where(input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),textarea,select,.xm-select-trigger,.xm-select-button){
   background:var(--ui-surface-control-bg)!important;
   border-color:var(--ui-surface-border)!important;
-  box-shadow:none!important;
+  box-shadow:var(--ui-surface-control-shadow)!important;
   -webkit-backdrop-filter:var(--ui-surface-filter)!important;
   backdrop-filter:var(--ui-surface-filter)!important;
+}
+
+/* Generic segmented controls participate in the same material hierarchy. */
+:where(.seg){
+  background:var(--ui-surface-control-bg)!important;
+  box-shadow:var(--ui-surface-control-shadow)!important;
+}
+:where(.seg button.on){
+  background:var(--ui-surface-item-bg)!important;
+  box-shadow:var(--ui-surface-item-shadow)!important;
 }
 
 /* Composite controls have exactly one material shell. Use these attributes in
@@ -172,7 +208,7 @@ html[data-borders=strong]{
 :where([data-ui-control="shell"]){
   background:var(--ui-surface-control-bg)!important;
   border-color:var(--ui-surface-border)!important;
-  box-shadow:none!important;
+  box-shadow:var(--ui-surface-control-shadow)!important;
   -webkit-backdrop-filter:var(--ui-surface-filter)!important;
   backdrop-filter:var(--ui-surface-filter)!important;
 }
@@ -269,7 +305,7 @@ dialog :where([data-ui-control="inner"]){
 .appearance-layout .slider-control .precision-number{
   background:var(--ui-surface-control-bg)!important;
   border-color:var(--ui-surface-border)!important;
-  box-shadow:none!important;
+  box-shadow:var(--ui-surface-control-shadow)!important;
   -webkit-backdrop-filter:var(--ui-surface-filter)!important;
   backdrop-filter:var(--ui-surface-filter)!important;
 }
