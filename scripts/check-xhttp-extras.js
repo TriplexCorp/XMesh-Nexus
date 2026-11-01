@@ -39,3 +39,5 @@ assert.throws(()=>create({'xhttp-post-bytes':'50-10'},'client'),/диапазо�
 assert.throws(()=>create({'xhttp-headers':'{"X":3}'},'client'),/требуется объект/);
 assert.match(fs.readFileSync('xray-studio-v4.js','utf8'),/\['xhttp','XHTTP'\]/,'Active Studio must expose XHTTP transport');
 console.log('XRAY Studio XHTTP serializer and themed selects: OK');
+require('./check-xhttp-core-strict.js');
+require('./check-subscription-qr.js');
