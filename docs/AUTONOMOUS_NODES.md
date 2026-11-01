@@ -87,10 +87,30 @@ changing user limit or a manually reset traffic counter may require a new
 acknowledged panel accounting revision before an offline-exhausted user can
 be safely re-enabled.
 
-Xray user removals currently redeploy the managed container rather than
-hot-unregistering clients via HandlerService, so remaining connections can
-briefly reconnect. A failed Xray config validation/deployment preserves
-or attempts to roll back the previous working configuration.
+Managed **account-only** changes are now reconciled without restarting Xray.
+After the signed desired policy has been verified and local quota/expiry rules
+have been applied, XMesh-Node compares the running and desired account lists.
+When no transport, TLS, routing, port or other structural field changed, the
+node uses Xray `HandlerService` (`AlterInbound`) on the existing private
+`127.0.0.1:10085` API to remove/add the affected accounts in memory. Other
+clients on the same Xray process keep their active sessions.
+
+`HandlerService` is a node-local operational augmentation only: the panel's
+signed Xray JSON remains authoritative, the API stays loopback-only, and profile
+attestation permits exactly the additional `HandlerService` service beside
+`StatsService`—not a different listener, API tag, routing rule or broader
+service set. The first reconciliation after upgrading an older node may perform
+one normal full redeploy to introduce HandlerService. Any structural config
+change, unsupported/legacy profile, ambiguous Xray CLI result or HandlerService
+failure leaves the active file unchanged and deliberately falls back to the
+existing validated full-redeploy/rollback path.
+
+Removing or disabling a user through HandlerService prevents new authentication
+for that account without restarting Xray. Xray does not expose a per-user
+"kill every already-established stream" operation through HandlerService, so a
+connection that was fully established before revocation can remain alive until
+that stream naturally closes. This limitation applies to the revoked user only;
+it no longer requires disconnecting unrelated users on the node.
 
 ## Diagnosis
 
@@ -111,7 +131,7 @@ Docker socket, or remove the `forced-stop` file to "fix" an outage.
 
 Обновление проходит по тому же подписанному каналу команд, что и перезапуск
 Xray. Администратор подтверждает действие, API ставит фиксированную команду
-`update_agent` в очередь, нода самостоятельно запускает заранее установленную
+`update_agent` в очередь, нода самостоятельно запускает заранее установленный
 `xmesh-node-agent-upgrade.service`. Панель не может передавать shell-команды,
 пути файлов или URL. Отдельная служба скачивает компоненты из фиксированных
 репозиториев, проверяет синтаксис, сохраняет существующий Ed25519-ключ и
