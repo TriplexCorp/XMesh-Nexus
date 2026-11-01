@@ -74,7 +74,8 @@ fn ensure_default_fingerprint(value: &mut Value) {
                         .map(str::trim)
                         .is_none_or(str::is_empty);
                     if missing {
-                        settings.insert("fingerprint".to_owned(), Value::String("chrome".to_owned()));
+                        settings
+                            .insert("fingerprint".to_owned(), Value::String("chrome".to_owned()));
                     }
                 }
             }
