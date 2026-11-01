@@ -35,4 +35,4 @@ A rolling upgrade may explicitly accept the immediately previous Agent version s
 
 The Agent update source-contract check must verify version consistency. Pull requests that change deployed Agent/runtime surfaces without increasing `AGENT_VERSION` relative to the base branch must fail CI.
 
-Current target: **`control-v6.0.2`**.
+Current target: **`control-v6.0.3`**.
