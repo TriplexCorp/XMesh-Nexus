@@ -1,0 +1,469 @@
+/* Squad editor premium v5 — final scoped visual layer.
+ * Keeps existing CRUD, inbound selection and impact calculations unchanged. */
+
+dialog#dlg.squad-wide{
+  width:min(1240px,calc(100vw - 32px))!important;
+  inline-size:min(1240px,calc(100vw - 32px))!important;
+  max-height:min(94dvh,980px);
+  padding:0;
+  border:0;
+  background:transparent;
+  overflow:visible;
+}
+
+dialog#dlg.squad-wide::backdrop{
+  background:var(--xm-modal-dim);
+  -webkit-backdrop-filter:blur(var(--xm-modal-blur));
+  backdrop-filter:blur(var(--xm-modal-blur));
+}
+
+dialog#dlg.squad-wide > form.box{
+  position:relative;
+  width:100%;
+  max-height:min(94dvh,980px);
+  padding:0;
+  gap:0;
+  overflow:hidden;
+  border:1px solid color-mix(in srgb,var(--a) 13%,var(--border-strong));
+  border-radius:22px;
+  background:
+    radial-gradient(900px 420px at 85% -20%,color-mix(in srgb,var(--a) 8%,transparent),transparent 62%),
+    linear-gradient(180deg,color-mix(in srgb,var(--s2) 34%,var(--s1)),var(--s1) 32%);
+  box-shadow:0 38px 110px -42px rgba(0,0,0,.86),0 1px 0 rgba(255,255,255,.035) inset;
+}
+
+dialog#dlg.squad-wide > form.box > h2{
+  position:relative;
+  margin:0;
+  padding:28px 30px 22px;
+  border-bottom:1px solid var(--ln);
+  font-size:1.42rem;
+  line-height:1.18;
+  font-weight:790;
+  letter-spacing:-.04em;
+  background:color-mix(in srgb,var(--s1) 90%,transparent);
+}
+
+dialog#dlg.squad-wide > form.box > h2::before{
+  content:"ACCESS POLICY / SQUAD";
+  display:block;
+  margin-bottom:7px;
+  color:var(--a);
+  font-size:.63rem;
+  line-height:1;
+  font-weight:840;
+  letter-spacing:.13em;
+}
+
+dialog#dlg.squad-wide > form.box > h2::after{
+  content:"Группа доступа к inbound и её влияние на подписки";
+  display:block;
+  margin-top:7px;
+  color:var(--mu);
+  font-size:.76rem;
+  line-height:1.45;
+  font-weight:520;
+  letter-spacing:-.01em;
+}
+
+dialog#dlg.squad-wide .squad-editor-layout{
+  display:grid;
+  grid-template-columns:minmax(0,.82fr) minmax(0,1.18fr);
+  gap:16px;
+  padding:20px 22px 18px;
+  align-items:stretch;
+  min-width:0;
+  overflow:auto;
+  overscroll-behavior:contain;
+}
+
+dialog#dlg.squad-wide .squad-editor-layout > section{
+  min-width:0;
+  min-height:0;
+  padding:20px;
+  gap:14px;
+  border:1px solid var(--ln);
+  border-radius:17px;
+  background:color-mix(in srgb,var(--s2) 35%,var(--s1));
+  box-shadow:0 1px 0 rgba(255,255,255,.022) inset;
+}
+
+dialog#dlg.squad-wide .node-form-section-title{
+  color:var(--tx);
+  font-size:.92rem;
+  font-weight:780;
+  letter-spacing:-.025em;
+}
+
+dialog#dlg.squad-wide .squad-editor-main{
+  display:flex;
+  flex-direction:column;
+}
+
+dialog#dlg.squad-wide .squad-editor-fields{
+  display:grid;
+  gap:13px;
+}
+
+dialog#dlg.squad-wide .squad-editor-fields .f{
+  display:grid;
+  gap:7px;
+}
+
+dialog#dlg.squad-wide .squad-editor-fields .f > span{
+  color:var(--mu);
+  font-size:.71rem;
+  font-weight:720;
+}
+
+dialog#dlg.squad-wide .squad-editor-fields :is(input,textarea){
+  width:100%;
+  min-height:48px;
+  border:1px solid var(--ln);
+  border-radius:12px;
+  background:color-mix(in srgb,var(--s1) 86%,var(--s2));
+  color:var(--tx);
+  padding:0 14px;
+  transition:border-color .15s,box-shadow .15s,background .15s;
+}
+
+dialog#dlg.squad-wide .squad-editor-fields textarea{
+  min-height:154px;
+  padding:13px 14px;
+  resize:none;
+  line-height:1.55;
+}
+
+dialog#dlg.squad-wide .squad-editor-fields :is(input,textarea):focus{
+  outline:0;
+  border-color:color-mix(in srgb,var(--a) 62%,var(--ln));
+  background:var(--s1);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--a) 11%,transparent);
+}
+
+dialog#dlg.squad-wide .squad-editor-connections{
+  display:flex;
+  flex-direction:column;
+}
+
+dialog#dlg.squad-wide .squad-section-heading{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  min-width:0;
+}
+
+dialog#dlg.squad-wide .squad-section-heading b{
+  font-size:.78rem;
+  font-weight:750;
+}
+
+dialog#dlg.squad-wide .squad-selected-count{
+  flex:none;
+  min-width:76px;
+  padding:5px 9px;
+  border:1px solid color-mix(in srgb,var(--a) 18%,var(--ln));
+  border-radius:999px;
+  color:var(--a);
+  background:color-mix(in srgb,var(--a) 7%,transparent);
+  text-align:center;
+  font-size:.66rem;
+  font-weight:760;
+}
+
+dialog#dlg.squad-wide .squad-editor-toolbar{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto auto;
+  gap:8px;
+  align-items:center;
+}
+
+dialog#dlg.squad-wide .squad-inbound-search{
+  min-width:0;
+  height:42px;
+  border:1px solid var(--ln);
+  border-radius:11px;
+  background:color-mix(in srgb,var(--s1) 88%,var(--s2));
+  box-shadow:none;
+}
+
+dialog#dlg.squad-wide .squad-inbound-search:focus-within{
+  border-color:color-mix(in srgb,var(--a) 55%,var(--ln));
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--a) 9%,transparent);
+}
+
+dialog#dlg.squad-wide .squad-editor-toolbar .gh{
+  min-height:42px;
+  padding-inline:12px;
+  border-color:var(--ln);
+  background:color-mix(in srgb,var(--s1) 70%,transparent);
+  font-size:.72rem;
+  font-weight:720;
+  white-space:nowrap;
+}
+
+dialog#dlg.squad-wide .squad-inbound-list{
+  display:grid;
+  gap:7px;
+  max-height:286px;
+  padding-right:3px;
+  overflow:auto;
+  scrollbar-gutter:stable;
+}
+
+dialog#dlg.squad-wide .squad-inbound-row{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto;
+  gap:11px;
+  align-items:center;
+  min-width:0;
+  padding:11px 12px;
+  border:1px solid var(--ln);
+  border-radius:12px;
+  background:color-mix(in srgb,var(--s1) 83%,var(--s2));
+  cursor:pointer;
+  transition:transform .12s,border-color .15s,background .15s,box-shadow .15s;
+}
+
+dialog#dlg.squad-wide .squad-inbound-row:hover{
+  transform:translateY(-1px);
+  border-color:color-mix(in srgb,var(--a) 28%,var(--ln));
+  background:color-mix(in srgb,var(--a) 4%,var(--s1));
+}
+
+dialog#dlg.squad-wide .squad-inbound-row:has(input:checked){
+  border-color:color-mix(in srgb,var(--a) 48%,var(--ln));
+  background:color-mix(in srgb,var(--a) 8%,var(--s1));
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--a) 10%,transparent) inset;
+}
+
+dialog#dlg.squad-wide .squad-inbound-row input{
+  width:16px;
+  height:16px;
+  accent-color:var(--a);
+}
+
+dialog#dlg.squad-wide .squad-inbound-copy{
+  display:grid;
+  gap:3px;
+  min-width:0;
+}
+
+dialog#dlg.squad-wide .squad-inbound-copy b{
+  overflow:hidden;
+  color:var(--tx);
+  font-size:.77rem;
+  font-weight:760;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+dialog#dlg.squad-wide .squad-inbound-copy small{
+  overflow:hidden;
+  color:var(--mu);
+  font-size:.66rem;
+  line-height:1.4;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+dialog#dlg.squad-wide .squad-inbound-hosts{
+  color:var(--mu);
+  font-size:.64rem;
+  font-weight:710;
+  white-space:nowrap;
+}
+
+dialog#dlg.squad-wide .squad-help,
+dialog#dlg.squad-wide .squad-inbound-empty{
+  color:var(--mu);
+  font-size:.67rem;
+  line-height:1.5;
+}
+
+dialog#dlg.squad-wide .squad-editor-side{
+  grid-column:1/-1;
+  padding:18px 20px 19px;
+  background:
+    linear-gradient(90deg,color-mix(in srgb,var(--a) 3.5%,var(--s1)),color-mix(in srgb,var(--s2) 28%,var(--s1)) 45%,var(--s1));
+}
+
+dialog#dlg.squad-wide [data-squad-preview]{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:14px 18px;
+  align-items:start;
+}
+
+dialog#dlg.squad-wide .squad-preview-stats{
+  grid-column:1/-1;
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:9px;
+}
+
+dialog#dlg.squad-wide .squad-preview-stat{
+  position:relative;
+  min-width:0;
+  padding:13px 15px 12px 17px;
+  border:1px solid var(--ln);
+  border-radius:13px;
+  background:color-mix(in srgb,var(--s1) 82%,var(--s2));
+  overflow:hidden;
+}
+
+dialog#dlg.squad-wide .squad-preview-stat::before{
+  content:"";
+  position:absolute;
+  left:0;
+  top:12px;
+  bottom:12px;
+  width:2px;
+  border-radius:2px;
+  background:color-mix(in srgb,var(--a) 70%,transparent);
+}
+
+dialog#dlg.squad-wide .squad-preview-stat b{
+  display:block;
+  margin-bottom:4px;
+  color:var(--tx);
+  font-size:1.24rem;
+  line-height:1;
+  font-weight:790;
+  font-variant-numeric:tabular-nums;
+}
+
+dialog#dlg.squad-wide .squad-preview-stat small{
+  color:var(--mu);
+  font-size:.65rem;
+  font-weight:650;
+}
+
+dialog#dlg.squad-wide .squad-preview-section{
+  display:grid;
+  align-content:start;
+  gap:7px;
+  min-width:0;
+  padding:12px 0 0;
+  border-top:1px solid var(--ln);
+}
+
+dialog#dlg.squad-wide .squad-preview-section > b{
+  font-size:.7rem;
+  font-weight:760;
+}
+
+dialog#dlg.squad-wide .squad-preview-list,
+dialog#dlg.squad-wide .squad-user-list{
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+  min-width:0;
+}
+
+dialog#dlg.squad-wide .squad-user-chip,
+dialog#dlg.squad-wide .squad-preview-list > *{
+  max-width:100%;
+  padding:5px 8px;
+  border:1px solid var(--ln);
+  border-radius:999px;
+  background:color-mix(in srgb,var(--s2) 50%,var(--s1));
+  color:var(--mu);
+  font-size:.63rem;
+  line-height:1.2;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+dialog#dlg.squad-wide .squad-preview-nodes{
+  grid-column:auto;
+}
+
+dialog#dlg.squad-wide .squad-preview-warnings,
+dialog#dlg.squad-wide .squad-preview-ready{
+  grid-column:1/-1;
+  margin:0;
+  padding:10px 12px;
+  border:1px solid color-mix(in srgb,var(--wr) 28%,var(--ln));
+  border-radius:11px;
+  background:color-mix(in srgb,var(--wr) 6%,var(--s1));
+  color:var(--wr);
+  font-size:.68rem;
+  line-height:1.5;
+}
+
+dialog#dlg.squad-wide .squad-preview-ready{
+  border-color:color-mix(in srgb,var(--ok) 26%,var(--ln));
+  background:color-mix(in srgb,var(--ok) 5%,var(--s1));
+  color:var(--ok);
+}
+
+dialog#dlg.squad-wide .squad-preview-warnings p{
+  display:flex;
+  gap:7px;
+  align-items:flex-start;
+}
+
+dialog#dlg.squad-wide #fe:empty{display:none}
+
+dialog#dlg.squad-wide > form.box > .act{
+  position:sticky;
+  bottom:0;
+  z-index:2;
+  display:flex;
+  align-items:center;
+  gap:9px;
+  margin:0;
+  padding:14px 20px;
+  border-top:1px solid var(--ln);
+  background:color-mix(in srgb,var(--s1) 94%,transparent);
+  -webkit-backdrop-filter:blur(12px);
+  backdrop-filter:blur(12px);
+}
+
+dialog#dlg.squad-wide > form.box > .act .gh,
+dialog#dlg.squad-wide > form.box > .act .btn,
+dialog#dlg.squad-wide > form.box > .act .dg{
+  min-height:42px;
+  padding-inline:17px;
+  border-radius:11px;
+  font-weight:740;
+}
+
+dialog#dlg.squad-wide > form.box > .act .btn{
+  min-width:124px;
+}
+
+@media(min-width:1800px){
+  dialog#dlg.squad-wide{
+    width:min(1380px,78vw)!important;
+    inline-size:min(1380px,78vw)!important;
+  }
+}
+
+@media(max-width:860px){
+  dialog#dlg.squad-wide{
+    width:calc(100vw - 18px)!important;
+    inline-size:calc(100vw - 18px)!important;
+  }
+  dialog#dlg.squad-wide > form.box{border-radius:17px}
+  dialog#dlg.squad-wide > form.box > h2{padding:22px 20px 18px}
+  dialog#dlg.squad-wide .squad-editor-layout{grid-template-columns:minmax(0,1fr);padding:14px}
+  dialog#dlg.squad-wide .squad-editor-side{grid-column:auto}
+  dialog#dlg.squad-wide [data-squad-preview]{grid-template-columns:minmax(0,1fr)}
+  dialog#dlg.squad-wide .squad-preview-stats{grid-column:auto;grid-template-columns:repeat(2,minmax(0,1fr))}
+  dialog#dlg.squad-wide .squad-preview-warnings,
+  dialog#dlg.squad-wide .squad-preview-ready{grid-column:auto}
+}
+
+@media(max-width:620px){
+  dialog#dlg.squad-wide .squad-editor-toolbar{grid-template-columns:1fr 1fr}
+  dialog#dlg.squad-wide .squad-inbound-search{grid-column:1/-1}
+  dialog#dlg.squad-wide .squad-editor-layout > section{padding:15px}
+  dialog#dlg.squad-wide .squad-preview-stats{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  dialog#dlg.squad-wide > form.box > .act{padding:12px 14px;flex-wrap:wrap}
+  dialog#dlg.squad-wide > form.box > .act .gh,
+  dialog#dlg.squad-wide > form.box > .act .btn{flex:1}
+}
