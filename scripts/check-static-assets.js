@@ -32,10 +32,12 @@ if(errors.length){
  const tlsJs=fs.readFileSync(path.join(root,'xray-studio-tls-dialog.js'),'utf8');
  const tlsCss=fs.readFileSync(path.join(root,'xray-studio-tls-dialog.css'),'utf8');
  new Function(tlsJs);
- assert.match(index,/xray-studio-tls-dialog\.css\?v=20261101-hysteria-tls-v1/,
-   'TLS stylesheet must remain explicitly versioned in the panel');
- assert.match(index,/xray-studio-tls-dialog\.js\?v=20261101-hysteria-tls-v1/,
-   'TLS behavior must remain explicitly versioned in the panel');
+ assert.match(index,/xray-studio-tls-dialog\.css\?v=20261101-tls-workspace-v2/,
+   'TLS workspace stylesheet must receive a fresh cache key');
+ assert.match(index,/xray-studio-tls-dialog\.js\?v=20261101-tls-workspace-v2/,
+   'TLS workspace behavior must receive a fresh cache key');
+ assert.match(index,/node-dialogs\.js\?v=20261101-agent-update-autovalidation-v1/,
+   'Agent update autovalidation handler must receive a fresh cache key');
  assert.match(dockerfile,/xray-studio-tls-dialog\.css xray-studio-tls-dialog\.js/,
    'Production image must package the TLS editor assets');
  assert.match(tlsJs,/action!==['"]tls['"]&&action!==['"]hysteria['"]/,
@@ -64,5 +66,5 @@ if(errors.length){
    'Legacy nested TLS section cards must not return');
  assert.match(tlsCss,/@media\(max-width:640px\)/,
    'TLS dialog must remain responsive on narrow screens');
- console.log('Static asset packaging + flat guided Hysteria TLS 1.3/h3 contract: OK.');
+ console.log('Static asset packaging + fresh Agent/TLS cache keys + flat guided TLS contract: OK.');
 }
