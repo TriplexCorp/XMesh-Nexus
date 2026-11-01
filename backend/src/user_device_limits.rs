@@ -22,7 +22,7 @@ struct DeviceClaim {
     app: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Decision {
     Unlimited,
     Allowed {
@@ -238,7 +238,7 @@ async fn sync_projection(tx: &mut Transaction<'_, Postgres>, user_id: i64) -> Re
         .await?;
     sqlx::query(
         "UPDATE panel_records
-            SET data=jsonb_set(data,'{devices}',$2,true)
+            SET data=jsonb_set(data,ARRAY['devices'],$2,true)
           WHERE collection='users' AND id=$1",
     )
     .bind(user_id)
@@ -246,6 +246,100 @@ async fn sync_projection(tx: &mut Transaction<'_, Postgres>, user_id: i64) -> Re
     .execute(&mut **tx)
     .await?;
     Ok(())
+}
+
+async fn lock_user(tx: &mut Transaction<'_, Postgres>, user_id: i64) -> Result<(), ApiError> {
+    let exists = sqlx::query_scalar::<_, i64>(
+        "SELECT id FROM panel_records WHERE collection='users' AND id=$1 FOR UPDATE",
+    )
+    .bind(user_id)
+    .fetch_optional(&mut **tx)
+    .await?;
+    if exists.is_none() {
+        return Err(ApiError::new(StatusCode::NOT_FOUND, "User not found"));
+    }
+    Ok(())
+}
+
+async fn audit_device_action(
+    tx: &mut Transaction<'_, Postgres>,
+    actor: &str,
+    action: &str,
+    user_id: i64,
+    detail: Value,
+) -> Result<(), ApiError> {
+    sqlx::query(
+        "INSERT INTO panel_audit_log (actor,action,collection,record_id,detail)
+         VALUES($1,$2,'users',$3,$4)",
+    )
+    .bind(actor)
+    .bind(action)
+    .bind(user_id)
+    .bind(detail)
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
+pub async fn remove_device(
+    state: &AppState,
+    user_id: i64,
+    device_id: i64,
+    actor: &str,
+) -> Result<Value, ApiError> {
+    if user_id <= 0 || device_id <= 0 {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid device slot"));
+    }
+    let mut tx = state.pool.begin().await?;
+    lock_user(&mut tx, user_id).await?;
+    let removed = sqlx::query(
+        "DELETE FROM user_subscription_devices WHERE user_id=$1 AND id=$2",
+    )
+    .bind(user_id)
+    .bind(device_id)
+    .execute(&mut *tx)
+    .await?;
+    if removed.rows_affected() == 0 {
+        return Err(ApiError::new(StatusCode::NOT_FOUND, "Device slot not found"));
+    }
+    sync_projection(&mut tx, user_id).await?;
+    audit_device_action(
+        &mut tx,
+        actor,
+        "subscription_device.removed",
+        user_id,
+        json!({"deviceId":device_id}),
+    )
+    .await?;
+    tx.commit().await?;
+    admin_status(state, user_id).await
+}
+
+pub async fn reset_devices(
+    state: &AppState,
+    user_id: i64,
+    actor: &str,
+) -> Result<Value, ApiError> {
+    if user_id <= 0 {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid user"));
+    }
+    let mut tx = state.pool.begin().await?;
+    lock_user(&mut tx, user_id).await?;
+    let removed = sqlx::query("DELETE FROM user_subscription_devices WHERE user_id=$1")
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await?;
+    sync_projection(&mut tx, user_id).await?;
+    audit_device_action(
+        &mut tx,
+        actor,
+        "subscription_devices.reset",
+        user_id,
+        json!({"removed":removed.rows_affected()}),
+    )
+    .await?;
+    tx.commit().await?;
+    admin_status(state, user_id).await
 }
 
 #[expect(
@@ -339,7 +433,7 @@ pub async fn authorize_feed(
     let mut count = count_devices(&mut tx, user_id).await?;
     let mut replaced_stale = false;
     if count >= limit {
-        let stale = sqlx::query_scalar::<_, i64>(
+        let replacement_id = sqlx::query_scalar::<_, i64>(
             "SELECT id FROM user_subscription_devices
               WHERE user_id=$1 AND last_seen_at < NOW() - INTERVAL '45 days'
               ORDER BY last_seen_at ASC,id ASC LIMIT 1",
@@ -347,10 +441,10 @@ pub async fn authorize_feed(
         .bind(user_id)
         .fetch_optional(&mut *tx)
         .await?;
-        if let Some(stale_id) = stale {
+        if let Some(device_id) = replacement_id {
             sqlx::query("DELETE FROM user_subscription_devices WHERE user_id=$1 AND id=$2")
                 .bind(user_id)
-                .bind(stale_id)
+                .bind(device_id)
                 .execute(&mut *tx)
                 .await?;
             count -= 1;
