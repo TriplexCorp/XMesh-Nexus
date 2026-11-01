@@ -11,6 +11,7 @@ const fs=require('node:fs');
 const originalReadFileSync=fs.readFileSync.bind(fs);
 const overlay=originalReadFileSync('backend/src/node_runtime.rs','utf8');
 const staged=originalReadFileSync('backend/src/node_runtime_p0d_staged.rs','utf8');
+const nodeDialogs=originalReadFileSync('node-dialogs.js','utf8');
 
 fs.readFileSync=function(path,...args){
   if(path==='backend/src/node_runtime.rs'){
@@ -46,4 +47,20 @@ assert.doesNotMatch(overlay,/strict-pq=on/,'Retry recovery must not activate str
 assert.doesNotMatch(overlay,/\b(url|uri|script|shell|command_text)\s*:/i,
   'Retry recovery must not introduce executable remote input');
 
+// UI must never maintain a second Agent-version allow-list. It only proves a
+// fresh runtime exists and lets the authenticated backend decide whether the
+// fixed self-update command is legal for the currently connected Agent.
+assert.match(nodeDialogs,/\[data-agent-update\]/);
+assert.match(nodeDialogs,/event\.stopImmediatePropagation\(\)/,
+  'Agent update override must supersede the historical app.js v4/v5 regex gate');
+assert.match(nodeDialogs,/if\(!runtime\.connected\)/,
+  'UI may reject stale connectivity before asking for an update');
+assert.match(nodeDialogs,/\/agent-update['"],\{[\s\S]*method:['"]POST['"]/,
+  'UI must delegate the update decision to the authenticated backend endpoint');
+assert.doesNotMatch(nodeDialogs,/runtime\.version[^\n]{0,120}(?:match|test)\(/,
+  'Frontend must not infer self-update capability from an Agent version regex');
+assert.match(nodeDialogs,/No client-side version allow-list/,
+  'The backend-authoritative capability contract must remain explicit');
+
 console.log('Manifest-bound Agent lost-response retry source contract: OK');
+console.log('Backend-authoritative Agent update validation: OK');
