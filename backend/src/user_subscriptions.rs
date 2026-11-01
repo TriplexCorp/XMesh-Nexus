@@ -186,6 +186,7 @@ pub async fn status(
     Extension(actor): Extension<AuthUser>,
     Path(id): Path<i64>,
 ) -> Result<Json<Value>, ApiError> {
+    crate::require_mutation(&actor)?;
     let mut response = base::status(
         State(state.clone()),
         Extension(actor),
