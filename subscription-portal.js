@@ -42,29 +42,35 @@
 
   function showQr(target) {
     if (target.dataset.ready === 'yes') return;
-    if (!window.qrgen?.QrCode) throw new Error('QR library is unavailable');
-    const qr = window.qrgen.QrCode.encodeText(input.value, window.qrgen.QrCode.Ecc.MEDIUM);
+    const Qr = window.qrcodegen?.QrCode;
+    if (!Qr) throw new Error('QR library is unavailable');
+    const value = String(input.value || '').trim();
+    if (!value) throw new Error('Subscription link is empty');
+    const qr = Qr.encodeText(value, Qr.Ecc.MEDIUM);
+    const quiet = 4;
+    const canvas = qr.size + quiet * 2;
     const ns = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(ns, 'svg');
-    svg.setAttribute('viewBox', '0 0 ' + qr.size + ' ' + qr.size);
+    svg.setAttribute('viewBox', '0 0 ' + canvas + ' ' + canvas);
     svg.setAttribute('role', 'img');
+    svg.setAttribute('shape-rendering', 'crispEdges');
     svg.setAttribute('aria-label', language === 'en' ? 'Subscription QR code' : 'QR-код подписки');
     const base = document.createElementNS(ns, 'rect');
-    base.setAttribute('width', String(qr.size));
-    base.setAttribute('height', String(qr.size));
+    base.setAttribute('width', String(canvas));
+    base.setAttribute('height', String(canvas));
     base.setAttribute('fill', '#fff');
     svg.append(base);
     let pathData = '';
     for (let y = 0; y < qr.size; y++) {
       for (let x = 0; x < qr.size; x++) {
-        if (qr.getModule(x, y)) pathData += 'M' + x + ',' + y + 'h1v1h-1z';
+        if (qr.getModule(x, y)) pathData += 'M' + (x + quiet) + ',' + (y + quiet) + 'h1v1h-1z';
       }
     }
     const path = document.createElementNS(ns, 'path');
     path.setAttribute('fill', '#101923');
     path.setAttribute('d', pathData);
     svg.append(path);
-    target.append(svg);
+    target.replaceChildren(svg);
     target.dataset.ready = 'yes';
   }
 
