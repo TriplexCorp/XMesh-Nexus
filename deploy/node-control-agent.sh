@@ -11,12 +11,12 @@ export LC_ALL=C
 [[ "$XMESH_API_URL" == https://* ]] || exit 2
 XMESH_API_URL="${XMESH_API_URL%/}"
 KEY="${XMESH_METRICS_PRIVATE_KEY:-/etc/xmesh-node-metrics/node.key}"
-AGENT_VERSION="control-v6.0.1"
+AGENT_VERSION="control-v6.0.2"
 UNIT="${XMESH_XRAY_UNIT:-xray.service}"
 # Only root-owned local configuration can choose a unit. Remote responses never do.
 [[ "$UNIT" =~ ^[A-Za-z0-9_.@-]+\.service$ ]] || { echo "Invalid systemd unit" >&2; exit 2; }
 [[ -r "$KEY" ]] || { echo "XMesh Ed25519 key unavailable" >&2; exit 2; }
-for required in flock python3 sha256sum readlink timeout; do
+for required in curl flock python3 sha256sum readlink systemd-run timeout; do
  command -v "$required" >/dev/null 2>&1 || exit 2
 done
 exec 9>/run/xmesh-node-control.lock
@@ -275,6 +275,53 @@ for path in sys.argv[4:6]:
 PY
  timeout 20 "$binary" --check-state "$base/xsp-v2" >/dev/null
 }
+UPDATER_RESULT_UNIT=xmesh-node-agent-upgrade.service
+UPDATER_ERROR=''
+run_agent_updater(){
+ local static_unit=xmesh-node-agent-upgrade.service transient_unit=xmesh-node-agent-upgrade-repair
+ local updater=/usr/local/sbin/xmesh-update-agent bootstrap='' rc=0
+ UPDATER_ERROR=''
+ if systemctl cat "$static_unit" >/dev/null 2>&1 && [[ -f "$updater" && ! -L "$updater" && -x "$updater" ]];then
+  UPDATER_RESULT_UNIT="$static_unit"
+  timeout 650 systemctl start --wait "$static_unit"
+  return $?
+ fi
+ install -d -m 0700 /run/xmesh-node-control || { UPDATER_ERROR='Cannot prepare Agent updater repair state';return 1; }
+ if [[ ! -f "$updater" || -L "$updater" || ! -x "$updater" ]];then
+  bootstrap=/run/xmesh-node-control/update-node-control-agent.bootstrap
+  rm -f "$bootstrap"
+  if ! curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy/update-node-control-agent.sh -o "$bootstrap";then
+   UPDATER_ERROR='Agent updater missing and verified bootstrap download failed';return 1
+  fi
+  if ! bash -n "$bootstrap" || ! grep -Fq 'AGENT_VERSION="control-v6.0.2"' "$bootstrap" || ! grep -Fq 'xmesh-node-agent-upgrade.service' "$bootstrap";then
+   rm -f "$bootstrap";UPDATER_ERROR='Downloaded Agent updater failed bootstrap validation';return 1
+  fi
+  chmod 0700 "$bootstrap"
+  updater="$bootstrap"
+ fi
+ UPDATER_RESULT_UNIT="$transient_unit"
+ systemctl reset-failed "$transient_unit" >/dev/null 2>&1 || true
+ if timeout 650 systemd-run --quiet --wait --collect --pipe --unit="$transient_unit" \
+  --property=Type=oneshot --property=TimeoutStartSec=650s \
+  --property=NoNewPrivileges=true --property=PrivateTmp=true \
+  --property=ProtectSystem=strict --property=ProtectHome=true \
+  --property=ProtectKernelModules=true --property=ProtectKernelTunables=true \
+  --property=ProtectControlGroups=true --property=RestrictSUIDSGID=true \
+  --property=LockPersonality=true \
+  --property=ReadWritePaths=/usr/local/sbin --property=ReadWritePaths=/usr/local/bin \
+  --property=ReadWritePaths=/usr/local/libexec --property=ReadWritePaths=/etc/systemd/system \
+  --property=ReadWritePaths=/var/lib/xmesh-node-control --property=ReadWritePaths=/var/lib/xmesh-xray-sync \
+  --property=ReadWritePaths=/var/lib/xmesh-agent --property=ReadWritePaths=-/opt/xmesh-node \
+  --property=ReadWritePaths=-/root/XMesh-Node --property=ReadWritePaths=/run \
+  "$updater" --remote;then
+  rc=0
+ else
+  rc=$?
+  UPDATER_ERROR='Agent updater repair service failed; inspect xmesh-node-agent-upgrade-repair'
+ fi
+ [[ -z "$bootstrap" ]] || rm -f "$bootstrap"
+ return "$rc"
+}
 stop_xray(){
  mkdir -p "$STATE_DIR"
  chmod 700 "$STATE_DIR"
@@ -368,22 +415,26 @@ elif [[ "$action" == update_agent ]];then
  if [[ "$release_version" != - ]];then
   if ! stage_agent_release_identity "$release_version" "$source_revision" "$artifact_sha256";then
    detail='Invalid or unstorable Agent release identity'
-  elif ! systemctl cat xmesh-node-agent-upgrade.service >/dev/null 2>&1;then
-   detail='Agent updater service missing; update the control Agent first'
-  elif timeout 650 systemctl start --wait xmesh-node-agent-upgrade.service && verify_staged_agent_package "$release_version" "$source_revision" "$artifact_sha256";then
+  elif run_agent_updater && verify_staged_agent_package "$release_version" "$source_revision" "$artifact_sha256";then
    success=true;detail='Staged Agent package activated and exact release identity verified'
   else
-   unit_result="$(systemctl show --property=Result --value xmesh-node-agent-upgrade.service 2>/dev/null || true)";[[ "$unit_result" =~ ^[a-zA-Z0-9_-]{1,40}$ ]] || unit_result=unknown
-   detail="Staged Agent apply failed (systemd: $unit_result); previous package remains/restored"
+   if [[ -n "$UPDATER_ERROR" ]];then
+    detail="$UPDATER_ERROR"
+   else
+    unit_result="$(systemctl show --property=Result --value "$UPDATER_RESULT_UNIT" 2>/dev/null || true)";[[ "$unit_result" =~ ^[a-zA-Z0-9_-]{1,40}$ ]] || unit_result=unknown
+    detail="Staged Agent apply failed (systemd: $unit_result); previous package remains/restored"
+   fi
   fi
  else
-  if ! systemctl cat xmesh-node-agent-upgrade.service >/dev/null 2>&1;then
-   detail='Agent updater service missing; reinstall control-v4 first'
-  elif timeout 650 systemctl start --wait xmesh-node-agent-upgrade.service && grep -Fxq "AGENT_VERSION=\"$target_version\"" /usr/local/sbin/xmesh-node-control;then
+  if run_agent_updater && grep -Fxq "AGENT_VERSION=\"$target_version\"" /usr/local/sbin/xmesh-node-control;then
    success=true;detail='Agent installed and version verified'
   else
-   unit_result="$(systemctl show --property=Result --value xmesh-node-agent-upgrade.service 2>/dev/null || true)";[[ "$unit_result" =~ ^[a-zA-Z0-9_-]{1,40}$ ]] || unit_result=unknown
-   detail="Agent update failed (systemd: $unit_result); journalctl -u xmesh-node-agent-upgrade.service"
+   if [[ -n "$UPDATER_ERROR" ]];then
+    detail="$UPDATER_ERROR"
+   else
+    unit_result="$(systemctl show --property=Result --value "$UPDATER_RESULT_UNIT" 2>/dev/null || true)";[[ "$unit_result" =~ ^[a-zA-Z0-9_-]{1,40}$ ]] || unit_result=unknown
+    detail="Agent update failed (systemd: $unit_result); inspect $UPDATER_RESULT_UNIT"
+   fi
   fi
  fi
 elif [[ "$action" == restart_xray ]];then
