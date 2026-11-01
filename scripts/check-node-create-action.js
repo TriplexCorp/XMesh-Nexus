@@ -88,8 +88,8 @@ assert.match(strictBootstrap,/Node\/Xray не запустятся без под
 // Redesigned modal surfaces share one cache-busted dialog asset layer.
 assert.match(html,/<link rel="stylesheet" href="\/node-dialogs\.css\?v=20261101-user-create-v2">/,
  'Dialog redesign stylesheet must be cache-busted');
-assert.match(html,/<script src="\/node-dialogs\.js\?v=20261101-user-create-v2"><\/script>/,
- 'Dialog behavior enhancer must be cache-busted');
+assert.match(html,/<script src="\/node-dialogs\.js\?v=20261101-agent-update-autovalidation-v1"><\/script>/,
+ 'Dialog behavior enhancer and Agent autovalidation must be cache-busted');
 assert.match(dialogCss,/dialog\.xm-action-confirm:has\(\.xm-action-confirm-icon\)\{[\s\S]*width:min\(760px/,
  'Registered-node confirmation must no longer use the tiny shared width');
 assert.match(dialogCss,/\.xm-action-confirm-close\{[\s\S]*grid-area:close/,
