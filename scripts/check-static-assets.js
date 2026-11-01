@@ -37,7 +37,7 @@ if(errors.length){
  assert.match(index,/xray-studio-tls-dialog\.css\?v=20261101-tls-layout-v5/,
    'TLS dialog stylesheet must receive the specificity-fix cache key');
  assert.match(index,/xray-studio-tls-dialog\.js\?v=20261101-tls-workspace-v2/,
-   'TLS workspace behavior cache key must remain stable when JS is unchanged');
+   'TLS workspace behavior cache key must remain stable until its asset key is intentionally rotated');
  assert.match(index,/node-dialogs\.js\?v=20261101-agent-update-autovalidation-v1/,
    'Agent update autovalidation handler must receive a fresh cache key');
  assert.match(index,/xray-studio-xhttp-expert\.js\?v=20261101-core-schema-v2/,
@@ -80,6 +80,10 @@ if(errors.length){
    'TLS editor must retain the guided workspace wrapper');
  assert.match(tlsJs,/class="xm-tls-summary"/,
    'TLS editor must expose the transport summary strip');
+ assert.match(tlsJs,/class="xm-tls-close xm-studio-modal-close" data-x aria-label="Закрыть окно">×<\/button>/,
+   'TLS dialog must reuse the Nexus-wide unified close control instead of a private SVG close button');
+ assert.doesNotMatch(tlsJs,/function closeIcon\(/,
+   'TLS dialog must not carry a second private close icon implementation');
  assert.match(tlsCss,/dialog\.xm-tls-dialog\{[\s\S]*width:min\(1180px,calc\(100vw - 2rem\)\)!important/,
    'TLS dialog width must explicitly defeat the generic 30rem dialog rule');
  assert.match(tlsCss,/\.xm-tls-layout\{display:grid;grid-template-columns:1fr/,
