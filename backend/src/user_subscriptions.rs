@@ -6,7 +6,7 @@ use axum::{
     http::{HeaderMap, StatusCode, header},
     response::Response,
 };
-use serde_json::Value;
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use sqlx::Row;
 use std::collections::HashMap;
@@ -19,11 +19,10 @@ use std::collections::HashMap;
 // subscription-preview-cta subscription-preview-quick subscription-preview-support.
 #[path = "user_subscriptions_base.rs"]
 mod base;
+#[path = "user_device_limits.rs"]
+mod device_limits;
 
-pub use base::{
-    create, migrate_legacy_ciphertexts, portal, provision_new_user, revoke, rotate_credentials,
-    serve, status,
-};
+pub use base::{migrate_legacy_ciphertexts, provision_new_user, revoke, rotate_credentials};
 
 async fn user_fingerprint(state: &AppState, id: i64) -> Result<Option<String>, ApiError> {
     let row = sqlx::query("SELECT data FROM panel_records WHERE collection='users' AND id=$1")
@@ -59,11 +58,6 @@ async fn token_fingerprint(state: &AppState, token: &str) -> Result<Option<Strin
     user_fingerprint(state, id).await
 }
 
-// The product contract says an empty user override inherits the host and an
-// empty host fingerprint means chrome. Older hosts may predate the explicit
-// `fp` field, so generated client JSON must materialize that final fallback
-// instead of merely showing it in the editor. Existing non-empty host values
-// are preserved; a per-user override is applied afterwards.
 fn ensure_default_fingerprint(value: &mut Value) {
     match value {
         Value::Array(items) => {
@@ -180,21 +174,130 @@ pub async fn admin_client_json(
     Ok(response)
 }
 
+pub async fn create(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Path(id): Path<i64>,
+    Query(options): Query<HashMap<String, String>>,
+) -> Result<Json<Value>, ApiError> {
+    crate::require_mutation(&actor)?;
+    match options.get("deviceAction").map(String::as_str) {
+        None => base::create(State(state), Extension(actor), Path(id)).await,
+        Some("remove") => {
+            let device_id = options
+                .get("deviceId")
+                .and_then(|value| value.parse::<i64>().ok())
+                .filter(|value| *value > 0)
+                .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Invalid device slot"))?;
+            let device_limit =
+                device_limits::remove_device(&state, id, device_id, &actor.username).await?;
+            Ok(Json(json!({"ok":true,"deviceLimit":device_limit})))
+        }
+        Some("reset") => {
+            let device_limit = device_limits::reset_devices(&state, id, &actor.username).await?;
+            Ok(Json(json!({"ok":true,"deviceLimit":device_limit})))
+        }
+        Some(_) => Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Unknown device action",
+        )),
+    }
+}
+
+pub async fn status(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Path(id): Path<i64>,
+) -> Result<Json<Value>, ApiError> {
+    crate::require_mutation(&actor)?;
+    let mut response = base::status(State(state.clone()), Extension(actor), Path(id)).await?;
+    response.0["deviceLimit"] = device_limits::admin_status(&state, id).await?;
+    Ok(response)
+}
+
+pub async fn serve(
+    State(state): State<AppState>,
+    Path(token): Path<String>,
+    headers: HeaderMap,
+    Query(options): Query<HashMap<String, String>>,
+) -> Result<Response, ApiError> {
+    let fingerprint = token_fingerprint(&state, &token).await?;
+    let request_headers = headers.clone();
+    let response = base::serve(
+        State(state.clone()),
+        Path(token.clone()),
+        headers,
+        Query(options),
+    )
+    .await?;
+    let decision = device_limits::authorize_feed(&state, &token, &request_headers).await?;
+    if matches!(
+        &decision,
+        device_limits::Decision::Missing { .. } | device_limits::Decision::LimitReached { .. }
+    ) {
+        return Ok(device_limits::apply_decision(
+            response,
+            decision,
+            &request_headers,
+        ));
+    }
+    let response = patch_response_fingerprint(response, fingerprint).await?;
+    Ok(device_limits::apply_decision(
+        response,
+        decision,
+        &request_headers,
+    ))
+}
+
+pub async fn portal(
+    State(state): State<AppState>,
+    Path(token): Path<String>,
+    headers: HeaderMap,
+    Query(options): Query<HashMap<String, String>>,
+) -> Result<Response, ApiError> {
+    let wants_feed = crate::subscription_user_agent::wants_feed(&headers, &options)
+        .map_err(|message| ApiError::new(StatusCode::BAD_REQUEST, message))?;
+    if wants_feed {
+        return serve(State(state), Path(token), headers, Query(options)).await;
+    }
+    base::portal(State(state), Path(token), headers, Query(options)).await
+}
+
 pub async fn portal_route(
     State(state): State<AppState>,
     OriginalUri(uri): OriginalUri,
     headers: HeaderMap,
     Query(options): Query<HashMap<String, String>>,
 ) -> Result<Response, ApiError> {
-    let token = uri
+    let (prefix, token) = uri
         .path()
         .rsplit_once('/')
-        .map(|(_, token)| token.to_owned())
-        .unwrap_or_default();
-    let fingerprint = token_fingerprint(&state, &token).await?;
-    let response =
-        base::portal_route(State(state), OriginalUri(uri), headers, Query(options)).await?;
-    patch_response_fingerprint(response, fingerprint).await
+        .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Subscription not found"))?;
+    let settings = crate::read_settings(&state.pool).await?;
+    let configured = settings
+        .get("subscriptionPath")
+        .and_then(Value::as_str)
+        .filter(|path| path.starts_with('/'))
+        .unwrap_or("/s")
+        .trim_end_matches('/');
+    if prefix != configured {
+        return Err(ApiError::new(
+            StatusCode::NOT_FOUND,
+            "Subscription not found",
+        ));
+    }
+    let wants_feed = crate::subscription_user_agent::wants_feed(&headers, &options)
+        .map_err(|message| ApiError::new(StatusCode::BAD_REQUEST, message))?;
+    if wants_feed {
+        return serve(
+            State(state),
+            Path(token.to_owned()),
+            headers,
+            Query(options),
+        )
+        .await;
+    }
+    base::portal_route(State(state), OriginalUri(uri), headers, Query(options)).await
 }
 
 #[cfg(test)]
