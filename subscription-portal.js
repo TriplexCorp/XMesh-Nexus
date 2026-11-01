@@ -5,6 +5,7 @@
   const language = document.documentElement.lang === 'en' ? 'en' : 'ru';
   const copy = language === 'en'
     ? {
+        brandNote:'Secure access workspace',
         linkLabel:'Personal HTTPS link',
         linkNote:'Use this address in a compatible client. Keep it private.',
         endpointLabel:'Secure endpoint',
@@ -17,6 +18,7 @@
         qrLabel:'Subscription QR code'
       }
     : {
+        brandNote:'Центр безопасного подключения',
         linkLabel:'Персональная HTTPS-ссылка',
         linkNote:'Добавьте этот адрес в совместимое приложение. Не передавайте его посторонним.',
         endpointLabel:'Защищённая точка подключения',
@@ -44,12 +46,14 @@
   const display = document.getElementById('subscription-link-display');
   const label = document.getElementById('subscription-link-label');
   const note = document.getElementById('subscription-link-note');
+  const brandNote = document.getElementById('subscription-brand-note');
   const endpointLabel = document.getElementById('subscription-endpoint-label');
   const endpointNote = document.getElementById('subscription-endpoint-note');
   const actionStatus = document.getElementById('subscription-action-status');
   const statusLabel = document.getElementById('subscription-status-label');
   const statusNote = document.getElementById('subscription-status-note');
 
+  if (brandNote) brandNote.textContent = copy.brandNote;
   if (statusLabel) statusLabel.textContent = copy.statusLabel;
   if (statusNote) statusNote.textContent = copy.statusNote;
   if (endpointLabel) endpointLabel.textContent = copy.endpointLabel;
