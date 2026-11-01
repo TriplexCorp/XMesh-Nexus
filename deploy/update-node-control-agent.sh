@@ -21,7 +21,7 @@ fi
 tmp="$(mktemp)"; trap 'rm -f "$tmp"' EXIT
 curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy/node-control-agent.sh -o "$tmp"
 bash -n "$tmp"
-grep -Fxq 'AGENT_VERSION="control-v6.0.4"' "$tmp" || { echo "Downloaded Agent is not the current v6 POSTQUANTUM patch" >&2;exit 1; }
+grep -Fxq 'AGENT_VERSION="control-v6.0.5"' "$tmp" || { echo "Downloaded Agent is not the current v6 POSTQUANTUM patch" >&2;exit 1; }
 grep -q 'enforceStop' "$tmp" || { echo "Downloaded agent is missing traffic cutoff support" >&2;exit 1; }
 grep -q 'pinned-image' "$tmp" || { echo "Downloaded agent does not support pinned Xray versions" >&2;exit 1; }
 
@@ -71,14 +71,14 @@ update_router() {
  new_revision="$(git -C "$dir" rev-parse HEAD)" || return 1
  [[ "$new_revision" =~ ^[0-9a-f]{40}$ ]] || return 1
  [[ -f "$dir/VERSION" && "$(tr -d '\r\n' < "$dir/VERSION")" == "6.0.0" ]] || { echo "XMesh-Node main is not v6.0.0" >&2; return 1; }
- [[ -f "$dir/AGENT_VERSION" && "$(tr -d '\r\n' < "$dir/AGENT_VERSION")" == "control-v6.0.4" ]] || { echo "XMesh-Node main does not expose Agent control-v6.0.4" >&2; return 1; }
+ [[ -f "$dir/AGENT_VERSION" && "$(tr -d '\r\n' < "$dir/AGENT_VERSION")" == "control-v6.0.5" ]] || { echo "XMesh-Node main does not expose Agent control-v6.0.5" >&2; return 1; }
  [[ -f "$dir/deploy/install-xsp-v2-production-agent.sh" && ! -L "$dir/deploy/install-xsp-v2-production-agent.sh" ]] || { echo "v6 PQ Agent installer is missing" >&2; return 1; }
  if (cd "$dir" && docker --config "$DOCKER_CONFIG" compose build xmesh-node && docker --config "$DOCKER_CONFIG" compose run --rm --no-deps xmesh-node -check -config /etc/xmesh-node/config.json && docker --config "$DOCKER_CONFIG" compose up -d --no-deps --force-recreate xmesh-node && [[ "$(docker inspect -f '{{.State.Running}}' xmesh-node)" == true ]] && bash deploy/install-xsp-v2-production-agent.sh "$new_revision");then
   identity="$(/usr/local/bin/xmesh-agent-xspv2-activate --identity)" || return 1
   python3 - "$identity" "$new_revision" <<'PY'
 import json,sys
 v=json.loads(sys.argv[1])
-assert v.get('version')=='control-v6.0.4',v
+assert v.get('version')=='control-v6.0.5',v
 assert v.get('sourceRevision')==sys.argv[2],v
 assert isinstance(v.get('artifactSha256'),str) and len(v['artifactSha256'])==64,v
 PY
@@ -202,6 +202,6 @@ if ! systemctl start xmesh-node-user-meter.service; then echo "WARNING: Xray use
 install -o root -g root -m 0700 "$self_tmp" /usr/local/sbin/.xmesh-update-agent.new; mv -f /usr/local/sbin/.xmesh-update-agent.new /usr/local/sbin/xmesh-update-agent
 if systemctl list-unit-files xmesh-xray-sync.service --no-legend 2>/dev/null | grep -q '^xmesh-xray-sync.service'; then systemctl start --no-block xmesh-xray-sync.service || echo "WARNING: Unable to queue immediate Xray reconciliation; timer will retry." >&2;fi
 if [[ "$MODE" != --remote ]]; then systemctl start xmesh-node-control.service;fi
-grep -Fxq 'AGENT_VERSION="control-v6.0.4"' /usr/local/sbin/xmesh-node-control || { echo "v6 Agent version verification failed" >&2; exit 1; }
-/usr/local/bin/xmesh-agent-xspv2-activate --identity | python3 -c 'import json,sys;v=json.load(sys.stdin);assert v["version"]=="control-v6.0.4" and len(v["artifactSha256"])==64'
-echo "XMesh Agent v6.0.4 POSTQUANTUM installed: signed control, verified PQ runtime, offline policy and pinned Xray synchronizer are active."
+grep -Fxq 'AGENT_VERSION="control-v6.0.5"' /usr/local/sbin/xmesh-node-control || { echo "v6 Agent version verification failed" >&2; exit 1; }
+/usr/local/bin/xmesh-agent-xspv2-activate --identity | python3 -c 'import json,sys;v=json.load(sys.stdin);assert v["version"]=="control-v6.0.5" and len(v["artifactSha256"])==64'
+echo "XMesh Agent v6.0.5 POSTQUANTUM installed: signed control, verified PQ runtime, offline policy and pinned Xray synchronizer are active."
