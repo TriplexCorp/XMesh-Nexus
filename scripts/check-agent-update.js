@@ -12,6 +12,7 @@ const originalReadFileSync=fs.readFileSync.bind(fs);
 const overlay=originalReadFileSync('backend/src/node_runtime.rs','utf8');
 const staged=originalReadFileSync('backend/src/node_runtime_p0d_staged.rs','utf8');
 const nodeDialogs=originalReadFileSync('node-dialogs.js','utf8');
+new Function(nodeDialogs);
 
 fs.readFileSync=function(path,...args){
   if(path==='backend/src/node_runtime.rs'){
