@@ -12,7 +12,7 @@ The rule is now simple:
 
 > Feature styles own geometry. `ui-system.css` owns material.
 
-Geometry means grid, width, height, padding required by the feature, overflow, responsive layout and content-specific typography. Material means background, border treatment, elevation, blur/transparency and shared radius.
+Geometry means grid, width, height, padding required by the feature, overflow, responsive layout and content-specific typography. Material means background, border treatment, separators, elevation, blur/transparency and shared radius.
 
 ## Runtime files
 
@@ -69,6 +69,7 @@ The existing Appearance setting remains the source of truth:
 - `--ui-surface-item-bg`
 - `--ui-surface-control-bg`
 - `--ui-surface-border`
+- `--ui-separator`
 - `--ui-surface-panel-shadow`
 - `--ui-surface-dialog-shadow`
 - `--ui-surface-filter`
@@ -107,12 +108,39 @@ A modal has exactly one primary material shell.
 
 Do not solve modal hierarchy by adding another feature-specific card background or shadow.
 
+## Separator hierarchy
+
+Separators are structural, not surface borders.
+
+A one-pixel divider between rows must use `--ui-separator`, not `--ui-surface-border`, `--ui-surface-border-strong` or a raw `var(--ln)` color. Separators deliberately remain low-contrast in Glass and Raised so a card does not become a stack of ruled horizontal bands.
+
+The global **Strong / Яркие** border mode strengthens actual surface and control boundaries only. It must **not** amplify row separators. `data-borders="off"` removes both borders and separators.
+
+Legacy `.setting-row` dividers are adapted centrally by `ui-system.css`; new generic row components should consume `--ui-separator` directly.
+
+## Composite controls
+
+A composite control has exactly one material shell.
+
+Examples include `36 px`, search fields with an embedded icon/button, unit inputs and controls where several interactive/text elements visually form one capsule. The outer shell owns background, border, radius and any material treatment. Inner native inputs must remain transparent, borderless and shadowless.
+
+Preferred markup:
+
+```html
+<label data-ui-control="shell">
+  <input data-ui-control="inner" type="number">
+  <span>px</span>
+</label>
+```
+
+Do not allow the global input material to paint an inner field again. That creates hard rectangular seams inside a rounded capsule, especially visible in Glass. The existing Appearance `.precision-number` is the legacy reference adapter for this rule.
+
 ## Radius and borders
 
 - panel/card/dialog radius → `--ui-radius` through `--ui-surface-panel-radius`;
 - controls/buttons → existing `--ui-control-radius` contract;
 - border visibility/strength comes from the global `data-borders` state;
-- strong borders may use the accent, but they must not turn neutral surfaces into accent-filled slabs;
+- strong borders may use the accent, but they must not turn neutral surfaces into accent-filled slabs or row separators into rulers;
 - features must not hard-code a second appearance system.
 
 A content-specific circular control may remain circular.
@@ -135,7 +163,9 @@ When touching an old feature:
 1. remove hard-coded material declarations from its feature CSS where practical;
 2. use semantic `<section>` / `.card` markup or `data-ui-surface`;
 3. do not auto-cardify ordinary rows merely because they are visually grouped;
-4. remove its entry from the compatibility registry once it no longer needs one.
+4. convert hard `var(--ln)` row dividers to `--ui-separator` when they are structural rather than surface boundaries;
+5. for compound fields, make one shell own material and keep inner inputs transparent;
+6. remove its entry from the compatibility registry once it no longer needs one.
 
 The target state is a shrinking registry, not an expanding list of per-feature theme overrides.
 
@@ -151,12 +181,13 @@ Before merging a new screen/dialog:
 
 1. Change Appearance between Classic, Glass and Raised. The surface must visibly change without recoloring every inner row.
 2. Open a modal in all three modes. It must have one clear shell and must not become a stack of nested cards.
-3. Change border mode. The same screen must follow it without accent flooding.
-4. Change radius. Panels, dialogs and controls must follow the shared radius contract.
-5. Change density and content width. Layout must remain usable.
-6. Check dark and light theme.
-7. Do not add a feature-specific `html[data-surface=...]` implementation.
-8. If the feature needs a new generic visual role, extend the shared system and documentation instead of creating a private theme.
+3. Change border mode. The same screen must follow it without accent flooding or hardening internal row separators.
+4. Inspect compound/unit controls at high zoom. There must be only one visible capsule with no rectangular inner-input seams.
+5. Change radius. Panels, dialogs and controls must follow the shared radius contract.
+6. Change density and content width. Layout must remain usable.
+7. Check dark and light theme.
+8. Do not add a feature-specific `html[data-surface=...]` implementation.
+9. If the feature needs a new generic visual role, extend the shared system and documentation instead of creating a private theme.
 
 ## Squad editor reference
 
@@ -170,4 +201,4 @@ Run:
 node scripts/check-ui-system.js
 ```
 
-The check verifies asset order, Docker packaging, root Appearance mapping, builder roles, Raised depth rules, modal isolation and the absence of new Squad-specific Classic/Glass/Raised forks.
+The check verifies asset order, Docker packaging, root Appearance mapping, builder roles, Raised depth rules, modal isolation, separator hierarchy, composite-control ownership and the absence of new Squad-specific Classic/Glass/Raised forks.
