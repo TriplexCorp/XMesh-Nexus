@@ -47,7 +47,10 @@
   const spec=key=>FU.find(item=>item.k===key);
   const decorate=(key,value=defaults[key],extra='')=>{
     const markup=field(spec(key),value);
-    return markup.replace('class="f"',`class="f user-create-field ${extra}`.trim());
+    // Keep the generated HTML valid. The previous replacement accidentally
+    // dropped the closing quote of class="...", causing every following select
+    // and section to be reparsed as broken markup by the browser.
+    return markup.replace('class="f"',`class="f user-create-field ${extra}"`.trim());
   };
 
   userNew=function userNewRedesigned(){
@@ -70,64 +73,73 @@
       <header class="user-create-head">
         <div class="user-create-title-wrap">
           <span class="user-create-title-icon">${ic('users')}</span>
-          <div><h2>Новый пользователь</h2><p>Создайте пользователя и задайте параметры доступа</p></div>
+          <div><span class="user-create-eyebrow">IDENTITY / ACCESS</span><h2>Новый пользователь</h2><p>Создайте учётную запись, назначьте доступ и политику использования.</p></div>
         </div>
-        <button type="button" class="user-create-close" data-x aria-label="Закрыть">${ic('x')}</button>
+        <button type="button" class="user-create-close" data-x aria-label="Закрыть">×</button>
       </header>
 
       <div class="user-create-body">
-        <section class="user-create-section user-create-section-main">
-          <div class="user-create-section-head">
-            <span class="user-create-section-icon">${ic('layers')}</span>
-            <div><h3>Основные настройки</h3><p>Базовые параметры пользователя</p></div>
-          </div>
-          <div class="user-create-main-grid">
-            <label class="f user-create-field user-create-template">
-              <span>Шаблон</span>
-              <select id="tplsel"><option value="">Без шаблона</option>${DB.tpls.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select>
-              <small>При необходимости подставит параметры из сохранённого шаблона</small>
-            </label>
-            <div class="user-create-username-row">
-              ${username}
-              <button type="button" class="gh user-create-generate" data-generate-username title="Сгенерировать случайное уникальное имя" aria-label="Сгенерировать имя пользователя">${ic('redo')}<span>Сгенерировать</span></button>
+        <div class="user-create-workspace">
+          <section class="user-create-section user-create-section-main">
+            <div class="user-create-section-head">
+              <span class="user-create-section-icon">${ic('layers')}</span>
+              <div><span class="user-create-section-kicker">IDENTITY & ACCESS</span><h3>Профиль доступа</h3><p>Имя пользователя, шаблон и XRAY STUDIO-профиль.</p></div>
             </div>
-            ${xrayProfile}
-          </div>
-        </section>
+            <div class="user-create-main-grid">
+              <div class="user-create-username-row">
+                ${username}
+                <button type="button" class="gh user-create-generate" data-generate-username title="Сгенерировать случайное уникальное имя" aria-label="Сгенерировать имя пользователя">${ic('redo')}<span>Сгенерировать</span></button>
+              </div>
+              <label class="f user-create-field user-create-template">
+                <span>Шаблон</span>
+                <select id="tplsel"><option value="">Без шаблона</option>${DB.tpls.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select>
+                <small>Можно быстро подставить сохранённые параметры.</small>
+              </label>
+              ${xrayProfile}
+            </div>
+          </section>
 
-        <section class="user-create-section user-create-section-limits">
-          <div class="user-create-section-head">
-            <span class="user-create-section-icon">${ic('activity')}</span>
-            <div><h3>Ограничения</h3><p>Лимиты и срок действия</p></div>
-          </div>
-          <div class="user-create-limits-grid">${limit}${days}${strategy}${hwid}</div>
-        </section>
+          <section class="user-create-section user-create-section-limits">
+            <div class="user-create-section-head">
+              <span class="user-create-section-icon">${ic('activity')}</span>
+              <div><span class="user-create-section-kicker">POLICY</span><h3>Ограничения</h3><p>Трафик, срок действия, сброс и устройства.</p></div>
+            </div>
+            <div class="user-create-limits-grid">${limit}${days}${strategy}${hwid}</div>
+            <div class="user-create-policy-note"><span>${ic('shield')}</span><p><b>Умный лимит устройств</b><small>0 — без ограничений. При значении больше 0 лимит исполняется сервером по зарегистрированным HWID.</small></p></div>
+          </section>
 
-        <section class="user-create-section user-create-section-extra">
-          <div class="user-create-section-head">
-            <span class="user-create-section-icon">${ic('sliders')}</span>
-            <div><h3>Дополнительно</h3><p>Опции и служебная информация</p></div>
-          </div>
-          <div class="user-create-extra-grid">
-            ${tag}
-            ${squads}
-            ${hold}
-            <label class="f user-create-field user-create-desc">
-              <span>Заметка</span>
-              <textarea name="desc" rows="3" placeholder="Добавьте заметку (необязательно)" autocomplete="off"></textarea>
-            </label>
-          </div>
-        </section>
+          <section class="user-create-section user-create-section-extra">
+            <div class="user-create-section-head">
+              <span class="user-create-section-icon">${ic('sliders')}</span>
+              <div><span class="user-create-section-kicker">METADATA</span><h3>Дополнительно</h3><p>Группы доступа, служебный тег и параметры срока.</p></div>
+            </div>
+            <div class="user-create-extra-grid">
+              ${squads}
+              ${tag}
+              ${hold}
+              <label class="f user-create-field user-create-desc">
+                <span>Заметка</span>
+                <textarea name="desc" rows="3" placeholder="Комментарий для администраторов (необязательно)" autocomplete="off"></textarea>
+              </label>
+            </div>
+          </section>
+        </div>
 
         <p class="er user-create-error" id="fe"></p>
       </div>
 
       <footer class="user-create-footer">
-        <button type="button" class="gh user-create-cancel" data-x>Отмена</button>
-        <button class="btn user-create-submit">${ic('plus')}<span>Создать пользователя</span></button>
+        <div class="user-create-footer-copy"><b>Новая учётная запись</b><span>Параметры можно изменить после создания.</span></div>
+        <div class="user-create-footer-actions">
+          <button type="button" class="gh user-create-cancel" data-x>Отмена</button>
+          <button class="btn user-create-submit">${ic('plus')}<span>Создать пользователя</span></button>
+        </div>
       </footer>
     </form>`,'user-create-modal');
 
+    // Dynamic selects are enhanced synchronously after the complete valid form
+    // exists, avoiding a one-frame native/fallback flash inside the modal.
+    window.XMeshSelects?.refresh?.(dlg);
     setTimeout(()=>$('[name=username]')?.focus(),60);
   };
 })();
