@@ -38,9 +38,23 @@
   letter-spacing:-.04em;
 }
 .user-create-head p{font-size:.84rem;max-width:72ch}
-/* The global data-x rule owns size/radius/glyph so this close control matches
- * every other panel modal instead of maintaining another local variant. */
-.user-create-close{flex:none;margin-left:auto}
+/* node-dialogs.css predates the panel-wide 34px close contract and gives this
+ * button a private 2.8rem square. Override those legacy dimensions explicitly
+ * so the control is visually identical to all other data-x modal closes. */
+.user-create-head .user-create-close{
+  width:var(--xm-close-size,34px)!important;
+  height:var(--xm-close-size,34px)!important;
+  min-width:var(--xm-close-size,34px)!important;
+  min-height:var(--xm-close-size,34px)!important;
+  flex:none;
+  margin-left:auto;
+  padding:0!important;
+  display:grid!important;
+  place-items:center;
+  border-radius:50%!important;
+  font-size:var(--xm-close-glyph-size,16px)!important;
+  line-height:1!important;
+}
 
 .user-create-body{
   padding:1rem 1.15rem 1.15rem;
