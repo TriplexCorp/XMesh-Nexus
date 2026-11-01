@@ -6,7 +6,7 @@ use axum::{
     http::{HeaderMap, StatusCode, header},
     response::Response,
 };
-use serde_json::Value;
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use sqlx::Row;
 use std::collections::HashMap;
@@ -22,9 +22,7 @@ mod base;
 #[path = "user_device_limits.rs"]
 mod device_limits;
 
-pub use base::{
-    create, migrate_legacy_ciphertexts, provision_new_user, revoke, rotate_credentials,
-};
+pub use base::{migrate_legacy_ciphertexts, provision_new_user, revoke, rotate_credentials};
 
 async fn user_fingerprint(state: &AppState, id: i64) -> Result<Option<String>, ApiError> {
     let row = sqlx::query("SELECT data FROM panel_records WHERE collection='users' AND id=$1")
@@ -179,6 +177,36 @@ pub async fn admin_client_json(
         apply_fingerprint(&mut response.0, &fingerprint);
     }
     Ok(response)
+}
+
+pub async fn create(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Path(id): Path<i64>,
+    Query(options): Query<HashMap<String, String>>,
+) -> Result<Json<Value>, ApiError> {
+    crate::require_mutation(&actor)?;
+    match options.get("deviceAction").map(String::as_str) {
+        None => base::create(State(state), Extension(actor), Path(id)).await,
+        Some("remove") => {
+            let device_id = options
+                .get("deviceId")
+                .and_then(|value| value.parse::<i64>().ok())
+                .filter(|value| *value > 0)
+                .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Invalid device slot"))?;
+            let device_limit =
+                device_limits::remove_device(&state, id, device_id, &actor.username).await?;
+            Ok(Json(json!({"ok":true,"deviceLimit":device_limit})))
+        }
+        Some("reset") => {
+            let device_limit = device_limits::reset_devices(&state, id, &actor.username).await?;
+            Ok(Json(json!({"ok":true,"deviceLimit":device_limit})))
+        }
+        Some(_) => Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Unknown device action",
+        )),
+    }
 }
 
 pub async fn status(
