@@ -231,10 +231,7 @@ async fn device_projection_tx(
         .map_err(ApiError::from)
 }
 
-async fn sync_projection(
-    tx: &mut Transaction<'_, Postgres>,
-    user_id: i64,
-) -> Result<(), ApiError> {
+async fn sync_projection(tx: &mut Transaction<'_, Postgres>, user_id: i64) -> Result<(), ApiError> {
     let devices = device_projection_tx(tx, user_id).await?;
     sqlx::query("SET LOCAL xmesh.device_projection_write = '1'")
         .execute(&mut **tx)
