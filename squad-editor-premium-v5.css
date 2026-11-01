@@ -1,6 +1,5 @@
-/* Squad editor premium v6 — commercial access-policy workspace.
- * Scoped visual layer only: squad CRUD, inbound selection, impact calculations,
- * backend APIs and subscription behavior remain unchanged. */
+/* Squad editor premium v7 — clean commercial access-policy surface.
+ * Visual layer only. No CRUD, preview, Xray, API or subscription behavior changes. */
 
 dialog#dlg.squad-wide{
   width:min(1320px,calc(100vw - 36px))!important;
@@ -13,54 +12,40 @@ dialog#dlg.squad-wide{
 }
 
 dialog#dlg.squad-wide::backdrop{
-  background:color-mix(in srgb,var(--xm-modal-dim) 92%,rgba(0,0,0,.22));
-  -webkit-backdrop-filter:blur(calc(var(--xm-modal-blur) + 2px)) saturate(112%);
-  backdrop-filter:blur(calc(var(--xm-modal-blur) + 2px)) saturate(112%);
+  background:var(--xm-modal-dim);
+  -webkit-backdrop-filter:blur(var(--xm-modal-blur));
+  backdrop-filter:blur(var(--xm-modal-blur));
 }
 
 dialog#dlg.squad-wide > form.box{
-  position:relative;
-  isolation:isolate;
+  display:flex;
+  flex-direction:column;
   width:100%;
   max-height:min(95dvh,1020px);
+  min-height:0;
   padding:0;
   gap:0;
   overflow:hidden;
-  border:1px solid color-mix(in srgb,var(--a) 18%,var(--border-strong));
-  border-radius:26px;
-  background:
-    radial-gradient(980px 420px at 83% -15%,color-mix(in srgb,var(--a) 13%,transparent),transparent 64%),
-    radial-gradient(620px 320px at -5% 42%,color-mix(in srgb,var(--a) 4%,transparent),transparent 68%),
-    linear-gradient(180deg,color-mix(in srgb,var(--s2) 46%,var(--s1)),var(--s1) 35%);
-  box-shadow:
-    0 52px 140px -48px rgba(0,0,0,.9),
-    0 22px 54px -34px rgba(0,0,0,.72),
-    0 1px 0 rgba(255,255,255,.055) inset;
+  border:1px solid var(--border-strong);
+  border-radius:24px;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--s2) 34%,var(--s1)),var(--s1) 28%);
+  box-shadow:0 38px 96px -38px rgba(0,0,0,.82),0 1px 0 rgba(255,255,255,.03) inset;
 }
 
-dialog#dlg.squad-wide > form.box::before{
-  content:"";
-  position:absolute;
-  inset:0 0 auto;
-  z-index:-1;
-  height:190px;
-  pointer-events:none;
-  background:
-    linear-gradient(90deg,color-mix(in srgb,var(--a) 7%,transparent),transparent 33%,color-mix(in srgb,var(--a) 4%,transparent) 72%,transparent),
-    linear-gradient(180deg,rgba(255,255,255,.025),transparent 76%);
-}
+dialog#dlg.squad-wide > form.box::before{display:none!important}
 
 dialog#dlg.squad-wide > form.box > h2{
+  flex:0 0 auto;
   position:relative;
   margin:0;
-  padding:31px 34px 26px 38px;
-  border-bottom:1px solid color-mix(in srgb,var(--a) 8%,var(--ln));
+  padding:30px 34px 25px 36px;
+  border-bottom:1px solid var(--ln);
   color:var(--tx);
-  font-size:1.62rem;
-  line-height:1.12;
+  background:color-mix(in srgb,var(--s1) 96%,var(--s2));
+  font-size:1.58rem;
+  line-height:1.13;
   font-weight:800;
-  letter-spacing:-.048em;
-  background:linear-gradient(180deg,color-mix(in srgb,var(--s1) 80%,transparent),color-mix(in srgb,var(--s1) 56%,transparent));
+  letter-spacing:-.045em;
 }
 
 dialog#dlg.squad-wide > form.box > h2::before{
@@ -68,11 +53,10 @@ dialog#dlg.squad-wide > form.box > h2::before{
   display:table;
   margin:0 0 10px;
   padding:6px 9px 5px;
-  border:1px solid color-mix(in srgb,var(--a) 25%,var(--ln));
+  border:1px solid color-mix(in srgb,var(--a) 30%,var(--ln));
   border-radius:999px;
   color:var(--a);
-  background:color-mix(in srgb,var(--a) 8%,transparent);
-  box-shadow:0 1px 0 rgba(255,255,255,.035) inset;
+  background:color-mix(in srgb,var(--a) 6%,var(--s1));
   font-size:.60rem;
   line-height:1;
   font-weight:840;
@@ -92,41 +76,41 @@ dialog#dlg.squad-wide > form.box > h2::after{
 }
 
 dialog#dlg.squad-wide .squad-editor-layout{
+  flex:1 1 auto;
+  min-width:0;
+  min-height:0;
   display:grid;
   grid-template-columns:minmax(0,.78fr) minmax(0,1.22fr);
   gap:18px;
-  padding:22px 24px 20px;
+  padding:20px 22px 18px;
   align-items:stretch;
-  min-width:0;
   overflow:auto;
   overscroll-behavior:contain;
-  scrollbar-gutter:stable;
+  scrollbar-width:thin;
+  scrollbar-color:color-mix(in srgb,var(--tx) 18%,transparent) transparent;
+}
+
+dialog#dlg.squad-wide .squad-editor-layout::-webkit-scrollbar{width:10px}
+dialog#dlg.squad-wide .squad-editor-layout::-webkit-scrollbar-track{background:transparent}
+dialog#dlg.squad-wide .squad-editor-layout::-webkit-scrollbar-thumb{
+  border:3px solid transparent;
+  border-radius:999px;
+  background:color-mix(in srgb,var(--tx) 18%,transparent);
+  background-clip:padding-box;
 }
 
 dialog#dlg.squad-wide .squad-editor-layout > section{
-  position:relative;
   min-width:0;
   min-height:0;
-  padding:22px;
-  gap:16px;
-  border:1px solid color-mix(in srgb,var(--a) 7%,var(--ln));
-  border-radius:19px;
-  background:
-    linear-gradient(180deg,rgba(255,255,255,.022),transparent 26%),
-    color-mix(in srgb,var(--s2) 42%,var(--s1));
-  box-shadow:
-    0 18px 34px -28px rgba(0,0,0,.62),
-    0 1px 0 rgba(255,255,255,.035) inset;
+  padding:21px;
+  gap:15px;
+  border:1px solid var(--ln);
+  border-radius:18px;
+  background:color-mix(in srgb,var(--s2) 33%,var(--s1));
+  box-shadow:0 1px 0 rgba(255,255,255,.02) inset;
 }
 
-dialog#dlg.squad-wide .squad-editor-layout > section::before{
-  content:"";
-  position:absolute;
-  inset:0 18px auto;
-  height:1px;
-  background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--a) 19%,transparent),transparent);
-  pointer-events:none;
-}
+dialog#dlg.squad-wide .squad-editor-layout > section::before{display:none!important}
 
 dialog#dlg.squad-wide .node-form-section-title{
   display:flex;
@@ -135,17 +119,17 @@ dialog#dlg.squad-wide .node-form-section-title{
   color:var(--tx);
   font-size:.94rem;
   font-weight:790;
-  letter-spacing:-.028em;
+  letter-spacing:-.026em;
 }
 
 dialog#dlg.squad-wide .node-form-section-title::before{
   content:"";
-  width:7px;
-  height:7px;
+  width:6px;
+  height:6px;
   flex:none;
   border-radius:999px;
   background:var(--a);
-  box-shadow:0 0 0 4px color-mix(in srgb,var(--a) 9%,transparent);
+  box-shadow:none;
 }
 
 dialog#dlg.squad-wide .squad-editor-main,
@@ -154,21 +138,14 @@ dialog#dlg.squad-wide .squad-editor-connections{
   flex-direction:column;
 }
 
-dialog#dlg.squad-wide .squad-editor-main{
-  background:
-    radial-gradient(420px 250px at 15% 0%,color-mix(in srgb,var(--a) 4.5%,transparent),transparent 72%),
-    linear-gradient(180deg,rgba(255,255,255,.018),transparent 30%),
-    color-mix(in srgb,var(--s2) 40%,var(--s1));
-}
-
 dialog#dlg.squad-wide .squad-editor-fields{
   display:grid;
-  gap:15px;
+  gap:14px;
 }
 
 dialog#dlg.squad-wide .squad-editor-fields .f{
   display:grid;
-  gap:8px;
+  gap:7px;
 }
 
 dialog#dlg.squad-wide .squad-editor-fields .f > span{
@@ -176,48 +153,36 @@ dialog#dlg.squad-wide .squad-editor-fields .f > span{
   font-size:.69rem;
   line-height:1.15;
   font-weight:740;
-  letter-spacing:.012em;
 }
 
 dialog#dlg.squad-wide .squad-editor-fields :is(input,textarea){
   width:100%;
-  min-height:50px;
-  border:1px solid color-mix(in srgb,var(--a) 5%,var(--ln));
-  border-radius:13px;
-  background:
-    linear-gradient(180deg,rgba(255,255,255,.018),transparent),
-    color-mix(in srgb,var(--s1) 89%,var(--s2));
+  min-height:49px;
+  padding:0 14px;
+  border:1px solid var(--ln);
+  border-radius:12px;
+  background:color-mix(in srgb,var(--s1) 91%,var(--s2));
   color:var(--tx);
-  padding:0 15px;
-  box-shadow:0 1px 0 rgba(255,255,255,.025) inset,0 8px 20px -18px rgba(0,0,0,.65);
-  transition:border-color .16s,box-shadow .16s,background .16s,transform .16s;
+  box-shadow:none;
+  transition:border-color .15s,background .15s,box-shadow .15s;
 }
 
 dialog#dlg.squad-wide .squad-editor-fields textarea{
-  min-height:168px;
-  padding:14px 15px;
+  min-height:164px;
+  padding:13px 14px;
   resize:none;
-  line-height:1.58;
+  line-height:1.56;
 }
 
 dialog#dlg.squad-wide .squad-editor-fields :is(input,textarea):hover{
-  border-color:color-mix(in srgb,var(--a) 20%,var(--ln));
+  border-color:color-mix(in srgb,var(--a) 18%,var(--ln));
 }
 
 dialog#dlg.squad-wide .squad-editor-fields :is(input,textarea):focus{
   outline:0;
-  border-color:color-mix(in srgb,var(--a) 64%,var(--ln));
-  background:color-mix(in srgb,var(--s1) 95%,var(--s2));
-  box-shadow:
-    0 0 0 3px color-mix(in srgb,var(--a) 11%,transparent),
-    0 12px 28px -22px color-mix(in srgb,var(--a) 34%,rgba(0,0,0,.7));
-}
-
-dialog#dlg.squad-wide .squad-editor-connections{
-  background:
-    radial-gradient(560px 280px at 100% 0%,color-mix(in srgb,var(--a) 5.5%,transparent),transparent 68%),
-    linear-gradient(180deg,rgba(255,255,255,.018),transparent 30%),
-    color-mix(in srgb,var(--s2) 40%,var(--s1));
+  border-color:color-mix(in srgb,var(--a) 58%,var(--ln));
+  background:var(--s1);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--a) 9%,transparent);
 }
 
 dialog#dlg.squad-wide .squad-section-heading{
@@ -232,23 +197,20 @@ dialog#dlg.squad-wide .squad-section-heading b{
   color:color-mix(in srgb,var(--tx) 88%,var(--mu));
   font-size:.76rem;
   font-weight:760;
-  letter-spacing:-.012em;
 }
 
 dialog#dlg.squad-wide .squad-selected-count{
   flex:none;
   min-width:82px;
   padding:6px 10px;
-  border:1px solid color-mix(in srgb,var(--a) 31%,var(--ln));
+  border:1px solid color-mix(in srgb,var(--a) 28%,var(--ln));
   border-radius:999px;
   color:var(--a);
-  background:
-    linear-gradient(180deg,color-mix(in srgb,var(--a) 12%,transparent),color-mix(in srgb,var(--a) 6%,transparent));
-  box-shadow:0 1px 0 rgba(255,255,255,.035) inset,0 8px 18px -16px color-mix(in srgb,var(--a) 40%,transparent);
+  background:color-mix(in srgb,var(--a) 6%,var(--s1));
+  box-shadow:none;
   text-align:center;
   font-size:.65rem;
   font-weight:800;
-  letter-spacing:.01em;
 }
 
 dialog#dlg.squad-wide .squad-editor-toolbar{
@@ -256,53 +218,52 @@ dialog#dlg.squad-wide .squad-editor-toolbar{
   grid-template-columns:minmax(0,1fr) auto auto;
   gap:9px;
   align-items:center;
-  padding:2px 0 1px;
 }
 
 dialog#dlg.squad-wide .squad-inbound-search{
   min-width:0;
-  height:44px;
-  border:1px solid color-mix(in srgb,var(--a) 7%,var(--ln));
-  border-radius:12px;
-  background:color-mix(in srgb,var(--s1) 90%,var(--s2));
-  box-shadow:0 1px 0 rgba(255,255,255,.022) inset;
-  transition:border-color .16s,box-shadow .16s,background .16s;
+  height:43px;
+  border:1px solid var(--ln);
+  border-radius:11px;
+  background:color-mix(in srgb,var(--s1) 91%,var(--s2));
+  box-shadow:none;
 }
 
 dialog#dlg.squad-wide .squad-inbound-search:hover{
-  border-color:color-mix(in srgb,var(--a) 20%,var(--ln));
+  border-color:color-mix(in srgb,var(--a) 18%,var(--ln));
 }
 
 dialog#dlg.squad-wide .squad-inbound-search:focus-within{
-  border-color:color-mix(in srgb,var(--a) 58%,var(--ln));
-  background:color-mix(in srgb,var(--s1) 96%,var(--s2));
-  box-shadow:0 0 0 3px color-mix(in srgb,var(--a) 10%,transparent);
+  border-color:color-mix(in srgb,var(--a) 52%,var(--ln));
+  background:var(--s1);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--a) 8%,transparent);
 }
 
 dialog#dlg.squad-wide .squad-editor-toolbar .gh{
-  min-height:44px;
+  min-height:43px;
   padding-inline:13px;
-  border-color:color-mix(in srgb,var(--a) 6%,var(--ln));
-  border-radius:12px;
-  background:linear-gradient(180deg,rgba(255,255,255,.02),transparent),color-mix(in srgb,var(--s1) 76%,transparent);
-  box-shadow:0 1px 0 rgba(255,255,255,.022) inset;
+  border-color:var(--ln);
+  border-radius:11px;
+  background:color-mix(in srgb,var(--s1) 82%,var(--s2));
+  box-shadow:none;
   font-size:.70rem;
   font-weight:740;
   white-space:nowrap;
 }
 
 dialog#dlg.squad-wide .squad-editor-toolbar .gh:hover{
-  border-color:color-mix(in srgb,var(--a) 24%,var(--ln));
-  background:color-mix(in srgb,var(--a) 5%,var(--s1));
+  border-color:color-mix(in srgb,var(--a) 22%,var(--ln));
+  background:color-mix(in srgb,var(--a) 4%,var(--s1));
 }
 
 dialog#dlg.squad-wide .squad-inbound-list{
   display:grid;
-  gap:8px;
-  max-height:300px;
-  padding:1px 4px 1px 1px;
+  gap:7px;
+  max-height:294px;
+  padding:1px 2px 1px 1px;
   overflow:auto;
-  scrollbar-gutter:stable;
+  scrollbar-width:thin;
+  scrollbar-color:color-mix(in srgb,var(--tx) 18%,transparent) transparent;
 }
 
 dialog#dlg.squad-wide .squad-inbound-list::-webkit-scrollbar{width:8px}
@@ -310,7 +271,7 @@ dialog#dlg.squad-wide .squad-inbound-list::-webkit-scrollbar-track{background:tr
 dialog#dlg.squad-wide .squad-inbound-list::-webkit-scrollbar-thumb{
   border:2px solid transparent;
   border-radius:999px;
-  background:color-mix(in srgb,var(--mu) 35%,transparent);
+  background:color-mix(in srgb,var(--tx) 18%,transparent);
   background-clip:padding-box;
 }
 
@@ -318,55 +279,32 @@ dialog#dlg.squad-wide .squad-inbound-row{
   position:relative;
   display:grid;
   grid-template-columns:auto minmax(0,1fr) auto;
-  gap:12px;
+  gap:11px;
   align-items:center;
   min-width:0;
-  min-height:58px;
-  padding:12px 13px;
-  border:1px solid color-mix(in srgb,var(--a) 5%,var(--ln));
-  border-radius:14px;
-  background:
-    linear-gradient(180deg,rgba(255,255,255,.018),transparent),
-    color-mix(in srgb,var(--s1) 86%,var(--s2));
-  box-shadow:0 8px 20px -19px rgba(0,0,0,.66),0 1px 0 rgba(255,255,255,.018) inset;
+  min-height:56px;
+  padding:11px 12px;
+  border:1px solid var(--ln);
+  border-radius:12px;
+  background:color-mix(in srgb,var(--s1) 86%,var(--s2));
+  box-shadow:none;
   cursor:pointer;
   overflow:hidden;
-  transition:transform .14s,border-color .16s,background .16s,box-shadow .16s;
+  transition:border-color .15s,background .15s,transform .12s;
 }
 
-dialog#dlg.squad-wide .squad-inbound-row::before{
-  content:"";
-  position:absolute;
-  inset:9px auto 9px 0;
-  width:3px;
-  border-radius:0 4px 4px 0;
-  background:transparent;
-  transition:background .16s,box-shadow .16s;
-}
+dialog#dlg.squad-wide .squad-inbound-row::before{display:none!important}
 
 dialog#dlg.squad-wide .squad-inbound-row:hover{
   transform:translateY(-1px);
-  border-color:color-mix(in srgb,var(--a) 29%,var(--ln));
-  background:
-    linear-gradient(180deg,color-mix(in srgb,var(--a) 3%,transparent),transparent),
-    color-mix(in srgb,var(--a) 3.5%,var(--s1));
-  box-shadow:0 12px 26px -21px rgba(0,0,0,.72),0 1px 0 rgba(255,255,255,.025) inset;
+  border-color:color-mix(in srgb,var(--a) 25%,var(--ln));
+  background:color-mix(in srgb,var(--a) 3%,var(--s1));
 }
 
 dialog#dlg.squad-wide .squad-inbound-row:has(input:checked){
-  border-color:color-mix(in srgb,var(--a) 55%,var(--ln));
-  background:
-    linear-gradient(90deg,color-mix(in srgb,var(--a) 9%,transparent),transparent 48%),
-    linear-gradient(180deg,color-mix(in srgb,var(--a) 4%,transparent),transparent),
-    color-mix(in srgb,var(--s1) 92%,var(--s2));
-  box-shadow:
-    0 0 0 1px color-mix(in srgb,var(--a) 8%,transparent) inset,
-    0 14px 30px -24px color-mix(in srgb,var(--a) 40%,rgba(0,0,0,.5));
-}
-
-dialog#dlg.squad-wide .squad-inbound-row:has(input:checked)::before{
-  background:var(--a);
-  box-shadow:0 0 14px color-mix(in srgb,var(--a) 48%,transparent);
+  border-color:color-mix(in srgb,var(--a) 45%,var(--ln));
+  background:color-mix(in srgb,var(--a) 7%,var(--s1));
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--a) 7%,transparent) inset;
 }
 
 dialog#dlg.squad-wide .squad-inbound-row input{
@@ -374,7 +312,6 @@ dialog#dlg.squad-wide .squad-inbound-row input{
   height:17px;
   margin:0;
   accent-color:var(--a);
-  filter:saturate(1.05);
 }
 
 dialog#dlg.squad-wide .squad-inbound-copy{
@@ -388,7 +325,7 @@ dialog#dlg.squad-wide .squad-inbound-copy b{
   color:var(--tx);
   font-size:.78rem;
   font-weight:770;
-  letter-spacing:-.018em;
+  letter-spacing:-.016em;
   text-overflow:ellipsis;
   white-space:nowrap;
 }
@@ -397,27 +334,26 @@ dialog#dlg.squad-wide .squad-inbound-copy small{
   overflow:hidden;
   color:var(--mu);
   font-size:.64rem;
-  line-height:1.42;
-  font-weight:520;
+  line-height:1.4;
   text-overflow:ellipsis;
   white-space:nowrap;
 }
 
 dialog#dlg.squad-wide .squad-inbound-hosts{
   padding:5px 8px;
-  border:1px solid color-mix(in srgb,var(--a) 7%,var(--ln));
+  border:1px solid var(--ln);
   border-radius:999px;
   color:color-mix(in srgb,var(--tx) 55%,var(--mu));
-  background:color-mix(in srgb,var(--s2) 52%,var(--s1));
+  background:color-mix(in srgb,var(--s2) 46%,var(--s1));
   font-size:.61rem;
   font-weight:730;
   white-space:nowrap;
 }
 
 dialog#dlg.squad-wide .squad-inbound-row:has(input:checked) .squad-inbound-hosts{
-  border-color:color-mix(in srgb,var(--a) 24%,var(--ln));
-  color:color-mix(in srgb,var(--a) 78%,var(--tx));
-  background:color-mix(in srgb,var(--a) 7%,var(--s1));
+  border-color:color-mix(in srgb,var(--a) 20%,var(--ln));
+  color:color-mix(in srgb,var(--a) 75%,var(--tx));
+  background:color-mix(in srgb,var(--a) 5%,var(--s1));
 }
 
 dialog#dlg.squad-wide .squad-help,
@@ -427,17 +363,11 @@ dialog#dlg.squad-wide .squad-inbound-empty{
   line-height:1.5;
 }
 
-dialog#dlg.squad-wide .squad-help{
-  padding-top:1px;
-}
-
 dialog#dlg.squad-wide .squad-editor-side{
   grid-column:1/-1;
-  padding:20px 22px 21px;
-  border-color:color-mix(in srgb,var(--a) 10%,var(--ln));
-  background:
-    radial-gradient(700px 300px at 10% 0%,color-mix(in srgb,var(--a) 6%,transparent),transparent 70%),
-    linear-gradient(100deg,color-mix(in srgb,var(--a) 4%,var(--s1)),color-mix(in srgb,var(--s2) 35%,var(--s1)) 48%,var(--s1));
+  padding:19px 20px 20px;
+  border-color:var(--ln);
+  background:color-mix(in srgb,var(--s2) 30%,var(--s1));
 }
 
 dialog#dlg.squad-wide .squad-editor-side .node-form-section-title{
@@ -448,7 +378,7 @@ dialog#dlg.squad-wide .squad-editor-side .node-form-section-title{
 dialog#dlg.squad-wide [data-squad-preview]{
   display:grid;
   grid-template-columns:repeat(3,minmax(0,1fr));
-  gap:15px 12px;
+  gap:12px;
   align-items:start;
 }
 
@@ -456,49 +386,35 @@ dialog#dlg.squad-wide .squad-preview-stats{
   grid-column:1/-1;
   display:grid;
   grid-template-columns:repeat(4,minmax(0,1fr));
-  gap:10px;
+  gap:9px;
 }
 
 dialog#dlg.squad-wide .squad-preview-stat{
-  position:relative;
   min-width:0;
-  min-height:76px;
-  padding:14px 15px 13px;
-  border:1px solid color-mix(in srgb,var(--a) 7%,var(--ln));
-  border-radius:14px;
-  background:
-    radial-gradient(180px 90px at 100% 0%,color-mix(in srgb,var(--a) 5%,transparent),transparent 70%),
-    linear-gradient(180deg,rgba(255,255,255,.022),transparent),
-    color-mix(in srgb,var(--s1) 84%,var(--s2));
-  box-shadow:0 12px 24px -22px rgba(0,0,0,.68),0 1px 0 rgba(255,255,255,.022) inset;
+  min-height:74px;
+  padding:13px 14px;
+  border:1px solid var(--ln);
+  border-radius:13px;
+  background:color-mix(in srgb,var(--s1) 84%,var(--s2));
+  box-shadow:none;
   overflow:hidden;
 }
 
-dialog#dlg.squad-wide .squad-preview-stat::before{
-  content:"";
-  position:absolute;
-  inset:0 0 auto;
-  height:2px;
-  background:linear-gradient(90deg,var(--a),color-mix(in srgb,var(--a) 26%,transparent) 56%,transparent);
-  opacity:.72;
-}
+dialog#dlg.squad-wide .squad-preview-stat::before{display:none!important}
 
 dialog#dlg.squad-wide .squad-preview-stat:first-child{
-  border-color:color-mix(in srgb,var(--a) 18%,var(--ln));
-  background:
-    radial-gradient(220px 100px at 100% 0%,color-mix(in srgb,var(--a) 9%,transparent),transparent 72%),
-    linear-gradient(180deg,color-mix(in srgb,var(--a) 4%,transparent),transparent),
-    color-mix(in srgb,var(--s1) 88%,var(--s2));
+  border-color:color-mix(in srgb,var(--a) 14%,var(--ln));
+  background:color-mix(in srgb,var(--a) 3%,var(--s1));
 }
 
 dialog#dlg.squad-wide .squad-preview-stat b{
   display:block;
   margin-bottom:6px;
   color:var(--tx);
-  font-size:1.42rem;
+  font-size:1.38rem;
   line-height:1;
   font-weight:810;
-  letter-spacing:-.045em;
+  letter-spacing:-.04em;
   font-variant-numeric:tabular-nums;
 }
 
@@ -514,18 +430,17 @@ dialog#dlg.squad-wide .squad-preview-section{
   align-content:start;
   gap:8px;
   min-width:0;
-  min-height:72px;
-  padding:12px 13px;
-  border:1px solid color-mix(in srgb,var(--a) 5%,var(--ln));
-  border-radius:13px;
-  background:color-mix(in srgb,var(--s1) 64%,transparent);
+  min-height:70px;
+  padding:11px 12px;
+  border:1px solid var(--ln);
+  border-radius:12px;
+  background:color-mix(in srgb,var(--s1) 75%,var(--s2));
 }
 
 dialog#dlg.squad-wide .squad-preview-section > b{
   color:color-mix(in srgb,var(--tx) 86%,var(--mu));
   font-size:.67rem;
   font-weight:770;
-  letter-spacing:-.01em;
 }
 
 dialog#dlg.squad-wide .squad-preview-list,
@@ -540,9 +455,9 @@ dialog#dlg.squad-wide .squad-user-chip,
 dialog#dlg.squad-wide .squad-preview-list > *{
   max-width:100%;
   padding:5px 8px;
-  border:1px solid color-mix(in srgb,var(--a) 6%,var(--ln));
+  border:1px solid var(--ln);
   border-radius:999px;
-  background:color-mix(in srgb,var(--s2) 47%,var(--s1));
+  background:color-mix(in srgb,var(--s2) 45%,var(--s1));
   color:color-mix(in srgb,var(--tx) 52%,var(--mu));
   font-size:.61rem;
   line-height:1.2;
@@ -559,10 +474,10 @@ dialog#dlg.squad-wide .squad-preview-ready{
   position:relative;
   grid-column:1/-1;
   margin:0;
-  padding:11px 13px 11px 34px;
-  border:1px solid color-mix(in srgb,var(--wr) 30%,var(--ln));
-  border-radius:12px;
-  background:linear-gradient(90deg,color-mix(in srgb,var(--wr) 8%,var(--s1)),color-mix(in srgb,var(--wr) 3%,var(--s1)));
+  padding:10px 12px 10px 31px;
+  border:1px solid color-mix(in srgb,var(--wr) 26%,var(--ln));
+  border-radius:11px;
+  background:color-mix(in srgb,var(--wr) 5%,var(--s1));
   color:var(--wr);
   font-size:.66rem;
   line-height:1.5;
@@ -573,19 +488,19 @@ dialog#dlg.squad-wide .squad-preview-warnings::before,
 dialog#dlg.squad-wide .squad-preview-ready::before{
   content:"";
   position:absolute;
-  left:14px;
+  left:13px;
   top:50%;
-  width:8px;
-  height:8px;
+  width:7px;
+  height:7px;
   border-radius:999px;
   background:currentColor;
-  box-shadow:0 0 0 4px color-mix(in srgb,currentColor 10%,transparent);
+  box-shadow:none;
   transform:translateY(-50%);
 }
 
 dialog#dlg.squad-wide .squad-preview-ready{
-  border-color:color-mix(in srgb,var(--ok) 29%,var(--ln));
-  background:linear-gradient(90deg,color-mix(in srgb,var(--ok) 8%,var(--s1)),color-mix(in srgb,var(--ok) 3%,var(--s1)));
+  border-color:color-mix(in srgb,var(--ok) 25%,var(--ln));
+  background:color-mix(in srgb,var(--ok) 5%,var(--s1));
   color:var(--ok);
 }
 
@@ -598,20 +513,21 @@ dialog#dlg.squad-wide .squad-preview-warnings p{
 dialog#dlg.squad-wide #fe:empty{display:none}
 
 dialog#dlg.squad-wide > form.box > .act{
-  position:sticky;
-  bottom:0;
-  z-index:3;
+  position:relative;
+  bottom:auto;
+  z-index:2;
+  flex:0 0 auto;
   display:flex;
   align-items:center;
   justify-content:flex-end;
   gap:10px;
   margin:0;
-  padding:15px 22px 16px;
-  border-top:1px solid color-mix(in srgb,var(--a) 8%,var(--ln));
-  background:color-mix(in srgb,var(--s1) 91%,transparent);
-  box-shadow:0 -18px 34px -30px rgba(0,0,0,.76),0 1px 0 rgba(255,255,255,.018) inset;
-  -webkit-backdrop-filter:blur(16px) saturate(112%);
-  backdrop-filter:blur(16px) saturate(112%);
+  padding:14px 20px 15px;
+  border-top:1px solid var(--ln);
+  background:color-mix(in srgb,var(--s1) 97%,var(--s2));
+  box-shadow:none;
+  -webkit-backdrop-filter:none;
+  backdrop-filter:none;
 }
 
 dialog#dlg.squad-wide > form.box > .act .gh,
@@ -619,37 +535,31 @@ dialog#dlg.squad-wide > form.box > .act .btn,
 dialog#dlg.squad-wide > form.box > .act .dg{
   min-height:44px;
   padding-inline:18px;
-  border-radius:12px;
+  border-radius:11px;
   font-weight:760;
-  transition:transform .14s,box-shadow .16s,border-color .16s,background .16s;
+  transition:transform .12s,border-color .15s,background .15s,box-shadow .15s;
 }
 
 dialog#dlg.squad-wide > form.box > .act .gh{
-  border-color:color-mix(in srgb,var(--a) 7%,var(--ln));
-  background:color-mix(in srgb,var(--s1) 68%,transparent);
+  border-color:var(--ln);
+  background:color-mix(in srgb,var(--s1) 82%,var(--s2));
 }
 
 dialog#dlg.squad-wide > form.box > .act .gh:hover{
-  border-color:color-mix(in srgb,var(--a) 22%,var(--ln));
+  border-color:color-mix(in srgb,var(--a) 20%,var(--ln));
   background:color-mix(in srgb,var(--a) 4%,var(--s1));
 }
 
 dialog#dlg.squad-wide > form.box > .act .btn{
   min-width:136px;
-  border-color:color-mix(in srgb,var(--a) 75%,var(--ln));
-  background:
-    linear-gradient(180deg,rgba(255,255,255,.16),transparent 46%),
-    var(--a);
-  box-shadow:
-    0 10px 24px -15px color-mix(in srgb,var(--a) 72%,transparent),
-    0 1px 0 rgba(255,255,255,.22) inset;
+  border-color:color-mix(in srgb,var(--a) 68%,var(--ln));
+  background:var(--a);
+  box-shadow:0 8px 18px -14px color-mix(in srgb,var(--a) 55%,transparent);
 }
 
 dialog#dlg.squad-wide > form.box > .act .btn:hover{
   transform:translateY(-1px);
-  box-shadow:
-    0 15px 30px -16px color-mix(in srgb,var(--a) 85%,transparent),
-    0 1px 0 rgba(255,255,255,.24) inset;
+  box-shadow:0 10px 20px -14px color-mix(in srgb,var(--a) 66%,transparent);
 }
 
 dialog#dlg.squad-wide > form.box > .act :is(.gh,.btn,.dg):active{
@@ -665,7 +575,7 @@ dialog#dlg.squad-wide > form.box > .act :is(.gh,.btn,.dg):active{
     grid-template-columns:minmax(0,.76fr) minmax(0,1.24fr);
     gap:20px;
   }
-  dialog#dlg.squad-wide .squad-inbound-list{max-height:320px}
+  dialog#dlg.squad-wide .squad-inbound-list{max-height:318px}
 }
 
 @media(max-width:980px){
@@ -685,7 +595,7 @@ dialog#dlg.squad-wide > form.box > .act :is(.gh,.btn,.dg):active{
 }
 
 @media(max-width:760px){
-  dialog#dlg.squad-wide > form.box{border-radius:20px}
+  dialog#dlg.squad-wide > form.box{border-radius:19px}
   dialog#dlg.squad-wide > form.box > h2{padding:25px 22px 21px 26px;font-size:1.4rem}
   dialog#dlg.squad-wide .squad-editor-layout{padding:13px;gap:13px}
   dialog#dlg.squad-wide .squad-editor-layout > section{padding:17px;border-radius:16px}
@@ -700,7 +610,7 @@ dialog#dlg.squad-wide > form.box > .act :is(.gh,.btn,.dg):active{
     width:calc(100vw - 14px)!important;
     inline-size:calc(100vw - 14px)!important;
   }
-  dialog#dlg.squad-wide > form.box{border-radius:17px}
+  dialog#dlg.squad-wide > form.box{border-radius:16px}
   dialog#dlg.squad-wide > form.box > h2{padding:22px 18px 18px 21px;font-size:1.28rem}
   dialog#dlg.squad-wide > form.box > h2::after{font-size:.71rem}
   dialog#dlg.squad-wide .squad-editor-toolbar{grid-template-columns:1fr 1fr}
@@ -714,91 +624,16 @@ dialog#dlg.squad-wide > form.box > .act :is(.gh,.btn,.dg):active{
   dialog#dlg.squad-wide > form.box > .act .btn{flex:1;min-width:0}
 }
 
+@media(max-height:760px) and (min-width:761px){
+  dialog#dlg.squad-wide > form.box > h2{padding-top:23px;padding-bottom:19px}
+  dialog#dlg.squad-wide .squad-editor-layout{padding-top:15px;padding-bottom:15px;gap:14px}
+  dialog#dlg.squad-wide .squad-editor-layout > section{padding:18px}
+  dialog#dlg.squad-wide .squad-inbound-list{max-height:255px}
+  dialog#dlg.squad-wide > form.box > .act{padding-top:12px;padding-bottom:13px}
+}
+
 @media(prefers-reduced-motion:reduce){
   dialog#dlg.squad-wide *{scroll-behavior:auto!important}
   dialog#dlg.squad-wide .squad-inbound-row,
   dialog#dlg.squad-wide > form.box > .act :is(.gh,.btn,.dg){transition:none!important}
-}
-
-/* v6.1 artifact correction: keep the premium treatment, but make the dialog
- * structurally three-zone so the action footer can never cover impact content. */
-dialog#dlg.squad-wide > form.box{
-  display:flex;
-  flex-direction:column;
-  align-content:initial;
-  min-height:0;
-}
-
-dialog#dlg.squad-wide > form.box > h2{
-  flex:0 0 auto;
-}
-
-dialog#dlg.squad-wide .squad-editor-layout{
-  flex:1 1 auto;
-  min-height:0;
-  max-height:none;
-  overscroll-behavior:contain;
-  scrollbar-gutter:auto;
-}
-
-dialog#dlg.squad-wide .squad-editor-layout::-webkit-scrollbar{width:10px}
-dialog#dlg.squad-wide .squad-editor-layout::-webkit-scrollbar-track{background:transparent}
-dialog#dlg.squad-wide .squad-editor-layout::-webkit-scrollbar-thumb{
-  border:3px solid transparent;
-  border-radius:999px;
-  background:color-mix(in srgb,var(--tx) 16%,transparent);
-  background-clip:padding-box;
-}
-
-dialog#dlg.squad-wide > form.box > .act{
-  position:relative;
-  bottom:auto;
-  z-index:2;
-  flex:0 0 auto;
-  background:color-mix(in srgb,var(--s1) 97%,var(--s2));
-  box-shadow:0 -1px 0 rgba(255,255,255,.018) inset,0 -14px 28px -32px rgba(0,0,0,.72);
-  -webkit-backdrop-filter:none;
-  backdrop-filter:none;
-}
-
-dialog#dlg.squad-wide .squad-editor-layout > section::before,
-dialog#dlg.squad-wide .squad-preview-stat::before{
-  display:none;
-}
-
-dialog#dlg.squad-wide .node-form-section-title::before{
-  width:6px;
-  height:6px;
-  box-shadow:none;
-  opacity:.9;
-}
-
-dialog#dlg.squad-wide .squad-preview-stat{
-  box-shadow:0 10px 22px -23px rgba(0,0,0,.62);
-}
-
-dialog#dlg.squad-wide .squad-preview-stat:first-child{
-  border-color:color-mix(in srgb,var(--a) 13%,var(--ln));
-}
-
-dialog#dlg.squad-wide .squad-inbound-list::-webkit-scrollbar-thumb{
-  background:color-mix(in srgb,var(--tx) 18%,transparent);
-  background-clip:padding-box;
-}
-
-@media(max-height:760px) and (min-width:761px){
-  dialog#dlg.squad-wide > form.box > h2{
-    padding-top:24px;
-    padding-bottom:20px;
-  }
-  dialog#dlg.squad-wide .squad-editor-layout{
-    padding-top:16px;
-    padding-bottom:16px;
-    gap:14px;
-  }
-  dialog#dlg.squad-wide .squad-editor-layout > section{
-    padding:18px;
-  }
-  dialog#dlg.squad-wide .squad-inbound-list{max-height:260px}
-  dialog#dlg.squad-wide > form.box > .act{padding-top:12px;padding-bottom:13px}
 }
