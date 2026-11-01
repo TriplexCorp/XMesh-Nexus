@@ -288,19 +288,23 @@ pub async fn remove_device(
     actor: &str,
 ) -> Result<Value, ApiError> {
     if user_id <= 0 || device_id <= 0 {
-        return Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid device slot"));
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Invalid device slot",
+        ));
     }
     let mut tx = state.pool.begin().await?;
     lock_user(&mut tx, user_id).await?;
-    let removed = sqlx::query(
-        "DELETE FROM user_subscription_devices WHERE user_id=$1 AND id=$2",
-    )
-    .bind(user_id)
-    .bind(device_id)
-    .execute(&mut *tx)
-    .await?;
+    let removed = sqlx::query("DELETE FROM user_subscription_devices WHERE user_id=$1 AND id=$2")
+        .bind(user_id)
+        .bind(device_id)
+        .execute(&mut *tx)
+        .await?;
     if removed.rows_affected() == 0 {
-        return Err(ApiError::new(StatusCode::NOT_FOUND, "Device slot not found"));
+        return Err(ApiError::new(
+            StatusCode::NOT_FOUND,
+            "Device slot not found",
+        ));
     }
     sync_projection(&mut tx, user_id).await?;
     audit_device_action(
@@ -315,11 +319,7 @@ pub async fn remove_device(
     admin_status(state, user_id).await
 }
 
-pub async fn reset_devices(
-    state: &AppState,
-    user_id: i64,
-    actor: &str,
-) -> Result<Value, ApiError> {
+pub async fn reset_devices(state: &AppState, user_id: i64, actor: &str) -> Result<Value, ApiError> {
     if user_id <= 0 {
         return Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid user"));
     }
