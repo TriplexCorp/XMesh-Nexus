@@ -27,7 +27,6 @@
   publish(root,message);
  }
  function securityIcon(){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 5 6v5c0 4.7 2.8 8.1 7 10 4.2-1.9 7-5.3 7-10V6l-7-3Z"/><path d="M9 12l2 2 4-4"/></svg>'}
- function closeIcon(){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>'}
  function certificateSummary(tls){
   const certs=Array.isArray(tls?.certificates)?tls.certificates:[];
   if(!certs.length)return {count:0,title:'Автоматически',text:'Ручной сертификат не закреплён. Managed TLS на ноде сможет подставить сертификат через подписанную policy.'};
@@ -63,7 +62,7 @@
         <span class="xm-tls-mark">${securityIcon()}</span>
         <div class="xm-tls-head-copy"><span class="xm-tls-eyebrow">XRAY STUDIO / TLS</span><h2 id="xm-tls-dialog-title">Защита транспорта</h2><p>${esc(tag)} · ${esc(protocol)} / ${esc(network||'raw')}</p></div>
       </div>
-      <button type="button" class="xm-tls-close" aria-label="Закрыть">${closeIcon()}</button>
+      <button type="button" class="xm-tls-close xm-studio-modal-close" data-x aria-label="Закрыть окно">×</button>
     </header>
     <div class="xm-tls-body">
       ${hysteria?`<section class="xm-tls-hero"><div><span>HYSTERIA2 / QUIC</span><strong>TLS 1.3 + h3 закреплены протоколом</strong><p>Параметры транспорта останутся совместимыми с QUIC listener и не могут быть случайно ослаблены через форму.</p></div><b>LOCKED</b></section>`:''}
