@@ -21,7 +21,7 @@ use sqlx::Row;
 /// `XMesh` v6 is the first numbered POSTQUANTUM major control-Agent release.
 /// v4/v5 remain accepted only so an already enrolled node can perform the
 /// authenticated transition to v6; they are not the advertised target.
-pub const CONTROL_AGENT_VERSION: &str = "control-v6.0.4";
+pub const CONTROL_AGENT_VERSION: &str = "control-v6.0.5";
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
