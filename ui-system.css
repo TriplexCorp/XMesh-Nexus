@@ -1,7 +1,7 @@
-/* XMesh Nexus unified UI surface contract v2.
+/* XMesh Nexus unified UI surface contract v3.
  * Loaded LAST. It is the single visual authority for Appearance surface settings.
  * Feature styles own geometry/layout; this file owns surface material, borders,
- * elevation, blur and shared radii. See docs/UI_SYSTEM.md. */
+ * separators, elevation, blur and shared radii. See docs/UI_SYSTEM.md. */
 
 :root{
   --ui-surface-panel-bg:var(--s1);
@@ -15,6 +15,7 @@
   --ui-surface-border:var(--ln);
   --ui-surface-border-strong:var(--border-strong,var(--ln));
   --ui-dialog-section-border:color-mix(in srgb,var(--tx) 7%,transparent);
+  --ui-separator:color-mix(in srgb,var(--tx) 7%,transparent);
   --ui-surface-panel-shadow:0 18px 48px -38px rgba(0,0,0,.72);
   --ui-surface-dialog-shadow:0 30px 82px -28px rgba(0,0,0,.72);
   --ui-surface-section-shadow:none;
@@ -42,6 +43,7 @@ html[data-surface=solid]{
   --ui-surface-floating-bg:color-mix(in srgb,var(--s1) 97%,var(--s2));
   --ui-dialog-section-bg:color-mix(in srgb,var(--s2) 26%,transparent);
   --ui-dialog-control-bg:color-mix(in srgb,var(--s1) 90%,var(--s2));
+  --ui-separator:color-mix(in srgb,var(--tx) 7%,transparent);
   --ui-surface-panel-shadow:0 18px 48px -38px rgba(0,0,0,.72);
   --ui-surface-dialog-shadow:0 30px 82px -28px rgba(0,0,0,.72);
   --ui-surface-section-shadow:none;
@@ -51,7 +53,8 @@ html[data-surface=solid]{
 }
 
 /* Glass: transparency and blur live on the outer material. Nested dialog
- * groups deliberately do not stack additional backdrop filters. */
+ * groups deliberately do not stack additional backdrop filters. Structural
+ * separators stay quieter than surface borders so glass never looks ruled. */
 html[data-surface=glass]{
   --ui-surface-panel-bg:color-mix(in srgb,var(--s1) 60%,transparent);
   --ui-surface-dialog-bg:color-mix(in srgb,var(--s1) 70%,transparent);
@@ -64,6 +67,7 @@ html[data-surface=glass]{
   --ui-surface-border:color-mix(in srgb,var(--tx) 11%,transparent);
   --ui-surface-border-strong:color-mix(in srgb,var(--tx) 16%,transparent);
   --ui-dialog-section-border:color-mix(in srgb,var(--tx) 8%,transparent);
+  --ui-separator:color-mix(in srgb,var(--tx) 4.5%,transparent);
   --ui-surface-panel-shadow:0 22px 64px -42px rgba(0,0,0,.82),inset 0 1px 0 color-mix(in srgb,var(--tx) 7%,transparent);
   --ui-surface-dialog-shadow:0 34px 96px -34px rgba(0,0,0,.86),inset 0 1px 0 color-mix(in srgb,var(--tx) 8%,transparent);
   --ui-surface-section-shadow:inset 0 1px 0 color-mix(in srgb,var(--tx) 4%,transparent);
@@ -86,6 +90,7 @@ html[data-surface=raised]{
   --ui-surface-border:color-mix(in srgb,var(--tx) 9%,var(--ln));
   --ui-surface-border-strong:color-mix(in srgb,var(--tx) 13%,var(--border-strong,var(--ln)));
   --ui-dialog-section-border:color-mix(in srgb,var(--tx) 8%,transparent);
+  --ui-separator:color-mix(in srgb,var(--tx) 5.5%,transparent);
   --ui-surface-panel-shadow:0 26px 68px -40px rgba(0,0,0,.84),0 8px 22px -20px color-mix(in srgb,var(--a) 16%,transparent),inset 0 1px 0 color-mix(in srgb,var(--tx) 5%,transparent);
   --ui-surface-dialog-shadow:0 38px 110px -38px rgba(0,0,0,.9),0 16px 42px -32px color-mix(in srgb,var(--a) 18%,transparent),inset 0 1px 0 color-mix(in srgb,var(--tx) 6%,transparent);
   --ui-surface-section-shadow:inset 0 1px 0 color-mix(in srgb,var(--tx) 3%,transparent);
@@ -94,11 +99,13 @@ html[data-surface=raised]{
   --ui-surface-filter:none;
 }
 
-/* Border setting changes shared tokens, never per-feature colors. */
+/* Border setting changes surface boundaries. Separators are intentionally a
+ * separate hierarchy: Strong borders must not turn content rows into rulers. */
 html[data-borders=off]{
   --ui-surface-border:transparent;
   --ui-surface-border-strong:transparent;
   --ui-dialog-section-border:transparent;
+  --ui-separator:transparent;
 }
 html[data-borders=strong]{
   --ui-surface-border:color-mix(in srgb,var(--a) 24%,var(--ln));
@@ -160,6 +167,23 @@ html[data-borders=strong]{
   backdrop-filter:var(--ui-surface-filter)!important;
 }
 
+/* Composite controls have exactly one material shell. Use these attributes in
+ * new markup for unit inputs, search-with-icon fields and similar controls. */
+:where([data-ui-control="shell"]){
+  background:var(--ui-surface-control-bg)!important;
+  border-color:var(--ui-surface-border)!important;
+  box-shadow:none!important;
+  -webkit-backdrop-filter:var(--ui-surface-filter)!important;
+  backdrop-filter:var(--ui-surface-filter)!important;
+}
+:where([data-ui-control="inner"]){
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+  -webkit-backdrop-filter:none!important;
+  backdrop-filter:none!important;
+}
+
 /* Modal depth isolation: the shell is the raised/glass surface. Nested groups
  * remain readable but flat; they must not create a stack of cards and blurs. */
 dialog :where([data-ui-surface="section"],[data-ui-surface="metric"],[data-ui-surface="item"],.node-form-section,.subscription-studio-section,.sv-section){
@@ -174,6 +198,17 @@ dialog :where(input:not([type="range"]):not([type="checkbox"]):not([type="radio"
   background:var(--ui-dialog-control-bg)!important;
   -webkit-backdrop-filter:none!important;
   backdrop-filter:none!important;
+}
+
+dialog :where([data-ui-control="shell"]){
+  background:var(--ui-dialog-control-bg)!important;
+  -webkit-backdrop-filter:none!important;
+  backdrop-filter:none!important;
+}
+dialog :where([data-ui-control="inner"]){
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
 }
 
 /* Sidebar participates in the selected material instead of being a separate theme. */
@@ -215,9 +250,33 @@ dialog :where(input:not([type="range"]):not([type="checkbox"]):not([type="radio"
   backdrop-filter:var(--ui-surface-filter)!important;
 }
 
+/* Structural separators are quieter than borders. This prevents Glass/Strong
+ * from producing hard ruled lines across cards. */
+.setting-row{
+  border-top-color:var(--ui-separator)!important;
+}
+
 /* Explicitly preserve Settings rows as flat content. The card itself owns depth. */
 .appearance-layout .setting-row{
   background:transparent!important;
+  box-shadow:none!important;
+  -webkit-backdrop-filter:none!important;
+  backdrop-filter:none!important;
+}
+
+/* Legacy composite-control adapter: the outer unit capsule owns material; its
+ * number input must remain transparent or it renders a rectangular seam. */
+.appearance-layout .slider-control .precision-number{
+  background:var(--ui-surface-control-bg)!important;
+  border-color:var(--ui-surface-border)!important;
+  box-shadow:none!important;
+  -webkit-backdrop-filter:var(--ui-surface-filter)!important;
+  backdrop-filter:var(--ui-surface-filter)!important;
+}
+.appearance-layout .slider-control .precision-number input[type="number"]{
+  background:transparent!important;
+  border:0!important;
+  border-radius:0!important;
   box-shadow:none!important;
   -webkit-backdrop-filter:none!important;
   backdrop-filter:none!important;
