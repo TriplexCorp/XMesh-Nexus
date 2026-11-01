@@ -24,7 +24,8 @@ for(const surface of ['solid','glass','raised']){
 for(const token of [
   '--ui-surface-panel-bg','--ui-surface-dialog-bg','--ui-surface-section-bg','--ui-surface-item-bg',
   '--ui-surface-control-bg','--ui-surface-border','--ui-surface-panel-shadow','--ui-surface-dialog-shadow',
-  '--ui-surface-control-shadow','--ui-dialog-section-bg','--ui-dialog-control-bg','--ui-separator','--ui-surface-filter'
+  '--ui-surface-control-shadow','--ui-dialog-section-bg','--ui-dialog-control-bg','--ui-separator','--ui-surface-filter',
+  '--ui-segment-track-bg','--ui-segment-active-bg','--ui-segment-active-border','--ui-segment-active-shadow'
 ])assert(css.includes(token),'Missing shared token '+token);
 
 assert.match(css,/html\[data-surface=glass\][\s\S]*--ui-surface-filter:blur\(/,
@@ -78,8 +79,15 @@ assert.match(css,/dialog :where\(\[data-ui-surface="section"\],[\s\S]*box-shadow
 assert.match(css,/dialog :where\(input:not\(\[type="range"\]\)[\s\S]*--ui-dialog-control-bg/,
   'Modal controls must use the dialog control material');
 
-assert.match(css,/:where\(\.seg\)[\s\S]*--ui-surface-control-bg/,
-  'Generic segmented controls must participate in shared material');
+assert.match(css,/:where\(\.seg\)[\s\S]*--ui-segment-track-bg/,
+  'Generic segmented controls must consume the shared segmented track token');
+assert.match(css,/:where\(\.seg button\.on\)[\s\S]*--ui-segment-active-bg[\s\S]*--ui-segment-active-border[\s\S]*--ui-segment-active-shadow/,
+  'Selected segmented options must use a dedicated premium active state, not a generic item surface');
+assert.match(css,/:where\(\.seg button:not\(\.on\):hover\)[\s\S]*--ui-segment-hover-bg/,
+  'Inactive segmented options must retain a distinct hover state');
+assert.doesNotMatch(css,/:where\(\.seg button\.on\)\{[^}]*background:var\(--ui-surface-item-bg\)/,
+  'Segment selection must not collapse back to the generic item background');
+
 assert.match(css,/:where\(\[data-ui-control="shell"\]\)[\s\S]*--ui-surface-control-bg/,
   'Composite control shells must own shared control material');
 assert.match(css,/:where\(\[data-ui-control="inner"\]\)[\s\S]*background:transparent!important;[\s\S]*border:0!important/,
