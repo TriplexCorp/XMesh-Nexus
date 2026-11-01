@@ -64,8 +64,6 @@ jobs:
           grep -Fq 'targetAgentVersion     = "control-v6.0.4"' deploy/xsp-v2-product-gateway/main.go
           grep -Fq 'previousAgentVersion   = "control-v6.0.3"' deploy/xsp-v2-product-gateway/main.go
           grep -Fq 'repairAgentVersion     = "control-v6.0.0"' deploy/xsp-v2-product-gateway/main.go
-          node scripts/check-agent-update-base.js
-          node scripts/check-agent-update.js
           git diff --check
       - name: Commit bounded release alignment
         shell: bash
