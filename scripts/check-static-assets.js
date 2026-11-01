@@ -34,8 +34,8 @@ if(errors.length){
  const xhttpExpert=fs.readFileSync(path.join(root,'xray-studio-xhttp-expert.js'),'utf8');
  new Function(tlsJs);
  new Function(xhttpExpert);
- assert.match(index,/xray-studio-tls-dialog\.css\?v=20261101-tls-horizontal-v3/,
-   'TLS horizontal workspace stylesheet must receive a fresh cache key');
+ assert.match(index,/xray-studio-tls-dialog\.css\?v=20261101-tls-layout-v5/,
+   'TLS dialog stylesheet must receive the specificity-fix cache key');
  assert.match(index,/xray-studio-tls-dialog\.js\?v=20261101-tls-workspace-v2/,
    'TLS workspace behavior cache key must remain stable when JS is unchanged');
  assert.match(index,/node-dialogs\.js\?v=20261101-agent-update-autovalidation-v1/,
@@ -80,19 +80,23 @@ if(errors.length){
    'TLS editor must retain the guided workspace wrapper');
  assert.match(tlsJs,/class="xm-tls-summary"/,
    'TLS editor must expose the transport summary strip');
- assert.match(tlsCss,/\.xm-tls-dialog\{[\s\S]*width:min\(1380px/,
-   'TLS dialog must use the wide horizontal workspace surface');
+ assert.match(tlsCss,/dialog\.xm-tls-dialog\{[\s\S]*width:min\(1180px,calc\(100vw - 2rem\)\)!important/,
+   'TLS dialog width must explicitly defeat the generic 30rem dialog rule');
  assert.match(tlsCss,/\.xm-tls-layout\{display:grid;grid-template-columns:1fr/,
    'TLS workspace must flow vertically only at the outer shell level');
- assert.match(tlsCss,/\.xm-tls-summary\{[\s\S]*grid-template-columns:minmax\(180px,.8fr\) minmax\(430px,2fr\) minmax\(310px,1.35fr\)/,
-   'Desktop TLS summary must be a horizontal status strip');
- assert.match(tlsCss,/\.xm-tls-settings\{[\s\S]*grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/,
-   'Desktop TLS controls must be presented as three horizontal columns');
+ assert.match(tlsCss,/\.xm-tls-summary\{[\s\S]*grid-template-columns:minmax\(180px,.8fr\) minmax\(430px,2fr\) minmax\(260px,1.2fr\)/,
+   'Desktop TLS summary must reserve non-overlapping space for profile, status and certificates');
+ assert.match(tlsCss,/\.xm-tls-summary dl\{[\s\S]*grid-template-columns:repeat\(4,minmax\(92px,1fr\)\)/,
+   'Desktop TLS status cards must keep a usable minimum width');
+ assert.match(tlsCss,/\.xm-tls-settings\{[\s\S]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/,
+   'Desktop TLS controls must use two readable columns');
+ assert.match(tlsCss,/\.xm-tls-block:nth-of-type\(3\)\{grid-column:1\/-1/,
+   'TLS Identification controls must occupy the full settings row');
  assert.match(tlsCss,/\.xm-tls-advanced\{grid-column:1\/-1/,
    'Advanced JSON must occupy a dedicated full-width lower row');
  assert.doesNotMatch(tlsCss,/position:sticky;top:0[\s\S]*\.xm-tls-summary/,
    'TLS summary must not return as a sticky vertical sidebar');
  assert.match(tlsCss,/@media\(max-width:760px\)/,
    'TLS dialog must remain responsive on narrow screens');
- console.log('Static assets + expert XHTTP schema controls + horizontal TLS workspace: OK.');
+ console.log('Static assets + expert XHTTP schema controls + robust TLS dialog layout: OK.');
 }
