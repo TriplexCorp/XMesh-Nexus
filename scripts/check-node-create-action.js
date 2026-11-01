@@ -6,6 +6,9 @@ const app=fs.readFileSync('app.js','utf8');
 const css=fs.readFileSync('styles.css','utf8');
 const dialogCss=fs.readFileSync('node-dialogs.css','utf8');
 const userCss=fs.readFileSync('user-create-v3.css','utf8');
+const sharingJs=fs.readFileSync('user-sharing-risk.js','utf8');
+const sharingContext=fs.readFileSync('user-sharing-context.js','utf8');
+const sharingCss=fs.readFileSync('user-sharing-risk.css','utf8');
 const dialogJs=fs.readFileSync('node-dialogs.js','utf8');
 const html=fs.readFileSync('index.html','utf8');
 const strictBootstrap=fs.readFileSync('node-bootstrap-v6.js','utf8');
@@ -89,8 +92,8 @@ assert.match(strictBootstrap,/Node\/Xray не запустятся без под
 // Redesigned modal surfaces share one cache-busted dialog asset layer.
 assert.match(html,/<link rel="stylesheet" href="\/node-dialogs\.css\?v=20261101-user-create-v2">/,
  'Base dialog redesign stylesheet must remain available');
-assert.match(html,/<link rel="stylesheet" href="\/user-create-v3\.css\?v=20261101-enterprise-v4">/,
- 'Enterprise create-user stylesheet must be cache-busted');
+assert.match(html,/<link rel="stylesheet" href="\/user-create-v3\.css\?v=20261101-enterprise-v4&r=20261101-create-v5">/,
+ 'Create-user v5 stylesheet must receive a fresh cache key while retaining the stable asset version');
 assert.match(html,/<script src="\/node-dialogs\.js\?v=20261101-user-create-enterprise-v3"><\/script>/,
  'Dialog behavior enhancer must be cache-busted after create-user markup repair');
 assert.match(dialogCss,/dialog\.xm-action-confirm:has\(\.xm-action-confirm-icon\)\{[\s\S]*width:min\(760px/,
@@ -129,16 +132,18 @@ assert.match(dialogJs,/class="user-create-close" data-x aria-label="Закрыт
  'New-user close control must use the shared data-x close contract');
 assert.match(dialogJs,/user-create-workspace/,'Create-user form must use the enterprise workspace wrapper');
 assert.match(dialogJs,/Умный лимит устройств/,'Device limit behavior must be explained in the creation flow');
-assert.match(userCss,/#dlg\.user-create-modal\{[\s\S]*width:min\(1460px/,
- 'New-user dialog must use the wider desktop surface');
-assert.match(userCss,/\.user-create-workspace\{[\s\S]*grid-template-columns:minmax\(0,1\.55fr\) minmax\(390px,\.8fr\)/,
- 'Desktop create-user workspace must use the polished two-zone layout');
+assert.match(userCss,/#dlg\.user-create-modal\{[\s\S]*width:min\(1380px/,
+ 'New-user dialog must use the quieter v5 desktop surface');
+assert.match(userCss,/\.user-create-workspace\{[\s\S]*grid-template-columns:minmax\(0,1\.72fr\) minmax\(360px,\.78fr\)/,
+ 'Desktop create-user workspace must use the refined v5 two-zone layout');
 assert.match(userCss,/\.user-create-limits-grid\{[\s\S]*grid-template-columns:minmax\(0,1fr\) minmax\(0,1fr\)/,
  'Limits must use readable two-column policy layout instead of four squeezed controls');
-assert.match(userCss,/\.user-create-section-extra\{grid-column:1\/-1\}/,
+assert.match(userCss,/\.user-create-section-extra\{grid-column:1\/-1/,
  'Metadata section must span the full desktop workspace');
 assert.match(userCss,/grid-template-areas:"squads tag hold desc"/,
  'Desktop metadata must use one compact horizontal rail');
+assert.match(userCss,/\.user-create-hold \.sw\{[\s\S]*width:2\.8rem!important;[\s\S]*height:1\.6rem!important/,
+ 'On-hold control must retain a real visible switch track instead of collapsing to a dot');
 assert.match(userCss,/\.user-create-section-kicker\{display:none\}/,
  'Duplicate English section kickers must stay visually suppressed');
 assert.match(userCss,/\.user-create-footer-copy\{display:none\}/,
@@ -148,15 +153,37 @@ assert.match(userCss,/@media\(max-width:680px\)[\s\S]*\.user-create-limits-grid,
 assert.match(userCss,/\.user-create-footer-actions\{display:flex/,
  'Create/cancel actions must stay grouped in a dedicated footer');
 
-assert.match(dockerfile,/node-dialogs\.css user-create-v3\.css node-dialogs\.js/,
- 'Production panel image must package the create-user enterprise stylesheet with dialog assets');
+// Anti-sharing intelligence is deliberately explainable: device slots are
+// authoritative, traffic history is verified, and high traffic alone is not enough.
+assert.match(html,/user-sharing-risk\.css\?v=20261101-sharing-v1/,'Sharing risk CSS must be loaded');
+assert.match(html,/user-sharing-context\.js\?v=20261101-sharing-v1[\s\S]*user-sharing-risk\.js\?v=20261101-sharing-v1/,
+ 'Sharing context must load immediately before the isolated risk monitor');
+assert.match(sharingContext,/globalThis\.DB=DB/,'Sharing monitor must receive the already-loaded runtime user snapshot');
+assert.match(sharingJs,/traffic\/history\?range=7d/,'Risk score must use verified seven-day Xray history');
+assert.match(sharingJs,/new1h>=2/,'Risk score must detect rapid device growth');
+assert.match(sharingJs,/nodes6h>=2/,'Risk score must detect concurrent multi-node activity');
+assert.match(sharingJs,/recent3h>=6\*GiB&&hourlyRatio>=4/,'Traffic anomaly must require both material volume and baseline deviation');
+assert.match(sharingJs,/Высокий объём трафика сам по себе не считается sharing/,
+ 'Risk explanation must explicitly reject traffic volume as standalone proof');
+assert.match(sharingJs,/dataset\.sharingHead='devices'/,'Users table must gain the Devices column');
+assert.match(sharingJs,/dataset\.sharingHead='risk'/,'Users table must gain the Risk column');
+assert.match(sharingCss,/\.xm-risk-pill\.is-high/,'High-risk table state must be visually distinct');
+assert.match(sharingCss,/\.xm-sharing-dialog\{/,'Risk details must use a dedicated explainable dialog');
+
+assert.match(dockerfile,/node-dialogs\.css user-create-v3\.css user-sharing-risk\.css node-dialogs\.js/,
+ 'Production panel image must package the create-user and sharing-risk styles with dialog assets');
+assert.match(dockerfile,/diagnostics\.js diagnostics\.css user-sharing-context\.js user-sharing-risk\.js/,
+ 'Production panel image must package sharing intelligence after diagnostics and runtime context');
 assert.match(dockerfile,/app\.js user-fingerprint-override\.js node-bootstrap-v6\.js unified-selects\.js/,
  'Production panel image must package user fingerprint control and the strict-PQ bootstrap override');
 
 assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length,'CSS braces must remain balanced');
 assert.equal((dialogCss.match(/\{/g)||[]).length,(dialogCss.match(/\}/g)||[]).length,'Dialog CSS braces must remain balanced');
 assert.equal((userCss.match(/\{/g)||[]).length,(userCss.match(/\}/g)||[]).length,'Create-user CSS braces must remain balanced');
+assert.equal((sharingCss.match(/\{/g)||[]).length,(sharingCss.match(/\}/g)||[]).length,'Sharing-risk CSS braces must remain balanced');
 new Function(app);
 new Function(strictBootstrap);
 new Function(dialogJs);
-console.log('Node action: redesigned repair + polished valid enterprise new-user dialog, TLS 1.3 bootstrap and exact-release strict-PQ repair contract OK');
+new Function(sharingContext);
+new Function(sharingJs);
+console.log('Node action: create-user v5 + explainable anti-sharing risk, strict-PQ repair and dialog contracts OK');
