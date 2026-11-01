@@ -15,7 +15,10 @@ FILES = [
 
 for name in FILES:
     p = Path(name)
-    p.write_text(p.read_text().replace('control-v6.0.5', 'control-v6.0.6'))
+    text = p.read_text()
+    text = text.replace('control-v6.0.5', 'control-v6.0.6')
+    text = text.replace('control-v6[.]0[.]5', 'control-v6[.]0[.]6')
+    p.write_text(text)
 
 p = Path('deploy/node-control-agent.sh')
 text = p.read_text()
