@@ -11,7 +11,7 @@ export LC_ALL=C
 [[ "$XMESH_API_URL" == https://* ]] || exit 2
 XMESH_API_URL="${XMESH_API_URL%/}"
 KEY="${XMESH_METRICS_PRIVATE_KEY:-/etc/xmesh-node-metrics/node.key}"
-AGENT_VERSION="control-v6.0.3"
+AGENT_VERSION="control-v6.0.4"
 UNIT="${XMESH_XRAY_UNIT:-xray.service}"
 # Only root-owned local configuration can choose a unit. Remote responses never do.
 [[ "$UNIT" =~ ^[A-Za-z0-9_.@-]+\.service$ ]] || { echo "Invalid systemd unit" >&2; exit 2; }
@@ -293,7 +293,7 @@ run_agent_updater(){
   if ! curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy/update-node-control-agent.sh -o "$bootstrap";then
    UPDATER_ERROR='Agent updater missing and verified bootstrap download failed';return 1
   fi
-  if ! bash -n "$bootstrap" || ! grep -Fq 'AGENT_VERSION="control-v6.0.3"' "$bootstrap" || ! grep -Fq 'xmesh-node-agent-upgrade.service' "$bootstrap";then
+  if ! bash -n "$bootstrap" || ! grep -Fq 'AGENT_VERSION="control-v6.0.4"' "$bootstrap" || ! grep -Fq 'xmesh-node-agent-upgrade.service' "$bootstrap";then
    rm -f "$bootstrap";UPDATER_ERROR='Downloaded Agent updater failed bootstrap validation';return 1
   fi
   chmod 0700 "$bootstrap"
