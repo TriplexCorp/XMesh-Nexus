@@ -6,7 +6,8 @@ function request(spec={}){
  const run=()=>new Promise(resolve=>{
   const active=document.activeElement;
   const dlg=document.createElement('dialog');
-  dlg.className='xm-studio-modal'+(spec.fields?.some(field=>field.type==='cards')?' xm-studio-modal--cards':'');
+  const realityDialog=spec.eyebrow==='XRAY STUDIO / REALITY'||spec.title==='Настройка REALITY';
+  dlg.className='xm-studio-modal'+(spec.fields?.some(field=>field.type==='cards')?' xm-studio-modal--cards':'')+(realityDialog?' xm-studio-modal--reality':'');
   dlg.setAttribute('aria-labelledby','xm-studio-modal-title');
   dlg.setAttribute('aria-describedby','xm-studio-modal-description');
   const shell=document.createElement('form');
