@@ -236,6 +236,9 @@ async fn sync_projection(
     user_id: i64,
 ) -> Result<(), ApiError> {
     let devices = device_projection_tx(tx, user_id).await?;
+    sqlx::query("SET LOCAL xmesh.device_projection_write = '1'")
+        .execute(&mut **tx)
+        .await?;
     sqlx::query(
         "UPDATE panel_records
             SET data=jsonb_set(data,'{devices}',$2,true)
