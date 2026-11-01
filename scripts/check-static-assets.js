@@ -113,8 +113,8 @@ if(errors.length){
    'Diagnostics workspace behavior must be loaded after app.js');
  assert.ok(index.indexOf('app.js?v=')<index.indexOf('/diagnostics.js?v='),
    'Diagnostics route override must load after the historical app route');
- assert.match(dockerfile,/app\.js diagnostics\.js diagnostics\.css/,
-   'Production image must package diagnostics JS/CSS');
+ assert.match(dockerfile,/unified-selects\.js diagnostics\.js diagnostics\.css/,
+   'Production image must package diagnostics after the established bootstrap override chain');
  assert.match(diagnosticsJs,/pages\.tools=\[['"]Диагностика['"],diagnosticsPage\]/,
    'Diagnostics must replace the historical tools route');
  assert.match(diagnosticsJs,/\/api\/v1\/system\/stats/,
