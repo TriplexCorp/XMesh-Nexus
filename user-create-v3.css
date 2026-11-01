@@ -1,277 +1,213 @@
-/* Enterprise create-user workspace v4 visual polish.
- * Loaded after node-dialogs.css so the user surface can evolve without
- * changing shared node/repair dialog contracts. */
+/* Enterprise create-user workspace v5.
+ * Reference direction: quiet Linear/Vercel-style grouping, strong focus states,
+ * fewer nested boxes and a real right-aligned switch control. */
 
 #dlg.user-create-modal{
-  width:min(1460px,calc(100vw - 2.5rem));
+  width:min(1380px,calc(100vw - 2.5rem));
+  max-width:none;
   max-height:calc(100dvh - 2rem);
 }
 #dlg.user-create-modal .user-create-dialog{
   max-height:calc(100dvh - 2rem);
-  border-radius:22px;
-  box-shadow:0 30px 80px rgba(0,0,0,.36),0 0 0 1px color-mix(in srgb,var(--a) 7%,transparent);
+  border-radius:18px;
+  overflow:hidden;
+  background:var(--s1);
+  border:1px solid color-mix(in srgb,var(--ln) 88%,var(--a) 12%);
+  box-shadow:0 34px 90px rgba(0,0,0,.42);
 }
+
 .user-create-head{
-  padding:1rem 1.35rem .95rem;
-  min-height:74px;
+  padding:1rem 1.2rem .9rem;
+  min-height:70px;
+  display:flex;
+  align-items:center;
+  border-bottom:1px solid var(--ln);
+  background:color-mix(in srgb,var(--s2) 42%,var(--s1));
 }
-.user-create-title-wrap{gap:.8rem}
+.user-create-title-wrap{display:flex;align-items:center;gap:.72rem;min-width:0}
 .user-create-title-icon{
-  width:2.7rem;
-  height:2.7rem;
-  border-radius:.82rem;
+  width:2.45rem;height:2.45rem;flex:none;
+  display:grid;place-items:center;
+  border-radius:.75rem;
+  color:var(--a);
+  border:1px solid color-mix(in srgb,var(--a) 28%,var(--ln));
+  background:color-mix(in srgb,var(--a) 7%,var(--s2));
 }
-.user-create-title-icon .ic{width:1.2rem;height:1.2rem}
-/* The visible Russian heading is enough. The duplicated English kicker made
- * the dialog look like a design system specimen instead of a production form. */
+.user-create-title-icon .ic{width:1.05rem;height:1.05rem}
 .user-create-eyebrow{display:none}
-.user-create-head h2{
-  margin:0 0 .12rem;
-  font-size:clamp(1.42rem,1.7vw,1.72rem);
-  line-height:1.08;
-  letter-spacing:-.035em;
-}
-.user-create-head p{
-  margin:0;
-  font-size:.78rem;
-  line-height:1.35;
-  max-width:78ch;
-}
+.user-create-head h2{margin:0 0 .12rem;font-size:1.28rem;line-height:1.08;letter-spacing:-.032em}
+.user-create-head p{margin:0;color:var(--mu);font-size:.68rem;line-height:1.35}
 .user-create-head .user-create-close{
   width:var(--xm-close-size,34px)!important;
   height:var(--xm-close-size,34px)!important;
   min-width:var(--xm-close-size,34px)!important;
   min-height:var(--xm-close-size,34px)!important;
-  flex:none;
-  margin-left:auto;
-  padding:0!important;
-  display:grid!important;
-  place-items:center;
+  margin-left:auto;padding:0!important;flex:none;
+  display:grid!important;place-items:center;
   border-radius:50%!important;
   font-size:var(--xm-close-glyph-size,16px)!important;
   line-height:1!important;
 }
 
-.user-create-body{
-  padding:.8rem .9rem .9rem;
-  overflow:auto;
-  overflow-x:hidden;
-  scrollbar-gutter:stable;
-}
+.user-create-body{padding:.8rem;overflow:auto;overflow-x:hidden;scrollbar-gutter:stable}
 .user-create-workspace{
   display:grid;
-  grid-template-columns:minmax(0,1.55fr) minmax(390px,.8fr);
-  gap:.8rem;
+  grid-template-columns:minmax(0,1.72fr) minmax(360px,.78fr);
+  gap:.72rem;
   align-items:stretch;
 }
 .user-create-section{
   margin:0!important;
-  padding:1rem;
-  border-radius:16px;
+  padding:.9rem;
   min-width:0;
-  background:
-    linear-gradient(155deg,color-mix(in srgb,var(--s2) 90%,transparent),color-mix(in srgb,var(--s1) 98%,transparent));
-  border-color:color-mix(in srgb,var(--ln) 84%,var(--a) 16%);
+  border:1px solid color-mix(in srgb,var(--ln) 90%,var(--tx) 10%);
+  border-radius:14px;
+  background:color-mix(in srgb,var(--s2) 56%,var(--s1));
+  box-shadow:none;
 }
-.user-create-section-main,
-.user-create-section-limits{min-height:100%}
-.user-create-section-extra{grid-column:1/-1}
-.user-create-section-head{
-  margin-bottom:.78rem;
-  align-items:flex-start;
-}
+.user-create-section-main,.user-create-section-limits{min-height:100%}
+.user-create-section-extra{grid-column:1/-1;background:color-mix(in srgb,var(--s2) 42%,var(--s1))}
+.user-create-section-head{display:flex;align-items:flex-start;gap:.58rem;margin-bottom:.72rem}
 .user-create-section-icon{
-  width:2.1rem;
-  height:2.1rem;
-  border-radius:.66rem;
+  width:1.9rem;height:1.9rem;flex:none;
+  display:grid;place-items:center;
+  border-radius:.58rem;
+  color:var(--a);
+  border:1px solid color-mix(in srgb,var(--a) 22%,var(--ln));
+  background:color-mix(in srgb,var(--a) 6%,var(--s2));
 }
-.user-create-section-icon .ic{width:.96rem;height:.96rem}
-/* Section names already communicate the hierarchy. Removing the repeated
- * uppercase kickers quiets the interface without changing semantics. */
+.user-create-section-icon .ic{width:.86rem;height:.86rem}
 .user-create-section-kicker{display:none}
-.user-create-section-head h3{
-  margin:0 0 .12rem;
-  font-size:.96rem;
-  line-height:1.2;
-  letter-spacing:-.018em;
-}
-.user-create-section-head p{
-  margin:0;
-  font-size:.7rem;
-  line-height:1.35;
-  color:var(--mu);
-}
+.user-create-section-head h3{margin:.04rem 0 .08rem;font-size:.86rem;line-height:1.18;letter-spacing:-.014em}
+.user-create-section-head p{margin:0;color:var(--mu);font-size:.62rem;line-height:1.35}
 
-.user-create-main-grid{
-  display:grid;
-  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
-  gap:.72rem .78rem;
-  align-items:start;
-}
+.user-create-main-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.66rem .72rem;align-items:start}
 .user-create-username-row{
   grid-column:1/-1;
   display:grid;
   grid-template-columns:minmax(0,1fr) auto;
-  gap:.6rem;
+  gap:.5rem;
   align-items:end;
-  padding-bottom:.05rem;
 }
-.user-create-template,
-.user-create-xray{min-width:0}
-.user-create-generate{
-  min-height:2.62rem;
-  padding:.6rem .9rem;
-  border-radius:.7rem;
-  white-space:nowrap;
-}
-.user-create-dialog .user-create-field{gap:.26rem}
-.user-create-dialog .user-create-field>span{
-  font-size:.73rem;
-  font-weight:760;
-  line-height:1.25;
-}
-.user-create-dialog .user-create-field>small{
-  font-size:.63rem;
-  line-height:1.34;
-}
+.user-create-template,.user-create-xray{min-width:0}
+.user-create-dialog .user-create-field{display:flex;flex-direction:column;gap:.24rem;min-width:0}
+.user-create-dialog .user-create-field>span{font-size:.68rem;font-weight:720;line-height:1.25;color:var(--tx)}
+.user-create-dialog .user-create-field>small{font-size:.57rem;line-height:1.35;color:var(--mu)}
 .user-create-dialog input:not([type=checkbox]),
 .user-create-dialog textarea,
 .user-create-dialog select,
 .user-create-dialog .xm-select-trigger{
-  min-height:2.62rem;
-  border-radius:.7rem;
+  min-height:2.7rem;
+  border-radius:.68rem;
+  border-color:color-mix(in srgb,var(--ln) 88%,var(--tx) 12%);
+  background:color-mix(in srgb,var(--s2) 82%,var(--s1));
+  box-shadow:none;
+}
+.user-create-dialog input:not([type=checkbox]):hover,
+.user-create-dialog textarea:hover,
+.user-create-dialog .xm-select-trigger:hover{border-color:color-mix(in srgb,var(--tx) 24%,var(--ln))}
+.user-create-dialog input:not([type=checkbox]):focus-visible,
+.user-create-dialog textarea:focus-visible,
+.user-create-dialog select:focus-visible,
+.user-create-dialog .xm-select-trigger:focus-visible{
+  outline:2px solid color-mix(in srgb,var(--a) 65%,transparent);
+  outline-offset:1px;
+  border-color:color-mix(in srgb,var(--a) 65%,var(--ln));
 }
 .user-create-dialog .xm-select-shell{width:100%;min-width:0}
-.user-create-dialog .xm-select-caption{
-  overflow:hidden;
-  text-overflow:ellipsis;
+.user-create-dialog .xm-select-caption{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.user-create-generate{
+  min-height:2.7rem;
+  height:2.7rem;
+  padding:.55rem .82rem;
+  border-radius:.68rem;
   white-space:nowrap;
+  border-color:color-mix(in srgb,var(--a) 24%,var(--ln));
+  background:color-mix(in srgb,var(--a) 6%,var(--s2));
 }
+.user-create-generate:hover{background:color-mix(in srgb,var(--a) 10%,var(--s2));border-color:color-mix(in srgb,var(--a) 40%,var(--ln))}
 
-.user-create-limits-grid{
-  display:grid;
-  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
-  gap:.68rem;
-  align-items:start;
-}
+.user-create-limits-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.62rem;align-items:start}
 .user-create-policy-note{
-  margin-top:.72rem;
-  padding:.62rem .68rem;
-  display:grid;
-  grid-template-columns:1.55rem minmax(0,1fr);
-  gap:.55rem;
-  align-items:start;
-  border:1px solid color-mix(in srgb,var(--a) 14%,var(--ln));
-  border-radius:.72rem;
-  background:color-mix(in srgb,var(--a) 4.5%,var(--s1));
+  margin-top:.65rem;padding:.58rem .62rem;
+  display:grid;grid-template-columns:1.45rem minmax(0,1fr);gap:.5rem;align-items:start;
+  border:1px solid color-mix(in srgb,var(--a) 12%,var(--ln));
+  border-radius:.68rem;
+  background:color-mix(in srgb,var(--a) 3.5%,var(--s1));
 }
-.user-create-policy-note>span{
-  width:1.55rem;
-  height:1.55rem;
-  display:grid;
-  place-items:center;
-  color:var(--a);
-  border-radius:.5rem;
-  background:color-mix(in srgb,var(--a) 9%,var(--s2));
-}
-.user-create-policy-note .ic{width:.8rem;height:.8rem}
-.user-create-policy-note p{margin:0;min-width:0}
-.user-create-policy-note b{display:block;font-size:.68rem;line-height:1.28}
-.user-create-policy-note small{display:block;margin-top:.1rem;color:var(--mu);font-size:.61rem;line-height:1.36}
+.user-create-policy-note>span{width:1.45rem;height:1.45rem;display:grid;place-items:center;color:var(--a);border-radius:.46rem;background:color-mix(in srgb,var(--a) 8%,var(--s2))}
+.user-create-policy-note .ic{width:.72rem;height:.72rem}
+.user-create-policy-note p{margin:0;min-width:0}.user-create-policy-note b{display:block;font-size:.64rem;line-height:1.28}.user-create-policy-note small{display:block;margin-top:.08rem;color:var(--mu);font-size:.55rem;line-height:1.38}
 
-/* On desktop Metadata becomes a single compact rail instead of a second tall
- * form row. This removes the large dead area visible in the previous version. */
 .user-create-extra-grid{
   display:grid;
-  grid-template-columns:minmax(15rem,1.1fr) minmax(9rem,.62fr) minmax(17rem,.9fr) minmax(20rem,1.25fr);
+  grid-template-columns:minmax(14rem,1.05fr) minmax(8rem,.55fr) minmax(18rem,.9fr) minmax(19rem,1.2fr);
   grid-template-areas:"squads tag hold desc";
-  gap:.72rem;
+  gap:.65rem;
   align-items:start;
 }
-.user-create-squads{grid-area:squads}
-.user-create-tag{grid-area:tag}
-.user-create-hold{grid-area:hold}
-.user-create-desc{grid-area:desc}
-.user-create-squads .ms{
-  min-height:2.62rem;
-  padding:.34rem;
-  gap:.32rem;
-  align-content:center;
-}
-.user-create-squads .ck{
-  min-height:1.72rem;
-  padding:.28rem .48rem;
-  display:inline-flex;
+.user-create-squads{grid-area:squads}.user-create-tag{grid-area:tag}.user-create-hold{grid-area:hold}.user-create-desc{grid-area:desc}
+.user-create-squads .ms{min-height:2.7rem;padding:.34rem;gap:.3rem;align-content:center;border-radius:.68rem;background:color-mix(in srgb,var(--s2) 82%,var(--s1))}
+.user-create-squads .ck{min-height:1.7rem;padding:.26rem .46rem;display:inline-flex;align-items:center;gap:.3rem;border-radius:.5rem}
+
+/* Switch row: the old width:max-content rule collapsed the absolute track.
+ * Keep a real 44x26 control and place it at the right edge of a settings row. */
+.user-create-hold{
+  min-height:3.72rem;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) auto;
+  grid-template-areas:"label switch" "help switch";
+  gap:.12rem .62rem!important;
   align-items:center;
-  gap:.32rem;
+  padding:.5rem .58rem;
+  border:1px solid color-mix(in srgb,var(--ln) 88%,var(--tx) 12%);
+  border-radius:.68rem;
+  background:color-mix(in srgb,var(--s2) 82%,var(--s1));
 }
-.user-create-hold .sw{min-height:2.62rem}
-.user-create-desc textarea{
-  min-height:2.62rem;
-  height:2.62rem;
-  max-height:6rem;
-  resize:vertical;
+.user-create-hold>span{grid-area:label}.user-create-hold>small{grid-area:help;margin:0!important}.user-create-hold .sw{
+  grid-area:switch;
+  position:relative!important;
+  width:2.8rem!important;
+  height:1.6rem!important;
+  min-width:2.8rem!important;
+  min-height:1.6rem!important;
+  display:inline-block!important;
+  align-self:center;
+  justify-self:end;
 }
-.user-create-error{margin:.55rem .12rem 0}
+.user-create-hold .sw input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer;z-index:2}
+.user-create-hold .sw span{position:absolute;inset:0;display:block;border-radius:999px;background:color-mix(in srgb,var(--tx) 8%,var(--s2));border:1px solid color-mix(in srgb,var(--tx) 18%,var(--ln));transition:background .18s ease,border-color .18s ease}
+.user-create-hold .sw span::after{content:"";position:absolute;width:1.08rem;height:1.08rem;left:.22rem;top:.2rem;border-radius:50%;background:color-mix(in srgb,var(--tx) 60%,var(--mu));box-shadow:0 1px 4px rgba(0,0,0,.35);transition:transform .2s cubic-bezier(.2,.8,.2,1),background .18s ease}
+.user-create-hold .sw input:checked+span{background:color-mix(in srgb,var(--a) 24%,var(--s2));border-color:color-mix(in srgb,var(--a) 55%,var(--ln))}.user-create-hold .sw input:checked+span::after{transform:translateX(1.12rem);background:var(--a)}
+.user-create-hold .sw input:focus-visible+span{outline:2px solid color-mix(in srgb,var(--a) 62%,transparent);outline-offset:2px}
 
-.user-create-footer{
-  padding:.72rem .9rem .78rem;
-  justify-content:flex-end;
-  gap:.7rem;
-}
-/* The previous footer repeated information already stated in the header and
- * made the bottom edge visually noisy. Keep it in the DOM for compatibility,
- * but make the action area the only visible footer content. */
-.user-create-footer-copy{display:none}
-.user-create-footer-actions{display:flex;align-items:center;gap:.55rem;flex:none}
-.user-create-footer button{
-  min-height:2.55rem;
-  padding:.58rem .95rem;
-  border-radius:.7rem;
-}
-.user-create-submit{min-width:12rem}
+.user-create-desc textarea{min-height:3.72rem;height:3.72rem;max-height:7rem;resize:vertical;padding-top:.66rem}
+.user-create-error{margin:.5rem .08rem 0;min-height:.8rem}
 
-@media(max-width:1220px){
+.user-create-footer{padding:.68rem .8rem .75rem;display:flex;justify-content:flex-end;gap:.55rem;border-top:1px solid var(--ln);background:color-mix(in srgb,var(--s2) 34%,var(--s1))}
+.user-create-footer-copy{display:none}.user-create-footer-actions{display:flex;align-items:center;gap:.5rem;flex:none}.user-create-footer button{min-height:2.55rem;padding:.56rem .9rem;border-radius:.66rem}.user-create-submit{min-width:11.5rem}
+
+@media(max-width:1180px){
   #dlg.user-create-modal{width:calc(100vw - 1.5rem)}
-  .user-create-workspace{grid-template-columns:minmax(0,1.35fr) minmax(350px,.8fr)}
-  .user-create-extra-grid{
-    grid-template-columns:minmax(0,1fr) minmax(0,.75fr);
-    grid-template-areas:"squads tag" "hold desc";
-  }
-  .user-create-desc textarea{height:2.62rem}
+  .user-create-workspace{grid-template-columns:minmax(0,1.35fr) minmax(330px,.78fr)}
+  .user-create-extra-grid{grid-template-columns:minmax(0,1fr) minmax(0,.75fr);grid-template-areas:"squads tag" "hold desc"}
 }
-@media(max-width:980px){
-  #dlg.user-create-modal{width:calc(100vw - 1.25rem)}
+@media(max-width:940px){
+  #dlg.user-create-modal{width:calc(100vw - 1.1rem)}
   .user-create-workspace{grid-template-columns:minmax(0,1fr)}
   .user-create-section-extra{grid-column:auto}
   .user-create-section-main,.user-create-section-limits{min-height:0}
-  .user-create-extra-grid{
-    grid-template-columns:minmax(0,1fr) minmax(0,1fr);
-    grid-template-areas:"squads tag" "hold desc";
-  }
+  .user-create-extra-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"squads tag" "hold desc"}
 }
 @media(max-width:680px){
-  #dlg.user-create-modal{width:calc(100vw - .75rem);max-height:calc(100dvh - .75rem)}
-  #dlg.user-create-modal .user-create-dialog{max-height:calc(100dvh - .75rem);border-radius:18px}
-  .user-create-head{padding:.9rem .95rem .82rem;min-height:0}
-  .user-create-title-icon{width:2.5rem;height:2.5rem}
-  .user-create-head p{display:none}
-  .user-create-body{padding:.68rem}
-  .user-create-section{padding:.82rem;border-radius:14px}
-  .user-create-main-grid,
-  .user-create-limits-grid,
-  .user-create-extra-grid{
-    grid-template-columns:minmax(0,1fr);
-    grid-template-areas:none;
-  }
-  .user-create-username-row{grid-column:auto;grid-template-columns:minmax(0,1fr)}
-  .user-create-generate{width:100%}
+  #dlg.user-create-modal{width:calc(100vw - .65rem);max-height:calc(100dvh - .65rem)}
+  #dlg.user-create-modal .user-create-dialog{max-height:calc(100dvh - .65rem);border-radius:15px}
+  .user-create-head{padding:.82rem .88rem;min-height:0}.user-create-title-icon{width:2.3rem;height:2.3rem}.user-create-head p{display:none}
+  .user-create-body{padding:.58rem}.user-create-section{padding:.74rem;border-radius:12px}
+  .user-create-main-grid,.user-create-limits-grid,.user-create-extra-grid{grid-template-columns:minmax(0,1fr);grid-template-areas:none}
+  .user-create-username-row{grid-column:auto;grid-template-columns:minmax(0,1fr)}.user-create-generate{width:100%}
   .user-create-squads,.user-create-tag,.user-create-hold,.user-create-desc{grid-area:auto}
-  .user-create-desc textarea{height:auto;min-height:4.3rem}
-  .user-create-footer{padding:.7rem;display:grid;grid-template-columns:1fr}
-  .user-create-footer-actions{display:grid;grid-template-columns:1fr 1fr;width:100%}
-  .user-create-footer button,.user-create-submit,.user-create-cancel{width:100%;min-width:0}
+  .user-create-desc textarea{height:auto;min-height:4.2rem}
+  .user-create-footer{padding:.62rem;display:grid;grid-template-columns:1fr}.user-create-footer-actions{display:grid;grid-template-columns:1fr 1fr;width:100%}.user-create-footer button,.user-create-submit,.user-create-cancel{width:100%;min-width:0}
 }
-@media(max-width:430px){
-  .user-create-footer-actions{grid-template-columns:1fr}
-}
+@media(max-width:430px){.user-create-footer-actions{grid-template-columns:1fr}}
