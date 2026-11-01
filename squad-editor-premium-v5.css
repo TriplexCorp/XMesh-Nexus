@@ -719,3 +719,86 @@ dialog#dlg.squad-wide > form.box > .act :is(.gh,.btn,.dg):active{
   dialog#dlg.squad-wide .squad-inbound-row,
   dialog#dlg.squad-wide > form.box > .act :is(.gh,.btn,.dg){transition:none!important}
 }
+
+/* v6.1 artifact correction: keep the premium treatment, but make the dialog
+ * structurally three-zone so the action footer can never cover impact content. */
+dialog#dlg.squad-wide > form.box{
+  display:flex;
+  flex-direction:column;
+  align-content:initial;
+  min-height:0;
+}
+
+dialog#dlg.squad-wide > form.box > h2{
+  flex:0 0 auto;
+}
+
+dialog#dlg.squad-wide .squad-editor-layout{
+  flex:1 1 auto;
+  min-height:0;
+  max-height:none;
+  overscroll-behavior:contain;
+  scrollbar-gutter:auto;
+}
+
+dialog#dlg.squad-wide .squad-editor-layout::-webkit-scrollbar{width:10px}
+dialog#dlg.squad-wide .squad-editor-layout::-webkit-scrollbar-track{background:transparent}
+dialog#dlg.squad-wide .squad-editor-layout::-webkit-scrollbar-thumb{
+  border:3px solid transparent;
+  border-radius:999px;
+  background:color-mix(in srgb,var(--tx) 16%,transparent);
+  background-clip:padding-box;
+}
+
+dialog#dlg.squad-wide > form.box > .act{
+  position:relative;
+  bottom:auto;
+  z-index:2;
+  flex:0 0 auto;
+  background:color-mix(in srgb,var(--s1) 97%,var(--s2));
+  box-shadow:0 -1px 0 rgba(255,255,255,.018) inset,0 -14px 28px -32px rgba(0,0,0,.72);
+  -webkit-backdrop-filter:none;
+  backdrop-filter:none;
+}
+
+dialog#dlg.squad-wide .squad-editor-layout > section::before,
+dialog#dlg.squad-wide .squad-preview-stat::before{
+  display:none;
+}
+
+dialog#dlg.squad-wide .node-form-section-title::before{
+  width:6px;
+  height:6px;
+  box-shadow:none;
+  opacity:.9;
+}
+
+dialog#dlg.squad-wide .squad-preview-stat{
+  box-shadow:0 10px 22px -23px rgba(0,0,0,.62);
+}
+
+dialog#dlg.squad-wide .squad-preview-stat:first-child{
+  border-color:color-mix(in srgb,var(--a) 13%,var(--ln));
+}
+
+dialog#dlg.squad-wide .squad-inbound-list::-webkit-scrollbar-thumb{
+  background:color-mix(in srgb,var(--tx) 18%,transparent);
+  background-clip:padding-box;
+}
+
+@media(max-height:760px) and (min-width:761px){
+  dialog#dlg.squad-wide > form.box > h2{
+    padding-top:24px;
+    padding-bottom:20px;
+  }
+  dialog#dlg.squad-wide .squad-editor-layout{
+    padding-top:16px;
+    padding-bottom:16px;
+    gap:14px;
+  }
+  dialog#dlg.squad-wide .squad-editor-layout > section{
+    padding:18px;
+  }
+  dialog#dlg.squad-wide .squad-inbound-list{max-height:260px}
+  dialog#dlg.squad-wide > form.box > .act{padding-top:12px;padding-bottom:13px}
+}
