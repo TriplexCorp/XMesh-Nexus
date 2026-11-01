@@ -27,6 +27,32 @@ UPDATE panel_records
 SET data = jsonb_set(data, '{devices}', '[]'::jsonb, true)
 WHERE collection = 'users' AND data ? 'devices';
 
+-- Prevent stale browser payloads and generic record edits from overwriting the
+-- server-derived device projection. Authoritative writers explicitly opt in for
+-- their current transaction via SET LOCAL xmesh.device_projection_write='1'.
+CREATE OR REPLACE FUNCTION xmesh_protect_device_projection()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+    IF OLD.collection = 'users'
+       AND NEW.collection = 'users'
+       AND (NEW.data -> 'devices') IS DISTINCT FROM (OLD.data -> 'devices')
+       AND COALESCE(current_setting('xmesh.device_projection_write', true), '') <> '1'
+    THEN
+        NEW.data := jsonb_set(
+            NEW.data,
+            '{devices}',
+            COALESCE(OLD.data -> 'devices', '[]'::jsonb),
+            true
+        );
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER panel_records_protect_device_projection
+BEFORE UPDATE OF data ON panel_records
+FOR EACH ROW EXECUTE FUNCTION xmesh_protect_device_projection();
+
 -- Rotating or revoking a subscription is also the coarse-grained emergency
 -- reset for all trusted device slots. Keep the derived JSON projection in sync.
 CREATE OR REPLACE FUNCTION xmesh_reset_subscription_devices()
@@ -36,6 +62,7 @@ DECLARE
 BEGIN
     target_user_id := CASE WHEN TG_OP = 'DELETE' THEN OLD.user_id ELSE NEW.user_id END;
     DELETE FROM user_subscription_devices WHERE user_id = target_user_id;
+    PERFORM set_config('xmesh.device_projection_write', '1', true);
     UPDATE panel_records
        SET data = jsonb_set(data, '{devices}', '[]'::jsonb, true)
      WHERE collection = 'users' AND id = target_user_id;
