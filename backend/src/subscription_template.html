@@ -8,7 +8,7 @@
   <title>{{BRAND}}</title>
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400..800&family=Manrope:wght@400..800&family=Inter:wght@400..800&family=Golos+Text:wght@400..800&family=Rubik:wght@400..800&family=Nunito+Sans:wght@400..800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Roboto:wght@400..800&family=PT+Sans:wght@400;700&family=Montserrat:wght@400..800&family=Ubuntu:wght@400;500;700&family=Open+Sans:wght@400..800&family=Source+Sans+3:wght@400..800&family=Fira+Sans:wght@400;500;600;700&family=Jost:wght@400..800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/subscription-studio.css">
-  <link rel="stylesheet" href="/subscription-public.css?v=20261101-enterprise-v2">
+  <link rel="stylesheet" href="/subscription-public.css?v=20261101-enterprise-workspace-v3">
   <style>
   :root{
     --portal-accent:{{ACCENT}};
@@ -26,47 +26,68 @@
 <main class="subscription-public-shell">
   <div class="subscription-preview" data-portal-theme="{{THEME}}" data-portal-layout="{{LAYOUT}}" data-portal-cards="{{CARD_STYLE}}" data-portal-font="{{FONT}}">
     <header class="subscription-preview-brand">
-      {{LOGO}}
-      <b>{{BRAND}}</b>
+      <div class="subscription-public-brand-identity">
+        {{LOGO}}
+        <div class="subscription-public-brand-copy">
+          <b>{{BRAND}}</b>
+          <small>Secure access workspace</small>
+        </div>
+      </div>
       <nav class="subscription-preview-languages" aria-label="Язык / Language">
         <a href="?lang=ru" lang="ru" class="{{RU_SELECTED}}" aria-current="{{RU_CURRENT}}">RU</a>
         <a href="?lang=en" lang="en" class="{{EN_SELECTED}}" aria-current="{{EN_CURRENT}}">EN</a>
       </nav>
     </header>
+
     <section class="subscription-preview-hero">
-      {{STATUS_DOT}}
-      <h3>{{HERO}}</h3>
-      <p>{{DESCRIPTION}}</p>
+      <div class="subscription-preview-hero-copy">
+        {{STATUS_DOT}}
+        <h3>{{HERO}}</h3>
+        <p>{{DESCRIPTION}}</p>
+      </div>
+      <div class="subscription-public-hero-accent" aria-hidden="true"><i></i><i></i><i></i></div>
     </section>
-    <div class="subscription-public-grid">
-      <section class="subscription-public-access-panel">
-        <header class="subscription-public-panel-title">
-          <span class="subscription-public-panel-icon" aria-hidden="true">01</span>
-          <div><b id="subscription-endpoint-label"></b><small id="subscription-endpoint-note"></small></div>
-        </header>
-        {{CTA}}
-        <section class="subscription-public-link-card" id="subscription-link-card" hidden>
-          <div class="subscription-public-link-card-head">
-            <div><b id="subscription-link-label"></b><small id="subscription-link-note"></small></div>
-            <em>HTTPS</em>
+
+    <div class="subscription-public-workspace">
+      <div class="subscription-public-grid">
+        <section class="subscription-public-access-panel">
+          <header class="subscription-public-panel-title">
+            <span class="subscription-public-panel-icon is-access" aria-hidden="true"></span>
+            <div><b id="subscription-endpoint-label"></b><small id="subscription-endpoint-note"></small></div>
+          </header>
+          <div class="subscription-public-primary-action">{{CTA}}</div>
+          <section class="subscription-public-link-card" id="subscription-link-card" hidden>
+            <div class="subscription-public-link-card-head">
+              <div><b id="subscription-link-label"></b><small id="subscription-link-note"></small></div>
+              <em>HTTPS</em>
+            </div>
+            <code id="subscription-link-display"></code>
+            <p class="subscription-public-action-status" id="subscription-action-status" aria-live="polite"></p>
+          </section>
+          {{QUICK_ACTIONS}}
+          <div class="subscription-public-secondary-surfaces">
+            {{QR}}
+            {{DEVICE_INFO}}
           </div>
-          <code id="subscription-link-display"></code>
-          <p class="subscription-public-action-status" id="subscription-action-status" aria-live="polite"></p>
         </section>
-        {{QUICK_ACTIONS}}
-        {{QR}}
-        {{DEVICE_INFO}}
-      </section>
-      <aside class="subscription-public-info-panel">
-        <header class="subscription-public-panel-title">
-          <span class="subscription-public-panel-icon" aria-hidden="true">02</span>
-          <div><b id="subscription-status-label"></b><small id="subscription-status-note"></small></div>
-        </header>
-        {{METRICS}}
-        {{SUPPORT}}
-      </aside>
+
+        <aside class="subscription-public-info-panel">
+          <header class="subscription-public-panel-title">
+            <span class="subscription-public-panel-icon is-status" aria-hidden="true"></span>
+            <div><b id="subscription-status-label"></b><small id="subscription-status-note"></small></div>
+          </header>
+          <div class="subscription-public-status-stack">
+            {{METRICS}}
+            {{SUPPORT}}
+          </div>
+        </aside>
+      </div>
+
+      <div class="subscription-public-catalog">
+        {{APPS}}
+      </div>
     </div>
-    {{APPS}}
+
     <footer>{{FOOTER}}</footer>
   </div>
 </main>
