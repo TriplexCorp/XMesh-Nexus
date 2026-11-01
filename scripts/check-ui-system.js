@@ -24,7 +24,7 @@ for(const surface of ['solid','glass','raised']){
 for(const token of [
   '--ui-surface-panel-bg','--ui-surface-dialog-bg','--ui-surface-section-bg','--ui-surface-item-bg',
   '--ui-surface-control-bg','--ui-surface-border','--ui-surface-panel-shadow','--ui-surface-dialog-shadow',
-  '--ui-dialog-section-bg','--ui-dialog-control-bg','--ui-surface-filter'
+  '--ui-dialog-section-bg','--ui-dialog-control-bg','--ui-separator','--ui-surface-filter'
 ])assert(css.includes(token),'Missing shared token '+token);
 
 assert.match(css,/html\[data-surface=glass\][\s\S]*--ui-surface-filter:blur\(/,
@@ -45,12 +45,27 @@ assert.doesNotMatch(raised,/--ui-surface-section-bg:[^;]*var\(--a\)/,
   'Raised sections must be neutral; accent belongs to focus/selection, not slab fills');
 assert.doesNotMatch(raised,/--ui-surface-item-bg:[^;]*var\(--a\)/,
   'Raised items must be neutral; accent belongs to focus/selection, not slab fills');
+
+const strongMatch=css.match(/html\[data-borders=strong\]\{([\s\S]*?)\n\}/);
+assert(strongMatch,'Strong border block missing');
+assert.doesNotMatch(strongMatch[1],/--ui-separator:/,
+  'Strong borders must not amplify structural separators into hard ruled lines');
+assert.match(css,/\.setting-row\{[\s\S]*border-top-color:var\(--ui-separator\)!important/,
+  'Setting-row hairlines must use the quiet separator token');
+
 assert.match(css,/\.appearance-layout \.setting-row\{[\s\S]*background:transparent!important/,
   'Appearance setting rows must stay flat inside their parent card');
 assert.match(css,/dialog :where\(\[data-ui-surface="section"\],[\s\S]*box-shadow:none!important;[\s\S]*backdrop-filter:none!important/,
   'Nested modal groups must not stack outer shadows or backdrop blur');
 assert.match(css,/dialog :where\(input:not\(\[type="range"\]\)[\s\S]*--ui-dialog-control-bg/,
   'Modal controls must use the dialog control material');
+
+assert.match(css,/:where\(\[data-ui-control="shell"\]\)[\s\S]*--ui-surface-control-bg/,
+  'Composite control shells must own shared control material');
+assert.match(css,/:where\(\[data-ui-control="inner"\]\)[\s\S]*background:transparent!important;[\s\S]*border:0!important/,
+  'Composite control inner fields must stay transparent and borderless');
+assert.match(css,/\.precision-number input\[type="number"\]\{[\s\S]*background:transparent!important;[\s\S]*border:0!important/,
+  'Legacy Appearance precision inputs must not render a second rectangular control inside the unit capsule');
 
 for(const role of ['panel','dialog','section','metric','item','floating']){
   assert(builder.includes("'"+role+"'"),'Builder role missing '+role);
@@ -68,6 +83,10 @@ assert.match(docs,/Raised is a \*\*depth hierarchy\*\*/,
   'Documentation must define Raised as hierarchy rather than accent tinting');
 assert.match(docs,/A modal has exactly one primary material shell\./,
   'Documentation must define modal depth isolation');
+assert.match(docs,/Separators are structural, not surface borders\./,
+  'Documentation must define quiet separator hierarchy');
+assert.match(docs,/A composite control has exactly one material shell\./,
+  'Documentation must define composite-control ownership');
 assert.match(docs,/Do \*\*not\*\* create `my-feature-glass\.css`/,
   'Documentation must forbid feature-specific material forks');
 
