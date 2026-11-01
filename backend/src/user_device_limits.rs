@@ -1,7 +1,6 @@
 use crate::{ApiError, AppState};
 use axum::{
     Json,
-    body::Body,
     http::{HeaderMap, HeaderName, HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
 };
@@ -68,9 +67,10 @@ fn canonical_hwid(raw: &str) -> Option<String> {
         && [8, 13, 18, 23]
             .into_iter()
             .all(|index| bytes.get(index) == Some(&b'-'))
-        && bytes.iter().enumerate().all(|(index, byte)| {
-            [8, 13, 18, 23].contains(&index) || byte.is_ascii_hexdigit()
-        });
+        && bytes
+            .iter()
+            .enumerate()
+            .all(|(index, byte)| [8, 13, 18, 23].contains(&index) || byte.is_ascii_hexdigit());
     if uuid_like {
         Some(
             value
@@ -111,7 +111,7 @@ fn app_from_user_agent(user_agent: &str) -> String {
 }
 
 fn platform_from(device_os: &str, user_agent: &str) -> &'static str {
-    let value = format!("{} {}", device_os, user_agent).to_ascii_lowercase();
+    let value = format!("{device_os} {user_agent}").to_ascii_lowercase();
     if value.contains("iphone")
         || value.contains("ipad")
         || value.contains("ios")
@@ -167,10 +167,7 @@ fn device_key(user_id: i64, canonical_hwid: &str) -> String {
 }
 
 fn user_limit(user: &Value) -> i64 {
-    user.get("hwid")
-        .and_then(Value::as_i64)
-        .unwrap_or(0)
-        .max(0)
+    user.get("hwid").and_then(Value::as_i64).unwrap_or(0).max(0)
 }
 
 async fn token_user_id(state: &AppState, token: &str) -> Result<Option<i64>, ApiError> {
@@ -191,10 +188,7 @@ async fn token_user_id(state: &AppState, token: &str) -> Result<Option<i64>, Api
     Ok(id)
 }
 
-async fn count_devices(
-    tx: &mut Transaction<'_, Postgres>,
-    user_id: i64,
-) -> Result<i64, ApiError> {
+async fn count_devices(tx: &mut Transaction<'_, Postgres>, user_id: i64) -> Result<i64, ApiError> {
     Ok(sqlx::query_scalar::<_, i64>(
         "SELECT COUNT(*)::BIGINT FROM user_subscription_devices WHERE user_id=$1",
     )
@@ -240,7 +234,7 @@ async fn device_projection_tx(
 async fn sync_projection(
     tx: &mut Transaction<'_, Postgres>,
     user_id: i64,
-) -> Result<Vec<Value>, ApiError> {
+) -> Result<(), ApiError> {
     let devices = device_projection_tx(tx, user_id).await?;
     sqlx::query(
         "UPDATE panel_records
@@ -248,12 +242,16 @@ async fn sync_projection(
           WHERE collection='users' AND id=$1",
     )
     .bind(user_id)
-    .bind(Value::Array(devices.clone()))
+    .bind(Value::Array(devices))
     .execute(&mut **tx)
     .await?;
-    Ok(devices)
+    Ok(())
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "Slot allocation is intentionally one transaction so the lock and capacity decision remain auditable"
+)]
 pub async fn authorize_feed(
     state: &AppState,
     token: &str,
@@ -295,7 +293,7 @@ pub async fn authorize_feed(
     let key = device_key(user_id, &claim.canonical_hwid);
     let tag = key[..12].to_owned();
     let existing = sqlx::query(
-        "SELECT id,platform,device_os,os_version,model,app,
+        "SELECT platform,device_os,os_version,model,app,
                 last_seen_at < NOW() - INTERVAL '5 minutes' AS needs_touch
            FROM user_subscription_devices
           WHERE user_id=$1 AND device_key=$2",
@@ -327,7 +325,7 @@ pub async fn authorize_feed(
             .bind(&claim.app)
             .execute(&mut *tx)
             .await?;
-            let _ = sync_projection(&mut tx, user_id).await?;
+            sync_projection(&mut tx, user_id).await?;
         }
         let count = count_devices(&mut tx, user_id).await?;
         tx.commit().await?;
@@ -379,7 +377,7 @@ pub async fn authorize_feed(
     .execute(&mut *tx)
     .await?;
     count += 1;
-    let _ = sync_projection(&mut tx, user_id).await?;
+    sync_projection(&mut tx, user_id).await?;
     tx.commit().await?;
     if replaced_stale {
         tracing::info!(
@@ -397,8 +395,10 @@ pub async fn authorize_feed(
 }
 
 fn insert_header(response: &mut Response, name: &'static str, value: &str) {
-    if let (Ok(name), Ok(value)) = (HeaderName::from_bytes(name.as_bytes()), HeaderValue::from_str(value))
-    {
+    if let (Ok(name), Ok(value)) = (
+        HeaderName::from_bytes(name.as_bytes()),
+        HeaderValue::from_str(value),
+    ) {
         response.headers_mut().insert(name, value);
     }
 }
@@ -415,8 +415,12 @@ fn announcement(headers: &HeaderMap, code: &str) -> String {
         ("device_limit_reached", false) => {
             "Достигнут лимит устройств. Удалите старое устройство или попросите поддержку сбросить слоты."
         }
-        ("device_id_invalid", true) => "The VPN client sent an invalid HWID. Update or reinstall the client.",
-        ("device_id_invalid", false) => "VPN-клиент передал некорректный HWID. Обновите или переустановите клиент.",
+        ("device_id_invalid", true) => {
+            "The VPN client sent an invalid HWID. Update or reinstall the client."
+        }
+        ("device_id_invalid", false) => {
+            "VPN-клиент передал некорректный HWID. Обновите или переустановите клиент."
+        }
         (_, true) => "This subscription requires a client that sends a device HWID.",
         (_, false) => "Для этой подписки нужен клиент, который передаёт HWID устройства.",
     };
@@ -430,7 +434,11 @@ fn hwid_headers(response: &mut Response, limit: i64, count: i64) {
     insert_header(response, "subscription-always-hwid-enable", "1");
 }
 
-pub fn apply_decision(response: Response, decision: Decision, request_headers: &HeaderMap) -> Response {
+pub fn apply_decision(
+    response: Response,
+    decision: Decision,
+    request_headers: &HeaderMap,
+) -> Response {
     match decision {
         Decision::Unlimited => response,
         Decision::Allowed {
@@ -467,7 +475,11 @@ pub fn apply_decision(response: Response, decision: Decision, request_headers: &
             hwid_headers(&mut response, limit, count);
             insert_header(&mut response, "x-hwid-not-supported", "true");
             insert_header(&mut response, "profile-update-interval", "1");
-            insert_header(&mut response, "announce", &announcement(request_headers, code));
+            insert_header(
+                &mut response,
+                "announce",
+                &announcement(request_headers, code),
+            );
             response
         }
         Decision::LimitReached { limit, count } => {
