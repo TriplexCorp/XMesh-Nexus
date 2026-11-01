@@ -23,6 +23,15 @@ on:
       - 'backend/src/node_runtime.rs'
       - 'backend/src/node_routing.rs'
       - 'app.js'
+      - 'node-geodata.js'
+      - 'node-geodata.css'
+      - 'node-routing.js'
+      - 'node-routing.css'
+      - 'backend/Dockerfile'
+      - 'backend/src/security.rs'
+      - 'index.html'
+      - 'styles.css'
+      - '.github/workflows/geodata-check.yml'
   workflow_dispatch:
 jobs:
   app-and-shell:
@@ -39,10 +48,17 @@ jobs:
           const docker=fs.readFileSync('backend/Dockerfile','utf8');
           const html=fs.readFileSync('index.html','utf8');
           const rebasing=fs.readFileSync('backend/src/security.rs','utf8');
+          const routing=fs.readFileSync('node-routing.js','utf8');
           for(const name of ['node-geodata.js','node-geodata.css','node-routing.js','node-routing.css']){
             if(!docker.includes(name)||!html.includes(name)||!rebasing.includes(name))
               throw new Error('Missing packaged or custom-path asset: '+name);
           }
+          if(routing.includes('class="box route-json-workspace"'))
+            throw new Error('Node routing JSON workspace must not nest the global .box modal shell');
+          if(!routing.includes('class="route-json-workspace"'))
+            throw new Error('Node routing JSON workspace shell is missing');
+          if(!html.includes('node-routing.js?v=20261101-single-shell-v1'))
+            throw new Error('Node routing single-shell fix must be cache-busted');
           // The general node form reads ENT.nodes.fs in full. Hidden GeoData
           // fields in that schema previously caused a null-input crash.
           const app=fs.readFileSync('app.js','utf8');
