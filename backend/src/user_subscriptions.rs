@@ -187,12 +187,7 @@ pub async fn status(
     Path(id): Path<i64>,
 ) -> Result<Json<Value>, ApiError> {
     crate::require_mutation(&actor)?;
-    let mut response = base::status(
-        State(state.clone()),
-        Extension(actor),
-        Path(id),
-    )
-    .await?;
+    let mut response = base::status(State(state.clone()), Extension(actor), Path(id)).await?;
     response.0["deviceLimit"] = device_limits::admin_status(&state, id).await?;
     Ok(response)
 }
