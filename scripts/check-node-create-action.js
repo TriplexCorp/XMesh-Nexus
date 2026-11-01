@@ -89,7 +89,7 @@ assert.match(strictBootstrap,/Node\/Xray не запустятся без под
 // Redesigned modal surfaces share one cache-busted dialog asset layer.
 assert.match(html,/<link rel="stylesheet" href="\/node-dialogs\.css\?v=20261101-user-create-v2">/,
  'Base dialog redesign stylesheet must remain available');
-assert.match(html,/<link rel="stylesheet" href="\/user-create-v3\.css\?v=20261101-enterprise-v3">/,
+assert.match(html,/<link rel="stylesheet" href="\/user-create-v3\.css\?v=20261101-enterprise-v4">/,
  'Enterprise create-user stylesheet must be cache-busted');
 assert.match(html,/<script src="\/node-dialogs\.js\?v=20261101-user-create-enterprise-v3"><\/script>/,
  'Dialog behavior enhancer must be cache-busted after create-user markup repair');
@@ -129,14 +129,20 @@ assert.match(dialogJs,/class="user-create-close" data-x aria-label="Закрыт
  'New-user close control must use the shared data-x close contract');
 assert.match(dialogJs,/user-create-workspace/,'Create-user form must use the enterprise workspace wrapper');
 assert.match(dialogJs,/Умный лимит устройств/,'Device limit behavior must be explained in the creation flow');
-assert.match(userCss,/#dlg\.user-create-modal\{[\s\S]*width:min\(1280px/,
+assert.match(userCss,/#dlg\.user-create-modal\{[\s\S]*width:min\(1460px/,
  'New-user dialog must use the wider desktop surface');
-assert.match(userCss,/\.user-create-workspace\{[\s\S]*grid-template-columns:minmax\(0,1\.28fr\) minmax\(360px,\.72fr\)/,
- 'Desktop create-user workspace must use a balanced two-zone layout');
+assert.match(userCss,/\.user-create-workspace\{[\s\S]*grid-template-columns:minmax\(0,1\.55fr\) minmax\(390px,\.8fr\)/,
+ 'Desktop create-user workspace must use the polished two-zone layout');
 assert.match(userCss,/\.user-create-limits-grid\{[\s\S]*grid-template-columns:minmax\(0,1fr\) minmax\(0,1fr\)/,
  'Limits must use readable two-column policy layout instead of four squeezed controls');
 assert.match(userCss,/\.user-create-section-extra\{grid-column:1\/-1\}/,
  'Metadata section must span the full desktop workspace');
+assert.match(userCss,/grid-template-areas:"squads tag hold desc"/,
+ 'Desktop metadata must use one compact horizontal rail');
+assert.match(userCss,/\.user-create-section-kicker\{display:none\}/,
+ 'Duplicate English section kickers must stay visually suppressed');
+assert.match(userCss,/\.user-create-footer-copy\{display:none\}/,
+ 'Footer must avoid repeating header explanatory copy');
 assert.match(userCss,/@media\(max-width:680px\)[\s\S]*\.user-create-limits-grid,/,
  'Create-user workspace must collapse cleanly on narrow screens');
 assert.match(userCss,/\.user-create-footer-actions\{display:flex/,
@@ -153,4 +159,4 @@ assert.equal((userCss.match(/\{/g)||[]).length,(userCss.match(/\}/g)||[]).length
 new Function(app);
 new Function(strictBootstrap);
 new Function(dialogJs);
-console.log('Node action: redesigned repair + valid enterprise new-user dialog, TLS 1.3 bootstrap and exact-release strict-PQ repair contract OK');
+console.log('Node action: redesigned repair + polished valid enterprise new-user dialog, TLS 1.3 bootstrap and exact-release strict-PQ repair contract OK');
