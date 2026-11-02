@@ -96,7 +96,7 @@ assert.match(tlsCss,/@media\(max-width:760px\)/);
 
 assert.match(index,/diagnostics\.css\?v=20261101-operations-v1/);
 assert.match(index,/diagnostics\.js\?v=20261101-operations-v1/);
-assert.ok(index.indexOf('app.js?v=')<index.indexOf('diagnostics.js?v='),
+assert.ok(index.indexOf('/js/core/app.js?v=')<index.indexOf('/js/features/nodes/diagnostics.js?v='),
   'Diagnostics route override must load after app.js');
 assert.match(diagnosticsJs,/pages\.tools=\[['"]Диагностика['"],diagnosticsPage\]/);
 assert.match(diagnosticsJs,/\/api\/v1\/system\/stats/);
