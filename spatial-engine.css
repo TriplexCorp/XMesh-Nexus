@@ -1,0 +1,245 @@
+/* XMesh Nexus universal spatial composition engine.
+ *
+ * This is the conveyor belt for panel geometry. It is intentionally feature-
+ * agnostic: runtime classification comes from ui-builder.js and these rules
+ * normalize workspace flow, sparse cards, empty states, low-count collections,
+ * tables and toolbars without creating another Classic / Glass / Raised theme.
+ *
+ * Material remains owned by ui-system.css. Shared scale / interaction remains
+ * owned by design-system-v2.css. Page-specific geometry may extend this layer
+ * only through spatial-layout.css when a generic rule cannot express the UI.
+ */
+
+:root{
+  --spatial-page-gap:clamp(.85rem,.64vw + .48rem,1.18rem);
+  --spatial-section-gap:clamp(.68rem,.46vw + .42rem,.95rem);
+  --spatial-inline-gap:clamp(.5rem,.34vw + .32rem,.72rem);
+  --spatial-toolbar-pad:clamp(.7rem,.44vw + .5rem,.92rem);
+  --spatial-empty-min:clamp(7.5rem,13vh,10rem);
+  --spatial-reading-max:84rem;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Workspace flow                                                             */
+/* -------------------------------------------------------------------------- */
+.view[data-ui-flow="workspace"]{
+  display:grid;
+  grid-auto-rows:max-content;
+  align-content:start;
+  align-items:start;
+  gap:var(--spatial-page-gap)!important;
+  min-height:0;
+}
+.view[data-ui-flow="workspace"]>*{
+  min-width:0;
+  align-self:start;
+}
+.view[data-ui-flow="workspace"]>:is(.two,.appearance-layout,[data-ui-collection]){
+  align-items:start!important;
+  grid-auto-rows:max-content!important;
+}
+.view[data-ui-flow="workspace"] :where(.card,[data-ui-surface="panel"]):not([data-ui-layout="editor"]){
+  min-height:0!important;
+  height:auto!important;
+  align-self:start!important;
+}
+.view[data-ui-flow="workspace"] :where(section,[data-ui-surface="section"]):not([data-ui-layout="editor"]){
+  min-height:0;
+}
+.view[data-ui-flow="workspace"] :where(.two,.grid,.cards,[data-ui-collection]){
+  min-height:0;
+  align-content:start;
+}
+
+/* Never use flex growth as accidental page filler. Runtime-tagged shells that
+ * are not editors/canvases hug their content instead of consuming viewport
+ * leftovers. */
+[data-ui-layout="panel"],
+[data-ui-layout="table"],
+[data-ui-layout="empty"],
+[data-ui-layout="sparse"]{
+  min-height:0!important;
+  height:auto!important;
+  align-self:start!important;
+  flex-grow:0!important;
+}
+[data-ui-layout="editor"],
+[data-ui-layout="canvas"]{
+  align-self:stretch;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Generic toolbars                                                           */
+/* -------------------------------------------------------------------------- */
+[data-ui-toolbar]{
+  min-height:0!important;
+  height:auto!important;
+  display:flex!important;
+  align-items:center!important;
+  align-content:center!important;
+  flex-wrap:wrap;
+  gap:var(--spatial-inline-gap)!important;
+}
+[data-ui-toolbar]>*{min-width:0}
+[data-ui-toolbar] :is(input[type="search"],input[type="text"],select,.xm-select-trigger){
+  min-width:min(100%,10rem);
+}
+[data-ui-toolbar]>.note{margin-right:auto}
+[data-ui-toolbar] :is(.btn,.gh,button){flex:0 0 auto}
+
+/* A filter/search row should spend width on the primary query instead of
+ * producing wide unused bands between tiny controls. */
+[data-ui-toolbar="filters"]{
+  display:grid!important;
+  grid-template-columns:minmax(15rem,2fr) repeat(auto-fit,minmax(9.5rem,.7fr));
+  align-items:end!important;
+}
+[data-ui-toolbar="filters"]>*{width:100%;min-width:0}
+
+/* -------------------------------------------------------------------------- */
+/* Tables / data surfaces                                                     */
+/* -------------------------------------------------------------------------- */
+[data-ui-layout="table"]{
+  overflow:visible;
+}
+[data-ui-layout="table"] :where(table,.table,.tbl){
+  margin-block:0!important;
+}
+[data-ui-layout="table"][data-ui-table-density="low"]{
+  padding-bottom:clamp(.72rem,.5vw + .45rem,1rem)!important;
+}
+[data-ui-layout="table"][data-ui-table-density="low"] :where(tbody tr,.tr){
+  min-height:0!important;
+}
+[data-ui-layout="table"][data-ui-table-density="empty"] :where(.table-wrap,.table-scroll,.scroll){
+  min-height:0!important;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Empty / sparse states                                                      */
+/* -------------------------------------------------------------------------- */
+[data-ui-layout="empty"]{
+  padding-block:clamp(.9rem,.7vw + .6rem,1.25rem)!important;
+}
+[data-ui-layout="empty"] :where(
+  .empty,
+  [class$="-empty"],
+  [class*="-empty "],
+  [class*=" empty-"],
+  [data-empty-state]
+){
+  min-height:var(--spatial-empty-min)!important;
+  height:auto!important;
+  padding:clamp(1.15rem,1vw + .7rem,1.65rem)!important;
+  display:grid;
+  align-content:center;
+  justify-items:center;
+  gap:.45rem;
+}
+[data-ui-layout="empty"] :where(h2,h3,h4,p){max-width:46rem;text-align:center}
+[data-ui-layout="empty"] :where(.btn,.gh,button){margin-top:.2rem}
+
+/* Sparse panels keep hierarchy but do not reserve editor-sized voids. */
+[data-ui-layout="sparse"]{
+  align-content:start!important;
+}
+[data-ui-layout="sparse"]>:not(dialog){
+  min-height:0!important;
+  flex-grow:0!important;
+}
+[data-ui-page-density="sparse"]{
+  align-content:start!important;
+}
+[data-ui-page-density="sparse"]>[data-ui-layout="sparse"]{
+  max-width:100%;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Collections / low-count behavior                                           */
+/* -------------------------------------------------------------------------- */
+[data-ui-collection]{
+  grid-auto-rows:auto!important;
+  align-items:start!important;
+  align-content:start!important;
+}
+[data-ui-collection]>:where(.card,[data-ui-surface="panel"]){
+  height:auto!important;
+  min-height:0!important;
+}
+[data-ui-collection][data-ui-count="1"][data-ui-low-count="expand"]{
+  grid-template-columns:minmax(0,1fr)!important;
+}
+[data-ui-collection][data-ui-count="2"][data-ui-low-count="expand"]{
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+}
+[data-ui-collection][data-ui-count="3"][data-ui-low-count="expand"]{
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+}
+
+/* Do not stretch nested cards merely because their grid siblings are taller. */
+[data-ui-collection]>.card,
+[data-ui-collection]>[data-ui-surface="panel"]{
+  align-self:start!important;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Content-first card internals                                               */
+/* -------------------------------------------------------------------------- */
+[data-ui-layout="panel"] :where(.hd,.bar2,.card-head,.section-head){
+  min-height:0!important;
+}
+[data-ui-layout="panel"] :where(.hd,.card-head,.section-head){
+  align-items:flex-start;
+}
+[data-ui-layout="panel"] :where(.acts,.actions,.card-actions){
+  align-items:center;
+  align-content:center;
+}
+
+/* Horizontal KPI rows may wrap, but they should not create equal-height
+ * skyscraper tiles when there are only a few metrics. */
+[data-ui-metrics]{
+  display:grid!important;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,11rem),1fr));
+  grid-auto-rows:auto!important;
+  align-items:start!important;
+  gap:var(--spatial-section-gap)!important;
+}
+[data-ui-metrics]>*{height:auto!important;min-height:0!important}
+
+/* -------------------------------------------------------------------------- */
+/* Purposeful whitespace exceptions                                           */
+/* -------------------------------------------------------------------------- */
+[data-ui-layout="editor"],
+[data-ui-layout="canvas"]{
+  min-height:var(--ui-purposeful-min-height,unset);
+}
+[data-ui-layout="editor"] :where(.editor,.code-editor,.sv-workspace),
+[data-ui-layout="canvas"] :where(canvas,.canvas,.preview){
+  min-height:inherit;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Responsive pipeline                                                        */
+/* -------------------------------------------------------------------------- */
+@media(max-width:1100px){
+  [data-ui-toolbar="filters"]{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  [data-ui-toolbar="filters"]>:first-child{grid-column:1/-1}
+  [data-ui-collection][data-ui-count="3"][data-ui-low-count="expand"]{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  }
+}
+@media(max-width:760px){
+  .view[data-ui-flow="workspace"]{gap:.85rem!important}
+  [data-ui-toolbar="filters"]{grid-template-columns:minmax(0,1fr)}
+  [data-ui-toolbar="filters"]>*{grid-column:auto!important}
+  [data-ui-collection][data-ui-count][data-ui-low-count="expand"]{
+    grid-template-columns:minmax(0,1fr)!important;
+  }
+}
+
+@media(prefers-reduced-motion:reduce){
+  [data-ui-layout],[data-ui-collection],[data-ui-toolbar]{scroll-behavior:auto}
+}
