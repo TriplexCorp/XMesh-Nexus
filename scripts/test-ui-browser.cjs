@@ -143,7 +143,7 @@ async function main() {
     });
     const inboundTag = prefix.replace(/-/g,'_');
     const profile = await create('profiles',{name:`${prefix} · Профиль`,config:JSON.stringify({inbounds:[{tag:inboundTag,listen:'127.0.0.1',port:28352,protocol:'vless',settings:{decryption:'none',clients:[]},streamSettings:{network:'tcp',security:'none'}}],outbounds:[{tag:'direct',protocol:'freedom'}]})});
-    const node = await create('nodes',{name:`${prefix} · Москва`,addr:'192.0.2.10',profileId:profile.id});
+    const node = await create('nodes',{name:`${prefix} · Москва`,addr:'192.0.2.10',port:443,xrayLocalPort:13456,mult:1,limit:0,resetDay:1,profileId:profile.id,rotationEnabled:false,rotationIntervalHours:24,rotationIps:'',billingCurrency:'EUR',billingPeriod:'monthly',billingRemindDays:7,billingPrice:0});
     const squad = await create('squads',{name:`${prefix} · Сквад`,desc:'Данные браузерной проверки',inb:[inboundTag]});
     await create('hosts',{remark:`${prefix} · Хост`,profileId:profile.id,tag:inboundTag,address:'ui.example.invalid',port:443,nodes:[node.id]});
     const user = await create('users',{username:`${prefix}-client`,squads:[squad.id],hwid:2});
@@ -239,17 +239,28 @@ async function main() {
       await page.locator(`[data-ne="nodes:${node.id}"]`).click();
       const form=page.locator('dialog form[data-ent="nodes"]');
       await form.locator('input[name="name"]').fill(`${prefix} · Изменён`);
+      const invalid=await form.locator(':invalid').evaluateAll(nodes=>nodes.map(node=>({name:node.getAttribute('name')||node.id||node.tagName,message:node.validationMessage})));
+      assert.equal(invalid.length,0,`Форма редактирования узла невалидна до отправки: ${JSON.stringify(invalid)}`);
       const save=form.locator('.act > button.btn');
       assert.equal(await save.count(),1,'Кнопка сохранения узла отсутствует или неоднозначна.');
       await save.click();
-      await page.waitForSelector('dialog[open]',{state:'detached'});
+      await page.waitForFunction(()=>{
+        const dialog=document.querySelector('dialog[open]');
+        if(!dialog)return true;
+        return !!dialog.querySelector('#fe')?.textContent?.trim();
+      },null,{timeout:5000});
+      if(await page.locator('dialog[open]').count()){
+        const errorText=String(await page.locator('dialog[open] #fe').textContent()||'').trim();
+        assert(!errorText,`Сохранение узла отклонено интерфейсом/API: ${errorText}`);
+      }
+      await page.waitForSelector('dialog[open]',{state:'detached',timeout:5000});
       const saved=await api('GET','/collections/nodes');
       assert(saved.items.some(n=>n.id===node.id&&n.name===`${prefix} · Изменён`));
     });
 
     // Multi-card composition is checked with a real second and third node.
-    await create('nodes',{name:`${prefix} · Берлин`,addr:'192.0.2.11',profileId:profile.id});
-    await create('nodes',{name:`${prefix} · Амстердам`,addr:'192.0.2.12',profileId:profile.id});
+    await create('nodes',{name:`${prefix} · Берлин`,addr:'192.0.2.11',port:443,profileId:profile.id});
+    await create('nodes',{name:`${prefix} · Амстердам`,addr:'192.0.2.12',port:443,profileId:profile.id});
     // Refresh the panel DB after out-of-band API fixture creation before
     // validating the multi-card collection layout.
     await page.reload({waitUntil:'domcontentloaded'});
