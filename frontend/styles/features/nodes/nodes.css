@@ -23,7 +23,7 @@
 /* Density is a product choice, not just a stored preference. The common
    low-count fleets below intentionally recompose so all three modes remain
    visibly distinct instead of resolving to the same auto-fit columns. */
-.nodes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,24rem),1fr));align-items:start;gap:var(--nx-page-gap);grid-auto-rows:max-content;min-width:0}
+.nodes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,24rem),1fr));align-items:start;justify-content:center;gap:var(--nx-page-gap);grid-auto-rows:max-content;min-width:0}
 .nodes[data-grid-mode=compact]{grid-template-columns:repeat(auto-fit,minmax(min(100%,20rem),1fr))}
 .nodes[data-grid-mode=spacious]{grid-template-columns:minmax(0,1fr)}
 
@@ -88,27 +88,27 @@
 .nc .acts>[data-nt] .ic{color:var(--wr)}
 .nc .acts>[data-ne] .ic{color:var(--nx-muted)}
 
-/* Common low-count fleets: each density choice changes real geometry. A single
-   node always consumes the management canvas instead of becoming an island. */
+/* Density controls both track count and readable card width. Low-count fleets
+   stay together instead of stretching cards/actions across an ultrawide canvas.
+   Shared card/control tokens continue to own every radius. */
 @container nodes-workspace (min-width:52rem){
-  .nodes[data-node-count="1"][data-grid-mode=compact],
-  .nodes[data-node-count="1"][data-grid-mode=standard],
-  .nodes[data-node-count="1"][data-grid-mode=spacious]{grid-template-columns:minmax(0,1fr)}
+  .nodes[data-node-count="1"][data-grid-mode=compact]{grid-template-columns:minmax(0,60rem)}
+  .nodes[data-node-count="1"][data-grid-mode=standard]{grid-template-columns:minmax(0,68rem)}
+  .nodes[data-node-count="1"][data-grid-mode=spacious]{grid-template-columns:minmax(0,76rem)}
 
-  .nodes[data-node-count="2"][data-grid-mode=compact],
-  .nodes[data-node-count="2"][data-grid-mode=standard]{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .nodes[data-node-count="2"][data-grid-mode=spacious]{grid-template-columns:minmax(0,1fr)}
+  .nodes[data-node-count="2"][data-grid-mode=compact]{grid-template-columns:repeat(2,minmax(0,60rem))}
+  .nodes[data-node-count="2"][data-grid-mode=standard]{grid-template-columns:repeat(2,minmax(0,68rem))}
+  .nodes[data-node-count="2"][data-grid-mode=spacious]{grid-template-columns:minmax(0,76rem)}
 
-  .nodes[data-node-count="3"][data-grid-mode=compact]{grid-template-columns:repeat(3,minmax(0,1fr))}
-  .nodes[data-node-count="3"][data-grid-mode=standard]{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .nodes[data-node-count="3"][data-grid-mode=spacious]{grid-template-columns:minmax(0,1fr)}
-
+  .nodes[data-node-count="3"][data-grid-mode=compact]{grid-template-columns:repeat(3,minmax(0,60rem))}
+  .nodes[data-node-count="3"][data-grid-mode=standard]{grid-template-columns:repeat(2,minmax(0,68rem))}
+  .nodes[data-node-count="3"][data-grid-mode=spacious]{grid-template-columns:minmax(0,76rem)}
 }
 
 @container nodes-workspace (min-width:74rem){
-  .nodes[data-grid-mode=compact]:not([data-node-count="1"]):not([data-node-count="2"]):not([data-node-count="3"]){grid-template-columns:repeat(4,minmax(0,1fr))}
-  .nodes[data-grid-mode=standard]:not([data-node-count="1"]):not([data-node-count="2"]):not([data-node-count="3"]){grid-template-columns:repeat(3,minmax(0,1fr))}
-  .nodes[data-grid-mode=spacious]:not([data-node-count="1"]):not([data-node-count="2"]):not([data-node-count="3"]){grid-template-columns:repeat(2,minmax(0,1fr))}
+  .nodes[data-grid-mode=compact]:not([data-node-count="1"]):not([data-node-count="2"]):not([data-node-count="3"]){grid-template-columns:repeat(4,minmax(0,60rem))}
+  .nodes[data-grid-mode=standard]:not([data-node-count="1"]):not([data-node-count="2"]):not([data-node-count="3"]){grid-template-columns:repeat(3,minmax(0,68rem))}
+  .nodes[data-grid-mode=spacious]:not([data-node-count="1"]):not([data-node-count="2"]):not([data-node-count="3"]){grid-template-columns:repeat(2,minmax(0,76rem))}
 }
 
 /* Action grouping follows the card itself, so fleet density cannot create tiny
