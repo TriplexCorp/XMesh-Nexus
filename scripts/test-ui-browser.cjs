@@ -167,6 +167,51 @@ async function main() {
       });
     }
 
+    await checked('Topbar: переключатель языка сохраняет внутреннюю геометрию',async()=>{
+      await page.setViewportSize({width:1366,height:768});
+      await navigate('admins');
+      const geometry=await page.locator('#language-trigger').evaluate(button=>{
+        const box=node=>{const r=node.getBoundingClientRect();return{left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height}};
+        return{outer:box(button),children:[...button.children].map(box)};
+      });
+      assert(geometry.outer.width>=70,'Переключатель языка снова сжат до квадратной icon-button ширины.');
+      assert.equal(geometry.children.length,3,'Переключатель языка должен содержать иконку, метку и стрелку.');
+      for(const child of geometry.children){
+        assert(child.left>=geometry.outer.left-1&&child.right<=geometry.outer.right+1&&child.top>=geometry.outer.top-1&&child.bottom<=geometry.outer.bottom+1,'Содержимое переключателя языка выходит за границы кнопки.');
+      }
+      return geometry;
+    });
+
+    await checked('Настройки: 100% масштаб и ширина 3000 px работают буквально',async()=>{
+      await page.setViewportSize({width:3840,height:2160});
+      await navigate('set');
+      const rootFont=parseFloat(await page.locator('html').evaluate(el=>getComputedStyle(el).fontSize));
+      assert(rootFont>=16.9&&rootFont<=17.1,`100% должен давать базовый размер около 17px, получено ${rootFont}px.`);
+      const widthSlider=page.locator('#content-width');
+      await widthSlider.evaluate(el=>{el.value='3000';el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}))});
+      await page.waitForTimeout(80);
+      const widthState=await page.evaluate(()=>({value:Number(document.querySelector('#content-width')?.value),view:document.querySelector('#view')?.getBoundingClientRect().width||0,token:getComputedStyle(document.documentElement).getPropertyValue('--panel-content-max').trim()}));
+      assert.equal(widthState.value,3000,'Ползунок ширины не принимает 3000 px.');
+      assert(widthState.view>=2995,`Рабочая область всё ещё зажата скрытым cap: ${widthState.view}px.`);
+      assert.equal(widthState.token,'3000px','Runtime token ширины не достиг 3000px.');
+      await widthSlider.evaluate(el=>{el.value='1920';el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}))});
+      return widthState;
+    });
+
+    await checked('Настройки: точное числовое поле имеет одну рамку',async()=>{
+      await page.setViewportSize({width:1920,height:1080});
+      await navigate('set');
+      const chrome=await page.locator('#content-width-value').evaluate(input=>{
+        const own=getComputedStyle(input),outer=getComputedStyle(input.parentElement);
+        return{border:own.borderTopWidth,background:own.backgroundColor,shadow:own.boxShadow,outerBorder:outer.borderTopWidth};
+      });
+      assert.equal(chrome.border,'0px','Внутренний number input снова рисует собственную рамку.');
+      assert.equal(chrome.shadow,'none','Внутренний number input снова рисует собственную тень.');
+      assert(['rgba(0, 0, 0, 0)','transparent'].includes(chrome.background),'Внутренний number input должен быть прозрачным.');
+      assert(parseFloat(chrome.outerBorder)>0,'Внешний precision-control потерял единственную рабочую рамку.');
+      return chrome;
+    });
+
     // Real Settings controls change appearance. Cover representative combinations
     // instead of pretending an enormous Cartesian product improves assurance.
     await page.setViewportSize({width:1920,height:1080});
