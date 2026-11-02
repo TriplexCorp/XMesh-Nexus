@@ -70,7 +70,8 @@ assert.match(dashboardServer,/fn dashboard_client_routing_assets_are_absolute/);
 assertPackaged(assert,['client-routing.js','client-routing.css']);
 assert.doesNotMatch(index,/<link[^>]+client-routing\.css/,
  'Client routing CSS must stay behind the canonical panel stylesheet entrypoint');
-assert.match(panelStyles(),/#client-route-root\.crx \.crx-card/,
+const panelCss=panelStyles();
+assert.match(panelCss,/#client-route-root\.crx \.crx-card/,
  'Client routing CSS must be reachable from the canonical panel stylesheet graph');
 
 console.log('Shared client routing: template editor, source assignment, subscriber authorization, admin API, and packaged assets OK.');
@@ -85,8 +86,11 @@ assert.match(source,/crx-tab-label/,'Editor navigation must have dedicated tab l
 
 assert.match(source,/<dialog class="crx-overlay"/,'Editor must use a native top-layer dialog');
 assert.match(source,/modal\.showModal\(\)/,'Editor must enter browser top layer');
-const routingCSS=fs.readFileSync('frontend/styles/features/routing/client-routing.css','utf8');
-assert.match(routingCSS,/dialog\.crx-overlay::backdrop/,'Native dialog must blur the full page backdrop');
+const routingCSS=clientCss;
+assert.match(panelCss,/\.dialog::backdrop,dialog::backdrop\{background:var\(--xm-modal-dim\);backdrop-filter:blur\(var\(--xm-modal-blur\)\)/,
+ 'Native dialogs must inherit backdrop dimming and blur from the shared dialog system');
+assert.doesNotMatch(routingCSS,/::backdrop/,
+ 'Client routing must not duplicate the shared dialog backdrop implementation');
 assert.equal((routingCSS.match(/\.crx-overlay\{/g)||[]).length,1,'Only one modal overlay style should exist');
 
 assert.match(source,/const reuse=Boolean\(live\?\.open&&live\.dataset\.crProfileId===p\.id\)/,
@@ -97,7 +101,5 @@ assert.match(source,/modal\.addEventListener\('cancel'/,
  'Browser Escape must synchronize dialog state');
 assert.match(clientCss,/\.crx-dialog\{[^}]*width:min\(100%,var\(--panel-content-max,1920px\)/,
  'Editor width must follow the panel width slider');
-assert.match(clientCss,/dialog\.crx-overlay::backdrop\{background:var\(--xm-modal-dim/,
- 'Editor must use shared backdrop tokens');
 assert.doesNotMatch(clientCss,/\.crx-overlay\{[^}]*backdrop-filter/,
  'Never apply page blur to the dialog content');
