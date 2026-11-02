@@ -9,11 +9,11 @@ on:
 permissions:
   contents: read
 
-# During rapid development, only the newest run on a branch needs to build
-# the expensive Docker image. PR runs remain independent.
+# During rapid development, only the newest run on a branch/PR needs to build
+# the expensive Docker image and browser matrix.
 concurrency:
   group: backend-ci-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'push' }}
+  cancel-in-progress: true
 
 jobs:
   subscription-build:
