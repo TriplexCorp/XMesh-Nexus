@@ -19,6 +19,12 @@
     return true;
   };
 
+  const register=(selector,role)=>{
+    if(typeof selector!=='string'||!selector.trim()||!roles.has(role))return false;
+    if(!registry.some(entry=>entry.selector===selector&&entry.role===role))registry.push({selector,role});
+    return true;
+  };
+
   const applyRegistry=(root=document,selector=null,role=null)=>{
     if(!root)return 0;
     let count=0;
