@@ -22,71 +22,75 @@
 
 /* Density is a product choice, not just a stored preference. The common
    low-count fleets below intentionally recompose so all three modes remain
-   visually distinct instead of resolving to the same auto-fit columns. */
+   visibly distinct instead of resolving to the same auto-fit columns. */
 .nodes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,24rem),1fr));align-items:start;gap:var(--nx-page-gap);grid-auto-rows:max-content;min-width:0}
 .nodes[data-grid-mode=compact]{grid-template-columns:repeat(auto-fit,minmax(min(100%,20rem),1fr))}
 .nodes[data-grid-mode=spacious]{grid-template-columns:minmax(0,1fr)}
 
-.nc{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--nx-space-4);align-content:start;min-width:0;height:auto;container:node-card / inline-size;border-color:color-mix(in srgb,var(--a) 20%,var(--nx-border))}
+/* Node cards intentionally echo the approved concept: a dark tinted enterprise
+   surface with an accent edge, one calm header, a split operational body and a
+   composed action console. The accent remains theme-driven. */
+.nc{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--nx-space-4);align-content:start;min-width:0;height:auto;container:node-card / inline-size;padding:clamp(1rem,1.2vw,1.4rem);border-color:color-mix(in srgb,var(--a) 42%,var(--nx-border));background:color-mix(in srgb,var(--nx-panel-bg) 96%,var(--a) 4%);box-shadow:0 18px 48px color-mix(in srgb,var(--a) 7%,transparent)}
 .nc.off{opacity:.7}
-.nc .h{display:flex;align-items:flex-start;flex-wrap:wrap;gap:.7rem;min-width:0;padding-bottom:var(--nx-space-3);border-bottom:1px solid var(--nx-separator)}
-.nc .fg{flex:none;font-size:1.8rem;line-height:1.2}
-.node-identity{flex:1;min-width:8rem;overflow-wrap:anywhere;line-height:1.45}
-.node-identity>b{font-size:var(--nx-text-lg);letter-spacing:-.02em}
-.node-hosting{display:flex;align-items:center;gap:.35rem;color:var(--nx-muted);font-size:var(--nx-text-xs);margin-top:.2rem}
+.nc .h{display:flex;align-items:flex-start;flex-wrap:wrap;gap:.8rem;min-width:0;padding-bottom:.95rem;border-bottom:1px solid var(--nx-separator)}
+.nc .fg{flex:none;font-size:1.9rem;line-height:1.2}
+.node-identity{flex:1;min-width:8rem;overflow-wrap:anywhere;line-height:1.42}
+.node-identity>b{font-size:1.08rem;letter-spacing:-.025em}
+.node-hosting{display:flex;align-items:center;gap:.35rem;color:var(--nx-muted);font-size:var(--nx-text-xs);margin-top:.22rem}
 .node-hosting .ic{width:.9rem;height:.9rem;flex:none}
-.node-live-badges{display:flex;align-items:center;justify-content:flex-end;gap:.35rem;flex-wrap:wrap;min-width:0;max-width:100%;margin-left:auto}
-.node-xray-version,.node-agent-version,.node-runtime-pill{display:inline-flex;align-items:center;gap:.35rem;padding:.3rem .62rem;border:1px solid var(--nx-border);border-radius:999px;background:var(--nx-section-bg);font-size:.7rem;font-weight:700;line-height:1.35;color:var(--nx-muted);overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
-.node-agent-version{color:var(--a);border-color:color-mix(in srgb,var(--a) 32%,var(--nx-border));background:color-mix(in srgb,var(--a) 8%,var(--nx-section-bg))}
-.node-runtime-online{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 32%,var(--nx-border));background:color-mix(in srgb,var(--ok) 6%,var(--nx-section-bg))}
+.node-live-badges{display:flex;align-items:center;justify-content:flex-end;gap:.42rem;flex-wrap:wrap;min-width:0;max-width:100%;margin-left:auto}
+.node-xray-version,.node-agent-version,.node-runtime-pill{display:inline-flex;align-items:center;gap:.35rem;padding:.34rem .7rem;border:1px solid var(--nx-border);border-radius:999px;background:color-mix(in srgb,var(--nx-section-bg) 94%,transparent);font-size:.72rem;font-weight:700;line-height:1.35;color:var(--nx-muted);overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.node-agent-version{color:var(--a);border-color:color-mix(in srgb,var(--a) 38%,var(--nx-border));background:color-mix(in srgb,var(--a) 8%,var(--nx-section-bg))}
+.node-runtime-online{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 38%,var(--nx-border));background:color-mix(in srgb,var(--ok) 7%,var(--nx-section-bg))}
 .node-runtime-offline{color:var(--wr);border-color:color-mix(in srgb,var(--wr) 32%,var(--nx-border))}
 .node-runtime-disabled,.node-runtime-unknown{color:var(--nx-muted)}
-.node-runtime-dot,.node-ip-indicator{display:inline-block;width:.4rem;height:.4rem;flex:none;border-radius:50%;background:currentColor}
-.node-summary,.node-metrics{display:grid;gap:var(--nx-space-3);align-content:start;min-width:0}
-.nc .kvg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--nx-space-4)}
+.node-runtime-dot,.node-ip-indicator{display:inline-block;width:.42rem;height:.42rem;flex:none;border-radius:50%;background:currentColor}
+.node-summary,.node-metrics{display:grid;gap:.72rem;align-content:start;min-width:0}
+.nc .kvg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--nx-space-4);padding-bottom:.82rem;border-bottom:1px solid var(--nx-separator)}
 .nc .kvg>div{display:grid;align-content:start;gap:.3rem;min-width:0;overflow-wrap:anywhere}
 .nc .kvg span{font-size:var(--nx-text-xs);color:var(--nx-muted)}
-.nc .kvg b{font-size:1.1rem}
+.nc .kvg b{font-size:1.12rem}
 .node-online-clients{display:flex;align-items:center;flex-wrap:wrap;gap:.45rem}
-.node-online-clients b{font-size:.9rem}
-.node-tls-health,.node-ip-rotation{display:flex;align-items:center;gap:.45rem;color:var(--nx-muted);font-size:var(--nx-text-xs);overflow-wrap:anywhere}
+.node-online-clients b{font-size:.92rem}
+.node-tls-health,.node-ip-rotation{display:flex;align-items:center;gap:.48rem;color:var(--nx-muted);font-size:.78rem;overflow-wrap:anywhere}
+.node-tls-health{color:var(--tx);font-weight:650}
 .node-ip-rotation.active{color:var(--tx)}
 .node-ip-rotation.active .node-ip-indicator{background:var(--ok)}
 
-.node-gauges{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.55rem;min-width:0}
-.ngauge{display:grid;justify-items:center;align-content:start;gap:.35rem;min-width:0;padding:.72rem .55rem;border:1px solid color-mix(in srgb,var(--a) 12%,var(--nx-border));border-radius:var(--nx-control-radius);background:color-mix(in srgb,var(--nx-section-bg) 92%,transparent);text-align:center}
-.ngauge .ringwrap{position:relative;width:3.3rem;height:3.3rem}
+.node-gauges{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.72rem;min-width:0}
+.ngauge{display:grid;justify-items:center;align-content:start;gap:.35rem;min-width:0;padding:.78rem .65rem;border:1px solid color-mix(in srgb,var(--a) 20%,var(--nx-border));border-radius:calc(var(--nx-control-radius) + .18rem);background:color-mix(in srgb,var(--nx-section-bg) 94%,var(--a) 2%);text-align:center}
+.ngauge .ringwrap{position:relative;width:3.45rem;height:3.45rem}
 .ngauge svg{display:block;width:100%;height:100%;transform:rotate(-90deg);overflow:visible}
 .ngauge circle{fill:none;stroke-width:3.8;stroke-linecap:round}
 .ng-track{stroke:var(--nx-separator)}
 .ng-arc{stroke:var(--g-color,var(--a));transition:stroke-dasharray .4s ease}
-.ng-center{position:absolute;inset:0;display:grid;place-content:center;font-size:.82rem;line-height:1.1}
-.ng-label{font-size:var(--nx-text-xs);font-weight:700}
-.ngauge small{font-size:.68rem;color:var(--nx-muted);overflow-wrap:anywhere;line-height:1.4}
-.node-speed{display:grid;gap:.45rem;min-width:0}
-.node-speed>div:first-child{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;font-size:var(--nx-text-xs);color:var(--nx-muted)}
-.node-speed b{color:var(--tx);font-variant-numeric:tabular-nums}
+.ng-center{position:absolute;inset:0;display:grid;place-content:center;font-size:.84rem;line-height:1.1}
+.ng-label{font-size:.78rem;font-weight:750}
+.ngauge small{font-size:.71rem;color:var(--nx-muted);overflow-wrap:anywhere;line-height:1.42}
+.node-speed{display:grid;gap:.52rem;min-width:0;margin-top:.15rem}
+.node-speed>div:first-child{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;font-size:.78rem;color:var(--nx-muted)}
+.node-speed b{color:var(--tx);font-variant-numeric:tabular-nums;font-size:.86rem}
+.node-speed .pb{height:.42rem;background:color-mix(in srgb,var(--nx-control-bg) 92%,var(--a) 3%)}
 
-/* The card footer is an operations console. Four related actions make a row on
-   broad concept cards, the next four make the second row, and Create Host ends
-   the composition as a full-width CTA. Container queries below reflow it from
-   the card width itself instead of the viewport. */
-.nc .acts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.55rem;padding-top:var(--nx-space-3);border-top:1px solid var(--nx-separator)}
-.nc .acts>button{width:100%;justify-content:center;min-width:0;min-height:2.55rem;padding:.48rem .58rem;font-size:.73rem;font-weight:700;white-space:normal;line-height:1.3;background:var(--nx-control-bg)}
-.nc .acts .ic{width:1.04rem;height:1.04rem;flex:none;opacity:.94}
-.nc .acts>[data-node-create-host]{grid-column:1/-1}
-.nc .acts>[data-agent-update]{color:var(--a);border-color:var(--nx-selected-border);background:var(--nx-selected-bg);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--a) 10%,transparent)}
-.nc .acts>[data-agent-update]:hover{background:color-mix(in srgb,var(--a) 15%,var(--nx-control-bg));border-color:color-mix(in srgb,var(--a) 58%,var(--nx-border))}
+/* The footer is the deliberate 4 + 4 + 1 operations console from the concept.
+   Container queries below reflow it from card width rather than viewport width. */
+.nc .acts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.58rem;padding-top:1rem;border-top:1px solid var(--nx-separator)}
+.nc .acts>button{width:100%;justify-content:center;min-width:0;min-height:2.72rem;padding:.52rem .68rem;font-size:.76rem;font-weight:700;white-space:normal;line-height:1.28;background:color-mix(in srgb,var(--nx-control-bg) 96%,transparent);border-color:color-mix(in srgb,var(--nx-border) 88%,var(--a) 12%)}
+.nc .acts .ic{width:1.08rem;height:1.08rem;flex:none;opacity:.96}
+.nc .acts>[data-node-create-host]{grid-column:1/-1;min-height:2.78rem;background:color-mix(in srgb,var(--nx-control-bg) 93%,var(--a) 3%)}
+.nc .acts>[data-agent-update]{color:var(--a);border-color:color-mix(in srgb,var(--a) 62%,var(--nx-border));background:color-mix(in srgb,var(--a) 10%,var(--nx-control-bg));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--a) 10%,transparent)}
+.nc .acts>[data-agent-update]:hover{background:color-mix(in srgb,var(--a) 16%,var(--nx-control-bg));border-color:color-mix(in srgb,var(--a) 72%,var(--nx-border))}
 .nc .acts>[data-node-bootstrap] .ic,.nc .acts>[data-node-create-host] .ic{color:var(--a)}
 .nc .acts>[data-xray-update] .ic,.nc .acts>[data-node-geodata] .ic{color:var(--b)}
 .nc .acts>[data-node-routing] .ic{color:var(--c3)}
 .nc .acts>[data-nt] .ic{color:var(--wr)}
 .nc .acts>[data-ne] .ic{color:var(--nx-muted)}
 
-/* Common low-count fleets: each density choice changes real geometry. */
+/* Common low-count fleets: each density choice changes real geometry. A single
+   node always consumes the management canvas instead of becoming an island. */
 @container nodes-workspace (min-width:52rem){
-  .nodes[data-node-count="1"][data-grid-mode=compact]{grid-template-columns:minmax(0,34rem)}
-  .nodes[data-node-count="1"][data-grid-mode=standard]{grid-template-columns:minmax(0,52rem)}
+  .nodes[data-node-count="1"][data-grid-mode=compact],
+  .nodes[data-node-count="1"][data-grid-mode=standard],
   .nodes[data-node-count="1"][data-grid-mode=spacious]{grid-template-columns:minmax(0,1fr)}
 
   .nodes[data-node-count="2"][data-grid-mode=compact],
@@ -97,25 +101,25 @@
   .nodes[data-node-count="3"][data-grid-mode=standard]{grid-template-columns:repeat(2,minmax(0,1fr))}
   .nodes[data-node-count="3"][data-grid-mode=spacious]{grid-template-columns:minmax(0,1fr)}
 
-  /* Spacious is the concept-card mode: one broad card with identity/health on
-     the left, telemetry on the right, then a 4+4 action console and full host CTA. */
-  .nodes[data-grid-mode=spacious]:is([data-node-count="1"],[data-node-count="2"],[data-node-count="3"])>.nc,
-  .nodes[data-node-count="1"][data-grid-mode=standard]>.nc{
-    grid-template-columns:minmax(18rem,.8fr) minmax(24rem,1.2fr);
-    gap:var(--nx-space-4) var(--nx-space-5);
+  /* One node always gets the approved concept anatomy. Spacious extends that
+     same premium anatomy to two- and three-node low-count fleets. */
+  .nodes[data-node-count="1"]>.nc,
+  .nodes[data-grid-mode=spacious]:is([data-node-count="2"],[data-node-count="3"])>.nc{
+    grid-template-columns:minmax(19rem,.78fr) minmax(28rem,1.22fr);
+    gap:var(--nx-space-4) clamp(1.25rem,2vw,2rem);
   }
-  .nodes[data-grid-mode=spacious]:is([data-node-count="1"],[data-node-count="2"],[data-node-count="3"])>.nc>.h,
-  .nodes[data-grid-mode=spacious]:is([data-node-count="1"],[data-node-count="2"],[data-node-count="3"])>.nc>.acts,
-  .nodes[data-node-count="1"][data-grid-mode=standard]>.nc>.h,
-  .nodes[data-node-count="1"][data-grid-mode=standard]>.nc>.acts{grid-column:1/-1}
-  .nodes[data-grid-mode=spacious]:is([data-node-count="1"],[data-node-count="2"],[data-node-count="3"])>.nc>.node-summary,
-  .nodes[data-node-count="1"][data-grid-mode=standard]>.nc>.node-summary{
+  .nodes[data-node-count="1"]>.nc>.h,
+  .nodes[data-node-count="1"]>.nc>.acts,
+  .nodes[data-grid-mode=spacious]:is([data-node-count="2"],[data-node-count="3"])>.nc>.h,
+  .nodes[data-grid-mode=spacious]:is([data-node-count="2"],[data-node-count="3"])>.nc>.acts{grid-column:1/-1}
+  .nodes[data-node-count="1"]>.nc>.node-summary,
+  .nodes[data-grid-mode=spacious]:is([data-node-count="2"],[data-node-count="3"])>.nc>.node-summary{
     grid-column:1;
-    padding-right:var(--nx-space-4);
+    padding-right:clamp(1rem,1.65vw,1.7rem);
     border-right:1px solid var(--nx-separator);
   }
-  .nodes[data-grid-mode=spacious]:is([data-node-count="1"],[data-node-count="2"],[data-node-count="3"])>.nc>.node-metrics,
-  .nodes[data-node-count="1"][data-grid-mode=standard]>.nc>.node-metrics{grid-column:2}
+  .nodes[data-node-count="1"]>.nc>.node-metrics,
+  .nodes[data-grid-mode=spacious]:is([data-node-count="2"],[data-node-count="3"])>.nc>.node-metrics{grid-column:2}
 }
 
 /* With two nodes on a truly wide management surface Compact spends width on
@@ -150,8 +154,11 @@
   .acts{grid-template-columns:repeat(4,minmax(0,1fr))}
 }
 @container node-card (min-width:52rem){
-  .ngauge{grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto;gap:.2rem .75rem;align-items:center;justify-items:start;text-align:left;padding:.82rem}
-  .ngauge .ringwrap{grid-row:1/3}
+  .ngauge{grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto;gap:.18rem .82rem;align-items:center;justify-items:start;text-align:left;padding:.82rem .95rem;min-height:5.2rem}
+  .ngauge .ringwrap{grid-row:1/3;width:3.65rem;height:3.65rem}
+}
+@container nodes-workspace (max-width:51.99rem){
+  .node-summary{border-right:0;padding-right:0}
 }
 @container nodes-workspace (max-width:35rem){
   .nodes-toolbar>label:not(.node-explorer-hosting),.nodes-toolbar>.node-explorer-search{flex-basis:100%;max-width:none}
