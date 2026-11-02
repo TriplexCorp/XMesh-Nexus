@@ -27,16 +27,15 @@
 .nodes[data-grid-mode=compact]{grid-template-columns:repeat(auto-fit,minmax(min(100%,20rem),1fr))}
 .nodes[data-grid-mode=spacious]{grid-template-columns:minmax(0,1fr)}
 
-/* Node cards intentionally echo the approved concept: a dark tinted enterprise
-   surface with an accent edge, one calm header, a split operational body and a
-   composed action console. The accent remains theme-driven. */
-.nc{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--nx-space-4);align-content:start;min-width:0;height:auto;container:node-card / inline-size;padding:clamp(1rem,1.2vw,1.4rem);border-color:color-mix(in srgb,var(--a) 42%,var(--nx-border));background:color-mix(in srgb,var(--nx-panel-bg) 96%,var(--a) 4%);box-shadow:0 18px 48px color-mix(in srgb,var(--a) 7%,transparent)}
+/* Reference anatomy uses an accent edge and the shared neutral panel shadow. */
+.nc{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--nx-space-4);align-content:start;min-width:0;height:auto;container:node-card / inline-size;padding:clamp(1rem,1.2vw,1.4rem);border-color:color-mix(in srgb,var(--a) 42%,var(--nx-border));background:color-mix(in srgb,var(--nx-panel-bg) 96%,var(--a) 4%);box-shadow:var(--nx-panel-shadow)}
 .nc.off{opacity:.7}
-.nc .h{display:flex;align-items:flex-start;flex-wrap:wrap;gap:.8rem;min-width:0;padding-bottom:.95rem;border-bottom:1px solid var(--nx-separator)}
+.nc .h{display:flex;align-items:center;flex-wrap:wrap;gap:.8rem;min-width:0;padding-bottom:.95rem;border-bottom:1px solid var(--nx-separator)}
 .nc .fg{flex:none;font-size:1.9rem;line-height:1.2}
 .node-identity{flex:1;min-width:8rem;overflow-wrap:anywhere;line-height:1.42}
 .node-identity>b{font-size:1.08rem;letter-spacing:-.025em}
-.node-hosting{display:flex;align-items:center;gap:.35rem;color:var(--nx-muted);font-size:var(--nx-text-xs);margin-top:.22rem}
+.node-endpoint{display:flex;align-items:center;flex-wrap:wrap;gap:.55rem}
+.node-hosting{display:inline-flex;align-items:center;gap:.35rem;color:var(--nx-muted);font-size:var(--nx-text-xs);margin-top:0}
 .node-hosting .ic{width:.9rem;height:.9rem;flex:none}
 .node-live-badges{display:flex;align-items:center;justify-content:flex-end;gap:.42rem;flex-wrap:wrap;min-width:0;max-width:100%;margin-left:auto}
 .node-xray-version,.node-agent-version,.node-runtime-pill{display:inline-flex;align-items:center;gap:.35rem;padding:.34rem .7rem;border:1px solid var(--nx-border);border-radius:999px;background:color-mix(in srgb,var(--nx-section-bg) 94%,transparent);font-size:.72rem;font-weight:700;line-height:1.35;color:var(--nx-muted);overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
@@ -45,14 +44,17 @@
 .node-runtime-offline{color:var(--wr);border-color:color-mix(in srgb,var(--wr) 32%,var(--nx-border))}
 .node-runtime-disabled,.node-runtime-unknown{color:var(--nx-muted)}
 .node-runtime-dot,.node-ip-indicator{display:inline-block;width:.42rem;height:.42rem;flex:none;border-radius:50%;background:currentColor}
+.node-body{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--nx-space-4);min-width:0}
 .node-summary,.node-metrics{display:grid;gap:.72rem;align-content:start;min-width:0}
-.nc .kvg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--nx-space-4);padding-bottom:.82rem;border-bottom:1px solid var(--nx-separator)}
+.nc .kvg{display:grid;line-height:1.35;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--nx-space-4);padding-bottom:.82rem;border-bottom:1px solid var(--nx-separator)}
 .nc .kvg>div{display:grid;align-content:start;gap:.3rem;min-width:0;overflow-wrap:anywhere}
+.nc .kvg>div+div{padding-left:var(--nx-space-4);border-left:1px solid var(--nx-separator)}
 .nc .kvg span{font-size:var(--nx-text-xs);color:var(--nx-muted)}
 .nc .kvg b{font-size:1.12rem}
-.node-online-clients{display:flex;align-items:center;flex-wrap:wrap;gap:.45rem}
+.node-online-clients{display:grid;gap:.2rem;margin-top:.2rem}
 .node-online-clients b{font-size:.92rem}
 .node-tls-health,.node-ip-rotation{display:flex;align-items:center;gap:.48rem;color:var(--nx-muted);font-size:.78rem;overflow-wrap:anywhere}
+.node-tls-health>.ic{width:1.15rem;height:1.15rem;flex:none}
 .node-tls-health{color:var(--tx);font-weight:650}
 .node-ip-rotation.active{color:var(--tx)}
 .node-ip-rotation.active .node-ip-indicator{background:var(--ok)}
@@ -70,7 +72,7 @@
 .node-speed{display:grid;gap:.52rem;min-width:0;margin-top:.15rem}
 .node-speed>div:first-child{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;font-size:.78rem;color:var(--nx-muted)}
 .node-speed b{color:var(--tx);font-variant-numeric:tabular-nums;font-size:.86rem}
-.node-speed .pb{height:.42rem;background:color-mix(in srgb,var(--nx-control-bg) 92%,var(--a) 3%)}
+.node-speed .pb{height:.42rem;background:color-mix(in srgb,var(--nx-muted) 30%,var(--nx-control-bg))}
 
 /* The footer is the deliberate 4 + 4 + 1 operations console from the concept.
    Container queries below reflow it from card width rather than viewport width. */
@@ -81,7 +83,7 @@
 .nc .acts>[data-agent-update]{color:var(--a);border-color:color-mix(in srgb,var(--a) 62%,var(--nx-border));background:color-mix(in srgb,var(--a) 10%,var(--nx-control-bg));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--a) 10%,transparent)}
 .nc .acts>[data-agent-update]:hover{background:color-mix(in srgb,var(--a) 16%,var(--nx-control-bg));border-color:color-mix(in srgb,var(--a) 72%,var(--nx-border))}
 .nc .acts>[data-node-bootstrap] .ic,.nc .acts>[data-node-create-host] .ic{color:var(--a)}
-.nc .acts>[data-xray-update] .ic,.nc .acts>[data-node-geodata] .ic{color:var(--b)}
+.nc .acts>[data-xray-update] .ic,.nc .acts>[data-node-geodata] .ic{color:var(--wr)}
 .nc .acts>[data-node-routing] .ic{color:var(--c3)}
 .nc .acts>[data-nt] .ic{color:var(--wr)}
 .nc .acts>[data-ne] .ic{color:var(--nx-muted)}
@@ -101,42 +103,6 @@
   .nodes[data-node-count="3"][data-grid-mode=standard]{grid-template-columns:repeat(2,minmax(0,1fr))}
   .nodes[data-node-count="3"][data-grid-mode=spacious]{grid-template-columns:minmax(0,1fr)}
 
-  /* One node always gets the approved concept anatomy. Spacious extends that
-     same premium anatomy to two- and three-node low-count fleets. */
-  .nodes[data-node-count="1"]>.nc,
-  .nodes[data-grid-mode=spacious]:is([data-node-count="2"],[data-node-count="3"])>.nc{
-    grid-template-columns:minmax(19rem,.78fr) minmax(28rem,1.22fr);
-    gap:var(--nx-space-4) clamp(1.25rem,2vw,2rem);
-  }
-  .nodes[data-node-count="1"]>.nc>.h,
-  .nodes[data-node-count="1"]>.nc>.acts,
-  .nodes[data-grid-mode=spacious]:is([data-node-count="2"],[data-node-count="3"])>.nc>.h,
-  .nodes[data-grid-mode=spacious]:is([data-node-count="2"],[data-node-count="3"])>.nc>.acts{grid-column:1/-1}
-  .nodes[data-node-count="1"]>.nc>.node-summary,
-  .nodes[data-grid-mode=spacious]:is([data-node-count="2"],[data-node-count="3"])>.nc>.node-summary{
-    grid-column:1;
-    padding-right:clamp(1rem,1.65vw,1.7rem);
-    border-right:1px solid var(--nx-separator);
-  }
-  .nodes[data-node-count="1"]>.nc>.node-metrics,
-  .nodes[data-grid-mode=spacious]:is([data-node-count="2"],[data-node-count="3"])>.nc>.node-metrics{grid-column:2}
-}
-
-/* With two nodes on a truly wide management surface Compact spends width on
-   lower card height rather than inventing a third empty grid track. */
-@container nodes-workspace (min-width:96rem){
-  .nodes[data-node-count="2"][data-grid-mode=compact]>.nc{
-    grid-template-columns:minmax(14rem,.72fr) minmax(20rem,1.28fr);
-    gap:var(--nx-space-3) var(--nx-space-4);
-  }
-  .nodes[data-node-count="2"][data-grid-mode=compact]>.nc>.h,
-  .nodes[data-node-count="2"][data-grid-mode=compact]>.nc>.acts{grid-column:1/-1}
-  .nodes[data-node-count="2"][data-grid-mode=compact]>.nc>.node-summary{
-    grid-column:1;
-    padding-right:var(--nx-space-3);
-    border-right:1px solid var(--nx-separator);
-  }
-  .nodes[data-node-count="2"][data-grid-mode=compact]>.nc>.node-metrics{grid-column:2}
 }
 
 @container nodes-workspace (min-width:74rem){
@@ -147,13 +113,14 @@
 
 /* Action grouping follows the card itself, so fleet density cannot create tiny
    four-column buttons just because the outer workspace is ultrawide. */
-@container node-card (min-width:32rem){
-  .acts{grid-template-columns:repeat(3,minmax(0,1fr))}
-}
 @container node-card (min-width:44rem){
-  .acts{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .nc .acts{grid-template-columns:repeat(4,minmax(0,1fr))}
 }
 @container node-card (min-width:52rem){
+  .node-body{grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:0}
+  .node-body>.node-summary{padding-right:var(--nx-space-5);border-right:1px solid var(--nx-separator)}
+  .node-body>.node-metrics{padding-left:var(--nx-space-5);align-content:stretch;grid-template-rows:auto minmax(0,1fr)}
+  .node-body .node-speed{align-content:center}
   .ngauge{grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto;gap:.18rem .82rem;align-items:center;justify-items:start;text-align:left;padding:.82rem .95rem;min-height:5.2rem}
   .ngauge .ringwrap{grid-row:1/3;width:3.65rem;height:3.65rem}
 }
@@ -164,7 +131,7 @@
   .nodes-toolbar>label:not(.node-explorer-hosting),.nodes-toolbar>.node-explorer-search{flex-basis:100%;max-width:none}
   .node-grid-controls{margin-left:0}
   .node-live-badges{justify-content:flex-start;margin-left:0;flex-basis:100%}
-  .nc .kvg,.node-gauges{grid-template-columns:minmax(0,1fr)}
+  .node-gauges{grid-template-columns:minmax(0,1fr)}
 }
 @media(max-width:390px){
   .nodes-toolbar .node-create-action{width:100%;margin-left:0}

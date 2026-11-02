@@ -220,17 +220,38 @@ Decorative pseudo-icons must not be generated merely to make Settings look “pr
 
 ### Nodes
 
-Nodes uses a broad enterprise workspace rather than shrinking the entire screen to make one card look dense.
+The active owner is `frontend/styles/features/nodes/nodes.css`; `nodesP()` in
+`frontend/js/core/app.js` renders the anatomy. Historical workspace-module
+references elsewhere in this document predate the current three-system-module
+asset graph, enforced by `scripts/check-ui-system.js`.
 
-Requirements:
+- A single node uses the full available fleet width in every density mode.
+- The header groups flag/name/endpoint/provider on the left and runtime badges on the right.
+- `.node-body` is a real grid: summary 40%, telemetry 60% once the card has room.
+- Users and XRAY STUDIO are adjacent summary columns with a vertical divider.
+- TLS retains its shield during runtime updates; GeoData retains its status dot.
+- Three equal-height KPI tiles share one row above the full telemetry speed rail.
+- Actions use four equal columns, four equal columns, then full-width Create Host.
+  Only narrow cards reflow to two columns.
+- Card depth comes from `--nx-panel-shadow`; accent outer bloom is forbidden.
+- Compact / Standard / Spacious change actual fleet track geometry.
+- Container queries use card width for anatomy and workspace width for fleet density.
+- Icons come from the shared `ic()` SVG renderer.
 
-- toolbar, explorer, result metadata and fleet remain separate composition layers;
-- search/filter controls use proportional tracks across the work surface;
-- one node becomes a deliberate two-zone card: identity/health + operational telemetry;
-- KPI tiles and speed rail use the operational zone instead of a fixed `48rem` island;
-- actions remain a predictable grid;
-- two/three/four-node fleet layouts still respond to density mode;
-- responsive behavior is based on the actual Nodes workspace container.
+### User Details
+
+`workspace-dialog-contract.css` owns final dialog geometry; `user-details.css`
+owns feature content. The desktop budget remains at most 54rem, bounded by the
+viewport. Header, usage band and footer stay in flow without shrinking. Three
+panes start at the same baseline. `.user-canvas-grid` is the single scroll owner
+with a stable scrollbar gutter. `userDrawer()` resets that owner's scroll
+position after mounting, including when another user replaces an open dialog.
+
+Browser acceptance lives in `scripts/test-ui-browser.cjs`: real DOM rectangles,
+semantic icons after runtime refresh, neutral computed shadow, 4 + 4 + 1 actions,
+54rem/viewport bounds, pane baselines, and reopening after a real scroll.
+Artifacts include `nodes-{width}x{height}.png` and
+`user-details-{width}x{height}.png` at 1920×1080, 2560×1440 and 3440×1440.
 
 ### Tables / Users / Squads / Hosts
 

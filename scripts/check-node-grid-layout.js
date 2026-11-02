@@ -32,19 +32,15 @@ assert.match(workspaces,/\.nodes\[data-node-count="3"\]\[data-grid-mode=standard
   'Three-node Standard must expose fewer columns than Compact');
 assert.match(workspaces,/\.nodes\[data-node-count="3"\]\[data-grid-mode=spacious\]\{grid-template-columns:minmax\(0,1fr\)\}/,
   'Three-node Spacious must preserve the wide concept composition');
-assert.match(workspaces,/@container nodes-workspace \(min-width:96rem\)[\s\S]*?\.nodes\[data-node-count="2"\]\[data-grid-mode=compact\]>\.nc\{[\s\S]*?grid-template-columns:minmax\(14rem,.72fr\) minmax\(20rem,1.28fr\)/,
-  'Two-node Compact must become vertically denser on ultrawide workspaces');
-
-/* The approved concept is a genuine two-zone card, not a wide one-column card:
- * operational identity/health on the left and telemetry on the right. */
-assert.match(workspaces,/\.nodes\[data-node-count="1"\]>\.nc,[\s\S]*?\.nodes\[data-grid-mode=spacious\]:is\(\[data-node-count="2"\],\[data-node-count="3"\]\)>\.nc\{[\s\S]*?grid-template-columns:minmax\(19rem,.78fr\) minmax\(28rem,1.22fr\)/,
-  'Concept cards must keep the approved 40/60 two-zone anatomy');
-assert.match(workspaces,/\.nodes\[data-node-count="1"\]>\.nc>\.node-summary,[\s\S]*?border-right:1px solid var\(--nx-separator\)/,
-  'Concept cards must keep the vertical divider between operations and telemetry');
-assert.match(workspaces,/\.nc\{[^}]*border-color:color-mix\(in srgb,var\(--a\) 42%,var\(--nx-border\)\)[^}]*background:color-mix\(in srgb,var\(--nx-panel-bg\) 96%,var\(--a\) 4%\)/,
-  'Node card must retain the accent edge and tinted premium surface from the concept');
-assert.match(workspaces,/@container node-card \(min-width:52rem\)\{[\s\S]*?\.ngauge\{grid-template-columns:auto minmax\(0,1fr\)[\s\S]*?min-height:5\.2rem/,
-  'Wide concept cards must render compact horizontal telemetry panels');
+/* The DOM owns the two-zone body, independent of fleet track placement. */
+assert.match(app,/class="node-body"><div class="node-summary"/);
+assert.match(workspaces,/\.node-body\{grid-template-columns:minmax\(0,2fr\) minmax\(0,3fr\)/);
+assert.match(workspaces,/\.node-body>\.node-summary\{[^}]*border-right:1px solid var\(--nx-separator\)/);
+assert.match(workspaces,/\.nc \.kvg>div\+div\{[^}]*border-left:1px solid var\(--nx-separator\)/);
+assert.match(workspaces,/box-shadow:var\(--nx-panel-shadow\)/,'Node card uses shared neutral depth');
+assert.doesNotMatch(workspaces,/\.nc\{[^}]*box-shadow:[^;}]*var\(--a\)/,'Accent outer shadows are forbidden');
+assert.match(app,/ic\('shield'\)\+'<span data-node-tls-label>/);
+assert.match(app,/tlsBadge\.querySelector\('\[data-node-tls-label\]'\)\.textContent=tls\.label/,'Runtime refresh preserves the shield');
 
 /* Actions are the composed 4 + 4 + 1 console from the concept. */
 assert.doesNotMatch(workspaces,/\.nc \.acts\{[^}]*auto-fit/,'Node action composition must not use auto-fit');
@@ -52,7 +48,7 @@ assert.match(workspaces,/\.nc \.acts>\[data-node-create-host\]\{grid-column:1\/-
   'Create Host must finish the action console as a full-width CTA');
 assert.match(workspaces,/\.nc \.acts>\[data-agent-update\]\{[^}]*color:var\(--a\);[^}]*border-color:color-mix\(in srgb,var\(--a\) 62%,var\(--nx-border\)\);[^}]*background:color-mix\(in srgb,var\(--a\) 10%,var\(--nx-control-bg\)\)/,
   'Update Agent must keep its premium accent treatment');
-assert.match(workspaces,/@container node-card \(min-width:44rem\)\{\s*\.acts\{grid-template-columns:repeat\(4,minmax\(0,1fr\)\)\}/,
+assert.match(workspaces,/@container node-card \(min-width:44rem\)\{\s*\.nc \.acts\{grid-template-columns:repeat\(4,minmax\(0,1fr\)\)\}/,
   'Wide node cards must compose actions as four columns');
 new Function(app);
 
