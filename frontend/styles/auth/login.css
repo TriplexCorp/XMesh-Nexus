@@ -17,12 +17,6 @@ body{
  min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;
  padding:clamp(1.25rem,4vw,3.25rem) 1.15rem;
 }
-.login-shell::before{
- content:"";position:fixed;inset:clamp(1rem,3vw,2.75rem);z-index:-1;pointer-events:none;
- border:1px solid color-mix(in srgb,var(--nx-border) 72%,transparent);
- border-radius:max(var(--nx-card-radius),1.5rem);
- opacity:.55;
-}
 .login-card{
  width:min(100%,31rem);padding:clamp(1.65rem,3vw,2.55rem);
  border:1px solid var(--nx-border-strong);border-radius:var(--nx-card-radius);
@@ -83,7 +77,6 @@ html[data-motion=off] :is(body,.login-card,input,button){transition:none}
 @keyframes login-enter{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
 @media(max-width:560px){
  .login-shell{padding:1rem}
- .login-shell::before{display:none}
  .login-card{width:100%;padding:1.55rem 1.3rem}
  h1{font-size:1.75rem}
 }
