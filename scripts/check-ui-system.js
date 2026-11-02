@@ -18,6 +18,7 @@ assert.match(index,/ui-builder\.js\?v=[a-z0-9-]+/,'UI builder must be cache-bust
 const lastCss=index.lastIndexOf('<link rel="stylesheet"');
 assert(index.slice(lastCss).includes('nexus-ui-v3.css'),'Design System v3 must be the final global stylesheet');
 assert(index.indexOf('app.js?v=')<index.indexOf('ui-builder.js?v='),'UI builder must load after app.js');
+assert.match(index,/<aside data-ui-surface="panel">/,'Sidebar must opt into the shared panel material explicitly');
 
 for(const retired of ['global-hover.css','ui-system.css','design-system-v2.css','spatial-engine.css','spatial-layout.css']){
   assert(!index.includes(retired),'Retired global layer must not be loaded: '+retired);
@@ -51,9 +52,10 @@ assert.match(foundation,/prefers-reduced-transparency/,'Glass must respect reduc
 
 assert.doesNotMatch(components,/html\[data-surface=(?:solid|glass|raised)\]/,'Components must consume material tokens, not fork surface modes');
 assert.doesNotMatch(layout,/html\[data-surface=(?:solid|glass|raised)\]/,'Layout must consume material tokens, not fork surface modes');
-assert.match(components,/\.card,[\s\S]*\[data-ui-surface="panel"\][\s\S]*--nx-panel-bg/,'Shared panel primitive missing');
-assert.match(components,/\.seg button\.on[\s\S]*--ui-segment-active-bg/,'Shared selected segment primitive missing');
-assert.match(components,/dialog \.box,dialog form\.box/,'Shared dialog shell primitive missing');
+assert.match(components,/body \.app \.card,[\s\S]*\[data-ui-surface="panel"\][\s\S]*--nx-panel-bg/,'Shared panel primitive must outrank legacy material selectors without theme forks');
+assert.match(components,/body \.app>aside\[data-ui-surface="panel"\]/,'Sidebar material must be owned by the shared v3 primitive');
+assert.match(components,/:is\(\.app,dialog\) \.seg button\.on[\s\S]*--ui-segment-active-bg/,'Shared selected segment primitive missing');
+assert.match(components,/dialog#dlg \.box,dialog#dlg form\.box/,'Shared dialog shell primitive missing');
 assert.match(components,/Composite controls own exactly one material shell/,'Composite control ownership must be documented in CSS');
 assert.match(components,/transform:none/,'Generic hover must not use lift motion');
 
@@ -62,8 +64,11 @@ assert.match(layout,/\[data-ui-collection\]\[data-ui-count="1"\]\[data-ui-low-co
 assert.match(layout,/\[data-ui-layout="empty"\]/,'Empty-state geometry missing');
 assert.match(layout,/\[data-ui-layout="editor"\],\[data-ui-layout="canvas"\]/,'Purposeful editor/canvas exception missing');
 assert.match(layout,/\.appearance-layout\{[\s\S]*grid-template-columns:minmax\(0,1\.06fr\) minmax\(28rem,\.94fr\)/,'Settings must use balanced full-width desktop columns');
-assert.match(layout,/\.nodes-page\.card,[\s\S]*background:transparent/,'Nodes outer shell must not become a giant enclosing card');
+assert.match(layout,/\.appearance-layout>\.appearance-column>\.card:nth-child\(n\)\{grid-area:auto\}/,'Settings must explicitly clear legacy implicit-grid placement');
+assert.match(layout,/body \.app \.nodes-page\.card,[\s\S]*background:transparent/,'Nodes outer shell must not become a giant enclosing card');
+assert.match(layout,/\.nodes-page\{[\s\S]*container:nodes-grid \/ inline-size/,'Nodes fleet composition must be owned by v3 container queries');
 assert.match(layout,/\.nodes-page>\.nodes\[data-node-count="1"\]>\.nc\{[\s\S]*grid-template-columns:minmax\(18rem,\.72fr\) minmax\(30rem,1\.28fr\)/,'Single-node card must use deliberate wide composition');
+assert.match(layout,/\.nodes-page>\.nodes\[data-node-count="1"\]>\.nc\{[\s\S]*max-width:none/,'Single-node card must not inherit a narrow fleet cap');
 assert.match(layout,/dialog#dlg\.node-wide[\s\S]*100dvh - 48px/,'Node editor viewport safety must live in v3 layout');
 
 for(const role of ['panel','dialog','section','metric','item','floating']){
