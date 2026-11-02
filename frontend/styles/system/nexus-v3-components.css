@@ -115,7 +115,7 @@ dialog:not([open]){display:none}
 :where(dialog)>.box,:where(dialog)>form.box,dialog>.sv-dialog,dialog>.stats-user-dialog,dialog>.crx-dialog{width:100%;min-width:0;min-height:0;max-width:100%;max-height:calc(100dvh - 2rem);overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
 .box{display:grid;gap:var(--nx-page-gap);align-content:start;padding:var(--nx-card-pad);border:1px solid var(--nx-border-strong);border-radius:var(--nx-card-radius);background:var(--nx-dialog-bg)}
 .box h2{font-size:1.18rem}
-:where(dialog)>.box>.act,:where(dialog)>form.box>.act{position:sticky;bottom:calc(-1 * var(--nx-card-pad));margin-top:auto;padding-block:.8rem;background:var(--nx-dialog-bg);border-top:1px solid var(--nx-separator);z-index:1}
+:where(dialog)>.box>.act,:where(dialog)>form.box>.act{position:sticky;bottom:0;margin-top:auto;padding-block:.8rem;background:var(--nx-dialog-bg);border-top:1px solid var(--nx-separator);z-index:1}
 :where(dialog) :is(input:not([type=range]):not([type=checkbox]):not([type=radio]),select,textarea){background:var(--nx-dialog-control-bg)}
 dialog.wide{--dialog-width:52rem}
 dialog:is(.user-modal,.node-wide,.host-wide,.squad-wide,[data-dialog-size=workspace]){--dialog-width:132rem}
@@ -125,8 +125,18 @@ dialog.pal{--dialog-width:42rem;margin:7vh auto auto}
 dialog.pop{--dialog-width:28rem;inset:1rem 1rem auto auto;margin:0}
 dialog.side{--dialog-width:34rem;inset:0 0 0 auto;margin:0;max-height:100dvh;height:100dvh;max-width:100vw;border-radius:var(--nx-card-radius) 0 0 var(--nx-card-radius)}
 dialog.side>.box{height:100%;max-height:100dvh;border-radius:inherit}
-:where(dialog,.sv-overlay,.crx-dialog,.notification-workspace) :is(button[data-x],button[aria-label^="Закрыть"],.sv-dialog-close,.crx-close,.xm-studio-modal-close){display:inline-flex;align-items:center;justify-content:center;flex:none;width:var(--xm-close-size);min-width:var(--xm-close-size);height:var(--xm-close-size);min-height:var(--xm-close-size);padding:0;border:1px solid var(--nx-border);border-radius:50%;background:var(--nx-control-bg);color:var(--mu)}
-:where(dialog,.sv-overlay,.crx-dialog,.notification-workspace) :is(button[data-x],button[aria-label^="Закрыть"],.sv-dialog-close,.crx-close,.xm-studio-modal-close) svg{width:var(--xm-close-glyph-size);height:var(--xm-close-glyph-size)}
+:where(dialog,.sv-overlay,.crx-dialog,.notification-workspace) :is(button[data-x][aria-label^="Закрыть"],button[data-x][aria-label^="Close"],.geo-close[data-x],.route-json-close[data-x],button[aria-label^="Закрыть"],button[aria-label^="Close"],.sv-dialog-close,.crx-close,.xm-studio-modal-close){display:inline-flex;align-items:center;justify-content:center;flex:none;width:var(--xm-close-size);min-width:var(--xm-close-size);height:var(--xm-close-size);min-height:var(--xm-close-size);padding:0;border:1px solid var(--nx-border);border-radius:50%;background:var(--nx-control-bg);color:var(--mu)}
+:where(dialog,.sv-overlay,.crx-dialog,.notification-workspace) :is(button[data-x][aria-label^="Закрыть"],button[data-x][aria-label^="Close"],.geo-close[data-x],.route-json-close[data-x],button[aria-label^="Закрыть"],button[aria-label^="Close"],.sv-dialog-close,.crx-close,.xm-studio-modal-close) svg{width:var(--xm-close-glyph-size);height:var(--xm-close-glyph-size)}
+
+#dlg{--modal-off:translateY(16px) scale(.982);opacity:0;transform:var(--modal-off);transition:opacity .24s cubic-bezier(.2,.75,.25,1),transform .32s cubic-bezier(.18,.82,.24,1),display .32s allow-discrete,overlay .32s allow-discrete}
+#dlg[open]{opacity:1;transform:translateY(0) scale(1)}
+#dlg.side{--modal-off:translateX(35px)}
+#dlg.pop,#dlg.pal{--modal-off:translateY(-12px) scale(.982)}
+#dlg::backdrop{opacity:0;transition:opacity .32s ease,display .32s allow-discrete,overlay .32s allow-discrete}
+#dlg[open]::backdrop{opacity:1}
+@starting-style{#dlg[open]{opacity:0;transform:var(--modal-off)}#dlg[open]::backdrop{opacity:0}}
+html[data-motion=off] #dlg,html[data-motion=off] #dlg::backdrop{transition:none;transform:none;opacity:1}
+@media(prefers-reduced-motion:reduce){#dlg,#dlg::backdrop{transition:none;transform:none;opacity:1}}
 
 /* Select: native <select> remains canonical form state and fallback. */
 .xm-select-shell{position:relative;display:block;width:100%;min-width:0}

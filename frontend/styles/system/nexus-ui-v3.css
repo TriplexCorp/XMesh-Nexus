@@ -1,5 +1,36 @@
-/* One presentation authority: foundation -> components -> layouts.
- * Feature modules own only named content structures, not global visual rules. */
-@import url("./nexus-v3-foundation.css");
-@import url("./nexus-v3-components.css");
-@import url("./nexus-v3-layout.css");
+/* Single panel presentation entrypoint. Legacy remains explicitly quarantined until
+ * the remaining runtime-only compatibility rules are migrated and browser-verified. */
+@import url("../legacy/styles.css?v=2450dae8dd45") layer(xmesh-legacy);
+@import url("./nexus-v3-foundation.css?v=ca321b7c08ac");
+@import url("./nexus-v3-components.css?v=0a23ada96856");
+@import url("./nexus-v3-layout.css?v=bf70f1e7d4dd");
+
+/* Feature modules own named feature geometry only. */
+@import url("../features/access/access.css?v=c9b134b8a0bd");
+@import url("../features/balancers/balancers.css?v=5e87988e0c89");
+@import url("../features/hosts/hosts.css?v=3b9de99032fa");
+@import url("../features/nodes/diagnostics.css?v=b99d57a26596");
+@import url("../features/nodes/node-dialogs.css?v=f759f1c84352");
+@import url("../features/nodes/node-editor.css?v=6c7e92270826");
+@import url("../features/nodes/node-geodata.css?v=655704fa0e0f");
+@import url("../features/nodes/node-routing.css?v=e02dfc9e746a");
+@import url("../features/nodes/nodes.css?v=ba667bf85565");
+@import url("../features/notifications/notifications.css?v=f43c8b1d5e24");
+@import url("../features/overview/overview.css?v=e984ce937d6e");
+@import url("../features/routing/client-routing.css?v=f60bd682945d");
+@import url("../features/security/security.css?v=45ec6a5fd0bd");
+@import url("../features/settings/settings-updates.css?v=982d5d1539f6");
+@import url("../features/settings/settings.css?v=5bfb4ae9d746");
+@import url("../features/squads/squad-editor-premium-v5.css?v=70ca047618a5");
+@import url("../features/statistics/statistics.css?v=8b76a1a3d66f");
+@import url("../features/subscriptions/subscription-public.css?v=bcded8f8defe");
+@import url("../features/subscriptions/subscription-studio.css?v=b91c26f9c910");
+@import url("../features/tools/tools.css?v=b2eed08c8a90");
+@import url("../features/users/user-details.css?v=f49be9a511c8");
+@import url("../features/users/user-editor.css?v=685a11a885a1");
+@import url("../features/users/user-sharing-risk.css?v=5113a6fd82ba");
+@import url("../features/users/users.css?v=9fa24db44d6f");
+@import url("../features/xray-studio/xray-studio-hosts.css?v=b288421656ea");
+@import url("../features/xray-studio/xray-studio-reality-dialog.css?v=08b9107e6c8a");
+@import url("../features/xray-studio/xray-studio-tls-dialog.css?v=3a560218d948");
+@import url("../features/xray-studio/xray-studio-v4.css?v=4baebba55c26");
