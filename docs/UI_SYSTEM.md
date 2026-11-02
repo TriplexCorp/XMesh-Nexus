@@ -33,7 +33,8 @@ The product uses a **calm enterprise** visual language:
 - accent is reserved for selection, focus and primary actions;
 - nested surfaces are minimized;
 - typography hierarchy does more work so borders and backgrounds can do less;
-- hover is a state change, not a special effect.
+- hover is a state change, not a special effect;
+- spatial rhythm is deliberate: large empty regions are avoided unless they communicate hierarchy, state or future content intentionally.
 
 Bloom is not an interaction primitive. Ordinary hover must not add neon glow, large accent shadows or `translateY` lift. Primary actions may change tone or border contrast, while neutral controls use a quiet surface/border delta. Persistent selection must remain more obvious than hover.
 
@@ -202,6 +203,30 @@ Shared material spacing tokens remain:
 - `--ui-space-section`
 - `--ui-space-item`
 
+## Empty-space and spatial-efficiency contract
+
+Whitespace is a hierarchy tool, not filler. XMesh UI must avoid **large accidental empty regions** that make a screen, card or modal feel unfinished, sparse or mechanically stretched.
+
+The default rule is:
+
+> No surface should be significantly taller or wider than its meaningful content without a clear interaction, hierarchy or responsive-layout reason.
+
+Apply this contract across pages, cards, forms, tables, editors and dialogs:
+
+- do not use fixed/min heights merely to make sibling cards equal when that produces large dead zones;
+- do not stretch rows, sections or modal bodies to fill available height unless the content is itself a workspace that benefits from expansion (for example a code editor, log viewer, table viewport or canvas);
+- prefer content-driven height, intrinsic sizing, balanced grid tracks and deliberate section gaps over oversized padding or `space-between` distribution;
+- when columns contain different amounts of content, avoid forcing visual equality if it creates an obviously empty lower half; allow independent height or rebalance the composition;
+- if a card has little content, make the card smaller rather than padding the absence; if additional room is intentional, that room must communicate a known state such as an empty state, preview, drop zone, chart canvas or reserved interactive workspace;
+- modal shells must fit their task. Short forms should not inherit tall editor/dialog geometry; long forms may scroll internally instead of creating a large empty footer/body region;
+- responsive layouts must collapse or reflow before they create conspicuous unused columns or gutters;
+- density settings may change rhythm, but no density mode is allowed to create dead space through fixed dimensions;
+- perceived density matters as much as numeric spacing: related controls should read as one coherent group, while unrelated groups still need enough separation to preserve hierarchy.
+
+Large whitespace is acceptable only when it has a visible purpose. Examples include breathing room around a primary analytical canvas, an intentionally sparse empty state, or a workspace reserved for user-generated content. Decorative emptiness is not a premium signal by itself; premium composition comes from proportion, grouping, hierarchy and controlled rhythm.
+
+For implementation, first remove the geometry that creates the void (`min-height`, forced equal rows, unnecessary flex growth, oversized padding, empty grid tracks). Do **not** hide the symptom by adding decorative cards, gradients, fake metrics or non-functional chrome.
+
 ## Legacy adaptation
 
 `ui-builder.js` contains a small centralized compatibility registry for legacy feature selectors. This registry is the only acceptable place to adapt old markup to shared surface roles.
@@ -235,8 +260,9 @@ Before merging a new screen/dialog:
 6. Change density and content width. Layout must remain usable and readable.
 7. Check dark and light theme.
 8. Hover neutral and primary actions. There must be no generic neon bloom or lift animation.
-9. Do not add a feature-specific `html[data-surface=...]` implementation.
-10. If the feature needs a new generic visual role, extend the shared system and documentation instead of creating a private theme.
+9. Inspect the screen at representative wide and narrow desktop widths. There must be no large accidental empty regions caused by fixed/min heights, forced equal columns, unnecessary flex growth or oversized padding; intentional whitespace must have a clear product purpose.
+10. Do not add a feature-specific `html[data-surface=...]` implementation.
+11. If the feature needs a new generic visual role, extend the shared system and documentation instead of creating a private theme.
 
 ## CI contract
 
