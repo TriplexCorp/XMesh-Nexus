@@ -50,6 +50,6 @@ assert(app.includes('data-node-search-clear data-action-icon="done"')&&app.inclu
 assert.match(app,/data-node-prev data-action-icon="done"/,'Previous page must not duplicate icons');
 assert.match(app,/data-node-next data-action-icon="done"/,'Next page must not duplicate icons');
 assert(app.includes("pager.hidden=pages===1;pager.dataset.singlePage=String(pages===1)"),"One-page pagination is visually simplified");
-assert(css.includes("border-radius:var(--ui-control-radius);")&&css.includes(".users-toolbar-actions>.users-refresh-action{"),"Users refresh obeys global radius");
+assert.match(css,/\.nodes-toolbar \.node-create-action\{[^}]*border-radius:var\(--ui-control-radius\)/,'Nodes toolbar actions must consume the shared control radius token');
 assert(css.includes('.node-explorer-pages[hidden]'),"Single-page navigation is removed from layout");
 console.log('Fleet explorer search/filter/sort and 1,200-node pagination: PASS.');
