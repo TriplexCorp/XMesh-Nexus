@@ -11,6 +11,10 @@ const read=rel=>fs.readFileSync(path.join(root,rel),'utf8');
 const dockerfile=read('backend/Dockerfile');
 assert.match(dockerfile,/COPY frontend\/ \/app\/static\//,
   'Production image must copy the canonical frontend tree');
+assert.match(dockerfile,/sed -E -i[\s\S]*\/app\/static\/nexus-ui-v3\.css/,
+  'Flattened panel CSS entrypoint must rewrite its relative imports to flat runtime aliases');
+assert.match(dockerfile,/packaged browser silently loses all feature CSS behind the entrypoint/,
+  'Packaging must document the relative-import failure mode protected by this contract');
 
 const pages=['frontend/index.html','frontend/login.html'];
 const errors=[];
