@@ -46,8 +46,10 @@ assert.match(engine,/flex-grow:0!important/,
   'Ordinary spatial shells must not consume viewport leftovers through flex-grow');
 assert.match(engine,/data-ui-count="1"\]\[data-ui-low-count="expand"/,
   'Low-count collections must have a generic one-item expansion rule');
-assert.match(engine,/data-ui-layout="empty"[\s\S]*--spatial-empty-min/,
-  'Empty states must use the shared compact height contract');
+assert.match(engine,/--spatial-empty-min:[^;]+;/,
+  'Spatial engine must define one shared compact empty-state height token');
+assert.match(engine,/data-ui-layout="empty"[\s\S]*min-height:var\(--spatial-empty-min\)!important/,
+  'Empty states must consume the shared compact height contract');
 assert.match(engine,/data-ui-layout="editor"/,
   'Purposeful editor whitespace must have an explicit exception');
 
