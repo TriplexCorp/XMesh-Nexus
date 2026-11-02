@@ -1,4 +1,4 @@
-name: Temporary Frontend Recovery Migration
+name: Temporary Frontend Architecture Gate
 
 on:
   push:
@@ -6,121 +6,21 @@ on:
       - tmp/frontend-recovery-runner-20261102
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  migrate:
+  gate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: integration/argon-frontend-recovery-20261102
-          fetch-depth: 0
-
-      - name: Remove legacy panel architecture and migrate runtime policies
-        shell: bash
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run canonical UI architecture gate
+        run: node scripts/check-ui-system.js
+      - name: Check cache graph and syntax
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import os, re
-
-          root=Path('.')
-          legacy_path=root/'frontend/styles/legacy/styles.css'
-          legacy=legacy_path.read_text(encoding='utf-8')
-
-          def flat_rules_with(needle):
-              # Legacy rules needed here are ordinary top-level rules without nested braces.
-              out=[]
-              for m in re.finditer(re.escape(needle), legacy):
-                  brace=legacy.find('{',m.start())
-                  if brace < 0: continue
-                  start=max(legacy.rfind('}',0,m.start()), legacy.rfind(';',0,m.start()))+1
-                  # Skip leading whitespace/comments conservatively.
-                  selector=legacy[start:brace]
-                  if needle not in selector: continue
-                  depth=0; end=None
-                  for i in range(brace,len(legacy)):
-                      if legacy[i]=='{': depth+=1
-                      elif legacy[i]=='}':
-                          depth-=1
-                          if depth==0:
-                              end=i+1; break
-                  if end is None: continue
-                  block=legacy[start:end].strip()
-                  if block not in out: out.append(block)
-              return out
-
-          foundation=root/'frontend/styles/system/nexus-v3-foundation.css'
-          f=foundation.read_text(encoding='utf-8')
-          viewer='''\n/* Read-only presentation policy mirrors server-side viewer RBAC. */\nhtml[data-access-role="viewer"] :is(\n  #addb,#restart,#pal,#bell,#bulk,\n  [data-nu],[data-exp],[data-ne],[data-core-update],[data-core-refresh],\n  [data-node-bootstrap],[data-nr],[data-xray-update],[data-agent-update],\n  [data-node-geodata],[data-node-routing],[data-node-traffic-reset],\n  [data-node-rotate],[data-rotate],[data-node-create-host],\n  [data-a="del"],[data-a="tog"],[data-a="rst"],\n  [data-user-sub-copy],[data-user-sub-revoke],[data-user-sub-new],\n  .user-save-button,.user-editor-actions,.user-id-copy,.node-actions,\n  .nodes-page .acts,.bulk-actions,.users-selection-toolbar\n){display:none!important}\nhtml[data-access-role="viewer"] dialog.user-modal .user-pane-access :is(button,input,select,textarea){pointer-events:none}\nhtml[data-access-role="viewer"] dialog.user-modal .user-inline-editor :is(input,textarea,select){opacity:1;cursor:default}\nhtml[data-access-role="viewer"] dialog.user-modal .user-inline-editor :is(input,textarea,select):focus{outline:none}\nhtml[data-access-role="viewer"] dialog.user-modal .user-head-actions button[data-x]{pointer-events:auto}\n'''
-          if 'html[data-access-role="viewer"] :is(' not in f:
-              f += viewer
-          foundation.write_text(f,encoding='utf-8')
-
-          components=root/'frontend/styles/system/nexus-v3-components.css'
-          c=components.read_text(encoding='utf-8')
-          toast='''\n/* Top-layer feedback remains visible while native dialogs are open. */\n#xmesh-feedback-toast[popover]{position:fixed;inset:auto auto clamp(1rem,4vh,2.5rem) 50%;margin:0;display:flex;align-items:center;gap:.6rem;width:max-content;max-width:min(29rem,calc(100vw - 2rem));padding:.65rem .95rem;border:1px solid var(--nx-border-strong);border-radius:var(--nx-control-radius);background:var(--nx-floating-bg);color:var(--tx);box-shadow:var(--nx-floating-shadow);font-size:.85rem;line-height:1.4;overflow-wrap:anywhere;opacity:0;transform:translate(-50%,.5rem);transition:opacity var(--nx-duration),transform var(--nx-duration);pointer-events:none}\n#xmesh-feedback-toast[popover]:not(:popover-open){display:none}\n#xmesh-feedback-toast[popover].toast-below-dialog{top:var(--toast-top);bottom:auto;left:var(--toast-left)}\n#xmesh-feedback-toast[popover].show{opacity:1;transform:translate(-50%,0);pointer-events:auto}\n#xmesh-feedback-toast .toast-state-icon{display:inline-flex;flex:none;color:var(--a)}\n#xmesh-feedback-toast.toast-error{border-color:var(--er)}\n#xmesh-feedback-toast.toast-error .toast-state-icon{color:var(--er)}\n#xmesh-feedback-toast .toast-action{margin-left:auto;color:var(--a);white-space:nowrap}\n'''
-          if '#xmesh-feedback-toast[popover]' not in c:
-              c += toast
-          components.write_text(c,encoding='utf-8')
-
-          nodes=root/'frontend/styles/features/nodes/nodes.css'
-          n=nodes.read_text(encoding='utf-8')
-          agent=[]
-          for needle in ('.node-agent-updating','.node-agent-spinner'):
-              agent += flat_rules_with(needle)
-          # Preserve only the feature-local agent state rules, deduplicated.
-          for block in agent:
-              if block.startswith('@media') or block.startswith('@keyframes'): continue
-              if block not in n: n += '\n'+block+'\n'
-          if '.node-explorer-pages[hidden]' not in n:
-              n += '\n.node-explorer-pages[hidden]{display:none}\n'
-          nodes.write_text(n,encoding='utf-8')
-
-          # The panel owns exactly one stylesheet graph; the public subscription portal is separate.
-          entry=root/'frontend/styles/system/nexus-ui-v3.css'
-          feature_root=root/'frontend/styles/features'
-          feature_files=sorted(p for p in feature_root.rglob('*.css') if p.is_file() and p.name!='subscription-public.css')
-          lines=[
-            '/* Single panel presentation authority: foundation -> components -> shared layouts -> feature geometry. */',
-            '@import url("./nexus-v3-foundation.css");',
-            '@import url("./nexus-v3-components.css");',
-            '@import url("./nexus-v3-layout.css");','',
-            '/* Scoped panel features. The public subscription portal has its own document entrypoint. */'
-          ]
-          for path in feature_files:
-              rel=Path(os.path.relpath(path,entry.parent)).as_posix()
-              lines.append(f'@import url("{rel}");')
-          entry.write_text('\n'.join(lines)+'\n',encoding='utf-8')
-
-          legacy_path.unlink()
-          ws=root/'frontend/styles/system/nexus-v3-workspaces.css'
-          if ws.exists(): ws.unlink()
-          PY
-
-      - name: Refresh content-addressed graph
-        run: node scripts/update-ui-cache.cjs
-
-      - name: Validate architecture boundary
-        shell: bash
-        run: |
-          test ! -e frontend/styles/legacy/styles.css
-          test ! -e frontend/styles/system/nexus-v3-workspaces.css
-          ! grep -R 'subscription-public.css' frontend/styles/system/nexus-ui-v3.css
-          grep -q 'data-access-role="viewer"' frontend/styles/system/nexus-v3-foundation.css
-          grep -q 'xmesh-feedback-toast' frontend/styles/system/nexus-v3-components.css
-          grep -q 'node-agent-updating' frontend/styles/features/nodes/nodes.css
           node scripts/update-ui-cache.cjs --check
           find frontend/js -name '*.js' -print0 | xargs -0 -n1 node --check
-          node scripts/check-viewer-security.js
-          node scripts/check-node-editor-layout.js
-          git diff --check
-
-      - name: Commit migration
-        shell: bash
-        run: |
-          git config user.name 'XMesh frontend integration'
-          git config user.email 'actions@users.noreply.github.com'
-          git add -A frontend
-          git commit -m 'refactor(frontend): retire legacy presentation layer'
-          git push origin HEAD:integration/argon-frontend-recovery-20261102
