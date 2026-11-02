@@ -3,7 +3,7 @@
 // Verify that reusable client rules have a real authoring and delivery path.
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
-const {assertPackaged}=require('./ci/frontend-source.cjs');
+const {assertPackaged,panelStyles}=require('./ci/frontend-source.cjs');
 const vm=require('node:vm');
 const source=fs.readFileSync('frontend/js/features/routing/client-routing.js','utf8');
 const sandbox={window:{},crypto:require('node:crypto').webcrypto};
@@ -51,7 +51,8 @@ assert.match(publicFeed,/xmeshOwnerNodeKey/);
 assert.match(api,/\.route\("\/client-routing", patch\(patch_client_routing\)\)/);
 assert.match(api,/require_mutation\(&actor\)\?/);
 const index=fs.readFileSync('frontend/index.html','utf8');
-assert.match(index,/src="\/js\/features\/routing\/client-routing\.js\?v=/,'Routing JS must be absolute under the nested dashboard URL');
+assert.match(index,/src="\/js\/features\/routing\/client-routing\.js\?v=[a-f0-9]{12}/,
+ 'Routing JS must be content-addressed under the nested dashboard URL');
 
 // The secured dashboard lives under /dashboard/<slug>. Every remaining
 // relative local asset must be in the Rust rebasing allowlist.
@@ -66,14 +67,12 @@ for (const item of index.matchAll(/(?:href|src)="([^"]+)"/g)) {
 }
 assert.match(dashboardServer,/fn dashboard_client_routing_assets_are_absolute/);
 
+assertPackaged(assert,['client-routing.js','client-routing.css']);
+assert.doesNotMatch(index,/<link[^>]+client-routing\.css/,
+ 'Client routing CSS must stay behind the canonical panel stylesheet entrypoint');
+assert.match(panelStyles(),/#client-route-root\.crx \.crx-card/,
+ 'Client routing CSS must be reachable from the canonical panel stylesheet graph');
 
-assert.match(index,/client-routing\.js\?v=[A-Za-z0-9-]+/,'Routing JS must carry a cache-busting version');
-
-const docker=fs.readFileSync('backend/Dockerfile','utf8');
-for(const item of ['client-routing.js','client-routing.css']){
- assert(index.includes(item),'HTML must load '+item);
- assertPackaged(assert,[item]);
-}
 console.log('Shared client routing: template editor, source assignment, subscriber authorization, admin API, and packaged assets OK.');
 
 assert.doesNotMatch(source,/ensureStylesheet|createElement\('link'\)/,'Feature runtime must not inject a second presentation implementation');
@@ -102,4 +101,3 @@ assert.match(clientCss,/dialog\.crx-overlay::backdrop\{background:var\(--xm-moda
  'Editor must use shared backdrop tokens');
 assert.doesNotMatch(clientCss,/\.crx-overlay\{[^}]*backdrop-filter/,
  'Never apply page blur to the dialog content');
-
