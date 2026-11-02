@@ -10,7 +10,6 @@ permissions:
 
 jobs:
   integrate:
-    if: github.event.head_commit.message == 'chore: stage frontend recovery runner'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout integration branch
@@ -24,6 +23,7 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import os
           import re
 
           root = Path('.')
@@ -60,7 +60,7 @@ jobs:
               '/* Feature modules own named feature geometry only. */',
           ]
           for path in feature_files:
-              rel = path.relative_to(root / 'frontend/styles/system').as_posix()
+              rel = Path(os.path.relpath(path, entry.parent)).as_posix()
               lines.append(f'@import url("{rel}");')
           entry.write_text('\n'.join(lines) + '\n', encoding='utf-8')
 
