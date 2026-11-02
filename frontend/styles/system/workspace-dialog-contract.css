@@ -58,6 +58,75 @@
   background:var(--nx-dialog-bg);
 }
 
+/* User details is one wide workspace surface, not a dialog wrapped around a
+ * second card. The native dialog owns the material edge/shadow; .user-canvas
+ * only owns spacing and internal layout. This removes the doubled lower shell
+ * visible when both layers had their own background, border and radius. */
+#dlg.user-modal{
+  --dialog-width:1840px;
+  box-sizing:border-box;
+  width:min(var(--dialog-width),calc(100vw - 2rem));
+  inline-size:min(var(--dialog-width),calc(100vw - 2rem));
+  min-width:min(1400px,calc(100vw - 2rem));
+  min-inline-size:min(1400px,calc(100vw - 2rem));
+  max-width:calc(100vw - 2rem);
+  max-inline-size:calc(100vw - 2rem);
+  min-height:0;
+  height:auto;
+  max-height:calc(100dvh - 2rem);
+  max-block-size:calc(100dvh - 2rem);
+  overflow:hidden;
+  border:1px solid var(--nx-border-strong);
+  border-radius:var(--nx-card-radius);
+  background:var(--nx-dialog-bg);
+}
+
+#dlg.user-modal>.user-canvas{
+  box-sizing:border-box;
+  width:100%;
+  inline-size:100%;
+  max-width:100%;
+  max-inline-size:100%;
+  block-size:auto;
+  height:auto;
+  min-block-size:0;
+  min-height:0;
+  max-block-size:calc(100dvh - 2rem);
+  max-height:calc(100dvh - 2rem);
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+  backdrop-filter:none;
+  -webkit-backdrop-filter:none;
+}
+
+#dlg.user-modal .user-canvas-grid{
+  flex:0 1 auto;
+  min-height:0;
+  overflow:auto;
+  overscroll-behavior:contain;
+  align-content:start;
+}
+
+#dlg.user-modal .user-canvas-foot{
+  flex:0 0 auto;
+  position:relative;
+  inset:auto;
+  margin-top:0;
+  background:var(--nx-dialog-bg);
+}
+
+@media(max-width:1480px){
+  #dlg.user-modal{
+    min-width:calc(100vw - 2rem);
+    min-inline-size:calc(100vw - 2rem);
+  }
+}
+
 @media(max-width:760px){
   #dlg.host-wide{
     min-width:0;
@@ -74,5 +143,19 @@
     height:calc(100dvh - 1rem);
     max-block-size:calc(100dvh - 1rem);
     max-height:calc(100dvh - 1rem);
+  }
+  #dlg.user-modal{
+    width:calc(100vw - 1rem);
+    inline-size:calc(100vw - 1rem);
+    min-width:0;
+    min-inline-size:0;
+    max-width:calc(100vw - 1rem);
+    max-inline-size:calc(100vw - 1rem);
+    max-height:calc(100dvh - 1rem);
+    max-block-size:calc(100dvh - 1rem);
+  }
+  #dlg.user-modal>.user-canvas{
+    max-height:calc(100dvh - 1rem);
+    max-block-size:calc(100dvh - 1rem);
   }
 }
