@@ -1,0 +1,91 @@
+name: Temporary broad frontend source suite
+
+on:
+  push:
+    branches:
+      - integration/argon-frontend-recovery-20261102
+
+permissions:
+  contents: read
+
+jobs:
+  source-suite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Frontend JavaScript syntax
+        run: find frontend/js -name '*.js' -print0 | xargs -0 -n1 node --check
+      - name: Canonical frontend source contracts
+        run: |
+          set -euo pipefail
+          checks=(
+            check-repo-layout.js
+            check-unified-selects.js
+            check-json-diagnostics.js
+            check-xray-intelligence.js
+            check-xray-tool-actions.js
+            check-xray-studio-wrap-tabs.js
+            check-xray-studio-enterprise.js
+            check-xray-studio-composer.js
+            check-xray-studio-hosts.js
+            check-xray-active-entrypoint.js
+            check-static-assets.js
+            check-client-routing.js
+            check-i18n.js
+            check-english-coverage.js
+            check-subscription-studio.js
+            check-admin-security.js
+            check-viewer-security.js
+            check-security-policy.js
+            check-modal-motion.js
+            check-mfa.js
+            check-security-center.js
+            check-security-audit.js
+            check-white-label.js
+            check-appearance-surfaces.js
+            check-ui-system.js
+            check-node-create-action.js
+            check-node-hosting-notifications.js
+            check-notification-center.js
+            check-statistics-feedback.js
+            test-traffic-chart-geometry.js
+            check-tech-debt.js
+            check-crud-dialog-lifecycle.js
+            check-user-presence.js
+            check-xsp-v2-foundation.js
+            check-xsp-v2-wire.js
+            check-xsp-v2-main-checkpoint.js
+            check-settings-update-actions.js
+            check-managed-xray-update.js
+            check-user-fingerprint-ownership.js
+            check-balancers-workspace.js
+            check-user-quota-preserves-traffic.js
+            check-node-traffic-reset.js
+            check-node-traffic-cutoff.js
+            check-node-network-traffic.js
+            check-node-xray-releases.js
+            check-agent-update.js
+            check-node-live-status.js
+            check-host-editor-zones.js
+            check-node-editor-layout.js
+            check-node-grid-layout.js
+            check-node-explorer.js
+            check-node-ip-rotation.js
+            check-xhttp-extras.js
+            check-xray-studio-selectors.js
+            check-xray-endpoint-autofill.js
+            test-client-config.js
+          )
+          for check in "${checks[@]}"; do
+            echo "::group::$check"
+            node "scripts/$check"
+            echo "::endgroup::"
+          done
+      - name: Cache graph is stable
+        run: node scripts/update-ui-cache.cjs --check
+      - name: Diff hygiene
+        run: git diff --check
