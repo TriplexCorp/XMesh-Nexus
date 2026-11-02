@@ -17,6 +17,33 @@ assert.doesNotMatch(workspaces,/!important/,'Node geometry must not depend on sp
 assert.doesNotMatch(workspaces,/min-height\s*:\s*(?:\d+vh|[4-9]\d{2}px)/,'Cards must not fill the viewport with artificial height');
 assert.match(app,/node-summary/,'Node operational summary has explicit anatomy');
 assert.match(app,/node-metrics/,'Node metrics have explicit anatomy');
+
+/* Density must change real rendered geometry, especially for the common
+ * two-node fleet shown in production. A dataset toggle alone is not enough. */
+assert.match(workspaces,/\.nodes\[data-node-count="2"\]\[data-grid-mode=compact\],[\s\S]*?\.nodes\[data-node-count="2"\]\[data-grid-mode=standard\]\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)\}/,
+  'Compact and Standard keep a two-card fleet row');
+assert.match(workspaces,/\.nodes\[data-node-count="2"\]\[data-grid-mode=spacious\]\{grid-template-columns:minmax\(0,1fr\)\}/,
+  'Spacious must become a deliberate single-column concept layout for two nodes');
+assert.match(workspaces,/\.nodes\[data-node-count="3"\]\[data-grid-mode=compact\]\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\)\}/,
+  'Three-node Compact must expose three columns');
+assert.match(workspaces,/\.nodes\[data-node-count="3"\]\[data-grid-mode=standard\]\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)\}/,
+  'Three-node Standard must expose fewer columns than Compact');
+assert.match(workspaces,/\.nodes\[data-node-count="3"\]\[data-grid-mode=spacious\]\{grid-template-columns:minmax\(0,1fr\)\}/,
+  'Three-node Spacious must preserve the wide concept composition');
+assert.match(workspaces,/@container nodes-workspace \(min-width:96rem\)[\s\S]*?\.nodes\[data-node-count="2"\]\[data-grid-mode=compact\]>\.nc\{[\s\S]*?grid-template-columns:minmax\(14rem,.72fr\) minmax\(20rem,1.28fr\)/,
+  'Two-node Compact must become vertically denser on ultrawide workspaces');
+assert.match(workspaces,/\.nodes\[data-grid-mode=spacious\]:is\(\[data-node-count="1"\],\[data-node-count="2"\],\[data-node-count="3"\]\)>\.nc,[\s\S]*?\{[\s\S]*?grid-template-columns:minmax\(18rem,.8fr\) minmax\(24rem,1.2fr\)/,
+  'Spacious low-count cards must use the concept two-zone anatomy');
+
+/* Actions are a composed console, not an auto-fit pile. The highlighted Agent
+ * action and full-width host CTA are part of the Nodes visual contract. */
+assert.doesNotMatch(workspaces,/\.nc \.acts\{[^}]*auto-fit/,'Node action composition must not use auto-fit');
+assert.match(workspaces,/\.nc \.acts>\[data-node-create-host\]\{grid-column:1\/-1\}/,
+  'Create Host must finish the action console as a full-width CTA');
+assert.match(workspaces,/\.nc \.acts>\[data-agent-update\]\{[^}]*border-color:var\(--nx-selected-border\);[^}]*background:var\(--nx-selected-bg\)/,
+  'Update Agent must keep its premium selected treatment');
+assert.match(workspaces,/@container node-card \(min-width:44rem\)\{\s*\.acts\{grid-template-columns:repeat\(4,minmax\(0,1fr\)\)\}/,
+  'Wide node cards must compose actions as four columns');
 new Function(app);
 
 // Exercise the real delegated click handler, rather than testing a copy.
@@ -59,4 +86,4 @@ for(const mode of ['compact','spacious','standard']){
 const prior=storage.get('xmeshNexusGridView');
 listeners.click({target:{closest:()=>({dataset:{nodeGridMode:'invalid'}})}});
 assert.equal(storage.get('xmeshNexusGridView'),prior,'Invalid mode should be ignored');
-console.log('Enterprise Nodes workspace composition and grid persistence: OK');
+console.log('Enterprise Nodes grid modes, premium card composition and persistence: OK');
