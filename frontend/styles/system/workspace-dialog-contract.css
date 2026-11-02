@@ -60,21 +60,23 @@
 
 /* User details is one wide workspace surface, not a dialog wrapped around a
  * second card. The native dialog owns the material edge/shadow; .user-canvas
- * only owns spacing and internal layout. */
-#dlg.user-modal{
-  --dialog-width:1840px;
+ * only owns spacing and internal layout. `dialog#dlg` intentionally matches the
+ * legacy users.css selector specificity so this canonical contract wins by load order. */
+dialog#dlg.user-modal{
+  --dialog-width:1960px;
   --modal-off:translateY(22px) scale(.972);
   box-sizing:border-box;
-  width:min(var(--dialog-width),calc(100vw - 2rem));
-  inline-size:min(var(--dialog-width),calc(100vw - 2rem));
-  min-width:min(1400px,calc(100vw - 2rem));
-  min-inline-size:min(1400px,calc(100vw - 2rem));
-  max-width:calc(100vw - 2rem);
-  max-inline-size:calc(100vw - 2rem);
+  width:min(var(--dialog-width),calc(100vw - 1.5rem));
+  inline-size:min(var(--dialog-width),calc(100vw - 1.5rem));
+  min-width:min(1480px,calc(100vw - 1.5rem));
+  min-inline-size:min(1480px,calc(100vw - 1.5rem));
+  max-width:calc(100vw - 1.5rem);
+  max-inline-size:calc(100vw - 1.5rem);
   min-height:0;
+  min-block-size:0;
   height:auto;
-  max-height:calc(100dvh - 2rem);
-  max-block-size:calc(100dvh - 2rem);
+  max-height:min(42rem,calc(100dvh - 1.5rem));
+  max-block-size:min(42rem,calc(100dvh - 1.5rem));
   overflow:hidden;
   border:1px solid var(--nx-border-strong);
   border-radius:var(--nx-card-radius);
@@ -89,7 +91,7 @@
   transition-behavior:allow-discrete;
 }
 
-#dlg.user-modal::backdrop{
+dialog#dlg.user-modal::backdrop{
   transition:
     opacity .42s ease,
     display .50s allow-discrete,
@@ -97,7 +99,7 @@
   transition-behavior:allow-discrete;
 }
 
-#dlg.user-modal>.user-canvas{
+dialog#dlg.user-modal>.user-canvas{
   box-sizing:border-box;
   width:100%;
   inline-size:100%;
@@ -107,8 +109,8 @@
   height:auto;
   min-block-size:0;
   min-height:0;
-  max-block-size:calc(100dvh - 2rem);
-  max-height:calc(100dvh - 2rem);
+  max-block-size:min(42rem,calc(100dvh - 1.5rem));
+  max-height:min(42rem,calc(100dvh - 1.5rem));
   display:flex;
   flex-direction:column;
   overflow:hidden;
@@ -128,6 +130,86 @@
   align-content:start;
 }
 
+/* Desktop User Details spends width to save height without reducing readable
+ * text sizes. This applies to ordinary desktop widths and scaled desktop UI. */
+@media(min-width:1200px){
+  #dlg.user-modal .user-head{
+    padding-bottom:.55rem;
+  }
+  #dlg.user-modal .user-overview-band{
+    gap:.4rem 1rem;
+    padding:.48rem 0 .52rem;
+  }
+  #dlg.user-modal .user-canvas-grid{
+    grid-template-columns:minmax(0,1.02fr) minmax(0,1.02fr) minmax(0,1.35fr);
+    gap:.7rem;
+    padding-block:.55rem;
+  }
+  #dlg.user-modal .user-pane{
+    gap:.48rem;
+    padding:.72rem .82rem;
+  }
+  #dlg.user-modal .user-inline-editor{
+    gap:.48rem;
+  }
+  #dlg.user-modal .user-edit-fields{
+    gap:.44rem .55rem;
+  }
+  #dlg.user-modal .user-editor-actions{
+    padding-top:.42rem;
+  }
+  #dlg.user-modal .user-section-divider{
+    margin:.14rem 0;
+  }
+  #dlg.user-modal .user-traffic-stats{
+    gap:.4rem;
+  }
+  #dlg.user-modal .user-device-line{
+    padding:.2rem 0;
+  }
+  #dlg.user-modal :is(input:not([type=range]):not([type=checkbox]):not([type=radio]),select,.xm-select-trigger){
+    min-height:2.12rem;
+    padding:.42rem .6rem;
+  }
+  #dlg.user-modal textarea{
+    min-height:3.85rem;
+    padding:.48rem .6rem;
+  }
+}
+
+/* Only genuinely wide desktop surfaces split the intelligence pane again.
+ * At 120-130% interface scale the effective CSS viewport becomes narrower;
+ * keeping traffic and devices stacked there prevents compressed long-form copy. */
+@media(min-width:1600px){
+  #dlg.user-modal .user-pane-insights{
+    display:grid;
+    grid-template-columns:minmax(0,1.35fr) minmax(12rem,.75fr);
+    grid-template-rows:auto minmax(0,1fr);
+    gap:.42rem .72rem;
+    align-items:start;
+  }
+  #dlg.user-modal .user-pane-insights>.user-pane-heading:first-child{
+    grid-column:1;
+    grid-row:1;
+  }
+  #dlg.user-modal .user-pane-insights>.user-traffic-stats{
+    grid-column:1;
+    grid-row:2;
+  }
+  #dlg.user-modal .user-pane-insights>.user-traffic-stats + .user-section-divider{
+    display:none;
+  }
+  #dlg.user-modal .user-pane-insights>.user-traffic-stats + .user-section-divider + .user-pane-heading{
+    grid-column:2;
+    grid-row:1;
+  }
+  #dlg.user-modal .user-pane-insights>.user-devices{
+    grid-column:2;
+    grid-row:2;
+    align-self:start;
+  }
+}
+
 /* The metadata row is part of the same material surface. Historical viewport
  * safety added a sticky-looking background, shadow and extra bottom inset here,
  * which visually recreated a second card even after .user-canvas was flattened. */
@@ -136,17 +218,17 @@
   position:relative;
   inset:auto;
   z-index:1;
-  margin-top:.12rem;
-  padding:.52rem 0 .08rem;
+  margin-top:.08rem;
+  padding:.36rem 0 .04rem;
   border-top:0;
   background:transparent;
   box-shadow:none;
 }
 
 @media(max-width:1480px){
-  #dlg.user-modal{
-    min-width:calc(100vw - 2rem);
-    min-inline-size:calc(100vw - 2rem);
+  dialog#dlg.user-modal{
+    min-width:calc(100vw - 1.5rem);
+    min-inline-size:calc(100vw - 1.5rem);
   }
 }
 
@@ -167,17 +249,19 @@
     max-block-size:calc(100dvh - 1rem);
     max-height:calc(100dvh - 1rem);
   }
-  #dlg.user-modal{
+  dialog#dlg.user-modal{
     width:calc(100vw - 1rem);
     inline-size:calc(100vw - 1rem);
     min-width:0;
     min-inline-size:0;
     max-width:calc(100vw - 1rem);
     max-inline-size:calc(100vw - 1rem);
+    min-height:0;
+    min-block-size:0;
     max-height:calc(100dvh - 1rem);
     max-block-size:calc(100dvh - 1rem);
   }
-  #dlg.user-modal>.user-canvas{
+  dialog#dlg.user-modal>.user-canvas{
     max-height:calc(100dvh - 1rem);
     max-block-size:calc(100dvh - 1rem);
   }
