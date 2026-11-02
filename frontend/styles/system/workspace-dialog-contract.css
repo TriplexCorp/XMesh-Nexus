@@ -60,10 +60,10 @@
 
 /* User details is one wide workspace surface, not a dialog wrapped around a
  * second card. The native dialog owns the material edge/shadow; .user-canvas
- * only owns spacing and internal layout. This removes the doubled lower shell
- * visible when both layers had their own background, border and radius. */
+ * only owns spacing and internal layout. */
 #dlg.user-modal{
   --dialog-width:1840px;
+  --modal-off:translateY(22px) scale(.972);
   box-sizing:border-box;
   width:min(var(--dialog-width),calc(100vw - 2rem));
   inline-size:min(var(--dialog-width),calc(100vw - 2rem));
@@ -79,6 +79,22 @@
   border:1px solid var(--nx-border-strong);
   border-radius:var(--nx-card-radius);
   background:var(--nx-dialog-bg);
+  transform-origin:50% 48%;
+  will-change:opacity,transform;
+  transition:
+    opacity .34s cubic-bezier(.2,.75,.25,1),
+    transform .50s cubic-bezier(.16,1,.3,1),
+    display .50s allow-discrete,
+    overlay .50s allow-discrete;
+  transition-behavior:allow-discrete;
+}
+
+#dlg.user-modal::backdrop{
+  transition:
+    opacity .42s ease,
+    display .50s allow-discrete,
+    overlay .50s allow-discrete;
+  transition-behavior:allow-discrete;
 }
 
 #dlg.user-modal>.user-canvas{
@@ -112,12 +128,19 @@
   align-content:start;
 }
 
+/* The metadata row is part of the same material surface. Historical viewport
+ * safety added a sticky-looking background, shadow and extra bottom inset here,
+ * which visually recreated a second card even after .user-canvas was flattened. */
 #dlg.user-modal .user-canvas-foot{
   flex:0 0 auto;
   position:relative;
   inset:auto;
-  margin-top:0;
-  background:var(--nx-dialog-bg);
+  z-index:1;
+  margin-top:.12rem;
+  padding:.52rem 0 .08rem;
+  border-top:0;
+  background:transparent;
+  box-shadow:none;
 }
 
 @media(max-width:1480px){
@@ -157,5 +180,23 @@
   #dlg.user-modal>.user-canvas{
     max-height:calc(100dvh - 1rem);
     max-block-size:calc(100dvh - 1rem);
+  }
+}
+
+/* Keep accessibility settings authoritative even though this stylesheet loads
+ * after the shared component motion defaults. */
+html[data-motion=off] #dlg.user-modal,
+html[data-motion=off] #dlg.user-modal::backdrop{
+  transition:none!important;
+  transform:none!important;
+  opacity:1!important;
+  will-change:auto;
+}
+@media(prefers-reduced-motion:reduce){
+  #dlg.user-modal,#dlg.user-modal::backdrop{
+    transition:none!important;
+    transform:none!important;
+    opacity:1!important;
+    will-change:auto;
   }
 }
