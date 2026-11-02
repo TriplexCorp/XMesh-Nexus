@@ -44,6 +44,10 @@ assert.match(controlAgent,/update-node-control-agent[.]sh -o "\$bootstrap"/,
   'signed update path must fetch a fresh updater bootstrap for every target release');
 assert.match(controlAgent,/grep -Fq 'XMESH_TARGET_AWARE_UPDATER=1' "\$bootstrap"/,
   'fresh updater bootstrap must advertise the target-aware contract');
+assert.match(controlAgent,/\/bin\/bash "\$bootstrap" --remote/,
+  'fresh updater bootstrap must be interpreted by trusted bash so noexec /run cannot block updates');
+assert.doesNotMatch(controlAgent,/^[ \t]*"\$bootstrap" --remote/m,
+  'fresh updater bootstrap must never be executed directly from potentially noexec /run');
 assert.doesNotMatch(controlAgent,/systemctl start --wait "\$static_unit"/,
   'signed updates must never blindly execute the updater frozen into the previous release');
 assert.match(controlAgent,/verify_agent_install "\$target_version"/,

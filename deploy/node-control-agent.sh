@@ -349,7 +349,7 @@ run_agent_updater(){
   --property=ReadWritePaths=/var/lib/xmesh-node-control --property=ReadWritePaths=/var/lib/xmesh-xray-sync \
   --property=ReadWritePaths=/var/lib/xmesh-agent --property=ReadWritePaths=-/opt/xmesh-node \
   --property=ReadWritePaths=-/root/XMesh-Node --property=ReadWritePaths=/run \
-  "$bootstrap" --remote >"$log" 2>&1;then
+  /bin/bash "$bootstrap" --remote >"$log" 2>&1;then
   rc=0
  else
   rc=$?
