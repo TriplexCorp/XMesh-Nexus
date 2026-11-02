@@ -185,7 +185,7 @@ async function main() {
         const sharedShadow=getComputedStyle(shadowProbe).boxShadow;shadowProbe.remove();
         const expectedIcon=name=>{const template=document.createElement('template');template.innerHTML=ic(name);return template.content.firstElementChild.innerHTML};
         const icons=['link','redo','dl','refresh-cw','globe','git-branch','pause','pen','server'];
-        return {rem:parseFloat(getComputedStyle(document.documentElement).fontSize),mode:card.parentElement.dataset.gridMode,card:box(card),container:box(card.parentElement),body:box(q('.node-body')),summary:box(q('.node-summary')),metrics:box(q('.node-metrics')),
+        return {rem:parseFloat(getComputedStyle(document.documentElement).fontSize),mode:card.parentElement.dataset.gridMode,toolbar:box(document.querySelector('.nodes-toolbar')),card:box(card),container:box(card.parentElement),body:box(q('.node-body')),summary:box(q('.node-summary')),metrics:box(q('.node-metrics')),
           primary:all('.kvg>div').map(box),kpis:all('.ngauge').map(box),speed:box(q('.node-speed')),speedBar:box(q('.node-speed .pb')),actions:box(q('.acts')),buttons:all('.acts>button').map(box),
           iconMatches:all('.acts>button').map((button,i)=>button.querySelector('svg')?.innerHTML===expectedIcon(icons[i])),
           shield:q('[data-node-tls-status] svg')?.innerHTML===expectedIcon('shield'),hosting:q('.node-hosting svg')?.innerHTML===expectedIcon('building-2'),
@@ -195,7 +195,8 @@ async function main() {
       });
       const cap={compact:60,standard:68,spacious:76}[g.mode]*g.rem;
       assert(Math.abs(g.card.width-Math.min(g.container.width,cap))<=2,'Single-node width must follow density cap');
-      assert(Math.abs((g.card.x-g.container.x)-(g.container.width-g.card.width)/2)<=2,'Bounded card must stay centered');
+      assert(Math.abs(g.card.x-g.container.x)<=2,'Bounded card must anchor to the left workspace edge');
+      assert(Math.abs(g.card.x-g.toolbar.x)<=2,'Single card must align with the left filter-toolbar edge');
       assert(g.summary.x<g.metrics.x);
       assert(g.summary.width/g.body.width>=.35&&g.summary.width/g.body.width<=.45,'Summary must occupy 35–45%');
       assert(g.metrics.width/g.body.width>=.55&&g.metrics.width/g.body.width<=.65,'Telemetry must occupy 55–65%');
@@ -609,9 +610,12 @@ async function main() {
         await page.locator(`[data-node-grid-mode="${mode}"]`).click();
         const state=await page.locator('.nodes').evaluate(grid=>{
           const box=el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,width:r.width}};
-          return {rem:parseFloat(getComputedStyle(document.documentElement).fontSize),cards:[...grid.children].map(card=>({box:box(card),buttons:[...card.querySelectorAll('.acts>button')].map(box)}))};
+          return {left:grid.getBoundingClientRect().left,toolbarLeft:document.querySelector('.nodes-toolbar').getBoundingClientRect().left,rem:parseFloat(getComputedStyle(document.documentElement).fontSize),cards:[...grid.children].map(card=>({box:box(card),buttons:[...card.querySelectorAll('.acts>button')].map(box)}))};
         });
+        assert(Math.abs(state.cards[0].box.x-state.left)<=2,'Fleet must anchor to the left grid edge in every density mode');
+        assert(Math.abs(state.cards[0].box.x-state.toolbarLeft)<=2,'Cards must align with the left filter-toolbar edge');
         for(const card of state.cards){
+          if(mode==='spacious')assert(Math.abs(card.box.x-state.left)<=2,'Every single-column card must stay left-aligned');
           assert(Math.abs(card.box.width-cap*state.rem)<=2,'Card must stop at its density width cap');
           assert(card.buttons.slice(0,4).every(b=>Math.abs(b.y-card.buttons[0].y)<=3),'Narrower card must preserve four action columns');
           assert(card.buttons.slice(0,8).every(b=>b.width<card.box.width*.27),'Inner actions must narrow with the card');

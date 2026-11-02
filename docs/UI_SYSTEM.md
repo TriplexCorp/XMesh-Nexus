@@ -225,7 +225,7 @@ The active owner is `frontend/styles/features/nodes/nodes.css`; `nodesP()` in
 references elsewhere in this document predate the current three-system-module
 asset graph, enforced by `scripts/check-ui-system.js`.
 
-- Nodes tracks are centered and capped by density: Compact 60rem, Standard 68rem, Spacious 76rem.
+- Nodes tracks are anchored to the left workspace edge and capped by density: Compact 60rem, Standard 68rem, Spacious 76rem.
   Cards and their action buttons stop stretching across ultrawide low-count fleets;
   narrower workspaces still shrink the tracks to fit. Global radius settings remain authoritative.
 - The header groups flag/name/endpoint/provider on the left and runtime badges on the right.

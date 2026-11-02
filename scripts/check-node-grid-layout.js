@@ -25,7 +25,7 @@ for(const [mode,cap] of [['compact',60],['standard',68],['spacious',76]]){
  const tracks=columns===1?`minmax(0,${cap}rem)`:`repeat(2,minmax(0,${cap}rem))`;
  assert(workspaces.includes(`.nodes[data-node-count="2"][data-grid-mode=${mode}]{grid-template-columns:${tracks}}`));
 }
-assert.match(workspaces,/justify-content:center/,'Bounded tracks remain grouped');
+assert.match(workspaces,/\.nodes\{[^}]*justify-content:start/,'Bounded tracks must anchor to the left workspace edge');
 assert.match(workspaces,/\.nodes\[data-node-count="3"\]\[data-grid-mode=compact\]\{grid-template-columns:repeat\(3,/);
 assert.match(workspaces,/\.nodes\[data-node-count="3"\]\[data-grid-mode=standard\]\{grid-template-columns:repeat\(2,/);
 assert.doesNotMatch(workspaces,/--(?:ui|nx)-(?:card-|control-)?radius\s*:/,'Nodes must not override global radius settings');
