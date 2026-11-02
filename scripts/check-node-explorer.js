@@ -44,7 +44,7 @@ assert.match(app,/runtimeQueue:\[\],runtimePending:new Set\(\),runtimeActive:0,r
 assert.match(app,/while\(explorer\.runtimeActive<8&&explorer\.runtimeQueue\.length/,'Limit concurrent node runtime requests to eight');
 assert.match(app,/explorer\.runtimeQueue=explorer\.runtimeQueue\.filter/,'Drop queued requests that are no longer visible');
 assert.match(app,/setTimeout\(\(\)=>\{if\(!root\.isConnected\)return;nodeExplorer\.page=1;nodeExplorerUpdate\(\)\},140\)/,'Debounced input');
-assert.match(css,/\.nodes-page \.node-explorer\{/,'Dedicated themed filter bar');
+assert.match(css,/\.nodes-page \.node-explorer\s*,\s*\.nodes-toolbar\s*\{/,'Nodes explorer and toolbar must share one feature-owned surface rule');
 assert.match(html,/app\.js\?v=[a-z0-9-]+/,'Cache-busted explorer script');
 assert(app.includes('data-node-search-clear data-action-icon="done"')&&app.includes('${ic("redo")}<span>Сбросить</span>'),'Reset button supplies exactly one SVG and opts out of icon decoration');
 assert.match(app,/data-node-prev data-action-icon="done"/,'Previous page must not duplicate icons');
