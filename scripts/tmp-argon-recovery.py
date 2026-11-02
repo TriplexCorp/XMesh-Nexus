@@ -102,6 +102,7 @@ replacements = [
     ('assert.match(html,/<script src="\\/js\\/features\\/nodes\\/node-bootstrap-v6\\.js\\?v=20261101-hysteria-policy-v1"><\\/script>/', 'assert.match(html,/<script src="\\/js\\/features\\/nodes\\/node-bootstrap-v6\\.js\\?v=[a-z0-9._-]+"><\\/script>/i'),
     ('assert.match(html,/<script src="\\/js\\/features\\/nodes\\/node-dialogs\\.js\\?v=20261101-user-create-enterprise-v3"><\\/script>/', 'assert.match(html,/<script src="\\/js\\/features\\/nodes\\/node-dialogs\\.js\\?v=[a-z0-9._-]+"><\\/script>/i'),
     ('assert.match(userCss,/\\.user-create-hold \\.sw\\{[\\s\\S]*width:2\\.8rem!important;[\\s\\S]*height:1\\.6rem!important/,', 'assert.match(userCss,/\\.user-create-hold \\.sw\\{[\\s\\S]*width:2\\.8rem;[\\s\\S]*height:1\\.6rem/,'),
+    ('assert.match(html,/user-sharing-context\\.js\\?v=20261101-sharing-v1[\\s\\S]*user-sharing-risk\\.js\\?v=20261101-sharing-v1/,', 'assert.match(html,/user-sharing-context\\.js\\?v=[a-f0-9]{12}[\\s\\S]*user-sharing-risk\\.js\\?v=[a-f0-9]{12}/,'),
 ]
 for old, new in replacements:
     if old in text:
