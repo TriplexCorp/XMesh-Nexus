@@ -7,11 +7,11 @@ body{line-height:1.52;letter-spacing:-.01em}
 body::before,body::after{opacity:.22;filter:blur(150px);animation:none}
 small{font-size:.82rem}
 
-/* Material surfaces. The .app prefix intentionally matches the specificity of
- * historical html[data-surface=*] selectors in styles.css without creating a
- * second material branch. v3 tokens remain the single material authority. */
-.app .card,
-.app [data-ui-surface="panel"]{
+/* Material surfaces. The body + app scope intentionally matches the
+ * specificity of historical html[data-surface=*] selectors in styles.css
+ * without creating a second material branch. v3 tokens remain authoritative. */
+body .app .card,
+body .app [data-ui-surface="panel"]{
   position:relative;
   min-width:0;
   padding:var(--nx-card-pad);
@@ -22,7 +22,7 @@ small{font-size:.82rem}
   backdrop-filter:var(--nx-backdrop);
   -webkit-backdrop-filter:var(--nx-backdrop);
 }
-.app .card::before{content:none}
+body .app .card::before{content:none}
 .app [data-ui-surface="section"]{
   min-width:0;
   padding:var(--nx-section-pad);
@@ -60,7 +60,7 @@ dialog [data-ui-surface="item"]{
 }
 
 /* Shell */
-.app>aside{
+body .app>aside[data-ui-surface="panel"]{
   background:color-mix(in srgb,var(--nx-panel-bg) 90%,transparent);
   border-right-color:var(--nx-border);
   backdrop-filter:var(--nx-backdrop);
