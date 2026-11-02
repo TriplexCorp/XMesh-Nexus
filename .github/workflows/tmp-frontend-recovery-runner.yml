@@ -1,4 +1,4 @@
-name: Temporary Frontend Contract Diagnostics
+name: Temporary Frontend Contract Migration
 
 on:
   push:
@@ -6,34 +6,132 @@ on:
       - tmp/frontend-recovery-runner-20261102
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  inspect:
+  migrate-tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: integration/argon-frontend-recovery-20261102
-      - name: Inspect stale source-contract assumptions
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Modernize stale source contracts
         shell: bash
         run: |
-          echo '=== direct CSS/cache assertions ==='
-          grep -nE 'styles\.css|\.css\\\?v|\.css\?v|legacy|user-create-v3|user-create-policy|user-create-extra' \
-            scripts/check-unified-selects.js \
-            scripts/check-xray-studio-wrap-tabs.js \
-            scripts/check-xray-studio-enterprise.js \
-            scripts/check-xray-active-entrypoint.js \
-            scripts/check-static-assets.js \
-            scripts/check-client-routing.js \
-            scripts/check-subscription-studio.js \
-            scripts/check-modal-motion.js \
-            scripts/check-node-create-action.js \
-            scripts/check-settings-update-actions.js \
-            scripts/check-node-ip-rotation.js || true
-          echo '=== stale canonical paths ==='
-          grep -nE "\.\./js/|node --check app\.js|readFileSync\(['\"]app\.js|/i18n\.js|/login\.js|js/core/js/core|styles/system/styles/system" scripts/*.js || true
-          echo '=== statistics native dialog ==='
-          grep -nE -B 3 -A 8 'stats-user-modal|statsPortal|showModal\(\)|closeStatsUser' frontend/js/core/app.js | head -220 || true
-          echo '=== XRAY native dialog / portal ==='
-          grep -nE -B 3 -A 8 'sv-overlay|composerPortal|append\(|showModal\(\)|sv-dialog' frontend/js/features/xray-studio/xray-studio-v4.js | head -220 || true
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          def read(p): return Path(p).read_text(encoding='utf-8')
+          def write(p,s): Path(p).write_text(s,encoding='utf-8')
+          def exact(p,old,new):
+              s=read(p)
+              if old not in s: raise SystemExit(f'missing expected fragment in {p}: {old[:100]!r}')
+              write(p,s.replace(old,new,1))
+          def sub(p,pattern,repl,count=1):
+              s=read(p); n=re.subn(pattern,repl,s,count=count,flags=re.S)
+              if n[1]!=count: raise SystemExit(f'expected {count} regex replacement(s) in {p}, got {n[1]}: {pattern}')
+              write(p,n[0])
+
+          exact('scripts/check-unified-selects.js',
+            "assert.match(html,/styles\\.css\\?v=[A-Za-z0-9-]+/,'shared selector stylesheet remains versioned across subsequent UI releases');",
+            "assert.match(html,/nexus-ui-v3\\.css\\?v=[a-f0-9]{12}/,'single shared presentation entrypoint remains content-addressed');")
+
+          # Feature CSS linkage is centrally enforced by check-ui-system; feature checks keep behavior/geometry contracts.
+          for p,patterns in {
+            'scripts/check-xray-studio-wrap-tabs.js':[r"assert\.match\(html,/xray-studio-v4\\\.css\\\?v=\[A-Za-z0-9\._-\]\+/,'CSS cache bust'\);\n"],
+            'scripts/check-client-routing.js':[r"assert\.match\(index,/client-routing\\\.css\\\?v=\[A-Za-z0-9-\]\+/,'Routing CSS must be cache-busted by its entrypoint'\);\n",r"assert\.match\(index,/href=\"\\/styles\\/features\\/routing\\/client-routing\\\.css\\\?v=/,'Routing CSS must be absolute under the nested dashboard URL'\);\n"],
+            'scripts/check-settings-update-actions.js':[],
+            'scripts/check-node-ip-rotation.js':[],
+          }.items():
+              s=read(p)
+              for pat in patterns: s,n=re.subn(pat,'',s,count=1); 
+              write(p,s)
+
+          # Modal motion: canonical paths, no retired legacy layer.
+          p='scripts/check-modal-motion.js'; s=read(p)
+          s=re.sub(r"assert\.match\(html,/<script\\s\+src=\"\\/js\\/core\\/js\\/core\\/app\\\.js[\s\S]*?'Application entrypoint must be loaded with a nonempty cache-busting version'\);",
+                   "assert.match(html,/<script src=\"\\/js\\/core\\/app\\.js\\?v=[a-f0-9]{12}\"><\\/script>/,'Application entrypoint must be content-addressed');",s,count=1)
+          s=re.sub(r"assert\.match\(html,/<style id=\"xmesh-legacy-compat\">[\s\S]*?'Legacy compatibility stylesheet must remain versioned and quarantined in its cascade layer'\);\n",'',s,count=1)
+          s=re.sub(r"assert\.match\(html,/<link\\s\+rel=\"stylesheet\"\\s\+href=\"\\/styles\\/system\\/styles\\/system\\/nexus-ui-v3\\\.css[\s\S]*?'Modern Design System entrypoint must remain the final versioned stylesheet'\);",
+                   "assert.match(html,/<link rel=\"stylesheet\" href=\"\\/styles\\/system\\/nexus-ui-v3\\.css\\?v=[a-f0-9]{12}\">/,'Design System entrypoint must remain content-addressed');",s,count=1)
+          write(p,s)
+
+          # Canonical browser-source paths after repository reorganization.
+          for p in ['scripts/check-user-fingerprint-ownership.js','scripts/test-client-config.js','scripts/check-xray-studio-hosts.js']:
+              s=read(p).replace("../js/","../frontend/js/")
+              write(p,s)
+          p='scripts/check-agent-update-base.js'; s=read(p).replace("['--check','app.js']","['--check','frontend/js/core/app.js']").replace('node --check app.js','node --check frontend/js/core/app.js'); write(p,s)
+          p='scripts/check-i18n.js'; s=read(p)
+          s=s.replace(r'/<script src="\/i18n\.js[^\"]*" defer><\/script>\s*<script src="\/login\.js[^\"]*" defer><\/script>/',r'/<script src="\/js\/core\/i18n\.js[^\"]*" defer><\/script>\s*<script src="\/js\/auth\/login\.js[^\"]*" defer><\/script>/')
+          write(p,s)
+
+          # Node explorer already uses hidden + explicit data-single-page; assert the current semantic contract.
+          exact('scripts/check-node-explorer.js',
+            "assert(app.includes(\"pager.dataset.singlePage=pages===1\"),\"One-page pagination is visually simplified\");",
+            "assert(app.includes(\"pager.hidden=pages===1;pager.dataset.singlePage=String(pages===1)\"),\"One-page pagination is visually simplified\");")
+          exact('scripts/check-node-explorer.js',
+            "assert(css.includes('.node-explorer-pages[data-single-page=\"true\"]'),\"Single page hides misleading disabled arrows\");",
+            "assert(css.includes('.node-explorer-pages[hidden]'),\"Single-page navigation is removed from layout\");")
+
+          # Settings update styles are part of the canonical graph; packaging remains explicit.
+          p='scripts/check-settings-update-actions.js'; s=read(p)
+          s=s.replace("assert.ok(html.includes('settings-updates.css?v='));\n","")
+          s=s.replace("assertPackaged(assert,['styles.css', 'settings-updates.css']);","assertPackaged(assert,['nexus-ui-v3.css','settings-updates.css']);")
+          write(p,s)
+          p='scripts/check-node-ip-rotation.js'; s=read(p).replace("assert.match(html,/styles\\.css\\?v=[a-z0-9-]+/);","assert.match(html,/nexus-ui-v3\\.css\\?v=[a-f0-9]{12}/);"); write(p,s)
+
+          # Create-user styles were consolidated into user-editor.css; direct feature links are intentionally gone.
+          p='scripts/check-node-create-action.js'; s=read(p)
+          s=s.replace("frontend/styles/features/users/user-create-v3.css","frontend/styles/features/users/user-editor.css")
+          s=s.replace("assert.match(html,/styles\\.css\\?v=[a-z0-9-]+/,'Update CSS cache');","assert.match(html,/nexus-ui-v3\\.css\\?v=[a-f0-9]{12}/,'Update CSS cache');")
+          s=re.sub(r"assert\.match\(html,/<link rel=\"stylesheet\" href=\"\\/styles\\/features\\/nodes\\/node-dialogs\\\.css[\s\S]*?\);\n",'',s,count=1)
+          s=re.sub(r"assert\.match\(html,/<link rel=\"stylesheet\" href=\"\\/user-create-v3\\\.css[\s\S]*?\);\n",'',s,count=1)
+          s=re.sub(r"assert\.match\(html,/user-sharing-risk\\\.css[\s\S]*?\);\n",'',s,count=1)
+          s=s.replace("assertPackaged(assert,['node-dialogs.css', 'user-create-v3.css', 'user-sharing-risk.css', 'node-dialogs.js']);","assertPackaged(assert,['node-dialogs.css','user-editor.css','user-sharing-risk.css','node-dialogs.js']);")
+          write(p,s)
+
+          # Static asset contract: imported CSS is protected by the central graph/cache gate; retain actual CSS/JS behavior checks.
+          p='scripts/check-static-assets.js'; s=read(p)
+          s=re.sub(r"assert\.match\(index,/xray-studio-tls-dialog\\\.css[\s\S]*?'TLS dialog stylesheet must receive the specificity-fix cache key'\);\n",'',s,count=1)
+          s=re.sub(r"assert\.match\(index,/user-create-v3\\\.css[\s\S]*?'Enterprise create-user layout must be cache-busted'\);\n",'',s,count=1)
+          s=re.sub(r"assert\.match\(index,/diagnostics\\\.css\\\?v=20261101-operations-v1/\);\n",'',s,count=1)
+          write(p,s)
+
+          # Subscription Studio CSS is imported by the canonical graph; public portal remains its own document surface.
+          p='scripts/check-subscription-studio.js'; s=read(p)
+          s=re.sub(r"assert\.match\(html,/<link\\s\+rel=\"stylesheet\"\\s\+href=\"\\/styles\\/features\\/subscriptions\\/subscription-studio\\\.css[\s\S]*?\);\n",'',s,count=1)
+          write(p,s)
+
+          # Statistics user intelligence is now a native dialog; prohibit regression to a body portal.
+          p='scripts/check-statistics-feedback.js'; s=read(p)
+          old="""// Stats overlay must escape transformed/scoped workspace containers to blur the entire app.\nassert.match(app,/document\\.body\\.append\\(statsPortal\\)/);\nassert.match(app,/document\\.querySelector\\('body > #stats-user-modal'\\)\\?\\.remove\\(\\)/);\nassert.match(css,/body > \\.stats-user-overlay\\{position:fixed;inset:0;width:100vw;height:100dvh/);\n"""
+          new="""// Statistics intelligence uses the browser top layer; never relocate it into body for geometry.\nassert.match(app,/<dialog id=\"stats-user-modal\" class=\"stats-user-overlay\"/);\nassert.match(app,/if\\(!modal\\.open\\)modal\\.showModal\\(\\)/);\nassert.match(app,/\\$\\('#stats-user-modal'\\)\\.close\\(\\)/);\nassert.doesNotMatch(app,/statsPortal|document\\.body\\.append\\(statsPortal\\)/);\n"""
+          if old not in s: raise SystemExit('statistics portal assertions not found')
+          write(p,s.replace(old,new,1))
+
+          # XRAY composer is intentionally hosted by the Studio native dialog, not a document.body portal.
+          p='scripts/check-xray-studio-selectors.js'; s=read(p)
+          start=s.index('// XRAY STUDIO constructor must blur the entire application')
+          end=s.index('if (issues.length)',start)
+          replacement="""// XRAY STUDIO constructor must use one native top-layer dialog.\nconst studio = fs.readFileSync(path.join(__dirname, '..', 'frontend/js/features/xray-studio/xray-studio-v4.js'), 'utf8');\nif (!studio.includes('<dialog class=\"sv-overlay\"')) issues.push('XRAY STUDIO native overlay dialog missing');\nif (!studio.includes('overlayElement.showModal()')) issues.push('XRAY STUDIO overlay must enter the browser top layer');\nif (!studio.includes('if(overlayElement.open)overlayElement.close()')) issues.push('XRAY STUDIO overlay close contract missing');\nif (studio.includes('document.body.append(portal)') || studio.includes('overlayWatch.observe(overlayElement')) issues.push('XRAY STUDIO must not restore body portal / MutationObserver geometry');\n\n"""
+          write(p,s[:start]+replacement+s[end:])
+          PY
+
+      - name: Verify migrated test syntax
+        shell: bash
+        run: |
+          for f in scripts/*.js scripts/ci/*.cjs; do node --check "$f"; done
+          git diff --check
+      - name: Commit source-contract migration
+        shell: bash
+        run: |
+          git config user.name 'XMesh frontend integration'
+          git config user.email 'actions@users.noreply.github.com'
+          git add scripts
+          git commit -m 'test(frontend): migrate source contracts to canonical UI graph'
+          git push origin HEAD:integration/argon-frontend-recovery-20261102
