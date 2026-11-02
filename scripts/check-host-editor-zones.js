@@ -48,9 +48,19 @@ const desktopEnd=css.indexOf('@media (max-width:1260px)',css.indexOf('.host-edit
 assert(desktopEnd>0,'Host editor must define a 1260px responsive boundary');
 const desktopCss=css.slice(css.indexOf('.host-editor-layout {'),desktopEnd);
 assert(!desktopCss.includes('"overrides overrides"'),'No separate overrides row on desktop');
-assert.match(css,/dialog\.host-wide>form\.box>\.act\s*\{[\s\S]*?position:static[\s\S]*?z-index:auto/,
+
+// The real outer workspace must outrank generic small-dialog fallbacks. Static
+// checks previously validated only the inner three-column grid, which allowed a
+// valid grid to be rendered inside a 30rem shell.
+assert.match(css,/#dlg\.host-wide\s*\{[\s\S]*?width:min\(var\(--dialog-width\),calc\(100vw - 2rem\)\)[\s\S]*?min-inline-size:min\(72rem,calc\(100vw - 2rem\)\)/,
+ 'Host editor must own a workstation-sized outer dialog');
+assert.match(css,/#dlg\.host-wide>form\.box\s*\{[\s\S]*?display:grid[\s\S]*?grid-template-rows:auto minmax\(0,1fr\) auto auto[\s\S]*?overflow:hidden/,
+ 'Host dialog shell must reserve a shrinkable body between header and footer');
+assert.match(css,/#dlg\.host-wide>form\.box>\.host-editor-layout\s*\{[\s\S]*?min-height:0[\s\S]*?overflow:auto/,
+ 'Host editor workspace must own vertical scrolling instead of the whole form');
+assert.match(css,/#dlg\.host-wide>form\.box>\.act\s*\{[\s\S]*?position:static[\s\S]*?z-index:auto/,
  'Host editor footer must stay in normal flow and never cover fields');
-assert.doesNotMatch(css,/dialog\.host-wide>form\.box>\.act\s*\{[^}]*!important/,
+assert.doesNotMatch(css,/#dlg\.host-wide>form\.box>\.act\s*\{[^}]*!important/,
  'Host editor footer must not rely on specificity escalation');
 assert.match(css,/@media \(max-width:1260px\)[\s\S]*?grid-template-areas:"primary preview" "overrides overrides"/,
  'Medium viewports must reflow the three zones without overlap');
@@ -58,4 +68,13 @@ assert.match(css,/@media \(max-width:760px\)[\s\S]*?grid-template-areas:"primary
  'Small screens must stack all three zones');
 assert.match(css,/@media \(max-width:440px\)[\s\S]*?\.host-connect-fields\s*\{[\s\S]*?grid-template-columns:minmax\(0,1fr\)/,
  'Phone layout must keep host fields usable');
-console.log('Host editor: three horizontal zones, all inputs, actions and safe footer OK');
+
+// User details must be content-sized. A minimum shell height plus fixed canvas
+// height created a large empty lower half even though all controls were visible.
+assert.match(css,/#dlg\.user-modal\s*\{[\s\S]*?min-height:0[\s\S]*?height:auto/,
+ 'User details dialog must not force an artificial minimum height');
+assert.match(css,/#dlg\.user-modal>\.user-canvas\s*\{[\s\S]*?block-size:auto[\s\S]*?display:flex[\s\S]*?flex-direction:column/,
+ 'User details canvas must grow naturally and shrink only at the viewport boundary');
+assert.match(css,/#dlg\.user-modal \.user-canvas-grid\s*\{[\s\S]*?flex:0 1 auto[\s\S]*?overflow:auto/,
+ 'User details body must be the shrinkable scroll owner');
+console.log('Workspace dialogs: host width/body/footer, responsive zones and user details content sizing OK');

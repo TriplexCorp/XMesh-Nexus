@@ -1,0 +1,78 @@
+/* Canonical workspace-dialog geometry.
+ *
+ * Large editors use one shell contract: a bounded native dialog, a fixed header,
+ * exactly one scrollable workspace body, and a footer that always remains in the
+ * viewport. Feature styles may own the body layout, but must not make the whole
+ * form the scroll owner or push actions below the screen. */
+
+#dlg.host-wide{
+  --dialog-width:96rem;
+  width:min(var(--dialog-width),calc(100vw - 2rem));
+  inline-size:min(var(--dialog-width),calc(100vw - 2rem));
+  min-width:min(72rem,calc(100vw - 2rem));
+  min-inline-size:min(72rem,calc(100vw - 2rem));
+  max-width:calc(100vw - 2rem);
+  max-inline-size:calc(100vw - 2rem);
+  max-height:calc(100dvh - 2rem);
+  max-block-size:calc(100dvh - 2rem);
+  min-height:0;
+  overflow:hidden;
+}
+
+#dlg.host-wide>form.box{
+  box-sizing:border-box;
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  grid-template-rows:auto minmax(0,1fr) auto auto;
+  block-size:min(52rem,calc(100dvh - 2rem));
+  height:min(52rem,calc(100dvh - 2rem));
+  min-height:0;
+  max-block-size:calc(100dvh - 2rem);
+  max-height:calc(100dvh - 2rem);
+  overflow:hidden;
+  overscroll-behavior:contain;
+}
+
+#dlg.host-wide>form.box>.host-editor-layout{
+  min-height:0;
+  max-height:100%;
+  overflow:auto;
+  overscroll-behavior:contain;
+  scrollbar-gutter:stable;
+  align-items:start;
+}
+
+#dlg.host-wide>form.box>#fe{
+  min-height:0;
+  margin:0;
+}
+
+#dlg.host-wide>form.box>.act{
+  position:static;
+  inset:auto;
+  z-index:auto;
+  flex:0 0 auto;
+  margin:0;
+  padding:11px 0 0;
+  border-top:1px solid var(--nx-border);
+  background:var(--nx-dialog-bg);
+}
+
+@media(max-width:760px){
+  #dlg.host-wide{
+    min-width:0;
+    min-inline-size:0;
+    width:calc(100vw - 1rem);
+    inline-size:calc(100vw - 1rem);
+    max-width:calc(100vw - 1rem);
+    max-inline-size:calc(100vw - 1rem);
+    max-height:calc(100dvh - 1rem);
+    max-block-size:calc(100dvh - 1rem);
+  }
+  #dlg.host-wide>form.box{
+    block-size:calc(100dvh - 1rem);
+    height:calc(100dvh - 1rem);
+    max-block-size:calc(100dvh - 1rem);
+    max-height:calc(100dvh - 1rem);
+  }
+}
