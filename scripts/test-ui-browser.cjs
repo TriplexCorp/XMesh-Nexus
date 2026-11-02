@@ -67,7 +67,7 @@ async function geometry(page) {
     const top = document.querySelector('.top');
     const root = document.documentElement;
     return {
-      viewport:{width:innerWidth,height:innerHeight},scrollWidth:root.scrollWidth,
+      viewport:{width:innerWidth,height:innerHeight},rootFont:parseFloat(getComputedStyle(root).fontSize),scrollWidth:root.scrollWidth,
       view:view && box(view),top:top && box(top),outside,columns,nodeCards,ranges,
       cards:[...(view?.querySelectorAll('.card') || [])].map(box),
       dialog:dialog && box(dialog),
@@ -98,7 +98,8 @@ function verifyPage(g, route) {
   }
   if (route === 'nodes' && g.nodeCards.length === 1) {
     assert(g.nodeCards[0].y - g.view.y < 230, 'Toolbar и счётчик занимают слишком много высоты перед одним узлом.');
-    assert(g.nodeCards[0].width > g.view.width * .7, 'Единственный узел остался узким островком.');
+    assert(g.nodeCards[0].width >= Math.min(g.view.width,g.rootFont*52)-1, 'Единственный узел стал слишком узким для рабочей композиции.');
+    assert(g.nodeCards[0].width <= g.rootFont*76+1, 'Единственный узел снова растягивается на ultrawide.');
   }
 }
 
@@ -184,7 +185,7 @@ async function main() {
         const sharedShadow=getComputedStyle(shadowProbe).boxShadow;shadowProbe.remove();
         const expectedIcon=name=>{const template=document.createElement('template');template.innerHTML=ic(name);return template.content.firstElementChild.innerHTML};
         const icons=['link','redo','dl','refresh-cw','globe','git-branch','pause','pen','server'];
-        return {card:box(card),container:box(card.parentElement),body:box(q('.node-body')),summary:box(q('.node-summary')),metrics:box(q('.node-metrics')),
+        return {rem:parseFloat(getComputedStyle(document.documentElement).fontSize),mode:card.parentElement.dataset.gridMode,card:box(card),container:box(card.parentElement),body:box(q('.node-body')),summary:box(q('.node-summary')),metrics:box(q('.node-metrics')),
           primary:all('.kvg>div').map(box),kpis:all('.ngauge').map(box),speed:box(q('.node-speed')),speedBar:box(q('.node-speed .pb')),actions:box(q('.acts')),buttons:all('.acts>button').map(box),
           iconMatches:all('.acts>button').map((button,i)=>button.querySelector('svg')?.innerHTML===expectedIcon(icons[i])),
           shield:q('[data-node-tls-status] svg')?.innerHTML===expectedIcon('shield'),hosting:q('.node-hosting svg')?.innerHTML===expectedIcon('building-2'),
@@ -192,7 +193,9 @@ async function main() {
           shadow:getComputedStyle(card).boxShadow,sharedShadow,divider:getComputedStyle(q('.node-summary')).borderRightWidth,
           primaryDivider:getComputedStyle(q('.kvg>div+div')).borderLeftWidth};
       });
-      assert(g.card.width>=g.container.width*.94,'Single node must fill the workspace');
+      const cap={compact:60,standard:68,spacious:76}[g.mode]*g.rem;
+      assert(Math.abs(g.card.width-Math.min(g.container.width,cap))<=2,'Single-node width must follow density cap');
+      assert(Math.abs((g.card.x-g.container.x)-(g.container.width-g.card.width)/2)<=2,'Bounded card must stay centered');
       assert(g.summary.x<g.metrics.x);
       assert(g.summary.width/g.body.width>=.35&&g.summary.width/g.body.width<=.45,'Summary must occupy 35–45%');
       assert(g.metrics.width/g.body.width>=.55&&g.metrics.width/g.body.width<=.65,'Telemetry must occupy 55–65%');
@@ -595,6 +598,45 @@ async function main() {
     });
 
     await create('nodes',{name:`${prefix} · Берлин`,addr:'192.0.2.11',port:443,profileId:profile.id});
+    await checked('Two nodes: bounded cards/actions and global radius on ultrawide',async()=>{
+      await page.setViewportSize({width:3440,height:1440});
+      await navigate('set');
+      await page.locator('#content-width').evaluate(el=>{el.value='3000';el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}))});
+      await page.reload({waitUntil:'domcontentloaded'});
+      await navigate('nodes');
+      const widths={};
+      for(const [mode,cap] of [['compact',60],['standard',68],['spacious',76]]){
+        await page.locator(`[data-node-grid-mode="${mode}"]`).click();
+        const state=await page.locator('.nodes').evaluate(grid=>{
+          const box=el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,width:r.width}};
+          return {rem:parseFloat(getComputedStyle(document.documentElement).fontSize),cards:[...grid.children].map(card=>({box:box(card),buttons:[...card.querySelectorAll('.acts>button')].map(box)}))};
+        });
+        for(const card of state.cards){
+          assert(Math.abs(card.box.width-cap*state.rem)<=2,'Card must stop at its density width cap');
+          assert(card.buttons.slice(0,4).every(b=>Math.abs(b.y-card.buttons[0].y)<=3),'Narrower card must preserve four action columns');
+          assert(card.buttons.slice(0,8).every(b=>b.width<card.box.width*.27),'Inner actions must narrow with the card');
+        }
+        if(mode!=='spacious')assert(state.cards[1].box.x-state.cards[0].box.right<=40,'Bounded cards must not leave an oversized internal gap');
+        widths[mode]=state.cards[0].box.width;
+        await screenshot(page,`nodes-two-3440-${mode}`);
+      }
+      assert(widths.compact<widths.standard&&widths.standard<widths.spacious,'Density must change actual card width');
+      const radii=[];
+      for(const radius of [6,28]){
+        await navigate('set');
+        await page.locator('#radius').evaluate((el,value)=>{el.value=String(value);el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}))},radius);
+        await navigate('nodes');
+        const actual=await page.locator('.nc').first().evaluate(card=>({card:parseFloat(getComputedStyle(card).borderTopLeftRadius),button:parseFloat(getComputedStyle(card.querySelector('.acts>button')).borderTopLeftRadius)}));
+        assert.equal(actual.card,radius);assert.equal(actual.button,radius);radii.push(actual);
+      }
+      await navigate('set');
+      await page.locator('#radius').evaluate(el=>{el.value='16';el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}))});
+      await page.locator('#content-width').evaluate(el=>{el.value='1920';el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}))});
+      await navigate('nodes');
+      await page.locator('[data-node-grid-mode="standard"]').click();
+      return {widths,radii};
+    });
+
     await create('nodes',{name:`${prefix} · Амстердам`,addr:'192.0.2.12',port:443,profileId:profile.id});
     await page.reload({waitUntil:'domcontentloaded'});
     await page.waitForFunction(() => !!document.querySelector('#view')?.children.length && !document.querySelector('#view .sk'));

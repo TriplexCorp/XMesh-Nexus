@@ -18,20 +18,17 @@ assert.doesNotMatch(workspaces,/min-height\s*:\s*(?:\d+vh|[4-9]\d{2}px)/,'Cards 
 assert.match(app,/node-summary/,'Node operational summary has explicit anatomy');
 assert.match(app,/node-metrics/,'Node metrics have explicit anatomy');
 
-/* Density must change real rendered geometry, especially for the common
- * two-node fleet shown in production. A dataset toggle alone is not enough. */
-assert.match(workspaces,/\.nodes\[data-node-count="1"\]\[data-grid-mode=compact\],[\s\S]*?\.nodes\[data-node-count="1"\]\[data-grid-mode=standard\],[\s\S]*?\.nodes\[data-node-count="1"\]\[data-grid-mode=spacious\]\{grid-template-columns:minmax\(0,1fr\)\}/,
-  'A single node must use the full management canvas in every density mode');
-assert.match(workspaces,/\.nodes\[data-node-count="2"\]\[data-grid-mode=compact\],[\s\S]*?\.nodes\[data-node-count="2"\]\[data-grid-mode=standard\]\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)\}/,
-  'Compact and Standard keep a two-card fleet row');
-assert.match(workspaces,/\.nodes\[data-node-count="2"\]\[data-grid-mode=spacious\]\{grid-template-columns:minmax\(0,1fr\)\}/,
-  'Spacious must become a deliberate single-column concept layout for two nodes');
-assert.match(workspaces,/\.nodes\[data-node-count="3"\]\[data-grid-mode=compact\]\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\)\}/,
-  'Three-node Compact must expose three columns');
-assert.match(workspaces,/\.nodes\[data-node-count="3"\]\[data-grid-mode=standard\]\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)\}/,
-  'Three-node Standard must expose fewer columns than Compact');
-assert.match(workspaces,/\.nodes\[data-node-count="3"\]\[data-grid-mode=spacious\]\{grid-template-columns:minmax\(0,1fr\)\}/,
-  'Three-node Spacious must preserve the wide concept composition');
+/* Density changes track count and caps card width without overriding radius. */
+for(const [mode,cap] of [['compact',60],['standard',68],['spacious',76]]){
+ assert(workspaces.includes(`.nodes[data-node-count="1"][data-grid-mode=${mode}]{grid-template-columns:minmax(0,${cap}rem)}`));
+ const columns=mode==='spacious'?1:2;
+ const tracks=columns===1?`minmax(0,${cap}rem)`:`repeat(2,minmax(0,${cap}rem))`;
+ assert(workspaces.includes(`.nodes[data-node-count="2"][data-grid-mode=${mode}]{grid-template-columns:${tracks}}`));
+}
+assert.match(workspaces,/justify-content:center/,'Bounded tracks remain grouped');
+assert.match(workspaces,/\.nodes\[data-node-count="3"\]\[data-grid-mode=compact\]\{grid-template-columns:repeat\(3,/);
+assert.match(workspaces,/\.nodes\[data-node-count="3"\]\[data-grid-mode=standard\]\{grid-template-columns:repeat\(2,/);
+assert.doesNotMatch(workspaces,/--(?:ui|nx)-(?:card-|control-)?radius\s*:/,'Nodes must not override global radius settings');
 /* The DOM owns the two-zone body, independent of fleet track placement. */
 assert.match(app,/class="node-body"><div class="node-summary"/);
 assert.match(workspaces,/\.node-body\{grid-template-columns:minmax\(0,2fr\) minmax\(0,3fr\)/);
