@@ -3,7 +3,9 @@
  * The historical styles.css and feature styles load before this file. This
  * entrypoint is the only global design layer allowed after feature CSS.
  * New global presentation rules belong in one of the three v3 modules below.
+ * Cache keys are the first 12 characters of each module's Git blob SHA; CI
+ * verifies them so a changed architecture module cannot reuse stale browser CSS.
  */
-@import url("./nexus-v3-foundation.css?v=20261102-v3-1");
-@import url("./nexus-v3-components.css?v=20261102-v3-1");
-@import url("./nexus-v3-layout.css?v=20261102-v3-1");
+@import url("./nexus-v3-foundation.css?v=779e67d53681");
+@import url("./nexus-v3-components.css?v=09657a27abc3");
+@import url("./nexus-v3-layout.css?v=22872b99f469");
