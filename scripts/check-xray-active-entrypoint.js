@@ -1,18 +1,24 @@
 #!/usr/bin/env node
 'use strict';
 const fs=require('node:fs');
-const {frontendAsset,assertPackaged}=require('./ci/frontend-source.cjs');
+const {frontendAsset,assertPackaged,panelStyles}=require('./ci/frontend-source.cjs');
 const assert=require('node:assert/strict');
 const read=p=>fs.readFileSync(p,'utf8');
 const html=read('frontend/index.html'),app=read('frontend/js/core/app.js'),docker=read('backend/Dockerfile'),security=read('backend/src/security.rs');
-const active=['xray-studio-v4.js','xray-studio-v4.css','xray-studio-tools.js','xray-studio-composer.js'];
-for(const name of active){
+const activeJs=['xray-studio-v4.js','xray-studio-tools.js','xray-studio-composer.js'];
+for(const name of activeJs){
  assert(fs.existsSync(frontendAsset(name)),'Active XRAY STUDIO asset missing: '+name);
- assert(html.includes(name+'?v='),'HTML does not load active asset: '+name);
+ assert.match(html,new RegExp(name.replaceAll('.', '\\.')+'\\?v=[a-f0-9]{12}'),'HTML does not load content-addressed active asset: '+name);
  assertPackaged(assert,[name]);
 }
+const activeCss='xray-studio-v4.css';
+assert(fs.existsSync(frontendAsset(activeCss)),'Active XRAY STUDIO asset missing: '+activeCss);
+assertPackaged(assert,[activeCss]);
+assert.doesNotMatch(html,/<link[^>]+xray-studio-v4\.css/,
+ 'XRAY STUDIO CSS must stay behind the canonical panel stylesheet entrypoint');
+assert.match(panelStyles(),/\.sv-studio\{/,
+ 'XRAY STUDIO CSS must be reachable from the canonical panel stylesheet graph');
 assert(html.includes('src="/js/features/xray-studio/xray-studio-v4.js'),'Unexpected Studio entrypoint');
-assert(html.includes('href="/styles/features/xray-studio/xray-studio-v4.css'),'Unexpected Studio stylesheet');
 assert(html.indexOf('xray-studio-tools.js')<html.indexOf('xray-studio-v4.js'),'Tools must load before studio');
 assert(html.indexOf('xray-studio-composer.js')<html.indexOf('xray-studio-v4.js'),'Composable config engine must load before Studio');
 assert(app.includes('window.XMeshStudioV4.view()')&&app.includes('window.XMeshStudioV4.mount'),'App must mount V4');
@@ -26,5 +32,5 @@ const studio=read('frontend/js/features/xray-studio/xray-studio-v4.js');
 assert(studio.includes('window.XMeshStudioV4='),'V4 export missing');
 assert(studio.includes('data-xm="manual"'),'JSON Tools integration missing');
 assert(!studio.includes('data-field="uuid"'),'Studio must not edit client UUID');
-for(const name of ['xray-studio-v4.js','xray-studio-tools.js','xray-studio-composer.js'])new Function(fs.readFileSync(frontendAsset(name),'utf8'));
-console.log('XRAY STUDIO V4 asset entrypoint, Docker packaging and mount chain: OK');
+for(const name of activeJs)new Function(fs.readFileSync(frontendAsset(name),'utf8'));
+console.log('XRAY STUDIO V4 asset entrypoint, canonical CSS graph, Docker packaging and mount chain: OK');
