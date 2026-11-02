@@ -34,20 +34,16 @@
     return count;
   };
 
-  const register=(selector,role)=>{
-    if(!selector||!roles.has(role))return false;
-    if(!registry.some(entry=>entry.selector===selector&&entry.role===role))registry.push({selector,role});
-    applyRegistry(document,selector,role);
-    return true;
-  };
-
   const classifySemantic=(root=document)=>{
     let count=0;
     const visit=node=>{
       if(!(node instanceof Element)||node.hasAttribute(ROLE_ATTR))return;
       if(node.matches('dialog .box,dialog form.box'))count+=setRole(node,'dialog')?1:0;
       else if(node.matches('.card'))count+=setRole(node,'panel')?1:0;
-      else if(node.matches('section')&&!node.closest('dialog'))count+=setRole(node,'section')?1:0;
+      /* Direct children of .view are page-composition roots, not material
+       * surfaces. Treating a root <section> as a section surface wraps the
+       * whole workspace in one giant card and defeats page-owned layout. */
+      else if(node.matches('section')&&!node.closest('dialog')&&!node.parentElement?.matches('.view'))count+=setRole(node,'section')?1:0;
       else if(node.matches('.squad-preview-stat,.stat,[class*="-kpi"],[class~="kpi"]'))count+=setRole(node,'metric')?1:0;
     };
     if(root instanceof Element)visit(root);

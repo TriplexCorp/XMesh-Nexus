@@ -87,10 +87,11 @@ assert.match(layout,/\[data-ui-layout="empty"\]/,'Empty-state geometry missing')
 assert.match(layout,/\[data-ui-layout="editor"\],\[data-ui-layout="canvas"\]/,'Purposeful editor/canvas exception missing');
 assert.match(layout,/\.appearance-layout\{[\s\S]*grid-template-columns:minmax\(0,1\.06fr\) minmax\(28rem,\.94fr\)/,'Settings must use balanced full-width desktop columns');
 assert.match(layout,/\.appearance-layout>\.appearance-column>\.card:nth-child\(n\)\{grid-area:auto\}/,'Settings must explicitly clear legacy implicit-grid placement');
-assert.match(layout,/body \.app \.nodes-page\.card,[\s\S]*background:transparent/,'Nodes outer shell must not become a giant enclosing card');
+assert.match(layout,/body \.app \.nodes-page\.card,[\s\S]*\.nodes-page\[data-ui-surface="section"\][\s\S]*background:transparent/,'Nodes page root must stay material-free even if legacy hydration marked it as a section surface');
 assert.match(layout,/\.nodes-page\{[\s\S]*container:nodes-grid \/ inline-size/,'Nodes fleet composition must be owned by v3 container queries');
-assert.match(layout,/\.nodes-page>\.nodes\[data-node-count="1"\]>\.nc\{[\s\S]*grid-template-columns:minmax\(18rem,\.72fr\) minmax\(30rem,1\.28fr\)/,'Single-node card must use deliberate wide composition');
-assert.match(layout,/\.nodes-page>\.nodes\[data-node-count="1"\]>\.nc\{[\s\S]*max-width:none/,'Single-node card must not inherit a narrow fleet cap');
+assert.match(layout,/body \.app \.nodes-page>\.nodes\[data-node-count="1"\]\[data-grid-mode\]\{grid-template-columns:minmax\(0,1fr\)\}/,'Single-node fleet width must outrank legacy density-specific caps');
+assert.match(layout,/body \.app \.nodes-page>\.nodes\[data-node-count="1"\]>\.nc\{[\s\S]*grid-template-columns:minmax\(18rem,\.72fr\) minmax\(30rem,1\.28fr\)/,'Single-node card must use deliberate wide composition');
+assert.match(layout,/body \.app \.nodes-page>\.nodes\[data-node-count="1"\]>\.nc\{[\s\S]*max-width:none/,'Single-node card must not inherit a narrow fleet cap');
 assert.match(layout,/dialog#dlg\.node-wide[\s\S]*100dvh - 48px/,'Node editor viewport safety must live in v3 layout');
 
 for(const role of ['panel','dialog','section','metric','item','floating']){
@@ -103,6 +104,7 @@ assert.match(builder,/new MutationObserver/,'Dynamic SPA surfaces must be hydrat
 assert.match(builder,/window\.XMeshUIBuilder/,'Builder must expose the shared runtime API');
 assert.match(builder,/classifyCollections/,'Builder must classify low-count collections');
 assert.match(builder,/classifyToolbar/,'Builder must classify toolbars');
+assert.match(builder,/!node\.parentElement\?\.matches\('\.view'\)/,'Builder must not turn direct page-composition sections into material surfaces');
 assert.doesNotMatch(builder,/getBoundingClientRect/,'Runtime builder must not measure geometry');
 assert.doesNotMatch(builder,/composeNodes/,'Runtime builder must not contain page-specific Nodes composition');
 assert.doesNotMatch(builder,/createElement\(['"]div['"]\)/,'Runtime builder must not create presentation wrappers');
