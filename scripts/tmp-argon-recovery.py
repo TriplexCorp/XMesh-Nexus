@@ -89,3 +89,16 @@ if old not in text and new not in text:
     raise SystemExit('browser CI env block drifted')
 text = text.replace(old, new, 1)
 ci.write_text(text, encoding='utf-8')
+
+check = Path('scripts/check-node-create-action.js')
+text = check.read_text(encoding='utf-8')
+replacements = [
+    ('assert.match(app, /<div class="bar2 nodes-toolbar"><p class="note">/,', 'assert.match(app, /<div class="nodes-toolbar" data-ui-toolbar="filters" role="search"/,'),
+    ('assert.match(html,/<script src="\\/js\\/features\\/nodes\\/node-bootstrap-v6\\.js\\?v=20261101-hysteria-policy-v1"><\\/script>/', 'assert.match(html,/<script src="\\/js\\/features\\/nodes\\/node-bootstrap-v6\\.js\\?v=[a-z0-9._-]+"><\\/script>/i'),
+    ('assert.match(html,/<script src="\\/js\\/features\\/nodes\\/node-dialogs\\.js\\?v=20261101-user-create-enterprise-v3"><\\/script>/', 'assert.match(html,/<script src="\\/js\\/features\\/nodes\\/node-dialogs\\.js\\?v=[a-z0-9._-]+"><\\/script>/i'),
+    ('assert.match(userCss,/\\.user-create-hold \\.sw\\{[\\s\\S]*width:2\\.8rem!important;[\\s\\S]*height:1\\.6rem!important/,', 'assert.match(userCss,/\\.user-create-hold \\.sw\\{[\\s\\S]*width:2\\.8rem;[\\s\\S]*height:1\\.6rem/,'),
+]
+for old, new in replacements:
+    if old in text:
+        text = text.replace(old, new, 1)
+check.write_text(text, encoding='utf-8')
