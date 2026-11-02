@@ -40,8 +40,26 @@ COPY --from=builder /build/output/xmesh-api /usr/local/bin/xmesh-api
 COPY --from=flag-assets /flags/package/flags/4x3/ /app/static/flags/
 # MIT license for bundled flag-icons assets.
 COPY --from=flag-assets /flags/package/LICENSE /app/static/flags/LICENSE
-# Browser assets are source-organized under frontend/ and keep that hierarchy at runtime.
+# Browser source remains organized under frontend/. The public subscription
+# router intentionally supports arbitrary 2..9-segment paths, so nested static
+# URLs would be captured by those routes before ServeDir's fallback. Keep the
+# organized tree for auditability, but create unique flat runtime aliases and
+# rewrite only the packaged HTML entrypoints to those collision-free URLs.
 COPY frontend/ /app/static/
+RUN set -eux; \
+    find /app/static -type f \( -name '*.css' -o -name '*.js' \) -print | \
+    while IFS= read -r src; do \
+      name="$(basename "$src")"; \
+      target="/app/static/$name"; \
+      [ "$src" = "$target" ] && continue; \
+      if [ -e "$target" ]; then \
+        echo "duplicate browser asset basename: $name" >&2; \
+        exit 1; \
+      fi; \
+      cp "$src" "$target"; \
+      rel="${src#/app/static}"; \
+      sed -i "s|$rel|/$name|g" /app/static/index.html /app/static/login.html; \
+    done
 RUN chown -R xmesh:xmesh /app/static
 USER 10001:10001
 WORKDIR /app
