@@ -38,13 +38,14 @@ new Function(tlsJs);
 new Function(xhttpExpert);
 new Function(diagnosticsJs);
 
-assert.match(index,/xray-studio-tls-dialog\.js\?v=20261101-tls-workspace-v2/,
-  'TLS workspace behavior cache key must remain stable until intentionally rotated');
-assert.match(index,/node-dialogs\.js\?v=20261101-user-create-enterprise-v3/,
-  'Create-user structural repair and Agent autovalidation handler must receive the current cache key');
+const hashedAsset=(asset)=>new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\?v=[a-f0-9]{12}');
+assert.match(index,hashedAsset('xray-studio-tls-dialog.js'),
+  'TLS workspace behavior must use a content-addressed cache key');
+assert.match(index,hashedAsset('node-dialogs.js'),
+  'Create-user structural repair and Agent autovalidation handler must use a content-addressed cache key');
 assert.match(xhttpExpert,/Session ID/);
-assert.match(index,/xray-studio-xhttp-expert\.js\?v=20261101-core-schema-v2/,
-  'Expert XHTTP editor must be cache-busted and loaded after the strict schema');
+assert.match(index,hashedAsset('xray-studio-xhttp-expert.js'),
+  'Expert XHTTP editor must be content-addressed and loaded after the strict schema');
 assert.match(xhttpExpert,/sessionIDPlacement/);
 assert.match(xhttpExpert,/sessionIDTable/);
 assert.match(xhttpExpert,/sessionIDLength/);
@@ -90,7 +91,7 @@ assert.match(tlsCss,/\.xm-tls-advanced\{grid-column:1\/-1/);
 assert.doesNotMatch(tlsCss,/position:sticky;top:0[\s\S]*\.xm-tls-summary/);
 assert.match(tlsCss,/@media\(max-width:760px\)/);
 
-assert.match(index,/diagnostics\.js\?v=20261101-operations-v1/);
+assert.match(index,hashedAsset('diagnostics.js'));
 assert.ok(index.indexOf('/js/core/app.js?v=')<index.indexOf('/js/features/nodes/diagnostics.js?v='),
   'Diagnostics route override must load after app.js');
 assert.match(diagnosticsJs,/pages\.tools=\[['"]Диагностика['"],diagnosticsPage\]/);
