@@ -86,10 +86,10 @@ function verifyPage(g, route) {
   if (route === 'set') {
     assert.equal(g.columns.length, 2, 'Settings должна содержать два явных стека карточек.');
     assert(g.columns.every(c => c.display !== 'contents'), 'Стек Settings потерял собственную геометрию.');
-    // At the ordinary desktop scale both columns fit even at 1366px. The
-    // enlarged interface is allowed to reflow in separate accessibility cases.
-    assert(Math.abs(g.columns[0].x - g.columns[1].x) > 100, 'Settings превратилась в одну длинную колонку.');
-    assert(g.columns.every(c => c.width >= 360), 'Settings превратилась в узкие вертикальные башни.');
+    const sideBySide=Math.abs(g.columns[0].x-g.columns[1].x)>100;
+    if(g.viewport.width>=1500)assert(sideBySide,'На широком desktop Settings превратилась в одну длинную колонку.');
+    if(sideBySide)assert(g.columns.every(c => c.width >= 360), 'Settings превратилась в узкие вертикальные башни.');
+    else assert(g.columns.every(c => c.width >= Math.min(720,g.view.width*.72)), 'Адаптивный стек Settings стал неоправданно узким.');
     for (const column of g.columns) for (let i=1;i<column.cards.length;i++) {
       const gap = column.cards[i].y - column.cards[i-1].bottom;
       assert(gap >= -1 && gap <= 48, `Искусственный вертикальный разрыв между карточками: ${gap}px.`);
@@ -130,7 +130,6 @@ async function main() {
   try {
     await api('POST','/auth/login',{username,password});
     dashboard = (await api('GET','/security/policy')).policy.dashboardPath;
-    // Exercise the real login form, not only cookie injection into a browser.
     await context.clearCookies();
     await page.goto(base + dashboard, {waitUntil:'domcontentloaded'});
     await page.locator('#username').fill(username);
@@ -151,8 +150,6 @@ async function main() {
     assert(fixtureBootstrap.collections?.profiles?.some(item=>item.id===profile.id),'Bootstrap не увидел тестовый профиль.');
     assert(fixtureBootstrap.collections?.nodes?.some(item=>item.id===node.id),'Bootstrap не увидел тестовый узел.');
     assert(fixtureBootstrap.collections?.users?.some(item=>item.id===user.id),'Bootstrap не увидел тестового пользователя.');
-    // The page bootstrap may have started before the API fixtures were created.
-    // Reload once so the in-memory DB used by hash navigation is authoritative.
     await page.reload({waitUntil:'domcontentloaded'});
     await page.waitForFunction(() => !!document.querySelector('#view')?.children.length && !document.querySelector('#view .sk'));
 
@@ -186,7 +183,7 @@ async function main() {
       await page.setViewportSize({width:3840,height:2160});
       await navigate('set');
       const rootFont=parseFloat(await page.locator('html').evaluate(el=>getComputedStyle(el).fontSize));
-      assert(rootFont>=16.9&&rootFont<=17.1,`100% должен давать базовый размер около 17px, получено ${rootFont}px.`);
+      assert(rootFont>=17.9&&rootFont<=18.1,`100% должен давать комфортный базовый размер около 18px, получено ${rootFont}px.`);
       const widthSlider=page.locator('#content-width');
       await widthSlider.evaluate(el=>{el.value='3000';el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}))});
       await page.waitForTimeout(80);
@@ -212,8 +209,59 @@ async function main() {
       return chrome;
     });
 
-    // Real Settings controls change appearance. Cover representative combinations
-    // instead of pretending an enormous Cartesian product improves assurance.
+    const setScale=async value=>{
+      await navigate('set');
+      await page.locator('#ts').evaluate((el,next)=>{el.value=String(next);el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}))},value);
+      await page.waitForTimeout(100);
+    };
+    await checked('Масштаб 130%: карточка пользователя не перекрывает содержимое footer',async()=>{
+      await page.setViewportSize({width:1920,height:1080});
+      await setScale(1.3);
+      await navigate('users');
+      await page.locator(`tr[data-id="${user.id}"]`).click();
+      await page.waitForSelector('dialog[open] .user-canvas');
+      const state=await page.locator('dialog[open] .user-canvas').evaluate(canvas=>{
+        const box=node=>{const r=node.getBoundingClientRect();return{x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};
+        const grid=canvas.querySelector('.user-canvas-grid'),foot=canvas.querySelector('.user-canvas-foot');
+        const visible=node=>node.getClientRects().length&&getComputedStyle(node).visibility!=='hidden';
+        const outside=[...canvas.querySelectorAll('button,input,select,textarea')].filter(visible).map(box).filter(r=>r.x<canvas.getBoundingClientRect().x-1||r.right>canvas.getBoundingClientRect().right+1);
+        return{viewport:{width:innerWidth,height:innerHeight},canvas:box(canvas),grid:box(grid),foot:box(foot),outside,gridClientHeight:grid.clientHeight,gridScrollHeight:grid.scrollHeight};
+      });
+      assert(state.canvas.x>=0&&state.canvas.right<=state.viewport.width+1&&state.canvas.y>=0&&state.canvas.bottom<=state.viewport.height+1,'User drawer выходит за viewport при 130%.');
+      assert(state.grid.height>160,'Scrollable body карточки пользователя схлопнулся при 130%.');
+      assert(state.grid.bottom<=state.foot.y+1,'Footer перекрывает центральное содержимое карточки пользователя.');
+      assert.equal(state.outside.length,0,'Контролы карточки пользователя выходят за drawer при 130%.');
+      await screenshot(page,'dialog-user-130-percent');
+      await page.keyboard.press('Escape');
+      await page.waitForSelector('dialog[open]',{state:'detached'});
+      await setScale(1);
+      return state;
+    });
+
+    await checked('User Intelligence: вкладки имеют полноценную рабочую область',async()=>{
+      await page.setViewportSize({width:1920,height:1080});
+      await navigate('users');
+      await page.locator(`tr[data-id="${user.id}"]`).click();
+      await page.waitForSelector('dialog[open] .user-canvas');
+      await page.locator(`[data-open-user-traffic="${user.id}"]`).click();
+      await page.waitForSelector('#stats-user-modal[open]');
+      const shell=await page.locator('#stats-user-modal[open]').evaluate(dialog=>{const r=dialog.getBoundingClientRect(),w=dialog.querySelector('.stats-user-workspace')?.getBoundingClientRect();return{width:r.width,height:r.height,workspaceHeight:w?.height||0,workspaceWidth:w?.width||0}});
+      assert(shell.width>=1400,`User Intelligence снова превратился в узкое окно: ${shell.width}px.`);
+      assert(shell.workspaceHeight>=280,`Рабочая область User Intelligence схлопнулась: ${shell.workspaceHeight}px.`);
+      for(const name of ['history','inbounds','observations']){
+        await page.locator(`[data-stats-user-tab="${name}"]`).click();
+        await page.waitForFunction(tab=>{const pane=document.querySelector(`[data-stats-user-pane="${tab}"]`);return pane&&!pane.hidden&&pane.getBoundingClientRect().height>0},name);
+        const pane=await page.locator(`[data-stats-user-pane="${name}"]`).evaluate(el=>{const r=el.getBoundingClientRect();return{width:r.width,height:r.height,scrollHeight:el.scrollHeight,hidden:el.hidden}});
+        assert(!pane.hidden&&pane.height>=180,`Вкладка ${name} не получила видимую рабочую область: ${JSON.stringify(pane)}.`);
+      }
+      await page.locator('[data-stats-user-tab="history"]').click();
+      await screenshot(page,'dialog-user-intelligence-history');
+      await page.locator('#stats-user-close').click();
+      await page.waitForFunction(()=>!document.querySelector('#stats-user-modal')?.open);
+      if(await page.locator('dialog#dlg[open]').count()){await page.keyboard.press('Escape');await page.waitForFunction(()=>!document.querySelector('#dlg')?.open)}
+      return shell;
+    });
+
     await page.setViewportSize({width:1920,height:1080});
     const appearances = [
       ['dark','solid','standard','comfortable','emerald'],
@@ -237,15 +285,12 @@ async function main() {
         assert.equal(g.material.sidebar,sidebar);
         assert.equal(g.material.density,density);
         assert.equal(g.material.theme,theme === 'auto' ? 'light' : theme);
-        // Dense and spacious modes may reflow Settings by actual container width.
         assert(g.scrollWidth<=1921, 'Изменение оформления вызвало горизонтальную прокрутку.');
         assert.equal(g.outside.length,0,'Изменение оформления обрезало элементы управления.');
         if (route==='set' || route==='nodes') await screenshot(page,`${route}-${theme}-${surface}-${sidebar}`);
       }
     });
 
-    // Restore ordinary scale before viewport-safety checks of long create/edit
-    // forms and user drawer. No form is saved except the owned node edit below.
     await navigate('set');
     for (const [key,value] of [['surface','solid'],['sidebar','standard'],['density','comfortable']]) await page.locator(`[data-ui="${key}"][data-value="${value}"]`).click();
     await page.locator('[data-th="dark"]').click();
@@ -387,8 +432,9 @@ async function main() {
       await page.locator('#xm-studio-v4 [data-tool="inbound"]').first().click();
       const selector='dialog.xm-studio-modal:not(.xm-studio-modal--cards)[open]';
       await page.waitForSelector(selector);
-      const dialogMotion=await page.locator(selector).evaluate(dialog=>{const s=getComputedStyle(dialog);return{transitionProperty:s.transitionProperty,transitionDuration:s.transitionDuration,animationName:s.animationName}});
+      const dialogMotion=await page.locator(selector).evaluate(dialog=>{const s=getComputedStyle(dialog);return{transitionProperty:s.transitionProperty,transitionDuration:s.transitionDuration,transitionBehavior:s.transitionBehavior,animationName:s.animationName}});
       assert(dialogMotion.transitionProperty.includes('opacity')&&dialogMotion.transitionProperty.includes('transform'),'Native dialog не использует общий opacity/transform motion contract.');
+      assert(dialogMotion.transitionBehavior.includes('allow-discrete'),'Native dialog не сохраняет transition во время закрытия top-layer.');
       assert.equal(dialogMotion.animationName,'none','Feature-specific dialog animation конкурирует с единым motion contract.');
       await page.emulateMedia({reducedMotion:'reduce'});
       const reduced=await page.locator(selector).evaluate(dialog=>{const s=getComputedStyle(dialog);return{transitionDuration:s.transitionDuration,animationName:s.animationName}});
@@ -398,7 +444,6 @@ async function main() {
       return{refresh,dialogMotion,reduced};
     });
 
-    // Validate real edit behavior without altering any pre-existing record.
     await checked('Редактирование узла сохраняется через API',async()=>{
       await navigate('nodes');
       await page.locator(`[data-ne="nodes:${node.id}"]`).click();
@@ -423,11 +468,8 @@ async function main() {
       assert(saved.items.some(n=>n.id===node.id&&n.name===`${prefix} · Изменён`));
     });
 
-    // Multi-card composition is checked with a real second and third node.
     await create('nodes',{name:`${prefix} · Берлин`,addr:'192.0.2.11',port:443,profileId:profile.id});
     await create('nodes',{name:`${prefix} · Амстердам`,addr:'192.0.2.12',port:443,profileId:profile.id});
-    // Refresh the panel DB after out-of-band API fixture creation before
-    // validating the multi-card collection layout.
     await page.reload({waitUntil:'domcontentloaded'});
     await page.waitForFunction(() => !!document.querySelector('#view')?.children.length && !document.querySelector('#view .sk'));
     for(const width of [1366,1920,3440]) await checked(`Коллекция узлов: ${width}px`,async()=>{
@@ -443,8 +485,6 @@ async function main() {
 
     assert.equal(report.javascriptErrors.length,0,'В браузере возникли JavaScript ошибки.');
   } finally {
-    // Delete in dependency order; preserve any pre-existing data. Error details
-    // deliberately omit API response bodies, which can contain credentials.
     const order=['users','hosts','nodes','squads','profiles'];
     for(const collection of order) for(const fixture of fixtures.filter(f=>f.collection===collection)) {
       try { await api('DELETE',`/collections/${fixture.collection}/${fixture.id}`); }

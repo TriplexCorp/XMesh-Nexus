@@ -1,28 +1,53 @@
 /* User drawer viewport safety.
- * Shared dialog behavior stays in the three system owners; this feature only
+ * Shared dialog behavior stays in the system owners; this feature only
  * constrains the user details drawer that can exceed short desktop viewports. */
 dialog.user-modal,
 dialog.user-modal > .user-canvas {
-  box-sizing: border-box;
+  box-sizing:border-box;
 }
 
 dialog.user-modal > .user-canvas {
-  max-height: min(100%, calc(100dvh - 2rem));
+  inline-size:100%;
+  max-inline-size:100%;
+  block-size:min(54rem,calc(100dvh - 2rem));
+  max-block-size:calc(100dvh - 2rem);
+  min-block-size:0;
+  display:grid;
+  grid-template-rows:auto auto minmax(0,1fr) auto;
+  overflow:hidden;
 }
 
-/* Keep the drawer footer reachable and visible while the body scrolls. */
+/* The central body, not the footer, owns scrolling. This prevents the sticky
+ * footer from covering fields at 120-200% interface scale. */
+dialog.user-modal .user-canvas-grid {
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,21rem),1fr));
+  min-height:0;
+  overflow:auto;
+  overscroll-behavior:contain;
+  align-content:start;
+  padding-bottom:var(--nx-space-3);
+}
+
+dialog.user-modal .user-pane {
+  min-width:0;
+}
+
 dialog.user-modal .user-canvas-foot {
-  position: sticky;
-  bottom: 0;
-  z-index: 4;
-  margin-top: 0;
-  padding-bottom: max(.55rem, env(safe-area-inset-bottom));
-  background: var(--nx-dialog-bg);
-  box-shadow: 0 -1px 0 var(--nx-border);
+  position:relative;
+  inset:auto;
+  z-index:4;
+  margin-top:0;
+  padding-bottom:max(.55rem,env(safe-area-inset-bottom));
+  background:var(--nx-dialog-bg);
+  box-shadow:0 -1px 0 var(--nx-border);
 }
 
-@media (max-width: 560px) {
+@media (max-width:760px) {
   dialog.user-modal > .user-canvas {
-    max-height: min(100%, calc(100dvh - 1rem));
+    block-size:calc(100dvh - 1rem);
+    max-block-size:calc(100dvh - 1rem);
+  }
+  dialog.user-modal .user-canvas-grid {
+    grid-template-columns:minmax(0,1fr);
   }
 }
