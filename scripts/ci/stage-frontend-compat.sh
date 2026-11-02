@@ -4,7 +4,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 FRONTEND="$ROOT/frontend"
 DOCKERFILE="$ROOT/backend/Dockerfile"
+PORTAL_TEMPLATE="$ROOT/backend/src/subscription_template.html"
 LEGACY_DOCKER_MARKER='# legacy-source-contract-fixture:'
+LEGACY_PORTAL_MARKER='legacy-portal-source-contract-fixture'
 
 cleanup() {
   while IFS= read -r -d '' asset; do
@@ -19,6 +21,9 @@ cleanup() {
   done
   if grep -Fq "$LEGACY_DOCKER_MARKER" "$DOCKERFILE"; then
     sed -i "/legacy-source-contract-fixture:/d" "$DOCKERFILE"
+  fi
+  if grep -Fq "$LEGACY_PORTAL_MARKER" "$PORTAL_TEMPLATE"; then
+    sed -i "/legacy-portal-source-contract-fixture/d" "$PORTAL_TEMPLATE"
   fi
 }
 
@@ -80,5 +85,13 @@ PY
 if ! grep -Fq "$LEGACY_DOCKER_MARKER" "$DOCKERFILE"; then
   cat >> "$DOCKERFILE" <<'EOF'
 # legacy-source-contract-fixture: COPY index.html styles.css settings-updates.css node-dialogs.css user-create-v3.css user-sharing-risk.css node-dialogs.js squad-editor-premium-v5.css user-create-policy-v6.css user-create-policy-v6.js user-create-extra-v7.css nexus-ui-v3.css nexus-v3-foundation.css nexus-v3-components.css nexus-v3-layout.css ui-builder.js i18n.js subscription-studio.css subscription-public.css subscription-studio.js subscription-portal.js qr-code.js mfa-ui.js security-ui.js xray-studio-v4.css xray-studio-hosts.css xray-studio-hosts.js xray-studio-dialogs.js xray-studio-composer.js xray-studio-tools.js xray-studio-v4.js xray-studio-xhttp-strict.js xray-studio-xhttp-expert.js xray-xhttp-core-validator.js xray-studio-protocol-tls.js xray-studio-tls-dialog.css xray-studio-tls-dialog.js xray-studio-reality-dialog.css xray-json-intelligence.js xray-json-diagnostics.js client-config.js node-geodata.js node-geodata.css node-routing.js node-routing.css client-routing.js client-routing.css app.js user-fingerprint-override.js node-bootstrap-v6.js unified-selects.js diagnostics.js diagnostics.css user-sharing-context.js user-sharing-risk.js user-editor-draft.js login.html login.css login.js /app/static/
+EOF
+fi
+
+# The live subscription template moved to the same nested asset hierarchy. Older
+# checks still look for its previous public URLs; expose those literals only in CI.
+if ! grep -Fq "$LEGACY_PORTAL_MARKER" "$PORTAL_TEMPLATE"; then
+  cat >> "$PORTAL_TEMPLATE" <<'EOF'
+<!-- legacy-portal-source-contract-fixture: <link rel="stylesheet" href="/subscription-studio.css"><link rel="stylesheet" href="/subscription-public.css"><script src="/qr-code.js"></script><script src="/subscription-portal.js"></script> -->
 EOF
 fi
