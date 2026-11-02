@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 'use strict';
-import {assertPackaged} from './ci/frontend-source.cjs';
+import {assertPackaged,panelStyles} from './ci/frontend-source.cjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 globalThis.window={};
@@ -17,6 +17,7 @@ assert(!view.includes('data-endpoint="sec"'),'Security is configured by inbound,
 const app=fs.readFileSync('frontend/js/core/app.js','utf8');
 const studio=fs.readFileSync('frontend/js/features/xray-studio/xray-studio-v4.js','utf8');
 const html=fs.readFileSync('frontend/index.html','utf8');
+const panelCss=panelStyles();
 const docker=fs.readFileSync('backend/Dockerfile','utf8');
 const server=fs.readFileSync('backend/src/user_subscriptions.rs','utf8')+'\n'+fs.readFileSync('backend/src/user_subscriptions_base.rs','utf8');
 assert(!app.includes("['hosts','link','Хосты',1]"),'Duplicate Hosts navigation must stay retired');
@@ -25,7 +26,10 @@ assert(app.includes("['hosts','globe-2','Хосты']"),'Hosts navigation must r
 assert(studio.includes('window.XMeshStudioHosts.view()'),'Studio must embed endpoints beside inbound');
 assert(studio.includes('window.XMeshStudioHosts.mount('),'Editor must activate endpoint controls');
 assert(html.indexOf('/js/features/xray-studio/xray-studio-hosts.js')<html.indexOf('/js/features/xray-studio/xray-studio-v4.js'));
-assert(html.includes('/styles/features/xray-studio/xray-studio-hosts.css'));
+assert.doesNotMatch(html,/<link[^>]+xray-studio-hosts\.css/,
+ 'XRAY STUDIO Hosts CSS must stay behind the canonical panel stylesheet entrypoint');
+assert.match(panelCss,/\.sv-public-endpoints\{/,
+ 'XRAY STUDIO Hosts styles must be reachable from the canonical panel CSS graph');
 assertPackaged(assert,['xray-studio-hosts.js', 'xray-studio-hosts.css']);
 assert(server.includes('fn host_for_profile('),'Generator must filter by profile and nodes');
 // The fallback guard must survive rustfmt's whitespace changes.
