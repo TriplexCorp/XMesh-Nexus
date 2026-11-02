@@ -8,6 +8,7 @@
   if(!api)return;
   const exact=new Map(Object.entries({
     'Балансировщики':'Balancers',
+    'Обновления XMesh Nexus':'XMesh Nexus updates',
     'Подробная статистика':'Detailed statistics',
     'История трафика':'Traffic history',
     'Inbound и ноды':'Inbounds & nodes',
@@ -92,6 +93,11 @@
   });
   const start=()=>{walk(document.body);observer.observe(document.body,{subtree:true,childList:true,characterData:true})};
   document.readyState==='loading'?document.addEventListener('DOMContentLoaded',start,{once:true}):start();
-  document.addEventListener('xmesh:languagechange',()=>queueMicrotask(()=>walk(document.body)));
+  /* The canonical runtime owns language state. Capture the UI action only to
+   * re-scan already-mounted nodes that did not mutate during the switch. */
+  document.addEventListener('click',event=>{
+    if(!event.target.closest?.('[data-panel-language="en"]'))return;
+    setTimeout(()=>walk(document.body),0);
+  },true);
   window.XMeshI18nConsistency=Object.freeze({translate,exact});
 })();
