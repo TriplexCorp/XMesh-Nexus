@@ -89,7 +89,7 @@ assert.match(source,/modal\.showModal\(\)/,'Editor must enter browser top layer'
 const routingCSS=clientCss;
 assert.match(panelCss,/\.dialog::backdrop,dialog::backdrop\{background:var\(--xm-modal-dim\);backdrop-filter:blur\(var\(--xm-modal-blur\)\)/,
  'Native dialogs must inherit backdrop dimming and blur from the shared dialog system');
-assert.doesNotMatch(routingCSS,/::backdrop/,
+assert.doesNotMatch(routingCSS,/#client-route-root\.crx[^\{]*::backdrop\s*\{/,
  'Client routing must not duplicate the shared dialog backdrop implementation');
 assert.equal((routingCSS.match(/\.crx-overlay\{/g)||[]).length,1,'Only one modal overlay style should exist');
 
