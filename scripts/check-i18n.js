@@ -5,6 +5,7 @@ const fs=require('node:fs');
 const assert=require('node:assert/strict');
 const vm=require('node:vm');
 const src=fs.readFileSync('frontend/js/core/i18n.js','utf8');
+const consistency=fs.readFileSync('frontend/js/core/i18n-consistency.js','utf8');
 const app=fs.readFileSync('frontend/js/core/app.js','utf8');
 const portal=fs.readFileSync('frontend/js/features/subscriptions/subscription-studio.js','utf8');
 const html=fs.readFileSync('frontend/index.html','utf8');
@@ -12,7 +13,7 @@ const login=fs.readFileSync('frontend/login.html','utf8');
 const docker=fs.readFileSync('backend/Dockerfile','utf8');
 const backend=fs.readFileSync('backend/src/main.rs','utf8');
 
-new Function(src);new Function(app);new Function(portal);
+new Function(src);new Function(consistency);new Function(app);new Function(portal);
 const text={nodeType:3,nodeValue:'Настройки',parentElement:{closest:()=>null}};
 const raw={nodeType:3,nodeValue:'CustomerServiceABC',parentElement:{closest:()=>null}};
 const preview={nodeType:3,nodeValue:'Подписка активна',parentElement:{closest:()=>true}};
@@ -46,7 +47,6 @@ assert.equal(api.translate('Повторяющееся поле «tag»: Xray/JS
 assert.equal(api.translate('Название вашего сервиса'),'Your service name');
 assert.equal(api.translate('3 узлов настроено. CPU, RAM и скорость требуют подключённого мониторинга.'),
  '3 nodes configured. CPU, RAM, and speed require connected monitoring.');
-// Regression coverage for formerly mixed RU/EN surfaces.
 for(const [ru,en] of [
  ['16 вариантов шрифта с поддержкой кириллицы. Выбор применяется ко всей панели и сохраняется в настройках','16 Cyrillic-compatible fonts. The choice applies across the panel and is saved in settings.'],
  ['Премиум клиенты','Premium clients'],
@@ -57,7 +57,6 @@ for(const [ru,en] of [
  ['Название профиля','Profile name'],
  ['Криптографический генератор недоступен. Используйте HTTPS.','Cryptographic random generator unavailable. Use HTTPS.']
 ])assert.equal(api.translate(ru),en,'Missing English translation for '+ru);
-// Statistics dashboard must remain fully readable under EN, including the dynamic cards.
 for(const [ru,en] of [
  ['Статистика инфраструктуры','Infrastructure statistics'],
  ['Метрики контейнера панели, не всей физической машины.','Metrics of the panel container, not the entire physical machine.'],
@@ -105,10 +104,11 @@ assert.match(portal,/\[\['ru','Русский'\],\['en','English'\]\]/);
 assert.doesNotMatch(portal,/tr:\['Abonelik aktif'/);
 assert.doesNotMatch(portal,/vi:\['Gói đăng ký/);
 assert.match(backend,/"subscriptionLanguage", &\["ru", "en"\]/);
-assert.match(html,/<script src="\/js\/core\/i18n\.js[^"]*"><\/script>\s*<script src="\/js\/features\/subscriptions\/subscription-studio\.js/);
+assert.match(html,/<script src="\/js\/core\/i18n\.js[^"]*"><\/script>\s*<script src="\/js\/core\/i18n-consistency\.js[^"]*"><\/script>\s*<script src="\/js\/features\/subscriptions\/subscription-studio\.js/,
+ 'Panel must load canonical i18n, late-render consistency, then the portal preview runtime');
 assert.match(login,/<script src="\/js\/core\/i18n\.js\?v=[a-f0-9]{12}" defer><\/script>\s*<script src="\/js\/auth\/login\.js\?v=[a-f0-9]{12}" defer><\/script>/,
  'Login must load canonical content-addressed i18n before auth runtime');
 assert.doesNotMatch(login,/<script src="\/(?:i18n|login)\.js(?:\?|\")/,
  'Legacy root login/i18n entrypoints must stay removed');
-assertPackaged(assert,['i18n.js']);
+assertPackaged(assert,['i18n.js','i18n-consistency.js']);
 console.log('RU/EN panel locale persistence, safe reversible translations, independent portal locale: OK');
