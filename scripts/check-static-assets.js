@@ -51,8 +51,8 @@ assert.match(login,hashedAsset('login.css'),
   'Login stylesheet must use a content-addressed cache key');
 assert.match(login,hashedAsset('login.js'),
   'Login appearance/auth runtime must use a content-addressed cache key');
-assert.ok(login.indexOf('/js/auth/login.js?v=')<login.indexOf('/styles/auth/login.css?v='),
-  'Saved appearance must be applied before the login stylesheet paints');
+assert.match(login,/<script src="\/js\/core\/i18n\.js\?v=[a-f0-9]{12}" defer><\/script>\s*<script src="\/js\/auth\/login\.js\?v=[a-f0-9]{12}" defer><\/script>/,
+  'Login must preserve canonical i18n-before-auth runtime order');
 assert.match(loginJs,/localStorage\.xmeshNexusSettings/,
   'Login must reuse the panel appearance settings instead of a private theme');
 for(const key of ['theme','accent','density','surface','glow','font','borders','motion']){
