@@ -22,10 +22,11 @@ jobs:
         with:
           node-version-file: .node-version
           package-manager-cache: false
-      - name: Repair Statistics refresh animation
+      - name: Repair Statistics refresh animation and shared period contract
         run: |
           python3 - <<'PY'
           from pathlib import Path
+
           p=Path('frontend/styles/features/statistics/statistics.css')
           s=p.read_text()
           marker='''#stats-user-refresh.is-refreshing .stats-refresh-icon {\n  animation:stats-user-refresh-spin .8s linear infinite;\n}\n'''
@@ -35,6 +36,15 @@ jobs:
               s=s.replace(marker, marker + '''@keyframes stats-user-refresh-spin {\n  to {\n    transform:rotate(360deg);\n  }\n}\n''', 1)
           s=s.replace('''@media (prefers-reduced-motion:reduce) {\n#stats-user-refresh.is-refreshing .stats-refresh-icon {\n  animation-duration:2s;\n}\n}\n''', '''@media (prefers-reduced-motion:reduce) {\n#stats-user-refresh.is-refreshing .stats-refresh-icon {\n  animation:none;\n}\n}\n''', 1)
           p.write_text(s)
+
+          t=Path('scripts/check-statistics-feedback.js')
+          c=t.read_text()
+          old="matches(css,/body > \\.xm-period-portal\\s*\\{[\\s\\S]*?position:fixed[\\s\\S]*?z-index:200000/);"
+          new="matches(css,/\\.xm-period-portal\\s*\\{[\\s\\S]*?position:fixed[\\s\\S]*?z-index:var\\(--nx-z-tooltip\\)/,'Detached period menu must use the shared popover stacking token');"
+          if old not in c and new not in c:
+              raise SystemExit('period portal assertion marker not found')
+          c=c.replace(old,new,1)
+          t.write_text(c)
           PY
       - name: Validate Statistics contract
         run: |
@@ -42,12 +52,12 @@ jobs:
           git diff --check
       - name: Commit repair
         run: |
-          if git diff --quiet -- frontend/styles/features/statistics/statistics.css; then
+          if git diff --quiet -- frontend/styles/features/statistics/statistics.css scripts/check-statistics-feedback.js; then
             echo 'No changes to commit'
             exit 0
           fi
           git config user.name 'Xmesh Creator'
           git config user.email 'Aselis3d@gmail.com'
-          git add frontend/styles/features/statistics/statistics.css
-          git commit -m 'fix(frontend): restore Statistics refresh animation'
+          git add frontend/styles/features/statistics/statistics.css scripts/check-statistics-feedback.js
+          git commit -m 'fix(frontend): complete Statistics native-dialog contract repair'
           git push origin HEAD:integration/argon-frontend-recovery-20261102
