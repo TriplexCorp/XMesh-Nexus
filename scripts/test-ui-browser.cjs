@@ -136,7 +136,7 @@ async function main() {
     await page.locator('#username').fill(username);
     await page.locator('#password').fill(password);
     await page.locator('#submit').click();
-    await page.waitForSelector('#nav');
+    await page.waitForFunction(() => !!document.querySelector('#view')?.children.length && !document.querySelector('#view .sk'));
     await checked('Вход через форму',async () => {
       assert.equal(await page.locator('#login-form').count(),0);
       assert(await page.locator('#view').isVisible());
@@ -147,6 +147,14 @@ async function main() {
     const squad = await create('squads',{name:`${prefix} · Сквад`,desc:'Данные браузерной проверки',inb:[inboundTag]});
     await create('hosts',{remark:`${prefix} · Хост`,profileId:profile.id,tag:inboundTag,address:'ui.example.invalid',port:443,nodes:[node.id]});
     const user = await create('users',{username:`${prefix}-client`,squads:[squad.id],hwid:2});
+    const fixtureBootstrap=await api('GET','/bootstrap');
+    assert(fixtureBootstrap.collections?.profiles?.some(item=>item.id===profile.id),'Bootstrap не увидел тестовый профиль.');
+    assert(fixtureBootstrap.collections?.nodes?.some(item=>item.id===node.id),'Bootstrap не увидел тестовый узел.');
+    assert(fixtureBootstrap.collections?.users?.some(item=>item.id===user.id),'Bootstrap не увидел тестового пользователя.');
+    // The page bootstrap may have started before the API fixtures were created.
+    // Reload once so the in-memory DB used by hash navigation is authoritative.
+    await page.reload({waitUntil:'domcontentloaded'});
+    await page.waitForFunction(() => !!document.querySelector('#view')?.children.length && !document.querySelector('#view .sk'));
 
     for (const [width,height] of sizes) {
       await page.setViewportSize({width,height});
@@ -239,6 +247,10 @@ async function main() {
     // Multi-card composition is checked with a real second and third node.
     await create('nodes',{name:`${prefix} · Берлин`,addr:'192.0.2.11',profileId:profile.id});
     await create('nodes',{name:`${prefix} · Амстердам`,addr:'192.0.2.12',profileId:profile.id});
+    // Refresh the panel DB after out-of-band API fixture creation before
+    // validating the multi-card collection layout.
+    await page.reload({waitUntil:'domcontentloaded'});
+    await page.waitForFunction(() => !!document.querySelector('#view')?.children.length && !document.querySelector('#view .sk'));
     for(const width of [1366,1920,3440]) await checked(`Коллекция узлов: ${width}px`,async()=>{
       await page.setViewportSize({width,height:1080});
       await navigate('nodes');
