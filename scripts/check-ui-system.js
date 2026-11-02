@@ -82,15 +82,21 @@ assert.match(components,/Composite controls own exactly one material shell/,'Com
 assert.match(components,/transform:none/,'Generic hover must not use lift motion');
 
 assert.match(layout,/\.view\[data-ui-flow="workspace"\][\s\S]*grid-auto-rows:max-content/,'Workspace flow must be content-driven');
+assert.match(layout,/\.wrap:has\(>\.view\[data-ui-frame="management"\]\)\{max-width:min\(var\(--panel-content-max,120rem\),120rem\)\}/,'Management frame must cap ultrawide mechanical stretching');
+assert.match(layout,/\.wrap:has\(>\.view\[data-ui-frame="data"\]\)\{max-width:min\(var\(--panel-content-max,138rem\),138rem\)\}/,'Data frame must have a wider deliberate ceiling');
+assert.match(layout,/\.wrap:has\(>\.view\[data-ui-frame="canvas"\]\)\{max-width:var\(--panel-content-max,120rem\)\}/,'Canvas frame must preserve the full user-selected width');
 assert.match(layout,/\[data-ui-collection\]\[data-ui-count="1"\]\[data-ui-low-count="expand"\]/,'Low-count collection rule missing');
 assert.match(layout,/\[data-ui-layout="empty"\]/,'Empty-state geometry missing');
 assert.match(layout,/\[data-ui-layout="editor"\],\[data-ui-layout="canvas"\]/,'Purposeful editor/canvas exception missing');
-assert.match(layout,/\.appearance-layout\{[\s\S]*grid-template-columns:minmax\(0,1\.06fr\) minmax\(28rem,\.94fr\)/,'Settings must use balanced full-width desktop columns');
+assert.match(layout,/\.appearance-layout\{[\s\S]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/,'Settings must use balanced full-width desktop columns');
+assert.match(layout,/\.appearance-layout \.setting-row\{[\s\S]*minmax\(18rem,32rem\)/,'Settings controls need a deliberate readable rail instead of ultrawide stretching');
 assert.match(layout,/\.appearance-layout>\.appearance-column>\.card:nth-child\(n\)\{grid-area:auto\}/,'Settings must explicitly clear legacy implicit-grid placement');
 assert.match(layout,/body \.app \.nodes-page\.card,[\s\S]*\.nodes-page\[data-ui-surface="section"\][\s\S]*background:transparent/,'Nodes page root must stay material-free even if legacy hydration marked it as a section surface');
 assert.match(layout,/\.nodes-page\{[\s\S]*container:nodes-grid \/ inline-size/,'Nodes fleet composition must be owned by v3 container queries');
+assert.match(layout,/\.nodes-page \.node-explorer\{[\s\S]*minmax\(22rem,32rem\)[\s\S]*minmax\(12rem,14rem\)/,'Node explorer controls must stop mechanically stretching across ultrawide space');
 assert.match(layout,/body \.app \.nodes-page>\.nodes\[data-node-count="1"\]\[data-grid-mode\]\{grid-template-columns:minmax\(0,1fr\)\}/,'Single-node fleet width must outrank legacy density-specific caps');
-assert.match(layout,/body \.app \.nodes-page>\.nodes\[data-node-count="1"\]>\.nc\{[\s\S]*grid-template-columns:minmax\(18rem,\.72fr\) minmax\(30rem,1\.28fr\)/,'Single-node card must use deliberate wide composition');
+assert.match(layout,/body \.app \.nodes-page>\.nodes\[data-node-count="1"\]>\.nc\{[\s\S]*grid-template-columns:minmax\(22rem,34rem\) minmax\(0,1fr\)/,'Single-node card must use a composed two-zone layout');
+assert.match(layout,/\.node-gauges\{[\s\S]*width:min\(100%,48rem\)/,'Single-node metrics must stop growing after useful reading width');
 assert.match(layout,/body \.app \.nodes-page>\.nodes\[data-node-count="1"\]>\.nc\{[\s\S]*max-width:none/,'Single-node card must not inherit a narrow fleet cap');
 assert.match(layout,/dialog#dlg\.node-wide[\s\S]*100dvh - 48px/,'Node editor viewport safety must live in v3 layout');
 
@@ -100,6 +106,14 @@ for(const role of ['panel','dialog','section','metric','item','floating']){
 for(const value of ['panel','table','empty','editor','canvas']){
   assert(builder.includes("'"+value+"'"),'Builder layout missing '+value);
 }
+for(const value of ['management','data','canvas']){
+  assert(builder.includes("'"+value+"'"),'Builder frame missing '+value);
+}
+assert.match(builder,/const register=\(selector,role\)=>/,'Semantic registry must be locally defined and deterministic');
+assert.match(builder,/classifyFrame/,'Builder must classify workspace width by semantic workload');
+assert.match(builder,/data-ui-card-head/,'Builder must expose reusable card heading anatomy');
+assert.match(builder,/register\('\.node-explorer','panel'\)/,'Node explorer must consume the shared panel material');
+assert.match(builder,/register\('\.ngauge','metric'\)/,'Node gauges must consume the shared metric role');
 assert.match(builder,/new MutationObserver/,'Dynamic SPA surfaces must be hydrated');
 assert.match(builder,/window\.XMeshUIBuilder/,'Builder must expose the shared runtime API');
 assert.match(builder,/classifyCollections/,'Builder must classify low-count collections');
@@ -115,6 +129,8 @@ for(const phrase of [
   'Content-driven height is the default',
   'Low-count states recompose',
   'Do not fill voids with fake UI',
+  'outer allowance',
+  'management',
   'New global visual work in it is forbidden'
 ])assert(docs.includes(phrase),'UI_SYSTEM v3 contract missing phrase: '+phrase);
 

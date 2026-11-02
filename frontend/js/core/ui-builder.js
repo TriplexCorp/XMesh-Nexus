@@ -4,16 +4,24 @@
   const ROLE_ATTR='data-ui-surface';
   const LAYOUT_ATTR='data-ui-layout';
   const FLOW_ATTR='data-ui-flow';
+  const FRAME_ATTR='data-ui-frame';
   const registry=[];
   let observer=null;
   let frame=0;
 
   const roles=new Set(['panel','dialog','section','metric','item','floating']);
   const layouts=new Set(['panel','table','empty','editor','canvas']);
+  const frames=new Set(['management','data','canvas']);
 
   const setRole=(node,role)=>{
     if(!(node instanceof Element)||node.hasAttribute(ROLE_ATTR)||!roles.has(role))return false;
     node.setAttribute(ROLE_ATTR,role);
+    return true;
+  };
+
+  const register=(selector,role)=>{
+    if(typeof selector!=='string'||!selector.trim()||!roles.has(role))return false;
+    if(!registry.some(entry=>entry.selector===selector&&entry.role===role))registry.push({selector,role});
     return true;
   };
 
@@ -44,11 +52,12 @@
        * surfaces. Treating a root <section> as a section surface wraps the
        * whole workspace in one giant card and defeats page-owned layout. */
       else if(node.matches('section')&&!node.closest('dialog')&&!node.parentElement?.matches('.view'))count+=setRole(node,'section')?1:0;
-      else if(node.matches('.squad-preview-stat,.stat,[class*="-kpi"],[class~="kpi"]'))count+=setRole(node,'metric')?1:0;
+      else if(node.matches('.squad-preview-stat,.stat,[class*="-kpi"],[class~="kpi"],.ngauge'))count+=setRole(node,'metric')?1:0;
+      else if(node.matches('.palette-preset'))count+=setRole(node,'item')?1:0;
     };
     if(root instanceof Element)visit(root);
     if(root.querySelectorAll){
-      for(const node of root.querySelectorAll('dialog .box,dialog form.box,.card,section,.squad-preview-stat,.stat,[class*="-kpi"],[class~="kpi"]'))visit(node);
+      for(const node of root.querySelectorAll('dialog .box,dialog form.box,.card,section,.squad-preview-stat,.stat,[class*="-kpi"],[class~="kpi"],.ngauge,.palette-preset'))visit(node);
     }
     return count;
   };
@@ -79,6 +88,11 @@
     else if(hasEmptyMarker(card))layout='empty';
     card.setAttribute(LAYOUT_ATTR,layout);
 
+    const first=card.firstElementChild;
+    const hasHeading=!!(first&&(first.matches('.hd,.bar2,[class$="-heading"],[class*="-heading "]')||first.querySelector('h2,h3')));
+    if(hasHeading)card.setAttribute('data-ui-card-head','true');
+    else card.removeAttribute('data-ui-card-head');
+
     if(layout==='table'){
       const rows=card.querySelectorAll('tbody tr').length;
       card.setAttribute('data-ui-table-rows',String(rows));
@@ -94,7 +108,7 @@
       if(box.closest('dialog')||isEditor(box))continue;
       const children=[...box.children].filter(node=>node instanceof Element);
       if(children.length<2||children.length>12)continue;
-      const metrics=children.filter(node=>node.matches('.stat,[class*="-kpi"],[class~="kpi"],[data-ui-surface="metric"]'));
+      const metrics=children.filter(node=>node.matches('.stat,.ngauge,[class*="-kpi"],[class~="kpi"],[data-ui-surface="metric"]'));
       if(metrics.length===children.length)box.setAttribute('data-ui-metrics','');
       else box.removeAttribute('data-ui-metrics');
     }
@@ -120,6 +134,14 @@
     }
   };
 
+  const classifyFrame=view=>{
+    if(!(view instanceof Element))return;
+    let value='management';
+    if(view.querySelector('[data-ui-layout="editor"],[data-ui-layout="canvas"],.sv-studio,.sv-workspace,[data-ui-editor],[data-ui-canvas],canvas,[data-chart]'))value='canvas';
+    else if(view.querySelector('[data-ui-layout="table"],table'))value='data';
+    view.setAttribute(FRAME_ATTR,frames.has(value)?value:'management');
+  };
+
   const classifyWorkspace=view=>{
     if(!(view instanceof Element))return;
     view.setAttribute(FLOW_ATTR,'workspace');
@@ -128,6 +150,7 @@
     for(const card of view.querySelectorAll('.card,[data-ui-surface="panel"]'))classifyCard(card);
     classifyMetrics(view);
     classifyCollections(view);
+    classifyFrame(view);
   };
 
   const collectViews=root=>{
@@ -181,6 +204,9 @@
   register('.squad-inbound-row','item');
   register('.xm-select-popover','floating');
   register('.node-form-section','section');
+  register('.node-explorer','panel');
+  register('.ngauge','metric');
+  register('.palette-preset','item');
   register('.subscription-studio-section','section');
   register('.sv-section','section');
 
@@ -190,7 +216,8 @@
     compose,
     surface:(element,role)=>setRole(element,role),
     roles:Object.freeze([...roles]),
-    layouts:Object.freeze([...layouts])
+    layouts:Object.freeze([...layouts]),
+    frames:Object.freeze([...frames])
   });
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});

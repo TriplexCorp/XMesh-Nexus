@@ -44,6 +44,7 @@ There must not be another global CSS layer after `nexus-ui-v3.css`.
 ### Layout owns
 
 - page/workspace rhythm;
+- workspace frame width policy;
 - toolbar geometry;
 - metric grids;
 - low-count collections;
@@ -67,6 +68,8 @@ It may:
 
 - map legacy markup to `data-ui-surface` roles;
 - mark cards as `panel`, `table`, `empty`, `editor` or `canvas`;
+- classify a workspace frame as `management`, `data` or `canvas` from semantic content;
+- mark reusable card heading anatomy without inserting presentation wrappers;
 - identify metric groups, collections and toolbars;
 - observe SPA content added later.
 
@@ -119,7 +122,27 @@ Collections may receive:
 
 Toolbars receive `data-ui-toolbar="actions|filters"`.
 
+Views receive one workspace frame:
+
+- `data-ui-frame="management"` — ordinary CRUD, settings and infrastructure screens;
+- `data-ui-frame="data"` — tables and data-dense operational screens;
+- `data-ui-frame="canvas"` — editors, charts and other work areas whose value comes from width.
+
 These attributes describe semantics. CSS decides presentation.
+
+## Workspace frame contract
+
+The Appearance content-width setting is an **outer allowance**, not an instruction to stretch every control and card until that width is consumed.
+
+On wide screens:
+
+- `management` is capped at `120rem` even if the user selected a larger content width;
+- `data` may use up to `138rem`;
+- `canvas` may use the complete user-selected `--panel-content-max` value.
+
+The cap disappears naturally on smaller viewports because the workspace is still `width:100%`. This keeps ordinary screens composed on ultrawide monitors while preserving full width for XRAY STUDIO, analytical canvases and other purposeful work areas.
+
+A page must not opt into `canvas` merely to avoid fixing bad composition.
 
 ## Spatial contract
 
@@ -133,6 +156,7 @@ Avoid:
 - forced equal-height cards;
 - `flex-grow` used only to fill the viewport;
 - oversized padding that simulates importance;
+- controls stretched simply because a track is wide;
 - separate full-width rows for a tiny count/status that could live in a toolbar;
 - small cards stranded in a huge low-count grid;
 - empty modal bodies/footers inherited from a larger editor layout.
@@ -181,17 +205,19 @@ Composite controls have one material shell; inner native inputs remain transpare
 
 ### Settings
 
-Settings is a real two-column workspace on wide desktop. Both columns stretch to available tracks; cards must never collapse to intrinsic narrow widths with a giant middle void. Palette presets use a compact full-width grid. Rows are content-driven and controls align consistently.
+Settings is a real two-column workspace on wide desktop. Columns are balanced rather than stretched into one huge control rail. Card headings form a consistent anatomy, explanatory copy stays readable, and the control rail has a deliberate maximum instead of consuming half of an ultrawide card. Palette presets use a compact full-width grid. Rows remain content-driven and controls align consistently.
 
 ### Nodes
 
 The Nodes page has no giant enclosing card. The description/view controls, explorer filters, result meta and node cards are separate composition layers with small deliberate gaps.
 
-A single node expands into a wide two-column card using the existing DOM. Runtime JavaScript must not move node elements into presentation wrappers.
+Search/filter controls have deliberate working widths instead of equal-fr stretching. A single node expands into a wide two-zone card using the existing DOM, but KPI tiles and the speed rail stop growing after they reach a useful reading width. Runtime JavaScript must not move node elements into presentation wrappers.
 
 ### Tables / Users / Squads / Hosts
 
 Short tables are short surfaces. They do not reserve fleet-scale height. The page background may remain empty below real content; that is preferable to stretching the table card or inventing content.
+
+Data-dense pages may use the wider `data` frame, but controls inside them still need deliberate widths.
 
 ### Empty states / Templates / Balancers
 
@@ -199,7 +225,7 @@ Empty states stay compact and explicit. They do not become half-screen blank car
 
 ### Editors
 
-Editors own their useful workspace. Global compaction must not shrink code, chart or canvas areas that benefit from height.
+Editors own their useful workspace. Global compaction must not shrink code, chart or canvas areas that benefit from height or width.
 
 ## Migration rule
 
@@ -225,11 +251,12 @@ Before merging UI work:
 5. No feature stylesheet adds `html[data-surface=...]` variants.
 6. No generic hover glow/lift is introduced.
 7. Wide desktop has no accidental dead regions inside surfaces.
-8. Narrow desktop reflows before controls clip or overflow.
-9. Low-count states intentionally use available width.
-10. Empty states are compact.
-11. Editors/canvases retain purposeful workspace.
-12. Runtime builder does not move DOM or measure geometry.
+8. Ultrawide management pages do not mechanically stretch controls to the content-width ceiling.
+9. Narrow desktop reflows before controls clip or overflow.
+10. Low-count states intentionally use available width.
+11. Empty states are compact.
+12. Editors/canvases retain purposeful workspace.
+13. Runtime builder does not move DOM or measure geometry.
 
 ## CI contract
 
@@ -239,4 +266,4 @@ Run:
 node scripts/check-ui-system.js
 ```
 
-The check enforces the single v3 entrypoint, production packaging, three-module architecture, material variants, shared primitives, non-mutating builder behavior, spatial rules and retirement of the historical global override stack.
+The check enforces the single v3 entrypoint, production packaging, three-module architecture, material variants, shared primitives, semantic workspace frames, non-mutating builder behavior, spatial rules and retirement of the historical global override stack.

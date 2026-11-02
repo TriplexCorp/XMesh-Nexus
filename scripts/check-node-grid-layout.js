@@ -29,6 +29,14 @@ assert(large.includes('body .app .nodes-page>.nodes[data-node-count="1"][data-gr
 
 assert.match(layout,/body \.app \.nodes-page>\.nodes\[data-node-count="1"\]>\.nc\{[\s\S]*max-width:none/,
  'Single-node card must not carry a historical narrow max-width');
+assert.match(layout,/body \.app \.nodes-page>\.nodes\[data-node-count="1"\]>\.nc\{[\s\S]*grid-template-columns:minmax\(22rem,34rem\) minmax\(0,1fr\)/,
+ 'Single-node card must use a bounded information rail and flexible operations zone');
+assert.match(layout,/\.nodes-page>\.nodes\[data-node-count="1"\]>\.nc>\.node-gauges\{[\s\S]*width:min\(100%,48rem\)[\s\S]*repeat\(3,minmax\(10\.5rem,1fr\)\)/,
+ 'Single-node KPI tiles must stop expanding after a useful reading width');
+assert.match(layout,/\.nodes-page>\.nodes\[data-node-count="1"\]>\.nc>\.node-speed\{[\s\S]*width:min\(100%,48rem\)/,
+ 'Single-node speed rail must align with the bounded KPI zone');
+assert.match(layout,/\.nodes-page \.node-explorer\{[\s\S]*minmax\(22rem,32rem\)[\s\S]*minmax\(12rem,14rem\)/,
+ 'Node filters must use deliberate control widths instead of equal-fr ultrawide stretching');
 for(const mode of ['compact','standard','spacious']){
  assert(layout.includes('.nodes-page>.nodes[data-grid-mode='+mode+']>.nc{padding:'),
   'Density '+mode+' must visibly affect card rhythm in v3');
