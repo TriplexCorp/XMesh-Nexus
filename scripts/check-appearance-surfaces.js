@@ -143,9 +143,9 @@ assert.match(app,/r\.style\.setProperty\('--ui-control-radius',radius\+'px'\)/,
 // Shared range styling remains available to other feature surfaces.
 const subscriptionJs=fs.readFileSync('frontend/js/features/subscriptions/subscription-studio.js','utf8');
 assert.match(subscriptionJs,/type="range" name="subscriptionRadius"/);
-assert.match(css,/^input\[type="range"\]\{/m);
-assert.match(css,/^input\[type="range"\]::-webkit-slider-thumb\{/m);
-assert.match(css,/^input\[type="range"\]::-moz-range-thumb\{/m);
+assert.match(css,/^input\[type=range\]\{/m);
+assert.match(css,/^input\[type=range\]::-webkit-slider-thumb\{/m);
+assert.match(css,/^input\[type=range\]::-moz-range-thumb\{/m);
 
 // Surface selection must update one visual/ARIA state at a time.
 const beginning=app.indexOf("else if(b=g('[data-ui]'))");
