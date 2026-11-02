@@ -25,8 +25,10 @@ assert.match(css,/@starting-style\{/,'Opening animation must have starting style
 assert.match(css,/#dlg\.side\{--modal-off:translateX/,'Side drawer animates from edge');
 assert.match(css,/html\[data-motion=off\] #dlg/);
 assert.match(css,/@media\(prefers-reduced-motion:reduce\)/);
-assert.match(html,/<script\s+src="app\.js\?v=[a-zA-Z0-9._-]+"\s*><\/script>/,
+assert.match(html,/<script\s+src="\/?app\.js\?v=[a-zA-Z0-9._-]+"\s*><\/script>/,
  'Application entrypoint must be loaded with a nonempty cache-busting version');
-assert.match(html,/<link\s+rel="stylesheet"\s+href="styles\.css\?v=[a-zA-Z0-9._-]+"\s*\/?\s*>/,
- 'Main stylesheet must be loaded with a nonempty cache-busting version');
+assert.match(html,/<style id="xmesh-legacy-compat">@import url\("\/?styles\.css\?v=[a-zA-Z0-9._-]+"\) layer\(xmesh-legacy\);<\/style>/,
+ 'Legacy compatibility stylesheet must remain versioned and quarantined in its cascade layer');
+assert.match(html,/<link\s+rel="stylesheet"\s+href="\/?nexus-ui-v3\.css\?v=[a-f0-9]{12}"\s*\/?\s*>/,
+ 'Modern Design System entrypoint must remain the final versioned stylesheet');
 console.log('User creation, dialog open/exit animations and accessibility controls: OK');

@@ -12,6 +12,7 @@
   const roles=new Set(['panel','dialog','section','metric','item','floating']);
   const layouts=new Set(['panel','table','empty','editor','canvas']);
   const frames=new Set(['management','data','canvas']);
+  const collectionSelector='.two,.three,.four,.grid,.cards,[data-ui-collection]';
 
   const setRole=(node,role)=>{
     if(!(node instanceof Element)||node.hasAttribute(ROLE_ATTR)||!roles.has(role))return false;
@@ -114,8 +115,12 @@
     }
   };
 
+  /* Collection semantics are opt-in by structural class/attribute. Earlier
+   * versions scanned every div/section and accidentally classified Settings
+   * columns (three cards) as low-count card collections, producing six skinny
+   * columns. A semantic builder must never infer page geometry from coincidence. */
   const classifyCollections=view=>{
-    for(const box of view.querySelectorAll('div,section')){
+    for(const box of view.querySelectorAll(collectionSelector)){
       if(box.closest('dialog')||isEditor(box)||box===view)continue;
       const children=[...box.children].filter(node=>node instanceof Element);
       const cards=children.filter(node=>node.matches('.card,[data-ui-surface="panel"]'));

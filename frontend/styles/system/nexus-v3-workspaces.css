@@ -1,0 +1,512 @@
+/* XMesh Nexus Design System v3 / Workspaces
+ * Canonical composition for complex core workspaces.
+ * This module is intentionally last: legacy geometry is quarantined in a
+ * lower cascade layer, while shared material remains owned by Components.
+ */
+
+/* -------------------------------------------------------------------------- */
+/* SETTINGS                                                                    */
+/* -------------------------------------------------------------------------- */
+#view:has(>.appearance-layout){
+  container-type:inline-size;
+  container-name:settings-workspace;
+}
+#view>.appearance-layout{
+  width:min(100%,150rem);
+  min-width:0;
+  justify-self:center;
+  display:grid;
+  grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);
+  gap:clamp(1rem,.8vw + .55rem,1.55rem);
+  align-items:start;
+}
+#view>.appearance-layout>.appearance-column{
+  width:100%;
+  min-width:0;
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  grid-auto-rows:max-content;
+  gap:clamp(1rem,.8vw + .55rem,1.55rem);
+  align-content:start;
+}
+#view>.appearance-layout>.appearance-column>.card:nth-child(n){
+  grid-area:auto;
+  width:100%;
+  min-width:0;
+  height:auto;
+  align-self:start;
+  padding:clamp(1.05rem,.65vw + .78rem,1.42rem);
+  border-color:color-mix(in srgb,var(--a) 13%,var(--nx-border));
+}
+
+/* Heading anatomy: hierarchy without decorative fake icons. */
+#view .appearance-layout :is(.settings-appearance-header,.appearance-card-heading),
+#view .appearance-layout .appearance-column>section.card>div:first-child{
+  min-width:0;
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:1rem;
+  margin:0 0 .52rem;
+  padding:0 0 .78rem;
+  border-bottom:1px solid var(--nx-separator);
+}
+#view .appearance-layout :is(.settings-appearance-header,.appearance-card-heading)::before,
+#view .appearance-layout .appearance-column>section.card>div:first-child::before{content:none}
+#view .appearance-layout :is(.settings-appearance-header,.appearance-card-heading) h3,
+#view .appearance-layout .appearance-column>section.card>div:first-child h3{
+  font-size:1.02rem;
+  line-height:1.25;
+  font-weight:760;
+  letter-spacing:-.028em;
+}
+#view .appearance-layout :is(.settings-appearance-header,.appearance-card-heading) small,
+#view .appearance-layout .appearance-column>section.card>div:first-child small{
+  color:var(--nx-muted);
+  font-size:.75rem;
+  line-height:1.42;
+  text-align:right;
+  max-width:28rem;
+}
+
+/* One readable information rail + one deliberate control rail. */
+#view .appearance-layout .setting-row{
+  position:relative;
+  display:grid;
+  grid-template-columns:minmax(12rem,.9fr) minmax(18rem,1.1fr);
+  align-items:center;
+  gap:clamp(.9rem,1vw,1.35rem);
+  min-height:0;
+  padding:.82rem 0;
+  background:transparent;
+  border-top:1px solid var(--nx-separator);
+  box-shadow:none;
+}
+#view .appearance-layout .setting-row:first-of-type{border-top-color:transparent}
+#view .appearance-layout .setting-copy{
+  min-width:0;
+  max-width:34rem;
+  display:grid;
+  gap:.18rem;
+}
+#view .appearance-layout .setting-copy :is(b,strong){
+  font-size:.88rem;
+  line-height:1.35;
+  font-weight:700;
+}
+#view .appearance-layout .setting-copy :is(small,p){
+  color:var(--nx-muted);
+  font-size:.74rem;
+  line-height:1.46;
+}
+#view .appearance-layout .setting-control{
+  min-width:0;
+  width:100%;
+  max-width:36rem;
+  justify-self:end;
+  justify-content:flex-end;
+}
+#view .appearance-layout .setting-control>.seg{margin-left:auto}
+#view .appearance-layout .setting-control>.choice{
+  width:auto;
+  max-width:100%;
+  justify-content:flex-end;
+}
+#view .appearance-layout .setting-row>.sw{justify-self:end}
+
+/* Theme gallery owns the whole card width. */
+#view .appearance-layout .appearance-preset-row{
+  grid-template-columns:minmax(0,1fr);
+  align-items:start;
+  gap:.72rem;
+}
+#view .appearance-layout .appearance-preset-row>.setting-copy{
+  display:flex;
+  max-width:none;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:1rem;
+}
+#view .appearance-layout .appearance-preset-row>.setting-control{
+  max-width:none;
+  justify-self:stretch;
+}
+#view .appearance-layout .palette-preset-grid{
+  width:100%;
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:.58rem;
+}
+#view .appearance-layout .palette-preset{
+  min-width:0;
+  min-height:3.55rem;
+  padding:.56rem .66rem;
+}
+#view .appearance-layout .palette-preset-foot{font-size:.7rem}
+
+/* Custom palette + range controls. */
+#view .appearance-layout .palette-hex-fields{
+  width:100%;
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:.7rem;
+}
+#view .appearance-layout .palette-hex-field{min-width:0}
+#view .appearance-layout .palette-hex-editor{width:100%}
+#view .appearance-layout .slider-control{
+  min-width:0;
+  display:grid;
+  grid-template-columns:minmax(9rem,1fr) auto;
+  gap:.75rem;
+  align-items:center;
+}
+#view .appearance-layout .color-slider-grid{
+  min-height:2.8rem;
+  padding:.38rem 0;
+  display:grid;
+  grid-template-columns:minmax(7rem,.4fr) minmax(13rem,1fr) 4.2rem;
+  gap:.8rem;
+  align-items:center;
+}
+#view .appearance-layout .palette-draft-preview{margin-top:.6rem}
+#view .appearance-layout .palette-draft-actions{margin-top:.5rem}
+
+/* Font chooser is a true chooser, not a wrapping sentence. */
+#view .appearance-layout>.appearance-column:first-child>.card:nth-child(3) .setting-row:last-child .setting-control{
+  max-width:38rem;
+}
+#view .appearance-layout>.appearance-column:first-child>.card:nth-child(3) .setting-row:last-child .choice{
+  width:100%;
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:.35rem;
+}
+#view .appearance-layout>.appearance-column:first-child>.card:nth-child(3) .setting-row:last-child .choice button{
+  width:100%;
+  min-width:0;
+  justify-content:center;
+}
+
+/* Keep full-width settings cards below the paired workspace intentional. */
+#view>.appearance-layout~.card{width:100%;min-width:0}
+
+/* -------------------------------------------------------------------------- */
+/* NODES                                                                       */
+/* -------------------------------------------------------------------------- */
+body .app #view>.nodes-page.card,
+body .app #view>.nodes-page[data-ui-surface="panel"],
+body .app #view>.nodes-page[data-ui-surface="section"]{
+  width:min(100%,150rem);
+  min-width:0;
+  justify-self:center;
+  padding:0;
+  background:transparent;
+  border:0;
+  box-shadow:none;
+  backdrop-filter:none;
+  -webkit-backdrop-filter:none;
+}
+#view>.nodes-page{
+  width:min(100%,150rem);
+  min-width:0;
+  justify-self:center;
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  gap:.82rem;
+  align-content:start;
+  container:nodes-workspace / inline-size;
+}
+#view>.nodes-page>.nodes-toolbar{
+  min-width:0;
+  min-height:0;
+  display:flex;
+  align-items:center;
+  gap:.75rem;
+  margin:0;
+  padding:.12rem .2rem;
+  background:transparent;
+  border:0;
+  box-shadow:none;
+}
+#view>.nodes-page>.nodes-toolbar>.note{
+  margin:0 auto 0 0;
+  max-width:64rem;
+  font-size:.78rem;
+  line-height:1.42;
+}
+#view .nodes-page .node-grid-controls{margin-left:auto}
+#view .nodes-page .node-create-action{white-space:nowrap}
+
+/* Search bar uses the whole work surface, but each control keeps a useful size. */
+#view .nodes-page .node-explorer{
+  min-width:0;
+  display:grid;
+  grid-template-columns:minmax(24rem,2fr) minmax(11rem,.72fr) minmax(13rem,.82fr) max-content max-content;
+  gap:.72rem;
+  align-items:end;
+  margin:0;
+  padding:.9rem 1rem;
+}
+#view .nodes-page .node-explorer>label{min-width:0}
+#view .nodes-page .node-explorer>label>span{
+  display:block;
+  margin:0 0 .3rem;
+  color:var(--nx-muted);
+  font-size:.68rem;
+  font-weight:720;
+}
+#view .nodes-page .node-explorer-search input{width:100%}
+#view .nodes-page .node-explorer-hosting{
+  min-height:var(--nx-control-h-sm);
+  align-self:end;
+  display:flex;
+  align-items:center;
+  gap:.42rem;
+  white-space:nowrap;
+}
+#view .nodes-page .node-explorer-reset{
+  align-self:end;
+  min-height:var(--nx-control-h-sm);
+}
+#view .nodes-page .node-explorer-meta{
+  min-width:0;
+  min-height:1.9rem;
+  margin:0;
+  padding:0 .18rem;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:.65rem;
+  color:var(--nx-muted);
+  font-size:.75rem;
+}
+#view .nodes-page [data-node-search-count]{
+  display:inline-flex;
+  align-items:center;
+  min-height:1.75rem;
+  padding:.22rem .62rem;
+  border:1px solid color-mix(in srgb,var(--a) 20%,var(--nx-border));
+  border-radius:999px;
+  background:color-mix(in srgb,var(--a) 6%,var(--nx-control-bg));
+  color:color-mix(in srgb,var(--tx) 90%,var(--nx-muted));
+  font-weight:680;
+}
+#view .nodes-page .node-explorer-pages{
+  margin-left:auto;
+  display:flex;
+  align-items:center;
+  gap:.3rem;
+}
+#view .nodes-page .node-explorer-pages[data-single-page=true] button{display:none}
+
+/* Fleet density is about multi-node browsing. Low-count states recompose. */
+#view>.nodes-page>.nodes{
+  width:100%;
+  min-width:0;
+  margin:0;
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  gap:var(--nx-page-gap);
+  align-items:start;
+  grid-auto-rows:max-content;
+}
+#view>.nodes-page>.nodes[data-grid-mode=compact]>.nc{padding:.92rem 1rem}
+#view>.nodes-page>.nodes[data-grid-mode=standard]>.nc{padding:1.08rem 1.16rem}
+#view>.nodes-page>.nodes[data-grid-mode=spacious]>.nc{padding:1.25rem 1.34rem}
+
+body .app #view>.nodes-page>.nodes[data-node-count="1"][data-grid-mode]{
+  grid-template-columns:minmax(0,1fr);
+}
+body .app #view>.nodes-page>.nodes[data-node-count="1"]>.nc{
+  width:100%;
+  max-width:none;
+  min-width:0;
+  height:auto;
+  display:grid;
+  grid-template-columns:minmax(24rem,.82fr) minmax(38rem,1.18fr);
+  gap:.9rem 1.45rem;
+  align-items:start;
+  border-color:color-mix(in srgb,var(--a) 22%,var(--nx-border));
+}
+#view>.nodes-page>.nodes[data-node-count="1"][data-grid-mode=compact]>.nc{gap:.72rem 1.1rem}
+#view>.nodes-page>.nodes[data-node-count="1"][data-grid-mode=standard]>.nc{gap:.9rem 1.45rem}
+#view>.nodes-page>.nodes[data-node-count="1"][data-grid-mode=spacious]>.nc{gap:1.05rem 1.65rem}
+#view>.nodes-page>.nodes[data-node-count="1"]>.nc>.h{
+  grid-column:1/-1;
+  grid-row:1;
+  margin:0;
+  padding:0 0 .9rem;
+  border-bottom:1px solid var(--nx-separator);
+}
+#view>.nodes-page>.nodes[data-node-count="1"]>.nc>.kvg{
+  grid-column:1;
+  grid-row:2;
+  margin:0;
+  padding:.22rem 0 .76rem;
+  border-bottom:1px solid var(--nx-separator);
+}
+#view>.nodes-page>.nodes[data-node-count="1"]>.nc>.node-tls-health{
+  grid-column:1;
+  grid-row:3;
+  margin:0;
+}
+#view>.nodes-page>.nodes[data-node-count="1"]>.nc>.node-ip-rotation{
+  grid-column:1;
+  margin:0;
+}
+#view>.nodes-page>.nodes[data-node-count="1"]>.nc>.node-gauges{
+  grid-column:2;
+  grid-row:2 / span 2;
+  width:100%;
+  display:grid;
+  grid-template-columns:repeat(3,minmax(12rem,1fr));
+  gap:.68rem;
+  margin:0;
+}
+#view>.nodes-page>.nodes[data-node-count="1"] .ngauge{
+  min-width:0;
+  min-height:6.35rem;
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr);
+  grid-template-rows:auto auto;
+  align-items:center;
+  justify-items:start;
+  gap:.08rem .76rem;
+  padding:.85rem .92rem;
+}
+#view>.nodes-page>.nodes[data-node-count="1"] .ngauge .ringwrap{
+  grid-row:1/3;
+  width:3.5rem;
+  height:3.5rem;
+}
+#view>.nodes-page>.nodes[data-node-count="1"] .ngauge small{text-align:left}
+#view>.nodes-page>.nodes[data-node-count="1"]>.nc>.node-speed{
+  grid-column:2;
+  width:100%;
+  margin:.2rem 0 0;
+}
+#view>.nodes-page>.nodes[data-node-count="1"]>.nc>.acts{
+  grid-column:1/-1;
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:.56rem;
+  margin:0;
+  padding-top:.95rem;
+  border-top:1px solid var(--nx-separator);
+}
+#view>.nodes-page>.nodes[data-node-count="1"]>.nc>.acts>button{
+  width:100%;
+  min-width:0;
+  min-height:2.62rem;
+  justify-content:center;
+}
+#view>.nodes-page>.nodes[data-node-count="1"]>.nc>.acts>[data-node-create-host]{
+  grid-column:1/-1;
+}
+#view>.nodes-page>.nodes:not([data-node-count="1"])>.nc{
+  height:auto;
+  align-self:start;
+}
+
+/* Fleet breakpoints */
+@container nodes-workspace (min-width:32rem){
+  #view>.nodes-page>.nodes[data-grid-mode=compact]{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  body .app #view>.nodes-page>.nodes[data-node-count="1"][data-grid-mode]{
+    grid-template-columns:minmax(0,1fr);
+  }
+}
+@container nodes-workspace (min-width:52rem){
+  #view>.nodes-page>.nodes[data-grid-mode=compact]{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+  #view>.nodes-page>.nodes[data-grid-mode=standard],
+  #view>.nodes-page>.nodes[data-grid-mode=spacious]{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  body .app #view>.nodes-page>.nodes[data-node-count="1"][data-grid-mode]{
+    grid-template-columns:minmax(0,1fr);
+  }
+  #view>.nodes-page>.nodes[data-node-count="2"]{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+@container nodes-workspace (min-width:70rem){
+  #view>.nodes-page>.nodes[data-grid-mode=compact]{
+    grid-template-columns:repeat(4,minmax(0,1fr));
+  }
+  #view>.nodes-page>.nodes[data-grid-mode=standard]{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+  #view>.nodes-page>.nodes[data-grid-mode=spacious]{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  body .app #view>.nodes-page>.nodes[data-node-count="1"][data-grid-mode]{
+    grid-template-columns:minmax(0,1fr);
+  }
+  #view>.nodes-page>.nodes[data-node-count="2"]{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  #view>.nodes-page>.nodes[data-node-count="3"][data-grid-mode=compact]{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+}
+
+/* Responsive reflow is based on actual workspace width. */
+@container settings-workspace (max-width:88rem){
+  #view>.appearance-layout{grid-template-columns:minmax(0,1fr)}
+}
+@container settings-workspace (max-width:58rem){
+  #view .appearance-layout .setting-row{grid-template-columns:minmax(0,1fr);align-items:start}
+  #view .appearance-layout .setting-control{
+    max-width:none;
+    justify-self:stretch;
+    justify-content:flex-start;
+  }
+  #view .appearance-layout .setting-control>.seg{margin-left:0}
+  #view .appearance-layout .setting-control>.choice{justify-content:flex-start}
+  #view .appearance-layout .setting-row>.sw{justify-self:start}
+  #view .appearance-layout .palette-preset-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #view .appearance-layout .palette-hex-fields{grid-template-columns:1fr}
+  #view .appearance-layout .color-slider-grid{grid-template-columns:1fr auto}
+  #view .appearance-layout .color-slider-grid>label{grid-column:1/-1}
+  #view .appearance-layout>.appearance-column:first-child>.card:nth-child(3) .setting-row:last-child .choice{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+@container nodes-workspace (max-width:92rem){
+  #view .nodes-page .node-explorer{
+    grid-template-columns:minmax(20rem,1.5fr) minmax(10rem,.7fr) minmax(11rem,.8fr);
+  }
+  body .app #view>.nodes-page>.nodes[data-node-count="1"]>.nc{
+    grid-template-columns:minmax(21rem,.75fr) minmax(32rem,1.25fr);
+  }
+  #view>.nodes-page>.nodes[data-node-count="1"]>.nc>.node-gauges{
+    grid-template-columns:repeat(3,minmax(10rem,1fr));
+  }
+}
+@container nodes-workspace (max-width:72rem){
+  #view .nodes-page .node-explorer{
+    grid-template-columns:minmax(0,1.5fr) minmax(10rem,1fr) minmax(10rem,1fr);
+  }
+  #view .nodes-page .node-explorer-search{grid-column:1/3}
+  body .app #view>.nodes-page>.nodes[data-node-count="1"]>.nc{
+    grid-template-columns:minmax(0,1fr);
+  }
+  #view>.nodes-page>.nodes[data-node-count="1"]>.nc>*{grid-column:1}
+  #view>.nodes-page>.nodes[data-node-count="1"]>.nc>.h{grid-column:1}
+  #view>.nodes-page>.nodes[data-node-count="1"]>.nc>.node-gauges{grid-row:auto}
+}
+@container nodes-workspace (max-width:46rem){
+  #view .nodes-page .node-explorer{grid-template-columns:minmax(0,1fr)}
+  #view .nodes-page .node-explorer>*{grid-column:1}
+  #view>.nodes-page>.nodes[data-node-count="1"] .node-gauges{grid-template-columns:1fr}
+  #view>.nodes-page>.nodes[data-node-count="1"]>.nc>.acts{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+@container nodes-workspace (max-width:30rem){
+  #view>.nodes-page>.nodes[data-node-count="1"]>.nc>.acts{grid-template-columns:1fr}
+  #view>.nodes-page>.nodes[data-node-count="1"]>.nc>.acts>[data-node-create-host]{grid-column:auto}
+}
