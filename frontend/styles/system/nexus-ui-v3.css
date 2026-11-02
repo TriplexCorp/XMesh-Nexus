@@ -23,7 +23,7 @@
 @import url("../features/squads/squad-editor-premium-v5.css?v=70ca047618a5");
 @import url("../features/statistics/statistics.css?v=356dac2ce47d");
 @import url("../features/subscriptions/subscription-studio.css?v=b91c26f9c910");
-@import url("../features/subscriptions/subscription-surface.css?v=88a5725dbc35");
+@import url("../features/subscriptions/subscription-surface.css?v=dbb0183fb3f2");
 @import url("../features/tools/tools.css?v=b2eed08c8a90");
 @import url("../features/users/user-details.css?v=f49be9a511c8");
 @import url("../features/users/user-dialog-viewport.css?v=055046d32582");
@@ -147,6 +147,8 @@ dialog:is(.sv-overlay,.xm-studio-modal) :is(.sv-dialog,.xm-studio-modal-shell){m
 }
 #stats-user-modal .stats-user-dialog{
   inline-size:100%;
+  max-inline-size:none;
+  max-width:none;
   block-size:min(52rem,calc(100dvh - 2.5rem));
   max-block-size:calc(100dvh - 2.5rem);
   display:grid;
