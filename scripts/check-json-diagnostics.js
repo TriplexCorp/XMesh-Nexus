@@ -59,6 +59,9 @@ assert.match(src,/setRangeText\(proposal\.replacement,proposal\.start,proposal\.
 assert.match(src,/textarea\.dispatchEvent\(new Event\('input'/,'Hot Fix must notify existing validators and JSON state');
 assert.match(src,/Math\.floor\(\(scroll-topPad\)\/lineHeight\)/,'Line gutter must use virtualized visible lines');
 assert.match(src,/textarea\.addEventListener\('scroll'/,'Line numbers should scroll with the editor');
-assert(html.indexOf('src="xray-json-diagnostics.js')>=0 && html.indexOf('src="app.js')>html.indexOf('src="xray-json-diagnostics.js'),'Diagnostics must load before the editor');
+const diagnosticsTag='/js/features/xray-studio/xray-json-diagnostics.js?v=';
+const studioTag='/js/features/xray-studio/xray-studio-v4.js?v=';
+assert(html.indexOf(diagnosticsTag)>=0,'Diagnostics asset must be loaded by the canonical panel entrypoint');
+assert(html.indexOf(studioTag)>html.indexOf(diagnosticsTag),'Diagnostics must load before the XRAY STUDIO editor');
 assertPackaged(assert,['xray-json-diagnostics.js']);
 console.log('Manual JSON line validation / gutter / Hot Fix: OK');
