@@ -39,14 +39,23 @@ for(const action of ['data-host-node-preset','data-host-count','data-host-resolv
  assert(html.includes(action),'Missing working host editor action '+action);
 }
 assert(!html.includes('<details'),'Advanced options must be always visible');
-const finalCss=css.slice(css.lastIndexOf('/* Host editor v5.'));
-assert(finalCss.length>2000,'Missing canonical layout stylesheet');
-assert(finalCss.includes('grid-template-areas:"primary overrides preview"'),
- 'All three zones must occupy one grid row');
-const desktopCss=finalCss.split('@media(max-width:1260px)')[0];
+
+// Host geometry is feature-owned inside the canonical panel graph. Desktop keeps
+// three permanent zones on one row; smaller viewports deliberately reflow them.
+assert.match(css,/\.host-editor-layout\s*\{[\s\S]*?display:grid[\s\S]*?grid-template-columns:minmax\(0,1\.08fr\) minmax\(0,1fr\) minmax\(0,1\.08fr\)[\s\S]*?grid-template-areas:"primary overrides preview"/,
+ 'Host editor must keep the three-zone desktop grid');
+const desktopEnd=css.indexOf('@media (max-width:1260px)',css.indexOf('.host-editor-layout {'));
+assert(desktopEnd>0,'Host editor must define a 1260px responsive boundary');
+const desktopCss=css.slice(css.indexOf('.host-editor-layout {'),desktopEnd);
 assert(!desktopCss.includes('"overrides overrides"'),'No separate overrides row on desktop');
-assert(finalCss.includes('position:static!important'),
- 'Bottom buttons must not cover the settings');
-assert(finalCss.includes('@media(max-width:760px)'),
- 'Keep accessible small-screen fallback');
+assert.match(css,/dialog\.host-wide>form\.box>\.act\s*\{[\s\S]*?position:static[\s\S]*?z-index:auto/,
+ 'Host editor footer must stay in normal flow and never cover fields');
+assert.doesNotMatch(css,/dialog\.host-wide>form\.box>\.act\s*\{[^}]*!important/,
+ 'Host editor footer must not rely on specificity escalation');
+assert.match(css,/@media \(max-width:1260px\)[\s\S]*?grid-template-areas:"primary preview" "overrides overrides"/,
+ 'Medium viewports must reflow the three zones without overlap');
+assert.match(css,/@media \(max-width:760px\)[\s\S]*?grid-template-areas:"primary" "overrides" "preview"/,
+ 'Small screens must stack all three zones');
+assert.match(css,/@media \(max-width:440px\)[\s\S]*?\.host-connect-fields\s*\{[\s\S]*?grid-template-columns:minmax\(0,1fr\)/,
+ 'Phone layout must keep host fields usable');
 console.log('Host editor: three horizontal zones, all inputs, actions and safe footer OK');
