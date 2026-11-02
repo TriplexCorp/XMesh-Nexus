@@ -81,7 +81,10 @@ assert.match(tlsJs,/class="xm-tls-close xm-studio-modal-close" data-x aria-label
   'TLS dialog must reuse the Nexus-wide close control');
 assert.doesNotMatch(tlsJs,/function closeIcon\(/,
   'TLS dialog must not carry a second private close icon implementation');
-assert.match(tlsCss,/dialog\.xm-tls-dialog\{[\s\S]*width:min\(1180px,calc\(100vw - 2rem\)\)!important/);
+assert.match(tlsCss,/dialog\.xm-tls-dialog\{[\s\S]*width:min\(1180px,calc\(100vw - 2rem\)\);[\s\S]*max-width:calc\(100vw - 2rem\)/,
+  'TLS dialog must remain viewport-bounded without specificity hacks');
+assert.doesNotMatch(tlsCss,/dialog\.xm-tls-dialog\{[\s\S]*width:[^;}]+!important/,
+  'TLS dialog width must not rely on !important');
 assert.match(tlsCss,/\.xm-tls-layout\{display:grid;grid-template-columns:1fr/);
 assert.match(tlsCss,/\.xm-tls-summary\{[\s\S]*grid-template-columns:minmax\(180px,.8fr\) minmax\(430px,2fr\) minmax\(260px,1.2fr\)/);
 assert.match(tlsCss,/\.xm-tls-summary dl\{[\s\S]*grid-template-columns:repeat\(4,minmax\(92px,1fr\)\)/);
