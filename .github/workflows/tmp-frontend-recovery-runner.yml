@@ -1,4 +1,4 @@
-name: Temporary Frontend Architecture Gate
+name: Temporary Frontend Contract Diagnostics
 
 on:
   push:
@@ -9,18 +9,31 @@ permissions:
   contents: read
 
 jobs:
-  gate:
+  inspect:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: integration/argon-frontend-recovery-20261102
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-      - name: Run canonical UI architecture gate
-        run: node scripts/check-ui-system.js
-      - name: Check cache graph and syntax
+      - name: Inspect stale source-contract assumptions
+        shell: bash
         run: |
-          node scripts/update-ui-cache.cjs --check
-          find frontend/js -name '*.js' -print0 | xargs -0 -n1 node --check
+          echo '=== direct CSS/cache assertions ==='
+          grep -nE 'styles\.css|\.css\\\?v|\.css\?v|legacy|user-create-v3|user-create-policy|user-create-extra' \
+            scripts/check-unified-selects.js \
+            scripts/check-xray-studio-wrap-tabs.js \
+            scripts/check-xray-studio-enterprise.js \
+            scripts/check-xray-active-entrypoint.js \
+            scripts/check-static-assets.js \
+            scripts/check-client-routing.js \
+            scripts/check-subscription-studio.js \
+            scripts/check-modal-motion.js \
+            scripts/check-node-create-action.js \
+            scripts/check-settings-update-actions.js \
+            scripts/check-node-ip-rotation.js || true
+          echo '=== stale canonical paths ==='
+          grep -nE "\.\./js/|node --check app\.js|readFileSync\(['\"]app\.js|/i18n\.js|/login\.js|js/core/js/core|styles/system/styles/system" scripts/*.js || true
+          echo '=== statistics native dialog ==='
+          grep -nE -B 3 -A 8 'stats-user-modal|statsPortal|showModal\(\)|closeStatsUser' frontend/js/core/app.js | head -220 || true
+          echo '=== XRAY native dialog / portal ==='
+          grep -nE -B 3 -A 8 'sv-overlay|composerPortal|append\(|showModal\(\)|sv-dialog' frontend/js/features/xray-studio/xray-studio-v4.js | head -220 || true
