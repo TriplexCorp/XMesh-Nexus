@@ -535,6 +535,9 @@ fn application_router(state: AppState) -> Router {
                 .fallback(|| async { StatusCode::NOT_FOUND }),
         )
         .merge(experimental_v2_routes(&state))
+        // Reserve canonical asset namespaces before subscription wildcard routes.
+        .nest_service("/js", ServeDir::new(format!("{static_dir}/js")))
+        .nest_service("/styles", ServeDir::new(format!("{static_dir}/styles")))
         .nest_service("/flags", ServeDir::new(format!("{static_dir}/flags")))
         .fallback_service(ServeDir::new(static_dir).append_index_html_on_directories(false))
         .layer(RequestBodyLimitLayer::new(2 * 1024 * 1024))

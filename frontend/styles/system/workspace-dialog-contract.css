@@ -113,6 +113,7 @@ dialog#dlg.user-modal>.user-canvas{
   max-height:min(54rem,calc(100dvh - 1.5rem));
   display:flex;
   flex-direction:column;
+  gap:var(--nx-space-3);
   overflow:hidden;
   border:0;
   border-radius:0;
@@ -122,7 +123,13 @@ dialog#dlg.user-modal>.user-canvas{
   -webkit-backdrop-filter:none;
 }
 
+#dlg.user-modal :is(.user-head,.user-overview-band){
+  flex:0 0 auto;
+}
+
 #dlg.user-modal .user-canvas-grid{
+  scrollbar-gutter:stable;
+  align-items:start;
   flex:0 1 auto;
   min-height:0;
   overflow:auto;
@@ -146,8 +153,8 @@ dialog#dlg.user-modal>.user-canvas{
     padding-block:.55rem;
   }
   #dlg.user-modal .user-pane{
-    gap:.48rem;
-    padding:.72rem .82rem;
+    gap:.65rem;
+    padding:.85rem 1rem;
   }
   #dlg.user-modal .user-inline-editor{
     gap:.48rem;
@@ -168,11 +175,11 @@ dialog#dlg.user-modal>.user-canvas{
     padding:.2rem 0;
   }
   #dlg.user-modal :is(input:not([type=range]):not([type=checkbox]):not([type=radio]),select,.xm-select-trigger){
-    min-height:2.12rem;
+    min-height:2.55rem;
     padding:.42rem .6rem;
   }
   #dlg.user-modal textarea{
-    min-height:3.85rem;
+    min-height:5.5rem;
     padding:.48rem .6rem;
   }
 }

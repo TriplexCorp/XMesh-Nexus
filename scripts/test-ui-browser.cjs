@@ -128,6 +128,13 @@ async function main() {
   }
   let dashboard;
   try {
+    await checked('Canonical nested frontend assets bypass subscription routes',async()=>{
+      for(const asset of ['/js/auth/login.js','/js/core/app.js','/styles/system/nexus-ui-v3.css','/styles/features/nodes/nodes.css']){
+        const response=await context.request.get(base+asset);
+        assert(response.ok(),`${asset}: HTTP ${response.status()}`);
+        assert((await response.body()).length>100,`${asset} must contain the canonical asset`);
+      }
+    });
     await api('POST','/auth/login',{username,password});
     dashboard = (await api('GET','/security/policy')).policy.dashboardPath;
     await context.clearCookies();
@@ -142,10 +149,11 @@ async function main() {
     });
     const inboundTag = prefix.replace(/-/g,'_');
     const profile = await create('profiles',{name:`${prefix} · Профиль`,config:JSON.stringify({inbounds:[{tag:inboundTag,listen:'127.0.0.1',port:28352,protocol:'vless',settings:{decryption:'none',clients:[]},streamSettings:{network:'tcp',security:'none'}}],outbounds:[{tag:'direct',protocol:'freedom'}]})});
-    const node = await create('nodes',{name:`${prefix} · Москва`,addr:'192.0.2.10',port:443,xrayLocalPort:13456,mult:1,limit:0,resetDay:1,profileId:profile.id,rotationEnabled:false,rotationIntervalHours:24,rotationIps:'',billingCurrency:'EUR',billingPeriod:'monthly',billingRemindDays:7,billingPrice:0});
+    const node = await create('nodes',{name:`${prefix} · Москва`,addr:'192.0.2.10',flag:'🇵🇱',port:443,xrayLocalPort:13456,mult:1,limit:0,resetDay:1,profileId:profile.id,rotationEnabled:false,rotationIntervalHours:24,rotationIps:'',billingCurrency:'EUR',billingPeriod:'monthly',billingRemindDays:7,billingPrice:0,hosting:'Datagio',tlsManualProvision:true,geoEnabled:true});
     const squad = await create('squads',{name:`${prefix} · Сквад`,desc:'Данные браузерной проверки',inb:[inboundTag]});
     await create('hosts',{remark:`${prefix} · Хост`,profileId:profile.id,tag:inboundTag,address:'ui.example.invalid',port:443,nodes:[node.id]});
-    const user = await create('users',{username:`${prefix}-client`,squads:[squad.id],hwid:2});
+    const user = await create('users',{username:`${prefix}-client`,squads:[squad.id],hwid:2,created:Date.now(),adminId:1});
+    const otherUser = await create('users',{username:`${prefix}-other`,squads:[squad.id],hwid:2,created:Date.now(),adminId:1});
     const fixtureBootstrap=await api('GET','/bootstrap');
     assert(fixtureBootstrap.collections?.profiles?.some(item=>item.id===profile.id),'Bootstrap не увидел тестовый профиль.');
     assert(fixtureBootstrap.collections?.nodes?.some(item=>item.id===node.id),'Bootstrap не увидел тестовый узел.');
@@ -163,6 +171,99 @@ async function main() {
         return g;
       });
     }
+
+    // Reference acceptance checks use the real renderer and live runtime refresh.
+    for(const [width,height] of [[1920,1080],[2560,1440],[3440,1440]]) await checked(`Reference Nodes: ${width}×${height}`,async()=>{
+      await page.setViewportSize({width,height});
+      await navigate('nodes');
+      await page.waitForFunction(()=>document.querySelector('[data-node-tls-status]')?.dataset.state);
+      const g=await page.locator('.nodes > .nc').evaluate(card=>{
+        const box=el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom}};
+        const q=s=>card.querySelector(s),all=s=>[...card.querySelectorAll(s)];
+        const shadowProbe=document.createElement('div');shadowProbe.style.boxShadow='var(--nx-panel-shadow)';card.append(shadowProbe);
+        const sharedShadow=getComputedStyle(shadowProbe).boxShadow;shadowProbe.remove();
+        const expectedIcon=name=>{const template=document.createElement('template');template.innerHTML=ic(name);return template.content.firstElementChild.innerHTML};
+        const icons=['link','redo','dl','refresh-cw','globe','git-branch','pause','pen','server'];
+        return {card:box(card),container:box(card.parentElement),body:box(q('.node-body')),summary:box(q('.node-summary')),metrics:box(q('.node-metrics')),
+          primary:all('.kvg>div').map(box),kpis:all('.ngauge').map(box),speed:box(q('.node-speed')),speedBar:box(q('.node-speed .pb')),actions:box(q('.acts')),buttons:all('.acts>button').map(box),
+          iconMatches:all('.acts>button').map((button,i)=>button.querySelector('svg')?.innerHTML===expectedIcon(icons[i])),
+          shield:q('[data-node-tls-status] svg')?.innerHTML===expectedIcon('shield'),hosting:q('.node-hosting svg')?.innerHTML===expectedIcon('building-2'),
+          geoDot:!!q('.node-ip-rotation .node-ip-indicator')&&getComputedStyle(q('.node-ip-indicator')).backgroundColor,
+          shadow:getComputedStyle(card).boxShadow,sharedShadow,divider:getComputedStyle(q('.node-summary')).borderRightWidth,
+          primaryDivider:getComputedStyle(q('.kvg>div+div')).borderLeftWidth};
+      });
+      assert(g.card.width>=g.container.width*.94,'Single node must fill the workspace');
+      assert(g.summary.x<g.metrics.x);
+      assert(g.summary.width/g.body.width>=.35&&g.summary.width/g.body.width<=.45,'Summary must occupy 35–45%');
+      assert(g.metrics.width/g.body.width>=.55&&g.metrics.width/g.body.width<=.65,'Telemetry must occupy 55–65%');
+      assert(parseFloat(g.divider)>0&&parseFloat(g.primaryDivider)>0,'Both vertical dividers must be visible');
+      assert(Math.abs(g.primary[0].y-g.primary[1].y)<=3,'Users and profile must start together');
+      assert(Math.abs(g.primary[0].y-g.kpis[0].y)<=3,'Summary and KPI baseline differs');
+      assert(Math.max(...g.kpis.map(r=>r.y))-Math.min(...g.kpis.map(r=>r.y))<=3,'KPI tops must align');
+      assert(Math.max(...g.kpis.map(r=>r.height))-Math.min(...g.kpis.map(r=>r.height))<=3,'KPI heights must align');
+      assert(g.speed.y>=g.kpis[0].bottom&&g.speed.width>=g.metrics.width*.85,'Speed must span telemetry below KPIs');
+      assert(g.speedBar.width>=g.speed.width*.98&&g.speedBar.height>=4,'Speed rail must be visible and full width');
+      assert.equal(g.buttons.length,9);
+      for(const offset of [0,4]){
+        const row=g.buttons.slice(offset,offset+4);
+        assert(Math.max(...row.map(r=>r.y))-Math.min(...row.map(r=>r.y))<=3,'Four actions must share a row');
+        assert(Math.max(...row.map(r=>r.width))-Math.min(...row.map(r=>r.width))<=3,'Action widths must match');
+      }
+      assert(g.buttons[4].y>g.buttons[0].y&&g.buttons[8].y>g.buttons[4].y,'Actions must form 4 + 4 + 1');
+      assert(g.buttons[8].width>=g.actions.width*.98,'Create Host must span the action container');
+      assert(g.shield&&g.hosting&&g.geoDot&&g.iconMatches.every(Boolean),'Semantic SVG icons/dot are missing or incorrect');
+      assert.equal(g.shadow,g.sharedShadow,'Node card must use only the shared neutral shadow');
+      await screenshot(page,`nodes-${width}x${height}`);
+      return g;
+    });
+
+    for(const [width,height] of [[1920,1080],[2560,1440],[3440,1440]]) await checked(`Reference User Details: ${width}×${height}`,async()=>{
+      await page.setViewportSize({width,height});
+      await navigate('users');
+      await page.locator(`tr[data-id="${user.id}"]`).click();
+      await page.waitForSelector('dialog[open] .user-canvas');
+      await page.waitForTimeout(150);
+      const g=await page.locator('#dlg').evaluate(dialog=>{
+        const box=el=>{const r=el.getBoundingClientRect();return {y:r.y,bottom:r.bottom,height:r.height}};
+        const q=s=>dialog.querySelector(s),body=q('.user-canvas-grid');
+        return {dialog:box(dialog),header:box(q('.user-head')),footer:box(q('.user-canvas-foot')),body:box(body),scrollTop:body.scrollTop,
+          panes:[...body.children].map(box),headings:[...body.querySelectorAll('.user-pane-heading:first-child')].map(box),
+          controls:[...q('.user-head-actions').children].map(box),usage:box(q('.user-usage-line')),identity:box(q('.user-identity-row')),
+          maxHeight:getComputedStyle(dialog).maxHeight,rem:parseFloat(getComputedStyle(document.documentElement).fontSize),
+          paneScrolls:[...body.children].filter(p=>getComputedStyle(p).overflowY==='auto'||getComputedStyle(p).overflowY==='scroll').length};
+      });
+      assert.equal(g.scrollTop,0,'Body must start at top');
+      assert(Math.max(...g.panes.map(r=>r.y))-Math.min(...g.panes.map(r=>r.y))<=4,'Three columns must start together');
+      assert(g.headings.every(r=>r.y>=g.body.y),'Initial headings must not be clipped');
+      assert(g.dialog.y>=0&&g.dialog.bottom<=height+1&&g.dialog.height<=54*g.rem+1,'Dialog must fit viewport and 54rem budget');
+      assert(g.header.y>=g.dialog.y&&g.footer.bottom<=height,'Header/footer must remain visible');
+      assert(g.body.bottom<=g.footer.y+1,'Body must not overlap footer');
+      const centers=g.controls.map(r=>r.y+r.height/2);
+      assert(Math.max(...centers)-Math.min(...centers)<=3,'Header controls must share a vertical axis');
+      assert(Math.abs(g.usage.y+g.usage.height/2-g.identity.y-g.identity.height/2)<=3,'Usage and Xray ID must align');
+      assert.equal(g.paneScrolls,0,'Columns must not own individual scrollbars');
+      await screenshot(page,`user-details-${width}x${height}`);
+      await page.keyboard.press('Escape');
+      await page.waitForFunction(()=>!document.querySelector('#dlg')?.open);
+      return g;
+    });
+
+    await checked('User Details: scroll resets when reopening another user',async()=>{
+      await page.setViewportSize({width:1920,height:650});
+      await navigate('users');
+      await page.locator(`tr[data-id="${user.id}"]`).click();
+      await page.waitForSelector('dialog[open] .user-canvas-grid');
+      const scrolled=await page.locator('.user-canvas-grid').evaluate(body=>{body.scrollTop=body.scrollHeight;return body.scrollTop});
+      assert(scrolled>0,'Fixture must exercise actual body scrolling');
+      await page.keyboard.press('Escape');
+      await page.waitForFunction(()=>!document.querySelector('#dlg')?.open);
+      await page.locator(`tr[data-id="${otherUser.id}"]`).click();
+      await page.waitForSelector('dialog[open] .user-canvas-grid');
+      await page.waitForTimeout(150);
+      assert.equal(await page.locator('.user-canvas-grid').evaluate(body=>body.scrollTop),0);
+      await page.keyboard.press('Escape');
+      await page.waitForFunction(()=>!document.querySelector('#dlg')?.open);
+    });
 
     await checked('Topbar: переключатель языка сохраняет внутреннюю геометрию',async()=>{
       await page.setViewportSize({width:1366,height:768});
@@ -479,6 +580,16 @@ async function main() {
       verifyPage(g,'nodes');
       assert(g.nodeCards.length>=3);
       assert(g.nodeCards.every(c=>c.width>=300),'Карточки коллекции стали слишком узкими.');
+      const modeColumns={};
+      for(const mode of ['compact','standard','spacious']){
+        await page.locator(`[data-node-grid-mode="${mode}"]`).click();
+        const state=await page.locator('.nodes').evaluate(grid=>({columns:getComputedStyle(grid).gridTemplateColumns.split(' ').length,width:grid.getBoundingClientRect().width,icons:[...grid.querySelectorAll('.nc')].every(card=>card.querySelectorAll('.acts>button svg').length===9)}));
+        modeColumns[mode]=state.columns;
+        assert(state.icons,'Fleet density must preserve semantic action icons');
+        await screenshot(page,`nodes-multiple-${width}-${mode}`);
+      }
+      assert(modeColumns.compact>modeColumns.standard&&modeColumns.standard>modeColumns.spacious,'Density must change real fleet columns');
+      await page.locator('[data-node-grid-mode="standard"]').click();
       await screenshot(page,`nodes-multiple-${width}`);
       return g;
     });
