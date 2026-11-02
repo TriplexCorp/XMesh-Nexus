@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 'use strict';
 const fs=require('node:fs');
+const path=require('node:path');
 const crypto=require('node:crypto');
 const assert=require('node:assert/strict');
 
 const index=fs.readFileSync('index.html','utf8');
+const sourceIndex=fs.readFileSync('frontend/index.html','utf8');
 const docker=fs.readFileSync('backend/Dockerfile','utf8');
 const app=fs.readFileSync('app.js','utf8');
 const entry=fs.readFileSync('nexus-ui-v3.css','utf8');
@@ -38,9 +40,9 @@ for(const [name,content] of [
 assert.match(index,/nexus-ui-v3\.css\?v=[a-f0-9]{12}/,'Design System v3 must be content-addressed');
 assert.match(index,/ui-builder\.js\?v=[a-f0-9]{12}/,'UI builder must be content-addressed');
 assert.match(index,/app\.js\?v=[a-f0-9]{12}/,'Core app must be content-addressed');
-assert.match(index,/<style id="xmesh-legacy-compat">@import url\("\/styles\/legacy\/styles\.css\?v=[^"]+"\) layer\(xmesh-legacy\);<\/style>/,
+assert.match(sourceIndex,/<style id="xmesh-legacy-compat">@import url\("\/styles\/legacy\/styles\.css\?v=[^"]+"\) layer\(xmesh-legacy\);<\/style>/,
  'Legacy stylesheet must be quarantined in the low-priority cascade layer');
-assert.doesNotMatch(index,/<link[^>]+styles\/legacy\/styles\.css/,
+assert.doesNotMatch(sourceIndex,/<link[^>]+styles\/legacy\/styles\.css/,
  'Legacy stylesheet must never be loaded as an unlayered link');
 const lastCss=index.lastIndexOf('<link rel="stylesheet"');
 assert(index.slice(lastCss).includes('nexus-ui-v3.css'),'Design System v3 must remain the final linked global stylesheet');
@@ -134,6 +136,13 @@ assert.match(builder,/const register=\(selector,role\)=>/,'Semantic registry mus
 assert.match(builder,/data-ui-card-head/,'Builder must expose reusable card heading anatomy');
 assert.match(builder,/register\('\.node-explorer','panel'\)/,'Node explorer must consume shared panel material');
 assert.match(builder,/register\('\.ngauge','metric'\)/,'Node gauges must consume shared metric role');
+assert(builder.includes("const collectionSelector='.two,.three,.four,.grid,.cards,[data-ui-collection]';"),
+ 'Collection classification must be opt-in by structural primitive');
+const collectionCode=builder.slice(builder.indexOf('const classifyCollections='),builder.indexOf('const classifyFrame='));
+assert(collectionCode.includes('view.querySelectorAll(collectionSelector)'),
+ 'Collection classifier must inspect only explicit collection candidates');
+assert(!collectionCode.includes("view.querySelectorAll('div,section')"),
+ 'Collection classifier must never infer layout from arbitrary div/section groups');
 assert.match(builder,/new MutationObserver/,'Dynamic SPA surfaces must be hydrated');
 assert.match(builder,/window\.XMeshUIBuilder/,'Builder must expose the shared runtime API');
 assert.match(builder,/classifyCollections/,'Builder must classify low-count collections');
@@ -142,6 +151,34 @@ assert.match(builder,/!node\.parentElement\?\.matches\('\.view'\)/,'Builder must
 assert.doesNotMatch(builder,/getBoundingClientRect/,'Runtime builder must not measure geometry');
 assert.doesNotMatch(builder,/composeNodes/,'Runtime builder must not contain page-specific Nodes composition');
 assert.doesNotMatch(builder,/createElement\(['"]div['"]\)/,'Runtime builder must not create presentation wrappers');
+
+// Audit every feature stylesheet: feature code may own local geometry but never
+// the global shell or Appearance material variants.
+const featureRoot=path.join('frontend','styles','features');
+const featureFiles=[];
+const walk=dir=>{
+  for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
+    const file=path.join(dir,entry.name);
+    if(entry.isDirectory())walk(file);
+    else if(entry.isFile()&&entry.name.endsWith('.css'))featureFiles.push(file);
+  }
+};
+walk(featureRoot);
+assert(featureFiles.length>0,'Feature CSS audit found no stylesheets');
+for(const file of featureFiles){
+  const css=fs.readFileSync(file,'utf8');
+  const rel=file.replaceAll('\\','/');
+  assert.doesNotMatch(css,/html\[data-surface=(?:solid|glass|raised)\]/,
+    rel+' must not fork shared Appearance material');
+  assert.doesNotMatch(css,/(?:^|\})\s*\.wrap\s*\{/m,
+    rel+' must not own the application .wrap shell');
+  assert.doesNotMatch(css,/(?:^|\})\s*\.view\s*\{/m,
+    rel+' must not own the global .view flow');
+  assert.doesNotMatch(css,/(?:^|\})\s*\.app\s*\{/m,
+    rel+' must not own the application grid');
+  assert.doesNotMatch(css,/(?:^|\})\s*\.app>aside\s*\{/m,
+    rel+' must not own the sidebar shell');
+}
 
 for(const phrase of [
   'one presentation entrypoint',
