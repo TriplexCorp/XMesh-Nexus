@@ -61,7 +61,7 @@ Feature CSS must not implement its own Classic / Glass / Raised theme, global bu
 
 ## Runtime builder
 
-`ui-builder.js` is a **semantic adapter**, not a layout engine.
+`ui-builder.js` is a semantic adapter, not a layout engine.
 
 It may:
 
