@@ -3,26 +3,30 @@ name: Create User Policy UI
 on:
   pull_request:
     paths:
-      - 'user-create-policy-v6.js'
-      - 'user-create-policy-v6.css'
-      - 'user-create-extra-v7.css'
-      - 'user-create-v3.css'
-      - 'node-dialogs.js'
-      - 'index.html'
+      - 'frontend/js/features/users/user-create-policy-v6.js'
+      - 'frontend/styles/features/users/user-create-policy-v6.css'
+      - 'frontend/styles/features/users/user-create-extra-v7.css'
+      - 'frontend/styles/features/users/user-create-v3.css'
+      - 'frontend/js/features/nodes/node-dialogs.js'
+      - 'frontend/index.html'
       - 'backend/Dockerfile'
+      - 'scripts/ci/stage-frontend-compat.sh'
       - 'scripts/check-user-create-policy-v6.js'
+      - 'scripts/check-static-assets.js'
       - '.github/workflows/user-create-policy-v6-ci.yml'
   push:
     branches: [main]
     paths:
-      - 'user-create-policy-v6.js'
-      - 'user-create-policy-v6.css'
-      - 'user-create-extra-v7.css'
-      - 'user-create-v3.css'
-      - 'node-dialogs.js'
-      - 'index.html'
+      - 'frontend/js/features/users/user-create-policy-v6.js'
+      - 'frontend/styles/features/users/user-create-policy-v6.css'
+      - 'frontend/styles/features/users/user-create-extra-v7.css'
+      - 'frontend/styles/features/users/user-create-v3.css'
+      - 'frontend/js/features/nodes/node-dialogs.js'
+      - 'frontend/index.html'
       - 'backend/Dockerfile'
+      - 'scripts/ci/stage-frontend-compat.sh'
       - 'scripts/check-user-create-policy-v6.js'
+      - 'scripts/check-static-assets.js'
       - '.github/workflows/user-create-policy-v6-ci.yml'
 
 permissions:
@@ -37,6 +41,10 @@ jobs:
         with:
           node-version-file: .node-version
           package-manager-cache: false
+      - name: Verify canonical repository layout
+        run: node scripts/check-repo-layout.js
+      - name: Stage legacy frontend basename fixtures
+        run: bash scripts/ci/stage-frontend-compat.sh
       - name: Check policy enhancement syntax
         run: node --check user-create-policy-v6.js
       - name: Verify aligned policy controls, metadata row and duration calendar
