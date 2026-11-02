@@ -23,7 +23,7 @@
 /* Density is a product choice, not just a stored preference. The common
    low-count fleets below intentionally recompose so all three modes remain
    visibly distinct instead of resolving to the same auto-fit columns. */
-.nodes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,24rem),1fr));align-items:start;justify-content:center;gap:var(--nx-page-gap);grid-auto-rows:max-content;min-width:0}
+.nodes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,24rem),1fr));align-items:start;justify-content:start;gap:var(--nx-page-gap);grid-auto-rows:max-content;min-width:0}
 .nodes[data-grid-mode=compact]{grid-template-columns:repeat(auto-fit,minmax(min(100%,20rem),1fr))}
 .nodes[data-grid-mode=spacious]{grid-template-columns:minmax(0,1fr)}
 
