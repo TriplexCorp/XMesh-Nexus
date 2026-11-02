@@ -1,4 +1,4 @@
-name: Temporary Frontend Recovery Runner
+name: Temporary Frontend Recovery Validator
 
 on:
   push:
@@ -6,10 +6,10 @@ on:
       - tmp/frontend-recovery-runner-20261102
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  integrate:
+  source-contracts:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout integration branch
@@ -17,121 +17,84 @@ jobs:
         with:
           ref: integration/argon-frontend-recovery-20261102
           fetch-depth: 0
-
-      - name: Apply verified recovery fixes
+      - name: Use Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Frontend JavaScript syntax
+        run: find frontend/js -name '*.js' -print0 | xargs -0 -n1 node --check
+      - name: Run frontend and UI source contracts
         shell: bash
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import os
-          import re
-
-          root = Path('.')
-
-          app = root / 'frontend/js/core/app.js'
-          text = app.read_text(encoding='utf-8')
-          old = '<span class="node-create-label">Новый узел</span></b\n  ${r.items.length?`<div class="node-explorer-pages"'
-          new = '<span class="node-create-label">Новый узел</span></button>\n  ${r.items.length?`<div class="node-explorer-pages"'
-          if text.count(old) != 1:
-              raise SystemExit(f'Expected exactly one malformed Nodes button, found {text.count(old)}')
-          app.write_text(text.replace(old, new), encoding='utf-8')
-
-          index = root / 'frontend/index.html'
-          html = index.read_text(encoding='utf-8')
-          html = re.sub(r'\n?<!-- Legacy compatibility[^\n]*\n<style id="xmesh-legacy-compat">.*?</style>\n?', '\n', html, count=1)
-          html = re.sub(r'\n?<!-- Feature-local geometry[^\n]*\n', '\n', html, count=1)
-          html = re.sub(r'^<link rel="stylesheet" href="/styles/features/[^\n]+\n', '', html, flags=re.M)
-          html = re.sub(r'^<script src="/js/core/ui-builder\.js[^\n]+\n', '', html, flags=re.M)
-          if '/styles/features/' in html or 'ui-builder.js' in html or 'xmesh-legacy-compat' in html:
-              raise SystemExit('index.html still contains retired presentation wiring')
-          index.write_text(html, encoding='utf-8')
-
-          entry = root / 'frontend/styles/system/nexus-ui-v3.css'
-          feature_root = root / 'frontend/styles/features'
-          feature_files = sorted(p for p in feature_root.rglob('*.css') if p.is_file())
-          lines = [
-              '/* Single panel presentation entrypoint. Legacy remains explicitly quarantined until',
-              ' * the remaining runtime-only compatibility rules are migrated and browser-verified. */',
-              '@import url("../legacy/styles.css") layer(xmesh-legacy);',
-              '@import url("./nexus-v3-foundation.css");',
-              '@import url("./nexus-v3-components.css");',
-              '@import url("./nexus-v3-layout.css");',
-              '',
-              '/* Feature modules own named feature geometry only. */',
-          ]
-          for path in feature_files:
-              rel = Path(os.path.relpath(path, entry.parent)).as_posix()
-              lines.append(f'@import url("{rel}");')
-          entry.write_text('\n'.join(lines) + '\n', encoding='utf-8')
-
-          components = root / 'frontend/styles/system/nexus-v3-components.css'
-          css = components.read_text(encoding='utf-8')
-          old_footer = ':where(dialog)>.box>.act,:where(dialog)>form.box>.act{position:sticky;bottom:calc(-1 * var(--nx-card-pad));margin-top:auto;padding-block:.8rem;background:var(--nx-dialog-bg);border-top:1px solid var(--nx-separator);z-index:1}'
-          new_footer = ':where(dialog)>.box>.act,:where(dialog)>form.box>.act{position:sticky;bottom:0;margin-top:auto;padding-block:.8rem;background:var(--nx-dialog-bg);border-top:1px solid var(--nx-separator);z-index:1}'
-          if css.count(old_footer) != 1:
-              raise SystemExit('Dialog sticky footer contract changed unexpectedly')
-          css = css.replace(old_footer, new_footer)
-
-          old_close = ':where(dialog,.sv-overlay,.crx-dialog,.notification-workspace) :is(button[data-x],button[aria-label^="Закрыть"],.sv-dialog-close,.crx-close,.xm-studio-modal-close)'
-          new_close = ':where(dialog,.sv-overlay,.crx-dialog,.notification-workspace) :is(button[data-x][aria-label^="Закрыть"],button[data-x][aria-label^="Close"],.geo-close[data-x],.route-json-close[data-x],button[aria-label^="Закрыть"],button[aria-label^="Close"],.sv-dialog-close,.crx-close,.xm-studio-modal-close)'
-          if css.count(old_close) != 2:
-              raise SystemExit(f'Expected two shared close selectors, found {css.count(old_close)}')
-          css = css.replace(old_close, new_close)
-
-          marker = '/* Select: native <select> remains canonical form state and fallback. */'
-          modal_motion = '''#dlg{--modal-off:translateY(16px) scale(.982);opacity:0;transform:var(--modal-off);transition:opacity .24s cubic-bezier(.2,.75,.25,1),transform .32s cubic-bezier(.18,.82,.24,1),display .32s allow-discrete,overlay .32s allow-discrete}\n#dlg[open]{opacity:1;transform:translateY(0) scale(1)}\n#dlg.side{--modal-off:translateX(35px)}\n#dlg.pop,#dlg.pal{--modal-off:translateY(-12px) scale(.982)}\n#dlg::backdrop{opacity:0;transition:opacity .32s ease,display .32s allow-discrete,overlay .32s allow-discrete}\n#dlg[open]::backdrop{opacity:1}\n@starting-style{#dlg[open]{opacity:0;transform:var(--modal-off)}#dlg[open]::backdrop{opacity:0}}\nhtml[data-motion=off] #dlg,html[data-motion=off] #dlg::backdrop{transition:none;transform:none;opacity:1}\n@media(prefers-reduced-motion:reduce){#dlg,#dlg::backdrop{transition:none;transform:none;opacity:1}}\n'''
-          if '#dlg[open]{opacity:1;transform:' not in css:
-              if marker not in css:
-                  raise SystemExit('Cannot place shared modal motion rules')
-              css = css.replace(marker, modal_motion + '\n' + marker, 1)
-          components.write_text(css, encoding='utf-8')
-
-          settings = root / 'frontend/styles/features/settings/settings.css'
-          scss = settings.read_text(encoding='utf-8')
-          old_slider = '.color-slider-grid{display:grid;grid-template-columns:7rem minmax(0,1fr) 3rem;align-items:center;gap:var(--nx-space-3);padding:.5rem 0;min-width:0}'
-          new_slider = '.color-slider-grid{display:grid;grid-template-columns:7rem minmax(12rem,32rem) 3rem;align-items:center;justify-content:start;gap:var(--nx-space-3);width:100%;max-width:40rem;padding:.5rem 0;min-width:0}'
-          if scss.count(old_slider) != 1:
-              raise SystemExit('Settings slider grid contract changed unexpectedly')
-          settings.write_text(scss.replace(old_slider, new_slider), encoding='utf-8')
-          PY
-
-      - name: Refresh content-addressed UI asset keys
-        run: node scripts/update-ui-cache.cjs
-
-      - name: Verify recovered source contracts
-        shell: bash
-        run: |
-          node scripts/update-ui-cache.cjs --check
-          find frontend/js -name '*.js' -print0 | xargs -0 -n1 node --check
-          node - <<'JS'
-          const fs=require('node:fs');
-          const assert=require('node:assert/strict');
-          const html=fs.readFileSync('frontend/index.html','utf8');
-          const app=fs.readFileSync('frontend/js/core/app.js','utf8');
-          const entry=fs.readFileSync('frontend/styles/system/nexus-ui-v3.css','utf8');
-          const components=fs.readFileSync('frontend/styles/system/nexus-v3-components.css','utf8');
-          const settings=fs.readFileSync('frontend/styles/features/settings/settings.css','utf8');
-          assert.equal((html.match(/\/styles\/system\/nexus-ui-v3\.css\?v=/g)||[]).length,1);
-          assert(!html.includes('/styles/features/'));
-          assert(!html.includes('ui-builder.js'));
-          assert(!html.includes('xmesh-legacy-compat'));
-          assert(entry.includes('@import url("../legacy/styles.css?'));
-          assert(entry.includes('../features/settings/settings.css?'));
-          assert(entry.includes('../features/nodes/nodes.css?'));
-          assert(entry.includes('../features/users/user-editor.css?'));
-          assert(app.includes('<span class="node-create-label">Новый узел</span></button>'));
-          assert(!app.includes('<span class="node-create-label">Новый узел</span></b\n'));
-          assert(components.includes('position:sticky;bottom:0'));
-          assert(!components.includes(':is(button[data-x],button[aria-label^="Закрыть"]'));
-          assert(settings.includes('max-width:40rem'));
-          JS
-          git diff --check
-
-      - name: Commit integration result
-        shell: bash
-        run: |
-          git config user.name 'XMesh frontend integration'
-          git config user.email 'actions@users.noreply.github.com'
-          git add frontend
-          git commit -m 'fix(frontend): integrate recovered design-system checkpoint'
-          git push origin HEAD:integration/argon-frontend-recovery-20261102
+          set +e
+          checks=(
+            check-repo-layout.js
+            check-unified-selects.js
+            check-json-diagnostics.js
+            check-xray-intelligence.js
+            check-xray-tool-actions.js
+            check-xray-studio-wrap-tabs.js
+            check-xray-studio-enterprise.js
+            check-xray-studio-composer.js
+            check-xray-studio-hosts.js
+            check-xray-active-entrypoint.js
+            check-static-assets.js
+            check-client-routing.js
+            check-i18n.js
+            check-english-coverage.js
+            check-subscription-studio.js
+            check-admin-security.js
+            check-viewer-security.js
+            check-security-policy.js
+            check-modal-motion.js
+            check-mfa.js
+            check-security-center.js
+            check-security-audit.js
+            check-white-label.js
+            check-appearance-surfaces.js
+            check-ui-system.js
+            check-node-create-action.js
+            check-node-hosting-notifications.js
+            check-notification-center.js
+            check-statistics-feedback.js
+            test-traffic-chart-geometry.js
+            check-tech-debt.js
+            check-crud-dialog-lifecycle.js
+            check-user-presence.js
+            check-settings-update-actions.js
+            check-managed-xray-update.js
+            check-user-fingerprint-ownership.js
+            check-balancers-workspace.js
+            check-user-quota-preserves-traffic.js
+            check-node-traffic-reset.js
+            check-node-traffic-cutoff.js
+            check-node-network-traffic.js
+            check-node-xray-releases.js
+            check-agent-update.js
+            check-node-live-status.js
+            check-host-editor-zones.js
+            check-node-editor-layout.js
+            check-node-grid-layout.js
+            check-node-explorer.js
+            check-node-ip-rotation.js
+            check-xhttp-extras.js
+            check-xray-studio-selectors.js
+            check-xray-endpoint-autofill.js
+            test-client-config.js
+          )
+          failures=()
+          for check in "${checks[@]}"; do
+            echo "::group::$check"
+            node "scripts/$check"
+            rc=$?
+            echo "::endgroup::"
+            if [ "$rc" -ne 0 ]; then failures+=("$check:$rc"); fi
+          done
+          printf 'FAILED_CHECKS=%s\n' "${failures[*]}"
+          if [ "${#failures[@]}" -ne 0 ]; then
+            printf '%s\n' "${failures[@]}" > /tmp/frontend-failures.txt
+            exit 1
+          fi
+      - name: Verify cache graph
+        if: always()
+        run: node scripts/update-ui-cache.cjs --check
