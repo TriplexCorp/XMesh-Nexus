@@ -69,12 +69,14 @@ assert.match(css,/@media \(max-width:760px\)[\s\S]*?grid-template-areas:"primary
 assert.match(css,/@media \(max-width:440px\)[\s\S]*?\.host-connect-fields\s*\{[\s\S]*?grid-template-columns:minmax\(0,1fr\)/,
  'Phone layout must keep host fields usable');
 
-// User details must be content-sized. A minimum shell height plus fixed canvas
-// height created a large empty lower half even though all controls were visible.
-assert.match(css,/#dlg\.user-modal\s*\{[\s\S]*?min-height:0[\s\S]*?height:auto/,
- 'User details dialog must not force an artificial minimum height');
-assert.match(css,/#dlg\.user-modal>\.user-canvas\s*\{[\s\S]*?block-size:auto[\s\S]*?display:flex[\s\S]*?flex-direction:column/,
- 'User details canvas must grow naturally and shrink only at the viewport boundary');
+// User Details is deliberately wider than a form dialog and must have only one
+// material shell. #dlg owns the edge/shadow; .user-canvas is layout-only.
+assert.match(css,/#dlg\.user-modal\s*\{[\s\S]*?--dialog-width:1840px[\s\S]*?min-inline-size:min\(1400px,calc\(100vw - 2rem\)\)[\s\S]*?height:auto/,
+ 'User details dialog must use the wide horizontal workspace contract');
+assert.match(css,/#dlg\.user-modal>\.user-canvas\s*\{[\s\S]*?block-size:auto[\s\S]*?display:flex[\s\S]*?flex-direction:column[\s\S]*?border:0[\s\S]*?border-radius:0[\s\S]*?background:transparent[\s\S]*?box-shadow:none/,
+ 'User details canvas must not draw a second card inside the dialog shell');
 assert.match(css,/#dlg\.user-modal \.user-canvas-grid\s*\{[\s\S]*?flex:0 1 auto[\s\S]*?overflow:auto/,
  'User details body must be the shrinkable scroll owner');
-console.log('Workspace dialogs: host width/body/footer, responsive zones and user details content sizing OK');
+assert.match(css,/#dlg\.user-modal \.user-canvas-foot\s*\{[\s\S]*?flex:0 0 auto[\s\S]*?position:relative/,
+ 'User details footer must stay inside the single dialog surface');
+console.log('Workspace dialogs: host shell and single-surface horizontal user details OK');
