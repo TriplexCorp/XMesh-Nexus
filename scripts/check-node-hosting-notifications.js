@@ -14,8 +14,10 @@ assert.match(app, /const statuses=new Map\(await Promise\.all/);
 assert.match(app, /nodeNotificationTitle\(item\.node\)/);
 assert.match(app, /data-notifications-refresh/);
 assert.doesNotMatch(app, /\(COUNTRIES\.find\(c=>c\.flag===x\.flag\)\?\.code\|\|'—'\)\+' · '\+x\.name/);
-assert.match(css,/\.nt \.notification-country-flag\{/);
-assert.match(css,/\.nc \.node-hosting\{/);
+assert.match(css,/\.nt\s+\.notification-country-flag\s*\{/,
+ 'Notification country flag must remain owned by the notifications feature');
+assert.match(css,/(?:^|\n)\.node-hosting\s*\{/m,
+ 'Optional hosting label must remain owned by the Nodes feature');
 assert.match(backend,/object\.get\("hosting"\)/);
 assert.match(backend,/value\.chars\(\)\.count\(\) > 100/);
 // Render the actual notification formatter with a minimal flag/escape fixture.
