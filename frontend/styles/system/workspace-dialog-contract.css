@@ -60,8 +60,9 @@
 
 /* User details is one wide workspace surface, not a dialog wrapped around a
  * second card. The native dialog owns the material edge/shadow; .user-canvas
- * only owns spacing and internal layout. */
-#dlg.user-modal{
+ * only owns spacing and internal layout. `dialog#dlg` intentionally matches the
+ * legacy users.css selector specificity so this canonical contract wins by load order. */
+dialog#dlg.user-modal{
   --dialog-width:1960px;
   --modal-off:translateY(22px) scale(.972);
   box-sizing:border-box;
@@ -72,6 +73,7 @@
   max-width:calc(100vw - 1.5rem);
   max-inline-size:calc(100vw - 1.5rem);
   min-height:0;
+  min-block-size:0;
   height:auto;
   max-height:min(42rem,calc(100dvh - 1.5rem));
   max-block-size:min(42rem,calc(100dvh - 1.5rem));
@@ -89,7 +91,7 @@
   transition-behavior:allow-discrete;
 }
 
-#dlg.user-modal::backdrop{
+dialog#dlg.user-modal::backdrop{
   transition:
     opacity .42s ease,
     display .50s allow-discrete,
@@ -97,7 +99,7 @@
   transition-behavior:allow-discrete;
 }
 
-#dlg.user-modal>.user-canvas{
+dialog#dlg.user-modal>.user-canvas{
   box-sizing:border-box;
   width:100%;
   inline-size:100%;
@@ -219,7 +221,7 @@
 }
 
 @media(max-width:1480px){
-  #dlg.user-modal{
+  dialog#dlg.user-modal{
     min-width:calc(100vw - 1.5rem);
     min-inline-size:calc(100vw - 1.5rem);
   }
@@ -242,17 +244,19 @@
     max-block-size:calc(100dvh - 1rem);
     max-height:calc(100dvh - 1rem);
   }
-  #dlg.user-modal{
+  dialog#dlg.user-modal{
     width:calc(100vw - 1rem);
     inline-size:calc(100vw - 1rem);
     min-width:0;
     min-inline-size:0;
     max-width:calc(100vw - 1rem);
     max-inline-size:calc(100vw - 1rem);
+    min-height:0;
+    min-block-size:0;
     max-height:calc(100dvh - 1rem);
     max-block-size:calc(100dvh - 1rem);
   }
-  #dlg.user-modal>.user-canvas{
+  dialog#dlg.user-modal>.user-canvas{
     max-height:calc(100dvh - 1rem);
     max-block-size:calc(100dvh - 1rem);
   }
