@@ -71,12 +71,16 @@ assert.match(css,/@media \(max-width:440px\)[\s\S]*?\.host-connect-fields\s*\{[\
 
 // User Details is deliberately wider than a form dialog and must have only one
 // material shell. #dlg owns the edge/shadow; .user-canvas is layout-only.
-assert.match(css,/#dlg\.user-modal\s*\{[\s\S]*?--dialog-width:1840px[\s\S]*?min-inline-size:min\(1400px,calc\(100vw - 2rem\)\)[\s\S]*?height:auto/,
+assert.match(css,/#dlg\.user-modal\s*\{[\s\S]*?--dialog-width:1840px[\s\S]*?--modal-off:translateY\(22px\) scale\(\.972\)[\s\S]*?min-inline-size:min\(1400px,calc\(100vw - 2rem\)\)[\s\S]*?height:auto/,
  'User details dialog must use the wide horizontal workspace contract');
+assert.match(css,/#dlg\.user-modal\s*\{[\s\S]*?opacity \.34s[\s\S]*?transform \.50s[\s\S]*?overlay \.50s allow-discrete/,
+ 'User details must use the slower premium open/close motion contract');
 assert.match(css,/#dlg\.user-modal>\.user-canvas\s*\{[\s\S]*?block-size:auto[\s\S]*?display:flex[\s\S]*?flex-direction:column[\s\S]*?border:0[\s\S]*?border-radius:0[\s\S]*?background:transparent[\s\S]*?box-shadow:none/,
  'User details canvas must not draw a second card inside the dialog shell');
 assert.match(css,/#dlg\.user-modal \.user-canvas-grid\s*\{[\s\S]*?flex:0 1 auto[\s\S]*?overflow:auto/,
  'User details body must be the shrinkable scroll owner');
-assert.match(css,/#dlg\.user-modal \.user-canvas-foot\s*\{[\s\S]*?flex:0 0 auto[\s\S]*?position:relative/,
- 'User details footer must stay inside the single dialog surface');
-console.log('Workspace dialogs: host shell and single-surface horizontal user details OK');
+assert.match(css,/#dlg\.user-modal \.user-canvas-foot\s*\{[\s\S]*?flex:0 0 auto[\s\S]*?position:relative[\s\S]*?border-top:0[\s\S]*?background:transparent[\s\S]*?box-shadow:none/,
+ 'User details footer must remain metadata, not render as a second material strip');
+assert.match(css,/html\[data-motion=off\] #dlg\.user-modal[\s\S]*?transition:none!important/,
+ 'User details premium motion must respect the animation setting');
+console.log('Workspace dialogs: host shell and single-surface animated user details OK');
