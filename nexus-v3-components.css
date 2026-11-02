@@ -1,0 +1,275 @@
+/* XMesh Nexus Design System v3 / Components
+ * Reusable visual primitives only. Page geometry belongs in nexus-v3-layout.css.
+ */
+
+html{font-size:calc(clamp(15px,.22vw + 14px,17px)*var(--ts,1))}
+body{line-height:1.52;letter-spacing:-.01em}
+body::before,body::after{opacity:.22;filter:blur(150px);animation:none}
+small{font-size:.82rem}
+
+/* Material surfaces */
+.card,
+[data-ui-surface="panel"]{
+  position:relative;
+  min-width:0;
+  background:var(--nx-panel-bg);
+  border:1px solid var(--nx-border);
+  border-radius:var(--nx-card-radius);
+  box-shadow:var(--nx-panel-shadow);
+  backdrop-filter:var(--nx-backdrop);
+  -webkit-backdrop-filter:var(--nx-backdrop);
+}
+[data-ui-surface="section"]{
+  min-width:0;
+  background:var(--nx-section-bg);
+  border:1px solid var(--nx-border);
+  border-radius:var(--nx-section-radius);
+  box-shadow:var(--nx-section-shadow);
+}
+[data-ui-surface="item"],
+[data-ui-surface="metric"]{
+  min-width:0;
+  background:var(--nx-item-bg);
+  border:1px solid var(--nx-border);
+  border-radius:var(--nx-item-radius);
+  box-shadow:var(--nx-item-shadow);
+}
+[data-ui-surface="floating"],
+.xm-select-popover{
+  background:var(--nx-floating-bg);
+  border:1px solid var(--nx-border-strong);
+  border-radius:var(--nx-section-radius);
+  box-shadow:var(--nx-floating-shadow);
+  backdrop-filter:var(--nx-backdrop);
+  -webkit-backdrop-filter:var(--nx-backdrop);
+}
+
+/* One surface owns elevation. Nested groups describe structure, not another
+ * stack of shadows. */
+.card .card,
+[data-ui-surface="panel"] [data-ui-surface="section"],
+[data-ui-surface="section"] [data-ui-surface="item"],
+dialog [data-ui-surface="section"],
+dialog [data-ui-surface="item"]{
+  box-shadow:none;
+}
+
+/* Shell */
+.app>aside{
+  background:color-mix(in srgb,var(--nx-panel-bg) 90%,transparent);
+  border-right-color:var(--nx-border);
+  backdrop-filter:var(--nx-backdrop);
+  -webkit-backdrop-filter:var(--nx-backdrop);
+}
+.brand{gap:.78rem}
+.logo{
+  border-radius:var(--nx-control-radius);
+  border-color:color-mix(in srgb,var(--tx) 10%,transparent);
+}
+.core{
+  background:color-mix(in srgb,var(--nx-section-bg) 72%,transparent);
+  border-color:var(--nx-border);
+  box-shadow:none;
+}
+.top{border-bottom-color:var(--nx-separator)}
+.top-eyebrow{font-size:.64rem;letter-spacing:.12em;opacity:.82}
+h1{font-size:var(--nx-title);line-height:1.14;letter-spacing:-.045em}
+h2,h3{letter-spacing:-.025em}
+.hd p,.note{color:var(--nx-muted)}
+
+/* Controls */
+button,.btn,.gh,.dg,.ib,.search,
+input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+select,textarea,.xm-select-trigger,.xm-select-button{
+  border-radius:var(--nx-control-radius);
+}
+
+input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+select,textarea,.xm-select-trigger,.xm-select-button,
+.search,.gh,.dg,.ib{
+  background:var(--nx-control-bg);
+  border:1px solid var(--nx-border);
+  box-shadow:var(--nx-control-shadow);
+}
+
+input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+select,.xm-select-trigger,.xm-select-button{
+  min-height:var(--nx-control-h);
+  font-size:.88rem;
+}
+textarea{font-size:.88rem;line-height:1.5}
+.search{min-height:var(--nx-control-h)}
+.gh,.dg{min-height:var(--nx-control-h-sm);padding:.52rem .82rem}
+.ib{width:var(--nx-control-h);height:var(--nx-control-h)}
+.btn{
+  min-height:var(--nx-control-h);
+  padding:.56rem 1rem;
+  background:var(--a);
+  border:1px solid color-mix(in srgb,var(--a) 72%,var(--tx) 8%);
+  color:var(--btn-text);
+  box-shadow:none;
+  font-weight:720;
+}
+
+:where(button,.btn,.gh,.dg,.ib,.search,[role="button"],nav a,nav .more){
+  transition:background-color .14s ease,border-color .14s ease,color .14s ease,opacity .14s ease;
+  text-shadow:none;
+}
+@media(hover:hover) and (pointer:fine){
+  :where(.gh,.dg,.ib,.search,nav a,nav .more,[role="button"]):not(:disabled):not([aria-disabled="true"]):hover{
+    transform:none;
+    background:var(--nx-hover-bg);
+    border-color:var(--nx-hover-border);
+    color:var(--tx);
+    box-shadow:none;
+  }
+  .btn:not(:disabled):hover{
+    transform:none;
+    background:color-mix(in srgb,var(--a) 90%,var(--tx) 10%);
+    border-color:color-mix(in srgb,var(--a) 78%,var(--tx) 10%);
+    color:var(--btn-text);
+    box-shadow:none;
+  }
+}
+
+:where(button,.btn,.gh,.dg,.ib,.search,[role="button"],input,select,textarea,.xm-select-trigger,.xm-select-button):focus-visible{
+  outline:2px solid var(--nx-focus);
+  outline-offset:2px;
+  box-shadow:none;
+}
+
+/* Navigation */
+nav a,nav .more{
+  min-height:2.8rem;
+  border-radius:var(--nx-control-radius);
+  border-color:transparent;
+}
+nav a.on{
+  color:var(--tx);
+  background:color-mix(in srgb,var(--a) 10%,var(--nx-item-bg));
+  border-color:color-mix(in srgb,var(--a) 24%,var(--nx-border));
+}
+nav a.on::before{box-shadow:none}
+
+/* Segmented controls */
+.seg{
+  display:inline-flex;
+  align-items:center;
+  gap:2px;
+  padding:3px;
+  background:var(--ui-segment-track-bg);
+  border:1px solid var(--ui-segment-track-border);
+  border-radius:var(--nx-control-radius);
+  box-shadow:none;
+}
+.seg button{
+  min-height:2.15rem;
+  padding:.4rem .68rem;
+  border:1px solid transparent;
+  border-radius:max(7px,calc(var(--nx-control-radius) - 3px));
+  color:var(--ui-segment-idle-color);
+  font-weight:590;
+  box-shadow:none;
+}
+.seg button.on{
+  background:var(--ui-segment-active-bg);
+  border-color:var(--ui-segment-active-border);
+  color:var(--ui-segment-active-color);
+  box-shadow:var(--ui-segment-active-shadow);
+  font-weight:730;
+}
+@media(hover:hover) and (pointer:fine){
+  .seg button:not(.on):hover{
+    background:var(--ui-segment-hover-bg);
+    border-color:transparent;
+    color:var(--tx);
+  }
+  .seg button.on:hover{
+    background:var(--ui-segment-active-bg);
+    border-color:var(--ui-segment-active-border);
+    box-shadow:var(--ui-segment-active-shadow);
+  }
+}
+
+/* Composite controls own exactly one material shell. */
+[data-ui-control="shell"],.precision-number,.palette-hex-editor{
+  background:var(--nx-control-bg);
+  border:1px solid var(--nx-border);
+  border-radius:var(--nx-control-radius);
+  box-shadow:var(--nx-control-shadow);
+}
+[data-ui-control="inner"],
+.precision-number input[type="number"],
+.palette-hex-editor input{
+  background:transparent;
+  border:0;
+  box-shadow:none;
+  outline:0;
+}
+
+/* Tables */
+table{border-collapse:separate;border-spacing:0}
+thead th{
+  color:var(--nx-muted);
+  font-size:.68rem;
+  letter-spacing:.045em;
+  text-transform:uppercase;
+  border-bottom-color:var(--nx-separator);
+}
+tbody td{border-bottom-color:var(--nx-separator)}
+tbody tr:last-child td{border-bottom-color:transparent}
+@media(hover:hover) and (pointer:fine){
+  tbody tr:hover td{background:color-mix(in srgb,var(--tx) 2.5%,transparent)}
+}
+
+/* Chips and status pills stay quiet; accent is reserved for active state. */
+.chip,.tag,[class*="-pill"]{box-shadow:none}
+
+/* Dialog material. Special editors may own geometry, but not a second material
+ * language. */
+dialog{
+  color:var(--tx);
+  background:transparent;
+}
+dialog::backdrop{
+  background:var(--xm-modal-dim,rgba(2,7,12,.72));
+  backdrop-filter:blur(var(--xm-modal-blur,10px));
+}
+dialog .box,dialog form.box,[data-ui-surface="dialog"]{
+  background:var(--nx-dialog-bg);
+  border:1px solid var(--nx-border-strong);
+  border-radius:var(--nx-card-radius);
+  box-shadow:var(--nx-dialog-shadow);
+  backdrop-filter:var(--nx-backdrop);
+  -webkit-backdrop-filter:var(--nx-backdrop);
+}
+dialog [data-ui-surface="section"]{
+  background:var(--nx-dialog-section-bg);
+  border-color:var(--nx-separator);
+  box-shadow:none;
+  backdrop-filter:none;
+  -webkit-backdrop-filter:none;
+}
+dialog :where(input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),select,textarea,.xm-select-trigger,.xm-select-button){
+  background:var(--nx-dialog-control-bg);
+}
+
+/* Empty states */
+.empty,[data-empty-state],[data-ui-layout="empty"] .empty{
+  color:var(--nx-muted);
+}
+.empty h2,.empty h3,[data-empty-state] h2,[data-empty-state] h3{color:var(--tx)}
+
+/* Settings rows are structural, never mini-cards. */
+.appearance-layout .setting-row{
+  background:transparent;
+  border-top-color:var(--nx-separator);
+  box-shadow:none;
+  backdrop-filter:none;
+  -webkit-backdrop-filter:none;
+}
+.appearance-layout .setting-row:first-of-type{border-top-color:transparent}
+
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}
+}
