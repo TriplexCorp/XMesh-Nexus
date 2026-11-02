@@ -6,7 +6,6 @@ permissions:
   contents: write
 jobs:
   patch:
-    if: ${{ !contains(github.event.head_commit.message, 'fix(browser): synchronize fixtures with panel bootstrap') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -23,21 +22,18 @@ jobs:
           from pathlib import Path
           p=Path('scripts/test-ui-browser.cjs')
           s=p.read_text()
-          old="""    await page.locator('#submit').click();
+          pairs=[
+          ("""    await page.locator('#submit').click();
     await page.waitForSelector('#nav');
     await checked('Вход через форму',async () => {
-"""
-          new="""    await page.locator('#submit').click();
+""","""    await page.locator('#submit').click();
     await page.waitForFunction(() => !!document.querySelector('#view')?.children.length && !document.querySelector('#view .sk'));
     await checked('Вход через форму',async () => {
-"""
-          assert old in s, 'login bootstrap marker not found'
-          s=s.replace(old,new,1)
-          old="""    const user = await create('users',{username:`${prefix}-client`,squads:[squad.id],hwid:2});
+"""),
+          ("""    const user = await create('users',{username:`${prefix}-client`,squads:[squad.id],hwid:2});
 
     for (const [width,height] of sizes) {
-"""
-          new="""    const user = await create('users',{username:`${prefix}-client`,squads:[squad.id],hwid:2});
+""","""    const user = await create('users',{username:`${prefix}-client`,squads:[squad.id],hwid:2});
     const fixtureBootstrap=await api('GET','/bootstrap');
     assert(fixtureBootstrap.collections?.profiles?.some(item=>item.id===profile.id),'Bootstrap не увидел тестовый профиль.');
     assert(fixtureBootstrap.collections?.nodes?.some(item=>item.id===node.id),'Bootstrap не увидел тестовый узел.');
@@ -48,29 +44,33 @@ jobs:
     await page.waitForFunction(() => !!document.querySelector('#view')?.children.length && !document.querySelector('#view .sk'));
 
     for (const [width,height] of sizes) {
-"""
-          assert old in s, 'fixture reload marker not found'
-          s=s.replace(old,new,1)
-          old="""    await create('nodes',{name:`${prefix} · Берлин`,addr:'192.0.2.11',profileId:profile.id});
+"""),
+          ("""    await create('nodes',{name:`${prefix} · Берлин`,addr:'192.0.2.11',profileId:profile.id});
     await create('nodes',{name:`${prefix} · Амстердам`,addr:'192.0.2.12',profileId:profile.id});
     for(const width of [1366,1920,3440]) await checked(`Коллекция узлов: ${width}px`,async()=>{
-"""
-          new="""    await create('nodes',{name:`${prefix} · Берлин`,addr:'192.0.2.11',profileId:profile.id});
+""","""    await create('nodes',{name:`${prefix} · Берлин`,addr:'192.0.2.11',profileId:profile.id});
     await create('nodes',{name:`${prefix} · Амстердам`,addr:'192.0.2.12',profileId:profile.id});
     // Refresh the panel DB after out-of-band API fixture creation before
     // validating the multi-card collection layout.
     await page.reload({waitUntil:'domcontentloaded'});
     await page.waitForFunction(() => !!document.querySelector('#view')?.children.length && !document.querySelector('#view .sk'));
     for(const width of [1366,1920,3440]) await checked(`Коллекция узлов: ${width}px`,async()=>{
-"""
-          assert old in s, 'multi-node reload marker not found'
-          s=s.replace(old,new,1)
+""")]
+          changed=0
+          for old,new in pairs:
+              if old in s:
+                  s=s.replace(old,new,1); changed+=1
+          print(f'Browser bootstrap replacements: {changed}')
           p.write_text(s)
           PY
           node --check scripts/test-ui-browser.cjs
           git diff --check
       - name: Commit browser synchronization fix
         run: |
+          if git diff --quiet -- scripts/test-ui-browser.cjs; then
+            echo "Browser synchronization already applied"
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add scripts/test-ui-browser.cjs
