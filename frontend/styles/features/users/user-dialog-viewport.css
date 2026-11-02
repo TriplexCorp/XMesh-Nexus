@@ -10,6 +10,17 @@ dialog.user-modal > .user-canvas {
   max-height: min(100%, calc(100dvh - 2rem));
 }
 
+/* Keep the drawer footer reachable and visible while the body scrolls. */
+dialog.user-modal .user-canvas-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  margin-top: 0;
+  padding-bottom: max(.55rem, env(safe-area-inset-bottom));
+  background: var(--nx-dialog-bg);
+  box-shadow: 0 -1px 0 var(--nx-border);
+}
+
 @media (max-width: 560px) {
   dialog.user-modal > .user-canvas {
     max-height: min(100%, calc(100dvh - 1rem));
