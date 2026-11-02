@@ -239,7 +239,7 @@ async function main() {
       assert.equal(g.scrollTop,0,'Body must start at top');
       assert(Math.max(...g.panes.map(r=>r.y))-Math.min(...g.panes.map(r=>r.y))<=4,'Three columns must start together');
       assert(g.headings.every(r=>r.y>=g.body.y),'Initial headings must not be clipped');
-      assert(g.dialog.y>=0&&g.dialog.bottom<=height+1&&g.dialog.height<=54*g.rem+1,'Dialog must fit viewport and 54rem budget');
+      assert(g.dialog.y>=0&&g.dialog.bottom<=height+1&&g.dialog.height<=height-1.5*g.rem+1,'Dialog must fit the available viewport height');
       assert(g.header.y>=g.dialog.y&&g.footer.bottom<=height,'Header/footer must remain visible');
       assert(g.body.bottom<=g.footer.y+1,'Body must not overlap footer');
       const centers=g.controls.map(r=>r.y+r.height/2);

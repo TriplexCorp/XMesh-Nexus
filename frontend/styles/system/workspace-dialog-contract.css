@@ -75,8 +75,8 @@ dialog#dlg.user-modal{
   min-height:0;
   min-block-size:0;
   height:auto;
-  max-height:min(54rem,calc(100dvh - 1.5rem));
-  max-block-size:min(54rem,calc(100dvh - 1.5rem));
+  max-height:calc(100dvh - 1.5rem);
+  max-block-size:calc(100dvh - 1.5rem);
   overflow:hidden;
   border:1px solid var(--nx-border-strong);
   border-radius:var(--nx-card-radius);
@@ -109,8 +109,8 @@ dialog#dlg.user-modal>.user-canvas{
   height:auto;
   min-block-size:0;
   min-height:0;
-  max-block-size:min(54rem,calc(100dvh - 1.5rem));
-  max-height:min(54rem,calc(100dvh - 1.5rem));
+  max-block-size:calc(100dvh - 1.5rem);
+  max-height:calc(100dvh - 1.5rem);
   display:flex;
   flex-direction:column;
   gap:var(--nx-space-3);
