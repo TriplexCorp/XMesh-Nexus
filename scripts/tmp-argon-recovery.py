@@ -67,6 +67,11 @@ dialog.xm-action-confirm:has(.xm-action-confirm-icon) .xm-action-confirm-actions
 '''
     dialogs.write_text(prefix + css, encoding='utf-8')
 
+nodes = Path('frontend/styles/features/nodes/nodes.css')
+node_css = nodes.read_text(encoding='utf-8')
+node_css = node_css.replace('background:var(--a);color:var(--btn-text)}','background:var(--a);color:var(--btn-text);}',1)
+nodes.write_text(node_css, encoding='utf-8')
+
 browser = Path('scripts/test-ui-browser.cjs')
 text = browser.read_text(encoding='utf-8')
 old_user = "['users',`[data-uo=\"${user.id}\"]`,'Просмотр пользователя']"
