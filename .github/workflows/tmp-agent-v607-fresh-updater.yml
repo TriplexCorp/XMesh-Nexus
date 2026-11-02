@@ -19,6 +19,7 @@ jobs:
           if [[ "$GITHUB_ACTOR" == "github-actions[bot]" ]]; then exit 0; fi
           python3 scripts/tmp_agent_v607_anchor_fix.py
           python3 scripts/tmp_agent_v607_codemod.py
+          python3 scripts/tmp_agent_v607_postfix.py
           bash -n deploy/node-control-agent.sh deploy/update-node-control-agent.sh deploy/install-node-metrics-agent.sh
           node scripts/check-agent-update.js
           git diff --check
