@@ -194,3 +194,13 @@ dialog.xm-action-confirm{--dialog-width:28rem;border:1px solid var(--nx-border-s
 .xm-period-option[aria-selected=true]{background:var(--nx-selected-bg);color:var(--a)}
 .xm-period-portal{position:fixed;inset:auto;margin:0;max-width:calc(100vw - 1rem);overflow-x:hidden;overflow-y:auto;z-index:var(--nx-z-tooltip)}
 .xm-action-confirm-close{position:absolute;top:1rem;right:1rem;display:grid;place-items:center;width:var(--xm-close-size);min-height:var(--xm-close-size);padding:0;border:1px solid var(--nx-border);border-radius:50%;background:var(--nx-control-bg);color:var(--mu)}
+
+/* Top-layer feedback remains visible while native dialogs are open. */
+#xmesh-feedback-toast[popover]{position:fixed;inset:auto auto clamp(1rem,4vh,2.5rem) 50%;margin:0;display:flex;align-items:center;gap:.6rem;width:max-content;max-width:min(29rem,calc(100vw - 2rem));padding:.65rem .95rem;border:1px solid var(--nx-border-strong);border-radius:var(--nx-control-radius);background:var(--nx-floating-bg);color:var(--tx);box-shadow:var(--nx-floating-shadow);font-size:.85rem;line-height:1.4;overflow-wrap:anywhere;opacity:0;transform:translate(-50%,.5rem);transition:opacity var(--nx-duration),transform var(--nx-duration);pointer-events:none}
+#xmesh-feedback-toast[popover]:not(:popover-open){display:none}
+#xmesh-feedback-toast[popover].toast-below-dialog{top:var(--toast-top);bottom:auto;left:var(--toast-left)}
+#xmesh-feedback-toast[popover].show{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+#xmesh-feedback-toast .toast-state-icon{display:inline-flex;flex:none;color:var(--a)}
+#xmesh-feedback-toast.toast-error{border-color:var(--er)}
+#xmesh-feedback-toast.toast-error .toast-state-icon{color:var(--er)}
+#xmesh-feedback-toast .toast-action{margin-left:auto;color:var(--a);white-space:nowrap}

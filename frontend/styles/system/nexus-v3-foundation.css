@@ -471,3 +471,20 @@ html[data-font=opensans] body{font-family:"Open Sans",system-ui,sans-serif}
 html[data-font=source] body{font-family:"Source Sans 3",system-ui,sans-serif}
 html[data-font=fira] body{font-family:"Fira Sans",system-ui,sans-serif}
 html[data-font=jost] body{font-family:Jost,system-ui,sans-serif}
+
+/* Read-only presentation policy mirrors server-side viewer RBAC. */
+html[data-access-role="viewer"] :is(
+  #addb,#restart,#pal,#bell,#bulk,
+  [data-nu],[data-exp],[data-ne],[data-core-update],[data-core-refresh],
+  [data-node-bootstrap],[data-nr],[data-xray-update],[data-agent-update],
+  [data-node-geodata],[data-node-routing],[data-node-traffic-reset],
+  [data-node-rotate],[data-rotate],[data-node-create-host],
+  [data-a="del"],[data-a="tog"],[data-a="rst"],
+  [data-user-sub-copy],[data-user-sub-revoke],[data-user-sub-new],
+  .user-save-button,.user-editor-actions,.user-id-copy,.node-actions,
+  .nodes-page .acts,.bulk-actions,.users-selection-toolbar
+){display:none!important}
+html[data-access-role="viewer"] dialog.user-modal .user-pane-access :is(button,input,select,textarea){pointer-events:none}
+html[data-access-role="viewer"] dialog.user-modal .user-inline-editor :is(input,textarea,select){opacity:1;cursor:default}
+html[data-access-role="viewer"] dialog.user-modal .user-inline-editor :is(input,textarea,select):focus{outline:none}
+html[data-access-role="viewer"] dialog.user-modal .user-head-actions button[data-x]{pointer-events:auto}
