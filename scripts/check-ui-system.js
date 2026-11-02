@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 'use strict';
 const fs=require('node:fs');
+const crypto=require('node:crypto');
 const assert=require('node:assert/strict');
 
 const index=fs.readFileSync('index.html','utf8');
 const docker=fs.readFileSync('backend/Dockerfile','utf8');
+const app=fs.readFileSync('app.js','utf8');
 const entry=fs.readFileSync('nexus-ui-v3.css','utf8');
 const foundation=fs.readFileSync('nexus-v3-foundation.css','utf8');
 const components=fs.readFileSync('nexus-v3-components.css','utf8');
@@ -13,8 +15,28 @@ const builder=fs.readFileSync('ui-builder.js','utf8');
 const docs=fs.readFileSync('docs/UI_SYSTEM.md','utf8');
 const squad=fs.readFileSync('squad-editor-premium-v5.css','utf8');
 
-assert.match(index,/nexus-ui-v3\.css\?v=[a-z0-9-]+/,'Design System v3 entrypoint must be cache-busted');
-assert.match(index,/ui-builder\.js\?v=[a-z0-9-]+/,'UI builder must be cache-busted');
+const gitBlobSha=content=>crypto.createHash('sha1')
+  .update(`blob ${Buffer.byteLength(content,'utf8')}\0`)
+  .update(content,'utf8')
+  .digest('hex');
+const cacheKey=content=>gitBlobSha(content).slice(0,12);
+
+// Core runtime assets are content-addressed. A UI refactor must never keep an
+// old browser cache key while changing the app, semantic builder or v3 modules.
+assert(index.includes(`app.js?v=${cacheKey(app)}`),'app.js cache key must match its Git blob SHA');
+assert(index.includes(`ui-builder.js?v=${cacheKey(builder)}`),'UI builder cache key must match its Git blob SHA');
+assert(index.includes(`nexus-ui-v3.css?v=${cacheKey(entry)}`),'Design System v3 entrypoint cache key must match its Git blob SHA');
+for(const [name,content] of [
+  ['nexus-v3-foundation.css',foundation],
+  ['nexus-v3-components.css',components],
+  ['nexus-v3-layout.css',layout]
+]){
+  assert(entry.includes(`${name}?v=${cacheKey(content)}`),`${name} cache key must match its Git blob SHA`);
+}
+
+assert.match(index,/nexus-ui-v3\.css\?v=[a-f0-9]{12}/,'Design System v3 entrypoint must be content-addressed');
+assert.match(index,/ui-builder\.js\?v=[a-f0-9]{12}/,'UI builder must be content-addressed');
+assert.match(index,/app\.js\?v=[a-f0-9]{12}/,'Core app must be content-addressed');
 const lastCss=index.lastIndexOf('<link rel="stylesheet"');
 assert(index.slice(lastCss).includes('nexus-ui-v3.css'),'Design System v3 must be the final global stylesheet');
 assert(index.indexOf('app.js?v=')<index.indexOf('ui-builder.js?v='),'UI builder must load after app.js');
