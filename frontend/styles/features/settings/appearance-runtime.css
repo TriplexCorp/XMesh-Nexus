@@ -1,0 +1,46 @@
+/* Runtime appearance preferences owned by Settings.
+ * These overrides intentionally apply after the shared system layers so the
+ * user-facing scale/workspace controls have one authoritative runtime policy. */
+:root{
+  --nx-ui-base-font-size:17px;
+  --nx-content-management:3000px;
+  --nx-content-data:3000px;
+  --nx-content-canvas:3000px;
+}
+
+/* 100% is the comfortable product baseline; the existing 90–200% control
+ * remains a true relative scale around that baseline. */
+html{font-size:calc(var(--nx-ui-base-font-size) * var(--ts,1))}
+
+/* The language selector is a compound topbar control, not a square icon button. */
+.top-language-trigger{
+  width:auto;
+  min-width:4.6rem;
+  padding-inline:.55rem;
+  gap:.32rem;
+  white-space:nowrap;
+}
+.top-language-trigger .ic:first-child{width:1rem;height:1rem}
+.top-language-trigger .ic:last-child{width:.72rem;height:.72rem;color:var(--nx-muted)}
+.top-language-label{font-size:.72rem;font-weight:750;letter-spacing:.04em;line-height:1}
+
+/* Precision values use the outer label as their only control chrome. The
+ * generic input rule has higher specificity, so match it explicitly here. */
+.precision-number>input[type=number][data-appearance-value]{
+  appearance:textfield;
+  flex:1 1 0;
+  width:0;
+  min-width:0;
+  min-height:0;
+  height:auto;
+  padding:0;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+  outline:0;
+  color:var(--tx);
+  text-align:right;
+  font-size:.8rem;
+}
+.precision-number>input[type=number][data-appearance-value]::-webkit-inner-spin-button{appearance:none}
