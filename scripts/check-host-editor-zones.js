@@ -82,8 +82,8 @@ assert.match(css,/#dlg\.user-modal \.user-canvas-grid\s*\{[\s\S]*?flex:0 1 auto[
  'User details body must be the shrinkable scroll owner');
 assert.match(css,/@media\(min-width:1200px\)[\s\S]*?#dlg\.user-modal \.user-canvas-grid\s*\{[\s\S]*?grid-template-columns:minmax\(0,1\.02fr\) minmax\(0,1\.02fr\) minmax\(0,1\.35fr\)/,
  'Desktop User Details must spend more width on the intelligence pane');
-assert.match(css,/@media\(min-width:1200px\)[\s\S]*?#dlg\.user-modal \.user-pane-insights\s*\{[\s\S]*?grid-template-columns:minmax\(0,1\.35fr\) minmax\(12rem,\.75fr\)[\s\S]*?grid-template-rows:auto minmax\(0,1fr\)/,
- 'Desktop traffic and devices must share a horizontal mini-workspace');
+assert.match(css,/@media\(min-width:1600px\)[\s\S]*?#dlg\.user-modal \.user-pane-insights\s*\{[\s\S]*?grid-template-columns:minmax\(0,1\.35fr\) minmax\(12rem,\.75fr\)[\s\S]*?grid-template-rows:auto minmax\(0,1fr\)/,
+ 'Traffic and devices may split horizontally only on genuinely wide desktop surfaces');
 assert.match(css,/#dlg\.user-modal \.user-canvas-foot\s*\{[\s\S]*?flex:0 0 auto[\s\S]*?position:relative[\s\S]*?border-top:0[\s\S]*?background:transparent[\s\S]*?box-shadow:none/,
  'User details footer must remain metadata, not render as a second material strip');
 assert.match(css,/html\[data-motion=off\] #dlg\.user-modal[\s\S]*?transition:none!important/,
