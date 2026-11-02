@@ -11,7 +11,7 @@ export LC_ALL=C
 [[ "$XMESH_API_URL" == https://* ]] || exit 2
 XMESH_API_URL="${XMESH_API_URL%/}"
 KEY="${XMESH_METRICS_PRIVATE_KEY:-/etc/xmesh-node-metrics/node.key}"
-AGENT_VERSION="control-v6.0.6"
+AGENT_VERSION="control-v6.0.7"
 UNIT="${XMESH_XRAY_UNIT:-xray.service}"
 # Only root-owned local configuration can choose a unit. Remote responses never do.
 [[ "$UNIT" =~ ^[A-Za-z0-9_.@-]+\.service$ ]] || { echo "Invalid systemd unit" >&2; exit 2; }
@@ -275,31 +275,66 @@ for path in sys.argv[4:6]:
 PY
  timeout 20 "$binary" --check-state "$base/xsp-v2" >/dev/null
 }
-UPDATER_RESULT_UNIT=xmesh-node-agent-upgrade.service
+UPDATER_RESULT_UNIT=xmesh-node-agent-upgrade-repair
 UPDATER_ERROR=''
+sanitize_updater_error(){
+ local log="${1:-}" result=''
+ [[ -f "$log" && ! -L "$log" ]] || return 0
+ result="$(python3 - "$log" <<'PYERR'
+import re,sys
+try:
+    raw=open(sys.argv[1],encoding='utf-8',errors='replace').read()[-8192:]
+except OSError:
+    raise SystemExit(0)
+lines=[line.strip() for line in raw.splitlines() if line.strip()]
+if not lines:
+    raise SystemExit(0)
+value=re.sub(r'[^A-Za-z0-9 .,:;_+/@()=\-]', ' ', lines[-1])
+value=re.sub(r'\s+',' ',value).strip()[:220]
+print(value)
+PYERR
+)"
+ printf '%s' "$result"
+}
+verify_agent_install(){
+ local expected_version="${1:-}" binary identity
+ [[ "$expected_version" =~ ^control-v6\.[0-9]+\.[0-9]+$ ]] || return 1
+ [[ -f /usr/local/sbin/xmesh-node-control && ! -L /usr/local/sbin/xmesh-node-control ]] || return 1
+ grep -Fxq "AGENT_VERSION=\"$expected_version\"" /usr/local/sbin/xmesh-node-control || return 1
+ [[ -f /usr/local/sbin/xmesh-update-agent && ! -L /usr/local/sbin/xmesh-update-agent && -x /usr/local/sbin/xmesh-update-agent ]] || return 1
+ grep -Fq 'XMESH_TARGET_AWARE_UPDATER=1' /usr/local/sbin/xmesh-update-agent || return 1
+ systemctl cat xmesh-node-agent-upgrade.service >/dev/null 2>&1 || return 1
+ for binary in /usr/local/bin/xmesh-agent-xspv2-activate /usr/local/bin/xmesh-agent-xspv2-product;do
+  [[ -f "$binary" && ! -L "$binary" && -x "$binary" ]] || return 1
+  identity="$(timeout 10 "$binary" --identity 2>/dev/null)" || return 1
+  python3 - "$identity" "$expected_version" <<'PYID'
+import json,sys
+try:
+    value=json.loads(sys.argv[1])
+except (json.JSONDecodeError,TypeError):
+    raise SystemExit(1)
+if value.get('version') != sys.argv[2]: raise SystemExit(1)
+if not isinstance(value.get('sourceRevision'),str) or len(value['sourceRevision']) != 40: raise SystemExit(1)
+if not isinstance(value.get('artifactSha256'),str) or len(value['artifactSha256']) != 64: raise SystemExit(1)
+PYID
+ done
+ router_running
+}
 run_agent_updater(){
- local expected_version="${1:-}" static_unit=xmesh-node-agent-upgrade.service transient_unit=xmesh-node-agent-upgrade-repair
- local updater=/usr/local/sbin/xmesh-update-agent bootstrap='' rc=0
+ local expected_version="${1:-}" transient_unit=xmesh-node-agent-upgrade-repair
+ local bootstrap=/run/xmesh-node-control/update-node-control-agent.bootstrap
+ local log=/run/xmesh-node-control/agent-update-output.log rc=0 reason=''
  UPDATER_ERROR=''
  [[ "$expected_version" =~ ^control-v6\.[0-9]+\.[0-9]+$ ]] || { UPDATER_ERROR='Invalid expected Agent target version'; return 1; }
- if systemctl cat "$static_unit" >/dev/null 2>&1 && [[ -f "$updater" && ! -L "$updater" && -x "$updater" ]];then
-  UPDATER_RESULT_UNIT="$static_unit"
-  timeout 650 systemctl start --wait "$static_unit"
-  return $?
+ install -d -m 0700 /run/xmesh-node-control || { UPDATER_ERROR='Cannot prepare Agent updater state';return 1; }
+ rm -f "$bootstrap" "$log"
+ if ! curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy/update-node-control-agent.sh -o "$bootstrap";then
+  UPDATER_ERROR='Fresh Agent updater download failed';return 1
  fi
- install -d -m 0700 /run/xmesh-node-control || { UPDATER_ERROR='Cannot prepare Agent updater repair state';return 1; }
- if [[ ! -f "$updater" || -L "$updater" || ! -x "$updater" ]];then
-  bootstrap=/run/xmesh-node-control/update-node-control-agent.bootstrap
-  rm -f "$bootstrap"
-  if ! curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 https://raw.githubusercontent.com/TriplexCorp/XMesh-Nexus/main/deploy/update-node-control-agent.sh -o "$bootstrap";then
-   UPDATER_ERROR='Agent updater missing and verified bootstrap download failed';return 1
-  fi
-  if ! bash -n "$bootstrap" || ! grep -Fq "AGENT_VERSION=\"$expected_version\"" "$bootstrap" || ! grep -Fq 'xmesh-node-agent-upgrade.service' "$bootstrap";then
-   rm -f "$bootstrap";UPDATER_ERROR='Downloaded Agent updater failed bootstrap validation';return 1
-  fi
-  chmod 0700 "$bootstrap"
-  updater="$bootstrap"
+ if ! bash -n "$bootstrap" || ! grep -Fq 'XMESH_TARGET_AWARE_UPDATER=1' "$bootstrap" || ! grep -Fq "AGENT_VERSION=\"$expected_version\"" "$bootstrap" || ! grep -Fq 'xmesh-node-agent-upgrade.service' "$bootstrap";then
+  rm -f "$bootstrap";UPDATER_ERROR='Fresh Agent updater failed target validation';return 1
  fi
+ chmod 0700 "$bootstrap"
  UPDATER_RESULT_UNIT="$transient_unit"
  systemctl reset-failed "$transient_unit" >/dev/null 2>&1 || true
  if timeout 650 systemd-run --quiet --wait --collect --pipe --unit="$transient_unit" \
@@ -314,13 +349,14 @@ run_agent_updater(){
   --property=ReadWritePaths=/var/lib/xmesh-node-control --property=ReadWritePaths=/var/lib/xmesh-xray-sync \
   --property=ReadWritePaths=/var/lib/xmesh-agent --property=ReadWritePaths=-/opt/xmesh-node \
   --property=ReadWritePaths=-/root/XMesh-Node --property=ReadWritePaths=/run \
-  "$updater" --remote;then
+  "$bootstrap" --remote >"$log" 2>&1;then
   rc=0
  else
   rc=$?
-  UPDATER_ERROR='Agent updater repair service failed; inspect xmesh-node-agent-upgrade-repair'
+  reason="$(sanitize_updater_error "$log")"
+  if [[ -n "$reason" ]];then UPDATER_ERROR="Agent update failed: $reason";else UPDATER_ERROR='Agent updater transient service failed';fi
  fi
- [[ -z "$bootstrap" ]] || rm -f "$bootstrap"
+ rm -f "$bootstrap"
  return "$rc"
 }
 stop_xray(){
@@ -427,8 +463,8 @@ elif [[ "$action" == update_agent ]];then
    fi
   fi
  else
-  if run_agent_updater "$target_version" && grep -Fxq "AGENT_VERSION=\"$target_version\"" /usr/local/sbin/xmesh-node-control;then
-   success=true;detail='Agent installed and version verified'
+  if run_agent_updater "$target_version" && verify_agent_install "$target_version";then
+   success=true;detail='Agent installed and full runtime verified'
   else
    if [[ -n "$UPDATER_ERROR" ]];then
     detail="$UPDATER_ERROR"

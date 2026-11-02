@@ -33,8 +33,10 @@ A rolling upgrade may explicitly accept the immediately previous Agent version s
 
 Updater self-repair must validate a downloaded bootstrap against the **commanded target Agent version** from the authenticated/signed update request. It must never pin repair validation to a literal version embedded in the older running Agent; otherwise a missing updater unit could deadlock the next release.
 
+The normal signed update path follows the same rule: it must execute a **fresh target-validated updater bootstrap**, not blindly start the updater executable installed by the previous release. The installed static updater service is an emergency/local fallback and must never become the authority that decides whether N can update to N+1. Failure ACKs should carry a bounded sanitized updater reason so operators are not left with only `systemd: exit-code`.
+
 ## CI requirement
 
 The Agent update source-contract check must verify version consistency. Pull requests that change deployed Agent/runtime surfaces without increasing `AGENT_VERSION` relative to the base branch must fail CI.
 
-Current target: **`control-v6.0.6`**.
+Current target: **`control-v6.0.7`**.
