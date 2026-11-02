@@ -4,6 +4,6 @@
  * entrypoint is the only global design layer allowed after feature CSS.
  * New global presentation rules belong in one of the three v3 modules below.
  */
-@import url("/nexus-v3-foundation.css?v=20261102-v3-1");
-@import url("/nexus-v3-components.css?v=20261102-v3-1");
-@import url("/nexus-v3-layout.css?v=20261102-v3-1");
+@import url("./nexus-v3-foundation.css?v=20261102-v3-1");
+@import url("./nexus-v3-components.css?v=20261102-v3-1");
+@import url("./nexus-v3-layout.css?v=20261102-v3-1");

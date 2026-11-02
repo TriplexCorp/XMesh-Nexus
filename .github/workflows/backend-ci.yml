@@ -45,6 +45,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+      - name: Verify canonical repository layout
+        run: node scripts/check-repo-layout.js
+      - name: Stage legacy frontend basename fixtures for source-contract checks
+        run: bash scripts/ci/stage-frontend-compat.sh
       - name: Check frontend syntax
         run: |
           node --version

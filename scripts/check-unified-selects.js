@@ -34,7 +34,8 @@ assert.match(app,/inboundSelect\.innerHTML=candidates\.map/,'host editor options
 assert.match(ui,/instance\.observer\.observe\(select/,'host options rebuild triggers sync');
 
 const docker=fs.readFileSync('backend/Dockerfile','utf8');
-assert.match(docker,/COPY [^\n]*\bunified-selects\.js\b[^\n]*\/app\/static\//,'shared select script must be shipped in Docker');
+assert.match(docker,/COPY frontend\/ \/app\/static\//,'canonical frontend tree must be shipped in Docker');
+assert.match(html,/unified-selects\.js\?v=/,'unified-selects must remain part of the canonical frontend entrypoint');
 assert.match(css,/#stats-dashboard \.stats-history-filters:has\(#stats-leaders-range\)/,'Top-10 toolbar has scoped layout');
 assert.match(css,/--stats-leaders-control-height:2\.8rem/,'all Top-10 controls use the same height');
 assert.match(css,/\.xm-period-trigger,\s*#stats-user-lookup,\s*#stats-user-lookup-open/s,'period, ID input and action are sized together');

@@ -6,7 +6,8 @@ on:
     paths:
       - "backend/src/main.rs"
       - "deploy/node-metrics-agent.sh"
-      - "app.js"
+      - "frontend/js/core/app.js"
+      - "scripts/ci/stage-frontend-compat.sh"
       - "scripts/test-node-presence.py"
       - "scripts/check-user-presence.js"
       - ".github/workflows/user-presence-integrity.yml"
@@ -15,7 +16,8 @@ on:
     paths:
       - "backend/src/main.rs"
       - "deploy/node-metrics-agent.sh"
-      - "app.js"
+      - "frontend/js/core/app.js"
+      - "scripts/ci/stage-frontend-compat.sh"
       - "scripts/test-node-presence.py"
       - "scripts/check-user-presence.js"
       - ".github/workflows/user-presence-integrity.yml"
@@ -34,6 +36,8 @@ jobs:
         with:
           node-version-file: .node-version
       - uses: dtolnay/rust-toolchain@stable
+      - name: Stage legacy frontend basename fixtures
+        run: bash scripts/ci/stage-frontend-compat.sh
       - name: Reject malformed or duplicated telemetry source
         run: |
           bash -n deploy/node-metrics-agent.sh

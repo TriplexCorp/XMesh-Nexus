@@ -7,30 +7,32 @@ on:
       - 'backend/src/node_runtime.rs'
       - 'backend/src/main.rs'
       - 'backend/migrations/0025_node_geodata_status.sql'
-      - 'app.js'
-      - 'node-geodata.js'
-      - 'node-geodata.css'
-      - 'node-routing.js'
-      - 'node-routing.css'
+      - 'frontend/js/core/app.js'
+      - 'frontend/js/features/nodes/node-geodata.js'
+      - 'frontend/styles/features/nodes/node-geodata.css'
+      - 'frontend/js/features/nodes/node-routing.js'
+      - 'frontend/styles/features/nodes/node-routing.css'
       - 'backend/Dockerfile'
       - 'backend/src/security.rs'
-      - 'index.html'
-      - 'styles.css'
+      - 'frontend/index.html'
+      - 'frontend/styles/legacy/styles.css'
+      - 'scripts/ci/stage-frontend-compat.sh'
       - '.github/workflows/geodata-check.yml'
   pull_request:
     paths:
       - 'backend/src/node_geodata.rs'
       - 'backend/src/node_runtime.rs'
       - 'backend/src/node_routing.rs'
-      - 'app.js'
-      - 'node-geodata.js'
-      - 'node-geodata.css'
-      - 'node-routing.js'
-      - 'node-routing.css'
+      - 'frontend/js/core/app.js'
+      - 'frontend/js/features/nodes/node-geodata.js'
+      - 'frontend/styles/features/nodes/node-geodata.css'
+      - 'frontend/js/features/nodes/node-routing.js'
+      - 'frontend/styles/features/nodes/node-routing.css'
       - 'backend/Dockerfile'
       - 'backend/src/security.rs'
-      - 'index.html'
-      - 'styles.css'
+      - 'frontend/index.html'
+      - 'frontend/styles/legacy/styles.css'
+      - 'scripts/ci/stage-frontend-compat.sh'
       - '.github/workflows/geodata-check.yml'
   workflow_dispatch:
 jobs:
@@ -38,6 +40,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Stage legacy frontend basename fixtures
+        run: bash scripts/ci/stage-frontend-compat.sh
       - name: Check dashboard JavaScript
         run: |
           node --check app.js
