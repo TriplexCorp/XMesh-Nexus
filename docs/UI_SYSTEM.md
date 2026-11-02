@@ -243,8 +243,8 @@ asset graph, enforced by `scripts/check-ui-system.js`.
 ### User Details
 
 `workspace-dialog-contract.css` owns final dialog geometry; `user-details.css`
-owns feature content. The desktop budget remains at most 54rem, bounded by the
-viewport. Header, usage band and footer stay in flow without shrinking. Three
+owns feature content. The desktop height budget uses the viewport minus its safe margin, so content
+can grow beyond the former 54rem cap when the screen has room. Header, usage band and footer stay in flow without shrinking. Three
 panes start at the same baseline. `.user-canvas-grid` is the single scroll owner
 with a stable scrollbar gutter. `userDrawer()` resets that owner's scroll
 position after mounting, including when another user replaces an open dialog.
