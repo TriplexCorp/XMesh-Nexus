@@ -65,8 +65,8 @@ jobs:
           }
           assert(!html.includes('/node-geodata.css')&&!html.includes('/node-routing.css'),
             'Feature styles must stay behind the canonical panel CSS entrypoint');
-          assert(css.includes('.geo-chip-ok'),'GeoData chip styles must be wired into the panel CSS graph');
-          assert(css.includes('.node-routing'),'Node routing styles must be wired into the panel CSS graph');
+          assert(css.includes('dialog#dlg.geo-modal'),'GeoData modal styles must be wired into the panel CSS graph');
+          assert(css.includes('dialog#dlg.node-routing-modal'),'Node routing styles must be wired into the panel CSS graph');
           if(routing.includes('class="box route-json-workspace"'))
             throw new Error('Node routing JSON workspace must not nest the global .box modal shell');
           if(!routing.includes('class="route-json-workspace"'))
