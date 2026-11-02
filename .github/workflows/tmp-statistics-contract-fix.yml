@@ -22,18 +22,26 @@ jobs:
         with:
           node-version-file: .node-version
           package-manager-cache: false
-      - name: Repair Statistics refresh animation and shared period contract
+      - name: Repair Statistics animations and shared period contract
         run: |
           python3 - <<'PY'
           from pathlib import Path
 
           p=Path('frontend/styles/features/statistics/statistics.css')
           s=p.read_text()
-          marker='''#stats-user-refresh.is-refreshing .stats-refresh-icon {\n  animation:stats-user-refresh-spin .8s linear infinite;\n}\n'''
+
+          refresh='''#stats-user-refresh.is-refreshing .stats-refresh-icon {\n  animation:stats-user-refresh-spin .8s linear infinite;\n}\n'''
           if '@keyframes stats-user-refresh-spin' not in s:
-              if marker not in s:
+              if refresh not in s:
                   raise SystemExit('refresh animation marker not found')
-              s=s.replace(marker, marker + '''@keyframes stats-user-refresh-spin {\n  to {\n    transform:rotate(360deg);\n  }\n}\n''', 1)
+              s=s.replace(refresh, refresh + '''@keyframes stats-user-refresh-spin {\n  to {\n    transform:rotate(360deg);\n  }\n}\n''', 1)
+
+          live='''  animation:stats-live-pulse 2s ease-out infinite;\n}\n'''
+          if '@keyframes stats-live-pulse' not in s:
+              if live not in s:
+                  raise SystemExit('live pulse marker not found')
+              s=s.replace(live, live + '''@keyframes stats-live-pulse {\n  0% {\n    box-shadow:0 0 0 0 currentColor;\n    opacity:1;\n  }\n  70% {\n    box-shadow:0 0 0 .45rem transparent;\n    opacity:.85;\n  }\n  100% {\n    box-shadow:0 0 0 0 transparent;\n    opacity:1;\n  }\n}\n''', 1)
+
           s=s.replace('''@media (prefers-reduced-motion:reduce) {\n#stats-user-refresh.is-refreshing .stats-refresh-icon {\n  animation-duration:2s;\n}\n}\n''', '''@media (prefers-reduced-motion:reduce) {\n#stats-user-refresh.is-refreshing .stats-refresh-icon {\n  animation:none;\n}\n}\n''', 1)
           p.write_text(s)
 
