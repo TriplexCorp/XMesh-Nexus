@@ -130,9 +130,8 @@ dialog#dlg.user-modal>.user-canvas{
   align-content:start;
 }
 
-/* Desktop user details deliberately spends width to save height. The right
- * intelligence pane also becomes a two-column mini-workspace: traffic on the
- * left and devices on the right, instead of stacking both vertically. */
+/* Desktop User Details spends width to save height without reducing readable
+ * text sizes. This applies to ordinary desktop widths and scaled desktop UI. */
 @media(min-width:1200px){
   #dlg.user-modal .user-head{
     padding-bottom:.55rem;
@@ -176,6 +175,12 @@ dialog#dlg.user-modal>.user-canvas{
     min-height:3.85rem;
     padding:.48rem .6rem;
   }
+}
+
+/* Only genuinely wide desktop surfaces split the intelligence pane again.
+ * At 120-130% interface scale the effective CSS viewport becomes narrower;
+ * keeping traffic and devices stacked there prevents compressed long-form copy. */
+@media(min-width:1600px){
   #dlg.user-modal .user-pane-insights{
     display:grid;
     grid-template-columns:minmax(0,1.35fr) minmax(12rem,.75fr);
