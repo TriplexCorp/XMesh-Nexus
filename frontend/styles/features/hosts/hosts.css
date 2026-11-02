@@ -294,13 +294,14 @@ dialog.host-wide :is(.host-connect-fields,.host-public-fields,.host-assignment-f
   line-height:1.35;
 }
 dialog.host-wide>form.box>.act {
-  position:static;
+  position:sticky;
+  bottom:0;
   flex:0 0 auto;
   margin:0;
   padding:11px 0 0;
   border-top:1px solid var(--nx-border);
   background:var(--nx-panel-bg);
-  z-index:auto;
+  z-index:5;
 }
 @media (max-width:1260px) {
 .host-editor-layout {
