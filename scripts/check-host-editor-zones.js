@@ -54,6 +54,10 @@ assert(!desktopCss.includes('"overrides overrides"'),'No separate overrides row 
 // valid grid to be rendered inside a 30rem shell.
 assert.match(css,/#dlg\.host-wide\s*\{[\s\S]*?width:min\(var\(--dialog-width\),calc\(100vw - 2rem\)\)[\s\S]*?min-inline-size:min\(72rem,calc\(100vw - 2rem\)\)/,
  'Host editor must own a workstation-sized outer dialog');
+assert.match(css,/#dlg\.host-wide>form\.box\s*\{[\s\S]*?display:grid[\s\S]*?grid-template-rows:auto minmax\(0,1fr\) auto auto[\s\S]*?overflow:hidden/,
+ 'Host dialog shell must reserve a shrinkable body between header and footer');
+assert.match(css,/#dlg\.host-wide>form\.box>\.host-editor-layout\s*\{[\s\S]*?min-height:0[\s\S]*?overflow:auto/,
+ 'Host editor workspace must own vertical scrolling instead of the whole form');
 assert.match(css,/#dlg\.host-wide>form\.box>\.act\s*\{[\s\S]*?position:static[\s\S]*?z-index:auto/,
  'Host editor footer must stay in normal flow and never cover fields');
 assert.doesNotMatch(css,/#dlg\.host-wide>form\.box>\.act\s*\{[^}]*!important/,
@@ -73,4 +77,4 @@ assert.match(css,/#dlg\.user-modal>\.user-canvas\s*\{[\s\S]*?block-size:auto[\s\
  'User details canvas must grow naturally and shrink only at the viewport boundary');
 assert.match(css,/#dlg\.user-modal \.user-canvas-grid\s*\{[\s\S]*?flex:0 1 auto[\s\S]*?overflow:auto/,
  'User details body must be the shrinkable scroll owner');
-console.log('Workspace dialogs: host width/footer, responsive zones and user details content sizing OK');
+console.log('Workspace dialogs: host width/body/footer, responsive zones and user details content sizing OK');
