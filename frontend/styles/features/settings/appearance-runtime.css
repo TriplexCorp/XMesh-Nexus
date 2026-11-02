@@ -2,14 +2,15 @@
  * These overrides intentionally apply after the shared system layers so the
  * user-facing scale/workspace controls have one authoritative runtime policy. */
 :root{
-  --nx-ui-base-font-size:17px;
+  --nx-ui-base-font-size:18px;
   --nx-content-management:3000px;
   --nx-content-data:3000px;
   --nx-content-canvas:3000px;
 }
 
 /* 100% is the comfortable product baseline; the existing 90–200% control
- * remains a true relative scale around that baseline. */
+ * remains a true relative scale around that baseline. Layouts must adapt to
+ * the scaled container instead of assuming a 16 px root. */
 html{font-size:calc(var(--nx-ui-base-font-size) * var(--ts,1))}
 
 /* The language selector is a compound topbar control, not a square icon button. */
