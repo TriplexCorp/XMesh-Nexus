@@ -109,6 +109,73 @@ dialog[open]:not(#dlg)::backdrop{opacity:1}
   dialog[open]:not(#dlg)::backdrop{opacity:0}
 }
 
+/* Workspace-sized #dlg surfaces must own their outer geometry here. This
+ * deliberately outranks broad feature fallbacks such as the historical 30rem
+ * default in users.css, so a three-zone editor can never be squeezed into a
+ * small action-dialog width. */
+#dlg.host-wide{
+  --dialog-width:96rem;
+  width:min(var(--dialog-width),calc(100vw - 2rem));
+  inline-size:min(var(--dialog-width),calc(100vw - 2rem));
+  min-width:min(72rem,calc(100vw - 2rem));
+  min-inline-size:min(72rem,calc(100vw - 2rem));
+  max-width:calc(100vw - 2rem);
+  max-inline-size:calc(100vw - 2rem);
+  min-height:0;
+}
+#dlg.host-wide>form.box{
+  max-block-size:calc(100dvh - 2rem);
+  overflow:auto;
+  overscroll-behavior:contain;
+}
+#dlg.host-wide>form.box>.act{
+  position:static;
+  inset:auto;
+  z-index:auto;
+  margin-top:0;
+}
+
+/* User details is content-sized until the viewport becomes the constraint.
+ * The body is the only shrinkable/scrollable region; the footer stays in flow.
+ * This removes the large empty lower half caused by combining a 690px dialog
+ * minimum with a fixed 54rem canvas height. */
+#dlg.user-modal{
+  min-height:0;
+  height:auto;
+}
+#dlg.user-modal>.user-canvas{
+  block-size:auto;
+  height:auto;
+  max-block-size:calc(100dvh - 2rem);
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+#dlg.user-modal .user-canvas-grid{
+  flex:0 1 auto;
+  min-height:0;
+  overflow:auto;
+  overscroll-behavior:contain;
+  align-content:start;
+}
+#dlg.user-modal .user-canvas-foot{
+  flex:0 0 auto;
+  position:relative;
+  inset:auto;
+  margin-top:0;
+}
+@media(max-width:760px){
+  #dlg.host-wide{
+    min-width:0;
+    min-inline-size:0;
+    width:calc(100vw - 1rem);
+    inline-size:calc(100vw - 1rem);
+    max-width:calc(100vw - 1rem);
+    max-inline-size:calc(100vw - 1rem);
+  }
+  #dlg.user-modal>.user-canvas{max-block-size:calc(100dvh - 1rem)}
+}
+
 /* XRAY STUDIO outer geometry belongs to the native dialog layer, not to the
  * feature body. `min-inline-size` intentionally defeats historical narrow
  * feature fallbacks while still collapsing safely to the viewport on mobile. */
