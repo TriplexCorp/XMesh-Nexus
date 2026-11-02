@@ -24,14 +24,18 @@ jobs:
           old='  "$bootstrap" --remote >"$log" 2>&1;then'
           new='  /bin/bash "$bootstrap" --remote >"$log" 2>&1;then'
           if old not in s: raise SystemExit('missing direct bootstrap execution anchor')
-          s=s.replace(old,new,1)
-          p.write_text(s)
+          p.write_text(s.replace(old,new,1))
+
           p=Path('scripts/check-agent-update.js')
           s=p.read_text()
-          anchor="assert.match(controlAgent,/grep -Fq 'XMESH_TARGET_AWARE_UPDATER=1' \\\"\\$bootstrap\\\"/,\n  'fresh updater bootstrap must advertise the target-aware contract');"
-          extra=anchor+"\nassert.match(controlAgent,/\\/bin\\/bash \\\"\\$bootstrap\\\" --remote/,\n  'fresh updater bootstrap must be interpreted by trusted bash so noexec /run cannot block updates');\nassert.doesNotMatch(controlAgent,/^[ \\t]*\\\"\\$bootstrap\\\" --remote/m,\n  'fresh updater bootstrap must never be executed directly from potentially noexec /run');"
-          if anchor not in s: raise SystemExit('missing updater regression anchor')
-          p.write_text(s.replace(anchor,extra,1))
+          marker="  'fresh updater bootstrap must advertise the target-aware contract');"
+          pos=s.index(marker)+len(marker)
+          extra=r'''
+assert.match(controlAgent,/\/bin\/bash "\$bootstrap" --remote/,
+  'fresh updater bootstrap must be interpreted by trusted bash so noexec /run cannot block updates');
+assert.doesNotMatch(controlAgent,/^[ \t]*"\$bootstrap" --remote/m,
+  'fresh updater bootstrap must never be executed directly from potentially noexec /run');'''
+          p.write_text(s[:pos]+extra+s[pos:])
           PY
           bash -n deploy/node-control-agent.sh
           node scripts/check-agent-update.js
