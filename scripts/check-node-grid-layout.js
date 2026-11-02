@@ -24,10 +24,10 @@ assert(large.includes('.nodes-page>.nodes[data-node-count="3"][data-grid-mode=co
  'Compact 3-node state must not preserve a phantom fourth column');
 assert(large.includes('.nodes-page>.nodes[data-node-count="2"]{grid-template-columns:repeat(2,minmax(0,1fr))}'),
  'Two nodes must deliberately use both available columns');
-assert(large.includes('.nodes-page>.nodes[data-node-count="1"]{grid-template-columns:minmax(0,1fr)}'),
- 'One node must expand to the available workspace instead of staying a narrow fleet card');
+assert(large.includes('body .app .nodes-page>.nodes[data-node-count="1"][data-grid-mode]{grid-template-columns:minmax(0,1fr)}'),
+ 'One node must use a v3 ownership selector strong enough to beat legacy density caps');
 
-assert.match(layout,/\.nodes-page>\.nodes\[data-node-count="1"\]>\.nc\{[\s\S]*max-width:none/,
+assert.match(layout,/body \.app \.nodes-page>\.nodes\[data-node-count="1"\]>\.nc\{[\s\S]*max-width:none/,
  'Single-node card must not carry a historical narrow max-width');
 for(const mode of ['compact','standard','spacious']){
  assert(layout.includes('.nodes-page>.nodes[data-grid-mode='+mode+']>.nc{padding:'),
@@ -35,13 +35,13 @@ for(const mode of ['compact','standard','spacious']){
  assert(layout.includes('.nodes-page>.nodes[data-node-count="1"][data-grid-mode='+mode+']>.nc{gap:'),
   'Single-node '+mode+' must remain visibly distinct without shrinking card width');
 }
-assert.doesNotMatch(layout,/data-node-count="1"[^\n]*grid-template-columns:minmax\(0,(?:22|30|40)rem\)/,
- 'Design System v3 must not restore the historical tiny single-node widths');
-assert.match(layout,/body \.app \.nodes-page\.card,[\s\S]*background:transparent/,
- 'Nodes page outer wrapper must stay structural instead of becoming a giant enclosing card');
+assert.doesNotMatch(layout,/data-node-count="1"[^\n]*grid-template-columns:minmax\(0,(?:22|30|35|38|40)rem\)/,
+ 'Design System v3 must not restore historical tiny single-node widths');
+assert.match(layout,/body \.app \.nodes-page\.card,[\s\S]*\.nodes-page\[data-ui-surface="section"\][\s\S]*background:transparent/,
+ 'Nodes page outer wrapper must stay structural even if semantic hydration marked it as a section surface');
 
-assert.match(html,/nexus-ui-v3\.css\?v=[a-z0-9-]+/,'Nodes presentation must ship through Design System v3');
-assert.match(html,/app\.js\?v=[a-z0-9-]+/);
+assert.match(html,/nexus-ui-v3\.css\?v=[a-f0-9]{12}/,'Nodes presentation must ship through content-addressed Design System v3');
+assert.match(html,/app\.js\?v=[a-f0-9]{12}/);
 assert.equal((layout.match(/\{/g)||[]).length,(layout.match(/\}/g)||[]).length,'v3 layout CSS brace balance');
 new Function(app);
 
