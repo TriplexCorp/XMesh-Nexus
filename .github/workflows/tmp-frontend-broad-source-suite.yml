@@ -21,7 +21,7 @@ jobs:
         run: find frontend/js -name '*.js' -print0 | xargs -0 -n1 node --check
       - name: Canonical frontend source contracts
         run: |
-          set -euo pipefail
+          set -uo pipefail
           checks=(
             check-repo-layout.js
             check-unified-selects.js
@@ -80,12 +80,24 @@ jobs:
             check-xray-endpoint-autofill.js
             test-client-config.js
           )
+          failures=()
           for check in "${checks[@]}"; do
             echo "::group::$check"
-            node "scripts/$check"
+            if node "scripts/$check"; then
+              echo "PASS $check"
+            else
+              echo "FAIL $check"
+              failures+=("$check")
+            fi
             echo "::endgroup::"
           done
+          if ((${#failures[@]})); then
+            printf 'FAILED_CONTRACTS=%s\n' "${failures[*]}"
+            exit 1
+          fi
       - name: Cache graph is stable
+        if: always()
         run: node scripts/update-ui-cache.cjs --check
       - name: Diff hygiene
+        if: always()
         run: git diff --check
