@@ -228,7 +228,7 @@ jobs:
       XSP_V2_PRODUCT_INTERNAL_TOKEN: "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
       PANEL_DOMAIN: ci.example.invalid
       COOKIE_SECURE: "false"
-      DASHBOARD_PATH: /dashboard/0123456789abcdef0123456789abcdef0123456789abcdef
+      DASHBOARD_PATH: /dashboard/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
     steps:
       - uses: actions/checkout@v7
       - name: Start disposable PostgreSQL, Redis and XMesh API
@@ -258,6 +258,7 @@ jobs:
       - name: Verify rendered layouts and dialog interactions in Chromium
         env:
           XMESH_BROWSER_OUTPUT: browser-results
+          XMESH_UI_DISPOSABLE: "1"
         run: node scripts/test-ui-browser.cjs
       - name: Retain browser geometry report and screenshots
         if: always()
