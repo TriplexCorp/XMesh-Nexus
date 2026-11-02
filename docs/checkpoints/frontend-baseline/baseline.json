@@ -1,0 +1,647 @@
+{
+  "metrics": [
+    {
+      "route": "set",
+      "width": 1440,
+      "height": 900,
+      "viewport": 1440,
+      "document": 1440,
+      "view": {
+        "class": "view",
+        "x": 312,
+        "y": 112,
+        "width": 1096,
+        "height": 5586,
+        "display": "grid",
+        "minHeight": "0px",
+        "maxWidth": "none"
+      },
+      "cards": [
+        {
+          "class": "card sg",
+          "x": 312,
+          "y": 112,
+          "width": 1096,
+          "height": 1043,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card sg",
+          "x": 312,
+          "y": 1176,
+          "width": 1096,
+          "height": 483,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card sg",
+          "x": 312,
+          "y": 1680,
+          "width": 1096,
+          "height": 508,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card sg",
+          "x": 312,
+          "y": 2209,
+          "width": 1096,
+          "height": 672,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card sg",
+          "x": 312,
+          "y": 2901,
+          "width": 1096,
+          "height": 405,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card sg",
+          "x": 312,
+          "y": 3327,
+          "width": 1096,
+          "height": 368,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card",
+          "x": 312,
+          "y": 3712,
+          "width": 1096,
+          "height": 375,
+          "display": "block",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card",
+          "x": 312,
+          "y": 4104,
+          "width": 1096,
+          "height": 415,
+          "display": "block",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card",
+          "x": 312,
+          "y": 4536,
+          "width": 1096,
+          "height": 127,
+          "display": "block",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card",
+          "x": 312,
+          "y": 4680,
+          "width": 1096,
+          "height": 516,
+          "display": "block",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card",
+          "x": 312,
+          "y": 5213,
+          "width": 1096,
+          "height": 293,
+          "display": "block",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card",
+          "x": 312,
+          "y": 5524,
+          "width": 1096,
+          "height": 175,
+          "display": "block",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        }
+      ],
+      "columns": [
+        {
+          "class": "appearance-column",
+          "x": 312,
+          "y": 112,
+          "width": 1096,
+          "height": 2076,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "appearance-column",
+          "x": 312,
+          "y": 2209,
+          "width": 1096,
+          "height": 1486,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        }
+      ],
+      "toolbar": []
+    },
+    {
+      "route": "nodes",
+      "width": 1440,
+      "height": 900,
+      "viewport": 1440,
+      "document": 1440,
+      "view": {
+        "class": "view",
+        "x": 312,
+        "y": 112,
+        "width": 1096,
+        "height": 819,
+        "display": "grid",
+        "minHeight": "0px",
+        "maxWidth": "none"
+      },
+      "cards": [
+        {
+          "class": "card nc",
+          "x": 312,
+          "y": 456,
+          "width": 1096,
+          "height": 475,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        }
+      ],
+      "columns": [],
+      "toolbar": [
+        {
+          "class": "bar2 nodes-toolbar",
+          "x": 312,
+          "y": 112,
+          "width": 1096,
+          "height": 50,
+          "display": "flex",
+          "minHeight": "0px",
+          "maxWidth": "none"
+        },
+        {
+          "class": "node-explorer",
+          "x": 312,
+          "y": 176,
+          "width": 1096,
+          "height": 206,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        }
+      ]
+    },
+    {
+      "route": "set",
+      "width": 1920,
+      "height": 1080,
+      "viewport": 1920,
+      "document": 1920,
+      "view": {
+        "class": "view",
+        "x": 320,
+        "y": 112,
+        "width": 1560,
+        "height": 4089,
+        "display": "grid",
+        "minHeight": "0px",
+        "maxWidth": "none"
+      },
+      "cards": [
+        {
+          "class": "card sg",
+          "x": 320,
+          "y": 112,
+          "width": 829,
+          "height": 1046,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card sg",
+          "x": 320,
+          "y": 1183,
+          "width": 829,
+          "height": 487,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card sg",
+          "x": 320,
+          "y": 1694,
+          "width": 829,
+          "height": 511,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card sg",
+          "x": 1174,
+          "y": 112,
+          "width": 706,
+          "height": 723,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card sg",
+          "x": 1174,
+          "y": 860,
+          "width": 706,
+          "height": 441,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card sg",
+          "x": 1174,
+          "y": 1326,
+          "width": 706,
+          "height": 407,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card",
+          "x": 320,
+          "y": 2225,
+          "width": 1560,
+          "height": 379,
+          "display": "block",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card",
+          "x": 320,
+          "y": 2623,
+          "width": 1560,
+          "height": 419,
+          "display": "block",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card",
+          "x": 320,
+          "y": 3062,
+          "width": 1560,
+          "height": 131,
+          "display": "block",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card",
+          "x": 320,
+          "y": 3213,
+          "width": 1560,
+          "height": 520,
+          "display": "block",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card",
+          "x": 320,
+          "y": 3753,
+          "width": 1560,
+          "height": 274,
+          "display": "block",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card",
+          "x": 320,
+          "y": 4047,
+          "width": 1560,
+          "height": 155,
+          "display": "block",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        }
+      ],
+      "columns": [
+        {
+          "class": "appearance-column",
+          "x": 320,
+          "y": 112,
+          "width": 829,
+          "height": 2093,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "appearance-column",
+          "x": 1174,
+          "y": 112,
+          "width": 706,
+          "height": 1621,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        }
+      ],
+      "toolbar": []
+    },
+    {
+      "route": "nodes",
+      "width": 1920,
+      "height": 1080,
+      "viewport": 1920,
+      "document": 1920,
+      "view": {
+        "class": "view",
+        "x": 320,
+        "y": 112,
+        "width": 1560,
+        "height": 811,
+        "display": "grid",
+        "minHeight": "0px",
+        "maxWidth": "none"
+      },
+      "cards": [
+        {
+          "class": "card nc",
+          "x": 320,
+          "y": 421,
+          "width": 1560,
+          "height": 502,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        }
+      ],
+      "columns": [],
+      "toolbar": [
+        {
+          "class": "bar2 nodes-toolbar",
+          "x": 320,
+          "y": 112,
+          "width": 1560,
+          "height": 50,
+          "display": "flex",
+          "minHeight": "0px",
+          "maxWidth": "none"
+        },
+        {
+          "class": "node-explorer",
+          "x": 320,
+          "y": 176,
+          "width": 1560,
+          "height": 172,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        }
+      ]
+    },
+    {
+      "route": "set",
+      "width": 3440,
+      "height": 1440,
+      "viewport": 3440,
+      "document": 3440,
+      "view": {
+        "class": "view",
+        "x": 940,
+        "y": 112,
+        "width": 1840,
+        "height": 4085,
+        "display": "grid",
+        "minHeight": "0px",
+        "maxWidth": "none"
+      },
+      "cards": [
+        {
+          "class": "card sg",
+          "x": 940,
+          "y": 112,
+          "width": 979,
+          "height": 1046,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card sg",
+          "x": 940,
+          "y": 1185,
+          "width": 979,
+          "height": 487,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card sg",
+          "x": 940,
+          "y": 1697,
+          "width": 979,
+          "height": 511,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card sg",
+          "x": 1946,
+          "y": 112,
+          "width": 834,
+          "height": 690,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card sg",
+          "x": 1946,
+          "y": 828,
+          "width": 834,
+          "height": 408,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card sg",
+          "x": 1946,
+          "y": 1262,
+          "width": 834,
+          "height": 389,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card",
+          "x": 940,
+          "y": 2230,
+          "width": 1840,
+          "height": 359,
+          "display": "block",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card",
+          "x": 940,
+          "y": 2611,
+          "width": 1840,
+          "height": 419,
+          "display": "block",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card",
+          "x": 940,
+          "y": 3052,
+          "width": 1840,
+          "height": 131,
+          "display": "block",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card",
+          "x": 940,
+          "y": 3205,
+          "width": 1840,
+          "height": 520,
+          "display": "block",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card",
+          "x": 940,
+          "y": 3747,
+          "width": 1840,
+          "height": 274,
+          "display": "block",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card",
+          "x": 940,
+          "y": 4043,
+          "width": 1840,
+          "height": 155,
+          "display": "block",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        }
+      ],
+      "columns": [
+        {
+          "class": "appearance-column",
+          "x": 940,
+          "y": 112,
+          "width": 979,
+          "height": 2096,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "appearance-column",
+          "x": 1946,
+          "y": 112,
+          "width": 834,
+          "height": 1539,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        }
+      ],
+      "toolbar": []
+    },
+    {
+      "route": "nodes",
+      "width": 3440,
+      "height": 1440,
+      "viewport": 3440,
+      "document": 3440,
+      "view": {
+        "class": "view",
+        "x": 940,
+        "y": 112,
+        "width": 1840,
+        "height": 753,
+        "display": "grid",
+        "minHeight": "0px",
+        "maxWidth": "none"
+      },
+      "cards": [
+        {
+          "class": "card nc",
+          "x": 940,
+          "y": 363,
+          "width": 1840,
+          "height": 502,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        }
+      ],
+      "columns": [],
+      "toolbar": [
+        {
+          "class": "bar2 nodes-toolbar",
+          "x": 940,
+          "y": 112,
+          "width": 1840,
+          "height": 50,
+          "display": "flex",
+          "minHeight": "0px",
+          "maxWidth": "none"
+        },
+        {
+          "class": "node-explorer",
+          "x": 940,
+          "y": 176,
+          "width": 1840,
+          "height": 113,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        }
+      ]
+    }
+  ],
+  "errors": []
+}

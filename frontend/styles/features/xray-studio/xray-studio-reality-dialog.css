@@ -2,8 +2,8 @@
  * Loaded after xray-studio-v4.css so this native-dialog width wins over the
  * generic action-sheet and app-wide dialog constraints. */
 dialog.xm-studio-modal.xm-studio-modal--reality{
-  width:min(74rem,calc(100vw - 2rem))!important;
-  max-width:calc(100vw - 2rem)!important;
+  width:min(74rem,calc(100vw - 2rem));
+  max-width:calc(100vw - 2rem);
   max-height:calc(100dvh - 2rem);
   overflow:auto;
 }
@@ -80,14 +80,14 @@ dialog.xm-studio-modal.xm-studio-modal--reality{
 
 @media(max-width:980px){
   dialog.xm-studio-modal.xm-studio-modal--reality{
-    width:min(58rem,calc(100vw - 1.25rem))!important;
-    max-width:calc(100vw - 1.25rem)!important;
+    width:min(58rem,calc(100vw - 1.25rem));
+    max-width:calc(100vw - 1.25rem);
   }
   .xm-studio-modal--reality .xm-studio-modal-fields{
     grid-template-columns:repeat(2,minmax(0,1fr));
   }
   .xm-studio-modal--reality .xm-studio-modal-field:nth-child(3),
-  .xm-studio-modal--reality .xm-studio-modal-field:nth-child(4){
+.xm-studio-modal--reality .xm-studio-modal-field:nth-child(4){
     grid-column:1/-1;
   }
   .xm-studio-modal--reality .xm-studio-modal-field:nth-child(4) select{
@@ -97,8 +97,8 @@ dialog.xm-studio-modal.xm-studio-modal--reality{
 
 @media(max-width:640px){
   dialog.xm-studio-modal.xm-studio-modal--reality{
-    width:calc(100vw - .8rem)!important;
-    max-width:calc(100vw - .8rem)!important;
+    width:calc(100vw - .8rem);
+    max-width:calc(100vw - .8rem);
     max-height:calc(100dvh - .8rem);
   }
   .xm-studio-modal--reality .xm-studio-modal-shell{
@@ -114,8 +114,8 @@ dialog.xm-studio-modal.xm-studio-modal--reality{
     gap:.9rem;
   }
   .xm-studio-modal--reality .xm-studio-modal-field,
-  .xm-studio-modal--reality .xm-studio-modal-field:nth-child(3),
-  .xm-studio-modal--reality .xm-studio-modal-field:nth-child(4){
+.xm-studio-modal--reality .xm-studio-modal-field:nth-child(3),
+.xm-studio-modal--reality .xm-studio-modal-field:nth-child(4){
     grid-column:1/-1;
   }
   .xm-studio-modal--reality .xm-studio-modal-help{

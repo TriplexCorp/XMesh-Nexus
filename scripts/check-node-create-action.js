@@ -1,20 +1,22 @@
 #!/usr/bin/env node
 'use strict';
+const {assertPackaged}=require('./ci/frontend-source.cjs');
+const {panelStyles}=require('./ci/frontend-source.cjs');
 const fs=require('node:fs');
 const assert=require('node:assert/strict');
-const app=fs.readFileSync('app.js','utf8');
-const css=fs.readFileSync('styles.css','utf8');
-const dialogCss=fs.readFileSync('node-dialogs.css','utf8');
-const userCss=fs.readFileSync('user-create-v3.css','utf8');
-const sharingJs=fs.readFileSync('user-sharing-risk.js','utf8');
-const sharingContext=fs.readFileSync('user-sharing-context.js','utf8');
-const sharingCss=fs.readFileSync('user-sharing-risk.css','utf8');
-const dialogJs=fs.readFileSync('node-dialogs.js','utf8');
-const html=fs.readFileSync('index.html','utf8');
-const strictBootstrap=fs.readFileSync('node-bootstrap-v6.js','utf8');
+const app=fs.readFileSync('frontend/js/core/app.js','utf8');
+const css=panelStyles();
+const dialogCss=fs.readFileSync('frontend/styles/features/nodes/node-dialogs.css','utf8');
+const userCss=fs.readFileSync('frontend/styles/features/users/user-editor.css','utf8');
+const sharingJs=fs.readFileSync('frontend/js/features/users/user-sharing-risk.js','utf8');
+const sharingContext=fs.readFileSync('frontend/js/features/users/user-sharing-context.js','utf8');
+const sharingCss=fs.readFileSync('frontend/styles/features/users/user-sharing-risk.css','utf8');
+const dialogJs=fs.readFileSync('frontend/js/features/nodes/node-dialogs.js','utf8');
+const html=fs.readFileSync('frontend/index.html','utf8');
+const strictBootstrap=fs.readFileSync('frontend/js/features/nodes/node-bootstrap-v6.js','utf8');
 const dockerfile=fs.readFileSync('backend/Dockerfile','utf8');
 
-assert.match(app, /<div class="bar2 nodes-toolbar"><p class="note">/,
+assert.match(app, /<div class="nodes-toolbar" data-ui-toolbar="filters" role="search"/,
  'Node list toolbar must be scoped to nodes page');
 assert.match(app, /<button type="button" class="node-create-action" data-ne="nodes" aria-label="Добавить новый узел"><span class="node-create-icon" aria-hidden="true">/ ,
  'New Node button must retain its existing creation handler and accessible label');
@@ -50,15 +52,15 @@ assert.match(css, /\.nodes-toolbar \.node-create-action\{[^}]*background:color-m
  'Action must follow the selected theme surface');
 assert.match(css, /@media\(max-width:390px\)\{\s*\.nodes-toolbar \.node-create-action\{width:100%;margin-left:0\}/,
  'New Node button must fit narrow phones');
-assert.match(html,/styles\.css\?v=[a-z0-9-]+/,'Update CSS cache');
+assert.match(html,/nexus-ui-v3\.css\?v=[a-f0-9]{12}/,'Update CSS cache');
 assert.match(html,/app\.js\?v=[a-z0-9-]+/,'Update JS cache');
 
 // XMesh v6 security invariant: the UI must override the historical installer
 // handler and pin the reviewed strict-PQ-only Node release. The Node bootstrap
 // itself blocks router/Xray startup until a durable verified receipt exists.
-assert.match(html,/<script src="\/node-bootstrap-v6\.js\?v=20261101-hysteria-policy-v1"><\/script>/,
+assert.match(html,/<script src="\/js\/features\/nodes\/node-bootstrap-v6\.js\?v=[a-z0-9._-]+"><\/script>/i,
  'Panel must cache-bust the strict-PQ bootstrap after changing the reviewed Node release pin');
-assert.ok(html.indexOf('app.js?v=')<html.indexOf('/node-bootstrap-v6.js?v='),
+assert.ok(html.indexOf('app.js?v=')<html.indexOf('/js/features/nodes/node-bootstrap-v6.js?v='),
  'Strict-PQ bootstrap override must load after the historical app handler');
 assert.match(strictBootstrap,/XMESH_V6_NODE_BOOTSTRAP_SHA='6ff742b416e1134801943bf6f64d997e68dbdcaf'/,
  'Fresh Node installation must pin the reviewed XMesh-Node release with independent protocol credentials');
@@ -90,11 +92,7 @@ assert.match(strictBootstrap,/Node\/Xray не запустятся без под
  'UI must state the fail-closed runtime invariant');
 
 // Redesigned modal surfaces share one cache-busted dialog asset layer.
-assert.match(html,/<link rel="stylesheet" href="\/node-dialogs\.css\?v=20261101-user-create-v2">/,
- 'Base dialog redesign stylesheet must remain available');
-assert.match(html,/<link rel="stylesheet" href="\/user-create-v3\.css\?v=20261101-enterprise-v4&r=20261101-create-v5">/,
- 'Create-user v5 stylesheet must receive a fresh cache key while retaining the stable asset version');
-assert.match(html,/<script src="\/node-dialogs\.js\?v=20261101-user-create-enterprise-v3"><\/script>/,
+assert.match(html,/<script src="\/js\/features\/nodes\/node-dialogs\.js\?v=[a-z0-9._-]+"><\/script>/i,
  'Dialog behavior enhancer must be cache-busted after create-user markup repair');
 assert.match(dialogCss,/dialog\.xm-action-confirm:has\(\.xm-action-confirm-icon\)\{[\s\S]*width:min\(760px/,
  'Registered-node confirmation must no longer use the tiny shared width');
@@ -142,7 +140,7 @@ assert.match(userCss,/\.user-create-section-extra\{grid-column:1\/-1/,
  'Metadata section must span the full desktop workspace');
 assert.match(userCss,/grid-template-areas:"squads tag hold desc"/,
  'Desktop metadata must use one compact horizontal rail');
-assert.match(userCss,/\.user-create-hold \.sw\{[\s\S]*width:2\.8rem!important;[\s\S]*height:1\.6rem!important/,
+assert.match(userCss,/\.user-create-hold \.sw\{[\s\S]*width:2\.8rem;[\s\S]*height:1\.6rem/,
  'On-hold control must retain a real visible switch track instead of collapsing to a dot');
 assert.match(userCss,/\.user-create-section-kicker\{display:none\}/,
  'Duplicate English section kickers must stay visually suppressed');
@@ -155,8 +153,7 @@ assert.match(userCss,/\.user-create-footer-actions\{display:flex/,
 
 // Anti-sharing intelligence is deliberately explainable: device slots are
 // authoritative, traffic history is verified, and high traffic alone is not enough.
-assert.match(html,/user-sharing-risk\.css\?v=20261101-sharing-v1/,'Sharing risk CSS must be loaded');
-assert.match(html,/user-sharing-context\.js\?v=20261101-sharing-v1[\s\S]*user-sharing-risk\.js\?v=20261101-sharing-v1/,
+assert.match(html,/user-sharing-context\.js\?v=[a-f0-9]{12}[\s\S]*user-sharing-risk\.js\?v=[a-f0-9]{12}/,
  'Sharing context must load immediately before the isolated risk monitor');
 assert.match(sharingContext,/globalThis\.DB=DB/,'Sharing monitor must receive the already-loaded runtime user snapshot');
 assert.match(sharingJs,/traffic\/history\?range=7d/,'Risk score must use verified seven-day Xray history');
@@ -170,12 +167,9 @@ assert.match(sharingJs,/dataset\.sharingHead='risk'/,'Users table must gain the 
 assert.match(sharingCss,/\.xm-risk-pill\.is-high/,'High-risk table state must be visually distinct');
 assert.match(sharingCss,/\.xm-sharing-dialog\{/,'Risk details must use a dedicated explainable dialog');
 
-assert.match(dockerfile,/node-dialogs\.css user-create-v3\.css user-sharing-risk\.css node-dialogs\.js/,
- 'Production panel image must package the create-user and sharing-risk styles with dialog assets');
-assert.match(dockerfile,/diagnostics\.js diagnostics\.css user-sharing-context\.js user-sharing-risk\.js/,
- 'Production panel image must package sharing intelligence after diagnostics and runtime context');
-assert.match(dockerfile,/app\.js user-fingerprint-override\.js node-bootstrap-v6\.js unified-selects\.js/,
- 'Production panel image must package user fingerprint control and the strict-PQ bootstrap override');
+assertPackaged(assert,['node-dialogs.css','user-editor.css','user-sharing-risk.css','node-dialogs.js']);
+assertPackaged(assert,['diagnostics.js', 'diagnostics.css', 'user-sharing-context.js', 'user-sharing-risk.js']);
+assertPackaged(assert,['app.js', 'user-fingerprint-override.js', 'node-bootstrap-v6.js', 'unified-selects.js']);
 
 assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length,'CSS braces must remain balanced');
 assert.equal((dialogCss.match(/\{/g)||[]).length,(dialogCss.match(/\}/g)||[]).length,'Dialog CSS braces must remain balanced');

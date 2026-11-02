@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 'use strict';
+const {panelStyles}=require('./ci/frontend-source.cjs');
 const fs=require('node:fs'),assert=require('node:assert/strict');
 const api=fs.readFileSync('backend/src/main.rs','utf8');
-const ui=fs.readFileSync('app.js','utf8');
-const css=fs.readFileSync('styles.css','utf8');
+const ui=fs.readFileSync('frontend/js/core/app.js','utf8');
+const css=panelStyles();
 assert.match(api,/\.route\(\s*"\/nodes\/\{id\}\/traffic\/reset"\s*,\s*post\(\s*reset_node_network_traffic\s*\)\s*,?\s*\)/);
 const reset=api.slice(api.indexOf('async fn reset_node_network_traffic('),api.indexOf('async fn update_record('));
 assert.match(reset,/require_mutation\(&actor\)/);

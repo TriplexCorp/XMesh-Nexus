@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
-const source=fs.readFileSync('xray-studio-dialogs.js','utf8');
+const source=fs.readFileSync('frontend/js/features/xray-studio/xray-studio-dialogs.js','utf8');
 
 class Element{
  constructor(tag){this.tagName=tag;this.children=[];this.events={};this.attrs={};this.value='';this.hidden=false;this.parent=null;this.removed=false;this.textContent='';}

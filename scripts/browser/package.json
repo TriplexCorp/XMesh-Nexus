@@ -1,0 +1,12 @@
+{
+  "name": "xmesh-browser-regressions",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Проверка геометрии панели XMesh Nexus в настоящем браузере",
+  "scripts": {
+    "test": "node ../test-ui-browser.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}

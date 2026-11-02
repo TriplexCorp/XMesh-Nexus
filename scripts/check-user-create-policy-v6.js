@@ -1,37 +1,56 @@
 #!/usr/bin/env node
 'use strict';
+const {assertPackaged,panelStyles}=require('./ci/frontend-source.cjs');
 const fs=require('node:fs');
 const assert=require('node:assert/strict');
-const js=fs.readFileSync('user-create-policy-v6.js','utf8');
-const css=fs.readFileSync('user-create-policy-v6.css','utf8');
-const extraCss=fs.readFileSync('user-create-extra-v7.css','utf8');
-const html=fs.readFileSync('index.html','utf8');
-const docker=fs.readFileSync('backend/Dockerfile','utf8');
+const js=fs.readFileSync('frontend/js/features/users/user-create-policy-v6.js','utf8');
+const html=fs.readFileSync('frontend/index.html','utf8');
+const css=panelStyles();
 new Function(js);
-assert.match(html,/user-create-policy-v6\.css\?v=20261101-duration-calendar-v1/,'Policy calendar CSS must be cache-busted');
-assert.match(html,/user-create-policy-v6\.js\?v=20261101-duration-calendar-v1/,'Policy calendar JS must be cache-busted');
-assert.match(html,/user-create-extra-v7\.css\?v=20261101-metadata-align-v1/,'Metadata alignment CSS must be cache-busted');
-assert.ok(html.indexOf('/node-dialogs.js?v=')<html.indexOf('/user-create-policy-v6.js?v='),'Policy enhancement must load after the base create-user dialog');
-assert.ok(html.indexOf('/user-create-policy-v6.css?v=')<html.indexOf('/user-create-extra-v7.css?v='),'Metadata alignment layer must load after the base create-user CSS layers');
-assert.match(docker,/user-create-policy-v6\.css user-create-policy-v6\.js user-create-extra-v7\.css/,'Production image must package policy calendar and metadata alignment assets');
-assert.match(js,/window\.userNew=function userNewPolicyCalendarV6/,'Create-user calendar must enhance the existing dialog instead of replacing submission logic');
-assert.match(js,/type="hidden" name="days"/,'Calendar UI must preserve the existing backend days field');
-assert.match(js,/\['0','∞'\],\['7','7 дней'\],\['30','30 дней'\],\['90','90 дней'\],\['180','180 дней'\]/,'Duration control must offer safe quick presets');
-assert.match(js,/data-user-create-date=/,'Calendar must support exact date selection');
-assert.match(js,/Срок начнётся с первого подключения/,'On-hold mode must explain duration semantics');
-assert.match(js,/Math\.max\(1,Math\.round\(serial\(target\)-serial\(today\(\)\)\)\)/,'Selected calendar dates must translate back into the existing integer-day contract');
-assert.match(css,/grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/,'Policy controls must retain a balanced 2x2 desktop grid');
-assert.match(css,/grid-template-rows:auto 3rem minmax\(1\.1rem,auto\)/,'Policy fields must share aligned label/control/help rows');
-assert.match(css,/input\[type=number\]::-webkit-inner-spin-button/,'Native Chromium number spinners must be suppressed');
-assert.match(css,/appearance:textfield/,'Native numeric controls must use the Nexus surface instead of browser spinner chrome');
-assert.match(css,/\.user-create-duration-calendar\{/,'Duration picker must render as a dedicated calendar popover');
-assert.match(css,/\.user-create-cal-day\.is-selected/,'Selected calendar date must have an explicit state');
-assert.match(extraCss,/grid-template-rows:1rem 3\.9rem/,'Metadata fields must share one label/control vertical rhythm');
-assert.match(extraCss,/\.user-create-squads \.ms\{[\s\S]*height:3\.9rem/,'Squad control must use the common metadata height');
-assert.match(extraCss,/\.user-create-tag input:not\(\[type=checkbox\]\)\{[\s\S]*height:3\.9rem!important/,'Tag input must use the common metadata height');
-assert.match(extraCss,/\.user-create-extra-grid>\.user-create-hold\{[\s\S]*border:0;[\s\S]*grid-template-areas:"label" "switch"/,'On-hold label must sit outside its control surface like the other metadata fields');
-assert.match(extraCss,/\.user-create-hold \.sw\{[\s\S]*width:100%!important;[\s\S]*height:3\.9rem!important/,'On-hold control surface must fill the common metadata control row');
-assert.match(extraCss,/\.user-create-desc textarea\{[\s\S]*height:3\.9rem;[\s\S]*resize:none/,'Note field must stay aligned and not be manually resized out of the row');
-assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length,'Policy CSS braces must remain balanced');
-assert.equal((extraCss.match(/\{/g)||[]).length,(extraCss.match(/\}/g)||[]).length,'Metadata CSS braces must remain balanced');
-console.log('Create-user policy v6 + metadata v7: aligned controls and duration calendar contract OK');
+
+assert.match(html,/\/js\/features\/users\/user-create-policy-v6\.js\?v=[a-f0-9]{12}/,
+ 'Policy calendar JS must use a content-addressed cache key');
+assert.ok(html.indexOf('/js/features/nodes/node-dialogs.js?v=')<html.indexOf('/js/features/users/user-create-policy-v6.js?v='),
+ 'Policy enhancement must load after the base create-user dialog');
+assertPackaged(assert,['user-create-policy-v6.js']);
+
+assert.match(js,/window\.userNew=function userNewPolicyCalendarV6/,
+ 'Create-user calendar must enhance the existing dialog instead of replacing submission logic');
+assert.match(js,/type="hidden" name="days"/,
+ 'Calendar UI must preserve the existing backend days field');
+assert.match(js,/\['0','∞'\],\['7','7 дней'\],\['30','30 дней'\],\['90','90 дней'\],\['180','180 дней'\]/,
+ 'Duration control must offer safe quick presets');
+assert.match(js,/data-user-create-date=/,
+ 'Calendar must support exact date selection');
+assert.match(js,/Срок начнётся с первого подключения/,
+ 'On-hold mode must explain duration semantics');
+assert.match(js,/Math\.max\(1,Math\.round\(serial\(target\)-serial\(today\(\)\)\)\)/,
+ 'Selected calendar dates must translate back into the existing integer-day contract');
+
+// CSS ownership moved into the canonical user-editor feature owner. Read the
+// complete panel graph so this test protects behavior without reviving deleted
+// user-create-policy-v6.css / user-create-extra-v7.css compatibility layers.
+assert.match(css,/#dlg\.user-create-modal\{/,
+ 'User editor styles must be wired into the canonical panel CSS graph');
+assert.match(css,/\.user-create-limits-grid\{[\s\S]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/,
+ 'Policy controls must retain a balanced two-column desktop grid');
+assert.match(css,/\.user-create-limits-grid>\.user-create-field\{[\s\S]*grid-template-rows:auto 3rem minmax\(1\.1rem,auto\)/,
+ 'Policy fields must share aligned label/control/help rows');
+assert.match(css,/input\[type=number\]::-webkit-inner-spin-button/,
+ 'Native Chromium number spinners must be suppressed');
+assert.match(css,/appearance:textfield/,
+ 'Native numeric controls must use the Nexus surface instead of browser spinner chrome');
+assert.match(css,/\.user-create-duration-calendar\{/,
+ 'Duration picker must render as a dedicated calendar popover');
+assert.match(css,/\.user-create-cal-day\.is-selected/,
+ 'Selected calendar date must have an explicit state');
+assert.match(css,/\.user-create-extra-grid\{[\s\S]*grid-template-areas:"squads tag hold desc"/,
+ 'Metadata controls must retain their authored desktop composition');
+assert.match(css,/\.user-create-hold \.sw\{[\s\S]*width:2\.8rem;[\s\S]*height:1\.6rem/,
+ 'On-hold switch must stay a real compact switch instead of a stretched legacy surface');
+assert.match(css,/\.user-create-desc textarea\{[^}]*min-height:3\.9rem;[^}]*resize:vertical/,
+ 'Note field must remain bounded while allowing intentional vertical resize');
+assert.doesNotMatch(css,/\.user-create-(?:limits|duration|extra|hold|desc)[^{]*\{[^}]*!important/,
+ 'User editor geometry must not depend on legacy !important overrides');
+
+console.log('Create-user policy calendar + canonical user-editor CSS contract: OK');

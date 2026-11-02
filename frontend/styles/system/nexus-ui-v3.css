@@ -1,11 +1,34 @@
-/* XMesh Nexus Design System v3 — single panel presentation entrypoint.
- *
- * Legacy compatibility is loaded separately in a low-priority cascade layer.
- * This entrypoint owns all modern presentation. Feature-specific workspace
- * geometry is isolated in the final workspaces module.
- * Cache keys are the first 12 characters of each module's Git blob SHA.
- */
-@import url("./nexus-v3-foundation.css?v=779e67d53681");
-@import url("./nexus-v3-components.css?v=09657a27abc3");
-@import url("./nexus-v3-layout.css?v=2ff83caa4742");
-@import url("./nexus-v3-workspaces.css?v=9cee03cd7d75");
+/* Single panel presentation authority: foundation -> components -> shared layouts -> feature geometry. */
+@import url("./nexus-v3-foundation.css?v=47517df661c5");
+@import url("./nexus-v3-components.css?v=1da2b8cb796c");
+@import url("./nexus-v3-layout.css?v=bf70f1e7d4dd");
+
+/* Scoped panel features. The public subscription portal has its own document entrypoint. */
+@import url("../features/access/access.css?v=c9b134b8a0bd");
+@import url("../features/balancers/balancers.css?v=5e87988e0c89");
+@import url("../features/hosts/hosts.css?v=6f2e19098531");
+@import url("../features/nodes/diagnostics.css?v=b99d57a26596");
+@import url("../features/nodes/node-dialogs.css?v=56d227cd5200");
+@import url("../features/nodes/node-editor.css?v=6c7e92270826");
+@import url("../features/nodes/node-geodata.css?v=655704fa0e0f");
+@import url("../features/nodes/node-routing.css?v=e02dfc9e746a");
+@import url("../features/nodes/nodes.css?v=09d3bdbfe261");
+@import url("../features/notifications/notifications.css?v=f43c8b1d5e24");
+@import url("../features/overview/overview.css?v=e984ce937d6e");
+@import url("../features/routing/client-routing.css?v=f60bd682945d");
+@import url("../features/security/security.css?v=45ec6a5fd0bd");
+@import url("../features/settings/settings-updates.css?v=982d5d1539f6");
+@import url("../features/settings/settings.css?v=cd1776ba14f2");
+@import url("../features/squads/squad-editor-premium-v5.css?v=70ca047618a5");
+@import url("../features/statistics/statistics.css?v=356dac2ce47d");
+@import url("../features/subscriptions/subscription-studio.css?v=b91c26f9c910");
+@import url("../features/tools/tools.css?v=b2eed08c8a90");
+@import url("../features/users/user-details.css?v=f49be9a511c8");
+@import url("../features/users/user-dialog-viewport.css?v=3f9c8e7c4fe0");
+@import url("../features/users/user-editor.css?v=685a11a885a1");
+@import url("../features/users/user-sharing-risk.css?v=5113a6fd82ba");
+@import url("../features/users/users.css?v=9fa24db44d6f");
+@import url("../features/xray-studio/xray-studio-hosts.css?v=b288421656ea");
+@import url("../features/xray-studio/xray-studio-reality-dialog.css?v=08b9107e6c8a");
+@import url("../features/xray-studio/xray-studio-tls-dialog.css?v=3a560218d948");
+@import url("../features/xray-studio/xray-studio-v4.css?v=4baebba55c26");

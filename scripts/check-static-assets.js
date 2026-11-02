@@ -11,6 +11,10 @@ const read=rel=>fs.readFileSync(path.join(root,rel),'utf8');
 const dockerfile=read('backend/Dockerfile');
 assert.match(dockerfile,/COPY frontend\/ \/app\/static\//,
   'Production image must copy the canonical frontend tree');
+assert.match(dockerfile,/sed -E -i[\s\S]*\/app\/static\/nexus-ui-v3\.css/,
+  'Flattened panel CSS entrypoint must rewrite its relative imports to flat runtime aliases');
+assert.match(dockerfile,/packaged browser silently loses all feature CSS behind the entrypoint/,
+  'Packaging must document the relative-import failure mode protected by this contract');
 
 const pages=['frontend/index.html','frontend/login.html'];
 const errors=[];
@@ -38,17 +42,14 @@ new Function(tlsJs);
 new Function(xhttpExpert);
 new Function(diagnosticsJs);
 
-assert.match(index,/xray-studio-tls-dialog\.css\?v=20261101-tls-layout-v5/,
-  'TLS dialog stylesheet must receive the specificity-fix cache key');
-assert.match(index,/xray-studio-tls-dialog\.js\?v=20261101-tls-workspace-v2/,
-  'TLS workspace behavior cache key must remain stable until intentionally rotated');
-assert.match(index,/node-dialogs\.js\?v=20261101-user-create-enterprise-v3/,
-  'Create-user structural repair and Agent autovalidation handler must receive the current cache key');
-assert.match(index,/user-create-v3\.css\?v=20261101-enterprise-v4/,
-  'Enterprise create-user layout must be cache-busted');
+const hashedAsset=(asset)=>new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\?v=[a-f0-9]{12}');
+assert.match(index,hashedAsset('xray-studio-tls-dialog.js'),
+  'TLS workspace behavior must use a content-addressed cache key');
+assert.match(index,hashedAsset('node-dialogs.js'),
+  'Create-user structural repair and Agent autovalidation handler must use a content-addressed cache key');
 assert.match(xhttpExpert,/Session ID/);
-assert.match(index,/xray-studio-xhttp-expert\.js\?v=20261101-core-schema-v2/,
-  'Expert XHTTP editor must be cache-busted and loaded after the strict schema');
+assert.match(index,hashedAsset('xray-studio-xhttp-expert.js'),
+  'Expert XHTTP editor must be content-addressed and loaded after the strict schema');
 assert.match(xhttpExpert,/sessionIDPlacement/);
 assert.match(xhttpExpert,/sessionIDTable/);
 assert.match(xhttpExpert,/sessionIDLength/);
@@ -84,7 +85,10 @@ assert.match(tlsJs,/class="xm-tls-close xm-studio-modal-close" data-x aria-label
   'TLS dialog must reuse the Nexus-wide close control');
 assert.doesNotMatch(tlsJs,/function closeIcon\(/,
   'TLS dialog must not carry a second private close icon implementation');
-assert.match(tlsCss,/dialog\.xm-tls-dialog\{[\s\S]*width:min\(1180px,calc\(100vw - 2rem\)\)!important/);
+assert.match(tlsCss,/dialog\.xm-tls-dialog\{[\s\S]*width:min\(1180px,calc\(100vw - 2rem\)\);[\s\S]*max-width:calc\(100vw - 2rem\)/,
+  'TLS dialog must remain viewport-bounded without specificity hacks');
+assert.doesNotMatch(tlsCss,/dialog\.xm-tls-dialog\{[\s\S]*width:[^;}]+!important/,
+  'TLS dialog width must not rely on !important');
 assert.match(tlsCss,/\.xm-tls-layout\{display:grid;grid-template-columns:1fr/);
 assert.match(tlsCss,/\.xm-tls-summary\{[\s\S]*grid-template-columns:minmax\(180px,.8fr\) minmax\(430px,2fr\) minmax\(260px,1.2fr\)/);
 assert.match(tlsCss,/\.xm-tls-summary dl\{[\s\S]*grid-template-columns:repeat\(4,minmax\(92px,1fr\)\)/);
@@ -94,8 +98,7 @@ assert.match(tlsCss,/\.xm-tls-advanced\{grid-column:1\/-1/);
 assert.doesNotMatch(tlsCss,/position:sticky;top:0[\s\S]*\.xm-tls-summary/);
 assert.match(tlsCss,/@media\(max-width:760px\)/);
 
-assert.match(index,/diagnostics\.css\?v=20261101-operations-v1/);
-assert.match(index,/diagnostics\.js\?v=20261101-operations-v1/);
+assert.match(index,hashedAsset('diagnostics.js'));
 assert.ok(index.indexOf('/js/core/app.js?v=')<index.indexOf('/js/features/nodes/diagnostics.js?v='),
   'Diagnostics route override must load after app.js');
 assert.match(diagnosticsJs,/pages\.tools=\[['"]Диагностика['"],diagnosticsPage\]/);

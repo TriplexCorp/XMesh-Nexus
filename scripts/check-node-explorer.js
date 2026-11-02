@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 'use strict';
+const {panelStyles}=require('./ci/frontend-source.cjs');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
-const app=fs.readFileSync('app.js','utf8');
-const css=fs.readFileSync('styles.css','utf8');
-const html=fs.readFileSync('index.html','utf8');
+const app=fs.readFileSync('frontend/js/core/app.js','utf8');
+const css=panelStyles();
+const html=fs.readFileSync('frontend/index.html','utf8');
 new Function(app);
 const start=app.indexOf('const NODE_EXPLORER_PAGE_SIZE=48;');
 const stop=app.indexOf('function nodeExplorerUpdate(){',start);
@@ -43,12 +44,12 @@ assert.match(app,/runtimeQueue:\[\],runtimePending:new Set\(\),runtimeActive:0,r
 assert.match(app,/while\(explorer\.runtimeActive<8&&explorer\.runtimeQueue\.length/,'Limit concurrent node runtime requests to eight');
 assert.match(app,/explorer\.runtimeQueue=explorer\.runtimeQueue\.filter/,'Drop queued requests that are no longer visible');
 assert.match(app,/setTimeout\(\(\)=>\{if\(!root\.isConnected\)return;nodeExplorer\.page=1;nodeExplorerUpdate\(\)\},140\)/,'Debounced input');
-assert.match(css,/\.nodes-page \.node-explorer\{/,'Dedicated themed filter bar');
+assert.match(css,/\.nodes-page \.node-explorer\s*,\s*\.nodes-toolbar\s*\{/,'Nodes explorer and toolbar must share one feature-owned surface rule');
 assert.match(html,/app\.js\?v=[a-z0-9-]+/,'Cache-busted explorer script');
 assert(app.includes('data-node-search-clear data-action-icon="done"')&&app.includes('${ic("redo")}<span>Сбросить</span>'),'Reset button supplies exactly one SVG and opts out of icon decoration');
 assert.match(app,/data-node-prev data-action-icon="done"/,'Previous page must not duplicate icons');
 assert.match(app,/data-node-next data-action-icon="done"/,'Next page must not duplicate icons');
-assert(app.includes("pager.dataset.singlePage=pages===1"),"One-page pagination is visually simplified");
-assert(css.includes("border-radius:var(--ui-control-radius);")&&css.includes(".users-toolbar-actions>.users-refresh-action{"),"Users refresh obeys global radius");
-assert(css.includes('.node-explorer-pages[data-single-page="true"]'),"Single page hides misleading disabled arrows");
+assert(app.includes("pager.hidden=pages===1;pager.dataset.singlePage=String(pages===1)"),"One-page pagination is visually simplified");
+assert.match(css,/\.nodes-toolbar \.node-create-action\{[^}]*border-radius:var\(--ui-control-radius\)/,'Nodes toolbar actions must consume the shared control radius token');
+assert(css.includes('.node-explorer-pages[hidden]'),"Single-page navigation is removed from layout");
 console.log('Fleet explorer search/filter/sort and 1,200-node pagination: PASS.');

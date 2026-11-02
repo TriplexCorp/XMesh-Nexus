@@ -22,7 +22,7 @@ for (const path of files) {
   if (markers.some(marker => name.includes(marker) || content.includes(marker))) violations.push(path);
 }
 assert.deepEqual(violations, [], 'Unexpected provider-specific branding in tracked files: '+violations.join(', '));
-const studio = fs.readFileSync('subscription-studio.js', 'utf8');
+const studio = fs.readFileSync('frontend/js/features/subscriptions/subscription-studio.js', 'utf8');
 assert.match(studio, /placeholder:'Название вашего сервиса'/,
   'Portal must ship with a vendor-neutral name placeholder');
 assert.match(studio, /subscriptionBrand:''/,

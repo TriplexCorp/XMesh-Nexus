@@ -4,7 +4,7 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 const assert=require('node:assert/strict');
 
-const source=fs.readFileSync('xray-studio-protocol-tls.js','utf8');
+const source=fs.readFileSync('frontend/js/features/xray-studio/xray-studio-protocol-tls.js','utf8');
 const listeners={};
 let randomCounter=1;
 class HTMLSelectElement{}

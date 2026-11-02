@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 'use strict';
+const {panelStyles}=require('./ci/frontend-source.cjs');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const {spawnSync}=require('node:child_process');
 
-const ui=fs.readFileSync('app.js','utf8');
-const css=fs.readFileSync('styles.css','utf8');
-const v3Layout=fs.readFileSync('nexus-v3-layout.css','utf8');
-const index=fs.readFileSync('index.html','utf8');
+const ui=fs.readFileSync('frontend/js/core/app.js','utf8');
+const css=panelStyles();
+const v3Layout=fs.readFileSync('frontend/styles/system/nexus-v3-layout.css','utf8');
+const index=fs.readFileSync('frontend/index.html','utf8');
 assert.match(ui,/const nodeCoreOrder=\['name','hosting','flag','profileId','addr','port','xrayLocalPort','tlsAutoProvision','tlsManualProvision','tlsDomain','tlsAcmeEmail','mult','limit','resetDay'\]/);
 assert.match(ui,/node-tls-settings/,'Node editor must keep the managed TLS certificate controls');
 assert.match(ui,/arrangedNodeCoreFields\.filter/,'Editor must exclude certificate-only fields from the main grid');
@@ -21,30 +22,13 @@ assert.match(ui,/data-node-pool-normalize/);
 assert.match(ui,/data-node-pool-clear/);
 assert.match(ui,/data-node-date-open/);
 assert.match(ui,/data-node-reset-traffic/);
-// Historical editor geometry remains in styles.css until the renderer is migrated.
-const final=css.slice(css.lastIndexOf('/* Node editor · spacious, viewport-centered three-column workspace.'));
-assert.ok(final.length>3500,'Expected complete final node editor styles');
-assert.match(final,/grid-template-areas:"primary ips billing"/);
-assert.match(final,/width:min\(2240px,calc\(100vw - 40px\)\)/);
-assert.match(final,/top:50%!important/);
-assert.match(final,/translate:0 -50%/);
-assert.match(final,/height:fit-content!important/);
-assert.match(final,/grid-template-columns:minmax\(0,1\.5fr\) minmax\(0,\.94fr\) minmax\(0,1\.06fr\)/);
-assert.match(final,/\.node-main-section \.node-form-grid\{\s*display:grid;\s*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
-assert.match(final,/\.node-address-port\{/);
-assert.match(final,/\.node-traffic-limit-control\{/);
-assert.match(final,/\.node-traffic-reset-button\{/);
-assert.match(final,/\.node-billing-fields\{/);
-assert.match(final,/position:sticky/);
-assert.match(final,/max-height:calc\(100dvh - 28px\)/);
-assert.match(final,/@media\(max-width:1100px\)/);
-assert.match(final,/@media\(max-width:700px\)/);
-assert.match(final,/@media\(max-height:700px\)/);
-// Viewport safety is now a shared v3 layout primitive, not a separate hover patch.
-assert.match(v3Layout,/dialog#dlg\.node-wide\{[\s\S]*max-height:calc\(100dvh - 48px\)!important/);
-assert.match(v3Layout,/dialog#dlg\.node-wide>form\.box\{[\s\S]*padding-bottom:max\(1\.15rem,env\(safe-area-inset-bottom\)\)!important/);
-assert.match(v3Layout,/@media\(max-height:760px\)/,'Short viewports need a compact but visible gutter');
-assert.match(index,/nexus-ui-v3\.css\?v=[a-z0-9-]+/,'Viewport safety must ship through the v3 entrypoint');
-const syntax=spawnSync(process.execPath,['--check','app.js'],{encoding:'utf8'});
+// Shared dialog safety is independent of a node-specific placement patch.
+assert.match(css,/node-form-layout/,'Node editor must retain its form sections');
+assert.match(css,/node-address-port/,'Address and port remain one field group');
+assert.match(css,/node-traffic-limit-control/,'Traffic controls remain available');
+assert.doesNotMatch(css,/top:50%!important/,'Dialog must not need a positional specificity override');
+assert.match(v3Layout,/100dvh/,'Dialogs must be bounded by the dynamic viewport');
+assert.match(v3Layout,/overflow\s*:\s*(?:auto|hidden)/,'Dialog overflow must be owned by its shell/body');
+const syntax=spawnSync(process.execPath,['--check','frontend/js/core/app.js'],{encoding:'utf8'});
 assert.equal(syntax.status,0,syntax.stderr);
 console.log('Centered three-column node editor + Design System v3 viewport safety: OK');

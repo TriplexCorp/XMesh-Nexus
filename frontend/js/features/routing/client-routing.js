@@ -73,32 +73,6 @@
     return values.map(([value,label])=>'<option value="'+escapeHTML(value)+'"'+(value===selected?' selected':'')+'>'+escapeHTML(label)+'</option>').join('');
   }
 
-  const CSS_VERSION = '20261024-route-json-v14';
-  function ensureStylesheet() {
-    const file = 'client-routing.css';
-    const existing = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
-      .find(link => {
-        try { return new URL(link.href, location.href).pathname.endsWith('/' + file); }
-        catch (_) { return false; }
-      });
-    // /dashboard/<secret-path> is not the static asset root. A matching
-    // filename/version at that location may be a 404 HTML response.
-    if (existing) {
-      const url = new URL(existing.href, location.href);
-      if (url.origin === location.origin && url.pathname === '/' + file &&
-          url.searchParams.get('v') === CSS_VERSION) return;
-    }
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = '/' + file + '?v=' + CSS_VERSION;
-    link.dataset.clientRoutingStyles = CSS_VERSION;
-    document.head.appendChild(link);
-    if (existing) existing.remove();
-  }
-  // Fail-safe: SVGs must never occupy the viewport if the optional CSS asset fails.
-  // One CSS owner: client-routing.css. No competing inline fallback rules.
-  function ensureCriticalStyles() {}
-
   function create(db, saveSettings, toast) {
     const nodes = (db.nodes||[]).filter(n=>!n.disabled);
     const hosts = (db.hosts||[]).filter(h=>!h.disabled);
@@ -393,8 +367,6 @@
       draft.push(copy);open(copy.id);
     }
     function wire(){
-      ensureCriticalStyles();
-      ensureStylesheet();
       const root=document.getElementById('client-route-root');if(!root)return;
       render();
       root.addEventListener('click',async event=>{

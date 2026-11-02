@@ -2,8 +2,8 @@
 'use strict';
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
-const app=fs.readFileSync('app.js','utf8');
-const studio=fs.readFileSync('subscription-studio.js','utf8');
+const app=fs.readFileSync('frontend/js/core/app.js','utf8');
+const studio=fs.readFileSync('frontend/js/features/subscriptions/subscription-studio.js','utf8');
 const engine=fs.readFileSync('backend/src/subscription_json.rs','utf8');
 assert.match(app,/\['balancers','network','Балансировщики'\]/);
 assert.match(app,/balancers:\['Балансировщики',balancersP\]/);

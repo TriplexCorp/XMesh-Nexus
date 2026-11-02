@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 'use strict';
+const {panelStyles}=require('./ci/frontend-source.cjs');
 // Behavioural SVG geometry check: execute the real renderers with measured data.
 const fs=require('node:fs');
 const assert=require('node:assert/strict');
-const app=fs.readFileSync('app.js','utf8');
-const css=fs.readFileSync('styles.css','utf8');
+const app=fs.readFileSync('frontend/js/core/app.js','utf8');
+const css=panelStyles();
 function extract(start,end){
  const from=app.indexOf(start),to=app.indexOf(end,from+start.length);
  assert(from!==-1&&to>from,'renderer source boundaries must exist: '+start);
@@ -49,8 +50,8 @@ for(const [renderer,height] of [[w=>stats(points,w),340],[w=>dashboard({points,s
  for(let i=0;i<a.length;i++)assert(Math.abs(a[i][1]-b[i][1])<0.01,'Y must not scale with width');
  assert(b.at(-1)[0]>a.at(-1)[0],'Plot must expand horizontally');
 }
-assert.match(css,/\.stats-detail-chart\{[^}]*height:21\.25rem/);
-assert.match(css,/\.traffic-chart-svg\{[^}]*height:18\.25rem/);
+assert.match(css,/\.stats-detail-chart\s*\{[^}]*height\s*:\s*21\.25rem/);
+assert.match(css,/\.traffic-chart-svg\s*\{[^}]*height\s*:\s*18\.25rem/);
 assert.doesNotMatch(css,/width:min\(100%,(?:72|100)rem\)/);
 assert.match(app,/new ResizeObserver\(update\)/);
 assert.match(app,/observer\.observe\(wrapper\)/);

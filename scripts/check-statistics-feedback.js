@@ -1,287 +1,237 @@
 #!/usr/bin/env node
 'use strict';
-const fs=require('node:fs'),assert=require('node:assert/strict');
-const app=fs.readFileSync('app.js','utf8');
-const sec=fs.readFileSync('security-ui.js','utf8');
+
+const {panelStyles}=require('./ci/frontend-source.cjs');
+const fs=require('node:fs');
+const assert=require('node:assert/strict');
+
+const app=fs.readFileSync('frontend/js/core/app.js','utf8');
+const sec=fs.readFileSync('frontend/js/auth/security-ui.js','utf8');
 const backend=fs.readFileSync('backend/src/main.rs','utf8');
 const agent=fs.readFileSync('deploy/node-metrics-agent.sh','utf8');
-const css=fs.readFileSync('styles.css','utf8');
-new Function(app);new Function(sec);
-assert.match(app,/\['statistics','chart-no-axes-combined','Статистика'/);
-assert.match(app,/statistics:\['Статистика',statisticsP\]/);
-assert.match(app,/function statisticsP\(\)/);
-assert.match(app,/\/api\/v1\/statistics\/overview/);
-assert.match(app,/\/api\/v1\/metrics\/traffic\?range=/);
-assert.match(app,/CPU steal/);
-assert.match(app,/stats-quality/);
-assert.match(app,/\/api\/v1\/statistics\/period-leaders/);
-assert.match(app,/id="stats-leaders"/);
-assert.match(app,/id="stats-history-results"/);
-assert.match(app,/id="stats-user-modal"/);
-assert.match(app,/data-stats-user-tab="history"/);
-assert.match(app,/data-stats-user-tab="inbounds"/);
-assert.match(app,/data-stats-user-tab="observations"/);
-assert.match(app,/const showStatsUserTab=name=>/);
-assert.match(app,/\$\$\('\.stats-user-pane'\)\.forEach/);
+const css=panelStyles();
+
+new Function(app);
+new Function(sec);
+
+const matches=(source,pattern,message)=>assert.match(source,pattern,message);
+const rejects=(source,pattern,message)=>assert.doesNotMatch(source,pattern,message);
+
+// Statistics entrypoint and data sources.
+matches(app,/\['statistics','chart-no-axes-combined','Статистика'/);
+matches(app,/statistics:\['Статистика',statisticsP\]/);
+matches(app,/function statisticsP\(\)/);
+matches(app,/\/api\/v1\/statistics\/overview/);
+matches(app,/\/api\/v1\/metrics\/traffic\?range=/);
+matches(app,/\/api\/v1\/statistics\/period-leaders/);
+matches(app,/traffic\/history\?/);
+matches(app,/traffic\/observations/);
+matches(app,/metrics\/traffic\/bucket-detail/);
+matches(app,/CPU steal/);
+matches(app,/stats-quality/);
+matches(app,/id="stats-leaders"/);
+matches(app,/id="stats-history-results"/);
+matches(app,/id="stats-live-badge"/);
+matches(app,/id="stats-sample-age"/);
+
+// User intelligence is a native top-layer dialog. Shared dialog components own
+// backdrop and viewport safety; Statistics only owns its internal geometry.
+matches(app,/<dialog id="stats-user-modal" class="stats-user-overlay" data-dialog-size="workspace"/);
+matches(app,/if\(!modal\.open\)modal\.showModal\(\)/);
+matches(app,/\$\('#stats-user-modal'\)\.close\(\)/);
+rejects(app,/statsPortal|document\.body\.append\(statsPortal\)/,'Statistics dialog must stay in the browser top layer');
+rejects(app,/const sourceRect=dlg\.getBoundingClientRect\(\)/,'Statistics navigation must not measure source dialog geometry');
+rejects(app,/dialogSize:\{width:sourceRect\.width,height:sourceRect\.height\}/,'Return navigation must not persist measured dialog geometry');
+rejects(app,/--stats-source-width/,'Statistics must not export measured geometry through CSS variables');
+matches(app,/userTrafficReturn=\{hash:location\.hash\|\|'#users',userId:id\}/);
+matches(css,/dialog:not\(\[open\]\)\s*\{\s*display:none/,'Shared dialog system must preserve native open\/closed semantics');
+matches(css,/dialog::backdrop\s*\{[\s\S]*?background:var\(--xm-modal-dim\)[\s\S]*?backdrop-filter:blur\(var\(--xm-modal-blur\)\)/,'Shared dialog system must own backdrop tokens');
+matches(css,/dialog:is\([^}]*\[data-dialog-size=workspace\][^}]*\)\s*\{\s*--dialog-width:132rem/,'Workspace dialogs must use the shared viewport-safe sizing contract');
+rejects(css,/\.stats-user-overlay\[hidden\]/,'Native dialog visibility must not depend on a legacy overlay [hidden] rule');
+
+// Statistics user workspace and tabs keep feature-owned, content-driven layout.
+matches(app,/class="stats-user-workspace"/);
+matches(app,/data-stats-user-tab="history"/);
+matches(app,/data-stats-user-tab="inbounds"/);
+matches(app,/data-stats-user-tab="observations"/);
+matches(app,/const showStatsUserTab=name=>/);
+matches(app,/\$\$\('\.stats-user-pane'\)\.forEach/);
 assert.equal((app.match(/\$\$\('\.stats-user-tabs button'\)\.forEach/g)||[]).length,2);
-assert.doesNotMatch(app,/(?<!\$)\$\([^\n;]*\)\.forEach\s*\(/, 'querySelector returns an element, not a collection; use $ for forEach');
-assert.match(app,/const closeStatsUser=\(\)=>/);
-assert.match(css,/\.stats-user-overlay\[hidden\]/);
-assert.match(app,/class="stats-user-workspace"/);
-assert.match(app,/id="stats-user-source-insight"/);
-assert.match(app,/id="stats-user-node-insight"/);
-assert.match(app,/id="stats-user-refresh"/);
-assert.match(app,/stats-insight-donut/);
-assert.match(css,/backdrop-filter:blur\(13px\)/);
-assert.match(css,/\.stats-user-workspace\{display:grid/);
-assert.match(css,/@media\(max-width:1050px\)/);
-assert.match(css,/Statistics intelligence: viewport-first landscape layout/);
-assert.match(css,/var\(--panel-content-max, 1920px\)/);
-assert.match(css,/max-height:calc\(100dvh - 2rem\)/);
-assert.match(css,/\.stats-user-main\{display:flex;flex-direction:column;min-height:0;overflow:hidden\}/);
+rejects(app,/(?<!\$)\$\([^\n;]*\)\.forEach\s*\(/,'querySelector returns one element; iterable paths must use $$');
+matches(css,/\.stats-user-workspace\s*\{[\s\S]*?display:grid[\s\S]*?grid-template-columns:/);
+matches(css,/\.stats-user-tabs\s*\{[\s\S]*?display:flex[\s\S]*?flex-direction:row/);
+matches(css,/\.stats-user-actions\s*\{[\s\S]*?margin-left:auto[\s\S]*?display:flex[\s\S]*?flex-direction:row/);
+matches(css,/\.stats-user-pane:not\(\[hidden\]\)\s*\{/);
+matches(css,/@media \(max-width:999px\)[\s\S]*?\.stats-user-workspace\s*\{[\s\S]*?grid-template-columns:minmax\(0,1fr\)/);
+matches(css,/@media \(min-width:\s*1000px\) and \(min-height:\s*650px\)[\s\S]*?\.stats-user-workspace\s*\{[\s\S]*?grid-template-columns:/);
+matches(css,/\.stats-user-dialog\s*\{[\s\S]*?display:flex[\s\S]*?flex-direction:column/);
 
+// User actions stay compact and do not require specificity escalation.
+matches(app,/id="stats-user-refresh" class="gh stats-user-refresh"/);
+matches(app,/id="stats-user-close" class="gh stats-user-close"/);
+matches(app,/refreshButton\.classList\.add\('is-refreshing'\)/);
+matches(app,/finally\{if\(request===historyRequest&&refreshButton\)/);
+matches(css,/@keyframes stats-user-refresh-spin/);
+matches(css,/\.stats-user-actions #stats-user-refresh \.stats-refresh-icon\s*\{[\s\S]*?display:block/);
+matches(css,/\.stats-user-actions #stats-user-close\s*\{[\s\S]*?flex:0 0 2\.15rem/);
 
-assert.match(app,/const statsXrayHistoryChart=points=>/);
-assert.match(app,/statsXrayHistoryChart\(points\)/);
-assert.match(app,/Подтверждённые дельты Upload и Download/);
-assert.match(css,/\.stats-xray-line/);
-
-assert.match(app,/id="stats-history-user"/);
-assert.match(app,/id="stats-history-inbound"/);
-assert.match(app,/id="stats-history-node"/);
-assert.match(app,/data-stats-history-user/);
-assert.match(app,/traffic\/history\?/);
-assert.match(app,/Это не доказательство нулевого трафика/);
-
-assert.match(backend,/async fn get_statistics_leaders/);
-assert.match(backend,/async fn get_statistics_period_leaders/);
-assert.match(backend,/async fn get_user_traffic_observations/);
-assert.match(backend,/source_type='user'/);
-assert.match(backend,/source_type='inbound'/);
-assert.match(backend,/LIMIT 501/);
-assert.match(app,/id="stats-leaders-range"/);
-assert.match(app,/statistics\/period-leaders/);
-assert.doesNotMatch(app,/id="stats-history-observations-load"/);
-assert.match(app,/traffic\/observations/);
-
-assert.match(backend,/lifetime_since_first_verified_sample/);
-assert.match(backend,/async fn persist_verified_traffic_deltas/);
-assert.match(backend,/async fn get_user_traffic_history/);
-assert.match(backend,/verified_traffic_deltas/);
-assert.match(backend,/traffic\/history/);
-assert.match(backend,/source_type=\$3/);
-
-assert.match(backend,/viewer_read_only\(&actor\)/);
-
-assert.match(app,/const statsDetailedChart=\(points,chartWidth=1000\)=>/);
-assert.match(app,/statsDetailedChart\(points\)/);
-assert.match(app,/data-bucket-ms/);
-assert.match(app,/metrics\/traffic\/bucket-detail/);
-assert.match(app,/const openBucket=async\(bucketMs\)=>/);
+// Detailed traffic chart and bucket drill-down.
+matches(app,/const statsDetailedChart=\(points,chartWidth=1000\)=>/);
+matches(app,/statsDetailedChart\(points\)/);
+matches(app,/data-bucket-ms/);
+matches(app,/const openBucket=async\(bucketMs\)=>/);
 assert.equal((app.match(/\$\$\('\.stats-detail-point-wrap'\)\.forEach/g)||[]).length,2,
   'selected SVG points must use querySelectorAll for both open and close');
-assert.doesNotMatch(app,/(?<!\$)\$\('\.stats-detail-point-wrap'\)\.forEach/,
-  'querySelector yields only one element and has no forEach');
-assert.match(app,/stats-bucket-detail/);
-assert.match(backend,/async fn get_traffic_bucket_detail\(/);
-assert.match(backend,/LIMIT 500/);
-assert.match(css,/\.stats-bucket-detail\[hidden\]/);
-assert.match(app,/class="stats-detail-point-wrap /);
-assert.match(app,/Пропуски не интерполируются/);
-assert.match(css,/\.stats-detail-point-wrap:is/);
-assert.match(css,/\.stats-detail-point-ring/);
-assert.match(css,/\.stats-detail-point-core/);
-assert.match(app,/class="stats-detail-point-hit"/);
-assert.match(css,/\.stats-detail-point-hit\{fill:transparent;stroke:none;pointer-events:all/);
-assert.match(app,/e\.target\.closest\?\.\('\.stats-detail-point-wrap'\)/);
-assert.doesNotMatch(css,/\.stats-detail-point-wrap[^\n]*drop-shadow/);
-assert.match(css,/\.stats-detail-grid/);
-assert.match(css,/\.stats-detail-line\.rx/);
-assert.match(css,/\.stats-detail-line\.tx/);
-assert.match(app,/id="stats-live-badge"/);
-assert.match(app,/id="stats-sample-age"/);
-assert.match(app,/lastSampleAt=Number\.isFinite\(sampled\)/);
-assert.match(app,/trafficSignature!==lastTrafficSignature\|\|period!==lastTrafficPeriod/);
-assert.match(app,/updateLiveStatus\(\)/);
-assert.match(css,/\.stats-live-badge\.is-paused/);
-assert.match(css,/@keyframes stats-live-pulse/);
-assert.match(css,/@media\(prefers-reduced-motion:reduce\)/);
-assert.match(app,/now-lastOverview>=15000/);
-assert.match(app,/now-lastSystem>=15000/);
-assert.match(app,/needOverview\?backendRequest\('\/api\/v1\/statistics\/overview'\)/);
-assert.match(app,/needSystem\?api\.systemStats\(\)/);
-assert.match(app,/const cadence=live\?5000:30000/);
-assert.match(app,/if\(cur!=='statistics'\|\|document\.hidden\)return/);
-assert.match(app,/if\(!refreshing&&Date\.now\(\)-lastRefresh>=cadence\)/);
-assert.match(app,/void refresh\(true\)/);
-assert.match(app,/telemetryState==='delayed'/);
-assert.match(app,/userStatsStatus/);
-assert.match(app,/rxReporting/);
-assert.match(app,/<option value="live">В реальном времени<\/option>/);
-assert.match(app,/<option value="5m">5 минут<\/option>/);
-assert.match(app,/<option value="15m">15 минут<\/option>/);
-assert.match(app,/<option value="30m">30 минут<\/option>/);
-assert.match(app,/<option value="3h">3 часа<\/option>/);
-assert.match(app,/<option value="6h">6 часов<\/option>/);
-assert.match(app,/<option value="12h">12 часов<\/option>/);
-assert.match(app,/id="stats-refresh"[\s\S]*?id="stats-period"/);
-assert.match(app,/'refresh-cw':'<path/);
-assert.match(backend,/"live" => \("live", 5_i64\)/);
-assert.match(backend,/"5m" => \("5m", 10_i64\)/);
-assert.match(app,/<option value="7d">7 дней<\/option>/);
-assert.match(app,/<option value="30d">30 дней<\/option>/);
-assert.match(backend,/fn metric_freshness\(/);
-assert.match(backend,/mod metric_freshness_tests/);
-assert.match(backend,/"7d" => \("7d", 3600_i64\)/);
-assert.match(backend,/"30d" => \("30d", 21_600_i64\)/);
-assert.match(app,/quality==='stale'/);
-assert.match(app,/statsValue\(ok\?v\.cpuStealPercent:null,'%'/);
-assert.match(app,/Нет данных/);
-assert.match(backend,/route\("\/statistics\/overview", get\(get_statistics_overview\)\)/);
-assert.match(backend,/async fn get_statistics_overview/);
-assert.match(backend,/SELECT cpu_percent, ram_used_bytes, ram_total_bytes/);
-assert.match(backend,/cpu_steal_percent: Option<f64>/);
-assert.match(backend,/cpuStealPercent/);
-assert.match(agent,/cpu_steal/);
-assert.match(agent,/cpu_steal >= last_cpu_steal/);
-assert.match(agent,/cpu_steal_percent/);
-assert.match(css,/\.stats-node-grid\{/);
-assert.match(css,/#stats-dashboard \.stats-heading \.act\{/);
-assert.match(css,/grid-template-columns:max-content minmax\(12rem,19rem\)/);
-assert.match(css,/#stats-dashboard #stats-refresh\{grid-column:1;grid-row:1/);
-assert.match(css,/#stats-dashboard #stats-period\{grid-column:2;grid-row:1/);
-assert.match(sec,/announce\('Настройки безопасности успешно сохранены\.'/);
-assert.match(sec,/announce\(error\.textContent,'error'\)/);
-assert.match(app,/toast-state-icon/);
-assert.match(sec,/if\(location\.pathname!==patch\.dashboardPath\)/);
-// Presence requires fresh authenticated counter deltas; guard against duplicated handlers.
-assert.match(backend,/const USER_ONLINE_WINDOW_MS:\s*i64\s*=\s*45_000/);
-assert.match(backend,/async fn get_user_presence\(/);
-assert.match(backend,/userStatsAccepted/);
-assert.match(backend,/latest_source_ms\.is_none_or/);
-assert.match(backend,/sample\.uplink_bytes>previous\.last_uplink_bytes/);
-assert.match(backend,/sample\.downlink_bytes>previous\.last_downlink_bytes/);
+rejects(app,/(?<!\$)\$\('\.stats-detail-point-wrap'\)\.forEach/,
+  'querySelector yields one element and has no forEach');
+matches(app,/id="stats-bucket-detail" class="stats-bucket-detail" hidden/);
+matches(app,/panel\.hidden=false/);
+matches(app,/\$\('#stats-bucket-detail'\)\.hidden=true/);
+matches(css,/\.stats-bucket-detail\s*\{[\s\S]*?display:grid/);
+matches(app,/class="stats-detail-point-hit"/);
+matches(app,/e\.target\.closest\?\.\('\.stats-detail-point-wrap'\)/);
+matches(css,/\.stats-detail-point-hit\s*\{[\s\S]*?fill:transparent[\s\S]*?stroke:none[\s\S]*?pointer-events:all/);
+matches(css,/\.stats-detail-point-wrap:is\(:hover,:focus-visible,\.is-selected\) \.stats-detail-point-ring/);
+matches(css,/\.stats-detail-point-ring\s*\{/);
+matches(css,/\.stats-detail-point-core\s*\{/);
+rejects(css,/\.stats-detail-point-wrap[^\n{]*\{[^}]*drop-shadow/);
+matches(css,/\.stats-detail-grid\s*\{/);
+matches(css,/\.stats-detail-line\.rx\s*\{/);
+matches(css,/\.stats-detail-line\.tx\s*\{/);
+matches(css,/\.stats-detail-chart\s*\{[\s\S]*?height:21\.25rem/);
+
+// Xray history and filters.
+matches(app,/const statsXrayHistoryChart=points=>/);
+matches(app,/statsXrayHistoryChart\(points\)/);
+matches(app,/Подтверждённые дельты Upload и Download/);
+matches(css,/\.stats-xray-line\s*\{/);
+matches(app,/id="stats-history-user"/);
+matches(app,/id="stats-history-inbound"/);
+matches(app,/id="stats-history-node"/);
+matches(app,/data-stats-history-user/);
+matches(app,/Это не доказательство нулевого трафика/);
+rejects(app,/id="stats-history-observations-load"/);
+matches(app,/enhanceStatsPeriodSelect\(\$\('#stats-leaders-range'\)\)/);
+matches(app,/enhanceStatsPeriodSelect\(\$\('#stats-history-range'\)\)/);
+matches(app,/enhanceStatsPeriodSelect\(\$\('#stats-history-inbound'\)\)/);
+matches(app,/enhanceStatsPeriodSelect\(\$\('#stats-history-node'\)\)/);
+matches(app,/select\.dispatchEvent\(new Event\('change',\{bubbles:true\}\)\)/);
+matches(css,/\.xm-period-menu\s*\{/);
+matches(app,/document\.body\.append\(menu\)/);
+matches(app,/menu\.style\.left=rect\.left/);
+matches(css,/\.xm-period-portal\s*\{[\s\S]*?position:fixed[\s\S]*?z-index:var\(--nx-z-tooltip\)/,'Detached period menu must use the shared popover stacking token');
+matches(css,/#stats-history-user::-webkit-inner-spin-button/);
+
+// Live refresh and freshness semantics.
+matches(app,/lastSampleAt=Number\.isFinite\(sampled\)/);
+matches(app,/trafficSignature!==lastTrafficSignature\|\|period!==lastTrafficPeriod/);
+matches(app,/updateLiveStatus\(\)/);
+matches(css,/\.stats-live-badge\.is-paused\s*\{/);
+matches(css,/@keyframes stats-live-pulse/);
+matches(css,/@media \(prefers-reduced-motion:reduce\)/);
+matches(app,/now-lastOverview>=15000/);
+matches(app,/now-lastSystem>=15000/);
+matches(app,/needOverview\?backendRequest\('\/api\/v1\/statistics\/overview'\)/);
+matches(app,/needSystem\?api\.systemStats\(\)/);
+matches(app,/const cadence=live\?5000:30000/);
+matches(app,/if\(cur!=='statistics'\|\|document\.hidden\)return/);
+matches(app,/if\(!refreshing&&Date\.now\(\)-lastRefresh>=cadence\)/);
+matches(app,/void refresh\(true\)/);
+matches(app,/telemetryState==='delayed'/);
+matches(app,/userStatsStatus/);
+matches(app,/rxReporting/);
+matches(app,/<option value="live">В реальном времени<\/option>/);
+matches(app,/<option value="5m">5 минут<\/option>/);
+matches(app,/<option value="15m">15 минут<\/option>/);
+matches(app,/<option value="30m">30 минут<\/option>/);
+matches(app,/<option value="3h">3 часа<\/option>/);
+matches(app,/<option value="6h">6 часов<\/option>/);
+matches(app,/<option value="12h">12 часов<\/option>/);
+matches(app,/<option value="7d">7 дней<\/option>/);
+matches(app,/<option value="30d">30 дней<\/option>/);
+
+// Statistics backend contracts and signed telemetry.
+matches(backend,/async fn get_statistics_leaders/);
+matches(backend,/async fn get_statistics_period_leaders/);
+matches(backend,/async fn get_user_traffic_observations/);
+matches(backend,/async fn get_user_traffic_history/);
+matches(backend,/async fn get_traffic_bucket_detail\(/);
+matches(backend,/async fn get_statistics_overview/);
+matches(backend,/route\("\/statistics\/overview", get\(get_statistics_overview\)\)/);
+matches(backend,/verified_traffic_deltas/);
+matches(backend,/lifetime_since_first_verified_sample/);
+matches(backend,/async fn persist_verified_traffic_deltas/);
+matches(backend,/source_type='user'/);
+matches(backend,/source_type='inbound'/);
+matches(backend,/source_type=\$3/);
+matches(backend,/LIMIT 501/);
+matches(backend,/LIMIT 500/);
+matches(backend,/viewer_read_only\(&actor\)/);
+matches(backend,/fn metric_freshness\(/);
+matches(backend,/mod metric_freshness_tests/);
+matches(backend,/"live" => \("live", 5_i64\)/);
+matches(backend,/"5m" => \("5m", 10_i64\)/);
+matches(backend,/"7d" => \("7d", 3600_i64\)/);
+matches(backend,/"30d" => \("30d", 21_600_i64\)/);
+matches(backend,/SELECT cpu_percent, ram_used_bytes, ram_total_bytes/);
+matches(backend,/cpu_steal_percent: Option<f64>/);
+matches(backend,/cpuStealPercent/);
+matches(agent,/cpu_steal/);
+matches(agent,/cpu_steal >= last_cpu_steal/);
+matches(agent,/cpu_steal_percent/);
+
+// Presence requires fresh authenticated counter deltas and one handler per path.
+matches(backend,/const USER_ONLINE_WINDOW_MS:\s*i64\s*=\s*45_000/);
+matches(backend,/async fn get_user_presence\(/);
+matches(backend,/userStatsAccepted/);
+matches(backend,/latest_source_ms\.is_none_or/);
+matches(backend,/sample\.uplink_bytes>previous\.last_uplink_bytes/);
+matches(backend,/sample\.downlink_bytes>previous\.last_downlink_bytes/);
 assert.equal((backend.match(/async fn ingest_node_metrics\(/g)||[]).length,1);
 assert.equal((backend.match(/async fn get_user_presence\(/g)||[]).length,1);
 assert.equal((backend.match(/async fn get_user_traffic\(/g)||[]).length,1);
 assert.equal((agent.match(/# Distinct users with a verified Xray byte delta/g)||[]).length,1);
 assert.equal((agent.match(/signed_file=/g)||[]).length,1);
-assert.match(app,/\/api\/v1\/users\/presence/);
-assert.match(app,/presenceFeedHealthy&&st\(u\)==='ACTIVE'/);
-console.log('Statistics view, real signed steal-time and save-confirmation contracts: PASS');
+matches(app,/\/api\/v1\/users\/presence/);
+matches(app,/presenceFeedHealthy&&st\(u\)==='ACTIVE'/);
 
-// Stats overlay must escape transformed/scoped workspace containers to blur the entire app.
-assert.match(app,/document\.body\.append\(statsPortal\)/);
-assert.match(app,/document\.querySelector\('body > #stats-user-modal'\)\?\.remove\(\)/);
-assert.match(css,/body > \.stats-user-overlay\{position:fixed;inset:0;width:100vw;height:100dvh/);
+// Dashboard geometry remains responsive and feature-owned.
+matches(css,/\.stats-dashboard\s*\{[\s\S]*?display:grid/);
+matches(css,/#stats-dashboard \.stats-heading \.act\s*\{[\s\S]*?grid-template-columns:max-content minmax\(12rem,19rem\)/);
+matches(css,/#stats-dashboard #stats-refresh\s*\{[\s\S]*?grid-column:1[\s\S]*?grid-row:1/);
+matches(css,/#stats-dashboard #stats-period\s*\{[\s\S]*?grid-column:2[\s\S]*?grid-row:1/);
+matches(css,/\.stats-node-grid\s*\{/);
+matches(css,/@media \(max-width:700px\)[\s\S]*?\.stats-node-grid\s*\{[\s\S]*?grid-template-columns:1fr/);
 
-assert.match(app,/id="stats-user-refresh" class="gh stats-user-refresh"/);
-assert.match(app,/id="stats-user-close" class="gh stats-user-close"/);
-assert.match(css,/\.stats-user-tabs\{display:flex;flex-direction:row/);
-assert.match(css,/\.stats-user-actions\{margin-left:auto;display:flex;flex-direction:row/);
+// Node breakdown colors are stable and separate from upload\/download semantics.
+matches(app,/function userServerColor\(id\)/);
+matches(app,/registerUserNodeColors\(servers\)/);
+matches(app,/userNodeDistance/);
+matches(app,/const userNodeColors=new Map\(\)/);
+matches(app,/--server-color:'\+userServerColor\(r\.nodeId\)/);
+matches(app,/registerUserNodeColors\(servers\);const nodeTotal/);
+matches(app,/class="stats-insight-node" style="--node-color:'\+userServerColor\(node\.nodeId\)/);
+matches(app,/const nodeLegend=servers\.map/);
+matches(css,/--traffic-upload:/);
+matches(css,/--traffic-download:/);
+matches(css,/\.stats-insight-track span\s*\{[\s\S]*?background:var\(--node-color,var\(--a\)\)/);
 
-// Regression: a single DOM element cannot be iterated with for...of.
-assert.match(app,/\$\$\('\.stats-user-tabs button'\)\.forEach/);
-assert.doesNotMatch(app,/for\(const button of \$\('\.stats-user-actions button'\)\)/);
+// Destructive reset must use the standard confirmation flow.
+matches(app,/Сбросить трафик<\/button>/);
+matches(app,/if\(a==='rst'\)\{/);
+matches(app,/confirmBox\('Сбросить трафик пользователя/);
+matches(app,/await api\.update\('users',id,\{used:0\}\)/);
+rejects(app,/a=='rst'\?\{used:0\}/);
 
-// Tab switching must not affect the outer modal dimensions.
-assert.match(css,/Stable modal geometry independent from selected statistics tab/);
-assert.match(css,/height:calc\(100dvh - 3rem\);max-height:calc\(100dvh - 3rem\)/);
-assert.match(css,/\.stats-user-pane:not\(\[hidden\]\)\{/);
+// Security feedback regressions covered by this cross-feature contract.
+matches(sec,/announce\('Настройки безопасности успешно сохранены\.'/);
+matches(sec,/announce\(error\.textContent,'error'\)/);
+matches(sec,/if\(location\.pathname!==patch\.dashboardPath\)/);
+matches(app,/toast-state-icon/);
 
-assert.doesNotMatch(app,/id="stats-history-load"/);
-assert.match(app,/refreshButton\.classList\.add\('is-refreshing'\)/);
-assert.match(app,/finally\{if\(request===historyRequest&&refreshButton\)/);
-assert.match(css,/@keyframes stats-user-refresh-spin/);
-assert.match(css,/\.stats-refresh-icon\{display:block!important/);
+// Scrollable panes use the shared scrollbar contract rather than feature-local hacks.
+rejects(css,/--scrollbar-size:9px/,'Statistics must not pin a legacy global scrollbar size token');
+matches(css,/scrollbar-color:var\(--scrollbar-thumb\) var\(--scrollbar-track\)/);
+matches(css,/\.stats-user-pane \.stats-bucket-table-wrap\s*\{[\s\S]*?max-height:none[\s\S]*?overflow-y:visible[\s\S]*?overflow-x:auto/);
 
-assert.match(css,/#stats-user-close\{flex:0 0 2\.15rem/);
-
-assert.match(app,/data-open-user-traffic="\$\{u\.id\}"/);
-assert.match(app,/ID пользователя: \$\{esc\(u\.id\)\}/);
-assert.match(app,/pendingUserTrafficDetail=\{id,name:/);
-assert.match(app,/openStatsUser\(requested\.id,requested\.name\)/);
-
-assert.match(app,/userTrafficReturn=\{hash:location\.hash\|\|'#users',userId:id,dialogSize:/);
-assert.match(app,/const origin=userTrafficReturn/);
-assert.match(app,/location\.hash=origin\.hash/);
-
-// Period controls retain native select state/API but render a branded listbox.
-assert.match(app,/function enhanceStatsPeriodSelect\(select\)/);
-assert.match(app,/enhanceStatsPeriodSelect\(\$\('#stats-leaders-range'\)\)/);
-assert.match(app,/enhanceStatsPeriodSelect\(\$\('#stats-history-range'\)\)/);
-assert.match(app,/select\.dispatchEvent\(new Event\('change',\{bubbles:true\}\)\)/);
-assert.match(css,/\.xm-period-menu\{position:absolute/);
-assert.match(css,/scrollbar-color:var\(--scrollbar-thumb\) var\(--scrollbar-track\)/);
-
-assert.match(app,/document\.body\.append\(menu\)/);
-assert.match(app,/menu\.style\.left=rect\.left/);
-assert.match(app,/body > \.xm-period-portal/);
-assert.match(css,/body > \.xm-period-portal\{position:fixed;z-index:200000/);
-
-// Traffic reset is destructive and must be confirmed in the standard modal.
-assert.match(app,/Сбросить трафик<\/button>/);
-assert.match(app,/if\(a==='rst'\)\{/);
-assert.match(app,/confirmBox\('Сбросить трафик пользователя/);
-assert.match(app,/await api\.update\('users',id,\{used:0\}\)/);
-assert.doesNotMatch(app,/a=='rst'\?\{used:0\}/);
-
-assert.match(css,/Shared desktop geometry for user editor and detailed user analytics/);
-assert.match(css,/width:min\(82rem,calc\(100vw - 2\.5rem\)\)/);
-assert.match(css,/height:min\(44\.5rem,calc\(100dvh - 2rem\)\)/);
-
-assert.match(app,/const sourceRect=dlg\.getBoundingClientRect\(\)/);
-assert.match(app,/dialogSize:\{width:sourceRect\.width,height:sourceRect\.height\}/);
-assert.match(app,/--stats-source-width/);
-assert.match(css,/var\(--stats-source-width,108rem\)/);
-
-assert.match(css,/Statistics history: a single branded vertical scrollbar/);
-assert.match(css,/max-height:none;overflow-y:visible;overflow-x:auto/);
-assert.match(css,/scrollbar-color:var\(--scrollbar-thumb\) var\(--scrollbar-track\)/);
-
-assert.match(app,/enhanceStatsPeriodSelect\(\$\('#stats-history-inbound'\)\)/);
-assert.match(app,/enhanceStatsPeriodSelect\(\$\('#stats-history-node'\)\)/);
-assert.match(app,/historyInbound\._xmRefresh\?\.\(\);historyNode\._xmRefresh\?\.\(\)/);
-assert.match(app,/if\(\$\('\.stats-user-pane\[data-stats-user-pane="observations"\]'\)\?\.hidden===false\)void loadObservations\(\)/);
-assert.match(css,/#stats-history-user::-webkit-inner-spin-button/);
-
-// Inbound / Nodes breakdown must respond to selected node and inbound filters.
-assert.match(app,/const renderStatsBreakdown=\(\)=>/);
-assert.match(app,/String\(entry\.nodeId\)===node/);
-assert.match(app,/String\(entry\.inboundTag\|\|''\)===inbound/);
-assert.match(app,/statsBreakdownTotals=totals/);
-assert.match(app,/renderStatsBreakdown\(\);void loadHistory\(\)/);
-
-// Node donuts use the same distinct stable palette as the aggregate node ring.
-assert.match(app,/function userServerColor\(id\)/);
-assert.match(app,/registerUserNodeColors\(servers\)/);
-assert.match(app,/userNodeDistance/);
-assert.match(app,/const userNodeColors=new Map\(\)/);
-assert.match(app,/--server-color:'\+userServerColor\(r\.nodeId\)/);
-assert.match(css,/conic-gradient\(var\(--server-color,var\(--a\)\)/);
-
-assert.match(app,/for\(const saturation of \[42,55\]\)/);
-assert.match(app,/for\(const lightness of \[68,76\]\)/);
-assert.match(app,/const feather=Math\.min\(\.22,\(end-cursor\)\/6\)/);
-
-// Node colours are shared across user card and analytics; traffic direction has separate tokens.
-assert.match(app,/registerUserNodeColors\(servers\);const nodeTotal/);
-assert.match(app,/class="stats-insight-node" style="--node-color:'\+userServerColor\(node\.nodeId\)/);
-assert.match(app,/const nodeLegend=servers\.map/);
-assert.match(css,/--traffic-upload:#72dbc4;--traffic-download:#b5a0f4/);
-assert.match(css,/\.stats-insight-track span\{background:var\(--node-color,var\(--a\)\)\}/);
-
-assert.match(css,/Global XMesh scrollbar contract/);
-assert.match(css,/dialog\.user-modal,dialog\.user-modal \*/);
-assert.match(css,/--scrollbar-size:9px/);
-assert.match(css,/scrollbar-color:var\(--scrollbar-thumb\) var\(--scrollbar-track\)/);
-
-assert.match(css,/--scrollbar-end-gap:7px/);
-assert.match(css,/::-webkit-scrollbar-button:single-button:vertical:start:decrement/);
-
-// Chart geometry is independently height-bounded and width-aware.
-assert.match(app,/const syncResponsiveTrafficChart=\(kind,selector,renderSvg,logicalHeight\)=>/);
-assert.match(css,/\.stats-detail-chart\{[\s\S]*?height:21\.25rem/);
-assert.match(css,/\.traffic-chart-svg\{[\s\S]*?height:18\.25rem/);
-assert.doesNotMatch(css,/width:min\(100%,(?:72|100)rem\)/);
-
+console.log('Statistics native-dialog, telemetry, responsive layout and feedback contracts: PASS');

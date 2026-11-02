@@ -3,8 +3,8 @@
 const fs=require('node:fs');
 const assert=require('node:assert/strict');
 
-const hosts=fs.readFileSync('xray-studio-hosts.js','utf8');
-const html=fs.readFileSync('index.html','utf8');
+const hosts=fs.readFileSync('frontend/js/features/xray-studio/xray-studio-hosts.js','utf8');
+const html=fs.readFileSync('frontend/index.html','utf8');
 
 assert.match(hosts,/data-endpoint="fp"><option value="chrome">Chrome \(по умолчанию\)<\/option>/,
   'Fingerprint selector must default to chrome');

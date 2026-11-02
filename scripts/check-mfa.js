@@ -1,19 +1,20 @@
 #!/usr/bin/env node
 'use strict';
+const {assertPackaged}=require('./ci/frontend-source.cjs');
 const fs=require('node:fs'),assert=require('node:assert/strict');
 const rust=fs.readFileSync('backend/src/mfa.rs','utf8');
 const auth=fs.readFileSync('backend/src/auth.rs','utf8');
 const admins=fs.readFileSync('backend/src/admin_accounts.rs','utf8');
 const main=fs.readFileSync('backend/src/main.rs','utf8');
 const sql=fs.readFileSync('backend/migrations/0009_totp.sql','utf8');
-const login=fs.readFileSync('login.js','utf8');
-const loginHtml=fs.readFileSync('login.html','utf8');
-const panel=fs.readFileSync('app.js','utf8');
-const mfaUi=fs.readFileSync('mfa-ui.js','utf8');
+const login=fs.readFileSync('frontend/js/auth/login.js','utf8');
+const loginHtml=fs.readFileSync('frontend/login.html','utf8');
+const panel=fs.readFileSync('frontend/js/core/app.js','utf8');
+const mfaUi=fs.readFileSync('frontend/js/auth/mfa-ui.js','utf8');
 const docker=fs.readFileSync('backend/Dockerfile','utf8');
 const compose=fs.readFileSync('compose.yaml','utf8');
 const installer=fs.readFileSync('install.sh','utf8');
-const html=fs.readFileSync('index.html','utf8');
+const html=fs.readFileSync('frontend/index.html','utf8');
 for(const js of [login,mfaUi,panel])new Function(js);
 for(const field of ['panel_totp','panel_totp_recovery','panel_mfa_challenges'])assert(sql.includes(field));
 for(const path of ['auth/mfa/status','auth/mfa/setup','auth/mfa/confirm','auth/mfa/disable','auth/mfa/verify'])
@@ -63,7 +64,7 @@ assert.match(panel,/function securityP\(\)/,
  'A dedicated account security page must exist');
 assert.doesNotMatch(panel,/window\.XMeshMfa\?\.panel\(\)\|\|''/,
  'MFA must not be hidden at the end of the long appearance settings page');
-const qrcodeSource=fs.readFileSync('qr-code.js','utf8');
+const qrcodeSource=fs.readFileSync('frontend/js/core/qr-code.js','utf8');
 const qrcodegen=new Function(qrcodeSource+';return qrcodegen;')();
 const qr=qrcodegen.QrCode.encodeText(
  'otpauth://totp/XMesh%20Nexus:test?secret=JBSWY3DPEHPK3PXP&issuer=XMesh%20Nexus&digits=6&period=30',
@@ -86,11 +87,11 @@ assert.doesNotMatch(mfaUi,/(QR-код для Google Authenticator|Код из Go
 
 assert.match(html,/qr-code\.js\?v=/,'QR encoder must be bundled with the frontend');
 assert(html.indexOf('qr-code.js')<html.indexOf('mfa-ui.js'),'QR generator must load before MFA');
-assert.match(docker,/qr-code\.js/,'Docker must package the local QR encoder');
+assertPackaged(assert,['qr-code.js']);
 assert.match(mfaUi,/<form id="mfa-start"/,
  '2FA enrollment form must be directly visible when disabled');
 assert.match(html,/mfa-ui\.js\?v=/);
-assert.match(docker,/mfa-ui\.js/);
+assertPackaged(assert,['mfa-ui.js']);
 assert.match(compose,/TOTP_ENCRYPTION_KEY/);
 assert.match(installer,/openssl rand -hex 32/);
 assert.match(installer,/TOTP_ENCRYPTION_KEY/);

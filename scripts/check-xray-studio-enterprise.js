@@ -3,10 +3,12 @@
 /* XRAY STUDIO enterprise shell / read-only inspector regression checks. */
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
-const js=fs.readFileSync('xray-studio-v4.js','utf8');
-const tools=fs.readFileSync('xray-studio-tools.js','utf8');
-const css=fs.readFileSync('xray-studio-v4.css','utf8');
-const html=fs.readFileSync('index.html','utf8');
+const {assertPackaged,panelStyles}=require('./ci/frontend-source.cjs');
+const js=fs.readFileSync('frontend/js/features/xray-studio/xray-studio-v4.js','utf8');
+const tools=fs.readFileSync('frontend/js/features/xray-studio/xray-studio-tools.js','utf8');
+const css=fs.readFileSync('frontend/styles/features/xray-studio/xray-studio-v4.css','utf8');
+const html=fs.readFileSync('frontend/index.html','utf8');
+const panelCss=panelStyles();
 new Function(js);new Function(tools);
 const w={XMeshStudioHosts:{view:()=>'<div></div>'}};
 new Function('window',js)(w);
@@ -33,12 +35,25 @@ assert.match(css,/\.sv-studio\.sv-outline-hidden \.sv-workspace\{grid-template-c
 assert.match(css,/container:sv-studio-workspace \/ inline-size/,'Workspace must react to the user-selected content width');
 assert.match(css,/@container sv-studio-workspace \(max-width:940px\)/,'Narrow content width stacks inspector');
 assert.match(css,/--vcode:/,'Same font token for JSON and overlay');
-// Asset revisions are intentional moving targets. Require nonempty cache keys,
-// not a hard-coded release token from an unrelated XRAY STUDIO redesign.
-for(const asset of ['xray-studio-v4.css','xray-studio-v4.js','xray-studio-composer.js','xray-studio-tools.js']){
- const entry=html.match(new RegExp(asset.replaceAll('.', '\\.')+'\\?v=([A-Za-z0-9-]+)'));
- assert(entry&&entry[1],asset+' must carry a cache-busting version');
+
+// XRAY STUDIO CSS belongs to the single canonical panel stylesheet graph. It
+// must be packaged and reachable through that graph, not reintroduced as a
+// direct feature <link>. Runtime JS entrypoints remain content-addressed.
+assertPackaged(assert,[
+ 'xray-studio-v4.css',
+ 'xray-studio-v4.js',
+ 'xray-studio-composer.js',
+ 'xray-studio-tools.js'
+]);
+assert.match(panelCss,/\.sv-studio\{/,
+ 'XRAY STUDIO feature CSS must be reachable from the canonical panel CSS graph');
+assert.doesNotMatch(html,/<link[^>]+xray-studio-v4\.css/,
+ 'XRAY STUDIO feature CSS must not bypass the canonical panel CSS entrypoint');
+for(const asset of ['xray-studio-v4.js','xray-studio-composer.js','xray-studio-tools.js']){
+ const entry=html.match(new RegExp(asset.replaceAll('.', '\\.')+'\\?v=([a-f0-9]{12})'));
+ assert(entry&&entry[1],asset+' must carry a content-addressed cache key');
 }
+
 class Element {
  constructor(tag='div'){this.tag=tag;this.children=[];this.dataset={};this.attrs={};this.textContent='';this.hidden=false}
  append(...items){this.children.push(...items)}

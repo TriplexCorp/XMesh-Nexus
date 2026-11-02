@@ -1,19 +1,8 @@
 (()=>{
 'use strict';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const announce=(message,kind='success')=>{
- let box=document.getElementById('xmesh-action-feedback');
- if(!box){
-  box=document.createElement('div');box.id='xmesh-action-feedback';
-  box.setAttribute('role','status');box.setAttribute('aria-live','polite');
-  document.body.appendChild(box);
- }
- box.className='xmesh-action-feedback '+(kind==='error'?'is-error':'is-success');
- box.textContent=message;box.classList.add('visible');
- if(announce.timer)clearTimeout(announce.timer);
- announce.timer=setTimeout(()=>box.classList.remove('visible'),4200);
-};
-window.XMeshFeedback=announce;
+// Feedback belongs to the shared panel toast, including modal top-layer support.
+const announce=message=>toast(message);
 const defaults={sessionHours:1,idleMinutes:15,maxSessions:1,loginAttempts:3,lockoutMinutes:15,dashboardPath:''};
 const request=async(path,options={})=>{
  const r=await fetch('/api/v1/security/'+path,{credentials:'same-origin',cache:'no-store',...options,headers:{...(options.body?{'Content-Type':'application/json'}:{}),...(options.headers||{})}});
@@ -86,18 +75,10 @@ async function mount(root){
   '<form id="security-policy-form"><div class="security-settings-grid">'+fields.map(f=>setting(...f,p,readonly)).join('')+
   '<label class="security-setting security-url-setting"><span><b>Путь входа в панель</b><small>Единственная точка входа в интерфейс. После сохранения старый адрес перестаёт работать. Путь не заменяет HTTPS и авторизацию.</small></span><span class="security-path-controls"><input name="dashboardPath" type="text" minlength="15" maxlength="75" pattern="/dashboard/[A-Za-z0-9_-]{4,64}" value="'+esc(p.dashboardPath)+'" '+(readonly?'disabled':'')+' required><button type="button" class="gh" data-security-generate-path>Сгенерировать</button><button type="button" class="gh" data-security-copy-path>Копировать ссылку</button></span></label></div>'+
   (readonly?'<p class="note">Редактирование доступно только владельцу (owner).</p>':'<div class="security-policy-actions"><button type="submit" class="btn">Сохранить политику</button><button type="button" class="gh" data-security-reset>Вернуть значения по умолчанию</button></div>')+'</form>'+
-  '<div class="security-subheading"><h4>Мои активные сессии</h4><p>При необходимости завершите другие входы в панель.</p></div>'+
-  '<div class="security-sessions">'+(sessionRes.sessions||[]).map(s=>'<div class="security-session"><span><b>'+(s.current?'Текущая сессия':'Сессия №'+esc(s.id))+'</b><small>Последняя активность: '+esc(new Date(s.lastActivity).toLocaleString())+' · Истекает: '+esc(new Date(s.expiresAt).toLocaleString())+'</small></span><button type="button" class="gh sm" data-security-revoke="'+esc(s.id)+'">'+(s.current?'Завершить':'Отозвать')+'</button></div>').join('')+
-  '<div class="security-policy-actions"><button type="button" class="gh" data-security-revoke-others>Завершить все другие сессии</button></div></div>'+
   '<div class="security-policy-footnote">Адрес снижает обнаруживаемость страницы входа, но не является паролем. API должен оставаться защищённым независимо от URL. Используйте длинный непредсказуемый путь и HTTPS.</div>';
   const sessionsBody=root.querySelector('#security-sessions-body');
-  const sessionHeading=[...body.querySelectorAll('.security-subheading')].find(el=>el.querySelector('h4')?.textContent==='Мои активные сессии');
-  const sessionList=body.querySelector('.security-sessions');
-  if(sessionsBody&&sessionList){
-    sessionsBody.replaceChildren();
-    if(sessionHeading)sessionHeading.remove();
-    sessionsBody.append(sessionList);
-  }
+  if(sessionsBody)sessionsBody.innerHTML='<div class="security-sessions">'+(sessionRes.sessions||[]).map(s=>'<div class="security-session"><span><b>'+(s.current?'Текущая сессия':'Сессия №'+esc(s.id))+'</b><small>Последняя активность: '+esc(new Date(s.lastActivity).toLocaleString())+' · Истекает: '+esc(new Date(s.expiresAt).toLocaleString())+'</small></span><button type="button" class="gh sm" data-security-revoke="'+esc(s.id)+'">'+(s.current?'Завершить':'Отозвать')+'</button></div>').join('')+
+    '<div class="security-policy-actions"><button type="button" class="gh" data-security-revoke-others>Завершить все другие сессии</button></div></div>';
  };
  try{await load()}catch(e){fail(e);body.innerHTML='<button class="gh" type="button" data-security-retry>Повторить загрузку</button>'}
  root.addEventListener('click',async e=>{
@@ -122,10 +103,10 @@ async function mount(root){
     for(const [key,value] of Object.entries(defaults))if(key!=='dashboardPath'&&form.elements.namedItem(key))form.elements.namedItem(key).value=value;
     announce('Значения по умолчанию подставлены. Нажмите «Сохранить политику» для применения.');
    }else if(btn.matches('[data-security-revoke-others]')){
-    if(!confirm('Завершить все остальные сессии вашей учётной записи?'))return;
+    if(!await panelConfirm('Завершить все остальные сессии вашей учётной записи?',{title:'Управление сессиями',confirmLabel:'Завершить сессии',danger:true}))return;
     await request('sessions/others',{method:'POST'});await load();announce('Остальные сессии завершены.');
    }else if(btn.matches('[data-security-revoke]')){
-    if(!confirm('Завершить выбранную сессию?'))return;
+    if(!await panelConfirm('Завершить выбранную сессию?',{title:'Управление сессиями',confirmLabel:'Завершить сессию',danger:true}))return;
     const id=btn.dataset.securityRevoke;
     const out=await request('sessions/'+encodeURIComponent(id),{method:'DELETE'});
     if(out.current){location.replace(location.pathname);return}

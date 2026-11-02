@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 'use strict';
+const {assertPackaged}=require('./ci/frontend-source.cjs');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
-const src=fs.readFileSync('xray-json-diagnostics.js','utf8');
-const studio=fs.readFileSync('xray-studio-v4.js','utf8');
-const html=fs.readFileSync('index.html','utf8');
+const src=fs.readFileSync('frontend/js/features/xray-studio/xray-json-diagnostics.js','utf8');
+const studio=fs.readFileSync('frontend/js/features/xray-studio/xray-studio-v4.js','utf8');
+const html=fs.readFileSync('frontend/index.html','utf8');
 const dock=fs.readFileSync('backend/Dockerfile','utf8');
 new Function(src);
 const host={};
@@ -58,6 +59,9 @@ assert.match(src,/setRangeText\(proposal\.replacement,proposal\.start,proposal\.
 assert.match(src,/textarea\.dispatchEvent\(new Event\('input'/,'Hot Fix must notify existing validators and JSON state');
 assert.match(src,/Math\.floor\(\(scroll-topPad\)\/lineHeight\)/,'Line gutter must use virtualized visible lines');
 assert.match(src,/textarea\.addEventListener\('scroll'/,'Line numbers should scroll with the editor');
-assert(html.indexOf('src="xray-json-diagnostics.js')>=0 && html.indexOf('src="app.js')>html.indexOf('src="xray-json-diagnostics.js'),'Diagnostics must load before the editor');
-assert.match(dock,/COPY [^\n]*xray-json-diagnostics\.js[^\n]* \/app\/static\//,'Docker image must include diagnostics');
+const diagnosticsTag='/js/features/xray-studio/xray-json-diagnostics.js?v=';
+const studioTag='/js/features/xray-studio/xray-studio-v4.js?v=';
+assert(html.indexOf(diagnosticsTag)>=0,'Diagnostics asset must be loaded by the canonical panel entrypoint');
+assert(html.indexOf(studioTag)>html.indexOf(diagnosticsTag),'Diagnostics must load before the XRAY STUDIO editor');
+assertPackaged(assert,['xray-json-diagnostics.js']);
 console.log('Manual JSON line validation / gutter / Hot Fix: OK');

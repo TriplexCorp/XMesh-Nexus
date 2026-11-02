@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 const ctx={window:{}};
-vm.runInNewContext(fs.readFileSync('xray-studio-composer.js','utf8'),ctx);
+vm.runInNewContext(fs.readFileSync('frontend/js/features/xray-studio/xray-studio-composer.js','utf8'),ctx);
 const C=ctx.window.XMeshStudioComposer;
 const cases=[
  ['vless','raw','none'],['vmess','ws','tls'],['trojan','grpc','tls'],

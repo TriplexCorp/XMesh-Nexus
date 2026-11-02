@@ -2,9 +2,10 @@
 'use strict';
 const fs=require('node:fs');
 const assert=require('node:assert/strict');
+const {panelStyles}=require('./ci/frontend-source.cjs');
 const read=p=>fs.readFileSync(p,'utf8');
-const app=read('app.js'),html=read('index.html'),css=read('styles.css');
-const studio=read('subscription-studio.js');
+const app=read('frontend/js/core/app.js'),html=read('frontend/index.html'),css=panelStyles();
+const studio=read('frontend/js/features/subscriptions/subscription-studio.js');
 const main=read('backend/src/main.rs');
 const auth=read('backend/src/auth.rs');
 const mfa=read('backend/src/mfa.rs');
@@ -59,4 +60,7 @@ assert.doesNotMatch(css,/--text-size-scale/);
 assert.match(css,/var\(--ts,1\)/);
 assert.match(app,/C\.rangePrecision/);
 assert.match(html,/subscription-studio\.js\?v=/);
+// The legacy stylesheet is gone by design; security audits must follow the
+// same canonical panel graph that the browser receives.
+assert.doesNotMatch(html,/styles\/legacy\/styles\.css/);
 console.log('Security audit guards: auth, sessions, CSRF, CSP, static routing, HTML escaping, portal locale, text precision: OK');

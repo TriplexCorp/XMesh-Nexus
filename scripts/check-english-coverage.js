@@ -5,8 +5,9 @@
  * Existing misses are tracked as explicit debt; newly untranslated copy fails CI.
  */
 const fs=require('node:fs');
+const {frontendAsset}=require('./ci/frontend-source.cjs');
 const assert=require('node:assert/strict');
-const src=fs.readFileSync('i18n.js','utf8');
+const src=fs.readFileSync('frontend/js/core/i18n.js','utf8');
 const doc={readyState:'loading',addEventListener(){},documentElement:{lang:'ru'}};
 const win={};
 new Function('window','localStorage','document',src+';return window.XMeshI18n;')(win,{getItem(){return'en'},setItem(){}},doc);
@@ -32,7 +33,7 @@ const take=source=>{
 };
 const missing={};let examined=0,translated=0;
 for(const file of files){
- const values=take(fs.readFileSync(file,'utf8'));
+ const values=take(fs.readFileSync(frontendAsset(file),'utf8'));
  examined+=values.length;
  const outstanding=values.filter(v=>{
   const result=api.translate(v);

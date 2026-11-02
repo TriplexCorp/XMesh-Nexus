@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 'use strict';
+const {panelStyles}=require('./ci/frontend-source.cjs');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const {spawnSync}=require('node:child_process');
@@ -19,8 +20,8 @@ const installer=fs.readFileSync('deploy/install-node-metrics-agent.sh','utf8');
 const stager=fs.readFileSync('deploy/xsp-v2-agent-staged-apply.sh','utf8');
 const stageUnit=fs.readFileSync('deploy/xmesh-xsp-v2-agent-stage.service','utf8');
 const stagedLifecycleTest=fs.readFileSync('scripts/test-xsp-agent-staged-apply.sh','utf8');
-const app=fs.readFileSync('app.js','utf8');
-const css=fs.readFileSync('styles.css','utf8');
+const app=fs.readFileSync('frontend/js/core/app.js','utf8');
+const css=panelStyles();
 
 assert.equal(fs.readFileSync('VERSION','utf8').trim(),'6.0.0');
 assert.equal(fs.readFileSync('AGENT_VERSION','utf8').trim(),'control-v6.0.7');
@@ -145,6 +146,6 @@ for(const file of ['deploy/node-control-agent.sh','deploy/update-node-control-ag
 const staged=spawnSync('bash',['scripts/test-xsp-agent-staged-apply.sh'],{encoding:'utf8',timeout:60000});
 assert.equal(staged.status,0,'Staged Agent lifecycle test failed:\n'+(staged.stdout||'')+'\n'+(staged.stderr||''));
 assert.match(staged.stdout,/staged Agent package apply\/rollback lifecycle: OK/);
-const syntax=spawnSync(process.execPath,['--check','app.js'],{encoding:'utf8'});
+const syntax=spawnSync(process.execPath,['--check','frontend/js/core/app.js'],{encoding:'utf8'});
 assert.equal(syntax.status,0,syntax.stderr);
 console.log('XMesh control-v6.0.7 POSTQUANTUM Agent upgrade/install and immutable staged migration contract: OK');

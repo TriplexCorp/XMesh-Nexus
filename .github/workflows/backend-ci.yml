@@ -9,11 +9,11 @@ on:
 permissions:
   contents: read
 
-# During rapid development, only the newest run on a branch needs to build
-# the expensive Docker image. PR runs remain independent.
+# During rapid development, only the newest run on a branch/PR needs to build
+# the expensive Docker image and browser matrix.
 concurrency:
   group: backend-ci-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'push' }}
+  cancel-in-progress: true
 
 jobs:
   subscription-build:
@@ -47,25 +47,11 @@ jobs:
           components: rustfmt, clippy
       - name: Verify canonical repository layout
         run: node scripts/check-repo-layout.js
-      - name: Stage legacy frontend basename fixtures for source-contract checks
-        run: bash scripts/ci/stage-frontend-compat.sh
       - name: Check frontend syntax
         run: |
           node --version
           test "$(node -p 'process.versions.node.split(".")[0]')" = "24"
-          node --check app.js
-          node --check ui-builder.js
-          node --check unified-selects.js
-          node --check subscription-studio.js
-          node --check subscription-portal.js
-          node --check login.js
-          node --check xray-studio-hosts.js
-          node --check xray-studio-v4.js
-          node --check xray-studio-tools.js
-          node --check xray-studio-composer.js
-          node --check client-routing.js
-          node --check xray-json-diagnostics.js
-          node --check xray-json-intelligence.js
+          find frontend/js -name '*.js' -print0 | xargs -0 -n1 node --check
       - name: Check shared themed selectors across all sections
         run: node scripts/check-unified-selects.js
       - name: Test manual JSON line diagnostics and Hot Fix
@@ -242,7 +228,7 @@ jobs:
       XSP_V2_PRODUCT_INTERNAL_TOKEN: "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
       PANEL_DOMAIN: ci.example.invalid
       COOKIE_SECURE: "false"
-      DASHBOARD_PATH: /dashboard/0123456789abcdef0123456789abcdef0123456789abcdef
+      DASHBOARD_PATH: /dashboard/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
     steps:
       - uses: actions/checkout@v7
       - name: Start disposable PostgreSQL, Redis and XMesh API
@@ -261,6 +247,26 @@ jobs:
           done
           docker compose logs --tail=120 panel
           exit 1
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Install pinned browser regression dependencies
+        run: |
+          npm ci --prefix scripts/browser
+          scripts/browser/node_modules/.bin/playwright install --with-deps chromium
+      - name: Verify rendered layouts and dialog interactions in Chromium
+        env:
+          XMESH_BROWSER_OUTPUT: browser-results
+          XMESH_UI_DISPOSABLE: "1"
+        run: node scripts/test-ui-browser.cjs
+      - name: Retain browser geometry report and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-layout-results
+          path: browser-results
+          if-no-files-found: ignore
       - name: Exercise dormant XSP-v2 public key epoch and replay migration in disposable PostgreSQL
         run: bash scripts/test-xsp-v2-schema-integration.sh
       - name: Exercise XSP-v2 cutover ledger immutability and replay constraints in disposable PostgreSQL

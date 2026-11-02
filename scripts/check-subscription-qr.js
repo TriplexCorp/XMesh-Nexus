@@ -2,12 +2,12 @@
 'use strict';
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
-const qrSource=fs.readFileSync('qr-code.js','utf8');
+const qrSource=fs.readFileSync('frontend/js/core/qr-code.js','utf8');
 const qrcodegen=new Function(qrSource+';return qrcodegen;')();
 const sample='https://free-tier.shop/subscription/0123456789abcdef0123456789abcdef';
 const qr=qrcodegen.QrCode.encodeText(sample,qrcodegen.QrCode.Ecc.MEDIUM);
 assert(qr.size>=21&&qr.getModule(0,0),'Bundled encoder must encode a realistic subscription URL');
-const portal=fs.readFileSync('subscription-portal.js','utf8');
+const portal=fs.readFileSync('frontend/js/features/subscriptions/subscription-portal.js','utf8');
 assert.match(portal,/window\.qrcodegen\?\.QrCode/,'Subscription portal must use the bundled qrcodegen global');
 assert.doesNotMatch(portal,/window\.qrgen\?\.QrCode/,'Broken qrgen alias must not return');
 assert.match(portal,/new URL\(raw, window\.location\.origin\)/,'Relative subscription paths must resolve against the visitor origin');
@@ -22,7 +22,7 @@ assert.match(portal,/compactSubscriptionUrl/,'Portal should show a shortened bea
 assert.match(portal,/brandNote:'Secure access workspace'/,'English enterprise header note must be localized');
 assert.match(portal,/brandNote:'Центр безопасного подключения'/,'Russian enterprise header note must be localized');
 const template=fs.readFileSync('backend/src/subscription_template.html','utf8');
-const publicCss=fs.readFileSync('subscription-public.css','utf8');
+const publicCss=fs.readFileSync('frontend/styles/features/subscriptions/subscription-public.css','utf8');
 assert.match(template,/subscription-portal\.js\?v=20261101-enterprise-workspace-v3/,'Public portal must cache-bust the enterprise workspace behavior');
 assert.match(template,/subscription-public\.css\?v=20261101-enterprise-workspace-v3/,'Public portal must cache-bust the enterprise workspace redesign');
 assert.match(template,/id="subscription-link-card"/,'Public portal must expose the enterprise subscription link surface');

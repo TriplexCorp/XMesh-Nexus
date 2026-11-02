@@ -1,0 +1,36 @@
+/* Feature ownership: tools. Shared tokens, controls, materials and viewport safety live in styles/system. */
+.logs {
+  max-height:calc(100dvh - 19rem);
+  min-height:16rem;
+  overflow:auto;
+}
+@media (max-width:760px) {
+.ll {
+  grid-template-columns:auto auto;
+}
+}
+@media (max-width:760px) {
+.ll span:last-child {
+  grid-column:1/-1;
+}
+}
+@media (max-width:760px) {
+.logs {
+  max-height:none;
+}
+}
+.ll {
+  display:grid;
+  grid-template-columns:5.5rem 4.6rem 1fr;
+  gap:.8rem;
+  align-items:baseline;
+  padding:.45rem 0;
+  border-top:1px solid var(--nx-border);
+  font-size:.95rem;
+  word-break:break-word;
+  border-top-color:var(--ln);
+}
+.ll time {
+  color:var(--mu);
+  font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}

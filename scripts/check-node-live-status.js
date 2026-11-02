@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 'use strict';
+const {panelStyles}=require('./ci/frontend-source.cjs');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
-const app=fs.readFileSync('app.js','utf8');
-const css=fs.readFileSync('styles.css','utf8');
+const app=fs.readFileSync('frontend/js/core/app.js','utf8');
+const css=panelStyles();
 const runtime=fs.readFileSync('backend/src/node_runtime.rs','utf8')+'\n'+fs.readFileSync('backend/src/node_runtime_legacy.rs','utf8');
 assert.match(app,/data-node-card-id/);
 assert.match(app,/data-node-runtime-state/);

@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 'use strict';
+const {assertPackaged}=require('./ci/frontend-source.cjs');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 const {webcrypto}=require('node:crypto');
-const source=fs.readFileSync('xray-studio-xhttp-strict.js','utf8');
+const source=fs.readFileSync('frontend/js/features/xray-studio/xray-studio-xhttp-strict.js','utf8');
 const sandbox={
  window:{},document:{addEventListener(){}},crypto:webcrypto,
  globalThis:null,Event:function(){},console
@@ -68,11 +69,11 @@ assert.equal(dirty.extra.uplinkHTTPMethod,'POST');
 assert.equal(dirty.extra.uplinkDataPlacement,'auto');
 assert.equal(api.validateSettings(dirty,'server').length,0,'normalized server stream-up settings must pass strict validation');
 
-const html=fs.readFileSync('index.html','utf8');
+const html=fs.readFileSync('frontend/index.html','utf8');
 assert(html.indexOf('xray-studio-xhttp-strict.js')<html.indexOf('xray-studio-protocol-tls.js'),
  'strict XHTTP click handler must load before legacy XHTTP handler');
 const docker=fs.readFileSync('backend/Dockerfile','utf8');
-assert.match(docker,/xray-studio-xhttp-strict\.js/);
-assert.match(docker,/xray-xhttp-core-validator\.js/);
+assertPackaged(assert,['xray-studio-xhttp-strict.js']);
+assertPackaged(assert,['xray-xhttp-core-validator.js']);
 assert.doesNotMatch(source,/option\('h2params'/,'nonexistent h2Params UI must not return');
 console.log('XHTTP strict core schema, mode and endpoint-role generation: OK');
