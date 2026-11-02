@@ -110,25 +110,30 @@ dialog[open]:not(#dlg)::backdrop{opacity:1}
   dialog[open]:not(#dlg)::backdrop{opacity:0}
 }
 
-/* XRAY STUDIO dialogs use the same native dialog width contract as the rest of
- * the panel. The feature content may choose a family size, never a tiny fallback. */
+/* XRAY STUDIO outer geometry belongs to the native dialog layer, not to the
+ * feature body. `min-inline-size` intentionally defeats the historical 36rem
+ * feature fallback while still collapsing safely to the viewport on mobile. */
 dialog.sv-overlay{
   --dialog-width:48rem;
-  width:min(var(--dialog-width),calc(100vw - 2rem));
-  max-width:calc(100vw - 2rem);
+  inline-size:min(var(--dialog-width),calc(100vw - 2rem));
+  min-inline-size:min(var(--dialog-width),calc(100vw - 2rem));
+  max-inline-size:calc(100vw - 2rem);
 }
 dialog.sv-overlay.sv-overlay-composer{
   --dialog-width:112rem;
-  width:min(var(--dialog-width),calc(100vw - 2rem));
+  inline-size:min(var(--dialog-width),calc(100vw - 2rem));
+  min-inline-size:min(var(--dialog-width),calc(100vw - 2rem));
 }
 dialog.xm-studio-modal{
   --dialog-width:52rem;
-  width:min(var(--dialog-width),calc(100vw - 2rem));
-  max-width:calc(100vw - 2rem);
+  inline-size:min(var(--dialog-width),calc(100vw - 2rem));
+  min-inline-size:min(var(--dialog-width),calc(100vw - 2rem));
+  max-inline-size:calc(100vw - 2rem);
 }
 dialog.xm-studio-modal.xm-studio-modal--cards{
   --dialog-width:84rem;
-  width:min(var(--dialog-width),calc(100vw - 2rem));
+  inline-size:min(var(--dialog-width),calc(100vw - 2rem));
+  min-inline-size:min(var(--dialog-width),calc(100vw - 2rem));
 }
 dialog:is(.sv-overlay,.xm-studio-modal) :is(.sv-dialog,.xm-studio-modal-shell){
   min-width:0;
