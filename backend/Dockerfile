@@ -44,7 +44,7 @@ COPY --from=flag-assets /flags/package/LICENSE /app/static/flags/LICENSE
 # router intentionally supports arbitrary 2..9-segment paths, so nested static
 # URLs would be captured by those routes before ServeDir's fallback. Keep the
 # organized tree for auditability, but create unique flat runtime aliases and
-# rewrite only the packaged HTML entrypoints to those collision-free URLs.
+# rewrite only the packaged entrypoints to those collision-free URLs.
 COPY frontend/ /app/static/
 RUN set -eux; \
     find /app/static -type f \( -name '*.css' -o -name '*.js' \) -print | \
@@ -59,7 +59,15 @@ RUN set -eux; \
       cp "$src" "$target"; \
       rel="${src#/app/static}"; \
       sed -i "s|$rel|/$name|g" /app/static/index.html /app/static/login.html; \
-    done
+    done; \
+    # The panel CSS entrypoint is also flattened to /nexus-ui-v3.css. Its
+    # authored relative imports were relative to /styles/system/, so rewrite
+    # those imports to the already-created flat aliases as well. Without this,
+    # the packaged browser silently loses all feature CSS behind the entrypoint.
+    sed -E -i \
+      -e 's|url\("\./([^"/]+\.css)(\?[^"/]*)?"\)|url("/\1\2")|g' \
+      -e 's|url\("\.\./features/[^"/]*/([^"/]+\.css)(\?[^"/]*)?"\)|url("/\1\2")|g' \
+      /app/static/nexus-ui-v3.css
 RUN chown -R xmesh:xmesh /app/static
 USER 10001:10001
 WORKDIR /app
