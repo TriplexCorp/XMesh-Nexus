@@ -86,8 +86,10 @@ function verifyPage(g, route) {
   if (route === 'set') {
     assert.equal(g.columns.length, 2, 'Settings должна содержать два явных стека карточек.');
     assert(g.columns.every(c => c.display !== 'contents'), 'Стек Settings потерял собственную геометрию.');
-    assert(Math.abs(g.columns[0].x - g.columns[1].x) > 100, 'Settings превратилась в одну длинную колонку.');
-    assert(g.columns.every(c => c.width >= 360), 'Settings превратилась в узкие вертикальные башни.');
+    const sideBySide=Math.abs(g.columns[0].x-g.columns[1].x)>100;
+    if(g.viewport.width>=1500)assert(sideBySide,'На широком desktop Settings превратилась в одну длинную колонку.');
+    if(sideBySide)assert(g.columns.every(c => c.width >= 360), 'Settings превратилась в узкие вертикальные башни.');
+    else assert(g.columns.every(c => c.width >= Math.min(720,g.view.width*.72)), 'Адаптивный стек Settings стал неоправданно узким.');
     for (const column of g.columns) for (let i=1;i<column.cards.length;i++) {
       const gap = column.cards[i].y - column.cards[i-1].bottom;
       assert(gap >= -1 && gap <= 48, `Искусственный вертикальный разрыв между карточками: ${gap}px.`);
