@@ -12,8 +12,10 @@ const studio=fs.readFileSync('frontend/js/features/xray-studio/xray-studio-v4.js
 const studioCss=fs.readFileSync('frontend/styles/features/xray-studio/xray-studio-v4.css','utf8');
 assert.ok(studioCss.includes('dialog.xm-studio-modal.xm-studio-modal--cards{'),
  'FinalMask must scope its width rule to the native dialog');
-assert.ok(studioCss.includes('width:min(84rem,calc(100vw - 2rem))!important'),
- 'FinalMask width must win against the global dialog constraint');
+assert.ok(studioCss.includes('width:min(84rem,calc(100vw - 2rem))'),
+ 'FinalMask must keep its wide viewport-bounded layout');
+assert.ok(!/dialog\.xm-studio-modal\.xm-studio-modal--cards\{[^}]*width:[^}]*!important/s.test(studioCss),
+ 'FinalMask width must not depend on legacy !important specificity hacks');
 assert.ok(studioCss.includes('grid-template-columns:repeat(4,minmax(0,1fr))'),
  'Wide FinalMask catalog must use four columns');
 
