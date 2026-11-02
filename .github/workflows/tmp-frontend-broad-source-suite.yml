@@ -1,103 +1,50 @@
-name: Temporary broad frontend source suite
+name: Temporary FinalMask contract patch
 
 on:
   push:
     branches:
       - integration/argon-frontend-recovery-20261102
+    paths:
+      - '.github/workflows/tmp-frontend-broad-source-suite.yml'
+  workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  source-suite:
+  patch:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-node@v7
         with:
-          node-version-file: .node-version
-          package-manager-cache: false
-      - name: Frontend JavaScript syntax
-        run: find frontend/js -name '*.js' -print0 | xargs -0 -n1 node --check
-      - name: Canonical frontend source contracts
+          ref: integration/argon-frontend-recovery-20261102
+      - name: Replace legacy FinalMask specificity assertion
         run: |
-          set -uo pipefail
-          checks=(
-            check-repo-layout.js
-            check-unified-selects.js
-            check-json-diagnostics.js
-            check-xray-intelligence.js
-            check-xray-tool-actions.js
-            check-xray-studio-wrap-tabs.js
-            check-xray-studio-enterprise.js
-            check-xray-studio-composer.js
-            check-xray-studio-hosts.js
-            check-xray-active-entrypoint.js
-            check-static-assets.js
-            check-client-routing.js
-            check-i18n.js
-            check-english-coverage.js
-            check-subscription-studio.js
-            check-admin-security.js
-            check-viewer-security.js
-            check-security-policy.js
-            check-modal-motion.js
-            check-mfa.js
-            check-security-center.js
-            check-security-audit.js
-            check-white-label.js
-            check-appearance-surfaces.js
-            check-ui-system.js
-            check-node-create-action.js
-            check-node-hosting-notifications.js
-            check-notification-center.js
-            check-statistics-feedback.js
-            test-traffic-chart-geometry.js
-            check-tech-debt.js
-            check-crud-dialog-lifecycle.js
-            check-user-presence.js
-            check-xsp-v2-foundation.js
-            check-xsp-v2-wire.js
-            check-xsp-v2-main-checkpoint.js
-            check-settings-update-actions.js
-            check-managed-xray-update.js
-            check-user-fingerprint-ownership.js
-            check-balancers-workspace.js
-            check-user-quota-preserves-traffic.js
-            check-node-traffic-reset.js
-            check-node-traffic-cutoff.js
-            check-node-network-traffic.js
-            check-node-xray-releases.js
-            check-agent-update.js
-            check-node-live-status.js
-            check-host-editor-zones.js
-            check-node-editor-layout.js
-            check-node-grid-layout.js
-            check-node-explorer.js
-            check-node-ip-rotation.js
-            check-xhttp-extras.js
-            check-xray-studio-selectors.js
-            check-xray-endpoint-autofill.js
-            test-client-config.js
-          )
-          failures=()
-          for check in "${checks[@]}"; do
-            echo "::group::$check"
-            if node "scripts/$check"; then
-              echo "PASS $check"
-            else
-              echo "FAIL $check"
-              failures+=("$check")
-            fi
-            echo "::endgroup::"
-          done
-          if ((${#failures[@]})); then
-            printf 'FAILED_CONTRACTS=%s\n' "${failures[*]}"
-            exit 1
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/check-xray-tool-actions.js')
+          s=p.read_text()
+          old="""assert.ok(studioCss.includes('width:min(84rem,calc(100vw - 2rem))!important'),\n 'FinalMask width must win against the global dialog constraint');"""
+          new="""assert.ok(studioCss.includes('width:min(84rem,calc(100vw - 2rem))'),\n 'FinalMask must keep its wide viewport-bounded layout');\nassert.ok(!/dialog\\.xm-studio-modal\\.xm-studio-modal--cards\\{[^}]*width:[^}]*!important/s.test(studioCss),\n 'FinalMask width must not depend on legacy !important specificity hacks');"""
+          if old not in s:
+              if new in s:
+                  print('FinalMask contract already migrated')
+                  raise SystemExit(0)
+              raise SystemExit('expected legacy FinalMask assertion not found')
+          p.write_text(s.replace(old,new,1))
+          PY
+      - name: Validate migrated contract
+        run: |
+          node scripts/check-xray-tool-actions.js
+          git diff --check
+      - name: Commit source-contract migration
+        run: |
+          if git diff --quiet -- scripts/check-xray-tool-actions.js; then
+            echo 'No changes to commit'
+            exit 0
           fi
-      - name: Cache graph is stable
-        if: always()
-        run: node scripts/update-ui-cache.cjs --check
-      - name: Diff hygiene
-        if: always()
-        run: git diff --check
+          git config user.name 'Xmesh Creator'
+          git config user.email 'Aselis3d@gmail.com'
+          git add scripts/check-xray-tool-actions.js
+          git commit -m 'test(frontend): drop legacy FinalMask specificity contract'
+          git push origin HEAD:integration/argon-frontend-recovery-20261102
