@@ -7,21 +7,31 @@ const index=fs.readFileSync('index.html','utf8');
 const docker=fs.readFileSync('backend/Dockerfile','utf8');
 const css=fs.readFileSync('ui-system.css','utf8');
 const design=fs.readFileSync('design-system-v2.css','utf8');
+const spatial=fs.readFileSync('spatial-engine.css','utf8');
+const spatialAdapters=fs.readFileSync('spatial-layout.css','utf8');
 const builder=fs.readFileSync('ui-builder.js','utf8');
 const docs=fs.readFileSync('docs/UI_SYSTEM.md','utf8');
+const spatialDocs=fs.readFileSync('docs/SPATIAL_COMPOSITION.md','utf8');
 const squad=fs.readFileSync('squad-editor-premium-v5.css','utf8');
 
 assert.match(index,/ui-system\.css\?v=[a-z0-9-]+/,'Unified UI stylesheet must be cache-busted');
 assert.match(index,/design-system-v2\.css\?v=[a-z0-9-]+/,'Design-system composition layer must be cache-busted');
+assert.match(index,/spatial-engine\.css\?v=[a-z0-9-]+/,'Universal spatial engine must be cache-busted');
+assert.match(index,/spatial-layout\.css\?v=[a-z0-9-]+/,'Spatial adapter layer must be cache-busted');
 assert.match(index,/ui-builder\.js\?v=[a-z0-9-]+/,'Unified UI builder must be cache-busted');
 const uiPos=index.indexOf('ui-system.css?v=');
 const designPos=index.indexOf('design-system-v2.css?v=');
+const spatialPos=index.indexOf('spatial-engine.css?v=');
+const adapterPos=index.indexOf('spatial-layout.css?v=');
 const lastCss=index.lastIndexOf('<link rel="stylesheet"');
 assert(uiPos>=0&&designPos>uiPos,'design-system-v2.css must load after ui-system.css');
-assert(index.slice(lastCss).includes('design-system-v2.css'),'design-system-v2.css must be the final presentation stylesheet');
+assert(spatialPos>designPos&&adapterPos>spatialPos,'Spatial engine/adapters must load after design-system-v2.css');
+assert(index.slice(lastCss).includes('spatial-layout.css'),'spatial-layout.css must be the final geometry stylesheet');
 assert(index.indexOf('app.js?v=')<index.indexOf('ui-builder.js?v='),'UI builder must load after app.js');
 assert.match(docker,/ui-system\.css/,'Production image must package ui-system.css');
 assert.match(docker,/design-system-v2\.css/,'Production image must package design-system-v2.css');
+assert.match(docker,/spatial-engine\.css/,'Production image must package spatial-engine.css');
+assert.match(docker,/spatial-layout\.css/,'Production image must package spatial-layout.css');
 assert.match(docker,/ui-builder\.js/,'Production image must package ui-builder.js');
 
 for(const surface of ['solid','glass','raised']){
@@ -108,15 +118,31 @@ assert.match(design,/body::before,body::after\{[^}]*animation:none!important/,
 assert.match(design,/:where\(button,\.btn,\.ib,\.gh,\.dg,[\s\S]*:hover\{[\s\S]*transform:none!important;[\s\S]*box-shadow:none!important/,
   'Generic hover must not use lift/bloom effects');
 assert.match(design,/\.nodes-page \.node-explorer\{[\s\S]*background:transparent!important;[\s\S]*border-bottom:/,
-  'Node explorer must be a quiet toolbar instead of another heavy card');
+  'Node explorer base layer must remain a quiet toolbar before spatial composition');
 assert.match(design,/\.nodes-page>\.nodes\[data-node-count="1"\]\[data-grid-mode=spacious\][\s\S]*48rem/,
-  'Single-node spacious mode must provide a genuinely large card');
+  'Base single-node spacious mode must provide a genuinely large card before runtime recomposition');
 assert.match(design,/\.appearance-layout \.setting-row\{[\s\S]*min-height:4\.2rem/,
-  'Settings rows must use the larger readable control rhythm');
+  'Base Settings rows must retain readable control rhythm before spatial compaction');
 assert.match(design,/\.sv-studio \.sv-workspace\{[\s\S]*height:clamp\(42rem/,
   'XRAY Studio must prioritize the editor workspace');
 assert.match(design,/\.sv-studio \.sv-topbar\{[\s\S]*background:transparent!important;[\s\S]*border-bottom:/,
   'XRAY Studio command chrome must be flattened into a quiet toolbar');
+
+/* Spatial geometry is final and must remain material-agnostic. */
+for(const layer of [spatial,spatialAdapters]){
+  assert.doesNotMatch(layer,/html\[data-surface=(?:solid|glass|raised)\]/,
+    'Spatial geometry must not fork Classic/Glass/Raised materials');
+}
+assert.match(spatial,/\.view\[data-ui-flow="workspace"\][\s\S]*grid-auto-rows:max-content/,
+  'Universal workspace flow must be content-driven');
+assert.match(spatial,/\[data-ui-layout="empty"\]/,
+  'Universal engine must include empty-state geometry');
+assert.match(spatial,/\[data-ui-collection\]\[data-ui-count="1"\]/,
+  'Universal engine must include low-count collection geometry');
+assert.match(spatialAdapters,/\.appearance-layout\{[\s\S]*grid-template-columns:/,
+  'Settings unique composition must live in the spatial adapter layer');
+assert.match(spatialAdapters,/\.nodes-page>\.nodes\[data-node-count="1"\]/,
+  'Single-node unique composition must live in the spatial adapter layer');
 
 for(const role of ['panel','dialog','section','metric','item','floating']){
   assert(builder.includes("'"+role+"'"),'Builder role missing '+role);
@@ -127,6 +153,10 @@ assert.match(builder,/node\.matches\('section'\)&&!node\.closest\('dialog'\)/,
   'Plain semantic sections inside dialogs must remain structural by default');
 assert.match(builder,/register\('\.squad-editor-layout>section','section'\)/,
   'Squad editor must be adapted through the central builder');
+assert.match(builder,/classifyWorkspace/,'Builder must classify workspace geometry globally');
+assert.match(builder,/classifyCollections/,'Builder must classify low-count collections globally');
+assert.match(builder,/measureSparse/,'Builder must detect accidental sparse panels');
+assert.match(builder,/composeNodes/,'Builder must support narrow structural adapters without replacing feature logic');
 
 assert.match(docs,/Feature styles own geometry\. `ui-system\.css` owns material\./,
   'Documentation must state the geometry/material ownership rule');
@@ -146,8 +176,12 @@ assert.match(docs,/Do \*\*not\*\* create `my-feature-glass\.css`/,
   'Documentation must forbid feature-specific material forks');
 assert.match(docs,/Bloom is not an interaction primitive/,
   'Documentation must forbid bloom as the default interaction language');
+assert.match(spatialDocs,/whole panel on one design conveyor/,
+  'Spatial documentation must define the panel-wide conveyor model');
+assert.match(spatialDocs,/Content-driven height is the default/,
+  'Spatial documentation must make content-driven height the default');
 
 assert.doesNotMatch(squad,/html\[data-surface=(?:solid|glass|raised)\]/,
   'Squad editor must not implement its own Appearance material variants');
 
-console.log('Unified UI system + Design System v2 checks passed');
+console.log('Unified UI system + Design System v2 + spatial pipeline checks passed');
