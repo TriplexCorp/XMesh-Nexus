@@ -11,9 +11,9 @@ const read=rel=>fs.readFileSync(path.join(root,rel),'utf8');
 const dockerfile=read('backend/Dockerfile');
 assert.match(dockerfile,/COPY frontend\/ \/app\/static\//,
   'Production image must copy the canonical frontend tree');
-assert.match(dockerfile,/sed -E -i[\s\S]*\/app\/static\/nexus-ui-v3\.css/,
-  'Flattened panel CSS entrypoint must rewrite its relative imports to flat runtime aliases');
-assert.match(dockerfile,/packaged browser silently loses all feature CSS behind the entrypoint/,
+assert.match(dockerfile,/sed -E -i[\s\S]*\/app\/static\/nexus-ui-v3\.css \/app\/static\/login\.css/,
+  'Flattened panel and login CSS entrypoints must rewrite relative imports to flat runtime aliases');
+assert.match(dockerfile,/production silently loses design[\s\S]*tokens\/features/,
   'Packaging must document the relative-import failure mode protected by this contract');
 
 const pages=['frontend/index.html','frontend/login.html'];
@@ -33,16 +33,39 @@ if(errors.length){
 }
 
 const index=read('frontend/index.html');
+const login=read('frontend/login.html');
+const loginJs=read('frontend/js/auth/login.js');
+const loginCss=read('frontend/styles/auth/login.css');
 const tlsJs=read('frontend/js/features/xray-studio/xray-studio-tls-dialog.js');
 const tlsCss=read('frontend/styles/features/xray-studio/xray-studio-tls-dialog.css');
 const xhttpExpert=read('frontend/js/features/xray-studio/xray-studio-xhttp-expert.js');
 const diagnosticsJs=read('frontend/js/features/nodes/diagnostics.js');
 const diagnosticsCss=read('frontend/styles/features/nodes/diagnostics.css');
+new Function(loginJs);
 new Function(tlsJs);
 new Function(xhttpExpert);
 new Function(diagnosticsJs);
 
 const hashedAsset=(asset)=>new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\?v=[a-f0-9]{12}');
+assert.match(login,hashedAsset('login.css'),
+  'Login stylesheet must use a content-addressed cache key');
+assert.match(login,hashedAsset('login.js'),
+  'Login appearance/auth runtime must use a content-addressed cache key');
+assert.match(login,/<script src="\/js\/core\/i18n\.js\?v=[a-f0-9]{12}" defer><\/script>\s*<script src="\/js\/auth\/login\.js\?v=[a-f0-9]{12}" defer><\/script>/,
+  'Login must preserve canonical i18n-before-auth runtime order');
+assert.match(loginJs,/localStorage\.xmeshNexusSettings/,
+  'Login must reuse the panel appearance settings instead of a private theme');
+for(const key of ['theme','accent','density','surface','glow','font','borders','motion']){
+  assert.match(loginJs,new RegExp('root\\.dataset\\.'+key+'='),
+    'Login must apply shared appearance dimension: '+key);
+}
+assert.match(loginCss,/@import url\("\.\.\/system\/nexus-v3-foundation\.css/,
+  'Login must consume the canonical design-system foundation');
+assert.match(loginCss,/@import url\("\.\.\/system\/nexus-v3-components\.css/,
+  'Login must consume shared Nexus components/tokens');
+assert.match(loginCss,/backdrop-filter:var\(--nx-backdrop\)/,
+  'Login card must honor the shared solid/glass/raised material contract');
+
 assert.match(index,hashedAsset('xray-studio-tls-dialog.js'),
   'TLS workspace behavior must use a content-addressed cache key');
 assert.match(index,hashedAsset('node-dialogs.js'),
@@ -112,4 +135,4 @@ assert.doesNotMatch(diagnosticsJs,/let\s+LOGS\s*=\s*\[\]/);
 assert.match(diagnosticsCss,/\.diag-overview-grid\{display:grid/);
 assert.match(diagnosticsCss,/@media\(max-width:760px\)/);
 
-console.log('Canonical frontend tree + packaged static assets + critical UI contracts: OK');
+console.log('Canonical frontend tree + packaged static assets + login appearance + critical UI contracts: OK');

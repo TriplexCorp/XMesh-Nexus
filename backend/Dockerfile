@@ -60,14 +60,14 @@ RUN set -eux; \
       rel="${src#/app/static}"; \
       sed -i "s|$rel|/$name|g" /app/static/index.html /app/static/login.html; \
     done; \
-    # The panel CSS entrypoint is also flattened to /nexus-ui-v3.css. Its
-    # authored relative imports were relative to /styles/system/, so rewrite
-    # those imports to the already-created flat aliases as well. Without this,
-    # the packaged browser silently loses all feature CSS behind the entrypoint.
+    # CSS entrypoints are flattened too. Rewrite authored relative imports to
+    # the already-created flat aliases or production silently loses design
+    # tokens/features while the entrypoint itself still returns HTTP 200.
     sed -E -i \
       -e 's|url\("\./([^"/]+\.css)(\?[^"/]*)?"\)|url("/\1\2")|g' \
+      -e 's|url\("\.\./system/([^"/]+\.css)(\?[^"/]*)?"\)|url("/\1\2")|g' \
       -e 's|url\("\.\./features/[^"/]*/([^"/]+\.css)(\?[^"/]*)?"\)|url("/\1\2")|g' \
-      /app/static/nexus-ui-v3.css
+      /app/static/nexus-ui-v3.css /app/static/login.css
 RUN chown -R xmesh:xmesh /app/static
 USER 10001:10001
 WORKDIR /app
