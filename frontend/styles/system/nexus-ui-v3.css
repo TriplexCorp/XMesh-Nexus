@@ -33,3 +33,124 @@
 @import url("../features/xray-studio/xray-studio-reality-dialog.css?v=08b9107e6c8a");
 @import url("../features/xray-studio/xray-studio-tls-dialog.css?v=3a560218d948");
 @import url("../features/xray-studio/xray-studio-v4.css?v=4baebba55c26");
+
+/* Product-wide interaction contract.
+ * Keep motion, dialog geometry and semantic loading feedback centralized here
+ * so feature styles do not grow their own subtly different animation systems. */
+:root{
+  --nx-motion-fast:.14s;
+  --nx-motion-medium:.24s;
+  --nx-motion-slow:.34s;
+  --nx-motion-ease:cubic-bezier(.2,.75,.25,1);
+  --nx-motion-ease-out:cubic-bezier(.16,1,.3,1);
+  --nx-motion-press:.985;
+  --nx-duration:var(--nx-motion-fast);
+}
+
+button{
+  transition:
+    transform var(--nx-motion-fast) var(--nx-motion-ease-out),
+    background-color var(--nx-motion-fast) ease,
+    border-color var(--nx-motion-fast) ease,
+    color var(--nx-motion-fast) ease,
+    box-shadow var(--nx-motion-medium) var(--nx-motion-ease-out),
+    opacity var(--nx-motion-fast) ease;
+}
+:where(.btn,.gh,.dg,.ib,.ia,.search,.xm-select-trigger):not(:disabled):hover{
+  transform:translateY(-1px);
+}
+button:not(:disabled):active{
+  transform:translateY(0) scale(var(--nx-motion-press));
+}
+:where(button[id$="-refresh"],button[class*="refresh"],button[data-user-traffic-refresh])
+  :is(.ic,.stats-refresh-icon,svg:first-child){
+  transform-origin:50% 50%;
+  transition:transform var(--nx-motion-medium) var(--nx-motion-ease-out);
+}
+:where(button[id$="-refresh"],button[class*="refresh"],button[data-user-traffic-refresh]):not(:disabled):active
+  :is(.ic,.stats-refresh-icon,svg:first-child){
+  transform:rotate(110deg);
+}
+:where(button[id$="-refresh"],button[class*="refresh"],button[data-user-traffic-refresh]):disabled
+  :is(.ic,.stats-refresh-icon,svg:first-child){
+  animation:nx-refresh-spin .78s linear infinite;
+}
+@keyframes nx-refresh-spin{to{transform:rotate(360deg)}}
+
+/* All native dialogs share the same premium top-layer motion. #dlg already
+ * has route-aware side/pop offsets in the system component layer. */
+dialog:not(#dlg){
+  --nx-dialog-enter:translateY(14px) scale(.982);
+  animation:none;
+  opacity:0;
+  transform:var(--nx-dialog-enter);
+  transition:
+    opacity var(--nx-motion-medium) var(--nx-motion-ease),
+    transform var(--nx-motion-slow) var(--nx-motion-ease-out),
+    display var(--nx-motion-slow) allow-discrete,
+    overlay var(--nx-motion-slow) allow-discrete;
+}
+dialog[open]:not(#dlg){
+  opacity:1;
+  transform:translateY(0) scale(1);
+}
+dialog:not(#dlg)::backdrop{
+  opacity:0;
+  transition:
+    opacity var(--nx-motion-slow) ease,
+    display var(--nx-motion-slow) allow-discrete,
+    overlay var(--nx-motion-slow) allow-discrete;
+}
+dialog[open]:not(#dlg)::backdrop{opacity:1}
+@starting-style{
+  dialog[open]:not(#dlg){
+    opacity:0;
+    transform:var(--nx-dialog-enter);
+  }
+  dialog[open]:not(#dlg)::backdrop{opacity:0}
+}
+
+/* XRAY STUDIO outer geometry belongs to the native dialog layer, not to the
+ * feature body. `min-inline-size` intentionally defeats the historical 36rem
+ * feature fallback while still collapsing safely to the viewport on mobile. */
+dialog.sv-overlay{
+  --dialog-width:48rem;
+  inline-size:min(var(--dialog-width),calc(100vw - 2rem));
+  min-inline-size:min(var(--dialog-width),calc(100vw - 2rem));
+  max-inline-size:calc(100vw - 2rem);
+}
+dialog.sv-overlay.sv-overlay-composer{
+  --dialog-width:112rem;
+  inline-size:min(var(--dialog-width),calc(100vw - 2rem));
+  min-inline-size:min(var(--dialog-width),calc(100vw - 2rem));
+}
+dialog.xm-studio-modal{
+  --dialog-width:52rem;
+  inline-size:min(var(--dialog-width),calc(100vw - 2rem));
+  min-inline-size:min(var(--dialog-width),calc(100vw - 2rem));
+  max-inline-size:calc(100vw - 2rem);
+}
+dialog.xm-studio-modal.xm-studio-modal--cards{
+  --dialog-width:84rem;
+  inline-size:min(var(--dialog-width),calc(100vw - 2rem));
+  min-inline-size:min(var(--dialog-width),calc(100vw - 2rem));
+}
+dialog:is(.sv-overlay,.xm-studio-modal) :is(.sv-dialog,.xm-studio-modal-shell){
+  min-width:0;
+  max-width:100%;
+}
+
+html[data-motion=off] dialog:not(#dlg),
+html[data-motion=off] dialog:not(#dlg)::backdrop{
+  animation:none!important;
+  transition:none!important;
+}
+html[data-motion=off] dialog[open]:not(#dlg){transform:none}
+@media(prefers-reduced-motion:reduce){
+  dialog:not(#dlg),
+  dialog:not(#dlg)::backdrop{
+    animation:none!important;
+    transition:none!important;
+  }
+  dialog[open]:not(#dlg){transform:none}
+}

@@ -278,6 +278,126 @@ async function main() {
       });
     }
 
+    const inspectStudioDialog=async(selector)=>page.locator(selector).evaluate(dialog=>{
+      const visible=node=>node.getClientRects().length&&getComputedStyle(node).visibility!=='hidden';
+      const box=node=>{const r=node.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom}};
+      const outer=box(dialog);
+      const controls=[...dialog.querySelectorAll('button,input,select,textarea')].filter(visible).map(node=>({identifier:node.id||node.getAttribute('name')||node.textContent.trim().slice(0,34),...box(node)}));
+      const escaped=controls.filter(r=>r.width&&(r.x<outer.x-1||r.right>outer.right+1));
+      const structural=[...dialog.querySelectorAll('.sv-dialog,[data-compose-root],.sv-compose-workspace,.sv-compose-choices,.sv-compose-choice-group,.sv-compose-preview,.xm-studio-modal-shell,.xm-studio-modal-fields,.xm-studio-modal-cardchoices')]
+        .filter(visible)
+        .map(node=>({name:node.className||node.getAttribute('data-compose-root')||node.tagName,clientWidth:node.clientWidth,scrollWidth:node.scrollWidth,...box(node)}));
+      const overflow=structural.filter(item=>item.clientWidth>0&&item.scrollWidth>item.clientWidth+2);
+      const cardRects=[...dialog.querySelectorAll('.xm-studio-modal-choice')].filter(visible).map(box);
+      const groupRects=[...dialog.querySelectorAll('.sv-compose-choice-group')].filter(visible).map(box);
+      const workspace=dialog.querySelector('.sv-compose-workspace');
+      return{viewport:{width:innerWidth,height:innerHeight},outer,escaped,overflow,cardRects,groupRects,workspace:workspace&&box(workspace)};
+    });
+    const closeStudioDialog=async selector=>{
+      await page.keyboard.press('Escape');
+      await page.waitForFunction(sel=>!document.querySelector(sel)?.open,selector);
+    };
+    const seedStudioTcp=async()=>{
+      await page.locator('#xm-studio-v4 [data-v="source"]').evaluate((el,tag)=>{
+        el.value=JSON.stringify({inbounds:[{tag,listen:'127.0.0.1',port:443,protocol:'vless',settings:{users:[],decryption:'none'},streamSettings:{network:'tcp',security:'none'}}],outbounds:[{tag:'direct',protocol:'freedom'}]});
+        el.dispatchEvent(new Event('input',{bubbles:true}));
+      },inboundTag);
+      await page.waitForTimeout(80);
+    };
+
+    for(const width of [1366,1920]) await checked(`XRAY Studio: конструктор сохраняет широкую рабочую геометрию · ${width}px`,async()=>{
+      await page.setViewportSize({width,height:1080});
+      await navigate('profiles');
+      await page.locator('#xm-studio-v4 [data-action="templates"]').click();
+      const selector='dialog.sv-overlay.sv-overlay-composer[open]';
+      await page.waitForSelector(selector);
+      const g=await inspectStudioDialog(selector);
+      assert(g.outer.width>=width-48,`Конструктор снова сжат вместо workstation-ширины: ${g.outer.width}/${width}px.`);
+      assert(g.workspace?.width>=g.outer.width*.9,'Рабочая область конструктора не использует ширину диалога.');
+      assert(g.groupRects.length>=3,'Конструктор потерял группы выбора протокола/транспорта/защиты.');
+      assert(g.groupRects.every(r=>r.width>=170),'Группа конструктора превратилась в узкую вертикальную колонку.');
+      assert.equal(g.escaped.length,0,`Контролы конструктора выходят за диалог: ${JSON.stringify(g.escaped.slice(0,4))}`);
+      assert.equal(g.overflow.length,0,`Внутренний layout конструктора переполнен: ${JSON.stringify(g.overflow.slice(0,4))}`);
+      await screenshot(page,`dialog-xray-composer-${width}`);
+      await closeStudioDialog(selector);
+      return g;
+    });
+
+    for(const width of [1366,1920]) await checked(`XRAY Studio: FinalMask остаётся широким карточным диалогом · ${width}px`,async()=>{
+      await page.setViewportSize({width,height:1080});
+      await navigate('profiles');
+      await seedStudioTcp();
+      const trigger=page.locator('#xm-studio-v4 [data-tool="finalmask"]');
+      assert(await trigger.count(),'Кнопка FinalMask отсутствует в реальном XRAY Studio toolset.');
+      await trigger.first().click();
+      const selector='dialog.xm-studio-modal.xm-studio-modal--cards[open]';
+      await page.waitForSelector(selector);
+      const g=await inspectStudioDialog(selector);
+      const expected=Math.min(1400,width-40);
+      assert(g.outer.width>=expected,`FinalMask снова сжат: ${g.outer.width}px, ожидается не менее ${expected}px.`);
+      assert(g.cardRects.length>=8,'FinalMask потерял карточный каталог вариантов.');
+      assert(g.cardRects.every(r=>r.width>=150),'Карточки FinalMask стали нечитаемо узкими.');
+      const columns=new Set(g.cardRects.map(r=>Math.round(r.x/8)*8));
+      assert(columns.size>=3,`FinalMask схлопнулся в ${columns.size} колонок на desktop.`);
+      assert.equal(g.escaped.length,0,`Контролы FinalMask выходят за диалог: ${JSON.stringify(g.escaped.slice(0,4))}`);
+      assert.equal(g.overflow.length,0,`Внутренний layout FinalMask переполнен: ${JSON.stringify(g.overflow.slice(0,4))}`);
+      await screenshot(page,`dialog-finalmask-${width}`);
+      await closeStudioDialog(selector);
+      return g;
+    });
+
+    for(const width of [1366,1920]) await checked(`XRAY Studio: новый inbound использует нормальную form-ширину · ${width}px`,async()=>{
+      await page.setViewportSize({width,height:1080});
+      await navigate('profiles');
+      await seedStudioTcp();
+      const trigger=page.locator('#xm-studio-v4 [data-tool="inbound"]');
+      assert(await trigger.count(),'Кнопка добавления inbound отсутствует в реальном XRAY Studio toolset.');
+      await trigger.first().click();
+      const selector='dialog.xm-studio-modal:not(.xm-studio-modal--cards)[open]';
+      await page.waitForSelector(selector);
+      const g=await inspectStudioDialog(selector);
+      assert(g.outer.width>=820,`Форма нового inbound снова слишком узкая: ${g.outer.width}px.`);
+      const fields=g.cardRects;
+      assert.equal(g.escaped.length,0,`Контролы нового inbound выходят за диалог: ${JSON.stringify(g.escaped.slice(0,4))}`);
+      assert.equal(g.overflow.length,0,`Внутренний layout нового inbound переполнен: ${JSON.stringify(g.overflow.slice(0,4))}`);
+      await screenshot(page,`dialog-new-inbound-${width}`);
+      await closeStudioDialog(selector);
+      return{...g,fields};
+    });
+
+    await checked('Motion: refresh и native dialogs используют единый premium-контракт',async()=>{
+      await page.setViewportSize({width:1920,height:1080});
+      await page.emulateMedia({reducedMotion:'no-preference'});
+      await navigate('statistics');
+      const refresh=await page.locator('#stats-refresh').evaluate(button=>{
+        const icon=button.querySelector('.ic,svg');
+        const before=getComputedStyle(button);
+        button.disabled=true;
+        const busy=getComputedStyle(icon);
+        const result={transitionProperty:before.transitionProperty,transitionDuration:before.transitionDuration,animationName:busy.animationName,animationDuration:busy.animationDuration};
+        button.disabled=false;
+        return result;
+      });
+      assert(refresh.transitionProperty.includes('transform'),'Общие кнопки не получили transform-transition.');
+      assert(refresh.animationName.includes('nx-refresh-spin'),'Статистика не показывает единый spinner во время disabled/loading состояния.');
+      assert.notEqual(refresh.animationDuration,'0s','Spinner статистики имеет нулевую длительность.');
+
+      await navigate('profiles');
+      await seedStudioTcp();
+      await page.locator('#xm-studio-v4 [data-tool="inbound"]').first().click();
+      const selector='dialog.xm-studio-modal:not(.xm-studio-modal--cards)[open]';
+      await page.waitForSelector(selector);
+      const dialogMotion=await page.locator(selector).evaluate(dialog=>{const s=getComputedStyle(dialog);return{transitionProperty:s.transitionProperty,transitionDuration:s.transitionDuration,animationName:s.animationName}});
+      assert(dialogMotion.transitionProperty.includes('opacity')&&dialogMotion.transitionProperty.includes('transform'),'Native dialog не использует общий opacity/transform motion contract.');
+      assert.equal(dialogMotion.animationName,'none','Feature-specific dialog animation конкурирует с единым motion contract.');
+      await page.emulateMedia({reducedMotion:'reduce'});
+      const reduced=await page.locator(selector).evaluate(dialog=>{const s=getComputedStyle(dialog);return{transitionDuration:s.transitionDuration,animationName:s.animationName}});
+      assert(reduced.transitionDuration.split(',').every(v=>parseFloat(v)===0),'prefers-reduced-motion не отключает dialog transitions.');
+      assert.equal(reduced.animationName,'none','prefers-reduced-motion не отключает dialog animation.');
+      await closeStudioDialog(selector);
+      return{refresh,dialogMotion,reduced};
+    });
+
     // Validate real edit behavior without altering any pre-existing record.
     await checked('Редактирование узла сохраняется через API',async()=>{
       await navigate('nodes');
