@@ -71,16 +71,20 @@ assert.match(css,/@media \(max-width:440px\)[\s\S]*?\.host-connect-fields\s*\{[\
 
 // User Details is deliberately wider than a form dialog and must have only one
 // material shell. #dlg owns the edge/shadow; .user-canvas is layout-only.
-assert.match(css,/#dlg\.user-modal\s*\{[\s\S]*?--dialog-width:1840px[\s\S]*?--modal-off:translateY\(22px\) scale\(\.972\)[\s\S]*?min-inline-size:min\(1400px,calc\(100vw - 2rem\)\)[\s\S]*?height:auto/,
- 'User details dialog must use the wide horizontal workspace contract');
+assert.match(css,/#dlg\.user-modal\s*\{[\s\S]*?--dialog-width:1960px[\s\S]*?--modal-off:translateY\(22px\) scale\(\.972\)[\s\S]*?min-inline-size:min\(1480px,calc\(100vw - 1\.5rem\)\)[\s\S]*?max-block-size:min\(42rem,calc\(100dvh - 1\.5rem\)\)/,
+ 'User details dialog must use the compact wide horizontal workspace contract');
 assert.match(css,/#dlg\.user-modal\s*\{[\s\S]*?opacity \.34s[\s\S]*?transform \.50s[\s\S]*?overlay \.50s allow-discrete/,
  'User details must use the slower premium open/close motion contract');
-assert.match(css,/#dlg\.user-modal>\.user-canvas\s*\{[\s\S]*?block-size:auto[\s\S]*?display:flex[\s\S]*?flex-direction:column[\s\S]*?border:0[\s\S]*?border-radius:0[\s\S]*?background:transparent[\s\S]*?box-shadow:none/,
- 'User details canvas must not draw a second card inside the dialog shell');
+assert.match(css,/#dlg\.user-modal>\.user-canvas\s*\{[\s\S]*?block-size:auto[\s\S]*?max-block-size:min\(42rem,calc\(100dvh - 1\.5rem\)\)[\s\S]*?display:flex[\s\S]*?flex-direction:column[\s\S]*?border:0[\s\S]*?background:transparent[\s\S]*?box-shadow:none/,
+ 'User details canvas must stay single-surface and vertically bounded');
 assert.match(css,/#dlg\.user-modal \.user-canvas-grid\s*\{[\s\S]*?flex:0 1 auto[\s\S]*?overflow:auto/,
  'User details body must be the shrinkable scroll owner');
+assert.match(css,/@media\(min-width:1200px\)[\s\S]*?#dlg\.user-modal \.user-canvas-grid\s*\{[\s\S]*?grid-template-columns:minmax\(0,1\.02fr\) minmax\(0,1\.02fr\) minmax\(0,1\.35fr\)/,
+ 'Desktop User Details must spend more width on the intelligence pane');
+assert.match(css,/@media\(min-width:1200px\)[\s\S]*?#dlg\.user-modal \.user-pane-insights\s*\{[\s\S]*?grid-template-columns:minmax\(0,1\.35fr\) minmax\(12rem,\.75fr\)[\s\S]*?grid-template-rows:auto minmax\(0,1fr\)/,
+ 'Desktop traffic and devices must share a horizontal mini-workspace');
 assert.match(css,/#dlg\.user-modal \.user-canvas-foot\s*\{[\s\S]*?flex:0 0 auto[\s\S]*?position:relative[\s\S]*?border-top:0[\s\S]*?background:transparent[\s\S]*?box-shadow:none/,
  'User details footer must remain metadata, not render as a second material strip');
 assert.match(css,/html\[data-motion=off\] #dlg\.user-modal[\s\S]*?transition:none!important/,
  'User details premium motion must respect the animation setting');
-console.log('Workspace dialogs: host shell and single-surface animated user details OK');
+console.log('Workspace dialogs: host shell and compact horizontal user details OK');
