@@ -22,7 +22,7 @@ jobs:
         with:
           node-version-file: .node-version
           package-manager-cache: false
-      - name: Repair Statistics animations and shared period contract
+      - name: Repair Statistics animations and shared contracts
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -47,11 +47,17 @@ jobs:
 
           t=Path('scripts/check-statistics-feedback.js')
           c=t.read_text()
-          old="matches(css,/body > \\.xm-period-portal\\s*\\{[\\s\\S]*?position:fixed[\\s\\S]*?z-index:200000/);"
-          new="matches(css,/\\.xm-period-portal\\s*\\{[\\s\\S]*?position:fixed[\\s\\S]*?z-index:var\\(--nx-z-tooltip\\)/,'Detached period menu must use the shared popover stacking token');"
-          if old not in c and new not in c:
+          period_old="matches(css,/body > \\.xm-period-portal\\s*\\{[\\s\\S]*?position:fixed[\\s\\S]*?z-index:200000/);"
+          period_new="matches(css,/\\.xm-period-portal\\s*\\{[\\s\\S]*?position:fixed[\\s\\S]*?z-index:var\\(--nx-z-tooltip\\)/,'Detached period menu must use the shared popover stacking token');"
+          if period_old not in c and period_new not in c:
               raise SystemExit('period portal assertion marker not found')
-          c=c.replace(old,new,1)
+          c=c.replace(period_old,period_new,1)
+
+          size_old="matches(css,/--scrollbar-size:9px/);"
+          size_new="rejects(css,/--scrollbar-size:9px/,'Statistics must not pin a legacy global scrollbar size token');"
+          if size_old not in c and size_new not in c:
+              raise SystemExit('scrollbar size assertion marker not found')
+          c=c.replace(size_old,size_new,1)
           t.write_text(c)
           PY
       - name: Validate Statistics contract
