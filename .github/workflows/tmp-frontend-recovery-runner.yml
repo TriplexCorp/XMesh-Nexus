@@ -1,4 +1,4 @@
-name: Temporary Frontend Recovery Validator
+name: Temporary Frontend Recovery Diagnostics
 
 on:
   push:
@@ -9,92 +9,20 @@ permissions:
   contents: read
 
 jobs:
-  source-contracts:
+  inspect:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout integration branch
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           ref: integration/argon-frontend-recovery-20261102
-          fetch-depth: 0
-      - name: Use Node.js 24
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-      - name: Frontend JavaScript syntax
-        run: find frontend/js -name '*.js' -print0 | xargs -0 -n1 node --check
-      - name: Run frontend and UI source contracts
+      - name: Inspect remaining runtime conflicts
         shell: bash
         run: |
-          set +e
-          checks=(
-            check-repo-layout.js
-            check-unified-selects.js
-            check-json-diagnostics.js
-            check-xray-intelligence.js
-            check-xray-tool-actions.js
-            check-xray-studio-wrap-tabs.js
-            check-xray-studio-enterprise.js
-            check-xray-studio-composer.js
-            check-xray-studio-hosts.js
-            check-xray-active-entrypoint.js
-            check-static-assets.js
-            check-client-routing.js
-            check-i18n.js
-            check-english-coverage.js
-            check-subscription-studio.js
-            check-admin-security.js
-            check-viewer-security.js
-            check-security-policy.js
-            check-modal-motion.js
-            check-mfa.js
-            check-security-center.js
-            check-security-audit.js
-            check-white-label.js
-            check-appearance-surfaces.js
-            check-ui-system.js
-            check-node-create-action.js
-            check-node-hosting-notifications.js
-            check-notification-center.js
-            check-statistics-feedback.js
-            test-traffic-chart-geometry.js
-            check-tech-debt.js
-            check-crud-dialog-lifecycle.js
-            check-user-presence.js
-            check-settings-update-actions.js
-            check-managed-xray-update.js
-            check-user-fingerprint-ownership.js
-            check-balancers-workspace.js
-            check-user-quota-preserves-traffic.js
-            check-node-traffic-reset.js
-            check-node-traffic-cutoff.js
-            check-node-network-traffic.js
-            check-node-xray-releases.js
-            check-agent-update.js
-            check-node-live-status.js
-            check-host-editor-zones.js
-            check-node-editor-layout.js
-            check-node-grid-layout.js
-            check-node-explorer.js
-            check-node-ip-rotation.js
-            check-xhttp-extras.js
-            check-xray-studio-selectors.js
-            check-xray-endpoint-autofill.js
-            test-client-config.js
-          )
-          failures=()
-          for check in "${checks[@]}"; do
-            echo "::group::$check"
-            node "scripts/$check"
-            rc=$?
-            echo "::endgroup::"
-            if [ "$rc" -ne 0 ]; then failures+=("$check:$rc"); fi
-          done
-          printf 'FAILED_CHECKS=%s\n' "${failures[*]}"
-          if [ "${#failures[@]}" -ne 0 ]; then
-            printf '%s\n' "${failures[@]}" > /tmp/frontend-failures.txt
-            exit 1
-          fi
-      - name: Verify cache graph
-        if: always()
-        run: node scripts/update-ui-cache.cjs --check
+          echo '=== legacy positional important ==='
+          grep -n -B 8 -A 14 'top:50%!important' frontend/styles/legacy/styles.css || true
+          echo '=== node single-page contract ==='
+          grep -n -B 8 -A 16 'node-explorer-pages\|data-single-page\|dataset.singlePage' frontend/js/core/app.js frontend/styles/features/nodes/nodes.css frontend/styles/legacy/styles.css || true
+          echo '=== workspace ownership refs ==='
+          grep -RIn 'nexus-v3-workspaces' frontend scripts .github || true
+          echo '=== public portal entry refs ==='
+          grep -RIn 'subscription-public.css' frontend scripts backend .github || true
