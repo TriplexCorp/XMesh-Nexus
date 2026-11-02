@@ -1,0 +1,78 @@
+name: Temporary browser bootstrap synchronization fix
+on:
+  push:
+    branches: [integration/argon-frontend-recovery-20261102]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, 'fix(browser): synchronize fixtures with panel bootstrap') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: integration/argon-frontend-recovery-20261102
+          fetch-depth: 1
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Patch deterministic browser bootstrap
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/test-ui-browser.cjs')
+          s=p.read_text()
+          old="""    await page.locator('#submit').click();
+    await page.waitForSelector('#nav');
+    await checked('Вход через форму',async () => {
+"""
+          new="""    await page.locator('#submit').click();
+    await page.waitForFunction(() => !!document.querySelector('#view')?.children.length && !document.querySelector('#view .sk'));
+    await checked('Вход через форму',async () => {
+"""
+          assert old in s, 'login bootstrap marker not found'
+          s=s.replace(old,new,1)
+          old="""    const user = await create('users',{username:`${prefix}-client`,squads:[squad.id],hwid:2});
+
+    for (const [width,height] of sizes) {
+"""
+          new="""    const user = await create('users',{username:`${prefix}-client`,squads:[squad.id],hwid:2});
+    const fixtureBootstrap=await api('GET','/bootstrap');
+    assert(fixtureBootstrap.collections?.profiles?.some(item=>item.id===profile.id),'Bootstrap не увидел тестовый профиль.');
+    assert(fixtureBootstrap.collections?.nodes?.some(item=>item.id===node.id),'Bootstrap не увидел тестовый узел.');
+    assert(fixtureBootstrap.collections?.users?.some(item=>item.id===user.id),'Bootstrap не увидел тестового пользователя.');
+    // The page bootstrap may have started before the API fixtures were created.
+    // Reload once so the in-memory DB used by hash navigation is authoritative.
+    await page.reload({waitUntil:'domcontentloaded'});
+    await page.waitForFunction(() => !!document.querySelector('#view')?.children.length && !document.querySelector('#view .sk'));
+
+    for (const [width,height] of sizes) {
+"""
+          assert old in s, 'fixture reload marker not found'
+          s=s.replace(old,new,1)
+          old="""    await create('nodes',{name:`${prefix} · Берлин`,addr:'192.0.2.11',profileId:profile.id});
+    await create('nodes',{name:`${prefix} · Амстердам`,addr:'192.0.2.12',profileId:profile.id});
+    for(const width of [1366,1920,3440]) await checked(`Коллекция узлов: ${width}px`,async()=>{
+"""
+          new="""    await create('nodes',{name:`${prefix} · Берлин`,addr:'192.0.2.11',profileId:profile.id});
+    await create('nodes',{name:`${prefix} · Амстердам`,addr:'192.0.2.12',profileId:profile.id});
+    // Refresh the panel DB after out-of-band API fixture creation before
+    // validating the multi-card collection layout.
+    await page.reload({waitUntil:'domcontentloaded'});
+    await page.waitForFunction(() => !!document.querySelector('#view')?.children.length && !document.querySelector('#view .sk'));
+    for(const width of [1366,1920,3440]) await checked(`Коллекция узлов: ${width}px`,async()=>{
+"""
+          assert old in s, 'multi-node reload marker not found'
+          s=s.replace(old,new,1)
+          p.write_text(s)
+          PY
+          node --check scripts/test-ui-browser.cjs
+          git diff --check
+      - name: Commit browser synchronization fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/test-ui-browser.cjs
+          git commit -m "fix(browser): synchronize fixtures with panel bootstrap"
+          git push origin HEAD:integration/argon-frontend-recovery-20261102
