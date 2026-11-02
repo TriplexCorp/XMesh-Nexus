@@ -1,11 +1,5 @@
-/* XMesh Nexus Design System v3 — single panel presentation entrypoint.
- *
- * Legacy compatibility is loaded separately in a low-priority cascade layer.
- * This entrypoint owns all modern presentation. Feature-specific workspace
- * geometry is isolated in the final workspaces module.
- * Cache keys are the first 12 characters of each module's Git blob SHA.
- */
-@import url("./nexus-v3-foundation.css?v=779e67d53681");
-@import url("./nexus-v3-components.css?v=09657a27abc3");
-@import url("./nexus-v3-layout.css?v=2ff83caa4742");
-@import url("./nexus-v3-workspaces.css?v=9cee03cd7d75");
+/* One presentation authority: foundation -> components -> layouts.
+ * Feature modules own only named content structures, not global visual rules. */
+@import url("./nexus-v3-foundation.css");
+@import url("./nexus-v3-components.css");
+@import url("./nexus-v3-layout.css");

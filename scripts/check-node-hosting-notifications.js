@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 'use strict';
+const {panelStyles}=require('./ci/frontend-source.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const app = fs.readFileSync('app.js','utf8');
-const css = fs.readFileSync('styles.css','utf8');
+const app = fs.readFileSync('frontend/js/core/app.js','utf8');
+const css = panelStyles();
 const backend = fs.readFileSync('backend/src/main.rs','utf8');
 new Function(app);
 assert.match(app, /nodes:\{t:'Узлы'[\s\S]*?\{k:'hosting',l:'Хостинг \(необязательно\)'/);

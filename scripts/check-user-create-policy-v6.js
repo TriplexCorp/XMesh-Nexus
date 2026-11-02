@@ -1,19 +1,20 @@
 #!/usr/bin/env node
 'use strict';
+const {assertPackaged}=require('./ci/frontend-source.cjs');
 const fs=require('node:fs');
 const assert=require('node:assert/strict');
-const js=fs.readFileSync('user-create-policy-v6.js','utf8');
-const css=fs.readFileSync('user-create-policy-v6.css','utf8');
-const extraCss=fs.readFileSync('user-create-extra-v7.css','utf8');
-const html=fs.readFileSync('index.html','utf8');
+const js=fs.readFileSync('frontend/js/features/users/user-create-policy-v6.js','utf8');
+const css=fs.readFileSync('frontend/styles/features/users/user-create-policy-v6.css','utf8');
+const extraCss=fs.readFileSync('frontend/styles/features/users/user-create-extra-v7.css','utf8');
+const html=fs.readFileSync('frontend/index.html','utf8');
 const docker=fs.readFileSync('backend/Dockerfile','utf8');
 new Function(js);
 assert.match(html,/user-create-policy-v6\.css\?v=20261101-duration-calendar-v1/,'Policy calendar CSS must be cache-busted');
 assert.match(html,/user-create-policy-v6\.js\?v=20261101-duration-calendar-v1/,'Policy calendar JS must be cache-busted');
 assert.match(html,/user-create-extra-v7\.css\?v=20261101-metadata-align-v1/,'Metadata alignment CSS must be cache-busted');
-assert.ok(html.indexOf('/node-dialogs.js?v=')<html.indexOf('/user-create-policy-v6.js?v='),'Policy enhancement must load after the base create-user dialog');
+assert.ok(html.indexOf('/js/features/nodes/node-dialogs.js?v=')<html.indexOf('/js/features/users/user-create-policy-v6.js?v='),'Policy enhancement must load after the base create-user dialog');
 assert.ok(html.indexOf('/user-create-policy-v6.css?v=')<html.indexOf('/user-create-extra-v7.css?v='),'Metadata alignment layer must load after the base create-user CSS layers');
-assert.match(docker,/user-create-policy-v6\.css user-create-policy-v6\.js user-create-extra-v7\.css/,'Production image must package policy calendar and metadata alignment assets');
+assertPackaged(assert,['user-create-policy-v6.css', 'user-create-policy-v6.js', 'user-create-extra-v7.css']);
 assert.match(js,/window\.userNew=function userNewPolicyCalendarV6/,'Create-user calendar must enhance the existing dialog instead of replacing submission logic');
 assert.match(js,/type="hidden" name="days"/,'Calendar UI must preserve the existing backend days field');
 assert.match(js,/\['0','∞'\],\['7','7 дней'\],\['30','30 дней'\],\['90','90 дней'\],\['180','180 дней'\]/,'Duration control must offer safe quick presets');

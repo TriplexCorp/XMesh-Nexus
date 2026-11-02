@@ -2,7 +2,7 @@
 'use strict';
 const fs=require('node:fs');
 const assert=require('node:assert/strict');
-const app=fs.readFileSync('app.js','utf8');
+const app=fs.readFileSync('frontend/js/core/app.js','utf8');
 new Function(app);
 const start=app.indexOf('function xrayStudioEndpointOptions(');
 const end=app.indexOf('function xrayClientSample()',start);
@@ -33,7 +33,7 @@ assert.equal(auto(options({nodes:[node(1,'192.168.1.4',3)],hosts:[],profiles:[pr
   'Refuse private-only endpoint');
 // The v3 form was retired; keep testing real host resolution above and the
 // active Studio V4 editor separately from removed xpb DOM wiring.
-const active=fs.readFileSync('xray-studio-v4.js','utf8');
+const active=fs.readFileSync('frontend/js/features/xray-studio/xray-studio-v4.js','utf8');
 assert.match(active,/window\.XMeshStudioV4=/);
 assert.match(active,/data-v="source"/);
 assert.doesNotMatch(app,/location\.hostname.*server-address/);

@@ -5,7 +5,7 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
-const app=fs.readFileSync('app.js','utf8');
+const app=fs.readFileSync('frontend/js/core/app.js','utf8');
 const start=app.indexOf('const nodeNotificationTitle=');
 const end=app.indexOf("$('#restart').onclick=",start);
 assert(start>0&&end>start,'Notification button wiring must exist');

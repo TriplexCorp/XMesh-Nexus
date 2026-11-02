@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 'use strict';
+const {panelStyles}=require('./ci/frontend-source.cjs');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
-const app=fs.readFileSync('app.js','utf8');
-const css=fs.readFileSync('styles.css','utf8');
+const app=fs.readFileSync('frontend/js/core/app.js','utf8');
+const css=panelStyles();
 new Function(app); // Catch invalid JavaScript before shipping any layout changes.
 const start=app.indexOf('function hostEditorMarkup(o,e){');
 const end=app.indexOf('\nfunction squadEditorMarkup(',start);

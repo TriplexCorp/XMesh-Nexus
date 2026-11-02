@@ -53,7 +53,7 @@ function view(){return [
 '<header class="sv-library-hero"><div class="sv-library-heading"><span class="sv-library-eyebrow"><span class="sv-library-beacon"></span> XRAY STUDIO / LIBRARY</span><h2>Библиотека профилей</h2><p>Все серверные конфигурации Xray в одном месте. Выберите профиль, чтобы продолжить редактирование.</p><div class="sv-library-summary"><span><strong data-v="profilesTotal">0</strong> сохранённых профилей</span><span data-v="profilesActive">Нет открытого профиля</span></div></div><button class="sv-primary sv-library-create" type="button" data-action="new-profile"><span aria-hidden="true">＋</span> Новый профиль</button></header>',
 '<div class="sv-library-toolbar"><label class="sv-library-search"><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.7" cy="10.7" r="6.7"/><path d="m16 16 5 5"/></svg></span><input class="sv-profiles-search" data-v="profilesSearch" type="search" placeholder="Поиск по профилям и inbound..." aria-label="Поиск профилей"></label><span class="sv-library-found" data-v="profilesFound" role="status" aria-live="polite">0 профилей</span></div>',
 '<div class="sv-profiles-list" data-v="profilesList"></div></section>',
-'<div class="sv-workspace"><div class="sv-columns"><section class="sv-codepanel"><header class="sv-codebar"><div class="sv-codebar-start"><label class="sv-profile-name"><span>Профиль</span><input data-field="name" type="text" maxlength="120" placeholder="Название профиля" autocomplete="off"></label><span class="sv-codebar-file"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg> config.json</span><small class="sv-file-state" data-v="dirty">Черновик</small></div><div class="sv-codebar-actions"><button type="button" data-action="undo" aria-label="Отменить" title="Отменить · Ctrl+Z">↶</button><button type="button" data-action="redo" aria-label="Повторить" title="Повторить · Ctrl+Y">↷</button><button type="button" data-action="outline" aria-controls="sv-studio-outline" aria-expanded="true" title="Показать или скрыть структуру"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18M7 8h4M7 12h4M7 16h3"/></svg> <span>Структура</span></button></div></header>',
+'<div class="sv-workspace"><section class="sv-codepanel"><header class="sv-codebar"><div class="sv-codebar-start"><label class="sv-profile-name"><span>Профиль</span><input data-field="name" type="text" maxlength="120" placeholder="Название профиля" autocomplete="off"></label><span class="sv-codebar-file"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg> config.json</span><small class="sv-file-state" data-v="dirty">Черновик</small></div><div class="sv-codebar-actions"><button type="button" data-action="undo" aria-label="Отменить" title="Отменить · Ctrl+Z">↶</button><button type="button" data-action="redo" aria-label="Повторить" title="Повторить · Ctrl+Y">↷</button><button type="button" data-action="outline" aria-controls="sv-studio-outline" aria-expanded="true" title="Показать или скрыть структуру"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18M7 8h4M7 12h4M7 16h3"/></svg> <span>Структура</span></button></div></header>',
 '<div class="sv-inline-tools" aria-label="Инструменты JSON"><div data-xm-tools class="sv-legacy"></div></div>',
 '<div class="sv-editor-context"><span><i class="sv-context-marker" aria-hidden="true"></i> JSON / SERVER CONFIG</span><span>Сохраните профиль, чтобы применить изменения</span></div><div class="sv-codesurface"><pre class="sv-gutter" data-v="gutter" aria-hidden="true"></pre><div class="sv-codeholder"><pre class="sv-highlight" data-v="highlight" aria-hidden="true"></pre><textarea data-v="source" data-xm="manual" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Серверный JSON"></textarea></div><pre class="sv-minimap" data-v="minimap" aria-hidden="true"></pre></div><div class="sv-core-diagnostics" data-v="coreIssues" role="status" aria-live="polite" hidden></div><footer class="sv-codestatus"><span data-v="position">Строка 1, столбец 1</span><span class="sv-codestatus-lines" data-v="lines">0 строк</span><span class="sv-codestatus-valid" data-v="valid" role="status">Проверка...</span><label><input type="checkbox" data-v="wrap" checked> Перенос строк</label></footer></section>',
 '<section class="sv-constructor"><header><h3>Конструктор конфигурации</h3><p>Изменения параметров синхронизируются с JSON.</p></header><nav class="sv-tabs"><button type="button" data-tab="basic" class="active">Основные</button><button type="button" data-tab="inbound">Входящие</button><button type="button" data-tab="outbound">Исходящие</button><button type="button" data-tab="routing">Маршрутизация</button><button type="button" data-tab="extra">Дополнительно</button></nav>',
@@ -63,32 +63,39 @@ function view(){return [
 '<div data-section="outbound" hidden><div class="sv-sectionhead"><h4>Исходящие соединения</h4><button type="button" data-action="add-outbound">+ Outbound</button></div>',select('outSelect','Выберите outbound',[['0','direct']]),field('outTag','Тег outbound'),select('outProtocol','Протокол',[['freedom','Freedom'],['blackhole','Blackhole'],['socks','SOCKS'],['http','HTTP'],['wireguard','WireGuard']]),'<button class="sv-danger" type="button" data-action="remove-outbound">Удалить outbound</button><p class="sv-note">Расширенные настройки outbound остаются в JSON.</p></div>',
 '<div data-section="routing" hidden><h4>Маршрутизация</h4>',select('routeStrategy','Domain strategy',[['AsIs','AsIs'],['IPIfNonMatch','IPIfNonMatch'],['IPOnDemand','IPOnDemand']]),'<p class="sv-note">Существующие routing.rules сохраняются. Добавляйте правила через JSON или Tools.</p></div>',
 '<div data-section="extra" hidden><h4>Дополнительные параметры</h4>',field('dns','DNS-серверы (через запятую)'),'<p class="sv-note">Другие параметры остаются без изменений.</p></div></div><footer data-v="sync">Синхронизировано с JSON</footer></section>',
-'</div>',
 '<aside class="sv-outline" id="sv-studio-outline" aria-label="Структура конфигурации"><div class="sv-outline-head"><div><span class="sv-outline-eyebrow">DOCUMENT INSPECTOR</span><h3>Структура</h3></div><button type="button" data-action="outline" aria-label="Скрыть структуру" title="Скрыть структуру">×</button></div><div class="sv-outline-content"><div class="sv-overview-metrics"><div><strong data-v="insInbounds">0</strong><span>Входящие</span></div><div><strong data-v="insOutbounds">0</strong><span>Исходящие</span></div><div><strong data-v="insRules">0</strong><span>Правила</span></div></div><section class="sv-outline-section"><h4>Разделы JSON</h4><nav data-v="jsonOutline" class="sv-outline-nav" aria-label="Навигация по JSON"></nav></section><section class="sv-outline-section"><h4>Входящие соединения</h4><div data-v="inboundOutline" class="sv-inbound-outline"></div></section></div><div class="sv-outline-footer"><span class="sv-outline-status-dot"></span><span data-v="outlineStatus">Ожидается проверка JSON</span><button type="button" data-action="check">Проверить</button></div></aside>',
 '</div>',
 '<footer class="sv-bottom"><span data-v="saveState">Несохранённая конфигурация</span><div><button type="button" data-action="reset">Сбросить изменения</button></div></footer>',
-'<div class="sv-overlay" data-v="overlay" hidden><div class="sv-dialog"><header><h3 data-v="overlayTitle">Профили</h3><button type="button" data-action="close">×</button></header><div data-v="overlayBody"></div></div></div><input data-v="upload" type="file" accept=".json,application/json" hidden></section>'
+'<dialog class="sv-overlay" data-v="overlay" aria-labelledby="sv-overlay-title"><div class="sv-dialog"><header><h3 id="sv-overlay-title" data-v="overlayTitle">Профили</h3><button type="button" data-action="close" aria-label="Закрыть окно">×</button></header><div data-v="overlayBody"></div></div></dialog><input data-v="upload" type="file" accept=".json,application/json" hidden></section>'
 ].join('')}
 function mount(root,ctx){
 const overlayElement=$(root,'overlay');
-const get=k=>$(root,k)||(k==='overlay'?overlayElement:overlayElement.querySelector('[data-v="'+k+'"]'));
+const get=k=>$(root,k);
 const control=k=>root.querySelector('[data-field="'+k+'"]'),value=k=>control(k)?.value||'',set=(k,v)=>{if(control(k))control(k).value=v??''};
 const input=get('source'),gutter=get('gutter'),highlight=get('highlight'),minimap=get('minimap');
 let name='Новый профиль',id=null,inboundIndex=0,outIndex=0,saved='',locked=false,tools=true;
 let diagnosticsLine=null,validatedSource=null,toolPaletteHandle=null;
 const notify=msg=>ctx.toast?.(msg);
 const studioDialog=window.XMeshStudioDialogs;
- // The composer handles its own buttons; the dialog header close is delegated here.
+ let overlayOpener=null;
+ const closeOverlay=()=>{
+  if(overlayElement.open)overlayElement.close();
+  overlayElement.classList.remove('sv-overlay-composer');
+  if(overlayOpener?.isConnected)overlayOpener.focus({preventScroll:true});
+  overlayOpener=null;
+ };
+ const showOverlay=()=>{
+  if(overlayElement.open)return;
+  overlayOpener=document.activeElement;
+  overlayElement.showModal();
+  window.XMeshSelects?.refresh(overlayElement);
+ };
  overlayElement.addEventListener('click',event=>{
-  if(event.target.closest('[data-action="close"]')){event.preventDefault();overlayElement.hidden=true;}
- });
- const overlayWatch=new MutationObserver(()=>{
-  if(overlayElement.hidden&&overlayElement.parentElement?.classList.contains('sv-studio-portal')){
-   root.append(overlayElement);
-   document.querySelector('body > .sv-studio-portal:empty')?.remove();
+  if(event.target===overlayElement||event.target.closest('[data-action="close"]')){
+   event.preventDefault();closeOverlay();
   }
  });
- overlayWatch.observe(overlayElement,{attributes:true,attributeFilter:['hidden']});
+ overlayElement.addEventListener('cancel',event=>{event.preventDefault();closeOverlay()});
 const approve=async spec=>{if(!studioDialog?.confirm)throw Error('Диалоги XRAY STUDIO не загружены');return studioDialog.confirm(spec)};
 const unsavedApproval=async description=>input.value===saved||await approve({title:'Несохранённые изменения',description,notice:'Изменения в текущем JSON будут потеряны. При необходимости сначала сохраните профиль.',danger:true,confirmLabel:'Продолжить без сохранения',cancelLabel:'Вернуться'});
  const hostManager=window.XMeshStudioHosts.mount(root,{
@@ -595,14 +602,6 @@ if(!x.tag||tags.has(x.tag))throw Error('Пустой или повторяющи
  }
 }}
 function openComposer(){
- // Move the constructor into a body-level portal to blur the whole app shell.
- // Preserve the original overlay and its event handlers; restore it on close.
- if(overlayElement.parentElement===root){
-  const portal=document.createElement('div');
-  portal.className='sv-studio sv-studio-portal';
-  portal.append(overlayElement);
-  document.body.append(portal);
- }
  const engine=window.XMeshStudioComposer;
  if(!engine){notify('Конструктор не загружен. Обновите страницу без кеша.');return}
  const overlay=get('overlay'),body=get('overlayBody');
@@ -777,7 +776,7 @@ function openComposer(){
  renderExamples();refresh();
  const tabs=()=>{for(const button of scope.querySelectorAll('[data-compose-tab]'))button.setAttribute('aria-selected',String(button.dataset.composeTab===tab));scope.querySelector('[data-compose-workspace]').hidden=tab!=='builder';examples.hidden=tab!=='examples'};
  tabs();
- function close(){overlay.hidden=true;overlay.classList.remove('sv-overlay-composer')}
+ function close(){closeOverlay()}
  scope.addEventListener('click',event=>{
   const button=event.target.closest('button');
   if(!button||busy)return;
@@ -848,7 +847,7 @@ function openComposer(){
     keys={privateKey:pair.privateKey,shortId:Array.from(random,b=>b.toString(16).padStart(2,'0')).join('')};
     publicKey=pair.publicKey;
    }
-   if(overlay.hidden||!scope.isConnected)throw Error('Конструктор был закрыт. JSON оставлен без изменений.');
+   if(!overlay.open||!scope.isConnected)throw Error('Конструктор был закрыт. JSON оставлен без изменений.');
    if(input.value!==originalSource||JSON.stringify(opts)!==selectionSignature)throw Error('JSON или параметры изменились во время генерации. Черновик не заменён.');
    const activeJson=chosen.mode==='add'?JSON.parse(originalSource):null;
    const documentValue=engine.buildDocument(chosen,activeJson,{shadowsocksPassword,realityKeys:keys});
@@ -863,20 +862,20 @@ function openComposer(){
     notify('JSON-черновик создан. Проверьте конфигурацию через Xray-core перед сохранением.'+suffix);
    }
   }catch(error){notify('Не удалось собрать JSON: '+error.message)}
-  finally{busy=false;if(!overlay.hidden)renderPreview()}
+  finally{busy=false;if(overlay.open)renderPreview()}
  };
  scope.querySelector('[data-compose-apply]').addEventListener('click',apply);
- overlay.hidden=false;
+ showOverlay();
 }
 function showPopup(title,kind){
  const body=get('overlayBody');body.replaceChildren();get('overlay').classList.remove('sv-overlay-composer');get('overlayTitle').textContent=title;
  if(kind==='profiles'){
- const create=document.createElement('button');create.className='sv-dialogitem';create.textContent='+ Новый профиль';create.onclick=async()=>{if(!await unsavedApproval('Открыть новый профиль без сохранения изменений?'))return;id=null;name='Новый профиль';inboundIndex=outIndex=0;saved='';update(defaultDoc());input.dispatchEvent(new Event('xmesh:reset-history'));get('overlay').hidden=true};body.append(create);
- for(const p of ctx.DB.profiles||[]){const b=document.createElement('button');b.className='sv-dialogitem';b.textContent=p.name;b.onclick=async()=>{if(!await unsavedApproval('Открыть другой профиль без сохранения изменений?'))return;try{const d=typeof p.config==='string'?JSON.parse(p.config):p.config;id=p.id;name=p.name;inboundIndex=outIndex=0;input.value=pretty(d);saved=input.value;paint();input.dispatchEvent(new Event('xmesh:reset-history'));get('overlay').hidden=true}catch(err){notify(err.message)}};body.append(b)}
+ const create=document.createElement('button');create.className='sv-dialogitem';create.textContent='+ Новый профиль';create.onclick=async()=>{if(!await unsavedApproval('Открыть новый профиль без сохранения изменений?'))return;id=null;name='Новый профиль';inboundIndex=outIndex=0;saved='';update(defaultDoc());input.dispatchEvent(new Event('xmesh:reset-history'));closeOverlay()};body.append(create);
+ for(const p of ctx.DB.profiles||[]){const b=document.createElement('button');b.className='sv-dialogitem';b.textContent=p.name;b.onclick=async()=>{if(!await unsavedApproval('Открыть другой профиль без сохранения изменений?'))return;try{const d=typeof p.config==='string'?JSON.parse(p.config):p.config;id=p.id;name=p.name;inboundIndex=outIndex=0;input.value=pretty(d);saved=input.value;paint();input.dispatchEvent(new Event('xmesh:reset-history'));closeOverlay()}catch(err){notify(err.message)}};body.append(b)}
  }else{
   openComposer();return;
  }
- get('overlay').hidden=false;
+ showOverlay();
 }
 function reportCore(message,line=null,success=false){
  const box=get('coreIssues');box.hidden=false;box.textContent=message;
@@ -917,7 +916,7 @@ async function action(a){
  case 'studio-editor':setPage('editor');return;
  case 'new-profile':return newProfile();
  case 'templates':return showPopup('Конструктор конфигураций','templates');
- case 'close':get('overlay').hidden=true;return;
+ case 'close':closeOverlay();return;
  case 'save':return save();
  case 'import':get('upload').click();return;
  case 'export':{const url=URL.createObjectURL(new Blob([input.value],{type:'application/json'})),link=document.createElement('a');link.href=url;link.download=(name.replace(/[^a-z0-9_-]/gi,'-')||'xray')+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);return}

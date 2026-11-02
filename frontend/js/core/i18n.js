@@ -18,6 +18,9 @@ window.XMeshI18n=(()=>{
     'Перевыпуск VPN-реквизитов':'Rotate VPN credentials',
     'Перевыпустить ссылку и ВСЕ VPN-реквизиты':'Replace subscription URL and ALL VPN credentials',
     'Перевыпустить VPN-доступ':'Rotate VPN access',
+    'Завершить сессии':'End sessions',
+    'Завершить сессию':'End session',
+    'Управление сессиями':'Session management',
     // Navigation and global shell
     'ОБЗОР':'OVERVIEW','Обзор':'Overview','УПРАВЛЕНИЕ':'MANAGEMENT',
     'Управление':'Management','ИНСТРУМЕНТЫ':'TOOLS','Инструменты':'Tools',

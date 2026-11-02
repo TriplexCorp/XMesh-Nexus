@@ -3,10 +3,10 @@
 /* XRAY STUDIO enterprise shell / read-only inspector regression checks. */
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
-const js=fs.readFileSync('xray-studio-v4.js','utf8');
-const tools=fs.readFileSync('xray-studio-tools.js','utf8');
-const css=fs.readFileSync('xray-studio-v4.css','utf8');
-const html=fs.readFileSync('index.html','utf8');
+const js=fs.readFileSync('frontend/js/features/xray-studio/xray-studio-v4.js','utf8');
+const tools=fs.readFileSync('frontend/js/features/xray-studio/xray-studio-tools.js','utf8');
+const css=fs.readFileSync('frontend/styles/features/xray-studio/xray-studio-v4.css','utf8');
+const html=fs.readFileSync('frontend/index.html','utf8');
 new Function(js);new Function(tools);
 const w={XMeshStudioHosts:{view:()=>'<div></div>'}};
 new Function('window',js)(w);

@@ -10,7 +10,6 @@ on:
       - 'frontend/js/features/nodes/node-dialogs.js'
       - 'frontend/index.html'
       - 'backend/Dockerfile'
-      - 'scripts/ci/stage-frontend-compat.sh'
       - 'scripts/check-user-create-policy-v6.js'
       - 'scripts/check-static-assets.js'
       - '.github/workflows/user-create-policy-v6-ci.yml'
@@ -24,7 +23,6 @@ on:
       - 'frontend/js/features/nodes/node-dialogs.js'
       - 'frontend/index.html'
       - 'backend/Dockerfile'
-      - 'scripts/ci/stage-frontend-compat.sh'
       - 'scripts/check-user-create-policy-v6.js'
       - 'scripts/check-static-assets.js'
       - '.github/workflows/user-create-policy-v6-ci.yml'
@@ -43,10 +41,8 @@ jobs:
           package-manager-cache: false
       - name: Verify canonical repository layout
         run: node scripts/check-repo-layout.js
-      - name: Stage legacy frontend basename fixtures
-        run: bash scripts/ci/stage-frontend-compat.sh
       - name: Check policy enhancement syntax
-        run: node --check user-create-policy-v6.js
+        run: node --check frontend/js/features/users/user-create-policy-v6.js
       - name: Verify aligned policy controls, metadata row and duration calendar
         run: node scripts/check-user-create-policy-v6.js
       - name: Verify production static packaging

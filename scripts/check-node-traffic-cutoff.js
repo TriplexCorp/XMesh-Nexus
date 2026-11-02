@@ -5,7 +5,7 @@ const backend=fs.readFileSync('backend/src/main.rs','utf8');
 const runtime=fs.readFileSync('backend/src/node_runtime.rs','utf8')+'\n'+fs.readFileSync('backend/src/node_runtime_legacy.rs','utf8');
 const agent=fs.readFileSync('deploy/node-control-agent.sh','utf8');
 const updater=fs.readFileSync('deploy/update-node-control-agent.sh','utf8');
-const app=fs.readFileSync('app.js','utf8');
+const app=fs.readFileSync('frontend/js/core/app.js','utf8');
 assert.match(backend,/NODE TRAFFIC LIMIT EXHAUSTED/);
 assert.match(backend,/node_network_traffic_totals t/);
 assert.match(backend,/>= \(data->>'limit'\)::numeric\*1073741824/);

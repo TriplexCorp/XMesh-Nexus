@@ -4,7 +4,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const agent=fs.readFileSync('deploy/node-metrics-agent.sh','utf8');
 const api=fs.readFileSync('backend/src/main.rs','utf8');
-const app=fs.readFileSync('app.js','utf8');
+const app=fs.readFileSync('frontend/js/core/app.js','utf8');
 const migration=fs.readFileSync('backend/migrations/0022_node_network_traffic_totals.sql','utf8');
 assert.match(agent,/"rxTotalBytes":%s,"txTotalBytes":%s/,'Agent reports real monotonic NIC counters');
 assert.match(api,/node_network_traffic_totals AS totals/,'API persists cumulative NIC deltas');

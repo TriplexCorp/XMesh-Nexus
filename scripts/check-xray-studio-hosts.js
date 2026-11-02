@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 'use strict';
+import {assertPackaged} from './ci/frontend-source.cjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 globalThis.window={};
-await import('../xray-studio-hosts.js');
+await import('../js/features/xray-studio/xray-studio-hosts.js');
 const module=window.XMeshStudioHosts;
 assert.equal(typeof module?.mount,'function');
 const view=module.view();
@@ -13,9 +14,9 @@ for(const key of ['data-endpoints-panel','data-endpoint-list','data-endpoint-edi
  assert(view.includes(key),'Endpoint UI missing '+key);
 }
 assert(!view.includes('data-endpoint="sec"'),'Security is configured by inbound, not Hosts');
-const app=fs.readFileSync('app.js','utf8');
-const studio=fs.readFileSync('xray-studio-v4.js','utf8');
-const html=fs.readFileSync('index.html','utf8');
+const app=fs.readFileSync('frontend/js/core/app.js','utf8');
+const studio=fs.readFileSync('frontend/js/features/xray-studio/xray-studio-v4.js','utf8');
+const html=fs.readFileSync('frontend/index.html','utf8');
 const docker=fs.readFileSync('backend/Dockerfile','utf8');
 const server=fs.readFileSync('backend/src/user_subscriptions.rs','utf8')+'\n'+fs.readFileSync('backend/src/user_subscriptions_base.rs','utf8');
 assert(!app.includes("['hosts','link','Хосты',1]"),'Duplicate Hosts navigation must stay retired');
@@ -23,9 +24,9 @@ assert(app.includes("hosts:['Хосты',()=>simple(['hosts'])]"),'Hosts route m
 assert(app.includes("['hosts','globe-2','Хосты']"),'Hosts navigation must remain accessible');
 assert(studio.includes('window.XMeshStudioHosts.view()'),'Studio must embed endpoints beside inbound');
 assert(studio.includes('window.XMeshStudioHosts.mount('),'Editor must activate endpoint controls');
-assert(html.indexOf('/xray-studio-hosts.js')<html.indexOf('/xray-studio-v4.js'));
-assert(html.includes('/xray-studio-hosts.css'));
-assert(docker.includes('xray-studio-hosts.js')&&docker.includes('xray-studio-hosts.css'));
+assert(html.indexOf('/js/features/xray-studio/xray-studio-hosts.js')<html.indexOf('/js/features/xray-studio/xray-studio-v4.js'));
+assert(html.includes('/styles/features/xray-studio/xray-studio-hosts.css'));
+assertPackaged(assert,['xray-studio-hosts.js', 'xray-studio-hosts.css']);
 assert(server.includes('fn host_for_profile('),'Generator must filter by profile and nodes');
 // The fallback guard must survive rustfmt's whitespace changes.
 const guard=server.match(/let\s+any_explicit_host\s*=\s*hosts\.iter\(\)\.any\([\s\S]*?\);/);

@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 'use strict';
+const {assertPackaged}=require('./ci/frontend-source.cjs');
 /* Matrix + secure generation regressions for the XRAY STUDIO combinatorial composer. */
 const fs=require('node:fs');
 const assert=require('node:assert/strict');
 const vm=require('node:vm');
-const source=fs.readFileSync('xray-studio-composer.js','utf8');
-const studio=fs.readFileSync('xray-studio-v4.js','utf8');
-const html=fs.readFileSync('index.html','utf8');
+const source=fs.readFileSync('frontend/js/features/xray-studio/xray-studio-composer.js','utf8');
+const studio=fs.readFileSync('frontend/js/features/xray-studio/xray-studio-v4.js','utf8');
+const html=fs.readFileSync('frontend/index.html','utf8');
 const docker=fs.readFileSync('backend/Dockerfile','utf8');
-const css=fs.readFileSync('xray-studio-v4.css','utf8');
+const css=fs.readFileSync('frontend/styles/features/xray-studio/xray-studio-v4.css','utf8');
 new Function(source);new Function(studio);
 const env={window:{}};
 vm.runInNewContext(source,env,{filename:'xray-studio-composer.js'});
@@ -122,13 +123,13 @@ assert.throws(()=>C.generateShadowsocksPassword('2022-blake3-aes-256-gcm',null),
 assert(studio.includes('function openComposer()'),'Studio must mount composer');
 assert(!studio.includes('const templates=['),'Fixed list must not be the only mode');
 assert(studio.includes('engine.buildDocument(chosen,activeJson'),'Studio must use the reusable document generator');
-assert(studio.includes("if(overlay.hidden||!scope.isConnected)"),'Closed modal must not commit an async generated key');
+assert(studio.includes("if(!overlay.open||!scope.isConnected)"),'Closed modal must not commit an async generated key');
 assert(studio.includes('selectionSignature=JSON.stringify(opts)'),'Composer must detect async option changes');
 assert(studio.includes("unsavedApproval('Создать новую конфигурацию"),'Destructive replacement needs permission');
 assert(studio.includes("get('overlay').classList.remove('sv-overlay-composer')"),'Dialog can return to normal layout');
-assert(html.includes('/xray-studio-composer.js?v='),'Composer must load before Studio');
+assert(html.includes('/js/features/xray-studio/xray-studio-composer.js?v='),'Composer must load before Studio');
 assert(html.indexOf('xray-studio-composer.js')<html.indexOf('xray-studio-v4.js'),'Correct script order');
-assert(docker.includes('xray-studio-composer.js'),'Production Docker must include module');
+assertPackaged(assert,['xray-studio-composer.js']);
 assert(css.includes('.sv-compose-workspace'),'Enterprise composer styles must exist');
 assert(css.includes('.sv-compose-preview'),'JSON preview must exist');
 console.log('XRAY STUDIO composer: '+comboCount+' documented combinations, Shadowsocks XHTTP REALITY, safe generator, append/no-overwrite and UI packaging OK.');

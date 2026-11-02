@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 'use strict';
 const fs=require('node:fs'),assert=require('node:assert/strict');
-const js=fs.readFileSync('xray-studio-v4.js','utf8');
-const css=fs.readFileSync('xray-studio-v4.css','utf8');
-const html=fs.readFileSync('index.html','utf8');
+const js=fs.readFileSync('frontend/js/features/xray-studio/xray-studio-v4.js','utf8');
+const css=fs.readFileSync('frontend/styles/features/xray-studio/xray-studio-v4.css','utf8');
+const html=fs.readFileSync('frontend/index.html','utf8');
 new Function(js);
 assert.match(js,/data-v="wrap" checked/,'soft wrap checkbox defaults to on');
 assert.match(js,/root\.classList\.toggle\('sv-wrap',get\('wrap'\)\.checked\)/,'initial wrap class matches checkbox');

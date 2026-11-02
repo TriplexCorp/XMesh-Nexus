@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 const context={window:{}};
-vm.runInNewContext(fs.readFileSync('xray-studio-composer.js','utf8'),context);
+vm.runInNewContext(fs.readFileSync('frontend/js/features/xray-studio/xray-studio-composer.js','utf8'),context);
 const C=context.window.XMeshStudioComposer;
 assert(C.transports.some(t=>t.id==='xdrive'),'XDRIVE must appear in transport picker');
 const valid={protocol:'vless',transport:'xdrive',security:'none',

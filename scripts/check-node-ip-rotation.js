@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 'use strict';
+const {panelStyles}=require('./ci/frontend-source.cjs');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 
-const app=fs.readFileSync('app.js','utf8');
+const app=fs.readFileSync('frontend/js/core/app.js','utf8');
 const backend=fs.readFileSync('backend/src/main.rs','utf8');
 const rot=fs.readFileSync('backend/src/node_rotation.rs','utf8');
 const migration=fs.readFileSync('backend/migrations/0007_node_ip_rotation.sql','utf8');
-const html=fs.readFileSync('index.html','utf8');
-const css=fs.readFileSync('styles.css','utf8');
+const html=fs.readFileSync('frontend/index.html','utf8');
+const css=panelStyles();
 
 assert.match(app,/k:'rotationEnabled'.*t:'bool'/,'Node editor must expose an enable switch');
 assert.match(app,/k:'rotationIps'.*t:'area'/,'Node editor must expose IP address pool');

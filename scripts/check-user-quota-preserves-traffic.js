@@ -4,7 +4,7 @@
 const fs=require('node:fs');
 const assert=require('node:assert/strict');
 const api=fs.readFileSync('backend/src/main.rs','utf8');
-const ui=fs.readFileSync('app.js','utf8');
+const ui=fs.readFileSync('frontend/js/core/app.js','utf8');
 const integration=fs.readFileSync('scripts/test-node-auth-integration.py','utf8');
 
 const update=api.slice(api.indexOf('async fn update_record('),api.indexOf('async fn delete_record('));

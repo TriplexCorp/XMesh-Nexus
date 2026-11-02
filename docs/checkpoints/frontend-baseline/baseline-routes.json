@@ -1,0 +1,534 @@
+{
+  "metrics": [
+    {
+      "route": "home",
+      "width": 1440,
+      "height": 900,
+      "viewport": 1440,
+      "document": 1440,
+      "view": {
+        "class": "view",
+        "x": 277,
+        "y": 104,
+        "width": 1134,
+        "height": 1442,
+        "display": "grid",
+        "minHeight": "0px",
+        "maxWidth": "none"
+      },
+      "cards": [
+        {
+          "class": "card home-overview",
+          "x": 277,
+          "y": 104,
+          "width": 1134,
+          "height": 238,
+          "display": "block",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card traffic-card",
+          "x": 277,
+          "y": 360,
+          "width": 1134,
+          "height": 539,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card system-card",
+          "x": 277,
+          "y": 916,
+          "width": 1134,
+          "height": 331,
+          "display": "block",
+          "minHeight": "0px",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card",
+          "x": 277,
+          "y": 1265,
+          "width": 687,
+          "height": 168,
+          "display": "block",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card",
+          "x": 982,
+          "y": 1265,
+          "width": 430,
+          "height": 282,
+          "display": "block",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        }
+      ],
+      "columns": [],
+      "toolbar": []
+    },
+    {
+      "route": "statistics",
+      "width": 1440,
+      "height": 900,
+      "viewport": 1440,
+      "document": 1440,
+      "view": {
+        "class": "view",
+        "x": 277,
+        "y": 104,
+        "width": 1134,
+        "height": 1962,
+        "display": "grid",
+        "minHeight": "0px",
+        "maxWidth": "none"
+      },
+      "cards": [
+        {
+          "class": "card",
+          "x": 277,
+          "y": 533,
+          "width": 1134,
+          "height": 212,
+          "display": "block",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card",
+          "x": 277,
+          "y": 763,
+          "width": 1134,
+          "height": 418,
+          "display": "block",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card",
+          "x": 277,
+          "y": 1198,
+          "width": 1134,
+          "height": 338,
+          "display": "block",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card",
+          "x": 277,
+          "y": 1554,
+          "width": 1134,
+          "height": 475,
+          "display": "block",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        }
+      ],
+      "columns": [],
+      "toolbar": []
+    },
+    {
+      "route": "users",
+      "width": 1440,
+      "height": 900,
+      "viewport": 1440,
+      "document": 1440,
+      "view": {
+        "class": "view",
+        "x": 277,
+        "y": 104,
+        "width": 1134,
+        "height": 491,
+        "display": "grid",
+        "minHeight": "0px",
+        "maxWidth": "none"
+      },
+      "cards": [
+        {
+          "class": "card users-panel",
+          "x": 277,
+          "y": 104,
+          "width": 1134,
+          "height": 491,
+          "display": "block",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        }
+      ],
+      "columns": [],
+      "toolbar": []
+    },
+    {
+      "route": "squads",
+      "width": 1440,
+      "height": 900,
+      "viewport": 1440,
+      "document": 1440,
+      "view": {
+        "class": "view",
+        "x": 277,
+        "y": 104,
+        "width": 1134,
+        "height": 262,
+        "display": "grid",
+        "minHeight": "0px",
+        "maxWidth": "none"
+      },
+      "cards": [
+        {
+          "class": "card",
+          "x": 277,
+          "y": 104,
+          "width": 1134,
+          "height": 262,
+          "display": "block",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        }
+      ],
+      "columns": [],
+      "toolbar": []
+    },
+    {
+      "route": "hosts",
+      "width": 1440,
+      "height": 900,
+      "viewport": 1440,
+      "document": 1440,
+      "view": {
+        "class": "view",
+        "x": 277,
+        "y": 104,
+        "width": 1134,
+        "height": 302,
+        "display": "grid",
+        "minHeight": "0px",
+        "maxWidth": "none"
+      },
+      "cards": [
+        {
+          "class": "card",
+          "x": 277,
+          "y": 104,
+          "width": 1134,
+          "height": 302,
+          "display": "block",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        }
+      ],
+      "columns": [],
+      "toolbar": []
+    },
+    {
+      "route": "templates",
+      "width": 1440,
+      "height": 900,
+      "viewport": 1440,
+      "document": 1440,
+      "view": {
+        "class": "view",
+        "x": 277,
+        "y": 104,
+        "width": 1134,
+        "height": 542,
+        "display": "grid",
+        "minHeight": "0px",
+        "maxWidth": "none"
+      },
+      "cards": [
+        {
+          "class": "card",
+          "x": 277,
+          "y": 104,
+          "width": 1134,
+          "height": 262,
+          "display": "block",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card",
+          "x": 277,
+          "y": 384,
+          "width": 1134,
+          "height": 262,
+          "display": "block",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        }
+      ],
+      "columns": [],
+      "toolbar": []
+    },
+    {
+      "route": "profiles",
+      "width": 1440,
+      "height": 900,
+      "viewport": 1440,
+      "document": 1440,
+      "view": {
+        "class": "view",
+        "x": 277,
+        "y": 104,
+        "width": 1134,
+        "height": 885,
+        "display": "grid",
+        "minHeight": "0px",
+        "maxWidth": "none"
+      },
+      "cards": [],
+      "columns": [],
+      "toolbar": []
+    },
+    {
+      "route": "subscription",
+      "width": 1440,
+      "height": 900,
+      "viewport": 1440,
+      "document": 1440,
+      "view": {
+        "class": "view",
+        "x": 277,
+        "y": 104,
+        "width": 1134,
+        "height": 6246,
+        "display": "grid",
+        "minHeight": "0px",
+        "maxWidth": "none"
+      },
+      "cards": [
+        {
+          "class": "card subscription-studio-section",
+          "x": 277,
+          "y": 222,
+          "width": 700,
+          "height": 315,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card subscription-studio-section",
+          "x": 277,
+          "y": 554,
+          "width": 700,
+          "height": 638,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card subscription-studio-section",
+          "x": 277,
+          "y": 1210,
+          "width": 700,
+          "height": 1465,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card subscription-studio-section",
+          "x": 277,
+          "y": 2692,
+          "width": 700,
+          "height": 1513,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card subscription-studio-section",
+          "x": 277,
+          "y": 4223,
+          "width": 700,
+          "height": 551,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card subscription-studio-section",
+          "x": 277,
+          "y": 4791,
+          "width": 700,
+          "height": 1558,
+          "display": "grid",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        }
+      ],
+      "columns": [],
+      "toolbar": []
+    },
+    {
+      "route": "balancers",
+      "width": 1440,
+      "height": 900,
+      "viewport": 1440,
+      "document": 1440,
+      "view": {
+        "class": "view",
+        "x": 277,
+        "y": 104,
+        "width": 1134,
+        "height": 179,
+        "display": "grid",
+        "minHeight": "0px",
+        "maxWidth": "none"
+      },
+      "cards": [],
+      "columns": [],
+      "toolbar": []
+    },
+    {
+      "route": "clientrouting",
+      "width": 1440,
+      "height": 900,
+      "viewport": 1440,
+      "document": 1440,
+      "view": {
+        "class": "view",
+        "x": 277,
+        "y": 104,
+        "width": 1134,
+        "height": 532,
+        "display": "grid",
+        "minHeight": "0px",
+        "maxWidth": "none"
+      },
+      "cards": [],
+      "columns": [],
+      "toolbar": []
+    },
+    {
+      "route": "tools",
+      "width": 1440,
+      "height": 900,
+      "viewport": 1440,
+      "document": 1440,
+      "view": {
+        "class": "view",
+        "x": 277,
+        "y": 104,
+        "width": 1134,
+        "height": 1313,
+        "display": "grid",
+        "minHeight": "0px",
+        "maxWidth": "none"
+      },
+      "cards": [],
+      "columns": [],
+      "toolbar": []
+    },
+    {
+      "route": "admins",
+      "width": 1440,
+      "height": 900,
+      "viewport": 1440,
+      "document": 1440,
+      "view": {
+        "class": "view",
+        "x": 277,
+        "y": 104,
+        "width": 1134,
+        "height": 192,
+        "display": "grid",
+        "minHeight": "0px",
+        "maxWidth": "none"
+      },
+      "cards": [
+        {
+          "class": "card",
+          "x": 277,
+          "y": 104,
+          "width": 1134,
+          "height": 192,
+          "display": "block",
+          "minHeight": "auto",
+          "maxWidth": "none"
+        }
+      ],
+      "columns": [],
+      "toolbar": []
+    },
+    {
+      "route": "security",
+      "width": 1440,
+      "height": 900,
+      "viewport": 1440,
+      "document": 1440,
+      "view": {
+        "class": "view",
+        "x": 277,
+        "y": 104,
+        "width": 1134,
+        "height": 492,
+        "display": "grid",
+        "minHeight": "0px",
+        "maxWidth": "none"
+      },
+      "cards": [
+        {
+          "class": "card mfa-security-card",
+          "x": 277,
+          "y": 245,
+          "width": 1134,
+          "height": 351,
+          "display": "block",
+          "minHeight": "0px",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card",
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "display": "block",
+          "minHeight": "0px",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card",
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "display": "block",
+          "minHeight": "0px",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card security-center-information security-audit",
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "display": "block",
+          "minHeight": "256px",
+          "maxWidth": "none"
+        },
+        {
+          "class": "card security-center-information",
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "display": "block",
+          "minHeight": "256px",
+          "maxWidth": "none"
+        }
+      ],
+      "columns": [],
+      "toolbar": []
+    }
+  ],
+  "errors": []
+}

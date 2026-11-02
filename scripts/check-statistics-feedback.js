@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 'use strict';
+const {panelStyles}=require('./ci/frontend-source.cjs');
 const fs=require('node:fs'),assert=require('node:assert/strict');
-const app=fs.readFileSync('app.js','utf8');
-const sec=fs.readFileSync('security-ui.js','utf8');
+const app=fs.readFileSync('frontend/js/core/app.js','utf8');
+const sec=fs.readFileSync('frontend/js/auth/security-ui.js','utf8');
 const backend=fs.readFileSync('backend/src/main.rs','utf8');
 const agent=fs.readFileSync('deploy/node-metrics-agent.sh','utf8');
-const css=fs.readFileSync('styles.css','utf8');
+const css=panelStyles();
 new Function(app);new Function(sec);
 assert.match(app,/\['statistics','chart-no-axes-combined','Статистика'/);
 assert.match(app,/statistics:\['Статистика',statisticsP\]/);

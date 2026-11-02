@@ -2,7 +2,7 @@
 'use strict';
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
-const app=fs.readFileSync('app.js','utf8');
+const app=fs.readFileSync('frontend/js/core/app.js','utf8');
 const a=app.indexOf('function xrayXhttpSettings(');
 const b=app.indexOf('function xrayBuilderConfig()',a);
 assert(a>=0&&b>a,'XHTTP serializer must exist');
@@ -37,7 +37,7 @@ assert(!('scMaxBufferedPosts' in client.extra),'Server-only setting must not lea
 assert.throws(()=>create({'xhttp-mux-connections':'4','xhttp-mux-concurrency':'8'},'client'),/нельзя включать/);
 assert.throws(()=>create({'xhttp-post-bytes':'50-10'},'client'),/диапазон/);
 assert.throws(()=>create({'xhttp-headers':'{"X":3}'},'client'),/требуется объект/);
-assert.match(fs.readFileSync('xray-studio-v4.js','utf8'),/\['xhttp','XHTTP'\]/,'Active Studio must expose XHTTP transport');
+assert.match(fs.readFileSync('frontend/js/features/xray-studio/xray-studio-v4.js','utf8'),/\['xhttp','XHTTP'\]/,'Active Studio must expose XHTTP transport');
 console.log('XRAY Studio XHTTP serializer and themed selects: OK');
 require('./check-xhttp-core-strict.js');
 require('./check-subscription-qr.js');

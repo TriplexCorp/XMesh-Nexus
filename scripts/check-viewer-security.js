@@ -1,12 +1,13 @@
 'use strict';
+const {panelStyles}=require('./ci/frontend-source.cjs');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const main=fs.readFileSync('backend/src/main.rs','utf8');
 const runtime=fs.readFileSync('backend/src/node_runtime.rs','utf8')+'\n'+fs.readFileSync('backend/src/node_runtime_legacy.rs','utf8');
 const security=fs.readFileSync('backend/src/security.rs','utf8');
 const users=fs.readFileSync('backend/src/user_subscriptions.rs','utf8')+'\n'+fs.readFileSync('backend/src/user_subscriptions_base.rs','utf8');
-const app=fs.readFileSync('app.js','utf8');
-const css=fs.readFileSync('styles.css','utf8');
+const app=fs.readFileSync('frontend/js/core/app.js','utf8');
+const css=panelStyles();
 const section=(source,start,end)=>{const a=source.indexOf(start);assert(a>=0,'Missing '+start);const b=source.indexOf(end,a+start.length);assert(b>=0,'Missing '+end);return source.slice(a,b)};
 const observer=section(main,'fn viewer_read_only(','async fn bootstrap(');
 assert.match(observer,/!matches!\(actor\.role\.as_str\(\), "owner" \| "admin"\)/);

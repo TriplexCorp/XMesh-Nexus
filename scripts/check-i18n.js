@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 'use strict';
+const {assertPackaged}=require('./ci/frontend-source.cjs');
 const fs=require('node:fs');
 const assert=require('node:assert/strict');
 const vm=require('node:vm');
-const src=fs.readFileSync('i18n.js','utf8');
-const app=fs.readFileSync('app.js','utf8');
-const portal=fs.readFileSync('subscription-studio.js','utf8');
-const html=fs.readFileSync('index.html','utf8');
-const login=fs.readFileSync('login.html','utf8');
+const src=fs.readFileSync('frontend/js/core/i18n.js','utf8');
+const app=fs.readFileSync('frontend/js/core/app.js','utf8');
+const portal=fs.readFileSync('frontend/js/features/subscriptions/subscription-studio.js','utf8');
+const html=fs.readFileSync('frontend/index.html','utf8');
+const login=fs.readFileSync('frontend/login.html','utf8');
 const docker=fs.readFileSync('backend/Dockerfile','utf8');
 const backend=fs.readFileSync('backend/src/main.rs','utf8');
 
@@ -104,7 +105,7 @@ assert.match(portal,/\[\['ru','Русский'\],\['en','English'\]\]/);
 assert.doesNotMatch(portal,/tr:\['Abonelik aktif'/);
 assert.doesNotMatch(portal,/vi:\['Gói đăng ký/);
 assert.match(backend,/"subscriptionLanguage", &\["ru", "en"\]/);
-assert.match(html,/<script src="i18n\.js[^"]*"><\/script>\s*<script src="subscription-studio\.js/);
+assert.match(html,/<script src="\/js\/core\/i18n\.js[^"]*"><\/script>\s*<script src="\/js\/features\/subscriptions\/subscription-studio\.js/);
 assert.match(login,/<script src="\/i18n\.js[^"]*" defer><\/script>\s*<script src="\/login\.js[^"]*" defer><\/script>/);
-assert.match(docker,/COPY index\.html[^\n]*i18n\.js/);
+assertPackaged(assert,['i18n.js']);
 console.log('RU/EN panel locale persistence, safe reversible translations, independent portal locale: OK');

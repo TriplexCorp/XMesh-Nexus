@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 'use strict';
+const {assertPackaged}=require('./ci/frontend-source.cjs');
 const assert=require('node:assert/strict'),fs=require('node:fs');
 const read=p=>fs.readFileSync(p,'utf8');
-const intelligence=read('xray-json-intelligence.js');
-const diagnostics=read('xray-json-diagnostics.js');
-const app=read('app.js');
-const html=read('index.html');
+const intelligence=read('frontend/js/features/xray-studio/xray-json-intelligence.js');
+const diagnostics=read('frontend/js/features/xray-studio/xray-json-diagnostics.js');
+const app=read('frontend/js/core/app.js');
+const html=read('frontend/index.html');
 const docker=read('backend/Dockerfile');
 new Function(intelligence);new Function(diagnostics);
 const env={};
@@ -83,7 +84,7 @@ assert.match(engine.decorateRun('<script>',0,'jx-string',null),/&lt;script&gt;/)
 assert.match(engine.decorateRun('abc',0,'jx-string',[{start:1,end:2,message:'bad',severity:'warning'}]),/is-warning/);
 assert.match(intelligence,/MAX_BYTES=900000/,'Cap expensive semantic analysis');
 assert.match(diagnostics,/sr-json-issue-list/,'Issue list must exist');
-assert.match(fs.readFileSync('xray-studio-v4.js','utf8'),/XrayJsonIntelligence\?\.analyze\?\.\(source,obj\)/,'Active Studio v4 invokes semantic engine');
-assert.match(html,/<script src="xray-json-intelligence\.js[^"]*"><\/script>\s*<script src="xray-json-diagnostics\.js/);
-assert.match(docker,/COPY [^\n]*xray-json-intelligence\.js[^\n]* \/app\/static\//);
+assert.match(fs.readFileSync('frontend/js/features/xray-studio/xray-studio-v4.js','utf8'),/XrayJsonIntelligence\?\.analyze\?\.\(source,obj\)/,'Active Studio v4 invokes semantic engine');
+assert.match(html,/<script src="\/js\/features\/xray-studio\/xray-json-intelligence\.js[^"]*"><\/script>\s*<script src="\/js\/features\/xray-studio\/xray-json-diagnostics\.js/);
+assertPackaged(assert,['xray-json-intelligence.js']);
 console.log('Intelligent Xray JSON validation: OK');

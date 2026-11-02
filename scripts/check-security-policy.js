@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 'use strict';
+const {assertPackaged}=require('./ci/frontend-source.cjs');
 const fs=require('node:fs'),assert=require('node:assert/strict');
 const backend=fs.readFileSync('backend/src/security.rs','utf8');
 const auth=fs.readFileSync('backend/src/auth.rs','utf8');
 const main=fs.readFileSync('backend/src/main.rs','utf8');
 const sql=fs.readFileSync('backend/migrations/0010_security_controls.sql','utf8');
-const ui=fs.readFileSync('security-ui.js','utf8');
-const app=fs.readFileSync('app.js','utf8');
-const html=fs.readFileSync('index.html','utf8');
+const ui=fs.readFileSync('frontend/js/auth/security-ui.js','utf8');
+const app=fs.readFileSync('frontend/js/core/app.js','utf8');
+const html=fs.readFileSync('frontend/index.html','utf8');
 const docker=fs.readFileSync('backend/Dockerfile','utf8');
 
 new Function(ui);new Function(app);
@@ -44,7 +45,7 @@ assert.match(backend,/join\("login.html"\)/,'Only the custom entrypoint may serv
 assert.match(backend,/crate::auth::is_authenticated/,'Alternate dashboard must require authentication');
 assert.match(backend,/html\s*=\s*html\.replace/,'Nested dashboard entry must resolve root assets');
 assert.match(html,/security-ui\.js\?v=/);
-assert.match(docker,/security-ui\.js/,'UI module must be included in production image');
+assertPackaged(assert,['security-ui.js']);
 assert.match(app,/XMeshSecurity\?\.panel/);
 assert.match(app,/XMeshSecurity\?\.mount/);
 console.log('Advanced security policy, server enforcement, per-account session revocation and dashboard path: OK');

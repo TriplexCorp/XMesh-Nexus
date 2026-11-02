@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 'use strict';
 const fs=require('node:fs'),assert=require('node:assert/strict');
-const ui=fs.readFileSync('security-ui.js','utf8');
-const app=fs.readFileSync('app.js','utf8');
-const html=fs.readFileSync('index.html','utf8');
+const ui=fs.readFileSync('frontend/js/auth/security-ui.js','utf8');
+const app=fs.readFileSync('frontend/js/core/app.js','utf8');
+const html=fs.readFileSync('frontend/index.html','utf8');
 const auth=fs.readFileSync('backend/src/auth.rs','utf8');
 const policy=fs.readFileSync('backend/src/security.rs','utf8');
 const main=fs.readFileSync('backend/src/main.rs','utf8');

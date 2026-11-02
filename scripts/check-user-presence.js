@@ -4,8 +4,8 @@ const fs=require('node:fs');
 const assert=require('node:assert/strict');
 const backend=fs.readFileSync('backend/src/main.rs','utf8');
 const agent=fs.readFileSync('deploy/node-metrics-agent.sh','utf8');
-const app=fs.readFileSync('app.js','utf8');
-const html=fs.readFileSync('index.html','utf8');
+const app=fs.readFileSync('frontend/js/core/app.js','utf8');
+const html=fs.readFileSync('frontend/index.html','utf8');
 
 assert.match(backend,/const USER_ONLINE_WINDOW_MS: i64 = 45_000;/);
 assert.match(backend,/now_ms - USER_ONLINE_WINDOW_MS/);

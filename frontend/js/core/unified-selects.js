@@ -24,12 +24,16 @@
   if(!instance||!instance.trigger.isConnected)return;
   const b=instance.trigger.getBoundingClientRect();
   const popup=instance.popup;
-  const height=Math.min(popup.scrollHeight||260,Math.max(100,innerHeight*.45));
-  const below=innerHeight-b.bottom>=height+8||innerHeight-b.bottom>=b.top;
-  popup.style.width=Math.max(120,Math.min(b.width,innerWidth-16))+'px';
-  popup.style.maxHeight=Math.max(95,Math.min(340,innerHeight-24))+'px';
-  popup.style.left=Math.max(8,Math.min(b.left,innerWidth-b.width-8))+'px';
-  popup.style.top=Math.round(below?Math.min(b.bottom+5,innerHeight-90):Math.max(8,b.top-height-5))+'px';
+  const above=Math.max(0,b.top-13),belowRoom=Math.max(0,innerHeight-b.bottom-13);
+  const desired=Math.min(popup.scrollHeight||260,340);
+  const below=belowRoom>=desired||belowRoom>=above;
+  const maxHeight=Math.min(340,below?belowRoom:above);
+  const height=Math.min(popup.scrollHeight||260,maxHeight);
+  const width=Math.min(Math.max(120,b.width),Math.max(0,innerWidth-16));
+  popup.style.width=width+'px';
+  popup.style.maxHeight=maxHeight+'px';
+  popup.style.left=Math.max(8,Math.min(b.left,innerWidth-width-8))+'px';
+  popup.style.top=Math.round(below?b.bottom+5:Math.max(8,b.top-height-5))+'px';
  }
  function buildOptions(instance){
   const {select,popup}=instance;
@@ -131,7 +135,7 @@
    const opts=[...popup.querySelectorAll('.xm-select-option:not(:disabled)')];
    const at=opts.indexOf(document.activeElement);
    if(e.key==='Escape'){e.preventDefault();dismiss(instance,true)}
-   else if(e.key==='Tab'){dismiss(instance)}
+   else if(e.key==='Tab'){dismiss(instance,true)}
    else if(e.key==='ArrowDown'||e.key==='ArrowUp'||e.key==='Home'||e.key==='End'){
     e.preventDefault();
     if(!opts.length)return;
@@ -171,7 +175,12 @@
   document.addEventListener('pointerdown',e=>{
    if(active&&!active.wrapper.contains(e.target)&&!active.popup.contains(e.target))dismiss(active);
   },true);
-  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&active)dismiss(active,true)},true);
+  document.addEventListener('keydown',e=>{
+   if(e.key==='Escape'&&active){
+    // Escape dismisses the innermost popup, preserving its owning dialog.
+    e.preventDefault();e.stopPropagation();dismiss(active,true);
+   }
+  },true);
   document.addEventListener('scroll',()=>{if(active)place(active)},{capture:true,passive:true});
   window.addEventListener('resize',()=>{if(active)place(active)});
   document.addEventListener('close',e=>{if(e.target instanceof HTMLDialogElement&&active)dismiss(active)},true);

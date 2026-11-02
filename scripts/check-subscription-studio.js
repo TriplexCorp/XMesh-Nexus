@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 'use strict';
+const {assertPackaged}=require('./ci/frontend-source.cjs');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 
-const src=fs.readFileSync('subscription-studio.js','utf8');
-const css=fs.readFileSync('subscription-studio.css','utf8');
-const app=fs.readFileSync('app.js','utf8');
+const src=fs.readFileSync('frontend/js/features/subscriptions/subscription-studio.js','utf8');
+const css=fs.readFileSync('frontend/styles/features/subscriptions/subscription-studio.css','utf8');
+const app=fs.readFileSync('frontend/js/core/app.js','utf8');
 const rust=fs.readFileSync('backend/src/main.rs','utf8');
-const html=fs.readFileSync('index.html','utf8');
+const html=fs.readFileSync('frontend/index.html','utf8');
 const docker=fs.readFileSync('backend/Dockerfile','utf8');
 
 new Function(src);
@@ -216,12 +217,12 @@ assert.match(rust,/"deploymentServerB"/);
 assert.match(rust,/"subscriptionPlacement", &\["a", "b", "c"\]/);
 assert(!rust.includes('.route("/s/'),'The management panel must not implement public subscription serving');
 assert.match(html,/subscription-studio\.js\?v=[a-z0-9-]+/,'Subscription Studio JavaScript must use a cache-busting version');
-assert.match(html,/<link\s+rel="stylesheet"\s+href="subscription-studio\.css\?v=[a-zA-Z0-9._-]+"\s*\/?>/,
+assert.match(html,/<link\s+rel="stylesheet"\s+href="\/styles\/features\/subscriptions\/subscription-studio\.css\?v=[a-zA-Z0-9._-]+"\s*\/?>/,
  'Subscription Studio stylesheet must retain a cache-busting version');
-assert.match(docker,/subscription-studio\.css subscription-public\.css subscription-studio\.js subscription-portal\.js/);
+assertPackaged(assert,['subscription-studio.css', 'subscription-public.css', 'subscription-studio.js', 'subscription-portal.js']);
 const template=fs.readFileSync('backend/src/subscription_template.html','utf8');
-const portalCss=fs.readFileSync('subscription-public.css','utf8');
-const portalJs=fs.readFileSync('subscription-portal.js','utf8');
+const portalCss=fs.readFileSync('frontend/styles/features/subscriptions/subscription-public.css','utf8');
+const portalJs=fs.readFileSync('frontend/js/features/subscriptions/subscription-portal.js','utf8');
 new Function(portalJs);
 const liveBackend=fs.readFileSync('backend/src/user_subscriptions.rs','utf8');
 for(const cls of ['subscription-preview','subscription-preview-brand','subscription-preview-hero','subscription-preview-meta','subscription-preview-progress','subscription-preview-cta','subscription-preview-quick','subscription-preview-support']) {

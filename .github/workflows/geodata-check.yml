@@ -15,8 +15,7 @@ on:
       - 'backend/Dockerfile'
       - 'backend/src/security.rs'
       - 'frontend/index.html'
-      - 'frontend/styles/legacy/styles.css'
-      - 'scripts/ci/stage-frontend-compat.sh'
+      - 'frontend/styles/**'
       - '.github/workflows/geodata-check.yml'
   pull_request:
     paths:
@@ -31,8 +30,7 @@ on:
       - 'backend/Dockerfile'
       - 'backend/src/security.rs'
       - 'frontend/index.html'
-      - 'frontend/styles/legacy/styles.css'
-      - 'scripts/ci/stage-frontend-compat.sh'
+      - 'frontend/styles/**'
       - '.github/workflows/geodata-check.yml'
   workflow_dispatch:
 jobs:
@@ -40,21 +38,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Stage legacy frontend basename fixtures
-        run: bash scripts/ci/stage-frontend-compat.sh
       - name: Check dashboard JavaScript
         run: |
-          node --check app.js
-          node --check node-geodata.js
-          node --check node-routing.js
+          node --check frontend/js/core/app.js
+          node --check frontend/js/features/nodes/node-geodata.js
+          node --check frontend/js/features/nodes/node-routing.js
           node - <<'JS'
           const fs=require('fs');
+          const assert=require('node:assert/strict');
+          const {assertPackaged}=require('./scripts/ci/frontend-source.cjs');
           const docker=fs.readFileSync('backend/Dockerfile','utf8');
-          const html=fs.readFileSync('index.html','utf8');
+          const html=fs.readFileSync('frontend/index.html','utf8');
           const rebasing=fs.readFileSync('backend/src/security.rs','utf8');
-          const routing=fs.readFileSync('node-routing.js','utf8');
+          const routing=fs.readFileSync('frontend/js/features/nodes/node-routing.js','utf8');
           for(const name of ['node-geodata.js','node-geodata.css','node-routing.js','node-routing.css']){
-            if(!docker.includes(name)||!html.includes(name)||!rebasing.includes(name))
+            assertPackaged(assert,[name]);
+            if(!html.includes(name)||!rebasing.includes(name))
               throw new Error('Missing packaged or custom-path asset: '+name);
           }
           if(routing.includes('class="box route-json-workspace"'))
@@ -65,7 +64,7 @@ jobs:
             throw new Error('Node routing single-shell fix must be cache-busted');
           // The general node form reads ENT.nodes.fs in full. Hidden GeoData
           // fields in that schema previously caused a null-input crash.
-          const app=fs.readFileSync('app.js','utf8');
+          const app=fs.readFileSync('frontend/js/core/app.js','utf8');
           const start=app.indexOf("nodes:{t:'Узлы'");
           const end=app.indexOf("  tpls:{",start);
           if(start<0||end<0)throw new Error('Cannot identify node schema');

@@ -9,7 +9,7 @@ const routes=fs.readFileSync('backend/src/main.rs','utf8');
 const migration=fs.readFileSync('backend/migrations/0023_xray_release_target.sql','utf8');
 const agent=fs.readFileSync('deploy/node-control-agent.sh','utf8');
 const updater=fs.readFileSync('deploy/update-node-control-agent.sh','utf8');
-const ui=fs.readFileSync('app.js','utf8');
+const ui=fs.readFileSync('frontend/js/core/app.js','utf8');
 assert.match(core,/pub async fn all_node_releases\(&self\)/);
 assert.match(core,/releases\?per_page=100&page=\{page\}/);
 assert.match(core,/if\s+count\s*<\s*100\s*\{\s*break\s*;\s*\}/);

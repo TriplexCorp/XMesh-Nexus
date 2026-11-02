@@ -3,18 +3,19 @@
 const fs=require('node:fs');
 const assert=require('node:assert/strict');
 
-const app=fs.readFileSync('app.js','utf8');
-const legacy=fs.readFileSync('styles.css','utf8');
-const foundation=fs.readFileSync('nexus-v3-foundation.css','utf8');
-const workspaces=fs.readFileSync('nexus-v3-workspaces.css','utf8');
-const html=fs.readFileSync('index.html','utf8');
+const app=fs.readFileSync('frontend/js/core/app.js','utf8');
+const {panelStyles}=require('./ci/frontend-source.cjs');
+const css=panelStyles();
+const foundation=fs.readFileSync('frontend/styles/system/nexus-v3-foundation.css','utf8');
+const settings=fs.readFileSync('frontend/styles/features/settings/settings.css','utf8');
+const html=fs.readFileSync('frontend/index.html','utf8');
 
 // Appearance modes and migration.
 assert.match(app,/choices\('surface',\[\['solid','Классика'\],\['glass','Glass'\],\['raised','Объём'\]\]\)/,
  'Appearance must offer only Classic, Glass and Raised');
 assert.doesNotMatch(app,/\['flat','Плоский'\]/,'Deprecated Flat must not be selectable');
 assert.doesNotMatch(app,/Выберите плоский/,'Old Flat explanatory text must stay removed');
-assert.doesNotMatch(legacy,/data-surface=flat/,'Deprecated Flat CSS must stay removed');
+assert.doesNotMatch(css,/data-surface=flat/,'Deprecated Flat CSS must stay removed');
 const migration=app.match(/if\(!\['solid','glass','raised'\]\.includes\(C\.surface\)\)C\.surface='solid';/);
 assert(migration,'Saved invalid/flat values must migrate to Classic');
 const normalize=new Function('C',migration[0]+'return C.surface;');
@@ -27,20 +28,12 @@ for(const surface of ['solid','glass','raised']){
  assert(foundation.includes('html[data-surface='+surface+']'),'Foundation missing '+surface+' material');
 }
 
-// Legacy may retain old compatibility selectors, but modern workspace geometry
-// must explicitly own Settings and must never erase its structural columns.
-assert.match(workspaces,/#view>\.appearance-layout\{[\s\S]*grid-template-columns:minmax\(0,1\.08fr\) minmax\(0,\.92fr\)/,
- 'Settings must use the canonical enterprise two-column composition');
-assert.match(workspaces,/#view>\.appearance-layout>\.appearance-column\{[\s\S]*display:grid/,
- 'Settings structural columns must remain real grid containers');
-assert.doesNotMatch(workspaces,/\.appearance-column\s*\{[^}]*display:contents/,
- 'Modern Settings must never flatten appearance columns with display:contents');
-assert.match(workspaces,/#view>\.appearance-layout>\.appearance-column>\.card:nth-child\(n\)\{[\s\S]*grid-area:auto/,
- 'Modern Settings must neutralize historical explicit grid-area placement');
-assert.match(workspaces,/@container settings-workspace \(max-width:88rem\)/,
- 'Settings must stack from actual workspace width rather than viewport width');
-assert.match(app,/<div class="appearance-layout">/,'Appearance workspace markup must exist');
+// Structural columns are declared by the route and remain ordinary containers.
+assert.match(app,/appearance-layout/,'Appearance workspace markup must exist');
 assert.match(app,/appearance-column/,'Appearance workspace must retain structural columns');
+assert.doesNotMatch(settings,/display\s*:\s*contents/,'Settings must not flatten its structural columns');
+assert.doesNotMatch(settings,/grid-area\s*:/,'Settings cards must flow naturally, without historical slot placement');
+assert.match(settings,/@(?:container|media)/,'Settings requires responsive reflow');
 
 // Content-width control: preview is frame-coalesced and persistence happens only
 // on commit, so dragging cannot serialize the whole theme for every pixel.
@@ -97,11 +90,6 @@ assert.match(app,/class="palette-preset/,'Curated theme tiles must remain labell
 assert.match(app,/class="palette-hex-fields"/,'Custom palette must offer HEX inputs');
 assert.doesNotMatch(app.slice(app.indexOf('async function setP()'),app.indexOf('/* ================= ПАЛИТРА КОМАНД')),/<input type="color"/,
  'Native color popups must stay absent');
-assert.match(workspaces,/#view \.appearance-layout \.palette-preset-grid\{[\s\S]*repeat\(4,minmax\(0,1fr\)\)/,
- 'Palette gallery must use the modern stable four-column grid');
-assert.match(workspaces,/#view \.appearance-layout \.color-slider-grid\{[\s\S]*display:grid/,
- 'HSL editor rows must be owned by modern workspace geometry');
-
 const colorCode=app.slice(app.indexOf('const updatePaletteColor='),app.indexOf('const brand=()=>'));
 let previewCount=0;
 const draft={a:'#112233',b:'#445566',h:0,s:0,l:0};
@@ -127,7 +115,7 @@ const palettePresets=[...paletteCode.matchAll(/\['([a-z]+)','(#[0-9a-f]{6})','(#
 assert.equal(palettePresets.length,24,'Appearance gallery must contain 24 curated presets');
 assert.equal(new Set(palettePresets.map(match=>match[1])).size,24,'Preset keys must be unique');
 for(const name of ['sapphire','teal','coral','indigo','copper','glacier','graphite']){
- assert(legacy.includes('[data-accent='+name+']'),'Curated theme missing '+name);
+ assert(css.includes('[data-accent='+name+']'),'Curated theme missing '+name);
 }
 
 // Range behavior: visible values use pixels/percentages and fine values remain exact.
@@ -144,7 +132,7 @@ for(const [id,min,max,step] of [
 assert.match(app,/id="tsv" data-appearance-value="ts" min="90" max="200" step="1"/,
  'Interface scale needs exact 1% numeric adjustment');
 assert.doesNotMatch(app,/id="text-size"/,'Duplicate text scaling control must not return');
-assert.doesNotMatch(legacy,/--text-size-scale/,'Text must inherit the unified scale only');
+assert.doesNotMatch(css,/--text-size-scale/,'Text must inherit the unified scale only');
 assert.match(app,/data-appearance-value="radius"/);
 assert.match(app,/data-appearance-value="content-width"/);
 assert.match(app,/data-appearance-value="gap-scale"/);
@@ -153,11 +141,11 @@ assert.match(app,/r\.style\.setProperty\('--ui-control-radius',radius\+'px'\)/,
  'Configured radius must apply to shared controls');
 
 // Shared range styling remains available to other feature surfaces.
-const subscriptionJs=fs.readFileSync('subscription-studio.js','utf8');
+const subscriptionJs=fs.readFileSync('frontend/js/features/subscriptions/subscription-studio.js','utf8');
 assert.match(subscriptionJs,/type="range" name="subscriptionRadius"/);
-assert.match(legacy,/^input\[type="range"\]\{/m);
-assert.match(legacy,/^input\[type="range"\]::-webkit-slider-thumb\{/m);
-assert.match(legacy,/^input\[type="range"\]::-moz-range-thumb\{/m);
+assert.match(css,/^input\[type="range"\]\{/m);
+assert.match(css,/^input\[type="range"\]::-webkit-slider-thumb\{/m);
+assert.match(css,/^input\[type="range"\]::-moz-range-thumb\{/m);
 
 // Surface selection must update one visual/ARIA state at a time.
 const beginning=app.indexOf("else if(b=g('[data-ui]'))");
@@ -194,7 +182,7 @@ assert.equal(themeSyncs,3,'Surface switches must update linked subscription appe
 assert.match(app,/aria-pressed="\$\{\(C\[key\]\|\|CDEFAULT\[key\]\)==v\?'true':'false'\}/,
  'Initial material selection must expose aria-pressed');
 
-assert.match(html,/styles\.css\?v=[a-z0-9-]+/,'Legacy compatibility asset must remain versioned');
+assert.doesNotMatch(html,/styles\/legacy\//,'Historical CSS must not be loaded');
 assert.match(html,/app\.js\?v=[a-z0-9-]+/,'Application script must remain versioned');
 new Function(app);
 console.log('Appearance behavior and enterprise Settings workspace: OK');

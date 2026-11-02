@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 'use strict';
+const {panelStyles}=require('./ci/frontend-source.cjs');
 // Behavioural SVG geometry check: execute the real renderers with measured data.
 const fs=require('node:fs');
 const assert=require('node:assert/strict');
-const app=fs.readFileSync('app.js','utf8');
-const css=fs.readFileSync('styles.css','utf8');
+const app=fs.readFileSync('frontend/js/core/app.js','utf8');
+const css=panelStyles();
 function extract(start,end){
  const from=app.indexOf(start),to=app.indexOf(end,from+start.length);
  assert(from!==-1&&to>from,'renderer source boundaries must exist: '+start);

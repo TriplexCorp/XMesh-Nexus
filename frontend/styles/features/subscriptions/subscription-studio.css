@@ -2,7 +2,7 @@
 .subscription-studio{
   --st-ink:var(--tx);
   --st-muted:var(--mu);
-  --st-border:var(--ln);
+  --st-border:var(--nx-border);
   --st-accent:var(--a);
   display:grid;gap:1.2rem;min-width:0;width:100%;
 }
@@ -19,8 +19,8 @@
 .subscription-studio-kicker{font-size:.7rem;letter-spacing:.15em;font-weight:780;color:var(--a)}
 .subscription-studio-notice{
   margin:0;color:var(--st-muted);border:1px solid var(--st-border);
-  border-left:3px solid var(--a);border-radius:var(--ui-control-radius);
-  background:var(--s2);padding:.85rem 1rem;line-height:1.55;font-size:.8rem;
+  border-left:3px solid var(--a);border-radius:var(--nx-control-radius);
+  background:var(--nx-section-bg);padding:.85rem 1rem;line-height:1.55;font-size:.8rem;
 }
 .subscription-studio-notice b{color:var(--st-ink)}
 .subscription-studio-layout{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(20rem,.8fr);gap:1.2rem;align-items:start;min-width:0}
@@ -29,26 +29,28 @@
 .subscription-studio-heading{display:flex;gap:.95rem;align-items:center;border-bottom:1px solid var(--st-border);padding-bottom:1rem}
 .subscription-studio-heading>span{
   width:2.4rem;height:2.4rem;display:grid;place-items:center;flex:0 0 auto;
-  background:color-mix(in srgb,var(--a) 10%,var(--s2));
-  border:1px solid color-mix(in srgb,var(--a) 26%,var(--ln));
-  border-radius:var(--ui-control-radius);color:var(--a);font-weight:750;font-size:.78rem
+  background:color-mix(in srgb,var(--a) 10%,var(--nx-section-bg));
+  border:1px solid color-mix(in srgb,var(--a) 26%,var(--nx-border));
+  border-radius:var(--nx-control-radius);color:var(--a);font-weight:750;font-size:.78rem
 }
 .subscription-studio-heading h3{font-size:1.04rem;font-weight:760;margin:0 0 .25rem}
 .subscription-studio-heading p{font-size:.79rem;color:var(--st-muted);margin:0;line-height:1.5}
 .subscription-studio-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.95rem;min-width:0}
 .subscription-studio .subscription-field{min-width:0;margin:0}
-.subscription-studio .subscription-field input,.subscription-studio .subscription-field textarea,.subscription-studio .subscription-field select{
+.subscription-studio .subscription-field input,
+.subscription-studio .subscription-field textarea,
+.subscription-studio .subscription-field select{
   width:100%;max-width:100%;min-width:0;
 }
 .subscription-studio .subscription-field input[type=color]{height:2.75rem;padding:.25rem;cursor:pointer}
-.subscription-studio-url{display:grid;gap:.45rem;background:var(--s2);padding:1rem;border:1px dashed var(--st-border);border-radius:var(--ui-control-radius)}
+.subscription-studio-url{display:grid;gap:.45rem;background:var(--nx-section-bg);padding:1rem;border:1px dashed var(--st-border);border-radius:var(--nx-control-radius)}
 .subscription-studio-url span{font-size:.72rem;color:var(--st-muted)}
 .subscription-studio-url code{overflow-wrap:anywhere;font-size:.85rem;color:var(--st-ink)}
 .subscription-roles{display:grid;gap:.65rem}
 .subscription-role{
   display:grid;grid-template-columns:2.4rem minmax(0,1fr) auto;
   gap:.85rem;align-items:center;padding:.75rem .85rem;border:1px solid var(--st-border);
-  border-radius:var(--ui-control-radius);background:var(--s2);min-width:0
+  border-radius:var(--nx-control-radius);background:var(--nx-section-bg);min-width:0
 }
 .subscription-role-icon{display:grid;place-items:center;width:2.4rem;height:2.4rem;color:var(--a);font-size:1.1rem}
 .subscription-role>div:not(.subscription-field){display:grid;gap:.2rem;min-width:0}
@@ -60,7 +62,7 @@
 .subscription-role .subscription-field select{min-height:2.4rem}
 .subscription-topology{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.65rem}
 .subscription-topology-item{
-  border:1px solid var(--st-border);border-radius:var(--ui-control-radius);
+  border:1px solid var(--st-border);border-radius:var(--nx-control-radius);
   padding:.85rem;display:grid;gap:.3rem;min-width:0
 }
 .subscription-topology-item span{color:var(--a);font-size:.65rem;font-weight:800;letter-spacing:.08em}
@@ -75,16 +77,13 @@
 .subscription-preview-label{display:flex;justify-content:space-between;align-items:center;gap:.8rem;font-size:.82rem}
 .subscription-preview-label span{color:var(--st-muted);font-size:.71rem}
 .subscription-preview{
-  position:relative;display:grid;gap:1.65rem;background:
-  radial-gradient(ellipse at 92% 3%,color-mix(in srgb,var(--portal-accent) 16%,transparent),transparent 55%),
-  #0c131b;
-  color:#ecf3f6;padding:clamp(1.25rem,2vw,2rem);border-radius:calc(var(--ui-radius) + 4px);
+  position:relative;display:grid;gap:1.65rem;padding:clamp(1.25rem,2vw,2rem);
   border:1px solid #293541;min-height:27rem;
   box-shadow:0 16px 55px rgba(0,0,0,.18)
 }
-.subscription-preview-brand{display:flex;gap:.75rem;align-items:center;font-weight:760;font-size:1.08rem;overflow-wrap:anywhere}
+.subscription-preview-brand{font-weight:760;font-size:1.08rem;overflow-wrap:anywhere}
 .subscription-preview-brand>span{
-  width:2.3rem;height:2.3rem;border-radius:11px;display:grid;place-items:center;
+  width:2.3rem;height:2.3rem;border-radius:var(--nx-control-radius);display:grid;place-items:center;
   background:var(--portal-accent);color:#10171e;flex:0 0 auto;font-size:1.15rem;
 }
 .subscription-preview-hero{display:grid;gap:.45rem}
@@ -92,31 +91,32 @@
 .subscription-preview-hero p{margin:0;color:#a9bac4;font-size:.82rem;line-height:1.5;overflow-wrap:anywhere}
 .subscription-preview-ok{color:var(--portal-accent);font-size:.75rem}
 .subscription-preview-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.7rem}
-.subscription-preview-meta>div{display:grid;gap:.5rem;border:1px solid #30404b;border-radius:12px;padding:.9rem}
+.subscription-preview-meta>div{display:grid;gap:.5rem;border:1px solid #30404b;border-radius:var(--nx-control-radius);padding:.9rem}
 .subscription-preview-meta small{font-size:.74rem;color:#a9bac4}
 .subscription-preview-meta b{font-size:.9rem}
 .subscription-preview-meta>[hidden]{display:none}
-.subscription-preview-progress{height:.3rem;border-radius:10px;background:#30404b;overflow:hidden}
-.subscription-preview-progress i{display:block;width:12.4%;height:100%;background:var(--portal-accent);border-radius:10px}
-.subscription-preview-cta{background:var(--portal-accent);color:#121b22;text-align:center;padding:.95rem;border-radius:12px;font-size:.85rem;font-weight:800}
+.subscription-preview-progress{height:.3rem;border-radius:var(--nx-control-radius);background:#30404b;overflow:hidden}
+.subscription-preview-progress i{display:block;width:12.4%;height:100%;background:var(--portal-accent);border-radius:var(--nx-control-radius)}
+.subscription-preview-cta{background:var(--portal-accent);color:#121b22;text-align:center;padding:.95rem;border-radius:var(--nx-control-radius);font-size:.85rem;font-weight:800}
 .subscription-preview footer{color:#a9bac4;font-size:.72rem;overflow-wrap:anywhere}
 .subscription-studio-stats{display:grid;grid-template-columns:1fr 1fr;gap:.8rem}
-.subscription-studio-stats>div{display:flex;justify-content:space-between;align-items:center;padding:1rem;gap:.5rem;border:1px solid var(--st-border);border-radius:var(--ui-control-radius);font-size:.8rem}
+.subscription-studio-stats>div{display:flex;justify-content:space-between;align-items:center;padding:1rem;gap:.5rem;border:1px solid var(--st-border);border-radius:var(--nx-control-radius);font-size:.8rem}
 .subscription-studio-stats small{color:var(--st-muted)}
 .subscription-studio-stats b{font-size:1.1rem}
 .subscription-preview-caption{font-size:.73rem;color:var(--st-muted);line-height:1.6;margin:0}
 @media(max-width:1180px){.subscription-studio-layout{grid-template-columns:minmax(0,1fr)}.subscription-studio-side{position:static;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start}.subscription-preview-label{grid-column:1/-1}.subscription-preview-caption{grid-column:2}.subscription-preview{grid-row:2/span 2}.subscription-studio-stats{grid-column:2}}
-@media(max-width:780px){.subscription-studio-side{display:grid;grid-template-columns:1fr}.subscription-preview,.subscription-studio-stats,.subscription-preview-label,.subscription-preview-caption{grid-column:1;grid-row:auto}.subscription-studio-pair{grid-template-columns:1fr}.subscription-topology{grid-template-columns:1fr}.subscription-role{grid-template-columns:2.1rem minmax(0,1fr)}.subscription-role strong,.subscription-role .subscription-field{grid-column:2;justify-self:start}.subscription-studio-intro .btn{width:100%}}
+@media(max-width:780px){.subscription-studio-side{display:grid;grid-template-columns:1fr}.subscription-preview,
+.subscription-studio-stats,
+.subscription-preview-label,
+.subscription-preview-caption{grid-column:1;grid-row:auto}.subscription-studio-pair{grid-template-columns:1fr}.subscription-topology{grid-template-columns:1fr}.subscription-role{grid-template-columns:2.1rem minmax(0,1fr)}.subscription-role strong,
+.subscription-role .subscription-field{grid-column:2;justify-self:start}.subscription-studio-intro .btn{width:100%}}
 
 /* Client portal appearance is independent from the panel theme. */
-.subscription-preview[data-portal-theme=light]{
-  background:radial-gradient(ellipse at 92% 3%,color-mix(in srgb,var(--portal-accent) 15%,transparent),transparent 60%),#f5f6f8;
-  color:#19232d;border-color:#d6dde3;
+.subscription-preview[data-portal-theme=light]{border-color:#d6dde3;
 }
 .subscription-preview[data-portal-theme=light] .subscription-preview-hero p,
 .subscription-preview[data-portal-theme=light] .subscription-preview-meta small,
 .subscription-preview[data-portal-theme=light] footer{color:#647484}
-.subscription-preview[data-portal-theme=light] .subscription-preview-meta>div{border-color:#d5dce4;background:#fff}
 .subscription-preview[data-portal-theme=light] .subscription-preview-progress{background:#e8ebef}
 .subscription-preview[data-portal-theme=light] .subscription-preview-cta{color:#16202a}
 
@@ -125,16 +125,16 @@
 .subscription-studio-subheading>span{width:2rem;height:2rem}
 .subscription-color-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
 .subscription-visibility{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem}
-.subscription-visibility label{padding:.7rem .85rem;border:1px solid var(--st-border);border-radius:var(--ui-control-radius);background:var(--s2)}
+.subscription-visibility label{padding:.7rem .85rem;border:1px solid var(--st-border);border-radius:var(--nx-control-radius);background:var(--nx-section-bg)}
 .subscription-studio [type=range]{accent-color:var(--a);cursor:pointer;padding:.5rem 0}
 .subscription-client-actions{display:flex;align-items:center;flex-wrap:wrap;gap:.45rem}
 .subscription-client-counter{font-size:.78rem;font-weight:700;color:var(--a)}
 .subscription-client-editor{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem}
-.subscription-client-row{border:1px solid var(--st-border);border-radius:var(--ui-control-radius);background:var(--s2);min-width:0;overflow:hidden}
-.subscription-client-row:has(.subscription-client-toggle input:checked){border-color:color-mix(in srgb,var(--a) 35%,var(--ln))}
+.subscription-client-row{border:1px solid var(--st-border);border-radius:var(--nx-control-radius);background:var(--nx-section-bg);min-width:0;overflow:hidden}
+.subscription-client-row:has(.subscription-client-toggle input:checked){border-color:color-mix(in srgb,var(--a) 35%,var(--nx-border))}
 .subscription-client-toggle{display:flex;align-items:center;gap:.62rem;padding:.7rem .75rem;cursor:pointer;min-width:0}
 .subscription-client-toggle>input{width:1.08rem;height:1.08rem;flex:0 0 auto;accent-color:var(--a)}
-.subscription-client-symbol{width:2.1rem;height:2.1rem;display:grid;place-items:center;background:color-mix(in srgb,var(--a) 10%,var(--s2));color:var(--a);border-radius:10px;flex:0 0 auto;font-size:.74rem;font-weight:750}
+.subscription-client-symbol{width:2.1rem;height:2.1rem;display:grid;place-items:center;background:color-mix(in srgb,var(--a) 10%,var(--nx-section-bg));color:var(--a);border-radius:var(--nx-control-radius);flex:0 0 auto;font-size:.74rem;font-weight:750}
 .subscription-client-name{min-width:0;display:grid;gap:.2rem}
 .subscription-client-name b{font-size:.81rem;line-height:1.4;overflow-wrap:anywhere}
 .subscription-client-name small{font-size:.7rem;line-height:1.4;color:var(--st-muted)}
@@ -153,20 +153,20 @@
   --portal-accent:#e8bb78;--portal-secondary:#c6e985;--portal-bg:#0c131b;--portal-card:#15212b;--portal-text:#ecf3f6;--portal-radius:16px;
 }
 .subscription-preview{
-  background:radial-gradient(ellipse at 92% 3%,color-mix(in srgb,var(--portal-accent) 16%,transparent),transparent 55%),var(--portal-bg);
   color:var(--portal-text);
-  border-radius:var(--portal-radius);
+  border-radius:var(--nx-control-radius);
   min-width:0;
 }
-.subscription-preview[data-portal-theme=light]{background:radial-gradient(ellipse at 92% 3%,color-mix(in srgb,var(--portal-accent) 14%,transparent),transparent 60%),var(--portal-bg);color:var(--portal-text)}
+.subscription-preview[data-portal-theme=light]{color:var(--portal-text)}
 .subscription-preview[data-portal-font=system]{font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
 .subscription-preview[data-portal-font=manrope]{font-family:Manrope,system-ui,sans-serif}
 .subscription-preview[data-portal-font=mono]{font-family:"IBM Plex Mono",monospace}
-.subscription-preview-brand>img{width:2.3rem;height:2.3rem;object-fit:cover;border-radius:calc(var(--portal-radius) * .65);flex:0 0 auto}
+.subscription-preview-brand>img{width:2.3rem;height:2.3rem;object-fit:cover;border-radius:var(--nx-control-radius);flex:0 0 auto}
 .subscription-preview :is(.subscription-preview-meta>div,.subscription-preview-apps,.subscription-preview-quick>span,.subscription-preview-support){
-  border-radius:var(--portal-radius);
+  border-radius:var(--nx-control-radius);
 }
-.subscription-preview .subscription-preview-meta>div,.subscription-preview .subscription-preview-apps{
+.subscription-preview .subscription-preview-meta>div,
+.subscription-preview .subscription-preview-apps{
   background:var(--portal-card);border:1px solid color-mix(in srgb,var(--portal-text) 16%,transparent)
 }
 .subscription-preview[data-portal-theme=light] .subscription-preview-meta>div{background:var(--portal-card);border-color:color-mix(in srgb,var(--portal-text) 14%,transparent)}
@@ -183,16 +183,18 @@
 .subscription-preview-apps>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem}
 .subscription-preview-apps[data-client-layout=list]>div{grid-template-columns:1fr}
 .subscription-preview-app{display:flex;gap:.45rem;align-items:center;min-width:0}
-.subscription-preview-app>span{display:grid;place-items:center;flex:0 0 auto;width:1.85rem;height:1.85rem;border:1px solid color-mix(in srgb,var(--portal-accent) 28%,transparent);color:var(--portal-accent);font-weight:750;font-size:.7rem;border-radius:.6rem}
+.subscription-preview-app>span{display:grid;place-items:center;flex:0 0 auto;width:1.85rem;height:1.85rem;border:1px solid color-mix(in srgb,var(--portal-accent) 28%,transparent);color:var(--portal-accent);font-weight:750;font-size:.7rem;border-radius:var(--nx-control-radius)}
 .subscription-preview-app>div{display:grid;gap:.08rem;min-width:0}
 .subscription-preview-app b{font-size:.72rem;overflow-wrap:anywhere}
 .subscription-preview-app small{font-size:.61rem;color:color-mix(in srgb,var(--portal-text) 65%,transparent);overflow-wrap:anywhere}
 .subscription-preview-quick{display:flex;gap:.5rem;flex-wrap:wrap}
-.subscription-preview-quick>span,.subscription-preview-support{padding:.55rem .75rem;border:1px solid color-mix(in srgb,var(--portal-text) 19%,transparent);font-size:.73rem}
+.subscription-preview-quick>span,
+.subscription-preview-support{padding:.55rem .75rem;border:1px solid color-mix(in srgb,var(--portal-text) 19%,transparent);font-size:.73rem}
 .subscription-preview-support{color:var(--portal-accent);text-align:center;font-weight:750}
-.subscription-preview [hidden]{display:none!important}
+.subscription-preview [hidden]{display:none}
 @media(max-width:1050px){.subscription-color-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:720px){.subscription-client-editor,.subscription-visibility{grid-template-columns:1fr}.subscription-color-grid{grid-template-columns:1fr}}
+@media(max-width:720px){.subscription-client-editor,
+.subscription-visibility{grid-template-columns:1fr}.subscription-color-grid{grid-template-columns:1fr}}
 
 
 /* Editable custom client entries share the built-in catalog's visual language. */
@@ -210,7 +212,7 @@
 .subscription-custom-details{display:grid;gap:.65rem;padding:.5rem .8rem .85rem}
 .subscription-custom-details .subscription-field{margin:0}
 .subscription-custom-details .subscription-field input{width:100%}
-.subscription-client-custom:has([data-custom-field=enabled]:checked){border-color:color-mix(in srgb,var(--a) 35%,var(--ln))}
+.subscription-client-custom:has([data-custom-field=enabled]:checked){border-color:color-mix(in srgb,var(--a) 35%,var(--nx-border))}
 @media(max-width:780px){
   .subscription-custom-header{flex-wrap:wrap}
   .subscription-custom-name{flex-basis:calc(100% - 4.5rem)}
@@ -220,9 +222,9 @@
 /* Portal theme linkage, visually grouped with the portal palette. */
 .subscription-theme-sync{
  display:flex;align-items:flex-start;gap:.75rem;padding:.88rem 1rem;
- border:1px solid color-mix(in srgb,var(--a) 24%,var(--ln));
- border-radius:var(--ui-control-radius);
- background:color-mix(in srgb,var(--a) 5%,var(--s1));
+ border:1px solid color-mix(in srgb,var(--a) 24%,var(--nx-border));
+ border-radius:var(--nx-control-radius);
+ background:color-mix(in srgb,var(--a) 5%,var(--nx-panel-bg));
  color:var(--tx);cursor:pointer;
 }
 .subscription-theme-sync input[type=checkbox]{
@@ -242,8 +244,8 @@
 .subscription-preview-brand [data-subscription-brand]{min-width:0;overflow-wrap:anywhere}
 .subscription-preview-languages{display:inline-flex;margin-inline-start:auto;padding:3px;gap:3px;
  border:1px solid color-mix(in srgb,var(--portal-text) 16%,transparent);
- border-radius:calc(var(--portal-radius,16px)*.65);background:color-mix(in srgb,var(--portal-text) 5%,transparent)}
-.subscription-preview-languages button{appearance:none;border:0;border-radius:calc(var(--portal-radius,16px)*.46);
+ border-radius:var(--nx-control-radius);background:color-mix(in srgb,var(--portal-text) 5%,transparent)}
+.subscription-preview-languages button{appearance:none;border:0;border-radius:var(--nx-control-radius);
  color:var(--portal-text);font:inherit;font-weight:800;font-size:.7rem;cursor:pointer;
  background:transparent;padding:.3rem .55rem;min-height:1.8rem;transition:background .15s,color .15s}
 .subscription-preview-languages button:hover{background:color-mix(in srgb,var(--portal-text) 11%,transparent)}

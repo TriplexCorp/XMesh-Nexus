@@ -4,7 +4,7 @@ const assert=require('node:assert/strict');
 const crypto=require('node:crypto');
 // Node 24 supplies a read-only global WebCrypto implementation.
 assert(global.crypto?.subtle, 'Node WebCrypto required for X25519 tests');
-const gen=require('../client-config.js');
+const gen=require('../js/features/users/client-config.js');
 (async()=>{
  const user={id:17,username:'user17',xrayId:crypto.randomUUID(),squads:[5]};
  const privateRaw=Buffer.alloc(32,7);

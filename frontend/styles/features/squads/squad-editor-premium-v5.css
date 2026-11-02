@@ -2,19 +2,13 @@
  * Visual layer only. No CRUD, preview, Xray, API or subscription behavior changes. */
 
 dialog#dlg.squad-wide{
-  width:min(1320px,calc(100vw - 36px))!important;
-  inline-size:min(1320px,calc(100vw - 36px))!important;
+  width:min(1320px,calc(100vw - 36px));
+  inline-size:min(1320px,calc(100vw - 36px));
   max-height:min(95dvh,1020px);
   padding:0;
   border:0;
   background:transparent;
   overflow:visible;
-}
-
-dialog#dlg.squad-wide::backdrop{
-  background:var(--xm-modal-dim);
-  -webkit-backdrop-filter:blur(var(--xm-modal-blur));
-  backdrop-filter:blur(var(--xm-modal-blur));
 }
 
 dialog#dlg.squad-wide > form.box{
@@ -27,21 +21,21 @@ dialog#dlg.squad-wide > form.box{
   gap:0;
   overflow:hidden;
   border:1px solid var(--border-strong);
-  border-radius:24px;
-  background:linear-gradient(180deg,color-mix(in srgb,var(--s2) 34%,var(--s1)),var(--s1) 28%);
-  box-shadow:0 38px 96px -38px rgba(0,0,0,.82),0 1px 0 rgba(255,255,255,.03) inset;
+  border-radius:var(--nx-card-radius);
+  background:var(--nx-dialog-bg);
+  box-shadow:var(--nx-dialog-shadow);
 }
 
-dialog#dlg.squad-wide > form.box::before{display:none!important}
+dialog#dlg.squad-wide > form.box::before{display:none}
 
 dialog#dlg.squad-wide > form.box > h2{
   flex:0 0 auto;
   position:relative;
   margin:0;
   padding:30px 34px 25px 36px;
-  border-bottom:1px solid var(--ln);
+  border-bottom:1px solid var(--nx-border);
   color:var(--tx);
-  background:color-mix(in srgb,var(--s1) 96%,var(--s2));
+  background:var(--nx-dialog-bg);
   font-size:1.58rem;
   line-height:1.13;
   font-weight:800;
@@ -53,10 +47,10 @@ dialog#dlg.squad-wide > form.box > h2::before{
   display:table;
   margin:0 0 10px;
   padding:6px 9px 5px;
-  border:1px solid color-mix(in srgb,var(--a) 30%,var(--ln));
+  border:1px solid color-mix(in srgb,var(--a) 30%,var(--nx-border));
   border-radius:999px;
   color:var(--a);
-  background:color-mix(in srgb,var(--a) 6%,var(--s1));
+  background:var(--nx-dialog-bg);
   font-size:.60rem;
   line-height:1;
   font-weight:840;
@@ -104,13 +98,13 @@ dialog#dlg.squad-wide .squad-editor-layout > section{
   min-height:0;
   padding:21px;
   gap:15px;
-  border:1px solid var(--ln);
-  border-radius:18px;
-  background:color-mix(in srgb,var(--s2) 33%,var(--s1));
+  border:1px solid var(--nx-border);
+  border-radius:var(--nx-card-radius);
+  background:color-mix(in srgb,var(--nx-section-bg) 33%,var(--nx-panel-bg));
   box-shadow:0 1px 0 rgba(255,255,255,.02) inset;
 }
 
-dialog#dlg.squad-wide .squad-editor-layout > section::before{display:none!important}
+dialog#dlg.squad-wide .squad-editor-layout > section::before{display:none}
 
 dialog#dlg.squad-wide .node-form-section-title{
   display:flex;
@@ -159,9 +153,9 @@ dialog#dlg.squad-wide .squad-editor-fields :is(input,textarea){
   width:100%;
   min-height:49px;
   padding:0 14px;
-  border:1px solid var(--ln);
-  border-radius:12px;
-  background:color-mix(in srgb,var(--s1) 91%,var(--s2));
+  border:1px solid var(--nx-border);
+  border-radius:var(--nx-card-radius);
+  background:color-mix(in srgb,var(--nx-panel-bg) 91%,var(--nx-section-bg));
   color:var(--tx);
   box-shadow:none;
   transition:border-color .15s,background .15s,box-shadow .15s;
@@ -175,13 +169,13 @@ dialog#dlg.squad-wide .squad-editor-fields textarea{
 }
 
 dialog#dlg.squad-wide .squad-editor-fields :is(input,textarea):hover{
-  border-color:color-mix(in srgb,var(--a) 18%,var(--ln));
+  border-color:color-mix(in srgb,var(--a) 18%,var(--nx-border));
 }
 
 dialog#dlg.squad-wide .squad-editor-fields :is(input,textarea):focus{
   outline:0;
-  border-color:color-mix(in srgb,var(--a) 58%,var(--ln));
-  background:var(--s1);
+  border-color:color-mix(in srgb,var(--a) 58%,var(--nx-border));
+  background:var(--nx-panel-bg);
   box-shadow:0 0 0 3px color-mix(in srgb,var(--a) 9%,transparent);
 }
 
@@ -203,10 +197,10 @@ dialog#dlg.squad-wide .squad-selected-count{
   flex:none;
   min-width:82px;
   padding:6px 10px;
-  border:1px solid color-mix(in srgb,var(--a) 28%,var(--ln));
+  border:1px solid color-mix(in srgb,var(--a) 28%,var(--nx-border));
   border-radius:999px;
   color:var(--a);
-  background:color-mix(in srgb,var(--a) 6%,var(--s1));
+  background:color-mix(in srgb,var(--a) 6%,var(--nx-panel-bg));
   box-shadow:none;
   text-align:center;
   font-size:.65rem;
@@ -223,28 +217,28 @@ dialog#dlg.squad-wide .squad-editor-toolbar{
 dialog#dlg.squad-wide .squad-inbound-search{
   min-width:0;
   height:43px;
-  border:1px solid var(--ln);
-  border-radius:11px;
-  background:color-mix(in srgb,var(--s1) 91%,var(--s2));
+  border:1px solid var(--nx-border);
+  border-radius:var(--nx-card-radius);
+  background:color-mix(in srgb,var(--nx-panel-bg) 91%,var(--nx-section-bg));
   box-shadow:none;
 }
 
 dialog#dlg.squad-wide .squad-inbound-search:hover{
-  border-color:color-mix(in srgb,var(--a) 18%,var(--ln));
+  border-color:color-mix(in srgb,var(--a) 18%,var(--nx-border));
 }
 
 dialog#dlg.squad-wide .squad-inbound-search:focus-within{
-  border-color:color-mix(in srgb,var(--a) 52%,var(--ln));
-  background:var(--s1);
+  border-color:color-mix(in srgb,var(--a) 52%,var(--nx-border));
+  background:var(--nx-panel-bg);
   box-shadow:0 0 0 3px color-mix(in srgb,var(--a) 8%,transparent);
 }
 
 dialog#dlg.squad-wide .squad-editor-toolbar .gh{
   min-height:43px;
   padding-inline:13px;
-  border-color:var(--ln);
-  border-radius:11px;
-  background:color-mix(in srgb,var(--s1) 82%,var(--s2));
+  border-color:var(--nx-border);
+  border-radius:var(--nx-card-radius);
+  background:color-mix(in srgb,var(--nx-panel-bg) 82%,var(--nx-section-bg));
   box-shadow:none;
   font-size:.70rem;
   font-weight:740;
@@ -252,8 +246,8 @@ dialog#dlg.squad-wide .squad-editor-toolbar .gh{
 }
 
 dialog#dlg.squad-wide .squad-editor-toolbar .gh:hover{
-  border-color:color-mix(in srgb,var(--a) 22%,var(--ln));
-  background:color-mix(in srgb,var(--a) 4%,var(--s1));
+  border-color:color-mix(in srgb,var(--a) 22%,var(--nx-border));
+  background:color-mix(in srgb,var(--a) 4%,var(--nx-panel-bg));
 }
 
 dialog#dlg.squad-wide .squad-inbound-list{
@@ -284,26 +278,26 @@ dialog#dlg.squad-wide .squad-inbound-row{
   min-width:0;
   min-height:56px;
   padding:11px 12px;
-  border:1px solid var(--ln);
-  border-radius:12px;
-  background:color-mix(in srgb,var(--s1) 86%,var(--s2));
+  border:1px solid var(--nx-border);
+  border-radius:var(--nx-card-radius);
+  background:color-mix(in srgb,var(--nx-panel-bg) 86%,var(--nx-section-bg));
   box-shadow:none;
   cursor:pointer;
   overflow:hidden;
   transition:border-color .15s,background .15s,transform .12s;
 }
 
-dialog#dlg.squad-wide .squad-inbound-row::before{display:none!important}
+dialog#dlg.squad-wide .squad-inbound-row::before{display:none}
 
 dialog#dlg.squad-wide .squad-inbound-row:hover{
   transform:translateY(-1px);
-  border-color:color-mix(in srgb,var(--a) 25%,var(--ln));
-  background:color-mix(in srgb,var(--a) 3%,var(--s1));
+  border-color:color-mix(in srgb,var(--a) 25%,var(--nx-border));
+  background:color-mix(in srgb,var(--a) 3%,var(--nx-panel-bg));
 }
 
 dialog#dlg.squad-wide .squad-inbound-row:has(input:checked){
-  border-color:color-mix(in srgb,var(--a) 45%,var(--ln));
-  background:color-mix(in srgb,var(--a) 7%,var(--s1));
+  border-color:color-mix(in srgb,var(--a) 45%,var(--nx-border));
+  background:color-mix(in srgb,var(--a) 7%,var(--nx-panel-bg));
   box-shadow:0 0 0 1px color-mix(in srgb,var(--a) 7%,transparent) inset;
 }
 
@@ -341,19 +335,19 @@ dialog#dlg.squad-wide .squad-inbound-copy small{
 
 dialog#dlg.squad-wide .squad-inbound-hosts{
   padding:5px 8px;
-  border:1px solid var(--ln);
+  border:1px solid var(--nx-border);
   border-radius:999px;
   color:color-mix(in srgb,var(--tx) 55%,var(--mu));
-  background:color-mix(in srgb,var(--s2) 46%,var(--s1));
+  background:color-mix(in srgb,var(--nx-section-bg) 46%,var(--nx-panel-bg));
   font-size:.61rem;
   font-weight:730;
   white-space:nowrap;
 }
 
 dialog#dlg.squad-wide .squad-inbound-row:has(input:checked) .squad-inbound-hosts{
-  border-color:color-mix(in srgb,var(--a) 20%,var(--ln));
+  border-color:color-mix(in srgb,var(--a) 20%,var(--nx-border));
   color:color-mix(in srgb,var(--a) 75%,var(--tx));
-  background:color-mix(in srgb,var(--a) 5%,var(--s1));
+  background:color-mix(in srgb,var(--a) 5%,var(--nx-panel-bg));
 }
 
 dialog#dlg.squad-wide .squad-help,
@@ -366,8 +360,8 @@ dialog#dlg.squad-wide .squad-inbound-empty{
 dialog#dlg.squad-wide .squad-editor-side{
   grid-column:1/-1;
   padding:19px 20px 20px;
-  border-color:var(--ln);
-  background:color-mix(in srgb,var(--s2) 30%,var(--s1));
+  border-color:var(--nx-border);
+  background:color-mix(in srgb,var(--nx-section-bg) 30%,var(--nx-panel-bg));
 }
 
 dialog#dlg.squad-wide .squad-editor-side .node-form-section-title{
@@ -393,18 +387,18 @@ dialog#dlg.squad-wide .squad-preview-stat{
   min-width:0;
   min-height:74px;
   padding:13px 14px;
-  border:1px solid var(--ln);
-  border-radius:13px;
-  background:color-mix(in srgb,var(--s1) 84%,var(--s2));
+  border:1px solid var(--nx-border);
+  border-radius:var(--nx-card-radius);
+  background:color-mix(in srgb,var(--nx-panel-bg) 84%,var(--nx-section-bg));
   box-shadow:none;
   overflow:hidden;
 }
 
-dialog#dlg.squad-wide .squad-preview-stat::before{display:none!important}
+dialog#dlg.squad-wide .squad-preview-stat::before{display:none}
 
 dialog#dlg.squad-wide .squad-preview-stat:first-child{
-  border-color:color-mix(in srgb,var(--a) 14%,var(--ln));
-  background:color-mix(in srgb,var(--a) 3%,var(--s1));
+  border-color:color-mix(in srgb,var(--a) 14%,var(--nx-border));
+  background:color-mix(in srgb,var(--a) 3%,var(--nx-panel-bg));
 }
 
 dialog#dlg.squad-wide .squad-preview-stat b{
@@ -432,9 +426,9 @@ dialog#dlg.squad-wide .squad-preview-section{
   min-width:0;
   min-height:70px;
   padding:11px 12px;
-  border:1px solid var(--ln);
-  border-radius:12px;
-  background:color-mix(in srgb,var(--s1) 75%,var(--s2));
+  border:1px solid var(--nx-border);
+  border-radius:var(--nx-card-radius);
+  background:color-mix(in srgb,var(--nx-panel-bg) 75%,var(--nx-section-bg));
 }
 
 dialog#dlg.squad-wide .squad-preview-section > b{
@@ -455,9 +449,9 @@ dialog#dlg.squad-wide .squad-user-chip,
 dialog#dlg.squad-wide .squad-preview-list > *{
   max-width:100%;
   padding:5px 8px;
-  border:1px solid var(--ln);
+  border:1px solid var(--nx-border);
   border-radius:999px;
-  background:color-mix(in srgb,var(--s2) 45%,var(--s1));
+  background:color-mix(in srgb,var(--nx-section-bg) 45%,var(--nx-panel-bg));
   color:color-mix(in srgb,var(--tx) 52%,var(--mu));
   font-size:.61rem;
   line-height:1.2;
@@ -475,9 +469,9 @@ dialog#dlg.squad-wide .squad-preview-ready{
   grid-column:1/-1;
   margin:0;
   padding:10px 12px 10px 31px;
-  border:1px solid color-mix(in srgb,var(--wr) 26%,var(--ln));
-  border-radius:11px;
-  background:color-mix(in srgb,var(--wr) 5%,var(--s1));
+  border:1px solid color-mix(in srgb,var(--wr) 26%,var(--nx-border));
+  border-radius:var(--nx-card-radius);
+  background:color-mix(in srgb,var(--wr) 5%,var(--nx-panel-bg));
   color:var(--wr);
   font-size:.66rem;
   line-height:1.5;
@@ -499,8 +493,8 @@ dialog#dlg.squad-wide .squad-preview-ready::before{
 }
 
 dialog#dlg.squad-wide .squad-preview-ready{
-  border-color:color-mix(in srgb,var(--ok) 25%,var(--ln));
-  background:color-mix(in srgb,var(--ok) 5%,var(--s1));
+  border-color:color-mix(in srgb,var(--ok) 25%,var(--nx-border));
+  background:color-mix(in srgb,var(--ok) 5%,var(--nx-panel-bg));
   color:var(--ok);
 }
 
@@ -523,9 +517,9 @@ dialog#dlg.squad-wide > form.box > .act{
   gap:10px;
   margin:0;
   padding:14px 20px 15px;
-  border-top:1px solid var(--ln);
-  background:color-mix(in srgb,var(--s1) 97%,var(--s2));
-  box-shadow:none;
+  border-top:1px solid var(--nx-border);
+  background:var(--nx-dialog-bg);
+  box-shadow:var(--nx-dialog-shadow);
   -webkit-backdrop-filter:none;
   backdrop-filter:none;
 }
@@ -535,31 +529,31 @@ dialog#dlg.squad-wide > form.box > .act .btn,
 dialog#dlg.squad-wide > form.box > .act .dg{
   min-height:44px;
   padding-inline:18px;
-  border-radius:11px;
+  border-radius:var(--nx-card-radius);
   font-weight:760;
   transition:transform .12s,border-color .15s,background .15s,box-shadow .15s;
 }
 
 dialog#dlg.squad-wide > form.box > .act .gh{
-  border-color:var(--ln);
-  background:color-mix(in srgb,var(--s1) 82%,var(--s2));
+  border-color:var(--nx-border);
+  background:var(--nx-dialog-bg);
 }
 
 dialog#dlg.squad-wide > form.box > .act .gh:hover{
-  border-color:color-mix(in srgb,var(--a) 20%,var(--ln));
-  background:color-mix(in srgb,var(--a) 4%,var(--s1));
+  border-color:color-mix(in srgb,var(--a) 20%,var(--nx-border));
+  background:var(--nx-dialog-bg);
 }
 
 dialog#dlg.squad-wide > form.box > .act .btn{
   min-width:136px;
-  border-color:color-mix(in srgb,var(--a) 68%,var(--ln));
-  background:var(--a);
-  box-shadow:0 8px 18px -14px color-mix(in srgb,var(--a) 55%,transparent);
+  border-color:color-mix(in srgb,var(--a) 68%,var(--nx-border));
+  background:var(--nx-dialog-bg);
+  box-shadow:var(--nx-dialog-shadow);
 }
 
 dialog#dlg.squad-wide > form.box > .act .btn:hover{
   transform:translateY(-1px);
-  box-shadow:0 10px 20px -14px color-mix(in srgb,var(--a) 66%,transparent);
+  box-shadow:var(--nx-dialog-shadow);
 }
 
 dialog#dlg.squad-wide > form.box > .act :is(.gh,.btn,.dg):active{
@@ -568,8 +562,8 @@ dialog#dlg.squad-wide > form.box > .act :is(.gh,.btn,.dg):active{
 
 @media(min-width:1800px){
   dialog#dlg.squad-wide{
-    width:min(1460px,80vw)!important;
-    inline-size:min(1460px,80vw)!important;
+    width:min(1460px,80vw);
+    inline-size:min(1460px,80vw);
   }
   dialog#dlg.squad-wide .squad-editor-layout{
     grid-template-columns:minmax(0,.76fr) minmax(0,1.24fr);
@@ -580,8 +574,8 @@ dialog#dlg.squad-wide > form.box > .act :is(.gh,.btn,.dg):active{
 
 @media(max-width:980px){
   dialog#dlg.squad-wide{
-    width:calc(100vw - 22px)!important;
-    inline-size:calc(100vw - 22px)!important;
+    width:calc(100vw - 22px);
+    inline-size:calc(100vw - 22px);
   }
   dialog#dlg.squad-wide .squad-editor-layout{
     grid-template-columns:minmax(0,1fr);
@@ -591,26 +585,26 @@ dialog#dlg.squad-wide > form.box > .act :is(.gh,.btn,.dg):active{
   dialog#dlg.squad-wide [data-squad-preview]{grid-template-columns:repeat(2,minmax(0,1fr))}
   dialog#dlg.squad-wide .squad-preview-stats{grid-column:1/-1;grid-template-columns:repeat(4,minmax(0,1fr))}
   dialog#dlg.squad-wide .squad-preview-warnings,
-  dialog#dlg.squad-wide .squad-preview-ready{grid-column:1/-1}
+dialog#dlg.squad-wide .squad-preview-ready{grid-column:1/-1}
 }
 
 @media(max-width:760px){
-  dialog#dlg.squad-wide > form.box{border-radius:19px}
+  dialog#dlg.squad-wide > form.box{border-radius:var(--nx-card-radius)}
   dialog#dlg.squad-wide > form.box > h2{padding:25px 22px 21px 26px;font-size:1.4rem}
   dialog#dlg.squad-wide .squad-editor-layout{padding:13px;gap:13px}
-  dialog#dlg.squad-wide .squad-editor-layout > section{padding:17px;border-radius:16px}
+  dialog#dlg.squad-wide .squad-editor-layout > section{padding:17px;border-radius:var(--nx-card-radius)}
   dialog#dlg.squad-wide [data-squad-preview]{grid-template-columns:minmax(0,1fr)}
   dialog#dlg.squad-wide .squad-preview-stats{grid-column:auto;grid-template-columns:repeat(2,minmax(0,1fr))}
   dialog#dlg.squad-wide .squad-preview-warnings,
-  dialog#dlg.squad-wide .squad-preview-ready{grid-column:auto}
+dialog#dlg.squad-wide .squad-preview-ready{grid-column:auto}
 }
 
 @media(max-width:620px){
   dialog#dlg.squad-wide{
-    width:calc(100vw - 14px)!important;
-    inline-size:calc(100vw - 14px)!important;
+    width:calc(100vw - 14px);
+    inline-size:calc(100vw - 14px);
   }
-  dialog#dlg.squad-wide > form.box{border-radius:16px}
+  dialog#dlg.squad-wide > form.box{border-radius:var(--nx-card-radius)}
   dialog#dlg.squad-wide > form.box > h2{padding:22px 18px 18px 21px;font-size:1.28rem}
   dialog#dlg.squad-wide > form.box > h2::after{font-size:.71rem}
   dialog#dlg.squad-wide .squad-editor-toolbar{grid-template-columns:1fr 1fr}
@@ -621,7 +615,7 @@ dialog#dlg.squad-wide > form.box > .act :is(.gh,.btn,.dg):active{
   dialog#dlg.squad-wide .squad-preview-stats{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
   dialog#dlg.squad-wide > form.box > .act{padding:12px 13px;flex-wrap:wrap}
   dialog#dlg.squad-wide > form.box > .act .gh,
-  dialog#dlg.squad-wide > form.box > .act .btn{flex:1;min-width:0}
+dialog#dlg.squad-wide > form.box > .act .btn{flex:1;min-width:0}
 }
 
 @media(max-height:760px) and (min-width:761px){
@@ -633,7 +627,7 @@ dialog#dlg.squad-wide > form.box > .act :is(.gh,.btn,.dg):active{
 }
 
 @media(prefers-reduced-motion:reduce){
-  dialog#dlg.squad-wide *{scroll-behavior:auto!important}
+  dialog#dlg.squad-wide *{scroll-behavior:auto}
   dialog#dlg.squad-wide .squad-inbound-row,
-  dialog#dlg.squad-wide > form.box > .act :is(.gh,.btn,.dg){transition:none!important}
+dialog#dlg.squad-wide > form.box > .act :is(.gh,.btn,.dg){transition:none}
 }

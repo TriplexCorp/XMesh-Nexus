@@ -21,7 +21,7 @@ const legacy=fs.readFileSync('backend/src/node_runtime_legacy.rs','utf8');
 const api=entry+'\n'+legacy;
 const router=fs.readFileSync('backend/src/main.rs','utf8');
 const agent=fs.readFileSync('deploy/node-control-agent.sh','utf8');
-const frontend=fs.readFileSync('app.js','utf8');
+const frontend=fs.readFileSync('frontend/js/core/app.js','utf8');
 assert.match(router,/\/nodes\/\{id\}\/xray-update/);
 assert.match(api,/pub async fn request_xray_update/);
 // v6 shadows request_restart and request_xray_update in the same overlay. Scope

@@ -3,7 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const appPath = path.join(__dirname, '..', 'app.js');
+const appPath = path.join(__dirname, '..', 'frontend/js/core/app.js');
 const source = fs.readFileSync(appPath, 'utf8');
 const lines = source.split(/\r?\n/);
 const issues = [];
@@ -21,7 +21,7 @@ for (let index = 0; index < lines.length; index += 1) {
 }
 
 // Keep the primary transport step and panel from disappearing in refactors.
-const studioSource = fs.readFileSync(path.join(__dirname, '..', 'xray-studio-v4.js'), 'utf8');
+const studioSource = fs.readFileSync(path.join(__dirname, '..', 'frontend/js/features/xray-studio/xray-studio-v4.js'), 'utf8');
 const requiredFragments = [
   ['transport selection', "select('transport','Транспорт'"],
   ['active Studio editor', 'data-v="source"'],
@@ -33,8 +33,8 @@ for (const [label, fragment] of requiredFragments) {
 
 
 // XRAY STUDIO constructor must blur the entire application, including the rail.
-const studio = fs.readFileSync(path.join(__dirname, '..', 'xray-studio-v4.js'), 'utf8');
-const studioCss = fs.readFileSync(path.join(__dirname, '..', 'xray-studio-v4.css'), 'utf8');
+const studio = fs.readFileSync(path.join(__dirname, '..', 'frontend/js/features/xray-studio/xray-studio-v4.js'), 'utf8');
+const studioCss = fs.readFileSync(path.join(__dirname, '..', 'frontend/styles/features/xray-studio/xray-studio-v4.css'), 'utf8');
 if (!studio.includes("portal.className='sv-studio sv-studio-portal'")) issues.push('XRAY STUDIO composer portal missing');
 if (!studio.includes('document.body.append(portal)')) issues.push('XRAY STUDIO composer not mounted on body');
 if (!studio.includes('overlayWatch.observe(overlayElement')) issues.push('XRAY STUDIO portal close cleanup missing');

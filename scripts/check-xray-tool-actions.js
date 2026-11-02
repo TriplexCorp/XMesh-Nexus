@@ -5,11 +5,11 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 const {webcrypto}=require('node:crypto');
 
-const source=fs.readFileSync('xray-studio-tools.js','utf8');
-const studio=fs.readFileSync('xray-studio-v4.js','utf8');
+const source=fs.readFileSync('frontend/js/features/xray-studio/xray-studio-tools.js','utf8');
+const studio=fs.readFileSync('frontend/js/features/xray-studio/xray-studio-v4.js','utf8');
 // Regression: the more-specific global dialog selector used to squeeze
 // FinalMask's multi-column catalog into a 30rem popup.
-const studioCss=fs.readFileSync('xray-studio-v4.css','utf8');
+const studioCss=fs.readFileSync('frontend/styles/features/xray-studio/xray-studio-v4.css','utf8');
 assert.ok(studioCss.includes('dialog.xm-studio-modal.xm-studio-modal--cards{'),
  'FinalMask must scope its width rule to the native dialog');
 assert.ok(studioCss.includes('width:min(84rem,calc(100vw - 2rem))!important'),

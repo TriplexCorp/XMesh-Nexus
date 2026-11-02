@@ -27,7 +27,7 @@ for(const stale of [
 for(const required of [
   'frontend/index.html',
   'frontend/login.html',
-  'frontend/styles/legacy/styles.css',
+  'frontend/styles/system/nexus-v3-foundation.css',
   'frontend/styles/system/nexus-ui-v3.css',
   'frontend/js/core/app.js',
   'frontend/js/features/xray-studio/xray-studio-v4.js',

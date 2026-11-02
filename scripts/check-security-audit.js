@@ -3,8 +3,8 @@
 const fs=require('node:fs');
 const assert=require('node:assert/strict');
 const read=p=>fs.readFileSync(p,'utf8');
-const app=read('app.js'),html=read('index.html'),css=read('styles.css');
-const studio=read('subscription-studio.js');
+const app=read('frontend/js/core/app.js'),html=read('frontend/index.html'),css=read('frontend/styles/legacy/styles.css');
+const studio=read('frontend/js/features/subscriptions/subscription-studio.js');
 const main=read('backend/src/main.rs');
 const auth=read('backend/src/auth.rs');
 const mfa=read('backend/src/mfa.rs');

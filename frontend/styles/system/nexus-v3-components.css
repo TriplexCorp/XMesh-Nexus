@@ -1,283 +1,186 @@
-/* XMesh Nexus Design System v3 / Components
- * Reusable visual primitives only. Page geometry belongs in nexus-v3-layout.css.
- */
+/* Shared components. Geometry unique to a feature belongs to that feature.
+ * Every component consumes the same foundation material and interaction tokens. */
+button{min-height:var(--nx-control-h-sm);border-radius:var(--nx-control-radius);transition:background-color var(--nx-duration),border-color var(--nx-duration),color var(--nx-duration)}
+button:disabled{opacity:.5;cursor:not-allowed}
+button:not(:disabled):hover{background:var(--nx-hover-bg)}
+button svg{flex:none}
+.ic{width:1.1rem;height:1.1rem;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.mu{color:var(--mu)}.er{color:var(--er)}
+.note,.hd p{color:var(--nx-muted);font-size:.8rem;line-height:1.55}
+.card,[data-ui-surface=panel]{min-width:0;align-self:start;padding:var(--nx-card-pad);background:var(--nx-panel-bg);border:1px solid var(--nx-border);border-radius:var(--nx-card-radius);box-shadow:var(--nx-panel-shadow);backdrop-filter:var(--nx-backdrop);-webkit-backdrop-filter:var(--nx-backdrop)}
+[data-ui-surface=section]{min-width:0;padding:var(--nx-section-pad);background:var(--nx-section-bg);border:1px solid var(--nx-border);border-radius:var(--nx-section-radius);box-shadow:var(--nx-section-shadow)}
+[data-ui-surface=item],[data-ui-surface=metric]{min-width:0;background:var(--nx-item-bg);border:1px solid var(--nx-border);border-radius:var(--nx-item-radius);box-shadow:var(--nx-item-shadow)}
+[data-ui-surface=floating]{background:var(--nx-floating-bg);border:1px solid var(--nx-border-strong);border-radius:var(--nx-section-radius);box-shadow:var(--nx-floating-shadow);backdrop-filter:var(--nx-backdrop)}
+.card .card{box-shadow:none}
+.btn,.gh,.dg,.ib,.ia{display:inline-flex;align-items:center;justify-content:center;gap:.45rem;min-width:0;min-height:var(--nx-control-h);padding:.55rem .85rem;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-control-bg);box-shadow:var(--nx-control-shadow);color:var(--tx);font-size:.82rem;font-weight:650;text-decoration:none;white-space:nowrap}
+.btn{background:var(--a);border-color:var(--a);color:var(--btn-text);font-weight:750}
+.btn:not(:disabled):hover{background:color-mix(in srgb,var(--a) 88%,var(--tx))}
+.dg{color:var(--er)}
+.dg:not(:disabled):hover{background:color-mix(in srgb,var(--er) 9%,var(--nx-control-bg));border-color:color-mix(in srgb,var(--er) 35%,var(--nx-border))}
+.gh:not(:disabled):hover,.ib:not(:disabled):hover,.ia:not(:disabled):hover{background:var(--nx-hover-bg);border-color:var(--nx-hover-border)}
+.ib,.ia{flex:none;width:var(--nx-control-h);height:var(--nx-control-h);padding:0;color:var(--mu)}
+.sm{min-height:var(--nx-control-h-sm);height:auto;padding:.4rem .65rem;font-size:.76rem}
+.btn .ic,.gh .ic,.dg .ic,.ib .ic,.ia .ic{width:1rem;height:1rem}
+.pip{position:absolute;top:.45rem;right:.45rem;width:.4rem;height:.4rem;border-radius:50%;background:var(--er)}
+.ib{position:relative}
+[data-theme=dark] .sun,[data-theme=light] .moon{display:none}
+input:not([type=range]):not([type=checkbox]):not([type=radio]),select,textarea,.xm-select-trigger{width:100%;min-width:0;min-height:var(--nx-control-h);padding:.55rem .75rem;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-control-bg);box-shadow:var(--nx-control-shadow);color:var(--tx);font:inherit;font-size:.85rem;line-height:1.4}
+textarea{height:auto;resize:vertical;white-space:pre;line-height:1.55;tab-size:2}
+input[type=checkbox],input[type=radio]{width:1.05rem;height:1.05rem;accent-color:var(--a);flex:none;cursor:pointer}
+input::placeholder,textarea::placeholder{color:var(--mu);opacity:.8}
+:where(input,select,textarea):disabled{opacity:.55;cursor:not-allowed}
+.f{display:grid;gap:.4rem;min-width:0}
+.f>span{font-size:.76rem;font-weight:650;color:var(--mu);line-height:1.4}
+.f small{color:var(--mu);font-size:.72rem;line-height:1.5}
+.seg,.choice{display:inline-flex;align-items:center;flex-wrap:wrap;gap:.2rem;width:fit-content;max-width:100%;padding:.2rem;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-control-bg)}
+.seg button,.choice button{min-width:0;min-height:var(--nx-control-h-sm);padding:.4rem .65rem;border:1px solid transparent;border-radius:max(.2rem,calc(var(--nx-control-radius) - .2rem));color:var(--mu);font-size:.76rem;font-weight:600;line-height:1.3}
+.seg button.on,.choice button.on{background:var(--nx-selected-bg);border-color:var(--nx-selected-border);color:var(--tx)}
+.seg button:not(.on):hover,.choice button:not(.on):hover{background:var(--nx-hover-bg);color:var(--tx)}
+.sw{position:relative;display:inline-block;flex:none;width:2.8rem;height:1.6rem}
+.sw input{position:absolute;inset:0;z-index:1;width:100%;height:100%;opacity:0;cursor:pointer}
+.sw span{position:absolute;inset:0;border:1px solid var(--nx-border);border-radius:999px;background:var(--nx-control-bg)}
+.sw span::after{content:"";position:absolute;top:.2rem;left:.22rem;width:1.1rem;height:1.1rem;border-radius:50%;background:var(--mu);transition:transform var(--nx-duration),background var(--nx-duration)}
+.sw input:checked+span{background:color-mix(in srgb,var(--a) 20%,var(--nx-control-bg))}
+.sw input:checked+span::after{transform:translateX(1.15rem);background:var(--a)}
+.sw input:focus-visible+span{outline:2px solid var(--nx-focus);outline-offset:3px}
+.ms{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem}
+.ck{display:flex;align-items:center;gap:.45rem;padding:.4rem .65rem;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-control-bg);font-size:.8rem;cursor:pointer}
+.ck:has(input:checked){background:var(--nx-selected-bg);border-color:var(--nx-selected-border)}
+.chip,.tag{display:inline-flex;align-items:center;gap:.3rem;width:fit-content;padding:.15rem .55rem;border-radius:999px;background:color-mix(in srgb,var(--c,var(--a)) 12%,var(--nx-item-bg));color:var(--c,var(--a));font-size:.73rem;line-height:1.5;white-space:nowrap}
+.dot{display:inline-block;flex:none;width:.5rem;height:.5rem;border-radius:50%;background:var(--c,var(--ok))}
+.pb{width:min(8rem,30vw);height:.4rem;overflow:hidden;border-radius:999px;background:var(--nx-control-bg)}
+.pb.f{width:100%;display:block}
+.pb i{display:block;width:var(--w,0%);height:100%;border-radius:inherit;background:var(--a);transition:width .4s}
+.pb.wr i{background:var(--wr)}.pb.er i{background:var(--er)}
+.tr{display:flex;align-items:center;gap:.65rem}.tr small{min-width:5rem;color:var(--mu)}
+.av{display:grid;place-items:center;flex:none;width:2.2rem;height:2.2rem;border-radius:50%;overflow:hidden;color:var(--logo-ink);font-weight:700}
+.who{display:flex;align-items:center;gap:.7rem}.who small{display:block;color:var(--mu);font-weight:400}
+.rowi{display:flex;align-items:center;gap:.8rem;padding:.7rem 0;border-top:1px solid var(--nx-separator)}
+.rowi:first-of-type{border-top:0}.rowi>div{flex:1;min-width:0}
+.val,.big{font-size:2rem;font-weight:650;line-height:1.2;letter-spacing:-.04em}
+.val small{font-size:.88rem;color:var(--mu)}
+.lg{display:flex;align-items:baseline;gap:.5rem;color:var(--mu)}
+.lg b{font-size:1.6rem;color:var(--c,var(--tx));font-weight:650}
+.lg i{width:.5rem;height:.5rem;border-radius:2px;background:var(--c,var(--a))}
+.live{display:flex;align-items:baseline;flex-wrap:wrap;gap:1.2rem}
+.fl{display:flex;align-items:center;gap:.3rem;flex-wrap:wrap}
+.fl button{min-height:var(--nx-control-h-sm);padding:.35rem .7rem;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-control-bg);font-size:.8rem;color:var(--mu)}
+.fl button.on{background:var(--nx-selected-bg);border-color:var(--nx-selected-border);color:var(--tx)}
+.fl button b{font-weight:500;opacity:.7}
+.kbd,kbd{display:inline-flex;align-items:center;padding:.1rem .35rem;border:1px solid var(--nx-border);border-radius:.3rem;background:var(--nx-control-bg);color:var(--mu);font-size:.68rem}
+.qr{width:11rem;max-width:100%;justify-self:center;padding:.5rem;border-radius:var(--nx-control-radius);background:#fff}
+.qr svg{display:block;width:100%}
+.lk{display:flex;align-items:center;gap:.5rem;min-width:0}
+.nt{display:grid;padding:.7rem 0;border-top:1px solid var(--nx-separator)}
+.nt:first-of-type{border-top:0}
+.pi{display:flex;align-items:center;gap:.7rem;width:100%;padding:.65rem .8rem;border-radius:var(--nx-control-radius);text-align:left}
+.pi.on{background:var(--nx-selected-bg)}.pi em{margin-left:auto;color:var(--mu);font-style:normal;font-size:.78rem}
 
-html{font-size:calc(clamp(15px,.22vw + 14px,17px)*var(--ts,1))}
-body{line-height:1.52;letter-spacing:-.01em}
-body::before,body::after{opacity:.22;filter:blur(150px);animation:none}
-small{font-size:.82rem}
+/* Tables have one horizontal overflow boundary, owned by the containing .tw. */
+table{width:100%;border-collapse:separate;border-spacing:0;font-size:.84rem}
+th{text-align:left;padding:.65rem .8rem;color:var(--nx-muted);font-size:.67rem;font-weight:650;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;border-bottom:1px solid var(--nx-separator)}
+th button{font:inherit;color:inherit;min-height:0}
+td{padding:.75rem .8rem;border-bottom:1px solid var(--nx-separator);vertical-align:middle;white-space:nowrap}
+tbody tr:last-child td{border-bottom:0}
+tbody tr[data-id],tbody tr[data-e]{cursor:pointer}
+tbody tr:hover td{background:var(--nx-hover-bg)}
+tr.sel td{background:var(--nx-selected-bg)}
+.c1{width:2.4rem}
 
-/* Material surfaces. The body + app scope intentionally matches the
- * specificity of historical html[data-surface=*] selectors in styles.css
- * without creating a second material branch. v3 tokens remain authoritative. */
-body .app .card,
-body .app [data-ui-surface="panel"]{
-  position:relative;
-  min-width:0;
-  padding:var(--nx-card-pad);
-  background:var(--nx-panel-bg);
-  border:1px solid var(--nx-border);
-  border-radius:var(--nx-card-radius);
-  box-shadow:var(--nx-panel-shadow);
-  backdrop-filter:var(--nx-backdrop);
-  -webkit-backdrop-filter:var(--nx-backdrop);
-}
-body .app .card::before{content:none}
-.app [data-ui-surface="section"]{
-  min-width:0;
-  padding:var(--nx-section-pad);
-  background:var(--nx-section-bg);
-  border:1px solid var(--nx-border);
-  border-radius:var(--nx-section-radius);
-  box-shadow:var(--nx-section-shadow);
-}
-.app [data-ui-surface="item"],
-.app [data-ui-surface="metric"]{
-  min-width:0;
-  background:var(--nx-item-bg);
-  border:1px solid var(--nx-border);
-  border-radius:var(--nx-item-radius);
-  box-shadow:var(--nx-item-shadow);
-}
-[data-ui-surface="floating"],
-.xm-select-popover{
-  background:var(--nx-floating-bg);
-  border:1px solid var(--nx-border-strong);
-  border-radius:var(--nx-section-radius);
-  box-shadow:var(--nx-floating-shadow);
-  backdrop-filter:var(--nx-backdrop);
-  -webkit-backdrop-filter:var(--nx-backdrop);
-}
+/* Settings/form row: shared information + bounded control rail. */
+.setting-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:.8rem;align-items:center;padding:.85rem 0;border-top:1px solid var(--nx-separator)}
+.setting-row:first-of-type{border-top:0}
+.setting-copy{display:grid;gap:.2rem;min-width:0}
+.setting-copy :is(b,strong){font-size:.85rem;line-height:1.35;font-weight:650}
+.setting-copy :is(small,p){max-width:36rem;color:var(--nx-muted);font-size:.74rem;line-height:1.5}
+.setting-control{display:flex;align-items:center;justify-content:flex-end;gap:.55rem;flex-wrap:wrap;min-width:0;max-width:36rem;width:100%;justify-self:end}
+.setting-control select{width:auto;max-width:100%}
+.slider-control{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:.65rem;min-width:0;width:100%;max-width:30rem}
+.precision-number{display:inline-flex;align-items:center;gap:.25rem;width:5.8rem;min-height:var(--nx-control-h-sm);padding:.35rem .6rem;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-control-bg)}
+.precision-number input[type=number]{appearance:textfield;width:100%;min-width:0;min-height:0;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;text-align:right;font-size:.8rem}
+.precision-number input::-webkit-inner-spin-button{appearance:none}
+.precision-number span{font-size:.7rem;color:var(--mu)}
+input[type=range]{appearance:none;display:block;width:100%;min-width:0;height:.4rem;border:0;border-radius:999px;padding:0;background:linear-gradient(to right,var(--a) 0%,var(--a) var(--range-pct,0%),color-mix(in srgb,var(--mu) 22%,var(--s2)) var(--range-pct,0%),color-mix(in srgb,var(--mu) 22%,var(--s2)) 100%);cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:.4rem;background:transparent}
+input[type=range]::-moz-range-track{height:.4rem;background:transparent}
+input[type=range]::-webkit-slider-thumb{appearance:none;width:1.05rem;height:1.05rem;margin-top:-.325rem;border:3px solid var(--s1);border-radius:50%;background:var(--a);box-shadow:0 0 0 1px var(--nx-border-strong)}
+input[type=range]::-moz-range-thumb{width:.7rem;height:.7rem;border:3px solid var(--s1);border-radius:50%;background:var(--a)}
+input[type=range]:focus-visible{outline:2px solid var(--nx-focus);outline-offset:6px}
 
-/* One surface owns elevation. Nested groups describe structure, not another
- * stack of shadows. */
-.app .card .card,
-.app [data-ui-surface="panel"] [data-ui-surface="section"],
-.app [data-ui-surface="section"] [data-ui-surface="item"],
-dialog [data-ui-surface="section"],
-dialog [data-ui-surface="item"]{
-  box-shadow:none;
-}
+/* Native dialog owns viewport safety; feature content never owns outer bounds. */
+dialog{--dialog-width:32rem;position:fixed;inset:0;margin:auto;width:min(var(--dialog-width),calc(100vw - 2rem));max-width:calc(100vw - 2rem);max-height:calc(100dvh - 2rem);padding:0;border:0;border-radius:var(--nx-card-radius);background:var(--nx-dialog-bg);color:var(--tx);box-shadow:var(--nx-dialog-shadow);overflow:hidden}
+/* Keep HTML's native open/closed semantics even when feature layout uses flex/grid. */
+dialog:not([open]){display:none}
+.dialog::backdrop,dialog::backdrop{background:var(--xm-modal-dim);backdrop-filter:blur(var(--xm-modal-blur));-webkit-backdrop-filter:blur(var(--xm-modal-blur))}
+:where(dialog)>.box,:where(dialog)>form.box,dialog>.sv-dialog,dialog>.stats-user-dialog,dialog>.crx-dialog{width:100%;min-width:0;min-height:0;max-width:100%;max-height:calc(100dvh - 2rem);overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+.box{display:grid;gap:var(--nx-page-gap);align-content:start;padding:var(--nx-card-pad);border:1px solid var(--nx-border-strong);border-radius:var(--nx-card-radius);background:var(--nx-dialog-bg)}
+.box h2{font-size:1.18rem}
+:where(dialog)>.box>.act,:where(dialog)>form.box>.act{position:sticky;bottom:calc(-1 * var(--nx-card-pad));margin-top:auto;padding-block:.8rem;background:var(--nx-dialog-bg);border-top:1px solid var(--nx-separator);z-index:1}
+:where(dialog) :is(input:not([type=range]):not([type=checkbox]):not([type=radio]),select,textarea){background:var(--nx-dialog-control-bg)}
+dialog.wide{--dialog-width:52rem}
+dialog:is(.user-modal,.node-wide,.host-wide,.squad-wide,[data-dialog-size=workspace]){--dialog-width:132rem}
+dialog:is(.xm-tls-dialog,.xm-reality-dialog){--dialog-width:88rem}
+dialog.sv-overlay{--dialog-width:140rem}
+dialog.pal{--dialog-width:42rem;margin:7vh auto auto}
+dialog.pop{--dialog-width:28rem;inset:1rem 1rem auto auto;margin:0}
+dialog.side{--dialog-width:34rem;inset:0 0 0 auto;margin:0;max-height:100dvh;height:100dvh;max-width:100vw;border-radius:var(--nx-card-radius) 0 0 var(--nx-card-radius)}
+dialog.side>.box{height:100%;max-height:100dvh;border-radius:inherit}
+:where(dialog,.sv-overlay,.crx-dialog,.notification-workspace) :is(button[data-x],button[aria-label^="Закрыть"],.sv-dialog-close,.crx-close,.xm-studio-modal-close){display:inline-flex;align-items:center;justify-content:center;flex:none;width:var(--xm-close-size);min-width:var(--xm-close-size);height:var(--xm-close-size);min-height:var(--xm-close-size);padding:0;border:1px solid var(--nx-border);border-radius:50%;background:var(--nx-control-bg);color:var(--mu)}
+:where(dialog,.sv-overlay,.crx-dialog,.notification-workspace) :is(button[data-x],button[aria-label^="Закрыть"],.sv-dialog-close,.crx-close,.xm-studio-modal-close) svg{width:var(--xm-close-glyph-size);height:var(--xm-close-glyph-size)}
 
-/* Shell */
-body .app>aside[data-ui-surface="panel"]{
-  background:color-mix(in srgb,var(--nx-panel-bg) 90%,transparent);
-  border-right-color:var(--nx-border);
-  backdrop-filter:var(--nx-backdrop);
-  -webkit-backdrop-filter:var(--nx-backdrop);
-}
-.brand{gap:.78rem}
-.logo{
-  border-radius:var(--nx-control-radius);
-  border-color:color-mix(in srgb,var(--tx) 10%,transparent);
-}
-.core{
-  background:color-mix(in srgb,var(--nx-section-bg) 72%,transparent);
-  border-color:var(--nx-border);
-  box-shadow:none;
-}
-.top{border-bottom-color:var(--nx-separator)}
-.top-eyebrow{font-size:.64rem;letter-spacing:.12em;opacity:.82}
-h1{font-size:var(--nx-title);line-height:1.14;letter-spacing:-.045em}
-h2,h3{letter-spacing:-.025em}
-.hd p,.note{color:var(--nx-muted)}
+/* Select: native <select> remains canonical form state and fallback. */
+.xm-select-shell{position:relative;display:block;width:100%;min-width:0}
+.xm-select-shell>.xm-select-source{position:absolute;width:1px;height:1px;min-height:0;padding:0;margin:0;border:0;opacity:0;pointer-events:none;clip-path:inset(50%);overflow:hidden}
+.xm-select-trigger{display:flex;align-items:center;justify-content:space-between;gap:.6rem;text-align:left;cursor:pointer}
+.xm-select-caption{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.xm-select-chevron{flex:none;color:var(--mu);line-height:1;transition:transform var(--nx-duration)}
+.xm-select-shell.is-open .xm-select-chevron{transform:rotate(180deg)}
+.xm-select-popover:popover-open{position:fixed;inset:auto;margin:0;padding:.3rem;max-width:calc(100vw - 1rem);overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;background:var(--nx-floating-bg);color:var(--tx);border:1px solid var(--nx-border-strong);border-radius:var(--nx-control-radius);box-shadow:var(--nx-floating-shadow);font:inherit}
+.xm-select-option{display:block;width:100%;min-height:var(--nx-control-h-sm);padding:.55rem .65rem;border:1px solid transparent;border-radius:max(.25rem,calc(var(--nx-control-radius) - .2rem));background:transparent;color:var(--tx);text-align:left;font-size:.8rem;white-space:normal;overflow-wrap:anywhere}
+.xm-select-option[aria-selected=true]{background:var(--nx-selected-bg);border-color:var(--nx-selected-border)}
+.xm-select-option[aria-selected=true]::after{content:"✓";float:right;margin-left:.6rem;color:var(--a)}
+.xm-select-option.in-group{padding-left:1.15rem}
 
-/* Controls. Prefixing shared primitives with .app is deliberate compatibility
- * specificity; it is not page-specific styling. */
-.app button,.app .btn,.app .gh,.app .dg,.app .ib,.app .search,
-.app input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
-.app select,.app textarea,.app .xm-select-trigger,.app .xm-select-button{
-  border-radius:var(--nx-control-radius);
+/* Confirmation and feedback share material and controls with every editor. */
+dialog.xm-action-confirm{--dialog-width:28rem;border:1px solid var(--nx-border-strong)}
+.xm-action-confirm-box{display:grid;gap:.9rem;padding:var(--nx-card-pad)}
+.xm-action-confirm-box h2{font-size:1.1rem}
+.xm-action-confirm-box p{color:var(--nx-muted);font-size:.85rem;line-height:1.55;overflow-wrap:anywhere}
+.xm-action-confirm-icon{display:grid;place-items:center;width:2.5rem;height:2.5rem;border-radius:var(--nx-control-radius);background:var(--nx-selected-bg);color:var(--a)}
+.xm-action-confirm-actions{display:flex;justify-content:flex-end;gap:.6rem;flex-wrap:wrap}
+#toast{position:fixed;inset:auto auto 1.5rem 50%;display:flex;align-items:center;gap:.8rem;max-width:calc(100vw - 2rem);padding:.7rem 1rem;transform:translate(-50%,1rem);opacity:0;border:1px solid var(--nx-border-strong);border-radius:var(--nx-control-radius);background:var(--nx-floating-bg);box-shadow:var(--nx-floating-shadow);pointer-events:none;z-index:var(--nx-z-feedback);font-size:.82rem;transition:opacity var(--nx-duration),transform var(--nx-duration)}
+#toast.show{transform:translate(-50%,0);opacity:1;pointer-events:auto}
+#toast button{color:var(--a);font-weight:650}
+.spin .ic{animation:nx-spin .9s linear infinite}
+@keyframes nx-spin{to{transform:rotate(360deg)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fade{from{opacity:0}}
+@media(max-width:760px){
+  .tb thead{display:none}
+  .tb,.tb tbody,.tb tr,.tb td{display:block}
+  .tb tr{padding:.75rem 0;border-top:1px solid var(--nx-separator)}
+  .tb td{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.35rem 0;border:0;white-space:normal;text-align:right}
+  .tb td::before{content:attr(data-l);color:var(--mu);text-align:left}
+  .tb td.c1{display:none}
+  #toast{bottom:6rem}
 }
-
-.app input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
-.app select,.app textarea,.app .xm-select-trigger,.app .xm-select-button,
-.app .search,.app .gh,.app .dg,.app .ib{
-  background:var(--nx-control-bg);
-  border:1px solid var(--nx-border);
-  box-shadow:var(--nx-control-shadow);
-}
-
-.app input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
-.app select,.app .xm-select-trigger,.app .xm-select-button{
-  min-height:var(--nx-control-h);
-  font-size:.88rem;
-}
-.app textarea{font-size:.88rem;line-height:1.5}
-.app .search{min-height:var(--nx-control-h)}
-.app .gh,.app .dg{min-height:var(--nx-control-h-sm);padding:.52rem .82rem}
-.app .ib{width:var(--nx-control-h);height:var(--nx-control-h)}
-.app .btn{
-  min-height:var(--nx-control-h);
-  padding:.56rem 1rem;
-  background:var(--a);
-  border:1px solid color-mix(in srgb,var(--a) 72%,var(--tx) 8%);
-  color:var(--btn-text);
-  box-shadow:none;
-  font-weight:720;
-}
-
-:where(.app button,.app .btn,.app .gh,.app .dg,.app .ib,.app .search,.app [role="button"],.app nav a,.app nav .more){
-  transition:background-color .14s ease,border-color .14s ease,color .14s ease,opacity .14s ease;
-  text-shadow:none;
-}
-@media(hover:hover) and (pointer:fine){
-  :where(.app .gh,.app .dg,.app .ib,.app .search,.app nav a,.app nav .more,.app [role="button"]):not(:disabled):not([aria-disabled="true"]):hover{
-    transform:none;
-    background:var(--nx-hover-bg);
-    border-color:var(--nx-hover-border);
-    color:var(--tx);
-    box-shadow:none;
-  }
-  .app .btn:not(:disabled):hover{
-    transform:none;
-    background:color-mix(in srgb,var(--a) 90%,var(--tx) 10%);
-    border-color:color-mix(in srgb,var(--a) 78%,var(--tx) 10%);
-    color:var(--btn-text);
-    box-shadow:none;
-  }
-}
-
-:where(.app button,.app .btn,.app .gh,.app .dg,.app .ib,.app .search,.app [role="button"],.app input,.app select,.app textarea,.app .xm-select-trigger,.app .xm-select-button):focus-visible{
-  outline:2px solid var(--nx-focus);
-  outline-offset:2px;
-  box-shadow:none;
-}
-
-/* Navigation */
-.app nav a,.app nav .more{
-  min-height:2.8rem;
-  border-radius:var(--nx-control-radius);
-  border-color:transparent;
-}
-.app nav a.on{
-  color:var(--tx);
-  background:color-mix(in srgb,var(--a) 10%,var(--nx-item-bg));
-  border-color:color-mix(in srgb,var(--a) 24%,var(--nx-border));
-}
-.app nav a.on::before{box-shadow:none}
-
-/* Segmented controls */
-:is(.app,dialog) .seg{
-  display:inline-flex;
-  align-items:center;
-  gap:2px;
-  padding:3px;
-  background:var(--ui-segment-track-bg);
-  border:1px solid var(--ui-segment-track-border);
-  border-radius:var(--nx-control-radius);
-  box-shadow:none;
-}
-:is(.app,dialog) .seg button{
-  min-height:2.15rem;
-  padding:.4rem .68rem;
-  border:1px solid transparent;
-  border-radius:max(7px,calc(var(--nx-control-radius) - 3px));
-  color:var(--ui-segment-idle-color);
-  font-weight:590;
-  box-shadow:none;
-}
-:is(.app,dialog) .seg button.on{
-  background:var(--ui-segment-active-bg);
-  border-color:var(--ui-segment-active-border);
-  color:var(--ui-segment-active-color);
-  box-shadow:var(--ui-segment-active-shadow);
-  font-weight:730;
-}
-@media(hover:hover) and (pointer:fine){
-  :is(.app,dialog) .seg button:not(.on):hover{
-    background:var(--ui-segment-hover-bg);
-    border-color:transparent;
-    color:var(--tx);
-  }
-  :is(.app,dialog) .seg button.on:hover{
-    background:var(--ui-segment-active-bg);
-    border-color:var(--ui-segment-active-border);
-    box-shadow:var(--ui-segment-active-shadow);
-  }
+@media(max-width:560px){
+  .setting-row{grid-template-columns:minmax(0,1fr)}
+  .setting-control{justify-content:flex-start;justify-self:start}
+  dialog{max-width:calc(100vw - 1rem);width:min(var(--dialog-width),calc(100vw - 1rem));max-height:calc(100dvh - 1rem)}
+  :where(dialog)>.box,:where(dialog)>form.box,dialog>.sv-dialog,dialog>.stats-user-dialog{max-height:calc(100dvh - 1rem)}
 }
 
-/* Composite controls own exactly one material shell. */
-.app [data-ui-control="shell"],.app .precision-number,.app .palette-hex-editor{
-  background:var(--nx-control-bg);
-  border:1px solid var(--nx-border);
-  border-radius:var(--nx-control-radius);
-  box-shadow:var(--nx-control-shadow);
-}
-.app [data-ui-control="inner"],
-.app .precision-number input[type="number"],
-.app .palette-hex-editor input{
-  background:transparent;
-  border:0;
-  box-shadow:none;
-  outline:0;
-}
-
-/* Tables */
-.app table{border-collapse:separate;border-spacing:0}
-.app thead th{
-  color:var(--nx-muted);
-  font-size:.68rem;
-  letter-spacing:.045em;
-  text-transform:uppercase;
-  border-bottom-color:var(--nx-separator);
-}
-.app tbody td{border-bottom-color:var(--nx-separator)}
-.app tbody tr:last-child td{border-bottom-color:transparent}
-@media(hover:hover) and (pointer:fine){
-  .app tbody tr:hover td{background:color-mix(in srgb,var(--tx) 2.5%,transparent)}
-}
-
-/* Chips and status pills stay quiet; accent is reserved for active state. */
-.app .chip,.app .tag,.app [class*="-pill"]{box-shadow:none}
-
-/* Dialog material. Special editors may own geometry, but not a second material
- * language. The #dlg selector deliberately outranks legacy surface-specific
- * dialog rules without introducing material branches. */
-dialog{
-  color:var(--tx);
-  background:transparent;
-}
-dialog::backdrop{
-  background:var(--xm-modal-dim,rgba(2,7,12,.72));
-  backdrop-filter:blur(var(--xm-modal-blur,10px));
-}
-dialog#dlg .box,dialog#dlg form.box,dialog#dlg [data-ui-surface="dialog"],
-dialog[data-ui-surface="dialog"]{
-  background:var(--nx-dialog-bg);
-  border:1px solid var(--nx-border-strong);
-  border-radius:var(--nx-card-radius);
-  box-shadow:var(--nx-dialog-shadow);
-  backdrop-filter:var(--nx-backdrop);
-  -webkit-backdrop-filter:var(--nx-backdrop);
-}
-dialog#dlg [data-ui-surface="section"],dialog [data-ui-surface="section"]{
-  background:var(--nx-dialog-section-bg);
-  border-color:var(--nx-separator);
-  box-shadow:none;
-  backdrop-filter:none;
-  -webkit-backdrop-filter:none;
-}
-dialog#dlg :where(input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),select,textarea,.xm-select-trigger,.xm-select-button){
-  background:var(--nx-dialog-control-bg);
-}
-
-/* Empty states */
-.app .empty,.app [data-empty-state],.app [data-ui-layout="empty"] .empty{
-  color:var(--nx-muted);
-}
-.app .empty h2,.app .empty h3,.app [data-empty-state] h2,.app [data-empty-state] h3{color:var(--tx)}
-
-/* Settings rows are structural, never mini-cards. */
-.app .appearance-layout .setting-row{
-  background:transparent;
-  border-top-color:var(--nx-separator);
-  box-shadow:none;
-  backdrop-filter:none;
-  -webkit-backdrop-filter:none;
-}
-.app .appearance-layout .setting-row:first-of-type{border-top-color:transparent}
-
-@media(prefers-reduced-motion:reduce){
-  *,*::before,*::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}
-}
+/* Shared period selector, including detached popover menu. */
+.xm-period-select{position:relative;display:block;min-width:0;width:100%}
+.xm-period-select>select{position:absolute;inset:auto;width:1px;height:1px;min-height:0;padding:0;border:0;opacity:0;pointer-events:none;clip-path:inset(50%)}
+.xm-period-trigger{display:flex;align-items:center;justify-content:space-between;gap:.55rem;width:100%;min-width:0;min-height:var(--nx-control-h);padding:.5rem .75rem;color:var(--tx);background:var(--nx-control-bg);border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);font:inherit;font-size:.82rem;cursor:pointer;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.xm-period-trigger:hover,.xm-period-trigger[aria-expanded=true]{border-color:var(--nx-selected-border)}
+.xm-period-chevron{flex:none;color:var(--mu);font-size:1.2em;line-height:1;transition:transform var(--nx-duration)}
+.xm-period-trigger[aria-expanded=true] .xm-period-chevron{transform:rotate(180deg)}
+.xm-period-menu{position:absolute;z-index:var(--nx-z-popover);top:calc(100% + .35rem);left:0;right:0;display:grid;gap:.2rem;max-height:min(16rem,40vh);padding:.35rem;background:var(--nx-floating-bg);border:1px solid var(--nx-border-strong);border-radius:var(--nx-control-radius);box-shadow:var(--nx-floating-shadow);overflow-y:auto}
+.xm-period-option{display:block;width:100%;padding:.55rem .7rem;border-radius:max(.25rem,calc(var(--nx-control-radius) - .2rem));background:transparent;color:var(--tx);text-align:left;font:inherit;font-size:.8rem;white-space:normal;overflow-wrap:anywhere}
+.xm-period-option:hover{background:var(--nx-hover-bg)}
+.xm-period-option[aria-selected=true]{background:var(--nx-selected-bg);color:var(--a)}
+.xm-period-portal{position:fixed;inset:auto;margin:0;max-width:calc(100vw - 1rem);overflow-x:hidden;overflow-y:auto;z-index:var(--nx-z-tooltip)}
+.xm-action-confirm-close{position:absolute;top:1rem;right:1rem;display:grid;place-items:center;width:var(--xm-close-size);min-height:var(--xm-close-size);padding:0;border:1px solid var(--nx-border);border-radius:50%;background:var(--nx-control-bg);color:var(--mu)}

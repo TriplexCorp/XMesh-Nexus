@@ -4,193 +4,58 @@ const fs=require('node:fs');
 const path=require('node:path');
 const crypto=require('node:crypto');
 const assert=require('node:assert/strict');
+const {root,panelStyles,assertPackaged}=require('./ci/frontend-source.cjs');
+const read=name=>fs.readFileSync(path.join(root,name),'utf8');
+const html=read('frontend/index.html');
+const app=read('frontend/js/core/app.js');
+const entry=read('frontend/styles/system/nexus-ui-v3.css');
+const foundation=read('frontend/styles/system/nexus-v3-foundation.css');
+const components=read('frontend/styles/system/nexus-v3-components.css');
+const layout=read('frontend/styles/system/nexus-v3-layout.css');
+const hash=text=>crypto.createHash('sha1').update(`blob ${Buffer.byteLength(text)}\0`).update(text).digest('hex').slice(0,12);
+const walk=dir=>fs.readdirSync(dir,{withFileTypes:true}).flatMap(e=>e.isDirectory()?walk(path.join(dir,e.name)):[path.join(dir,e.name)]);
+const featureFiles=walk(path.join(root,'frontend/styles/features')).filter(name=>name.endsWith('.css'));
+const allCss=panelStyles();
 
-const index=fs.readFileSync('index.html','utf8');
-const sourceIndex=fs.readFileSync('frontend/index.html','utf8');
-const docker=fs.readFileSync('backend/Dockerfile','utf8');
-const app=fs.readFileSync('app.js','utf8');
-const entry=fs.readFileSync('nexus-ui-v3.css','utf8');
-const foundation=fs.readFileSync('nexus-v3-foundation.css','utf8');
-const components=fs.readFileSync('nexus-v3-components.css','utf8');
-const layout=fs.readFileSync('nexus-v3-layout.css','utf8');
-const workspaces=fs.readFileSync('nexus-v3-workspaces.css','utf8');
-const builder=fs.readFileSync('ui-builder.js','utf8');
-const docs=fs.readFileSync('docs/UI_SYSTEM.md','utf8');
-const squad=fs.readFileSync('squad-editor-premium-v5.css','utf8');
-
-const gitBlobSha=content=>crypto.createHash('sha1')
-  .update(`blob ${Buffer.byteLength(content,'utf8')}\0`)
-  .update(content,'utf8')
-  .digest('hex');
-const cacheKey=content=>gitBlobSha(content).slice(0,12);
-
-// Core runtime assets are content-addressed.
-assert(index.includes(`app.js?v=${cacheKey(app)}`),'app.js cache key must match its Git blob SHA');
-assert(index.includes(`ui-builder.js?v=${cacheKey(builder)}`),'UI builder cache key must match its Git blob SHA');
-assert(index.includes(`nexus-ui-v3.css?v=${cacheKey(entry)}`),'Design System v3 entrypoint cache key must match its Git blob SHA');
-for(const [name,content] of [
-  ['nexus-v3-foundation.css',foundation],
-  ['nexus-v3-components.css',components],
-  ['nexus-v3-layout.css',layout],
-  ['nexus-v3-workspaces.css',workspaces]
-]){
-  assert(entry.includes(`${name}?v=${cacheKey(content)}`),`${name} cache key must match its Git blob SHA`);
+for(const retired of ['frontend/styles/legacy/styles.css','frontend/js/core/ui-builder.js','frontend/styles/system/nexus-v3-workspaces.css']){
+  assert(!fs.existsSync(path.join(root,retired)),`Historical implementation must be removed: ${retired}`);
+  assert(!html.includes(path.basename(retired)),`Historical implementation must not load: ${retired}`);
 }
-
-assert.match(index,/nexus-ui-v3\.css\?v=[a-f0-9]{12}/,'Design System v3 must be content-addressed');
-assert.match(index,/ui-builder\.js\?v=[a-f0-9]{12}/,'UI builder must be content-addressed');
-assert.match(index,/app\.js\?v=[a-f0-9]{12}/,'Core app must be content-addressed');
-assert.match(sourceIndex,/<style id="xmesh-legacy-compat">@import url\("\/styles\/legacy\/styles\.css\?v=[^"]+"\) layer\(xmesh-legacy\);<\/style>/,
- 'Legacy stylesheet must be quarantined in the low-priority cascade layer');
-assert.doesNotMatch(sourceIndex,/<link[^>]+styles\/legacy\/styles\.css/,
- 'Legacy stylesheet must never be loaded as an unlayered link');
-const lastCss=index.lastIndexOf('<link rel="stylesheet"');
-assert(index.slice(lastCss).includes('nexus-ui-v3.css'),'Design System v3 must remain the final linked global stylesheet');
-assert(index.indexOf('app.js?v=')<index.indexOf('ui-builder.js?v='),'UI builder must load after app.js');
-assert.match(index,/<aside data-ui-surface="panel">/,'Sidebar must opt into shared panel material');
-
-for(const retired of ['global-hover.css','ui-system.css','design-system-v2.css','spatial-engine.css','spatial-layout.css']){
-  assert(!index.includes(retired),'Retired global layer must not be loaded: '+retired);
-  assert(!docker.includes(' '+retired+' '),'Retired global layer must not be packaged: '+retired);
+assert(!fs.existsSync(path.join(root,'scripts/ci/stage-frontend-compat.sh')),'Source checks must not synthesize old assets or mutate backend files');
+assert.equal((html.match(/nexus-ui-v3\.css\?v=/g)||[]).length,1,'Panel has one presentation entrypoint');
+assert(html.includes(`nexus-ui-v3.css?v=${hash(entry)}`),'Design-system cache key must match the content');
+assert(html.includes(`app.js?v=${hash(app)}`),'Runtime cache key must match the content');
+for(const name of ['nexus-v3-foundation.css','nexus-v3-components.css','nexus-v3-layout.css']){
+ const css=read('frontend/styles/system/'+name);
+ assert(entry.includes(`${name}?v=${hash(css)}`),`Imported system asset must be content addressed: ${name}`);
 }
-for(const asset of ['nexus-ui-v3.css','nexus-v3-foundation.css','nexus-v3-components.css','nexus-v3-layout.css','nexus-v3-workspaces.css','ui-builder.js']){
-  assert(docker.includes(asset),'Production compatibility fixture must package '+asset);
-}
+assert.equal((entry.match(/@import/g)||[]).length,3,'System owns foundation, components, and shared layouts only');
+assertPackaged(assert,['nexus-ui-v3.css','nexus-v3-foundation.css','nexus-v3-components.css','nexus-v3-layout.css']);
 
-for(const module of ['nexus-v3-foundation.css','nexus-v3-components.css','nexus-v3-layout.css','nexus-v3-workspaces.css']){
-  assert(entry.includes(module),'v3 entrypoint must import '+module);
-}
-assert.equal((entry.match(/@import/g)||[]).length,4,'v3 entrypoint must have exactly four architecture modules');
+for(const material of ['solid','glass','raised']) assert(foundation.includes(`data-surface=${material}`),`Missing shared material ${material}`);
+for(const option of ['density','borders','motion']) assert(foundation.includes(`data-${option}`),`Missing shared ${option} preference`);
+for(const token of ['--nx-control-h','--nx-card-pad','--nx-page-gap','--nx-panel-bg','--nx-control-bg','--nx-dialog-bg','--nx-selected-bg'])
+ assert(foundation.includes(token),`Missing common token ${token}`);
+assert.match(foundation,/prefers-reduced-(?:motion|transparency)/,'System respects accessibility media preferences');
+assert.match(components,/focus-visible/,'Shared controls expose visible keyboard focus');
+assert.match(layout,/data-workspace/,'Width categories belong to shared layout');
+assert.match(app,/data-workspace|dataset\.workspace/,'Route must explicitly declare its frame');
+assert.match(app,/data-ui-collection/,'Collections must be explicit');
+assert.doesNotMatch(app,/classifyMetrics|classifyCollections|classifyFrame/,'No DOM-inferred page geometry');
+assert.doesNotMatch(layout,/\.appearance-layout|\.nodes-page|#stats-dashboard|\.sv-studio/,'Shared layout cannot own feature geometry');
+assert.doesNotMatch(allCss,/display\s*:\s*contents/,'Workspace wrappers must retain their layout boxes');
 
-for(const surface of ['solid','glass','raised']){
-  assert(foundation.includes('html[data-surface='+surface+']'),'Missing shared '+surface+' material');
-}
-for(const token of [
-  '--nx-control-h','--nx-card-pad','--nx-page-gap','--nx-panel-bg','--nx-control-bg','--nx-selected-bg',
-  '--ui-surface-panel-bg','--ui-surface-dialog-bg','--ui-surface-section-bg','--ui-surface-item-bg',
-  '--ui-surface-control-bg','--ui-surface-border','--ui-separator','--ui-surface-filter',
-  '--ds-control-h','--ds-card-pad','--ds-page-gap','--ds-selected-bg'
-])assert(foundation.includes(token),'Missing v3 foundation token '+token);
-assert.match(foundation,/html\[data-surface=glass\][\s\S]*--nx-backdrop:blur\(/,'Glass must use real backdrop blur');
-assert.match(foundation,/html\[data-surface=raised\]/,'Raised material block missing');
-assert.match(foundation,/html\[data-theme=light\]\[data-surface=raised\]/,'Light Raised must have a dedicated depth profile');
-assert.match(foundation,/html\[data-borders=off\]/,'Border off mode must be centralized');
-assert.match(foundation,/html\[data-borders=strong\]/,'Strong border mode must be centralized');
-assert.match(foundation,/html\[data-density=compact\]/,'Density must be centralized');
-assert.match(foundation,/prefers-reduced-transparency/,'Glass must respect reduced transparency');
-
-for(const [name,css] of [['components',components],['layout',layout],['workspaces',workspaces]]){
-  assert.doesNotMatch(css,/html\[data-surface=(?:solid|glass|raised)\]/,
-    name+' must consume material tokens, not fork surface modes');
-}
-assert.match(components,/body \.app \.card,[\s\S]*\[data-ui-surface="panel"\][\s\S]*--nx-panel-bg/,'Shared panel primitive missing');
-assert.match(components,/body \.app>aside\[data-ui-surface="panel"\]/,'Sidebar material must be owned by v3 components');
-assert.match(components,/:is\(\.app,dialog\) \.seg button\.on[\s\S]*--ui-segment-active-bg/,'Selected segment primitive missing');
-assert.match(components,/dialog#dlg \.box,dialog#dlg form\.box/,'Shared dialog shell primitive missing');
-assert.match(components,/Composite controls own exactly one material shell/,'Composite control ownership must be documented');
-assert.match(components,/transform:none/,'Generic hover must not use lift motion');
-
-assert.match(layout,/\.wrap\{[\s\S]*max-width:var\(--panel-content-max,1920px\)/,
- 'Shared shell must honor the user content width directly');
-assert.doesNotMatch(layout,/data-ui-frame="(?:management|data|canvas)"/,
- 'Shared layout must not impose frame-specific width caps');
-assert.match(layout,/\.view\[data-ui-flow="workspace"\][\s\S]*grid-auto-rows:max-content/,'Workspace flow must be content-driven');
-assert.match(layout,/\[data-ui-collection\]\[data-ui-count="1"\]\[data-ui-low-count="expand"\]/,'Low-count collection rule missing');
-assert.match(layout,/\[data-ui-layout="empty"\]/,'Empty-state geometry missing');
-assert.match(layout,/\[data-ui-layout="editor"\],\[data-ui-layout="canvas"\]/,'Purposeful editor/canvas exception missing');
-assert.doesNotMatch(layout,/\.appearance-layout|\.nodes-page/,
- 'Shared layout must never own complex page-specific workspace geometry');
-
-assert.match(workspaces,/#view>\.appearance-layout\{[\s\S]*grid-template-columns:minmax\(0,1\.08fr\) minmax\(0,\.92fr\)/,
- 'Settings must use a real balanced two-column workspace');
-assert.match(workspaces,/#view>\.appearance-layout>\.appearance-column\{[\s\S]*display:grid/,
- 'Settings columns must remain real grid containers');
-assert.match(workspaces,/#view>\.appearance-layout>\.appearance-column>\.card:nth-child\(n\)\{[\s\S]*grid-area:auto/,
- 'Settings must neutralize historical explicit grid placement');
-assert.match(workspaces,/\.palette-preset-grid\{[\s\S]*repeat\(4,minmax\(0,1fr\)\)/,
- 'Theme gallery must be a stable four-column control surface');
-assert.match(workspaces,/card:nth-child\(3\)[\s\S]*\.choice\{[\s\S]*repeat\(3,minmax\(0,1fr\)\)/,
- 'Font chooser must use a structured grid');
-assert.doesNotMatch(workspaces,/settings-appearance-header::before[\s\S]*radial-gradient/,
- 'Settings headings must not reintroduce fake decorative icon bubbles');
-
-assert.match(workspaces,/#view>\.nodes-page\{[\s\S]*container:nodes-workspace \/ inline-size/,'Nodes workspace must use container-driven composition');
-assert.match(workspaces,/width:min\(100%,150rem\)/,'Core workspaces need an enterprise desktop width');
-assert.match(workspaces,/body \.app #view>\.nodes-page>\.nodes\[data-node-count="1"\]>\.nc\{[\s\S]*grid-template-columns:minmax\(24rem,\.82fr\) minmax\(38rem,1\.18fr\)/,
- 'Single node must use proportional two-zone composition');
-assert.match(workspaces,/\.node-gauges\{[\s\S]*width:100%[\s\S]*repeat\(3,minmax\(12rem,1fr\)\)/,
- 'Node metrics must fill the operations zone');
-assert.doesNotMatch(workspaces,/width:min\(100%,48rem\)/,
- 'Fixed 48rem KPI bottleneck must never return');
-assert.match(workspaces,/@container settings-workspace \(max-width:88rem\)/,'Settings must reflow by actual workspace width');
-assert.match(workspaces,/@container nodes-workspace \(max-width:72rem\)/,'Nodes must reflow by actual workspace width');
-assert.match(layout,/dialog#dlg\.node-wide[\s\S]*100dvh - 48px/,'Node editor viewport safety must live in shared layout');
-
-for(const role of ['panel','dialog','section','metric','item','floating']){
-  assert(builder.includes("'"+role+"'"),'Builder role missing '+role);
-}
-for(const value of ['panel','table','empty','editor','canvas']){
-  assert(builder.includes("'"+value+"'"),'Builder layout missing '+value);
-}
-assert.match(builder,/const register=\(selector,role\)=>/,'Semantic registry must be locally defined and deterministic');
-assert.match(builder,/data-ui-card-head/,'Builder must expose reusable card heading anatomy');
-assert.match(builder,/register\('\.node-explorer','panel'\)/,'Node explorer must consume shared panel material');
-assert.match(builder,/register\('\.ngauge','metric'\)/,'Node gauges must consume shared metric role');
-assert(builder.includes("const collectionSelector='.two,.three,.four,.grid,.cards,[data-ui-collection]';"),
- 'Collection classification must be opt-in by structural primitive');
-const collectionCode=builder.slice(builder.indexOf('const classifyCollections='),builder.indexOf('const classifyFrame='));
-assert(collectionCode.includes('view.querySelectorAll(collectionSelector)'),
- 'Collection classifier must inspect only explicit collection candidates');
-assert(!collectionCode.includes("view.querySelectorAll('div,section')"),
- 'Collection classifier must never infer layout from arbitrary div/section groups');
-assert.match(builder,/new MutationObserver/,'Dynamic SPA surfaces must be hydrated');
-assert.match(builder,/window\.XMeshUIBuilder/,'Builder must expose the shared runtime API');
-assert.match(builder,/classifyCollections/,'Builder must classify low-count collections');
-assert.match(builder,/classifyToolbar/,'Builder must classify toolbars');
-assert.match(builder,/!node\.parentElement\?\.matches\('\.view'\)/,'Builder must not wrap direct page composition');
-assert.doesNotMatch(builder,/getBoundingClientRect/,'Runtime builder must not measure geometry');
-assert.doesNotMatch(builder,/composeNodes/,'Runtime builder must not contain page-specific Nodes composition');
-assert.doesNotMatch(builder,/createElement\(['"]div['"]\)/,'Runtime builder must not create presentation wrappers');
-
-// Audit every feature stylesheet: feature code may own local geometry but never
-// the global shell or Appearance material variants.
-const featureRoot=path.join('frontend','styles','features');
-const featureFiles=[];
-const walk=dir=>{
-  for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
-    const file=path.join(dir,entry.name);
-    if(entry.isDirectory())walk(file);
-    else if(entry.isFile()&&entry.name.endsWith('.css'))featureFiles.push(file);
-  }
-};
-walk(featureRoot);
-assert(featureFiles.length>0,'Feature CSS audit found no stylesheets');
 for(const file of featureFiles){
-  const css=fs.readFileSync(file,'utf8');
-  const rel=file.replaceAll('\\','/');
-  assert.doesNotMatch(css,/html\[data-surface=(?:solid|glass|raised)\]/,
-    rel+' must not fork shared Appearance material');
-  assert.doesNotMatch(css,/(?:^|\})\s*\.wrap\s*\{/m,
-    rel+' must not own the application .wrap shell');
-  assert.doesNotMatch(css,/(?:^|\})\s*\.view\s*\{/m,
-    rel+' must not own the global .view flow');
-  assert.doesNotMatch(css,/(?:^|\})\s*\.app\s*\{/m,
-    rel+' must not own the application grid');
-  assert.doesNotMatch(css,/(?:^|\})\s*\.app>aside\s*\{/m,
-    rel+' must not own the sidebar shell');
+ const css=fs.readFileSync(file,'utf8'),name=path.relative(root,file);
+ assert.doesNotMatch(css,/\bhtml\s*\[data-surface\s*=/,`${name}: shared material variants may only be declared in foundation`);
+ assert.doesNotMatch(css,/(?:^|[},])\s*(?:body\s+)?(?:\.app|\.wrap|\.view|#view|aside|\.top)\s*\{/m,`${name}: feature cannot own global shell`);
+ assert.doesNotMatch(css,/(?:^|[;{])\s*(?:width|min-width|max-width|height|min-height|max-height|grid-template-columns|grid-area|flex-grow)\s*:[^;}]*!important/,`${name}: feature geometry must not escalate specificity`);
 }
-
-for(const phrase of [
-  'one presentation entrypoint',
-  'semantic adapter, not a layout engine',
-  'Content-driven height is the default',
-  'Low-count states recompose',
-  'Do not fill voids with fake UI',
-  'legacy cascade layer',
-  'workspace composition',
-  'New global visual work in it is forbidden'
-])assert(docs.includes(phrase),'UI_SYSTEM v3 contract missing phrase: '+phrase);
-
-assert.doesNotMatch(squad,/html\[data-surface=(?:solid|glass|raised)\]/,'Squad editor must not implement Appearance material variants');
-
-console.log('XMesh Nexus Design System v3 enterprise architecture checks passed');
+for(const file of ['frontend/styles/features/settings/settings.css','frontend/styles/features/nodes/nodes.css']){
+ const css=read(file);
+ assert.doesNotMatch(css,/\.(?:nodes-page|appearance-layout)\s*\{[^}]*min-height\s*:/,`${file}: pages must have content-driven height`);
+ assert.doesNotMatch(css,/:nth-child\([^)]*\)\s*\{[^}]*grid-area\s*:/,`${file}: no placement by historical child index`);
+}
+assert.match(layout+'\n'+components,/100dvh/,'Dialog geometry must be viewport-bounded');
+assert.match(layout+'\n'+components,/overflow\s*:\s*auto/,'Dialogs need an internal scroll container');
+console.log(`UI architecture: canonical assets, three system owners, ${featureFiles.length} scoped feature stylesheets, explicit layout, and dialog safety: PASS`);

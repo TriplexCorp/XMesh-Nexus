@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 'use strict';
+const {panelStyles}=require('./ci/frontend-source.cjs');
 const fs=require('node:fs'),assert=require('node:assert/strict');
-const app=fs.readFileSync('app.js','utf8');
-const ui=fs.readFileSync('unified-selects.js','utf8');
-const css=fs.readFileSync('styles.css','utf8');
-const html=fs.readFileSync('index.html','utf8');
+const app=fs.readFileSync('frontend/js/core/app.js','utf8');
+const ui=fs.readFileSync('frontend/js/core/unified-selects.js','utf8');
+const css=panelStyles();
+const html=fs.readFileSync('frontend/index.html','utf8');
 new Function(ui);
 assert.match(html,/unified-selects\.js\?v=/,'component loaded by every panel route');
-assert.match(html,/src="\/unified-selects\.js\?v=/,'hidden dashboard requires absolute selector script URL');
+assert.match(html,/src="\/js\/core\/unified-selects\.js\?v=/,'hidden dashboard requires absolute selector script URL');
 const sec=fs.readFileSync('backend/src/security.rs','utf8');
 assert.match(sec,/"unified-selects\.js"/,'dashboard asset rebasing handles unified selects');
 assert.match(html,/styles\.css\?v=[A-Za-z0-9-]+/,'shared selector stylesheet remains versioned across subsequent UI releases');

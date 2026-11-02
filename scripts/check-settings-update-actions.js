@@ -1,13 +1,14 @@
 'use strict';
+const {assertPackaged}=require('./ci/frontend-source.cjs');
 const fs=require('node:fs');
 const assert=require('node:assert/strict');
-const app=fs.readFileSync('app.js','utf8');
+const app=fs.readFileSync('frontend/js/core/app.js','utf8');
 const api=fs.readFileSync('backend/src/main.rs','utf8');
-const css=fs.readFileSync('settings-updates.css','utf8');
-const html=fs.readFileSync('index.html','utf8');
+const css=fs.readFileSync('frontend/styles/features/settings/settings-updates.css','utf8');
+const html=fs.readFileSync('frontend/index.html','utf8');
 const docker=fs.readFileSync('backend/Dockerfile','utf8');
 assert.ok(html.includes('settings-updates.css?v='));
-assert.ok(docker.includes('styles.css settings-updates.css'));
+assertPackaged(assert,['styles.css', 'settings-updates.css']);
 assert.ok(css.includes('#core-panel .update-action-row,'));
 assert.ok(css.includes('#panel-update-card .update-action-row{'));
 assert.ok(css.includes('grid-template-columns:repeat(2,minmax(0,12.5rem))'));

@@ -53,6 +53,7 @@
   const tag=String(inbound.tag||('inbound #'+(index+1)));
   const protocol=String(inbound.protocol||'—');
   const mode=tlsMode(tls,hysteria);
+  const opener=document.activeElement;
   const dialog=document.createElement('dialog');
   dialog.className='xm-tls-dialog';
   dialog.setAttribute('aria-labelledby','xm-tls-dialog-title');
@@ -116,7 +117,7 @@
     <footer class="xm-tls-footer"><span>Изменения применяются только к выбранному inbound.</span><div><button type="button" class="xm-tls-cancel">Отмена</button><button type="submit" class="xm-tls-apply">Применить TLS</button></div></footer>
   </form>`;
   const form=dialog.querySelector('form'),error=dialog.querySelector('.xm-tls-json-error');
-  const finish=()=>{if(dialog.open)dialog.close();dialog.remove()};
+  const finish=()=>{if(dialog.open)dialog.close();dialog.remove();if(opener?.isConnected)opener.focus({preventScroll:true})};
   dialog.querySelector('.xm-tls-close').addEventListener('click',finish);
   dialog.querySelector('.xm-tls-cancel').addEventListener('click',finish);
   dialog.addEventListener('cancel',ev=>{ev.preventDefault();finish()});

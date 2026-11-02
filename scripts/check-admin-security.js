@@ -6,8 +6,8 @@ const main=fs.readFileSync('backend/src/main.rs','utf8');
 const auth=fs.readFileSync('backend/src/auth.rs','utf8');
 const accounts=fs.readFileSync('backend/src/admin_accounts.rs','utf8');
 const migration=fs.readFileSync('backend/migrations/0008_admin_rbac.sql','utf8');
-const ui=fs.readFileSync('app.js','utf8');
-const index=fs.readFileSync('index.html','utf8');
+const ui=fs.readFileSync('frontend/js/core/app.js','utf8');
+const index=fs.readFileSync('frontend/index.html','utf8');
 const getHandler=(name)=>{
  const start=main.indexOf('async fn '+name+'(');
  assert(start>=0,'Missing backend handler '+name);
