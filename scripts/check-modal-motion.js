@@ -26,10 +26,6 @@ assert.match(css,/@starting-style\{/,'Opening animation must have starting style
 assert.match(css,/#dlg\.side\{--modal-off:translateX/,'Side drawer animates from edge');
 assert.match(css,/html\[data-motion=off\] #dlg/);
 assert.match(css,/@media\(prefers-reduced-motion:reduce\)/);
-assert.match(html,/<script\s+src="\/js\/core\/js\/core\/app\.js\?v=[a-zA-Z0-9._-]+"\s*><\/script>/,
- 'Application entrypoint must be loaded with a nonempty cache-busting version');
-assert.match(html,/<style id="xmesh-legacy-compat">@import url\("\/styles\/legacy\/styles\/legacy\/styles\.css\?v=[a-zA-Z0-9._-]+"\) layer\(xmesh-legacy\);<\/style>/,
- 'Legacy compatibility stylesheet must remain versioned and quarantined in its cascade layer');
-assert.match(html,/<link\s+rel="stylesheet"\s+href="\/styles\/system\/styles\/system\/nexus-ui-v3\.css\?v=[a-f0-9]{12}"\s*\/?\s*>/,
- 'Modern Design System entrypoint must remain the final versioned stylesheet');
+assert.match(html,/<script src="\/js\/core\/app\.js\?v=[a-f0-9]{12}"><\/script>/,'Application entrypoint must be content-addressed');
+assert.match(html,/<link rel="stylesheet" href="\/styles\/system\/nexus-ui-v3\.css\?v=[a-f0-9]{12}">/,'Design System entrypoint must remain content-addressed');
 console.log('User creation, dialog open/exit animations and accessibility controls: OK');

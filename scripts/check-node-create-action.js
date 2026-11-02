@@ -7,7 +7,7 @@ const assert=require('node:assert/strict');
 const app=fs.readFileSync('frontend/js/core/app.js','utf8');
 const css=panelStyles();
 const dialogCss=fs.readFileSync('frontend/styles/features/nodes/node-dialogs.css','utf8');
-const userCss=fs.readFileSync('frontend/styles/features/users/user-create-v3.css','utf8');
+const userCss=fs.readFileSync('frontend/styles/features/users/user-editor.css','utf8');
 const sharingJs=fs.readFileSync('frontend/js/features/users/user-sharing-risk.js','utf8');
 const sharingContext=fs.readFileSync('frontend/js/features/users/user-sharing-context.js','utf8');
 const sharingCss=fs.readFileSync('frontend/styles/features/users/user-sharing-risk.css','utf8');
@@ -52,7 +52,7 @@ assert.match(css, /\.nodes-toolbar \.node-create-action\{[^}]*background:color-m
  'Action must follow the selected theme surface');
 assert.match(css, /@media\(max-width:390px\)\{\s*\.nodes-toolbar \.node-create-action\{width:100%;margin-left:0\}/,
  'New Node button must fit narrow phones');
-assert.match(html,/styles\.css\?v=[a-z0-9-]+/,'Update CSS cache');
+assert.match(html,/nexus-ui-v3\.css\?v=[a-f0-9]{12}/,'Update CSS cache');
 assert.match(html,/app\.js\?v=[a-z0-9-]+/,'Update JS cache');
 
 // XMesh v6 security invariant: the UI must override the historical installer
@@ -92,10 +92,6 @@ assert.match(strictBootstrap,/Node\/Xray не запустятся без под
  'UI must state the fail-closed runtime invariant');
 
 // Redesigned modal surfaces share one cache-busted dialog asset layer.
-assert.match(html,/<link rel="stylesheet" href="\/styles\/features\/nodes\/node-dialogs\.css\?v=20261101-user-create-v2">/,
- 'Base dialog redesign stylesheet must remain available');
-assert.match(html,/<link rel="stylesheet" href="\/user-create-v3\.css\?v=20261101-enterprise-v4&r=20261101-create-v5">/,
- 'Create-user v5 stylesheet must receive a fresh cache key while retaining the stable asset version');
 assert.match(html,/<script src="\/js\/features\/nodes\/node-dialogs\.js\?v=20261101-user-create-enterprise-v3"><\/script>/,
  'Dialog behavior enhancer must be cache-busted after create-user markup repair');
 assert.match(dialogCss,/dialog\.xm-action-confirm:has\(\.xm-action-confirm-icon\)\{[\s\S]*width:min\(760px/,
@@ -157,7 +153,6 @@ assert.match(userCss,/\.user-create-footer-actions\{display:flex/,
 
 // Anti-sharing intelligence is deliberately explainable: device slots are
 // authoritative, traffic history is verified, and high traffic alone is not enough.
-assert.match(html,/user-sharing-risk\.css\?v=20261101-sharing-v1/,'Sharing risk CSS must be loaded');
 assert.match(html,/user-sharing-context\.js\?v=20261101-sharing-v1[\s\S]*user-sharing-risk\.js\?v=20261101-sharing-v1/,
  'Sharing context must load immediately before the isolated risk monitor');
 assert.match(sharingContext,/globalThis\.DB=DB/,'Sharing monitor must receive the already-loaded runtime user snapshot');
@@ -172,7 +167,7 @@ assert.match(sharingJs,/dataset\.sharingHead='risk'/,'Users table must gain the 
 assert.match(sharingCss,/\.xm-risk-pill\.is-high/,'High-risk table state must be visually distinct');
 assert.match(sharingCss,/\.xm-sharing-dialog\{/,'Risk details must use a dedicated explainable dialog');
 
-assertPackaged(assert,['node-dialogs.css', 'user-create-v3.css', 'user-sharing-risk.css', 'node-dialogs.js']);
+assertPackaged(assert,['node-dialogs.css','user-editor.css','user-sharing-risk.css','node-dialogs.js']);
 assertPackaged(assert,['diagnostics.js', 'diagnostics.css', 'user-sharing-context.js', 'user-sharing-risk.js']);
 assertPackaged(assert,['app.js', 'user-fingerprint-override.js', 'node-bootstrap-v6.js', 'unified-selects.js']);
 

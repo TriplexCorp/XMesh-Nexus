@@ -4,7 +4,7 @@ import {assertPackaged} from './ci/frontend-source.cjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 globalThis.window={};
-await import('../js/features/xray-studio/xray-studio-hosts.js');
+await import('../frontend/js/features/xray-studio/xray-studio-hosts.js');
 const module=window.XMeshStudioHosts;
 assert.equal(typeof module?.mount,'function');
 const view=module.view();

@@ -217,8 +217,6 @@ assert.match(rust,/"deploymentServerB"/);
 assert.match(rust,/"subscriptionPlacement", &\["a", "b", "c"\]/);
 assert(!rust.includes('.route("/s/'),'The management panel must not implement public subscription serving');
 assert.match(html,/subscription-studio\.js\?v=[a-z0-9-]+/,'Subscription Studio JavaScript must use a cache-busting version');
-assert.match(html,/<link\s+rel="stylesheet"\s+href="\/styles\/features\/subscriptions\/subscription-studio\.css\?v=[a-zA-Z0-9._-]+"\s*\/?>/,
- 'Subscription Studio stylesheet must retain a cache-busting version');
 assertPackaged(assert,['subscription-studio.css', 'subscription-public.css', 'subscription-studio.js', 'subscription-portal.js']);
 const template=fs.readFileSync('backend/src/subscription_template.html','utf8');
 const portalCss=fs.readFileSync('frontend/styles/features/subscriptions/subscription-public.css','utf8');

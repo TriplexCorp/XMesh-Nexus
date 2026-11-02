@@ -11,7 +11,7 @@ assert.match(html,/unified-selects\.js\?v=/,'component loaded by every panel rou
 assert.match(html,/src="\/js\/core\/unified-selects\.js\?v=/,'hidden dashboard requires absolute selector script URL');
 const sec=fs.readFileSync('backend/src/security.rs','utf8');
 assert.match(sec,/"unified-selects\.js"/,'dashboard asset rebasing handles unified selects');
-assert.match(html,/styles\.css\?v=[A-Za-z0-9-]+/,'shared selector stylesheet remains versioned across subsequent UI releases');
+assert.match(html,/nexus-ui-v3\.css\?v=[a-f0-9]{12}/,'single shared presentation entrypoint remains content-addressed');
 assert.match(ui,/MutationObserver/,'dynamically created selectors are enhanced');
 assert.match(ui,/select\.dispatchEvent\(new Event\('change',\{bubbles:true\}\)\)/,'existing change handlers still run');
 assert.match(ui,/select\.selectedIndex=i/,'form source stays native select');

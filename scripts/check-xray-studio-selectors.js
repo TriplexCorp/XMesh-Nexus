@@ -32,13 +32,13 @@ for (const [label, fragment] of requiredFragments) {
 }
 
 
-// XRAY STUDIO constructor must blur the entire application, including the rail.
+// XRAY STUDIO constructor must use one native top-layer dialog.
 const studio = fs.readFileSync(path.join(__dirname, '..', 'frontend/js/features/xray-studio/xray-studio-v4.js'), 'utf8');
-const studioCss = fs.readFileSync(path.join(__dirname, '..', 'frontend/styles/features/xray-studio/xray-studio-v4.css'), 'utf8');
-if (!studio.includes("portal.className='sv-studio sv-studio-portal'")) issues.push('XRAY STUDIO composer portal missing');
-if (!studio.includes('document.body.append(portal)')) issues.push('XRAY STUDIO composer not mounted on body');
-if (!studio.includes('overlayWatch.observe(overlayElement')) issues.push('XRAY STUDIO portal close cleanup missing');
-if (!studioCss.includes('body > .sv-studio-portal > .sv-overlay')) issues.push('XRAY STUDIO full-viewport backdrop missing');
+if (!studio.includes('<dialog class="sv-overlay"')) issues.push('XRAY STUDIO native overlay dialog missing');
+if (!studio.includes('overlayElement.showModal()')) issues.push('XRAY STUDIO overlay must enter the browser top layer');
+if (!studio.includes('if(overlayElement.open)overlayElement.close()')) issues.push('XRAY STUDIO overlay close contract missing');
+if (studio.includes('document.body.append(portal)') || studio.includes('overlayWatch.observe(overlayElement')) issues.push('XRAY STUDIO must not restore body portal / MutationObserver geometry');
+
 if (issues.length) {
   console.error('XRAY Studio selector audit failed:');
   for (const issue of issues) console.error(' - ' + issue);

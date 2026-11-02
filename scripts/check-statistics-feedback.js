@@ -171,10 +171,11 @@ assert.match(app,/\/api\/v1\/users\/presence/);
 assert.match(app,/presenceFeedHealthy&&st\(u\)==='ACTIVE'/);
 console.log('Statistics view, real signed steal-time and save-confirmation contracts: PASS');
 
-// Stats overlay must escape transformed/scoped workspace containers to blur the entire app.
-assert.match(app,/document\.body\.append\(statsPortal\)/);
-assert.match(app,/document\.querySelector\('body > #stats-user-modal'\)\?\.remove\(\)/);
-assert.match(css,/body > \.stats-user-overlay\{position:fixed;inset:0;width:100vw;height:100dvh/);
+// Statistics intelligence uses the browser top layer; never relocate it into body for geometry.
+assert.match(app,/<dialog id="stats-user-modal" class="stats-user-overlay"/);
+assert.match(app,/if\(!modal\.open\)modal\.showModal\(\)/);
+assert.match(app,/\$\('#stats-user-modal'\)\.close\(\)/);
+assert.doesNotMatch(app,/statsPortal|document\.body\.append\(statsPortal\)/);
 
 assert.match(app,/id="stats-user-refresh" class="gh stats-user-refresh"/);
 assert.match(app,/id="stats-user-close" class="gh stats-user-close"/);

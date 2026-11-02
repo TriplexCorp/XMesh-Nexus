@@ -9,7 +9,7 @@ const base=fs.readFileSync('backend/src/user_subscriptions_base.rs','utf8');
 const transport=fs.readFileSync('backend/src/subscription_transport.rs','utf8');
 const hostEditor=fs.readFileSync('frontend/js/features/xray-studio/xray-studio-hosts.js','utf8');
 const clientSource=fs.readFileSync('frontend/js/features/users/client-config.js','utf8');
-const clientConfig=require('../js/features/users/client-config.js');
+const clientConfig=require('../frontend/js/features/users/client-config.js');
 const index=fs.readFileSync('frontend/index.html','utf8');
 const docker=fs.readFileSync('backend/Dockerfile','utf8');
 

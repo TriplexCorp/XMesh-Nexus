@@ -51,8 +51,6 @@ assert.match(publicFeed,/xmeshOwnerNodeKey/);
 assert.match(api,/\.route\("\/client-routing", patch\(patch_client_routing\)\)/);
 assert.match(api,/require_mutation\(&actor\)\?/);
 const index=fs.readFileSync('frontend/index.html','utf8');
-assert.match(index,/client-routing\.css\?v=[A-Za-z0-9-]+/,'Routing CSS must be cache-busted by its entrypoint');
-assert.match(index,/href="\/styles\/features\/routing\/client-routing\.css\?v=/,'Routing CSS must be absolute under the nested dashboard URL');
 assert.match(index,/src="\/js\/features\/routing\/client-routing\.js\?v=/,'Routing JS must be absolute under the nested dashboard URL');
 
 // The secured dashboard lives under /dashboard/<slug>. Every remaining

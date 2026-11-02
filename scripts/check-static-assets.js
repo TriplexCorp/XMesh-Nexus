@@ -38,14 +38,10 @@ new Function(tlsJs);
 new Function(xhttpExpert);
 new Function(diagnosticsJs);
 
-assert.match(index,/xray-studio-tls-dialog\.css\?v=20261101-tls-layout-v5/,
-  'TLS dialog stylesheet must receive the specificity-fix cache key');
 assert.match(index,/xray-studio-tls-dialog\.js\?v=20261101-tls-workspace-v2/,
   'TLS workspace behavior cache key must remain stable until intentionally rotated');
 assert.match(index,/node-dialogs\.js\?v=20261101-user-create-enterprise-v3/,
   'Create-user structural repair and Agent autovalidation handler must receive the current cache key');
-assert.match(index,/user-create-v3\.css\?v=20261101-enterprise-v4/,
-  'Enterprise create-user layout must be cache-busted');
 assert.match(xhttpExpert,/Session ID/);
 assert.match(index,/xray-studio-xhttp-expert\.js\?v=20261101-core-schema-v2/,
   'Expert XHTTP editor must be cache-busted and loaded after the strict schema');
@@ -94,7 +90,6 @@ assert.match(tlsCss,/\.xm-tls-advanced\{grid-column:1\/-1/);
 assert.doesNotMatch(tlsCss,/position:sticky;top:0[\s\S]*\.xm-tls-summary/);
 assert.match(tlsCss,/@media\(max-width:760px\)/);
 
-assert.match(index,/diagnostics\.css\?v=20261101-operations-v1/);
 assert.match(index,/diagnostics\.js\?v=20261101-operations-v1/);
 assert.ok(index.indexOf('/js/core/app.js?v=')<index.indexOf('/js/features/nodes/diagnostics.js?v='),
   'Diagnostics route override must load after app.js');
