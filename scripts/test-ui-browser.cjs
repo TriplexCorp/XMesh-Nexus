@@ -265,6 +265,31 @@ async function main() {
       await page.waitForFunction(()=>!document.querySelector('#dlg')?.open);
     });
 
+    for(const [width,height] of [[390,844],[768,1024]]) await checked(`User Details stacked panes: ${width}×${height}`,async()=>{
+      await page.setViewportSize({width,height});
+      await navigate('users');
+      await page.locator(`tr[data-id="${user.id}"]`).click();
+      await page.waitForSelector('dialog[open] .user-canvas-grid');
+      const g=await page.locator('#dlg').evaluate(dialog=>{
+        const box=el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,height:r.height}};
+        const body=dialog.querySelector('.user-canvas-grid');
+        return {dialog:box(dialog),panes:[...body.children].map(box),scrollTop:body.scrollTop,scrollHeight:body.scrollHeight,clientHeight:body.clientHeight,footer:box(dialog.querySelector('.user-canvas-foot'))};
+      });
+      assert(g.dialog.y>=0&&g.dialog.bottom<=height+1&&g.dialog.right<=width+1,'Mobile dialog must fit viewport');
+      assert.equal(g.scrollTop,0);
+      assert(g.scrollHeight>g.clientHeight,'Stacked panes must use the workspace scroll owner');
+      for(let i=1;i<g.panes.length;i++){
+        assert(Math.abs(g.panes[i].x-g.panes[0].x)<=3,'Narrow panes must use one column');
+        assert(g.panes[i].y>=g.panes[i-1].bottom-1,'Stacked panes must not overlap');
+      }
+      assert(g.footer.bottom<=height+1,'Mobile footer must stay visible');
+      await page.screenshot({path:path.join(output,`user-details-${width}x${height}.png`),fullPage:false,animations:'disabled'});
+      report.screenshots.push(`user-details-${width}x${height}.png`);
+      await page.keyboard.press('Escape');
+      await page.waitForFunction(()=>!document.querySelector('#dlg')?.open);
+      return g;
+    });
+
     await checked('Topbar: переключатель языка сохраняет внутреннюю геометрию',async()=>{
       await page.setViewportSize({width:1366,height:768});
       await navigate('admins');

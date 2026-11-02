@@ -128,6 +128,7 @@ dialog#dlg.user-modal>.user-canvas{
 }
 
 #dlg.user-modal .user-canvas-grid{
+  grid-auto-rows:max-content;
   scrollbar-gutter:stable;
   align-items:start;
   flex:0 1 auto;
