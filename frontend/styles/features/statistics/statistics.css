@@ -45,6 +45,20 @@ dialog.user-modal .user-stats-refresh:hover {
   box-shadow:0 0 0 0 currentColor;
   animation:stats-live-pulse 2s ease-out infinite;
 }
+@keyframes stats-live-pulse {
+  0% {
+    box-shadow:0 0 0 0 currentColor;
+    opacity:1;
+  }
+  70% {
+    box-shadow:0 0 0 .45rem transparent;
+    opacity:.85;
+  }
+  100% {
+    box-shadow:0 0 0 0 transparent;
+    opacity:1;
+  }
+}
 .stats-live-badge.is-paused {
   color:var(--mu);
   border-color:var(--nx-border);
@@ -1174,13 +1188,18 @@ dialog.user-modal .user-stats-refresh:hover {
 #stats-user-refresh.is-refreshing .stats-refresh-icon {
   animation:stats-user-refresh-spin .8s linear infinite;
 }
+@keyframes stats-user-refresh-spin {
+  to {
+    transform:rotate(360deg);
+  }
+}
 #stats-user-refresh.is-refreshing {
   cursor:progress;
   opacity:.8;
 }
 @media (prefers-reduced-motion:reduce) {
 #stats-user-refresh.is-refreshing .stats-refresh-icon {
-  animation-duration:2s;
+  animation:none;
 }
 }
 .stats-user-actions #stats-user-close {

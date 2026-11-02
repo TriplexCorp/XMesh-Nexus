@@ -119,7 +119,7 @@ matches(app,/select\.dispatchEvent\(new Event\('change',\{bubbles:true\}\)\)/);
 matches(css,/\.xm-period-menu\s*\{/);
 matches(app,/document\.body\.append\(menu\)/);
 matches(app,/menu\.style\.left=rect\.left/);
-matches(css,/body > \.xm-period-portal\s*\{[\s\S]*?position:fixed[\s\S]*?z-index:200000/);
+matches(css,/\.xm-period-portal\s*\{[\s\S]*?position:fixed[\s\S]*?z-index:var\(--nx-z-tooltip\)/,'Detached period menu must use the shared popover stacking token');
 matches(css,/#stats-history-user::-webkit-inner-spin-button/);
 
 // Live refresh and freshness semantics.
@@ -230,7 +230,7 @@ matches(sec,/if\(location\.pathname!==patch\.dashboardPath\)/);
 matches(app,/toast-state-icon/);
 
 // Scrollable panes use the shared scrollbar contract rather than feature-local hacks.
-matches(css,/--scrollbar-size:9px/);
+rejects(css,/--scrollbar-size:9px/,'Statistics must not pin a legacy global scrollbar size token');
 matches(css,/scrollbar-color:var\(--scrollbar-thumb\) var\(--scrollbar-track\)/);
 matches(css,/\.stats-user-pane \.stats-bucket-table-wrap\s*\{[\s\S]*?max-height:none[\s\S]*?overflow-y:visible[\s\S]*?overflow-x:auto/);
 
