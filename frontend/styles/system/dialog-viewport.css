@@ -1,0 +1,30 @@
+/* Shared native-dialog viewport contract.
+ * Outer dialog bounds belong to the system layer, not individual features.
+ * max-height must include padding and borders; otherwise a max-height content box
+ * can still render its footer below the viewport and poison browser interaction tests. */
+dialog,
+:where(dialog) > .box,
+:where(dialog) > form.box,
+dialog > .sv-dialog,
+dialog > .stats-user-dialog,
+dialog > .crx-dialog {
+  box-sizing: border-box;
+}
+
+:where(dialog) > .box,
+:where(dialog) > form.box,
+dialog > .sv-dialog,
+dialog > .stats-user-dialog,
+dialog > .crx-dialog {
+  max-height: min(100%, calc(100dvh - 2rem));
+}
+
+@media (max-width: 560px) {
+  :where(dialog) > .box,
+  :where(dialog) > form.box,
+  dialog > .sv-dialog,
+  dialog > .stats-user-dialog,
+  dialog > .crx-dialog {
+    max-height: min(100%, calc(100dvh - 1rem));
+  }
+}
