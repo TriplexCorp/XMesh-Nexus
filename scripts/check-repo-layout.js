@@ -17,6 +17,9 @@ for(const stale of [
   'docs/P0E_FINAL_ASSEMBLER_READY2',
   'scripts/.p0e-final-assembler-version',
   'scripts/README.p0e-final-assembler.txt',
+  'scripts/check-button-radius.js',
+  'scripts/check-sni-fallback-composer.js',
+  'scripts/check-studio-profiles.js',
 ]){
   assert(!fs.existsSync(path.join(root,stale)),`Obsolete repository artifact must stay deleted: ${stale}`);
 }
