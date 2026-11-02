@@ -1,4 +1,4 @@
-name: Temporary Agent v6.0.7 noexec bootstrap fix
+name: Temporary Agent noexec patch
 on:
   push:
     branches:
@@ -12,31 +12,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: fix/agent-v6.0.7-fresh-updater-20261102
-      - name: Patch noexec-safe bootstrap execution
+      - name: Apply and verify patch
         shell: bash
         run: |
           set -Eeuo pipefail
           if [[ "$GITHUB_ACTOR" == "github-actions[bot]" ]]; then exit 0; fi
-          python3 - <<'PY'
-          from pathlib import Path
-          p=Path('deploy/node-control-agent.sh')
-          s=p.read_text()
-          old='  "$bootstrap" --remote >"$log" 2>&1;then'
-          new='  /bin/bash "$bootstrap" --remote >"$log" 2>&1;then'
-          if old not in s: raise SystemExit('missing direct bootstrap execution anchor')
-          p.write_text(s.replace(old,new,1))
-
-          p=Path('scripts/check-agent-update.js')
-          s=p.read_text()
-          marker="  'fresh updater bootstrap must advertise the target-aware contract');"
-          pos=s.index(marker)+len(marker)
-          extra=r'''
-assert.match(controlAgent,/\/bin\/bash "\$bootstrap" --remote/,
-  'fresh updater bootstrap must be interpreted by trusted bash so noexec /run cannot block updates');
-assert.doesNotMatch(controlAgent,/^[ \t]*"\$bootstrap" --remote/m,
-  'fresh updater bootstrap must never be executed directly from potentially noexec /run');'''
-          p.write_text(s[:pos]+extra+s[pos:])
-          PY
+          python3 scripts/tmp_noexec_patch.py
           bash -n deploy/node-control-agent.sh
           node scripts/check-agent-update.js
           git diff --check
@@ -45,8 +26,8 @@ assert.doesNotMatch(controlAgent,/^[ \t]*"\$bootstrap" --remote/m,
         run: |
           set -Eeuo pipefail
           if git diff --quiet; then exit 0; fi
-          git config user.name 'xmesh-ci-bot'
-          git config user.email 'actions@users.noreply.github.com'
+          git config user.name xmesh-ci-bot
+          git config user.email actions@users.noreply.github.com
           git add deploy/node-control-agent.sh scripts/check-agent-update.js
-          git commit -m 'fix(agent): execute updater bootstrap safely on noexec run'
+          git commit -m "fix(agent): execute updater bootstrap safely on noexec run"
           git push origin HEAD:fix/agent-v6.0.7-fresh-updater-20261102
