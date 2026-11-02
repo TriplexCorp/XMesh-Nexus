@@ -237,8 +237,11 @@ async function main() {
     await checked('Редактирование узла сохраняется через API',async()=>{
       await navigate('nodes');
       await page.locator(`[data-ne="nodes:${node.id}"]`).click();
-      await page.locator('dialog form input[name="name"]').fill(`${prefix} · Изменён`);
-      await page.locator('dialog form button[type="submit"]').click();
+      const form=page.locator('dialog form[data-ent="nodes"]');
+      await form.locator('input[name="name"]').fill(`${prefix} · Изменён`);
+      const save=form.locator('.act > button.btn');
+      assert.equal(await save.count(),1,'Кнопка сохранения узла отсутствует или неоднозначна.');
+      await save.click();
       await page.waitForSelector('dialog[open]',{state:'detached'});
       const saved=await api('GET','/collections/nodes');
       assert(saved.items.some(n=>n.id===node.id&&n.name===`${prefix} · Изменён`));
@@ -279,4 +282,7 @@ async function main() {
   if(report.failures.length)process.exitCode=1;
 }
 
-main().catch(error=>{console.error(`Браузерная проверка прервана: ${shortError(error)}`);process.exitCode=1;});
+main().catch(error=>{
+  console.error(shortError(error));
+  process.exitCode=1;
+});
