@@ -106,6 +106,9 @@ assert.doesNotMatch(portal,/tr:\['Abonelik aktif'/);
 assert.doesNotMatch(portal,/vi:\['Gói đăng ký/);
 assert.match(backend,/"subscriptionLanguage", &\["ru", "en"\]/);
 assert.match(html,/<script src="\/js\/core\/i18n\.js[^"]*"><\/script>\s*<script src="\/js\/features\/subscriptions\/subscription-studio\.js/);
-assert.match(login,/<script src="\/i18n\.js[^"]*" defer><\/script>\s*<script src="\/login\.js[^"]*" defer><\/script>/);
+assert.match(login,/<script src="\/js\/core\/i18n\.js\?v=[a-f0-9]{12}" defer><\/script>\s*<script src="\/js\/auth\/login\.js\?v=[a-f0-9]{12}" defer><\/script>/,
+ 'Login must load canonical content-addressed i18n before auth runtime');
+assert.doesNotMatch(login,/<script src="\/(?:i18n|login)\.js(?:\?|\")/,
+ 'Legacy root login/i18n entrypoints must stay removed');
 assertPackaged(assert,['i18n.js']);
 console.log('RU/EN panel locale persistence, safe reversible translations, independent portal locale: OK');
