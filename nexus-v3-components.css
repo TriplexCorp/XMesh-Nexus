@@ -7,11 +7,14 @@ body{line-height:1.52;letter-spacing:-.01em}
 body::before,body::after{opacity:.22;filter:blur(150px);animation:none}
 small{font-size:.82rem}
 
-/* Material surfaces */
-.card,
-[data-ui-surface="panel"]{
+/* Material surfaces. The .app prefix intentionally matches the specificity of
+ * historical html[data-surface=*] selectors in styles.css without creating a
+ * second material branch. v3 tokens remain the single material authority. */
+.app .card,
+.app [data-ui-surface="panel"]{
   position:relative;
   min-width:0;
+  padding:var(--nx-card-pad);
   background:var(--nx-panel-bg);
   border:1px solid var(--nx-border);
   border-radius:var(--nx-card-radius);
@@ -19,15 +22,17 @@ small{font-size:.82rem}
   backdrop-filter:var(--nx-backdrop);
   -webkit-backdrop-filter:var(--nx-backdrop);
 }
-[data-ui-surface="section"]{
+.app .card::before{content:none}
+.app [data-ui-surface="section"]{
   min-width:0;
+  padding:var(--nx-section-pad);
   background:var(--nx-section-bg);
   border:1px solid var(--nx-border);
   border-radius:var(--nx-section-radius);
   box-shadow:var(--nx-section-shadow);
 }
-[data-ui-surface="item"],
-[data-ui-surface="metric"]{
+.app [data-ui-surface="item"],
+.app [data-ui-surface="metric"]{
   min-width:0;
   background:var(--nx-item-bg);
   border:1px solid var(--nx-border);
@@ -46,9 +51,9 @@ small{font-size:.82rem}
 
 /* One surface owns elevation. Nested groups describe structure, not another
  * stack of shadows. */
-.card .card,
-[data-ui-surface="panel"] [data-ui-surface="section"],
-[data-ui-surface="section"] [data-ui-surface="item"],
+.app .card .card,
+.app [data-ui-surface="panel"] [data-ui-surface="section"],
+.app [data-ui-surface="section"] [data-ui-surface="item"],
 dialog [data-ui-surface="section"],
 dialog [data-ui-surface="item"]{
   box-shadow:none;
@@ -77,31 +82,32 @@ h1{font-size:var(--nx-title);line-height:1.14;letter-spacing:-.045em}
 h2,h3{letter-spacing:-.025em}
 .hd p,.note{color:var(--nx-muted)}
 
-/* Controls */
-button,.btn,.gh,.dg,.ib,.search,
-input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
-select,textarea,.xm-select-trigger,.xm-select-button{
+/* Controls. Prefixing shared primitives with .app is deliberate compatibility
+ * specificity; it is not page-specific styling. */
+.app button,.app .btn,.app .gh,.app .dg,.app .ib,.app .search,
+.app input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+.app select,.app textarea,.app .xm-select-trigger,.app .xm-select-button{
   border-radius:var(--nx-control-radius);
 }
 
-input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
-select,textarea,.xm-select-trigger,.xm-select-button,
-.search,.gh,.dg,.ib{
+.app input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+.app select,.app textarea,.app .xm-select-trigger,.app .xm-select-button,
+.app .search,.app .gh,.app .dg,.app .ib{
   background:var(--nx-control-bg);
   border:1px solid var(--nx-border);
   box-shadow:var(--nx-control-shadow);
 }
 
-input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
-select,.xm-select-trigger,.xm-select-button{
+.app input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+.app select,.app .xm-select-trigger,.app .xm-select-button{
   min-height:var(--nx-control-h);
   font-size:.88rem;
 }
-textarea{font-size:.88rem;line-height:1.5}
-.search{min-height:var(--nx-control-h)}
-.gh,.dg{min-height:var(--nx-control-h-sm);padding:.52rem .82rem}
-.ib{width:var(--nx-control-h);height:var(--nx-control-h)}
-.btn{
+.app textarea{font-size:.88rem;line-height:1.5}
+.app .search{min-height:var(--nx-control-h)}
+.app .gh,.app .dg{min-height:var(--nx-control-h-sm);padding:.52rem .82rem}
+.app .ib{width:var(--nx-control-h);height:var(--nx-control-h)}
+.app .btn{
   min-height:var(--nx-control-h);
   padding:.56rem 1rem;
   background:var(--a);
@@ -111,19 +117,19 @@ textarea{font-size:.88rem;line-height:1.5}
   font-weight:720;
 }
 
-:where(button,.btn,.gh,.dg,.ib,.search,[role="button"],nav a,nav .more){
+:where(.app button,.app .btn,.app .gh,.app .dg,.app .ib,.app .search,.app [role="button"],.app nav a,.app nav .more){
   transition:background-color .14s ease,border-color .14s ease,color .14s ease,opacity .14s ease;
   text-shadow:none;
 }
 @media(hover:hover) and (pointer:fine){
-  :where(.gh,.dg,.ib,.search,nav a,nav .more,[role="button"]):not(:disabled):not([aria-disabled="true"]):hover{
+  :where(.app .gh,.app .dg,.app .ib,.app .search,.app nav a,.app nav .more,.app [role="button"]):not(:disabled):not([aria-disabled="true"]):hover{
     transform:none;
     background:var(--nx-hover-bg);
     border-color:var(--nx-hover-border);
     color:var(--tx);
     box-shadow:none;
   }
-  .btn:not(:disabled):hover{
+  .app .btn:not(:disabled):hover{
     transform:none;
     background:color-mix(in srgb,var(--a) 90%,var(--tx) 10%);
     border-color:color-mix(in srgb,var(--a) 78%,var(--tx) 10%);
@@ -132,27 +138,27 @@ textarea{font-size:.88rem;line-height:1.5}
   }
 }
 
-:where(button,.btn,.gh,.dg,.ib,.search,[role="button"],input,select,textarea,.xm-select-trigger,.xm-select-button):focus-visible{
+:where(.app button,.app .btn,.app .gh,.app .dg,.app .ib,.app .search,.app [role="button"],.app input,.app select,.app textarea,.app .xm-select-trigger,.app .xm-select-button):focus-visible{
   outline:2px solid var(--nx-focus);
   outline-offset:2px;
   box-shadow:none;
 }
 
 /* Navigation */
-nav a,nav .more{
+.app nav a,.app nav .more{
   min-height:2.8rem;
   border-radius:var(--nx-control-radius);
   border-color:transparent;
 }
-nav a.on{
+.app nav a.on{
   color:var(--tx);
   background:color-mix(in srgb,var(--a) 10%,var(--nx-item-bg));
   border-color:color-mix(in srgb,var(--a) 24%,var(--nx-border));
 }
-nav a.on::before{box-shadow:none}
+.app nav a.on::before{box-shadow:none}
 
 /* Segmented controls */
-.seg{
+:is(.app,dialog) .seg{
   display:inline-flex;
   align-items:center;
   gap:2px;
@@ -162,7 +168,7 @@ nav a.on::before{box-shadow:none}
   border-radius:var(--nx-control-radius);
   box-shadow:none;
 }
-.seg button{
+:is(.app,dialog) .seg button{
   min-height:2.15rem;
   padding:.4rem .68rem;
   border:1px solid transparent;
@@ -171,7 +177,7 @@ nav a.on::before{box-shadow:none}
   font-weight:590;
   box-shadow:none;
 }
-.seg button.on{
+:is(.app,dialog) .seg button.on{
   background:var(--ui-segment-active-bg);
   border-color:var(--ui-segment-active-border);
   color:var(--ui-segment-active-color);
@@ -179,12 +185,12 @@ nav a.on::before{box-shadow:none}
   font-weight:730;
 }
 @media(hover:hover) and (pointer:fine){
-  .seg button:not(.on):hover{
+  :is(.app,dialog) .seg button:not(.on):hover{
     background:var(--ui-segment-hover-bg);
     border-color:transparent;
     color:var(--tx);
   }
-  .seg button.on:hover{
+  :is(.app,dialog) .seg button.on:hover{
     background:var(--ui-segment-active-bg);
     border-color:var(--ui-segment-active-border);
     box-shadow:var(--ui-segment-active-shadow);
@@ -192,15 +198,15 @@ nav a.on::before{box-shadow:none}
 }
 
 /* Composite controls own exactly one material shell. */
-[data-ui-control="shell"],.precision-number,.palette-hex-editor{
+.app [data-ui-control="shell"],.app .precision-number,.app .palette-hex-editor{
   background:var(--nx-control-bg);
   border:1px solid var(--nx-border);
   border-radius:var(--nx-control-radius);
   box-shadow:var(--nx-control-shadow);
 }
-[data-ui-control="inner"],
-.precision-number input[type="number"],
-.palette-hex-editor input{
+.app [data-ui-control="inner"],
+.app .precision-number input[type="number"],
+.app .palette-hex-editor input{
   background:transparent;
   border:0;
   box-shadow:none;
@@ -208,25 +214,26 @@ nav a.on::before{box-shadow:none}
 }
 
 /* Tables */
-table{border-collapse:separate;border-spacing:0}
-thead th{
+.app table{border-collapse:separate;border-spacing:0}
+.app thead th{
   color:var(--nx-muted);
   font-size:.68rem;
   letter-spacing:.045em;
   text-transform:uppercase;
   border-bottom-color:var(--nx-separator);
 }
-tbody td{border-bottom-color:var(--nx-separator)}
-tbody tr:last-child td{border-bottom-color:transparent}
+.app tbody td{border-bottom-color:var(--nx-separator)}
+.app tbody tr:last-child td{border-bottom-color:transparent}
 @media(hover:hover) and (pointer:fine){
-  tbody tr:hover td{background:color-mix(in srgb,var(--tx) 2.5%,transparent)}
+  .app tbody tr:hover td{background:color-mix(in srgb,var(--tx) 2.5%,transparent)}
 }
 
 /* Chips and status pills stay quiet; accent is reserved for active state. */
-.chip,.tag,[class*="-pill"]{box-shadow:none}
+.app .chip,.app .tag,.app [class*="-pill"]{box-shadow:none}
 
 /* Dialog material. Special editors may own geometry, but not a second material
- * language. */
+ * language. The #dlg selector deliberately outranks legacy surface-specific
+ * dialog rules without introducing material branches. */
 dialog{
   color:var(--tx);
   background:transparent;
@@ -235,7 +242,8 @@ dialog::backdrop{
   background:var(--xm-modal-dim,rgba(2,7,12,.72));
   backdrop-filter:blur(var(--xm-modal-blur,10px));
 }
-dialog .box,dialog form.box,[data-ui-surface="dialog"]{
+dialog#dlg .box,dialog#dlg form.box,dialog#dlg [data-ui-surface="dialog"],
+dialog[data-ui-surface="dialog"]{
   background:var(--nx-dialog-bg);
   border:1px solid var(--nx-border-strong);
   border-radius:var(--nx-card-radius);
@@ -243,32 +251,32 @@ dialog .box,dialog form.box,[data-ui-surface="dialog"]{
   backdrop-filter:var(--nx-backdrop);
   -webkit-backdrop-filter:var(--nx-backdrop);
 }
-dialog [data-ui-surface="section"]{
+dialog#dlg [data-ui-surface="section"],dialog [data-ui-surface="section"]{
   background:var(--nx-dialog-section-bg);
   border-color:var(--nx-separator);
   box-shadow:none;
   backdrop-filter:none;
   -webkit-backdrop-filter:none;
 }
-dialog :where(input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),select,textarea,.xm-select-trigger,.xm-select-button){
+dialog#dlg :where(input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),select,textarea,.xm-select-trigger,.xm-select-button){
   background:var(--nx-dialog-control-bg);
 }
 
 /* Empty states */
-.empty,[data-empty-state],[data-ui-layout="empty"] .empty{
+.app .empty,.app [data-empty-state],.app [data-ui-layout="empty"] .empty{
   color:var(--nx-muted);
 }
-.empty h2,.empty h3,[data-empty-state] h2,[data-empty-state] h3{color:var(--tx)}
+.app .empty h2,.app .empty h3,.app [data-empty-state] h2,.app [data-empty-state] h3{color:var(--tx)}
 
 /* Settings rows are structural, never mini-cards. */
-.appearance-layout .setting-row{
+.app .appearance-layout .setting-row{
   background:transparent;
   border-top-color:var(--nx-separator);
   box-shadow:none;
   backdrop-filter:none;
   -webkit-backdrop-filter:none;
 }
-.appearance-layout .setting-row:first-of-type{border-top-color:transparent}
+.app .appearance-layout .setting-row:first-of-type{border-top-color:transparent}
 
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}
