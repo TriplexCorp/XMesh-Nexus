@@ -1,0 +1,17 @@
+/* User drawer viewport safety.
+ * Shared dialog behavior stays in the three system owners; this feature only
+ * constrains the user details drawer that can exceed short desktop viewports. */
+dialog.user-modal,
+dialog.user-modal > .user-canvas {
+  box-sizing: border-box;
+}
+
+dialog.user-modal > .user-canvas {
+  max-height: min(100%, calc(100dvh - 2rem));
+}
+
+@media (max-width: 560px) {
+  dialog.user-modal > .user-canvas {
+    max-height: min(100%, calc(100dvh - 1rem));
+  }
+}
