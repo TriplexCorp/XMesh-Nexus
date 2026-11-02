@@ -8,8 +8,8 @@
 <meta name="theme-color" content="#071b15">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400..800&family=Inter:wght@400..800&family=Golos+Text:wght@400..800&family=Rubik:wght@400..800&family=Nunito+Sans:wght@400..800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Roboto:wght@400..800&family=PT+Sans:wght@400;700&family=Montserrat:wght@400..800&family=Ubuntu:wght@400;500;700&family=Open+Sans:wght@400..800&family=Source+Sans+3:wght@400..800&family=Fira+Sans:wght@400;500;600;700&family=Jost:wght@400..800&display=swap" rel="stylesheet">
-<!-- Legacy structural CSS. No new global presentation rules belong here. -->
-<link rel="stylesheet" href="/styles/legacy/styles.css?v=nodes-density-20261026">
+<!-- Legacy compatibility is intentionally quarantined below all modern CSS in the cascade. -->
+<style id="xmesh-legacy-compat">@import url("/styles/legacy/styles.css?v=nodes-density-20261026") layer(xmesh-legacy);</style>
 <!-- Feature-local geometry. Design System v3 below is the only global authority. -->
 <link rel="stylesheet" href="/styles/features/nodes/node-dialogs.css?v=20261101-user-create-v2">
 <link rel="stylesheet" href="/styles/features/users/user-create-v3.css?v=20261101-enterprise-v4&r=20261101-create-v5">
@@ -27,7 +27,7 @@
 <link rel="stylesheet" href="/styles/features/xray-studio/xray-studio-reality-dialog.css?v=20261101-horizontal-v1">
 <link rel="stylesheet" href="/styles/features/settings/settings-updates.css?v=20261026-settings-actions-v1">
 <link rel="stylesheet" href="/styles/features/nodes/diagnostics.css?v=20261101-operations-v1">
-<link rel="stylesheet" href="/styles/system/nexus-ui-v3.css?v=a97bd184dd80">
+<link rel="stylesheet" href="/styles/system/nexus-ui-v3.css?v=eaf7ac133c3b">
 </head>
 <body>
 <div class="app">
