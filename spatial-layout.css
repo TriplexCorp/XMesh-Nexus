@@ -1,0 +1,432 @@
+/* XMesh Nexus spatial composition layer.
+ * Shared geometry only: no Classic / Glass / Raised branches and no private
+ * feature material. Loaded by ui-builder.js after the main design system.
+ *
+ * Purpose: make content use the available workspace deliberately, eliminate
+ * accidental dead zones and keep low-count states / settings usable within the
+ * first desktop viewport without shrinking controls into an admin-table UI. */
+
+:root{
+  --sp-gap:clamp(.85rem,.72vw + .48rem,1.15rem);
+  --sp-row-gap:clamp(.62rem,.48vw + .36rem,.9rem);
+  --sp-toolbar-pad:clamp(.78rem,.56vw + .52rem,1rem);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Settings — content-driven height, balanced two-column composition           */
+/* -------------------------------------------------------------------------- */
+.appearance-layout{
+  display:grid!important;
+  grid-template-columns:minmax(0,1.02fr) minmax(0,.98fr)!important;
+  gap:var(--sp-gap)!important;
+  align-items:start!important;
+}
+.appearance-layout>.appearance-column{
+  display:grid!important;
+  grid-auto-rows:max-content!important;
+  align-content:start!important;
+  gap:var(--sp-gap)!important;
+  min-width:0;
+}
+.appearance-layout .card{
+  min-height:0!important;
+  height:auto!important;
+  align-self:start!important;
+}
+.appearance-layout .settings-appearance-header,
+.appearance-layout .appearance-card-heading,
+.appearance-layout .appearance-column>section.card>div:first-child{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:1rem;
+  margin-bottom:.55rem;
+}
+.appearance-layout .settings-appearance-header h3,
+.appearance-layout .appearance-card-heading h3,
+.appearance-layout .appearance-column>section.card>div:first-child h3{
+  font-size:1rem;
+  line-height:1.25;
+}
+.appearance-layout .settings-appearance-header small,
+.appearance-layout .appearance-card-heading small,
+.appearance-layout .appearance-column>section.card>div:first-child small{
+  font-size:.72rem;
+  line-height:1.4;
+  color:var(--ds-muted,var(--mu));
+}
+.appearance-layout .setting-row{
+  min-height:0!important;
+  padding:.68rem 0!important;
+  gap:1rem!important;
+  grid-template-columns:minmax(0,1fr) minmax(12rem,.92fr)!important;
+  align-items:center!important;
+}
+.appearance-layout .setting-copy{align-self:center!important}
+.appearance-layout .setting-copy :is(b,strong){font-size:.86rem!important}
+.appearance-layout .setting-copy :is(small,p){font-size:.72rem!important;line-height:1.4!important}
+.appearance-layout .setting-control{min-width:0;justify-self:stretch}
+.appearance-layout .setting-control>.seg{margin-left:auto}
+
+/* Theme presets need horizontal room. The copy becomes a compact heading and
+ * the palette fills the card width instead of being squeezed into one column. */
+.appearance-layout .appearance-preset-row{
+  display:grid!important;
+  grid-template-columns:1fr!important;
+  gap:.62rem!important;
+  align-items:start!important;
+}
+.appearance-layout .appearance-preset-row>.setting-copy{
+  display:flex!important;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:1rem;
+}
+.appearance-layout .palette-preset-grid{
+  width:100%;
+  display:grid!important;
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  gap:.46rem!important;
+}
+.appearance-layout .palette-preset{
+  min-width:0!important;
+  min-height:3.2rem!important;
+  padding:.5rem .58rem!important;
+}
+.appearance-layout .palette-preset-demo{min-width:0!important}
+.appearance-layout .palette-preset-foot{font-size:.67rem!important}
+
+/* Custom palette is one compact footer row. */
+.appearance-layout .appearance-column:first-child>section.card:first-child .setting-row:last-child{
+  grid-template-columns:minmax(11rem,.78fr) minmax(0,1.22fr)!important;
+  align-items:end!important;
+}
+.appearance-layout .palette-hex-fields{
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  gap:.65rem!important;
+  width:100%;
+}
+.appearance-layout .palette-hex-field{min-width:0}
+.appearance-layout .palette-hex-editor{width:100%}
+
+/* Composition is intentionally row-dense: descriptions establish hierarchy,
+ * controls stay right-aligned, and no row owns a decorative fixed height. */
+.appearance-layout .appearance-column:nth-child(2)>section.card:first-child .setting-row{
+  padding:.72rem 0!important;
+}
+.appearance-layout .appearance-column:nth-child(2)>section.card:first-child .slider-control{
+  grid-template-columns:minmax(8rem,1fr) auto!important;
+}
+.appearance-layout .appearance-column:nth-child(2)>section.card:first-child input[type=range]{
+  min-width:8rem;
+}
+
+/* Lower settings cards begin immediately after the top cards. */
+.appearance-layout .color-slider-grid{
+  min-height:2.85rem!important;
+  padding:.36rem 0!important;
+  grid-template-columns:minmax(7.5rem,.42fr) minmax(12rem,1fr) 4rem!important;
+  gap:.8rem!important;
+}
+.appearance-layout .palette-draft-preview{margin-top:.55rem!important}
+.appearance-layout .palette-draft-actions{margin-top:.45rem!important}
+
+@media(max-width:1180px){
+  .appearance-layout{grid-template-columns:minmax(0,1fr)!important}
+  .appearance-layout>.appearance-column{gap:var(--sp-gap)!important}
+}
+@media(max-width:720px){
+  .appearance-layout .setting-row,
+  .appearance-layout .appearance-column:first-child>section.card:first-child .setting-row:last-child{
+    grid-template-columns:minmax(0,1fr)!important;
+    align-items:start!important;
+  }
+  .appearance-layout .setting-control>.seg{margin-left:0}
+  .appearance-layout .palette-preset-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .appearance-layout .palette-hex-fields{grid-template-columns:1fr!important}
+  .appearance-layout .color-slider-grid{grid-template-columns:1fr auto!important}
+  .appearance-layout .color-slider-grid>label{grid-column:1/-1}
+}
+
+/* -------------------------------------------------------------------------- */
+/* Nodes — one utility rail, deliberate low-count state, wide single-node card */
+/* -------------------------------------------------------------------------- */
+.nodes-page{
+  position:relative;
+  display:grid!important;
+  gap:var(--sp-gap)!important;
+  align-content:start;
+}
+.nodes-page>.nodes-toolbar{
+  display:flex!important;
+  align-items:center!important;
+  min-height:0!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  background:transparent!important;
+}
+.nodes-page>.nodes-toolbar>.note{
+  margin:0;
+  font-size:.78rem;
+  line-height:1.45;
+}
+.nodes-page>.nodes-toolbar>:not(.note){display:none!important}
+
+.nodes-page .node-explorer{
+  display:grid!important;
+  grid-template-columns:minmax(20rem,2.4fr) auto minmax(9.5rem,.78fr) minmax(11.5rem,.9fr) auto auto auto;
+  align-items:end!important;
+  gap:.62rem!important;
+  margin:0!important;
+  padding:var(--sp-toolbar-pad)!important;
+  border:1px solid var(--ui-surface-border)!important;
+  border-radius:var(--ui-surface-panel-radius,var(--ui-radius))!important;
+  background:var(--ui-surface-panel-bg)!important;
+  box-shadow:var(--ui-surface-panel-shadow)!important;
+  backdrop-filter:var(--ui-surface-filter,none)!important;
+  -webkit-backdrop-filter:var(--ui-surface-filter,none)!important;
+}
+.nodes-page .node-explorer>label{min-width:0}
+.nodes-page .node-explorer>label>span,
+.nodes-page .node-grid-controls>.note{
+  display:block;
+  margin:0 0 .28rem;
+  font-size:.67rem!important;
+  font-weight:700;
+  color:var(--ds-muted,var(--mu));
+}
+.nodes-page .node-explorer-search{grid-column:auto!important}
+.nodes-page .node-explorer-search input{width:100%}
+.nodes-page .node-explorer-hosting{
+  align-self:end!important;
+  min-height:var(--ds-control-h-sm,2.45rem)!important;
+  padding:0 .2rem!important;
+}
+.nodes-page .node-explorer-reset{
+  min-height:var(--ds-control-h-sm,2.45rem)!important;
+  align-self:end!important;
+  padding-inline:.7rem!important;
+}
+.nodes-page .node-result-chip{
+  align-self:end;
+  display:inline-flex!important;
+  align-items:center;
+  justify-content:center;
+  min-height:var(--ds-control-h-sm,2.45rem);
+  padding:.48rem .75rem;
+  border:1px solid color-mix(in srgb,var(--a) 34%,var(--ui-surface-border));
+  border-radius:var(--ui-control-radius);
+  background:color-mix(in srgb,var(--a) 8%,var(--ui-surface-control-bg));
+  color:var(--tx)!important;
+  font-size:.78rem!important;
+  font-weight:760!important;
+  white-space:nowrap;
+}
+.nodes-page .node-grid-controls{
+  display:grid!important;
+  align-content:end;
+  gap:0!important;
+  margin:0!important;
+  min-width:max-content;
+}
+.nodes-page .node-grid-controls .seg{min-height:var(--ds-control-h-sm,2.45rem)}
+.nodes-page .node-create-action{
+  min-height:var(--ds-control-h-sm,2.45rem)!important;
+  align-self:end!important;
+  white-space:nowrap;
+}
+.nodes-page .node-explorer-pages{
+  align-self:end;
+  display:flex!important;
+  align-items:center;
+  justify-content:flex-end;
+  gap:.3rem!important;
+  min-height:var(--ds-control-h-sm,2.45rem);
+  margin:0!important;
+}
+.nodes-page .node-explorer-pages[data-single-page=true] button{display:none!important}
+.nodes-page .node-explorer-pages[data-single-page=true] [data-node-search-page]{
+  min-width:0;
+  padding:.45rem .15rem;
+  color:var(--ds-muted,var(--mu));
+  font-size:.72rem;
+}
+.nodes-page .node-explorer-meta:empty{display:none!important}
+.nodes-page .node-explorer-meta{
+  margin:0!important;
+  padding:0!important;
+  min-height:0!important;
+}
+.nodes-page .node-explorer-empty{margin:0!important}
+
+.nodes-page>.nodes{
+  width:100%;
+  gap:var(--sp-gap)!important;
+  align-items:start!important;
+  grid-auto-rows:auto!important;
+}
+.nodes-page>.nodes[data-node-count="1"]{
+  grid-template-columns:minmax(0,1fr)!important;
+}
+.nodes-page>.nodes[data-node-count="1"]>.nc{
+  width:100%;
+  min-width:0;
+  height:auto!important;
+  display:grid!important;
+  grid-template-columns:minmax(19rem,.82fr) minmax(28rem,1.38fr);
+  grid-template-areas:
+    "head head"
+    "summary metrics"
+    "actions actions";
+  gap:1rem 1.35rem!important;
+  padding:1.2rem 1.35rem!important;
+  align-items:start;
+}
+.nodes-page>.nodes[data-node-count="1"]>.nc>.h{
+  grid-area:head;
+  margin:0!important;
+  padding:0 0 .85rem;
+  border-bottom:1px solid var(--ds-hairline,var(--ui-separator));
+}
+.nodes-page>.nodes[data-node-count="1"] .node-live-badges{
+  margin-left:auto;
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  flex-wrap:wrap;
+  gap:.5rem;
+}
+.nodes-page>.nodes[data-node-count="1"] .node-summary-pane{
+  grid-area:summary;
+  min-width:0;
+  display:grid;
+  gap:.72rem;
+  align-content:start;
+  padding-right:1.2rem;
+  border-right:1px solid var(--ds-hairline,var(--ui-separator));
+}
+.nodes-page>.nodes[data-node-count="1"] .node-summary-pane>.kvg{
+  margin:0!important;
+  padding:.05rem 0 .75rem!important;
+  border-bottom:1px solid var(--ds-hairline,var(--ui-separator));
+  gap:.9rem 1.15rem!important;
+}
+.nodes-page>.nodes[data-node-count="1"] .node-summary-pane>.kvg>div+div{
+  padding-left:1.15rem;
+  border-left:1px solid var(--ds-hairline,var(--ui-separator));
+}
+.nodes-page>.nodes[data-node-count="1"] .node-summary-pane :is(.node-tls-health,.node-ip-rotation){
+  margin:0!important;
+  min-height:0!important;
+}
+.nodes-page>.nodes[data-node-count="1"] .node-metrics-pane{
+  grid-area:metrics;
+  min-width:0;
+  display:grid;
+  gap:.8rem;
+  align-content:start;
+}
+.nodes-page>.nodes[data-node-count="1"] .node-gauges{
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:.62rem!important;
+}
+.nodes-page>.nodes[data-node-count="1"] .ngauge{
+  min-height:6.2rem;
+  display:grid!important;
+  grid-template-columns:auto minmax(0,1fr);
+  grid-template-rows:auto auto;
+  align-items:center;
+  justify-items:start!important;
+  gap:.05rem .7rem!important;
+  padding:.8rem .9rem!important;
+}
+.nodes-page>.nodes[data-node-count="1"] .ngauge .ringwrap{
+  grid-row:1/3;
+  width:3.35rem!important;
+  height:3.35rem!important;
+}
+.nodes-page>.nodes[data-node-count="1"] .ngauge .ng-label{
+  align-self:end;
+  font-size:.8rem!important;
+}
+.nodes-page>.nodes[data-node-count="1"] .ngauge small{
+  align-self:start;
+  text-align:left!important;
+}
+.nodes-page>.nodes[data-node-count="1"] .node-speed{
+  margin:0!important;
+  padding:.2rem 0 0!important;
+}
+.nodes-page>.nodes[data-node-count="1"]>.nc>.acts{
+  grid-area:actions;
+  display:grid!important;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:.5rem!important;
+  padding-top:.95rem;
+  border-top:1px solid var(--ds-hairline,var(--ui-separator));
+}
+.nodes-page>.nodes[data-node-count="1"]>.nc>.acts>button{
+  width:100%;
+  min-width:0;
+  min-height:2.55rem!important;
+  justify-content:center;
+}
+.nodes-page>.nodes[data-node-count="1"]>.nc>.acts>[data-node-create-host]{
+  grid-column:1/-1;
+}
+
+/* Multi-node states retain the existing density semantics, only removing the
+ * fixed equal-row stretching that created unnecessary card height. */
+.nodes-page>.nodes:not([data-node-count="1"]){grid-auto-rows:auto!important}
+.nodes-page>.nodes:not([data-node-count="1"])>.nc{height:auto!important}
+
+@container nodes-grid (max-width:92rem){
+  .nodes-page .node-explorer{
+    grid-template-columns:minmax(18rem,2fr) auto minmax(10rem,1fr) minmax(11rem,1fr) auto;
+  }
+  .nodes-page .node-grid-controls,
+  .nodes-page .node-create-action{grid-row:2}
+  .nodes-page .node-grid-controls{grid-column:3/5}
+  .nodes-page .node-create-action{grid-column:5}
+  .nodes-page .node-explorer-pages{grid-row:2;grid-column:2}
+}
+@container nodes-grid (max-width:68rem){
+  .nodes-page .node-explorer{grid-template-columns:minmax(0,1.5fr) minmax(10rem,1fr) minmax(10rem,1fr)}
+  .nodes-page .node-explorer-search{grid-column:1/3!important}
+  .nodes-page .node-result-chip{grid-column:3}
+  .nodes-page .node-explorer-hosting{grid-column:1}
+  .nodes-page .node-explorer-reset{grid-column:2}
+  .nodes-page .node-explorer-pages{grid-column:3;grid-row:auto}
+  .nodes-page .node-grid-controls{grid-column:1/3;grid-row:auto}
+  .nodes-page .node-create-action{grid-column:3;grid-row:auto}
+  .nodes-page>.nodes[data-node-count="1"]>.nc{
+    grid-template-columns:minmax(0,1fr);
+    grid-template-areas:"head" "summary" "metrics" "actions";
+  }
+  .nodes-page>.nodes[data-node-count="1"] .node-summary-pane{
+    padding-right:0;
+    padding-bottom:.8rem;
+    border-right:0;
+    border-bottom:1px solid var(--ds-hairline,var(--ui-separator));
+  }
+}
+@container nodes-grid (max-width:45rem){
+  .nodes-page .node-explorer{grid-template-columns:minmax(0,1fr)!important}
+  .nodes-page .node-explorer>*{grid-column:1!important;grid-row:auto!important}
+  .nodes-page .node-explorer-pages{justify-content:flex-start}
+  .nodes-page>.nodes[data-node-count="1"] .node-gauges{grid-template-columns:1fr!important}
+  .nodes-page>.nodes[data-node-count="1"]>.nc>.acts{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@container nodes-grid (max-width:30rem){
+  .nodes-page>.nodes[data-node-count="1"]>.nc>.acts{grid-template-columns:1fr}
+  .nodes-page>.nodes[data-node-count="1"]>.nc>.acts>[data-node-create-host]{grid-column:auto}
+  .nodes-page>.nodes[data-node-count="1"] .node-summary-pane>.kvg{grid-template-columns:1fr!important}
+  .nodes-page>.nodes[data-node-count="1"] .node-summary-pane>.kvg>div+div{
+    padding-left:0;
+    padding-top:.7rem;
+    border-left:0;
+    border-top:1px solid var(--ds-hairline,var(--ui-separator));
+  }
+}
