@@ -3,49 +3,46 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const app=fs.readFileSync('app.js','utf8');
-const css=fs.readFileSync('styles.css','utf8');
+const layout=fs.readFileSync('nexus-v3-layout.css','utf8');
 const html=fs.readFileSync('index.html','utf8');
 
 assert.match(app,/<section class="nodes-page"><div class="bar2 nodes-toolbar">/,'Page needs a dedicated grid container');
 assert.match(app,/<div class="nodes" data-grid-mode="\$\{gridMode\}" data-node-count="\$\{r\.items\.length\}"><\/div>/,'Nodes grid must expose density mode and count for lazy rendering');
 assert.match(app,/localStorage\.getItem\(NODE_GRID_KEY\)/,'Current mode must persist across navigation');
-assert.match(css,/\.nodes-page\{[^}]*container:nodes-grid \/ inline-size;/s,'Layout must use its available container width');
+assert.match(layout,/\.nodes-page\{[^}]*container:nodes-grid \/ inline-size/s,'Design System v3 must own the Nodes container query');
 for(const width of ['32rem','52rem','70rem']){
- assert(css.includes('@container nodes-grid (min-width:'+width+')'),'Missing grid breakpoint '+width);
+ assert(layout.includes('@container nodes-grid (min-width:'+width+')'),'Missing v3 grid breakpoint '+width);
 }
-const columns=/@container nodes-grid \(min-width:70rem\)\{([\s\S]*?)\n\}/.exec(css)?.[1];
-assert(columns,'Large container columns missing');
+
+const large=/@container nodes-grid \(min-width:70rem\)\{([\s\S]*?)\n\}/.exec(layout)?.[1];
+assert(large,'Large v3 Nodes grid block missing');
 for(const [mode,count] of [['compact',4],['standard',3],['spacious',2]]){
- assert(columns.includes('.nodes-page>.nodes[data-grid-mode='+mode+']{\n    grid-template-columns:repeat('+count+',minmax(0,1fr));'),
+ assert(large.includes('.nodes-page>.nodes[data-grid-mode='+mode+']{grid-template-columns:repeat('+count+',minmax(0,1fr))}'),
   mode+' must display '+count+' columns when enough nodes exist');
 }
-assert(columns.includes('.nodes-page>.nodes[data-node-count="3"][data-grid-mode=compact]'),
- 'Compact 3-node list must not waste a fourth column');
-for(const mode of ['compact','spacious']){
- assert(css.includes('.nodes-page>.nodes[data-grid-mode='+mode+']>.nc{'),'Density must affect cards, not only grid columns');
+assert(large.includes('.nodes-page>.nodes[data-node-count="3"][data-grid-mode=compact]{grid-template-columns:repeat(3,minmax(0,1fr))}'),
+ 'Compact 3-node state must not preserve a phantom fourth column');
+assert(large.includes('.nodes-page>.nodes[data-node-count="2"]{grid-template-columns:repeat(2,minmax(0,1fr))}'),
+ 'Two nodes must deliberately use both available columns');
+assert(large.includes('.nodes-page>.nodes[data-node-count="1"]{grid-template-columns:minmax(0,1fr)}'),
+ 'One node must expand to the available workspace instead of staying a narrow fleet card');
+
+assert.match(layout,/\.nodes-page>\.nodes\[data-node-count="1"\]>\.nc\{[\s\S]*max-width:none/,
+ 'Single-node card must not carry a historical narrow max-width');
+for(const mode of ['compact','standard','spacious']){
+ assert(layout.includes('.nodes-page>.nodes[data-grid-mode='+mode+']>.nc{padding:'),
+  'Density '+mode+' must visibly affect card rhythm in v3');
+ assert(layout.includes('.nodes-page>.nodes[data-node-count="1"][data-grid-mode='+mode+']>.nc{gap:'),
+  'Single-node '+mode+' must remain visibly distinct without shrinking card width');
 }
-// Low node counts must still have three visibly distinct density choices.
-for(const [mode,width] of [['compact',22],['standard',30],['spacious',40]]){
- assert(css.includes('.nodes-page>.nodes[data-node-count="1"][data-grid-mode='+mode+']{\n    grid-template-columns:minmax(0,'+width+'rem);'),
-  'One node must show a different card width for '+mode);
-}
-assert(css.includes('@container nodes-grid (min-width:52rem){') &&
-  css.includes('.nodes-page>.nodes[data-node-count="2"]{'),
- 'Two nodes must use the available container width at desktop breakpoints');
-// Regression: 3 nodes in Standard must form THREE full-width columns on
-// desktop; an old 2-column + max-width override left a huge empty right side.
-const gridRules=css.slice(css.indexOf('/* Nodes density modes'),css.indexOf('/* Node IP rotation status'));
-assert(gridRules.includes('.nodes-page>.nodes[data-grid-mode=standard]{\n    grid-template-columns:repeat(3,minmax(0,1fr));'),
- 'Standard grid must use three columns at 70rem+');
-assert.doesNotMatch(gridRules,/\.nodes-page>\.nodes\[data-node-count="3"\]\[data-grid-mode=standard\]\s*\{/,
- 'Three-node Standard cannot override the desktop 3-column grid');
-assert.doesNotMatch(gridRules,/\.nodes-page>\.nodes\[data-node-count="2"\]\[data-grid-mode=(?:standard|compact|spacious)\]\s*\{/,
- 'Two-node layout cannot be clamped to a narrow grid');
-assert.doesNotMatch(gridRules,/max-width:\s*(?:48|64|68)rem/,
- 'Two- and three-node grids must fill available horizontal space');
-assert.match(html,/styles\.css\?v=[a-z0-9-]+/,'Stylesheet must have a cache-busting key');
+assert.doesNotMatch(layout,/data-node-count="1"[^\n]*grid-template-columns:minmax\(0,(?:22|30|40)rem\)/,
+ 'Design System v3 must not restore the historical tiny single-node widths');
+assert.match(layout,/body \.app \.nodes-page\.card,[\s\S]*background:transparent/,
+ 'Nodes page outer wrapper must stay structural instead of becoming a giant enclosing card');
+
+assert.match(html,/nexus-ui-v3\.css\?v=[a-z0-9-]+/,'Nodes presentation must ship through Design System v3');
 assert.match(html,/app\.js\?v=[a-z0-9-]+/);
-assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length,'CSS brace balance');
+assert.equal((layout.match(/\{/g)||[]).length,(layout.match(/\}/g)||[]).length,'v3 layout CSS brace balance');
 new Function(app);
 
 // Exercise the real delegated click handler, rather than testing a copy.
@@ -89,4 +86,4 @@ for(const mode of ['compact','spacious','standard']){
 const prior=storage.get('xmeshNexusGridView');
 listeners.click({target:{closest:()=>({dataset:{nodeGridMode:'invalid'}})}});
 assert.equal(storage.get('xmeshNexusGridView'),prior,'Invalid mode should be ignored');
-console.log('Nodes grid responsive layout and click/persistence: OK');
+console.log('Design System v3 Nodes grid responsive layout and click/persistence: OK');

@@ -1,0 +1,241 @@
+/* XMesh Nexus Design System v3 / Foundation
+ * Tokens, density, radii and material variants only.
+ * No page selectors belong in this file.
+ */
+
+:root{
+  --nx-control-h:2.72rem;
+  --nx-control-h-sm:2.35rem;
+  --nx-control-h-lg:3rem;
+  --nx-space-1:.35rem;
+  --nx-space-2:.55rem;
+  --nx-space-3:.78rem;
+  --nx-space-4:1rem;
+  --nx-space-5:1.25rem;
+  --nx-space-6:1.55rem;
+  --nx-page-gap:clamp(.9rem,.55vw + .55rem,1.3rem);
+  --nx-card-pad:clamp(1rem,.6vw + .72rem,1.35rem);
+  --nx-section-pad:clamp(.8rem,.45vw + .62rem,1.05rem);
+  --nx-inline-gap:clamp(.55rem,.35vw + .38rem,.82rem);
+  --nx-content-max:none;
+  --nx-card-radius:var(--ui-radius,18px);
+  --nx-control-radius:var(--ui-control-radius,10px);
+  --nx-section-radius:max(10px,calc(var(--nx-card-radius) - 4px));
+  --nx-item-radius:max(8px,calc(var(--nx-control-radius) + 2px));
+  --nx-text-xs:.72rem;
+  --nx-text-sm:.8rem;
+  --nx-text-md:.9rem;
+  --nx-text-lg:1.04rem;
+  --nx-title:1.5rem;
+  --nx-muted:color-mix(in srgb,var(--mu) 92%,var(--tx) 8%);
+  --nx-focus:color-mix(in srgb,var(--a) 76%,var(--tx) 24%);
+  --nx-separator:color-mix(in srgb,var(--tx) 6%,transparent);
+  --nx-border:color-mix(in srgb,var(--ln) 84%,var(--tx) 4%);
+  --nx-border-strong:color-mix(in srgb,var(--border-strong,var(--ln)) 88%,var(--tx) 5%);
+
+  --nx-panel-bg:var(--s1);
+  --nx-dialog-bg:var(--s1);
+  --nx-section-bg:color-mix(in srgb,var(--s2) 38%,var(--s1));
+  --nx-item-bg:color-mix(in srgb,var(--s1) 86%,var(--s2));
+  --nx-control-bg:color-mix(in srgb,var(--s1) 91%,var(--s2));
+  --nx-floating-bg:color-mix(in srgb,var(--s1) 96%,var(--s2));
+  --nx-dialog-section-bg:color-mix(in srgb,var(--s2) 25%,transparent);
+  --nx-dialog-control-bg:color-mix(in srgb,var(--s1) 89%,var(--s2));
+  --nx-panel-shadow:0 18px 48px -38px rgba(0,0,0,.72);
+  --nx-dialog-shadow:0 30px 82px -28px rgba(0,0,0,.72);
+  --nx-section-shadow:none;
+  --nx-item-shadow:none;
+  --nx-control-shadow:none;
+  --nx-floating-shadow:0 24px 64px -32px rgba(0,0,0,.76);
+  --nx-backdrop:none;
+  --nx-hover-bg:color-mix(in srgb,var(--tx) 4.5%,transparent);
+  --nx-hover-border:color-mix(in srgb,var(--tx) 12%,var(--nx-border));
+  --nx-selected-bg:color-mix(in srgb,var(--a) 10%,var(--nx-item-bg));
+  --nx-selected-border:color-mix(in srgb,var(--a) 42%,var(--nx-border));
+
+  /* Compatibility aliases. Feature modules consume these names but do not own
+   * them anymore. This keeps the v3 migration non-destructive. */
+  --ui-surface-panel-bg:var(--nx-panel-bg);
+  --ui-surface-dialog-bg:var(--nx-dialog-bg);
+  --ui-surface-section-bg:var(--nx-section-bg);
+  --ui-surface-item-bg:var(--nx-item-bg);
+  --ui-surface-control-bg:var(--nx-control-bg);
+  --ui-surface-floating-bg:var(--nx-floating-bg);
+  --ui-dialog-section-bg:var(--nx-dialog-section-bg);
+  --ui-dialog-control-bg:var(--nx-dialog-control-bg);
+  --ui-surface-border:var(--nx-border);
+  --ui-surface-border-strong:var(--nx-border-strong);
+  --ui-dialog-section-border:var(--nx-separator);
+  --ui-separator:var(--nx-separator);
+  --ui-surface-panel-shadow:var(--nx-panel-shadow);
+  --ui-surface-dialog-shadow:var(--nx-dialog-shadow);
+  --ui-surface-section-shadow:var(--nx-section-shadow);
+  --ui-surface-item-shadow:var(--nx-item-shadow);
+  --ui-surface-control-shadow:var(--nx-control-shadow);
+  --ui-surface-floating-shadow:var(--nx-floating-shadow);
+  --ui-surface-filter:var(--nx-backdrop);
+  --ui-surface-panel-radius:var(--nx-card-radius);
+  --ui-surface-section-radius:var(--nx-section-radius);
+  --ui-surface-item-radius:var(--nx-item-radius);
+  --ui-space-section:var(--nx-section-pad);
+  --ui-space-item:var(--nx-space-3);
+
+  --ui-segment-track-bg:var(--nx-control-bg);
+  --ui-segment-track-border:var(--nx-border);
+  --ui-segment-idle-color:color-mix(in srgb,var(--tx) 34%,var(--mu));
+  --ui-segment-hover-bg:color-mix(in srgb,var(--a) 7%,transparent);
+  --ui-segment-active-bg:var(--nx-selected-bg);
+  --ui-segment-active-border:var(--nx-selected-border);
+  --ui-segment-active-color:var(--tx);
+  --ui-segment-active-shadow:0 1px 0 color-mix(in srgb,var(--tx) 7%,transparent);
+
+  --ds-control-h:var(--nx-control-h);
+  --ds-control-h-sm:var(--nx-control-h-sm);
+  --ds-control-h-lg:var(--nx-control-h-lg);
+  --ds-page-gap:var(--nx-page-gap);
+  --ds-card-pad:var(--nx-card-pad);
+  --ds-section-gap:var(--nx-space-4);
+  --ds-text-xs:var(--nx-text-xs);
+  --ds-text-sm:var(--nx-text-sm);
+  --ds-text-md:var(--nx-text-md);
+  --ds-text-lg:var(--nx-text-lg);
+  --ds-title:var(--nx-title);
+  --ds-muted:var(--nx-muted);
+  --ds-hairline:var(--nx-separator);
+  --ds-hover-bg:var(--nx-hover-bg);
+  --ds-hover-border:var(--nx-hover-border);
+  --ds-selected-bg:var(--nx-selected-bg);
+  --ds-selected-border:var(--nx-selected-border);
+  --ds-focus:var(--nx-focus);
+  --ds-soft-shadow:var(--nx-panel-shadow);
+
+  --sp-gap:var(--nx-page-gap);
+  --sp-row-gap:var(--nx-space-3);
+  --sp-toolbar-pad:var(--nx-space-3);
+}
+
+html[data-density=compact]{
+  --nx-control-h:2.45rem;
+  --nx-control-h-sm:2.2rem;
+  --nx-card-pad:.9rem;
+  --nx-section-pad:.72rem;
+  --nx-page-gap:.78rem;
+  --nx-inline-gap:.5rem;
+}
+html[data-density=comfortable]{
+  --nx-control-h:2.72rem;
+  --nx-control-h-sm:2.35rem;
+  --nx-card-pad:clamp(1rem,.6vw + .72rem,1.35rem);
+  --nx-section-pad:clamp(.8rem,.45vw + .62rem,1.05rem);
+  --nx-page-gap:clamp(.9rem,.55vw + .55rem,1.3rem);
+}
+html[data-density=spacious]{
+  --nx-control-h:2.92rem;
+  --nx-control-h-sm:2.55rem;
+  --nx-card-pad:clamp(1.18rem,.72vw + .78rem,1.55rem);
+  --nx-section-pad:clamp(.95rem,.55vw + .7rem,1.2rem);
+  --nx-page-gap:clamp(1.05rem,.7vw + .62rem,1.5rem);
+}
+
+html[data-borders=off]{
+  --nx-border:transparent;
+  --nx-border-strong:transparent;
+}
+html[data-borders=soft]{
+  --nx-border:color-mix(in srgb,var(--ln) 84%,var(--tx) 4%);
+  --nx-border-strong:color-mix(in srgb,var(--border-strong,var(--ln)) 88%,var(--tx) 5%);
+}
+html[data-borders=strong]{
+  --nx-border:color-mix(in srgb,var(--tx) 13%,var(--ln));
+  --nx-border-strong:color-mix(in srgb,var(--tx) 18%,var(--border-strong,var(--ln)));
+}
+
+/* Classic — opaque and calm. */
+html[data-surface=solid]{
+  --nx-panel-bg:var(--s1);
+  --nx-dialog-bg:var(--s1);
+  --nx-section-bg:color-mix(in srgb,var(--s2) 38%,var(--s1));
+  --nx-item-bg:color-mix(in srgb,var(--s1) 86%,var(--s2));
+  --nx-control-bg:color-mix(in srgb,var(--s1) 91%,var(--s2));
+  --nx-floating-bg:color-mix(in srgb,var(--s1) 96%,var(--s2));
+  --nx-dialog-section-bg:color-mix(in srgb,var(--s2) 25%,transparent);
+  --nx-dialog-control-bg:color-mix(in srgb,var(--s1) 89%,var(--s2));
+  --nx-panel-shadow:0 18px 48px -38px rgba(0,0,0,.72);
+  --nx-dialog-shadow:0 30px 82px -28px rgba(0,0,0,.72);
+  --nx-section-shadow:none;
+  --nx-item-shadow:none;
+  --nx-control-shadow:none;
+  --nx-floating-shadow:0 24px 64px -32px rgba(0,0,0,.76);
+  --nx-backdrop:none;
+}
+
+/* Glass — transparency exists only on material surfaces, never as a separate
+ * feature skin. */
+html[data-surface=glass]{
+  --nx-panel-bg:color-mix(in srgb,var(--s1) 62%,transparent);
+  --nx-dialog-bg:color-mix(in srgb,var(--s1) 72%,transparent);
+  --nx-section-bg:color-mix(in srgb,var(--s2) 45%,transparent);
+  --nx-item-bg:color-mix(in srgb,var(--s1) 55%,transparent);
+  --nx-control-bg:color-mix(in srgb,var(--s1) 52%,transparent);
+  --nx-floating-bg:color-mix(in srgb,var(--s1) 76%,transparent);
+  --nx-dialog-section-bg:color-mix(in srgb,var(--s2) 27%,transparent);
+  --nx-dialog-control-bg:color-mix(in srgb,var(--s1) 58%,transparent);
+  --nx-border:color-mix(in srgb,var(--tx) 11%,transparent);
+  --nx-border-strong:color-mix(in srgb,var(--tx) 16%,transparent);
+  --nx-separator:color-mix(in srgb,var(--tx) 5%,transparent);
+  --nx-panel-shadow:0 22px 64px -42px rgba(0,0,0,.82),inset 0 1px 0 color-mix(in srgb,var(--tx) 6%,transparent);
+  --nx-dialog-shadow:0 34px 96px -34px rgba(0,0,0,.86),inset 0 1px 0 color-mix(in srgb,var(--tx) 7%,transparent);
+  --nx-section-shadow:inset 0 1px 0 color-mix(in srgb,var(--tx) 4%,transparent);
+  --nx-item-shadow:inset 0 1px 0 color-mix(in srgb,var(--tx) 3%,transparent);
+  --nx-control-shadow:inset 0 1px 0 color-mix(in srgb,var(--tx) 3%,transparent);
+  --nx-floating-shadow:0 28px 70px -34px rgba(0,0,0,.84),inset 0 1px 0 color-mix(in srgb,var(--tx) 7%,transparent);
+  --nx-backdrop:blur(18px) saturate(132%);
+}
+
+/* Raised — neutral depth hierarchy, not accent-coloured slabs. */
+html[data-surface=raised]{
+  --nx-panel-bg:color-mix(in srgb,var(--s1) 94%,var(--s2) 6%);
+  --nx-dialog-bg:color-mix(in srgb,var(--s1) 92%,var(--s2) 8%);
+  --nx-section-bg:color-mix(in srgb,var(--s2) 42%,var(--s1));
+  --nx-item-bg:color-mix(in srgb,var(--s1) 78%,var(--s2) 22%);
+  --nx-control-bg:color-mix(in srgb,var(--s1) 82%,var(--s2) 18%);
+  --nx-floating-bg:color-mix(in srgb,var(--s1) 88%,var(--s2) 12%);
+  --nx-dialog-section-bg:color-mix(in srgb,var(--s2) 28%,transparent);
+  --nx-dialog-control-bg:color-mix(in srgb,var(--s1) 82%,var(--s2) 18%);
+  --nx-panel-shadow:0 24px 66px -38px rgba(0,0,0,.88),0 8px 22px -18px rgba(0,0,0,.5),inset 0 1px 0 color-mix(in srgb,var(--tx) 6%,transparent);
+  --nx-dialog-shadow:0 38px 110px -34px rgba(0,0,0,.92),0 16px 42px -28px rgba(0,0,0,.58),inset 0 1px 0 color-mix(in srgb,var(--tx) 7%,transparent);
+  --nx-section-shadow:0 8px 20px -18px rgba(0,0,0,.62),inset 0 1px 0 color-mix(in srgb,var(--tx) 4%,transparent);
+  --nx-item-shadow:0 5px 14px -12px rgba(0,0,0,.64),inset 0 1px 0 color-mix(in srgb,var(--tx) 4%,transparent);
+  --nx-control-shadow:0 4px 12px -10px rgba(0,0,0,.68),inset 0 1px 0 color-mix(in srgb,var(--tx) 5%,transparent);
+  --nx-floating-shadow:0 30px 78px -30px rgba(0,0,0,.9),0 12px 30px -20px rgba(0,0,0,.56),inset 0 1px 0 color-mix(in srgb,var(--tx) 6%,transparent);
+  --nx-backdrop:none;
+}
+
+html[data-theme=light][data-surface=raised]{
+  --nx-panel-bg:color-mix(in srgb,var(--s1) 74%,var(--s2) 26%);
+  --nx-dialog-bg:color-mix(in srgb,var(--s1) 80%,var(--s2) 20%);
+  --nx-section-bg:color-mix(in srgb,var(--s1) 42%,var(--s2) 58%);
+  --nx-item-bg:color-mix(in srgb,var(--s1) 60%,var(--s2) 40%);
+  --nx-control-bg:color-mix(in srgb,var(--s1) 67%,var(--s2) 33%);
+  --nx-floating-bg:color-mix(in srgb,var(--s1) 89%,var(--s2) 11%);
+  --nx-dialog-section-bg:color-mix(in srgb,var(--s2) 46%,var(--s1));
+  --nx-dialog-control-bg:color-mix(in srgb,var(--s1) 64%,var(--s2) 36%);
+  --nx-panel-shadow:0 18px 42px -16px rgba(36,48,68,.34),0 6px 14px -8px rgba(36,48,68,.2),inset 0 1px 0 rgba(255,255,255,.94);
+  --nx-dialog-shadow:0 30px 68px -18px rgba(36,48,68,.42),0 10px 24px -12px rgba(36,48,68,.24),inset 0 1px 0 rgba(255,255,255,.96);
+  --nx-section-shadow:0 8px 18px -14px rgba(36,48,68,.28),inset 0 1px 0 rgba(255,255,255,.82);
+  --nx-item-shadow:0 4px 10px -8px rgba(36,48,68,.24),inset 0 1px 0 rgba(255,255,255,.88);
+  --nx-control-shadow:0 3px 8px -6px rgba(36,48,68,.22),inset 0 1px 0 rgba(255,255,255,.9);
+  --nx-floating-shadow:0 22px 54px -22px rgba(36,48,68,.34),0 8px 20px -12px rgba(36,48,68,.22),inset 0 1px 0 rgba(255,255,255,.94);
+}
+
+@media(prefers-reduced-transparency:reduce){
+  html[data-surface=glass]{
+    --nx-panel-bg:var(--s1);
+    --nx-dialog-bg:var(--s1);
+    --nx-section-bg:color-mix(in srgb,var(--s2) 42%,var(--s1));
+    --nx-item-bg:color-mix(in srgb,var(--s1) 84%,var(--s2));
+    --nx-control-bg:color-mix(in srgb,var(--s1) 88%,var(--s2));
+    --nx-floating-bg:var(--s1);
+    --nx-backdrop:none;
+  }
+}

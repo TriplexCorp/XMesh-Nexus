@@ -6,7 +6,7 @@ const {spawnSync}=require('node:child_process');
 
 const ui=fs.readFileSync('app.js','utf8');
 const css=fs.readFileSync('styles.css','utf8');
-const globalHover=fs.readFileSync('global-hover.css','utf8');
+const v3Layout=fs.readFileSync('nexus-v3-layout.css','utf8');
 const index=fs.readFileSync('index.html','utf8');
 assert.match(ui,/const nodeCoreOrder=\['name','hosting','flag','profileId','addr','port','xrayLocalPort','tlsAutoProvision','tlsManualProvision','tlsDomain','tlsAcmeEmail','mult','limit','resetDay'\]/);
 assert.match(ui,/node-tls-settings/,'Node editor must keep the managed TLS certificate controls');
@@ -21,7 +21,7 @@ assert.match(ui,/data-node-pool-normalize/);
 assert.match(ui,/data-node-pool-clear/);
 assert.match(ui,/data-node-date-open/);
 assert.match(ui,/data-node-reset-traffic/);
-// The final node-specific CSS wins over older layout rules.
+// Historical editor geometry remains in styles.css until the renderer is migrated.
 const final=css.slice(css.lastIndexOf('/* Node editor · spacious, viewport-centered three-column workspace.'));
 assert.ok(final.length>3500,'Expected complete final node editor styles');
 assert.match(final,/grid-template-areas:"primary ips billing"/);
@@ -40,12 +40,11 @@ assert.match(final,/max-height:calc\(100dvh - 28px\)/);
 assert.match(final,/@media\(max-width:1100px\)/);
 assert.match(final,/@media\(max-width:700px\)/);
 assert.match(final,/@media\(max-height:700px\)/);
-// Loaded after styles.css: keep an explicit lower viewport gutter so the
-// centered node editor and its sticky action row cannot be clipped.
-assert.match(globalHover,/dialog#dlg\.node-wide\{[\s\S]*max-height:calc\(100dvh - 48px\)!important/);
-assert.match(globalHover,/dialog#dlg\.node-wide > form\.box\{[\s\S]*padding-bottom:max\(1\.15rem,env\(safe-area-inset-bottom\)\)!important/);
-assert.match(globalHover,/@media\(max-height:760px\)/,'Short viewports need a compact but still visible gutter');
-assert.match(index,/global-hover\.css\?v=20261101-node-viewport-v2/,'Viewport safety stylesheet must be cache-busted');
+// Viewport safety is now a shared v3 layout primitive, not a separate hover patch.
+assert.match(v3Layout,/dialog#dlg\.node-wide\{[\s\S]*max-height:calc\(100dvh - 48px\)!important/);
+assert.match(v3Layout,/dialog#dlg\.node-wide>form\.box\{[\s\S]*padding-bottom:max\(1\.15rem,env\(safe-area-inset-bottom\)\)!important/);
+assert.match(v3Layout,/@media\(max-height:760px\)/,'Short viewports need a compact but visible gutter');
+assert.match(index,/nexus-ui-v3\.css\?v=[a-z0-9-]+/,'Viewport safety must ship through the v3 entrypoint');
 const syntax=spawnSync(process.execPath,['--check','app.js'],{encoding:'utf8'});
 assert.equal(syntax.status,0,syntax.stderr);
-console.log('Centered three-column node editor + viewport-safe lower gutter: OK');
+console.log('Centered three-column node editor + Design System v3 viewport safety: OK');

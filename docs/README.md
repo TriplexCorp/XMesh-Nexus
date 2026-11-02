@@ -28,7 +28,7 @@ For future development, also read the current [Development Checkpoint — 2026-1
 | [PANEL_UPDATE_AND_TELEMETRY.md](PANEL_UPDATE_AND_TELEMETRY.md) | Owner-authorized panel update path, telemetry and accounting behavior |
 | [AUTONOMOUS_NODES.md](AUTONOMOUS_NODES.md) | Managed node/Agent operational model |
 | [DEVELOPMENT_CHECKPOINT_2026-10-31.md](DEVELOPMENT_CHECKPOINT_2026-10-31.md) | Current UX/security/config invariants that future development must preserve |
-| [UI_SYSTEM.md](UI_SYSTEM.md) | Authoritative panel design-system contract: shared Appearance materials, surface roles, runtime UI builder and rules for future UI work |
+| [UI_SYSTEM.md](UI_SYSTEM.md) | Authoritative Design System v3 contract: foundation, components, layout primitives, semantic UI builder and migration rules |
 | [ENTERPRISE_ROADMAP.md](ENTERPRISE_ROADMAP.md) | Current engineering/release roadmap and readiness boundaries |
 
 ## Xray configuration
@@ -94,7 +94,7 @@ When a product contract changes:
 
 - update the subsystem documentation in the same PR;
 - update [DEVELOPMENT_CHECKPOINT_2026-10-31.md](DEVELOPMENT_CHECKPOINT_2026-10-31.md) or replace it with a newer dated checkpoint when the old one becomes stale;
-- for panel UI changes, preserve the [UI System contract](UI_SYSTEM.md): feature CSS owns geometry, while shared Appearance material belongs to `ui-system.css` / `ui-builder.js`;
+- for panel UI changes, preserve the [UI System contract](UI_SYSTEM.md): feature CSS may own only genuinely feature-specific geometry; global tokens, material, components and workspace composition belong exclusively to the three-module `nexus-ui-v3.css` system, while `ui-builder.js` remains semantic and non-mutating;
 - update README feature claims if user-visible behavior changed;
 - keep installation ports/dependencies synchronized with `install.sh` and `compose.yaml`;
 - preserve the single-public-443 invariant unless an explicit replacement architecture is reviewed;

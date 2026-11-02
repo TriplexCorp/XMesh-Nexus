@@ -12,21 +12,22 @@
 - **Маршруты API.** Отдельный fallback для `/api/v1` возвращает HTTP 404 для отсутствующих API-маршрутов, вместо переадресации к статическим файлам с ответом 405.
 - **XRAY STUDIO.** Три компактных раздела переведены с устаревшего набора аргументов `(body,false,true)` на `(body,true)` без изменения их внешнего вида.
 - **Защита от регрессий.** `scripts/check-tech-debt.js` проверяет отсутствие удалённых UI-обработчиков, опасного механизма удаления локальных данных, подключений flagcdn и возвращения старого endpoint; выполняется в GitHub Actions. Ранее `scripts/check-node-create-action.js` усилен проверкой корректного CSS `border-radius`.
-- **CSS-дизайн-система — foundation.** Добавлены `ui-system.css` и `ui-builder.js`: Appearance теперь имеет единый финальный material-layer для Classic / Glass / Raised, border/radius/density settings и динамических SPA surfaces. Контракт и правила расширения закреплены в `docs/UI_SYSTEM.md`, регрессии блокирует `scripts/check-ui-system.js`.
+- **Design System v3.** Исторический каскад из `global-hover.css`, `ui-system.css`, `design-system-v2.css`, `spatial-engine.css` и `spatial-layout.css` заменён единым entrypoint `nexus-ui-v3.css`. Он разделён только на foundation / components / layout. `ui-builder.js` теперь семантический адаптер: он маркирует SPA-контент, но не измеряет геометрию, не двигает DOM и не создаёт presentation wrappers. Контракт закреплён в `docs/UI_SYSTEM.md`, регрессии блокирует `scripts/check-ui-system.js`.
 
 ## Сохранено сознательно
 
 - **`backend/migrations/0005_*.sql` и `0013_*.sql`:** исторические миграции не удаляются и не изменяются. Их контрольные суммы важны для обновления существующих PostgreSQL.
 - **Преобразование `inbound.settings.clients` в `settings.users`:** может понадобиться для старых сохранённых VLESS/VMess-профилей. Удалять допустимо только после инвентаризации реальных профилей и миграционного теста.
 - **Некоторые параметры клиентского Xray и старые названия отпечатков:** поддерживаются самим Xray/core и не считаются автоматически мёртвым кодом.
+- **`styles.css` как compatibility layer.** Значительная часть старой разметки всё ещё зависит от его структурных селекторов. Он остаётся загруженным до v3, но новые глобальные visual rules в него добавлять запрещено. Его дальнейшее сокращение должно идти вместе с миграцией соответствующих renderers, а не через ещё один override-файл.
 
 ## Следующие этапы
 
 1. **Модульная архитектура JS.** `app.js` включает UI, состояние, XRAY STUDIO, обработчики событий и HTTP-клиент. Разнести по функциональным модулям с небольшими, проверяемыми интерфейсами без изменения пользовательских URL и данных.
-2. **CSS-дизайн-система — migration/testing.** Foundation уже создан в `ui-system.css` + `ui-builder.js`. Дальше постепенно удалять из feature CSS собственные material-declarations, сокращать central legacy adapter registry и добавить браузерную проверку computed styles для Classic / Glass / Raised, а не только source-contract checks.
+2. **Design System v3 — migration/testing.** Постепенно удалять из feature CSS глобально выглядящие material/interaction declarations, переносить повторяемую геометрию в v3 primitives и сокращать legacy-часть `styles.css`. Добавить браузерную computed-style/visual проверку Classic / Glass / Raised и representative page layouts, а не полагаться только на source-contract checks.
 3. **API-маршрутизация.** Проверить работу нового fallback на всех HTTP-методах интеграционными тестами и исключить неожиданные коллизии путей.
 4. **Конфигурации Xray.** Отдельно проверить сериализацию VLESS/VMess/Trojan/XHTTP, шаблоны с одним/несколькими inbound, персонифицированные UUID и статистические email. Применить автоматическую миграцию старого поля `clients` только при подтверждённой совместимости.
 5. **Безопасность systemd update.** Отдельно проверить путь запуска updater, права на marker-файлы, синхронизацию `.env`, защиту от гонок и корректность rollback на реальном VPS.
 6. **Тестирование данных и UX.** Добавить сценарии браузера и БД на создание/удаление узла и пользователя, закрытие модалок, изменение настроек оформления, мобильный экран, откат при ошибке API.
 
-**Статус:** это безопасный поэтапный рефакторинг; foundation общей UI design-system создан, но миграция legacy feature CSS и браузерная визуальная верификация продолжаются.
+**Статус:** Design System v3 теперь задаёт единую глобальную архитектуру панели. Оставшийся CSS-долг — это локальная миграция legacy renderers/feature styles, а не дальнейшее наращивание глобальных override-слоёв.
