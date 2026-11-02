@@ -230,7 +230,7 @@ async function main() {
       const g=await page.locator('#dlg').evaluate(dialog=>{
         const box=el=>{const r=el.getBoundingClientRect();return {y:r.y,bottom:r.bottom,height:r.height}};
         const q=s=>dialog.querySelector(s),body=q('.user-canvas-grid');
-        return {dialog:box(dialog),header:box(q('.user-head')),footer:box(q('.user-canvas-foot')),body:box(body),scrollTop:body.scrollTop,
+        return {dialog:box(dialog),header:box(q('.user-head')),footer:box(q('.user-canvas-foot')),body:box(body),scrollTop:body.scrollTop,scrollHeight:body.scrollHeight,clientHeight:body.clientHeight,
           panes:[...body.children].map(box),headings:[...body.querySelectorAll('.user-pane-heading:first-child')].map(box),
           controls:[...q('.user-head-actions').children].map(box),usage:box(q('.user-usage-line')),identity:box(q('.user-identity-row')),
           maxHeight:getComputedStyle(dialog).maxHeight,rem:parseFloat(getComputedStyle(document.documentElement).fontSize),
@@ -246,6 +246,8 @@ async function main() {
       assert(Math.max(...centers)-Math.min(...centers)<=3,'Header controls must share a vertical axis');
       assert(Math.abs(g.usage.y+g.usage.height/2-g.identity.y-g.identity.height/2)<=3,'Usage and Xray ID must align');
       assert.equal(g.paneScrolls,0,'Columns must not own individual scrollbars');
+      if(height>=1440) assert(g.scrollHeight<=g.clientHeight+1,'Content must fit without scrolling when viewport height is sufficient');
+      assert(g.dialog.bottom-g.footer.bottom<=2*g.rem,'Dialog must not leave a large empty area below its footer');
       await screenshot(page,`user-details-${width}x${height}`);
       await page.keyboard.press('Escape');
       await page.waitForFunction(()=>!document.querySelector('#dlg')?.open);
