@@ -202,7 +202,7 @@ async function main() {
       ['hosts','[data-ne="hosts"]','Создание хоста'],
       ['squads','[data-ne="squads"]','Создание сквада'],
       ['users','[data-nu]','Создание пользователя'],
-      ['users',`[data-uo="${user.id}"]`,'Просмотр пользователя'],
+      ['users',`tr[data-id="${user.id}"]`,'Просмотр пользователя'],
       ['templates','[data-ne="tpls"]','Шаблон пользователя'],
       ['admins','[data-ne="admins"]','Создание администратора'],
     ];
@@ -215,7 +215,8 @@ async function main() {
         const g=await geometry(page);
         assert(g.dialog.x>=-1 && g.dialog.y>=-1 && g.dialog.right<=width+1 && g.dialog.bottom<=height+1,'Диалог выходит за viewport.');
         assert.equal(g.outside.length,0,'Элементы диалога обрезаны по горизонтали.');
-        const footer=await page.locator('dialog[open] .act').last().boundingBox();
+        const footerLoc=page.locator('dialog[open] > form.box > .act, dialog[open] > .box > .act, dialog[open] .user-create-footer, dialog[open] .user-canvas-foot');
+        const footer=(await footerLoc.count())?await footerLoc.last().boundingBox():null;
         if(footer)assert(footer.y>=0&&footer.y+footer.height<=height+1,'Кнопки footer находятся за пределами viewport.');
         await screenshot(page,`dialog-${route}-${label.includes('Редактирование')?'edit':label.includes('Просмотр')?'drawer':'create'}-${width}`);
         await page.keyboard.press('Escape');

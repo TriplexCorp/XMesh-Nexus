@@ -16,7 +16,7 @@ const html=fs.readFileSync('frontend/index.html','utf8');
 const strictBootstrap=fs.readFileSync('frontend/js/features/nodes/node-bootstrap-v6.js','utf8');
 const dockerfile=fs.readFileSync('backend/Dockerfile','utf8');
 
-assert.match(app, /<div class="bar2 nodes-toolbar"><p class="note">/,
+assert.match(app, /<div class="nodes-toolbar" data-ui-toolbar="filters" role="search"/,
  'Node list toolbar must be scoped to nodes page');
 assert.match(app, /<button type="button" class="node-create-action" data-ne="nodes" aria-label="Добавить новый узел"><span class="node-create-icon" aria-hidden="true">/ ,
  'New Node button must retain its existing creation handler and accessible label');
@@ -58,7 +58,7 @@ assert.match(html,/app\.js\?v=[a-z0-9-]+/,'Update JS cache');
 // XMesh v6 security invariant: the UI must override the historical installer
 // handler and pin the reviewed strict-PQ-only Node release. The Node bootstrap
 // itself blocks router/Xray startup until a durable verified receipt exists.
-assert.match(html,/<script src="\/js\/features\/nodes\/node-bootstrap-v6\.js\?v=20261101-hysteria-policy-v1"><\/script>/,
+assert.match(html,/<script src="\/js\/features\/nodes\/node-bootstrap-v6\.js\?v=[a-z0-9._-]+"><\/script>/i,
  'Panel must cache-bust the strict-PQ bootstrap after changing the reviewed Node release pin');
 assert.ok(html.indexOf('app.js?v=')<html.indexOf('/js/features/nodes/node-bootstrap-v6.js?v='),
  'Strict-PQ bootstrap override must load after the historical app handler');
@@ -92,7 +92,7 @@ assert.match(strictBootstrap,/Node\/Xray не запустятся без под
  'UI must state the fail-closed runtime invariant');
 
 // Redesigned modal surfaces share one cache-busted dialog asset layer.
-assert.match(html,/<script src="\/js\/features\/nodes\/node-dialogs\.js\?v=20261101-user-create-enterprise-v3"><\/script>/,
+assert.match(html,/<script src="\/js\/features\/nodes\/node-dialogs\.js\?v=[a-z0-9._-]+"><\/script>/i,
  'Dialog behavior enhancer must be cache-busted after create-user markup repair');
 assert.match(dialogCss,/dialog\.xm-action-confirm:has\(\.xm-action-confirm-icon\)\{[\s\S]*width:min\(760px/,
  'Registered-node confirmation must no longer use the tiny shared width');
@@ -140,7 +140,7 @@ assert.match(userCss,/\.user-create-section-extra\{grid-column:1\/-1/,
  'Metadata section must span the full desktop workspace');
 assert.match(userCss,/grid-template-areas:"squads tag hold desc"/,
  'Desktop metadata must use one compact horizontal rail');
-assert.match(userCss,/\.user-create-hold \.sw\{[\s\S]*width:2\.8rem!important;[\s\S]*height:1\.6rem!important/,
+assert.match(userCss,/\.user-create-hold \.sw\{[\s\S]*width:2\.8rem;[\s\S]*height:1\.6rem/,
  'On-hold control must retain a real visible switch track instead of collapsing to a dot');
 assert.match(userCss,/\.user-create-section-kicker\{display:none\}/,
  'Duplicate English section kickers must stay visually suppressed');
@@ -153,7 +153,7 @@ assert.match(userCss,/\.user-create-footer-actions\{display:flex/,
 
 // Anti-sharing intelligence is deliberately explainable: device slots are
 // authoritative, traffic history is verified, and high traffic alone is not enough.
-assert.match(html,/user-sharing-context\.js\?v=20261101-sharing-v1[\s\S]*user-sharing-risk\.js\?v=20261101-sharing-v1/,
+assert.match(html,/user-sharing-context\.js\?v=[a-f0-9]{12}[\s\S]*user-sharing-risk\.js\?v=[a-f0-9]{12}/,
  'Sharing context must load immediately before the isolated risk monitor');
 assert.match(sharingContext,/globalThis\.DB=DB/,'Sharing monitor must receive the already-loaded runtime user snapshot');
 assert.match(sharingJs,/traffic\/history\?range=7d/,'Risk score must use verified seven-day Xray history');

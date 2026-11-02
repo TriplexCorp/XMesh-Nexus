@@ -1,3 +1,24 @@
+dialog.xm-action-confirm:has(.xm-action-confirm-icon){
+  width:min(760px,calc(100vw - 2rem));
+  max-width:calc(100vw - 2rem);
+}
+dialog.xm-action-confirm:has(.xm-action-confirm-icon) .xm-action-confirm-box{
+  position:relative;
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto;
+  grid-template-areas:
+    "icon title close"
+    "body body body"
+    "actions actions actions";
+  align-items:center;
+  gap:.85rem 1rem;
+}
+dialog.xm-action-confirm:has(.xm-action-confirm-icon) .xm-action-confirm-icon{grid-area:icon}
+dialog.xm-action-confirm:has(.xm-action-confirm-icon) .xm-action-confirm-box>h2{grid-area:title;margin:0}
+dialog.xm-action-confirm:has(.xm-action-confirm-icon) .xm-action-confirm-box>p{grid-area:body;margin:0}
+dialog.xm-action-confirm:has(.xm-action-confirm-icon) .xm-action-confirm-actions{grid-area:actions}
+.xm-action-confirm-close{grid-area:close;position:static;width:var(--xm-close-size,34px);height:var(--xm-close-size,34px);display:grid;place-items:center;border-radius:50%}
+
 /* Strict-PQ command dialog. Keep the native dialog shell transparent and let
  * the node-setup card own the visual surface. */
 #dlg:has(.node-setup){
