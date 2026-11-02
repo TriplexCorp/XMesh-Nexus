@@ -1,0 +1,64 @@
+name: Temporary statistics contract migration
+
+on:
+  push:
+    branches:
+      - integration/argon-frontend-recovery-20261102
+    paths:
+      - '.github/workflows/tmp-statistics-contract-fix.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: integration/argon-frontend-recovery-20261102
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Migrate stale Statistics portal assertions
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/check-statistics-feedback.js')
+          s=p.read_text()
+          replacements={
+            "assert.match(css,/\\.stats-user-overlay\\[hidden\\]/);": "assert.match(app,/<dialog id=\\\"stats-user-modal\\\" class=\\\"stats-user-overlay\\\"/);\nassert.match(app,/if\\(!modal\\.open\\)modal\\.showModal\\(\\)/);\nassert.match(app,/\\$\\('#stats-user-modal'\\)\\.close\\(\\)/);\nassert.doesNotMatch(css,/\\.stats-user-overlay\\[hidden\\]/,'Native dialog visibility must not depend on the removed overlay [hidden] rule');\nassert.match(css,/dialog:not\\(\\[open\\]\\)\\{display:none\\}/,'Shared dialog system must own native open/closed visibility');",
+            "assert.match(css,/backdrop-filter:blur\\(13px\\)/);": "assert.match(css,/dialog::backdrop\\{background:var\\(--xm-modal-dim\\);backdrop-filter:blur\\(var\\(--xm-modal-blur\\)\\)/,'Statistics dialog must inherit the shared backdrop tokens');",
+            "assert.match(css,/Statistics intelligence: viewport-first landscape layout/);": "assert.match(css,/\\.stats-user-workspace\\s*\\{[\\s\\S]*?display:grid/,'Statistics intelligence workspace must retain authored grid ownership');",
+            "assert.match(css,/var\\(--panel-content-max, 1920px\\)/);": "assert.match(css,/var\\(--panel-content-max,\\s*1920px\\)/);",
+            "assert.match(css,/\\.stats-user-main\\{display:flex;flex-direction:column;min-height:0;overflow:hidden\\}/);": "assert.match(css,/\\.stats-user-main\\s*\\{[\\s\\S]*?display:flex;[\\s\\S]*?flex-direction:column;[\\s\\S]*?min-height:0;[\\s\\S]*?overflow:hidden/);",
+            "assert.match(css,/Shared desktop geometry for user editor and detailed user analytics/);": "assert.match(css,/dialog\\.stats-user-overlay|\\.stats-user-dialog/,'Detailed user analytics must keep an authored dialog surface');",
+            "assert.match(app,/const sourceRect=dlg\\.getBoundingClientRect\\(\\)/);\nassert.match(app,/dialogSize:\\{width:sourceRect\\.width,height:sourceRect\\.height\\}/);\nassert.match(app,/--stats-source-width/);\nassert.match(css,/var\\(--stats-source-width,108rem\\)/);": "assert.doesNotMatch(app,/getBoundingClientRect\\(\\).*stats|--stats-source-width|dialogSize:\\{width:sourceRect/,'Statistics navigation must not measure source dialog geometry at runtime');"
+          }
+          changed=0
+          for old,new in replacements.items():
+            if old in s:
+              s=s.replace(old,new,1); changed+=1
+          if changed == 0:
+            print('No stale Statistics assertions found')
+          else:
+            print(f'Migrated {changed} Statistics assertions')
+          p.write_text(s)
+          PY
+      - name: Validate Statistics contract
+        run: |
+          node scripts/check-statistics-feedback.js
+          git diff --check
+      - name: Commit migrated contract
+        run: |
+          if git diff --quiet -- scripts/check-statistics-feedback.js; then
+            echo 'No changes to commit'
+            exit 0
+          fi
+          git config user.name 'Xmesh Creator'
+          git config user.email 'Aselis3d@gmail.com'
+          git add scripts/check-statistics-feedback.js
+          git commit -m 'test(frontend): migrate Statistics to native dialog contract'
+          git push origin HEAD:integration/argon-frontend-recovery-20261102
