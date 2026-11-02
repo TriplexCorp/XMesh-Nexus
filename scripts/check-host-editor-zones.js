@@ -70,12 +70,13 @@ assert.match(css,/@media \(max-width:440px\)[\s\S]*?\.host-connect-fields\s*\{[\
  'Phone layout must keep host fields usable');
 
 // User Details is deliberately wider than a form dialog and must have only one
-// material shell. #dlg owns the edge/shadow; .user-canvas is layout-only.
-assert.match(css,/#dlg\.user-modal\s*\{[\s\S]*?--dialog-width:1960px[\s\S]*?--modal-off:translateY\(22px\) scale\(\.972\)[\s\S]*?min-inline-size:min\(1480px,calc\(100vw - 1\.5rem\)\)[\s\S]*?max-block-size:min\(42rem,calc\(100dvh - 1\.5rem\)\)/,
- 'User details dialog must use the compact wide horizontal workspace contract');
-assert.match(css,/#dlg\.user-modal\s*\{[\s\S]*?opacity \.34s[\s\S]*?transform \.50s[\s\S]*?overlay \.50s allow-discrete/,
+// material shell. The canonical selector intentionally matches the legacy
+// dialog#dlg:is(.node-wide,.user-modal) specificity so load order is authoritative.
+assert.match(css,/dialog#dlg\.user-modal\s*\{[\s\S]*?--dialog-width:1960px[\s\S]*?--modal-off:translateY\(22px\) scale\(\.972\)[\s\S]*?min-inline-size:min\(1480px,calc\(100vw - 1\.5rem\)\)[\s\S]*?min-height:0[\s\S]*?max-block-size:min\(42rem,calc\(100dvh - 1\.5rem\)\)/,
+ 'User details dialog must outrank the legacy min-height and use the compact wide workspace contract');
+assert.match(css,/dialog#dlg\.user-modal\s*\{[\s\S]*?opacity \.34s[\s\S]*?transform \.50s[\s\S]*?overlay \.50s allow-discrete/,
  'User details must use the slower premium open/close motion contract');
-assert.match(css,/#dlg\.user-modal>\.user-canvas\s*\{[\s\S]*?block-size:auto[\s\S]*?max-block-size:min\(42rem,calc\(100dvh - 1\.5rem\)\)[\s\S]*?display:flex[\s\S]*?flex-direction:column[\s\S]*?border:0[\s\S]*?background:transparent[\s\S]*?box-shadow:none/,
+assert.match(css,/dialog#dlg\.user-modal>\.user-canvas\s*\{[\s\S]*?block-size:auto[\s\S]*?max-block-size:min\(42rem,calc\(100dvh - 1\.5rem\)\)[\s\S]*?display:flex[\s\S]*?flex-direction:column[\s\S]*?border:0[\s\S]*?background:transparent[\s\S]*?box-shadow:none/,
  'User details canvas must stay single-surface and vertically bounded');
 assert.match(css,/#dlg\.user-modal \.user-canvas-grid\s*\{[\s\S]*?flex:0 1 auto[\s\S]*?overflow:auto/,
  'User details body must be the shrinkable scroll owner');
