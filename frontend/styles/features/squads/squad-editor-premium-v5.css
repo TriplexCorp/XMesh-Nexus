@@ -4,7 +4,7 @@
 dialog#dlg.squad-wide{
   width:min(1320px,calc(100vw - 36px));
   inline-size:min(1320px,calc(100vw - 36px));
-  max-height:min(95dvh,1020px);
+  max-height:min(calc(100dvh - 1.5rem),64rem);
   padding:0;
   border:0;
   background:transparent;
@@ -15,7 +15,7 @@ dialog#dlg.squad-wide > form.box{
   display:flex;
   flex-direction:column;
   width:100%;
-  max-height:min(95dvh,1020px);
+  max-height:min(calc(100dvh - 1.5rem),64rem);
   min-height:0;
   padding:0;
   gap:0;
