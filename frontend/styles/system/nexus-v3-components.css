@@ -44,7 +44,8 @@ input::placeholder,textarea::placeholder{color:var(--mu);opacity:.8}
 .sw input:checked+span::after{transform:translateX(1.15rem);background:var(--a)}
 .sw input:focus-visible+span{outline:2px solid var(--nx-focus);outline-offset:3px}
 .ms{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem}
-.ck{display:flex;align-items:center;gap:.45rem;padding:.4rem .65rem;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-control-bg);font-size:.8rem;cursor:pointer}
+.ck{display:flex;min-width:0;max-width:100%;box-sizing:border-box;align-items:center;gap:.45rem;padding:.4rem .65rem;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-control-bg);font-size:.8rem;cursor:pointer}
+.ck>span{min-width:0;overflow-wrap:anywhere}
 .ck:has(input:checked){background:var(--nx-selected-bg);border-color:var(--nx-selected-border)}
 .chip,.tag{display:inline-flex;align-items:center;gap:.3rem;width:fit-content;padding:.15rem .55rem;border-radius:999px;background:color-mix(in srgb,var(--c,var(--a)) 12%,var(--nx-item-bg));color:var(--c,var(--a));font-size:.73rem;line-height:1.5;white-space:nowrap}
 .dot{display:inline-block;flex:none;width:.5rem;height:.5rem;border-radius:50%;background:var(--c,var(--ok))}

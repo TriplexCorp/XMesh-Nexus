@@ -442,6 +442,12 @@ async function main() {
         await navigate(route);
         await page.locator(selector).first().click();
         await page.waitForSelector('dialog[open]');
+        if(route==='squads'){
+          const search=await page.locator('[data-squad-search]').evaluate(input=>{const s=getComputedStyle(input),r=input.getBoundingClientRect(),p=input.closest('.search').getBoundingClientRect();return {border:parseFloat(s.borderTopWidth),shadow:s.boxShadow,height:r.height,parentHeight:p.height}});
+          assert.equal(search.border,0,'Composite search must not render a second input border');
+          assert.equal(search.shadow,'none','Composite search must not render a nested input shadow');
+          assert(search.height<=search.parentHeight,'Search input must fit its control shell');
+        }
         const g=await geometry(page);
         assert(g.dialog.x>=-1 && g.dialog.y>=-1 && g.dialog.right<=width+1 && g.dialog.bottom<=height+1,'Диалог выходит за viewport.');
         assert.equal(g.outside.length,0,'Элементы диалога обрезаны по горизонтали.');
@@ -494,6 +500,36 @@ async function main() {
       assert(g.body.bottom<=g.footer.y+1,'Footer must not cover assignments');
       if(height>=1440) assert(g.scrollHeight<=g.clientHeight+1,'Desktop host content must fit when viewport has enough height');
       await screenshot(page,`host-assignments-${width}x${height}`);
+      await page.keyboard.press('Escape');
+      await page.waitForSelector('dialog[open]',{state:'detached'});
+      return g;
+    });
+
+    for(const [width,height] of [[1366,768],[1920,1080],[390,844]]) for(const [route,entity] of [['templates','tpls'],['admins','admins']]) await checked(`Entity editor containment: ${entity} · ${width}×${height}`,async()=>{
+      await page.setViewportSize({width,height});
+      await navigate(route);
+      await page.locator(`[data-ne="${entity}"]`).first().click();
+      await page.waitForSelector('dialog[open] .entity-editor-body');
+      const body=page.locator('.entity-editor-body');
+      if(entity==='tpls') await body.locator('.ck span').first().evaluate(el=>{el.textContent='Очень длинное название сквада '+('длинноеназвание'.repeat(8))});
+      await body.evaluate(el=>{el.scrollTop=el.scrollHeight});
+      const g=await page.locator('dialog[open]').evaluate(dialog=>{
+        const box=el=>{const r=el.getBoundingClientRect();return{x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};
+        const body=dialog.querySelector('.entity-editor-body');
+        const choices=[...body.querySelectorAll('.ck')].map(label=>({label:box(label),text:box(label.querySelector('span')),input:box(label.querySelector('input'))}));
+        const last=body.lastElementChild;
+        return {dialog:box(dialog),body:box(body),footer:box(dialog.querySelector('.act')),last:box(last),scrollTop:body.scrollTop,scrollHeight:body.scrollHeight,clientHeight:body.clientHeight,choices};
+      });
+      assert(g.dialog.y>=0&&g.dialog.bottom<=height+1,'Entity editor must stay in viewport');
+      assert(g.body.bottom<=g.footer.y+1,'Footer must have reserved space outside the scroll body');
+      assert(g.last.bottom<=g.body.bottom+1,'Last field must be fully reachable above footer');
+      assert(g.footer.bottom<=height,'Footer actions must stay visible');
+      for(const c of g.choices){
+        assert(c.input.width<=24,'Shared choices must retain compact checkboxes');
+        assert(c.text.x>=c.input.right&&c.text.right<=c.label.right+1,'Long choice labels must wrap inside their own bounds');
+        assert(c.label.right<=g.body.right+1,'Choice must fit scroll owner');
+      }
+      await screenshot(page,`entity-${entity}-${width}x${height}`);
       await page.keyboard.press('Escape');
       await page.waitForSelector('dialog[open]',{state:'detached'});
       return g;

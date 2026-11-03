@@ -34,7 +34,7 @@
 .search{display:flex;align-items:center;gap:.6rem;flex:0 1 21rem;min-width:12rem;min-height:var(--nx-control-h);padding:.55rem .8rem;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-control-bg);color:var(--nx-muted);text-align:left}
 .search .search-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .search kbd{margin-left:auto}
-.search input{flex:1;min-width:0;padding:0;background:none;border:0;outline:0}
+.search input:not([type=range]):not([type=checkbox]):not([type=radio]){flex:1;min-width:0;min-height:0;padding:0;background:none;border:0;border-radius:0;box-shadow:none;outline:0}
 .search-glyph{display:grid;place-items:center}
 .tl{display:flex;align-items:center;gap:.45rem;min-width:0}
 .top-language{position:relative}
