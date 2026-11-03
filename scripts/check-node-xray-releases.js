@@ -19,13 +19,16 @@ assert.match(routes,/\/nodes\/xray-releases/);
 assert.match(runtime,/pub async fn available_xray_releases/);
 const current=fs.readFileSync('backend/src/node_runtime.rs','utf8');
 const legacyStatus=fs.readFileSync('backend/src/node_runtime_legacy.rs','utf8');
-// The server's release gate remains in the release-versioned runtime overlay.
-// Its exact allowed versions are projected into read-only status for the UI.
-for(const major of [3,4,5,6]){
- assert(current.includes("version LIKE 'control-v"+major+".%'"),"Runtime must accept control-v"+major);
- assert(legacyStatus.includes('"control-v'+major+'.'+'"),"Runtime status must expose control-v"+major);
-}
-assert.match(legacyStatus,/"xrayUpdateSupported":fresh && \[/);
+// Compare the server's exact allowed agent majors against the runtime status
+// capability projection. A new Agent major must update both together.
+const capabilityGate=current.slice(current.indexOf('async fn control_v6_transition_active('),current.indexOf('/// v6 shadow for the legacy restart endpoint'));
+assert(capabilityGate.length>100,'Missing current Xray update command gate');
+const updateBranch=capabilityGate.slice(capabilityGate.indexOf('} else {'));
+const allowed=[...updateBranch.matchAll(/version LIKE 'control-v(\\d+)\\.%'/g)].map(m=>Number(m[1]));
+const statusBlock=legacyStatus.slice(legacyStatus.indexOf('const MANAGED_XRAY_AGENT_PREFIXES'),legacyStatus.indexOf('fn supports_managed_xray_update('));
+const advertised=[...statusBlock.matchAll(/"control-v(\\d+)\\."/g)].map(m=>Number(m[1]));
+assert.deepEqual(advertised,allowed,'Backend capability must match release-versioned command gate');
+assert.match(legacyStatus,/"xrayUpdateSupported":fresh && supports_managed_xray_update\\(&agent_version\\)/);
 assert.match(legacyStatus,/"xrayUpdateSupported":false/);
 assert.match(ui,/runtime\.xrayUpdateSupported !== true/);
 assert.doesNotMatch(ui,/\/\^control-v\(\?:3\|4\)/,'UI must not duplicate an obsolete version allow-list');
