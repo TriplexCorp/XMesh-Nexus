@@ -455,6 +455,50 @@ async function main() {
       });
     }
 
+    for(const [width,height] of [[1920,1080],[2560,1440],[768,900],[390,844]]) await checked(`Host assignments: ${width}×${height}`,async()=>{
+      await page.setViewportSize({width,height});
+      await navigate('hosts');
+      await page.locator('[data-ne="hosts"]').first().click();
+      await page.waitForSelector('dialog[open] .host-assignment-fields');
+      await page.locator('.host-assignment-fields .ms').evaluate(list=>{
+        const template=list.querySelector('label');
+        for(const name of ['PL Польша','Тест','13455','Москва','Очень длинное название назначенной ноды без потери текста']){
+          const label=template.cloneNode(true);
+          label.querySelector('input').value='geometry-'+list.children.length;
+          label.querySelector('input').checked=false;
+          label.querySelector('span').textContent=name;
+          list.append(label);
+        }
+      });
+      const choice=page.locator('.host-assignment-fields .ms label').last();
+      await choice.click();
+      assert(await choice.locator('input').isChecked(),'Clicking the node label must toggle its checkbox');
+      await choice.click();
+      assert(!(await choice.locator('input').isChecked()),'Node assignment must toggle off');
+      await page.locator('.host-assignment-fields').evaluate(el=>el.scrollIntoView({block:'nearest'}));
+      const g=await page.locator('dialog[open]').evaluate(dialog=>{
+        const box=e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};
+        const labels=[...dialog.querySelectorAll('.ms label')].map(label=>({label:box(label),input:box(label.querySelector('input')),text:box(label.querySelector('span'))}));
+        const body=dialog.querySelector('.host-editor-layout');
+        return {labels,body:box(body),footer:box(dialog.querySelector('.act')),scrollHeight:body.scrollHeight,clientHeight:body.clientHeight};
+      });
+      for(const {label,input,text} of g.labels){
+        assert(input.width<=24&&input.height<=24,'Checkbox must retain shared compact control dimensions');
+        assert(text.x>=input.right&&text.right<=label.right+1,'Node name must fit inside its own choice');
+        assert(label.x>=g.body.x&&label.right<=g.body.right+1,'Assignment must fit inside workspace');
+      }
+      for(let i=0;i<g.labels.length;i++) for(let j=i+1;j<g.labels.length;j++){
+        const a=g.labels[i].label,b=g.labels[j].label;
+        assert(a.right<=b.x+1||b.right<=a.x+1||a.bottom<=b.y+1||b.bottom<=a.y+1,'Node choices must not overlap');
+      }
+      assert(g.body.bottom<=g.footer.y+1,'Footer must not cover assignments');
+      if(height>=1440) assert(g.scrollHeight<=g.clientHeight+1,'Desktop host content must fit when viewport has enough height');
+      await screenshot(page,`host-assignments-${width}x${height}`);
+      await page.keyboard.press('Escape');
+      await page.waitForSelector('dialog[open]',{state:'detached'});
+      return g;
+    });
+
     const inspectStudioDialog=async(selector)=>page.locator(selector).evaluate(dialog=>{
       const visible=node=>node.getClientRects().length&&getComputedStyle(node).visibility!=='hidden';
       const box=node=>{const r=node.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom}};
