@@ -1,3 +1,5 @@
+> Historical WIP snapshot from 2026-11-02. **Not an active task list.** The refactor was subsequently completed; current implementation, [UI System](../UI_SYSTEM.md) and CI contracts override all instructions below. Do not continue work from the WIP checklist.
+
 # Промежуточный checkpoint рефакторинга фронтенда
 
 Дата: 2 ноября 2026 года. Работа остановлена по просьбе пользователя из-за лимита сессии. **Рефакторинг НЕ завершён. Состояние WIP; приложение после изменений ещё не прошло приёмку.**
