@@ -385,7 +385,11 @@ pub async fn status(
                 "nodeId":node_id,
                 "connected":fresh,
                 "version":agent_version,
-                "xrayUpdateSupported":fresh && crate::node_runtime::managed_xray_update_agent_supported(&agent_version),
+                // Match the version majors permitted by the v6 request_xray_update
+                // overlay. Do not infer support from connected=true alone.
+                "xrayUpdateSupported":fresh && [
+                    "control-v3.", "control-v4.", "control-v5.", "control-v6."
+                ].iter().any(|prefix| agent_version.starts_with(prefix)),
                 "routerRunning":row.try_get::<bool,_>("router_running")?,
                 "xrayRunning":row.try_get::<bool,_>("xray_running")?,
                 "xrayVersion":row.try_get::<Option<String>,_>("xray_version")?,
