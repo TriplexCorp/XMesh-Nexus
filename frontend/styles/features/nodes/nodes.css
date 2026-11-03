@@ -34,7 +34,7 @@
 .nodes[data-grid-mode=compact]>.nc{gap:var(--nx-space-3);padding:var(--nx-space-4)}
 .nodes[data-grid-mode=compact] .node-metrics{padding-top:var(--nx-space-3);border-top:1px solid var(--nx-separator)}
 .nc .h{display:flex;align-items:center;flex-wrap:wrap;gap:.8rem;min-width:0;padding-bottom:.95rem;border-bottom:1px solid var(--nx-separator)}
-.nc .fg{display:grid;place-items:center;flex:none;padding:.4rem;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-section-bg);font-size:1.9rem;line-height:1}
+.nc .fg{display:grid;place-items:center;flex:none;font-size:1.9rem;line-height:1}
 .nc .fg:has(>span.flag-img:empty){display:none}
 .nc .fg>.flag-img{display:block;width:2.8rem;height:2rem;object-fit:contain;border-radius:min(.28rem,var(--nx-control-radius));box-shadow:none}
 .node-identity{flex:1;min-width:8rem;overflow-wrap:anywhere;line-height:1.42}

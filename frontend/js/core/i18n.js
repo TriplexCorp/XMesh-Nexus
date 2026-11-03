@@ -947,6 +947,10 @@ window.XMeshI18n=(()=>{
   dict.set("В шаблоне users пустой: клиентов требуется добавить через панель или Xray до подключения.","The template has an empty users list: add clients in the panel or Xray before connecting.");
   dict.set("TLS требует одновременно certificateFile и keyFile.","TLS requires both certificateFile and keyFile.");
   // Node explorer and control-agent installation status.
+  dict.set('Перезапустить Xray','Restart Xray');
+  dict.set('Перезапуск Xray','Restart Xray');
+  dict.set('Перезапуск Xray…','Restarting Xray…');
+  dict.set('Ожидается подтверждение перезапуска Xray','Waiting for Xray restart confirmation');
   dict.set('Навигация по страницам','Page navigation');
   dict.set('Agent не подтвердил установку в течение 15 минут.','The agent did not confirm installation within 15 minutes.');
   // Dual-ended FinalMask editor and transport compatibility diagnostics.

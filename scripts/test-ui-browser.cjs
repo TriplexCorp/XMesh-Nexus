@@ -243,8 +243,11 @@ async function main() {
       assert(g.overflow<=width+1,'Compact layout must not overflow the document');
       assert(g.flagLoaded&&g.flagAlt,'Node flag must retain its local SVG and accessible country name');
       assert(g.flag.width>=g.rem*2.7&&g.flag.height>=g.rem*1.9,'Node flag must be a prominent header accent');
-      assert(g.flag.x>g.flagFrame.x&&g.flag.right<g.flagFrame.right&&g.flag.bottom<g.flagFrame.bottom,'Flag must fit inside its frame');
+      assert(g.flag.x>=g.flagFrame.x&&g.flag.right<=g.flagFrame.right+1&&g.flag.bottom<=g.flagFrame.bottom+1,'Flag must fit its wrapper');
       assert(g.flagFrame.right<g.identity.x,'Flag accent must not overlap the node identity');
+      const flagChrome=await page.locator('.nc .fg').first().evaluate(el=>{const s=getComputedStyle(el);return{border:s.borderTopWidth,background:s.backgroundColor}});
+      assert.equal(flagChrome.border,'0px','Country flag must not have a surrounding ring');
+      assert.equal(flagChrome.background,'rgba(0, 0, 0, 0)','Country flag must not have a backplate');
       if(width>=1920){
         const aspect=g.card.width/g.card.height;
         assert(aspect>=.85&&aspect<=1.35,'Normal compact fixture must read as a near-square card: '+aspect);
@@ -870,6 +873,44 @@ async function main() {
           assert(peers.every(other=>Math.abs(other.speed.bottom-c.speed.bottom)<=3),'Speed rails must align between cards in the same row');
         }
         return g;
+      });
+      for(const outcome of ['cancel','succeeded','failed'])await checked(`Xray restart feedback: ${outcome}`,async()=>{
+        await page.setViewportSize({width:1920,height:1080});
+        await navigate('nodes');
+        const path=`**/api/v1/nodes/${node.id}/restart`;
+        let posts=0,release;
+        const gate=new Promise(resolve=>{release=resolve});
+        const handler=async route=>{
+          if(route.request().method()==='POST'){posts++;return route.fulfill({json:{id:'restart-fixture',state:'queued'}})}
+          await gate;
+          return route.fulfill({json:{id:'restart-fixture',state:outcome,result:'Fixture restart failure'}});
+        };
+        await page.route(path,handler);
+        try{
+          await page.locator(`[data-nr="${node.id}"]`).click();
+          await page.locator('.xm-action-confirm[open]').waitFor();
+          if(outcome==='cancel'){
+            await page.locator('.xm-action-confirm .gh').click();
+          }else{
+            await page.locator('.xm-action-confirm .btn').click();
+            const badge=page.locator(`[data-node-card-id="${node.id}"] [data-node-xray-version]`);
+            await badge.locator('.node-agent-spinner').waitFor();
+            assert((await badge.innerText()).includes('Перезапуск Xray'),'Badge must describe the active restart');
+            assert(await page.locator(`[data-nr="${node.id}"]`).isDisabled(),'Restart must block repeated submissions');
+            await page.evaluate(()=>drawNodeLive());
+            assert.equal(await badge.locator('.node-agent-spinner').count(),1,'Live refresh must preserve restart feedback');
+            if(outcome==='failed'){
+              await navigate('hosts');await navigate('nodes');
+              await badge.locator('.node-agent-spinner').waitFor();
+              assert(await page.locator(`[data-nr="${node.id}"]`).isDisabled(),'Rerender must preserve restart progress and submission guard');
+            }
+            await screenshot(page,`node-xray-restart-${outcome}`);
+          }
+          release();
+          await page.waitForFunction(id=>{const b=document.querySelector('[data-nr="'+id+'"]');return b&&!b.disabled&&!b.querySelector('.node-agent-spinner')},node.id,{timeout:10000});
+          assert.equal(posts,outcome==='cancel'?0:1,'Restart must send exactly one command only after confirmation');
+          assert.equal(await page.locator(`[data-node-card-id="${node.id}"] [data-node-xray-version] .node-agent-spinner`).count(),0,'Terminal states must clear the badge spinner');
+        }finally{release();await page.unroute(path,handler)}
       });
     }finally{
       await page.unroute(runtimePattern,runtimeFixture);
