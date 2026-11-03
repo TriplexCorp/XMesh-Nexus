@@ -241,6 +241,10 @@ asset graph, enforced by `scripts/check-ui-system.js`.
   Only narrow cards reflow to two columns.
 - Card depth comes from `--nx-panel-shadow`; accent outer bloom is forbidden.
 - Compact / Standard / Spacious change actual fleet track geometry.
+- Equal fractional fleet rows and stretched cards keep every rendered card at
+  the same content-driven height, across rows and runtime states. The middle
+  body absorbs available space, keeping telemetry and actions at the bottom;
+  no fixed card height or runtime DOM measurement is used.
 - Container queries use card width for anatomy and workspace width for fleet density.
 - Icons come from the shared `ic()` SVG renderer.
 
