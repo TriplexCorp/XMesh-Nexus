@@ -224,7 +224,7 @@
   --nx-floating-bg:color-mix(in srgb,var(--s1) 96%,var(--s2));
   --nx-dialog-section-bg:color-mix(in srgb,var(--s2) 25%,transparent);
   --nx-dialog-control-bg:color-mix(in srgb,var(--s1) 89%,var(--s2));
-  --nx-panel-shadow:0 18px 48px -38px rgba(0,0,0,.72);
+  --nx-panel-shadow:none;
   --nx-dialog-shadow:0 30px 82px -28px rgba(0,0,0,.72);
   --nx-section-shadow:none;
   --nx-item-shadow:none;
@@ -342,7 +342,7 @@ html[data-surface=solid]{
   --nx-floating-bg:color-mix(in srgb,var(--s1) 96%,var(--s2));
   --nx-dialog-section-bg:color-mix(in srgb,var(--s2) 25%,transparent);
   --nx-dialog-control-bg:color-mix(in srgb,var(--s1) 89%,var(--s2));
-  --nx-panel-shadow:0 18px 48px -38px rgba(0,0,0,.72);
+  --nx-panel-shadow:none;
   --nx-dialog-shadow:0 30px 82px -28px rgba(0,0,0,.72);
   --nx-section-shadow:none;
   --nx-item-shadow:none;
@@ -440,9 +440,9 @@ h2{font-size:1.2rem}h3{font-size:1rem}
 ::selection{background:color-mix(in srgb,var(--a) 25%,transparent);color:var(--tx)}
 :root{--nx-content-management:150rem;--nx-content-data:200rem;--nx-content-canvas:240rem;--nx-duration:.16s;--nx-z-navigation:20;--nx-z-popover:80;--nx-z-dialog:100;--nx-z-tooltip:200;--nx-z-feedback:300;--xm-close-size:2.15rem;--xm-close-glyph-size:1rem;--scrollbar-size:8px;--scrollbar-track:transparent;--scrollbar-thumb:color-mix(in srgb,var(--mu) 42%,var(--s2));--scrollbar-thumb-hover:color-mix(in srgb,var(--a) 35%,var(--mu));--scrollbar-end-gap:7px;--traffic-upload:#72dbc4;--traffic-download:#b5a0f4}
 html[data-glow=off]{--glow-alpha:0%}
-html[data-glow=subtle]{--glow-alpha:4%}
-html[data-glow=normal]{--glow-alpha:8%}
-html[data-glow=rich]{--glow-alpha:13%}
+html[data-glow=subtle]{--glow-alpha:2%}
+html[data-glow=normal]{--glow-alpha:4%}
+html[data-glow=rich]{--glow-alpha:8%}
 body{background-image:radial-gradient(ellipse 120vw 100vh at 8% 0%,color-mix(in srgb,var(--a) var(--glow-alpha),transparent),transparent 85%),radial-gradient(ellipse 120vw 110vh at 100% 10%,color-mix(in srgb,var(--b) calc(var(--glow-alpha) * .7),transparent),transparent 90%);background-attachment:fixed}
 *{scrollbar-width:thin;scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track)}
 *::-webkit-scrollbar{width:var(--scrollbar-size);height:var(--scrollbar-size)}

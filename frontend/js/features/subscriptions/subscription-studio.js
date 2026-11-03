@@ -111,7 +111,7 @@ window.XMeshSubscriptionStudio = (() => {
     if(!slot.some(([id])=>id===data.nodePlacement)) data.nodePlacement='a';
     const markup = [
       '<div class="subscription-studio">',
-      '<header class="subscription-studio-intro"><div><span class="subscription-studio-kicker">XMESH NEXUS / DELIVERY</span><h2>SUBSCRIPTION STUDIO</h2>',
+      '<header class="subscription-studio-intro"><div><h2>SUBSCRIPTION STUDIO</h2>',
       '<p>Оформление действующей страницы подписки, её публичный URL и каталог приложений.</p></div>',
       '<button type="submit" form="subscription-studio-form" class="btn">'+
         '<span aria-hidden="true">✓</span> Сохранить настройки</button></header>',

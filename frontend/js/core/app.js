@@ -234,17 +234,17 @@ const nodeRotationValidate = data => {
   return '';
 };
 const ENT={
-  squads:{t:'Сквады',n:'Набор инбаундов: что именно получает пользователь в подписке.',s:'id',nw:'Сквад',fs:[{k:'name',l:'Название',req:1},{k:'desc',l:'Описание'},{k:'inb',l:'Инбаунды (из профилей Xray)',t:'multi',o:tags}],
+  squads:{t:'Сквады',n:'Доступ пользователей к подключениям Xray.',s:'id',nw:'Сквад',fs:[{k:'name',l:'Название',req:1},{k:'desc',l:'Описание'},{k:'inb',l:'Инбаунды (из профилей Xray)',t:'multi',o:tags}],
     cols:[['Название',r=>`<b>${esc(r.name)}</b><br><span class="mu">${esc(r.desc)}</span>`],['Инбаунды',r=>r.inb.map(t=>chip(esc(t),tcol(t))).join(' ')||'—'],['Пользователей',r=>DB.users.filter(u=>u.squads.includes(r.id)).length]],
     guard:r=>DB.users.some(u=>u.squads.includes(r.id))?'В скваде есть пользователи. Сначала переведите их в другой сквад.':''},
-  hosts:{t:'Хосты',n:'Публичные точки входа: наследование XRAY STUDIO, назначение нод и точечные переопределения для клиентов.',s:'order',nw:'Хост',mv:1,fs:[
+  hosts:{t:'Хосты',n:'Публичные подключения и назначение серверов.',s:'order',nw:'Хост',mv:1,fs:[
     {k:'profileId',l:'Профиль XRAY STUDIO',t:'sel',o:()=>DB.profiles.map(p=>[p.id,p.name])},
     {k:'tag',l:'Inbound',t:'sel',o:tags},
     {k:'nodes',l:'Назначенные ноды',t:'multi',o:()=>DB.nodes.map(n=>[n.id,n.name])},
     {k:'disabled',l:'Отключить выдачу хоста в подписках',t:'bool'},
-    {k:'remark',l:'Название сервера в приложении (Remarks)',req:1,h:'Например: Нидерланды. Это имя увидит клиент Happ; технические теги Xray формируются отдельно.'},
+    {k:'remark',l:'Название в приложении',req:1,h:'Отображается в Happ.'},
     {k:'address',l:'Публичный адрес',req:1},
-    {k:'countryCode',l:'Страна (код из двух букв)',ph:'NL, DE, SE…',h:'Необязательно. Для Нидерландов укажите NL. Влияет на автогруппировку и имя технического outbound.'},
+    {k:'countryCode',l:'Код страны',ph:'NL, DE, SE…',h:'Две буквы: NL, DE, SE. Необязательно.'},
     {k:'port',l:'Публичный порт',t:'num'},
     {k:'sni',l:'SNI (переопределение)',ph:'Из inbound, если пусто'},
     {k:'host',l:'HTTP Host (переопределение)',ph:'Из inbound, если пусто'},
@@ -345,15 +345,15 @@ const ENT={
       return '';
     },
     guard:r=>''},
-  tpls:{t:'Шаблоны пользователей',n:'Готовые тарифы: выбираются при создании и подставляют лимиты, срок и доступ.',s:'id',nw:'Шаблон',fs:[{k:'name',l:'Название',req:1},{k:'limit',l:'Лимит, ГБ',t:'num',h:'0 — без лимита'},{k:'days',l:'Срок, дней',t:'num',h:'0 — бессрочно'},{k:'strategy',l:'Сброс трафика',t:'sel',o:STRAT},{k:'hwid',l:'Лимит устройств',t:'num'},{k:'squads',l:'Сквады',t:'multi',o:()=>DB.squads.map(s=>[s.id,s.name])},{k:'hold',l:'Отсчёт срока с первого подключения',t:'bool'}],def:()=>({strategy:'NO_RESET',hwid:2,squads:[]}),
+  tpls:{t:'Шаблоны пользователей',n:'Лимиты, срок и доступ для новых пользователей.',s:'id',nw:'Шаблон',fs:[{k:'name',l:'Название',req:1},{k:'limit',l:'Лимит, ГБ',t:'num',h:'0 — без лимита'},{k:'days',l:'Срок, дней',t:'num',h:'0 — бессрочно'},{k:'strategy',l:'Сброс трафика',t:'sel',o:STRAT},{k:'hwid',l:'Лимит устройств',t:'num'},{k:'squads',l:'Сквады',t:'multi',o:()=>DB.squads.map(s=>[s.id,s.name])},{k:'hold',l:'Отсчёт срока с первого подключения',t:'bool'}],def:()=>({strategy:'NO_RESET',hwid:2,squads:[]}),
     cols:[['Название',r=>`<b>${esc(r.name)}</b>`],['Трафик',r=>r.limit?r.limit+' ГБ':'∞'],['Срок',r=>r.days?r.days+' дн':'∞'],['Устройств',r=>r.hwid],['Сквады',r=>r.squads.map(i=>chip(esc(DB.squads.find(s=>s.id==i)?.name||'?'),'--b')).join(' ')],['Режим',r=>r.hold?chip('on hold','--c3'):'—']]},
-  subs:{t:'Шаблоны подписки',n:'Что получает клиентское приложение: формат и содержимое конфигурации.',s:'id',nw:'Шаблон',fs:[{k:'name',l:'Название',req:1},{k:'fmt',l:'Формат',t:'sel',o:FMT},{k:'content',l:'Содержимое',t:'area',rows:9}],def:()=>({fmt:'XRAY_JSON',content:'{}'}),
+  subs:{t:'Шаблоны подписки',n:'Формат и содержимое клиентской конфигурации.',s:'id',nw:'Шаблон',fs:[{k:'name',l:'Название',req:1},{k:'fmt',l:'Формат',t:'sel',o:FMT},{k:'content',l:'Содержимое',t:'area',rows:9}],def:()=>({fmt:'XRAY_JSON',content:'{}'}),
     cols:[['Название',r=>`<b>${esc(r.name)}</b>`],['Формат',r=>chip(r.fmt,'--c3')],['Размер',r=>r.content.length+' симв.']]},
-  profiles:{t:'XRAY STUDIO',n:'Серверные конфигурации и публичные подключения. Инбаунды назначаются сквадам.',s:'id',nw:'Профиль',fs:[{k:'name',l:'Название',req:1},{k:'config',l:'Конфигурация (JSON)',t:'area',rows:16,h:'Вставьте полный конфиг Xray. В нём должен быть хотя бы один inbound.'}],def:()=>({config:''}),
+  profiles:{t:'XRAY STUDIO',n:'Конфигурации Xray и подключения.',s:'id',nw:'Профиль',fs:[{k:'name',l:'Название',req:1},{k:'config',l:'Конфигурация (JSON)',t:'area',rows:16,h:'Вставьте полный конфиг Xray. В нём должен быть хотя бы один inbound.'}],def:()=>({config:''}),
     chk:(d,id)=>{let j;try{j=JSON.parse(d.config)}catch(e){return'Некорректный JSON: '+e.message}if(!Array.isArray(j.inbounds)||!j.inbounds.length)return'В конфиге нет массива inbounds.';const t=j.inbounds.map(i=>i.tag);if(t.some(x=>!x))return'У каждого инбаунда должен быть tag.';if(new Set(t).size!=t.length)return'Теги инбаундов должны быть уникальными.';const ot=DB.profiles.filter(p=>p.id!=id).flatMap(p=>inbs(p).map(i=>i.tag));if(t.some(x=>ot.includes(x)))return'Тег уже используется в другом профиле.'},
     cols:[['Название',r=>`<b>${esc(r.name)}</b>`],['Инбаунды',r=>inbs(r).map(i=>chip(esc(i.tag)+' · '+i.port,tcol(i.tag))).join(' ')||'—'],['Узлов',r=>DB.nodes.filter(n=>n.profileId==r.id).length]],
     guard:r=>DB.nodes.some(n=>n.profileId==r.id)?'Профиль назначен узлам. Сначала смените профиль у этих узлов.':''},
-  admins:{t:'Администраторы',n:'Реальные учётные записи входа. Права проверяются Rust API, а не интерфейсом.',s:'id',nw:'Администратор',
+  admins:{t:'Администраторы',n:'Учётные записи и права доступа.',s:'id',nw:'Администратор',
     fs:[{k:'username',l:'Логин',req:1,pat:'[A-Za-z0-9_.\\-]{3,64}'},
       {k:'password',l:'Новый пароль (от 16 символов)',t:'password',h:'Для новой записи обязателен. При редактировании оставьте пустым, чтобы сохранить пароль.'},
       {k:'role',l:'Роль',t:'sel',o:[['owner','Владелец'],['admin','Администратор'],['viewer','Наблюдатель']]},
@@ -912,10 +912,10 @@ const balancersP=async()=>{
    selector:source,observatory:obs};
  });
  const markup='<section class="balancer-workspace"><div class="balancer-intro"><div>'+
-  '<h2>Балансировщики</h2><p>Создавайте собственные группы с любыми комбинациями серверов. Только JSON; без автоматических групп.</p>'+
+  '<p>Группы серверов для JSON-подписок.</p>'+
   '</div><div class="balancer-toolbar"><span id="balancers-count"></span><button class="btn" type="button" id="balancer-add">'+ic('plus')+'Новый балансировщик</button></div></div>'+
   '<div id="balancers-list" class="balancer-list"></div>'+
-  '<div class="balancer-savebar"><p>Серверы выбираются по стабильным ID. Изменения применятся после сохранения.</p>'+
+  '<div class="balancer-savebar"><p>Изменения применятся после сохранения.</p>'+
   '<button type="button" class="btn" id="balancer-save">'+ic('save')+'Сохранить изменения</button></div></section>';
  return [markup,()=>{
   const list=$('#balancers-list');
@@ -2675,13 +2675,13 @@ async function profilesP(){
 }
 
 /* ================= CRUD-страницы ================= */
-async function crudCard(k){
+async function crudCard(k,showTitle=true){
   const e=ENT[k],{items}=await api.list(k,{sort:e.s});
   const emptyLabel={nodes:'Узлов пока нет',profiles:'Профилей в XRAY STUDIO пока нет',squads:'Сквадов пока нет',hosts:'Хостов пока нет',tpls:'Шаблонов пока нет',subs:'Шаблонов подписки пока нет',admins:'Администраторов пока нет',tokens:'API-токенов пока нет'}[k]||'Пока пусто';
   const emptyHint={nodes:'Добавьте первый сервер и назначьте ему профиль.',profiles:'Добавьте собственную конфигурацию Xray с inbound.',squads:'Создайте группу доступа на основе inbound.',hosts:'Добавьте адреса подключения, которые должны видеть клиенты.',tpls:'Сохраните тарифные параметры для повторного использования.',subs:'Настройте формат выдачи подписки после подключения API.',admins:'Список заполнится после добавления администраторов.',tokens:'Создайте токен для внешней интеграции.'}[k]||'Добавьте первую запись.';
-  return `<div class="card"><div class="hd"><div><h3>${e.t}</h3><p>${e.n||''}</p></div><button class="btn sm" data-ne="${k}">${ic('plus')}${e.nw}</button></div>${items.length?`<div class="tw" data-ui-layout="table"><table class="tb"><thead><tr>${e.cols.map(c=>`<th>${c[0]}</th>`).join('')}${e.mv?'<th></th>':''}</tr></thead><tbody>${items.map((r,i)=>`<tr data-e="${k}:${r.id}">${e.cols.map(c=>`<td data-l="${c[0]}">${c[1](r)}</td>`).join('')}${e.mv?`<td data-l="Порядок"><button class="ia" data-mv="${k}:${r.id}:-1" ${i?'':'disabled'} aria-label="Выше">${ic('up')}</button><button class="ia" data-mv="${k}:${r.id}:1" ${i<items.length-1?'':'disabled'} aria-label="Ниже">${ic('down')}</button></td>`:''}</tr>`).join('')}</tbody></table></div>`:`<div class="empty"><b>${emptyLabel}</b><span>${emptyHint}</span><button class="gh sm" data-ne="${k}">${ic('plus')}${e.nw}</button></div>`}</div>`
+  return `<div class="card"><div class="hd"><div>${showTitle?`<h3>${e.t}</h3>`:''}<p>${e.n||''}</p></div><button class="btn sm" data-ne="${k}">${ic('plus')}${e.nw}</button></div>${items.length?`<div class="tw" data-ui-layout="table"><table class="tb"><thead><tr>${e.cols.map(c=>`<th>${c[0]}</th>`).join('')}${e.mv?'<th></th>':''}</tr></thead><tbody>${items.map((r,i)=>`<tr data-e="${k}:${r.id}">${e.cols.map(c=>`<td data-l="${c[0]}">${c[1](r)}</td>`).join('')}${e.mv?`<td data-l="Порядок"><button class="ia" data-mv="${k}:${r.id}:-1" ${i?'':'disabled'} aria-label="Выше">${ic('up')}</button><button class="ia" data-mv="${k}:${r.id}:1" ${i<items.length-1?'':'disabled'} aria-label="Ниже">${ic('down')}</button></td>`:''}</tr>`).join('')}</tbody></table></div>`:`<div class="empty"><b>${emptyLabel}</b><span>${emptyHint}</span><button class="gh sm" data-ne="${k}">${ic('plus')}${e.nw}</button></div>`}</div>`
 }
-async function simple(ks){const h=await Promise.all(ks.map(crudCard));return [h.join('')]}
+async function simple(ks){const h=await Promise.all(ks.map(k=>crudCard(k,ks.length>1)));return [h.join('')]}
 /* Host = client-facing endpoint, not a second Xray server configuration.
    Resolve inherited values for preview only; never expose server privateKey. */
 function hostProfile(profileId){return DB.profiles.find(p=>String(p.id)===String(profileId))}

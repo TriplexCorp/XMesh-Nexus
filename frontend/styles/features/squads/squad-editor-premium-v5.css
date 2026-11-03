@@ -178,10 +178,11 @@ dialog#dlg.squad-wide .squad-editor-fields :is(input,textarea):hover{
 }
 
 dialog#dlg.squad-wide .squad-editor-fields :is(input,textarea):focus{
-  outline:0;
-  border-color:color-mix(in srgb,var(--a) 58%,var(--nx-border));
+  outline:2px solid var(--nx-focus);
+  outline-offset:-2px;
+  border-color:var(--nx-border);
   background:var(--nx-panel-bg);
-  box-shadow:0 0 0 3px color-mix(in srgb,var(--a) 9%,transparent);
+  box-shadow:none;
 }
 
 dialog#dlg.squad-wide .squad-section-heading{

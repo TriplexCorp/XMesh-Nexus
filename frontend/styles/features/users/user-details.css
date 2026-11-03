@@ -124,9 +124,10 @@ dialog.user-modal .user-edit-fields .f>small {
   display:none;
 }
 dialog.user-modal .user-edit-fields :is(input:not([type=hidden]),select):focus {
-  outline:0;
-  border-color:color-mix(in srgb,var(--a) 45%,var(--nx-border));
-  box-shadow:0 0 0 2px color-mix(in srgb,var(--a) 14%,transparent);
+  outline:2px solid var(--nx-focus);
+  outline-offset:-2px;
+  border-color:var(--nx-border);
+  box-shadow:none;
 }
 dialog.user-modal .user-edit-fields .f:has([name="desc"]) {
   grid-column:1/-1;
@@ -767,7 +768,7 @@ dialog.user-modal .user-edit-fields .user-notes-field {
 }
 dialog.user-modal .user-notes-field textarea:focus {
   outline:2px solid var(--a);
-  outline-offset:1px;
+  outline-offset:-2px;
 }
 dialog.user-modal .user-notes-field .user-note-meta {
   display:flex;

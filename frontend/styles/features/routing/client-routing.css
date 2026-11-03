@@ -31,7 +31,6 @@
 #client-route-root.crx textarea:focus-visible{outline:2px solid var(--crx-accent);outline-offset:2px}
 #client-route-root.crx .crx-page-head{display:flex;align-items:end;justify-content:space-between;gap:1.25rem;flex-wrap:wrap;padding:.875rem 0 1.125rem;border-bottom:1px solid var(--crx-border)}
 #client-route-root.crx .crx-page-copy{display:grid;gap:.35rem}
-#client-route-root.crx .crx-eyebrow{display:inline-flex;align-items:center;gap:.5rem;color:var(--crx-accent);font-size:.7rem;font-weight:800;letter-spacing:.09em}
 #client-route-root.crx .crx-page-copy h2{font-size:1.5rem;font-weight:800}
 #client-route-root.crx .crx-page-copy p,
 #client-route-root.crx .crx-section-head p{color:var(--crx-muted);font-size:.8125rem}
@@ -133,7 +132,21 @@
 #client-route-root.crx .crx-dialog-body,
 #client-route-root.crx .crx-settings,
 #client-route-root.crx .crx-dialog-footer{padding:.875rem}#client-route-root.crx nav.crx-tabs{padding:.625rem .875rem}#client-route-root.crx .crx-rule-fields{grid-template-columns:1fr;flex-basis:100%}#client-route-root.crx .crx-rule-n{display:none}#client-route-root.crx .crx-settings-fields,
-#client-route-root.crx .crx-settings-actions{width:100%}#client-route-root.crx .crx-settings-fields>label:not(.crx-toggle){flex:1}}
+#client-route-root.crx .crx-settings-actions{width:100%}#client-route-root.crx .crx-settings-fields>label:not(.crx-toggle){flex:1;min-width:0}
+#client-route-root.crx .crx-dialog-header{min-height:0;padding:.75rem}
+#client-route-root.crx .crx-dialog-mark,#client-route-root.crx .crx-dialog-kicker{display:none}
+#client-route-root.crx .crx-dialog-header h2{font-size:1.05rem}
+#client-route-root.crx nav.crx-tabs{gap:.25rem;min-height:0;padding:.5rem}
+#client-route-root.crx nav.crx-tabs>button{padding:.45rem .5rem;font-size:.75rem;gap:.3rem}
+#client-route-root.crx nav.crx-tabs .crx-icon{display:none}
+#client-route-root.crx .crx-settings{gap:.6rem;padding:.65rem .75rem}
+#client-route-root.crx .crx-settings-fields{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.6rem;align-items:end}
+#client-route-root.crx .crx-settings-actions{flex-wrap:nowrap;gap:.5rem}
+#client-route-root.crx .crx-settings-actions button{flex:1;min-height:2.2rem;padding:.35rem .5rem;font-size:.75rem}
+#client-route-root.crx .crx-dialog-footer{padding:.65rem .75rem;gap:.5rem}
+#client-route-root.crx .crx-dialog-summary small{font-size:.7rem;line-height:1.3}
+#client-route-root.crx .crx-dialog-summary{font-size:.75rem}
+}
 @media(prefers-reduced-motion:reduce){#client-route-root.crx *{transition:none}}
 
 /* The browser-native ::backdrop owns blur; never filter the dialog itself. */

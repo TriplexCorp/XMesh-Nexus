@@ -16,7 +16,6 @@
 }
 .subscription-studio-intro p{margin:0;color:var(--st-muted);font-size:.875rem;max-width:56rem;line-height:1.55}
 .subscription-studio-intro .btn{min-height:2.7rem;flex:0 0 auto}
-.subscription-studio-kicker{font-size:.7rem;letter-spacing:.15em;font-weight:780;color:var(--a)}
 .subscription-studio-notice{
   margin:0;color:var(--st-muted);border:1px solid var(--st-border);
   border-left:3px solid var(--a);border-radius:var(--nx-control-radius);
@@ -43,7 +42,7 @@
   width:100%;max-width:100%;min-width:0;
 }
 .subscription-studio .subscription-field input[type=color]{height:2.75rem;padding:.25rem;cursor:pointer}
-.subscription-studio-url{display:grid;gap:.45rem;background:var(--nx-section-bg);padding:1rem;border:1px dashed var(--st-border);border-radius:var(--nx-control-radius)}
+.subscription-studio-url{display:grid;gap:.45rem;background:transparent;padding:.8rem 0;border:0;border-top:1px solid var(--st-border);border-radius:0}
 .subscription-studio-url span{font-size:.72rem;color:var(--st-muted)}
 .subscription-studio-url code{overflow-wrap:anywhere;font-size:.85rem;color:var(--st-ink)}
 .subscription-roles{display:grid;gap:.65rem}

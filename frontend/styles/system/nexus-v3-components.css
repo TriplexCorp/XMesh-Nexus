@@ -11,7 +11,7 @@ button svg{flex:none}
 [data-ui-surface=section]{min-width:0;padding:var(--nx-section-pad);background:var(--nx-section-bg);border:1px solid var(--nx-border);border-radius:var(--nx-section-radius);box-shadow:var(--nx-section-shadow)}
 [data-ui-surface=item],[data-ui-surface=metric]{min-width:0;background:var(--nx-item-bg);border:1px solid var(--nx-border);border-radius:var(--nx-item-radius);box-shadow:var(--nx-item-shadow)}
 [data-ui-surface=floating]{background:var(--nx-floating-bg);border:1px solid var(--nx-border-strong);border-radius:var(--nx-section-radius);box-shadow:var(--nx-floating-shadow);backdrop-filter:var(--nx-backdrop)}
-.card .card{box-shadow:none}
+.card .card{padding-inline:0;border:0;border-top:1px solid var(--nx-separator);border-radius:0;background:transparent;box-shadow:none}
 .btn,.gh,.dg,.ib,.ia{display:inline-flex;align-items:center;justify-content:center;gap:.45rem;min-width:0;min-height:var(--nx-control-h);padding:.55rem .85rem;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-control-bg);box-shadow:var(--nx-control-shadow);color:var(--tx);font-size:.82rem;font-weight:650;text-decoration:none;white-space:nowrap}
 .btn{background:var(--a);border-color:var(--a);color:var(--btn-text);font-weight:750}
 .btn:not(:disabled):hover{background:color-mix(in srgb,var(--a) 88%,var(--tx))}
@@ -25,12 +25,13 @@ button svg{flex:none}
 .ib{position:relative}
 [data-theme=dark] .sun,[data-theme=light] .moon{display:none}
 input:not([type=range]):not([type=checkbox]):not([type=radio]),select,textarea,.xm-select-trigger{width:100%;min-width:0;min-height:var(--nx-control-h);padding:.55rem .75rem;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-control-bg);box-shadow:var(--nx-control-shadow);color:var(--tx);font:inherit;font-size:.85rem;line-height:1.4}
+:where(input:not([type=range]):not([type=checkbox]):not([type=radio]),textarea,select,.xm-select-trigger):focus-visible{outline:2px solid var(--nx-focus);outline-offset:-2px;box-shadow:none}
 textarea{height:auto;resize:vertical;white-space:pre;line-height:1.55;tab-size:2}
 input[type=checkbox],input[type=radio]{width:1.05rem;height:1.05rem;accent-color:var(--a);flex:none;cursor:pointer}
 input::placeholder,textarea::placeholder{color:var(--mu);opacity:.8}
 :where(input,select,textarea):disabled{opacity:.55;cursor:not-allowed}
 .f{display:grid;gap:.4rem;min-width:0}
-.f>span{font-size:.76rem;font-weight:650;color:var(--mu);line-height:1.4}
+.f>span{font-size:.8rem;font-weight:650;color:var(--nx-muted);line-height:1.4}
 .f small{color:var(--mu);font-size:.72rem;line-height:1.5}
 .seg,.choice{display:inline-flex;align-items:center;flex-wrap:wrap;gap:.2rem;width:fit-content;max-width:100%;padding:.2rem;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-control-bg)}
 .seg button,.choice button{min-width:0;min-height:var(--nx-control-h-sm);padding:.4rem .65rem;border:1px solid transparent;border-radius:max(.2rem,calc(var(--nx-control-radius) - .2rem));color:var(--mu);font-size:.76rem;font-weight:600;line-height:1.3}
@@ -68,7 +69,7 @@ input::placeholder,textarea::placeholder{color:var(--mu);opacity:.8}
 .fl button{min-height:var(--nx-control-h-sm);padding:.35rem .7rem;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-control-bg);font-size:.8rem;color:var(--mu)}
 .fl button.on{background:var(--nx-selected-bg);border-color:var(--nx-selected-border);color:var(--tx)}
 .fl button b{font-weight:500;opacity:.7}
-.kbd,kbd{display:inline-flex;align-items:center;padding:.1rem .35rem;border:1px solid var(--nx-border);border-radius:.3rem;background:var(--nx-control-bg);color:var(--mu);font-size:.68rem}
+.kbd,kbd{display:inline-flex;flex:none;white-space:nowrap;align-items:center;padding:.1rem .35rem;border:1px solid var(--nx-border);border-radius:.3rem;background:var(--nx-control-bg);color:var(--mu);font-size:.68rem}
 .qr{width:11rem;max-width:100%;justify-self:center;padding:.5rem;border-radius:var(--nx-control-radius);background:#fff}
 .qr svg{display:block;width:100%}
 .lk{display:flex;align-items:center;gap:.5rem;min-width:0}
@@ -79,7 +80,7 @@ input::placeholder,textarea::placeholder{color:var(--mu);opacity:.8}
 
 /* Tables have one horizontal overflow boundary, owned by the containing .tw. */
 table{width:100%;border-collapse:separate;border-spacing:0;font-size:.84rem}
-th{text-align:left;padding:.65rem .8rem;color:var(--nx-muted);font-size:.67rem;font-weight:650;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;border-bottom:1px solid var(--nx-separator)}
+th{text-align:left;padding:.65rem .8rem;color:var(--nx-muted);font-size:.75rem;font-weight:650;letter-spacing:.04em;text-transform:none;white-space:nowrap;border-bottom:1px solid var(--nx-separator)}
 th button{font:inherit;color:inherit;min-height:0}
 td{padding:.75rem .8rem;border-bottom:1px solid var(--nx-separator);vertical-align:middle;white-space:nowrap}
 tbody tr:last-child td{border-bottom:0}
