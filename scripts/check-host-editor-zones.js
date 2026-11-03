@@ -22,6 +22,30 @@ const editor=new Function('DB','hostProfile','inbs','field','esc','ic',source+'\
  DB,()=>DB.profiles[0],()=>[{tag:'vless-main-2',protocol:'vless'}],
  field,x=>String(x).replace(/&/g,'&amp;').replace(/"/g,'&quot;'),()=>''
 );
+const helperStart=app.indexOf('function hostNodeCountryCode(node){');
+const helperEnd=app.indexOf('function hostProfile(',helperStart);
+assert(helperStart>=0&&helperEnd>helperStart,'Missing canonical node country preset helpers');
+const countries=[{code:'NL',flag:'🇳🇱'},{code:'PL',flag:'🇵🇱'},{code:'DE',flag:'🇩🇪'}];
+const helpers=new Function('COUNTRY_CODES','COUNTRIES',app.slice(helperStart,helperEnd)+'return {hostNodeCountryCode,hostAutofillNodeFields};')(
+  countries.map(c=>c.code),countries
+);
+assert.equal(helpers.hostNodeCountryCode({flag:'🇳🇱'}),'NL','Flag emoji must resolve to ISO country');
+assert.equal(helpers.hostNodeCountryCode({flag:'pl'}),'PL','Legacy ISO flag must be accepted');
+assert.equal(helpers.hostNodeCountryCode({countryCode:'DE',flag:'🇳🇱'}),'DE','Explicit node ISO must be authoritative');
+assert.equal(helpers.hostNodeCountryCode({flag:'❓'}),'','Unknown flags must not generate fake ISO codes');
+const fields={remark:{value:''},countryCode:{value:''}};
+const form={elements:{namedItem:key=>fields[key]}};
+helpers.hostAutofillNodeFields(form,{flag:'🇳🇱',name:'Нидерланды'});
+assert.equal(fields.remark.value,'NL');
+assert.equal(fields.countryCode.value,'NL');
+fields.remark.value='Manual custom name';
+helpers.hostAutofillNodeFields(form,{flag:'🇵🇱',name:'Польша'});
+assert.equal(fields.remark.value,'Manual custom name','Implicit autofill must preserve a manual remark');
+helpers.hostAutofillNodeFields(form,{flag:'🇵🇱',name:'Польша'},true);
+assert.equal(fields.remark.value,'PL','Explicit node preset must replace stale remark');
+assert.equal(fields.countryCode.value,'PL','Explicit node preset must update country');
+assert.match(app,/hostAutofillNodeFields\(form,node,true\)/,'Node preset must fill country and remark');
+assert.match(app,/remark:countryCode\|\|node\.name\|\|'Новый хост',countryCode/,'Create Host from a node must use its country');
 const html=editor({profileId:1,tag:'vless-main-2',remark:'NL',
  address:'example.net',port:443,nodes:[5]}, {fs:fspec});
 const sections=[...html.matchAll(/<section class="([^"]+)"/g)].map(x=>x[1]);

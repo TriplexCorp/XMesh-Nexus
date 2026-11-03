@@ -11,6 +11,8 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    'Нет свежего подтверждения от управляющего агента ноды. Проверьте подключение.':'No recent heartbeat from the node control agent. Check its connection.',
+    'Управляющий агент ноды не поддерживает управляемое обновление Xray. Обновите Agent.':'The node control agent does not support managed Xray updates. Update the Agent.',
     'Проверка профиля не установлена · нажмите «Обновить Agent»':'Profile verification helper missing · click Update Agent',
     // Owner-only credential compromise response
     'Новые VPN-ключи выпущены. Обновите импорты клиентов и проверьте синхронизацию каждой ноды.':'New VPN credentials issued. Refresh client imports and verify every node has synchronized.',

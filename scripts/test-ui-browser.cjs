@@ -908,7 +908,7 @@ async function main() {
     await context.grantPermissions(['clipboard-read','clipboard-write']);
     const hostTlsProfile=await create('profiles',{name:`${prefix} · TLS host`,config:JSON.stringify({inbounds:[{tag:prefix+'-host-tls',listen:'127.0.0.1',port:29443,protocol:'vless',settings:{clients:[],decryption:'none'},streamSettings:{network:'xhttp',security:'tls',tlsSettings:{serverName:'tls.example.invalid'},xhttpSettings:{path:'/host-preview/'+('long-segment-'.repeat(24))}}}],outbounds:[{tag:'direct',protocol:'freedom'}]})});
     let hostPresetNode;
-    for(let i=0;i<4;i++)hostPresetNode=await create('nodes',{name:`${prefix} · Сервер ${i+1}`,addr:`192.0.2.${30+i}`,port:443,profileId:hostTlsProfile.id});
+    for(let i=0;i<4;i++)hostPresetNode=await create('nodes',{name:`${prefix} · Сервер ${i+1}`,addr:`192.0.2.${30+i}`,port:443,profileId:hostTlsProfile.id,flag:'🇳🇱'});
     await create('nodes',{name:`${prefix} · Отключён`,addr:'192.0.2.50',port:443,profileId:profile.id,disabled:true,tlsManualProvision:true});
     await create('nodes',{name:`${prefix} · Без телеметрии`,addr:'192.0.2.51',port:443,profileId:profile.id,disabled:true});
     // Transport fixtures exercise the real renderer/live refresh without
@@ -916,7 +916,7 @@ async function main() {
     const runtimePattern=/\/api\/v1\/nodes\/\d+\/runtime(?:\?.*)?$/;
     const runtimeFixture=async route=>{
       if(new URL(route.request().url()).pathname!==`/api/v1/nodes/${node.id}/runtime`)return route.continue();
-      await route.fulfill({json:{connected:true,version:'control-v6.0.7',xrayVersion:'26.10.31',xrayRunning:true,routerRunning:true,desiredRevisionSource:'current',desiredRevision:'fixture',appliedRevision:'fixture',tlsStatus:{state:'valid',daysRemaining:87},geoData:{state:'current',files:{geoip:{},geosite:{}}}}});
+      await route.fulfill({json:{connected:true,xrayUpdateSupported:true,version:'control-v6.0.7',xrayVersion:'26.10.31',xrayRunning:true,routerRunning:true,desiredRevisionSource:'current',desiredRevision:'fixture',appliedRevision:'fixture',tlsStatus:{state:'valid',daysRemaining:87},geoData:{state:'current',files:{geoip:{},geosite:{}}}}});
     };
     const metricsPattern='**/api/v1/statistics/overview';
     const metricsFixture=async route=>{
@@ -929,6 +929,24 @@ async function main() {
     await page.route(metricsPattern,metricsFixture);
     try{
       await page.reload({waitUntil:'domcontentloaded'});
+      await checked('Xray release picker: authenticated control-v6 capability',async()=>{
+        // A control-v6 heartbeat must not be rejected by the historic v3/v4
+        // browser regex. Only the backend-authorized capability is consulted.
+        const catalogRoute='**/api/v1/nodes/xray-releases';
+        await page.route(catalogRoute,route=>route.fulfill({json:{items:[{
+          version:'v26.10.30',published_at:'2026-10-30T00:00:00Z',prerelease:false,
+          url:'https://github.com/XTLS/Xray-core/releases/tag/v26.10.30'
+        }]}}));
+        try{
+          await navigate('nodes');
+          await page.locator(`[data-xray-update="${node.id}"]`).first().click();
+          const release=page.locator('.xray-release-row').first();
+          await release.waitFor({timeout:12000});
+          assert.equal(await release.locator('strong').innerText(),'v26.10.30');
+          await page.locator('.xray-release-dialog .gh').click();
+          await page.locator('.xray-release-dialog').waitFor({state:'detached'});
+        }finally{await page.unroute(catalogRoute)}
+      });
       await navigate('set');
       await page.locator('#content-width').evaluate(el=>{el.value='3000';el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}))});
       for(const [mode,width,height] of [['compact',1920,1080],['compact',2560,1440],['compact',3440,1440],['standard',3440,1440],['spacious',3440,1440],['compact',390,844]])await checked(`Equal Node heights: ${mode} ${width}×${height}`,async()=>{
@@ -1011,6 +1029,8 @@ async function main() {
       await page.waitForSelector('[data-host-node-preset]');
       await page.locator('[data-host-node-preset]').evaluate((select,id)=>{select.value=String(id);select.dispatchEvent(new Event('change',{bubbles:true}))},hostPresetNode.id);
       assert.equal(await page.locator('[name="address"]').inputValue(),hostPresetNode.addr,'Node preset must fill public endpoint');
+      assert.equal(await page.locator('[name="remark"]').inputValue(),'NL','Node preset must fill the ISO remark from the node flag');
+      assert.equal(await page.locator('[name="countryCode"]').inputValue(),'NL','Node preset must fill the explicit ISO country field');
       assert.equal(await page.locator('[name="profileId"]').inputValue(),String(hostTlsProfile.id),'Node preset must retain profile binding');
       assert.equal(await page.locator('[name="profileId"]').evaluate(select=>select.closest('.xm-select-shell').querySelector('.xm-select-caption').textContent),hostTlsProfile.name,'Visible profile caption must match preset binding');
       await page.locator('[name="remark"]').focus();
