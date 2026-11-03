@@ -160,5 +160,5 @@
   border:2px solid color-mix(in srgb,var(--a) 25%,transparent);
   border-top-color:var(--a);
   border-radius:50%;
-  animation:xmesh-agent-spinning .8s linear infinite;
+  animation:nx-spin .8s linear infinite;
 }

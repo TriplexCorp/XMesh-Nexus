@@ -178,6 +178,54 @@ async function main() {
       });
     }
 
+    await checked('Node operation spinners actually rotate and respect motion preferences',async()=>{
+      await page.setViewportSize({width:1920,height:1080});
+      await page.emulateMedia({reducedMotion:'no-preference'});
+      await navigate('nodes');
+      await page.locator('[data-node-grid-mode="compact"]').click();
+      const previous=await page.evaluate(()=>document.documentElement.dataset.motion);
+      const samples=[];
+      try{
+        for(const operation of ['agent','update','restart']){
+          await page.evaluate(({id,operation})=>{
+            document.documentElement.dataset.motion='on';
+            nodeAgentUpdating.delete(id);nodeXrayUpdating.delete(id);nodeXrayRestarting.delete(id);
+            updateNodeRuntimeBadges(DB.nodes.find(n=>Number(n.id)===id),null);
+            if(operation==='agent'){nodeAgentUpdating.add(id);paintNodeAgentUpdate(id,true)}
+            else{(operation==='update'?nodeXrayUpdating:nodeXrayRestarting).add(id);paintNodeXrayUpdate(id)}
+          },{id:node.id,operation});
+          const spinner=page.locator(`[data-node-card-id="${node.id}"] ${operation==='agent'?'[data-node-agent-version]':'[data-node-xray-version]'} .node-agent-spinner`);
+          const sample=()=>spinner.evaluate(el=>({transform:getComputedStyle(el).transform,animations:el.getAnimations().map(a=>({state:a.playState,time:a.currentTime}))}));
+          await spinner.waitFor();
+          const first=await sample();await page.waitForTimeout(170);const second=await sample();
+          assert(first.animations.some(a=>a.state==='running'),'Operation must have a real running CSS animation: '+operation);
+          assert(second.animations[0].time>first.animations[0].time+70,'Animation timeline must advance: '+operation);
+          assert.notEqual(first.transform,second.transform,'Spinner rotation matrix must change: '+operation);
+          samples.push({operation,first,second});
+          if(operation==='restart')for(let i=0;i<6;i++){
+            const filename=`node-spinner-motion-${i}.png`;
+            await page.locator(`[data-node-card-id="${node.id}"] > .h`).screenshot({path:path.join(output,filename),animations:'allow'});
+            report.screenshots.push(filename);await page.waitForTimeout(120);
+          }
+          await page.evaluate(()=>{document.documentElement.dataset.motion='off'});
+          assert.equal((await sample()).animations.length,0,'Panel motion-off must stop the spinner');
+          await page.evaluate(()=>{document.documentElement.dataset.motion='on'});
+          await page.emulateMedia({reducedMotion:'reduce'});
+          assert.equal((await sample()).animations.length,0,'System reduced-motion must stop the spinner');
+          await page.emulateMedia({reducedMotion:'no-preference'});
+        }
+      }finally{
+        await page.evaluate(({id,previous})=>{
+          nodeAgentUpdating.delete(id);nodeXrayUpdating.delete(id);nodeXrayRestarting.delete(id);
+          if(previous===undefined)delete document.documentElement.dataset.motion;else document.documentElement.dataset.motion=previous;
+        },{id:node.id,previous});
+        await page.emulateMedia({reducedMotion:'reduce'});
+        await navigate('users');await navigate('nodes');
+        await page.locator('[data-node-grid-mode="standard"]').click();
+      }
+      return samples;
+    });
+
     // Reference acceptance checks use the real renderer and live runtime refresh.
     for(const [width,height] of [[1920,1080],[2560,1440],[3440,1440]]) await checked(`Reference Nodes: ${width}×${height}`,async()=>{
       await page.setViewportSize({width,height});
