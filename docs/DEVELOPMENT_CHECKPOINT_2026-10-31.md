@@ -4,7 +4,7 @@
 **Source baseline before this documentation work:** `ddbd7164d323f4db020b985c3c43035b0f7e2233`  
 **Purpose:** preserve product and implementation decisions that must survive README rewrites, new chats, refactors and future UI work.
 
-This document is a **development handoff**, not marketing copy. When implementation and this file disagree, inspect current `main`, tests and the relevant subsystem documentation before changing behavior.
+This is a **dated development handoff**, not the live UI implementation specification. When it disagrees with current `main`, tests, the [UI System contract](UI_SYSTEM.md) or the [single-public-443 topology](SINGLE_PUBLIC_443_CONTROL_PLANE.md), the current implementation and authoritative subsystem documents take precedence.
 
 ## 1. Product boundary
 
@@ -35,7 +35,7 @@ Network expectations for a normal v6 deployment:
 
 - TCP/80: ACME HTTP-01 and HTTP→HTTPS redirect;
 - TCP/443: administrator/public web and subscription endpoint via Nginx;
-- TCP/8444: strict-PQ operational node control-plane ingress in v6;
+- TCP/8444: **loopback only**, an internal strict-PQ backend behind the single public TCP/443 multiplexer; never expose it publicly;
 - the panel container itself is published only on `${APP_BIND:-127.0.0.1}:${APP_PORT:-8080}`.
 
 Do not document manual `.env` secret generation as the primary installation flow. The installer is designed to generate and preserve those values.
