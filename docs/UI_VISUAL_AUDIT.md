@@ -46,3 +46,18 @@ Browser coverage adds six real inbound choices, desktop/mobile geometry,
 search/select-all/clear interactions, enabled Save state and screenshots at
 1920×1080, 2560×1440, 1366×768 and 390×844. New profiles are loaded before opening
 the editor, so these cases exercise the actual renderer with populated data.
+
+## Host editor redesign
+
+The host editor retains three permanent editing zones and all existing field names
+and data attributes. The primary rail is wider; public fields use
+aligned pairs, paired port/country inputs align, and node assignments form a bounded
+choice grid in a full-width assignment rail below the editing zones. Semantic SVG headings distinguish connection, overrides and preview.
+The preview consumes the existing section material without another nested panel.
+Obsolete feature-level sticky-footer rules are removed; dialog geometry and its
+single scroll owner remain in the canonical workspace contract. All controls and
+panels use shared radius/material tokens.
+
+Regression cases use a real TLS/XHTTP profile and a real node fleet at 1920×1080,
+2560×1440 and 390×844. They exercise preset autofill, SNI preview, reset overrides,
+semantic heading icons, field baselines and responsive section containment.

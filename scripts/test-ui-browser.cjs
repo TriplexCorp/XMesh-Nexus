@@ -747,6 +747,48 @@ async function main() {
       return g;
     });
 
+    const hostTlsProfile=await create('profiles',{name:`${prefix} · TLS host`,config:JSON.stringify({inbounds:[{tag:prefix+'-host-tls',listen:'127.0.0.1',port:29443,protocol:'vless',settings:{clients:[],decryption:'none'},streamSettings:{network:'xhttp',security:'tls',tlsSettings:{serverName:'tls.example.invalid'},xhttpSettings:{path:'/host-preview'}}}],outbounds:[{tag:'direct',protocol:'freedom'}]})});
+    let hostPresetNode;
+    for(let i=0;i<4;i++)hostPresetNode=await create('nodes',{name:`${prefix} · Сервер ${i+1}`,addr:`192.0.2.${30+i}`,port:443,profileId:hostTlsProfile.id});
+    await page.reload({waitUntil:'domcontentloaded'});
+    await page.waitForFunction(()=>!!document.querySelector('#view')?.children.length&&!document.querySelector('#view .sk'));
+    for(const [width,height] of [[1920,1080],[2560,1440],[390,844]]) await checked(`Host redesign with TLS and fleet: ${width}×${height}`,async()=>{
+      await page.setViewportSize({width,height});
+      await navigate('hosts');
+      await page.locator('[data-ne="hosts"]').first().click();
+      await page.waitForSelector('[data-host-node-preset]');
+      await page.locator('[data-host-node-preset]').evaluate((select,id)=>{select.value=String(id);select.dispatchEvent(new Event('change',{bubbles:true}))},hostPresetNode.id);
+      assert.equal(await page.locator('[name="address"]').inputValue(),hostPresetNode.addr,'Node preset must fill public endpoint');
+      assert.equal(await page.locator('[name="profileId"]').inputValue(),String(hostTlsProfile.id),'Node preset must retain profile binding');
+      await page.locator('[name="sni"]').fill('override.example.invalid');
+      await page.locator('[name="sni"]').dispatchEvent('change');
+      assert((await page.locator('[data-host-resolved]').innerText()).includes('override.example.invalid'),'Live preview must reflect SNI override');
+      await page.locator('[data-host-clear-overrides]').click();
+      assert.equal(await page.locator('[name="sni"]').inputValue(),'','Reset must clear overrides');
+      await page.waitForFunction(()=>!document.getElementById('xmesh-feedback-toast')?.matches(':popover-open'));
+      await page.locator('.host-editor-layout').evaluate(body=>{body.scrollTop=0});
+      const g=await page.locator('#dlg').evaluate(d=>{
+        const box=e=>{const r=e.getBoundingClientRect();return{x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};
+        const q=s=>d.querySelector(s),primary=q('.host-primary-panel'),advanced=q('.host-advanced-panel'),preview=q('.host-editor-side');
+        return{dialog:box(d),primary:box(primary),advanced:box(advanced),preview:box(preview),assignment:box(q('.host-assignment-panel')),body:box(q('.host-editor-layout')),footer:box(q('.act')),port:box(q('[name="port"]')),country:box(q('[name="countryCode"]')),address:box(q('[name="address"]')),publicFields:box(q('.host-public-fields')),icons:[primary,advanced,preview].map(p=>!!p.querySelector('.node-form-section-title svg')),choices:[...d.querySelectorAll('.ms label')].map(box)};
+      });
+      await screenshot(page,`host-redesign-${width}x${height}`);
+      await page.keyboard.press('Escape');
+      await page.waitForSelector('dialog[open]',{state:'detached'});
+      assert(g.icons.every(Boolean),'Three editor zones must retain semantic SVG headings');
+      assert(g.dialog.y>=0&&g.dialog.bottom<=height+1,'Host editor must fit viewport');
+      assert(g.body.bottom<=g.footer.y+1,'Footer must not cover fields');
+      if(width>=1920){
+        assert(g.primary.right<g.advanced.x&&g.advanced.right<g.preview.x,'Desktop must keep three distinct editing zones');
+        assert(Math.abs(g.port.y-g.country.y)<=3,'Paired public fields must share a baseline');
+        assert(g.address.width>=g.publicFields.width*.4,'Paired public endpoint must retain readable width');
+        assert(g.choices.length>=5,'Fixture must show a real node fleet');
+        assert(g.assignment.y>=Math.max(g.primary.bottom,g.advanced.bottom,g.preview.bottom),'Fleet assignment must sit below the three editing zones');
+        assert(g.assignment.width>=g.body.width*.95,'Fleet assignment must use the workspace width');
+      }else assert(g.assignment.y>=g.primary.bottom&&g.advanced.y>=g.assignment.bottom&&g.preview.y>=g.advanced.bottom,'Mobile sections must not overlap');
+      return g;
+    });
+
     await create('profiles',{name:`${prefix} · populated squad`,config:JSON.stringify({inbounds:['hysteria-main','masque-main','shadowsocks-main','trojan-main','vless-main'].map((tag,i)=>({tag:prefix+'-'+tag,listen:'127.0.0.1',port:29000+i,protocol:'vless',settings:{clients:[],decryption:'none'},streamSettings:{network:'tcp',security:'none'}})),outbounds:[{tag:'direct',protocol:'freedom'}]})});
     await page.reload({waitUntil:'domcontentloaded'});
     await page.waitForFunction(()=>!!document.querySelector('#view')?.children.length&&!document.querySelector('#view .sk'));
@@ -766,6 +808,8 @@ async function main() {
       assert.equal(await page.locator('input[name="inb"]:checked').count(),0,'Clear must still work');
       await page.locator('.squad-inbound-row').first().click();
       await page.locator('input[name="name"]').fill('Squad layout check');
+      await page.waitForFunction(()=>!document.getElementById('xmesh-feedback-toast')?.matches(':popover-open'));
+      await page.locator('.host-editor-layout').evaluate(body=>{body.scrollTop=0});
       const g=await page.locator('#dlg').evaluate(d=>{
         const box=e=>{const r=e.getBoundingClientRect();return{x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};
         const q=s=>d.querySelector(s),list=q('.squad-inbound-list'),body=q('.squad-editor-layout');
