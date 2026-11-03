@@ -899,6 +899,11 @@ async function main() {
             assert(await page.locator(`[data-nr="${node.id}"]`).isDisabled(),'Restart must block repeated submissions');
             await page.evaluate(()=>drawNodeLive());
             assert.equal(await badge.locator('.node-agent-spinner').count(),1,'Live refresh must preserve restart feedback');
+            if(outcome==='failed'){
+              await navigate('hosts');await navigate('nodes');
+              await badge.locator('.node-agent-spinner').waitFor();
+              assert(await page.locator(`[data-nr="${node.id}"]`).isDisabled(),'Rerender must preserve restart progress and submission guard');
+            }
             await screenshot(page,`node-xray-restart-${outcome}`);
           }
           release();

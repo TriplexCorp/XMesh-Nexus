@@ -4243,9 +4243,10 @@ the old node will lose access. Cancel and create a new Node ID if both must work
      finally{
        nodeXrayRestarting.delete(id);
        delete b.dataset.loading;
+       const currentNode=DB.nodes.find(n=>Number(n.id)===id)||node;
        const button=document.querySelector('[data-nr="'+id+'"]');
-       if(button){delete button.dataset.loading;button.disabled=!!node.disabled;button.innerHTML=renderNodeRestart(id)}
-       if(cur==='nodes')updateNodeRuntimeBadges(node,restartRuntime);
+       if(button){delete button.dataset.loading;button.disabled=!!currentNode.disabled;button.innerHTML=renderNodeRestart(id)}
+       if(cur==='nodes')updateNodeRuntimeBadges(currentNode,restartRuntime);
      }
    }
   else if(b=g('[data-nt]')){const n=DB.nodes.find(x=>x.id==b.dataset.nt);await api.update('nodes',n.id,{disabled:!n.disabled});toast(`${n.name}: ${n.disabled?'отключён':'включён'}`);render(1)}
