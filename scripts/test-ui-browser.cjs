@@ -819,6 +819,60 @@ async function main() {
     const hostTlsProfile=await create('profiles',{name:`${prefix} · TLS host`,config:JSON.stringify({inbounds:[{tag:prefix+'-host-tls',listen:'127.0.0.1',port:29443,protocol:'vless',settings:{clients:[],decryption:'none'},streamSettings:{network:'xhttp',security:'tls',tlsSettings:{serverName:'tls.example.invalid'},xhttpSettings:{path:'/host-preview/'+('long-segment-'.repeat(24))}}}],outbounds:[{tag:'direct',protocol:'freedom'}]})});
     let hostPresetNode;
     for(let i=0;i<4;i++)hostPresetNode=await create('nodes',{name:`${prefix} · Сервер ${i+1}`,addr:`192.0.2.${30+i}`,port:443,profileId:hostTlsProfile.id});
+    await create('nodes',{name:`${prefix} · Отключён`,addr:'192.0.2.50',port:443,profileId:profile.id,disabled:true,tlsManualProvision:true});
+    await create('nodes',{name:`${prefix} · Без телеметрии`,addr:'192.0.2.51',port:443,profileId:profile.id,disabled:true});
+    // Transport fixtures exercise the real renderer/live refresh without
+    // activating a node or writing synthetic telemetry to the backend.
+    const runtimePattern=/\/api\/v1\/nodes\/\d+\/runtime(?:\?.*)?$/;
+    const runtimeFixture=async route=>{
+      if(new URL(route.request().url()).pathname!==`/api/v1/nodes/${node.id}/runtime`)return route.continue();
+      await route.fulfill({json:{connected:true,version:'control-v6.0.7',xrayVersion:'26.10.31',xrayRunning:true,routerRunning:true,desiredRevisionSource:'current',desiredRevision:'fixture',appliedRevision:'fixture',tlsStatus:{state:'valid',daysRemaining:87},geoData:{state:'current',files:{geoip:{},geosite:{}}}}});
+    };
+    const metricsPattern='**/api/v1/statistics/overview';
+    const metricsFixture=async route=>{
+      const response=await route.fetch(),data=await response.json();
+      const active=data.nodes?.find(n=>Number(n.id)===node.id);
+      if(active)Object.assign(active,{networkRxBytes:12345678900,networkTxBytes:123456789,latest:{stale:false,cpuPercent:27,ramUsedBytes:2e9,ramTotalBytes:8e9,rxBytesPerSec:0,txBytesPerSec:0,onlineClients:0}});
+      await route.fulfill({response,json:data});
+    };
+    await page.route(runtimePattern,runtimeFixture);
+    await page.route(metricsPattern,metricsFixture);
+    try{
+      await page.reload({waitUntil:'domcontentloaded'});
+      await navigate('set');
+      await page.locator('#content-width').evaluate(el=>{el.value='3000';el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}))});
+      for(const [mode,width,height] of [['compact',1920,1080],['compact',2560,1440],['compact',3440,1440],['standard',3440,1440],['spacious',3440,1440],['compact',390,844]])await checked(`Equal Node heights: ${mode} ${width}×${height}`,async()=>{
+        await page.setViewportSize({width,height});
+        await navigate('nodes');
+        await page.locator(`[data-node-grid-mode="${mode}"]`).click();
+        await page.locator(`[data-node-card-id="${node.id}"] .node-runtime-online`).waitFor();
+        const g=await page.locator('.nodes').evaluate(grid=>{
+          const box=e=>{const r=e.getBoundingClientRect();return{x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};
+          return{overflow:document.documentElement.scrollWidth,cards:[...grid.children].map(card=>({card:box(card),status:card.querySelector('[data-node-runtime-state]').textContent,body:box(card.querySelector('.node-body')),metrics:box(card.querySelector('.node-metrics')),speed:box(card.querySelector('.node-speed')),actions:box(card.querySelector('.acts')),buttons:[...card.querySelectorAll('.acts>button')].map(box)}))};
+        });
+        await screenshot(page,`nodes-equal-${mode}-${width}x${height}`);
+        assert(g.cards.length>=9,'Fixture must include multiple rows and mixed optional health fields');
+        assert(g.cards.some(c=>c.status.includes('Активна'))&&g.cards.some(c=>c.status.includes('Остановка не подтверждена')),'Fixture must include active and disabled runtime states');
+        assert(Math.max(...g.cards.map(c=>c.card.height))-Math.min(...g.cards.map(c=>c.card.height))<=2,'All visible cards must have equal heights across rows and statuses');
+        assert(g.overflow<=width+1,'Equal-height layout must not overflow the document');
+        for(const c of g.cards){
+          assert(c.body.bottom<=c.actions.y+1,'Body must not overlap actions');
+          assert(c.buttons.every(b=>b.x>=c.card.x&&b.right<=c.card.right+1&&b.bottom<=c.card.bottom),'Every action must fit inside its card');
+          const peers=g.cards.filter(other=>Math.abs(other.card.y-c.card.y)<=2);
+          assert(peers.every(other=>Math.abs(other.actions.y-c.actions.y)<=3),'Action rows must align between cards in the same row');
+          assert(peers.every(other=>Math.abs(other.speed.bottom-c.speed.bottom)<=3),'Speed rails must align between cards in the same row');
+        }
+        return g;
+      });
+    }finally{
+      await page.unroute(runtimePattern,runtimeFixture);
+      await page.unroute(metricsPattern,metricsFixture);
+      await page.setViewportSize({width:1920,height:1080});
+      await navigate('set');
+      await page.locator('#content-width').evaluate(el=>{el.value='1920';el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}))});
+      await navigate('nodes');
+      await page.locator('[data-node-grid-mode="standard"]').click();
+    }
     await page.reload({waitUntil:'domcontentloaded'});
     await page.waitForFunction(()=>!!document.querySelector('#view')?.children.length&&!document.querySelector('#view .sk'));
     for(const [width,height] of [[1920,1080],[2560,1440],[390,844]]) await checked(`Host redesign with TLS and fleet: ${width}×${height}`,async()=>{
