@@ -758,11 +758,12 @@ async function main() {
         await page.locator(`[data-node-grid-mode="${mode}"]`).click();
         const state=await page.locator('.nodes').evaluate(grid=>{
           const box=el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,width:r.width}};
-          return {left:grid.getBoundingClientRect().left,toolbarLeft:document.querySelector('.nodes-toolbar').getBoundingClientRect().left,rem:parseFloat(getComputedStyle(document.documentElement).fontSize),cards:[...grid.children].map(card=>({box:box(card),buttons:[...card.querySelectorAll('.acts>button')].map(box)}))};
+          return {left:grid.getBoundingClientRect().left,toolbarLeft:document.querySelector('.nodes-toolbar').getBoundingClientRect().left,rem:parseFloat(getComputedStyle(document.documentElement).fontSize),cards:[...grid.children].map(card=>({box:box(card),buttons:[...card.querySelectorAll('.acts>button')].map(box),summaryOnly:card.querySelector('.node-summary').children.length===1,summaryBorder:getComputedStyle(card.querySelector('.kvg')).borderBottomWidth}))};
         });
         assert(Math.abs(state.cards[0].box.x-state.left)<=2,'Fleet must anchor to the left grid edge in every density mode');
         assert(Math.abs(state.cards[0].box.x-state.toolbarLeft)<=2,'Cards must align with the left filter-toolbar edge');
         for(const card of state.cards){
+          if(mode==='compact'&&card.summaryOnly)assert.equal(card.summaryBorder,'0px','Compact card without health rows must not show a redundant separator');
           if(mode==='spacious')assert(Math.abs(card.box.x-state.left)<=2,'Every single-column card must stay left-aligned');
           assert(Math.abs(card.box.width-cap*state.rem)<=2,'Card must stop at its density width cap');
           assert(card.buttons.slice(0,4).every(b=>Math.abs(b.y-card.buttons[0].y)<=3),'Narrower card must preserve four action columns');
