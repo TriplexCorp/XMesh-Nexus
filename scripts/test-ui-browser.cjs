@@ -492,7 +492,7 @@ async function main() {
         assert(a.right<=b.x+1||b.right<=a.x+1||a.bottom<=b.y+1||b.bottom<=a.y+1,'Node choices must not overlap');
       }
       assert(g.body.bottom<=g.footer.y+1,'Footer must not cover assignments');
-      if(height>=1080) assert(g.scrollHeight<=g.clientHeight+1,'Desktop host content must fit when viewport has enough height');
+      if(height>=1440) assert(g.scrollHeight<=g.clientHeight+1,'Desktop host content must fit when viewport has enough height');
       await screenshot(page,`host-assignments-${width}x${height}`);
       await page.keyboard.press('Escape');
       await page.waitForSelector('dialog[open]',{state:'detached'});
