@@ -76,7 +76,7 @@ dialog#dlg.squad-wide .squad-editor-layout{
   display:grid;
   grid-template-columns:minmax(0,.72fr) minmax(0,1.28fr);
   grid-template-areas:"main connections" "impact connections";
-  grid-template-rows:max-content max-content;
+  grid-template-rows:auto 1fr;
   gap:18px;
   padding:20px 22px 18px;
   align-items:start;

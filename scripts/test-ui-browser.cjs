@@ -772,6 +772,9 @@ async function main() {
         const button=q('button.btn'),cs=getComputedStyle(button);
         return {dialog:box(d),main:box(q('.squad-editor-main')),connections:box(q('.squad-editor-connections')),impact:box(q('.squad-editor-side')),body:box(body),footer:box(q('.act')),list:box(list),listScroll:list.scrollHeight,listClient:list.clientHeight,bodyScroll:body.scrollHeight,bodyClient:body.clientHeight,rows:[...list.children].map(box),button:{color:cs.color,background:cs.backgroundColor,disabled:button.disabled}};
       });
+      await screenshot(page,`squad-populated-${width}x${height}`);
+      await page.keyboard.press('Escape');
+      await page.waitForSelector('dialog[open]',{state:'detached'});
       assert(g.dialog.y>=0&&g.dialog.bottom<=height+1,'Squad dialog must fit viewport');
       assert(g.body.bottom<=g.footer.y+1,'Footer must not overlay body');
       assert(g.listScroll<=g.listClient+1,'Inbound list must not create a nested scrollbar');
@@ -788,9 +791,6 @@ async function main() {
         assert(g.impact.y>=g.connections.bottom,'Mobile connections must not overlap impact');
       }
       if(height>=1080) assert(g.bodyScroll<=g.bodyClient+1,'Normal populated squad must fit desktop without scrolling');
-      await screenshot(page,`squad-populated-${width}x${height}`);
-      await page.keyboard.press('Escape');
-      await page.waitForSelector('dialog[open]',{state:'detached'});
       return g;
     });
 
