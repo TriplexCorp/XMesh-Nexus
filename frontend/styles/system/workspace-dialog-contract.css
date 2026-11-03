@@ -24,8 +24,8 @@
   display:grid;
   grid-template-columns:minmax(0,1fr);
   grid-template-rows:auto minmax(0,1fr) auto auto;
-  block-size:min(52rem,calc(100dvh - 2rem));
-  height:min(52rem,calc(100dvh - 2rem));
+  block-size:fit-content;
+  height:fit-content;
   min-height:0;
   max-block-size:calc(100dvh - 2rem);
   max-height:calc(100dvh - 2rem);

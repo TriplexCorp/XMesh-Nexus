@@ -12,7 +12,7 @@
   min-width:0;
   margin:0;
 }
-.host-editor-layout .f input {
+.host-editor-layout .f input:not([type="checkbox"]):not([type="radio"]) {
   width:100%;
   box-sizing:border-box;
 }
@@ -112,7 +112,7 @@ dialog.host-wide>form.box>#fe:empty {
   display:grid;
   grid-template-columns:minmax(0,1.08fr) minmax(0,1fr) minmax(0,1.08fr);
   gap:clamp(10px,.75vw,16px);
-  align-items:stretch;
+  align-items:start;
   grid-template-areas:"primary overrides preview";
   min-width:0;
 }
@@ -182,7 +182,7 @@ dialog.host-wide .node-form-section-title {
 }
 .host-assignment-fields {
   display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
+  grid-template-columns:minmax(0,1fr);
   gap:10px 12px;
   align-content:start;
   align-items:start;
@@ -288,6 +288,11 @@ dialog.host-wide :is(.host-connect-fields,.host-public-fields,.host-assignment-f
   flex:0 1 auto;
   min-width:0;
   font-size:.8rem;
+  box-sizing:border-box;
+}
+.host-editor-layout .ms label>span {
+  min-width:0;
+  overflow-wrap:anywhere;
 }
 .host-editor-layout [data-host-count] {
   font-size:.73rem;
