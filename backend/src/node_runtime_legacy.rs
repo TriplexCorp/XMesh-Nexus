@@ -10,6 +10,37 @@ use serde_json::{Value, json};
 use sha2::Digest;
 use sqlx::Row;
 
+// Mirrors the release-versioned request_xray_update allow-list. CI compares
+// these prefixes with the server command gate, preventing a browser/runtime
+// capability mismatch without modifying the protected Agent release overlay.
+const MANAGED_XRAY_AGENT_PREFIXES: [&str; 4] = [
+    "control-v3.",
+    "control-v4.",
+    "control-v5.",
+    "control-v6.",
+];
+
+fn supports_managed_xray_update(version: &str) -> bool {
+    MANAGED_XRAY_AGENT_PREFIXES
+        .iter()
+        .any(|prefix| version.starts_with(prefix))
+}
+
+#[cfg(test)]
+mod managed_xray_version_tests {
+    use super::supports_managed_xray_update;
+
+    #[test]
+    fn validates_approved_agent_major_versions() {
+        for version in ["control-v3.1.0", "control-v4.0.0", "control-v5.1.3", "control-v6.0.7"] {
+            assert!(supports_managed_xray_update(version), "{version}");
+        }
+        for version in ["control-v1.2.0", "control-v2.9.0", "untrusted-v6.0.7", "control-v7.0.0"] {
+            assert!(!supports_managed_xray_update(version), "{version}");
+        }
+    }
+}
+
 // Stable error codes only: never send profile JSON, secrets or raw database
 // errors to the UI. The real root cause is recorded as a bounded stage.
 fn profile_compile_error_code(error: &ApiError) -> &'static str {
@@ -385,11 +416,9 @@ pub async fn status(
                 "nodeId":node_id,
                 "connected":fresh,
                 "version":agent_version,
-                // Match the version majors permitted by the v6 request_xray_update
-                // overlay. Do not infer support from connected=true alone.
-                "xrayUpdateSupported":fresh && [
-                    "control-v3.", "control-v4.", "control-v5.", "control-v6."
-                ].iter().any(|prefix| agent_version.starts_with(prefix)),
+                // The server's fixed-update gate and this read-only status
+                // are compared by the Xray release regression contract.
+                "xrayUpdateSupported":fresh && supports_managed_xray_update(&agent_version),
                 "routerRunning":row.try_get::<bool,_>("router_running")?,
                 "xrayRunning":row.try_get::<bool,_>("xray_running")?,
                 "xrayVersion":row.try_get::<Option<String>,_>("xray_version")?,
