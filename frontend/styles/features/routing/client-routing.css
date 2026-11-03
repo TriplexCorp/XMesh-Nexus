@@ -144,7 +144,7 @@
 #client-route-root.crx .crx-settings-actions{flex-wrap:nowrap;gap:.5rem}
 #client-route-root.crx .crx-settings-actions button{flex:1;min-height:2.2rem;padding:.35rem .5rem;font-size:.75rem}
 #client-route-root.crx .crx-dialog-footer{padding:.65rem .75rem;gap:.5rem}
-#client-route-root.crx .crx-dialog-summary small{display:none}
+#client-route-root.crx .crx-dialog-summary small{font-size:.7rem;line-height:1.3}
 #client-route-root.crx .crx-dialog-summary{font-size:.75rem}
 }
 @media(prefers-reduced-motion:reduce){#client-route-root.crx *{transition:none}}

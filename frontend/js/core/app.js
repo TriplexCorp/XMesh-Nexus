@@ -912,7 +912,7 @@ const balancersP=async()=>{
    selector:source,observatory:obs};
  });
  const markup='<section class="balancer-workspace"><div class="balancer-intro"><div>'+
-  '<p>Объединяйте серверы в группы.</p>'+
+  '<p>Группы серверов для JSON-подписок.</p>'+
   '</div><div class="balancer-toolbar"><span id="balancers-count"></span><button class="btn" type="button" id="balancer-add">'+ic('plus')+'Новый балансировщик</button></div></div>'+
   '<div id="balancers-list" class="balancer-list"></div>'+
   '<div class="balancer-savebar"><p>Изменения применятся после сохранения.</p>'+
