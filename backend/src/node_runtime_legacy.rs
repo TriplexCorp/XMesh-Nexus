@@ -344,6 +344,7 @@ pub async fn status(
     match record {
         Some(row) => {
             let fresh: bool = row.try_get("fresh")?;
+            let agent_version: String = row.try_get("version")?;
             let applied: Option<String> = row.try_get("applied_revision")?;
             // Recompile read-only using the exact same compiler as the
             // authenticated desired-config endpoint. A stale issued record
@@ -383,7 +384,8 @@ pub async fn status(
                 "desiredRevision":expected,
                 "nodeId":node_id,
                 "connected":fresh,
-                "version":row.try_get::<String,_>("version")?,
+                "version":agent_version,
+                "xrayUpdateSupported":fresh && crate::node_runtime::managed_xray_update_agent_supported(&agent_version),
                 "routerRunning":row.try_get::<bool,_>("router_running")?,
                 "xrayRunning":row.try_get::<bool,_>("xray_running")?,
                 "xrayVersion":row.try_get::<Option<String>,_>("xray_version")?,
@@ -397,7 +399,7 @@ pub async fn status(
             })))
         }
         None => Ok(Json(
-            json!({"nodeId":node_id,"connected":false,"lastSeenAt":null}),
+            json!({"nodeId":node_id,"connected":false,"xrayUpdateSupported":false,"lastSeenAt":null}),
         )),
     }
 }
