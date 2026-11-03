@@ -23,6 +23,50 @@ use sqlx::Row;
 /// authenticated transition to v6; they are not the advertised target.
 pub const CONTROL_AGENT_VERSION: &str = "control-v6.0.7";
 
+/// Backend capability predicate for the fixed managed-Xray action.
+/// The authenticated control heartbeat, not a separately maintained UI regex,
+/// decides eligibility. Later compatible control majors inherit this minimum
+/// version contract without another browser-side allow-list change.
+pub(crate) fn managed_xray_update_agent_supported(version: &str) -> bool {
+    let Some(version) = version.strip_prefix("control-v") else {
+        return false;
+    };
+    let mut parts = version.split('.');
+    let (Some(major), Some(minor), Some(patch), None) =
+        (parts.next(), parts.next(), parts.next(), parts.next())
+    else {
+        return false;
+    };
+    let numeric = |value: &str| !value.is_empty() && value.bytes().all(|c| c.is_ascii_digit());
+    numeric(major)
+        && major.parse::<u32>().is_ok_and(|major| major >= 3)
+        && numeric(minor)
+        && numeric(patch)
+}
+
+#[cfg(test)]
+mod managed_xray_capability_tests {
+    use super::managed_xray_update_agent_supported;
+
+    #[test]
+    fn supports_existing_and_future_compatible_control_majors() {
+        for version in ["control-v3.1.0", "control-v4.0.0", "control-v5.1.3",
+                        "control-v6.0.7", "control-v7.0.0"] {
+            assert!(managed_xray_update_agent_supported(version), "{version}");
+        }
+    }
+
+    #[test]
+    fn rejects_old_or_unrecognized_agent_versions() {
+        for version in ["", "control-v1.0.0", "control-v2.9.9", "control-v3",
+                        "control-v3.fake", "control-v6.0.7-extra",
+                        "random-v7.0.0", "control-vx.1.2"] {
+            assert!(!managed_xray_update_agent_supported(version), "{version}");
+        }
+    }
+}
+
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RetryPoll {
@@ -99,23 +143,34 @@ async fn control_v6_transition_active(
     include_legacy_v1_v3: bool,
 ) -> Result<bool, ApiError> {
     let interval = format!("{seconds} seconds");
-    let query = if include_legacy_v1_v3 {
-        "SELECT EXISTS(SELECT 1 FROM node_runtime_heartbeats
-         WHERE node_id=$1 AND received_at>NOW()-$2::INTERVAL
-           AND (version LIKE 'control-v1%' OR version LIKE 'control-v2%' OR
-                version LIKE 'control-v3%' OR version LIKE 'control-v4%' OR
-                version LIKE 'control-v5%' OR version LIKE 'control-v6%'))"
-    } else {
-        "SELECT EXISTS(SELECT 1 FROM node_runtime_heartbeats
-         WHERE node_id=$1 AND received_at>NOW()-$2::INTERVAL
-           AND (version LIKE 'control-v3.%' OR version LIKE 'control-v4.%' OR
-                version LIKE 'control-v5.%' OR version LIKE 'control-v6.%'))"
-    };
-    Ok(sqlx::query_scalar::<_, bool>(query)
+    if include_legacy_v1_v3 {
+        // The restart compatibility surface is intentionally unchanged.
+        return Ok(sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS(SELECT 1 FROM node_runtime_heartbeats
+             WHERE node_id=$1 AND received_at>NOW()-$2::INTERVAL
+               AND (version LIKE 'control-v1%' OR version LIKE 'control-v2%' OR
+                    version LIKE 'control-v3%' OR version LIKE 'control-v4%' OR
+                    version LIKE 'control-v5%' OR version LIKE 'control-v6%'))",
+        )
         .bind(node_id)
         .bind(interval)
         .fetch_one(&state.pool)
-        .await?)
+        .await?);
+    }
+    // Same predicate as GET /nodes/{id}/runtime; never let the UI and the
+    // command authorization drift to different hard-coded agent majors.
+    let version = sqlx::query_scalar::<_, String>(
+        "SELECT version FROM node_runtime_heartbeats
+         WHERE node_id=$1 AND received_at>NOW()-$2::INTERVAL
+         ORDER BY received_at DESC LIMIT 1",
+    )
+    .bind(node_id)
+    .bind(interval)
+    .fetch_optional(&state.pool)
+    .await?;
+    Ok(version
+        .as_deref()
+        .is_some_and(managed_xray_update_agent_supported))
 }
 
 /// v6 shadow for the legacy restart endpoint. This exists because a genuine
