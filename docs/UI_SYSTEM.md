@@ -225,9 +225,13 @@ The active owner is `frontend/styles/features/nodes/nodes.css`; `nodesP()` in
 references elsewhere in this document predate the current three-system-module
 asset graph, enforced by `scripts/check-ui-system.js`.
 
-- Nodes tracks are anchored to the left workspace edge and capped by density: Compact 60rem, Standard 68rem, Spacious 76rem.
+- Nodes tracks are anchored to the left workspace edge and capped by density: Compact 40rem, Standard 68rem, Spacious 76rem.
   Cards and their action buttons stop stretching across ultrawide low-count fleets;
   narrower workspaces still shrink the tracks to fit. Global radius settings remain authoritative.
+- Compact is the square-card experiment: summary above telemetry, a separating line,
+  and three horizontal KPI tiles at readable card widths. Its proportions follow
+  content, with no forced aspect ratio or clipped actions. Four action columns fit
+  from a 36rem content width; narrower cards retain the two-column fallback.
 - The header groups flag/name/endpoint/provider on the left and runtime badges on the right.
 - `.node-body` is a real grid: summary 40%, telemetry 60% once the card has room.
 - Users and XRAY STUDIO are adjacent summary columns with a vertical divider.

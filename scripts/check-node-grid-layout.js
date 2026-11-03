@@ -19,7 +19,7 @@ assert.match(app,/node-summary/,'Node operational summary has explicit anatomy')
 assert.match(app,/node-metrics/,'Node metrics have explicit anatomy');
 
 /* Density changes track count and caps card width without overriding radius. */
-for(const [mode,cap] of [['compact',60],['standard',68],['spacious',76]]){
+for(const [mode,cap] of [['compact',40],['standard',68],['spacious',76]]){
  assert(workspaces.includes(`.nodes[data-node-count="1"][data-grid-mode=${mode}]{grid-template-columns:minmax(0,${cap}rem)}`));
  const columns=mode==='spacious'?1:2;
  const tracks=columns===1?`minmax(0,${cap}rem)`:`repeat(2,minmax(0,${cap}rem))`;
@@ -47,6 +47,8 @@ assert.match(workspaces,/\.nc \.acts>\[data-agent-update\]\{[^}]*color:var\(--a\
   'Update Agent must keep its premium accent treatment');
 assert.match(workspaces,/@container node-card \(min-width:44rem\)\{\s*\.nc \.acts\{grid-template-columns:repeat\(4,minmax\(0,1fr\)\)\}/,
   'Wide node cards must compose actions as four columns');
+assert.match(workspaces,/@container node-card \(min-width:36rem\)\{\s*\.nodes\[data-grid-mode=compact\] \.acts\{grid-template-columns:repeat\(4,minmax\(0,1fr\)\)\}/,
+  'Compact square cards must retain four readable action columns when space permits');
 new Function(app);
 
 // Exercise the real delegated click handler, rather than testing a copy.
