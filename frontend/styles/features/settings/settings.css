@@ -52,7 +52,7 @@
 .settings-brand-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--nx-space-4)}
 .setting-actions{display:flex;justify-content:flex-end;gap:var(--nx-inline-gap)}
 .settings-services .setting-control{max-width:25rem}
-.settings-services .setting-row>div{min-width:0;overflow-wrap:anywhere}
+.settings-services .setting-row>div,.settings-services .rowi>div{min-width:0;overflow-wrap:anywhere}
 .history-placeholder{min-width:0;overflow-wrap:anywhere;padding:.85rem 1rem;border:1px dashed var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-section-bg);color:var(--nx-muted);font-size:var(--nx-text-sm);line-height:1.5}
 @container settings-workspace (max-width:60rem){
   .appearance-layout,.settings-services{grid-template-columns:minmax(0,1fr)}

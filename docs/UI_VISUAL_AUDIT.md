@@ -120,3 +120,5 @@ intrinsically larger than the viewport; the document itself must stay bounded.
 Mobile Settings also wraps long updater feedback and version metadata. The
 regression fixture includes an unbroken URL token so server-dependent messages
 cannot expand the document on narrow viewports.
+Webhook event names also wrap before their switches, preserving the full event
+identifier without overlapping the control.

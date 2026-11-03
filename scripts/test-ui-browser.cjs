@@ -454,6 +454,11 @@ async function main() {
       await page.locator('#core-message').evaluate(el=>{el.textContent='Update request failed: https://example.invalid/releases/'+('abcdef0123456789'.repeat(40))});
       const g=await geometry(page);
       assert(g.scrollWidth<=391,'Long updater feedback must wrap without expanding the document');
+      const hooks=await page.locator('[data-hk]').evaluateAll(inputs=>inputs.map(input=>{
+        const row=input.closest('.rowi'),text=row.firstElementChild.getBoundingClientRect(),toggle=input.closest('.sw').getBoundingClientRect();
+        return {name:input.dataset.hk,textRight:text.right,toggleLeft:toggle.left,wrapped:row.firstElementChild.scrollWidth<=row.firstElementChild.clientWidth+1};
+      }));
+      assert(hooks.every(h=>h.wrapped&&h.textRight< h.toggleLeft),'Webhook names must wrap before their switches: '+JSON.stringify(hooks));
       await screenshot(page,'audit-settings-long-feedback-390');
       return g;
     });
