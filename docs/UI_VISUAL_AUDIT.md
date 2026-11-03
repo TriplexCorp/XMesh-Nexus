@@ -65,3 +65,25 @@ semantic heading icons, field baselines and responsive section containment.
 Preset autofill explicitly refreshes the existing XMeshSelects component so its
 visible profile caption matches the updated native select value. Browser checks
 verify both values to prevent a stale profile label after choosing a node.
+
+## Host workbench: desktop height acceptance
+
+The full-width assignment row in the previous iteration still followed the
+height of the longest preview column. This follow-up makes the preview an
+independent sidebar spanning both editing rows. Connection/override fields share
+the upper editing area; node assignments span only that editing area below them.
+Outer card nesting is removed from editable sections. Empty error state no longer
+reserves a phantom grid track in the canonical dialog shell.
+
+Long preview values remain intact in the DOM/title and have a full-value copy
+action rather than wrapping an unbounded path into multiple rows. The browser
+fixture now contains a 300+ character XHTTP path and seven real nodes. Desktop
+acceptance requires workspace scrollHeight <= clientHeight + 1 at 1920×1080 and
+2560×1440. Mobile retains a single scroll owner, stable actions and non-overlapping
+sections.
+
+Design research: official Geist Modal and Input examples
+(https://vercel.com/geist/modal, https://vercel.com/geist/input), and Cloudflare's
+responsive dashboard redesign (https://blog.cloudflare.com/redesigning-cloudflare/).
+These inform hierarchy and form density; existing XMesh tokens and icon helpers
+remain the implementation owners.

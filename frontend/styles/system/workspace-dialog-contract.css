@@ -33,6 +33,10 @@
   overscroll-behavior:contain;
 }
 
+#dlg.host-wide>form.box:has(>#fe:empty){
+  grid-template-rows:auto minmax(0,1fr) auto;
+}
+
 #dlg.host-wide>form.box>.host-editor-layout{
   min-height:0;
   max-height:100%;

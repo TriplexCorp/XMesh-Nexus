@@ -2771,7 +2771,10 @@ function hostEditorRefresh(form,changedProfile=false){
   const shortId=val('shortId')||reality.shortIds?.[0]||'';
   const requiredNodes=[...form.querySelectorAll('[name="nodes"]:checked')].map(el=>DB.nodes.find(n=>String(n.id)===el.value));
   const mismatched=requiredNodes.filter(n=>!n||n.disabled||!profile||String(n.profileId)!==String(profile.id));
-  const show=(label,value)=>'<div class="host-resolved-line"><span>'+esc(label)+'</span><b>'+esc(String(value||'—'))+'</b></div>';
+  const show=(label,value)=>{
+    const text=String(value||'—');
+    return '<div class="host-resolved-line"><span>'+esc(label)+'</span><b title="'+esc(text)+'"><span class="host-resolved-text">'+esc(text)+'</span>'+(text.length>48?'<button type="button" class="host-value-copy" data-host-copy-value="'+esc(text)+'" aria-label="Копировать" title="Копировать">'+ic('copy')+'</button>':'')+'</b></div>';
+  };
   const preview=form.querySelector('[data-host-resolved]');
   if(preview){
     preview.innerHTML=
@@ -3935,6 +3938,7 @@ document.addEventListener('click',async e=>{
   }
   else if(b=g('[data-user-traffic-refresh]')){e.preventDefault();void loadUserTrafficStats(+b.dataset.userTrafficRefresh)}
   else if(b=g('[data-copy-xray-id]')){const u=DB.users.find(x=>x.id==+b.dataset.copyXrayId);if(u?.xrayId)copyT(u.xrayId)}
+  else if(b=g('[data-host-copy-value]'))copyT(b.dataset.hostCopyValue);
   else if(g('[data-copy]'))copyT($('#lk').value);
   else if(b=g('[data-a]')){const id=+b.dataset.u,a=b.dataset.a;
     if(a=='del'){confirmBox('Удалить пользователя?','Удалить',()=>delUsers(new Set([id])));return}
