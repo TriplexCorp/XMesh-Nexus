@@ -2684,6 +2684,24 @@ async function crudCard(k,showTitle=true){
 async function simple(ks){const h=await Promise.all(ks.map(k=>crudCard(k,ks.length>1)));return [h.join('')]}
 /* Host = client-facing endpoint, not a second Xray server configuration.
    Resolve inherited values for preview only; never expose server privateKey. */
+// Host preset metadata must follow the selected node, not a hard-coded
+// country name or a stale remark from another node. Flags can be emoji or ISO.
+function hostNodeCountryCode(node){
+  for(const value of [node?.countryCode,node?.flag]){
+    const code=String(value||'').trim().toUpperCase();
+    if(COUNTRY_CODES.includes(code))return code;
+    const match=COUNTRIES.find(country=>country.flag===value);
+    if(match)return match.code;
+  }
+  return '';
+}
+function hostAutofillNodeFields(form,node,force=false){
+  const code=hostNodeCountryCode(node);
+  const remark=form.elements.namedItem('remark');
+  const country=form.elements.namedItem('countryCode');
+  if(remark && (force || !String(remark.value||'').trim()))remark.value=code||node.name||'';
+  if(country && (force || !String(country.value||'').trim()))country.value=code;
+}
 function hostProfile(profileId){return DB.profiles.find(p=>String(p.id)===String(profileId))}
 function hostInbound(profileId,tag){return inbs(hostProfile(profileId)||{}).find(i=>i.tag===tag)}
 // Client-only X25519 public-key derivation: never export a REALITY private key
@@ -2737,10 +2755,11 @@ function hostEditorRefresh(form,changedProfile=false){
     if(compatible.length===1){
       const node=compatible[0];
       form.querySelectorAll('[name="nodes"]').forEach(input=>{input.checked=String(input.value)===String(node.id)});
-      for(const [key,value] of [['address',node.addr||''],['port',node.port||443],['remark',node.name||'']]){
+      for(const [key,value] of [['address',node.addr||''],['port',node.port||443]]){
         const input=form.elements.namedItem(key);
         if(input&&(key==='port'||!String(input.value||'').trim()))input.value=String(value);
       }
+      hostAutofillNodeFields(form,node);
     }
   }
   const inbound=candidates.find(i=>i.tag===inboundSelect?.value);
@@ -3029,7 +3048,7 @@ function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id
   const rotationProbe=id&&o.rotationEnabled
     ?`<div class="node-rotation-probe"><label class="f"><span>Проверка на пользователе</span><select data-node-rotation-user>${userOptions||'<option value="">Нет активных пользователей</option>'}</select></label><button type="button" class="gh sm" data-node-rotation-probe="${id}" ${userOptions?'':'disabled'}>${ic('redo')}Получить следующий IP</button><output data-node-rotation-result aria-live="polite"></output><small>Тест переключает адрес выбранного пользователя. Публичная подписка использует закреплённый IP до следующего интервала ротации.</small></div>`
     :'';
-  const hostWizard=k==='hosts'?'<div class="host-quick"><label class="f"><span>Быстро заполнить из узла</span><select data-host-node-preset><option value="">Выберите сервер…</option>'+DB.nodes.map(n=>'<option value="'+esc(String(n.id))+'">'+esc(n.name)+' · '+esc(n.addr||'')+'</option>').join('')+'</select></label><p class="note">Подставит адрес, порт и привязку. Остальные поля сохранятся.</p></div>':'';
+  const hostWizard=k==='hosts'?'<div class="host-quick"><label class="f"><span>Быстро заполнить из узла</span><select data-host-node-preset><option value="">Выберите сервер…</option>'+DB.nodes.map(n=>'<option value="'+esc(String(n.id))+'">'+esc(n.name)+' · '+esc(n.addr||'')+'</option>').join('')+'</select></label><p class="note">Подставит адрес, порт, страну, название и привязку. Остальные поля сохранятся.</p></div>':'';
   const fields=k==='squads'?squadEditorMarkup(o,e):k==='hosts'?hostEditorMarkup(o,e):k==='nodes'
     ?'<div class="node-form-layout"><section class="node-main-section"><div class="node-form-section-title">Основные параметры</div><p class="node-section-intro">Подключение, профиль Xray и ограничения узла</p><div class="node-form-grid">'+nodeMainFields+'</div>'+nodeTlsFields+nodeResetAction+'</section>'+`<section class="node-ip-section"><div class="node-form-section-title">IP-пул и ротация</div><div class="node-ip-hint">Адреса должны принадлежать этому VPS и быть доступны извне.</div><div class="node-rotation-editor-body">${rotationFields}<div class="node-pool-toolbar"><span data-node-pool-count>Адресов: ${nodeRotationIPs(o).length} / 256</span><button type="button" class="gh sm" data-node-pool-normalize>Убрать повторы</button><button type="button" class="gh sm" data-node-pool-clear>Очистить</button></div><output data-node-pool-feedback aria-live="polite"></output>${rotationProbe}</div></section><section class="node-billing-section"><div class="node-form-section-title">Инфрабиллинг</div><p class="node-ip-hint">Стоимость, аренда и напоминания</p><div class="node-billing-fields">${billingFields}</div></section></div>`
     :standardFields;
@@ -3973,7 +3992,9 @@ document.addEventListener('click',async e=>{
     const node=DB.nodes.find(n=>String(n.id)===b.dataset.nodeCreateHost);
     if(node){
       const profile=hostProfile(node.profileId),inbound=profile?inbs(profile).find(i=>SUBSCRIPTION_PROTOCOLS.has(i.protocol)):null;
-      entForm('hosts',null,{remark:node.name||'Новый хост',address:node.addr||'',port:node.port||443,
+      const countryCode=hostNodeCountryCode(node);
+      entForm('hosts',null,{remark:countryCode||node.name||'Новый хост',countryCode,
+        address:node.addr||'',port:node.port||443,
         profileId:profile?.id||DB.profiles[0]?.id||0,tag:inbound?.tag||'',nodes:[node.id],fp:'',order:DB.hosts.length+1});
     }
   }
@@ -4153,8 +4174,13 @@ the old node will lose access. Cancel and create a new Node ID if both must work
     try{
       const version=await selectNodeXrayRelease(node,async()=>{
         const runtime=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/runtime');
-        if(!runtime.connected||!/^control-v(?:3|4)[.]/.test(String(runtime.version||''))){
-          throw new Error('Для выбора версии требуется управляющий агент control-v3. Обновите агент ноды.');
+        // Eligibility comes from the authenticated backend heartbeat policy,
+        // shared with POST /xray-update. Never maintain another agent-major
+        // allow-list in the browser (v5/v6 were incorrectly rejected here).
+        if(runtime.xrayUpdateSupported !== true){
+          throw new Error(runtime.connected
+            ? 'Управляющий агент ноды не поддерживает управляемое обновление Xray. Обновите Agent.'
+            : 'Нет свежего подтверждения от управляющего агента ноды. Проверьте подключение.');
         }
         const catalog=await backendRequest('/api/v1/nodes/xray-releases');
         return {installed:runtime.xrayVersion,releases:Array.isArray(catalog.items)?catalog.items:[]};
@@ -4404,10 +4430,10 @@ document.addEventListener('change',async e=>{const t=e.target;
     const node=DB.nodes.find(n=>String(n.id)===t.value),form=t.closest('form');
     if(node&&form){
       const address=form.elements.namedItem('address'),port=form.elements.namedItem('port'),
-        remark=form.elements.namedItem('remark'),profile=form.elements.namedItem('profileId');
+        profile=form.elements.namedItem('profileId');
       if(address)address.value=node.addr||'';
       if(port)port.value=node.port||443;
-      if(remark&&!remark.value.trim())remark.value=node.name||'';
+      hostAutofillNodeFields(form,node,true);
       if(profile&&hostProfile(node.profileId)&&String(profile.value)!==String(node.profileId)){
         profile.value=String(node.profileId);
         const key=form.elements.namedItem('publicKey');if(key){key.value='';delete key.dataset.hostAutoPublic}
