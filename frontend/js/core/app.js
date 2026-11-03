@@ -4392,6 +4392,7 @@ document.addEventListener('change',async e=>{const t=e.target;
       }
       form.querySelectorAll('[name="nodes"]').forEach(input=>{input.checked=String(input.value)===String(node.id)});
       hostEditorRefresh(form,true);void hostDeriveRealityPublic(form);
+      window.XMeshSelects?.refresh(form);
       const warning=form.querySelector('[data-host-warnings]');
       if(!hostProfile(node.profileId) && warning){
         warning.hidden=false;

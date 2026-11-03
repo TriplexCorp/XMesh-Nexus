@@ -61,3 +61,7 @@ panels use shared radius/material tokens.
 Regression cases use a real TLS/XHTTP profile and a real node fleet at 1920×1080,
 2560×1440 and 390×844. They exercise preset autofill, SNI preview, reset overrides,
 semantic heading icons, field baselines and responsive section containment.
+
+Preset autofill explicitly refreshes the existing XMeshSelects component so its
+visible profile caption matches the updated native select value. Browser checks
+verify both values to prevent a stale profile label after choosing a node.
