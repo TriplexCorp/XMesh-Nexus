@@ -106,7 +106,7 @@
     const makeRule=()=>({match:'geosite',value:'',action:'proxy'});
 
     const rootMarkup='<section class="crx" id="client-route-root" aria-label="Клиентская маршрутизация">'+
-      '<header class="crx-page-head"><div class="crx-page-copy"><span class="crx-eyebrow">'+icon('route')+' КЛИЕНТСКАЯ МАРШРУТИЗАЦИЯ</span>'+
+      '<header class="crx-page-head"><div class="crx-page-copy">'+
       '<h2>Правила подключения</h2><p>Один шаблон — несколько серверов. Управляйте направлениями трафика в Xray JSON.</p></div>'+
       '<div class="crx-page-actions"><span class="crx-total" data-cr-counter></span><button type="button" class="crx-btn crx-btn-primary" data-cr-add>'+icon('plus')+' Новый шаблон</button></div></header>'+
       '<div class="crx-list" data-cr-list></div>'+

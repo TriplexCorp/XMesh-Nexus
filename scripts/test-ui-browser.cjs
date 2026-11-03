@@ -21,7 +21,7 @@ assert.equal(process.env.XMESH_UI_DISPOSABLE, '1', 'Укажите XMESH_UI_DISP
 const output = path.resolve(process.env.XMESH_BROWSER_OUTPUT || '/tmp/xmesh-browser-results');
 fs.mkdirSync(output, {recursive: true});
 
-const sizes = [[1366,768], [1440,900], [1920,1080], [2560,1440], [3440,1440], [3840,2160]];
+const sizes = [[390,844],[768,1024],[1366,768], [1440,900], [1920,1080], [2560,1440], [3440,1440], [3840,2160]];
 const routes = ['home','statistics','users','squads','hosts','nodes','templates','profiles','subscription','balancers','clientrouting','tools','admins','security','set'];
 const report = {checks: [], failures: [], javascriptErrors: [], screenshots: []};
 const fixtures = [];
@@ -155,6 +155,7 @@ async function main() {
     await create('hosts',{remark:`${prefix} · Хост`,profileId:profile.id,tag:inboundTag,address:'ui.example.invalid',port:443,nodes:[node.id]});
     const user = await create('users',{username:`${prefix}-client`,squads:[squad.id],hwid:2,created:Date.now(),adminId:1});
     const otherUser = await create('users',{username:`${prefix}-other`,squads:[squad.id],hwid:2,created:Date.now(),adminId:1});
+    await create('tpls',{name:`${prefix} · Standard`,limit:30,days:30,strategy:'NO_RESET',hwid:2,squads:[squad.id]});
     const fixtureBootstrap=await api('GET','/bootstrap');
     assert(fixtureBootstrap.collections?.profiles?.some(item=>item.id===profile.id),'Bootstrap не увидел тестовый профиль.');
     assert(fixtureBootstrap.collections?.nodes?.some(item=>item.id===node.id),'Bootstrap не увидел тестовый узел.');
@@ -167,8 +168,12 @@ async function main() {
       for (const route of routes) await checked(`${route}: ${width}×${height}`, async () => {
         await navigate(route);
         const g = await geometry(page);
-        if (['set','nodes'].includes(route) || width === 1440 || width === 3440) await screenshot(page,`${route}-${width}`);
-        verifyPage(g,route);
+        if (['set','nodes'].includes(route) || width === 390 || width === 768 || width === 1440 || width === 1920 || width === 3440) await screenshot(page,`${route}-${width}`);
+        if(width<1000){
+          assert(!g.renderFailed,'Mobile route must render');
+          assert(g.scrollWidth<=width+1,'Mobile document must not overflow horizontally');
+          assert(g.view.x>=0&&g.view.right<=width+1,'Mobile workspace must stay in viewport');
+        }else verifyPage(g,route);
         return g;
       });
     }
@@ -426,6 +431,23 @@ async function main() {
     await navigate('set');
     for (const [key,value] of [['surface','solid'],['sidebar','standard'],['density','comfortable']]) await page.locator(`[data-ui="${key}"][data-value="${value}"]`).click();
     await page.locator('[data-th="dark"]').click();
+    for(const [width,height] of [[1920,1080],[768,1024],[390,844]]) for(const route of ['balancers','clientrouting']) await checked(`Populated editor audit: ${route} · ${width}`,async()=>{
+      await page.setViewportSize({width,height});
+      await navigate(route);
+      await page.locator(route==='balancers'?'#balancer-add':'[data-cr-add]').first().click();
+      if(route==='clientrouting') await page.waitForSelector('dialog[open]');
+      const g=await geometry(page);
+      assert(g.scrollWidth<=width+1,'Editor must not overflow the document');
+      if(g.dialog)assert(g.dialog.x>=0&&g.dialog.right<=width+1,'Editor dialog must fit horizontally');
+      if(route==='clientrouting'&&width===390){
+        const body=await page.locator('.crx-dialog-body').boundingBox();
+        assert(body.height>=height*.3,'Routing workspace must retain at least 30% of mobile viewport height');
+      }
+      await screenshot(page,`audit-editor-${route}-${width}`);
+      if(route==='clientrouting')await page.keyboard.press('Escape');
+      return g;
+    });
+
     const dialogs=[
       ['nodes','[data-ne="nodes"]','Создание узла'],
       ['nodes',`[data-ne="nodes:${node.id}"]`,'Редактирование узла'],
@@ -762,6 +784,12 @@ async function main() {
       assert.equal(await page.locator('[name="address"]').inputValue(),hostPresetNode.addr,'Node preset must fill public endpoint');
       assert.equal(await page.locator('[name="profileId"]').inputValue(),String(hostTlsProfile.id),'Node preset must retain profile binding');
       assert.equal(await page.locator('[name="profileId"]').evaluate(select=>select.closest('.xm-select-shell').querySelector('.xm-select-caption').textContent),hostTlsProfile.name,'Visible profile caption must match preset binding');
+      await page.locator('[name="remark"]').focus();
+      const focus=await page.locator('[name="remark"]').evaluate(input=>{const s=getComputedStyle(input);return {style:s.outlineStyle,offset:parseFloat(s.outlineOffset),shadow:s.boxShadow}});
+      assert.equal(focus.style,'solid','Text fields must keep visible keyboard focus');
+      assert(focus.offset<=0,'Focus must stay inside the control without a detached double contour');
+      assert.equal(focus.shadow,'none','Text fields must not add a second focus shadow');
+      await screenshot(page,`audit-focus-host-${width}`);
       await page.locator('[name="sni"]').fill('override.example.invalid');
       await page.locator('[name="sni"]').dispatchEvent('change');
       assert((await page.locator('[data-host-resolved]').innerText()).includes('override.example.invalid'),'Live preview must reflect SNI override');
@@ -844,7 +872,7 @@ async function main() {
 
     assert.equal(report.javascriptErrors.length,0,'В браузере возникли JavaScript ошибки.');
   } finally {
-    const order=['users','hosts','nodes','squads','profiles'];
+    const order=['users','tpls','hosts','nodes','squads','profiles'];
     for(const collection of order) for(const fixture of fixtures.filter(f=>f.collection===collection)) {
       try { await api('DELETE',`/collections/${fixture.collection}/${fixture.id}`); }
       catch(error) { report.failures.push({label:'Очистка тестовых данных',error:shortError(error)}); }

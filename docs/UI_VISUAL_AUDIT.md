@@ -87,3 +87,32 @@ Design research: official Geist Modal and Input examples
 responsive dashboard redesign (https://blog.cloudflare.com/redesigning-cloudflare/).
 These inform hierarchy and form density; existing XMesh tokens and icon helpers
 remain the implementation owners.
+
+## Panel-wide refinement
+
+Shared refinements cover every navigation section: dashboard, statistics, users,
+squads, hosts, nodes, templates, XRAY STUDIO, SUBSCRIPTION STUDIO, balancers,
+client routing, diagnostics, administrators, security and settings.
+
+- Shared text/select focus is drawn inside the control; user/squad feature focus
+  owners no longer add a detached shadow. Host focus screenshots and computed
+  outline/shadow assertions cover the reported double-contour defect.
+- Nested ordinary cards become separated sections, solid panels lose decorative
+  shadows, background tint is reduced without removing appearance modes, table
+  headings use readable sentence case, and labels have stronger hierarchy.
+- Decorative workspace/delivery/operations headers and redundant CRUD/balancer
+  titles are removed. Entity descriptions and Host helper text are concise, with
+  matching English translations. Operational warnings and destructive-action
+  explanations remain intact.
+- Dashboard counts use separators; subscription URL fields lose an extra framed
+  container. Diagnostics adapts to its container width, fixing document overflow
+  beside the sidebar at 768px. Mobile routing controls reserve usable editor space.
+- The browser harness exercises all 15 routes at 390, 768, 1366, 1440, 1920, 2560,
+  3440 and 3840px, with document overflow checks and route screenshots at mobile,
+  desktop and ultrawide widths. Populated template, balancer and routing editors
+  supplement the real user/node/host/squad/profile fixtures. Draft balancers and
+  routing templates are reviewed without saving infrastructure changes.
+
+Review artifacts include per-route screenshots, focused Host fields and populated
+editors. Native table/JSON scroll boundaries remain available where content is
+intrinsically larger than the viewport; the document itself must stay bounded.

@@ -128,6 +128,6 @@ assert.match(diagnosticsJs,/privacyNote:'Subscription URLs, credentials, audit d
 assert.match(diagnosticsJs,/setInterval\(\(\)=>\{if\(location\.hash===['"]#tools['"]/);
 assert.doesNotMatch(diagnosticsJs,/let\s+LOGS\s*=\s*\[\]/);
 assert.match(diagnosticsCss,/\.diag-overview-grid\{display:grid/);
-assert.match(diagnosticsCss,/@media\(max-width:760px\)/);
+assert.match(diagnosticsCss,/@container diagnostics \(max-width:760px\)/);
 
 console.log('Canonical frontend tree + packaged static assets + login appearance + critical UI contracts: OK');
