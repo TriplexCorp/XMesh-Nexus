@@ -13,12 +13,8 @@ use sqlx::Row;
 // Mirrors the release-versioned request_xray_update allow-list. CI compares
 // these prefixes with the server command gate, preventing a browser/runtime
 // capability mismatch without modifying the protected Agent release overlay.
-const MANAGED_XRAY_AGENT_PREFIXES: [&str; 4] = [
-    "control-v3.",
-    "control-v4.",
-    "control-v5.",
-    "control-v6.",
-];
+const MANAGED_XRAY_AGENT_PREFIXES: [&str; 4] =
+    ["control-v3.", "control-v4.", "control-v5.", "control-v6."];
 
 fn supports_managed_xray_update(version: &str) -> bool {
     MANAGED_XRAY_AGENT_PREFIXES
@@ -32,10 +28,20 @@ mod managed_xray_version_tests {
 
     #[test]
     fn validates_approved_agent_major_versions() {
-        for version in ["control-v3.1.0", "control-v4.0.0", "control-v5.1.3", "control-v6.0.7"] {
+        for version in [
+            "control-v3.1.0",
+            "control-v4.0.0",
+            "control-v5.1.3",
+            "control-v6.0.7",
+        ] {
             assert!(supports_managed_xray_update(version), "{version}");
         }
-        for version in ["control-v1.2.0", "control-v2.9.0", "untrusted-v6.0.7", "control-v7.0.0"] {
+        for version in [
+            "control-v1.2.0",
+            "control-v2.9.0",
+            "untrusted-v6.0.7",
+            "control-v7.0.0",
+        ] {
             assert!(!supports_managed_xray_update(version), "{version}");
         }
     }
