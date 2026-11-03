@@ -5,6 +5,46 @@
  * viewport. Feature styles may own the body layout, but must not make the whole
  * form the scroll owner or push actions below the screen. */
 
+/* The node editor fits its form. A legacy minimum height shared with User
+ * Details left a second material surface extending below the form at zoom-out.
+ * Only the native dialog owns the edge; the form is its content. */
+dialog#dlg.node-wide{
+  box-sizing:border-box;
+  width:min(1680px,calc(100vw - 48px));
+  inline-size:min(1680px,calc(100vw - 48px));
+  min-width:0;
+  max-width:calc(100vw - 48px);
+  max-inline-size:calc(100vw - 48px);
+  min-height:0;
+  height:fit-content;
+  max-height:calc(100dvh - 32px);
+  padding:0;
+  margin:auto;
+  overflow:hidden;
+  border:1px solid var(--nx-border-strong);
+}
+
+dialog#dlg.node-wide>form.box{
+  max-height:calc(100dvh - 34px);
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+}
+
+@media(max-width:760px){
+  dialog#dlg.node-wide{
+    width:calc(100vw - 12px);
+    inline-size:calc(100vw - 12px);
+    max-width:calc(100vw - 12px);
+    max-inline-size:calc(100vw - 12px);
+    max-height:calc(100dvh - 12px);
+  }
+  dialog#dlg.node-wide>form.box{
+    max-height:calc(100dvh - 14px);
+  }
+}
+
 #dlg.host-wide{
   --dialog-width:96rem;
   width:min(var(--dialog-width),calc(100vw - 2rem));

@@ -385,29 +385,6 @@ dialog:not(.side):not(.pop):not(.pal):not(.user-modal) {
   grid-template-columns:minmax(0,1fr);
 }
 }
-dialog#dlg:is(.node-wide,.user-modal) {
-  box-sizing:border-box;
-  width:min(1680px,calc(100vw - 48px));
-  inline-size:min(1680px,calc(100vw - 48px));
-  min-width:0;
-  max-width:calc(100vw - 48px);
-  max-inline-size:calc(100vw - 48px);
-  min-height:min(690px,calc(100dvh - 32px));
-  max-height:calc(100dvh - 32px);
-  height:auto;
-  padding:0;
-  margin:auto;
-  overflow:hidden;
-}
-@media (max-width:760px) {
-dialog#dlg:is(.node-wide,.user-modal) {
-  width:calc(100vw - 12px);
-  inline-size:calc(100vw - 12px);
-  max-width:calc(100vw - 12px);
-  max-inline-size:calc(100vw - 12px);
-  min-height:0;
-}
-}
 .users-toolbar-actions>.users-refresh-action {
   display:inline-flex;
   align-items:center;

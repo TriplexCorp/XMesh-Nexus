@@ -549,6 +549,39 @@ async function main() {
       return g;
     });
 
+    for(const [width,height,scale] of [[1920,1080,1],[2560,1440,1],[4096,1582,.5],[390,844,1]]){
+      await page.setViewportSize({width,height});
+      const zoom=scale===1?null:await context.newCDPSession(page);
+      if(zoom)await zoom.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:scale,mobile:false});
+      try{
+        for(const edit of [false,true])await checked(`Node editor single surface: ${edit?'edit':'create'} ${width}×${height} scale ${scale}`,async()=>{
+          await navigate('nodes');
+          await page.locator(edit?`[data-ne="nodes:${node.id}"]`:'[data-ne="nodes"]').first().click();
+          await page.waitForSelector('#dlg.node-wide[open]');
+          try{
+            const g=await page.locator('#dlg').evaluate(d=>{
+              const f=d.querySelector('form.box'),r=d.getBoundingClientRect(),b=f.getBoundingClientRect(),s=getComputedStyle(f);
+              return {dialog:{top:r.top,bottom:r.bottom,left:r.left,right:r.right,height:r.height},form:{top:b.top,bottom:b.bottom,height:b.height},background:s.backgroundColor,shadow:s.boxShadow,border:parseFloat(s.borderTopWidth),overflow:getComputedStyle(d).overflowY};
+            });
+            assert(Math.abs(g.dialog.bottom-g.form.bottom)<=2,'Node dialog must end with the form, without an empty material tail');
+            assert(Math.abs(g.form.top-g.dialog.top)<=2,'Node dialog must not reserve an empty surface above the form');
+            assert.equal(g.background,'rgba(0, 0, 0, 0)','Form must not render a second material surface');
+            assert.equal(g.shadow,'none');
+            assert.equal(g.border,0,'Only the dialog owns the outer edge');
+            assert(g.dialog.top>=0&&g.dialog.bottom<=height+1&&g.dialog.left>=0&&g.dialog.right<=width+1,'Node editor must fit the viewport');
+            assert.equal(g.overflow,'hidden','Native shell must not gain a second scrollbar');
+            await screenshot(page,`node-editor-${edit?'edit':'create'}-${width}-${scale===1?'normal':'zoom-out'}`);
+            return g;
+          }finally{
+            await page.keyboard.press('Escape');
+            await page.waitForSelector('dialog[open]',{state:'detached'});
+          }
+        });
+      }finally{
+        if(zoom){await zoom.send('Emulation.clearDeviceMetricsOverride');await zoom.detach()}
+      }
+    }
+
     const dialogs=[
       ['nodes','[data-ne="nodes"]','Создание узла'],
       ['nodes',`[data-ne="nodes:${node.id}"]`,'Редактирование узла'],
