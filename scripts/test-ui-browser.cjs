@@ -747,6 +747,53 @@ async function main() {
       return g;
     });
 
+    await create('profiles',{name:`${prefix} · populated squad`,config:JSON.stringify({inbounds:['hysteria-main','masque-main','shadowsocks-main','trojan-main','vless-main'].map((tag,i)=>({tag:prefix+'-'+tag,listen:'127.0.0.1',port:29000+i,protocol:'vless',settings:{clients:[],decryption:'none'},streamSettings:{network:'tcp',security:'none'}})),outbounds:[{tag:'direct',protocol:'freedom'}]})});
+    await page.reload({waitUntil:'domcontentloaded'});
+    await page.waitForFunction(()=>!!document.querySelector('#view')?.children.length&&!document.querySelector('#view .sk'));
+    for(const [width,height] of [[1920,1080],[2560,1440],[1366,768],[390,844]]) await checked(`Populated Squad composition: ${width}×${height}`,async()=>{
+      await page.setViewportSize({width,height});
+      await navigate('squads');
+      await page.locator('[data-ne="squads"]').first().click();
+      await page.waitForSelector('.squad-inbound-row');
+      const count=await page.locator('.squad-inbound-row').count();
+      assert(count>=6,'Fixture must exercise a populated inbound list');
+      await page.locator('[data-squad-select="all"]').click();
+      assert.equal(await page.locator('input[name="inb"]:checked').count(),count,'Select all must still work');
+      await page.locator('[data-squad-search]').fill('hysteria-main');
+      assert.equal(await page.locator('.squad-inbound-row:visible').count(),1,'Search must filter actual inbound choices');
+      await page.locator('[data-squad-search]').fill('');
+      await page.locator('[data-squad-select="clear"]').click();
+      assert.equal(await page.locator('input[name="inb"]:checked').count(),0,'Clear must still work');
+      await page.locator('.squad-inbound-row').first().click();
+      await page.locator('input[name="name"]').fill('Squad layout check');
+      const g=await page.locator('#dlg').evaluate(d=>{
+        const box=e=>{const r=e.getBoundingClientRect();return{x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};
+        const q=s=>d.querySelector(s),list=q('.squad-inbound-list'),body=q('.squad-editor-layout');
+        const button=q('button.btn'),cs=getComputedStyle(button);
+        return {dialog:box(d),main:box(q('.squad-editor-main')),connections:box(q('.squad-editor-connections')),impact:box(q('.squad-editor-side')),body:box(body),footer:box(q('.act')),list:box(list),listScroll:list.scrollHeight,listClient:list.clientHeight,bodyScroll:body.scrollHeight,bodyClient:body.clientHeight,rows:[...list.children].map(box),button:{color:cs.color,background:cs.backgroundColor,disabled:button.disabled}};
+      });
+      await screenshot(page,`squad-populated-${width}x${height}`);
+      await page.keyboard.press('Escape');
+      await page.waitForSelector('dialog[open]',{state:'detached'});
+      assert(g.dialog.y>=0&&g.dialog.bottom<=height+1,'Squad dialog must fit viewport');
+      assert(g.body.bottom<=g.footer.y+1,'Footer must not overlay body');
+      assert(g.listScroll<=g.listClient+1,'Inbound list must not create a nested scrollbar');
+      assert(!g.button.disabled,'Valid squad must enable save');
+      assert.notEqual(g.button.color,g.button.background,'Save must retain visible foreground');
+      if(width>=1366){
+        assert(g.main.right<g.connections.x,'Settings and connections must occupy separate columns');
+        assert(g.impact.x===g.main.x&&g.impact.y>=g.main.bottom,'Impact must follow settings without stretching the settings panel');
+        assert(g.connections.width>g.main.width*1.5,'Inbound selection must receive most of the workspace width');
+        assert(g.main.height<g.connections.height,'Two settings must not stretch to the height of the inbound list');
+      }
+      if(width<980){
+        assert(g.connections.y>=g.main.bottom,'Mobile settings must not overlap connections');
+        assert(g.impact.y>=g.connections.bottom,'Mobile connections must not overlap impact');
+      }
+      if(height>=1080) assert(g.bodyScroll<=g.bodyClient+1,'Normal populated squad must fit desktop without scrolling');
+      return g;
+    });
+
     assert.equal(report.javascriptErrors.length,0,'В браузере возникли JavaScript ошибки.');
   } finally {
     const order=['users','hosts','nodes','squads','profiles'];

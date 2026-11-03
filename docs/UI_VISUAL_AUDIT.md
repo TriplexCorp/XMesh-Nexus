@@ -32,3 +32,17 @@ reproduced layout defects rather than introducing a new visual style.
   state in every section has been exhaustively reviewed.
 
 Canonical cache keys are regenerated with `node scripts/update-ui-cache.cjs`.
+
+## Populated Squad editor follow-up
+
+The empty-list screenshot did not expose the cramped nested inbound scroller.
+The Squad feature stylesheet now places compact settings and impact information
+in the left rail, with the wider inbound list on the right. The list grows in
+normal flow and the workspace remains the single scroll owner. Header decoration
+and nested impact card borders are reduced, supporting text is larger, inbound
+names wrap, and Save uses the shared accent/foreground tokens.
+
+Browser coverage adds six real inbound choices, desktop/mobile geometry,
+search/select-all/clear interactions, enabled Save state and screenshots at
+1920×1080, 2560×1440, 1366×768 and 390×844. New profiles are loaded before opening
+the editor, so these cases exercise the actual renderer with populated data.
