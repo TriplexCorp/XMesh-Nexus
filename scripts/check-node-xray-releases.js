@@ -19,10 +19,13 @@ assert.match(routes,/\/nodes\/xray-releases/);
 assert.match(runtime,/pub async fn available_xray_releases/);
 const current=fs.readFileSync('backend/src/node_runtime.rs','utf8');
 const legacyStatus=fs.readFileSync('backend/src/node_runtime_legacy.rs','utf8');
-assert.match(current,/fn managed_xray_update_agent_supported\(version: &str\) -> bool/);
-assert.match(current,/major\.parse::<u32>\(\)\.is_ok_and\(\|major\| major >= 3\)/);
-assert.match(current,/\.is_some_and\(managed_xray_update_agent_supported\)/);
-assert.match(legacyStatus,/"xrayUpdateSupported":fresh && crate::node_runtime::managed_xray_update_agent_supported\(&agent_version\)/);
+// The server's release gate remains in the release-versioned runtime overlay.
+// Its exact allowed versions are projected into read-only status for the UI.
+for(const major of [3,4,5,6]){
+ assert(current.includes("version LIKE 'control-v"+major+".%'"),"Runtime must accept control-v"+major);
+ assert(legacyStatus.includes('"control-v'+major+'.'+'"),"Runtime status must expose control-v"+major);
+}
+assert.match(legacyStatus,/"xrayUpdateSupported":fresh && \[/);
 assert.match(legacyStatus,/"xrayUpdateSupported":false/);
 assert.match(ui,/runtime\.xrayUpdateSupported !== true/);
 assert.doesNotMatch(ui,/\/\^control-v\(\?:3\|4\)/,'UI must not duplicate an obsolete version allow-list');
