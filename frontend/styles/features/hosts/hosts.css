@@ -1,382 +1,84 @@
-/* Feature ownership: hosts. Shared tokens, controls, materials and viewport safety live in styles/system. */
-.host-editor-layout .node-form-section-title {
-  margin:.3rem 0 0;
-  font-weight:700;
-  font-size:.86rem;
-}
-.host-editor-layout .node-form-section-title:not(:first-child) {
-  padding-top:.8rem;
-  border-top:1px solid var(--nx-border);
-}
-.host-editor-layout .f {
-  min-width:0;
-  margin:0;
-}
-.host-editor-layout .f input:not([type="checkbox"]):not([type="radio"]) {
-  width:100%;
-  box-sizing:border-box;
-}
-.host-editor-layout .f select {
-  width:100%;
-  box-sizing:border-box;
-}
-.host-resolved-line:last-child {
-  border:0;
-}
-.host-resolved-line>span {
-  color:var(--mu);
-}
-.host-validation:not([hidden]) {
-  border:1px solid var(--wr,var(--nx-border));
-  border-radius:var(--ui-control-radius);
-  padding:.8rem .9rem;
-  color:var(--tx);
-  background:var(--nx-section-bg);
-  font-size:.78rem;
-  line-height:1.55;
-  margin:0;
-}
-.host-advanced {
-  border-top:1px solid var(--nx-border);
-  padding-top:.75rem;
-}
-.host-advanced>summary {
-  cursor:pointer;
-  list-style:none;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:.6rem;
-  font-size:.84rem;
-  font-weight:700;
-  padding:.55rem .1rem;
-}
-.host-advanced>summary::-webkit-details-marker {
-  display:none;
-}
-.host-advanced>summary svg {
-  width:1rem;
-  height:1rem;
-  transition:transform .2s;
-}
-.host-advanced[open]>summary svg {
-  transform:rotate(180deg);
-}
-dialog.host-wide .act {
-  position:sticky;
-  bottom:0;
-  background:var(--nx-panel-bg);
-  padding-top:.8rem;
-  border-top:1px solid var(--nx-border);
-  z-index:5;
-}
-@media (max-width:780px) {
-.host-editor-layout {
-  grid-template-columns:minmax(0,1fr);
-}
-}
-@media (max-width:780px) {
-.host-advanced-fields {
-  grid-template-columns:minmax(0,1fr);
-}
-}
-@media (max-width:780px) {
-.host-advanced-fields .f:has([name="publicKey"]) {
-  grid-column:auto;
-}
-}
-@media (max-width:780px) {
-.host-advanced-fields .f:has([name="clientEncryption"]) {
-  grid-column:auto;
-}
-}
-dialog.host-wide [data-host-repair] {
-  min-height:36px;
-  white-space:normal;
-  text-align:left;
-}
-dialog.host-wide [data-host-link-profile] {
-  min-height:36px;
-  white-space:normal;
-  text-align:left;
-}
-dialog.host-wide>form.box>h2 {
-  margin:0;
-  font-size:1.18rem;
-  line-height:1.3;
-}
-dialog.host-wide>form.box>#fe:empty {
-  display:none;
-}
-.host-editor-layout {
+/* Host editor composition. The system workspace contract owns dialog geometry. */
+dialog.host-wide>form.box>h2{margin:0;font-size:1.4rem;line-height:1.3;padding-bottom:.8rem;border-bottom:1px solid var(--nx-border)}
+.host-editor-layout{
   display:grid;
-  grid-template-columns:minmax(0,1.08fr) minmax(0,1fr) minmax(0,1.08fr);
-  gap:clamp(10px,.75vw,16px);
+  grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,1.1fr);
+  grid-template-areas:"primary overrides preview" "assignment assignment assignment";
+  grid-auto-rows:max-content;
+  gap:clamp(14px,1vw,22px);
   align-items:start;
-  grid-template-areas:"primary overrides preview";
   min-width:0;
 }
-.host-editor-layout>section {
+.host-editor-layout>section,.host-assignment-panel{
   min-width:0;
   display:flex;
   flex-direction:column;
-  gap:.75rem;
-  padding:clamp(12px,.9vw,18px);
+  gap:16px;
+  padding:clamp(16px,1.1vw,24px);
   border:1px solid var(--nx-border);
-  border-radius:var(--ui-radius);
+  border-radius:var(--nx-card-radius);
   background:var(--nx-panel-bg);
   box-sizing:border-box;
   margin:0;
 }
-.host-editor-layout>.host-primary-panel {
-  grid-area:primary;
-  display:flex;
-  flex-direction:column;
-  align-items:stretch;
-  gap:9px;
-}
-.host-editor-layout>.host-advanced-panel {
-  grid-area:overrides;
-  display:flex;
-  flex-direction:column;
-  align-items:stretch;
-  gap:10px;
-  border:1px solid var(--nx-border);
-}
-.host-editor-layout>.host-editor-side {
-  grid-area:preview;
-  display:flex;
-  flex-direction:column;
-  gap:9px;
-}
-dialog.host-wide .node-form-section-title {
-  font-size:.87rem;
-  line-height:1.35;
-  font-weight:720;
-  margin:0;
-  padding:0;
-  border:0;
-}
-.host-primary-panel>.node-form-section-title:not(:first-child) {
-  margin-top:6px;
-  padding-top:10px;
-  border-top:1px solid var(--nx-border);
-}
-.host-connect-fields {
+.host-editor-layout>.host-primary-panel{grid-area:primary;gap:12px;padding:18px}
+.host-editor-layout>.host-advanced-panel{grid-area:overrides}
+.host-editor-layout>.host-editor-side{grid-area:preview;background:var(--nx-section-bg)}
+dialog.host-wide .node-form-section-title{display:flex;align-items:center;gap:.6rem;font-size:.94rem;line-height:1.4;font-weight:720;margin:0;padding:0;border:0;min-width:0}
+.host-editor-layout .node-form-section-title svg{color:var(--a);width:1.1rem;height:1.1rem;flex:none}
+.host-primary-panel>.node-form-section-title:not(:first-child){padding-top:12px;border-top:1px solid var(--nx-border)}
+.host-editor-layout .f{min-width:0;margin:0}
+.host-editor-layout .f>span:first-child{font-size:.78rem;line-height:1.4;font-weight:650}
+.host-editor-layout .f :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea){width:100%;max-width:100%;min-width:0;box-sizing:border-box;min-height:2.5rem;font-size:.88rem}
+.host-editor-layout .f small{font-size:.73rem;line-height:1.45;color:var(--mu);overflow-wrap:anywhere}
+.host-connect-fields,.host-public-fields,.host-assignment-fields,.host-advanced-fields{
   display:grid;
   grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:10px 12px;
-  align-content:start;
+  gap:14px 12px;
   align-items:start;
   min-width:0;
-  width:100%;
 }
-.host-public-fields {
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:10px 12px;
-  align-content:start;
-  align-items:start;
-  min-width:0;
-  width:100%;
+.host-connect-fields>.f:first-child{grid-column:1/-1;padding:12px;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-section-bg)}
+.host-public-fields>.f>span:first-child{min-block-size:2.8em}
+.host-assignment-panel{grid-area:assignment}
+.host-assignment-fields{grid-template-columns:minmax(0,1fr) minmax(14rem,.28fr)}
+.host-assignment-fields>.f:last-child{padding-left:16px;border-left:1px solid var(--nx-border)}
+.host-editor-layout .host-assignment-panel .ms{grid-template-columns:repeat(4,minmax(0,1fr))}
+.host-advanced-fields>.f>span:first-child{min-block-size:2.8em}
+.host-advanced-fields .f:has([name="publicKey"]),.host-advanced-fields .f:has([name="clientEncryption"]){grid-column:1/-1}
+.host-advanced-fields .f:has([name="publicKey"])>span,.host-advanced-fields .f:has([name="clientEncryption"])>span{min-block-size:0}
+.host-advanced-heading{display:grid;gap:6px}
+.host-advanced-actions{display:flex;justify-content:flex-start;padding-top:12px;border-top:1px solid var(--nx-border)}
+.host-editor-layout .node-ip-hint{margin:0;font-size:.75rem;line-height:1.5;color:var(--mu);overflow-wrap:anywhere}
+.host-resolved{display:grid;min-width:0}
+.host-resolved-line{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:12px;align-items:start;padding:.5rem 0;border-bottom:1px solid var(--nx-border);min-width:0;font-size:.78rem;line-height:1.45}
+.host-resolved-line:last-child{border:0}
+.host-resolved-line>span{color:var(--mu);min-width:0}
+.host-resolved-line>b{font-size:.8rem;text-align:right;min-width:0;overflow-wrap:anywhere;font-weight:650}
+.host-editor-layout .ms{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;min-width:0}
+.host-editor-layout .ms label{width:100%;max-width:100%;min-width:0;font-size:.8rem;box-sizing:border-box;padding:.65rem .7rem;align-items:start}
+.host-editor-layout .ms label>input{margin-top:.1rem}
+.host-editor-layout .ms label>span{min-width:0;overflow-wrap:anywhere}
+.host-editor-layout [data-host-count]{font-size:.75rem;line-height:1.4;color:var(--mu)}
+.host-validation:not([hidden]){border:1px solid var(--wr);border-radius:var(--nx-control-radius);padding:.8rem;color:var(--tx);background:var(--nx-panel-bg);font-size:.76rem;line-height:1.5;margin:0}
+dialog.host-wide :is([data-host-repair],[data-host-link-profile]){min-height:36px;white-space:normal;text-align:left}
+.host-preview-disclaimer{padding-top:12px;border-top:1px solid var(--nx-border)}
+@media (max-width:1260px){
+  .host-editor-layout{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-areas:"primary preview" "assignment assignment" "overrides overrides"}
+  .host-advanced-fields{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .host-advanced-fields .f:has([name="publicKey"]),.host-advanced-fields .f:has([name="clientEncryption"]){grid-column:span 2}
 }
-.host-assignment-fields {
-  display:grid;
-  grid-template-columns:minmax(0,1fr);
-  gap:10px 12px;
-  align-content:start;
-  align-items:start;
-  min-width:0;
-  width:100%;
+@media (max-width:760px){
+  .host-editor-layout{grid-template-columns:minmax(0,1fr);grid-template-areas:"primary" "assignment" "overrides" "preview";grid-auto-rows:max-content}
+  .host-advanced-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .host-assignment-fields{grid-template-columns:minmax(0,1fr)}
+  .host-assignment-fields>.f:last-child{padding-left:0;border-left:0}
+  .host-editor-layout .host-assignment-panel .ms{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .host-advanced-fields .f:has([name="publicKey"]),.host-advanced-fields .f:has([name="clientEncryption"]){grid-column:1/-1}
 }
-.host-connect-fields>.f:first-child {
-  grid-column:1/-1;
-}
-.host-advanced-fields {
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:10px 12px;
-  margin:0;
-  align-content:start;
-  align-items:start;
-  min-width:0;
-  width:100%;
-}
-.host-advanced-fields .f:has([name="publicKey"]) {
-  grid-column:1/-1;
-}
-.host-advanced-fields .f:has([name="clientEncryption"]) {
-  grid-column:1/-1;
-}
-dialog.host-wide :is(.host-connect-fields,.host-public-fields,.host-assignment-fields,.host-advanced-fields)>.f {
-  min-width:0;
-  margin:0;
-}
-.host-editor-layout .f>span:first-child {
-  font-size:.76rem;
-  line-height:1.32;
-  font-weight:630;
-}
-.host-editor-layout .f :is(input:not([type="checkbox"]),select,textarea) {
-  width:100%;
-  max-width:100%;
-  min-width:0;
-  box-sizing:border-box;
-  min-height:2.45rem;
-  font-size:.9rem;
-}
-.host-editor-layout .f small {
-  font-size:.7rem;
-  line-height:1.3;
-  color:var(--mu);
-  overflow-wrap:anywhere;
-}
-.host-editor-layout .node-ip-hint {
-  line-height:1.35;
-  margin:0;
-  font-size:.73rem;
-  color:var(--mu);
-}
-.host-advanced-heading {
-  display:grid;
-  gap:4px;
-  margin:0;
-}
-.host-advanced-heading>.node-form-section-title {
-  margin:0;
-  padding:0;
-  border:0;
-}
-.host-advanced-actions {
-  display:flex;
-  margin-top:auto;
-  justify-content:flex-start;
-  padding:6px 0 0;
-}
-.host-resolved {
-  display:grid;
-  gap:0;
-  padding:0 .7rem;
-  border:1px solid var(--nx-border);
-  border-radius:var(--ui-control-radius);
-  background:var(--nx-section-bg);
-}
-.host-resolved-line {
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:.5rem;
-  padding:.42rem 0;
-  border-bottom:1px solid var(--nx-border);
-  min-width:0;
-  font-size:.75rem;
-}
-.host-resolved-line>b {
-  font-size:.76rem;
-  text-align:right;
-  min-width:0;
-  overflow-wrap:anywhere;
-  line-height:1.3;
-}
-.host-editor-layout .ms {
-  display:flex;
-  flex-wrap:wrap;
-  gap:.35rem;
-}
-.host-editor-layout .ms label {
-  max-width:100%;
-  flex:0 1 auto;
-  min-width:0;
-  font-size:.8rem;
-  box-sizing:border-box;
-}
-.host-editor-layout .ms label>span {
-  min-width:0;
-  overflow-wrap:anywhere;
-}
-.host-editor-layout [data-host-count] {
-  font-size:.73rem;
-  line-height:1.35;
-}
-dialog.host-wide>form.box>.act {
-  position:sticky;
-  bottom:0;
-  flex:0 0 auto;
-  margin:0;
-  padding:11px 0 0;
-  border-top:1px solid var(--nx-border);
-  background:var(--nx-panel-bg);
-  z-index:5;
-}
-@media (max-width:1260px) {
-.host-editor-layout {
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  grid-template-areas:"primary preview" "overrides overrides";
-}
-}
-@media (max-width:1260px) {
-.host-advanced-fields {
-  grid-template-columns:repeat(3,minmax(0,1fr));
-}
-}
-@media (max-width:1260px) {
-.host-advanced-fields .f:has([name="publicKey"]) {
-  grid-column:span 2;
-}
-}
-@media (max-width:1260px) {
-.host-advanced-fields .f:has([name="clientEncryption"]) {
-  grid-column:span 2;
-}
-}
-@media (max-width:760px) {
-.host-editor-layout {
-  grid-template-columns:minmax(0,1fr);
-  grid-template-areas:"primary" "overrides" "preview";
-}
-}
-@media (max-width:760px) {
-.host-advanced-fields {
-  grid-template-columns:repeat(2,minmax(0,1fr));
-}
-}
-@media (max-width:760px) {
-.host-advanced-fields .f:has([name="publicKey"]) {
-  grid-column:1/-1;
-}
-}
-@media (max-width:760px) {
-.host-advanced-fields .f:has([name="clientEncryption"]) {
-  grid-column:1/-1;
-}
-}
-@media (max-width:440px) {
-.host-connect-fields {
-  grid-template-columns:minmax(0,1fr);
-}
-}
-@media (max-width:440px) {
-.host-public-fields {
-  grid-template-columns:minmax(0,1fr);
-}
-}
-@media (max-width:440px) {
-.host-assignment-fields {
-  grid-template-columns:minmax(0,1fr);
-}
-}
-@media (max-width:440px) {
-.host-advanced-fields {
-  grid-template-columns:minmax(0,1fr);
-}
-}
-@media (max-width:440px) {
-.host-connect-fields>* {
-  grid-column:1/-1;
-}
-}
-@media (max-width:440px) {
-.host-advanced-fields>* {
-  grid-column:1/-1;
-}
+@media (max-width:440px){
+  .host-connect-fields,.host-public-fields,.host-advanced-fields{grid-template-columns:minmax(0,1fr)}
+  .host-connect-fields>*,.host-advanced-fields>*{grid-column:1/-1}
+  .host-advanced-fields>.f>span:first-child{min-block-size:0}
+  .host-editor-layout .host-assignment-panel .ms{grid-template-columns:minmax(0,1fr)}
 }

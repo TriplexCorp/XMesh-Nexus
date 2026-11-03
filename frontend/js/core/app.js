@@ -2850,20 +2850,21 @@ function hostEditorMarkup(o,e){
   // actions unchanged so the existing save and live-preview logic still work.
   return '<div class="host-editor-layout">'+
     '<section class="host-editor-main host-primary-panel" aria-label="Подключение и назначение">'+
-    '<div class="node-form-section-title">Подключение</div>'+
+    '<div class="node-form-section-title">'+ic('link')+'<span>Подключение</span></div>'+
     '<div class="host-connect-fields">'+preset+p+tag+'</div>'+
     '<div class="node-form-section-title">Публичная точка</div>'+
     '<div class="host-public-fields">'+basic+'</div>'+
-    '<div class="node-form-section-title">Назначение</div>'+
+    '</section>'+
+    '<div class="host-assignment-panel"><div class="node-form-section-title">'+ic('server')+'<span>Назначение</span></div>'+
     '<div class="host-assignment-fields">'+nodes+'</div>'+
-    '<small class="note" data-host-count></small></section>'+
+    '<small class="note" data-host-count></small></div>'+
     '<section class="host-advanced host-advanced-panel" aria-label="Расширенные переопределения">'+
-    '<div class="host-advanced-heading"><div class="node-form-section-title">Расширенные переопределения</div>'+
+    '<div class="host-advanced-heading"><div class="node-form-section-title">'+ic('sliders')+'<span>Расширенные переопределения</span></div>'+
     '<p class="node-ip-hint">Пустые поля наследуются из XRAY STUDIO.</p></div>'+
     '<div class="host-advanced-fields">'+advanced+'</div>'+
     '<div class="host-advanced-actions"><button type="button" class="gh sm" data-host-clear-overrides>'+ic('rotate-ccw')+'Сбросить переопределения</button></div></section>'+
     '<section class="host-editor-side" aria-label="Клиентское подключение">'+
-    '<div class="node-form-section-title">Клиентское подключение</div>'+
+    '<div class="node-form-section-title">'+ic('globe')+'<span>Клиентское подключение</span></div>'+
     '<p class="node-ip-hint">Предпросмотр из XRAY STUDIO. Приватные ключи не экспортируются.</p>'+
     '<div class="host-resolved" data-host-resolved></div>'+
     '<p class="node-ip-hint" data-host-runtime role="status" aria-live="polite"></p>'+
@@ -4391,6 +4392,7 @@ document.addEventListener('change',async e=>{const t=e.target;
       }
       form.querySelectorAll('[name="nodes"]').forEach(input=>{input.checked=String(input.value)===String(node.id)});
       hostEditorRefresh(form,true);void hostDeriveRealityPublic(form);
+      window.XMeshSelects?.refresh(form);
       const warning=form.querySelector('[data-host-warnings]');
       if(!hostProfile(node.profileId) && warning){
         warning.hidden=false;

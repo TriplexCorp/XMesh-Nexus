@@ -42,7 +42,7 @@ assert(!html.includes('<details'),'Advanced options must be always visible');
 
 // Host geometry is feature-owned inside the canonical panel graph. Desktop keeps
 // three permanent zones on one row; smaller viewports deliberately reflow them.
-assert.match(css,/\.host-editor-layout\s*\{[\s\S]*?display:grid[\s\S]*?grid-template-columns:minmax\(0,1\.08fr\) minmax\(0,1fr\) minmax\(0,1\.08fr\)[\s\S]*?grid-template-areas:"primary overrides preview"/,
+assert.match(css,/\.host-editor-layout\s*\{[\s\S]*?display:grid[\s\S]*?grid-template-columns:minmax\(0,1\.2fr\) minmax\(0,1fr\) minmax\(0,1\.1fr\)[\s\S]*?grid-template-areas:"primary overrides preview" "assignment assignment assignment"/,
  'Host editor must keep the three-zone desktop grid');
 const desktopEnd=css.indexOf('@media (max-width:1260px)',css.indexOf('.host-editor-layout {'));
 assert(desktopEnd>0,'Host editor must define a 1260px responsive boundary');
@@ -62,11 +62,11 @@ assert.match(css,/#dlg\.host-wide>form\.box>\.act\s*\{[\s\S]*?position:static[\s
  'Host editor footer must stay in normal flow and never cover fields');
 assert.doesNotMatch(css,/#dlg\.host-wide>form\.box>\.act\s*\{[^}]*!important/,
  'Host editor footer must not rely on specificity escalation');
-assert.match(css,/@media \(max-width:1260px\)[\s\S]*?grid-template-areas:"primary preview" "overrides overrides"/,
+assert.match(css,/@media \(max-width:1260px\)[\s\S]*?grid-template-areas:"primary preview" "assignment assignment" "overrides overrides"/,
  'Medium viewports must reflow the three zones without overlap');
-assert.match(css,/@media \(max-width:760px\)[\s\S]*?grid-template-areas:"primary" "overrides" "preview"/,
+assert.match(css,/@media \(max-width:760px\)[\s\S]*?grid-template-areas:"primary" "assignment" "overrides" "preview"/,
  'Small screens must stack all three zones');
-assert.match(css,/@media \(max-width:440px\)[\s\S]*?\.host-connect-fields\s*\{[\s\S]*?grid-template-columns:minmax\(0,1fr\)/,
+assert.match(css,/@media \(max-width:440px\)[\s\S]*?\.host-connect-fields[^{}]*\{[\s\S]*?grid-template-columns:minmax\(0,1fr\)/,
  'Phone layout must keep host fields usable');
 
 // User Details is deliberately wider than a form dialog and must have only one
