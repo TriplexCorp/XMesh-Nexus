@@ -981,6 +981,11 @@ async function main() {
       await page.waitForSelector('.squad-inbound-row');
       const count=await page.locator('.squad-inbound-row').count();
       assert(count>=6,'Fixture must exercise a populated inbound list');
+      if(height>=1080){
+        const initial=await page.locator('.squad-editor-layout').evaluate(el=>({scroll:el.scrollHeight,client:el.clientHeight}));
+        assert(initial.scroll<=initial.client+1,'New squad with no selected inbound must fit without a small workspace scrollbar: '+JSON.stringify(initial));
+        await screenshot(page,`squad-create-unselected-${width}x${height}`);
+      }
       await page.locator('[data-squad-select="all"]').click();
       assert.equal(await page.locator('input[name="inb"]:checked').count(),count,'Select all must still work');
       await page.locator('[data-squad-search]').fill('hysteria-main');
