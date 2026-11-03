@@ -292,3 +292,25 @@ html[data-motion=off] #dlg.user-modal::backdrop{
     will-change:auto;
   }
 }
+
+/* Ordinary entity editors reserve their footer outside the scrolling fields. */
+#dlg>form.entity-editor{
+  grid-template-rows:auto minmax(0,1fr) auto auto;
+  overflow:hidden;
+}
+#dlg>form.entity-editor>.entity-editor-body{
+  padding:.25rem;
+  display:grid;
+  gap:var(--nx-page-gap);
+  min-width:0;
+  min-height:0;
+  overflow:auto;
+  scrollbar-gutter:stable;
+  overscroll-behavior:contain;
+}
+#dlg>form.entity-editor>#fe:empty{display:none}
+#dlg>form.entity-editor>.act{
+  position:static;
+  margin:0;
+  z-index:auto;
+}
