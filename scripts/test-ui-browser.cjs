@@ -68,7 +68,7 @@ async function geometry(page) {
     const root = document.documentElement;
     return {
       viewport:{width:innerWidth,height:innerHeight},rootFont:parseFloat(getComputedStyle(root).fontSize),scrollWidth:root.scrollWidth,
-      view:view && box(view),top:top && box(top),outside,columns,nodeCards,ranges,
+      view:view && box(view),top:top && box(top),outside,columns,nodeCards,ranges,nodeGridMode:document.querySelector('.nodes')?.dataset.gridMode,
       cards:[...(view?.querySelectorAll('.card') || [])].map(box),
       dialog:dialog && box(dialog),
       material:{surface:root.dataset.surface,theme:root.dataset.theme,sidebar:root.dataset.sidebar,density:root.dataset.density},
@@ -98,7 +98,7 @@ function verifyPage(g, route) {
   }
   if (route === 'nodes' && g.nodeCards.length === 1) {
     assert(g.nodeCards[0].y - g.view.y < 230, 'Toolbar и счётчик занимают слишком много высоты перед одним узлом.');
-    assert(g.nodeCards[0].width >= Math.min(g.view.width,g.rootFont*52)-1, 'Единственный узел стал слишком узким для рабочей композиции.');
+    assert(g.nodeCards[0].width >= Math.min(g.view.width,g.rootFont*(g.nodeGridMode==='compact'?40:52))-1, 'Единственный узел стал слишком узким для рабочей композиции.');
     assert(g.nodeCards[0].width <= g.rootFont*76+1, 'Единственный узел снова растягивается на ultrawide.');
   }
 }
@@ -198,7 +198,7 @@ async function main() {
           shadow:getComputedStyle(card).boxShadow,sharedShadow,divider:getComputedStyle(q('.node-summary')).borderRightWidth,
           primaryDivider:getComputedStyle(q('.kvg>div+div')).borderLeftWidth};
       });
-      const cap={compact:60,standard:68,spacious:76}[g.mode]*g.rem;
+      const cap={compact:40,standard:68,spacious:76}[g.mode]*g.rem;
       assert(Math.abs(g.card.width-Math.min(g.container.width,cap))<=2,'Single-node width must follow density cap');
       assert(Math.abs(g.card.x-g.container.x)<=2,'Bounded card must anchor to the left workspace edge');
       assert(Math.abs(g.card.x-g.toolbar.x)<=2,'Single card must align with the left filter-toolbar edge');
@@ -223,6 +223,35 @@ async function main() {
       assert(g.shield&&g.hosting&&g.geoDot&&g.iconMatches.every(Boolean),'Semantic SVG icons/dot are missing or incorrect');
       assert.equal(g.shadow,g.sharedShadow,'Node card must use only the shared neutral shadow');
       await screenshot(page,`nodes-${width}x${height}`);
+      return g;
+    });
+
+    for(const [width,height] of [[1920,1080],[2560,1440],[3440,1440],[390,844]]) await checked(`Square compact Node: ${width}×${height}`,async()=>{
+      await page.setViewportSize({width,height});
+      await navigate('nodes');
+      await page.locator('[data-node-grid-mode="compact"]').click();
+      const g=await page.locator('.nc').first().evaluate(card=>{
+        const box=e=>{const r=e.getBoundingClientRect();return{x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};
+        return{card:box(card),grid:box(card.parentElement),rem:parseFloat(getComputedStyle(document.documentElement).fontSize),summary:box(card.querySelector('.node-summary')),metrics:box(card.querySelector('.node-metrics')),kpis:[...card.querySelectorAll('.ngauge')].map(box),actions:box(card.querySelector('.acts')),buttons:[...card.querySelectorAll('.acts>button')].map(box),icons:card.querySelectorAll('.acts>button svg').length,shield:!!card.querySelector('[data-node-tls-status] svg'),overflow:document.documentElement.scrollWidth};
+      });
+      assert(Math.abs(g.card.x-g.grid.x)<=2,'Square card must remain left-anchored');
+      assert(g.card.width<=g.rem*40+1,'Compact card must stop at 40rem');
+      assert(g.metrics.y>=g.summary.bottom,'Compact telemetry must follow the summary');
+      assert.equal(g.buttons.length,9);assert.equal(g.icons,9);assert(g.shield,'Compact card must retain TLS icon');
+      assert(g.overflow<=width+1,'Compact layout must not overflow the document');
+      if(width>=1920){
+        const aspect=g.card.width/g.card.height;
+        assert(aspect>=.85&&aspect<=1.35,'Normal compact fixture must read as a near-square card: '+aspect);
+        assert(Math.max(...g.kpis.map(r=>r.y))-Math.min(...g.kpis.map(r=>r.y))<=3,'Compact KPI tops must align');
+        assert(Math.max(...g.kpis.map(r=>r.height))-Math.min(...g.kpis.map(r=>r.height))<=3,'Compact KPI heights must align');
+        for(const offset of [0,4]){
+          assert(g.buttons.slice(offset,offset+4).every(b=>Math.abs(b.y-g.buttons[offset].y)<=3),'Compact actions must keep four columns');
+          assert(g.buttons.slice(offset,offset+4).every(b=>Math.abs(b.height-g.buttons[offset].height)<=3),'Compact action heights must align despite wrapped labels');
+        }
+        assert(g.buttons[8].width>=g.actions.width*.98,'Compact Create Host must span the action grid');
+      }
+      await screenshot(page,`nodes-square-${width}x${height}`);
+      await page.locator('[data-node-grid-mode="standard"]').click();
       return g;
     });
 
@@ -725,15 +754,16 @@ async function main() {
       await page.reload({waitUntil:'domcontentloaded'});
       await navigate('nodes');
       const widths={};
-      for(const [mode,cap] of [['compact',60],['standard',68],['spacious',76]]){
+      for(const [mode,cap] of [['compact',40],['standard',68],['spacious',76]]){
         await page.locator(`[data-node-grid-mode="${mode}"]`).click();
         const state=await page.locator('.nodes').evaluate(grid=>{
           const box=el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,width:r.width}};
-          return {left:grid.getBoundingClientRect().left,toolbarLeft:document.querySelector('.nodes-toolbar').getBoundingClientRect().left,rem:parseFloat(getComputedStyle(document.documentElement).fontSize),cards:[...grid.children].map(card=>({box:box(card),buttons:[...card.querySelectorAll('.acts>button')].map(box)}))};
+          return {left:grid.getBoundingClientRect().left,toolbarLeft:document.querySelector('.nodes-toolbar').getBoundingClientRect().left,rem:parseFloat(getComputedStyle(document.documentElement).fontSize),cards:[...grid.children].map(card=>({box:box(card),buttons:[...card.querySelectorAll('.acts>button')].map(box),summaryOnly:card.querySelector('.node-summary').children.length===1,summaryBorder:getComputedStyle(card.querySelector('.kvg')).borderBottomWidth}))};
         });
         assert(Math.abs(state.cards[0].box.x-state.left)<=2,'Fleet must anchor to the left grid edge in every density mode');
         assert(Math.abs(state.cards[0].box.x-state.toolbarLeft)<=2,'Cards must align with the left filter-toolbar edge');
         for(const card of state.cards){
+          if(mode==='compact'&&card.summaryOnly)assert.equal(card.summaryBorder,'0px','Compact card without health rows must not show a redundant separator');
           if(mode==='spacious')assert(Math.abs(card.box.x-state.left)<=2,'Every single-column card must stay left-aligned');
           assert(Math.abs(card.box.width-cap*state.rem)<=2,'Card must stop at its density width cap');
           assert(card.buttons.slice(0,4).every(b=>Math.abs(b.y-card.buttons[0].y)<=3),'Narrower card must preserve four action columns');
@@ -744,6 +774,7 @@ async function main() {
         await screenshot(page,`nodes-two-3440-${mode}`);
       }
       assert(widths.compact<widths.standard&&widths.standard<widths.spacious,'Density must change actual card width');
+      await page.locator('[data-node-grid-mode="compact"]').click();
       const radii=[];
       for(const radius of [6,28]){
         await navigate('set');

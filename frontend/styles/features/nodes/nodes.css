@@ -25,11 +25,14 @@
    visibly distinct instead of resolving to the same auto-fit columns. */
 .nodes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,24rem),1fr));align-items:start;justify-content:start;gap:var(--nx-page-gap);grid-auto-rows:max-content;min-width:0}
 .nodes[data-grid-mode=compact]{grid-template-columns:repeat(auto-fit,minmax(min(100%,20rem),1fr))}
+.nodes[data-node-count="1"][data-grid-mode=compact]{grid-template-columns:minmax(0,40rem)}
 .nodes[data-grid-mode=spacious]{grid-template-columns:minmax(0,1fr)}
 
 /* Reference anatomy uses an accent edge and the shared neutral panel shadow. */
 .nc{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--nx-space-4);align-content:start;min-width:0;height:auto;container:node-card / inline-size;padding:clamp(1rem,1.2vw,1.4rem);border-color:color-mix(in srgb,var(--a) 42%,var(--nx-border));background:color-mix(in srgb,var(--nx-panel-bg) 96%,var(--a) 4%);box-shadow:var(--nx-panel-shadow)}
 .nc.off{opacity:.7}
+.nodes[data-grid-mode=compact]>.nc{gap:var(--nx-space-3);padding:var(--nx-space-4)}
+.nodes[data-grid-mode=compact] .node-metrics{padding-top:var(--nx-space-3);border-top:1px solid var(--nx-separator)}
 .nc .h{display:flex;align-items:center;flex-wrap:wrap;gap:.8rem;min-width:0;padding-bottom:.95rem;border-bottom:1px solid var(--nx-separator)}
 .nc .fg{flex:none;font-size:1.9rem;line-height:1.2}
 .node-identity{flex:1;min-width:8rem;overflow-wrap:anywhere;line-height:1.42}
@@ -49,6 +52,7 @@
 .nc .kvg{display:grid;line-height:1.35;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--nx-space-4);padding-bottom:.82rem;border-bottom:1px solid var(--nx-separator)}
 .nc .kvg>div{display:grid;align-content:start;gap:.3rem;min-width:0;overflow-wrap:anywhere}
 .nc .kvg>div+div{padding-left:var(--nx-space-4);border-left:1px solid var(--nx-separator)}
+.nodes[data-grid-mode=compact] .kvg:last-child{padding-bottom:0;border-bottom:0}
 .nc .kvg span{font-size:var(--nx-text-xs);color:var(--nx-muted)}
 .nc .kvg b{font-size:1.12rem}
 .node-online-clients{display:grid;gap:.2rem;margin-top:.2rem}
@@ -77,7 +81,7 @@
 /* The footer is the deliberate 4 + 4 + 1 operations console from the concept.
    Container queries below reflow it from card width rather than viewport width. */
 .nc .acts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.58rem;padding-top:1rem;border-top:1px solid var(--nx-separator)}
-.nc .acts>button{width:100%;justify-content:center;min-width:0;min-height:2.72rem;padding:.52rem .68rem;font-size:.76rem;font-weight:700;white-space:normal;line-height:1.28;background:color-mix(in srgb,var(--nx-control-bg) 96%,transparent);border-color:color-mix(in srgb,var(--nx-border) 88%,var(--a) 12%)}
+.nc .acts>button{width:100%;align-self:stretch;justify-content:center;min-width:0;min-height:2.72rem;padding:.52rem .68rem;font-size:.76rem;font-weight:700;white-space:normal;line-height:1.28;background:color-mix(in srgb,var(--nx-control-bg) 96%,transparent);border-color:color-mix(in srgb,var(--nx-border) 88%,var(--a) 12%)}
 .nc .acts .ic{width:1.08rem;height:1.08rem;flex:none;opacity:.96}
 .nc .acts>[data-node-create-host]{grid-column:1/-1;min-height:2.78rem;background:color-mix(in srgb,var(--nx-control-bg) 93%,var(--a) 3%)}
 .nc .acts>[data-agent-update]{color:var(--a);border-color:color-mix(in srgb,var(--a) 62%,var(--nx-border));background:color-mix(in srgb,var(--a) 10%,var(--nx-control-bg));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--a) 10%,transparent)}
@@ -92,27 +96,31 @@
    stay together instead of stretching cards/actions across an ultrawide canvas.
    Shared card/control tokens continue to own every radius. */
 @container nodes-workspace (min-width:52rem){
-  .nodes[data-node-count="1"][data-grid-mode=compact]{grid-template-columns:minmax(0,60rem)}
   .nodes[data-node-count="1"][data-grid-mode=standard]{grid-template-columns:minmax(0,68rem)}
   .nodes[data-node-count="1"][data-grid-mode=spacious]{grid-template-columns:minmax(0,76rem)}
 
-  .nodes[data-node-count="2"][data-grid-mode=compact]{grid-template-columns:repeat(2,minmax(0,60rem))}
+  .nodes[data-node-count="2"][data-grid-mode=compact]{grid-template-columns:repeat(2,minmax(0,40rem))}
   .nodes[data-node-count="2"][data-grid-mode=standard]{grid-template-columns:repeat(2,minmax(0,68rem))}
   .nodes[data-node-count="2"][data-grid-mode=spacious]{grid-template-columns:minmax(0,76rem)}
 
-  .nodes[data-node-count="3"][data-grid-mode=compact]{grid-template-columns:repeat(3,minmax(0,60rem))}
+  .nodes[data-node-count="3"][data-grid-mode=compact]{grid-template-columns:repeat(3,minmax(0,40rem))}
   .nodes[data-node-count="3"][data-grid-mode=standard]{grid-template-columns:repeat(2,minmax(0,68rem))}
   .nodes[data-node-count="3"][data-grid-mode=spacious]{grid-template-columns:minmax(0,76rem)}
 }
 
 @container nodes-workspace (min-width:74rem){
-  .nodes[data-grid-mode=compact]:not([data-node-count="1"]):not([data-node-count="2"]):not([data-node-count="3"]){grid-template-columns:repeat(4,minmax(0,60rem))}
+  .nodes[data-grid-mode=compact]:not([data-node-count="1"]):not([data-node-count="2"]):not([data-node-count="3"]){grid-template-columns:repeat(4,minmax(0,40rem))}
   .nodes[data-grid-mode=standard]:not([data-node-count="1"]):not([data-node-count="2"]):not([data-node-count="3"]){grid-template-columns:repeat(3,minmax(0,68rem))}
   .nodes[data-grid-mode=spacious]:not([data-node-count="1"]):not([data-node-count="2"]):not([data-node-count="3"]){grid-template-columns:repeat(2,minmax(0,76rem))}
 }
 
 /* Action grouping follows the card itself, so fleet density cannot create tiny
    four-column buttons just because the outer workspace is ultrawide. */
+@container node-card (min-width:36rem){
+  .nodes[data-grid-mode=compact] .acts{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .nodes[data-grid-mode=compact] .ngauge{grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto;gap:.18rem .55rem;align-items:center;justify-items:start;text-align:left;padding:.65rem;min-height:4.6rem}
+  .nodes[data-grid-mode=compact] .ngauge .ringwrap{grid-row:1/3;width:3rem;height:3rem}
+}
 @container node-card (min-width:44rem){
   .nc .acts{grid-template-columns:repeat(4,minmax(0,1fr))}
 }
