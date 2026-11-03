@@ -808,8 +808,6 @@ async function main() {
       assert.equal(await page.locator('input[name="inb"]:checked').count(),0,'Clear must still work');
       await page.locator('.squad-inbound-row').first().click();
       await page.locator('input[name="name"]').fill('Squad layout check');
-      await page.waitForFunction(()=>!document.getElementById('xmesh-feedback-toast')?.matches(':popover-open'));
-      await page.locator('.host-editor-layout').evaluate(body=>{body.scrollTop=0});
       const g=await page.locator('#dlg').evaluate(d=>{
         const box=e=>{const r=e.getBoundingClientRect();return{x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};
         const q=s=>d.querySelector(s),list=q('.squad-inbound-list'),body=q('.squad-editor-layout');
