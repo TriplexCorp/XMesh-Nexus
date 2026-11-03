@@ -3072,6 +3072,10 @@ const nodeRuntimeState=(node,runtime)=>{
 };
 const nodeAgentUpdating=new Set();
 const nodeXrayUpdating=new Set();
+const nodeXrayRestarting=new Set();
+const renderNodeRestart=nodeId=>nodeXrayRestarting.has(Number(nodeId))
+  ?'<span class="node-agent-spinner" aria-hidden="true"></span>Перезапуск Xray…'
+  :ic('redo')+'Перезапуск Xray';
 function renderNodeAgentVersion(nodeId,runtime){
   if(nodeAgentUpdating.has(Number(nodeId))){
     return '<span class="node-agent-spinner" aria-hidden="true"></span><span>Agent обновляется</span>';
@@ -3096,6 +3100,7 @@ function paintNodeAgentUpdate(nodeId,updating){
   }
 }
 function renderNodeXrayVersion(nodeId,runtime){
+  if(nodeXrayRestarting.has(Number(nodeId)))return '<span class="node-agent-spinner" aria-hidden="true"></span><span>Перезапуск Xray…</span>';
   if(nodeXrayUpdating.has(Number(nodeId))){
     return '<span class="node-agent-spinner" aria-hidden="true"></span><span>Xray обновляется</span>';
   }
@@ -3104,12 +3109,13 @@ function renderNodeXrayVersion(nodeId,runtime){
 function paintNodeXrayUpdate(nodeId){
   const badge=document.querySelector('[data-node-card-id="'+nodeId+'"] [data-node-xray-version]');
   if(!badge)return;
-  const updating=nodeXrayUpdating.has(Number(nodeId));
+  const restarting=nodeXrayRestarting.has(Number(nodeId));
+  const updating=restarting||nodeXrayUpdating.has(Number(nodeId));
   badge.classList.toggle('node-agent-updating',updating);
   if(updating){
     badge.setAttribute('role','status');
-    badge.setAttribute('aria-label','Xray обновляется');
-    badge.title='Ожидается подтверждение обновления Xray';
+    badge.setAttribute('aria-label',restarting?'Перезапуск Xray…':'Xray обновляется');
+    badge.title=restarting?'Ожидается подтверждение перезапуска Xray':'Ожидается подтверждение обновления Xray';
     badge.innerHTML=renderNodeXrayVersion(nodeId,null);
   }else{
     badge.removeAttribute('role');
@@ -3192,7 +3198,7 @@ const updateNodeRuntimeBadges=(node,runtime)=>{
     pill.append(dot,document.createTextNode(status.label));
   }
   if(version){
-    if(nodeXrayUpdating.has(Number(node.id))){
+    if(nodeXrayUpdating.has(Number(node.id))||nodeXrayRestarting.has(Number(node.id))){
       paintNodeXrayUpdate(node.id);
     }else{
       paintNodeXrayUpdate(node.id);
@@ -3426,7 +3432,7 @@ async function nodesP(){
         ${nodeGauge(n,'traffic-'+n.id,'Трафик сети',n.limit?k*100:0,trafficGb===null?'—':n.limit?Math.round(k*100)+'%':'∞',trafficGb===null?'нет данных':(n.limit?`${gb(trafficGb)} / ${gb(n.limit)}`:`${gb(trafficGb)} · без лимита`)+(nodeTrafficFactor(n)!==1?` · ×${nodeTrafficFactor(n)} (учётный)`:''),tc)}
       </div>
       <div class="mb node-speed"><div><span>Текущая скорость</span><b id="nm${n.id}">${Number.isFinite(l.mbps)?fmt(l.mbps)+' Мбит/с':'—'}</b></div><div class="pb f" style="--w:${Number.isFinite(l.mbps)?cl(l.mbps/240*100,0,100):0}%" id="npm${n.id}"><i></i></div></div></div></div>
-      <footer class="acts" data-ui-toolbar="actions"><button class="gh sm" data-node-bootstrap="${n.id}">${ic('link')}Подключить агент ноды</button><button class="gh sm" data-nr="${n.id}" ${n.disabled?'disabled title="Сначала включите узел после восстановления лимита"':''}>${ic('redo')}Перезапуск</button><button class="gh sm" data-xray-update="${n.id}">${ic('dl')}Обновить Xray</button><button class="gh sm" data-agent-update="${n.id}" title="Обновить управляющий Agent через подтверждённую команду ноде">${ic("refresh-cw")}Обновить Agent</button><button type="button" class="gh sm node-geodata-open" data-node-geodata="${n.id}" title="Настройки GeoData и ручное обновление файлов на этом узле">${ic("globe")}Обновить GeoData</button><button type="button" class="gh sm node-routing-open" data-node-routing="${n.id}" title="Направление трафика по GeoSite, GeoIP и через другие ноды">${ic("git-branch")}Маршрутизация</button><button class="gh sm" data-nt="${n.id}">${ic(n.disabled?'play':'pause')}${n.disabled?'Включить':'Отключить'}</button><button class="gh sm" data-ne="nodes:${n.id}">${ic('pen')}Изменить</button><button class="gh sm" data-node-create-host="${n.id}">${ic('server')}Создать хост</button></footer></div>`;
+      <footer class="acts" data-ui-toolbar="actions"><button class="gh sm" data-node-bootstrap="${n.id}">${ic('link')}Подключить агент ноды</button><button class="gh sm" data-nr="${n.id}" ${n.disabled||nodeXrayRestarting.has(Number(n.id))?'disabled':''} title="Перезапустить Xray">${renderNodeRestart(n.id)}</button><button class="gh sm" data-xray-update="${n.id}">${ic('dl')}Обновить Xray</button><button class="gh sm" data-agent-update="${n.id}" title="Обновить управляющий Agent через подтверждённую команду ноде">${ic("refresh-cw")}Обновить Agent</button><button type="button" class="gh sm node-geodata-open" data-node-geodata="${n.id}" title="Настройки GeoData и ручное обновление файлов на этом узле">${ic("globe")}Обновить GeoData</button><button type="button" class="gh sm node-routing-open" data-node-routing="${n.id}" title="Направление трафика по GeoSite, GeoIP и через другие ноды">${ic("git-branch")}Маршрутизация</button><button class="gh sm" data-nt="${n.id}">${ic(n.disabled?'play':'pause')}${n.disabled?'Включить':'Отключить'}</button><button class="gh sm" data-ne="nodes:${n.id}">${ic('pen')}Изменить</button><button class="gh sm" data-node-create-host="${n.id}">${ic('server')}Создать хост</button></footer></div>`;
   });
   const cardById=new Map(r.items.map((n,i)=>[n.id,cards[i]]));
   const hostsByNode=new Map();
@@ -4141,7 +4147,7 @@ the old node will lose access. Cancel and create a new Node ID if both must work
   else if(b=g('[data-xray-update]')){
     const id=Number(b.dataset.xrayUpdate),node=DB.nodes.find(n=>Number(n.id)===id);
     if(!node){toast('Узел не найден.');return}
-    if(b.dataset.loading==='1')return;
+    if(b.dataset.loading==='1'||nodeXrayRestarting.has(id))return;
     b.dataset.loading='1';b.disabled=true;
     const original=b.innerHTML;
     try{
@@ -4200,10 +4206,12 @@ the old node will lose access. Cancel and create a new Node ID if both must work
   else if(b=g('[data-nr]')){
      const id=Number(b.dataset.nr),node=DB.nodes.find(n=>Number(n.id)===id);
      if(!node){toast('Нода больше не существует. Обновите список.');return}
-     if(b.dataset.loading==='1')return;
+     if(b.dataset.loading==='1'||nodeXrayRestarting.has(id)||nodeXrayUpdating.has(id))return;
      b.dataset.loading='1';b.disabled=true;
+     let restartRuntime=null;
      try{
        const state=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/runtime');
+       restartRuntime=state;
        if(!state.connected||!/^control-v[1-9]/.test(String(state.version||''))){
          throw new Error('Нет управляющего агента. Агент метрик не выполняет перезапуск: обновите его через «Подключить агент ноды».');
        }
@@ -4212,6 +4220,9 @@ the old node will lose access. Cancel and create a new Node ID if both must work
          {title:'Перезапуск Xray',confirmLabel:'Перезапустить'}
        );
        if(!confirmed)return;
+       nodeXrayRestarting.add(id);
+       paintNodeXrayUpdate(id);
+       b.innerHTML=renderNodeRestart(id);
        const request=await backendRequest('/api/v1/nodes/'+encodeURIComponent(id)+'/restart',{
          method:'POST',body:JSON.stringify({})
        });
@@ -4229,7 +4240,13 @@ the old node will lose access. Cancel and create a new Node ID if both must work
        toast(node.name+': Xray перезапущен и проверен управляющим агентом.');
        if(cur==='nodes')render(1);
      }catch(error){toast('Не удалось перезапустить Xray: '+(error.message||'ошибка API'))}
-     finally{delete b.dataset.loading;if(b.isConnected)b.disabled=false}
+     finally{
+       nodeXrayRestarting.delete(id);
+       delete b.dataset.loading;
+       const button=document.querySelector('[data-nr="'+id+'"]');
+       if(button){delete button.dataset.loading;button.disabled=!!node.disabled;button.innerHTML=renderNodeRestart(id)}
+       if(cur==='nodes')updateNodeRuntimeBadges(node,restartRuntime);
+     }
    }
   else if(b=g('[data-nt]')){const n=DB.nodes.find(x=>x.id==b.dataset.nt);await api.update('nodes',n.id,{disabled:!n.disabled});toast(`${n.name}: ${n.disabled?'отключён':'включён'}`);render(1)}
   else if(b=g('[data-tt]')){TP.tab=b.dataset.tt;TP.q='';TP.f='';render(1)}
