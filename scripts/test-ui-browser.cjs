@@ -783,6 +783,10 @@ async function main() {
         assert(g.connections.width>g.main.width*1.5,'Inbound selection must receive most of the workspace width');
         assert(g.main.height<g.connections.height,'Two settings must not stretch to the height of the inbound list');
       }
+      if(width<980){
+        assert(g.connections.y>=g.main.bottom,'Mobile settings must not overlap connections');
+        assert(g.impact.y>=g.connections.bottom,'Mobile connections must not overlap impact');
+      }
       if(height>=1080) assert(g.bodyScroll<=g.bodyClient+1,'Normal populated squad must fit desktop without scrolling');
       await screenshot(page,`squad-populated-${width}x${height}`);
       await page.keyboard.press('Escape');

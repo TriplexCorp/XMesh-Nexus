@@ -76,7 +76,7 @@ dialog#dlg.squad-wide .squad-editor-layout{
   display:grid;
   grid-template-columns:minmax(0,.72fr) minmax(0,1.28fr);
   grid-template-areas:"main connections" "impact connections";
-  grid-template-rows:auto 1fr;
+  grid-template-rows:max-content max-content;
   gap:18px;
   padding:20px 22px 18px;
   align-items:start;
@@ -390,7 +390,6 @@ dialog#dlg.squad-wide .squad-preview-stat{
   min-width:0;
   min-height:0;
   padding:9px 10px;
-  border:0;
   border:1px solid var(--nx-border);
   border-radius:var(--nx-card-radius);
   background:color-mix(in srgb,var(--nx-panel-bg) 84%,var(--nx-section-bg));
@@ -586,7 +585,7 @@ dialog#dlg.squad-wide > form.box > .act :is(.gh,.btn,.dg):active{
   dialog#dlg.squad-wide .squad-editor-layout{
     grid-template-columns:minmax(0,1fr);
     grid-template-areas:"main" "connections" "impact";
-    grid-template-rows:auto;
+    grid-template-rows:repeat(3,max-content);
     padding:16px;
   }
   dialog#dlg.squad-wide .squad-editor-side{grid-column:auto}
