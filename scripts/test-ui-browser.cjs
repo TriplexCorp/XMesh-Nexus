@@ -929,6 +929,24 @@ async function main() {
     await page.route(metricsPattern,metricsFixture);
     try{
       await page.reload({waitUntil:'domcontentloaded'});
+      await checked('Xray release picker: authenticated control-v6 capability',async()=>{
+        // A control-v6 heartbeat must not be rejected by the historic v3/v4
+        // browser regex. Only the backend-authorized capability is consulted.
+        const catalogRoute='**/api/v1/nodes/xray-releases';
+        await page.route(catalogRoute,route=>route.fulfill({json:{items:[{
+          version:'v26.10.30',published_at:'2026-10-30T00:00:00Z',prerelease:false,
+          url:'https://github.com/XTLS/Xray-core/releases/tag/v26.10.30'
+        }]}}));
+        try{
+          await navigate('nodes');
+          await page.locator(`[data-xray-update="${node.id}"]`).first().click();
+          const release=page.locator('.xray-release-row').first();
+          await release.waitFor({timeout:12000});
+          assert.equal(await release.locator('strong').innerText(),'v26.10.30');
+          await page.locator('.xray-release-dialog .gh').click();
+          await page.locator('.xray-release-dialog').waitFor({state:'detached'});
+        }finally{await page.unroute(catalogRoute)}
+      });
       await navigate('set');
       await page.locator('#content-width').evaluate(el=>{el.value='3000';el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}))});
       for(const [mode,width,height] of [['compact',1920,1080],['compact',2560,1440],['compact',3440,1440],['standard',3440,1440],['spacious',3440,1440],['compact',390,844]])await checked(`Equal Node heights: ${mode} ${width}×${height}`,async()=>{
