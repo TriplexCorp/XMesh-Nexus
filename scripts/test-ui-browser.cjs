@@ -230,15 +230,21 @@ async function main() {
       await page.setViewportSize({width,height});
       await navigate('nodes');
       await page.locator('[data-node-grid-mode="compact"]').click();
+      await page.locator('.nc .fg img').first().evaluate(img=>img.decode());
       const g=await page.locator('.nc').first().evaluate(card=>{
         const box=e=>{const r=e.getBoundingClientRect();return{x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};
-        return{card:box(card),grid:box(card.parentElement),rem:parseFloat(getComputedStyle(document.documentElement).fontSize),summary:box(card.querySelector('.node-summary')),metrics:box(card.querySelector('.node-metrics')),kpis:[...card.querySelectorAll('.ngauge')].map(box),actions:box(card.querySelector('.acts')),buttons:[...card.querySelectorAll('.acts>button')].map(box),icons:card.querySelectorAll('.acts>button svg').length,shield:!!card.querySelector('[data-node-tls-status] svg'),overflow:document.documentElement.scrollWidth};
+        const flag=card.querySelector('.fg img');
+        return{card:box(card),grid:box(card.parentElement),rem:parseFloat(getComputedStyle(document.documentElement).fontSize),summary:box(card.querySelector('.node-summary')),metrics:box(card.querySelector('.node-metrics')),kpis:[...card.querySelectorAll('.ngauge')].map(box),actions:box(card.querySelector('.acts')),buttons:[...card.querySelectorAll('.acts>button')].map(box),icons:card.querySelectorAll('.acts>button svg').length,shield:!!card.querySelector('[data-node-tls-status] svg'),overflow:document.documentElement.scrollWidth,flag:box(flag),flagFrame:box(flag.parentElement),identity:box(card.querySelector('.node-identity')),flagLoaded:flag.complete&&flag.naturalWidth>0,flagAlt:flag.alt};
       });
       assert(Math.abs(g.card.x-g.grid.x)<=2,'Square card must remain left-anchored');
       assert(g.card.width<=g.rem*40+1,'Compact card must stop at 40rem');
       assert(g.metrics.y>=g.summary.bottom,'Compact telemetry must follow the summary');
       assert.equal(g.buttons.length,9);assert.equal(g.icons,9);assert(g.shield,'Compact card must retain TLS icon');
       assert(g.overflow<=width+1,'Compact layout must not overflow the document');
+      assert(g.flagLoaded&&g.flagAlt,'Node flag must retain its local SVG and accessible country name');
+      assert(g.flag.width>=g.rem*2.7&&g.flag.height>=g.rem*1.9,'Node flag must be a prominent header accent');
+      assert(g.flag.x>g.flagFrame.x&&g.flag.right<g.flagFrame.right&&g.flag.bottom<g.flagFrame.bottom,'Flag must fit inside its frame');
+      assert(g.flagFrame.right<g.identity.x,'Flag accent must not overlap the node identity');
       if(width>=1920){
         const aspect=g.card.width/g.card.height;
         assert(aspect>=.85&&aspect<=1.35,'Normal compact fixture must read as a near-square card: '+aspect);
@@ -848,7 +854,7 @@ async function main() {
         await page.locator(`[data-node-card-id="${node.id}"] .node-runtime-online`).waitFor();
         const g=await page.locator('.nodes').evaluate(grid=>{
           const box=e=>{const r=e.getBoundingClientRect();return{x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};
-          return{overflow:document.documentElement.scrollWidth,cards:[...grid.children].map(card=>({card:box(card),status:card.querySelector('[data-node-runtime-state]').textContent,body:box(card.querySelector('.node-body')),metrics:box(card.querySelector('.node-metrics')),speed:box(card.querySelector('.node-speed')),actions:box(card.querySelector('.acts')),buttons:[...card.querySelectorAll('.acts>button')].map(box)}))};
+          return{overflow:document.documentElement.scrollWidth,cards:[...grid.children].map(card=>({card:box(card),status:card.querySelector('[data-node-runtime-state]').textContent,body:box(card.querySelector('.node-body')),metrics:box(card.querySelector('.node-metrics')),speed:box(card.querySelector('.node-speed')),actions:box(card.querySelector('.acts')),buttons:[...card.querySelectorAll('.acts>button')].map(box),emptyFlag:!!card.querySelector('.fg>span.flag-img:empty'),flagDisplay:getComputedStyle(card.querySelector('.fg')).display}))};
         });
         await screenshot(page,`nodes-equal-${mode}-${width}x${height}`);
         assert(g.cards.length>=9,'Fixture must include multiple rows and mixed optional health fields');
@@ -856,6 +862,7 @@ async function main() {
         assert(Math.max(...g.cards.map(c=>c.card.height))-Math.min(...g.cards.map(c=>c.card.height))<=2,'All visible cards must have equal heights across rows and statuses');
         assert(g.overflow<=width+1,'Equal-height layout must not overflow the document');
         for(const c of g.cards){
+          if(c.emptyFlag)assert.equal(c.flagDisplay,'none','Unconfigured flag must not leave an empty accent frame');
           assert(c.body.bottom<=c.actions.y+1,'Body must not overlap actions');
           assert(c.buttons.every(b=>b.x>=c.card.x&&b.right<=c.card.right+1&&b.bottom<=c.card.bottom),'Every action must fit inside its card');
           const peers=g.cards.filter(other=>Math.abs(other.card.y-c.card.y)<=2);
