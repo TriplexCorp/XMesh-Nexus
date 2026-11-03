@@ -116,3 +116,7 @@ client routing, diagnostics, administrators, security and settings.
 Review artifacts include per-route screenshots, focused Host fields and populated
 editors. Native table/JSON scroll boundaries remain available where content is
 intrinsically larger than the viewport; the document itself must stay bounded.
+
+Mobile Settings also wraps long updater feedback and version metadata. The
+regression fixture includes an unbroken URL token so server-dependent messages
+cannot expand the document on narrow viewports.

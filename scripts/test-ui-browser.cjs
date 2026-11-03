@@ -171,7 +171,7 @@ async function main() {
         if (['set','nodes'].includes(route) || width === 390 || width === 768 || width === 1440 || width === 1920 || width === 3440) await screenshot(page,`${route}-${width}`);
         if(width<1000){
           assert(!g.renderFailed,'Mobile route must render');
-          assert(g.scrollWidth<=width+1,'Mobile document must not overflow horizontally');
+          assert(g.scrollWidth<=width+1,'Mobile document must not overflow horizontally: '+JSON.stringify({width:g.scrollWidth,outside:g.outside}));
           assert(g.view.x>=0&&g.view.right<=width+1,'Mobile workspace must stay in viewport');
         }else verifyPage(g,route);
         return g;
@@ -445,6 +445,16 @@ async function main() {
       }
       await screenshot(page,`audit-editor-${route}-${width}`);
       if(route==='clientrouting')await page.keyboard.press('Escape');
+      return g;
+    });
+
+    await checked('Settings: long update feedback stays inside mobile workspace',async()=>{
+      await page.setViewportSize({width:390,height:844});
+      await navigate('set');
+      await page.locator('#core-message').evaluate(el=>{el.textContent='Update request failed: https://example.invalid/releases/'+('abcdef0123456789'.repeat(40))});
+      const g=await geometry(page);
+      assert(g.scrollWidth<=391,'Long updater feedback must wrap without expanding the document');
+      await screenshot(page,'audit-settings-long-feedback-390');
       return g;
     });
 
