@@ -783,8 +783,10 @@ mod tests {
         // missing or stale source selector (including legacy node: sources).
         assert_eq!(build_feed(vec![], &settings).unwrap(), json!([]));
         assert_eq!(build_feed(vec![], &json!({})).unwrap(), json!([]));
-        assert!(build(vec![], &json!({})).is_err(),
-            "Only the subscription feed, not arbitrary client config building, is empty-success");
+        assert!(
+            build(vec![], &json!({})).is_err(),
+            "Only the subscription feed, not arbitrary client config building, is empty-success"
+        );
     }
 
     fn outbound(code: &str) -> Value {
