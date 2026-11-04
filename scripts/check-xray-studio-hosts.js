@@ -32,15 +32,22 @@ assert.match(panelCss,/\.sv-public-endpoints\{/,
  'XRAY STUDIO Hosts styles must be reachable from the canonical panel CSS graph');
 assertPackaged(assert,['xray-studio-hosts.js', 'xray-studio-hosts.css']);
 assert(server.includes('fn host_for_profile('),'Generator must filter by profile and nodes');
-// The fallback guard must survive rustfmt's whitespace changes.
-const guard=server.match(/let\s+any_explicit_host\s*=\s*hosts\.iter\(\)\.any\([\s\S]*?\);/);
-assert(guard,'Explicit hosts must be detected before considering raw node IPs');
-assert.match(guard[0],/nonempty\(h,\s*"tag"\)\s*==\s*Some\(tag\)/,
- 'Fallback guard must match the inbound tag');
-assert.match(server,/else\s+if\s*!any_explicit_host\s*\{/,
- 'Raw node IP fallback must only run when no explicit host exists');
-assert.match(server,/\.filter\(\|h\|\s*host_for_profile\(h,\s*tag,\s*profile,\s*&nodes\)\)/,
- 'Disabled and nonmatching hosts must not be served');
+// Explicit Hosts are the only publishable endpoint source. This fail-closed
+// contract is shared with the browser Client JSON generator.
+assert.match(server,/fn published_hosts_for_profile/,'Only real Hosts can be published');
+assert.match(server,/\.filter\(\|host\| host_for_profile\(host, tag, profile, nodes\)\)/,
+ 'Disabled, mismatched and unassigned Hosts must not be published');
+assert.doesNotMatch(server,/else\s+if\s+!any_explicit_host/,
+ 'No implicit raw-node fallback is allowed, even when the Hosts table is empty');
+assert.doesNotMatch(server,/xmeshSourceKey"\] = json!\(format!\("node:/,
+ 'Subscription sources must come from explicit Host records only');
+assert.match(server,/return Ok\(outbounds\)/,
+ 'Empty authorized endpoint sets must remain valid empty subscriptions');
+const jsClient=fs.readFileSync('frontend/js/features/users/client-config.js','utf8');
+assert.match(jsClient,/const candidates=hosts;/,
+ 'Browser Client JSON can use only explicit Host records');
+assert.doesNotMatch(jsClient,/associatedNodes\.map\(n=>\(\{/,
+ 'Browser Client JSON must not synthesize endpoints from Nodes');
 // Regression: the Hosts form previously rejected Hysteria2 (and every non-VLESS
 // protocol) before sending any request, even though backend subscriptions worked.
 const hostStart=app.indexOf("hosts:{t:'Хосты'");
@@ -78,7 +85,7 @@ assert(!app.includes('Для подписок сейчас поддержива�
  'Remove the obsolete VLESS-only editor warning');
 assert.match(app,/inbs\(profile\)\.find\(i=>SUBSCRIPTION_PROTOCOLS\.has\(i\.protocol\)\)/,
  'Creating a host from a node must not require a VLESS inbound');
-assert.equal((server.match(/if let Some\(mut outbound\) = proxy_outbound\(user, inbound, &?host, device\)/g)||[]).length,2,
- 'Both explicit hosts and direct node fallback must use the multi-protocol exporter');
+assert.equal((server.match(/if let Some\(mut outbound\) = proxy_outbound\(user, inbound, &?host, device\)/g)||[]).length,1,
+ 'Exactly one explicit-Host export path must exist for all supported protocols');
 
 console.log('XRAY STUDIO endpoints integration, backwards-compatible storage and routing: PASS');
