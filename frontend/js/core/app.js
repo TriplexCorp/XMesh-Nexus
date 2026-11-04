@@ -3175,17 +3175,29 @@ function nodeProfileStatus(runtime){
         missing_profile_json:'В профиле отсутствует JSON',
         invalid_profile_json:'Ошибка формата JSON профиля',
         missing_inbounds:'Нет inbound в профиле',
-        unsupported_inbound_count:'Нужен один управляемый inbound',
+        unsupported_inbound_count:'Нужен один inbound или пара TCP + Hysteria2',
         invalid_inbound:'Ошибка inbound в профиле',
         missing_inbound_tag:'Отсутствует тег inbound',
         invalid_inbound_settings:'Нет настроек inbound',
         conflicting_stats_api:'Конфликт StatsService API',
+        conflicting_tls_modes:'Выбраны два несовместимых режима TLS',
+        tls_mode_required:'Для TLS выберите ACME или внешний сертификат',
+        managed_tls_identity_invalid:'Управляемый TLS: проверьте домен и email ACME',
+        managed_tls_inbound_missing:'Управляемый TLS включён, но в профиле нет TLS inbound',
+        managed_tls_validation:'Некорректные настройки управляемого TLS',
+        invalid_tls_settings:'Некорректный tlsSettings в профиле',
+        masque_validation:'Проверьте транспорт MASQUE и ALPN',
         node_disabled:'Нода отключена',
         geodata_validation:'Проверьте GeoData',
         routing_validation:'Проверьте маршрутизацию',
         serialization:'Не удалось сформировать JSON',
         compile_failed:'Ошибка подготовки профиля'
-      }[runtime.profileCompileError]||'Не удалось подготовить профиль панели');
+      }[runtime.profileCompileError]||(
+        'Ошибка подготовки профиля'+(
+          /^[a-z_]{1,64}$/.test(String(runtime.profileCompileError||''))
+            ?' ('+runtime.profileCompileError+')':''
+        )
+      ));
     if(runtime.desiredRevisionSource==='missing')
       return 'Проверен на ноде · панель ещё не получила ревизию';
     return 'Проверен на ноде · нет совпадающей ревизии панели';
