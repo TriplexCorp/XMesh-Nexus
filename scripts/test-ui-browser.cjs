@@ -212,6 +212,24 @@ async function main() {
         await dialog.locator('.xm-device-capacity').waitFor();
         assert.equal(await dialog.locator('.xm-sharing-device').count(),count);
         assert.equal(await dialog.locator('[data-device-tab=devices]').getAttribute('aria-selected'),'true');
+        const originalRadius=await page.evaluate(()=>document.documentElement.style.getPropertyValue('--ui-control-radius'));
+        try{
+          for(const radius of ['6px','999px']){
+            await page.evaluate(value=>document.documentElement.style.setProperty('--ui-control-radius',value),radius);
+            const shape=await dialog.locator('.xm-device-tabs button').evaluateAll(buttons=>buttons.map(b=>{const s=getComputedStyle(b),r=b.getBoundingClientRect();return{radii:[s.borderTopLeftRadius,s.borderTopRightRadius,s.borderBottomLeftRadius,s.borderBottomRightRadius],borders:[s.borderTopWidth,s.borderRightWidth,s.borderLeftWidth],bottom:r.bottom,line:s.borderBottomWidth}}));
+            assert(shape.every(b=>b.radii.every(r=>r==='0px')),'Navigation underline must stay straight at every global corner setting');
+            assert(shape.every(b=>b.borders.every(w=>w==='0px')&&b.line==='2px'),'Tabs must have only a bottom indicator, not a capsule edge');
+            assert(Math.abs(shape[0].bottom-shape[1].bottom)<=1,'Tab indicators must share a baseline');
+            assert.notEqual(await dialog.locator('.xm-sharing-close').evaluate(b=>getComputedStyle(b).borderRadius),'0px','Ordinary controls must keep global rounding');
+          }
+          if(width===1920&&count===2){
+            const filename='devices-tabs-max-radius.png';
+            await dialog.locator('.xm-device-toolbar').screenshot({path:path.join(output,filename),animations:'disabled'});report.screenshots.push(filename);
+          }
+        }finally{
+          await page.evaluate(value=>{if(value)document.documentElement.style.setProperty('--ui-control-radius',value);else document.documentElement.style.removeProperty('--ui-control-radius')},originalRadius);
+        }
+
         assert(!(await page.locator('.xm-sharing-overview').isVisible()),'Healthy users must not get an anti-sharing warning banner');
         if(count){
           assert(!(await dialog.locator('.xm-device-picker').innerText()).includes('26200'),'Build identifiers must not dominate device choices');

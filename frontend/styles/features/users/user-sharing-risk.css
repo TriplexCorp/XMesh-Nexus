@@ -29,7 +29,7 @@ dialog#xm-sharing-dialog.xm-sharing-dialog{width:min(64rem,calc(100vw - 2rem));h
 .xm-sharing-close{display:grid;place-items:center;flex:none;width:2.4rem;height:2.4rem;padding:.65rem;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:transparent;color:var(--mu);cursor:pointer}
 .xm-device-toolbar{flex:none;display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:0 1.4rem;border-bottom:1px solid var(--nx-border)}
 .xm-device-tabs{display:flex;gap:1.3rem;min-width:0}
-.xm-device-tabs button{display:flex;align-items:center;gap:.45rem;padding:.8rem 0;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--mu);font:inherit;font-size:.87rem;cursor:pointer}
+.xm-device-tabs button{display:flex;align-items:center;gap:.45rem;padding:.8rem 0;border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;color:var(--mu);font:inherit;font-size:.87rem;cursor:pointer}
 .xm-device-tabs button[aria-selected=true]{color:var(--tx);border-bottom-color:var(--a);font-weight:650}
 .xm-device-tabs button span{color:var(--mu);font-size:.75rem;font-weight:500}
 .xm-device-limit{display:flex;align-items:center;gap:.45rem;flex:none;padding:.4rem 0;border:0;background:transparent;color:var(--mu);font:inherit;font-size:.8rem;cursor:pointer}
