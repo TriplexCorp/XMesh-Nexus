@@ -292,8 +292,8 @@ const ENT={
         return chip(r.disabled?'Выключен':'Настроен',r.disabled?'--mu':'--ok');
       }],['Вкл.',swc('hosts')]]},
   nodes:{t:'Узлы',nw:'Узел',s:'id',fs:[{k:'name',l:'Название',req:1},{k:'hosting',l:'Хостинг (необязательно)',h:'Например: Cloudrix, Hetzner, OVH. Отображается в карточке узла.'},{k:'flag',l:'Страна и флаг',t:'country'},{k:'addr',l:'Адрес ноды',req:1,ph:'1.2.3.4, 2001:db8::1 или nl1.example.com',h:'IPv4, IPv6 без скобок или домен. Порт указывается отдельно.'},{k:'port',l:'Порт ноды',t:'num',req:1},{k:'profileId',l:'XRAY STUDIO (можно позже)',t:'sel',h:'Не требуется для подключения ноды. После назначения профиля конфигурация Xray применится автоматически.',o:()=>DB.profiles.map(p=>[p.id,p.name])},{k:'xrayLocalPort',l:'Локальный порт Xray',t:'num',h:'Порт Xray на 127.0.0.1; не публичный порт ноды.'},
-    {k:'tlsAutoProvision',l:'Управляемый TLS (Let’s Encrypt)',t:'bool',h:'Только при явном включении. Требует домен ноды, email ACME и доступный TCP/80. Панель подпишет параметры; сертификат выпускается на ноде.'},
-    {k:'tlsManualProvision',l:'Внешний TLS-сертификат уже установлен',t:'bool',h:'Выберите только если сертификаты из XRAY STUDIO уже доступны на этой ноде. Несовместимо с управляемым TLS.'},
+    {k:'tlsAutoProvision',l:'Принудительно Let’s Encrypt',t:'bool',h:'Необязательно: TLS определяется по security профиля. Ручной режим нужен только чтобы принудительно включить ACME.'},
+    {k:'tlsManualProvision',l:'Принудительно внешний сертификат',t:'bool',h:'Необязательно: готовые пути сертификата определяются автоматически из профиля. Используйте только для явного запрета ACME.'},
     {k:'tlsDomain',l:'TLS-домен ноды',ph:'node.example.com',h:'DNS-имя, которым вы управляете. Используется только при управляемом TLS. Никаких глобальных доменов.'},
     {k:'tlsAcmeEmail',l:'Контакт ACME (email)',ph:'admin@example.com',h:'Email для регистрации Let’s Encrypt и уведомлений о сертификате.'},{k:'mult',l:'Коэффициент трафика',t:'num',h:'1 — без изменений, 2 — считать вдвое'},{k:'limit',l:'Лимит трафика, ГБ',t:'num',h:'0 — без лимита'},{k:'resetDay',l:'День сброса счётчика',t:'num'},
     {k:'billingPrice',l:'Стоимость аренды',t:'num'},
@@ -327,12 +327,10 @@ const ENT={
       // optional until an operator assigns a profile to the enrolled node.
       const nodeProfile=DB.profiles.find(p=>String(p.id)===String(data.profileId));
       const requiresTLS=nodeProfile&&inbs(nodeProfile).some(ib=>ib.streamSettings?.security==='tls');
-      if(requiresTLS&&!data.tlsAutoProvision&&!data.tlsManualProvision)
-        return 'TLS-профиль: включите управляемый TLS либо подтвердите предварительную установку сертификатов на ноде.';
       if(data.tlsAutoProvision&&data.tlsManualProvision)
         return 'Выберите только один способ управления сертификатом.';
-      if(data.tlsAutoProvision){
-        const domain=String(data.tlsDomain||'').trim().toLowerCase(),email=String(data.tlsAcmeEmail||'').trim();
+      if(requiresTLS&&data.tlsAutoProvision){
+        const domain=String(data.tlsDomain||data.addr||'').trim().toLowerCase(),email=String(data.tlsAcmeEmail||'').trim();
         if(!/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(domain))return 'Управляемый TLS: укажите корректный DNS-домен ноды.';
         if(!/^[^\s@]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(email))return 'Управляемый TLS: укажите контактный email ACME.';
       }
@@ -3042,7 +3040,7 @@ function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id
     ?'<div class="node-address-port">'+field(f,o[f.k])+field(nodeCoreFields.find(x=>x.k==='port'),o.port)+'</div>'
     :f.k==='port'?'':field(f,o[f.k])).join('');
   const tlsField=k=>{const f=nodeCoreFields.find(x=>x.k===k);return f?field(f,o[f.k]):''};
-  const nodeTlsFields='<fieldset class="node-tls-settings"><legend>Сертификат ноды</legend><p class="node-tls-help">Необязательно. Для Reality сертификат Let’s Encrypt обычно не требуется.</p><div class="node-tls-modes">'+tlsField('tlsAutoProvision')+tlsField('tlsManualProvision')+'</div><div class="node-tls-details">'+tlsField('tlsDomain')+tlsField('tlsAcmeEmail')+'</div></fieldset>';
+  const nodeTlsFields='<fieldset class="node-tls-settings"><legend>Сертификат ноды</legend><p class="node-tls-help">Режим определяется автоматически по security профиля: TLS — сертификат, REALITY/none — без него. Переключатели ниже необязательны.</p><div class="node-tls-modes">'+tlsField('tlsAutoProvision')+tlsField('tlsManualProvision')+'</div><div class="node-tls-details">'+tlsField('tlsDomain')+tlsField('tlsAcmeEmail')+'</div></fieldset>';
   const nodeResetAction=id?'<div class="node-reset-action"><div class="node-reset-copy"><strong>Счётчик трафика</strong><span>Обнулить расход ноды. Xray не перезапускается.</span></div><button type="button" class="gh sm node-traffic-reset-button" data-node-reset-traffic="'+esc(String(id))+'" title="">'+ic('redo')+'Обнулить</button><output class="node-traffic-reset-status" data-node-reset-feedback aria-live="polite"></output></div>':'';
   const userOptions=DB.users.filter(u=>st(u)==='ACTIVE').map(u=>`<option value="${u.id}">${esc(u.username)}</option>`).join('');
   const rotationProbe=id&&o.rotationEnabled
@@ -3181,7 +3179,9 @@ function nodeProfileStatus(runtime){
         invalid_inbound_settings:'Нет настроек inbound',
         conflicting_stats_api:'Конфликт StatsService API',
         conflicting_tls_modes:'Выбраны два несовместимых режима TLS',
-        tls_mode_required:'Для TLS выберите ACME или внешний сертификат',
+        tls_mode_required:'TLS: требуется сертификат для подключённого профиля',
+        automatic_tls_prerequisites:'Авто-TLS: укажите DNS-домен ноды и контакт ACME',
+        external_tls_certificates_missing:'Внешний TLS: в профиле нет пары файлов сертификата и ключа',
         managed_tls_identity_invalid:'Управляемый TLS: проверьте домен и email ACME',
         managed_tls_inbound_missing:'Управляемый TLS включён, но в профиле нет TLS inbound',
         managed_tls_validation:'Некорректные настройки управляемого TLS',
