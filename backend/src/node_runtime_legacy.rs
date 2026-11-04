@@ -2149,6 +2149,20 @@ mod provision_tests {
             .unwrap();
         assert_eq!(provision["domain"], "nl.example.org");
         assert_eq!(provision["email"], "ops@example.org");
+        let mut no_tls_settings = json!({"inbounds":[{
+            "tag":"tls","protocol":"vless","streamSettings":{"security":"tls"}
+        }]});
+        assert!(
+            configure_node_tls_with_contact(
+                &node,
+                &mut no_tls_settings,
+                Some("ops@example.org")
+            )
+            .unwrap()
+            .is_some()
+        );
+        assert!(no_tls_settings["inbounds"][0]["streamSettings"]["tlsSettings"]
+            ["certificates"].is_array());
         assert_eq!(
             tls["inbounds"][0]["streamSettings"]["tlsSettings"]["certificates"][0]["certificateFile"],
             "/etc/letsencrypt/live/nl.example.org/fullchain.pem"
