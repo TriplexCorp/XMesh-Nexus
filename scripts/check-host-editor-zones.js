@@ -26,27 +26,33 @@ const helperStart=app.indexOf('function hostNodeCountryCode(node){');
 const helperEnd=app.indexOf('function hostProfile(',helperStart);
 assert(helperStart>=0&&helperEnd>helperStart,'Missing canonical node country preset helpers');
 const countries=[{code:'NL',flag:'🇳🇱'},{code:'PL',flag:'🇵🇱'},{code:'DE',flag:'🇩🇪'}];
-const helpers=new Function('COUNTRY_CODES','COUNTRIES',app.slice(helperStart,helperEnd)+'return {hostNodeCountryCode,hostAutofillNodeFields};')(
-  countries.map(c=>c.code),countries
+const flag=code=>String.fromCodePoint(...code.split('').map(c=>127397+c.charCodeAt(0)));
+const helpers=new Function('COUNTRY_CODES','COUNTRIES','countryFlag',
+  app.slice(helperStart,helperEnd)+'return {hostNodeCountryCode,hostNodeCountryRemark,hostAutofillNodeFields};')(
+  countries.map(c=>c.code),countries,flag
 );
 assert.equal(helpers.hostNodeCountryCode({flag:'🇳🇱'}),'NL','Flag emoji must resolve to ISO country');
 assert.equal(helpers.hostNodeCountryCode({flag:'pl'}),'PL','Legacy ISO flag must be accepted');
 assert.equal(helpers.hostNodeCountryCode({countryCode:'DE',flag:'🇳🇱'}),'DE','Explicit node ISO must be authoritative');
 assert.equal(helpers.hostNodeCountryCode({flag:'❓'}),'','Unknown flags must not generate fake ISO codes');
+assert.equal(helpers.hostNodeCountryRemark({flag:'🇵🇱',name:'Польша'}),'🇵🇱','Happ Remark must be a flag, not ISO letters');
+assert.equal(helpers.hostNodeCountryRemark({flag:'NL',name:'Нидерланды'}),'🇳🇱','ISO node flags must produce a client-visible emoji');
+assert.equal(helpers.hostNodeCountryRemark({countryCode:'DE',flag:'🇵🇱'}),'🇩🇪','Explicit ISO override determines the emoji too');
+assert.equal(helpers.hostNodeCountryRemark({name:'Custom node',flag:'❓'}),'Custom node','Unknown country must not generate a fake flag');
 const fields={remark:{value:''},countryCode:{value:''}};
 const form={elements:{namedItem:key=>fields[key]}};
 helpers.hostAutofillNodeFields(form,{flag:'🇳🇱',name:'Нидерланды'});
-assert.equal(fields.remark.value,'NL');
+assert.equal(fields.remark.value,'🇳🇱','Implicit autofill must show a flag in Happ, not NL');
 assert.equal(fields.countryCode.value,'NL');
 fields.remark.value='Manual custom name';
 helpers.hostAutofillNodeFields(form,{flag:'🇵🇱',name:'Польша'});
 assert.equal(fields.remark.value,'Manual custom name','Implicit autofill must preserve a manual remark');
 helpers.hostAutofillNodeFields(form,{flag:'🇵🇱',name:'Польша'},true);
-assert.equal(fields.remark.value,'PL','Explicit node preset must replace stale remark');
+assert.equal(fields.remark.value,'🇵🇱','Explicit node preset must replace the stale label with a flag');
 assert.equal(fields.countryCode.value,'PL','Explicit node preset must update country');
 assert.match(app,/hostAutofillNodeFields\(form,node,true\)/,'Node preset must fill country and remark');
-assert.match(app,/remark:countryCode\|\|node\.name\|\|'Новый хост',countryCode/,'Create Host from a node must use its country');
-const html=editor({profileId:1,tag:'vless-main-2',remark:'NL',
+assert.match(app,/remark:hostNodeCountryRemark\(node\)\|\|'Новый хост',countryCode/,'Create Host from a node must use emoji for client and ISO for routing');
+const html=editor({profileId:1,tag:'vless-main-2',remark:'🇳🇱',
  address:'example.net',port:443,nodes:[5]}, {fs:fspec});
 const sections=[...html.matchAll(/<section class="([^"]+)"/g)].map(x=>x[1]);
 assert.deepEqual(sections,[
