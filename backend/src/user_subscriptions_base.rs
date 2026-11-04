@@ -704,6 +704,22 @@ fn host_for_profile(host: &Value, tag: &str, profile: &Value, nodes: &[Value]) -
     }
     true
 }
+// Only the admin-owned Hosts collection publishes client-facing endpoints.
+// A node is infrastructure, not a subscription server. This must stay true
+// when the entire Hosts collection is empty, all Hosts are disabled, or no
+// Host matches the requested profile/inbound/node binding.
+fn published_hosts_for_profile<'a>(
+    hosts: &'a [Value],
+    tag: &str,
+    profile: &Value,
+    nodes: &[Value],
+) -> Vec<&'a Value> {
+    hosts
+        .iter()
+        .filter(|host| host_for_profile(host, tag, profile, nodes))
+        .collect()
+}
+
 // Never rewrite a CDN/host alias to an arbitrary node IP. Rotation applies
 // only to an unambiguous directly addressed node that owns the host address.
 // A public host may inherit per-node client routing only when its placement
@@ -888,54 +904,25 @@ async fn collect_user_outbounds(
                 continue;
             }
             log_subscription_candidate(profile, inbound, &nodes, tag);
-            // Do not silently fall back to a node's raw address when an explicitly
-            // configured public host is disabled or pinned to a different node.
-            let any_explicit_host = hosts.iter().any(|h| {
-                nonempty(h, "tag") == Some(tag)
-                    && (h.get("profileId").is_none_or(Value::is_null)
-                        || same_record_id(h.get("profileId"), profile.get("id")))
-            });
-            let matched: Vec<&Value> = hosts
-                .iter()
-                .filter(|h| host_for_profile(h, tag, profile, &nodes))
-                .collect();
-            if !matched.is_empty() {
-                for host in matched {
-                    if let Some(mut outbound) = proxy_outbound(user, inbound, host, device) {
-                        // Persist a stable selector identity independent of display name/order.
-                        if let Some(id) = host.get("id").and_then(Value::as_i64) {
-                            outbound["xmeshSourceKey"] = json!(format!("host:{id}"));
-                        }
-                        if let Some(node) = host_owner_node(host, profile, &nodes)
-                            && let Some(id) = node.get("id").and_then(Value::as_i64)
-                        {
-                            outbound["xmeshOwnerNodeKey"] = json!(format!("node:{id}"));
-                        }
-                        if let Some(node) = direct_host_node(host, profile, &nodes) {
-                            apply_ip_rotation(state, user, node, &mut outbound, rotate).await?;
-                        }
-                        outbounds.push(outbound);
-                    } else {
-                        log_unavailable_subscription_host(user, inbound, host, tag);
+            let matched = published_hosts_for_profile(&hosts, tag, profile, &nodes);
+            for host in matched {
+                if let Some(mut outbound) = proxy_outbound(user, inbound, host, device) {
+                    // Stable explicit-host identity is independent of display name.
+                    if let Some(id) = host.get("id").and_then(Value::as_i64) {
+                        outbound["xmeshSourceKey"] = json!(format!("host:{id}"));
                     }
-                }
-            } else if !any_explicit_host {
-                for node in nodes.iter().filter(|n| {
-                    same_record_id(n.get("profileId"), profile.get("id"))
-                        && n.get("disabled") != Some(&Value::Bool(true))
-                }) {
-                    let host = json!({"address":node.get("publicAddress").or_else(||node.get("externalAddress")).or_else(||node.get("addr")),"port":node.get("port").or_else(||inbound.get("port")),"remark":node.get("name"),"country":node.get("country")});
-                    if let Some(mut outbound) = proxy_outbound(user, inbound, &host, device) {
-                        if let Some(id) = node.get("id").and_then(Value::as_i64) {
-                            outbound["xmeshSourceKey"] = json!(format!("node:{id}:{tag}"));
-                        }
+                    if let Some(node) = host_owner_node(host, profile, &nodes)
+                        && let Some(id) = node.get("id").and_then(Value::as_i64)
+                    {
+                        outbound["xmeshOwnerNodeKey"] = json!(format!("node:{id}"));
+                    }
+                    if let Some(node) = direct_host_node(host, profile, &nodes) {
                         apply_ip_rotation(state, user, node, &mut outbound, rotate).await?;
-                        outbounds.push(outbound);
                     }
+                    outbounds.push(outbound);
+                } else {
+                    log_unavailable_subscription_host(user, inbound, host, tag);
                 }
-            } else if any_explicit_host {
-                tracing::warn!(inbound_tag=%tag, profile_id=?(profile.get("id").and_then(serde_json::Value::as_i64)),
-      "Subscription explicit host exists but none matches enabled profile/node binding");
             }
         }
     }
@@ -944,13 +931,16 @@ async fn collect_user_outbounds(
             "У пользователя нет доступных inbound: назначьте сквад с нужными inbound."
         } else if profiles.is_empty() {
             "Нет XRAY-профилей. Создайте и сохраните профиль с inbound."
-        } else if hosts.is_empty() && nodes.is_empty() {
-            "Нет публичных хостов или узлов. Добавьте адрес подключения в XRAY STUDIO."
+        } else if hosts.is_empty() {
+            "Нет опубликованных хостов. Создайте хост для клиентского подключения."
         } else {
             "Не найдены рабочие подключения: проверьте сквады, теги inbound, UUID пользователя, адреса и порты публичных хостов, Reality и привязку профилей."
         };
         tracing::warn!(reason, squad_count=ids.len(), inbound_count=tags.len(), profile_count=profiles.len(), host_count=hosts.len(), node_count=nodes.len(), user_id=?(user.get("id").and_then(serde_json::Value::as_i64)), "Subscription has no valid endpoints");
-        return Err(ApiError::new(StatusCode::SERVICE_UNAVAILABLE, reason));
+        // An active subscription with no publishable Hosts is a valid empty
+        // state. A 503 prevents VPN clients from replacing cached old servers.
+        // Return [] with HTTP 200; access-token and user-status checks are
+        // performed before this point and remain fail-closed.
     }
     Ok(outbounds)
 }
@@ -1902,6 +1892,45 @@ mod tests {
         let host = json!({"tag":"vless-main-2","profileId":"22","nodes":["21"],"address":"13.143.175.131"});
         assert!(host_for_profile(&host, "vless-main-2", &profile, &nodes));
         assert_eq!(direct_host_node(&host, &profile, &nodes).unwrap()["id"], 21);
+    }
+    #[test]
+    fn subscription_never_publishes_nodes_without_explicit_hosts() {
+        let profile = json!({"id":7});
+        let nodes = vec![
+            json!({"id":10,"profileId":7,"addr":"198.51.100.10","disabled":false}),
+            json!({"id":11,"profileId":7,"addr":"198.51.100.11","disabled":false}),
+        ];
+        assert!(
+            published_hosts_for_profile(&[], "main", &profile, &nodes).is_empty(),
+            "Even two fully active nodes cannot become public endpoints without Hosts"
+        );
+
+        let valid = json!({"id":21,"tag":"main","profileId":7,
+            "address":"vpn.example.org","nodes":[10],"disabled":false});
+        let disabled = json!({"id":22,"tag":"main","profileId":7,
+            "address":"disabled.example.org","nodes":[10],"disabled":true});
+        let wrong_profile = json!({"id":23,"tag":"main","profileId":8,
+            "address":"wrong.example.org","nodes":[10]});
+        let wrong_node = json!({"id":24,"tag":"main","profileId":7,
+            "address":"other.example.org","nodes":[99]});
+        let wrong_tag = json!({"id":25,"tag":"other","profileId":7,
+            "address":"other-tag.example.org","nodes":[10]});
+        for unavailable in [&disabled, &wrong_profile, &wrong_node, &wrong_tag] {
+            assert!(
+                published_hosts_for_profile(
+                    std::slice::from_ref(unavailable),
+                    "main",
+                    &profile,
+                    &nodes
+                )
+                .is_empty(),
+                "A disabled or mismatched Host must not trigger node fallback"
+            );
+        }
+        let hosts = vec![disabled, wrong_profile, wrong_node, wrong_tag, valid];
+        let selected = published_hosts_for_profile(&hosts, "main", &profile, &nodes);
+        assert_eq!(selected.len(), 1);
+        assert_eq!(selected[0]["id"], 21);
     }
     #[test]
     fn hosts_respect_profile_and_node_assignment() {

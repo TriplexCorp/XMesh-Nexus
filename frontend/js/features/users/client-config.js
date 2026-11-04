@@ -147,12 +147,10 @@
     const associatedNodes=(Array.isArray(db.nodes)?db.nodes:[]).filter(n=>!n.disabled&&String(n.profileId)===String(profile.id));
     const hosts=allHosts.filter(h=>!h.disabled && (!Array.isArray(h.nodes)||!h.nodes.length
       ||h.nodes.some(id=>associatedNodes.some(n=>String(n.id)===String(id)))));
-    // When a host is explicitly disabled or pinned elsewhere, never silently
-    // re-publish the node's unprotected raw address as an alternative.
-    const candidates=hosts.length?hosts:(allHosts.length?[]:associatedNodes.map(n=>({
-      id:'node:'+n.id,remark:n.name,address:n.publicAddress||n.externalAddress||n.addr,
-      port:inbound.port,sni:inbound.streamSettings?.realitySettings?.serverNames?.[0]||''
-    })));
+    // Public endpoints originate exclusively from the operator-created Hosts
+    // collection. Nodes must never be synthesized as fallback subscription
+    // entries when Hosts are absent, disabled or do not match this profile.
+    const candidates=hosts;
     for(const host of candidates){
      const item={name:(host.remark||host.address||inbound.tag),tag:inbound.tag,hostId:host.id};
      try{
