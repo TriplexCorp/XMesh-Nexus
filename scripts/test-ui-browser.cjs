@@ -191,13 +191,21 @@ async function main() {
       await page.route(pattern,async route=>{
         const response=await route.fetch(),data=await response.json();
         const u=data.collections.users.find(u=>u.id===user.id);
-        u.hwid=limit;u.devices=Array.from({length:count},(_,i)=>({id:1000+i,model:i?'Phone '+i:'DESKTOP-LONG-NAME-123456789',plat:i?'Android':'Windows',os:i?'Android 15':'Windows 11',app:'Happ',first:Date.now()-86400000*(10+i),last:Date.now()-600000*(i+1),fingerprint:'test-hwid-<unsafe>-'+i,refreshes:12}));
+        u.hwid=limit;u.devices=Array.from({length:count},(_,i)=>({id:1000+i,model:i?(count===2?'DESKTOP-FMFMPGO_x86_64':'Phone '+i):'DESKTOP-D17RJR9_x86_64',plat:i&&count!==2?'Android':'Windows',os:i&&count!==2?'Android':'Windows',osVersion:i&&count!==2?'15':'11_10.0.26200',app:'Happ',first:Date.now()-86400000*(10+i),last:Date.now()-600000*(i+1),fingerprint:'test-hwid-<unsafe>-'+i,refreshes:12}));
         snapshot=structuredClone(u);await route.fulfill({response,json:data});
       });
       try{
         await navigate('users');
         await page.reload({waitUntil:'domcontentloaded'});
         await page.locator(`#ut [data-sharing-detail="${user.id}"][data-sharing-focus="devices"]`).waitFor();
+        if(width>=1920){
+          const pager=await page.locator('#ut .pg').evaluate(p=>{const s=p.querySelector('.xm-select-shell');return{height:p.getBoundingClientRect().height,selectWidth:s?.getBoundingClientRect().width}});
+          assert(pager.selectWidth<=120&&pager.height<=80,'Users pagination must stay on one compact row');
+        }
+        const healthy=page.locator('#ut .xm-risk-pill.is-normal').first();
+        await healthy.waitFor();
+        assert.equal(await healthy.locator('span').count(),0,'Healthy rows must not repeat a status sentence');
+        assert(await healthy.getAttribute('aria-label'),'Quiet assessment control needs an accessible name');
         await screenshot(page,`devices-table-${width}-${count}-${limit}`);
         await page.locator(`#ut [data-sharing-detail="${user.id}"][data-sharing-focus="devices"]`).click();
         const dialog=page.locator('#xm-sharing-dialog');
@@ -206,8 +214,13 @@ async function main() {
         assert.equal(await dialog.locator('[data-device-tab=devices]').getAttribute('aria-selected'),'true');
         assert(!(await page.locator('.xm-sharing-overview').isVisible()),'Healthy users must not get an anti-sharing warning banner');
         if(count){
+          assert(!(await dialog.locator('.xm-device-picker').innerText()).includes('26200'),'Build identifiers must not dominate device choices');
+          assert(!(await dialog.locator('.xm-device-picker').innerText()).includes('x86_64'),'Architecture suffix belongs in diagnostics');
+          assert((await dialog.locator('.xm-device-inspector h3').innerText()).includes('D17RJR9'),'Inspector must name the selected machine');
+          assert((await dialog.locator('.xm-device-identity p').innerText()).includes('Windows 11'),'Windows display version must be retained without the build');
           await dialog.locator('.xm-sharing-device-details summary').first().click();
           assert((await dialog.locator('.xm-sharing-device-details dd').first().innerText()).includes('<unsafe>'),'HWID must remain literal escaped text');
+          assert((await dialog.locator('.xm-sharing-device-details').innerText()).includes('11_10.0.26200'),'Raw version remains available in diagnostics');
           await dialog.locator('.xm-sharing-device-details summary').first().click();
         }else assert(await dialog.locator('.xm-sharing-empty').isVisible());
         const bounds=await dialog.evaluate(d=>{const r=d.getBoundingClientRect();return{left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,scroll:d.querySelector('.xm-sharing-body').scrollWidth,client:d.querySelector('.xm-sharing-body').clientWidth}});
@@ -226,7 +239,7 @@ async function main() {
         assert.equal(await dialog.locator('[data-device-tab=devices]').getAttribute('aria-selected'),'true','Arrow keys must switch device tabs');
         if(count>1){
           await dialog.locator('[data-device-select="1001"]').click();
-          assert((await dialog.locator('.xm-device-inspector').innerText()).includes('Phone 1'),'Selecting a device must update its inspector');
+          assert((await dialog.locator('.xm-device-inspector').innerText()).includes(count===2?'FMFMPGO':'Phone 1'),'Selecting a device must update its inspector');
         }
         await dialog.locator('[data-device-limit-open]').click();
         await dialog.locator('[name=limit]').fill('3');
