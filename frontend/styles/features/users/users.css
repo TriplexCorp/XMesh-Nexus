@@ -11,6 +11,8 @@ dialog:not(.side):not(.pop):not(.pal):not(.user-modal) {
 .users-panel {
   min-width:0;
 }
+/* Keep the enhanced page-size select inside the pagination row. */
+.users-panel #ut .pg>.xm-select-shell{width:5rem;flex:0 0 5rem}
 .users-statusbar {
   min-width:0;
   margin-bottom:1rem;
