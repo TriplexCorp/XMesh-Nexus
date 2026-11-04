@@ -178,6 +178,46 @@ async function main() {
       });
     }
 
+    for(const [width,height,count,limit] of [[1920,1080,1,2],[2560,1440,5,5],[390,844,5,0],[1920,1080,0,2]])await checked(`Device workspace: ${width} ${count}/${limit||'unlimited'}`,async()=>{
+      await page.setViewportSize({width,height});
+      const pattern='**/api/v1/bootstrap';
+      await page.route(pattern,async route=>{
+        const response=await route.fetch(),data=await response.json();
+        const u=data.collections.users.find(u=>u.id===user.id);
+        u.hwid=limit;u.devices=Array.from({length:count},(_,i)=>({model:i?'Phone '+i:'DESKTOP-LONG-NAME-123456789',plat:i?'Android':'Windows',os:i?'Android 15':'Windows 11',app:'Happ',first:Date.now()-86400000*(i+1),last:Date.now()-600000*(i+1),fingerprint:'test-hwid-<unsafe>-'+i,refreshes:12}));
+        await route.fulfill({response,json:data});
+      });
+      try{
+        await navigate('users');
+        await page.reload({waitUntil:'domcontentloaded'});
+        await page.locator(`[data-sharing-detail="${user.id}"][data-sharing-focus="devices"]`).click();
+        const dialog=page.locator('#xm-sharing-dialog');
+        await dialog.locator('.xm-sharing-capacity').waitFor();
+        assert.equal(await dialog.locator('.xm-sharing-device').count(),count);
+        assert.equal(await dialog.locator('.xm-sharing-analysis').getAttribute('open'),null,'Devices entry must prioritise the device list');
+        if(count){
+          await dialog.locator('.xm-sharing-device-details summary').first().click();
+          assert((await dialog.locator('.xm-sharing-device-details dd').first().innerText()).includes('<unsafe>'),'HWID must remain literal escaped text');
+          await dialog.locator('.xm-sharing-device-details summary').first().click();
+        }else assert(await dialog.locator('.xm-sharing-empty').isVisible());
+        const bounds=await dialog.evaluate(d=>{const r=d.getBoundingClientRect();return{left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,scroll:d.querySelector('.xm-sharing-body').scrollWidth,client:d.querySelector('.xm-sharing-body').clientWidth}});
+        assert(bounds.left>=0&&bounds.right<=width+1&&bounds.top>=0&&bounds.bottom<=height+1,'Device dialog must fit the viewport');
+        assert(bounds.scroll<=bounds.client+1,'Device content must not overflow horizontally');
+        if(width>=1920)assert(bounds.width>=900,'Device workspace must not inherit the narrow generic action dialog');
+        await screenshot(page,`devices-${width}-${count}-${limit}`);
+        await dialog.locator('.xm-sharing-analysis>summary').click();
+        assert(await dialog.locator('.xm-sharing-reasons').isVisible(),'Assessment explanation stays accessible');
+        await screenshot(page,`devices-analysis-${width}-${count}-${limit}`);
+        await page.keyboard.press('Escape');
+        await page.locator(`[data-sharing-detail="${user.id}"][data-sharing-focus="risk"]`).evaluate(el=>el.click());
+        await dialog.locator('.xm-sharing-analysis[open]').waitFor();
+        return bounds;
+      }finally{
+        if(await page.locator('#xm-sharing-dialog[open]').count())await page.keyboard.press('Escape');
+        await page.unroute(pattern);
+      }
+    });
+
     await checked('Node operation spinners actually rotate and respect motion preferences',async()=>{
       await page.setViewportSize({width:1920,height:1080});
       await page.emulateMedia({reducedMotion:'no-preference'});
