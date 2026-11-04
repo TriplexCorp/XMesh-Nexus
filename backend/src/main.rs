@@ -4097,27 +4097,19 @@ fn validate_record(collection: &str, data: &Value) -> Result<(), ApiError> {
     })?;
     if collection == "nodes" {
         validate_node_address(data)?;
-        if object.get("tlsAutoProvision").and_then(Value::as_bool) == Some(true)
-            && object.get("tlsManualProvision").and_then(Value::as_bool) == Some(true)
+        // Certificate mode follows the referenced XRAY STUDIO profile security
+        // at desired-profile compilation. Do not force two manual switches or
+        // node-local ACME identity fields during unrelated node saves: the
+        // installer-owned PANEL_ACME_EMAIL and node DNS name are reused there.
+        // Validate any explicitly supplied overrides without requiring them.
+        if let Some(domain) = object
+            .get("tlsDomain")
+            .and_then(Value::as_str)
+            .filter(|domain| !domain.trim().is_empty())
         {
-            return Err(ApiError::new(
-                StatusCode::BAD_REQUEST,
-                "Choose either managed TLS or externally provisioned certificates.",
-            ));
-        }
-        if object.get("tlsAutoProvision").and_then(Value::as_bool) == Some(true) {
-            let domain = object
-                .get("tlsDomain")
-                .and_then(Value::as_str)
-                .unwrap_or("")
-                .trim()
-                .to_ascii_lowercase();
-            let email = object
-                .get("tlsAcmeEmail")
-                .and_then(Value::as_str)
-                .unwrap_or("")
-                .trim();
-            let valid_domain = domain.len() <= 253
+            let domain = domain.trim().to_ascii_lowercase();
+            let valid = domain.len() <= 253
+                && domain.parse::<std::net::IpAddr>().is_err()
                 && domain.contains('.')
                 && domain.split('.').all(|part| {
                     !part.is_empty()
@@ -4128,7 +4120,20 @@ fn validate_record(collection: &str, data: &Value) -> Result<(), ApiError> {
                             .bytes()
                             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
                 });
-            let valid_email = email.len() <= 254
+            if !valid {
+                return Err(ApiError::new(
+                    StatusCode::BAD_REQUEST,
+                    "Managed TLS requires a valid node domain.",
+                ));
+            }
+        }
+        if let Some(email) = object
+            .get("tlsAcmeEmail")
+            .and_then(Value::as_str)
+            .filter(|email| !email.trim().is_empty())
+        {
+            let email = email.trim();
+            let valid = email.len() <= 254
                 && !email.contains(char::is_whitespace)
                 && email.split_once('@').is_some_and(|(user, host)| {
                     !user.is_empty()
@@ -4138,10 +4143,10 @@ fn validate_record(collection: &str, data: &Value) -> Result<(), ApiError> {
                             .bytes()
                             .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-'))
                 });
-            if !valid_domain || !valid_email {
+            if !valid {
                 return Err(ApiError::new(
                     StatusCode::BAD_REQUEST,
-                    "Managed TLS requires a valid node domain and ACME email.",
+                    "Managed TLS requires a valid ACME contact email.",
                 ));
             }
         }
