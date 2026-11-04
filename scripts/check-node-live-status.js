@@ -32,5 +32,11 @@ assert.doesNotMatch(app,/version\.innerHTML\s*=\s*runtime/,'Untrusted node versi
 assert.match(css,/\.node-runtime-online/);
 assert.match(css,/\.node-runtime-offline/);
 assert.match(runtime,/"xrayVersion":row\.try_get/);
+assert.match(runtime,/fn configure_node_tls_with_contact\(/,'Backend must derive certificate mode from authoritative profile security');
+assert.match(runtime,/if tls_inbounds\.is_empty\(\)/,'REALITY or none must not request TLS provisioning');
+assert.match(runtime,/std::env::var\("PANEL_ACME_EMAIL"\)/,'Installer ACME contact should be reused');
+assert.match(runtime,/Automatic TLS needs a valid node domain and ACME contact email/,'No invented ACME identity');
+assert.match(app,/automatic_tls_prerequisites:'Авто-TLS:/,'Show concrete TLS prerequisite error');
+assert.doesNotMatch(app,/TLS-профиль: включите управляемый TLS либо подтвердите/,'Node editor must not require manual TLS toggles');
 assert.match(runtime,/received_at > NOW\(\) - INTERVAL '65 seconds'/);
 console.log('Live Xray and node state contract: OK');

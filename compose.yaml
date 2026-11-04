@@ -54,6 +54,9 @@ services:
     environment:
       APP_ADDR: 0.0.0.0:8080
       STATIC_DIR: /app/static
+      # Installer-owned ACME contact; Node TLS can provision automatically from
+      # its XRAY STUDIO security=tls profile without manual mode toggles.
+      PANEL_ACME_EMAIL: ${PANEL_ACME_EMAIL:-}
       CORE_DATA_DIR: /var/lib/xmesh/core
       DATABASE_URL: postgresql://xmesh_app:${APP_DB_PASSWORD:?Run ./install.sh first}@db:5432/xmesh
       REDIS_URL: redis://:${REDIS_PASSWORD:?Run ./install.sh first}@redis:6379/0

@@ -63,7 +63,9 @@ fn profile_compile_error_code(error: &ApiError) -> &'static str {
         "invalid_profile_json"
     } else if message.starts_with("Profile has no inbounds") {
         "missing_inbounds"
-    } else if message.starts_with("Automatic local-port mapping") {
+    } else if message.starts_with("Automatic local-port mapping")
+        || message.starts_with("Managed profiles support")
+    {
         "unsupported_inbound_count"
     } else if message.starts_with("Invalid inbound") {
         "invalid_inbound"
@@ -75,10 +77,24 @@ fn profile_compile_error_code(error: &ApiError) -> &'static str {
         "conflicting_stats_api"
     } else if message.starts_with("Choose either managed ACME TLS") {
         "conflicting_tls_modes"
+    } else if message.starts_with("Managed TLS requires a valid node TLS domain") {
+        "managed_tls_identity_invalid"
+    } else if message.starts_with("Managed TLS requires an assigned TLS inbound") {
+        "managed_tls_inbound_missing"
     } else if message.starts_with("Managed TLS requires") {
         "managed_tls_validation"
+    } else if message.starts_with("Invalid TLS settings") {
+        "invalid_tls_settings"
+    } else if message.starts_with("Automatic TLS needs") {
+        "automatic_tls_prerequisites"
+    } else if message.starts_with("External TLS needs") {
+        "external_tls_certificates_missing"
     } else if message.starts_with("TLS node needs managed ACME") {
         "tls_mode_required"
+    } else if message.starts_with("Managed Xray local ports must not collide") {
+        "invalid_local_port"
+    } else if message.starts_with("Node-managed MASQUE") || message.starts_with("MASQUE requires") {
+        "masque_validation"
     } else if message.starts_with("Node disabled") {
         "node_disabled"
     } else if message.starts_with("GeoData") {
@@ -142,6 +158,57 @@ mod profile_application_tests {
             super::profile_compile_error_code(&unknown),
             "compile_failed"
         );
+    }
+    #[test]
+    fn compilation_failure_codes_are_actionable_without_exposing_profile_data() {
+        let cases = [
+            (
+                "Choose either managed ACME TLS or an external certificate, not both.",
+                "conflicting_tls_modes",
+            ),
+            (
+                "Managed TLS requires a valid node TLS domain and ACME email.",
+                "managed_tls_identity_invalid",
+            ),
+            (
+                "Managed TLS requires an assigned TLS inbound.",
+                "managed_tls_inbound_missing",
+            ),
+            (
+                "TLS node needs managed ACME settings or explicit externally provisioned certificates.",
+                "tls_mode_required",
+            ),
+            ("Invalid TLS settings.", "invalid_tls_settings"),
+            (
+                "Managed profiles support one inbound or a TCP proxy + Hysteria2 pair.",
+                "unsupported_inbound_count",
+            ),
+            (
+                "Managed Xray local ports must not collide with StatsService.",
+                "invalid_local_port",
+            ),
+            (
+                "Node-managed MASQUE requires ALPN h3 or h2 explicitly.",
+                "masque_validation",
+            ),
+            (
+                "MASQUE requires non-empty address ranges.",
+                "masque_validation",
+            ),
+        ];
+        for (message, expected) in cases {
+            let error = super::ApiError::new(axum::http::StatusCode::CONFLICT, message);
+            assert_eq!(
+                super::profile_compile_error_code(&error),
+                expected,
+                "{message}"
+            );
+        }
+        let secret = super::ApiError::new(
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "privateKey=sensitive-value",
+        );
+        assert_eq!(super::profile_compile_error_code(&secret), "compile_failed");
     }
     #[test]
     fn never_claims_application_without_current_matching_digest() {
@@ -1650,56 +1717,77 @@ fn ensure_masque_address(config: &mut Value) -> Result<(), ApiError> {
     Ok(())
 }
 
+fn configure_node_managed_tls(node: &Value, config: &mut Value) -> Result<Option<Value>, ApiError> {
+    let panel_email = std::env::var("PANEL_ACME_EMAIL").ok();
+    configure_node_tls_with_contact(node, config, panel_email.as_deref())
+}
+
+/// The XRAY STUDIO inbound security is authoritative. A node's legacy
+/// certificate-mode switches are overrides, never prerequisites for applying
+/// a TLS profile and never commands to enable TLS on a REALITY/none profile.
+/// The panel installer already collects `PANEL_ACME_EMAIL` once.
 #[expect(
     clippy::too_many_lines,
-    reason = "TLS mode validation and certificate injection are one atomic operation"
+    reason = "Certificate mode decision and signed TLS path injection are atomic"
 )]
-fn configure_node_managed_tls(node: &Value, config: &mut Value) -> Result<Option<Value>, ApiError> {
-    if node.get("tlsAutoProvision").and_then(Value::as_bool) == Some(true)
-        && node.get("tlsManualProvision").and_then(Value::as_bool) == Some(true)
-    {
+fn configure_node_tls_with_contact(
+    node: &Value,
+    config: &mut Value,
+    panel_email: Option<&str>,
+) -> Result<Option<Value>, ApiError> {
+    let inbounds = config
+        .get_mut("inbounds")
+        .and_then(Value::as_array_mut)
+        .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Profile has no inbounds."))?;
+    let tls_inbounds: Vec<usize> = inbounds
+        .iter()
+        .enumerate()
+        .filter(|(_, inbound)| {
+            inbound
+                .pointer("/streamSettings/security")
+                .and_then(Value::as_str)
+                == Some("tls")
+        })
+        .map(|(index, _)| index)
+        .collect();
+
+    // Keep inactive certificate paths in the Studio profile. They must never
+    // result in a node ACME operation for security=none/reality.
+    if tls_inbounds.is_empty() {
+        return Ok(None);
+    }
+
+    let managed_override = node.get("tlsAutoProvision").and_then(Value::as_bool) == Some(true);
+    let external_override = node.get("tlsManualProvision").and_then(Value::as_bool) == Some(true);
+    if managed_override && external_override {
         return Err(ApiError::new(
             StatusCode::CONFLICT,
             "Choose either managed ACME TLS or an external certificate, not both.",
         ));
     }
-    if node.get("tlsAutoProvision").and_then(Value::as_bool) != Some(true) {
-        // Legacy records without the new field retain their existing manual
-        // provisioning contract. New records must choose explicitly.
-        if node.get("tlsAutoProvision").and_then(Value::as_bool) == Some(false)
-            && node.get("tlsManualProvision").and_then(Value::as_bool) != Some(true)
-            && config
-                .get("inbounds")
-                .and_then(Value::as_array)
-                .is_some_and(|items| {
-                    items.iter().any(|ib| {
-                        ib.get("streamSettings")
-                            .and_then(|s| s.get("security"))
-                            .and_then(Value::as_str)
-                            == Some("tls")
-                    })
-                })
-        {
-            return Err(ApiError::new(
-                StatusCode::CONFLICT,
-                "TLS node needs managed ACME settings or explicit externally provisioned certificates.",
-            ));
-        }
-        return Ok(None);
-    }
+
     let domain = node
         .get("tlsDomain")
         .and_then(Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .or_else(|| node.get("addr").and_then(Value::as_str))
         .unwrap_or("")
         .trim()
         .to_ascii_lowercase();
     let email = node
         .get("tlsAcmeEmail")
         .and_then(Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .or(panel_email)
         .unwrap_or("")
         .trim();
     let valid_domain = domain.len() <= 253
+        && domain.parse::<std::net::IpAddr>().is_err()
         && domain.contains('.')
+        && domain
+            .split('.')
+            .next_back()
+            .is_some_and(|part| part.bytes().any(|b| b.is_ascii_alphabetic()))
         && domain.split('.').all(|part| {
             !part.is_empty()
                 && part.len() <= 63
@@ -1719,29 +1807,80 @@ fn configure_node_managed_tls(node: &Value, config: &mut Value) -> Result<Option
                     .bytes()
                     .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-'))
         });
+
+    // A profile with explicitly supplied certificateFile+keyFile pairs can
+    // continue using node-local material without a fresh ACME issuance.
+    // Never claim the file actually exists: node attestation remains required.
+    let external_paths_ready = tls_inbounds.iter().all(|&index| {
+        inbounds[index]
+            .pointer("/streamSettings/tlsSettings/certificates")
+            .and_then(Value::as_array)
+            .is_some_and(|certs| {
+                !certs.is_empty()
+                    && certs.iter().all(|cert| {
+                        cert.get("certificateFile")
+                            .and_then(Value::as_str)
+                            .is_some_and(|p| p.starts_with('/') && !p.trim().is_empty())
+                            && cert
+                                .get("keyFile")
+                                .and_then(Value::as_str)
+                                .is_some_and(|p| p.starts_with('/') && !p.trim().is_empty())
+                    })
+            })
+    });
+
+    // Canonical Let's Encrypt file paths are managed by the signed node
+    // reconciler when the installer contact is available. Custom paths stay
+    // external, preserving existing installations and their own renewers.
+    let managed_paths = tls_inbounds.iter().all(|&index| {
+        inbounds[index]
+            .pointer("/streamSettings/tlsSettings/certificates")
+            .and_then(Value::as_array)
+            .is_some_and(|certs| {
+                certs.len() == 1
+                    && certs[0].get("certificateFile").and_then(Value::as_str)
+                        == Some(format!("/etc/letsencrypt/live/{domain}/fullchain.pem").as_str())
+            })
+    });
+
+    let managed = if managed_override {
+        true
+    } else if external_override {
+        false
+    } else if valid_domain && valid_email && (!external_paths_ready || managed_paths) {
+        true
+    } else if external_paths_ready {
+        false
+    } else {
+        // Never invent an ACME identity or assume absent external certs exist.
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "Automatic TLS needs a valid node domain and ACME contact email.",
+        ));
+    };
+    if !managed {
+        if !external_paths_ready {
+            return Err(ApiError::new(
+                StatusCode::CONFLICT,
+                "External TLS needs certificateFile and keyFile in the assigned profile.",
+            ));
+        }
+        return Ok(None);
+    }
     if !valid_domain || !valid_email {
         return Err(ApiError::new(
             StatusCode::CONFLICT,
             "Managed TLS requires a valid node TLS domain and ACME email.",
         ));
     }
-    let inbounds = config
-        .get_mut("inbounds")
-        .and_then(Value::as_array_mut)
-        .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Profile has no inbounds."))?;
-    let mut updated = false;
-    for inbound in inbounds {
-        let Some(stream) = inbound
+    for index in tls_inbounds {
+        let stream = inbounds[index]
             .get_mut("streamSettings")
             .and_then(Value::as_object_mut)
-        else {
-            continue;
-        };
-        if stream.get("security").and_then(Value::as_str) != Some("tls") {
-            continue;
-        }
-        let tls = stream.entry("tlsSettings").or_insert_with(|| json!({}));
-        let tls = tls
+            .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Invalid TLS settings."))?;
+        let tls = stream
+            .entry("tlsSettings")
+            .or_insert_with(|| json!({}))
             .as_object_mut()
             .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Invalid TLS settings."))?;
         tls.insert(
@@ -1751,17 +1890,10 @@ fn configure_node_managed_tls(node: &Value, config: &mut Value) -> Result<Option
                 "keyFile":format!("/etc/letsencrypt/live/{domain}/privkey.pem")
             }]),
         );
-        updated = true;
     }
-    if !updated {
-        return Err(ApiError::new(
-            StatusCode::CONFLICT,
-            "Managed TLS requires an assigned TLS inbound.",
-        ));
-    }
-    Ok(Some(
-        json!({"domain":domain,"email":email,"provider":"letsencrypt-http01"}),
-    ))
+    Ok(Some(json!({
+        "domain":domain,"email":email,"provider":"letsencrypt-http01"
+    })))
 }
 
 async fn compile_node_profile(
@@ -2003,6 +2135,112 @@ mod provision_tests {
             "conflicting_tls_modes"
         );
     }
+    #[test]
+    fn tls_mode_is_derived_from_security_without_manual_switches() {
+        let node =
+            json!({"addr":"nl.example.org","tlsAutoProvision":false,"tlsManualProvision":false});
+        let profile = || {
+            json!({"inbounds":[{"protocol":"vless","tag":"main",
+            "streamSettings":{"security":"tls","tlsSettings":{}}}]})
+        };
+        let mut tls = profile();
+        let provision = configure_node_tls_with_contact(&node, &mut tls, Some("ops@example.org"))
+            .unwrap()
+            .unwrap();
+        assert_eq!(provision["domain"], "nl.example.org");
+        assert_eq!(provision["email"], "ops@example.org");
+        let mut no_tls_settings = json!({"inbounds":[{
+            "tag":"tls","protocol":"vless","streamSettings":{"security":"tls"}
+        }]});
+        assert!(
+            configure_node_tls_with_contact(&node, &mut no_tls_settings, Some("ops@example.org"))
+                .unwrap()
+                .is_some()
+        );
+        assert!(
+            no_tls_settings["inbounds"][0]["streamSettings"]["tlsSettings"]["certificates"]
+                .is_array()
+        );
+        assert_eq!(
+            tls["inbounds"][0]["streamSettings"]["tlsSettings"]["certificates"][0]["certificateFile"],
+            "/etc/letsencrypt/live/nl.example.org/fullchain.pem"
+        );
+
+        for security in ["reality", "none"] {
+            let mut inactive = profile();
+            inactive["inbounds"][0]["streamSettings"]["security"] = json!(security);
+            // Stale switches from an older TLS profile cannot trigger ACME.
+            let old_node = json!({"tlsAutoProvision":true,"tlsManualProvision":true});
+            assert!(
+                configure_node_tls_with_contact(&old_node, &mut inactive, Some("ops@example.org"))
+                    .unwrap()
+                    .is_none()
+            );
+            assert!(
+                inactive["inbounds"][0]["streamSettings"]["tlsSettings"]
+                    .get("certificates")
+                    .is_none()
+            );
+        }
+        let mut hysteria = json!({"inbounds":[{"protocol":"hysteria","tag":"h3",
+            "streamSettings":{"security":"tls","network":"hysteria","tlsSettings":{"alpn":["h3"]}}}]});
+        assert!(
+            configure_node_tls_with_contact(&node, &mut hysteria, Some("ops@example.org"))
+                .unwrap()
+                .is_some()
+        );
+        assert_eq!(
+            hysteria["inbounds"][0]["streamSettings"]["tlsSettings"]["alpn"],
+            json!(["h3"])
+        );
+    }
+
+    #[test]
+    fn tls_mode_preserves_custom_external_certificates_and_fails_closed() {
+        let custom = json!({"inbounds":[{"tag":"tls","protocol":"vless",
+        "streamSettings":{"security":"tls","tlsSettings":{"certificates":[{
+            "certificateFile":"/opt/certs/site.crt","keyFile":"/opt/certs/site.key"
+        }]}}}]});
+        let mut existing = custom.clone();
+        let node = json!({"addr":"192.0.2.1","tlsAutoProvision":false,"tlsManualProvision":false});
+        assert!(
+            configure_node_tls_with_contact(&node, &mut existing, None)
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(existing, custom);
+        let mut no_certs = json!({"inbounds":[{"tag":"tls","streamSettings":{
+            "security":"tls","tlsSettings":{}
+        }}]});
+        assert_eq!(
+            profile_compile_error_code(
+                &configure_node_tls_with_contact(&node, &mut no_certs, None).unwrap_err()
+            ),
+            "automatic_tls_prerequisites"
+        );
+        let mut explicit = no_certs.clone();
+        let manual = json!({"tlsManualProvision":true});
+        assert_eq!(
+            profile_compile_error_code(
+                &configure_node_tls_with_contact(&manual, &mut explicit, None).unwrap_err()
+            ),
+            "external_tls_certificates_missing"
+        );
+        let mut invalid_acme = no_certs.clone();
+        let manual_acme = json!({"addr":"192.0.2.1","tlsAutoProvision":true});
+        assert_eq!(
+            profile_compile_error_code(
+                &configure_node_tls_with_contact(
+                    &manual_acme,
+                    &mut invalid_acme,
+                    Some("ops@example.org")
+                )
+                .unwrap_err()
+            ),
+            "managed_tls_identity_invalid"
+        );
+    }
+
     #[test]
     fn node_desired_config_uses_local_xray_port_not_public_port() {
         let node = json!({"xrayLocalPort": "5000", "port": 443});
