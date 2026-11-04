@@ -1240,8 +1240,10 @@ dialog.node-wide .node-main-section .country-picker-dropdown .country-option {
   width:100%;
 }
 .xray-release-dialog .xm-action-confirm-box {
-  width:min(94vw,570px);
-  max-width:570px;
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  grid-template-columns:minmax(0,1fr);
 }
 .xray-release-dialog .xray-release-search {
   display:block;
@@ -1309,11 +1311,12 @@ dialog.node-wide .node-main-section .country-picker-dropdown .country-option {
 .xray-release-dialog .xray-release-spinner {
   display:inline-block;
   width:1.1rem;
+  height:1.1rem;
   flex-shrink:0;
   border:2px solid var(--nx-border);
   border-top-color:var(--a);
   border-radius:50%;
-  animation:xray-release-spin .7s linear infinite;
+  animation:nx-spin .7s linear infinite;
 }
 @media (prefers-reduced-motion:reduce) {
 .xray-release-dialog .xray-release-spinner {
