@@ -1918,8 +1918,12 @@ mod tests {
         for unavailable in [&disabled, &wrong_profile, &wrong_node, &wrong_tag] {
             assert!(
                 published_hosts_for_profile(
-                    std::slice::from_ref(unavailable), "main", &profile, &nodes
-                ).is_empty(),
+                    std::slice::from_ref(unavailable),
+                    "main",
+                    &profile,
+                    &nodes
+                )
+                .is_empty(),
                 "A disabled or mismatched Host must not trigger node fallback"
             );
         }
