@@ -150,7 +150,8 @@ def main():
         "inbounds": [{
             "tag": "CI_AUTH_VLESS", "listen": "127.0.0.1", "port": 28352,
             "protocol": "vless", "settings": {"decryption": "none", "clients": []},
-            "streamSettings": {"network": "tcp", "security": "none"}
+            "streamSettings": {"network": "raw", "security": "tls",
+                               "tlsSettings": {"serverName": "ci-host.example.com"}}
         }],
         "outbounds": [{"tag": "direct", "protocol": "freedom"}],
         "routing": {"rules": []}
@@ -172,8 +173,42 @@ def main():
     check(status, 201, "admin creates fully bound active host")
     assert host["id"] > 0 and host["profileId"] == profile_id
     assert host["nodes"] == [node_id] and host["tag"] == "CI_AUTH_VLESS"
+    # PostgreSQL/Redis + HTTP lifecycle regression: only a real enabled Host
+    # may appear in a subscription. Keep the Node assigned and online-looking
+    # throughout disabled/deleted Host checks to detect implicit node fallback.
+    status, squad, _ = api("POST", "/collections/squads",
+                           {"name": "CI authorized Host squad", "inb": ["CI_AUTH_VLESS"]},
+                           admin_cookie)
+    check(status, 201, "admin creates subscription test squad")
+    squad_id = squad["id"]
+    check(api("PATCH", f"/collections/users/{user_id}", {"squads": [squad_id]},
+              owner_cookie)[0], 200, "assign test inbound to subscription user")
+
+    def assert_client_hosts(expected, label):
+        status, feed, _ = api("GET", f"/users/{user_id}/client-json", cookie=owner_cookie)
+        check(status, 200, label + " (HTTP)")
+        assert isinstance(feed, list) and len(feed) == expected, (
+            f"{label}: expected {expected} published Hosts, got {feed}")
+        if expected:
+            proxy = feed[0]["outbounds"][0]
+            assert proxy["settings"]["vnext"][0]["address"] == "ci-host.example.com", (
+                "Subscription must use the explicit Host address")
+        print("PASS:", label)
+
+    assert_client_hosts(1, "enabled Host publishes one client server")
+    check(api("PATCH", f"/collections/hosts/{host['id']}",
+              {"disabled": True}, admin_cookie)[0], 200,
+          "disable Host while Node remains enabled")
+    assert_client_hosts(0, "disabled Host does not fall back to live Node")
+    check(api("PATCH", f"/collections/hosts/{host['id']}",
+              {"disabled": False}, admin_cookie)[0], 200,
+          "re-enable explicit Host")
+    assert_client_hosts(1, "re-enabled Host publishes again")
     check(api("DELETE", f"/collections/hosts/{host['id']}", cookie=admin_cookie)[0], 200,
           "clean up active host")
+    assert_client_hosts(0, "deleted final Host returns 200 with an empty JSON feed")
+    check(api("DELETE", f"/collections/squads/{squad_id}", cookie=admin_cookie)[0], 200,
+          "clean up subscription test squad")
     check(api("DELETE", f"/collections/nodes/{node_id}", cookie=admin_cookie)[0], 200,
           "clean up active host node")
     check(api("DELETE", f"/collections/profiles/{profile_id}", cookie=admin_cookie)[0], 200,
