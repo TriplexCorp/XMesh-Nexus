@@ -1874,10 +1874,13 @@ fn configure_node_tls_with_contact(
         ));
     }
     for index in tls_inbounds {
-        let tls = inbounds[index]
-            .pointer_mut("/streamSettings/tlsSettings")
+        let stream = inbounds[index]
+            .get_mut("streamSettings")
+            .and_then(Value::as_object_mut)
             .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Invalid TLS settings."))?;
-        let tls = tls
+        let tls = stream
+            .entry("tlsSettings")
+            .or_insert_with(|| json!({}))
             .as_object_mut()
             .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "Invalid TLS settings."))?;
         tls.insert(
