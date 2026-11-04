@@ -63,7 +63,9 @@ fn profile_compile_error_code(error: &ApiError) -> &'static str {
         "invalid_profile_json"
     } else if message.starts_with("Profile has no inbounds") {
         "missing_inbounds"
-    } else if message.starts_with("Automatic local-port mapping") {
+    } else if message.starts_with("Automatic local-port mapping")
+        || message.starts_with("Managed profiles support")
+    {
         "unsupported_inbound_count"
     } else if message.starts_with("Invalid inbound") {
         "invalid_inbound"
@@ -75,10 +77,22 @@ fn profile_compile_error_code(error: &ApiError) -> &'static str {
         "conflicting_stats_api"
     } else if message.starts_with("Choose either managed ACME TLS") {
         "conflicting_tls_modes"
+    } else if message.starts_with("Managed TLS requires a valid node TLS domain") {
+        "managed_tls_identity_invalid"
+    } else if message.starts_with("Managed TLS requires an assigned TLS inbound") {
+        "managed_tls_inbound_missing"
     } else if message.starts_with("Managed TLS requires") {
         "managed_tls_validation"
+    } else if message.starts_with("Invalid TLS settings") {
+        "invalid_tls_settings"
     } else if message.starts_with("TLS node needs managed ACME") {
         "tls_mode_required"
+    } else if message.starts_with("Managed Xray local ports must not collide") {
+        "invalid_local_port"
+    } else if message.starts_with("Node-managed MASQUE")
+        || message.starts_with("MASQUE requires")
+    {
+        "masque_validation"
     } else if message.starts_with("Node disabled") {
         "node_disabled"
     } else if message.starts_with("GeoData") {
@@ -142,6 +156,29 @@ mod profile_application_tests {
             super::profile_compile_error_code(&unknown),
             "compile_failed"
         );
+    }
+    #[test]
+    fn compilation_failure_codes_are_actionable_without_exposing_profile_data() {
+        let cases = [
+            ("Choose either managed ACME TLS or an external certificate, not both.", "conflicting_tls_modes"),
+            ("Managed TLS requires a valid node TLS domain and ACME email.", "managed_tls_identity_invalid"),
+            ("Managed TLS requires an assigned TLS inbound.", "managed_tls_inbound_missing"),
+            ("TLS node needs managed ACME settings or explicit externally provisioned certificates.", "tls_mode_required"),
+            ("Invalid TLS settings.", "invalid_tls_settings"),
+            ("Managed profiles support one inbound or a TCP proxy + Hysteria2 pair.", "unsupported_inbound_count"),
+            ("Managed Xray local ports must not collide with StatsService.", "invalid_local_port"),
+            ("Node-managed MASQUE requires ALPN h3 or h2 explicitly.", "masque_validation"),
+            ("MASQUE requires non-empty address ranges.", "masque_validation"),
+        ];
+        for (message, expected) in cases {
+            let error = super::ApiError::new(axum::http::StatusCode::CONFLICT, message);
+            assert_eq!(super::profile_compile_error_code(&error), expected, "{message}");
+        }
+        let secret = super::ApiError::new(
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "privateKey=sensitive-value",
+        );
+        assert_eq!(super::profile_compile_error_code(&secret), "compile_failed");
     }
     #[test]
     fn never_claims_application_without_current_matching_digest() {
