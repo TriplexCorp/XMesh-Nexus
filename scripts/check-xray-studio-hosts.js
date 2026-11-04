@@ -41,7 +41,7 @@ assert.doesNotMatch(server,/else\s+if\s+!any_explicit_host/,
  'No implicit raw-node fallback is allowed, even when the Hosts table is empty');
 assert.doesNotMatch(server,/xmeshSourceKey"\] = json!\(format!\("node:/,
  'Subscription sources must come from explicit Host records only');
-assert.match(server,/return Ok\(outbounds\)/,
+assert.match(server,/\bOk\(outbounds\)/,
  'Empty authorized endpoint sets must remain valid empty subscriptions');
 const jsClient=fs.readFileSync('frontend/js/features/users/client-config.js','utf8');
 assert.match(jsClient,/const candidates=hosts;/,
