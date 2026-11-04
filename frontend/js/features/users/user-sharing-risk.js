@@ -221,10 +221,10 @@
       const limitForm=dialog.querySelector('.xm-device-limit-form'),feedback=dialog.querySelector('.xm-device-feedback');
       dialog.querySelector('[data-device-limit-open]').onclick=()=>{if(!writable)return;limitForm.hidden=false;limitForm.elements.limit.focus()};
       dialog.querySelector('[data-device-limit-cancel]').onclick=()=>{limitForm.hidden=true;dialog.querySelector('[data-device-limit-open]').focus()};
-      async function update(patch){
+      async function update(patch,deviceId=null){
         if(busy||!writable)return;busy=true;
         dialog.querySelectorAll('[data-device-remove],.xm-device-limit-form button').forEach(b=>b.disabled=true);
-        try{await api.update('users',user.id,patch);cache.delete(user.id);dialog.dataset.deviceChanged='1';if(dialog.open&&request===detailRequest)await openDetail(userById(user.id)||user,tab,selected);else refreshViews()}
+        try{if(deviceId!==null)await removeUserDevice(user.id,deviceId);else await api.update('users',user.id,patch);cache.delete(user.id);dialog.dataset.deviceChanged='1';if(dialog.open&&request===detailRequest)await openDetail(userById(user.id)||user,tab,selected);else refreshViews()}
         catch(error){feedback.textContent=t('Не удалось сохранить: ','Could not save: ')+(error.message||t('Ошибка API','API error'));dialog.querySelectorAll('[data-device-remove],.xm-device-limit-form button').forEach(b=>b.disabled=false)}
         finally{busy=false}
       }
@@ -234,7 +234,7 @@
         if(busy)return;
         busy=true;let confirmed=false;
         try{confirmed=await panelConfirm(t('Привязка будет удалена и освободит место. Это не блокирует устройство: при следующем обновлении подписки клиент сможет зарегистрироваться снова.','Removing this binding frees a slot. It does not block the device: the client can register again on its next subscription refresh.'),{title:t('Удалить привязку устройства?','Remove device binding?'),confirmLabel:t('Удалить привязку','Remove binding'),danger:true})}finally{busy=false}
-        if(confirmed&&dialog.open&&request===detailRequest)await update({devices:(userById(user.id)?.devices||[]).filter(d=>String(d.id)!==String(selected))});
+        if(confirmed&&dialog.open&&request===detailRequest)await update(null,selected);
       };
     }
     paint();dialog.dataset.focus=focus;dialog.querySelector('.xm-sharing-close').focus({preventScroll:true});

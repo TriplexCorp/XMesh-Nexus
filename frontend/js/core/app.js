@@ -162,6 +162,14 @@ async function backendRequest(path,options={}){
   }
   return payload;
 }
+// Device bindings are authoritative SQL records, not editable user JSON.
+async function removeUserDevice(userId,deviceId){
+  const result=await backendRequest('/api/v1/users/'+encodeURIComponent(userId)+'/subscription?deviceAction=remove&deviceId='+encodeURIComponent(deviceId),{method:'POST'});
+  if(result.ok!==true||!Array.isArray(result.deviceLimit?.devices))throw Error(panelIsEnglish()?'Server did not confirm device removal':'Сервер не подтвердил удаление устройства');
+  const user=DB.users.find(u=>String(u.id)===String(userId));
+  if(user)user.devices=result.deviceLimit.devices;
+  return user;
+}
 const lat=()=>Promise.resolve();
 const st=u=>u.disabled?'DISABLED':u.hold?'ON_HOLD':(u.limit&&u.used>=u.limit)?'LIMITED':(u.expireAt&&u.expireAt<Date.now())?'EXPIRED':'ACTIVE';
 const USER_PRESENCE_WINDOW_MS=45_000;
@@ -4005,7 +4013,7 @@ document.addEventListener('click',async e=>{
     const p=a=='tog'?{disabled:!u.disabled}:a=='rev'?{short:Math.floor(Math.random()*2**40).toString(36).padStart(8,'a'),devices:[]}:null;
     if(!p)return;
     await api.update('users',id,p);toast({tog:'Статус изменён',rst:'Трафик сброшен',rev:'Ссылка перевыпущена'}[a]);render(1);userDrawer(id,a=='rev'?'sub':UT)}
-  else if(b=g('[data-dd]')){const [ui,di]=b.dataset.dd.split(':').map(Number),u=DB.users.find(x=>x.id==ui);await api.update('users',ui,{devices:u.devices.filter(d=>d.id!=di)});toast('Устройство удалено');if(cur=='tools')drawTools();else userDrawer(ui,'dev')}
+  else if(b=g('[data-dd]')){const [ui,di]=b.dataset.dd.split(':').map(Number);await removeUserDevice(ui,di);toast('Устройство удалено');if(cur=='tools')drawTools();else userDrawer(ui,'dev')}
   else if(b=g('[data-qx]')){const u=DB.users.find(x=>x.id==b.dataset.qx);if(u)userDrawer(u.id,'ov')}
   else if(b=g('[data-qr]')){await api.update('users',+b.dataset.qr,{used:0});toast('Трафик сброшен');render(1)}
   else if(b=g('[data-host-clear-overrides]')){
