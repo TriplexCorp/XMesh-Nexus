@@ -1717,10 +1717,6 @@ fn ensure_masque_address(config: &mut Value) -> Result<(), ApiError> {
     Ok(())
 }
 
-#[expect(
-    clippy::too_many_lines,
-    reason = "TLS mode validation and certificate injection are one atomic operation"
-)]
 fn configure_node_managed_tls(node: &Value, config: &mut Value) -> Result<Option<Value>, ApiError> {
     let panel_email = std::env::var("PANEL_ACME_EMAIL").ok();
     configure_node_tls_with_contact(node, config, panel_email.as_deref())
@@ -1729,7 +1725,11 @@ fn configure_node_managed_tls(node: &Value, config: &mut Value) -> Result<Option
 /// The XRAY STUDIO inbound security is authoritative. A node's legacy
 /// certificate-mode switches are overrides, never prerequisites for applying
 /// a TLS profile and never commands to enable TLS on a REALITY/none profile.
-/// The panel installer already collects PANEL_ACME_EMAIL once.
+/// The panel installer already collects `PANEL_ACME_EMAIL` once.
+#[expect(
+    clippy::too_many_lines,
+    reason = "Certificate mode decision and signed TLS path injection are atomic"
+)]
 fn configure_node_tls_with_contact(
     node: &Value,
     config: &mut Value,
@@ -1786,7 +1786,7 @@ fn configure_node_tls_with_contact(
         && domain.contains('.')
         && domain
             .split('.')
-            .last()
+            .next_back()
             .is_some_and(|part| part.bytes().any(|b| b.is_ascii_alphabetic()))
         && domain.split('.').all(|part| {
             !part.is_empty()
