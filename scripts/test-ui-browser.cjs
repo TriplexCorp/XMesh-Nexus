@@ -929,23 +929,72 @@ async function main() {
     await page.route(metricsPattern,metricsFixture);
     try{
       await page.reload({waitUntil:'domcontentloaded'});
-      await checked('Xray release picker: authenticated control-v6 capability',async()=>{
+      await checked('Xray release picker: control-v6 loading animation and catalog',async()=>{
         // A control-v6 heartbeat must not be rejected by the historic v3/v4
         // browser regex. Only the backend-authorized capability is consulted.
         const catalogRoute='**/api/v1/nodes/xray-releases';
-        await page.route(catalogRoute,route=>route.fulfill({json:{items:[{
+        let releaseCatalog;
+        const pendingCatalog=new Promise(resolve=>{releaseCatalog=resolve});
+        const previous=await page.evaluate(()=>document.documentElement.dataset.motion);
+        await page.route(catalogRoute,async route=>{await pendingCatalog;await route.fulfill({json:{items:[{
           version:'v26.10.30',published_at:'2026-10-30T00:00:00Z',prerelease:false,
           url:'https://github.com/XTLS/Xray-core/releases/tag/v26.10.30'
-        }]}}));
+        }]}})});
         try{
+          await page.setViewportSize({width:1920,height:1080});
+          await page.emulateMedia({reducedMotion:'no-preference'});
           await navigate('nodes');
+          await page.evaluate(()=>{document.documentElement.dataset.motion='on'});
           await page.locator(`[data-xray-update="${node.id}"]`).first().click();
+          const spinner=page.locator('.xray-release-spinner');
+          await spinner.waitFor();
+          const sample=()=>spinner.evaluate(el=>{const r=el.getBoundingClientRect();return{width:r.width,height:r.height,transform:getComputedStyle(el).transform,animations:el.getAnimations().map(a=>({state:a.playState,time:a.currentTime}))}});
+          const first=await sample();await page.waitForTimeout(170);const second=await sample();
+          assert(first.height>=12&&Math.abs(first.width-first.height)<=1,'Release spinner must be a circle, not a collapsed horizontal border');
+          assert(first.animations.some(a=>a.state==='running'),'Release loader must have a running animation');
+          assert(second.animations[0].time>first.animations[0].time+70,'Release loader timeline must advance');
+          assert.notEqual(first.transform,second.transform,'Release loader must actually rotate');
+          assert(await page.locator('.xray-release-search').isDisabled(),'Search stays disabled until the catalog arrives');
+          assert(await page.locator('.xray-release-dialog .btn').isDisabled(),'Installation stays disabled while loading');
+          await page.mouse.move(0,0);
+          for(let i=0;i<6;i++){
+            const filename=`xray-release-loading-motion-${i}.png`;
+            await page.locator('.xray-release-dialog').screenshot({path:path.join(output,filename),animations:'allow'});
+            report.screenshots.push(filename);await page.waitForTimeout(120);
+          }
+          for(const [width,height] of [[1920,1080],[390,844]]){
+            await page.setViewportSize({width,height});
+            const bounds=await page.locator('.xray-release-dialog').evaluate(d=>{
+              const box=e=>{const r=e.getBoundingClientRect();return{left:r.left,right:r.right,top:r.top,bottom:r.bottom}};
+              return{dialog:box(d),content:box(d.firstElementChild),controls:[...d.querySelectorAll('input,button')].map(box)};
+            });
+            assert(bounds.content.right<=bounds.dialog.right+1,'Release picker content must fit its native dialog');
+            assert(bounds.controls.every(r=>r.left>=bounds.dialog.left&&r.right<=bounds.dialog.right+1),'Loading controls must not be clipped horizontally');
+            assert(bounds.dialog.top>=0&&bounds.dialog.bottom<=height+1,'Loading dialog must fit the viewport');
+            await screenshot(page,`xray-release-loading-${width}`);
+          }
+          await page.setViewportSize({width:1920,height:1080});
+          await page.evaluate(()=>{document.documentElement.dataset.motion='off'});
+          assert.equal((await sample()).animations.length,0,'Panel motion-off must stop the release loader');
+          await page.evaluate(()=>{document.documentElement.dataset.motion='on'});
+          await page.emulateMedia({reducedMotion:'reduce'});
+          assert.equal((await sample()).animations.length,0,'System reduced-motion must stop the release loader');
+          releaseCatalog();
           const release=page.locator('.xray-release-row').first();
           await release.waitFor({timeout:12000});
           assert.equal(await release.locator('strong').innerText(),'v26.10.30');
+          assert.equal(await spinner.count(),0,'Loading indicator must disappear after the catalog arrives');
+          assert(!(await page.locator('.xray-release-search').isDisabled()),'Loaded catalog enables search');
           await page.locator('.xray-release-dialog .gh').click();
           await page.locator('.xray-release-dialog').waitFor({state:'detached'});
-        }finally{await page.unroute(catalogRoute)}
+          return{first,second};
+        }finally{
+          releaseCatalog();
+          if(await page.locator('.xray-release-dialog[open]').count())await page.keyboard.press('Escape');
+          await page.unroute(catalogRoute);
+          await page.emulateMedia({reducedMotion:'reduce'});
+          await page.evaluate(previous=>{if(previous===undefined)delete document.documentElement.dataset.motion;else document.documentElement.dataset.motion=previous},previous);
+        }
       });
       await navigate('set');
       await page.locator('#content-width').evaluate(el=>{el.value='3000';el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}))});
