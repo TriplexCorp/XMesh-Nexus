@@ -609,7 +609,11 @@ fn configure_feed_balancer(config: &mut Value, row: &Value) {
 
 pub fn build_feed(proxies: Vec<Value>, settings: &Value) -> Result<Value, String> {
     if proxies.is_empty() {
-        return Err("Нет доступных клиентских подключений".into());
+        // A valid active subscription can have zero published Hosts. Return a
+        // successful empty JSON feed so clients can replace previously cached
+        // node-generated endpoints after an admin removes the last Host.
+        // Do not synthesize a SMART balancer or any direct-node entry.
+        return Ok(json!([]));
     }
     if proxies.len() > 256 {
         return Err("Превышен лимит подключений в одной подписке".into());
@@ -770,6 +774,19 @@ pub fn validate_settings(settings: &Value) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn empty_explicit_host_feed_is_successful_and_contains_no_proxy_or_balancer() {
+        let settings = json!({"clientBalancers":[{"tag":"AUTO_1","remark":"Legacy group",
+          "serverDescription":"","selector":["node:3:main"],
+          "strategy":"leastPing","enabled":true}]});
+        // Empty publishable Hosts must never make a synthetic server from a
+        // missing or stale source selector (including legacy node: sources).
+        assert_eq!(build_feed(vec![], &settings).unwrap(), json!([]));
+        assert_eq!(build_feed(vec![], &json!({})).unwrap(), json!([]));
+        assert!(build(vec![], &json!({})).is_err(),
+            "Only the subscription feed, not arbitrary client config building, is empty-success");
+    }
+
     fn outbound(code: &str) -> Value {
         json!({"tag":"User-facing label","xmeshCountry":code,"protocol":"vless",
    "settings":{"vnext":[{"address":"vpn.example.com","port":443,
