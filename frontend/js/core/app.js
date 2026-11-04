@@ -2701,7 +2701,9 @@ function hostNodeCountryCode(node){
 }
 function hostNodeCountryRemark(node){
   const code=hostNodeCountryCode(node);
-  return code?countryFlag(code):String(node?.name||'');
+  const name=String(node?.name||'').trim();
+  const flag=code?countryFlag(code):'';
+  return flag&&name?`${flag} ${name}`:flag||name;
 }
 function hostAutofillNodeFields(form,node,force=false){
   const code=hostNodeCountryCode(node);
