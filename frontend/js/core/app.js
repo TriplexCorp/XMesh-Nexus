@@ -2686,8 +2686,10 @@ async function crudCard(k,showTitle=true){
 async function simple(ks){const h=await Promise.all(ks.map(k=>crudCard(k,ks.length>1)));return [h.join('')]}
 /* Host = client-facing endpoint, not a second Xray server configuration.
    Resolve inherited values for preview only; never expose server privateKey. */
-// Host preset metadata must follow the selected node, not a hard-coded
-// country name or a stale remark from another node. Flags can be emoji or ISO.
+// Node country has two independent representations:
+// - ISO alpha-2 (PL): subscription grouping/routing in countryCode
+// - flag emoji (🇵🇱): client-visible host Remark, including Happ.
+// Never use the ISO letters as the visible fallback when a valid flag exists.
 function hostNodeCountryCode(node){
   for(const value of [node?.countryCode,node?.flag]){
     const code=String(value||'').trim().toUpperCase();
@@ -2697,11 +2699,15 @@ function hostNodeCountryCode(node){
   }
   return '';
 }
+function hostNodeCountryRemark(node){
+  const code=hostNodeCountryCode(node);
+  return code?countryFlag(code):String(node?.name||'');
+}
 function hostAutofillNodeFields(form,node,force=false){
   const code=hostNodeCountryCode(node);
   const remark=form.elements.namedItem('remark');
   const country=form.elements.namedItem('countryCode');
-  if(remark && (force || !String(remark.value||'').trim()))remark.value=code||node.name||'';
+  if(remark && (force || !String(remark.value||'').trim()))remark.value=hostNodeCountryRemark(node);
   if(country && (force || !String(country.value||'').trim()))country.value=code;
 }
 function hostProfile(profileId){return DB.profiles.find(p=>String(p.id)===String(profileId))}
@@ -4009,7 +4015,7 @@ document.addEventListener('click',async e=>{
     if(node){
       const profile=hostProfile(node.profileId),inbound=profile?inbs(profile).find(i=>SUBSCRIPTION_PROTOCOLS.has(i.protocol)):null;
       const countryCode=hostNodeCountryCode(node);
-      entForm('hosts',null,{remark:countryCode||node.name||'Новый хост',countryCode,
+      entForm('hosts',null,{remark:hostNodeCountryRemark(node)||'Новый хост',countryCode,
         address:node.addr||'',port:node.port||443,
         profileId:profile?.id||DB.profiles[0]?.id||0,tag:inbound?.tag||'',nodes:[node.id],fp:'',order:DB.hosts.length+1});
     }

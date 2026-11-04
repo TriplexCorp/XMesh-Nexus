@@ -1170,7 +1170,7 @@ async function main() {
       await page.waitForSelector('[data-host-node-preset]');
       await page.locator('[data-host-node-preset]').evaluate((select,id)=>{select.value=String(id);select.dispatchEvent(new Event('change',{bubbles:true}))},hostPresetNode.id);
       assert.equal(await page.locator('[name="address"]').inputValue(),hostPresetNode.addr,'Node preset must fill public endpoint');
-      assert.equal(await page.locator('[name="remark"]').inputValue(),'NL','Node preset must fill the ISO remark from the node flag');
+      assert.equal(await page.locator('[name="remark"]').inputValue(),'🇳🇱','Node preset must fill the flag emoji for the Happ remark');
       assert.equal(await page.locator('[name="countryCode"]').inputValue(),'NL','Node preset must fill the explicit ISO country field');
       assert.equal(await page.locator('[name="profileId"]').inputValue(),String(hostTlsProfile.id),'Node preset must retain profile binding');
       assert.equal(await page.locator('[name="profileId"]').evaluate(select=>select.closest('.xm-select-shell').querySelector('.xm-select-caption').textContent),hostTlsProfile.name,'Visible profile caption must match preset binding');
