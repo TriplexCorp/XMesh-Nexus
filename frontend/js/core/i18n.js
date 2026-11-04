@@ -11,6 +11,21 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Проверьте транспорт MASQUE и ALPN":"Check MASQUE transport and ALPN",
+    "Некорректный tlsSettings в профиле":"Invalid tlsSettings in the profile",
+    "Некорректные настройки управляемого TLS":"Invalid managed TLS settings",
+    "Управляемый TLS включён, но в профиле нет TLS inbound":"Managed TLS is enabled but the profile has no TLS inbound",
+    "Управляемый TLS: проверьте домен и email ACME":"Managed TLS: check domain and ACME email",
+    "Выбраны два несовместимых режима TLS":"Two incompatible TLS provisioning modes selected",
+    "Нужен один inbound или пара TCP + Hysteria2":"One inbound or a TCP + Hysteria2 pair is required",
+    "TLS: требуется сертификат для подключённого профиля":"TLS: certificate required for the assigned profile",
+    "Внешний TLS: в профиле нет пары файлов сертификата и ключа":"External TLS: certificate and key file paths are missing from the profile",
+    "Авто-TLS: укажите DNS-домен ноды и контакт ACME":"Auto TLS: configure a node DNS name and ACME contact",
+    "Режим определяется автоматически по security профиля: TLS — сертификат, REALITY/none — без него. Переключатели ниже необязательны.":"The mode follows profile security automatically: TLS uses a certificate, REALITY/none does not. Overrides below are optional.",
+    "Необязательно: готовые пути сертификата определяются автоматически из профиля. Используйте только для явного запрета ACME.":"Optional: certificate paths are inferred from the profile. Use only to explicitly disable ACME.",
+    "Принудительно внешний сертификат":"Force external certificate",
+    "Необязательно: TLS определяется по security профиля. Ручной режим нужен только чтобы принудительно включить ACME.":"Optional: TLS follows the profile security mode. Use this only to force ACME.",
+    "Принудительно Let’s Encrypt":"Force Let’s Encrypt",
     'Нет свежего подтверждения от управляющего агента ноды. Проверьте подключение.':'No recent heartbeat from the node control agent. Check its connection.',
     'Управляющий агент ноды не поддерживает управляемое обновление Xray. Обновите Agent.':'The node control agent does not support managed Xray updates. Update the Agent.',
     'Проверка профиля не установлена · нажмите «Обновить Agent»':'Profile verification helper missing · click Update Agent',
