@@ -178,23 +178,33 @@ async function main() {
       });
     }
 
-    for(const [width,height,count,limit] of [[1920,1080,1,2],[2560,1440,5,5],[390,844,5,0],[1920,1080,0,2]])await checked(`Device workspace: ${width} ${count}/${limit||'unlimited'}`,async()=>{
+    for(const [width,height,count,limit] of [[1920,1080,2,2],[2560,1440,5,5],[390,844,5,0],[1920,1080,0,2]])await checked(`Device workspace: ${width} ${count}/${limit||'unlimited'}`,async()=>{
       await page.setViewportSize({width,height});
-      const pattern='**/api/v1/bootstrap';
+      const pattern='**/api/v1/bootstrap',mutation=`**/api/v1/collections/users/${user.id}`;
+      let snapshot,failNext=false;const patches=[];
+      const initial=await page.evaluate(()=>({role:sessionUser.role,language:XMeshI18n.getLanguage()}));
+      await page.route(mutation,async route=>{
+        const patch=route.request().postDataJSON();patches.push(patch);
+        if(failNext){failNext=false;await route.fulfill({status:503,json:{error:'Device write temporarily unavailable'}});return}
+        snapshot={...snapshot,...patch};await route.fulfill({json:snapshot});
+      });
       await page.route(pattern,async route=>{
         const response=await route.fetch(),data=await response.json();
         const u=data.collections.users.find(u=>u.id===user.id);
-        u.hwid=limit;u.devices=Array.from({length:count},(_,i)=>({model:i?'Phone '+i:'DESKTOP-LONG-NAME-123456789',plat:i?'Android':'Windows',os:i?'Android 15':'Windows 11',app:'Happ',first:Date.now()-86400000*(i+1),last:Date.now()-600000*(i+1),fingerprint:'test-hwid-<unsafe>-'+i,refreshes:12}));
-        await route.fulfill({response,json:data});
+        u.hwid=limit;u.devices=Array.from({length:count},(_,i)=>({id:1000+i,model:i?'Phone '+i:'DESKTOP-LONG-NAME-123456789',plat:i?'Android':'Windows',os:i?'Android 15':'Windows 11',app:'Happ',first:Date.now()-86400000*(10+i),last:Date.now()-600000*(i+1),fingerprint:'test-hwid-<unsafe>-'+i,refreshes:12}));
+        snapshot=structuredClone(u);await route.fulfill({response,json:data});
       });
       try{
         await navigate('users');
         await page.reload({waitUntil:'domcontentloaded'});
-        await page.locator(`[data-sharing-detail="${user.id}"][data-sharing-focus="devices"]`).click();
+        await page.locator(`#ut [data-sharing-detail="${user.id}"][data-sharing-focus="devices"]`).waitFor();
+        await screenshot(page,`devices-table-${width}-${count}-${limit}`);
+        await page.locator(`#ut [data-sharing-detail="${user.id}"][data-sharing-focus="devices"]`).click();
         const dialog=page.locator('#xm-sharing-dialog');
-        await dialog.locator('.xm-sharing-capacity').waitFor();
+        await dialog.locator('.xm-device-capacity').waitFor();
         assert.equal(await dialog.locator('.xm-sharing-device').count(),count);
-        assert.equal(await dialog.locator('.xm-sharing-analysis').getAttribute('open'),null,'Devices entry must prioritise the device list');
+        assert.equal(await dialog.locator('[data-device-tab=devices]').getAttribute('aria-selected'),'true');
+        assert(!(await page.locator('.xm-sharing-overview').isVisible()),'Healthy users must not get an anti-sharing warning banner');
         if(count){
           await dialog.locator('.xm-sharing-device-details summary').first().click();
           assert((await dialog.locator('.xm-sharing-device-details dd').first().innerText()).includes('<unsafe>'),'HWID must remain literal escaped text');
@@ -205,16 +215,58 @@ async function main() {
         assert(bounds.scroll<=bounds.client+1,'Device content must not overflow horizontally');
         if(width>=1920)assert(bounds.width>=900,'Device workspace must not inherit the narrow generic action dialog');
         await screenshot(page,`devices-${width}-${count}-${limit}`);
-        await dialog.locator('.xm-sharing-analysis>summary').click();
+        await dialog.locator('[data-device-tab=risk]').click();
+        assert.equal(await dialog.locator('.xm-sharing-score').innerText(),'0/100','Full slots alone must not increase suspicion');
         assert(await dialog.locator('.xm-sharing-reasons').isVisible(),'Assessment explanation stays accessible');
         await screenshot(page,`devices-analysis-${width}-${count}-${limit}`);
         await page.keyboard.press('Escape');
-        await page.locator(`[data-sharing-detail="${user.id}"][data-sharing-focus="risk"]`).evaluate(el=>el.click());
-        await dialog.locator('.xm-sharing-analysis[open]').waitFor();
+        await page.locator(`#ut [data-sharing-detail="${user.id}"][data-sharing-focus="risk"]`).evaluate(el=>el.click());
+        await dialog.locator('#xm-assessment-panel:not([hidden])').waitFor();
+        await dialog.locator('[data-device-tab=risk]').focus();await page.keyboard.press('ArrowLeft');
+        assert.equal(await dialog.locator('[data-device-tab=devices]').getAttribute('aria-selected'),'true','Arrow keys must switch device tabs');
+        if(count>1){
+          await dialog.locator('[data-device-select="1001"]').click();
+          assert((await dialog.locator('.xm-device-inspector').innerText()).includes('Phone 1'),'Selecting a device must update its inspector');
+        }
+        await dialog.locator('[data-device-limit-open]').click();
+        await dialog.locator('[name=limit]').fill('3');
+        await dialog.locator('.xm-device-limit-form .btn').click();
+        await page.waitForFunction(()=>document.querySelector('[data-device-limit-open]')?.textContent.includes('3'));
+        assert.deepEqual(patches.at(-1),{hwid:3});
+        if(count){
+          await dialog.locator('[data-device-remove]').click();
+          await page.locator('.xm-action-confirm .gh').click();
+          assert.equal(patches.length,1,'Cancel must not remove the binding');
+          failNext=true;
+          await dialog.locator('[data-device-remove]').click();
+          await page.locator('.xm-action-confirm .dg').click();
+          await dialog.locator('.xm-device-feedback').filter({hasText:'Device write temporarily unavailable'}).waitFor();
+          assert.equal(await dialog.locator('.xm-sharing-device').count(),count,'Failed removal must preserve devices');
+          await dialog.locator('[data-device-remove]').click();
+          await page.locator('.xm-action-confirm .dg').click();
+          await page.waitForFunction(expected=>document.querySelectorAll('.xm-sharing-device').length===expected,count-1);
+          assert.deepEqual(patches.at(-1).devices.map(d=>d.id),Array.from({length:count},(_,i)=>1000+i).filter(id=>id!==(count>1?1001:1000)),'Removal must keep every other device');
+        }
+        await page.keyboard.press('Escape');
+        await page.locator(`tr[data-id="${user.id}"]`).click();
+        await page.locator('#dlg [data-sharing-detail]').first().click();
+        await dialog.locator('.xm-device-capacity').waitFor();
+        await page.keyboard.press('Escape');await page.keyboard.press('Escape');
+        if(width===1920&&count===2){
+          await page.evaluate(()=>{sessionUser.role='viewer';XMeshI18n.setLanguage('en')});
+          await page.locator(`#ut [data-sharing-detail="${user.id}"][data-sharing-focus="devices"]`).click();
+          await dialog.locator('.xm-device-capacity').waitFor();
+          assert(await dialog.locator('[data-device-limit-open]').isDisabled(),'Read-only viewer must not change the limit');
+          assert.equal(await dialog.locator('[data-device-remove]').count(),0,'Read-only viewer must not remove bindings');
+          assert.equal(await dialog.locator('h2').innerText(),'Devices & access');
+          await screenshot(page,'devices-viewer-english');
+        }
         return bounds;
       }finally{
         if(await page.locator('#xm-sharing-dialog[open]').count())await page.keyboard.press('Escape');
-        await page.unroute(pattern);
+        if(await page.locator('#dlg[open]').count())await page.keyboard.press('Escape');
+        await page.evaluate(initial=>{sessionUser.role=initial.role;XMeshI18n.setLanguage(initial.language)},initial);
+        await page.unroute(pattern);await page.unroute(mutation);
       }
     });
 
