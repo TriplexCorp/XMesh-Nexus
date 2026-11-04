@@ -4272,6 +4272,30 @@ fn validate_record(collection: &str, data: &Value) -> Result<(), ApiError> {
 }
 
 #[cfg(test)]
+mod node_tls_auto_mode_validation_tests {
+    use super::*;
+
+    #[test]
+    fn allows_node_save_without_per_node_acme_email_or_manual_certificate_mode() {
+        let node = json!({
+            "addr":"nl.example.org",
+            "tlsAutoProvision":true,
+            "tlsManualProvision":false
+        });
+        assert!(validate_record("nodes", &node).is_ok());
+        // Legacy switches must not block switching the assigned profile back
+        // to security=none or reality. The compiler checks conflicts only
+        // when the selected profile actually contains a TLS inbound.
+        let legacy = json!({
+            "addr":"nl.example.org",
+            "tlsAutoProvision":true,
+            "tlsManualProvision":true
+        });
+        assert!(validate_record("nodes", &legacy).is_ok());
+    }
+}
+
+#[cfg(test)]
 mod reality_profile_autofill_validation_tests {
     use super::*;
 
