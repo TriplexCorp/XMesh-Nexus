@@ -149,7 +149,7 @@ async function main() {
       assert(await page.locator('#view').isVisible());
     });
     const inboundTag = prefix.replace(/-/g,'_');
-    const profile = await create('profiles',{name:`${prefix} · Профиль`,config:JSON.stringify({inbounds:[{tag:inboundTag,listen:'127.0.0.1',port:28352,protocol:'vless',settings:{decryption:'none',clients:[]},streamSettings:{network:'tcp',security:'none'}}],outbounds:[{tag:'direct',protocol:'freedom'}]})});
+    const profile = await create('profiles',{name:`${prefix} · Профиль`,config:JSON.stringify({inbounds:[{tag:inboundTag,listen:'127.0.0.1',port:28352,protocol:'vless',settings:{decryption:'none',clients:[]},streamSettings:{network:'tcp',security:'tls',tlsSettings:{serverName:'ui.example.invalid'}}}],outbounds:[{tag:'direct',protocol:'freedom'}]})});
     const node = await create('nodes',{name:`${prefix} · Москва`,addr:'192.0.2.10',flag:'🇵🇱',port:443,xrayLocalPort:13456,mult:1,limit:0,resetDay:1,profileId:profile.id,rotationEnabled:false,rotationIntervalHours:24,rotationIps:'',billingCurrency:'EUR',billingPeriod:'monthly',billingRemindDays:7,billingPrice:0,hosting:'Datagio',tlsManualProvision:true,geoEnabled:true});
     const squad = await create('squads',{name:`${prefix} · Сквад`,desc:'Данные браузерной проверки',inb:[inboundTag]});
     await create('hosts',{remark:`${prefix} · Хост`,profileId:profile.id,tag:inboundTag,address:'ui.example.invalid',port:443,nodes:[node.id]});
@@ -180,13 +180,20 @@ async function main() {
 
     for(const [width,height,count,limit] of [[1920,1080,2,2],[2560,1440,5,5],[390,844,5,0],[1920,1080,0,2]])await checked(`Device workspace: ${width} ${count}/${limit||'unlimited'}`,async()=>{
       await page.setViewportSize({width,height});
-      const pattern='**/api/v1/bootstrap',mutation=`**/api/v1/collections/users/${user.id}`;
-      let snapshot,failNext=false;const patches=[];
+      const pattern='**/api/v1/bootstrap',mutation=`**/api/v1/collections/users/${user.id}`,removeRoute=`**/api/v1/users/${user.id}/subscription?deviceAction=remove&deviceId=*`;
+      let snapshot,failNext=false;const patches=[],removals=[];
       const initial=await page.evaluate(()=>({role:sessionUser.role,language:XMeshI18n.getLanguage()}));
       await page.route(mutation,async route=>{
         const patch=route.request().postDataJSON();patches.push(patch);
-        if(failNext){failNext=false;await route.fulfill({status:503,json:{error:'Device write temporarily unavailable'}});return}
+        assert(!('devices' in patch),'Device bindings must not be deleted through user JSON PATCH');
         snapshot={...snapshot,...patch};await route.fulfill({json:snapshot});
+      });
+      await page.route(removeRoute,async route=>{
+        assert.equal(route.request().method(),'POST');
+        const id=Number(new URL(route.request().url()).searchParams.get('deviceId'));removals.push(id);
+        if(failNext){failNext=false;await route.fulfill({status:503,json:{error:'Device write temporarily unavailable'}});return}
+        snapshot.devices=snapshot.devices.filter(d=>d.id!==id);
+        await route.fulfill({json:{ok:true,deviceLimit:{devices:snapshot.devices,count:snapshot.devices.length,limit:snapshot.hwid}}});
       });
       await page.route(pattern,async route=>{
         const response=await route.fetch(),data=await response.json();
@@ -267,7 +274,7 @@ async function main() {
         if(count){
           await dialog.locator('[data-device-remove]').click();
           await page.locator('.xm-action-confirm .gh').click();
-          assert.equal(patches.length,1,'Cancel must not remove the binding');
+          assert.equal(removals.length,0,'Cancel must not remove the binding');
           failNext=true;
           await dialog.locator('[data-device-remove]').click();
           await page.locator('.xm-action-confirm .dg').click();
@@ -276,7 +283,7 @@ async function main() {
           await dialog.locator('[data-device-remove]').click();
           await page.locator('.xm-action-confirm .dg').click();
           await page.waitForFunction(expected=>document.querySelectorAll('.xm-sharing-device').length===expected,count-1);
-          assert.deepEqual(patches.at(-1).devices.map(d=>d.id),Array.from({length:count},(_,i)=>1000+i).filter(id=>id!==(count>1?1001:1000)),'Removal must keep every other device');
+          assert.deepEqual(snapshot.devices.map(d=>d.id),Array.from({length:count},(_,i)=>1000+i).filter(id=>id!==(count>1?1001:1000)),'Removal must keep every other device');
         }
         await page.keyboard.press('Escape');
         await page.locator(`tr[data-id="${user.id}"]`).click();
@@ -297,8 +304,46 @@ async function main() {
         if(await page.locator('#xm-sharing-dialog[open]').count())await page.keyboard.press('Escape');
         if(await page.locator('#dlg[open]').count())await page.keyboard.press('Escape');
         await page.evaluate(initial=>{sessionUser.role=initial.role;XMeshI18n.setLanguage(initial.language)},initial);
-        await page.unroute(pattern);await page.unroute(mutation);
+        await page.unroute(pattern);await page.unroute(mutation);await page.unroute(removeRoute);
       }
+    });
+
+    await checked('Device removal persists through the real subscription API',async()=>{
+      await api('PATCH',`/collections/users/${user.id}`,{hwid:3});
+      const subscription=await api('GET',`/users/${user.id}/subscription`);
+      assert(subscription.token,'Test subscription must have a real public token');
+      const feed=base+new URL(subscription.url,base).pathname+'?format=json';
+      async function register(model){
+        const response=await context.request.get(feed,{headers:{'x-hwid':require('node:crypto').randomUUID(),'x-device-os':'Windows','x-ver-os':'11','x-device-model':model,'User-Agent':'Happ/1.0'}});
+        assert(response.ok(),'Public subscription must register the test HWID: HTTP '+response.status());
+      }
+      await register('Real device A');await register('Real device B');
+      const before=(await api('GET',`/users/${user.id}/subscription`)).deviceLimit.devices;
+      assert.equal(before.length,2,'Two real SQL-backed device slots must be registered');
+      const removed=before.find(d=>d.model==='Real device A'),retained=before.find(d=>d.model==='Real device B');
+      await navigate('users');await page.reload({waitUntil:'domcontentloaded'});
+      await page.locator(`#ut [data-sharing-detail="${user.id}"][data-sharing-focus=devices]`).click();
+      const dialog=page.locator('#xm-sharing-dialog');
+      await dialog.locator(`[data-device-select="${removed.id}"]`).click();
+      // Register another device after the UI snapshot. Removing A must not
+      // overwrite B or this newly registered C with a stale devices array.
+      await register('Real device C');
+      const third=(await api('GET',`/users/${user.id}/subscription`)).deviceLimit.devices.find(d=>d.model==='Real device C');
+      await dialog.locator('[data-device-remove]').click();
+      await page.locator('.xm-action-confirm .dg').click();
+      await dialog.locator(`[data-device-select="${removed.id}"]`).waitFor({state:'detached'});
+      const after=(await api('GET',`/users/${user.id}/subscription`)).deviceLimit.devices;
+      assert.deepEqual(after.map(d=>d.id).sort(),[retained.id,third.id].sort(),'Real API must delete only the selected SQL row, retaining concurrent registrations');
+      await page.keyboard.press('Escape');await page.reload({waitUntil:'domcontentloaded'});
+      await page.locator(`#ut [data-sharing-detail="${user.id}"][data-sharing-focus=devices]`).click();
+      await dialog.locator(`[data-device-select="${retained.id}"]`).waitFor();
+      assert.equal(await dialog.locator('.xm-sharing-device').count(),2,'Deletion must survive a full page reload');
+      await page.keyboard.press('Escape');
+      const crossUser=await context.request.post(base+`/api/v1/users/${otherUser.id}/subscription?deviceAction=remove&deviceId=${retained.id}`,{headers:{Origin:base}});
+      assert.equal(crossUser.status(),404,'A device from another user must not be removed');
+      for(const id of [retained.id,third.id])await api('POST',`/users/${user.id}/subscription?deviceAction=remove&deviceId=${id}`);
+      await api('PATCH',`/collections/users/${user.id}`,{hwid:2});
+      await page.reload({waitUntil:'domcontentloaded'});
     });
 
     await checked('Node operation spinners actually rotate and respect motion preferences',async()=>{
