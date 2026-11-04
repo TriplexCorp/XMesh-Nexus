@@ -120,6 +120,8 @@ Default means live inheritance. It should not copy the current host value into t
 
 Hosts represent client-facing endpoint configuration rather than the physical node alone. This separation is useful when infrastructure, DNS and exported client identity should evolve independently.
 
+**Publish rule:** client-facing subscriptions and exported Client JSON contain only enabled, authorized Host records that match the selected XRAY STUDIO profile, inbound and node binding. A Node is never automatically exported as a replacement Host, even when the Hosts collection is empty. Deleting/disabling the last publishable Host therefore produces **zero** client servers without changing the Node runtime or its signed configuration. The authenticated active-user subscription endpoint returns a successful empty JSON array (`[]`) with `Cache-Control: no-store, private`, so clients can discard previously downloaded endpoints on refresh; clients may retain historical local entries until their own refresh/removal behavior runs. Invalid tokens and inactive subscriptions remain denied independently of this empty-feed behavior.
+
 Host configuration can include the endpoint/addressing data and client-visible transport/security metadata used when subscriptions are generated.
 
 ### Host fingerprint
