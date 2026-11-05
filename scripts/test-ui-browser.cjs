@@ -1874,6 +1874,20 @@ async function main() {
       assert.equal(await page.locator('.squad-editor-connections .node-form-section-title .ic').count(),1,'Connection section must retain native icon');
       assert.equal(await page.locator('.squad-editor-side .node-form-section-title .ic').count(),1,'Impact section must retain native icon');
       assert.equal(await page.locator('.squad-preview-stat > svg.ic').count(),4,'Impact metrics must use semantic Nexus icons');
+      const impactDetails=page.locator('[data-squad-impact-details]');
+      assert.equal(await impactDetails.count(),1,'Impact details must be available through one disclosure');
+      assert.equal(await impactDetails.getAttribute('open'),null,'Entity lists must be collapsed by default');
+      assert.equal(await page.locator('.squad-editor-side .squad-preview-section:visible').count(),0,
+        'Host, user and node lists must not crowd the impact preview');
+      await impactDetails.locator('summary').click();
+      assert.equal(await impactDetails.getAttribute('open'),'','Details must be keyboard-accessible native disclosure');
+      assert.equal(await impactDetails.locator('.squad-preview-section').count(),3,
+        'Hosts, users and nodes must remain accessible in details');
+      await page.locator('.squad-inbound-row').first().click();
+      assert.equal(await impactDetails.getAttribute('open'),'',
+        'Changing inbound selection must preserve expanded impact details');
+      await impactDetails.locator('summary').click();
+      assert.equal(await impactDetails.getAttribute('open'),null,'Details must collapse without modifying selection');
       if(height>=1080){
         const initial=await page.locator('.squad-editor-layout').evaluate(el=>({scroll:el.scrollHeight,client:el.clientHeight}));
         assert(initial.scroll<=initial.client+1,'New squad with no selected inbound must fit without a small workspace scrollbar: '+JSON.stringify(initial));
