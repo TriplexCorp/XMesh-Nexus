@@ -107,7 +107,7 @@
 
     const rootMarkup='<section class="crx" id="client-route-root" aria-label="Клиентская маршрутизация">'+
       '<header class="crx-page-head"><div class="crx-page-copy">'+
-      '<h2>Правила подключения</h2><p>Один шаблон — несколько серверов. Управляйте направлениями трафика в Xray JSON.</p></div>'+
+      '<h2>Шаблоны</h2></div>'+
       '<div class="crx-page-actions"><span class="crx-total" data-cr-counter></span><button type="button" class="crx-btn crx-btn-primary" data-cr-add>'+icon('plus')+' Новый шаблон</button></div></header>'+
       '<div class="crx-list" data-cr-list></div>'+
       '<div class="crx-bottom" data-cr-bottom><div><strong data-cr-status></strong><span>Изменения попадут в клиентскую подписку при следующем обновлении</span></div>'+
@@ -115,45 +115,44 @@
       '<button type="button" class="crx-btn crx-btn-primary" data-cr-save disabled>'+icon('save')+' Сохранить изменения</button></div></div>'+
       '<div data-cr-modal-host></div></section>';
 
+    const countLabel=(n,ru,en)=>n+' '+(window.XMeshI18n?.getLanguage?.()==='en'?en[n===1?0:1]:ru[({one:0,few:1,many:2,other:2})[new Intl.PluralRules('ru').select(n)]]);
     function current(){return draft.find(p=>p.id===activeId);}
     function dirty(){return JSON.stringify(draft)!==saved;}
     function countInfo(){return draft.reduce((n,p)=>n+(p.servers||[]).length,0);}
     function status(){
       const el=document.getElementById('client-route-root');if(!el)return;
-      el.querySelector('[data-cr-counter]').textContent=draft.length+' шаблон'+(draft.length===1?'':'ов');
-      el.querySelector('[data-cr-status]').textContent=draft.length+' шаблонов · '+countInfo()+' назначений';
+      el.querySelector('[data-cr-counter]').textContent=countLabel(draft.length,['шаблон','шаблона','шаблонов'],['template','templates']);
+      el.querySelector('[data-cr-status]').textContent=countLabel(draft.length,['шаблон','шаблона','шаблонов'],['template','templates'])+' · '+countLabel(countInfo(),['назначение','назначения','назначений'],['assignment','assignments']);
       el.querySelector('[data-cr-reset]').hidden=!dirty();
       el.querySelector('[data-cr-save]').disabled=saveBusy||!dirty();
       el.querySelector('[data-cr-save]').innerHTML=saveBusy?'Сохраняем…':icon('save')+' Сохранить изменения';
       el.querySelector('[data-cr-bottom]').classList.toggle('is-dirty',dirty());
+      el.querySelector('[data-cr-bottom]').hidden=!dirty()&&!saveBusy;
     }
     function sourceSummary(p){
       const assigned=p.servers||[];
-      const flags=assigned.slice(0,5).map(key=>{
+      const flags=assigned.slice(0,2).map(key=>{
         const item=sourceByKey.get(key);
-        return '<span title="'+escapeHTML(item?.title||key)+'">'+flag(item?.code)+'</span>';
+        return '<span class="crx-assigned-source" title="'+escapeHTML(item?.title||key)+'">'+flag(item?.code)+'<span>'+escapeHTML(item?.title||key)+'</span></span>';
       }).join('');
-      return flags+'<span class="crx-flags-count">'+assigned.length+' сервер'+(assigned.length===1?'':'ов')+'</span>';
+      return flags+(assigned.length>2?'<span class="crx-flags-count">+'+(assigned.length-2)+'</span>':'');
     }
     function card(p) {
       const rulePreview=(p.rules||[]).slice(0,2).map(rule=>
-        '<span class="crx-rule-chip"><b>'+escapeHTML(kinds[rule.match]||rule.match)+'</b> '+escapeHTML(rule.value||'—')+
-        ' <em>→ '+escapeHTML(actions[rule.action]||rule.action)+'</em></span>').join('');
+        '<span class="crx-rule-chip"><span>'+escapeHTML(kinds[rule.match]||rule.match)+'</span><b>'+escapeHTML(rule.value||'—')+
+        '</b><em>→ '+escapeHTML(actions[rule.action]||rule.action)+'</em></span>').join('');
       return '<article class="crx-card'+(p.enabled===false?' is-disabled':'')+'" data-cr-profile="'+escapeHTML(p.id)+'">'+
-        '<div class="crx-card-top"><div class="crx-card-symbol">'+icon('route')+'</div>'+
-        '<span class="crx-state'+(p.enabled===false?' is-off':'')+'"><i></i>'+(p.enabled===false?'Выключен':'Активен')+'</span></div>'+
-        '<div class="crx-card-title">'+escapeHTML(p.name||'Без названия')+'</div>'+
-        '<div class="crx-card-desc">Маршрутизация Xray JSON</div>'+
-        '<div class="crx-card-divider"></div>'+
-        '<div class="crx-card-stats"><span>'+icon('server')+' '+(p.servers||[]).length+' назначений</span>'+
-        '<span>'+icon('settings')+' '+(p.rules||[]).length+' правил</span></div>'+
-        '<div class="crx-card-flags">'+sourceSummary(p)+'</div>'+
+        '<div class="crx-card-identity"><h3 class="crx-card-title">'+escapeHTML(p.name||'Без названия')+'</h3>'+
+        '<div class="crx-card-stats"><span class="crx-state'+(p.enabled===false?' is-off':'')+'"><i></i>'+(p.enabled===false?'Выключен':'Активен')+'</span>'+
+        '<span>'+countLabel((p.rules||[]).length,['правило','правила','правил'],['rule','rules'])+'</span></div></div>'+
+        '<div class="crx-card-flags">'+(sourceSummary(p)||'<span class="crx-card-no-rules">Нет назначений</span>')+'</div>'+
         '<div class="crx-card-rules">'+(rulePreview||'<span class="crx-card-no-rules">Дополнительных правил пока нет</span>')+'</div>'+
         '<div class="crx-card-footer"><button type="button" class="crx-btn crx-btn-outline" data-cr-open="'+escapeHTML(p.id)+'">'+
           'Настроить '+icon('chevron')+'</button>'+
         '<button type="button" class="crx-icon-btn" data-cr-duplicate="'+escapeHTML(p.id)+'" title="Копировать шаблон" aria-label="Копировать шаблон">'+icon('copy')+'</button></div>'+
       '</article>';
     }
+
     function editorSource(key,p){
       const s=sourceByKey.get(key)||{key,title:key,kind:'Недоступный сервер',detail:'Привязка сохранена',code:''};
       const checked=(p.servers||[]).includes(key);
@@ -194,7 +193,7 @@
       const reuse=Boolean(live?.open&&live.dataset.crProfileId===p.id);
       const markup='<dialog class="crx-overlay" data-cr-overlay aria-labelledby="crx-dialog-title"><div class="crx-dialog">'+
         '<header class="crx-dialog-header"><div class="crx-dialog-identity"><div class="crx-dialog-mark">'+icon('route')+'</div>'+
-        '<div><span class="crx-dialog-kicker">РЕДАКТОР МАРШРУТИЗАЦИИ</span><h2 id="crx-dialog-title">'+escapeHTML(p.name||'Новый шаблон')+'</h2></div></div>'+
+        '<div><h2 id="crx-dialog-title">'+escapeHTML(p.name||'Новый шаблон')+'</h2></div></div>'+
         '<button type="button" class="crx-icon-btn crx-close" data-cr-close title="Закрыть" aria-label="Закрыть">'+icon('close')+'</button></header>'+
         '<nav class="crx-tabs" role="tablist" aria-label="Разделы маршрутизации">'+
           [['sources','Назначения','server'],['rules','Правила','settings'],['json','JSON','code']].map(([id,label,symbol])=>
@@ -219,7 +218,7 @@
           '<textarea class="crx-json" data-cr-json-text spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="JSON шаблона">'+escapeHTML(jsonValue)+'</textarea>'+
           '<p class="crx-json-error" data-cr-json-error'+(jsonError?'':' hidden')+'>'+escapeHTML(jsonError)+'</p>')+
         '</main><footer class="crx-dialog-footer"><div class="crx-dialog-summary">'+
-        '<span>'+(p.servers||[]).length+' назначений · '+(p.rules||[]).length+' правил</span><small>Настройки применяются к следующим JSON-подпискам</small></div>'+
+        '<span>'+(p.servers||[]).length+' назначений · '+(p.rules||[]).length+' правил</span></div>'+
         '<div class="crx-dialog-footer-actions">'+
         '<button type="button" class="crx-btn crx-btn-primary" data-cr-save'+(saveBusy?' disabled':'')+'>'+icon('save')+' Сохранить изменения</button></div></footer>'+
         '<div class="crx-settings"><div class="crx-settings-fields"><label>Название шаблона<input data-cr-name maxlength="100" value="'+escapeHTML(p.name||'')+'"></label>'+
