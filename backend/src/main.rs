@@ -343,6 +343,7 @@ fn protected_routes(state: &AppState) -> Router<AppState> {
             get(get_statistics_period_leaders),
         )
         .route("/metrics/traffic", get(get_traffic_metrics))
+        .route("/squads/traffic/24h", get(get_squad_traffic_24h))
         .route(
             "/metrics/traffic/bucket-detail",
             get(get_traffic_bucket_detail),
@@ -3307,6 +3308,69 @@ async fn get_traffic_bucket_detail(
         json!({"range":range,"bucketMs":query.bucket_ms,"intervalSeconds":interval_seconds,
         "source":"server_metric_samples","nodes":nodes,"truncated":nodes.len()==500}),
     ))
+}
+
+/// Verified 24-hour usage of users *currently* assigned to each squad.
+/// This is not node-wide traffic and not a mutually exclusive billing ledger:
+/// a user assigned to multiple squads contributes to each corresponding card.
+async fn get_squad_traffic_24h(
+    State(state): State<AppState>,
+    Extension(actor): Extension<auth::AuthUser>,
+) -> Result<(HeaderMap, Json<Value>), ApiError> {
+    if viewer_read_only(&actor) {
+        return Err(ApiError::new(StatusCode::FORBIDDEN, "Недостаточно прав."));
+    }
+    let rows = sqlx::query(
+        "WITH squad_members AS (
+             SELECT sq.id AS squad_id, u.id AS user_id
+             FROM panel_records sq
+             JOIN panel_records u ON u.collection='users'
+             AND EXISTS (
+                 SELECT 1
+                 FROM jsonb_array_elements_text(
+                     CASE WHEN jsonb_typeof(u.data->'squads')='array'
+                     THEN u.data->'squads' ELSE '[]'::jsonb END
+                 ) AS membership(id)
+                 WHERE membership.id = sq.id::text
+             )
+             WHERE sq.collection='squads'
+         )
+         SELECT sm.squad_id,
+                (EXTRACT(EPOCH FROM time_bucket(INTERVAL '1 hour', d.sampled_at))*1000)::BIGINT AS bucket_ms,
+                SUM(d.uplink_bytes)::BIGINT AS up,
+                SUM(d.downlink_bytes)::BIGINT AS down,
+                COUNT(*)::BIGINT AS samples,
+                (EXTRACT(EPOCH FROM MAX(d.sampled_at))*1000)::BIGINT AS latest_ms
+         FROM verified_traffic_deltas d
+         JOIN squad_members sm ON sm.user_id=d.user_id
+         WHERE d.source_type='user' AND d.sampled_at>=NOW()-INTERVAL '24 hours'
+         GROUP BY sm.squad_id, time_bucket(INTERVAL '1 hour', d.sampled_at)
+         ORDER BY sm.squad_id, bucket_ms"
+    )
+    .fetch_all(&state.pool)
+    .await?;
+    let mut items = Vec::with_capacity(rows.len());
+    for row in rows {
+        items.push(json!({
+            "squadId": row.try_get::<i64,_>("squad_id")?,
+            "bucketMs": row.try_get::<i64,_>("bucket_ms")?,
+            "uplinkBytes": row.try_get::<i64,_>("up")?,
+            "downlinkBytes": row.try_get::<i64,_>("down")?,
+            "sampleCount": row.try_get::<i64,_>("samples")?,
+            "latestSampleMs": row.try_get::<i64,_>("latest_ms")?
+        }));
+    }
+    let mut headers = HeaderMap::new();
+    headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("private, no-store"));
+    headers.insert(header::VARY, HeaderValue::from_static("Cookie"));
+    Ok((headers, Json(json!({
+        "source":"verified_traffic_deltas",
+        "sourceType":"user",
+        "range":"24h",
+        "membership":"current",
+        "bucketSeconds":3600,
+        "items":items
+    }))))
 }
 
 async fn get_traffic_metrics(
