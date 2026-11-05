@@ -3011,13 +3011,14 @@ function syncNodeEffectiveTls(form){
   if(!form||form.dataset.ent!=='nodes')return;
   const field=k=>form.elements.namedItem(k);
   const profile=DB.profiles.find(p=>String(p.id)===String(field('profileId')?.value));
-  const state=nodeTlsReadiness(profile,{addr:field('addr')?.value,tlsDomain:field('tlsDomain')?.value,
+  const values={addr:field('addr')?.value,tlsDomain:field('tlsDomain')?.value,
     tlsAcmeEmail:field('tlsAcmeEmail')?.value,tlsAutoProvision:field('tlsAutoProvision')?.checked,
-    tlsManualProvision:field('tlsManualProvision')?.checked});
+    tlsManualProvision:field('tlsManualProvision')?.checked};
+  const state=nodeTlsReadiness(profile,values);
   const mode=state.mode;
   const status=form.querySelector('[data-node-tls-effective]');
   const label=form.querySelector('[data-node-tls-state]');
-  const feedback=form.querySelector('[data-node-tls-readiness]'),hint=form.querySelector('[data-node-tls-note]');
+  const feedback=form.querySelector('[data-node-tls-readiness]');
   const names={on:'TLS включён',off:'Без TLS',unconfigured:profile?'Режим Security не задан':'Профиль не выбран'};
   if(status)status.dataset.state=mode;
   if(label)label.textContent=names[mode];
@@ -3025,10 +3026,23 @@ function syncNodeEffectiveTls(form){
     feedback.textContent=mode==='on'?(state.ready?(state.method==='external'?'Внешний сертификат из профиля':String(field('tlsDomain')?.value||field('addr')?.value||'')):state.reason):mode==='off'?'Сертификат не требуется':profile?'Укажите Security в профиле Xray':'Выберите профиль Xray в параметрах подключения';}
   const method=state.method==='external'||field('tlsManualProvision')?.checked?'external':'acme';
   for(const radio of form.querySelectorAll('[name="nodeTlsMethod"]'))radio.checked=radio.value===method;
-  const acme=form.querySelector('[data-node-tls-acme]'),external=form.querySelector('[data-node-tls-external]');
-  if(acme)acme.hidden=method!=='acme';
-  if(external)external.hidden=method!=='external';
-  if(hint){hint.textContent=mode==='on'?(state.ready&&state.method==='acme'?'Выпуск начнётся при применении профиля':state.reason):'Настройки сертификата сохраняются для будущих TLS-профилей.';hint.dataset.ready=state.ready?'yes':'no';hint.hidden=state.ready&&state.method==='external';}
+  // Both panels contribute their intrinsic size to the same grid cell. Render
+  // each panel's own feedback even while inactive so switching does not change
+  // the maximum content height or re-center the native dialog.
+  for(const source of ['acme','external']){
+    const panel=form.querySelector('[data-node-tls-'+source+']');
+    if(!panel)continue;
+    panel.dataset.active=String(source===method);
+    panel.setAttribute('aria-hidden',String(source!==method));
+    panel.inert=source!==method;
+    const hint=panel.querySelector('[data-node-tls-note]');
+    const readiness=state.method==='conflict'?state:nodeTlsReadiness(profile,{...values,tlsAutoProvision:source==='acme',tlsManualProvision:source==='external'});
+    if(hint){
+      hint.textContent=mode==='on'?(state.method==='conflict'?state.reason:readiness.ready&&source==='acme'?'Выпуск начнётся при применении профиля':readiness.reason):'Настройки сертификата сохраняются для будущих TLS-профилей.';
+      hint.dataset.ready=readiness.ready?'yes':'no';
+      hint.hidden=readiness.ready&&source==='external';
+    }
+  }
 }
 function selectNodeEditorTab(form,key,focus=false){
   if(!form||!['connection','network','billing'].includes(key))return;
@@ -3060,7 +3074,7 @@ function focusNodeTlsSetup(form,focusField=''){
   selectNodeEditorTab(form,'connection');
   syncNodeEffectiveTls(form);
   const target=focusField&&form.elements.namedItem(focusField);
-  if(target&&!target.closest('[hidden]'))target.focus();
+  if(target&&!target.closest('[hidden],[inert]'))target.focus();
   else form.querySelector('[name="nodeTlsMethod"]:checked')?.focus();
 }
 document.addEventListener('change',event=>{
@@ -3116,9 +3130,10 @@ function entForm(k,id,seed){const e=ENT[k],o=seed||(id?DB[k].find(x=>String(x.id
         '<label class="node-tls-method-option"><input type="radio" name="nodeTlsMethod" value="acme" '+(o.tlsManualProvision?'':'checked')+'><strong>Let’s Encrypt</strong></label>'+
         '<label class="node-tls-method-option"><input type="radio" name="nodeTlsMethod" value="external" '+(o.tlsManualProvision?'checked':'')+'><strong>Свой сертификат</strong></label>'+
       '</fieldset>'+
-      '<div class="node-tls-acme-fields" data-node-tls-acme>'+tlsField('tlsDomain')+tlsField('tlsAcmeEmail')+'</div>'+
-      '<div class="node-tls-external-note" data-node-tls-external hidden><strong>Пути в профиле Xray</strong><p>Укажите certificateFile и keyFile для каждого TLS inbound в XRAY STUDIO. Файлы должны существовать на ноде.</p></div>'+
-      '<p class="node-tls-setup-feedback" data-node-tls-note role="status" aria-live="polite"></p>'+
+      '<div class="node-tls-details">'+
+        '<div class="node-tls-mode-panel" data-node-tls-acme data-active="true" aria-hidden="false"><div class="node-tls-acme-fields">'+tlsField('tlsDomain')+tlsField('tlsAcmeEmail')+'</div><p class="node-tls-setup-feedback" data-node-tls-note role="status" aria-live="polite"></p></div>'+
+        '<div class="node-tls-mode-panel" data-node-tls-external data-active="false" aria-hidden="true" inert><div class="node-tls-external-note"><strong>Пути в профиле Xray</strong><p>Укажите certificateFile и keyFile для каждого TLS inbound в XRAY STUDIO. Файлы должны существовать на ноде.</p></div><p class="node-tls-setup-feedback" data-node-tls-note role="status" aria-live="polite"></p></div>'+
+      '</div>'+
     '</div></section>';
   const nodeResetAction=id?'<div class="node-reset-action"><div class="node-reset-copy"><strong>Счётчик трафика</strong><span>Обнулить расход ноды. Xray не перезапускается.</span></div><button type="button" class="gh sm node-traffic-reset-button" data-node-reset-traffic="'+esc(String(id))+'" title="">'+ic('redo')+'Обнулить</button><output class="node-traffic-reset-status" data-node-reset-feedback aria-live="polite"></output></div>':'';
   const userOptions=DB.users.filter(u=>st(u)==='ACTIVE').map(u=>`<option value="${u.id}">${esc(u.username)}</option>`).join('');

@@ -1177,6 +1177,39 @@ async function main() {
       // after API fixture changes so the editor reads the intended inventory.
       await page.reload({waitUntil:'domcontentloaded'});
       await page.waitForFunction(()=>!!document.querySelector('#view')?.children.length&&!document.querySelector('#view .sk'));
+    for(const [width,height,edit] of [[1366,768,true],[1920,1080,true],[1920,1080,false],[390,844,false]])await checked(`Node editor TLS mode stability: ${edit?'edit':'create'} ${width}×${height}`,async()=>{
+      await page.setViewportSize({width,height});await navigate('nodes');
+      const initialScale=await page.evaluate(()=>C.ts);
+      await page.evaluate(()=>{C.ts=1.1;apply()});
+      await page.locator(edit?`[data-ne="nodes:${node.id}"]`:'[data-ne="nodes"]').first().click();
+      const form=page.locator('#dlg form[data-ent="nodes"]');
+      try{
+        await form.locator('[name="profileId"]').selectOption(String(missingTlsProfile.id));
+        await form.locator('[name="nodeTlsMethod"][value="acme"]').check();
+        await form.locator('[name="tlsDomain"]').fill('node.example.invalid');
+        await form.locator('[name="tlsAcmeEmail"]').fill('ops@example.com');
+        const measure=()=>form.evaluate(f=>{
+          const selectors=['#dlg','.node-editor-heading','[name="name"]','.node-tls-method','.act'];
+          return selectors.map(selector=>{const r=(selector==='#dlg'?f.closest(selector):f.querySelector(selector)).getBoundingClientRect();return{selector,x:r.x,y:r.y,width:r.width,height:r.height}});
+        });
+        // Mobile may scroll a focused input into view. Compare both modes at the
+        // same content origin so native focus scrolling is not mistaken for drift.
+        await form.locator('.node-form-layout').evaluate(el=>el.scrollTop=0);
+        const before=await measure();
+        for(const method of ['external','acme','external','acme']){
+          await form.locator(`[name="nodeTlsMethod"][value="${method}"]`).check();
+          await form.locator('.node-form-layout').evaluate(el=>el.scrollTop=0);
+          const inactive=form.locator('.node-tls-mode-panel[data-active="false"]');
+          assert.equal(await inactive.count(),1,'Exactly one certificate mode must be inactive');
+          assert(await inactive.evaluate(el=>el.inert&&el.getAttribute('aria-hidden')==='true'),'Inactive certificate controls must be excluded from focus and accessibility');
+          assert(!(await inactive.isVisible()),'Inactive certificate fields must not be visible');
+          const after=await measure();
+          for(let i=0;i<before.length;i++)for(const key of ['x','y','width','height'])assert(Math.abs(after[i][key]-before[i][key])<=.1,'Certificate mode must not move '+before[i].selector+' '+key+': '+JSON.stringify({before,after}));
+        }
+        return before;
+      }finally{await page.keyboard.press('Escape');await page.evaluate(ts=>{C.ts=ts;apply()},initialScale)}
+    });
+
       await checked('Node certificate status follows Security, not saved TLS overrides',async()=>{
         try{
           await navigate('nodes');
@@ -1201,7 +1234,7 @@ async function main() {
           await page.locator('[data-ne="nodes:'+node.id+'"]').first().click();
           const form=page.locator('dialog form[data-ent="nodes"]');
           await form.locator('[name="profileId"]').selectOption(String(missingTlsProfile.id));
-          const status=form.locator('[data-node-tls-note]');
+          const status=form.locator('[data-node-tls-note]:visible');
           const modal=form.locator('[data-node-tls-inline]');
           await modal.locator('[name="nodeTlsMethod"][value="acme"]').check();
           assert.equal(await form.locator('[name="tlsManualProvision"]').isChecked(),false,'Radio selection must disable stale external override');
@@ -1215,7 +1248,7 @@ async function main() {
           await form.locator('[name="tlsDomain"]').fill('test-node.example.invalid');
           assert.match(await status.innerText(),/email ACME/,'Missing ACME email must be explained');
           await form.locator('[name="tlsAcmeEmail"]').fill('tls@example.com');
-          assert.match(await modal.locator('[data-node-tls-note]').innerText(),/Выпуск начнётся при применении профиля/,'Ready ACME settings must not claim a certificate has already been issued');
+          assert.match(await modal.locator('[data-node-tls-note]:visible').innerText(),/Выпуск начнётся при применении профиля/,'Ready ACME settings must not claim a certificate has already been issued');
         }finally{await page.keyboard.press('Escape')}
       });
     }finally{
