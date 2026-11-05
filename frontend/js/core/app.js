@@ -5034,7 +5034,7 @@ window.addEventListener('keydown',e=>{
  palette();
 },true);
 document.addEventListener('keydown',e=>{
-  if(e.target.id=='pq'){if(e.key=='ArrowDown'||e.key=='ArrowUp'){e.preventDefault();const n=Math.min(PI.length,12);PX=(PX+(e.key=='ArrowDown'?1:n-1))%Math.max(n,1);$('.pi').forEach((x,i)=>x.classList.toggle('on',i==PX));$('.pi.on')?.scrollIntoView({block:'nearest'})}if(e.key=='Enter'){e.preventDefault();const x=PI[PX];if(x){dlg.close();x.r()}}return}
+  if(e.target.id=='pq'){if(e.key=='ArrowDown'||e.key=='ArrowUp'){e.preventDefault();const n=Math.min(PI.length,12);PX=(PX+(e.key=='ArrowDown'?1:n-1))%Math.max(n,1);$$('.pi').forEach((x,i)=>x.classList.toggle('on',i==PX));$('.pi.on')?.scrollIntoView({block:'nearest'})}if(e.key=='Enter'){e.preventDefault();const x=PI[PX];if(x){dlg.close();x.r()}}return}
   if(e.key=='/'&&!/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)){e.preventDefault();cur=='users'?$('#uq').focus():palette()}});
 document.addEventListener('submit',async e=>{const f=e.target,k=f.dataset.k;if(!k)return;const er=m=>{e.preventDefault();$('#fe')&&($('#fe').textContent=m)};
   if(k=='user'){
