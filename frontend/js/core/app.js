@@ -2095,7 +2095,7 @@ function userDrawer(id,tab){
     ?hosts.map(host=>`<div class="user-host-line"><span>${esc(host.remark||host.tag)}</span><small title="${esc(host.address||'')}">${esc(host.address||'')}:${esc(host.port||'')}</small></div>`).join('')
     :'<span class="user-canvas-muted">Подходящие серверы не назначены</span>';
   const devices=u.devices.length
-    ?u.devices.slice().sort((a,b)=>(Number(b.last)||0)-(Number(a.last)||0)).slice(0,3).map(d=>`<button type="button" class="user-device-preview" data-sharing-detail="${u.id}" data-sharing-focus="devices">${ic(/android|ios|iphone/i.test(d.os||d.plat||'')?'smartphone':'monitor')}<span><b>${esc(d.os||d.plat||(panelIsEnglish()?'Device':'Устройство'))}</b><small>${esc(d.app||d.model||(panelIsEnglish()?'Client':'Клиент'))} · ${panelIsEnglish()?'subscription refresh':'обновление подписки'} ${ago(d.last)}</small></span>${ic('chevronRight')}</button>`).join('')
+    ?u.devices.slice().sort((a,b)=>(Number(b.last)||0)-(Number(a.last)||0)).slice(0,3).map(d=>`<button type="button" class="user-device-preview" data-sharing-detail="${u.id}" data-sharing-focus="devices" data-sharing-device="${esc(d.id)}">${ic(/android|ios|iphone/i.test(d.os||d.plat||'')?'smartphone':'monitor')}<span><b>${esc(d.os||d.plat||(panelIsEnglish()?'Device':'Устройство'))}</b><small>${esc(d.app||d.model||(panelIsEnglish()?'Client':'Клиент'))} · ${panelIsEnglish()?'subscription refresh':'обновление подписки'} ${ago(d.last)}</small></span>${ic('chevronRight')}</button>`).join('')
     :`<span class="user-canvas-muted">${panelIsEnglish()?'The client has not refreshed the subscription yet':'Клиент ещё не обновлял подписку'}</span>`;
   modal(`<div class="box user-drawer user-canvas">
     <header class="user-head">
