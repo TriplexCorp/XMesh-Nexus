@@ -1874,6 +1874,15 @@ async function main() {
       assert.equal(await page.locator('.squad-editor-connections .node-form-section-title .ic').count(),1,'Connection section must retain native icon');
       assert.equal(await page.locator('.squad-editor-side .node-form-section-title .ic').count(),1,'Impact section must retain native icon');
       assert.equal(await page.locator('.squad-preview-stat > svg.ic').count(),4,'Impact metrics must use semantic Nexus icons');
+      const details=page.locator('.squad-preview-details');
+      assert.equal(await details.count(),1,'Impact panel must have one optional details disclosure');
+      assert.equal(await details.evaluate(el=>el.open),false,'Impact names must be collapsed by default');
+      assert.equal(await details.locator('.squad-preview-section:visible').count(),0,'No full user or host lists in the default summary');
+      await details.locator('summary').click();
+      assert.equal(await details.evaluate(el=>el.open),true,'Details should expand on one click');
+      await details.locator('summary').click();
+      assert.equal(await details.evaluate(el=>el.open),false,'Details should collapse again');
+
       if(height>=1080){
         const initial=await page.locator('.squad-editor-layout').evaluate(el=>({scroll:el.scrollHeight,client:el.clientHeight}));
         assert(initial.scroll<=initial.client+1,'New squad with no selected inbound must fit without a small workspace scrollbar: '+JSON.stringify(initial));
@@ -1886,7 +1895,12 @@ async function main() {
       await page.locator('[data-squad-search]').fill('');
       await page.locator('[data-squad-select="clear"]').click();
       assert.equal(await page.locator('input[name="inb"]:checked').count(),0,'Clear must still work');
+      await details.locator('summary').click();
+      assert.equal(await details.evaluate(el=>el.open),true);
       await page.locator('.squad-inbound-row').first().click();
+      assert.equal(await details.evaluate(el=>el.open),true,'Recalculating impact must preserve expanded state');
+      await details.locator('summary').click();
+      assert.equal(await details.evaluate(el=>el.open),false,'Compact summary should be restored');
       await page.locator('input[name="name"]').fill('Squad layout check');
       const g=await page.locator('#dlg').evaluate(d=>{
         const box=e=>{const r=e.getBoundingClientRect();return{x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};

@@ -11,6 +11,7 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Подробнее о связях":"Relationship details",
     "Настройте доступ сквада к подключениям":"Configure the squad's connection access",
     "Фильтр по профилю":"Filter by profile",
     "Все профили":"All profiles",

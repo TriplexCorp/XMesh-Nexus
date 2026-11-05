@@ -330,6 +330,17 @@ accessible native selects, global Classic / Glass / Raised materials, and RU/EN
 copy. Browser checks exercise profile filtering and no-scroll geometry on
 1920, 1366 and mobile viewports.
 
+The **Impact on subscriptions** preview follows a *summary-first* rule: show
+only the four genuine counters (inbound, matching enabled hosts, associated
+nodes and affected users) plus safety warnings by default. Do **not** dump
+usernames or host tiles into the editor's initial viewport. Optional
+`<details>` disclosure provides the relationship listings on demand, capped
+for rendering performance; preserve the open state when inbound selection
+recalculates the preview. Warning states must stay visible even when disclosure
+is collapsed. Native HTML disclosure semantics, keyboard focus and existing
+Nexus Classic/Glass/Raised tokens apply. Do not change membership or
+persisted Squad data to achieve visual compactness.
+
 ### Empty states / Templates / Balancers
 
 Empty states stay compact and explicit. They do not become half-screen blank cards.
