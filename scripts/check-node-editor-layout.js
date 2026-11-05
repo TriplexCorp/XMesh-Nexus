@@ -40,6 +40,17 @@ assert.equal(mode({inbounds:[{protocol:'trojan',streamSettings:{}}]}),'unconfigu
 for(const contract of ['data-node-tls-effective','data-node-tls-state','data-node-tls-preferences','syncNodeEffectiveTls(dlg.querySelector','form[data-ent="nodes"] [name="profileId"]'])
  assert(ui.includes(contract),'Node TLS UI contract missing: '+contract);
 
+// Keep certificate preferences in their own right-side surface: never let the
+// primary column become taller than the viewport from TLS controls.
+const nodeLayoutStart=ui.indexOf("  const fields=k==='squads'?");
+const nodeLayoutEnd=ui.indexOf('  const boundedEntityEditor=',nodeLayoutStart);
+assert(nodeLayoutStart>0&&nodeLayoutEnd>nodeLayoutStart,'Node editor composition not found');
+const nodeLayout=ui.slice(nodeLayoutStart,nodeLayoutEnd);
+assert(nodeLayout.includes('node-side-stack'),'Node editor must have a separate certificate/billing side stack');
+assert(nodeLayout.includes("${billingFields}</div></section>${nodeTlsFields}"),'Certificate must follow billing in its own section');
+assert(!nodeLayout.includes("nodeMainFields+'</div>'+nodeTlsFields"),'TLS must not expand primary node fields');
+assert.match(css,/dialog\\.node-wide \\.node-side-stack \\{/,'Right-side node stack must have scoped geometry');
+
 // Shared dialog safety is independent of a node-specific placement patch.
 assert.match(css,/node-form-layout/,'Node editor must retain its form sections');
 assert.match(css,/node-address-port/,'Address and port remain one field group');
