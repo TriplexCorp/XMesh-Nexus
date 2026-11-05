@@ -1984,6 +1984,16 @@ async function main() {
         const realityNode=await create('nodes',{name:prefix+' Germany Premium',addr:'192.0.2.61',port:443,profileId:realityProfile.id,flag:'DE'});
         await page.setViewportSize({width:1920,height:1080});await navigate('hosts');await page.reload({waitUntil:'domcontentloaded'});
         await page.locator('[data-ne="hosts"]').first().click();const form=page.locator('#dlg form[data-ent="hosts"]');
+        const fpOptions=await form.locator('[name="fp"] option').evaluateAll(options=>options.map(option=>({value:option.value,label:option.textContent.trim()})));
+        assert.equal(fpOptions.filter(option=>option.value==='chrome').length,1,'Host fingerprint must show chrome only once');
+        assert(!fpOptions.some(option=>option.value===''),'Host fingerprint must not duplicate chrome as an empty default');
+        assert.equal(fpOptions.find(option=>option.value==='chrome').label,'chrome');
+        assert.equal(await form.locator('[name="fp"]').inputValue(),'chrome','New Host must select chrome automatically');
+        await form.locator('[name="fp"]').evaluate(select=>{select.value='firefox';select.dispatchEvent(new Event('input',{bubbles:true}))});
+        assert.equal(await form.locator('[name="fp"]').inputValue(),'firefox');
+        await form.locator('[data-host-clear-overrides]').click();
+        assert.equal(await form.locator('[name="fp"]').inputValue(),'chrome','Reset overrides must restore chrome');
+        await page.waitForFunction(()=>document.querySelector('#dlg [name="fp"]')?.closest('.xm-select-shell')?.querySelector('.xm-select-caption')?.textContent==='chrome');
         await form.locator('[data-host-node-preset]').evaluate((select,id)=>{select.value=String(id);select.dispatchEvent(new Event('change',{bubbles:true}))},realityNode.id);
         await page.waitForFunction(expected=>document.querySelector('#dlg [name="publicKey"]')?.value===expected,publicKey);
         assert.equal(await form.locator('[name="remark"]').inputValue(),'🇩🇪 '+realityNode.name);

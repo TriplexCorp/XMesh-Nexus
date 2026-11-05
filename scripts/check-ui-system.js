@@ -109,6 +109,16 @@ assert.doesNotMatch(squadCards,/\.squad-card-tags\{[^}]*overflow:hidden/,
  'Alignment must not hide inbound tags');
 
 // Host directory uses the canonical feature styles and existing mutations.
+// Host fingerprint default is chrome, not a second empty-value option.
+assert.match(app,/\{k:'fp',l:'uTLS fingerprint',t:'sel',o:\[\['chrome','chrome'\]/,
+ 'Host fingerprint select must expose chrome as the one default');
+assert.doesNotMatch(app,/\['','По умолчанию \(chrome\)'\]/,
+ 'Do not duplicate chrome as a default option');
+assert.match(app,/def:\(\)=>\(\{port:443,fp:'chrome',order:DB\.hosts\.length\+1/,
+ 'New Hosts must persist chrome by default');
+assert.match(app,/input\.value=key==='fp'\?'chrome':''/,
+ 'Resetting Host overrides must leave the single chrome choice selected');
+
 const hostCss=read('frontend/styles/features/hosts/hosts.css');
 assert.match(app,/hosts:\['Хосты',hostsP\]/,
  'Hosts must use the card directory, not the old CRUD table');
