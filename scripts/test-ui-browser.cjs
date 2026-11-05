@@ -827,7 +827,7 @@ async function main() {
           try{
             const g=await page.locator('#dlg').evaluate(d=>{
               const f=d.querySelector('form.box'),r=d.getBoundingClientRect(),b=f.getBoundingClientRect(),s=getComputedStyle(f),layout=f.querySelector('.node-form-layout').getBoundingClientRect(),footer=f.querySelector('.act').getBoundingClientRect();
-              return {layoutBottom:layout.bottom,footerTop:footer.top,dialog:{top:r.top,bottom:r.bottom,left:r.left,right:r.right,height:r.height},form:{top:b.top,bottom:b.bottom,height:b.height,scrollHeight:f.scrollHeight,clientHeight:f.clientHeight},tlsInSide:!!f.querySelector('.node-network-stack > .node-tls-settings'),background:s.backgroundColor,shadow:s.boxShadow,border:parseFloat(s.borderTopWidth),overflow:getComputedStyle(d).overflowY};
+              return {bodyScroll:f.querySelector('.node-form-layout').scrollHeight,bodyClient:f.querySelector('.node-form-layout').clientHeight,layoutBottom:layout.bottom,footerTop:footer.top,dialog:{top:r.top,bottom:r.bottom,left:r.left,right:r.right,height:r.height},form:{top:b.top,bottom:b.bottom,height:b.height,scrollHeight:f.scrollHeight,clientHeight:f.clientHeight},tlsInSide:!!f.querySelector('.node-network-stack > .node-tls-settings'),background:s.backgroundColor,shadow:s.boxShadow,border:parseFloat(s.borderTopWidth),overflow:getComputedStyle(d).overflowY};
             });
             assert(Math.abs(g.dialog.bottom-g.form.bottom)<=2,'Node dialog must end with the form, without an empty material tail');
             assert(Math.abs(g.form.top-g.dialog.top)<=2,'Node dialog must not reserve an empty surface above the form');
@@ -836,9 +836,10 @@ async function main() {
             assert.equal(g.border,0,'Only the dialog owns the outer edge');
             assert(g.dialog.top>=0&&g.dialog.bottom<=height+1&&g.dialog.left>=0&&g.dialog.right<=width+1,'Node editor must fit the viewport');
             assert.equal(g.overflow,'hidden','Native shell must not gain a second scrollbar');
-            assert(g.tlsInSide,'TLS settings must live alongside billing, not below main fields');
+            assert(g.tlsInSide,'TLS summary must be adjacent to connection fields');
             if(width>=1366&&height>=768&&scale===1){
               assert(g.form.scrollHeight<=g.form.clientHeight+2,'Desktop Node editor must have no scrollbar: '+JSON.stringify(g));
+              assert(g.bodyScroll<=g.bodyClient+2,'Desktop connection fields must fit without hidden inner scrolling: '+JSON.stringify(g));
               assert(g.layoutBottom<=g.footerTop+1,'Footer must not cover the final Node fields: '+JSON.stringify(g));
               await page.locator('#dlg [data-node-tls-open]').click();
               const modal=page.locator('#dlg [data-node-tls-dialog][open]');
@@ -869,6 +870,88 @@ async function main() {
         if(zoom){await zoom.send('Emulation.clearDeviceMetricsOverride');await zoom.detach()}
       }
     }
+
+    for(const [width,height] of [[1366,768],[390,844]])await checked(`Node editor task tabs: ${width}×${height}`,async()=>{
+      await page.setViewportSize({width,height});await navigate('nodes');
+      await page.locator(`[data-ne="nodes:${node.id}"]`).first().click();
+      const form=page.locator('#dlg form[data-ent="nodes"]');
+      try{
+        await form.locator('[name="hosting"]').fill('Unsaved hosting');
+        for(const key of ['network','billing','connection']){
+          await form.locator(`[data-node-editor-tab="${key}"]`).click();
+          if(key==='network'){
+            await form.locator('[name="rotationIps"]').fill('192.0.2.10\n192.0.2.10\n192.0.2.11');
+            await form.locator('[data-node-pool-normalize]').click();
+            assert.equal((await form.locator('[name="rotationIps"]').inputValue()).trim(),'192.0.2.10\n192.0.2.11');
+          }
+          if(key==='billing'){
+            await form.locator('[data-node-date-open]').click();
+            await form.locator('[data-node-date-calendar] [data-user-date-today]').click();
+            assert((await form.locator('[name="billingDueDate"]').inputValue()).length>0,'Billing calendar must remain usable in its tab');
+          }
+          assert.equal(await form.locator('[role="tab"][aria-selected="true"]').count(),1);
+          assert.equal(await form.locator('[data-node-editor-pane]:visible').count(),1);
+          const g=await geometry(page);assert(g.scrollWidth<=width+1,'Task panel must fit viewport');
+          await screenshot(page,`node-task-${key}-${width}`);
+        }
+        assert.equal(await form.locator('[name="hosting"]').inputValue(),'Unsaved hosting','Switching tasks must preserve draft inputs');
+        const first=form.locator('[data-node-editor-tab="connection"]');
+        await first.focus();await page.keyboard.press('ArrowRight');
+        assert.equal(await form.locator('[data-node-editor-tab="network"]').getAttribute('aria-selected'),'true');
+        await page.keyboard.press('End');
+        assert.equal(await form.locator('[data-node-editor-tab="billing"]').getAttribute('aria-selected'),'true');
+        await form.locator('[name="billingPrice"]').fill('-1');
+        await form.locator('[data-node-editor-tab="connection"]').click();
+        await form.locator('.act .btn').click();
+        assert.equal(await form.locator('[data-node-editor-tab="billing"]').getAttribute('aria-selected'),'true','Native validation must reveal the invalid field panel');
+        await form.locator('[name="billingPrice"]').fill('0');
+        await form.locator('[data-node-editor-tab="connection"]').click();
+        await form.locator('[data-node-tls-open]').click();
+        const tls=form.locator('[data-node-tls-dialog]');
+        assert.equal(await tls.locator('.node-tls-setup-close svg').count(),1,'Close control must render exactly one glyph');
+        assert.equal((await tls.locator('.node-tls-setup-close').innerText()).trim(),'','Close control must not duplicate its icon with a text cross');
+        await tls.locator('[name="nodeTlsMethod"][value="acme"]').check();
+        await tls.locator('[name="tlsDomain"]').fill('node.example.invalid');
+        await tls.locator('[name="tlsAcmeEmail"]').fill('ops@example.com');
+        const certificateBounds=await tls.evaluate(d=>{const r=d.getBoundingClientRect(),done=d.querySelector('.node-tls-setup-actions').getBoundingClientRect();return{top:r.top,bottom:r.bottom,doneBottom:done.bottom,height:innerHeight}});
+        assert(certificateBounds.top>=0&&certificateBounds.bottom<=height+1,'ACME setup must fit the viewport');
+        if(width>=1366)assert(certificateBounds.doneBottom<=certificateBounds.bottom+1,'Desktop ACME setup must show its completion action without scrolling');
+        await screenshot(page,`node-tls-acme-${width}`);
+        await tls.locator('[name="nodeTlsMethod"][value="external"]').check();
+        assert(await tls.locator('[data-node-tls-external]').isVisible());
+        assert(!(await tls.locator('[data-node-tls-acme]').isVisible()));
+        await screenshot(page,`node-tls-external-${width}`);
+        await page.keyboard.press('Escape');
+        assert.equal(await form.locator('[data-node-tls-open]').evaluate(el=>document.activeElement===el),true,'Closing TLS returns focus to its trigger');
+      }finally{if(await form.locator('[data-node-tls-dialog][open]').count())await page.keyboard.press('Escape');await page.keyboard.press('Escape')}
+    });
+
+    await checked('Node editor appearance and global radius',async()=>{
+      await page.setViewportSize({width:1366,height:900});await navigate('nodes');
+      await page.locator(`[data-ne="nodes:${node.id}"]`).first().click();
+      const initial=await page.evaluate(()=>({theme:C.theme,surface:C.surface,radius:C.radius}));
+      try{
+        for(const theme of ['dark','light'])for(const surface of ['solid','glass','raised']){
+          await page.evaluate(v=>{Object.assign(C,v);apply()},{theme,surface});
+          await screenshot(page,`node-workspace-${theme}-${surface}`);
+        }
+        await page.locator('[data-node-tls-open]').click();
+        const modal=page.locator('[data-node-tls-dialog][open]');
+        await modal.locator('[name="nodeTlsMethod"][value="acme"]').check();
+        for(const radius of [1,36]){
+          await page.evaluate(radius=>{C.radius=radius;apply()},radius);
+          const rounded=await modal.locator('.node-tls-method-option').first().evaluate(el=>getComputedStyle(el).borderTopLeftRadius);
+          assert.equal(rounded,radius+'px','Certificate choices must inherit the global control radius');
+        }
+        await modal.locator('[name="tlsDomain"]').fill('node.example.invalid');
+        await modal.locator('[name="tlsAcmeEmail"]').fill('ops@example.com');
+        await screenshot(page,'node-tls-light-glass');
+      }finally{
+        if(await page.locator('[data-node-tls-dialog][open]').count())await page.keyboard.press('Escape');
+        await page.keyboard.press('Escape');
+        await page.evaluate(v=>{Object.assign(C,v);apply()},initial);
+      }
+    });
 
     const dialogs=[
       ['nodes','[data-ne="nodes"]','Создание узла'],
@@ -1109,22 +1192,22 @@ async function main() {
       // after API fixture changes so the editor reads the intended inventory.
       await page.reload({waitUntil:'domcontentloaded'});
       await page.waitForFunction(()=>!!document.querySelector('#view')?.children.length&&!document.querySelector('#view .sk'));
-      await checked('Node certificate switch follows Security, not saved TLS overrides',async()=>{
+      await checked('Node certificate status follows Security, not saved TLS overrides',async()=>{
         try{
           await navigate('nodes');
           await page.locator(`[data-ne="nodes:${node.id}"]`).first().click();
           const form=page.locator('dialog form[data-ent="nodes"]');
           const toggle=form.locator('[data-node-tls-effective]');
           const setup=form.locator('[data-node-tls-dialog]');
-          assert.equal(await toggle.isChecked(),true,'TLS profile must render certificate toggle ON');
-          assert.equal(await toggle.isDisabled(),true,'Derived switch cannot silently rewrite Security');
+          assert.equal(await toggle.getAttribute('data-state'),'on','TLS profile must render TLS status ON');
+          assert.equal(await toggle.locator('input,button').count(),0,'Derived TLS state must not pretend to be an editable control');
           await form.locator('[name="profileId"]').selectOption(String(noTlsProfile.id));
-          assert.equal(await toggle.isChecked(),false,'Security none must render OFF despite stored external override');
-          assert.match(await form.locator('[data-node-tls-state]').innerText(),/ВЫКЛ/);
+          assert.equal(await toggle.getAttribute('data-state'),'off','Security none must render OFF despite stored external override');
+          assert.match(await form.locator('[data-node-tls-state]').innerText(),/Без TLS/);
           assert.equal(await setup.evaluate(el=>el.open),false,'TLS setup dialog stays closed when switching profiles');
           assert.equal(await form.locator('[name="tlsManualProvision"]').isChecked(),true,'Saved override preference must not be erased');
           await form.locator('[name="profileId"]').selectOption(String(profile.id));
-          assert.equal(await toggle.isChecked(),true,'Switch must return ON after restoring TLS profile');
+          assert.equal(await toggle.getAttribute('data-state'),'on','Status must return ON after restoring TLS profile');
         }finally{await page.keyboard.press('Escape')}
       });
       await checked('TLS certificate setup is required before saving a TLS Node profile',async()=>{
@@ -1148,7 +1231,7 @@ async function main() {
           await form.locator('[name="tlsDomain"]').fill('test-node.example.invalid');
           assert.match(await status.innerText(),/email ACME/,'Missing ACME email must be explained');
           await form.locator('[name="tlsAcmeEmail"]').fill('tls@example.com');
-          assert.match(await status.innerText(),/Let’s Encrypt настроен/,'Ready ACME settings must be communicated without claiming certificate issuance');
+          assert.match(await modal.locator('[data-node-tls-note]').innerText(),/Выпуск начнётся при применении профиля/,'Ready ACME settings must not claim a certificate has already been issued');
           await modal.locator('[data-node-tls-close]').first().click();
         }finally{await page.keyboard.press('Escape')}
       });
@@ -1163,6 +1246,11 @@ async function main() {
       await page.locator(`[data-ne="nodes:${node.id}"]`).click();
       const form=page.locator('dialog form[data-ent="nodes"]');
       await form.locator('input[name="name"]').fill(`${prefix} · Изменён`);
+      await form.locator('[data-node-editor-tab="billing"]').click();
+      await form.locator('[name="billingNote"]').fill('Billing tab saved');
+      await form.locator('[data-node-editor-tab="network"]').click();
+      await form.locator('[name="rotationIntervalHours"]').fill('36');
+      await form.locator('[data-node-editor-tab="connection"]').click();
       const invalid=await form.locator(':invalid').evaluateAll(nodes=>nodes.map(node=>({name:node.getAttribute('name')||node.id||node.tagName,message:node.validationMessage})));
       assert.equal(invalid.length,0,`Форма редактирования узла невалидна до отправки: ${JSON.stringify(invalid)}`);
       const save=form.locator('.act > button.btn');
@@ -1180,6 +1268,9 @@ async function main() {
       await page.waitForSelector('dialog[open]',{state:'detached',timeout:5000});
       const saved=await api('GET','/collections/nodes');
       assert(saved.items.some(n=>n.id===node.id&&n.name===`${prefix} · Изменён`));
+      const savedNode=saved.items.find(n=>n.id===node.id);
+      assert.equal(savedNode.billingNote,'Billing tab saved','Inactive billing fields must be included in the save');
+      assert.equal(savedNode.rotationIntervalHours,36,'Inactive IP-pool fields must be included in the save');
     });
 
     await create('nodes',{name:`${prefix} · Берлин`,addr:'192.0.2.11',port:443,profileId:profile.id});

@@ -12,7 +12,8 @@ const index=fs.readFileSync('frontend/index.html','utf8');
 assert.match(ui,/const nodeCoreOrder=\['name','hosting','flag','profileId','addr','port','xrayLocalPort','tlsAutoProvision','tlsManualProvision','tlsDomain','tlsAcmeEmail','mult','limit','resetDay'\]/);
 assert.match(ui,/node-tls-settings/,'Node editor must keep the managed TLS certificate controls');
 assert.match(ui,/arrangedNodeCoreFields\.filter/,'Editor must exclude certificate-only fields from the main grid');
-assert.match(ui,/node-section-intro/);
+assert.match(ui,/data-node-editor-pane/);
+assert.match(ui,/selectNodeEditorTab/);
 assert.match(ui,/node-form-layout/);
 assert.match(ui,/node-main-section/);
 assert.match(ui,/node-ip-section/);
@@ -84,4 +85,4 @@ assert.match(v3Layout,/100dvh/,'Dialogs must be bounded by the dynamic viewport'
 assert.match(v3Layout,/overflow\s*:\s*(?:auto|hidden)/,'Dialog overflow must be owned by its shell/body');
 const syntax=spawnSync(process.execPath,['--check','frontend/js/core/app.js'],{encoding:'utf8'});
 assert.equal(syntax.status,0,syntax.stderr);
-console.log('Centered three-column node editor + Design System v3 viewport safety: OK');
+console.log('Task-based Node editor, independent TLS setup and viewport safety: OK');

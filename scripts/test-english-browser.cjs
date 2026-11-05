@@ -36,6 +36,11 @@ async function main(){const browser=await chromium.launch({headless:true,executa
   for(const route of routes)await check('English route: '+route,async()=>{await navigate(route);await scan(page,route)});
   const dialogs=[['nodes','[data-ne="nodes"]'],['nodes',`[data-ne="nodes:${node.id}"]`],['hosts','[data-ne="hosts"]'],['squads','[data-ne="squads"]'],['users','[data-nu]'],['users',`tr[data-id="${user.id}"]`],['templates','[data-ne="tpls"]'],['admins','[data-ne="admins"]'],['balancers','#balancer-add'],['clientrouting','[data-cr-add]']];
   for(const [route,selector]of dialogs)await check('English dialog: '+selector,async()=>{await navigate(route);await page.locator(selector).first().click();if(route!=='balancers')await page.locator('dialog[open]').waitFor();await scan(page,selector);if(route==='clientrouting')for(const tab of ['rules','json']){await page.locator('[data-cr-tab="'+tab+'"]').click();await scan(page,'routing '+tab)}await page.keyboard.press('Escape')});
+  await check('English Node settings tabs',async()=>{
+   await navigate('nodes');await page.locator(`[data-ne="nodes:${node.id}"]`).click();
+   assert.equal(await page.locator('[data-node-tls-state]').innerText(),'Security not configured','A selected profile with missing Security must not be reported as missing');
+   try{for(const key of ['connection','network','billing']){await page.locator(`[data-node-editor-tab="${key}"]`).click();await scan(page,'Node '+key)}}finally{await page.keyboard.press('Escape')}
+  });
   await check('English Node certificate setup and validation',async()=>{
    const tlsProfile=await create('profiles',{name:prefix+' TLS setup',config:JSON.stringify({inbounds:[{tag:prefix+'-tls',listen:'127.0.0.1',port:28443,protocol:'trojan',settings:{clients:[]},streamSettings:{network:'tcp',security:'tls',tlsSettings:{}}}],outbounds:[{tag:'direct',protocol:'freedom'}]})});
    await navigate('nodes');await page.locator(`[data-ne="nodes:${node.id}"]`).click();
@@ -49,7 +54,7 @@ async function main(){const browser=await chromium.launch({headless:true,executa
     await form.locator('[name="tlsDomain"]').fill('node.example.invalid');
     await scan(page,'missing ACME email');assert.match(await status.innerText(),/email/i);
     await form.locator('[name="tlsAcmeEmail"]').fill('ops@example.com');
-    await scan(page,'ACME configured');assert.match(await status.innerText(),/Let.s Encrypt/i);
+    await scan(page,'ACME configured');assert.match(await form.locator('[data-node-tls-note]').innerText(),/profile is applied/i);
     await form.locator('[name="nodeTlsMethod"][value="external"]').check();
     await scan(page,'external certificate missing paths');assert.match(await status.innerText(),/certificateFile/);
    }finally{
