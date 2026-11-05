@@ -162,12 +162,16 @@
 .user-create-policy-note .ic{width:.74rem;height:.74rem}
 .user-create-policy-note p{margin:0;min-width:0}.user-create-policy-note b{display:block;font-size:.68rem;line-height:1.28}.user-create-policy-note small{display:block;margin-top:.1rem;color:var(--mu);font-size:.58rem;line-height:1.4}
 
+/* The section becomes a size query container. Field layout reacts to the
+ * *actual dialog content width*, not the browser viewport or zoom level. */
+.user-create-section-extra{container-type:inline-size;container-name:nx-user-extra}
 .user-create-extra-grid{
   display:grid;
-  grid-template-columns:minmax(14rem,1.05fr) minmax(8rem,.55fr) minmax(18rem,.9fr) minmax(19rem,1.2fr);
-  grid-template-areas:"squads tag hold desc";
-  gap:.68rem;
+  grid-template-columns:minmax(0,1fr);
+  grid-template-areas:"squads" "tag" "hold" "desc";
+  gap:.76rem;
   align-items:start;
+  min-width:0;
 }
 .user-create-squads{grid-area:squads}.user-create-tag{grid-area:tag}.user-create-desc{grid-area:desc}
 .user-create-squads .ms{min-height:3rem;padding:.36rem;gap:.3rem;align-content:center;border-radius:var(--nx-control-radius);background:color-mix(in srgb,var(--nx-section-bg) 82%,var(--nx-panel-bg))}
@@ -204,7 +208,6 @@
 @media(max-width:1180px){
   #dlg.user-create-modal{width:calc(100vw - 1.5rem)}
   .user-create-workspace{grid-template-columns:minmax(0,1.35fr) minmax(330px,.78fr)}
-  .user-create-extra-grid{grid-template-columns:minmax(0,1fr) minmax(0,.75fr);grid-template-areas:"squads tag" "hold desc"}
 }
 @media(max-width:940px){
   #dlg.user-create-modal{width:calc(100vw - 1.1rem)}
@@ -212,7 +215,6 @@
   .user-create-section-extra{grid-column:auto}
   .user-create-section-main,
 .user-create-section-limits{min-height:0}
-  .user-create-extra-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"squads tag" "hold desc"}
 }
 @media(max-width:680px){
   #dlg.user-create-modal{width:calc(100vw - .65rem);max-height:calc(100dvh - .65rem)}
@@ -220,13 +222,8 @@
   .user-create-head{padding:.82rem .88rem;min-height:0}.user-create-title-icon{width:2.3rem;height:2.3rem}.user-create-head p{display:none}
   .user-create-body{padding:.58rem}.user-create-section{padding:.74rem;border-radius:var(--nx-card-radius)}
   .user-create-main-grid,
-.user-create-limits-grid,
-.user-create-extra-grid{grid-template-columns:minmax(0,1fr);grid-template-areas:none}
+.user-create-limits-grid{grid-template-columns:minmax(0,1fr);grid-template-areas:none}
   .user-create-username-row{grid-column:auto;grid-template-columns:minmax(0,1fr)}.user-create-generate{width:100%;margin-top:0}
-  .user-create-squads,
-.user-create-tag,
-.user-create-hold,
-.user-create-desc{grid-area:auto}
   .user-create-desc textarea{height:auto;min-height:4.2rem}
   .user-create-footer{padding:.62rem;display:grid;grid-template-columns:1fr}.user-create-footer-actions{display:grid;grid-template-columns:1fr 1fr;width:100%}.user-create-footer button,
 .user-create-submit,
@@ -500,147 +497,189 @@
   }
   .user-create-duration-presets{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
-#dlg.user-create-modal .user-create-extra-grid{
-  align-items:start;
-}
 
+/* Canonical metadata field grid. All sizes follow the section width and
+ * shared Nexus tokens; no forced one-line rail or hard-coded field heights. */
+#dlg.user-create-modal .user-create-extra-grid{
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  grid-template-areas:"squads" "tag" "hold" "desc";
+  gap:.76rem;
+  align-items:start;
+  min-width:0;
+  max-width:100%;
+}
 #dlg.user-create-modal .user-create-extra-grid>.user-create-field{
   min-width:0;
   min-height:0;
   margin:0;
   display:grid;
   grid-template-columns:minmax(0,1fr);
-  grid-template-rows:1rem 3.9rem;
-  gap:.34rem;
+  grid-template-rows:auto auto;
   align-content:start;
-  align-items:stretch;
+  align-items:start;
+  gap:.42rem;
 }
-
 #dlg.user-create-modal .user-create-extra-grid>.user-create-field>span:first-child{
+  display:block;
   min-width:0;
-  min-height:1rem;
-  display:flex;
-  align-items:flex-end;
+  min-height:0;
   margin:0;
   font-size:.72rem;
   font-weight:740;
-  line-height:1.2;
-  letter-spacing:-.01em;
+  line-height:1.35;
   color:var(--tx);
+  white-space:normal;
+  overflow-wrap:anywhere;
 }
-
-/* Squads: same control box as the other metadata fields. */
 #dlg.user-create-modal .user-create-squads .ms{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:flex-start;
+  align-content:flex-start;
+  justify-content:flex-start;
+  gap:.35rem;
   width:100%;
-  height:3.9rem;
-  min-height:3.9rem;
-  max-height:3.9rem;
-  margin:0;
-  padding:.42rem;
+  min-width:0;
+  min-height:4.4rem;
+  height:auto;
+  max-height:9rem;
   box-sizing:border-box;
-  align-content:center;
-  overflow:auto;
+  margin:0;
+  padding:.48rem;
+  overflow-x:hidden;
+  overflow-y:auto;
+  overscroll-behavior:contain;
   scrollbar-width:thin;
+  border:1px solid var(--nx-border);
+  border-radius:var(--nx-control-radius);
+  background:var(--nx-section-bg);
+}
+#dlg.user-create-modal .user-create-squads .ms .ck{
+  display:inline-flex;
+  align-items:center;
+  flex:0 1 auto;
+  max-width:100%;
+  min-width:0;
+  min-height:1.85rem;
+  padding:.32rem .5rem;
+  white-space:normal;
+  overflow:hidden;
+}
+#dlg.user-create-modal .user-create-squads .ms .ck>span{
+  min-width:0;
+  overflow-wrap:anywhere;
 }
 #dlg.user-create-modal .user-create-tag input:not([type=checkbox]){
   width:100%;
-  height:3.9rem;
-  min-height:3.9rem;
-  margin:0;
+  min-width:0;
+  height:3.35rem;
+  min-height:3.35rem;
+  max-width:100%;
   box-sizing:border-box;
+  margin:0;
 }
 #dlg.user-create-modal .user-create-extra-grid>.user-create-hold{
   padding:0;
   border:0;
-  border-radius:0;
   background:transparent;
   box-shadow:none;
   grid-template-columns:minmax(0,1fr);
-  grid-template-rows:1rem 3.9rem;
+  grid-template-rows:auto auto;
   grid-template-areas:"label" "switch";
 }
-
 #dlg.user-create-modal .user-create-hold .sw{
   grid-area:switch;
+  display:block;
   position:relative;
   width:100%;
-  height:3.9rem;
   min-width:0;
-  min-height:3.9rem;
+  height:3.35rem;
+  min-height:3.35rem;
   margin:0;
-  display:block;
+  box-sizing:border-box;
   align-self:stretch;
   justify-self:stretch;
-  box-sizing:border-box;
-  border:1px solid color-mix(in srgb,var(--nx-border) 88%,var(--tx) 12%);
+  border:1px solid var(--nx-border);
   border-radius:var(--nx-control-radius);
-  background:color-mix(in srgb,var(--nx-section-bg) 82%,var(--nx-panel-bg));
-  transition:border-color .16s ease,background .16s ease,box-shadow .16s ease;
+  background:var(--nx-section-bg);
+  transition:border-color .16s ease,background .16s ease;
 }
 #dlg.user-create-modal .user-create-hold .sw:hover{
-  border-color:color-mix(in srgb,var(--tx) 24%,var(--nx-border));
+  border-color:var(--nx-border-strong);
 }
 #dlg.user-create-modal .user-create-hold .sw::before{
   content:"Выключено";
   position:absolute;
-  left:.78rem;
+  left:.76rem;
   top:50%;
   transform:translateY(-50%);
+  max-width:calc(100% - 4.5rem);
   color:var(--mu);
-  font-size:.66rem;
+  font-size:.72rem;
   font-weight:650;
-  line-height:1;
+  line-height:1.2;
   pointer-events:none;
 }
 #dlg.user-create-modal .user-create-hold .sw:has(input:checked)::before{
   content:"Включено";
-  color:color-mix(in srgb,var(--a) 78%,var(--tx));
+  color:var(--tx);
 }
 #dlg.user-create-modal .user-create-hold .sw:has(input:focus-visible){
-  border-color:color-mix(in srgb,var(--a) 62%,var(--nx-border));
-  box-shadow:0 0 0 3px color-mix(in srgb,var(--a) 11%,transparent);
+  outline:2px solid var(--nx-focus);
+  outline-offset:2px;
 }
 #dlg.user-create-modal .user-create-hold .sw input{
   position:absolute;
   inset:0;
+  z-index:2;
   width:100%;
   height:100%;
-  margin:0;
   opacity:0;
+  margin:0;
   cursor:pointer;
-  z-index:2;
 }
 #dlg.user-create-modal .user-create-hold .sw>span{
   position:absolute;
-  inset:auto .72rem auto auto;
+  inset:auto .68rem auto auto;
   top:50%;
+  display:block;
+  transform:translateY(-50%);
   width:2.8rem;
   height:1.6rem;
-  transform:translateY(-50%);
-  display:block;
+  border:1px solid var(--nx-border);
   border-radius:999px;
-  background:color-mix(in srgb,var(--tx) 8%,var(--nx-section-bg));
-  border:1px solid color-mix(in srgb,var(--tx) 18%,var(--nx-border));
-  transition:background .18s ease,border-color .18s ease;
+  background:var(--nx-control-bg);
   pointer-events:none;
 }
-
-/* Note: exact same 3.9rem surface; no manual resize that can break the row. */
 #dlg.user-create-modal .user-create-desc textarea{
-  width:100%;
-  height:3.9rem;
-  min-height:3.9rem;
-  max-height:3.9rem;
-  margin:0;
+  display:block;
   box-sizing:border-box;
-  resize:none;
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  height:auto;
+  min-height:5.2rem;
+  max-height:16rem;
+  margin:0;
+  padding:.72rem .78rem;
+  resize:vertical;
+  overflow-x:hidden;
+  overflow-y:auto;
+  overflow-wrap:anywhere;
+  white-space:pre-wrap;
 }
-
-@media(max-width:680px){
-  #dlg.user-create-modal .user-create-extra-grid>.user-create-field{
-    grid-template-rows:minmax(1rem,auto) 3.9rem;
+@container nx-user-extra (min-width:44rem){
+  #dlg.user-create-modal .user-create-extra-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    grid-template-areas:"squads squads" "tag hold" "desc desc";
   }
 }
-
+@container nx-user-extra (min-width:78rem){
+  #dlg.user-create-modal .user-create-extra-grid{
+    grid-template-columns:minmax(0,1.45fr) minmax(0,.68fr) minmax(0,1.3fr) minmax(0,1.45fr);
+    grid-template-areas:"squads tag hold desc";
+  }
+}
 :root[lang="en"] #dlg.user-create-modal .user-create-hold .sw::before{content:"Off"}
 :root[lang="en"] #dlg.user-create-modal .user-create-hold .sw:has(input:checked)::before{content:"On"}
