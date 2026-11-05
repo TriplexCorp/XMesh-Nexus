@@ -259,7 +259,9 @@ jobs:
         env:
           XMESH_BROWSER_OUTPUT: browser-results
           XMESH_UI_DISPOSABLE: "1"
-        run: node scripts/test-ui-browser.cjs
+        run: |
+          node scripts/test-ui-browser.cjs
+          node scripts/test-appearance-materials.cjs
       - name: Retain browser geometry report and screenshots
         if: always()
         uses: actions/upload-artifact@v4
