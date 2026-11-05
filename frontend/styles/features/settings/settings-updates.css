@@ -3,12 +3,14 @@
 #core-panel .update-action-row,
 #panel-update-card .update-action-row{
   display:grid;
-  grid-template-columns:repeat(2,minmax(0,12.5rem));
+  grid-template-columns:repeat(2,minmax(0,1fr));
   align-items:stretch;
-  justify-content:end;
+  justify-content:stretch;
   gap:.65rem;
   width:100%;
-  margin-top:.85rem;
+  margin-top:1.1rem;
+  padding-top:1rem;
+  border-top:1px solid var(--nx-separator);
 }
 #core-panel .update-action-row > button,
 #panel-update-card .update-action-row > button{

@@ -70,6 +70,7 @@ async function geometry(page) {
       viewport:{width:innerWidth,height:innerHeight},rootFont:parseFloat(getComputedStyle(root).fontSize),scrollWidth:root.scrollWidth,
       view:view && box(view),top:top && box(top),outside,columns,nodeCards,ranges,nodeGridMode:document.querySelector('.nodes')?.dataset.gridMode,
       cards:[...(view?.querySelectorAll('.card') || [])].map(box),
+      settingsUpdates:[...document.querySelectorAll('#core-panel,#panel-update-card')].map(panel=>({actions:box(panel.querySelector('.update-action-row')),message:box(panel.querySelector('.history-placeholder'))})),
       dialog:dialog && box(dialog),
       material:{surface:root.dataset.surface,theme:root.dataset.theme,sidebar:root.dataset.sidebar,density:root.dataset.density},
       renderFailed:!!view?.textContent.includes('Не удалось открыть раздел'),
@@ -85,6 +86,7 @@ function verifyPage(g, route) {
   assert(g.view.x >= 0 && g.view.right <= g.viewport.width + 1, 'Рабочая область выходит за окно.');
   if (route === 'set') {
     assert.equal(g.columns.length, 2, 'Settings должна содержать два явных стека карточек.');
+    for(const panel of g.settingsUpdates)assert(panel.message.y-panel.actions.bottom>=8,'Update actions and status must have a visible gap');
     assert(g.columns.every(c => c.display !== 'contents'), 'Стек Settings потерял собственную геометрию.');
     const sideBySide=Math.abs(g.columns[0].x-g.columns[1].x)>100;
     if(g.viewport.width>=1500)assert(sideBySide,'На широком desktop Settings превратилась в одну длинную колонку.');

@@ -10,7 +10,7 @@ const docker=fs.readFileSync('backend/Dockerfile','utf8');
 assertPackaged(assert,['nexus-ui-v3.css','settings-updates.css']);
 assert.ok(css.includes('#core-panel .update-action-row,'));
 assert.ok(css.includes('#panel-update-card .update-action-row{'));
-assert.ok(css.includes('grid-template-columns:repeat(2,minmax(0,12.5rem))'));
+assert.ok(css.includes('grid-template-columns:repeat(2,minmax(0,1fr))'));
 assert.ok(css.includes('@media(max-width:420px)'));
 assert.ok(app.includes('const ownerUpdates=sessionUser?.role===\'owner\''));
 assert.ok(app.includes('panelUpdateStatusText(panelUpdateView.status)'));
