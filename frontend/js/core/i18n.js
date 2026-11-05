@@ -11,6 +11,10 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    // Create-user contact fields: keep dynamic form copy in the central catalog.
+    "Например, 123456789":"For example, 123456789",
+    "Учётная запись, подключение и контактные данные.":"Account, connection, and contact details.",
+    "Контактные данные":"Contact details",
     "Подробнее о связях":"Relationship details",
     "Настройте доступ сквада к подключениям":"Configure the squad's connection access",
     "Фильтр по профилю":"Filter by profile",

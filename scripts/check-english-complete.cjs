@@ -5,6 +5,9 @@ const {runtime,candidates}=require('./ci/english-audit.cjs');
 const assert=require('node:assert/strict');
 const api=runtime(),phrases=candidates();const missing=[];
 // Exercise real interpolated API copy, not just untranslated source templates.
+assert.equal(api.translate('Например, 123456789'),'For example, 123456789');
+assert.equal(api.translate('Учётная запись, подключение и контактные данные.'),'Account, connection, and contact details.');
+assert.equal(api.translate('Контактные данные'),'Contact details');
 assert.equal(api.translate('Версия v26.10.31'),'Version v26.10.31');
 assert.equal(api.translate('3 мин'),'3 min');
 assert.equal(api.translate('1 ч 2 мин'),'1 h 2 min');
