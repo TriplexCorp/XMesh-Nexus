@@ -11,6 +11,18 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "Настроить сертификат":"Configure certificate",
+    "Настройка TLS-сертификата":"TLS certificate setup",
+    "Выберите способ получения сертификата для узла.":"Choose how this node obtains its certificate.",
+    "Источник сертификата":"Certificate source",
+    "Получить автоматически по DNS-домену":"Issue automatically using a DNS domain",
+    "Свой сертификат":"Your certificate",
+    "Использовать пути из XRAY STUDIO":"Use paths from XRAY STUDIO",
+    "Укажите certificateFile и keyFile для каждого TLS inbound в XRAY STUDIO. Файлы должны существовать на ноде.":"Specify certificateFile and keyFile for each TLS inbound in XRAY STUDIO. Files must exist on the node.",
+    "Настройка сохранится вместе с узлом":"Changes are saved with the node",
+    "Готово":"Done",
+    "Настройки сертификата сохраняются для будущих TLS-профилей.":"Certificate preferences are preserved for future TLS profiles.",
+    "Let’s Encrypt":"Let's Encrypt",
     "TLS по Security":"TLS from Security",
     "Не настроено — выберите профиль":"Not configured — select a profile",
     "Выберите один способ получения сертификата: Let’s Encrypt или внешний сертификат.":"Choose one certificate source: Let's Encrypt or an external certificate.",

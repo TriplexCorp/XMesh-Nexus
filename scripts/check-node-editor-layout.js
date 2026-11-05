@@ -37,7 +37,7 @@ assert.equal(mode({inbounds:[{protocol:'trojan',streamSettings:{security:'tls'}}
 assert.equal(mode(null),'unconfigured');
 assert.equal(mode({inbounds:[] }),'unconfigured');
 assert.equal(mode({inbounds:[{protocol:'trojan',streamSettings:{}}]}),'unconfigured');
-for(const contract of ['data-node-tls-effective','data-node-tls-state','data-node-tls-preferences','syncNodeEffectiveTls(dlg.querySelector','form[data-ent="nodes"] [name="profileId"]'])
+for(const contract of ['data-node-tls-effective','data-node-tls-state','data-node-tls-dialog','data-node-tls-open','syncNodeEffectiveTls(dlg.querySelector','form[data-ent="nodes"] [name="profileId"]'])
  assert(ui.includes(contract),'Node TLS UI contract missing: '+contract);
 
 // A TLS-required profile cannot be saved without a real certificate source.
@@ -64,11 +64,16 @@ assert.equal(readiness(makeProfile('trojan','tls'),{addr:'node.example.org',tlsM
 assert.equal(readiness(makeProfile('vless','tls'),{addr:'node.example.org',tlsAcmeEmail:''}).ready,false);
 assert.equal(readiness(makeProfile('vless','tls'),{tlsDomain:'node.example.org',tlsAcmeEmail:'ops@example.org',tlsAutoProvision:true,tlsManualProvision:true}).ready,false);
 assert.match(ui,/data-node-tls-readiness/);
-assert.match(ui,/data-node-tls-preferences/);
+assert.match(ui,/data-node-tls-dialog/);
+assert.match(ui,/data-node-tls-open/);
+assert.match(ui,/nodeTlsMethod/);
+assert.match(ui,/openNodeTlsSetup\(f,readiness\.field\)/);
+assert(!ui.includes('node-tls-popup'),'Legacy overlapping TLS popover must not return');
 assert.match(ui,/node-network-stack/);
 assert.match(ui,/certificate\.mode==='on'&&!certificate\.ready/);
 assert(css.includes('dialog.node-wide .node-network-stack {'),'TLS settings must have right-column layout');
-assert(css.includes('.node-tls-popup'),'Certificate setup must be popover-based on desktop');
+assert(css.includes('dialog.node-wide dialog.node-tls-setup-dialog'),'Certificate setup must have an independent modal surface');
+assert(!css.includes('.node-tls-popup'),'Old overlapping popup CSS should be removed');
 
 // Shared dialog safety is independent of a node-specific placement patch.
 assert.match(css,/node-form-layout/,'Node editor must retain its form sections');

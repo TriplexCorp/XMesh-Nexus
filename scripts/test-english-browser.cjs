@@ -44,14 +44,19 @@ async function main(){const browser=await chromium.launch({headless:true,executa
     await form.locator('[name="profileId"]').selectOption(String(tlsProfile.id));
     await form.locator('.act .btn').click();
     await scan(page,'missing TLS domain');assert.match(await status.innerText(),/DNS domain/i);
-    assert(await form.locator('[data-node-tls-preferences]').evaluate(el=>el.open),'Validation must reveal certificate setup');
+    assert(await form.locator('[data-node-tls-dialog]').evaluate(el=>el.open),'Validation must open the TLS setup dialog');
+    await scan(page,'TLS certificate dialog');
     await form.locator('[name="tlsDomain"]').fill('node.example.invalid');
     await scan(page,'missing ACME email');assert.match(await status.innerText(),/email/i);
     await form.locator('[name="tlsAcmeEmail"]').fill('ops@example.com');
     await scan(page,'ACME configured');assert.match(await status.innerText(),/Let.s Encrypt/i);
-    await form.locator('[name="tlsManualProvision"]').check();
+    await form.locator('[name="nodeTlsMethod"][value="external"]').check();
     await scan(page,'external certificate missing paths');assert.match(await status.innerText(),/certificateFile/);
-   }finally{await page.keyboard.press('Escape')}
+   }finally{
+    const setup=page.locator('[data-node-tls-dialog][open]');
+    if(await setup.count())await setup.locator('[data-node-tls-close]').first().click();
+    await page.keyboard.press('Escape');
+   }
   });
   await check('English XRAY STUDIO composer',async()=>{await navigate('profiles');await page.locator('[data-action="templates"]').click();await page.locator('dialog[open]').waitFor();await scan(page,'composer');await page.keyboard.press('Escape')});
   for(const [tool,protocol,network,security]of [['reality','vless','raw','none'],['tls','vless','raw','tls'],['inbound','vless','raw','none'],['finalmask','vless','raw','none'],['xhttp','vless','xhttp','none'],['protocol-config','shadowsocks','raw','none'],['transport-config','vless','ws','tls'],['hysteria-config','hysteria','hysteria','tls']])await check('English Xray tool: '+tool,async()=>{
