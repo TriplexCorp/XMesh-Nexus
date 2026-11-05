@@ -1552,3 +1552,16 @@ dialog.user-modal .user-pane {
   #dlg.user-modal .user-traffic-legend .user-legend-share{grid-column:2/-1;text-align:left}
   #dlg.user-modal .user-subscription-column{padding-inline-start:.85rem}
 }
+
+/* Historical signed counters must be visibly distinct from current nodes. */
+#dlg.user-modal .user-server-archive{
+  display:inline-flex;align-items:center;align-self:start;width:max-content;
+  padding:.1rem .45rem;border:1px solid var(--nx-border);border-radius:999px;
+  font-size:.62rem;font-weight:700;color:var(--mu);
+}
+#dlg.user-modal .user-legend-archive{
+  display:inline-block;margin-inline-start:.4rem;color:var(--mu);font-size:.67rem
+}
+#dlg.user-modal .user-server-archive-note{
+  margin:.32rem 0;font-size:.72rem;line-height:1.45;color:var(--mu)
+}

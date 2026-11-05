@@ -1342,6 +1342,26 @@ async fn delete_record(
     .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Запись не найдена."))?;
     let result = row_to_record(&row)?;
     if collection == "nodes" {
+        // Keep the last known name for historical signed traffic. Deleting a node
+        // must not make its previous accounting resemble a new active machine.
+        let deleted_data: Value = row.try_get("data")?;
+        let historical_name = ["remark", "name", "tag"]
+            .into_iter()
+            .filter_map(|field| deleted_data.get(field).and_then(Value::as_str))
+            .map(str::trim)
+            .find(|name| !name.is_empty())
+            .map_or_else(|| format!("Узел #{id}"), str::to_owned);
+        let historical_name: String = historical_name.chars().take(256).collect();
+        sqlx::query(
+            "INSERT INTO node_traffic_name_history (node_id, display_name)
+             VALUES ($1, $2)
+             ON CONFLICT (node_id) DO UPDATE SET
+                 display_name=EXCLUDED.display_name, archived_at=NOW()",
+        )
+        .bind(id)
+        .bind(&historical_name)
+        .execute(&mut *tx)
+        .await?;
         sqlx::query("DELETE FROM node_metric_keys WHERE node_id = $1")
             .bind(id)
             .execute(&mut *tx)
@@ -2095,12 +2115,16 @@ async fn get_statistics_period_leaders(
     .await?;
     let nodes = sqlx::query(
         "SELECT d.node_id,
-                COALESCE(NULLIF(n.data->>'name',''),'Узел #'||d.node_id::TEXT) AS name,
+                COALESCE(NULLIF(n.data->>'name',''),NULLIF(h.display_name,''),
+                    CASE WHEN n.id IS NULL THEN 'Архивная нода #'||d.node_id::TEXT
+                         ELSE 'Узел #'||d.node_id::TEXT END) AS name,
+                (n.id IS NULL) AS node_archived,
                 SUM(d.uplink_bytes)::BIGINT AS up,SUM(d.downlink_bytes)::BIGINT AS down
          FROM verified_traffic_deltas d
          LEFT JOIN panel_records n ON n.collection='nodes' AND n.id=d.node_id
+         LEFT JOIN node_traffic_name_history h ON h.node_id=d.node_id
          WHERE d.source_type='user' AND d.sampled_at>=NOW()-$1::INTERVAL
-         GROUP BY d.node_id,n.data
+         GROUP BY d.node_id,n.id,n.data,h.display_name
          ORDER BY SUM(d.uplink_bytes+d.downlink_bytes) DESC,d.node_id LIMIT 10",
     )
     .bind(duration)
@@ -2129,6 +2153,7 @@ async fn get_statistics_period_leaders(
         top_nodes.push(json!({
             "nodeId":row.try_get::<i64,_>("node_id")?,
             "name":row.try_get::<String,_>("name")?,
+            "nodeArchived":row.try_get::<bool,_>("node_archived")?,
             "uplinkBytes":row.try_get::<i64,_>("up")?,
             "downlinkBytes":row.try_get::<i64,_>("down")?
         }));
@@ -3111,12 +3136,11 @@ async fn get_user_traffic(
         .unwrap_or(0.0);
     let rows = sqlx::query(
         "SELECT totals.node_id,
-                COALESCE(
-                  NULLIF(node.data->>'remark', ''),
-                  NULLIF(node.data->>'name', ''),
-                  NULLIF(node.data->>'tag', ''),
-                  'Узел #' || totals.node_id::text
-                ) AS node_name,
+                COALESCE(NULLIF(node.data->>'remark',''),NULLIF(node.data->>'name',''),
+                  NULLIF(node.data->>'tag',''),NULLIF(history.display_name,''),
+                  CASE WHEN node.id IS NULL THEN 'Архивная нода #' || totals.node_id::text
+                       ELSE 'Узел #' || totals.node_id::text END) AS node_name,
+                (node.id IS NULL) AS node_archived,
                 totals.uplink_bytes,
                 totals.downlink_bytes,
                 totals.observations,
@@ -3124,6 +3148,7 @@ async fn get_user_traffic(
          FROM user_node_traffic_totals totals
          LEFT JOIN panel_records node
            ON node.collection = 'nodes' AND node.id = totals.node_id
+         LEFT JOIN node_traffic_name_history history ON history.node_id = totals.node_id
          WHERE totals.user_id = $1
          ORDER BY (totals.uplink_bytes + totals.downlink_bytes) DESC, totals.node_id",
     )
@@ -3141,6 +3166,7 @@ async fn get_user_traffic(
         servers.push(json!({
             "nodeId": row.try_get::<i64, _>("node_id")?,
             "name": row.try_get::<String, _>("node_name")?,
+            "nodeArchived": row.try_get::<bool, _>("node_archived")?,
             "uplinkBytes": up,
             "downlinkBytes": down,
             "observations": row.try_get::<i64, _>("observations")?,
@@ -3149,9 +3175,13 @@ async fn get_user_traffic(
     }
     let inbound_rows = sqlx::query(
         "SELECT t.node_id,t.inbound_tag,t.uplink_bytes,t.downlink_bytes,t.observations,
-                COALESCE(NULLIF(n.data->>'name',''),'Узел #'||t.node_id::text) AS node_name
+                COALESCE(NULLIF(n.data->>'name',''),NULLIF(h.display_name,''),
+                    CASE WHEN n.id IS NULL THEN 'Архивная нода #'||t.node_id::text
+                         ELSE 'Узел #'||t.node_id::text END) AS node_name,
+                (n.id IS NULL) AS node_archived
          FROM user_inbound_traffic_totals t
          LEFT JOIN panel_records n ON n.collection='nodes' AND n.id=t.node_id
+         LEFT JOIN node_traffic_name_history h ON h.node_id=t.node_id
          WHERE t.user_id=$1 ORDER BY (t.uplink_bytes+t.downlink_bytes) DESC,t.inbound_tag",
     )
     .bind(user_id)
@@ -3162,6 +3192,7 @@ async fn get_user_traffic(
         inbound_totals.push(json!({
             "nodeId":r.try_get::<i64,_>("node_id")?,
             "nodeName":r.try_get::<String,_>("node_name")?,
+            "nodeArchived":r.try_get::<bool,_>("node_archived")?,
             "inboundTag":r.try_get::<String,_>("inbound_tag")?,
             "uplinkBytes":r.try_get::<i64,_>("uplink_bytes")?,
             "downlinkBytes":r.try_get::<i64,_>("downlink_bytes")?,
