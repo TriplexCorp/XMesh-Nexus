@@ -964,7 +964,7 @@ const balancersP=async()=>{
   });
  }];
 };
-const pages={home:['Дашборд',homeP],statistics:['Статистика',statisticsP],users:['Пользователи',usersP],squads:['Сквады',squadsP],hosts:['Хосты',()=>simple(['hosts'])],nodes:['Узлы',nodesP],templates:['Шаблоны',()=>simple(['tpls','subs'])],profiles:['XRAY STUDIO',profilesP],subscription:['SUBSCRIPTION STUDIO',subscriptionStudioP],balancers:['Балансировщики',balancersP],clientrouting:['Маршрутизация клиентов',async()=>{
+const pages={home:['Дашборд',homeP],statistics:['Статистика',statisticsP],users:['Пользователи',usersP],squads:['Сквады',squadsP],hosts:['Хосты',hostsP],nodes:['Узлы',nodesP],templates:['Шаблоны',()=>simple(['tpls','subs'])],profiles:['XRAY STUDIO',profilesP],subscription:['SUBSCRIPTION STUDIO',subscriptionStudioP],balancers:['Балансировщики',balancersP],clientrouting:['Маршрутизация клиентов',async()=>{
     // Do not assume the editor asset was loaded by an older cached index.html.
     // A failed optional script must not crash the whole workspace.
     if(typeof window.XMeshClientRouting?.create!=='function'){
@@ -2777,6 +2777,74 @@ async function squadsP(){
     '</section>';
   return [html,()=>{const root=$('.squad-directory');if(items.length)void loadSquadCardTraffic(root)}];
 }
+
+/* Host directory: use existing persisted Host records and readiness contract.
+ * No synthetic reachability or traffic indicators are shown. */
+function hostPublicEndpoint(host){
+  const raw=String(host.address||'').trim();
+  const address=raw.includes(':')&&!raw.startsWith('[')?'['+raw+']':raw;
+  return address+':'+String(host.port||443);
+}
+function hostCard(host,index,total){
+  const id=esc(String(host.id)),name=esc(String(host.remark||'Хост'));
+  const profile=hostProfile(host.profileId);
+  const assigned=Array.isArray(host.nodes)?host.nodes:[];
+  const resolved=assigned.map(nodeId=>DB.nodes.find(node=>String(node.id)===String(nodeId))).filter(Boolean);
+  const flags=resolved.slice(0,4).map(node=>
+    '<span class="host-card-node" title="'+esc(String(node.name||''))+'">'+flagView(node.flag)+'</span>'
+  ).join('');
+  const more=resolved.length>4?'<span class="host-card-node-extra">+'+(resolved.length-4)+'</span>':'';
+  const endpoint=esc(hostPublicEndpoint(host));
+  const readiness=ENT.hosts.cols[4][1](host);
+  const state=host.disabled?'Выключен':'Включён';
+  const stateClass=host.disabled?'is-disabled':'is-enabled';
+  const toggle='<label class="sw host-card-toggle"><input type="checkbox" data-tg="hosts:'+id+'" '+(host.disabled?'':'checked')+' aria-label="'+state+'"><span></span></label>';
+  return '<article class="host-card" data-host-card-id="'+id+'">'+
+    '<header class="host-card-header"><div class="host-card-identity">'+
+    '<span class="host-card-emblem">'+ic('server')+'</span>'+
+    '<div class="host-card-heading"><button type="button" class="host-card-name" data-ne="hosts:'+id+'" data-no-translate>'+name+'</button>'+
+    '<span class="host-card-state '+stateClass+'">'+ic(host.disabled?'pause':'check')+state+'</span></div></div>'+
+    '<div class="host-card-head-actions">'+toggle+
+    '<details class="host-card-actions"><summary aria-label="Действия с хостом" title="Действия с хостом">'+ic('more')+'</summary>'+
+    '<div class="host-card-menu"><button type="button" class="dg" data-del="hosts:'+id+'">'+ic('trash')+'Удалить</button></div>'+
+    '</details></div></header>'+
+    '<div class="host-card-information">'+
+    '<div class="host-card-detail"><span class="host-card-detail-label">'+ic('globe')+'Адрес</span>'+
+    '<div class="host-card-endpoint"><b data-no-translate title="'+endpoint+'">'+endpoint+'</b>'+
+    '<button type="button" class="host-card-copy" data-host-copy="'+id+'" title="Копировать адрес" aria-label="Копировать адрес">'+ic('copy')+'</button></div></div>'+
+    '<div class="host-card-detail"><span class="host-card-detail-label">'+ic('layers')+'Профиль / inbound</span>'+
+    '<div class="host-card-profile"><b data-no-translate>'+(profile?esc(String(profile.name)):'—')+'</b>'+
+    (host.tag?'<span class="host-card-inbound" data-no-translate>'+chip(esc(String(host.tag)),tcol(host.tag))+'</span>':'')+
+    '</div></div></div>'+
+    '<div class="host-card-meta">'+
+    '<div class="host-card-detail"><span class="host-card-detail-label">'+ic('link')+'Привязки</span>'+
+    '<div class="host-card-assignment">'+(flags||'<span class="host-card-empty">—</span>')+more+
+    '<strong>'+assigned.length+'</strong><small>Ноды</small></div></div>'+
+    '<div class="host-card-detail"><span class="host-card-detail-label">'+ic('activity')+'Готовность</span>'+
+    '<div class="host-card-readiness">'+readiness+'</div></div></div>'+
+    '<footer class="host-card-footer"><div class="host-card-primary-actions">'+
+    '<button type="button" class="gh sm host-card-edit" data-ne="hosts:'+id+'">'+ic('sliders')+'Настроить</button>'+
+    '<button type="button" class="gh sm host-card-duplicate" data-host-duplicate="'+id+'">'+ic('copy')+'Дублировать</button>'+
+    '</div><div class="host-card-order">'+
+    '<button type="button" class="ia" data-mv="hosts:'+id+':-1" '+(index===0?'disabled':'')+' aria-label="Выше" title="Выше">'+ic('up')+'</button>'+
+    '<button type="button" class="ia" data-mv="hosts:'+id+':1" '+(index===total-1?'disabled':'')+' aria-label="Ниже" title="Ниже">'+ic('down')+'</button>'+
+    '</div></footer></article>';
+}
+async function hostsP(){
+  const {items}=await api.list('hosts',{sort:'order'});
+  const active=items.filter(item=>!item.disabled).length;
+  const summary='<div class="host-directory-summary" aria-label="Хосты">'+
+    '<div class="host-summary-metric"><span>'+ic('server')+'Всего хостов</span><strong>'+items.length+'</strong></div>'+
+    '<div class="host-summary-metric is-active"><span>'+ic('check')+'Активных</span><strong>'+active+'</strong></div>'+
+    '<div class="host-summary-metric"><span>'+ic('minus')+'Отключённых</span><strong>'+(items.length-active)+'</strong></div>'+
+    '</div>';
+  const body=items.length?'<div class="host-card-grid" data-ui-layout="cards">'+items.map((host,i)=>hostCard(host,i,items.length)).join('')+'</div>':
+    '<div class="card empty"><b>Хостов пока нет</b><span>Добавьте адреса подключения, которые должны видеть клиенты.</span>'+
+    '<button type="button" class="gh sm" data-ne="hosts">'+ic('plus')+'Хост</button></div>';
+  return ['<section class="host-directory"><div class="host-directory-toolbar"><p>'+ENT.hosts.n+'</p>'+
+    '<button type="button" class="btn sm" data-ne="hosts">'+ic('plus')+'Хост</button></div>'+summary+body+'</section>'];
+}
+
 async function simple(ks){const h=await Promise.all(ks.map(k=>crudCard(k,ks.length>1)));return [h.join('')]}
 /* Host = client-facing endpoint, not a second Xray server configuration.
    Resolve inherited values for preview only; never expose server privateKey. */
@@ -4236,6 +4304,25 @@ document.addEventListener('click',async e=>{
     }
   }
   else if(b=g('[data-host-repair]')){const node=DB.nodes.find(n=>String(n.id)===b.dataset.hostRepair);if(node){toast('Откройте настройки ноды и назначьте нужный XRAY-профиль. Несохранённые поля хоста не сохраняются.');entForm('nodes',node.id);}}
+  else if(b=g('[data-host-copy]')){
+    e.preventDefault();
+    const host=DB.hosts.find(h=>String(h.id)===b.dataset.hostCopy);
+    if(!host)return;
+    const endpoint=hostPublicEndpoint(host);
+    try{
+      if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(endpoint);
+      else{
+        const input=document.createElement('textarea');
+        input.value=endpoint;
+        input.style.position='fixed';
+        input.style.opacity='0';
+        document.body.append(input);input.select();
+        try{if(!document.execCommand('copy'))throw Error('Clipboard unavailable')}
+        finally{input.remove()}
+      }
+      toast('Адрес скопирован');
+    }catch(error){toast('Не удалось скопировать адрес');}
+  }
   else if(b=g('[data-host-duplicate]')){const host=DB.hosts.find(h=>String(h.id)===b.dataset.hostDuplicate);if(host){const {id,...copy}=host;entForm('hosts',null,{...copy,remark:(copy.remark||'Хост')+' · копия',order:DB.hosts.length+1});}}
   else if(b=g('[data-ne]')){const [k,id]=b.dataset.ne.split(':');entForm(k,id)}
   else if(b=g('tr[data-e]')){const [k,id]=b.dataset.e.split(':');entForm(k,id)}
@@ -4723,7 +4810,25 @@ document.addEventListener('change',async e=>{const t=e.target;
     if(t.classList.contains('invalid')){t.value=t.id==='custom-a'?paletteDraft.a:paletteDraft.b;t.classList.remove('invalid');t.setAttribute('aria-invalid','false')}
     return;
   }
-  if(t.dataset.tg){const [k,id]=t.dataset.tg.split(':');await api.update(k,id,{disabled:!t.checked});toast(t.checked?'Включено':'Отключено')}
+  if(t.dataset.tg){
+    const [k,id]=t.dataset.tg.split(':');
+    if(k==='hosts'){
+      const host=DB.hosts.find(item=>String(item.id)===id);
+      if(!host)return;
+      t.disabled=true;
+      try{
+        await api.update('hosts',host.id,{disabled:!t.checked});
+        toast(t.checked?'Включено':'Отключено');
+        if(cur==='hosts')await render(1);
+      }catch(error){
+        t.checked=!host.disabled;
+        toast('Не удалось сохранить: '+(error?.message||'ошибка API'));
+      }finally{if(t.isConnected)t.disabled=false;}
+    }else{
+      await api.update(k,id,{disabled:!t.checked});
+      toast(t.checked?'Включено':'Отключено');
+    }
+  }
   else if(t.dataset.usq){const [ui,si]=t.dataset.usq.split(':').map(Number),u=DB.users.find(x=>x.id==ui);await api.update('users',ui,{squads:t.checked?[...new Set([...u.squads,si])]:u.squads.filter(x=>x!=si)});toast('Доступ обновлён');render(1);userDrawer(ui,'acc')}
   else if(t.dataset.hw){await api.update('users',+t.dataset.hw,{hwid:+t.value||0});toast('Лимит устройств сохранён');render(1);userDrawer(+t.dataset.hw,'acc')}
   else if(t.dataset.hk){const old=DB.set.hooks[t.dataset.hk];DB.set.hooks[t.dataset.hk]=t.checked?1:0;try{await api.saveSettings({hooks:{...DB.set.hooks}});toast(t.checked?'Событие включено':'Событие отключено')}catch(err){DB.set.hooks[t.dataset.hk]=old;t.checked=!!old;toast(err.message)}}

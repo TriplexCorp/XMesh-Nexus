@@ -11,6 +11,14 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    // Host directory cards and clipboard actions.
+    "Всего хостов":"Total hosts",
+    "Активных":"Active",
+    "Отключённых":"Disabled",
+    "Действия с хостом":"Host actions",
+    "Копировать адрес":"Copy address",
+    "Адрес скопирован":"Address copied",
+    "Не удалось скопировать адрес":"Could not copy address",
     // Create-user contact fields: keep dynamic form copy in the central catalog.
     "Например, 123456789":"For example, 123456789",
     "Учётная запись, подключение и контактные данные.":"Account, connection, and contact details.",

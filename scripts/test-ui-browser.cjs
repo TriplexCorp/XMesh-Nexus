@@ -154,7 +154,7 @@ async function main() {
     const profile = await create('profiles',{name:`${prefix} · Профиль`,config:JSON.stringify({inbounds:[{tag:inboundTag,listen:'127.0.0.1',port:28352,protocol:'vless',settings:{decryption:'none',clients:[]},streamSettings:{network:'tcp',security:'tls',tlsSettings:{serverName:'ui.example.invalid',certificates:[{certificateFile:'/etc/xmesh/external/fullchain.pem',keyFile:'/etc/xmesh/external/privkey.pem'}]}}}],outbounds:[{tag:'direct',protocol:'freedom'}]})});
     const node = await create('nodes',{name:`${prefix} · Москва`,addr:'192.0.2.10',flag:'🇵🇱',port:443,xrayLocalPort:13456,mult:1,limit:0,resetDay:1,profileId:profile.id,rotationEnabled:false,rotationIntervalHours:24,rotationIps:'',billingCurrency:'EUR',billingPeriod:'monthly',billingRemindDays:7,billingPrice:0,hosting:'Datagio',tlsManualProvision:true,geoEnabled:true});
     const squad = await create('squads',{name:`${prefix} · Сквад`,desc:'Данные браузерной проверки',inb:[inboundTag]});
-    await create('hosts',{remark:`${prefix} · Хост`,profileId:profile.id,tag:inboundTag,address:'ui.example.invalid',port:443,nodes:[node.id]});
+    const host = await create('hosts',{remark:`${prefix} · Хост`,profileId:profile.id,tag:inboundTag,address:'ui.example.invalid',port:443,nodes:[node.id]});
     const user = await create('users',{username:`${prefix}-client`,squads:[squad.id],hwid:2,created:Date.now(),adminId:1});
     const otherUser = await create('users',{username:`${prefix}-other`,squads:[squad.id],hwid:2,created:Date.now(),adminId:1});
     await create('tpls',{name:`${prefix} · Standard`,limit:30,days:30,strategy:'NO_RESET',hwid:2,squads:[squad.id]});
@@ -256,6 +256,42 @@ async function main() {
         card.starts.forEach((top,i)=>{
           assert(Math.abs(top-first.starts[i])<2,'Squad section '+i+' must align across cards');
         });
+      }
+    });
+
+    await checked('Host directory: cards, layout, active state and existing controls',async()=>{
+      for(const [width,height] of [[1920,1080],[1366,768],[390,844]]){
+        await page.setViewportSize({width,height});
+        await navigate('hosts');
+        const card=page.locator('[data-host-card-id="'+host.id+'"]');
+        assert(await card.isVisible(),'Persisted host must be shown as a card');
+        assert.equal(await page.locator('#view tr[data-e^="hosts:"]').count(),0,'Host table rows must be replaced');
+        assert.equal(await card.locator('.host-card-edit').count(),1,'One-click Host settings must stay available');
+        assert.equal(await card.locator('[data-host-duplicate]').count(),1,'Duplicate action must remain available');
+        assert.equal(await card.locator('[data-host-copy]').count(),1,'Address must offer a direct copy action');
+        assert.equal(await card.locator('[data-mv]').count(),2,'Host order controls must be retained');
+        assert.equal(await card.locator('.host-card-endpoint b').innerText(),'ui.example.invalid:443');
+        assert(await card.locator('.host-card-readiness .chip').isVisible(),'Readiness must use the existing Host validation');
+        const g=await card.evaluate(el=>{
+          const a=el.getBoundingClientRect();
+          const viewport=window.innerWidth;
+          const overflow=[...el.querySelectorAll('button,input,summary')]
+            .filter(e=>e.getClientRects().length)
+            .some(e=>{const b=e.getBoundingClientRect();return b.left<a.left-2||b.right>a.right+2});
+          return{left:a.left,right:a.right,viewport,overflow};
+        });
+        assert(g.left>=0&&g.right<=g.viewport+1,'Host card cannot overflow viewport');
+        assert(!g.overflow,'Host card controls must remain contained');
+        if(width===1920){
+          const toggle=card.locator('input[data-tg^="hosts:"]');
+          const off=page.waitForResponse(r=>r.request().method()==='PATCH'&&new URL(r.url()).pathname==='/api/v1/collections/hosts/'+host.id);
+          await toggle.uncheck();assert((await off).ok(),'Disable must persist via existing API');
+          await page.waitForFunction(id=>!!document.querySelector('[data-host-card-id="'+id+'"] .host-card-state.is-disabled'),host.id);
+          const on=page.waitForResponse(r=>r.request().method()==='PATCH'&&new URL(r.url()).pathname==='/api/v1/collections/hosts/'+host.id);
+          await page.locator('[data-host-card-id="'+host.id+'"] input[data-tg^="hosts:"]').check();
+          assert((await on).ok(),'Enable must persist via existing API');
+          await page.waitForFunction(id=>!!document.querySelector('[data-host-card-id="'+id+'"] .host-card-state.is-enabled'),host.id);
+        }
       }
     });
 
@@ -1919,7 +1955,7 @@ async function main() {
         assert(!JSON.stringify(createdResponse.request().postDataJSON()).includes(privateKey),'Host API payload must contain no server private key');
         assert.equal(createdHost.publicKey,publicKey);assert.equal(createdHost.countryCode,'DE');
         assert.deepEqual(createdHost.nodes,[realityNode.id]);
-        await page.locator(`tr[data-e="hosts:${createdHost.id}"]`).click();
+        await page.locator(`[data-host-card-id="${createdHost.id}"] .host-card-edit`).click();
         assert.equal(await form.locator('[name="remark"]').inputValue(),'🇩🇪 '+realityNode.name,'Edit must restore the saved remark');
         assert.equal(await form.locator('[name="publicKey"]').inputValue(),publicKey);
         await form.locator('[name="remark"]').fill(prefix+' edited host');
@@ -1927,7 +1963,7 @@ async function main() {
         await form.locator('.act button.btn').click();const editedResponse=await editing;
         assert(editedResponse.ok(),'Host edit must submit successfully');const edited=await editedResponse.json();
         assert.equal(edited.remark,prefix+' edited host');assert.equal(edited.publicKey,publicKey);assert.equal(edited.countryCode,'DE');
-        await page.locator(`tr[data-e="hosts:${createdHost.id}"]`).click();
+        await page.locator(`[data-host-card-id="${createdHost.id}"] .host-card-edit`).click();
         assert.equal(await form.locator('[name="remark"]').inputValue(),prefix+' edited host','Saved manual changes must survive reopening');
         await page.keyboard.press('Escape');
       });

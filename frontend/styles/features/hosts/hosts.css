@@ -68,3 +68,112 @@ dialog.host-wide :is([data-host-repair],[data-host-link-profile]){min-height:36p
   .host-connect-fields>*,.host-advanced-fields>*{grid-column:1/-1}
   .host-public-fields>.f>span:first-child,.host-advanced-fields>.f>span:first-child{min-block-size:0}
 }
+
+
+/* Host directory · compact Nexus cards. Shared system tokens own all material
+   choices (solid, glass and raised); this feature only defines composition. */
+.host-directory{display:grid;gap:var(--nx-page-gap);align-content:start;min-width:0}
+.host-directory-toolbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.7rem 1rem;min-width:0}
+.host-directory-toolbar p{margin:0;color:var(--nx-muted);font-size:.86rem}
+.host-directory-toolbar>.btn{flex:none}
+.host-directory-summary{
+  display:flex;align-items:center;flex-wrap:wrap;gap:.7rem 1.8rem;
+  min-width:0;padding:.85rem 1.1rem;
+  border:1px solid var(--nx-border);
+  border-radius:var(--nx-card-radius);
+  background:var(--nx-panel-bg);
+  background-image:var(--nx-panel-image);
+  box-shadow:var(--nx-panel-shadow);
+  backdrop-filter:var(--nx-backdrop);
+}
+.host-summary-metric{display:grid;grid-template-columns:auto;gap:.22rem;min-width:6.5rem}
+.host-summary-metric>span{display:flex;align-items:center;gap:.42rem;color:var(--mu);font-size:.76rem;line-height:1.25}
+.host-summary-metric>span .ic{width:.94rem;height:.94rem;flex:none;color:var(--a)}
+.host-summary-metric.is-active>span .ic{color:var(--ok)}
+.host-summary-metric>strong{padding-left:1.36rem;color:var(--tx);font-size:1.2rem;line-height:1.25;font-weight:780;font-variant-numeric:tabular-nums}
+.host-card-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,30rem),1fr));
+  gap:var(--nx-page-gap);align-items:stretch;min-width:0;
+}
+.host-card{
+  position:relative;display:flex;flex-direction:column;min-width:0;
+  padding:var(--nx-card-pad);gap:.9rem;
+  border:1px solid var(--nx-border-strong);border-radius:var(--nx-card-radius);
+  background:var(--nx-panel-bg);background-image:var(--nx-panel-image);
+  box-shadow:var(--nx-panel-shadow);
+  backdrop-filter:var(--nx-backdrop);
+  -webkit-backdrop-filter:var(--nx-backdrop);
+}
+.host-card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:.8rem;min-width:0;min-height:3.45rem}
+.host-card-identity{display:flex;align-items:flex-start;gap:.75rem;min-width:0;flex:1 1 auto}
+.host-card-emblem{
+  flex:none;display:grid;place-items:center;width:2.7rem;height:2.7rem;
+  border:1px solid color-mix(in srgb,var(--a) 26%,var(--nx-border));
+  border-radius:var(--nx-control-radius);
+  background:color-mix(in srgb,var(--a) 9%,var(--nx-section-bg));color:var(--a);
+}
+.host-card-emblem .ic{width:1.35rem;height:1.35rem}
+.host-card-heading{min-width:0;display:grid;align-content:start;justify-items:start;gap:.37rem}
+.host-card-name{min-width:0;max-width:100%;margin:0;padding:0;border:0;background:transparent;box-shadow:none;color:var(--tx);font:inherit;font-size:1.04rem;font-weight:790;line-height:1.25;text-align:left;overflow-wrap:anywhere;cursor:pointer}
+.host-card-name:hover{color:var(--a)}
+.host-card-state{display:inline-flex;align-items:center;gap:.3rem;padding:.2rem .55rem;border-radius:999px;color:var(--mu);background:var(--nx-section-bg);font-size:.72rem;font-weight:710;line-height:1.3}
+.host-card-state .ic{width:.85rem;height:.85rem;flex:none}
+.host-card-state.is-enabled{color:var(--ok);background:color-mix(in srgb,var(--ok) 11%,var(--nx-section-bg))}
+.host-card-head-actions{display:flex;align-items:center;gap:.5rem;flex:none}
+.host-card-toggle{margin:.55rem .1rem 0 0}
+.host-card-actions{position:relative;z-index:3}
+.host-card-actions summary{display:grid;place-items:center;cursor:pointer;list-style:none;min-width:2.1rem;height:2.1rem;border:1px solid var(--nx-border);border-radius:999px;color:var(--mu);background:var(--nx-control-bg)}
+.host-card-actions summary::-webkit-details-marker{display:none}
+.host-card-actions summary .ic{width:1rem;height:1rem}
+.host-card-actions[open] summary,.host-card-actions summary:hover{color:var(--tx);border-color:var(--nx-border-strong);background:var(--nx-hover-bg)}
+.host-card-menu{position:absolute;right:0;top:calc(100% + .3rem);min-width:10rem;padding:.35rem;border:1px solid var(--nx-border-strong);border-radius:var(--nx-control-radius);background:var(--nx-floating-bg);box-shadow:var(--nx-floating-shadow)}
+.host-card-menu button{width:100%;justify-content:flex-start;min-height:2.2rem;box-shadow:none}
+.host-card-information{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;min-width:0;border:1px solid var(--nx-border);border-radius:var(--nx-control-radius);background:var(--nx-section-bg)}
+.host-card-detail{min-width:0;display:grid;gap:.5rem;align-content:start;padding:.8rem}
+.host-card-information>.host-card-detail+.host-card-detail{border-left:1px solid var(--nx-border)}
+.host-card-detail-label{display:flex;align-items:center;gap:.43rem;color:var(--mu);font-size:.76rem;font-weight:620;line-height:1.3}
+.host-card-detail-label .ic{width:.99rem;height:.99rem;flex:none;color:var(--a)}
+.host-card-endpoint{display:flex;align-items:center;justify-content:space-between;gap:.4rem;min-width:0}
+.host-card-endpoint b{min-width:0;max-width:100%;color:var(--tx);font-size:.82rem;font-weight:710;line-height:1.4;overflow-wrap:anywhere;user-select:text}
+.host-card-copy{display:grid;place-items:center;flex:none;width:1.95rem;height:1.95rem;margin-left:auto;padding:0;border:1px solid transparent;border-radius:var(--nx-control-radius);color:var(--mu);background:transparent;cursor:pointer}
+.host-card-copy .ic{width:1rem;height:1rem}
+.host-card-copy:hover{border-color:var(--nx-border);color:var(--a);background:var(--nx-control-bg)}
+.host-card-profile{display:flex;align-items:center;gap:.38rem .45rem;flex-wrap:wrap;min-width:0}
+.host-card-profile>b{min-width:0;color:var(--tx);font-size:.82rem;font-weight:710;overflow-wrap:anywhere}
+.host-card-inbound{display:inline-flex;min-width:0;max-width:100%}
+.host-card-inbound .chip{max-width:100%;white-space:normal;overflow-wrap:anywhere}
+.host-card-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;min-width:0}
+.host-card-meta>.host-card-detail{padding:.12rem .8rem .15rem}
+.host-card-meta>.host-card-detail+.host-card-detail{border-left:1px solid var(--nx-border)}
+.host-card-assignment{display:flex;align-items:center;gap:.32rem;flex-wrap:wrap;min-width:0;min-height:1.65rem}
+.host-card-node{display:inline-flex;align-items:center;justify-content:center;min-width:1.5rem;height:1.45rem}
+.host-card-node .flag-img{max-height:1.05rem;max-width:1.5rem;object-fit:contain}
+.host-card-node-extra,.host-card-assignment small{color:var(--mu);font-size:.69rem;line-height:1.4}
+.host-card-assignment strong{font-size:.81rem;font-weight:760;color:var(--tx);font-variant-numeric:tabular-nums}
+.host-card-empty{color:var(--mu)}
+.host-card-readiness{display:flex;flex-wrap:wrap;align-items:flex-start;min-width:0}
+.host-card-readiness .chip{max-width:100%;white-space:normal;overflow-wrap:anywhere;line-height:1.3}
+.host-card-footer{display:flex;align-items:center;justify-content:space-between;gap:.65rem;padding-top:.75rem;margin-top:auto;border-top:1px solid var(--nx-border)}
+.host-card-primary-actions,.host-card-order{display:flex;align-items:center;flex-wrap:wrap;gap:.42rem;min-width:0}
+.host-card-primary-actions>.gh{font-size:.77rem;min-height:2.3rem}
+.host-card-order{flex:none}
+.host-card-order .ia{width:2.15rem;height:2.15rem;min-height:2.15rem;padding:0;border-radius:999px}
+.host-card-order .ia:disabled{opacity:.35}
+.host-card :is(.host-card-name,.host-card-copy,.host-card-actions summary,.host-card-order .ia):focus-visible{outline:2px solid var(--nx-focus);outline-offset:2px}
+@media(max-width:620px){
+  .host-directory-summary{gap:.9rem 1rem}
+  .host-summary-metric{min-width:5.7rem}
+  .host-card{gap:.75rem}
+  .host-card-header{gap:.4rem}
+  .host-card-identity{gap:.55rem}
+  .host-card-information{grid-template-columns:minmax(0,1fr)}
+  .host-card-information>.host-card-detail+.host-card-detail{border-left:0;border-top:1px solid var(--nx-border)}
+}
+@media(max-width:440px){
+  .host-card-meta{grid-template-columns:minmax(0,1fr);gap:.65rem}
+  .host-card-meta>.host-card-detail{padding:.1rem}
+  .host-card-meta>.host-card-detail+.host-card-detail{border-left:0}
+  .host-card-footer{flex-wrap:wrap}
+  .host-card-primary-actions{flex:1 1 auto}
+  .host-card-order{margin-left:auto}
+}

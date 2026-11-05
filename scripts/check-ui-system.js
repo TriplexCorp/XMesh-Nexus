@@ -90,4 +90,23 @@ assert.match(squadCards,/grid-row:span 5;grid-template-rows:subgrid/,
 assert.doesNotMatch(squadCards,/\.squad-card-tags\{[^}]*overflow:hidden/,
  'Alignment must not hide inbound tags');
 
+// Host directory uses the canonical feature styles and existing mutations.
+const hostCss=read('frontend/styles/features/hosts/hosts.css');
+assert.match(app,/hosts:\['Хосты',hostsP\]/,
+ 'Hosts must use the card directory, not the old CRUD table');
+assert.match(app,/function hostCard\(host,index,total\)/,
+ 'Host card renderer must preserve record identity and original order');
+assert.match(app,/ENT\.hosts\.cols\[4\]\[1\]\(host\)/,
+ 'Readiness must reuse the existing saved Host validator');
+for(const action of ['data-ne="hosts:', 'data-host-copy=', 'data-host-duplicate=', 'data-mv="hosts:', 'data-tg="hosts:'])
+ assert(app.includes(action),'Host cards must retain the working '+action+' control');
+assert.match(app,/if\(k==='hosts'\)\{[\s\S]*await api\.update\('hosts',host\.id,\{disabled:!t\.checked\}\)/,
+ 'Host switch must persist to the backend and handle errors');
+assert.match(hostCss,/\.host-card-grid\{[\s\S]*grid-template-columns:repeat\(auto-fill/,
+ 'Host cards must form a responsive compact grid');
+assert.match(hostCss,/\.host-card-footer\{[\s\S]*margin-top:auto/,
+ 'Host actions must align at the bottom without empty vertical space');
+assert.match(hostCss,/@media\(max-width:440px\)/,
+ 'Host cards must adapt to narrow mobile layouts');
+
 console.log(`UI architecture: one content-addressed panel graph, three system owners, ${panelFeatureFiles.length} scoped panel features, explicit layout, and dialog safety: PASS`);
