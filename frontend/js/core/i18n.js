@@ -11,6 +11,19 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    "TLS по Security":"TLS from Security",
+    "Не настроено — выберите профиль":"Not configured — select a profile",
+    "Выберите один способ получения сертификата: Let’s Encrypt или внешний сертификат.":"Choose one certificate source: Let's Encrypt or an external certificate.",
+    "В профиле заданы пути сертификата. Наличие файлов на ноде будет проверено отдельно.":"Certificate file paths are set in the profile. Their presence on the node is verified separately.",
+    "В XRAY STUDIO укажите certificateFile и keyFile для каждого TLS inbound.":"Specify certificateFile and keyFile for every TLS inbound in XRAY STUDIO.",
+    "Для автоматического TLS укажите DNS-домен ноды. IP-адрес для сертификата не подходит.":"For automatic TLS, enter the node DNS domain. An IP address is not valid here.",
+    "Для выпуска Let’s Encrypt укажите контактный email ACME.":"Enter an ACME contact email to issue a Let's Encrypt certificate.",
+    "Let’s Encrypt настроен. Выпуск сертификата начнётся при применении профиля на ноде.":"Let's Encrypt is configured. Certificate issuance starts when the node applies the profile.",
+    "Выберите способ получения сертификата: автоматический выпуск или внешний сертификат из профиля.":"Choose automatic certificate issuance or an external certificate from the profile.",
+    "Настройки сохраняются для будущих TLS-профилей.":"Preferences are kept for future TLS profiles.",
+    "Сертификат не требуется для выбранного Security.":"The selected Security does not require a certificate.",
+    "Настроить сертификат · требуется":"Configure certificate · required",
+    "Параметры сертификата":"Certificate settings",
     'Сертификат TLS по Security':'Certificate TLS (profile Security)',
     'ВКЛ — профиль использует TLS':'ON — profile uses TLS',
     'ВЫКЛ — сертификат TLS не используется':'OFF — certificate TLS is not used',
