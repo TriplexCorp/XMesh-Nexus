@@ -40,6 +40,36 @@ assert.equal(mode({inbounds:[{protocol:'trojan',streamSettings:{}}]}),'unconfigu
 for(const contract of ['data-node-tls-effective','data-node-tls-state','data-node-tls-preferences','syncNodeEffectiveTls(dlg.querySelector','form[data-ent="nodes"] [name="profileId"]'])
  assert(ui.includes(contract),'Node TLS UI contract missing: '+contract);
 
+// A TLS-required profile cannot be saved without a real certificate source.
+const readyStart=ui.indexOf('function nodeTlsReadiness(profile,data={}){');
+const readyEnd=ui.indexOf('function syncNodeEffectiveTls(',readyStart);
+assert(readyStart>=0&&readyEnd>readyStart,'Missing certificate readiness helper');
+const readiness=new Function('nodeEffectiveTlsMode','inbs',
+  ui.slice(readyStart,readyEnd)+'return nodeTlsReadiness;')(mode,p=>p.inbounds);
+const makeProfile=(protocol,security,certificates)=>({inbounds:[{protocol,
+  streamSettings:{security,tlsSettings:certificates?{certificates}:{}}}]});
+for(const protocol of ['vless','trojan','vmess','shadowsocks','hysteria','masque','custom']){
+  assert.equal(readiness(makeProfile(protocol,'none'),{addr:'192.0.2.5'}).ready,true,protocol+' NONE must not be blocked');
+  assert.equal(readiness(makeProfile(protocol,'reality'),{addr:'192.0.2.5'}).ready,true,protocol+' REALITY must not be blocked');
+  const missing=readiness(makeProfile(protocol,'tls'),{addr:'192.0.2.5'});
+  assert.equal(missing.ready,false,protocol+' TLS without a certificate must be blocked');
+  assert.match(missing.reason,/DNS-домен/);
+  const acme=readiness(makeProfile(protocol,'tls'),{addr:'192.0.2.5',tlsDomain:'node.example.org',tlsAcmeEmail:'admin@example.org'});
+  assert.equal(acme.ready,true,protocol+' TLS with ACME must be ready to provision');
+  assert.equal(acme.method,'acme');
+}
+const external=[{certificateFile:'/etc/ssl/node.crt',keyFile:'/etc/ssl/node.key'}];
+assert.equal(readiness(makeProfile('trojan','tls',external),{addr:'192.0.2.5',tlsManualProvision:true}).ready,true);
+assert.equal(readiness(makeProfile('trojan','tls'),{addr:'node.example.org',tlsManualProvision:true}).ready,false);
+assert.equal(readiness(makeProfile('vless','tls'),{addr:'node.example.org',tlsAcmeEmail:''}).ready,false);
+assert.equal(readiness(makeProfile('vless','tls'),{tlsDomain:'node.example.org',tlsAcmeEmail:'ops@example.org',tlsAutoProvision:true,tlsManualProvision:true}).ready,false);
+assert.match(ui,/data-node-tls-readiness/);
+assert.match(ui,/data-node-tls-preferences/);
+assert.match(ui,/node-side-stack/);
+assert.match(ui,/certificate\.mode==='on'&&!certificate\.ready/);
+assert(css.includes('dialog.node-wide .node-side-stack {'),'TLS settings must have right-column layout');
+assert(css.includes('.node-tls-popup'),'Certificate setup must be popover-based on desktop');
+
 // Shared dialog safety is independent of a node-specific placement patch.
 assert.match(css,/node-form-layout/,'Node editor must retain its form sections');
 assert.match(css,/node-address-port/,'Address and port remain one field group');
