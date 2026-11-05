@@ -146,8 +146,10 @@ assert.match(userCss,/@container nx-user-extra \(min-width:78rem\)/,
  'Four-column metadata is allowed only when its parent is wide enough');
 assert.match(userCss,/grid-template-areas:"squads squads" "tag hold" "desc desc"/,
  'Squads and notes must span both columns before the full-width layout');
-assert.match(userCss,/\.user-create-hold \.sw\{[\s\S]*width:2\.8rem;[\s\S]*height:1\.6rem/,
- 'On-hold control must retain a real visible switch track instead of collapsing to a dot');
+assert.match(userCss,/#dlg\.user-create-modal \.user-create-hold \.sw>span\{[\s\S]*width:2\.8rem;[\s\S]*height:1\.6rem/,
+ 'On-hold control must retain a compact switch inside a full-width interactive row');
+assert.match(userCss,/#dlg\.user-create-modal \.user-create-desc textarea\{[\s\S]*overflow-x:hidden;/,
+ 'User notes must never introduce a horizontal scroller');
 assert.match(userCss,/\.user-create-section-kicker\{display:none\}/,
  'Duplicate English section kickers must stay visually suppressed');
 assert.match(userCss,/\.user-create-footer-copy\{display:none\}/,
