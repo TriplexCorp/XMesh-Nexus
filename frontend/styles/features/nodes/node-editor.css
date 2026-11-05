@@ -1895,4 +1895,14 @@ dialog.node-wide .node-billing-fields {
   }
 }
 
-
+/* At short desktop heights preserve the no-scroll editor without shrinking
+ * control text or clipping the independent TLS setup dialog. */
+@media (min-width:1151px) and (min-height:701px) and (max-height:800px) {
+  dialog.node-wide > form.box {
+    gap:.3rem;
+    padding-block:.5rem;
+  }
+  dialog.node-wide > form.box > .act {
+    padding-top:.35rem;
+  }
+}
