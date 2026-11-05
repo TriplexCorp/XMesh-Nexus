@@ -983,27 +983,27 @@ dialog#dlg.node-wide > form.box {
   min-height:0;
   overflow:hidden;
 }
-dialog.node-wide :is(.node-editor-heading,.node-tls-setup-heading) {
+dialog.node-wide .node-editor-heading {
   display:flex;
   align-items:flex-start;
   justify-content:space-between;
   gap:1rem;
 }
 dialog.node-wide .node-editor-heading { flex:0 0 auto; padding-bottom:.8rem; }
-dialog.node-wide :is(.node-editor-heading h2,.node-tls-setup-heading h3) {
+dialog.node-wide .node-editor-heading h2 {
   margin:0;
   font-size:1.35rem;
   font-weight:740;
   line-height:1.3;
   letter-spacing:-.025em;
 }
-dialog.node-wide :is(.node-editor-heading p,.node-tls-setup-heading p) {
+dialog.node-wide .node-editor-heading p {
   margin:.3rem 0 0;
   color:var(--mu);
   font-size:.82rem;
   overflow-wrap:anywhere;
 }
-dialog.node-wide :is(.node-editor-heading p,.node-tls-setup-heading p):empty { display:none; }
+dialog.node-wide .node-editor-heading p:empty { display:none; }
 dialog.node-wide .node-editor-tabs {
   flex:0 0 auto;
   display:flex;
@@ -1130,17 +1130,16 @@ dialog.node-wide .node-network-stack {
   border-left:1px solid var(--nx-separator);
 }
 dialog.node-wide .node-tls-settings { min-width:0; }
-dialog.node-wide .node-tls-symbol { color:var(--mu);margin-bottom:.85rem; }
-dialog.node-wide .node-tls-symbol svg { width:1.5rem;height:1.5rem; }
-dialog.node-wide .node-tls-settings h3 { margin:0 0 .85rem;font-size:.95rem;line-height:1.3; }
+dialog.node-wide .node-tls-heading { display:flex;align-items:center;gap:.55rem;margin-bottom:.6rem; }
+dialog.node-wide .node-tls-heading svg { color:var(--mu);flex:none; }
+dialog.node-wide .node-tls-heading h3 { margin:0;font-size:.95rem;line-height:1.3; }
 dialog.node-wide .node-tls-effective { display:flex;align-items:center;gap:.45rem;font-size:.83rem;font-weight:650; }
 dialog.node-wide .node-tls-effective::before { content:'';width:.4rem;height:.4rem;border-radius:50%;background:var(--mu);flex:none; }
 dialog.node-wide .node-tls-effective[data-state=on]::before { background:var(--a); }
-dialog.node-wide .node-tls-readiness { margin:.45rem 0 1rem;font-size:.78rem;line-height:1.5;overflow-wrap:anywhere;color:var(--mu); }
+dialog.node-wide .node-tls-readiness { margin:.45rem 0 0;font-size:.78rem;line-height:1.5;overflow-wrap:anywhere;color:var(--mu); }
 dialog.node-wide .node-tls-readiness[data-mode=on][data-ready=no] { color:var(--er); }
-dialog.node-wide .node-tls-context { margin:.75rem 0 0;color:var(--mu);font-size:.73rem;line-height:1.5; }
-dialog.node-wide .node-tls-configure { display:flex;gap:.5rem;width:100%;font-size:.8rem;padding:.65rem .7rem; }
-dialog.node-wide .node-tls-configure svg:last-child { margin-left:auto; }
+dialog.node-wide .node-tls-readiness[hidden] { display:none; }
+dialog.node-wide .node-tls-context { margin:.35rem 0 .65rem;color:var(--mu);font-size:.73rem;line-height:1.5; }
 dialog.node-wide .node-tls-stored-flags { display:none; }
 dialog.node-wide :is(.node-ip-section,.node-billing-section) { max-width:43rem; }
 dialog.node-wide .node-billing-fields > :has([name=billingProviderUrl]),
@@ -1167,67 +1166,41 @@ dialog.node-wide > form.box > .act {
 }
 dialog.node-wide #fe { flex:0 0 auto;margin:0 0 .6rem; }
 dialog.node-wide #fe:empty { display:none; }
-/* A focused secondary task with stacked fields and native radio semantics. */
-dialog.node-wide dialog.node-tls-setup-dialog {
-  --dialog-width:32rem;
-  box-sizing:border-box;
-  position:fixed;
-  inset:0;
-  margin:auto;
-  width:min(32rem,calc(100vw - 1.5rem));
-  min-width:0;
-  max-width:calc(100vw - 1.5rem);
-  max-height:calc(100dvh - 1.5rem);
-  overflow:auto;
-  padding:0;
-  color:var(--tx);
-  border:1px solid var(--nx-border-strong);
-  border-radius:var(--nx-card-radius);
-  background:var(--nx-dialog-bg);
-  box-shadow:var(--nx-dialog-shadow);
-}
-dialog.node-wide dialog.node-tls-setup-dialog::backdrop { background:var(--xm-modal-dim);backdrop-filter:blur(var(--xm-modal-blur)); }
-dialog.node-wide .node-tls-setup-shell { display:grid;gap:.95rem;padding:1.3rem; }
+/* Certificate controls are expanded in the connection sidebar. */
+dialog.node-wide .node-tls-inline { display:grid;gap:.65rem;min-width:0; }
 dialog.node-wide .node-tls-method { display:grid;gap:.35rem;margin:0;padding:0;min-width:0;border:0; }
-dialog.node-wide .node-tls-method legend { padding:0 0 .7rem;font-size:.8rem;font-weight:650;color:var(--mu); }
+dialog.node-wide .node-tls-method legend { padding:0 0 .45rem;font-size:.8rem;font-weight:650;color:var(--mu); }
 dialog.node-wide .node-tls-method-option {
   display:grid;
-  grid-template-columns:auto minmax(0,1fr) auto;
+  grid-template-columns:auto minmax(0,1fr);
   align-items:center;
-  gap:.85rem;
+  gap:.6rem;
   margin:0;
-  padding:.65rem .8rem;
+  padding:.5rem .6rem;
   border:1px solid transparent;
   border-radius:var(--ui-control-radius);
   cursor:pointer;
 }
 dialog.node-wide .node-tls-method-option:has(input:checked) { background:var(--nx-selected-bg);border-color:var(--nx-border); }
 dialog.node-wide .node-tls-method-option:has(input:focus-visible) { outline:2px solid var(--a);outline-offset:2px; }
-dialog.node-wide .node-tls-method-icon { display:flex;color:var(--mu); }
-dialog.node-wide .node-tls-method-option > span:nth-child(2) { display:grid;gap:.2rem; }
 dialog.node-wide .node-tls-method-option strong { font-size:.87rem;line-height:1.4;font-weight:650; }
-dialog.node-wide .node-tls-method-option small { font-size:.75rem;line-height:1.4;color:var(--mu); }
 dialog.node-wide .node-tls-method-option input[type=radio] { width:1rem;height:1rem;min-width:1rem;min-height:1rem;margin:0;padding:0;accent-color:var(--a); }
-dialog.node-wide .node-tls-acme-fields { display:grid;gap:.8rem; }
+dialog.node-wide .node-tls-acme-fields { display:grid;gap:.65rem; }
 dialog.node-wide :is(.node-tls-acme-fields,.node-tls-external-note)[hidden] { display:none; }
-dialog.node-wide .node-tls-acme-fields .f { display:grid;min-width:0;margin:0;gap:.4rem; }
-dialog.node-wide .node-tls-acme-fields input { height:2.8rem;min-height:2.8rem;width:100%;min-width:0;font-size:.9rem; }
+dialog.node-wide .node-tls-acme-fields .f { display:grid;min-width:0;margin:0;gap:.35rem; }
+dialog.node-wide .node-tls-acme-fields input { box-sizing:border-box;height:2.4rem;min-height:2.4rem;width:100%;min-width:0;font-size:.9rem; }
 dialog.node-wide .node-tls-acme-fields small { font-size:.73rem;line-height:1.4;color:var(--mu); }
 dialog.node-wide .node-tls-external-note { font-size:.83rem;line-height:1.6;overflow-wrap:anywhere; }
 dialog.node-wide .node-tls-external-note p { color:var(--mu);margin:.4rem 0 0; }
 dialog.node-wide .node-tls-setup-feedback[hidden] { display:none; }
 dialog.node-wide .node-tls-setup-feedback { margin:0;font-size:.75rem;line-height:1.5;color:var(--mu); }
 dialog.node-wide .node-tls-setup-feedback[data-ready=no] { color:var(--er); }
-dialog.node-wide .node-tls-setup-actions { display:flex;align-items:center;justify-content:space-between;gap:1rem;padding-top:1rem;border-top:1px solid var(--nx-separator); }
-dialog.node-wide .node-tls-setup-actions span { color:var(--mu);font-size:.73rem;line-height:1.4; }
-dialog.node-wide .node-tls-setup-actions button { min-width:6rem; }
 @media(max-width:760px) {
   dialog#dlg.node-wide > form.box { padding:1rem; }
   dialog.node-wide .node-connection-pane { grid-template-columns:minmax(0,1fr);gap:1.2rem; }
   dialog.node-wide .node-network-stack { border-left:0;border-top:1px solid var(--nx-separator);padding:1.1rem 0 0; }
   dialog.node-wide .node-editor-tabs { gap:.1rem; }
   dialog.node-wide .node-editor-tabs [role=tab] { padding:.6rem .65rem;font-size:.8rem; }
-  dialog.node-wide .node-tls-setup-shell { padding:1.2rem;gap:1.1rem; }
 }
 @media(max-width:440px) {
   dialog.node-wide :is(.node-form-grid,.node-billing-fields) { grid-template-columns:minmax(0,1fr); }
