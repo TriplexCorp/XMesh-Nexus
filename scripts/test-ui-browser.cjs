@@ -1069,6 +1069,52 @@ async function main() {
         const pane=await page.locator(`[data-stats-user-pane="${name}"]`).evaluate(el=>{const r=el.getBoundingClientRect();return{width:r.width,height:r.height,scrollHeight:el.scrollHeight,hidden:el.hidden}});
         assert(!pane.hidden&&pane.height>=180,`Вкладка ${name} не получила видимую рабочую область: ${JSON.stringify(pane)}.`);
       }
+      // Regression: a native showModal() makes body-mounted dropdown options
+      // inert. Verify actual pointer selection inside the modal on both panes.
+      await page.waitForFunction(()=>!!document.querySelector('#stats-user-overview strong'));
+      await page.evaluate(({tag,nodeId,nodeName})=>{
+        for(const [id,value,label] of [
+          ['stats-history-inbound',tag,tag],
+          ['stats-history-node',String(nodeId),nodeName]
+        ]){
+          const select=document.getElementById(id);
+          if(![...select.options].some(option=>option.value===value)){
+            select.add(new Option(label,value));
+            select._xmRefresh?.();
+          }
+        }
+      },{tag:inboundTag,nodeId:node.id,nodeName:node.name});
+      const chooseStatsFilter=async(id,value,apiPart,param)=>{
+        const control=page.locator('#stats-user-modal #'+id);
+        const trigger=page.locator('#stats-user-modal label:has(#'+id+') .xm-period-trigger');
+        await trigger.click();
+        const menu=page.locator('#stats-user-modal .xm-period-menu:not([hidden])');
+        await menu.waitFor({state:'visible'});
+        assert(await menu.evaluate(element=>element.closest('dialog')?.id==='stats-user-modal'),
+          'Statistics select options must live inside the active native dialog, not inert body');
+        const option=menu.locator('.xm-period-option[data-value="'+value+'"]');
+        const requested=page.waitForRequest(request=>{
+          const url=new URL(request.url());
+          return url.pathname.includes('/users/'+user.id+'/traffic/'+apiPart) &&
+            (value?url.searchParams.get(param)===value:!url.searchParams.has(param)) &&
+            request.method()==='GET';
+        });
+        await option.click();
+        await requested;
+        assert.equal(await control.inputValue(),value,'Select must actually update '+id);
+        assert.equal(await trigger.getAttribute('aria-expanded'),'false','Menu must close after selection');
+      };
+      await page.locator('[data-stats-user-tab="inbounds"]').click();
+      await chooseStatsFilter('stats-history-inbound',inboundTag,'history','inboundTag');
+      await chooseStatsFilter('stats-history-node',String(node.id),'history','nodeId');
+      await chooseStatsFilter('stats-history-range','7d','history','range');
+      await page.locator('[data-stats-user-tab="observations"]').click();
+      await chooseStatsFilter('stats-history-inbound','', 'observations','inboundTag');
+      await chooseStatsFilter('stats-history-node','', 'observations','nodeId');
+      await chooseStatsFilter('stats-history-range','1h','observations','range');
+      await chooseStatsFilter('stats-history-inbound',inboundTag,'observations','inboundTag');
+      await chooseStatsFilter('stats-history-node',String(node.id),'observations','nodeId');
+      await chooseStatsFilter('stats-history-range','24h','observations','range');
       await page.locator('[data-stats-user-tab="history"]').click();
       await screenshot(page,'dialog-user-intelligence-history');
       await page.locator('#stats-user-close').click();

@@ -117,7 +117,14 @@ matches(app,/enhanceStatsPeriodSelect\(\$\('#stats-history-inbound'\)\)/);
 matches(app,/enhanceStatsPeriodSelect\(\$\('#stats-history-node'\)\)/);
 matches(app,/select\.dispatchEvent\(new Event\('change',\{bubbles:true\}\)\)/);
 matches(css,/\.xm-period-menu\s*\{/);
-matches(app,/document\.body\.append\(menu\)/);
+matches(app,/const ownerDialog=select\.closest\('dialog'\)/,
+  'Statistics period/select menus must discover their owning native dialog');
+matches(app,/\(ownerDialog\|\|document\.body\)\.append\(menu\)/,
+  'Statistics filter options must stay inside the non-inert modal dialog');
+rejects(app,/^\s*document\.body\.append\(menu\);/m,
+  'Body-portaled Statistics filter menus are inert inside native modals');
+matches(app,/ownerDialog\?\.addEventListener\('close',close\)/,
+  'Modal close must dismiss expanded filter menus');
 matches(app,/menu\.style\.left=rect\.left/);
 matches(css,/\.xm-period-portal\s*\{[\s\S]*?position:fixed[\s\S]*?z-index:var\(--nx-z-tooltip\)/,'Detached period menu must use the shared popover stacking token');
 matches(css,/#stats-history-user::-webkit-inner-spin-button/);

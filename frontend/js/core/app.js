@@ -1159,9 +1159,11 @@ function enhanceStatsPeriodSelect(select){
  const shell=document.createElement('span');shell.className='xm-period-select';
  const trigger=document.createElement('button');trigger.type='button';trigger.className='xm-period-trigger';trigger.setAttribute('aria-haspopup','listbox');trigger.setAttribute('aria-expanded','false');
  const arrow=document.createElement('span');arrow.className='xm-period-chevron';arrow.setAttribute('aria-hidden','true');arrow.textContent='⌄';
- // Mount dropdown under body so cards, tables and overflow containers cannot cover it.
+ // Keep the fixed-position menu inside its owning native modal dialog.
+ // Appending it to document.body makes its options inert while showModal() is active.
+ const ownerDialog=select.closest('dialog');
  const menu=document.createElement('span');menu.className='xm-period-menu xm-period-portal';menu.setAttribute('role','listbox');menu.hidden=true;
- document.body.append(menu);
+ (ownerDialog||document.body).append(menu);
  const close=()=>{menu.hidden=true;trigger.setAttribute('aria-expanded','false')};
  const position=()=>{
   const rect=trigger.getBoundingClientRect(),roomBelow=innerHeight-rect.bottom,menuHeight=Math.min(menu.scrollHeight,Math.min(256,innerHeight*.4));
@@ -1183,6 +1185,8 @@ function enhanceStatsPeriodSelect(select){
   sync();menu.hidden=false;trigger.setAttribute('aria-expanded','true');position();
  };
  menu._xmTrigger=trigger;
+ // A closed modal must never retain an expanded period/inbound/node menu.
+ ownerDialog?.addEventListener('close',close);
  select.parentNode.insertBefore(shell,select);shell.append(select,trigger);
  trigger.addEventListener('click',()=>menu.hidden?open():close());
  trigger.addEventListener('keydown',event=>{if(event.key==='Escape'){close();return}if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();open();(menu.querySelector('[aria-selected="true"]')||menu.querySelector('button'))?.focus()}});

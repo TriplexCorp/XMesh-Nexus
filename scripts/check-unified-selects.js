@@ -24,6 +24,14 @@ assert.match(ui,/if\(active&&active!==instance\)dismiss\(active\)/,'only one pop
 assert.match(ui,/select\.disabled/,'disabled state preserved');
 assert.match(ui,/select\[multiple\]/,'multi-select remains native');
 assert.match(ui,/\.xm-period-select select/,'existing statistics component is excluded');
+assert.match(app,/const ownerDialog=select\.closest\('dialog'\)/,
+ 'Statistics selectors also discover their owning modal dialog');
+assert.match(app,/\(ownerDialog\|\|document\.body\)\.append\(menu\)/,
+ 'Statistics selector menus must not be placed outside active native dialogs');
+assert.doesNotMatch(app,/^\s*document\.body\.append\(menu\);/m,
+ 'Detached statistics menus become inert under showModal');
+assert.match(app,/ownerDialog\?\.addEventListener\('close',close\)/,
+ 'Statistics menu must reset when its modal dialog closes');
 assert.match(ui,/\.country-picker select/,'existing accessible country picker is excluded');
 assert.match(ui,/ArrowDown.*ArrowUp.*Home.*End/,'keyboard arrow/Home/End support');
 assert.match(css,/\.xm-select-popover:popover-open/,'theme popover styling');
