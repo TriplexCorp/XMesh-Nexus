@@ -80,4 +80,14 @@ assert.match(app,/\[15,30,60\]\.includes\(size\)/,
 assert.match(app,/UQ\.size=size;\s*UQ\.page=1;\s*void drawUsers\(\)/,
  'Page-size changes reset page 1 and rerender');
 
+const squadCards=read('frontend/styles/features/squads/squad-cards.css');
+assert.match(squadCards,/\.squad-card-grid\{[\s\S]*align-items:stretch/,
+ 'Squad cards must stretch inside each grid row');
+assert.match(squadCards,/@supports \(grid-template-rows:subgrid\)/,
+ 'Squad cards must share semantic section tracks on modern browsers');
+assert.match(squadCards,/grid-row:span 5;grid-template-rows:subgrid/,
+ 'Subgrid must align all five sections');
+assert.doesNotMatch(squadCards,/\.squad-card-tags\{[^}]*overflow:hidden/,
+ 'Alignment must not hide inbound tags');
+
 console.log(`UI architecture: one content-addressed panel graph, three system owners, ${panelFeatureFiles.length} scoped panel features, explicit layout, and dialog safety: PASS`);

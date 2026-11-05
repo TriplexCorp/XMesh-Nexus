@@ -210,6 +210,55 @@ async function main() {
       }
     });
 
+    await checked('Squad sections: equal height with unequal inbound counts',async()=>{
+      await page.setViewportSize({width:1920,height:1080});
+      await navigate('squads');
+      const positions=await page.locator('.squad-card-grid').evaluate(grid=>{
+        const original=grid.querySelector('.squad-card');
+        if(!original)throw Error('Squad fixture missing');
+        const variants=[
+          ['TLS', 'Длинное описание группы доступа к подключениям Xray', ['hysteria-main','masque-main','shadowsocks-main','trojan-main','vless-main']],
+          ['Vless', 'Группа доступа', ['vless-main']],
+          ['hysteria', 'Ещё одно описание группы доступа', ['hysteria-main']]
+        ];
+        const cards=[original];
+        variants.forEach(([name,description,tags],i)=>{
+          const card=original.cloneNode(true);
+          card.dataset.squadCard='alignment-fixture-'+i;
+          card.querySelector('.squad-card-name').textContent=name;
+          card.querySelector('.squad-card-identity p').textContent=description;
+          const tagContainer=card.querySelector('.squad-card-tags');
+          tagContainer.replaceChildren(...tags.map(value=>{
+            const chip=document.createElement('span');
+            chip.className='chip';
+            chip.textContent=value;
+            return chip;
+          }));
+          grid.append(card);
+          cards.push(card);
+        });
+        const sectionNames=['.squad-card-head','.squad-card-tags','.squad-card-metrics','.squad-card-relations','.squad-card-traffic'];
+        return cards.map(card=>{
+          const box=card.getBoundingClientRect();
+          return{
+            top:box.top,bottom:box.bottom,
+            starts:sectionNames.map(selector=>card.querySelector(selector).getBoundingClientRect().top),
+            tagsVisible:card.querySelector('.squad-card-tags').scrollHeight<=card.querySelector('.squad-card-tags').clientHeight+1
+          };
+        });
+      });
+      assert(positions.every(item=>item.tagsVisible),'All squad inbound tags must remain visible');
+      const first=positions[0];
+      assert(positions.length>=4,'Need multiple squad cards for alignment test');
+      for(const card of positions.slice(1)){
+        assert(Math.abs(card.top-first.top)<2,'Squad cards must share the same row');
+        assert(Math.abs(card.bottom-first.bottom)<2,'Squad cards must end at the same height');
+        card.starts.forEach((top,i)=>{
+          assert(Math.abs(top-first.starts[i])<2,'Squad section '+i+' must align across cards');
+        });
+      }
+    });
+
     await checked('Squad cards: real access mapping, traffic source and responsive grid',async()=>{
       const metrics=await api('GET','/squads/traffic/24h');
       assert.equal(metrics.source,'verified_traffic_deltas');

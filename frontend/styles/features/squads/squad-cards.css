@@ -8,12 +8,30 @@
 .squad-card-grid{
   display:grid;
   grid-template-columns:repeat(auto-fill,minmax(min(100%,24rem),1fr));
-  align-items:start;
+  align-items:stretch;
   gap:var(--nx-page-gap);
   min-width:0;
 }
-.squad-card{position:relative;display:grid;align-content:start;gap:.8rem;min-width:0;padding:var(--nx-card-pad);border:1px solid var(--nx-border-strong);border-radius:var(--nx-card-radius);background:var(--nx-panel-bg);box-shadow:var(--nx-panel-shadow)}
-.squad-card-head{display:grid;grid-template-columns:2.7rem minmax(0,1fr) auto;gap:.7rem;align-items:start;min-width:0}
+.squad-card{
+  position:relative;
+  display:grid;
+  grid-template-rows:minmax(4.35rem,auto) minmax(3.15rem,auto) auto auto minmax(5.5rem,auto);
+  align-content:stretch;
+  gap:.8rem;
+  min-width:0;
+  padding:var(--nx-card-pad);
+  border:1px solid var(--nx-border-strong);
+  border-radius:var(--nx-card-radius);
+  background:var(--nx-panel-bg);
+  box-shadow:var(--nx-panel-shadow);
+}
+/* Shared semantic tracks align cards even when inbound counts differ.
+   The explicit track sizes above remain the fallback without subgrid. */
+@supports (grid-template-rows:subgrid){
+  .squad-card-grid{row-gap:.8rem}
+  .squad-card{grid-row:span 5;grid-template-rows:subgrid}
+}
+.squad-card-head{display:grid;grid-template-columns:2.7rem minmax(0,1fr) auto;gap:.7rem;align-items:start;min-width:0;min-height:4.35rem}
 .squad-card-emblem{display:grid;place-items:center;width:2.7rem;height:2.7rem;border:1px solid var(--nx-border);border-radius:var(--ui-control-radius);color:var(--a);background:var(--nx-section-bg)}
 .squad-card-emblem .ic{width:1.3rem;height:1.3rem}
 .squad-card-identity{min-width:0;align-self:center}
@@ -34,7 +52,7 @@
 .squad-card-menu button.is-danger{color:var(--er)}
 .squad-card-menu .ic{width:.88rem;height:.88rem;flex:none}
 .squad-card-name:focus-visible,.squad-card-actions summary:focus-visible,.squad-card-menu button:focus-visible{outline:2px solid var(--nx-focus);outline-offset:2px}
-.squad-card-tags{display:flex;flex-wrap:wrap;align-items:flex-start;align-content:start;gap:.35rem;min-height:1.7rem;min-width:0}
+.squad-card-tags{display:flex;flex-wrap:wrap;align-items:flex-start;align-content:start;gap:.35rem;min-height:3.15rem;min-width:0}
 .squad-card-tags .chip{max-width:100%;overflow-wrap:anywhere}
 .squad-card-no-tags{color:var(--mu);font-size:.8rem}
 .squad-card-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem;padding:.75rem 0;border-top:1px solid var(--nx-border);border-bottom:1px solid var(--nx-border)}
@@ -48,7 +66,7 @@
 .squad-card-relations .ic{width:.85rem;height:.85rem;color:var(--mu)}
 .squad-card-relations b{color:var(--tx);font-weight:720;font-variant-numeric:tabular-nums}
 .squad-card-relations .squad-card-missing{color:var(--wr)}
-.squad-card-traffic{display:grid;grid-template-columns:minmax(0,1fr) minmax(5rem,.52fr);align-items:center;gap:.4rem .65rem;min-height:5.5rem;padding:.75rem .8rem;border:1px solid var(--nx-border);border-radius:var(--ui-radius);background:var(--nx-section-bg)}
+.squad-card-traffic{display:grid;align-self:stretch;grid-template-columns:minmax(0,1fr) minmax(5rem,.52fr);align-items:center;gap:.4rem .65rem;min-height:5.5rem;padding:.75rem .8rem;border:1px solid var(--nx-border);border-radius:var(--ui-radius);background:var(--nx-section-bg)}
 .squad-card-traffic-value{display:grid;align-content:center;gap:.16rem;min-width:0}
 .squad-card-traffic-value strong{font-size:1.03rem;font-weight:765;color:var(--tx);font-variant-numeric:tabular-nums}
 .squad-card-traffic-value small{font-size:.72rem;color:var(--mu);line-height:1.35}
