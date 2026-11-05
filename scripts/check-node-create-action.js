@@ -138,8 +138,14 @@ assert.match(userCss,/\.user-create-limits-grid\{[\s\S]*grid-template-columns:mi
  'Limits must use readable two-column policy layout instead of four squeezed controls');
 assert.match(userCss,/\.user-create-section-extra\{grid-column:1\/-1/,
  'Metadata section must span the full desktop workspace');
-assert.match(userCss,/grid-template-areas:"squads tag hold desc"/,
- 'Desktop metadata must use one compact horizontal rail');
+assert.match(userCss,/container-type:inline-size;container-name:nx-user-extra/,
+ 'Metadata layout must respond to its actual dialog section width');
+assert.match(userCss,/@container nx-user-extra \(min-width:44rem\)/,
+ 'Metadata must have a two-column layout at intermediate section sizes');
+assert.match(userCss,/@container nx-user-extra \(min-width:78rem\)/,
+ 'Four-column metadata is allowed only when its parent is wide enough');
+assert.match(userCss,/grid-template-areas:"squads squads" "tag hold" "desc desc"/,
+ 'Squads and notes must span both columns before the full-width layout');
 assert.match(userCss,/\.user-create-hold \.sw\{[\s\S]*width:2\.8rem;[\s\S]*height:1\.6rem/,
  'On-hold control must retain a real visible switch track instead of collapsing to a dot');
 assert.match(userCss,/\.user-create-section-kicker\{display:none\}/,
