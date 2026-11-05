@@ -119,6 +119,27 @@ assert.match(app,/def:\(\)=>\(\{port:443,fp:'chrome',order:DB\.hosts\.length\+1/
 assert.match(app,/input\.value=key==='fp'\?'chrome':''/,
  'Resetting Host overrides must leave the single chrome choice selected');
 
+// Unified directory toolbar contract: search left, create right on all sizes.
+assert.match(app,/class="nx-directory-toolbar squad-directory-toolbar">'\+search\+/,
+ 'Squads toolbar must start with its search control');
+assert.match(app,/class="nx-directory-toolbar host-directory-toolbar">'\+search\+/,
+ 'Hosts toolbar must start with its search control');
+assert.match(app,/function applyHostSearch\(root\)/,
+ 'Hosts need an isolated client-side filter');
+assert.match(app,/const searchText=\[host\.remark,host\.address,hostPublicEndpoint\(host\),host\.countryCode,/,
+ 'Host search must index real record fields');
+assert.match(app,/host\.tag,profile\?\.name,\.\.\.resolved\.map\(node=>node\.name\)/,
+ 'Host search must include inbound, profile and assigned nodes');
+assert.match(app,/data-host-search-empty/,
+ 'Host search must distinguish no matches from an empty inventory');
+assert.match(app,/data-host-search-clear/,
+ 'Host search must support clearing without page reload');
+const componentsCss=read('frontend/styles/system/nexus-v3-components.css');
+assert.match(componentsCss,/\.nx-directory-toolbar\{\s*display:grid;grid-template-columns:minmax\(0,19rem\) minmax\(0,1fr\) auto/,
+ 'Both directory toolbars must put the first search track on the left');
+assert.match(componentsCss,/@media\(max-width:850px\)\{[\s\S]*\.nx-directory-toolbar\{grid-template-columns:minmax\(0,1fr\) auto/,
+ 'Search left and create right must hold on mobile too');
+
 const hostCss=read('frontend/styles/features/hosts/hosts.css');
 assert.match(app,/hosts:\['Хосты',hostsP\]/,
  'Hosts must use the card directory, not the old CRUD table');

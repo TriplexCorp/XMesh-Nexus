@@ -209,3 +209,44 @@ dialog.xm-action-confirm{--dialog-width:28rem;border:1px solid var(--nx-border-s
 #xmesh-feedback-toast.toast-error{border-color:var(--er)}
 #xmesh-feedback-toast.toast-error .toast-state-icon{color:var(--er)}
 #xmesh-feedback-toast .toast-action{margin-left:auto;color:var(--a);white-space:nowrap}
+
+
+/* Searchable directory toolbar shared by Squads and Hosts.
+   Search is always the first, leftmost control; create stays right. */
+.nx-directory-toolbar{
+  display:grid;grid-template-columns:minmax(0,19rem) minmax(0,1fr) auto;
+  align-items:center;gap:.6rem .95rem;min-width:0;
+}
+.nx-directory-toolbar-note{margin:0;color:var(--mu);font-size:.79rem;line-height:1.45;overflow-wrap:anywhere}
+.nx-directory-toolbar>.btn{justify-self:end;flex:none}
+.nx-directory-search{position:relative;display:flex;align-items:center;min-width:0;width:100%}
+.nx-directory-search>.ic{position:absolute;left:.72rem;width:1rem;height:1rem;color:var(--mu);pointer-events:none}
+.nx-directory-search input[type=search]:not([type=range]):not([type=checkbox]):not([type=radio]){
+  width:100%;min-width:0;min-height:var(--nx-control-h-sm);padding-left:2.2rem;padding-right:2.05rem;
+  border-radius:var(--nx-control-radius);background:var(--nx-control-bg);color:var(--tx);font-size:.8rem;
+}
+.nx-directory-search input::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none}
+.nx-directory-search-clear{
+  position:absolute;right:.3rem;display:grid;place-items:center;
+  width:1.7rem;height:1.7rem;min-height:0;padding:0;border:0;
+  border-radius:var(--nx-control-radius);background:transparent;color:var(--mu);cursor:pointer;
+}
+.nx-directory-search-clear>.ic{width:.87rem;height:.87rem}
+.nx-directory-search-clear:hover{background:var(--nx-hover-bg);color:var(--tx)}
+.nx-directory-search-clear[hidden]{display:none}
+.nx-directory-search-count{margin:0;color:var(--mu);font-size:.76rem;line-height:1.35}
+.nx-directory-search-count b{color:var(--tx);font-variant-numeric:tabular-nums;font-weight:750}
+.nx-directory-search-count[hidden]{display:none}
+.nx-directory-search-empty{
+  display:grid;justify-items:center;gap:.4rem;padding:1.65rem 1rem;
+  border:1px dashed var(--nx-border-strong);border-radius:var(--nx-card-radius);
+  background:var(--nx-section-bg);text-align:center;
+}
+.nx-directory-search-empty>.ic{width:1.15rem;height:1.15rem;color:var(--mu)}
+.nx-directory-search-empty>b{color:var(--tx);font-size:.89rem}
+.nx-directory-search-empty>span{color:var(--mu);font-size:.78rem}
+.nx-directory-search-empty[hidden]{display:none}
+@media(max-width:850px){
+  .nx-directory-toolbar{grid-template-columns:minmax(0,1fr) auto;row-gap:.45rem}
+  .nx-directory-toolbar-note{grid-column:1/-1;grid-row:2}
+}

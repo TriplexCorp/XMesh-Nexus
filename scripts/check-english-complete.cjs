@@ -18,6 +18,8 @@ assert.equal(api.translate("Не удалось скопировать адре�
 assert.equal(api.translate("Поиск сквадов"),"Search squads");
 assert.equal(api.translate("Поиск по названию, описанию или inbound"),"Search by name, description or inbound");
 assert.equal(api.translate("Попробуйте другой запрос или очистите поиск."),"Try another query or clear the search.");
+assert.equal(api.translate("Поиск хостов"),"Search hosts");
+assert.equal(api.translate("Поиск по названию, адресу, профилю или inbound"),"Search by name, address, profile or inbound");
 assert.equal(api.translate('Версия v26.10.31'),'Version v26.10.31');
 assert.equal(api.translate('3 мин'),'3 min');
 assert.equal(api.translate('1 ч 2 мин'),'1 h 2 min');

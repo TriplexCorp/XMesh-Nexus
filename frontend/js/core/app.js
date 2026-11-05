@@ -2794,14 +2794,15 @@ async function squadsP(){
       '<div class="squad-card-traffic" data-squad-traffic="'+esc(s.id)+'" aria-live="polite"><span class="squad-card-traffic-loading">'+ic('activity')+' Загрузка статистики…</span></div>'+
       '</article>';
   }).join('');
-  const search=items.length?'<div class="squad-directory-search">'+ic('search')+
-    '<input type="search" data-squad-search aria-label="Поиск сквадов" placeholder="Поиск по названию, описанию или inbound" autocomplete="off" spellcheck="false" value="'+esc(squadSearchQuery)+'">'+
-    '<button type="button" class="squad-directory-search-clear" data-squad-search-clear aria-label="Очистить поиск" title="Очистить поиск" '+(squadSearchQuery?'':'hidden')+'>'+ic('x')+'</button></div>':'';
-  const html='<section class="squad-directory"><div class="squad-directory-toolbar"><p>Доступ пользователей к подключениям Xray.</p>'+
-    '<div class="squad-directory-actions">'+search+'<button type="button" class="btn sm" data-ne="squads">'+ic('plus')+' Сквад</button></div></div>'+
-    (items.length?'<p class="squad-directory-search-count" data-squad-search-count hidden><span>Найдено:</span> <b data-squad-search-count-value></b></p>'+
+  const search='<div class="nx-directory-search squad-directory-search">'+ic('search')+
+    '<input type="search" data-squad-search aria-label="Поиск сквадов" placeholder="Поиск по названию, описанию или inbound" autocomplete="off" spellcheck="false" value="'+esc(squadSearchQuery)+'" '+(items.length?'':'disabled')+'>'+
+    '<button type="button" class="nx-directory-search-clear" data-squad-search-clear aria-label="Очистить поиск" title="Очистить поиск" '+(squadSearchQuery?'':'hidden')+'>'+ic('x')+'</button></div>';
+  const html='<section class="squad-directory"><div class="nx-directory-toolbar squad-directory-toolbar">'+search+
+    '<p class="nx-directory-toolbar-note">Доступ пользователей к подключениям Xray.</p>'+
+    '<button type="button" class="btn sm" data-ne="squads">'+ic('plus')+' Сквад</button></div>'+
+    (items.length?'<p class="nx-directory-search-count" data-squad-search-count hidden><span>Найдено:</span> <b data-squad-search-count-value></b></p>'+
     '<div class="squad-card-grid" data-ui-layout="cards">'+cards+'</div>'+
-    '<div class="squad-directory-search-empty" data-squad-search-empty hidden>'+ic('search')+
+    '<div class="nx-directory-search-empty" data-squad-search-empty hidden>'+ic('search')+
     '<b>Совпадений не найдено</b><span>Попробуйте другой запрос или очистите поиск.</span></div>'+
     '<p class="squad-directory-note">'+ic('shield')+' Трафик берётся только из подтверждённых персональных счётчиков Xray за 24 часа. Пользователь в нескольких сквадах учитывается в каждом из них.</p>':
     '<div class="card empty"><b>Сквадов пока нет</b><span>Создайте группу доступа на основе inbound.</span><button class="gh sm" data-ne="squads">'+ic('plus')+' Сквад</button></div>')+
@@ -2823,6 +2824,29 @@ async function squadsP(){
   }];
 }
 
+// Preserve the Host search when a saved record or toggle triggers a rerender.
+let hostSearchQuery='';
+function applyHostSearch(root){
+  const input=root?.querySelector('[data-host-search]');
+  if(!input)return;
+  const query=squadSearchKey(input.value.trim());
+  const cards=[...root.querySelectorAll('.host-card-grid .host-card')];
+  let matches=0;
+  for(const card of cards){
+    const visible=!query||squadSearchKey(card.dataset.hostSearchText).includes(query);
+    card.hidden=!visible;
+    if(visible)matches++;
+  }
+  const clear=root.querySelector('[data-host-search-clear]');
+  if(clear)clear.hidden=!input.value;
+  const count=root.querySelector('[data-host-search-count]');
+  if(count)count.hidden=!query;
+  const value=root.querySelector('[data-host-search-count-value]');
+  if(value)value.textContent=String(matches);
+  const empty=root.querySelector('[data-host-search-empty]');
+  if(empty)empty.hidden=!query||matches>0;
+}
+
 /* Host directory: use existing persisted Host records and readiness contract.
  * No synthetic reachability or traffic indicators are shown. */
 function hostPublicEndpoint(host){
@@ -2840,11 +2864,13 @@ function hostCard(host,index,total){
   ).join('');
   const more=resolved.length>4?'<span class="host-card-node-extra">+'+(resolved.length-4)+'</span>':'';
   const endpoint=esc(hostPublicEndpoint(host));
+  const searchText=[host.remark,host.address,hostPublicEndpoint(host),host.countryCode,
+    host.tag,profile?.name,...resolved.map(node=>node.name)].join(' ');
   const readiness=ENT.hosts.cols[4][1](host);
   const state=host.disabled?'Выключен':'Включён';
   const stateClass=host.disabled?'is-disabled':'is-enabled';
   const toggle='<label class="sw host-card-toggle"><input type="checkbox" data-tg="hosts:'+id+'" '+(host.disabled?'':'checked')+' aria-label="'+state+'"><span></span></label>';
-  return '<article class="host-card" data-host-card-id="'+id+'">'+
+  return '<article class="host-card" data-host-card-id="'+id+'" data-host-search-text="'+esc(searchText)+'">'+
     '<header class="host-card-header"><div class="host-card-identity">'+
     '<span class="host-card-emblem">'+ic('server')+'</span>'+
     '<div class="host-card-heading"><button type="button" class="host-card-name" data-ne="hosts:'+id+'" data-no-translate>'+name+'</button>'+
@@ -2877,7 +2903,11 @@ function hostCard(host,index,total){
 }
 async function hostsP(){
   const {items}=await api.list('hosts',{sort:'order'});
+  if(!items.length)hostSearchQuery='';
   const active=items.filter(item=>!item.disabled).length;
+  const search='<div class="nx-directory-search host-directory-search">'+ic('search')+
+    '<input type="search" data-host-search aria-label="Поиск хостов" placeholder="Поиск по названию, адресу, профилю или inbound" autocomplete="off" spellcheck="false" value="'+esc(hostSearchQuery)+'" '+(items.length?'':'disabled')+'>'+
+    '<button type="button" class="nx-directory-search-clear" data-host-search-clear aria-label="Очистить поиск" title="Очистить поиск" '+(hostSearchQuery?'':'hidden')+'>'+ic('x')+'</button></div>';
   const summary='<div class="host-directory-summary" aria-label="Хосты">'+
     '<div class="host-summary-metric"><span>'+ic('server')+'Всего хостов</span><strong>'+items.length+'</strong></div>'+
     '<div class="host-summary-metric is-active"><span>'+ic('check')+'Активных</span><strong>'+active+'</strong></div>'+
@@ -2886,8 +2916,27 @@ async function hostsP(){
   const body=items.length?'<div class="host-card-grid" data-ui-layout="cards">'+items.map((host,i)=>hostCard(host,i,items.length)).join('')+'</div>':
     '<div class="card empty"><b>Хостов пока нет</b><span>Добавьте адреса подключения, которые должны видеть клиенты.</span>'+
     '<button type="button" class="gh sm" data-ne="hosts">'+ic('plus')+'Хост</button></div>';
-  return ['<section class="host-directory"><div class="host-directory-toolbar"><p>'+ENT.hosts.n+'</p>'+
-    '<button type="button" class="btn sm" data-ne="hosts">'+ic('plus')+'Хост</button></div>'+summary+body+'</section>'];
+  const html='<section class="host-directory"><div class="nx-directory-toolbar host-directory-toolbar">'+search+
+    '<p class="nx-directory-toolbar-note">'+ENT.hosts.n+'</p>'+
+    '<button type="button" class="btn sm" data-ne="hosts">'+ic('plus')+'Хост</button></div>'+summary+
+    (items.length?'<p class="nx-directory-search-count" data-host-search-count hidden><span>Найдено:</span> <b data-host-search-count-value></b></p>':'')+
+    body+
+    (items.length?'<div class="nx-directory-search-empty" data-host-search-empty hidden>'+ic('search')+
+    '<b>Совпадений не найдено</b><span>Попробуйте другой запрос или очистите поиск.</span></div>':'')+'</section>';
+  return [html,()=>{
+    const root=$('.host-directory');
+    if(!root||!items.length)return;
+    const input=root.querySelector('[data-host-search]');
+    input?.addEventListener('input',()=>{hostSearchQuery=input.value;applyHostSearch(root)});
+    input?.addEventListener('keydown',event=>{
+      if(event.key!=='Escape'||!input.value)return;
+      event.preventDefault();hostSearchQuery='';input.value='';applyHostSearch(root);
+    });
+    root.querySelector('[data-host-search-clear]')?.addEventListener('click',()=>{
+      hostSearchQuery='';input.value='';applyHostSearch(root);input.focus();
+    });
+    applyHostSearch(root);
+  }];
 }
 
 async function simple(ks){const h=await Promise.all(ks.map(k=>crudCard(k,ks.length>1)));return [h.join('')]}

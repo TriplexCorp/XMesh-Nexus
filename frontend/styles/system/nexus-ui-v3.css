@@ -1,12 +1,12 @@
 /* Single panel presentation authority: foundation -> components -> shared layouts -> feature geometry. */
 @import url("./nexus-v3-foundation.css?v=b388299054ab");
-@import url("./nexus-v3-components.css?v=f480de496ac1");
+@import url("./nexus-v3-components.css?v=2db99325edc0");
 @import url("./nexus-v3-layout.css?v=aa9c2b3e01cf");
 
 /* Scoped panel features. The public subscription portal has its own document entrypoint. */
 @import url("../features/access/access.css?v=c9b134b8a0bd");
 @import url("../features/balancers/balancers.css?v=5e87988e0c89");
-@import url("../features/hosts/hosts.css?v=c6fe9dac9220");
+@import url("../features/hosts/hosts.css?v=d4885fa871ea");
 @import url("../features/nodes/diagnostics.css?v=88108462f070");
 @import url("../features/nodes/node-dialogs.css?v=56d227cd5200");
 @import url("../features/nodes/node-editor.css?v=9047232b10eb");
@@ -21,7 +21,7 @@
 @import url("../features/settings/settings-updates.css?v=5e16121d5fc4");
 @import url("../features/settings/settings.css?v=699c5cd100d7");
 @import url("../features/squads/squad-editor-premium-v5.css?v=9d0a784986c3");
-@import url("../features/squads/squad-cards.css?v=22d5d3ef350d");
+@import url("../features/squads/squad-cards.css?v=8cbffdd04d6a");
 @import url("../features/statistics/statistics.css?v=356dac2ce47d");
 @import url("../features/subscriptions/subscription-studio.css?v=7e484d60213d");
 @import url("../features/subscriptions/subscription-surface.css?v=dbb0183fb3f2");

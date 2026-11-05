@@ -11,6 +11,9 @@ window.XMeshI18n=(()=>{
   let language='ru';
   try{language=localStorage.getItem(key)==='en'?'en':'ru'}catch(_){}
   const dict=new Map(Object.entries({
+    // Shared directory toolbar: Host search labels.
+    "Поиск хостов":"Search hosts",
+    "Поиск по названию, адресу, профилю или inbound":"Search by name, address, profile or inbound",
     // Squad directory search controls.
     "Поиск сквадов":"Search squads",
     "Поиск по названию, описанию или inbound":"Search by name, description or inbound",

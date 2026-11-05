@@ -73,9 +73,7 @@ dialog.host-wide :is([data-host-repair],[data-host-link-profile]){min-height:36p
 /* Host directory · compact Nexus cards. Shared system tokens own all material
    choices (solid, glass and raised); this feature only defines composition. */
 .host-directory{display:grid;gap:var(--nx-page-gap);align-content:start;min-width:0}
-.host-directory-toolbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.7rem 1rem;min-width:0}
-.host-directory-toolbar p{margin:0;color:var(--nx-muted);font-size:.86rem}
-.host-directory-toolbar>.btn{flex:none}
+.host-card[hidden]{display:none}
 .host-directory-summary{
   display:flex;align-items:center;flex-wrap:wrap;gap:.7rem 1.8rem;
   min-width:0;padding:.85rem 1.1rem;

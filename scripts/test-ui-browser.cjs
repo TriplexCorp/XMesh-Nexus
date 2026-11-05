@@ -295,6 +295,51 @@ async function main() {
       }
     });
 
+    await checked('Hosts directory: left search filters records without changing summary',async()=>{
+      for(const [width,height] of [[1920,1080],[390,844]]){
+        await page.setViewportSize({width,height});
+        await navigate('hosts');
+        const input=page.locator('[data-host-search]');
+        const card=page.locator('[data-host-card-id="'+host.id+'"]');
+        const clear=page.locator('[data-host-search-clear]');
+        const empty=page.locator('[data-host-search-empty]');
+        await input.waitFor({state:'visible'});
+        assert(await card.isVisible(),'Real Host must remain visible before search');
+        const before=await page.locator('.host-card-grid .host-card:visible').count();
+        const totals=await page.locator('.host-directory-summary').innerText();
+        for(const phrase of [host.remark,'UI.EXAMPLE.INVALID',profile.name,inboundTag.toUpperCase(),node.name]){
+          await input.fill(phrase);
+          assert(await card.isVisible(),'Hosts search must match saved metadata: '+phrase);
+          assert.equal(await page.locator('[data-host-search-count-value]').innerText(),'1');
+          assert(!(await empty.isVisible()),'Successful search must not show empty result state');
+        }
+        await input.fill('___no_host_matches_this_phrase___');
+        assert.equal(await page.locator('.host-card-grid .host-card:visible').count(),0);
+        assert(await empty.isVisible(),'Missing Host must show an empty result message');
+        assert.equal(await page.locator('[data-host-search-count-value]').innerText(),'0');
+        assert.equal(await page.locator('.host-directory-summary').innerText(),totals,
+          'Search must not alter the unfiltered inventory totals');
+        await clear.click();
+        assert.equal(await input.inputValue(),'');
+        assert.equal(await page.locator('.host-card-grid .host-card:visible').count(),before);
+        await input.fill('__no_match__');
+        await input.press('Escape');
+        assert.equal(await input.inputValue(),'','Escape must clear Hosts search');
+        assert(await card.isVisible(),'Escape must restore all Hosts');
+        const g=await page.locator('.host-directory-toolbar').evaluate(el=>{
+          const toolbar=el.getBoundingClientRect();
+          const search=el.querySelector('[data-host-search]').getBoundingClientRect();
+          const create=el.querySelector('[data-ne="hosts"]').getBoundingClientRect();
+          return{left:toolbar.left,right:toolbar.right,searchLeft:search.left,searchRight:search.right,
+            createLeft:create.left,createRight:create.right,viewport:window.innerWidth};
+        });
+        assert(g.left>=0&&g.right<=g.viewport+1,'Hosts toolbar must stay inside viewport');
+        assert(Math.abs(g.searchLeft-g.left)<2,'Hosts search must be the first leftmost toolbar control');
+        assert(g.searchRight<g.createLeft,'Hosts creation must stay to the right of search');
+        assert(g.createRight<=g.right+1,'Hosts create must stay inside toolbar');
+      }
+    });
+
     await checked('Squad directory: instant search by name, description and inbound',async()=>{
       for(const [width,height] of [[1920,1080],[390,844]]){
         await page.setViewportSize({width,height});
@@ -327,12 +372,18 @@ async function main() {
         await search.press('Escape');
         assert.equal(await search.inputValue(),'','Escape must clear active search');
         assert(await card.isVisible(),'Escape must restore squad cards');
-        const layout=await page.locator('.squad-directory-actions').evaluate(el=>{
-          const bounds=el.getBoundingClientRect(),input=el.querySelector('[data-squad-search]').getBoundingClientRect();
-          return{bounds:{left:bounds.left,right:bounds.right},input:{left:input.left,right:input.right},viewport:window.innerWidth};
+        const layout=await page.locator('.squad-directory-toolbar').evaluate(el=>{
+          const bounds=el.getBoundingClientRect();
+          const input=el.querySelector('[data-squad-search]').getBoundingClientRect();
+          const create=el.querySelector('[data-ne="squads"]').getBoundingClientRect();
+          return {bounds:{left:bounds.left,right:bounds.right},
+            input:{left:input.left,right:input.right},create:{left:create.left,right:create.right},
+            viewport:window.innerWidth};
         });
-        assert(layout.bounds.left>=0&&layout.bounds.right<=layout.viewport+1,'Search toolbar must fit viewport');
-        assert(layout.input.left>=layout.bounds.left&&layout.input.right<=layout.bounds.right+1,'Search must stay within toolbar');
+        assert(layout.bounds.left>=0&&layout.bounds.right<=layout.viewport+1,'Squad toolbar must fit viewport');
+        assert(Math.abs(layout.input.left-layout.bounds.left)<2,'Squads search must be the leftmost toolbar control');
+        assert(layout.input.right<layout.create.left,'Squads create must remain to the right of search');
+        assert(layout.create.right<=layout.bounds.right+1,'Squads create must remain inside toolbar');
       }
     });
 
