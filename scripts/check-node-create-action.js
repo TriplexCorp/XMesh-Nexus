@@ -154,7 +154,7 @@ assert.match(userCss,/\.user-create-section-kicker\{display:none\}/,
  'Duplicate English section kickers must stay visually suppressed');
 assert.match(userCss,/\.user-create-footer-copy\{display:none\}/,
  'Footer must avoid repeating header explanatory copy');
-assert.match(userCss,/@media\(max-width:680px\)[\s\S]*\.user-create-limits-grid,/,
+assert.match(userCss,/@media\(max-width:680px\)[\s\S]*\.user-create-main-grid,\s*\.user-create-limits-grid\{grid-template-columns:minmax\(0,1fr\)/,
  'Create-user workspace must collapse cleanly on narrow screens');
 assert.match(userCss,/\.user-create-footer-actions\{display:flex/,
  'Create/cancel actions must stay grouped in a dedicated footer');
