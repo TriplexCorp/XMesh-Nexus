@@ -1796,7 +1796,8 @@ async function main() {
       const count=await page.locator('.squad-inbound-row').count();
       assert(count>=6,'Fixture must exercise a populated inbound list');
       const profileFilter=page.locator('[data-squad-profile]');
-      assert(await profileFilter.isVisible(),'XRAY STUDIO profile filter must be visible');
+      await page.locator('.squad-profile-filter .xm-select-trigger').waitFor({state:'visible'});
+      assert(await page.locator('.squad-profile-filter .xm-select-trigger').isVisible(),'Xray profile filter must retain the shared Nexus selector');
       const profileRows=page.locator('[data-squad-option]');
       const tagged=profileRows.filter({has:page.locator('input[name="inb"][value="'+prefix+'-hysteria-main"]')});
       const profileId=String(await tagged.getAttribute('data-squad-profiles')).split('|')[0];
