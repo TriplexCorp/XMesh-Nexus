@@ -5,6 +5,10 @@ const {runtime,candidates}=require('./ci/english-audit.cjs');
 const assert=require('node:assert/strict');
 const api=runtime(),phrases=candidates();const missing=[];
 // Exercise real interpolated API copy, not just untranslated source templates.
+assert.equal(api.translate('Версия v26.10.31'),'Version v26.10.31');
+assert.equal(api.translate('3 мин'),'3 min');
+assert.equal(api.translate('1 ч 2 мин'),'1 h 2 min');
+assert.equal(api.translate('4 д 3 ч'),'4 d 3 h');
 assert.equal(api.translate('Поле hwid должно быть текстом.'),'Field hwid must be text.');
 assert.equal(api.translate('Не удалось сохранить: Поле hwid должно быть текстом.'),'Could not save: Field hwid must be text.');
 assert.equal(api.translate('Неизвестный параметр Xray-core: path'),'Unknown Xray-core setting: path');
