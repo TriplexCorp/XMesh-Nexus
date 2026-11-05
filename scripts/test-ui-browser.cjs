@@ -185,11 +185,18 @@ async function main() {
         await page.waitForFunction(id=>!!document.querySelector(`[data-squad-traffic="${id}"] .squad-card-traffic-value`),squad.id);
         const g=await page.locator('.squad-card-grid').evaluate(el=>{
           const rect=el.getBoundingClientRect();
+          const style=getComputedStyle(el);
+          const gap=parseFloat(style.columnGap)||0;
+          const fontSize=parseFloat(getComputedStyle(document.documentElement).fontSize)||16;
+          const minCardWidth=Math.min(rect.width,24*fontSize);
           return{left:rect.left,right:rect.right,viewport:innerWidth,
-            columns:getComputedStyle(el).gridTemplateColumns.split(' ').length};
+            columns:style.gridTemplateColumns.split(' ').length,
+            expectedColumns:Math.max(1,Math.floor((rect.width+gap+.01)/(minCardWidth+gap)))};
         });
         assert(g.left>=0&&g.right<=g.viewport+1,'Cards must fit horizontally');
-        assert.equal(g.columns,width<860?1:width<1450?2:3,'Squad grid breakpoint must be deterministic');
+        assert.equal(g.columns,g.expectedColumns,'Squad grid columns must follow the available workspace width');
+        if(width===1920)assert(g.columns>=4,'Wide desktop must show at least four compact squad cards');
+        if(width===390)assert.equal(g.columns,1,'Mobile must show one squad card per row');
         await screenshot(page,`squad-cards-${width}x${height}`);
         const edit=card.locator('.squad-card-edit');
         assert(await edit.isVisible(),'Edit must be directly visible, not hidden in an actions menu');
